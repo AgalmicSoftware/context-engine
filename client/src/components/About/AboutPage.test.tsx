@@ -5,16 +5,14 @@ import path from 'path';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import { normalizeScssContract } from 'testUtils/scssContractAssertions';
 
-import AboutPage, {
-  getAboutDemoSessionPath,
-  getConfiguredRecognitionIndividuals,
-} from './AboutPage';
+import AboutPage, { getAboutDemoSessionPath, getConfiguredRecognitionIndividuals } from './AboutPage';
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const ABOUT_DEMO_VIDEO_EMBED_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/preview';
 const ABOUT_DEMO_VIDEO_MEDIA_URL = '/about-demo.mp4';
-const ABOUT_DEMO_VIDEO_THUMBNAIL_URL = 'https://drive.google.com/thumbnail?id=1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf&sz=w1000';
+const ABOUT_DEMO_VIDEO_THUMBNAIL_URL =
+  'https://drive.google.com/thumbnail?id=1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf&sz=w1000';
 
 beforeEach(() => {
   if (typeof ORIGINAL_PUBLIC_URL === 'undefined') {
@@ -25,11 +23,12 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
-const renderAboutPage = () => render(
-  <MemoryRouter>
-    <AboutPage />
-  </MemoryRouter>
-);
+const renderAboutPage = () =>
+  render(
+    <MemoryRouter>
+      <AboutPage />
+    </MemoryRouter>,
+  );
 
 describe('AboutPage', () => {
   it('renders the hero with the expected primary and external links', () => {
@@ -43,30 +42,29 @@ describe('AboutPage', () => {
     const mobileVideoPlayer = within(hero).getByTestId('ce-about-demo-video-player');
 
     expect(hero).toBeInTheDocument();
-    expect(within(hero).getByText(
-      'An open-source toolkit for deliberation, sensemaking, and negotiation (for humans and AI agents)'
-    )).toBeVisible();
-    expect(demoLink).toHaveAttribute(
-      'href',
-      getAboutDemoSessionPath()
-    );
+    expect(
+      within(hero).getByText(
+        'An open-source toolkit for deliberation, sensemaking, and negotiation (for humans and AI agents)',
+      ),
+    ).toBeVisible();
+    expect(demoLink).toHaveAttribute('href', getAboutDemoSessionPath());
     expect(newSessionLink).toHaveAttribute('href', '/new');
     expect(within(hero).getByTestId('ce-about-link-whitepaper')).toBeVisible();
     expect(within(hero).getByTestId('ce-about-link-whitepaper')).toHaveAttribute(
       'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md'
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md',
     );
     expect(within(hero).getByLabelText(/view context engine on github/i)).toBeVisible();
     expect(within(hero).getByTestId('ce-about-link-github')).toHaveAttribute(
       'href',
-      'https://github.com/AgalmicSoftware/context-engine'
+      'https://github.com/AgalmicSoftware/context-engine',
     );
     expect(within(hero).queryByTestId('ce-about-link-contributing')).not.toBeInTheDocument();
     expect(within(hero).queryByTestId('ce-about-link-license')).not.toBeInTheDocument();
     expect(within(hero).queryByTestId('ce-about-link-slides')).not.toBeInTheDocument();
     expect(within(hero).getByRole('link', { name: /Email/i })).toHaveAttribute(
       'href',
-      'mailto:[redacted-email]'
+      'mailto:contextengine@protonmail.com',
     );
     expect(desktopDemoVideo.tagName.toLowerCase()).toBe('iframe');
     expect(desktopDemoVideo).toHaveAttribute('src', ABOUT_DEMO_VIDEO_EMBED_URL);
@@ -148,10 +146,10 @@ describe('AboutPage', () => {
     expect(screen.getByText(/low-dimensional debate/i)).toBeInTheDocument();
     expect(screen.getByText(/durable public map/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/public ai discourse gets flattened into slogans like "accelerate" vs\. "pause,"/i)
+      screen.getByText(/public ai discourse gets flattened into slogans like "accelerate" vs\. "pause,"/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/create a structured public map of ai questions, preferences, and predictions in durable form/i)
+      screen.getByText(/create a structured public map of ai questions, preferences, and predictions in durable form/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/how ce helps/i)).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-about-usecase-ai-discourse')).toHaveAttribute('aria-pressed', 'true');
@@ -161,7 +159,7 @@ describe('AboutPage', () => {
     expect(screen.queryByText(/durable public map/i)).not.toBeInTheDocument();
     expect(within(screen.getByRole('article')).getByText(/^for companies$/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/record predictions, assumptions, and confidence before outcomes are known/i)
+      screen.getByText(/record predictions, assumptions, and confidence before outcomes are known/i),
     ).toBeInTheDocument();
     expect(screen.getByTestId('ce-about-usecase-corporate')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('ce-about-usecase-ai-discourse')).toHaveAttribute('aria-pressed', 'false');
@@ -169,19 +167,21 @@ describe('AboutPage', () => {
     fireEvent.click(screen.getByTestId('ce-about-usecase-cities'));
 
     expect(
-      screen.getByText(/gather input that is more nuanced than a poll and more durable than a hearing/i)
+      screen.getByText(/gather input that is more nuanced than a poll and more durable than a hearing/i),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('ce-about-usecase-conferences'));
 
     expect(
-      screen.getByText(/leave with a durable map of consensus, subgroup differences, and unresolved questions/i)
+      screen.getByText(/leave with a durable map of consensus, subgroup differences, and unresolved questions/i),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('ce-about-usecase-digital-groups'));
 
     expect(
-      screen.getByText(/train representative ai models, and keep community data attributable, licensable, and revocable/i)
+      screen.getByText(
+        /train representative ai models, and keep community data attributable, licensable, and revocable/i,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -245,7 +245,7 @@ describe('AboutPage', () => {
     expect(screen.queryByRole('button', { name: /present functionalities/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^future$/i })).not.toBeInTheDocument();
     expect(
-      screen.queryByText(/zero-knowledge proofs for encrypted predictions and retroactive evaluation/i)
+      screen.queryByText(/zero-knowledge proofs for encrypted predictions and retroactive evaluation/i),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/^Stage 1:$/i)).not.toBeInTheDocument();
 
@@ -253,45 +253,59 @@ describe('AboutPage', () => {
 
     expect(screen.getByText(/^Sessions:$/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/include questions, responses, documents, access gates, and configuration/i)
+      screen.getByText(/include questions, responses, documents, access gates, and configuration/i),
     ).toBeInTheDocument();
     expect(screen.getByText(/^Questions:$/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/supports binary, rating, multiple-choice, and freeform questions/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/supports binary, rating, multiple-choice, and freeform questions/i)).toBeInTheDocument();
     expect(screen.getByText(/^Storage:$/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/responses and documents on arweave plus built-in report views, exports, and address-based comparison tools/i)
+      screen.getByText(
+        /responses and documents on arweave plus built-in report views, exports, and address-based comparison tools/i,
+      ),
     ).toBeInTheDocument();
 
     fireEvent.click(roadmapToggle);
 
     expect(screen.getByText(/^Current Foundations$/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/create sessions with questions, responses, documents, access gates, and configuration from the web app/i)
+      screen.getByText(
+        /create sessions with questions, responses, documents, access gates, and configuration from the web app/i,
+      ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/run binary, rating, multiple-choice, and freeform questions with conviction weighting and comments/i)
+      screen.getByText(
+        /run binary, rating, multiple-choice, and freeform questions with conviction weighting and comments/i,
+      ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/use sbt groups for gated participation, encrypted fields, and sponsored rpc, ai, gas, arweave, and lit resources/i)
+      screen.getByText(
+        /use sbt groups for gated participation, encrypted fields, and sponsored rpc, ai, gas, arweave, and lit resources/i,
+      ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/persist responses and documents on arweave with report views, exports, and address-based comparison tools/i)
+      screen.getByText(
+        /persist responses and documents on arweave with report views, exports, and address-based comparison tools/i,
+      ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/generate questions, transcribe input, summarize clusters, analyze results, and compare positions across wallets/i)
+      screen.getByText(
+        /generate questions, transcribe input, summarize clusters, analyze results, and compare positions across wallets/i,
+      ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/explore shipped demo sessions and reusable ai discourse corpus data from the app and repository/i)
+      screen.getByText(
+        /explore shipped demo sessions and reusable ai discourse corpus data from the app and repository/i,
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText(/^Privacy, Credentials, and Safety$/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/stronger privacy with unlinkable per-response and per-sbt accounts, zk\/fhe aggregation/i)
+      screen.getByText(/stronger privacy with unlinkable per-response and per-sbt accounts, zk\/fhe aggregation/i),
     ).toBeInTheDocument();
     expect(screen.getByText(/zktls group formation for privacy-preserving groups/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/ai whistleblowing toolkit with affiliation proofs, encrypted claims, and conditional timelocks/i)
+      screen.getByText(
+        /ai whistleblowing toolkit with affiliation proofs, encrypted claims, and conditional timelocks/i,
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText(/^Deployment and Resilience$/i)).toBeInTheDocument();
     expect(screen.getByText(/walkaway resilience through ens-hosted frontends/i)).toBeInTheDocument();
@@ -330,21 +344,23 @@ describe('AboutPage', () => {
 
   it('only treats named recognition individuals as renderable configuration', () => {
     expect(getConfiguredRecognitionIndividuals()).toEqual([]);
-    expect(getConfiguredRecognitionIndividuals([
-      null,
-      {},
-      { name: '   ' },
-      { name: 'Audrey Tang', url: 'https://example.com/audrey' },
-    ])).toEqual([
-      { name: 'Audrey Tang', url: 'https://example.com/audrey' },
-    ]);
+    expect(
+      getConfiguredRecognitionIndividuals([
+        null,
+        {},
+        { name: '   ' },
+        { name: 'Audrey Tang', url: 'https://example.com/audrey' },
+      ]),
+    ).toEqual([{ name: 'Audrey Tang', url: 'https://example.com/audrey' }]);
   });
 
   it('uses the configured public demo route when list scope has no concrete session slug', () => {
-    expect(getAboutDemoSessionPath({
-      selectedSessionScope: 'list',
-      selectedSessionSlugs: ['general'],
-    } as any)).toBe('/session/demo-1');
+    expect(
+      getAboutDemoSessionPath({
+        selectedSessionScope: 'list',
+        selectedSessionSlugs: ['general'],
+      } as any),
+    ).toBe('/session/demo-1');
   });
 
   it.each([
@@ -378,44 +394,50 @@ describe('AboutPage', () => {
       /prototype tools for resilient technology, coordination, and governance in live community settings/i,
       null,
     ],
-  ])('shows product-facing recognition modal copy in the %s recognition modal', async (
-    testId: string,
-    firstCopy: RegExp,
-    secondCopy: RegExp,
-    expectedLinkHref: string | null
-  ) => {
-    renderAboutPage();
+  ])(
+    'shows product-facing recognition modal copy in the %s recognition modal',
+    async (testId: string, firstCopy: RegExp, secondCopy: RegExp, expectedLinkHref: string | null) => {
+      renderAboutPage();
 
-    fireEvent.click(screen.getByTestId(testId));
+      fireEvent.click(screen.getByTestId(testId));
 
-    const dialog = screen.getByRole('dialog');
+      const dialog = screen.getByRole('dialog');
 
-    expect(screen.getByText(firstCopy)).toBeInTheDocument();
-    expect(screen.getByText(secondCopy)).toBeInTheDocument();
-    expect(
-      within(dialog).getByRole('button', { name: /close recognition details/i })
-    ).toBeVisible();
-    if (expectedLinkHref) {
-      expect(within(dialog).getByRole('link', { name: /github repo/i })).toHaveAttribute('href', expectedLinkHref);
-    }
+      expect(screen.getByText(firstCopy)).toBeInTheDocument();
+      expect(screen.getByText(secondCopy)).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: /close recognition details/i })).toBeVisible();
+      if (expectedLinkHref) {
+        expect(within(dialog).getByRole('link', { name: /github repo/i })).toHaveAttribute('href', expectedLinkHref);
+      }
 
-    fireEvent.click(within(dialog).getByRole('button', { name: /close recognition details/i }));
+      fireEvent.click(within(dialog).getByRole('button', { name: /close recognition details/i }));
 
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    });
-  });
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+    },
+  );
 
   it('uses large muted OnePageSession-style section headings on the about page', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
     const normalizedScss = normalizeScssContract(scss);
 
-    expect(scss).toMatch(/\.sectionTitle\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?font-size:\s*clamp\(1\.6rem,\s*4vw,\s*2\.1rem\);[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/);
+    expect(scss).toMatch(
+      /\.sectionTitle\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?font-size:\s*clamp\(1\.6rem,\s*4vw,\s*2\.1rem\);[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/,
+    );
     expect(scss).not.toMatch(/&:hover\s+\.sectionTitle\s*{[\s\S]*?#4dffa4;/);
-    expect(scss).toMatch(/\.useCaseLabel\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?color:\s*rgba\(14,\s*20,\s*39,\s*0\.5\);/);
-    expect(scss).toMatch(/\.featureLabel\s*{[\s\S]*?font-size:\s*clamp\(1\.08rem,\s*1\.6vw,\s*1\.22rem\);[\s\S]*?font-weight:\s*700;/);
-    expect(scss).toMatch(/\.featureItem\s*{[\s\S]*?border-radius:\s*16px;[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.05\);/);
-    expect(scss).toMatch(/\.roadmapChecklistItem\s*{[\s\S]*?grid-template-columns:\s*auto minmax\(0,\s*1fr\);[\s\S]*?font-size:\s*0\.98rem;/);
+    expect(scss).toMatch(
+      /\.useCaseLabel\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?color:\s*rgba\(14,\s*20,\s*39,\s*0\.5\);/,
+    );
+    expect(scss).toMatch(
+      /\.featureLabel\s*{[\s\S]*?font-size:\s*clamp\(1\.08rem,\s*1\.6vw,\s*1\.22rem\);[\s\S]*?font-weight:\s*700;/,
+    );
+    expect(scss).toMatch(
+      /\.featureItem\s*{[\s\S]*?border-radius:\s*16px;[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.05\);/,
+    );
+    expect(scss).toMatch(
+      /\.roadmapChecklistItem\s*{[\s\S]*?grid-template-columns:\s*auto minmax\(0,\s*1fr\);[\s\S]*?font-size:\s*0\.98rem;/,
+    );
     expect(normalizedScss).toMatch(/\.roadmapCheck\s*{[\s\S]*?border-radius:\s*999px;[\s\S]*?content:\s*'\\2713';/);
     expect(scss).toMatch(/\.roadmapChecklistItemPlanned\s*{[\s\S]*?color:\s*rgba\(244,\s*247,\s*255,\s*0\.62\);/);
     expect(scss).toMatch(/\.roadmapChecklistItemPlanned\s+\.roadmapCheck\s*{[\s\S]*?background:\s*transparent;/);
@@ -425,28 +447,58 @@ describe('AboutPage', () => {
   it('keeps mobile recognition rows aligned and keeps use-case buttons responsive', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
 
-    expect(scss).toMatch(/@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
-    expect(scss).toMatch(/@media \(min-width:\s*520px\) and \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
-    expect(scss).toMatch(/@media \(max-width:\s*519px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*1fr;/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseDetailRow\s*{[\s\S]*?flex-direction:\s*column;/);
+    expect(scss).toMatch(
+      /@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*520px\) and \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*519px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*1fr;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseDetailRow\s*{[\s\S]*?flex-direction:\s*column;/,
+    );
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeader\s*{[\s\S]*?flex-wrap:\s*wrap;/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeaderAside\s*{[\s\S]*?display:\s*contents;/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummary\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*1 0 100%;/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummaryLogo \+ \.recognitionSummaryLogo\s*{[\s\S]*?margin-left:\s*-6px;/);
-    expect(scss).toMatch(/\.recognitionItem\s*{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionStrip\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*stretch;/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionItem\s*{[\s\S]*?grid-template-columns:\s*46px minmax\(0,\s*1fr\);/);
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeaderAside\s*{[\s\S]*?display:\s*contents;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummary\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*1 0 100%;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummaryLogo \+ \.recognitionSummaryLogo\s*{[\s\S]*?margin-left:\s*-6px;/,
+    );
+    expect(scss).toMatch(
+      /\.recognitionItem\s*{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionStrip\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*stretch;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionItem\s*{[\s\S]*?grid-template-columns:\s*46px minmax\(0,\s*1fr\);/,
+    );
     expect(scss).toMatch(/\.recognitionModalLogo\.recognitionLogoRxc\s*{[\s\S]*?background:\s*linear-gradient/);
     expect(scss).toMatch(/\.mobileDemoVideo\s*{[\s\S]*?display:\s*none;/);
     expect(scss).toMatch(/\.mobileDemoVideoPlayer\s*{[\s\S]*?object-fit:\s*contain;/);
     expect(scss).toMatch(/\.mobileDemoVideoPlayButton\s*{[\s\S]*?touch-action:\s*manipulation;/);
     expect(scss).toMatch(/@media \(max-width:\s*1023px\)\s*{[\s\S]*?\.hero\s*{[\s\S]*?grid-template-columns:\s*1fr;/);
-    expect(scss).toMatch(/@media \(max-width:\s*1023px\)\s*{[\s\S]*?\.heroVideo\s*{[\s\S]*?width:\s*min\(620px,\s*100%\);[\s\S]*?order:\s*-1;/);
-    expect(scss).toMatch(/@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.mainTitle\s*{[\s\S]*?font-size:\s*clamp\(3rem,\s*7vw,\s*4\.4rem\);/);
-    expect(scss).toMatch(/@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.tagline\s*{[\s\S]*?font-size:\s*clamp\(1\.45rem,\s*3\.4vw,\s*1\.85rem\);/);
-    expect(scss).toMatch(/@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.heroPrimaryButton\s*{[\s\S]*?font-size:\s*1\.52rem;/);
+    expect(scss).toMatch(
+      /@media \(max-width:\s*1023px\)\s*{[\s\S]*?\.heroVideo\s*{[\s\S]*?width:\s*min\(620px,\s*100%\);[\s\S]*?order:\s*-1;/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.mainTitle\s*{[\s\S]*?font-size:\s*clamp\(3rem,\s*7vw,\s*4\.4rem\);/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.tagline\s*{[\s\S]*?font-size:\s*clamp\(1\.45rem,\s*3\.4vw,\s*1\.85rem\);/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.heroPrimaryButton\s*{[\s\S]*?font-size:\s*1\.52rem;/,
+    );
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.demoVideo\s*{[\s\S]*?display:\s*none;/);
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.mobileDemoVideo\s*{[\s\S]*?display:\s*grid;/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.mobileDemoVideoPlayer\s*{[\s\S]*?min-height:\s*clamp\(220px,\s*62vw,\s*300px\);/);
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.mobileDemoVideoPlayer\s*{[\s\S]*?min-height:\s*clamp\(220px,\s*62vw,\s*300px\);/,
+    );
   });
 });

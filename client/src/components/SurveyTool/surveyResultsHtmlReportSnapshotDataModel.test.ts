@@ -2,36 +2,35 @@ import {
   normalizeGeneratedSessionResultsAnalysisArtifact,
   type SessionResultsGeneratedAnalysisArtifact,
 } from '../../utilities/sessionResultsExport';
-import {
-  buildSurveyResultsHtmlReportSnapshot,
-} from './surveyResultsHtmlReportSnapshotDataModel';
+import { buildSurveyResultsHtmlReportSnapshot } from './surveyResultsHtmlReportSnapshotDataModel';
 
-const buildArtifact = (): SessionResultsGeneratedAnalysisArtifact => normalizeGeneratedSessionResultsAnalysisArtifact({
-  generatedAt: '2026-07-01T00:00:00.000Z',
-  inputSignature: 'sig',
-  rawOutput: {
-    sections: {
-      argumentMap: {
-        debates: [{ id: 'debate-1' }],
-      },
-      atlas: {
-        edges: [{ id: 'edge-1' }],
-        nodes: [{ id: 'node-1' }, { id: 'node-2' }],
-      },
-      breakdown: {
-        dimensions: [{ id: 'dimension-1' }],
-        groups: [{ id: 'group-1' }],
-        summary: { headline: 'summary' },
-      },
-      riskMatrix: {
-        categories: [{ id: 'risk-1' }],
-        comments: [{ id: 'comment-1' }],
-        heatmap: { high: 1 },
-        scenarioLinks: [{ id: 'scenario-1' }],
+const buildArtifact = (): SessionResultsGeneratedAnalysisArtifact =>
+  normalizeGeneratedSessionResultsAnalysisArtifact({
+    generatedAt: '2026-07-01T00:00:00.000Z',
+    inputSignature: 'sig',
+    rawOutput: {
+      sections: {
+        argumentMap: {
+          debates: [{ id: 'debate-1' }],
+        },
+        atlas: {
+          edges: [{ id: 'edge-1' }],
+          nodes: [{ id: 'node-1' }, { id: 'node-2' }],
+        },
+        breakdown: {
+          dimensions: [{ id: 'dimension-1' }],
+          groups: [{ id: 'group-1' }],
+          summary: { headline: 'summary' },
+        },
+        riskMatrix: {
+          categories: [{ id: 'risk-1' }],
+          comments: [{ id: 'comment-1' }],
+          heatmap: { high: 1 },
+          scenarioLinks: [{ id: 'scenario-1' }],
+        },
       },
     },
-  },
-});
+  });
 
 describe('surveyResultsHtmlReportSnapshotDataModel', () => {
   it('builds a redacted snapshot from question and response counts', () => {
@@ -117,7 +116,9 @@ describe('surveyResultsHtmlReportSnapshotDataModel', () => {
     });
     expect(snapshot.sections.report.available).toBe(true);
     expect(snapshot.sections.report.reason).toBeUndefined();
-    expect(snapshot.sections.argumentMap.reason).toBe('Generate analysis views to derive an argument map from this session data.');
+    expect(snapshot.sections.argumentMap.reason).toBe(
+      'Generate analysis views to derive an argument map from this session data.',
+    );
   });
 
   it('keeps the empty-section reason when no questions or responses are hydrated', () => {
@@ -127,7 +128,9 @@ describe('surveyResultsHtmlReportSnapshotDataModel', () => {
 
     expect(snapshot.sections.report.available).toBe(false);
     expect(snapshot.sections.report.reason).toBe('No filtered questions or responses are hydrated yet.');
-    expect(snapshot.sections.argumentMap.reason).toBe('Generate analysis views to derive an argument map from this session data.');
+    expect(snapshot.sections.argumentMap.reason).toBe(
+      'Generate analysis views to derive an argument map from this session data.',
+    );
   });
 
   it('threads generated analysis artifact sections into the snapshot', () => {

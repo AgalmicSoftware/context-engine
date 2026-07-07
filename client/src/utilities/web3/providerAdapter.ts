@@ -1,13 +1,5 @@
-import {
-  chainCurrency,
-  chainHexId,
-  chainHttpRpc,
-  chainHttpRpcNoPath,
-} from '../../variables/chains.js';
-import {
-  getReadProviderForChain,
-  getReadProviderForGroup,
-} from './rpcProviders.js';
+import { chainCurrency, chainHexId, chainHttpRpc, chainHttpRpcNoPath } from '../../variables/chains.js';
+import { getReadProviderForChain, getReadProviderForGroup } from './rpcProviders.js';
 
 type AnyRecord = Record<string, any>;
 
@@ -46,13 +38,12 @@ type WalletChainRequestOptions = {
   injectedProvider?: AnyRecord | null;
 };
 
-const getWindowLike = (): AnyRecord | null => (
-  typeof window !== 'undefined' ? (window as AnyRecord) : null
-);
+const getWindowLike = (): AnyRecord | null => (typeof window !== 'undefined' ? (window as AnyRecord) : null);
 
-const normalizeProviderName = (providerName: unknown): string => (
-  String(providerName || '').trim().toLowerCase()
-);
+const normalizeProviderName = (providerName: unknown): string =>
+  String(providerName || '')
+    .trim()
+    .toLowerCase();
 
 const errorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message) return error.message;
@@ -111,13 +102,12 @@ export const resolveInjectedProvider = (injectedProvider?: unknown): AdapterResu
 
 export const resolveReadProvider = (options: ResolveReadProviderOptions = {}): AdapterResult => {
   try {
-    const provider = typeof options.readProviderFactory === 'function'
-      ? options.readProviderFactory(options)
-      : (
-        options.groupKeyOrCfg !== undefined
+    const provider =
+      typeof options.readProviderFactory === 'function'
+        ? options.readProviderFactory(options)
+        : options.groupKeyOrCfg !== undefined
           ? getReadProviderForGroup(options.groupKeyOrCfg as any, options.readOptions || null)
-          : getReadProviderForChain(options.chainId)
-      );
+          : getReadProviderForChain(options.chainId);
 
     return {
       ok: true,
@@ -260,13 +250,15 @@ export const addWalletChain = async ({
   try {
     await provider.request({
       method: 'wallet_addEthereumChain',
-      params: [{
-        chainId,
-        chainName: chain.name,
-        nativeCurrency: native,
-        rpcUrls: rpcHttp ? [rpcHttp] : [],
-        blockExplorerUrls: [chain.blockExplorers?.default?.url].filter(Boolean),
-      }],
+      params: [
+        {
+          chainId,
+          chainName: chain.name,
+          nativeCurrency: native,
+          rpcUrls: rpcHttp ? [rpcHttp] : [],
+          blockExplorerUrls: [chain.blockExplorers?.default?.url].filter(Boolean),
+        },
+      ],
     });
     return { ok: true, provider, source: 'injected-wallet', status: 'added' };
   } catch (error) {

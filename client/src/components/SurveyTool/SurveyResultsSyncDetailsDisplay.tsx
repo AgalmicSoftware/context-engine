@@ -21,25 +21,20 @@ type SurveyResultsSyncDetailsDisplayProps = {
   onManualRefresh: () => void;
   syncDetailsStyle: React.CSSProperties;
   syncStatusDisplay: Pick<SurveyResultsSyncStatusDisplayPlan, 'question' | 'response' | 'viewMode'>;
-} & Pick<
-  SurveyResultsSyncTrackRowProps,
-  'miniBarSpinnerStyle' | 'miniProgressStyle' | 'remainingSpinnerStyle'
->;
+} & Pick<SurveyResultsSyncTrackRowProps, 'miniBarSpinnerStyle' | 'miniProgressStyle' | 'remainingSpinnerStyle'>;
 
 const renderSurveyResultsSyncBarText = (
   barText: string,
   showRemainingSpinner: boolean,
-  remainingSpinnerStyle: React.CSSProperties
-): React.ReactNode => (
+  remainingSpinnerStyle: React.CSSProperties,
+): React.ReactNode =>
   showRemainingSpinner ? (
     <>
-      {barText}{' '}
-      <FontAwesomeIcon icon={faSpinner} spin style={remainingSpinnerStyle} />
+      {barText} <FontAwesomeIcon icon={faSpinner} spin style={remainingSpinnerStyle} />
     </>
   ) : (
     barText
-  )
-);
+  );
 
 export const SurveyResultsSyncTrackRow = ({
   label,
@@ -64,11 +59,7 @@ export const SurveyResultsSyncTrackRow = ({
           className={styles.miniProgress}
         />
         <div className={styles.miniBarFraction}>
-          {renderSurveyResultsSyncBarText(
-            track.label,
-            track.showRemainingSpinner,
-            remainingSpinnerStyle
-          )}
+          {renderSurveyResultsSyncBarText(track.label, track.showRemainingSpinner, remainingSpinnerStyle)}
         </div>
       </>
     )}
@@ -83,17 +74,10 @@ const SurveyResultsSyncDetailsDisplay = ({
   syncDetailsStyle,
   syncStatusDisplay,
 }: SurveyResultsSyncDetailsDisplayProps): React.ReactElement => {
-  const {
-    question,
-    response,
-    viewMode,
-  } = syncStatusDisplay;
+  const { question, response, viewMode } = syncStatusDisplay;
 
   return (
-    <div
-      className={styles.syncStatus__details}
-      style={syncDetailsStyle}
-    >
+    <div className={styles.syncStatus__details} style={syncDetailsStyle}>
       <div className={styles.miniBarContainer}>
         {viewMode === 'questions' && (
           <SurveyResultsSyncTrackRow
@@ -113,11 +97,7 @@ const SurveyResultsSyncDetailsDisplay = ({
           track={response}
         />
       </div>
-      <div
-        className={styles.syncStatus__refreshAction}
-        onClick={onManualRefresh}
-        title="Refresh Data from Cache/Chain"
-      >
+      <div className={styles.syncStatus__refreshAction} onClick={onManualRefresh} title="Refresh Data from Cache/Chain">
         <FontAwesomeIcon icon={faSyncAlt} />
         <span>Refresh Now</span>
       </div>

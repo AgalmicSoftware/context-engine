@@ -6,9 +6,15 @@ import {
 
 describe('sbtInstanceListenersMode helpers', () => {
   beforeEach(() => {
-    try { window.history.replaceState({}, '', '/'); } catch (_) {}
-    try { localStorage.removeItem('ce:sbtInstanceListenersMode'); } catch (_) {}
-    try { delete (globalThis as Record<string, unknown>).CE_SBT_INSTANCE_LISTENERS_MODE; } catch (_) {}
+    try {
+      window.history.replaceState({}, '', '/');
+    } catch (_) {}
+    try {
+      localStorage.removeItem('ce:sbtInstanceListenersMode');
+    } catch (_) {}
+    try {
+      delete (globalThis as Record<string, unknown>).CE_SBT_INSTANCE_LISTENERS_MODE;
+    } catch (_) {}
   });
 
   it('normalizes bad inputs to "auto"', () => {

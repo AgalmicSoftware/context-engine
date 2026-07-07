@@ -7,24 +7,28 @@ import {
 describe('surveyResultsQuestionSummaryStatusController', () => {
   describe('buildSurveyResultsQuestionSummaryDisplayPlan', () => {
     it('uses selected question metadata when it is available', () => {
-      expect(buildSurveyResultsQuestionSummaryDisplayPlan({
-        questionId: 'q1',
-        question: {
-          id: 'q1',
-          prompt: 'Explain the tradeoff',
-          type: 'freeform',
-        },
-      })).toEqual({
+      expect(
+        buildSurveyResultsQuestionSummaryDisplayPlan({
+          questionId: 'q1',
+          question: {
+            id: 'q1',
+            prompt: 'Explain the tradeoff',
+            type: 'freeform',
+          },
+        }),
+      ).toEqual({
         metadataMissing: false,
         questionPrompt: 'Explain the tradeoff',
       });
     });
 
     it('falls back to a stable unknown-question prompt when selected metadata is missing', () => {
-      expect(buildSurveyResultsQuestionSummaryDisplayPlan({
-        questionId: 'Q1',
-        question: null,
-      })).toEqual({
+      expect(
+        buildSurveyResultsQuestionSummaryDisplayPlan({
+          questionId: 'Q1',
+          question: null,
+        }),
+      ).toEqual({
         metadataMissing: true,
         questionPrompt: 'Unknown question: Q1',
       });
@@ -35,10 +39,12 @@ describe('surveyResultsQuestionSummaryStatusController', () => {
     it('shows summaries and keeps the display active when entries are present', () => {
       const entries: Array<[string, unknown]> = [['q1', [{ answer: 'yes' }]]];
 
-      expect(buildSurveyResultsQuestionSummariesListDisplayPlan({
-        entries,
-        filterLoading: false,
-      })).toEqual({
+      expect(
+        buildSurveyResultsQuestionSummariesListDisplayPlan({
+          entries,
+          filterLoading: false,
+        }),
+      ).toEqual({
         emptyMessage: 'No results yet.',
         entries,
         errorMessage: '',
@@ -50,10 +56,12 @@ describe('surveyResultsQuestionSummaryStatusController', () => {
     });
 
     it('shows the empty state only when not loading or showing an error', () => {
-      expect(buildSurveyResultsQuestionSummariesListDisplayPlan({
-        entries: [],
-        filterLoading: false,
-      })).toMatchObject({
+      expect(
+        buildSurveyResultsQuestionSummariesListDisplayPlan({
+          entries: [],
+          filterLoading: false,
+        }),
+      ).toMatchObject({
         emptyMessage: 'No results yet.',
         isInert: true,
         showEmptyState: true,
@@ -61,10 +69,12 @@ describe('surveyResultsQuestionSummaryStatusController', () => {
         showSummaries: false,
       });
 
-      expect(buildSurveyResultsQuestionSummariesListDisplayPlan({
-        entries: [],
-        filterLoading: true,
-      })).toMatchObject({
+      expect(
+        buildSurveyResultsQuestionSummariesListDisplayPlan({
+          entries: [],
+          filterLoading: true,
+        }),
+      ).toMatchObject({
         isInert: true,
         showEmptyState: false,
         showError: false,
@@ -73,11 +83,13 @@ describe('surveyResultsQuestionSummaryStatusController', () => {
     });
 
     it('shows an error message instead of the empty state', () => {
-      expect(buildSurveyResultsQuestionSummariesListDisplayPlan({
-        entries: [],
-        errorMessage: 'Results could not be displayed.',
-        filterLoading: false,
-      })).toMatchObject({
+      expect(
+        buildSurveyResultsQuestionSummariesListDisplayPlan({
+          entries: [],
+          errorMessage: 'Results could not be displayed.',
+          filterLoading: false,
+        }),
+      ).toMatchObject({
         errorMessage: 'Results could not be displayed.',
         isInert: true,
         showEmptyState: false,
@@ -87,10 +99,12 @@ describe('surveyResultsQuestionSummaryStatusController', () => {
     });
 
     it('treats invalid entries as an inert empty list', () => {
-      expect(buildSurveyResultsQuestionSummariesListDisplayPlan({
-        entries: null,
-        filterLoading: false,
-      })).toMatchObject({
+      expect(
+        buildSurveyResultsQuestionSummariesListDisplayPlan({
+          entries: null,
+          filterLoading: false,
+        }),
+      ).toMatchObject({
         entries: [],
         isInert: true,
         showEmptyState: true,
@@ -110,19 +124,23 @@ describe('surveyResultsQuestionSummaryStatusController', () => {
       });
       expect(args).toEqual({ aggregatorEntriesCount: 0, filterLoading: false });
 
-      expect(buildSurveyResultsQuestionListDisplayPlan({
-        aggregatorEntriesCount: 0,
-        filterLoading: true,
-      })).toEqual({
+      expect(
+        buildSurveyResultsQuestionListDisplayPlan({
+          aggregatorEntriesCount: 0,
+          filterLoading: true,
+        }),
+      ).toEqual({
         isInert: true,
         shouldRenderQuestionTable: true,
         showEmptyState: false,
       });
 
-      expect(buildSurveyResultsQuestionListDisplayPlan({
-        aggregatorEntriesCount: 2,
-        filterLoading: false,
-      })).toEqual({
+      expect(
+        buildSurveyResultsQuestionListDisplayPlan({
+          aggregatorEntriesCount: 2,
+          filterLoading: false,
+        }),
+      ).toEqual({
         isInert: false,
         shouldRenderQuestionTable: true,
         showEmptyState: false,

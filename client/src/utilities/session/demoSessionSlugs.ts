@@ -18,14 +18,10 @@ export const getDemoSessionSlugs = (slugs: unknown = CE_DEMO_SESSION_SLUGS): str
   return out;
 };
 
-export const getPrimaryDemoSessionSlug = (slugs: unknown = CE_DEMO_SESSION_SLUGS): string => (
-  getDemoSessionSlugs(slugs)[0] || FALLBACK_DEMO_SESSION_SLUG
-);
+export const getPrimaryDemoSessionSlug = (slugs: unknown = CE_DEMO_SESSION_SLUGS): string =>
+  getDemoSessionSlugs(slugs)[0] || FALLBACK_DEMO_SESSION_SLUG;
 
-export const isDemoSessionSlug = (
-  slug: unknown,
-  slugs: unknown = CE_DEMO_SESSION_SLUGS
-): boolean => {
+export const isDemoSessionSlug = (slug: unknown, slugs: unknown = CE_DEMO_SESSION_SLUGS): boolean => {
   const normalized = normalizeDemoSessionSlug(slug);
   if (!normalized) return false;
   return getDemoSessionSlugs(slugs).includes(normalized);

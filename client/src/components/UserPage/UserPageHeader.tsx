@@ -290,13 +290,8 @@ const UserPageHeader = ({
             disabled={compareButtonDisplayState.disabled}
             title={compareButtonDisplayState.title}
           >
-            Compare{' '}
-            {compareButtonDisplayState.shouldRenderCollapseOpenIcon && (
-              <FontAwesomeIcon icon={faChevronUp} />
-            )}
-            {compareButtonDisplayState.shouldRenderCollapseClosedIcon && (
-              <FontAwesomeIcon icon={faChevronDown} />
-            )}
+            Compare {compareButtonDisplayState.shouldRenderCollapseOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
+            {compareButtonDisplayState.shouldRenderCollapseClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
           </button>
 
           <button
@@ -308,7 +303,8 @@ const UserPageHeader = ({
           >
             {analyzeButtonDisplayState.shouldRenderAnalyzing ? (
               <>
-                <FontAwesomeIcon icon={faSpinner} spin />&nbsp;{analyzeButtonDisplayState.label}
+                <FontAwesomeIcon icon={faSpinner} spin />
+                &nbsp;{analyzeButtonDisplayState.label}
               </>
             ) : (
               analyzeButtonDisplayState.label

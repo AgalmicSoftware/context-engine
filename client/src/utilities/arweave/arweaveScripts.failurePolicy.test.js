@@ -52,21 +52,43 @@ describe('arweaveScripts failure policy', () => {
     });
     readSessionScanSlugs.mockReturnValue([]);
     fetchWorkerWithAuth.mockResolvedValue(jsonResp(200, { id: 'tx-default' }));
-    try { delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAYS; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
+    try {
+      delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAYS;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
   });
 
   afterEach(() => {
     jest.clearAllMocks();
-    try { delete globalThis.CE_ARWEAVE_GATEWAYS; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAYS;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS;
+    } catch (_) {}
   });
 
   it('uses short not-found cooldowns for response payload categories', async () => {
@@ -83,7 +105,7 @@ describe('arweaveScripts failure policy', () => {
         retries: 0,
         disableExistencePrecheck: true,
         debugContext: { category: 'question_response_payload' },
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -122,7 +144,7 @@ describe('arweaveScripts failure policy', () => {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         debugContext: { category: 'session_registry_metadata' },
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -170,7 +192,7 @@ describe('arweaveScripts failure policy', () => {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 1,
         bypassCache: true,
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 400,

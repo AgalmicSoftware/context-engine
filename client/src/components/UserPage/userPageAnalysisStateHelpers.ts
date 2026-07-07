@@ -1,8 +1,4 @@
-import {
-  isPlainAnalysisObject,
-  toAnalysisRecord,
-  type UserPageUnknownRecord,
-} from './userPageCoreHelpers';
+import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 
 export type UserPageAnalysisFingerprintInput = {
   address?: unknown;
@@ -148,15 +144,21 @@ export const buildUserPageAnalysisFingerprint = async ({
   model,
   version = 1,
 }: UserPageAnalysisFingerprintInput): Promise<string> => {
-  const canonical = JSON.stringify(sortUserAnalysisKeys({
-    version,
-    userData,
-    address: String(address || '').trim().toLowerCase(),
-    networkId: String(networkId || ''),
-    sessionSlug: String(sessionSlug || ''),
-    provider: String(provider || '').trim().toLowerCase(),
-    model: String(model || '').trim(),
-  }));
+  const canonical = JSON.stringify(
+    sortUserAnalysisKeys({
+      version,
+      userData,
+      address: String(address || '')
+        .trim()
+        .toLowerCase(),
+      networkId: String(networkId || ''),
+      sessionSlug: String(sessionSlug || ''),
+      provider: String(provider || '')
+        .trim()
+        .toLowerCase(),
+      model: String(model || '').trim(),
+    }),
+  );
   return digestUserPageAnalysisCanonicalString(canonical);
 };
 
@@ -177,9 +179,7 @@ export const resolveUserPageAnalysisCacheStatusState = ({
   analysisCachedAt = null,
   analysisServedFromCache = false,
 }: ResolveUserPageAnalysisCacheStatusStateArgs = {}): UserPageAnalysisCacheStatusState => {
-  const analysisCacheAge = analysisServedFromCache
-    ? formatAnalysisCacheAge(analysisCachedAt)
-    : '';
+  const analysisCacheAge = analysisServedFromCache ? formatAnalysisCacheAge(analysisCachedAt) : '';
   return {
     analysisCacheAge,
     shouldRenderAnalysisCacheStatus: !!analysisCacheAge,
@@ -235,11 +235,8 @@ export const buildUserPageTooltipTargetIds = (viewAddress: unknown = ''): UserPa
   const rawAddrSeed = String(viewAddress || 'addr');
   const sanitizedAddrSeed = rawAddrSeed.replace(/[^A-Za-z0-9_-]/g, '');
   const normalizedAddrSeed = sanitizedAddrSeed.toLowerCase();
-  const addrFragment = (
-    normalizedAddrSeed.startsWith('0x')
-      ? normalizedAddrSeed.slice(2)
-      : normalizedAddrSeed
-  ).slice(0, 6) || 'addr';
+  const addrFragment =
+    (normalizedAddrSeed.startsWith('0x') ? normalizedAddrSeed.slice(2) : normalizedAddrSeed).slice(0, 6) || 'addr';
   return {
     addrFragment,
     analyzeBtnWrapId: `analyzeBtnWrap_${addrFragment}`,
@@ -341,18 +338,11 @@ export const buildUserPageAnalysisErrorStatePatch = ({
 export const extractUserPageAnalysisAdditionalComment = (value: unknown): string | null => {
   const record = toAnalysisRecord(value);
   if (!Object.keys(record).length) return null;
-  const candidates = [
-    record.additionalComment,
-    record.additionalComments,
-    record.comment,
-    record.comments,
-  ];
+  const candidates = [record.additionalComment, record.additionalComments, record.comment, record.comments];
   for (const candidate of candidates) {
     if (candidate == null) continue;
     const candidateRecord = toAnalysisRecord(candidate);
-    const val = typeof candidate === 'string'
-      ? candidate
-      : (candidateRecord.value ?? candidateRecord.text ?? null);
+    const val = typeof candidate === 'string' ? candidate : (candidateRecord.value ?? candidateRecord.text ?? null);
     const encrypted = typeof candidate === 'object' && candidateRecord.encrypted === true;
     if (val && val !== '*' && !encrypted && String(val).trim() !== '*') return String(val);
   }
@@ -371,8 +361,7 @@ export const extractUserPageAnalysisImportance = (value: unknown): unknown => {
     answer.conviction ??
     answer.importance;
   const candidateRecord = toAnalysisRecord(candidate);
-  return (
-    candidate === '*' ||
-    (candidate && typeof candidate === 'object' && candidateRecord.encrypted === true)
-  ) ? undefined : candidate;
+  return candidate === '*' || (candidate && typeof candidate === 'object' && candidateRecord.encrypted === true)
+    ? undefined
+    : candidate;
 };

@@ -5,11 +5,14 @@ import {
 } from '../sessionWizardRouteState';
 import useSessionWizardNewSessionBanner from './useSessionWizardNewSessionBanner.js';
 
-const renderBanner = (overrides = {}) => renderHook(() => useSessionWizardNewSessionBanner({
-  hasSponsoredBundleLink: false,
-  newSessionBannerDismissalContextKey: '/new::plain',
-  ...overrides,
-}));
+const renderBanner = (overrides = {}) =>
+  renderHook(() =>
+    useSessionWizardNewSessionBanner({
+      hasSponsoredBundleLink: false,
+      newSessionBannerDismissalContextKey: '/new::plain',
+      ...overrides,
+    }),
+  );
 
 describe('useSessionWizardNewSessionBanner', () => {
   beforeEach(() => {

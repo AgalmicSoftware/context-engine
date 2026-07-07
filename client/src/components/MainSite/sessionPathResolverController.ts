@@ -71,7 +71,7 @@ const getRetryDelayMs = (count: number): number => {
 const readResolveStatus = (
   controller: SessionPathResolverControllerInternal,
   kind: ResolveKind,
-  key: string
+  key: string,
 ): ResolveStatus => {
   if (!key) return buildEmptyResolveStatus();
 
@@ -80,9 +80,7 @@ const readResolveStatus = (
   const retryCount = Number(controller._errorCounts[kind][key] || 0);
   const lastErrorTsRaw = controller._lastErrors[kind][key]?.ts;
   const lastErrorTsNum = Number(lastErrorTsRaw || 0);
-  const lastErrorTs = Number.isFinite(lastErrorTsNum) && lastErrorTsNum > 0
-    ? lastErrorTsNum
-    : null;
+  const lastErrorTs = Number.isFinite(lastErrorTsNum) && lastErrorTsNum > 0 ? lastErrorTsNum : null;
 
   return {
     hasAttempted: !!attempts[key],
@@ -92,11 +90,7 @@ const readResolveStatus = (
   };
 };
 
-const clearRetryTimer = (
-  controller: SessionPathResolverControllerInternal,
-  kind: ResolveKind,
-  key: string
-): void => {
+const clearRetryTimer = (controller: SessionPathResolverControllerInternal, kind: ResolveKind, key: string): void => {
   const timers = controller._retryTimers[kind];
   if (!timers[key]) return;
   clearTimeout(timers[key]);
@@ -107,7 +101,7 @@ const clearResolveErrorState = (
   controller: SessionPathResolverControllerInternal,
   kind: ResolveKind,
   key: string,
-  host: SessionPathResolverHost
+  host: SessionPathResolverHost,
 ): void => {
   try {
     delete controller._errorCounts[kind][key];
@@ -124,7 +118,7 @@ const recordResolveFailure = (
   key: string,
   error: unknown,
   host: SessionPathResolverHost,
-  retry: () => void
+  retry: () => void,
 ): void => {
   if (controller._destroyed) return;
   try {
@@ -158,14 +152,10 @@ const recordResolveFailure = (
 
 const fetchSessionFromRegistryAcrossChains = async (
   host: SessionPathResolverHost,
-  request: { sessionId?: string; slug?: string }
+  request: { sessionId?: string; slug?: string },
 ): Promise<{ resolved: boolean; lastErr: unknown }> => {
-  const fetchSessionFromRegistry = (
-    sessionRegistryUtils.fetchSessionFromRegistry || fetchSessionFromRegistryFn
-  );
-  const upsertSessionRegistryCache = (
-    sessionRegistryUtils.upsertSessionRegistryCache || upsertSessionRegistryCacheFn
-  );
+  const fetchSessionFromRegistry = sessionRegistryUtils.fetchSessionFromRegistry || fetchSessionFromRegistryFn;
+  const upsertSessionRegistryCache = sessionRegistryUtils.upsertSessionRegistryCache || upsertSessionRegistryCacheFn;
   const lit = getGlobalLitHooks();
   const chainIds = getSessionRegistryChainIds();
   let resolved = false;
@@ -195,10 +185,7 @@ const fetchSessionFromRegistryAcrossChains = async (
   return { resolved, lastErr };
 };
 
-const maybeCanonicalizeSessionIdRoute = (
-  host: SessionPathResolverHost,
-  sessionId: string
-): void => {
+const maybeCanonicalizeSessionIdRoute = (host: SessionPathResolverHost, sessionId: string): void => {
   const resolvedCfg = sessionRegistryStore.getSessionConfigById(sessionId);
   if (!resolvedCfg || typeof window === 'undefined') return;
 
@@ -208,12 +195,10 @@ const maybeCanonicalizeSessionIdRoute = (
   const currentSessionId = sessionRegistryUtils.formatSessionId(currentToken);
   if (!currentSessionId || currentSessionId !== sessionId) return;
 
-  const currentParts = String(normalizedCurrentPath || '').split('/').filter(Boolean);
-  const isDocsSubroute = (
-    currentParts.length >= 3 &&
-    currentParts[0] === 'session' &&
-    currentParts[2] === 'docs'
-  );
+  const currentParts = String(normalizedCurrentPath || '')
+    .split('/')
+    .filter(Boolean);
+  const isDocsSubroute = currentParts.length >= 3 && currentParts[0] === 'session' && currentParts[2] === 'docs';
   if (isDocsSubroute) return;
 
   const resolvedSlug = normalizeSessionSlug(resolvedCfg.slug || '');
@@ -225,9 +210,7 @@ const maybeCanonicalizeSessionIdRoute = (
   window.history.replaceState({}, '', nextUrl);
 };
 
-export function createSessionPathResolverController(
-  host: SessionPathResolverHost
-): SessionPathResolverController {
+export function createSessionPathResolverController(host: SessionPathResolverHost): SessionPathResolverController {
   const controller = {
     _destroyed: false,
     _pendingIdResolves: new Set<string>(),

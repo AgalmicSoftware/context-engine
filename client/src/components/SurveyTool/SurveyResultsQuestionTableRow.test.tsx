@@ -31,7 +31,7 @@ describe('SurveyResultsQuestionTableRow', () => {
             styleMap={styleMap}
           />
         </tbody>
-      </table>
+      </table>,
     );
 
     expect(screen.getByText('First prompt')).toHaveClass('promptColumn');
@@ -62,7 +62,7 @@ describe('SurveyResultsQuestionTableRow', () => {
             styleMap={styleMap}
           />
         </tbody>
-      </table>
+      </table>,
     );
 
     expect(screen.getByText('(No prompt)')).toBeInTheDocument();

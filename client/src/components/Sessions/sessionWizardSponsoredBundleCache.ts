@@ -35,10 +35,9 @@ const base64ToBytes = (value = ''): Uint8Array => {
 };
 
 const generateSessionWizardSponsoredBundleTabId = (): string => {
-  const cryptoApi = (
+  const cryptoApi =
     (typeof globalThis !== 'undefined' && globalThis.crypto ? globalThis.crypto : null) ||
-    (typeof window !== 'undefined' && window.crypto ? window.crypto : null)
-  );
+    (typeof window !== 'undefined' && window.crypto ? window.crypto : null);
   if (cryptoApi) {
     const bytes = new Uint8Array(8);
     cryptoApi.getRandomValues(bytes);
@@ -87,7 +86,7 @@ const openSessionWizardSponsoredBundleKeyDb = (): Promise<IDBDatabase> => {
 
     const request = indexedDB.open(
       SESSION_WIZARD_SPONSORED_BUNDLE_KEY_DB_NAME,
-      SESSION_WIZARD_SPONSORED_BUNDLE_KEY_DB_VERSION
+      SESSION_WIZARD_SPONSORED_BUNDLE_KEY_DB_VERSION,
     );
 
     request.onerror = () => {
@@ -120,9 +119,9 @@ const openSessionWizardSponsoredBundleKeyDb = (): Promise<IDBDatabase> => {
   return sessionWizardSponsoredBundleKeyDbPromise;
 };
 
-const runSessionWizardSponsoredBundleKeyDbTx = async <T,>(
+const runSessionWizardSponsoredBundleKeyDbTx = async <T>(
   mode: IDBTransactionMode,
-  action: (store: IDBObjectStore) => IDBRequest<T> | void
+  action: (store: IDBObjectStore) => IDBRequest<T> | void,
 ): Promise<T | undefined> => {
   const db = await openSessionWizardSponsoredBundleKeyDb();
   return new Promise((resolve, reject) => {
@@ -143,7 +142,8 @@ const runSessionWizardSponsoredBundleKeyDbTx = async <T,>(
         request.onsuccess = () => {
           requestResult = request.result;
         };
-        request.onerror = () => finish(() => reject(request.error || tx.error || new Error('IndexedDB request failed')));
+        request.onerror = () =>
+          finish(() => reject(request.error || tx.error || new Error('IndexedDB request failed')));
       }
 
       // IndexedDB request success only means the operation was queued; the write is
@@ -161,9 +161,8 @@ export const __test__runSessionWizardSponsoredBundleKeyDbTx = runSessionWizardSp
 
 const readSessionWizardSponsoredBundleCacheKeyFromIndexedDb = async (): Promise<CryptoKey | null> => {
   try {
-    return await runSessionWizardSponsoredBundleKeyDbTx(
-      'readonly',
-      (store) => store.get(getSessionWizardSponsoredBundleCacheKeyDbEntry())
+    return await runSessionWizardSponsoredBundleKeyDbTx('readonly', (store) =>
+      store.get(getSessionWizardSponsoredBundleCacheKeyDbEntry()),
     );
   } catch (_) {
     return null;
@@ -173,9 +172,8 @@ const readSessionWizardSponsoredBundleCacheKeyFromIndexedDb = async (): Promise<
 const writeSessionWizardSponsoredBundleCacheKeyToIndexedDb = async (key: CryptoKey | null = null): Promise<boolean> => {
   if (!key) return false;
   try {
-    await runSessionWizardSponsoredBundleKeyDbTx(
-      'readwrite',
-      (store) => store.put(key, getSessionWizardSponsoredBundleCacheKeyDbEntry())
+    await runSessionWizardSponsoredBundleKeyDbTx('readwrite', (store) =>
+      store.put(key, getSessionWizardSponsoredBundleCacheKeyDbEntry()),
     );
     return true;
   } catch (_) {
@@ -185,9 +183,8 @@ const writeSessionWizardSponsoredBundleCacheKeyToIndexedDb = async (key: CryptoK
 
 const deleteSessionWizardSponsoredBundleCacheKeyFromIndexedDb = async () => {
   try {
-    await runSessionWizardSponsoredBundleKeyDbTx(
-      'readwrite',
-      (store) => store.delete(getSessionWizardSponsoredBundleCacheKeyDbEntry())
+    await runSessionWizardSponsoredBundleKeyDbTx('readwrite', (store) =>
+      store.delete(getSessionWizardSponsoredBundleCacheKeyDbEntry()),
     );
   } catch (error) {
     log.warn('SessionWizard: fallback', error);
@@ -207,11 +204,7 @@ const getSessionWizardSponsoredBundleCacheKey = async (): Promise<CryptoKey | nu
         await deleteSessionWizardSponsoredBundleCacheKeyFromIndexedDb();
       }
 
-      const key = await cryptoApi.subtle.generateKey(
-        { name: 'AES-GCM', length: 256 },
-        false,
-        ['encrypt', 'decrypt']
-      );
+      const key = await cryptoApi.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
       await writeSessionWizardSponsoredBundleCacheKeyToIndexedDb(key);
       return key;
     })().catch((error) => {
@@ -234,11 +227,7 @@ const encryptSessionWizardSponsoredBundleCachePayload = async (payload: AnyRecor
   if (!cryptoApi || !key) return null;
   const iv = cryptoApi.getRandomValues(new Uint8Array(12));
   const plaintext = textEncoder.encode(JSON.stringify(payload));
-  const ciphertext = await cryptoApi.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    plaintext
-  );
+  const ciphertext = await cryptoApi.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
   return JSON.stringify({
     iv: bytesToBase64(iv),
     ciphertext: bytesToBase64(new Uint8Array(ciphertext)),
@@ -260,7 +249,7 @@ const decryptSessionWizardSponsoredBundleCachePayload = async (raw = '') => {
       iv: base64ToBytes(parsed.iv),
     },
     key,
-    base64ToBytes(parsed.ciphertext)
+    base64ToBytes(parsed.ciphertext),
   );
 
   return JSON.parse(textDecoder.decode(plaintext));
@@ -297,7 +286,7 @@ export const writeSessionWizardSponsoredBundleCache = async (txId = '', bundle: 
   try {
     const raw = sessionStorage.getItem(SESSION_WIZARD_SPONSORED_BUNDLE_CACHE_KEY);
     const parsed = raw ? await decryptSessionWizardSponsoredBundleCachePayload(raw) : {};
-    const next = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? { ...parsed } : {};
+    const next = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? { ...parsed } : {};
     const normalizedBundle = normalizeSparseSponsoredBundlePayload(bundle);
     if (hasSponsoredBundleFields(normalizedBundle)) {
       next[normalizedTxId] = normalizedBundle;

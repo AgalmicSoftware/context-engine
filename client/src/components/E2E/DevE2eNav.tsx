@@ -28,14 +28,18 @@ const resolveSessionSlug = (search: string) => {
     const qp = new URLSearchParams(toStr(search));
     const fromQuery = toStr(qp.get('sessionSlug')).trim();
     if (fromQuery) return fromQuery;
-  } catch (e) { void e; /* fallback: dev nav session lookup. */ }
+  } catch (e) {
+    void e; /* fallback: dev nav session lookup. */
+  }
 
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       const fromLs = toStr(window.localStorage.getItem('ce-e2e-session-slug')).trim();
       if (fromLs) return fromLs;
     }
-  } catch (e) { void e; /* fallback: dev nav session lookup. */ }
+  } catch (e) {
+    void e; /* fallback: dev nav session lookup. */
+  }
 
   // Keep a stable default for E2E/dev navigation.
   return 'general';
@@ -48,11 +52,7 @@ const isAgentModeEnabled = (search: string) => {
 
 const isDevNavEnabled = (search: string) => {
   if (process.env.NODE_ENV === 'production') return false;
-  return (
-    readQueryFlag(search, 'e2eNav')
-    || readLocalStorageFlag('ce-e2e-nav')
-    || isAgentModeEnabled(search)
-  );
+  return readQueryFlag(search, 'e2eNav') || readLocalStorageFlag('ce-e2e-nav') || isAgentModeEnabled(search);
 };
 
 export const buildDevNavAtlasTarget = (pathname = '', search = '') => {
@@ -107,7 +107,8 @@ export default function DevE2eNav() {
         border: '1px solid rgba(255,255,255,0.18)',
         color: '#fff',
         maxWidth: 260,
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+        fontFamily:
+          'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
         fontSize: 12,
         lineHeight: 1.2,
       }}

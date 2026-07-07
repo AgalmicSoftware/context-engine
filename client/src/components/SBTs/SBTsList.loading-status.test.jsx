@@ -78,7 +78,7 @@ describe('SBTsList selector and initial loading status', () => {
 
   it('renders locked-name cards as [encrypted] instead of placeholder contract names', async () => {
     const liveCache = {
-      '84532': {
+      84532: {
         sbtList: {
           '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa': {
             sbtAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -108,14 +108,18 @@ describe('SBTsList selector and initial loading status', () => {
     };
 
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') return liveCache;
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') return liveCache;
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
 
     renderSBTsList();
@@ -143,14 +147,14 @@ describe('SBTsList selector and initial loading status', () => {
     await waitFor(() => {
       expect(ensureLightSbtDiscovery).toHaveBeenCalledWith(
         'alpha',
-        expect.objectContaining({ forceScopeSlug: 'alpha' })
+        expect.objectContaining({ forceScopeSlug: 'alpha' }),
       );
     });
 
     await waitFor(() => {
-      const calledSlugs = mockGetRelevantBlockWindowForFilter.mock.calls.map(([arg]) => (
-        arg && typeof arg === 'object' ? arg.slug : arg
-      ));
+      const calledSlugs = mockGetRelevantBlockWindowForFilter.mock.calls.map(([arg]) =>
+        arg && typeof arg === 'object' ? arg.slug : arg,
+      );
       expect(calledSlugs).toEqual(expect.arrayContaining(['alpha', 'beta']));
     });
 
@@ -171,7 +175,7 @@ describe('SBTsList selector and initial loading status', () => {
 
     await act(async () => {
       resolveReadCache({
-        '84532': {
+        84532: {
           sbtList: {},
           lastBlock: 0,
         },
@@ -279,31 +283,41 @@ describe('SBTsList selector and initial loading status', () => {
     const ensureLightSbtDiscovery = jest.fn().mockResolvedValue(undefined);
 
     mockGetSessionChainId.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'demo') return null;
       if (normalized === '') return 11155420;
       return 84532;
     });
-    mockGetSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '').trim().toLowerCase() === 'demo'
+    mockGetSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'demo'
         ? null
-        : { sessionName: 'Alpha', blockLimits: { start: 1 } }
-    ));
-    mockGetDemoSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '').trim().toLowerCase() === 'demo'
+        : { sessionName: 'Alpha', blockLimits: { start: 1 } },
+    );
+    mockGetDemoSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'demo'
         ? { slug: 'demo', sessionName: 'Demo', networkChainId: 11155420 }
-        : null
-    ));
-    mockPeekCacheSync.mockImplementation((_namespace, slug) => (
-      String(slug || '').trim().toLowerCase() === 'demo'
+        : null,
+    );
+    mockPeekCacheSync.mockImplementation((_namespace, slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'demo'
         ? demoCache
-        : { 84532: { lastBlock: 0, sbtList: {} } }
-    ));
-    mockReadCache.mockImplementation(async (_namespace, slug) => (
-      String(slug || '').trim().toLowerCase() === 'demo'
+        : { 84532: { lastBlock: 0, sbtList: {} } },
+    );
+    mockReadCache.mockImplementation(async (_namespace, slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'demo'
         ? demoCache
-        : { 84532: { lastBlock: 0, sbtList: {} } }
-    ));
+        : { 84532: { lastBlock: 0, sbtList: {} } },
+    );
 
     renderSBTsList({
       allSessionsMode: false,
@@ -348,25 +362,27 @@ describe('SBTsList selector and initial loading status', () => {
 
     mockReadSessionScanScope.mockReturnValue('list');
     mockReadSessionScanSlugs.mockReturnValue(['demo']);
-    mockGetAllSessionEntries.mockReturnValue([
-      ['demo', { slug: 'demo', sessionName: 'Demo' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['demo', { slug: 'demo', sessionName: 'Demo' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['demo', { slug: 'demo', sessionName: 'Demo' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['demo', { slug: 'demo', sessionName: 'Demo' }]]);
     mockGetSessionChainId.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'demo') return null;
       if (normalized === '') return 11155420;
       return 84532;
     });
-    mockGetSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '').trim().toLowerCase() === 'demo'
+    mockGetSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'demo'
         ? null
-        : { sessionName: 'Alpha', blockLimits: { start: 1 } }
-    ));
-    mockGetDemoSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '').trim().toLowerCase() === 'demo'
+        : { sessionName: 'Alpha', blockLimits: { start: 1 } },
+    );
+    mockGetDemoSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'demo'
         ? {
             slug: 'demo',
             sessionName: 'Demo',
@@ -374,14 +390,16 @@ describe('SBTsList selector and initial loading status', () => {
             blockLimits: { start: 1 },
             corsWorkerUrl: 'https://worker.example',
           }
-        : null
-    ));
+        : null,
+    );
     mockPeekCacheSync.mockReturnValue(null);
-    mockReadCache.mockImplementation(async (_namespace, slug) => (
-      String(slug || '').trim().toLowerCase() === 'demo'
+    mockReadCache.mockImplementation(async (_namespace, slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'demo'
         ? demoCache
-        : { 84532: { lastBlock: 0, sbtList: {} } }
-    ));
+        : { 84532: { lastBlock: 0, sbtList: {} } },
+    );
 
     renderSBTsList({
       allSessionsMode: true,
@@ -394,7 +412,7 @@ describe('SBTsList selector and initial loading status', () => {
     await waitFor(() => {
       expect(ensureLightSbtDiscovery).toHaveBeenCalledWith(
         'demo',
-        expect.objectContaining({ force: true, forceScopeSlug: 'demo' })
+        expect.objectContaining({ force: true, forceScopeSlug: 'demo' }),
       );
     });
     await waitFor(() => {
@@ -428,25 +446,27 @@ describe('SBTsList selector and initial loading status', () => {
 
     mockReadSessionScanScope.mockReturnValue('list');
     mockReadSessionScanSlugs.mockReturnValue(['demo']);
-    mockGetAllSessionEntries.mockReturnValue([
-      ['demo', { slug: 'demo', sessionName: 'Demo' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['demo', { slug: 'demo', sessionName: 'Demo' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['demo', { slug: 'demo', sessionName: 'Demo' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['demo', { slug: 'demo', sessionName: 'Demo' }]]);
     mockGetSessionChainId.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'demo') return null;
       if (normalized === '') return 11155420;
       return 84532;
     });
-    mockGetSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '').trim().toLowerCase() === 'demo'
+    mockGetSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'demo'
         ? null
-        : { sessionName: 'General', networkChainId: 11155420, blockLimits: { start: 1 } }
-    ));
-    mockGetDemoSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '').trim().toLowerCase() === 'demo'
+        : { sessionName: 'General', networkChainId: 11155420, blockLimits: { start: 1 } },
+    );
+    mockGetDemoSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'demo'
         ? {
             slug: '',
             sessionName: 'Context Engine',
@@ -454,11 +474,13 @@ describe('SBTsList selector and initial loading status', () => {
             blockLimits: { start: 1 },
             corsWorkerUrl: 'https://worker.example',
           }
-        : null
-    ));
+        : null,
+    );
     mockPeekCacheSync.mockReturnValue(null);
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'demo') return { 11155420: { lastBlock: 1400, sbtList: {} } };
       if (normalized === '') return generalCache;
       return { 84532: { lastBlock: 0, sbtList: {} } };
@@ -478,7 +500,7 @@ describe('SBTsList selector and initial loading status', () => {
     await waitFor(() => {
       expect(ensureLightSbtDiscovery).toHaveBeenCalledWith(
         '',
-        expect.objectContaining({ force: true, forceScopeSlug: '' })
+        expect.objectContaining({ force: true, forceScopeSlug: '' }),
       );
     });
     await waitFor(() => {
@@ -490,9 +512,7 @@ describe('SBTsList selector and initial loading status', () => {
     localStorage.clear();
     mockReadSessionScanScope.mockReturnValue('list');
     mockReadSessionScanSlugs.mockReturnValue([]);
-    mockGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
     mockSessionRegistryGetAllSessionEntries.mockReturnValue([]);
     mockGetSessionChainId.mockImplementation((slug) => (String(slug || '').trim() ? 84532 : null));
 
@@ -517,14 +537,12 @@ describe('SBTsList selector and initial loading status', () => {
     localStorage.clear();
     mockReadSessionScanScope.mockReturnValue('list');
     mockReadSessionScanSlugs.mockReturnValue([]);
-    mockGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
     mockSessionRegistryGetAllSessionEntries.mockReturnValue([]);
 
     const alphaAddress = '0x00000000000000000000000000000000000000a1';
     const liveCache = {
-      '84532': {
+      84532: {
         sbtList: {
           [alphaAddress.toLowerCase()]: {
             sbtAddress: alphaAddress,
@@ -546,14 +564,18 @@ describe('SBTsList selector and initial loading status', () => {
     };
 
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') return liveCache;
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') return liveCache;
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
 
     const ensureLightSbtDiscovery = jest.fn();
@@ -590,7 +612,7 @@ describe('SBTsList selector and initial loading status', () => {
     const alphaAddress = '0x00000000000000000000000000000000000000a1';
     const unassignedAddress = '0x00000000000000000000000000000000000000a9';
     const alphaCache = {
-      '84532': {
+      84532: {
         sbtList: {
           [alphaAddress.toLowerCase()]: {
             sbtAddress: alphaAddress,
@@ -628,9 +650,11 @@ describe('SBTsList selector and initial loading status', () => {
     };
 
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') return alphaCache;
-      return { '84532': { sbtList: {}, lastBlock: 0 } };
+      return { 84532: { sbtList: {}, lastBlock: 0 } };
     });
 
     const ensureLightSbtDiscovery = jest.fn().mockResolvedValue(undefined);
@@ -698,24 +722,21 @@ describe('SBTsList selector and initial loading status', () => {
     });
 
     await waitFor(() => {
-      const calledSlugs = mockGetRelevantBlockWindowForFilter.mock.calls.map(([arg]) => (
-        arg && typeof arg === 'object' ? arg.slug : arg
-      ));
+      const calledSlugs = mockGetRelevantBlockWindowForFilter.mock.calls.map(([arg]) =>
+        arg && typeof arg === 'object' ? arg.slug : arg,
+      );
       expect(calledSlugs).toEqual(expect.arrayContaining(['alpha']));
     });
 
-    const calledSlugs = mockGetRelevantBlockWindowForFilter.mock.calls.map(([arg]) => (
-      arg && typeof arg === 'object' ? arg.slug : arg
-    ));
-    expect(calledSlugs).not.toContain(privateSessionIdSlug);
-    expect(ensureLightSbtDiscovery).toHaveBeenCalledWith(
-      'alpha',
-      expect.objectContaining({ forceScopeSlug: 'alpha' })
+    const calledSlugs = mockGetRelevantBlockWindowForFilter.mock.calls.map(([arg]) =>
+      arg && typeof arg === 'object' ? arg.slug : arg,
     );
+    expect(calledSlugs).not.toContain(privateSessionIdSlug);
+    expect(ensureLightSbtDiscovery).toHaveBeenCalledWith('alpha', expect.objectContaining({ forceScopeSlug: 'alpha' }));
 
     await act(async () => {
       resolveReadCache({
-        '84532': {
+        84532: {
           sbtList: {},
           lastBlock: 0,
         },
@@ -728,7 +749,7 @@ describe('SBTsList selector and initial loading status', () => {
     const alphaAddress = '0x00000000000000000000000000000000000000a1';
     const betaAddress = '0x00000000000000000000000000000000000000b1';
     const buildCache = (address, name) => ({
-      '84532': {
+      84532: {
         sbtList: {
           [address.toLowerCase()]: {
             sbtAddress: address,
@@ -754,10 +775,12 @@ describe('SBTsList selector and initial loading status', () => {
       resolveBetaRead = resolve;
     });
     mockReadCache.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') return Promise.resolve(buildCache(alphaAddress, 'Alpha Badge'));
       if (normalized === 'beta') return pendingBetaRead;
-      return Promise.resolve({ '84532': { sbtList: {}, lastBlock: 0 } });
+      return Promise.resolve({ 84532: { sbtList: {}, lastBlock: 0 } });
     });
 
     const ensureLightSbtDiscovery = jest.fn();
@@ -772,12 +795,13 @@ describe('SBTsList selector and initial loading status', () => {
     });
 
     rerender(
-      <SBTsList {...buildSBTsListProps({
-        sessionSlug: 'beta',
-        allSessionsMode: undefined,
-        ensureLightSbtDiscovery,
-      })}
-      />
+      <SBTsList
+        {...buildSBTsListProps({
+          sessionSlug: 'beta',
+          allSessionsMode: undefined,
+          ensureLightSbtDiscovery,
+        })}
+      />,
     );
 
     await waitFor(() => {

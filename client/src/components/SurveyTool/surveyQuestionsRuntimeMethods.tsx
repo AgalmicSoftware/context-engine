@@ -32,7 +32,7 @@ import type {
 export type SurveyQuestionsRuntimeMethods = SurveyQuestionsLegacyRecord;
 
 export const createSurveyQuestionsRuntimeMethods = (
-  context: SurveyQuestionsLegacyRecord
+  context: SurveyQuestionsLegacyRecord,
 ): SurveyQuestionsRuntimeMethods => {
   const {
     DEBUG_PREFILL,
@@ -560,7 +560,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     writeSurveysCache,
   } = context;
 
-const shouldUseAnimationFrameForAutoDecryptSweep = () => {
+  const shouldUseAnimationFrameForAutoDecryptSweep = () => {
     if (typeof window === 'undefined') return false;
     if (typeof window.requestAnimationFrame !== 'function') return false;
     if (typeof document !== 'undefined' && document.hidden) return false;
@@ -569,16 +569,20 @@ const shouldUseAnimationFrameForAutoDecryptSweep = () => {
     return true;
   };
 
-const clearAutoDecryptSweepScheduling = () => {
+  const clearAutoDecryptSweepScheduling = () => {
     inst._autoDecryptSweepMicrotaskScheduled = false;
     inst._queuedAutoDecryptSweepReasons.clear();
     if (inst._autoDecryptSweepFrameRequestId != null && typeof window !== 'undefined') {
-      try { window.cancelAnimationFrame(inst._autoDecryptSweepFrameRequestId); } catch (e: unknown) { surveyLog.warn('SurveyTool: cleanup', e); }
+      try {
+        window.cancelAnimationFrame(inst._autoDecryptSweepFrameRequestId);
+      } catch (e: unknown) {
+        surveyLog.warn('SurveyTool: cleanup', e);
+      }
     }
     inst._autoDecryptSweepFrameRequestId = null;
   };
 
-const flushQueuedAutoDecryptVisibleSweep = () => {
+  const flushQueuedAutoDecryptVisibleSweep = () => {
     inst._autoDecryptSweepFrameRequestId = null;
     inst._queuedAutoDecryptSweepReasons.clear();
     if (!inst._isMounted) return;
@@ -586,7 +590,7 @@ const flushQueuedAutoDecryptVisibleSweep = () => {
     maybeAutoDecryptVisibleFields();
   };
 
-const queueAutoDecryptVisibleSweep = (reason: SurveyQuestionsLegacyValue = 'unknown') => {
+  const queueAutoDecryptVisibleSweep = (reason: SurveyQuestionsLegacyValue = 'unknown') => {
     if (!inst._isMounted) return;
     if (reason) inst._queuedAutoDecryptSweepReasons.add(String(reason));
     if (inst._autoDecryptSweepMicrotaskScheduled) return;
@@ -604,10 +608,10 @@ const queueAutoDecryptVisibleSweep = (reason: SurveyQuestionsLegacyValue = 'unkn
     });
   };
 
-const buildAutoDecryptMaskedFieldSignature = (field: SurveyQuestionsLegacyValue = null) =>
+  const buildAutoDecryptMaskedFieldSignature = (field: SurveyQuestionsLegacyValue = null) =>
     (buildAutoDecryptMaskedFieldSignatureHelper as SurveyQuestionsLegacyValue)(field);
 
-const buildDecryptContextSnapshot = () => {
+  const buildDecryptContextSnapshot = () => {
     const draftSlug: SurveyQuestionsLegacyValue = inst._getEffectiveDraftSlug
       ? inst._getEffectiveDraftSlug()
       : resolveEffectiveSlug(propsRef.current);
@@ -615,67 +619,72 @@ const buildDecryptContextSnapshot = () => {
     const singleQuestionMode: SurveyQuestionsLegacyValue = !!propsRef.current.singleQuestionMode;
     const isStandalone: SurveyQuestionsLegacyValue = !!propsRef.current.isStandalone;
     return {
-      account: String(propsRef.current?.account || '').trim().toLowerCase(),
-      providerKind: String((cryptoUtils as SurveyQuestionsLegacyValue).getProviderKind(propsRef.current?.provider) || '').trim().toLowerCase(),
+      account: String(propsRef.current?.account || '')
+        .trim()
+        .toLowerCase(),
+      providerKind: String(
+        (cryptoUtils as SurveyQuestionsLegacyValue).getProviderKind(propsRef.current?.provider) || '',
+      )
+        .trim()
+        .toLowerCase(),
       sessionSlug: normalizeSessionSlugValue(hydrationContext.sessionSlug || draftSlug || ''),
       networkID: String(
         hydrationContext.networkIdStr ||
-        propsRef.current?.networkID ||
-        propsRef.current?.network?.id ||
-        propsRef.current?.network?.chainId ||
-        ''
+          propsRef.current?.networkID ||
+          propsRef.current?.network?.id ||
+          propsRef.current?.network?.chainId ||
+          '',
       ).trim(),
-      responder: String(
-        propsRef.current?.responderAddress ||
-        propsRef.current?.viewAddress ||
-        ''
-      ).trim().toLowerCase(),
+      responder: String(propsRef.current?.responderAddress || propsRef.current?.viewAddress || '')
+        .trim()
+        .toLowerCase(),
       provider: propsRef.current?.provider,
       loginComplete: !!propsRef.current?.loginComplete,
       singleQuestionMode,
       isStandalone,
-      surveyIndex: singleQuestionMode || isStandalone ? 0 : (propsRef.current?.surveyIndex || 0),
+      surveyIndex: singleQuestionMode || isStandalone ? 0 : propsRef.current?.surveyIndex || 0,
       surveyId: propsRef.current?.surveyId || propsRef.current?.surveyID || '',
       questionID: propsRef.current?.questionID || '',
       mounted: !!inst._isMounted,
     };
   };
 
-const buildDecryptContextKey = (snapshot: SurveyQuestionsLegacyValue = null) =>
+  const buildDecryptContextKey = (snapshot: SurveyQuestionsLegacyValue = null) =>
     buildDecryptContextKeyFromContext(snapshot || buildDecryptContextSnapshot());
 
-const isDecryptContextCurrent = (snapshot: SurveyQuestionsLegacyValue = null) => (
+  const isDecryptContextCurrent = (snapshot: SurveyQuestionsLegacyValue = null) =>
     !!snapshot &&
     (!snapshot.mounted || inst._isMounted) &&
-    buildDecryptContextKey(snapshot) === buildDecryptContextKey()
-  );
+    buildDecryptContextKey(snapshot) === buildDecryptContextKey();
 
-const canUpdateStateForAsyncSnapshot = (snapshot: SurveyQuestionsLegacyValue = null) => (
-    !!snapshot &&
-    (!snapshot.mounted || inst._isMounted)
-  );
+  const canUpdateStateForAsyncSnapshot = (snapshot: SurveyQuestionsLegacyValue = null) =>
+    !!snapshot && (!snapshot.mounted || inst._isMounted);
 
-const startSurveyDecryptAttempt = () => {
+  const startSurveyDecryptAttempt = () => {
     const attemptId: SurveyQuestionsLegacyValue = (Number(inst._surveyDecryptAttemptSeq) || 0) + 1;
     inst._surveyDecryptAttemptSeq = attemptId;
     inst._activeSurveyDecryptAttemptSeq = attemptId;
     return attemptId;
   };
 
-const canUpdateSurveyDecryptAttempt = (snapshot: SurveyQuestionsLegacyValue = null, attemptId: SurveyQuestionsLegacyValue = null) => (
+  const canUpdateSurveyDecryptAttempt = (
+    snapshot: SurveyQuestionsLegacyValue = null,
+    attemptId: SurveyQuestionsLegacyValue = null,
+  ) =>
     canUpdateStateForAsyncSnapshot(snapshot) &&
     Number(attemptId || 0) > 0 &&
-    inst._activeSurveyDecryptAttemptSeq === attemptId
-  );
+    inst._activeSurveyDecryptAttemptSeq === attemptId;
 
-const finishSurveyDecryptAttempt = (attemptId: SurveyQuestionsLegacyValue = null) => {
+  const finishSurveyDecryptAttempt = (attemptId: SurveyQuestionsLegacyValue = null) => {
     if (Number(attemptId || 0) > 0 && inst._activeSurveyDecryptAttemptSeq === attemptId) {
       inst._activeSurveyDecryptAttemptSeq = 0;
     }
   };
 
-const registerQuestionDecryptBusyTokens = (keysToMark: SurveyQuestionsLegacyValue = []) => {
-    const result: SurveyQuestionsLegacyValue = (buildQuestionDecryptBusyTokenRegistrationHelper as SurveyQuestionsLegacyValue)({
+  const registerQuestionDecryptBusyTokens = (keysToMark: SurveyQuestionsLegacyValue = []) => {
+    const result: SurveyQuestionsLegacyValue = (
+      buildQuestionDecryptBusyTokenRegistrationHelper as SurveyQuestionsLegacyValue
+    )({
       tokenSeq: inst._questionDecryptBusyTokenSeq,
       busyTokens: inst._questionDecryptBusyTokens,
       keysToMark,
@@ -685,7 +694,10 @@ const registerQuestionDecryptBusyTokens = (keysToMark: SurveyQuestionsLegacyValu
     return result.token;
   };
 
-const clearQuestionDecryptBusyTokens = (keysToClear: SurveyQuestionsLegacyValue = [], token: SurveyQuestionsLegacyValue = null) => {
+  const clearQuestionDecryptBusyTokens = (
+    keysToClear: SurveyQuestionsLegacyValue = [],
+    token: SurveyQuestionsLegacyValue = null,
+  ) => {
     inst._questionDecryptBusyTokens = (buildClearedQuestionDecryptBusyTokensHelper as SurveyQuestionsLegacyValue)({
       busyTokens: inst._questionDecryptBusyTokens,
       keysToClear,
@@ -693,21 +705,26 @@ const clearQuestionDecryptBusyTokens = (keysToClear: SurveyQuestionsLegacyValue 
     });
   };
 
-const ownsQuestionDecryptBusyTokens = (keysToCheck: SurveyQuestionsLegacyValue = [], token: SurveyQuestionsLegacyValue = null) =>
+  const ownsQuestionDecryptBusyTokens = (
+    keysToCheck: SurveyQuestionsLegacyValue = [],
+    token: SurveyQuestionsLegacyValue = null,
+  ) =>
     (ownsQuestionDecryptBusyTokensHelper as SurveyQuestionsLegacyValue)({
       busyTokens: inst._questionDecryptBusyTokens,
       keysToCheck,
       token,
     });
 
-const buildQuestionDecryptOwnedClearState = (
+  const buildQuestionDecryptOwnedClearState = (
     prev: SurveyQuestionsLegacyValue,
     questionId: SurveyQuestionsLegacyValue,
     fieldToDecrypt: SurveyQuestionsLegacyValue = 'both',
     token: SurveyQuestionsLegacyValue = null,
     extraPatch: SurveyQuestionsLegacyValue = {},
   ) => {
-    const result: SurveyQuestionsLegacyValue = (buildQuestionDecryptOwnedClearStateHelper as SurveyQuestionsLegacyValue)({
+    const result: SurveyQuestionsLegacyValue = (
+      buildQuestionDecryptOwnedClearStateHelper as SurveyQuestionsLegacyValue
+    )({
       prevState: prev,
       questionId,
       fieldToDecrypt,
@@ -720,80 +737,111 @@ const buildQuestionDecryptOwnedClearState = (
     return result.statePatch;
   };
 
-const buildQuestionDecryptStaleState = (prev: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, fieldToDecrypt: SurveyQuestionsLegacyValue = 'both', token: SurveyQuestionsLegacyValue = null) => {
+  const buildQuestionDecryptStaleState = (
+    prev: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    fieldToDecrypt: SurveyQuestionsLegacyValue = 'both',
+    token: SurveyQuestionsLegacyValue = null,
+  ) => {
     // Regression guard: stale decrypt cleanup may only clear busy flags it owns.
     // A newer decrypt for the same field can start after engine attempt's await.
     return buildQuestionDecryptOwnedClearState(prev, questionId, fieldToDecrypt, token);
   };
 
-const buildQuestionDecryptFailureStateForAttempt = (prev: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, fieldToDecrypt: SurveyQuestionsLegacyValue = 'both', errorMessage: SurveyQuestionsLegacyValue = '', token: SurveyQuestionsLegacyValue = null) => {
-    const patch: SurveyQuestionsLegacyValue = buildQuestionDecryptOwnedClearState(prev, questionId, fieldToDecrypt, token, {
-      submissionError: errorMessage || 'Decryption failed.',
-    });
+  const buildQuestionDecryptFailureStateForAttempt = (
+    prev: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    fieldToDecrypt: SurveyQuestionsLegacyValue = 'both',
+    errorMessage: SurveyQuestionsLegacyValue = '',
+    token: SurveyQuestionsLegacyValue = null,
+  ) => {
+    const patch: SurveyQuestionsLegacyValue = buildQuestionDecryptOwnedClearState(
+      prev,
+      questionId,
+      fieldToDecrypt,
+      token,
+      {
+        submissionError: errorMessage || 'Decryption failed.',
+      },
+    );
     if (patch) return patch;
     return null;
   };
 
-const buildDecryptTaskKey = (mode: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, fieldToDecrypt: SurveyQuestionsLegacyValue = 'both', responseOverride: SurveyQuestionsLegacyValue = null, decryptContext: SurveyQuestionsLegacyValue = null) => {
+  const buildDecryptTaskKey = (
+    mode: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    fieldToDecrypt: SurveyQuestionsLegacyValue = 'both',
+    responseOverride: SurveyQuestionsLegacyValue = null,
+    decryptContext: SurveyQuestionsLegacyValue = null,
+  ) => {
     const baseKey: SurveyQuestionsLegacyValue = (buildDecryptTaskKeyHelper as SurveyQuestionsLegacyValue)(
       mode,
       questionId,
       fieldToDecrypt,
       responseOverride,
-      String(
-      propsRef.current?.responderAddress ||
-      propsRef.current?.viewAddress ||
-      ''
-      ),
+      String(propsRef.current?.responderAddress || propsRef.current?.viewAddress || ''),
     );
     return `${baseKey}|${buildDecryptContextKey(decryptContext || buildDecryptContextSnapshot())}`;
   };
 
-const getQuestionFieldTaskKey = (questionId: SurveyQuestionsLegacyValue, fieldKey: SurveyQuestionsLegacyValue = 'answer') => {
+  const getQuestionFieldTaskKey = (
+    questionId: SurveyQuestionsLegacyValue,
+    fieldKey: SurveyQuestionsLegacyValue = 'answer',
+  ) => {
     return (getQuestionFieldTaskKeyHelper as SurveyQuestionsLegacyValue)(questionId, fieldKey);
   };
 
-const isQuestionFieldBusy = (questionId: SurveyQuestionsLegacyValue, fieldKey: SurveyQuestionsLegacyValue = 'answer') => {
+  const isQuestionFieldBusy = (
+    questionId: SurveyQuestionsLegacyValue,
+    fieldKey: SurveyQuestionsLegacyValue = 'answer',
+  ) => {
     const taskKey: SurveyQuestionsLegacyValue = getQuestionFieldTaskKey(questionId, fieldKey);
     if (!taskKey) return false;
     return !!(stateRef.current.decryptingByKey && stateRef.current.decryptingByKey[taskKey]);
   };
 
-const getQuestionFieldDecryptSelection = (
+  const getQuestionFieldDecryptSelection = (
     questionId: SurveyQuestionsLegacyValue,
     fieldToDecrypt: SurveyQuestionsLegacyValue = 'both',
     responseSlice: SurveyQuestionsLegacyValue = null,
-  ) => (getQuestionFieldDecryptSelectionHelper as SurveyQuestionsLegacyValue)(questionId, fieldToDecrypt, responseSlice);
+  ) =>
+    (getQuestionFieldDecryptSelectionHelper as SurveyQuestionsLegacyValue)(questionId, fieldToDecrypt, responseSlice);
 
-const decryptQuestionRatingEnvelopes = async (
+  const decryptQuestionRatingEnvelopes = async (
     ratingEnvelopes: SurveyQuestionsLegacyValue = null,
     { chainId, lit, account, providerLike }: SurveyQuestionsLegacyValue = {},
-  ) => (decryptQuestionRatingEnvelopesHelper as SurveyQuestionsLegacyValue)(
-    ratingEnvelopes,
-    { chainId, lit, account, providerLike },
-    {
-      decryptEnvelopeValue: (cryptoUtils as SurveyQuestionsLegacyValue).decryptEnvelopeValue,
-      logWarn: (error: SurveyQuestionsLegacyValue) => surveyLog.warn('SurveyTool: fallback', error),
-    },
-  );
+  ) =>
+    (decryptQuestionRatingEnvelopesHelper as SurveyQuestionsLegacyValue)(
+      ratingEnvelopes,
+      { chainId, lit, account, providerLike },
+      {
+        decryptEnvelopeValue: (cryptoUtils as SurveyQuestionsLegacyValue).decryptEnvelopeValue,
+        logWarn: (error: SurveyQuestionsLegacyValue) => surveyLog.warn('SurveyTool: fallback', error),
+      },
+    );
 
-const decryptQuestionRatingEnvelopeMap = async (
+  const decryptQuestionRatingEnvelopeMap = async (
     ratingEnvelopesByQid: SurveyQuestionsLegacyValue = {},
     { chainId, lit, account, providerLike }: SurveyQuestionsLegacyValue = {},
-  ) => (decryptQuestionRatingEnvelopeMapHelper as SurveyQuestionsLegacyValue)(
-    ratingEnvelopesByQid,
-    { chainId, lit, account, providerLike },
-    {
-      decryptEnvelopeValue: (cryptoUtils as SurveyQuestionsLegacyValue).decryptEnvelopeValue,
-      logWarn: (error: SurveyQuestionsLegacyValue) => surveyLog.warn('SurveyTool: fallback', error),
-    },
-  );
+  ) =>
+    (decryptQuestionRatingEnvelopeMapHelper as SurveyQuestionsLegacyValue)(
+      ratingEnvelopesByQid,
+      { chainId, lit, account, providerLike },
+      {
+        decryptEnvelopeValue: (cryptoUtils as SurveyQuestionsLegacyValue).decryptEnvelopeValue,
+        logWarn: (error: SurveyQuestionsLegacyValue) => surveyLog.warn('SurveyTool: fallback', error),
+      },
+    );
 
-const buildQuestionDecryptExecutionContext = (baselineForDecrypt: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue) => {
+  const buildQuestionDecryptExecutionContext = (
+    baselineForDecrypt: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+  ) => {
     const litHooks: SurveyQuestionsLegacyValue =
       propsRef.current.lit ||
       propsRef.current.litHooks ||
-      (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
+      (typeof window !== 'undefined' ? window.__litHooks || window.litHooks : null);
     return (buildQuestionDecryptExecutionContextHelper as SurveyQuestionsLegacyValue)({
       baselineForDecrypt,
       questionId,
@@ -809,11 +857,14 @@ const buildQuestionDecryptExecutionContext = (baselineForDecrypt: SurveyQuestion
     });
   };
 
-const buildSurveyDecryptExecutionContext = (sourceSlice: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue = null) => {
+  const buildSurveyDecryptExecutionContext = (
+    sourceSlice: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue = null,
+  ) => {
     const litHooks: SurveyQuestionsLegacyValue =
       propsRef.current.lit ||
       propsRef.current.litHooks ||
-      (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
+      (typeof window !== 'undefined' ? window.__litHooks || window.litHooks : null);
     return (buildSurveyDecryptExecutionContextHelper as SurveyQuestionsLegacyValue)({
       sourceSlice,
       questionId,
@@ -829,187 +880,173 @@ const buildSurveyDecryptExecutionContext = (sourceSlice: SurveyQuestionsLegacyVa
     });
   };
 
-const buildViewedResponseDecryptSuccessState = (
+  const buildViewedResponseDecryptSuccessState = (
     prevState: SurveyQuestionsLegacyValue,
     options: SurveyQuestionsLegacyValue = {},
   ) => (buildViewedResponseDecryptSuccessStateHelper as SurveyQuestionsLegacyValue)(prevState, options);
 
-const buildSelfQuestionDecryptSuccessState = (
+  const buildSelfQuestionDecryptSuccessState = (
     prevState: SurveyQuestionsLegacyValue,
     options: SurveyQuestionsLegacyValue = {},
   ) => (buildSelfQuestionDecryptSuccessStateHelper as SurveyQuestionsLegacyValue)(prevState, options, deepClone);
 
-const buildSurveyDecryptSuccessState = (
+  const buildSurveyDecryptSuccessState = (
     prevState: SurveyQuestionsLegacyValue,
     options: SurveyQuestionsLegacyValue = {},
   ) => (buildSurveyDecryptSuccessStateHelper as SurveyQuestionsLegacyValue)(prevState, options, deepClone);
 
-const syncDecryptedQuestionIntoBaseline = (
+  const syncDecryptedQuestionIntoBaseline = (
     editBaseline: SurveyQuestionsLegacyValue,
     fallbackBaseline: SurveyQuestionsLegacyValue,
     nextTargetStateSlice: SurveyQuestionsLegacyValue,
     options: SurveyQuestionsLegacyValue = {},
-  ) => (syncDecryptedQuestionIntoBaselineHelper as SurveyQuestionsLegacyValue)(
-    editBaseline,
-    fallbackBaseline,
-    nextTargetStateSlice,
-    options,
-    deepClone,
-  );
+  ) =>
+    (syncDecryptedQuestionIntoBaselineHelper as SurveyQuestionsLegacyValue)(
+      editBaseline,
+      fallbackBaseline,
+      nextTargetStateSlice,
+      options,
+      deepClone,
+    );
 
-const mergeLatestEncryptedQuestionFields = (
+  const mergeLatestEncryptedQuestionFields = (
     responseSlice: SurveyQuestionsLegacyValue,
     questionId: SurveyQuestionsLegacyValue,
     latestResponse: SurveyQuestionsLegacyValue,
     options: SurveyQuestionsLegacyValue = {},
-  ) => (mergeLatestEncryptedQuestionFieldsHelper as SurveyQuestionsLegacyValue)(responseSlice, questionId, latestResponse, options);
+  ) =>
+    (mergeLatestEncryptedQuestionFieldsHelper as SurveyQuestionsLegacyValue)(
+      responseSlice,
+      questionId,
+      latestResponse,
+      options,
+    );
 
-const mergeQuestionResponseOverrideIntoDecryptSlice = (
+  const mergeQuestionResponseOverrideIntoDecryptSlice = (
     responseSlice: SurveyQuestionsLegacyValue,
     questionId: SurveyQuestionsLegacyValue,
     responseOverride: SurveyQuestionsLegacyValue,
-  ) => (mergeQuestionResponseOverrideIntoDecryptSliceHelper as SurveyQuestionsLegacyValue)(responseSlice, questionId, responseOverride);
+  ) =>
+    (mergeQuestionResponseOverrideIntoDecryptSliceHelper as SurveyQuestionsLegacyValue)(
+      responseSlice,
+      questionId,
+      responseOverride,
+    );
 
-const buildSurveyDecryptSourceState = (
+  const buildSurveyDecryptSourceState = (
     latestResponse: SurveyQuestionsLegacyValue = null,
     fallbackSourceSlice: SurveyQuestionsLegacyValue = null,
     previousStateSlice: SurveyQuestionsLegacyValue = null,
-  ) => (buildSurveyDecryptSourceStateHelper as SurveyQuestionsLegacyValue)(
-    latestResponse,
-    fallbackSourceSlice,
-    previousStateSlice,
-    buildSliceFromUserAnswers,
-  );
+  ) =>
+    (buildSurveyDecryptSourceStateHelper as SurveyQuestionsLegacyValue)(
+      latestResponse,
+      fallbackSourceSlice,
+      previousStateSlice,
+      buildSliceFromUserAnswers,
+    );
 
-const hydrateLatestQuestionDecryptState = async (
-    options: SurveyQuestionsLegacyValue = {},
-  ) => (hydrateLatestQuestionDecryptStateHelper as SurveyQuestionsLegacyValue)(
-    options,
-    {
+  const hydrateLatestQuestionDecryptState = async (options: SurveyQuestionsLegacyValue = {}) =>
+    (hydrateLatestQuestionDecryptStateHelper as SurveyQuestionsLegacyValue)(options, {
       getQuestionFieldDecryptSelection: getQuestionFieldDecryptSelection,
       readQuestionsCache,
       getLatestQuestionResponse: getLatestQuestionResponse,
       mergeLatestEncryptedQuestionFields: mergeLatestEncryptedQuestionFields,
       mergeQuestionRatingEnvelopeState: mergeQuestionRatingEnvelopeState,
       logWarn: (error: SurveyQuestionsLegacyValue) => surveyLog.warn('SurveyTool: fallback', error),
-    },
-  );
+    });
 
-const prepareViewedQuestionDecryptState = async (
-    options: SurveyQuestionsLegacyValue = {},
-  ) => (prepareViewedQuestionDecryptStateHelper as SurveyQuestionsLegacyValue)(
-    options,
-    {
+  const prepareViewedQuestionDecryptState = async (options: SurveyQuestionsLegacyValue = {}) =>
+    (prepareViewedQuestionDecryptStateHelper as SurveyQuestionsLegacyValue)(options, {
       buildViewedResponseDecryptBaseline: buildViewedResponseDecryptBaseline,
       hydrateLatestQuestionDecryptState: hydrateLatestQuestionDecryptState,
-    },
-  );
+    });
 
-const prepareSelfQuestionDecryptState = async (
-    options: SurveyQuestionsLegacyValue = {},
-  ) => (prepareSelfQuestionDecryptStateHelper as SurveyQuestionsLegacyValue)(
-    options,
-    {
+  const prepareSelfQuestionDecryptState = async (options: SurveyQuestionsLegacyValue = {}) =>
+    (prepareSelfQuestionDecryptStateHelper as SurveyQuestionsLegacyValue)(options, {
       buildSelfQuestionDecryptBaseline: buildSelfQuestionDecryptBaseline,
       mergeQuestionResponseOverrideIntoDecryptSlice: mergeQuestionResponseOverrideIntoDecryptSlice,
       mergeQuestionRatingEnvelopeState: mergeQuestionRatingEnvelopeState,
       hydrateLatestQuestionDecryptState: hydrateLatestQuestionDecryptState,
       logWarn: (error: SurveyQuestionsLegacyValue) => surveyLog.warn('SurveyTool: fallback', error),
-    },
-  );
+    });
 
-const resolveLatestSurveyDecryptResponse = async (
-    options: SurveyQuestionsLegacyValue = {},
-  ) => (resolveLatestSurveyDecryptResponseHelper as SurveyQuestionsLegacyValue)(
-    options,
-    {
+  const resolveLatestSurveyDecryptResponse = async (options: SurveyQuestionsLegacyValue = {}) =>
+    (resolveLatestSurveyDecryptResponseHelper as SurveyQuestionsLegacyValue)(options, {
       getLatestQuestionResponse: surveyQuestionReadsPort.getResponse,
       getLatestSurveyResponse: getSurveyResponse,
-    },
-  );
+    });
 
-const prepareSurveyDecryptAttempt = async (
-    options: SurveyQuestionsLegacyValue = {},
-  ) => (prepareSurveyDecryptAttemptHelper as SurveyQuestionsLegacyValue)(
-    options,
-    {
+  const prepareSurveyDecryptAttempt = async (options: SurveyQuestionsLegacyValue = {}) =>
+    (prepareSurveyDecryptAttemptHelper as SurveyQuestionsLegacyValue)(options, {
       resolveLatestSurveyDecryptResponse: resolveLatestSurveyDecryptResponse,
       buildSurveyDecryptSourceState: buildSurveyDecryptSourceState,
       buildSurveyDecryptExecutionContext: buildSurveyDecryptExecutionContext,
-    },
-  );
+    });
 
-const resolveQuestionDecryptHandlingMode = (
-    options: SurveyQuestionsLegacyValue = {},
-  ) => (resolveQuestionDecryptHandlingModeHelper as SurveyQuestionsLegacyValue)(
-    options,
-    {
+  const resolveQuestionDecryptHandlingMode = (options: SurveyQuestionsLegacyValue = {}) =>
+    (resolveQuestionDecryptHandlingModeHelper as SurveyQuestionsLegacyValue)(options, {
       getViewedResponseOverrideForQuestion: getViewedResponseOverrideForQuestion,
-    },
-  );
+    });
 
-const prepareQuestionDecryptAttempt = (
-    options: SurveyQuestionsLegacyValue = {},
-  ) => (prepareQuestionDecryptAttemptHelper as SurveyQuestionsLegacyValue)(
-    options,
-    {
+  const prepareQuestionDecryptAttempt = (options: SurveyQuestionsLegacyValue = {}) =>
+    (prepareQuestionDecryptAttemptHelper as SurveyQuestionsLegacyValue)(options, {
       getQuestionFieldDecryptSelection: getQuestionFieldDecryptSelection,
       buildQuestionDecryptExecutionContext: buildQuestionDecryptExecutionContext,
-    },
-  );
+    });
 
-const finalizeQuestionDecryptAttempt = async (
-    options: SurveyQuestionsLegacyValue = {},
-  ) => (finalizeQuestionDecryptAttemptHelper as SurveyQuestionsLegacyValue)(
-    options,
-    {
+  const finalizeQuestionDecryptAttempt = async (options: SurveyQuestionsLegacyValue = {}) =>
+    (finalizeQuestionDecryptAttemptHelper as SurveyQuestionsLegacyValue)(options, {
       decryptSingleField: (cryptoUtils as SurveyQuestionsLegacyValue).decryptSingleField,
       decryptQuestionRatingEnvelopes: decryptQuestionRatingEnvelopes,
-    },
-  );
+    });
 
-const finalizeSurveyDecryptAttempt = async (
-    options: SurveyQuestionsLegacyValue = {},
-  ) => (finalizeSurveyDecryptAttemptHelper as SurveyQuestionsLegacyValue)(
-    options,
-    {
+  const finalizeSurveyDecryptAttempt = async (options: SurveyQuestionsLegacyValue = {}) =>
+    (finalizeSurveyDecryptAttemptHelper as SurveyQuestionsLegacyValue)(options, {
       decryptMultipleAnswers: (cryptoUtils as SurveyQuestionsLegacyValue).decryptMultipleAnswers,
       decryptQuestionRatingEnvelopeMap: decryptQuestionRatingEnvelopeMap,
       normalizeBulkDecryptedSliceForSurveyState: normalizeBulkDecryptedSliceForSurveyState,
-    },
-  );
+    });
 
-const normalizeBulkDecryptedSliceForSurveyState = (
+  const normalizeBulkDecryptedSliceForSurveyState = (
     decryptedSlice: SurveyQuestionsLegacyValue,
     options: SurveyQuestionsLegacyValue = {},
   ) => (normalizeBulkDecryptedSliceForSurveyStateHelper as SurveyQuestionsLegacyValue)(decryptedSlice, options);
 
-const mergeQuestionRatingEnvelopeState = (previousState: SurveyQuestionsLegacyValue, nextSource: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue = null) =>
-    (mergeQuestionRatingEnvelopeStateHelper as SurveyQuestionsLegacyValue)(previousState, nextSource, questionId);
+  const mergeQuestionRatingEnvelopeState = (
+    previousState: SurveyQuestionsLegacyValue,
+    nextSource: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue = null,
+  ) => (mergeQuestionRatingEnvelopeStateHelper as SurveyQuestionsLegacyValue)(previousState, nextSource, questionId);
 
-const buildQuestionDecryptStartState = (prevState: SurveyQuestionsLegacyValue, keysToMark: SurveyQuestionsLegacyValue = []) =>
-    (buildQuestionDecryptStartStateHelper as SurveyQuestionsLegacyValue)(prevState, keysToMark);
+  const buildQuestionDecryptStartState = (
+    prevState: SurveyQuestionsLegacyValue,
+    keysToMark: SurveyQuestionsLegacyValue = [],
+  ) => (buildQuestionDecryptStartStateHelper as SurveyQuestionsLegacyValue)(prevState, keysToMark);
 
-const buildQuestionDecryptFailureState = (
+  const buildQuestionDecryptFailureState = (
     prevState: SurveyQuestionsLegacyValue,
     questionId: SurveyQuestionsLegacyValue,
     fieldToDecrypt: SurveyQuestionsLegacyValue = 'both',
     errorMessage: SurveyQuestionsLegacyValue = '',
-  ) => (buildQuestionDecryptFailureStateHelper as SurveyQuestionsLegacyValue)(
-    prevState,
-    questionId,
-    fieldToDecrypt,
-    errorMessage,
-  );
+  ) =>
+    (buildQuestionDecryptFailureStateHelper as SurveyQuestionsLegacyValue)(
+      prevState,
+      questionId,
+      fieldToDecrypt,
+      errorMessage,
+    );
 
-const buildViewedResponseDecryptBaseline = (responseOverride: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue) =>
+  const buildViewedResponseDecryptBaseline = (
+    responseOverride: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+  ) =>
     (buildViewedResponseDecryptBaselineHelper as SurveyQuestionsLegacyValue)(
       responseOverride,
       questionId,
       buildSliceFromUserAnswers,
     );
 
-const buildSelfQuestionDecryptBaseline = (surveyIndex: SurveyQuestionsLegacyValue) =>
+  const buildSelfQuestionDecryptBaseline = (surveyIndex: SurveyQuestionsLegacyValue) =>
     (buildSelfQuestionDecryptBaselineHelper as SurveyQuestionsLegacyValue)(
       surveyIndex,
       stateRef.current.surveysResponseState,
@@ -1018,20 +1055,20 @@ const buildSelfQuestionDecryptBaseline = (surveyIndex: SurveyQuestionsLegacyValu
       deepClone,
     );
 
-const normalizeSingleQuestionViewedResponse = (rawResponse: SurveyQuestionsLegacyValue = null) =>
+  const normalizeSingleQuestionViewedResponse = (rawResponse: SurveyQuestionsLegacyValue = null) =>
     (normalizeSingleQuestionViewedResponseHelper as SurveyQuestionsLegacyValue)(rawResponse);
 
-const runDedupedDecryptTask = (taskKey: SurveyQuestionsLegacyValue, runner: SurveyQuestionsLegacyValue) =>
+  const runDedupedDecryptTask = (taskKey: SurveyQuestionsLegacyValue, runner: SurveyQuestionsLegacyValue) =>
     (runDedupedDecryptTaskHelper as SurveyQuestionsLegacyValue)(inst._decryptFieldTaskInFlight, taskKey, runner);
 
-const clearGateSbtHydrationRetry = () => {
+  const clearGateSbtHydrationRetry = () => {
     if (!inst._gateSbtHydrationRetryTimer) return;
     clearTimeout(inst._gateSbtHydrationRetryTimer);
     inst._transientTimeouts.delete(inst._gateSbtHydrationRetryTimer);
     inst._gateSbtHydrationRetryTimer = null;
   };
 
-const scheduleGateSbtHydrationRetry = () => {
+  const scheduleGateSbtHydrationRetry = () => {
     if (!inst._isMounted) return;
     if (inst._gateSbtHydrationRetryTimer) return;
     inst._gateSbtHydrationRetryTimer = setManagedTimeout(() => {
@@ -1040,106 +1077,125 @@ const scheduleGateSbtHydrationRetry = () => {
     }, GATE_SBT_HYDRATION_RETRY_MS);
   };
 
-const isResponseJsonPreviewVisible = (stateIn: SurveyQuestionsLegacyValue = stateRef.current) => (
-    !!(stateIn && stateIn.showResponseJson)
-  );
+  const isResponseJsonPreviewVisible = (stateIn: SurveyQuestionsLegacyValue = stateRef.current) =>
+    !!(stateIn && stateIn.showResponseJson);
 
-const scheduleJsonPreviewUpdate = (delayMs: SurveyQuestionsLegacyValue = 120, force: SurveyQuestionsLegacyValue = false) => {
+  const scheduleJsonPreviewUpdate = (
+    delayMs: SurveyQuestionsLegacyValue = 120,
+    force: SurveyQuestionsLegacyValue = false,
+  ) => {
     if (!force && !isResponseJsonPreviewVisible()) return;
     if (inst._jsonPreviewTimer) clearTimeout(inst._jsonPreviewTimer);
-    inst._jsonPreviewTimer = setTimeout(() => {
-      inst._jsonPreviewTimer = null;
-      updateJsonPreview(force);
-    }, Math.max(0, Number(delayMs) || 0));
-  };
-
-const resolveResponseGateConfigBySlug = (slugIn: SurveyQuestionsLegacyValue) => {
-    const slug: SurveyQuestionsLegacyValue = String(slugIn || '').trim().toLowerCase();
-    return (
-      sessionRegistryReadsPort.getSessionConfig(slug) ||
-      getStrictSessionConfigBySlug(slug)
+    inst._jsonPreviewTimer = setTimeout(
+      () => {
+        inst._jsonPreviewTimer = null;
+        updateJsonPreview(force);
+      },
+      Math.max(0, Number(delayMs) || 0),
     );
   };
 
-const resolveEffectiveResponseGateConfig = (slugIn: SurveyQuestionsLegacyValue = '', propsSnapshot: SurveyQuestionsLegacyValue = propsRef.current) => {
-    const slug: SurveyQuestionsLegacyValue = String(slugIn || '').trim().toLowerCase();
+  const resolveResponseGateConfigBySlug = (slugIn: SurveyQuestionsLegacyValue) => {
+    const slug: SurveyQuestionsLegacyValue = String(slugIn || '')
+      .trim()
+      .toLowerCase();
+    return sessionRegistryReadsPort.getSessionConfig(slug) || getStrictSessionConfigBySlug(slug);
+  };
+
+  const resolveEffectiveResponseGateConfig = (
+    slugIn: SurveyQuestionsLegacyValue = '',
+    propsSnapshot: SurveyQuestionsLegacyValue = propsRef.current,
+  ) => {
+    const slug: SurveyQuestionsLegacyValue = String(slugIn || '')
+      .trim()
+      .toLowerCase();
     const resolved: SurveyQuestionsLegacyValue = resolveSurveyToolResponseGateSessionContext({
       sessionSlug: slug,
-      sessionConfig: (propsSnapshot?.sessionConfig && typeof propsSnapshot.sessionConfig === 'object')
-        ? propsSnapshot.sessionConfig
-        : null,
+      sessionConfig:
+        propsSnapshot?.sessionConfig && typeof propsSnapshot.sessionConfig === 'object'
+          ? propsSnapshot.sessionConfig
+          : null,
       resolveBySlug: resolveResponseGateConfigBySlug,
     });
     return resolved.effectiveSessionConfig || {};
   };
 
-const resolveSessionChainId = (slugIn: SurveyQuestionsLegacyValue = '', cfgIn: SurveyQuestionsLegacyValue = null, propsSnapshot: SurveyQuestionsLegacyValue = propsRef.current) => {
+  const resolveSessionChainId = (
+    slugIn: SurveyQuestionsLegacyValue = '',
+    cfgIn: SurveyQuestionsLegacyValue = null,
+    propsSnapshot: SurveyQuestionsLegacyValue = propsRef.current,
+  ) => {
     const slug: SurveyQuestionsLegacyValue = String(
-      slugIn || (inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : resolveEffectiveSlug(propsSnapshot)) || ''
-    ).trim().toLowerCase();
+      slugIn ||
+        (inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : resolveEffectiveSlug(propsSnapshot)) ||
+        '',
+    )
+      .trim()
+      .toLowerCase();
     const cfg: SurveyQuestionsLegacyValue =
-      cfgIn && typeof cfgIn === 'object'
-        ? cfgIn
-        : resolveEffectiveResponseGateConfig(slug, propsSnapshot);
-    return Number(
-      cfg?.networkChainId ||
-      cfg?.contracts?.surveys?.chainId ||
-      cfg?.contracts?.sbtFactory?.chainId ||
-      cfg?.__registry?.chainId ||
-      cfg?.__registry?.registryChainId ||
-      propsSnapshot?.networkChainId ||
-      propsSnapshot?.network?.id ||
-      propsSnapshot?.network?.chainId ||
-      0
-    ) || null;
+      cfgIn && typeof cfgIn === 'object' ? cfgIn : resolveEffectiveResponseGateConfig(slug, propsSnapshot);
+    return (
+      Number(
+        cfg?.networkChainId ||
+          cfg?.contracts?.surveys?.chainId ||
+          cfg?.contracts?.sbtFactory?.chainId ||
+          cfg?.__registry?.chainId ||
+          cfg?.__registry?.registryChainId ||
+          propsSnapshot?.networkChainId ||
+          propsSnapshot?.network?.id ||
+          propsSnapshot?.network?.chainId ||
+          0,
+      ) || null
+    );
   };
 
-const buildResponseGateConfigSignature = (cfg: SurveyQuestionsLegacyValue = {}) => {
+  const buildResponseGateConfigSignature = (cfg: SurveyQuestionsLegacyValue = {}) => {
     return buildResponseGateConfigSignature(cfg);
   };
 
-const invalidateCanDecryptOtherResponsesTracking = () => {
+  const invalidateCanDecryptOtherResponsesTracking = () => {
     inst._canDecryptOtherResponsesRunId += 1;
     inst._canDecryptOtherResponsesKey = '';
     inst._canDecryptOtherResponsesInFlight = null;
   };
 
-const resetBlockedAutoDecryptSweepInternals = () => {
+  const resetBlockedAutoDecryptSweepInternals = () => {
     inst._autoDecQueue = [];
     inst._autoDecProcessing = false;
     inst._autoDecryptMaskedAttemptSignature = {};
     clearAutoDecryptSweepScheduling();
   };
 
-const resetVisibleAutoDecryptSweepState = () => {
+  const resetVisibleAutoDecryptSweepState = () => {
     inst._autoDecryptVisibleSweepCache = null;
     resetBlockedAutoDecryptSweepInternals();
   };
 
-const startCanDecryptOtherResponsesRun = (snapshotKey: SurveyQuestionsLegacyValue = '') => {
+  const startCanDecryptOtherResponsesRun = (snapshotKey: SurveyQuestionsLegacyValue = '') => {
     inst._canDecryptOtherResponsesKey = String(snapshotKey || '');
     const runId: SurveyQuestionsLegacyValue = (Number(inst._canDecryptOtherResponsesRunId) || 0) + 1;
     inst._canDecryptOtherResponsesRunId = runId;
     return runId;
   };
 
-const isCurrentCanDecryptOtherResponsesRun = (runId: SurveyQuestionsLegacyValue, snapshotKey: SurveyQuestionsLegacyValue = '') => (
-    inst._canDecryptOtherResponsesRunId === runId &&
-    inst._canDecryptOtherResponsesKey === String(snapshotKey || '')
-  );
+  const isCurrentCanDecryptOtherResponsesRun = (
+    runId: SurveyQuestionsLegacyValue,
+    snapshotKey: SurveyQuestionsLegacyValue = '',
+  ) => inst._canDecryptOtherResponsesRunId === runId && inst._canDecryptOtherResponsesKey === String(snapshotKey || '');
 
-const clearCanDecryptOtherResponsesInFlightIfTracked = (tracked: SurveyQuestionsLegacyValue = null) => {
+  const clearCanDecryptOtherResponsesInFlightIfTracked = (tracked: SurveyQuestionsLegacyValue = null) => {
     if (inst._canDecryptOtherResponsesInFlight === tracked) {
       inst._canDecryptOtherResponsesInFlight = null;
     }
   };
 
-const refreshCanDecryptOtherResponses = async () => {
+  const refreshCanDecryptOtherResponses = async () => {
     try {
       const ctx: SurveyQuestionsLegacyValue = buildCanDecryptContext({
         getEffectiveDraftSlug: () => resolveResponseGateSessionSlug(),
         resolveEffectiveSlugFromProps: () => resolveEffectiveSlug(propsRef.current),
-        resolveEffectiveResponseGateConfig: (slug: SurveyQuestionsLegacyValue) => resolveEffectiveResponseGateConfig(slug),
+        resolveEffectiveResponseGateConfig: (slug: SurveyQuestionsLegacyValue) =>
+          resolveEffectiveResponseGateConfig(slug),
         getResponseGatePolicy: () => getResponseGatePolicy(),
         account: propsRef.current?.account || '',
         loginComplete: propsRef.current?.loginComplete,
@@ -1153,7 +1209,10 @@ const refreshCanDecryptOtherResponses = async () => {
       if (preCheck.earlyExit) {
         // Invalidate any in-flight checks so they can't race and re-enable decrypt UI.
         invalidateCanDecryptOtherResponsesTracking();
-        if (stateRef.current.canDecryptOtherResponses || stateRef.current.canDecryptOtherResponsesStatus !== preCheck.status) {
+        if (
+          stateRef.current.canDecryptOtherResponses ||
+          stateRef.current.canDecryptOtherResponsesStatus !== preCheck.status
+        ) {
           setState(buildCanDecryptOtherResponsesState({ status: preCheck.status }));
         }
         return false;
@@ -1166,18 +1225,22 @@ const refreshCanDecryptOtherResponses = async () => {
       const runId: SurveyQuestionsLegacyValue = startCanDecryptOtherResponsesRun(snapshotKey);
 
       const run: SurveyQuestionsLegacyValue = (async () => {
-        if (stateRef.current.canDecryptOtherResponsesStatus !== 'checking' &&
+        if (
+          stateRef.current.canDecryptOtherResponsesStatus !== 'checking' &&
           isCurrentCanDecryptOtherResponsesRun(runId, snapshotKey)
         ) {
           // Clear any previously granted permission while we verify against the current gate/session/wallet.
           setState(buildCanDecryptOtherResponsesState({ status: 'checking' }));
         }
-        const { canDecrypt, status }: SurveyQuestionsLegacyValue = await resolveCanDecryptGateAccess({
-          cfg,
-          slug,
-          account: snapshot.account,
-          resourceKeysToCheck: snapshot.resourceKeysToCheck,
-        }, checkSponsoredAccess);
+        const { canDecrypt, status }: SurveyQuestionsLegacyValue = await resolveCanDecryptGateAccess(
+          {
+            cfg,
+            slug,
+            account: snapshot.account,
+            resourceKeysToCheck: snapshot.resourceKeysToCheck,
+          },
+          checkSponsoredAccess,
+        );
         if (isCurrentCanDecryptOtherResponsesRun(runId, snapshotKey)) {
           setState(buildCanDecryptOtherResponsesState({ canDecrypt, status }));
         }
@@ -1202,17 +1265,20 @@ const refreshCanDecryptOtherResponses = async () => {
     } catch (_: any) {
       try {
         setState(buildCanDecryptOtherResponsesState({ status: 'unknown' }));
-      } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+      } catch (e: any) {
+        surveyLog.warn('SurveyTool: fallback', e);
+      }
       return false;
     }
   };
 
-const buildCanDecryptOtherResponsesSignature = () => {
+  const buildCanDecryptOtherResponsesSignature = () => {
     try {
       return buildCanDecryptContext({
         getEffectiveDraftSlug: () => resolveResponseGateSessionSlug(),
         resolveEffectiveSlugFromProps: () => resolveEffectiveSlug(propsRef.current),
-        resolveEffectiveResponseGateConfig: (slug: SurveyQuestionsLegacyValue) => resolveEffectiveResponseGateConfig(slug),
+        resolveEffectiveResponseGateConfig: (slug: SurveyQuestionsLegacyValue) =>
+          resolveEffectiveResponseGateConfig(slug),
         getResponseGatePolicy: () => getResponseGatePolicy(),
         account: propsRef.current?.account || '',
         loginComplete: propsRef.current?.loginComplete,
@@ -1225,16 +1291,18 @@ const buildCanDecryptOtherResponsesSignature = () => {
     }
   };
 
-const maybeRefreshCanDecryptOtherResponses = () => {
+  const maybeRefreshCanDecryptOtherResponses = () => {
     try {
       const sig: SurveyQuestionsLegacyValue = buildCanDecryptOtherResponsesSignature();
       if (sig === inst._canDecryptOtherResponsesSig) return;
       inst._canDecryptOtherResponsesSig = sig;
       refreshCanDecryptOtherResponses();
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
   };
 
-const emitPendingStats = (stats: SurveyQuestionsPendingStatsInput) => {
+  const emitPendingStats = (stats: SurveyQuestionsPendingStatsInput) => {
     if (typeof propsRef.current.onPendingStatsChange !== 'function') return;
     const total = Number(stats?.total || 0);
     const encrypted = Number(stats?.encrypted || 0);
@@ -1246,20 +1314,23 @@ const emitPendingStats = (stats: SurveyQuestionsPendingStatsInput) => {
       last?.encrypted === encrypted &&
       !!last?.submittedSinceLastEdit === submittedSinceLastEdit &&
       !!last?.isSubmitting === isSubmitting
-    ) return;
+    )
+      return;
     inst._lastPendingStats = { total, encrypted, submittedSinceLastEdit, isSubmitting };
     propsRef.current.onPendingStatsChange({ total, encrypted, submittedSinceLastEdit, isSubmitting });
   };
 
-const getPendingStatsSnapshot = () => getPendingStatsSnapshotFromState(stateRef.current);
+  const getPendingStatsSnapshot = () => getPendingStatsSnapshotFromState(stateRef.current);
 
-const getActiveSurveyIndex = (surveyIndexParam?: number | null) => (
+  const getActiveSurveyIndex = (surveyIndexParam?: number | null) =>
     propsRef.current.isStandalone || propsRef.current.singleQuestionMode
       ? 0
-      : (surveyIndexParam ?? propsRef.current.surveyIndex ?? 0)
-  );
+      : (surveyIndexParam ?? propsRef.current.surveyIndex ?? 0);
 
-const didEditDiffInputsChange = (prevProps?: SurveyQuestionsProps | null, prevState?: SurveyQuestionsState | null) => {
+  const didEditDiffInputsChange = (
+    prevProps?: SurveyQuestionsProps | null,
+    prevState?: SurveyQuestionsState | null,
+  ) => {
     if (!prevProps || !prevState) return true;
     const prevSessionSlugHint = getSessionSlugHintFromProps(prevProps);
     const nextSessionSlugHint = getSessionSlugHintFromProps(propsRef.current);
@@ -1294,12 +1365,12 @@ const didEditDiffInputsChange = (prevProps?: SurveyQuestionsProps | null, prevSt
     return false;
   };
 
-const invalidateDiffCaches = () => {
+  const invalidateDiffCaches = () => {
     inst._changedQidsAndFieldsCache = null;
     inst._pendingEditStatsCache = null;
   };
 
-const runDefaultComponentDidMount = () => {
+  const runDefaultComponentDidMount = () => {
     // Force-disable auto-decrypt on wagmi/passkey while no signer session is ready.
     if (isAutoDecryptBlocked()) {
       resetBlockedAutoDecryptSweepInternals();
@@ -1314,10 +1385,10 @@ const runDefaultComponentDidMount = () => {
         const { poseidon }: SurveyQuestionsLegacyValue = await import('poseidon-lite');
         if (typeof poseidon === 'function' && inst._isMounted) {
           setState(buildHasherState(poseidon));
-          surveyLog.log("✅ ZK-Compatible Poseidon Hasher Loaded (poseidon-lite)");
+          surveyLog.log('✅ ZK-Compatible Poseidon Hasher Loaded (poseidon-lite)');
         }
       } catch (e: any) {
-        surveyLog.warn("⚠️ Failed to load Real Poseidon. Falling back to Keccak (Non-ZK).", e);
+        surveyLog.warn('⚠️ Failed to load Real Poseidon. Falling back to Keccak (Non-ZK).', e);
       }
     };
     loadHasher();
@@ -1325,14 +1396,24 @@ const runDefaultComponentDidMount = () => {
     loadBookmarks();
     hydrateGateSbtLabels();
     try {
-      const slugSig: SurveyQuestionsLegacyValue = normalizeSessionSlugValue(inst._getEffectiveDraftSlug() || resolveEffectiveSlug(propsRef.current));
-      const acctSig: SurveyQuestionsLegacyValue = String(propsRef.current.account || '').trim().toLowerCase();
+      const slugSig: SurveyQuestionsLegacyValue = normalizeSessionSlugValue(
+        inst._getEffectiveDraftSlug() || resolveEffectiveSlug(propsRef.current),
+      );
+      const acctSig: SurveyQuestionsLegacyValue = String(propsRef.current.account || '')
+        .trim()
+        .toLowerCase();
       inst._priorResponseHydrationContextSig = `${slugSig}|${acctSig}`;
       inst._priorResponseBackfillAttempted = new Set();
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
     // Determine whether the connected wallet satisfies the response gate; used to show/hide decrypt buttons
     // when viewing another wallet's encrypted response.
-    try { maybeRefreshCanDecryptOtherResponses(); } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    try {
+      maybeRefreshCanDecryptOtherResponses();
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
     if (propsRef.current.singleQuestionMode) {
       (async () => {
         await fetchSingleQuestionData();
@@ -1342,7 +1423,10 @@ const runDefaultComponentDidMount = () => {
 
         if (propsRef.current.responderAddress) {
           setState(buildViewingResponseModeState(), async () => {
-            if (propsRef.current.account && propsRef.current.account.toLowerCase() === propsRef.current.responderAddress.toLowerCase()) {
+            if (
+              propsRef.current.account &&
+              propsRef.current.account.toLowerCase() === propsRef.current.responderAddress.toLowerCase()
+            ) {
               if (stateRef.current.userHasResponse) {
                 // UI will show decrypt/edit or start fresh buttons
               }
@@ -1352,14 +1436,22 @@ const runDefaultComponentDidMount = () => {
           setState(buildDisplayAnswerModeState(propsRef.current.displayAnswerMode));
         }
       })();
-    } else if (!propsRef.current.isStandalone) { // Survey mode (multiple questions)
+    } else if (!propsRef.current.isStandalone) {
+      // Survey mode (multiple questions)
       (async () => {
         await fetchQuestionPool();
         const initialStates: SurveyQuestionsLegacyValue = initializeSurveyResponseState();
         setState(
           buildInitialSurveyResponseState({
             surveysResponseState: initialStates,
-            editBaseline: deepClone(initialStates[propsRef.current.surveyIndex || 0] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
+            editBaseline: deepClone(
+              initialStates[propsRef.current.surveyIndex || 0] || {
+                answers: {},
+                importance: {},
+                conviction: {},
+                additionalComments: {},
+              },
+            ),
           }),
           async () => {
             rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
@@ -1367,34 +1459,39 @@ const runDefaultComponentDidMount = () => {
             await rehydrateLocalCacheAnswersForRenderedIds(null, { responseHydrationOwned: true });
 
             // Defer prefill if caches/IDs not ready yet; avoid double-prefill
-            if (propsRef.current.isQuestionCacheReady ||
-                (Array.isArray(stateRef.current.questionPool) && stateRef.current.questionPool.length > 0)) {
+            if (
+              propsRef.current.isQuestionCacheReady ||
+              (Array.isArray(stateRef.current.questionPool) && stateRef.current.questionPool.length > 0)
+            ) {
               await fetchSurveyResponse();
               checkAndHandleStartFresh();
             } else {
               setState(buildPrefillQueuedAfterCacheState(true));
             }
-          }
+          },
         );
       })();
-    } else { // Standalone mode (question pool passed as prop)
+    } else {
+      // Standalone mode (question pool passed as prop)
       const initialSlice: SurveyQuestionsLegacyValue = initializeSurveyResponseState();
       setState(
         buildInitialStandaloneResponseState({
           surveysResponseState: initialSlice,
-          editBaseline: deepClone(initialSlice[0] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
+          editBaseline: deepClone(
+            initialSlice[0] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+          ),
           jsonPreview: prepareJsonAndHash(0),
         }),
         () => {
           rehydrateDraftForRenderedIds();
           // Quick local-cache rehydrate for non-encrypted prior answers (standalone list)
           rehydrateLocalCacheAnswersForRenderedIds();
-        }
+        },
       );
     }
   };
 
-const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, prevState: SurveyQuestionsState) => {
+  const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, prevState: SurveyQuestionsState) => {
     const diffInputsChanged = didEditDiffInputsChange(prevProps, prevState);
     if (diffInputsChanged) {
       const propsHydrationContextChanged =
@@ -1412,7 +1509,8 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
         prevProps.networkChainId !== propsRef.current.networkChainId ||
         getSessionSlugHintFromProps(prevProps) !== getSessionSlugHintFromProps(propsRef.current) ||
         getSessionSlugPinnedFromProps(prevProps) !== getSessionSlugPinnedFromProps(propsRef.current) ||
-        buildQuestionIdScopeSignature(prevProps.questionPool) !== buildQuestionIdScopeSignature(propsRef.current.questionPool);
+        buildQuestionIdScopeSignature(prevProps.questionPool) !==
+          buildQuestionIdScopeSignature(propsRef.current.questionPool);
       if (propsHydrationContextChanged || !inst._responseHydrationStateUpdateDepth) {
         invalidateResponseHydrationRuns();
       }
@@ -1441,7 +1539,7 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
     }
 
     const pendingStats = diffInputsChanged
-        ? ((typeof getPendingEditStats === 'function' && getPendingEditStats()) || getPendingStatsSnapshot())
+      ? (typeof getPendingEditStats === 'function' && getPendingEditStats()) || getPendingStatsSnapshot()
       : getPendingStatsSnapshot();
     emitPendingStats(pendingStats);
     if (diffInputsChanged && typeof recalculateEditStats === 'function') {
@@ -1449,14 +1547,20 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
     }
 
     try {
-      const slugSig = normalizeSessionSlugValue(inst._getEffectiveDraftSlug() || resolveEffectiveSlug(propsRef.current));
-      const acctSig = String(propsRef.current.account || '').trim().toLowerCase();
+      const slugSig = normalizeSessionSlugValue(
+        inst._getEffectiveDraftSlug() || resolveEffectiveSlug(propsRef.current),
+      );
+      const acctSig = String(propsRef.current.account || '')
+        .trim()
+        .toLowerCase();
       const nextSig = `${slugSig}|${acctSig}`;
       if (nextSig !== inst._priorResponseHydrationContextSig) {
         inst._priorResponseHydrationContextSig = nextSig;
         inst._priorResponseBackfillAttempted = new Set();
       }
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
 
     // Force-disable auto-decrypt whenever provider/account changes to wagmi/passkey without a signer session.
     if (
@@ -1464,13 +1568,20 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
       isAutoDecryptBlocked()
     ) {
       resetBlockedAutoDecryptSweepInternals();
-      if (stateRef.current.autoDecryptEnabled || (stateRef.current.decryptingByKey && Object.keys(stateRef.current.decryptingByKey).length > 0)) {
+      if (
+        stateRef.current.autoDecryptEnabled ||
+        (stateRef.current.decryptingByKey && Object.keys(stateRef.current.decryptingByKey).length > 0)
+      ) {
         setState(buildAutoDecryptDisabledState());
       }
     }
 
     // Keep the "can decrypt viewed responses" capability in sync with wallet/session/gate changes.
-    try { maybeRefreshCanDecryptOtherResponses(); } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    try {
+      maybeRefreshCanDecryptOtherResponses();
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
     // Re-trigger auto-decrypt sweep when cache data arrives after initial render.
     // Without engine, an early sweep with empty cache never re-fires, leaving "Decrypt"
     // buttons visible even though the user has permission.
@@ -1538,11 +1649,10 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
         !stateRef.current.parsedViewAddressAnswers &&
         stateRef.current.noResponse !== true;
       const singleQuestionBootstrapPending =
-        waitingForViewedResponseBootstrap || (
-          !stateRef.current.displayAnswerMode &&
+        waitingForViewedResponseBootstrap ||
+        (!stateRef.current.displayAnswerMode &&
           !stateRef.current.parsedViewAddressAnswers &&
-          (!Array.isArray(stateRef.current.questionPool) || stateRef.current.questionPool.length === 0)
-        );
+          (!Array.isArray(stateRef.current.questionPool) || stateRef.current.questionPool.length === 0));
       const shouldRetrySingleQuestionBootstrap =
         singleQuestionBootstrapPending && (authOrProviderBecameReady || networkBecameReady);
       const retryMaskedOnReadiness = shouldRetryMaskedQuestionRefresh({
@@ -1565,9 +1675,11 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
 
       if (identityChanged) {
         // Reset submissionComplete when switching questions so fetch logic isn't blocked
-        setState(buildResponseLoadingResetState(
-          updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset')
-        ));
+        setState(
+          buildResponseLoadingResetState(
+            updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
+          ),
+        );
         await fetchSingleQuestionData(); // merge-safe
       } else if (cacheTick || groupContextChanged || retryMaskedOnReadiness || shouldRetrySingleQuestionBootstrap) {
         // Don’t rebuild while user has pending edits; keeps “Submit (X)” stable
@@ -1578,9 +1690,7 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
         }
         const pendingBootstrapRetryAttempt = getPendingSingleQuestionBootstrapRetryAttempt(propsRef.current.questionID);
         await fetchSingleQuestionData(
-          pendingBootstrapRetryAttempt > 0
-            ? { bootstrapRetryAttempt: pendingBootstrapRetryAttempt }
-            : undefined
+          pendingBootstrapRetryAttempt > 0 ? { bootstrapRetryAttempt: pendingBootstrapRetryAttempt } : undefined,
         ); // merge-safe
       }
 
@@ -1589,50 +1699,47 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
         // We use a callback to ensure rehydration happens on the reset (empty) state,
         // followed by the fetch which merges on-chain data into the draft.
         resetFormStateForAccountChange(async () => {
-            setState(buildResponseLoadingResetState(
-              updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset')
-            ));
+          setState(
+            buildResponseLoadingResetState(
+              updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
+            ),
+          );
 
-            // 1. Apply Draft (Anon answers) onto Empty
-            rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
+          // 1. Apply Draft (Anon answers) onto Empty
+          rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
 
-            // 2. Fetch Chain (Merges Chain into Draft)
-            const pendingBootstrapRetryAttempt = propsRef.current.singleQuestionMode
-              ? getPendingSingleQuestionBootstrapRetryAttempt(propsRef.current.questionID)
-              : 0;
-            await fetchSingleQuestionData(
-              pendingBootstrapRetryAttempt > 0
-                ? { bootstrapRetryAttempt: pendingBootstrapRetryAttempt }
-                : undefined
-            );
+          // 2. Fetch Chain (Merges Chain into Draft)
+          const pendingBootstrapRetryAttempt = propsRef.current.singleQuestionMode
+            ? getPendingSingleQuestionBootstrapRetryAttempt(propsRef.current.questionID)
+            : 0;
+          await fetchSingleQuestionData(
+            pendingBootstrapRetryAttempt > 0 ? { bootstrapRetryAttempt: pendingBootstrapRetryAttempt } : undefined,
+          );
 
-            const isViewingOwnResponse =
-              propsRef.current.account &&
-              propsRef.current.responderAddress &&
-              propsRef.current.account.toLowerCase() === propsRef.current.responderAddress.toLowerCase();
-            const isViewingNoSpecificResponder =
-              propsRef.current.account && !propsRef.current.responderAddress;
+          const isViewingOwnResponse =
+            propsRef.current.account &&
+            propsRef.current.responderAddress &&
+            propsRef.current.account.toLowerCase() === propsRef.current.responderAddress.toLowerCase();
+          const isViewingNoSpecificResponder = propsRef.current.account && !propsRef.current.responderAddress;
 
-            if (
-              stateRef.current.userHasResponse &&
-              (isViewingOwnResponse || isViewingNoSpecificResponder)
-            ) {
-              setState(buildEditingResponseModeState());
-            }
+          if (stateRef.current.userHasResponse && (isViewingOwnResponse || isViewingNoSpecificResponder)) {
+            setState(buildEditingResponseModeState());
+          }
         });
       }
 
       if (prevState.questionPool !== stateRef.current.questionPool) {
         setState(
-          (prevStateInner: SurveyQuestionsLegacyValue) => buildQuestionPoolResponseMergeState(prevStateInner, {
-            mergeSurveyResponseState: mergeSurveyResponseState,
-            questionPool: stateRef.current.questionPool || [],
-            surveyIndex: 0,
-          }),
+          (prevStateInner: SurveyQuestionsLegacyValue) =>
+            buildQuestionPoolResponseMergeState(prevStateInner, {
+              mergeSurveyResponseState: mergeSurveyResponseState,
+              questionPool: stateRef.current.questionPool || [],
+              surveyIndex: 0,
+            }),
           () => {
             updateJsonPreview();
             rehydrateDraftForRenderedIds();
-          }
+          },
         );
       }
     }
@@ -1651,81 +1758,74 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
           prevProps.questionResponsesNonce !== propsRef.current.questionResponsesNonce);
 
       if (surveyChanged) {
-        setState(buildSurveyChangedResetState(
-          updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset')
-        ));
-        await fetchQuestionPool();
         setState(
-          buildSurveysResponseStatePatch(initializeSurveyResponseState()),
-          async () => {
-            await fetchSurveyResponse();
-            checkAndHandleStartFresh();
-          }
+          buildSurveyChangedResetState(updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset')),
         );
+        await fetchQuestionPool();
+        setState(buildSurveysResponseStatePatch(initializeSurveyResponseState()), async () => {
+          await fetchSurveyResponse();
+          checkAndHandleStartFresh();
+        });
       } else if (cacheInvalidated) {
         // Don’t rebuild while user has pending edits; keeps “Submit (X)” stable
         const hasPendingQuestionPoolHydration = getSurveyQuestionPoolLoadState().isIncomplete;
-        if ((stateRef.current.isDirty || (stateRef.current.modifiedCount || 0) > 0) && !hasPendingQuestionPoolHydration) {
+        if (
+          (stateRef.current.isDirty || (stateRef.current.modifiedCount || 0) > 0) &&
+          !hasPendingQuestionPoolHydration
+        ) {
           bumpSurveyPerfCounter('noopSkipCount');
           surveyLog.debug('baseline-guard: skipped rebuild');
           // do nothing
         } else {
           await fetchQuestionPool();
           setState(
-            (prev: SurveyQuestionsLegacyValue) => buildSurveyResponseMergeState(prev, {
-              mergeSurveyResponseState: mergeSurveyResponseState,
-              questionPool: stateRef.current.questionPool || [],
-              surveyIndex: propsRef.current.surveyIndex,
-            }),
+            (prev: SurveyQuestionsLegacyValue) =>
+              buildSurveyResponseMergeState(prev, {
+                mergeSurveyResponseState: mergeSurveyResponseState,
+                questionPool: stateRef.current.questionPool || [],
+                surveyIndex: propsRef.current.surveyIndex,
+              }),
             async () => {
               await fetchSurveyResponse();
               if (!stateRef.current.suppressPrefill) {
                 rehydrateDraftForRenderedIds();
               }
-            }
+            },
           );
         }
       }
 
-      if (
-        propsRef.current.account !== prevProps.account ||
-        propsRef.current.viewAddress !== prevProps.viewAddress
-      ) {
+      if (propsRef.current.account !== prevProps.account || propsRef.current.viewAddress !== prevProps.viewAddress) {
         // Clear live form state before reacting to new account/viewAddress
         resetFormStateForAccountChange(async () => {
-            setState(buildSurveyAccountViewResetState({
+          setState(
+            buildSurveyAccountViewResetState({
               parsedViewAddressAnswers:
                 propsRef.current.viewAddress !== prevProps.viewAddress
                   ? null
                   : stateRef.current.parsedViewAddressAnswers,
-              noResponse:
-                propsRef.current.viewAddress !== prevProps.viewAddress
-                  ? false
-                  : stateRef.current.noResponse,
+              noResponse: propsRef.current.viewAddress !== prevProps.viewAddress ? false : stateRef.current.noResponse,
               submittedSinceLastEdit: updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
-            }));
+            }),
+          );
 
-            // 1. Rehydrate draft immediately so it exists before fetch returns
-            if (propsRef.current.account && propsRef.current.account !== prevProps.account) {
-               rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
-            }
+          // 1. Rehydrate draft immediately so it exists before fetch returns
+          if (propsRef.current.account && propsRef.current.account !== prevProps.account) {
+            rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
+          }
 
-            // 2. Fetch Chain (Merges Chain into Draft)
-            await fetchSurveyResponse();
+          // 2. Fetch Chain (Merges Chain into Draft)
+          await fetchSurveyResponse();
 
-            const isViewingOwnSurveyResponse =
-              propsRef.current.account &&
-              propsRef.current.viewAddress &&
-              propsRef.current.account.toLowerCase() === propsRef.current.viewAddress.toLowerCase();
-            const isViewingNoSpecificSurvey =
-              propsRef.current.account && !propsRef.current.viewAddress;
+          const isViewingOwnSurveyResponse =
+            propsRef.current.account &&
+            propsRef.current.viewAddress &&
+            propsRef.current.account.toLowerCase() === propsRef.current.viewAddress.toLowerCase();
+          const isViewingNoSpecificSurvey = propsRef.current.account && !propsRef.current.viewAddress;
 
-            if (
-              stateRef.current.userHasResponse &&
-              (isViewingOwnSurveyResponse || isViewingNoSpecificSurvey)
-            ) {
-              setState(buildEditingResponseModeState());
-            }
+          if (stateRef.current.userHasResponse && (isViewingOwnSurveyResponse || isViewingNoSpecificSurvey)) {
+            setState(buildEditingResponseModeState());
+          }
         });
       }
     }
@@ -1734,17 +1834,18 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
     else {
       if (prevProps.questionPool !== propsRef.current.questionPool) {
         setState(
-          (prevStateInner: SurveyQuestionsLegacyValue) => buildQuestionPoolResponseMergeState(prevStateInner, {
-            includeQuestionPool: true,
-            mergeSurveyResponseState: mergeSurveyResponseState,
-            questionPool: propsRef.current.questionPool || [],
-            surveyIndex: 0,
-          }),
+          (prevStateInner: SurveyQuestionsLegacyValue) =>
+            buildQuestionPoolResponseMergeState(prevStateInner, {
+              includeQuestionPool: true,
+              mergeSurveyResponseState: mergeSurveyResponseState,
+              questionPool: propsRef.current.questionPool || [],
+              surveyIndex: 0,
+            }),
           () => {
             updateJsonPreview();
             rehydrateDraftForRenderedIds();
             rehydrateLocalCacheAnswersForRenderedIds();
-          }
+          },
         );
       }
 
@@ -1769,13 +1870,15 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
       if (propsRef.current.account !== prevProps.account || standaloneAuthBecameReady) {
         // Clear live form state before reacting to new account
         resetFormStateForAccountChange(() => {
-             setState(buildStandaloneAuthResetState(
-              updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset')
-            ));
-            // Standalone mode typically relies on local cache or props,
-            // but we should also rerun cache/prior-response hydration when auth becomes ready.
-            rehydrateDraftForRenderedIds();
-            rehydrateLocalCacheAnswersForRenderedIds();
+          setState(
+            buildStandaloneAuthResetState(
+              updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
+            ),
+          );
+          // Standalone mode typically relies on local cache or props,
+          // but we should also rerun cache/prior-response hydration when auth becomes ready.
+          rehydrateDraftForRenderedIds();
+          rehydrateLocalCacheAnswersForRenderedIds();
         });
       }
     }
@@ -1783,13 +1886,11 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
     // Auto-decrypt sweep when enabled and inputs change
     if (
       stateRef.current.autoDecryptEnabled &&
-      (
-        prevState.surveysResponseState !== stateRef.current.surveysResponseState ||
+      (prevState.surveysResponseState !== stateRef.current.surveysResponseState ||
         prevState.autoDecryptEnabled !== stateRef.current.autoDecryptEnabled ||
         prevState.questionPool !== stateRef.current.questionPool ||
         prevProps.account !== propsRef.current.account ||
-        cacheJustBecameReady
-      ) &&
+        cacheJustBecameReady) &&
       !isAutoDecryptBlocked()
     ) {
       queueAutoDecryptVisibleSweep('state-change');
@@ -1801,7 +1902,11 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
     }
 
     // Trigger when the comments panel toggles (user reveals additional comments)
-    if (stateRef.current.autoDecryptEnabled && prevState.showComments !== stateRef.current.showComments && !isAutoDecryptBlocked()) {
+    if (
+      stateRef.current.autoDecryptEnabled &&
+      prevState.showComments !== stateRef.current.showComments &&
+      !isAutoDecryptBlocked()
+    ) {
       queueAutoDecryptVisibleSweep('comments-toggle');
     }
 
@@ -1829,7 +1934,7 @@ const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, pre
     }
   };
 
-const runDefaultComponentWillUnmount = () => {
+  const runDefaultComponentWillUnmount = () => {
     if (inst._emptySubmitTimer) {
       clearTimeout(inst._emptySubmitTimer);
       inst._emptySubmitTimer = null;
@@ -1843,7 +1948,11 @@ const runDefaultComponentWillUnmount = () => {
       inst._persistTimer = null;
     }
     if (hasPendingDraftChanges) {
-      try { persistDraft(); } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+      try {
+        persistDraft();
+      } catch (e: any) {
+        surveyLog.warn('SurveyTool: fallback', e);
+      }
     }
     if (inst._jsonPreviewTimer) {
       clearTimeout(inst._jsonPreviewTimer);
@@ -1880,13 +1989,13 @@ const runDefaultComponentWillUnmount = () => {
     invalidateResponseHydrationRuns();
   };
 
-const _getDraftScope = () => {
+  const _getDraftScope = () => {
     return propsRef.current.singleQuestionMode
       ? 'questions' // Align primary scope with spec; per-QID isolation stays in answers
       : String(propsRef.current?.surveyId || 'questions').toLowerCase();
   };
 
-const _getEffectiveDraftSlug = () => {
+  const _getEffectiveDraftSlug = () => {
     return propsRef.current.singleQuestionMode
       ? resolveSlugForIds({
           questionId: propsRef.current.questionID,
@@ -1900,7 +2009,7 @@ const _getEffectiveDraftSlug = () => {
         });
   };
 
-const getAudioInputWorkerProps = () => {
+  const getAudioInputWorkerProps = () => {
     // Prefer the explicit route/session slug to avoid cross-cache slug drift on /question routes.
     const explicitSessionSlug: SurveyQuestionsLegacyValue = resolveEffectiveSlug(propsRef.current);
     const resolvedSession: SurveyQuestionsLegacyValue = explicitSessionSlug
@@ -1908,9 +2017,12 @@ const getAudioInputWorkerProps = () => {
       : resolveDraftSessionContext(propsRef.current, inst._getEffectiveDraftSlug());
     const sessionSlug: SurveyQuestionsLegacyValue = resolvedSession.sessionSlug || '';
     const sessionConfig: SurveyQuestionsLegacyValue = resolvedSession.sessionConfig || null;
-    const providerLike: SurveyQuestionsLegacyValue = typeof propsRef.current.providerLike === 'string'
-      ? propsRef.current.providerLike
-      : (typeof propsRef.current.provider === 'string' ? propsRef.current.provider : '');
+    const providerLike: SurveyQuestionsLegacyValue =
+      typeof propsRef.current.providerLike === 'string'
+        ? propsRef.current.providerLike
+        : typeof propsRef.current.provider === 'string'
+          ? propsRef.current.provider
+          : '';
     const chainId: SurveyQuestionsLegacyValue = resolveSessionChainId(sessionSlug, sessionConfig);
     return {
       sessionSlug,
@@ -1923,13 +2035,15 @@ const getAudioInputWorkerProps = () => {
     };
   };
 
-const buildQuestionDecryptContext = (slugIn: SurveyQuestionsLegacyValue) => {
-    const slug: SurveyQuestionsLegacyValue = String(slugIn ?? '').trim().toLowerCase();
+  const buildQuestionDecryptContext = (slugIn: SurveyQuestionsLegacyValue) => {
+    const slug: SurveyQuestionsLegacyValue = String(slugIn ?? '')
+      .trim()
+      .toLowerCase();
     const cfg: SurveyQuestionsLegacyValue = resolveExplicitSessionContext(slug).sessionConfig || null;
     const litHooks: SurveyQuestionsLegacyValue =
       propsRef.current.lit ||
       propsRef.current.litHooks ||
-      (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
+      (typeof window !== 'undefined' ? window.__litHooks || window.litHooks : null);
     return buildQuestionDecryptContextForSession({
       cfg,
       account: propsRef.current.account || '',
@@ -1939,16 +2053,16 @@ const buildQuestionDecryptContext = (slugIn: SurveyQuestionsLegacyValue) => {
     });
   };
 
-const buildAutomaticQuestionMetadataFetchOptions = (slugIn: SurveyQuestionsLegacyValue) => {
+  const buildAutomaticQuestionMetadataFetchOptions = (slugIn: SurveyQuestionsLegacyValue) => {
     const decryptContext: SurveyQuestionsLegacyValue = buildQuestionDecryptContext(slugIn);
-    return shouldAttemptAutomaticPromptDecrypt()
-      ? { decryptContext }
-      : { decryptContext, skipDecrypt: true };
+    return shouldAttemptAutomaticPromptDecrypt() ? { decryptContext } : { decryptContext, skipDecrypt: true };
   };
 
-const hasMaskedCurrentQuestionPayload = () => {
+  const hasMaskedCurrentQuestionPayload = () => {
     if (!propsRef.current.singleQuestionMode) return false;
-    const q: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current.questionPool) ? stateRef.current.questionPool[0] : null;
+    const q: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current.questionPool)
+      ? stateRef.current.questionPool[0]
+      : null;
     if (q && typeof q === 'object') {
       if (isMaskedQuestionPayload(q)) return true;
       const prompt: SurveyQuestionsLegacyValue = String(q.prompt || '').trim();
@@ -1959,7 +2073,7 @@ const hasMaskedCurrentQuestionPayload = () => {
     const slug: SurveyQuestionsLegacyValue = inst._getEffectiveDraftSlug();
     const cfg: SurveyQuestionsLegacyValue = resolveExplicitSessionContext(slug).sessionConfig || null;
     const netIdStr: SurveyQuestionsLegacyValue = String(
-      propsRef.current.network?.id ?? propsRef.current.networkChainId ?? cfg?.networkChainId ?? ''
+      propsRef.current.network?.id ?? propsRef.current.networkChainId ?? cfg?.networkChainId ?? '',
     );
     if (!netIdStr) return false;
     const cache: SurveyQuestionsLegacyValue = readQuestionsCache(slug) || {};
@@ -1967,35 +2081,46 @@ const hasMaskedCurrentQuestionPayload = () => {
     return isMaskedQuestionPayload(cached);
   };
 
-const isMaskedPromptText = (prompt: SurveyQuestionsLegacyValue) => isSurveyQuestionsMaskedPromptText(prompt);
+  const isMaskedPromptText = (prompt: SurveyQuestionsLegacyValue) => isSurveyQuestionsMaskedPromptText(prompt);
 
-const getQuestionFetchCandidateSlugs = (questionId: SurveyQuestionsLegacyValue, preferredSlug: SurveyQuestionsLegacyValue = '', opts: SurveyQuestionsLegacyValue = {}) => {
-    const sanitize: SurveyQuestionsLegacyValue = (s: SurveyQuestionsLegacyValue) => (
+  const getQuestionFetchCandidateSlugs = (
+    questionId: SurveyQuestionsLegacyValue,
+    preferredSlug: SurveyQuestionsLegacyValue = '',
+    opts: SurveyQuestionsLegacyValue = {},
+  ) => {
+    const sanitize: SurveyQuestionsLegacyValue = (s: SurveyQuestionsLegacyValue) =>
       s == null
         ? ''
-        : String(s).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '')
-    );
+        : String(s)
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]/g, '');
 
-    const qid: SurveyQuestionsLegacyValue = String(questionId || '').trim().toLowerCase();
+    const qid: SurveyQuestionsLegacyValue = String(questionId || '')
+      .trim()
+      .toLowerCase();
     const slugPinned: SurveyQuestionsLegacyValue = getSessionSlugPinnedFromProps(propsRef.current);
     const explicitSlug: SurveyQuestionsLegacyValue = sanitize(getSessionSlugHintFromProps(propsRef.current));
-    const currentQuestionSessionName: SurveyQuestionsLegacyValue = (stateRef.current.questionPool?.[0] as SurveyQuestionsLegacyValue)?.sessionName;
+    const currentQuestionSessionName: SurveyQuestionsLegacyValue = (
+      stateRef.current.questionPool?.[0] as SurveyQuestionsLegacyValue
+    )?.sessionName;
     const resolvedSlug: SurveyQuestionsLegacyValue = sanitize(
       resolveSlugForIds({
         sessionName: propsRef.current.sessionName || currentQuestionSessionName,
         questionId: qid || propsRef.current.questionID || null,
-        surveyId: propsRef.current.singleQuestionMode ? null : (propsRef.current.surveyId || null),
+        surveyId: propsRef.current.singleQuestionMode ? null : propsRef.current.surveyId || null,
         props: propsRef.current,
         network: propsRef.current.network,
-      })
+      }),
     );
     const preferred: SurveyQuestionsLegacyValue = sanitize(preferredSlug);
-    const effective: SurveyQuestionsLegacyValue = preferred || explicitSlug || resolvedSlug || sanitize(resolveEffectiveSlug(propsRef.current));
-    const explicitSlugKnown: SurveyQuestionsLegacyValue = explicitSlug === '' || !!resolveExplicitSessionContext(explicitSlug).sessionConfig;
+    const effective: SurveyQuestionsLegacyValue =
+      preferred || explicitSlug || resolvedSlug || sanitize(resolveEffectiveSlug(propsRef.current));
+    const explicitSlugKnown: SurveyQuestionsLegacyValue =
+      explicitSlug === '' || !!resolveExplicitSessionContext(explicitSlug).sessionConfig;
     // Default behavior preserves strict session pinning; callers can opt into fallback explicitly.
     const allowPinnedFallback: SurveyQuestionsLegacyValue =
-      opts?.allowPinnedFallback === true ||
-      (slugPinned && !!explicitSlug && !explicitSlugKnown);
+      opts?.allowPinnedFallback === true || (slugPinned && !!explicitSlug && !explicitSlugKnown);
 
     const out: SurveyQuestionsLegacyValue = [];
     const seen: SurveyQuestionsLegacyValue = new Set();
@@ -2019,12 +2144,23 @@ const getQuestionFetchCandidateSlugs = (questionId: SurveyQuestionsLegacyValue, 
     return out;
   };
 
-const cacheQuestionPayloadForSlug = (slugIn: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, questionPayload: SurveyQuestionsLegacyValue) => {
-    const slug: SurveyQuestionsLegacyValue = String(slugIn ?? '').trim().toLowerCase();
-    const qid: SurveyQuestionsLegacyValue = String(questionId || '').trim().toLowerCase();
+  const cacheQuestionPayloadForSlug = (
+    slugIn: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    questionPayload: SurveyQuestionsLegacyValue,
+  ) => {
+    const slug: SurveyQuestionsLegacyValue = String(slugIn ?? '')
+      .trim()
+      .toLowerCase();
+    const qid: SurveyQuestionsLegacyValue = String(questionId || '')
+      .trim()
+      .toLowerCase();
     if (!qid || !questionPayload) return;
 
-    const cacheWriteContext: SurveyQuestionsLegacyValue = resolveQuestionPayloadCacheWriteContext(propsRef.current, slug);
+    const cacheWriteContext: SurveyQuestionsLegacyValue = resolveQuestionPayloadCacheWriteContext(
+      propsRef.current,
+      slug,
+    );
     const netIdStr: SurveyQuestionsLegacyValue = cacheWriteContext.networkIdStr || '';
     if (!netIdStr) return;
 
@@ -2037,48 +2173,69 @@ const cacheQuestionPayloadForSlug = (slugIn: SurveyQuestionsLegacyValue, questio
     void writeQuestionsCache(slug, questionsCache);
   };
 
-const applyQuestionPayloadToRenderedPools = (questionId: SurveyQuestionsLegacyValue, questionPayload: SurveyQuestionsLegacyValue) => {
-    const qid: SurveyQuestionsLegacyValue = String(questionId || '').trim().toLowerCase();
+  const applyQuestionPayloadToRenderedPools = (
+    questionId: SurveyQuestionsLegacyValue,
+    questionPayload: SurveyQuestionsLegacyValue,
+  ) => {
+    const qid: SurveyQuestionsLegacyValue = String(questionId || '')
+      .trim()
+      .toLowerCase();
     if (!qid || !questionPayload) return;
 
-    setState((prev: SurveyQuestionsLegacyValue) => buildRenderedQuestionPayloadPoolsState(prev, qid, questionPayload, {
-      pickBetterQuestionPayload: pickBetterQuestionPayload as SurveyQuestionsLegacyValue,
-      areQuestionPayloadsEquivalent,
-    }));
+    setState((prev: SurveyQuestionsLegacyValue) =>
+      buildRenderedQuestionPayloadPoolsState(prev, qid, questionPayload, {
+        pickBetterQuestionPayload: pickBetterQuestionPayload as SurveyQuestionsLegacyValue,
+        areQuestionPayloadsEquivalent,
+      }),
+    );
   };
 
-const fetchQuestionPayloadWithDeterministicContext = async (questionId: SurveyQuestionsLegacyValue, opts: SurveyQuestionsLegacyValue = {}) => {
-    const qid: SurveyQuestionsLegacyValue = String(questionId || '').trim().toLowerCase();
+  const fetchQuestionPayloadWithDeterministicContext = async (
+    questionId: SurveyQuestionsLegacyValue,
+    opts: SurveyQuestionsLegacyValue = {},
+  ) => {
+    const qid: SurveyQuestionsLegacyValue = String(questionId || '')
+      .trim()
+      .toLowerCase();
     if (!qid) return { promptReady: false, bestQuestionData: null, bestSlug: '' };
 
     const currentQuestion: SurveyQuestionsLegacyValue =
       (Array.isArray(stateRef.current.questionPool)
-        ? stateRef.current.questionPool.find((q: SurveyQuestionsLegacyValue) => String(q?.id || '').toLowerCase() === qid)
+        ? stateRef.current.questionPool.find(
+            (q: SurveyQuestionsLegacyValue) => String(q?.id || '').toLowerCase() === qid,
+          )
         : null) ||
       (Array.isArray(stateRef.current.pileQuestions)
-        ? stateRef.current.pileQuestions.find((q: SurveyQuestionsLegacyValue) => String(q?.id || '').toLowerCase() === qid)
+        ? stateRef.current.pileQuestions.find(
+            (q: SurveyQuestionsLegacyValue) => String(q?.id || '').toLowerCase() === qid,
+          )
         : null) ||
       null;
 
     let bestQuestionData: SurveyQuestionsLegacyValue = currentQuestion ? { ...currentQuestion, id: qid } : null;
-    let bestSlug: SurveyQuestionsLegacyValue = String(opts.preferredSlug ?? inst._getEffectiveDraftSlug() ?? '').toLowerCase();
+    let bestSlug: SurveyQuestionsLegacyValue = String(
+      opts.preferredSlug ?? inst._getEffectiveDraftSlug() ?? '',
+    ).toLowerCase();
     const candidateSlugs: SurveyQuestionsLegacyValue = getQuestionFetchCandidateSlugs(qid, bestSlug);
     let fetchedAny: SurveyQuestionsLegacyValue = false;
 
     for (const candidateSlug of candidateSlugs) {
       const decryptContext: SurveyQuestionsLegacyValue = buildQuestionDecryptContext(candidateSlug);
-      const litReady: SurveyQuestionsLegacyValue = !!(decryptContext?.litHooks && typeof decryptContext.litHooks.getKey === 'function');
+      const litReady: SurveyQuestionsLegacyValue = !!(
+        decryptContext?.litHooks && typeof decryptContext.litHooks.getKey === 'function'
+      );
       try {
         const fetched: SurveyQuestionsLegacyValue = await surveyQuestionReadsPort.getQuestionData(
           propsRef.current.provider,
           qid,
           candidateSlug,
-          { decryptContext }
+          { decryptContext },
         );
         if (!fetched) continue;
         fetchedAny = true;
         const normalized: SurveyQuestionsLegacyValue = { ...fetched, id: qid };
-        const picked: SurveyQuestionsLegacyValue = pickBetterQuestionPayload(bestQuestionData, normalized) || normalized;
+        const picked: SurveyQuestionsLegacyValue =
+          pickBetterQuestionPayload(bestQuestionData, normalized) || normalized;
         bestQuestionData = picked;
         bestSlug = candidateSlug;
         cacheQuestionPayloadForSlug(candidateSlug, qid, picked);
@@ -2110,9 +2267,10 @@ const fetchQuestionPayloadWithDeterministicContext = async (questionId: SurveyQu
       const litHooks: SurveyQuestionsLegacyValue =
         propsRef.current.lit ||
         propsRef.current.litHooks ||
-        (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
+        (typeof window !== 'undefined' ? window.__litHooks || window.litHooks : null);
       const litReady: SurveyQuestionsLegacyValue = !!(litHooks && typeof litHooks.getKey === 'function');
-      const chainId: SurveyQuestionsLegacyValue = Number(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? 0) || null;
+      const chainId: SurveyQuestionsLegacyValue =
+        Number(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? 0) || null;
       const reason: SurveyQuestionsLegacyValue =
         !propsRef.current.loginComplete || !propsRef.current.account
           ? 'not_logged_in'
@@ -2141,8 +2299,10 @@ const fetchQuestionPayloadWithDeterministicContext = async (questionId: SurveyQu
     return { promptReady, bestQuestionData, bestSlug };
   };
 
-const handleReloadMaskedPrompt = async (questionId: SurveyQuestionsLegacyValue) => {
-    const qid: SurveyQuestionsLegacyValue = String(questionId || '').trim().toLowerCase();
+  const handleReloadMaskedPrompt = async (questionId: SurveyQuestionsLegacyValue) => {
+    const qid: SurveyQuestionsLegacyValue = String(questionId || '')
+      .trim()
+      .toLowerCase();
     if (!qid) return false;
     const key: SurveyQuestionsLegacyValue = getQuestionFieldTaskKey(qid, 'prompt');
 
@@ -2150,7 +2310,9 @@ const handleReloadMaskedPrompt = async (questionId: SurveyQuestionsLegacyValue) 
 
     try {
       const preferredSlug: SurveyQuestionsLegacyValue = inst._getEffectiveDraftSlug();
-      const result: SurveyQuestionsLegacyValue = await fetchQuestionPayloadWithDeterministicContext(qid, { preferredSlug });
+      const result: SurveyQuestionsLegacyValue = await fetchQuestionPayloadWithDeterministicContext(qid, {
+        preferredSlug,
+      });
 
       if (propsRef.current.singleQuestionMode && qid === String(propsRef.current.questionID || '').toLowerCase()) {
         await fetchSingleQuestionData({ forceQuestionMetadataRefetch: true });
@@ -2160,15 +2322,19 @@ const handleReloadMaskedPrompt = async (questionId: SurveyQuestionsLegacyValue) 
       // After a successful decrypt, refresh the visible pile cards from that source without
       // triggering a full filter/apply cycle that could wipe in-progress edits.
       if (result?.promptReady) {
-        setState((prev: SurveyQuestionsLegacyValue) => buildVisiblePileQuestionsAfterPromptDecryptState(prev, {
-          isFilterStateActive: isSurveyToolFilterStateActive,
-          isMaskedPromptText: isMaskedPromptText,
-        }));
+        setState((prev: SurveyQuestionsLegacyValue) =>
+          buildVisiblePileQuestionsAfterPromptDecryptState(prev, {
+            isFilterStateActive: isSurveyToolFilterStateActive,
+            isMaskedPromptText: isMaskedPromptText,
+          }),
+        );
       }
 
       const activePrompt: SurveyQuestionsLegacyValue = (() => {
         const q: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current.questionPool)
-          ? stateRef.current.questionPool.find((item: SurveyQuestionsLegacyValue) => String(item?.id || '').toLowerCase() === qid)
+          ? stateRef.current.questionPool.find(
+              (item: SurveyQuestionsLegacyValue) => String(item?.id || '').toLowerCase() === qid,
+            )
           : null;
         return q?.prompt;
       })();
@@ -2184,12 +2350,18 @@ const handleReloadMaskedPrompt = async (questionId: SurveyQuestionsLegacyValue) 
     }
   };
 
-const reloadMaskedQuestionBatch = async (questionIds: SurveyQuestionsLegacyValue = []) => {
-    const ids: SurveyQuestionsLegacyValue = Array.from(new Set(
-      (Array.isArray(questionIds) ? questionIds : [])
-        .map((qid: SurveyQuestionsLegacyValue) => String(qid || '').trim().toLowerCase())
-        .filter(Boolean)
-    ));
+  const reloadMaskedQuestionBatch = async (questionIds: SurveyQuestionsLegacyValue = []) => {
+    const ids: SurveyQuestionsLegacyValue = Array.from(
+      new Set(
+        (Array.isArray(questionIds) ? questionIds : [])
+          .map((qid: SurveyQuestionsLegacyValue) =>
+            String(qid || '')
+              .trim()
+              .toLowerCase(),
+          )
+          .filter(Boolean),
+      ),
+    );
     if (!ids.length) return;
 
     setState(buildBulkPromptReloadingState(true));
@@ -2203,8 +2375,10 @@ const reloadMaskedQuestionBatch = async (questionIds: SurveyQuestionsLegacyValue
     }
   };
 
-const renderPromptWithManualDecrypt = (question: SurveyQuestionsLegacyValue) => {
-    const qid: SurveyQuestionsLegacyValue = String(question?.id || '').trim().toLowerCase();
+  const renderPromptWithManualDecrypt = (question: SurveyQuestionsLegacyValue) => {
+    const qid: SurveyQuestionsLegacyValue = String(question?.id || '')
+      .trim()
+      .toLowerCase();
     const promptText: SurveyQuestionsLegacyValue = question?.prompt || 'Question';
     const promptMasked: SurveyQuestionsLegacyValue = isMaskedPromptText(promptText);
     const payloadDisplay: SurveyQuestionsLegacyValue = getQuestionPayloadDisplayState(question);
@@ -2251,7 +2425,7 @@ const renderPromptWithManualDecrypt = (question: SurveyQuestionsLegacyValue) => 
     );
   };
 
-const renderQuestionTagControl = (question: SurveyQuestionsLegacyValue, options: SurveyQuestionsLegacyValue = {}) => {
+  const renderQuestionTagControl = (question: SurveyQuestionsLegacyValue, options: SurveyQuestionsLegacyValue = {}) => {
     const { rowStyle }: SurveyQuestionsLegacyValue = options;
     return (
       <SurveyQuestionTagControl
@@ -2268,27 +2442,24 @@ const renderQuestionTagControl = (question: SurveyQuestionsLegacyValue, options:
     );
   };
 
-const renderQuestionTagDropdown = (question: SurveyQuestionsLegacyValue) => (
-    renderQuestionTagControl(question)
-  );
+  const renderQuestionTagDropdown = (question: SurveyQuestionsLegacyValue) => renderQuestionTagControl(question);
 
-const handleQuestionTagSelect = (tag: SurveyQuestionsLegacyValue) => {
+  const handleQuestionTagSelect = (tag: SurveyQuestionsLegacyValue) => {
     const normalizedTag: SurveyQuestionsLegacyValue = String(tag || '').trim();
     if (!normalizedTag) return;
     setState(buildActiveTagModalState(normalizedTag));
   };
 
-const closeQuestionTagModal = () => {
+  const closeQuestionTagModal = () => {
     setState(buildActiveTagModalState());
   };
 
-const renderQuestionTagDropdownRow = (question: SurveyQuestionsLegacyValue) => (
+  const renderQuestionTagDropdownRow = (question: SurveyQuestionsLegacyValue) =>
     renderQuestionTagControl(question, {
       rowStyle: QUESTION_TAG_DROPDOWN_ROW_STYLE,
-    })
-  );
+    });
 
-const getSliderMode = (questionId: SurveyQuestionsLegacyValue) => {
+  const getSliderMode = (questionId: SurveyQuestionsLegacyValue) => {
     return getQuestionSliderMode({
       explicitMode: stateRef.current.sliderModeByQuestion?.[questionId],
       isStandalone: propsRef.current.isStandalone,
@@ -2299,26 +2470,32 @@ const getSliderMode = (questionId: SurveyQuestionsLegacyValue) => {
     });
   };
 
-const setSliderMode = (questionId: SurveyQuestionsLegacyValue, mode: SurveyQuestionsLegacyValue) => {
-    setState((prev: SurveyQuestionsLegacyValue) => (
+  const setSliderMode = (questionId: SurveyQuestionsLegacyValue, mode: SurveyQuestionsLegacyValue) => {
+    setState((prev: SurveyQuestionsLegacyValue) =>
       // Track whether the conviction/importance control has been "opened" for engine question.
-      buildSliderModeStatePatch(prev, questionId, mode)
-    ));
+      buildSliderModeStatePatch(prev, questionId, mode),
+    );
   };
 
-const getConvictionValueForSlice = (slice: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue) => {
+  const getConvictionValueForSlice = (slice: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue) => {
     return getQuestionConvictionSliderValue(slice, questionId);
   };
 
-const getImportanceValueForSlice = (slice: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue) => {
+  const getImportanceValueForSlice = (slice: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue) => {
     return getQuestionImportanceSliderValue(slice, questionId);
   };
 
-const flushDraftPersistAfterSliderChange = () => {
+  const flushDraftPersistAfterSliderChange = () => {
     persistDraftSafely && persistDraftSafely(0);
   };
 
-const handleConvictionImportanceChange = (surveyIndex: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, mode: SurveyQuestionsLegacyValue, value: SurveyQuestionsLegacyValue, options: SurveyQuestionsLegacyValue = {}) => {
+  const handleConvictionImportanceChange = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    mode: SurveyQuestionsLegacyValue,
+    value: SurveyQuestionsLegacyValue,
+    options: SurveyQuestionsLegacyValue = {},
+  ) => {
     if (mode === 'importance') {
       handleImportance(surveyIndex, questionId, value, options);
     } else {
@@ -2326,7 +2503,7 @@ const handleConvictionImportanceChange = (surveyIndex: SurveyQuestionsLegacyValu
     }
   };
 
-const renderFullQuestionSliderSection = ({
+  const renderFullQuestionSliderSection = ({
     surveyIndex,
     questionId,
     sliderMode,
@@ -2344,24 +2521,15 @@ const renderFullQuestionSliderSection = ({
       importanceValue={importanceValue}
       isSubmitting={stateRef.current.isSubmitting}
       onChange={(value: SurveyQuestionsLegacyValue, event: SurveyQuestionsLegacyValue) =>
-        handleConvictionImportanceChange(
-          surveyIndex,
-          questionId,
-          sliderMode,
-          value,
-          buildSliderPersistOptions(event)
-        )}
+        handleConvictionImportanceChange(surveyIndex, questionId, sliderMode, value, buildSliderPersistOptions(event))
+      }
       onChangeComplete={flushDraftPersistAfterSliderChange}
-      onCommit={(committedValue: SurveyQuestionsLegacyValue) => handleConvictionImportanceChange(
-        surveyIndex,
-        questionId,
-        sliderMode,
-        committedValue,
-        {
+      onCommit={(committedValue: SurveyQuestionsLegacyValue) =>
+        handleConvictionImportanceChange(surveyIndex, questionId, sliderMode, committedValue, {
           persistDraft: false,
           afterUpdate: flushDraftPersistAfterSliderChange,
-        }
-      )}
+        })
+      }
       onSelectMode={(nextMode: SurveyQuestionsLegacyValue) => setSliderMode(questionId, nextMode)}
       questionId={questionId}
       singleQuestionMode={propsRef.current.singleQuestionMode}
@@ -2371,7 +2539,7 @@ const renderFullQuestionSliderSection = ({
     />
   );
 
-const renderFullQuestionResponseInput = ({
+  const renderFullQuestionResponseInput = ({
     question,
     qIndex,
     surveyIndex,
@@ -2387,31 +2555,23 @@ const renderFullQuestionResponseInput = ({
       singleQuestionMode={propsRef.current.singleQuestionMode}
       audioInputWorkerProps={getAudioInputWorkerProps()}
       onAnswerChange={(answerValue: SurveyQuestionsLegacyValue) => handleAnswer(surveyIndex, question.id, answerValue)}
-      onDeferredRatingCommit={(committedRating: SurveyQuestionsLegacyValue) => handleAnswer(
-        surveyIndex,
-        question.id,
-        committedRating,
-        {
+      onDeferredRatingCommit={(committedRating: SurveyQuestionsLegacyValue) =>
+        handleAnswer(surveyIndex, question.id, committedRating, {
           persistDraft: false,
           afterUpdate: flushDraftPersistAfterSliderChange,
-        }
-      )}
-      onRatingChange={(ratingAnswer: SurveyQuestionsLegacyValue, event: SurveyQuestionsLegacyValue) => handleAnswer(
-        surveyIndex,
-        question.id,
-        ratingAnswer,
-        buildSliderPersistOptions(event)
-      )}
+        })
+      }
+      onRatingChange={(ratingAnswer: SurveyQuestionsLegacyValue, event: SurveyQuestionsLegacyValue) =>
+        handleAnswer(surveyIndex, question.id, ratingAnswer, buildSliderPersistOptions(event))
+      }
       onRatingChangeComplete={flushDraftPersistAfterSliderChange}
-      onToggleAnswerEncryption={(newEncryptedState: SurveyQuestionsLegacyValue) => toggleAnswerEncryption(
-        surveyIndex,
-        question.id,
-        newEncryptedState
-      )}
+      onToggleAnswerEncryption={(newEncryptedState: SurveyQuestionsLegacyValue) =>
+        toggleAnswerEncryption(surveyIndex, question.id, newEncryptedState)
+      }
     />
   );
 
-const renderFullQuestionAdditionalInput = ({
+  const renderFullQuestionAdditionalInput = ({
     qIndex,
     surveyIndex,
     questionId,
@@ -2425,33 +2585,31 @@ const renderFullQuestionAdditionalInput = ({
       value={additional?.value || ''}
       encrypted={additional?.encrypted || false}
       dataTestId={E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT}
-      dataCeQuestionId={String(questionId || '').trim().toLowerCase()}
+      dataCeQuestionId={String(questionId || '')
+        .trim()
+        .toLowerCase()}
       disabled={stateRef.current.isSubmitting}
       forceGlow={glowAdditional}
-      updateFunction={(additionalCommentsValue: SurveyQuestionsLegacyValue) => handleAdditional(surveyIndex, questionId, additionalCommentsValue)}
+      updateFunction={(additionalCommentsValue: SurveyQuestionsLegacyValue) =>
+        handleAdditional(surveyIndex, questionId, additionalCommentsValue)
+      }
       toggleEncryption={(newEncryptedState: SurveyQuestionsLegacyValue) =>
         toggleAdditionalCommentsEncryption(surveyIndex, questionId, newEncryptedState)
       }
     />
   );
 
-const parseEncryptedEnvelope = (field: SurveyQuestionsLegacyValue) => (parseEncryptedEnvelopeHelper as SurveyQuestionsLegacyValue)(field);
+  const parseEncryptedEnvelope = (field: SurveyQuestionsLegacyValue) =>
+    (parseEncryptedEnvelopeHelper as SurveyQuestionsLegacyValue)(field);
 
-const getFieldDecryptState = ({
-    questionId,
-    fieldKey,
-    field,
-  }: SurveyQuestionsLegacyValue) => (buildFieldDecryptStateHelper as SurveyQuestionsLegacyValue)(field, {
-    loginComplete: propsRef.current.loginComplete,
-    account: propsRef.current.account,
-    busy: isQuestionFieldBusy(questionId, fieldKey),
-  });
+  const getFieldDecryptState = ({ questionId, fieldKey, field }: SurveyQuestionsLegacyValue) =>
+    (buildFieldDecryptStateHelper as SurveyQuestionsLegacyValue)(field, {
+      loginComplete: propsRef.current.loginComplete,
+      account: propsRef.current.account,
+      busy: isQuestionFieldBusy(questionId, fieldKey),
+    });
 
-const getQuestionFieldDisplayState = ({
-    questionId,
-    answer,
-    additional,
-  }: SurveyQuestionsLegacyValue) => {
+  const getQuestionFieldDisplayState = ({ questionId, answer, additional }: SurveyQuestionsLegacyValue) => {
     const answerDecryptState: SurveyQuestionsLegacyValue = getFieldDecryptState({
       questionId,
       fieldKey: 'answer',
@@ -2471,17 +2629,20 @@ const getQuestionFieldDisplayState = ({
     });
   };
 
-const getQuestionResponseDisplayState = ({
-    questionId,
-    responseSlice,
-  }: SurveyQuestionsLegacyValue) => {
+  const getQuestionResponseDisplayState = ({ questionId, responseSlice }: SurveyQuestionsLegacyValue) => {
     const slice: SurveyQuestionsLegacyValue = responseSlice || {};
     const answer: SurveyQuestionsLegacyValue = slice.answers?.[questionId] || buildEmptyResponseFieldState(questionId);
-    const additional: SurveyQuestionsLegacyValue = slice.additionalComments?.[questionId] || buildEmptyResponseFieldState(questionId, 'additional');
+    const additional: SurveyQuestionsLegacyValue =
+      slice.additionalComments?.[questionId] || buildEmptyResponseFieldState(questionId, 'additional');
     const convictionValue: SurveyQuestionsLegacyValue = getConvictionValueForSlice(slice, questionId);
     const importanceValue: SurveyQuestionsLegacyValue = getImportanceValueForSlice(slice, questionId);
-    const hasConvictionImportanceValue: SurveyQuestionsLegacyValue = hasConvictionOrImportanceValueForQuestion(slice, questionId);
-    const sliderMode: SurveyQuestionsLegacyValue = ENABLE_IMPORTANCE_SLIDER_TOGGLE ? getSliderMode(questionId) : 'conviction';
+    const hasConvictionImportanceValue: SurveyQuestionsLegacyValue = hasConvictionOrImportanceValueForQuestion(
+      slice,
+      questionId,
+    );
+    const sliderMode: SurveyQuestionsLegacyValue = ENABLE_IMPORTANCE_SLIDER_TOGGLE
+      ? getSliderMode(questionId)
+      : 'conviction';
     return (buildQuestionResponseDisplayStateHelper as SurveyQuestionsLegacyValue)({
       answer,
       additional,
@@ -2492,10 +2653,7 @@ const getQuestionResponseDisplayState = ({
     });
   };
 
-const getQuestionRenderDisplayState = ({
-    questionId,
-    responseSlice,
-  }: SurveyQuestionsLegacyValue) => {
+  const getQuestionRenderDisplayState = ({ questionId, responseSlice }: SurveyQuestionsLegacyValue) => {
     const responseDisplayState: SurveyQuestionsLegacyValue = getQuestionResponseDisplayState({
       questionId,
       responseSlice,
@@ -2512,53 +2670,49 @@ const getQuestionRenderDisplayState = ({
     });
   };
 
-const isQuestionPromptMasked = (question: SurveyQuestionsLegacyValue): boolean => isQuestionPromptMaskedHelper(question);
+  const isQuestionPromptMasked = (question: SurveyQuestionsLegacyValue): boolean =>
+    isQuestionPromptMaskedHelper(question);
 
-const getQuestionPayloadDisplayState = (question: SurveyQuestionsLegacyValue) => {
+  const getQuestionPayloadDisplayState = (question: SurveyQuestionsLegacyValue) => {
     const slug: SurveyQuestionsLegacyValue = normalizeSessionSlugValue(
       question?.sessionSlug ||
-      question?.sessionName ||
-      inst._getEffectiveDraftSlug() ||
-      resolveEffectiveSlug(propsRef.current)
+        question?.sessionName ||
+        inst._getEffectiveDraftSlug() ||
+        resolveEffectiveSlug(propsRef.current),
     );
-    const sessionConfig: SurveyQuestionsLegacyValue = slug ? (resolveExplicitSessionContext(slug).sessionConfig || null) : null;
+    const sessionConfig: SurveyQuestionsLegacyValue = slug
+      ? resolveExplicitSessionContext(slug).sessionConfig || null
+      : null;
     return resolveQuestionPayloadDisplayState(question, sessionConfig);
   };
 
-const getAnswerLockDisplayState = ({
-    field,
-    masked,
-  }: SurveyQuestionsLegacyValue) => buildAnswerLockDisplayState({
-    field,
-    masked,
-    isSubmitting: stateRef.current.isSubmitting,
-  });
+  const getAnswerLockDisplayState = ({ field, masked }: SurveyQuestionsLegacyValue) =>
+    buildAnswerLockDisplayState({
+      field,
+      masked,
+      isSubmitting: stateRef.current.isSubmitting,
+    });
 
-const getGatedPromptNoticeState = ({
-    question,
-    tooltipIdSuffix,
-    fallbackId = 'gated',
-  }: SurveyQuestionsLegacyValue) => buildGatedPromptNoticeState({
-    questionId: question?.id,
-    tooltipIdSuffix,
-    fallbackId,
-    gateNames: resolveGatedPromptGateNames(question),
-    sbtLabel: t('sbt'),
-    gateLabel: t('gate'),
-    gatesLabel: t('gates'),
-  });
+  const getGatedPromptNoticeState = ({ question, tooltipIdSuffix, fallbackId = 'gated' }: SurveyQuestionsLegacyValue) =>
+    buildGatedPromptNoticeState({
+      questionId: question?.id,
+      tooltipIdSuffix,
+      fallbackId,
+      gateNames: resolveGatedPromptGateNames(question),
+      sbtLabel: t('sbt'),
+      gateLabel: t('gate'),
+      gatesLabel: t('gates'),
+    });
 
-const renderGatedPromptNotice = ({
-    question,
-    tooltipIdSuffix,
-    fallbackId,
-  }: SurveyQuestionsLegacyValue) => {
+  const renderGatedPromptNotice = ({ question, tooltipIdSuffix, fallbackId }: SurveyQuestionsLegacyValue) => {
     const { tooltipId, tooltipText }: SurveyQuestionsLegacyValue = getGatedPromptNoticeState({
       question,
       tooltipIdSuffix,
       fallbackId,
     });
-    const qid: SurveyQuestionsLegacyValue = String(question?.id || '').trim().toLowerCase();
+    const qid: SurveyQuestionsLegacyValue = String(question?.id || '')
+      .trim()
+      .toLowerCase();
     const promptReloading: SurveyQuestionsLegacyValue = qid ? isQuestionFieldBusy(qid, 'prompt') : false;
     const canReloadPrompt: SurveyQuestionsLegacyValue = qid && isQuestionPromptMasked(question);
     const payloadDisplay: SurveyQuestionsLegacyValue = getQuestionPayloadDisplayState(question);
@@ -2591,11 +2745,7 @@ const renderGatedPromptNotice = ({
     );
   };
 
-const renderFullQuestionGatedPromptCard = ({
-    cardKey,
-    question,
-    cardIcons,
-  }: SurveyQuestionsLegacyValue) => (
+  const renderFullQuestionGatedPromptCard = ({ cardKey, question, cardIcons }: SurveyQuestionsLegacyValue) =>
     renderSurveyQuestionsFullQuestionGatedPromptCard({
       cardKey,
       promptContent: renderPromptWithManualDecrypt(question),
@@ -2606,27 +2756,20 @@ const renderFullQuestionGatedPromptCard = ({
         fallbackId: cardKey || 'gated',
       }),
       tagDropdownRow: renderQuestionTagDropdownRow(question),
-    })
-  );
+    });
 
-const renderQuestionMaskedPromptCard = ({
-    mode,
-    question,
-    cardKey,
-    cardIcons,
-  }: SurveyQuestionsLegacyValue) => (
+  const renderQuestionMaskedPromptCard = ({ mode, question, cardKey, cardIcons }: SurveyQuestionsLegacyValue) =>
     mode === 'full'
       ? renderFullQuestionGatedPromptCard({
           cardKey,
           question,
           cardIcons,
         })
-      : (typeof engine.renderPileGatedPromptCard === 'function'
+      : typeof engine.renderPileGatedPromptCard === 'function'
         ? engine.renderPileGatedPromptCard({ question })
-        : null)
-  );
+        : null;
 
-const renderQuestionAnswerLockControl = ({
+  const renderQuestionAnswerLockControl = ({
     surveyIndex,
     questionId,
     answer,
@@ -2634,41 +2777,43 @@ const renderQuestionAnswerLockControl = ({
     lockDisabled,
     lockTitle,
     visualContext,
-  }: SurveyQuestionsLegacyValue) => renderAnswerLockControl({
-    surveyIndex,
-    questionId,
-    answer,
-    lockDisabled,
-    lockTitle,
-    glowAnswer,
-    forceAudienceMenu: true,
-    selfAudienceLabel: 'only me',
-    visualContext,
-  });
+  }: SurveyQuestionsLegacyValue) =>
+    renderAnswerLockControl({
+      surveyIndex,
+      questionId,
+      answer,
+      lockDisabled,
+      lockTitle,
+      glowAnswer,
+      forceAudienceMenu: true,
+      selfAudienceLabel: 'only me',
+      visualContext,
+    });
 
-const renderQuestionAdditionalLockControl = ({
+  const renderQuestionAdditionalLockControl = ({
     surveyIndex,
     questionId,
     additional,
     glowAdditional,
     visualContext,
-  }: SurveyQuestionsLegacyValue) => renderAnswerLockControl({
-    surveyIndex,
-    questionId,
-    answer: additional,
-    field: additional,
-    fieldKey: 'additional',
-    lockDisabled: stateRef.current.isSubmitting,
-    lockTitle: additional.encrypted ? 'Encrypted comments' : 'Comments encryption audience',
-    glowAnswer: glowAdditional,
-    forceAudienceMenu: true,
-    selfAudienceLabel: 'only me',
-    showPlaintextOption: true,
-    showFollowOption: true,
-    visualContext,
-  });
+  }: SurveyQuestionsLegacyValue) =>
+    renderAnswerLockControl({
+      surveyIndex,
+      questionId,
+      answer: additional,
+      field: additional,
+      fieldKey: 'additional',
+      lockDisabled: stateRef.current.isSubmitting,
+      lockTitle: additional.encrypted ? 'Encrypted comments' : 'Comments encryption audience',
+      glowAnswer: glowAdditional,
+      forceAudienceMenu: true,
+      selfAudienceLabel: 'only me',
+      showPlaintextOption: true,
+      showFollowOption: true,
+      visualContext,
+    });
 
-const renderFullQuestionFooterIcons = ({
+  const renderFullQuestionFooterIcons = ({
     surveyIndex,
     question,
     answer,
@@ -2703,7 +2848,7 @@ const renderFullQuestionFooterIcons = ({
     );
   };
 
-const renderFullQuestionCardIcons = ({
+  const renderFullQuestionCardIcons = ({
     question,
     showResponseLookupSpinner,
     isQuestionBookmarked,
@@ -2716,14 +2861,14 @@ const renderFullQuestionCardIcons = ({
         arweaveHref={surveyResponseStoragePort.buildQuestionArweaveHref(question, {
           contextLabel: 'survey_tool_question_link',
         })}
-        questionHref={question.id
-          ? buildQuestionRoutePath(question.id, { sessionSlug: inst._getEffectiveDraftSlug() })
-          : ''}
+        questionHref={
+          question.id ? buildQuestionRoutePath(question.id, { sessionSlug: inst._getEffectiveDraftSlug() }) : ''
+        }
       />
     );
   };
 
-const renderQuestionFieldDecryptControl = ({
+  const renderQuestionFieldDecryptControl = ({
     questionId,
     fieldKey,
     allowDecrypt,
@@ -2733,7 +2878,9 @@ const renderQuestionFieldDecryptControl = ({
     showBusySpinnerWhenAutoDecryptEnabled = false,
     wrapperStyle,
   }: SurveyQuestionsLegacyValue) => {
-    const displayState: SurveyQuestionsLegacyValue = (buildQuestionFieldDecryptControlDisplayStateHelper as SurveyQuestionsLegacyValue)({
+    const displayState: SurveyQuestionsLegacyValue = (
+      buildQuestionFieldDecryptControlDisplayStateHelper as SurveyQuestionsLegacyValue
+    )({
       actionLabel,
       allowDecrypt,
       autoDecryptEnabled: stateRef.current.autoDecryptEnabled,
@@ -2745,14 +2892,11 @@ const renderQuestionFieldDecryptControl = ({
     });
 
     return (
-      <QuestionDecryptControl
-        {...displayState}
-        onClick={() => handleDecryptQuestionAnswer(questionId, fieldKey)}
-      />
+      <QuestionDecryptControl {...displayState} onClick={() => handleDecryptQuestionAnswer(questionId, fieldKey)} />
     );
   };
 
-const renderFullQuestionCardShell = ({
+  const renderFullQuestionCardShell = ({
     cardKey,
     question,
     cardIcons,
@@ -2773,7 +2917,7 @@ const renderFullQuestionCardShell = ({
     />
   );
 
-const areResponsesConsistent = (latest: SurveyQuestionsLegacyValue, surveyIndex: SurveyQuestionsLegacyValue) => {
+  const areResponsesConsistent = (latest: SurveyQuestionsLegacyValue, surveyIndex: SurveyQuestionsLegacyValue) => {
     return areSurveyResponsesConsistent({
       latest,
       editBaseline: stateRef.current.editBaseline,
@@ -2783,7 +2927,7 @@ const areResponsesConsistent = (latest: SurveyQuestionsLegacyValue, surveyIndex:
     });
   };
 
-const getEditTrackingQuestionIds = (surveyIndexParam: SurveyQuestionsLegacyValue = null) => {
+  const getEditTrackingQuestionIds = (surveyIndexParam: SurveyQuestionsLegacyValue = null) => {
     const ids: SurveyQuestionsLegacyValue = new Set();
     const add: SurveyQuestionsLegacyValue = (rawId: SurveyQuestionsLegacyValue) => {
       const normalized: SurveyQuestionsLegacyValue = normalizeQuestionIdKey(rawId);
@@ -2813,65 +2957,92 @@ const getEditTrackingQuestionIds = (surveyIndexParam: SurveyQuestionsLegacyValue
       }
       if (ids.size > 0) return ids;
 
-      if (Array.isArray(stateRef.current?.questionPool)) stateRef.current.questionPool.forEach((q: SurveyQuestionsLegacyValue) => add(q?.id));
-      if (Array.isArray(stateRef.current?.pileQuestions)) stateRef.current.pileQuestions.forEach((q: SurveyQuestionsLegacyValue) => add(q?.id));
-      if (Array.isArray(propsRef.current?.questionPool)) propsRef.current.questionPool.forEach((q: SurveyQuestionsLegacyValue) => add(q?.id));
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+      if (Array.isArray(stateRef.current?.questionPool))
+        stateRef.current.questionPool.forEach((q: SurveyQuestionsLegacyValue) => add(q?.id));
+      if (Array.isArray(stateRef.current?.pileQuestions))
+        stateRef.current.pileQuestions.forEach((q: SurveyQuestionsLegacyValue) => add(q?.id));
+      if (Array.isArray(propsRef.current?.questionPool))
+        propsRef.current.questionPool.forEach((q: SurveyQuestionsLegacyValue) => add(q?.id));
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
     return ids;
   };
 
-const getIndexedQuestionEntryKeys = (source: SurveyQuestionsLegacyValue) => {
+  const getIndexedQuestionEntryKeys = (source: SurveyQuestionsLegacyValue) => {
     if (!source || typeof source !== 'object') return null;
     try {
       const cached: SurveyQuestionsLegacyValue = inst._normalizedQuestionEntryKeyCache.get(source);
       if (cached) return cached;
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
     const result: SurveyQuestionsLegacyValue = buildIndexedQuestionEntryKeys(source, normalizeQuestionIdKey);
     try {
       if (result) inst._normalizedQuestionEntryKeyCache.set(source, result);
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
     return result;
   };
 
-const getChangedQidsAndFields = (surveyIndexParam: SurveyQuestionsLegacyValue) => measureSync('ce.surveyQuestions.getChangedQidsAndFields', () => {
-    const surveyIndex: SurveyQuestionsLegacyValue = getActiveSurveyIndex(surveyIndexParam);
-    const currentSlice: SurveyQuestionsLegacyValue =
-      (stateRef.current.surveysResponseState && stateRef.current.surveysResponseState[surveyIndex]) ||
-      { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-    const scopedIds: SurveyQuestionsLegacyValue = getEditTrackingQuestionIds(surveyIndex);
-    const { result, newCache }: SurveyQuestionsLegacyValue = orchestrateGetChangedQidsAndFields(
-      {
-        surveyIndex,
-        currentSlice,
-        isLoggedIn: !!(propsRef.current.account && propsRef.current.loginComplete),
-        isLoadingResponse: !!stateRef.current.isLoadingResponse,
-        scopedIds,
-        userAnswers: stateRef.current.userAnswers,
-      },
-      {
-        resolveDiffBaselineSlice: (allowLocalCache: SurveyQuestionsLegacyValue) => resolveDiffBaselineSlice(allowLocalCache),
-        getIndexedQuestionEntryKeys: (source: SurveyQuestionsLegacyValue) => getIndexedQuestionEntryKeys(source),
-        getDefaultResponseEncryptionAudience: () => getDefaultResponseEncryptionAudience(),
-        normalizeResponseEncryptionAudience: (audience: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue) => normalizeResponseEncryptionAudience(audience, qid),
-        getDefaultResponseEncryptionAudienceForQid: (qid: SurveyQuestionsLegacyValue) => getDefaultResponseEncryptionAudienceForQid(qid),
-        resolveFieldEncryptionGateId: (field: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fieldKey: SurveyQuestionsLegacyValue) => resolveFieldEncryptionGateId(field, qid, fieldKey),
-        normalizeFieldAudienceMode: (mode: SurveyQuestionsLegacyValue, fieldKey: SurveyQuestionsLegacyValue, field: SurveyQuestionsLegacyValue) => normalizeFieldAudienceMode(mode, fieldKey, field),
-        valuesEqual: valuesEqual,
-        buildSurveyResponseSliceSignature,
-        buildRatingEnvelopeQidSetFromUserAnswers,
-        hasMeaningfulFieldValue: hasMeaningfulFieldValue as SurveyQuestionsLegacyValue,
-        bumpPerfCounter: bumpSurveyPerfCounter,
-      },
-      inst._changedQidsAndFieldsCache,
-    );
-    if (newCache !== inst._changedQidsAndFieldsCache) {
-      inst._changedQidsAndFieldsCache = newCache;
-      inst._pendingEditStatsCache = null;
-    }
-    return result;
-  });
+  const getChangedQidsAndFields = (surveyIndexParam: SurveyQuestionsLegacyValue) =>
+    measureSync('ce.surveyQuestions.getChangedQidsAndFields', () => {
+      const surveyIndex: SurveyQuestionsLegacyValue = getActiveSurveyIndex(surveyIndexParam);
+      const currentSlice: SurveyQuestionsLegacyValue = (stateRef.current.surveysResponseState &&
+        stateRef.current.surveysResponseState[surveyIndex]) || {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      };
+      const scopedIds: SurveyQuestionsLegacyValue = getEditTrackingQuestionIds(surveyIndex);
+      const { result, newCache }: SurveyQuestionsLegacyValue = orchestrateGetChangedQidsAndFields(
+        {
+          surveyIndex,
+          currentSlice,
+          isLoggedIn: !!(propsRef.current.account && propsRef.current.loginComplete),
+          isLoadingResponse: !!stateRef.current.isLoadingResponse,
+          scopedIds,
+          userAnswers: stateRef.current.userAnswers,
+        },
+        {
+          resolveDiffBaselineSlice: (allowLocalCache: SurveyQuestionsLegacyValue) =>
+            resolveDiffBaselineSlice(allowLocalCache),
+          getIndexedQuestionEntryKeys: (source: SurveyQuestionsLegacyValue) => getIndexedQuestionEntryKeys(source),
+          getDefaultResponseEncryptionAudience: () => getDefaultResponseEncryptionAudience(),
+          normalizeResponseEncryptionAudience: (
+            audience: SurveyQuestionsLegacyValue,
+            qid: SurveyQuestionsLegacyValue,
+          ) => normalizeResponseEncryptionAudience(audience, qid),
+          getDefaultResponseEncryptionAudienceForQid: (qid: SurveyQuestionsLegacyValue) =>
+            getDefaultResponseEncryptionAudienceForQid(qid),
+          resolveFieldEncryptionGateId: (
+            field: SurveyQuestionsLegacyValue,
+            qid: SurveyQuestionsLegacyValue,
+            fieldKey: SurveyQuestionsLegacyValue,
+          ) => resolveFieldEncryptionGateId(field, qid, fieldKey),
+          normalizeFieldAudienceMode: (
+            mode: SurveyQuestionsLegacyValue,
+            fieldKey: SurveyQuestionsLegacyValue,
+            field: SurveyQuestionsLegacyValue,
+          ) => normalizeFieldAudienceMode(mode, fieldKey, field),
+          valuesEqual: valuesEqual,
+          buildSurveyResponseSliceSignature,
+          buildRatingEnvelopeQidSetFromUserAnswers,
+          hasMeaningfulFieldValue: hasMeaningfulFieldValue as SurveyQuestionsLegacyValue,
+          bumpPerfCounter: bumpSurveyPerfCounter,
+        },
+        inst._changedQidsAndFieldsCache,
+      );
+      if (newCache !== inst._changedQidsAndFieldsCache) {
+        inst._changedQidsAndFieldsCache = newCache;
+        inst._pendingEditStatsCache = null;
+      }
+      return result;
+    });
 
-const maybeAutoDecryptVisibleFields = () => {
+  const maybeAutoDecryptVisibleFields = () => {
     try {
       // Guard: do not run decrypt sweeps while an error is present (avoid clobber after failed submit)
       if (stateRef.current && stateRef.current.submissionError) {
@@ -2892,7 +3063,7 @@ const maybeAutoDecryptVisibleFields = () => {
       }
 
       const surveyIndex: SurveyQuestionsLegacyValue =
-        propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : (propsRef.current.surveyIndex || 0);
+        propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex || 0;
       const slice: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex];
       if (!slice) {
         inst._autoDecryptVisibleSweepCache = null;
@@ -2906,7 +3077,9 @@ const maybeAutoDecryptVisibleFields = () => {
         return;
       }
 
-      const accountLower: SurveyQuestionsLegacyValue = String(propsRef.current.account || '').trim().toLowerCase();
+      const accountLower: SurveyQuestionsLegacyValue = String(propsRef.current.account || '')
+        .trim()
+        .toLowerCase();
       const idsKey: SurveyQuestionsLegacyValue = buildRenderedIdsSignature(ids);
       const attempted: SurveyQuestionsLegacyValue = { ...(stateRef.current.autoDecryptAttempted || {}) };
       const inflight: SurveyQuestionsLegacyValue = { ...(stateRef.current.decryptingByKey || {}) };
@@ -2914,7 +3087,7 @@ const maybeAutoDecryptVisibleFields = () => {
       const queuedSet: SurveyQuestionsLegacyValue = new Set(
         Array.isArray(inst._autoDecQueue)
           ? inst._autoDecQueue.map((it: SurveyQuestionsLegacyValue) => `${it.qid}:${it.field}`)
-          : []
+          : [],
       );
       let visibleSignature: SurveyQuestionsLegacyValue = `${idsKey}|${accountLower}|${stateRef.current.autoDecryptEnabled ? 1 : 0}`;
       const toQueue: SurveyQuestionsLegacyValue = [];
@@ -2924,7 +3097,8 @@ const maybeAutoDecryptVisibleFields = () => {
         const qid: SurveyQuestionsLegacyValue = qidSource.toLowerCase();
         if (!qid) return;
         const ans: SurveyQuestionsLegacyValue = slice.answers?.[qidSource] ?? slice.answers?.[qid];
-        const add: SurveyQuestionsLegacyValue = slice.additionalComments?.[qidSource] ?? slice.additionalComments?.[qid];
+        const add: SurveyQuestionsLegacyValue =
+          slice.additionalComments?.[qidSource] ?? slice.additionalComments?.[qid];
 
         const kA: SurveyQuestionsLegacyValue = getQuestionFieldTaskKey(qid, 'answer');
         const kD: SurveyQuestionsLegacyValue = getQuestionFieldTaskKey(qid, 'additional');
@@ -2933,15 +3107,23 @@ const maybeAutoDecryptVisibleFields = () => {
         visibleSignature += `|${qid}|a:${answerSig}|d:${additionalSig}`;
 
         if (
-          ans && ans.value === '*' && (ans.encryptedPortion || ans.encrypted) &&
-          !attempted[kA] && !queuedSet.has(kA) && !inflight[kA] &&
+          ans &&
+          ans.value === '*' &&
+          (ans.encryptedPortion || ans.encrypted) &&
+          !attempted[kA] &&
+          !queuedSet.has(kA) &&
+          !inflight[kA] &&
           (!maskedAttemptSignature[kA] || maskedAttemptSignature[kA] !== answerSig)
         ) {
           toQueue.push({ qid, field: 'answer', maskedSig: answerSig });
         }
         if (
-          add && add.value === '*' && (add.encryptedPortion || add.encrypted) &&
-          !attempted[kD] && !queuedSet.has(kD) && !inflight[kD] &&
+          add &&
+          add.value === '*' &&
+          (add.encryptedPortion || add.encrypted) &&
+          !attempted[kD] &&
+          !queuedSet.has(kD) &&
+          !inflight[kD] &&
           (!maskedAttemptSignature[kD] || maskedAttemptSignature[kD] !== additionalSig)
         ) {
           toQueue.push({ qid, field: 'additional', maskedSig: additionalSig });
@@ -2984,7 +3166,7 @@ const maybeAutoDecryptVisibleFields = () => {
     }
   };
 
-const processAutoDecryptQueue = async () => {
+  const processAutoDecryptQueue = async () => {
     if (!stateRef.current.autoDecryptEnabled) {
       inst._autoDecQueue = [];
       inst._autoDecProcessing = false;
@@ -3033,7 +3215,11 @@ const processAutoDecryptQueue = async () => {
       inst._autoDecProcessing = false;
       // Deferred re-sweep: let setState callbacks settle before re-scanning
       Promise.resolve().then(() => {
-        try { queueAutoDecryptVisibleSweep('post-item'); } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+        try {
+          queueAutoDecryptVisibleSweep('post-item');
+        } catch (e: any) {
+          surveyLog.warn('SurveyTool: fallback', e);
+        }
       });
       if (inst._autoDecQueue.length > 0) {
         if (inst._autoDecProcessTimer) {
@@ -3048,9 +3234,12 @@ const processAutoDecryptQueue = async () => {
     }
   };
 
-const getDraftKey = () => {
+  const getDraftKey = () => {
     try {
-      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(propsRef.current, inst._getEffectiveDraftSlug());
+      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(
+        propsRef.current,
+        inst._getEffectiveDraftSlug(),
+      );
       const slug: SurveyQuestionsLegacyValue = draftContext.sessionSlug || '';
       const networkIdStr: SurveyQuestionsLegacyValue = draftContext.networkIdStr;
       const surveyScope: SurveyQuestionsLegacyValue = inst._getDraftScope();
@@ -3065,9 +3254,12 @@ const getDraftKey = () => {
     }
   };
 
-const loadDraft = () => {
+  const loadDraft = () => {
     try {
-      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(propsRef.current, inst._getEffectiveDraftSlug());
+      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(
+        propsRef.current,
+        inst._getEffectiveDraftSlug(),
+      );
       const slug: SurveyQuestionsLegacyValue = draftContext.sessionSlug || '';
       const networkIdStr: SurveyQuestionsLegacyValue = draftContext.networkIdStr;
 
@@ -3097,20 +3289,26 @@ const loadDraft = () => {
           if (!raw) return null;
           const parsedResult: SurveyQuestionsLegacyValue = parsePersistedDraftStorageValue({ raw });
           if (parsedResult.status !== 'valid') {
-            try { sessionStorage.removeItem(key); } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+            try {
+              sessionStorage.removeItem(key);
+            } catch (e: any) {
+              surveyLog.warn('SurveyTool: fallback', e);
+            }
             return null;
           }
           return { raw: parsedResult.raw, obj: parsedResult.payload };
-        } catch (_: any) { return null; }
+        } catch (_: any) {
+          return null;
+        }
       };
       const pend: SurveyQuestionsLegacyValue = readAndParse(pendingKey);
       const perQidAnon: SurveyQuestionsLegacyValue = anonPerQidKey ? readAndParse(anonPerQidKey) : null;
       const perQidAcct: SurveyQuestionsLegacyValue = acctPerQidKey ? readAndParse(acctPerQidKey) : null;
-      const rawDraftByKey: SurveyQuestionsLegacyValue = new Map(([
+      const rawDraftByKey: SurveyQuestionsLegacyValue = new Map([
         ...(pend ? [[pendingKey, pend]] : []),
         ...(perQidAnon ? [[anonPerQidKey, perQidAnon]] : []),
         ...(perQidAcct ? [[acctPerQidKey, perQidAcct]] : []),
-      ] as SurveyQuestionsLegacyValue));
+      ] as SurveyQuestionsLegacyValue);
       const loadPlan: SurveyQuestionsLegacyValue = buildSurveyDraftLoadPlan({
         hasAccount: !!accountLower,
         primaryAccountKey: acctKey,
@@ -3138,27 +3336,33 @@ const loadDraft = () => {
 
       const targetKey: SurveyQuestionsLegacyValue = accountLower ? acctKey : anonKey;
       const mergedRaw: SurveyQuestionsLegacyValue = JSON.stringify(mergedDraft);
-      const targetHit: SurveyQuestionsLegacyValue = draftHits.find((hit: SurveyQuestionsLegacyValue) => hit.readKey === targetKey);
+      const targetHit: SurveyQuestionsLegacyValue = draftHits.find(
+        (hit: SurveyQuestionsLegacyValue) => hit.readKey === targetKey,
+      );
       const shouldWriteTarget: SurveyQuestionsLegacyValue =
         !!targetKey &&
-        (
-          !targetHit ||
+        (!targetHit ||
           targetHit.raw !== mergedRaw ||
-          draftHits.some((hit: SurveyQuestionsLegacyValue) => hit.readKey !== targetKey || hit.writeKey)
-        );
+          draftHits.some((hit: SurveyQuestionsLegacyValue) => hit.readKey !== targetKey || hit.writeKey));
 
       let wroteTarget: SurveyQuestionsLegacyValue = !shouldWriteTarget;
       if (shouldWriteTarget) {
         try {
           sessionStorage.setItem(targetKey, mergedRaw);
           wroteTarget = true;
-        } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+        } catch (e: any) {
+          surveyLog.warn('SurveyTool: fallback', e);
+        }
       }
 
       if (wroteTarget && targetKey) {
         draftHits.forEach((hit: SurveyQuestionsLegacyValue) => {
           if (!hit.readKey || hit.readKey === targetKey) return;
-          try { sessionStorage.removeItem(hit.readKey); } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+          try {
+            sessionStorage.removeItem(hit.readKey);
+          } catch (e: any) {
+            surveyLog.warn('SurveyTool: fallback', e);
+          }
         });
       }
 
@@ -3172,7 +3376,7 @@ const loadDraft = () => {
     }
   };
 
-const migratePersistedDraftForActiveAccount = () => {
+  const migratePersistedDraftForActiveAccount = () => {
     try {
       if (!propsRef.current?.account) return null;
       return loadDraft();
@@ -3182,161 +3386,183 @@ const migratePersistedDraftForActiveAccount = () => {
     }
   };
 
-const persistDraftSafely = (delayMs: SurveyQuestionsLegacyValue = 150) => {
+  const persistDraftSafely = (delayMs: SurveyQuestionsLegacyValue = 150) => {
     if (inst._persistTimer) clearTimeout(inst._persistTimer);
     inst._persistTimer = setTimeout(persistDraft, delayMs);
   };
 
-const persistDraft = () => measureSync('ce.surveyQuestions.persistDraft', () => {
-    try {
-      const key: SurveyQuestionsLegacyValue = getDraftKey();
+  const persistDraft = () =>
+    measureSync('ce.surveyQuestions.persistDraft', () => {
+      try {
+        const key: SurveyQuestionsLegacyValue = getDraftKey();
 
-      // Guard null key and clean up malformed JSON
-      if (!key) return;
-      const keyTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingOnKeyChange({
-        nextDraftKey: key,
-        lastDraftKey: inst._lastDraftKey,
-        lastDraftJSON: inst._lastDraftJSON,
-        lastDraftSemanticSignature: inst._lastDraftSemanticSignature,
-        draftParseCache: inst._draftParseCache,
-      });
-      inst._applyDraftTrackingState(keyTracking);
-
-      migratePersistedDraftForActiveAccount();
-
-      // Preload prior persisted answers so we don't prune non-rendered QIDs
-      const {
-        prevAnswers,
-        prevBaseline,
-        prevDraftRaw,
-        prevSemanticSignature,
-        nextDraftParseCache,
-        shouldResetDraftTracking,
-      }: SurveyQuestionsLegacyValue = loadPreviousPersistedDraftSnapshot(
-        {
-          key,
+        // Guard null key and clean up malformed JSON
+        if (!key) return;
+        const keyTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingOnKeyChange({
+          nextDraftKey: key,
           lastDraftKey: inst._lastDraftKey,
           lastDraftJSON: inst._lastDraftJSON,
           lastDraftSemanticSignature: inst._lastDraftSemanticSignature,
           draftParseCache: inst._draftParseCache,
-        },
-        {
-          readDraftRaw: (draftKey: SurveyQuestionsLegacyValue) => sessionStorage.getItem(draftKey) || '',
-          removeDraftRaw: (draftKey: SurveyQuestionsLegacyValue) => sessionStorage.removeItem(draftKey),
-          buildSemanticSignature: buildSurveyDraftSemanticSignature,
-        },
-      );
-      const loadTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingAfterLoad({
-        lastDraftKey: inst._lastDraftKey,
-        lastDraftJSON: inst._lastDraftJSON,
-        lastDraftSemanticSignature: inst._lastDraftSemanticSignature,
-        draftParseCache: inst._draftParseCache,
-        nextDraftParseCache,
-        shouldResetDraftTracking,
-      });
-      inst._applyDraftTrackingState(loadTracking);
+        });
+        inst._applyDraftTrackingState(keyTracking);
 
-      const surveyIndex: SurveyQuestionsLegacyValue = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
-      const slice: SurveyQuestionsLegacyValue = (stateRef.current.surveysResponseState && stateRef.current.surveysResponseState[surveyIndex]) || {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {}
-      };
+        migratePersistedDraftForActiveAccount();
 
-      // Only persist rendered (or all if none rendered)
-      const renderedIds: SurveyQuestionsLegacyValue = getHydrationQuestionIds();
-      const dirtyQids: SurveyQuestionsLegacyValue = inst._draftDirtyQids ? [...inst._draftDirtyQids] : [];
-      const allowed: SurveyQuestionsLegacyValue = buildPersistDraftAllowedQuestionIds({
-        renderedQuestionIds: renderedIds,
-        dirtyQuestionIds: dirtyQids,
-        slice,
-      });
+        // Preload prior persisted answers so we don't prune non-rendered QIDs
+        const {
+          prevAnswers,
+          prevBaseline,
+          prevDraftRaw,
+          prevSemanticSignature,
+          nextDraftParseCache,
+          shouldResetDraftTracking,
+        }: SurveyQuestionsLegacyValue = loadPreviousPersistedDraftSnapshot(
+          {
+            key,
+            lastDraftKey: inst._lastDraftKey,
+            lastDraftJSON: inst._lastDraftJSON,
+            lastDraftSemanticSignature: inst._lastDraftSemanticSignature,
+            draftParseCache: inst._draftParseCache,
+          },
+          {
+            readDraftRaw: (draftKey: SurveyQuestionsLegacyValue) => sessionStorage.getItem(draftKey) || '',
+            removeDraftRaw: (draftKey: SurveyQuestionsLegacyValue) => sessionStorage.removeItem(draftKey),
+            buildSemanticSignature: buildSurveyDraftSemanticSignature,
+          },
+        );
+        const loadTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingAfterLoad({
+          lastDraftKey: inst._lastDraftKey,
+          lastDraftJSON: inst._lastDraftJSON,
+          lastDraftSemanticSignature: inst._lastDraftSemanticSignature,
+          draftParseCache: inst._draftParseCache,
+          nextDraftParseCache,
+          shouldResetDraftTracking,
+        });
+        inst._applyDraftTrackingState(loadTracking);
 
-      const baselineSlice: SurveyQuestionsLegacyValue = stateRef.current.editBaseline || { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-      // Start from previous draft answers/baseline so non-rendered QIDs survive,
-      // then overwrite only the currently allowed question set.
-      const { answersObj, baselineObj }: SurveyQuestionsLegacyValue = buildPersistedDraftMapsForAllowedIds({
-        allowedQuestionIds: allowed,
-        slice,
-        baselineSlice,
-        prevAnswers,
-        prevBaseline,
-        resolvers: {
-          resolveFieldEncryptionAudience: resolveFieldEncryptionAudience,
-          resolveFieldEncryptionGateId: resolveFieldEncryptionGateId,
-          normalizeFieldAudienceMode: normalizeFieldAudienceMode,
-        },
-      });
+        const surveyIndex: SurveyQuestionsLegacyValue =
+          propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
+        const slice: SurveyQuestionsLegacyValue = (stateRef.current.surveysResponseState &&
+          stateRef.current.surveysResponseState[surveyIndex]) || {
+          answers: {},
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        };
 
-      if (Object.keys(answersObj).length === 0) {
-        // No meaningful draft → clear both scoped variants (and SQM compat)
-        clearDraft();
-        return;
-      }
+        // Only persist rendered (or all if none rendered)
+        const renderedIds: SurveyQuestionsLegacyValue = getHydrationQuestionIds();
+        const dirtyQids: SurveyQuestionsLegacyValue = inst._draftDirtyQids ? [...inst._draftDirtyQids] : [];
+        const allowed: SurveyQuestionsLegacyValue = buildPersistDraftAllowedQuestionIds({
+          renderedQuestionIds: renderedIds,
+          dirtyQuestionIds: dirtyQids,
+          slice,
+        });
 
-      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(propsRef.current, inst._getEffectiveDraftSlug());
-      const slug: SurveyQuestionsLegacyValue = draftContext.sessionSlug || '';
-      const persistWritePlan: SurveyQuestionsLegacyValue = buildPersistedDraftWritePlan({
-        draftKey: key,
-        sessionSlug: slug,
-        networkIdStr: draftContext.networkIdStr,
-        account: propsRef.current?.account,
-        surveyScope: inst._getDraftScope(),
-        singleQuestionMode: propsRef.current.singleQuestionMode,
-      });
-      const payload: SurveyQuestionsLegacyValue = buildPersistedDraftPayload({
-        draftContext,
-        singleQuestionMode: propsRef.current.singleQuestionMode,
-        questionId: propsRef.current.questionID,
-        surveyId: propsRef.current.surveyId,
-        answersObj,
-        // Keep baseline in storage; prefill/merge logic depends on it to avoid false dirty diffs.
-        baselineObj,
-      });
+        const baselineSlice: SurveyQuestionsLegacyValue = stateRef.current.editBaseline || {
+          answers: {},
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        };
+        // Start from previous draft answers/baseline so non-rendered QIDs survive,
+        // then overwrite only the currently allowed question set.
+        const { answersObj, baselineObj }: SurveyQuestionsLegacyValue = buildPersistedDraftMapsForAllowedIds({
+          allowedQuestionIds: allowed,
+          slice,
+          baselineSlice,
+          prevAnswers,
+          prevBaseline,
+          resolvers: {
+            resolveFieldEncryptionAudience: resolveFieldEncryptionAudience,
+            resolveFieldEncryptionGateId: resolveFieldEncryptionGateId,
+            normalizeFieldAudienceMode: normalizeFieldAudienceMode,
+          },
+        });
 
-      const nextSemanticSignature: SurveyQuestionsLegacyValue = buildSurveyDraftSemanticSignature(payload);
-      if (nextSemanticSignature && nextSemanticSignature === prevSemanticSignature) {
-        inst._lastDraftJSON = prevDraftRaw || inst._lastDraftJSON;
-        inst._lastDraftSemanticSignature = nextSemanticSignature;
-        if (inst._draftDirtyQids) inst._draftDirtyQids.clear();
-        return;
-      }
+        if (Object.keys(answersObj).length === 0) {
+          // No meaningful draft → clear both scoped variants (and SQM compat)
+          clearDraft();
+          return;
+        }
 
-      const nextJson: SurveyQuestionsLegacyValue = JSON.stringify(payload);
-      if (nextJson === inst._lastDraftJSON) return;
-      try {
-        sessionStorage.setItem(key, nextJson);
-      } catch (e: any) {
-        surveyLog.warn('SurveyTool: draft persistence failed', e);
-        return;
-      }
+        const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(
+          propsRef.current,
+          inst._getEffectiveDraftSlug(),
+        );
+        const slug: SurveyQuestionsLegacyValue = draftContext.sessionSlug || '';
+        const persistWritePlan: SurveyQuestionsLegacyValue = buildPersistedDraftWritePlan({
+          draftKey: key,
+          sessionSlug: slug,
+          networkIdStr: draftContext.networkIdStr,
+          account: propsRef.current?.account,
+          surveyScope: inst._getDraftScope(),
+          singleQuestionMode: propsRef.current.singleQuestionMode,
+        });
+        const payload: SurveyQuestionsLegacyValue = buildPersistedDraftPayload({
+          draftContext,
+          singleQuestionMode: propsRef.current.singleQuestionMode,
+          questionId: propsRef.current.questionID,
+          surveyId: propsRef.current.surveyId,
+          answersObj,
+          // Keep baseline in storage; prefill/merge logic depends on it to avoid false dirty diffs.
+          baselineObj,
+        });
 
-      // SQM compat mirror under :questions (without :q:<qid>) for tooling/tests
-      if (persistWritePlan.compatWriteKey) {
+        const nextSemanticSignature: SurveyQuestionsLegacyValue = buildSurveyDraftSemanticSignature(payload);
+        if (nextSemanticSignature && nextSemanticSignature === prevSemanticSignature) {
+          inst._lastDraftJSON = prevDraftRaw || inst._lastDraftJSON;
+          inst._lastDraftSemanticSignature = nextSemanticSignature;
+          if (inst._draftDirtyQids) inst._draftDirtyQids.clear();
+          return;
+        }
+
+        const nextJson: SurveyQuestionsLegacyValue = JSON.stringify(payload);
+        if (nextJson === inst._lastDraftJSON) return;
         try {
-          sessionStorage.setItem(persistWritePlan.compatWriteKey, nextJson);
-        } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+          sessionStorage.setItem(key, nextJson);
+        } catch (e: any) {
+          surveyLog.warn('SurveyTool: draft persistence failed', e);
+          return;
+        }
+
+        // SQM compat mirror under :questions (without :q:<qid>) for tooling/tests
+        if (persistWritePlan.compatWriteKey) {
+          try {
+            sessionStorage.setItem(persistWritePlan.compatWriteKey, nextJson);
+          } catch (e: any) {
+            surveyLog.warn('SurveyTool: fallback', e);
+          }
+        }
+
+        const writeTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingAfterWrite({
+          key,
+          raw: nextJson,
+          payload,
+          semanticSignature: nextSemanticSignature,
+        });
+        inst._applyDraftTrackingState(writeTracking);
+        if (inst._draftDirtyQids) inst._draftDirtyQids.clear();
+
+        persistWritePlan.staleAnonKeys.forEach((draftKey: SurveyQuestionsLegacyValue) => {
+          try {
+            sessionStorage.removeItem(draftKey);
+          } catch (e: any) {
+            surveyLog.warn('SurveyTool: fallback', e);
+          }
+        });
+      } catch (e: any) {
+        surveyLog.warn('SurveyTool: fallback', e);
       }
+    });
 
-      const writeTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingAfterWrite({
-        key,
-        raw: nextJson,
-        payload,
-        semanticSignature: nextSemanticSignature,
-      });
-      inst._applyDraftTrackingState(writeTracking);
-      if (inst._draftDirtyQids) inst._draftDirtyQids.clear();
-
-      persistWritePlan.staleAnonKeys.forEach((draftKey: SurveyQuestionsLegacyValue) => {
-        try { sessionStorage.removeItem(draftKey); } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
-      });
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
-  });
-
-const clearDraft = () => {
+  const clearDraft = () => {
     try {
-      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(propsRef.current, inst._getEffectiveDraftSlug());
+      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(
+        propsRef.current,
+        inst._getEffectiveDraftSlug(),
+      );
       const slug: SurveyQuestionsLegacyValue = draftContext.sessionSlug || '';
       const networkIdStr: SurveyQuestionsLegacyValue = draftContext.networkIdStr;
 
@@ -3349,16 +3575,27 @@ const clearDraft = () => {
         surveyScope,
       });
 
-      purgeKeys.forEach((k: any) => { try { sessionStorage.removeItem(k); } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); } });
+      purgeKeys.forEach((k: any) => {
+        try {
+          sessionStorage.removeItem(k);
+        } catch (e: any) {
+          surveyLog.warn('SurveyTool: fallback', e);
+        }
+      });
 
       const clearedTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingClearedState();
       inst._applyDraftTrackingState(clearedTracking);
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
   };
 
-const clearDraftFor = (qid: SurveyQuestionsLegacyValue) => {
+  const clearDraftFor = (qid: SurveyQuestionsLegacyValue) => {
     try {
-      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(propsRef.current, inst._getEffectiveDraftSlug());
+      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(
+        propsRef.current,
+        inst._getEffectiveDraftSlug(),
+      );
       const slug: SurveyQuestionsLegacyValue = draftContext.sessionSlug || '';
       const networkIdStr: SurveyQuestionsLegacyValue = draftContext.networkIdStr;
 
@@ -3384,7 +3621,11 @@ const clearDraftFor = (qid: SurveyQuestionsLegacyValue) => {
             buildSemanticSignature: buildSurveyDraftSemanticSignature,
           });
           if (removalPlan.action === 'delete-storage') {
-            try { sessionStorage.removeItem(key); } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+            try {
+              sessionStorage.removeItem(key);
+            } catch (e: any) {
+              surveyLog.warn('SurveyTool: fallback', e);
+            }
             const deleteTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingAfterScopedDelete({
               key,
               lastDraftKey: inst._lastDraftKey,
@@ -3396,27 +3637,35 @@ const clearDraftFor = (qid: SurveyQuestionsLegacyValue) => {
             return;
           }
           if (removalPlan.action === 'update-storage' && removalPlan.nextPayload && removalPlan.nextJson) {
-              sessionStorage.setItem(key, removalPlan.nextJson);
-              const writeTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingAfterWrite({
-                key,
-                raw: removalPlan.nextJson,
-                payload: removalPlan.nextPayload,
-                semanticSignature: removalPlan.nextSemanticSignature,
-              });
-              inst._applyDraftTrackingState(writeTracking);
+            sessionStorage.setItem(key, removalPlan.nextJson);
+            const writeTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingAfterWrite({
+              key,
+              raw: removalPlan.nextJson,
+              payload: removalPlan.nextPayload,
+              semanticSignature: removalPlan.nextSemanticSignature,
+            });
+            inst._applyDraftTrackingState(writeTracking);
           }
-        } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+        } catch (e: any) {
+          surveyLog.warn('SurveyTool: fallback', e);
+        }
       });
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
   };
 
-const getCurrentRenderedQuestionIds = () => {
+  const getCurrentRenderedQuestionIds = () => {
     const runtimeStrategy: SurveyQuestionsLegacyValue = getRuntimeStrategy();
     if (typeof runtimeStrategy?.getCurrentRenderedQuestionIds === 'function') {
       return runtimeStrategy.getCurrentRenderedQuestionIds(engine);
     }
-    const questionPool: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current?.questionPool) ? stateRef.current.questionPool : [];
-    const pileQuestions: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current?.pileQuestions) ? stateRef.current.pileQuestions : [];
+    const questionPool: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current?.questionPool)
+      ? stateRef.current.questionPool
+      : [];
+    const pileQuestions: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current?.pileQuestions)
+      ? stateRef.current.pileQuestions
+      : [];
     const singleQuestionMode: SurveyQuestionsLegacyValue = !!propsRef.current.singleQuestionMode;
     const questionId: SurveyQuestionsLegacyValue = String(propsRef.current.questionID || '');
     if (
@@ -3437,7 +3686,9 @@ const getCurrentRenderedQuestionIds = () => {
         questionPool,
         pileQuestions,
       });
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
     inst._currentRenderedQuestionIdsCache = renderedIds;
     inst._currentRenderedQuestionIdsCacheQuestionPool = questionPool;
     inst._currentRenderedQuestionIdsCacheQuestionPoolLength = questionPool.length;
@@ -3448,14 +3699,17 @@ const getCurrentRenderedQuestionIds = () => {
     return renderedIds;
   };
 
-const getHydrationQuestionIds = () => {
+  const getHydrationQuestionIds = () => {
     return readRenderedQuestionIds({
       getRenderedQuestionIds: () => getCurrentRenderedQuestionIds(),
       normalizeRenderedIds: buildNormalizedRenderedQuestionIds,
     });
   };
 
-const buildLocalCacheHydrationSignature = (surveyIndex: SurveyQuestionsLegacyValue, renderedIds: SurveyQuestionsLegacyValue = []) => {
+  const buildLocalCacheHydrationSignature = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    renderedIds: SurveyQuestionsLegacyValue = [],
+  ) => {
     try {
       return resolveLocalCacheHydrationSignatureLookup({
         surveyIndex,
@@ -3468,7 +3722,8 @@ const buildLocalCacheHydrationSignature = (surveyIndex: SurveyQuestionsLegacyVal
         suppressPrefill: stateRef.current?.suppressPrefill,
         submissionError: stateRef.current?.submissionError,
         submissionComplete: stateRef.current?.submissionComplete,
-        resolveResponseHydrationContext: (rawSlug: SurveyQuestionsLegacyValue) => resolveResponseHydrationContext(propsRef.current, rawSlug),
+        resolveResponseHydrationContext: (rawSlug: SurveyQuestionsLegacyValue) =>
+          resolveResponseHydrationContext(propsRef.current, rawSlug),
         normalizeSessionSlugValue,
         getExtraScopeSlugs: (slug: SurveyQuestionsLegacyValue) => getExtraQuestionReadSlugs(propsRef.current, slug),
       });
@@ -3477,14 +3732,17 @@ const buildLocalCacheHydrationSignature = (surveyIndex: SurveyQuestionsLegacyVal
     }
   };
 
-const getRenderedQuestionIdsForResponseHydration = () => {
+  const getRenderedQuestionIdsForResponseHydration = () => {
     return readRenderedQuestionIds({
       getRenderedQuestionIds: () => getCurrentRenderedQuestionIds(),
       normalizeRenderedIds: buildNormalizedRenderedQuestionIds,
     });
   };
 
-const resolveQuestionSlugMapForIds = (questionIds: SurveyQuestionsLegacyValue = [], opts: SurveyQuestionsLegacyValue = {}) => {
+  const resolveQuestionSlugMapForIds = (
+    questionIds: SurveyQuestionsLegacyValue = [],
+    opts: SurveyQuestionsLegacyValue = {},
+  ) => {
     return resolveQuestionSlugMapLookup({
       questionIds,
       questionPool: stateRef.current?.questionPool,
@@ -3500,7 +3758,11 @@ const resolveQuestionSlugMapForIds = (questionIds: SurveyQuestionsLegacyValue = 
     });
   };
 
-const resolveSubmissionGroupContext = ({ questionIds = [], surveyId = null, fallbackSlug = null }: SurveyQuestionsLegacyValue = {}) => {
+  const resolveSubmissionGroupContext = ({
+    questionIds = [],
+    surveyId = null,
+    fallbackSlug = null,
+  }: SurveyQuestionsLegacyValue = {}) => {
     return buildSubmissionGroupContext({
       questionIds,
       slugByQuestionId: resolveQuestionSlugMapForIds(questionIds, { surveyId }),
@@ -3509,7 +3771,7 @@ const resolveSubmissionGroupContext = ({ questionIds = [], surveyId = null, fall
     });
   };
 
-const getMissingRenderedResponseIdsForAccount = async (opts: SurveyQuestionsLegacyValue = {}) => {
+  const getMissingRenderedResponseIdsForAccount = async (opts: SurveyQuestionsLegacyValue = {}) => {
     const fallbackSlug: SurveyQuestionsLegacyValue = resolveEffectiveSlug(propsRef.current);
     return resolveSurveyMissingRenderedResponseLookup({
       props: propsRef.current,
@@ -3517,19 +3779,22 @@ const getMissingRenderedResponseIdsForAccount = async (opts: SurveyQuestionsLega
       slug: opts?.slug ?? inst._getEffectiveDraftSlug() ?? fallbackSlug,
       fallbackSlug,
       renderedIds: getRenderedQuestionIdsForResponseHydration(),
-      resolveResponseHydrationContext: (nextSlug: SurveyQuestionsLegacyValue) => resolveResponseHydrationContext(propsRef.current, nextSlug),
+      resolveResponseHydrationContext: (nextSlug: SurveyQuestionsLegacyValue) =>
+        resolveResponseHydrationContext(propsRef.current, nextSlug),
       normalizeSessionSlugValue,
-      getExtraScopeSlugs: (slug: SurveyQuestionsLegacyValue) => (
-        propsRef.current?.minifiedMode === 'pile'
-          ? getExtraQuestionReadSlugs(propsRef.current, slug)
-          : []
-      ),
-      resolveQuestionSlugMapForIds: (questionIds: SurveyQuestionsLegacyValue, context: SurveyQuestionsLegacyValue) => resolveQuestionSlugMapForIds(
-        questionIds,
-        { surveyId: context?.surveyId || null }
-      ),
-      resolveScopeNetId: (resolvedSlug: SurveyQuestionsLegacyValue, entryNetId: SurveyQuestionsLegacyValue, fallbackNetId: SurveyQuestionsLegacyValue) => {
-        const resolvedContext: SurveyQuestionsLegacyValue = resolveResponseHydrationContext(propsRef.current, normalizeSessionSlugValue(resolvedSlug));
+      getExtraScopeSlugs: (slug: SurveyQuestionsLegacyValue) =>
+        propsRef.current?.minifiedMode === 'pile' ? getExtraQuestionReadSlugs(propsRef.current, slug) : [],
+      resolveQuestionSlugMapForIds: (questionIds: SurveyQuestionsLegacyValue, context: SurveyQuestionsLegacyValue) =>
+        resolveQuestionSlugMapForIds(questionIds, { surveyId: context?.surveyId || null }),
+      resolveScopeNetId: (
+        resolvedSlug: SurveyQuestionsLegacyValue,
+        entryNetId: SurveyQuestionsLegacyValue,
+        fallbackNetId: SurveyQuestionsLegacyValue,
+      ) => {
+        const resolvedContext: SurveyQuestionsLegacyValue = resolveResponseHydrationContext(
+          propsRef.current,
+          normalizeSessionSlugValue(resolvedSlug),
+        );
         return resolvedContext.networkIdStr || entryNetId || fallbackNetId;
       },
       readQuestionsCacheAsync,
@@ -3537,16 +3802,17 @@ const getMissingRenderedResponseIdsForAccount = async (opts: SurveyQuestionsLega
     });
   };
 
-const ensurePriorResponsesForRenderedIds = async (opts: SurveyQuestionsLegacyValue = {}) => {
+  const ensurePriorResponsesForRenderedIds = async (opts: SurveyQuestionsLegacyValue = {}) => {
     return executeSurveyPriorResponseBackfill({
       props: propsRef.current,
       state: stateRef.current,
       slug: opts?.slug,
       attemptedSet: inst._priorResponseBackfillAttempted,
-      getMissingRenderedResponseIdsForAccount: ({ responder, slug: nextSlug }: SurveyQuestionsLegacyValue) => getMissingRenderedResponseIdsForAccount({
-        responder,
-        slug: nextSlug,
-      }),
+      getMissingRenderedResponseIdsForAccount: ({ responder, slug: nextSlug }: SurveyQuestionsLegacyValue) =>
+        getMissingRenderedResponseIdsForAccount({
+          responder,
+          slug: nextSlug,
+        }),
       setHydratingState: (active: SurveyQuestionsLegacyValue) => setState(buildHydratingPriorResponsesState(active)),
       isMounted: inst._isMounted,
       readQuestionsCacheAsync,
@@ -3567,12 +3833,9 @@ const ensurePriorResponsesForRenderedIds = async (opts: SurveyQuestionsLegacyVal
     });
   };
 
-const rehydrateDraftForRenderedIds = (forceOverwriteOrOptions: SurveyQuestionsLegacyValue = false) => {
-    const hasOptions: SurveyQuestionsLegacyValue = (
-      forceOverwriteOrOptions &&
-      typeof forceOverwriteOrOptions === 'object' &&
-      !Array.isArray(forceOverwriteOrOptions)
-    );
+  const rehydrateDraftForRenderedIds = (forceOverwriteOrOptions: SurveyQuestionsLegacyValue = false) => {
+    const hasOptions: SurveyQuestionsLegacyValue =
+      forceOverwriteOrOptions && typeof forceOverwriteOrOptions === 'object' && !Array.isArray(forceOverwriteOrOptions);
     const options: SurveyQuestionsLegacyValue = hasOptions ? forceOverwriteOrOptions : {};
     const forceOverwrite: SurveyQuestionsLegacyValue = hasOptions
       ? !!options.forceOverwrite
@@ -3590,15 +3853,18 @@ const rehydrateDraftForRenderedIds = (forceOverwriteOrOptions: SurveyQuestionsLe
       cloneBaseline: deepClone,
       setState: setStateForHydration,
       updateJsonPreview: updateJsonPreview,
-      onError: (error: SurveyQuestionsLegacyValue) => { surveyLog.warn('SurveyTool: fallback', error); },
-      buildDraftRunPlan: (args: SurveyQuestionsLegacyValue) => buildDraftHydrationRunPlan({
-        ...args,
-        forceOverwrite,
-      }),
+      onError: (error: SurveyQuestionsLegacyValue) => {
+        surveyLog.warn('SurveyTool: fallback', error);
+      },
+      buildDraftRunPlan: (args: SurveyQuestionsLegacyValue) =>
+        buildDraftHydrationRunPlan({
+          ...args,
+          forceOverwrite,
+        }),
     });
   };
 
-const resetFormStateForAccountChange = (callback: SurveyQuestionsLegacyValue) => {
+  const resetFormStateForAccountChange = (callback: SurveyQuestionsLegacyValue) => {
     executeSurveyFormStateReset({
       props: propsRef.current,
       state: stateRef.current,
@@ -3614,18 +3880,27 @@ const resetFormStateForAccountChange = (callback: SurveyQuestionsLegacyValue) =>
       setState: setState.bind(engine),
       callback,
       updateSubmittedSinceLastEdit,
-      onPersistError: (error: SurveyQuestionsLegacyValue) => { surveyLog.warn('SurveyTool: fallback', error); },
-      onCleanupError: (error: SurveyQuestionsLegacyValue) => { surveyLog.warn('SurveyTool: cleanup', error); },
+      onPersistError: (error: SurveyQuestionsLegacyValue) => {
+        surveyLog.warn('SurveyTool: fallback', error);
+      },
+      onCleanupError: (error: SurveyQuestionsLegacyValue) => {
+        surveyLog.warn('SurveyTool: cleanup', error);
+      },
     });
   };
 
-const deepClone = (obj: SurveyQuestionsLegacyValue) => {
-    try { return JSON.parse(JSON.stringify(obj)); } catch { return obj; }
+  const deepClone = (obj: SurveyQuestionsLegacyValue) => {
+    try {
+      return JSON.parse(JSON.stringify(obj));
+    } catch {
+      return obj;
+    }
   };
 
-const valuesEqual = (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) => {
+  const valuesEqual = (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) => {
     // Normalize empties
-    const norm: SurveyQuestionsLegacyValue = (v: SurveyQuestionsLegacyValue) => (v === undefined || v === '') ? null : v;
+    const norm: SurveyQuestionsLegacyValue = (v: SurveyQuestionsLegacyValue) =>
+      v === undefined || v === '' ? null : v;
 
     // Arrays: compare order-sensitive (checkbox order is stable)
     if (Array.isArray(a) || Array.isArray(b)) {
@@ -3636,7 +3911,8 @@ const valuesEqual = (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValu
     }
 
     // Numbers vs strings: compare numerically if either is a number-like
-    const an: SurveyQuestionsLegacyValue = Number(a); const bn: SurveyQuestionsLegacyValue = Number(b);
+    const an: SurveyQuestionsLegacyValue = Number(a);
+    const bn: SurveyQuestionsLegacyValue = Number(b);
     const aNumLike: SurveyQuestionsLegacyValue = !Number.isNaN(an) && a !== null && a !== '' && typeof a !== 'object';
     const bNumLike: SurveyQuestionsLegacyValue = !Number.isNaN(bn) && b !== null && b !== '' && typeof b !== 'object';
     if (aNumLike || bNumLike) return Number(a) === Number(b);
@@ -3644,28 +3920,44 @@ const valuesEqual = (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValu
     return String(norm(a)) === String(norm(b));
   };
 
-const computeModifiedQuestionsCount = (baselineSlice: SurveyQuestionsLegacyValue, currentSlice: SurveyQuestionsLegacyValue) => {
+  const computeModifiedQuestionsCount = (
+    baselineSlice: SurveyQuestionsLegacyValue,
+    currentSlice: SurveyQuestionsLegacyValue,
+  ) => {
     if (!baselineSlice || !currentSlice) return 0;
 
-    const addNormalizedIds: SurveyQuestionsLegacyValue = (idsSet: SurveyQuestionsLegacyValue, source: SurveyQuestionsLegacyValue) => {
+    const addNormalizedIds: SurveyQuestionsLegacyValue = (
+      idsSet: SurveyQuestionsLegacyValue,
+      source: SurveyQuestionsLegacyValue,
+    ) => {
       Object.keys(source || {}).forEach((rawKey: SurveyQuestionsLegacyValue) => {
         const normalized: SurveyQuestionsLegacyValue = normalizeQuestionIdKey(rawKey);
         if (normalized) idsSet.add(normalized);
       });
     };
-    const pickField: SurveyQuestionsLegacyValue = (source: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue) => {
+    const pickField: SurveyQuestionsLegacyValue = (
+      source: SurveyQuestionsLegacyValue,
+      qid: SurveyQuestionsLegacyValue,
+    ) => {
       if (!source || typeof source !== 'object') return {};
       if (source[qid] && typeof source[qid] === 'object') return source[qid];
-      const rawKey: SurveyQuestionsLegacyValue = Object.keys(source).find((k: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(k) === qid);
-      return (rawKey && source[rawKey] && typeof source[rawKey] === 'object') ? source[rawKey] : {};
+      const rawKey: SurveyQuestionsLegacyValue = Object.keys(source).find(
+        (k: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(k) === qid,
+      );
+      return rawKey && source[rawKey] && typeof source[rawKey] === 'object' ? source[rawKey] : {};
     };
-    const pickNumber: SurveyQuestionsLegacyValue = (source: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue) => {
+    const pickNumber: SurveyQuestionsLegacyValue = (
+      source: SurveyQuestionsLegacyValue,
+      qid: SurveyQuestionsLegacyValue,
+    ) => {
       if (!source || typeof source !== 'object') return null;
       if (Object.prototype.hasOwnProperty.call(source, qid)) {
         const n: SurveyQuestionsLegacyValue = Number(source[qid]);
         return Number.isFinite(n) ? n : null;
       }
-      const rawKey: SurveyQuestionsLegacyValue = Object.keys(source).find((k: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(k) === qid);
+      const rawKey: SurveyQuestionsLegacyValue = Object.keys(source).find(
+        (k: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(k) === qid,
+      );
       if (!rawKey) return null;
       const n: SurveyQuestionsLegacyValue = Number(source[rawKey]);
       return Number.isFinite(n) ? n : null;
@@ -3708,7 +4000,7 @@ const computeModifiedQuestionsCount = (baselineSlice: SurveyQuestionsLegacyValue
     return count;
   };
 
-const handleRevertPendingChanges = () => {
+  const handleRevertPendingChanges = () => {
     executeSurveyPendingRevert({
       props: propsRef.current,
       state: stateRef.current,
@@ -3727,25 +4019,28 @@ const handleRevertPendingChanges = () => {
     });
   };
 
-const buildSliceFromUserAnswers = (userAnswers: SurveyQuestionsLegacyValue, prevSlice: SurveyQuestionsLegacyValue = null) => buildHydratedResponseSlice({
-    userAnswers,
-    prevSlice,
-    applyResponseHydrationListToSlice: inst._applyResponseHydrationListToSlice,
-    parseValue: (value: SurveyQuestionsLegacyValue) => {
-      try {
-        if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
-          return JSON.parse(value);
+  const buildSliceFromUserAnswers = (
+    userAnswers: SurveyQuestionsLegacyValue,
+    prevSlice: SurveyQuestionsLegacyValue = null,
+  ) =>
+    buildHydratedResponseSlice({
+      userAnswers,
+      prevSlice,
+      applyResponseHydrationListToSlice: inst._applyResponseHydrationListToSlice,
+      parseValue: (value: SurveyQuestionsLegacyValue) => {
+        try {
+          if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
+            return JSON.parse(value);
+          }
+        } catch (e: any) {
+          surveyLog.warn('SurveyTool: fallback', e);
         }
-      } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
-      return value;
-    },
-  });
+        return value;
+      },
+    });
 
-const resolveDiffBaselineSlice = (allowLocalCache: SurveyQuestionsLegacyValue = false) => {
-    const {
-      baselineSlice,
-      nextUserAnswersSliceCache,
-    }: SurveyQuestionsLegacyValue = resolveSurveyBaselineSourceSlice({
+  const resolveDiffBaselineSlice = (allowLocalCache: SurveyQuestionsLegacyValue = false) => {
+    const { baselineSlice, nextUserAnswersSliceCache }: SurveyQuestionsLegacyValue = resolveSurveyBaselineSourceSlice({
       editBaseline: stateRef.current.editBaseline,
       allowLocalCache,
       userAnswers: stateRef.current.userAnswers,
@@ -3757,8 +4052,12 @@ const resolveDiffBaselineSlice = (allowLocalCache: SurveyQuestionsLegacyValue = 
     return baselineSlice;
   };
 
-const prefillSurveyResponses = (userAnswers: SurveyQuestionsLegacyValue, options: SurveyQuestionsLegacyValue = {}) => {
-    const surveyIndex: SurveyQuestionsLegacyValue = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : (propsRef.current.surveyIndex || 0);
+  const prefillSurveyResponses = (
+    userAnswers: SurveyQuestionsLegacyValue,
+    options: SurveyQuestionsLegacyValue = {},
+  ) => {
+    const surveyIndex: SurveyQuestionsLegacyValue =
+      propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex || 0;
     const setStateForPrefill: SurveyQuestionsLegacyValue = options?.responseHydrationOwned
       ? setResponseHydrationState.bind(engine)
       : setState.bind(engine);
@@ -3775,13 +4074,14 @@ const prefillSurveyResponses = (userAnswers: SurveyQuestionsLegacyValue, options
     });
   };
 
-const buildSliceFromLocalCache = () => {
+  const buildSliceFromLocalCache = () => {
     const slice: SurveyQuestionsLegacyValue = buildSurveyLocalCacheSlice({
       props: propsRef.current,
       rawSlug: inst._getEffectiveDraftSlug(),
       renderedIds: getCurrentRenderedQuestionIds(),
       localCacheSliceMemo: inst._localCacheSliceMemo,
-      resolveResponseHydrationContext: (rawSlug: SurveyQuestionsLegacyValue) => resolveResponseHydrationContext(propsRef.current, rawSlug),
+      resolveResponseHydrationContext: (rawSlug: SurveyQuestionsLegacyValue) =>
+        resolveResponseHydrationContext(propsRef.current, rawSlug),
       normalizeSessionSlugValue,
       getExtraScopeSlugs: (slug: SurveyQuestionsLegacyValue) => getExtraQuestionReadSlugs(propsRef.current, slug),
       readQuestionsCache,
@@ -3789,8 +4089,12 @@ const buildSliceFromLocalCache = () => {
       parseResponse: (raw: SurveyQuestionsLegacyValue) => {
         let resp: SurveyQuestionsLegacyValue = raw;
         try {
-          if (typeof resp === 'string') { resp = JSON.parse(resp); }
-        } catch { resp = null; }
+          if (typeof resp === 'string') {
+            resp = JSON.parse(resp);
+          }
+        } catch {
+          resp = null;
+        }
         return resp;
       },
       applyCachedResponseEntryToSlice: inst._applyCachedResponseEntryToSlice,
@@ -3802,19 +4106,19 @@ const buildSliceFromLocalCache = () => {
       },
     });
     if (slice) {
-      DEBUG_PREFILL && surveyLog.log('[Survey][buildSlice] Building for rendered IDs:', getCurrentRenderedQuestionIds());
+      DEBUG_PREFILL &&
+        surveyLog.log('[Survey][buildSlice] Building for rendered IDs:', getCurrentRenderedQuestionIds());
     }
     return slice;
   };
 
-const rehydrateLocalCacheAnswersForRenderedIds = async (callback: SurveyQuestionsLegacyValue = null, options: SurveyQuestionsLegacyValue = {}) => {
+  const rehydrateLocalCacheAnswersForRenderedIds = async (
+    callback: SurveyQuestionsLegacyValue = null,
+    options: SurveyQuestionsLegacyValue = {},
+  ) => {
     let finalCallback: SurveyQuestionsLegacyValue = callback;
     let finalOptions: SurveyQuestionsLegacyValue = options;
-    if (
-      callback &&
-      typeof callback === 'object' &&
-      !Array.isArray(callback)
-    ) {
+    if (callback && typeof callback === 'object' && !Array.isArray(callback)) {
       finalOptions = callback;
       finalCallback = null;
     }
@@ -3823,16 +4127,15 @@ const rehydrateLocalCacheAnswersForRenderedIds = async (callback: SurveyQuestion
       : setState.bind(engine);
     const runId: SurveyQuestionsLegacyValue = (Number(inst._localCacheRehydrateRunId) || 0) + 1;
     inst._localCacheRehydrateRunId = runId;
-    const isStaleRun: SurveyQuestionsLegacyValue = () => (
-      (inst._hasMounted && !inst._isMounted) ||
-      inst._localCacheRehydrateRunId !== runId
-    );
+    const isStaleRun: SurveyQuestionsLegacyValue = () =>
+      (inst._hasMounted && !inst._isMounted) || inst._localCacheRehydrateRunId !== runId;
     await executeSurveyLocalCacheRehydrate({
       props: propsRef.current,
       state: stateRef.current,
       lastHydrationSig: inst._rehydrateLocalCacheLastSig,
       getHydrationQuestionIds: () => getHydrationQuestionIds(),
-      buildHydrationSignature: (idx: SurveyQuestionsLegacyValue, ids: SurveyQuestionsLegacyValue) => buildLocalCacheHydrationSignature(idx, ids),
+      buildHydrationSignature: (idx: SurveyQuestionsLegacyValue, ids: SurveyQuestionsLegacyValue) =>
+        buildLocalCacheHydrationSignature(idx, ids),
       buildSliceFromLocalCache: () => buildSliceFromLocalCache(),
       setLastHydrationSig: (value: SurveyQuestionsLegacyValue) => {
         inst._rehydrateLocalCacheLastSig = value;
@@ -3840,15 +4143,18 @@ const rehydrateLocalCacheAnswersForRenderedIds = async (callback: SurveyQuestion
       loadDraft: () => loadDraft(),
       buildDraftAnswersByQuestionId,
       cloneBaseline: deepClone,
-      buildDraftAwareCacheHydrationState: (args: SurveyQuestionsLegacyValue) => buildDraftAwareCacheHydrationState({
-        ...args,
-        areEnvelopesEquivalent,
-      }),
+      buildDraftAwareCacheHydrationState: (args: SurveyQuestionsLegacyValue) =>
+        buildDraftAwareCacheHydrationState({
+          ...args,
+          areEnvelopesEquivalent,
+        }),
       applyLocalCacheHydrationEntryToSlice: inst._applyLocalCacheHydrationEntryToSlice,
       setState: setStateForLocalCache,
       updateJsonPreview: updateJsonPreview,
       recalculateEditStats: recalculateEditStats,
-      ensurePriorResponses: () => { void ensurePriorResponsesForRenderedIds(); },
+      ensurePriorResponses: () => {
+        void ensurePriorResponsesForRenderedIds();
+      },
       callback: finalCallback,
       bumpNoop: () => bumpSurveyPerfCounter('noopSkipCount'),
       onNoChange: () => {
@@ -3861,32 +4167,34 @@ const rehydrateLocalCacheAnswersForRenderedIds = async (callback: SurveyQuestion
     });
   };
 
-const toggleAutoDecrypt = () => {
+  const toggleAutoDecrypt = () => {
     // Guard: auto-decrypt is disabled for wagmi/passkey providers unless auto-sign is ready.
     if (isAutoDecryptBlocked()) {
       resetBlockedAutoDecryptSweepInternals();
       setState(buildAutoDecryptDisabledState());
       return;
     }
-    setState(
-      buildAutoDecryptToggleState,
-      () => {
-        if (!stateRef.current.autoDecryptEnabled) {
-          inst._autoDecQueue = [];
-          inst._autoDecProcessing = false;
-          inst._autoDecryptMaskedAttemptSignature = {};
-          clearAutoDecryptSweepScheduling();
-          if (Object.keys(stateRef.current.decryptingByKey || {}).length > 0) {
-            setState(buildClearedDecryptingByKeyState());
-          }
-          return;
+    setState(buildAutoDecryptToggleState, () => {
+      if (!stateRef.current.autoDecryptEnabled) {
+        inst._autoDecQueue = [];
+        inst._autoDecProcessing = false;
+        inst._autoDecryptMaskedAttemptSignature = {};
+        clearAutoDecryptSweepScheduling();
+        if (Object.keys(stateRef.current.decryptingByKey || {}).length > 0) {
+          setState(buildClearedDecryptingByKeyState());
         }
-        queueAutoDecryptVisibleSweep('toggle-enabled');
+        return;
       }
-    );
+      queueAutoDecryptVisibleSweep('toggle-enabled');
+    });
   };
 
-const getLatestQuestionResponse = async (responder: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, networkID: SurveyQuestionsLegacyValue, questionsCache: SurveyQuestionsLegacyValue) => {
+  const getLatestQuestionResponse = async (
+    responder: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    networkID: SurveyQuestionsLegacyValue,
+    questionsCache: SurveyQuestionsLegacyValue,
+  ) => {
     const slug: SurveyQuestionsLegacyValue = inst._getEffectiveDraftSlug();
     const strNet: SurveyQuestionsLegacyValue = String(networkID || '');
 
@@ -3902,17 +4210,19 @@ const getLatestQuestionResponse = async (responder: SurveyQuestionsLegacyValue, 
         // ensure scaffolding
         freshCache[strNet] = freshCache[strNet] || {};
         freshCache[strNet].questionResponses = freshCache[strNet].questionResponses || {};
-        freshCache[strNet].questionResponses[questionId] =
-          freshCache[strNet].questionResponses[questionId] || {};
+        freshCache[strNet].questionResponses[questionId] = freshCache[strNet].questionResponses[questionId] || {};
         freshCache[strNet].questionResponsesMeta = freshCache[strNet].questionResponsesMeta || {};
         freshCache[strNet].questionResponsesMeta[questionId] =
           freshCache[strNet].questionResponsesMeta[questionId] || {};
 
         // Recency guard (only replace if strictly newer by (bn, li))
-        const prev: SurveyQuestionsLegacyValue = freshCache[strNet].questionResponsesMeta[questionId][addrLower] || { bn: 0, li: 0 };
+        const prev: SurveyQuestionsLegacyValue = freshCache[strNet].questionResponsesMeta[questionId][addrLower] || {
+          bn: 0,
+          li: 0,
+        };
         const bn: SurveyQuestionsLegacyValue = latest?.blockNumber ?? 0;
         const li: SurveyQuestionsLegacyValue = latest?.logIndex ?? 0;
-        const isStale: SurveyQuestionsLegacyValue = (bn < prev.bn) || (bn === prev.bn && li <= prev.li);
+        const isStale: SurveyQuestionsLegacyValue = bn < prev.bn || (bn === prev.bn && li <= prev.li);
         if (!isStale) {
           freshCache[strNet].questionResponses[questionId][addrLower] = latest;
           freshCache[strNet].questionResponsesMeta[questionId][addrLower] = { bn, li };
@@ -3920,12 +4230,17 @@ const getLatestQuestionResponse = async (responder: SurveyQuestionsLegacyValue, 
         }
         return latest;
       }
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
 
     return latest;
   };
 
-const getLatestSurveyResponse = async (responder: SurveyQuestionsLegacyValue, surveyId: SurveyQuestionsLegacyValue) => {
+  const getLatestSurveyResponse = async (
+    responder: SurveyQuestionsLegacyValue,
+    surveyId: SurveyQuestionsLegacyValue,
+  ) => {
     try {
       const latest: SurveyQuestionsLegacyValue = await getSurveyResponse(responder, surveyId);
       return latest || null;
@@ -3934,7 +4249,7 @@ const getLatestSurveyResponse = async (responder: SurveyQuestionsLegacyValue, su
     }
   };
 
-const loadBookmarks = async () => {
+  const loadBookmarks = async () => {
     try {
       const slug: SurveyQuestionsLegacyValue = resolveEffectiveSlug(propsRef.current);
       let obj: SurveyQuestionsLegacyValue = peekCacheSync('bookmarksCache', slug);
@@ -3953,7 +4268,7 @@ const loadBookmarks = async () => {
     }
   };
 
-const handleBookmarkToggle = (questionId: SurveyQuestionsLegacyValue) => {
+  const handleBookmarkToggle = (questionId: SurveyQuestionsLegacyValue) => {
     if (!questionId) return;
 
     const slug: SurveyQuestionsLegacyValue = resolveEffectiveSlug(propsRef.current);
@@ -3978,19 +4293,24 @@ const handleBookmarkToggle = (questionId: SurveyQuestionsLegacyValue) => {
     });
   };
 
-const getAnsweredQuestionsCount = () => {
+  const getAnsweredQuestionsCount = () => {
     const runtimeStrategy: SurveyQuestionsLegacyValue = getRuntimeStrategy();
     if (typeof runtimeStrategy?.getAnsweredQuestionsCount === 'function') {
       return runtimeStrategy.getAnsweredQuestionsCount(engine);
     }
-    const surveyIndex: SurveyQuestionsLegacyValue = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : (propsRef.current.surveyIndex || 0);
+    const surveyIndex: SurveyQuestionsLegacyValue =
+      propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex || 0;
 
     if (!stateRef.current.surveysResponseState || !stateRef.current.surveysResponseState[surveyIndex]) {
       return 0;
     }
 
-    const currentSlice: SurveyQuestionsLegacyValue =
-      stateRef.current.surveysResponseState[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
+    const currentSlice: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState[surveyIndex] || {
+      answers: {},
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    };
 
     // Prefer explicit session baseline; else derive from last saved answers; else derive from local cache; else empty
     const baselineSlice: SurveyQuestionsLegacyValue = resolveDiffBaselineSlice(true);
@@ -3999,14 +4319,15 @@ const getAnsweredQuestionsCount = () => {
     return computeModifiedQuestionsCount(baselineSlice, currentSlice);
   };
 
-const recalculateEditStats = (pendingStatsOverride: SurveyQuestionsLegacyValue = null) => {
+  const recalculateEditStats = (pendingStatsOverride: SurveyQuestionsLegacyValue = null) => {
     try {
-      const stats: SurveyQuestionsLegacyValue =
-        (pendingStatsOverride && typeof pendingStatsOverride === 'object'
-          ? pendingStatsOverride
-          : null) ||
-        (typeof getPendingEditStats === 'function' && getPendingEditStats()) ||
-        { total: stateRef.current.modifiedCount || 0, encrypted: stateRef.current.encryptedModifiedCount || 0 };
+      const stats: SurveyQuestionsLegacyValue = (pendingStatsOverride && typeof pendingStatsOverride === 'object'
+        ? pendingStatsOverride
+        : null) ||
+        (typeof getPendingEditStats === 'function' && getPendingEditStats()) || {
+          total: stateRef.current.modifiedCount || 0,
+          encrypted: stateRef.current.encryptedModifiedCount || 0,
+        };
       const modifiedCount: SurveyQuestionsLegacyValue = Number(stats.total || 0);
       const encryptedModifiedCount: SurveyQuestionsLegacyValue = Number(stats.encrypted || 0);
 
@@ -4029,19 +4350,23 @@ const recalculateEditStats = (pendingStatsOverride: SurveyQuestionsLegacyValue =
         shouldResetSubmitted ||
         shouldRelatchSubmitted
       ) {
-        setState(buildEditStatsState({
-          modifiedCount,
-          encryptedModifiedCount,
-          hasEncryptedChanges,
-          isDirty,
-          shouldResetSubmitted,
-          shouldRelatchSubmitted,
-        }));
+        setState(
+          buildEditStatsState({
+            modifiedCount,
+            encryptedModifiedCount,
+            hasEncryptedChanges,
+            isDirty,
+            shouldResetSubmitted,
+            shouldRelatchSubmitted,
+          }),
+        );
       }
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
   };
 
-const initializeSurveyResponseState = () => {
+  const initializeSurveyResponseState = () => {
     const questionPoolIds: SurveyQuestionsLegacyValue = Array.isArray(propsRef.current.questionPool)
       ? propsRef.current.questionPool.map((question: SurveyQuestionsLegacyValue) => question.id)
       : [];
@@ -4065,19 +4390,22 @@ const initializeSurveyResponseState = () => {
     });
   };
 
-const checkAndHandleStartFresh = () => {
-    if (shouldSurveyAutoStartFresh({
-      props: propsRef.current,
-      state: stateRef.current,
-      getRenderedQuestionIds: () => readRenderedQuestionIds({
-        getRenderedQuestionIds: () => getCurrentRenderedQuestionIds(),
-      }),
-    })) {
+  const checkAndHandleStartFresh = () => {
+    if (
+      shouldSurveyAutoStartFresh({
+        props: propsRef.current,
+        state: stateRef.current,
+        getRenderedQuestionIds: () =>
+          readRenderedQuestionIds({
+            getRenderedQuestionIds: () => getCurrentRenderedQuestionIds(),
+          }),
+      })
+    ) {
       handleStartFresh();
     }
   };
 
-const getSurveyQuestionPoolLoadState = () => {
+  const getSurveyQuestionPoolLoadState = () => {
     return buildSurveyQuestionPoolLoadState({
       isStandalone: propsRef.current.isStandalone,
       singleQuestionMode: propsRef.current.singleQuestionMode,
@@ -4086,7 +4414,10 @@ const getSurveyQuestionPoolLoadState = () => {
     });
   };
 
-const showTransientSubmitFeedback = (message: SurveyQuestionsLegacyValue = '', durationMs: SurveyQuestionsLegacyValue = 2000) => {
+  const showTransientSubmitFeedback = (
+    message: SurveyQuestionsLegacyValue = '',
+    durationMs: SurveyQuestionsLegacyValue = 2000,
+  ) => {
     const runtimeStrategy: SurveyQuestionsLegacyValue = getRuntimeStrategy();
     if (typeof runtimeStrategy?.showTransientSubmitFeedback === 'function') {
       return runtimeStrategy.showTransientSubmitFeedback(engine, message, durationMs);
@@ -4108,47 +4439,51 @@ const showTransientSubmitFeedback = (message: SurveyQuestionsLegacyValue = '', d
     }, normalizeTransientSubmitFeedbackDurationMs(durationMs));
   };
 
-const maybeBlockSubmitUntilQuestionPoolComplete = () => {
+  const maybeBlockSubmitUntilQuestionPoolComplete = () => {
     const { isIncomplete, pendingCount }: SurveyQuestionsLegacyValue = getSurveyQuestionPoolLoadState();
     if (!isIncomplete) return false;
 
-    showTransientSubmitFeedback(buildQuestionPoolPendingSubmitFeedbackMessage({
-      pendingCount,
-    }));
+    showTransientSubmitFeedback(
+      buildQuestionPoolPendingSubmitFeedbackMessage({
+        pendingCount,
+      }),
+    );
     void fetchQuestionPool().catch((error: any) => {
       surveyLog.warn('SurveyQuestions: submit-triggered question pool refresh failed.', error);
     });
     return true;
   };
 
-async function fetchQuestionPool() {
+  async function fetchQuestionPool() {
     if (propsRef.current.isStandalone || propsRef.current.singleQuestionMode) return;
     const runId: SurveyQuestionsLegacyValue = (Number(inst._questionPoolHydrationRunId) || 0) + 1;
     inst._questionPoolHydrationRunId = runId;
-    const isStaleQuestionPoolRun: SurveyQuestionsLegacyValue = () => (
-      !inst._isMounted ||
-      inst._questionPoolHydrationRunId !== runId
-    );
+    const isStaleQuestionPoolRun: SurveyQuestionsLegacyValue = () =>
+      !inst._isMounted || inst._questionPoolHydrationRunId !== runId;
     const setQuestionPoolState: SurveyQuestionsLegacyValue = (...args: SurveyQuestionsLegacyValue[]) => {
       if (!isStaleQuestionPoolRun()) {
         setState(...args);
       }
     };
     if (!propsRef.current.surveyId) {
-      surveyLog.warn("SurveyQuestions: fetchQuestionPool – no surveyID supplied");
+      surveyLog.warn('SurveyQuestions: fetchQuestionPool – no surveyID supplied');
       setQuestionPoolState(buildClearedSurveyQuestionPoolState());
       return;
     }
 
     // Prefer ID-aware resolver for /survey/:id routes (no /session/:slug)
     const slug: SurveyQuestionsLegacyValue = propsRef.current.surveyId
-      ? resolveSlugForIds({ surveyId: propsRef.current.surveyId, props: propsRef.current, network: propsRef.current.network })
+      ? resolveSlugForIds({
+          surveyId: propsRef.current.surveyId,
+          props: propsRef.current,
+          network: propsRef.current.network,
+        })
       : resolveEffectiveSlug(propsRef.current);
     const questionReadContext: SurveyQuestionsLegacyValue = resolveQuestionReadCacheContext(propsRef.current, slug);
     let effectiveSlug: SurveyQuestionsLegacyValue = questionReadContext.sessionSlug || slug;
     const netIdStr: SurveyQuestionsLegacyValue = questionReadContext.networkIdStr;
     if (!netIdStr) {
-      surveyLog.error("SurveyQuestions: fetchQuestionPool – network.id undefined");
+      surveyLog.error('SurveyQuestions: fetchQuestionPool – network.id undefined');
       setQuestionPoolState(buildClearedSurveyQuestionPoolState());
       return;
     }
@@ -4167,13 +4502,19 @@ async function fetchQuestionPool() {
     let surveyDataFromCache: SurveyQuestionsLegacyValue = surveysNet.surveys?.[surveyIdLower];
 
     let surveyData: SurveyQuestionsLegacyValue = null;
-    if (propsRef.current.surveys && propsRef.current.surveyIndex !== null && propsRef.current.surveys[propsRef.current.surveyIndex]) {
+    if (
+      propsRef.current.surveys &&
+      propsRef.current.surveyIndex !== null &&
+      propsRef.current.surveys[propsRef.current.surveyIndex]
+    ) {
       const surveyFromProp: SurveyQuestionsLegacyValue = propsRef.current.surveys[propsRef.current.surveyIndex];
       if (surveyFromProp.id && surveyFromProp.id.toLowerCase() === surveyIdLower) {
         surveyData = surveyFromProp;
       }
     }
-    if (!surveyData) { surveyData = surveyDataFromCache; }
+    if (!surveyData) {
+      surveyData = surveyDataFromCache;
+    }
 
     // Temporary demo-1 compatibility: render fixture questions synchronously while
     // the durable Cloudflare-backed demo session is still pending.
@@ -4188,10 +4529,7 @@ async function fetchQuestionPool() {
     let temporaryDemoFixtureSlug: SurveyQuestionsLegacyValue = '';
     let temporaryDemoFixtureQuestions: SurveyQuestionsLegacyValue[] = [];
     for (const candidateSlug of temporaryDemoSlugCandidates) {
-      const candidateQuestions = getTemporaryDemoSessionQuestionFixtures(
-        candidateSlug,
-        temporaryDemoSessionConfig
-      );
+      const candidateQuestions = getTemporaryDemoSessionQuestionFixtures(candidateSlug, temporaryDemoSessionConfig);
       if (!candidateQuestions.length) continue;
       temporaryDemoFixtureSlug = normalizeSessionSlugValue(candidateSlug);
       temporaryDemoFixtureQuestions = candidateQuestions;
@@ -4205,7 +4543,7 @@ async function fetchQuestionPool() {
       if (temporaryDemoFixtureSlug) effectiveSlug = temporaryDemoFixtureSlug;
       const currentQuestionsCache = ensureQuestionsNet(
         readQuestionsCache(effectiveSlug) || {},
-        netIdStr
+        netIdStr,
       ) as SurveyQuestionsRecord;
       const questionsNet = currentQuestionsCache[netIdStr] as SurveyQuestionsRecord;
       if (!questionsNet.questions || typeof questionsNet.questions !== 'object') questionsNet.questions = {};
@@ -4229,7 +4567,8 @@ async function fetchQuestionPool() {
         id: surveyIdLower,
         surveyID: surveyIdLower,
         title: surveyData?.title || surveyDataFromCache?.title || propsRef.current.surveyTitle || 'Demo Session',
-        sessionName: surveyData?.sessionName || surveyDataFromCache?.sessionName || propsRef.current.sessionName || effectiveSlug,
+        sessionName:
+          surveyData?.sessionName || surveyDataFromCache?.sessionName || propsRef.current.sessionName || effectiveSlug,
         questionIDs: temporaryDemoQuestionIds,
         temporaryDemoSeed: true,
       };
@@ -4247,21 +4586,25 @@ async function fetchQuestionPool() {
         surveyData = await surveyQuestionReadsPort.getSurveyDataById(
           propsRef.current.provider,
           surveyIdLower,
-          effectiveSlug
+          effectiveSlug,
         );
         if (isStaleQuestionPoolRun()) return;
         if (surveyData) {
-          if (!Array.isArray(surveyData.questionIDs))
-            surveyData.questionIDs = [];
+          if (!Array.isArray(surveyData.questionIDs)) surveyData.questionIDs = [];
           surveyData.surveyID = surveyIdLower;
-          surveyData.id       = surveyIdLower;
+          surveyData.id = surveyIdLower;
 
           let currentGlobalSurveysCache: SurveyQuestionsLegacyValue = readSurveysCache(effectiveSlug);
           if (!currentGlobalSurveysCache || typeof currentGlobalSurveysCache !== 'object') {
             currentGlobalSurveysCache = {};
           }
           if (!currentGlobalSurveysCache[netIdStr]) {
-            currentGlobalSurveysCache[netIdStr] = { surveys: {}, surveysLatestBlock:0, surveyResponses:{}, surveyResponsesLatestBlock:{} };
+            currentGlobalSurveysCache[netIdStr] = {
+              surveys: {},
+              surveysLatestBlock: 0,
+              surveyResponses: {},
+              surveyResponsesLatestBlock: {},
+            };
           }
           if (!currentGlobalSurveysCache[netIdStr].surveys) {
             currentGlobalSurveysCache[netIdStr].surveys = {};
@@ -4270,7 +4613,7 @@ async function fetchQuestionPool() {
           await writeSurveysCache(effectiveSlug, currentGlobalSurveysCache);
         }
       } catch (e: any) {
-        surveyLog.error("SurveyQuestions: failed to fetch survey from chain:", e);
+        surveyLog.error('SurveyQuestions: failed to fetch survey from chain:', e);
         surveyData = null;
       }
     }
@@ -4299,7 +4642,9 @@ async function fetchQuestionPool() {
       setQuestionPoolState({
         questionPool,
         questionPoolExpectedIds: expectedQuestionIds,
-        questionPoolPendingIds: expectedQuestionIds.filter((qid: SurveyQuestionsLegacyValue) => !fixtureQuestionById.has(qid)),
+        questionPoolPendingIds: expectedQuestionIds.filter(
+          (qid: SurveyQuestionsLegacyValue) => !fixtureQuestionById.has(qid),
+        ),
       });
       return;
     }
@@ -4310,89 +4655,100 @@ async function fetchQuestionPool() {
         isStaleRun: isStaleQuestionPoolRun,
         warnMissing,
         publishQuestionPool: ({ warnMissing: shouldWarnMissing }: SurveyQuestionsLegacyValue = {}) => {
-      const questionsCacheFromStorage = readQuestionsCache(effectiveSlug) || {};
-      const questionsNet = questionsCacheFromStorage[netIdStr] || {
-        questionsLatestBlock: 0,
-        questions: {},
-        questionResponses: {},
-        questionResponsesLatestBlock: 0,
-      };
-      const networkQuestions = (questionsNet.questions || {}) as SurveyQuestionsRecord;
+          const questionsCacheFromStorage = readQuestionsCache(effectiveSlug) || {};
+          const questionsNet = questionsCacheFromStorage[netIdStr] || {
+            questionsLatestBlock: 0,
+            questions: {},
+            questionResponses: {},
+            questionResponsesLatestBlock: 0,
+          };
+          const networkQuestions = (questionsNet.questions || {}) as SurveyQuestionsRecord;
 
-      const questionPool = expectedQuestionIds
-        .map((qid: string) => {
-          const qData = networkQuestions[qid] as SurveyQuestionsCacheQuestion | undefined;
-          if (isPendingQuestionMetadataPlaceholder(qData)) return null;
-          if (qData) return { ...qData, id: qData.id.toLowerCase() };
-          if (shouldWarnMissing) {
-            surveyLog.warn(`SurveyQuestions: Question data for ID ${qid} not found in cache after ensureQuestionCached.`);
-          }
-          return null;
-        })
-        .filter(Boolean);
-      const loadedQuestionIds = new Set(
-        questionPool
-          .map((question: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(question?.id))
-          .filter(Boolean)
-      );
-      const pendingQuestionIds = expectedQuestionIds.filter((qid: string) => !loadedQuestionIds.has(qid));
+          const questionPool = expectedQuestionIds
+            .map((qid: string) => {
+              const qData = networkQuestions[qid] as SurveyQuestionsCacheQuestion | undefined;
+              if (isPendingQuestionMetadataPlaceholder(qData)) return null;
+              if (qData) return { ...qData, id: qData.id.toLowerCase() };
+              if (shouldWarnMissing) {
+                surveyLog.warn(
+                  `SurveyQuestions: Question data for ID ${qid} not found in cache after ensureQuestionCached.`,
+                );
+              }
+              return null;
+            })
+            .filter(Boolean);
+          const loadedQuestionIds = new Set(
+            questionPool
+              .map((question: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(question?.id))
+              .filter(Boolean),
+          );
+          const pendingQuestionIds = expectedQuestionIds.filter((qid: string) => !loadedQuestionIds.has(qid));
 
-      const nextQuestionPoolSig = buildQuestionIdScopeSignature(questionPool);
-      const snapshotSig = JSON.stringify({
-        expectedQuestionIds,
-        pendingQuestionIds,
-        questionPool,
-      });
-      if (snapshotSig === lastPublishedQuestionPoolSnapshotSig) return;
-      lastPublishedQuestionPoolSnapshotSig = snapshotSig;
-      setQuestionPoolState((prev: SurveyQuestionsLegacyValue) => {
-        const prevQuestionPool = Array.isArray(prev?.questionPool) ? prev.questionPool : [];
-        const prevExpectedQuestionIds = Array.isArray(prev?.questionPoolExpectedIds)
-          ? prev.questionPoolExpectedIds
-          : [];
-        const prevPendingQuestionIds = Array.isArray(prev?.questionPoolPendingIds)
-          ? prev.questionPoolPendingIds
-          : [];
-        const prevQuestionPoolById = new Map();
-        prevQuestionPool.forEach((entry: SurveyQuestionsLegacyValue) => {
-          const key = normalizeQuestionIdKey(entry?.id);
-          if (!key || prevQuestionPoolById.has(key)) return;
-          prevQuestionPoolById.set(key, entry);
-        });
+          const nextQuestionPoolSig = buildQuestionIdScopeSignature(questionPool);
+          const snapshotSig = JSON.stringify({
+            expectedQuestionIds,
+            pendingQuestionIds,
+            questionPool,
+          });
+          if (snapshotSig === lastPublishedQuestionPoolSnapshotSig) return;
+          lastPublishedQuestionPoolSnapshotSig = snapshotSig;
+          setQuestionPoolState((prev: SurveyQuestionsLegacyValue) => {
+            const prevQuestionPool = Array.isArray(prev?.questionPool) ? prev.questionPool : [];
+            const prevExpectedQuestionIds = Array.isArray(prev?.questionPoolExpectedIds)
+              ? prev.questionPoolExpectedIds
+              : [];
+            const prevPendingQuestionIds = Array.isArray(prev?.questionPoolPendingIds)
+              ? prev.questionPoolPendingIds
+              : [];
+            const prevQuestionPoolById = new Map();
+            prevQuestionPool.forEach((entry: SurveyQuestionsLegacyValue) => {
+              const key = normalizeQuestionIdKey(entry?.id);
+              if (!key || prevQuestionPoolById.has(key)) return;
+              prevQuestionPoolById.set(key, entry);
+            });
 
-        const mergedQuestionPool = questionPool.map((entry: SurveyQuestionsLegacyValue) => {
-          const key = normalizeQuestionIdKey(entry?.id);
-          if (!key) return entry;
-          const existing = prevQuestionPoolById.get(key);
-          if (!existing) return entry;
-          const picked = pickBetterQuestionPayload(existing, entry) || entry;
-          if (picked === existing) return existing;
-          const normalized = { ...picked, id: key };
-          return areQuestionPayloadsEquivalent(existing, normalized) ? existing : normalized;
-        });
+            const mergedQuestionPool = questionPool.map((entry: SurveyQuestionsLegacyValue) => {
+              const key = normalizeQuestionIdKey(entry?.id);
+              if (!key) return entry;
+              const existing = prevQuestionPoolById.get(key);
+              if (!existing) return entry;
+              const picked = pickBetterQuestionPayload(existing, entry) || entry;
+              if (picked === existing) return existing;
+              const normalized = { ...picked, id: key };
+              return areQuestionPayloadsEquivalent(existing, normalized) ? existing : normalized;
+            });
 
-        const prevQuestionPoolSig = buildQuestionIdScopeSignature(prevQuestionPool);
-        const expectedIdsUnchanged =
-          prevExpectedQuestionIds.length === expectedQuestionIds.length &&
-          prevExpectedQuestionIds.every((qid: SurveyQuestionsLegacyValue, index: SurveyQuestionsLegacyValue) => qid === expectedQuestionIds[index]);
-        const pendingIdsUnchanged =
-          prevPendingQuestionIds.length === pendingQuestionIds.length &&
-          prevPendingQuestionIds.every((qid: SurveyQuestionsLegacyValue, index: SurveyQuestionsLegacyValue) => qid === pendingQuestionIds[index]);
-        if (prevQuestionPoolSig === nextQuestionPoolSig) {
-          const hasSemanticChange =
-            prevQuestionPool.length !== mergedQuestionPool.length ||
-            prevQuestionPool.some((entry: SurveyQuestionsLegacyValue, idx: SurveyQuestionsLegacyValue) => entry !== mergedQuestionPool[idx]);
-          if (!hasSemanticChange && expectedIdsUnchanged && pendingIdsUnchanged) {
-            bumpSurveyPerfCounter('noopSkipCount');
-            return null;
-          }
-        }
-        return {
-          questionPool: mergedQuestionPool,
-          questionPoolExpectedIds: expectedQuestionIds,
-          questionPoolPendingIds: pendingQuestionIds,
-        };
-      });
+            const prevQuestionPoolSig = buildQuestionIdScopeSignature(prevQuestionPool);
+            const expectedIdsUnchanged =
+              prevExpectedQuestionIds.length === expectedQuestionIds.length &&
+              prevExpectedQuestionIds.every(
+                (qid: SurveyQuestionsLegacyValue, index: SurveyQuestionsLegacyValue) =>
+                  qid === expectedQuestionIds[index],
+              );
+            const pendingIdsUnchanged =
+              prevPendingQuestionIds.length === pendingQuestionIds.length &&
+              prevPendingQuestionIds.every(
+                (qid: SurveyQuestionsLegacyValue, index: SurveyQuestionsLegacyValue) =>
+                  qid === pendingQuestionIds[index],
+              );
+            if (prevQuestionPoolSig === nextQuestionPoolSig) {
+              const hasSemanticChange =
+                prevQuestionPool.length !== mergedQuestionPool.length ||
+                prevQuestionPool.some(
+                  (entry: SurveyQuestionsLegacyValue, idx: SurveyQuestionsLegacyValue) =>
+                    entry !== mergedQuestionPool[idx],
+                );
+              if (!hasSemanticChange && expectedIdsUnchanged && pendingIdsUnchanged) {
+                bumpSurveyPerfCounter('noopSkipCount');
+                return null;
+              }
+            }
+            return {
+              questionPool: mergedQuestionPool,
+              questionPoolExpectedIds: expectedQuestionIds,
+              questionPoolPendingIds: pendingQuestionIds,
+            };
+          });
         },
       });
     };
@@ -4410,19 +4766,23 @@ async function fetchQuestionPool() {
         } finally {
           publishQuestionPoolFromCache();
         }
-      })
+      }),
     );
-    const failedQuestionHydrations: SurveyQuestionsLegacyValue = cacheHydrationResults.filter((result: SurveyQuestionsLegacyValue) => result.status === 'rejected');
+    const failedQuestionHydrations: SurveyQuestionsLegacyValue = cacheHydrationResults.filter(
+      (result: SurveyQuestionsLegacyValue) => result.status === 'rejected',
+    );
     if (failedQuestionHydrations.length > 0) {
       surveyLog.warn(
         `SurveyQuestions: ${failedQuestionHydrations.length} question cache hydration request(s) failed for survey ${surveyIdLower}.`,
-        failedQuestionHydrations.map((result: SurveyQuestionsLegacyValue) => result.reason?.message || result.reason || 'unknown error')
+        failedQuestionHydrations.map(
+          (result: SurveyQuestionsLegacyValue) => result.reason?.message || result.reason || 'unknown error',
+        ),
       );
     }
     publishQuestionPoolFromCache({ warnMissing: true });
-	  }
+  }
 
-const loadQuestionFromCache = async (questionId: SurveyQuestionsLegacyValue) => {
+  const loadQuestionFromCache = async (questionId: SurveyQuestionsLegacyValue) => {
     const slug: SurveyQuestionsLegacyValue = resolveEffectiveSlug(propsRef.current);
     const questionReadContext: SurveyQuestionsLegacyValue = resolveQuestionReadCacheContext(propsRef.current, slug);
     const effectiveSlug: SurveyQuestionsLegacyValue = questionReadContext.sessionSlug || slug;
@@ -4437,7 +4797,11 @@ const loadQuestionFromCache = async (questionId: SurveyQuestionsLegacyValue) => 
     return questionsCache[netIdStr].questions[qIdLower] || null;
   };
 
-const mergeSurveyResponseState = (currentState: SurveyQuestionsLegacyValue, newQuestionPool: SurveyQuestionsLegacyValue, surveyIndex: SurveyQuestionsLegacyValue = 0) => {
+  const mergeSurveyResponseState = (
+    currentState: SurveyQuestionsLegacyValue,
+    newQuestionPool: SurveyQuestionsLegacyValue,
+    surveyIndex: SurveyQuestionsLegacyValue = 0,
+  ) => {
     return buildMergedSurveyResponseState({
       currentState,
       newQuestionPool,
@@ -4447,12 +4811,14 @@ const mergeSurveyResponseState = (currentState: SurveyQuestionsLegacyValue, newQ
     });
   };
 
-async function fetchSurveyResponse() {
+  async function fetchSurveyResponse() {
     if (!inst._isMounted) return;
-    const runId: SurveyQuestionsLegacyValue = (Number(inst._fetchSurveyResponseRunId || 0) + 1);
+    const runId: SurveyQuestionsLegacyValue = Number(inst._fetchSurveyResponseRunId || 0) + 1;
     inst._fetchSurveyResponseRunId = runId;
     const isStale: SurveyQuestionsLegacyValue = () => !inst._isMounted || inst._fetchSurveyResponseRunId !== runId;
-    const safe: SurveyQuestionsLegacyValue = (...args: SurveyQuestionsLegacyValue[]) => { if (!isStale()) (setResponseHydrationState as SurveyQuestionsLegacyValue)(...args); };
+    const safe: SurveyQuestionsLegacyValue = (...args: SurveyQuestionsLegacyValue[]) => {
+      if (!isStale()) (setResponseHydrationState as SurveyQuestionsLegacyValue)(...args);
+    };
 
     safe(buildSurveyResponseFetchLoadingState());
 
@@ -4461,15 +4827,17 @@ async function fetchSurveyResponse() {
       try {
         const viewAnswers: SurveyQuestionsLegacyValue = await getLatestSurveyResponse(
           propsRef.current.viewAddress,
-          propsRef.current.surveyId
+          propsRef.current.surveyId,
         );
         if (isStale()) return;
         if (viewAnswers) {
-          safe((prev: SurveyQuestionsLegacyValue) => buildViewedSurveyResponseState(
-            prev,
-            viewAnswers,
-            mergeDecryptedViewedResponse as SurveyQuestionsLegacyValue
-          ));
+          safe((prev: SurveyQuestionsLegacyValue) =>
+            buildViewedSurveyResponseState(
+              prev,
+              viewAnswers,
+              mergeDecryptedViewedResponse as SurveyQuestionsLegacyValue,
+            ),
+          );
         } else {
           safe(buildViewedSurveyNoResponseState());
         }
@@ -4487,41 +4855,48 @@ async function fetchSurveyResponse() {
       try {
         const userAnswers: SurveyQuestionsLegacyValue = await getLatestSurveyResponse(
           propsRef.current.account,
-          propsRef.current.surveyId
+          propsRef.current.surveyId,
         );
         if (isStale()) return;
 
         // Consistency check logic
         if (stateRef.current.submissionComplete) {
-          const surveyIndex: SurveyQuestionsLegacyValue = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : (propsRef.current.surveyIndex || 0);
-          surveyLog.log("Comparing incoming chain data vs optimistic baseline");
+          const surveyIndex: SurveyQuestionsLegacyValue =
+            propsRef.current.isStandalone || propsRef.current.singleQuestionMode
+              ? 0
+              : propsRef.current.surveyIndex || 0;
+          surveyLog.log('Comparing incoming chain data vs optimistic baseline');
 
           // Only switch off optimistic mode if chain data matches our submitted baseline
           if (userAnswers && areResponsesConsistent(userAnswers, surveyIndex)) {
-            surveyLog.log("Result: New. Chain data consistent with submission. Exiting optimistic mode.");
+            surveyLog.log('Result: New. Chain data consistent with submission. Exiting optimistic mode.');
             const hasEncrypted: SurveyQuestionsLegacyValue = userAnswers.responses?.some(
-              (r: SurveyQuestionsLegacyValue) => !!r?.answer?.encryptedPortion || !!r?.additional?.encryptedPortion
+              (r: SurveyQuestionsLegacyValue) => !!r?.answer?.encryptedPortion || !!r?.additional?.encryptedPortion,
             );
-            safe(buildUserSurveyResponseFoundState({
-              hasEncrypted,
-              resetSubmissionComplete: true,
-              userAnswers,
-            }));
+            safe(
+              buildUserSurveyResponseFoundState({
+                hasEncrypted,
+                resetSubmissionComplete: true,
+                userAnswers,
+              }),
+            );
             // We do NOT call prefillSurveyResponses here to avoid rebuilding baseline unnecessarily
           } else {
             // Chain is stale or null. Keep optimistic state.
-            surveyLog.log("Result: Stale. Chain data older than optimistic baseline. Ignoring fetch.");
+            surveyLog.log('Result: Stale. Chain data older than optimistic baseline. Ignoring fetch.');
           }
         }
         // Normal Path (Not in optimistic mode)
         else if (userAnswers) {
           const hasEncrypted: SurveyQuestionsLegacyValue = userAnswers.responses?.some(
-            (r: SurveyQuestionsLegacyValue) => !!r?.answer?.encryptedPortion || !!r?.additional?.encryptedPortion
+            (r: SurveyQuestionsLegacyValue) => !!r?.answer?.encryptedPortion || !!r?.additional?.encryptedPortion,
           );
-          safe(buildUserSurveyResponseFoundState({
-            hasEncrypted,
-            userAnswers,
-          }));
+          safe(
+            buildUserSurveyResponseFoundState({
+              hasEncrypted,
+              userAnswers,
+            }),
+          );
           if (!isStale()) {
             prefillSurveyResponses(userAnswers, { responseHydrationOwned: true });
           }
@@ -4544,7 +4919,7 @@ async function fetchSurveyResponse() {
     safe(buildResponseHydrationInvalidatedState());
   }
 
-const prefillSingleQuestionResponse = (userAnswer: SurveyQuestionsLegacyValue) => {
+  const prefillSingleQuestionResponse = (userAnswer: SurveyQuestionsLegacyValue) => {
     const questionId: SurveyQuestionsLegacyValue = normalizeQuestionIdKey(propsRef.current.questionID);
 
     executeSurveySingleQuestionPrefill({
@@ -4559,7 +4934,7 @@ const prefillSingleQuestionResponse = (userAnswer: SurveyQuestionsLegacyValue) =
     });
   };
 
-const parseAnswerValue = (value: SurveyQuestionsLegacyValue) => {
+  const parseAnswerValue = (value: SurveyQuestionsLegacyValue) => {
     try {
       if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
         return JSON.parse(value);
@@ -4570,7 +4945,7 @@ const parseAnswerValue = (value: SurveyQuestionsLegacyValue) => {
     return value;
   };
 
-const handleStartFresh = () => {
+  const handleStartFresh = () => {
     invalidateResponseHydrationRuns();
     executeSurveyStartFresh({
       props: propsRef.current,
@@ -4586,7 +4961,7 @@ const handleStartFresh = () => {
     });
   };
 
-async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
+  async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
     const runId: SurveyQuestionsLegacyValue = (Number(inst._fetchSingleQuestionRunId) || 0) + 1;
     inst._fetchSingleQuestionRunId = runId;
     const isStaleRun: SurveyQuestionsLegacyValue = () => !inst._isMounted || inst._fetchSingleQuestionRunId !== runId;
@@ -4595,13 +4970,15 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
     };
     const bootstrapRetryAttempt: SurveyQuestionsLegacyValue = Number(opts?.bootstrapRetryAttempt || 0);
     const configuredFetchTimeoutMs: SurveyQuestionsLegacyValue = Number(opts?.questionFetchTimeoutMs);
-    const fetchTimeoutMs: SurveyQuestionsLegacyValue = Number.isFinite(configuredFetchTimeoutMs) && configuredFetchTimeoutMs > 0
-      ? Math.max(3000, configuredFetchTimeoutMs)
-      : 8000;
+    const fetchTimeoutMs: SurveyQuestionsLegacyValue =
+      Number.isFinite(configuredFetchTimeoutMs) && configuredFetchTimeoutMs > 0
+        ? Math.max(3000, configuredFetchTimeoutMs)
+        : 8000;
     const configuredFetchRecoveryMs: SurveyQuestionsLegacyValue = Number(opts?.questionFetchTimeoutRecoveryMs);
-    const fetchTimeoutRecoveryMs: SurveyQuestionsLegacyValue = Number.isFinite(configuredFetchRecoveryMs) && configuredFetchRecoveryMs > 0
-      ? Math.max(fetchTimeoutMs, configuredFetchRecoveryMs)
-      : Math.max(fetchTimeoutMs, 20000);
+    const fetchTimeoutRecoveryMs: SurveyQuestionsLegacyValue =
+      Number.isFinite(configuredFetchRecoveryMs) && configuredFetchRecoveryMs > 0
+        ? Math.max(fetchTimeoutMs, configuredFetchRecoveryMs)
+        : Math.max(fetchTimeoutMs, 20000);
     const maxCandidateSlugs: SurveyQuestionsLegacyValue = Math.max(2, Number(opts?.maxCandidateSlugs || 8));
 
     const sourceContextPlan: SurveyQuestionsLegacyValue = buildSingleQuestionSourceRestoreContextPlan({
@@ -4620,7 +4997,9 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
       return;
     }
     const questionId: SurveyQuestionsLegacyValue = sourceContextPlan.questionId;
-    const preserveCurrentSingleQuestionPool: SurveyQuestionsLegacyValue = (extraState: SurveyQuestionsLegacyValue = {}) => {
+    const preserveCurrentSingleQuestionPool: SurveyQuestionsLegacyValue = (
+      extraState: SurveyQuestionsLegacyValue = {},
+    ) => {
       const plan: SurveyQuestionsLegacyValue = buildSingleQuestionPreservedPoolState({
         questionId,
         questionPool: stateRef.current.questionPool,
@@ -4649,13 +5028,15 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
 
     const responderAddress: SurveyQuestionsLegacyValue = propsRef.current.responderAddress;
 
-    const getCacheStateForSlug: SurveyQuestionsLegacyValue = async (slug: SurveyQuestionsLegacyValue) => resolveSingleQuestionCacheState({
-      slug,
-      questionId,
-      resolveQuestionBootstrapContext: (nextSlug: SurveyQuestionsLegacyValue) => resolveQuestionBootstrapContext(propsRef.current, nextSlug),
-      readQuestionsCacheAsync,
-      ensureQuestionsNet: ensureQuestionsNet as SurveyQuestionsLegacyValue,
-    });
+    const getCacheStateForSlug: SurveyQuestionsLegacyValue = async (slug: SurveyQuestionsLegacyValue) =>
+      resolveSingleQuestionCacheState({
+        slug,
+        questionId,
+        resolveQuestionBootstrapContext: (nextSlug: SurveyQuestionsLegacyValue) =>
+          resolveQuestionBootstrapContext(propsRef.current, nextSlug),
+        readQuestionsCacheAsync,
+        ensureQuestionsNet: ensureQuestionsNet as SurveyQuestionsLegacyValue,
+      });
 
     const cacheBootstrapResult: SurveyQuestionsLegacyValue = await resolveSingleQuestionCacheBootstrap({
       questionId,
@@ -4665,7 +5046,8 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
       resolveCacheState: getCacheStateForSlug,
       readRecentPayload: readRecentQuestionPayload,
       canUseRecentPayload: canUseRecentQuestionPayloadForAccount,
-      resolveBootstrapNetworkId: (slug: SurveyQuestionsLegacyValue) => resolveQuestionBootstrapContext(propsRef.current, slug).networkIdStr || '',
+      resolveBootstrapNetworkId: (slug: SurveyQuestionsLegacyValue) =>
+        resolveQuestionBootstrapContext(propsRef.current, slug).networkIdStr || '',
       updateCacheAtomic,
       ensureQuestionsNet: ensureQuestionsNet as SurveyQuestionsLegacyValue,
       pickBetterQuestionPayload: pickBetterQuestionPayload as SurveyQuestionsLegacyValue,
@@ -4674,20 +5056,24 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
     });
     if (isStaleRun()) return;
 
-    const cacheBootstrapPlan: SurveyQuestionsLegacyValue = resolveSingleQuestionCacheBootstrapFlowPlan({ cacheBootstrapResult });
+    const cacheBootstrapPlan: SurveyQuestionsLegacyValue = resolveSingleQuestionCacheBootstrapFlowPlan({
+      cacheBootstrapResult,
+    });
     if (cacheBootstrapPlan.seededHydration) {
-      const { questionData: seededQData, isLoadingResponse }: SurveyQuestionsLegacyValue = cacheBootstrapPlan.seededHydration;
+      const { questionData: seededQData, isLoadingResponse }: SurveyQuestionsLegacyValue =
+        cacheBootstrapPlan.seededHydration;
       setResponseHydrationState(
-        (prev: SurveyQuestionsLegacyValue) => buildSingleQuestionSeededHydrationState({
-          prevState: prev,
-          questionData: seededQData,
-          isLoadingResponse,
-          mergeSurveyResponseState: mergeSurveyResponseState,
-        }),
+        (prev: SurveyQuestionsLegacyValue) =>
+          buildSingleQuestionSeededHydrationState({
+            prevState: prev,
+            questionData: seededQData,
+            isLoadingResponse,
+            mergeSurveyResponseState: mergeSurveyResponseState,
+          }),
         () => {
           updateJsonPreview();
           rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
-        }
+        },
       );
     }
     if (isStaleRun()) return;
@@ -4701,13 +5087,18 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
         responderAddress: cacheBootstrapResult.target.responderAddress,
         runId,
       };
-      const stopHandlingPlan: SurveyQuestionsLegacyValue = resolveSingleQuestionCacheBootstrapStopHandlingPlan(stopPlanContext);
+      const stopHandlingPlan: SurveyQuestionsLegacyValue =
+        resolveSingleQuestionCacheBootstrapStopHandlingPlan(stopPlanContext);
       if (stopHandlingPlan.action === 'retry') {
-        const didScheduleRetry: SurveyQuestionsLegacyValue = scheduleSingleQuestionBootstrapRetry(stopHandlingPlan.retryRequest);
-        const retryOutcome: SurveyQuestionsLegacyValue = (resolveSingleQuestionCacheBootstrapStopHandlingPlan({
-          ...stopPlanContext,
-          didScheduleRetry,
-        } as SurveyQuestionsLegacyValue) as SurveyQuestionsLegacyValue).retryOutcome;
+        const didScheduleRetry: SurveyQuestionsLegacyValue = scheduleSingleQuestionBootstrapRetry(
+          stopHandlingPlan.retryRequest,
+        );
+        const retryOutcome: SurveyQuestionsLegacyValue = (
+          resolveSingleQuestionCacheBootstrapStopHandlingPlan({
+            ...stopPlanContext,
+            didScheduleRetry,
+          } as SurveyQuestionsLegacyValue) as SurveyQuestionsLegacyValue
+        ).retryOutcome;
         if (retryOutcome?.debugPayload) {
           updateSingleQuestionDebug(retryOutcome.debugPayload);
         }
@@ -4756,15 +5147,17 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
       loginComplete: !!propsRef.current.loginComplete,
       hasAccount: !!propsRef.current.account,
       isMaskedQuestionPayload,
-      fetchSingleQuestionMetadataCandidates: (args: SurveyQuestionsLegacyValue) => fetchSingleQuestionMetadataCandidates({
-        ...args,
-        getQuestionData: (candidateSlug: SurveyQuestionsLegacyValue) => surveyQuestionReadsPort.getQuestionData(
-          propsRef.current.provider,
-          questionId,
-          candidateSlug,
-          buildAutomaticQuestionMetadataFetchOptions(candidateSlug)
-        ),
-      }),
+      fetchSingleQuestionMetadataCandidates: (args: SurveyQuestionsLegacyValue) =>
+        fetchSingleQuestionMetadataCandidates({
+          ...args,
+          getQuestionData: (candidateSlug: SurveyQuestionsLegacyValue) =>
+            surveyQuestionReadsPort.getQuestionData(
+              propsRef.current.provider,
+              questionId,
+              candidateSlug,
+              buildAutomaticQuestionMetadataFetchOptions(candidateSlug),
+            ),
+        }),
       pickBetterQuestionPayload: pickBetterQuestionPayload as SurveyQuestionsLegacyValue,
       areQuestionPayloadsEquivalent,
       normalizeSingleQuestionMetadataForCache,
@@ -4783,7 +5176,7 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
 
     if (metadataBootstrapResult.status === 'unavailable') {
       surveyLog.warn(
-        `SurveyQuestions: No question data for ${questionId} (slug='${metadataBootstrapResult.effectiveSingleSlug}').`
+        `SurveyQuestions: No question data for ${questionId} (slug='${metadataBootstrapResult.effectiveSingleSlug}').`,
       );
       const didScheduleRetry: SurveyQuestionsLegacyValue = scheduleSingleQuestionBootstrapRetry({
         questionId,
@@ -4806,10 +5199,12 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
         existingQuestionData: qData || recentPayloadForAccount || null,
       });
       if (placeholderQuestion) {
-        safeSetState((prev: SurveyQuestionsLegacyValue) => buildSingleQuestionPlaceholderHydrationState(prev, {
-          mergeSurveyResponseState: mergeSurveyResponseState,
-          placeholderQuestion,
-        }));
+        safeSetState((prev: SurveyQuestionsLegacyValue) =>
+          buildSingleQuestionPlaceholderHydrationState(prev, {
+            mergeSurveyResponseState: mergeSurveyResponseState,
+            placeholderQuestion,
+          }),
+        );
         return;
       }
       if (didScheduleRetry) {
@@ -4839,32 +5234,40 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
     // Build pool and merge state before fetching responses
     if (isStaleRun()) return;
     setResponseHydrationState(
-      (prev: SurveyQuestionsLegacyValue) => buildSingleQuestionReadyHydrationState(prev, {
-        mergeSurveyResponseState: mergeSurveyResponseState,
-        questionData: qData,
-      }),
+      (prev: SurveyQuestionsLegacyValue) =>
+        buildSingleQuestionReadyHydrationState(prev, {
+          mergeSurveyResponseState: mergeSurveyResponseState,
+          questionData: qData,
+        }),
       async () => {
         if (isStaleRun()) return;
-        const writeRespToCache: SurveyQuestionsLegacyValue = async (responder: SurveyQuestionsLegacyValue, respObj: SurveyQuestionsLegacyValue) => writeSingleQuestionResponseToCache({
-          responder,
-          respObj,
-          questionId,
-          effectiveSingleSlug,
-          netIdStr,
-          readQuestionsCacheAsync,
-          ensureQuestionsNet: ensureQuestionsNet as SurveyQuestionsLegacyValue,
-          writeQuestionsCache: writeQuestionsCache as SurveyQuestionsLegacyValue,
-        });
+        const writeRespToCache: SurveyQuestionsLegacyValue = async (
+          responder: SurveyQuestionsLegacyValue,
+          respObj: SurveyQuestionsLegacyValue,
+        ) =>
+          writeSingleQuestionResponseToCache({
+            responder,
+            respObj,
+            questionId,
+            effectiveSingleSlug,
+            netIdStr,
+            readQuestionsCacheAsync,
+            ensureQuestionsNet: ensureQuestionsNet as SurveyQuestionsLegacyValue,
+            writeQuestionsCache: writeQuestionsCache as SurveyQuestionsLegacyValue,
+          });
 
-        const readCachedResponderResponse: SurveyQuestionsLegacyValue = (responder: SurveyQuestionsLegacyValue) => readSingleQuestionCachedResponderResponse({
-          responder,
-          questionId,
-          netIdStr,
-          questionsCache,
-          cloneValue: deepClone,
-        });
+        const readCachedResponderResponse: SurveyQuestionsLegacyValue = (responder: SurveyQuestionsLegacyValue) =>
+          readSingleQuestionCachedResponderResponse({
+            responder,
+            questionId,
+            netIdStr,
+            questionsCache,
+            cloneValue: deepClone,
+          });
 
-        const readFreshCachedResponderResponse: SurveyQuestionsLegacyValue = async (responder: SurveyQuestionsLegacyValue) => (
+        const readFreshCachedResponderResponse: SurveyQuestionsLegacyValue = async (
+          responder: SurveyQuestionsLegacyValue,
+        ) =>
           readFreshSingleQuestionCachedResponderResponse({
             responder,
             questionId,
@@ -4876,8 +5279,7 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
             updateQuestionsCache: (nextCache: SurveyQuestionsLegacyValue) => {
               questionsCache = nextCache;
             },
-          })
-        );
+          });
 
         // Fetch latest response for the appropriate address, scoped to engine slug
         if (responderAddress) {
@@ -4902,33 +5304,26 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
               questionId: nextQuestionId,
               effectiveSingleSlug: nextSingleSlug,
               forceArweaveFetch = false,
-            }: SurveyQuestionsLegacyValue) => surveyQuestionReadsPort.getResponse(
-              provider,
-              nextResponderAddress,
-              nextQuestionId,
-              nextSingleSlug,
-              { forceArweaveFetch }
-            ),
+            }: SurveyQuestionsLegacyValue) =>
+              surveyQuestionReadsPort.getResponse(provider, nextResponderAddress, nextQuestionId, nextSingleSlug, {
+                forceArweaveFetch,
+              }),
             getResponseHash: ({
               provider,
               responderAddress: nextResponderAddress,
               questionId: nextQuestionId,
               effectiveSingleSlug: nextSingleSlug,
-            }: SurveyQuestionsLegacyValue) => surveyQuestionReadsPort.getResponseHash(
-              provider,
-              nextResponderAddress,
-              nextQuestionId,
-              nextSingleSlug
-            ),
+            }: SurveyQuestionsLegacyValue) =>
+              surveyQuestionReadsPort.getResponseHash(provider, nextResponderAddress, nextQuestionId, nextSingleSlug),
             writeResponseToCache: writeRespToCache,
             readCachedResponderResponse,
             readFreshCachedResponderResponse,
             prefillSingleQuestionResponse: prefillSingleQuestionResponse,
           });
           if (
-            viewedBootstrapResult?.reason === 'stale'
-            || viewedBootstrapResult?.reason === 'retrying'
-            || viewedBootstrapResult?.reason === 'malformed'
+            viewedBootstrapResult?.reason === 'stale' ||
+            viewedBootstrapResult?.reason === 'retrying' ||
+            viewedBootstrapResult?.reason === 'malformed'
           ) {
             return;
           }
@@ -4945,12 +5340,8 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
               responderAddress: nextResponderAddress,
               questionId: nextQuestionId,
               effectiveSingleSlug: nextSingleSlug,
-            }: SurveyQuestionsLegacyValue) => surveyQuestionReadsPort.getResponse(
-              provider,
-              nextResponderAddress,
-              nextQuestionId,
-              nextSingleSlug
-            ),
+            }: SurveyQuestionsLegacyValue) =>
+              surveyQuestionReadsPort.getResponse(provider, nextResponderAddress, nextQuestionId, nextSingleSlug),
             writeResponseToCache: writeRespToCache,
             areResponsesConsistent: areResponsesConsistent,
             prefillSingleQuestionResponse: prefillSingleQuestionResponse,
@@ -4963,11 +5354,14 @@ async function fetchSingleQuestionData(opts: SurveyQuestionsLegacyValue = {}) {
         updateJsonPreview();
         rehydrateDraftForRenderedIds();
         rehydrateLocalCacheAnswersForRenderedIds();
-      }
+      },
     );
   }
 
-const resolveDecryptSurveyId = (baselineForDecrypt: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue = null) => {
+  const resolveDecryptSurveyId = (
+    baselineForDecrypt: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue = null,
+  ) => {
     return (resolveDecryptSurveyIdHelper as SurveyQuestionsLegacyValue)(baselineForDecrypt, {
       propSurveyId: propsRef.current.surveyId || propsRef.current.surveyID,
       questionId,
@@ -4975,7 +5369,7 @@ const resolveDecryptSurveyId = (baselineForDecrypt: SurveyQuestionsLegacyValue, 
     });
   };
 
-async function handleDecryptEdit() {
+  async function handleDecryptEdit() {
     const decryptContext: SurveyQuestionsLegacyValue = buildDecryptContextSnapshot();
     const decryptAttemptId: SurveyQuestionsLegacyValue = startSurveyDecryptAttempt();
     setState(buildDecryptEditStartState());
@@ -4992,29 +5386,26 @@ async function handleDecryptEdit() {
     });
 
     try {
-      const {
-        sourceSlice,
-        ratingEnvelopesByQid,
-        chainId,
-        lit,
-        opts,
-        poolForDecrypt,
-      }: SurveyQuestionsLegacyValue = await prepareSurveyDecryptAttempt({
-        singleQuestionMode: decryptContext.singleQuestionMode,
-        questionId: decryptContext.questionID,
-        account: decryptContext.account,
-        providerLike: decryptContext.provider,
-        slug,
-        surveyId: decryptContext.surveyId,
-        fallbackUserAnswers,
-        fallbackSourceSlice,
-        previousStateSlice,
-      });
-      if ((applySurveyDecryptStaleStatusHelper as SurveyQuestionsLegacyValue)({
-        host: engine,
-        context: decryptContext,
-        attemptId: decryptAttemptId,
-      }).shouldReturn) return;
+      const { sourceSlice, ratingEnvelopesByQid, chainId, lit, opts, poolForDecrypt }: SurveyQuestionsLegacyValue =
+        await prepareSurveyDecryptAttempt({
+          singleQuestionMode: decryptContext.singleQuestionMode,
+          questionId: decryptContext.questionID,
+          account: decryptContext.account,
+          providerLike: decryptContext.provider,
+          slug,
+          surveyId: decryptContext.surveyId,
+          fallbackUserAnswers,
+          fallbackSourceSlice,
+          previousStateSlice,
+        });
+      if (
+        (applySurveyDecryptStaleStatusHelper as SurveyQuestionsLegacyValue)({
+          host: engine,
+          context: decryptContext,
+          attemptId: decryptAttemptId,
+        }).shouldReturn
+      )
+        return;
       const {
         normalizedDecryptedSlice,
         decryptedImportanceFromEnv,
@@ -5030,45 +5421,67 @@ async function handleDecryptEdit() {
         opts,
         previousStateSlice,
       });
-      if ((applySurveyDecryptStaleStatusHelper as SurveyQuestionsLegacyValue)({
-        host: engine,
-        context: decryptContext,
-        attemptId: decryptAttemptId,
-      }).shouldReturn) return;
+      if (
+        (applySurveyDecryptStaleStatusHelper as SurveyQuestionsLegacyValue)({
+          host: engine,
+          context: decryptContext,
+          attemptId: decryptAttemptId,
+        }).shouldReturn
+      )
+        return;
 
       finishSurveyDecryptAttempt(decryptAttemptId);
-      setState((prevState: SurveyQuestionsLegacyValue) => buildSurveyDecryptSuccessState(prevState, {
-        surveyIndex,
-        decryptedSlice: normalizedDecryptedSlice,
-        decryptedImportanceFromEnv,
-        decryptedConvictionFromEnv,
-      }), () => {
-        const jsonPreview: SurveyQuestionsLegacyValue = prepareJsonAndHash(surveyIndex);
-        setState(buildJsonPreviewState(jsonPreview));
-        persistDraftSafely && persistDraftSafely(0);
-      });
+      setState(
+        (prevState: SurveyQuestionsLegacyValue) =>
+          buildSurveyDecryptSuccessState(prevState, {
+            surveyIndex,
+            decryptedSlice: normalizedDecryptedSlice,
+            decryptedImportanceFromEnv,
+            decryptedConvictionFromEnv,
+          }),
+        () => {
+          const jsonPreview: SurveyQuestionsLegacyValue = prepareJsonAndHash(surveyIndex);
+          setState(buildJsonPreviewState(jsonPreview));
+          persistDraftSafely && persistDraftSafely(0);
+        },
+      );
     } catch (error: any) {
       surveyLog.error('Error decrypting answers:', error);
-      if ((applySurveyDecryptStaleStatusHelper as SurveyQuestionsLegacyValue)({
-        host: engine,
-        context: decryptContext,
-        attemptId: decryptAttemptId,
-      }).shouldReturn) return;
+      if (
+        (applySurveyDecryptStaleStatusHelper as SurveyQuestionsLegacyValue)({
+          host: engine,
+          context: decryptContext,
+          attemptId: decryptAttemptId,
+        }).shouldReturn
+      )
+        return;
       finishSurveyDecryptAttempt(decryptAttemptId);
       setState(buildDecryptEditFailureState(error.message));
     }
   }
 
-const handleDecryptViewedResponseField = async (questionId: SurveyQuestionsLegacyValue, fieldToDecrypt: SurveyQuestionsLegacyValue = 'both', responseOverride: SurveyQuestionsLegacyValue = null) => {
+  const handleDecryptViewedResponseField = async (
+    questionId: SurveyQuestionsLegacyValue,
+    fieldToDecrypt: SurveyQuestionsLegacyValue = 'both',
+    responseOverride: SurveyQuestionsLegacyValue = null,
+  ) => {
     const decryptContext: SurveyQuestionsLegacyValue = buildDecryptContextSnapshot();
-    const taskKey: SurveyQuestionsLegacyValue = buildDecryptTaskKey('viewed', questionId, fieldToDecrypt, responseOverride, decryptContext);
-    return runDedupedDecryptTask(
-      taskKey,
-      () => handleDecryptViewedResponseFieldInternal(questionId, fieldToDecrypt, responseOverride, decryptContext)
+    const taskKey: SurveyQuestionsLegacyValue = buildDecryptTaskKey(
+      'viewed',
+      questionId,
+      fieldToDecrypt,
+      responseOverride,
+      decryptContext,
+    );
+    return runDedupedDecryptTask(taskKey, () =>
+      handleDecryptViewedResponseFieldInternal(questionId, fieldToDecrypt, responseOverride, decryptContext),
     );
   };
 
-const getViewedResponseOverrideForQuestion = (questionId: SurveyQuestionsLegacyValue, responseContainer: SurveyQuestionsLegacyValue = stateRef.current?.parsedViewAddressAnswers) => {
+  const getViewedResponseOverrideForQuestion = (
+    questionId: SurveyQuestionsLegacyValue,
+    responseContainer: SurveyQuestionsLegacyValue = stateRef.current?.parsedViewAddressAnswers,
+  ) => {
     return (getViewedResponseOverrideForQuestionHelper as SurveyQuestionsLegacyValue)(
       questionId,
       responseContainer,
@@ -5076,7 +5489,12 @@ const getViewedResponseOverrideForQuestion = (questionId: SurveyQuestionsLegacyV
     );
   };
 
-const handleDecryptViewedResponseFieldInternal = async (questionId: SurveyQuestionsLegacyValue, fieldToDecrypt: SurveyQuestionsLegacyValue = 'both', responseOverride: SurveyQuestionsLegacyValue = null, decryptContext: SurveyQuestionsLegacyValue = null) => {
+  const handleDecryptViewedResponseFieldInternal = async (
+    questionId: SurveyQuestionsLegacyValue,
+    fieldToDecrypt: SurveyQuestionsLegacyValue = 'both',
+    responseOverride: SurveyQuestionsLegacyValue = null,
+    decryptContext: SurveyQuestionsLegacyValue = null,
+  ) => {
     const context: SurveyQuestionsLegacyValue = decryptContext || buildDecryptContextSnapshot();
     let decryptAttemptToken: SurveyQuestionsLegacyValue = null;
     // Require wallet login (viewer). Decryption is enforced by Lit access control conditions.
@@ -5084,35 +5502,34 @@ const handleDecryptViewedResponseFieldInternal = async (questionId: SurveyQuesti
       return false;
     }
 
-    const qid: SurveyQuestionsLegacyValue = String(questionId || '').trim().toLowerCase();
+    const qid: SurveyQuestionsLegacyValue = String(questionId || '')
+      .trim()
+      .toLowerCase();
     if (!qid || !responseOverride || typeof responseOverride !== 'object') {
       return false;
     }
 
     try {
       const responderForLatest: SurveyQuestionsLegacyValue = String(
-        responseOverride?.responder ||
-        responseOverride?.responderAddress ||
-        context.responder ||
-        ''
+        responseOverride?.responder || responseOverride?.responderAddress || context.responder || '',
       ).trim();
-      const {
-        baselineForDecrypt,
-        ratingEnvelopes,
-      }: SurveyQuestionsLegacyValue = await prepareViewedQuestionDecryptState({
-        questionId: qid,
-        fieldToDecrypt,
-        responseOverride,
-        account: context.account,
-        responderForLatest,
-        sessionSlug: context.sessionSlug || '',
-        networkID: context.networkID,
-      });
+      const { baselineForDecrypt, ratingEnvelopes }: SurveyQuestionsLegacyValue =
+        await prepareViewedQuestionDecryptState({
+          questionId: qid,
+          fieldToDecrypt,
+          responseOverride,
+          account: context.account,
+          responderForLatest,
+          sessionSlug: context.sessionSlug || '',
+          networkID: context.networkID,
+        });
       if (!isDecryptContextCurrent(context)) {
         return false;
       }
 
-      const attemptStatus: SurveyQuestionsLegacyValue = (startQuestionDecryptAttemptStatusHelper as SurveyQuestionsLegacyValue)({
+      const attemptStatus: SurveyQuestionsLegacyValue = (
+        startQuestionDecryptAttemptStatusHelper as SurveyQuestionsLegacyValue
+      )({
         host: engine,
         questionId: qid,
         fieldToDecrypt,
@@ -5121,23 +5538,21 @@ const handleDecryptViewedResponseFieldInternal = async (questionId: SurveyQuesti
       if (attemptStatus.shouldReturn) return attemptStatus.result;
       decryptAttemptToken = attemptStatus.decryptAttemptToken;
 
-      const {
-        decryptedStateSlice,
-        didUpdate,
-        decryptedImportance,
-        decryptedConviction,
-      }: SurveyQuestionsLegacyValue = await finalizeQuestionDecryptAttempt({
-        questionId: qid,
-        fieldToDecrypt,
-        baselineForDecrypt,
-        ratingEnvelopes,
-        account: context.account,
-        providerLike: context.provider,
-        chainId: attemptStatus.chainId,
-        lit: attemptStatus.lit,
-        opts: attemptStatus.opts,
-      });
-      const completionStatus: SurveyQuestionsLegacyValue = (applyQuestionDecryptCompletionStatusHelper as SurveyQuestionsLegacyValue)({
+      const { decryptedStateSlice, didUpdate, decryptedImportance, decryptedConviction }: SurveyQuestionsLegacyValue =
+        await finalizeQuestionDecryptAttempt({
+          questionId: qid,
+          fieldToDecrypt,
+          baselineForDecrypt,
+          ratingEnvelopes,
+          account: context.account,
+          providerLike: context.provider,
+          chainId: attemptStatus.chainId,
+          lit: attemptStatus.lit,
+          opts: attemptStatus.opts,
+        });
+      const completionStatus: SurveyQuestionsLegacyValue = (
+        applyQuestionDecryptCompletionStatusHelper as SurveyQuestionsLegacyValue
+      )({
         host: engine,
         context,
         questionId: qid,
@@ -5145,7 +5560,14 @@ const handleDecryptViewedResponseFieldInternal = async (questionId: SurveyQuesti
         decryptAttemptToken,
         keysToMark: attemptStatus.keysToMark,
         successStateKind: 'viewed',
-        successStateOptions: { questionId: qid, clearMode: attemptStatus.clearMode, didUpdate, decryptedStateSlice, decryptedImportance, decryptedConviction },
+        successStateOptions: {
+          questionId: qid,
+          clearMode: attemptStatus.clearMode,
+          didUpdate,
+          decryptedStateSlice,
+          decryptedImportance,
+          decryptedConviction,
+        },
       });
       if (completionStatus.shouldReturn) return completionStatus.result;
 
@@ -5163,16 +5585,30 @@ const handleDecryptViewedResponseFieldInternal = async (questionId: SurveyQuesti
     }
   };
 
-const handleDecryptQuestionAnswer = async (questionId: SurveyQuestionsLegacyValue, fieldToDecrypt: SurveyQuestionsLegacyValue = 'both', responseOverride: SurveyQuestionsLegacyValue = null) => {
+  const handleDecryptQuestionAnswer = async (
+    questionId: SurveyQuestionsLegacyValue,
+    fieldToDecrypt: SurveyQuestionsLegacyValue = 'both',
+    responseOverride: SurveyQuestionsLegacyValue = null,
+  ) => {
     const decryptContext: SurveyQuestionsLegacyValue = buildDecryptContextSnapshot();
-    const taskKey: SurveyQuestionsLegacyValue = buildDecryptTaskKey('self', questionId, fieldToDecrypt, responseOverride, decryptContext);
-    return runDedupedDecryptTask(
-      taskKey,
-      () => handleDecryptQuestionAnswerInternal(questionId, fieldToDecrypt, responseOverride, decryptContext)
+    const taskKey: SurveyQuestionsLegacyValue = buildDecryptTaskKey(
+      'self',
+      questionId,
+      fieldToDecrypt,
+      responseOverride,
+      decryptContext,
+    );
+    return runDedupedDecryptTask(taskKey, () =>
+      handleDecryptQuestionAnswerInternal(questionId, fieldToDecrypt, responseOverride, decryptContext),
     );
   };
 
-const handleDecryptQuestionAnswerInternal = async (questionId: SurveyQuestionsLegacyValue, fieldToDecrypt: SurveyQuestionsLegacyValue = 'both', responseOverride: SurveyQuestionsLegacyValue = null, decryptContext: SurveyQuestionsLegacyValue = null) => {
+  const handleDecryptQuestionAnswerInternal = async (
+    questionId: SurveyQuestionsLegacyValue,
+    fieldToDecrypt: SurveyQuestionsLegacyValue = 'both',
+    responseOverride: SurveyQuestionsLegacyValue = null,
+    decryptContext: SurveyQuestionsLegacyValue = null,
+  ) => {
     const context: SurveyQuestionsLegacyValue = decryptContext || buildDecryptContextSnapshot();
     let decryptAttemptToken: SurveyQuestionsLegacyValue = null;
     // Require wallet login
@@ -5187,23 +5623,16 @@ const handleDecryptQuestionAnswerInternal = async (questionId: SurveyQuestionsLe
     try {
       // If we're viewing someone else's response (via /question/:id/:responder or /survey/:id?address=),
       // decrypt in-place against the viewed response object (do NOT switch to edit mode).
-      const {
-        effectiveResponseOverride,
-        hasResponseOverride,
-        isViewedResponseMode,
-      }: SurveyQuestionsLegacyValue = resolveQuestionDecryptHandlingMode({
-        questionId: qid,
-        responseOverride,
-        viewerAccount: context.account,
-        viewedResponder: context.responder || '',
-      });
+      const { effectiveResponseOverride, hasResponseOverride, isViewedResponseMode }: SurveyQuestionsLegacyValue =
+        resolveQuestionDecryptHandlingMode({
+          questionId: qid,
+          responseOverride,
+          viewerAccount: context.account,
+          viewedResponder: context.responder || '',
+        });
       if (isViewedResponseMode) {
         if (!hasResponseOverride) return false;
-        return await handleDecryptViewedResponseField(
-          qid,
-          fieldToDecrypt,
-          effectiveResponseOverride
-        );
+        return await handleDecryptViewedResponseField(qid, fieldToDecrypt, effectiveResponseOverride);
       }
 
       const {
@@ -5224,7 +5653,9 @@ const handleDecryptQuestionAnswerInternal = async (questionId: SurveyQuestionsLe
         return false;
       }
 
-      const attemptStatus: SurveyQuestionsLegacyValue = (startQuestionDecryptAttemptStatusHelper as SurveyQuestionsLegacyValue)({
+      const attemptStatus: SurveyQuestionsLegacyValue = (
+        startQuestionDecryptAttemptStatusHelper as SurveyQuestionsLegacyValue
+      )({
         host: engine,
         questionId: qid,
         fieldToDecrypt,
@@ -5233,23 +5664,21 @@ const handleDecryptQuestionAnswerInternal = async (questionId: SurveyQuestionsLe
       if (attemptStatus.shouldReturn) return attemptStatus.result;
       decryptAttemptToken = attemptStatus.decryptAttemptToken;
 
-      const {
-        decryptedStateSlice,
-        didUpdate,
-        decryptedImportance,
-        decryptedConviction,
-      }: SurveyQuestionsLegacyValue = await finalizeQuestionDecryptAttempt({
-        questionId: qid,
-        fieldToDecrypt,
-        baselineForDecrypt,
-        ratingEnvelopes: latestRatingEnvs,
-        account: context.account,
-        providerLike: context.provider,
-        chainId: attemptStatus.chainId,
-        lit: attemptStatus.lit,
-        opts: attemptStatus.opts,
-      });
-      const completionStatus: SurveyQuestionsLegacyValue = (applyQuestionDecryptCompletionStatusHelper as SurveyQuestionsLegacyValue)({
+      const { decryptedStateSlice, didUpdate, decryptedImportance, decryptedConviction }: SurveyQuestionsLegacyValue =
+        await finalizeQuestionDecryptAttempt({
+          questionId: qid,
+          fieldToDecrypt,
+          baselineForDecrypt,
+          ratingEnvelopes: latestRatingEnvs,
+          account: context.account,
+          providerLike: context.provider,
+          chainId: attemptStatus.chainId,
+          lit: attemptStatus.lit,
+          opts: attemptStatus.opts,
+        });
+      const completionStatus: SurveyQuestionsLegacyValue = (
+        applyQuestionDecryptCompletionStatusHelper as SurveyQuestionsLegacyValue
+      )({
         host: engine,
         context,
         questionId: qid,
@@ -5257,7 +5686,16 @@ const handleDecryptQuestionAnswerInternal = async (questionId: SurveyQuestionsLe
         decryptAttemptToken,
         keysToMark: attemptStatus.keysToMark,
         successStateKind: 'self',
-        successStateOptions: { surveyIndex, questionId: qid, clearMode: attemptStatus.clearMode, didUpdate, baselineSlice, decryptedStateSlice, decryptedImportance, decryptedConviction },
+        successStateOptions: {
+          surveyIndex,
+          questionId: qid,
+          clearMode: attemptStatus.clearMode,
+          didUpdate,
+          baselineSlice,
+          decryptedStateSlice,
+          decryptedImportance,
+          decryptedConviction,
+        },
         onSuccessStateApplied: () => {
           updateJsonPreview && updateJsonPreview();
           persistDraftSafely && persistDraftSafely(0);
@@ -5279,24 +5717,50 @@ const handleDecryptQuestionAnswerInternal = async (questionId: SurveyQuestionsLe
     }
   };
 
-const handleAnswer = (surveyIndex: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, answer: SurveyQuestionsLegacyValue, options: SurveyQuestionsLegacyValue = {}) => {
+  const handleAnswer = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    answer: SurveyQuestionsLegacyValue,
+    options: SurveyQuestionsLegacyValue = {},
+  ) => {
     surveyIndex = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex;
     questionId = normalizeQuestionIdKey(questionId);
     if (!questionId) return;
     const shouldPersistDraft: SurveyQuestionsLegacyValue = options?.persistDraft !== false;
-    const afterUpdate: SurveyQuestionsLegacyValue = typeof options?.afterUpdate === 'function' ? options.afterUpdate : null;
+    const afterUpdate: SurveyQuestionsLegacyValue =
+      typeof options?.afterUpdate === 'function' ? options.afterUpdate : null;
 
-    const sourceSlice: SurveyQuestionsLegacyValue =
-      stateRef.current.surveysResponseState?.[surveyIndex] ||
-      { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
+    const sourceSlice: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex] || {
+      answers: {},
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    };
     const plan: SurveyQuestionsLegacyValue = buildAnswerUpdatePlan(questionId, answer, sourceSlice, {
-      buildEmptyResponseFieldState: ((qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => buildEmptyResponseFieldState(qid, fk)) as SurveyQuestionsLegacyValue,
-      resolveFieldEncryptionAudience: (field: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionAudience(field, qid, fk),
-      resolveFieldEncryptionGateId: (field: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionGateId(field, qid, fk),
+      buildEmptyResponseFieldState: ((qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) =>
+        buildEmptyResponseFieldState(qid, fk)) as SurveyQuestionsLegacyValue,
+      resolveFieldEncryptionAudience: (
+        field: SurveyQuestionsLegacyValue,
+        qid: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+      ) => resolveFieldEncryptionAudience(field, qid, fk),
+      resolveFieldEncryptionGateId: (
+        field: SurveyQuestionsLegacyValue,
+        qid: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+      ) => resolveFieldEncryptionGateId(field, qid, fk),
       isQuestionLockedForResponse: (qid: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(qid),
       getEffectiveRecipientsForQid: (qid: SurveyQuestionsLegacyValue) => getEffectiveRecipientsForQid(qid),
-      normalizeFieldAudienceMode: (val: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue, f: SurveyQuestionsLegacyValue) => normalizeFieldAudienceMode(val, fk, f),
-      buildInheritedAdditionalFieldState: ((af: SurveyQuestionsLegacyValue, ansf: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue) => buildInheritedAdditionalFieldState(af, ansf, qid)) as SurveyQuestionsLegacyValue,
+      normalizeFieldAudienceMode: (
+        val: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+        f: SurveyQuestionsLegacyValue,
+      ) => normalizeFieldAudienceMode(val, fk, f),
+      buildInheritedAdditionalFieldState: ((
+        af: SurveyQuestionsLegacyValue,
+        ansf: SurveyQuestionsLegacyValue,
+        qid: SurveyQuestionsLegacyValue,
+      ) => buildInheritedAdditionalFieldState(af, ansf, qid)) as SurveyQuestionsLegacyValue,
       valuesEqual: (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) => valuesEqual(a, b),
       getQuestionById: (qid: SurveyQuestionsLegacyValue) => getQuestionById(qid),
       computeHash: (value: SurveyQuestionsLegacyValue) => utils.keccak256(utils.toUtf8Bytes(value)),
@@ -5324,32 +5788,59 @@ const handleAnswer = (surveyIndex: SurveyQuestionsLegacyValue, questionId: Surve
 
     newSurveysResponseState[surveyIndex] = slice;
 
-    setState(buildSurveyUserEditResponseStatePatch(
-      newSurveysResponseState,
-      updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'user_edit')
-    ), () => {
-      scheduleJsonPreviewUpdate();
-      if (shouldPersistDraft) persistDraftSafely();
-      if (afterUpdate) afterUpdate();
-    });
+    setState(
+      buildSurveyUserEditResponseStatePatch(
+        newSurveysResponseState,
+        updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'user_edit'),
+      ),
+      () => {
+        scheduleJsonPreviewUpdate();
+        if (shouldPersistDraft) persistDraftSafely();
+        if (afterUpdate) afterUpdate();
+      },
+    );
   };
 
-const handleAdditional = (surveyIndex: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, additionalComments: SurveyQuestionsLegacyValue) => {
+  const handleAdditional = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    additionalComments: SurveyQuestionsLegacyValue,
+  ) => {
     surveyIndex = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex;
     questionId = normalizeQuestionIdKey(questionId);
     if (!questionId) return;
 
-    const sourceSlice: SurveyQuestionsLegacyValue =
-      stateRef.current.surveysResponseState?.[surveyIndex] ||
-      { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
+    const sourceSlice: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex] || {
+      answers: {},
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    };
     const plan: SurveyQuestionsLegacyValue = buildAdditionalUpdatePlan(questionId, additionalComments, sourceSlice, {
-      buildEmptyResponseFieldState: ((qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => buildEmptyResponseFieldState(qid, fk)) as SurveyQuestionsLegacyValue,
-      resolveFieldEncryptionAudience: (field: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionAudience(field, qid, fk),
-      resolveFieldEncryptionGateId: (field: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionGateId(field, qid, fk),
+      buildEmptyResponseFieldState: ((qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) =>
+        buildEmptyResponseFieldState(qid, fk)) as SurveyQuestionsLegacyValue,
+      resolveFieldEncryptionAudience: (
+        field: SurveyQuestionsLegacyValue,
+        qid: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+      ) => resolveFieldEncryptionAudience(field, qid, fk),
+      resolveFieldEncryptionGateId: (
+        field: SurveyQuestionsLegacyValue,
+        qid: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+      ) => resolveFieldEncryptionGateId(field, qid, fk),
       isQuestionLockedForResponse: (qid: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(qid),
       getEffectiveRecipientsForQid: (qid: SurveyQuestionsLegacyValue) => getEffectiveRecipientsForQid(qid),
-      normalizeFieldAudienceMode: (val: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue, f: SurveyQuestionsLegacyValue) => normalizeFieldAudienceMode(val, fk, f),
-      buildInheritedAdditionalFieldState: ((af: SurveyQuestionsLegacyValue, ansf: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue) => buildInheritedAdditionalFieldState(af, ansf, qid)) as SurveyQuestionsLegacyValue,
+      normalizeFieldAudienceMode: (
+        val: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+        f: SurveyQuestionsLegacyValue,
+      ) => normalizeFieldAudienceMode(val, fk, f),
+      buildInheritedAdditionalFieldState: ((
+        af: SurveyQuestionsLegacyValue,
+        ansf: SurveyQuestionsLegacyValue,
+        qid: SurveyQuestionsLegacyValue,
+      ) => buildInheritedAdditionalFieldState(af, ansf, qid)) as SurveyQuestionsLegacyValue,
       valuesEqual: (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) => valuesEqual(a, b),
       getQuestionById: (qid: SurveyQuestionsLegacyValue) => getQuestionById(qid),
       computeHash: (value: SurveyQuestionsLegacyValue) => utils.keccak256(utils.toUtf8Bytes(value)),
@@ -5370,136 +5861,224 @@ const handleAdditional = (surveyIndex: SurveyQuestionsLegacyValue, questionId: S
 
     newSurveysResponseState[surveyIndex] = slice;
 
-    setState(buildSurveyUserEditResponseStatePatch(
-      newSurveysResponseState,
-      updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'user_edit')
-    ), () => {
-      scheduleJsonPreviewUpdate();
-      persistDraftSafely();
-    });
+    setState(
+      buildSurveyUserEditResponseStatePatch(
+        newSurveysResponseState,
+        updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'user_edit'),
+      ),
+      () => {
+        scheduleJsonPreviewUpdate();
+        persistDraftSafely();
+      },
+    );
   };
 
-const handleConviction = (surveyIndex: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, conviction: SurveyQuestionsLegacyValue, options: SurveyQuestionsLegacyValue = {}) => {
+  const handleConviction = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    conviction: SurveyQuestionsLegacyValue,
+    options: SurveyQuestionsLegacyValue = {},
+  ) => {
     surveyIndex = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex;
     questionId = normalizeQuestionIdKey(questionId);
     if (!questionId) return;
     const shouldPersistDraft: SurveyQuestionsLegacyValue = options?.persistDraft !== false;
-    const afterUpdate: SurveyQuestionsLegacyValue = typeof options?.afterUpdate === 'function' ? options.afterUpdate : null;
-    const priorValue: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex]?.conviction?.[questionId];
+    const afterUpdate: SurveyQuestionsLegacyValue =
+      typeof options?.afterUpdate === 'function' ? options.afterUpdate : null;
+    const priorValue: SurveyQuestionsLegacyValue =
+      stateRef.current.surveysResponseState?.[surveyIndex]?.conviction?.[questionId];
     if (priorValue === conviction) return;
     if (inst._draftDirtyQids) inst._draftDirtyQids.add(questionId);
     invalidateDiffCaches();
 
     const newSurveysResponseState: SurveyQuestionsLegacyValue = [...stateRef.current.surveysResponseState];
-    const slice: SurveyQuestionsLegacyValue = { ...(newSurveysResponseState[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
+    const slice: SurveyQuestionsLegacyValue = {
+      ...(newSurveysResponseState[surveyIndex] || {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      }),
+    };
     slice.conviction = { ...(slice.conviction || {}), [questionId]: conviction };
     newSurveysResponseState[surveyIndex] = slice;
 
-    setState(buildSurveyUserEditResponseStatePatch(
-      newSurveysResponseState,
-      updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'user_edit')
-    ), () => {
-      scheduleJsonPreviewUpdate();
-      if (shouldPersistDraft) persistDraftSafely();
-      if (afterUpdate) afterUpdate();
-    });
+    setState(
+      buildSurveyUserEditResponseStatePatch(
+        newSurveysResponseState,
+        updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'user_edit'),
+      ),
+      () => {
+        scheduleJsonPreviewUpdate();
+        if (shouldPersistDraft) persistDraftSafely();
+        if (afterUpdate) afterUpdate();
+      },
+    );
   };
 
-const handleImportance = (surveyIndex: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, importance: SurveyQuestionsLegacyValue, options: SurveyQuestionsLegacyValue = {}) => {
+  const handleImportance = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    importance: SurveyQuestionsLegacyValue,
+    options: SurveyQuestionsLegacyValue = {},
+  ) => {
     surveyIndex = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex;
     questionId = normalizeQuestionIdKey(questionId);
     if (!questionId) return;
     const shouldPersistDraft: SurveyQuestionsLegacyValue = options?.persistDraft !== false;
-    const afterUpdate: SurveyQuestionsLegacyValue = typeof options?.afterUpdate === 'function' ? options.afterUpdate : null;
-    const priorValue: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex]?.importance?.[questionId];
+    const afterUpdate: SurveyQuestionsLegacyValue =
+      typeof options?.afterUpdate === 'function' ? options.afterUpdate : null;
+    const priorValue: SurveyQuestionsLegacyValue =
+      stateRef.current.surveysResponseState?.[surveyIndex]?.importance?.[questionId];
     if (priorValue === importance) return;
     if (inst._draftDirtyQids) inst._draftDirtyQids.add(questionId);
     invalidateDiffCaches();
 
     const newSurveysResponseState: SurveyQuestionsLegacyValue = [...stateRef.current.surveysResponseState];
-    const slice: SurveyQuestionsLegacyValue = { ...(newSurveysResponseState[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
+    const slice: SurveyQuestionsLegacyValue = {
+      ...(newSurveysResponseState[surveyIndex] || {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      }),
+    };
     slice.importance = { ...(slice.importance || {}), [questionId]: importance };
     newSurveysResponseState[surveyIndex] = slice;
 
-    setState(buildSurveyUserEditResponseStatePatch(
-      newSurveysResponseState,
-      updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'user_edit')
-    ), () => {
-      scheduleJsonPreviewUpdate();
-      if (shouldPersistDraft) persistDraftSafely();
-      if (afterUpdate) afterUpdate();
-    });
-  };
-
-const toggleAnswerEncryption = (surveyIndex: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, newEncryptedState: SurveyQuestionsLegacyValue) => {
-    const idx: SurveyQuestionsLegacyValue = (propsRef.current.isStandalone || propsRef.current.singleQuestionMode) ? 0 : (surveyIndex || 0);
-    const qid: SurveyQuestionsLegacyValue = String(questionId || '').toLowerCase();
-    invalidateDiffCaches();
-
-    setState((prev: SurveyQuestionsLegacyValue) => buildAnswerEncryptionToggleResponseState(prev, {
-      buildEncryptionTogglePlan: buildEncryptionTogglePlan as SurveyQuestionsLegacyValue,
-      deps: {
-        isQuestionLockedForResponse: (q: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(q),
-        buildEmptyResponseFieldState: (q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => buildEmptyResponseFieldState(q, fk),
-        resolveFieldEncryptionAudience: (f: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionAudience(f, q, fk),
-        resolveFieldEncryptionGateId: (f: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionGateId(f, q, fk),
-        normalizeFieldAudienceMode: (v: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue, f: SurveyQuestionsLegacyValue) => normalizeFieldAudienceMode(v, fk, f),
-        buildInheritedAdditionalFieldState: (af: SurveyQuestionsLegacyValue, ans: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue) => buildInheritedAdditionalFieldState(af, ans, q),
-        normalizeResponseEncryptionAudience: (a: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue) => normalizeResponseEncryptionAudience(a, q),
-      },
-      newEncryptedState,
-      questionId: qid,
-      surveyIndex: idx,
-    }), () => {
-      scheduleJsonPreviewUpdate();
-      persistDraftSafely && persistDraftSafely();
-    });
-  };
-
-const toggleAdditionalCommentsEncryption = (surveyIndex: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, newEncryptedState: SurveyQuestionsLegacyValue) => {
-    const idx: SurveyQuestionsLegacyValue = (propsRef.current.isStandalone || propsRef.current.singleQuestionMode) ? 0 : (surveyIndex || 0);
-    const qid: SurveyQuestionsLegacyValue = String(questionId || '').toLowerCase();
-    invalidateDiffCaches();
-
-    setState((prev: SurveyQuestionsLegacyValue) => buildAdditionalEncryptionToggleResponseState(prev, {
-      buildEncryptionTogglePlan: buildEncryptionTogglePlan as SurveyQuestionsLegacyValue,
-      deps: {
-        isQuestionLockedForResponse: (q: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(q),
-        buildEmptyResponseFieldState: (q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => buildEmptyResponseFieldState(q, fk),
-        resolveFieldEncryptionAudience: (f: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionAudience(f, q, fk),
-        resolveFieldEncryptionGateId: (f: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionGateId(f, q, fk),
-        normalizeFieldAudienceMode: (v: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue, f: SurveyQuestionsLegacyValue) => normalizeFieldAudienceMode(v, fk, f),
-        buildInheritedAdditionalFieldState: (af: SurveyQuestionsLegacyValue, ans: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue) => buildInheritedAdditionalFieldState(af, ans, q),
-        normalizeResponseEncryptionAudience: (a: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue) => normalizeResponseEncryptionAudience(a, q),
-      },
-      newEncryptedState,
-      questionId: qid,
-      surveyIndex: idx,
-    }), () => {
-      scheduleJsonPreviewUpdate();
-      persistDraftSafely && persistDraftSafely();
-    });
-  };
-
-const toggleDisplayAnswerMode = () => {
     setState(
-      buildDisplayAnswerModeToggleState,
-      async () => {
-        if (stateRef.current.displayAnswerMode) {
-          if (propsRef.current.singleQuestionMode && propsRef.current.responderAddress) {
-            await fetchSingleQuestionData();
-          } else if (propsRef.current.viewAddress) {
-            await fetchSurveyResponse();
-          }
-        } else {
-          setState(buildParsedViewAddressAnswersState());
-        }
-        updateJsonPreview();
-      }
+      buildSurveyUserEditResponseStatePatch(
+        newSurveysResponseState,
+        updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'user_edit'),
+      ),
+      () => {
+        scheduleJsonPreviewUpdate();
+        if (shouldPersistDraft) persistDraftSafely();
+        if (afterUpdate) afterUpdate();
+      },
     );
   };
 
-const handleShowJsonAtBottom = () => {
+  const toggleAnswerEncryption = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    newEncryptedState: SurveyQuestionsLegacyValue,
+  ) => {
+    const idx: SurveyQuestionsLegacyValue =
+      propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex || 0;
+    const qid: SurveyQuestionsLegacyValue = String(questionId || '').toLowerCase();
+    invalidateDiffCaches();
+
+    setState(
+      (prev: SurveyQuestionsLegacyValue) =>
+        buildAnswerEncryptionToggleResponseState(prev, {
+          buildEncryptionTogglePlan: buildEncryptionTogglePlan as SurveyQuestionsLegacyValue,
+          deps: {
+            isQuestionLockedForResponse: (q: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(q),
+            buildEmptyResponseFieldState: (q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) =>
+              buildEmptyResponseFieldState(q, fk),
+            resolveFieldEncryptionAudience: (
+              f: SurveyQuestionsLegacyValue,
+              q: SurveyQuestionsLegacyValue,
+              fk: SurveyQuestionsLegacyValue,
+            ) => resolveFieldEncryptionAudience(f, q, fk),
+            resolveFieldEncryptionGateId: (
+              f: SurveyQuestionsLegacyValue,
+              q: SurveyQuestionsLegacyValue,
+              fk: SurveyQuestionsLegacyValue,
+            ) => resolveFieldEncryptionGateId(f, q, fk),
+            normalizeFieldAudienceMode: (
+              v: SurveyQuestionsLegacyValue,
+              fk: SurveyQuestionsLegacyValue,
+              f: SurveyQuestionsLegacyValue,
+            ) => normalizeFieldAudienceMode(v, fk, f),
+            buildInheritedAdditionalFieldState: (
+              af: SurveyQuestionsLegacyValue,
+              ans: SurveyQuestionsLegacyValue,
+              q: SurveyQuestionsLegacyValue,
+            ) => buildInheritedAdditionalFieldState(af, ans, q),
+            normalizeResponseEncryptionAudience: (a: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue) =>
+              normalizeResponseEncryptionAudience(a, q),
+          },
+          newEncryptedState,
+          questionId: qid,
+          surveyIndex: idx,
+        }),
+      () => {
+        scheduleJsonPreviewUpdate();
+        persistDraftSafely && persistDraftSafely();
+      },
+    );
+  };
+
+  const toggleAdditionalCommentsEncryption = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    newEncryptedState: SurveyQuestionsLegacyValue,
+  ) => {
+    const idx: SurveyQuestionsLegacyValue =
+      propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex || 0;
+    const qid: SurveyQuestionsLegacyValue = String(questionId || '').toLowerCase();
+    invalidateDiffCaches();
+
+    setState(
+      (prev: SurveyQuestionsLegacyValue) =>
+        buildAdditionalEncryptionToggleResponseState(prev, {
+          buildEncryptionTogglePlan: buildEncryptionTogglePlan as SurveyQuestionsLegacyValue,
+          deps: {
+            isQuestionLockedForResponse: (q: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(q),
+            buildEmptyResponseFieldState: (q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) =>
+              buildEmptyResponseFieldState(q, fk),
+            resolveFieldEncryptionAudience: (
+              f: SurveyQuestionsLegacyValue,
+              q: SurveyQuestionsLegacyValue,
+              fk: SurveyQuestionsLegacyValue,
+            ) => resolveFieldEncryptionAudience(f, q, fk),
+            resolveFieldEncryptionGateId: (
+              f: SurveyQuestionsLegacyValue,
+              q: SurveyQuestionsLegacyValue,
+              fk: SurveyQuestionsLegacyValue,
+            ) => resolveFieldEncryptionGateId(f, q, fk),
+            normalizeFieldAudienceMode: (
+              v: SurveyQuestionsLegacyValue,
+              fk: SurveyQuestionsLegacyValue,
+              f: SurveyQuestionsLegacyValue,
+            ) => normalizeFieldAudienceMode(v, fk, f),
+            buildInheritedAdditionalFieldState: (
+              af: SurveyQuestionsLegacyValue,
+              ans: SurveyQuestionsLegacyValue,
+              q: SurveyQuestionsLegacyValue,
+            ) => buildInheritedAdditionalFieldState(af, ans, q),
+            normalizeResponseEncryptionAudience: (a: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue) =>
+              normalizeResponseEncryptionAudience(a, q),
+          },
+          newEncryptedState,
+          questionId: qid,
+          surveyIndex: idx,
+        }),
+      () => {
+        scheduleJsonPreviewUpdate();
+        persistDraftSafely && persistDraftSafely();
+      },
+    );
+  };
+
+  const toggleDisplayAnswerMode = () => {
+    setState(buildDisplayAnswerModeToggleState, async () => {
+      if (stateRef.current.displayAnswerMode) {
+        if (propsRef.current.singleQuestionMode && propsRef.current.responderAddress) {
+          await fetchSingleQuestionData();
+        } else if (propsRef.current.viewAddress) {
+          await fetchSurveyResponse();
+        }
+      } else {
+        setState(buildParsedViewAddressAnswersState());
+      }
+      updateJsonPreview();
+    });
+  };
+
+  const handleShowJsonAtBottom = () => {
     if (!stateRef.current.showJson) {
       setState(buildShowJsonState(true), () => {
         if (bottomRef.current) {
@@ -5513,7 +6092,7 @@ const handleShowJsonAtBottom = () => {
     }
   };
 
-const handleScrollToTop = () => {
+  const handleScrollToTop = () => {
     if (!stateRef.current.showJson) {
       setState(buildShowJsonState(true), () => {
         if (topRef.current) {
@@ -5527,7 +6106,10 @@ const handleScrollToTop = () => {
     }
   };
 
-const getSurveyResponse = async (responderAddress: SurveyQuestionsLegacyValue, surveyID: SurveyQuestionsLegacyValue) => {
+  const getSurveyResponse = async (
+    responderAddress: SurveyQuestionsLegacyValue,
+    surveyID: SurveyQuestionsLegacyValue,
+  ) => {
     // Prefer id-aware group resolution so /survey/:id outside /session still resolves
     const slug: SurveyQuestionsLegacyValue = resolveSlugForIds({
       surveyId: surveyID,
@@ -5538,12 +6120,12 @@ const getSurveyResponse = async (responderAddress: SurveyQuestionsLegacyValue, s
       propsRef.current.provider,
       responderAddress,
       surveyID,
-      slug
+      slug,
     );
     return surveyAnswers;
   };
 
-const getSurveyMetadataForJson = (surveyHash: SurveyQuestionsLegacyValue) => {
+  const getSurveyMetadataForJson = (surveyHash: SurveyQuestionsLegacyValue) => {
     if (!surveyHash) return { surveyTitle: null, sessionName: '' };
 
     try {
@@ -5567,7 +6149,7 @@ const getSurveyMetadataForJson = (surveyHash: SurveyQuestionsLegacyValue) => {
 
       let surveyTitle: SurveyQuestionsLegacyValue = null;
       let sessionName: SurveyQuestionsLegacyValue = '';
-      const netBucket: SurveyQuestionsLegacyValue = netIdStr ? (surveysCache?.[netIdStr] || null) : null;
+      const netBucket: SurveyQuestionsLegacyValue = netIdStr ? surveysCache?.[netIdStr] || null : null;
       const s: SurveyQuestionsLegacyValue = netBucket?.surveys?.[surveyIdLower];
       if (s?.title) surveyTitle = surveyResponseStoragePort.sanitizeSurveyTitleForResponsePayload(s);
       if (s?.sessionName) sessionName = s.sessionName;
@@ -5581,9 +6163,14 @@ const getSurveyMetadataForJson = (surveyHash: SurveyQuestionsLegacyValue) => {
     }
   };
 
-const prepareJsonAndHash = (surveyIndex: SurveyQuestionsLegacyValue, responderAddress?: SurveyQuestionsLegacyValue, overrideState: SurveyQuestionsLegacyValue = null) => {
+  const prepareJsonAndHash = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    responderAddress?: SurveyQuestionsLegacyValue,
+    overrideState: SurveyQuestionsLegacyValue = null,
+  ) => {
     surveyIndex = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex;
-    const surveyResponseState: SurveyQuestionsLegacyValue = overrideState || stateRef.current.surveysResponseState[surveyIndex];
+    const surveyResponseState: SurveyQuestionsLegacyValue =
+      overrideState || stateRef.current.surveysResponseState[surveyIndex];
     return buildResponsePayload({
       isStandalone: propsRef.current.isStandalone as SurveyQuestionsLegacyValue,
       singleQuestionMode: propsRef.current.singleQuestionMode as SurveyQuestionsLegacyValue,
@@ -5593,13 +6180,28 @@ const prepareJsonAndHash = (surveyIndex: SurveyQuestionsLegacyValue, responderAd
       surveyResponseState,
       questionPool: Array.isArray(stateRef.current.questionPool) ? stateRef.current.questionPool : [],
       pileQuestions: Array.isArray(stateRef.current.pileQuestions) ? stateRef.current.pileQuestions : [],
-      resolveFieldEncryptionAudience: (field: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fieldKey: SurveyQuestionsLegacyValue) => resolveFieldEncryptionAudience(field, qid, fieldKey),
+      resolveFieldEncryptionAudience: (
+        field: SurveyQuestionsLegacyValue,
+        qid: SurveyQuestionsLegacyValue,
+        fieldKey: SurveyQuestionsLegacyValue,
+      ) => resolveFieldEncryptionAudience(field, qid, fieldKey),
       getQuestionEncryptionGates: (q: SurveyQuestionsLegacyValue) => getQuestionEncryptionGates(q),
-      resolveFieldEncryptionGateId: (field: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fieldKey: SurveyQuestionsLegacyValue) => resolveFieldEncryptionGateId(field, qid, fieldKey),
-      normalizeFieldAudienceMode: (mode: SurveyQuestionsLegacyValue, fieldKey: SurveyQuestionsLegacyValue, field: SurveyQuestionsLegacyValue) => normalizeFieldAudienceMode(mode, fieldKey, field),
+      resolveFieldEncryptionGateId: (
+        field: SurveyQuestionsLegacyValue,
+        qid: SurveyQuestionsLegacyValue,
+        fieldKey: SurveyQuestionsLegacyValue,
+      ) => resolveFieldEncryptionGateId(field, qid, fieldKey),
+      normalizeFieldAudienceMode: (
+        mode: SurveyQuestionsLegacyValue,
+        fieldKey: SurveyQuestionsLegacyValue,
+        field: SurveyQuestionsLegacyValue,
+      ) => normalizeFieldAudienceMode(mode, fieldKey, field),
       getSurveyMetadataForJson: (hash: SurveyQuestionsLegacyValue) => getSurveyMetadataForJson(hash),
       resolveSessionContext: () => {
-        const context: SurveyQuestionsLegacyValue = resolveResponseJsonContext(propsRef.current, resolveEffectiveSlug(propsRef.current));
+        const context: SurveyQuestionsLegacyValue = resolveResponseJsonContext(
+          propsRef.current,
+          resolveEffectiveSlug(propsRef.current),
+        );
         return { sessionName: context.sessionConfig?.sessionName || '' };
       },
       getConvictionFromSlice,
@@ -5608,20 +6210,21 @@ const prepareJsonAndHash = (surveyIndex: SurveyQuestionsLegacyValue, responderAd
     });
   };
 
-const updateJsonPreview = (force: SurveyQuestionsLegacyValue = false) => {
+  const updateJsonPreview = (force: SurveyQuestionsLegacyValue = false) => {
     if (!force && !isResponseJsonPreviewVisible()) return;
-    const surveyIndex: SurveyQuestionsLegacyValue = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
+    const surveyIndex: SurveyQuestionsLegacyValue =
+      propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
     setState(buildJsonPreviewState(prepareJsonAndHash(surveyIndex)));
   };
 
-const jsonTreeDisplay = (jsonInput: SurveyQuestionsLegacyValue) => (
+  const jsonTreeDisplay = (jsonInput: SurveyQuestionsLegacyValue) => (
     <SurveyQuestionsJsonTree
       jsonInput={jsonInput}
       onInvalidInput={(...args: SurveyQuestionsLegacyValue[]) => surveyLog.error(...args)}
     />
   );
 
-const handlePrimarySubmitClick = () => {
+  const handlePrimarySubmitClick = () => {
     const inFlightPlan: SurveyQuestionsPrimarySubmitPlan = buildSurveyQuestionsPrimarySubmitPlan({
       isSubmitting: stateRef.current.isSubmitting,
       submitGuardActive: inst._submitGuard,
@@ -5629,9 +6232,7 @@ const handlePrimarySubmitClick = () => {
     if (inFlightPlan.action === 'inert') return;
 
     const pendingStats: SurveyQuestionsSubmitPendingStats = resolveSurveyQuestionsSubmitPendingStats({
-      getPendingEditStats: typeof getPendingEditStats === 'function'
-        ? () => getPendingEditStats()
-        : undefined,
+      getPendingEditStats: typeof getPendingEditStats === 'function' ? () => getPendingEditStats() : undefined,
       fallbackTotal: stateRef.current.modifiedCount || 0,
     });
     const pendingEditCount = pendingStats.total;
@@ -5678,14 +6279,14 @@ const handlePrimarySubmitClick = () => {
     });
   };
 
-const getQuestionsJson = () => {
+  const getQuestionsJson = () => {
     return buildSurveyQuestionsJson({
       singleQuestionMode: propsRef.current.singleQuestionMode,
       questionPool: stateRef.current.questionPool,
     });
   };
 
-const getResponseJson = () => {
+  const getResponseJson = () => {
     const isViewingSubmitted: SurveyQuestionsLegacyValue = shouldUseSubmittedResponseJson({
       viewAddress: propsRef.current.viewAddress,
       responderAddress: propsRef.current.responderAddress,
@@ -5701,11 +6302,12 @@ const getResponseJson = () => {
       });
     }
 
-    const surveyIndex: SurveyQuestionsLegacyValue = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
+    const surveyIndex: SurveyQuestionsLegacyValue =
+      propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
     return prepareJsonAndHash(surveyIndex);
   };
 
-const getSurveyJson = () => {
+  const getSurveyJson = () => {
     return buildSurveyDefinitionJson({
       isStandalone: propsRef.current.isStandalone,
       singleQuestionMode: propsRef.current.singleQuestionMode,
@@ -5715,7 +6317,7 @@ const getSurveyJson = () => {
     });
   };
 
-const copyJsonToClipboard = (json: SurveyQuestionsLegacyValue, type: SurveyQuestionsLegacyValue) => {
+  const copyJsonToClipboard = (json: SurveyQuestionsLegacyValue, type: SurveyQuestionsLegacyValue) => {
     let jsonToUse: SurveyQuestionsLegacyValue = json;
 
     if (!jsonToUse || (typeof jsonToUse === 'object' && Object.keys(jsonToUse).length === 0)) {
@@ -5724,43 +6326,50 @@ const copyJsonToClipboard = (json: SurveyQuestionsLegacyValue, type: SurveyQuest
       }
     }
 
-    if (!jsonToUse || (typeof jsonToUse === 'object' && Object.keys(jsonToUse).length === 0 && type !== 'questions' && type !== 'survey')) {
+    if (
+      !jsonToUse ||
+      (typeof jsonToUse === 'object' &&
+        Object.keys(jsonToUse).length === 0 &&
+        type !== 'questions' &&
+        type !== 'survey')
+    ) {
       surveyLog.warn('No valid JSON data to copy for type:', type);
       return;
     }
 
     const jsonString: SurveyQuestionsLegacyValue =
-      typeof jsonToUse === 'string'
-        ? jsonToUse
-        : JSON.stringify(jsonToUse, null, 2);
-    navigator.clipboard.writeText(jsonString).then(() => {
-      notify.success('Copied to clipboard');
-      if (type === 'questions') {
-        setState(buildCopiedQuestionsJsonState(true));
-        setManagedTimeout(() => {
-          setState(buildCopiedQuestionsJsonState(false));
-        }, 2000);
-      } else if (type === 'response') {
-        setState(buildCopiedResponseJsonState(true));
-        setManagedTimeout(() => {
-          setState(buildCopiedResponseJsonState(false));
-        }, 2000);
-      } else if (type === 'survey') {
-        setState(buildCopiedSurveyJsonState(true));
-        setManagedTimeout(() => {
-          setState(buildCopiedSurveyJsonState(false));
-        }, 2000);
-      }
-    }).catch((error: any) => {
-      surveyLog.error('Failed to copy JSON to clipboard:', error);
-    });
+      typeof jsonToUse === 'string' ? jsonToUse : JSON.stringify(jsonToUse, null, 2);
+    navigator.clipboard
+      .writeText(jsonString)
+      .then(() => {
+        notify.success('Copied to clipboard');
+        if (type === 'questions') {
+          setState(buildCopiedQuestionsJsonState(true));
+          setManagedTimeout(() => {
+            setState(buildCopiedQuestionsJsonState(false));
+          }, 2000);
+        } else if (type === 'response') {
+          setState(buildCopiedResponseJsonState(true));
+          setManagedTimeout(() => {
+            setState(buildCopiedResponseJsonState(false));
+          }, 2000);
+        } else if (type === 'survey') {
+          setState(buildCopiedSurveyJsonState(true));
+          setManagedTimeout(() => {
+            setState(buildCopiedSurveyJsonState(false));
+          }, 2000);
+        }
+      })
+      .catch((error: any) => {
+        surveyLog.error('Failed to copy JSON to clipboard:', error);
+      });
   };
 
-const toggleShowQuestionsJson = () => {
+  const toggleShowQuestionsJson = () => {
     setState(buildQuestionsJsonToggleState);
   };
 
-const toggleShowResponseJson = () => {
+  const toggleShowResponseJson = () => {
     setState(buildResponseJsonToggleState, () => {
       if (stateRef.current.showResponseJson) {
         updateJsonPreview(true);
@@ -5773,16 +6382,16 @@ const toggleShowResponseJson = () => {
     });
   };
 
-const toggleShowSurveyJson = () => {
+  const toggleShowSurveyJson = () => {
     setState(buildSurveyJsonToggleState);
   };
 
-const getCommentsOpen = (questionId: SurveyQuestionsLegacyValue, defaultOpen: SurveyQuestionsLegacyValue = false) => {
+  const getCommentsOpen = (questionId: SurveyQuestionsLegacyValue, defaultOpen: SurveyQuestionsLegacyValue = false) => {
     const current: SurveyQuestionsLegacyValue = stateRef.current?.showComments?.[questionId];
     return typeof current === 'boolean' ? current : !!defaultOpen;
   };
 
-const toggleComments = (questionId: SurveyQuestionsLegacyValue, defaultOpen: SurveyQuestionsLegacyValue = false) => {
+  const toggleComments = (questionId: SurveyQuestionsLegacyValue, defaultOpen: SurveyQuestionsLegacyValue = false) => {
     const runtimeStrategy: SurveyQuestionsLegacyValue = getRuntimeStrategy();
     if (typeof runtimeStrategy?.toggleComments === 'function') {
       return runtimeStrategy.toggleComments(engine, questionId, defaultOpen);
@@ -5790,7 +6399,7 @@ const toggleComments = (questionId: SurveyQuestionsLegacyValue, defaultOpen: Sur
     setState((prev: SurveyQuestionsLegacyValue) => buildCommentsToggleState(prev, questionId, defaultOpen));
   };
 
-const getLockAudienceDisplayState = ({
+  const getLockAudienceDisplayState = ({
     questionId,
     answer,
     fieldKey = 'answer',
@@ -5804,19 +6413,28 @@ const getLockAudienceDisplayState = ({
     visualContext = 'default',
   }: SurveyQuestionsLegacyValue) => {
     const qid: SurveyQuestionsLegacyValue = String(questionId || '').toLowerCase();
-    const resolvedFieldKey: SurveyQuestionsLegacyValue = String(fieldKey || '').trim().toLowerCase() === 'additional'
-      ? 'additional'
-      : 'answer';
-    const fieldState: SurveyQuestionsLegacyValue = (field && typeof field === 'object') ? field : (answer || {});
+    const resolvedFieldKey: SurveyQuestionsLegacyValue =
+      String(fieldKey || '')
+        .trim()
+        .toLowerCase() === 'additional'
+        ? 'additional'
+        : 'answer';
+    const fieldState: SurveyQuestionsLegacyValue = field && typeof field === 'object' ? field : answer || {};
     const forcedGate: SurveyQuestionsLegacyValue = isQuestionLockedForResponse(qid);
     const gateOption: SurveyQuestionsLegacyValue = resolveQuestionGateOption(qid);
-    const gateOptions: SurveyQuestionsLegacyValue = Array.isArray(gateOption?.gateDetails) ? gateOption.gateDetails : [];
-    const currentAudience: SurveyQuestionsLegacyValue = resolveFieldEncryptionAudience(fieldState, qid, resolvedFieldKey);
+    const gateOptions: SurveyQuestionsLegacyValue = Array.isArray(gateOption?.gateDetails)
+      ? gateOption.gateDetails
+      : [];
+    const currentAudience: SurveyQuestionsLegacyValue = resolveFieldEncryptionAudience(
+      fieldState,
+      qid,
+      resolvedFieldKey,
+    );
     const currentGateId: SurveyQuestionsLegacyValue = resolveFieldEncryptionGateId(fieldState, qid, resolvedFieldKey);
     const currentAudienceMode: SurveyQuestionsLegacyValue = normalizeFieldAudienceMode(
       fieldState?.audienceMode,
       resolvedFieldKey,
-      fieldState
+      fieldState,
     );
     const displayState: SurveyQuestionsLegacyValue = buildLockAudienceDisplayState({
       questionId: qid,
@@ -5841,7 +6459,7 @@ const getLockAudienceDisplayState = ({
       ? getLockAudienceMenuStateKey(qid, displayState.effectiveFieldKey)
       : '';
     const expandedGateId: SurveyQuestionsLegacyValue = normalizeGateLabelText(
-      stateRef.current.lockAudienceGateDetailsByQuestion?.[menuStateKey] || ''
+      stateRef.current.lockAudienceGateDetailsByQuestion?.[menuStateKey] || '',
     );
 
     return {
@@ -5850,7 +6468,7 @@ const getLockAudienceDisplayState = ({
     };
   };
 
-const applyLockAudienceSelection = ({
+  const applyLockAudienceSelection = ({
     surveyIndex,
     qid,
     effectiveFieldKey,
@@ -5864,7 +6482,7 @@ const applyLockAudienceSelection = ({
     applyAnswerEncryptionAudience(surveyIndex, qid, audience, { gateId });
   };
 
-const toggleQuestionFieldEncryptionEnabled = ({
+  const toggleQuestionFieldEncryptionEnabled = ({
     surveyIndex,
     qid,
     effectiveFieldKey,
@@ -5877,7 +6495,7 @@ const toggleQuestionFieldEncryptionEnabled = ({
     toggleAnswerEncryption(surveyIndex, qid, nextEncrypted);
   };
 
-const handleLockAudienceButtonClick = ({
+  const handleLockAudienceButtonClick = ({
     surveyIndex,
     qid,
     effectiveFieldKey,
@@ -5932,7 +6550,7 @@ const handleLockAudienceButtonClick = ({
     }
   };
 
-const renderAnswerLockControl = ({
+  const renderAnswerLockControl = ({
     surveyIndex,
     questionId,
     answer,
@@ -5985,7 +6603,10 @@ const renderAnswerLockControl = ({
       showPlaintextOption,
       visualContext,
     });
-    const handleAudienceSelect: SurveyQuestionsLegacyValue = (audience: SurveyQuestionsLegacyValue, gateId: SurveyQuestionsLegacyValue = '') => {
+    const handleAudienceSelect: SurveyQuestionsLegacyValue = (
+      audience: SurveyQuestionsLegacyValue,
+      gateId: SurveyQuestionsLegacyValue = '',
+    ) => {
       applyLockAudienceSelection({
         surveyIndex,
         qid,
@@ -6035,16 +6656,25 @@ const renderAnswerLockControl = ({
         showFollowOption={showFollowOption}
         onLockClick={handleLockClick}
         onSelectAudience={handleAudienceSelect}
-        onToggleGateDetails={(nextQid: SurveyQuestionsLegacyValue, gateId: SurveyQuestionsLegacyValue, nextFieldKey: SurveyQuestionsLegacyValue) => (
-          toggleLockAudienceGateDetails(nextQid, gateId, nextFieldKey)
-        )}
+        onToggleGateDetails={(
+          nextQid: SurveyQuestionsLegacyValue,
+          gateId: SurveyQuestionsLegacyValue,
+          nextFieldKey: SurveyQuestionsLegacyValue,
+        ) => toggleLockAudienceGateDetails(nextQid, gateId, nextFieldKey)}
       />
     );
   };
 
-const renderQuestion = (question: SurveyQuestionsLegacyValue, qIndex: SurveyQuestionsLegacyValue, currentSurveyResponseState: SurveyQuestionsLegacyValue) => {
+  const renderQuestion = (
+    question: SurveyQuestionsLegacyValue,
+    qIndex: SurveyQuestionsLegacyValue,
+    currentSurveyResponseState: SurveyQuestionsLegacyValue,
+  ) => {
     if (!currentSurveyResponseState || !currentSurveyResponseState.answers) {
-      surveyLog.warn('renderQuestion: currentSurveyResponseState or its answers property is undefined/null. Question ID:', question?.id);
+      surveyLog.warn(
+        'renderQuestion: currentSurveyResponseState or its answers property is undefined/null. Question ID:',
+        question?.id,
+      );
       return null;
     }
 
@@ -6053,7 +6683,8 @@ const renderQuestion = (question: SurveyQuestionsLegacyValue, qIndex: SurveyQues
       return null;
     }
 
-    const surveyIndex: SurveyQuestionsLegacyValue = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
+    const surveyIndex: SurveyQuestionsLegacyValue =
+      propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
     const displayState: SurveyQuestionsLegacyValue = getQuestionRenderDisplayState({
       questionId: question.id,
       responseSlice: currentSurveyResponseState,
@@ -6109,7 +6740,7 @@ const renderQuestion = (question: SurveyQuestionsLegacyValue, qIndex: SurveyQues
     });
   };
 
-const buildResponseGatePolicyCacheKey = () =>
+  const buildResponseGatePolicyCacheKey = () =>
     buildResponseGatePolicyCacheKeyFromInputs({
       singleQuestionMode: isResponseGateQuestionFlow(),
       isStandalone: propsRef.current.isStandalone,
@@ -6120,7 +6751,7 @@ const buildResponseGatePolicyCacheKey = () =>
       networkId: String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? ''),
     });
 
-const getQuestionRouteSessionSlug = () => {
+  const getQuestionRouteSessionSlug = () => {
     try {
       if (typeof window === 'undefined') return '';
       return normalizeSessionSlugValue(parseQuestionSessionSlugFromSearch(window.location?.search || '') || '');
@@ -6129,18 +6760,13 @@ const getQuestionRouteSessionSlug = () => {
     }
   };
 
-const getExplicitResponseGateSessionSlug = () => (
-    getQuestionRouteSessionSlug() ||
-    normalizeSessionSlugValue(getSessionSlugHintFromProps(propsRef.current))
-  );
+  const getExplicitResponseGateSessionSlug = () =>
+    getQuestionRouteSessionSlug() || normalizeSessionSlugValue(getSessionSlugHintFromProps(propsRef.current));
 
-const isResponseGateQuestionFlow = (questionId: SurveyQuestionsLegacyValue = propsRef.current.questionID) => !!(
-    propsRef.current.singleQuestionMode ||
-    propsRef.current.isStandalone ||
-    questionId
-  );
+  const isResponseGateQuestionFlow = (questionId: SurveyQuestionsLegacyValue = propsRef.current.questionID) =>
+    !!(propsRef.current.singleQuestionMode || propsRef.current.isStandalone || questionId);
 
-const resolveResponseGateSessionSlug = (questionId: SurveyQuestionsLegacyValue = propsRef.current.questionID) => {
+  const resolveResponseGateSessionSlug = (questionId: SurveyQuestionsLegacyValue = propsRef.current.questionID) => {
     const explicitSlug: SurveyQuestionsLegacyValue = getExplicitResponseGateSessionSlug();
     if (explicitSlug) return explicitSlug;
     if (isResponseGateQuestionFlow(questionId)) {
@@ -6159,7 +6785,7 @@ const resolveResponseGateSessionSlug = (questionId: SurveyQuestionsLegacyValue =
     });
   };
 
-const getResponseGatePolicy = () => {
+  const getResponseGatePolicy = () => {
     const cacheKey: SurveyQuestionsLegacyValue = buildResponseGatePolicyCacheKey();
     const isQuestionResponseFlow: SurveyQuestionsLegacyValue = isResponseGateQuestionFlow();
     const cached: SurveyQuestionsLegacyValue = inst._responseGatePolicyCache;
@@ -6178,13 +6804,8 @@ const getResponseGatePolicy = () => {
       cfgSignature = '';
     }
 
-    if (
-      cached &&
-      cached.key === cacheKey &&
-      cached.cfgSignature === cfgSignature &&
-      cached.value
-    ) {
-      if ((now - Number(cached.ts || 0)) < 1500) return cached.value;
+    if (cached && cached.key === cacheKey && cached.cfgSignature === cfgSignature && cached.value) {
+      if (now - Number(cached.ts || 0) < 1500) return cached.value;
       inst._responseGatePolicyCache = { ...cached, cfg, ts: now };
       return cached.value;
     }
@@ -6208,10 +6829,16 @@ const getResponseGatePolicy = () => {
     return policy;
   };
 
-const getQuestionLookupMap = () => {
-    const stateQuestionPool: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current.questionPool) ? stateRef.current.questionPool : null;
-    const statePileQuestions: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current.pileQuestions) ? stateRef.current.pileQuestions : null;
-    const propsQuestionPool: SurveyQuestionsLegacyValue = Array.isArray(propsRef.current.questionPool) ? propsRef.current.questionPool : null;
+  const getQuestionLookupMap = () => {
+    const stateQuestionPool: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current.questionPool)
+      ? stateRef.current.questionPool
+      : null;
+    const statePileQuestions: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current.pileQuestions)
+      ? stateRef.current.pileQuestions
+      : null;
+    const propsQuestionPool: SurveyQuestionsLegacyValue = Array.isArray(propsRef.current.questionPool)
+      ? propsRef.current.questionPool
+      : null;
     const cache: SurveyQuestionsLegacyValue = inst._questionByIdLookupCache;
 
     if (
@@ -6246,41 +6873,49 @@ const getQuestionLookupMap = () => {
     return next;
   };
 
-const getQuestionById = (questionId: SurveyQuestionsLegacyValue) => {
+  const getQuestionById = (questionId: SurveyQuestionsLegacyValue) => {
     const qid: SurveyQuestionsLegacyValue = normalizeQuestionIdKey(questionId);
     if (!qid) return null;
     return getQuestionLookupMap().get(qid) || null;
   };
 
-const buildGateAudienceSbtItems = (sbtAddresses: SurveyQuestionsLegacyValue = [], sessionSlug: SurveyQuestionsLegacyValue = '') => (
+  const buildGateAudienceSbtItems = (
+    sbtAddresses: SurveyQuestionsLegacyValue = [],
+    sessionSlug: SurveyQuestionsLegacyValue = '',
+  ) =>
     buildGateAudienceSbtItemsController(sbtAddresses, sessionSlug, {
       resolveSbtGateLabel: (address: SurveyQuestionsLegacyValue) => resolveSbtGateLabel(address),
       getShortenedAddress: getShortenedAddress as SurveyQuestionsLegacyValue,
       buildSbtDetailPath,
-    })
-  );
+    });
 
-const getQuestionEncryptionGates = (question: SurveyQuestionsLegacyValue) => getQuestionEncryptionGatesCore(question);
+  const getQuestionEncryptionGates = (question: SurveyQuestionsLegacyValue) => getQuestionEncryptionGatesCore(question);
 
-const normalizeFieldAudienceMode = (value: SurveyQuestionsLegacyValue, fieldKey: SurveyQuestionsLegacyValue = 'answer', field: SurveyQuestionsLegacyValue = {}) =>
-    normalizeFieldAudienceModeCore(value, fieldKey, field, hasMeaningfulFieldValue as SurveyQuestionsLegacyValue);
+  const normalizeFieldAudienceMode = (
+    value: SurveyQuestionsLegacyValue,
+    fieldKey: SurveyQuestionsLegacyValue = 'answer',
+    field: SurveyQuestionsLegacyValue = {},
+  ) => normalizeFieldAudienceModeCore(value, fieldKey, field, hasMeaningfulFieldValue as SurveyQuestionsLegacyValue);
 
-const getQuestionGateOptions = (questionId: SurveyQuestionsLegacyValue) => (
+  const getQuestionGateOptions = (questionId: SurveyQuestionsLegacyValue) =>
     getQuestionGateOptionsController(questionId, {
       getQuestionById: (qid: SurveyQuestionsLegacyValue) => getQuestionById(qid),
       getQuestionEncryptionGates: (question: SurveyQuestionsLegacyValue) => getQuestionEncryptionGates(question),
       buildRecipientsFromGates: (gates: SurveyQuestionsLegacyValue) => buildRecipientsFromGates(gates),
       normalizeGateLabelText: (value: SurveyQuestionsLegacyValue) => normalizeGateLabelText(value),
       resolveConfiguredGateLabel: (opts: SurveyQuestionsLegacyValue = {}) => resolveConfiguredGateLabel(opts),
-      resolveGateDisplayLabel: (gate: SurveyQuestionsLegacyValue = {}, fallbackSbt: SurveyQuestionsLegacyValue = '') => resolveGateDisplayLabel(gate, fallbackSbt),
-      buildGateAudienceSbtItems: (sbtAddresses: SurveyQuestionsLegacyValue = [], sessionSlug: SurveyQuestionsLegacyValue = '') => buildGateAudienceSbtItems(sbtAddresses, sessionSlug),
+      resolveGateDisplayLabel: (gate: SurveyQuestionsLegacyValue = {}, fallbackSbt: SurveyQuestionsLegacyValue = '') =>
+        resolveGateDisplayLabel(gate, fallbackSbt),
+      buildGateAudienceSbtItems: (
+        sbtAddresses: SurveyQuestionsLegacyValue = [],
+        sessionSlug: SurveyQuestionsLegacyValue = '',
+      ) => buildGateAudienceSbtItems(sbtAddresses, sessionSlug),
       resolveSbtGateLabel: (address: SurveyQuestionsLegacyValue) => resolveSbtGateLabel(address),
       getShortenedAddress: getShortenedAddress as SurveyQuestionsLegacyValue,
       normalizeQuestionIdKey,
-    })
-  );
+    });
 
-const buildFallbackResponseGateOptions = (questionId: SurveyQuestionsLegacyValue = null) => {
+  const buildFallbackResponseGateOptions = (questionId: SurveyQuestionsLegacyValue = null) => {
     const slug: SurveyQuestionsLegacyValue = normalizeSessionSlugValue(resolveResponseGateSessionSlug(questionId));
     const cfg: SurveyQuestionsLegacyValue = resolveEffectiveResponseGateConfig(slug);
     const isQuestionResponseFlow: SurveyQuestionsLegacyValue = isResponseGateQuestionFlow(questionId);
@@ -6294,20 +6929,25 @@ const buildFallbackResponseGateOptions = (questionId: SurveyQuestionsLegacyValue
 
     return gates
       .map((gate: SurveyQuestionsLegacyValue, gateIndex: SurveyQuestionsLegacyValue) => {
-        const sbtAddresses: SurveyQuestionsLegacyValue = Array.from(new Set(
-          (Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : [])
-            .map((address: SurveyQuestionsLegacyValue) => String(address || '').trim())
-            .filter(Boolean)
-        ));
+        const sbtAddresses: SurveyQuestionsLegacyValue = Array.from(
+          new Set(
+            (Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : [])
+              .map((address: SurveyQuestionsLegacyValue) => String(address || '').trim())
+              .filter(Boolean),
+          ),
+        );
         if (!sbtAddresses.length) return null;
-        const gateId: SurveyQuestionsLegacyValue = normalizeGateLabelText(
-          gate?.gateId || gate?.id || gate?.resourceKey || ''
-        ) || `gate-${gateIndex}`;
-        const label: SurveyQuestionsLegacyValue = resolveConfiguredGateLabel({
-          gate,
-          resourceKey: policy?.primaryResource || '',
-          sbtAddresses,
-        }) || resolveGateDisplayLabel(gate, sbtAddresses[0] || '') || gate?.label || `${t('gate')} ${gateIndex + 1}`;
+        const gateId: SurveyQuestionsLegacyValue =
+          normalizeGateLabelText(gate?.gateId || gate?.id || gate?.resourceKey || '') || `gate-${gateIndex}`;
+        const label: SurveyQuestionsLegacyValue =
+          resolveConfiguredGateLabel({
+            gate,
+            resourceKey: policy?.primaryResource || '',
+            sbtAddresses,
+          }) ||
+          resolveGateDisplayLabel(gate, sbtAddresses[0] || '') ||
+          gate?.label ||
+          `${t('gate')} ${gateIndex + 1}`;
         const gateRecipients: SurveyQuestionsLegacyValue = recipients[gateIndex]
           ? [recipients[gateIndex]]
           : buildRecipientsFromGates([gate]);
@@ -6317,7 +6957,10 @@ const buildFallbackResponseGateOptions = (questionId: SurveyQuestionsLegacyValue
           sbtAddresses,
           sbtItems: buildGateAudienceSbtItems(sbtAddresses, slug),
           sbtSummary: sbtAddresses
-            .map((address: SurveyQuestionsLegacyValue) => resolveSbtGateLabel(address) || getShortenedAddress(address, false))
+            .map(
+              (address: SurveyQuestionsLegacyValue) =>
+                resolveSbtGateLabel(address) || getShortenedAddress(address, false),
+            )
             .join(', '),
           recipients: gateRecipients,
         };
@@ -6325,7 +6968,7 @@ const buildFallbackResponseGateOptions = (questionId: SurveyQuestionsLegacyValue
       .filter(Boolean);
   };
 
-const getResponseGateOptions = (questionId: SurveyQuestionsLegacyValue = null) => {
+  const getResponseGateOptions = (questionId: SurveyQuestionsLegacyValue = null) => {
     const options: SurveyQuestionsLegacyValue = getResponseGateOptionsController(questionId, {
       normalizeQuestionIdKey,
       isQuestionLockedForResponse: (qid: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(qid),
@@ -6334,78 +6977,116 @@ const getResponseGateOptions = (questionId: SurveyQuestionsLegacyValue = null) =
       buildRecipientsFromGates: (gates: SurveyQuestionsLegacyValue) => buildRecipientsFromGates(gates),
       resolveLockAudienceSessionName: () => resolveLockAudienceSessionName(),
       resolveConfiguredGateLabel: (opts: SurveyQuestionsLegacyValue = {}) => resolveConfiguredGateLabel(opts),
-      resolveGateDisplayLabel: (gate: SurveyQuestionsLegacyValue = {}, fallbackSbt: SurveyQuestionsLegacyValue = '') => resolveGateDisplayLabel(gate, fallbackSbt),
-      buildGateAudienceSbtItems: (sbtAddresses: SurveyQuestionsLegacyValue = [], sessionSlug: SurveyQuestionsLegacyValue = '') => buildGateAudienceSbtItems(sbtAddresses, sessionSlug),
+      resolveGateDisplayLabel: (gate: SurveyQuestionsLegacyValue = {}, fallbackSbt: SurveyQuestionsLegacyValue = '') =>
+        resolveGateDisplayLabel(gate, fallbackSbt),
+      buildGateAudienceSbtItems: (
+        sbtAddresses: SurveyQuestionsLegacyValue = [],
+        sessionSlug: SurveyQuestionsLegacyValue = '',
+      ) => buildGateAudienceSbtItems(sbtAddresses, sessionSlug),
       resolveSbtGateLabel: (address: SurveyQuestionsLegacyValue) => resolveSbtGateLabel(address),
       getShortenedAddress: getShortenedAddress as SurveyQuestionsLegacyValue,
       t,
-      getEffectiveDraftSlug: typeof inst._getEffectiveDraftSlug === 'function'
-        ? () => inst._getEffectiveDraftSlug()
-        : null,
+      getEffectiveDraftSlug:
+        typeof inst._getEffectiveDraftSlug === 'function' ? () => inst._getEffectiveDraftSlug() : null,
       resolveEffectiveSlug: () => resolveEffectiveSlug(propsRef.current),
     });
-    return Array.isArray(options) && options.length > 0
-      ? options
-      : buildFallbackResponseGateOptions(questionId);
+    return Array.isArray(options) && options.length > 0 ? options : buildFallbackResponseGateOptions(questionId);
   };
 
-const getResponseGateOptionById = (questionId: SurveyQuestionsLegacyValue = null, gateId: SurveyQuestionsLegacyValue = '') => (
+  const getResponseGateOptionById = (
+    questionId: SurveyQuestionsLegacyValue = null,
+    gateId: SurveyQuestionsLegacyValue = '',
+  ) =>
     getResponseGateOptionByIdController(questionId, gateId, {
       normalizeGateLabelText: (value: SurveyQuestionsLegacyValue) => normalizeGateLabelText(value),
       getResponseGateOptions: (qid: SurveyQuestionsLegacyValue = null) => getResponseGateOptions(qid),
-    })
-  );
-
-const resolveFieldEncryptionGateId = (field: SurveyQuestionsLegacyValue = {}, questionId: SurveyQuestionsLegacyValue = null, fieldKey: SurveyQuestionsLegacyValue = 'answer') => (
-    resolveFieldEncryptionGateIdController(field, questionId, fieldKey, {
-      resolveFieldEncryptionAudience: (nextField: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionAudience(nextField, qid, fk),
-      normalizeGateLabelText: (value: SurveyQuestionsLegacyValue) => normalizeGateLabelText(value),
-      getResponseGateOptionById: (qid: SurveyQuestionsLegacyValue = null, gateId: SurveyQuestionsLegacyValue = '') => getResponseGateOptionById(qid, gateId),
-    })
-  );
-
-const buildInheritedAdditionalFieldState = (additionalField: SurveyQuestionsLegacyValue = {}, answerField: SurveyQuestionsLegacyValue = {}, questionId: SurveyQuestionsLegacyValue = null) =>
-    buildInheritedAdditionalFieldStateCore(additionalField, answerField, questionId, {
-      resolveFieldEncryptionAudience: (field: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionAudience(field, qid, fk),
-      resolveFieldEncryptionGateId: (field: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionGateId(field, qid, fk),
     });
 
-const getEffectiveRecipientsForField = ({ questionId, fieldKey = 'answer', field = null }: SurveyQuestionsLegacyValue = {}) => (
-    getEffectiveRecipientsForFieldController({ questionId, fieldKey, field }, {
-      normalizeQuestionIdKey,
-      isQuestionLockedForResponse: (qid: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(qid),
-      getEffectiveRecipientsForQid: (qid: SurveyQuestionsLegacyValue) => getEffectiveRecipientsForQid(qid),
-      resolveFieldEncryptionAudience: (nextField: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionAudience(nextField, qid, fk),
-      resolveFieldEncryptionGateId: (nextField: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionGateId(nextField, qid, fk),
-      getResponseGateOptionById: (qid: SurveyQuestionsLegacyValue = null, gateId: SurveyQuestionsLegacyValue = '') => getResponseGateOptionById(qid, gateId),
-    })
-  );
+  const resolveFieldEncryptionGateId = (
+    field: SurveyQuestionsLegacyValue = {},
+    questionId: SurveyQuestionsLegacyValue = null,
+    fieldKey: SurveyQuestionsLegacyValue = 'answer',
+  ) =>
+    resolveFieldEncryptionGateIdController(field, questionId, fieldKey, {
+      resolveFieldEncryptionAudience: (
+        nextField: SurveyQuestionsLegacyValue,
+        qid: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+      ) => resolveFieldEncryptionAudience(nextField, qid, fk),
+      normalizeGateLabelText: (value: SurveyQuestionsLegacyValue) => normalizeGateLabelText(value),
+      getResponseGateOptionById: (qid: SurveyQuestionsLegacyValue = null, gateId: SurveyQuestionsLegacyValue = '') =>
+        getResponseGateOptionById(qid, gateId),
+    });
 
-const resolveGatedPromptGateNames = (question: SurveyQuestionsLegacyValue) => (
+  const buildInheritedAdditionalFieldState = (
+    additionalField: SurveyQuestionsLegacyValue = {},
+    answerField: SurveyQuestionsLegacyValue = {},
+    questionId: SurveyQuestionsLegacyValue = null,
+  ) =>
+    buildInheritedAdditionalFieldStateCore(additionalField, answerField, questionId, {
+      resolveFieldEncryptionAudience: (
+        field: SurveyQuestionsLegacyValue,
+        qid: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+      ) => resolveFieldEncryptionAudience(field, qid, fk),
+      resolveFieldEncryptionGateId: (
+        field: SurveyQuestionsLegacyValue,
+        qid: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+      ) => resolveFieldEncryptionGateId(field, qid, fk),
+    });
+
+  const getEffectiveRecipientsForField = ({
+    questionId,
+    fieldKey = 'answer',
+    field = null,
+  }: SurveyQuestionsLegacyValue = {}) =>
+    getEffectiveRecipientsForFieldController(
+      { questionId, fieldKey, field },
+      {
+        normalizeQuestionIdKey,
+        isQuestionLockedForResponse: (qid: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(qid),
+        getEffectiveRecipientsForQid: (qid: SurveyQuestionsLegacyValue) => getEffectiveRecipientsForQid(qid),
+        resolveFieldEncryptionAudience: (
+          nextField: SurveyQuestionsLegacyValue,
+          qid: SurveyQuestionsLegacyValue,
+          fk: SurveyQuestionsLegacyValue,
+        ) => resolveFieldEncryptionAudience(nextField, qid, fk),
+        resolveFieldEncryptionGateId: (
+          nextField: SurveyQuestionsLegacyValue,
+          qid: SurveyQuestionsLegacyValue,
+          fk: SurveyQuestionsLegacyValue,
+        ) => resolveFieldEncryptionGateId(nextField, qid, fk),
+        getResponseGateOptionById: (qid: SurveyQuestionsLegacyValue = null, gateId: SurveyQuestionsLegacyValue = '') =>
+          getResponseGateOptionById(qid, gateId),
+      },
+    );
+
+  const resolveGatedPromptGateNames = (question: SurveyQuestionsLegacyValue) =>
     resolveGatedPromptGateNamesController(question, {
       normalizeGateLabelText: (value: SurveyQuestionsLegacyValue) => normalizeGateLabelText(value),
-      resolveGateDisplayLabel: (gate: SurveyQuestionsLegacyValue = {}, fallbackSbt: SurveyQuestionsLegacyValue = '') => resolveGateDisplayLabel(gate, fallbackSbt),
-      getQuestionEncryptionGates: (nextQuestion: SurveyQuestionsLegacyValue) => getQuestionEncryptionGates(nextQuestion),
-      getEffectiveDraftSlug: typeof inst._getEffectiveDraftSlug === 'function'
-        ? () => inst._getEffectiveDraftSlug()
-        : null,
+      resolveGateDisplayLabel: (gate: SurveyQuestionsLegacyValue = {}, fallbackSbt: SurveyQuestionsLegacyValue = '') =>
+        resolveGateDisplayLabel(gate, fallbackSbt),
+      getQuestionEncryptionGates: (nextQuestion: SurveyQuestionsLegacyValue) =>
+        getQuestionEncryptionGates(nextQuestion),
+      getEffectiveDraftSlug:
+        typeof inst._getEffectiveDraftSlug === 'function' ? () => inst._getEffectiveDraftSlug() : null,
       resolveEffectiveSlug: () => resolveEffectiveSlug(propsRef.current),
-      resolveEffectiveResponseGateConfig: (slug: SurveyQuestionsLegacyValue) => resolveEffectiveResponseGateConfig(slug),
-    })
-  );
+      resolveEffectiveResponseGateConfig: (slug: SurveyQuestionsLegacyValue) =>
+        resolveEffectiveResponseGateConfig(slug),
+    });
 
-const buildRecipientsFromGates = (gates: SurveyQuestionsLegacyValue = []) => (
+  const buildRecipientsFromGates = (gates: SurveyQuestionsLegacyValue = []) =>
     buildRecipientsFromGatesController(gates, {
       resolveSessionChainId: () => resolveSessionChainId(),
-    })
-  );
+    });
 
-const isQuestionLockedForResponse = (questionId: SurveyQuestionsLegacyValue) => {
+  const isQuestionLockedForResponse = (questionId: SurveyQuestionsLegacyValue) => {
     const q: SurveyQuestionsLegacyValue = getQuestionById(questionId);
     return getQuestionEncryptionGates(q).length > 0;
   };
 
-const getEffectiveRecipientsForQid = (questionId: SurveyQuestionsLegacyValue) => {
+  const getEffectiveRecipientsForQid = (questionId: SurveyQuestionsLegacyValue) => {
     const q: SurveyQuestionsLegacyValue = getQuestionById(questionId);
     const gates: SurveyQuestionsLegacyValue = getQuestionEncryptionGates(q);
     if (gates.length) return buildRecipientsFromGates(gates);
@@ -6413,54 +7094,70 @@ const getEffectiveRecipientsForQid = (questionId: SurveyQuestionsLegacyValue) =>
     return Array.isArray(policy?.recipients) ? policy.recipients : [];
   };
 
-const hasDefaultResponseGateRecipients = () => {
+  const hasDefaultResponseGateRecipients = () => {
     const recipients: SurveyQuestionsLegacyValue = getResponseGatePolicy()?.recipients;
     return Array.isArray(recipients) && recipients.length > 0;
   };
 
-const getDefaultResponseEncryptionAudience = () => (
-    hasDefaultResponseGateRecipients() ? 'gate' : 'self'
-  );
+  const getDefaultResponseEncryptionAudience = () => (hasDefaultResponseGateRecipients() ? 'gate' : 'self');
 
-const getDefaultResponseEncryptionAudienceForQid = (questionId: SurveyQuestionsLegacyValue) => (
-    isQuestionLockedForResponse(questionId) || getEffectiveRecipientsForQid(questionId).length > 0
-      ? 'gate'
-      : 'self'
-  );
+  const getDefaultResponseEncryptionAudienceForQid = (questionId: SurveyQuestionsLegacyValue) =>
+    isQuestionLockedForResponse(questionId) || getEffectiveRecipientsForQid(questionId).length > 0 ? 'gate' : 'self';
 
-const normalizeResponseEncryptionAudience = (value: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue = null) =>
+  const normalizeResponseEncryptionAudience = (
+    value: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue = null,
+  ) =>
     normalizeResponseEncryptionAudienceCore(value, questionId, {
       isQuestionLocked: (qid: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(qid),
       getEffectiveRecipientsForQid: (qid: SurveyQuestionsLegacyValue) => getEffectiveRecipientsForQid(qid),
       hasDefaultGateRecipients: () => hasDefaultResponseGateRecipients(),
     });
 
-const buildEmptyResponseFieldState = (questionId: SurveyQuestionsLegacyValue = null, fieldKey: SurveyQuestionsLegacyValue = 'answer') =>
+  const buildEmptyResponseFieldState = (
+    questionId: SurveyQuestionsLegacyValue = null,
+    fieldKey: SurveyQuestionsLegacyValue = 'answer',
+  ) =>
     buildEmptyResponseFieldStateCore(questionId, fieldKey, {
       getDefaultAudienceForQid: (qid: SurveyQuestionsLegacyValue) => getDefaultResponseEncryptionAudienceForQid(qid),
       getDefaultAudience: () => getDefaultResponseEncryptionAudience(),
-      resolveFieldEncryptionGateId: (field: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionGateId(field, qid, fk),
-      normalizeFieldAudienceMode: (val: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue, f: SurveyQuestionsLegacyValue) => normalizeFieldAudienceMode(val, fk, f),
+      resolveFieldEncryptionGateId: (
+        field: SurveyQuestionsLegacyValue,
+        qid: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+      ) => resolveFieldEncryptionGateId(field, qid, fk),
+      normalizeFieldAudienceMode: (
+        val: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+        f: SurveyQuestionsLegacyValue,
+      ) => normalizeFieldAudienceMode(val, fk, f),
     });
 
-const resolveFieldEncryptionAudience = (field: SurveyQuestionsLegacyValue = {}, questionId: SurveyQuestionsLegacyValue = null, fieldKey: SurveyQuestionsLegacyValue = 'answer') =>
+  const resolveFieldEncryptionAudience = (
+    field: SurveyQuestionsLegacyValue = {},
+    questionId: SurveyQuestionsLegacyValue = null,
+    fieldKey: SurveyQuestionsLegacyValue = 'answer',
+  ) =>
     resolveFieldEncryptionAudienceCore(field, questionId, fieldKey, {
-      normalizeAudience: (val: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue) => normalizeResponseEncryptionAudience(val, qid),
+      normalizeAudience: (val: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue) =>
+        normalizeResponseEncryptionAudience(val, qid),
       getDefaultAudienceForQid: (qid: SurveyQuestionsLegacyValue) => getDefaultResponseEncryptionAudienceForQid(qid),
       getDefaultAudience: () => getDefaultResponseEncryptionAudience(),
     });
 
-const normalizeGateLabelText = (value: SurveyQuestionsLegacyValue) => normalizeGateLabelTextCore(value);
+  const normalizeGateLabelText = (value: SurveyQuestionsLegacyValue) => normalizeGateLabelTextCore(value);
 
-const resolveSbtGateLabel = (address: SurveyQuestionsLegacyValue, preferredSlug: SurveyQuestionsLegacyValue = '') => {
+  const resolveSbtGateLabel = (address: SurveyQuestionsLegacyValue, preferredSlug: SurveyQuestionsLegacyValue = '') => {
     const normalizedAddress: SurveyQuestionsLegacyValue = String(address || '').trim();
     if (!normalizedAddress) return '';
     const slug: SurveyQuestionsLegacyValue = String(
       preferredSlug ||
-      (inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : '') ||
-      resolveEffectiveSlug(propsRef.current) ||
-      ''
-    ).trim().toLowerCase();
+        (inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : '') ||
+        resolveEffectiveSlug(propsRef.current) ||
+        '',
+    )
+      .trim()
+      .toLowerCase();
     return resolveSbtDisplayLabel({
       address: normalizedAddress,
       preferredSlug: slug,
@@ -6468,7 +7165,7 @@ const resolveSbtGateLabel = (address: SurveyQuestionsLegacyValue, preferredSlug:
     });
   };
 
-const collectGateSbtAddressesForHydration = () => {
+  const collectGateSbtAddressesForHydration = () => {
     const policy: SurveyQuestionsLegacyValue = getResponseGatePolicy();
     const questionPools: SurveyQuestionsLegacyValue = [
       Array.isArray(stateRef.current.questionPool) ? stateRef.current.questionPool : [],
@@ -6485,13 +7182,15 @@ const collectGateSbtAddressesForHydration = () => {
     });
   };
 
-const hydrateGateSbtLabels = async ({ force = false }: SurveyQuestionsLegacyValue = {}) => {
+  const hydrateGateSbtLabels = async ({ force = false }: SurveyQuestionsLegacyValue = {}) => {
     const addresses: SurveyQuestionsLegacyValue = collectGateSbtAddressesForHydration();
     const slug: SurveyQuestionsLegacyValue = String(
       (inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : '') ||
-      resolveEffectiveSlug(propsRef.current) ||
-      ''
-    ).trim().toLowerCase();
+        resolveEffectiveSlug(propsRef.current) ||
+        '',
+    )
+      .trim()
+      .toLowerCase();
     const cfg: SurveyQuestionsLegacyValue = resolveEffectiveResponseGateConfig(slug);
     const chainId: SurveyQuestionsLegacyValue = resolveSessionChainId(slug, cfg);
     const signature: SurveyQuestionsLegacyValue = `${slug}|${Number(chainId || 0)}|${addresses.join(',')}`;
@@ -6514,11 +7213,20 @@ const hydrateGateSbtLabels = async ({ force = false }: SurveyQuestionsLegacyValu
       if (!inst._isMounted) return;
       const resolvedAddresses: SurveyQuestionsLegacyValue = new Set(
         (Array.isArray(hits) ? hits : [])
-          .map((entry: SurveyQuestionsLegacyValue) => String(entry?.address || '').trim().toLowerCase())
-          .filter(Boolean)
+          .map((entry: SurveyQuestionsLegacyValue) =>
+            String(entry?.address || '')
+              .trim()
+              .toLowerCase(),
+          )
+          .filter(Boolean),
       );
       const hasUnresolvedAddresses: SurveyQuestionsLegacyValue = addresses.some(
-        (address: SurveyQuestionsLegacyValue) => !resolvedAddresses.has(String(address || '').trim().toLowerCase())
+        (address: SurveyQuestionsLegacyValue) =>
+          !resolvedAddresses.has(
+            String(address || '')
+              .trim()
+              .toLowerCase(),
+          ),
       );
       if (!Array.isArray(hits) || hits.length === 0) {
         if (!targetedLookupEnabled) {
@@ -6550,20 +7258,26 @@ const hydrateGateSbtLabels = async ({ force = false }: SurveyQuestionsLegacyValu
     }
   };
 
-const buildLockedQuestionGateDetails = (hiddenMaskedQuestionIds: SurveyQuestionsLegacyValue = []) => {
+  const buildLockedQuestionGateDetails = (hiddenMaskedQuestionIds: SurveyQuestionsLegacyValue = []) => {
     const hiddenIds: SurveyQuestionsLegacyValue = new Set(
       (Array.isArray(hiddenMaskedQuestionIds) ? hiddenMaskedQuestionIds : [])
-        .map((qid: SurveyQuestionsLegacyValue) => String(qid || '').trim().toLowerCase())
-        .filter(Boolean)
+        .map((qid: SurveyQuestionsLegacyValue) =>
+          String(qid || '')
+            .trim()
+            .toLowerCase(),
+        )
+        .filter(Boolean),
     );
     if (hiddenIds.size === 0) return [];
 
     const pool: SurveyQuestionsLegacyValue = getLockedQuestionGateSourcePool(hiddenMaskedQuestionIds);
     const slug: SurveyQuestionsLegacyValue = String(
       (inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : '') ||
-      resolveEffectiveSlug(propsRef.current) ||
-      ''
-    ).trim().toLowerCase();
+        resolveEffectiveSlug(propsRef.current) ||
+        '',
+    )
+      .trim()
+      .toLowerCase();
     const questionGateDetails: SurveyQuestionsLegacyValue = buildLockedQuestionGateDetailsFromPool({
       hiddenMaskedQuestionIds,
       pool,
@@ -6571,24 +7285,28 @@ const buildLockedQuestionGateDetails = (hiddenMaskedQuestionIds: SurveyQuestions
       getQuestionEncryptionGates: (question: SurveyQuestionsLegacyValue) => getQuestionEncryptionGates(question),
       normalizeGateLabelText: (value: SurveyQuestionsLegacyValue) => normalizeGateLabelText(value),
       resolveConfiguredGateLabel: (args: SurveyQuestionsLegacyValue) => resolveConfiguredGateLabel(args),
-      resolveSbtGateLabel: (address: SurveyQuestionsLegacyValue, preferredSlug: SurveyQuestionsLegacyValue = '') => resolveSbtGateLabel(address, preferredSlug),
+      resolveSbtGateLabel: (address: SurveyQuestionsLegacyValue, preferredSlug: SurveyQuestionsLegacyValue = '') =>
+        resolveSbtGateLabel(address, preferredSlug),
       getShortenedAddress: getShortenedAddress as SurveyQuestionsLegacyValue,
       buildSbtDetailPath,
       normalizeSessionSlug: normalizeSessionSlugValue,
-      getChecksumAddress: (address: SurveyQuestionsLegacyValue) => (
-        ethers.utils.isAddress(address) ? ethers.utils.getAddress(address) : address
-      ),
+      getChecksumAddress: (address: SurveyQuestionsLegacyValue) =>
+        ethers.utils.isAddress(address) ? ethers.utils.getAddress(address) : address,
       translate: t,
     });
     if (questionGateDetails.length > 0) return questionGateDetails;
     return buildSessionQuestionGateDetails(hiddenIds.size || 1);
   };
 
-const getLockedQuestionGateSourcePool = (hiddenMaskedQuestionIds: SurveyQuestionsLegacyValue = []) => {
+  const getLockedQuestionGateSourcePool = (hiddenMaskedQuestionIds: SurveyQuestionsLegacyValue = []) => {
     const hiddenIds: SurveyQuestionsLegacyValue = new Set(
       (Array.isArray(hiddenMaskedQuestionIds) ? hiddenMaskedQuestionIds : [])
-        .map((qid: SurveyQuestionsLegacyValue) => String(qid || '').trim().toLowerCase())
-        .filter(Boolean)
+        .map((qid: SurveyQuestionsLegacyValue) =>
+          String(qid || '')
+            .trim()
+            .toLowerCase(),
+        )
+        .filter(Boolean),
     );
     const candidates: SurveyQuestionsLegacyValue = [
       Array.isArray(stateRef.current.allQuestionsForFilter) ? stateRef.current.allQuestionsForFilter : [],
@@ -6599,32 +7317,43 @@ const getLockedQuestionGateSourcePool = (hiddenMaskedQuestionIds: SurveyQuestion
     if (!candidates.length) return [];
     if (hiddenIds.size === 0) return candidates[0];
 
-    const scored: SurveyQuestionsLegacyValue = candidates.map((pool: SurveyQuestionsLegacyValue, index: SurveyQuestionsLegacyValue) => {
-      let matchedCount: SurveyQuestionsLegacyValue = 0;
-      let gateCount: SurveyQuestionsLegacyValue = 0;
-      pool.forEach((question: SurveyQuestionsLegacyValue) => {
-        const questionId: SurveyQuestionsLegacyValue = String(question?.id || '').trim().toLowerCase();
-        if (!hiddenIds.has(questionId)) return;
-        matchedCount += 1;
-        gateCount += getQuestionEncryptionGates(question).length;
-      });
-      return { pool, index, matchedCount, gateCount };
-    });
+    const scored: SurveyQuestionsLegacyValue = candidates.map(
+      (pool: SurveyQuestionsLegacyValue, index: SurveyQuestionsLegacyValue) => {
+        let matchedCount: SurveyQuestionsLegacyValue = 0;
+        let gateCount: SurveyQuestionsLegacyValue = 0;
+        pool.forEach((question: SurveyQuestionsLegacyValue) => {
+          const questionId: SurveyQuestionsLegacyValue = String(question?.id || '')
+            .trim()
+            .toLowerCase();
+          if (!hiddenIds.has(questionId)) return;
+          matchedCount += 1;
+          gateCount += getQuestionEncryptionGates(question).length;
+        });
+        return { pool, index, matchedCount, gateCount };
+      },
+    );
 
-    const matchingPools: SurveyQuestionsLegacyValue = scored.filter((entry: SurveyQuestionsLegacyValue) => entry.matchedCount > 0);
+    const matchingPools: SurveyQuestionsLegacyValue = scored.filter(
+      (entry: SurveyQuestionsLegacyValue) => entry.matchedCount > 0,
+    );
     if (!matchingPools.length) return candidates[0];
 
-    matchingPools.sort((a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) => (
-      (b.gateCount - a.gateCount) ||
-      (b.matchedCount - a.matchedCount) ||
-      (a.index - b.index)
-    ));
+    matchingPools.sort(
+      (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) =>
+        b.gateCount - a.gateCount || b.matchedCount - a.matchedCount || a.index - b.index,
+    );
     return matchingPools[0].pool;
   };
 
-const getMemoizedLockedQuestionGateDetails = (hiddenMaskedQuestionIds: SurveyQuestionsLegacyValue = []) => {
-    const hiddenIds: SurveyQuestionsLegacyValue = (Array.isArray(hiddenMaskedQuestionIds) ? hiddenMaskedQuestionIds : [])
-      .map((qid: SurveyQuestionsLegacyValue) => String(qid || '').trim().toLowerCase())
+  const getMemoizedLockedQuestionGateDetails = (hiddenMaskedQuestionIds: SurveyQuestionsLegacyValue = []) => {
+    const hiddenIds: SurveyQuestionsLegacyValue = (
+      Array.isArray(hiddenMaskedQuestionIds) ? hiddenMaskedQuestionIds : []
+    )
+      .map((qid: SurveyQuestionsLegacyValue) =>
+        String(qid || '')
+          .trim()
+          .toLowerCase(),
+      )
       .filter(Boolean);
     const hiddenSignature: SurveyQuestionsLegacyValue = hiddenIds.join('|');
     const pool: SurveyQuestionsLegacyValue = getLockedQuestionGateSourcePool(hiddenIds);
@@ -6655,23 +7384,30 @@ const getMemoizedLockedQuestionGateDetails = (hiddenMaskedQuestionIds: SurveyQue
     return nextValue;
   };
 
-const buildSessionQuestionGateDetails = (questionCount: SurveyQuestionsLegacyValue = 0) => {
+  const buildSessionQuestionGateDetails = (questionCount: SurveyQuestionsLegacyValue = 0) => {
     const count: SurveyQuestionsLegacyValue = Math.max(1, Number(questionCount || 0) || 1);
     const slug: SurveyQuestionsLegacyValue = String(
       (inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : '') ||
-      resolveEffectiveSlug(propsRef.current) ||
-      ''
-    ).trim().toLowerCase();
+        resolveEffectiveSlug(propsRef.current) ||
+        '',
+    )
+      .trim()
+      .toLowerCase();
     const options: SurveyQuestionsLegacyValue = getResponseGateOptions(null);
     return (Array.isArray(options) ? options : [])
       .map((option: SurveyQuestionsLegacyValue, index: SurveyQuestionsLegacyValue) => {
-        const sbtAddresses: SurveyQuestionsLegacyValue = Array.from(new Set(
-          (Array.isArray(option?.sbtAddresses) ? option.sbtAddresses : [])
-            .map((address: SurveyQuestionsLegacyValue) => String(address || '').trim())
-            .filter(Boolean)
-        ));
+        const sbtAddresses: SurveyQuestionsLegacyValue = Array.from(
+          new Set(
+            (Array.isArray(option?.sbtAddresses) ? option.sbtAddresses : [])
+              .map((address: SurveyQuestionsLegacyValue) => String(address || '').trim())
+              .filter(Boolean),
+          ),
+        );
         if (!sbtAddresses.length) return null;
-        const id: SurveyQuestionsLegacyValue = `session:${option.gateId || index}:${sbtAddresses.map((address: SurveyQuestionsLegacyValue) => address.toLowerCase()).sort().join('|')}`;
+        const id: SurveyQuestionsLegacyValue = `session:${option.gateId || index}:${sbtAddresses
+          .map((address: SurveyQuestionsLegacyValue) => address.toLowerCase())
+          .sort()
+          .join('|')}`;
         const sessionSlug: SurveyQuestionsLegacyValue = slug || normalizeSessionSlugValue(option?.sessionSlug || '');
         return {
           id,
@@ -6690,11 +7426,10 @@ const buildSessionQuestionGateDetails = (questionCount: SurveyQuestionsLegacyVal
       .filter(Boolean);
   };
 
-const getLockedGateRequirementSentence = (lockedGateDetails: SurveyQuestionsLegacyValue = []) => (
-    buildLockedGateRequirementSentenceCore(lockedGateDetails, { translate: t })
-  );
+  const getLockedGateRequirementSentence = (lockedGateDetails: SurveyQuestionsLegacyValue = []) =>
+    buildLockedGateRequirementSentenceCore(lockedGateDetails, { translate: t });
 
-const renderLockedQuestionsPanel = ({
+  const renderLockedQuestionsPanel = ({
     hiddenMaskedQuestionIds = [],
     lockedGateDetails = [],
     title = '',
@@ -6718,49 +7453,55 @@ const renderLockedQuestionsPanel = ({
     />
   );
 
-const resolveGateDisplayLabel = (gate: SurveyQuestionsLegacyValue = {}, fallbackSbt: SurveyQuestionsLegacyValue = '') => (
+  const resolveGateDisplayLabel = (
+    gate: SurveyQuestionsLegacyValue = {},
+    fallbackSbt: SurveyQuestionsLegacyValue = '',
+  ) =>
     resolveGateDisplayLabelController(gate, fallbackSbt, {
       normalizeGateLabelText: (value: SurveyQuestionsLegacyValue) => normalizeGateLabelText(value),
       resolveSbtGateLabel: (address: SurveyQuestionsLegacyValue) => resolveSbtGateLabel(address),
       getShortenedAddress: getShortenedAddress as SurveyQuestionsLegacyValue,
       t,
-    })
-  );
+    });
 
-const resolveConfiguredGateLabel = ({ gate = {}, resourceKey = '', sbtAddresses = [] }: SurveyQuestionsLegacyValue = {}) => (
-    resolveConfiguredGateLabelController(
-      { gate, resourceKey, sbtAddresses },
-      inst._responseGatePolicyCache?.cfg,
-      {
-        normalizeGateLabelText: (value: SurveyQuestionsLegacyValue) => normalizeGateLabelText(value),
-        resolveGateDisplayLabel: (configuredGate: SurveyQuestionsLegacyValue = {}, fallbackSbt: SurveyQuestionsLegacyValue = '') => (
-          resolveGateDisplayLabel(configuredGate, fallbackSbt)
-        ),
-      },
-    )
-  );
+  const resolveConfiguredGateLabel = ({
+    gate = {},
+    resourceKey = '',
+    sbtAddresses = [],
+  }: SurveyQuestionsLegacyValue = {}) =>
+    resolveConfiguredGateLabelController({ gate, resourceKey, sbtAddresses }, inst._responseGatePolicyCache?.cfg, {
+      normalizeGateLabelText: (value: SurveyQuestionsLegacyValue) => normalizeGateLabelText(value),
+      resolveGateDisplayLabel: (
+        configuredGate: SurveyQuestionsLegacyValue = {},
+        fallbackSbt: SurveyQuestionsLegacyValue = '',
+      ) => resolveGateDisplayLabel(configuredGate, fallbackSbt),
+    });
 
-const resolveLockAudienceSessionName = () => (
+  const resolveLockAudienceSessionName = () =>
     resolveLockAudienceSessionNameController({
       normalizeGateLabelText: (value: SurveyQuestionsLegacyValue) => normalizeGateLabelText(value),
       props: propsRef.current,
       responseGatePolicyCacheCfg: inst._responseGatePolicyCache?.cfg as SurveyQuestionsLegacyValue,
       resolveSlugForIds,
       resolveLockAudienceSessionNameContext,
-    })
-  );
+    });
 
-const resolveQuestionGateOption = (questionId: SurveyQuestionsLegacyValue = null) => {
+  const resolveQuestionGateOption = (questionId: SurveyQuestionsLegacyValue = null) => {
     const gateDetails: SurveyQuestionsLegacyValue = getResponseGateOptions(questionId);
     if (!gateDetails.length) return null;
 
-    const gateNames: SurveyQuestionsLegacyValue = Array.from(new Set(gateDetails.map((entry: SurveyQuestionsLegacyValue) => entry.label).filter(Boolean)));
-    const allSbtAddresses: SurveyQuestionsLegacyValue = Array.from(new Set(gateDetails.flatMap((entry: SurveyQuestionsLegacyValue) => entry.sbtAddresses || [])));
-    const sbtSummary: SurveyQuestionsLegacyValue = allSbtAddresses.length > 0
-      ? allSbtAddresses
-        .map((addr: SurveyQuestionsLegacyValue) => resolveSbtGateLabel(addr) || getShortenedAddress(addr, false))
-        .join(', ')
-      : 'none';
+    const gateNames: SurveyQuestionsLegacyValue = Array.from(
+      new Set(gateDetails.map((entry: SurveyQuestionsLegacyValue) => entry.label).filter(Boolean)),
+    );
+    const allSbtAddresses: SurveyQuestionsLegacyValue = Array.from(
+      new Set(gateDetails.flatMap((entry: SurveyQuestionsLegacyValue) => entry.sbtAddresses || [])),
+    );
+    const sbtSummary: SurveyQuestionsLegacyValue =
+      allSbtAddresses.length > 0
+        ? allSbtAddresses
+            .map((addr: SurveyQuestionsLegacyValue) => resolveSbtGateLabel(addr) || getShortenedAddress(addr, false))
+            .join(', ')
+        : 'none';
 
     return {
       label: gateNames.join(', ') || gateDetails[0]?.label || 'gate',
@@ -6771,105 +7512,173 @@ const resolveQuestionGateOption = (questionId: SurveyQuestionsLegacyValue = null
     };
   };
 
-const getLockAudienceMenuStateKey = (questionId: SurveyQuestionsLegacyValue, fieldKey: SurveyQuestionsLegacyValue = 'answer') => {
+  const getLockAudienceMenuStateKey = (
+    questionId: SurveyQuestionsLegacyValue,
+    fieldKey: SurveyQuestionsLegacyValue = 'answer',
+  ) => {
     const qid: SurveyQuestionsLegacyValue = String(questionId || '').toLowerCase();
     if (!qid) return '';
-    return String(fieldKey || '').trim().toLowerCase() === 'additional'
+    return String(fieldKey || '')
+      .trim()
+      .toLowerCase() === 'additional'
       ? `${qid}:additional`
       : qid;
   };
 
-const isLockAudienceMenuOpen = (questionId: SurveyQuestionsLegacyValue, fieldKey: SurveyQuestionsLegacyValue = 'answer') => {
+  const isLockAudienceMenuOpen = (
+    questionId: SurveyQuestionsLegacyValue,
+    fieldKey: SurveyQuestionsLegacyValue = 'answer',
+  ) => {
     const key: SurveyQuestionsLegacyValue = getLockAudienceMenuStateKey(questionId, fieldKey);
     if (!key) return false;
     return !!(stateRef.current.lockAudienceMenuByQuestion && stateRef.current.lockAudienceMenuByQuestion[key]);
   };
 
-const toggleLockAudienceGateDetails = (questionId: SurveyQuestionsLegacyValue, forceOpen: SurveyQuestionsLegacyValue = null, fieldKey: SurveyQuestionsLegacyValue = 'answer') => {
+  const toggleLockAudienceGateDetails = (
+    questionId: SurveyQuestionsLegacyValue,
+    forceOpen: SurveyQuestionsLegacyValue = null,
+    fieldKey: SurveyQuestionsLegacyValue = 'answer',
+  ) => {
     const key: SurveyQuestionsLegacyValue = getLockAudienceMenuStateKey(questionId, fieldKey);
     if (!key) return;
     const normalizedGateId: SurveyQuestionsLegacyValue = normalizeGateLabelText(
-      typeof forceOpen === 'string' ? forceOpen : ''
+      typeof forceOpen === 'string' ? forceOpen : '',
     );
-    setState((prev: SurveyQuestionsLegacyValue) => buildLockAudienceGateDetailsState(
-      prev,
-      key,
-      forceOpen,
-      normalizedGateId,
-      normalizeGateLabelText
-    ));
+    setState((prev: SurveyQuestionsLegacyValue) =>
+      buildLockAudienceGateDetailsState(prev, key, forceOpen, normalizedGateId, normalizeGateLabelText),
+    );
   };
 
-const toggleLockAudienceMenu = (questionId: SurveyQuestionsLegacyValue, forceOpen: SurveyQuestionsLegacyValue = null, fieldKey: SurveyQuestionsLegacyValue = 'answer') => {
+  const toggleLockAudienceMenu = (
+    questionId: SurveyQuestionsLegacyValue,
+    forceOpen: SurveyQuestionsLegacyValue = null,
+    fieldKey: SurveyQuestionsLegacyValue = 'answer',
+  ) => {
     const key: SurveyQuestionsLegacyValue = getLockAudienceMenuStateKey(questionId, fieldKey);
     if (!key) return;
     setState((prev: SurveyQuestionsLegacyValue) => buildLockAudienceMenuState(prev, key, forceOpen));
   };
 
-const applyAnswerEncryptionAudience = (surveyIndex: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, audience: SurveyQuestionsLegacyValue, options: SurveyQuestionsLegacyValue = {}) => {
-    const idx: SurveyQuestionsLegacyValue = (propsRef.current.isStandalone || propsRef.current.singleQuestionMode) ? 0 : (surveyIndex || 0);
+  const applyAnswerEncryptionAudience = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    audience: SurveyQuestionsLegacyValue,
+    options: SurveyQuestionsLegacyValue = {},
+  ) => {
+    const idx: SurveyQuestionsLegacyValue =
+      propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex || 0;
     const qid: SurveyQuestionsLegacyValue = String(questionId || '').toLowerCase();
     if (!qid) return;
     invalidateDiffCaches();
 
-    setState((prev: SurveyQuestionsLegacyValue) => buildAnswerEncryptionAudienceState(prev, {
-      audience,
-      buildAnswerAudienceSelectionPlan: buildAnswerAudienceSelectionPlan as SurveyQuestionsLegacyValue,
-      buildSurveyResponseStateArray,
-      deps: {
-        isQuestionLockedForResponse: (q: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(q),
-        buildEmptyResponseFieldState: (q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => buildEmptyResponseFieldState(q, fk),
-        resolveFieldEncryptionAudience: (f: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionAudience(f, q, fk),
-        resolveFieldEncryptionGateId: (f: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionGateId(f, q, fk),
-        normalizeFieldAudienceMode: (v: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue, f: SurveyQuestionsLegacyValue) => normalizeFieldAudienceMode(v, fk, f),
-        buildInheritedAdditionalFieldState: (af: SurveyQuestionsLegacyValue, ans: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue) => buildInheritedAdditionalFieldState(af, ans, q),
-        normalizeResponseEncryptionAudience: (a: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue) => normalizeResponseEncryptionAudience(a, q),
+    setState(
+      (prev: SurveyQuestionsLegacyValue) =>
+        buildAnswerEncryptionAudienceState(prev, {
+          audience,
+          buildAnswerAudienceSelectionPlan: buildAnswerAudienceSelectionPlan as SurveyQuestionsLegacyValue,
+          buildSurveyResponseStateArray,
+          deps: {
+            isQuestionLockedForResponse: (q: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(q),
+            buildEmptyResponseFieldState: (q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) =>
+              buildEmptyResponseFieldState(q, fk),
+            resolveFieldEncryptionAudience: (
+              f: SurveyQuestionsLegacyValue,
+              q: SurveyQuestionsLegacyValue,
+              fk: SurveyQuestionsLegacyValue,
+            ) => resolveFieldEncryptionAudience(f, q, fk),
+            resolveFieldEncryptionGateId: (
+              f: SurveyQuestionsLegacyValue,
+              q: SurveyQuestionsLegacyValue,
+              fk: SurveyQuestionsLegacyValue,
+            ) => resolveFieldEncryptionGateId(f, q, fk),
+            normalizeFieldAudienceMode: (
+              v: SurveyQuestionsLegacyValue,
+              fk: SurveyQuestionsLegacyValue,
+              f: SurveyQuestionsLegacyValue,
+            ) => normalizeFieldAudienceMode(v, fk, f),
+            buildInheritedAdditionalFieldState: (
+              af: SurveyQuestionsLegacyValue,
+              ans: SurveyQuestionsLegacyValue,
+              q: SurveyQuestionsLegacyValue,
+            ) => buildInheritedAdditionalFieldState(af, ans, q),
+            normalizeResponseEncryptionAudience: (a: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue) =>
+              normalizeResponseEncryptionAudience(a, q),
+          },
+          gateId: options?.gateId || '',
+          questionId: qid,
+          surveyIndex: idx,
+        }),
+      () => {
+        scheduleJsonPreviewUpdate();
+        persistDraftSafely && persistDraftSafely();
       },
-      gateId: options?.gateId || '',
-      questionId: qid,
-      surveyIndex: idx,
-    }), () => {
-      scheduleJsonPreviewUpdate();
-      persistDraftSafely && persistDraftSafely();
-    });
+    );
   };
 
-const applyAdditionalEncryptionAudience = (surveyIndex: SurveyQuestionsLegacyValue, questionId: SurveyQuestionsLegacyValue, audience: SurveyQuestionsLegacyValue, options: SurveyQuestionsLegacyValue = {}) => {
-    const idx: SurveyQuestionsLegacyValue = (propsRef.current.isStandalone || propsRef.current.singleQuestionMode) ? 0 : (surveyIndex || 0);
+  const applyAdditionalEncryptionAudience = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+    audience: SurveyQuestionsLegacyValue,
+    options: SurveyQuestionsLegacyValue = {},
+  ) => {
+    const idx: SurveyQuestionsLegacyValue =
+      propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex || 0;
     const qid: SurveyQuestionsLegacyValue = String(questionId || '').toLowerCase();
     if (!qid) return;
     invalidateDiffCaches();
 
-    setState((prev: SurveyQuestionsLegacyValue) => buildAdditionalEncryptionAudienceState(prev, {
-      audience,
-      buildAdditionalAudienceSelectionPlan: buildAdditionalAudienceSelectionPlan as SurveyQuestionsLegacyValue,
-      buildSurveyResponseStateArray,
-      deps: {
-        isQuestionLockedForResponse: (q: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(q),
-        buildEmptyResponseFieldState: (q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => buildEmptyResponseFieldState(q, fk),
-        resolveFieldEncryptionAudience: (f: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionAudience(f, q, fk),
-        resolveFieldEncryptionGateId: (f: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionGateId(f, q, fk),
-        normalizeFieldAudienceMode: (v: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue, f: SurveyQuestionsLegacyValue) => normalizeFieldAudienceMode(v, fk, f),
-        buildInheritedAdditionalFieldState: (af: SurveyQuestionsLegacyValue, ans: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue) => buildInheritedAdditionalFieldState(af, ans, q),
-        normalizeResponseEncryptionAudience: (a: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue) => normalizeResponseEncryptionAudience(a, q),
+    setState(
+      (prev: SurveyQuestionsLegacyValue) =>
+        buildAdditionalEncryptionAudienceState(prev, {
+          audience,
+          buildAdditionalAudienceSelectionPlan: buildAdditionalAudienceSelectionPlan as SurveyQuestionsLegacyValue,
+          buildSurveyResponseStateArray,
+          deps: {
+            isQuestionLockedForResponse: (q: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(q),
+            buildEmptyResponseFieldState: (q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) =>
+              buildEmptyResponseFieldState(q, fk),
+            resolveFieldEncryptionAudience: (
+              f: SurveyQuestionsLegacyValue,
+              q: SurveyQuestionsLegacyValue,
+              fk: SurveyQuestionsLegacyValue,
+            ) => resolveFieldEncryptionAudience(f, q, fk),
+            resolveFieldEncryptionGateId: (
+              f: SurveyQuestionsLegacyValue,
+              q: SurveyQuestionsLegacyValue,
+              fk: SurveyQuestionsLegacyValue,
+            ) => resolveFieldEncryptionGateId(f, q, fk),
+            normalizeFieldAudienceMode: (
+              v: SurveyQuestionsLegacyValue,
+              fk: SurveyQuestionsLegacyValue,
+              f: SurveyQuestionsLegacyValue,
+            ) => normalizeFieldAudienceMode(v, fk, f),
+            buildInheritedAdditionalFieldState: (
+              af: SurveyQuestionsLegacyValue,
+              ans: SurveyQuestionsLegacyValue,
+              q: SurveyQuestionsLegacyValue,
+            ) => buildInheritedAdditionalFieldState(af, ans, q),
+            normalizeResponseEncryptionAudience: (a: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue) =>
+              normalizeResponseEncryptionAudience(a, q),
+          },
+          gateId: options?.gateId || '',
+          questionId: qid,
+          surveyIndex: idx,
+        }),
+      () => {
+        scheduleJsonPreviewUpdate();
+        persistDraftSafely && persistDraftSafely();
       },
-      gateId: options?.gateId || '',
-      questionId: qid,
-      surveyIndex: idx,
-    }), () => {
-      scheduleJsonPreviewUpdate();
-      persistDraftSafely && persistDraftSafely();
-    });
+    );
   };
 
-const buildLitEncryptionOptionsForRecipients = (recipients: SurveyQuestionsLegacyValue = []) => {
+  const buildLitEncryptionOptionsForRecipients = (recipients: SurveyQuestionsLegacyValue = []) => {
     const list: SurveyQuestionsLegacyValue = Array.isArray(recipients) ? recipients.filter(Boolean) : [];
     if (!list.length) return undefined;
 
     const litHooks: SurveyQuestionsLegacyValue =
       propsRef.current.lit ||
       propsRef.current.litHooks ||
-      (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
+      (typeof window !== 'undefined' ? window.__litHooks || window.litHooks : null);
     if (!litHooks || typeof litHooks.saveKey !== 'function') {
       return undefined;
     }
@@ -6894,16 +7703,28 @@ const buildLitEncryptionOptionsForRecipients = (recipients: SurveyQuestionsLegac
     return out;
   };
 
-const buildFieldEncryptionWorkGroups = (slice: SurveyQuestionsLegacyValue = {}, changedQids: SurveyQuestionsLegacyValue = new Set()) => {
+  const buildFieldEncryptionWorkGroups = (
+    slice: SurveyQuestionsLegacyValue = {},
+    changedQids: SurveyQuestionsLegacyValue = new Set(),
+  ) => {
     return buildFieldEncryptionWorkGroupsCore(slice, changedQids, {
       isQuestionLockedForResponse: (q: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(q),
-      resolveFieldEncryptionGateId: (f: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionGateId(f, q, fk),
-      resolveFieldEncryptionAudience: (f: SurveyQuestionsLegacyValue, q: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionAudience(f, q, fk),
-      getEffectiveRecipientsForField: ((opts: SurveyQuestionsLegacyValue) => getEffectiveRecipientsForField(opts)) as SurveyQuestionsLegacyValue,
+      resolveFieldEncryptionGateId: (
+        f: SurveyQuestionsLegacyValue,
+        q: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+      ) => resolveFieldEncryptionGateId(f, q, fk),
+      resolveFieldEncryptionAudience: (
+        f: SurveyQuestionsLegacyValue,
+        q: SurveyQuestionsLegacyValue,
+        fk: SurveyQuestionsLegacyValue,
+      ) => resolveFieldEncryptionAudience(f, q, fk),
+      getEffectiveRecipientsForField: ((opts: SurveyQuestionsLegacyValue) =>
+        getEffectiveRecipientsForField(opts)) as SurveyQuestionsLegacyValue,
     });
   };
 
-const encryptFieldWorkGroups = async ({ workGroups = [], baseOpts = {} }: SurveyQuestionsLegacyValue = {}) => {
+  const encryptFieldWorkGroups = async ({ workGroups = [], baseOpts = {} }: SurveyQuestionsLegacyValue = {}) => {
     const encState: SurveyQuestionsLegacyValue = { answers: {}, additionalComments: {} };
     const list: SurveyQuestionsLegacyValue = Array.isArray(workGroups) ? workGroups : [];
 
@@ -6942,10 +7763,11 @@ const encryptFieldWorkGroups = async ({ workGroups = [], baseOpts = {} }: Survey
     return encState;
   };
 
-const buildSubmitContextSnapshot = () => {
+  const buildSubmitContextSnapshot = () => {
     const singleQuestionMode: SurveyQuestionsLegacyValue = !!propsRef.current.singleQuestionMode;
     const isStandalone: SurveyQuestionsLegacyValue = !!propsRef.current.isStandalone;
-    const surveyIndex: SurveyQuestionsLegacyValue = singleQuestionMode || isStandalone ? 0 : (propsRef.current.surveyIndex || 0);
+    const surveyIndex: SurveyQuestionsLegacyValue =
+      singleQuestionMode || isStandalone ? 0 : propsRef.current.surveyIndex || 0;
     const effectiveDraftSlug: SurveyQuestionsLegacyValue = resolveSubmitEffectiveDraftSlug({
       draftSlug: inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : '',
       routeSlug: resolveEffectiveSlug(propsRef.current),
@@ -6956,7 +7778,9 @@ const buildSubmitContextSnapshot = () => {
       props: propsRef.current,
       account: propsRef.current.account || '',
       provider: propsRef.current.provider,
-      providerKind: String((cryptoUtils as SurveyQuestionsLegacyValue).getProviderKind(propsRef.current.provider) || '').trim().toLowerCase(),
+      providerKind: String((cryptoUtils as SurveyQuestionsLegacyValue).getProviderKind(propsRef.current.provider) || '')
+        .trim()
+        .toLowerCase(),
       loginComplete: !!propsRef.current.loginComplete,
       singleQuestionMode,
       isStandalone,
@@ -6969,58 +7793,66 @@ const buildSubmitContextSnapshot = () => {
     };
   };
 
-const buildSubmitContextKey = (snapshot: SurveyQuestionsLegacyValue = null) => {
+  const buildSubmitContextKey = (snapshot: SurveyQuestionsLegacyValue = null) => {
     const context: SurveyQuestionsLegacyValue = snapshot || buildSubmitContextSnapshot();
     return [
-      String(context.account || '').trim().toLowerCase(),
-      String(context.providerKind || '').trim().toLowerCase(),
+      String(context.account || '')
+        .trim()
+        .toLowerCase(),
+      String(context.providerKind || '')
+        .trim()
+        .toLowerCase(),
       normalizeSessionSlugValue(context.effectiveDraftSlug || ''),
       String(context.chainId || '').trim(),
-      context.singleQuestionMode ? 'single' : (context.isStandalone ? 'standalone' : 'survey'),
+      context.singleQuestionMode ? 'single' : context.isStandalone ? 'standalone' : 'survey',
       String(context.surveyIndex ?? '').trim(),
-      String(context.surveyId || '').trim().toLowerCase(),
-      String(context.questionID || '').trim().toLowerCase(),
+      String(context.surveyId || '')
+        .trim()
+        .toLowerCase(),
+      String(context.questionID || '')
+        .trim()
+        .toLowerCase(),
     ].join('|');
   };
 
-const isSubmitContextCurrent = (snapshot: SurveyQuestionsLegacyValue = null) => (
-    !!snapshot &&
-    (!snapshot.mounted || inst._isMounted) &&
-    buildSubmitContextKey(snapshot) === buildSubmitContextKey()
-  );
+  const isSubmitContextCurrent = (snapshot: SurveyQuestionsLegacyValue = null) =>
+    !!snapshot && (!snapshot.mounted || inst._isMounted) && buildSubmitContextKey(snapshot) === buildSubmitContextKey();
 
-const startSubmitAttempt = (): number => {
+  const startSubmitAttempt = (): number => {
     const attemptId = (Number(inst._submitAttemptSeq) || 0) + 1;
     inst._submitAttemptSeq = attemptId;
     inst._activeSubmitAttemptSeq = attemptId;
     return attemptId;
   };
 
-const finishSubmitAttempt = (attemptId: unknown = null): void => {
+  const finishSubmitAttempt = (attemptId: unknown = null): void => {
     if (Number(attemptId || 0) > 0 && inst._activeSubmitAttemptSeq === attemptId) {
       inst._activeSubmitAttemptSeq = 0;
     }
   };
 
-const handleStaleSubmitContext = (snapshot: SurveyQuestionsLegacyValue = null) => {
+  const handleStaleSubmitContext = (snapshot: SurveyQuestionsLegacyValue = null) => {
     runSurveyQuestionsStaleSubmitController({
       snapshot,
       ports: {
         clearSubmitGuard: () => {
           inst._submitGuard = false;
         },
-        canUpdateSubmitState: (currentSnapshot: SurveyQuestionsLegacyValue) => canUpdateStateForAsyncSnapshot(currentSnapshot),
-        isSubmitAttemptActive: (_submitAttemptId: SurveyQuestionsLegacyValue, currentSnapshot: SurveyQuestionsLegacyValue) => (
+        canUpdateSubmitState: (currentSnapshot: SurveyQuestionsLegacyValue) =>
+          canUpdateStateForAsyncSnapshot(currentSnapshot),
+        isSubmitAttemptActive: (
+          _submitAttemptId: SurveyQuestionsLegacyValue,
+          currentSnapshot: SurveyQuestionsLegacyValue,
+        ) =>
           inst._activeSubmitAttemptSeq ===
-          (currentSnapshot as { submitAttemptId?: unknown } | null | undefined)?.submitAttemptId
-        ),
+          (currentSnapshot as { submitAttemptId?: unknown } | null | undefined)?.submitAttemptId,
         finishSubmitAttempt: (submitAttemptId: number) => finishSubmitAttempt(submitAttemptId),
         setSubmitStaleState: (statePatch: SurveyQuestionsSubmitStaleStatePatch) => setState(statePatch),
       },
     });
   };
 
-const encryptAndUpload = async () => {
+  const encryptAndUpload = async () => {
     let submitContext: SurveyQuestionsLegacyValue = null;
     try {
       if (!propsRef.current.loginComplete) {
@@ -7057,44 +7889,54 @@ const encryptAndUpload = async () => {
       });
       submitContext.submitAttemptId = startResult.submitAttemptId;
 
-      const providerKind: SurveyQuestionsLegacyValue = (cryptoUtils as SurveyQuestionsLegacyValue).getProviderKind(submitContext.provider);
+      const providerKind: SurveyQuestionsLegacyValue = (cryptoUtils as SurveyQuestionsLegacyValue).getProviderKind(
+        submitContext.provider,
+      );
 
       // Compute changed set once (used for encrypt + submit)
       const surveyIndex: SurveyQuestionsLegacyValue = submitContext.surveyIndex;
       const { changedQids }: SurveyQuestionsLegacyValue = getChangedQidsAndFields(surveyIndex);
 
       // Local state tracker to ensure baseline syncs with encrypted data even if React is slow
-      let activeSlice: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex] || { answers: {}, additionalComments: {}, importance: {}, conviction: {} };
+      let activeSlice: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex] || {
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      };
 
       // Only encrypt when there are changed encrypted fields
       const pendingStats: SurveyQuestionsSubmitPendingStats = resolveSurveyQuestionsSubmitPendingStats({
-        getPendingEditStats: typeof getPendingEditStats === 'function'
-          ? () => getPendingEditStats()
-          : undefined,
+        getPendingEditStats: typeof getPendingEditStats === 'function' ? () => getPendingEditStats() : undefined,
         fallbackTotal: stateRef.current.modifiedCount || 0,
         fallbackEncrypted: stateRef.current.hasEncryptedChanges ? 1 : 0,
       });
       const shouldEncrypt = Number(pendingStats.encrypted || 0) > 0 && changedQids.size > 0;
 
       if (shouldEncrypt) {
-        const {
-          groups: workGroups,
-          missingRecipients,
-        }: SurveyQuestionsLegacyValue = buildFieldEncryptionWorkGroups(activeSlice, changedQids);
-        const hasWork: SurveyQuestionsLegacyValue = workGroups.some((group: SurveyQuestionsLegacyValue) => (
-          Object.keys(group?.slice?.answers || {}).length > 0 ||
-          Object.keys(group?.slice?.additionalComments || {}).length > 0
-        ));
+        const { groups: workGroups, missingRecipients }: SurveyQuestionsLegacyValue = buildFieldEncryptionWorkGroups(
+          activeSlice,
+          changedQids,
+        );
+        const hasWork: SurveyQuestionsLegacyValue = workGroups.some(
+          (group: SurveyQuestionsLegacyValue) =>
+            Object.keys(group?.slice?.answers || {}).length > 0 ||
+            Object.keys(group?.slice?.additionalComments || {}).length > 0,
+        );
 
         if (hasWork) {
-        if (missingRecipients.length > 0) {
-          throw new Error(`Missing Lit recipients for gated field(s): ${missingRecipients.join(', ')}`);
-        }
-          const surveyId: SurveyQuestionsLegacyValue = submitContext.singleQuestionMode ? ethers.constants.HashZero : submitContext.surveyId;
+          if (missingRecipients.length > 0) {
+            throw new Error(`Missing Lit recipients for gated field(s): ${missingRecipients.join(', ')}`);
+          }
+          const surveyId: SurveyQuestionsLegacyValue = submitContext.singleQuestionMode
+            ? ethers.constants.HashZero
+            : submitContext.surveyId;
           const poolForCommit: SurveyQuestionsLegacyValue =
-            (Array.isArray(stateRef.current.questionPool) && stateRef.current.questionPool.length > 0)
+            Array.isArray(stateRef.current.questionPool) && stateRef.current.questionPool.length > 0
               ? stateRef.current.questionPool
-              : (Array.isArray(stateRef.current.pileQuestions) ? stateRef.current.pileQuestions : []);
+              : Array.isArray(stateRef.current.pileQuestions)
+                ? stateRef.current.pileQuestions
+                : [];
           const encState: SurveyQuestionsLegacyValue = await encryptFieldWorkGroups({
             workGroups,
             baseOpts: {
@@ -7114,7 +7956,9 @@ const encryptAndUpload = async () => {
 
           // Merge back (overrides hash with salted Keccak; carries envelope v1 + recipients)
           const newArr: SurveyQuestionsLegacyValue = [...stateRef.current.surveysResponseState];
-          const base: SurveyQuestionsLegacyValue = { ...(newArr[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
+          const base: SurveyQuestionsLegacyValue = {
+            ...(newArr[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
+          };
 
           Object.keys(encState.answers || {}).forEach((qid: SurveyQuestionsLegacyValue) => {
             base.answers = { ...(base.answers || {}) };
@@ -7122,7 +7966,10 @@ const encryptAndUpload = async () => {
           });
           Object.keys(encState.additionalComments || {}).forEach((qid: SurveyQuestionsLegacyValue) => {
             base.additionalComments = { ...(base.additionalComments || {}) };
-            base.additionalComments[qid] = { ...(base.additionalComments[qid] || {}), ...(encState.additionalComments[qid] || {}) };
+            base.additionalComments[qid] = {
+              ...(base.additionalComments[qid] || {}),
+              ...(encState.additionalComments[qid] || {}),
+            };
           });
 
           // Update local tracker AND React state
@@ -7145,7 +7992,7 @@ const encryptAndUpload = async () => {
         handleStaleSubmitContext(submitContext);
         return;
       }
-      surveyLog.log("Submission receipt received", receipt?.blockNumber || 'unknown block');
+      surveyLog.log('Submission receipt received', receipt?.blockNumber || 'unknown block');
 
       // Success path
 
@@ -7156,9 +8003,11 @@ const encryptAndUpload = async () => {
       }
 
       // 2. Clear drafts for changed QIDs
-      surveyLog.log("Clearing drafts for QIDs:", Array.from(changedQids));
+      surveyLog.log('Clearing drafts for QIDs:', Array.from(changedQids));
       try {
-        Array.from(changedQids).forEach((qid: SurveyQuestionsLegacyValue) => clearDraftFor && clearDraftFor(String(qid)));
+        Array.from(changedQids).forEach(
+          (qid: SurveyQuestionsLegacyValue) => clearDraftFor && clearDraftFor(String(qid)),
+        );
       } catch (_: any) {
         if (propsRef.current.singleQuestionMode && propsRef.current.questionID) {
           clearDraftFor(propsRef.current.questionID.toLowerCase());
@@ -7169,15 +8018,14 @@ const encryptAndUpload = async () => {
 
       // 3. Compute responder URL for post-submit UI
       const submittedCacheSlug: SurveyQuestionsLegacyValue = normalizeSessionSlugValue(
-        receipt?.__ceSubmissionGroupKey != null
-          ? receipt.__ceSubmissionGroupKey
-          : submitContext.effectiveDraftSlug
+        receipt?.__ceSubmissionGroupKey != null ? receipt.__ceSubmissionGroupKey : submitContext.effectiveDraftSlug,
       );
       const responseUrl = resolveSurveyQuestionsSubmittedResponseUrl({
         account: submitContext.account,
         currentPathname: window.location.pathname,
         isStandalone: submitContext.isStandalone,
-        logWarn: (message: SurveyQuestionsLegacyValue, error: SurveyQuestionsLegacyValue) => surveyLog.warn(message, error),
+        logWarn: (message: SurveyQuestionsLegacyValue, error: SurveyQuestionsLegacyValue) =>
+          surveyLog.warn(message, error),
         questionID: submitContext.questionID,
         singleQuestionMode: submitContext.singleQuestionMode,
         submissionSlug: submittedCacheSlug,
@@ -7185,7 +8033,7 @@ const encryptAndUpload = async () => {
       });
 
       // 4. UPDATE BASELINE & OPTIMISTIC STATE
-      surveyLog.log("Setting new Baseline");
+      surveyLog.log('Setting new Baseline');
 
       // Ensure surveysResponseState and editBaseline are mathematically identical
       // We clone activeSlice (which holds the final encrypted/plaintext state)
@@ -7201,8 +8049,9 @@ const encryptAndUpload = async () => {
       const optimisticUserAnswers: SurveyQuestionsLegacyValue = prepareJsonAndHash(surveyIndex, undefined, finalSlice);
 
       // Check encryption status from the new baseline
-      const hasEncrypted = Object.values(nextBaseline.answers || {}).some((a: SurveyQuestionsLegacyValue) => !!a.encrypted) ||
-                           Object.values(nextBaseline.additionalComments || {}).some((a: SurveyQuestionsLegacyValue) => !!a.encrypted);
+      const hasEncrypted =
+        Object.values(nextBaseline.answers || {}).some((a: SurveyQuestionsLegacyValue) => !!a.encrypted) ||
+        Object.values(nextBaseline.additionalComments || {}).some((a: SurveyQuestionsLegacyValue) => !!a.encrypted);
       invalidateDiffCaches();
       inst._userAnswersSliceCache = { source: null, value: null };
 
@@ -7219,21 +8068,22 @@ const encryptAndUpload = async () => {
             inst._submitGuard = false;
           },
           finishSubmitAttempt: (submitAttemptId: number) => finishSubmitAttempt(submitAttemptId),
-          setSubmitSuccessState: (
-            statePatch: SurveySubmitSuccessStatePatch,
-            afterStateApplied?: () => void
-          ) => setState(statePatch, afterStateApplied),
+          setSubmitSuccessState: (statePatch: SurveySubmitSuccessStatePatch, afterStateApplied?: () => void) =>
+            setState(statePatch, afterStateApplied),
         },
         afterStateApplied: async () => {
           try {
             if (!isSubmitContextCurrent(submitContext)) return;
-            const cacheWriteResult: SurveyQuestionsLegacyValue = await writeSubmittedResponsesToLocalCaches({
-              receipt,
-              questionResponses: receipt?.__ceQuestionResponses,
-              surveyResponse: receipt?.__ceSurveyResponse,
-              surveyId: receipt?.__ceSurveyId,
-              submissionSlug: submittedCacheSlug,
-            }, submitContext).catch((error: any) => {
+            const cacheWriteResult: SurveyQuestionsLegacyValue = await writeSubmittedResponsesToLocalCaches(
+              {
+                receipt,
+                questionResponses: receipt?.__ceQuestionResponses,
+                surveyResponse: receipt?.__ceSurveyResponse,
+                surveyId: receipt?.__ceSurveyId,
+                submissionSlug: submittedCacheSlug,
+              },
+              submitContext,
+            ).catch((error: any) => {
               surveyLog.warn('[SurveyQuestions] Local submit cache write-through failed:', error);
               return { questionCacheWritten: false, surveyCacheWritten: false };
             });
@@ -7243,7 +8093,9 @@ const encryptAndUpload = async () => {
               !cacheWriteResult?.questionCacheWritten &&
               typeof propsRef.current.refreshQuestionResponses === 'function'
             ) {
-              const ids: SurveyQuestionsLegacyValue = Array.from(changedQids).map((id: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(id)).filter(Boolean);
+              const ids: SurveyQuestionsLegacyValue = Array.from(changedQids)
+                .map((id: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(id))
+                .filter(Boolean);
               if (ids.length > 0 && isSubmitContextCurrent(submitContext)) {
                 await propsRef.current.refreshQuestionResponses(ids, {
                   slug: submittedCacheSlug,
@@ -7261,7 +8113,9 @@ const encryptAndUpload = async () => {
                 await propsRef.current.refreshSurveyResponsesByID(submitContext.surveyId);
               }
             }
-          } catch (e: any) { surveyLog.warn('SurveyTool: callback', e); }
+          } catch (e: any) {
+            surveyLog.warn('SurveyTool: callback', e);
+          }
         },
       });
     } catch (error: any) {
@@ -7285,10 +8139,14 @@ const encryptAndUpload = async () => {
     }
   };
 
-const computePendingEditStatsAtIndex = (idx: SurveyQuestionsLegacyValue) => {
-    const currentSlice: SurveyQuestionsLegacyValue =
-      (stateRef.current.surveysResponseState && stateRef.current.surveysResponseState[idx]) ||
-      { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
+  const computePendingEditStatsAtIndex = (idx: SurveyQuestionsLegacyValue) => {
+    const currentSlice: SurveyQuestionsLegacyValue = (stateRef.current.surveysResponseState &&
+      stateRef.current.surveysResponseState[idx]) || {
+      answers: {},
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    };
     const { result, newCache }: SurveyQuestionsLegacyValue = computePendingEditStats(
       {
         idx,
@@ -7313,7 +8171,7 @@ const computePendingEditStatsAtIndex = (idx: SurveyQuestionsLegacyValue) => {
     return result;
   };
 
-const getPendingEditStats = (surveyIndexParam?: SurveyQuestionsLegacyValue) => {
+  const getPendingEditStats = (surveyIndexParam?: SurveyQuestionsLegacyValue) => {
     const runtimeStrategy: SurveyQuestionsLegacyValue = getRuntimeStrategy();
     if (typeof runtimeStrategy?.getPendingEditStats === 'function') {
       return runtimeStrategy.getPendingEditStats(engine, surveyIndexParam);
@@ -7321,7 +8179,7 @@ const getPendingEditStats = (surveyIndexParam?: SurveyQuestionsLegacyValue) => {
     return computePendingEditStatsAtIndex(getActiveSurveyIndex(surveyIndexParam));
   };
 
-const handleExitEditing = () => {
+  const handleExitEditing = () => {
     executeSurveyExitEditing({
       props: propsRef.current,
       state: stateRef.current,
@@ -7342,25 +8200,33 @@ const handleExitEditing = () => {
     });
   };
 
-const verifyEncryption = async (onlyTheseQids: SurveyQuestionsLegacyValue = null, sliceOverride: SurveyQuestionsLegacyValue = null) => {
-    surveyLog.log("Verifying encryption...");
-    const surveyIndex: SurveyQuestionsLegacyValue = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
-    const stateToCheck: SurveyQuestionsLegacyValue = sliceOverride || stateRef.current.surveysResponseState[surveyIndex];
+  const verifyEncryption = async (
+    onlyTheseQids: SurveyQuestionsLegacyValue = null,
+    sliceOverride: SurveyQuestionsLegacyValue = null,
+  ) => {
+    surveyLog.log('Verifying encryption...');
+    const surveyIndex: SurveyQuestionsLegacyValue =
+      propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
+    const stateToCheck: SurveyQuestionsLegacyValue =
+      sliceOverride || stateRef.current.surveysResponseState[surveyIndex];
     const { passed, failures }: SurveyQuestionsLegacyValue = verifyEncryptionIntegrity(stateToCheck, onlyTheseQids);
 
     failures.forEach((msg: SurveyQuestionsLegacyValue) => surveyLog.error(msg));
 
     if (!passed) {
-      throw new Error("Encryption verification failed. Some data marked for encryption was not processed correctly.");
+      throw new Error('Encryption verification failed. Some data marked for encryption was not processed correctly.');
     }
-    surveyLog.log("Encryption verification successful.");
+    surveyLog.log('Encryption verification successful.');
     return true;
   };
 
-const submitSurveyResponse = async (overrideState: SurveyQuestionsLegacyValue = null, overrideChangedQids: SurveyQuestionsLegacyValue = null, submitContext: SurveyQuestionsLegacyValue = null) => {
-    const context: SurveyQuestionsLegacyValue = submitContext && typeof submitContext === 'object'
-      ? submitContext
-      : buildSubmitContextSnapshot();
+  const submitSurveyResponse = async (
+    overrideState: SurveyQuestionsLegacyValue = null,
+    overrideChangedQids: SurveyQuestionsLegacyValue = null,
+    submitContext: SurveyQuestionsLegacyValue = null,
+  ) => {
+    const context: SurveyQuestionsLegacyValue =
+      submitContext && typeof submitContext === 'object' ? submitContext : buildSubmitContextSnapshot();
     if (!context.loginComplete) {
       propsRef.current.toggleLoginModal(true);
       return;
@@ -7377,7 +8243,7 @@ const submitSurveyResponse = async (overrideState: SurveyQuestionsLegacyValue = 
     try {
       const { changedQids, changedMap }: SurveyQuestionsLegacyValue = getChangedQidsAndFields(idx);
       changedMapForSubmit = changedMap || {};
-      changedSet = overrideChangedQids ? overrideChangedQids : (changedQids || new Set());
+      changedSet = overrideChangedQids ? overrideChangedQids : changedQids || new Set();
     } catch (_: any) {
       changedMapForSubmit = {};
       changedSet = overrideChangedQids ? overrideChangedQids : new Set();
@@ -7402,9 +8268,7 @@ const submitSurveyResponse = async (overrideState: SurveyQuestionsLegacyValue = 
       });
     } catch (e: any) {
       inst._submitGuard = false;
-      setState(buildSubmitPreparationErrorState(
-        e.message || 'No new or changed responses to submit.'
-      ));
+      setState(buildSubmitPreparationErrorState(e.message || 'No new or changed responses to submit.'));
       throw e;
     }
 
@@ -7412,7 +8276,7 @@ const submitSurveyResponse = async (overrideState: SurveyQuestionsLegacyValue = 
 
     const submissionContext: SurveyQuestionsLegacyValue = resolveSubmissionGroupContext({
       questionIds,
-      surveyId: context.singleQuestionMode ? null : (context.surveyId || null),
+      surveyId: context.singleQuestionMode ? null : context.surveyId || null,
       fallbackSlug: context.effectiveDraftSlug,
     });
     if (!submissionContext.ok) {
@@ -7428,33 +8292,43 @@ const submitSurveyResponse = async (overrideState: SurveyQuestionsLegacyValue = 
       await processRatingEnvelopesForSubmit(
         {
           sliceForSubmit:
-            (overrideState && typeof overrideState === 'object')
+            overrideState && typeof overrideState === 'object'
               ? overrideState
-              : (stateRef.current.surveysResponseState && stateRef.current.surveysResponseState[idx]) ||
-                { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+              : (stateRef.current.surveysResponseState && stateRef.current.surveysResponseState[idx]) || {
+                  answers: {},
+                  importance: {},
+                  conviction: {},
+                  additionalComments: {},
+                },
           userAnswersSource: stateRef.current.userAnswers,
           questionResponses,
           changedMapForSubmit,
           encryptionBaseOpts: {
             provider: context.provider,
             account: context.account,
-            chainId: resolveSessionChainId(submissionGroupKey, null, context.props || propsRef.current) || context.chainId,
-            surveyId:
-              (context.singleQuestionMode || context.isStandalone)
-                ? ethers.constants.HashZero
-                : context.surveyId,
+            chainId:
+              resolveSessionChainId(submissionGroupKey, null, context.props || propsRef.current) || context.chainId,
+            surveyId: context.singleQuestionMode || context.isStandalone ? ethers.constants.HashZero : context.surveyId,
             kind: 'rating',
             hasher: stateRef.current.hasher,
           },
         },
         {
           isQuestionLockedForResponse: (qid: SurveyQuestionsLegacyValue) => isQuestionLockedForResponse(qid),
-          resolveFieldEncryptionAudience: (field: SurveyQuestionsLegacyValue, qid: SurveyQuestionsLegacyValue, fk: SurveyQuestionsLegacyValue) => resolveFieldEncryptionAudience(field, qid, fk),
+          resolveFieldEncryptionAudience: (
+            field: SurveyQuestionsLegacyValue,
+            qid: SurveyQuestionsLegacyValue,
+            fk: SurveyQuestionsLegacyValue,
+          ) => resolveFieldEncryptionAudience(field, qid, fk),
           getEffectiveRecipientsForQid: (qid: SurveyQuestionsLegacyValue) => getEffectiveRecipientsForQid(qid),
-          getEffectiveRecipientsForField: ((opts: SurveyQuestionsLegacyValue) => getEffectiveRecipientsForField(opts)) as SurveyQuestionsLegacyValue,
-          getDefaultResponseEncryptionAudienceForQid: (qid: SurveyQuestionsLegacyValue) => getDefaultResponseEncryptionAudienceForQid(qid),
-          buildLitEncryptionOptionsForRecipients: (r: SurveyQuestionsLegacyValue) => buildLitEncryptionOptionsForRecipients(r),
-          encryptEnvelopeValue: (value: SurveyQuestionsLegacyValue, opts: SurveyQuestionsLegacyValue) => (cryptoUtils as SurveyQuestionsLegacyValue).encryptEnvelopeValue(value, opts),
+          getEffectiveRecipientsForField: ((opts: SurveyQuestionsLegacyValue) =>
+            getEffectiveRecipientsForField(opts)) as SurveyQuestionsLegacyValue,
+          getDefaultResponseEncryptionAudienceForQid: (qid: SurveyQuestionsLegacyValue) =>
+            getDefaultResponseEncryptionAudienceForQid(qid),
+          buildLitEncryptionOptionsForRecipients: (r: SurveyQuestionsLegacyValue) =>
+            buildLitEncryptionOptionsForRecipients(r),
+          encryptEnvelopeValue: (value: SurveyQuestionsLegacyValue, opts: SurveyQuestionsLegacyValue) =>
+            (cryptoUtils as SurveyQuestionsLegacyValue).encryptEnvelopeValue(value, opts),
           getImportanceFromResponse,
           getConvictionFromResponse,
           warn: (msg: SurveyQuestionsLegacyValue, err: SurveyQuestionsLegacyValue) => surveyLog.warn(msg, err),
@@ -7489,7 +8363,7 @@ const submitSurveyResponse = async (overrideState: SurveyQuestionsLegacyValue = 
       questionResponses,
       hashedSurveyId,
       surveyResponse,
-      submissionGroupKey
+      submissionGroupKey,
     );
 
     return normalizeSubmitReceipt(tx, {
@@ -7501,8 +8375,12 @@ const submitSurveyResponse = async (overrideState: SurveyQuestionsLegacyValue = 
     });
   };
 
-const writeSubmittedResponsesToLocalCaches = async (params: SurveyQuestionsLegacyValue = {}, submitContext: SurveyQuestionsLegacyValue = null) => {
-    const context: SurveyQuestionsLegacyValue = submitContext && typeof submitContext === 'object' ? submitContext : null;
+  const writeSubmittedResponsesToLocalCaches = async (
+    params: SurveyQuestionsLegacyValue = {},
+    submitContext: SurveyQuestionsLegacyValue = null,
+  ) => {
+    const context: SurveyQuestionsLegacyValue =
+      submitContext && typeof submitContext === 'object' ? submitContext : null;
     const contextProps: SurveyQuestionsLegacyValue = context?.props || propsRef.current;
     return (writeSubmittedResponsesToLocalCachesHelper as SurveyQuestionsLegacyValue)(params, {
       account: context?.account || propsRef.current.account || '',
@@ -7510,11 +8388,17 @@ const writeSubmittedResponsesToLocalCaches = async (params: SurveyQuestionsLegac
       singleQuestionMode: context ? !!context.singleQuestionMode : !!propsRef.current.singleQuestionMode,
       isStandalone: context ? !!context.isStandalone : !!propsRef.current.isStandalone,
       deepClone: (obj: SurveyQuestionsLegacyValue) => deepClone(obj),
-      resolveSubmittedCacheWriteContext: (slug: SurveyQuestionsLegacyValue) => resolveSubmittedCacheWriteContext(contextProps, slug),
+      resolveSubmittedCacheWriteContext: (slug: SurveyQuestionsLegacyValue) =>
+        resolveSubmittedCacheWriteContext(contextProps, slug),
     });
   };
 
-const renderQuestionAnswer = (question: SurveyQuestionsLegacyValue, response: SurveyQuestionsLegacyValue, index: SurveyQuestionsLegacyValue, isOwnResponse: SurveyQuestionsLegacyValue) => {
+  const renderQuestionAnswer = (
+    question: SurveyQuestionsLegacyValue,
+    response: SurveyQuestionsLegacyValue,
+    index: SurveyQuestionsLegacyValue,
+    isOwnResponse: SurveyQuestionsLegacyValue,
+  ) => {
     if (!question || !response) {
       surveyLog.warn('renderQuestionAnswer: question or response is undefined');
       return null;
@@ -7542,7 +8426,7 @@ const renderQuestionAnswer = (question: SurveyQuestionsLegacyValue, response: Su
     );
   };
 
-const renderSurveyAnswers = (responses: SurveyQuestionsLegacyValue, isOwnResponse: SurveyQuestionsLegacyValue) => {
+  const renderSurveyAnswers = (responses: SurveyQuestionsLegacyValue, isOwnResponse: SurveyQuestionsLegacyValue) => {
     return (
       <SurveyQuestionsSurveyAnswersView
         isOwnResponse={isOwnResponse}
@@ -7554,9 +8438,9 @@ const renderSurveyAnswers = (responses: SurveyQuestionsLegacyValue, isOwnRespons
     );
   };
 
-const getMemoizedMaskedQuestionVisibility = (
+  const getMemoizedMaskedQuestionVisibility = (
     questionPoolInput: unknown,
-    singleQuestionMode: unknown
+    singleQuestionMode: unknown,
   ): SurveyQuestionsMaskedQuestionVisibilityState => {
     const fullQuestionPool = Array.isArray(questionPoolInput) ? questionPoolInput : EMPTY_QUESTION_POOL;
     const isSingleQuestionMode = !!singleQuestionMode;
@@ -7588,15 +8472,17 @@ const getMemoizedMaskedQuestionVisibility = (
       : { [modeKey]: value };
     try {
       inst._maskedQuestionVisibilityMemoByPool.set(fullQuestionPool, nextMemoByMode);
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: any) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
     return value;
   };
 
-const renderDefaultSurveyQuestionsRoute = () => {
+  const renderDefaultSurveyQuestionsRoute = () => {
     bumpSurveyPerfCounter('renderCount');
     const maskedQuestionVisibility = getMemoizedMaskedQuestionVisibility(
       stateRef.current.questionPool,
-      propsRef.current.singleQuestionMode
+      propsRef.current.singleQuestionMode,
     );
     const renderReadiness: SurveyQuestionsRenderReadinessDescriptor = buildSurveyQuestionsRenderReadinessDescriptor({
       displayAnswerMode: stateRef.current.displayAnswerMode,
@@ -7631,10 +8517,7 @@ const renderDefaultSurveyQuestionsRoute = () => {
 
     if (renderReadiness.shouldShowLoadingState) {
       return (
-        <SurveyQuestionsRouteSurface
-          renderReadiness={renderReadiness}
-          loadingProgressState={fullLoadingProgress}
-        />
+        <SurveyQuestionsRouteSurface renderReadiness={renderReadiness} loadingProgressState={fullLoadingProgress} />
       );
     }
 
@@ -7677,24 +8560,25 @@ const renderDefaultSurveyQuestionsRoute = () => {
       resolveMaskedCurrentQuestionPayload: hasMaskedCurrentQuestionPayload,
       singleQuestionMode: propsRef.current.singleQuestionMode,
     });
-    const submitFooterDisplayState: SurveyQuestionsSubmitFooterDisplayState = buildSurveyQuestionsSubmitFooterDisplayState({
-      currentStep: stateRef.current.currentStep,
-      hasEncryptedAnswers: submitReadiness.hasEncryptedAnswers,
-      hasMaskedCurrentQuestionPayload: submitReadiness.hasMaskedCurrentQuestionPayload,
-      isDirty: stateRef.current.isDirty,
-      isEditing: stateRef.current.isEditing,
-      isLoadingResponse: stateRef.current.isLoadingResponse,
-      isSingleQuestionView,
-      isSubmitting: stateRef.current.isSubmitting,
-      pendingEditCount: submitReadiness.pendingEditCount,
-      responseUrl: stateRef.current.responseUrl,
-      singleQuestionMode: propsRef.current.singleQuestionMode,
-      startFresh: stateRef.current.startFresh,
-      submissionComplete: stateRef.current.submissionComplete,
-      submittedSinceLastEdit: stateRef.current.submittedSinceLastEdit,
-      useHeaderSubmit: propsRef.current.useHeaderSubmit,
-      userHasResponse: stateRef.current.userHasResponse,
-    });
+    const submitFooterDisplayState: SurveyQuestionsSubmitFooterDisplayState =
+      buildSurveyQuestionsSubmitFooterDisplayState({
+        currentStep: stateRef.current.currentStep,
+        hasEncryptedAnswers: submitReadiness.hasEncryptedAnswers,
+        hasMaskedCurrentQuestionPayload: submitReadiness.hasMaskedCurrentQuestionPayload,
+        isDirty: stateRef.current.isDirty,
+        isEditing: stateRef.current.isEditing,
+        isLoadingResponse: stateRef.current.isLoadingResponse,
+        isSingleQuestionView,
+        isSubmitting: stateRef.current.isSubmitting,
+        pendingEditCount: submitReadiness.pendingEditCount,
+        responseUrl: stateRef.current.responseUrl,
+        singleQuestionMode: propsRef.current.singleQuestionMode,
+        startFresh: stateRef.current.startFresh,
+        submissionComplete: stateRef.current.submissionComplete,
+        submittedSinceLastEdit: stateRef.current.submittedSinceLastEdit,
+        useHeaderSubmit: propsRef.current.useHeaderSubmit,
+        userHasResponse: stateRef.current.userHasResponse,
+      });
 
     const { jsonForDisplay } = buildSurveyQuestionsJsonForDisplayState({
       isOwnResponse,
@@ -7721,16 +8605,19 @@ const renderDefaultSurveyQuestionsRoute = () => {
     const surveyJson = jsonPanelDisplayState.showSurveyJsonPanel ? getSurveyJson() : null;
     const questionsJson = jsonPanelDisplayState.showQuestionsJsonPanel ? getQuestionsJson() : null;
     const responseJson = jsonPanelDisplayState.showResponseJsonPanel
-      ? (viewingAnswers ? jsonForDisplay : getResponseJson())
+      ? viewingAnswers
+        ? jsonForDisplay
+        : getResponseJson()
       : null;
     const canEditQuestions = submitFooterDisplayState.canEditQuestions;
-    const authoringPanelDisplayState: SurveyQuestionsAuthoringPanelDisplayState = buildSurveyQuestionsAuthoringPanelDisplayState({
-      canEditQuestions,
-      hasCurrentSurveyResponseState: !!currentSurveyResponseState,
-      hideEmbeddedDebugUi,
-      questionPoolReady,
-      singleQuestionMode: propsRef.current.singleQuestionMode,
-    });
+    const authoringPanelDisplayState: SurveyQuestionsAuthoringPanelDisplayState =
+      buildSurveyQuestionsAuthoringPanelDisplayState({
+        canEditQuestions,
+        hasCurrentSurveyResponseState: !!currentSurveyResponseState,
+        hideEmbeddedDebugUi,
+        questionPoolReady,
+        singleQuestionMode: propsRef.current.singleQuestionMode,
+      });
     const layoutDisplayState = buildSurveyQuestionsLayoutDisplayState({
       activeTagModalTag: stateRef.current.activeTagModalTag,
       isSingleQuestionView,
@@ -7739,16 +8626,17 @@ const renderDefaultSurveyQuestionsRoute = () => {
       styleMap: styles,
       viewingAnswers,
     });
-    const authoringRouteReadiness: SurveyQuestionsAuthoringRouteReadinessDescriptor = buildSurveyQuestionsAuthoringRouteReadinessDescriptor({
-      canEditQuestions,
-      gatedEmptyStateReady,
-      hasCurrentSurveyResponseState: !!currentSurveyResponseState,
-      questionPoolReady,
-      visibleQuestionPool,
-    });
+    const authoringRouteReadiness: SurveyQuestionsAuthoringRouteReadinessDescriptor =
+      buildSurveyQuestionsAuthoringRouteReadinessDescriptor({
+        canEditQuestions,
+        gatedEmptyStateReady,
+        hasCurrentSurveyResponseState: !!currentSurveyResponseState,
+        questionPoolReady,
+        visibleQuestionPool,
+      });
     const renderedEditableQuestions: React.ReactNode = authoringRouteReadiness.shouldRenderEditableQuestions
       ? visibleQuestionPool.map((question: SurveyQuestionsLegacyValue, qIndex: SurveyQuestionsLegacyValue) =>
-          renderQuestion(question, qIndex, currentSurveyResponseState)
+          renderQuestion(question, qIndex, currentSurveyResponseState),
         )
       : null;
     const lockedGateDetails = getMemoizedLockedQuestionGateDetails(hiddenMaskedQuestionIds);

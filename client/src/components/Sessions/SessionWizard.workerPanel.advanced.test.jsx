@@ -70,7 +70,9 @@ describe('SessionWizard worker panel rendering', () => {
     const originalStrictConfig = contractScriptsModule.getSessionConfigBySlugOrDefault.getMockImplementation();
 
     contractScriptsModule.getSessionConfigBySlugOrDefault.mockImplementation((slug = '') => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized) return null;
       return {
         slug: '',
@@ -106,34 +108,37 @@ describe('SessionWizard worker panel rendering', () => {
       admin: TEST_ADMIN_ADDRESS,
     });
 
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      draft: {
-        slug: 'guard-session',
-        sessionName: 'Guard Session',
-        networkChainId: 84532,
-        contracts: {
-          sbtFactory: {
-            address: mockSelectorSourceFactory,
-            chainId: 84532,
-          },
-        },
-        __registry: {
-          chainId: 84532,
-          registryChainId: 84532,
-        },
-        sponsored: {
-          defaultGateId: 'gate-1',
-          gates: {
-            'gate-1': {
-              sbtAddress: sponsoredAddress,
-              sbtAddresses: [sponsoredAddress],
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          slug: 'guard-session',
+          sessionName: 'Guard Session',
+          networkChainId: 84532,
+          contracts: {
+            sbtFactory: {
+              address: mockSelectorSourceFactory,
               chainId: 84532,
-              mode: 'any',
+            },
+          },
+          __registry: {
+            chainId: 84532,
+            registryChainId: 84532,
+          },
+          sponsored: {
+            defaultGateId: 'gate-1',
+            gates: {
+              'gate-1': {
+                sbtAddress: sponsoredAddress,
+                sbtAddresses: [sponsoredAddress],
+                chainId: 84532,
+                mode: 'any',
+              },
             },
           },
         },
-      },
-    }));
+      }),
+    );
 
     renderSessionWizard({ activeSessionSlug: 'guard-session' });
 
@@ -152,13 +157,16 @@ describe('SessionWizard worker panel rendering', () => {
   });
 
   it('hides an empty cached worker URL in normal mode until a real worker exists', async () => {
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      draft: {
-        corsWorkerUrl: '',
-      },
-      deployComplete: false,
-      deployWorkerUrl: '',
-    }));
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          corsWorkerUrl: '',
+        },
+        deployComplete: false,
+        deployWorkerUrl: '',
+      }),
+    );
 
     renderSessionWizard();
 
@@ -174,13 +182,16 @@ describe('SessionWizard worker panel rendering', () => {
   });
 
   it('does not resurrect a stale cached deploy URL after deploy verification was cleared', async () => {
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      draft: {
-        corsWorkerUrl: '',
-      },
-      deployComplete: false,
-      deployWorkerUrl: 'https://deployed.example.test',
-    }));
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          corsWorkerUrl: '',
+        },
+        deployComplete: false,
+        deployWorkerUrl: 'https://deployed.example.test',
+      }),
+    );
 
     renderSessionWizard();
 
@@ -193,13 +204,16 @@ describe('SessionWizard worker panel rendering', () => {
 
   it('shows the worker URL in normal mode after a worker has been deployed', async () => {
     const deployedWorkerUrl = 'https://deployed.example.test';
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      draft: {
-        corsWorkerUrl: deployedWorkerUrl,
-      },
-      deployComplete: true,
-      deployWorkerUrl: deployedWorkerUrl,
-    }));
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          corsWorkerUrl: deployedWorkerUrl,
+        },
+        deployComplete: true,
+        deployWorkerUrl: deployedWorkerUrl,
+      }),
+    );
 
     renderSessionWizard();
 
@@ -273,9 +287,7 @@ describe('SessionWizard worker panel rendering', () => {
       const deployPayload = JSON.parse(deployCall[1].body);
       expect(deployPayload.bundleUrl).toBe(WORKER_BUNDLE_URL);
       expect(deployPayload.bundleText).toBeUndefined();
-      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue(
-        'https://deployed.example.test'
-      );
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('https://deployed.example.test');
 
       selectNormalModeCard('Deploy Session');
 
@@ -283,13 +295,11 @@ describe('SessionWizard worker panel rendering', () => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeDisabled();
       });
       expect(
-        screen.queryByText('Custom worker mode requires a successful deploy in this run before metadata upload.')
+        screen.queryByText('Custom worker mode requires a successful deploy in this run before metadata upload.'),
       ).not.toBeInTheDocument();
 
       selectNormalModeCard('Worker');
-      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue(
-        'https://deployed.example.test'
-      );
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('https://deployed.example.test');
     } finally {
       global.fetch = originalFetch;
       workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
@@ -352,16 +362,14 @@ describe('SessionWizard worker panel rendering', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          /Worker deployed\..*account active \(tenant-subdomain\); script enabled\./
+          /Worker deployed\..*account active \(tenant-subdomain\); script enabled\./,
         );
       });
       const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
       const deployPayload = JSON.parse(deployCall[1].body);
       expect(deployPayload.bundleUrl).toBe(WORKER_BUNDLE_URL);
       expect(deployPayload.bundleText).toBeUndefined();
-      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue(
-        'https://deployed.example.test'
-      );
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('https://deployed.example.test');
     } finally {
       global.fetch = originalFetch;
       workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
@@ -372,39 +380,49 @@ describe('SessionWizard worker panel rendering', () => {
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
 
-    expect(resolveSessionWizardWorkerBaseUrl({
-      configuredWorkerUrl: '',
-      deployWorkerUrl: '',
-      fallbackWorkerUrl: 'https://shared.example.test',
-      workerMode: 'custom',
-    })).toBe('');
+    expect(
+      resolveSessionWizardWorkerBaseUrl({
+        configuredWorkerUrl: '',
+        deployWorkerUrl: '',
+        fallbackWorkerUrl: 'https://shared.example.test',
+        workerMode: 'custom',
+      }),
+    ).toBe('');
 
-    expect(resolveSessionWizardWorkerBaseUrl({
-      configuredWorkerUrl: '',
-      deployWorkerUrl: '',
-      fallbackWorkerUrl: 'https://shared.example.test',
-      workerMode: 'default',
-    })).toBe('https://shared.example.test');
+    expect(
+      resolveSessionWizardWorkerBaseUrl({
+        configuredWorkerUrl: '',
+        deployWorkerUrl: '',
+        fallbackWorkerUrl: 'https://shared.example.test',
+        workerMode: 'default',
+      }),
+    ).toBe('https://shared.example.test');
   });
 
   it('fills publish progress gradually within an active step and completes at 100 after done', () => {
-    expect(getSessionWizardPublishProgressPercent({
-      publishStep: 2,
-      publishBusy: true,
-      totalSteps: 5,
-      elapsedMs: 0,
-    })).toBeGreaterThan(20);
-    expect(getSessionWizardPublishProgressPercent({
-      publishStep: 2,
-      publishBusy: true,
-      totalSteps: 5,
-      elapsedMs: 2600,
-    })).toBeGreaterThan(35);
-    expect(getSessionWizardPublishProgressPercent({
-      publishStep: 5,
-      publishBusy: false,
-      totalSteps: 5,
-      elapsedMs: 0,
-    })).toBe(100);
+    expect(
+      getSessionWizardPublishProgressPercent({
+        publishStep: 2,
+        publishBusy: true,
+        totalSteps: 5,
+        elapsedMs: 0,
+      }),
+    ).toBeGreaterThan(20);
+    expect(
+      getSessionWizardPublishProgressPercent({
+        publishStep: 2,
+        publishBusy: true,
+        totalSteps: 5,
+        elapsedMs: 2600,
+      }),
+    ).toBeGreaterThan(35);
+    expect(
+      getSessionWizardPublishProgressPercent({
+        publishStep: 5,
+        publishBusy: false,
+        totalSteps: 5,
+        elapsedMs: 0,
+      }),
+    ).toBe(100);
   });
 });

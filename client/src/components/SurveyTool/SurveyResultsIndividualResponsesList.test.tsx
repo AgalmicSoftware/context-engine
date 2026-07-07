@@ -19,11 +19,9 @@ const styleMap = {
 
 describe('SurveyResultsIndividualResponsesList', () => {
   it('builds stable row ids from survey and responder identity', () => {
-    expect(buildSurveyResultsResponseRowId(
-      { responder: '0xABC123', surveyId: 'survey-1' },
-      'fallback-survey',
-      4
-    )).toBe('survey-1:0xabc123');
+    expect(buildSurveyResultsResponseRowId({ responder: '0xABC123', surveyId: 'survey-1' }, 'fallback-survey', 4)).toBe(
+      'survey-1:0xabc123',
+    );
   });
 
   it('renders the empty individual-results state', () => {
@@ -34,7 +32,7 @@ describe('SurveyResultsIndividualResponsesList', () => {
         renderResponseBody={jest.fn()}
         responses={[]}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByText('No results yet.')).toBeInTheDocument();
@@ -53,16 +51,13 @@ describe('SurveyResultsIndividualResponsesList', () => {
         renderResponseBody={renderResponseBody}
         responses={[{ responder: '0xabc123/def456' }]}
         styleMap={styleMap}
-      />
+      />,
     );
 
-    expect(screen.getAllByRole('link')[0]).toHaveAttribute(
-      'href',
-      `/u/${encodeURIComponent('0xabc123/def456')}`
-    );
+    expect(screen.getAllByRole('link')[0]).toHaveAttribute('href', `/u/${encodeURIComponent('0xabc123/def456')}`);
     expect(screen.getAllByRole('link')[1]).toHaveAttribute(
       'href',
-      `/survey/${encodeURIComponent('survey id/with spaces')}/${encodeURIComponent('0xabc123/def456')}?session=alpha`
+      `/survey/${encodeURIComponent('survey id/with spaces')}/${encodeURIComponent('0xabc123/def456')}?session=alpha`,
     );
     expect(screen.getAllByRole('link')[1]).toHaveAttribute('target', '_blank');
     expect(screen.getAllByRole('link')[1]).toHaveAttribute('rel', 'noopener noreferrer');
@@ -77,9 +72,7 @@ describe('SurveyResultsIndividualResponsesList', () => {
   });
 
   it('keeps the expanded responder open when filtering changes response indexes', () => {
-    const renderResponseBody = jest.fn((response) => (
-      <div data-testid="response-body">{response.responder}</div>
-    ));
+    const renderResponseBody = jest.fn((response) => <div data-testid="response-body">{response.responder}</div>);
     const { rerender } = render(
       <SurveyResultsIndividualResponsesList
         activeToggles={{ 'survey-1:0xbbb': true }}
@@ -87,12 +80,9 @@ describe('SurveyResultsIndividualResponsesList', () => {
         filterLoading={false}
         onToggleResponse={jest.fn()}
         renderResponseBody={renderResponseBody}
-        responses={[
-          { responder: '0xAAA' },
-          { responder: '0xBBB' },
-        ]}
+        responses={[{ responder: '0xAAA' }, { responder: '0xBBB' }]}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByTestId('response-body')).toHaveTextContent('0xBBB');
@@ -108,7 +98,7 @@ describe('SurveyResultsIndividualResponsesList', () => {
         renderResponseBody={renderResponseBody}
         responses={[{ responder: '0xBBB' }]}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByTestId('response-body')).toHaveTextContent('0xBBB');
@@ -126,7 +116,7 @@ describe('SurveyResultsIndividualResponsesList', () => {
         renderResponseBody={renderResponseBody}
         responses={[{ responder: '0xabc123' }]}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.queryByTestId('response-body')).not.toBeInTheDocument();
@@ -141,7 +131,7 @@ describe('SurveyResultsIndividualResponsesList', () => {
         renderResponseBody={jest.fn()}
         responses={[]}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.queryByText('No results yet.')).not.toBeInTheDocument();

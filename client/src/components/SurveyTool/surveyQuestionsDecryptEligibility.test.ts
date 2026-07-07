@@ -1,7 +1,4 @@
-import {
-  decideAutoDecryptBlocked,
-  decideAutomaticPromptDecryptByKind,
-} from './surveyQuestionsDecryptEligibility.js';
+import { decideAutoDecryptBlocked, decideAutomaticPromptDecryptByKind } from './surveyQuestionsDecryptEligibility.js';
 
 describe('surveyQuestionsDecryptEligibility', () => {
   describe('decideAutoDecryptBlocked', () => {

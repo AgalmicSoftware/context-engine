@@ -1,10 +1,4 @@
-import {
-  showToast,
-  subscribeToToasts,
-  type ToastListener,
-  type ToastOptions,
-  type ToastPayload,
-} from './toastBus.js';
+import { showToast, subscribeToToasts, type ToastListener, type ToastOptions, type ToastPayload } from './toastBus.js';
 
 describe('toastBus', () => {
   it('normalizes emitted payloads before notifying subscribers', () => {
@@ -69,9 +63,11 @@ describe('toastBus', () => {
       expect(() => showToast('Continue')).not.toThrow();
 
       expect(throwingListener).toHaveBeenCalledTimes(1);
-      expect(receivingListener).toHaveBeenCalledWith(expect.objectContaining({
-        message: 'Continue',
-      }));
+      expect(receivingListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Continue',
+        }),
+      );
     } finally {
       unsubscribeThrowing();
       unsubscribeReceiving();
@@ -87,9 +83,11 @@ describe('toastBus', () => {
     showToast('Second');
 
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
-      message: 'First',
-    }));
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'First',
+      }),
+    );
   });
 
   it('ignores non-function subscribers at runtime', () => {

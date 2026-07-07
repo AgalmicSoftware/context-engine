@@ -3,9 +3,7 @@ import chainGateway, * as chainGatewayModule from './chainGateway.js';
 
 type CommonJsExportRecord = Record<string, unknown>;
 
-const commonJsExports = typeof exports === 'undefined'
-  ? null
-  : (exports as CommonJsExportRecord);
+const commonJsExports = typeof exports === 'undefined' ? null : (exports as CommonJsExportRecord);
 
 if (commonJsExports) {
   Object.defineProperty(commonJsExports, '__esModule', { value: true });

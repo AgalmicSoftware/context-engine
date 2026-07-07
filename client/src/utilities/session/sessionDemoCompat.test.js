@@ -47,18 +47,20 @@ describe('sessionDemoCompat', () => {
 
     expect(seed).not.toBeNull();
     expect(seed).toEqual(expect.any(Object));
-    expect(seed).toEqual(expect.objectContaining({
-      sessionName: demoSessions.general.sessionName,
-      contracts: demoSessions.general.contracts,
-      ai: expect.objectContaining({
-        reasoningEffort: 'low',
-        models: expect.objectContaining({
-          fast: expect.objectContaining({ provider: 'openai', model: 'gpt-4o-mini' }),
-          thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-4o-mini' }),
-          transcription: expect.objectContaining({ provider: 'openai', model: 'whisper-1' }),
+    expect(seed).toEqual(
+      expect.objectContaining({
+        sessionName: demoSessions.general.sessionName,
+        contracts: demoSessions.general.contracts,
+        ai: expect.objectContaining({
+          reasoningEffort: 'low',
+          models: expect.objectContaining({
+            fast: expect.objectContaining({ provider: 'openai', model: 'gpt-4o-mini' }),
+            thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-4o-mini' }),
+            transcription: expect.objectContaining({ provider: 'openai', model: 'whisper-1' }),
+          }),
         }),
       }),
-    }));
+    );
   });
 
   it('returns an empty result for an unknown template seed', () => {

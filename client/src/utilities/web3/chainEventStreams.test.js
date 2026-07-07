@@ -51,9 +51,7 @@ const buildMethods = ({ getReadProviderForGroup } = {}) => {
     getReadProviderForChain,
     getReadProviderForGroup,
     SBT_FACTORY_ABI: ['event SBTCreated(address indexed sbtAddress)'],
-    CUSTOM_SBT_ABI: [
-      'event SBTActivity(address indexed account,uint256 indexed tokenId,bool indexed burned)',
-    ],
+    CUSTOM_SBT_ABI: ['event SBTActivity(address indexed account,uint256 indexed tokenId,bool indexed burned)'],
     SURVEYS: [
       'event SurveyAdded(address indexed creator,bytes32 indexed surveyId)',
       'event QuestionsAdded(address indexed creator,bytes32[] questionIds,bytes32[] surveyIds)',
@@ -78,9 +76,9 @@ describe('chainEventStreams provider scoping', () => {
   it('rebinds SBT factory listeners when the provider scope changes on the same chain', async () => {
     const alphaProvider = makeProvider('https://alpha-rpc.example');
     const betaProvider = makeProvider('https://beta-rpc.example');
-    const getReadProviderForGroup = jest.fn((groupKeyOrCfg) => (
-      groupKeyOrCfg === 'beta' ? betaProvider : alphaProvider
-    ));
+    const getReadProviderForGroup = jest.fn((groupKeyOrCfg) =>
+      groupKeyOrCfg === 'beta' ? betaProvider : alphaProvider,
+    );
     const { methods, sbtListenerMap, getReadProviderForChain, contractSpy } = buildMethods({
       getReadProviderForGroup,
     });
@@ -98,9 +96,9 @@ describe('chainEventStreams provider scoping', () => {
   it('treats SBT instance listeners with different provider scopes as distinct subscriptions', async () => {
     const alphaProvider = makeProvider('https://alpha-rpc.example');
     const betaProvider = makeProvider('https://beta-rpc.example');
-    const getReadProviderForGroup = jest.fn((groupKeyOrCfg) => (
-      groupKeyOrCfg === 'beta' ? betaProvider : alphaProvider
-    ));
+    const getReadProviderForGroup = jest.fn((groupKeyOrCfg) =>
+      groupKeyOrCfg === 'beta' ? betaProvider : alphaProvider,
+    );
     const { methods, contractSpy } = buildMethods({
       getReadProviderForGroup,
     });
@@ -130,14 +128,16 @@ describe('chainEventStreams provider scoping', () => {
       logIndex: 5,
     });
 
-    expect(handleNewEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'SBTCreated',
-      sbtAddress: SBT_INSTANCE_ADDRESS,
-      transactionHash: '0xcreated',
-      blockNumber: 12,
-      transactionIndex: 3,
-      logIndex: 5,
-    }));
+    expect(handleNewEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'SBTCreated',
+        sbtAddress: SBT_INSTANCE_ADDRESS,
+        transactionHash: '0xcreated',
+        blockNumber: 12,
+        transactionIndex: 3,
+        logIndex: 5,
+      }),
+    );
   });
 
   it('forwards transaction and log ordering metadata on SBT activity events', async () => {
@@ -150,30 +150,27 @@ describe('chainEventStreams provider scoping', () => {
 
     const instanceContract = contractSpy.mock.results[0]?.value;
     const [, onActivity] = instanceContract.on.mock.calls.find(([eventName]) => eventName === 'SBTActivity');
-    onActivity(
-      '0x00000000000000000000000000000000000000dd',
-      { toString: () => '9' },
-      true,
-      {
-        transactionHash: '0xactivity',
-        blockNumber: 22,
-        transactionIndex: 1,
-        logIndex: 4,
-      }
-    );
-
-    expect(handleNewEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'SBTActivity',
-      address: ethers.utils.getAddress(SBT_INSTANCE_ADDRESS),
+    onActivity('0x00000000000000000000000000000000000000dd', { toString: () => '9' }, true, {
       transactionHash: '0xactivity',
       blockNumber: 22,
       transactionIndex: 1,
       logIndex: 4,
-      args: expect.objectContaining({
-        account: '0x00000000000000000000000000000000000000dd',
-        tokenId: '9',
-        burned: true,
+    });
+
+    expect(handleNewEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'SBTActivity',
+        address: ethers.utils.getAddress(SBT_INSTANCE_ADDRESS),
+        transactionHash: '0xactivity',
+        blockNumber: 22,
+        transactionIndex: 1,
+        logIndex: 4,
+        args: expect.objectContaining({
+          account: '0x00000000000000000000000000000000000000dd',
+          tokenId: '9',
+          burned: true,
+        }),
       }),
-    }));
+    );
   });
 });

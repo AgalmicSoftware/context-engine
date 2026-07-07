@@ -6,9 +6,8 @@ import {
   renderBootFailure,
 } from './bootRecovery.js';
 
-const screenButton = (label) => Array.from(document.querySelectorAll('button')).find(
-  (button) => button.textContent === label
-);
+const screenButton = (label) =>
+  Array.from(document.querySelectorAll('button')).find((button) => button.textContent === label);
 
 describe('bootRecovery', () => {
   beforeEach(() => {
@@ -28,7 +27,7 @@ describe('bootRecovery', () => {
         reload,
         clearCaches,
         autoRefreshDelayMs: -1,
-      })
+      }),
     ).toBe(true);
 
     expect(document.body).toHaveTextContent('A new version of Context Engine is available');
@@ -135,9 +134,7 @@ describe('bootRecovery', () => {
 
     reloadWithCacheBuster(fakeWindow);
 
-    expect(assign).toHaveBeenCalledWith(
-      'http://localhost:3000/session/demo-1?existing=1&ceBootReload=123456'
-    );
+    expect(assign).toHaveBeenCalledWith('http://localhost:3000/session/demo-1?existing=1&ceBootReload=123456');
 
     Date.now.mockRestore();
   });
@@ -180,10 +177,13 @@ describe('bootRecovery', () => {
       sessionStorage: storage,
     };
 
-    expect(recoverFromStaleChunkLoadError(
-      new TypeError("'text/html' is not a valid JavaScript MIME type."),
-      { window: fakeWindow, storage, reload }
-    )).toBe(true);
+    expect(
+      recoverFromStaleChunkLoadError(new TypeError("'text/html' is not a valid JavaScript MIME type."), {
+        window: fakeWindow,
+        storage,
+        reload,
+      }),
+    ).toBe(true);
 
     expect(storage.setItem).toHaveBeenCalledWith('ce:staleChunkReloadAttempted:v20260618b', 'true');
     expect(reload).toHaveBeenCalledTimes(1);
@@ -202,10 +202,13 @@ describe('bootRecovery', () => {
       sessionStorage: storage,
     };
 
-    expect(recoverFromStaleChunkLoadError(
-      new TypeError("'text/html' is not a valid JavaScript MIME type."),
-      { window: fakeWindow, storage, reload }
-    )).toBe(false);
+    expect(
+      recoverFromStaleChunkLoadError(new TypeError("'text/html' is not a valid JavaScript MIME type."), {
+        window: fakeWindow,
+        storage,
+        reload,
+      }),
+    ).toBe(false);
 
     expect(storage.setItem).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();

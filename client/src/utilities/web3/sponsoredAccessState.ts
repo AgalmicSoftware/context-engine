@@ -27,15 +27,7 @@ export type SponsoredGate = {
 export type SponsoredResource = string | null | undefined;
 
 type SponsoredAccessStatus =
-  | 'no-gate'
-  | 'unknown'
-  | 'needs-wallet'
-  | 'invalid-gate'
-  | 'granted'
-  | 'denied'
-  | 'error'
-  | 'unresolved'
-  | 'timed-out';
+  'no-gate' | 'unknown' | 'needs-wallet' | 'invalid-gate' | 'granted' | 'denied' | 'error' | 'unresolved' | 'timed-out';
 
 export type SponsoredAccessResult = {
   status: SponsoredAccessStatus;
@@ -111,11 +103,7 @@ export const normalizeGateMode = (gate: SponsoredGate | null | undefined = {}): 
   if (!gate) return 'any';
 
   const requireAll = gate.requireAll;
-  if (
-    requireAll === true ||
-    requireAll === 1 ||
-    toStr(requireAll).trim() === '1'
-  ) {
+  if (requireAll === true || requireAll === 1 || toStr(requireAll).trim() === '1') {
     return 'all';
   }
 
@@ -148,13 +136,12 @@ export const getGateSbtAddresses = (gate: SponsoredGate | null | undefined = {})
 
 const resolveOnChainGateForResource = (
   cfg: SessionConfigLike = {},
-  resourceKey: SponsoredResource = ''
+  resourceKey: SponsoredResource = '',
 ): SponsoredGateResolution => {
   const registry = cfg?.__registry && typeof cfg.__registry === 'object' ? cfg.__registry : {};
   const gateAuthority = toStr(registry.gateAuthority).trim().toLowerCase();
-  const gatesByResource = registry.gatesByResource && typeof registry.gatesByResource === 'object'
-    ? registry.gatesByResource
-    : null;
+  const gatesByResource =
+    registry.gatesByResource && typeof registry.gatesByResource === 'object' ? registry.gatesByResource : null;
   const key = toStr(resourceKey).trim() || 'default';
   if (gateAuthority !== 'onchain') {
     return {
@@ -174,7 +161,7 @@ const resolveOnChainGateForResource = (
   }
 
   const requestedGateSnapshot = gatesByResource[key] || null;
-  const defaultGateSnapshot = key !== 'default' ? (gatesByResource.default || null) : null;
+  const defaultGateSnapshot = key !== 'default' ? gatesByResource.default || null : null;
   const requestedLookupStatus = toStr(requestedGateSnapshot?.lookupStatus).trim().toLowerCase();
   const defaultLookupStatus = toStr(defaultGateSnapshot?.lookupStatus).trim().toLowerCase();
   const requestedSbtAddresses = getGateSbtAddresses({
@@ -185,14 +172,10 @@ const resolveOnChainGateForResource = (
     sbtAddresses: defaultGateSnapshot?.sbtAddresses,
     sbtAddress: defaultGateSnapshot?.sbtAddress,
   });
-  const shouldUseDefaultGate = (
+  const shouldUseDefaultGate =
     key === 'rpc' &&
     defaultLookupStatus === 'ok' &&
-    (
-      requestedLookupStatus !== 'ok' ||
-      (!requestedSbtAddresses.length && defaultSbtAddresses.length)
-    )
-  );
+    (requestedLookupStatus !== 'ok' || (!requestedSbtAddresses.length && defaultSbtAddresses.length));
   const gateSnapshot = shouldUseDefaultGate ? defaultGateSnapshot : requestedGateSnapshot;
   const lookupStatus = toStr(gateSnapshot?.lookupStatus).trim().toLowerCase();
   if (lookupStatus !== 'ok') {
@@ -221,7 +204,9 @@ const resolveOnChainGateForResource = (
     status: SPONSORED_GATE_STATES.RESTRICTED,
     gate: {
       type: 'sbt',
-      label: toStr(gateSnapshot?.label || gateSnapshot?.name || gateSnapshot?.title).trim() || `Registry ${shouldUseDefaultGate ? 'default' : key} gate`,
+      label:
+        toStr(gateSnapshot?.label || gateSnapshot?.name || gateSnapshot?.title).trim() ||
+        `Registry ${shouldUseDefaultGate ? 'default' : key} gate`,
       gateId: toStr(gateSnapshot?.gateId || gateSnapshot?.id).trim() || null,
       sbtAddress: sbtAddresses[0],
       sbtAddresses,
@@ -245,7 +230,7 @@ export const getDefaultSponsoredGate = (cfg: SessionConfigLike = {}): SponsoredG
  */
 export const resolveSponsoredGateStateForResource = (
   cfg: SessionConfigLike = {},
-  resourceKey: SponsoredResource = ''
+  resourceKey: SponsoredResource = '',
 ): SponsoredGateResolution => {
   return resolveOnChainGateForResource(cfg, resourceKey || 'default');
 };
@@ -255,7 +240,7 @@ export const resolveSponsoredGateStateForResource = (
  */
 export const resolveSponsoredGateForResource = (
   cfg: SessionConfigLike = {},
-  resourceKey: SponsoredResource = ''
+  resourceKey: SponsoredResource = '',
 ): SponsoredGate | null => {
   return resolveSponsoredGateStateForResource(cfg, resourceKey || 'default').gate;
 };
@@ -305,13 +290,14 @@ const buildAccessCacheKey = ({
   const sbtAddresses = getGateSbtAddresses(gate);
   if (!sbtAddresses.length) return '';
   const mode = normalizeGateMode(gate);
-  const addressKey = sbtAddresses.map((addr) => addr.toLowerCase()).sort().join('|');
+  const addressKey = sbtAddresses
+    .map((addr) => addr.toLowerCase())
+    .sort()
+    .join('|');
   return `${normalizedAccount}:${addressKey}:${gate?.chainId || ''}:${mode}:${toStr(resourceKey).trim() || 'default'}`;
 };
 
-const normalizeAccessChangeStatus = (status: unknown): string => (
-  toStr(status).trim().toLowerCase()
-);
+const normalizeAccessChangeStatus = (status: unknown): string => toStr(status).trim().toLowerCase();
 
 const normalizeAccessChangeAccount = (account: unknown): string => {
   const normalized = toStr(account).trim().toLowerCase();
@@ -337,9 +323,7 @@ const shouldEmitSponsoredAccessChange = (previousStatus: unknown, nextStatus: un
 /**
  * Subscribe to sponsored access state transitions for cached gate checks.
  */
-export const addSponsoredAccessChangeListener = (
-  listener: SponsoredAccessChangeListener | unknown
-): (() => void) => {
+export const addSponsoredAccessChangeListener = (listener: SponsoredAccessChangeListener | unknown): (() => void) => {
   if (typeof listener !== 'function') {
     return () => {};
   }
@@ -395,9 +379,7 @@ const readAccessCacheEntry = ({
   return cached;
 };
 
-const toPublicSponsoredAccessValue = (
-  value: SponsoredAccessResult | null
-): SponsoredAccessResult | null => {
+const toPublicSponsoredAccessValue = (value: SponsoredAccessResult | null): SponsoredAccessResult | null => {
   if (!value || typeof value !== 'object') return value || null;
   const status = toStr(value?.status).trim().toLowerCase();
   if (status !== SPONSORED_ACCESS_STATES.TIMED_OUT) {
@@ -422,9 +404,11 @@ const runAccessCheckWithInflight = ({
   if (!cacheKey) {
     try {
       return Promise.resolve(runCheck?.())
-        .then((value) => (typeof onResolve === 'function'
-          ? onResolve(value as SponsoredAccessResult)
-          : (value as SponsoredAccessResult | null)))
+        .then((value) =>
+          typeof onResolve === 'function'
+            ? onResolve(value as SponsoredAccessResult)
+            : (value as SponsoredAccessResult | null),
+        )
         .catch((err) => {
           if (typeof onReject === 'function') {
             return onReject(err);
@@ -457,13 +441,16 @@ const runAccessCheckWithInflight = ({
       handler(value);
     };
 
-    timeoutId = setTimeout(() => {
-      try {
-        finish(resolve, typeof onTimeout === 'function' ? onTimeout() : null);
-      } catch (err) {
-        finish(reject, err);
-      }
-    }, Math.max(0, Number(timeoutMs || 0)));
+    timeoutId = setTimeout(
+      () => {
+        try {
+          finish(resolve, typeof onTimeout === 'function' ? onTimeout() : null);
+        } catch (err) {
+          finish(reject, err);
+        }
+      },
+      Math.max(0, Number(timeoutMs || 0)),
+    );
 
     let runPromise: Promise<SponsoredAccessResult | null | undefined> | null = null;
     try {
@@ -577,18 +564,14 @@ export const checkSponsoredAccessWithChecker = async ({
   pruneAccessCache(now);
   const key = buildAccessCacheKey({ account, gate, resourceKey });
   const cached = key ? accessCache.get(key) : null;
-  if (cached && (now - Number(cached.ts || 0)) < SPONSORED_ACCESS_CACHE_HIT_TTL_MS) {
+  if (cached && now - Number(cached.ts || 0) < SPONSORED_ACCESS_CACHE_HIT_TTL_MS) {
     return toPublicSponsoredAccessValue(cached.value) as SponsoredAccessResult;
   }
   if (cached) accessCache.delete(key);
 
   const persistAccessResult = (value: SponsoredAccessResult): SponsoredAccessResult => {
     const status = toStr(value?.status).trim().toLowerCase();
-    if (
-      status !== 'granted' &&
-      status !== 'denied' &&
-      status !== SPONSORED_ACCESS_STATES.TIMED_OUT
-    ) {
+    if (status !== 'granted' && status !== 'denied' && status !== SPONSORED_ACCESS_STATES.TIMED_OUT) {
       return value;
     }
     return writeCachedSponsoredAccess({
@@ -601,34 +584,36 @@ export const checkSponsoredAccessWithChecker = async ({
     }) as SponsoredAccessResult;
   };
 
-  return Promise.resolve(runAccessCheckWithInflight({
-    cacheKey: key,
-    runCheck: async () => {
-      const checks = await Promise.all(
-        sbtAddresses.map((addr) =>
-          Promise.resolve(checkSbtAccess?.({
-            sbtAddress: addr,
-            account,
-            sessionConfig: cfg,
-            sessionSlug,
-            resourceKey,
-          }))
-        )
-      );
-      const has =
-        normalizeGateMode(gate) === 'all'
-          ? checks.every(Boolean)
-          : checks.some(Boolean);
-      return { status: has ? 'granted' : 'denied', gate, resourceKey };
-    },
-    onResolve: persistAccessResult,
-    onReject: (err) => ({ status: 'error', error: (err as Error | null)?.message || 'unknown', gate, resourceKey }),
-    onTimeout: () => persistAccessResult({
-      status: SPONSORED_ACCESS_STATES.TIMED_OUT,
-      gate,
-      resourceKey,
+  return Promise.resolve(
+    runAccessCheckWithInflight({
+      cacheKey: key,
+      runCheck: async () => {
+        const checks = await Promise.all(
+          sbtAddresses.map((addr) =>
+            Promise.resolve(
+              checkSbtAccess?.({
+                sbtAddress: addr,
+                account,
+                sessionConfig: cfg,
+                sessionSlug,
+                resourceKey,
+              }),
+            ),
+          ),
+        );
+        const has = normalizeGateMode(gate) === 'all' ? checks.every(Boolean) : checks.some(Boolean);
+        return { status: has ? 'granted' : 'denied', gate, resourceKey };
+      },
+      onResolve: persistAccessResult,
+      onReject: (err) => ({ status: 'error', error: (err as Error | null)?.message || 'unknown', gate, resourceKey }),
+      onTimeout: () =>
+        persistAccessResult({
+          status: SPONSORED_ACCESS_STATES.TIMED_OUT,
+          gate,
+          resourceKey,
+        }),
     }),
-  })).then((value) => toPublicSponsoredAccessValue(value) as SponsoredAccessResult);
+  ).then((value) => toPublicSponsoredAccessValue(value) as SponsoredAccessResult);
 };
 
 /**

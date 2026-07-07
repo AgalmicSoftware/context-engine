@@ -40,14 +40,19 @@ describe('SessionWizard pending SBT persistence rendering', () => {
   });
 
   it('does not restore cached pending SBT drafts from localStorage', async () => {
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      pendingSbtDrafts: [{
-        predictedAddress: mockPendingSbtAddress,
-        displayName: 'Cached Pending SBT',
-        passwordList: ['claim-code-1'],
-        groupPassword: 'shared-secret',
-      }],
-    }));
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        pendingSbtDrafts: [
+          {
+            predictedAddress: mockPendingSbtAddress,
+            displayName: 'Cached Pending SBT',
+            passwordList: ['claim-code-1'],
+            groupPassword: 'shared-secret',
+          },
+        ],
+      }),
+    );
 
     renderSessionWizard();
 
@@ -80,7 +85,7 @@ describe('SessionWizard pending SBT persistence rendering', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toHaveAttribute(
       'data-ce-sbt-address',
-      mockPendingSbtAddress.toLowerCase()
+      mockPendingSbtAddress.toLowerCase(),
     );
     expect(screen.getByText(mockPendingSbtAddress)).toBeInTheDocument();
   });

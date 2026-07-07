@@ -71,12 +71,10 @@ describe('chains RPC defaults', () => {
       expect(publicUrls.some((url) => /infura\.io/i.test(String(url || '')))).toBe(false);
       expect(defaultUrls.some((url) => /infura\.io/i.test(String(url || '')))).toBe(false);
     }
-    BASE_SEPOLIA_PUBLIC_RPC_URLS
-      .filter((url) => !/base\.org$/i.test(String(url || '')))
-      .forEach((url) => {
-        expect(publicUrls).toContain(url);
-        expect(defaultUrls).toContain(url);
-      });
+    BASE_SEPOLIA_PUBLIC_RPC_URLS.filter((url) => !/base\.org$/i.test(String(url || ''))).forEach((url) => {
+      expect(publicUrls).toContain(url);
+      expect(defaultUrls).toContain(url);
+    });
     expect(publicUrls.some((url) => /blockpi\.network/i.test(String(url || '')))).toBe(false);
     expect(defaultUrls.some((url) => /blockpi\.network/i.test(String(url || '')))).toBe(false);
   });
@@ -84,15 +82,23 @@ describe('chains RPC defaults', () => {
   it('ships Base Sepolia public fallback URLs in the expected production order', () => {
     const optionalPrefixUrls = [getPathRpcUrl(84532), configuredPaidBaseSepoliaRpcUrl];
 
-    expect(withoutLeadingOptionalRpcUrls(baseSepolia.rpcUrls?.public?.http, optionalPrefixUrls)).toEqual(BASE_SEPOLIA_PUBLIC_RPC_URLS);
-    expect(withoutLeadingOptionalRpcUrls(baseSepolia.rpcUrls?.default?.http, optionalPrefixUrls)).toEqual(BASE_SEPOLIA_PUBLIC_RPC_URLS);
+    expect(withoutLeadingOptionalRpcUrls(baseSepolia.rpcUrls?.public?.http, optionalPrefixUrls)).toEqual(
+      BASE_SEPOLIA_PUBLIC_RPC_URLS,
+    );
+    expect(withoutLeadingOptionalRpcUrls(baseSepolia.rpcUrls?.default?.http, optionalPrefixUrls)).toEqual(
+      BASE_SEPOLIA_PUBLIC_RPC_URLS,
+    );
   });
 
   it('ships OP Sepolia public fallback URLs in the expected production order', () => {
     const optionalPrefixUrls = [getPathRpcUrl(11155420), configuredPaidOpSepoliaRpcUrl];
 
-    expect(withoutLeadingOptionalRpcUrls(optimismSepolia.rpcUrls?.public?.http, optionalPrefixUrls)).toEqual(OP_SEPOLIA_PUBLIC_RPC_URLS);
-    expect(withoutLeadingOptionalRpcUrls(optimismSepolia.rpcUrls?.default?.http, optionalPrefixUrls)).toEqual(OP_SEPOLIA_PUBLIC_RPC_URLS);
+    expect(withoutLeadingOptionalRpcUrls(optimismSepolia.rpcUrls?.public?.http, optionalPrefixUrls)).toEqual(
+      OP_SEPOLIA_PUBLIC_RPC_URLS,
+    );
+    expect(withoutLeadingOptionalRpcUrls(optimismSepolia.rpcUrls?.default?.http, optionalPrefixUrls)).toEqual(
+      OP_SEPOLIA_PUBLIC_RPC_URLS,
+    );
   });
 
   it('uses an archive-capable OP Sepolia public RPC as the first non-PATH fallback', () => {
@@ -163,10 +169,12 @@ describe('chains RPC defaults', () => {
 
     globalThis.CE_INCLUDE_LOCAL_SESSION_REGISTRY = true;
     expect(getSessionRegistryAddress(localChainId)).toBe(localContracts.SessionRegistry);
-    expect(getSessionContractsForChain(localChainId)).toEqual(expect.objectContaining({
-      surveys: localContracts.Surveys,
-      sbtFactory: localContracts.SBTFactory,
-    }));
+    expect(getSessionContractsForChain(localChainId)).toEqual(
+      expect.objectContaining({
+        surveys: localContracts.Surveys,
+        sbtFactory: localContracts.SBTFactory,
+      }),
+    );
   });
 
   it('keeps generated local contracts out of the default registry scan list unless explicitly enabled', () => {

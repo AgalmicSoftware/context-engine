@@ -14,9 +14,7 @@ interface SbtRealtimeCoverageControllerOptions {
   setState?: ((updater: SbtRealtimeCoverageUpdater, cb?: unknown) => unknown) | null;
 }
 
-export const createSbtRealtimeCoverageController = ({
-  setState = null,
-}: SbtRealtimeCoverageControllerOptions = {}) => {
+export const createSbtRealtimeCoverageController = ({ setState = null }: SbtRealtimeCoverageControllerOptions = {}) => {
   const applyState = (updater: SbtRealtimeCoverageUpdater, cb?: unknown): void => {
     if (typeof setState === 'function') {
       setState(updater, cb);

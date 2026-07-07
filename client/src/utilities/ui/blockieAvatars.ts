@@ -21,7 +21,7 @@ export function hashSeed(str: unknown): number {
 // Tiny PRNG used in existing code (mulberry32)
 export function mulberry32(a: number): () => number {
   return function (): number {
-    let t = (a += 0x6D2B79F5);
+    let t = (a += 0x6d2b79f5);
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -35,11 +35,7 @@ export function hslToRgb(h: number, s: number, l: number): number[] {
     const k = (n + h / 30) % 12;
     return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
   };
-  return [
-    Math.round(255 * f(0)),
-    Math.round(255 * f(8)),
-    Math.round(255 * f(4)),
-  ];
+  return [Math.round(255 * f(0)), Math.round(255 * f(8)), Math.round(255 * f(4))];
 }
 
 // Generate symmetric blockie as a data URL (8×8 grid by default)

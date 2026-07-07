@@ -50,17 +50,20 @@ describe('contractScripts Arweave upload tags', () => {
   });
 
   it('omits invalid or reserved tag names when session metadata is incomplete', () => {
-    const tags = buildArweaveUploadTags({
-      networkChainId: 0,
-      contracts: {
-        surveys: {
-          address: 'not-an-address',
+    const tags = buildArweaveUploadTags(
+      {
+        networkChainId: 0,
+        contracts: {
+          surveys: {
+            address: 'not-an-address',
+          },
+        },
+        network: {
+          name: '   ',
         },
       },
-      network: {
-        name: '   ',
-      },
-    }, '');
+      '',
+    );
 
     expect(tags).toEqual([]);
     expect(tags.find((tag) => tag.name === 'App-Name')).toBeUndefined();
@@ -80,17 +83,19 @@ describe('contractScripts Arweave upload tags', () => {
 
     const result = await resolveArweaveUploadOpts(cfg);
 
-    expect(result).toEqual(expect.objectContaining({
-      arweaveJwk: '',
-      sessionSlug: 'demo-session',
-      sessionConfig: cfg,
-      tags: [
-        { name: 'CE-SessionSlug', value: 'demo-session' },
-        { name: 'CE-ChainId', value: '84532' },
-        { name: 'CE-ContractAddress', value: surveyAddress },
-        { name: 'CE-Network', value: getChainById(84532)?.name || '' },
-      ],
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        arweaveJwk: '',
+        sessionSlug: 'demo-session',
+        sessionConfig: cfg,
+        tags: [
+          { name: 'CE-SessionSlug', value: 'demo-session' },
+          { name: 'CE-ChainId', value: '84532' },
+          { name: 'CE-ContractAddress', value: surveyAddress },
+          { name: 'CE-Network', value: getChainById(84532)?.name || '' },
+        ],
+      }),
+    );
     expect(result.tags.every((tag) => tag.name.startsWith('CE-'))).toBe(true);
   });
 
@@ -120,24 +125,31 @@ describe('contractScripts Arweave upload tags', () => {
         signer,
       });
 
-      expect(result).toEqual(expect.objectContaining({
-        arweaveJwk: '{"kty":"RSA"}',
-        sessionSlug: 'demo-session',
-        skipAuth: true,
-        adminAuth: {
-          address: signer.address,
-          message: expect.stringContaining('Admin request: bootstrap arweave upload'),
-          signature: expect.any(String),
+      expect(result).toEqual(
+        expect.objectContaining({
+          arweaveJwk: '{"kty":"RSA"}',
           sessionSlug: 'demo-session',
-        },
-      }));
-      expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(expect.objectContaining({
-        sessionSlug: 'demo-session',
-        sessionConfig: cfg,
-      }));
-      expect(global.fetch).toHaveBeenCalledWith('https://worker.example/auth/nonce', expect.objectContaining({
-        method: 'POST',
-      }));
+          skipAuth: true,
+          adminAuth: {
+            address: signer.address,
+            message: expect.stringContaining('Admin request: bootstrap arweave upload'),
+            signature: expect.any(String),
+            sessionSlug: 'demo-session',
+          },
+        }),
+      );
+      expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionSlug: 'demo-session',
+          sessionConfig: cfg,
+        }),
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://worker.example/auth/nonce',
+        expect.objectContaining({
+          method: 'POST',
+        }),
+      );
     } finally {
       global.fetch = originalFetch;
     }
@@ -165,12 +177,14 @@ describe('contractScripts Arweave upload tags', () => {
       signer,
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      arweaveJwk: '{"kty":"RSA"}',
-      sessionSlug: 'demo-session',
-      skipAuth: true,
-      forceDirectArweaveUpload: true,
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        arweaveJwk: '{"kty":"RSA"}',
+        sessionSlug: 'demo-session',
+        skipAuth: true,
+        forceDirectArweaveUpload: true,
+      }),
+    );
     expect(result.adminAuth).toBeUndefined();
     expect(getCorsProxyUrlOrThrow).not.toHaveBeenCalled();
   });

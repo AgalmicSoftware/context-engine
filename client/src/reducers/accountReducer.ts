@@ -21,31 +21,19 @@ type AccountReducerAction =
   | { type?: string; payload?: unknown };
 
 const initialState: AccountState = {
-  account: '',          // ETH address connected to site
-  provider: 'none',     // 'none' | 'wagmi' | 'web3auth' | 'passkey_eoa'
+  account: '', // ETH address connected to site
+  provider: 'none', // 'none' | 'wagmi' | 'web3auth' | 'passkey_eoa'
   network: null,
   alerts: [],
   userImageURL: null,
 };
 
 const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value &&
-  typeof value === 'object' &&
-  !Array.isArray(value)
-);
-const isEmptyObject = (value: unknown): boolean => (
-  !!value &&
-  typeof value === 'object' &&
-  !Array.isArray(value) &&
-  Object.keys(value).length === 0
-);
-const ACCOUNT_PAYLOAD_FIELDS: Array<keyof AccountPayload> = [
-  'account',
-  'provider',
-  'network',
-  'userImageURL',
-];
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+const isEmptyObject = (value: unknown): boolean =>
+  !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0;
+const ACCOUNT_PAYLOAD_FIELDS: Array<keyof AccountPayload> = ['account', 'provider', 'network', 'userImageURL'];
 
 const mergeAccountPayload = (state: AccountState, payload: unknown): AccountState => {
   if (!isRecord(payload)) return state;

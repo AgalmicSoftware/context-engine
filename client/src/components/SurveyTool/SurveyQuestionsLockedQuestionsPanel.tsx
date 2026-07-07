@@ -1,12 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretDown,
-  faCaretUp,
-  faExternalLinkAlt,
-  faLock,
-  faSpinner,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faExternalLinkAlt, faLock, faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -88,7 +82,8 @@ const renderRequirementLinks = (items: RequiredSbtLinkItem[]): React.ReactNode =
   const extra = items.length > shown.length ? ` +${items.length - shown.length} more` : '';
   return (
     <>
-      {t('sbt')}{items.length === 1 ? '' : 's'} required:{' '}
+      {t('sbt')}
+      {items.length === 1 ? '' : 's'} required:{' '}
       {shown.map((item, index) => (
         <React.Fragment key={item.key}>
           {index > 0 ? ', ' : null}
@@ -147,13 +142,11 @@ const SurveyQuestionsLockedQuestionsPanel = ({
   const resolvedTitle = title || `${hiddenCount} Locked Question${hiddenCount === 1 ? '' : 's'}`;
   const canToggleLockedDetails = lockedGateDetails.length > 0 && showCaret;
   const showLockedGateDetails = forceExpanded || (!!lockedGateDetailsExpanded && canToggleLockedDetails);
-  const bannerClassName = [
-    styles.lockedQuestionsBanner,
-    surface === 'dark' ? styles.lockedQuestionsBannerOnDark : '',
-  ].filter(Boolean).join(' ') || undefined;
-  const renderedSubtitle = subtitle
-    ? renderLinkedSubtitle({ lockedGateDetails, subtitle })
-    : null;
+  const bannerClassName =
+    [styles.lockedQuestionsBanner, surface === 'dark' ? styles.lockedQuestionsBannerOnDark : '']
+      .filter(Boolean)
+      .join(' ') || undefined;
+  const renderedSubtitle = subtitle ? renderLinkedSubtitle({ lockedGateDetails, subtitle }) : null;
 
   return (
     <div className={bannerClassName} role="status" data-testid={E2E_TESTIDS.SURVEY_LOCKED_BANNER}>
@@ -162,14 +155,8 @@ const SurveyQuestionsLockedQuestionsPanel = ({
       </div>
       <div className={styles.lockedQuestionsHeader}>
         <div className={styles.lockedQuestionsCopy}>
-          <div className={styles.lockedQuestionsTitle}>
-            {resolvedTitle}
-          </div>
-          {renderedSubtitle ? (
-            <div className={styles.lockedQuestionsSubtext}>
-              {renderedSubtitle}
-            </div>
-          ) : null}
+          <div className={styles.lockedQuestionsTitle}>{resolvedTitle}</div>
+          {renderedSubtitle ? <div className={styles.lockedQuestionsSubtext}>{renderedSubtitle}</div> : null}
         </div>
         <div className={styles.lockedQuestionsAction}>
           <button

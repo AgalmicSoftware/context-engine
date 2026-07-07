@@ -33,14 +33,11 @@ describe('GateTooltip', () => {
       <GateTooltip
         gateId="vip_access"
         gateConfig={{ label: 'VIP Gate', mode: 'all' }}
-        sbtAddresses={[
-          '0x1111111111111111111111111111111111111111',
-          '0x2222222222222222222222222222222222222222',
-        ]}
+        sbtAddresses={['0x1111111111111111111111111111111111111111', '0x2222222222222222222222222222222222222222']}
         userHeldSBTs={['0x1111111111111111111111111111111111111111']}
       >
         [encrypted]
-      </GateTooltip>
+      </GateTooltip>,
     );
 
     expect(screen.getByText('[encrypted]')).toBeTruthy();

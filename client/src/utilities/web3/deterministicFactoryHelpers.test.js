@@ -1,9 +1,5 @@
 import { ethers } from 'ethers';
-import {
-  hasNonZeroHashValue,
-  isEmptyRevertDataValue,
-  normalizeCreate2Salt,
-} from './deterministicFactoryHelpers.js';
+import { hasNonZeroHashValue, isEmptyRevertDataValue, normalizeCreate2Salt } from './deterministicFactoryHelpers.js';
 
 describe('deterministicFactoryHelpers', () => {
   it('preserves blank and full-length hex salts', () => {

@@ -32,9 +32,7 @@ jest.mock('./QuestionFilter', () => {
     ReactActual.useImperativeHandle(ref, () => ({
       handleApplyFilters: jest.fn(),
     }));
-    return props?.filterModalOpen
-      ? <div data-testid="ce-surveyresults-question-filter">Question Filter</div>
-      : null;
+    return props?.filterModalOpen ? <div data-testid="ce-surveyresults-question-filter">Question Filter</div> : null;
   });
 });
 const mockPolisReport = jest.fn((..._args: any[]) => null);
@@ -109,12 +107,13 @@ const buildQuestionCache = ({
   questionResponses = {},
   questionsLatestBlock = 1,
   questionResponsesLatestBlock = 1,
-}: Record<string, any> = {}): Record<string, any> => normalizeQuestionCache({
-  questions,
-  questionResponses,
-  questionsLatestBlock,
-  questionResponsesLatestBlock,
-});
+}: Record<string, any> = {}): Record<string, any> =>
+  normalizeQuestionCache({
+    questions,
+    questionResponses,
+    questionsLatestBlock,
+    questionResponsesLatestBlock,
+  });
 
 const buildSurveyCache = ({
   surveyId,
@@ -151,11 +150,7 @@ const seedCacheEnvironment = ({
   surveysBySlug = {},
 }: CacheEnvironment = {}): void => {
   const defaultBookmarks = { surveys: [], questions: [] };
-  const lookupSlug = (
-    entries: Record<string, any>,
-    slug: any,
-    fallback: any
-  ): any => {
+  const lookupSlug = (entries: Record<string, any>, slug: any, fallback: any): any => {
     const normalizedSlug = String(slug ?? '');
     const lowerSlug = normalizedSlug.toLowerCase();
     if (Object.prototype.hasOwnProperty.call(entries, normalizedSlug)) {
@@ -210,38 +205,40 @@ const seedCacheEnvironment = ({
   jest.spyOn(contractScriptsDefault as any, 'getLatestBlockNumber').mockResolvedValue(0);
 };
 
-const renderQuestionResults = (
-  props: Record<string, any> = {},
-  route = '/questions/results'
-) => renderSurveyResults({
-  isOpen: true,
-  isQuestionCacheReady: true,
-  isResponsesCacheReady: true,
-  isSBTCacheReady: true,
-  network: { id: Number(NETWORK_ID) },
-  networkChainId: Number(NETWORK_ID),
-  preventUrlChange: true,
-  provider: {},
-  viewMode: 'questions',
-  ...props,
-}, { route });
+const renderQuestionResults = (props: Record<string, any> = {}, route = '/questions/results') =>
+  renderSurveyResults(
+    {
+      isOpen: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      network: { id: Number(NETWORK_ID) },
+      networkChainId: Number(NETWORK_ID),
+      preventUrlChange: true,
+      provider: {},
+      viewMode: 'questions',
+      ...props,
+    },
+    { route },
+  );
 
-const renderSurveyModeResults = (
-  props: Record<string, any> = {},
-  route = '/'
-) => renderSurveyResults({
-  isOpen: true,
-  isQuestionCacheReady: true,
-  isResponsesCacheReady: true,
-  isSBTCacheReady: true,
-  isSurveyCacheReady: true,
-  network: { id: Number(NETWORK_ID) },
-  networkChainId: Number(NETWORK_ID),
-  preventUrlChange: true,
-  provider: {},
-  viewMode: 'survey',
-  ...props,
-}, { route });
+const renderSurveyModeResults = (props: Record<string, any> = {}, route = '/') =>
+  renderSurveyResults(
+    {
+      isOpen: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+      network: { id: Number(NETWORK_ID) },
+      networkChainId: Number(NETWORK_ID),
+      preventUrlChange: true,
+      provider: {},
+      viewMode: 'survey',
+      ...props,
+    },
+    { route },
+  );
 
 const waitForPrompt = async (prompt: string): Promise<void> => {
   await waitFor(() => {
@@ -253,9 +250,7 @@ const expectPromptAbsent = (prompt: string): void => {
   expect(screen.queryAllByText(prompt)).toHaveLength(0);
 };
 
-const getFilterSummaryText = (): string => (
-  document.querySelector('[class*="filterSummaryText"]')?.textContent || ''
-);
+const getFilterSummaryText = (): string => document.querySelector('[class*="filterSummaryText"]')?.textContent || '';
 
 const expectQuestionResponseCounts = (questions: number, responses: number): void => {
   const text = getFilterSummaryText();
@@ -265,7 +260,7 @@ const expectQuestionResponseCounts = (questions: number, responses: number): voi
 
 const rerenderHarness = async (
   view: ReturnType<typeof renderQuestionResults>,
-  props: Record<string, any>
+  props: Record<string, any>,
 ): Promise<void> => {
   await act(async () => {
     view.rerenderSurveyResults(props);
@@ -286,10 +281,8 @@ const getLatestPolisReportProps = (): Record<string, any> => {
   return calls[calls.length - 1][0];
 };
 
-const collectSurveyLinks = (): string[] => (
-  Array.from(document.querySelectorAll('a[href^="/survey/"]'))
-    .map((link) => link.getAttribute('href') || '')
-);
+const collectSurveyLinks = (): string[] =>
+  Array.from(document.querySelectorAll('a[href^="/survey/"]')).map((link) => link.getAttribute('href') || '');
 
 const switchToIndividualsView = async (): Promise<void> => {
   const viewSwitch = screen.queryAllByRole('switch', { name: VIEW_MODE_SWITCH_NAME })[0];
@@ -317,17 +310,22 @@ afterEach(() => {
   jest.restoreAllMocks();
   try {
     window.history.replaceState({}, '', '/');
-  } catch (_) { /* noop */ }
+  } catch (_) {
+    /* noop */
+  }
 });
 
 describe('SurveyResults session resolution', () => {
   it('does not rewrite route-owned results URLs on unmount', async () => {
     seedCacheEnvironment();
-    const view = renderQuestionResults({
-      activeSessionSlug: 'edge',
-      preventUrlChange: true,
-      sessionSlug: 'edge',
-    }, '/session/edge/questions/results');
+    const view = renderQuestionResults(
+      {
+        activeSessionSlug: 'edge',
+        preventUrlChange: true,
+        sessionSlug: 'edge',
+      },
+      '/session/edge/questions/results',
+    );
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Question Results' })).toBeInTheDocument();
     });
@@ -345,7 +343,9 @@ describe('SurveyResults session resolution', () => {
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/\.modalHeader\s*{[\s\S]*position:\s*relative;[\s\S]*padding-right:\s*4\.5rem;/);
-    expect(scss).toMatch(/\.modalHeader\s+:global\(\.close\)\s*(?:,[^{]*?)?\s*{[\s\S]*position:\s*absolute;[\s\S]*top:\s*0\.85rem;[\s\S]*right:\s*0\.85rem;[\s\S]*margin:\s*0;[\s\S]*padding:\s*0\.25rem;/);
+    expect(scss).toMatch(
+      /\.modalHeader\s+:global\(\.close\)\s*(?:,[^{]*?)?\s*{[\s\S]*position:\s*absolute;[\s\S]*top:\s*0\.85rem;[\s\S]*right:\s*0\.85rem;[\s\S]*margin:\s*0;[\s\S]*padding:\s*0\.25rem;/,
+    );
     expect(scss).toMatch(/\.modalHeaderControls\s*{[\s\S]*margin-left:\s*auto;/);
     expect(scss).not.toMatch(/\.modalHeaderCornerActions\s*{/);
     expect(scss).not.toMatch(/\.sessionSelectorToggle\s*{/);
@@ -369,10 +369,13 @@ describe('SurveyResults session resolution', () => {
       },
     });
 
-    renderQuestionResults({
-      sessionSlug: 'DEBATE',
-      activeSessionSlug: 'DEBATE',
-    }, '/questions/results');
+    renderQuestionResults(
+      {
+        sessionSlug: 'DEBATE',
+        activeSessionSlug: 'DEBATE',
+      },
+      '/questions/results',
+    );
     await waitForPrompt('Debate question');
 
     expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('bookmarksCache', 'DEBATE', { clone: false });
@@ -408,11 +411,10 @@ describe('SurveyResults session resolution', () => {
   });
 
   it('keeps explicit non-general session slugs unresolved when no config exists', async () => {
-    const configSpy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug')
-      .mockImplementation((slug: any) => {
-        if (slug === 'rxc') return { slug: 'rxc', networkChainId: 84532 };
-        return null;
-      });
+    const configSpy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation((slug: any) => {
+      if (slug === 'rxc') return { slug: 'rxc', networkChainId: 84532 };
+      return null;
+    });
 
     const context = resolveSurveyResultsSessionContext({
       sessionSlug: 'DEBATE',
@@ -510,10 +512,13 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha']);
 
-    renderQuestionResults({
-      activeSessionSlug: 'edge',
-      sessionSlugPinned: true,
-    }, '/session/edge/questions/results');
+    renderQuestionResults(
+      {
+        activeSessionSlug: 'edge',
+        sessionSlugPinned: true,
+      },
+      '/session/edge/questions/results',
+    );
     await waitForPrompt('Edge 1');
 
     expectPromptAbsent('Alpha 2');
@@ -562,12 +567,15 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo', 'alpha']);
 
-    renderQuestionResults({
-      preventUrlChange: false,
-      sessionSlug: 'demo',
-      activeSessionSlug: 'demo',
-      sessionSlugPinned: true,
-    }, '/questions/results?session=demo');
+    renderQuestionResults(
+      {
+        preventUrlChange: false,
+        sessionSlug: 'demo',
+        activeSessionSlug: 'demo',
+        sessionSlugPinned: true,
+      },
+      '/questions/results?session=demo',
+    );
     await waitForPrompt('Demo question');
 
     expectPromptAbsent('Wrong session question');
@@ -614,13 +622,16 @@ describe('SurveyResults session resolution', () => {
       jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
       jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
 
-      renderQuestionResults({
-        sessionSlug: 'demo',
-        activeSessionSlug: 'demo',
-        sessionSlugPinned: true,
-        isOpen: true,
-        viewMode: 'questions',
-      }, '/questions/results?session=demo');
+      renderQuestionResults(
+        {
+          sessionSlug: 'demo',
+          activeSessionSlug: 'demo',
+          sessionSlugPinned: true,
+          isOpen: true,
+          viewMode: 'questions',
+        },
+        '/questions/results?session=demo',
+      );
 
       await waitFor(() => {
         const text = getFilterSummaryText();
@@ -664,14 +675,17 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
 
-    renderQuestionResults({
-      sessionSlug: 'demo',
-      activeSessionSlug: 'demo',
-      preventUrlChange: false,
-      sessionSlugPinned: true,
-      isOpen: true,
-      viewMode: 'questions',
-    }, '/questions/results?session=demo');
+    renderQuestionResults(
+      {
+        sessionSlug: 'demo',
+        activeSessionSlug: 'demo',
+        preventUrlChange: false,
+        sessionSlugPinned: true,
+        isOpen: true,
+        viewMode: 'questions',
+      },
+      '/questions/results?session=demo',
+    );
 
     await waitFor(() => {
       expectQuestionResponseCounts(1, 1);
@@ -720,14 +734,17 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
 
-    renderQuestionResults({
-      sessionSlug: 'demo',
-      activeSessionSlug: 'demo',
-      preventUrlChange: false,
-      sessionSlugPinned: true,
-      isOpen: true,
-      viewMode: 'questions',
-    }, '/questions/results?session=demo');
+    renderQuestionResults(
+      {
+        sessionSlug: 'demo',
+        activeSessionSlug: 'demo',
+        preventUrlChange: false,
+        sessionSlugPinned: true,
+        isOpen: true,
+        viewMode: 'questions',
+      },
+      '/questions/results?session=demo',
+    );
 
     await waitFor(() => {
       expectQuestionResponseCounts(1, 1);
@@ -745,15 +762,19 @@ describe('SurveyResults session resolution', () => {
       const reportProps = getLatestPolisReportProps();
       const reportRows = reportProps.questionResponses?.[demoQuestion.id] || [];
       expect(reportRows).toHaveLength(1);
-      expect(reportRows[0]).toEqual(expect.objectContaining({
-        responder: RESPONDER_ONE,
-        questionId: demoQuestion.id,
-      }));
+      expect(reportRows[0]).toEqual(
+        expect.objectContaining({
+          responder: RESPONDER_ONE,
+          questionId: demoQuestion.id,
+        }),
+      );
       const parsedResponse = JSON.parse(String(reportRows[0].response || '{}'));
-      expect(parsedResponse).toEqual(expect.objectContaining({
-        prompt: demoQuestion.prompt,
-        answer: { value: 'Agree', encrypted: false },
-      }));
+      expect(parsedResponse).toEqual(
+        expect.objectContaining({
+          prompt: demoQuestion.prompt,
+          answer: { value: 'Agree', encrypted: false },
+        }),
+      );
     });
   });
 
@@ -786,12 +807,15 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo', 'alpha']);
 
-    renderQuestionResults({
-      preventUrlChange: true,
-      sessionSlug: 'demo',
-      activeSessionSlug: 'demo',
-      sessionSlugPinned: true,
-    }, '/questions/results?session=demo');
+    renderQuestionResults(
+      {
+        preventUrlChange: true,
+        sessionSlug: 'demo',
+        activeSessionSlug: 'demo',
+        sessionSlugPinned: true,
+      },
+      '/questions/results?session=demo',
+    );
     await waitForPrompt('Legacy demo question');
 
     expectPromptAbsent('Wrong session question');
@@ -807,10 +831,13 @@ describe('SurveyResults session resolution', () => {
     };
     seedCacheEnvironment({ questionsBySlug });
 
-    const view = renderQuestionResults({
-      activeSessionSlug: 'edge',
-      questionResponsesNonce: 1,
-    }, '/session/edge/questions/results');
+    const view = renderQuestionResults(
+      {
+        activeSessionSlug: 'edge',
+        questionResponsesNonce: 1,
+      },
+      '/session/edge/questions/results',
+    );
     await waitForPrompt('Edge question');
     expectQuestionResponseCounts(1, 1);
 
@@ -845,9 +872,12 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
 
-    renderQuestionResults({
-      activeSessionSlug: 'edge',
-    }, '/session/edge');
+    renderQuestionResults(
+      {
+        activeSessionSlug: 'edge',
+      },
+      '/session/edge',
+    );
     await waitForPrompt('Edge 1');
 
     expectPromptAbsent('Alpha 2');
@@ -921,9 +951,12 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha']);
 
-    renderQuestionResults({
-      activeSessionSlug: 'edge',
-    }, '/questions/results');
+    renderQuestionResults(
+      {
+        activeSessionSlug: 'edge',
+      },
+      '/questions/results',
+    );
     await waitForPrompt('Ready edge question');
     await waitForPrompt('Ready alpha question');
 
@@ -955,9 +988,12 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
 
-    renderQuestionResults({
-      activeSessionSlug: 'edge',
-    }, '/session/edge');
+    renderQuestionResults(
+      {
+        activeSessionSlug: 'edge',
+      },
+      '/session/edge',
+    );
     await waitForPrompt('Edge 1');
     fireEvent.click(screen.getByRole('button', { name: /Filter/i }));
 
@@ -1006,9 +1042,12 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['telegram-demo-2', 'demo']);
 
-    renderQuestionResults({
-      activeSessionSlug: 'telegram-demo-2',
-    }, '/session/telegram-demo-2');
+    renderQuestionResults(
+      {
+        activeSessionSlug: 'telegram-demo-2',
+      },
+      '/session/telegram-demo-2',
+    );
     await waitForPrompt('Local question');
 
     expectPromptAbsent('[encrypted]');
@@ -1041,12 +1080,15 @@ describe('SurveyResults session resolution', () => {
     });
     (contractScriptsDefault.getLatestBlockNumber as jest.Mock).mockReturnValue(latestBlockPromise);
 
-    renderQuestionResults({
-      preventUrlChange: true,
-      sessionSlug: 'demo',
-      activeSessionSlug: 'demo',
-      sessionSlugPinned: true,
-    }, '/questions/results?session=demo');
+    renderQuestionResults(
+      {
+        preventUrlChange: true,
+        sessionSlug: 'demo',
+        activeSessionSlug: 'demo',
+        sessionSlugPinned: true,
+      },
+      '/questions/results?session=demo',
+    );
 
     await waitForPrompt('Legacy demo question');
     expectQuestionResponseCounts(1, 1);
@@ -1069,12 +1111,15 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
 
-    const view = renderQuestionResults({
-      sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-      sessionSlugPinned: true,
-      questionResponsesNonce: 1,
-    }, '/questions/results');
+    const view = renderQuestionResults(
+      {
+        sessionSlug: 'edge',
+        activeSessionSlug: 'edge',
+        sessionSlugPinned: true,
+        questionResponsesNonce: 1,
+      },
+      '/questions/results',
+    );
     await waitForPrompt('Edge 1');
 
     await rerenderHarness(view, {
@@ -1094,11 +1139,14 @@ describe('SurveyResults session resolution', () => {
   it('does not render a SurveyResults session selector', async () => {
     seedCacheEnvironment();
 
-    renderQuestionResults({
-      sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-      sessionSlugPinned: true,
-    }, '/questions/results?session=edge');
+    renderQuestionResults(
+      {
+        sessionSlug: 'edge',
+        activeSessionSlug: 'edge',
+        sessionSlugPinned: true,
+      },
+      '/questions/results?session=edge',
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Question Results' })).toBeInTheDocument();
@@ -1110,11 +1158,14 @@ describe('SurveyResults session resolution', () => {
   it('does not render question-results corner actions for a removed session selector', async () => {
     seedCacheEnvironment();
 
-    renderQuestionResults({
-      sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-      sessionSlugPinned: true,
-    }, '/questions/results?session=edge');
+    renderQuestionResults(
+      {
+        sessionSlug: 'edge',
+        activeSessionSlug: 'edge',
+        sessionSlugPinned: true,
+      },
+      '/questions/results?session=edge',
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Question Results' })).toBeInTheDocument();
@@ -1176,11 +1227,10 @@ describe('SurveyResults session resolution', () => {
   });
 
   it('does not inherit the general session config for unknown non-general slugs', async () => {
-    const configSpy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug')
-      .mockImplementation((slug: any) => {
-        if (slug === '') return { slug: '', networkChainId: 84532 };
-        return null;
-      });
+    const configSpy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation((slug: any) => {
+      if (slug === '') return { slug: '', networkChainId: 84532 };
+      return null;
+    });
 
     const context = resolveSurveyResultsSessionContext({
       sessionSlug: 'missing-session-slug',

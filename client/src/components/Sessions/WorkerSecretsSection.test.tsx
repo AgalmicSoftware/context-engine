@@ -3,30 +3,31 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import WorkerSecretsSection from './WorkerSecretsSection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const renderWorkerSecretsSection = (props = {}) => render(
-  <WorkerSecretsSection
-    isNormalMode={false}
-    translate={(key) => {
-      if (key === 'gatesLower') return 'gates';
-      if (key === 'gateLower') return 'gate';
-      return key;
-    }}
-    renderInfoTooltip={({ testId }) => <button type="button" data-testid={testId} />}
-    devPersistWorkerSecrets
-    persistWorkerSecrets={false}
-    setPersistWorkerSecrets={() => {}}
-    workerSecretsEnabled
-    setWorkerSecretsEnabled={() => {}}
-    clearWorkerSecretFields={() => {}}
-    effectivePersistWorkerSecrets={false}
-    workerResourceKeys={['ai', 'rpc']}
-    renderResource={(resourceKey) => <div key={resourceKey}>card {resourceKey}</div>}
-    workerAllowOrigins="https://app.example"
-    setWorkerAllowOrigins={() => {}}
-    defaultAllowedOrigins="https://default.example"
-    {...props}
-  />
-);
+const renderWorkerSecretsSection = (props = {}) =>
+  render(
+    <WorkerSecretsSection
+      isNormalMode={false}
+      translate={(key) => {
+        if (key === 'gatesLower') return 'gates';
+        if (key === 'gateLower') return 'gate';
+        return key;
+      }}
+      renderInfoTooltip={({ testId }) => <button type="button" data-testid={testId} />}
+      devPersistWorkerSecrets
+      persistWorkerSecrets={false}
+      setPersistWorkerSecrets={() => {}}
+      workerSecretsEnabled
+      setWorkerSecretsEnabled={() => {}}
+      clearWorkerSecretFields={() => {}}
+      effectivePersistWorkerSecrets={false}
+      workerResourceKeys={['ai', 'rpc']}
+      renderResource={(resourceKey) => <div key={resourceKey}>card {resourceKey}</div>}
+      workerAllowOrigins="https://app.example"
+      setWorkerAllowOrigins={() => {}}
+      defaultAllowedOrigins="https://default.example"
+      {...props}
+    />,
+  );
 
 describe('WorkerSecretsSection', () => {
   it('renders the secrets/resource shell and forwards origin edits', () => {
@@ -40,7 +41,9 @@ describe('WorkerSecretsSection', () => {
 
     expect(screen.getByText('Worker secrets')).toBeInTheDocument();
     expect(screen.getByText('Resource gates (on-chain)')).toBeInTheDocument();
-    expect(screen.getByText('Secrets are not saved locally — re-enter them if you refresh the page.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Secrets are not saved locally — re-enter them if you refresh the page.'),
+    ).toBeInTheDocument();
     expect(screen.getByText('card ai')).toBeInTheDocument();
     expect(screen.getByText('card rpc')).toBeInTheDocument();
 

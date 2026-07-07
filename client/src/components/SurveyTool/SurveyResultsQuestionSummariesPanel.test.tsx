@@ -64,7 +64,7 @@ describe('SurveyResultsQuestionSummariesPanel', () => {
         surveyAggregateEntries={[['q1', []]]}
         surveyViewMode="individuals"
         viewMode="survey"
-      />
+      />,
     );
 
     expect(container).toBeEmptyDOMElement();

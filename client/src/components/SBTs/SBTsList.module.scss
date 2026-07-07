@@ -1,5 +1,5 @@
-@use "sass:color";
-@use "scss/variables" as tokens;
+@use 'sass:color';
+@use 'scss/variables' as tokens;
 
 $primary-color: #00ff77;
 $secondary-color: #41a6e9;
@@ -94,7 +94,11 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
   background: rgba(0, 0, 0, 0.25);
   color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
 
   &:hover,
   &:focus-visible {
@@ -126,7 +130,9 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
   text-transform: uppercase;
   padding: 5px 8px;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
   &:hover {
     background: rgba(0, 0, 0, 0.35);
     border-color: rgba(255, 255, 255, 0.45);
@@ -163,7 +169,10 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
   text-transform: uppercase;
   padding: 6px 10px;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    opacity 0.2s ease;
 
   &:hover {
     background: rgba(255, 255, 255, 0.13);
@@ -194,7 +203,10 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
   font-family: var(--ce-font-mono);
   font-size: 0.9rem;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
   margin: 0;
   min-width: 170px;
 }
@@ -270,7 +282,9 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
   opacity: 0.5;
   margin-left: 0;
   flex-shrink: 0;
-  transition: opacity 0.2s ease, color 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease;
 
   &:hover {
     color: rgba(218, 228, 238, 0.78);
@@ -418,7 +432,9 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: color 0.18s ease, transform 0.18s ease;
+  transition:
+    color 0.18s ease,
+    transform 0.18s ease;
 
   &:hover,
   &:focus-visible {
@@ -1369,7 +1385,10 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
     padding: 6px 10px;
     font-size: 0.95rem;
     color: rgba(255, 255, 255, 0.9);
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    transition:
+      background 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease;
     cursor: pointer;
     user-select: none;
     input[type='checkbox'] {

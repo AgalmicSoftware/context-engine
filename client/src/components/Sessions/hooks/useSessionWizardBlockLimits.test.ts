@@ -8,12 +8,14 @@ type DraftState = {
   } | null;
 };
 
-const renderBlockLimits = (overrides: Partial<{
-  registryChainId: unknown;
-  draftBlockLimitStart: unknown;
-  setDraft: jest.Mock;
-  updateDraftValue: jest.Mock;
-}> = {}) => {
+const renderBlockLimits = (
+  overrides: Partial<{
+    registryChainId: unknown;
+    draftBlockLimitStart: unknown;
+    setDraft: jest.Mock;
+    updateDraftValue: jest.Mock;
+  }> = {},
+) => {
   const setDraft = overrides.setDraft || jest.fn();
   const updateDraftValue = overrides.updateDraftValue || jest.fn();
   const updateDraftValueRef = { current: updateDraftValue };
@@ -21,12 +23,14 @@ const renderBlockLimits = (overrides: Partial<{
   return {
     setDraft,
     updateDraftValue,
-    ...renderHook(() => useSessionWizardBlockLimits<DraftState>({
-      registryChainId: overrides.registryChainId ?? 0,
-      draftBlockLimitStart: overrides.draftBlockLimitStart,
-      setDraft,
-      updateDraftValueRef,
-    })),
+    ...renderHook(() =>
+      useSessionWizardBlockLimits<DraftState>({
+        registryChainId: overrides.registryChainId ?? 0,
+        draftBlockLimitStart: overrides.draftBlockLimitStart,
+        setDraft,
+        updateDraftValueRef,
+      }),
+    ),
   };
 };
 

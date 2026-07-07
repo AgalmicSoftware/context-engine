@@ -33,21 +33,15 @@ export const buildPileQuestionSetHydrationPlan = ({
 } = {}): PileHydrationExecutionPlan => {
   const normalizedResultSignature = String(resultSignature || '');
   const normalizedLastResultSignature = String(lastResultSignature || '');
-  const shouldSkipDuplicateSignature = (
-    !!normalizedResultSignature &&
-    normalizedResultSignature === normalizedLastResultSignature
-  );
-  const shouldUpdateResultSignature = (
-    !!normalizedResultSignature &&
-    normalizedResultSignature !== normalizedLastResultSignature
-  );
+  const shouldSkipDuplicateSignature =
+    !!normalizedResultSignature && normalizedResultSignature === normalizedLastResultSignature;
+  const shouldUpdateResultSignature =
+    !!normalizedResultSignature && normalizedResultSignature !== normalizedLastResultSignature;
 
   return {
     shouldSkipDuplicateSignature,
     shouldUpdateResultSignature,
-    nextResultSignature: shouldUpdateResultSignature
-      ? normalizedResultSignature
-      : normalizedLastResultSignature,
+    nextResultSignature: shouldUpdateResultSignature ? normalizedResultSignature : normalizedLastResultSignature,
     shouldInitializeResponses: !!initializeResponses,
     rehydrateOptions: {
       requestEpoch,

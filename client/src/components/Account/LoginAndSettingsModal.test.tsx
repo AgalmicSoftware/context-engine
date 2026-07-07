@@ -11,10 +11,7 @@ import {
   getSessionNetwork,
   getProviderLocation,
 } from '../../utilities/web3/contractScripts.js';
-import {
-  getWorkerSessionToken,
-  clearAllWorkerSessionTokens,
-} from '../../utilities/worker/workerAuth.js';
+import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
 import { notify } from '../../utilities/ui/notify.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { baseSepolia, getDefaultHttpRpc } from '../../variables/chains.js';
@@ -66,7 +63,12 @@ jest.mock('../../utilities/ai/aiSettings.js', () => {
     saveLocalAiSettings: jest.fn(),
     clearLocalAiSettings: jest.fn(),
     deriveAiPreset: jest.fn(() => 'gpt-5'),
-    toModelLeaf: jest.fn((m) => String(m || '').toLowerCase().split('/').pop()),
+    toModelLeaf: jest.fn((m) =>
+      String(m || '')
+        .toLowerCase()
+        .split('/')
+        .pop(),
+    ),
   };
 });
 
@@ -151,9 +153,7 @@ const ALT_PASSKEY_ADDRESS = '0x3333333333333333333333333333333333333333';
 const mountClassSubject = (subject: any) => {
   subject._isMounted = true;
   subject.setState = (nextState: any, cb?: () => void) => {
-    const update = typeof nextState === 'function'
-      ? nextState(subject.state, subject.props)
-      : nextState;
+    const update = typeof nextState === 'function' ? nextState(subject.state, subject.props) : nextState;
     subject.state = { ...subject.state, ...(update || {}) };
     if (typeof cb === 'function') cb();
   };
@@ -170,7 +170,10 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   it('does not update local state after unmount while session restore is pending', async () => {
     let resolveRestore!: (value: string | null) => void;
     mockedPasskeyWallet.restorePasskeyWalletSession.mockImplementationOnce(
-      () => new Promise<string | null>((resolve) => { resolveRestore = resolve; })
+      () =>
+        new Promise<string | null>((resolve) => {
+          resolveRestore = resolve;
+        }),
     );
 
     const subject = new LoginAndSettingsModalSubject(buildProps());
@@ -198,10 +201,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     await subject.componentDidMount();
 
     expect(mockedPasskeyWallet.restorePasskeyWalletSession).toHaveBeenCalledWith({ requireSigner: false });
-    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-      account: PASSKEY_ADDRESS,
-      provider: 'passkey_eoa',
-    }));
+    expect(props.changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+      }),
+    );
     expect(props.updateLoginInfo).toHaveBeenCalledWith({
       loginInProgress: false,
       loginComplete: true,
@@ -212,7 +217,10 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   it('does not let pending passkey wallet restore overwrite explicit sign-in', async () => {
     let resolveRestore!: (value: string | null) => void;
     mockedPasskeyWallet.restorePasskeyWalletSession.mockImplementationOnce(
-      () => new Promise<string | null>((resolve) => { resolveRestore = resolve; })
+      () =>
+        new Promise<string | null>((resolve) => {
+          resolveRestore = resolve;
+        }),
     );
     mockedPasskeyWallet.unlockPasskeyWallet.mockResolvedValueOnce(ALT_PASSKEY_ADDRESS);
     const props = buildProps({
@@ -227,19 +235,26 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     expect(mockedPasskeyWallet.unlockPasskeyWallet).toHaveBeenCalledTimes(1);
     expect(props.changeAccount).toHaveBeenCalledTimes(1);
-    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-      account: ALT_PASSKEY_ADDRESS,
-      provider: 'passkey_eoa',
-    }));
-    expect(props.changeAccount).not.toHaveBeenCalledWith(expect.objectContaining({
-      account: PASSKEY_ADDRESS,
-    }));
+    expect(props.changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: ALT_PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+      }),
+    );
+    expect(props.changeAccount).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: PASSKEY_ADDRESS,
+      }),
+    );
   });
 
   it('does not let stale passkey wallet sign-in completion overwrite logout', async () => {
     let resolveLogin!: (value: string) => void;
     mockedPasskeyWallet.unlockPasskeyWallet.mockImplementationOnce(
-      () => new Promise<string>((resolve) => { resolveLogin = resolve; })
+      () =>
+        new Promise<string>((resolve) => {
+          resolveLogin = resolve;
+        }),
     );
     const props = buildProps({
       provider: 'none',
@@ -254,9 +269,11 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(mockedPasskeyWallet.unlockPasskeyWallet).toHaveBeenCalledTimes(1);
     expect(props.changeAccount).toHaveBeenCalledTimes(1);
     expect(props.changeAccount).toHaveBeenCalledWith({});
-    expect(props.changeAccount).not.toHaveBeenCalledWith(expect.objectContaining({
-      account: ALT_PASSKEY_ADDRESS,
-    }));
+    expect(props.changeAccount).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: ALT_PASSKEY_ADDRESS,
+      }),
+    );
     expect(props.updateLoginInfo).not.toHaveBeenLastCalledWith({
       loginInProgress: false,
       loginComplete: true,
@@ -267,7 +284,10 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   it('does not let stale passkey wallet sign-in completion overwrite a Wagmi login', async () => {
     let resolveLogin!: (value: string) => void;
     mockedPasskeyWallet.unlockPasskeyWallet.mockImplementationOnce(
-      () => new Promise<string>((resolve) => { resolveLogin = resolve; })
+      () =>
+        new Promise<string>((resolve) => {
+          resolveLogin = resolve;
+        }),
     );
     const props = buildProps({
       account: '',
@@ -288,14 +308,18 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     expect(mockedPasskeyWallet.unlockPasskeyWallet).toHaveBeenCalledTimes(1);
     expect(props.changeAccount).toHaveBeenCalledTimes(1);
-    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-      account: WAGMI_ADDRESS,
-      provider: 'wagmi',
-    }));
-    expect(props.changeAccount).not.toHaveBeenCalledWith(expect.objectContaining({
-      account: ALT_PASSKEY_ADDRESS,
-      provider: 'passkey_eoa',
-    }));
+    expect(props.changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: WAGMI_ADDRESS,
+        provider: 'wagmi',
+      }),
+    );
+    expect(props.changeAccount).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: ALT_PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+      }),
+    );
     expect(props.updateLoginInfo).toHaveBeenLastCalledWith({
       loginInProgress: false,
       loginComplete: true,
@@ -334,9 +358,11 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
       expect(request).toHaveBeenCalledWith({
         method: 'wallet_addEthereumChain',
-        params: [expect.objectContaining({
-          rpcUrls: [getDefaultHttpRpc(84532, { allowPath: false })],
-        })],
+        params: [
+          expect.objectContaining({
+            rpcUrls: [getDefaultHttpRpc(84532, { allowPath: false })],
+          }),
+        ],
       });
     } finally {
       (window as any).ethereum = originalEthereum;
@@ -345,7 +371,8 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
   it('retries switching after adding an unknown target network', async () => {
     const originalEthereum = window.ethereum;
-    const request = jest.fn()
+    const request = jest
+      .fn()
       .mockRejectedValueOnce({ code: 4902 })
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined);
@@ -362,10 +389,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       });
       expect(request).toHaveBeenNthCalledWith(2, {
         method: 'wallet_addEthereumChain',
-        params: [expect.objectContaining({
-          chainId: '0x14a34',
-          rpcUrls: [getDefaultHttpRpc(84532, { allowPath: false })],
-        })],
+        params: [
+          expect.objectContaining({
+            chainId: '0x14a34',
+            rpcUrls: [getDefaultHttpRpc(84532, { allowPath: false })],
+          }),
+        ],
       });
       expect(request).toHaveBeenNthCalledWith(3, {
         method: 'wallet_switchEthereumChain',
@@ -423,12 +452,9 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     await subject.handleClearAllCaches();
 
-    expect(mockedCacheScripts.listNamespaceEntriesSync).toHaveBeenCalledWith(
-      'questionsCache',
-      { cloneValues: false }
-    );
+    expect(mockedCacheScripts.listNamespaceEntriesSync).toHaveBeenCalledWith('questionsCache', { cloneValues: false });
     const edgeCalls = mockedCacheScripts.removeCache.mock.calls.filter(
-      ([namespace, slug]: any[]) => namespace === 'questionsCache' && slug === 'edge'
+      ([namespace, slug]: any[]) => namespace === 'questionsCache' && slug === 'edge',
     );
     expect(edgeCalls).toHaveLength(1);
     expect(mockedCacheScripts.removeCache).toHaveBeenCalledWith('questionsCache', '');
@@ -437,9 +463,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
   it('deduplicates in-flight cache clear requests', async () => {
     let resolveInit!: () => void;
-    mockedCacheScripts.initCacheManager.mockImplementation(() => new Promise<void>((resolve) => {
-      resolveInit = resolve;
-    }));
+    mockedCacheScripts.initCacheManager.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveInit = resolve;
+        }),
+    );
 
     const subject = new LoginAndSettingsModalSubject(buildProps());
     subject.reloadPage = jest.fn();
@@ -456,10 +485,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('renders only the current pre-login layout and does not render legacy Torus button ids', () => {
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      loginComplete: false,
-      loginInProgress: false,
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        loginComplete: false,
+        loginInProgress: false,
+      }),
+    );
 
     const tree = subject.getModalDisplay();
 
@@ -472,10 +503,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('renders the shared overview panel in the pre-login drawer while config stays collapsed by default', () => {
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      loginComplete: false,
-      loginInProgress: false,
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        loginComplete: false,
+        loginInProgress: false,
+      }),
+    );
     subject.state = {
       ...subject.state,
       preLoginSettingsOpen: true,
@@ -490,10 +523,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
   it('sets persistent wagmi disconnect flag on wagmi logout', async () => {
     const wagmiDisconnect = jest.fn();
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      provider: 'wagmi',
-      wagmiDisconnect,
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        provider: 'wagmi',
+        wagmiDisconnect,
+      }),
+    );
 
     await subject.handleLogout();
 
@@ -524,21 +559,19 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       });
       expect(props.changeAccount).toHaveBeenCalledWith({});
       expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[account]',
-        'wagmiDisconnect failed:',
-        disconnectError
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[account]', 'wagmiDisconnect failed:', disconnectError);
     } finally {
       consoleErrorSpy.mockRestore();
     }
   });
 
   it('does not set wagmi disconnect flag when logging out passkey wallet', async () => {
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      provider: 'passkey_eoa',
-      wagmiDisconnect: jest.fn(),
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        provider: 'passkey_eoa',
+        wagmiDisconnect: jest.fn(),
+      }),
+    );
 
     await subject.handleLogout();
 
@@ -557,10 +590,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
     expect(mockedNotify.info).toHaveBeenCalledWith('Passkey account switched.');
-    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-      account: ALT_PASSKEY_ADDRESS,
-      provider: 'passkey_eoa',
-    }));
+    expect(props.changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: ALT_PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+      }),
+    );
     expect(props.updateLoginInfo).toHaveBeenCalledWith({
       loginInProgress: false,
       loginComplete: true,
@@ -569,12 +604,16 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('uses wagmi balance props for faucet checks without Redux balance state', async () => {
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      wagmiBalance: { data: { value: 0n } },
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: WAGMI_ADDRESS,
+          loginComplete: true,
+          provider: 'wagmi',
+          wagmiBalance: { data: { value: 0n } },
+        }),
+      ),
+    );
     subject.autoSendTestFunds = jest.fn();
 
     await subject.checkAndSendTestFundsIfNeeded();
@@ -586,13 +625,17 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('does not repeat automatic faucet sends for the same low-balance context', async () => {
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      activeSessionSlug: 'edge',
-      loginComplete: true,
-      provider: 'wagmi',
-      wagmiBalance: { data: { value: 0n } },
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: WAGMI_ADDRESS,
+          activeSessionSlug: 'edge',
+          loginComplete: true,
+          provider: 'wagmi',
+          wagmiBalance: { data: { value: 0n } },
+        }),
+      ),
+    );
     subject.autoSendTestFunds = jest.fn();
     subject.loadAiSettings = jest.fn();
     subject.loadResourceKeys = jest.fn();
@@ -642,21 +685,30 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     subject.componentDidUpdate(prevProps);
 
     expect(subject.checkAndSendTestFundsIfNeeded).not.toHaveBeenCalled();
-    expect(subject.shouldComponentUpdate({
-      ...nextProps,
-      wagmiBalance: { data: { value: ethers.BigNumber.from(0) } },
-    }, subject.state)).toBe(false);
+    expect(
+      subject.shouldComponentUpdate(
+        {
+          ...nextProps,
+          wagmiBalance: { data: { value: ethers.BigNumber.from(0) } },
+        },
+        subject.state,
+      ),
+    ).toBe(false);
   });
 
   it('uses the live wagmi address for faucet checks before Redux account catches up', async () => {
     const nextWagmiAddress = '0x4444444444444444444444444444444444444444';
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      wagmiAddress: nextWagmiAddress,
-      wagmiBalance: { data: { value: 0n } },
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: WAGMI_ADDRESS,
+          loginComplete: true,
+          provider: 'wagmi',
+          wagmiAddress: nextWagmiAddress,
+          wagmiBalance: { data: { value: 0n } },
+        }),
+      ),
+    );
 
     await subject.checkAndSendTestFundsIfNeeded();
 
@@ -669,26 +721,30 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
           providerLike: 'wagmi',
           chainId: 84532,
         }),
-      })
+      }),
     );
     expect(subject.state.walletBalanceWei.eq(ethers.BigNumber.from(0))).toBe(true);
   });
 
   it('uses the active session chain for faucet requests even when the wallet is on another chain', async () => {
-    mockedGetSessionNetwork.mockImplementation((slug: string) => (
+    mockedGetSessionNetwork.mockImplementation((slug: string) =>
       slug === 'demo-1'
         ? { id: 11155420, chainId: 11155420, name: 'OP Sepolia' }
-        : { id: 84532, chainId: 84532, name: 'Base Sepolia' }
-    ));
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      activeSessionSlug: 'demo-1',
-      network: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
-      wagmiNetwork: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
-      wagmiBalance: { data: { value: 0n } },
-    })));
+        : { id: 84532, chainId: 84532, name: 'Base Sepolia' },
+    );
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: WAGMI_ADDRESS,
+          loginComplete: true,
+          provider: 'wagmi',
+          activeSessionSlug: 'demo-1',
+          network: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
+          wagmiNetwork: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
+          wagmiBalance: { data: { value: 0n } },
+        }),
+      ),
+    );
 
     await subject.checkAndSendTestFundsIfNeeded();
 
@@ -702,17 +758,21 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
           chainId: 11155420,
           walletChainId: 84532,
         }),
-      })
+      }),
     );
   });
 
   it('preserves the zero-balance state when auto-funding is disabled', async () => {
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      wagmiBalance: { data: { value: 0n } },
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: WAGMI_ADDRESS,
+          loginComplete: true,
+          provider: 'wagmi',
+          wagmiBalance: { data: { value: 0n } },
+        }),
+      ),
+    );
     subject.state.autoRequestTestnetFundsEnabled = false;
 
     await subject.checkAndSendTestFundsIfNeeded();
@@ -723,12 +783,14 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('keeps the wallet balance unknown state when the balance has not been loaded yet', () => {
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      wagmiBalance: { data: { value: null } },
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        account: WAGMI_ADDRESS,
+        loginComplete: true,
+        provider: 'wagmi',
+        wagmiBalance: { data: { value: null } },
+      }),
+    );
 
     expect(subject.state.walletBalanceWei).toBeNull();
   });
@@ -737,15 +799,21 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     const getBalance = jest.fn(async () => {
       throw new Error('rpc timeout');
     });
-    const providerCtorSpy = jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider(this: any) {
+    const providerCtorSpy = jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider(
+      this: any,
+    ) {
       this.getBalance = getBalance;
     } as any);
 
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: PASSKEY_ADDRESS,
-      loginComplete: true,
-      provider: 'passkey_eoa',
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: PASSKEY_ADDRESS,
+          loginComplete: true,
+          provider: 'passkey_eoa',
+        }),
+      ),
+    );
     subject.autoSendTestFunds = jest.fn();
 
     await subject.checkAndSendTestFundsIfNeeded();
@@ -757,11 +825,15 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('triggers passkey faucet checks after a successful balance sync', async () => {
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: PASSKEY_ADDRESS,
-      loginComplete: true,
-      provider: 'passkey_eoa',
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: PASSKEY_ADDRESS,
+          loginComplete: true,
+          provider: 'passkey_eoa',
+        }),
+      ),
+    );
     subject.autoSendTestFunds = jest.fn();
     subject.syncWalletBalance = jest.fn(async () => ({
       balance: ethers.BigNumber.from(0),
@@ -780,13 +852,17 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       amountEth: '0.0002',
     });
 
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      activeSessionSlug: 'edge',
-      wagmiBalance: { data: { value: 0n } },
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: WAGMI_ADDRESS,
+          loginComplete: true,
+          provider: 'wagmi',
+          activeSessionSlug: 'edge',
+          wagmiBalance: { data: { value: 0n } },
+        }),
+      ),
+    );
 
     await subject.handleManualTestFundsRequest();
 
@@ -799,7 +875,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
           providerLike: 'wagmi',
           chainId: 84532,
         }),
-      })
+      }),
     );
     expect(subject.state.sentTxHash).toBe('0xfeed1234');
     expect(subject.state.testFundsStatusTone).toBe('success');
@@ -812,13 +888,17 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     (error as any).status = 403;
     mockedContractScripts.sendTestnetFunds.mockRejectedValueOnce(error);
 
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      activeSessionSlug: 'edge',
-      wagmiBalance: { data: { value: 0n } },
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: WAGMI_ADDRESS,
+          loginComplete: true,
+          provider: 'wagmi',
+          activeSessionSlug: 'edge',
+          wagmiBalance: { data: { value: 0n } },
+        }),
+      ),
+    );
 
     try {
       await subject.handleManualTestFundsRequest();
@@ -827,11 +907,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       expect(subject.state.testFundsStatusTone).toBe('error');
       expect(subject.state.testFundsStatusMessage).toContain('Get test gas failed');
       expect(subject.state.testFundsStatusMessage).toContain('Token missing faucet scope.');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[account]',
-        'Manual testnet funds request failed:',
-        error
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[account]', 'Manual testnet funds request failed:', error);
     } finally {
       consoleErrorSpy.mockRestore();
     }
@@ -839,17 +915,24 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
   it('ignores stale manual faucet responses after the active session changes', async () => {
     let resolveFunds!: (value: any) => void;
-    mockedContractScripts.sendTestnetFunds.mockImplementationOnce(() => (
-      new Promise((resolve) => { resolveFunds = resolve; })
-    ));
+    mockedContractScripts.sendTestnetFunds.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFunds = resolve;
+        }),
+    );
 
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      activeSessionSlug: 'edge',
-      wagmiBalance: { data: { value: 0n } },
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: WAGMI_ADDRESS,
+          loginComplete: true,
+          provider: 'wagmi',
+          activeSessionSlug: 'edge',
+          wagmiBalance: { data: { value: 0n } },
+        }),
+      ),
+    );
     subject.checkAndSendTestFundsIfNeeded = jest.fn();
     subject.loadAiSettings = jest.fn();
     subject.loadResourceKeys = jest.fn();
@@ -886,15 +969,22 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
   it('ignores stale balance reads after the active wallet changes', async () => {
     let resolveBalance!: (value: any) => void;
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: PASSKEY_ADDRESS,
-      loginComplete: true,
-      provider: 'passkey_eoa',
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: PASSKEY_ADDRESS,
+          loginComplete: true,
+          provider: 'passkey_eoa',
+        }),
+      ),
+    );
     subject.autoSendTestFunds = jest.fn();
-    subject.readWalletBalance = jest.fn(() => new Promise((resolve) => {
-      resolveBalance = resolve;
-    }));
+    subject.readWalletBalance = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveBalance = resolve;
+        }),
+    );
 
     const pendingCheck = subject.checkAndSendTestFundsIfNeeded();
     subject.props = buildProps({
@@ -916,27 +1006,33 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       sessionName: 'Weyl v. Yarvin Debate',
     });
 
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      activeSessionSlug: 'rxc',
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        activeSessionSlug: 'rxc',
+      }),
+    );
 
-    expect(subject.getSessionDescriptor('rxc')).toEqual(expect.objectContaining({
-      slug: 'rxc',
-      slugLabel: 'rxc',
-      sessionName: 'Weyl v. Yarvin Debate',
-      label: 'Weyl v. Yarvin Debate',
-      description: 'Weyl v. Yarvin Debate (rxc)',
-    }));
+    expect(subject.getSessionDescriptor('rxc')).toEqual(
+      expect.objectContaining({
+        slug: 'rxc',
+        slugLabel: 'rxc',
+        sessionName: 'Weyl v. Yarvin Debate',
+        label: 'Weyl v. Yarvin Debate',
+        description: 'Weyl v. Yarvin Debate (rxc)',
+      }),
+    );
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('rxc', { allowDemoFallback: true });
   });
 
   it('includes the logged-in session selector when the settings panel is open', () => {
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      activeSessionSlug: 'edge',
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        account: WAGMI_ADDRESS,
+        loginComplete: true,
+        provider: 'wagmi',
+        activeSessionSlug: 'edge',
+      }),
+    );
     subject.state = {
       ...subject.state,
       aiSettingsOpen: true,
@@ -971,20 +1067,24 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     subject.handleSaveSessionScanSettings();
 
     const savedSelection = props.updateGlobalSessionSelection.mock.calls[0]?.[0] || {};
-    expect(savedSelection).toEqual(expect.objectContaining({
-      selectedSessionSlugs: ['edge', 'rxc'],
-    }));
+    expect(savedSelection).toEqual(
+      expect.objectContaining({
+        selectedSessionSlugs: ['edge', 'rxc'],
+      }),
+    );
     expect(savedSelection).not.toHaveProperty('primarySessionSlug');
     expect(subject.state.sessionScanStatus).toBe('Saved.');
   });
 
   it('preserves an explicit general primary session while list scope is active', () => {
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      activeSessionSlug: '',
-      primarySessionExplicit: true,
-      selectedSessionScope: 'list',
-      selectedSessionSlugs: ['', 'edge'],
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        activeSessionSlug: '',
+        primarySessionExplicit: true,
+        selectedSessionScope: 'list',
+        selectedSessionSlugs: ['', 'edge'],
+      }),
+    );
     subject.state = {
       ...subject.state,
       sessionScanScope: 'list',
@@ -1012,58 +1112,66 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       sessionScanSlugs: [],
       sessionScanSlugsInput: '',
     };
-    expect(subject.getConfiguredSessionScanSlugs({
-      sessionScanSlugs: [],
-      sessionScanSlugsInput: '',
-    })).toEqual([]);
+    expect(
+      subject.getConfiguredSessionScanSlugs({
+        sessionScanSlugs: [],
+        sessionScanSlugsInput: '',
+      }),
+    ).toEqual([]);
     subject.getConfiguredSessionScanSlugs = jest.fn(() => []);
     subject.getActiveSessionSlug = jest.fn(() => 'edge');
 
     subject.handleSaveSessionScanSettings();
 
     const savedSelection = props.updateGlobalSessionSelection.mock.calls[0]?.[0] || {};
-    expect(savedSelection).toEqual(expect.objectContaining({
-      selectedSessionSlugs: [],
-    }));
+    expect(savedSelection).toEqual(
+      expect.objectContaining({
+        selectedSessionSlugs: [],
+      }),
+    );
     expect(savedSelection).not.toHaveProperty('primarySessionSlug');
     expect(subject.state.sessionScanScope).toBe('general');
     expect(subject.state.sessionScanStatus).toBe('No sessions selected; saved as general mode.');
   });
 
   it('derives the list-mode primary session from the first selected session slug', () => {
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      activeSessionSlug: '',
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        activeSessionSlug: '',
+      }),
+    );
     subject.getSessionScanScopeValue = jest.fn(() => 'list');
     subject.getConfiguredSessionScanSlugs = jest.fn(() => ['edge', 'rxc']);
 
-    expect(subject.getListModePrimarySessionSlug({
-      sessionScanScope: 'list',
-      sessionScanSlugs: ['edge', 'rxc'],
-    })).toBe('edge');
+    expect(
+      subject.getListModePrimarySessionSlug({
+        sessionScanScope: 'list',
+        sessionScanSlugs: ['edge', 'rxc'],
+      }),
+    ).toBe('edge');
   });
 
   it('uses demo-session sponsored keys for display-only sponsor session sources', () => {
     mockedGetAllSessionSlugs.mockReturnValue(['edge']);
-    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (
-      String(slug || '') === '' ? {} : null
-    ));
-    mockedGetDemoSessionConfigBySlug.mockImplementation((slug: any) => (
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (String(slug || '') === '' ? {} : null));
+    mockedGetDemoSessionConfigBySlug.mockImplementation((slug: any) =>
       String(slug || '') === 'edge'
         ? {
-          slug: 'edge',
-          sessionName: 'Edge 2025',
-          sponsoredKeys: {
-            ai: { encrypted: true },
-            rpc: { encrypted: true },
-          },
-        }
-        : null
-    ));
+            slug: 'edge',
+            sessionName: 'Edge 2025',
+            sponsoredKeys: {
+              ai: { encrypted: true },
+              rpc: { encrypted: true },
+            },
+          }
+        : null,
+    );
 
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      activeSessionSlug: 'edge',
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        activeSessionSlug: 'edge',
+      }),
+    );
 
     const sources = subject.getSponsoredSessionSources({ activeSlug: 'edge' });
 
@@ -1094,19 +1202,21 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     let sponsoredKeys: any = {
       ai: { encrypted: true },
     };
-    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) =>
       String(slug || '') === 'edge'
         ? {
-          slug: 'edge',
-          sessionName: 'Edge 2025',
-          sponsoredKeys,
-        }
-        : {}
-    ));
+            slug: 'edge',
+            sessionName: 'Edge 2025',
+            sponsoredKeys,
+          }
+        : {},
+    );
 
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      activeSessionSlug: 'edge',
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        activeSessionSlug: 'edge',
+      }),
+    );
 
     expect(subject.getSponsoredSessionSources({ activeSlug: 'edge' }).byResource.rpc).toEqual([]);
 
@@ -1130,20 +1240,22 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     let sponsoredKeys: any = {
       ai: { encrypted: true },
     };
-    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) =>
       String(slug || '') === 'edge'
         ? {
-          slug: 'edge',
-          sessionName: 'Edge 2025',
-          sponsoredKeys,
-        }
-        : {}
-    ));
+            slug: 'edge',
+            sessionName: 'Edge 2025',
+            sponsoredKeys,
+          }
+        : {},
+    );
 
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      activeSessionSlug: 'edge',
-      loginComplete: true,
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        activeSessionSlug: 'edge',
+        loginComplete: true,
+      }),
+    );
 
     expect(subject.getSettingsOverviewContext().sponsorSessions.byResource.rpc).toEqual([]);
 
@@ -1163,56 +1275,58 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('uses demo-session sponsored keys for display-only active-session config when strict config is missing', () => {
-    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (
-      String(slug || '') === '' ? {} : null
-    ));
-    mockedGetDemoSessionConfigBySlug.mockImplementation((slug: any) => (
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (String(slug || '') === '' ? {} : null));
+    mockedGetDemoSessionConfigBySlug.mockImplementation((slug: any) =>
       String(slug || '') === 'edge'
         ? {
-          slug: 'edge',
-          sessionName: 'Edge 2025',
-          sponsoredKeys: {
-            ai: { encrypted: true },
-          },
-        }
-        : null
-    ));
+            slug: 'edge',
+            sessionName: 'Edge 2025',
+            sponsoredKeys: {
+              ai: { encrypted: true },
+            },
+          }
+        : null,
+    );
 
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      activeSessionSlug: 'edge',
-    }));
-
-    expect(subject.getDisplaySessionConfig('edge')).toEqual(expect.objectContaining({
-      slug: 'edge',
-      sessionName: 'Edge 2025',
-      sponsoredKeys: expect.objectContaining({
-        ai: expect.objectContaining({ encrypted: true }),
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        activeSessionSlug: 'edge',
       }),
-    }));
+    );
+
+    expect(subject.getDisplaySessionConfig('edge')).toEqual(
+      expect.objectContaining({
+        slug: 'edge',
+        sessionName: 'Edge 2025',
+        sponsoredKeys: expect.objectContaining({
+          ai: expect.objectContaining({ encrypted: true }),
+        }),
+      }),
+    );
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('edge', { allowDemoFallback: true });
   });
 
   it('keeps loadSponsoredAccess strict when only a demo-session config exists', async () => {
-    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (
-      String(slug || '') === 'rxc' ? null : {}
-    ));
-    mockedGetDemoSessionConfigBySlug.mockImplementation((slug: any) => (
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (String(slug || '') === 'rxc' ? null : {}));
+    mockedGetDemoSessionConfigBySlug.mockImplementation((slug: any) =>
       String(slug || '') === 'rxc'
         ? {
-          slug: 'rxc',
-          sessionName: 'Weyl v. Yarvin Debate',
-          sponsoredKeys: {
-            ai: { encrypted: true },
-          },
-        }
-        : null
-    ));
+            slug: 'rxc',
+            sessionName: 'Weyl v. Yarvin Debate',
+            sponsoredKeys: {
+              ai: { encrypted: true },
+            },
+          }
+        : null,
+    );
     mockedCheckSponsoredAccess.mockResolvedValue({ status: 'unknown' });
 
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      activeSessionSlug: 'rxc',
-      account: '0x00000000000000000000000000000000000000aa',
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        activeSessionSlug: 'rxc',
+        account: '0x00000000000000000000000000000000000000aa',
+      }),
+    );
     subject.setState = jest.fn((patch) => {
       subject.state = { ...subject.state, ...(patch || {}) };
     });
@@ -1221,10 +1335,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     expect(checkSponsoredAccess).toHaveBeenCalledTimes(4);
     mockedCheckSponsoredAccess.mock.calls.forEach(([arg]: any[]) => {
-      expect(arg).toEqual(expect.objectContaining({
-        sessionSlug: 'rxc',
-        account: '0x00000000000000000000000000000000000000aa',
-      }));
+      expect(arg).toEqual(
+        expect.objectContaining({
+          sessionSlug: 'rxc',
+          account: '0x00000000000000000000000000000000000000aa',
+        }),
+      );
       expect(arg.sessionConfig).toEqual({});
     });
     expect(getDemoSessionConfigBySlug).not.toHaveBeenCalled();

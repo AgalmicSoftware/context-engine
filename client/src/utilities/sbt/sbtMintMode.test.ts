@@ -13,7 +13,7 @@ describe('sbtMintMode', () => {
     expect(normalizeSbtMintMode(1)).toBe(SBT_MINT_MODE.PASSWORD_COMMIT_REVEAL);
     expect(normalizeSbtMintMode(3)).toBe(SBT_MINT_MODE.LIMITED_INVITE_SIGNATURE);
     expect(normalizeSbtMintMode(4, SBT_MINT_MODE.UNLIMITED_GROUP_SIGNATURE)).toBe(
-      SBT_MINT_MODE.UNLIMITED_GROUP_SIGNATURE
+      SBT_MINT_MODE.UNLIMITED_GROUP_SIGNATURE,
     );
     expect(normalizeSbtMintMode('bad')).toBe(SBT_MINT_MODE.PUBLIC_CLAIM);
   });
@@ -26,14 +26,16 @@ describe('sbtMintMode', () => {
     expect(usesClaimPasswordsForSbtMintMode(SBT_MINT_MODE.PASSWORD_COMMIT_REVEAL)).toBe(true);
 
     expect(deriveSbtMintModeFromDistribution({ distributionOption: 'hasPasswords' })).toBe(
-      SBT_MINT_MODE.PASSWORD_COMMIT_REVEAL
+      SBT_MINT_MODE.PASSWORD_COMMIT_REVEAL,
     );
-    expect(deriveSbtMintModeFromDistribution({
-      distributionOption: 'groupPassword',
-      isLimited: true,
-    })).toBe(SBT_MINT_MODE.LIMITED_INVITE_SIGNATURE);
+    expect(
+      deriveSbtMintModeFromDistribution({
+        distributionOption: 'groupPassword',
+        isLimited: true,
+      }),
+    ).toBe(SBT_MINT_MODE.LIMITED_INVITE_SIGNATURE);
     expect(deriveSbtMintModeFromDistribution({ distributionOption: 'groupPassword' })).toBe(
-      SBT_MINT_MODE.UNLIMITED_GROUP_SIGNATURE
+      SBT_MINT_MODE.UNLIMITED_GROUP_SIGNATURE,
     );
     expect(deriveSbtMintModeFromDistribution()).toBe(SBT_MINT_MODE.PUBLIC_CLAIM);
   });

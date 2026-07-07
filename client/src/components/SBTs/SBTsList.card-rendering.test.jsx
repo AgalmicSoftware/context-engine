@@ -34,13 +34,10 @@ jest.mock('./SBTPage', () => (props) => {
   mockSBTPage(props);
   return (
     <div data-testid="mock-sbt-page">
-      <button type="button" data-testid="mock-sbt-nested-button">Nested Action</button>
-      <div
-        role="button"
-        tabIndex={0}
-        data-testid="mock-sbt-ignore-nav"
-        data-featured-card-ignore-nav="true"
-      >
+      <button type="button" data-testid="mock-sbt-nested-button">
+        Nested Action
+      </button>
+      <div role="button" tabIndex={0} data-testid="mock-sbt-ignore-nav" data-featured-card-ignore-nav="true">
         Nested Custom Action
       </div>
     </div>
@@ -56,11 +53,7 @@ jest.mock('./CreateSBTGroup', () => {
 jest.mock('../TagPage/TagModal', () => (props) => {
   mockTagModal(props);
   if (!props.isOpen) return null;
-  return (
-    <div data-testid="mock-tag-modal">
-      {props.activeTag}
-    </div>
-  );
+  return <div data-testid="mock-tag-modal">{props.activeTag}</div>;
 });
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
@@ -132,7 +125,11 @@ jest.mock('../../utilities/session/sessionDemoCompat.js', () => {
 });
 
 const setupGroupMocks = () => {
-  mockNormalizeSessionSlug.mockImplementation((value = '') => String(value || '').trim().toLowerCase());
+  mockNormalizeSessionSlug.mockImplementation((value = '') =>
+    String(value || '')
+      .trim()
+      .toLowerCase(),
+  );
   mockGetAllSessionEntries.mockReturnValue([
     ['alpha', { slug: 'alpha' }],
     ['beta', { slug: 'beta' }],
@@ -156,14 +153,18 @@ const setupGroupMocks = () => {
   mockReadSessionScanScope.mockReturnValue('all');
   mockReadSessionScanSlugs.mockReturnValue([]);
   mockGetSessionSlugByName.mockImplementation((sessionName) => {
-    const normalized = String(sessionName || '').trim().toLowerCase();
+    const normalized = String(sessionName || '')
+      .trim()
+      .toLowerCase();
     if (normalized === 'alpha') return 'alpha';
     if (normalized === 'beta') return 'beta';
     if (normalized === 'general' || normalized === 'context engine') return '';
     return '';
   });
   mockGetDemoSessionConfigBySlug.mockImplementation((slug) => {
-    const normalized = String(slug || '').trim().toLowerCase();
+    const normalized = String(slug || '')
+      .trim()
+      .toLowerCase();
     if (normalized === 'edge') {
       return {
         slug: 'edge',
@@ -173,7 +174,9 @@ const setupGroupMocks = () => {
     return null;
   });
   mockGetSessionConfigBySlug.mockImplementation((slug) => {
-    const normalized = String(slug || '').trim().toLowerCase();
+    const normalized = String(slug || '')
+      .trim()
+      .toLowerCase();
     if (normalized === 'alpha') {
       return {
         sessionName: 'Alpha',
@@ -202,34 +205,34 @@ const setupGroupMocks = () => {
     };
   });
   mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-    const normalized = String(slug || '').trim().toLowerCase();
+    const normalized = String(slug || '')
+      .trim()
+      .toLowerCase();
     if (normalized === 'alpha') {
       return {
-        '84532': { lastBlock: 1050, sbtList: {} },
+        84532: { lastBlock: 1050, sbtList: {} },
       };
     }
     if (normalized === 'beta') {
       return {
-        '84532': { lastBlock: 2060, sbtList: {} },
+        84532: { lastBlock: 2060, sbtList: {} },
       };
     }
     return {
-      '84532': { lastBlock: 0, sbtList: {} },
+      84532: { lastBlock: 0, sbtList: {} },
     };
   });
   mockReadCache.mockResolvedValue({
-    '84532': {
+    84532: {
       sbtList: {},
       lastBlock: 0,
     },
   });
   mockListNamespaceEntriesSync.mockReturnValue([]);
   mockGetRelevantBlockWindowForFilter.mockImplementation(async (slugInput) => {
-    const normalized = String(
-      slugInput && typeof slugInput === 'object'
-        ? (slugInput.slug || '')
-        : (slugInput || '')
-    ).trim().toLowerCase();
+    const normalized = String(slugInput && typeof slugInput === 'object' ? slugInput.slug || '' : slugInput || '')
+      .trim()
+      .toLowerCase();
     if (normalized === 'alpha') return { fromBlock: 1000, toBlock: 1100 };
     if (normalized === 'beta') return { fromBlock: 2000, toBlock: 2200 };
     return { fromBlock: 1, toBlock: 1 };
@@ -273,7 +276,9 @@ describe('SBTsList card rendering and navigation', () => {
 
   afterAll(() => {
     if (typeof ORIGINAL_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP === 'undefined') {
-      try { delete globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP; } catch (_) {}
+      try {
+        delete globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP;
+      } catch (_) {}
     } else {
       globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP = ORIGINAL_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP;
     }
@@ -285,12 +290,14 @@ describe('SBTsList card rendering and navigation', () => {
       ignored_SBTs_LIST: [],
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [alphaAddress.toLowerCase()]: {
               sbtAddress: alphaAddress,
@@ -329,7 +336,7 @@ describe('SBTsList card rendering and navigation', () => {
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
         onNavigateToSbt={onNavigateToSbt}
-      />
+      />,
     );
 
     const featuredCard = await screen.findByTestId(`featured-sbt-link-${alphaAddress.toLowerCase()}`);
@@ -349,12 +356,14 @@ describe('SBTsList card rendering and navigation', () => {
     });
 
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [featuredAddress.toLowerCase()]: {
               sbtAddress: featuredAddress,
@@ -407,7 +416,7 @@ describe('SBTsList card rendering and navigation', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -423,10 +432,12 @@ describe('SBTsList card rendering and navigation', () => {
     mockReadSessionScanSlugs.mockReturnValue(['alpha', 'beta']);
 
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               [sharedAddress.toLowerCase()]: {
                 sbtAddress: sharedAddress,
@@ -449,7 +460,7 @@ describe('SBTsList card rendering and navigation', () => {
       }
       if (normalized === 'beta') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               [sharedAddress.toLowerCase()]: {
                 sbtAddress: sharedAddress,
@@ -470,7 +481,7 @@ describe('SBTsList card rendering and navigation', () => {
           },
         };
       }
-      return { '84532': { sbtList: {}, lastBlock: 0 } };
+      return { 84532: { sbtList: {}, lastBlock: 0 } };
     });
 
     render(
@@ -489,7 +500,7 @@ describe('SBTsList card rendering and navigation', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -506,12 +517,14 @@ describe('SBTsList card rendering and navigation', () => {
       ignored_SBTs_LIST: [],
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [alphaAddress.toLowerCase()]: {
               sbtAddress: alphaAddress,
@@ -548,7 +561,7 @@ describe('SBTsList card rendering and navigation', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     const liveCardLink = await screen.findByRole('link', { name: /Alpha Live Badge/i });
@@ -563,12 +576,14 @@ describe('SBTsList card rendering and navigation', () => {
       ignored_SBTs_LIST: [],
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [alphaAddress.toLowerCase()]: {
               sbtAddress: alphaAddress,
@@ -622,7 +637,7 @@ describe('SBTsList card rendering and navigation', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     const toggleButton = await screen.findByRole('button', { name: /show details for Alpha Detailed Badge/i });
@@ -657,12 +672,14 @@ describe('SBTsList card rendering and navigation', () => {
       ignored_SBTs_LIST: [],
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [alphaAddress.toLowerCase()]: {
               sbtAddress: alphaAddress,
@@ -700,7 +717,7 @@ describe('SBTsList card rendering and navigation', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     const featuredTagButton = await screen.findByRole('button', { name: /open tag explorer for Governance/i });
@@ -716,12 +733,14 @@ describe('SBTsList card rendering and navigation', () => {
       ignored_SBTs_LIST: [],
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [alphaAddress.toLowerCase()]: {
               sbtAddress: alphaAddress,
@@ -759,7 +778,7 @@ describe('SBTsList card rendering and navigation', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     const modalFeaturedLink = await screen.findByRole('link', { name: /Alpha Modal Featured Badge/i });
@@ -774,12 +793,14 @@ describe('SBTsList card rendering and navigation', () => {
       ignored_SBTs_LIST: [],
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [alphaAddress.toLowerCase()]: {
               sbtAddress: alphaAddress,
@@ -818,20 +839,22 @@ describe('SBTsList card rendering and navigation', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     expect(await screen.findByTestId('mock-sbt-page')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Alpha Interactive Featured Badge/i })).not.toBeInTheDocument();
     const renderedProps = mockSBTPage.mock.calls.map(([props]) => props).filter(Boolean);
-    expect(renderedProps).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        SBTAddress: alphaAddress,
-        sessionSlug: 'alpha',
-        miniaturized: true,
-        miniMintable: true,
-      }),
-    ]));
+    expect(renderedProps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          SBTAddress: alphaAddress,
+          sessionSlug: 'alpha',
+          miniaturized: true,
+          miniMintable: true,
+        }),
+      ]),
+    );
   });
 
   it('renders modal live and expired cards as interactive mini SBT pages when interactiveMiniCards is enabled', async () => {
@@ -842,12 +865,14 @@ describe('SBTsList card rendering and navigation', () => {
       ignored_SBTs_LIST: [],
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [liveAddress.toLowerCase()]: {
               sbtAddress: liveAddress,
@@ -900,17 +925,12 @@ describe('SBTsList card rendering and navigation', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
-      const renderedAddresses = mockSBTPage.mock.calls
-        .map(([props]) => props?.SBTAddress)
-        .filter(Boolean);
-      expect(renderedAddresses).toEqual(expect.arrayContaining([
-        liveAddress,
-        expiredAddress,
-      ]));
+      const renderedAddresses = mockSBTPage.mock.calls.map(([props]) => props?.SBTAddress).filter(Boolean);
+      expect(renderedAddresses).toEqual(expect.arrayContaining([liveAddress, expiredAddress]));
     });
     expect(screen.getAllByTestId('mock-sbt-page').length).toBeGreaterThanOrEqual(2);
   });
@@ -922,12 +942,14 @@ describe('SBTsList card rendering and navigation', () => {
       ignored_SBTs_LIST: [],
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [alphaAddress.toLowerCase()]: {
               sbtAddress: alphaAddress,
@@ -968,7 +990,7 @@ describe('SBTsList card rendering and navigation', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     fireEvent.click(await screen.findByTestId('mock-sbt-nested-button'));
@@ -984,12 +1006,14 @@ describe('SBTsList card rendering and navigation', () => {
       ignored_SBTs_LIST: [],
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [alphaAddress.toLowerCase()]: {
               sbtAddress: alphaAddress,
@@ -1028,7 +1052,7 @@ describe('SBTsList card rendering and navigation', () => {
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
         onNavigateToSbt={onNavigateToSbt}
-      />
+      />,
     );
 
     const nestedButton = await screen.findByTestId('mock-sbt-nested-button');
@@ -1043,12 +1067,14 @@ describe('SBTsList card rendering and navigation', () => {
       ignored_SBTs_LIST: [],
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [alphaAddress.toLowerCase()]: {
               sbtAddress: alphaAddress,
@@ -1087,7 +1113,7 @@ describe('SBTsList card rendering and navigation', () => {
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
         onNavigateToSbt={onNavigateToSbt}
-      />
+      />,
     );
 
     const nestedIgnoreNav = await screen.findByTestId('mock-sbt-ignore-nav');

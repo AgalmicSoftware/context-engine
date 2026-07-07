@@ -1,6 +1,4 @@
-import {
-  collectSbtListLinkedScopedEntries,
-} from './sbtListScopedEntryHelpers';
+import { collectSbtListLinkedScopedEntries } from './sbtListScopedEntryHelpers';
 import { SBT_LIST_NO_SESSION_UNIVERSE_SLUG } from './sbtListSessionUniverseHelpers';
 
 const entries = [
@@ -88,33 +86,37 @@ describe('sbtListScopedEntryHelpers', () => {
   });
 
   it('handles malformed entries, empty targets, and synthetic no-session slugs defensively', () => {
-    expect(collectSbtListLinkedScopedEntries({
-      entries,
-      targetSlugs: [],
-    })).toEqual([]);
+    expect(
+      collectSbtListLinkedScopedEntries({
+        entries,
+        targetSlugs: [],
+      }),
+    ).toEqual([]);
 
-    expect(collectSbtListLinkedScopedEntries({
-      entries: [
-        null,
-        { slug: 'bad', value: null },
-        { slug: 'bad-list', value: { 11155420: { sbtList: null } } },
-        {
-          slug: 'source-none',
-          value: {
-            11155420: {
-              sbtList: {
-                '0xNone': {
-                  sbtInfo: { name: 'No Session' },
-                  slug: SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
+    expect(
+      collectSbtListLinkedScopedEntries({
+        entries: [
+          null,
+          { slug: 'bad', value: null },
+          { slug: 'bad-list', value: { 11155420: { sbtList: null } } },
+          {
+            slug: 'source-none',
+            value: {
+              11155420: {
+                sbtList: {
+                  '0xNone': {
+                    sbtInfo: { name: 'No Session' },
+                    slug: SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
+                  },
                 },
               },
             },
           },
-        },
-      ],
-      resolveSbtSessionSlug: (item) => item.slug,
-      targetSlugs: [SBT_LIST_NO_SESSION_UNIVERSE_SLUG],
-    })).toEqual([
+        ],
+        resolveSbtSessionSlug: (item) => item.slug,
+        targetSlugs: [SBT_LIST_NO_SESSION_UNIVERSE_SLUG],
+      }),
+    ).toEqual([
       {
         __sourceSessionSlug: 'source-none',
         sbtAddress: '0xNone',

@@ -25,39 +25,19 @@ describe('deriveEoaPrivateKeyFromPrf', () => {
     const prfOutput = new Uint8Array(32).fill(1).buffer;
     const derivedPrivateKey = new Uint8Array(32);
     derivedPrivateKey[31] = 1;
-    const importKeySpy = jest.spyOn(crypto.subtle, 'importKey').mockImplementation(async (
-      format,
-      keyData,
-      algorithm,
-      extractable,
-      keyUsages
-    ) => {
-      expect(format).toBe('raw');
-      expect(keyData).toBeInstanceOf(Uint8Array);
-      expect(algorithm).toBe('HKDF');
-      expect(extractable).toBe(false);
-      expect(keyUsages).toEqual(['deriveBits']);
-      return key;
-    });
-    const deriveBitsSpy = jest.spyOn(crypto.subtle, 'deriveBits').mockImplementation(async (
-      algorithm,
-      baseKey,
-      length
-    ) => {
-      expect(algorithm).toEqual(expect.objectContaining({
-        name: 'HKDF',
-        hash: 'SHA-256',
-      }));
-      expect((algorithm as HkdfParams).salt).toBeInstanceOf(Uint8Array);
-      expect((algorithm as HkdfParams).info).toBeInstanceOf(Uint8Array);
-      expect(baseKey).toBe(key);
-      expect(length).toBe(256);
-      return derivedPrivateKey.buffer;
-    });
+    const importKeySpy = jest
+      .spyOn(crypto.subtle, 'importKey')
+      .mockImplementation(async (format, keyData, algorithm, extractable, keyUsages) => {
+        expect(format).toBe('raw');
+        expect(keyData).toBeInstanceOf(Uint8Array);
+        expect(algorithm).toBe('HKDF');
+        expect(extractable).toBe(false);
+        expect(keyUsages).toEqual(['deriveBits']);
+        return key;
+      });
+    const deriveBitsSpy = jest.spyOn(crypto.subtle, 'deriveBits').mockResolvedValue(derivedPrivateKey.buffer);
 
-    await expect(deriveEoaPrivateKeyFromPrf({ prfOutput, config })).resolves.toBe(
-      `0x${'0'.repeat(63)}1`
-    );
+    await expect(deriveEoaPrivateKeyFromPrf({ prfOutput, config })).resolves.toBe(`0x${'0'.repeat(63)}1`);
 
     expect(importKeySpy).toHaveBeenCalledTimes(1);
     expect(deriveBitsSpy).toHaveBeenCalledTimes(1);

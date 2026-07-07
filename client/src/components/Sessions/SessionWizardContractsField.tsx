@@ -34,9 +34,10 @@ const getContractEntryAddress = (
   contracts: ContractRecord | null | undefined,
   defaults: ContractRecord | null | undefined,
 ): string => {
-  const entry = contracts?.[contractKey] && typeof contracts[contractKey] === 'object'
-    ? contracts[contractKey] as ContractRecord
-    : {};
+  const entry =
+    contracts?.[contractKey] && typeof contracts[contractKey] === 'object'
+      ? (contracts[contractKey] as ContractRecord)
+      : {};
   return toStr(entry.address || '').trim() || toStr(defaults?.[contractKey] || '').trim();
 };
 

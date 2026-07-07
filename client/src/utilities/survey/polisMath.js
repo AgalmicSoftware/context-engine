@@ -21,11 +21,7 @@ import * as d3 from 'd3';
 import { UMAP } from 'umap-js';
 import { kmeans as Kmeans } from 'ml-kmeans';
 
-import {
-  Network,
-  Clustering,
-  LeidenAlgorithm,
-} from 'networkanalysis-ts';
+import { Network, Clustering, LeidenAlgorithm } from 'networkanalysis-ts';
 
 /***************************************************************
  * Utility: shape, dot, norm, matrix multiply
@@ -89,7 +85,7 @@ export function subtractRowMeans(M) {
       sum += val;
       count++;
     }
-    const mean = (count > 0) ? sum / count : 0;
+    const mean = count > 0 ? sum / count : 0;
     for (let j = 0; j < row.length; j++) {
       row[j] = (row[j] ?? 0) - mean;
     }
@@ -109,7 +105,7 @@ export function subtractColumnMeans(M) {
     }
   }
   for (let j = 0; j < cols; j++) {
-    colMeans[j] = colCounts[j] ? (colMeans[j] / colCounts[j]) : 0;
+    colMeans[j] = colCounts[j] ? colMeans[j] / colCounts[j] : 0;
   }
   for (let i = 0; i < rows; i++) {
     for (let j = 0; j < cols; j++) {
@@ -128,7 +124,7 @@ function powerIteration(M, nIters = 20) {
   const cols = M[0].length;
   let v = new Array(cols).fill(0).map(() => Math.random() - 0.5);
   for (let iter = 0; iter < nIters; iter++) {
-    const Mv = matVec(M, v);             // shape [rows]
+    const Mv = matVec(M, v); // shape [rows]
     const MtMv = matVecTranspose(M, Mv); // shape [cols]
     const length = norm(MtMv);
     if (length < 1e-12) break;
@@ -165,7 +161,7 @@ export function doPCA(M, nComps = 2) {
  ***************************************************************/
 
 export function wrappedPCA(ratingMatrix, subtractWhat = 'row') {
-  const M = ratingMatrix.map(r => [...r]);
+  const M = ratingMatrix.map((r) => [...r]);
   if (subtractWhat === 'row') {
     subtractRowMeans(M);
   } else {
@@ -181,10 +177,12 @@ export function wrappedPCA(ratingMatrix, subtractWhat = 'row') {
 
 export function projectRows(ratingMatrix, pca) {
   const out = [];
-  const pc1 = pca.comps[0], pc2 = pca.comps[1];
+  const pc1 = pca.comps[0],
+    pc2 = pca.comps[1];
   for (let i = 0; i < ratingMatrix.length; i++) {
     const row = ratingMatrix[i];
-    let x = 0, y = 0;
+    let x = 0,
+      y = 0;
     for (let j = 0; j < row.length; j++) {
       x += row[j] * pc1[j];
       y += row[j] * pc2[j];
@@ -210,14 +208,18 @@ export function computeExtremity(points) {
  ***************************************************************/
 
 export function beeswarmByExtremity(points, width, height) {
-  const minE = d3.min(points, d => d.extremity) ?? 0;
-  const maxE = d3.max(points, d => d.extremity) ?? 1;
-  const xScale = d3.scaleLinear().domain([minE, maxE]).range([40, width - 40]);
-  const dataCopy = points.map(d => ({ ...d }));
+  const minE = d3.min(points, (d) => d.extremity) ?? 0;
+  const maxE = d3.max(points, (d) => d.extremity) ?? 1;
+  const xScale = d3
+    .scaleLinear()
+    .domain([minE, maxE])
+    .range([40, width - 40]);
+  const dataCopy = points.map((d) => ({ ...d }));
   const centerY = height / 2;
 
-  const sim = d3.forceSimulation(dataCopy)
-    .force('x', d3.forceX(d => xScale(d.extremity)).strength(2))
+  const sim = d3
+    .forceSimulation(dataCopy)
+    .force('x', d3.forceX((d) => xScale(d.extremity)).strength(2))
     .force('y', d3.forceY(centerY).strength(0.2))
     .force('collide', d3.forceCollide(7))
     .stop();
@@ -244,14 +246,14 @@ export function computePolisStats(ratingMatrix) {
       }
     }
   }
-  let voters = participantVotes.filter(v => v > 0).length;
-  let votesPerVoterAvg = (voters > 0) ? totalVotes / voters : 0;
+  let voters = participantVotes.filter((v) => v > 0).length;
+  let votesPerVoterAvg = voters > 0 ? totalVotes / voters : 0;
   return {
     nComments,
     nParticipants,
     totalVotes,
     voters,
-    votesPerVoterAvg
+    votesPerVoterAvg,
   };
 }
 
@@ -280,7 +282,7 @@ export function clusterParticipantsKmeans(ratingMatrix, k = 3) {
 export function clusterUMAPPointsKmeans(umapPoints, k = 3, seed = null) {
   // umapPoints is array of { x, y, index }
   if (!umapPoints || !umapPoints.length) return [];
-  const data = umapPoints.map(d => [d.x, d.y]);
+  const data = umapPoints.map((d) => [d.x, d.y]);
   if (data.length < k) {
     return new Array(data.length).fill(0);
   }
@@ -314,7 +316,8 @@ function buildSimilarityMatrix(ratingMatrix) {
   }
   for (let i = 0; i < nParticipants; i++) {
     for (let j = i + 1; j < nParticipants; j++) {
-      const v1 = participants[i], v2 = participants[j];
+      const v1 = participants[i],
+        v2 = participants[j];
       let s = 0;
       for (let k = 0; k < v1.length; k++) {
         s += v1[k] * v2[k];
@@ -409,7 +412,7 @@ export function silhouetteScore(data, clusters, k) {
           a += distMat[i][idx];
         }
       }
-      a /= (cMembers[c].length - 1);
+      a /= cMembers[c].length - 1;
     }
     let b = Infinity;
     for (let c2 = 0; c2 < k; c2++) {
@@ -438,13 +441,13 @@ export function doUMAP(data, nNeighbors = 15, randomSeed = null) {
   if (randomSeed !== null) {
     // Simple PRNG for deterministic results
     const mulberry32 = (a) => {
-      return function() {
-        var t = a += 0x6D2B79F5;
-        t = Math.imul((t ^ (t >>> 15)), (t | 1));
-        t ^= t + Math.imul((t ^ (t >>> 7)), (t | 61));
-        return (((t ^ (t >>> 14)) >>> 0)) / 4294967296;
-      }
-    }
+      return function () {
+        var t = (a += 0x6d2b79f5);
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    };
     umapOptions.random = mulberry32(randomSeed);
   }
 
@@ -462,7 +465,9 @@ export function getCommentBarData(ratingMatrix) {
   const barData = [];
   for (let c = 0; c < ratingMatrix.length; c++) {
     const row = ratingMatrix[c];
-    let agrees = 0, disagrees = 0, passes = 0;
+    let agrees = 0,
+      disagrees = 0,
+      passes = 0;
     for (let val of row) {
       if (val === 1) agrees++;
       else if (val === -1) disagrees++;
@@ -516,7 +521,7 @@ export function findRepresentativeQuestions(ratingMatrix, assignments, questionP
     for (let p = 0; p < nParticipants; p++) {
       const val = ratingMatrix[c][p];
       if (val === 1 || val === -1) {
-        globalAvg[c] += (val === 1 ? 1 : 0);
+        globalAvg[c] += val === 1 ? 1 : 0;
         globalCount[c]++;
       }
     }
@@ -549,7 +554,7 @@ export function findRepresentativeQuestions(ratingMatrix, assignments, questionP
 
   const result = {};
 
-  Object.keys(clusterMaps).forEach(kStr => {
+  Object.keys(clusterMaps).forEach((kStr) => {
     const k = parseInt(kStr, 10);
     const arr = clusterMaps[k];
     const diffs = [];
@@ -559,14 +564,13 @@ export function findRepresentativeQuestions(ratingMatrix, assignments, questionP
       if (cnt > 0) clusterAvg = sum / cnt;
       const diff = clusterAvg - globalAvg[c];
       const qId = allQuestions[c];
-      const realPrompt = (questionPromptsMap && qId && questionPromptsMap[qId])
-        ? questionPromptsMap[qId]
-        : `Question #${c + 1}`;
+      const realPrompt =
+        questionPromptsMap && qId && questionPromptsMap[qId] ? questionPromptsMap[qId] : `Question #${c + 1}`;
       diffs.push({
         questionIndex: c,
         difference: diff,
         label: `#${c + 1}`,
-        prompt: realPrompt
+        prompt: realPrompt,
       });
     }
     diffs.sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference));
@@ -598,7 +602,7 @@ export function computeJointSVD(ratingMatrix, randomSeed = 42) {
     let s1 = Math.sqrt(M2[1][1] || 0);
     return [
       [s0, 0],
-      [0, s1]
+      [0, s1],
     ];
   }
   const sSqrt = sqrt2x2(S);
@@ -623,7 +627,7 @@ export function computeJointSVD(ratingMatrix, randomSeed = 42) {
 
   return {
     part2D: colCoords,
-    stmt2D: rowCoords
+    stmt2D: rowCoords,
   };
 }
 
@@ -634,7 +638,7 @@ function approximateSVD2(A, randomSeed = null) {
   // --- deterministic RNG (mulberry32) when a seed is provided ---
   function mulberry32(a) {
     return function () {
-      let t = (a += 0x6D2B79F5);
+      let t = (a += 0x6d2b79f5);
       t = Math.imul(t ^ (t >>> 15), t | 1);
       t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -712,7 +716,7 @@ function approximateSVD2(A, randomSeed = null) {
   let U = [],
     S = [
       [0, 0],
-      [0, 0]
+      [0, 0],
     ],
     V = [];
 
@@ -758,34 +762,34 @@ function approximateSVD2(A, randomSeed = null) {
  *
  ***************************************************************/
 export function computeQuestionDivisiveness(ratingMatrix) {
-    const [nComments, nParticipants] = matrixShape(ratingMatrix);
-    const results = [];
+  const [nComments, nParticipants] = matrixShape(ratingMatrix);
+  const results = [];
 
-    for (let c = 0; c < nComments; c++) {
-      let agrees = 0;
-      let disagrees = 0;
-      for (let p = 0; p < nParticipants; p++) {
-        const val = ratingMatrix[c][p];
-        // Only count 1 or -1 as actual responses
-        if (val === 1) agrees++;
-        else if (val === -1) disagrees++;
-        // if val === 0 (unsure) or null/undefined => ignore
-      }
-      const total = agrees + disagrees;
-      let divisiveness = 0;
-      if (total > 0) {
-        const probAgree = agrees / total;
-        const distFromHalf = Math.abs(probAgree - 0.5);
-        divisiveness = 1 - 2 * distFromHalf; // range [0..1]
-      }
-      results.push({
-        commentIndex: c,
-        agrees,
-        disagrees,
-        total,
-        divisiveness,
-      });
+  for (let c = 0; c < nComments; c++) {
+    let agrees = 0;
+    let disagrees = 0;
+    for (let p = 0; p < nParticipants; p++) {
+      const val = ratingMatrix[c][p];
+      // Only count 1 or -1 as actual responses
+      if (val === 1) agrees++;
+      else if (val === -1) disagrees++;
+      // if val === 0 (unsure) or null/undefined => ignore
     }
-
-    return results;
+    const total = agrees + disagrees;
+    let divisiveness = 0;
+    if (total > 0) {
+      const probAgree = agrees / total;
+      const distFromHalf = Math.abs(probAgree - 0.5);
+      divisiveness = 1 - 2 * distFromHalf; // range [0..1]
+    }
+    results.push({
+      commentIndex: c,
+      agrees,
+      disagrees,
+      total,
+      divisiveness,
+    });
   }
+
+  return results;
+}

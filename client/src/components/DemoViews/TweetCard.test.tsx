@@ -24,7 +24,7 @@ describe('TweetCard', () => {
     render(
       <MemoryRouter>
         <TweetCard entry={entry} onTagClick={onTagClick} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByText('Gregory C Allen')).toBeInTheDocument();
@@ -53,7 +53,7 @@ describe('TweetCard', () => {
             text: longText,
           }}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByRole('button', { name: 'Show more' })).toBeInTheDocument();

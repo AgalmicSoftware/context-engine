@@ -38,14 +38,10 @@ export const renderPileCardShell = ({
 }: PileCardShellProps): React.ReactElement => (
   <Card className={styles.pileCardInner}>
     <CardBody className={styles.pileCardBody}>
-      <div className={styles.pileCardHeader}>
-        {promptHeader}
-      </div>
+      <div className={styles.pileCardHeader}>{promptHeader}</div>
 
       <div className={styles.pileCardMainContent}>
-        <div className={questionContainerClass}>
-          {questionComponent}
-        </div>
+        <div className={questionContainerClass}>{questionComponent}</div>
       </div>
 
       {footerSection}
@@ -59,9 +55,7 @@ export const renderPileGatedPromptCard = ({
 }: PileGatedPromptCardProps): React.ReactElement => (
   <Card className={styles.pileCardInner}>
     <CardBody className={styles.pileCardBody}>
-      <div className={styles.pileCardHeader}>
-        {promptHeader}
-      </div>
+      <div className={styles.pileCardHeader}>{promptHeader}</div>
       {gatedPromptNotice}
     </CardBody>
   </Card>
@@ -75,7 +69,7 @@ export const renderPileActiveQuestionCard = ({
   questionComponent,
   questionContainerClass,
   footerSection,
-}: PileActiveQuestionCardProps): React.ReactNode => (
+}: PileActiveQuestionCardProps): React.ReactNode =>
   promptMasked
     ? renderQuestionMaskedPromptCard({
         mode: 'pile',
@@ -86,5 +80,4 @@ export const renderPileActiveQuestionCard = ({
         questionComponent,
         questionContainerClass,
         footerSection,
-      })
-);
+      });

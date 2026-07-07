@@ -1,9 +1,6 @@
 import contractScripts, { normalizeSessionSlug } from '../web3/contractScripts.js';
 import { createLogger } from 'utilities/logging.js';
-import {
-  normalizeArweaveFailureMeta,
-  shouldStopPendingMetadataRetry,
-} from '../arweave/arweaveRetryHelpers.js';
+import { normalizeArweaveFailureMeta, shouldStopPendingMetadataRetry } from '../arweave/arweaveRetryHelpers.js';
 import { prepareSurveyMetadataCacheEntry } from './metadataCacheEntryBuilders.js';
 import { resolveScopedMetadataSessionSlug } from '../session/metadataSessionBinding.js';
 import {
@@ -11,9 +8,7 @@ import {
   resolveSurveyResponseWatermark,
   type SurveyResponseItem,
 } from './sessionSurveyResponseHelpers.js';
-import {
-  sbtEventStreamsPort,
-} from '../../domains/sbts/sbtEventStreamsPort.js';
+import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
 
 type StateRecord = Record<string, unknown>;
@@ -106,39 +101,30 @@ interface PendingSurveyRetryResult {
 }
 
 interface SurveyContractScripts {
-  getRelevantBlockWindowForFilter: (
-    slug: string
-  ) => Promise<{ fromBlock: number; toBlock: number }>;
+  getRelevantBlockWindowForFilter: (slug: string) => Promise<{ fromBlock: number; toBlock: number }>;
   getSurveyDataById: (
     providerName: string,
     surveyId: string,
     slug: string,
-    opts?: CacheRecord
+    opts?: CacheRecord,
   ) => Promise<SurveyMetadata | null>;
   fetchUserSubmittedSurveyIDs: (
     providerName: string,
     fromBlock: number,
     toBlock: number,
-    slug: string
+    slug: string,
   ) => Promise<SurveyDiscoveryItem[]>;
   fetchAllSurveyResponses: (
     providerName: string,
     surveyId: string,
     startBlock: number,
     latestBlock: number,
-    slug: string
+    slug: string,
   ) => Promise<unknown>;
-  listenForSurveyEvents?: (
-    providerName: string,
-    handler: (event: unknown) => unknown,
-    slug: string
-  ) => unknown;
+  listenForSurveyEvents?: (providerName: string, handler: (event: unknown) => unknown, slug: string) => unknown;
   removeSurveyEventsListener?: (providerName: string, slug: string) => unknown;
 }
-type SurveyEventStreamsPort = Pick<
-  SbtEventStreamsPort,
-  'listenForSurveyEvents' | 'removeSurveyEventsListener'
->;
+type SurveyEventStreamsPort = Pick<SbtEventStreamsPort, 'listenForSurveyEvents' | 'removeSurveyEventsListener'>;
 
 export interface SessionSurveyCacheHost {
   [key: string]: unknown;
@@ -162,7 +148,7 @@ export interface SessionSurveyCacheHost {
     surveyData: Record<string, unknown>,
     creationBlock: unknown,
     networkID: string,
-    opts?: Record<string, unknown>
+    opts?: Record<string, unknown>,
   ) => boolean | void;
   queueLocalRevisionUpdate?: (opts?: QueueLocalRevisionUpdateOptions) => void;
 }
@@ -179,9 +165,7 @@ export interface SessionSurveyCacheController {
 const mainSiteLog = createLogger('mainSite');
 const surveyContractScripts = contractScripts as unknown as SurveyContractScripts;
 
-export const createSessionSurveyCacheController = (
-  host: SessionSurveyCacheHost = {}
-): SessionSurveyCacheController => {
+export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost = {}): SessionSurveyCacheController => {
   let _surveyInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _surveyInitPending: Record<string, SurveyInitOptions | undefined> = {};
   let _pendingSurveyMetadataRetryTimers: Record<string, ReturnType<typeof setTimeout> | undefined> = {};
@@ -193,54 +177,40 @@ export const createSessionSurveyCacheController = (
     }
     if (typeof cb === 'function') cb();
   };
-  const isMounted = (): boolean => (
-    typeof host.isMounted === 'function' ? host.isMounted() : false
-  );
-  const dgRead = (...args: [string, string]): CacheRecord | null => (
-    typeof host.dgRead === 'function' ? (host.dgRead(...args) as CacheRecord | null) : null
-  );
-  const dgWrite = (...args: [string, string, CacheRecord]): unknown => (
-    typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null
-  );
-  const getActiveSessionSlug = (): string => String(
-    typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : ''
-  );
-  const getSessionChainId = (slug: string): string | number | null | undefined => (
-    typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null
-  );
-  const getSessionScanScope = (): string => String(
-    typeof host.getSessionScanScope === 'function' ? host.getSessionScanScope() || '' : ''
-  );
-  const scanScopeNoop = (slug: string, op: string, onSkipped?: () => void): boolean => (
-    typeof host.scanScopeNoop === 'function' ? host.scanScopeNoop(slug, op, onSkipped) : false
-  );
-  const shouldSkipSessionScanForSlug = (slug: string, op: string, scopeCtx?: unknown): boolean => (
+  const isMounted = (): boolean => (typeof host.isMounted === 'function' ? host.isMounted() : false);
+  const dgRead = (...args: [string, string]): CacheRecord | null =>
+    typeof host.dgRead === 'function' ? (host.dgRead(...args) as CacheRecord | null) : null;
+  const dgWrite = (...args: [string, string, CacheRecord]): unknown =>
+    typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null;
+  const getActiveSessionSlug = (): string =>
+    String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
+  const getSessionChainId = (slug: string): string | number | null | undefined =>
+    typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
+  const getSessionScanScope = (): string =>
+    String(typeof host.getSessionScanScope === 'function' ? host.getSessionScanScope() || '' : '');
+  const scanScopeNoop = (slug: string, op: string, onSkipped?: () => void): boolean =>
+    typeof host.scanScopeNoop === 'function' ? host.scanScopeNoop(slug, op, onSkipped) : false;
+  const shouldSkipSessionScanForSlug = (slug: string, op: string, scopeCtx?: unknown): boolean =>
     typeof host.shouldSkipSessionScanForSlug === 'function'
       ? host.shouldSkipSessionScanForSlug(slug, op, scopeCtx)
-      : false
-  );
-  const onSurveyEventDetectedForGroup = (slug: string, event: unknown): unknown => (
+      : false;
+  const onSurveyEventDetectedForGroup = (slug: string, event: unknown): unknown =>
     typeof host.onSurveyEventDetectedForGroup === 'function'
       ? host.onSurveyEventDetectedForGroup(slug, event)
-      : undefined
-  );
+      : undefined;
   const checkAllCachesReady = (): void => {
     if (typeof host.checkAllCachesReady === 'function') {
       host.checkAllCachesReady();
     }
   };
-  const mergeLegacyNumericNetworkKey = (cache: CacheRecord, networkID: string): boolean => (
+  const mergeLegacyNumericNetworkKey = (cache: CacheRecord, networkID: string): boolean =>
     typeof host.mergeLegacyNumericNetworkKey === 'function'
       ? host.mergeLegacyNumericNetworkKey(cache, networkID)
-      : false
-  );
+      : false;
   const writeSurveyMetadataToCache = (
     ...args: [string, string, CacheRecord, unknown, string, CacheRecord?]
-  ): boolean | void => (
-    typeof host.writeSurveyMetadataToCache === 'function'
-      ? host.writeSurveyMetadataToCache(...args)
-      : false
-  );
+  ): boolean | void =>
+    typeof host.writeSurveyMetadataToCache === 'function' ? host.writeSurveyMetadataToCache(...args) : false;
   const queueLocalRevisionUpdate = (opts: QueueLocalRevisionUpdateOptions = {}): void => {
     if (typeof host.queueLocalRevisionUpdate === 'function') {
       host.queueLocalRevisionUpdate(opts);
@@ -249,15 +219,18 @@ export const createSessionSurveyCacheController = (
     const shouldBumpQuestionResponsesNonce = !!opts?.needsQuestionResponsesNonce;
     const shouldCheckAllCachesReady = !!opts?.checkAllCachesReady;
     if (!shouldBumpQuestionResponsesNonce && !shouldCheckAllCachesReady) return;
-    setState((prev) => {
-      const next: StateRecord = {};
-      if (shouldBumpQuestionResponsesNonce) {
-        next.questionResponsesNonce = Number(prev?.questionResponsesNonce || 0) + 1;
-      }
-      return Object.keys(next).length ? next : null;
-    }, () => {
-      if (shouldCheckAllCachesReady) checkAllCachesReady();
-    });
+    setState(
+      (prev) => {
+        const next: StateRecord = {};
+        if (shouldBumpQuestionResponsesNonce) {
+          next.questionResponsesNonce = Number(prev?.questionResponsesNonce || 0) + 1;
+        }
+        return Object.keys(next).length ? next : null;
+      },
+      () => {
+        if (shouldCheckAllCachesReady) checkAllCachesReady();
+      },
+    );
   };
   const surveyEventStreams = host.surveyEventStreamsPort || sbtEventStreamsPort;
 
@@ -269,7 +242,11 @@ export const createSessionSurveyCacheController = (
   const destroy = (): void => {
     if (_pendingSurveyMetadataRetryTimers && typeof _pendingSurveyMetadataRetryTimers === 'object') {
       Object.values(_pendingSurveyMetadataRetryTimers).forEach((timer) => {
-        try { clearTimeout(timer); } catch (e: unknown) { mainSiteLog.warn('MainSite: cleanup', e); }
+        try {
+          clearTimeout(timer);
+        } catch (e: unknown) {
+          mainSiteLog.warn('MainSite: cleanup', e);
+        }
       });
     }
     _pendingSurveyMetadataRetryTimers = {};
@@ -291,11 +268,7 @@ export const createSessionSurveyCacheController = (
   const initializeSurveyCacheForGroup = (slugIn: string, opts: unknown = {}): Promise<void> => {
     try {
       const slug = normalizeSessionSlug(slugIn || '');
-      const suppressUiState = !!(
-        opts &&
-        typeof opts === 'object' &&
-        (opts as SurveyInitOptions).background === true
-      );
+      const suppressUiState = !!(opts && typeof opts === 'object' && (opts as SurveyInitOptions).background === true);
       const rerunOpts: SurveyInitOptions = {
         ...((opts && typeof opts === 'object' ? opts : {}) as SurveyInitOptions),
         background: suppressUiState,
@@ -305,9 +278,11 @@ export const createSessionSurveyCacheController = (
         setState(nextState, cb);
       };
 
-      if (scanScopeNoop(slug, 'initializeSurveyCacheForGroup', () => {
-        setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
-      })) {
+      if (
+        scanScopeNoop(slug, 'initializeSurveyCacheForGroup', () => {
+          setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
+        })
+      ) {
         return Promise.resolve();
       }
 
@@ -320,12 +295,13 @@ export const createSessionSurveyCacheController = (
 
       const run: Promise<void> = (async (): Promise<void> => {
         mainSiteLog.log('initializeSurveyCacheForGroup() - invoked', { slug });
-        setSurveyState((prev) => (
-          prev.surveyCacheInitializationError ? { surveyCacheInitializationError: false } : null
-        ));
+        setSurveyState((prev) =>
+          prev.surveyCacheInitializationError ? { surveyCacheInitializationError: false } : null,
+        );
         const networkID = String(getSessionChainId(slug) || '');
 
-        const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(slug);
+        const { fromBlock: baseFrom, toBlock: baseTo } =
+          await surveyContractScripts.getRelevantBlockWindowForFilter(slug);
         if (baseFrom > baseTo) {
           setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
           return;
@@ -350,10 +326,7 @@ export const createSessionSurveyCacheController = (
         }
         currentNetworkCache.surveysLatestBlock = lastProcessedSurveyBlock;
 
-        if (
-          typeof currentNetworkCache.surveyResponses !== 'object' ||
-          currentNetworkCache.surveyResponses === null
-        ) {
+        if (typeof currentNetworkCache.surveyResponses !== 'object' || currentNetworkCache.surveyResponses === null) {
           currentNetworkCache.surveyResponses = {};
         }
         if (
@@ -369,24 +342,21 @@ export const createSessionSurveyCacheController = (
           currentNetworkCache.pendingSurveyMetadata = {};
         }
 
-        const cachedSurveyRefreshItems: SurveyDiscoveryItem[] = (
-          slug
-            ? Object.values(currentNetworkCache.surveys || {})
+        const cachedSurveyRefreshItems: SurveyDiscoveryItem[] = slug
+          ? Object.values(currentNetworkCache.surveys || {})
               .map((survey) => ({
                 surveyId: String(survey?.surveyID || survey?.id || '').toLowerCase(),
-                creationBlock: Number.isFinite(Number(survey?.creationBlock))
-                  ? Number(survey.creationBlock)
-                  : null,
+                creationBlock: Number.isFinite(Number(survey?.creationBlock)) ? Number(survey.creationBlock) : null,
               }))
-              .filter((item) => (
-                !!item.surveyId &&
-                !Object.prototype.hasOwnProperty.call(
-                  currentNetworkCache.surveys?.[item.surveyId] || {},
-                  'sessionSlugExplicit'
-                )
-              ))
-            : []
-        );
+              .filter(
+                (item) =>
+                  !!item.surveyId &&
+                  !Object.prototype.hasOwnProperty.call(
+                    currentNetworkCache.surveys?.[item.surveyId] || {},
+                    'sessionSlugExplicit',
+                  ),
+              )
+          : [];
 
         const latestBlock = baseTo;
         mainSiteLog.log('Latest block number (Surveys, clamped):', latestBlock);
@@ -403,7 +373,7 @@ export const createSessionSurveyCacheController = (
         const markPendingSurvey = (
           surveyIdLower: string,
           creationBlock: unknown,
-          { bumpAttempts = true, error = null }: { bumpAttempts?: boolean; error?: unknown } = {}
+          { bumpAttempts = true, error = null }: { bumpAttempts?: boolean; error?: unknown } = {},
         ): void => {
           if (!surveyIdLower) return;
           if (
@@ -413,10 +383,11 @@ export const createSessionSurveyCacheController = (
             currentNetworkCache.pendingSurveyMetadata = {};
           }
           const slot = currentNetworkCache.pendingSurveyMetadata;
-          const prev = slot[surveyIdLower] && typeof slot[surveyIdLower] === 'object'
-            ? slot[surveyIdLower]
-            : { attempts: 0, nextRetryAtMs: 0, creationBlock: null };
-          const attempts = bumpAttempts ? (Number(prev.attempts || 0) + 1) : Number(prev.attempts || 0);
+          const prev =
+            slot[surveyIdLower] && typeof slot[surveyIdLower] === 'object'
+              ? slot[surveyIdLower]
+              : { attempts: 0, nextRetryAtMs: 0, creationBlock: null };
+          const attempts = bumpAttempts ? Number(prev.attempts || 0) + 1 : Number(prev.attempts || 0);
           const stopDecision = shouldStopPendingMetadataRetry({
             pendingEntry: { ...prev, attempts },
             error,
@@ -425,17 +396,13 @@ export const createSessionSurveyCacheController = (
           const failureMeta = normalizeArweaveFailureMeta(error) as CacheRecord;
           const terminalRetryAtMs = Number(failureMeta.nextRetryAtMs || 0);
           if (stopDecision.stop) {
-            if (
-              stopDecision.terminal &&
-              Number.isFinite(terminalRetryAtMs) &&
-              terminalRetryAtMs > Date.now()
-            ) {
+            if (stopDecision.terminal && Number.isFinite(terminalRetryAtMs) && terminalRetryAtMs > Date.now()) {
               slot[surveyIdLower] = {
                 attempts,
                 nextRetryAtMs: terminalRetryAtMs,
                 creationBlock: Number.isFinite(Number(creationBlock))
                   ? Number(creationBlock)
-                  : (Number(prev.creationBlock) || null),
+                  : Number(prev.creationBlock) || null,
                 state: String(failureMeta.state || 'terminal_not_found'),
                 lastStatus: Number.isFinite(Number(failureMeta.status)) ? Number(failureMeta.status) : null,
                 message: String(failureMeta.message || ''),
@@ -447,12 +414,13 @@ export const createSessionSurveyCacheController = (
               const externalNextRetryAt = Number(failureMeta.nextRetryAtMs || 0);
               slot[surveyIdLower] = {
                 attempts,
-                nextRetryAtMs: Number.isFinite(externalNextRetryAt) && externalNextRetryAt > cooldownRetryAtMs
-                  ? externalNextRetryAt
-                  : cooldownRetryAtMs,
+                nextRetryAtMs:
+                  Number.isFinite(externalNextRetryAt) && externalNextRetryAt > cooldownRetryAtMs
+                    ? externalNextRetryAt
+                    : cooldownRetryAtMs,
                 creationBlock: Number.isFinite(Number(creationBlock))
                   ? Number(creationBlock)
-                  : (Number(prev.creationBlock) || null),
+                  : Number(prev.creationBlock) || null,
                 state: String(failureMeta.state || 'transient'),
                 lastStatus: Number.isFinite(Number(failureMeta.status)) ? Number(failureMeta.status) : null,
                 message: String(failureMeta.message || ''),
@@ -465,7 +433,11 @@ export const createSessionSurveyCacheController = (
               });
               return;
             }
-            try { delete slot[surveyIdLower]; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+            try {
+              delete slot[surveyIdLower];
+            } catch (e: unknown) {
+              mainSiteLog.warn('MainSite: fallback', e);
+            }
             mainSiteLog.warn('[MainSite] Stopping pending survey metadata retry', {
               group: slug,
               surveyId: surveyIdLower,
@@ -481,12 +453,13 @@ export const createSessionSurveyCacheController = (
           const computedNextRetryAt = Date.now() + computeBackoffMs(attempts);
           slot[surveyIdLower] = {
             attempts,
-            nextRetryAtMs: Number.isFinite(externalNextRetryAt) && externalNextRetryAt > computedNextRetryAt
-              ? externalNextRetryAt
-              : computedNextRetryAt,
+            nextRetryAtMs:
+              Number.isFinite(externalNextRetryAt) && externalNextRetryAt > computedNextRetryAt
+                ? externalNextRetryAt
+                : computedNextRetryAt,
             creationBlock: Number.isFinite(Number(creationBlock))
               ? Number(creationBlock)
-              : (Number(prev.creationBlock) || null),
+              : Number(prev.creationBlock) || null,
             state: String(failureMeta.state || 'transient'),
             lastStatus: Number.isFinite(Number(failureMeta.status)) ? Number(failureMeta.status) : null,
             message: String(failureMeta.message || ''),
@@ -497,15 +470,18 @@ export const createSessionSurveyCacheController = (
             if (currentNetworkCache?.pendingSurveyMetadata?.[surveyIdLower]) {
               delete currentNetworkCache.pendingSurveyMetadata[surveyIdLower];
             }
-          } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+          } catch (e: unknown) {
+            mainSiteLog.warn('MainSite: fallback', e);
+          }
         };
         const pruneLoadedPendingSurveyMetadata = (): number => {
           try {
             const pending = currentNetworkCache?.pendingSurveyMetadata;
             if (!pending || typeof pending !== 'object') return 0;
-            const cachedSurveys = (
+            const cachedSurveys =
               currentNetworkCache?.surveys && typeof currentNetworkCache.surveys === 'object'
-            ) ? currentNetworkCache.surveys : {};
+                ? currentNetworkCache.surveys
+                : {};
             let removed = 0;
             Object.keys(pending).forEach((sidRaw) => {
               const sid = String(sidRaw || '').toLowerCase();
@@ -513,7 +489,9 @@ export const createSessionSurveyCacheController = (
               try {
                 delete pending[sidRaw];
                 removed += 1;
-              } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+              } catch (e: unknown) {
+                mainSiteLog.warn('MainSite: fallback', e);
+              }
             });
             return removed;
           } catch (e: unknown) {
@@ -523,7 +501,7 @@ export const createSessionSurveyCacheController = (
         const prepareScopedSurveyMetadataEntry = (
           surveyIdLower: string,
           surveyData: SurveyMetadata,
-          creationBlock: string | number | null | undefined
+          creationBlock: string | number | null | undefined,
         ): { preparedSurveyData: SurveyMetadata; targetSlug: string } => {
           const preparedSurveyData = prepareSurveyMetadataCacheEntry({
             surveyId: surveyIdLower,
@@ -539,9 +517,10 @@ export const createSessionSurveyCacheController = (
             targetSlug,
           };
         };
-        const retryPendingSurveyMetadata = async (
-          { maxToProcess = 10, batchSize = 3 }: { maxToProcess?: number; batchSize?: number } = {}
-        ): Promise<number> => {
+        const retryPendingSurveyMetadata = async ({
+          maxToProcess = 10,
+          batchSize = 3,
+        }: { maxToProcess?: number; batchSize?: number } = {}): Promise<number> => {
           try {
             const removedStalePending = pruneLoadedPendingSurveyMetadata();
             if (removedStalePending > 0) {
@@ -552,13 +531,14 @@ export const createSessionSurveyCacheController = (
             const now = Date.now();
             const due: PendingSurveyRetryRow[] = Object.keys(pending)
               .map((sid) => ({ sid, entry: pending[sid] }))
-              .filter((row) => (
-                row &&
-                row.sid &&
-                !currentNetworkCache?.surveys?.[String(row.sid || '').toLowerCase()] &&
-                Number(row.entry?.nextRetryAtMs || 0) <= now
-              ))
-              .sort((a, b) => (Number(a.entry?.nextRetryAtMs || 0) - Number(b.entry?.nextRetryAtMs || 0)))
+              .filter(
+                (row) =>
+                  row &&
+                  row.sid &&
+                  !currentNetworkCache?.surveys?.[String(row.sid || '').toLowerCase()] &&
+                  Number(row.entry?.nextRetryAtMs || 0) <= now,
+              )
+              .sort((a, b) => Number(a.entry?.nextRetryAtMs || 0) - Number(b.entry?.nextRetryAtMs || 0))
               .slice(0, Math.max(0, Number(maxToProcess || 0)));
             if (!due.length) return 0;
 
@@ -567,29 +547,28 @@ export const createSessionSurveyCacheController = (
             for (let i = 0; i < due.length; i += batchSize) {
               const batch = due.slice(i, i + batchSize);
               // eslint-disable-next-line no-await-in-loop
-              const results: PendingSurveyRetryResult[] = await Promise.all(batch.map(async ({ sid, entry }) => {
-                const sidLower = String(sid || '').toLowerCase();
-                if (!sidLower) return { sid: sidLower, entry, surveyData: null };
-                if (currentNetworkCache?.surveys?.[sidLower]) {
-                  return {
-                    sid: sidLower,
-                    entry,
-                    surveyData: currentNetworkCache.surveys[sidLower],
-                    skippedCached: true,
-                  };
-                }
-                try {
-                  const surveyData = await surveyContractScripts.getSurveyDataById(
-                    'none',
-                    sidLower,
-                    slug,
-                    { throwOnFailure: true }
-                  ) as SurveyMetadata;
-                  return { sid: sidLower, entry, surveyData };
-                } catch (err: unknown) {
-                  return { sid: sidLower, entry, surveyData: null, err };
-                }
-              }));
+              const results: PendingSurveyRetryResult[] = await Promise.all(
+                batch.map(async ({ sid, entry }) => {
+                  const sidLower = String(sid || '').toLowerCase();
+                  if (!sidLower) return { sid: sidLower, entry, surveyData: null };
+                  if (currentNetworkCache?.surveys?.[sidLower]) {
+                    return {
+                      sid: sidLower,
+                      entry,
+                      surveyData: currentNetworkCache.surveys[sidLower],
+                      skippedCached: true,
+                    };
+                  }
+                  try {
+                    const surveyData = (await surveyContractScripts.getSurveyDataById('none', sidLower, slug, {
+                      throwOnFailure: true,
+                    })) as SurveyMetadata;
+                    return { sid: sidLower, entry, surveyData };
+                  } catch (err: unknown) {
+                    return { sid: sidLower, entry, surveyData: null, err };
+                  }
+                }),
+              );
 
               results.forEach((item) => {
                 const sid = String(item.sid || '').toLowerCase();
@@ -598,19 +577,23 @@ export const createSessionSurveyCacheController = (
                   const { preparedSurveyData, targetSlug } = prepareScopedSurveyMetadataEntry(
                     sid,
                     item.surveyData,
-                    item.entry?.creationBlock
+                    item.entry?.creationBlock,
                   );
                   if (targetSlug === slug) {
                     currentNetworkCache.surveys[sid] = preparedSurveyData;
                   } else {
-                    try { delete currentNetworkCache.surveys[sid]; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+                    try {
+                      delete currentNetworkCache.surveys[sid];
+                    } catch (e: unknown) {
+                      mainSiteLog.warn('MainSite: fallback', e);
+                    }
                     writeSurveyMetadataToCache(
                       targetSlug,
                       sid,
                       preparedSurveyData,
                       item.entry?.creationBlock,
                       networkID,
-                      { enforceScopedIsolation: true }
+                      { enforceScopedIsolation: true },
                     );
                   }
                   clearPendingSurvey(sid);
@@ -636,7 +619,7 @@ export const createSessionSurveyCacheController = (
             if (!pending || typeof pending !== 'object') return;
 
             const entries = Object.values(pending).filter(
-              (value): value is PendingSurveyMetadataEntry => !!value && typeof value === 'object'
+              (value): value is PendingSurveyMetadataEntry => !!value && typeof value === 'object',
             );
             if (!entries.length) return;
 
@@ -658,13 +641,14 @@ export const createSessionSurveyCacheController = (
                 const activeSlug = normalizeSessionSlug(getActiveSessionSlug() || '');
                 const allowGeneralBackfillRetry = slug === '' && getSessionScanScope() === 'general';
                 if (!allowGeneralBackfillRetry && activeSlug !== slug) return;
-                initializeSurveyCacheForGroup(
-                  slug,
-                  suppressUiState ? { background: true } : undefined
-                );
-              } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+                initializeSurveyCacheForGroup(slug, suppressUiState ? { background: true } : undefined);
+              } catch (e: unknown) {
+                mainSiteLog.warn('MainSite: fallback', e);
+              }
             }, delayMs);
-          } catch (e: unknown) { mainSiteLog.warn('MainSite: cleanup', e); }
+          } catch (e: unknown) {
+            mainSiteLog.warn('MainSite: cleanup', e);
+          }
         };
 
         let userCache = (dgRead('userCache', slug) || {}) as UserCache;
@@ -697,44 +681,39 @@ export const createSessionSurveyCacheController = (
           await retryPendingSurveyMetadata().catch(() => null);
 
           if (fromBlockForSurveyDiscovery <= latestBlock) {
-            mainSiteLog.log(`Fetching survey IDs from block ${fromBlockForSurveyDiscovery} to ${latestBlock} (group=${slug})`);
-            surveyItems = await surveyContractScripts.fetchUserSubmittedSurveyIDs(
+            mainSiteLog.log(
+              `Fetching survey IDs from block ${fromBlockForSurveyDiscovery} to ${latestBlock} (group=${slug})`,
+            );
+            surveyItems = (await surveyContractScripts.fetchUserSubmittedSurveyIDs(
               'none',
               fromBlockForSurveyDiscovery,
               latestBlock,
-              slug
-            ) as SurveyDiscoveryItem[];
+              slug,
+            )) as SurveyDiscoveryItem[];
           } else {
             mainSiteLog.log('No new blocks to fetch survey IDs from.');
           }
 
-          surveyItems = [
-            ...cachedSurveyRefreshItems,
-            ...(Array.isArray(surveyItems) ? surveyItems : []),
-          ];
+          surveyItems = [...cachedSurveyRefreshItems, ...(Array.isArray(surveyItems) ? surveyItems : [])];
 
           if (surveyItems && surveyItems.length > 0) {
             for (const item of surveyItems) {
               const surveyID = item.surveyId.toLowerCase();
               const creationBlock = item.creationBlock;
               const existingSurvey = currentNetworkCache.surveys[surveyID];
-              const needsBindingRefresh = (
+              const needsBindingRefresh =
                 !!slug &&
                 !!existingSurvey &&
-                !Object.prototype.hasOwnProperty.call(existingSurvey, 'sessionSlugExplicit')
-              );
+                !Object.prototype.hasOwnProperty.call(existingSurvey, 'sessionSlugExplicit');
 
               if (!existingSurvey || needsBindingRefresh) {
                 let surveyData: SurveyMetadata | null = null;
                 let surveyFetchErr: unknown = null;
                 try {
                   // eslint-disable-next-line no-await-in-loop
-                  surveyData = await surveyContractScripts.getSurveyDataById(
-                    'none',
-                    surveyID,
-                    slug,
-                    { throwOnFailure: true }
-                  ) as SurveyMetadata;
+                  surveyData = (await surveyContractScripts.getSurveyDataById('none', surveyID, slug, {
+                    throwOnFailure: true,
+                  })) as SurveyMetadata;
                 } catch (e: unknown) {
                   surveyFetchErr = e;
                   surveyData = null;
@@ -743,20 +722,19 @@ export const createSessionSurveyCacheController = (
                   const { preparedSurveyData, targetSlug } = prepareScopedSurveyMetadataEntry(
                     surveyID,
                     surveyData,
-                    creationBlock
+                    creationBlock,
                   );
                   if (targetSlug === slug) {
                     currentNetworkCache.surveys[surveyID] = preparedSurveyData;
                   } else {
-                    try { delete currentNetworkCache.surveys[surveyID]; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
-                    writeSurveyMetadataToCache(
-                      targetSlug,
-                      surveyID,
-                      preparedSurveyData,
-                      creationBlock,
-                      networkID,
-                      { enforceScopedIsolation: true }
-                    );
+                    try {
+                      delete currentNetworkCache.surveys[surveyID];
+                    } catch (e: unknown) {
+                      mainSiteLog.warn('MainSite: fallback', e);
+                    }
+                    writeSurveyMetadataToCache(targetSlug, surveyID, preparedSurveyData, creationBlock, networkID, {
+                      enforceScopedIsolation: true,
+                    });
                   }
                   clearPendingSurvey(surveyID);
 
@@ -777,7 +755,7 @@ export const createSessionSurveyCacheController = (
 
           currentNetworkCache.surveysLatestBlock = Math.max(
             Number(currentNetworkCache.surveysLatestBlock) || 0,
-            latestBlock
+            latestBlock,
           );
           dgWrite('surveysCache', slug, surveysCache);
 
@@ -786,7 +764,7 @@ export const createSessionSurveyCacheController = (
             const surveyObj = currentNetworkCache.surveys[surveyID];
             const surveyResponseLastBlock = Object.prototype.hasOwnProperty.call(
               currentNetworkCache.surveyResponsesLatestBlock,
-              surveyIDLower
+              surveyIDLower,
             )
               ? currentNetworkCache.surveyResponsesLatestBlock[surveyIDLower]
               : initialLastBlockSurvey;
@@ -794,21 +772,23 @@ export const createSessionSurveyCacheController = (
             const startBlock = Math.max(
               surveyResponseLastBlock + 1,
               Number(surveyObj?.creationBlock || 0),
-              initialLastBlockSurvey
+              initialLastBlockSurvey,
             );
 
             if (latestBlock >= startBlock) {
               mainSiteLog.log(
-                `Fetching/updating responses for survey ${surveyIDLower}, from block ${startBlock} up to ${latestBlock} (group=${slug})`
+                `Fetching/updating responses for survey ${surveyIDLower}, from block ${startBlock} up to ${latestBlock} (group=${slug})`,
               );
               try {
-                const surveyResponseBatch = normalizeSurveyResponseBatchResult(await surveyContractScripts.fetchAllSurveyResponses(
-                  'none',
-                  surveyIDLower,
-                  startBlock,
-                  latestBlock,
-                  slug
-                ));
+                const surveyResponseBatch = normalizeSurveyResponseBatchResult(
+                  await surveyContractScripts.fetchAllSurveyResponses(
+                    'none',
+                    surveyIDLower,
+                    startBlock,
+                    latestBlock,
+                    slug,
+                  ),
+                );
 
                 if (!currentNetworkCache.surveyResponses[surveyIDLower]) {
                   currentNetworkCache.surveyResponses[surveyIDLower] = {};
@@ -872,7 +852,9 @@ export const createSessionSurveyCacheController = (
             try {
               if (!isMounted()) return;
               initializeSurveyCacheForGroup(slug, pendingOpts || rerunOpts);
-            } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+            } catch (e: unknown) {
+              mainSiteLog.warn('MainSite: fallback', e);
+            }
           }, 0);
         }
       };
@@ -887,21 +869,22 @@ export const createSessionSurveyCacheController = (
 
   const startSurveyAndQuestionEventListenerForGroup = (slugIn: string | null = ''): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
-    mainSiteLog.log('startSurveyAndQuestionEventListenerForGroup() – Setting up survey & question events listener', { slug });
+    mainSiteLog.log('startSurveyAndQuestionEventListenerForGroup() – Setting up survey & question events listener', {
+      slug,
+    });
     surveyEventStreams.removeSurveyEventsListener('none', slug);
     if (shouldSkipSessionScanForSlug(slug, 'startSurveyAndQuestionEventListenerForGroup')) return false;
     surveyEventStreams.listenForSurveyEvents(
       'none',
       (event: unknown) => onSurveyEventDetectedForGroup(slug, event),
-      slug
+      slug,
     );
     mainSiteLog.log('Survey & Question event listener started');
     return true;
   };
 
-  const startSurveyAndQuestionEventListener = (): boolean => (
-    startSurveyAndQuestionEventListenerForGroup(getActiveSessionSlug())
-  );
+  const startSurveyAndQuestionEventListener = (): boolean =>
+    startSurveyAndQuestionEventListenerForGroup(getActiveSessionSlug());
 
   const refreshSurveyResponsesByIDForGroup = async (slugIn: string, surveyID: string): Promise<void> => {
     const slug = normalizeSessionSlug(slugIn || '');
@@ -936,17 +919,13 @@ export const createSessionSurveyCacheController = (
     const surveyObj = surveysCache[netId].surveys[surveyIDLower];
     const currentLocalBlock = Object.prototype.hasOwnProperty.call(
       surveysCache[netId].surveyResponsesLatestBlock,
-      surveyIDLower
+      surveyIDLower,
     )
       ? surveysCache[netId].surveyResponsesLatestBlock[surveyIDLower]
       : initialLastBlockSurvey;
 
     const latestChainBlock = baseTo;
-    const startBlock = Math.max(
-      currentLocalBlock + 1,
-      Number(surveyObj?.creationBlock || 0),
-      initialLastBlockSurvey
-    );
+    const startBlock = Math.max(currentLocalBlock + 1, Number(surveyObj?.creationBlock || 0), initialLastBlockSurvey);
 
     if (startBlock > latestChainBlock) {
       mainSiteLog.log('Survey responses are already up-to-date for surveyID:', surveyIDLower);
@@ -954,15 +933,11 @@ export const createSessionSurveyCacheController = (
     }
 
     mainSiteLog.log(
-      `Fetching new responses for surveyID ${surveyIDLower} from block ${startBlock} to ${latestChainBlock} (group=${slug})`
+      `Fetching new responses for surveyID ${surveyIDLower} from block ${startBlock} to ${latestChainBlock} (group=${slug})`,
     );
-    const surveyResponseBatch = normalizeSurveyResponseBatchResult(await surveyContractScripts.fetchAllSurveyResponses(
-      'none',
-      surveyIDLower,
-      startBlock,
-      latestChainBlock,
-      slug
-    ));
+    const surveyResponseBatch = normalizeSurveyResponseBatchResult(
+      await surveyContractScripts.fetchAllSurveyResponses('none', surveyIDLower, startBlock, latestChainBlock, slug),
+    );
 
     if (!surveysCache[netId].surveyResponses[surveyIDLower]) {
       surveysCache[netId].surveyResponses[surveyIDLower] = {};

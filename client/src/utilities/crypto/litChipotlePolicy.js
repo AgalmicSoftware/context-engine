@@ -5,17 +5,9 @@ export const CHIPOTLE_POLICY_VERSION = 'chipotle-sbt-v2';
 
 const ethersUtils = ethers?.utils || ethers;
 
-const toStr = (value) => (
-  typeof value === 'string'
-    ? value
-    : value == null
-      ? ''
-      : String(value)
-);
+const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
-export const normalizeChipotleGateMode = (value) => (
-  toStr(value).trim().toLowerCase() === 'all' ? 'all' : 'any'
-);
+export const normalizeChipotleGateMode = (value) => (toStr(value).trim().toLowerCase() === 'all' ? 'all' : 'any');
 
 export const normalizeChipotleChainId = (value) => {
   const parsed = Number(value || 0);
@@ -43,19 +35,17 @@ export const normalizeChipotleSbtAddresses = (values = []) => {
 export const stableChipotleStringify = (value) => {
   const walk = (entry) => {
     if (entry == null) return entry;
-    if (
-      typeof entry === 'string' ||
-      typeof entry === 'number' ||
-      typeof entry === 'boolean'
-    ) {
+    if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean') {
       return entry;
     }
     if (Array.isArray(entry)) return entry.map(walk);
     if (typeof entry === 'object') {
       const out = {};
-      Object.keys(entry).sort().forEach((key) => {
-        out[key] = walk(entry[key]);
-      });
+      Object.keys(entry)
+        .sort()
+        .forEach((key) => {
+          out[key] = walk(entry[key]);
+        });
       return out;
     }
     return toStr(entry);
@@ -99,9 +89,7 @@ export const buildLitChipotlePolicy = ({
 
 export const fingerprintLitChipotlePolicy = (policy = {}) => {
   const canonicalPolicy = buildLitChipotlePolicy(policy);
-  return ethersUtils.keccak256(
-    ethersUtils.toUtf8Bytes(stableChipotleStringify(canonicalPolicy))
-  );
+  return ethersUtils.keccak256(ethersUtils.toUtf8Bytes(stableChipotleStringify(canonicalPolicy)));
 };
 
 export const normalizeChipotleCekHex = (value) => {
@@ -112,10 +100,7 @@ export const normalizeChipotleCekHex = (value) => {
   return ethersUtils.hexlify(ethersUtils.arrayify(raw));
 };
 
-export const buildLitChipotleWrappedPlaintext = ({
-  cekHex,
-  policy,
-} = {}) => {
+export const buildLitChipotleWrappedPlaintext = ({ cekHex, policy } = {}) => {
   const canonicalPolicy = buildLitChipotlePolicy(policy);
   return {
     v: CHIPOTLE_WRAPPED_KEY_VERSION,
@@ -150,9 +135,7 @@ export const parseLitChipotleWrappedPlaintext = (value) => {
 };
 
 export const normalizeLitChipotleMetadataVersion = (chipotle = {}) => {
-  const raw = chipotle && typeof chipotle === 'object'
-    ? chipotle.version ?? chipotle.v
-    : null;
+  const raw = chipotle && typeof chipotle === 'object' ? (chipotle.version ?? chipotle.v) : null;
   const parsed = Number(raw || 0);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
 };

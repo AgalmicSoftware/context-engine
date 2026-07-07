@@ -24,9 +24,8 @@ type EncryptionConfig = {
   [key: string]: unknown;
 };
 
-const isPlainObject = (value: unknown): value is PlainObject => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isPlainObject = (value: unknown): value is PlainObject =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const getGateMap = (cfg: EncryptionConfig = {}): Record<string, EncryptionGate> | null => {
   const gates = cfg?.encryption?.gates;

@@ -1,21 +1,14 @@
-import {
-  buildSurveyResultsAnalysisLifecyclePlan,
-} from './surveyResultsAnalysisLifecyclePlan';
+import { buildSurveyResultsAnalysisLifecyclePlan } from './surveyResultsAnalysisLifecyclePlan';
 import type {
   SessionResultsAnalysisSectionKey,
   SessionResultsGeneratedAnalysisArtifact,
 } from '../../utilities/sessionResultsExport';
 
-const allSections: SessionResultsAnalysisSectionKey[] = [
-  'breakdown',
-  'argumentMap',
-  'riskMatrix',
-  'atlas',
-];
+const allSections: SessionResultsAnalysisSectionKey[] = ['breakdown', 'argumentMap', 'riskMatrix', 'atlas'];
 
 const createArtifact = (
   inputSignature = 'input-sig',
-  availableSections: SessionResultsAnalysisSectionKey[] = allSections
+  availableSections: SessionResultsAnalysisSectionKey[] = allSections,
 ): SessionResultsGeneratedAnalysisArtifact => ({
   generatedAt: '2026-06-01T00:00:00.000Z',
   inputSignature,
@@ -56,12 +49,14 @@ describe('surveyResultsAnalysisLifecyclePlan', () => {
   it('uses a ready current artifact when it matches the requested input signature', () => {
     const artifact = createArtifact('current-input');
 
-    expect(buildSurveyResultsAnalysisLifecyclePlan({
-      allSections,
-      currentArtifact: artifact,
-      inputSignature: 'current-input',
-      requestedSections: ['breakdown'],
-    })).toEqual({
+    expect(
+      buildSurveyResultsAnalysisLifecyclePlan({
+        allSections,
+        currentArtifact: artifact,
+        inputSignature: 'current-input',
+        requestedSections: ['breakdown'],
+      }),
+    ).toEqual({
       artifact,
       blockedReason: '',
       failureRecovery: retryableFailureRecovery,
@@ -97,12 +92,14 @@ describe('surveyResultsAnalysisLifecyclePlan', () => {
   it('ignores stale current artifacts and plans generation against the current signature', () => {
     const staleArtifact = createArtifact('stale-input');
 
-    expect(buildSurveyResultsAnalysisLifecyclePlan({
-      allSections,
-      currentArtifact: staleArtifact,
-      inputSignature: 'fresh-input',
-      requestedSections: ['breakdown', 'riskMatrix'],
-    })).toEqual({
+    expect(
+      buildSurveyResultsAnalysisLifecyclePlan({
+        allSections,
+        currentArtifact: staleArtifact,
+        inputSignature: 'fresh-input',
+        requestedSections: ['breakdown', 'riskMatrix'],
+      }),
+    ).toEqual({
       artifact: null,
       blockedReason: '',
       failureRecovery: retryableFailureRecovery,
@@ -137,12 +134,14 @@ describe('surveyResultsAnalysisLifecyclePlan', () => {
   it('ignores stale cached artifacts and plans generation against the current signature', () => {
     const staleArtifact = createArtifact('stale-cache-input');
 
-    expect(buildSurveyResultsAnalysisLifecyclePlan({
-      allSections,
-      cachedArtifact: staleArtifact,
-      inputSignature: 'fresh-input',
-      requestedSections: ['breakdown'],
-    })).toEqual({
+    expect(
+      buildSurveyResultsAnalysisLifecyclePlan({
+        allSections,
+        cachedArtifact: staleArtifact,
+        inputSignature: 'fresh-input',
+        requestedSections: ['breakdown'],
+      }),
+    ).toEqual({
       artifact: null,
       blockedReason: '',
       failureRecovery: retryableFailureRecovery,

@@ -1,7 +1,4 @@
-import contractScripts, {
-  getReadProviderForGroup,
-  getSessionConfigBySlug,
-} from './contractScripts.js';
+import contractScripts, { getReadProviderForGroup, getSessionConfigBySlug } from './contractScripts.js';
 import * as contractScriptsModule from './contractScripts.js';
 import chainGateway, {
   getReadProviderForGroup as getReadProviderForGroupGateway,
@@ -25,9 +22,7 @@ describe('contractScripts compatibility barrel', () => {
 
   it('keeps the legacy js entrypoint spyable for Jest callers', () => {
     const mocked = { slug: 'mock-session' };
-    const spy = jest
-      .spyOn(contractScriptsModule, 'getSessionConfigBySlug')
-      .mockReturnValue(mocked);
+    const spy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(mocked);
 
     expect(contractScriptsModule.getSessionConfigBySlug('ignored')).toBe(mocked);
     expect(spy).toHaveBeenCalledWith('ignored');
@@ -35,9 +30,7 @@ describe('contractScripts compatibility barrel', () => {
 
   it('keeps the canonical chainGateway entrypoint spyable for Jest callers', () => {
     const mocked = { slug: 'gateway-session' };
-    const spy = jest
-      .spyOn(chainGatewayModule, 'getSessionConfigBySlug')
-      .mockReturnValue(mocked);
+    const spy = jest.spyOn(chainGatewayModule, 'getSessionConfigBySlug').mockReturnValue(mocked);
 
     expect(chainGatewayModule.getSessionConfigBySlug('ignored')).toBe(mocked);
     expect(spy).toHaveBeenCalledWith('ignored');
@@ -68,7 +61,9 @@ describe('contractScripts compatibility barrel', () => {
     const barrelPath = path.resolve(__dirname, 'chainGateway.ts');
 
     fs.mkdirSync(outputDir, { recursive: true });
-    fs.writeFileSync(implStubPath, `
+    fs.writeFileSync(
+      implStubPath,
+      `
       const contractScripts = {
         marker: 'stub-default',
         getProviderLocation: () => 'stub-provider',
@@ -103,8 +98,11 @@ describe('contractScripts compatibility barrel', () => {
         isNonexistentTokenError: () => true,
       };
       export default contractScripts;
-    `);
-    fs.writeFileSync(entryPath, `
+    `,
+    );
+    fs.writeFileSync(
+      entryPath,
+      `
       import contractScripts, {
         __test__contractScriptsErrors,
         getReadProviderForGroup,
@@ -117,8 +115,11 @@ describe('contractScripts compatibility barrel', () => {
         provider: getReadProviderForGroup().provider,
         slug: getSessionConfigBySlug('edge').slug,
       };
-    `);
-    fs.writeFileSync(viteConfigPath, `
+    `,
+    );
+    fs.writeFileSync(
+      viteConfigPath,
+      `
       export default {
         logLevel: 'silent',
         resolve: {
@@ -145,19 +146,16 @@ describe('contractScripts compatibility barrel', () => {
           },
         },
       };
-    `);
+    `,
+    );
 
     try {
       try {
-        execFileSync(
-          process.execPath,
-          [viteBinPath, 'build', '--config', viteConfigPath],
-          {
-            cwd: clientRoot,
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'pipe'],
-          }
-        );
+        execFileSync(process.execPath, [viteBinPath, 'build', '--config', viteConfigPath], {
+          cwd: clientRoot,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
       } catch (error) {
         const stdout = error.stdout ? `\nstdout:\n${error.stdout}` : '';
         const stderr = error.stderr ? `\nstderr:\n${error.stderr}` : '';

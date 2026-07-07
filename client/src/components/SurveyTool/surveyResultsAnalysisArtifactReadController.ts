@@ -1,6 +1,4 @@
-import type {
-  SessionResultsGeneratedAnalysisArtifact,
-} from '../../utilities/sessionResultsExport';
+import type { SessionResultsGeneratedAnalysisArtifact } from '../../utilities/sessionResultsExport';
 import {
   selectSurveyResultsAnalysisArtifactFromCache,
   type SurveyResultsAnalysisArtifactCacheReadPort,
@@ -10,7 +8,7 @@ import {
 } from './surveyResultsAnalysisArtifactCachePorts';
 
 export type SurveyResultsAnalysisArtifactReadSelector = (
-  args: SurveyResultsAnalysisArtifactSelectionArgs
+  args: SurveyResultsAnalysisArtifactSelectionArgs,
 ) => SessionResultsGeneratedAnalysisArtifact | null;
 
 export type SurveyResultsAnalysisArtifactReadControllerPorts = {
@@ -64,11 +62,7 @@ export const runSurveyResultsAnalysisArtifactReadController = ({
   }
 
   try {
-    const cacheValue = ports.readAnalysisArtifactCache(
-      readRequest.namespace,
-      readRequest.slug,
-      readRequest.options
-    );
+    const cacheValue = ports.readAnalysisArtifactCache(readRequest.namespace, readRequest.slug, readRequest.options);
     const selectAnalysisArtifact = ports.selectAnalysisArtifact || selectSurveyResultsAnalysisArtifactFromCache;
     return {
       artifact: selectAnalysisArtifact({

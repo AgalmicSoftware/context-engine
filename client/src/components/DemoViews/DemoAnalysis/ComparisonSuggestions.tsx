@@ -14,9 +14,8 @@ export type ComparisonSuggestionsProps = {
   activeSuggestionKey?: string;
 };
 
-const buildSuggestionSelectionKey = (questionId = '', pair: string[] = []) => (
-  `${String(questionId || '').trim()}::${[...(Array.isArray(pair) ? pair : [])].sort().join('::')}`
-);
+const buildSuggestionSelectionKey = (questionId = '', pair: string[] = []) =>
+  `${String(questionId || '').trim()}::${[...(Array.isArray(pair) ? pair : [])].sort().join('::')}`;
 
 const ComparisonSuggestions = ({
   suggestions = [],
@@ -43,7 +42,7 @@ const ComparisonSuggestions = ({
         </div>
       </div>
       <div className={styles.suggestionsList}>
-        {suggestions.map((suggestion, index) => (
+        {suggestions.map((suggestion, index) =>
           (() => {
             const selectionKey = buildSuggestionSelectionKey(suggestion.questionId, suggestion.pair);
             const isActive = selectionKey === activeSuggestionKey;
@@ -65,8 +64,8 @@ const ComparisonSuggestions = ({
                 <span className={styles.suggestionQuestion}>{suggestion.questionText}</span>
               </button>
             );
-          })()
-        ))}
+          })(),
+        )}
       </div>
     </section>
   );

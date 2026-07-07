@@ -6,55 +6,85 @@ import SessionWizardShell, { type SessionWizardShellProps } from './SessionWizar
 
 jest.mock('./SessionWizardHeader', () => (props: any) => (
   <div data-testid="shell-header" data-mode={props.wizardMode}>
-    <button type="button" onClick={props.onEnterAdvancedMode}>advanced</button>
-    <button type="button" onClick={props.onEnterNormalMode}>normal</button>
-    <button type="button" onClick={props.onToggleDisplaySettings}>display</button>
-    <button type="button" onClick={props.onCloseDisplaySettings}>close display</button>
-    <button type="button" onClick={() => props.onRegistryChainIdChange('11155420')}>chain</button>
+    <button type="button" onClick={props.onEnterAdvancedMode}>
+      advanced
+    </button>
+    <button type="button" onClick={props.onEnterNormalMode}>
+      normal
+    </button>
+    <button type="button" onClick={props.onToggleDisplaySettings}>
+      display
+    </button>
+    <button type="button" onClick={props.onCloseDisplaySettings}>
+      close display
+    </button>
+    <button type="button" onClick={() => props.onRegistryChainIdChange('11155420')}>
+      chain
+    </button>
   </div>
 ));
 
 jest.mock('./SessionWizardRequirementsBanner', () => (props: any) => (
   <div data-testid="shell-requirements" data-funding-href={props.fundingRequirementHref || ''}>
     <span>{props.fundingRequirementLabel}</span>
-    <button type="button" onClick={props.onDismiss}>dismiss requirements</button>
+    <button type="button" onClick={props.onDismiss}>
+      dismiss requirements
+    </button>
   </div>
 ));
 
 jest.mock('./SessionWizardSponsoredStatus', () => (props: any) => (
   <div data-testid="shell-sponsored-status" data-tone={props.status?.tone || ''}>
     <span>{props.status?.message || ''}</span>
-    <button type="button" onClick={props.onRetry}>retry sponsored bundle</button>
+    <button type="button" onClick={props.onRetry}>
+      retry sponsored bundle
+    </button>
   </div>
 ));
 
 jest.mock('./SessionWizardNormalModeRail', () => (props: any) => (
   <div data-testid="shell-normal-rail" data-active-index={props.activeNormalModeIndex}>
-    <button type="button" onClick={() => props.onFocusSection('worker')}>focus worker</button>
+    <button type="button" onClick={() => props.onFocusSection('worker')}>
+      focus worker
+    </button>
   </div>
 ));
 
 jest.mock('./EncryptionPanel', () => (props: any) => (
   <section data-testid="shell-encryption" data-collapsed={String(props.isCollapsed)}>
-    <button type="button" onClick={props.onToggleCollapsed}>toggle encryption</button>
-    <button type="button" onClick={() => props.launchCreateSbtModal('gate-1')}>create sbt</button>
+    <button type="button" onClick={props.onToggleCollapsed}>
+      toggle encryption
+    </button>
+    <button type="button" onClick={() => props.launchCreateSbtModal('gate-1')}>
+      create sbt
+    </button>
   </section>
 ));
 
 jest.mock('./SessionMetadataEditor', () => (props: any) => (
   <section data-testid="shell-metadata" data-collapsed={String(props.isCollapsed)}>
     {props.headerAccessory}
-    <button type="button" onClick={props.onToggleCollapsed}>toggle metadata</button>
-    <button type="button" onClick={props.onToggleMoreOptions}>more metadata</button>
-    <button type="button" onClick={props.onToggleJsonPreview}>json preview</button>
-    <button type="button" onClick={props.onCopyDraftJson}>copy draft</button>
+    <button type="button" onClick={props.onToggleCollapsed}>
+      toggle metadata
+    </button>
+    <button type="button" onClick={props.onToggleMoreOptions}>
+      more metadata
+    </button>
+    <button type="button" onClick={props.onToggleJsonPreview}>
+      json preview
+    </button>
+    <button type="button" onClick={props.onCopyDraftJson}>
+      copy draft
+    </button>
   </section>
 ));
 
 jest.mock('./WorkerPanel', () => (props: any) => (
   <section data-testid="shell-worker" data-worker-url={props.displayedWorkerUrl || ''}>
     {props.deployHelperToggle}
-    <button type="button" onClick={props.onToggleCollapsed}>toggle worker</button>
+    <button type="button" onClick={props.onToggleCollapsed}>
+      toggle worker
+    </button>
     <button
       type="button"
       onClick={props.handleDeployWorker}
@@ -70,13 +100,15 @@ jest.mock('./SessionPublishSummary', () => (props: any) => (
     data-testid="shell-publish"
     data-metadata-label={props.publishUiPlan?.publishMetadataDisplayState?.metadataUriLabel || ''}
     data-metadata-uri={props.publishUiPlan?.publishMetadataDisplayState?.metadataUri || ''}
-    data-publish-advanced-open={
-      String(props.publishUiPlan?.publishActionDisplayState?.publishAdvancedOpen || false)
-    }
+    data-publish-advanced-open={String(props.publishUiPlan?.publishActionDisplayState?.publishAdvancedOpen || false)}
     data-worker-source={props.workerUrlSource || ''}
   >
-    <button type="button" onClick={props.onToggleCollapsed}>toggle publish</button>
-    <button type="button" onClick={props.onTogglePublishAdvanced}>publish advanced</button>
+    <button type="button" onClick={props.onToggleCollapsed}>
+      toggle publish
+    </button>
+    <button type="button" onClick={props.onTogglePublishAdvanced}>
+      publish advanced
+    </button>
     <button
       type="button"
       data-testid="ce-wizard-publish"
@@ -85,15 +117,23 @@ jest.mock('./SessionPublishSummary', () => (props: any) => (
     >
       publish
     </button>
-    <button type="button" onClick={props.onCopyAdminUrl}>copy admin</button>
+    <button type="button" onClick={props.onCopyAdminUrl}>
+      copy admin
+    </button>
   </section>
 ));
 
 jest.mock('./SessionWizardModals', () => (props: any) => (
   <div data-testid="shell-modals" data-session-slug={props.createSbtModalSessionSlug || ''}>
-    <button type="button" onClick={props.closeCreateSbtModal}>close create sbt</button>
-    <button type="button" onClick={props.closeContractViewerModal}>close contract</button>
-    <button type="button" onClick={props.onCloseSessionHeaderPreviewModal}>close preview</button>
+    <button type="button" onClick={props.closeCreateSbtModal}>
+      close create sbt
+    </button>
+    <button type="button" onClick={props.closeContractViewerModal}>
+      close contract
+    </button>
+    <button type="button" onClick={props.onCloseSessionHeaderPreviewModal}>
+      close preview
+    </button>
   </div>
 ));
 

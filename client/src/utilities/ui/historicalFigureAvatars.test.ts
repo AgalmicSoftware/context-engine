@@ -10,14 +10,17 @@ import {
 describe('historicalFigureAvatars', () => {
   const expectHistoricalPhotoUrl = (url: string) => {
     expect(url).toMatch(
-      /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/|https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/)/
+      /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/|https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/)/,
     );
   };
   const createMockCanvas = (dataUrl: string) => {
-    const getContext = jest.fn(() => ({
-      fillStyle: '',
-      fillRect: jest.fn(),
-    } as unknown as CanvasRenderingContext2D));
+    const getContext = jest.fn(
+      () =>
+        ({
+          fillStyle: '',
+          fillRect: jest.fn(),
+        }) as unknown as CanvasRenderingContext2D,
+    );
     const toDataURL = jest.fn(() => dataUrl);
     const canvas = {
       width: 0,
@@ -41,9 +44,7 @@ describe('historicalFigureAvatars', () => {
   };
 
   it('provides Wikimedia photo URLs for every historical figure in the demo Polis dataset', () => {
-    const demoUsernames = (demoPolisData?.participantsVotes || [])
-      .map((entry) => entry?.xid)
-      .filter(Boolean);
+    const demoUsernames = (demoPolisData?.participantsVotes || []).map((entry) => entry?.xid).filter(Boolean);
 
     demoUsernames.forEach((username) => {
       expect(hasHistoricalFigureAvatar(username)).toBe(true);
@@ -78,7 +79,9 @@ describe('historicalFigureAvatars', () => {
     const { canvas, getContext, toDataURL } = createMockCanvas('data:image/png;base64,known-figure-blockie');
     const createElementSpy = mockCanvasCreateElement(canvas);
 
-    expect(getHistoricalFigureAvatarOrBlockie('Franklin', { preferBlockie: true })).toBe('data:image/png;base64,known-figure-blockie');
+    expect(getHistoricalFigureAvatarOrBlockie('Franklin', { preferBlockie: true })).toBe(
+      'data:image/png;base64,known-figure-blockie',
+    );
     expect(getContext).toHaveBeenCalledWith('2d');
     expect(toDataURL).toHaveBeenCalledWith('image/png');
 

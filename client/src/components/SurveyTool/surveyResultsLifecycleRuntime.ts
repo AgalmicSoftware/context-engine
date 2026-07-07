@@ -1,7 +1,4 @@
-import type {
-  SurveyResultsProps,
-  SurveyResultsState,
-} from './SurveyResults';
+import type { SurveyResultsProps, SurveyResultsState } from './SurveyResults';
 import {
   buildSurveyResultsQuestionScopeResetPatch,
   buildSurveyResultsSurveyIdPropChangePatch,
@@ -111,9 +108,7 @@ const pushResultsPath = (path: string): void => {
   window.history.pushState({}, '', applyExistingGroupPrefix(path));
 };
 
-const ensureMountedResultsUrl = ({
-  ports,
-}: SurveyResultsComponentMountArgs): void => {
+const ensureMountedResultsUrl = ({ ports }: SurveyResultsComponentMountArgs): void => {
   const props = ports.getProps();
   const state = ports.getState();
   if (props.preventUrlChange) return;
@@ -122,7 +117,9 @@ const ensureMountedResultsUrl = ({
   let path =
     state.viewMode === 'questions'
       ? '/questions/results'
-      : (state.surveyId ? `/survey/${state.surveyId}/results` : '/questions/results');
+      : state.surveyId
+        ? `/survey/${state.surveyId}/results`
+        : '/questions/results';
 
   path = applyExistingGroupPrefix(path);
 
@@ -187,10 +184,7 @@ export const runSurveyResultsComponentDidMount = ({
   };
 };
 
-export const runSurveyResultsComponentWillUnmount = ({
-  instance,
-  ports,
-}: SurveyResultsComponentMountArgs): void => {
+export const runSurveyResultsComponentWillUnmount = ({ instance, ports }: SurveyResultsComponentMountArgs): void => {
   instance._isMounted = false;
   ports.destroyFetchResponsesRuntime();
   instance._nonceTickInFlight = false;
@@ -226,11 +220,7 @@ export const runSurveyResultsComponentWillUnmount = ({
       let newPath = currentPath.replace('/results', '').replace(/\/+$/, '');
       if (!newPath) {
         newPath =
-          state.viewMode === 'questions'
-            ? '/questions'
-            : state.surveyId
-              ? `/survey/${state.surveyId}`
-              : '/questions';
+          state.viewMode === 'questions' ? '/questions' : state.surveyId ? `/survey/${state.surveyId}` : '/questions';
       }
       newPath = ports.appendSessionHintToSurveyPath(newPath);
       window.history.pushState({}, '', newPath);
@@ -273,10 +263,28 @@ export const runSurveyResultsComponentDidUpdate = ({
 
   if (prevProps.isOpen && !props.isOpen) {
     clearResponseParseMemo(instance);
-    queueStatePatchValue({ hasPendingStatePatch, key: 'questionResultsHydrated', pendingStatePatch, state, value: false });
-    queueStatePatchValue({ hasPendingStatePatch, key: 'surveyResultsHydrated', pendingStatePatch, state, value: false });
+    queueStatePatchValue({
+      hasPendingStatePatch,
+      key: 'questionResultsHydrated',
+      pendingStatePatch,
+      state,
+      value: false,
+    });
+    queueStatePatchValue({
+      hasPendingStatePatch,
+      key: 'surveyResultsHydrated',
+      pendingStatePatch,
+      state,
+      value: false,
+    });
     queueStatePatchValue({ hasPendingStatePatch, key: 'demoResultsViewMode', pendingStatePatch, state, value: 'raw' });
-    queueStatePatchValue({ hasPendingStatePatch, key: 'demoResultsAtlasNodeId', pendingStatePatch, state, value: null });
+    queueStatePatchValue({
+      hasPendingStatePatch,
+      key: 'demoResultsAtlasNodeId',
+      pendingStatePatch,
+      state,
+      value: null,
+    });
     if (!props.preventUrlChange && typeof window !== 'undefined') {
       let basePath: string;
       if (state.viewMode === 'questions') {
@@ -295,13 +303,35 @@ export const runSurveyResultsComponentDidUpdate = ({
 
   if (!prevProps.isOpen && props.isOpen) {
     ports.resetLocalStoragePollingBackoff('modal-open');
-    if (String(state.viewMode || '').trim().toLowerCase() === 'questions') {
-      queueStatePatchValue({ hasPendingStatePatch, key: 'questionResultsHydrated', pendingStatePatch, state, value: false });
+    if (
+      String(state.viewMode || '')
+        .trim()
+        .toLowerCase() === 'questions'
+    ) {
+      queueStatePatchValue({
+        hasPendingStatePatch,
+        key: 'questionResultsHydrated',
+        pendingStatePatch,
+        state,
+        value: false,
+      });
     } else {
-      queueStatePatchValue({ hasPendingStatePatch, key: 'surveyResultsHydrated', pendingStatePatch, state, value: false });
+      queueStatePatchValue({
+        hasPendingStatePatch,
+        key: 'surveyResultsHydrated',
+        pendingStatePatch,
+        state,
+        value: false,
+      });
     }
     queueStatePatchValue({ hasPendingStatePatch, key: 'demoResultsViewMode', pendingStatePatch, state, value: 'raw' });
-    queueStatePatchValue({ hasPendingStatePatch, key: 'demoResultsAtlasNodeId', pendingStatePatch, state, value: null });
+    queueStatePatchValue({
+      hasPendingStatePatch,
+      key: 'demoResultsAtlasNodeId',
+      pendingStatePatch,
+      state,
+      value: null,
+    });
     const isSyncedOnOpen = isSurveyResultsStateSynced(state);
     instance._syncLoadingStartedAt = isSyncedOnOpen ? null : Date.now();
     ports.updateLocalStoragePollingState();
@@ -309,21 +339,18 @@ export const runSurveyResultsComponentDidUpdate = ({
     refreshReasons.add('modal-open');
 
     const filterStatePropChanged =
-      getFilterStateSignature(props.filterState) !==
-      getFilterStateSignature(prevProps.filterState);
+      getFilterStateSignature(props.filterState) !== getFilterStateSignature(prevProps.filterState);
 
     const updateTasks = (): void => {
       ports.updateParentWithCurrentFiltersForUrl();
 
-      if (
-        !props.preventUrlChange &&
-        typeof window !== 'undefined' &&
-        !window.location.pathname.endsWith('/results')
-      ) {
+      if (!props.preventUrlChange && typeof window !== 'undefined' && !window.location.pathname.endsWith('/results')) {
         const path =
           state.viewMode === 'questions'
             ? '/questions/results'
-            : (state.surveyId ? `/survey/${state.surveyId}/results` : '/questions/results');
+            : state.surveyId
+              ? `/survey/${state.surveyId}/results`
+              : '/questions/results';
         pushResultsPath(ports.appendSessionHintToSurveyPath(path));
       }
     };
@@ -343,22 +370,14 @@ export const runSurveyResultsComponentDidUpdate = ({
   }
 
   const cacheJustBecameReady =
-    (state.viewMode === 'questions' &&
-      !prevProps.isQuestionCacheReady &&
-      props.isQuestionCacheReady) ||
-    (state.viewMode === 'survey' &&
-      !prevProps.isSurveyCacheReady &&
-      props.isSurveyCacheReady);
+    (state.viewMode === 'questions' && !prevProps.isQuestionCacheReady && props.isQuestionCacheReady) ||
+    (state.viewMode === 'survey' && !prevProps.isSurveyCacheReady && props.isSurveyCacheReady);
 
   if (props.isOpen && cacheJustBecameReady) {
     refreshReasons.add('cache-ready');
   }
 
-  if (
-    props.isOpen &&
-    prevProps.isResponsesCacheReady !== props.isResponsesCacheReady &&
-    props.isResponsesCacheReady
-  ) {
+  if (props.isOpen && prevProps.isResponsesCacheReady !== props.isResponsesCacheReady && props.isResponsesCacheReady) {
     refreshReasons.add('responses-cache-ready');
   }
 
@@ -375,28 +394,22 @@ export const runSurveyResultsComponentDidUpdate = ({
       () => {
         ports.resetLocalStoragePollingBackoff('view-mode-change');
         ports.queueResultsRefresh('view-mode-change');
-      }
+      },
     );
   }
 
-  if ((props.surveyId !== prevProps.surveyId) || (prevState.surveyId !== state.surveyId)) {
+  if (props.surveyId !== prevProps.surveyId || prevState.surveyId !== state.surveyId) {
     clearResponseParseMemo(instance);
     if (props.surveyId && props.surveyId !== state.surveyId) {
-      ports.applyStatePatch(
-        buildSurveyResultsSurveyIdPropChangePatch(props.surveyId),
-        () => {
-          ports.resetLocalStoragePollingBackoff('survey-id-prop-change');
-          ports.queueResultsRefresh('survey-id-prop-change');
-        }
-      );
+      ports.applyStatePatch(buildSurveyResultsSurveyIdPropChangePatch(props.surveyId), () => {
+        ports.resetLocalStoragePollingBackoff('survey-id-prop-change');
+        ports.queueResultsRefresh('survey-id-prop-change');
+      });
     } else if (prevState.surveyId !== state.surveyId && state.viewMode === 'survey') {
-      ports.applyStatePatch(
-        buildSurveyResultsSurveyIdStateChangePatch(),
-        () => {
-          ports.resetLocalStoragePollingBackoff('survey-id-state-change');
-          ports.queueResultsRefresh('survey-id-state-change');
-        }
-      );
+      ports.applyStatePatch(buildSurveyResultsSurveyIdStateChangePatch(), () => {
+        ports.resetLocalStoragePollingBackoff('survey-id-state-change');
+        ports.queueResultsRefresh('survey-id-state-change');
+      });
     }
   }
 
@@ -423,7 +436,9 @@ export const runSurveyResultsComponentDidUpdate = ({
   });
   if (
     props.isOpen &&
-    String(state.viewMode || '').trim().toLowerCase() === 'questions' &&
+    String(state.viewMode || '')
+      .trim()
+      .toLowerCase() === 'questions' &&
     prevQuestionScopeSignature !== nextQuestionScopeSignature
   ) {
     clearResponseParseMemo(instance);

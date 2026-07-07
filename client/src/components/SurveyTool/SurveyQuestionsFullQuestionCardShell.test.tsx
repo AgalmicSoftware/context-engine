@@ -13,7 +13,7 @@ describe('SurveyQuestionsFullQuestionCardShell', () => {
         sliderSection={<span>Slider</span>}
         footerIcons={<button type="button">Footer action</button>}
         commentsSection={<div>Comments</div>}
-      />
+      />,
     );
 
     expect(screen.getByText('Prompt text')).toBeInTheDocument();

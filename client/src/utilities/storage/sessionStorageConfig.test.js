@@ -19,7 +19,9 @@ describe('sessionStorageConfig', () => {
 
   test('keeps lit-arweave available and selected for encrypted document payloads', () => {
     expect(resolveSessionStorageBackend({}, { encrypted: true })).toBe(STORAGE_BACKENDS.LIT_ARWEAVE);
-    expect(resolveSessionStorageBackend({ storageProfile: { backend: 'lit-arweave' } })).toBe(STORAGE_BACKENDS.LIT_ARWEAVE);
+    expect(resolveSessionStorageBackend({ storageProfile: { backend: 'lit-arweave' } })).toBe(
+      STORAGE_BACKENDS.LIT_ARWEAVE,
+    );
     expect(requiresLitForSessionStorage({ storageProfile: { backend: 'lit-arweave' } })).toBe(true);
   });
 
@@ -31,7 +33,9 @@ describe('sessionStorageConfig', () => {
     expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
     expect(usesCloudflareSessionStorage(sessionConfig)).toBe(true);
     expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(true);
-    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE);
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(
+      SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
+    );
     expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl).toEqual({
       gate: SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE,
       encryption: SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.NONE,
@@ -50,8 +54,12 @@ describe('sessionStorageConfig', () => {
     expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
     expect(requiresLitForSessionStorage(sessionConfig, { resource: 'responses' })).toBe(true);
     expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(false);
-    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED);
-    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.encryption).toBe(SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT);
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(
+      SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED,
+    );
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.encryption).toBe(
+      SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT,
+    );
   });
 
   test('marks Cloudflare public_read mode as non-Lit and non-SBT-gated', () => {
@@ -65,8 +73,12 @@ describe('sessionStorageConfig', () => {
     expect(requiresLitForSessionStorage(sessionConfig, { resource: 'questions' })).toBe(false);
     expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(false);
     expect(usesPublicReadCloudflareStorage(sessionConfig)).toBe(true);
-    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ);
-    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.gate).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE);
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(
+      SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ,
+    );
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.gate).toBe(
+      SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE,
+    );
   });
 
   test('normalizes v2 worker_envelope access without requiring Lit', () => {

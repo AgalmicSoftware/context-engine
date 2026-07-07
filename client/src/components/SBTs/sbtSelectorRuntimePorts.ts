@@ -6,10 +6,7 @@ export type SbtSelectorLogger = UnknownRecord & {
   log: SbtSelectorLogMethod;
 };
 
-export type EnsureLightSbtUniverse = (
-  slugs: string[],
-  options?: { forceExactSlugs?: boolean }
-) => unknown;
+export type EnsureLightSbtUniverse = (slugs: string[], options?: { forceExactSlugs?: boolean }) => unknown;
 
 export type SbtDisplayNameTargetedArgs = {
   address?: unknown;
@@ -34,23 +31,17 @@ export type ResolveSbtDisplayLabelArgs = {
   sbtInfo?: unknown;
 };
 
-export type ResolveSbtDisplayLabelTyped = (
-  args: ResolveSbtDisplayLabelArgs
-) => unknown;
+export type ResolveSbtDisplayLabelTyped = (args: ResolveSbtDisplayLabelArgs) => unknown;
 
 export type HydrateSbtDisplayNameTargeted = (
-  args?: SbtDisplayNameTargetedArgs
+  args?: SbtDisplayNameTargetedArgs,
 ) => Promise<SbtDisplayNameTargetedResult | null>;
 
 export type WarmSbtDisplayNamesTargeted = (
-  args?: SbtDisplayNameTargetedArgs
+  args?: SbtDisplayNameTargetedArgs,
 ) => Promise<SbtDisplayNameTargetedResult[] | null | undefined>;
 
-export type WriteCacheTyped = (
-  namespace: string,
-  slug?: string,
-  value?: unknown
-) => Promise<unknown>;
+export type WriteCacheTyped = (namespace: string, slug?: string, value?: unknown) => Promise<unknown>;
 
 export type ContractScriptsSbtAddressLoader = UnknownRecord & {
   getAllSbtAddressesCached: (
@@ -58,7 +49,7 @@ export type ContractScriptsSbtAddressLoader = UnknownRecord & {
     discoveryRef: unknown,
     options?: {
       onDiscoveredAddresses?: (payload?: { addresses?: unknown }) => void;
-    }
+    },
   ) => Promise<unknown>;
 };
 
@@ -90,27 +81,20 @@ export const bindSbtSelectorRuntimePorts = ({
   warmSbtDisplayNamesTargeted,
   writeCache,
 }: BindSbtSelectorRuntimePortsArgs): SbtSelectorRuntimePorts => {
-  const readContractScripts = (): ContractScriptsSbtAddressLoader => (
-    contractScripts() as unknown as ContractScriptsSbtAddressLoader
-  );
-  const readHydrateSbtDisplayNameTargeted = (): HydrateSbtDisplayNameTargeted => (
-    hydrateSbtDisplayNameTargeted() as unknown as HydrateSbtDisplayNameTargeted
-  );
-  const readResolveSbtDisplayLabel = (): ResolveSbtDisplayLabelTyped => (
-    resolveSbtDisplayLabel() as unknown as ResolveSbtDisplayLabelTyped
-  );
-  const readWarmSbtDisplayNamesTargeted = (): WarmSbtDisplayNamesTargeted => (
-    warmSbtDisplayNamesTargeted() as unknown as WarmSbtDisplayNamesTargeted
-  );
-  const readWriteCache = (): WriteCacheTyped => (
-    writeCache() as unknown as WriteCacheTyped
-  );
+  const readContractScripts = (): ContractScriptsSbtAddressLoader =>
+    contractScripts() as unknown as ContractScriptsSbtAddressLoader;
+  const readHydrateSbtDisplayNameTargeted = (): HydrateSbtDisplayNameTargeted =>
+    hydrateSbtDisplayNameTargeted() as unknown as HydrateSbtDisplayNameTargeted;
+  const readResolveSbtDisplayLabel = (): ResolveSbtDisplayLabelTyped =>
+    resolveSbtDisplayLabel() as unknown as ResolveSbtDisplayLabelTyped;
+  const readWarmSbtDisplayNamesTargeted = (): WarmSbtDisplayNamesTargeted =>
+    warmSbtDisplayNamesTargeted() as unknown as WarmSbtDisplayNamesTargeted;
+  const readWriteCache = (): WriteCacheTyped => writeCache() as unknown as WriteCacheTyped;
 
   return {
     contractScripts: {
-      getAllSbtAddressesCached: (mode, discoveryRef, options) => (
-        readContractScripts().getAllSbtAddressesCached(mode, discoveryRef, options)
-      ),
+      getAllSbtAddressesCached: (mode, discoveryRef, options) =>
+        readContractScripts().getAllSbtAddressesCached(mode, discoveryRef, options),
     },
     hydrateSbtDisplayNameTargeted: (args) => readHydrateSbtDisplayNameTargeted()(args),
     logger: logger() as unknown as SbtSelectorLogger,
@@ -120,6 +104,5 @@ export const bindSbtSelectorRuntimePorts = ({
   };
 };
 
-export const isEnsureLightSbtUniverse = (value: unknown): value is EnsureLightSbtUniverse => (
-  typeof value === 'function'
-);
+export const isEnsureLightSbtUniverse = (value: unknown): value is EnsureLightSbtUniverse =>
+  typeof value === 'function';

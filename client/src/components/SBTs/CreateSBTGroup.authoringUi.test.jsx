@@ -77,12 +77,18 @@ describe('CreateSBTGroup authoring UI rendering', () => {
     render(instance.render());
 
     expect(screen.queryByText('Choose who can remove this Group after collect.')).not.toBeInTheDocument();
-    expect(screen.queryByText('Override the deployer if a different burn admin should manage revocation.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Override the deployer if a different burn admin should manage revocation.'),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Pick the chain where the Group contract will be deployed.')).not.toBeInTheDocument();
     expect(screen.queryByText('This draft is pinned to the session chain.')).not.toBeInTheDocument();
-    expect(screen.queryByText('Use deterministic deployment so the final Group address is known ahead of time.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Use deterministic deployment so the final Group address is known ahead of time.'),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Generate a unique claim link for each participant.')).not.toBeInTheDocument();
-    expect(screen.queryByText('Hide this group from the public list while keeping direct access intact.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Hide this group from the public list while keeping direct access intact.'),
+    ).not.toBeInTheDocument();
   });
 
   it('shows a pending group-name message before deterministic preview inputs are complete', () => {
@@ -381,12 +387,16 @@ describe('CreateSBTGroup authoring UI rendering', () => {
 
     render(instance.render());
 
-    expect(document.querySelector(
-      `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="tokenInfoCollapsed"]`
-    )).not.toBeNull();
-    expect(document.querySelector(
-      `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="mintOptionsCollapsed"]`
-    )).not.toBeNull();
+    expect(
+      document.querySelector(
+        `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="tokenInfoCollapsed"]`,
+      ),
+    ).not.toBeNull();
+    expect(
+      document.querySelector(
+        `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="mintOptionsCollapsed"]`,
+      ),
+    ).not.toBeNull();
   });
 
   it('surfaces the visible error banner through a stable E2E hook', () => {
@@ -403,7 +413,7 @@ describe('CreateSBTGroup authoring UI rendering', () => {
     render(instance.render());
 
     expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_ERROR)).toHaveTextContent(
-      'Upload metadata before adding this Group to the session.'
+      'Upload metadata before adding this Group to the session.',
     );
   });
 });

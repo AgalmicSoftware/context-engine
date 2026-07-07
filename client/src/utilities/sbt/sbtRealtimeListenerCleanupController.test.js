@@ -3,9 +3,7 @@ jest.mock('../web3/contractScripts.js', () => ({
   normalizeSessionSlug: jest.fn((s) => String(s || '')),
 }));
 
-const {
-  createSbtRealtimeListenerCleanupController,
-} = require('./sbtRealtimeListenerCleanupController.js');
+const { createSbtRealtimeListenerCleanupController } = require('./sbtRealtimeListenerCleanupController.js');
 const { normalizeSessionSlug } = require('../web3/contractScripts.js');
 
 describe('createSbtRealtimeListenerCleanupController', () => {

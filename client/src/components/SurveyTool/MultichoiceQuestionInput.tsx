@@ -19,10 +19,8 @@ export const buildMultichoiceOptionClassName = ({
   baseClassName?: unknown;
   isSelected?: unknown;
   selectedClassName?: unknown;
-} = {}): string => ([
-  String(baseClassName || ''),
-  isSelected ? String(selectedClassName || '') : '',
-].filter(Boolean).join(' '));
+} = {}): string =>
+  [String(baseClassName || ''), isSelected ? String(selectedClassName || '') : ''].filter(Boolean).join(' ');
 
 export const findDuplicateMultichoiceOptionLabels = (options: unknown[] = []): string[] => {
   const seen = new Set<string>();
@@ -52,9 +50,7 @@ const MultichoiceQuestionInput = ({
   if (duplicateLabels.length > 0) {
     return (
       <FormGroup id={styles.multiChoice}>
-        <div role="alert">
-          Multichoice options must have unique labels.
-        </div>
+        <div role="alert">Multichoice options must have unique labels.</div>
       </FormGroup>
     );
   }

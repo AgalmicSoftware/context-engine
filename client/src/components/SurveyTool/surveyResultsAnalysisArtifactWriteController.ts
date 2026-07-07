@@ -1,6 +1,4 @@
-import type {
-  SurveyResultsAnalysisArtifactWritePlan,
-} from './surveyResultsCacheWriteEligibilityPlan';
+import type { SurveyResultsAnalysisArtifactWritePlan } from './surveyResultsCacheWriteEligibilityPlan';
 import type {
   SurveyResultsAnalysisArtifactCacheWritePort,
   SurveyResultsAnalysisArtifactCacheTarget,
@@ -48,11 +46,7 @@ export const runSurveyResultsAnalysisArtifactWriteController = async ({
   }
 
   try {
-    await ports.writeAnalysisArtifact(
-      plan.target.namespace,
-      plan.target.slug,
-      plan.payload as SurveyResultsRecord
-    );
+    await ports.writeAnalysisArtifact(plan.target.namespace, plan.target.slug, plan.payload as SurveyResultsRecord);
     return {
       attempted: true,
       error: null,

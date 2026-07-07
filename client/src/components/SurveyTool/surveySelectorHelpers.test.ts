@@ -27,18 +27,11 @@ import {
 
 describe('surveySelectorHelpers document URLs', () => {
   it('trims string document URLs and drops blanks or non-strings', () => {
-    expect(getSurveyDocumentUrls({
-      documentURLs: [
-        ' https://example.com/one ',
-        '',
-        '   ',
-        12,
-        'ar://abc123',
-      ],
-    })).toEqual([
-      'https://example.com/one',
-      'ar://abc123',
-    ]);
+    expect(
+      getSurveyDocumentUrls({
+        documentURLs: [' https://example.com/one ', '', '   ', 12, 'ar://abc123'],
+      }),
+    ).toEqual(['https://example.com/one', 'ar://abc123']);
   });
 
   it('returns an empty list when no document URL array exists', () => {
@@ -47,50 +40,62 @@ describe('surveySelectorHelpers document URLs', () => {
   });
 
   it('uses the only document URL as the title for single-document surveys', () => {
-    expect(getSurveyDocumentLinkTitle({
-      documentURLs: [' https://example.com/one '],
-    })).toBe('https://example.com/one');
+    expect(
+      getSurveyDocumentLinkTitle({
+        documentURLs: [' https://example.com/one '],
+      }),
+    ).toBe('https://example.com/one');
   });
 
   it('summarizes multiple document URLs for link titles', () => {
-    expect(getSurveyDocumentLinkTitle({
-      documentURLs: ['https://example.com/one', 'https://example.com/two'],
-    })).toBe('2 documents');
+    expect(
+      getSurveyDocumentLinkTitle({
+        documentURLs: ['https://example.com/one', 'https://example.com/two'],
+      }),
+    ).toBe('2 documents');
   });
 });
 
 describe('surveySelectorHelpers copy survey id resolution', () => {
   it('prefers explicit survey IDs over URL and selected survey fallbacks', () => {
-    expect(resolveSurveyIdToCopy({
-      surveyID: 'explicit-id',
-      search: '?surveyID=url-id',
-      surveys: [{ id: 'selected-id' }],
-      selectedSurveyIndex: 0,
-    })).toBe('explicit-id');
+    expect(
+      resolveSurveyIdToCopy({
+        surveyID: 'explicit-id',
+        search: '?surveyID=url-id',
+        surveys: [{ id: 'selected-id' }],
+        selectedSurveyIndex: 0,
+      }),
+    ).toBe('explicit-id');
   });
 
   it('uses URL surveyID before selected survey fallback', () => {
-    expect(resolveSurveyIdToCopy({
-      search: '?surveyID=url-id',
-      surveys: [{ id: 'selected-id' }],
-      selectedSurveyIndex: 0,
-    })).toBe('url-id');
+    expect(
+      resolveSurveyIdToCopy({
+        search: '?surveyID=url-id',
+        surveys: [{ id: 'selected-id' }],
+        selectedSurveyIndex: 0,
+      }),
+    ).toBe('url-id');
   });
 
   it('falls back to the selected survey id', () => {
-    expect(resolveSurveyIdToCopy({
-      search: '?unrelated=true',
-      surveys: [{ id: 'first-id' }, { id: 'selected-id' }],
-      selectedSurveyIndex: 1,
-    })).toBe('selected-id');
+    expect(
+      resolveSurveyIdToCopy({
+        search: '?unrelated=true',
+        surveys: [{ id: 'first-id' }, { id: 'selected-id' }],
+        selectedSurveyIndex: 1,
+      }),
+    ).toBe('selected-id');
   });
 
   it('returns null when no survey id source exists', () => {
-    expect(resolveSurveyIdToCopy({
-      search: '?unrelated=true',
-      surveys: [],
-      selectedSurveyIndex: null,
-    })).toBeNull();
+    expect(
+      resolveSurveyIdToCopy({
+        search: '?unrelated=true',
+        surveys: [],
+        selectedSurveyIndex: null,
+      }),
+    ).toBeNull();
   });
 });
 
@@ -109,12 +114,14 @@ describe('surveySelectorHelpers pending submit stats', () => {
   });
 
   it('builds normalized pending-submit stats state patches', () => {
-    expect(buildSurveySelectorPendingSubmitStatsPatch({
-      total: '3' as any,
-      encrypted: 1,
-      submittedSinceLastEdit: 'yes' as any,
-      isSubmitting: 0 as any,
-    })).toEqual({
+    expect(
+      buildSurveySelectorPendingSubmitStatsPatch({
+        total: '3' as any,
+        encrypted: 1,
+        submittedSinceLastEdit: 'yes' as any,
+        isSubmitting: 0 as any,
+      }),
+    ).toEqual({
       pendingSubmitStats: {
         total: 3,
         encrypted: 1,
@@ -173,7 +180,7 @@ describe('surveySelectorHelpers simple state patches', () => {
       loading: false,
     });
     expect(buildSurveySelectorEmptySurveyListPatch().surveys).not.toBe(
-      buildSurveySelectorEmptySurveyListPatch().surveys
+      buildSurveySelectorEmptySurveyListPatch().surveys,
     );
     expect(buildSurveySelectorLoadedSurveysPatch(surveys)).toEqual({
       surveys,
@@ -224,36 +231,44 @@ describe('surveySelectorHelpers selected survey resolution', () => {
   const surveyB = `0x${'b'.repeat(64)}`;
 
   it('clears selection on the survey list route', () => {
-    expect(resolveSelectedSurveyIndex({
-      surveys: [{ id: surveyA }],
-      path: '/surveys',
-      surveyId: surveyA,
-      previousSelectedSurveyIndex: 0,
-    })).toBeNull();
+    expect(
+      resolveSelectedSurveyIndex({
+        surveys: [{ id: surveyA }],
+        path: '/surveys',
+        surveyId: surveyA,
+        previousSelectedSurveyIndex: 0,
+      }),
+    ).toBeNull();
   });
 
   it('prefers a valid survey route id over the prop id', () => {
-    expect(resolveSelectedSurveyIndex({
-      surveys: [{ id: surveyA }, { id: surveyB }],
-      path: `/survey/0x${'B'.repeat(64)}`,
-      surveyId: surveyA,
-      previousSelectedSurveyIndex: null,
-    })).toBe(1);
+    expect(
+      resolveSelectedSurveyIndex({
+        surveys: [{ id: surveyA }, { id: surveyB }],
+        path: `/survey/0x${'B'.repeat(64)}`,
+        surveyId: surveyA,
+        previousSelectedSurveyIndex: null,
+      }),
+    ).toBe(1);
   });
 
   it('falls back to prop survey id and preserves previous selection when missing', () => {
-    expect(resolveSelectedSurveyIndex({
-      surveys: [{ id: surveyA }, { id: surveyB }],
-      path: '/questions',
-      surveyId: surveyA.toUpperCase(),
-      previousSelectedSurveyIndex: null,
-    })).toBe(0);
-    expect(resolveSelectedSurveyIndex({
-      surveys: [{ id: surveyA }],
-      path: '/questions',
-      surveyId: surveyB,
-      previousSelectedSurveyIndex: 0,
-    })).toBe(0);
+    expect(
+      resolveSelectedSurveyIndex({
+        surveys: [{ id: surveyA }, { id: surveyB }],
+        path: '/questions',
+        surveyId: surveyA.toUpperCase(),
+        previousSelectedSurveyIndex: null,
+      }),
+    ).toBe(0);
+    expect(
+      resolveSelectedSurveyIndex({
+        surveys: [{ id: surveyA }],
+        path: '/questions',
+        surveyId: surveyB,
+        previousSelectedSurveyIndex: 0,
+      }),
+    ).toBe(0);
   });
 });
 
@@ -317,23 +332,11 @@ describe('surveySelectorHelpers survey question cache checks', () => {
       },
     };
 
-    expect(areSurveySpecificQuestionsLoaded(
-      { questionIDs: ['Q1', 'q2'] },
-      '84532',
-      parsedQuestionsCache,
-    )).toBe(true);
-    expect(areSurveySpecificQuestionsLoaded(
-      { questionIDs: ['q1', 'q3'] },
-      '84532',
-      parsedQuestionsCache,
-    )).toBe(false);
+    expect(areSurveySpecificQuestionsLoaded({ questionIDs: ['Q1', 'q2'] }, '84532', parsedQuestionsCache)).toBe(true);
+    expect(areSurveySpecificQuestionsLoaded({ questionIDs: ['q1', 'q3'] }, '84532', parsedQuestionsCache)).toBe(false);
   });
 
   it('returns false when the requested network bucket is missing questions', () => {
-    expect(areSurveySpecificQuestionsLoaded(
-      { questionIDs: ['q1'] },
-      '84532',
-      { '84532': {} },
-    )).toBe(false);
+    expect(areSurveySpecificQuestionsLoaded({ questionIDs: ['q1'] }, '84532', { '84532': {} })).toBe(false);
   });
 });

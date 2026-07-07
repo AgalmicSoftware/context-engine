@@ -11,7 +11,7 @@ describe('UserStats', () => {
         userStats={{ mostUniqueIdea: 'Novel idea', surveysResponded: 3 }}
         collapseOpen="mostUniqueIdea"
         toggleCollapse={toggleCollapse}
-      />
+      />,
     );
 
     expect(screen.getByText('Novel idea')).toBeInTheDocument();

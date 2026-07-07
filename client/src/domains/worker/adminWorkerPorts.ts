@@ -24,9 +24,7 @@ export type AdminResolvedCorsProxyUrl = AdminWorkerRecord & {
 };
 
 export type AdminWorkerCorsProxyModule = {
-  resolveCorsProxyUrl: (
-    input?: AdminResolveCorsProxyUrlInput
-  ) => Promise<AdminResolvedCorsProxyUrl>;
+  resolveCorsProxyUrl: (input?: AdminResolveCorsProxyUrlInput) => Promise<AdminResolvedCorsProxyUrl>;
 };
 
 export type AdminBuildWorkerAllowOriginsInput = {
@@ -35,9 +33,7 @@ export type AdminBuildWorkerAllowOriginsInput = {
 };
 
 export type AdminWorkerCorsOriginsModule = {
-  buildWorkerAllowOrigins: (
-    input?: AdminBuildWorkerAllowOriginsInput
-  ) => string[];
+  buildWorkerAllowOrigins: (input?: AdminBuildWorkerAllowOriginsInput) => string[];
 };
 
 export type AdminWorkerFetchOptions = RequestInit;
@@ -55,13 +51,11 @@ export type AdminWorkerFetchResponse = {
 };
 
 export type AdminWorkerAuthModule = WorkerAuthPublishModule & {
-  buildSiweMessage: (
-    input: AdminBuildSiweMessageInput
-  ) => string;
+  buildSiweMessage: (input: AdminBuildSiweMessageInput) => string;
   fetchWorkerWithAuth: (
     url: string,
     options?: AdminWorkerFetchOptions,
-    context?: AdminWorkerFetchContext
+    context?: AdminWorkerFetchContext,
   ) => Promise<AdminWorkerFetchResponse>;
 };
 
@@ -87,33 +81,23 @@ export type AdminPrepareSiweLoginResult = {
 };
 
 export type AdminWorkerUrlPort = {
-  resolveCorsProxyUrl: (
-    input?: AdminResolveCorsProxyUrlInput
-  ) => Promise<AdminResolvedCorsProxyUrl>;
-  buildWorkerAllowOrigins: (
-    input?: AdminBuildWorkerAllowOriginsInput
-  ) => string[];
+  resolveCorsProxyUrl: (input?: AdminResolveCorsProxyUrlInput) => Promise<AdminResolvedCorsProxyUrl>;
+  buildWorkerAllowOrigins: (input?: AdminBuildWorkerAllowOriginsInput) => string[];
   normalizeWorkerUrl: (value: unknown) => string;
 };
 
 export type WorkerAdminAuthPort = {
-  buildSignedBootstrapAdminAuth: (
-    input: WorkerBootstrapAdminAuthInput
-  ) => Promise<AdminWorkerRecord>;
-  buildSignedAdminActionAuth: (
-    input: WorkerAdminActionAuthInput
-  ) => Promise<AdminWorkerRecord>;
+  buildSignedBootstrapAdminAuth: (input: WorkerBootstrapAdminAuthInput) => Promise<AdminWorkerRecord>;
+  buildSignedAdminActionAuth: (input: WorkerAdminActionAuthInput) => Promise<AdminWorkerRecord>;
   fetchWorkerWithAuth: (
     url: string,
     options?: AdminWorkerFetchOptions,
-    context?: AdminWorkerFetchContext
+    context?: AdminWorkerFetchContext,
   ) => Promise<AdminWorkerFetchResponse>;
 };
 
 export type WorkerSiweLoginPort = {
-  prepareSiweLogin: (
-    input: AdminPrepareSiweLoginInput
-  ) => Promise<AdminPrepareSiweLoginResult>;
+  prepareSiweLogin: (input: AdminPrepareSiweLoginInput) => Promise<AdminPrepareSiweLoginResult>;
 };
 
 export type AdminWorkerPorts = {
@@ -124,7 +108,7 @@ export type AdminWorkerPorts = {
 
 type FetchLike = (
   input: string,
-  init?: RequestInit
+  init?: RequestInit,
 ) => Promise<{
   ok?: boolean;
   status?: number;
@@ -140,14 +124,10 @@ export type BindAdminWorkerPortsArgs = {
 
 const defaultFetchImpl = (): FetchLike => fetch;
 
-const readResponseJson = async (response: {
-  json?: () => Promise<unknown>;
-}): Promise<AdminWorkerRecord> => {
+const readResponseJson = async (response: { json?: () => Promise<unknown> }): Promise<AdminWorkerRecord> => {
   if (typeof response.json !== 'function') return {};
   const data = await response.json().catch(() => ({}));
-  return data && typeof data === 'object' && !Array.isArray(data)
-    ? data as AdminWorkerRecord
-    : {};
+  return data && typeof data === 'object' && !Array.isArray(data) ? (data as AdminWorkerRecord) : {};
 };
 
 export const bindAdminWorkerPorts = ({
@@ -167,15 +147,9 @@ export const bindAdminWorkerPorts = ({
       normalizeWorkerUrl: (value) => workerAuthPublishAdapter.normalizeWorkerUrl(value),
     },
     adminAuth: {
-      buildSignedBootstrapAdminAuth: (input) => (
-        workerAuthPublishAdapter.buildSignedBootstrapAdminAuth(input)
-      ),
-      buildSignedAdminActionAuth: (input) => (
-        workerAuthPublishAdapter.buildSignedAdminActionAuth(input)
-      ),
-      fetchWorkerWithAuth: (url, options, context) => (
-        readWorkerAuth().fetchWorkerWithAuth(url, options, context)
-      ),
+      buildSignedBootstrapAdminAuth: (input) => workerAuthPublishAdapter.buildSignedBootstrapAdminAuth(input),
+      buildSignedAdminActionAuth: (input) => workerAuthPublishAdapter.buildSignedAdminActionAuth(input),
+      fetchWorkerWithAuth: (url, options, context) => readWorkerAuth().fetchWorkerWithAuth(url, options, context),
     },
     siweLogin: {
       prepareSiweLogin: async ({

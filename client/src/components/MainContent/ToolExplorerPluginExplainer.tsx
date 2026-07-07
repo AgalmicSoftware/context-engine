@@ -18,8 +18,12 @@ const ToolExplorerPluginExplainer = ({ explainText }: ToolExplorerPluginExplaine
 
   return (
     <span className={styles.explainerTooltipIcon}>
-      <FontAwesomeIcon icon={faQuestionCircle} id={idRef.current} style={{ cursor: 'pointer', opacity: 0.65, fontSize: '1.1em' }} />
-      <CETooltip placement='top' target={idRef.current} delay={{ show: 100, hide: 300 }}>
+      <FontAwesomeIcon
+        icon={faQuestionCircle}
+        id={idRef.current}
+        style={{ cursor: 'pointer', opacity: 0.65, fontSize: '1.1em' }}
+      />
+      <CETooltip placement="top" target={idRef.current} delay={{ show: 100, hide: 300 }}>
         {explainText}
       </CETooltip>
     </span>

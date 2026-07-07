@@ -48,24 +48,30 @@ describe('surveyResultsDisplayPatchHelpers', () => {
       demoResultsViewMode: 'atlas',
       demoResultsAtlasNodeId: null,
     });
-    expect(buildSurveyResultsDemoViewSelectPatch({
-      nextView: 'breakdown',
-      prevState: { demoResultsViewMode: 'breakdown', demoResultsAtlasNodeId: 'node-a' },
-    })).toEqual({
+    expect(
+      buildSurveyResultsDemoViewSelectPatch({
+        nextView: 'breakdown',
+        prevState: { demoResultsViewMode: 'breakdown', demoResultsAtlasNodeId: 'node-a' },
+      }),
+    ).toEqual({
       demoResultsViewMode: 'raw',
       demoResultsAtlasNodeId: null,
     });
-    expect(buildSurveyResultsDemoViewSelectPatch({
-      nextView: 'atlas',
-      prevState: { demoResultsViewMode: 'report', demoResultsAtlasNodeId: 'node-a' },
-    })).toEqual({
+    expect(
+      buildSurveyResultsDemoViewSelectPatch({
+        nextView: 'atlas',
+        prevState: { demoResultsViewMode: 'report', demoResultsAtlasNodeId: 'node-a' },
+      }),
+    ).toEqual({
       demoResultsViewMode: 'atlas',
       demoResultsAtlasNodeId: 'node-a',
     });
-    expect(buildSurveyResultsDemoViewSelectPatch({
-      nextView: 'unknown',
-      prevState: { demoResultsViewMode: 'atlas', demoResultsAtlasNodeId: 'node-a' },
-    })).toEqual({
+    expect(
+      buildSurveyResultsDemoViewSelectPatch({
+        nextView: 'unknown',
+        prevState: { demoResultsViewMode: 'atlas', demoResultsAtlasNodeId: 'node-a' },
+      }),
+    ).toEqual({
       demoResultsViewMode: 'report',
       demoResultsAtlasNodeId: null,
     });
@@ -79,42 +85,54 @@ describe('surveyResultsDisplayPatchHelpers', () => {
   });
 
   it('builds generic toggle and sort patches', () => {
-    expect(buildSurveyResultsBooleanTogglePatch({
-      prevState: { showQuestionFilter: false },
-      stateKey: 'showQuestionFilter',
-    })).toEqual({ showQuestionFilter: true });
-    expect(buildSurveyResultsBooleanTogglePatch({
-      prevState: { exportAreaOpen: true },
-      stateKey: 'exportAreaOpen',
-    })).toEqual({ exportAreaOpen: false });
+    expect(
+      buildSurveyResultsBooleanTogglePatch({
+        prevState: { showQuestionFilter: false },
+        stateKey: 'showQuestionFilter',
+      }),
+    ).toEqual({ showQuestionFilter: true });
+    expect(
+      buildSurveyResultsBooleanTogglePatch({
+        prevState: { exportAreaOpen: true },
+        stateKey: 'exportAreaOpen',
+      }),
+    ).toEqual({ exportAreaOpen: false });
     expect(buildSurveyResultsBooleanTogglePatch()).toEqual({});
-    expect(buildSurveyResultsKeyedTogglePatch({
-      itemKey: 'q1',
-      mapKey: 'activeQuestionToggles',
-      prevState: { activeQuestionToggles: { q1: false, q2: true } },
-    })).toEqual({
+    expect(
+      buildSurveyResultsKeyedTogglePatch({
+        itemKey: 'q1',
+        mapKey: 'activeQuestionToggles',
+        prevState: { activeQuestionToggles: { q1: false, q2: true } },
+      }),
+    ).toEqual({
       activeQuestionToggles: { q1: true, q2: true },
     });
-    expect(buildSurveyResultsKeyedTogglePatch({
-      forceValue: true,
-      itemKey: 'q1',
-      mapKey: 'activeQuestionToggles',
-      prevState: { activeQuestionToggles: { q1: false } },
-    })).toEqual({
+    expect(
+      buildSurveyResultsKeyedTogglePatch({
+        forceValue: true,
+        itemKey: 'q1',
+        mapKey: 'activeQuestionToggles',
+        prevState: { activeQuestionToggles: { q1: false } },
+      }),
+    ).toEqual({
       activeQuestionToggles: { q1: true },
     });
     expect(buildSurveyResultsKeyedTogglePatch()).toEqual({});
-    expect(buildSurveyResultsQuestionIdSortPatch({
-      column: 'questionId',
-      prevState: { questionIdSortBy: 'questionId', questionIdSortAsc: true },
-    })).toEqual({
+    expect(
+      buildSurveyResultsQuestionIdSortPatch({
+        column: 'questionId',
+        prevState: { questionIdSortBy: 'questionId', questionIdSortAsc: true },
+      }),
+    ).toEqual({
       questionIdSortBy: 'questionId',
       questionIdSortAsc: false,
     });
-    expect(buildSurveyResultsQuestionIdSortPatch({
-      column: 'responses',
-      prevState: { questionIdSortBy: 'questionId', questionIdSortAsc: false },
-    })).toEqual({
+    expect(
+      buildSurveyResultsQuestionIdSortPatch({
+        column: 'responses',
+        prevState: { questionIdSortBy: 'questionId', questionIdSortAsc: false },
+      }),
+    ).toEqual({
       questionIdSortBy: 'responses',
       questionIdSortAsc: true,
     });
@@ -133,8 +151,7 @@ describe('surveyResultsDisplayPatchHelpers', () => {
     expect(buildSurveyResultsBookmarkedSurveyIdsPatch(surveyIds)).toEqual({
       bookmarkedSurveyIDs: ['s1'],
     });
-    expect(buildSurveyResultsBookmarkedSurveyIdsPatch(surveyIds).bookmarkedSurveyIDs)
-      .not.toBe(surveyIds);
+    expect(buildSurveyResultsBookmarkedSurveyIdsPatch(surveyIds).bookmarkedSurveyIDs).not.toBe(surveyIds);
     expect(buildSurveyResultsBookmarkedQuestionIdsPatch(questionIds)).toEqual({
       bookmarkedQuestionIDs: ['q1'],
     });

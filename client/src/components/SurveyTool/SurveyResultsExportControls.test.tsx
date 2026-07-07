@@ -33,7 +33,7 @@ describe('SurveyResultsExportControls', () => {
         onExportTypeChange={jest.fn()}
         onToggleExportArea={onToggleExportArea}
         styleMap={styleMap}
-      />
+      />,
     );
 
     const toggle = screen.getByRole('button', { name: 'Export Data' });
@@ -61,7 +61,7 @@ describe('SurveyResultsExportControls', () => {
         onExportTypeChange={onExportTypeChange}
         onToggleExportArea={onToggleExportArea}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByText('Export Data:')).toBeInTheDocument();

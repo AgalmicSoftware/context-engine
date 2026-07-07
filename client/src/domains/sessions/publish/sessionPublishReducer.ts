@@ -100,7 +100,7 @@ const EFFECT_STATUSES: Record<SessionPublishEffect, SessionPublishStatus> = {
 };
 
 export const createInitialSessionPublishState = (
-  overrides: Partial<SessionPublishState> = {}
+  overrides: Partial<SessionPublishState> = {},
 ): SessionPublishState => ({
   status: 'idle',
   plan: {},
@@ -115,9 +115,7 @@ export const createInitialSessionPublishState = (
   ...overrides,
 });
 
-export const buildSessionPublishEffectQueue = (
-  plan: SessionPublishPlan = {}
-): SessionPublishEffect[] => {
+export const buildSessionPublishEffectQueue = (plan: SessionPublishPlan = {}): SessionPublishEffect[] => {
   const queue: SessionPublishEffect[] = ['checkRequirements'];
   if (plan.autoDeployWorker) queue.push('deployWorker');
   if (plan.deployPendingSbts) queue.push('deployPendingSbts');
@@ -129,14 +127,12 @@ export const buildSessionPublishEffectQueue = (
 
 export const getNextSessionPublishEffect = (
   plan: SessionPublishPlan,
-  completed: SessionPublishCompletedEffects = {}
-): SessionPublishEffect | null => (
-  buildSessionPublishEffectQueue(plan).find((effect) => !completed[effect]) || null
-);
+  completed: SessionPublishCompletedEffects = {},
+): SessionPublishEffect | null => buildSessionPublishEffectQueue(plan).find((effect) => !completed[effect]) || null;
 
 const moveToNextEffect = (
   state: SessionPublishState,
-  completed: SessionPublishCompletedEffects = state.completed
+  completed: SessionPublishCompletedEffects = state.completed,
 ): SessionPublishState => {
   const nextEffect = getNextSessionPublishEffect(state.plan, completed);
   if (!nextEffect) {
@@ -161,20 +157,19 @@ const beginAttempt = (
   state: SessionPublishState,
   plan: SessionPublishPlan,
   completed: SessionPublishCompletedEffects,
-  attempt: number
-): SessionPublishState => moveToNextEffect({
-  ...state,
-  plan,
-  completed,
-  attempt,
-  currentEffect: null,
-  error: null,
-  cancelled: false,
-});
+  attempt: number,
+): SessionPublishState =>
+  moveToNextEffect({
+    ...state,
+    plan,
+    completed,
+    attempt,
+    currentEffect: null,
+    error: null,
+    cancelled: false,
+  });
 
-const resetRetryRequirementCheck = (
-  completed: SessionPublishCompletedEffects
-): SessionPublishCompletedEffects => {
+const resetRetryRequirementCheck = (completed: SessionPublishCompletedEffects): SessionPublishCompletedEffects => {
   const next = { ...completed };
   delete next.checkRequirements;
   return next;
@@ -182,7 +177,7 @@ const resetRetryRequirementCheck = (
 
 export const sessionPublishReducer = (
   state: SessionPublishState,
-  action: SessionPublishAction
+  action: SessionPublishAction,
 ): SessionPublishState => {
   if (action.type === 'edit') {
     return createInitialSessionPublishState({ status: 'editing' });
@@ -199,12 +194,7 @@ export const sessionPublishReducer = (
   }
 
   if (action.type === 'beginPublish') {
-    return beginAttempt(
-      createInitialSessionPublishState({ status: 'editing' }),
-      action.plan || {},
-      {},
-      1
-    );
+    return beginAttempt(createInitialSessionPublishState({ status: 'editing' }), action.plan || {}, {}, 1);
   }
 
   if (action.type === 'retry') {
@@ -212,7 +202,7 @@ export const sessionPublishReducer = (
       state,
       action.plan || state.plan,
       resetRetryRequirementCheck(state.completed),
-      state.attempt + 1
+      state.attempt + 1,
     );
   }
 
@@ -238,14 +228,17 @@ export const sessionPublishReducer = (
       ...state.completed,
       [action.effect]: true,
     };
-    return moveToNextEffect({
-      ...state,
-      workerUrl: action.result?.workerUrl || state.workerUrl,
-      metadataUri: action.result?.metadataUri || state.metadataUri,
-      deployedPendingSbtCount: Number.isFinite(action.result?.deployedPendingSbtCount)
-        ? Number(action.result?.deployedPendingSbtCount)
-        : state.deployedPendingSbtCount,
-    }, completed);
+    return moveToNextEffect(
+      {
+        ...state,
+        workerUrl: action.result?.workerUrl || state.workerUrl,
+        metadataUri: action.result?.metadataUri || state.metadataUri,
+        deployedPendingSbtCount: Number.isFinite(action.result?.deployedPendingSbtCount)
+          ? Number(action.result?.deployedPendingSbtCount)
+          : state.deployedPendingSbtCount,
+      },
+      completed,
+    );
   }
 
   return state;

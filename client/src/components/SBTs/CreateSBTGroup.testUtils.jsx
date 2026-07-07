@@ -6,9 +6,7 @@ import contractScripts from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getScopedCreateSbtFormCacheKey } from '../../utilities/sbt/sbtCreateFormCache.js';
-import {
-  SBT_PASSWORD_RECOVERY_STORAGE_KEY,
-} from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
+import { SBT_PASSWORD_RECOVERY_STORAGE_KEY } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { t } from '../../utilities/ui/terminology.js';
 
 const mockFetchImageFromURL = jest.fn();
@@ -31,7 +29,7 @@ const SBT_FACTORY_RECEIPT_TEST_IFACE = new ethers.utils.Interface([
 export const makeFactoryReceiptLog = (eventName, args) => {
   const encoded = SBT_FACTORY_RECEIPT_TEST_IFACE.encodeEventLog(
     SBT_FACTORY_RECEIPT_TEST_IFACE.getEvent(eventName),
-    args
+    args,
   );
   return {
     address: '0x00000000000000000000000000000000000000fa',

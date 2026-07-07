@@ -1,7 +1,4 @@
-import {
-  ensureQuestionArweaveCacheBranches,
-  mergeQuestionArweaveCacheBranches,
-} from './questionArweaveCacheBranches';
+import { ensureQuestionArweaveCacheBranches, mergeQuestionArweaveCacheBranches } from './questionArweaveCacheBranches';
 
 describe('question arweave cache branches', () => {
   it('merges and preserves arweave cache branches', () => {

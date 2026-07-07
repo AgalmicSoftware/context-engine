@@ -29,11 +29,11 @@ const pruneTimestampedRecord = (record, { tsField, maxEntries } = {}) => {
   const max = Math.max(0, Math.floor(Number(maxEntries) || 0));
   const keys = Object.keys(record);
   if (max <= 0 || keys.length <= max) return record;
-  const sorted = keys
-    .map((key) => ({ key, ts: Number(record?.[key]?.[tsField] || 0) }))
-    .sort((a, b) => a.ts - b.ts);
+  const sorted = keys.map((key) => ({ key, ts: Number(record?.[key]?.[tsField] || 0) })).sort((a, b) => a.ts - b.ts);
   for (let i = 0; i < sorted.length - max; i += 1) {
-    try { delete record[sorted[i].key]; } catch (_) {}
+    try {
+      delete record[sorted[i].key];
+    } catch (_) {}
   }
   return record;
 };
@@ -46,18 +46,12 @@ const SESSION_START_BLOCK_FALLBACK_CACHE = new Map();
 const _resolveSessionCache = new Map();
 let _resolveSessionCacheTimer = null;
 
-const defaultStrictAllowDemoFallback = () => (
-  !USE_ONCHAIN_SESSION_REGISTRY
-);
+const defaultStrictAllowDemoFallback = () => !USE_ONCHAIN_SESSION_REGISTRY;
 
 const resolveSessionConfigEntry = (sessionSlug, opts = {}) => {
   const hasAllowDemoFallback = Object.prototype.hasOwnProperty.call(opts, 'allowDemoFallback');
-  const allowDemoFallback = hasAllowDemoFallback
-    ? !!opts.allowDemoFallback
-    : defaultStrictAllowDemoFallback();
-  const preferRegistry = Object.prototype.hasOwnProperty.call(opts, 'preferRegistry')
-    ? !!opts.preferRegistry
-    : true;
+  const allowDemoFallback = hasAllowDemoFallback ? !!opts.allowDemoFallback : defaultStrictAllowDemoFallback();
+  const preferRegistry = Object.prototype.hasOwnProperty.call(opts, 'preferRegistry') ? !!opts.preferRegistry : true;
   const resolved = resolveSessionConfigFromSources({
     sessionSlug,
     getRegistrySessionConfig: (slug) => sessionRegistryStore.getSessionConfig(slug),
@@ -124,15 +118,16 @@ const resolveSession = (groupKeyOrCfg) => {
 };
 
 export const memoizedResolveSession = (groupKeyOrCfg) => {
-  const resolvedInput = (
-    groupKeyOrCfg &&
-    typeof groupKeyOrCfg === 'object' &&
-    groupKeyOrCfg._isWeb3Context === true
-  )
-    ? (groupKeyOrCfg.groupKeyOrCfg ?? groupKeyOrCfg.cfg ?? groupKeyOrCfg)
-    : groupKeyOrCfg;
-  const key = resolvedInput === undefined ? '' :
-    (typeof resolvedInput === 'string' ? resolvedInput : JSON.stringify(resolvedInput));
+  const resolvedInput =
+    groupKeyOrCfg && typeof groupKeyOrCfg === 'object' && groupKeyOrCfg._isWeb3Context === true
+      ? (groupKeyOrCfg.groupKeyOrCfg ?? groupKeyOrCfg.cfg ?? groupKeyOrCfg)
+      : groupKeyOrCfg;
+  const key =
+    resolvedInput === undefined
+      ? ''
+      : typeof resolvedInput === 'string'
+        ? resolvedInput
+        : JSON.stringify(resolvedInput);
   if (_resolveSessionCache.has(key)) return _resolveSessionCache.get(key);
   const result = resolveSession(resolvedInput === undefined ? '' : resolvedInput);
   _resolveSessionCache.set(key, result);
@@ -200,13 +195,12 @@ export const setTimedMemoValue = (map, key, value, maxEntries = HASH_READ_MAX_EN
 
 export const buildHashReadMemoKey = ({ baseKey, id }) => `${baseKey}|${id}`;
 
-export const buildHashReadInflightKey = ({ baseKey, id, throwOnError = false }) => (
-  `${buildHashReadMemoKey({ baseKey, id })}|strict:${throwOnError ? '1' : '0'}`
-);
+export const buildHashReadInflightKey = ({ baseKey, id, throwOnError = false }) =>
+  `${buildHashReadMemoKey({ baseKey, id })}|strict:${throwOnError ? '1' : '0'}`;
 
 const readQuestionsCacheStorage = async (slug) => {
   const parsed = await readCache('questionsCache', slug);
-  return (parsed && typeof parsed === 'object') ? parsed : {};
+  return parsed && typeof parsed === 'object' ? parsed : {};
 };
 
 const ensureQuestionsNetworkNode = (cacheObj, netIdStr) => {
@@ -249,15 +243,9 @@ export const createContractScriptsCache = ({
 }) => {
   const resolveReadContext = (groupKeyOrCfg) => {
     const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-    const slug = normalizeSessionSlug(
-      (typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfg?.slug || '') || ''
-    );
-    const chainId = Number(
-      cfg?.networkChainId ||
-      cfg?.contracts?.surveys?.chainId ||
-      cfg?.contracts?.sbtFactory?.chainId ||
-      0
-    ) || 0;
+    const slug = normalizeSessionSlug((typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfg?.slug || '') || '');
+    const chainId =
+      Number(cfg?.networkChainId || cfg?.contracts?.surveys?.chainId || cfg?.contracts?.sbtFactory?.chainId || 0) || 0;
     return {
       cfg,
       slug,
@@ -285,19 +273,18 @@ export const createContractScriptsCache = ({
   };
 
   const buildSbtScopeMemoTag = (groupKeyOrCfg, resolvedCfg = null) => {
-    const cfg = (
-      resolvedCfg &&
-      typeof resolvedCfg === 'object'
-    ) ? resolvedCfg : resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
+    const cfg =
+      resolvedCfg && typeof resolvedCfg === 'object'
+        ? resolvedCfg
+        : resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
     const slug = normalizeSessionSlug(cfg?.slug || '') || 'general';
     const addrs = getSessionAddresses(cfg);
     const factoryAddr = normalizeAddress(addrs?.sbtFactory?.address || '') || 'no-factory';
     const chainId = Number(addrs?.sbtFactory?.chainId || cfg?.networkChainId || 0) || 0;
     const scopeBypass = shouldBypassSessionScopeWindow(groupKeyOrCfg, cfg);
     const blockStart = normalizeBlockWindowMemoPart(cfg?.blockLimits?.start, 'start-unknown');
-    const blockEnd = cfg?.blockLimits?.end == null
-      ? 'end-latest'
-      : normalizeBlockWindowMemoPart(cfg?.blockLimits?.end, 'end-invalid');
+    const blockEnd =
+      cfg?.blockLimits?.end == null ? 'end-latest' : normalizeBlockWindowMemoPart(cfg?.blockLimits?.end, 'end-invalid');
     return `${factoryAddr}:${chainId}:${scopeBypass ? 'scope-bypass' : 'scope-default'}:${slug}:${blockStart}:${blockEnd}`;
   };
 
@@ -308,9 +295,8 @@ export const createContractScriptsCache = ({
     return next;
   };
 
-  const isLatestSbtMemoRun = (store, memoKey, runVersion) => (
-    Number(store?._runVersion?.[memoKey] || 0) === Number(runVersion || 0)
-  );
+  const isLatestSbtMemoRun = (store, memoKey, runVersion) =>
+    Number(store?._runVersion?.[memoKey] || 0) === Number(runVersion || 0);
 
   const buildSessionStartCacheKey = (chainId, registrySlug) => {
     const id = Number(chainId || 0) || 0;
@@ -319,9 +305,7 @@ export const createContractScriptsCache = ({
 
   const readSessionCreatedBlockViaQueryFilter = async (contract, slugHash) => {
     if (!contract || typeof contract.queryFilter !== 'function') return null;
-    const filter = contract?.filters?.SessionCreated
-      ? contract.filters.SessionCreated(null, slugHash)
-      : null;
+    const filter = contract?.filters?.SessionCreated ? contract.filters.SessionCreated(null, slugHash) : null;
     if (!filter) return null;
     const events = await contract.queryFilter(filter, 0, 'latest');
     if (!Array.isArray(events) || !events.length) return null;
@@ -338,9 +322,7 @@ export const createContractScriptsCache = ({
     const provider = contract?.provider;
     if (!provider || typeof provider.getLogs !== 'function') return null;
 
-    const topic0 = contract?.interface?.getEventTopic
-      ? contract.interface.getEventTopic('SessionCreated')
-      : null;
+    const topic0 = contract?.interface?.getEventTopic ? contract.interface.getEventTopic('SessionCreated') : null;
     if (!topic0) return null;
 
     let latest = 0;
@@ -482,9 +464,7 @@ export const createContractScriptsCache = ({
   const readArweaveTxFailureCacheEntry = async ({ groupKeyOrCfg, txId, preferMemo = true }) => {
     const normalizedTxId = String(txId || '').trim();
     if (!normalizedTxId) return null;
-    const memoHit = preferMemo
-      ? getArweaveFailureMemoEntry({ groupKeyOrCfg, txId: normalizedTxId })
-      : null;
+    const memoHit = preferMemo ? getArweaveFailureMemoEntry({ groupKeyOrCfg, txId: normalizedTxId }) : null;
     const { slug, chainId } = resolveReadContext(groupKeyOrCfg);
     if (!chainId) return memoHit ? normalizeFailureEntry(memoHit) : null;
     const netIdStr = String(chainId);
@@ -514,7 +494,7 @@ export const createContractScriptsCache = ({
     if (!chainId) return null;
     const netIdStr = String(chainId);
     await updateCacheAtomic('questionsCache', slug, (current) => {
-      const cache = (current && typeof current === 'object') ? current : {};
+      const cache = current && typeof current === 'object' ? current : {};
       const net = ensureQuestionsNetworkNode(cache, netIdStr);
       net.arweaveTxFailureCache[normalizedTxId] = { ...normalizedEntry };
       pruneTimestampedRecord(net.arweaveTxFailureCache, {
@@ -534,10 +514,15 @@ export const createContractScriptsCache = ({
     if (!chainId) return;
     const netIdStr = String(chainId);
     await updateCacheAtomic('questionsCache', slug, (current) => {
-      const cache = (current && typeof current === 'object') ? current : {};
+      const cache = current && typeof current === 'object' ? current : {};
       const net = ensureQuestionsNetworkNode(cache, netIdStr);
-      if (net.arweaveTxFailureCache && Object.prototype.hasOwnProperty.call(net.arweaveTxFailureCache, normalizedTxId)) {
-        try { delete net.arweaveTxFailureCache[normalizedTxId]; } catch (_) {}
+      if (
+        net.arweaveTxFailureCache &&
+        Object.prototype.hasOwnProperty.call(net.arweaveTxFailureCache, normalizedTxId)
+      ) {
+        try {
+          delete net.arweaveTxFailureCache[normalizedTxId];
+        } catch (_) {}
       }
       return cache;
     });
@@ -551,7 +536,7 @@ export const createContractScriptsCache = ({
     if (!chainId) return;
     const netIdStr = String(chainId);
     await updateCacheAtomic('questionsCache', slug, (current) => {
-      const cache = (current && typeof current === 'object') ? current : {};
+      const cache = current && typeof current === 'object' ? current : {};
       const net = ensureQuestionsNetworkNode(cache, netIdStr);
       net.arweaveTxCache[normalizedTxId] = {
         text,
@@ -566,9 +551,8 @@ export const createContractScriptsCache = ({
     });
   };
 
-  const buildArweaveTxFetchInflightKey = ({ chainId, txId, forceFetch = false }) => (
-    `${Number(chainId || 0)}|${String(txId || '').trim()}|force:${forceFetch ? '1' : '0'}`
-  );
+  const buildArweaveTxFetchInflightKey = ({ chainId, txId, forceFetch = false }) =>
+    `${Number(chainId || 0)}|${String(txId || '').trim()}|force:${forceFetch ? '1' : '0'}`;
 
   const runArweaveTxFetchCoalesced = async ({ chainId, txId, forceFetch = false, task }) => {
     const inflightKey = buildArweaveTxFetchInflightKey({ chainId, txId, forceFetch });

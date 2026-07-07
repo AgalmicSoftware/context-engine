@@ -123,27 +123,30 @@ describe('error paths', () => {
   it('propagates transport failures when the worker URL is unreachable', async () => {
     global.fetch = jest.fn().mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
-    await expect(
-      getWorkerSessionToken({ workerUrl: 'https://worker.example', context: authContext })
-    ).rejects.toThrow('Failed to fetch');
+    await expect(getWorkerSessionToken({ workerUrl: 'https://worker.example', context: authContext })).rejects.toThrow(
+      'Failed to fetch',
+    );
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('does not reuse expired cached tokens when refresh fails', async () => {
     const cacheKey = `ce:workerToken:v1:${normalizeWorkerUrl('https://worker.example')}::${TEST_ADDRESS}`;
-    localStorage.setItem(cacheKey, JSON.stringify({
-      token: 'expired-token',
-      exp: Math.floor(Date.now() / 1000) - 60,
-    }));
+    localStorage.setItem(
+      cacheKey,
+      JSON.stringify({
+        token: 'expired-token',
+        exp: Math.floor(Date.now() / 1000) - 60,
+      }),
+    );
     global.fetch = jest
       .fn()
       .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
       .mockResolvedValueOnce(jsonResp(200, {}));
 
-    await expect(
-      getWorkerSessionToken({ workerUrl: 'https://worker.example', context: authContext })
-    ).rejects.toThrow('Worker login did not return a token.');
+    await expect(getWorkerSessionToken({ workerUrl: 'https://worker.example', context: authContext })).rejects.toThrow(
+      'Worker login did not return a token.',
+    );
 
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(localStorage.getItem(cacheKey)).toBeNull();
@@ -159,9 +162,9 @@ describe('error paths', () => {
       text: async () => 'not-json',
     });
 
-    await expect(
-      getWorkerSessionToken({ workerUrl: 'https://worker.example', context: authContext })
-    ).rejects.toThrow('Worker nonce response missing nonce.');
+    await expect(getWorkerSessionToken({ workerUrl: 'https://worker.example', context: authContext })).rejects.toThrow(
+      'Worker nonce response missing nonce.',
+    );
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });

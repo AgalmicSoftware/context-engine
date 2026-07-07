@@ -11,12 +11,8 @@ import {
   buildPileSubmitTempTextPatch,
   buildPileSubmitViewState,
 } from './surveyPileViewState.js';
-import {
-  renderPileGatedPromptCard,
-} from './surveyPileActiveQuestionCard';
-import {
-  renderPileInteractionSurface,
-} from './surveyPileInteractionSurface';
+import { renderPileGatedPromptCard } from './surveyPileActiveQuestionCard';
+import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
   buildClearedTransientSubmitFeedbackState,
   buildQuestionPoolPendingSubmitFeedbackMessage,
@@ -24,20 +20,18 @@ import {
   normalizeTransientSubmitFeedbackDurationMs,
 } from './surveyQuestionSubmitFeedback.js';
 import { buildSurveyQuestionPoolLoadState } from './surveyQuestionsTypes.js';
-import {
-  buildListeningModeSearch,
-  isListeningModeQueryEnabled,
-} from '../../utilities/audio/rollingTranscription';
+import { buildListeningModeSearch, isListeningModeQueryEnabled } from '../../utilities/audio/rollingTranscription';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 jest.mock('./CreateQuestionsAndSurveys', () => {
   const React = require('react');
   return {
     __esModule: true,
-    default: (props) => React.createElement('div', {
-      'data-testid': 'mock-pile-create',
-      'data-hide-survey-toggle': String(props.hideSurveyQuestionToggleUntilAuthoring),
-    }),
+    default: (props) =>
+      React.createElement('div', {
+        'data-testid': 'mock-pile-create',
+        'data-hide-survey-toggle': String(props.hideSurveyQuestionToggleUntilAuthoring),
+      }),
   };
 });
 
@@ -45,9 +39,10 @@ jest.mock('./SessionListeningPanel', () => {
   const React = require('react');
   return {
     __esModule: true,
-    default: () => React.createElement('div', {
-      'data-testid': 'mock-listening-panel',
-    }),
+    default: () =>
+      React.createElement('div', {
+        'data-testid': 'mock-listening-panel',
+      }),
   };
 });
 
@@ -80,9 +75,8 @@ const nodeHasClassName = (node, className) => {
   return value.split(/\s+/).includes(className);
 };
 
-const findNodeByClassName = (node, className) => (
-  findElement(node, (candidate) => nodeHasClassName(candidate, className))
-);
+const findNodeByClassName = (node, className) =>
+  findElement(node, (candidate) => nodeHasClassName(candidate, className));
 
 const getElementChildren = (node) => {
   if (!isElementNode(node)) return [];
@@ -99,17 +93,18 @@ const treeHasDataTestId = (node, testId) => {
   return treeHasDataTestId(node.props.children, testId);
 };
 
-const baseRail = (overrides = {}) => buildPileSubmitRailViewState({
-  pendingStats: { total: 1 },
-  isSubmitting: false,
-  submittedSinceLastEdit: false,
-  submissionComplete: false,
-  pileSubmitTempText: '',
-  pileSubmitLabel: 'Submit',
-  account: '',
-  isAddress: () => false,
-  ...overrides,
-});
+const baseRail = (overrides = {}) =>
+  buildPileSubmitRailViewState({
+    pendingStats: { total: 1 },
+    isSubmitting: false,
+    submittedSinceLastEdit: false,
+    submissionComplete: false,
+    pileSubmitTempText: '',
+    pileSubmitLabel: 'Submit',
+    account: '',
+    isAddress: () => false,
+    ...overrides,
+  });
 
 const buildSurfaceProps = (overrides = {}) => {
   const rail = overrides.rail || baseRail();
@@ -122,9 +117,7 @@ const buildSurfaceProps = (overrides = {}) => {
     loadingElapsedSec: 0,
     pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
     activePileIndex: 0,
-    renderActiveQuestion: jest.fn((question) => (
-      <div data-testid={`active-${question.id}`}>{question.prompt}</div>
-    )),
+    renderActiveQuestion: jest.fn((question) => <div data-testid={`active-${question.id}`}>{question.prompt}</div>),
     hasTerminalScanError: false,
     scanErrorMessage: '',
     hasError: false,
@@ -158,20 +151,24 @@ const buildSurfaceProps = (overrides = {}) => {
   };
 };
 
-const renderPile = (props = {}, options = {}) => renderSurveyPileViewMode({
-  minifiedMode: 'pile',
-  network: { id: 84532 },
-  networkChainId: 84532,
-  account: '',
-  loginComplete: false,
-  cacheHasLoaded: true,
-  isQuestionCacheReady: true,
-  questionResponsesNonce: 2,
-  questionsCacheNonce: 2,
-  onFilterChange: jest.fn(),
-  runtimeStrategy: createPileViewRuntimeStrategy(),
-  ...props,
-}, options);
+const renderPile = (props = {}, options = {}) =>
+  renderSurveyPileViewMode(
+    {
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      loginComplete: false,
+      cacheHasLoaded: true,
+      isQuestionCacheReady: true,
+      questionResponsesNonce: 2,
+      questionsCacheNonce: 2,
+      onFilterChange: jest.fn(),
+      runtimeStrategy: createPileViewRuntimeStrategy(),
+      ...props,
+    },
+    options,
+  );
 
 const applyPatch = (state, patch) => ({ ...state, ...patch });
 
@@ -209,15 +206,14 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('renders option-bearing poll aliases as pile multichoice inputs', async () => {
     renderPile({
-      questionPool: [{
-        id: 'poll-q1',
-        type: 'poll',
-        prompt: 'Which capability matters most?',
-        choices: [
-          { label: 'Cross-site graph' },
-          { text: 'Session memory' },
-        ],
-      }],
+      questionPool: [
+        {
+          id: 'poll-q1',
+          type: 'poll',
+          prompt: 'Which capability matters most?',
+          choices: [{ label: 'Cross-site graph' }, { text: 'Session memory' }],
+        },
+      ],
       cacheHasLoaded: false,
       isQuestionCacheReady: true,
       isResponsesCacheReady: false,
@@ -254,7 +250,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     const tree = renderPileInteractionSurface(buildSurfaceProps());
     const submitButton = findElement(
       tree,
-      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT
+      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT,
     );
     const submitContent = findNodeByClassName(submitButton?.props?.children, 'pileSubmitButtonContent');
     const submitTrail = findNodeByClassName(submitButton?.props?.children, 'pileSubmitButtonTrail');
@@ -280,7 +276,7 @@ describe('SurveyPileViewMode runtime surface', () => {
         questionId="q1"
         sliderMode="conviction"
         sliderOpen={false}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByLabelText('Conviction / importance'));
@@ -305,14 +301,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       getSubmitCount: jest.fn(() => 4),
       props: {},
       state: {
-        pileQuestions: [
-          { id: 'q0' },
-          { id: 'q1' },
-          { id: 'q2' },
-          { id: 'q3' },
-          { id: 'q4' },
-          { id: 'q5' },
-        ],
+        pileQuestions: [{ id: 'q0' }, { id: 'q1' }, { id: 'q2' }, { id: 'q3' }, { id: 'q4' }, { id: 'q5' }],
         activePileIndex: 3,
         showComments: {},
       },
@@ -350,9 +339,12 @@ describe('SurveyPileViewMode runtime surface', () => {
     Element.prototype.scrollIntoView = scrollIntoView;
 
     try {
-      renderPile({}, {
-        route: '/session/demo?foo=1&mode=listening#pile',
-      });
+      renderPile(
+        {},
+        {
+          route: '/session/demo?foo=1&mode=listening#pile',
+        },
+      );
 
       const listeningToggle = await screen.findByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE);
       expect(listeningToggle).toHaveAttribute('aria-pressed', 'true');
@@ -424,9 +416,11 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(loadState.isIncomplete).toBe(true);
     expect(fetchQuestionPool).toHaveBeenCalledTimes(1);
     expect(getProviderKind).not.toHaveBeenCalled();
-    expect(buildQuestionPoolPendingSubmitFeedbackMessage({
-      pendingCount: loadState.pendingCount,
-    })).toBe('Loading 1 more question...');
+    expect(
+      buildQuestionPoolPendingSubmitFeedbackMessage({
+        pendingCount: loadState.pendingCount,
+      }),
+    ).toBe('Loading 1 more question...');
     // port note: the old full-mode test asserted that pile-only
     // `pileSubmitTempText` was absent from direct state. The portable seam is
     // the full-survey load guard and transient feedback message builder.
@@ -445,9 +439,12 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(state.pileSubmitTempText).toBe('Saved');
 
     setTimeout(() => {
-      state = applyPatch(state, buildClearedTransientSubmitFeedbackState({
-        mirrorToPileSubmitText: true,
-      }));
+      state = applyPatch(
+        state,
+        buildClearedTransientSubmitFeedbackState({
+          mirrorToPileSubmitText: true,
+        }),
+      );
     }, normalizeTransientSubmitFeedbackDurationMs(1500));
 
     jest.advanceTimersByTime(1500);
@@ -468,14 +465,20 @@ describe('SurveyPileViewMode runtime surface', () => {
 
     clearTimeout(pileTimer);
     pileTimer = null;
-    state = applyPatch(state, buildTransientSubmitFeedbackState({
-      message: 'Saved',
-      mirrorToPileSubmitText: true,
-    }));
-    setTimeout(() => {
-      state = applyPatch(state, buildClearedTransientSubmitFeedbackState({
+    state = applyPatch(
+      state,
+      buildTransientSubmitFeedbackState({
+        message: 'Saved',
         mirrorToPileSubmitText: true,
-      }));
+      }),
+    );
+    setTimeout(() => {
+      state = applyPatch(
+        state,
+        buildClearedTransientSubmitFeedbackState({
+          mirrorToPileSubmitText: true,
+        }),
+      );
     }, normalizeTransientSubmitFeedbackDurationMs(1500));
 
     expect(state.submissionError).toBe('Saved');
@@ -522,43 +525,50 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('renders the pile clear-pending button only while pending changes are actionable', () => {
     const handleRevertPendingChanges = jest.fn();
-    const actionableTree = renderPileInteractionSurface(buildSurfaceProps({
-      rail: baseRail({ pendingStats: { total: 2 } }),
-      handleRevertPendingChanges,
-    }));
+    const actionableTree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail: baseRail({ pendingStats: { total: 2 } }),
+        handleRevertPendingChanges,
+      }),
+    );
     const clearButton = findElement(
       actionableTree,
-      (node) => isElementNode(node) && node.props.title === 'Clear changes'
+      (node) => isElementNode(node) && node.props.title === 'Clear changes',
     );
 
     expect(clearButton).not.toBeNull();
     clearButton.props.onClick();
     expect(handleRevertPendingChanges).toHaveBeenCalledTimes(1);
 
-    const submittingTree = renderPileInteractionSurface(buildSurfaceProps({
-      rail: baseRail({ pendingStats: { total: 2 }, isSubmitting: true }),
-      isSubmitting: true,
-    }));
+    const submittingTree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail: baseRail({ pendingStats: { total: 2 }, isSubmitting: true }),
+        isSubmitting: true,
+      }),
+    );
 
-    expect(findElement(
-      submittingTree,
-      (node) => isElementNode(node) && node.props.title === 'Clear changes'
-    )).toBeNull();
+    expect(
+      findElement(submittingTree, (node) => isElementNode(node) && node.props.title === 'Clear changes'),
+    ).toBeNull();
   });
 
   it('hides the pile submit rail when no rail is visible', () => {
-    const tree = renderPileInteractionSurface(buildSurfaceProps({
-      rail: baseRail({ pendingStats: { total: 0 } }),
-    }));
+    const tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail: baseRail({ pendingStats: { total: 0 } }),
+      }),
+    );
     const hiddenFooter = findNodeByClassName(tree, 'pileFooterHidden');
 
     expect(hiddenFooter).not.toBeNull();
   });
 
   it('keeps the pile interaction geometry stable when the top rail becomes visible', () => {
-    let tree = renderPileInteractionSurface(buildSurfaceProps({
-      rail: baseRail({ pendingStats: { total: 0 } }),
-    }));
+    let tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail: baseRail({ pendingStats: { total: 0 } }),
+      }),
+    );
     let interactionUnit = findNodeByClassName(tree, 'pileInteractionUnit');
     let hiddenFooter = findNodeByClassName(tree, 'pileFooterHidden');
 
@@ -566,9 +576,11 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(nodeHasClassName(interactionUnit, 'pileInteractionUnitWithSubmitRail')).toBe(false);
     expect(hiddenFooter).not.toBeNull();
 
-    tree = renderPileInteractionSurface(buildSurfaceProps({
-      rail: baseRail({ pendingStats: { total: 1 } }),
-    }));
+    tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail: baseRail({ pendingStats: { total: 1 } }),
+      }),
+    );
     interactionUnit = findNodeByClassName(tree, 'pileInteractionUnit');
     hiddenFooter = findNodeByClassName(tree, 'pileFooterHidden');
 
@@ -579,17 +591,19 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('links the pile success checkmark to the submitted responder user page after submit', () => {
     const responderAddress = '0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD';
-    const tree = renderPileInteractionSurface(buildSurfaceProps({
-      rail: baseRail({
-        pendingStats: { total: 0 },
-        submittedSinceLastEdit: true,
-        account: responderAddress,
-        isAddress: (value) => value === responderAddress,
+    const tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail: baseRail({
+          pendingStats: { total: 0 },
+          submittedSinceLastEdit: true,
+          account: responderAddress,
+          isAddress: (value) => value === responderAddress,
+        }),
       }),
-    }));
+    );
     const submitButton = findElement(
       tree,
-      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT
+      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT,
     );
     const successBadge = findNodeByClassName(tree, 'pileSubmitSuccessBadge');
     const successIcon = findNodeByClassName(tree, 'pileSubmitSuccessIcon');
@@ -607,13 +621,15 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('keeps the pile success checkmark non-clickable when no responder address is available', () => {
-    const tree = renderPileInteractionSurface(buildSurfaceProps({
-      rail: baseRail({
-        pendingStats: { total: 0 },
-        submittedSinceLastEdit: true,
-        account: '',
+    const tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail: baseRail({
+          pendingStats: { total: 0 },
+          submittedSinceLastEdit: true,
+          account: '',
+        }),
       }),
-    }));
+    );
     const successBadge = findNodeByClassName(tree, 'pileSubmitSuccessBadge');
     const successIcon = findNodeByClassName(tree, 'pileSubmitSuccessIcon');
 
@@ -627,17 +643,19 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('renders the pile hologram as a full-card takeover and hides pile controls while active', () => {
-    const closedTree = renderPileInteractionSurface(buildSurfaceProps({
-      renderActiveQuestion: jest.fn(() => null),
-      showHologramAssistant: false,
-    }));
+    const closedTree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        renderActiveQuestion: jest.fn(() => null),
+        showHologramAssistant: false,
+      }),
+    );
     const closedToggleButton = findElement(
       closedTree,
-      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_TOGGLE
+      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_TOGGLE,
     );
     const closedHologram = findElement(
       closedTree,
-      (node) => isElementNode(node) && node.type === PileHologramAssistant
+      (node) => isElementNode(node) && node.type === PileHologramAssistant,
     );
     const closedControls = findNodeByClassName(closedTree, 'pileControls');
     const closedActions = findNodeByClassName(closedControls?.props?.children, 'pileActions');
@@ -651,18 +669,17 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(closedNav).not.toBeNull();
     expect(closedHologram).toBeNull();
 
-    const openTree = renderPileInteractionSurface(buildSurfaceProps({
-      renderActiveQuestion: jest.fn(() => null),
-      showHologramAssistant: true,
-    }));
+    const openTree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        renderActiveQuestion: jest.fn(() => null),
+        showHologramAssistant: true,
+      }),
+    );
     const openToggleButton = findElement(
       openTree,
-      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_TOGGLE
+      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_TOGGLE,
     );
-    const openHologram = findElement(
-      openTree,
-      (node) => isElementNode(node) && node.type === PileHologramAssistant
-    );
+    const openHologram = findElement(openTree, (node) => isElementNode(node) && node.type === PileHologramAssistant);
 
     expect(openToggleButton).toBeNull();
     expect(findNodeByClassName(openTree, 'pileControls')).toBeNull();
@@ -682,11 +699,13 @@ describe('SurveyPileViewMode runtime surface', () => {
       account: '',
     });
 
-    renderPileInteractionSurface(buildSurfaceProps({
-      rail,
-      pileQuestions: [],
-      isStillLoading: true,
-    }));
+    renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail,
+        pileQuestions: [],
+        isStillLoading: true,
+      }),
+    );
 
     expect(getPendingEditStats).not.toHaveBeenCalled();
     // port note: the extracted pile surface consumes a precomputed rail state
@@ -695,30 +714,37 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('keeps the pile action container neutral while only the filter button gets the active class', () => {
-    const tree = renderPileInteractionSurface(buildSurfaceProps({
-      isFilterActive: true,
-    }));
+    const tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        isFilterActive: true,
+      }),
+    );
     const actionsNode = findNodeByClassName(tree, 'pileActions');
-    const filterButton = findElement(tree, (node) => (
-      isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_FILTER_TOGGLE
-    ));
-    const createButton = findElement(tree, (node) => (
-      isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_CREATE_TOGGLE_PILE
-    ));
-    const viewAllButton = findElement(tree, (node) => (
-      isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_VIEW_ALL
-    ));
+    const filterButton = findElement(
+      tree,
+      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_FILTER_TOGGLE,
+    );
+    const createButton = findElement(
+      tree,
+      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_CREATE_TOGGLE_PILE,
+    );
+    const viewAllButton = findElement(
+      tree,
+      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_VIEW_ALL,
+    );
 
     expect(actionsNode).not.toBeNull();
     expect(nodeHasClassName(actionsNode, 'pileActionsActive')).toBe(false);
     expect(filterButton).not.toBeNull();
     expect(nodeHasClassName(filterButton, 'actionButton')).toBe(true);
     expect(nodeHasClassName(filterButton, 'actionButtonActive')).toBe(true);
-    expect(filterButton.props.style).toEqual(expect.objectContaining({
-      color: '#4cd964',
-      borderColor: '#4cd964',
-      opacity: 0.75,
-    }));
+    expect(filterButton.props.style).toEqual(
+      expect.objectContaining({
+        color: '#4cd964',
+        borderColor: '#4cd964',
+        opacity: 0.75,
+      }),
+    );
     expect(createButton).not.toBeNull();
     expect(nodeHasClassName(createButton, 'actionButton')).toBe(true);
     expect(nodeHasClassName(createButton, 'actionButtonActive')).toBe(false);
@@ -728,9 +754,11 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('renders the pile mini spinner as a sibling of the controls stack during background refresh', () => {
-    const tree = renderPileInteractionSurface(buildSurfaceProps({
-      showMiniBackgroundSpinner: true,
-    }));
+    const tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        showMiniBackgroundSpinner: true,
+      }),
+    );
     const interactionNode = findNodeByClassName(tree, 'pileInteractionUnit');
     const controlsNode = findNodeByClassName(tree, 'pileControls');
     const actionsNode = findNodeByClassName(controlsNode?.props?.children, 'pileActions');
@@ -744,11 +772,9 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(actionsNode).not.toBeNull();
     expect(navNode).not.toBeNull();
     expect(spinnerNode).not.toBeNull();
-    expect(interactionChildClasses).toEqual(expect.arrayContaining([
-      'miniSpinnerWrapper',
-      'pileCardContainer',
-      'pileControls',
-    ]));
+    expect(interactionChildClasses).toEqual(
+      expect.arrayContaining(['miniSpinnerWrapper', 'pileCardContainer', 'pileControls']),
+    );
     expect(controlsChildClasses).toHaveLength(3);
     expect(nodeHasClassName(getElementChildren(controlsNode)[0], 'pileActions')).toBe(true);
     expect(nodeHasClassName(getElementChildren(controlsNode)[1], 'pileFooter')).toBe(true);
@@ -779,9 +805,6 @@ describe('SurveyPileViewMode runtime surface', () => {
 
     fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SURVEY_CREATE_TOGGLE_PILE));
 
-    expect(await screen.findByTestId('mock-pile-create')).toHaveAttribute(
-      'data-hide-survey-toggle',
-      'true'
-    );
+    expect(await screen.findByTestId('mock-pile-create')).toHaveAttribute('data-hide-survey-toggle', 'true');
   });
 });

@@ -3,10 +3,7 @@ import {
   parseQuestionSessionSlugFromSearch,
 } from '../../utilities/survey/questionRouting.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import {
-  buildPublicRoute,
-  stripPublicUrlBasePath,
-} from '../../utilities/ui/publicUrl.js';
+import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { createLogger } from 'utilities/logging.js';
 
 const surveyLog = createLogger('surveys');
@@ -19,10 +16,7 @@ export const readPathSearch = (path = ''): string => {
 
 export const hasExplicitSessionQueryPinInPath = (path = ''): boolean => {
   const search = readPathSearch(path);
-  return (
-    parseQuestionSessionSlugFromSearch(search) !== null ||
-    parseQuestionSessionIdFromSearch(search) !== null
-  );
+  return parseQuestionSessionSlugFromSearch(search) !== null || parseQuestionSessionIdFromSearch(search) !== null;
 };
 
 export const appendExplicitSessionHintToPath = (pathIn = '', sessionSlugIn = ''): string => {

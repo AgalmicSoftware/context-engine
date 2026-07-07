@@ -24,53 +24,54 @@ export const isSurveyResultsDemoQuestionResultsContext = ({
 }: {
   effectiveSlug?: unknown;
   viewMode?: unknown;
-} = {}): boolean => (
-  String(viewMode || '').trim().toLowerCase() === 'questions' &&
-  isDemoSessionSlug(String(effectiveSlug || ''))
-);
+} = {}): boolean =>
+  String(viewMode || '')
+    .trim()
+    .toLowerCase() === 'questions' && isDemoSessionSlug(String(effectiveSlug || ''));
 
 export const hasSurveyResultsQuestionResponseEntries = (
   bucket: SurveyResultsDemoQuestionBucket | null | undefined,
-  ports: SurveyResultsDemoQuestionFallbackPorts
+  ports: SurveyResultsDemoQuestionFallbackPorts,
 ): boolean => {
   const questionResponses = bucket?.questionResponses;
   if (!questionResponses || typeof questionResponses !== 'object') return false;
-  return Object.values(questionResponses).some((responderMap) => (
-    !!responderMap &&
-    typeof responderMap === 'object' &&
-    Object.values(responderMap as Record<string, unknown>).some((responseData) => (
-      !ports.isDemoFixtureResponse(ports.parseResponse(responseData))
-    ))
-  ));
+  return Object.values(questionResponses).some(
+    (responderMap) =>
+      !!responderMap &&
+      typeof responderMap === 'object' &&
+      Object.values(responderMap as Record<string, unknown>).some(
+        (responseData) => !ports.isDemoFixtureResponse(ports.parseResponse(responseData)),
+      ),
+  );
 };
 
 export const isBuiltInDemoPendingQuestionMetadataPlaceholder = (
-  question: SurveyResultsDemoQuestionRecord | null | undefined
-): boolean => (
-  !!question && question.__ceQuestionMetadataPending === true
-);
+  question: SurveyResultsDemoQuestionRecord | null | undefined,
+): boolean => !!question && question.__ceQuestionMetadataPending === true;
 
 export const buildSurveyResultsBuiltInDemoQuestionFallbackMap = (
   bucket: SurveyResultsDemoQuestionBucket | null | undefined,
   ports: SurveyResultsDemoQuestionFallbackPorts,
-  bucketSlug: unknown = ''
+  bucketSlug: unknown = '',
 ): Record<string, SurveyResultsDemoQuestionRecord> => {
   const normalizedBucketSlug = normalizeSessionSlug(bucketSlug || '');
-  const existingQuestions = bucket?.questions && typeof bucket.questions === 'object'
-    ? bucket.questions
-    : {};
+  const existingQuestions = bucket?.questions && typeof bucket.questions === 'object' ? bucket.questions : {};
   const responseQuestionIds = new Set<string>();
   Object.entries(bucket?.questionResponses || {}).forEach(([qid, responderMap]) => {
-    const questionId = String(qid || '').trim().toLowerCase();
+    const questionId = String(qid || '')
+      .trim()
+      .toLowerCase();
     if (!questionId || !responderMap || typeof responderMap !== 'object') return;
-    const hasLiveResponse = Object.values(responderMap as Record<string, unknown>).some((responseData) => (
-      !ports.isDemoFixtureResponse(ports.parseResponse(responseData))
-    ));
+    const hasLiveResponse = Object.values(responderMap as Record<string, unknown>).some(
+      (responseData) => !ports.isDemoFixtureResponse(ports.parseResponse(responseData)),
+    );
     if (hasLiveResponse) responseQuestionIds.add(questionId);
   });
   const out: Record<string, SurveyResultsDemoQuestionRecord> = {};
   getPolisDemoQuestionPool().forEach((entry) => {
-    const questionId = String(entry?.id || '').trim().toLowerCase();
+    const questionId = String(entry?.id || '')
+      .trim()
+      .toLowerCase();
     if (!questionId) return;
     if (!responseQuestionIds.has(questionId)) return;
     const existingQuestion = existingQuestions[questionId] as SurveyResultsDemoQuestionRecord | undefined;
@@ -105,20 +106,14 @@ export const applySurveyResultsBuiltInDemoQuestionMetadataFallbackToBucket = ({
   ports: SurveyResultsDemoQuestionFallbackPorts;
   viewMode?: unknown;
 }): SurveyResultsDemoQuestionBucket => {
-  const sourceBucket = bucket && typeof bucket === 'object'
-    ? bucket
-    : {};
+  const sourceBucket = bucket && typeof bucket === 'object' ? bucket : {};
   if (!isSurveyResultsDemoQuestionResultsContext({ effectiveSlug, viewMode })) {
     return sourceBucket;
   }
   if (!hasSurveyResultsQuestionResponseEntries(sourceBucket, ports)) {
     return sourceBucket;
   }
-  const fallbackQuestions = buildSurveyResultsBuiltInDemoQuestionFallbackMap(
-    sourceBucket,
-    ports,
-    bucketSlug
-  );
+  const fallbackQuestions = buildSurveyResultsBuiltInDemoQuestionFallbackMap(sourceBucket, ports, bucketSlug);
   if (Object.keys(fallbackQuestions).length === 0) return sourceBucket;
   return {
     ...sourceBucket,

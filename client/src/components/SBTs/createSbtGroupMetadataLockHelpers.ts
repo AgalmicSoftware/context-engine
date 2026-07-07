@@ -27,12 +27,11 @@ type WriteCreateSbtEncryptedFieldGateArgs = ResolveCreateSbtEncryptedFieldGateVa
   target?: Record<string, unknown> | null;
 };
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const normalizeGateIds = (value: unknown): string[] => {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
+  const values = Array.isArray(value) ? value : value ? [value] : [];
   const seen = new Set<string>();
   const out: string[] = [];
   values.forEach((entry: unknown) => {
@@ -80,7 +79,7 @@ export const normalizeCreateSbtSelectedGateIds = (value: unknown, validGateIds: 
 
 export const normalizeCreateSbtMetadataLockGateIdsForValidGates = (
   metadataLockGateIds: unknown = {},
-  validGateIds: unknown[] = []
+  validGateIds: unknown[] = [],
 ): Record<string, string[]> => {
   const normalizedMetadataLocks = normalizeMetadataLockGateIds(metadataLockGateIds);
   return METADATA_LOCK_FIELDS.reduce<Record<string, string[]>>((acc, fieldKey) => {
@@ -89,11 +88,10 @@ export const normalizeCreateSbtMetadataLockGateIdsForValidGates = (
   }, createEmptyMetadataLockGateIds());
 };
 
-export const getCreateSbtValidGateIds = (gateOptions: unknown): unknown[] => (
+export const getCreateSbtValidGateIds = (gateOptions: unknown): unknown[] =>
   (Array.isArray(gateOptions) ? gateOptions : [])
     .map((opt: unknown) => (isPlainObject(opt) ? opt.id : null))
-    .filter(Boolean)
-);
+    .filter(Boolean);
 
 export const buildCreateSbtMetadataLockSelectionState = ({
   gateOptions = [],
@@ -142,10 +140,12 @@ export const resolveCreateSbtLegacyDescriptionLockGateIds = ({
   const parsedRecord = isPlainObject(parsed) ? parsed : {};
   const legacyDescriptionAddresses = new Set<string>(
     (Array.isArray(parsedRecord.descriptionGateSBTs) ? parsedRecord.descriptionGateSBTs : [])
-      .map((entry: unknown) => (
-        String((isPlainObject(entry) ? entry.address : entry) || '').trim().toLowerCase()
-      ))
-      .filter(Boolean)
+      .map((entry: unknown) =>
+        String((isPlainObject(entry) ? entry.address : entry) || '')
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean),
   );
   if (legacyDescriptionAddresses.size === 0) return [];
   return (Array.isArray(gateOptions) ? gateOptions : [])
@@ -174,28 +174,25 @@ export const resolveCreateSbtRestoredMetadataLockGateIds = ({
   });
   return normalizeMetadataLockGateIds({
     ...cachedMetadataLockGateIds,
-    description: normalizeGateIds(cachedMetadataLockGateIds.description).length > 0
-      ? cachedMetadataLockGateIds.description
-      : (
-        normalizeGateIds(parsedRecord.descriptionLockGateIds).length > 0
+    description:
+      normalizeGateIds(cachedMetadataLockGateIds.description).length > 0
+        ? cachedMetadataLockGateIds.description
+        : normalizeGateIds(parsedRecord.descriptionLockGateIds).length > 0
           ? parsedRecord.descriptionLockGateIds
-          : legacyDescriptionLockGateIds
-      ),
-    tags: normalizeGateIds(cachedMetadataLockGateIds.tags).length > 0
-      ? cachedMetadataLockGateIds.tags
-      : parsedRecord.tagsLockGateIds,
-    documentURLs: normalizeGateIds(cachedMetadataLockGateIds.documentURLs).length > 0
-      ? cachedMetadataLockGateIds.documentURLs
-      : parsedRecord.docsLockGateIds,
+          : legacyDescriptionLockGateIds,
+    tags:
+      normalizeGateIds(cachedMetadataLockGateIds.tags).length > 0
+        ? cachedMetadataLockGateIds.tags
+        : parsedRecord.tagsLockGateIds,
+    documentURLs:
+      normalizeGateIds(cachedMetadataLockGateIds.documentURLs).length > 0
+        ? cachedMetadataLockGateIds.documentURLs
+        : parsedRecord.docsLockGateIds,
   });
 };
 
-export const getMetadataFieldLockGateIds = (
-  lockMap?: Record<string, unknown>,
-  fieldKey = ''
-): string[] => (
-  normalizeGateIds(lockMap?.[fieldKey])
-);
+export const getMetadataFieldLockGateIds = (lockMap?: Record<string, unknown>, fieldKey = ''): string[] =>
+  normalizeGateIds(lockMap?.[fieldKey]);
 
 export const resolveCreateSbtMetadataFieldGateIds = ({
   fieldKey = '',
@@ -208,19 +205,14 @@ export const resolveCreateSbtMetadataFieldGateIds = ({
   const selectedGateIds = rawGateIds.filter((gateId) => knownGateIds.has(gateId));
   if (rawGateIds.length > 0 && selectedGateIds.length !== rawGateIds.length) {
     const gatesLower = String(gatesLowerLabel || 'gates');
-    throw new Error(`${fieldKey} encryption ${gatesLower} could not be resolved. Please reselect the lock or configure valid ${gatesLower}.`);
+    throw new Error(
+      `${fieldKey} encryption ${gatesLower} could not be resolved. Please reselect the lock or configure valid ${gatesLower}.`,
+    );
   }
   return selectedGateIds;
 };
 
-export const areMetadataLockGateMapsEqual = (
-  a?: Record<string, unknown>,
-  b?: Record<string, unknown>
-): boolean => (
-  METADATA_LOCK_FIELDS.every((fieldKey) => (
-    areStringArraysEqual(
-      getMetadataFieldLockGateIds(a, fieldKey),
-      getMetadataFieldLockGateIds(b, fieldKey)
-    )
-  ))
-);
+export const areMetadataLockGateMapsEqual = (a?: Record<string, unknown>, b?: Record<string, unknown>): boolean =>
+  METADATA_LOCK_FIELDS.every((fieldKey) =>
+    areStringArraysEqual(getMetadataFieldLockGateIds(a, fieldKey), getMetadataFieldLockGateIds(b, fieldKey)),
+  );

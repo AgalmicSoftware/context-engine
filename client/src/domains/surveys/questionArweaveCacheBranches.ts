@@ -1,12 +1,13 @@
 type UnknownRecord = Record<string, unknown>;
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const isTerminalArweaveFailureState = (state: unknown): boolean => (
-  String(state || '').trim().toLowerCase().startsWith('terminal_')
-);
+const isTerminalArweaveFailureState = (state: unknown): boolean =>
+  String(state || '')
+    .trim()
+    .toLowerCase()
+    .startsWith('terminal_');
 
 const pickNewerTextEntry = (a: unknown, b: unknown) => {
   const aRecord = isRecord(a) ? a : {};
@@ -38,11 +39,7 @@ const pickNewerFailureEntry = (a: unknown, b: unknown) => {
   return a || b || null;
 };
 
-const mergeByKey = (
-  localMap: unknown,
-  freshMap: unknown,
-  chooser: (a: unknown, b: unknown) => unknown
-) => {
+const mergeByKey = (localMap: unknown, freshMap: unknown, chooser: (a: unknown, b: unknown) => unknown) => {
   const local: UnknownRecord = isRecord(localMap) ? localMap : {};
   const fresh: UnknownRecord = isRecord(freshMap) ? freshMap : {};
   const out: UnknownRecord = {};
@@ -71,14 +68,12 @@ export const ensureQuestionArweaveCacheBranches = (networkNode: unknown) => {
 
 export const mergeQuestionArweaveCacheBranches = (localNode: unknown, freshNode: unknown) => {
   const local = ensureQuestionArweaveCacheBranches(localNode);
-  const fresh = ensureQuestionArweaveCacheBranches(
-    isRecord(freshNode) ? freshNode : {}
-  );
+  const fresh = ensureQuestionArweaveCacheBranches(isRecord(freshNode) ? freshNode : {});
   local.arweaveTxCache = mergeByKey(local.arweaveTxCache, fresh.arweaveTxCache, pickNewerTextEntry);
   local.arweaveTxFailureCache = mergeByKey(
     local.arweaveTxFailureCache,
     fresh.arweaveTxFailureCache,
-    pickNewerFailureEntry
+    pickNewerFailureEntry,
   );
   return local;
 };

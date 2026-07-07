@@ -45,12 +45,14 @@ describe('SurveyResultsQuestionSummaryCard', () => {
         resolvedQuestionType="freeform"
         styleMap={styleMap}
         viewableResponsesCount={3}
-      />
+      />,
     );
 
     expect(screen.getByText('Question prompt')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
-    expect(screen.getByText('No metadata found for this question in local cache.')).toHaveStyle({ fontStyle: 'italic' });
+    expect(screen.getByText('No metadata found for this question in local cache.')).toHaveStyle({
+      fontStyle: 'italic',
+    });
     expect(screen.getByText('Freeform summary')).toBeInTheDocument();
     expect(renderFreeformSummary).toHaveBeenCalledTimes(1);
     expect(renderMultichoiceSummary).not.toHaveBeenCalled();
@@ -84,7 +86,7 @@ describe('SurveyResultsQuestionSummaryCard', () => {
         renderMultichoiceSummary={renderMultichoiceSummary}
         resolvedQuestionType="multichoice"
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByText('Multichoice summary')).toBeInTheDocument();
@@ -103,7 +105,7 @@ describe('SurveyResultsQuestionSummaryCard', () => {
         renderMultichoiceSummary={renderMultichoiceSummary}
         resolvedQuestionType="binary"
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByText('Default summary')).toBeInTheDocument();

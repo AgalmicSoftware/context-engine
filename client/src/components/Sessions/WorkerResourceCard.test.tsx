@@ -5,7 +5,10 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 jest.mock('../Gates/GateMultiSelectLock', () => ({
   __esModule: true,
-  default: ({ onChangeSelectedGateIds, onToggleOpen }: {
+  default: ({
+    onChangeSelectedGateIds,
+    onToggleOpen,
+  }: {
     onChangeSelectedGateIds: (nextIds: string[]) => void;
     onToggleOpen: (nextOpen: boolean) => void;
   }) => (
@@ -39,7 +42,7 @@ describe('WorkerResourceCard', () => {
         disabled={false}
       >
         <div>resource inputs</div>
-      </WorkerResourceCard>
+      </WorkerResourceCard>,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)).toHaveAttribute('data-ce-resource-key', 'ai');

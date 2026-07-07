@@ -92,7 +92,9 @@ export const renderAiOrGateSelect = ({
           onChange={(e) => onUpdateDraftValue(currentPath, e.target.value)}
         >
           <option value="openai">OpenAI</option>
-          <option value="local" disabled>Local (coming soon)</option>
+          <option value="local" disabled>
+            Local (coming soon)
+          </option>
         </Input>
       ),
     });
@@ -137,12 +139,14 @@ export const renderAiOrGateSelect = ({
           ? 'transcription'
           : null;
   if (modelType) {
-    const providerMode = modelType === 'transcription'
-      ? 'openai'
-      : normalizeAiProvider(draft?.ai?.models?.[modelType]?.provider || 'openai');
-    const modelOptions = modelType === 'transcription'
-      ? getAiModelOptions('transcription', 'openai')
-      : getAiModelOptions(modelType, providerMode);
+    const providerMode =
+      modelType === 'transcription'
+        ? 'openai'
+        : normalizeAiProvider(draft?.ai?.models?.[modelType]?.provider || 'openai');
+    const modelOptions =
+      modelType === 'transcription'
+        ? getAiModelOptions('transcription', 'openai')
+        : getAiModelOptions(modelType, providerMode);
     if (!modelOptions.length) return null;
     const options = Array.from(new Set(modelOptions.filter(Boolean)));
     const selectedModel = normalizeAiModelForProvider(modelType, providerMode, value);
@@ -151,11 +155,7 @@ export const renderAiOrGateSelect = ({
       displayLabelText,
       fieldTooltipControl,
       children: (
-        <Input
-          type="select"
-          value={selectedModel}
-          onChange={(e) => onUpdateDraftValue(currentPath, e.target.value)}
-        >
+        <Input type="select" value={selectedModel} onChange={(e) => onUpdateDraftValue(currentPath, e.target.value)}>
           {options.map((option) => (
             <option key={option} value={option}>
               {option}
@@ -175,9 +175,7 @@ export const renderAiOrGateSelect = ({
       fieldTooltipControl,
       children: (
         <div className={styles.defaultGateControl}>
-          {activeGate && (
-            <span className={styles.gateColor} style={{ background: activeGate.color }} />
-          )}
+          {activeGate && <span className={styles.gateColor} style={{ background: activeGate.color }} />}
           <Input
             type="select"
             className={styles.defaultGateSelect}

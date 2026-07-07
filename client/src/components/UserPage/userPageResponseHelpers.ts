@@ -1,8 +1,4 @@
-import {
-  isPlainAnalysisObject,
-  toAnalysisRecord,
-  type UserPageUnknownRecord,
-} from './userPageCoreHelpers';
+import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 
 export const cloneUserPageParsedResponsePayload = (value: unknown): unknown => {
   if (value == null || typeof value !== 'object') return value;
@@ -25,7 +21,7 @@ export const cloneUserPageParsedResponsePayload = (value: unknown): unknown => {
 export const parseUserPageCachedResponsePayload = (
   rawValue: unknown,
   memo: Map<string, unknown> | null | undefined,
-  memoLimit: number
+  memoLimit: number,
 ): unknown => {
   if (typeof rawValue !== 'string') return cloneUserPageParsedResponsePayload(rawValue);
   if (memo && memo.has(rawValue)) {
@@ -67,25 +63,24 @@ export const extractUserPageFirstDefinedValue = (...values: unknown[]): unknown 
 
 export const normalizeUserPageResponseField = (
   rawField: unknown,
-  fallbackValues: unknown[] = []
+  fallbackValues: unknown[] = [],
 ): UserPageNormalizedResponseField => {
-  const base: UserPageNormalizedResponseField = (rawField && typeof rawField === 'object' && !Array.isArray(rawField))
-    ? { ...rawField as UserPageUnknownRecord }
-    : {};
-  const scalarFallback = (rawField != null && typeof rawField !== 'object')
-    ? rawField
-    : undefined;
+  const base: UserPageNormalizedResponseField =
+    rawField && typeof rawField === 'object' && !Array.isArray(rawField)
+      ? { ...(rawField as UserPageUnknownRecord) }
+      : {};
+  const scalarFallback = rawField != null && typeof rawField !== 'object' ? rawField : undefined;
   const nextValue = extractUserPageFirstDefinedValue(
     base.value,
     scalarFallback,
-    ...(Array.isArray(fallbackValues) ? fallbackValues : [])
+    ...(Array.isArray(fallbackValues) ? fallbackValues : []),
   );
   if (nextValue !== undefined) base.value = nextValue;
   return base;
 };
 
 export const normalizeUserPageSingleQuestionResponsePayload = (
-  rawResponse: unknown = null
+  rawResponse: unknown = null,
 ): UserPageNormalizedQuestionResponsePayload | null => {
   if (rawResponse == null) return null;
 
@@ -98,9 +93,7 @@ export const normalizeUserPageSingleQuestionResponsePayload = (
 
   const rawRecord = toAnalysisRecord(rawResponse);
   const nestedResponse = isPlainAnalysisObject(rawRecord.response) ? rawRecord.response : null;
-  const base = nestedResponse
-    ? { ...rawRecord, ...nestedResponse }
-    : { ...rawRecord };
+  const base = nestedResponse ? { ...rawRecord, ...nestedResponse } : { ...rawRecord };
 
   const answerFallback = extractUserPageFirstDefinedValue(
     base.answerValue,
@@ -108,17 +101,17 @@ export const normalizeUserPageSingleQuestionResponsePayload = (
     base.responseValue,
     base.answerText,
     base.responseText,
-    (
-      base.answer == null &&
+    base.answer == null &&
       (typeof base.response === 'string' || typeof base.response === 'number' || typeof base.response === 'boolean')
-    ) ? base.response : undefined
+      ? base.response
+      : undefined,
   );
   const additionalFallback = extractUserPageFirstDefinedValue(
     base.additionalComment,
     base.additionalComments,
     base.comment,
     base.comments,
-    base.additionalText
+    base.additionalText,
   );
 
   const normalized: UserPageNormalizedQuestionResponsePayload = {
@@ -171,10 +164,7 @@ export const hasDisplayableUserPageResponsePayload = (responseObj: unknown = nul
   if (!Object.keys(responseRecord).length) return false;
   const answer = toAnalysisRecord(responseRecord.answer);
   const additional = toAnalysisRecord(responseRecord.additional);
-  return (
-    isDisplayableUserPageResponseValue(answer.value) ||
-    isDisplayableUserPageResponseValue(additional.value)
-  );
+  return isDisplayableUserPageResponseValue(answer.value) || isDisplayableUserPageResponseValue(additional.value);
 };
 
 export const hasUserPageResponseSubmissionHints = (value: unknown = null): boolean => {
@@ -210,10 +200,7 @@ export type UserPageResponseRecencyWithHints = UserPageResponseRecency & {
 };
 export type UserPageResponseByResponderMap = Record<string, unknown>;
 export type UserPageResponseBucketMap = Record<string, UserPageResponseByResponderMap>;
-export type UserPageResponseRecencyBucketMap = Record<
-  string,
-  Record<string, UserPageResponseRecencyWithHints>
->;
+export type UserPageResponseRecencyBucketMap = Record<string, Record<string, UserPageResponseRecencyWithHints>>;
 type UserPageQuestionResponseInfoWithRecency = UserPageUnknownRecord & {
   id?: unknown;
   _responseRecency?: unknown;
@@ -221,21 +208,16 @@ type UserPageQuestionResponseInfoWithRecency = UserPageUnknownRecord & {
 
 export const extractUserPageResponseRecency = (
   responseObj: unknown = null,
-  recencyMeta: unknown = null
+  recencyMeta: unknown = null,
 ): UserPageResponseRecency => {
   const meta = toAnalysisRecord(recencyMeta);
   const src = toAnalysisRecord(responseObj);
   return {
     bn: Number(meta.bn ?? meta.blockNumber ?? src.blockNumber ?? src.bn ?? 0) || 0,
-    txi: Number(
-      meta.txi ??
-      meta.transactionIndex ??
-      meta.txIndex ??
-      src.txi ??
-      src.transactionIndex ??
-      src.txIndex ??
-      0
-    ) || 0,
+    txi:
+      Number(
+        meta.txi ?? meta.transactionIndex ?? meta.txIndex ?? src.txi ?? src.transactionIndex ?? src.txIndex ?? 0,
+      ) || 0,
     li: Number(meta.li ?? meta.logIndex ?? src.logIndex ?? src.li ?? 0) || 0,
     ts: Number(meta.ts ?? meta.timestamp ?? src.ts ?? src.timestamp ?? 0) || 0,
   };
@@ -243,7 +225,7 @@ export const extractUserPageResponseRecency = (
 
 export const extractUserPageResponseRecencyWithHints = (
   responseObj: unknown = null,
-  recencyMeta: unknown = null
+  recencyMeta: unknown = null,
 ): UserPageResponseRecencyWithHints => {
   const recency = extractUserPageResponseRecency(responseObj, recencyMeta);
   return {
@@ -262,11 +244,9 @@ export const compareUserPageResponseRecency = (left: unknown, right: unknown): n
   return 0;
 };
 
-export const normalizeUserPageQuestionResponseInfoOrder = (
-  questionResponseInfo: unknown
-): UserPageUnknownRecord[] => {
+export const normalizeUserPageQuestionResponseInfoOrder = (questionResponseInfo: unknown): UserPageUnknownRecord[] => {
   const entries: UserPageQuestionResponseInfoWithRecency[] = Array.isArray(questionResponseInfo)
-    ? [...questionResponseInfo as UserPageQuestionResponseInfoWithRecency[]]
+    ? [...(questionResponseInfo as UserPageQuestionResponseInfoWithRecency[])]
     : [];
   entries.sort((a, b) => {
     const cmp = compareUserPageResponseRecency(a._responseRecency, b._responseRecency);

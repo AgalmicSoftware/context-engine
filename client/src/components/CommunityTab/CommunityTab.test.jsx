@@ -17,14 +17,7 @@ import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 const ORIGINAL_SESSION_SCAN_SCOPE = globalThis.CE_SESSION_SCAN_SCOPE;
 const ORIGINAL_SESSION_SCAN_SLUGS = globalThis.CE_SESSION_SCAN_SLUGS;
 
-const MANAGED_NAMESPACES = [
-  'questionsCache',
-  'surveysCache',
-  'bookmarksCache',
-  'filters',
-  'sbtCache',
-  'userCache',
-];
+const MANAGED_NAMESPACES = ['questionsCache', 'surveysCache', 'bookmarksCache', 'filters', 'sbtCache', 'userCache'];
 let canvasCreateElementSpy;
 
 const clearManagedCaches = async () => {
@@ -38,9 +31,7 @@ const clearManagedCaches = async () => {
 
 const attachMutableSetState = (instance) => {
   instance.setState = jest.fn((update, cb) => {
-    const patch = typeof update === 'function'
-      ? update(instance.state, instance.props)
-      : update;
+    const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
     if (patch && typeof patch === 'object') {
       instance.state = { ...instance.state, ...patch };
     }
@@ -72,7 +63,9 @@ const collectNodeText = (node) => {
 
 describe('CommunityTab helpers', () => {
   beforeEach(async () => {
-    try { window.history.replaceState({}, '', '/'); } catch (_) {}
+    try {
+      window.history.replaceState({}, '', '/');
+    } catch (_) {}
     localStorage.clear();
     globalThis.CE_SESSION_SCAN_SCOPE = 'active';
     globalThis.CE_SESSION_SCAN_SLUGS = [];
@@ -101,12 +94,16 @@ describe('CommunityTab helpers', () => {
 
   afterAll(() => {
     if (typeof ORIGINAL_SESSION_SCAN_SCOPE === 'undefined') {
-      try { delete globalThis.CE_SESSION_SCAN_SCOPE; } catch (_) {}
+      try {
+        delete globalThis.CE_SESSION_SCAN_SCOPE;
+      } catch (_) {}
     } else {
       globalThis.CE_SESSION_SCAN_SCOPE = ORIGINAL_SESSION_SCAN_SCOPE;
     }
     if (typeof ORIGINAL_SESSION_SCAN_SLUGS === 'undefined') {
-      try { delete globalThis.CE_SESSION_SCAN_SLUGS; } catch (_) {}
+      try {
+        delete globalThis.CE_SESSION_SCAN_SLUGS;
+      } catch (_) {}
     } else {
       globalThis.CE_SESSION_SCAN_SLUGS = ORIGINAL_SESSION_SCAN_SLUGS;
     }
@@ -159,23 +156,29 @@ describe('CommunityTab helpers', () => {
       const demoDataset = polisReportModule.getPolisDemoDatasetForSlug('demo');
       const expectedDemoLabels = (Array.isArray(demoDataset?.comments) ? demoDataset.comments : [])
         .filter((comment) => {
-          const type = String(comment?.type || 'binary').trim().toLowerCase();
+          const type = String(comment?.type || 'binary')
+            .trim()
+            .toLowerCase();
           return type === 'binary';
         })
         .map((comment) => String(comment?.commentBody || '').trim())
         .filter(Boolean);
 
       expect(points).toHaveLength(expectedDemoLabels.length);
-      expect(points[0]).toEqual(expect.objectContaining({
-        questionId: expect.any(String),
-        label: expectedDemoLabels[0],
-        total: expect.any(Number),
-      }));
+      expect(points[0]).toEqual(
+        expect.objectContaining({
+          questionId: expect.any(String),
+          label: expectedDemoLabels[0],
+          total: expect.any(Number),
+        }),
+      );
       expect(plotNode.props.points).toHaveLength(expectedDemoLabels.length);
       expect(plotNode.props.showIdleSummary).toBe(false);
-      expect(plotNode.props.points[0]).toEqual(expect.objectContaining({
-        label: expectedDemoLabels[0],
-      }));
+      expect(plotNode.props.points[0]).toEqual(
+        expect.objectContaining({
+          label: expectedDemoLabels[0],
+        }),
+      );
       expect(headings).toHaveLength(0);
     } finally {
       localStorage.removeItem('ce:sessionScanScope');
@@ -218,14 +221,14 @@ describe('CommunityTab helpers', () => {
       participantsVotes: [
         {
           votes: {
-            '0': 1,
-            '1': -1,
+            0: 1,
+            1: -1,
           },
         },
         {
           votes: {
-            '0': 0,
-            '1': 1,
+            0: 0,
+            1: 1,
           },
         },
       ],
@@ -236,15 +239,17 @@ describe('CommunityTab helpers', () => {
       const points = instance._buildDemoBeeswarmPoints();
 
       expect(points).toHaveLength(1);
-      expect(points[0]).toEqual(expect.objectContaining({
-        questionId: 'legacy-binary',
-        label: 'Legacy binary comment without a type',
-        extremity: 0,
-        agrees: 1,
-        disagrees: 0,
-        unsure: 1,
-        total: 2,
-      }));
+      expect(points[0]).toEqual(
+        expect.objectContaining({
+          questionId: 'legacy-binary',
+          label: 'Legacy binary comment without a type',
+          extremity: 0,
+          agrees: 1,
+          disagrees: 0,
+          unsure: 1,
+          total: 2,
+        }),
+      );
     } finally {
       demoSpy.mockRestore();
     }
@@ -314,15 +319,18 @@ describe('CommunityTab helpers', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'demo' });
 
     const tree = instance.render();
-    const [toggleNode] = collectTreeNodes(tree, (node) => (
-      node?.props?.['data-testid'] === 'ce-community-session-selector-toggle'
-    ));
-    const [panelNode] = collectTreeNodes(tree, (node) => (
-      node?.props?.['data-testid'] === 'ce-community-session-selector-panel'
-    ));
-    const [leaderboardToggleNode] = collectTreeNodes(tree, (node) => (
-      node?.props?.['data-testid'] === 'ce-community-leaderboard-controls-toggle'
-    ));
+    const [toggleNode] = collectTreeNodes(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-community-session-selector-toggle',
+    );
+    const [panelNode] = collectTreeNodes(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-community-session-selector-panel',
+    );
+    const [leaderboardToggleNode] = collectTreeNodes(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-community-leaderboard-controls-toggle',
+    );
 
     expect(toggleNode).toBeFalsy();
     expect(panelNode).toBeFalsy();
@@ -339,18 +347,22 @@ describe('CommunityTab helpers', () => {
     };
 
     const tree = instance.render();
-    const [toggleNode] = collectTreeNodes(tree, (node) => (
-      node?.props?.['data-testid'] === 'ce-community-leaderboard-controls-toggle'
-    ));
-    const [panelNode] = collectTreeNodes(tree, (node) => (
-      node?.props?.['data-testid'] === 'ce-community-leaderboard-controls-panel'
-    ));
-    const [hideSimulatedNode] = collectTreeNodes(tree, (node) => (
-      node?.props?.['data-testid'] === 'ce-community-hide-simulated-users'
-    ));
-    const [hideUsersNode] = collectTreeNodes(tree, (node) => (
-      node?.props?.['data-testid'] === 'ce-community-hide-users'
-    ));
+    const [toggleNode] = collectTreeNodes(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-community-leaderboard-controls-toggle',
+    );
+    const [panelNode] = collectTreeNodes(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-community-leaderboard-controls-panel',
+    );
+    const [hideSimulatedNode] = collectTreeNodes(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-community-hide-simulated-users',
+    );
+    const [hideUsersNode] = collectTreeNodes(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-community-hide-users',
+    );
 
     expect(toggleNode).toBeTruthy();
     expect(panelNode).toBeTruthy();
@@ -368,11 +380,11 @@ describe('CommunityTab helpers', () => {
     };
 
     const tree = instance.render();
-    const [modalNode] = collectTreeNodes(tree, (node) => (
-      node?.props?.isOpen === true &&
-      node?.props?.size === 'lg' &&
-      node?.props?.toggle === instance.toggleModal
-    ));
+    const [modalNode] = collectTreeNodes(
+      tree,
+      (node) =>
+        node?.props?.isOpen === true && node?.props?.size === 'lg' && node?.props?.toggle === instance.toggleModal,
+    );
 
     expect(modalNode).toBeTruthy();
     expect(modalNode.props.centered).toBe(true);
@@ -402,10 +414,7 @@ describe('CommunityTab helpers', () => {
 
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
     const tree = instance.renderModalContent();
-    const anchors = collectTreeNodes(
-      tree,
-      (node) => node?.type === 'a' && typeof node?.props?.href === 'string'
-    );
+    const anchors = collectTreeNodes(tree, (node) => node?.type === 'a' && typeof node?.props?.href === 'string');
     expect(anchors.map((node) => node.props.href)).toEqual([
       '/survey/0xabc?session=test-10',
       '/survey/0xdef?session=edge',
@@ -413,7 +422,7 @@ describe('CommunityTab helpers', () => {
 
     const responseSpans = collectTreeNodes(
       tree,
-      (node) => node?.type === 'span' && typeof node?.props?.onClick === 'function'
+      (node) => node?.type === 'span' && typeof node?.props?.onClick === 'function',
     );
     responseSpans[0].props.onClick();
     responseSpans[1].props.onClick();
@@ -431,21 +440,19 @@ describe('CommunityTab helpers', () => {
       instance.state = {
         ...instance.state,
         modalType: 'surveys',
-        surveysList: [
-          { id: '0xabc', title: 'Survey A', responsesCount: 2, questionsCount: 3, slug: 'test-10' },
-        ],
+        surveysList: [{ id: '0xabc', title: 'Survey A', responsesCount: 2, questionsCount: 3, slug: 'test-10' }],
       };
 
       const surveysTree = instance.renderModalContent();
       const [surveyAnchor] = collectTreeNodes(
         surveysTree,
-        (node) => node?.type === 'a' && typeof node?.props?.href === 'string'
+        (node) => node?.type === 'a' && typeof node?.props?.href === 'string',
       );
       expect(surveyAnchor.props.href).toBe('/ce/survey/0xabc?session=test-10');
 
       const [responseSpan] = collectTreeNodes(
         surveysTree,
-        (node) => node?.type === 'span' && typeof node?.props?.onClick === 'function'
+        (node) => node?.type === 'span' && typeof node?.props?.onClick === 'function',
       );
       responseSpan.props.onClick();
       expect(openSpy).toHaveBeenNthCalledWith(1, '/ce/survey/0xabc/results?session=test-10', '_blank');
@@ -457,7 +464,7 @@ describe('CommunityTab helpers', () => {
       const questionsTree = instance.renderModalContent();
       const [questionsAnchor] = collectTreeNodes(
         questionsTree,
-        (node) => node?.type === 'a' && typeof node?.props?.href === 'string'
+        (node) => node?.type === 'a' && typeof node?.props?.href === 'string',
       );
       expect(questionsAnchor.props.href).toBe('/ce/questions');
 
@@ -495,10 +502,7 @@ describe('CommunityTab helpers', () => {
 
     const tree = instance.renderModalContent();
     const [plotNode] = collectTreeNodes(tree, (node) => node?.type === BeeswarmPlot);
-    const [anchorNode] = collectTreeNodes(
-      tree,
-      (node) => node?.type === 'a' && node?.props?.href === '/questions'
-    );
+    const [anchorNode] = collectTreeNodes(tree, (node) => node?.type === 'a' && node?.props?.href === '/questions');
     const modalChildren = Array.isArray(tree?.props?.children)
       ? tree.props.children
       : [tree?.props?.children].filter(Boolean);
@@ -514,7 +518,9 @@ describe('CommunityTab helpers', () => {
     expect(anchorNode.props.rel).toBeUndefined();
     expect(topBarNode).toBeTruthy();
     expect(plotWrapNode).toBeTruthy();
-    expect(collectTreeNodes(topBarNode, (node) => node?.type === 'a' && node?.props?.href === '/questions')).toHaveLength(1);
+    expect(
+      collectTreeNodes(topBarNode, (node) => node?.type === 'a' && node?.props?.href === '/questions'),
+    ).toHaveLength(1);
     expect(collectTreeNodes(plotWrapNode, (node) => node?.type === BeeswarmPlot)).toHaveLength(1);
   });
 
@@ -537,9 +543,7 @@ describe('CommunityTab helpers', () => {
       },
     ];
     jest.spyOn(instance, '_shouldUseDemoBeeswarmData').mockReturnValue(false);
-    const buildSpy = jest
-      .spyOn(instance, '_buildCommunityBeeswarmPoints')
-      .mockReturnValue(fallbackPoints);
+    const buildSpy = jest.spyOn(instance, '_buildCommunityBeeswarmPoints').mockReturnValue(fallbackPoints);
 
     const tree = instance.renderModalContent();
     const [plotNode] = collectTreeNodes(tree, (node) => node?.type === BeeswarmPlot);
@@ -590,18 +594,12 @@ describe('CommunityTab helpers', () => {
 
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
     const tree = instance.renderModalContent();
-    const anchors = collectTreeNodes(
-      tree,
-      (node) => node?.type === 'a' && typeof node?.props?.href === 'string'
-    );
-    expect(anchors.map((node) => node.props.href)).toEqual([
-      '/survey/0xabc?session=DEBATE',
-      '/survey/0xdef',
-    ]);
+    const anchors = collectTreeNodes(tree, (node) => node?.type === 'a' && typeof node?.props?.href === 'string');
+    expect(anchors.map((node) => node.props.href)).toEqual(['/survey/0xabc?session=DEBATE', '/survey/0xdef']);
 
     const responseSpans = collectTreeNodes(
       tree,
-      (node) => node?.type === 'span' && typeof node?.props?.onClick === 'function'
+      (node) => node?.type === 'span' && typeof node?.props?.onClick === 'function',
     );
     responseSpans[0].props.onClick();
     responseSpans[1].props.onClick();
@@ -639,27 +637,13 @@ describe('CommunityTab helpers', () => {
     const ignoredAddr = '0x5E1B80A3eBdf5c575c4Cb8148fB5B0c118c55A5f';
     const featuredAddr = '0xd417C701Cf8ef4282CB62bFBf047B338b2f4FeB8';
 
-    expect(
-      instance._shouldCountSbt(
-        { sbtAddress: '0xabc', sbtInfo: { hidden: true } },
-        'rxc'
-      )
-    ).toBe(false);
+    expect(instance._shouldCountSbt({ sbtAddress: '0xabc', sbtInfo: { hidden: true } }, 'rxc')).toBe(false);
 
-    expect(
-      instance._shouldCountSbt({ sbtAddress: ignoredAddr, sbtInfo: {} }, 'rxc')
-    ).toBe(true);
+    expect(instance._shouldCountSbt({ sbtAddress: ignoredAddr, sbtInfo: {} }, 'rxc')).toBe(true);
 
-    expect(
-      instance._shouldCountSbt(
-        { sbtAddress: featuredAddr, sbtInfo: { unlisted: true } },
-        'rxc'
-      )
-    ).toBe(false);
+    expect(instance._shouldCountSbt({ sbtAddress: featuredAddr, sbtInfo: { unlisted: true } }, 'rxc')).toBe(false);
 
-    expect(
-      instance._shouldCountSbt({ sbtAddress: '0xdef', sbtInfo: {} }, 'rxc')
-    ).toBe(true);
+    expect(instance._shouldCountSbt({ sbtAddress: '0xdef', sbtInfo: {} }, 'rxc')).toBe(true);
   });
 
   it('dedupes leaderboard users by username while preserving simulated-user precedence', () => {
@@ -1244,12 +1228,14 @@ describe('CommunityTab helpers', () => {
     await instance._hydrateSbtHoldersForSlug('');
 
     const cache = await readCache('sbtCache', '');
-    expect(cache[netKey].sbtList['0x1']).toEqual(expect.objectContaining({
-      mintedAddresses: ['0xabc'],
-      burnedAddresses: [],
-      countsLoaded: true,
-      blockNumber: 25,
-    }));
+    expect(cache[netKey].sbtList['0x1']).toEqual(
+      expect.objectContaining({
+        mintedAddresses: ['0xabc'],
+        burnedAddresses: [],
+        countsLoaded: true,
+        blockNumber: 25,
+      }),
+    );
   });
 
   it('keeps users modal default filtered list in sync when unique users grows after hydration', async () => {

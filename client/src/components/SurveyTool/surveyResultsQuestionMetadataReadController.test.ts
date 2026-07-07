@@ -1,6 +1,4 @@
-import {
-  runSurveyResultsQuestionMetadataReadController,
-} from './surveyResultsQuestionMetadataReadController';
+import { runSurveyResultsQuestionMetadataReadController } from './surveyResultsQuestionMetadataReadController';
 
 describe('surveyResultsQuestionMetadataReadController', () => {
   it('reads network questions through the injected port with normalized identity args', () => {
@@ -86,14 +84,16 @@ describe('surveyResultsQuestionMetadataReadController', () => {
   });
 
   it('returns a missing status and empty patch for missing or empty cache results', () => {
-    expect(runSurveyResultsQuestionMetadataReadController({
-      identity: {
-        questionId: 'Q-empty',
-      },
-      ports: {
-        readNetworkQuestions: jest.fn(() => ({})),
-      },
-    })).toMatchObject({
+    expect(
+      runSurveyResultsQuestionMetadataReadController({
+        identity: {
+          questionId: 'Q-empty',
+        },
+        ports: {
+          readNetworkQuestions: jest.fn(() => ({})),
+        },
+      }),
+    ).toMatchObject({
       metadataStatus: 'missing',
       networkQuestions: {},
       question: null,
@@ -101,14 +101,16 @@ describe('surveyResultsQuestionMetadataReadController', () => {
       statePatch: {},
     });
 
-    expect(runSurveyResultsQuestionMetadataReadController({
-      identity: {
-        questionId: 'Q-empty',
-      },
-      ports: {
-        readNetworkQuestions: jest.fn(() => null),
-      },
-    })).toMatchObject({
+    expect(
+      runSurveyResultsQuestionMetadataReadController({
+        identity: {
+          questionId: 'Q-empty',
+        },
+        ports: {
+          readNetworkQuestions: jest.fn(() => null),
+        },
+      }),
+    ).toMatchObject({
       metadataStatus: 'missing',
       networkQuestions: {},
       question: null,

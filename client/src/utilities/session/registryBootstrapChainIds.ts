@@ -14,20 +14,23 @@ const toPositiveChainId = (value: unknown): number => {
 };
 
 const normalizeScope = (value: unknown): SessionRegistryBootstrapScope => {
-  const raw = String(value || '').trim().toLowerCase();
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
   if (raw === 'all' || raw === 'list' || raw === 'general') return raw;
   return 'active';
 };
 
 const normalizeListSlug = (value: unknown): string => {
-  const raw = String(value == null ? '' : value).trim().toLowerCase();
+  const raw = String(value == null ? '' : value)
+    .trim()
+    .toLowerCase();
   if (!raw || raw === 'general') return '';
   return raw;
 };
 
-const hasConcreteListTargets = (list: ReadonlyArray<unknown> = []): boolean => (
-  (Array.isArray(list) ? list : []).some((slug) => normalizeListSlug(slug))
-);
+const hasConcreteListTargets = (list: ReadonlyArray<unknown> = []): boolean =>
+  (Array.isArray(list) ? list : []).some((slug) => normalizeListSlug(slug));
 
 export const resolveSessionRegistryBootstrapChainIds = ({
   scope = 'active',

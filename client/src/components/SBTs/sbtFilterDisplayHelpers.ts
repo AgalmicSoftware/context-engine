@@ -4,11 +4,7 @@ type SbtFilterQuickChipDisplayStateArgs = {
   filterKey?: unknown;
   gateColors?: unknown;
   index?: unknown;
-  resolveDisplayLabel?: ((args: {
-    address: string;
-    fallback: string;
-    preferredSlug: string;
-  }) => unknown) | null;
+  resolveDisplayLabel?: ((args: { address: string; fallback: string; preferredSlug: string }) => unknown) | null;
   selectedSet?: Set<string> | null;
   sessionSlug?: unknown;
 };
@@ -88,13 +84,11 @@ type SbtFilterModeSectionsState = {
   shouldRenderResponderFilter: boolean;
 };
 
-const asCacheObject = (value: unknown): UnknownRecord => (
-  (value && typeof value === 'object') ? value as UnknownRecord : {}
-);
+const asCacheObject = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' ? (value as UnknownRecord) : {};
 
-export const hasSbtFilterFeaturedOptions = (defaultFeaturedSBTs: unknown): defaultFeaturedSBTs is unknown[] => (
-  Array.isArray(defaultFeaturedSBTs) && defaultFeaturedSBTs.length > 0
-);
+export const hasSbtFilterFeaturedOptions = (defaultFeaturedSBTs: unknown): defaultFeaturedSBTs is unknown[] =>
+  Array.isArray(defaultFeaturedSBTs) && defaultFeaturedSBTs.length > 0;
 
 export const buildSbtFilterBooleanTogglePatch = ({
   state = {},
@@ -107,15 +101,8 @@ export const buildSbtFilterBooleanTogglePatch = ({
   };
 };
 
-export const resolveSbtFilterButtonText = ({
-  mode = '',
-}: ResolveSbtFilterButtonTextArgs = {}): string => (
-  mode === 'questions' ||
-  mode === 'questionResponses' ||
-  mode === 'creatorAndResponder'
-    ? 'Response Filter'
-    : 'Filter'
-);
+export const resolveSbtFilterButtonText = ({ mode = '' }: ResolveSbtFilterButtonTextArgs = {}): string =>
+  mode === 'questions' || mode === 'questionResponses' || mode === 'creatorAndResponder' ? 'Response Filter' : 'Filter';
 
 export const resolveSbtFilterOptionsVisibilityState = ({
   autoExpand = false,
@@ -168,13 +155,13 @@ export const buildSbtFilterSurfaceClassNames = ({
   shouldUseLightSurface = false,
 }: BuildSbtFilterSurfaceClassNamesArgs = {}): SbtFilterSurfaceClassNames => {
   const useLightSurface = !!shouldUseLightSurface;
-  const filterButtonClassName = useLightSurface
-    ? String(filterButtonLightClassName || '') || undefined
-    : undefined;
+  const filterButtonClassName = useLightSurface ? String(filterButtonLightClassName || '') || undefined : undefined;
   const filterOptionsClassName = [
     String(filterOptionsBaseClassName || ''),
     useLightSurface ? String(filterOptionsLightClassName || '') : '',
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return {
     filterButtonClassName,
@@ -188,22 +175,15 @@ export const resolveSbtFilterModeSectionsState = ({
   const modeName = String(mode || '');
   return {
     shouldRenderAddressFilter: modeName === 'addresses',
-    shouldRenderQuestionCreatorFilter: (
-      modeName === 'creator' ||
-      modeName === 'creatorAndResponder' ||
-      modeName === 'questions'
-    ),
-    shouldRenderQuestionFilter: (
+    shouldRenderQuestionCreatorFilter:
+      modeName === 'creator' || modeName === 'creatorAndResponder' || modeName === 'questions',
+    shouldRenderQuestionFilter:
       modeName === 'creator' ||
       modeName === 'creatorAndResponder' ||
       modeName === 'questions' ||
-      modeName === 'questionResponses'
-    ),
-    shouldRenderQuestionResponderFilter: (
-      modeName === 'responder' ||
-      modeName === 'creatorAndResponder' ||
-      modeName === 'questionResponses'
-    ),
+      modeName === 'questionResponses',
+    shouldRenderQuestionResponderFilter:
+      modeName === 'responder' || modeName === 'creatorAndResponder' || modeName === 'questionResponses',
     shouldRenderResponderFilter: modeName === 'responder',
   };
 };
@@ -228,27 +208,29 @@ export const buildSbtFilterQuickChipDisplayState = ({
   const addressLower = address.toLowerCase();
   const colorIndex = Number(index || 0) || 0;
   const colors = Array.isArray(gateColors) ? gateColors : [];
-  const backgroundColor = colors.length > 0
-    ? String(colors[colorIndex % colors.length] || '')
-    : undefined;
+  const backgroundColor = colors.length > 0 ? String(colors[colorIndex % colors.length] || '') : undefined;
   const preferredSlug = String(sessionSlug || '');
   const selectedAddresses = selectedSet instanceof Set ? selectedSet : new Set<string>();
   const isSelected = selectedAddresses.has(addressLower);
   let resolvedLabel = '';
   try {
-    resolvedLabel = typeof resolveDisplayLabel === 'function'
-      ? String(resolveDisplayLabel({
-        address,
-        preferredSlug,
-        fallback: 'address',
-      }) || '')
-      : '';
+    resolvedLabel =
+      typeof resolveDisplayLabel === 'function'
+        ? String(
+            resolveDisplayLabel({
+              address,
+              preferredSlug,
+              fallback: 'address',
+            }) || '',
+          )
+        : '';
   } catch (_) {
     resolvedLabel = '';
   }
-  const chipLabel = resolvedLabel && resolvedLabel.toLowerCase() !== addressLower
-    ? resolvedLabel
-    : formatSbtFilterQuickChipAddress(address);
+  const chipLabel =
+    resolvedLabel && resolvedLabel.toLowerCase() !== addressLower
+      ? resolvedLabel
+      : formatSbtFilterQuickChipAddress(address);
 
   return {
     address,
@@ -267,7 +249,7 @@ export const buildSbtFilterQuickChipClassName = ({
   baseClassName = '',
   selectedClassName = '',
   shouldUseSelectedClass = false,
-}: BuildSbtFilterQuickChipClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  shouldUseSelectedClass ? String(selectedClassName || '') : '',
-].filter(Boolean).join(' '));
+}: BuildSbtFilterQuickChipClassNameArgs = {}): string =>
+  [String(baseClassName || ''), shouldUseSelectedClass ? String(selectedClassName || '') : '']
+    .filter(Boolean)
+    .join(' ');

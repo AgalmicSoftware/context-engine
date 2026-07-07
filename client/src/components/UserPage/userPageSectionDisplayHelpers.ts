@@ -94,13 +94,9 @@ export type UserPageSbtDisplayState = {
 export const resolveUserPageQuestionPromptText = (questionData: unknown): string => {
   const record = toAnalysisRecord(questionData);
   if (!Object.keys(record).length) return '';
-  const questionText = typeof record.question === 'string'
-    ? record.question.trim()
-    : '';
+  const questionText = typeof record.question === 'string' ? record.question.trim() : '';
   if (questionText) return questionText;
-  const promptText = typeof record.prompt === 'string'
-    ? record.prompt.trim()
-    : '';
+  const promptText = typeof record.prompt === 'string' ? record.prompt.trim() : '';
   if (promptText) return promptText;
   return '';
 };
@@ -118,14 +114,13 @@ export const resolveUserPageSurveyCreatedCardState = ({
   const hasTags = Array.isArray(record.tags) && record.tags.length > 0;
   const hasDocURLs = Array.isArray(record.documentURLs) && record.documentURLs.length > 0;
   const hasQuestionIDs = Array.isArray(record.questionIDs) && record.questionIDs.length > 0;
-  const questionPreviewEntries = (
+  const questionPreviewEntries =
     Array.isArray(record.questionPreviews) && record.questionPreviews.length > 0
-  )
-    ? record.questionPreviews
-    : ((record.questionIDs || []) as unknown[]).map((qid: unknown) => ({
-      id: String(qid || ''),
-      text: '',
-    }));
+      ? record.questionPreviews
+      : ((record.questionIDs || []) as unknown[]).map((qid: unknown) => ({
+          id: String(qid || ''),
+          text: '',
+        }));
 
   return {
     hasDocURLs,
@@ -142,10 +137,7 @@ export const resolveUserPageSurveyPreviewDisplayState = ({
   baseClassName = '',
   interactive = false,
 }: ResolveUserPageSurveyPreviewDisplayStateArgs = {}): UserPageSurveyPreviewDisplayState => ({
-  className: [
-    String(baseClassName || ''),
-    String(actionsClassName || ''),
-  ].filter(Boolean).join(' '),
+  className: [String(baseClassName || ''), String(actionsClassName || '')].filter(Boolean).join(' '),
   style: { cursor: interactive ? 'pointer' : 'default' },
 });
 
@@ -157,10 +149,7 @@ export const resolveUserPageSurveyCountDisplayState = ({
   const label = `${String(count || 0)} questions`;
   return {
     ariaLabel: label,
-    className: [
-      String(infoClassName || ''),
-      String(countOnlyClassName || ''),
-    ].filter(Boolean).join(' '),
+    className: [String(infoClassName || ''), String(countOnlyClassName || '')].filter(Boolean).join(' '),
     title: label,
   };
 };

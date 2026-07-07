@@ -40,12 +40,13 @@ const findElement = (node, predicate) => {
   return null;
 };
 
-const findLazySurveyResultsNode = (node) => (
-  findElement(node, (candidate) => (
-    candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-    Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen')
-  ))
-);
+const findLazySurveyResultsNode = (node) =>
+  findElement(
+    node,
+    (candidate) =>
+      candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
+      Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen'),
+  );
 
 describe('SurveyTool results routing', () => {
   afterEach(() => {

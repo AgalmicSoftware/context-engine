@@ -9,7 +9,7 @@ export const POLICY_FILTERS = {
   all: 'all',
 } as const;
 
-export type PolicyFilterId = typeof POLICY_FILTERS[keyof typeof POLICY_FILTERS];
+export type PolicyFilterId = (typeof POLICY_FILTERS)[keyof typeof POLICY_FILTERS];
 
 export type PolicyEntry = {
   id?: string | number;
@@ -110,13 +110,7 @@ const PROPOSED_STATUS_MATCHERS = [
   'planned',
 ];
 
-const INACTIVE_STATUS_MATCHERS = [
-  'vetoed',
-  'withdrawn',
-  'rejected',
-  'failed',
-  'expired',
-];
+const INACTIVE_STATUS_MATCHERS = ['vetoed', 'withdrawn', 'rejected', 'failed', 'expired'];
 
 const JURISDICTION_RULES: JurisdictionRule[] = [
   {
@@ -222,20 +216,24 @@ const matchesPattern = (value: string, patterns: RegExp[] = []) => patterns.some
 
 const getJurisdictionRule = (jurisdiction: string | number = ''): JurisdictionRule => {
   const normalizedJurisdiction = normalizeText(jurisdiction);
-  return JURISDICTION_RULES.find((rule) => matchesPattern(normalizedJurisdiction, rule.patterns))
-    || { anchor: 'international', flag: '🌐', patterns: [] };
+  return (
+    JURISDICTION_RULES.find((rule) => matchesPattern(normalizedJurisdiction, rule.patterns)) || {
+      anchor: 'international',
+      flag: '🌐',
+      patterns: [],
+    }
+  );
 };
 
-export const getPolicyJurisdictionAnchor = (jurisdiction: string | number = '') => getJurisdictionRule(jurisdiction).anchor;
+export const getPolicyJurisdictionAnchor = (jurisdiction: string | number = '') =>
+  getJurisdictionRule(jurisdiction).anchor;
 
 const getPolicyTimestamp = (entry: PolicyEntry = {}) => {
   const datedValue = entry.date_enacted || entry.date || entry.created_at || entry.updated_at || entry.year;
 
   if (!datedValue) return Number.NEGATIVE_INFINITY;
   if (typeof datedValue === 'number') {
-    const normalizedYear = String(datedValue).length === 4
-      ? Date.parse(`${datedValue}-01-01T00:00:00Z`)
-      : datedValue;
+    const normalizedYear = String(datedValue).length === 4 ? Date.parse(`${datedValue}-01-01T00:00:00Z`) : datedValue;
     return Number.isNaN(normalizedYear) ? Number.NEGATIVE_INFINITY : normalizedYear;
   }
 
@@ -310,7 +308,7 @@ const getPolicyGroupTitle = (statusGroup: PolicyFilterId) => {
 
 export const getJurisdictionFlag = (jurisdiction: string | number = '') => getJurisdictionRule(jurisdiction).flag;
 
-export const sortPolicyEntries = (entries: PolicyEntry[] = []) => (
+export const sortPolicyEntries = (entries: PolicyEntry[] = []) =>
   [...entries].sort((entryA, entryB) => {
     const sortRankDifference = getPolicySortRank(entryA) - getPolicySortRank(entryB);
     if (sortRankDifference !== 0) return sortRankDifference;
@@ -319,8 +317,7 @@ export const sortPolicyEntries = (entries: PolicyEntry[] = []) => (
     if (timestampDifference !== 0) return timestampDifference;
 
     return String(entryA.title || entryA.id || '').localeCompare(String(entryB.title || entryB.id || ''));
-  })
-);
+  });
 
 type GlobeDot = {
   key: string;
@@ -388,7 +385,10 @@ const PolicyGlobe = ({ entries = [], children }: PolicyGlobeProps) => {
             className={`${styles.filterButton} ${FILTER_STYLE_CLASS_BY_ID[option.id] || ''} ${isActive ? styles.filterButtonActive : ''}`.trim()}
             onClick={() => setFilterStatus(option.id)}
           >
-            <span className={`${styles.filterSwatch} ${FILTER_SWATCH_CLASS_BY_ID[option.id] || ''}`.trim()} aria-hidden="true" />
+            <span
+              className={`${styles.filterSwatch} ${FILTER_SWATCH_CLASS_BY_ID[option.id] || ''}`.trim()}
+              aria-hidden="true"
+            />
             <span>{option.label}</span>
           </button>
         );

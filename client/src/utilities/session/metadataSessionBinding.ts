@@ -25,31 +25,21 @@ export type BuildEnvelopeOptions = {
 
 export type MetadataRecord = Record<string, unknown>;
 
-const isMetadataRecord = (value: unknown): value is MetadataRecord => (
-  value !== null && typeof value === 'object'
-);
+const isMetadataRecord = (value: unknown): value is MetadataRecord => value !== null && typeof value === 'object';
 
-export const resolveMetadataSessionBinding = (
-  metadata: unknown,
-  fallbackSlug = ''
-): MetadataSessionBinding => {
+export const resolveMetadataSessionBinding = (metadata: unknown, fallbackSlug = ''): MetadataSessionBinding => {
   const fallback = normalizeSessionSlug(fallbackSlug || '');
   if (!isMetadataRecord(metadata)) {
     return { sessionSlug: fallback, authority: 'fallback' };
   }
 
   const hasOwn = (key: string) => Object.prototype.hasOwnProperty.call(metadata, key);
-  const hasExplicitSlugField =
-    hasOwn('sessionSlug') ||
-    hasOwn('slug');
+  const hasExplicitSlugField = hasOwn('sessionSlug') || hasOwn('slug');
   const hasExplicitFlag = hasOwn('sessionSlugExplicit');
   const metadataSlugIsAuthoritative = !hasExplicitFlag || metadata?.sessionSlugExplicit === true;
 
   if (hasExplicitSlugField && metadataSlugIsAuthoritative) {
-    const explicitCandidates = [
-      metadata?.sessionSlug,
-      metadata?.slug,
-    ];
+    const explicitCandidates = [metadata?.sessionSlug, metadata?.slug];
     for (let index = 0; index < explicitCandidates.length; index += 1) {
       const rawValue = explicitCandidates[index];
       if (rawValue == null) continue;
@@ -76,17 +66,10 @@ export const resolveMetadataSessionBinding = (
   return { sessionSlug: fallback, authority: 'fallback' };
 };
 
-export const resolveMetadataSessionSlug = (
-  metadata: unknown,
-  fallbackSlug = ''
-): string => (
-  resolveMetadataSessionBinding(metadata, fallbackSlug).sessionSlug
-);
+export const resolveMetadataSessionSlug = (metadata: unknown, fallbackSlug = ''): string =>
+  resolveMetadataSessionBinding(metadata, fallbackSlug).sessionSlug;
 
-export const resolveScopedMetadataSessionSlug = (
-  metadata: unknown,
-  fallbackSlug = ''
-): string => {
+export const resolveScopedMetadataSessionSlug = (metadata: unknown, fallbackSlug = ''): string => {
   const binding = resolveMetadataSessionBinding(metadata, fallbackSlug);
   if (binding.authority === 'fallback') return '';
   return normalizeSessionSlug(binding.sessionSlug || '');
@@ -95,7 +78,7 @@ export const resolveScopedMetadataSessionSlug = (
 export const buildMetadataSessionCacheEnvelope = (
   metadata: unknown,
   fallbackSlug = '',
-  options: BuildEnvelopeOptions = {}
+  options: BuildEnvelopeOptions = {},
 ): MetadataSessionCacheEnvelope => {
   const scoped = options.scoped === true;
   const includeSlugField = options.includeSlugField === true;

@@ -1,9 +1,6 @@
 import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import type { SbtListHelperItem, SbtListHelperRecord } from './sbtListCardDetailsHelpers';
-import {
-  dedupeNormalizedSbtListSlugs,
-  pickNormalizedSbtListSessionSlug,
-} from './sbtListSessionUniverseHelpers';
+import { dedupeNormalizedSbtListSlugs, pickNormalizedSbtListSessionSlug } from './sbtListSessionUniverseHelpers';
 
 export type SbtListScopedEntryOptions = {
   requireConcreteBinding?: boolean;
@@ -24,13 +21,10 @@ type CollectSbtListLinkedScopedEntriesArgs = {
   targetSlugs?: unknown;
 };
 
-const isSbtListScopedRecord = (value: unknown): value is SbtListHelperRecord => (
-  !!value && typeof value === 'object'
-);
+const isSbtListScopedRecord = (value: unknown): value is SbtListHelperRecord => !!value && typeof value === 'object';
 
-const normalizeScopedCacheEntries = (entries: unknown): SbtListScopedCacheEntry[] => (
-  (Array.isArray(entries) ? entries : []).filter(isSbtListScopedRecord) as SbtListScopedCacheEntry[]
-);
+const normalizeScopedCacheEntries = (entries: unknown): SbtListScopedCacheEntry[] =>
+  (Array.isArray(entries) ? entries : []).filter(isSbtListScopedRecord) as SbtListScopedCacheEntry[];
 
 export const collectSbtListLinkedScopedEntries = ({
   entries = [],
@@ -52,34 +46,30 @@ export const collectSbtListLinkedScopedEntries = ({
     if (!cacheValue) return;
 
     Object.values(cacheValue).forEach((netNode) => {
-      const scopedList = (
-        isSbtListScopedRecord(netNode) && isSbtListScopedRecord(netNode.sbtList)
-      ) ? netNode.sbtList : null;
+      const scopedList =
+        isSbtListScopedRecord(netNode) && isSbtListScopedRecord(netNode.sbtList) ? netNode.sbtList : null;
       if (!scopedList) return;
 
       Object.entries(scopedList).forEach(([cacheAddress, entry]) => {
-        const rawEntry = isSbtListScopedRecord(entry) ? entry as SbtListHelperItem : {};
+        const rawEntry = isSbtListScopedRecord(entry) ? (entry as SbtListHelperItem) : {};
         const entryWithSource: SbtListHelperItem = {
           ...rawEntry,
-          __sourceSessionSlug: pickNormalizedSbtListSessionSlug(
-            rawEntry.__sourceSessionSlug,
-            sourceSlug
-          ),
+          __sourceSessionSlug: pickNormalizedSbtListSessionSlug(rawEntry.__sourceSessionSlug, sourceSlug),
           sbtAddress: rawEntry.sbtAddress || cacheAddress,
           slug: pickNormalizedSbtListSessionSlug(rawEntry.slug, sourceSlug),
         };
-        const addrLower = String(entryWithSource.sbtAddress || '').trim().toLowerCase();
+        const addrLower = String(entryWithSource.sbtAddress || '')
+          .trim()
+          .toLowerCase();
         if (!addrLower || seen.has(addrLower)) return;
 
         const concreteBindingSlug = resolveConcreteSessionBindingSlug(entryWithSource);
-        const bindingInScope = (
-          concreteBindingSlug != null &&
-          targetSlugSet.has(normalizeSessionSlug(concreteBindingSlug))
-        );
+        const bindingInScope =
+          concreteBindingSlug != null && targetSlugSet.has(normalizeSessionSlug(concreteBindingSlug));
         if (requireConcreteBinding && !bindingInScope) return;
 
         const resolvedSlug = normalizeSessionSlug(
-          resolveSbtSessionSlug(entryWithSource) || entryWithSource.slug || sourceSlug
+          resolveSbtSessionSlug(entryWithSource) || entryWithSource.slug || sourceSlug,
         );
         const resolvedInScope = targetSlugSet.has(resolvedSlug);
         if (!requireConcreteBinding && !bindingInScope && !resolvedInScope) return;
@@ -88,7 +78,7 @@ export const collectSbtListLinkedScopedEntries = ({
         out.push(
           bindingInScope
             ? { ...entryWithSource, slug: normalizeSessionSlug(concreteBindingSlug || '') }
-            : { ...entryWithSource, slug: resolvedSlug }
+            : { ...entryWithSource, slug: resolvedSlug },
         );
       });
     });

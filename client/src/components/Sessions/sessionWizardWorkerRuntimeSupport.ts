@@ -48,19 +48,18 @@ export const resolveSessionWizardWorkerBaseUrlFromDraft = ({
 }: WorkerBaseUrlParams = {}): string => {
   const fallbackWorkerUrl = getSessionWizardDefaultWorkerUrl();
   const configuredWorkerUrl = toStr(draft?.corsWorkerUrl).trim();
-  const effectiveConfiguredWorkerUrl = (
+  const effectiveConfiguredWorkerUrl =
     wizardMode === 'normal' &&
     !allowNormalModeSharedHostedWorker &&
     !deployComplete &&
     isSessionWizardDefaultWorkerPlaceholderUrl(configuredWorkerUrl, fallbackWorkerUrl)
-  )
-    ? ''
-    : configuredWorkerUrl;
+      ? ''
+      : configuredWorkerUrl;
   return resolveSessionWizardWorkerBaseUrl({
     configuredWorkerUrl: effectiveConfiguredWorkerUrl,
     deployWorkerUrl: deployComplete ? deployWorkerUrl : '',
     fallbackWorkerUrl,
-    workerMode: (wizardMode === 'normal' && !allowNormalModeSharedHostedWorker) ? 'custom' : workerMode,
+    workerMode: wizardMode === 'normal' && !allowNormalModeSharedHostedWorker ? 'custom' : workerMode,
   });
 };
 
@@ -72,15 +71,13 @@ export const resolveSessionWizardWorkerUrlSourceState = ({
   visibleConfiguredWorkerUrl = '',
   workerMode = '',
 }: ResolveSessionWizardWorkerUrlSourceStateArgs = {}): SessionWizardWorkerUrlSourceState => {
-  const usesDefaultWorkerUrl = !!visibleConfiguredWorkerUrl &&
-    !!defaultWorkerUrl &&
-    visibleConfiguredWorkerUrl === defaultWorkerUrl;
-  const deployWorkerMatchesConfiguredUrl = !!visibleConfiguredWorkerUrl &&
-    !!deployedWorkerUrl &&
-    visibleConfiguredWorkerUrl === deployedWorkerUrl;
+  const usesDefaultWorkerUrl =
+    !!visibleConfiguredWorkerUrl && !!defaultWorkerUrl && visibleConfiguredWorkerUrl === defaultWorkerUrl;
+  const deployWorkerMatchesConfiguredUrl =
+    !!visibleConfiguredWorkerUrl && !!deployedWorkerUrl && visibleConfiguredWorkerUrl === deployedWorkerUrl;
   const workerUrlSource = !resolvedWorkerBaseUrl
     ? 'missing (set worker URL)'
-    : (workerMode === 'default' || usesDefaultWorkerUrl)
+    : workerMode === 'default' || usesDefaultWorkerUrl
       ? 'default worker'
       : deployVerifiedInUi && deployWorkerMatchesConfiguredUrl
         ? 'deployed worker URL (verified this run)'
@@ -103,9 +100,7 @@ const resolveSessionWizardWorkerRuntimeChainId = ({
   draft?: AnyRecord | null;
   registryChainId?: unknown;
   networkId?: unknown;
-} = {}): number | null => (
-  Number(registryChainId || draft?.networkChainId || networkId || 0) || null
-);
+} = {}): number | null => Number(registryChainId || draft?.networkChainId || networkId || 0) || null;
 
 export const resolveSessionWizardWorkerRpcUrlFromDraft = ({
   draft,
@@ -183,9 +178,10 @@ export const resolveSessionWizardWorkerFaucetConfigFromDraft = ({
     return cleaned ? cleaned : toStr(fallback).trim();
   };
   const chainId = resolveSessionWizardWorkerRuntimeChainId({ draft, registryChainId, networkId });
-  const defaultRpcUrl = resolveSessionWizardWorkerRpcUrlFromDraft({ draft, registryChainId, networkId, workerSecrets })
-    || getDefaultHttpRpc(chainId)
-    || resolveFallbackRpcUrl(chainId);
+  const defaultRpcUrl =
+    resolveSessionWizardWorkerRpcUrlFromDraft({ draft, registryChainId, networkId, workerSecrets }) ||
+    getDefaultHttpRpc(chainId) ||
+    resolveFallbackRpcUrl(chainId);
   return {
     rpcUrl: fallbackIfUnset(faucetCfg.rpcUrl, defaultRpcUrl),
     amountEth: fallbackIfUnset(faucetCfg.amountEth, '0.0002'),
@@ -196,7 +192,10 @@ export const resolveSessionWizardWorkerFaucetConfigFromDraft = ({
 export const parseSessionWizardAllowOriginsInput = (value: unknown): string[] => {
   const raw = toStr(value).trim();
   if (!raw) return [];
-  const entries = raw.split(/[\n,]+/).map((entry) => entry.trim()).filter(Boolean);
+  const entries = raw
+    .split(/[\n,]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
   const normalized = normalizeOriginList(entries);
   return normalized.length ? normalized : normalizeOriginList(DEFAULT_WORKER_ALLOWED_ORIGINS);
 };

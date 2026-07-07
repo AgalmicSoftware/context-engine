@@ -72,9 +72,7 @@ const formatWinstonToAr = (winston, decimals = 6) => {
   if (!/^\d+$/.test(normalized)) {
     throw new Error('Invalid Arweave balance.');
   }
-  const safeDecimals = Number.isFinite(Number(decimals))
-    ? Math.max(0, Math.min(12, Number(decimals)))
-    : 6;
+  const safeDecimals = Number.isFinite(Number(decimals)) ? Math.max(0, Math.min(12, Number(decimals))) : 6;
   const whole = normalized.length > 12 ? normalized.slice(0, -12) : '0';
   const fractionFull = normalized.padStart(13, '0').slice(-12);
   if (safeDecimals === 0) return whole;
@@ -151,27 +149,25 @@ const emitArweaveUploadFallbackTelemetry = (payload = {}) => {
     existing.push(entry);
     if (existing.length > 500) existing.splice(0, existing.length - 500);
     globalThis[ARWEAVE_UPLOAD_FALLBACK_TELEMETRY_KEY] = existing;
-  } catch (e) { log.warn('arweaveScripts: telemetry', e); }
+  } catch (e) {
+    log.warn('arweaveScripts: telemetry', e);
+  }
 };
 
-const isGateUnavailableError = (message = '') => (
-  /on-chain gate data unavailable/i.test(String(message || ''))
-);
+const isGateUnavailableError = (message = '') => /on-chain gate data unavailable/i.test(String(message || ''));
 
-const isWorkerAuthRouteUnsupportedError = (message = '') => (
-  /worker auth (?:nonce|login) route not supported \(404\)/i.test(String(message || ''))
-);
+const isWorkerAuthRouteUnsupportedError = (message = '') =>
+  /worker auth (?:nonce|login) route not supported \(404\)/i.test(String(message || ''));
 
-const isWorkerMissingArweaveKeyError = (message = '') => (
-  /arweave key not configured/i.test(String(message || ''))
-);
+const isWorkerMissingArweaveKeyError = (message = '') => /arweave key not configured/i.test(String(message || ''));
 
-const isWorkerMissingSessionSecretsError = (message = '') => (
-  /session secrets not configured/i.test(String(message || ''))
-);
+const isWorkerMissingSessionSecretsError = (message = '') =>
+  /session secrets not configured/i.test(String(message || ''));
 
 const isTransientWorkerUploadError = ({ message = '', status = null } = {}) => {
-  const normalizedMessage = String(message || '').trim().toLowerCase();
+  const normalizedMessage = String(message || '')
+    .trim()
+    .toLowerCase();
   const normalizedStatus = Number(status || 0) || 0;
   if (
     normalizedMessage.includes('could not getprice') ||
@@ -184,11 +180,10 @@ const isTransientWorkerUploadError = ({ message = '', status = null } = {}) => {
   return normalizedStatus === 502 || normalizedStatus === 503 || normalizedStatus === 504;
 };
 
-const shouldFallbackUploadCandidate = ({ message = '' } = {}) => (
+const shouldFallbackUploadCandidate = ({ message = '' } = {}) =>
   isGateUnavailableError(message) ||
   isWorkerAuthRouteUnsupportedError(message) ||
-  isWorkerMissingArweaveKeyError(message)
-);
+  isWorkerMissingArweaveKeyError(message);
 
 const readScopeUploadSlugs = () => {
   try {
@@ -240,12 +235,16 @@ const getGateSnapshotSbtAddresses = (snapshot = null) => {
 const hasSponsoredArweaveKey = (sessionConfig = null) => {
   const value = sessionConfig?.sponsoredKeys?.arweave;
   if (typeof value === 'boolean') return value;
-  const normalized = String(value ?? '').trim().toLowerCase();
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
 };
 
 const getUploadCandidateReasonPriority = (reason = '') => {
-  const normalized = String(reason || '').trim().toLowerCase();
+  const normalized = String(reason || '')
+    .trim()
+    .toLowerCase();
   if (normalized === 'sponsored-referrer') return 0;
   if (normalized === 'shared-fallback') return 1;
   if (normalized === 'scope-list') return 2;
@@ -253,13 +252,13 @@ const getUploadCandidateReasonPriority = (reason = '') => {
 };
 
 const classifyUploadGateStatus = (sessionConfig = null, resourceKey = 'arweave') => {
-  const registry = sessionConfig?.__registry && typeof sessionConfig.__registry === 'object'
-    ? sessionConfig.__registry
-    : {};
-  const gateAuthority = String(registry?.gateAuthority || '').trim().toLowerCase();
-  const gatesByResource = registry?.gatesByResource && typeof registry.gatesByResource === 'object'
-    ? registry.gatesByResource
-    : null;
+  const registry =
+    sessionConfig?.__registry && typeof sessionConfig.__registry === 'object' ? sessionConfig.__registry : {};
+  const gateAuthority = String(registry?.gateAuthority || '')
+    .trim()
+    .toLowerCase();
+  const gatesByResource =
+    registry?.gatesByResource && typeof registry.gatesByResource === 'object' ? registry.gatesByResource : null;
   const primaryKey = String(resourceKey || '').trim() || 'arweave';
 
   const readStatusForKey = (key) => {
@@ -273,7 +272,9 @@ const classifyUploadGateStatus = (sessionConfig = null, resourceKey = 'arweave')
     if (!snapshot || typeof snapshot !== 'object') {
       return { key, status: 'missing' };
     }
-    const lookupStatus = String(snapshot.lookupStatus || '').trim().toLowerCase();
+    const lookupStatus = String(snapshot.lookupStatus || '')
+      .trim()
+      .toLowerCase();
     if (lookupStatus !== 'ok') {
       return { key, status: 'unresolved' };
     }
@@ -288,11 +289,16 @@ const classifyUploadGateStatus = (sessionConfig = null, resourceKey = 'arweave')
   const fallback = primaryKey === 'default' ? null : readStatusForKey('default');
   const allowsPrimary = primary.status === 'no-gate';
   const allowsFallback = fallback?.status === 'no-gate';
-  const selectedKey = allowsPrimary ? primary.key : (allowsFallback ? fallback.key : primary.key);
-  const selectedStatus = allowsPrimary ? primary.status : (allowsFallback ? fallback.status : primary.status);
-  const preferenceRank = selectedStatus === 'no-gate'
-    ? (selectedKey === primaryKey ? 0 : 1)
-    : (selectedStatus === 'unknown' || selectedStatus === 'missing' ? 2 : 3);
+  const selectedKey = allowsPrimary ? primary.key : allowsFallback ? fallback.key : primary.key;
+  const selectedStatus = allowsPrimary ? primary.status : allowsFallback ? fallback.status : primary.status;
+  const preferenceRank =
+    selectedStatus === 'no-gate'
+      ? selectedKey === primaryKey
+        ? 0
+        : 1
+      : selectedStatus === 'unknown' || selectedStatus === 'missing'
+        ? 2
+        : 3;
   return {
     gateStatus: fallback
       ? `${primary.key}:${primary.status}|default:${fallback.status}`
@@ -364,9 +370,7 @@ const buildUploadSessionCandidates = async ({
         resolved = null;
       }
     }
-    const workerUrl = source.explicitWorkerUrl
-      ? source.explicitWorkerUrl
-      : normalizeWorkerBaseUrl(resolved?.url || '');
+    const workerUrl = source.explicitWorkerUrl ? source.explicitWorkerUrl : normalizeWorkerBaseUrl(resolved?.url || '');
     if (!workerUrl) continue;
     const resolvedSessionConfig = resolved?.session || resolved?.group || null;
     const gateSummary = classifyUploadGateStatus(resolvedSessionConfig, 'arweave');
@@ -421,7 +425,9 @@ const buildArweaveGatewayRawUrl = (txId, gateway) => {
 const AR_IO_GATEWAY_HOST_SET = new Set(['ar-io.dev', 'ar-io.net', 'ar.io']);
 const AR_IO_GATEWAY_HOST_SUFFIXES = ['.ar-io.dev', '.ar-io.net', '.ar.io'];
 const isArIoGatewayHost = (host = '') => {
-  const lowered = String(host || '').trim().toLowerCase();
+  const lowered = String(host || '')
+    .trim()
+    .toLowerCase();
   if (!lowered) return false;
   if (AR_IO_GATEWAY_HOST_SET.has(lowered)) return true;
   return AR_IO_GATEWAY_HOST_SUFFIXES.some((suffix) => lowered.endsWith(suffix));
@@ -477,15 +483,14 @@ const normalizeTagsPayload = (raw) => {
   return null;
 };
 
-const isRetryableStatus = (status) => (
+const isRetryableStatus = (status) =>
   status === 202 ||
   status === 425 ||
   status === 429 ||
   status === 500 ||
   status === 502 ||
   status === 503 ||
-  status === 504
-);
+  status === 504;
 
 const classifyStatusKind = (status) => {
   if (status === 404) return 'not_found';
@@ -497,8 +502,13 @@ const classifyStatusKind = (status) => {
 };
 
 const looksLikeHtmlGatewayPayload = ({ text = '', contentType = '' } = {}) => {
-  const type = String(contentType || '').trim().toLowerCase();
-  const snippet = String(text || '').trimStart().slice(0, 256).toLowerCase();
+  const type = String(contentType || '')
+    .trim()
+    .toLowerCase();
+  const snippet = String(text || '')
+    .trimStart()
+    .slice(0, 256)
+    .toLowerCase();
   if (type.includes('text/html') || type.includes('application/xhtml+xml')) return true;
   return (
     snippet.startsWith('<!doctype html') ||
@@ -519,9 +529,11 @@ const inferStatusFromHtmlGatewayPayload = (text = '') => {
   if (hasTitleStatus(404) || (/\b404\b/.test(snippet) && /page not found|not found/i.test(snippet))) return 404;
   if (hasTitleStatus(429) || (/\b429\b/.test(snippet) && /too many requests|rate limit/i.test(snippet))) return 429;
   if (hasTitleStatus(401) || (/\b401\b/.test(snippet) && /unauthorized|not authorized/i.test(snippet))) return 401;
-  if (hasTitleStatus(403) || (/\b403\b/.test(snippet) && /forbidden|access denied|permission denied/i.test(snippet))) return 403;
+  if (hasTitleStatus(403) || (/\b403\b/.test(snippet) && /forbidden|access denied|permission denied/i.test(snippet)))
+    return 403;
   if (hasTitleStatus(502) || (/\b502\b/.test(snippet) && /bad gateway/i.test(snippet))) return 502;
-  if (hasTitleStatus(503) || (/\b503\b/.test(snippet) && /service unavailable|temporarily unavailable/i.test(snippet))) return 503;
+  if (hasTitleStatus(503) || (/\b503\b/.test(snippet) && /service unavailable|temporarily unavailable/i.test(snippet)))
+    return 503;
   if (hasTitleStatus(504) || (/\b504\b/.test(snippet) && /gateway timeout/i.test(snippet))) return 504;
   if (hasTitleStatus(500) || (/\b500\b/.test(snippet) && /internal server error/i.test(snippet))) return 500;
   return null;
@@ -578,19 +590,16 @@ const withTimeout = async (promise, ms, label = 'operation') => {
 
 const isEmptyGatewayResponseText = (text) => String(text ?? '').trim().length === 0;
 
-const createEmptyGatewayResponseError = ({
-  txId = '',
-  gateway = '',
-  attempt = 0,
-} = {}) => createArweaveFetchError({
-  txId,
-  status: null,
-  retryable: true,
-  kind: 'network',
-  gateway,
-  attempt,
-  message: 'Arweave gateway returned empty response body.',
-});
+const createEmptyGatewayResponseError = ({ txId = '', gateway = '', attempt = 0 } = {}) =>
+  createArweaveFetchError({
+    txId,
+    status: null,
+    retryable: true,
+    kind: 'network',
+    gateway,
+    attempt,
+    message: 'Arweave gateway returned empty response body.',
+  });
 
 const readResponseBodyPreview = async (response) => {
   if (!response || typeof response.text !== 'function') return '';
@@ -701,7 +710,7 @@ const dedupeTxEvent = (key) => {
   if (!key) return true;
   const now = Date.now();
   const prev = Number(arweaveTxEventDedupe.get(key) || 0);
-  if (prev > 0 && (now - prev) < ARWEAVE_TX_EVENT_DEDUPE_TTL_MS) return false;
+  if (prev > 0 && now - prev < ARWEAVE_TX_EVENT_DEDUPE_TTL_MS) return false;
   arweaveTxEventDedupe.set(key, now);
   while (arweaveTxEventDedupe.size > ARWEAVE_TX_CONTEXT_CACHE_MAX) {
     const oldest = arweaveTxEventDedupe.keys().next().value;
@@ -714,9 +723,15 @@ const dedupeTxEvent = (key) => {
 const registerArweaveTxContext = (txId, context = {}) => {
   const normalizedTxId = extractArweaveTxId(txId);
   if (!normalizedTxId) return;
-  const category = String(context?.category || '').trim().toLowerCase() || 'unknown';
+  const category =
+    String(context?.category || '')
+      .trim()
+      .toLowerCase() || 'unknown';
   const caller = String(context?.caller || context?.fn || '').trim() || '';
-  const source = String(context?.source || '').trim().toLowerCase() || 'unknown';
+  const source =
+    String(context?.source || '')
+      .trim()
+      .toLowerCase() || 'unknown';
   const label = caller ? `${category}:${caller}:${source}` : `${category}:${source}`;
   const prev = arweaveTxContextCache.get(normalizedTxId) || { labels: [], ts: 0 };
   const labels = Array.isArray(prev.labels) ? [...prev.labels] : [];
@@ -770,7 +785,7 @@ const markGraphqlEndpointFailure = (endpoint, status = null) => {
   const exponent = Math.max(0, Math.min(8, failures - 1));
   const cooldownMs = Math.min(
     ARWEAVE_GRAPHQL_COOLDOWN_MAX_MS,
-    Math.round(ARWEAVE_GRAPHQL_COOLDOWN_BASE_MS * Math.pow(2, exponent))
+    Math.round(ARWEAVE_GRAPHQL_COOLDOWN_BASE_MS * Math.pow(2, exponent)),
   );
   arweaveGraphqlEndpointHealth.set(key, {
     failures,
@@ -829,7 +844,9 @@ const markGatewayFailure = (gateway, { status = null, kind = '' } = {}) => {
   const statusNum = Number(status);
   const shouldCool = shouldGatewayCooldown({
     status: Number.isFinite(statusNum) ? statusNum : null,
-    kind: String(kind || '').trim().toLowerCase(),
+    kind: String(kind || '')
+      .trim()
+      .toLowerCase(),
   });
   const prev = readGatewayHealth(key);
   if (!shouldCool) {
@@ -844,7 +861,7 @@ const markGatewayFailure = (gateway, { status = null, kind = '' } = {}) => {
   const exponent = Math.max(0, Math.min(8, failures - 1));
   const cooldownMs = Math.min(
     ARWEAVE_GATEWAY_COOLDOWN_MAX_MS,
-    Math.round(ARWEAVE_GATEWAY_COOLDOWN_BASE_MS * Math.pow(2, exponent))
+    Math.round(ARWEAVE_GATEWAY_COOLDOWN_BASE_MS * Math.pow(2, exponent)),
   );
   arweaveGatewayHealth.set(key, {
     failures,
@@ -869,7 +886,7 @@ const getGatewaySortScore = (gateway) => {
   return Math.max(0, Number(health.failures || 0));
 };
 
-const sortGatewaysByHealth = (gateways = []) => (
+const sortGatewaysByHealth = (gateways = []) =>
   [...(Array.isArray(gateways) ? gateways : [])]
     .map((gateway, index) => ({
       gateway,
@@ -880,8 +897,7 @@ const sortGatewaysByHealth = (gateways = []) => (
       if (a.score !== b.score) return a.score - b.score;
       return a.index - b.index;
     })
-    .map((item) => item.gateway)
-);
+    .map((item) => item.gateway);
 
 const getAvailableGatewaysForAttempt = (gateways = []) => {
   const ordered = sortGatewaysByHealth(gateways);
@@ -896,7 +912,9 @@ const buildFetchTimeoutError = (url, timeoutMs, cause = null) => {
   err.url = String(url || '');
   err.timeoutMs = Number(timeoutMs || 0) || 0;
   if (cause) {
-    try { err.cause = cause; } catch (_) {}
+    try {
+      err.cause = cause;
+    } catch (_) {}
   }
   return err;
 };
@@ -923,7 +941,11 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = ARWEAVE_GRAPHQL_T
   const timeoutPromise = new Promise((_, reject) => {
     timer = setTimeout(() => {
       didTimeout = true;
-      try { ctrl.abort(); } catch (e) { log.warn('arweaveScripts: cleanup', e); }
+      try {
+        ctrl.abort();
+      } catch (e) {
+        log.warn('arweaveScripts: cleanup', e);
+      }
       reject(buildFetchTimeoutError(url, timeout));
     }, timeout);
   });
@@ -958,7 +980,9 @@ const getWayfinderResolver = (opts = {}) => {
     if (typeof globalThis.CE_ARWEAVE_WAYFINDER_RESOLVE === 'function') {
       return globalThis.CE_ARWEAVE_WAYFINDER_RESOLVE;
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
   return null;
 };
 
@@ -984,11 +1008,11 @@ const resolveWayfinderUrlForTx = async ({
         debugContext,
         attemptedUrls: Array.from(attemptedUrls || []),
       });
-      const resolvedUrl = normalizeHttpUrl(
-        resolved?.toString ? resolved.toString() : resolved
-      );
+      const resolvedUrl = normalizeHttpUrl(resolved?.toString ? resolved.toString() : resolved);
       if (resolvedUrl) return resolvedUrl;
-    } catch (e) { log.warn('arweaveScripts: fallback', e); }
+    } catch (e) {
+      log.warn('arweaveScripts: fallback', e);
+    }
   }
 
   if (opts?.useWayfinder === false) return '';
@@ -997,11 +1021,7 @@ const resolveWayfinderUrlForTx = async ({
   return '';
 };
 
-const buildWayfinderRouteCandidates = ({
-  txId = '',
-  resolvedUrl = '',
-  opts = {},
-} = {}) => {
+const buildWayfinderRouteCandidates = ({ txId = '', resolvedUrl = '', opts = {} } = {}) => {
   const out = [];
   const seen = new Set();
   const push = (route, url, gateway = 'wayfinder') => {
@@ -1016,15 +1036,13 @@ const buildWayfinderRouteCandidates = ({
   try {
     const parsed = new URL(normalizedResolvedUrl);
     const gatewayBase = parsed.origin;
-    const gatewayRouteOpts = (
-      isDirectToArIoEnabled(opts)
-        ? { ...(opts || {}), includeTxDataRoute: false }
-        : opts
-    );
+    const gatewayRouteOpts = isDirectToArIoEnabled(opts) ? { ...(opts || {}), includeTxDataRoute: false } : opts;
     buildArweaveGatewayRouteCandidates(txId, gatewayBase, gatewayRouteOpts).forEach(({ route, url }) => {
       push(`wayfinder-${route}`, url, normalizeGatewayBase(gatewayBase) || 'wayfinder');
     });
-  } catch (e) { log.warn('arweaveScripts: fallback', e); }
+  } catch (e) {
+    log.warn('arweaveScripts: fallback', e);
+  }
 
   return out;
 };
@@ -1078,7 +1096,9 @@ const tryWayfinderFallback = async ({
           sawRetryableNonNotFound = true;
           continue;
         }
-        const contentType = String(resp?.headers?.get?.('content-type') || '').trim().toLowerCase();
+        const contentType = String(resp?.headers?.get?.('content-type') || '')
+          .trim()
+          .toLowerCase();
         const derivedStatus = looksLikeHtmlGatewayPayload({ text, contentType })
           ? inferStatusFromHtmlGatewayPayload(text)
           : null;
@@ -1180,26 +1200,34 @@ const ensureArweaveResourceErrorListener = () => {
   if (typeof window === 'undefined' || !window?.addEventListener) return;
   arweaveResourceErrorListenerInstalled = true;
   try {
-    window.addEventListener('error', (event) => {
-      try {
-        const target = event?.target;
-        if (!target || target === window) return;
-        const rawUrl = String(target.currentSrc || target.src || target.href || '').trim();
-        if (!rawUrl) return;
-        const txId = extractArweaveTxId(rawUrl);
-        if (!txId) return;
-        const labels = getArweaveTxContextLabels(txId);
-        const dedupeKey = `resource-error|${txId}|${labels.join('|')}`;
-        if (!dedupeTxEvent(dedupeKey)) return;
-        log.warn('[arweave] resource-load-error', {
-          txId,
-          labels,
-          url: rawUrl,
-          tag: String(target.tagName || '').toLowerCase() || null,
-        });
-      } catch (e) { log.warn('arweaveScripts: fallback', e); }
-    }, true);
-  } catch (e) { log.warn('arweaveScripts: fallback', e); }
+    window.addEventListener(
+      'error',
+      (event) => {
+        try {
+          const target = event?.target;
+          if (!target || target === window) return;
+          const rawUrl = String(target.currentSrc || target.src || target.href || '').trim();
+          if (!rawUrl) return;
+          const txId = extractArweaveTxId(rawUrl);
+          if (!txId) return;
+          const labels = getArweaveTxContextLabels(txId);
+          const dedupeKey = `resource-error|${txId}|${labels.join('|')}`;
+          if (!dedupeTxEvent(dedupeKey)) return;
+          log.warn('[arweave] resource-load-error', {
+            txId,
+            labels,
+            url: rawUrl,
+            tag: String(target.tagName || '').toLowerCase() || null,
+          });
+        } catch (e) {
+          log.warn('arweaveScripts: fallback', e);
+        }
+      },
+      true,
+    );
+  } catch (e) {
+    log.warn('arweaveScripts: fallback', e);
+  }
 };
 
 const normalizeArweaveDebugContext = (raw) => {
@@ -1224,13 +1252,13 @@ const normalizeArweaveDebugContext = (raw) => {
   return Object.keys(normalized).length ? normalized : null;
 };
 
-const shouldStopOnFirstNotFound = (opts = {}) => (
-  opts?.stopOnFirst404 === true || opts?.shortCircuitNotFound === true
-);
+const shouldStopOnFirstNotFound = (opts = {}) => opts?.stopOnFirst404 === true || opts?.shortCircuitNotFound === true;
 
 const readBoolish = (raw, defaultVal = false) => {
   if (typeof raw === 'boolean') return raw;
-  const value = String(raw == null ? '' : raw).trim().toLowerCase();
+  const value = String(raw == null ? '' : raw)
+    .trim()
+    .toLowerCase();
   if (value === '1' || value === 'true' || value === 'yes' || value === 'on') return true;
   if (value === '0' || value === 'false' || value === 'no' || value === 'off') return false;
   return defaultVal;
@@ -1241,7 +1269,9 @@ const readGlobalBool = (key, defaultVal = false) => {
     if (typeof globalThis !== 'undefined' && typeof globalThis[key] !== 'undefined') {
       return readBoolish(globalThis[key], defaultVal);
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
   return defaultVal;
 };
 
@@ -1254,14 +1284,18 @@ const readArweaveRuntimeDiagnostics = () => {
     if (typeof navigator !== 'undefined' && navigator?.userAgent) {
       userAgent = String(navigator.userAgent);
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
   try {
     if (typeof window !== 'undefined') {
       viewportWidth = Number(window.innerWidth || 0) || null;
       viewportHeight = Number(window.innerHeight || 0) || null;
       devicePixelRatio = Number(window.devicePixelRatio || 0) || null;
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
 
   const cacheBackend = getCacheBackendDiagnostics();
   return {
@@ -1275,15 +1309,16 @@ const readArweaveRuntimeDiagnostics = () => {
 };
 
 const isResponsePayloadCategory = (debugContext = null) => {
-  const category = String(debugContext?.category || '').trim().toLowerCase();
-  return (
-    category === 'question_response_payload' ||
-    category === 'survey_response_payload'
-  );
+  const category = String(debugContext?.category || '')
+    .trim()
+    .toLowerCase();
+  return category === 'question_response_payload' || category === 'survey_response_payload';
 };
 
 const isDisplayCriticalMetadataCategory = (debugContext = null) => {
-  const category = String(debugContext?.category || '').trim().toLowerCase();
+  const category = String(debugContext?.category || '')
+    .trim()
+    .toLowerCase();
   return (
     category === 'session_registry_metadata' ||
     category === 'sbt_metadata' ||
@@ -1302,31 +1337,24 @@ const resolvePreflightTxExistenceDecision = (opts = {}, debugContext = null) => 
   if (opts?.preflightTxExistence === true) {
     return { enabled: true, source: 'opts:preflightTxExistence=true' };
   }
-  const category = String(debugContext?.category || '').trim().toLowerCase();
+  const category = String(debugContext?.category || '')
+    .trim()
+    .toLowerCase();
   if (category === 'session_registry_metadata') {
     return {
-      enabled: readGlobalBool(
-        'CE_ARWEAVE_PREFLIGHT_SESSION_METADATA',
-        !!CE_ARWEAVE_PREFLIGHT_SESSION_METADATA
-      ),
+      enabled: readGlobalBool('CE_ARWEAVE_PREFLIGHT_SESSION_METADATA', !!CE_ARWEAVE_PREFLIGHT_SESSION_METADATA),
       source: 'config:session_metadata',
     };
   }
   if (category === 'sbt_metadata') {
     return {
-      enabled: readGlobalBool(
-        'CE_ARWEAVE_PREFLIGHT_SBT_METADATA',
-        !!CE_ARWEAVE_PREFLIGHT_SBT_METADATA
-      ),
+      enabled: readGlobalBool('CE_ARWEAVE_PREFLIGHT_SBT_METADATA', !!CE_ARWEAVE_PREFLIGHT_SBT_METADATA),
       source: 'config:sbt_metadata',
     };
   }
   if (isResponsePayloadCategory(debugContext)) {
     return {
-      enabled: readGlobalBool(
-        'CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS',
-        !!CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS
-      ),
+      enabled: readGlobalBool('CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS', !!CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS),
       source: 'config:response_payloads',
     };
   }
@@ -1336,16 +1364,17 @@ const resolvePreflightTxExistenceDecision = (opts = {}, debugContext = null) => 
 const shouldUseShortNotFoundCooldown = (debugContext = null) => {
   if (isResponsePayloadCategory(debugContext)) return true;
   if (!isDisplayCriticalMetadataCategory(debugContext)) return false;
-  const category = String(debugContext?.category || '').trim().toLowerCase();
+  const category = String(debugContext?.category || '')
+    .trim()
+    .toLowerCase();
   if (category === 'question_metadata' || category === 'survey_metadata') return true;
   return resolvePreflightTxExistenceDecision({}, debugContext).enabled === false;
 };
 
 const resolveDownloadGatewaysForContext = (opts = {}, debugContext = null) => {
   void debugContext;
-  const configuredGateways = Array.isArray(opts.gateways) && opts.gateways.length
-    ? normalizeGatewayList(opts.gateways)
-    : [];
+  const configuredGateways =
+    Array.isArray(opts.gateways) && opts.gateways.length ? normalizeGatewayList(opts.gateways) : [];
   if (configuredGateways.length) return configuredGateways;
   return getDefaultArweaveGateways(opts);
 };
@@ -1363,7 +1392,9 @@ const shouldLogArweaveFetchDebug = (opts = {}, debugContext = null) => {
       if (window.__CE_ARWEAVE_DEBUG__ === true) return true;
       if (window.ENABLE_RPC_DEBUG_LOGGING === true) return true;
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
   return false;
 };
 
@@ -1405,7 +1436,10 @@ const checkArweaveTxExistsViaGraphql = async (txId, opts = {}, debugContext = nu
   if (!normalizedTxId) return null;
   const runtimeDiagnostics = readArweaveRuntimeDiagnostics();
   registerArweaveTxContext(normalizedTxId, {
-    category: String(debugContext?.category || '').trim().toLowerCase() || 'unknown',
+    category:
+      String(debugContext?.category || '')
+        .trim()
+        .toLowerCase() || 'unknown',
     caller: String(debugContext?.caller || debugContext?.fn || '').trim(),
     source: 'graphql_precheck',
   });
@@ -1418,9 +1452,7 @@ const checkArweaveTxExistsViaGraphql = async (txId, opts = {}, debugContext = nu
   }
 
   const run = (async () => {
-    const configured = Array.isArray(opts?.graphqlUrls)
-      ? opts.graphqlUrls
-      : [];
+    const configured = Array.isArray(opts?.graphqlUrls) ? opts.graphqlUrls : [];
     const endpoints = [];
     const pushEndpoint = (value) => {
       const endpoint = String(value || '').trim();
@@ -1439,15 +1471,22 @@ const checkArweaveTxExistsViaGraphql = async (txId, opts = {}, debugContext = nu
         continue;
       }
       try {
-        const res = await fetchWithTimeout(endpoint, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', accept: 'application/json' },
-          body: JSON.stringify({ query, variables: { ids: [normalizedTxId] } }),
-        }, Number(opts?.graphqlTimeoutMs || ARWEAVE_GRAPHQL_TIMEOUT_MS));
+        const res = await fetchWithTimeout(
+          endpoint,
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', accept: 'application/json' },
+            body: JSON.stringify({ query, variables: { ids: [normalizedTxId] } }),
+          },
+          Number(opts?.graphqlTimeoutMs || ARWEAVE_GRAPHQL_TIMEOUT_MS),
+        );
         if (!res?.ok) {
           const status = Number(res?.status || 0) || null;
           markGraphqlEndpointFailure(endpoint, status);
-          const category = String(debugContext?.category || '').trim().toLowerCase() || 'unknown';
+          const category =
+            String(debugContext?.category || '')
+              .trim()
+              .toLowerCase() || 'unknown';
           const dedupeKey = `graphql-unhealthy|${endpoint}|${status}|${category}`;
           if (dedupeTxEvent(dedupeKey)) {
             log.warn('[arweave] graphql endpoint unhealthy', {
@@ -1464,17 +1503,26 @@ const checkArweaveTxExistsViaGraphql = async (txId, opts = {}, debugContext = nu
         const exists = Array.isArray(edges) && edges.length > 0;
         setTxExistenceCacheEntry(normalizedTxId, exists);
         markGraphqlEndpointSuccess(endpoint);
-        logArweaveFetchDebug('debug', '[arweave] tx-existence-check', {
-          txId: normalizedTxId,
-          exists,
-          endpoint,
-          ...runtimeDiagnostics,
-          ...(debugContext || {}),
-        }, opts, debugContext);
+        logArweaveFetchDebug(
+          'debug',
+          '[arweave] tx-existence-check',
+          {
+            txId: normalizedTxId,
+            exists,
+            endpoint,
+            ...runtimeDiagnostics,
+            ...(debugContext || {}),
+          },
+          opts,
+          debugContext,
+        );
         return exists;
       } catch (_) {
         markGraphqlEndpointFailure(endpoint, null);
-        const category = String(debugContext?.category || '').trim().toLowerCase() || 'unknown';
+        const category =
+          String(debugContext?.category || '')
+            .trim()
+            .toLowerCase() || 'unknown';
         const dedupeKey = `graphql-network-error|${endpoint}|${category}`;
         if (dedupeTxEvent(dedupeKey)) {
           log.warn('[arweave] graphql endpoint network error', {
@@ -1519,10 +1567,7 @@ const computeFailureRetryAtMs = ({
   if (status === 202 || kind === 'pending') return now + ARWEAVE_FAILURE_PENDING_RETRY_MS;
   if (!retryable || kind === 'invalid') return now + ARWEAVE_FAILURE_INVALID_RETRY_MS;
   const n = Math.max(0, Math.min(10, safeAttempts - 1));
-  const delay = Math.min(
-    ARWEAVE_FAILURE_MAX_RETRY_MS,
-    Math.round(ARWEAVE_FAILURE_BASE_RETRY_MS * Math.pow(2, n))
-  );
+  const delay = Math.min(ARWEAVE_FAILURE_MAX_RETRY_MS, Math.round(ARWEAVE_FAILURE_BASE_RETRY_MS * Math.pow(2, n)));
   return now + delay;
 };
 
@@ -1569,9 +1614,10 @@ const recordFailureCacheEntry = (txId, error, { debugContext = null } = {}) => {
   const now = Date.now();
   const status = Number.isFinite(Number(error?.status)) ? Number(error.status) : null;
   const kind = String(error?.kind || classifyStatusKind(status) || 'unknown');
-  const retryable = (typeof error?.retryable === 'boolean')
-    ? error.retryable
-    : (status === 404 || status === 202 || status === 429 || status >= 500 || kind === 'network');
+  const retryable =
+    typeof error?.retryable === 'boolean'
+      ? error.retryable
+      : status === 404 || status === 202 || status === 429 || status >= 500 || kind === 'network';
   const nextRetryAtMs = computeFailureRetryAtMs({ status, kind, retryable, attempts, debugContext });
   const cappedRetryAt = Math.min(nextRetryAtMs, Date.now() + MAX_FAILURE_COOLDOWN_MS);
   const entry = {
@@ -1592,9 +1638,14 @@ const buildFailureCacheError = ({ txId, failureEntry }) => {
   const entry = failureEntry && typeof failureEntry === 'object' ? failureEntry : {};
   const status = Number.isFinite(Number(entry.status)) ? Number(entry.status) : null;
   const kind = String(entry.kind || (status === 404 ? 'not_found' : 'cooldown') || 'cooldown');
-  const retryable = (typeof entry.retryable === 'boolean')
-    ? entry.retryable
-    : (kind === 'not_found' || kind === 'pending' || kind === 'network' || kind === 'server' || kind === 'rate_limited');
+  const retryable =
+    typeof entry.retryable === 'boolean'
+      ? entry.retryable
+      : kind === 'not_found' ||
+        kind === 'pending' ||
+        kind === 'network' ||
+        kind === 'server' ||
+        kind === 'rate_limited';
   const err = createArweaveFetchError({
     txId,
     status,
@@ -1621,13 +1672,7 @@ const parseDirectUploadArweaveJwk = (raw) => {
   }
 };
 
-const uploadDirectToArweave = async ({
-  data,
-  contentType,
-  tags,
-  arweaveJwk,
-  requestId = '',
-} = {}) => {
+const uploadDirectToArweave = async ({ data, contentType, tags, arweaveJwk, requestId = '' } = {}) => {
   const jwk = parseDirectUploadArweaveJwk(arweaveJwk);
   const arweave = Arweave.init({
     host: 'arweave.net',
@@ -1645,9 +1690,8 @@ const uploadDirectToArweave = async ({
     }
     bytes = new Uint8Array(await data.arrayBuffer());
   } else {
-    const payload = (contentType === 'application/json' && typeof data !== 'string')
-      ? JSON.stringify(data)
-      : String(data);
+    const payload =
+      contentType === 'application/json' && typeof data !== 'string' ? JSON.stringify(data) : String(data);
     bytes = new TextEncoder().encode(payload);
     if (bytes.length > MAX_ARWEAVE_UPLOAD_BYTES) {
       throw new Error('Arweave upload payload exceeds 100 MB limit.');
@@ -1668,11 +1712,7 @@ const uploadDirectToArweave = async ({
     const uploader = await arweave.transactions.getUploader(tx);
     while (!uploader.isComplete) {
       // eslint-disable-next-line no-await-in-loop
-      await withTimeout(
-        uploader.uploadChunk(),
-        ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS,
-        'Arweave chunk upload'
-      );
+      await withTimeout(uploader.uploadChunk(), ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS, 'Arweave chunk upload');
     }
   } catch (err) {
     if (err?.code === 'ETIMEDOUT' && err?.retryable) throw err;
@@ -1692,105 +1732,132 @@ const uploadDirectToArweave = async ({
 };
 
 async function uploadDataToArweave(data, format, opts = {}) {
-    if (!data) throw new Error("No data provided for Arweave upload.");
-    const resolvedSessionSlug = resolveUploadSessionSlug(opts);
-    const tags = normalizeTagsPayload(opts?.tags);
+  if (!data) throw new Error('No data provided for Arweave upload.');
+  const resolvedSessionSlug = resolveUploadSessionSlug(opts);
+  const tags = normalizeTagsPayload(opts?.tags);
 
-    const requestId = typeof opts?.requestId === 'string' && opts.requestId.trim()
+  const requestId =
+    typeof opts?.requestId === 'string' && opts.requestId.trim()
       ? opts.requestId.trim()
       : `arw_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-    const explicitWorkerUrl = normalizeWorkerBaseUrl(opts.workerUrl || '');
-    let corsWorkerUrl = explicitWorkerUrl;
-    if (!corsWorkerUrl) {
-      try {
-        corsWorkerUrl = await getCorsProxyUrlOrThrow({
-          sessionConfig: opts.sessionConfig,
-          sessionSlug: opts.sessionSlug,
-          context: opts.context,
-          allowDemoFallback: defaultStrictAllowDemoFallback(),
-        });
-      } catch (_) {
-        corsWorkerUrl = '';
-      }
-    }
-    const baseUrl = normalizeWorkerBaseUrl(corsWorkerUrl || '');
-    const endpoint = baseUrl ? `${baseUrl}/arweave/upload` : '';
-    let endpointOrigin = '';
+  const explicitWorkerUrl = normalizeWorkerBaseUrl(opts.workerUrl || '');
+  let corsWorkerUrl = explicitWorkerUrl;
+  if (!corsWorkerUrl) {
     try {
-      endpointOrigin = new URL(endpoint).origin;
-    } catch {
-      endpointOrigin = '';
+      corsWorkerUrl = await getCorsProxyUrlOrThrow({
+        sessionConfig: opts.sessionConfig,
+        sessionSlug: opts.sessionSlug,
+        context: opts.context,
+        allowDemoFallback: defaultStrictAllowDemoFallback(),
+      });
+    } catch (_) {
+      corsWorkerUrl = '';
     }
-    const windowOrigin = typeof window !== 'undefined' && window.location
-      ? window.location.origin
-      : '';
-    const requestWithAuth = (url, options, attempt = {}) => (
-      opts?.skipAuth
-        ? fetch(url, options)
-        : fetchWorkerWithAuth(url, options, {
+  }
+  const baseUrl = normalizeWorkerBaseUrl(corsWorkerUrl || '');
+  const endpoint = baseUrl ? `${baseUrl}/arweave/upload` : '';
+  let endpointOrigin = '';
+  try {
+    endpointOrigin = new URL(endpoint).origin;
+  } catch {
+    endpointOrigin = '';
+  }
+  const windowOrigin = typeof window !== 'undefined' && window.location ? window.location.origin : '';
+  const requestWithAuth = (url, options, attempt = {}) =>
+    opts?.skipAuth
+      ? fetch(url, options)
+      : fetchWorkerWithAuth(url, options, {
           sessionSlug: Object.prototype.hasOwnProperty.call(attempt, 'sessionSlug')
             ? attempt.sessionSlug
             : resolvedSessionSlug,
           context: opts.context,
           workerUrl: normalizeWorkerBaseUrl(attempt.workerUrl || baseUrl),
           allowDemoFallback: defaultStrictAllowDemoFallback(),
-        })
+        });
+  const adminAuth = (() => {
+    if (!opts?.adminAuth || typeof opts.adminAuth !== 'object') return null;
+    const source = opts.adminAuth;
+    const authSlug = normalizeSessionSlug(
+      Object.prototype.hasOwnProperty.call(source, 'sessionSlug')
+        ? source.sessionSlug
+        : Object.prototype.hasOwnProperty.call(source, 'slug')
+          ? source.slug
+          : resolvedSessionSlug,
     );
-    const adminAuth = (() => {
-      if (!opts?.adminAuth || typeof opts.adminAuth !== 'object') return null;
-      const source = opts.adminAuth;
-      const authSlug = normalizeSessionSlug(
-        Object.prototype.hasOwnProperty.call(source, 'sessionSlug')
-          ? source.sessionSlug
-          : Object.prototype.hasOwnProperty.call(source, 'slug')
-            ? source.slug
-            : resolvedSessionSlug
-      );
-      const slugField = resolveUploadSlugField();
-      const payload = Object.entries(source).reduce((acc, [key, value]) => {
-        if (value == null) return acc;
-        acc[key] = value;
-        return acc;
-      }, {});
-      payload[slugField] = authSlug;
-      return payload;
-    })();
-    let arweaveJwkValue = '';
-    if (opts?.arweaveJwk) {
-      if (typeof opts.arweaveJwk === 'string') {
-        arweaveJwkValue = opts.arweaveJwk;
-      } else {
-        try {
-          arweaveJwkValue = JSON.stringify(opts.arweaveJwk);
-        } catch {
-          arweaveJwkValue = '';
-        }
+    const slugField = resolveUploadSlugField();
+    const payload = Object.entries(source).reduce((acc, [key, value]) => {
+      if (value == null) return acc;
+      acc[key] = value;
+      return acc;
+    }, {});
+    payload[slugField] = authSlug;
+    return payload;
+  })();
+  let arweaveJwkValue = '';
+  if (opts?.arweaveJwk) {
+    if (typeof opts.arweaveJwk === 'string') {
+      arweaveJwkValue = opts.arweaveJwk;
+    } else {
+      try {
+        arweaveJwkValue = JSON.stringify(opts.arweaveJwk);
+      } catch {
+        arweaveJwkValue = '';
       }
     }
-    const shouldForceDirectUpload = opts?.forceDirectArweaveUpload === true && !!arweaveJwkValue;
+  }
+  const shouldForceDirectUpload = opts?.forceDirectArweaveUpload === true && !!arweaveJwkValue;
 
-    // Decide content-type
-    let contentType = typeof opts?.contentType === 'string' ? opts.contentType.trim() : '';
-    if (!contentType) {
-      contentType = 'application/json';
-      if (format !== undefined) {
-        switch (String(format).toLowerCase()) {
-          case 'json': contentType = 'application/json'; break;
-          case 'png': contentType = 'image/png'; break;
-          case 'jpg':
-          case 'jpeg': contentType = 'image/jpeg'; break;
-          case 'gif': contentType = 'image/gif'; break;
-          case 'mp4': contentType = 'video/mp4'; break;
-          case 'md':
-          case 'markdown': contentType = 'text/markdown'; break;
-          default: throw new Error(`Unsupported format: ${format}`);
-        }
-      } else if (typeof File !== 'undefined' && (data instanceof File || data instanceof Blob)) {
-        contentType = (data && data.type) ? data.type : 'application/octet-stream';
+  // Decide content-type
+  let contentType = typeof opts?.contentType === 'string' ? opts.contentType.trim() : '';
+  if (!contentType) {
+    contentType = 'application/json';
+    if (format !== undefined) {
+      switch (String(format).toLowerCase()) {
+        case 'json':
+          contentType = 'application/json';
+          break;
+        case 'png':
+          contentType = 'image/png';
+          break;
+        case 'jpg':
+        case 'jpeg':
+          contentType = 'image/jpeg';
+          break;
+        case 'gif':
+          contentType = 'image/gif';
+          break;
+        case 'mp4':
+          contentType = 'video/mp4';
+          break;
+        case 'md':
+        case 'markdown':
+          contentType = 'text/markdown';
+          break;
+        default:
+          throw new Error(`Unsupported format: ${format}`);
       }
+    } else if (typeof File !== 'undefined' && (data instanceof File || data instanceof Blob)) {
+      contentType = data && data.type ? data.type : 'application/octet-stream';
     }
-    if (shouldForceDirectUpload) {
+  }
+  if (shouldForceDirectUpload) {
+    return uploadDirectToArweave({
+      data,
+      contentType,
+      tags,
+      arweaveJwk: arweaveJwkValue,
+      requestId,
+    });
+  }
+
+  const uploadCandidates = await buildUploadSessionCandidates({
+    selectedSessionSlug: resolvedSessionSlug,
+    initialWorkerUrl: baseUrl,
+    context: opts.context,
+  });
+  if (!uploadCandidates.length) {
+    if (arweaveJwkValue) {
       return uploadDirectToArweave({
         data,
         contentType,
@@ -1799,119 +1866,72 @@ async function uploadDataToArweave(data, format, opts = {}) {
         requestId,
       });
     }
+    throw new Error('Worker URL is missing for Arweave upload.');
+  }
 
-    const uploadCandidates = await buildUploadSessionCandidates({
-      selectedSessionSlug: resolvedSessionSlug,
-      initialWorkerUrl: baseUrl,
-      context: opts.context,
-    });
-    if (!uploadCandidates.length) {
-      if (arweaveJwkValue) {
-        return uploadDirectToArweave({
-          data,
-          contentType,
-          tags,
-          arweaveJwk: arweaveJwkValue,
-          requestId,
-        });
-      }
-      throw new Error('Worker URL is missing for Arweave upload.');
-    }
+  log.log('[arweave] upload request', {
+    requestId,
+    endpoint,
+    format: format ?? null,
+    contentType,
+    skipAuth: !!opts?.skipAuth,
+    hasAdminAuth: !!adminAuth?.address,
+    hasJwk: !!arweaveJwkValue,
+    tags: tags ? tags.length : 0,
+    candidateCount: uploadCandidates.length,
+    candidates: uploadCandidates.map((item) => ({
+      sessionSlug: item.sessionSlug || 'general',
+      workerUrl: item.workerUrl,
+      gateStatus: item.gateStatus,
+      reason: item.reason,
+    })),
+  });
+  log.info('[arweave][client] resolved endpoint', {
+    requestId,
+    explicitWorkerUrl: explicitWorkerUrl || null,
+    corsWorkerUrl: corsWorkerUrl || null,
+    baseUrl,
+    endpoint,
+    windowOrigin: windowOrigin || null,
+    endpointOrigin: endpointOrigin || null,
+  });
 
-    log.log('[arweave] upload request', {
+  const attemptUploadForCandidate = async ({
+    candidate,
+    buildRequestInit,
+    hasFormData = false,
+    bodyBytes = null,
+    attemptIndex = 0,
+  } = {}) => {
+    const candidateBaseUrl = normalizeWorkerBaseUrl(candidate?.workerUrl || '');
+    const candidateEndpoint = `${candidateBaseUrl.replace(/\/+$/, '')}/arweave/upload`;
+    const t0 = Date.now();
+    log.info('[arweave][client] fetch start', {
       requestId,
-      endpoint,
-      format: format ?? null,
+      method: 'POST',
       contentType,
+      hasFormData: !!hasFormData,
+      bodyBytes,
       skipAuth: !!opts?.skipAuth,
-      hasAdminAuth: !!adminAuth?.address,
-      hasJwk: !!arweaveJwkValue,
-      tags: tags ? tags.length : 0,
-      candidateCount: uploadCandidates.length,
-      candidates: uploadCandidates.map((item) => ({
-        sessionSlug: item.sessionSlug || 'general',
-        workerUrl: item.workerUrl,
-        gateStatus: item.gateStatus,
-        reason: item.reason,
-      })),
-    });
-    log.info('[arweave][client] resolved endpoint', {
-      requestId,
-      explicitWorkerUrl: explicitWorkerUrl || null,
-      corsWorkerUrl: corsWorkerUrl || null,
-      baseUrl,
-      endpoint,
-      windowOrigin: windowOrigin || null,
-      endpointOrigin: endpointOrigin || null,
+      sessionSlug: candidate?.sessionSlug || '',
+      workerUrl: candidateBaseUrl,
+      endpoint: candidateEndpoint,
+      attemptIndex,
+      ts: new Date().toISOString(),
     });
 
-    const attemptUploadForCandidate = async ({
-      candidate,
-      buildRequestInit,
-      hasFormData = false,
-      bodyBytes = null,
-      attemptIndex = 0,
-    } = {}) => {
-      const candidateBaseUrl = normalizeWorkerBaseUrl(candidate?.workerUrl || '');
-      const candidateEndpoint = `${candidateBaseUrl.replace(/\/+$/, '')}/arweave/upload`;
-      const t0 = Date.now();
-      log.info('[arweave][client] fetch start', {
-        requestId,
-        method: 'POST',
-        contentType,
-        hasFormData: !!hasFormData,
-        bodyBytes,
-        skipAuth: !!opts?.skipAuth,
+    let response;
+    try {
+      response = await requestWithAuth(candidateEndpoint, buildRequestInit(), {
         sessionSlug: candidate?.sessionSlug || '',
         workerUrl: candidateBaseUrl,
-        endpoint: candidateEndpoint,
-        attemptIndex,
-        ts: new Date().toISOString(),
       });
-
-      let response;
-      try {
-        response = await requestWithAuth(candidateEndpoint, buildRequestInit(), {
-          sessionSlug: candidate?.sessionSlug || '',
-          workerUrl: candidateBaseUrl,
-        });
-      } catch (err) {
-        const message = String(err?.message || err || 'network error');
-        log.error('[arweave][client] fetch error', {
-          requestId,
-          message,
-          name: err?.name,
-          durationMs: Date.now() - t0,
-          sessionSlug: candidate?.sessionSlug || '',
-          workerUrl: candidateBaseUrl,
-          endpoint: candidateEndpoint,
-          attemptIndex,
-          ts: new Date().toISOString(),
-        });
-        emitArweaveUploadFallbackTelemetry({
-          requestId,
-          sessionSlug: candidate?.sessionSlug || '',
-          workerUrl: candidateBaseUrl,
-          gateStatus: candidate?.gateStatus || 'unknown',
-          reason: candidate?.reason || 'unknown',
-          responseStatus: null,
-          attemptIndex,
-          error: message,
-        });
-        return {
-          ok: false,
-          status: null,
-          endpoint: candidateEndpoint,
-          message,
-          shouldFallback: shouldFallbackUploadCandidate({ message }),
-          networkError: true,
-        };
-      }
-
-      log.info('[arweave][client] fetch done', {
+    } catch (err) {
+      const message = String(err?.message || err || 'network error');
+      log.error('[arweave][client] fetch error', {
         requestId,
-        status: response?.status,
-        ok: response?.ok,
+        message,
+        name: err?.name,
         durationMs: Date.now() - t0,
         sessionSlug: candidate?.sessionSlug || '',
         workerUrl: candidateBaseUrl,
@@ -1919,289 +1939,334 @@ async function uploadDataToArweave(data, format, opts = {}) {
         attemptIndex,
         ts: new Date().toISOString(),
       });
-
-      let payload = await parseWorkerUploadResponseJson(response);
-      let message = payload?.error || payload?.message || (response.ok ? '' : `Arweave upload failed (${response.status})`);
-
-      if (!response.ok && arweaveJwkValue && isWorkerMissingSessionSecretsError(message)) {
-        log.info('[arweave][client] bootstrap retry', {
-          requestId,
-          sessionSlug: candidate?.sessionSlug || '',
-          workerUrl: candidateBaseUrl,
-          endpoint: candidateEndpoint,
-          attemptIndex,
-          mode: opts?.skipAuth ? 'bootstrap-upload' : 'authenticated-upload',
-        });
-        try {
-          const bootstrapResponse = opts?.skipAuth
-            ? await fetch(candidateEndpoint, buildRequestInit())
-            : await requestWithAuth(candidateEndpoint, buildRequestInit(), {
-                sessionSlug: candidate?.sessionSlug || '',
-                workerUrl: candidateBaseUrl,
-              });
-          const bootstrapPayload = await parseWorkerUploadResponseJson(bootstrapResponse);
-          const bootstrapMessage =
-            bootstrapPayload?.error ||
-            bootstrapPayload?.message ||
-            (bootstrapResponse.ok ? '' : `Arweave upload failed (${bootstrapResponse.status})`);
-          response = bootstrapResponse;
-          payload = bootstrapPayload;
-          message = bootstrapMessage;
-        } catch (err) {
-          const bootstrapError = String(err?.message || err || 'network error');
-          return {
-            ok: false,
-            status: null,
-            endpoint: candidateEndpoint,
-            message: bootstrapError,
-            shouldFallback: shouldFallbackUploadCandidate({ message: bootstrapError }),
-            networkError: true,
-          };
-        }
-      }
-
-      if (!response.ok && arweaveJwkValue && isWorkerMissingSessionSecretsError(message)) {
-        log.info('[arweave][client] direct upload retry', {
-          requestId,
-          sessionSlug: candidate?.sessionSlug || '',
-          workerUrl: candidateBaseUrl,
-          endpoint: candidateEndpoint,
-          attemptIndex,
-        });
-        try {
-          const directId = await uploadDirectToArweave({
-            data,
-            contentType,
-            tags,
-            arweaveJwk: arweaveJwkValue,
-            requestId,
-          });
-          return {
-            ok: true,
-            id: directId,
-          };
-        } catch (err) {
-          return {
-            ok: false,
-            status: null,
-            endpoint: candidateEndpoint,
-            message: String(err?.message || err || 'Arweave direct upload failed.'),
-            shouldFallback: false,
-            networkError: false,
-          };
-        }
-      }
-
       emitArweaveUploadFallbackTelemetry({
         requestId,
         sessionSlug: candidate?.sessionSlug || '',
         workerUrl: candidateBaseUrl,
         gateStatus: candidate?.gateStatus || 'unknown',
         reason: candidate?.reason || 'unknown',
-        responseStatus: Number(response?.status || 0) || null,
+        responseStatus: null,
         attemptIndex,
-        error: message || undefined,
+        error: message,
       });
+      return {
+        ok: false,
+        status: null,
+        endpoint: candidateEndpoint,
+        message,
+        shouldFallback: shouldFallbackUploadCandidate({ message }),
+        networkError: true,
+      };
+    }
 
-      if (!response.ok) {
+    log.info('[arweave][client] fetch done', {
+      requestId,
+      status: response?.status,
+      ok: response?.ok,
+      durationMs: Date.now() - t0,
+      sessionSlug: candidate?.sessionSlug || '',
+      workerUrl: candidateBaseUrl,
+      endpoint: candidateEndpoint,
+      attemptIndex,
+      ts: new Date().toISOString(),
+    });
+
+    let payload = await parseWorkerUploadResponseJson(response);
+    let message =
+      payload?.error || payload?.message || (response.ok ? '' : `Arweave upload failed (${response.status})`);
+
+    if (!response.ok && arweaveJwkValue && isWorkerMissingSessionSecretsError(message)) {
+      log.info('[arweave][client] bootstrap retry', {
+        requestId,
+        sessionSlug: candidate?.sessionSlug || '',
+        workerUrl: candidateBaseUrl,
+        endpoint: candidateEndpoint,
+        attemptIndex,
+        mode: opts?.skipAuth ? 'bootstrap-upload' : 'authenticated-upload',
+      });
+      try {
+        const bootstrapResponse = opts?.skipAuth
+          ? await fetch(candidateEndpoint, buildRequestInit())
+          : await requestWithAuth(candidateEndpoint, buildRequestInit(), {
+              sessionSlug: candidate?.sessionSlug || '',
+              workerUrl: candidateBaseUrl,
+            });
+        const bootstrapPayload = await parseWorkerUploadResponseJson(bootstrapResponse);
+        const bootstrapMessage =
+          bootstrapPayload?.error ||
+          bootstrapPayload?.message ||
+          (bootstrapResponse.ok ? '' : `Arweave upload failed (${bootstrapResponse.status})`);
+        response = bootstrapResponse;
+        payload = bootstrapPayload;
+        message = bootstrapMessage;
+      } catch (err) {
+        const bootstrapError = String(err?.message || err || 'network error');
         return {
           ok: false,
-          status: Number(response?.status || 0) || null,
+          status: null,
           endpoint: candidateEndpoint,
-          message,
-          shouldFallback: shouldFallbackUploadCandidate({ message }),
-          networkError: false,
+          message: bootstrapError,
+          shouldFallback: shouldFallbackUploadCandidate({ message: bootstrapError }),
+          networkError: true,
         };
       }
+    }
 
-      const rawId = payload?.id || payload?.txId || payload?.arweaveTxId || payload?.url || payload?.arweaveUrl || '';
-      const normalizedId = normalizeArweaveUploadId(rawId);
-      if (!normalizedId) {
+    if (!response.ok && arweaveJwkValue && isWorkerMissingSessionSecretsError(message)) {
+      log.info('[arweave][client] direct upload retry', {
+        requestId,
+        sessionSlug: candidate?.sessionSlug || '',
+        workerUrl: candidateBaseUrl,
+        endpoint: candidateEndpoint,
+        attemptIndex,
+      });
+      try {
+        const directId = await uploadDirectToArweave({
+          data,
+          contentType,
+          tags,
+          arweaveJwk: arweaveJwkValue,
+          requestId,
+        });
+        return {
+          ok: true,
+          id: directId,
+        };
+      } catch (err) {
         return {
           ok: false,
-          status: Number(response?.status || 0) || null,
+          status: null,
           endpoint: candidateEndpoint,
-          message: 'Arweave upload succeeded but no tx id was returned by worker.',
+          message: String(err?.message || err || 'Arweave direct upload failed.'),
           shouldFallback: false,
           networkError: false,
         };
       }
-      return {
-        ok: true,
-        id: normalizedId,
-      };
-    };
-
-    const runUploadAttempts = async ({ buildRequestInit, hasFormData = false, bodyBytes = null } = {}) => {
-      let fallbackTriggered = false;
-      let attemptCount = 0;
-      let lastError = null;
-      const maxTransientAttemptsPerCandidate = 3;
-
-      for (let index = 0; index < uploadCandidates.length; index += 1) {
-        if (index > 0 && !fallbackTriggered) break;
-        const candidate = uploadCandidates[index];
-        for (let transientAttempt = 1; transientAttempt <= maxTransientAttemptsPerCandidate; transientAttempt += 1) {
-          attemptCount += 1;
-          const result = await attemptUploadForCandidate({
-            candidate,
-            buildRequestInit,
-            hasFormData,
-            bodyBytes,
-            attemptIndex: (index * maxTransientAttemptsPerCandidate) + transientAttempt - 1,
-          });
-          if (result.ok) return result.id;
-
-          const rawMessage = String(result?.message || '').trim();
-          let error = null;
-          if (rawMessage.includes('Arweave key not configured')) {
-            error = new Error('No Arweave key configured in the worker.');
-          } else if (result?.networkError) {
-            error = new Error(`Arweave upload network error (${result.endpoint}): ${rawMessage || 'network error'}`);
-          } else {
-            error = new Error(rawMessage || `Arweave upload failed (${result?.status || 'unknown'})`);
-          }
-          error.status = result?.status ?? null;
-          error.sessionSlug = candidate?.sessionSlug || '';
-          error.workerUrl = candidate?.workerUrl || '';
-          lastError = error;
-
-          if (
-            isTransientWorkerUploadError({
-              message: rawMessage,
-              status: result?.status,
-            }) &&
-            transientAttempt < maxTransientAttemptsPerCandidate
-          ) {
-            // Keep retrying the same worker briefly for transient upstream pricing/routing failures.
-            // These happen in live no-mock runs and usually settle within a couple of quick retries.
-            // eslint-disable-next-line no-await-in-loop
-            await sleep(750 * transientAttempt);
-            continue;
-          }
-
-          if (result?.shouldFallback) {
-            fallbackTriggered = true;
-            break;
-          }
-          if (!fallbackTriggered) {
-            throw error;
-          }
-          break;
-        }
-      }
-
-      if (!lastError) {
-        throw new Error('Arweave upload failed: no worker candidates available.');
-      }
-      if (fallbackTriggered && uploadCandidates.length > 1) {
-        const exhaustedError = new Error(
-          `${lastError.message} (worker fallback exhausted after ${attemptCount} attempt${attemptCount === 1 ? '' : 's'})`
-        );
-        exhaustedError.cause = lastError;
-        throw exhaustedError;
-      }
-      throw lastError;
-    };
-
-    // File/Blob route
-    if (typeof File !== 'undefined' && (data instanceof File || data instanceof Blob)) {
-      const buildFormRequestInit = () => {
-        const form = new FormData();
-        form.append('file', data, data.name || `upload.${(format || '').toString().toLowerCase() || 'bin'}`);
-        form.append('contentType', contentType);
-        form.append('requestId', requestId);
-        if (resolvedSessionSlug) {
-          form.append('sessionSlug', resolvedSessionSlug);
-        }
-        if (tags) {
-          try { form.append('tags', JSON.stringify(tags)); } catch (e) { log.warn('arweaveScripts: fallback', e); }
-        }
-        if (arweaveJwkValue) form.append('arweaveJwk', arweaveJwkValue);
-        if (adminAuth) {
-          Object.entries(adminAuth).forEach(([key, value]) => {
-            if (value == null) return;
-            form.append(key, String(value));
-          });
-        }
-        return { method: 'POST', body: form };
-      };
-      return await runUploadAttempts({
-        buildRequestInit: buildFormRequestInit,
-        hasFormData: true,
-        bodyBytes: typeof data?.size === 'number' ? data.size : null,
-      });
     }
 
-    // JSON/string route
-    const payload = (contentType === 'application/json' && typeof data !== 'string')
-      ? JSON.stringify(data)
-      : String(data);
-
-    const body = {
-      data: payload,
-      contentType,
+    emitArweaveUploadFallbackTelemetry({
       requestId,
-      ...(resolvedSessionSlug ? { sessionSlug: resolvedSessionSlug } : {}),
-      ...(tags ? { tags } : {}),
-      ...(adminAuth || {}),
-      ...(arweaveJwkValue ? { arweaveJwk: arweaveJwkValue } : {}),
+      sessionSlug: candidate?.sessionSlug || '',
+      workerUrl: candidateBaseUrl,
+      gateStatus: candidate?.gateStatus || 'unknown',
+      reason: candidate?.reason || 'unknown',
+      responseStatus: Number(response?.status || 0) || null,
+      attemptIndex,
+      error: message || undefined,
+    });
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: Number(response?.status || 0) || null,
+        endpoint: candidateEndpoint,
+        message,
+        shouldFallback: shouldFallbackUploadCandidate({ message }),
+        networkError: false,
+      };
+    }
+
+    const rawId = payload?.id || payload?.txId || payload?.arweaveTxId || payload?.url || payload?.arweaveUrl || '';
+    const normalizedId = normalizeArweaveUploadId(rawId);
+    if (!normalizedId) {
+      return {
+        ok: false,
+        status: Number(response?.status || 0) || null,
+        endpoint: candidateEndpoint,
+        message: 'Arweave upload succeeded but no tx id was returned by worker.',
+        shouldFallback: false,
+        networkError: false,
+      };
+    }
+    return {
+      ok: true,
+      id: normalizedId,
     };
-    const bodyJson = JSON.stringify(body);
+  };
+
+  const runUploadAttempts = async ({ buildRequestInit, hasFormData = false, bodyBytes = null } = {}) => {
+    let fallbackTriggered = false;
+    let attemptCount = 0;
+    let lastError = null;
+    const maxTransientAttemptsPerCandidate = 3;
+
+    for (let index = 0; index < uploadCandidates.length; index += 1) {
+      if (index > 0 && !fallbackTriggered) break;
+      const candidate = uploadCandidates[index];
+      for (let transientAttempt = 1; transientAttempt <= maxTransientAttemptsPerCandidate; transientAttempt += 1) {
+        attemptCount += 1;
+        const result = await attemptUploadForCandidate({
+          candidate,
+          buildRequestInit,
+          hasFormData,
+          bodyBytes,
+          attemptIndex: index * maxTransientAttemptsPerCandidate + transientAttempt - 1,
+        });
+        if (result.ok) return result.id;
+
+        const rawMessage = String(result?.message || '').trim();
+        let error = null;
+        if (rawMessage.includes('Arweave key not configured')) {
+          error = new Error('No Arweave key configured in the worker.');
+        } else if (result?.networkError) {
+          error = new Error(`Arweave upload network error (${result.endpoint}): ${rawMessage || 'network error'}`);
+        } else {
+          error = new Error(rawMessage || `Arweave upload failed (${result?.status || 'unknown'})`);
+        }
+        error.status = result?.status ?? null;
+        error.sessionSlug = candidate?.sessionSlug || '';
+        error.workerUrl = candidate?.workerUrl || '';
+        lastError = error;
+
+        if (
+          isTransientWorkerUploadError({
+            message: rawMessage,
+            status: result?.status,
+          }) &&
+          transientAttempt < maxTransientAttemptsPerCandidate
+        ) {
+          // Keep retrying the same worker briefly for transient upstream pricing/routing failures.
+          // These happen in live no-mock runs and usually settle within a couple of quick retries.
+          // eslint-disable-next-line no-await-in-loop
+          await sleep(750 * transientAttempt);
+          continue;
+        }
+
+        if (result?.shouldFallback) {
+          fallbackTriggered = true;
+          break;
+        }
+        if (!fallbackTriggered) {
+          throw error;
+        }
+        break;
+      }
+    }
+
+    if (!lastError) {
+      throw new Error('Arweave upload failed: no worker candidates available.');
+    }
+    if (fallbackTriggered && uploadCandidates.length > 1) {
+      const exhaustedError = new Error(
+        `${lastError.message} (worker fallback exhausted after ${attemptCount} attempt${attemptCount === 1 ? '' : 's'})`,
+      );
+      exhaustedError.cause = lastError;
+      throw exhaustedError;
+    }
+    throw lastError;
+  };
+
+  // File/Blob route
+  if (typeof File !== 'undefined' && (data instanceof File || data instanceof Blob)) {
+    const buildFormRequestInit = () => {
+      const form = new FormData();
+      form.append('file', data, data.name || `upload.${(format || '').toString().toLowerCase() || 'bin'}`);
+      form.append('contentType', contentType);
+      form.append('requestId', requestId);
+      if (resolvedSessionSlug) {
+        form.append('sessionSlug', resolvedSessionSlug);
+      }
+      if (tags) {
+        try {
+          form.append('tags', JSON.stringify(tags));
+        } catch (e) {
+          log.warn('arweaveScripts: fallback', e);
+        }
+      }
+      if (arweaveJwkValue) form.append('arweaveJwk', arweaveJwkValue);
+      if (adminAuth) {
+        Object.entries(adminAuth).forEach(([key, value]) => {
+          if (value == null) return;
+          form.append(key, String(value));
+        });
+      }
+      return { method: 'POST', body: form };
+    };
     return await runUploadAttempts({
-      buildRequestInit: () => ({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: bodyJson,
-      }),
-      hasFormData: false,
-      bodyBytes: bodyJson.length,
+      buildRequestInit: buildFormRequestInit,
+      hasFormData: true,
+      bodyBytes: typeof data?.size === 'number' ? data.size : null,
     });
   }
 
+  // JSON/string route
+  const payload = contentType === 'application/json' && typeof data !== 'string' ? JSON.stringify(data) : String(data);
+
+  const body = {
+    data: payload,
+    contentType,
+    requestId,
+    ...(resolvedSessionSlug ? { sessionSlug: resolvedSessionSlug } : {}),
+    ...(tags ? { tags } : {}),
+    ...(adminAuth || {}),
+    ...(arweaveJwkValue ? { arweaveJwk: arweaveJwkValue } : {}),
+  };
+  const bodyJson = JSON.stringify(body);
+  return await runUploadAttempts({
+    buildRequestInit: () => ({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: bodyJson,
+    }),
+    hasFormData: false,
+    bodyBytes: bodyJson.length,
+  });
+}
 
 async function downloadDataFromArweave(txID, opts = {}) {
-    if (!txID) throw new Error('Missing Arweave txID');
-    const normalizedTxId = normalizeArweaveUploadId(txID);
-    const cacheBypass = !!opts?.bypassCache;
-    const bypassFailureCache = cacheBypass || !!opts?.bypassFailureCache;
-    const debugContext = normalizeArweaveDebugContext(opts?.debugContext);
-    const stopOnFirst404 = shouldStopOnFirstNotFound(opts, debugContext);
-    const preflightDecision = resolvePreflightTxExistenceDecision(opts, debugContext);
-    const preflightTxExistence = preflightDecision.enabled;
-    const runtimeDiagnostics = readArweaveRuntimeDiagnostics();
-    const inFlightKey = normalizedTxId;
-    registerArweaveTxContext(normalizedTxId, {
-      category: String(debugContext?.category || '').trim().toLowerCase() || 'unknown',
-      caller: String(debugContext?.caller || debugContext?.fn || '').trim(),
-      source: 'gateway_fetch',
-    });
-    ensureArweaveResourceErrorListener();
-    logArweaveFetchDebug('debug', '[arweave] preflight-decision', {
+  if (!txID) throw new Error('Missing Arweave txID');
+  const normalizedTxId = normalizeArweaveUploadId(txID);
+  const cacheBypass = !!opts?.bypassCache;
+  const bypassFailureCache = cacheBypass || !!opts?.bypassFailureCache;
+  const debugContext = normalizeArweaveDebugContext(opts?.debugContext);
+  const stopOnFirst404 = shouldStopOnFirstNotFound(opts, debugContext);
+  const preflightDecision = resolvePreflightTxExistenceDecision(opts, debugContext);
+  const preflightTxExistence = preflightDecision.enabled;
+  const runtimeDiagnostics = readArweaveRuntimeDiagnostics();
+  const inFlightKey = normalizedTxId;
+  registerArweaveTxContext(normalizedTxId, {
+    category:
+      String(debugContext?.category || '')
+        .trim()
+        .toLowerCase() || 'unknown',
+    caller: String(debugContext?.caller || debugContext?.fn || '').trim(),
+    source: 'gateway_fetch',
+  });
+  ensureArweaveResourceErrorListener();
+  logArweaveFetchDebug(
+    'debug',
+    '[arweave] preflight-decision',
+    {
       txId: normalizedTxId,
       enabled: preflightTxExistence,
       source: preflightDecision.source,
       shortCircuitNotFound: stopOnFirst404,
       ...runtimeDiagnostics,
       ...(debugContext || {}),
-    }, opts, debugContext);
+    },
+    opts,
+    debugContext,
+  );
 
-    if (!cacheBypass) {
-      const cached = getArweaveTextCacheEntry(normalizedTxId);
-      if (cached && typeof cached.text === 'string') return cached.text;
-      if (arweaveTextInFlight.has(inFlightKey)) {
-        return await arweaveTextInFlight.get(inFlightKey);
-      }
+  if (!cacheBypass) {
+    const cached = getArweaveTextCacheEntry(normalizedTxId);
+    if (cached && typeof cached.text === 'string') return cached.text;
+    if (arweaveTextInFlight.has(inFlightKey)) {
+      return await arweaveTextInFlight.get(inFlightKey);
     }
+  }
 
-    if (!bypassFailureCache) {
-      const failureEntry = getFailureCacheEntry(normalizedTxId);
-      if (failureEntry && Number(failureEntry.nextRetryAtMs || 0) > Date.now()) {
-        const cooldownErr = buildFailureCacheError({
-          txId: normalizedTxId,
-          failureEntry,
-        });
-        logArweaveFetchDebug('warn', '[arweave] tx-fetch-cooldown-hit', {
+  if (!bypassFailureCache) {
+    const failureEntry = getFailureCacheEntry(normalizedTxId);
+    if (failureEntry && Number(failureEntry.nextRetryAtMs || 0) > Date.now()) {
+      const cooldownErr = buildFailureCacheError({
+        txId: normalizedTxId,
+        failureEntry,
+      });
+      logArweaveFetchDebug(
+        'warn',
+        '[arweave] tx-fetch-cooldown-hit',
+        {
           txId: normalizedTxId,
           status: cooldownErr.status,
           kind: cooldownErr.kind,
@@ -2210,64 +2275,70 @@ async function downloadDataFromArweave(txID, opts = {}) {
           shortCircuitedByFailureCache: true,
           ...runtimeDiagnostics,
           ...(debugContext || {}),
-        }, opts, debugContext);
-        throw cooldownErr;
-      }
-      if (failureEntry && Number(failureEntry.nextRetryAtMs || 0) <= Date.now()) {
-        clearFailureCacheEntry(normalizedTxId);
-      }
+        },
+        opts,
+        debugContext,
+      );
+      throw cooldownErr;
     }
+    if (failureEntry && Number(failureEntry.nextRetryAtMs || 0) <= Date.now()) {
+      clearFailureCacheEntry(normalizedTxId);
+    }
+  }
 
-    const run = (async () => {
-      const gateways = resolveDownloadGatewaysForContext(opts, debugContext);
-      const retries = Number.isFinite(opts.retries) ? Math.max(0, opts.retries) : 3;
-      const retryDelayMs = Number.isFinite(opts.retryDelayMs) ? opts.retryDelayMs : 1500;
-      // Guard against a single hung gateway request stalling the entire read path.
-      const gatewayTimeoutMs = Number.isFinite(opts.gatewayTimeoutMs)
-        ? Math.max(300, Number(opts.gatewayTimeoutMs))
-        : 8000;
+  const run = (async () => {
+    const gateways = resolveDownloadGatewaysForContext(opts, debugContext);
+    const retries = Number.isFinite(opts.retries) ? Math.max(0, opts.retries) : 3;
+    const retryDelayMs = Number.isFinite(opts.retryDelayMs) ? opts.retryDelayMs : 1500;
+    // Guard against a single hung gateway request stalling the entire read path.
+    const gatewayTimeoutMs = Number.isFinite(opts.gatewayTimeoutMs)
+      ? Math.max(300, Number(opts.gatewayTimeoutMs))
+      : 8000;
 
-      let lastStatus = null;
-      let lastError = null;
-      let lastRetryableNonNotFoundError = null;
-      let sawRetryableNonNotFoundOverall = false;
-      const directToArIo = resolveDirectToArIoForContext(opts, debugContext);
-      const attemptedUrlsAcrossAllPasses = new Set();
-      try {
-        if (preflightTxExistence) {
-          const exists = await checkArweaveTxExistsViaGraphql(normalizedTxId, opts, debugContext);
-          if (exists === false) {
-            throw createArweaveFetchError({
-              txId: normalizedTxId,
-              status: 404,
-              retryable: true,
-              kind: 'not_found',
-              gateway: 'graphql',
-              attempt: 0,
-              message: 'Arweave content not available yet. Retry later.',
-            });
-          }
+    let lastStatus = null;
+    let lastError = null;
+    let lastRetryableNonNotFoundError = null;
+    let sawRetryableNonNotFoundOverall = false;
+    const directToArIo = resolveDirectToArIoForContext(opts, debugContext);
+    const attemptedUrlsAcrossAllPasses = new Set();
+    try {
+      if (preflightTxExistence) {
+        const exists = await checkArweaveTxExistsViaGraphql(normalizedTxId, opts, debugContext);
+        if (exists === false) {
+          throw createArweaveFetchError({
+            txId: normalizedTxId,
+            status: 404,
+            retryable: true,
+            kind: 'not_found',
+            gateway: 'graphql',
+            attempt: 0,
+            message: 'Arweave content not available yet. Retry later.',
+          });
         }
+      }
 
-        if (directToArIo) {
-          // Troubleshooting mode stays on ar.io for the full retry budget and
-          // never falls through to the legacy gateway fanout.
-          for (let attempt = 0; attempt <= retries; attempt += 1) {
-            const arIoOnlyResult = await tryWayfinderFallback({
-              txId: normalizedTxId,
-              opts,
-              debugContext,
-              attempt,
-              gatewayTimeoutMs,
-              attemptedUrls: new Set(),
-              allAttemptedUrls: attemptedUrlsAcrossAllPasses,
-            });
-            if (
-              arIoOnlyResult?.ok &&
-              typeof arIoOnlyResult.text === 'string' &&
-              !isEmptyGatewayResponseText(arIoOnlyResult.text)
-            ) {
-              logArweaveFetchDebug('log', '[arweave] ar.io-only hit', {
+      if (directToArIo) {
+        // Troubleshooting mode stays on ar.io for the full retry budget and
+        // never falls through to the legacy gateway fanout.
+        for (let attempt = 0; attempt <= retries; attempt += 1) {
+          const arIoOnlyResult = await tryWayfinderFallback({
+            txId: normalizedTxId,
+            opts,
+            debugContext,
+            attempt,
+            gatewayTimeoutMs,
+            attemptedUrls: new Set(),
+            allAttemptedUrls: attemptedUrlsAcrossAllPasses,
+          });
+          if (
+            arIoOnlyResult?.ok &&
+            typeof arIoOnlyResult.text === 'string' &&
+            !isEmptyGatewayResponseText(arIoOnlyResult.text)
+          ) {
+            logArweaveFetchDebug(
+              'log',
+              '[arweave] ar.io-only hit',
+              {
                 txId: normalizedTxId,
                 route: arIoOnlyResult.route,
                 gateway: arIoOnlyResult.gateway,
@@ -2275,24 +2346,30 @@ async function downloadDataFromArweave(txID, opts = {}) {
                 attempt,
                 ...runtimeDiagnostics,
                 ...(debugContext || {}),
-              }, opts, debugContext);
-              if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, arIoOnlyResult.text);
-              if (!bypassFailureCache) clearFailureCacheEntry(normalizedTxId);
-              return arIoOnlyResult.text;
+              },
+              opts,
+              debugContext,
+            );
+            if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, arIoOnlyResult.text);
+            if (!bypassFailureCache) clearFailureCacheEntry(normalizedTxId);
+            return arIoOnlyResult.text;
+          }
+          if (arIoOnlyResult?.error && arIoOnlyResult.error.name === 'ArweaveFetchError') {
+            lastError = arIoOnlyResult.error;
+            if (Number.isFinite(Number(arIoOnlyResult.error.status))) {
+              lastStatus = Number(arIoOnlyResult.error.status);
             }
-            if (arIoOnlyResult?.error && arIoOnlyResult.error.name === 'ArweaveFetchError') {
-              lastError = arIoOnlyResult.error;
-              if (Number.isFinite(Number(arIoOnlyResult.error.status))) {
-                lastStatus = Number(arIoOnlyResult.error.status);
-              }
-              if (arIoOnlyResult.sawRetryableNonNotFound) {
-                sawRetryableNonNotFoundOverall = true;
-              }
-              if (arIoOnlyResult.error.kind !== 'not_found' && arIoOnlyResult.error.status !== 404) {
-                lastRetryableNonNotFoundError = arIoOnlyResult.error;
-                sawRetryableNonNotFoundOverall = true;
-              }
-              logArweaveFetchDebug('warn', '[arweave] ar.io-only miss', {
+            if (arIoOnlyResult.sawRetryableNonNotFound) {
+              sawRetryableNonNotFoundOverall = true;
+            }
+            if (arIoOnlyResult.error.kind !== 'not_found' && arIoOnlyResult.error.status !== 404) {
+              lastRetryableNonNotFoundError = arIoOnlyResult.error;
+              sawRetryableNonNotFoundOverall = true;
+            }
+            logArweaveFetchDebug(
+              'warn',
+              '[arweave] ar.io-only miss',
+              {
                 txId: normalizedTxId,
                 status: arIoOnlyResult.error.status,
                 kind: arIoOnlyResult.error.kind,
@@ -2300,65 +2377,73 @@ async function downloadDataFromArweave(txID, opts = {}) {
                 resolvedUrl: arIoOnlyResult.resolvedUrl,
                 attempt,
                 ...(debugContext || {}),
-              }, opts, debugContext);
-              if (
-                arIoOnlyResult.error.retryable === false &&
-                arIoOnlyResult.error.kind !== 'not_found' &&
-                arIoOnlyResult.error.status !== 404
-              ) {
-                throw arIoOnlyResult.error;
-              }
-            }
-            if (attempt < retries) {
-              const delay = Math.round(retryDelayMs * Math.pow(1.6, attempt));
-              await sleep(delay);
+              },
+              opts,
+              debugContext,
+            );
+            if (
+              arIoOnlyResult.error.retryable === false &&
+              arIoOnlyResult.error.kind !== 'not_found' &&
+              arIoOnlyResult.error.status !== 404
+            ) {
+              throw arIoOnlyResult.error;
             }
           }
-        } else {
-          for (let attempt = 0; attempt <= retries; attempt += 1) {
-            const attemptedUrlsThisAttempt = new Set();
-            let sawNotFoundThisAttempt = false;
-            let sawRetryableNonNotFound = false;
-            let shouldStopGatewayFanout = false;
-            const gatewaysForAttempt = getAvailableGatewaysForAttempt(gateways);
-            for (const gateway of gatewaysForAttempt) {
-              const gatewayUrls = buildArweaveGatewayRouteCandidates(normalizedTxId, gateway, opts);
-              for (let routeIndex = 0; routeIndex < gatewayUrls.length; routeIndex += 1) {
-                const { url, route } = gatewayUrls[routeIndex];
-                const hasNextRoute = routeIndex < gatewayUrls.length - 1;
-                try {
-                  if (attemptedUrlsThisAttempt.has(url)) continue;
-                  attemptedUrlsThisAttempt.add(url);
-                  attemptedUrlsAcrossAllPasses.add(url);
-                  const resp = await fetchWithTimeout(url, { redirect: 'follow' }, gatewayTimeoutMs);
-                  if (resp.ok) {
-                    const text = await resp.text();
-                    if (isEmptyGatewayResponseText(text)) {
-                      throw createEmptyGatewayResponseError({
-                        txId: normalizedTxId,
-                        gateway,
-                        attempt,
-                      });
-                    }
-                    const contentType = String(resp?.headers?.get?.('content-type') || '').trim().toLowerCase();
-                    const derivedStatus = looksLikeHtmlGatewayPayload({ text, contentType })
-                      ? inferStatusFromHtmlGatewayPayload(text)
-                      : null;
-                    if (derivedStatus != null) {
-                      const kind = classifyStatusKind(derivedStatus);
-                      const retryable = isRetryableStatus(derivedStatus);
-                      lastStatus = derivedStatus;
-                      lastError = createArweaveFetchError({
-                        txId: normalizedTxId,
-                        status: derivedStatus,
-                        retryable,
-                        kind,
-                        gateway,
-                        attempt,
-                        message: `Arweave gateway returned HTML payload (${derivedStatus})`,
-                      });
-                      markGatewayFailure(gateway, { status: derivedStatus, kind });
-                      logArweaveFetchDebug('warn', '[arweave] gateway html payload', {
+          if (attempt < retries) {
+            const delay = Math.round(retryDelayMs * Math.pow(1.6, attempt));
+            await sleep(delay);
+          }
+        }
+      } else {
+        for (let attempt = 0; attempt <= retries; attempt += 1) {
+          const attemptedUrlsThisAttempt = new Set();
+          let sawNotFoundThisAttempt = false;
+          let sawRetryableNonNotFound = false;
+          let shouldStopGatewayFanout = false;
+          const gatewaysForAttempt = getAvailableGatewaysForAttempt(gateways);
+          for (const gateway of gatewaysForAttempt) {
+            const gatewayUrls = buildArweaveGatewayRouteCandidates(normalizedTxId, gateway, opts);
+            for (let routeIndex = 0; routeIndex < gatewayUrls.length; routeIndex += 1) {
+              const { url, route } = gatewayUrls[routeIndex];
+              const hasNextRoute = routeIndex < gatewayUrls.length - 1;
+              try {
+                if (attemptedUrlsThisAttempt.has(url)) continue;
+                attemptedUrlsThisAttempt.add(url);
+                attemptedUrlsAcrossAllPasses.add(url);
+                const resp = await fetchWithTimeout(url, { redirect: 'follow' }, gatewayTimeoutMs);
+                if (resp.ok) {
+                  const text = await resp.text();
+                  if (isEmptyGatewayResponseText(text)) {
+                    throw createEmptyGatewayResponseError({
+                      txId: normalizedTxId,
+                      gateway,
+                      attempt,
+                    });
+                  }
+                  const contentType = String(resp?.headers?.get?.('content-type') || '')
+                    .trim()
+                    .toLowerCase();
+                  const derivedStatus = looksLikeHtmlGatewayPayload({ text, contentType })
+                    ? inferStatusFromHtmlGatewayPayload(text)
+                    : null;
+                  if (derivedStatus != null) {
+                    const kind = classifyStatusKind(derivedStatus);
+                    const retryable = isRetryableStatus(derivedStatus);
+                    lastStatus = derivedStatus;
+                    lastError = createArweaveFetchError({
+                      txId: normalizedTxId,
+                      status: derivedStatus,
+                      retryable,
+                      kind,
+                      gateway,
+                      attempt,
+                      message: `Arweave gateway returned HTML payload (${derivedStatus})`,
+                    });
+                    markGatewayFailure(gateway, { status: derivedStatus, kind });
+                    logArweaveFetchDebug(
+                      'warn',
+                      '[arweave] gateway html payload',
+                      {
                         txId: normalizedTxId,
                         gateway,
                         route,
@@ -2367,21 +2452,27 @@ async function downloadDataFromArweave(txID, opts = {}) {
                         retryable,
                         attempt,
                         ...(debugContext || {}),
-                      }, opts, debugContext);
-                      if (derivedStatus === 404) {
-                        if (hasNextRoute) continue;
-                        sawNotFoundThisAttempt = true;
-                        if (stopOnFirst404) shouldStopGatewayFanout = true;
-                        break;
-                      }
-                      if (!retryable) {
-                        throw lastError;
-                      }
-                      sawRetryableNonNotFound = true;
-                      continue;
+                      },
+                      opts,
+                      debugContext,
+                    );
+                    if (derivedStatus === 404) {
+                      if (hasNextRoute) continue;
+                      sawNotFoundThisAttempt = true;
+                      if (stopOnFirst404) shouldStopGatewayFanout = true;
+                      break;
                     }
-                    markGatewaySuccess(gateway);
-                    logArweaveFetchDebug('log', '[arweave] gateway hit', {
+                    if (!retryable) {
+                      throw lastError;
+                    }
+                    sawRetryableNonNotFound = true;
+                    continue;
+                  }
+                  markGatewaySuccess(gateway);
+                  logArweaveFetchDebug(
+                    'log',
+                    '[arweave] gateway hit',
+                    {
                       txId: normalizedTxId,
                       gateway,
                       route,
@@ -2389,25 +2480,31 @@ async function downloadDataFromArweave(txID, opts = {}) {
                       attempt,
                       ...runtimeDiagnostics,
                       ...(debugContext || {}),
-                    }, opts, debugContext);
-                    if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, text);
-                    if (!bypassFailureCache) clearFailureCacheEntry(normalizedTxId);
-                    return text;
-                  }
-                  lastStatus = resp.status;
-                  const kind = classifyStatusKind(resp.status);
-                  const retryable = isRetryableStatus(resp.status);
-                  lastError = createArweaveFetchError({
-                    txId: normalizedTxId,
-                    status: resp.status,
-                    retryable,
-                    kind,
-                    gateway,
-                    attempt,
-                    message: `Arweave fetch failed (${resp.status})`,
-                  });
-                  markGatewayFailure(gateway, { status: resp.status, kind });
-                  logArweaveFetchDebug('warn', '[arweave] gateway miss', {
+                    },
+                    opts,
+                    debugContext,
+                  );
+                  if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, text);
+                  if (!bypassFailureCache) clearFailureCacheEntry(normalizedTxId);
+                  return text;
+                }
+                lastStatus = resp.status;
+                const kind = classifyStatusKind(resp.status);
+                const retryable = isRetryableStatus(resp.status);
+                lastError = createArweaveFetchError({
+                  txId: normalizedTxId,
+                  status: resp.status,
+                  retryable,
+                  kind,
+                  gateway,
+                  attempt,
+                  message: `Arweave fetch failed (${resp.status})`,
+                });
+                markGatewayFailure(gateway, { status: resp.status, kind });
+                logArweaveFetchDebug(
+                  'warn',
+                  '[arweave] gateway miss',
+                  {
                     txId: normalizedTxId,
                     gateway,
                     route,
@@ -2416,64 +2513,73 @@ async function downloadDataFromArweave(txID, opts = {}) {
                     retryable,
                     attempt,
                     ...(debugContext || {}),
-                  }, opts, debugContext);
-                  if (resp.status === 404) {
+                  },
+                  opts,
+                  debugContext,
+                );
+                if (resp.status === 404) {
+                  if (hasNextRoute) continue;
+                  sawNotFoundThisAttempt = true;
+                  const category =
+                    String(debugContext?.category || '')
+                      .trim()
+                      .toLowerCase() || 'unknown';
+                  const caller = String(debugContext?.caller || debugContext?.fn || '').trim() || null;
+                  const dedupeKey = `gateway-404|${normalizedTxId}|${category}`;
+                  if (dedupeTxEvent(dedupeKey)) {
+                    log.warn('[arweave] tx-fetch-404-classified', {
+                      txId: normalizedTxId,
+                      category,
+                      caller,
+                      gateway,
+                      route,
+                      attempt,
+                    });
+                  }
+                  if (stopOnFirst404) shouldStopGatewayFanout = true;
+                  break;
+                }
+                if (!retryable) {
+                  throw lastError;
+                }
+                sawRetryableNonNotFound = true;
+                sawRetryableNonNotFoundOverall = true;
+                lastRetryableNonNotFoundError = lastError;
+                if (hasNextRoute) continue;
+                break;
+              } catch (err) {
+                if (err && err.name === 'ArweaveFetchError') {
+                  lastError = err;
+                  if (err.retryable === false) throw err;
+                  if (err.status === 404 || err.kind === 'not_found') {
                     if (hasNextRoute) continue;
                     sawNotFoundThisAttempt = true;
-                    const category = String(debugContext?.category || '').trim().toLowerCase() || 'unknown';
-                    const caller = String(debugContext?.caller || debugContext?.fn || '').trim() || null;
-                    const dedupeKey = `gateway-404|${normalizedTxId}|${category}`;
-                    if (dedupeTxEvent(dedupeKey)) {
-                      log.warn('[arweave] tx-fetch-404-classified', {
-                        txId: normalizedTxId,
-                        category,
-                        caller,
-                        gateway,
-                        route,
-                        attempt,
-                      });
-                    }
                     if (stopOnFirst404) shouldStopGatewayFanout = true;
-                    break;
+                  } else {
+                    sawRetryableNonNotFound = true;
+                    sawRetryableNonNotFoundOverall = true;
+                    lastRetryableNonNotFoundError = err;
                   }
-                  if (!retryable) {
-                    throw lastError;
-                  }
+                } else {
+                  lastError = createArweaveFetchError({
+                    txId: normalizedTxId,
+                    status: null,
+                    retryable: true,
+                    kind: 'network',
+                    gateway,
+                    attempt,
+                    message: err?.message || 'Arweave network request failed',
+                    cause: err,
+                  });
                   sawRetryableNonNotFound = true;
                   sawRetryableNonNotFoundOverall = true;
                   lastRetryableNonNotFoundError = lastError;
-                  if (hasNextRoute) continue;
-                  break;
-                } catch (err) {
-                  if (err && err.name === 'ArweaveFetchError') {
-                    lastError = err;
-                    if (err.retryable === false) throw err;
-                    if (err.status === 404 || err.kind === 'not_found') {
-                      if (hasNextRoute) continue;
-                      sawNotFoundThisAttempt = true;
-                      if (stopOnFirst404) shouldStopGatewayFanout = true;
-                    } else {
-                      sawRetryableNonNotFound = true;
-                      sawRetryableNonNotFoundOverall = true;
-                      lastRetryableNonNotFoundError = err;
-                    }
-                  } else {
-                    lastError = createArweaveFetchError({
-                      txId: normalizedTxId,
-                      status: null,
-                      retryable: true,
-                      kind: 'network',
-                      gateway,
-                      attempt,
-                      message: err?.message || 'Arweave network request failed',
-                      cause: err,
-                    });
-                    sawRetryableNonNotFound = true;
-                    sawRetryableNonNotFoundOverall = true;
-                    lastRetryableNonNotFoundError = lastError;
-                  }
-                  markGatewayFailure(gateway, { status: lastError?.status, kind: lastError?.kind || 'network' });
-                  logArweaveFetchDebug('warn', '[arweave] gateway error', {
+                }
+                markGatewayFailure(gateway, { status: lastError?.status, kind: lastError?.kind || 'network' });
+                logArweaveFetchDebug(
+                  'warn',
+                  '[arweave] gateway error',
+                  {
                     txId: normalizedTxId,
                     gateway,
                     route,
@@ -2482,179 +2588,194 @@ async function downloadDataFromArweave(txID, opts = {}) {
                     retryable: lastError?.retryable !== false,
                     attempt,
                     ...(debugContext || {}),
-                  }, opts, debugContext);
-                  if (!hasNextRoute) break;
-                }
+                  },
+                  opts,
+                  debugContext,
+                );
+                if (!hasNextRoute) break;
               }
-              if (shouldStopGatewayFanout) break;
             }
-            // 404s are common for immutable missing txs; avoid repeated multi-attempt hammering
-            // if every gateway in this round reported "not found".
-            if (sawNotFoundThisAttempt && (stopOnFirst404 || !sawRetryableNonNotFound)) {
-              break;
-            }
-            if (attempt < retries) {
-              const delay = Math.round(retryDelayMs * Math.pow(1.6, attempt));
-              await sleep(delay);
-            }
+            if (shouldStopGatewayFanout) break;
           }
+          // 404s are common for immutable missing txs; avoid repeated multi-attempt hammering
+          // if every gateway in this round reported "not found".
+          if (sawNotFoundThisAttempt && (stopOnFirst404 || !sawRetryableNonNotFound)) {
+            break;
+          }
+          if (attempt < retries) {
+            const delay = Math.round(retryDelayMs * Math.pow(1.6, attempt));
+            await sleep(delay);
+          }
+        }
 
-          const wayfinderResult = await tryWayfinderFallback({
-            txId: normalizedTxId,
-            opts,
-            debugContext,
-            attempt: retries + 1,
-            gatewayTimeoutMs,
-            attemptedUrls: attemptedUrlsAcrossAllPasses,
-            allAttemptedUrls: attemptedUrlsAcrossAllPasses,
-          });
-          if (
-            wayfinderResult?.ok &&
-            typeof wayfinderResult.text === 'string' &&
-            !isEmptyGatewayResponseText(wayfinderResult.text)
-          ) {
-            logArweaveFetchDebug('log', '[arweave] wayfinder fallback hit', {
+        const wayfinderResult = await tryWayfinderFallback({
+          txId: normalizedTxId,
+          opts,
+          debugContext,
+          attempt: retries + 1,
+          gatewayTimeoutMs,
+          attemptedUrls: attemptedUrlsAcrossAllPasses,
+          allAttemptedUrls: attemptedUrlsAcrossAllPasses,
+        });
+        if (
+          wayfinderResult?.ok &&
+          typeof wayfinderResult.text === 'string' &&
+          !isEmptyGatewayResponseText(wayfinderResult.text)
+        ) {
+          logArweaveFetchDebug(
+            'log',
+            '[arweave] wayfinder fallback hit',
+            {
               txId: normalizedTxId,
               route: wayfinderResult.route,
               gateway: wayfinderResult.gateway,
               resolvedUrl: wayfinderResult.resolvedUrl,
               ...runtimeDiagnostics,
               ...(debugContext || {}),
-            }, opts, debugContext);
-            if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, wayfinderResult.text);
-            if (!bypassFailureCache) clearFailureCacheEntry(normalizedTxId);
-            return wayfinderResult.text;
+            },
+            opts,
+            debugContext,
+          );
+          if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, wayfinderResult.text);
+          if (!bypassFailureCache) clearFailureCacheEntry(normalizedTxId);
+          return wayfinderResult.text;
+        }
+        if (wayfinderResult?.error && wayfinderResult.error.name === 'ArweaveFetchError') {
+          lastError = wayfinderResult.error;
+          if (Number.isFinite(Number(wayfinderResult.error.status))) {
+            lastStatus = Number(wayfinderResult.error.status);
           }
-          if (wayfinderResult?.error && wayfinderResult.error.name === 'ArweaveFetchError') {
-            lastError = wayfinderResult.error;
-            if (Number.isFinite(Number(wayfinderResult.error.status))) {
-              lastStatus = Number(wayfinderResult.error.status);
-            }
-            if (wayfinderResult.sawRetryableNonNotFound) {
-              sawRetryableNonNotFoundOverall = true;
-            }
-            if (wayfinderResult.error.kind !== 'not_found' && wayfinderResult.error.status !== 404) {
-              lastRetryableNonNotFoundError = wayfinderResult.error;
-              sawRetryableNonNotFoundOverall = true;
-            }
-            logArweaveFetchDebug('warn', '[arweave] wayfinder fallback miss', {
+          if (wayfinderResult.sawRetryableNonNotFound) {
+            sawRetryableNonNotFoundOverall = true;
+          }
+          if (wayfinderResult.error.kind !== 'not_found' && wayfinderResult.error.status !== 404) {
+            lastRetryableNonNotFoundError = wayfinderResult.error;
+            sawRetryableNonNotFoundOverall = true;
+          }
+          logArweaveFetchDebug(
+            'warn',
+            '[arweave] wayfinder fallback miss',
+            {
               txId: normalizedTxId,
               status: wayfinderResult.error.status,
               kind: wayfinderResult.error.kind,
               retryable: wayfinderResult.error.retryable,
               resolvedUrl: wayfinderResult.resolvedUrl,
               ...(debugContext || {}),
-            }, opts, debugContext);
-          }
+            },
+            opts,
+            debugContext,
+          );
         }
+      }
 
-        if ((lastStatus === 404 || lastStatus === 202) && !sawRetryableNonNotFoundOverall) {
-          throw createArweaveFetchError({
-            txId: normalizedTxId,
-            status: lastStatus,
-            retryable: true,
-            kind: lastStatus === 404 ? 'not_found' : 'pending',
-            message: 'Arweave content not available yet. Retry later.',
-            cause: lastError,
-          });
-        }
-        if (lastRetryableNonNotFoundError && lastRetryableNonNotFoundError.name === 'ArweaveFetchError') {
-          throw lastRetryableNonNotFoundError;
-        }
-        if (lastError && lastError.name === 'ArweaveFetchError') throw lastError;
+      if ((lastStatus === 404 || lastStatus === 202) && !sawRetryableNonNotFoundOverall) {
         throw createArweaveFetchError({
           txId: normalizedTxId,
           status: lastStatus,
           retryable: true,
-          kind: 'unknown',
-          message: lastError?.message || 'Arweave fetch failed',
+          kind: lastStatus === 404 ? 'not_found' : 'pending',
+          message: 'Arweave content not available yet. Retry later.',
           cause: lastError,
         });
-      } catch (error) {
-        if (!bypassFailureCache && error && error.name === 'ArweaveFetchError') {
-          const entry = recordFailureCacheEntry(normalizedTxId, error, { debugContext });
-          if (entry) {
-            error.nextRetryAtMs = Number(entry.nextRetryAtMs || 0);
-            error.failureAttempts = Number(entry.attempts || 0);
-          }
+      }
+      if (lastRetryableNonNotFoundError && lastRetryableNonNotFoundError.name === 'ArweaveFetchError') {
+        throw lastRetryableNonNotFoundError;
+      }
+      if (lastError && lastError.name === 'ArweaveFetchError') throw lastError;
+      throw createArweaveFetchError({
+        txId: normalizedTxId,
+        status: lastStatus,
+        retryable: true,
+        kind: 'unknown',
+        message: lastError?.message || 'Arweave fetch failed',
+        cause: lastError,
+      });
+    } catch (error) {
+      if (!bypassFailureCache && error && error.name === 'ArweaveFetchError') {
+        const entry = recordFailureCacheEntry(normalizedTxId, error, { debugContext });
+        if (entry) {
+          error.nextRetryAtMs = Number(entry.nextRetryAtMs || 0);
+          error.failureAttempts = Number(entry.attempts || 0);
         }
-        throw error;
       }
-    })();
-
-    if (!cacheBypass) {
-      arweaveTextInFlight.set(inFlightKey, run);
+      throw error;
     }
-    try {
-      return await run;
-    } finally {
-      if (!cacheBypass && arweaveTextInFlight.get(inFlightKey) === run) {
-        arweaveTextInFlight.delete(inFlightKey);
-      }
+  })();
+
+  if (!cacheBypass) {
+    arweaveTextInFlight.set(inFlightKey, run);
+  }
+  try {
+    return await run;
+  } finally {
+    if (!cacheBypass && arweaveTextInFlight.get(inFlightKey) === run) {
+      arweaveTextInFlight.delete(inFlightKey);
     }
   }
+}
 
 function padBase64String(b64string) {
-    const remainder = b64string.length % 4;
-    return remainder === 0 ? b64string : `${b64string}${'='.repeat(4 - remainder)}`;
-  }
+  const remainder = b64string.length % 4;
+  return remainder === 0 ? b64string : `${b64string}${'='.repeat(4 - remainder)}`;
+}
 
 function encodeBytesToBase64(byteArray) {
-    const bytes = byteArray instanceof Uint8Array ? byteArray : Uint8Array.from(byteArray);
-    if (typeof globalThis !== 'undefined' && typeof globalThis.btoa === 'function') {
-      let binary = '';
-      for (let i = 0; i < bytes.length; i += 1) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      return globalThis.btoa(binary);
+  const bytes = byteArray instanceof Uint8Array ? byteArray : Uint8Array.from(byteArray);
+  if (typeof globalThis !== 'undefined' && typeof globalThis.btoa === 'function') {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 1) {
+      binary += String.fromCharCode(bytes[i]);
     }
-    if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
-      return Buffer.from(bytes).toString('base64');
-    }
-    throw new Error('No base64 encoder is available.');
+    return globalThis.btoa(binary);
   }
+  if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
+    return Buffer.from(bytes).toString('base64');
+  }
+  throw new Error('No base64 encoder is available.');
+}
 
 function decodeBase64ToBytes(b64string) {
-    const padded = padBase64String(b64string);
-    if (typeof globalThis !== 'undefined' && typeof globalThis.atob === 'function') {
-      const binary = globalThis.atob(padded);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i += 1) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      return bytes;
+  const padded = padBase64String(b64string);
+  if (typeof globalThis !== 'undefined' && typeof globalThis.atob === 'function') {
+    const binary = globalThis.atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
     }
-    if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
-      return Uint8Array.from(Buffer.from(padded, 'base64'));
-    }
-    throw new Error('No base64 decoder is available.');
+    return bytes;
   }
+  if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
+    return Uint8Array.from(Buffer.from(padded, 'base64'));
+  }
+  throw new Error('No base64 decoder is available.');
+}
 
 function hexToBase64url(hexString) {
-    if (!hexString || hexString === '0x') return '';
-    let byteArray = ethers.utils.arrayify(hexString);
-    let b64string = encodeBytesToBase64(byteArray);
-    let b64urlstring = b64string.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    return b64urlstring;
-  }
+  if (!hexString || hexString === '0x') return '';
+  let byteArray = ethers.utils.arrayify(hexString);
+  let b64string = encodeBytesToBase64(byteArray);
+  let b64urlstring = b64string.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return b64urlstring;
+}
 
 function base64urlToHex(b64urlstring) {
-    if (!b64urlstring) return '0x';
-    let byteArray = base64DecodeURL(b64urlstring);
-    let hexString = ethers.utils.hexlify(byteArray);
-    return hexString;
-  }
+  if (!b64urlstring) return '0x';
+  let byteArray = base64DecodeURL(b64urlstring);
+  let hexString = ethers.utils.hexlify(byteArray);
+  return hexString;
+}
 
 function base64DecodeURL(b64urlstring) {
-    let b64string = b64urlstring.replace(/-/g, '+').replace(/_/g, '/');
-    let byteArray = decodeBase64ToBytes(b64string);
-    return byteArray;
-  }
+  let b64string = b64urlstring.replace(/-/g, '+').replace(/_/g, '/');
+  let byteArray = decodeBase64ToBytes(b64string);
+  return byteArray;
+}
 
 function base64urlToBase64(b64urlstring) {
-    let b64string = b64urlstring.replace(/-/g, '+').replace(/_/g, '/');
-    return b64string;
-  }
+  let b64string = b64urlstring.replace(/-/g, '+').replace(/_/g, '/');
+  return b64string;
+}
 
 export const arweaveClient = {
   buildArweaveGatewayUrl,

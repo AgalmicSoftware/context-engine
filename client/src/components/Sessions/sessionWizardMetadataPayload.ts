@@ -1,7 +1,4 @@
-import {
-  normalizeLitMetadataNetwork,
-  normalizeSessionNaming,
-} from '../../utilities/session/sessionMetadata.js';
+import { normalizeLitMetadataNetwork, normalizeSessionNaming } from '../../utilities/session/sessionMetadata.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import type { AnyRecord } from '../shellTypes';
@@ -10,9 +7,7 @@ import { deepClone } from './sessionWizardCoreUtils';
 import { isSecretFieldPath } from './sessionWizardGateUtils';
 import { normalizeSessionWizardSlug } from './sessionWizardUrlSupport';
 
-const isRecord = (value: unknown): value is AnyRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const normalizeSessionWizardDefaultFeaturedSbtMetadata = (value: unknown): string[] => {
   let entries: string[] = [];
@@ -46,7 +41,7 @@ export const resolveSessionWizardMetadataPayloadBase = ({
   sessionId?: unknown;
 } = {}): AnyRecord => {
   const metadata = normalizeSessionNaming(
-    normalizeLitMetadataNetwork(deepClone(isRecord(draft) ? draft : {}))
+    normalizeLitMetadataNetwork(deepClone(isRecord(draft) ? draft : {})),
   ) as AnyRecord;
 
   metadata.sessionName = toStr(metadata.sessionName || '').trim();
@@ -72,9 +67,7 @@ export const resolveSessionWizardMetadataPayloadBase = ({
 
   delete metadata.sponsoredSbtAddress;
   if (metadata.defaultFeaturedSBTs != null) {
-    metadata.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(
-      metadata.defaultFeaturedSBTs
-    );
+    metadata.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(metadata.defaultFeaturedSBTs);
   }
 
   return metadata;
@@ -116,15 +109,11 @@ export const stripSessionWizardMetadataSecretFields = (metadata: AnyRecord): Any
 
 export const getSessionWizardMetadataSecretFieldGateKeys = (metadata: unknown): string[] => {
   if (!isRecord(metadata) || !isRecord(metadata.encryptedFieldGates)) return [];
-  return Object.keys(metadata.encryptedFieldGates).filter((key) => (
-    isSecretFieldPath(key.split('.'))
-  ));
+  return Object.keys(metadata.encryptedFieldGates).filter((key) => isSecretFieldPath(key.split('.')));
 };
 
 export const buildSessionWizardSecretFieldGateErrorMessage = (keys: unknown): string => {
-  const list = Array.isArray(keys)
-    ? keys.map((key) => toStr(key).trim()).filter(Boolean)
-    : [];
+  const list = Array.isArray(keys) ? keys.map((key) => toStr(key).trim()).filter(Boolean) : [];
   const suffix = list.length ? `: ${list.join(', ')}.` : '.';
   return `Worker secret fields cannot be locked in public metadata${suffix} Store secrets in the Worker panel instead.`;
 };
@@ -151,9 +140,7 @@ export const applySessionWizardMetadataUploadGuards = ({
     next.lit.defaultGateId = defaultGateId || next.lit.defaultGateId;
   }
 
-  const existingSpendLimits = isRecord(next.perMemberSpendLimits)
-    ? next.perMemberSpendLimits
-    : {};
+  const existingSpendLimits = isRecord(next.perMemberSpendLimits) ? next.perMemberSpendLimits : {};
   next.perMemberSpendLimits = {
     ...existingSpendLimits,
     ai: selections.ai?.perMemberLimit || existingSpendLimits.ai || '',

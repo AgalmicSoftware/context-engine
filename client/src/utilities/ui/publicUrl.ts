@@ -6,12 +6,14 @@ type ProcWithEnv = { env?: Record<string, unknown> } | undefined;
 // so the SPA can still be mounted under a subpath in preview or alternate hosting
 // setups without rewriting every internal route helper.
 export const readPublicUrlBasePath = (
-  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv
+  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv,
 ): string => {
   const raw = toStr(proc?.env?.PUBLIC_URL || '').trim();
   if (!raw) return '';
   try {
-    return toStr(new URL(raw).pathname || '').trim().replace(/\/+$/, '');
+    return toStr(new URL(raw).pathname || '')
+      .trim()
+      .replace(/\/+$/, '');
   } catch {
     return raw.replace(/\/+$/, '');
   }
@@ -19,7 +21,7 @@ export const readPublicUrlBasePath = (
 
 export const buildPublicUrlPath = (
   pathname = '',
-  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv
+  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv,
 ): string => {
   const normalizedPath = toStr(pathname).trim();
   if (!normalizedPath) return '';
@@ -29,7 +31,7 @@ export const buildPublicUrlPath = (
 
 export const stripPublicUrlBasePath = (
   pathname = '',
-  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv
+  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv,
 ): string => {
   const rawPath = toStr(pathname).trim();
   const basePath = readPublicUrlBasePath(proc);
@@ -48,7 +50,7 @@ export const stripPublicUrlBasePath = (
 
 export const buildPublicRoute = (
   pathname = '',
-  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv
+  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv,
 ): string => {
   const normalizedPath = toStr(pathname).trim();
   if (!normalizedPath) return readPublicUrlBasePath(proc) || '/';
@@ -60,17 +62,19 @@ type AtlasNodeRouteOptions = {
   returnTo?: string | null;
 };
 
-type WindowLike = {
-  location?: {
-    hash?: unknown;
-    origin?: unknown;
-    pathname?: unknown;
-    search?: unknown;
-  };
-} | undefined;
+type WindowLike =
+  | {
+      location?: {
+        hash?: unknown;
+        origin?: unknown;
+        pathname?: unknown;
+        search?: unknown;
+      };
+    }
+  | undefined;
 
 export const readWindowLocationPath = (
-  win: WindowLike = (typeof window !== 'undefined' ? window : undefined) as WindowLike
+  win: WindowLike = (typeof window !== 'undefined' ? window : undefined) as WindowLike,
 ): string => {
   const pathname = toStr(win?.location?.pathname || '').trim();
   const search = toStr(win?.location?.search || '').trim();
@@ -81,7 +85,7 @@ export const readWindowLocationPath = (
 export const buildAtlasNodeRoute = (
   nodeId = '',
   options: AtlasNodeRouteOptions = {},
-  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv
+  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv,
 ): string => {
   const normalizedNodeId = toStr(nodeId).trim();
   const baseRoute = buildPublicRoute(normalizedNodeId ? `/atlas/${normalizedNodeId}` : '/atlas', proc);
@@ -102,7 +106,7 @@ export const buildAtlasNodeRoute = (
 
 export const readSafeInternalReturnTo = (
   returnTo = '',
-  win: WindowLike = (typeof window !== 'undefined' ? window : undefined) as WindowLike
+  win: WindowLike = (typeof window !== 'undefined' ? window : undefined) as WindowLike,
 ): string => {
   const normalizedReturnTo = toStr(returnTo).trim();
   const origin = toStr(win?.location?.origin || '').trim();

@@ -3,14 +3,9 @@
  * @description Pure session config lookup helpers shared by contractScripts.
  */
 
-import {
-  USE_ONCHAIN_SESSION_REGISTRY,
-} from '../../variables/appConfig.js';
+import { USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import { getChainById } from '../../variables/chains.js';
-import {
-  canonicalizeSessionSlug,
-  resolveSessionConfigFromSources,
-} from '../session/canonicalSessionContext.js';
+import { canonicalizeSessionSlug, resolveSessionConfigFromSources } from '../session/canonicalSessionContext.js';
 import { normalizeSessionNaming } from '../session/sessionMetadata.js';
 import { resolveSessionConfigAliases } from '../session/sessionNaming.js';
 import {
@@ -54,13 +49,11 @@ type SessionLists = {
   BLOCKED_SURVEY_IDS: unknown[];
 };
 
-const defaultStrictAllowDemoFallback = (): boolean => (
-  !USE_ONCHAIN_SESSION_REGISTRY
-);
+const defaultStrictAllowDemoFallback = (): boolean => !USE_ONCHAIN_SESSION_REGISTRY;
 
 export function resolveSessionConfigEntry(
   sessionSlug: unknown = '',
-  opts: ResolveSessionConfigEntryOptions = {}
+  opts: ResolveSessionConfigEntryOptions = {},
 ): ResolvedSessionConfigResult {
   const hasPreferRegistry = Object.prototype.hasOwnProperty.call(opts, 'preferRegistry');
   const hasAllowDemoFallback = Object.prototype.hasOwnProperty.call(opts, 'allowDemoFallback');
@@ -84,7 +77,7 @@ export function resolveSessionConfigEntry(
 
 export function normalizeResolvedSessionConfig(
   resolved: ResolvedSessionConfigResult | null | undefined,
-  opts: NormalizeResolvedSessionConfigOptions = {}
+  opts: NormalizeResolvedSessionConfigOptions = {},
 ): SessionConfigLike | null {
   if (!resolved?.sessionConfig) return null;
   if (resolved.sessionConfigSource === 'registry' && opts.normalizeRegistry !== true) {
@@ -156,7 +149,7 @@ export function resolveSessionByName(rawName: unknown): SessionConfigLike | null
 
 export function resolveDemoSessionBySlug(
   slugIn: unknown = '',
-  opts: ResolveSessionConfigEntryOptions = {}
+  opts: ResolveSessionConfigEntryOptions = {},
 ): SessionConfigLike | null {
   const hasAllowDemoFallback = Object.prototype.hasOwnProperty.call(opts, 'allowDemoFallback');
   // Compatibility/demo UI readers can opt in explicitly without weakening the strict default.
@@ -165,7 +158,7 @@ export function resolveDemoSessionBySlug(
       preferRegistry: false,
       allowDemoFallback: hasAllowDemoFallback ? !!opts.allowDemoFallback : defaultStrictAllowDemoFallback(),
     }),
-    { normalizeRegistry: true }
+    { normalizeRegistry: true },
   );
 }
 
@@ -178,10 +171,7 @@ export function normalizeSessionSlug(rawSlug: unknown): string {
 // Legacy alias removed — function is now normalizeSessionSlug directly.
 
 export function getDefaultSessionConfig(): SessionConfigLike | null {
-  return normalizeResolvedSessionConfig(
-    resolveSessionConfigEntry(''),
-    { normalizeRegistry: true }
-  );
+  return normalizeResolvedSessionConfig(resolveSessionConfigEntry(''), { normalizeRegistry: true });
 }
 
 // Legacy alias removed — function is now getDefaultSessionConfig directly.
@@ -200,7 +190,7 @@ export function getSessionConfigBySlug(slugOrEmpty: unknown): SessionConfigLike 
 
 export function getDemoSessionConfigBySlug(
   slugOrEmpty: unknown,
-  opts: ResolveSessionConfigEntryOptions = {}
+  opts: ResolveSessionConfigEntryOptions = {},
 ): SessionConfigLike | null {
   return resolveDemoSessionBySlug(slugOrEmpty === undefined ? '' : slugOrEmpty, opts);
 }
@@ -220,7 +210,7 @@ export function getAllSessionEntries(): SessionConfigEntry[] {
   const cached = sessionRegistryStore.getAllSessionEntries();
   if (cached && cached.length) {
     return (cached as SessionConfigEntry[]).map(
-      ([key, cfg]) => [key, normalizeSessionNaming(cfg) as SessionConfigLike] as SessionConfigEntry
+      ([key, cfg]) => [key, normalizeSessionNaming(cfg) as SessionConfigLike] as SessionConfigEntry,
     );
   }
   // In on-chain mode, do not silently fall back to demo sessions.
@@ -231,9 +221,7 @@ export function getAllSessionEntries(): SessionConfigEntry[] {
 // Legacy alias removed — function is now getAllSessionEntries directly.
 
 export function getAllSessionSlugs(opts: { includeEmpty?: boolean } = {}): string[] {
-  const includeEmpty = opts && Object.prototype.hasOwnProperty.call(opts, 'includeEmpty')
-    ? !!opts.includeEmpty
-    : true;
+  const includeEmpty = opts && Object.prototype.hasOwnProperty.call(opts, 'includeEmpty') ? !!opts.includeEmpty : true;
   const out: string[] = [];
   for (const [key, cfg] of getAllSessionEntries()) {
     let slug = (typeof cfg?.slug === 'string' ? cfg.slug : key) || '';
@@ -291,7 +279,7 @@ export function getSessionNetwork(sessionKeyOrCfg: unknown = null): AnyRecord | 
 
 export function getChainLabelById(chainId: unknown): string {
   const n = Number(chainId);
-  const idForLabel = Number.isFinite(n) ? n : (typeof chainId === 'string' ? chainId.trim() : String(chainId));
+  const idForLabel = Number.isFinite(n) ? n : typeof chainId === 'string' ? chainId.trim() : String(chainId);
   const ch = Number.isFinite(n) ? getChainById(n) : null;
   const name = (ch as AnyRecord | null)?.name || `chain-${idForLabel}`;
   return `${name} (${idForLabel})`;

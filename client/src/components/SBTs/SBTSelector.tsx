@@ -6,7 +6,7 @@ import { ethers } from 'ethers';
 import styles from './SBTSelector.module.scss';
 import { faCog, faExternalLinkAlt, faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import AsyncSearchSelect from "../Shared/AsyncSearchSelect";
+import AsyncSearchSelect from '../Shared/AsyncSearchSelect';
 
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import {
@@ -22,10 +22,7 @@ import {
   loadSessionRegistryCache,
   SESSION_REGISTRY_CACHE_UPDATED_EVENT,
 } from '../../utilities/web3/sessionRegistry.js';
-import {
-  DEFAULT_CHAIN_ID,
-  USE_ONCHAIN_SESSION_REGISTRY,
-} from '../../variables/appConfig.js';
+import { DEFAULT_CHAIN_ID, USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import { createLogger, emitForcedLog } from '../../utilities/logging.js';
 import { listNamespaceEntriesSync, readCache, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -41,14 +38,8 @@ import {
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { getCanonicalSessionFeaturedSBTs } from '../../utilities/sbt/sessionFeaturedSBTs.js';
-import {
-  bindSbtSelectorRuntimePorts,
-  isEnsureLightSbtUniverse,
-} from './sbtSelectorRuntimePorts';
-import type {
-  SbtSelectorLogMethod,
-  UnknownRecord,
-} from './sbtSelectorRuntimePorts';
+import { bindSbtSelectorRuntimePorts, isEnsureLightSbtUniverse } from './sbtSelectorRuntimePorts';
+import type { SbtSelectorLogMethod, UnknownRecord } from './sbtSelectorRuntimePorts';
 import { resolveSbtSelectorSelectedSessionContext } from './sbtSelectorSessionResolution.js';
 import {
   buildSbtOptionsRequestSignature,
@@ -210,12 +201,13 @@ type SbtSelectorAsyncOption = UnknownRecord & {
   label?: React.ReactNode;
   value?: unknown;
 };
-type SbtSelectorSelectableOption = SbtSelectorScopedEntry & SbtSelectorLooseOption & {
-  selectionKey?: unknown;
-  sessionName?: unknown;
-  sessionSlug?: unknown;
-  sessionSlugExplicit?: unknown;
-};
+type SbtSelectorSelectableOption = SbtSelectorScopedEntry &
+  SbtSelectorLooseOption & {
+    selectionKey?: unknown;
+    sessionName?: unknown;
+    sessionSlug?: unknown;
+    sessionSlugExplicit?: unknown;
+  };
 type SbtSelectorLabelOption = {
   image?: unknown;
   label?: unknown;
@@ -356,9 +348,7 @@ type SbtSelectorAddressHydrationResult = {
   address: string;
   sbtInfo: UnknownRecord | null;
 };
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object';
 const sbtSelectorRuntimePorts = bindSbtSelectorRuntimePorts({
   contractScripts: () => contractScripts,
   hydrateSbtDisplayNameTargeted: () => hydrateSbtDisplayNameTargeted,
@@ -381,9 +371,10 @@ const SHARED_LIGHT_UNIVERSE_KICKOFF_TTL_MS = 60 * 1000;
 const emitSbtSelectorDebug = (level: unknown, message: unknown, payload?: unknown): void => {
   const loggerLevel = String(level || 'log');
   const dynamicMethod = sbtLogUntyped[loggerLevel];
-  const loggerMethod: SbtSelectorLogMethod = typeof dynamicMethod === 'function'
-    ? (dynamicMethod as SbtSelectorLogMethod).bind(sbtLog)
-    : sbtLogUntyped.log.bind(sbtLog);
+  const loggerMethod: SbtSelectorLogMethod =
+    typeof dynamicMethod === 'function'
+      ? (dynamicMethod as SbtSelectorLogMethod).bind(sbtLog)
+      : sbtLogUntyped.log.bind(sbtLog);
   if (isSbtSelectorForcedDebugEnabled()) {
     if (typeof payload === 'undefined') {
       emitForcedLog(loggerLevel, message);
@@ -460,9 +451,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     this._pendingSelectedSbtKeys = new Set();
   }
 
-  refreshScopedUniverse = ({
-    forceDiscover = false,
-  }: SbtSelectorRefreshScopedUniverseArgs = {}): unknown => {
+  refreshScopedUniverse = ({ forceDiscover = false }: SbtSelectorRefreshScopedUniverseArgs = {}): unknown => {
     const discoveryPromise = this.ensureSbtUniverse({ force: !!forceDiscover });
     this.loadSBTOptions({ force: true });
     Promise.resolve(discoveryPromise).then(() => {
@@ -501,11 +490,19 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
 
   componentWillUnmount() {
     this._isMounted = false;
-    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function' && this._globalSessionSelectionListener) {
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.removeEventListener === 'function' &&
+      this._globalSessionSelectionListener
+    ) {
       window.removeEventListener(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, this._globalSessionSelectionListener);
       this._globalSessionSelectionListener = null;
     }
-    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function' && this._sessionRegistryCacheListener) {
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.removeEventListener === 'function' &&
+      this._sessionRegistryCacheListener
+    ) {
       window.removeEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, this._sessionRegistryCacheListener);
       this._sessionRegistryCacheListener = null;
     }
@@ -568,9 +565,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       networkChanged,
       selectedSbtPropsChanged,
       sessionConfigChanged,
-      shouldWarmRegistryCache: universeScopeChanged
-        ? this.shouldWarmRegistryCacheForTargets()
-        : false,
+      shouldWarmRegistryCache: universeScopeChanged ? this.shouldWarmRegistryCacheForTargets() : false,
       sharedLightUniverseFnChanged,
       slugPropChanged,
       sourceGroupChanged,
@@ -581,7 +576,9 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     }
 
     if (updateEffects.shouldEnsureUniverse) {
-      this.ensureSbtUniverse({ force: sourceGroupChanged || slugPropChanged || sessionConfigChanged || discoveryOverrideChanged });
+      this.ensureSbtUniverse({
+        force: sourceGroupChanged || slugPropChanged || sessionConfigChanged || discoveryOverrideChanged,
+      });
     }
     if (updateEffects.shouldKickoffSharedLightUniverse) {
       this.kickoffSharedLightUniverseIfNeeded();
@@ -607,13 +604,11 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
 
   getPropSessionSlug = (props: Readonly<SbtSelectorProps> = this.props): string => resolvePropSessionSlug(props);
 
-  buildSlugListSignature = (slugs: unknown): string => buildSessionSlugSignature(
-    normalizeDiscoverySlugs(slugs, { allowEmpty: true })
-  );
+  buildSlugListSignature = (slugs: unknown): string =>
+    buildSessionSlugSignature(normalizeDiscoverySlugs(slugs, { allowEmpty: true }));
 
-  getDiscoveryOverrideSignature = (props: Readonly<SbtSelectorProps> = this.props): string => (
-    this.buildSlugListSignature(getNormalizedDiscoveryOverride(props))
-  );
+  getDiscoveryOverrideSignature = (props: Readonly<SbtSelectorProps> = this.props): string =>
+    this.buildSlugListSignature(getNormalizedDiscoveryOverride(props));
 
   getResolvedScopeMode = (): string => {
     return resolveSbtSelectorScopeMode({
@@ -824,9 +819,8 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     }
   };
 
-  getTargetSlugChainSignature = (targetSlugs: unknown = []): string => (
-    buildTargetSlugChainSignature(targetSlugs, (targetSlug: string) => this.getSessionNetworkId(targetSlug))
-  );
+  getTargetSlugChainSignature = (targetSlugs: unknown = []): string =>
+    buildTargetSlugChainSignature(targetSlugs, (targetSlug: string) => this.getSessionNetworkId(targetSlug));
 
   getIgnoredAddressSet = ({
     effectiveSlug,
@@ -886,7 +880,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
   };
 
   writeCacheContext = async (context: unknown): Promise<void> => {
-    const cacheContext = isRecord(context) ? context as SbtSelectorCacheContext : null;
+    const cacheContext = isRecord(context) ? (context as SbtSelectorCacheContext) : null;
     if (!cacheContext || !cacheContext.netKey) return;
     const netNode = cacheContext.cache[cacheContext.netKey] || { sbtList: {} };
     cacheContext.cache[cacheContext.netKey] = netNode;
@@ -911,9 +905,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       scopeMode,
       targetSlugs,
       onMissingAddress: (sbt) => sbtLog.warn('SBT without address:', sbt),
-      resolveSbtLabel: (sbtInfo, address, sessionSlug) => (
-        this.resolveSbtLabel(sbtInfo, address, sessionSlug)
-      ),
+      resolveSbtLabel: (sbtInfo, address, sessionSlug) => this.resolveSbtLabel(sbtInfo, address, sessionSlug),
     });
   };
 
@@ -945,9 +937,8 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     });
     if (Object.keys(nextPatch).length > 0) {
       this.setState((prevState: Readonly<SbtSelectorState>) => ({
-        loadingOptions: typeof nextPatch.loadingOptions === 'boolean'
-          ? nextPatch.loadingOptions
-          : prevState.loadingOptions,
+        loadingOptions:
+          typeof nextPatch.loadingOptions === 'boolean' ? nextPatch.loadingOptions : prevState.loadingOptions,
         sbtOptions: nextPatch.sbtOptions || prevState.sbtOptions,
         scopeFeaturedAddresses: nextPatch.scopeFeaturedAddresses || prevState.scopeFeaturedAddresses,
       }));
@@ -962,14 +953,16 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     fallbackSlug = '',
     onProgress,
   }: SbtSelectorHydrateScopedEntriesArgs = {}): Promise<void> => {
-    const lookupEntries: SbtSelectorHydrateScopedEntry[] = (Array.isArray(entries) ? entries : [])
-      .map((entry: unknown) => (isRecord(entry) ? entry as SbtSelectorHydrateScopedEntry : {}));
+    const lookupEntries: SbtSelectorHydrateScopedEntry[] = (Array.isArray(entries) ? entries : []).map(
+      (entry: unknown) => (isRecord(entry) ? (entry as SbtSelectorHydrateScopedEntry) : {}),
+    );
     if (!lookupEntries.length) return;
-    const resolvedContextBySlug = contextBySlug instanceof Map
-      ? contextBySlug as Map<string, SbtSelectorCacheContext>
-      : new Map<string, SbtSelectorCacheContext>();
+    const resolvedContextBySlug =
+      contextBySlug instanceof Map
+        ? (contextBySlug as Map<string, SbtSelectorCacheContext>)
+        : new Map<string, SbtSelectorCacheContext>();
     const resolvedAggregatedSbtList = isRecord(aggregatedSbtList)
-      ? aggregatedSbtList as SbtSelectorScopedEntryMap
+      ? (aggregatedSbtList as SbtSelectorScopedEntryMap)
       : {};
     const orderedContexts = Array.from(resolvedContextBySlug.values());
     const fallbackContext = orderedContexts[0] || null;
@@ -978,48 +971,51 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     const BATCH = 4;
     for (let i = 0; i < lookupEntries.length; i += BATCH) {
       const batch = lookupEntries.slice(i, i + BATCH);
-      const results = await Promise.all(batch.map(async (entry: SbtSelectorHydrateScopedEntry): Promise<SbtSelectorHydrationResult | null> => {
-        const rawAddress = String(entry?.address || '').trim();
-        if (!rawAddress || !ethers.utils.isAddress(rawAddress)) return null;
-        const lower = rawAddress.toLowerCase();
-        const targetSlug = pickNormalizedSessionSlug(entry?.slug, fallbackSlug);
-        const context = resolvedContextBySlug.get(targetSlug) || fallbackContext;
-        if (!context) return null;
-        const aggregatedKey = buildSbtLookupKey({ address: rawAddress, chainId: context.chainId });
-        const existingInfo = resolvedAggregatedSbtList[aggregatedKey]?.sbtInfo || context.sbtList?.[lower]?.sbtInfo || null;
-        if (hasSbtDisplayName(existingInfo)) {
-          clearNameLookupFailure(context.nameLookupState, lower);
-          return null;
-        }
-        if (!canRetryNameLookup(context.nameLookupState, lower, Date.now())) {
-          return null;
-        }
+      const results = await Promise.all(
+        batch.map(async (entry: SbtSelectorHydrateScopedEntry): Promise<SbtSelectorHydrationResult | null> => {
+          const rawAddress = String(entry?.address || '').trim();
+          if (!rawAddress || !ethers.utils.isAddress(rawAddress)) return null;
+          const lower = rawAddress.toLowerCase();
+          const targetSlug = pickNormalizedSessionSlug(entry?.slug, fallbackSlug);
+          const context = resolvedContextBySlug.get(targetSlug) || fallbackContext;
+          if (!context) return null;
+          const aggregatedKey = buildSbtLookupKey({ address: rawAddress, chainId: context.chainId });
+          const existingInfo =
+            resolvedAggregatedSbtList[aggregatedKey]?.sbtInfo || context.sbtList?.[lower]?.sbtInfo || null;
+          if (hasSbtDisplayName(existingInfo)) {
+            clearNameLookupFailure(context.nameLookupState, lower);
+            return null;
+          }
+          if (!canRetryNameLookup(context.nameLookupState, lower, Date.now())) {
+            return null;
+          }
 
-        try {
-          const lookup = await hydrateSbtDisplayNameTargetedTyped({
-            address: rawAddress,
-            preferredSlug: targetSlug,
-            metadataLookupConfig: this.getMetadataLookupConfig(targetSlug),
-            chainId: context.chainId,
-            writeBack: true,
-          });
-          return {
-            address: rawAddress,
-            lower,
-            slug: targetSlug,
-            context,
-            sbtInfo: lookup?.info || null,
-          };
-        } catch (_) {
-          return {
-            address: rawAddress,
-            lower,
-            slug: targetSlug,
-            context,
-            sbtInfo: null,
-          };
-        }
-      }));
+          try {
+            const lookup = await hydrateSbtDisplayNameTargetedTyped({
+              address: rawAddress,
+              preferredSlug: targetSlug,
+              metadataLookupConfig: this.getMetadataLookupConfig(targetSlug),
+              chainId: context.chainId,
+              writeBack: true,
+            });
+            return {
+              address: rawAddress,
+              lower,
+              slug: targetSlug,
+              context,
+              sbtInfo: lookup?.info || null,
+            };
+          } catch (_) {
+            return {
+              address: rawAddress,
+              lower,
+              slug: targetSlug,
+              context,
+              sbtInfo: null,
+            };
+          }
+        }),
+      );
 
       const touchedContexts = applySbtSelectorHydrationResults({
         results,
@@ -1028,7 +1024,9 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       }) as Set<SbtSelectorCacheContext>;
 
       if (touchedContexts.size > 0) {
-        await Promise.all(Array.from(touchedContexts).map((context: SbtSelectorCacheContext) => this.writeCacheContext(context)));
+        await Promise.all(
+          Array.from(touchedContexts).map((context: SbtSelectorCacheContext) => this.writeCacheContext(context)),
+        );
         if (typeof onProgress === 'function') {
           onProgress({
             completedCount: Math.min(lookupEntries.length, i + batch.length),
@@ -1050,23 +1048,25 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
 
   shouldAutoDiscover = (): boolean => this.props.autoDiscover !== false;
 
-  getSelectorLogContext = (extra: UnknownRecord = {}): SbtSelectorLogContext => (
+  getSelectorLogContext = (extra: UnknownRecord = {}): SbtSelectorLogContext =>
     buildSbtSelectorLogContext({
       effectiveSessionSlug: this.getEffectiveSessionSlug(),
       extra,
       id: this.props.id,
       label: this.props.label,
-    }) as SbtSelectorLogContext
-  );
+    }) as SbtSelectorLogContext;
 
-  getSharedLightUniverseKickoffSlugs = ({ slugOverride }: SbtSelectorSlugOverrideArgs = {}): string[] => (
-    this.getResolvedTargetSlugs({ slugOverride })
-  );
+  getSharedLightUniverseKickoffSlugs = ({ slugOverride }: SbtSelectorSlugOverrideArgs = {}): string[] =>
+    this.getResolvedTargetSlugs({ slugOverride });
 
   kickoffSharedLightUniverseIfNeeded = ({ slugOverride }: SbtSelectorSlugOverrideArgs = {}): unknown | null => {
     if (!this.shouldAutoDiscover()) {
       if (sbtLog.isEnabled('debug') || isSbtSelectorForcedDebugEnabled()) {
-        emitSbtSelectorDebug('debug', '[SBTSelector] shared light-universe kickoff skipped (autoDiscover disabled)', this.getSelectorLogContext());
+        emitSbtSelectorDebug(
+          'debug',
+          '[SBTSelector] shared light-universe kickoff skipped (autoDiscover disabled)',
+          this.getSelectorLogContext(),
+        );
       }
       return null;
     }
@@ -1074,7 +1074,11 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     const ensureLightSbtUniverse = this.props.ensureLightSbtUniverse;
     if (!isEnsureLightSbtUniverse(ensureLightSbtUniverse)) {
       if (sbtLog.isEnabled('debug') || isSbtSelectorForcedDebugEnabled()) {
-        emitSbtSelectorDebug('debug', '[SBTSelector] shared light-universe kickoff unavailable', this.getSelectorLogContext());
+        emitSbtSelectorDebug(
+          'debug',
+          '[SBTSelector] shared light-universe kickoff unavailable',
+          this.getSelectorLogContext(),
+        );
       }
       return null;
     }
@@ -1093,7 +1097,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     });
     const now = Date.now();
     const lastKickoffAt = Number(SBTSelector._sharedLightUniverseKickoffMemo[kickoffSig] || 0);
-    if (lastKickoffAt > 0 && (now - lastKickoffAt) < SHARED_LIGHT_UNIVERSE_KICKOFF_TTL_MS) {
+    if (lastKickoffAt > 0 && now - lastKickoffAt < SHARED_LIGHT_UNIVERSE_KICKOFF_TTL_MS) {
       if (sbtLog.isEnabled('debug') || isSbtSelectorForcedDebugEnabled()) {
         emitSbtSelectorDebug('debug', '[SBTSelector] shared light-universe kickoff skipped (memo hit)', {
           ...kickoffContext,
@@ -1112,13 +1116,15 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     try {
       const result = ensureLightSbtUniverse(kickoffSlugs, { forceExactSlugs: true });
       this.beginDiscovering();
-      Promise.resolve(result).then(() => {
-        if (sbtLog.isEnabled('debug') || isSbtSelectorForcedDebugEnabled()) {
-          emitSbtSelectorDebug('debug', '[SBTSelector] shared light-universe kickoff settled', kickoffContext);
-        }
-      }).finally(() => {
-        this.endDiscovering();
-      });
+      Promise.resolve(result)
+        .then(() => {
+          if (sbtLog.isEnabled('debug') || isSbtSelectorForcedDebugEnabled()) {
+            emitSbtSelectorDebug('debug', '[SBTSelector] shared light-universe kickoff settled', kickoffContext);
+          }
+        })
+        .finally(() => {
+          this.endDiscovering();
+        });
       const maybePromise = result as Promise<unknown>;
       if (maybePromise && typeof maybePromise.catch === 'function') {
         maybePromise.catch((error: unknown) => {
@@ -1134,14 +1140,15 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     }
   };
 
-  ensureSbtUniverseForSlug = async ({
-    slug,
-    force,
-  }: SbtSelectorEnsureUniverseForSlugArgs = {}): Promise<unknown | null> => {
+  ensureSbtUniverseForSlug = async ({ slug, force }: SbtSelectorEnsureUniverseForSlugArgs = {}): Promise<
+    unknown | null
+  > => {
     const resolvedSlug = normalizeSessionSlug(slug || '');
     const discoveryRef = this.getDiscoverySessionRef(resolvedSlug);
     const networkID = this.getSessionNetworkId(resolvedSlug);
-    const factoryAddress = String(discoveryRef?.contracts?.sbtFactory?.address || '').trim().toLowerCase();
+    const factoryAddress = String(discoveryRef?.contracts?.sbtFactory?.address || '')
+      .trim()
+      .toLowerCase();
     const logContext = this.getSelectorLogContext({
       targetSlug: resolvedSlug,
       force: !!force,
@@ -1160,7 +1167,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     const memoKey = `${resolvedSlug}:${networkID}:${factoryAddress}`;
     const now = Date.now();
     const memoHit = SBTSelector._universeMemo[memoKey];
-    if (!force && memoHit && (now - memoHit) < 60000) {
+    if (!force && memoHit && now - memoHit < 60000) {
       if (sbtLog.isEnabled('debug') || isSbtSelectorForcedDebugEnabled()) {
         emitSbtSelectorDebug('debug', '[SBTSelector] local universe discovery skipped (memo hit)', {
           ...logContext,
@@ -1189,7 +1196,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
         const netKey = String(networkID);
         let sbtCache: SbtCacheByNet = normalizeSbtCacheForNet(
           await this.readSbtCacheBySlug(resolvedSlug),
-          netKey
+          netKey,
         ) as SbtCacheByNet;
         let sbtList: SbtSelectorScopedEntryMap = sbtCache[netKey].sbtList || {};
         let nameLookupState: SbtNameLookupState = ensureNameLookupState(sbtCache, netKey);
@@ -1197,7 +1204,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
         const mergeLatestCacheState = async (): Promise<void> => {
           const latestCache = normalizeSbtCacheForNet(
             await this.readSbtCacheBySlug(resolvedSlug),
-            netKey
+            netKey,
           ) as SbtCacheByNet;
           const mergeResult = mergeSbtSelectorLatestCacheState({
             latestCache,
@@ -1271,20 +1278,22 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
         const BATCH = 6;
         for (let i = 0; i < toFetch.length; i += BATCH) {
           const batch = toFetch.slice(i, i + BATCH);
-          const results = await Promise.all(batch.map(async (address: string): Promise<SbtSelectorAddressHydrationResult> => {
-            try {
-              const lookup = await hydrateSbtDisplayNameTargetedTyped({
-                address,
-                preferredSlug: resolvedSlug,
-                metadataLookupConfig: metadataLookupCfg,
-                chainId: networkID,
-                writeBack: true,
-              });
-              return { address, sbtInfo: lookup?.info || null };
-            } catch (_) {
-              return { address, sbtInfo: null };
-            }
-          }));
+          const results = await Promise.all(
+            batch.map(async (address: string): Promise<SbtSelectorAddressHydrationResult> => {
+              try {
+                const lookup = await hydrateSbtDisplayNameTargetedTyped({
+                  address,
+                  preferredSlug: resolvedSlug,
+                  metadataLookupConfig: metadataLookupCfg,
+                  chainId: networkID,
+                  writeBack: true,
+                });
+                return { address, sbtInfo: lookup?.info || null };
+              } catch (_) {
+                return { address, sbtInfo: null };
+              }
+            }),
+          );
           const batchNow = Date.now();
           const hydrationResult = applySbtSelectorAddressHydrationResultsToList({
             nameLookupState,
@@ -1316,23 +1325,24 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     return run;
   };
 
-  ensureSbtUniverse = async ({
-    slugOverride,
-    force,
-  }: SbtSelectorEnsureUniverseArgs = {}): Promise<unknown | null> => {
+  ensureSbtUniverse = async ({ slugOverride, force }: SbtSelectorEnsureUniverseArgs = {}): Promise<unknown | null> => {
     if (!this.shouldAutoDiscover()) return null;
     if (typeof window === 'undefined') return null;
 
     const forceDiscovery = !!force;
     const targetSlugs = this.getResolvedTargetSlugs({ slugOverride });
     if (!targetSlugs.length) return null;
-    emitSbtSelectorDebug('info', '[SBTSelector] ensureSbtUniverse start', this.getSelectorLogContext({
-      scopeMode: this.getResolvedScopeMode(),
-      slugOverride: normalizeSessionSlug(slugOverride ?? ''),
-      force: forceDiscovery,
-      targetSlugs,
-      hasSharedUniverseKickoff: typeof this.props.ensureLightSbtUniverse === 'function',
-    }));
+    emitSbtSelectorDebug(
+      'info',
+      '[SBTSelector] ensureSbtUniverse start',
+      this.getSelectorLogContext({
+        scopeMode: this.getResolvedScopeMode(),
+        slugOverride: normalizeSessionSlug(slugOverride ?? ''),
+        force: forceDiscovery,
+        targetSlugs,
+        hasSharedUniverseKickoff: typeof this.props.ensureLightSbtUniverse === 'function',
+      }),
+    );
     this.kickoffSharedLightUniverseIfNeeded({ slugOverride });
 
     this.beginDiscovering();
@@ -1349,16 +1359,13 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
 
   isOptionsLoading = (): boolean => isSbtSelectorOptionsLoading(this.state);
 
-  getNoOptionsMessage = (): string | null => (
+  getNoOptionsMessage = (): string | null =>
     resolveSbtSelectorNoOptionsMessage({
       isLoading: this.isOptionsLoading(),
       pluralLabel: t('sbts'),
-    })
-  );
+    });
 
-  getLoadingOptionCount = (): number => (
-    getSbtSelectorLoadingOptionCount(this.state.sbtOptions)
-  );
+  getLoadingOptionCount = (): number => getSbtSelectorLoadingOptionCount(this.state.sbtOptions);
 
   getLoadingStatusText = ({ compact = false }: SbtSelectorLoadingStatusArgs = {}): string => {
     return getSbtSelectorLoadingStatusText({
@@ -1399,9 +1406,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
 
   getLoadingMessage = (): React.ReactElement => this.renderLoadingStatus({ includeTestId: true });
 
-  loadSBTOptions = async ({
-    force = false,
-  }: SbtSelectorLoadOptionsArgs = {}): Promise<unknown | null> => {
+  loadSBTOptions = async ({ force = false }: SbtSelectorLoadOptionsArgs = {}): Promise<unknown | null> => {
     const forceReload = !!force;
     const slug = normalizeSessionSlug(this.getEffectiveSessionSlug());
     const scopeMode = this.getResolvedScopeMode();
@@ -1647,14 +1652,10 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
         ...(Array.isArray(this.state.sbtOptions) ? this.state.sbtOptions : []),
         ...this.normalizeAdditionalSBTOptions(),
       ] as SbtSelectorSelectableOption[];
-      let selectedSBT = selectableOptions.find(
-        (sbt: SbtSelectorSelectableOption) => {
-          const optionKey = getSelectableSbtKey(sbt);
-          return optionKey
-            ? optionKey === selectedKey
-            : normalizeSelectableSbtAddress(sbt?.address) === selectedAddress;
-        }
-      );
+      let selectedSBT = selectableOptions.find((sbt: SbtSelectorSelectableOption) => {
+        const optionKey = getSelectableSbtKey(sbt);
+        return optionKey ? optionKey === selectedKey : normalizeSelectableSbtAddress(sbt?.address) === selectedAddress;
+      });
       if (!selectedSBT) {
         // SBT not in options, need to fetch metadata
         try {
@@ -1678,7 +1679,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
               sbtInfo,
               sessionSlug: resolvedSlug,
               sessionName: resolvedSession.sessionName,
-            })
+            }),
           );
           selectedSBT = {
             address: selectedAddress,
@@ -1731,16 +1732,19 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     const customAddressLower = normalizeSelectableSbtAddress(customSBTAddress);
     if (!customAddressLower) return;
     if (this.props.limitToFeatured === true && !this.getEffectiveFeaturedAddressSet().has(customAddressLower)) {
-      this.setState(buildSbtSelectorManualInputWarningPatch({
-        warning: `Only featured ${t('sbts')} can be added by address in this selector.`,
-      }));
+      this.setState(
+        buildSbtSelectorManualInputWarningPatch({
+          warning: `Only featured ${t('sbts')} can be added by address in this selector.`,
+        }),
+      );
       return;
     }
 
-    const initialSelectionKey = buildSbtLookupKey({
-      address: customAddressLower,
-      chainId: this.getSessionNetworkId(this.getEffectiveSessionSlug()),
-    }) || customAddressLower;
+    const initialSelectionKey =
+      buildSbtLookupKey({
+        address: customAddressLower,
+        chainId: this.getSessionNetworkId(this.getEffectiveSessionSlug()),
+      }) || customAddressLower;
     if (this.hasSelectedOrPendingSbtKey(initialSelectionKey)) return;
 
     let customSelectionKey = initialSelectionKey;
@@ -1785,7 +1789,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
         sbtAddress: customAddressLower,
         sbtInfo,
         manual: true,
-        slug: resolvedSlug
+        slug: resolvedSlug,
       };
       await writeCacheTyped('sbtCache', resolvedSlug, normalizedCache);
       const customSBT = buildSbtSelectorCustomSbtSelection({
@@ -1810,15 +1814,11 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
   };
 
   toggleManualInput = (): void => {
-    this.setState((prevState: SbtSelectorToggleState) => (
-      buildSbtSelectorManualInputTogglePatch(prevState)
-    ));
+    this.setState((prevState: SbtSelectorToggleState) => buildSbtSelectorManualInputTogglePatch(prevState));
   };
 
   toggleGroupPicker = (): void => {
-    this.setState((prevState: SbtSelectorToggleState) => (
-      buildSbtSelectorGroupPickerTogglePatch(prevState)
-    ));
+    this.setState((prevState: SbtSelectorToggleState) => buildSbtSelectorGroupPickerTogglePatch(prevState));
   };
 
   applyGroupSourceSelection = (next: unknown): void => {
@@ -1826,11 +1826,10 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       activeSlug: this.getPropSessionSlug(),
       next,
     });
-    this.setState(
-      buildSbtSelectorGroupSourceSelectionPatch({ selection: nextSelection }),
-      () => this.ensureSbtUniverse({ slugOverride: nextSelection.slugOverride, force: true }).then(() => {
+    this.setState(buildSbtSelectorGroupSourceSelectionPatch({ selection: nextSelection }), () =>
+      this.ensureSbtUniverse({ slugOverride: nextSelection.slugOverride, force: true }).then(() => {
         if (this._isMounted) this.loadSBTOptions({ force: true });
-      })
+      }),
     );
   };
 
@@ -1850,10 +1849,8 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
   };
 
   normalizeAdditionalSBTOptions = (
-    optionsInput: unknown = this.props.additionalSBTOptions
-  ): SbtSelectorAdditionalOption[] => (
-    normalizeAdditionalSbtOptions(optionsInput)
-  );
+    optionsInput: unknown = this.props.additionalSBTOptions,
+  ): SbtSelectorAdditionalOption[] => normalizeAdditionalSbtOptions(optionsInput);
 
   formatOptionLabel = ({ label, image, value }: SbtSelectorLabelOption): React.ReactElement => {
     const imageState = resolveSbtSelectorLabelImageState({ image });
@@ -1878,7 +1875,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
   resolveSbtLabel = (
     sbtInfo: unknown,
     address: unknown,
-    preferredSlug: unknown = this.getEffectiveSessionSlug()
+    preferredSlug: unknown = this.getEffectiveSessionSlug(),
   ): string => {
     return String(
       resolveSbtDisplayLabelTyped({
@@ -1887,14 +1884,14 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
         preferredSlug: String(preferredSlug || ''),
         fallback: 'short',
       }) ||
-      address ||
-      `Unnamed ${t('sbt')}`
+        address ||
+        `Unnamed ${t('sbt')}`,
     );
   };
 
   getSbtOptionsByAddress = (sbtOptionsInput: unknown): Map<string, SbtSelectorSelectableOption> => {
     const sbtOptions = Array.isArray(sbtOptionsInput) ? sbtOptionsInput : [];
-    const memo = this._sbtOptionsByAddressMemo as SbtSelectorOptionMemo | undefined || {};
+    const memo = (this._sbtOptionsByAddressMemo as SbtSelectorOptionMemo | undefined) || {};
     if (memo.source === sbtOptions && memo.value instanceof Map) {
       return memo.value;
     }
@@ -1905,7 +1902,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
 
   getSbtOptionsBySelectionKey = (sbtOptionsInput: unknown): Map<string, SbtSelectorSelectableOption> => {
     const sbtOptions = Array.isArray(sbtOptionsInput) ? sbtOptionsInput : [];
-    const memo = this._sbtOptionsBySelectionKeyMemo as SbtSelectorOptionMemo | undefined || {};
+    const memo = (this._sbtOptionsBySelectionKeyMemo as SbtSelectorOptionMemo | undefined) || {};
     if (memo.source === sbtOptions && memo.value instanceof Map) {
       return memo.value;
     }
@@ -1914,25 +1911,17 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     return bySelectionKey;
   };
 
-  getSelectedSbtKeySet = (): Set<string> => (
-    buildSelectedSbtKeySet(this.props.selectedSBTs)
-  );
+  getSelectedSbtKeySet = (): Set<string> => buildSelectedSbtKeySet(this.props.selectedSBTs);
 
-  getSelectedSbtAddressSet = (): Set<string> => (
-    buildSelectedSbtAddressSet(this.props.selectedSBTs)
-  );
+  getSelectedSbtAddressSet = (): Set<string> => buildSelectedSbtAddressSet(this.props.selectedSBTs);
 
-  getEffectiveFeaturedAddressSet = (): Set<string> => (
+  getEffectiveFeaturedAddressSet = (): Set<string> =>
     buildEffectiveFeaturedAddressSet({
       scopeFeaturedAddresses: this.state.scopeFeaturedAddresses,
       defaultFeaturedSBTs: this.props.defaultFeaturedSBTs,
-    })
-  );
+    });
 
-  getSbtDetailLinkSessionSlug = (
-    sbt: unknown,
-    fallbackSlug: unknown = this.getEffectiveSessionSlug()
-  ): string => {
+  getSbtDetailLinkSessionSlug = (sbt: unknown, fallbackSlug: unknown = this.getEffectiveSessionSlug()): string => {
     return resolveSbtDetailLinkSessionSlug({ sbt, fallbackSlug });
   };
 
@@ -1969,10 +1958,10 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     const currentSessionSlug = this.getEffectiveSessionSlug();
     const activeSessionSlug = this.getPropSessionSlug();
 
-    const sbtOptionsList = Array.isArray(sbtOptions) ? sbtOptions as SbtSelectorOption[] : [];
-    const groupOptionsList = Array.isArray(groupOptions) ? groupOptions as SbtSelectorGroupOption[] : [];
+    const sbtOptionsList = Array.isArray(sbtOptions) ? (sbtOptions as SbtSelectorOption[]) : [];
+    const groupOptionsList = Array.isArray(groupOptions) ? (groupOptions as SbtSelectorGroupOption[]) : [];
     const selectedSbts = Array.isArray(this.props.selectedSBTs)
-      ? this.props.selectedSBTs as SbtSelectorSelectableOption[]
+      ? (this.props.selectedSBTs as SbtSelectorSelectableOption[])
       : [];
     const selectedAddressesState = resolveSbtSelectorSelectedAddressesState({ selectedSbts });
     const additionalOptions = this.normalizeAdditionalSBTOptions();
@@ -2016,9 +2005,8 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       SbtSelectorSelectableOption
     >({
       currentSessionSlug,
-      resolveSbtLabel: (sbtInfo: unknown, address: string, sessionSlug: string) => (
-        this.resolveSbtLabel(sbtInfo, address, sessionSlug)
-      ),
+      resolveSbtLabel: (sbtInfo: unknown, address: string, sessionSlug: string) =>
+        this.resolveSbtLabel(sbtInfo, address, sessionSlug),
       sbtOptionsByAddress,
       sbtOptionsBySelectionKey,
       selectedSbts,
@@ -2186,7 +2174,11 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
                 key={getSelectableSbtKey(sbt) || String(sbt.address || '')}
                 className={styles.addressTag}
                 data-testid={E2E_TESTIDS.SBT_SELECTOR_SELECTED}
-                data-ce-sbt-address={String(sbt.address || '').trim().toLowerCase() || undefined}
+                data-ce-sbt-address={
+                  String(sbt.address || '')
+                    .trim()
+                    .toLowerCase() || undefined
+                }
               >
                 <span className={styles.sbtName}>{String(sbt.name || sbt.address || '')}</span>
                 <FontAwesomeIcon
@@ -2203,13 +2195,12 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
                   icon={faExternalLinkAlt}
                   className={styles.linkIcon}
                   size="lg"
-                  onClick={() => window.open(
-                    buildSbtDetailPath(
-                      sbt.address,
-                      this.getSbtDetailLinkSessionSlug(sbt, currentSessionSlug)
-                    ),
-                    '_blank'
-                  )}
+                  onClick={() =>
+                    window.open(
+                      buildSbtDetailPath(sbt.address, this.getSbtDetailLinkSessionSlug(sbt, currentSessionSlug)),
+                      '_blank',
+                    )
+                  }
                 />
               </div>
             ))}

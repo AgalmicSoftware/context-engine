@@ -83,24 +83,30 @@ describe('surveyResultsHelpers state patches', () => {
       demoResultsViewMode: 'atlas',
       demoResultsAtlasNodeId: null,
     });
-    expect(buildSurveyResultsDemoViewSelectPatch({
-      nextView: 'breakdown',
-      prevState: { demoResultsViewMode: 'breakdown', demoResultsAtlasNodeId: 'node-a' },
-    })).toEqual({
+    expect(
+      buildSurveyResultsDemoViewSelectPatch({
+        nextView: 'breakdown',
+        prevState: { demoResultsViewMode: 'breakdown', demoResultsAtlasNodeId: 'node-a' },
+      }),
+    ).toEqual({
       demoResultsViewMode: 'raw',
       demoResultsAtlasNodeId: null,
     });
-    expect(buildSurveyResultsDemoViewSelectPatch({
-      nextView: 'atlas',
-      prevState: { demoResultsViewMode: 'report', demoResultsAtlasNodeId: 'node-a' },
-    })).toEqual({
+    expect(
+      buildSurveyResultsDemoViewSelectPatch({
+        nextView: 'atlas',
+        prevState: { demoResultsViewMode: 'report', demoResultsAtlasNodeId: 'node-a' },
+      }),
+    ).toEqual({
       demoResultsViewMode: 'atlas',
       demoResultsAtlasNodeId: 'node-a',
     });
-    expect(buildSurveyResultsDemoViewSelectPatch({
-      nextView: 'unknown',
-      prevState: { demoResultsViewMode: 'atlas', demoResultsAtlasNodeId: 'node-a' },
-    })).toEqual({
+    expect(
+      buildSurveyResultsDemoViewSelectPatch({
+        nextView: 'unknown',
+        prevState: { demoResultsViewMode: 'atlas', demoResultsAtlasNodeId: 'node-a' },
+      }),
+    ).toEqual({
       demoResultsViewMode: 'report',
       demoResultsAtlasNodeId: null,
     });
@@ -110,12 +116,14 @@ describe('surveyResultsHelpers state patches', () => {
     expect(buildSurveyResultsNetworkLatestBlockPatch(Number.POSITIVE_INFINITY)).toEqual({
       networkLatestBlock: 0,
     });
-    expect(buildSurveyResultsViewModeResetPatch({
-      questionResultsHydrated: true,
-      surveyId: '0xsurvey',
-      surveyResultsHydrated: true,
-      viewMode: 'questions',
-    })).toEqual({
+    expect(
+      buildSurveyResultsViewModeResetPatch({
+        questionResultsHydrated: true,
+        surveyId: '0xsurvey',
+        surveyResultsHydrated: true,
+        viewMode: 'questions',
+      }),
+    ).toEqual({
       questionLocalBlock: 0,
       responseLocalBlock: 0,
       surveyLocalBlock: 0,
@@ -128,12 +136,14 @@ describe('surveyResultsHelpers state patches', () => {
       demoResultsAtlasNodeId: null,
       surveyId: '',
     });
-    expect(buildSurveyResultsViewModeResetPatch({
-      questionResultsHydrated: true,
-      surveyId: '0xsurvey',
-      surveyResultsHydrated: true,
-      viewMode: 'survey',
-    })).toEqual({
+    expect(
+      buildSurveyResultsViewModeResetPatch({
+        questionResultsHydrated: true,
+        surveyId: '0xsurvey',
+        surveyResultsHydrated: true,
+        viewMode: 'survey',
+      }),
+    ).toEqual({
       questionLocalBlock: 0,
       responseLocalBlock: 0,
       surveyLocalBlock: 0,
@@ -162,14 +172,16 @@ describe('surveyResultsHelpers state patches', () => {
       demoResultsViewMode: 'raw',
       demoResultsAtlasNodeId: null,
     });
-    expect(buildSurveyResultsLocalStoragePollPatch({
-      cachedQuestionsCount: 3,
-      cachedSurveyResponsesCount: 4,
-      networkLatestBlock: 99,
-      questionLocalBlock: 10,
-      responseLocalBlock: 11,
-      surveyLocalBlock: 12,
-    })).toEqual({
+    expect(
+      buildSurveyResultsLocalStoragePollPatch({
+        cachedQuestionsCount: 3,
+        cachedSurveyResponsesCount: 4,
+        networkLatestBlock: 99,
+        questionLocalBlock: 10,
+        responseLocalBlock: 11,
+        surveyLocalBlock: 12,
+      }),
+    ).toEqual({
       questionLocalBlock: 10,
       responseLocalBlock: 11,
       surveyLocalBlock: 12,
@@ -194,10 +206,12 @@ describe('surveyResultsHelpers state patches', () => {
         latestBlock: 456,
       },
     });
-    expect(buildSurveyResultsRefreshStatusWritePlan({
-      latestBlock: 789,
-      writeNetworkLatestBlock: true,
-    })).toEqual({
+    expect(
+      buildSurveyResultsRefreshStatusWritePlan({
+        latestBlock: 789,
+        writeNetworkLatestBlock: true,
+      }),
+    ).toEqual({
       blockedReason: '',
       shouldWrite: true,
       statePatch: {
@@ -210,10 +224,12 @@ describe('surveyResultsHelpers state patches', () => {
         latestBlock: 789,
       },
     });
-    expect(buildSurveyResultsRefreshStatusWritePlan({
-      latestBlock: Number.POSITIVE_INFINITY,
-      writeNetworkLatestBlock: true,
-    })).toEqual({
+    expect(
+      buildSurveyResultsRefreshStatusWritePlan({
+        latestBlock: Number.POSITIVE_INFINITY,
+        writeNetworkLatestBlock: true,
+      }),
+    ).toEqual({
       blockedReason: '',
       shouldWrite: true,
       statePatch: {
@@ -226,11 +242,13 @@ describe('surveyResultsHelpers state patches', () => {
         latestBlock: Number.POSITIVE_INFINITY,
       },
     });
-    expect(buildSurveyResultsRefreshStatusWritePlan({
-      isMounted: false,
-      latestBlock: 999,
-      writeNetworkLatestBlock: true,
-    })).toEqual({
+    expect(
+      buildSurveyResultsRefreshStatusWritePlan({
+        isMounted: false,
+        latestBlock: 999,
+        writeNetworkLatestBlock: true,
+      }),
+    ).toEqual({
       blockedReason: 'unmounted',
       shouldWrite: false,
       statePatch: null,
@@ -250,26 +268,24 @@ describe('surveyResultsHelpers state patches', () => {
         latestBlock: undefined,
       },
     });
-    expect(buildSurveyResultsRefreshStatusSequencePlan({
-      latestBlock: 321,
-      followUpEffects: [
-        'manualRefreshDispatch',
-        '',
-        'resetLocalStoragePollingBackoff:manual-refresh',
-        'pollLocalStorageForUpdates',
-        'queueResultsRefresh:manual-refresh',
-      ],
-    })).toEqual({
+    expect(
+      buildSurveyResultsRefreshStatusSequencePlan({
+        latestBlock: 321,
+        followUpEffects: [
+          'manualRefreshDispatch',
+          '',
+          'resetLocalStoragePollingBackoff:manual-refresh',
+          'pollLocalStorageForUpdates',
+          'queueResultsRefresh:manual-refresh',
+        ],
+      }),
+    ).toEqual({
       blockedReason: '',
       dispatchEligibility: 'eligible',
       orderedEffects: [
         {
           kind: 'state-patch',
-          keys: [
-            'refreshTargetQuestionBlock',
-            'refreshTargetResponseBlock',
-            'refreshTargetSurveyBlock',
-          ],
+          keys: ['refreshTargetQuestionBlock', 'refreshTargetResponseBlock', 'refreshTargetSurveyBlock'],
           target: {
             latestBlock: 321,
           },
@@ -290,12 +306,14 @@ describe('surveyResultsHelpers state patches', () => {
         latestBlock: 321,
       },
     });
-    expect(buildSurveyResultsRefreshStatusSequencePlan({
-      isMounted: false,
-      latestBlock: 654,
-      writeNetworkLatestBlock: true,
-      followUpEffects: ['pollLocalStorageForUpdates'],
-    })).toEqual({
+    expect(
+      buildSurveyResultsRefreshStatusSequencePlan({
+        isMounted: false,
+        latestBlock: 654,
+        writeNetworkLatestBlock: true,
+        followUpEffects: ['pollLocalStorageForUpdates'],
+      }),
+    ).toEqual({
       blockedReason: 'unmounted',
       dispatchEligibility: 'blocked',
       orderedEffects: [],
@@ -306,11 +324,13 @@ describe('surveyResultsHelpers state patches', () => {
         latestBlock: 654,
       },
     });
-    expect(buildSurveyResultsRefreshStatusSequencePlan({
-      latestBlock: 789,
-      writeNetworkLatestBlock: true,
-      followUpEffects: ['pollLocalStorageForUpdates'],
-    }).orderedEffects).toEqual([
+    expect(
+      buildSurveyResultsRefreshStatusSequencePlan({
+        latestBlock: 789,
+        writeNetworkLatestBlock: true,
+        followUpEffects: ['pollLocalStorageForUpdates'],
+      }).orderedEffects,
+    ).toEqual([
       {
         kind: 'state-patch',
         keys: [
@@ -325,11 +345,13 @@ describe('surveyResultsHelpers state patches', () => {
       },
       { kind: 'follow-up', effect: 'pollLocalStorageForUpdates' },
     ]);
-    expect(buildSurveyResultsRefreshStatusSequencePlan({
-      latestBlock: Number.POSITIVE_INFINITY,
-      writeNetworkLatestBlock: true,
-      followUpEffects: ['pollLocalStorageForUpdates'],
-    }).statePatch).toEqual({
+    expect(
+      buildSurveyResultsRefreshStatusSequencePlan({
+        latestBlock: Number.POSITIVE_INFINITY,
+        writeNetworkLatestBlock: true,
+        followUpEffects: ['pollLocalStorageForUpdates'],
+      }).statePatch,
+    ).toEqual({
       networkLatestBlock: 0,
       refreshTargetQuestionBlock: Number.POSITIVE_INFINITY,
       refreshTargetResponseBlock: Number.POSITIVE_INFINITY,
@@ -338,41 +360,49 @@ describe('surveyResultsHelpers state patches', () => {
     expect(buildSurveyResultsFilteredQuestionsCountPatch(4)).toEqual({
       filteredQuestionsCount: 4,
     });
-    expect(buildSurveyResultsQuestionFilterCountPatch({
-      count: 2,
-      props: { isQuestionCacheReady: false, isResponsesCacheReady: true },
-      state: { filteredQuestionsCount: 1 },
-    })).toBeNull();
-    expect(buildSurveyResultsQuestionFilterCountPatch({
-      count: 0,
-      props: { isQuestionCacheReady: true, isResponsesCacheReady: false },
-      state: { aggregatorQuestionResponses: {}, questionResponses: {}, filteredQuestionsCount: 3 },
-    })).toBeNull();
-    expect(buildSurveyResultsQuestionFilterCountPatch({
-      count: 0,
-      props: { isQuestionCacheReady: true, isResponsesCacheReady: true },
-      state: {
-        aggregatorQuestionResponses: { q1: [{ responder: '0x1' }] },
-        filteredQuestionsCount: 3,
-        filterLoading: false,
-      },
-    })).toEqual({
+    expect(
+      buildSurveyResultsQuestionFilterCountPatch({
+        count: 2,
+        props: { isQuestionCacheReady: false, isResponsesCacheReady: true },
+        state: { filteredQuestionsCount: 1 },
+      }),
+    ).toBeNull();
+    expect(
+      buildSurveyResultsQuestionFilterCountPatch({
+        count: 0,
+        props: { isQuestionCacheReady: true, isResponsesCacheReady: false },
+        state: { aggregatorQuestionResponses: {}, questionResponses: {}, filteredQuestionsCount: 3 },
+      }),
+    ).toBeNull();
+    expect(
+      buildSurveyResultsQuestionFilterCountPatch({
+        count: 0,
+        props: { isQuestionCacheReady: true, isResponsesCacheReady: true },
+        state: {
+          aggregatorQuestionResponses: { q1: [{ responder: '0x1' }] },
+          filteredQuestionsCount: 3,
+          filterLoading: false,
+        },
+      }),
+    ).toEqual({
       filteredQuestionsCount: 0,
     });
-    expect(buildSurveyResultsQuestionFilterQuestions({
-      questionResponses: {
-        Q1: { '0xaaa': { response: true } },
-        q2: { '0xbbb': { response: true } },
-      },
-      networkQuestionsById: {
-        q1: {
-          id: 'q1',
-          creator: '0xaaa',
-          prompt: 'Question one',
-          type: 'freeform',
+    expect(
+      buildSurveyResultsQuestionFilterQuestions({
+        questionResponses: {
+          Q1: { '0xaaa': { response: true } },
+          q2: { '0xbbb': { response: true } },
         },
-      },
-    })).toEqual([
+        networkQuestionsById: {
+          q1: {
+            id: 'q1',
+            creator: '0xaaa',
+            prompt: 'Question one',
+            type: 'freeform',
+          },
+        },
+      }),
+    ).toEqual([
       {
         id: 'q1',
         creator: '0xaaa',
@@ -387,13 +417,15 @@ describe('surveyResultsHelpers state patches', () => {
       },
     ]);
     expect(buildSurveyResultsQuestionFilterQuestions()).toEqual([]);
-    expect(stringifySurveyResultsAggregatorResponses({
-      q1: [
-        { responder: '0x1', response: 'already text' },
-        { responder: '0x2', response: { answer: 'choice-a' } },
-      ],
-      q2: 'not-an-array',
-    })).toEqual({
+    expect(
+      stringifySurveyResultsAggregatorResponses({
+        q1: [
+          { responder: '0x1', response: 'already text' },
+          { responder: '0x2', response: { answer: 'choice-a' } },
+        ],
+        q2: 'not-an-array',
+      }),
+    ).toEqual({
       q1: [
         { responder: '0x1', response: 'already text' },
         { responder: '0x2', response: '{"answer":"choice-a"}' },
@@ -401,24 +433,28 @@ describe('surveyResultsHelpers state patches', () => {
       q2: [],
     });
     expect(stringifySurveyResultsAggregatorResponses(null)).toEqual({});
-    expect(buildSurveyResultsQuestionFilterCountPatch({
-      count: 0,
-      props: { isQuestionCacheReady: true, isResponsesCacheReady: true },
-      state: {
-        viewMode: 'survey',
-        surveyViewMode: 'aggregate',
-        aggregateQuestionResponses: { q1: [] },
-        aggregatorQuestionResponses: {},
-        filteredQuestionsCount: 3,
-      },
-    })).toEqual({
+    expect(
+      buildSurveyResultsQuestionFilterCountPatch({
+        count: 0,
+        props: { isQuestionCacheReady: true, isResponsesCacheReady: true },
+        state: {
+          viewMode: 'survey',
+          surveyViewMode: 'aggregate',
+          aggregateQuestionResponses: { q1: [] },
+          aggregatorQuestionResponses: {},
+          filteredQuestionsCount: 3,
+        },
+      }),
+    ).toEqual({
       filteredQuestionsCount: 0,
     });
-    expect(buildSurveyResultsQuestionFilterCountPatch({
-      count: 3,
-      props: { isQuestionCacheReady: true, isResponsesCacheReady: true },
-      state: { filteredQuestionsCount: 3 },
-    })).toBeNull();
+    expect(
+      buildSurveyResultsQuestionFilterCountPatch({
+        count: 3,
+        props: { isQuestionCacheReady: true, isResponsesCacheReady: true },
+        state: { filteredQuestionsCount: 3 },
+      }),
+    ).toBeNull();
     expect(buildSurveyResultsSurveyViewModePatch('aggregate')).toEqual({
       surveyViewMode: 'aggregate',
     });
@@ -432,86 +468,110 @@ describe('surveyResultsHelpers state patches', () => {
       viewMode: 'survey',
       surveyId: '0x1',
     });
-    expect(buildSurveyResultsFilterLoadingUpdate({
-      loading: true,
-      stateFilterLoading: true,
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilterLoadingUpdate({
+        loading: true,
+        stateFilterLoading: true,
+      }),
+    ).toEqual({
       nextLoading: true,
       nextPendingValue: null,
       shouldQueueState: false,
     });
-    expect(buildSurveyResultsFilterLoadingUpdate({
-      loading: false,
-      pendingValue: true,
-      stateFilterLoading: false,
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilterLoadingUpdate({
+        loading: false,
+        pendingValue: true,
+        stateFilterLoading: false,
+      }),
+    ).toEqual({
       nextLoading: false,
       nextPendingValue: false,
       shouldQueueState: true,
     });
-    expect(buildSurveyResultsFilterLoadingStatePatch({
-      nextLoading: false,
-      prevState: { filterLoading: true },
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilterLoadingStatePatch({
+        nextLoading: false,
+        prevState: { filterLoading: true },
+      }),
+    ).toEqual({
       filterLoading: false,
     });
-    expect(buildSurveyResultsFilterLoadingStatePatch({
-      nextLoading: false,
-      prevState: { filterLoading: false },
-    })).toBeNull();
-    expect(buildSurveyResultsBooleanTogglePatch({
-      prevState: { showQuestionFilter: false },
-      stateKey: 'showQuestionFilter',
-    })).toEqual({ showQuestionFilter: true });
-    expect(buildSurveyResultsBooleanTogglePatch({
-      prevState: { exportAreaOpen: true },
-      stateKey: 'exportAreaOpen',
-    })).toEqual({ exportAreaOpen: false });
+    expect(
+      buildSurveyResultsFilterLoadingStatePatch({
+        nextLoading: false,
+        prevState: { filterLoading: false },
+      }),
+    ).toBeNull();
+    expect(
+      buildSurveyResultsBooleanTogglePatch({
+        prevState: { showQuestionFilter: false },
+        stateKey: 'showQuestionFilter',
+      }),
+    ).toEqual({ showQuestionFilter: true });
+    expect(
+      buildSurveyResultsBooleanTogglePatch({
+        prevState: { exportAreaOpen: true },
+        stateKey: 'exportAreaOpen',
+      }),
+    ).toEqual({ exportAreaOpen: false });
     expect(buildSurveyResultsBooleanTogglePatch()).toEqual({});
-    expect(buildSurveyResultsKeyedTogglePatch({
-      itemKey: 'q1',
-      mapKey: 'activeQuestionToggles',
-      prevState: { activeQuestionToggles: { q1: false, q2: true } },
-    })).toEqual({
+    expect(
+      buildSurveyResultsKeyedTogglePatch({
+        itemKey: 'q1',
+        mapKey: 'activeQuestionToggles',
+        prevState: { activeQuestionToggles: { q1: false, q2: true } },
+      }),
+    ).toEqual({
       activeQuestionToggles: { q1: true, q2: true },
     });
-    expect(buildSurveyResultsKeyedTogglePatch({
-      forceValue: true,
-      itemKey: 'q1',
-      mapKey: 'activeQuestionToggles',
-      prevState: { activeQuestionToggles: { q1: false } },
-    })).toEqual({
+    expect(
+      buildSurveyResultsKeyedTogglePatch({
+        forceValue: true,
+        itemKey: 'q1',
+        mapKey: 'activeQuestionToggles',
+        prevState: { activeQuestionToggles: { q1: false } },
+      }),
+    ).toEqual({
       activeQuestionToggles: { q1: true },
     });
     expect(buildSurveyResultsKeyedTogglePatch()).toEqual({});
-    expect(buildSurveyResultsQuestionIdSortPatch({
-      column: 'questionId',
-      prevState: { questionIdSortBy: 'questionId', questionIdSortAsc: true },
-    })).toEqual({
+    expect(
+      buildSurveyResultsQuestionIdSortPatch({
+        column: 'questionId',
+        prevState: { questionIdSortBy: 'questionId', questionIdSortAsc: true },
+      }),
+    ).toEqual({
       questionIdSortBy: 'questionId',
       questionIdSortAsc: false,
     });
-    expect(buildSurveyResultsQuestionIdSortPatch({
-      column: 'responses',
-      prevState: { questionIdSortBy: 'questionId', questionIdSortAsc: false },
-    })).toEqual({
+    expect(
+      buildSurveyResultsQuestionIdSortPatch({
+        column: 'responses',
+        prevState: { questionIdSortBy: 'questionId', questionIdSortAsc: false },
+      }),
+    ).toEqual({
       questionIdSortBy: 'responses',
       questionIdSortAsc: true,
     });
   });
 
   it('builds committed filter and question-filter state patches', () => {
-    expect(buildSurveyResultsCommittedFilterStatePatch({
-      filterState: { questionTypes: ['binary'] },
-      statePatch: { filteredQuestionsCount: 2 },
-    })).toEqual({
+    expect(
+      buildSurveyResultsCommittedFilterStatePatch({
+        filterState: { questionTypes: ['binary'] },
+        statePatch: { filteredQuestionsCount: 2 },
+      }),
+    ).toEqual({
       filteredQuestionsCount: 2,
       filterState: { questionTypes: ['binary'] },
     });
-    expect(buildSurveyResultsCommittedFilterStatePatch({
-      filterState: { questionTypes: ['rating'] },
-      statePatch: null,
-    })).toEqual({
+    expect(
+      buildSurveyResultsCommittedFilterStatePatch({
+        filterState: { questionTypes: ['rating'] },
+        statePatch: null,
+      }),
+    ).toEqual({
       filterState: { questionTypes: ['rating'] },
     });
     expect(buildSurveyResultsQuestionScopeResetPatch()).toEqual({
@@ -530,19 +590,21 @@ describe('surveyResultsHelpers state patches', () => {
       q2: [{ responder: '0x2', response: { answer: { value: 'source' } } }],
       q3: [{ responder: '0x3', response: { answer: { value: 'omitted' } } }],
     };
-    expect(buildSurveyResultsQuestionFilterPatch({
-      filteredQuestions: [{ id: 'Q1' }, { id: 'q2' }],
-      filteredResponsesByQuestion: {
-        q1: [{ responder: '0x4', response: { answer: { value: 'filtered' } } }],
-        q2: [],
-      },
-      networkQuestions: {
-        q1: { type: 'freeform' },
-        q2: { type: 'freeform' },
-      },
-      sourceMap,
-      totalResponsesCount: 5,
-    })).toEqual({
+    expect(
+      buildSurveyResultsQuestionFilterPatch({
+        filteredQuestions: [{ id: 'Q1' }, { id: 'q2' }],
+        filteredResponsesByQuestion: {
+          q1: [{ responder: '0x4', response: { answer: { value: 'filtered' } } }],
+          q2: [],
+        },
+        networkQuestions: {
+          q1: { type: 'freeform' },
+          q2: { type: 'freeform' },
+        },
+        sourceMap,
+        totalResponsesCount: 5,
+      }),
+    ).toEqual({
       filteredQuestionsCount: 2,
       sbtFilteredAggregatorQuestionResponses: {
         q1: [{ responder: '0x4', response: { answer: { value: 'filtered' } } }],
@@ -550,45 +612,45 @@ describe('surveyResultsHelpers state patches', () => {
       filteredResponsesCount: 1,
     });
 
-    expect(buildSurveyResultsQuestionFilterPatch({
-      filteredQuestions: [{ id: 'q1' }, { id: 'q2' }],
-      isSurveyAggregate: true,
-      sourceMap: {
-        q1: [
-          { responder: '0xAAA' },
-          { responder: '0xaaa' },
-        ],
-        q2: [{ responder: '0xBBB' }],
-      },
-      totalResponsesCount: 1,
-    })).toEqual({
+    expect(
+      buildSurveyResultsQuestionFilterPatch({
+        filteredQuestions: [{ id: 'q1' }, { id: 'q2' }],
+        isSurveyAggregate: true,
+        sourceMap: {
+          q1: [{ responder: '0xAAA' }, { responder: '0xaaa' }],
+          q2: [{ responder: '0xBBB' }],
+        },
+        totalResponsesCount: 1,
+      }),
+    ).toEqual({
       filteredQuestionsCount: 2,
       sbtFilteredAggregatorQuestionResponses: {
-        q1: [
-          { responder: '0xAAA' },
-          { responder: '0xaaa' },
-        ],
+        q1: [{ responder: '0xAAA' }, { responder: '0xaaa' }],
         q2: [{ responder: '0xBBB' }],
       },
       filteredResponsesCount: 1,
     });
 
-    expect(buildSurveyResultsQuestionFilterPatch({
-      filteredQuestions: [{ id: 'q1' }, { id: 'q2' }],
-      isSurveyIndividuals: true,
-      sourceMap,
-      totalResponsesCount: 5,
-    })).toEqual({
+    expect(
+      buildSurveyResultsQuestionFilterPatch({
+        filteredQuestions: [{ id: 'q1' }, { id: 'q2' }],
+        isSurveyIndividuals: true,
+        sourceMap,
+        totalResponsesCount: 5,
+      }),
+    ).toEqual({
       filteredQuestionsCount: 2,
     });
   });
 
   it('builds filtered response patch plans by view mode', () => {
-    expect(buildSurveyResultsFilteredResponsesPatchPlan({
-      filteredResponses: [{ responder: '0x1' }],
-      surveyViewMode: 'individuals',
-      viewMode: 'survey',
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilteredResponsesPatchPlan({
+        filteredResponses: [{ responder: '0x1' }],
+        surveyViewMode: 'individuals',
+        viewMode: 'survey',
+      }),
+    ).toEqual({
       patch: {
         sbtFilteredResponses: [{ responder: '0x1' }],
         filteredResponsesCount: 1,
@@ -596,11 +658,13 @@ describe('surveyResultsHelpers state patches', () => {
       status: 'apply',
     });
 
-    expect(buildSurveyResultsFilteredResponsesPatchPlan({
-      filteredResponses: null,
-      surveyViewMode: 'individuals',
-      viewMode: 'survey',
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilteredResponsesPatchPlan({
+        filteredResponses: null,
+        surveyViewMode: 'individuals',
+        viewMode: 'survey',
+      }),
+    ).toEqual({
       patch: {
         sbtFilteredResponses: [],
         filteredResponsesCount: 0,
@@ -608,25 +672,21 @@ describe('surveyResultsHelpers state patches', () => {
       status: 'invalid-array',
     });
 
-    expect(buildSurveyResultsFilteredResponsesPatchPlan({
-      filteredResponses: {
-        q1: [
-          { responder: '0xAAA' },
-          { responder: '0xaaa' },
-        ],
-        q2: [],
-        q3: [{ responder: '0xBBB' }],
-      },
-      surveyViewMode: 'aggregate',
-      totalResponsesCount: 5,
-      viewMode: 'survey',
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilteredResponsesPatchPlan({
+        filteredResponses: {
+          q1: [{ responder: '0xAAA' }, { responder: '0xaaa' }],
+          q2: [],
+          q3: [{ responder: '0xBBB' }],
+        },
+        surveyViewMode: 'aggregate',
+        totalResponsesCount: 5,
+        viewMode: 'survey',
+      }),
+    ).toEqual({
       patch: {
         sbtFilteredAggregatorQuestionResponses: {
-          q1: [
-            { responder: '0xAAA' },
-            { responder: '0xaaa' },
-          ],
+          q1: [{ responder: '0xAAA' }, { responder: '0xaaa' }],
           q3: [{ responder: '0xBBB' }],
         },
         filteredResponsesCount: 2,
@@ -634,15 +694,17 @@ describe('surveyResultsHelpers state patches', () => {
       status: 'apply',
     });
 
-    expect(buildSurveyResultsFilteredResponsesPatchPlan({
-      filteredResponses: {
-        q1: [{ responder: '0x1', response: { answer: { value: 'Yes' } } }],
-        q2: [],
-      },
-      networkQuestions: { q1: { type: 'freeform' } },
-      totalResponsesCount: 1,
-      viewMode: 'questions',
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilteredResponsesPatchPlan({
+        filteredResponses: {
+          q1: [{ responder: '0x1', response: { answer: { value: 'Yes' } } }],
+          q2: [],
+        },
+        networkQuestions: { q1: { type: 'freeform' } },
+        totalResponsesCount: 1,
+        viewMode: 'questions',
+      }),
+    ).toEqual({
       patch: {
         sbtFilteredAggregatorQuestionResponses: {
           q1: [{ responder: '0x1', response: { answer: { value: 'Yes' } } }],
@@ -652,10 +714,12 @@ describe('surveyResultsHelpers state patches', () => {
       status: 'apply',
     });
 
-    expect(buildSurveyResultsFilteredResponsesPatchPlan({
-      filteredResponses: 'invalid',
-      viewMode: 'questions',
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilteredResponsesPatchPlan({
+        filteredResponses: 'invalid',
+        viewMode: 'questions',
+      }),
+    ).toEqual({
       patch: null,
       status: 'invalid-aggregator',
     });
@@ -668,8 +732,7 @@ describe('surveyResultsHelpers state patches', () => {
     expect(buildSurveyResultsBookmarkedSurveyIdsPatch(surveyIds)).toEqual({
       bookmarkedSurveyIDs: ['s1'],
     });
-    expect(buildSurveyResultsBookmarkedSurveyIdsPatch(surveyIds).bookmarkedSurveyIDs)
-      .not.toBe(surveyIds);
+    expect(buildSurveyResultsBookmarkedSurveyIdsPatch(surveyIds).bookmarkedSurveyIDs).not.toBe(surveyIds);
     expect(buildSurveyResultsBookmarkedQuestionIdsPatch(questionIds)).toEqual({
       bookmarkedQuestionIDs: ['q1'],
     });
@@ -681,31 +744,39 @@ describe('surveyResultsHelpers state patches', () => {
       alertMessage: '',
     });
     const overrides = { row1: { answerValue: 'yes' } };
-    expect(buildSurveyResultsLockedResponsesDecryptCompletePatch({
-      anyDecrypted: true,
-      decryptedResponseOverrides: overrides,
-      walletLowerLabel: 'wallet',
-    })).toEqual({
+    expect(
+      buildSurveyResultsLockedResponsesDecryptCompletePatch({
+        anyDecrypted: true,
+        decryptedResponseOverrides: overrides,
+        walletLowerLabel: 'wallet',
+      }),
+    ).toEqual({
       lockedResponsesDecrypting: false,
       decryptedResponseOverrides: overrides,
     });
-    expect(buildSurveyResultsLockedResponsesDecryptCompletePatch({
-      anyDecrypted: false,
-      decryptedResponseOverrides: overrides,
-      walletLowerLabel: 'account',
-    })).toEqual({
+    expect(
+      buildSurveyResultsLockedResponsesDecryptCompletePatch({
+        anyDecrypted: false,
+        decryptedResponseOverrides: overrides,
+        walletLowerLabel: 'account',
+      }),
+    ).toEqual({
       lockedResponsesDecrypting: false,
       decryptedResponseOverrides: overrides,
       alertMessage: 'Unable to decrypt locked responses with the connected account.',
     });
-    expect(toggleSurveyResultsLockedResponseDetailsPatch({
-      lockedResponseDetailsOpen: false,
-    })).toEqual({
+    expect(
+      toggleSurveyResultsLockedResponseDetailsPatch({
+        lockedResponseDetailsOpen: false,
+      }),
+    ).toEqual({
       lockedResponseDetailsOpen: true,
     });
-    expect(toggleSurveyResultsLockedResponseDetailsPatch({
-      lockedResponseDetailsOpen: true,
-    })).toEqual({
+    expect(
+      toggleSurveyResultsLockedResponseDetailsPatch({
+        lockedResponseDetailsOpen: true,
+      }),
+    ).toEqual({
       lockedResponseDetailsOpen: false,
     });
   });
@@ -729,17 +800,19 @@ describe('surveyResultsHelpers state patches', () => {
       surveyResultsHydrated: true,
     });
 
-    expect(buildSurveyResultsSurveyModeHydratedPatch({
-      aggregateQuestionResponses: finalAggregator,
-      filteredResponsesCount: rawResponses.length,
-      responses: rawResponses,
-      sbtFilteredAggregatorQuestionResponses: finalAggregator,
-      sbtFilteredResponses: rawResponses,
-      surveyDocumentURLs: docUrls,
-      surveyTitle: 'Research survey',
-      totalQuestionsCount: 1,
-      totalResponsesCount: 1,
-    })).toEqual({
+    expect(
+      buildSurveyResultsSurveyModeHydratedPatch({
+        aggregateQuestionResponses: finalAggregator,
+        filteredResponsesCount: rawResponses.length,
+        responses: rawResponses,
+        sbtFilteredAggregatorQuestionResponses: finalAggregator,
+        sbtFilteredResponses: rawResponses,
+        surveyDocumentURLs: docUrls,
+        surveyTitle: 'Research survey',
+        totalQuestionsCount: 1,
+        totalResponsesCount: 1,
+      }),
+    ).toEqual({
       aggregateQuestionResponses: finalAggregator,
       sbtFilteredAggregatorQuestionResponses: finalAggregator,
       sbtFilteredResponses: rawResponses,
@@ -759,16 +832,18 @@ describe('surveyResultsHelpers state patches', () => {
     const filteredAggregator = { q1: [] };
     const questionResponses = { q1: { '0x1': { answer: 'Yes' } } };
 
-    expect(buildSurveyResultsFilteredQuestionModeHydratedPatch({
-      aggregatorQuestionResponses: finalAggregator,
-      currentFilteredQuestionsCount: 7,
-      currentFilteredResponsesCount: undefined,
-      initialFilteredCount: 3,
-      questionResponses,
-      sbtFilteredAggregatorQuestionResponses: filteredAggregator,
-      totalQuestionsCount: 2,
-      totalResponsesCount: 3,
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilteredQuestionModeHydratedPatch({
+        aggregatorQuestionResponses: finalAggregator,
+        currentFilteredQuestionsCount: 7,
+        currentFilteredResponsesCount: undefined,
+        initialFilteredCount: 3,
+        questionResponses,
+        sbtFilteredAggregatorQuestionResponses: filteredAggregator,
+        totalQuestionsCount: 2,
+        totalResponsesCount: 3,
+      }),
+    ).toEqual({
       aggregatorQuestionResponses: finalAggregator,
       sbtFilteredAggregatorQuestionResponses: filteredAggregator,
       questionResponses,
@@ -779,13 +854,15 @@ describe('surveyResultsHelpers state patches', () => {
       questionResultsHydrated: true,
     });
 
-    expect(buildSurveyResultsUnfilteredQuestionModeHydratedPatch({
-      aggregatorQuestionResponses: finalAggregator,
-      filteredResponsesCount: 3,
-      questionResponses,
-      totalQuestionsCount: 2,
-      totalResponsesCount: 3,
-    })).toEqual({
+    expect(
+      buildSurveyResultsUnfilteredQuestionModeHydratedPatch({
+        aggregatorQuestionResponses: finalAggregator,
+        filteredResponsesCount: 3,
+        questionResponses,
+        totalQuestionsCount: 2,
+        totalResponsesCount: 3,
+      }),
+    ).toEqual({
       aggregatorQuestionResponses: finalAggregator,
       sbtFilteredAggregatorQuestionResponses: finalAggregator,
       questionResponses,
@@ -854,11 +931,13 @@ describe('surveyResultsHelpers individual response aggregation', () => {
 
 describe('surveyResultsHelpers signature serialization', () => {
   it('serializes object keys deterministically and preserves bigint values', () => {
-    expect(stableSerializeSignatureValue({
-      z: 1,
-      a: 2n,
-      nested: { b: 'two', a: 'one' },
-    })).toBe('{"a":"__bigint:2","nested":{"a":"one","b":"two"},"z":1}');
+    expect(
+      stableSerializeSignatureValue({
+        z: 1,
+        a: 2n,
+        nested: { b: 'two', a: 'one' },
+      }),
+    ).toBe('{"a":"__bigint:2","nested":{"a":"one","b":"two"},"z":1}');
   });
 
   it('handles circular payloads without throwing', () => {
@@ -870,9 +949,7 @@ describe('surveyResultsHelpers signature serialization', () => {
 
   it('changes responder signatures when deep payload values mutate in place', () => {
     const responderPayload = {
-      responses: [
-        { questionID: 'q1', answer: { value: 'before' } },
-      ],
+      responses: [{ questionID: 'q1', answer: { value: 'before' } }],
     };
     const responsesByResponder = {
       '0xA': responderPayload,
@@ -904,8 +981,7 @@ describe('surveyResultsHelpers timestamps', () => {
       ],
     };
 
-    expect(getSurveyResponseAggregateTimestampMs(payload.responses[0], payload))
-      .toBe(1738368000000);
+    expect(getSurveyResponseAggregateTimestampMs(payload.responses[0], payload)).toBe(1738368000000);
   });
 
   it('dedupes survey payload responses by effective responder/question recency', () => {
@@ -928,8 +1004,10 @@ describe('surveyResultsHelpers timestamps', () => {
       responses: Array<Record<string, unknown> & { answer?: { value?: unknown } }>;
     };
 
-    expect(normalized.responses.map((row) => row.questionID || row.questionId || row.kind))
-      .toEqual(['q1', 'legacyMeta']);
+    expect(normalized.responses.map((row) => row.questionID || row.questionId || row.kind)).toEqual([
+      'q1',
+      'legacyMeta',
+    ]);
     expect(normalized.responses[0]?.answer?.value).toBe('latest');
   });
 
@@ -974,7 +1052,7 @@ describe('surveyResultsHelpers timestamps', () => {
     const ms = pickTimestampMs(
       { answer: { timeStamp: '2025-03-01T00:00:00.000Z' } },
       { timeStamp: '2024-01-01T00:00:00.000Z' },
-      { timeStamp: '2023-01-01T00:00:00.000Z' }
+      { timeStamp: '2023-01-01T00:00:00.000Z' },
     );
 
     expect(formatTsForCsv(ms)).toBe('2025-03-01T00:00:00.000Z');
@@ -983,29 +1061,30 @@ describe('surveyResultsHelpers timestamps', () => {
 
 describe('surveyResultsHelpers count helpers', () => {
   it('excludes blank freeform rows from question-mode response totals', () => {
-    expect(countQuestionModeResponses(
-      {
-        q1: [
-          { response: { answer: { value: '   ' } } },
-          { response: { answer: { value: 'Visible answer' } } },
-        ],
-      },
-      { q1: { type: 'freeform' } }
-    )).toBe(1);
+    expect(
+      countQuestionModeResponses(
+        {
+          q1: [{ response: { answer: { value: '   ' } } }, { response: { answer: { value: 'Visible answer' } } }],
+        },
+        { q1: { type: 'freeform' } },
+      ),
+    ).toBe(1);
   });
 
   it('recognizes survey payloads with at least one countable answer', () => {
-    expect(hasAnyCountableSurveyAnswer(
-      {
-        responses: [
-          { questionID: 'q1', answer: { value: '   ' } },
-          { questionID: 'q2', answer: { value: 'Agree' } },
-        ],
-      },
-      {
-        q1: { type: 'freeform' },
-        q2: { type: 'binary' },
-      }
-    )).toBe(true);
+    expect(
+      hasAnyCountableSurveyAnswer(
+        {
+          responses: [
+            { questionID: 'q1', answer: { value: '   ' } },
+            { questionID: 'q2', answer: { value: 'Agree' } },
+          ],
+        },
+        {
+          q1: { type: 'freeform' },
+          q2: { type: 'binary' },
+        },
+      ),
+    ).toBe(true);
   });
 });

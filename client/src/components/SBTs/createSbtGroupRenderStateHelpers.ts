@@ -158,21 +158,14 @@ type CreateSbtActionDisplayState = {
   shouldRenderStartFreshButton: boolean;
 };
 
-const isCreateSbtRenderPlainObject = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isCreateSbtRenderPlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const hasCreateSbtTextValue = (value: unknown): boolean => (
-  String(value || '').trim().length > 0
-);
+const hasCreateSbtTextValue = (value: unknown): boolean => String(value || '').trim().length > 0;
 
-const hasCreateSbtLength = (value: unknown): boolean => (
-  Array.isArray(value) ? value.length > 0 : false
-);
+const hasCreateSbtLength = (value: unknown): boolean => (Array.isArray(value) ? value.length > 0 : false);
 
-const hasCreateSbtDisplayLength = (value: unknown): boolean => (
-  Number((value as { length?: unknown })?.length || 0) > 0
-);
+const hasCreateSbtDisplayLength = (value: unknown): boolean => Number((value as { length?: unknown })?.length || 0) > 0;
 
 export const resolveCreateSbtInfoDisplayState = ({
   documentURLs = [],
@@ -241,33 +234,32 @@ export const buildCreateSbtRenderState = ({
   tags = [],
   tagsSelectedGateIds = [],
 }: BuildCreateSbtRenderStateArgs = {}): CreateSbtRenderState => {
-  const normalizedDocumentUrlDraft = typeof normalizeDocumentUrlDraft === 'function'
-    ? normalizeDocumentUrlDraft(documentUrl)
-    : [];
+  const normalizedDocumentUrlDraft =
+    typeof normalizeDocumentUrlDraft === 'function' ? normalizeDocumentUrlDraft(documentUrl) : [];
   const hasDocumentUrlDraft = Array.isArray(normalizedDocumentUrlDraft)
     ? normalizedDocumentUrlDraft.length > 0
     : hasCreateSbtTextValue(normalizedDocumentUrlDraft);
   const isDeferredDeployMode = !!deferredDeployMode;
   const resolvedDistributionOption = String(distributionOption || '');
   const isPasswordDistribution =
-    resolvedDistributionOption === 'hasPasswords' ||
-    resolvedDistributionOption === 'groupPassword';
+    resolvedDistributionOption === 'hasPasswords' || resolvedDistributionOption === 'groupPassword';
 
   return {
     createActionLabel: isDeferredDeployMode ? 'Add to Session' : 'Create',
-    distributionOptions: (Array.isArray(distributionConfigs) ? distributionConfigs : [])
-      .map((optionInput: unknown) => {
-        const option = isCreateSbtRenderPlainObject(optionInput) ? optionInput as CreateSbtDistributionOptionConfig : {};
-        return {
-          ...option,
-          selected: option.value === distributionOption,
-          shouldUseActiveClass: option.value === distributionOption,
-        };
-      }),
+    distributionOptions: (Array.isArray(distributionConfigs) ? distributionConfigs : []).map((optionInput: unknown) => {
+      const option = isCreateSbtRenderPlainObject(optionInput)
+        ? (optionInput as CreateSbtDistributionOptionConfig)
+        : {};
+      return {
+        ...option,
+        selected: option.value === distributionOption,
+        shouldUseActiveClass: option.value === distributionOption,
+      };
+    }),
     headerTitle: isDeferredDeployMode ? 'Add to Session' : 'Create',
     isLimitedWithPasswords: !!isLimited && isPasswordDistribution,
     isPasswordDistribution,
-    isDirty: (
+    isDirty:
       hasCreateSbtTextValue(sbtName) ||
       hasCreateSbtTextValue(sbtDescription) ||
       !!sbtImageFile ||
@@ -280,8 +272,7 @@ export const buildCreateSbtRenderState = ({
       hasCreateSbtLength(docsSelectedGateIds) ||
       hasCreateSbtLength(imageSelectedGateIds) ||
       hasCreateSbtTextValue(create2Salt) ||
-      hasCreateSbtLength(tags)
-    ),
+      hasCreateSbtLength(tags),
     predictableAddressLocked: isDeferredDeployMode || resolvedDistributionOption === 'groupPassword',
     ...(isDeferredDeployMode
       ? { rootSurfaceStyle: { '--ce-create-group-surface-bg': String(deferredSurfaceBg || '') } }
@@ -349,9 +340,8 @@ export const buildCreateSbtProgressStepClassName = ({
   completed = false,
   completedClassName = '',
   pendingClassName = '',
-}: BuildCreateSbtProgressStepClassNameArgs = {}): string => (
-  String((completed ? completedClassName : pendingClassName) || '')
-);
+}: BuildCreateSbtProgressStepClassNameArgs = {}): string =>
+  String((completed ? completedClassName : pendingClassName) || '');
 
 export const resolveCreateSbtSuccessDisplayState = ({
   distributionOption = '',
@@ -372,12 +362,8 @@ export const resolveCreateSbtSuccessDisplayState = ({
     shouldRenderInviteLinks: isMinted && option === 'hasPasswords' && inviteLinkCount > 0,
     shouldRenderJsonPanel: !!showJson && isMinted,
     shouldRenderOpenMintAutoJoin: !!openMintAutoJoinUrl,
-    shouldRenderPasswordRecovery: (
-      isMinted &&
-      option !== 'hasPasswords' &&
-      Array.isArray(passwordList) &&
-      passwordList.length > 0
-    ),
+    shouldRenderPasswordRecovery:
+      isMinted && option !== 'hasPasswords' && Array.isArray(passwordList) && passwordList.length > 0,
     shouldRenderSuccessPanel: isMinted,
     shouldRenderTokenUriLink: !!tokenURI,
   };

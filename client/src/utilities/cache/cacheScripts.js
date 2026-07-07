@@ -24,9 +24,7 @@ const IDB_PROBE_KEY = '__dg_cache_probe__';
 const IDB_CONSECUTIVE_FAILURE_THRESHOLD = 3;
 const IDB_RECOVERY_RETRY_MS = 30 * 1000;
 const READ_FAILED = Symbol('dg-cache-read-failed');
-const safeClone = typeof structuredClone === 'function'
-  ? structuredClone
-  : (v) => JSON.parse(JSON.stringify(v));
+const safeClone = typeof structuredClone === 'function' ? structuredClone : (v) => JSON.parse(JSON.stringify(v));
 
 const MANAGED_NAMESPACE_LIST = [
   'questionsCache',
@@ -61,17 +59,15 @@ const clientId = (() => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return crypto.randomUUID();
     }
-  } catch (e) { cacheLog.warn('cacheScripts: fallback', e); }
+  } catch (e) {
+    cacheLog.warn('cacheScripts: fallback', e);
+  }
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 })();
 
-const isManagedNamespace = (namespace) => (
-  MANAGED_NAMESPACES.has(String(namespace || ''))
-);
+const isManagedNamespace = (namespace) => MANAGED_NAMESPACES.has(String(namespace || ''));
 
-const toStorageKey = (namespace, slug = '') => (
-  `dg:${String(namespace || '')}:${String(slug || '')}`
-);
+const toStorageKey = (namespace, slug = '') => `dg:${String(namespace || '')}:${String(slug || '')}`;
 
 const parseStorageKey = (key) => {
   const raw = String(key || '');
@@ -94,11 +90,7 @@ const cloneValue = (value) => {
   }
 };
 
-const isPlainObject = (value) => (
-  value != null &&
-  typeof value === 'object' &&
-  !Array.isArray(value)
-);
+const isPlainObject = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
 
 const valuesEqual = (a, b) => {
   try {
@@ -178,7 +170,11 @@ const restoreActiveOptimisticMirrorEntries = (entries = []) => {
 
 const emitUpdate = (payload = {}) => {
   subscribers.forEach((handler) => {
-    try { handler(payload); } catch (e) { cacheLog.warn('cacheScripts: callback', e); }
+    try {
+      handler(payload);
+    } catch (e) {
+      cacheLog.warn('cacheScripts: callback', e);
+    }
   });
 };
 
@@ -229,7 +225,9 @@ const broadcastUpdate = (payload = {}) => {
       sourceId: clientId,
       ts: Date.now(),
     });
-  } catch (e) { cacheLog.warn('cacheScripts: fallback', e); }
+  } catch (e) {
+    cacheLog.warn('cacheScripts: fallback', e);
+  }
 };
 
 const parseJsonOrNull = (raw) => {
@@ -315,7 +313,9 @@ const attachStorageListenerOnce = () => {
         value: cloneValue(parsedValue),
         source: 'storage',
       });
-    } catch (e) { cacheLog.warn('cacheScripts: telemetry', e); }
+    } catch (e) {
+      cacheLog.warn('cacheScripts: telemetry', e);
+    }
   });
   storageListenerAttached = true;
 };
@@ -382,9 +382,7 @@ const ensureBackendReady = async () => {
 };
 
 const hydrateMirrorFromIdb = async ({ preserveOptimistic = false } = {}) => {
-  const optimisticSnapshots = preserveOptimistic
-    ? snapshotActiveOptimisticMirrorEntries()
-    : [];
+  const optimisticSnapshots = preserveOptimistic ? snapshotActiveOptimisticMirrorEntries() : [];
   clearMirror();
   try {
     const all = await idbEntries(IDB_STORE);
@@ -453,7 +451,9 @@ const migrateManagedKeysFromLocalStorage = async ({ useIdb = true } = {}) => {
       if (!parsed || !isManagedNamespace(parsed.namespace)) continue;
       keys.push(key);
     }
-  } catch (e) { cacheLog.warn('cacheScripts: fallback', e); }
+  } catch (e) {
+    cacheLog.warn('cacheScripts: fallback', e);
+  }
 
   let moved = 0;
   let removed = 0;
@@ -508,7 +508,7 @@ const migrateManagedKeysFromLocalStorage = async ({ useIdb = true } = {}) => {
 const attemptIdbRecovery = async ({ force = false } = {}) => {
   if (idbAvailable) return true;
   const now = Date.now();
-  if (!force && (now - idbLastRecoveryProbeAt) < IDB_RECOVERY_RETRY_MS) return false;
+  if (!force && now - idbLastRecoveryProbeAt < IDB_RECOVERY_RETRY_MS) return false;
   if (idbRecoveryPromise) return idbRecoveryPromise;
 
   idbRecoveryPromise = (async () => {
@@ -654,9 +654,7 @@ const readPersistentKey = async (storageKey) => {
 
 const enqueueWriteTaskForStorageKey = (storageKey, task) => {
   const prev = writeQueuesByKey.get(storageKey) || Promise.resolve();
-  const run = prev
-    .catch(() => null)
-    .then(async () => task());
+  const run = prev.catch(() => null).then(async () => task());
   writeQueuesByKey.set(storageKey, run);
   run
     .finally(() => {
@@ -664,7 +662,9 @@ const enqueueWriteTaskForStorageKey = (storageKey, task) => {
         writeQueuesByKey.delete(storageKey);
       }
     })
-    .catch((e) => { cacheLog.warn('cacheScripts: fallback', e); });
+    .catch((e) => {
+      cacheLog.warn('cacheScripts: fallback', e);
+    });
   return run;
 };
 
@@ -703,8 +703,7 @@ export const initCacheManager = async () => {
           hydrated,
         });
       }
-    }
-    else hydrateMirrorFromLocalStorage();
+    } else hydrateMirrorFromLocalStorage();
   })();
   return initPromise;
 };
@@ -723,8 +722,7 @@ export const migrateLocalStorageToIDB = async () => {
     if (idbAvailable) {
       await hydrateMirrorFromIdb();
       hydrateMissingMirrorFromLocalStorage();
-    }
-    else hydrateMirrorFromLocalStorage();
+    } else hydrateMirrorFromLocalStorage();
   }
   return report;
 };
@@ -767,9 +765,7 @@ export const writeCache = async (namespace, slug = '', value = null) => {
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return false;
   const key = toStorageKey(ns, sl);
-  return enqueueWriteTaskForStorageKey(key, async () => (
-    writeCacheDirect({ namespace: ns, slug: sl, key, value })
-  ));
+  return enqueueWriteTaskForStorageKey(key, async () => writeCacheDirect({ namespace: ns, slug: sl, key, value }));
 };
 
 // Optimistic write for read-after-write flows that intentionally do not await persistence.
@@ -842,11 +838,10 @@ export const writeCacheOptimistic = (namespace, slug = '', value = null) => {
     return true;
   });
 
-  return run
-    .catch(async (error) => {
-      await rollback();
-      throw error;
-    });
+  return run.catch(async (error) => {
+    await rollback();
+    throw error;
+  });
 };
 
 export const updateCacheAtomic = async (namespace, slug = '', updater = (current) => current) => {
@@ -894,9 +889,7 @@ export const removeCache = async (namespace, slug = '') => {
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return false;
   const key = toStorageKey(ns, sl);
-  return enqueueWriteTaskForStorageKey(key, async () => (
-    removeCacheDirect({ namespace: ns, slug: sl, key })
-  ));
+  return enqueueWriteTaskForStorageKey(key, async () => removeCacheDirect({ namespace: ns, slug: sl, key }));
 };
 
 export const peekCacheSync = (namespace, slug = '', options = {}) => {
@@ -938,12 +931,8 @@ export const listNamespaceEntriesSync = (namespace, options = {}) => {
 };
 
 export const getCacheBackendDiagnostics = () => {
-  const probeState = backendReadyPromise
-    ? (didHydrateMirror ? 'ready' : 'probing')
-    : 'unprobed';
-  const persistentBackend = probeState === 'unprobed'
-    ? 'unknown'
-    : (idbAvailable ? 'indexeddb' : 'localstorage');
+  const probeState = backendReadyPromise ? (didHydrateMirror ? 'ready' : 'probing') : 'unprobed';
+  const persistentBackend = probeState === 'unprobed' ? 'unknown' : idbAvailable ? 'indexeddb' : 'localstorage';
   return {
     persistentBackend,
     probeState,

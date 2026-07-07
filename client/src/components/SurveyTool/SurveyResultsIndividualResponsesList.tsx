@@ -18,9 +18,11 @@ type SurveyResultsIndividualResponsesListProps = {
 export const buildSurveyResultsResponseRowId = (
   response: SurveyResultsResponseListEntry,
   fallbackSurveyId = '',
-  index = 0
+  index = 0,
 ): string => {
-  const responder = String(response?.responder || '').trim().toLowerCase();
+  const responder = String(response?.responder || '')
+    .trim()
+    .toLowerCase();
   const surveyId = String(response?.surveyId || fallbackSurveyId || '').trim();
   if (responder || surveyId) {
     return `${surveyId || 'unknown-survey'}:${responder || 'unknown-responder'}`;

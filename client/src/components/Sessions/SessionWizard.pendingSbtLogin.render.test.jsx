@@ -30,12 +30,13 @@ const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
-const buildMockSponsoredBundleEnvelope = () => JSON.stringify({
-  type: 'contextengine-sponsored-bundle',
-  version: 1,
-  cipher: 'password-aes-gcm',
-  encryptedData: 'encrypted-base64',
-});
+const buildMockSponsoredBundleEnvelope = () =>
+  JSON.stringify({
+    type: 'contextengine-sponsored-bundle',
+    version: 1,
+    cipher: 'password-aes-gcm',
+    encryptedData: 'encrypted-base64',
+  });
 const buildMockSponsoredBundle = () => ({
   openaiKey: 'sponsored-openai',
   arweaveJwk: '{"kty":"RSA","n":"sponsored"}',
@@ -108,10 +109,12 @@ jest.mock('../SBTs/SBTSelector', () => (props) => {
     >
       <button
         type="button"
-        onClick={() => props.onAddSBT?.({
-          address: mockReplacementSbtAddress,
-          name: 'Replacement SBT',
-        })}
+        onClick={() =>
+          props.onAddSBT?.({
+            address: mockReplacementSbtAddress,
+            name: 'Replacement SBT',
+          })
+        }
       >
         {`Mock add ${props.id || 'selector'} SBT`}
       </button>
@@ -119,11 +122,7 @@ jest.mock('../SBTs/SBTSelector', () => (props) => {
         const address = typeof entry === 'string' ? entry : entry?.address || entry?.sbtAddress || '';
         if (!address) return null;
         return (
-          <button
-            key={address}
-            type="button"
-            onClick={() => props.onRemoveSBT?.(address)}
-          >
+          <button key={address} type="button" onClick={() => props.onRemoveSBT?.(address)}>
             {`Mock remove ${address} from ${props.id || 'selector'}`}
           </button>
         );
@@ -195,7 +194,11 @@ jest.mock('../../utilities/session/resourceKeys.js', () => ({
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   registerSessionOnChain: (...args) => mockRegisterSessionOnChain(...args),
   sessionRegistryUtils: {
-    normalizeSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
+    normalizeSlug: jest.fn((value = '') =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    ),
     formatSessionId: jest.fn((value = '') => String(value || '').trim()),
     normalizeSessionIdHex: jest.fn((value = '') => String(value || '').trim()),
     toRegistrySlug: jest.fn((value = '') => String(value || '').trim()),
@@ -214,7 +217,9 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
     getSbtMetadata: jest.fn(async () => ({})),
   },
   getSessionConfigBySlugOrDefault: jest.fn((slug = '') => {
-    const normalized = String(slug || '').trim().toLowerCase();
+    const normalized = String(slug || '')
+      .trim()
+      .toLowerCase();
     if (normalized && normalized !== 'general') return null;
     return {
       slug: '',
@@ -233,7 +238,9 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
     };
   }),
   getDemoSessionConfigBySlug: jest.fn((slug = '') => {
-    const normalized = String(slug || '').trim().toLowerCase();
+    const normalized = String(slug || '')
+      .trim()
+      .toLowerCase();
     if (normalized && normalized !== 'general') return null;
     return {
       slug: '',
@@ -287,8 +294,8 @@ jest.mock('../../variables/appConfig.js', () => {
 import SessionWizard from './SessionWizard';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
-const createTooltipStore = (tooltipsEnabled = true) => createStore(
-  (state = { sessionState: { tooltipsEnabled } }, action) => {
+const createTooltipStore = (tooltipsEnabled = true) =>
+  createStore((state = { sessionState: { tooltipsEnabled } }, action) => {
     if (action.type === 'SET_TOOLTIPS') {
       return {
         sessionState: {
@@ -297,27 +304,27 @@ const createTooltipStore = (tooltipsEnabled = true) => createStore(
       };
     }
     return state;
-  }
-);
+  });
 const renderSessionWizardWithTooltipStore = ({ tooltipsEnabled = true, props = {} } = {}) => {
   const store = createTooltipStore(tooltipsEnabled);
   const view = render(
     <Provider store={store}>
       <SessionWizard network={{ id: 84532 }} {...props} />
-    </Provider>
+    </Provider>,
   );
   return { store, ...view };
 };
-const renderLoggedInSessionWizard = (props = {}) => renderSessionWizard({
-  account: TEST_ADMIN_ADDRESS,
-  loginComplete: true,
-  toggleLoginModal: jest.fn(),
-  ...props,
-});
-const getWizardResourceCard = (resourceKey) => (
-  screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
-    .find((card) => card.getAttribute('data-ce-resource-key') === resourceKey)
-);
+const renderLoggedInSessionWizard = (props = {}) =>
+  renderSessionWizard({
+    account: TEST_ADMIN_ADDRESS,
+    loginComplete: true,
+    toggleLoginModal: jest.fn(),
+    ...props,
+  });
+const getWizardResourceCard = (resourceKey) =>
+  screen
+    .getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
+    .find((card) => card.getAttribute('data-ce-resource-key') === resourceKey);
 const enableAdvancedMode = () => {
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
 };
@@ -342,7 +349,7 @@ describe('SessionWizard pending SBT login rendering', () => {
     window.history.replaceState({}, '', '/');
     localStorage.clear();
     sessionStorage.clear();
-    buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) => (
+    buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) =>
       Object.keys(sessionContracts).map((contractKey) => ({
         key: contractKey,
         name:
@@ -364,15 +371,17 @@ describe('SessionWizard pending SBT login rendering', () => {
                 : 'Contract.sol',
         source: `contract ${contractKey} {}`,
         addresses: sessionContracts[contractKey]?.address
-          ? [{
-              address: sessionContracts[contractKey].address,
-              id: sessionContracts[contractKey].chainId || 84532,
-              testnet: true,
-              explorerUrl: `https://example.example.test/${contractKey}`,
-            }]
+          ? [
+              {
+                address: sessionContracts[contractKey].address,
+                id: sessionContracts[contractKey].chainId || 84532,
+                testnet: true,
+                explorerUrl: `https://example.example.test/${contractKey}`,
+              },
+            ]
           : [],
-      }))
-    ));
+      })),
+    );
   });
 
   it('prompts for login before opening create-SBT and auto-resumes once the wallet account is available', async () => {
@@ -397,7 +406,7 @@ describe('SessionWizard pending SBT login rendering', () => {
         account={TEST_ADMIN_ADDRESS}
         loginComplete={true}
         toggleLoginModal={toggleLoginModal}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -408,8 +417,7 @@ describe('SessionWizard pending SBT login rendering', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toHaveAttribute(
       'data-ce-sbt-address',
-      mockPendingSbtAddress.toLowerCase()
+      mockPendingSbtAddress.toLowerCase(),
     );
   });
-
 });

@@ -5,10 +5,13 @@ import { DEFAULT_ARWEAVE_GRAPHQL_URLS } from './config.js';
 const DEFAULT_FIRST = 25;
 const MAX_FIRST = 100;
 
-type GraphqlTagFilterInput = {
-  name?: unknown;
-  values?: unknown;
-} | null | undefined;
+type GraphqlTagFilterInput =
+  | {
+      name?: unknown;
+      values?: unknown;
+    }
+  | null
+  | undefined;
 
 type GraphqlRequestTagFilter = {
   name: string;
@@ -77,15 +80,14 @@ type ListedArweaveTransaction = {
   } | null;
 };
 
-const buildTagFilters = (filters: unknown): GraphqlRequestTagFilter[] => (
+const buildTagFilters = (filters: unknown): GraphqlRequestTagFilter[] =>
   (Array.isArray(filters) ? filters : [])
     .filter((f): f is Exclude<GraphqlTagFilterInput, null | undefined> => Boolean(f) && typeof f === 'object')
     .map((f) => ({
       name: toStr(f.name).trim(),
       values: Array.isArray(f.values) ? f.values.map((v) => toStr(v).trim()).filter(Boolean) : [],
     }))
-    .filter((f) => f.name && f.values.length)
-);
+    .filter((f) => f.name && f.values.length);
 
 const readTagMap = (tags: unknown): Record<string, string> => {
   const out: Record<string, string> = {};
@@ -159,19 +161,15 @@ export const listArweaveTransactionsByTags = async ({
       });
 
       // eslint-disable-next-line no-await-in-loop
-      const payload = await res.json().catch(() => null) as GraphqlPayload;
+      const payload = (await res.json().catch(() => null)) as GraphqlPayload;
       if (!res.ok) {
-        throw new Error(
-          payload?.errors?.[0]?.message || payload?.error || `Arweave GraphQL error (${res.status})`
-        );
+        throw new Error(payload?.errors?.[0]?.message || payload?.error || `Arweave GraphQL error (${res.status})`);
       }
       if (payload?.errors?.length) {
         throw new Error(payload.errors[0]?.message || 'Arweave GraphQL error.');
       }
 
-      edges = Array.isArray(payload?.data?.transactions?.edges)
-        ? payload.data.transactions.edges
-        : [];
+      edges = Array.isArray(payload?.data?.transactions?.edges) ? payload.data.transactions.edges : [];
       lastErr = null;
       break;
     } catch (err) {
@@ -180,25 +178,27 @@ export const listArweaveTransactionsByTags = async ({
   }
   if (lastErr) throw lastErr;
 
-  return edges.map((edge) => {
-    const node = edge?.node || {};
-    const txId = toStr(node?.id).trim();
-    return {
-      cursor: toStr(edge?.cursor).trim() || null,
-      txId,
-      owner: toStr(node?.owner?.address).trim() || null,
-      tags: Array.isArray(node?.tags) ? node.tags : [],
-      tagMap: readTagMap(node?.tags),
-      data: {
-        size: Number(node?.data?.size || 0) || null,
-        type: toStr(node?.data?.type).trim() || null,
-      },
-      block: node?.block
-        ? {
-            height: Number(node.block?.height || 0) || null,
-            timestamp: Number(node.block?.timestamp || 0) || null,
-          }
-        : null,
-    };
-  }).filter((edge) => edge.txId);
+  return edges
+    .map((edge) => {
+      const node = edge?.node || {};
+      const txId = toStr(node?.id).trim();
+      return {
+        cursor: toStr(edge?.cursor).trim() || null,
+        txId,
+        owner: toStr(node?.owner?.address).trim() || null,
+        tags: Array.isArray(node?.tags) ? node.tags : [],
+        tagMap: readTagMap(node?.tags),
+        data: {
+          size: Number(node?.data?.size || 0) || null,
+          type: toStr(node?.data?.type).trim() || null,
+        },
+        block: node?.block
+          ? {
+              height: Number(node.block?.height || 0) || null,
+              timestamp: Number(node.block?.timestamp || 0) || null,
+            }
+          : null,
+      };
+    })
+    .filter((edge) => edge.txId);
 };

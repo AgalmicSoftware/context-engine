@@ -50,9 +50,7 @@ export const SbtListInitialLoader = ({
             </div>
             <div className={styles.loadingGroupMeta}>
               {group.progressText}
-              {!group.hasLatest && (
-                <FontAwesomeIcon icon={faSpinner} spin className={styles.loadingGroupSpinner} />
-              )}
+              {!group.hasLatest && <FontAwesomeIcon icon={faSpinner} spin className={styles.loadingGroupSpinner} />}
             </div>
             <div
               className={styles.loadingProgressBar}
@@ -92,12 +90,7 @@ export const SbtListSectionTitle = ({
   <div className={styles.sectionTitleRow}>
     <h2 className={styles.sectionTitle}>{label}</h2>
     {showSpinner && (
-      <FontAwesomeIcon
-        icon={faSpinner}
-        spin
-        className={styles.sectionCornerSpinner}
-        data-testid={spinnerId}
-      />
+      <FontAwesomeIcon icon={faSpinner} spin className={styles.sectionCornerSpinner} data-testid={spinnerId} />
     )}
   </div>
 );

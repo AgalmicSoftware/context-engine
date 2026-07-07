@@ -4,16 +4,9 @@ import {
   buildSbtFilterStateSignature,
   normalizeIncomingFilterState,
 } from './sbtFilterSelectionHelpers';
-import type {
-  SbtFilterSelectedSbtEntry,
-  SbtFilterSelectionState,
-} from './sbtFilterSelectionHelpers';
-import {
-  buildHolderUnionSet,
-} from './sbtFilterHolderHelpers';
-import type {
-  SbtHolderSetMap,
-} from './sbtFilterHolderHelpers';
+import type { SbtFilterSelectedSbtEntry, SbtFilterSelectionState } from './sbtFilterSelectionHelpers';
+import { buildHolderUnionSet } from './sbtFilterHolderHelpers';
+import type { SbtHolderSetMap } from './sbtFilterHolderHelpers';
 export {
   buildHolderUnionSet,
   buildHistorySummaryFromCounts,
@@ -33,11 +26,7 @@ export {
   resolveSbtFilterHolderScanFromBlock,
   setBoundedSbtHolderMemoEntry,
 } from './sbtFilterHolderHelpers';
-export type {
-  AddressCountMap,
-  SbtFilterHolderFetchResult,
-  SbtHolderSetMap,
-} from './sbtFilterHolderHelpers';
+export type { AddressCountMap, SbtFilterHolderFetchResult, SbtHolderSetMap } from './sbtFilterHolderHelpers';
 export {
   appendSbtFilterOption,
   asSelectedSbtEntry,
@@ -258,15 +247,9 @@ export type SbtFilterNetworkLike = UnknownRecord & {
   networkChainId?: unknown;
 };
 
-export type SbtFilterCacheReader = (
-  namespace: string,
-  slug: string,
-  options?: { clone?: boolean }
-) => unknown;
+export type SbtFilterCacheReader = (namespace: string, slug: string, options?: { clone?: boolean }) => unknown;
 
-export const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object'
-);
+export const isRecord = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object';
 
 export const SBT_FILTER_REAPPLY_STATE_FIELDS = [
   'selectedSBTGroupsCreator',
@@ -278,9 +261,8 @@ export const SBT_FILTER_REAPPLY_STATE_FIELDS = [
   'onlyVerifiedHumans',
 ] as const;
 
-export const asCacheObject = (value: unknown): UnknownRecord => (
-  (value && typeof value === 'object') ? value as UnknownRecord : {}
-);
+export const asCacheObject = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' ? (value as UnknownRecord) : {};
 
 export const buildSbtFilterInitialState = ({
   autoExpand = false,
@@ -305,21 +287,16 @@ export const buildSbtFilterInitialState = ({
   };
 };
 
-export const asQuestionNetBucket = (value: unknown): SbtFilterQuestionNetBucket => (
-  asCacheObject(value) as SbtFilterQuestionNetBucket
-);
+export const asQuestionNetBucket = (value: unknown): SbtFilterQuestionNetBucket =>
+  asCacheObject(value) as SbtFilterQuestionNetBucket;
 
-export const asSbtNetBucket = (value: unknown): SbtFilterSbtNetBucket => (
-  asCacheObject(value) as SbtFilterSbtNetBucket
-);
+export const asSbtNetBucket = (value: unknown): SbtFilterSbtNetBucket => asCacheObject(value) as SbtFilterSbtNetBucket;
 
-export const asQuestionEntry = (value: unknown): SbtFilterQuestionEntry | null => (
-  isRecord(value) ? value as SbtFilterQuestionEntry : null
-);
+export const asQuestionEntry = (value: unknown): SbtFilterQuestionEntry | null =>
+  isRecord(value) ? (value as SbtFilterQuestionEntry) : null;
 
-export const asResponseEntry = (value: unknown): SbtFilterResponseEntry => (
-  isRecord(value) ? value as SbtFilterResponseEntry : { response: value }
-);
+export const asResponseEntry = (value: unknown): SbtFilterResponseEntry =>
+  isRecord(value) ? (value as SbtFilterResponseEntry) : { response: value };
 
 export const normalizeAggregatorResponseEntries = (value: unknown): SbtFilterResponseEntry[] => {
   if (Array.isArray(value)) return value.map(asResponseEntry);
@@ -337,7 +314,7 @@ export const normalizeAggregatorResponseEntries = (value: unknown): SbtFilterRes
 
 export const filterSbtFilterObjectItems = (
   items: unknown,
-  filterItem: SbtFilterItemPredicate
+  filterItem: SbtFilterItemPredicate,
 ): Record<string, unknown> => {
   const filteredItems: Record<string, unknown> = {};
   Object.entries(asCacheObject(items)).forEach(([key, val]) => {
@@ -346,8 +323,7 @@ export const filterSbtFilterObjectItems = (
       if (filteredArr.length > 0) filteredItems[key] = filteredArr;
       return;
     }
-    const filteredPairs = Object.entries(asCacheObject(val))
-      .filter(([, respVal]) => filterItem(respVal));
+    const filteredPairs = Object.entries(asCacheObject(val)).filter(([, respVal]) => filterItem(respVal));
     if (filteredPairs.length > 0) {
       filteredItems[key] = Object.fromEntries(filteredPairs);
     }
@@ -355,11 +331,7 @@ export const filterSbtFilterObjectItems = (
   return filteredItems;
 };
 
-export function mergeKnownQuestionsIntoFilterItems<T>(
-  baseItems: T,
-  questionNetCache: unknown,
-  mode: unknown
-): T {
+export function mergeKnownQuestionsIntoFilterItems<T>(baseItems: T, questionNetCache: unknown, mode: unknown): T {
   const questionNetBucket = asQuestionNetBucket(questionNetCache);
   if (!questionNetBucket.questions) {
     return baseItems;
@@ -376,9 +348,7 @@ export function mergeKnownQuestionsIntoFilterItems<T>(
     mode === 'responder'
   ) {
     if (Array.isArray(baseItems)) {
-      const existingIDs = new Set(baseItems.map((q) => (
-        String(isRecord(q) ? q.id || '' : '').toLowerCase()
-      )));
+      const existingIDs = new Set(baseItems.map((q) => String(isRecord(q) ? q.id || '' : '').toLowerCase()));
       const newArray = [...baseItems];
       allKnownQIDs.forEach((qIdLower) => {
         if (!existingIDs.has(qIdLower)) {
@@ -405,28 +375,17 @@ export function mergeKnownQuestionsIntoFilterItems<T>(
 const readSbtFilterCacheBySlug = (
   namespace: string,
   slug: unknown,
-  readCache: SbtFilterCacheReader = peekCacheSync
-): UnknownRecord => (
-  asCacheObject(readCache(namespace, String(slug || ''), { clone: false }))
-);
+  readCache: SbtFilterCacheReader = peekCacheSync,
+): UnknownRecord => asCacheObject(readCache(namespace, String(slug || ''), { clone: false }));
 
-export const readSbtFilterQuestionsCacheBySlug = (
-  slug: unknown,
-  readCache?: SbtFilterCacheReader
-): UnknownRecord => (
-  readSbtFilterCacheBySlug('questionsCache', slug, readCache)
-);
+export const readSbtFilterQuestionsCacheBySlug = (slug: unknown, readCache?: SbtFilterCacheReader): UnknownRecord =>
+  readSbtFilterCacheBySlug('questionsCache', slug, readCache);
 
-export const readSbtFilterSbtCacheBySlug = (
-  slug: unknown,
-  readCache?: SbtFilterCacheReader
-): UnknownRecord => (
-  readSbtFilterCacheBySlug('sbtCache', slug, readCache)
-);
+export const readSbtFilterSbtCacheBySlug = (slug: unknown, readCache?: SbtFilterCacheReader): UnknownRecord =>
+  readSbtFilterCacheBySlug('sbtCache', slug, readCache);
 
-export const buildSbtFilterSbtCacheMemoKey = (slugForCache: unknown = ''): string => (
-  `dg:sbtCache:${slugForCache || ''}`
-);
+export const buildSbtFilterSbtCacheMemoKey = (slugForCache: unknown = ''): string =>
+  `dg:sbtCache:${slugForCache || ''}`;
 
 export const readMemoizedSbtFilterSbtCacheBySlug = ({
   cacheBySlug = null,
@@ -446,13 +405,16 @@ export const readMemoizedSbtFilterSbtNetBucketBySlug = ({
   netKeyForCache = '',
   readSbtCacheBySlug: readSbtCacheBySlugFn = readSbtFilterSbtCacheBySlug,
   slugForCache = '',
-}: ReadMemoizedSbtFilterSbtNetBucketBySlugArgs = {}): SbtFilterSbtNetBucket => (
-  asSbtNetBucket(asCacheObject(readMemoizedSbtFilterSbtCacheBySlug({
-    cacheBySlug,
-    readSbtCacheBySlug: readSbtCacheBySlugFn,
-    slugForCache,
-  }))[String(netKeyForCache || '')])
-);
+}: ReadMemoizedSbtFilterSbtNetBucketBySlugArgs = {}): SbtFilterSbtNetBucket =>
+  asSbtNetBucket(
+    asCacheObject(
+      readMemoizedSbtFilterSbtCacheBySlug({
+        cacheBySlug,
+        readSbtCacheBySlug: readSbtCacheBySlugFn,
+        slugForCache,
+      }),
+    )[String(netKeyForCache || '')],
+  );
 
 export const buildSbtFilterSbtEntryCachePatch = ({
   entryPatch = {},
@@ -485,31 +447,26 @@ export const buildSbtFilterSbtEntryCachePatch = ({
 export const readSbtFilterQuestionsNetBucketBySlug = (
   slug: unknown,
   netKey: unknown,
-  readCache?: SbtFilterCacheReader
-): SbtFilterQuestionNetBucket => (
-  asQuestionNetBucket(asCacheObject(readSbtFilterQuestionsCacheBySlug(slug, readCache))[String(netKey || '')])
-);
+  readCache?: SbtFilterCacheReader,
+): SbtFilterQuestionNetBucket =>
+  asQuestionNetBucket(asCacheObject(readSbtFilterQuestionsCacheBySlug(slug, readCache))[String(netKey || '')]);
 
 export const getCachedSbtFilterQuestionEntry = (
   questionNetCache: SbtFilterQuestionNetBucket,
-  qId: unknown
-): SbtFilterQuestionEntry | null => (
-  asQuestionEntry(asCacheObject(questionNetCache.questions)[String(qId || '')])
-);
+  qId: unknown,
+): SbtFilterQuestionEntry | null => asQuestionEntry(asCacheObject(questionNetCache.questions)[String(qId || '')]);
 
 export const getCachedSbtFilterQuestionResponseMap = (
   questionNetCache: SbtFilterQuestionNetBucket,
-  qId: unknown
-): UnknownRecord => (
-  asCacheObject(asCacheObject(questionNetCache.questionResponses)[String(qId)])
-);
+  qId: unknown,
+): UnknownRecord => asCacheObject(asCacheObject(questionNetCache.questionResponses)[String(qId)]);
 
 export function unifySbtFilterAggregatorWithAllLocalQuestions<T>(
   baseItems: T,
   networkID: unknown,
   mode: unknown,
   slug: unknown,
-  readCache?: SbtFilterCacheReader
+  readCache?: SbtFilterCacheReader,
 ): T {
   const netKey = String(networkID || '');
   if (!netKey) return baseItems;
@@ -528,11 +485,8 @@ export const scheduleMicrotask = (cb: unknown): void => {
   Promise.resolve().then(callback);
 };
 
-export const doesSbtFilterModeNeedQuestionCache = (mode: unknown): boolean => (
-  mode === 'creator' ||
-  mode === 'creatorAndResponder' ||
-  mode === 'questions'
-);
+export const doesSbtFilterModeNeedQuestionCache = (mode: unknown): boolean =>
+  mode === 'creator' || mode === 'creatorAndResponder' || mode === 'questions';
 
 export const isSbtFilterDataReady = ({
   mode,
@@ -541,18 +495,14 @@ export const isSbtFilterDataReady = ({
 }: SbtFilterDataReadyArgs = {}): boolean => {
   if (mode === 'addresses') return true;
   if (isSBTCacheReady !== true) return false;
-  return doesSbtFilterModeNeedQuestionCache(mode)
-    ? isQuestionCacheReady === true
-    : true;
+  return doesSbtFilterModeNeedQuestionCache(mode) ? isQuestionCacheReady === true : true;
 };
 
 export const shouldApplySbtFilterOnDataReady = ({
   hasActiveFilter = false,
   isDataReady = false,
   wasDataReady = false,
-}: ShouldApplySbtFilterOnDataReadyArgs = {}): boolean => (
-  !!isDataReady && !wasDataReady && !!hasActiveFilter
-);
+}: ShouldApplySbtFilterOnDataReadyArgs = {}): boolean => !!isDataReady && !wasDataReady && !!hasActiveFilter;
 
 export const resolveSbtFilterLoadingUpdate = ({
   currentLoading = false,
@@ -568,9 +518,10 @@ export const resolveSbtFilterLoadingUpdate = ({
   };
 };
 
-export const buildSbtFilterLoadingPatch = ({
-  loading = false,
-}: BuildSbtFilterLoadingPatchArgs = {}): Record<string, boolean> => ({
+export const buildSbtFilterLoadingPatch = ({ loading = false }: BuildSbtFilterLoadingPatchArgs = {}): Record<
+  string,
+  boolean
+> => ({
   loading: loading === true,
 });
 
@@ -583,9 +534,7 @@ export const buildSbtFilterLastAppliedSnapshotPatch = ({
 export const isLatestSbtFilterApplyRun = ({
   activeApplyFilterRunId = 0,
   runId = 0,
-}: IsLatestSbtFilterApplyRunArgs = {}): boolean => (
-  Number(runId || 0) === Number(activeApplyFilterRunId || 0)
-);
+}: IsLatestSbtFilterApplyRunArgs = {}): boolean => Number(runId || 0) === Number(activeApplyFilterRunId || 0);
 
 export const hasRelevantSbtFilterStateChanged = ({
   fields = SBT_FILTER_REAPPLY_STATE_FIELDS,
@@ -594,8 +543,9 @@ export const hasRelevantSbtFilterStateChanged = ({
 }: HasRelevantSbtFilterStateChangedArgs = {}): boolean => {
   const prev = asCacheObject(prevState);
   const next = asCacheObject(nextState);
-  return (Array.isArray(fields) ? fields : SBT_FILTER_REAPPLY_STATE_FIELDS)
-    .some((field) => prev[field] !== next[field]);
+  return (Array.isArray(fields) ? fields : SBT_FILTER_REAPPLY_STATE_FIELDS).some(
+    (field) => prev[field] !== next[field],
+  );
 };
 
 export const resolveSbtFilterExternalStateSync = ({
@@ -605,9 +555,10 @@ export const resolveSbtFilterExternalStateSync = ({
   prevExternalState = {},
 }: ResolveSbtFilterExternalStateSyncArgs = {}): SbtFilterExternalStateSyncDecision => {
   const nextExternalSig = buildSbtFilterStateSignature(currentExternalState || {});
-  const prevExternalSig = typeof lastExternalSignature === 'string'
-    ? lastExternalSignature
-    : buildSbtFilterStateSignature(prevExternalState || {});
+  const prevExternalSig =
+    typeof lastExternalSignature === 'string'
+      ? lastExternalSignature
+      : buildSbtFilterStateSignature(prevExternalState || {});
   const incomingStateNormalized = normalizeIncomingFilterState(currentExternalState || {});
   const incomingSig = buildSbtFilterStateSignature(incomingStateNormalized);
   const hasExternalChanged = prevExternalSig !== nextExternalSig;
@@ -635,11 +586,7 @@ export const shouldReapplySbtFilterAfterUpdate = ({
   if (hasRelevantSbtFilterStateChanged({ nextState, prevState })) return true;
   const prev = asCacheObject(prevProps);
   const next = asCacheObject(nextProps);
-  return (
-    prev.items !== next.items ||
-    prev.mode !== next.mode ||
-    prev.sbtCacheRevision !== next.sbtCacheRevision
-  );
+  return prev.items !== next.items || prev.mode !== next.mode || prev.sbtCacheRevision !== next.sbtCacheRevision;
 };
 
 export const resolveEffectiveSbtFilterNetwork = ({
@@ -651,19 +598,10 @@ export const resolveEffectiveSbtFilterNetwork = ({
   readSessionChainId?: (slug: unknown) => unknown;
   sessionSlug?: unknown;
 } = {}): SbtFilterNetworkLike | null => {
-  const raw = isRecord(network) ? network as SbtFilterNetworkLike : null;
-  const sessionChainId = Number(
-    typeof readSessionChainId === 'function'
-      ? readSessionChainId(sessionSlug || '')
-      : 0
-  ) || null;
-  const chainId = Number(
-    raw?.id ||
-    raw?.chainId ||
-    raw?.networkChainId ||
-    sessionChainId ||
-    0
-  ) || null;
+  const raw = isRecord(network) ? (network as SbtFilterNetworkLike) : null;
+  const sessionChainId =
+    Number(typeof readSessionChainId === 'function' ? readSessionChainId(sessionSlug || '') : 0) || null;
+  const chainId = Number(raw?.id || raw?.chainId || raw?.networkChainId || sessionChainId || 0) || null;
   if (raw && chainId && Number(raw.id || 0) !== chainId) {
     return { ...raw, id: chainId };
   }
@@ -672,13 +610,12 @@ export const resolveEffectiveSbtFilterNetwork = ({
   return { id: chainId, chainId };
 };
 
-export const getSbtFilterItemCount = (items: unknown): number => (
+export const getSbtFilterItemCount = (items: unknown): number =>
   Array.isArray(items)
     ? items.length
-    : (items && typeof items === 'object')
+    : items && typeof items === 'object'
       ? Object.keys(items).length
-      : Number(items || 0)
-);
+      : Number(items || 0);
 
 export const shouldExpandMissingAddressItemsForSbtFilter = ({
   expandToSbtHolders,
@@ -688,12 +625,11 @@ export const shouldExpandMissingAddressItemsForSbtFilter = ({
   expandToSbtHolders?: unknown;
   mode?: unknown;
   selectedSBTGroups?: unknown;
-} = {}): boolean => (
+} = {}): boolean =>
   mode === 'addresses' &&
   expandToSbtHolders === true &&
   Array.isArray(selectedSBTGroups) &&
-  selectedSBTGroups.length > 0
-);
+  selectedSBTGroups.length > 0;
 
 export const shouldPassThroughSbtFilter = ({
   hasActiveFilter,
@@ -703,10 +639,7 @@ export const shouldPassThroughSbtFilter = ({
   hasActiveFilter?: unknown;
   items?: unknown;
   shouldExpandMissingAddressItems?: unknown;
-} = {}): boolean => (
-  !hasActiveFilter ||
-  (!items && !shouldExpandMissingAddressItems)
-);
+} = {}): boolean => !hasActiveFilter || (!items && !shouldExpandMissingAddressItems);
 
 export const resolveSbtFilterAddressItemsToFilter = ({
   items = null,
@@ -769,7 +702,15 @@ const normalizeCappedIdentityValue = (value: unknown, trail: WeakSet<object> = n
   }
   const normalizedObject: UnknownRecord = {};
   const entries = Object.entries(value as UnknownRecord)
-    .map(([key, nextValue]) => [String(key || '').trim().toLowerCase(), nextValue] as [string, unknown])
+    .map(
+      ([key, nextValue]) =>
+        [
+          String(key || '')
+            .trim()
+            .toLowerCase(),
+          nextValue,
+        ] as [string, unknown],
+    )
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   entries.forEach(([key, nextValue]) => {
     normalizedObject[key] = normalizeCappedIdentityValue(nextValue, trail);
@@ -809,7 +750,15 @@ const buildNestedIdentitySignature = (value: unknown, depth = 0): string => {
   }
 
   const entries = Object.entries(value as UnknownRecord)
-    .map(([key, nextValue]) => [String(key || '').trim().toLowerCase(), nextValue] as [string, unknown])
+    .map(
+      ([key, nextValue]) =>
+        [
+          String(key || '')
+            .trim()
+            .toLowerCase(),
+          nextValue,
+        ] as [string, unknown],
+    )
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   let hash = hashIdentityPart(ITEMS_SOURCE_SIG_HASH_SEED, `o:${entries.length}`);
   entries.forEach(([key, nextValue]) => {
@@ -825,14 +774,13 @@ const buildEntryResponseIdentityPayload = (entry: unknown): unknown => {
     return entry.response;
   }
 
-  const hasAnswerLikeFields = (
+  const hasAnswerLikeFields =
     Object.prototype.hasOwnProperty.call(entry, 'answer') ||
     Object.prototype.hasOwnProperty.call(entry, 'additional') ||
     Object.prototype.hasOwnProperty.call(entry, 'additionalComment') ||
     Object.prototype.hasOwnProperty.call(entry, 'additionalComments') ||
     Object.prototype.hasOwnProperty.call(entry, 'importance') ||
-    Object.prototype.hasOwnProperty.call(entry, 'conviction')
-  );
+    Object.prototype.hasOwnProperty.call(entry, 'conviction');
   if (hasAnswerLikeFields) {
     return {
       answer: Object.prototype.hasOwnProperty.call(entry, 'answer') ? entry.answer : null,
@@ -865,9 +813,7 @@ const buildEntryIdentityToken = (entry: unknown): string => {
   const address = normalizeIdentityPrimitive(entry.address || entry.sbtAddress);
   const slug = normalizeIdentityPrimitive(entry.sessionSlug || entry.slug || entry.group);
   const chain = normalizeIdentityPrimitive(entry.chainId || entry.chainID);
-  const timestamp = normalizeIdentityPrimitive(
-    entry.timestamp ?? entry.timeStamp ?? ''
-  );
+  const timestamp = normalizeIdentityPrimitive(entry.timestamp ?? entry.timeStamp ?? '');
   const responseLike = buildEntryResponseIdentityPayload(entry);
   const responseSig = buildNestedIdentitySignature(responseLike);
   const dense = [id, responder, creator, address, slug, chain, timestamp].filter(Boolean).join('|');
@@ -906,7 +852,15 @@ const buildValueIdentitySignature = (value: unknown, depth = 0): string => {
   }
 
   const entries = Object.entries(value as UnknownRecord)
-    .map(([key, nextValue]) => [String(key || '').trim().toLowerCase(), nextValue] as [string, unknown])
+    .map(
+      ([key, nextValue]) =>
+        [
+          String(key || '')
+            .trim()
+            .toLowerCase(),
+          nextValue,
+        ] as [string, unknown],
+    )
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   const indexes = buildAllIndexes(entries.length);
   let hash = ITEMS_SOURCE_SIG_HASH_SEED;
@@ -918,9 +872,7 @@ const buildValueIdentitySignature = (value: unknown, depth = 0): string => {
   return `o:${entries.length}:${indexes.length}:${hash >>> 0}:${buildEntryIdentityToken(value)}`;
 };
 
-export const buildItemsSourceSignature = (items: unknown): string => (
-  buildValueIdentitySignature(items, 0)
-);
+export const buildItemsSourceSignature = (items: unknown): string => buildValueIdentitySignature(items, 0);
 
 export const buildSbtFilterSelectedEntryList = ({
   excludedSBTGroups = [],
@@ -929,14 +881,15 @@ export const buildSbtFilterSelectedEntryList = ({
   selectedSBTGroups = [],
   selectedSBTGroupsCreator = [],
   selectedSBTGroupsResponder = [],
-}: BuildSbtFilterSelectedEntryListArgs = {}): unknown[] => ([
-  ...selectedSBTGroupsCreator,
-  ...excludedSBTGroupsCreator,
-  ...selectedSBTGroupsResponder,
-  ...excludedSBTGroupsResponder,
-  ...selectedSBTGroups,
-  ...excludedSBTGroups,
-].filter(Boolean));
+}: BuildSbtFilterSelectedEntryListArgs = {}): unknown[] =>
+  [
+    ...selectedSBTGroupsCreator,
+    ...excludedSBTGroupsCreator,
+    ...selectedSBTGroupsResponder,
+    ...excludedSBTGroupsResponder,
+    ...selectedSBTGroups,
+    ...excludedSBTGroups,
+  ].filter(Boolean);
 
 export const buildUniqueSbtEntries = (sbtEntries: unknown = []): Map<string, SbtFilterSelectedSbtEntry> => {
   const uniqueSbtEntries: Map<string, SbtFilterSelectedSbtEntry> = new Map();
@@ -965,7 +918,7 @@ export const doesAddressPassHolderSets = (
   address: unknown,
   includeSet: Set<string>,
   hasIncludeGroups: boolean,
-  excludeSet: Set<string>
+  excludeSet: Set<string>,
 ): boolean => {
   if (!address) return true;
   const lowerAddr = String(address || '').toLowerCase();
@@ -1005,15 +958,13 @@ export const resolveSbtFilterAddressItemDecision = ({
       address,
       selectedAddressHolderSet instanceof Set ? selectedAddressHolderSet : new Set<string>(),
       !!hasSelectedGroups,
-      excludedAddressHolderSet instanceof Set ? excludedAddressHolderSet : new Set<string>()
+      excludedAddressHolderSet instanceof Set ? excludedAddressHolderSet : new Set<string>(),
     ),
     shouldLogInvalidType: false,
   };
 };
 
-export const resolveSbtFilterItemParticipantAddresses = (
-  item: unknown
-): SbtFilterItemParticipantAddresses => {
+export const resolveSbtFilterItemParticipantAddresses = (item: unknown): SbtFilterItemParticipantAddresses => {
   const itemRecord = asCacheObject(item);
   return {
     creator: itemRecord.creator ? String(itemRecord.creator).toLowerCase() : null,
@@ -1044,7 +995,7 @@ export const doesSbtFilterAddressPassSelection = ({
       address,
       selectedCreatorHolderSet,
       Array.isArray(selectedSBTGroupsCreator) && selectedSBTGroupsCreator.length > 0,
-      excludedCreatorHolderSet
+      excludedCreatorHolderSet,
     );
   }
   if (selectedSBTs === selectedSBTGroupsResponder && excludedSBTs === excludedSBTGroupsResponder) {
@@ -1052,7 +1003,7 @@ export const doesSbtFilterAddressPassSelection = ({
       address,
       selectedResponderHolderSet,
       Array.isArray(selectedSBTGroupsResponder) && selectedSBTGroupsResponder.length > 0,
-      excludedResponderHolderSet
+      excludedResponderHolderSet,
     );
   }
   if (selectedSBTs === selectedSBTGroups && excludedSBTs === excludedSBTGroups) {
@@ -1060,14 +1011,14 @@ export const doesSbtFilterAddressPassSelection = ({
       address,
       selectedAddressHolderSet,
       Array.isArray(selectedSBTGroups) && selectedSBTGroups.length > 0,
-      excludedAddressHolderSet
+      excludedAddressHolderSet,
     );
   }
   return doesAddressPassHolderSets(
     address,
     buildHolderUnionSet(selectedSBTs, sbtHoldersMap),
     Array.isArray(selectedSBTs) && selectedSBTs.length > 0,
-    buildHolderUnionSet(excludedSBTs, sbtHoldersMap)
+    buildHolderUnionSet(excludedSBTs, sbtHoldersMap),
   );
 };
 
@@ -1077,13 +1028,8 @@ export const resolveSbtFilterEmptyResponderShortCircuit = ({
   selectedResponderHolderSet = null,
   selectedSBTGroupsResponder = [],
 }: ResolveSbtFilterEmptyResponderShortCircuitArgs = {}): SbtFilterEmptyResponderShortCircuitResult => {
-  const hasResponderInclude = (
-    Array.isArray(selectedSBTGroupsResponder) &&
-    selectedSBTGroupsResponder.length > 0
-  );
-  const responderHolderCount = selectedResponderHolderSet instanceof Set
-    ? selectedResponderHolderSet.size
-    : 0;
+  const hasResponderInclude = Array.isArray(selectedSBTGroupsResponder) && selectedSBTGroupsResponder.length > 0;
+  const responderHolderCount = selectedResponderHolderSet instanceof Set ? selectedResponderHolderSet.size : 0;
   if (!hasResponderInclude || responderHolderCount > 0) {
     return {
       shouldShortCircuit: false,

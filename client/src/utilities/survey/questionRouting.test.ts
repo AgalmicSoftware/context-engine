@@ -83,11 +83,7 @@ describe('questionRouting helper regressions', () => {
 
   it('does not silently fall back to default group for unresolved non-general slug', () => {
     const fallbackResolver = jest.fn(() => 84532);
-    const value = resolveStrictSessionValue(
-      'test-65',
-      () => null,
-      fallbackResolver
-    );
+    const value = resolveStrictSessionValue('test-65', () => null, fallbackResolver);
 
     expect(value).toBeNull();
     expect(fallbackResolver).not.toHaveBeenCalled();
@@ -98,7 +94,7 @@ describe('questionRouting helper regressions', () => {
     const value = resolveStrictSessionValue(
       'test-65',
       () => ({ slug: 'test-65', __unresolved: true }),
-      fallbackResolver
+      fallbackResolver,
     );
 
     expect(value).toBeNull();
@@ -197,46 +193,57 @@ describe('questionRouting helper regressions', () => {
   });
 
   it('labels masked prompts by payload access mode instead of surfacing the raw mask', () => {
-    expect(resolveQuestionPayloadDisplayState({
-      id: 'q-public',
-      prompt: '[encrypted]',
-    }, {
-      storageProfile: {
-        backend: 'cloudflare',
-        payloadAccessControl: { mode: 'public_read' },
-      },
-    })).toMatchObject({
+    expect(
+      resolveQuestionPayloadDisplayState(
+        {
+          id: 'q-public',
+          prompt: '[encrypted]',
+        },
+        {
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { mode: 'public_read' },
+          },
+        },
+      ),
+    ).toMatchObject({
       status: 'unavailable',
       label: 'Unavailable',
       requiresAuth: false,
     });
 
-    expect(resolveQuestionPayloadDisplayState({
-      id: 'q-gated',
-      prompt: '[encrypted]',
-      payloadAccessMode: 'worker_sbt_gate',
-    })).toMatchObject({
+    expect(
+      resolveQuestionPayloadDisplayState({
+        id: 'q-gated',
+        prompt: '[encrypted]',
+        payloadAccessMode: 'worker_sbt_gate',
+      }),
+    ).toMatchObject({
       status: 'worker_sbt_gate',
       label: 'Requires session access',
       requiresAuth: true,
     });
 
-    expect(resolveQuestionPayloadDisplayState({
-      id: 'q-envelope',
-      prompt: '[encrypted]',
-      payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
-    })).toMatchObject({
+    expect(
+      resolveQuestionPayloadDisplayState({
+        id: 'q-envelope',
+        prompt: '[encrypted]',
+        payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
+      }),
+    ).toMatchObject({
       status: 'worker_sbt_gate',
       label: 'Requires session access',
       requiresAuth: true,
     });
 
-    expect(resolveQuestionPayloadDisplayState({
-      id: 'q-lit',
-      prompt: '[encrypted]',
-      promptEncrypted: '{"ciphertext":"cipher"}',
-      payloadAccessMode: 'lit_encrypted',
-    })).toMatchObject({
+    expect(
+      resolveQuestionPayloadDisplayState({
+        id: 'q-lit',
+        prompt: '[encrypted]',
+        promptEncrypted: '{"ciphertext":"cipher"}',
+        payloadAccessMode: 'lit_encrypted',
+      }),
+    ).toMatchObject({
       status: 'lit_encrypted',
       label: 'Encrypted',
       requiresAuth: true,
@@ -244,11 +251,8 @@ describe('questionRouting helper regressions', () => {
   });
 
   it('does not treat unknown query slugs as pinnable', () => {
-    const getSessionConfigBySlug = (slug: string | null): KnownSessionConfig | null => (
-      slug === 'test-65'
-        ? { slug: 'test-65' }
-        : null
-    );
+    const getSessionConfigBySlug = (slug: string | null): KnownSessionConfig | null =>
+      slug === 'test-65' ? { slug: 'test-65' } : null;
 
     expect(isPinnableQuestionRouteSlug('test-65', getSessionConfigBySlug)).toBe(true);
     expect(isPinnableQuestionRouteSlug('', getSessionConfigBySlug)).toBe(true);

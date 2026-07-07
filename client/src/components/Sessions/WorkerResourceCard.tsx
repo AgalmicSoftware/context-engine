@@ -42,16 +42,10 @@ const WorkerResourceCard = ({
   disabled,
   children = null,
 }: WorkerResourceCardProps) => {
-  const renderTooltip = typeof renderInfoTooltip === 'function'
-    ? renderInfoTooltip
-    : () => null;
+  const renderTooltip = typeof renderInfoTooltip === 'function' ? renderInfoTooltip : () => null;
 
   return (
-    <div
-      className={styles.gateCard}
-      data-testid={E2E_TESTIDS.WIZARD_RESOURCE_CARD}
-      data-ce-resource-key={resourceKey}
-    >
+    <div className={styles.gateCard} data-testid={E2E_TESTIDS.WIZARD_RESOURCE_CARD} data-ce-resource-key={resourceKey}>
       <div className={styles.gateHeader}>
         <div className={styles.gateTitleRow}>
           <div className={styles.gateTitle}>{label}</div>
@@ -73,9 +67,7 @@ const WorkerResourceCard = ({
           showDots={false}
         />
       </div>
-      <div className={styles.resourceFields}>
-        {children}
-      </div>
+      <div className={styles.resourceFields}>{children}</div>
     </div>
   );
 };

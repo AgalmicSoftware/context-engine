@@ -195,21 +195,17 @@ describe('userPageDeepScanHelpers', () => {
     expect(formatUserPageDeepScanBlockCount(-5)).toBe('0');
     expect(formatUserPageDeepScanBlockCount('bad')).toBe('0');
 
-    expect(formatUserPageDeepScanTooltipLinesFromRows([
-      makeRow({ label: 'Alpha Session', remainingBlocks: 99 }),
-      makeRow({
-        label: 'Beta Session',
-        latestBlock: null,
-        lastBlockScanned: 3210,
-        remainingBlocks: null,
-      }),
-    ])).toEqual([
-      'Session: Alpha Session',
-      'Up to date',
-      '',
-      'Session: Beta Session',
-      '3,210 scanned',
-    ]);
+    expect(
+      formatUserPageDeepScanTooltipLinesFromRows([
+        makeRow({ label: 'Alpha Session', remainingBlocks: 99 }),
+        makeRow({
+          label: 'Beta Session',
+          latestBlock: null,
+          lastBlockScanned: 3210,
+          remainingBlocks: null,
+        }),
+      ]),
+    ).toEqual(['Session: Alpha Session', 'Up to date', '', 'Session: Beta Session', '3,210 scanned']);
     expect(formatUserPageDeepScanTooltipLinesFromRows([])).toBeNull();
 
     expect(buildUserPageDeepScanTooltipDisplayState()).toEqual({
@@ -217,32 +213,40 @@ describe('userPageDeepScanHelpers', () => {
       deepScanTooltipText: '',
       deepScanTooltipTitle: '',
     });
-    expect(buildUserPageDeepScanTooltipDisplayState({
-      isDeepScanning: true,
-    })).toEqual({
+    expect(
+      buildUserPageDeepScanTooltipDisplayState({
+        isDeepScanning: true,
+      }),
+    ).toEqual({
       deepScanTooltipContent: ['Deep scan in progress...'],
       deepScanTooltipText: 'Deep scan in progress...',
       deepScanTooltipTitle: 'Deep scan: Deep scan in progress...',
     });
-    expect(buildUserPageDeepScanTooltipDisplayState({
-      deepScanTooltipLines: ['Alpha', '', ' Beta '],
-    })).toEqual({
+    expect(
+      buildUserPageDeepScanTooltipDisplayState({
+        deepScanTooltipLines: ['Alpha', '', ' Beta '],
+      }),
+    ).toEqual({
       deepScanTooltipContent: ['Alpha', '', ' Beta '],
       deepScanTooltipText: 'Alpha |  Beta ',
       deepScanTooltipTitle: 'Deep scan: Alpha |  Beta ',
     });
-    expect(buildUserPageDeepScanTooltipDisplayState({
-      deepScanProgressRows: [makeRow({ label: 'Gamma' })],
-      fallbackLine: 'Scanning...',
-    })).toEqual({
+    expect(
+      buildUserPageDeepScanTooltipDisplayState({
+        deepScanProgressRows: [makeRow({ label: 'Gamma' })],
+        fallbackLine: 'Scanning...',
+      }),
+    ).toEqual({
       deepScanTooltipContent: ['Scanning...'],
       deepScanTooltipText: 'Scanning...',
       deepScanTooltipTitle: 'Deep scan: Scanning...',
     });
-    expect(buildUserPageDeepScanTooltipDisplayState({
-      deepScanTooltipLines: [],
-      isDeepScanning: true,
-    })).toEqual({
+    expect(
+      buildUserPageDeepScanTooltipDisplayState({
+        deepScanTooltipLines: [],
+        isDeepScanning: true,
+      }),
+    ).toEqual({
       deepScanTooltipContent: [],
       deepScanTooltipText: '',
       deepScanTooltipTitle: '',
@@ -273,71 +277,87 @@ describe('userPageDeepScanHelpers', () => {
       questionDeepScanLoadingActive: false,
       surveyDeepScanLoadingActive: true,
     });
-    expect(buildUserPageRenderLoadingState({
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: false,
-      isSBTCacheReady: true,
-      isSurveyCacheReady: true,
-    })).toMatchObject({
+    expect(
+      buildUserPageRenderLoadingState({
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: false,
+        isSBTCacheReady: true,
+        isSurveyCacheReady: true,
+      }),
+    ).toMatchObject({
       disabledByCache: true,
       isQuestionLoadingAny: true,
       isSurveyLoadingAny: true,
     });
-    expect(resolveUserPageAiActionAvailability({
-      aiAvailable: false,
-      disabledByCache: false,
-      walletLabel: 'wallet',
-    })).toEqual({
+    expect(
+      resolveUserPageAiActionAvailability({
+        aiAvailable: false,
+        disabledByCache: false,
+        walletLabel: 'wallet',
+      }),
+    ).toEqual({
       disabled: true,
       title: 'AI not available — connect a wallet or use a session with sponsored AI',
     });
-    expect(resolveUserPageAiActionAvailability({
-      aiAvailable: true,
-      disabledByCache: true,
-    })).toEqual({
+    expect(
+      resolveUserPageAiActionAvailability({
+        aiAvailable: true,
+        disabledByCache: true,
+      }),
+    ).toEqual({
       disabled: true,
       title: 'Available when the user page fully loads.',
     });
-    expect(resolveUserPageAiActionAvailability({
-      aiAvailable: true,
-      disabledByCache: false,
-    })).toEqual({
+    expect(
+      resolveUserPageAiActionAvailability({
+        aiAvailable: true,
+        disabledByCache: false,
+      }),
+    ).toEqual({
       disabled: false,
       title: undefined,
     });
-    expect(resolveUserPageAnalyzeButtonDisplayState({
-      aiActionAvailability: { disabled: false },
-      analyzing: false,
-    })).toEqual({
+    expect(
+      resolveUserPageAnalyzeButtonDisplayState({
+        aiActionAvailability: { disabled: false },
+        analyzing: false,
+      }),
+    ).toEqual({
       ariaBusy: 'false',
       disabled: false,
       label: 'Analyze',
       shouldRenderAnalyzing: false,
       title: undefined,
     });
-    expect(resolveUserPageAnalyzeButtonDisplayState({
-      aiActionAvailability: { disabled: true, title: 'Wait' },
-      analyzing: true,
-    })).toEqual({
+    expect(
+      resolveUserPageAnalyzeButtonDisplayState({
+        aiActionAvailability: { disabled: true, title: 'Wait' },
+        analyzing: true,
+      }),
+    ).toEqual({
       ariaBusy: 'true',
       disabled: true,
       label: 'Analyzing',
       shouldRenderAnalyzing: true,
       title: 'Wait',
     });
-    expect(resolveUserPageCompareButtonDisplayState({
-      aiActionAvailability: { disabled: true, title: 'Wait' },
-      collapseOpen: true,
-    })).toEqual({
+    expect(
+      resolveUserPageCompareButtonDisplayState({
+        aiActionAvailability: { disabled: true, title: 'Wait' },
+        collapseOpen: true,
+      }),
+    ).toEqual({
       disabled: true,
       shouldRenderCollapseClosedIcon: false,
       shouldRenderCollapseOpenIcon: true,
       title: 'Wait',
     });
-    expect(resolveUserPageCompareButtonDisplayState({
-      aiActionAvailability: { disabled: false },
-      collapseOpen: false,
-    })).toEqual({
+    expect(
+      resolveUserPageCompareButtonDisplayState({
+        aiActionAvailability: { disabled: false },
+        collapseOpen: false,
+      }),
+    ).toEqual({
       disabled: false,
       shouldRenderCollapseClosedIcon: true,
       shouldRenderCollapseOpenIcon: false,
@@ -361,97 +381,115 @@ describe('userPageDeepScanHelpers', () => {
       surveyResponsesLoadingEmpty: false,
       surveysCreatedLoadingEmpty: true,
     });
-    expect(buildUserPageSectionLoadingEmptyState({
-      isQuestionLoadingAny: true,
-      isQuestionReady: true,
-      isSbtLoadingAny: true,
-      isSurveyLoadingAny: true,
-      isSurveyReady: true,
-      loadingQuestions: false,
-      loadingSurveys: false,
-      questionCreationInfo: [],
-      questionDeepScanLoadingActive: true,
-      questionResponseInfo: [],
-      sbtList: [],
-      surveyCreationInfo: [],
-      surveyDeepScanLoadingActive: true,
-      surveyResponseInfo: [],
-    })).toEqual({
+    expect(
+      buildUserPageSectionLoadingEmptyState({
+        isQuestionLoadingAny: true,
+        isQuestionReady: true,
+        isSbtLoadingAny: true,
+        isSurveyLoadingAny: true,
+        isSurveyReady: true,
+        loadingQuestions: false,
+        loadingSurveys: false,
+        questionCreationInfo: [],
+        questionDeepScanLoadingActive: true,
+        questionResponseInfo: [],
+        sbtList: [],
+        surveyCreationInfo: [],
+        surveyDeepScanLoadingActive: true,
+        surveyResponseInfo: [],
+      }),
+    ).toEqual({
       questionResponsesLoadingEmpty: true,
       questionsCreatedLoadingEmpty: true,
       sbtSectionLoadingEmpty: true,
       surveyResponsesLoadingEmpty: true,
       surveysCreatedLoadingEmpty: true,
     });
-    expect(buildUserPageSectionLoadingEmptyState({
-      isQuestionLoadingAny: true,
-      isQuestionReady: false,
-      isSbtLoadingAny: true,
-      isSurveyLoadingAny: true,
-      isSurveyReady: false,
-      loadingQuestions: true,
-      loadingSurveys: true,
-      questionCreationInfo: [{}],
-      questionResponseInfo: [{}],
-      sbtList: [{}],
-      surveyCreationInfo: [{}],
-      surveyResponseInfo: [{}],
-    })).toEqual({
+    expect(
+      buildUserPageSectionLoadingEmptyState({
+        isQuestionLoadingAny: true,
+        isQuestionReady: false,
+        isSbtLoadingAny: true,
+        isSurveyLoadingAny: true,
+        isSurveyReady: false,
+        loadingQuestions: true,
+        loadingSurveys: true,
+        questionCreationInfo: [{}],
+        questionResponseInfo: [{}],
+        sbtList: [{}],
+        surveyCreationInfo: [{}],
+        surveyResponseInfo: [{}],
+      }),
+    ).toEqual({
       questionResponsesLoadingEmpty: false,
       questionsCreatedLoadingEmpty: false,
       sbtSectionLoadingEmpty: false,
       surveyResponsesLoadingEmpty: false,
       surveysCreatedLoadingEmpty: false,
     });
-    expect(buildUserPageUncertainEmptyText({
-      hasUncertainSbtData: true,
-      hasUncertainUserData: true,
-      sbtLabel: 'Badge',
-      sbtsLowerLabel: 'badges',
-    })).toEqual({
+    expect(
+      buildUserPageUncertainEmptyText({
+        hasUncertainSbtData: true,
+        hasUncertainUserData: true,
+        sbtLabel: 'Badge',
+        sbtsLowerLabel: 'badges',
+      }),
+    ).toEqual({
       questionResponsesEmptyText: 'Question responses may be incomplete due scan/RPC issues. Try refresh.',
       sbtEmptyText: 'Badge results may be incomplete due scan/RPC issues. Try refresh.',
     });
-    expect(buildUserPageUncertainEmptyText({
-      hasUncertainSbtData: false,
-      hasUncertainUserData: false,
-      sbtsLowerLabel: 'badges',
-    })).toEqual({
+    expect(
+      buildUserPageUncertainEmptyText({
+        hasUncertainSbtData: false,
+        hasUncertainUserData: false,
+        sbtsLowerLabel: 'badges',
+      }),
+    ).toEqual({
       questionResponsesEmptyText: 'No question responses found.',
       sbtEmptyText: 'No badges found.',
     });
-    expect(shouldRetryUserPageQuestionData({
-      hasUncertainUserData: false,
-      holdQuestionLoading: true,
-      questionSection: null,
-    })).toBe(false);
-    expect(shouldRetryUserPageQuestionData({
-      hasUncertainUserData: true,
-      holdQuestionLoading: true,
-      questionSection: { questionResponseInfo: [{ id: 'q1' }] },
-    })).toBe(true);
-    expect(shouldRetryUserPageQuestionData({
-      hasUncertainUserData: true,
-      holdQuestionLoading: false,
-      questionSection: { questionResponseInfo: [] },
-    })).toBe(true);
-    expect(shouldRetryUserPageQuestionData({
-      hasUncertainUserData: true,
-      holdQuestionLoading: false,
-      questionSection: { questionResponseInfo: [{ id: 'q1' }] },
-    })).toBe(false);
-    expect(buildUserPageUncertaintyLoadingFlags({
-      hasQuestionSources: true,
-      hasSbtSources: false,
-      hasSurveySources: false,
-      keepQuestionLoadingDuringDeepScan: true,
-      keepSurveyLoadingDuringDeepScan: false,
-      prevState: {
+    expect(
+      shouldRetryUserPageQuestionData({
+        hasUncertainUserData: false,
+        holdQuestionLoading: true,
+        questionSection: null,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRetryUserPageQuestionData({
         hasUncertainUserData: true,
-        isDeepScanning: false,
-      },
-      uncertainResources: new Set(['surveyResponses']),
-    })).toEqual({
+        holdQuestionLoading: true,
+        questionSection: { questionResponseInfo: [{ id: 'q1' }] },
+      }),
+    ).toBe(true);
+    expect(
+      shouldRetryUserPageQuestionData({
+        hasUncertainUserData: true,
+        holdQuestionLoading: false,
+        questionSection: { questionResponseInfo: [] },
+      }),
+    ).toBe(true);
+    expect(
+      shouldRetryUserPageQuestionData({
+        hasUncertainUserData: true,
+        holdQuestionLoading: false,
+        questionSection: { questionResponseInfo: [{ id: 'q1' }] },
+      }),
+    ).toBe(false);
+    expect(
+      buildUserPageUncertaintyLoadingFlags({
+        hasQuestionSources: true,
+        hasSbtSources: false,
+        hasSurveySources: false,
+        keepQuestionLoadingDuringDeepScan: true,
+        keepSurveyLoadingDuringDeepScan: false,
+        prevState: {
+          hasUncertainUserData: true,
+          isDeepScanning: false,
+        },
+        uncertainResources: new Set(['surveyResponses']),
+      }),
+    ).toEqual({
       hasGateUncertainty: true,
       hasQuestionGateUncertainty: false,
       hasSurveyGateUncertainty: true,
@@ -462,16 +500,18 @@ describe('userPageDeepScanHelpers', () => {
       keepSurveyLoadingFromUserUncertainty: true,
       preserveUserDataUncertainty: true,
     });
-    expect(buildUserPageUncertaintyLoadingFlags({
-      hasQuestionSources: true,
-      hasSbtSources: true,
-      hasSurveySources: true,
-      prevState: {
-        hasUncertainUserData: false,
-        isDeepScanning: true,
-      },
-      uncertainResources: new Set(['questionResponses']),
-    })).toMatchObject({
+    expect(
+      buildUserPageUncertaintyLoadingFlags({
+        hasQuestionSources: true,
+        hasSbtSources: true,
+        hasSurveySources: true,
+        prevState: {
+          hasUncertainUserData: false,
+          isDeepScanning: true,
+        },
+        uncertainResources: new Set(['questionResponses']),
+      }),
+    ).toMatchObject({
       hasGateUncertainty: true,
       hasQuestionGateUncertainty: true,
       hasSurveyGateUncertainty: false,
@@ -480,40 +520,50 @@ describe('userPageDeepScanHelpers', () => {
       keepSurveyLoadingFromUserUncertainty: false,
       preserveUserDataUncertainty: false,
     });
-    expect(buildUserPageDeepScanRefreshCarryPatch({
-      deepScanProgressRows: [{ slug: 'alpha' }],
-      deepScanTooltipLines: ['line-a'],
-      prevState: {},
-    })).toEqual({
+    expect(
+      buildUserPageDeepScanRefreshCarryPatch({
+        deepScanProgressRows: [{ slug: 'alpha' }],
+        deepScanTooltipLines: ['line-a'],
+        prevState: {},
+      }),
+    ).toEqual({
       deepScanProgressRows: [{ slug: 'alpha' }],
       deepScanTooltipLines: ['line-a'],
     });
-    expect(buildUserPageDeepScanRefreshCarryPatch({
-      prevState: {
-        deepScanProgressRows: [{ slug: 'old' }],
-        deepScanTooltipLines: ['old-line'],
-      },
-    })).toEqual({
+    expect(
+      buildUserPageDeepScanRefreshCarryPatch({
+        prevState: {
+          deepScanProgressRows: [{ slug: 'old' }],
+          deepScanTooltipLines: ['old-line'],
+        },
+      }),
+    ).toEqual({
       deepScanProgressRows: null,
       deepScanTooltipLines: null,
     });
-    expect(buildUserPageDeepScanRefreshCarryPatch({
-      prevState: {
-        deepScanProgressRows: [],
-        deepScanTooltipLines: [],
-      },
-    })).toEqual({});
-    expect(buildUserPageUserStatsMergePatch({
-      prevUserStats: { badgesReceived: 1, surveysCreated: 2 },
-      userStatsPatch: { badgesReceived: 3 },
-    })).toEqual({
+    expect(
+      buildUserPageDeepScanRefreshCarryPatch({
+        prevState: {
+          deepScanProgressRows: [],
+          deepScanTooltipLines: [],
+        },
+      }),
+    ).toEqual({});
+    expect(
+      buildUserPageUserStatsMergePatch({
+        prevUserStats: { badgesReceived: 1, surveysCreated: 2 },
+        userStatsPatch: { badgesReceived: 3 },
+      }),
+    ).toEqual({
       badgesReceived: 3,
       surveysCreated: 2,
     });
-    expect(buildUserPageUserStatsMergePatch({
-      prevUserStats: { badgesReceived: 1 },
-      userStatsPatch: {},
-    })).toBeNull();
+    expect(
+      buildUserPageUserStatsMergePatch({
+        prevUserStats: { badgesReceived: 1 },
+        userStatsPatch: {},
+      }),
+    ).toBeNull();
   });
 
   it('builds deep-scan tooltip input signatures from cache progress', () => {
@@ -528,89 +578,106 @@ describe('userPageDeepScanHelpers', () => {
       },
     }));
 
-    expect(buildUserPageDeepScanTooltipInputSignature({
-      latestBlockNumber: 120,
-      listNamespaceSlugs: () => ['edge', ''],
-      network: { id: 84532 },
-      peekCache,
-      viewAddress,
-    })).toBe(`${viewLower}|84532|120|:84532:10:1;edge:84532:12:2`);
+    expect(
+      buildUserPageDeepScanTooltipInputSignature({
+        latestBlockNumber: 120,
+        listNamespaceSlugs: () => ['edge', ''],
+        network: { id: 84532 },
+        peekCache,
+        viewAddress,
+      }),
+    ).toBe(`${viewLower}|84532|120|:84532:10:1;edge:84532:12:2`);
     expect(peekCache).toHaveBeenCalledWith('userCache', '', { clone: false });
-    expect(buildUserPageDeepScanTooltipInputSignature({
-      viewAddress: '',
-    })).toBe('');
-    expect(buildUserPageDeepScanTooltipInputSignature({
-      latestBlockNumber: 'bad',
-      listNamespaceSlugs: () => ['edge'],
-      network: { id: 'bad' },
-      peekCache: () => ({}),
-      viewAddress,
-    })).toBe(`${viewLower}|NaN||edge:`);
+    expect(
+      buildUserPageDeepScanTooltipInputSignature({
+        viewAddress: '',
+      }),
+    ).toBe('');
+    expect(
+      buildUserPageDeepScanTooltipInputSignature({
+        latestBlockNumber: 'bad',
+        listNamespaceSlugs: () => ['edge'],
+        network: { id: 'bad' },
+        peekCache: () => ({}),
+        viewAddress,
+      }),
+    ).toBe(`${viewLower}|NaN||edge:`);
   });
 
   it('builds deep-scan priority slugs from scan scope settings', () => {
     const getAllowedSessionSlugs = jest.fn((_scope: string, slugs: unknown[]) => slugs);
 
-    expect(buildUserPageDeepScanPrioritySlugs({
-      activeSessionSlug: 'primary-session',
-      getAllowedSessionSlugs,
-      readSessionScanScope: () => 'list',
-      readSessionScanSlugs: () => ['', 'edge', 'primary-session', 'edge'],
-    })).toEqual(['', 'edge', 'primary-session']);
-    expect(buildUserPageDeepScanPrioritySlugs({
-      activeSessionSlug: 'primary-session',
-      getAllowedSessionSlugs,
-      readSessionScanScope: () => 'list',
-      readSessionScanSlugs: () => ['', 'edge'],
-    })).toEqual(['primary-session', '', 'edge']);
-    expect(buildUserPageDeepScanPrioritySlugs({
-      activeSessionSlug: 'primary-session',
-      getAllowedSessionSlugs,
-      readSessionScanScope: () => 'active',
-      readSessionScanSlugs: () => ['ignored'],
-    })).toEqual(['primary-session', 'ignored']);
-    expect(buildUserPageDeepScanPrioritySlugs({
-      activeSessionSlug: '',
-      getAllowedSessionSlugs,
-      readSessionScanScope: () => 'active',
-      readSessionScanSlugs: () => ['ignored'],
-    })).toEqual([]);
+    expect(
+      buildUserPageDeepScanPrioritySlugs({
+        activeSessionSlug: 'primary-session',
+        getAllowedSessionSlugs,
+        readSessionScanScope: () => 'list',
+        readSessionScanSlugs: () => ['', 'edge', 'primary-session', 'edge'],
+      }),
+    ).toEqual(['', 'edge', 'primary-session']);
+    expect(
+      buildUserPageDeepScanPrioritySlugs({
+        activeSessionSlug: 'primary-session',
+        getAllowedSessionSlugs,
+        readSessionScanScope: () => 'list',
+        readSessionScanSlugs: () => ['', 'edge'],
+      }),
+    ).toEqual(['primary-session', '', 'edge']);
+    expect(
+      buildUserPageDeepScanPrioritySlugs({
+        activeSessionSlug: 'primary-session',
+        getAllowedSessionSlugs,
+        readSessionScanScope: () => 'active',
+        readSessionScanSlugs: () => ['ignored'],
+      }),
+    ).toEqual(['primary-session', 'ignored']);
+    expect(
+      buildUserPageDeepScanPrioritySlugs({
+        activeSessionSlug: '',
+        getAllowedSessionSlugs,
+        readSessionScanScope: () => 'active',
+        readSessionScanSlugs: () => ['ignored'],
+      }),
+    ).toEqual([]);
   });
 
   it('resolves deep-scan session display config with default and demo fallbacks', () => {
-    const getSessionConfigBySlug = jest.fn((slug: string) => (
-      slug === 'edge' ? { sessionName: 'Edge' } : null
-    ));
+    const getSessionConfigBySlug = jest.fn((slug: string) => (slug === 'edge' ? { sessionName: 'Edge' } : null));
     const getSessionConfigBySlugOrDefault = jest.fn(() => ({ sessionName: 'General' }));
-    const getDemoSessionConfigBySlug = jest.fn((slug: string) => (
-      slug === 'demo' ? { sessionName: 'Demo' } : null
-    ));
+    const getDemoSessionConfigBySlug = jest.fn((slug: string) => (slug === 'demo' ? { sessionName: 'Demo' } : null));
 
-    expect(resolveUserPageDeepScanSessionDisplayConfig({
-      getDemoSessionConfigBySlug,
-      getSessionConfigBySlug,
-      getSessionConfigBySlugOrDefault,
-      slugIn: '',
-    })).toEqual({ sessionName: 'General' });
+    expect(
+      resolveUserPageDeepScanSessionDisplayConfig({
+        getDemoSessionConfigBySlug,
+        getSessionConfigBySlug,
+        getSessionConfigBySlugOrDefault,
+        slugIn: '',
+      }),
+    ).toEqual({ sessionName: 'General' });
     expect(getSessionConfigBySlugOrDefault).toHaveBeenCalledWith('');
-    expect(resolveUserPageDeepScanSessionDisplayConfig({
-      getDemoSessionConfigBySlug,
-      getSessionConfigBySlug,
-      getSessionConfigBySlugOrDefault,
-      slugIn: 'edge',
-    })).toEqual({ sessionName: 'Edge' });
-    expect(resolveUserPageDeepScanSessionDisplayConfig({
-      getDemoSessionConfigBySlug,
-      getSessionConfigBySlug,
-      getSessionConfigBySlugOrDefault,
-      slugIn: 'demo',
-    })).toEqual({ sessionName: 'Demo' });
+    expect(
+      resolveUserPageDeepScanSessionDisplayConfig({
+        getDemoSessionConfigBySlug,
+        getSessionConfigBySlug,
+        getSessionConfigBySlugOrDefault,
+        slugIn: 'edge',
+      }),
+    ).toEqual({ sessionName: 'Edge' });
+    expect(
+      resolveUserPageDeepScanSessionDisplayConfig({
+        getDemoSessionConfigBySlug,
+        getSessionConfigBySlug,
+        getSessionConfigBySlugOrDefault,
+        slugIn: 'demo',
+      }),
+    ).toEqual({ sessionName: 'Demo' });
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('demo', { allowDemoFallback: true });
-    expect(resolveUserPageDeepScanSessionDisplayConfig({
-      getDemoSessionConfigBySlug: () => 'bad',
-      getSessionConfigBySlug: () => null,
-      slugIn: 'missing',
-    })).toBeNull();
+    expect(
+      resolveUserPageDeepScanSessionDisplayConfig({
+        getDemoSessionConfigBySlug: () => 'bad',
+        getSessionConfigBySlug: () => null,
+        slugIn: 'missing',
+      }),
+    ).toBeNull();
   });
-
 });

@@ -80,7 +80,7 @@ const SessionWizardCreateSbtModal = ({
           ...(draft && typeof draft === 'object' ? draft : {}),
           slug: createSbtModalSessionSlug,
           networkChainId: createSbtModalChainId,
-          contracts: (draft && typeof draft.contracts === 'object') ? draft.contracts : {},
+          contracts: draft && typeof draft.contracts === 'object' ? draft.contracts : {},
         }}
         arweaveJwkOverride={createSbtModalArweaveJwkOverride}
         encryptionGates={encryptionGates.map((gate) => ({

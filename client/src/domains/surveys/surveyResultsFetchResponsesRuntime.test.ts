@@ -1,6 +1,4 @@
-import {
-  createSurveyResultsFetchResponsesRuntime,
-} from './surveyResultsFetchResponsesRuntime';
+import { createSurveyResultsFetchResponsesRuntime } from './surveyResultsFetchResponsesRuntime';
 
 describe('surveyResultsFetchResponsesRuntime', () => {
   it('coalesces repeated requests into one promise-microtask flush', async () => {
@@ -38,9 +36,12 @@ describe('surveyResultsFetchResponsesRuntime', () => {
     let resolveFirstFetch: (() => void) | null = null;
     const fetchResponses = jest
       .fn()
-      .mockImplementationOnce(() => new Promise<void>((resolve) => {
-        resolveFirstFetch = resolve;
-      }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveFirstFetch = resolve;
+          }),
+      )
       .mockResolvedValue(undefined);
     const runtime = createSurveyResultsFetchResponsesRuntime({
       fetchResponses,

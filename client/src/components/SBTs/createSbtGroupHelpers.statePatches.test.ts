@@ -62,56 +62,70 @@ describe('createSbtGroupHelpers state patch helpers', () => {
     });
 
     expect(deferredCreate2SaltBuilder).toHaveBeenCalledTimes(1);
-    expect(initialState).toEqual(expect.objectContaining({
-      sbtName: '',
-      sbtCodes: [],
-      groupSubmitted: false,
-      groupHash: '',
-      sbtDistribution: expect.objectContaining({
-        adminAddress: '0xAdmin',
-        network: { id: 11155420, name: 'OP Sepolia' },
+    expect(initialState).toEqual(
+      expect.objectContaining({
+        sbtName: '',
+        sbtCodes: [],
+        groupSubmitted: false,
+        groupHash: '',
+        sbtDistribution: expect.objectContaining({
+          adminAddress: '0xAdmin',
+          network: { id: 11155420, name: 'OP Sepolia' },
+        }),
+        deferredCreate2Salt: 'draft/initial-salt',
+        predictableAddressEnabled: true,
+        mintOptionsCollapsed: false,
+        distributionOptionsCollapsed: false,
+        numInviteLinks: 10,
+        exportFormat: 'json',
+        countdown: 12,
+        documentIDHashes: '',
+        arweaveTxId: '',
+        copyJsonSuccess: false,
+        copyLinkSuccess: false,
+        copyIdSuccess: false,
       }),
-      deferredCreate2Salt: 'draft/initial-salt',
-      predictableAddressEnabled: true,
-      mintOptionsCollapsed: false,
-      distributionOptionsCollapsed: false,
-      numInviteLinks: 10,
-      exportFormat: 'json',
-      countdown: 12,
-      documentIDHashes: '',
-      arweaveTxId: '',
-      copyJsonSuccess: false,
-      copyLinkSuccess: false,
-      copyIdSuccess: false,
-    }));
+    );
     expect(initialState.bookmarkedSbtsSet).toEqual(new Set());
 
     deferredCreate2SaltBuilder.mockClear();
-    expect(buildCreateSbtInitialState({
-      deferredCreate2SaltBuilder,
-      deferredDeploy: false,
-    })).toEqual(expect.objectContaining({
-      deferredCreate2Salt: '',
-      mintOptionsCollapsed: true,
-      distributionOptionsCollapsed: true,
-    }));
+    expect(
+      buildCreateSbtInitialState({
+        deferredCreate2SaltBuilder,
+        deferredDeploy: false,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        deferredCreate2Salt: '',
+        mintOptionsCollapsed: true,
+        distributionOptionsCollapsed: true,
+      }),
+    );
     expect(deferredCreate2SaltBuilder).not.toHaveBeenCalled();
-    expect(buildCreateSbtCollapseTogglePatch({
-      section: 'mintOptionsCollapsed',
-      state: { mintOptionsCollapsed: true },
-    })).toEqual({ mintOptionsCollapsed: false });
-    expect(buildCreateSbtCollapseTogglePatch({
-      section: 'distributionOptionsCollapsed',
-      state: { distributionOptionsCollapsed: 1 },
-    })).toEqual({ distributionOptionsCollapsed: false });
-    expect(buildCreateSbtCollapseTogglePatch({
-      section: 'tokenInfoCollapsed',
-      state: null,
-    })).toEqual({ tokenInfoCollapsed: true });
-    expect(resolveCreateSbtCollapseHeaderDisplayState({
-      isCollapsed: true,
-      title: 'Token Info',
-    })).toEqual({
+    expect(
+      buildCreateSbtCollapseTogglePatch({
+        section: 'mintOptionsCollapsed',
+        state: { mintOptionsCollapsed: true },
+      }),
+    ).toEqual({ mintOptionsCollapsed: false });
+    expect(
+      buildCreateSbtCollapseTogglePatch({
+        section: 'distributionOptionsCollapsed',
+        state: { distributionOptionsCollapsed: 1 },
+      }),
+    ).toEqual({ distributionOptionsCollapsed: false });
+    expect(
+      buildCreateSbtCollapseTogglePatch({
+        section: 'tokenInfoCollapsed',
+        state: null,
+      }),
+    ).toEqual({ tokenInfoCollapsed: true });
+    expect(
+      resolveCreateSbtCollapseHeaderDisplayState({
+        isCollapsed: true,
+        title: 'Token Info',
+      }),
+    ).toEqual({
       ariaExpanded: false,
       ariaLabel: 'Expand Token Info',
       shouldRenderCollapsedTitle: true,
@@ -119,10 +133,12 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       shouldRenderOpenIcon: false,
       shouldUseOpenClass: false,
     });
-    expect(resolveCreateSbtCollapseHeaderDisplayState({
-      isCollapsed: false,
-      title: 'Token Info',
-    })).toEqual({
+    expect(
+      resolveCreateSbtCollapseHeaderDisplayState({
+        isCollapsed: false,
+        title: 'Token Info',
+      }),
+    ).toEqual({
       ariaExpanded: true,
       ariaLabel: 'Collapse Token Info',
       shouldRenderCollapsedTitle: false,
@@ -130,38 +146,52 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       shouldRenderOpenIcon: true,
       shouldUseOpenClass: true,
     });
-    expect(buildCreateSbtCollapseHeaderClassName({
-      baseClassName: 'section-header',
-      openClassName: 'section-header-open',
-      shouldUseOpenClass: false,
-    })).toBe('section-header');
-    expect(buildCreateSbtCollapseHeaderClassName({
-      baseClassName: 'section-header',
-      openClassName: 'section-header-open',
-      shouldUseOpenClass: true,
-    })).toBe('section-header section-header-open');
-    expect(buildCreateSbtActiveClassName({
-      activeClassName: 'active-option',
-      baseClassNames: 'option-card',
-      shouldUseActiveClass: false,
-    })).toBe('option-card');
-    expect(buildCreateSbtActiveClassName({
-      activeClassName: 'setting-row-active',
-      baseClassNames: ['setting-row', 'setting-toggle-row'],
-      shouldUseActiveClass: true,
-    })).toBe('setting-row setting-toggle-row setting-row-active');
-    expect(buildCreateSbtActionLinkClassName({
-      actionClassName: 'action-btn',
-      linkClassName: 'action-link',
-    })).toBe('action-btn action-link');
-    expect(buildCreateSbtInlineFieldLockClassName({
-      baseClassName: 'field-lock',
-      inlineClassName: 'field-lock-inline',
-    })).toBe('field-lock field-lock-inline');
-    expect(buildCreateSbtTokenInfoMetaCardClassName({
-      fieldSectionClassName: 'field-section',
-      metaCardClassName: 'token-meta-card',
-    })).toBe('field-section token-meta-card');
+    expect(
+      buildCreateSbtCollapseHeaderClassName({
+        baseClassName: 'section-header',
+        openClassName: 'section-header-open',
+        shouldUseOpenClass: false,
+      }),
+    ).toBe('section-header');
+    expect(
+      buildCreateSbtCollapseHeaderClassName({
+        baseClassName: 'section-header',
+        openClassName: 'section-header-open',
+        shouldUseOpenClass: true,
+      }),
+    ).toBe('section-header section-header-open');
+    expect(
+      buildCreateSbtActiveClassName({
+        activeClassName: 'active-option',
+        baseClassNames: 'option-card',
+        shouldUseActiveClass: false,
+      }),
+    ).toBe('option-card');
+    expect(
+      buildCreateSbtActiveClassName({
+        activeClassName: 'setting-row-active',
+        baseClassNames: ['setting-row', 'setting-toggle-row'],
+        shouldUseActiveClass: true,
+      }),
+    ).toBe('setting-row setting-toggle-row setting-row-active');
+    expect(
+      buildCreateSbtActionLinkClassName({
+        actionClassName: 'action-btn',
+        linkClassName: 'action-link',
+      }),
+    ).toBe('action-btn action-link');
+    expect(
+      buildCreateSbtInlineFieldLockClassName({
+        baseClassName: 'field-lock',
+        inlineClassName: 'field-lock-inline',
+      }),
+    ).toBe('field-lock field-lock-inline');
+    expect(
+      buildCreateSbtTokenInfoMetaCardClassName({
+        fieldSectionClassName: 'field-section',
+        metaCardClassName: 'token-meta-card',
+      }),
+    ).toBe('field-section token-meta-card');
     expect(resolveCreateSbtTooltipIconStyle()).toEqual({ opacity: 0.5 });
     expect(resolveCreateSbtActionIconStyle()).toEqual({ marginRight: '5px' });
     expect(resolveCreateSbtFailureIconStyle()).toEqual({ color: 'red' });
@@ -181,21 +211,29 @@ describe('createSbtGroupHelpers state patch helpers', () => {
         overflow: 'hidden',
       },
     });
-    expect(buildCreateSbtBooleanTogglePatch({
-      state: { showJson: false },
-      stateKey: 'showJson',
-    })).toEqual({ showJson: true });
-    expect(buildCreateSbtBooleanTogglePatch({
-      state: { showJson: 'open' },
-      stateKey: 'showJson',
-    })).toEqual({ showJson: false });
-    expect(buildCreateSbtCopySuccessPatch({
-      stateKey: 'copyIdSuccess',
-    })).toEqual({ copyIdSuccess: true });
-    expect(buildCreateSbtCopySuccessPatch({
-      stateKey: 'copyJsonSuccess',
-      copied: false,
-    })).toEqual({ copyJsonSuccess: false });
+    expect(
+      buildCreateSbtBooleanTogglePatch({
+        state: { showJson: false },
+        stateKey: 'showJson',
+      }),
+    ).toEqual({ showJson: true });
+    expect(
+      buildCreateSbtBooleanTogglePatch({
+        state: { showJson: 'open' },
+        stateKey: 'showJson',
+      }),
+    ).toEqual({ showJson: false });
+    expect(
+      buildCreateSbtCopySuccessPatch({
+        stateKey: 'copyIdSuccess',
+      }),
+    ).toEqual({ copyIdSuccess: true });
+    expect(
+      buildCreateSbtCopySuccessPatch({
+        stateKey: 'copyJsonSuccess',
+        copied: false,
+      }),
+    ).toEqual({ copyJsonSuccess: false });
     expect(buildCreateSbtCopiedLinkIndexPatch({ index: 2 })).toEqual({
       copiedLinkIndex: 2,
     });
@@ -230,11 +268,13 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       predictedAddressBusy: true,
       predictedAddressStatus: 'Calculating address…',
     });
-    expect(buildCreateSbtPredictedAddressPatch({
-      predictedAddress: '0xabc',
-      predictedAddressStatus: '',
-      predictedAddressBusy: false,
-    })).toEqual({
+    expect(
+      buildCreateSbtPredictedAddressPatch({
+        predictedAddress: '0xabc',
+        predictedAddressStatus: '',
+        predictedAddressBusy: false,
+      }),
+    ).toEqual({
       predictedAddress: '0xabc',
       predictedAddressStatus: '',
       predictedAddressBusy: false,
@@ -249,18 +289,22 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       mintingFailed: true,
       error: 'Required',
     });
-    expect(buildCreateSbtMintSuccessPatch({
-      passwordList: ['one'],
-      sbtAddress: '0xabc',
-    })).toEqual({
+    expect(
+      buildCreateSbtMintSuccessPatch({
+        passwordList: ['one'],
+        sbtAddress: '0xabc',
+      }),
+    ).toEqual({
       sbtMinted: true,
       sbtAddress: '0xabc',
       currentStep: 3,
       passwordList: ['one'],
     });
-    expect(buildCreateSbtMintSuccessPatch({
-      passwordList: 'bad',
-    })).toEqual({
+    expect(
+      buildCreateSbtMintSuccessPatch({
+        passwordList: 'bad',
+      }),
+    ).toEqual({
       sbtMinted: true,
       sbtAddress: '',
       currentStep: 3,
@@ -296,15 +340,17 @@ describe('createSbtGroupHelpers state patch helpers', () => {
     expect(buildCreateSbtMetadataLockGateIdsPatch({ metadataLockGateIds })).toEqual({
       metadataLockGateIds,
     });
-    expect(buildCreateSbtMetadataLockFallbackPatch({
-      fallbackGateIds: ['gate-b'],
-      fieldKey: 'name',
-      lockKey: 'name-lock',
-      metadataLockGateIds: {
-        description: ['gate-a'],
-        invalid: ['gate-z'],
-      },
-    })).toEqual({
+    expect(
+      buildCreateSbtMetadataLockFallbackPatch({
+        fallbackGateIds: ['gate-b'],
+        fieldKey: 'name',
+        lockKey: 'name-lock',
+        metadataLockGateIds: {
+          description: ['gate-a'],
+          invalid: ['gate-z'],
+        },
+      }),
+    ).toEqual({
       metadataLockGateIds: {
         description: ['gate-a'],
         documentURLs: [],
@@ -325,10 +371,12 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       shareableUrl: '/s/alpha',
       autoJoinUrl: '/s/alpha',
     });
-    expect(buildCreateSbtInviteLinksBackupPatch({
-      sbtInviteLinks: ['link'],
-      sbtInviteBackupDate: '2026-05-05',
-    })).toEqual({
+    expect(
+      buildCreateSbtInviteLinksBackupPatch({
+        sbtInviteLinks: ['link'],
+        sbtInviteBackupDate: '2026-05-05',
+      }),
+    ).toEqual({
       sbtInviteLinks: ['link'],
       sbtInviteBackupDate: '2026-05-05',
     });
@@ -344,9 +392,11 @@ describe('createSbtGroupHelpers state patch helpers', () => {
     expect(buildCreateSbtExportFormatPatch({ exportFormat: null })).toEqual({
       exportFormat: '',
     });
-    expect(buildCreateSbtImageUploadMethodPatch({
-      useImageUrl: true,
-    })).toEqual({
+    expect(
+      buildCreateSbtImageUploadMethodPatch({
+        useImageUrl: true,
+      }),
+    ).toEqual({
       useImageUrl: true,
       sbtImageFile: null,
       sbtImageUrl: '',
@@ -365,17 +415,21 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       lockedImageAsset: null,
     });
     const imageFile = { name: 'badge.png' };
-    expect(buildCreateSbtImageFilePatch({
-      clearLockedAsset: true,
-      file: imageFile,
-    })).toEqual({
+    expect(
+      buildCreateSbtImageFilePatch({
+        clearLockedAsset: true,
+        file: imageFile,
+      }),
+    ).toEqual({
       sbtImageFile: imageFile,
       imageLoadError: false,
       lockedImageAsset: null,
     });
-    expect(buildCreateSbtImageLoadErrorPatch({
-      clearLockedAsset: true,
-    })).toEqual({
+    expect(
+      buildCreateSbtImageLoadErrorPatch({
+        clearLockedAsset: true,
+      }),
+    ).toEqual({
       imageLoadError: true,
       sbtImageFile: null,
       lockedImageAsset: null,
@@ -386,16 +440,20 @@ describe('createSbtGroupHelpers state patch helpers', () => {
     expect(buildCreateSbtImageLoadReadyPatch()).toEqual({
       imageLoadError: false,
     });
-    expect(buildCreateSbtInputChangePatch({
-      name: 'sbtName',
-      value: 'Alpha group',
-    })).toEqual({
+    expect(
+      buildCreateSbtInputChangePatch({
+        name: 'sbtName',
+        value: 'Alpha group',
+      }),
+    ).toEqual({
       sbtName: 'Alpha group',
     });
-    expect(buildCreateSbtInputChangePatch({
-      name: 'sbtImageUrl',
-      value: 'https://example.test/badge.png',
-    })).toEqual({
+    expect(
+      buildCreateSbtInputChangePatch({
+        name: 'sbtImageUrl',
+        value: 'https://example.test/badge.png',
+      }),
+    ).toEqual({
       sbtImageUrl: 'https://example.test/badge.png',
       lockedImageAsset: null,
       imageChooserStatusText: '',
@@ -405,11 +463,13 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       sbtImageFile: null,
       lockedImageAsset: null,
     });
-    expect(buildCreateSbtSelectedImageFilePatch({
-      file: imageFile,
-      statusText: 'Ready',
-      statusTone: 'loading',
-    })).toEqual({
+    expect(
+      buildCreateSbtSelectedImageFilePatch({
+        file: imageFile,
+        statusText: 'Ready',
+        statusTone: 'loading',
+      }),
+    ).toEqual({
       useImageUrl: false,
       sbtImageFile: imageFile,
       sbtImageUrl: '',
@@ -418,11 +478,13 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       imageChooserStatusTone: 'loading',
       lockedImageAsset: null,
     });
-    expect(buildCreateSbtSelectedImageFilePatch({
-      file: imageFile,
-      sbtImageUrl: 'https://example.test/badge.png',
-      useImageUrl: true,
-    })).toEqual({
+    expect(
+      buildCreateSbtSelectedImageFilePatch({
+        file: imageFile,
+        sbtImageUrl: 'https://example.test/badge.png',
+        useImageUrl: true,
+      }),
+    ).toEqual({
       useImageUrl: true,
       sbtImageFile: imageFile,
       sbtImageUrl: 'https://example.test/badge.png',
@@ -431,10 +493,12 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       imageChooserStatusTone: 'default',
       lockedImageAsset: null,
     });
-    expect(buildCreateSbtImageChooserStatusPatch({
-      statusText: 'Loading preview...',
-      statusTone: 'loading',
-    })).toEqual({
+    expect(
+      buildCreateSbtImageChooserStatusPatch({
+        statusText: 'Loading preview...',
+        statusTone: 'loading',
+      }),
+    ).toEqual({
       imageChooserStatusText: 'Loading preview...',
       imageChooserStatusTone: 'loading',
     });
@@ -442,12 +506,16 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       imageChooserStatusText: '',
       imageChooserStatusTone: 'default',
     });
-    expect(buildCreateSbtCountdownTickPatch({
-      state: { countdown: 2, countdownActive: true },
-    })).toEqual({ countdown: 1 });
-    expect(buildCreateSbtCountdownTickPatch({
-      state: { countdown: 1, countdownActive: true },
-    })).toEqual({ countdown: 0, countdownActive: false });
+    expect(
+      buildCreateSbtCountdownTickPatch({
+        state: { countdown: 2, countdownActive: true },
+      }),
+    ).toEqual({ countdown: 1 });
+    expect(
+      buildCreateSbtCountdownTickPatch({
+        state: { countdown: 1, countdownActive: true },
+      }),
+    ).toEqual({ countdown: 0, countdownActive: false });
     expect(buildCreateSbtDeferredSaveCompletePatch()).toEqual({
       startedMinting: false,
       mintingFailed: false,
@@ -462,30 +530,36 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       currentStep: 0,
       error: '',
     });
-    expect(buildCreateSbtDistributionFieldPatch({
-      fieldKey: 'burnAuth',
-      fieldValue: 1,
-      state: { sbtDistribution: { isLimited: true } },
-    })).toEqual({
+    expect(
+      buildCreateSbtDistributionFieldPatch({
+        fieldKey: 'burnAuth',
+        fieldValue: 1,
+        state: { sbtDistribution: { isLimited: true } },
+      }),
+    ).toEqual({
       sbtDistribution: {
         isLimited: true,
         burnAuth: 1,
       },
     });
-    expect(buildCreateSbtDistributionFieldPatch({
-      fieldKey: 'mintingEndTime',
-      fieldValue: '2026-01-01T00:00:00.000Z',
-      state: null,
-    })).toEqual({
+    expect(
+      buildCreateSbtDistributionFieldPatch({
+        fieldKey: 'mintingEndTime',
+        fieldValue: '2026-01-01T00:00:00.000Z',
+        state: null,
+      }),
+    ).toEqual({
       sbtDistribution: {
         mintingEndTime: '2026-01-01T00:00:00.000Z',
       },
     });
-    expect(buildCreateSbtNetworkChangePatch({
-      chain: { id: 11155420, name: 'OP Sepolia' },
-      currentDistribution: { burnAuth: 1, network: { id: 84532 } },
-      network: 11155420,
-    })).toEqual({
+    expect(
+      buildCreateSbtNetworkChangePatch({
+        chain: { id: 11155420, name: 'OP Sepolia' },
+        currentDistribution: { burnAuth: 1, network: { id: 84532 } },
+        network: 11155420,
+      }),
+    ).toEqual({
       network: 11155420,
       sbtDistribution: {
         burnAuth: 1,

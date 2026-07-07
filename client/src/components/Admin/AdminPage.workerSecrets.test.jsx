@@ -92,11 +92,7 @@ jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-se
 
 const AdminPage = require('./AdminPage').default;
 
-const renderAdminPage = async ({
-  account = ADMIN_ADDRESS,
-  initialSessionId,
-  initialRegistryChainId,
-} = {}) => {
+const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, initialRegistryChainId } = {}) => {
   let utils;
   await act(async () => {
     utils = render(
@@ -107,7 +103,7 @@ const renderAdminPage = async ({
         toggleLoginModal={jest.fn()}
         initialSessionId={initialSessionId}
         initialRegistryChainId={initialRegistryChainId}
-      />
+      />,
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -117,9 +113,7 @@ const renderAdminPage = async ({
 
 const getWorkerSecretsPanel = () => screen.getByText('Worker secrets').closest('section');
 const getSecretCardButton = (panel, label) => within(panel).getByRole('button', { name: label });
-const getSecretInputByLabel = (labelText) => (
-  screen.getByText(labelText).parentElement.querySelector('input,textarea')
-);
+const getSecretInputByLabel = (labelText) => screen.getByText(labelText).parentElement.querySelector('input,textarea');
 const clickAndSettle = async (element) => {
   await act(async () => {
     fireEvent.click(element);
@@ -140,11 +134,13 @@ describe('AdminPage worker secrets controls', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    );
     sessionEntries = [['edge', buildSessionConfig()]];
     mockLoadSessionRegistryCache.mockResolvedValue(undefined);
     mockGetAllSessionEntries.mockImplementation(() => sessionEntries);
@@ -243,11 +239,13 @@ describe('AdminPage worker secrets controls', () => {
     const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/secret-presence'));
     expect(adminCall).toBeDefined();
     const payload = JSON.parse(adminCall[1].body);
-    expect(payload).toEqual(expect.objectContaining({
-      action: 'secret-presence',
-      sessionSlug: 'edge',
-      slug: 'edge',
-    }));
+    expect(payload).toEqual(
+      expect.objectContaining({
+        action: 'secret-presence',
+        sessionSlug: 'edge',
+        slug: 'edge',
+      }),
+    );
     expect(payload.secrets).toBeUndefined();
     expect(JSON.stringify(payload)).not.toMatch(/sk-|secret-value|rpc\.example/);
   });
@@ -294,13 +292,15 @@ describe('AdminPage worker secrets controls', () => {
   });
 
   it('resets worker secret presence when the general session worker URL changes', async () => {
-    sessionEntries = [[
-      '',
-      buildSessionConfig({
-        slug: 'general',
-        sessionName: 'General Session',
-      }),
-    ]];
+    sessionEntries = [
+      [
+        '',
+        buildSessionConfig({
+          slug: 'general',
+          sessionName: 'General Session',
+        }),
+      ],
+    ];
     global.fetch = jest.fn((url) => {
       if (String(url).endsWith('/auth/nonce')) {
         return Promise.resolve({ ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) });
@@ -446,11 +446,13 @@ describe('AdminPage worker secrets controls', () => {
   });
 
   it('saves worker secrets through the signed admin route and reports success', async () => {
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    );
 
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
@@ -467,26 +469,39 @@ describe('AdminPage worker secrets controls', () => {
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
     });
-    expect(within(within(workerSecretsPanel).getByRole('button', { name: 'AI' })).getByText('Configured')).toBeInTheDocument();
-    expect(within(within(workerSecretsPanel).getByRole('button', { name: 'RPC' })).getByText('Unknown')).toBeInTheDocument();
-    expect(within(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' })).getByText('Unknown')).toBeInTheDocument();
-    expect(within(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' })).getByText('Unknown')).toBeInTheDocument();
+    expect(
+      within(within(workerSecretsPanel).getByRole('button', { name: 'AI' })).getByText('Configured'),
+    ).toBeInTheDocument();
+    expect(
+      within(within(workerSecretsPanel).getByRole('button', { name: 'RPC' })).getByText('Unknown'),
+    ).toBeInTheDocument();
+    expect(
+      within(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' })).getByText('Unknown'),
+    ).toBeInTheDocument();
+    expect(
+      within(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' })).getByText('Unknown'),
+    ).toBeInTheDocument();
 
-    expect(global.fetch).toHaveBeenCalledWith('https://worker.example.test/admin/set-secrets', expect.objectContaining({
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    }));
-    expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'set-secrets',
-      slug: 'edge',
-      workerUrl: 'https://worker.example.test',
-      body: {
-        sessionSlug: 'edge',
-        secrets: {
-          openaiKey: 'sk-live-test',
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://worker.example.test/admin/set-secrets',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'set-secrets',
+        slug: 'edge',
+        workerUrl: 'https://worker.example.test',
+        body: {
+          sessionSlug: 'edge',
+          secrets: {
+            openaiKey: 'sk-live-test',
+          },
         },
-      },
-    }));
+      }),
+    );
 
     const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
     const payload = JSON.parse(adminCall[1].body);
@@ -504,29 +519,35 @@ describe('AdminPage worker secrets controls', () => {
         openaiKey: 'sk-live-test',
       },
     });
-    expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
-      chainId: 84532,
-      slug: 'edge',
-      fields: expect.objectContaining({
-        sponsored_ai: '1',
-        sponsored_transcribe: '1',
+    expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chainId: 84532,
+        slug: 'edge',
+        fields: expect.objectContaining({
+          sponsored_ai: '1',
+          sponsored_transcribe: '1',
+        }),
       }),
-    }));
+    );
   });
 
   it('canonicalizes selected session slugs before signed admin worker actions', async () => {
-    sessionEntries = [[
-      ' TeSt!?_A ',
-      buildSessionConfig({
-        slug: ' TeSt!?_A ',
-        sessionName: 'Slug Normalization Session',
-      }),
-    ]];
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
+    sessionEntries = [
+      [
+        ' TeSt!?_A ',
+        buildSessionConfig({
+          slug: ' TeSt!?_A ',
+          sessionName: 'Slug Normalization Session',
+        }),
+      ],
+    ];
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    );
 
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
@@ -541,9 +562,11 @@ describe('AdminPage worker secrets controls', () => {
     await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
-      expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
-        slug: 'test_a',
-      }));
+      expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: 'test_a',
+        }),
+      );
     });
 
     const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
@@ -553,11 +576,13 @@ describe('AdminPage worker secrets controls', () => {
   });
 
   it('saves Lit account API keys and updates the sponsored_lit session flag', async () => {
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    );
 
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
@@ -577,24 +602,30 @@ describe('AdminPage worker secrets controls', () => {
 
     const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
     const payload = JSON.parse(adminCall[1].body);
-    expect(payload.secrets).toEqual(expect.objectContaining({
-      litAccountApiKey: 'account-secret',
-    }));
-    expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
-      chainId: 84532,
-      slug: 'edge',
-      fields: expect.objectContaining({
-        sponsored_lit: '1',
+    expect(payload.secrets).toEqual(
+      expect.objectContaining({
+        litAccountApiKey: 'account-secret',
       }),
-    }));
+    );
+    expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chainId: 84532,
+        slug: 'edge',
+        fields: expect.objectContaining({
+          sponsored_lit: '1',
+        }),
+      }),
+    );
   });
 
   it('saves Lit usage API keys and updates the sponsored_lit session flag', async () => {
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    );
 
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
@@ -614,25 +645,31 @@ describe('AdminPage worker secrets controls', () => {
 
     const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
     const payload = JSON.parse(adminCall[1].body);
-    expect(payload.secrets).toEqual(expect.objectContaining({
-      litUsageApiKey: 'lit-secret',
-    }));
-    expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
-      chainId: 84532,
-      slug: 'edge',
-      fields: expect.objectContaining({
-        sponsored_lit: '1',
+    expect(payload.secrets).toEqual(
+      expect.objectContaining({
+        litUsageApiKey: 'lit-secret',
       }),
-    }));
+    );
+    expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chainId: 84532,
+        slug: 'edge',
+        fields: expect.objectContaining({
+          sponsored_lit: '1',
+        }),
+      }),
+    );
   });
 
   it('preserves sponsored_lit when saving unrelated worker secrets', async () => {
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        sponsoredKeys: { lit: true },
-      }),
-    ]];
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          sponsoredKeys: { lit: true },
+        }),
+      ],
+    ];
 
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
@@ -650,59 +687,63 @@ describe('AdminPage worker secrets controls', () => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
     });
 
-    expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
-      chainId: 84532,
-      slug: 'edge',
-      fields: expect.objectContaining({
-        sponsored_ai: '1',
-        sponsored_transcribe: '1',
-        sponsored_lit: '1',
+    expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chainId: 84532,
+        slug: 'edge',
+        fields: expect.objectContaining({
+          sponsored_ai: '1',
+          sponsored_transcribe: '1',
+          sponsored_lit: '1',
+        }),
       }),
-    }));
+    );
   });
 
   it('only signs Lit Chipotle status requests after the explicit refresh action', async () => {
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        sponsoredKeys: { lit: true },
-        litCredentials: {
-          litApiBase: 'https://api.chipotle.litprotocol.com',
-          litGroupId: 'group_123',
-          litPkpId: 'pkp_123',
-          litActionCid: 'bafy123',
-        },
-      }),
-    ]];
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/admin/lit-chipotle-status')
-        ? {
-            ok: true,
-            json: async () => ({
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          sponsoredKeys: { lit: true },
+          litCredentials: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+            litGroupId: 'group_123',
+            litPkpId: 'pkp_123',
+            litActionCid: 'bafy123',
+          },
+        }),
+      ],
+    ];
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/admin/lit-chipotle-status')
+          ? {
               ok: true,
-              ready: true,
-              apiBase: 'https://api.chipotle.litprotocol.com',
-              balance: { balance_display: '$5.00 credit' },
-              warnings: [],
-              groupSummary: {
-                walletCount: 1,
-                actionCount: 1,
-                hasConfiguredPkp: true,
-                hasConfiguredAction: true,
-              },
-            }),
-          }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
+              json: async () => ({
+                ok: true,
+                ready: true,
+                apiBase: 'https://api.chipotle.litprotocol.com',
+                balance: { balance_display: '$5.00 credit' },
+                warnings: [],
+                groupSummary: {
+                  walletCount: 1,
+                  actionCount: 1,
+                  hasConfiguredPkp: true,
+                  hasConfiguredAction: true,
+                },
+              }),
+            }
+          : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    );
 
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
     await waitFor(() => {
       expect(
-        mockBuildSignedAdminActionAuth.mock.calls.find(
-          ([args]) => args?.action === 'lit-chipotle-status'
-        )
+        mockBuildSignedAdminActionAuth.mock.calls.find(([args]) => args?.action === 'lit-chipotle-status'),
       ).toBeUndefined();
     });
     expect(global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/lit-chipotle-status'))).toBeUndefined();
@@ -716,11 +757,13 @@ describe('AdminPage worker secrets controls', () => {
     await clickAndSettle(refreshButton);
 
     await waitFor(() => {
-      expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
-        action: 'lit-chipotle-status',
-        slug: 'edge',
-        workerUrl: 'https://worker.example.test',
-      }));
+      expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'lit-chipotle-status',
+          slug: 'edge',
+          workerUrl: 'https://worker.example.test',
+        }),
+      );
       expect(global.fetch).toHaveBeenCalledWith(
         'https://worker.example.test/admin/lit-chipotle-status',
         expect.objectContaining({ method: 'POST' }),
@@ -730,35 +773,39 @@ describe('AdminPage worker secrets controls', () => {
   });
 
   it('passes an unsaved Lit usage API key to the Chipotle status refresh request', async () => {
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        sponsoredKeys: { lit: true },
-        litCredentials: {
-          litApiBase: 'https://api.chipotle.litprotocol.com',
-          litGroupId: 'group_123',
-        },
-      }),
-    ]];
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/admin/lit-chipotle-status')
-        ? {
-            ok: true,
-            json: async () => ({
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          sponsoredKeys: { lit: true },
+          litCredentials: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+            litGroupId: 'group_123',
+          },
+        }),
+      ],
+    ];
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/admin/lit-chipotle-status')
+          ? {
               ok: true,
-              ready: false,
-              apiBase: 'https://api.chipotle.litprotocol.com',
-              warnings: [],
-              groupSummary: {
-                walletCount: null,
-                actionCount: null,
-                hasConfiguredPkp: null,
-                hasConfiguredAction: null,
-              },
-            }),
-          }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
+              json: async () => ({
+                ok: true,
+                ready: false,
+                apiBase: 'https://api.chipotle.litprotocol.com',
+                warnings: [],
+                groupSummary: {
+                  walletCount: null,
+                  actionCount: null,
+                  hasConfiguredPkp: null,
+                  hasConfiguredAction: null,
+                },
+              }),
+            }
+          : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    );
 
     await renderAdminPage();
     await waitForResolvedWorkerUrl();

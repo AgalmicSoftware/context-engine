@@ -43,7 +43,7 @@ describe('SurveyAudioFieldInput', () => {
         disabled
         updateFunction={jest.fn()}
         toggleEncryption={jest.fn()}
-      />
+      />,
     );
 
     const input = screen.getByTestId('mock-audio-input');
@@ -64,7 +64,7 @@ describe('SurveyAudioFieldInput', () => {
         disableEncryption={false}
         updateFunction={jest.fn()}
         toggleEncryption={jest.fn()}
-      />
+      />,
     );
 
     const input = screen.getByTestId('mock-audio-input');
@@ -89,7 +89,7 @@ describe('SurveyAudioFieldInput', () => {
         workerUrl="https://worker.example/audio"
         updateFunction={updateFunction}
         toggleEncryption={toggleEncryption}
-      />
+      />,
     );
 
     const props = mockAudioInputProps[mockAudioInputProps.length - 1];

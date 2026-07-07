@@ -7,7 +7,7 @@ export type SurveyResultsBookmarksCacheReadOptions = {
 export type SurveyResultsBookmarksCacheReadPort = (
   namespace: SurveyResultsBookmarksCacheNamespace,
   slug: string,
-  options: SurveyResultsBookmarksCacheReadOptions
+  options: SurveyResultsBookmarksCacheReadOptions,
 ) => unknown;
 
 export type SurveyResultsBookmarksCacheReadRequest = {
@@ -26,9 +26,9 @@ type SurveyResultsBookmarksCacheValue = {
   questions?: unknown;
 };
 
-export function buildSurveyResultsBookmarksCacheReadRequest(
-  { slug = '' }: { slug?: unknown } = {}
-): SurveyResultsBookmarksCacheReadRequest {
+export function buildSurveyResultsBookmarksCacheReadRequest({
+  slug = '',
+}: { slug?: unknown } = {}): SurveyResultsBookmarksCacheReadRequest {
   return { namespace: 'bookmarksCache', slug: String(slug || ''), options: { clone: false } };
 }
 

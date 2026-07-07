@@ -5,10 +5,7 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { toStr } from '../shared/primitives.js';
-import {
-  STORAGE_BACKENDS,
-  normalizeStorageRef,
-} from './storageRefs.js';
+import { STORAGE_BACKENDS, normalizeStorageRef } from './storageRefs.js';
 import {
   SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
   normalizeSessionStorageConfig,
@@ -42,15 +39,14 @@ interface ListSessionStorageRefsOptions extends StorageWorkerOptions {
 }
 
 const normalizeWorkerBaseUrl = (rawUrl: unknown): string => toStr(rawUrl).trim().replace(/\/+$/, '');
-const normalizeTags = (tags: unknown): Array<{ name: string; value: string }> => (
+const normalizeTags = (tags: unknown): Array<{ name: string; value: string }> =>
   (Array.isArray(tags) ? tags : [])
     .filter((tag) => tag && typeof tag === 'object')
     .map((tag) => ({
       name: toStr((tag as UnknownRecord).name).trim(),
       value: toStr((tag as UnknownRecord).value).trim(),
     }))
-    .filter((tag) => tag.name && tag.value !== '')
-);
+    .filter((tag) => tag.name && tag.value !== '');
 
 const resolveStorageWorkerUrl = async ({
   sessionSlug,
@@ -70,12 +66,10 @@ const resolveStorageWorkerUrl = async ({
 };
 
 const parseStorageUploadResponse = async (response: Response): Promise<UnknownRecord> => {
-  const body = await response.json().catch(() => ({})) as UnknownRecord;
+  const body = (await response.json().catch(() => ({}))) as UnknownRecord;
   if (!response.ok) {
     throw new Error(
-      (body?.error as string) ||
-      (body?.message as string) ||
-      `Storage upload failed (${response.status}).`
+      (body?.error as string) || (body?.message as string) || `Storage upload failed (${response.status}).`,
     );
   }
   const storageRef = normalizeStorageRef(body?.storageRef || body, {
@@ -85,18 +79,22 @@ const parseStorageUploadResponse = async (response: Response): Promise<UnknownRe
   return { ...body, storageRef, id: storageRef.id };
 };
 
-export const uploadDataToSessionStorage = async (data: unknown, format: unknown, {
-  sessionSlug = '',
-  sessionConfig = null,
-  context = null,
-  workerUrl = '',
-  tags = [],
-  contentType = '',
-  resource = 'docsContext',
-  encrypted = false,
-  payloadEncrypted = false,
-  arweaveJwk = '',
-}: UploadDataToSessionStorageOptions = {}): Promise<UnknownRecord> => {
+export const uploadDataToSessionStorage = async (
+  data: unknown,
+  format: unknown,
+  {
+    sessionSlug = '',
+    sessionConfig = null,
+    context = null,
+    workerUrl = '',
+    tags = [],
+    contentType = '',
+    resource = 'docsContext',
+    encrypted = false,
+    payloadEncrypted = false,
+    arweaveJwk = '',
+  }: UploadDataToSessionStorageOptions = {},
+): Promise<UnknownRecord> => {
   const payloadIsEncrypted = encrypted || payloadEncrypted;
   const backend = resolveSessionStorageBackend(sessionConfig, { resource, encrypted: payloadIsEncrypted });
   const normalizedTags = normalizeTags(tags);
@@ -137,11 +135,11 @@ export const uploadDataToSessionStorage = async (data: unknown, format: unknown,
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
   if (!baseUrl) throw new Error('Worker URL is missing for storage upload.');
   const endpoint = `${baseUrl}/storage/upload`;
-  const bodyContentType = toStr(contentType).trim() || (
-    typeof File !== 'undefined' && (data instanceof File || data instanceof Blob)
+  const bodyContentType =
+    toStr(contentType).trim() ||
+    (typeof File !== 'undefined' && (data instanceof File || data instanceof Blob)
       ? data.type || 'application/octet-stream'
-      : 'application/json'
-  );
+      : 'application/json');
 
   let requestInit: RequestInit;
   if (typeof File !== 'undefined' && (data instanceof File || data instanceof Blob)) {
@@ -193,14 +191,18 @@ export const readSessionStorageBlob = async ({
   if (!ref || ref.backend !== STORAGE_BACKENDS.CLOUDFLARE) throw new Error('Cloudflare storageRef is required.');
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
   const endpoint = `${baseUrl}/storage/read?id=${encodeURIComponent(ref.id)}`;
-  const response = await fetchWorkerWithAuth(endpoint, { method: 'GET' }, {
-    sessionSlug,
-    sessionConfig,
-    context,
-    workerUrl: baseUrl,
-    allowDemoFallback: defaultStrictAllowDemoFallback(),
-    preferAnonymous: true,
-  });
+  const response = await fetchWorkerWithAuth(
+    endpoint,
+    { method: 'GET' },
+    {
+      sessionSlug,
+      sessionConfig,
+      context,
+      workerUrl: baseUrl,
+      allowDemoFallback: defaultStrictAllowDemoFallback(),
+      preferAnonymous: true,
+    },
+  );
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body?.error || `Storage read failed (${response.status}).`);
@@ -217,15 +219,19 @@ export const listSessionStorageRefs = async ({
 }: ListSessionStorageRefsOptions = {}): Promise<unknown[]> => {
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
   const endpoint = `${baseUrl}/storage/list?resource=${encodeURIComponent(resource as string)}`;
-  const response = await fetchWorkerWithAuth(endpoint, { method: 'GET' }, {
-    sessionSlug,
-    sessionConfig,
-    context,
-    workerUrl: baseUrl,
-    allowDemoFallback: defaultStrictAllowDemoFallback(),
-    preferAnonymous: true,
-  });
-  const body = await response.json().catch(() => ({})) as UnknownRecord;
+  const response = await fetchWorkerWithAuth(
+    endpoint,
+    { method: 'GET' },
+    {
+      sessionSlug,
+      sessionConfig,
+      context,
+      workerUrl: baseUrl,
+      allowDemoFallback: defaultStrictAllowDemoFallback(),
+      preferAnonymous: true,
+    },
+  );
+  const body = (await response.json().catch(() => ({}))) as UnknownRecord;
   if (!response.ok) throw new Error((body?.error as string) || `Storage list failed (${response.status}).`);
   return Array.isArray(body?.items) ? body.items : [];
 };

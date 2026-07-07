@@ -17,25 +17,47 @@ describe('contractScripts.getRelevantBlockWindowForFilter scope windows', () => 
   let upsertSessionRegistryCacheSpy;
 
   beforeEach(() => {
-    try { window.history.replaceState({}, '', '/'); } catch (_) {}
-    try { localStorage.removeItem('ce:sessionScanScope'); } catch (_) {}
-    try { localStorage.removeItem('ce:sessionScanSlugs'); } catch (_) {}
-    try { delete globalThis.CE_SESSION_SCAN_SCOPE; } catch (_) {}
-    try { delete globalThis.CE_SESSION_SCAN_SLUGS; } catch (_) {}
+    try {
+      window.history.replaceState({}, '', '/');
+    } catch (_) {}
+    try {
+      localStorage.removeItem('ce:sessionScanScope');
+    } catch (_) {}
+    try {
+      localStorage.removeItem('ce:sessionScanSlugs');
+    } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_SCOPE;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_SLUGS;
+    } catch (_) {}
     latestBlockSpy = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(50000000);
     getRegistryContractSpy = jest.spyOn(sessionRegistryUtils, 'getRegistryContract').mockReturnValue(null);
-    upsertSessionRegistryCacheSpy = jest.spyOn(sessionRegistryUtils, 'upsertSessionRegistryCache').mockImplementation(() => null);
+    upsertSessionRegistryCacheSpy = jest
+      .spyOn(sessionRegistryUtils, 'upsertSessionRegistryCache')
+      .mockImplementation(() => null);
   });
 
   afterEach(() => {
     if (latestBlockSpy) latestBlockSpy.mockRestore();
     if (getRegistryContractSpy) getRegistryContractSpy.mockRestore();
     if (upsertSessionRegistryCacheSpy) upsertSessionRegistryCacheSpy.mockRestore();
-    try { window.history.replaceState({}, '', '/'); } catch (_) {}
-    try { localStorage.removeItem('ce:sessionScanScope'); } catch (_) {}
-    try { localStorage.removeItem('ce:sessionScanSlugs'); } catch (_) {}
-    try { delete globalThis.CE_SESSION_SCAN_SCOPE; } catch (_) {}
-    try { delete globalThis.CE_SESSION_SCAN_SLUGS; } catch (_) {}
+    try {
+      window.history.replaceState({}, '', '/');
+    } catch (_) {}
+    try {
+      localStorage.removeItem('ce:sessionScanScope');
+    } catch (_) {}
+    try {
+      localStorage.removeItem('ce:sessionScanSlugs');
+    } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_SCOPE;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_SLUGS;
+    } catch (_) {}
   });
 
   it('allows active non-general route slug in general scope', async () => {
@@ -125,10 +147,9 @@ describe('contractScripts.getRelevantBlockWindowForFilter scope windows', () => 
       __ignoreSessionScanScope: true,
     };
 
-    await expect(contractScripts.getRelevantBlockWindowForFilter(cfg))
-      .rejects
-      .toThrow('Missing or invalid required blockLimits.start');
+    await expect(contractScripts.getRelevantBlockWindowForFilter(cfg)).rejects.toThrow(
+      'Missing or invalid required blockLimits.start',
+    );
     expect(latestBlockSpy).not.toHaveBeenCalled();
   });
-
 });

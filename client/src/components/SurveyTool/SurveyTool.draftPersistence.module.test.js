@@ -16,10 +16,7 @@ import {
   mergePersistedDraftPayloads,
   parsePersistedDraftStorageValue,
 } from './surveyToolDraftState';
-import {
-  executeSurveyResponsePrefill,
-  executeSurveySingleQuestionPrefill,
-} from './surveyToolHydrationController';
+import { executeSurveyResponsePrefill, executeSurveySingleQuestionPrefill } from './surveyToolHydrationController';
 import {
   buildDraftHydrationState,
   buildHydratedResponseSlice,
@@ -38,9 +35,7 @@ const buildEmptySlice = () => ({
 
 const cloneValue = (value) => JSON.parse(JSON.stringify(value));
 
-const normalizeResponseEncryptionAudience = (audience) => (
-  audience === 'gate' ? 'self' : (audience || 'self')
-);
+const normalizeResponseEncryptionAudience = (audience) => (audience === 'gate' ? 'self' : audience || 'self');
 
 const normalizeFieldAudienceMode = (audienceMode) => audienceMode || 'explicit';
 
@@ -57,15 +52,8 @@ const buildInheritedAdditionalFieldState = (additionalState) => ({
   audienceMode: 'inherit',
 });
 
-const areEnvelopesEquivalent = (
-  incomingEnvelope,
-  currentEnvelope,
-  incomingEncrypted,
-  currentEncrypted,
-) => (
-  String(incomingEnvelope || '') === String(currentEnvelope || '') &&
-  !!incomingEncrypted === !!currentEncrypted
-);
+const areEnvelopesEquivalent = (incomingEnvelope, currentEnvelope, incomingEncrypted, currentEncrypted) =>
+  String(incomingEnvelope || '') === String(currentEnvelope || '') && !!incomingEncrypted === !!currentEncrypted;
 
 const draftEntryResolvers = {
   resolveFieldEncryptionAudience: (field) => field.encryptionAudience || 'self',
@@ -161,25 +149,28 @@ const applyResponseHydrationListToSlice = ({
   list.forEach((response) => {
     const questionId = String(questionIdResolver(response) || '').toLowerCase();
     if (!questionId) return;
-    if (applyResponseHydrationEntryToSlice({
-      targetSlice,
-      currentSlice,
-      questionId,
-      response,
-      allowOverwrite,
-    })) {
+    if (
+      applyResponseHydrationEntryToSlice({
+        targetSlice,
+        currentSlice,
+        questionId,
+        response,
+        allowOverwrite,
+      })
+    ) {
       changed = true;
     }
   });
   return changed;
 };
 
-const buildSliceFromUserAnswers = (userAnswers, prevSlice = null) => buildHydratedResponseSlice({
-  userAnswers,
-  prevSlice,
-  applyResponseHydrationListToSlice,
-  parseValue,
-});
+const buildSliceFromUserAnswers = (userAnswers, prevSlice = null) =>
+  buildHydratedResponseSlice({
+    userAnswers,
+    prevSlice,
+    applyResponseHydrationListToSlice,
+    parseValue,
+  });
 
 const draftContext = {
   sessionSlug: 'edge',
@@ -284,14 +275,20 @@ describe('SurveyTool draft persistence', () => {
     const pendingKey = 'dg:surveyDraft:missing-session-slug:__pending__:0xabc:questions';
     const legacyGeneralKey = 'dg:surveyDraft:missing-session-slug:84532:0xabc:questions';
 
-    sessionStorage.setItem(pendingKey, JSON.stringify({
-      meta: { networkId: null, surveyId: 'questions', ts: 111 },
-      answers: { q1: { value: 'pending-draft' } },
-    }));
-    sessionStorage.setItem(legacyGeneralKey, JSON.stringify({
-      meta: { networkId: 84532, surveyId: 'questions', ts: 222 },
-      answers: { q1: { value: 'wrong-general-draft' } },
-    }));
+    sessionStorage.setItem(
+      pendingKey,
+      JSON.stringify({
+        meta: { networkId: null, surveyId: 'questions', ts: 111 },
+        answers: { q1: { value: 'pending-draft' } },
+      }),
+    );
+    sessionStorage.setItem(
+      legacyGeneralKey,
+      JSON.stringify({
+        meta: { networkId: 84532, surveyId: 'questions', ts: 222 },
+        answers: { q1: { value: 'wrong-general-draft' } },
+      }),
+    );
 
     const plan = buildSurveyDraftLoadPlan({
       hasAccount: true,
@@ -343,7 +340,7 @@ describe('SurveyTool draft persistence', () => {
         Array.from({ length: 10 }, (_, index) => {
           const qid = `q${index + 1}`;
           return [qid, { value: `anon ${qid}` }];
-        })
+        }),
       ),
     };
 
@@ -626,8 +623,7 @@ describe('SurveyTool draft persistence', () => {
     expect(secondPayload.answers.q1.value).toBe('stable-answer');
     expect(secondPayload.baseline.q1.value).toBe('baseline-v2');
     expect(secondPayload.baseline.q1.answerEncryptedPortion).toBe('ans-base-2');
-    expect(buildSurveyDraftSemanticSignature(secondPayload))
-      .not.toBe(buildSurveyDraftSemanticSignature(firstPayload));
+    expect(buildSurveyDraftSemanticSignature(secondPayload)).not.toBe(buildSurveyDraftSemanticSignature(firstPayload));
   });
 
   it('rehydrates baseline from draft even when no answer entry exists', () => {
@@ -721,15 +717,18 @@ describe('SurveyTool draft persistence', () => {
       importance: {},
       conviction: {},
     };
-    const nextSlice = buildSliceFromUserAnswers({
-      responses: [
-        {
-          questionID: 'q1',
-          answer: { value: '*', encrypted: true, encryptedPortion: '' },
-          additional: { value: '*', encrypted: true, encryptedPortion: '' },
-        },
-      ],
-    }, prevSlice);
+    const nextSlice = buildSliceFromUserAnswers(
+      {
+        responses: [
+          {
+            questionID: 'q1',
+            answer: { value: '*', encrypted: true, encryptedPortion: '' },
+            additional: { value: '*', encrypted: true, encryptedPortion: '' },
+          },
+        ],
+      },
+      prevSlice,
+    );
 
     expect(nextSlice.answers.q1.value).toBe('');
     expect(nextSlice.additionalComments.q1.value).toBe('*');
@@ -846,23 +845,25 @@ describe('SurveyTool draft persistence', () => {
   });
 
   it('merges survey response state into ensured survey slots', () => {
-    expect(buildMergedSurveyResponseState({
-      currentState: [
-        {
-          answers: { keep: { value: 'persisted' } },
-          importance: {},
-          conviction: {},
-          additionalComments: {},
-        },
-      ],
-      newQuestionPool: [{ id: 'q1' }],
-      surveyIndex: 2,
-      buildEmptyResponseFieldState: (qid, fieldKey = 'answer') => ({
-        value: '',
-        qid,
-        fieldKey,
+    expect(
+      buildMergedSurveyResponseState({
+        currentState: [
+          {
+            answers: { keep: { value: 'persisted' } },
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+        ],
+        newQuestionPool: [{ id: 'q1' }],
+        surveyIndex: 2,
+        buildEmptyResponseFieldState: (qid, fieldKey = 'answer') => ({
+          value: '',
+          qid,
+          fieldKey,
+        }),
       }),
-    })).toEqual([
+    ).toEqual([
       {
         answers: { keep: { value: 'persisted' } },
         importance: {},
@@ -1009,11 +1010,7 @@ const applyState = (stateRef) => (update, callback) => {
   return patch;
 };
 
-const executePrefillSurvey = ({
-  surveysResponseState = [],
-  editBaseline = buildEmptySlice(),
-  responses = [],
-} = {}) => {
+const executePrefillSurvey = ({ surveysResponseState = [], editBaseline = buildEmptySlice(), responses = [] } = {}) => {
   const stateRef = {
     current: {
       surveysResponseState,

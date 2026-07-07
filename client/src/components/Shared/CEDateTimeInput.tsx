@@ -44,11 +44,8 @@ const normalizeDateValue = (rawValue: string, withTime = false) => {
 
 const joinClassNames = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ');
 
-const normalizeTimeStepSeconds = (showTimeSelect: boolean, timeIntervals: number | string) => (
-  showTimeSelect
-    ? Math.max(1, Number(timeIntervals || 15)) * 60
-    : undefined
-);
+const normalizeTimeStepSeconds = (showTimeSelect: boolean, timeIntervals: number | string) =>
+  showTimeSelect ? Math.max(1, Number(timeIntervals || 15)) * 60 : undefined;
 
 const alignMinDateToStepBoundary = (value: Date | null | undefined, stepSeconds?: number) => {
   if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
@@ -60,11 +57,8 @@ const alignMinDateToStepBoundary = (value: Date | null | undefined, stepSeconds?
   }
 
   const aligned = new Date(value.getTime());
-  const totalMinutes = (
-    (aligned.getHours() * 60) +
-    aligned.getMinutes() +
-    ((aligned.getSeconds() * 1000) + aligned.getMilliseconds()) / 60000
-  );
+  const totalMinutes =
+    aligned.getHours() * 60 + aligned.getMinutes() + (aligned.getSeconds() * 1000 + aligned.getMilliseconds()) / 60000;
   const roundedMinutes = Math.ceil(totalMinutes / stepMinutes) * stepMinutes;
 
   aligned.setHours(0, 0, 0, 0);
@@ -97,12 +91,8 @@ const CEDateTimeInput = ({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const step = normalizeTimeStepSeconds(showTimeSelect, timeIntervals);
   const normalizedMinDate = useMemo(
-    () => (
-      showTimeSelect
-        ? alignMinDateToStepBoundary(minDate, step)
-        : minDate
-    ),
-    [minDate, showTimeSelect, step]
+    () => (showTimeSelect ? alignMinDateToStepBoundary(minDate, step) : minDate),
+    [minDate, showTimeSelect, step],
   );
   const minValue = toLocalInputValue(normalizedMinDate, showTimeSelect);
   const hasInvalidDraft = Boolean(String(draftValue || '').trim()) && !normalizeDateValue(draftValue, showTimeSelect);
@@ -122,9 +112,7 @@ const CEDateTimeInput = ({
     const input = inputRef.current;
     if (!input || typeof input.setCustomValidity !== 'function') return;
     input.setCustomValidity(
-      hasInvalidDraft
-        ? (showTimeSelect ? 'Enter a complete date and time.' : 'Enter a complete date.')
-        : ''
+      hasInvalidDraft ? (showTimeSelect ? 'Enter a complete date and time.' : 'Enter a complete date.') : '',
     );
   }, [hasInvalidDraft, showTimeSelect]);
 

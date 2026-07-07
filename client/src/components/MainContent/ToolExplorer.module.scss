@@ -203,7 +203,12 @@
   text-transform: uppercase;
   cursor: pointer;
   text-decoration: none;
-  transition: transform 0.14s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    transform 0.14s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
 
   svg {
     font-size: 0.95em;

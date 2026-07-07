@@ -22,15 +22,10 @@ const focusElement = (node: Element | null) => {
   if (node instanceof HTMLElement) node.focus();
 };
 
-const toOptionKey = (option?: CheckboxOption | null) => (
-  option && (option.value !== undefined && option.value !== null)
-    ? String(option.value)
-    : ''
-);
+const toOptionKey = (option?: CheckboxOption | null) =>
+  option && option.value !== undefined && option.value !== null ? String(option.value) : '';
 
-const getOptionLabel = (option: CheckboxOption) => (
-  option.label ?? (option.value == null ? '' : String(option.value))
-);
+const getOptionLabel = (option: CheckboxOption) => option.label ?? (option.value == null ? '' : String(option.value));
 
 const CheckboxMultiSelect = ({
   inputId,
@@ -50,9 +45,7 @@ const CheckboxMultiSelect = ({
   const searchRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
-  const normalizedValue = useMemo(() => (
-    Array.isArray(value) ? value : []
-  ), [value]);
+  const normalizedValue = useMemo(() => (Array.isArray(value) ? value : []), [value]);
   const selectedKeys = useMemo(() => {
     const keys = new Set();
     normalizedValue.forEach((option) => {
@@ -62,16 +55,18 @@ const CheckboxMultiSelect = ({
     return keys;
   }, [normalizedValue]);
 
-  const normalizedOptions = useMemo(() => (
-    Array.isArray(options) ? options : []
-  ), [options]);
+  const normalizedOptions = useMemo(() => (Array.isArray(options) ? options : []), [options]);
 
   const filteredOptions = useMemo(() => {
-    const trimmed = String(query || '').trim().toLowerCase();
+    const trimmed = String(query || '')
+      .trim()
+      .toLowerCase();
     if (!trimmed) return normalizedOptions;
-    return normalizedOptions.filter((option) => (
-      String(option?.label ?? option?.value ?? '').toLowerCase().includes(trimmed)
-    ));
+    return normalizedOptions.filter((option) =>
+      String(option?.label ?? option?.value ?? '')
+        .toLowerCase()
+        .includes(trimmed),
+    );
   }, [normalizedOptions, query]);
 
   useEffect(() => {
@@ -107,80 +102,92 @@ const CheckboxMultiSelect = ({
     setFocusedIndex(-1);
   }, [open]);
 
-  const toggleOption = useCallback((option: CheckboxOption) => {
-    if (disabled || !onChange) return;
-    const key = toOptionKey(option);
-    if (!key) return;
-    const already = selectedKeys.has(key);
-    if (already) {
-      const next = normalizedValue.filter((entry) => toOptionKey(entry) !== key);
-      onChange(next);
-    } else {
-      onChange([...normalizedValue, option]);
-    }
-  }, [disabled, onChange, normalizedValue, selectedKeys]);
+  const toggleOption = useCallback(
+    (option: CheckboxOption) => {
+      if (disabled || !onChange) return;
+      const key = toOptionKey(option);
+      if (!key) return;
+      const already = selectedKeys.has(key);
+      if (already) {
+        const next = normalizedValue.filter((entry) => toOptionKey(entry) !== key);
+        onChange(next);
+      } else {
+        onChange([...normalizedValue, option]);
+      }
+    },
+    [disabled, onChange, normalizedValue, selectedKeys],
+  );
 
-  const handleClearAll = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
-    if (event) {
-      event.stopPropagation();
-      event.preventDefault();
-    }
-    if (disabled || !onChange) return;
-    onChange([]);
-  }, [disabled, onChange]);
+  const handleClearAll = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      if (disabled || !onChange) return;
+      onChange([]);
+    },
+    [disabled, onChange],
+  );
 
   const handleControlClick = useCallback(() => {
     if (disabled) return;
     setOpen((prev) => !prev);
   }, [disabled]);
 
-  const handleSearchKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      if (filteredOptions.length > 0) {
-        setFocusedIndex(0);
-        const list = listRef.current;
-        if (list) {
-          const firstRow = list.querySelector('[data-cms-row-index="0"]');
-          focusElement(firstRow);
+  const handleSearchKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (filteredOptions.length > 0) {
+          setFocusedIndex(0);
+          const list = listRef.current;
+          if (list) {
+            const firstRow = list.querySelector('[data-cms-row-index="0"]');
+            focusElement(firstRow);
+          }
         }
       }
-    }
-  }, [filteredOptions.length]);
+    },
+    [filteredOptions.length],
+  );
 
-  const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLLabelElement>, option: CheckboxOption, index: number) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      toggleOption(option);
-      return;
-    }
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      const nextIndex = Math.min(filteredOptions.length - 1, index + 1);
-      setFocusedIndex(nextIndex);
-      const list = listRef.current;
-      if (list) {
-        const nextRow = list.querySelector(`[data-cms-row-index="${nextIndex}"]`);
-        focusElement(nextRow);
-      }
-      return;
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      if (index <= 0) {
-        setFocusedIndex(-1);
-        if (searchRef.current && typeof searchRef.current.focus === 'function') searchRef.current.focus();
+  const handleRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLLabelElement>, option: CheckboxOption, index: number) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleOption(option);
         return;
       }
-      const prevIndex = index - 1;
-      setFocusedIndex(prevIndex);
-      const list = listRef.current;
-      if (list) {
-        const prevRow = list.querySelector(`[data-cms-row-index="${prevIndex}"]`);
-        focusElement(prevRow);
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        const nextIndex = Math.min(filteredOptions.length - 1, index + 1);
+        setFocusedIndex(nextIndex);
+        const list = listRef.current;
+        if (list) {
+          const nextRow = list.querySelector(`[data-cms-row-index="${nextIndex}"]`);
+          focusElement(nextRow);
+        }
+        return;
       }
-    }
-  }, [filteredOptions.length, toggleOption]);
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (index <= 0) {
+          setFocusedIndex(-1);
+          if (searchRef.current && typeof searchRef.current.focus === 'function') searchRef.current.focus();
+          return;
+        }
+        const prevIndex = index - 1;
+        setFocusedIndex(prevIndex);
+        const list = listRef.current;
+        if (list) {
+          const prevRow = list.querySelector(`[data-cms-row-index="${prevIndex}"]`);
+          focusElement(prevRow);
+        }
+      }
+    },
+    [filteredOptions.length, toggleOption],
+  );
 
   const canClear = !!isClearable && normalizedValue.length > 0 && !disabled;
   const controlLabel = placeholder;

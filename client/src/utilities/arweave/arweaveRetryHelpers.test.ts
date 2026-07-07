@@ -1,7 +1,4 @@
-import {
-  prunePendingMetadataEntries,
-  shouldStopPendingMetadataRetry,
-} from './arweaveRetryHelpers.js';
+import { prunePendingMetadataEntries, shouldStopPendingMetadataRetry } from './arweaveRetryHelpers.js';
 
 describe('arweaveRetryHelpers', () => {
   it('stops pending retries when the error is terminal', () => {

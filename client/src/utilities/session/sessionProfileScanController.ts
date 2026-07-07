@@ -175,43 +175,26 @@ export interface SessionProfileScanController {
   getActiveProfileScanChainId: () => number | null;
   readProfileScanStepTimeoutMs: (kind?: string) => number;
   readProfileScanSbtBurstSize: () => number;
-  readProfileScanActivityLookbackBlocks: (
-    opts?: ReadProfileScanActivityLookbackBlocksOptions
-  ) => number;
+  readProfileScanActivityLookbackBlocks: (opts?: ReadProfileScanActivityLookbackBlocksOptions) => number;
   readUserProfileAllSessionsFlag: (runtimeKey: string, fallback?: boolean) => boolean;
   readProfileScanRegistryLookupTimeoutMs: () => number;
   getRegistrySessionEntryCount: () => number;
   getRegistrySessionCoverageCountForChain: (chainIdIn?: NullableChainIdInput) => number;
   getRegistryBootstrapScopeKey: (chainIdsIn?: Array<number | string> | null) => string;
-  getProfileScanListScopeSessionConfigCacheKey: (
-    slugIn: string,
-    chainIdIn?: NullableChainIdInput
-  ) => string;
+  getProfileScanListScopeSessionConfigCacheKey: (slugIn: string, chainIdIn?: NullableChainIdInput) => string;
   resolveListScopeSessionConfigFromRegistry: (
     slugIn: string,
-    opts?: ResolveListScopeSessionConfigOptions
+    opts?: ResolveListScopeSessionConfigOptions,
   ) => Promise<ProfileScanSessionConfig | null>;
-  ensureRegistryHydratedForProfileScan: (
-    opts?: Record<string, unknown>
-  ) => Promise<RegistryHydrationStatus>;
+  ensureRegistryHydratedForProfileScan: (opts?: Record<string, unknown>) => Promise<RegistryHydrationStatus>;
   isOnchainSessionRegistryEnabled: () => boolean;
   refreshSessionUniverseRegistryCache: () => Promise<unknown | null>;
-  resolveProfileDeepScanPlan: (
-    opts?: ResolveProfileDeepScanPlanOptions
-  ) => ProfileDeepScanPlan;
+  resolveProfileDeepScanPlan: (opts?: ResolveProfileDeepScanPlanOptions) => ProfileDeepScanPlan;
   getProfileDeepScanSlugs: () => string[];
-  scheduleProfileScanRetryAfterRegistryHydration: (
-    targetAddress: string,
-    reason?: string
-  ) => void;
-  shouldBackfillGeneralSession: (
-    slugIn: string,
-    scopeContextIn?: SessionScanScopeContext | null
-  ) => boolean;
+  scheduleProfileScanRetryAfterRegistryHydration: (targetAddress: string, reason?: string) => void;
+  shouldBackfillGeneralSession: (slugIn: string, scopeContextIn?: SessionScanScopeContext | null) => boolean;
   enqueueGeneralSessionBackfill: (opts?: EnqueueGeneralSessionBackfillOptions) => void;
-  runWithGeneralSessionBackfill: (
-    opts?: RunWithGeneralSessionBackfillOptions
-  ) => Promise<unknown | undefined>;
+  runWithGeneralSessionBackfill: (opts?: RunWithGeneralSessionBackfillOptions) => Promise<unknown | undefined>;
   emitProfileScanTelemetry: (event: string, payload?: Record<string, unknown>) => unknown;
   isProfileScanTelemetryEnabled: (...args: unknown[]) => boolean;
   isProfileScanColdDiagEnabled: (...args: unknown[]) => boolean;
@@ -240,25 +223,22 @@ const getErrorMessage = (error: unknown): string => {
   return String(errorRecord?.message || error);
 };
 
-const getSessionConfigChainId = (
-  config: unknown,
-  fallbackChainId: NullableChainIdInput = 0
-): number => {
+const getSessionConfigChainId = (config: unknown, fallbackChainId: NullableChainIdInput = 0): number => {
   const cfg = asProfileScanSessionConfig(config);
-  return Number(
-    cfg?.networkChainId ||
-    cfg?.contracts?.surveys?.chainId ||
-    cfg?.contracts?.sbtFactory?.chainId ||
-    fallbackChainId ||
-    0
-  ) || 0;
+  return (
+    Number(
+      cfg?.networkChainId ||
+        cfg?.contracts?.surveys?.chainId ||
+        cfg?.contracts?.sbtFactory?.chainId ||
+        fallbackChainId ||
+        0,
+    ) || 0
+  );
 };
 
 const normalizeSlugArray = (slugs: unknown): string[] => {
   return Array.from(
-    new Set(
-      (Array.isArray(slugs) ? slugs : []).map((slug: unknown) => normalizeSessionSlug(slug || ''))
-    )
+    new Set((Array.isArray(slugs) ? slugs : []).map((slug: unknown) => normalizeSessionSlug(slug || ''))),
   );
 };
 
@@ -267,9 +247,7 @@ const getResultLoadMeta = (result: unknown): RegistryLoadMeta | null => {
   return asRegistryLoadMeta(resultRecord?.__loadMeta);
 };
 
-export const createSessionProfileScanController = (
-  host: SessionProfileScanHost
-): SessionProfileScanController => {
+export const createSessionProfileScanController = (host: SessionProfileScanHost): SessionProfileScanController => {
   const hostApi = host as Required<SessionProfileScanHost>;
   let _registryBootstrapPromise: Promise<unknown> | null = null;
   let _registryBootstrapScopeKey = '';
@@ -281,22 +259,18 @@ export const createSessionProfileScanController = (
     _profileScanTelemetrySeq: 0,
   } as TelemetryContext;
 
-  _telemetryCtx.isProfileScanTelemetryEnabled =
-    isMainSiteProfileScanTelemetryEnabled.bind(
-      _telemetryCtx
-    ) as TelemetryContext['isProfileScanTelemetryEnabled'];
-  _telemetryCtx.emitProfileScanTelemetry =
-    emitMainSiteProfileScanTelemetry.bind(
-      _telemetryCtx
-    ) as TelemetryContext['emitProfileScanTelemetry'];
-  _telemetryCtx.isProfileScanColdDiagEnabled =
-    isMainSiteProfileScanColdDiagEnabled.bind(
-      _telemetryCtx
-    ) as TelemetryContext['isProfileScanColdDiagEnabled'];
-  _telemetryCtx.emitProfileScanColdDiag =
-    emitMainSiteProfileScanColdDiag.bind(
-      _telemetryCtx
-    ) as TelemetryContext['emitProfileScanColdDiag'];
+  _telemetryCtx.isProfileScanTelemetryEnabled = isMainSiteProfileScanTelemetryEnabled.bind(
+    _telemetryCtx,
+  ) as TelemetryContext['isProfileScanTelemetryEnabled'];
+  _telemetryCtx.emitProfileScanTelemetry = emitMainSiteProfileScanTelemetry.bind(
+    _telemetryCtx,
+  ) as TelemetryContext['emitProfileScanTelemetry'];
+  _telemetryCtx.isProfileScanColdDiagEnabled = isMainSiteProfileScanColdDiagEnabled.bind(
+    _telemetryCtx,
+  ) as TelemetryContext['isProfileScanColdDiagEnabled'];
+  _telemetryCtx.emitProfileScanColdDiag = emitMainSiteProfileScanColdDiag.bind(
+    _telemetryCtx,
+  ) as TelemetryContext['emitProfileScanColdDiag'];
 
   const hasExplicitProfileScanScopeOverride = (): boolean => {
     try {
@@ -318,10 +292,7 @@ export const createSessionProfileScanController = (
     } catch (e: unknown) {}
 
     try {
-      if (
-        typeof globalThis !== 'undefined' &&
-        typeof readRuntimeGlobalValue('CE_SESSION_SCAN_SCOPE') !== 'undefined'
-      ) {
+      if (typeof globalThis !== 'undefined' && typeof readRuntimeGlobalValue('CE_SESSION_SCAN_SCOPE') !== 'undefined') {
         return true;
       }
     } catch (e: unknown) {}
@@ -350,13 +321,15 @@ export const createSessionProfileScanController = (
   }
 
   const readProfileScanStepTimeoutMs = (kind = 'sbt'): number => {
-    const normalizedKind = String(kind || '').trim().toLowerCase();
-    const defaultMs = normalizedKind === 'activity'
-      ? Number(CE_PROFILE_SCAN_ACTIVITY_TIMEOUT_MS || 12000)
-      : Number(CE_PROFILE_SCAN_SBT_TIMEOUT_MS || 30000);
-    const runtimeKey = normalizedKind === 'activity'
-      ? 'CE_PROFILE_SCAN_ACTIVITY_TIMEOUT_MS'
-      : 'CE_PROFILE_SCAN_SBT_TIMEOUT_MS';
+    const normalizedKind = String(kind || '')
+      .trim()
+      .toLowerCase();
+    const defaultMs =
+      normalizedKind === 'activity'
+        ? Number(CE_PROFILE_SCAN_ACTIVITY_TIMEOUT_MS || 12000)
+        : Number(CE_PROFILE_SCAN_SBT_TIMEOUT_MS || 30000);
+    const runtimeKey =
+      normalizedKind === 'activity' ? 'CE_PROFILE_SCAN_ACTIVITY_TIMEOUT_MS' : 'CE_PROFILE_SCAN_SBT_TIMEOUT_MS';
     try {
       if (typeof globalThis !== 'undefined') {
         const runtimeValue = readRuntimeGlobalValue(runtimeKey);
@@ -370,7 +343,9 @@ export const createSessionProfileScanController = (
           if (Number.isFinite(n) && n >= 5000) return Math.min(180000, Math.floor(n));
         }
       }
-    } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+    } catch (e: unknown) {
+      mainSiteLog.warn('MainSite: fallback', e);
+    }
     if (Number.isFinite(defaultMs) && defaultMs >= 5000) {
       return Math.min(180000, Math.floor(defaultMs));
     }
@@ -387,14 +362,16 @@ export const createSessionProfileScanController = (
           if (Number.isFinite(n) && n >= 1) return Math.min(16, Math.floor(n));
         }
       }
-    } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+    } catch (e: unknown) {
+      mainSiteLog.warn('MainSite: fallback', e);
+    }
     if (Number.isFinite(fallback) && fallback >= 1) return Math.min(16, Math.floor(fallback));
     return 1;
   };
 
-  const readProfileScanActivityLookbackBlocks = (
-    { useAllSessions = false }: ReadProfileScanActivityLookbackBlocksOptions = {}
-  ): number => {
+  const readProfileScanActivityLookbackBlocks = ({
+    useAllSessions = false,
+  }: ReadProfileScanActivityLookbackBlocksOptions = {}): number => {
     const defaultLookback = useAllSessions ? 2500 : 0;
     try {
       if (typeof globalThis !== 'undefined') {
@@ -404,7 +381,9 @@ export const createSessionProfileScanController = (
           if (Number.isFinite(n) && n >= 0) return Math.min(200000, Math.floor(n));
         }
       }
-    } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+    } catch (e: unknown) {
+      mainSiteLog.warn('MainSite: fallback', e);
+    }
     return defaultLookback;
   };
 
@@ -416,7 +395,9 @@ export const createSessionProfileScanController = (
           return readBoolishRuntimeFlag(runtimeValue, !!fallback);
         }
       }
-    } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+    } catch (e: unknown) {
+      mainSiteLog.warn('MainSite: fallback', e);
+    }
     return !!fallback;
   };
 
@@ -433,24 +414,21 @@ export const createSessionProfileScanController = (
     })();
     const legacyAllSessions = readUserProfileAllSessionsFlag(
       'CE_USER_PROFILE_SCAN_ALL_SESSIONS',
-      !!CE_USER_PROFILE_SCAN_ALL_SESSIONS
+      !!CE_USER_PROFILE_SCAN_ALL_SESSIONS,
     );
     const useAllSessionsSbtScan = readUserProfileAllSessionsFlag(
       'CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS',
-      hasLegacyRuntimeOverride ? legacyAllSessions : !!CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS
+      hasLegacyRuntimeOverride ? legacyAllSessions : !!CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS,
     );
     const useAllSessionsSurveyActivityScan = readUserProfileAllSessionsFlag(
       'CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS',
-      hasLegacyRuntimeOverride ? legacyAllSessions : !!CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS
+      hasLegacyRuntimeOverride ? legacyAllSessions : !!CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS,
     );
     const useAllSessionsQuestionActivityScan = readUserProfileAllSessionsFlag(
       'CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS',
-      hasLegacyRuntimeOverride ? legacyAllSessions : !!CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS
+      hasLegacyRuntimeOverride ? legacyAllSessions : !!CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS,
     );
-    const useAllSessionsActivityScan = !!(
-      useAllSessionsSurveyActivityScan ||
-      useAllSessionsQuestionActivityScan
-    );
+    const useAllSessionsActivityScan = !!(useAllSessionsSurveyActivityScan || useAllSessionsQuestionActivityScan);
     return {
       legacyAllSessions,
       useAllSessionsSbtScan,
@@ -483,9 +461,7 @@ export const createSessionProfileScanController = (
     }
   };
 
-  const getRegistrySessionCoverageCountForChain = (
-    chainIdIn: NullableChainIdInput = null
-  ): number => {
+  const getRegistrySessionCoverageCountForChain = (chainIdIn: NullableChainIdInput = null): number => {
     const activeChainId = Number(chainIdIn || 0) || 0;
     try {
       const entries = sessionRegistryStore.getAllSessionEntries() as unknown;
@@ -511,8 +487,8 @@ export const createSessionProfileScanController = (
         (Array.isArray(chainIdsIn) ? chainIdsIn : [])
           .map((id: number | string) => Number(id))
           .filter((id: number) => Number.isFinite(id) && id > 0)
-          .map((id: number) => Math.floor(id))
-      )
+          .map((id: number) => Math.floor(id)),
+      ),
     ).sort((a: number, b: number) => a - b);
     if (ids.length === 0) return 'all';
     return ids.join(',');
@@ -528,26 +504,24 @@ export const createSessionProfileScanController = (
           if (Number.isFinite(n) && n >= 2000) return Math.min(60000, Math.floor(n));
         }
       }
-    } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+    } catch (e: unknown) {
+      mainSiteLog.warn('MainSite: fallback', e);
+    }
     return fallback;
   };
 
   const getProfileScanListScopeSessionConfigCacheKey = (
     slugIn: string,
-    chainIdIn: NullableChainIdInput = null
+    chainIdIn: NullableChainIdInput = null,
   ): string => {
     const slug = normalizeSessionSlug(slugIn || '');
-    const chainId = Number(
-      chainIdIn != null
-        ? chainIdIn
-        : getActiveProfileScanChainId()
-    ) || 0;
+    const chainId = Number(chainIdIn != null ? chainIdIn : getActiveProfileScanChainId()) || 0;
     return `${slug}|${chainId > 0 ? Math.floor(chainId) : 0}`;
   };
 
   const resolveListScopeSessionConfigFromRegistry = async (
     slugIn: string,
-    opts: ResolveListScopeSessionConfigOptions = {}
+    opts: ResolveListScopeSessionConfigOptions = {},
   ): Promise<ProfileScanSessionConfig | null> => {
     const slug = normalizeSessionSlug(slugIn || '');
     if (!slug && slug !== '') return null;
@@ -565,7 +539,7 @@ export const createSessionProfileScanController = (
       _profileScanListScopeSessionConfigCache.set(cacheKey, existingConfig);
       _profileScanListScopeSessionConfigCache.set(
         getProfileScanListScopeSessionConfigCacheKey(slug, existingChainId),
-        existingConfig
+        existingConfig,
       );
       return existingConfig;
     }
@@ -574,10 +548,10 @@ export const createSessionProfileScanController = (
       new Set([
         ...(activeChainId > 0 ? [activeChainId] : []),
         ...(Number(DEFAULT_CHAIN_ID || 0) > 0 ? [Number(DEFAULT_CHAIN_ID)] : []),
-        ...((getSessionRegistryChainIds() as Array<unknown>)
+        ...(getSessionRegistryChainIds() as Array<unknown>)
           .map((id: unknown) => Number(id))
-          .filter((id: number) => id > 0)),
-      ])
+          .filter((id: number) => id > 0),
+      ]),
     );
     if (!orderedChainIds.length) return null;
 
@@ -588,7 +562,7 @@ export const createSessionProfileScanController = (
     const runWithTimeout = async <T>(
       promiseFactory: () => Promise<T> | T,
       chainId: number,
-      bootstrapRpc: boolean
+      bootstrapRpc: boolean,
     ): Promise<T> => {
       let timeoutId: ReturnType<typeof setTimeout> | null = null;
       try {
@@ -597,7 +571,7 @@ export const createSessionProfileScanController = (
           new Promise<never>((_, reject) => {
             timeoutId = setTimeout(() => {
               const err = new Error(
-                `[MainSite] List-scope registry lookup timed out after ${lookupTimeoutMs}ms for slug "${slug}" on chain ${chainId}.`
+                `[MainSite] List-scope registry lookup timed out after ${lookupTimeoutMs}ms for slug "${slug}" on chain ${chainId}.`,
               ) as Error & { code?: string };
               err.code = 'REGISTRY_LOOKUP_TIMEOUT';
               reject(err);
@@ -613,32 +587,34 @@ export const createSessionProfileScanController = (
       for (const bootstrapRpc of [true, false]) {
         try {
           const config = await runWithTimeout(
-            () => fetchSessionFromRegistry({
-              chainId: registryChainId,
-              slug,
-              providerLike: hostApi.getProvider(),
-              account: hostApi.getAccount(),
-              lit,
-              bootstrapRpc,
-            }) as Promise<unknown>,
+            () =>
+              fetchSessionFromRegistry({
+                chainId: registryChainId,
+                slug,
+                providerLike: hostApi.getProvider(),
+                account: hostApi.getAccount(),
+                lit,
+                bootstrapRpc,
+              }) as Promise<unknown>,
             registryChainId,
-            bootstrapRpc
+            bootstrapRpc,
           );
           const resolvedConfig = asProfileScanSessionConfig(config);
           if (!resolvedConfig) continue;
           upsertSessionRegistryCache({ config: resolvedConfig });
-          const resolvedChainId = Number(
-            resolvedConfig.networkChainId ||
-            resolvedConfig.contracts?.surveys?.chainId ||
-            resolvedConfig.contracts?.sbtFactory?.chainId ||
-            registryChainId ||
-            0
-          ) || null;
+          const resolvedChainId =
+            Number(
+              resolvedConfig.networkChainId ||
+                resolvedConfig.contracts?.surveys?.chainId ||
+                resolvedConfig.contracts?.sbtFactory?.chainId ||
+                registryChainId ||
+                0,
+            ) || null;
           _profileScanListScopeSessionConfigCache.set(cacheKey, resolvedConfig);
           if (resolvedChainId && resolvedChainId > 0) {
             _profileScanListScopeSessionConfigCache.set(
               getProfileScanListScopeSessionConfigCacheKey(slug, resolvedChainId),
-              resolvedConfig
+              resolvedConfig,
             );
           }
           _telemetryCtx.emitProfileScanTelemetry('list-scope-chain-id-resolved', {
@@ -669,7 +645,7 @@ export const createSessionProfileScanController = (
   };
 
   const ensureRegistryHydratedForProfileScan = async (
-    opts: Record<string, unknown> = {}
+    opts: Record<string, unknown> = {},
   ): Promise<RegistryHydrationStatus> => {
     const activeChainId = getActiveProfileScanChainId();
     const scopeContext = getProfileScanScopeContext();
@@ -684,11 +660,7 @@ export const createSessionProfileScanController = (
     }) as Array<number | string> | null | undefined;
     const bootstrapScopeKey = getRegistryBootstrapScopeKey(chainIds);
     let run: Promise<unknown> | null = _registryBootstrapPromise;
-    const hasScopeMismatch = !!(
-      run &&
-      _registryBootstrapScopeKey &&
-      _registryBootstrapScopeKey !== bootstrapScopeKey
-    );
+    const hasScopeMismatch = !!(run && _registryBootstrapScopeKey && _registryBootstrapScopeKey !== bootstrapScopeKey);
     if (hasScopeMismatch) {
       _telemetryCtx.emitProfileScanTelemetry('registry-bootstrap-scope-mismatch', {
         expectedScope: bootstrapScopeKey,
@@ -732,7 +704,9 @@ export const createSessionProfileScanController = (
             if (Number.isFinite(n) && n >= 5000) return Math.min(180000, Math.floor(n));
           }
         }
-      } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+      } catch (e: unknown) {
+        mainSiteLog.warn('MainSite: fallback', e);
+      }
       if (Number.isFinite(fallback) && fallback >= 5000) return Math.min(180000, Math.floor(fallback));
       return 45000;
     })();
@@ -766,10 +740,7 @@ export const createSessionProfileScanController = (
     let afterCount = getRegistrySessionEntryCount();
     let hadLoadErrors = !!(loadMetaResult && loadMetaResult.hadLoadErrors);
     let alternateRpcAttempt: RegistryAlternateRpcAttempt | null = null;
-    const shouldRetryWithAlternateRpc = (
-      afterCount <= 0 &&
-      (timedOut || hadLoadErrors || !!loadError)
-    );
+    const shouldRetryWithAlternateRpc = afterCount <= 0 && (timedOut || hadLoadErrors || !!loadError);
     if (shouldRetryWithAlternateRpc) {
       const lit = getGlobalLitHooks();
       let retryTimedOut = false;
@@ -786,7 +757,7 @@ export const createSessionProfileScanController = (
               lit,
               force: true,
               bootstrapRpc: false,
-            }) as Promise<unknown>
+            }) as Promise<unknown>,
           )
             .then((result: unknown) => {
               retryLoadMeta = getResultLoadMeta(result);
@@ -874,20 +845,21 @@ export const createSessionProfileScanController = (
     }
   };
 
-  const resolveProfileDeepScanPlan = (
-    { registryStatus = null, useAllSessionsScan = null }: ResolveProfileDeepScanPlanOptions = {}
-  ): ProfileDeepScanPlan => {
+  const resolveProfileDeepScanPlan = ({
+    registryStatus = null,
+    useAllSessionsScan = null,
+  }: ResolveProfileDeepScanPlanOptions = {}): ProfileDeepScanPlan => {
     const activeChainId = getActiveProfileScanChainId();
-    const useAllSessions = typeof useAllSessionsScan === 'boolean'
-      ? useAllSessionsScan
-      : isUserProfileAllSessionsScanEnabled();
+    const useAllSessions =
+      typeof useAllSessionsScan === 'boolean' ? useAllSessionsScan : isUserProfileAllSessionsScanEnabled();
     const scopeContext = hostApi.getSessionScanScopeContext();
-    const listScopePrioritySlugs = scopeContext.scope === 'list'
-      ? normalizeSlugArray(getAllowedSessionSlugs('list', scopeContext.list, scopeContext.activeSlug))
-      : [];
+    const listScopePrioritySlugs =
+      scopeContext.scope === 'list'
+        ? normalizeSlugArray(getAllowedSessionSlugs('list', scopeContext.list, scopeContext.activeSlug))
+        : [];
     const prioritizeSlugs = (
       slugs: unknown,
-      opts: { prioritySlugs?: unknown } = {}
+      opts: { prioritySlugs?: unknown } = {},
     ): Pick<ProfileDeepScanPlan, 'relevantSlugs' | 'prioritizedGeneralFirst' | 'scanOrdering'> & {
       slugs: string[];
     } => {
@@ -895,8 +867,9 @@ export const createSessionProfileScanController = (
       const activeSlug = normalizeSessionSlug(hostApi.getActiveSessionSlug() || '');
       const hasGeneral = normalized.includes('');
       const hasActive = normalized.includes(activeSlug);
-      const explicitPriority = normalizeSlugArray(opts.prioritySlugs)
-        .filter((slug: string) => normalized.includes(slug));
+      const explicitPriority = normalizeSlugArray(opts.prioritySlugs).filter((slug: string) =>
+        normalized.includes(slug),
+      );
       const ordered: string[] = [];
       const push = (slug: unknown): void => {
         const normalizedSlug = normalizeSessionSlug(slug || '');
@@ -918,9 +891,14 @@ export const createSessionProfileScanController = (
         slugs: ordered,
         relevantSlugs: hasActive ? [activeSlug] : [],
         prioritizedGeneralFirst: ordered[0] === '',
-        scanOrdering: explicitPriority.length > 0
-          ? (useAllSessions ? 'scope-list-first-all' : 'scope-list-first-scoped')
-          : (useAllSessions ? 'active-first-general-early-all' : 'active-first-general-early-scoped'),
+        scanOrdering:
+          explicitPriority.length > 0
+            ? useAllSessions
+              ? 'scope-list-first-all'
+              : 'scope-list-first-scoped'
+            : useAllSessions
+              ? 'active-first-general-early-all'
+              : 'active-first-general-early-scoped',
       };
     };
     const dedupeNormalized = (slugs: unknown): string[] => normalizeSlugArray(slugs);
@@ -933,35 +911,24 @@ export const createSessionProfileScanController = (
         return slugChainId === activeChainId;
       });
       const scopedFallback: string[] = [];
-      const prioritized = prioritizeSlugs(
-        all.length > 0 ? all : scopedFallback,
-        { prioritySlugs: listScopePrioritySlugs }
-      );
+      const prioritized = prioritizeSlugs(all.length > 0 ? all : scopedFallback, {
+        prioritySlugs: listScopePrioritySlugs,
+      });
       const slugs = prioritized.slugs;
-      const registryEntryCount = Number(
-        registryStatus && Number.isFinite(Number(registryStatus.afterCount))
-          ? Number(registryStatus.afterCount)
-          : getRegistrySessionEntryCount()
-      ) || 0;
+      const registryEntryCount =
+        Number(
+          registryStatus && Number.isFinite(Number(registryStatus.afterCount))
+            ? Number(registryStatus.afterCount)
+            : getRegistrySessionEntryCount(),
+        ) || 0;
       const hadLoadErrors = !!(registryStatus && registryStatus.hadLoadErrors);
       const timedOut = !!(registryStatus && registryStatus.timedOut);
-      const hasRegistryEntries = (
-        registryEntryCount > 0 ||
-        !!(registryStatus && registryStatus.hasEntries === true)
-      );
+      const hasRegistryEntries = registryEntryCount > 0 || !!(registryStatus && registryStatus.hasEntries === true);
       const hasAnyActiveChainSlug = all.length > 0;
       const noActiveChainSlugs =
-        Number(activeChainId || 0) > 0 &&
-        hasRegistryEntries &&
-        !timedOut &&
-        !hadLoadErrors &&
-        !hasAnyActiveChainSlug;
-      const coverageComplete = (
-        hasRegistryEntries &&
-        hasAnyActiveChainSlug &&
-        !hadLoadErrors &&
-        !timedOut
-      ) || noActiveChainSlugs;
+        Number(activeChainId || 0) > 0 && hasRegistryEntries && !timedOut && !hadLoadErrors && !hasAnyActiveChainSlug;
+      const coverageComplete =
+        (hasRegistryEntries && hasAnyActiveChainSlug && !hadLoadErrors && !timedOut) || noActiveChainSlugs;
       let coverageReason = noActiveChainSlugs ? 'registry-no-active-chain-slugs' : 'registry-ready';
       if (!coverageComplete) {
         if (hadLoadErrors) {
@@ -989,10 +956,9 @@ export const createSessionProfileScanController = (
         scanOrdering: prioritized.scanOrdering,
       };
     }
-    const prioritized = prioritizeSlugs(
-      dedupeNormalized(hostApi.getScopedSessionSlugs(scopeContext.scope)),
-      { prioritySlugs: listScopePrioritySlugs }
-    );
+    const prioritized = prioritizeSlugs(dedupeNormalized(hostApi.getScopedSessionSlugs(scopeContext.scope)), {
+      prioritySlugs: listScopePrioritySlugs,
+    });
     return {
       slugs: prioritized.slugs,
       usedAllSessions: false,
@@ -1005,18 +971,13 @@ export const createSessionProfileScanController = (
     };
   };
 
-  const scheduleProfileScanRetryAfterRegistryHydration = (
-    targetAddress: string,
-    reason = ''
-  ): void => {
+  const scheduleProfileScanRetryAfterRegistryHydration = (targetAddress: string, reason = ''): void => {
     const target = String(targetAddress || '').trim();
     if (!target || !ethers.utils.isAddress(target)) return;
     const targetLower = target.toLowerCase();
     if (_profileScanRetryAfterRegistry.has(targetLower)) return;
     const run = _registryBootstrapPromise;
-    const waitForBootstrap = run
-      ? Promise.resolve(run).catch(() => null)
-      : Promise.resolve(null);
+    const waitForBootstrap = run ? Promise.resolve(run).catch(() => null) : Promise.resolve(null);
     const waitForHydration = !!run;
 
     _profileScanRetryAfterRegistry.add(targetLower);
@@ -1040,19 +1001,24 @@ export const createSessionProfileScanController = (
           reason: String(reason || ''),
           waitForHydration,
         });
-        return hostApi.scanSpecificUserProfile(target)
+        return hostApi
+          .scanSpecificUserProfile(target)
           .then((scanReport: unknown) => {
             if (!scanReport || typeof scanReport !== 'object') return;
             try {
               if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-                window.dispatchEvent(new CustomEvent(PROFILE_SCAN_REPORT_EVENT, {
-                  detail: {
-                    source: 'registry-retry',
-                    scanReport,
-                  },
-                }));
+                window.dispatchEvent(
+                  new CustomEvent(PROFILE_SCAN_REPORT_EVENT, {
+                    detail: {
+                      source: 'registry-retry',
+                      scanReport,
+                    },
+                  }),
+                );
               }
-            } catch (e: unknown) { mainSiteLog.warn('MainSite: telemetry', e); }
+            } catch (e: unknown) {
+              mainSiteLog.warn('MainSite: telemetry', e);
+            }
           })
           .catch((e: unknown) => {
             _telemetryCtx.emitProfileScanTelemetry('retry-failed', {
@@ -1078,7 +1044,7 @@ export const createSessionProfileScanController = (
 
   const shouldBackfillGeneralSession = (
     slugIn: string,
-    scopeContextIn: SessionScanScopeContext | null = null
+    scopeContextIn: SessionScanScopeContext | null = null,
   ): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
     if (!slug) return false;
@@ -1098,14 +1064,15 @@ export const createSessionProfileScanController = (
     const activeSlugNormalized = normalizeSessionSlug(activeSlug || '');
     _generalBackfillQueue = _generalBackfillQueue || {};
 
-    const slot = _generalBackfillQueue[opKey] && typeof _generalBackfillQueue[opKey] === 'object'
-      ? _generalBackfillQueue[opKey]
-      : {
-        inFlight: null,
-        pending: false,
-        runGeneral: null,
-        activeSlug: '',
-      };
+    const slot =
+      _generalBackfillQueue[opKey] && typeof _generalBackfillQueue[opKey] === 'object'
+        ? _generalBackfillQueue[opKey]
+        : {
+            inFlight: null,
+            pending: false,
+            runGeneral: null,
+            activeSlug: '',
+          };
 
     slot.pending = true;
     slot.runGeneral = runGeneral;
@@ -1134,7 +1101,9 @@ export const createSessionProfileScanController = (
       } finally {
         try {
           delete _generalBackfillQueue[opKey];
-        } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+        } catch (e: unknown) {
+          mainSiteLog.warn('MainSite: fallback', e);
+        }
       }
     })();
   };

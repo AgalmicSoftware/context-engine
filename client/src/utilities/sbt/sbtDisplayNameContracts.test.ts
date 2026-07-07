@@ -32,15 +32,9 @@ describe('sbtDisplayNameContracts', () => {
 
   it('exposes stable legacy encrypted-field aliases', () => {
     expect(getLegacySbtEncryptedFieldKeys('name')).toEqual(['nameEncrypted', 'encryptedName']);
-    expect(getLegacySbtEncryptedFieldKeys('description')).toEqual([
-      'descriptionEncrypted',
-      'encryptedDescription',
-    ]);
+    expect(getLegacySbtEncryptedFieldKeys('description')).toEqual(['descriptionEncrypted', 'encryptedDescription']);
     expect(getLegacySbtEncryptedFieldKeys('tags')).toEqual(['tagsEncrypted', 'encryptedTags']);
-    expect(getLegacySbtEncryptedFieldKeys('documentURLs')).toEqual([
-      'documentURLsEncrypted',
-      'docUrlsEncrypted',
-    ]);
+    expect(getLegacySbtEncryptedFieldKeys('documentURLs')).toEqual(['documentURLsEncrypted', 'docUrlsEncrypted']);
     expect(getLegacySbtEncryptedFieldKeys('image')).toEqual(['imageEncrypted', 'encryptedImage']);
     expect(getLegacySbtEncryptedFieldKeys(' name ')).toEqual([]);
     expect(getLegacySbtEncryptedFieldKeys('unknown')).toEqual([]);
@@ -69,39 +63,48 @@ describe('sbtDisplayNameContracts', () => {
   });
 
   it('preserves display-name fallback ordering and locked-name masking', () => {
-    expect(getSbtMetadataDisplayNameValue({
-      name: '',
-      title: 'Title Name',
-      symbol: 'SYM',
-      contractName: 'Contract',
-    })).toBe('Title Name');
-    expect(getSbtMetadataDisplayNameValue({
-      name: '',
-      title: '',
-      symbol: 'SYM',
-      contractName: 'Contract',
-    })).toBe('SYM');
-    expect(getSbtMetadataDisplayNameValue({
-      name: '',
-      title: '',
-      symbol: '',
-      contractName: 'Contract',
-    })).toBe('Contract');
-    expect(getSbtMetadataDisplayNameValue({
-      name: '',
-      title: 'Visible Title',
-      encryptedName: true,
-    })).toBe(SBT_MASKED_FIELD_VALUE);
-    expect(getSbtMetadataDisplayNameValue({
-      name: 'Visible Name',
-      encryptedName: true,
-    })).toBe('Visible Name');
+    expect(
+      getSbtMetadataDisplayNameValue({
+        name: '',
+        title: 'Title Name',
+        symbol: 'SYM',
+        contractName: 'Contract',
+      }),
+    ).toBe('Title Name');
+    expect(
+      getSbtMetadataDisplayNameValue({
+        name: '',
+        title: '',
+        symbol: 'SYM',
+        contractName: 'Contract',
+      }),
+    ).toBe('SYM');
+    expect(
+      getSbtMetadataDisplayNameValue({
+        name: '',
+        title: '',
+        symbol: '',
+        contractName: 'Contract',
+      }),
+    ).toBe('Contract');
+    expect(
+      getSbtMetadataDisplayNameValue({
+        name: '',
+        title: 'Visible Title',
+        encryptedName: true,
+      }),
+    ).toBe(SBT_MASKED_FIELD_VALUE);
+    expect(
+      getSbtMetadataDisplayNameValue({
+        name: 'Visible Name',
+        encryptedName: true,
+      }),
+    ).toBe('Visible Name');
   });
 
   it('preserves description fallback and malformed input behavior', () => {
     expect(getSbtMetadataDescriptionText({ description: '  Details  ' })).toBe('Details');
-    expect(getSbtMetadataDescriptionText({ description: '', encryptedDescription: true }))
-      .toBe(SBT_MASKED_FIELD_VALUE);
+    expect(getSbtMetadataDescriptionText({ description: '', encryptedDescription: true })).toBe(SBT_MASKED_FIELD_VALUE);
     expect(getSbtMetadataDescriptionText({ description: '' })).toBe('');
     expect(getSbtMetadataDescriptionText(null)).toBe('');
     expect(getSbtMetadataDisplayNameValue(null)).toBe('');
@@ -118,26 +121,34 @@ describe('sbtDisplayNameContracts', () => {
   });
 
   it('preserves memo and retry key formats', () => {
-    expect(buildSbtDisplayLabelMemoKey({
-      addressLower: '  0xABC  ',
-      preferredSlug: ' Edge Session ',
-      chainId: '84532',
-    })).toBe('0xabc|edge session|84532');
-    expect(buildSbtDisplayLabelMemoKey({
-      addressLower: null,
-      preferredSlug: null,
-      chainId: 'not-a-chain',
-    })).toBe('||0');
-    expect(buildSbtDisplayRetryStateKey({
-      addressLower: ' 0xABC ',
-      slug: ' Edge Session ',
-      chainId: '84532',
-    })).toBe(' 0xABC |edge session|84532');
-    expect(buildSbtDisplayRetryStateKey({
-      addressLower: null,
-      slug: null,
-      chainId: 'not-a-chain',
-    })).toBe('null||0');
+    expect(
+      buildSbtDisplayLabelMemoKey({
+        addressLower: '  0xABC  ',
+        preferredSlug: ' Edge Session ',
+        chainId: '84532',
+      }),
+    ).toBe('0xabc|edge session|84532');
+    expect(
+      buildSbtDisplayLabelMemoKey({
+        addressLower: null,
+        preferredSlug: null,
+        chainId: 'not-a-chain',
+      }),
+    ).toBe('||0');
+    expect(
+      buildSbtDisplayRetryStateKey({
+        addressLower: ' 0xABC ',
+        slug: ' Edge Session ',
+        chainId: '84532',
+      }),
+    ).toBe(' 0xABC |edge session|84532');
+    expect(
+      buildSbtDisplayRetryStateKey({
+        addressLower: null,
+        slug: null,
+        chainId: 'not-a-chain',
+      }),
+    ).toBe('null||0');
     expect(buildSbtDisplayInflightLookupKey('0xabc|edge|84532')).toBe('0xabc|edge|84532|lookup');
   });
 
@@ -194,22 +205,30 @@ describe('sbtDisplayNameContracts', () => {
   });
 
   it('preserves display memo write eligibility', () => {
-    expect(shouldWriteSbtDisplayLabelMemoEntry({
-      memoKey: ' 0xabc|edge|84532 ',
-      value: { name: 'Visible Name' },
-    })).toBe(true);
-    expect(shouldWriteSbtDisplayLabelMemoEntry({
-      memoKey: '',
-      value: { name: 'Visible Name' },
-    })).toBe(false);
-    expect(shouldWriteSbtDisplayLabelMemoEntry({
-      memoKey: '0xabc|edge|84532',
-      value: { name: '' },
-    })).toBe(false);
-    expect(shouldWriteSbtDisplayLabelMemoEntry({
-      memoKey: '0xabc|edge|84532',
-      value: null,
-    })).toBe(false);
+    expect(
+      shouldWriteSbtDisplayLabelMemoEntry({
+        memoKey: ' 0xabc|edge|84532 ',
+        value: { name: 'Visible Name' },
+      }),
+    ).toBe(true);
+    expect(
+      shouldWriteSbtDisplayLabelMemoEntry({
+        memoKey: '',
+        value: { name: 'Visible Name' },
+      }),
+    ).toBe(false);
+    expect(
+      shouldWriteSbtDisplayLabelMemoEntry({
+        memoKey: '0xabc|edge|84532',
+        value: { name: '' },
+      }),
+    ).toBe(false);
+    expect(
+      shouldWriteSbtDisplayLabelMemoEntry({
+        memoKey: '0xabc|edge|84532',
+        value: null,
+      }),
+    ).toBe(false);
   });
 
   it('preserves display metadata persistence eligibility', () => {
@@ -237,10 +256,8 @@ describe('sbtDisplayNameContracts', () => {
     };
     const before = JSON.stringify(bucket);
 
-    expect(resolveSbtCacheEntryFromBucket(bucket, addressA.toLowerCase()))
-      .toBe(bucket.sbtList[addressA.toLowerCase()]);
-    expect(resolveSbtCacheEntryFromBucket(bucket, addressB.toLowerCase()))
-      .toBe(bucket.sbtList.alias);
+    expect(resolveSbtCacheEntryFromBucket(bucket, addressA.toLowerCase())).toBe(bucket.sbtList[addressA.toLowerCase()]);
+    expect(resolveSbtCacheEntryFromBucket(bucket, addressB.toLowerCase())).toBe(bucket.sbtList.alias);
     expect(resolveSbtCacheEntryFromBucket({ sbtList: null }, addressA.toLowerCase())).toBeNull();
     expect(resolveSbtCacheEntryFromBucket(null, addressA.toLowerCase())).toBeNull();
     expect(JSON.stringify(bucket)).toBe(before);
@@ -276,17 +293,23 @@ describe('sbtDisplayNameContracts', () => {
       },
     };
 
-    expect(resolveSbtDisplayNameFromCacheValue(cacheValue, address.toLowerCase(), {
-      expectedChainId: 84532,
-    })).toEqual(expect.objectContaining({
-      name: 'Base Title',
-      netKey: '84532',
-      chainId: 84532,
-      entry: cacheValue[84532].sbtList.alias,
-    }));
-    expect(resolveSbtDisplayNameFromCacheValue(cacheValue, address.toLowerCase(), {
-      expectedChainId: 11155420,
-    })).toBeNull();
+    expect(
+      resolveSbtDisplayNameFromCacheValue(cacheValue, address.toLowerCase(), {
+        expectedChainId: 84532,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        name: 'Base Title',
+        netKey: '84532',
+        chainId: 84532,
+        entry: cacheValue[84532].sbtList.alias,
+      }),
+    );
+    expect(
+      resolveSbtDisplayNameFromCacheValue(cacheValue, address.toLowerCase(), {
+        expectedChainId: 11155420,
+      }),
+    ).toBeNull();
     expect(resolveSbtDisplayNameFromCacheValue(null, address.toLowerCase())).toBeNull();
   });
 
@@ -312,38 +335,50 @@ describe('sbtDisplayNameContracts', () => {
     };
     const before = JSON.stringify(cacheObj);
 
-    expect(resolveSbtDisplayCacheWriteNetKey({
-      cacheObj,
-      addressLower: address.toLowerCase(),
-      chainId: 84532,
-      info: { chainID: 10 },
-    })).toBe('84532');
-    expect(resolveSbtDisplayCacheWriteNetKey({
-      cacheObj,
-      addressLower: address.toLowerCase(),
-      chainId: null,
-      info: { chainID: 10 },
-    })).toBe('10');
-    expect(resolveSbtDisplayCacheWriteNetKey({
-      cacheObj,
-      addressLower: '0x5555555555555555555555555555555555555555',
-      chainId: 11155420,
-      info: { chainID: 84532 },
-    })).toBe('11155420');
-    expect(resolveSbtDisplayCacheWriteNetKey({
-      cacheObj,
-      addressLower: '0x5555555555555555555555555555555555555555',
-      chainId: null,
-      info: { chainID: 84532 },
-    })).toBe('84532');
-    expect(resolveSbtDisplayCacheWriteNetKey({
-      cacheObj: { 84532: { sbtList: {} } },
-      addressLower: address.toLowerCase(),
-    })).toBe('84532');
-    expect(resolveSbtDisplayCacheWriteNetKey({
-      cacheObj: { 84532: {}, 10: {} },
-      addressLower: address.toLowerCase(),
-    })).toBe('');
+    expect(
+      resolveSbtDisplayCacheWriteNetKey({
+        cacheObj,
+        addressLower: address.toLowerCase(),
+        chainId: 84532,
+        info: { chainID: 10 },
+      }),
+    ).toBe('84532');
+    expect(
+      resolveSbtDisplayCacheWriteNetKey({
+        cacheObj,
+        addressLower: address.toLowerCase(),
+        chainId: null,
+        info: { chainID: 10 },
+      }),
+    ).toBe('10');
+    expect(
+      resolveSbtDisplayCacheWriteNetKey({
+        cacheObj,
+        addressLower: '0x5555555555555555555555555555555555555555',
+        chainId: 11155420,
+        info: { chainID: 84532 },
+      }),
+    ).toBe('11155420');
+    expect(
+      resolveSbtDisplayCacheWriteNetKey({
+        cacheObj,
+        addressLower: '0x5555555555555555555555555555555555555555',
+        chainId: null,
+        info: { chainID: 84532 },
+      }),
+    ).toBe('84532');
+    expect(
+      resolveSbtDisplayCacheWriteNetKey({
+        cacheObj: { 84532: { sbtList: {} } },
+        addressLower: address.toLowerCase(),
+      }),
+    ).toBe('84532');
+    expect(
+      resolveSbtDisplayCacheWriteNetKey({
+        cacheObj: { 84532: {}, 10: {} },
+        addressLower: address.toLowerCase(),
+      }),
+    ).toBe('');
     expect(JSON.stringify(cacheObj)).toBe(before);
   });
 
@@ -364,12 +399,14 @@ describe('sbtDisplayNameContracts', () => {
     };
     const before = JSON.stringify({ existingEntry, metadata });
 
-    expect(buildSbtDisplayCacheEntry({
-      existingEntry,
-      checksum: '0xnew',
-      metadata,
-      slug: 'edge',
-    })).toEqual({
+    expect(
+      buildSbtDisplayCacheEntry({
+        existingEntry,
+        checksum: '0xnew',
+        metadata,
+        slug: 'edge',
+      }),
+    ).toEqual({
       sbtAddress: '0xnew',
       ownerCount: 2,
       sbtInfo: {
@@ -381,12 +418,14 @@ describe('sbtDisplayNameContracts', () => {
       },
       slug: 'edge',
     });
-    expect(buildSbtDisplayCacheEntry({
-      existingEntry: null,
-      checksum: '0xnew',
-      metadata: { encryptedName: true },
-      slug: 'edge',
-    })).toEqual({
+    expect(
+      buildSbtDisplayCacheEntry({
+        existingEntry: null,
+        checksum: '0xnew',
+        metadata: { encryptedName: true },
+        slug: 'edge',
+      }),
+    ).toEqual({
       sbtAddress: '0xnew',
       sbtInfo: { encryptedName: true },
       slug: 'edge',

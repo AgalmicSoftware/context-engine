@@ -12,26 +12,22 @@ import {
 
 const deepClone = (value) => JSON.parse(JSON.stringify(value));
 
-const buildTimestampedCacheEntries = (count, buildEntry) => (
-  Object.fromEntries(
-    Array.from({ length: count }, (_, index) => [
-      `tx-${index}`,
-      buildEntry(index),
-    ])
-  )
-);
+const buildTimestampedCacheEntries = (count, buildEntry) =>
+  Object.fromEntries(Array.from({ length: count }, (_, index) => [`tx-${index}`, buildEntry(index)]));
 
 const buildSubjectConfig = () => ({
-  resolveSession: (groupKeyOrCfg) => (
+  resolveSession: (groupKeyOrCfg) =>
     groupKeyOrCfg && typeof groupKeyOrCfg === 'object'
       ? groupKeyOrCfg
       : {
           slug: String(groupKeyOrCfg || ''),
           networkChainId: 84532,
           contracts: {},
-        }
-  ),
-  normalizeSessionSlug: (slug) => String(slug || '').trim().toLowerCase(),
+        },
+  normalizeSessionSlug: (slug) =>
+    String(slug || '')
+      .trim()
+      .toLowerCase(),
   getSessionAddresses: () => ({
     sbtFactory: {
       address: '0x0000000000000000000000000000000000000001',
@@ -90,10 +86,12 @@ const loadIsolatedModule = ({
 describe('contractScriptsCache helpers', () => {
   it('preserves hash memo key formats', () => {
     expect(buildHashReadMemoKey({ baseKey: '84532|edge', id: '0xabc' })).toBe('84532|edge|0xabc');
-    expect(buildHashReadInflightKey({ baseKey: '84532|edge', id: '0xabc', throwOnError: true }))
-      .toBe('84532|edge|0xabc|strict:1');
-    expect(buildHashReadInflightKey({ baseKey: '84532|edge', id: '0xabc', throwOnError: false }))
-      .toBe('84532|edge|0xabc|strict:0');
+    expect(buildHashReadInflightKey({ baseKey: '84532|edge', id: '0xabc', throwOnError: true })).toBe(
+      '84532|edge|0xabc|strict:1',
+    );
+    expect(buildHashReadInflightKey({ baseKey: '84532|edge', id: '0xabc', throwOnError: false })).toBe(
+      '84532|edge|0xabc|strict:0',
+    );
   });
 
   it('dedupes hash revert log keys and prunes oldest entries', () => {
@@ -226,11 +224,7 @@ describe('contractScriptsCache helpers', () => {
 
     await subject.writeArweaveTxCacheEntry({ groupKeyOrCfg: '', txId: 'tx-1', text: 'fresh payload' });
 
-    expect(updateCacheAtomic).toHaveBeenCalledWith(
-      'questionsCache',
-      '',
-      expect.any(Function)
-    );
+    expect(updateCacheAtomic).toHaveBeenCalledWith('questionsCache', '', expect.any(Function));
     expect(updatedCache['084532']).toEqual(startingCache['084532']);
     expect(updatedCache['84532'].arweaveTxCache['tx-1']).toMatchObject({
       text: 'fresh payload',
@@ -242,14 +236,11 @@ describe('contractScriptsCache helpers', () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(5000);
     const startingCache = {
       84532: {
-        arweaveTxCache: buildTimestampedCacheEntries(
-          ARWEAVE_TX_CACHE_MAX_ENTRIES,
-          (index) => ({
-            text: `payload-${index}`,
-            contentType: 'text/plain',
-            savedAtMs: index + 1,
-          })
-        ),
+        arweaveTxCache: buildTimestampedCacheEntries(ARWEAVE_TX_CACHE_MAX_ENTRIES, (index) => ({
+          text: `payload-${index}`,
+          contentType: 'text/plain',
+          savedAtMs: index + 1,
+        })),
       },
     };
     let updatedCache = null;
@@ -288,18 +279,15 @@ describe('contractScriptsCache helpers', () => {
   it('keeps the bounded Arweave tx failure cache at max size and prunes the oldest failure row', async () => {
     const startingCache = {
       84532: {
-        arweaveTxFailureCache: buildTimestampedCacheEntries(
-          ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES,
-          (index) => ({
-            attempts: 1,
-            firstFailedAtMs: index + 1,
-            lastFailedAtMs: index + 1,
-            nextRetryAtMs: index + 100,
-            lastStatus: 503,
-            state: 'transient',
-            message: `failure-${index}`,
-          })
-        ),
+        arweaveTxFailureCache: buildTimestampedCacheEntries(ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES, (index) => ({
+          attempts: 1,
+          firstFailedAtMs: index + 1,
+          lastFailedAtMs: index + 1,
+          nextRetryAtMs: index + 100,
+          lastStatus: 503,
+          state: 'transient',
+          message: `failure-${index}`,
+        })),
       },
     };
     let updatedCache = null;

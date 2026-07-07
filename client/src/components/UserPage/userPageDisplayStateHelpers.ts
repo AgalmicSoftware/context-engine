@@ -1,7 +1,4 @@
-import {
-  toAnalysisRecord,
-  type UserPageUnknownRecord,
-} from './userPageCoreHelpers';
+import { toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 
 type BuildUserPageBooleanTogglePatchArgs = {
   state?: unknown;
@@ -105,9 +102,10 @@ export const buildUserPageFullProfileModalStatePatch = ({
   showFullProfileModal: open === true,
 });
 
-export const buildUserPageCopiedStatePatch = ({
-  copied = false,
-}: BuildUserPageCopiedStatePatchArgs = {}): Record<string, boolean> => ({
+export const buildUserPageCopiedStatePatch = ({ copied = false }: BuildUserPageCopiedStatePatchArgs = {}): Record<
+  string,
+  boolean
+> => ({
   copied: copied === true,
 });
 
@@ -125,18 +123,14 @@ export const buildUserPageRootClassName = ({
   baseClassName = '',
   minimized = false,
   minimizedClassName = '',
-}: BuildUserPageRootClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  minimized ? String(minimizedClassName || '') : '',
-].filter(Boolean).join(' '));
+}: BuildUserPageRootClassNameArgs = {}): string =>
+  [String(baseClassName || ''), minimized ? String(minimizedClassName || '') : ''].filter(Boolean).join(' ');
 
 export const buildUserPageCreatedQuestionWrapperClassName = ({
   baseClassName = '',
   bolderClassName = '',
-}: BuildUserPageCreatedQuestionWrapperClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  String(bolderClassName || ''),
-].filter(Boolean).join(' '));
+}: BuildUserPageCreatedQuestionWrapperClassNameArgs = {}): string =>
+  [String(baseClassName || ''), String(bolderClassName || '')].filter(Boolean).join(' ');
 
 export const resolveUserPageAvatarDisplayState = ({
   blockieUrl = '',

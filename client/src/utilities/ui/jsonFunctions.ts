@@ -13,7 +13,8 @@ export const copyJsonToClipboard = (obj: unknown): Promise<void> => {
       return Promise.reject(error);
     }
 
-    return navigator.clipboard.writeText(formatted)
+    return navigator.clipboard
+      .writeText(formatted)
       .then(() => {
         notify.success('JSON copied to clipboard');
       })

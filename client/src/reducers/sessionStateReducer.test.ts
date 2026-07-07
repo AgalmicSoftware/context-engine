@@ -97,25 +97,17 @@ describe('sessionStateReducer', () => {
     it('uses stored false regardless of the env default', () => {
       localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(false));
 
-      expect(
-        loadReducerWithDemoSurfaceModeDefault('true')(undefined, { type: '@@INIT' }).demoSurfaceMode
-      ).toBe(false);
+      expect(loadReducerWithDemoSurfaceModeDefault('true')(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(false);
 
-      expect(
-        loadReducerWithDemoSurfaceModeDefault('false')(undefined, { type: '@@INIT' }).demoSurfaceMode
-      ).toBe(false);
+      expect(loadReducerWithDemoSurfaceModeDefault('false')(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(false);
     });
 
     it('uses stored true regardless of the env default', () => {
       localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(true));
 
-      expect(
-        loadReducerWithDemoSurfaceModeDefault('false')(undefined, { type: '@@INIT' }).demoSurfaceMode
-      ).toBe(true);
+      expect(loadReducerWithDemoSurfaceModeDefault('false')(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(true);
 
-      expect(
-        loadReducerWithDemoSurfaceModeDefault('true')(undefined, { type: '@@INIT' }).demoSurfaceMode
-      ).toBe(true);
+      expect(loadReducerWithDemoSurfaceModeDefault('true')(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(true);
     });
 
     it('uses the env default when no demoSurfaceMode preference is stored and the default is true', () => {
@@ -199,7 +191,7 @@ describe('sessionStateReducer', () => {
       {
         type: SET_DEMO_SURFACE_MODE,
         payload: false,
-      }
+      },
     );
 
     expect(updated.demoSurfaceMode).toBe(false);
@@ -238,7 +230,7 @@ describe('sessionStateReducer', () => {
       {
         type: TOGGLE_DEMO_MODE,
         payload: { tools: true, futureTab: true, votes: true },
-      }
+      },
     );
     expect(withPartialDemoMode.demoMode).toEqual({
       tools: true,

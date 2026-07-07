@@ -59,11 +59,7 @@ const NORMALIZED_GENERAL_REGISTRY_SESSION = {
   },
 };
 
-const deepClone = (value) => (
-  typeof value === 'undefined'
-    ? value
-    : JSON.parse(JSON.stringify(value))
-);
+const deepClone = (value) => (typeof value === 'undefined' ? value : JSON.parse(JSON.stringify(value)));
 
 const setRegistryCacheState = (registryState) => {
   if (registryState === 'populated') {
@@ -117,9 +113,9 @@ const resetResolverMockImplementations = () => {
   mockSessionRegistryReadCache.mockImplementation(() => readMockRegistryCache());
 
   mockSessionRegistryGetAllSessionEntries.mockReset();
-  mockSessionRegistryGetAllSessionEntries.mockImplementation(() => (
-    Object.entries(getMockRegistrySessions()).map(([key, value]) => [key, deepClone(value)])
-  ));
+  mockSessionRegistryGetAllSessionEntries.mockImplementation(() =>
+    Object.entries(getMockRegistrySessions()).map(([key, value]) => [key, deepClone(value)]),
+  );
 
   mockSessionRegistryRefreshSessionRegistryFieldsCache.mockReset();
   mockSessionRegistryRefreshSessionRegistryFieldsCache.mockResolvedValue(undefined);
@@ -287,7 +283,8 @@ const CALLER_NULL_SAFETY = [
     caller: 'getWeb3Context',
     file: 'contractScripts.impl.ts#getWeb3Context',
     safe: true,
-    reason: 'extractChainId(cfg) and getSessionAddresses(cfg) are null-tolerant, so the context is created with fallback/default-chain resolution.',
+    reason:
+      'extractChainId(cfg) and getSessionAddresses(cfg) are null-tolerant, so the context is created with fallback/default-chain resolution.',
   },
   {
     caller: 'maybeDecryptSurveyPayload',
@@ -305,7 +302,8 @@ const CALLER_NULL_SAFETY = [
     caller: 'predictSBTAddress',
     file: 'contractScripts.impl.ts#predictSBTAddress',
     safe: true,
-    reason: 'null cfg collapses to empty slug/address lookup; missing sbtFactory address returns an empty string early.',
+    reason:
+      'null cfg collapses to empty slug/address lookup; missing sbtFactory address returns an empty string early.',
   },
   {
     caller: 'addSurveyWithQuestions',
@@ -359,7 +357,8 @@ const CALLER_NULL_SAFETY = [
     caller: 'getReadProviderForGroup',
     file: 'rpcProviders.js#getReadProviderForGroup',
     safe: true,
-    reason: 'extractChainId(null) falls back through DEFAULT_CHAIN_ID and the remaining provider-selection helpers use optional chaining.',
+    reason:
+      'extractChainId(null) falls back through DEFAULT_CHAIN_ID and the remaining provider-selection helpers use optional chaining.',
   },
 ];
 
@@ -376,7 +375,8 @@ const CALLER_EXPORT_RESOLVERS = {
   addQuestions: ({ contractScriptsImplModule }) => contractScriptsImplModule.default?.addQuestions,
   createSBT: ({ contractScriptsImplModule }) => contractScriptsImplModule.default?.createSBT,
   countSBTCreated: ({ contractScriptsImplModule }) => contractScriptsImplModule.default?.countSBTCreated,
-  getSbtCreationBlockByAddress: ({ contractScriptsImplModule }) => contractScriptsImplModule.default?.getSbtCreationBlockByAddress,
+  getSbtCreationBlockByAddress: ({ contractScriptsImplModule }) =>
+    contractScriptsImplModule.default?.getSbtCreationBlockByAddress,
   getSbtMetadata: ({ contractScriptsImplModule }) => contractScriptsImplModule.default?.getSbtMetadata,
   isPasswordValid: ({ contractScriptsImplModule }) => contractScriptsImplModule.default?.isPasswordValid,
   getReadProviderForGroup: ({ rpcProvidersModule }) => rpcProvidersModule.getReadProviderForGroup,
@@ -408,11 +408,7 @@ describe('resolveSession parity characterization', () => {
         jest.resetModules();
         installResolverMocks({ useOnchainRegistry });
         resetResolverMockImplementations();
-        ({
-          localModule,
-          exportedModule,
-          sessionSourceResolverModule,
-        } = loadScenarioBranchModules());
+        ({ localModule, exportedModule, sessionSourceResolverModule } = loadScenarioBranchModules());
       });
 
       afterAll(() => {
@@ -568,7 +564,8 @@ describe('resolveSession parity characterization', () => {
           caller: 'getWeb3Context',
           file: 'contractScripts.impl.ts#getWeb3Context',
           safe: true,
-          reason: 'extractChainId(cfg) and getSessionAddresses(cfg) are null-tolerant, so the context is created with fallback/default-chain resolution.',
+          reason:
+            'extractChainId(cfg) and getSessionAddresses(cfg) are null-tolerant, so the context is created with fallback/default-chain resolution.',
         },
         {
           caller: 'maybeDecryptSurveyPayload',
@@ -586,7 +583,8 @@ describe('resolveSession parity characterization', () => {
           caller: 'predictSBTAddress',
           file: 'contractScripts.impl.ts#predictSBTAddress',
           safe: true,
-          reason: 'null cfg collapses to empty slug/address lookup; missing sbtFactory address returns an empty string early.',
+          reason:
+            'null cfg collapses to empty slug/address lookup; missing sbtFactory address returns an empty string early.',
         },
         {
           caller: 'addSurveyWithQuestions',
@@ -616,7 +614,8 @@ describe('resolveSession parity characterization', () => {
           caller: 'getSbtCreationBlockByAddress',
           file: 'contractScripts.impl.ts#getSbtCreationBlockByAddress',
           safe: true,
-          reason: 'getSessionAddresses(cfg) handles null and the function returns null when no factory address resolves.',
+          reason:
+            'getSessionAddresses(cfg) handles null and the function returns null when no factory address resolves.',
         },
         {
           caller: 'getSbtMetadata',
@@ -634,13 +633,15 @@ describe('resolveSession parity characterization', () => {
           caller: 'getLocalAwareReadProviderForGroup',
           file: 'rpcProviders.js#getLocalAwareReadProviderForGroup',
           safe: true,
-          reason: 'extractChainId(null) falls back through DEFAULT_CHAIN_ID before delegating to getReadProviderForGroup.',
+          reason:
+            'extractChainId(null) falls back through DEFAULT_CHAIN_ID before delegating to getReadProviderForGroup.',
         },
         {
           caller: 'getReadProviderForGroup',
           file: 'rpcProviders.js#getReadProviderForGroup',
           safe: true,
-          reason: 'extractChainId(null) falls back through DEFAULT_CHAIN_ID and the remaining provider-selection helpers use optional chaining.',
+          reason:
+            'extractChainId(null) falls back through DEFAULT_CHAIN_ID and the remaining provider-selection helpers use optional chaining.',
         },
       ]);
     });

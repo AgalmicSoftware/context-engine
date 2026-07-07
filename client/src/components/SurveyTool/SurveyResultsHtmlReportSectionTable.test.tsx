@@ -33,7 +33,7 @@ describe('SurveyResultsHtmlReportSectionTable', () => {
           report: true,
         }}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByText('Report')).toBeInTheDocument();

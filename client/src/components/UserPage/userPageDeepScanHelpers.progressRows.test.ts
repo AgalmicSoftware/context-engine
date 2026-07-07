@@ -65,10 +65,12 @@ describe('userPageDeepScanHelpers progress row helpers', () => {
       startBlock: 100,
       displayLastBlock: 125,
     });
-    expect(buildUserPageDeepScanProgressRowDisplayState({
-      index: 2,
-      row: determinateRow,
-    })).toEqual({
+    expect(
+      buildUserPageDeepScanProgressRowDisplayState({
+        index: 2,
+        row: determinateRow,
+      }),
+    ).toEqual({
       indeterminateText: '125 scanned',
       progressFillStyle: { width: '25%' },
       progressWidth: '25%',
@@ -95,10 +97,12 @@ describe('userPageDeepScanHelpers progress row helpers', () => {
       percentComplete: null,
       isDeterminate: false,
     });
-    expect(buildUserPageDeepScanProgressRowDisplayState({
-      row: indeterminateRow,
-      showScannedText: false,
-    })).toMatchObject({
+    expect(
+      buildUserPageDeepScanProgressRowDisplayState({
+        row: indeterminateRow,
+        showScannedText: false,
+      }),
+    ).toMatchObject({
       indeterminateText: 'Syncing... latest block pending',
       progressFillStyle: { width: '0%' },
       progressWidth: '0%',
@@ -112,11 +116,9 @@ describe('userPageDeepScanHelpers progress row helpers', () => {
   it('derives deep-scan progress rows from user cache entries', () => {
     const viewAddress = '0x00000000000000000000000000000000000000AA';
     const viewLower = viewAddress.toLowerCase();
-    const getSessionDisplayConfig = jest.fn((slug: string) => (
-      slug === 'edge-session'
-        ? { sessionName: 'Edge Session', blockLimits: { start: 100 } }
-        : null
-    ));
+    const getSessionDisplayConfig = jest.fn((slug: string) =>
+      slug === 'edge-session' ? { sessionName: 'Edge Session', blockLimits: { start: 100 } } : null,
+    );
 
     const rows = deriveUserPageDeepScanProgressRows({
       currentChainId: 84532,
@@ -169,33 +171,41 @@ describe('userPageDeepScanHelpers progress row helpers', () => {
   });
 
   it('builds deep-scan row signatures from progress fields', () => {
-    expect(buildUserPageDeepScanProgressRowsSignature([
-      makeRow({ label: 'Alpha Session' }),
-    ])).toBe('alpha:84532:1000:1200:200:50:1:Alpha Session');
+    expect(buildUserPageDeepScanProgressRowsSignature([makeRow({ label: 'Alpha Session' })])).toBe(
+      'alpha:84532:1000:1200:200:50:1:Alpha Session',
+    );
     expect(buildUserPageDeepScanProgressRowsSignature(null)).toBe('');
-    expect(buildUserPageDeepScanTooltipOutputSignature({
-      deepScanTooltipLines: ['Alpha', 'Beta'],
-      deepScanProgressRows: [makeRow({ label: 'Alpha Session' })],
-    })).toBe('Alpha|Beta||alpha:84532:1000:1200:200:50:1:Alpha Session');
-    expect(buildUserPageDeepScanTooltipOutputSignature({
-      deepScanTooltipLines: null,
-      deepScanProgressRows: null,
-    })).toBe('||');
-    expect(resolveUserPageDeepScanProgressStateUpdate({
-      currentDeepScanProgressRows: [makeRow({ label: 'Alpha Session' })],
-      currentDeepScanTooltipLines: ['Alpha', 'Beta'],
-      nextDeepScanProgressRows: [makeRow({ label: 'Alpha Session' })],
-      nextDeepScanTooltipLines: ['Alpha', 'Beta'],
-    })).toEqual({
+    expect(
+      buildUserPageDeepScanTooltipOutputSignature({
+        deepScanTooltipLines: ['Alpha', 'Beta'],
+        deepScanProgressRows: [makeRow({ label: 'Alpha Session' })],
+      }),
+    ).toBe('Alpha|Beta||alpha:84532:1000:1200:200:50:1:Alpha Session');
+    expect(
+      buildUserPageDeepScanTooltipOutputSignature({
+        deepScanTooltipLines: null,
+        deepScanProgressRows: null,
+      }),
+    ).toBe('||');
+    expect(
+      resolveUserPageDeepScanProgressStateUpdate({
+        currentDeepScanProgressRows: [makeRow({ label: 'Alpha Session' })],
+        currentDeepScanTooltipLines: ['Alpha', 'Beta'],
+        nextDeepScanProgressRows: [makeRow({ label: 'Alpha Session' })],
+        nextDeepScanTooltipLines: ['Alpha', 'Beta'],
+      }),
+    ).toEqual({
       nextOutputSignature: 'Alpha|Beta||alpha:84532:1000:1200:200:50:1:Alpha Session',
       shouldUpdate: false,
     });
-    expect(resolveUserPageDeepScanProgressStateUpdate({
-      currentDeepScanProgressRows: [makeRow({ label: 'Alpha Session' })],
-      currentDeepScanTooltipLines: ['Alpha'],
-      nextDeepScanProgressRows: [makeRow({ label: 'Beta Session', remainingBlocks: 150 })],
-      nextDeepScanTooltipLines: ['Beta'],
-    })).toEqual({
+    expect(
+      resolveUserPageDeepScanProgressStateUpdate({
+        currentDeepScanProgressRows: [makeRow({ label: 'Alpha Session' })],
+        currentDeepScanTooltipLines: ['Alpha'],
+        nextDeepScanProgressRows: [makeRow({ label: 'Beta Session', remainingBlocks: 150 })],
+        nextDeepScanTooltipLines: ['Beta'],
+      }),
+    ).toEqual({
       nextOutputSignature: 'Beta||alpha:84532:1000:1200:150:50:1:Beta Session',
       shouldUpdate: true,
     });

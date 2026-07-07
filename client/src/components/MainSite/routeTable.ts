@@ -1,13 +1,6 @@
-import {
-  KNOWN_ROUTE_PREFIXES,
-  VALID_SURVEY_ID_RE,
-  isStaticNonCacheRoute,
-} from './routeConfig.js';
+import { KNOWN_ROUTE_PREFIXES, VALID_SURVEY_ID_RE, isStaticNonCacheRoute } from './routeConfig.js';
 import { isOnOrWithinRoutePath } from './routePathHelpers.js';
-import {
-  getSbtAddressFromPath,
-  isSbtListRoutePath,
-} from './sbtRoutePathHelpers.js';
+import { getSbtAddressFromPath, isSbtListRoutePath } from './sbtRoutePathHelpers.js';
 
 export type MainSiteRouteKey =
   | 'wizard'
@@ -70,13 +63,14 @@ type RouteDefinitionContext = {
   surveyIDFromPath: string | null;
 };
 
-const splitCleanPath = (path: string): string[] => (
-  String(path || '').split('?')[0].split('#')[0].split('/').filter(Boolean)
-);
+const splitCleanPath = (path: string): string[] =>
+  String(path || '')
+    .split('?')[0]
+    .split('#')[0]
+    .split('/')
+    .filter(Boolean);
 
-const isExactRoute = (path: string, route: string): boolean => (
-  path === route || path === `${route}/`
-);
+const isExactRoute = (path: string, route: string): boolean => path === route || path === `${route}/`;
 
 const readQuestionId = (pathSegments: string[]): string | null => {
   const questionIndex = pathSegments.indexOf('question');
@@ -116,19 +110,14 @@ const routeDefinitions: RouteDefinition[] = [
   },
   {
     key: 'compare',
-    match: ({ fullPath }) => (
-      fullPath === '/compare' ||
-      fullPath === '/compare/' ||
-      fullPath.startsWith('/compare/')
-    ),
+    match: ({ fullPath }) => fullPath === '/compare' || fullPath === '/compare/' || fullPath.startsWith('/compare/'),
   },
   {
     key: 'surveysOrQuestionsList',
-    match: ({ fullPath }) => (
+    match: ({ fullPath }) =>
       isOnOrWithinRoutePath(fullPath, '/surveys') ||
       fullPath.startsWith('/survey/') ||
-      isOnOrWithinRoutePath(fullPath, '/questions')
-    ),
+      isOnOrWithinRoutePath(fullPath, '/questions'),
   },
   {
     key: 'questionDetail',
@@ -193,17 +182,18 @@ export function resolveMainSiteRouteMatch({
 }: ResolveMainSiteRouteMatchOptions): MainSiteRouteMatch {
   const pathWithoutQuery = String(fullPath || '').split('?')[0] || '';
   const pathSegments = splitCleanPath(pathWithoutQuery);
-  const firstPathSegment = String(pathSegments[0] || '').trim().toLowerCase();
-  const inferredSurveyID = surveyIDFromPath || (
-    pathWithoutQuery.startsWith('/survey/') &&
-    pathSegments[1] &&
-    VALID_SURVEY_ID_RE.test(pathSegments[1])
+  const firstPathSegment = String(pathSegments[0] || '')
+    .trim()
+    .toLowerCase();
+  const inferredSurveyID =
+    surveyIDFromPath ||
+    (pathWithoutQuery.startsWith('/survey/') && pathSegments[1] && VALID_SURVEY_ID_RE.test(pathSegments[1])
       ? pathSegments[1]
-      : null
-  );
+      : null);
   const isSbtsListRoute = isSbtListRoutePath(pathWithoutQuery);
   const sbtAddress = getSbtAddressFromPath(pathWithoutQuery, { isAddress });
-  const isSbtDetailRoute = !!sbtAddress || pathWithoutQuery.startsWith('/sbt/') || pathWithoutQuery.startsWith('/group/');
+  const isSbtDetailRoute =
+    !!sbtAddress || pathWithoutQuery.startsWith('/sbt/') || pathWithoutQuery.startsWith('/group/');
   const isKnownRoutePrefix =
     pathWithoutQuery === '/' ||
     pathWithoutQuery === '' ||
@@ -235,7 +225,7 @@ export function resolveMainSiteRouteMatch({
     shouldBypassCacheHydrationWait,
     surveyIDFromPath: inferredSurveyID,
     sbtAddress,
-    sessionToken: firstPathSegment === 'session' ? (pathSegments[1] || null) : null,
+    sessionToken: firstPathSegment === 'session' ? pathSegments[1] || null : null,
     questionId: readQuestionId(pathSegments),
   };
 }

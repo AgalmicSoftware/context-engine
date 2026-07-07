@@ -1,8 +1,4 @@
-import {
-  LazySurveyResults,
-  QuestionsDashboard,
-  SurveySelector,
-} from './SurveySelector';
+import { LazySurveyResults, QuestionsDashboard, SurveySelector } from './SurveySelector';
 
 const findElement = (node: any, predicate: (candidate: any) => boolean): any => {
   const stack = [node];

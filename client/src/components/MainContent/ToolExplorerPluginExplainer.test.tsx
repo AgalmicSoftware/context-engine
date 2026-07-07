@@ -4,9 +4,7 @@ import ToolExplorerPluginExplainer from './ToolExplorerPluginExplainer';
 
 jest.mock('../Shared/CETooltip', () => ({
   __esModule: true,
-  default: ({ children }: { children: React.ReactNode }) => (
-    <span data-testid="mock-ce-tooltip">{children}</span>
-  ),
+  default: ({ children }: { children: React.ReactNode }) => <span data-testid="mock-ce-tooltip">{children}</span>,
 }));
 
 describe('ToolExplorerPluginExplainer', () => {

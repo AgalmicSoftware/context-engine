@@ -25,7 +25,9 @@ const clientId = (() => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return crypto.randomUUID();
     }
-  } catch (e) { storageLog.warn('storageManager: fallback', e); }
+  } catch (e) {
+    storageLog.warn('storageManager: fallback', e);
+  }
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 })();
 
@@ -53,7 +55,9 @@ const broadcast = (message) => {
       sourceId: clientId,
       ts: Date.now(),
     });
-  } catch (e) { storageLog.warn('storageManager: fallback', e); }
+  } catch (e) {
+    storageLog.warn('storageManager: fallback', e);
+  }
 };
 
 const isQuotaExceeded = (err) => {
@@ -132,10 +136,14 @@ const openDb = () => {
         db.onversionchange = () => {
           try {
             db.close();
-          } catch (e) { storageLog.warn('storageManager: cleanup', e); }
+          } catch (e) {
+            storageLog.warn('storageManager: cleanup', e);
+          }
           dbPromise = null;
         };
-      } catch (e) { storageLog.warn('storageManager: cleanup', e); }
+      } catch (e) {
+        storageLog.warn('storageManager: cleanup', e);
+      }
       resolve(db);
     };
   });
@@ -224,7 +232,9 @@ const migrateLocalStorageToIdb = async (db) => {
     if (raw == null) {
       try {
         localStorage.removeItem(key);
-      } catch (e) { storageLog.warn('storageManager: fallback', e); }
+      } catch (e) {
+        storageLog.warn('storageManager: fallback', e);
+      }
       continue;
     }
 
@@ -269,7 +279,9 @@ const evictOldIdbEntries = async (db, { maxAgeMs = CACHE_MAX_AGE_MS } = {}) => {
   for (const key of toDelete) {
     try {
       await idbDeleteRecord(db, key);
-    } catch (e) { storageLog.warn('storageManager: fallback', e); }
+    } catch (e) {
+      storageLog.warn('storageManager: fallback', e);
+    }
   }
   return toDelete.length;
 };
@@ -282,7 +294,9 @@ const trimIdbArrays = async (db, { maxEntries = MAX_ARRAY_ENTRIES } = {}) => {
     try {
       trimLargeArraysInPlace(rec.value, maxEntries);
       await idbPutRecord(db, rec);
-    } catch (e) { storageLog.warn('storageManager: fallback', e); }
+    } catch (e) {
+      storageLog.warn('storageManager: fallback', e);
+    }
   }
 };
 
@@ -305,7 +319,9 @@ const writeLocalStorageMeta = (meta) => {
   if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(LS_META_KEY, JSON.stringify(meta || {}));
-  } catch (e) { storageLog.warn('storageManager: fallback', e); }
+  } catch (e) {
+    storageLog.warn('storageManager: fallback', e);
+  }
 };
 
 const evictOldLocalStorageEntries = ({ maxAgeMs = CACHE_MAX_AGE_MS } = {}) => {
@@ -321,7 +337,9 @@ const evictOldLocalStorageEntries = ({ maxAgeMs = CACHE_MAX_AGE_MS } = {}) => {
     try {
       localStorage.removeItem(key);
       deleted += 1;
-    } catch (e) { storageLog.warn('storageManager: fallback', e); }
+    } catch (e) {
+      storageLog.warn('storageManager: fallback', e);
+    }
     delete meta[key];
   });
 
@@ -339,7 +357,9 @@ const trimLocalStorageArrays = ({ maxEntries = MAX_ARRAY_ENTRIES } = {}) => {
       const key = localStorage.key(i);
       if (key && key.startsWith(DG_PREFIX)) keys.push(key);
     }
-  } catch (e) { storageLog.warn('storageManager: fallback', e); }
+  } catch (e) {
+    storageLog.warn('storageManager: fallback', e);
+  }
 
   const now = Date.now();
 
@@ -352,7 +372,9 @@ const trimLocalStorageArrays = ({ maxEntries = MAX_ARRAY_ENTRIES } = {}) => {
       trimLargeArraysInPlace(parsed, maxEntries);
       localStorage.setItem(key, JSON.stringify(parsed));
       meta[key] = now;
-    } catch (e) { storageLog.warn('storageManager: fallback', e); }
+    } catch (e) {
+      storageLog.warn('storageManager: fallback', e);
+    }
   });
 
   writeLocalStorageMeta(meta);
@@ -372,7 +394,9 @@ const storageManager = {
       if (msg.sourceId && msg.sourceId === clientId) return;
       try {
         handler(msg);
-      } catch (e) { storageLog.warn('storageManager: callback', e); }
+      } catch (e) {
+        storageLog.warn('storageManager: callback', e);
+      }
     };
 
     try {
@@ -380,13 +404,17 @@ const storageManager = {
     } catch (_) {
       try {
         chan.onmessage = listener;
-      } catch (e) { storageLog.warn('storageManager: fallback', e); }
+      } catch (e) {
+        storageLog.warn('storageManager: fallback', e);
+      }
     }
 
     return () => {
       try {
         chan.removeEventListener('message', listener);
-      } catch (e) { storageLog.warn('storageManager: cleanup', e); }
+      } catch (e) {
+        storageLog.warn('storageManager: cleanup', e);
+      }
     };
   },
 
@@ -494,7 +522,9 @@ const storageManager = {
       evictOldLocalStorageEntries();
       trimLocalStorageArrays();
       trimLargeArraysInPlace(obj, MAX_ARRAY_ENTRIES);
-    } catch (e) { storageLog.warn('storageManager: fallback', e); }
+    } catch (e) {
+      storageLog.warn('storageManager: fallback', e);
+    }
 
     try {
       localStorage.setItem(key, JSON.stringify(obj));
@@ -530,17 +560,20 @@ const storageManager = {
 
     try {
       localStorage.removeItem(key);
-    } catch (e) { storageLog.warn('storageManager: fallback', e); }
+    } catch (e) {
+      storageLog.warn('storageManager: fallback', e);
+    }
 
     try {
       const meta = readLocalStorageMeta();
       delete meta[key];
       writeLocalStorageMeta(meta);
-    } catch (e) { storageLog.warn('storageManager: fallback', e); }
+    } catch (e) {
+      storageLog.warn('storageManager: fallback', e);
+    }
 
     broadcast({ action: 'remove', key, name, slug, fallback: 'localStorage' });
   },
 };
 
 export default storageManager;
-

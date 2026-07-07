@@ -61,10 +61,12 @@ describe('contractHelpers sendTestnetFunds', () => {
     const corsProxyOpts = getCorsProxyUrlOrThrow.mock.calls[0][0];
 
     expect(getCorsProxyUrlOrThrow).toHaveBeenCalledTimes(1);
-    expect(corsProxyOpts).toEqual(expect.objectContaining({
-      sessionSlug: 'alpha',
-      allowDemoFallback: defaultStrictAllowDemoFallback(),
-    }));
+    expect(corsProxyOpts).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'alpha',
+        allowDemoFallback: defaultStrictAllowDemoFallback(),
+      }),
+    );
     expect(workerUrl).toBe('https://worker.example.com/base');
     expect(JSON.parse(init.body)).toEqual({
       action: 'request_test_eth',
@@ -74,11 +76,13 @@ describe('contractHelpers sendTestnetFunds', () => {
       hashedPassword: `0x${'ab'.repeat(32)}`,
       signature: `0x${'cd'.repeat(65)}`,
     });
-    expect(authContext).toEqual(expect.objectContaining({
-      sessionSlug: 'alpha',
-      workerUrl: 'https://worker.example.com/base',
-      allowDemoFallback: defaultStrictAllowDemoFallback(),
-    }));
+    expect(authContext).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'alpha',
+        workerUrl: 'https://worker.example.com/base',
+        allowDemoFallback: defaultStrictAllowDemoFallback(),
+      }),
+    );
     expect(result).toEqual({ ok: true, txHash: '0xproof123' });
   });
 
@@ -126,11 +130,13 @@ describe('contractHelpers sendTestnetFunds', () => {
     const recipientAddress = '0x1111111111111111111111111111111111111111';
     await helper.sendTestnetFunds(recipientAddress, 'missing-session');
 
-    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(expect.objectContaining({
-      sessionSlug: 'missing-session',
-      sessionConfig: null,
-      allowDemoFallback: defaultStrictAllowDemoFallback(),
-    }));
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'missing-session',
+        sessionConfig: null,
+        allowDemoFallback: defaultStrictAllowDemoFallback(),
+      }),
+    );
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker.example.com/base',
       expect.any(Object),
@@ -138,7 +144,7 @@ describe('contractHelpers sendTestnetFunds', () => {
         sessionSlug: 'missing-session',
         workerUrl: 'https://worker.example.com/base',
         allowDemoFallback: defaultStrictAllowDemoFallback(),
-      })
+      }),
     );
   });
 
@@ -192,13 +198,15 @@ describe('contractHelpers sendTestnetFunds', () => {
       },
     });
 
-    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(expect.objectContaining({
-      context: expect.objectContaining({
-        account: recipientAddress,
-        providerLike: 'wagmi',
-        chainId: 84532,
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({
+          account: recipientAddress,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        }),
       }),
-    }));
+    );
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker.example.com/base',
       expect.any(Object),
@@ -208,7 +216,7 @@ describe('contractHelpers sendTestnetFunds', () => {
           providerLike: 'wagmi',
           chainId: 84532,
         }),
-      })
+      }),
     );
   });
 
@@ -259,12 +267,14 @@ describe('contractHelpers sendTestnetFunds', () => {
     const recipientAddress = '0x1111111111111111111111111111111111111111';
     await helper.sendTestnetFunds(recipientAddress, 'demo-1');
 
-    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(expect.objectContaining({
-      sessionSlug: 'demo-1',
-      context: expect.objectContaining({
-        chainId: 11155420,
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'demo-1',
+        context: expect.objectContaining({
+          chainId: 11155420,
+        }),
       }),
-    }));
+    );
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker.example.com/base',
       expect.any(Object),
@@ -273,7 +283,7 @@ describe('contractHelpers sendTestnetFunds', () => {
         context: expect.objectContaining({
           chainId: 11155420,
         }),
-      })
+      }),
     );
   });
 
@@ -293,7 +303,8 @@ describe('contractHelpers sendTestnetFunds', () => {
       json: async () => ({ ok: true, txHash: '0xrefreshed123' }),
     }));
     const refreshSessionRegistryFieldsCache = jest.fn(async () => refreshedConfig);
-    const getCorsProxyUrlOrThrow = jest.fn()
+    const getCorsProxyUrlOrThrow = jest
+      .fn()
       .mockRejectedValueOnce(new Error('Worker URL is not configured.'))
       .mockResolvedValueOnce('https://demo-worker.example/');
     const getSessionConfigBySlug = jest.fn(() => staleConfig);
@@ -337,37 +348,48 @@ describe('contractHelpers sendTestnetFunds', () => {
     const result = await helper.sendTestnetFunds(recipientAddress, 'demo-1');
 
     expect(refreshSessionRegistryFieldsCache).toHaveBeenCalledTimes(1);
-    expect(refreshSessionRegistryFieldsCache).toHaveBeenCalledWith(expect.objectContaining({
-      chainId: 11155420,
-      slug: 'demo-1',
-      providerLike: 'wagmi',
-    }));
+    expect(refreshSessionRegistryFieldsCache).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chainId: 11155420,
+        slug: 'demo-1',
+        providerLike: 'wagmi',
+      }),
+    );
     expect(getCorsProxyUrlOrThrow).toHaveBeenCalledTimes(2);
-    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      sessionSlug: 'demo-1',
-      sessionConfig: staleConfig,
-    }));
-    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      sessionSlug: 'demo-1',
-      sessionConfig: refreshedConfig,
-    }));
+    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        sessionSlug: 'demo-1',
+        sessionConfig: staleConfig,
+      }),
+    );
+    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        sessionSlug: 'demo-1',
+        sessionConfig: refreshedConfig,
+      }),
+    );
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://demo-worker.example',
       expect.any(Object),
       expect.objectContaining({
         sessionSlug: 'demo-1',
         workerUrl: 'https://demo-worker.example',
-      })
+      }),
     );
     expect(result).toEqual({ ok: true, txHash: '0xrefreshed123' });
   });
 
   it('retries testnet funding against the sponsored source session when the requested session is not deployable yet', async () => {
-    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
-      sessionSlug: 'source-session',
-      workerUrl: 'https://source-worker.example',
-      targetSessionSlug: '',
-    }));
+    sessionStorage.setItem(
+      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+      JSON.stringify({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: '',
+      }),
+    );
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: true,
@@ -406,11 +428,9 @@ describe('contractHelpers sendTestnetFunds', () => {
           sessionState: { activeSessionSlug: '' },
         }),
       },
-      getSessionConfigBySlug: jest.fn((slug) => (
-        slug === 'source-session'
-          ? { slug: 'source-session', networkChainId: 84532 }
-          : null
-      )),
+      getSessionConfigBySlug: jest.fn((slug) =>
+        slug === 'source-session' ? { slug: 'source-session', networkChainId: 84532 } : null,
+      ),
       getCorsProxyUrlOrThrow,
       fetchWorkerWithAuth,
     });
@@ -426,18 +446,21 @@ describe('contractHelpers sendTestnetFunds', () => {
         sessionSlug: 'source-session',
         workerUrl: 'https://source-worker.example',
         allowDemoFallback: defaultStrictAllowDemoFallback(),
-      })
+      }),
     );
     expect(result).toEqual({ ok: true, txHash: '0xbootstrap123' });
   });
 
   it('redeems a one-time sponsored faucet grant before falling back to authenticated source-session funding', async () => {
-    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
-      sessionSlug: 'source-session',
-      workerUrl: 'https://source-worker.example',
-      targetSessionSlug: '',
-      faucetGrantToken: 'faucet-grant-1',
-    }));
+    sessionStorage.setItem(
+      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+      JSON.stringify({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: '',
+        faucetGrantToken: 'faucet-grant-1',
+      }),
+    );
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: true,
@@ -502,11 +525,14 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('does not reuse sponsored bootstrap funding context for a different target session', async () => {
-    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
-      sessionSlug: 'source-session',
-      workerUrl: 'https://source-worker.example',
-      targetSessionSlug: 'sponsored-target',
-    }));
+    sessionStorage.setItem(
+      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+      JSON.stringify({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: 'sponsored-target',
+      }),
+    );
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: true,
@@ -552,7 +578,7 @@ describe('contractHelpers sendTestnetFunds', () => {
 
     const recipientAddress = '0x1111111111111111111111111111111111111111';
     await expect(helper.sendTestnetFunds(recipientAddress, 'different-session')).rejects.toThrow(
-      'Failed to request test ETH: Worker URL unavailable for requested session'
+      'Failed to request test ETH: Worker URL unavailable for requested session',
     );
 
     expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
@@ -560,11 +586,14 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('does not retry sponsored bootstrap funding on non-deployability worker failures', async () => {
-    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
-      sessionSlug: 'source-session',
-      workerUrl: 'https://source-worker.example',
-      targetSessionSlug: 'sponsored-target',
-    }));
+    sessionStorage.setItem(
+      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+      JSON.stringify({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: 'sponsored-target',
+      }),
+    );
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: false,
@@ -602,18 +631,18 @@ describe('contractHelpers sendTestnetFunds', () => {
           sessionState: { activeSessionSlug: 'sponsored-target' },
         }),
       },
-      getSessionConfigBySlug: jest.fn((slug) => (
+      getSessionConfigBySlug: jest.fn((slug) =>
         slug === 'sponsored-target'
           ? { slug: 'sponsored-target', networkChainId: 84532 }
-          : { slug: 'source-session', networkChainId: 84532 }
-      )),
+          : { slug: 'source-session', networkChainId: 84532 },
+      ),
       getCorsProxyUrlOrThrow,
       fetchWorkerWithAuth,
     });
 
     const recipientAddress = '0x1111111111111111111111111111111111111111';
     await expect(helper.sendTestnetFunds(recipientAddress, 'sponsored-target')).rejects.toThrow(
-      'Failed to request test ETH: Too many requests'
+      'Failed to request test ETH: Too many requests',
     );
 
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
@@ -623,7 +652,7 @@ describe('contractHelpers sendTestnetFunds', () => {
       expect.objectContaining({
         sessionSlug: 'sponsored-target',
         workerUrl: 'https://target-worker.example',
-      })
+      }),
     );
   });
 
@@ -688,12 +717,15 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('retries sponsored bootstrap funding when the deployed worker is missing a local faucet key', async () => {
-    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
-      sessionSlug: 'source-session',
-      workerUrl: 'https://source-worker.example',
-      targetSessionSlug: 'sponsored-target',
-      faucetGrantToken: 'faucet-grant-1',
-    }));
+    sessionStorage.setItem(
+      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+      JSON.stringify({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: 'sponsored-target',
+        faucetGrantToken: 'faucet-grant-1',
+      }),
+    );
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: false,
@@ -735,11 +767,11 @@ describe('contractHelpers sendTestnetFunds', () => {
           sessionState: { activeSessionSlug: 'sponsored-target' },
         }),
       },
-      getSessionConfigBySlug: jest.fn((slug) => (
+      getSessionConfigBySlug: jest.fn((slug) =>
         slug === 'sponsored-target'
           ? { slug: 'sponsored-target', networkChainId: 84532 }
-          : { slug: 'source-session', networkChainId: 84532 }
-      )),
+          : { slug: 'source-session', networkChainId: 84532 },
+      ),
       getCorsProxyUrlOrThrow,
       fetchWorkerWithAuth,
       fetchImpl,
@@ -755,7 +787,7 @@ describe('contractHelpers sendTestnetFunds', () => {
       expect.objectContaining({
         sessionSlug: 'sponsored-target',
         workerUrl: 'https://target-worker.example',
-      })
+      }),
     );
     expect(fetchImpl).toHaveBeenCalledWith('https://source-worker.example/sponsored/redeem-faucet', {
       method: 'POST',
@@ -774,14 +806,18 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('consumes one-time sponsored faucet grants instead of reusing them on later missing-key retries', async () => {
-    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
-      sessionSlug: 'source-session',
-      workerUrl: 'https://source-worker.example',
-      targetSessionSlug: 'sponsored-target',
-      faucetGrantToken: 'faucet-grant-1',
-    }));
+    sessionStorage.setItem(
+      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+      JSON.stringify({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: 'sponsored-target',
+        faucetGrantToken: 'faucet-grant-1',
+      }),
+    );
 
-    const fetchWorkerWithAuth = jest.fn()
+    const fetchWorkerWithAuth = jest
+      .fn()
       .mockImplementationOnce(async () => ({
         ok: false,
         status: 401,
@@ -827,11 +863,11 @@ describe('contractHelpers sendTestnetFunds', () => {
           sessionState: { activeSessionSlug: 'sponsored-target' },
         }),
       },
-      getSessionConfigBySlug: jest.fn((slug) => (
+      getSessionConfigBySlug: jest.fn((slug) =>
         slug === 'sponsored-target'
           ? { slug: 'sponsored-target', networkChainId: 84532 }
-          : { slug: 'source-session', networkChainId: 84532 }
-      )),
+          : { slug: 'source-session', networkChainId: 84532 },
+      ),
       getCorsProxyUrlOrThrow,
       fetchWorkerWithAuth,
       fetchImpl,
@@ -849,7 +885,7 @@ describe('contractHelpers sendTestnetFunds', () => {
     });
 
     await expect(helper.sendTestnetFunds(recipientAddress, 'sponsored-target')).rejects.toThrow(
-      'Failed to request test ETH: Server misconfigured: faucetPrivateKey is missing.'
+      'Failed to request test ETH: Server misconfigured: faucetPrivateKey is missing.',
     );
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
@@ -875,9 +911,9 @@ describe('contractHelpers session-aware cache keys', () => {
         preferredUrls: ['https://beta-rpc.example'],
       },
     };
-    const getReadProviderForGroup = jest.fn((groupKeyOrCfg) => (
-      groupKeyOrCfg === 'beta' ? betaProvider : alphaProvider
-    ));
+    const getReadProviderForGroup = jest.fn((groupKeyOrCfg) =>
+      groupKeyOrCfg === 'beta' ? betaProvider : alphaProvider,
+    );
     const helper = createContractHelperMethods({
       resolveSession: jest.fn((groupKeyOrCfg) => ({
         slug: groupKeyOrCfg || 'general',

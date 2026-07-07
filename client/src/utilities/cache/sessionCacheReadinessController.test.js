@@ -1,35 +1,42 @@
-jest.mock('utilities/logging.js', () => ({
-  __esModule: true,
-  createLogger: () => ({
-    log: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
+jest.mock(
+  'utilities/logging.js',
+  () => ({
+    __esModule: true,
+    createLogger: () => ({
+      log: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    }),
   }),
-}), { virtual: true });
+  { virtual: true },
+);
 
-jest.mock('../../utilities/ui/uiRuntimeStats.js', () => ({
-  __esModule: true,
-  recordCeRuntimeCacheEvent: jest.fn(),
-}), { virtual: true });
+jest.mock(
+  '../../utilities/ui/uiRuntimeStats.js',
+  () => ({
+    __esModule: true,
+    recordCeRuntimeCacheEvent: jest.fn(),
+  }),
+  { virtual: true },
+);
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
-  __esModule: true,
-  normalizeSessionSlug: jest.fn(),
-}), { virtual: true });
+jest.mock(
+  '../../utilities/web3/contractScripts.js',
+  () => ({
+    __esModule: true,
+    normalizeSessionSlug: jest.fn(),
+  }),
+  { virtual: true },
+);
 
 const { createSessionCacheReadinessController } = require('./sessionCacheReadinessController.js');
 const { recordCeRuntimeCacheEvent } = require('../../utilities/ui/uiRuntimeStats.js');
 const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
 
 const createMockHost = (overrides = {}) => {
-  const {
-    initialState,
-    mounted,
-    activeSlug,
-    ...rest
-  } = overrides;
+  const { initialState, mounted, activeSlug, ...rest } = overrides;
   const state = {
     sbtCacheRevision: 0,
     questionResponsesNonce: 0,
@@ -59,12 +66,7 @@ const createMockHost = (overrides = {}) => {
 };
 
 const createAsyncSetStateHost = (overrides = {}) => {
-  const {
-    initialState,
-    mounted,
-    activeSlug,
-    ...rest
-  } = overrides;
+  const { initialState, mounted, activeSlug, ...rest } = overrides;
   const state = {
     sbtCacheRevision: 0,
     questionResponsesNonce: 0,
@@ -128,8 +130,10 @@ describe('createSessionCacheReadinessController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    contractScriptsModule.normalizeSessionSlug.mockImplementation(
-      (slug) => String(slug || '').trim().toLowerCase()
+    contractScriptsModule.normalizeSessionSlug.mockImplementation((slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase(),
     );
   });
 
@@ -203,18 +207,12 @@ describe('createSessionCacheReadinessController', () => {
       const controller = createSessionCacheReadinessController(host);
       const order = [];
 
-      expect(
-        controller.setReadinessStateIfChanged(
-          { isResponsesCacheReady: true },
-          () => order.push('first')
-        )
-      ).toBe(true);
-      expect(
-        controller.setReadinessStateIfChanged(
-          { isResponsesCacheReady: true },
-          () => order.push('second')
-        )
-      ).toBe(false);
+      expect(controller.setReadinessStateIfChanged({ isResponsesCacheReady: true }, () => order.push('first'))).toBe(
+        true,
+      );
+      expect(controller.setReadinessStateIfChanged({ isResponsesCacheReady: true }, () => order.push('second'))).toBe(
+        false,
+      );
 
       expect(host.setState).toHaveBeenCalledTimes(2);
       expect(host.getPendingSetStateCount()).toBe(2);
@@ -242,7 +240,7 @@ describe('createSessionCacheReadinessController', () => {
         controller.setReadinessStateIfChanged({
           isSBTCacheReady: true,
           isResponsesCacheReady: true,
-        })
+        }),
       ).toBe(true);
 
       expect(host.setState).toHaveBeenCalledTimes(1);
@@ -589,25 +587,22 @@ describe('createSessionCacheReadinessController', () => {
       expect(host.getState()).toMatchObject({ sbtCacheRevision: 1 });
     });
 
-    it.each(['questionsCache', 'surveysCache'])(
-      'queues %s events as question response nonce updates',
-      (namespace) => {
-        const host = createMockHost();
-        const controller = createSessionCacheReadinessController(host);
+    it.each(['questionsCache', 'surveysCache'])('queues %s events as question response nonce updates', (namespace) => {
+      const host = createMockHost();
+      const controller = createSessionCacheReadinessController(host);
 
-        controller.handleCrossTabCacheUpdateEvent({
-          namespace,
-          slug: 'test-slug',
-          source: 'remote',
-        });
-        jest.runOnlyPendingTimers();
+      controller.handleCrossTabCacheUpdateEvent({
+        namespace,
+        slug: 'test-slug',
+        source: 'remote',
+      });
+      jest.runOnlyPendingTimers();
 
-        expect(host.getState()).toMatchObject({
-          questionResponsesNonce: 1,
-          isResponsesCacheReady: true,
-        });
-      }
-    );
+      expect(host.getState()).toMatchObject({
+        questionResponsesNonce: 1,
+        isResponsesCacheReady: true,
+      });
+    });
 
     it('suppresses local question echo events while init is in flight', () => {
       const host = createMockHost({

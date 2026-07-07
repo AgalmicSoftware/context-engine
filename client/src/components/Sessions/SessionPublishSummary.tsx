@@ -1,9 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretDown,
-  faCaretUp,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
 import SessionPublishAdvancedSettingsPanel from './SessionPublishAdvancedSettingsPanel';
@@ -105,113 +102,97 @@ const SessionPublishSummary = ({
   adminUrlStatus,
   status,
 }: SessionPublishSummaryProps) => {
-  const {
-    publishActionDisplayState,
-    publishMetadataDisplayState,
-    publishProgressDisplayState,
-    publishReadiness,
-  } = publishUiPlan;
-  const {
-    displayMode,
-    publishAdvancedOpen,
-  } = publishActionDisplayState;
+  const { publishActionDisplayState, publishMetadataDisplayState, publishProgressDisplayState, publishReadiness } =
+    publishUiPlan;
+  const { displayMode, publishAdvancedOpen } = publishActionDisplayState;
   const isNormalDisplayMode = displayMode === 'normal';
-  const {
-    showUploadBlockedReason,
-    uploadBlockedReason,
-  } = publishReadiness;
+  const { showUploadBlockedReason, uploadBlockedReason } = publishReadiness;
 
   return (
-  <section id="session-wizard-section-publish" className={styles.panel}>
-    {displayMode === 'advanced' ? (
-      <button type="button" className={styles.panelHeader} onClick={onToggleCollapsed}>
-        <span className={styles.panelTitle}>Publish</span>
-        <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
-      </button>
-    ) : null}
-    {(isNormalDisplayMode || !isCollapsed) ? (
-      <div className={styles.panelBody}>
-        {isNormalDisplayMode ? (
-          <div className={styles.publishHero}>
-            <div className={styles.publishSummaryGrid}>
-              {normalModePublishSummary.map((item) => (
-                <div key={item.label} className={styles.publishSummaryCard}>
-                  <span className={styles.publishSummaryLabel}>{item.label}</span>
-                  <span className={styles.publishSummaryValue}>{item.value}</span>
-                </div>
-              ))}
+    <section id="session-wizard-section-publish" className={styles.panel}>
+      {displayMode === 'advanced' ? (
+        <button type="button" className={styles.panelHeader} onClick={onToggleCollapsed}>
+          <span className={styles.panelTitle}>Publish</span>
+          <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
+        </button>
+      ) : null}
+      {isNormalDisplayMode || !isCollapsed ? (
+        <div className={styles.panelBody}>
+          {isNormalDisplayMode ? (
+            <div className={styles.publishHero}>
+              <div className={styles.publishSummaryGrid}>
+                {normalModePublishSummary.map((item) => (
+                  <div key={item.label} className={styles.publishSummaryCard}>
+                    <span className={styles.publishSummaryLabel}>{item.label}</span>
+                    <span className={styles.publishSummaryValue}>{item.value}</span>
+                  </div>
+                ))}
+              </div>
+              <SessionPublishActionControls
+                displayState={publishActionDisplayState}
+                onPublish={onPublish}
+                onTogglePublishAdvanced={onTogglePublishAdvanced}
+              />
             </div>
+          ) : (
             <SessionPublishActionControls
               displayState={publishActionDisplayState}
               onPublish={onPublish}
               onTogglePublishAdvanced={onTogglePublishAdvanced}
             />
-          </div>
-        ) : (
-          <SessionPublishActionControls
-            displayState={publishActionDisplayState}
-            onPublish={onPublish}
-            onTogglePublishAdvanced={onTogglePublishAdvanced}
+          )}
+
+          {showSponsoredBundleFallbackInput ? (
+            <SessionPublishBundleFallbackPanel
+              bundleFile={bundleFile}
+              bundleFileInputRef={bundleFileInputRef}
+              localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
+              manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
+              normalModeBundleUrlOverride={normalModeBundleUrlOverride}
+              normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
+              onBundleFileChange={onBundleFileChange}
+              onClearBundleFile={onClearBundleFile}
+              onNormalModeBundleUrlOverrideChange={onNormalModeBundleUrlOverrideChange}
+              sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
+            />
+          ) : null}
+
+          <SessionPublishProgressPanel progressDisplayState={publishProgressDisplayState} />
+
+          {showUploadBlockedReason ? <div className={styles.statusNote}>{uploadBlockedReason}</div> : null}
+
+          {publishAdvancedOpen ? (
+            <SessionPublishAdvancedSettingsPanel
+              manualGasLimit={manualGasLimit}
+              manualGasPriceGwei={manualGasPriceGwei}
+              manualMaxFeePerGasGwei={manualMaxFeePerGasGwei}
+              manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
+              manualMetadataUrl={manualMetadataUrl}
+              onManualGasLimitChange={onManualGasLimitChange}
+              onManualGasPriceGweiChange={onManualGasPriceGweiChange}
+              onManualMaxFeePerGasGweiChange={onManualMaxFeePerGasGweiChange}
+              onManualMaxPriorityFeePerGasGweiChange={onManualMaxPriorityFeePerGasGweiChange}
+              onManualMetadataUrlChange={onManualMetadataUrlChange}
+              renderInfoTooltip={renderInfoTooltip}
+              resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
+              workerUrlSource={workerUrlSource}
+            />
+          ) : null}
+
+          <SessionPublishResultLinks
+            adminUrl={adminUrl}
+            adminUrlStatus={adminUrlStatus}
+            onCopyAdminUrl={onCopyAdminUrl}
+            publishMetadataDisplayState={publishMetadataDisplayState}
+            publishedPendingSbtLinks={publishedPendingSbtLinks}
+            registerExplorerBaseUrl={registerExplorerBaseUrl}
+            registerTxs={registerTxs}
+            sessionUrl={sessionUrl}
+            status={status}
           />
-        )}
-
-        {showSponsoredBundleFallbackInput ? (
-          <SessionPublishBundleFallbackPanel
-            bundleFile={bundleFile}
-            bundleFileInputRef={bundleFileInputRef}
-            localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
-            manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
-            normalModeBundleUrlOverride={normalModeBundleUrlOverride}
-            normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
-            onBundleFileChange={onBundleFileChange}
-            onClearBundleFile={onClearBundleFile}
-            onNormalModeBundleUrlOverrideChange={onNormalModeBundleUrlOverrideChange}
-            sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
-          />
-        ) : null}
-
-        <SessionPublishProgressPanel
-          progressDisplayState={publishProgressDisplayState}
-        />
-
-        {showUploadBlockedReason ? (
-          <div className={styles.statusNote}>
-            {uploadBlockedReason}
-          </div>
-        ) : null}
-
-        {publishAdvancedOpen ? (
-          <SessionPublishAdvancedSettingsPanel
-            manualGasLimit={manualGasLimit}
-            manualGasPriceGwei={manualGasPriceGwei}
-            manualMaxFeePerGasGwei={manualMaxFeePerGasGwei}
-            manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
-            manualMetadataUrl={manualMetadataUrl}
-            onManualGasLimitChange={onManualGasLimitChange}
-            onManualGasPriceGweiChange={onManualGasPriceGweiChange}
-            onManualMaxFeePerGasGweiChange={onManualMaxFeePerGasGweiChange}
-            onManualMaxPriorityFeePerGasGweiChange={onManualMaxPriorityFeePerGasGweiChange}
-            onManualMetadataUrlChange={onManualMetadataUrlChange}
-            renderInfoTooltip={renderInfoTooltip}
-            resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
-            workerUrlSource={workerUrlSource}
-          />
-        ) : null}
-
-        <SessionPublishResultLinks
-          adminUrl={adminUrl}
-          adminUrlStatus={adminUrlStatus}
-          onCopyAdminUrl={onCopyAdminUrl}
-          publishMetadataDisplayState={publishMetadataDisplayState}
-          publishedPendingSbtLinks={publishedPendingSbtLinks}
-          registerExplorerBaseUrl={registerExplorerBaseUrl}
-          registerTxs={registerTxs}
-          sessionUrl={sessionUrl}
-          status={status}
-        />
-      </div>
-    ) : null}
-  </section>
+        </div>
+      ) : null}
+    </section>
   );
 };
 

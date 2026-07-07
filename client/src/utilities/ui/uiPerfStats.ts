@@ -50,16 +50,17 @@ type UiPerfRuntimeGlobal = typeof globalThis & {
   __CE_UI_PERF__?: UiPerfGlobalApi;
 };
 
-const getRuntimeGlobal = (): UiPerfRuntimeGlobal | null => (
-  typeof globalThis === 'undefined' ? null : globalThis as UiPerfRuntimeGlobal
-);
+const getRuntimeGlobal = (): UiPerfRuntimeGlobal | null =>
+  typeof globalThis === 'undefined' ? null : (globalThis as UiPerfRuntimeGlobal);
 
 const nowMs = (): number => {
   try {
     if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
       return performance.now();
     }
-  } catch (e) { void e; /* fallback: performance clock detection. */ }
+  } catch (e) {
+    void e; /* fallback: performance clock detection. */
+  }
   return Date.now();
 };
 
@@ -176,9 +177,4 @@ const measureSync = <T = unknown>(label: unknown, fn: (() => T) | null | undefin
   }
 };
 
-export {
-  isCeUiPerfEnabled,
-  ceUiPerfSnapshot,
-  resetCeUiPerfStats,
-  measureSync,
-};
+export { isCeUiPerfEnabled, ceUiPerfSnapshot, resetCeUiPerfStats, measureSync };

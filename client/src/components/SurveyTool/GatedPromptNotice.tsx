@@ -30,10 +30,7 @@ export const buildGatedPromptTooltipIconClassName = ({
 }: {
   baseClassName?: unknown;
   tooltipClassName?: unknown;
-} = {}): string => ([
-  String(baseClassName || ''),
-  String(tooltipClassName || ''),
-].filter(Boolean).join(' '));
+} = {}): string => [String(baseClassName || ''), String(tooltipClassName || '')].filter(Boolean).join(' ');
 
 const GatedPromptNotice = ({
   questionId = '',
@@ -53,7 +50,9 @@ const GatedPromptNotice = ({
     className={styles.gatedPromptNotice}
     role="note"
     data-testid={E2E_TESTIDS.SURVEY_GATED_PROMPT_NOTICE}
-    data-ce-question-id={String(questionId || '').trim().toLowerCase()}
+    data-ce-question-id={String(questionId || '')
+      .trim()
+      .toLowerCase()}
   >
     <FontAwesomeIcon icon={faLock} style={resolveGatedPromptLockIconStyle()} />
     <span className={styles.gatedPromptNoticeText}>
@@ -80,7 +79,9 @@ const GatedPromptNotice = ({
         type="button"
         className={styles.gatedPromptNoticeActionButton}
         data-testid={actionTestId}
-        data-ce-question-id={String(questionId || '').trim().toLowerCase()}
+        data-ce-question-id={String(questionId || '')
+          .trim()
+          .toLowerCase()}
         disabled={actionDisabled}
         aria-busy={actionBusy}
         title={actionTitle}

@@ -1,9 +1,4 @@
-import {
-  base64URLToBuffer,
-  bufferSourceToUint8Array,
-  bufferToBase64URL,
-  isArrayBufferLike,
-} from './encoding.js';
+import { base64URLToBuffer, bufferSourceToUint8Array, bufferToBase64URL, isArrayBufferLike } from './encoding.js';
 
 type PrfResults = {
   prf?: {
@@ -38,18 +33,11 @@ export const getCredentialPrfEnabled = (credential: PublicKeyCredential): boolea
   return results?.prf?.enabled === true || !!results?.prf?.results?.first;
 };
 
-export const deriveAesGcmKeyFromPrf = async (
-  prfOutput: ArrayBuffer,
-  saltBase64Url: string
-): Promise<CryptoKey> => {
+export const deriveAesGcmKeyFromPrf = async (prfOutput: ArrayBuffer, saltBase64Url: string): Promise<CryptoKey> => {
   if (!crypto.subtle) throw new Error('WebCrypto subtle API is not available.');
-  const baseKey = await crypto.subtle.importKey(
-    'raw',
-    bufferSourceToUint8Array(prfOutput),
-    'HKDF',
-    false,
-    ['deriveKey']
-  );
+  const baseKey = await crypto.subtle.importKey('raw', bufferSourceToUint8Array(prfOutput), 'HKDF', false, [
+    'deriveKey',
+  ]);
   return crypto.subtle.deriveKey(
     {
       name: 'HKDF',
@@ -60,7 +48,7 @@ export const deriveAesGcmKeyFromPrf = async (
     baseKey,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['encrypt', 'decrypt']
+    ['encrypt', 'decrypt'],
   );
 };
 

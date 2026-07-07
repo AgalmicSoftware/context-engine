@@ -1,6 +1,4 @@
-import {
-  runSurveyResultsManualRefreshStatusApplicationController,
-} from './surveyResultsManualRefreshStatusApplicationController';
+import { runSurveyResultsManualRefreshStatusApplicationController } from './surveyResultsManualRefreshStatusApplicationController';
 
 describe('surveyResultsManualRefreshStatusApplicationController', () => {
   it('applies manual refresh target blocks before dispatching follow-up effects', async () => {
@@ -56,17 +54,19 @@ describe('surveyResultsManualRefreshStatusApplicationController', () => {
     const applyRefreshState = jest.fn();
     const dispatchManualRefresh = jest.fn();
 
-    await expect(runSurveyResultsManualRefreshStatusApplicationController({
-      isMounted: false,
-      ports: {
-        applyRefreshState,
-        dispatchManualRefresh,
-        pollLocalStorageForUpdates: jest.fn(),
-        queueResultsRefresh: jest.fn(),
-        readLatestBlock: () => 654,
-        resetLocalStoragePollingBackoff: jest.fn(),
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSurveyResultsManualRefreshStatusApplicationController({
+        isMounted: false,
+        ports: {
+          applyRefreshState,
+          dispatchManualRefresh,
+          pollLocalStorageForUpdates: jest.fn(),
+          queueResultsRefresh: jest.fn(),
+          readLatestBlock: () => 654,
+          resetLocalStoragePollingBackoff: jest.fn(),
+        },
+      }),
+    ).resolves.toEqual({
       blockedReason: 'unmounted',
       latestBlock: 654,
       orderedEffects: [],
@@ -81,18 +81,20 @@ describe('surveyResultsManualRefreshStatusApplicationController', () => {
     const applyRefreshState = jest.fn();
     const dispatchManualRefresh = jest.fn();
 
-    await expect(runSurveyResultsManualRefreshStatusApplicationController({
-      ports: {
-        applyRefreshState,
-        dispatchManualRefresh,
-        pollLocalStorageForUpdates: jest.fn(),
-        queueResultsRefresh: jest.fn(),
-        readLatestBlock: async () => {
-          throw error;
+    await expect(
+      runSurveyResultsManualRefreshStatusApplicationController({
+        ports: {
+          applyRefreshState,
+          dispatchManualRefresh,
+          pollLocalStorageForUpdates: jest.fn(),
+          queueResultsRefresh: jest.fn(),
+          readLatestBlock: async () => {
+            throw error;
+          },
+          resetLocalStoragePollingBackoff: jest.fn(),
         },
-        resetLocalStoragePollingBackoff: jest.fn(),
-      },
-    })).rejects.toThrow(error);
+      }),
+    ).rejects.toThrow(error);
     expect(applyRefreshState).not.toHaveBeenCalled();
     expect(dispatchManualRefresh).not.toHaveBeenCalled();
   });

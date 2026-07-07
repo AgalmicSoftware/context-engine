@@ -17,27 +17,18 @@ describe('sbtListRuntimePorts', () => {
       hasCachedCreateSbtForm: () => jest.fn(() => false),
     });
 
-    await expect(
-      ports.contractScripts.getGroupPasswordHash('none', '0x1', 'alpha')
-    ).resolves.toBe('first-hash');
-    await expect(
-      ports.contractScripts.getRelevantBlockWindowForFilter({ slug: 'alpha' })
-    ).resolves.toEqual({ toBlock: 10 });
+    await expect(ports.contractScripts.getGroupPasswordHash('none', '0x1', 'alpha')).resolves.toBe('first-hash');
+    await expect(ports.contractScripts.getRelevantBlockWindowForFilter({ slug: 'alpha' })).resolves.toEqual({
+      toBlock: 10,
+    });
 
     currentContractScripts = secondContractScripts;
 
-    await expect(
-      ports.contractScripts.getGroupPasswordHash('none', '0x2', 'beta')
-    ).resolves.toBe('second-hash');
-    await expect(
-      ports.contractScripts.getRelevantBlockWindowForFilter({ slug: 'beta' })
-    ).resolves.toEqual({ toBlock: 22 });
-    expect(secondContractScripts.getGroupPasswordHash).toHaveBeenCalledWith(
-      'none',
-      '0x2',
-      'beta',
-      undefined
-    );
+    await expect(ports.contractScripts.getGroupPasswordHash('none', '0x2', 'beta')).resolves.toBe('second-hash');
+    await expect(ports.contractScripts.getRelevantBlockWindowForFilter({ slug: 'beta' })).resolves.toEqual({
+      toBlock: 22,
+    });
+    expect(secondContractScripts.getGroupPasswordHash).toHaveBeenCalledWith('none', '0x2', 'beta', undefined);
   });
 
   it('resolves current create-form cache reader when checking initial visibility', () => {

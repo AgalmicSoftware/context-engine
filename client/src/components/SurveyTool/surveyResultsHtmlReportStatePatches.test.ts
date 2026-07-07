@@ -9,9 +9,7 @@ import {
   buildSurveyResultsHtmlReportModalOpenPatch,
   buildSurveyResultsHtmlReportSectionTogglePatch,
 } from './surveyResultsHtmlReportStatePatches';
-import {
-  SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS,
-} from './surveyResultsHtmlReportSelection';
+import { SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS } from './surveyResultsHtmlReportSelection';
 
 describe('surveyResultsHtmlReportStatePatches', () => {
   it('builds modal open and close state patches without side effects', () => {
@@ -27,26 +25,30 @@ describe('surveyResultsHtmlReportStatePatches', () => {
   });
 
   it('builds section toggle patches from normalized selected sections', () => {
-    expect(buildSurveyResultsHtmlReportSectionTogglePatch({
-      currentSections: {
-        report: true,
-        snapshotJson: true,
-      },
-      sectionKey: 'report',
-    })).toEqual({
+    expect(
+      buildSurveyResultsHtmlReportSectionTogglePatch({
+        currentSections: {
+          report: true,
+          snapshotJson: true,
+        },
+        sectionKey: 'report',
+      }),
+    ).toEqual({
       htmlReportSelectedSections: {
         ...SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS,
         report: false,
         snapshotJson: true,
       },
     });
-    expect(buildSurveyResultsHtmlReportSectionTogglePatch({
-      currentSections: {
-        report: false,
-        snapshotJson: true,
-      },
-      sectionKey: 'not-a-section',
-    })).toEqual({
+    expect(
+      buildSurveyResultsHtmlReportSectionTogglePatch({
+        currentSections: {
+          report: false,
+          snapshotJson: true,
+        },
+        sectionKey: 'not-a-section',
+      }),
+    ).toEqual({
       htmlReportSelectedSections: {
         ...SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS,
         report: false,
@@ -75,11 +77,13 @@ describe('surveyResultsHtmlReportStatePatches', () => {
       inputSignature: 'live-input',
     };
 
-    expect(buildSurveyResultsHtmlReportDemoModePatch({
-      currentArtifact: liveArtifact,
-      demoArtifact,
-      nextDemoMode: true,
-    })).toEqual({
+    expect(
+      buildSurveyResultsHtmlReportDemoModePatch({
+        currentArtifact: liveArtifact,
+        demoArtifact,
+        nextDemoMode: true,
+      }),
+    ).toEqual({
       htmlReportDemoMode: true,
       htmlReportAnalysisArtifact: demoArtifact,
       htmlReportAnalysisError: '',
@@ -91,10 +95,12 @@ describe('surveyResultsHtmlReportStatePatches', () => {
         snapshotJson: true,
       },
     });
-    expect(buildSurveyResultsHtmlReportDemoModePatch({
-      currentArtifact: demoArtifact,
-      nextDemoMode: false,
-    })).toEqual({
+    expect(
+      buildSurveyResultsHtmlReportDemoModePatch({
+        currentArtifact: demoArtifact,
+        nextDemoMode: false,
+      }),
+    ).toEqual({
       htmlReportDemoMode: false,
       htmlReportAnalysisArtifact: null,
       htmlReportAnalysisError: '',
@@ -110,10 +116,12 @@ describe('surveyResultsHtmlReportStatePatches', () => {
     expect(buildSurveyResultsHtmlReportAnalysisErrorPatch('Connect first.')).toEqual({
       htmlReportAnalysisError: 'Connect first.',
     });
-    expect(buildSurveyResultsHtmlReportAnalysisEligibilityBlockedPatch({
-      inputSignature: 'blocked-input',
-      reason: 'Need at least one response.',
-    })).toEqual({
+    expect(
+      buildSurveyResultsHtmlReportAnalysisEligibilityBlockedPatch({
+        inputSignature: 'blocked-input',
+        reason: 'Need at least one response.',
+      }),
+    ).toEqual({
       htmlReportAnalysisError: 'Need at least one response.',
       htmlReportAnalysisInputSignature: 'blocked-input',
     });

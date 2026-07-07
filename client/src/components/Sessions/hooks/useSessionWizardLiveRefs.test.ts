@@ -18,26 +18,28 @@ describe('useSessionWizardLiveRefs', () => {
   it('syncs live runtime refs from current values', () => {
     const refs = buildRefs();
 
-    renderHook(() => useSessionWizardLiveRefs({
-      draft: { slug: 'current-draft' },
-      draftRef: refs.draftRef,
-      deployForm: { workerName: 'current-worker' },
-      deployFormRef: refs.deployFormRef,
-      account: '0xabc',
-      resolvedWalletAccountRef: refs.resolvedWalletAccountRef,
-      deployComplete: true,
-      deployCompleteRef: refs.deployCompleteRef,
-      deployWorkerUrl: 'https://worker.example.test',
-      deployWorkerUrlRef: refs.deployWorkerUrlRef,
-      provisionedSponsoredContext: { sessionSlug: 'sponsored-session' },
-      provisionedSponsoredContextRef: refs.provisionedSponsoredContextRef,
-      workerSecretsEnabled: true,
-      workerSecretsEnabledRef: refs.workerSecretsEnabledRef,
-      persistWorkerSecrets: true,
-      persistWorkerSecretsRef: refs.persistWorkerSecretsRef,
-      workerSecrets: { customRpcUrl: 'https://rpc.example.test' },
-      workerSecretsRef: refs.workerSecretsRef,
-    }));
+    renderHook(() =>
+      useSessionWizardLiveRefs({
+        draft: { slug: 'current-draft' },
+        draftRef: refs.draftRef,
+        deployForm: { workerName: 'current-worker' },
+        deployFormRef: refs.deployFormRef,
+        account: '0xabc',
+        resolvedWalletAccountRef: refs.resolvedWalletAccountRef,
+        deployComplete: true,
+        deployCompleteRef: refs.deployCompleteRef,
+        deployWorkerUrl: 'https://worker.example.test',
+        deployWorkerUrlRef: refs.deployWorkerUrlRef,
+        provisionedSponsoredContext: { sessionSlug: 'sponsored-session' },
+        provisionedSponsoredContextRef: refs.provisionedSponsoredContextRef,
+        workerSecretsEnabled: true,
+        workerSecretsEnabledRef: refs.workerSecretsEnabledRef,
+        persistWorkerSecrets: true,
+        persistWorkerSecretsRef: refs.persistWorkerSecretsRef,
+        workerSecrets: { customRpcUrl: 'https://rpc.example.test' },
+        workerSecretsRef: refs.workerSecretsRef,
+      }),
+    );
 
     expect(refs.draftRef.current).toEqual({ slug: 'current-draft' });
     expect(refs.deployFormRef.current).toEqual({ workerName: 'current-worker' });
@@ -54,26 +56,27 @@ describe('useSessionWizardLiveRefs', () => {
     const refs = buildRefs();
 
     const { rerender } = renderHook(
-      ({ account }) => useSessionWizardLiveRefs({
-        draft: { slug: 'current-draft' },
-        draftRef: refs.draftRef,
-        deployForm: { workerName: 'current-worker' },
-        deployFormRef: refs.deployFormRef,
-        account,
-        resolvedWalletAccountRef: refs.resolvedWalletAccountRef,
-        deployComplete: false,
-        deployCompleteRef: refs.deployCompleteRef,
-        deployWorkerUrl: '',
-        deployWorkerUrlRef: refs.deployWorkerUrlRef,
-        provisionedSponsoredContext: { sessionSlug: '' },
-        provisionedSponsoredContextRef: refs.provisionedSponsoredContextRef,
-        workerSecretsEnabled: false,
-        workerSecretsEnabledRef: refs.workerSecretsEnabledRef,
-        persistWorkerSecrets: false,
-        persistWorkerSecretsRef: refs.persistWorkerSecretsRef,
-        workerSecrets: { customRpcUrl: '' },
-        workerSecretsRef: refs.workerSecretsRef,
-      }),
+      ({ account }) =>
+        useSessionWizardLiveRefs({
+          draft: { slug: 'current-draft' },
+          draftRef: refs.draftRef,
+          deployForm: { workerName: 'current-worker' },
+          deployFormRef: refs.deployFormRef,
+          account,
+          resolvedWalletAccountRef: refs.resolvedWalletAccountRef,
+          deployComplete: false,
+          deployCompleteRef: refs.deployCompleteRef,
+          deployWorkerUrl: '',
+          deployWorkerUrlRef: refs.deployWorkerUrlRef,
+          provisionedSponsoredContext: { sessionSlug: '' },
+          provisionedSponsoredContextRef: refs.provisionedSponsoredContextRef,
+          workerSecretsEnabled: false,
+          workerSecretsEnabledRef: refs.workerSecretsEnabledRef,
+          persistWorkerSecrets: false,
+          persistWorkerSecretsRef: refs.persistWorkerSecretsRef,
+          workerSecrets: { customRpcUrl: '' },
+          workerSecretsRef: refs.workerSecretsRef,
+        }),
       { initialProps: { account: '' } },
     );
 

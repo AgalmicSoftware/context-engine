@@ -12,26 +12,24 @@ jest.mock('../../utilities/survey/questionRouting.js', () => ({
   resolveStrictSessionValue: jest.fn(),
 }));
 
-const {
-  getSessionCfg,
-  getSessionChainId,
-  getSessionNetwork,
-} = require('./mainSiteSessionConfig.js');
+const { getSessionCfg, getSessionChainId, getSessionNetwork } = require('./mainSiteSessionConfig.js');
 const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
 const questionRoutingModule = require('../../utilities/survey/questionRouting.js');
 
 describe('mainSiteSessionConfig', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    contractScriptsModule.normalizeSessionSlug.mockImplementation(
-      (slug) => String(slug || '').trim().toLowerCase()
+    contractScriptsModule.normalizeSessionSlug.mockImplementation((slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase(),
     );
     contractScriptsModule.getSessionConfigBySlugOrDefault.mockImplementation((slug) => ({
       slug,
       source: 'default',
     }));
-    questionRoutingModule.resolveStrictSessionValue.mockImplementation(
-      (slug, _strictLookup, resolver) => resolver(slug)
+    questionRoutingModule.resolveStrictSessionValue.mockImplementation((slug, _strictLookup, resolver) =>
+      resolver(slug),
     );
   });
 
@@ -51,12 +49,10 @@ describe('mainSiteSessionConfig', () => {
         slug,
         source: 'strict',
       }));
-      questionRoutingModule.resolveStrictSessionValue.mockImplementation(
-        (slug, strictLookup, resolver) => {
-          expect(strictLookup).toBe(contractScriptsModule.getSessionConfigBySlug);
-          return resolver(slug);
-        }
-      );
+      questionRoutingModule.resolveStrictSessionValue.mockImplementation((slug, strictLookup, resolver) => {
+        expect(strictLookup).toBe(contractScriptsModule.getSessionConfigBySlug);
+        return resolver(slug);
+      });
 
       const result = getSessionCfg(' Edge ');
 
@@ -64,7 +60,7 @@ describe('mainSiteSessionConfig', () => {
       expect(questionRoutingModule.resolveStrictSessionValue).toHaveBeenCalledWith(
         'edge',
         contractScriptsModule.getSessionConfigBySlug,
-        expect.any(Function)
+        expect.any(Function),
       );
       expect(contractScriptsModule.getSessionConfigBySlug).toHaveBeenCalledWith('edge');
       expect(result).toEqual(cfg);
@@ -81,7 +77,7 @@ describe('mainSiteSessionConfig', () => {
       expect(questionRoutingModule.resolveStrictSessionValue).toHaveBeenCalledWith(
         'edge',
         contractScriptsModule.getSessionConfigBySlug,
-        contractScriptsModule.getSessionChainId
+        contractScriptsModule.getSessionChainId,
       );
       expect(result).toBe(84532);
     });
@@ -104,7 +100,7 @@ describe('mainSiteSessionConfig', () => {
       expect(questionRoutingModule.resolveStrictSessionValue).toHaveBeenCalledWith(
         'edge',
         contractScriptsModule.getSessionConfigBySlug,
-        contractScriptsModule.getSessionNetwork
+        contractScriptsModule.getSessionNetwork,
       );
       expect(result).toBe(network);
     });

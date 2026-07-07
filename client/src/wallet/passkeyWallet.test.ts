@@ -34,14 +34,11 @@ const derivedConfig: PasskeyWalletConfig = {
   walletKeyMode: 'passkey-derived',
 };
 
-const makeCredential = ({ prf = true, prfOutput = PRF_OUTPUT } = {}) => ({
-  rawId: RAW_ID.buffer,
-  getClientExtensionResults: () => (
-    prf
-      ? { prf: { enabled: true, results: { first: prfOutput.slice(0) } } }
-      : {}
-  ),
-}) as unknown as PublicKeyCredential;
+const makeCredential = ({ prf = true, prfOutput = PRF_OUTPUT } = {}) =>
+  ({
+    rawId: RAW_ID.buffer,
+    getClientExtensionResults: () => (prf ? { prf: { enabled: true, results: { first: prfOutput.slice(0) } } } : {}),
+  }) as unknown as PublicKeyCredential;
 
 const makeCredentials = ({ prf = true } = {}): PasskeyCredentialClient => ({
   create: jest.fn(async () => makeCredential({ prf })),
@@ -101,12 +98,14 @@ describe('PasskeyEoaWalletClient', () => {
     await expect(client.createWallet()).resolves.toBe(ADDRESS);
     const stored = await storage.read();
 
-    expect(stored).toEqual(expect.objectContaining({
-      rpId: 'localhost',
-      credentialId: expect.any(String),
-      evmAddress: ADDRESS,
-      encryptionVersion: 'passkey-prf-aes-gcm-v1',
-    }));
+    expect(stored).toEqual(
+      expect.objectContaining({
+        rpId: 'localhost',
+        credentialId: expect.any(String),
+        evmAddress: ADDRESS,
+        encryptionVersion: 'passkey-prf-aes-gcm-v1',
+      }),
+    );
     expect(JSON.stringify(stored)).not.toContain(PRIVATE_KEY.slice(2));
     expect(sessionClient.calls[0].privateKey).toBe(PRIVATE_KEY);
   });
@@ -130,17 +129,21 @@ describe('PasskeyEoaWalletClient', () => {
       storage,
       credentials: makeCredentials(),
       sessionClient,
-      privateKeyFactory: () => { throw new Error('should not create a new private key'); },
+      privateKeyFactory: () => {
+        throw new Error('should not create a new private key');
+      },
     });
 
     await expect(returning.unlockWallet()).resolves.toBe(ADDRESS);
     await expect(returning.signMessage('hello')).resolves.toMatch(/^0x11/);
-    await expect(returning.signTypedData({
-      domain: { name: 'Context Engine' },
-      types: { Message: [{ name: 'contents', type: 'string' }] },
-      primaryType: 'Message',
-      message: { contents: 'hello' },
-    })).resolves.toMatch(/^0x22/);
+    await expect(
+      returning.signTypedData({
+        domain: { name: 'Context Engine' },
+        types: { Message: [{ name: 'contents', type: 'string' }] },
+        primaryType: 'Message',
+        message: { contents: 'hello' },
+      }),
+    ).resolves.toMatch(/^0x22/);
     await expect(returning.sendTransaction({ to: ADDRESS, value: '0x0' })).resolves.toMatch(/^0x33/);
   });
 
@@ -152,17 +155,21 @@ describe('PasskeyEoaWalletClient', () => {
       storage,
       credentials: createCredentials,
       sessionClient: makeSessionClient(),
-      privateKeyFactory: () => { throw new Error('derived mode must not generate a random key'); },
+      privateKeyFactory: () => {
+        throw new Error('derived mode must not generate a random key');
+      },
     });
 
     const createdAddress = await first.createWallet();
     const storedMetadata = await storage.read();
-    expect(storedMetadata).toEqual(expect.objectContaining({
-      keyMode: 'passkey-derived',
-      evmAddress: createdAddress,
-      derivationVersion: 'passkey-prf-hkdf-secp256k1-v1',
-      prfSalt: expect.any(String),
-    }));
+    expect(storedMetadata).toEqual(
+      expect.objectContaining({
+        keyMode: 'passkey-derived',
+        evmAddress: createdAddress,
+        derivationVersion: 'passkey-prf-hkdf-secp256k1-v1',
+        prfSalt: expect.any(String),
+      }),
+    );
     expect(JSON.stringify(storedMetadata)).not.toContain('encryptedPrivateKey');
     await first.disconnect();
     await storage.clear();
@@ -174,15 +181,19 @@ describe('PasskeyEoaWalletClient', () => {
       storage,
       credentials: unlockCredentials,
       sessionClient,
-      privateKeyFactory: () => { throw new Error('derived mode must not generate a random key'); },
+      privateKeyFactory: () => {
+        throw new Error('derived mode must not generate a random key');
+      },
     });
 
     await expect(returning.unlockWallet()).resolves.toBe(createdAddress);
-    expect(unlockCredentials.get).toHaveBeenCalledWith(expect.objectContaining({
-      publicKey: expect.not.objectContaining({
-        allowCredentials: expect.anything(),
+    expect(unlockCredentials.get).toHaveBeenCalledWith(
+      expect.objectContaining({
+        publicKey: expect.not.objectContaining({
+          allowCredentials: expect.anything(),
+        }),
       }),
-    }));
+    );
     expect(sessionClient.calls[0].privateKey).toMatch(/^0x[0-9a-f]{64}$/);
     expect(sessionClient.calls[0].privateKey).not.toBe(PRIVATE_KEY);
   });
@@ -190,16 +201,18 @@ describe('PasskeyEoaWalletClient', () => {
   it('does not persist or log PRF output or derived private keys', async () => {
     const storage = createMemoryWalletStorage();
     const sessionClient = makeSessionClient();
-    const consoleSpies = (['log', 'info', 'debug', 'warn', 'error'] as const).map((method) => (
-      jest.spyOn(console, method).mockImplementation(() => {})
-    ));
+    const consoleSpies = (['log', 'info', 'debug', 'warn', 'error'] as const).map((method) =>
+      jest.spyOn(console, method).mockImplementation(() => {}),
+    );
     try {
       const client = new PasskeyEoaWalletClient({
         config: derivedConfig,
         storage,
         credentials: makeCredentials(),
         sessionClient,
-        privateKeyFactory: () => { throw new Error('derived mode must not generate a random key'); },
+        privateKeyFactory: () => {
+          throw new Error('derived mode must not generate a random key');
+        },
       });
 
       await client.createWallet();
@@ -209,13 +222,15 @@ describe('PasskeyEoaWalletClient', () => {
       const prfHex = Buffer.from(new Uint8Array(PRF_OUTPUT)).toString('hex');
       const logPayload = consoleSpies
         .flatMap((spy) => spy.mock.calls)
-        .flatMap((args) => args.map((arg) => {
-          try {
-            return JSON.stringify(arg);
-          } catch (_) {
-            return String(arg);
-          }
-        }))
+        .flatMap((args) =>
+          args.map((arg) => {
+            try {
+              return JSON.stringify(arg);
+            } catch (_) {
+              return String(arg);
+            }
+          }),
+        )
         .join('\n');
 
       for (const sensitive of [derivedPrivateKey, derivedPrivateKey.slice(2), prfBase64Url, prfHex]) {
@@ -245,7 +260,9 @@ describe('PasskeyEoaWalletClient', () => {
       credentials,
       sessionClient,
       sessionClientFactory: () => sessionClient,
-      privateKeyFactory: () => { throw new Error('derived mode must not generate a random key'); },
+      privateKeyFactory: () => {
+        throw new Error('derived mode must not generate a random key');
+      },
     });
 
     const address = await client.createWallet();
@@ -271,13 +288,17 @@ describe('PasskeyEoaWalletClient', () => {
       credentials: makeCredentials(),
       sessionClient: makeSessionClient(),
       readProviderFactory,
-      privateKeyFactory: () => { throw new Error('derived mode must not generate a random key'); },
+      privateKeyFactory: () => {
+        throw new Error('derived mode must not generate a random key');
+      },
     });
 
-    await expect(client.request({
-      method: 'eth_getBalance',
-      params: [ADDRESS, 'latest'],
-    })).resolves.toBe('0x5');
+    await expect(
+      client.request({
+        method: 'eth_getBalance',
+        params: [ADDRESS, 'latest'],
+      }),
+    ).resolves.toBe('0x5');
 
     expect(readProviderFactory).toHaveBeenCalledWith(11155420);
     expect(readProvider.getBalance).toHaveBeenCalledWith(ADDRESS, 'latest');
@@ -301,13 +322,17 @@ describe('PasskeyEoaWalletClient', () => {
           { priority: 1, provider: firstProvider },
         ],
       })),
-      privateKeyFactory: () => { throw new Error('derived mode must not generate a random key'); },
+      privateKeyFactory: () => {
+        throw new Error('derived mode must not generate a random key');
+      },
     });
 
-    await expect(client.request({
-      method: 'eth_feeHistory',
-      params: ['0x1', 'latest', []],
-    })).resolves.toBe('0x1234');
+    await expect(
+      client.request({
+        method: 'eth_feeHistory',
+        params: ['0x1', 'latest', []],
+      }),
+    ).resolves.toBe('0x1234');
 
     expect(firstProvider.send).toHaveBeenCalledWith('eth_feeHistory', ['0x1', 'latest', []]);
     expect(secondProvider.send).toHaveBeenCalledWith('eth_feeHistory', ['0x1', 'latest', []]);
@@ -324,7 +349,9 @@ describe('PasskeyEoaWalletClient', () => {
     });
 
     let thrown: unknown = null;
-    await client.unlockWallet().catch((error) => { thrown = error; });
+    await client.unlockWallet().catch((error) => {
+      thrown = error;
+    });
 
     expect(thrown).toBeInstanceOf(MissingPasskeyWalletRecordError);
     expect(isMissingPasskeyWalletRecordError(thrown)).toBe(true);
@@ -371,22 +398,28 @@ describe('soft session policy', () => {
       now: 1000,
     });
 
-    expect(() => assertSoftSessionAllowed({
-      policy,
-      method: 'personal_sign',
-      now: 1500,
-    })).not.toThrow();
-    expect(() => assertSoftSessionAllowed({
-      policy,
-      method: 'personal_sign',
-      now: 2500,
-    })).toThrow(/expired/i);
-    expect(() => assertSoftSessionAllowed({
-      policy,
-      method: 'eth_sendTransaction',
-      tx: { to: ADDRESS, value: '0x1' },
-      now: 1500,
-    })).toThrow(/value-bearing/i);
+    expect(() =>
+      assertSoftSessionAllowed({
+        policy,
+        method: 'personal_sign',
+        now: 1500,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertSoftSessionAllowed({
+        policy,
+        method: 'personal_sign',
+        now: 2500,
+      }),
+    ).toThrow(/expired/i);
+    expect(() =>
+      assertSoftSessionAllowed({
+        policy,
+        method: 'eth_sendTransaction',
+        tx: { to: ADDRESS, value: '0x1' },
+        now: 1500,
+      }),
+    ).toThrow(/value-bearing/i);
   });
 
   it('requires explicit policy permission for raw transaction signing', async () => {
@@ -403,17 +436,21 @@ describe('soft session policy', () => {
       policy,
     });
 
-    await expect(sessionClient.request({
-      method: 'eth_signTransaction',
-      params: [{
-        from: ADDRESS,
-        to: ADDRESS,
-        chainId: 11155420,
-        value: '0x0',
-        nonce: 0,
-        gasLimit: 21000,
-      }],
-    })).rejects.toThrow(/does not allow eth_signTransaction/i);
+    await expect(
+      sessionClient.request({
+        method: 'eth_signTransaction',
+        params: [
+          {
+            from: ADDRESS,
+            to: ADDRESS,
+            chainId: 11155420,
+            value: '0x0',
+            nonce: 0,
+            gasLimit: 21000,
+          },
+        ],
+      }),
+    ).rejects.toThrow(/does not allow eth_signTransaction/i);
   });
 
   it('does not forward unsupported session methods to the raw RPC provider', async () => {
@@ -430,10 +467,12 @@ describe('soft session policy', () => {
       policy,
     });
 
-    await expect(sessionClient.request({
-      method: 'eth_feeHistory',
-      params: ['0x1', 'latest', []],
-    })).rejects.toThrow(/Unsupported passkey session method: eth_feeHistory/i);
+    await expect(
+      sessionClient.request({
+        method: 'eth_feeHistory',
+        params: ['0x1', 'latest', []],
+      }),
+    ).rejects.toThrow(/Unsupported passkey session method: eth_feeHistory/i);
   });
 
   it('applies sender, chain, target, and value policy to raw transaction signing', () => {
@@ -453,40 +492,50 @@ describe('soft session policy', () => {
       value: '0x0',
     };
 
-    expect(() => assertSoftSessionAllowed({
-      policy,
-      method: 'eth_signTransaction',
-      tx: allowedTx,
-      chainId: 11155420,
-      now: 1500,
-    })).not.toThrow();
-    expect(() => assertSoftSessionAllowed({
-      policy,
-      method: 'eth_signTransaction',
-      tx: { ...allowedTx, from: '0x0000000000000000000000000000000000000001' },
-      chainId: 11155420,
-      now: 1500,
-    })).toThrow(/sender/i);
-    expect(() => assertSoftSessionAllowed({
-      policy,
-      method: 'eth_signTransaction',
-      tx: { ...allowedTx, chainId: 84532 },
-      chainId: 11155420,
-      now: 1500,
-    })).toThrow(/active chain/i);
-    expect(() => assertSoftSessionAllowed({
-      policy,
-      method: 'eth_signTransaction',
-      tx: { ...allowedTx, to: '0x0000000000000000000000000000000000000002' },
-      chainId: 11155420,
-      now: 1500,
-    })).toThrow(/target/i);
-    expect(() => assertSoftSessionAllowed({
-      policy,
-      method: 'eth_signTransaction',
-      tx: { ...allowedTx, value: '0x1' },
-      chainId: 11155420,
-      now: 1500,
-    })).toThrow(/value-bearing/i);
+    expect(() =>
+      assertSoftSessionAllowed({
+        policy,
+        method: 'eth_signTransaction',
+        tx: allowedTx,
+        chainId: 11155420,
+        now: 1500,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertSoftSessionAllowed({
+        policy,
+        method: 'eth_signTransaction',
+        tx: { ...allowedTx, from: '0x0000000000000000000000000000000000000001' },
+        chainId: 11155420,
+        now: 1500,
+      }),
+    ).toThrow(/sender/i);
+    expect(() =>
+      assertSoftSessionAllowed({
+        policy,
+        method: 'eth_signTransaction',
+        tx: { ...allowedTx, chainId: 84532 },
+        chainId: 11155420,
+        now: 1500,
+      }),
+    ).toThrow(/active chain/i);
+    expect(() =>
+      assertSoftSessionAllowed({
+        policy,
+        method: 'eth_signTransaction',
+        tx: { ...allowedTx, to: '0x0000000000000000000000000000000000000002' },
+        chainId: 11155420,
+        now: 1500,
+      }),
+    ).toThrow(/target/i);
+    expect(() =>
+      assertSoftSessionAllowed({
+        policy,
+        method: 'eth_signTransaction',
+        tx: { ...allowedTx, value: '0x1' },
+        chainId: 11155420,
+        now: 1500,
+      }),
+    ).toThrow(/value-bearing/i);
   });
 });

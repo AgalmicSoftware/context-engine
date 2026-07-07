@@ -29,14 +29,12 @@ describe('surveyToolNavigation', () => {
   });
 
   it('appends a normalized session hint unless the path is already pinned', () => {
-    expect(appendExplicitSessionHintToPath('/questions/results', 'Edge')).toBe(
-      '/questions/results?session=Edge'
-    );
+    expect(appendExplicitSessionHintToPath('/questions/results', 'Edge')).toBe('/questions/results?session=Edge');
     expect(appendExplicitSessionHintToPath('/questions/results?foo=bar', 'edge')).toBe(
-      '/questions/results?foo=bar&session=edge'
+      '/questions/results?foo=bar&session=edge',
     );
     expect(appendExplicitSessionHintToPath('/questions/results?session=other', 'edge')).toBe(
-      '/questions/results?session=other'
+      '/questions/results?session=other',
     );
   });
 

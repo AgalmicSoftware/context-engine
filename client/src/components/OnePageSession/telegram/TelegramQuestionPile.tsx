@@ -25,9 +25,10 @@ type TelegramQuestionPileProps = {
   onSubmitAnswer: (question: TelegramAgentQuestion, answer: TelegramAnswerInput) => void;
 };
 
-const normalizeQuestionType = (question: TelegramAgentQuestion): string => (
-  String(question.questionType || question.type || 'freeform').trim().toLowerCase()
-);
+const normalizeQuestionType = (question: TelegramAgentQuestion): string =>
+  String(question.questionType || question.type || 'freeform')
+    .trim()
+    .toLowerCase();
 
 const questionContainerClassName = (question: TelegramAgentQuestion): string => {
   const type = normalizeQuestionType(question);
@@ -44,9 +45,8 @@ const buildInitialAnswer = (question: TelegramAgentQuestion): TelegramAnswerInpu
   return { value: '' };
 };
 
-const selectedMultichoiceValues = (answer: TelegramAnswerInput): unknown[] => (
-  Array.isArray(answer.values) ? answer.values : []
-);
+const selectedMultichoiceValues = (answer: TelegramAnswerInput): unknown[] =>
+  Array.isArray(answer.values) ? answer.values : [];
 
 const TelegramQuestionPile = ({
   activeIndex,
@@ -69,7 +69,11 @@ const TelegramQuestionPile = ({
   };
 
   if (status === 'loading') {
-    return <div className={styles.telegramListPanel} data-testid="ce-session-telegram-questions">Loading questions...</div>;
+    return (
+      <div className={styles.telegramListPanel} data-testid="ce-session-telegram-questions">
+        Loading questions...
+      </div>
+    );
   }
 
   if (!activeQuestion) {
@@ -88,7 +92,9 @@ const TelegramQuestionPile = ({
   const submitDisabled = !canSubmit || isSubmitting || alreadySubmitted || activeQuestion.answerable === false;
   const submitDisabledReason = alreadySubmitted
     ? 'Already submitted'
-    : (activeQuestion.answerable === false ? 'Not answerable from this session' : disabledReason);
+    : activeQuestion.answerable === false
+      ? 'Not answerable from this session'
+      : disabledReason;
 
   let questionComponent: React.ReactNode;
   if (type === 'binary') {
@@ -124,9 +130,7 @@ const TelegramQuestionPile = ({
           disabled={isSubmitting}
           className={surveyStyles.ratingSlider}
         />
-        <span className={surveyStyles.ratingValueDisplay}>
-          {Number.isFinite(ratingValue) ? ratingValue : 5}
-        </span>
+        <span className={surveyStyles.ratingValueDisplay}>{Number.isFinite(ratingValue) ? ratingValue : 5}</span>
       </div>
     );
   } else {
@@ -148,7 +152,9 @@ const TelegramQuestionPile = ({
   return (
     <section className={styles.telegramListPanel} data-testid="ce-session-telegram-questions">
       <div className={styles.telegramListHeader}>
-        <span>Question {activeIndex + 1} of {questions.length}</span>
+        <span>
+          Question {activeIndex + 1} of {questions.length}
+        </span>
         <div className={styles.telegramPileNav}>
           <button
             type="button"
@@ -183,7 +189,11 @@ const TelegramQuestionPile = ({
               <h3>{activeQuestion.prompt}</h3>
               {activeQuestion.tags.length ? (
                 <div className={styles.telegramChipRow}>
-                  {activeQuestion.tags.map((tag) => <span key={tag} className={styles.telegramChipDark}>{tag}</span>)}
+                  {activeQuestion.tags.map((tag) => (
+                    <span key={tag} className={styles.telegramChipDark}>
+                      {tag}
+                    </span>
+                  ))}
                 </div>
               ) : null}
             </div>

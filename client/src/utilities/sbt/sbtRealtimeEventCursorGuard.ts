@@ -1,7 +1,4 @@
-import {
-  compareSbtRealtimeEventCursor,
-  normalizeSbtRealtimeEventCursor,
-} from './sbtRealtimeCursorHelpers.js';
+import { compareSbtRealtimeEventCursor, normalizeSbtRealtimeEventCursor } from './sbtRealtimeCursorHelpers.js';
 import type { SbtRealtimeEventCursor } from './sbtRealtimeCursorHelpers.js';
 
 interface SbtRealtimeEventCursorGuardOptions {
@@ -35,11 +32,7 @@ export const getSbtRealtimeEventCursorGuard = ({
   });
   const lastRealtimeCursor = normalizeSbtRealtimeEventCursor(lastRealtimeEventCursor);
 
-  if (
-    lastRealtimeCursor &&
-    eventCursor &&
-    compareSbtRealtimeEventCursor(eventCursor, lastRealtimeCursor) <= 0
-  ) {
+  if (lastRealtimeCursor && eventCursor && compareSbtRealtimeEventCursor(eventCursor, lastRealtimeCursor) <= 0) {
     return {
       eventCursor,
       lastRealtimeCursor,

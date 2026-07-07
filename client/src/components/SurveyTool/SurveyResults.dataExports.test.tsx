@@ -175,9 +175,15 @@ describe('SurveyResults data export controls', () => {
     }
 
     const lines = csv.split('\n');
-    expect(lines[0]).toBe('responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp');
-    expect(lines[1]).toBe(`"${RESPONDER_ONE}","q1","Question One","multichoice","Alpha;Beta;Gamma","7","Alpha, Gamma","hash-1","Latest note","false","false","add-hash-1","2025-01-01T00:00:00.000Z"`);
-    expect(lines[2]).toBe(`"${RESPONDER_TWO}","q2","Question Two","freeform","","4","*","","","true","false","","2025-02-02T00:00:00.000Z"`);
+    expect(lines[0]).toBe(
+      'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp',
+    );
+    expect(lines[1]).toBe(
+      `"${RESPONDER_ONE}","q1","Question One","multichoice","Alpha;Beta;Gamma","7","Alpha, Gamma","hash-1","Latest note","false","false","add-hash-1","2025-01-01T00:00:00.000Z"`,
+    );
+    expect(lines[2]).toBe(
+      `"${RESPONDER_TWO}","q2","Question Two","freeform","","4","*","","","true","false","","2025-02-02T00:00:00.000Z"`,
+    );
     expect(csv).not.toContain('Old note');
     expect(csv).not.toContain('old-hash');
     expect(lines).toHaveLength(3);
@@ -227,9 +233,15 @@ describe('SurveyResults data export controls', () => {
     }
 
     const lines = csv.split('\n');
-    expect(lines[0]).toBe('questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp');
-    expect(lines[1]).toBe(`"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","${RESPONDER_ONE}","9","Alpha, Gamma","ans-hash","Current note","false","false","add-hash","2025-03-01T00:00:00.000Z"`);
-    expect(lines[2]).toBe(`"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","${RESPONDER_TWO}","5","Beta","second-ans-hash","Second note","false","false","second-add-hash","2025-03-02T00:00:00.000Z"`);
+    expect(lines[0]).toBe(
+      'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp',
+    );
+    expect(lines[1]).toBe(
+      `"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","${RESPONDER_ONE}","9","Alpha, Gamma","ans-hash","Current note","false","false","add-hash","2025-03-01T00:00:00.000Z"`,
+    );
+    expect(lines[2]).toBe(
+      `"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","${RESPONDER_TWO}","5","Beta","second-ans-hash","Second note","false","false","second-add-hash","2025-03-02T00:00:00.000Z"`,
+    );
     expect(lines).toHaveLength(3);
   });
 
@@ -265,14 +277,20 @@ describe('SurveyResults data export controls', () => {
     }
 
     const lines = csv.split('\n');
-    expect(lines[1]).toBe(`"q2","Fallback Question","multichoice","Yes;No","${RESPONDER_TWO}","4","Yes","","","false","","","2025-04-01T00:00:00.000Z"`);
+    expect(lines[1]).toBe(
+      `"q2","Fallback Question","multichoice","Yes;No","${RESPONDER_TWO}","4","Yes","","","false","","","2025-04-01T00:00:00.000Z"`,
+    );
   });
 
   it('exports results JSON for the current filtered question view', async () => {
     seedQuestionsCache({
       questionResponses: {
         q1: {
-          '0xabc': { answer: { encrypted: false, value: 'Agree' }, questionId: 'q1', timeStamp: '2025-05-01T00:00:00.000Z' },
+          '0xabc': {
+            answer: { encrypted: false, value: 'Agree' },
+            questionId: 'q1',
+            timeStamp: '2025-05-01T00:00:00.000Z',
+          },
         },
       },
       questions: {
@@ -314,11 +332,13 @@ describe('SurveyResults data export controls', () => {
     expect(exported.sessionSlug).toBe('demo');
     expect(exported.viewMode).toBe('questions');
     expect(exported.surveyTitle).toBe('');
-    expect(exported.counts).toEqual(expect.objectContaining({
-      totalQuestions: 1,
-      totalResponses: 1,
-      filteredResponses: 1,
-    }));
+    expect(exported.counts).toEqual(
+      expect.objectContaining({
+        totalQuestions: 1,
+        totalResponses: 1,
+        filteredResponses: 1,
+      }),
+    );
     expect(exported.filterState).toEqual({
       sbtFilter: {
         selectedTraits: ['builder'],
@@ -342,7 +362,11 @@ describe('SurveyResults data export controls', () => {
     seedQuestionsCache({
       questionResponses: {
         q1: {
-          '0xabc': { answer: { encrypted: false, value: 'Agree' }, questionId: 'q1', timeStamp: '2025-05-01T00:00:00.000Z' },
+          '0xabc': {
+            answer: { encrypted: false, value: 'Agree' },
+            questionId: 'q1',
+            timeStamp: '2025-05-01T00:00:00.000Z',
+          },
         },
       },
       questions: {
@@ -369,22 +393,24 @@ describe('SurveyResults data export controls', () => {
 
     const exported = JSON.parse(exportedText);
     expect(exported.filteredQuestions).toHaveLength(2);
-    expect(exported.filteredQuestions).toEqual(expect.arrayContaining([
-      {
-        id: 'Q1',
-        prompt: 'Prompt One',
-        type: 'binary',
-        tags: ['governance'],
-        options: [],
-      },
-      {
-        id: 'Q2',
-        prompt: 'Prompt Two',
-        type: 'freeform',
-        tags: ['safety'],
-        options: [],
-      },
-    ]));
+    expect(exported.filteredQuestions).toEqual(
+      expect.arrayContaining([
+        {
+          id: 'Q1',
+          prompt: 'Prompt One',
+          type: 'binary',
+          tags: ['governance'],
+          options: [],
+        },
+        {
+          id: 'Q2',
+          prompt: 'Prompt Two',
+          type: 'freeform',
+          tags: ['safety'],
+          options: [],
+        },
+      ]),
+    );
     expect(exported.filteredQuestionResponses).toBeUndefined();
     expect(exported.filteredResponses).toBeUndefined();
   });

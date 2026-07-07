@@ -35,12 +35,7 @@ const defaultDeps = (overrides: Partial<MutationDeps> = {}): MutationDeps => ({
 describe('surveyToolResponseMutationController', () => {
   describe('resolveFieldEncryptionDefaults', () => {
     it('returns unlocked self defaults for basic field', () => {
-      const result = resolveFieldEncryptionDefaults(
-        { value: 'a', encrypted: false },
-        'q1',
-        'answer',
-        defaultDeps(),
-      );
+      const result = resolveFieldEncryptionDefaults({ value: 'a', encrypted: false }, 'q1', 'answer', defaultDeps());
 
       expect(result).toEqual({
         questionLocked: false,

@@ -11,12 +11,16 @@ jest.mock('utilities/logging', () => ({
   createLogger: jest.fn(() => mockLogger),
 }));
 
-jest.mock('../../utilities/cache/cacheScripts.js', () => ({
-  __esModule: true,
-  peekCacheSync: jest.fn(),
-  removeCache: jest.fn(),
-  writeCacheOptimistic: jest.fn(),
-}), { virtual: true });
+jest.mock(
+  '../../utilities/cache/cacheScripts.js',
+  () => ({
+    __esModule: true,
+    peekCacheSync: jest.fn(),
+    removeCache: jest.fn(),
+    writeCacheOptimistic: jest.fn(),
+  }),
+  { virtual: true },
+);
 
 jest.mock('./sessionCacheConstants', () => ({
   __esModule: true,
@@ -125,9 +129,7 @@ describe('createMainSiteDgStorage', () => {
     let attempts = 0;
 
     mainSiteUtils.isMainSitePerfCountersEnabled.mockReturnValue(true);
-    mainSiteUtils.getMainSitePerfNow
-      .mockReturnValueOnce(10)
-      .mockReturnValue(16);
+    mainSiteUtils.getMainSitePerfNow.mockReturnValueOnce(10).mockReturnValue(16);
     storageEviction.trimLargeArrays.mockImplementation((obj) => {
       if (Array.isArray(obj?.items)) {
         obj.items = obj.items.slice(-2);
@@ -152,7 +154,10 @@ describe('createMainSiteDgStorage', () => {
     expect(storageEviction.trimLargeArrays).toHaveBeenCalledTimes(1);
     expect(JSON.parse(localStorage.getItem(storageKey))).toEqual({ items: [3, 4] });
     expect(mainSiteUtils.bumpMainSitePerfCounter).toHaveBeenCalledWith('dgWriteNonManagedCalls');
-    expect(mainSiteUtils.bumpMainSitePerfCounter).toHaveBeenCalledWith('dgWriteNonManagedSerializedBytes', expect.any(Number));
+    expect(mainSiteUtils.bumpMainSitePerfCounter).toHaveBeenCalledWith(
+      'dgWriteNonManagedSerializedBytes',
+      expect.any(Number),
+    );
     expect(mainSiteUtils.bumpMainSitePerfCounter).toHaveBeenCalledWith('dgWriteNonManagedQuotaRetryCount');
     expect(mainSiteUtils.bumpMainSitePerfCounter).toHaveBeenCalledWith('dgWriteNonManagedQuotaRetrySuccess');
     expect(mainSiteUtils.bumpMainSitePerfCounter).toHaveBeenCalledWith('dgWriteNonManagedDurationSamples', 1);

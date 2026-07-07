@@ -1,6 +1,4 @@
-import type {
-  SurveyResultsCacheReadinessDisplayPlanArgs,
-} from './surveyResultsCacheReadinessDisplayPlan';
+import type { SurveyResultsCacheReadinessDisplayPlanArgs } from './surveyResultsCacheReadinessDisplayPlan';
 
 type SurveyResultsRecord = Record<string, unknown>;
 export type SurveyResultsCacheFilterState = SurveyResultsRecord & {
@@ -135,15 +133,10 @@ export const buildSurveyResultsCacheControllerSnapshot = ({
   const normalizedCurrentSurveyId = String(currentSurveyId || '');
   const normalizedViewMode = String(viewMode || '');
   const canRefreshQuestions =
-    normalizedViewMode === 'questions' &&
-    (!!hasRefreshQuestionMetadata || !!hasRefreshQuestionResponses);
+    normalizedViewMode === 'questions' && (!!hasRefreshQuestionMetadata || !!hasRefreshQuestionResponses);
   const canRefreshSurvey =
-    normalizedViewMode === 'survey' &&
-    !!normalizedCurrentSurveyId &&
-    !!hasRefreshSurveyResponsesByID;
-  const manualRefreshStatus = canRefreshQuestions
-    ? 'questions'
-    : (canRefreshSurvey ? 'survey' : 'inert');
+    normalizedViewMode === 'survey' && !!normalizedCurrentSurveyId && !!hasRefreshSurveyResponsesByID;
+  const manualRefreshStatus = canRefreshQuestions ? 'questions' : canRefreshSurvey ? 'survey' : 'inert';
   const pollingInput = {
     networkLatestBlock,
     questionLocalBlock,

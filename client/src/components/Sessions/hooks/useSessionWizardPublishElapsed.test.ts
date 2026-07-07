@@ -19,11 +19,13 @@ describe('useSessionWizardPublishElapsed', () => {
   it('resets elapsed time when publish is idle', () => {
     const setPublishStepElapsedMs = jest.fn();
 
-    renderHook(() => useSessionWizardPublishElapsed({
-      publishBusy: false,
-      publishStep: 0,
-      setPublishStepElapsedMs,
-    }));
+    renderHook(() =>
+      useSessionWizardPublishElapsed({
+        publishBusy: false,
+        publishStep: 0,
+        setPublishStepElapsedMs,
+      }),
+    );
 
     expect(setPublishStepElapsedMs).toHaveBeenCalledWith(0);
   });
@@ -31,11 +33,13 @@ describe('useSessionWizardPublishElapsed', () => {
   it('ticks elapsed time while a publish step is active', () => {
     const setPublishStepElapsedMs = jest.fn();
 
-    renderHook(() => useSessionWizardPublishElapsed({
-      publishBusy: true,
-      publishStep: 2,
-      setPublishStepElapsedMs,
-    }));
+    renderHook(() =>
+      useSessionWizardPublishElapsed({
+        publishBusy: true,
+        publishStep: 2,
+        setPublishStepElapsedMs,
+      }),
+    );
 
     expect(setPublishStepElapsedMs).toHaveBeenCalledWith(0);
 
@@ -49,11 +53,13 @@ describe('useSessionWizardPublishElapsed', () => {
 
   it('clears the timer on unmount', () => {
     const setPublishStepElapsedMs = jest.fn();
-    const { unmount } = renderHook(() => useSessionWizardPublishElapsed({
-      publishBusy: true,
-      publishStep: 1,
-      setPublishStepElapsedMs,
-    }));
+    const { unmount } = renderHook(() =>
+      useSessionWizardPublishElapsed({
+        publishBusy: true,
+        publishStep: 1,
+        setPublishStepElapsedMs,
+      }),
+    );
 
     unmount();
     now = 2000;

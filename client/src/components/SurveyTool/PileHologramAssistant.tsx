@@ -6,12 +6,8 @@ const FACE_CENTER_X = 210;
 const FACE_CENTER_Y = 156;
 const FACE_RADIUS_X = 108;
 const FACE_RADIUS_Y = 124;
-const FACE_ROW_OFFSETS = Object.freeze(
-  Array.from({ length: 19 }, (_, index) => -108 + (index * 12))
-);
-const FACE_COLUMN_OFFSETS = Object.freeze(
-  Array.from({ length: 17 }, (_, index) => -80 + (index * 10))
-);
+const FACE_ROW_OFFSETS = Object.freeze(Array.from({ length: 19 }, (_, index) => -108 + index * 12));
+const FACE_COLUMN_OFFSETS = Object.freeze(Array.from({ length: 17 }, (_, index) => -80 + index * 10));
 const PULSE_DOTS = Object.freeze([
   { cx: 132, cy: 100, r: 2.3 },
   { cx: 286, cy: 120, r: 2.1 },
@@ -68,32 +64,18 @@ const buildLatitudePath = (offsetY: number) => {
 
   const halfWidth = FACE_RADIUS_X * Math.sqrt(normalized);
   const y = FACE_CENTER_Y + offsetY;
-  const baseArc = offsetY < 0
-    ? -Math.max(3, Math.abs(offsetY) * 0.12)
-    : Math.max(4, Math.abs(offsetY) * 0.15);
-  const browLift = (
-    offsetY > -58 && offsetY < -18
-      ? (1 - (Math.abs(offsetY + 38) / 20)) * 10
-      : 0
-  );
-  const noseLift = (
-    offsetY > -8 && offsetY < 52
-      ? (1 - (Math.abs(offsetY - 20) / 30)) * 18
-      : 0
-  );
-  const mouthDip = (
-    offsetY > 48 && offsetY < 88
-      ? (1 - (Math.abs(offsetY - 68) / 20)) * -6
-      : 0
-  );
+  const baseArc = offsetY < 0 ? -Math.max(3, Math.abs(offsetY) * 0.12) : Math.max(4, Math.abs(offsetY) * 0.15);
+  const browLift = offsetY > -58 && offsetY < -18 ? (1 - Math.abs(offsetY + 38) / 20) * 10 : 0;
+  const noseLift = offsetY > -8 && offsetY < 52 ? (1 - Math.abs(offsetY - 20) / 30) * 18 : 0;
+  const mouthDip = offsetY > 48 && offsetY < 88 ? (1 - Math.abs(offsetY - 68) / 20) * -6 : 0;
   const centerY = y + baseArc + browLift + noseLift + mouthDip;
-  const outerY = y + (baseArc * 0.56);
-  const innerY = y + (baseArc * 0.84) + (noseLift * 0.28);
+  const outerY = y + baseArc * 0.56;
+  const innerY = y + baseArc * 0.84 + noseLift * 0.28;
 
   return [
     `M ${FACE_CENTER_X - halfWidth} ${y}`,
-    `C ${FACE_CENTER_X - (halfWidth * 0.62)} ${outerY}, ${FACE_CENTER_X - (halfWidth * 0.2)} ${innerY}, ${FACE_CENTER_X} ${centerY}`,
-    `C ${FACE_CENTER_X + (halfWidth * 0.2)} ${innerY}, ${FACE_CENTER_X + (halfWidth * 0.62)} ${outerY}, ${FACE_CENTER_X + halfWidth} ${y}`,
+    `C ${FACE_CENTER_X - halfWidth * 0.62} ${outerY}, ${FACE_CENTER_X - halfWidth * 0.2} ${innerY}, ${FACE_CENTER_X} ${centerY}`,
+    `C ${FACE_CENTER_X + halfWidth * 0.2} ${innerY}, ${FACE_CENTER_X + halfWidth * 0.62} ${outerY}, ${FACE_CENTER_X + halfWidth} ${y}`,
   ].join(' ');
 };
 
@@ -104,7 +86,7 @@ const buildLongitudePath = (offsetX: number) => {
   const halfHeight = FACE_RADIUS_Y * Math.sqrt(normalized);
   const x = FACE_CENTER_X + offsetX;
   const inwardPull = offsetX * 0.18;
-  const centerWeight = 1 - (Math.abs(offsetX) / FACE_RADIUS_X);
+  const centerWeight = 1 - Math.abs(offsetX) / FACE_RADIUS_X;
   const browPinch = centerWeight * 10;
   const cheekBulge = centerWeight * 18;
   const jawTuck = centerWeight * 8;
@@ -115,7 +97,7 @@ const buildLongitudePath = (offsetX: number) => {
   return [
     `M ${x} ${topY}`,
     `C ${x + inwardPull} ${FACE_CENTER_Y - 56 - browPinch}, ${x + inwardPull} ${FACE_CENTER_Y + 8 - cheekBulge}, ${x} ${lowerMidY}`,
-    `C ${x - (inwardPull * 0.3)} ${FACE_CENTER_Y + 82 + cheekBulge}, ${x - (inwardPull * 0.25)} ${FACE_CENTER_Y + 126 + jawTuck}, ${x} ${bottomY}`,
+    `C ${x - inwardPull * 0.3} ${FACE_CENTER_Y + 82 + cheekBulge}, ${x - inwardPull * 0.25} ${FACE_CENTER_Y + 126 + jawTuck}, ${x} ${bottomY}`,
   ].join(' ');
 };
 
@@ -125,22 +107,14 @@ export const resolvePileHologramMeshLineStyle = (opacity: unknown): React.CSSPro
 
 function PileHologramAssistant() {
   return (
-    <div
-      className={styles.pileHologramPanel}
-      aria-hidden="true"
-      data-testid={E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_PANEL}
-    >
+    <div className={styles.pileHologramPanel} aria-hidden="true" data-testid={E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_PANEL}>
       <div className={styles.pileHologramBackdrop} />
       <div className={styles.pileHologramScanlines} />
 
       <div className={styles.pileHologramStage}>
         <div className={styles.pileHologramAura} />
 
-        <svg
-          viewBox="0 0 420 360"
-          className={styles.pileHologramSvg}
-          focusable="false"
-        >
+        <svg viewBox="0 0 420 360" className={styles.pileHologramSvg} focusable="false">
           <defs>
             <clipPath id={HEAD_CLIP_ID}>
               <path d={HEAD_PATH} />
@@ -167,16 +141,8 @@ function PileHologramAssistant() {
           </defs>
 
           <g className={styles.pileHologramFloat}>
-            <path
-              d={BUST_PATH}
-              className={styles.pileHologramBustFill}
-              fill={`url(#${BUST_FILL_ID})`}
-            />
-            <path
-              d={FACE_DEPTH_PATH}
-              className={styles.pileHologramDepthShell}
-              fill={`url(#${FACE_DEPTH_ID})`}
-            />
+            <path d={BUST_PATH} className={styles.pileHologramBustFill} fill={`url(#${BUST_FILL_ID})`} />
+            <path d={FACE_DEPTH_PATH} className={styles.pileHologramDepthShell} fill={`url(#${FACE_DEPTH_ID})`} />
             <ellipse
               cx="210"
               cy="174"
@@ -185,21 +151,13 @@ function PileHologramAssistant() {
               className={styles.pileHologramFaceGlow}
               fill={`url(#${FACE_GLOW_ID})`}
             />
-            <path
-              d={FACE_CORE_PATH}
-              className={styles.pileHologramFaceCore}
-              fill={`url(#${FACE_FILL_ID})`}
-            />
-            <path
-              d={HEAD_PATH}
-              className={styles.pileHologramDepthOutline}
-              transform="translate(0 -4)"
-            />
+            <path d={FACE_CORE_PATH} className={styles.pileHologramFaceCore} fill={`url(#${FACE_FILL_ID})`} />
+            <path d={HEAD_PATH} className={styles.pileHologramDepthOutline} transform="translate(0 -4)" />
             <path d={HEAD_PATH} className={styles.pileHologramHeadOutline} />
 
             <g clipPath={`url(#${HEAD_CLIP_ID})`} className={styles.pileHologramMeshGroup}>
               {FACE_ROW_OFFSETS.map((offsetY) => {
-                const opacity = 0.22 + ((1 - (Math.abs(offsetY) / FACE_RADIUS_Y)) * 0.66);
+                const opacity = 0.22 + (1 - Math.abs(offsetY) / FACE_RADIUS_Y) * 0.66;
                 return (
                   <path
                     key={`row-${offsetY}`}
@@ -210,7 +168,7 @@ function PileHologramAssistant() {
                 );
               })}
               {FACE_COLUMN_OFFSETS.map((offsetX) => {
-                const opacity = 0.18 + ((1 - (Math.abs(offsetX) / FACE_RADIUS_X)) * 0.68);
+                const opacity = 0.18 + (1 - Math.abs(offsetX) / FACE_RADIUS_X) * 0.68;
                 return (
                   <path
                     key={`col-${offsetX}`}

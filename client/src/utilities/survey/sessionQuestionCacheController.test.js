@@ -89,9 +89,7 @@ const {
   readSessionScanMaxBlockRange,
   resolveValidatedSessionScanWindow,
 } = require('../session/sessionScanScope.js');
-const {
-  getTemporaryDemoSessionQuestionFixtures,
-} = require('../session/demoSessionQuestionFixtures.js');
+const { getTemporaryDemoSessionQuestionFixtures } = require('../session/demoSessionQuestionFixtures.js');
 const { getGlobalLitHooks } = require('../crypto/litProtocol.js');
 const {
   buildQuestionDecryptContextForSession,
@@ -103,19 +101,14 @@ const {
   shouldCommitThrottledProgress,
   shouldFlushCoalescedRun,
 } = require('../session/mainSiteProgressHelpers.js');
-const {
-  isMaskedQuestionPayload,
-  pickBetterQuestionPayload,
-} = require('./questionRouting.js');
+const { isMaskedQuestionPayload, pickBetterQuestionPayload } = require('./questionRouting.js');
 
 const NETWORK_ID = '11155420';
 const SESSION_SLUG = 'alpha';
 const ACCOUNT = '0xUser';
 const PROVIDER_LIKE = 'provider-like';
 
-const deepClone = (value) => (
-  value == null ? value : JSON.parse(JSON.stringify(value))
-);
+const deepClone = (value) => (value == null ? value : JSON.parse(JSON.stringify(value)));
 
 const createDeferred = () => {
   let resolve;
@@ -214,28 +207,20 @@ const createMockHost = (overrides = {}) => {
       return true;
     }),
     getActiveSessionSlug: jest.fn(() => activeSlug || SESSION_SLUG),
-    getSessionCfg: jest.fn(() => (
+    getSessionCfg: jest.fn(() =>
       Object.prototype.hasOwnProperty.call(overrides, 'sessionCfg')
         ? sessionCfg
-        : { networkChainId: NETWORK_ID, blockLimits: null }
-    )),
-    getSessionChainId: jest.fn(() => (
-      Object.prototype.hasOwnProperty.call(overrides, 'chainId') ? chainId : NETWORK_ID
-    )),
+        : { networkChainId: NETWORK_ID, blockLimits: null },
+    ),
+    getSessionChainId: jest.fn(() =>
+      Object.prototype.hasOwnProperty.call(overrides, 'chainId') ? chainId : NETWORK_ID,
+    ),
     getSessionScanScope: jest.fn(() => sessionScanScope || 'session'),
-    getAccount: jest.fn(() => (
-      Object.prototype.hasOwnProperty.call(overrides, 'account') ? account : ACCOUNT
-    )),
-    getProviderLike: jest.fn(() => (
-      Object.prototype.hasOwnProperty.call(overrides, 'providerLike')
-        ? providerLike
-        : PROVIDER_LIKE
-    )),
-    getNetwork: jest.fn(() => (
-      Object.prototype.hasOwnProperty.call(overrides, 'network')
-        ? network
-        : { id: 84532 }
-    )),
+    getAccount: jest.fn(() => (Object.prototype.hasOwnProperty.call(overrides, 'account') ? account : ACCOUNT)),
+    getProviderLike: jest.fn(() =>
+      Object.prototype.hasOwnProperty.call(overrides, 'providerLike') ? providerLike : PROVIDER_LIKE,
+    ),
+    getNetwork: jest.fn(() => (Object.prototype.hasOwnProperty.call(overrides, 'network') ? network : { id: 84532 })),
     scanScopeNoop: jest.fn(() => false),
     setReadinessStateIfChanged: jest.fn((patch) => {
       if (patch) Object.assign(state, patch);
@@ -279,22 +264,15 @@ describe('createSessionQuestionCacheController', () => {
             chunkEventCount: 0,
           });
         }
-        const rows = await contractScripts.fetchUserSubmittedQuestionIDs(
-          mode,
-          fromBlock,
-          toBlock,
-          slug
-        );
+        const rows = await contractScripts.fetchUserSubmittedQuestionIDs(mode, fromBlock, toBlock, slug);
         if (typeof partialCb === 'function') partialCb(rows, toBlock);
-        return (rows || [])
-          .map((row) => String(row?.questionId || '').toLowerCase())
-          .filter(Boolean);
-      }
+        return (rows || []).map((row) => String(row?.questionId || '').toLowerCase()).filter(Boolean);
+      },
     );
     contractScripts.getQuestionDataById.mockResolvedValue(null);
-    contractScripts.getQuestionData.mockImplementation((mode, qId, slug, opts) => (
-      contractScripts.getQuestionDataById(mode, qId, slug, opts)
-    ));
+    contractScripts.getQuestionData.mockImplementation((mode, qId, slug, opts) =>
+      contractScripts.getQuestionDataById(mode, qId, slug, opts),
+    );
     contractScripts.decryptQuestionPayloadInPlace.mockImplementation(async () => undefined);
     ensureQuestionArweaveCacheBranches.mockImplementation((node) => {
       if (!node || typeof node !== 'object') return;
@@ -326,10 +304,7 @@ describe('createSessionQuestionCacheController', () => {
       reachedMaxAttempts: false,
     }));
     readSessionScanMaxBlockRange.mockImplementation((fallback) => fallback);
-    resolveValidatedSessionScanWindow.mockImplementation(({
-      resolvedWindow,
-      maxBlockRange,
-    }) => {
+    resolveValidatedSessionScanWindow.mockImplementation(({ resolvedWindow, maxBlockRange }) => {
       const fromBlock = Number(resolvedWindow?.fromBlock || 0);
       const toBlock = Number(resolvedWindow?.toBlock || 0);
       return {
@@ -337,50 +312,35 @@ describe('createSessionQuestionCacheController', () => {
         fromBlock,
         toBlock,
         requestedToBlock: toBlock,
-        requestedRangeBlocks: fromBlock <= toBlock ? (toBlock - fromBlock + 1) : 0,
+        requestedRangeBlocks: fromBlock <= toBlock ? toBlock - fromBlock + 1 : 0,
         maxBlockRange: maxBlockRange || DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE,
         wasCapped: false,
       };
     });
     globalLitHooks = { getKey: jest.fn(() => 'lit-key') };
     getGlobalLitHooks.mockReturnValue(globalLitHooks);
-    buildQuestionDecryptContextForSession.mockImplementation(({
-      cfg = null,
-      account = '',
-      providerLike = '',
-      litHooks = null,
-      fallbackChainId = null,
-    } = {}) => ({
-      account,
-      providerLike,
-      chainId: Number(cfg?.networkChainId || fallbackChainId || 0) || null,
-      litHooks: litHooks || null,
-      litOpts: litHooks && typeof litHooks.getKey === 'function'
-        ? { getKey: litHooks.getKey }
-        : null,
-    }));
-    hasMaskedQuestionPayloadImproved.mockImplementation((prev, next) => (
-      !!prev?.masked && !next?.masked
-    ));
-    buildQuestionReadyStatePatch.mockImplementation(({
-      prevState,
-      ready,
-      incrementNonce,
-    }) => ({
+    buildQuestionDecryptContextForSession.mockImplementation(
+      ({ cfg = null, account = '', providerLike = '', litHooks = null, fallbackChainId = null } = {}) => ({
+        account,
+        providerLike,
+        chainId: Number(cfg?.networkChainId || fallbackChainId || 0) || null,
+        litHooks: litHooks || null,
+        litOpts: litHooks && typeof litHooks.getKey === 'function' ? { getKey: litHooks.getKey } : null,
+      }),
+    );
+    hasMaskedQuestionPayloadImproved.mockImplementation((prev, next) => !!prev?.masked && !next?.masked);
+    buildQuestionReadyStatePatch.mockImplementation(({ prevState, ready, incrementNonce }) => ({
       isQuestionCacheReady: ready,
-      questionResponsesNonce: Number(prevState?.questionResponsesNonce || 0) + (
-        incrementNonce ? 1 : 0
-      ),
+      questionResponsesNonce: Number(prevState?.questionResponsesNonce || 0) + (incrementNonce ? 1 : 0),
     }));
     shouldClearQuestionProgressInFinalize.mockImplementation(() => false);
     shouldCommitThrottledProgress.mockImplementation(({ force }) => !!force);
     shouldFlushCoalescedRun.mockImplementation(({ force }) => !!force);
     getTemporaryDemoSessionQuestionFixtures.mockReturnValue([]);
-    isMaskedQuestionPayload.mockImplementation((question) => (
-      !!question?.masked ||
-      String(question?.prompt || '') === '[encrypted]' ||
-      question?.promptDecrypted === false
-    ));
+    isMaskedQuestionPayload.mockImplementation(
+      (question) =>
+        !!question?.masked || String(question?.prompt || '') === '[encrypted]' || question?.promptDecrypted === false,
+    );
     pickBetterQuestionPayload.mockImplementation((prev, next) => next);
   });
 
@@ -534,28 +494,33 @@ describe('createSessionQuestionCacheController', () => {
 
       const stored = host.getStored('questionsCache', SESSION_SLUG);
 
-      expect(stored?.[NETWORK_ID]).toEqual(expect.objectContaining({
-        questionsLatestBlock: 12,
-        questionsDiscoveryCheckpointBlock: 12,
-        questions: {},
-        questionResponses: {},
-        questionResponsesMeta: {},
-        pendingQuestionMetadata: {},
-        questionResponsesLatestBlock: 9,
-        arweaveTxCache: {},
-        arweaveTxFailureCache: {},
-        questionHydrationMeta: {},
-      }));
+      expect(stored?.[NETWORK_ID]).toEqual(
+        expect.objectContaining({
+          questionsLatestBlock: 12,
+          questionsDiscoveryCheckpointBlock: 12,
+          questions: {},
+          questionResponses: {},
+          questionResponsesMeta: {},
+          pendingQuestionMetadata: {},
+          questionResponsesLatestBlock: 9,
+          arweaveTxCache: {},
+          arweaveTxFailureCache: {},
+          questionHydrationMeta: {},
+        }),
+      );
     });
 
     it('resets empty discovery watermarks when a gated empty recovery forces a rescan', async () => {
       const host = createMockHost({
         initialStorage: {
           questionsCache: {
-            [SESSION_SLUG]: createQuestionsCacheEnvelope({}, {
-              questionsLatestBlock: 12,
-              questionsDiscoveryCheckpointBlock: 12,
-            }),
+            [SESSION_SLUG]: createQuestionsCacheEnvelope(
+              {},
+              {
+                questionsLatestBlock: 12,
+                questionsDiscoveryCheckpointBlock: 12,
+              },
+            ),
           },
         },
       });
@@ -563,12 +528,7 @@ describe('createSessionQuestionCacheController', () => {
 
       await controller.initializeQuestionCacheForGroup(SESSION_SLUG, { forceDiscoveryRescan: true });
 
-      expect(contractScripts.fetchUserSubmittedQuestionIDs).toHaveBeenCalledWith(
-        'none',
-        10,
-        12,
-        SESSION_SLUG
-      );
+      expect(contractScripts.fetchUserSubmittedQuestionIDs).toHaveBeenCalledWith('none', 10, 12, SESSION_SLUG);
     });
 
     it('fetches question IDs via contractScripts.fetchUserSubmittedQuestionIDs', async () => {
@@ -576,21 +536,14 @@ describe('createSessionQuestionCacheController', () => {
 
       await controller.initializeQuestionCacheForGroup(SESSION_SLUG);
 
-      expect(contractScripts.fetchUserSubmittedQuestionIDs).toHaveBeenCalledWith(
-        'none',
-        10,
-        12,
-        SESSION_SLUG
-      );
+      expect(contractScripts.fetchUserSubmittedQuestionIDs).toHaveBeenCalledWith('none', 10, 12, SESSION_SLUG);
     });
 
     it('handles question metadata fetch success', async () => {
       const host = createMockHost();
       const controller = createSessionQuestionCacheController(host);
 
-      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([
-        { questionId: 'Q1', creationBlock: 11 },
-      ]);
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([{ questionId: 'Q1', creationBlock: 11 }]);
       contractScripts.getQuestionDataById.mockResolvedValue({
         creator: '0xCreator',
         prompt: 'Prompt text',
@@ -607,7 +560,7 @@ describe('createSessionQuestionCacheController', () => {
           throwOnFailure: true,
           arweaveRetries: 0,
           arweaveGatewayTimeoutMs: 4500,
-        })
+        }),
       );
       expect(host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questions?.q1).toMatchObject({
         id: 'q1',
@@ -643,13 +596,12 @@ describe('createSessionQuestionCacheController', () => {
       await flushMicrotasks(6);
 
       expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith('demo-1');
-      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef'])
-        .toMatchObject({
-          id: '0xabcdef',
-          prompt: 'Fixture prompt',
-          sessionSlug: 'demo-1',
-          temporaryDemoSeed: true,
-        });
+      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef']).toMatchObject({
+        id: '0xabcdef',
+        prompt: 'Fixture prompt',
+        sessionSlug: 'demo-1',
+        temporaryDemoSeed: true,
+      });
       expect(host.getStateSnapshot()).toMatchObject({
         isQuestionCacheReady: true,
         questionResponsesNonce: 1,
@@ -697,9 +649,7 @@ describe('createSessionQuestionCacheController', () => {
         maxBlockRange: DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE,
         wasCapped: false,
       });
-      contractScripts.getAllQuestionIDsChunkedWithCallback.mockReturnValueOnce(
-        discoveryDeferred.promise
-      );
+      contractScripts.getAllQuestionIDsChunkedWithCallback.mockReturnValueOnce(discoveryDeferred.promise);
 
       const initPromise = controller.initializeQuestionCacheForGroup('demo-1');
       await flushMicrotasks(10);
@@ -708,17 +658,17 @@ describe('createSessionQuestionCacheController', () => {
         'demo-1',
         expect.objectContaining({
           demoCompatibilitySeed: { temporary: true },
-        })
+        }),
       );
-      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef'])
-        .toMatchObject({
-          id: '0xabcdef',
-          prompt: 'Fixture prompt',
-          sessionSlug: 'demo-1',
-          temporaryDemoSeed: true,
-        });
-      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.pendingQuestionMetadata?.['0xabcdef'])
-        .toBeUndefined();
+      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef']).toMatchObject({
+        id: '0xabcdef',
+        prompt: 'Fixture prompt',
+        sessionSlug: 'demo-1',
+        temporaryDemoSeed: true,
+      });
+      expect(
+        host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.pendingQuestionMetadata?.['0xabcdef'],
+      ).toBeUndefined();
       expect(host.getStateSnapshot()).toMatchObject({
         isQuestionCacheReady: true,
         questionResponsesNonce: 1,
@@ -734,17 +684,15 @@ describe('createSessionQuestionCacheController', () => {
       const controller = createSessionQuestionCacheController(host);
       const metadataDeferred = createDeferred();
 
-      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([
-        { questionId: 'Q1', creationBlock: 11 },
-      ]);
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([{ questionId: 'Q1', creationBlock: 11 }]);
       contractScripts.getQuestionDataById.mockReturnValue(metadataDeferred.promise);
 
       const initPromise = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
 
       await flushMicrotasks(10);
 
-      const pendingDuringHydration = host
-        .getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.pendingQuestionMetadata?.q1;
+      const pendingDuringHydration = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]
+        ?.pendingQuestionMetadata?.q1;
 
       expect(pendingDuringHydration).toMatchObject({
         attempts: 0,
@@ -838,15 +786,12 @@ describe('createSessionQuestionCacheController', () => {
       const host = createMockHost({ activeSlug: SESSION_SLUG });
       const controller = createSessionQuestionCacheController(host);
 
-      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([
-        { questionId: 'Q1', creationBlock: 11 },
-      ]);
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([{ questionId: 'Q1', creationBlock: 11 }]);
       contractScripts.getQuestionDataById.mockRejectedValue(new Error('metadata missing'));
 
       await controller.initializeQuestionCacheForGroup(SESSION_SLUG);
 
-      const pendingEntry = host
-        .getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.pendingQuestionMetadata?.q1;
+      const pendingEntry = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.pendingQuestionMetadata?.q1;
 
       expect(pendingEntry).toMatchObject({
         attempts: 1,
@@ -872,27 +817,35 @@ describe('createSessionQuestionCacheController', () => {
       const host = createMockHost({
         initialStorage: {
           questionsCache: {
-            [SESSION_SLUG]: createQuestionsCacheEnvelope({}, {
-              questionResponsesLatestBlock: 11,
-            }),
+            [SESSION_SLUG]: createQuestionsCacheEnvelope(
+              {},
+              {
+                questionResponsesLatestBlock: 11,
+              },
+            ),
           },
         },
       });
       const controller = createSessionQuestionCacheController(host);
       const metadataDeferred = createDeferred();
 
-      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([
-        { questionId: 'Q1', creationBlock: 11 },
-      ]);
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([{ questionId: 'Q1', creationBlock: 11 }]);
       contractScripts.getQuestionDataById.mockReturnValue(metadataDeferred.promise);
 
       const initPromise = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
 
       await flushMicrotasks();
 
-      host.setStored('questionsCache', SESSION_SLUG, createQuestionsCacheEnvelope({}, {
-        questionResponsesLatestBlock: 17,
-      }));
+      host.setStored(
+        'questionsCache',
+        SESSION_SLUG,
+        createQuestionsCacheEnvelope(
+          {},
+          {
+            questionResponsesLatestBlock: 17,
+          },
+        ),
+      );
 
       metadataDeferred.resolve({
         creator: '0xConcurrent',
@@ -953,7 +906,7 @@ describe('createSessionQuestionCacheController', () => {
             chunkEventCount: 0,
           });
           return [];
-        }
+        },
       );
 
       await controller.initializeQuestionCacheForGroup(SESSION_SLUG);
@@ -974,20 +927,15 @@ describe('createSessionQuestionCacheController', () => {
       const host = createMockHost({ activeSlug: SESSION_SLUG });
       const controller = createSessionQuestionCacheController(host);
 
-      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([
-        { questionId: 'Q1', creationBlock: 11 },
-      ]);
-      contractScripts.getQuestionDataById
-        .mockRejectedValueOnce(new Error('metadata missing'))
-        .mockResolvedValueOnce({
-          creator: '0xRecovered',
-          prompt: 'Recovered prompt',
-        });
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([{ questionId: 'Q1', creationBlock: 11 }]);
+      contractScripts.getQuestionDataById.mockRejectedValueOnce(new Error('metadata missing')).mockResolvedValueOnce({
+        creator: '0xRecovered',
+        prompt: 'Recovered prompt',
+      });
 
       await controller.initializeQuestionCacheForGroup(SESSION_SLUG);
 
-      const firstPending = host
-        .getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.pendingQuestionMetadata?.q1;
+      const firstPending = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.pendingQuestionMetadata?.q1;
 
       expect(firstPending).toMatchObject({
         attempts: 1,
@@ -1025,9 +973,7 @@ describe('createSessionQuestionCacheController', () => {
       const host = createMockHost({ activeSlug: SESSION_SLUG });
       const controller = createSessionQuestionCacheController(host);
 
-      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([
-        { questionId: 'Q1', creationBlock: 11 },
-      ]);
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([{ questionId: 'Q1', creationBlock: 11 }]);
       contractScripts.getQuestionDataById.mockRejectedValue(new Error('gone'));
       shouldStopPendingMetadataRetry.mockReturnValue({
         stop: true,
@@ -1043,8 +989,7 @@ describe('createSessionQuestionCacheController', () => {
 
       await controller.initializeQuestionCacheForGroup(SESSION_SLUG);
 
-      const pendingEntry = host
-        .getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.pendingQuestionMetadata?.q1;
+      const pendingEntry = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.pendingQuestionMetadata?.q1;
 
       expect(pendingEntry).toBeDefined();
       expect(pendingEntry).toMatchObject({
@@ -1139,13 +1084,15 @@ describe('createSessionQuestionCacheController', () => {
 
       await controller.refreshEncryptedQuestionPayloadsForGroup(SESSION_SLUG, { force: true });
 
-      expect(buildQuestionDecryptContextForSession).toHaveBeenCalledWith(expect.objectContaining({
-        cfg: { networkChainId: NETWORK_ID, blockLimits: null },
-        account: ACCOUNT,
-        providerLike: PROVIDER_LIKE,
-        litHooks: globalLitHooks,
-        fallbackChainId: 777,
-      }));
+      expect(buildQuestionDecryptContextForSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cfg: { networkChainId: NETWORK_ID, blockLimits: null },
+          account: ACCOUNT,
+          providerLike: PROVIDER_LIKE,
+          litHooks: globalLitHooks,
+          fallbackChainId: 777,
+        }),
+      );
     });
 
     it('skips entries that have not improved', async () => {
@@ -1201,7 +1148,7 @@ describe('createSessionQuestionCacheController', () => {
           masked: false,
           prompt: 'Decrypted prompt',
           promptDecrypted: true,
-        })
+        }),
       );
       expect(host.dgWrite).toHaveBeenCalledWith(
         'questionsCache',
@@ -1217,7 +1164,7 @@ describe('createSessionQuestionCacheController', () => {
               }),
             }),
           }),
-        })
+        }),
       );
       expect(host.queueLocalRevisionUpdate).toHaveBeenCalledWith({
         needsQuestionResponsesNonce: true,
@@ -1303,10 +1250,14 @@ describe('createSessionQuestionCacheController', () => {
 
       await controller.refreshEncryptedQuestionPayloadsForGroup(SESSION_SLUG, { force: true });
 
-      host.setStored('questionsCache', SESSION_SLUG, createQuestionsCacheEnvelope({
-        q1: createMaskedQuestion('q1'),
-        q2: createMaskedQuestion('q2'),
-      }));
+      host.setStored(
+        'questionsCache',
+        SESSION_SLUG,
+        createQuestionsCacheEnvelope({
+          q1: createMaskedQuestion('q1'),
+          q2: createMaskedQuestion('q2'),
+        }),
+      );
 
       nowRef.value = 10000;
       await controller.refreshEncryptedQuestionPayloadsForGroup(SESSION_SLUG);
@@ -1357,9 +1308,11 @@ describe('createSessionQuestionCacheController', () => {
       nowRef.value = 6000;
       await controller.refreshEncryptedQuestionPayloadsForGroup(SESSION_SLUG);
 
-      expect(
-        contractScripts.decryptQuestionPayloadInPlace.mock.calls.map(([question]) => question.id)
-      ).toEqual(['q1', 'q2', 'q3']);
+      expect(contractScripts.decryptQuestionPayloadInPlace.mock.calls.map(([question]) => question.id)).toEqual([
+        'q1',
+        'q2',
+        'q3',
+      ]);
     });
   });
 

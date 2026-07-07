@@ -35,9 +35,7 @@ const getLocalStorage = (storageIn?: StorageLike | null): StorageLike | null => 
   return null;
 };
 
-export const readSessionWizardDraftCache = (
-  { storage }: SessionWizardDraftCacheOptions = {}
-): unknown | null => {
+export const readSessionWizardDraftCache = ({ storage }: SessionWizardDraftCacheOptions = {}): unknown | null => {
   const storageRef = getLocalStorage(storage);
   if (!storageRef) return null;
   const result = safeJsonRead(storageRef, SESSION_WIZARD_CACHE_KEY);
@@ -46,7 +44,7 @@ export const readSessionWizardDraftCache = (
 
 export const writeSessionWizardDraftCache = (
   payload: unknown,
-  { storage, maxBytes }: SessionWizardDraftCacheWriteOptions = {}
+  { storage, maxBytes }: SessionWizardDraftCacheWriteOptions = {},
 ): SafeJsonWriteResult => {
   const storageRef = getLocalStorage(storage);
   if (!storageRef) {

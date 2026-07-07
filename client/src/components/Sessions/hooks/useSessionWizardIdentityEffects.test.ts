@@ -7,18 +7,20 @@ type DraftState = {
   sessionName?: unknown;
 };
 
-const renderIdentityEffects = (overrides: Partial<{
-  initialRegistryChainId: unknown;
-  initialSessionId: unknown;
-  privateSlugMode: boolean;
-  sessionId: unknown;
-  slugPinnedByPendingSbtDrafts: boolean;
-  draftSessionName: unknown;
-  draftSlug: unknown;
-  lastManualSlug: string;
-  hasPrivateSbtName: boolean;
-  privateSlugModeCurrent: boolean;
-}> = {}) => {
+const renderIdentityEffects = (
+  overrides: Partial<{
+    initialRegistryChainId: unknown;
+    initialSessionId: unknown;
+    privateSlugMode: boolean;
+    sessionId: unknown;
+    slugPinnedByPendingSbtDrafts: boolean;
+    draftSessionName: unknown;
+    draftSlug: unknown;
+    lastManualSlug: string;
+    hasPrivateSbtName: boolean;
+    privateSlugModeCurrent: boolean;
+  }> = {},
+) => {
   const setRegistryChainId = jest.fn();
   const setSessionId = jest.fn();
   const setDraft = jest.fn();
@@ -28,23 +30,25 @@ const renderIdentityEffects = (overrides: Partial<{
   const privateSlugModeRef = { current: overrides.privateSlugModeCurrent ?? false };
   const togglePrivateSlugModeRef = { current: togglePrivateSlugMode };
 
-  renderHook(() => useSessionWizardIdentityEffects<DraftState>({
-    initialRegistryChainId: overrides.initialRegistryChainId,
-    setRegistryChainId,
-    initialSessionId: overrides.initialSessionId,
-    setSessionId,
-    setDraft,
-    privateSlugMode: overrides.privateSlugMode ?? false,
-    sessionId: overrides.sessionId ?? '',
-    slugPinnedByPendingSbtDrafts: overrides.slugPinnedByPendingSbtDrafts ?? false,
-    draftSessionName: overrides.draftSessionName ?? '',
-    draftSlug: overrides.draftSlug ?? '',
-    lastManualSlugRef,
-    hasPrivateSbtName: overrides.hasPrivateSbtName ?? false,
-    lastHasPrivateSbtNameRef,
-    privateSlugModeRef,
-    togglePrivateSlugModeRef,
-  }));
+  renderHook(() =>
+    useSessionWizardIdentityEffects<DraftState>({
+      initialRegistryChainId: overrides.initialRegistryChainId,
+      setRegistryChainId,
+      initialSessionId: overrides.initialSessionId,
+      setSessionId,
+      setDraft,
+      privateSlugMode: overrides.privateSlugMode ?? false,
+      sessionId: overrides.sessionId ?? '',
+      slugPinnedByPendingSbtDrafts: overrides.slugPinnedByPendingSbtDrafts ?? false,
+      draftSessionName: overrides.draftSessionName ?? '',
+      draftSlug: overrides.draftSlug ?? '',
+      lastManualSlugRef,
+      hasPrivateSbtName: overrides.hasPrivateSbtName ?? false,
+      lastHasPrivateSbtNameRef,
+      privateSlugModeRef,
+      togglePrivateSlugModeRef,
+    }),
+  );
 
   return {
     lastHasPrivateSbtNameRef,

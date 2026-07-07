@@ -20,10 +20,8 @@ export const buildConvictionImportanceToggleLineClassName = ({
   activeClassName?: unknown;
   baseClassName?: unknown;
   isActive?: unknown;
-} = {}): string => ([
-  String(baseClassName || ''),
-  isActive ? String(activeClassName || '') : '',
-].filter(Boolean).join(' '));
+} = {}): string =>
+  [String(baseClassName || ''), isActive ? String(activeClassName || '') : ''].filter(Boolean).join(' ');
 
 const ConvictionImportanceLabel = ({
   importanceToggleEnabled = false,

@@ -1,6 +1,4 @@
-import {
-  normalizeRoutePath,
-} from './routePathHelpers.js';
+import { normalizeRoutePath } from './routePathHelpers.js';
 
 describe('routePathHelpers', () => {
   it('forwards the legacy DACC demo link to the about page', () => {

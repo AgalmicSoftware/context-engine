@@ -3,25 +3,29 @@ import { resolveSessionWizardFundingRequirement } from './sessionWizardFundingRe
 
 describe('resolveSessionWizardFundingRequirement', () => {
   it('links OP Sepolia funding to the Optimism faucet', () => {
-    expect(resolveSessionWizardFundingRequirement({
-      defaultChainId: 11155420,
-      getChainById: (chainId) => ({
-        id: chainId,
-        name: 'OP Sepolia',
-        nativeCurrency: { symbol: 'ETH' },
+    expect(
+      resolveSessionWizardFundingRequirement({
+        defaultChainId: 11155420,
+        getChainById: (chainId) => ({
+          id: chainId,
+          name: 'OP Sepolia',
+          nativeCurrency: { symbol: 'ETH' },
+        }),
       }),
-    })).toEqual({
+    ).toEqual({
       href: SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet,
       label: 'OP Sepolia ETH for on-chain registration',
     });
   });
 
   it('uses a chain-name fallback for unknown configured chains', () => {
-    expect(resolveSessionWizardFundingRequirement({
-      defaultChainId: 31337,
-      getChainById: () => null,
-      getChainName: () => 'Local Foundry',
-    })).toEqual({
+    expect(
+      resolveSessionWizardFundingRequirement({
+        defaultChainId: 31337,
+        getChainById: () => null,
+        getChainName: () => 'Local Foundry',
+      }),
+    ).toEqual({
       href: '',
       label: 'Local Foundry ETH for on-chain registration',
     });

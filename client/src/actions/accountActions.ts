@@ -23,9 +23,7 @@ type AccountAction = {
 type AccountDispatch = (action: AccountAction) => void;
 type AccountThunk = (dispatch: AccountDispatch) => void;
 
-const getCurrentProfile = (): AccountSnapshot => (
-  (store.getState() as RootStateSnapshot).profile || {}
-);
+const getCurrentProfile = (): AccountSnapshot => (store.getState() as RootStateSnapshot).profile || {};
 
 export const fetchAccount = (): AccountThunk => (dispatch) => {
   const profile = getCurrentProfile();
@@ -43,11 +41,13 @@ export const fetchAccount = (): AccountThunk => (dispatch) => {
   });
 };
 
-export const changeAccount = (web3info: AccountSnapshot): AccountThunk => (dispatch) => {
-  accountLog.log('account changed to ' + web3info.account + ' provided by ' + web3info.provider);
+export const changeAccount =
+  (web3info: AccountSnapshot): AccountThunk =>
+  (dispatch) => {
+    accountLog.log('account changed to ' + web3info.account + ' provided by ' + web3info.provider);
 
-  dispatch({
-    type: LOGIN_ACCOUNT,
-    payload: web3info,
-  });
-};
+    dispatch({
+      type: LOGIN_ACCOUNT,
+      payload: web3info,
+    });
+  };

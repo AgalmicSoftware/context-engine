@@ -98,7 +98,7 @@ describe('SessionWizard login guard rendering', () => {
       await waitFor(() => {
         expect(toggleLoginModal).toHaveBeenCalledWith(true);
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          'Connect your wallet to set the admin address.'
+          'Connect your wallet to set the admin address.',
         );
       });
       expect(global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'))).toBeUndefined();

@@ -1,6 +1,6 @@
-@use "sass:color";
-@use "scss/finalSubmitCta" as finalSubmitCta;
-@use "scss/variables" as tokens;
+@use 'sass:color';
+@use 'scss/finalSubmitCta' as finalSubmitCta;
+@use 'scss/variables' as tokens;
 
 /* --- Variables (Matching SBTPage) --- */
 $user-page-text-color: tokens.$ce-white;
@@ -777,8 +777,7 @@ $user-page-background: tokens.$ce-panel-bg;
   background-clip: padding-box;
   border: 1px solid $input-border;
   border-radius: 0.25rem;
-  transition:
-    border-color 0.15s ease-in-out;
+  transition: border-color 0.15s ease-in-out;
   flex-grow: 0;
   &:focus {
     color: var(--ce-color-white);
@@ -1222,7 +1221,9 @@ $user-page-background: tokens.$ce-panel-bg;
     color: $user-page-text-color;
     font-weight: 600;
     cursor: pointer;
-    transition: border-color 0.2s ease, background 0.2s ease;
+    transition:
+      border-color 0.2s ease,
+      background 0.2s ease;
 
     &:hover {
       border-color: rgba(255, 255, 255, 0.3);

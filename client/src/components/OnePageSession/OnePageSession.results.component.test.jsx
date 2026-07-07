@@ -25,10 +25,7 @@ const mockDemoAnalysisWorkspace = jest.fn();
 const mockCorpusViewer = jest.fn();
 const originalFetch = global.fetch;
 const fullCrossCorpusPayload = JSON.parse(
-  fs.readFileSync(
-    path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'),
-    'utf8'
-  )
+  fs.readFileSync(path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'), 'utf8'),
 );
 
 const extractMediaBlock = (scss, query, requiredSnippet = '') => {
@@ -80,11 +77,7 @@ jest.mock('../SurveyTool/SurveyPage', () => (props) => {
 
 jest.mock('../SBTs/SBTsPage', () => (props) => {
   mockSBTsPage(props);
-  return (
-    <div data-testid="sbts-page">
-      {props.showCreateGroupExternal ? 'Create Open' : 'Create Closed'}
-    </div>
-  );
+  return <div data-testid="sbts-page">{props.showCreateGroupExternal ? 'Create Open' : 'Create Closed'}</div>;
 });
 jest.mock('../PolisReport/PolisReport', () => (props) => {
   mockPolisReport(props);
@@ -117,9 +110,8 @@ jest.mock('../MainContent/RiskMatrix', () => ({
           <button
             type="button"
             data-testid="risk-matrix-open-atlas-node"
-            onClick={() => props.onOpenAtlasNode(
-              '0x4110000000000000000000000000000000000000000000000000000000000000',
-              {
+            onClick={() =>
+              props.onOpenAtlasNode('0x4110000000000000000000000000000000000000000000000000000000000000', {
                 modal: true,
                 selectedCellId: 'Capabilities_vs_Labor',
                 activeCategoryX: 'Capabilities',
@@ -135,8 +127,8 @@ jest.mock('../MainContent/RiskMatrix', () => ({
                     intensity: 5,
                   },
                 ],
-              }
-            )}
+              })
+            }
           >
             Open linked atlas node
           </button>
@@ -154,13 +146,10 @@ jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
 }));
 jest.mock('../DemoViews/CorpusViewer', () => {
   const React = require('react');
-  const fullCorpusUrl = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json';
+  const fullCorpusUrl =
+    'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json';
 
-  function MockCorpusViewer({
-    externalLoadRequestNonce,
-    onAtlasIssueOpen,
-    onExternalLoadStateChange,
-  }) {
+  function MockCorpusViewer({ externalLoadRequestNonce, onAtlasIssueOpen, onExternalLoadStateChange }) {
     mockCorpusViewer({ externalLoadRequestNonce, onAtlasIssueOpen, onExternalLoadStateChange });
     React.useEffect(() => {
       let cancelled = false;
@@ -277,21 +266,15 @@ describe('OnePageSession results routing', () => {
     return subject;
   };
 
-  const getAutoMintStorageKey = (account, sbtAddress, chainId = 84532) => (
-    `autoMint:${String(account || '').toLowerCase()}:${chainId}:${String(sbtAddress || '').toLowerCase()}`
-  );
+  const getAutoMintStorageKey = (account, sbtAddress, chainId = 84532) =>
+    `autoMint:${String(account || '').toLowerCase()}:${chainId}:${String(sbtAddress || '').toLowerCase()}`;
 
   it('shows the demo Documents tooltip copy only when the section is expanded', async () => {
     const props = buildProps();
-    const documentsTooltipText = 'Allows the conversation to be enriched by data, and the formats can change per-session';
+    const documentsTooltipText =
+      'Allows the conversation to be enriched by data, and the formats can change per-session';
 
-    render(
-      <OnePageSession
-        {...props}
-        slug="demo"
-        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-      />
-    );
+    render(<OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />);
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
     expect(screen.getByText('Context')).toBeInTheDocument();
@@ -302,7 +285,7 @@ describe('OnePageSession results routing', () => {
     expect(screen.getByText(documentsTooltipText)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'GitHub' })).toHaveAttribute(
       'href',
-      'https://github.com/AgalmicSoftware/context-engine/tree/main/ai-discourse-corpus'
+      'https://github.com/AgalmicSoftware/context-engine/tree/main/ai-discourse-corpus',
     );
     expect(screen.getByTestId('ce-demo-documents-load-full-corpus')).toHaveTextContent('Load full corpus');
   });
@@ -320,12 +303,8 @@ describe('OnePageSession results routing', () => {
 
     render(
       <MemoryRouter initialEntries={['/session/demo']}>
-        <OnePageSession
-          {...props}
-          slug="demo"
-          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-        />
-      </MemoryRouter>
+        <OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />
+      </MemoryRouter>,
     );
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
@@ -347,7 +326,7 @@ describe('OnePageSession results routing', () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json',
-        { cache: 'no-store' }
+        { cache: 'no-store' },
       );
     });
 
@@ -366,11 +345,10 @@ describe('OnePageSession results routing', () => {
     const priorUrl = window.location.href;
     window.history.pushState({}, '', '/session/edge');
 
-    const getFullCalls = () => (
+    const getFullCalls = () =>
       mockSurveyPage.mock.calls
         .map((args) => args[0])
-        .filter((childProps) => childProps?.miniMode === true && childProps?.minifiedMode !== 'pile')
-    );
+        .filter((childProps) => childProps?.miniMode === true && childProps?.minifiedMode !== 'pile');
 
     try {
       render(<OnePageSession {...buildProps()} />);
@@ -391,7 +369,11 @@ describe('OnePageSession results routing', () => {
       expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
       expect(window.location.pathname).toBe('/session/edge/questions/results');
       expect(window.location.search).toBe('?session=edge');
-      expect(getFullCalls().slice(-2).map((props) => props.autoOpenResults)).toEqual([false, true]);
+      expect(
+        getFullCalls()
+          .slice(-2)
+          .map((props) => props.autoOpenResults),
+      ).toEqual([false, true]);
 
       act(() => {
         const latestProps = getFullCalls()[getFullCalls().length - 1];
@@ -413,7 +395,11 @@ describe('OnePageSession results routing', () => {
         jest.advanceTimersByTime(0);
       });
 
-      expect(getFullCalls().slice(-2).map((props) => props.autoOpenResults)).toEqual([false, true]);
+      expect(
+        getFullCalls()
+          .slice(-2)
+          .map((props) => props.autoOpenResults),
+      ).toEqual([false, true]);
       expect(window.location.pathname).toBe('/session/edge/questions/results');
       expect(window.location.search).toBe('?session=edge');
     } finally {
@@ -432,11 +418,10 @@ describe('OnePageSession results routing', () => {
     // PUBLIC_URL mode; root deployment remains the default today.
     process.env.PUBLIC_URL = '/ce/';
 
-    const getFullCalls = () => (
+    const getFullCalls = () =>
       mockSurveyPage.mock.calls
         .map((args) => args[0])
-        .filter((childProps) => childProps?.miniMode === true && childProps?.minifiedMode !== 'pile')
-    );
+        .filter((childProps) => childProps?.miniMode === true && childProps?.minifiedMode !== 'pile');
 
     try {
       window.history.replaceState({}, '', '/ce/session/edge');
@@ -487,13 +472,7 @@ describe('OnePageSession results routing', () => {
         ...mergedProps.sessionConfig,
         ...(sessionSlug != null ? { slug: sessionSlug } : {}),
       };
-      const view = render(
-        <OnePageSession
-          {...mergedProps}
-          {...extraProps}
-          sessionConfig={sessionConfig}
-        />
-      );
+      const view = render(<OnePageSession {...mergedProps} {...extraProps} sessionConfig={sessionConfig} />);
 
       await waitFor(() => {
         expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
@@ -579,13 +558,7 @@ describe('OnePageSession results routing', () => {
 
     try {
       window.history.replaceState({}, '', '/session/edge/questions/results?session=edge');
-      render(
-        <OnePageSession
-          {...buildProps()}
-          routeQuestionsOpen={true}
-          routeAutoOpenResults={true}
-        />
-      );
+      render(<OnePageSession {...buildProps()} routeQuestionsOpen={true} routeAutoOpenResults={true} />);
 
       expect(await screen.findByTestId('survey-page-full')).toBeInTheDocument();
       const fullCalls = mockSurveyPage.mock.calls
@@ -603,24 +576,12 @@ describe('OnePageSession results routing', () => {
 
     try {
       window.history.replaceState({}, '', '/session/edge/questions/results?session=edge');
-      const view = render(
-        <OnePageSession
-          {...buildProps()}
-          routeQuestionsOpen={true}
-          routeAutoOpenResults={true}
-        />
-      );
+      const view = render(<OnePageSession {...buildProps()} routeQuestionsOpen={true} routeAutoOpenResults={true} />);
 
       expect(await screen.findByTestId('survey-page-full')).toBeInTheDocument();
 
       window.history.replaceState({}, '', '/session/edge?session=edge');
-      view.rerender(
-        <OnePageSession
-          {...buildProps()}
-          routeQuestionsOpen={false}
-          routeAutoOpenResults={false}
-        />
-      );
+      view.rerender(<OnePageSession {...buildProps()} routeQuestionsOpen={false} routeAutoOpenResults={false} />);
 
       await waitFor(() => {
         expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
@@ -656,7 +617,7 @@ describe('OnePageSession results routing', () => {
     const tabletResultsBlock = extractMediaBlock(
       scss,
       '@media only screen and (max-width: 1024px)',
-      '.resultsModeActionsScroller'
+      '.resultsModeActionsScroller',
     );
 
     expect(scss).toMatch(/\.resultsModeActionsScroller\s*{[\s\S]*?padding-block:\s*6px;[\s\S]*?margin-block:\s*-6px;/);
@@ -672,12 +633,8 @@ describe('OnePageSession results routing', () => {
 
     render(
       <MemoryRouter initialEntries={['/session/demo']}>
-        <OnePageSession
-          {...props}
-          slug="demo"
-          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-        />
-      </MemoryRouter>
+        <OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -700,12 +657,8 @@ describe('OnePageSession results routing', () => {
 
     render(
       <MemoryRouter initialEntries={['/session/demo']}>
-        <OnePageSession
-          {...props}
-          slug="demo"
-          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-        />
-      </MemoryRouter>
+        <OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -734,12 +687,8 @@ describe('OnePageSession results routing', () => {
 
     render(
       <MemoryRouter initialEntries={['/session/demo']}>
-        <OnePageSession
-          {...props}
-          slug="demo"
-          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-        />
-      </MemoryRouter>
+        <OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -773,11 +722,14 @@ describe('OnePageSession results routing', () => {
     });
 
     const riskMatrixCalls = mockRiskMatrix.mock.calls.map((args) => args[0]).filter(Boolean);
-    expect(riskMatrixCalls.some((props) => (
-      props?.restoreState?.modal === true
-      && props?.restoreState?.selectedCellId === 'Capabilities_vs_Labor'
-      && props?.restoreState?.comment === 'Return here after checking the atlas node.'
-    ))).toBe(true);
+    expect(
+      riskMatrixCalls.some(
+        (props) =>
+          props?.restoreState?.modal === true &&
+          props?.restoreState?.selectedCellId === 'Capabilities_vs_Labor' &&
+          props?.restoreState?.comment === 'Return here after checking the atlas node.',
+      ),
+    ).toBe(true);
     expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
   });
 
@@ -786,12 +738,8 @@ describe('OnePageSession results routing', () => {
 
     render(
       <MemoryRouter initialEntries={['/session/demo']}>
-        <OnePageSession
-          {...props}
-          slug="demo"
-          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-        />
-      </MemoryRouter>
+        <OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />
+      </MemoryRouter>,
     );
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
@@ -836,11 +784,7 @@ describe('OnePageSession results routing', () => {
     jest.clearAllMocks();
 
     render(
-      <OnePageSession
-        {...baseProps}
-        slug="demo-1"
-        sessionConfig={{ ...baseProps.sessionConfig, slug: 'demo-1' }}
-      />
+      <OnePageSession {...baseProps} slug="demo-1" sessionConfig={{ ...baseProps.sessionConfig, slug: 'demo-1' }} />,
     );
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
@@ -852,13 +796,7 @@ describe('OnePageSession results routing', () => {
   it('uses a report-style icon for the polis results mode switcher', async () => {
     const baseProps = buildProps();
 
-    render(
-      <OnePageSession
-        {...baseProps}
-        slug="demo"
-        sessionConfig={{ ...baseProps.sessionConfig, slug: 'demo' }}
-      />
-    );
+    render(<OnePageSession {...baseProps} slug="demo" sessionConfig={{ ...baseProps.sessionConfig, slug: 'demo' }} />);
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
@@ -870,13 +808,7 @@ describe('OnePageSession results routing', () => {
   it('orders Debate Map ahead of Breakdown in the demo results mode switcher', async () => {
     const props = buildProps();
 
-    render(
-      <OnePageSession
-        {...props}
-        slug="demo"
-        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-      />
-    );
+    render(<OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />);
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
@@ -894,13 +826,7 @@ describe('OnePageSession results routing', () => {
   it('renders the demo analysis workspace when the Breakdown mode is selected', async () => {
     const props = buildProps();
 
-    render(
-      <OnePageSession
-        {...props}
-        slug="demo"
-        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-      />
-    );
+    render(<OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />);
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
@@ -913,7 +839,7 @@ describe('OnePageSession results routing', () => {
       within(resultsNav)
         .getAllByRole('button')
         .slice(0, 4)
-        .map((button) => button.getAttribute('title') || button.textContent?.trim())
+        .map((button) => button.getAttribute('title') || button.textContent?.trim()),
     ).toEqual(['Report', 'Debate Map', 'Breakdown', 'Risk Matrix']);
 
     const polisButton = screen.getByRole('button', { name: /^Report$/i });
@@ -931,9 +857,7 @@ describe('OnePageSession results routing', () => {
     expect(analysisButton).toHaveAttribute('aria-pressed', 'true');
     expect(analysisButton).toHaveClass(styles.sectionHeaderViewModeButtonActive);
     expect(polisButton).toHaveAttribute('aria-pressed', 'false');
-    expect(mockDemoAnalysisWorkspace).toHaveBeenLastCalledWith(
-      expect.objectContaining({ sessionSlug: 'demo' })
-    );
+    expect(mockDemoAnalysisWorkspace).toHaveBeenLastCalledWith(expect.objectContaining({ sessionSlug: 'demo' }));
   });
 
   it('kicks off a slug-scoped light SBT universe scan on mount and session switches', async () => {
@@ -949,7 +873,7 @@ describe('OnePageSession results routing', () => {
           slug="demo"
           sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
           ensureLightSbtUniverse={ensureLightSbtUniverse}
-        />
+        />,
       );
 
       await waitFor(() => {
@@ -965,7 +889,7 @@ describe('OnePageSession results routing', () => {
           slug="edge"
           sessionConfig={{ ...props.sessionConfig, slug: 'edge' }}
           ensureLightSbtUniverse={ensureLightSbtUniverse}
-        />
+        />,
       );
 
       await waitFor(() => {
@@ -1012,7 +936,7 @@ describe('OnePageSession results routing', () => {
     jest.useFakeTimers();
     const peekSpy = jest
       .spyOn(cacheScripts, 'peekCacheSync')
-      .mockImplementation((namespace) => (namespace === 'questionsCache' ? { '84532': { questionResponses: {} } } : {}));
+      .mockImplementation((namespace) => (namespace === 'questionsCache' ? { 84532: { questionResponses: {} } } : {}));
     const props = buildProps();
     const { rerender } = render(<OnePageSession {...props} isQuestionCacheReady={true} />);
     const getQuestionsPeekCalls = () => peekSpy.mock.calls.filter((args) => args[0] === 'questionsCache').length;
@@ -1024,7 +948,7 @@ describe('OnePageSession results routing', () => {
         {...props}
         isQuestionCacheReady={true}
         questionResponsesNonce={props.questionResponsesNonce + 1}
-      />
+      />,
     );
     jest.advanceTimersByTime(150);
 
@@ -1036,7 +960,7 @@ describe('OnePageSession results routing', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('active');
     const peekSpy = jest
       .spyOn(cacheScripts, 'peekCacheSync')
-      .mockImplementation((namespace) => (namespace === 'questionsCache' ? { '84532': { questionResponses: {} } } : {}));
+      .mockImplementation((namespace) => (namespace === 'questionsCache' ? { 84532: { questionResponses: {} } } : {}));
     const props = buildProps();
     const { rerender } = render(<OnePageSession {...props} isQuestionCacheReady={true} />);
     const getQuestionsPeekCalls = () => peekSpy.mock.calls.filter((args) => args[0] === 'questionsCache').length;
@@ -1050,7 +974,7 @@ describe('OnePageSession results routing', () => {
         {...props}
         isQuestionCacheReady={true}
         questionResponsesNonce={props.questionResponsesNonce + 1}
-      />
+      />,
     );
     jest.advanceTimersByTime(150);
     expect(getQuestionsPeekCalls()).toBe(2);
@@ -1061,7 +985,7 @@ describe('OnePageSession results routing', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('active');
     const peekSpy = jest
       .spyOn(cacheScripts, 'peekCacheSync')
-      .mockImplementation((namespace) => (namespace === 'questionsCache' ? { '84532': { questionResponses: {} } } : {}));
+      .mockImplementation((namespace) => (namespace === 'questionsCache' ? { 84532: { questionResponses: {} } } : {}));
     const props = buildProps();
     render(<OnePageSession {...props} isQuestionCacheReady={true} />);
     const getQuestionsPeekCalls = () => peekSpy.mock.calls.filter((args) => args[0] === 'questionsCache').length;
@@ -1086,7 +1010,7 @@ describe('OnePageSession results routing', () => {
         {...props}
         defaultFilterState={null}
         sessionConfig={{ ...props.sessionConfig, defaultFilterState: null }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -1119,7 +1043,7 @@ describe('OnePageSession results routing', () => {
         slug="edge"
         defaultFilterState={initialDefault}
         sessionConfig={{ ...props.sessionConfig, slug: 'edge', defaultFilterState: initialDefault }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -1141,7 +1065,7 @@ describe('OnePageSession results routing', () => {
         slug="next-session"
         defaultFilterState={nextDefault}
         sessionConfig={{ ...props.sessionConfig, slug: 'next-session', defaultFilterState: nextDefault }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -1158,7 +1082,7 @@ describe('OnePageSession results routing', () => {
         slug="edge"
         defaultFilterState={sharedDefault}
         sessionConfig={{ ...props.sessionConfig, slug: 'edge', defaultFilterState: sharedDefault }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -1181,7 +1105,7 @@ describe('OnePageSession results routing', () => {
         slug="edge"
         defaultFilterState={sharedDefault}
         sessionConfig={{ ...props.sessionConfig, slug: 'edge', defaultFilterState: sharedDefault }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -1193,9 +1117,7 @@ describe('OnePageSession results routing', () => {
     const initialDefault = { selectedTags: ['alpha'] };
     const nextDefault = { selectedTags: ['beta'] };
     const props = buildProps();
-    const kickoffSpy = jest
-      .spyOn(OnePageSession.prototype, 'kickoffAutoMintIfNeeded')
-      .mockImplementation(() => {});
+    const kickoffSpy = jest.spyOn(OnePageSession.prototype, 'kickoffAutoMintIfNeeded').mockImplementation(() => {});
 
     const { rerender } = render(
       <OnePageSession
@@ -1204,7 +1126,7 @@ describe('OnePageSession results routing', () => {
         slug="edge"
         defaultFilterState={initialDefault}
         sessionConfig={{ ...props.sessionConfig, slug: 'edge', defaultFilterState: initialDefault }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -1219,7 +1141,7 @@ describe('OnePageSession results routing', () => {
         slug="next-session"
         defaultFilterState={nextDefault}
         sessionConfig={{ ...props.sessionConfig, slug: 'next-session', defaultFilterState: nextDefault }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -1232,7 +1154,7 @@ describe('OnePageSession results routing', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('active');
     const peekSpy = jest
       .spyOn(cacheScripts, 'peekCacheSync')
-      .mockImplementation((namespace) => (namespace === 'questionsCache' ? { '84532': { questionResponses: {} } } : {}));
+      .mockImplementation((namespace) => (namespace === 'questionsCache' ? { 84532: { questionResponses: {} } } : {}));
     const initialDefault = { selectedTags: ['alpha'] };
     const nextDefault = { selectedTags: ['beta'] };
     const props = buildProps();
@@ -1243,7 +1165,7 @@ describe('OnePageSession results routing', () => {
         isQuestionCacheReady={true}
         defaultFilterState={initialDefault}
         sessionConfig={{ ...props.sessionConfig, slug: 'edge', defaultFilterState: initialDefault }}
-      />
+      />,
     );
     const getQuestionsPeekCalls = () => peekSpy.mock.calls.filter((args) => args[0] === 'questionsCache').length;
 
@@ -1259,10 +1181,9 @@ describe('OnePageSession results routing', () => {
         questionResponsesNonce={props.questionResponsesNonce + 1}
         defaultFilterState={nextDefault}
         sessionConfig={{ ...props.sessionConfig, slug: 'next-session', defaultFilterState: nextDefault }}
-      />
+      />,
     );
     jest.advanceTimersByTime(150);
     expect(getQuestionsPeekCalls()).toBe(2);
   });
-
 });

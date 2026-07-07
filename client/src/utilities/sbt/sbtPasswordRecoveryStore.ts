@@ -1,7 +1,4 @@
-import {
-  safeJsonRead,
-  safeJsonWrite,
-} from '../cache/storageJson.js';
+import { safeJsonRead, safeJsonWrite } from '../cache/storageJson.js';
 
 export const SBT_PASSWORD_RECOVERY_STORAGE_KEY = 'ce:sbtPasswordRecovery:v1';
 export const SBT_PASSWORD_RECOVERY_ENVELOPE_VERSION = 1;
@@ -30,15 +27,12 @@ type SbtPasswordRecoveryStoreEnvelope = {
   entries: Record<string, SbtPasswordRecoveryEntry>;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
-const errorMessage = (error: unknown, fallback: string): string => (
+const errorMessage = (error: unknown, fallback: string): string =>
   error && typeof error === 'object' && 'message' in error && error.message
     ? String(error.message)
-    : String(error || fallback)
-);
+    : String(error || fallback);
 
 const getLocalStorage = (storageIn?: StorageLike | null): StorageLike | null => {
   if (storageIn !== undefined) return storageIn;
@@ -55,7 +49,10 @@ const getLocalStorage = (storageIn?: StorageLike | null): StorageLike | null => 
   return null;
 };
 
-const normalizeAddress = (value: unknown): string => String(value || '').trim().toLowerCase();
+const normalizeAddress = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
 const normalizeChainId = (value: unknown): number | null => {
   const chainId = Number(value || 0);
@@ -86,21 +83,19 @@ const buildEmptyStore = (now: number): SbtPasswordRecoveryStoreEnvelope => ({
   entries: {},
 });
 
-export const getSbtPasswordRecoveryKey = ({ chainId, sbtAddress }: { chainId?: unknown; sbtAddress?: unknown } = {}): string => {
+export const getSbtPasswordRecoveryKey = ({
+  chainId,
+  sbtAddress,
+}: { chainId?: unknown; sbtAddress?: unknown } = {}): string => {
   const address = normalizeAddress(sbtAddress);
   if (!address) return '';
   return `${normalizeChainId(chainId) || 'unknown'}:${address}`;
 };
 
-const getUnknownSbtPasswordRecoveryKey = ({ sbtAddress }: { sbtAddress?: unknown } = {}): string => (
-  getSbtPasswordRecoveryKey({ chainId: null, sbtAddress })
-);
+const getUnknownSbtPasswordRecoveryKey = ({ sbtAddress }: { sbtAddress?: unknown } = {}): string =>
+  getSbtPasswordRecoveryKey({ chainId: null, sbtAddress });
 
-const normalizeEntry = (
-  entry: unknown,
-  fallbackKey: string,
-  now: number
-): SbtPasswordRecoveryEntry | null => {
+const normalizeEntry = (entry: unknown, fallbackKey: string, now: number): SbtPasswordRecoveryEntry | null => {
   if (!isRecord(entry)) return null;
   const keyParts = String(fallbackKey || '').split(':');
   const chainId = normalizeChainId(entry.chainId) || normalizeChainId(keyParts[0]);
@@ -125,10 +120,7 @@ const normalizeStore = (parsed: unknown, now: number): SbtPasswordRecoveryStoreE
   if (!isRecord(parsed)) {
     throw new Error('SBT password recovery store must be a JSON object.');
   }
-  if (
-    parsed.v !== SBT_PASSWORD_RECOVERY_ENVELOPE_VERSION ||
-    parsed.kind !== SBT_PASSWORD_RECOVERY_KIND
-  ) {
+  if (parsed.v !== SBT_PASSWORD_RECOVERY_ENVELOPE_VERSION || parsed.kind !== SBT_PASSWORD_RECOVERY_KIND) {
     throw new Error('Unsupported SBT password recovery store envelope.');
   }
 
@@ -137,10 +129,12 @@ const normalizeStore = (parsed: unknown, now: number): SbtPasswordRecoveryStoreE
   Object.entries(sourceEntries).forEach(([key, entry]) => {
     const normalized = normalizeEntry(entry, key, now);
     if (!normalized) return;
-    entries[getSbtPasswordRecoveryKey({
-      chainId: normalized.chainId,
-      sbtAddress: normalized.sbtAddress,
-    })] = normalized;
+    entries[
+      getSbtPasswordRecoveryKey({
+        chainId: normalized.chainId,
+        sbtAddress: normalized.sbtAddress,
+      })
+    ] = normalized;
   });
 
   return {
@@ -167,7 +161,7 @@ export const readSbtPasswordRecoveryStore = ({
     storageRef,
     SBT_PASSWORD_RECOVERY_STORAGE_KEY,
     (parsed) => normalizeStore(parsed, now),
-    { clearInvalid }
+    { clearInvalid },
   );
 
   return result.ok ? result.value : buildEmptyStore(now);
@@ -181,7 +175,7 @@ export const writeSbtPasswordRecoveryStore = (
   }: {
     storage?: StorageLike | null;
     now?: number;
-  } = {}
+  } = {},
 ) => {
   const storageRef = getLocalStorage(storage);
   if (!storageRef) {
@@ -199,7 +193,7 @@ export const writeSbtPasswordRecoveryStore = (
             updatedAt: now,
           }
         : store,
-      now
+      now,
     );
   } catch (error) {
     return {
@@ -232,12 +226,7 @@ export const getSbtPasswordRecoveryCodes = ({
 
   const unknownKey = getUnknownSbtPasswordRecoveryKey({ sbtAddress });
   const unknownEntry = unknownKey ? store.entries[unknownKey] : null;
-  if (
-    normalizedChainId &&
-    unknownEntry &&
-    Array.isArray(unknownEntry.passwords) &&
-    unknownEntry.passwords.length > 0
-  ) {
+  if (normalizedChainId && unknownEntry && Array.isArray(unknownEntry.passwords) && unknownEntry.passwords.length > 0) {
     // Regression guard: earlier writes could land under unknown:<address>
     // before the UI resolved a chain id. Promote that entry on first exact read.
     store.entries[key] = {
@@ -254,9 +243,7 @@ export const getSbtPasswordRecoveryCodes = ({
 
   if (!normalizedChainId) {
     const address = normalizeAddress(sbtAddress);
-    const addressEntry = Object.values(store.entries).find(
-      (candidate) => candidate.sbtAddress === address
-    );
+    const addressEntry = Object.values(store.entries).find((candidate) => candidate.sbtAddress === address);
     if (addressEntry && addressEntry.passwords.length > 0) return [...addressEntry.passwords];
   }
 
@@ -292,9 +279,8 @@ export const upsertSbtPasswordRecoveryCodes = ({
 
   const store = readSbtPasswordRecoveryStore({ storage, now });
   const previous = store.entries[key];
-  const passwordsForEntry = mode === 'append'
-    ? normalizePasswords([...(previous?.passwords || []), ...nextPasswords])
-    : nextPasswords;
+  const passwordsForEntry =
+    mode === 'append' ? normalizePasswords([...(previous?.passwords || []), ...nextPasswords]) : nextPasswords;
   const expiresAt = now + Math.max(1, Number(ttlMs) || SBT_PASSWORD_RECOVERY_DEFAULT_TTL_MS);
 
   store.entries[key] = {

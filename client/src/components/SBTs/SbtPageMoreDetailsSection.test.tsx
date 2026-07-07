@@ -13,7 +13,7 @@ describe('SbtPageMoreDetailsSection', () => {
         relevantInfo={<div data-testid="relevant-info">Details</div>}
         sectionHeaderClassName="section-header"
         toggleState={{ isOpen: true, shouldRenderOpenIcon: true }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('heading', { name: /MORE/i }));
@@ -27,7 +27,7 @@ describe('SbtPageMoreDetailsSection', () => {
       <SbtPageMoreDetailsSection
         relevantInfo={<div data-testid="relevant-info">Details</div>}
         toggleState={{ isOpen: false, shouldRenderClosedIcon: true }}
-      />
+      />,
     );
 
     expect(screen.queryByTestId('relevant-info')).not.toBeInTheDocument();

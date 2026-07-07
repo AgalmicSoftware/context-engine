@@ -1,6 +1,4 @@
-import type {
-  SessionPublishPlan,
-} from './sessionPublishReducer';
+import type { SessionPublishPlan } from './sessionPublishReducer';
 
 export type SessionPublishRequirementsInput = {
   plan: SessionPublishPlan;
@@ -98,12 +96,10 @@ export type SessionPublishSignAdminActionInput = {
 export type SessionWizardPublishPorts = {
   checkRequirements: (input: SessionPublishRequirementsInput) => Promise<SessionPublishRequirementsResult>;
   uploadSessionHeader: (
-    input: SessionPublishUploadSessionHeaderInput
+    input: SessionPublishUploadSessionHeaderInput,
   ) => Promise<SessionPublishUploadSessionHeaderResult | null>;
   uploadMetadata: (input: SessionPublishUploadMetadataInput) => Promise<SessionPublishUploadMetadataResult | null>;
-  resolveUploadOptions: (
-    input: SessionPublishResolveUploadOptionsInput
-  ) => Promise<SessionPublishUploadOptionsResult>;
+  resolveUploadOptions: (input: SessionPublishResolveUploadOptionsInput) => Promise<SessionPublishUploadOptionsResult>;
   deployWorker: (input: SessionPublishDeployWorkerInput) => Promise<SessionPublishDeployWorkerResult | null>;
   verifyWorker: (input: SessionPublishVerifyWorkerInput) => Promise<SessionPublishRequirementsResult>;
   registerSession: (input: SessionPublishRegisterSessionInput) => Promise<SessionPublishRegisterSessionResult | null>;

@@ -5,10 +5,7 @@
  *
  * Key exports: isTerminalArweaveFailureState, shouldStopPendingMetadataRetry, prunePendingMetadataEntries, ensureQuestionArweaveCacheBranches
  */
-import {
-  isTerminalArweaveFailureState,
-  normalizeArweaveFailureMeta,
-} from './arweaveFailureClassifiers.js';
+import { isTerminalArweaveFailureState, normalizeArweaveFailureMeta } from './arweaveFailureClassifiers.js';
 
 export { isTerminalArweaveFailureState, normalizeArweaveFailureMeta };
 export {
@@ -18,9 +15,8 @@ export {
 
 type UnknownRecord = Record<string, unknown>;
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const shouldStopPendingMetadataRetry = ({
   pendingEntry = null,
@@ -45,7 +41,10 @@ export const shouldStopPendingMetadataRetry = ({
   };
 };
 
-const normalizePendingMetadataKey = (key: unknown): string => String(key || '').trim().toLowerCase();
+const normalizePendingMetadataKey = (key: unknown): string =>
+  String(key || '')
+    .trim()
+    .toLowerCase();
 
 export const prunePendingMetadataEntries = ({
   pendingEntries = null,
@@ -56,7 +55,7 @@ export const prunePendingMetadataEntries = ({
   hydratedEntries?: unknown;
   normalizeKey?: ((key: unknown) => string) | null;
 } = {}) => {
-  const normalize = (typeof normalizeKey === 'function') ? normalizeKey : normalizePendingMetadataKey;
+  const normalize = typeof normalizeKey === 'function' ? normalizeKey : normalizePendingMetadataKey;
   const pending: UnknownRecord = isRecord(pendingEntries) ? pendingEntries : {};
   const hydrated: UnknownRecord = isRecord(hydratedEntries) ? hydratedEntries : {};
   const nextPending: UnknownRecord = {};

@@ -60,9 +60,8 @@ export type BuildCreateSbtPredictableDeploySignatureArgs = {
   selectedAuthoringChainId?: unknown;
 };
 
-const isCreateSbtPlainObject = (value: unknown): value is Record<string, unknown> => (
-  value != null && typeof value === 'object' && !Array.isArray(value)
-);
+const isCreateSbtPlainObject = (value: unknown): value is Record<string, unknown> =>
+  value != null && typeof value === 'object' && !Array.isArray(value);
 
 export const buildCreateSbtAutoCreate2SaltSource = ({
   groupHash = '',
@@ -70,13 +69,18 @@ export const buildCreateSbtAutoCreate2SaltSource = ({
   sessionSlug = '',
 }: BuildCreateSbtAutoCreate2SaltSourceArgs = {}): string => {
   const normalizedSessionSlug = normalizeSessionSlug(sessionSlug || '') || 'general';
-  const rawName = String(sbtName || '').trim().toLowerCase();
+  const rawName = String(sbtName || '')
+    .trim()
+    .toLowerCase();
   const nameSlug = rawName
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48);
   if (nameSlug) return `${normalizedSessionSlug}/${nameSlug}`;
-  const hashSuffix = String(groupHash || '').replace(/^0x/i, '').slice(0, 10) || 'draft';
+  const hashSuffix =
+    String(groupHash || '')
+      .replace(/^0x/i, '')
+      .slice(0, 10) || 'draft';
   return `${normalizedSessionSlug}/group-${hashSuffix}`;
 };
 
@@ -115,11 +119,8 @@ export const resolveCreateSbtPredictableAddressActive = ({
   create2Salt = '',
   deferredDeployMode = false,
   predictableAddressEnabled = false,
-}: ResolveCreateSbtPredictableAddressActiveArgs = {}): boolean => (
-  !!deferredDeployMode ||
-  !!predictableAddressEnabled ||
-  !!String(create2Salt || '').trim()
-);
+}: ResolveCreateSbtPredictableAddressActiveArgs = {}): boolean =>
+  !!deferredDeployMode || !!predictableAddressEnabled || !!String(create2Salt || '').trim();
 
 export const resolveCreateSbtPredictableDeployBaseState = ({
   account = '',
@@ -174,31 +175,30 @@ export const buildCreateSbtPredictableDeploySignature = ({
   selectedAuthoringChainId = null,
 }: BuildCreateSbtPredictableDeploySignatureArgs = {}): string => {
   if (!isCreateSbtPlainObject(predictionShape)) return '';
-  const groupCfg = isCreateSbtPlainObject(predictionShape.groupCfg)
-    ? predictionShape.groupCfg
-    : {};
+  const groupCfg = isCreateSbtPlainObject(predictionShape.groupCfg) ? predictionShape.groupCfg : {};
   const contracts = isCreateSbtPlainObject(groupCfg.contracts) ? groupCfg.contracts : {};
   const sbtFactory = isCreateSbtPlainObject(contracts.sbtFactory) ? contracts.sbtFactory : {};
   const networkRecord = isCreateSbtPlainObject(network) ? network : {};
-  const sbtFactoryAddress = String(
-    sbtFactory.address ||
-    groupCfg.sbtFactoryAddress ||
-    ''
-  ).trim().toLowerCase();
-  const networkChainId = Number(
-    groupCfg.networkChainId ||
-    sbtFactory.chainId ||
-    selectedAuthoringChainId ||
-    networkRecord.id ||
-    networkRecord.chainId ||
-    0
-  ) || 0;
+  const sbtFactoryAddress = String(sbtFactory.address || groupCfg.sbtFactoryAddress || '')
+    .trim()
+    .toLowerCase();
+  const networkChainId =
+    Number(
+      groupCfg.networkChainId ||
+        sbtFactory.chainId ||
+        selectedAuthoringChainId ||
+        networkRecord.id ||
+        networkRecord.chainId ||
+        0,
+    ) || 0;
 
   return JSON.stringify({
     contractName: String(predictionShape.contractName || '').trim(),
     symbol: String(predictionShape.symbol || '').trim(),
     limitedNumber: Number(predictionShape.limitedNumber || 0) || 0,
-    adminAddress: String(predictionShape.adminAddress || '').trim().toLowerCase(),
+    adminAddress: String(predictionShape.adminAddress || '')
+      .trim()
+      .toLowerCase(),
     mintingEndTimeUnix: Number(predictionShape.mintingEndTimeUnix || 0) || 0,
     mintModeOnChain: Number(predictionShape.mintModeOnChain ?? 0) || 0,
     hasPasswordMintOnChain: predictionShape.hasPasswordMintOnChain === true,

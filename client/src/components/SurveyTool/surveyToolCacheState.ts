@@ -1,8 +1,4 @@
-import {
-  peekCacheSync,
-  readCache,
-  writeCacheOptimistic,
-} from '../../utilities/cache/cacheScripts.js';
+import { peekCacheSync, readCache, writeCacheOptimistic } from '../../utilities/cache/cacheScripts.js';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import type { UnknownRecord } from './surveyToolTypes.js';
 
@@ -62,11 +58,11 @@ export function readQuestionsCacheRef(slug: string) {
 
 export async function readQuestionsCacheAsync(slug: string) {
   const value = await readCache('questionsCache', slug);
-  return (value && typeof value === 'object') ? value : (readQuestionsCache(slug) || {});
+  return value && typeof value === 'object' ? value : readQuestionsCache(slug) || {};
 }
 
 export function mergeQuestionResponses(target: UnknownRecord = {}, source: UnknownRecord = {}) {
-  const nextTarget = (target && typeof target === 'object') ? target : {};
+  const nextTarget = target && typeof target === 'object' ? target : {};
   if (!source || typeof source !== 'object') return nextTarget;
   Object.keys(source).forEach((rawQuestionId) => {
     const normalizedQuestionId = normalizeQuestionIdKey(rawQuestionId);
@@ -74,20 +70,24 @@ export function mergeQuestionResponses(target: UnknownRecord = {}, source: Unkno
     if (!normalizedQuestionId || !responderMap || typeof responderMap !== 'object') return;
     nextTarget[normalizedQuestionId] = nextTarget[normalizedQuestionId] || {};
     Object.keys(responderMap as UnknownRecord).forEach((rawResponderAddress) => {
-      const responderAddress = String(rawResponderAddress || '').trim().toLowerCase();
+      const responderAddress = String(rawResponderAddress || '')
+        .trim()
+        .toLowerCase();
       if (!responderAddress) return;
-      (nextTarget[normalizedQuestionId] as UnknownRecord)[responderAddress] = (responderMap as UnknownRecord)[rawResponderAddress];
+      (nextTarget[normalizedQuestionId] as UnknownRecord)[responderAddress] = (responderMap as UnknownRecord)[
+        rawResponderAddress
+      ];
     });
   });
   return nextTarget;
 }
 
 export function writeQuestionsCache(slug: string, obj: unknown) {
-  return (writeCacheOptimistic as unknown as (
-    namespace: string,
-    slug: string,
-    value: unknown
-  ) => unknown)('questionsCache', slug, obj || {});
+  return (writeCacheOptimistic as unknown as (namespace: string, slug: string, value: unknown) => unknown)(
+    'questionsCache',
+    slug,
+    obj || {},
+  );
 }
 
 export function readSurveysCache(slug: string) {
@@ -100,19 +100,21 @@ export function readSurveysCacheRef(slug: string) {
 
 export async function readSurveysCacheAsync(slug: string) {
   const value = await readCache('surveysCache', slug);
-  return (value && typeof value === 'object') ? value : (readSurveysCache(slug) || {});
+  return value && typeof value === 'object' ? value : readSurveysCache(slug) || {};
 }
 
 export function writeSurveysCache(slug: string, obj: unknown) {
-  return (writeCacheOptimistic as unknown as (
-    namespace: string,
-    slug: string,
-    value: unknown
-  ) => unknown)('surveysCache', slug, obj || {});
+  return (writeCacheOptimistic as unknown as (namespace: string, slug: string, value: unknown) => unknown)(
+    'surveysCache',
+    slug,
+    obj || {},
+  );
 }
 
 export function readRecentQuestionPayload(questionId: unknown) {
-  const qid = String(questionId || '').trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   if (!qid) return null;
   if (typeof window === 'undefined' || !window.sessionStorage) return null;
   try {
@@ -123,7 +125,7 @@ export function readRecentQuestionPayload(questionId: unknown) {
     const entry = (parsed as UnknownRecord)[qid];
     if (!entry || typeof entry !== 'object') return null;
     const ts = Number((entry as UnknownRecord).savedAtMs || 0);
-    if (!ts || (Date.now() - ts) > RECENT_QUESTION_PAYLOADS_TTL_MS) return null;
+    if (!ts || Date.now() - ts > RECENT_QUESTION_PAYLOADS_TTL_MS) return null;
     const payload = { ...(entry as UnknownRecord) };
     delete payload.savedAtMs;
     payload.id = qid;
@@ -135,8 +137,12 @@ export function readRecentQuestionPayload(questionId: unknown) {
 
 export function canUseRecentQuestionPayloadForAccount(payload: unknown, account: unknown): boolean {
   if (!payload || typeof payload !== 'object') return false;
-  const accountLower = String(account || '').trim().toLowerCase();
-  const creatorLower = String((payload as UnknownRecord).creator || '').trim().toLowerCase();
+  const accountLower = String(account || '')
+    .trim()
+    .toLowerCase();
+  const creatorLower = String((payload as UnknownRecord).creator || '')
+    .trim()
+    .toLowerCase();
   if (!accountLower || !creatorLower) return false;
   return creatorLower === accountLower;
 }
@@ -155,7 +161,7 @@ export function areQuestionPayloadsEquivalent(a: unknown, b: unknown): boolean {
 }
 
 export function ensureQuestionsNet(cache: UnknownRecord = {}, netIdStr: string): Record<string, QuestionNetworkCache> {
-  const nextCache = (cache && typeof cache === 'object') ? cache : {};
+  const nextCache = cache && typeof cache === 'object' ? cache : {};
   if (!nextCache[netIdStr]) {
     nextCache[netIdStr] = {
       questionsLatestBlock: 0,
@@ -168,7 +174,7 @@ export function ensureQuestionsNet(cache: UnknownRecord = {}, netIdStr: string):
 }
 
 export function ensureSurveysNet(cache: UnknownRecord = {}, netIdStr: string): Record<string, SurveyNetworkCache> {
-  const nextCache = (cache && typeof cache === 'object') ? cache : {};
+  const nextCache = cache && typeof cache === 'object' ? cache : {};
   if (!nextCache[netIdStr]) {
     nextCache[netIdStr] = {
       surveysLatestBlock: 0,
@@ -183,9 +189,9 @@ export function ensureSurveysNet(cache: UnknownRecord = {}, netIdStr: string): R
 export function mergeSurveyToolCachePatchIntoSurveysCache(
   cache: UnknownRecord = {},
   netIdStr: string,
-  patch: UnknownRecord = {}
+  patch: UnknownRecord = {},
 ): Record<string, SurveyNetworkCache> {
-  if (!netIdStr) return (cache && typeof cache === 'object') ? cache as Record<string, SurveyNetworkCache> : {};
+  if (!netIdStr) return cache && typeof cache === 'object' ? (cache as Record<string, SurveyNetworkCache>) : {};
   const global = ensureSurveysNet(cache, netIdStr);
   const net = global[netIdStr];
   if (!net) return global;
@@ -209,7 +215,7 @@ export function mergeSurveyToolCachePatchIntoSurveysCache(
 }
 
 export const toResponseRecencyMeta = (source: ResponseMetaSource | null = null): ResponseRecencyMeta => {
-  const row = (source && typeof source === 'object') ? source : {};
+  const row = source && typeof source === 'object' ? source : {};
   const nowTs = Math.floor(Date.now() / 1000);
   return {
     bn: Math.max(0, Number(row.blockNumber ?? row.bn ?? 0) || 0),
@@ -222,32 +228,22 @@ export const toResponseRecencyMeta = (source: ResponseMetaSource | null = null):
 
 export const isIncomingResponseMetaNewer = (
   incoming: ResponseMetaSource | null = null,
-  existing: ResponseMetaSource | null = null
+  existing: ResponseMetaSource | null = null,
 ): boolean => {
   const next = toResponseRecencyMeta(incoming);
   const prev = toResponseRecencyMeta(existing);
   return (
     next.bn > prev.bn ||
-    (
-      next.bn === prev.bn &&
-      (
-        next.txi > prev.txi ||
-        (
-          next.txi === prev.txi &&
-          (
-            next.li > prev.li ||
-            (
-              next.li === prev.li &&
-              next.ts >= prev.ts
-            )
-          )
-        )
-      )
-    )
+    (next.bn === prev.bn &&
+      (next.txi > prev.txi ||
+        (next.txi === prev.txi && (next.li > prev.li || (next.li === prev.li && next.ts >= prev.ts)))))
   );
 };
 
-export const stampResponsePayloadWithMeta = (payload: unknown, meta: ResponseMetaSource | null = null): UnknownRecord => {
+export const stampResponsePayloadWithMeta = (
+  payload: unknown,
+  meta: ResponseMetaSource | null = null,
+): UnknownRecord => {
   if (!payload || typeof payload !== 'object') return payload as UnknownRecord;
   const recency = toResponseRecencyMeta(meta);
   return {
@@ -261,8 +257,8 @@ export const stampResponsePayloadWithMeta = (payload: unknown, meta: ResponseMet
 };
 
 export const mergeSurveyResponsePayloads = (existingPayload: unknown, incomingPayload: unknown): UnknownRecord => {
-  const existing = (existingPayload && typeof existingPayload === 'object') ? existingPayload as UnknownRecord : null;
-  const incoming = (incomingPayload && typeof incomingPayload === 'object') ? incomingPayload as UnknownRecord : null;
+  const existing = existingPayload && typeof existingPayload === 'object' ? (existingPayload as UnknownRecord) : null;
+  const incoming = incomingPayload && typeof incomingPayload === 'object' ? (incomingPayload as UnknownRecord) : null;
   if (!existing) return incoming as UnknownRecord;
   if (!incoming) return existing;
 

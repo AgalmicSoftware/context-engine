@@ -1,4 +1,3 @@
-
 import {
   RATING_FIELD_SPECS,
   buildRatingBaseline,
@@ -6,10 +5,7 @@ import {
   processRatingEnvelopesForSubmit,
   shouldEncryptRatingForQid,
 } from './surveyToolRatingEnvelopeSubmitController';
-import type {
-  RatingEnvelopeContext,
-  RatingEnvelopeDeps,
-} from './surveyToolRatingEnvelopeSubmitController';
+import type { RatingEnvelopeContext, RatingEnvelopeDeps } from './surveyToolRatingEnvelopeSubmitController';
 
 type TestFieldState = {
   encrypted?: boolean;
@@ -93,9 +89,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     it('extracts importance and conviction plaintext values from responses', () => {
       const result = buildRatingBaseline(
         {
-          responses: [
-            { questionID: 'Q1', importance: 8, conviction: 3 },
-          ],
+          responses: [{ questionID: 'Q1', importance: 8, conviction: 3 }],
         },
         buildMockDeps(),
       );
@@ -164,9 +158,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     it('normalizes qid to lowercase', () => {
       const result = buildRatingBaseline(
         {
-          responses: [
-            { questionId: 'MiXeD-QID', importance: 4, conviction: 7 },
-          ],
+          responses: [{ questionId: 'MiXeD-QID', importance: 4, conviction: 7 }],
         },
         buildMockDeps(),
       );
@@ -210,9 +202,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
         'Q1',
         slice,
         buildMockDeps({
-          resolveFieldEncryptionAudience: (_field, _qid, fieldKey) => (
-            fieldKey === 'answer' ? 'gate' : 'self'
-          ),
+          resolveFieldEncryptionAudience: (_field, _qid, fieldKey) => (fieldKey === 'answer' ? 'gate' : 'self'),
           getEffectiveRecipientsForField: () => ['0xAnswerGate'],
         }),
       );
@@ -257,9 +247,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
         'Q1',
         slice,
         buildMockDeps({
-          resolveFieldEncryptionAudience: (_field, _qid, fieldKey) => (
-            fieldKey === 'additional' ? 'gate' : 'self'
-          ),
+          resolveFieldEncryptionAudience: (_field, _qid, fieldKey) => (fieldKey === 'additional' ? 'gate' : 'self'),
           getEffectiveRecipientsForField: () => ['0xAdditionalGate'],
         }),
       );
@@ -330,23 +318,13 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     });
 
     it('returns true when payload answer is encrypted', () => {
-      const result = shouldEncryptRatingForQid(
-        'Q1',
-        { answer: { encrypted: true } },
-        makeSlice(),
-        buildMockDeps(),
-      );
+      const result = shouldEncryptRatingForQid('Q1', { answer: { encrypted: true } }, makeSlice(), buildMockDeps());
 
       expect(result).toBe(true);
     });
 
     it('returns false when nothing is encrypted', () => {
-      const result = shouldEncryptRatingForQid(
-        'Q1',
-        {},
-        makeSlice(),
-        buildMockDeps(),
-      );
+      const result = shouldEncryptRatingForQid('Q1', {}, makeSlice(), buildMockDeps());
 
       expect(result).toBe(false);
     });
@@ -455,10 +433,9 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     });
 
     it('encrypts importance and conviction when encryption is active', async () => {
-      const encryptEnvelopeValue = jest.fn(async (
-        value: unknown,
-        _opts?: Record<string, unknown>,
-      ) => `encrypted:${value}`);
+      const encryptEnvelopeValue = jest.fn(
+        async (value: unknown, _opts?: Record<string, unknown>) => `encrypted:${value}`,
+      );
       const respObj: TestRatingResponse = {
         questionID: 'Q1',
         importance: 8,

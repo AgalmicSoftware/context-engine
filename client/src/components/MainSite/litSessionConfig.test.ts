@@ -1,7 +1,4 @@
-import {
-  resolveMainSiteLitSessionConfig,
-  resolveMainSiteLitSessionConfigSource,
-} from './litSessionConfig.js';
+import { resolveMainSiteLitSessionConfig, resolveMainSiteLitSessionConfigSource } from './litSessionConfig.js';
 
 const VALID_SBT_ADDRESS = '0x0000000000000000000000000000000000000001';
 const resolveConfig = resolveMainSiteLitSessionConfig;
@@ -30,43 +27,57 @@ const buildSessionConfigWithGate = ({
 
 describe('litSessionConfig', () => {
   it('resolves chainId from gate first, then config, then fallback', () => {
-    expect(resolveConfig({
-      sessionConfig: {
-        ...buildSessionConfigWithGate({ chainId: 1 }),
-        networkChainId: 2,
-      },
-      networkChainIdFallback: 3,
-    }).chainId).toBe(1);
+    expect(
+      resolveConfig({
+        sessionConfig: {
+          ...buildSessionConfigWithGate({ chainId: 1 }),
+          networkChainId: 2,
+        },
+        networkChainIdFallback: 3,
+      }).chainId,
+    ).toBe(1);
 
-    expect(resolveConfig({
-      sessionConfig: { networkChainId: 2 },
-      networkChainIdFallback: 3,
-    }).chainId).toBe(2);
+    expect(
+      resolveConfig({
+        sessionConfig: { networkChainId: 2 },
+        networkChainIdFallback: 3,
+      }).chainId,
+    ).toBe(2);
 
-    expect(resolveConfig({
-      sessionConfig: {},
-      networkChainIdFallback: 3,
-    }).chainId).toBe(3);
+    expect(
+      resolveConfig({
+        sessionConfig: {},
+        networkChainIdFallback: 3,
+      }).chainId,
+    ).toBe(3);
 
-    expect(resolveConfig({
-      sessionConfig: {},
-    }).chainId).toBeNull();
+    expect(
+      resolveConfig({
+        sessionConfig: {},
+      }).chainId,
+    ).toBeNull();
   });
 
   it('only publishes a litNetwork label when a Chipotle worker runtime is configured', () => {
-    expect(resolveConfig({
-      sessionConfig: {},
-    }).litNetwork).toBe('');
+    expect(
+      resolveConfig({
+        sessionConfig: {},
+      }).litNetwork,
+    ).toBe('');
   });
 
   it('reads optional lit.userMaxPrice deployment defaults without requiring new UI fields', () => {
-    expect(resolveConfig({
-      sessionConfig: { lit: { userMaxPrice: '123' } },
-    }).userMaxPrice).toBe('123');
+    expect(
+      resolveConfig({
+        sessionConfig: { lit: { userMaxPrice: '123' } },
+      }).userMaxPrice,
+    ).toBe('123');
 
-    expect(resolveConfig({
-      sessionConfig: { litUserMaxPrice: '456' },
-    }).userMaxPrice).toBe('456');
+    expect(
+      resolveConfig({
+        sessionConfig: { litUserMaxPrice: '456' },
+      }).userMaxPrice,
+    ).toBe('456');
   });
 
   it('builds access control conditions only when gate addresses exist', () => {
@@ -179,10 +190,12 @@ describe('litSessionConfig', () => {
 
     const result = resolveConfig({ sessionConfig });
 
-    expect(result.chipotle).toEqual(expect.objectContaining({
-      enabled: true,
-      workerUrl: 'https://worker.example.test',
-    }));
+    expect(result.chipotle).toEqual(
+      expect.objectContaining({
+        enabled: true,
+        workerUrl: 'https://worker.example.test',
+      }),
+    );
     expect(result.gateAddresses).toEqual([VALID_SBT_ADDRESS]);
     expect(result.accessControlConditions).toEqual([
       expect.objectContaining({
@@ -241,10 +254,12 @@ describe('litSessionConfig', () => {
       },
     };
 
-    expect(resolveMainSiteLitSessionConfigSource({
-      slug: 'dynamic-session',
-      resolveRegistryConfigBySlug: (slug) => (slug === 'dynamic-session' ? registryConfig : null),
-      resolveStaticConfigBySlug: () => staticConfig,
-    })).toBe(registryConfig);
+    expect(
+      resolveMainSiteLitSessionConfigSource({
+        slug: 'dynamic-session',
+        resolveRegistryConfigBySlug: (slug) => (slug === 'dynamic-session' ? registryConfig : null),
+        resolveStaticConfigBySlug: () => staticConfig,
+      }),
+    ).toBe(registryConfig);
   });
 });

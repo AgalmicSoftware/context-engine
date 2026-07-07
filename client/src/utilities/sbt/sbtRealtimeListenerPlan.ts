@@ -1,11 +1,5 @@
-type SbtInstanceListenerPlanReason = (
-  'missing-network' |
-  'empty-cache' |
-  'disabled' |
-  'max-disabled' |
-  'too-many' |
-  'attach'
-);
+type SbtInstanceListenerPlanReason =
+  'missing-network' | 'empty-cache' | 'disabled' | 'max-disabled' | 'too-many' | 'attach';
 
 interface SbtInstanceListenerPlanOptions {
   allowInstanceListeners?: unknown;

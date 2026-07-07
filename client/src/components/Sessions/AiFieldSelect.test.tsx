@@ -5,9 +5,7 @@ import styles from './SessionWizard.module.scss';
 import { renderAiOrGateSelect, type RenderAiOrGateSelectParams } from './AiFieldSelect';
 import { AI_PROVIDER_OPTIONS, getAiModelOptions } from './sessionWizardAiConfig';
 
-const buildParams = (
-  overrides: Partial<RenderAiOrGateSelectParams> = {}
-): RenderAiOrGateSelectParams => ({
+const buildParams = (overrides: Partial<RenderAiOrGateSelectParams> = {}): RenderAiOrGateSelectParams => ({
   keyString: 'ai.models.transcription.provider',
   value: 'openai',
   currentPath: ['ai', 'models', 'transcription', 'provider'],
@@ -54,14 +52,16 @@ describe('renderAiOrGateSelect', () => {
     const options = within(select).getAllByRole('option');
 
     expect(select).toHaveValue('openai');
-    expect(options.map((option) => {
-      const optionEl = asOptionElement(option);
-      return {
-        value: optionEl.getAttribute('value'),
-        label: optionEl.textContent,
-        disabled: optionEl.disabled,
-      };
-    })).toEqual([
+    expect(
+      options.map((option) => {
+        const optionEl = asOptionElement(option);
+        return {
+          value: optionEl.getAttribute('value'),
+          label: optionEl.textContent,
+          disabled: optionEl.disabled,
+        };
+      }),
+    ).toEqual([
       { value: 'openai', label: 'OpenAI', disabled: false },
       { value: 'local', label: 'Local (coming soon)', disabled: true },
     ]);
@@ -85,19 +85,21 @@ describe('renderAiOrGateSelect', () => {
     const select = screen.getByRole('combobox');
     const options = within(select).getAllByRole('option');
 
-    expect(options.map((option) => {
-      const optionEl = asOptionElement(option);
-      return {
-        value: optionEl.getAttribute('value'),
-        label: optionEl.textContent,
-        disabled: optionEl.disabled,
-      };
-    })).toEqual(
+    expect(
+      options.map((option) => {
+        const optionEl = asOptionElement(option);
+        return {
+          value: optionEl.getAttribute('value'),
+          label: optionEl.textContent,
+          disabled: optionEl.disabled,
+        };
+      }),
+    ).toEqual(
       AI_PROVIDER_OPTIONS.map((option) => ({
         value: option.value,
         label: option.label,
         disabled: !!option.disabled,
-      }))
+      })),
     );
 
     fireEvent.change(select, { target: { value: 'anthropic' } });
@@ -106,7 +108,7 @@ describe('renderAiOrGateSelect', () => {
     expect(params.onUpdateDraftValue).toHaveBeenNthCalledWith(
       2,
       ['ai', 'models', 'fast', 'model'],
-      getAiModelOptions('fast', 'anthropic')[0]
+      getAiModelOptions('fast', 'anthropic')[0],
     );
   });
 
@@ -146,10 +148,12 @@ describe('renderAiOrGateSelect', () => {
     const gateColor = container.querySelector(`.${styles.gateColor}`);
 
     expect(select).toHaveValue('gate-2');
-    expect(options.map((option) => ({
-      value: option.getAttribute('value'),
-      label: option.textContent,
-    }))).toEqual([
+    expect(
+      options.map((option) => ({
+        value: option.getAttribute('value'),
+        label: option.textContent,
+      })),
+    ).toEqual([
       { value: 'gate-1', label: 'Gate One' },
       { value: 'gate-2', label: 'Gate Two' },
     ]);
@@ -162,10 +166,14 @@ describe('renderAiOrGateSelect', () => {
   });
 
   it('returns null for non-matching keyStrings', () => {
-    expect(renderAiOrGateSelect(buildParams({
-      keyString: 'sessionName',
-      currentPath: ['sessionName'],
-      value: 'Demo Session',
-    }))).toBeNull();
+    expect(
+      renderAiOrGateSelect(
+        buildParams({
+          keyString: 'sessionName',
+          currentPath: ['sessionName'],
+          value: 'Demo Session',
+        }),
+      ),
+    ).toBeNull();
   });
 });

@@ -1,9 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import SessionWizardSessionIdBadge, {
-  formatSessionIdBadgeText,
-} from './SessionWizardSessionIdBadge';
+import SessionWizardSessionIdBadge, { formatSessionIdBadgeText } from './SessionWizardSessionIdBadge';
 
 const renderInfoTooltip = ({ testId, ariaLabel }: Record<string, unknown>) => (
   <button type="button" data-testid={String(testId)} aria-label={String(ariaLabel)} />
@@ -12,11 +10,7 @@ const renderInfoTooltip = ({ testId, ariaLabel }: Record<string, unknown>) => (
 describe('SessionWizardSessionIdBadge', () => {
   it('renders nothing without a session ID', () => {
     const { container } = render(
-      <SessionWizardSessionIdBadge
-        onCopy={jest.fn()}
-        onRegenerate={jest.fn()}
-        renderInfoTooltip={renderInfoTooltip}
-      />
+      <SessionWizardSessionIdBadge onCopy={jest.fn()} onRegenerate={jest.fn()} renderInfoTooltip={renderInfoTooltip} />,
     );
 
     expect(container).toBeEmptyDOMElement();
@@ -33,7 +27,7 @@ describe('SessionWizardSessionIdBadge', () => {
         onRegenerate={onRegenerate}
         renderInfoTooltip={renderInfoTooltip}
         sessionIdDisplay="1234567890abcdef"
-      />
+      />,
     );
 
     expect(screen.getByTitle('1234567890abcdef')).toHaveTextContent('1234567890abcd…');

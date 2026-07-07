@@ -1,15 +1,7 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCode,
-  faCopy,
-  faChevronDown,
-  faChevronUp,
-} from '@fortawesome/free-solid-svg-icons';
-import {
-  copyJsonToClipboard,
-  formatJsonForDisplay,
-} from '../../../utilities/ui/jsonFunctions';
+import { faCode, faCopy, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
+import { copyJsonToClipboard, formatJsonForDisplay } from '../../../utilities/ui/jsonFunctions';
 import styles from './JsonDisplay.module.scss';
 
 type JsonDisplayProps = {
@@ -19,12 +11,7 @@ type JsonDisplayProps = {
   maxHeight?: number | string;
 };
 
-const JsonDisplay = ({
-  data,
-  label = 'View .json',
-  defaultOpen = false,
-  maxHeight = 300,
-}: JsonDisplayProps) => {
+const JsonDisplay = ({ data, label = 'View .json', defaultOpen = false, maxHeight = 300 }: JsonDisplayProps) => {
   const [open, setOpen] = useState(defaultOpen);
 
   if (data == null) return null;
@@ -33,18 +20,10 @@ const JsonDisplay = ({
 
   return (
     <div className={styles.jsonContainer}>
-      <button
-        className={styles.toggleButton}
-        onClick={() => setOpen(!open)}
-        type="button"
-        aria-expanded={open}
-      >
+      <button className={styles.toggleButton} onClick={() => setOpen(!open)} type="button" aria-expanded={open}>
         <FontAwesomeIcon icon={faCode} style={{ marginRight: 6 }} />
         {label}
-        <FontAwesomeIcon
-          icon={open ? faChevronUp : faChevronDown}
-          style={{ marginLeft: 6, fontSize: '0.8em' }}
-        />
+        <FontAwesomeIcon icon={open ? faChevronUp : faChevronDown} style={{ marginLeft: 6, fontSize: '0.8em' }} />
       </button>
       {open && (
         <div className={styles.jsonBody}>
@@ -59,7 +38,9 @@ const JsonDisplay = ({
           >
             <FontAwesomeIcon icon={faCopy} />
           </button>
-          <pre className={styles.jsonPre} style={{ maxHeight }}>{formatted}</pre>
+          <pre className={styles.jsonPre} style={{ maxHeight }}>
+            {formatted}
+          </pre>
         </div>
       )}
     </div>

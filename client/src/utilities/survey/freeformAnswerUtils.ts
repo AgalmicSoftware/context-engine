@@ -1,8 +1,7 @@
 type CacheRecord = Record<string, unknown>;
 
-const isRecord = (value: unknown): value is CacheRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is CacheRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const normalizeQuestionType = (questionType: unknown): string => {
   if (typeof questionType !== 'string') return '';

@@ -47,36 +47,53 @@ describe('survey response storage port', () => {
     currentStorageRefs = secondStorageRefs;
 
     expect(port.getLegacyArweaveTxId({ arweaveTxId: 'second-tx' })).toBe('second-tx');
-    expect(port.normalizeArweaveUrl('second-tx', { contextLabel: 'survey_tool_question_link' }))
-      .toBe('second-href');
-    expect(port.buildQuestionArweaveHref({ arweaveTxId: 'second-tx' }, {
-      contextLabel: 'survey_tool_question_link',
-    })).toBe('second-href');
+    expect(port.normalizeArweaveUrl('second-tx', { contextLabel: 'survey_tool_question_link' })).toBe('second-href');
+    expect(
+      port.buildQuestionArweaveHref(
+        { arweaveTxId: 'second-tx' },
+        {
+          contextLabel: 'survey_tool_question_link',
+        },
+      ),
+    ).toBe('second-href');
 
-    expect(firstNoLeakPayloads.sanitizeQuestionPromptForResponsePayload)
-      .toHaveBeenCalledWith({ prompt: 'first' }, undefined);
-    expect(firstNoLeakPayloads.sanitizeSurveyTitleForResponsePayload)
-      .toHaveBeenCalledWith({ title: 'first' }, undefined);
-    expect(secondStorageRefs.getLegacyArweaveTxId)
-      .toHaveBeenCalledWith({ arweaveTxId: 'second-tx' });
-    expect(secondArweaveUrls.normalizeArweaveUrl)
-      .toHaveBeenCalledWith('second-tx', { contextLabel: 'survey_tool_question_link' });
+    expect(firstNoLeakPayloads.sanitizeQuestionPromptForResponsePayload).toHaveBeenCalledWith(
+      { prompt: 'first' },
+      undefined,
+    );
+    expect(firstNoLeakPayloads.sanitizeSurveyTitleForResponsePayload).toHaveBeenCalledWith(
+      { title: 'first' },
+      undefined,
+    );
+    expect(secondStorageRefs.getLegacyArweaveTxId).toHaveBeenCalledWith({ arweaveTxId: 'second-tx' });
+    expect(secondArweaveUrls.normalizeArweaveUrl).toHaveBeenCalledWith('second-tx', {
+      contextLabel: 'survey_tool_question_link',
+    });
   });
 
   it('preserves locked-field sanitizer and question link behavior', () => {
-    expect(surveyResponseStoragePort.sanitizeQuestionPromptForResponsePayload({
-      prompt: 'Hidden question',
-      promptEncrypted: { ciphertext: 'sealed' },
-    })).toBe('[encrypted]');
-    expect(surveyResponseStoragePort.sanitizeSurveyTitleForResponsePayload({
-      title: 'Hidden survey',
-      titleEncrypted: { ciphertext: 'sealed' },
-    })).toBe('[encrypted]');
-    expect(surveyResponseStoragePort.buildQuestionArweaveHref({
-      arweaveTxId: txId,
-    }, {
-      contextLabel: 'survey_tool_question_link',
-    })).toContain(txId);
+    expect(
+      surveyResponseStoragePort.sanitizeQuestionPromptForResponsePayload({
+        prompt: 'Hidden question',
+        promptEncrypted: { ciphertext: 'sealed' },
+      }),
+    ).toBe('[encrypted]');
+    expect(
+      surveyResponseStoragePort.sanitizeSurveyTitleForResponsePayload({
+        title: 'Hidden survey',
+        titleEncrypted: { ciphertext: 'sealed' },
+      }),
+    ).toBe('[encrypted]');
+    expect(
+      surveyResponseStoragePort.buildQuestionArweaveHref(
+        {
+          arweaveTxId: txId,
+        },
+        {
+          contextLabel: 'survey_tool_question_link',
+        },
+      ),
+    ).toContain(txId);
     expect(surveyResponseStoragePort.buildQuestionArweaveHref({})).toBe('');
   });
 });

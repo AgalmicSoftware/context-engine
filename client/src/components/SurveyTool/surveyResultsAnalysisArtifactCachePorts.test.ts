@@ -19,28 +19,36 @@ const buildArtifact = (inputSignature = 'ready-input') => ({
 
 describe('surveyResultsAnalysisArtifactCachePorts', () => {
   it('builds the current analysis artifact cache key shape from network identity', () => {
-    expect(buildSurveyResultsAnalysisArtifactCacheKey({
-      inputSignature: 'input-a',
-      networkLabel: 'OP Sepolia',
-    })).toBe('sessionResultsAnalysis:v1:OP Sepolia:input-a');
+    expect(
+      buildSurveyResultsAnalysisArtifactCacheKey({
+        inputSignature: 'input-a',
+        networkLabel: 'OP Sepolia',
+      }),
+    ).toBe('sessionResultsAnalysis:v1:OP Sepolia:input-a');
 
-    expect(buildSurveyResultsAnalysisArtifactCacheKey({
-      chainId: 84532,
-      inputSignature: 'input-b',
-      networkLabel: '',
-    })).toBe('sessionResultsAnalysis:v1:84532:input-b');
+    expect(
+      buildSurveyResultsAnalysisArtifactCacheKey({
+        chainId: 84532,
+        inputSignature: 'input-b',
+        networkLabel: '',
+      }),
+    ).toBe('sessionResultsAnalysis:v1:84532:input-b');
 
-    expect(buildSurveyResultsAnalysisArtifactCacheKey({
-      inputSignature: 'input-c',
-    })).toBe('sessionResultsAnalysis:v1:unknown:input-c');
+    expect(
+      buildSurveyResultsAnalysisArtifactCacheKey({
+        inputSignature: 'input-c',
+      }),
+    ).toBe('sessionResultsAnalysis:v1:unknown:input-c');
   });
 
   it('derives a typed sync read request without performing cache execution', () => {
-    expect(buildSurveyResultsAnalysisArtifactCacheTarget({
-      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
-      inputSignature: 'ready-input',
-      slug: 'alpha-session',
-    })).toEqual({
+    expect(
+      buildSurveyResultsAnalysisArtifactCacheTarget({
+        cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
+        inputSignature: 'ready-input',
+        slug: 'alpha-session',
+      }),
+    ).toEqual({
       namespace: 'analysisCache',
       slug: 'alpha-session',
       cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
@@ -71,11 +79,13 @@ describe('surveyResultsAnalysisArtifactCachePorts', () => {
   });
 
   it('blocks read requests when the cache key is missing', () => {
-    expect(buildSurveyResultsAnalysisArtifactCacheReadRequestPlan({
-      cacheKey: '',
-      inputSignature: 'ready-input',
-      slug: 'alpha-session',
-    })).toEqual({
+    expect(
+      buildSurveyResultsAnalysisArtifactCacheReadRequestPlan({
+        cacheKey: '',
+        inputSignature: 'ready-input',
+        slug: 'alpha-session',
+      }),
+    ).toEqual({
       readRequest: null,
       shouldRead: false,
       skipReason: 'missing-cache-key',
@@ -98,24 +108,28 @@ describe('surveyResultsAnalysisArtifactCachePorts', () => {
       inputSignature: 'ready-input',
     };
 
-    expect(selectSurveyResultsAnalysisArtifactFromCache({
-      cacheValue: {
-        sessionResultsAnalysis: {
-          'sessionResultsAnalysis:v1:OP Sepolia:ready-input': readyArtifact,
-          'sessionResultsAnalysis:v1:OP Sepolia:stale-input': staleArtifact,
+    expect(
+      selectSurveyResultsAnalysisArtifactFromCache({
+        cacheValue: {
+          sessionResultsAnalysis: {
+            'sessionResultsAnalysis:v1:OP Sepolia:ready-input': readyArtifact,
+            'sessionResultsAnalysis:v1:OP Sepolia:stale-input': staleArtifact,
+          },
         },
-      },
-      target,
-    })).toBe(readyArtifact);
+        target,
+      }),
+    ).toBe(readyArtifact);
 
-    expect(selectSurveyResultsAnalysisArtifactFromCache({
-      cacheValue: {
-        sessionResultsAnalysis: {
-          'sessionResultsAnalysis:v1:OP Sepolia:ready-input': staleArtifact,
+    expect(
+      selectSurveyResultsAnalysisArtifactFromCache({
+        cacheValue: {
+          sessionResultsAnalysis: {
+            'sessionResultsAnalysis:v1:OP Sepolia:ready-input': staleArtifact,
+          },
         },
-      },
-      target,
-    })).toBeNull();
+        target,
+      }),
+    ).toBeNull();
   });
 
   it('rejects partial or malformed cached analysis artifact payloads', () => {
@@ -126,27 +140,31 @@ describe('surveyResultsAnalysisArtifactCachePorts', () => {
       inputSignature: 'ready-input',
     };
 
-    expect(selectSurveyResultsAnalysisArtifactFromCache({
-      cacheValue: {
-        sessionResultsAnalysis: {
-          'sessionResultsAnalysis:v1:OP Sepolia:ready-input': {
-            generatedAt: '2026-06-01T00:00:00.000Z',
-            inputSignature: 'ready-input',
-            kind: 'ce_session_results_analysis_artifact',
-            participants: [],
-            source: 'ai-generated',
-            version: 1,
+    expect(
+      selectSurveyResultsAnalysisArtifactFromCache({
+        cacheValue: {
+          sessionResultsAnalysis: {
+            'sessionResultsAnalysis:v1:OP Sepolia:ready-input': {
+              generatedAt: '2026-06-01T00:00:00.000Z',
+              inputSignature: 'ready-input',
+              kind: 'ce_session_results_analysis_artifact',
+              participants: [],
+              source: 'ai-generated',
+              version: 1,
+            },
           },
         },
-      },
-      target,
-    })).toBeNull();
+        target,
+      }),
+    ).toBeNull();
 
-    expect(selectSurveyResultsAnalysisArtifactFromCache({
-      cacheValue: {
-        sessionResultsAnalysis: 'malformed',
-      },
-      target,
-    })).toBeNull();
+    expect(
+      selectSurveyResultsAnalysisArtifactFromCache({
+        cacheValue: {
+          sessionResultsAnalysis: 'malformed',
+        },
+        target,
+      }),
+    ).toBeNull();
   });
 });

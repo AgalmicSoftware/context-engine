@@ -1,7 +1,4 @@
-import {
-  buildEmptyResponseSlice,
-  isSurveyToolRecord,
-} from './surveyToolTypes.js';
+import { buildEmptyResponseSlice, isSurveyToolRecord } from './surveyToolTypes.js';
 
 describe('surveyToolTypes', () => {
   it('builds fresh empty response slices', () => {

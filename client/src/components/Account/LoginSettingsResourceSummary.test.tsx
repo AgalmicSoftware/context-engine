@@ -1,10 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
-import {
-  LoginSettingsSessionPills,
-  LoginSettingsSupportedResourceCard,
-} from './LoginSettingsResourceSummary';
+import { LoginSettingsSessionPills, LoginSettingsSupportedResourceCard } from './LoginSettingsResourceSummary';
 
 describe('LoginSettingsResourceSummary', () => {
   it('renders empty and populated session pills', () => {
@@ -18,7 +15,7 @@ describe('LoginSettingsResourceSummary', () => {
           { isActive: true, label: 'General', slug: '', slugLabel: 'general' },
           { isActive: false, label: 'Edge', slug: 'edge', slugLabel: 'edge' },
         ]}
-      />
+      />,
     );
 
     expect(screen.getByText('General')).toBeInTheDocument();
@@ -43,12 +40,10 @@ describe('LoginSettingsResourceSummary', () => {
             tone: 'Warning',
           },
         }}
-        extraSessions={[
-          { isActive: false, label: 'Edge', slug: 'edge', slugLabel: 'edge' },
-        ]}
+        extraSessions={[{ isActive: false, label: 'Edge', slug: 'edge', slugLabel: 'edge' }]}
         extrasExpanded={false}
         onToggleSessions={onToggleSessions}
-      />
+      />,
     );
 
     const card = screen.getByText('RPC').closest('div');

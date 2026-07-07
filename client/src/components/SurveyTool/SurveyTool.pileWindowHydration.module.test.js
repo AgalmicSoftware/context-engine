@@ -4,10 +4,7 @@ import {
   executePileInitializeResponseState,
   executePileQuestionSetHydration,
 } from './surveyPileResponseController';
-import {
-  buildPileComponentUpdatePlan,
-  buildPileQuestionProgressSignals,
-} from './surveyPileLifecycle';
+import { buildPileComponentUpdatePlan, buildPileQuestionProgressSignals } from './surveyPileLifecycle';
 import { buildPileResponseWindow } from './surveyPileResponseWindow';
 
 const cloneValue = (value) => JSON.parse(JSON.stringify(value));
@@ -20,9 +17,7 @@ const buildEmptyResponseFieldState = (questionId = null, fieldKey = 'answer') =>
 });
 
 const buildSynchronousSetState = (stateRef) => (update, callback) => {
-  const patch = typeof update === 'function'
-    ? update(stateRef.current)
-    : update;
+  const patch = typeof update === 'function' ? update(stateRef.current) : update;
   if (patch && typeof patch === 'object') {
     stateRef.current = { ...stateRef.current, ...patch };
   }
@@ -30,11 +25,12 @@ const buildSynchronousSetState = (stateRef) => (update, callback) => {
   return patch;
 };
 
-const createPileQuestions = (count) => Array.from({ length: count }, (_, idx) => ({
-  id: `q${idx + 1}`,
-  type: 'freeform',
-  prompt: `Q${idx + 1}`,
-}));
+const createPileQuestions = (count) =>
+  Array.from({ length: count }, (_, idx) => ({
+    id: `q${idx + 1}`,
+    type: 'freeform',
+    prompt: `Q${idx + 1}`,
+  }));
 
 const applyCachedResponseEntryToSlice = ({ targetSlice, questionId, response }) => {
   targetSlice.answers[questionId] = {
@@ -102,16 +98,18 @@ describe('SurveyTool pile visible window hydration', () => {
       current: {
         pileQuestions: createPileQuestions(3),
         activePileIndex: 0,
-        surveysResponseState: [{
-          answers: {
-            q1: { value: 'Existing', encrypted: false },
+        surveysResponseState: [
+          {
+            answers: {
+              q1: { value: 'Existing', encrypted: false },
+            },
+            importance: {},
+            conviction: {},
+            additionalComments: {
+              q1: { value: '', encrypted: false },
+            },
           },
-          importance: {},
-          conviction: {},
-          additionalComments: {
-            q1: { value: '', encrypted: false },
-          },
-        }],
+        ],
         editBaseline: {
           answers: {
             q1: { value: 'Existing', encrypted: false },
@@ -143,7 +141,9 @@ describe('SurveyTool pile visible window hydration', () => {
     expect(stateRef.current.decryptingByKey).toEqual({ 'q1:answer': true });
     expect(stateRef.current._autoDecryptMaskedAttemptSignature).toEqual({ 'q1:answer': 'masked-sig' });
     expect(stateRef.current.surveysResponseState?.[0]?.answers?.q2).toEqual(expect.objectContaining({ value: '' }));
-    expect(stateRef.current.surveysResponseState?.[0]?.additionalComments?.q3).toEqual(expect.objectContaining({ value: '' }));
+    expect(stateRef.current.surveysResponseState?.[0]?.additionalComments?.q3).toEqual(
+      expect.objectContaining({ value: '' }),
+    );
     // port note: dropped direct `rehydrateDraftForRenderedIds(false)` inspection.
     // The extracted controller owns the visible-window backfill and invokes the
     // rehydrate callback exactly once without touching auto-decrypt ledger state.
@@ -183,7 +183,12 @@ describe('SurveyTool pile visible window hydration', () => {
     });
 
     expect(firstPlan.reason).toBe('initialize');
-    expect(firstPlan.initialSlice?.answers && Object.keys(firstPlan.initialSlice.answers)).toEqual(['q1', 'q2', 'q3', 'q4']);
+    expect(firstPlan.initialSlice?.answers && Object.keys(firstPlan.initialSlice.answers)).toEqual([
+      'q1',
+      'q2',
+      'q3',
+      'q4',
+    ]);
     expect(secondPlan.reason).toBe('unchanged');
     expect(setState).toHaveBeenCalledTimes(1);
   });

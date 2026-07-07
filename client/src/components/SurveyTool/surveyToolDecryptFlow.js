@@ -19,20 +19,10 @@ export const parseEncryptedEnvelope = (field = null) => {
   }
 };
 
-export const buildFieldDecryptState = (
-  field = null,
-  {
-    loginComplete = false,
-    account = '',
-    busy = false,
-  } = {},
-) => {
+export const buildFieldDecryptState = (field = null, { loginComplete = false, account = '', busy = false } = {}) => {
   const envelope = parseEncryptedEnvelope(field);
   const masked = !!(field?.value === '*' && (field?.encryptedPortion || field?.encrypted));
-  const allowDecrypt = masked && (
-    !!envelope ||
-    (!!loginComplete && !!account)
-  );
+  const allowDecrypt = masked && (!!envelope || (!!loginComplete && !!account));
 
   return {
     envelope,
@@ -75,10 +65,7 @@ export const buildQuestionResponseDisplayState = ({
   activeSliderValue: sliderMode === 'importance' ? importanceValue : convictionValue,
 });
 
-export const buildQuestionRenderDisplayState = ({
-  responseDisplayState = {},
-  fieldDisplayState = {},
-} = {}) => ({
+export const buildQuestionRenderDisplayState = ({ responseDisplayState = {}, fieldDisplayState = {} } = {}) => ({
   ...responseDisplayState,
   ...fieldDisplayState,
   maskedAnswer: !!fieldDisplayState?.answerDecryptState?.masked,
@@ -126,14 +113,15 @@ export const buildDecryptTaskKey = (
   responseOverride = null,
   defaultResponder = '',
 ) => {
-  const qid = String(questionId || '').trim().toLowerCase();
-  const field = String(fieldToDecrypt || 'both').trim().toLowerCase();
-  const responder = String(
-    responseOverride?.responder ||
-    responseOverride?.responderAddress ||
-    defaultResponder ||
-    ''
-  ).trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
+  const field = String(fieldToDecrypt || 'both')
+    .trim()
+    .toLowerCase();
+  const responder = String(responseOverride?.responder || responseOverride?.responderAddress || defaultResponder || '')
+    .trim()
+    .toLowerCase();
   const answerSig = buildAutoDecryptMaskedFieldSignature(responseOverride?.answer);
   const additionalSig = buildAutoDecryptMaskedFieldSignature(responseOverride?.additional);
   return [String(mode || 'self'), qid, field, responder, answerSig, additionalSig].join('|');
@@ -149,14 +137,11 @@ export const normalizeSingleQuestionViewedResponse = (rawResponse = null) => {
     };
   }
 
-  const nestedResponse = (
-    rawResponse.response &&
-    typeof rawResponse.response === 'object' &&
-    !Array.isArray(rawResponse.response)
-  ) ? rawResponse.response : null;
-  const base = nestedResponse
-    ? { ...rawResponse, ...nestedResponse }
-    : { ...rawResponse };
+  const nestedResponse =
+    rawResponse.response && typeof rawResponse.response === 'object' && !Array.isArray(rawResponse.response)
+      ? rawResponse.response
+      : null;
+  const base = nestedResponse ? { ...rawResponse, ...nestedResponse } : { ...rawResponse };
 
   const firstDefined = (...values) => {
     for (let i = 0; i < values.length; i += 1) {
@@ -166,13 +151,8 @@ export const normalizeSingleQuestionViewedResponse = (rawResponse = null) => {
   };
 
   const normalizeField = (field, fallbackValue) => {
-    const nextField = (
-      field && typeof field === 'object' && !Array.isArray(field)
-    ) ? { ...field } : {};
-    const scalar = (
-      field != null &&
-      typeof field !== 'object'
-    ) ? field : undefined;
+    const nextField = field && typeof field === 'object' && !Array.isArray(field) ? { ...field } : {};
+    const scalar = field != null && typeof field !== 'object' ? field : undefined;
     const value = firstDefined(nextField.value, scalar, fallbackValue);
     if (value !== undefined) nextField.value = value;
     return nextField;
@@ -184,17 +164,17 @@ export const normalizeSingleQuestionViewedResponse = (rawResponse = null) => {
     base.responseValue,
     base.answerText,
     base.responseText,
-    (
-      base.answer == null &&
+    base.answer == null &&
       (typeof base.response === 'string' || typeof base.response === 'number' || typeof base.response === 'boolean')
-    ) ? base.response : undefined
+      ? base.response
+      : undefined,
   );
   const additionalFallback = firstDefined(
     base.additionalComment,
     base.additionalComments,
     base.comment,
     base.comments,
-    base.additionalText
+    base.additionalText,
   );
 
   const normalized = {
@@ -221,19 +201,21 @@ export const normalizeSingleQuestionViewedResponse = (rawResponse = null) => {
   return hasShapeHints ? normalized : null;
 };
 
-export const getViewedResponseOverrideForQuestion = (
-  questionId,
-  responseContainer,
-  viewedResponder = '',
-) => {
-  const qid = String(questionId || '').trim().toLowerCase();
+export const getViewedResponseOverrideForQuestion = (questionId, responseContainer, viewedResponder = '') => {
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   if (!qid || !responseContainer || typeof responseContainer !== 'object') return null;
-  const normalizedViewedResponder = String(viewedResponder || '').trim().toLowerCase();
+  const normalizedViewedResponder = String(viewedResponder || '')
+    .trim()
+    .toLowerCase();
 
   const decorateResponse = (rawResponse) => {
     if (!rawResponse || typeof rawResponse !== 'object') return null;
     const next = { ...rawResponse };
-    const rawId = String(next.questionID || next.questionId || '').trim().toLowerCase();
+    const rawId = String(next.questionID || next.questionId || '')
+      .trim()
+      .toLowerCase();
     if (rawId && rawId !== qid) return null;
     if (!next.questionID && !next.questionId) next.questionID = qid;
     if (normalizedViewedResponder) {
@@ -255,26 +237,20 @@ export const getViewedResponseOverrideForQuestion = (
 };
 
 export const resolveQuestionDecryptHandlingMode = (
-  {
-    questionId,
-    responseOverride = null,
-    viewerAccount = '',
-    viewedResponder = '',
-  } = {},
-  {
-    getViewedResponseOverrideForQuestion,
-  } = {},
+  { questionId, responseOverride = null, viewerAccount = '', viewedResponder = '' } = {},
+  { getViewedResponseOverrideForQuestion } = {},
 ) => {
-  const viewerLower = String(viewerAccount || '').trim().toLowerCase();
-  const viewedResponderLower = String(viewedResponder || '').trim().toLowerCase();
+  const viewerLower = String(viewerAccount || '')
+    .trim()
+    .toLowerCase();
+  const viewedResponderLower = String(viewedResponder || '')
+    .trim()
+    .toLowerCase();
   const effectiveResponseOverride =
     responseOverride && typeof responseOverride === 'object'
       ? responseOverride
       : getViewedResponseOverrideForQuestion(questionId);
-  const hasResponseOverride = !!(
-    effectiveResponseOverride &&
-    typeof effectiveResponseOverride === 'object'
-  );
+  const hasResponseOverride = !!(effectiveResponseOverride && typeof effectiveResponseOverride === 'object');
   const isViewedResponseMode = !!viewedResponderLower && viewedResponderLower !== viewerLower;
 
   return {
@@ -288,18 +264,13 @@ export const resolveQuestionDecryptHandlingMode = (
 
 export const resolveDecryptSurveyId = (
   baselineForDecrypt,
-  {
-    propSurveyId = '',
-    questionId = null,
-    defaultSurveyId = '',
-  } = {},
+  { propSurveyId = '', questionId = null, defaultSurveyId = '' } = {},
 ) => {
   if (propSurveyId) return propSurveyId;
 
   const getEnvelopeSurveyId = (field) => parseEncryptedEnvelope(field)?.aad?.surveyId || null;
 
-  const normalizedQuestionId =
-    questionId == null ? '' : String(questionId).trim().toLowerCase();
+  const normalizedQuestionId = questionId == null ? '' : String(questionId).trim().toLowerCase();
 
   if (normalizedQuestionId) {
     const scopedSurveyId =
@@ -308,10 +279,7 @@ export const resolveDecryptSurveyId = (
     if (scopedSurveyId) return scopedSurveyId;
   }
 
-  const containers = [
-    baselineForDecrypt?.answers,
-    baselineForDecrypt?.additionalComments,
-  ];
+  const containers = [baselineForDecrypt?.answers, baselineForDecrypt?.additionalComments];
 
   for (const container of containers) {
     if (!container || typeof container !== 'object') continue;
@@ -343,16 +311,17 @@ export const runDedupedDecryptTask = (inFlightMap, taskKey, runner) => {
 };
 
 export const getQuestionFieldTaskKey = (questionId, fieldKey = 'answer') => {
-  const qid = String(questionId || '').trim().toLowerCase();
-  const normalizedFieldKey = String(fieldKey || 'answer').trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
+  const normalizedFieldKey = String(fieldKey || 'answer')
+    .trim()
+    .toLowerCase();
   if (!qid) return '';
   return `${qid}:${normalizedFieldKey}`;
 };
 
-export const getQuestionFieldTaskKeys = (
-  questionId,
-  { includeAnswer = false, includeAdditional = false } = {},
-) => {
+export const getQuestionFieldTaskKeys = (questionId, { includeAnswer = false, includeAdditional = false } = {}) => {
   const keys = [];
   if (includeAnswer) {
     const answerKey = getQuestionFieldTaskKey(questionId, 'answer');
@@ -373,11 +342,7 @@ export const markQuestionFieldBusyMap = (busyMap, keysToMark = []) => {
   return next;
 };
 
-export const clearQuestionFieldBusyMap = (
-  busyMap,
-  questionId,
-  fieldToDecrypt = 'both',
-) => {
+export const clearQuestionFieldBusyMap = (busyMap, questionId, fieldToDecrypt = 'both') => {
   const cleared = { ...(busyMap || {}) };
   const keysToClear = getQuestionFieldTaskKeys(questionId, {
     includeAnswer: fieldToDecrypt === 'answer' || fieldToDecrypt === 'both',
@@ -389,15 +354,9 @@ export const clearQuestionFieldBusyMap = (
   return cleared;
 };
 
-export const hasQuestionDecryptBusy = (busyMap = {}) => (
-  Object.values(busyMap || {}).some(Boolean)
-);
+export const hasQuestionDecryptBusy = (busyMap = {}) => Object.values(busyMap || {}).some(Boolean);
 
-export const buildQuestionDecryptBusyTokenRegistration = ({
-  tokenSeq = 0,
-  busyTokens = {},
-  keysToMark = [],
-} = {}) => {
+export const buildQuestionDecryptBusyTokenRegistration = ({ tokenSeq = 0, busyTokens = {}, keysToMark = [] } = {}) => {
   const token = (Number(tokenSeq) || 0) + 1;
   const nextBusyTokens = { ...(busyTokens || {}) };
   keysToMark.forEach((key) => {
@@ -409,11 +368,7 @@ export const buildQuestionDecryptBusyTokenRegistration = ({
   };
 };
 
-export const buildClearedQuestionDecryptBusyTokens = ({
-  busyTokens = {},
-  keysToClear = [],
-  token = null,
-} = {}) => {
+export const buildClearedQuestionDecryptBusyTokens = ({ busyTokens = {}, keysToClear = [], token = null } = {}) => {
   const nextBusyTokens = { ...(busyTokens || {}) };
   keysToClear.forEach((key) => {
     if (!key) return;
@@ -424,11 +379,7 @@ export const buildClearedQuestionDecryptBusyTokens = ({
   return nextBusyTokens;
 };
 
-export const ownsQuestionDecryptBusyTokens = ({
-  busyTokens = {},
-  keysToCheck = [],
-  token = null,
-} = {}) => {
+export const ownsQuestionDecryptBusyTokens = ({ busyTokens = {}, keysToCheck = [], token = null } = {}) => {
   if (token == null) return true;
   const keys = keysToCheck.filter(Boolean);
   return keys.length > 0 && keys.every((key) => busyTokens?.[key] === token);
@@ -451,14 +402,16 @@ export const buildQuestionDecryptOwnedClearState = ({
   if (keysToClear.length === 0) {
     return {
       busyTokens: { ...(busyTokens || {}) },
-      statePatch: token == null
-        ? {
-            ...extraPatch,
-            isDecrypting: Number(activeSurveyDecryptAttemptSeq || 0) > 0 ||
-              hasQuestionDecryptBusy(prevState?.decryptingByKey || {}),
-            decryptingByKey: prevState?.decryptingByKey || {},
-          }
-        : null,
+      statePatch:
+        token == null
+          ? {
+              ...extraPatch,
+              isDecrypting:
+                Number(activeSurveyDecryptAttemptSeq || 0) > 0 ||
+                hasQuestionDecryptBusy(prevState?.decryptingByKey || {}),
+              decryptingByKey: prevState?.decryptingByKey || {},
+            }
+          : null,
     };
   }
 
@@ -475,40 +428,34 @@ export const buildQuestionDecryptOwnedClearState = ({
     }),
     statePatch: {
       ...extraPatch,
-      isDecrypting: Number(activeSurveyDecryptAttemptSeq || 0) > 0 ||
-        hasQuestionDecryptBusy(decryptingByKey),
+      isDecrypting: Number(activeSurveyDecryptAttemptSeq || 0) > 0 || hasQuestionDecryptBusy(decryptingByKey),
       decryptingByKey,
     },
   };
 };
 
-export const getQuestionFieldDecryptSelection = (
-  questionId,
-  fieldToDecrypt = 'both',
-  responseSlice = null,
-) => {
-  const qid = String(questionId || '').trim().toLowerCase();
+export const getQuestionFieldDecryptSelection = (questionId, fieldToDecrypt = 'both', responseSlice = null) => {
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   const maskedAnswer = !!(
     (fieldToDecrypt === 'answer' || fieldToDecrypt === 'both') &&
     responseSlice?.answers?.[qid]?.value === '*' &&
-    (responseSlice?.answers?.[qid]?.encryptedPortion ||
-      responseSlice?.answers?.[qid]?.encrypted)
+    (responseSlice?.answers?.[qid]?.encryptedPortion || responseSlice?.answers?.[qid]?.encrypted)
   );
 
   const maskedAdditional = !!(
     (fieldToDecrypt === 'additional' || fieldToDecrypt === 'both') &&
     responseSlice?.additionalComments?.[qid]?.value === '*' &&
-    (responseSlice?.additionalComments?.[qid]?.encryptedPortion ||
-      responseSlice?.additionalComments?.[qid]?.encrypted)
+    (responseSlice?.additionalComments?.[qid]?.encryptedPortion || responseSlice?.additionalComments?.[qid]?.encrypted)
   );
 
   return {
     maskedAnswer,
     maskedAdditional,
     hasMaskedField: !!(maskedAnswer || maskedAdditional),
-    clearMode: maskedAnswer && maskedAdditional
-      ? 'both'
-      : (maskedAnswer ? 'answer' : (maskedAdditional ? 'additional' : '')),
+    clearMode:
+      maskedAnswer && maskedAdditional ? 'both' : maskedAnswer ? 'answer' : maskedAdditional ? 'additional' : '',
     keysToMark: getQuestionFieldTaskKeys(qid, {
       includeAnswer: maskedAnswer,
       includeAdditional: maskedAdditional,
@@ -531,11 +478,7 @@ export const buildQuestionDecryptFailureState = (
 ) => ({
   isDecrypting: false,
   submissionError: errorMessage || 'Decryption failed.',
-  decryptingByKey: clearQuestionFieldBusyMap(
-    prevState?.decryptingByKey,
-    questionId,
-    fieldToDecrypt,
-  ),
+  decryptingByKey: clearQuestionFieldBusyMap(prevState?.decryptingByKey, questionId, fieldToDecrypt),
 });
 
 export const startQuestionDecryptAttemptStatus = ({
@@ -548,16 +491,14 @@ export const startQuestionDecryptAttemptStatus = ({
   setState = null,
   buildQuestionDecryptStartState: buildStartState = null,
 } = {}) => {
-  const preparePort = prepareQuestionDecryptAttempt || ((options) => (
-    host?.prepareQuestionDecryptAttempt?.(options) || {}
-  ));
-  const registerBusyPort = registerQuestionDecryptBusyTokens || ((keys) => (
-    host?.registerQuestionDecryptBusyTokens?.(keys)
-  ));
+  const preparePort =
+    prepareQuestionDecryptAttempt || ((options) => host?.prepareQuestionDecryptAttempt?.(options) || {});
+  const registerBusyPort =
+    registerQuestionDecryptBusyTokens || ((keys) => host?.registerQuestionDecryptBusyTokens?.(keys));
   const setStatePort = setState || (host?.setState ? host.setState.bind(host) : () => {});
-  const buildStartPort = buildStartState || ((prev, keys) => (
-    host?.buildQuestionDecryptStartState?.(prev, keys) || buildQuestionDecryptStartState(prev, keys)
-  ));
+  const buildStartPort =
+    buildStartState ||
+    ((prev, keys) => host?.buildQuestionDecryptStartState?.(prev, keys) || buildQuestionDecryptStartState(prev, keys));
 
   const preparedAttempt = preparePort({ questionId, fieldToDecrypt, baselineForDecrypt }) || {};
   if (!preparedAttempt.shouldDecrypt) {
@@ -602,50 +543,42 @@ export const applyQuestionDecryptCompletionStatus = ({
   onSuccessStateApplied,
 } = {}) => {
   const setStatePort = setState || (host?.setState ? host.setState.bind(host) : () => {});
-  const clearBusyPort = clearQuestionDecryptBusyTokens || ((keys, token) => (
-    host?.clearQuestionDecryptBusyTokens?.(keys, token)
-  ));
-  const isCurrentPort = isDecryptContextCurrent || ((snapshot) => (
-    host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true
-  ));
-  const canUpdatePort = canUpdateStateForAsyncSnapshot || ((snapshot) => (
-    host?.canUpdateStateForAsyncSnapshot ? host.canUpdateStateForAsyncSnapshot(snapshot) : false
-  ));
-  const ownsBusyPort = ownsQuestionDecryptBusyTokens || ((keys, token) => (
-    host?.ownsQuestionDecryptBusyTokens ? host.ownsQuestionDecryptBusyTokens(keys, token) : true
-  ));
-  const buildStalePort = buildQuestionDecryptStaleState || ((prev, targetQid, targetField, token) => (
-    host?.buildQuestionDecryptStaleState?.(prev, targetQid, targetField, token) || null
-  ));
-  const buildSuccessPort = buildSuccessState || ((prev) => {
-    if (successStateKind === 'viewed') {
-      return host?.buildViewedResponseDecryptSuccessState?.(prev, successStateOptions) || null;
-    }
-    if (successStateKind === 'self') {
-      return host?.buildSelfQuestionDecryptSuccessState?.(prev, successStateOptions) || null;
-    }
-    return null;
-  });
+  const clearBusyPort =
+    clearQuestionDecryptBusyTokens || ((keys, token) => host?.clearQuestionDecryptBusyTokens?.(keys, token));
+  const isCurrentPort =
+    isDecryptContextCurrent ||
+    ((snapshot) => (host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true));
+  const canUpdatePort =
+    canUpdateStateForAsyncSnapshot ||
+    ((snapshot) => (host?.canUpdateStateForAsyncSnapshot ? host.canUpdateStateForAsyncSnapshot(snapshot) : false));
+  const ownsBusyPort =
+    ownsQuestionDecryptBusyTokens ||
+    ((keys, token) => (host?.ownsQuestionDecryptBusyTokens ? host.ownsQuestionDecryptBusyTokens(keys, token) : true));
+  const buildStalePort =
+    buildQuestionDecryptStaleState ||
+    ((prev, targetQid, targetField, token) =>
+      host?.buildQuestionDecryptStaleState?.(prev, targetQid, targetField, token) || null);
+  const buildSuccessPort =
+    buildSuccessState ||
+    ((prev) => {
+      if (successStateKind === 'viewed') {
+        return host?.buildViewedResponseDecryptSuccessState?.(prev, successStateOptions) || null;
+      }
+      if (successStateKind === 'self') {
+        return host?.buildSelfQuestionDecryptSuccessState?.(prev, successStateOptions) || null;
+      }
+      return null;
+    });
 
   if (!isCurrentPort(context)) {
     if (canUpdatePort(context)) {
-      setStatePort((prev) => buildStalePort(
-        prev,
-        questionId,
-        fieldToDecrypt,
-        decryptAttemptToken,
-      ));
+      setStatePort((prev) => buildStalePort(prev, questionId, fieldToDecrypt, decryptAttemptToken));
     }
     return { shouldReturn: true, result: false, reason: 'stale-context' };
   }
 
   if (!ownsBusyPort(keysToMark, decryptAttemptToken)) {
-    setStatePort((prev) => buildStalePort(
-      prev,
-      questionId,
-      fieldToDecrypt,
-      decryptAttemptToken,
-    ));
+    setStatePort((prev) => buildStalePort(prev, questionId, fieldToDecrypt, decryptAttemptToken));
     return { shouldReturn: true, result: false, reason: 'stale-busy-token' };
   }
 
@@ -668,44 +601,29 @@ export const applyQuestionDecryptFailureStatus = ({
   buildQuestionDecryptFailureStateForAttempt = null,
 } = {}) => {
   const setStatePort = setState || (host?.setState ? host.setState.bind(host) : () => {});
-  const isCurrentPort = isDecryptContextCurrent || ((snapshot) => (
-    host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true
-  ));
-  const canUpdatePort = canUpdateStateForAsyncSnapshot || ((snapshot) => (
-    host?.canUpdateStateForAsyncSnapshot ? host.canUpdateStateForAsyncSnapshot(snapshot) : false
-  ));
-  const buildStalePort = buildQuestionDecryptStaleState || ((prev, targetQid, targetField, token) => (
-    host?.buildQuestionDecryptStaleState?.(prev, targetQid, targetField, token) || null
-  ));
-  const buildFailurePort = buildQuestionDecryptFailureStateForAttempt || ((
-    prev,
-    targetQid,
-    targetField,
-    message,
-    token,
-  ) => (
-    host?.buildQuestionDecryptFailureStateForAttempt?.(prev, targetQid, targetField, message, token) || null
-  ));
+  const isCurrentPort =
+    isDecryptContextCurrent ||
+    ((snapshot) => (host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true));
+  const canUpdatePort =
+    canUpdateStateForAsyncSnapshot ||
+    ((snapshot) => (host?.canUpdateStateForAsyncSnapshot ? host.canUpdateStateForAsyncSnapshot(snapshot) : false));
+  const buildStalePort =
+    buildQuestionDecryptStaleState ||
+    ((prev, targetQid, targetField, token) =>
+      host?.buildQuestionDecryptStaleState?.(prev, targetQid, targetField, token) || null);
+  const buildFailurePort =
+    buildQuestionDecryptFailureStateForAttempt ||
+    ((prev, targetQid, targetField, message, token) =>
+      host?.buildQuestionDecryptFailureStateForAttempt?.(prev, targetQid, targetField, message, token) || null);
 
   if (!isCurrentPort(context)) {
     if (decryptAttemptToken != null && canUpdatePort(context)) {
-      setStatePort((prev) => buildStalePort(
-        prev,
-        questionId,
-        fieldToDecrypt,
-        decryptAttemptToken,
-      ));
+      setStatePort((prev) => buildStalePort(prev, questionId, fieldToDecrypt, decryptAttemptToken));
     }
     return false;
   }
 
-  setStatePort((prev) => buildFailurePort(
-    prev,
-    questionId,
-    fieldToDecrypt,
-    error?.message,
-    decryptAttemptToken,
-  ));
+  setStatePort((prev) => buildFailurePort(prev, questionId, fieldToDecrypt, error?.message, decryptAttemptToken));
   return false;
 };
 
@@ -819,20 +737,15 @@ export const collectQuestionRatingEnvelopesByQid = (source = null) => {
     const addFromResponseObject = (responseObject) => {
       if (!responseObject || typeof responseObject !== 'object') return;
       const questionId = String(
-        responseObject?.questionID ||
-        responseObject?.questionId ||
-        responseObject?.questionIDHash ||
-        ''
-      ).trim().toLowerCase();
+        responseObject?.questionID || responseObject?.questionId || responseObject?.questionIDHash || '',
+      )
+        .trim()
+        .toLowerCase();
       if (!questionId) return;
       const importanceEncrypted =
-        typeof responseObject?.importanceEncrypted === 'string'
-          ? responseObject.importanceEncrypted
-          : '';
+        typeof responseObject?.importanceEncrypted === 'string' ? responseObject.importanceEncrypted : '';
       const convictionEncrypted =
-        typeof responseObject?.convictionEncrypted === 'string'
-          ? responseObject.convictionEncrypted
-          : '';
+        typeof responseObject?.convictionEncrypted === 'string' ? responseObject.convictionEncrypted : '';
       if (!importanceEncrypted && !convictionEncrypted) return;
       ratingEnvelopesByQid[questionId] = {
         importanceEncrypted,
@@ -854,24 +767,15 @@ export const collectQuestionRatingEnvelopesByQid = (source = null) => {
   return ratingEnvelopesByQid;
 };
 
-export const carryForwardSurveyQuestionRatings = (
-  sourceSlice = null,
-  previousStateSlice = null,
-) => {
+export const carryForwardSurveyQuestionRatings = (sourceSlice = null, previousStateSlice = null) => {
   const nextSourceSlice = ensureQuestionDecryptSliceShape(sourceSlice);
   Object.keys(previousStateSlice?.importance || {}).forEach((questionId) => {
-    if (
-      nextSourceSlice.importance[questionId] === undefined ||
-      nextSourceSlice.importance[questionId] === null
-    ) {
+    if (nextSourceSlice.importance[questionId] === undefined || nextSourceSlice.importance[questionId] === null) {
       nextSourceSlice.importance[questionId] = previousStateSlice.importance[questionId];
     }
   });
   Object.keys(previousStateSlice?.conviction || {}).forEach((questionId) => {
-    if (
-      nextSourceSlice.conviction[questionId] === undefined ||
-      nextSourceSlice.conviction[questionId] === null
-    ) {
+    if (nextSourceSlice.conviction[questionId] === undefined || nextSourceSlice.conviction[questionId] === null) {
       nextSourceSlice.conviction[questionId] = previousStateSlice.conviction[questionId];
     }
   });
@@ -886,9 +790,7 @@ export const buildSurveyDecryptSourceState = (
 ) => {
   const baseSourceSlice = latestResponse
     ? buildSliceFromUserAnswers(latestResponse)
-    : ensureQuestionDecryptSliceShape(
-        fallbackSourceSlice || buildEmptyQuestionDecryptSlice(),
-      );
+    : ensureQuestionDecryptSliceShape(fallbackSourceSlice || buildEmptyQuestionDecryptSlice());
 
   return {
     sourceSlice: carryForwardSurveyQuestionRatings(baseSourceSlice, previousStateSlice),
@@ -902,15 +804,11 @@ export const buildSurveyDecryptAttemptSourceInputs = ({
   getEffectiveDraftSlug = null,
 } = {}) => {
   const surveyIndex = decryptContext?.surveyIndex || 0;
-  const fallbackSourceSlice =
-    state?.surveysResponseState?.[surveyIndex] ||
-    buildEmptyQuestionDecryptSlice();
+  const fallbackSourceSlice = state?.surveysResponseState?.[surveyIndex] || buildEmptyQuestionDecryptSlice();
 
   return {
     surveyIndex,
-    slug: decryptContext?.sessionSlug || (
-      typeof getEffectiveDraftSlug === 'function' ? getEffectiveDraftSlug() : ''
-    ),
+    slug: decryptContext?.sessionSlug || (typeof getEffectiveDraftSlug === 'function' ? getEffectiveDraftSlug() : ''),
     fallbackUserAnswers: state?.userAnswers,
     fallbackSourceSlice,
     previousStateSlice: state?.surveysResponseState?.[surveyIndex] || {},
@@ -927,37 +825,30 @@ export const applySurveyDecryptStaleStatus = ({
   setSurveyDecryptStaleState = null,
   buildSurveyDecryptStaleState = null,
 } = {}) => {
-  const isCurrentPort = typeof isDecryptContextCurrent === 'function'
-    ? isDecryptContextCurrent
-    : ((snapshot) => (
-        host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true
-      ));
+  const isCurrentPort =
+    typeof isDecryptContextCurrent === 'function'
+      ? isDecryptContextCurrent
+      : (snapshot) => (host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true);
 
   if (isCurrentPort(context)) {
     return { shouldReturn: false, reason: 'current-context' };
   }
 
-  const canUpdatePort = typeof canUpdateSurveyDecryptAttempt === 'function'
-    ? canUpdateSurveyDecryptAttempt
-    : ((snapshot, targetAttemptId) => (
-        host?.canUpdateSurveyDecryptAttempt
-          ? host.canUpdateSurveyDecryptAttempt(snapshot, targetAttemptId)
-          : false
-      ));
+  const canUpdatePort =
+    typeof canUpdateSurveyDecryptAttempt === 'function'
+      ? canUpdateSurveyDecryptAttempt
+      : (snapshot, targetAttemptId) =>
+          host?.canUpdateSurveyDecryptAttempt ? host.canUpdateSurveyDecryptAttempt(snapshot, targetAttemptId) : false;
 
   if (canUpdatePort(context, attemptId)) {
     const finishPort = finishSurveyDecryptAttempt || host?.finishSurveyDecryptAttempt;
     if (typeof finishPort === 'function') {
       finishPort(attemptId);
     }
-    const setStalePort = setSurveyDecryptStaleState || (
-      host?.setState ? host.setState.bind(host) : null
-    );
+    const setStalePort = setSurveyDecryptStaleState || (host?.setState ? host.setState.bind(host) : null);
     if (typeof setStalePort === 'function') {
       const buildStalePort = buildSurveyDecryptStaleState || host?.buildSurveyDecryptStaleState;
-      const stalePatch = typeof buildStalePort === 'function'
-        ? buildStalePort()
-        : { isDecrypting: false };
+      const stalePatch = typeof buildStalePort === 'function' ? buildStalePort() : { isDecrypting: false };
       setStalePort(stalePatch);
     }
     return { shouldReturn: true, reason: 'stale-context-applied' };
@@ -990,21 +881,10 @@ export const hydrateLatestQuestionDecryptState = async (
   let nextRatingEnvelopes = initialRatingEnvelopes;
 
   try {
-    const hydrateSelection = getQuestionFieldDecryptSelection(
-      questionId,
-      fieldToDecrypt,
-      nextBaselineForDecrypt,
-    );
-    const {
-      maskedAnswer: maskedAnswerForHydrate,
-      maskedAdditional: maskedAdditionalForHydrate,
-    } = hydrateSelection;
+    const hydrateSelection = getQuestionFieldDecryptSelection(questionId, fieldToDecrypt, nextBaselineForDecrypt);
+    const { maskedAnswer: maskedAnswerForHydrate, maskedAdditional: maskedAdditionalForHydrate } = hydrateSelection;
 
-    if (
-      (maskedAnswerForHydrate || maskedAdditionalForHydrate) &&
-      account &&
-      networkID
-    ) {
+    if ((maskedAnswerForHydrate || maskedAdditionalForHydrate) && account && networkID) {
       const questionsCache = readQuestionsCache(sessionSlug) || {};
       const fetchQuestionId = String(questionId || '').toLowerCase();
       const latest = await getLatestQuestionResponse(
@@ -1015,20 +895,11 @@ export const hydrateLatestQuestionDecryptState = async (
       );
 
       if (latest) {
-        nextRatingEnvelopes = mergeQuestionRatingEnvelopeState(
-          nextRatingEnvelopes,
-          latest,
-          questionId,
-        );
-        nextBaselineForDecrypt = mergeLatestEncryptedQuestionFields(
-          nextBaselineForDecrypt,
-          questionId,
-          latest,
-          {
-            includeAnswer: maskedAnswerForHydrate,
-            includeAdditional: maskedAdditionalForHydrate,
-          },
-        );
+        nextRatingEnvelopes = mergeQuestionRatingEnvelopeState(nextRatingEnvelopes, latest, questionId);
+        nextBaselineForDecrypt = mergeLatestEncryptedQuestionFields(nextBaselineForDecrypt, questionId, latest, {
+          includeAnswer: maskedAnswerForHydrate,
+          includeAdditional: maskedAdditionalForHydrate,
+        });
       }
     }
   } catch (error) {
@@ -1051,20 +922,17 @@ export const prepareViewedQuestionDecryptState = async (
     sessionSlug = '',
     networkID = '',
   } = {},
-  {
-    buildViewedResponseDecryptBaseline,
-    hydrateLatestQuestionDecryptState: hydrateLatestQuestionDecryptStateFn,
-  } = {},
+  { buildViewedResponseDecryptBaseline, hydrateLatestQuestionDecryptState: hydrateLatestQuestionDecryptStateFn } = {},
 ) => {
-  const qid = String(questionId || '').trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   let baselineForDecrypt = buildViewedResponseDecryptBaseline(responseOverride, qid);
   let ratingEnvelopes = {
-    importanceEncrypted: typeof responseOverride?.importanceEncrypted === 'string'
-      ? responseOverride.importanceEncrypted
-      : '',
-    convictionEncrypted: typeof responseOverride?.convictionEncrypted === 'string'
-      ? responseOverride.convictionEncrypted
-      : '',
+    importanceEncrypted:
+      typeof responseOverride?.importanceEncrypted === 'string' ? responseOverride.importanceEncrypted : '',
+    convictionEncrypted:
+      typeof responseOverride?.convictionEncrypted === 'string' ? responseOverride.convictionEncrypted : '',
   };
 
   if (qid && responseOverride && typeof responseOverride === 'object') {
@@ -1108,31 +976,21 @@ export const prepareSelfQuestionDecryptState = async (
     logWarn = () => {},
   } = {},
 ) => {
-  const qid = String(questionId || '').trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   let { baselineSlice, baselineForDecrypt } = buildSelfQuestionDecryptBaseline(surveyIndex);
 
   if (responseOverride && typeof responseOverride === 'object') {
     try {
-      baselineForDecrypt = mergeQuestionResponseOverrideIntoDecryptSlice(
-        baselineForDecrypt,
-        qid,
-        responseOverride,
-      );
+      baselineForDecrypt = mergeQuestionResponseOverrideIntoDecryptSlice(baselineForDecrypt, qid, responseOverride);
     } catch (error) {
       logWarn(error);
     }
   }
 
-  let ratingEnvelopes = mergeQuestionRatingEnvelopeState(
-    null,
-    responseOverride,
-    qid,
-  );
-  ratingEnvelopes = mergeQuestionRatingEnvelopeState(
-    ratingEnvelopes,
-    userAnswers,
-    qid,
-  );
+  let ratingEnvelopes = mergeQuestionRatingEnvelopeState(null, responseOverride, qid);
+  ratingEnvelopes = mergeQuestionRatingEnvelopeState(ratingEnvelopes, userAnswers, qid);
 
   const hydrated = await hydrateLatestQuestionDecryptStateFn({
     questionId: qid,
@@ -1166,22 +1024,17 @@ export const resolveLatestSurveyDecryptResponse = async (
     surveyId = '',
     fallbackUserAnswers = null,
   } = {},
-  {
-    getLatestQuestionResponse,
-    getLatestSurveyResponse,
-  } = {},
+  { getLatestQuestionResponse, getLatestSurveyResponse } = {},
 ) => {
   let latest = null;
 
   if (singleQuestionMode) {
-    const qid = String(questionId || '').trim().toLowerCase();
-    latest = qid && account
-      ? await getLatestQuestionResponse(providerLike, account, qid, slug)
-      : null;
+    const qid = String(questionId || '')
+      .trim()
+      .toLowerCase();
+    latest = qid && account ? await getLatestQuestionResponse(providerLike, account, qid, slug) : null;
   } else {
-    latest = account
-      ? await getLatestSurveyResponse(account, surveyId)
-      : null;
+    latest = account ? await getLatestSurveyResponse(account, surveyId) : null;
   }
 
   return latest || fallbackUserAnswers || null;
@@ -1199,11 +1052,7 @@ export const prepareSurveyDecryptAttempt = async (
     fallbackSourceSlice = null,
     previousStateSlice = null,
   } = {},
-  {
-    resolveLatestSurveyDecryptResponse,
-    buildSurveyDecryptSourceState,
-    buildSurveyDecryptExecutionContext,
-  } = {},
+  { resolveLatestSurveyDecryptResponse, buildSurveyDecryptSourceState, buildSurveyDecryptExecutionContext } = {},
 ) => {
   const latest = await resolveLatestSurveyDecryptResponse({
     singleQuestionMode,
@@ -1215,21 +1064,13 @@ export const prepareSurveyDecryptAttempt = async (
     fallbackUserAnswers,
   });
 
-  const {
-    sourceSlice,
-    ratingEnvelopesByQid,
-  } = buildSurveyDecryptSourceState(
+  const { sourceSlice, ratingEnvelopesByQid } = buildSurveyDecryptSourceState(
     latest,
     fallbackSourceSlice,
     previousStateSlice,
   );
 
-  const {
-    chainId,
-    lit,
-    opts,
-    poolForDecrypt,
-  } = buildSurveyDecryptExecutionContext(sourceSlice, questionId);
+  const { chainId, lit, opts, poolForDecrypt } = buildSurveyDecryptExecutionContext(sourceSlice, questionId);
 
   return {
     latest,
@@ -1254,22 +1095,11 @@ export const finalizeSurveyDecryptAttempt = async (
     opts,
     previousStateSlice = null,
   } = {},
-  {
-    decryptMultipleAnswers,
-    decryptQuestionRatingEnvelopeMap,
-    normalizeBulkDecryptedSliceForSurveyState,
-  } = {},
+  { decryptMultipleAnswers, decryptQuestionRatingEnvelopeMap, normalizeBulkDecryptedSliceForSurveyState } = {},
 ) => {
-  const decryptedSlice = await decryptMultipleAnswers(
-    sourceSlice,
-    poolForDecrypt,
-    opts,
-  );
+  const decryptedSlice = await decryptMultipleAnswers(sourceSlice, poolForDecrypt, opts);
 
-  const {
-    decryptedImportanceFromEnv,
-    decryptedConvictionFromEnv,
-  } = await decryptQuestionRatingEnvelopeMap(
+  const { decryptedImportanceFromEnv, decryptedConvictionFromEnv } = await decryptQuestionRatingEnvelopeMap(
     ratingEnvelopesByQid,
     {
       account,
@@ -1279,13 +1109,10 @@ export const finalizeSurveyDecryptAttempt = async (
     },
   );
 
-  const normalizedDecryptedSlice = normalizeBulkDecryptedSliceForSurveyState(
-    decryptedSlice,
-    {
-      previousStateSlice,
-      baselineSlice: sourceSlice,
-    },
-  );
+  const normalizedDecryptedSlice = normalizeBulkDecryptedSliceForSurveyState(decryptedSlice, {
+    previousStateSlice,
+    baselineSlice: sourceSlice,
+  });
 
   return {
     normalizedDecryptedSlice,
@@ -1311,9 +1138,11 @@ export const buildQuestionDecryptExecutionContext = ({
   const chainId = network?.id;
   const surveyId = resolveDecryptSurveyId(baselineForDecrypt, questionId);
   const resolvedQuestionPool =
-    (Array.isArray(questionPool) && questionPool.length > 0)
+    Array.isArray(questionPool) && questionPool.length > 0
       ? questionPool
-      : (Array.isArray(pileQuestions) ? pileQuestions : []);
+      : Array.isArray(pileQuestions)
+        ? pileQuestions
+        : [];
   const executionPlan = buildSurveyQuestionDecryptExecutionPlan({
     account,
     chainId,
@@ -1348,9 +1177,11 @@ export const buildSurveyDecryptExecutionContext = ({
   const chainId = network?.id;
   const surveyId = resolveDecryptSurveyId(sourceSlice, questionId);
   const poolForDecrypt =
-    (Array.isArray(questionPool) && questionPool.length > 0)
+    Array.isArray(questionPool) && questionPool.length > 0
       ? questionPool
-      : (Array.isArray(pileQuestions) ? pileQuestions : []);
+      : Array.isArray(pileQuestions)
+        ? pileQuestions
+        : [];
   const lit = litHooks && litHooks.getKey ? { getKey: litHooks.getKey } : undefined;
 
   return {
@@ -1373,21 +1204,10 @@ export const buildSurveyDecryptExecutionContext = ({
 };
 
 export const prepareQuestionDecryptAttempt = (
-  {
-    questionId,
-    fieldToDecrypt = 'both',
-    baselineForDecrypt,
-  } = {},
-  {
-    getQuestionFieldDecryptSelection,
-    buildQuestionDecryptExecutionContext,
-  } = {},
+  { questionId, fieldToDecrypt = 'both', baselineForDecrypt } = {},
+  { getQuestionFieldDecryptSelection, buildQuestionDecryptExecutionContext } = {},
 ) => {
-  const decryptSelection = getQuestionFieldDecryptSelection(
-    questionId,
-    fieldToDecrypt,
-    baselineForDecrypt,
-  );
+  const decryptSelection = getQuestionFieldDecryptSelection(questionId, fieldToDecrypt, baselineForDecrypt);
 
   if (!decryptSelection.hasMaskedField) {
     return {
@@ -1397,12 +1217,7 @@ export const prepareQuestionDecryptAttempt = (
     };
   }
 
-  const {
-    chainId,
-    lit,
-    opts,
-    target,
-  } = buildQuestionDecryptExecutionContext(baselineForDecrypt, questionId);
+  const { chainId, lit, opts, target } = buildQuestionDecryptExecutionContext(baselineForDecrypt, questionId);
   const requestPlan = buildSurveyQuestionDecryptRequestPlan({
     account: opts?.account,
     baselineForDecrypt,
@@ -1445,41 +1260,21 @@ export const finalizeQuestionDecryptAttempt = async (
     lit,
     opts,
   } = {},
-  {
-    decryptSingleField,
-    decryptQuestionRatingEnvelopes,
-  } = {},
+  { decryptSingleField, decryptQuestionRatingEnvelopes } = {},
 ) => {
   const qid = normalizeQuestionIdKey(questionId);
-  const decryptedStateSlice = await decryptSingleField(
-    baselineForDecrypt,
-    qid,
-    fieldToDecrypt,
-    opts,
-  );
+  const decryptedStateSlice = await decryptSingleField(baselineForDecrypt, qid, fieldToDecrypt, opts);
 
-  const producedAnswer = !!(
-    decryptedStateSlice.answers &&
-    decryptedStateSlice.answers[qid]
-  );
-  const producedAdditional = !!(
-    decryptedStateSlice.additionalComments &&
-    decryptedStateSlice.additionalComments[qid]
-  );
+  const producedAnswer = !!(decryptedStateSlice.answers && decryptedStateSlice.answers[qid]);
+  const producedAdditional = !!(decryptedStateSlice.additionalComments && decryptedStateSlice.additionalComments[qid]);
   const didUpdate = producedAnswer || producedAdditional;
 
-  const {
-    decryptedImportance,
-    decryptedConviction,
-  } = await decryptQuestionRatingEnvelopes(
-    ratingEnvelopes,
-    {
-      account,
-      chainId,
-      lit,
-      providerLike,
-    },
-  );
+  const { decryptedImportance, decryptedConviction } = await decryptQuestionRatingEnvelopes(ratingEnvelopes, {
+    account,
+    chainId,
+    lit,
+    providerLike,
+  });
 
   return {
     decryptedStateSlice,
@@ -1490,9 +1285,7 @@ export const finalizeQuestionDecryptAttempt = async (
 };
 
 export const ensureQuestionDecryptSliceShape = (responseSlice) => {
-  const base = responseSlice && typeof responseSlice === 'object'
-    ? responseSlice
-    : buildEmptyQuestionDecryptSlice();
+  const base = responseSlice && typeof responseSlice === 'object' ? responseSlice : buildEmptyQuestionDecryptSlice();
 
   return {
     ...base,
@@ -1505,15 +1298,12 @@ export const ensureQuestionDecryptSliceShape = (responseSlice) => {
 
 export const applyDecryptedQuestionResponseValues = (
   responseRecord,
-  {
-    questionId,
-    decryptedStateSlice,
-    decryptedImportance = null,
-    decryptedConviction = null,
-  } = {},
+  { questionId, decryptedStateSlice, decryptedImportance = null, decryptedConviction = null } = {},
 ) => {
   if (!responseRecord || typeof responseRecord !== 'object') return responseRecord;
-  const qid = String(questionId || '').trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   const next = { ...responseRecord };
   let changed = false;
 
@@ -1545,21 +1335,20 @@ export const applyDecryptedQuestionResponseValues = (
   return changed ? next : responseRecord;
 };
 
-export const applyDecryptedQuestionResponseValuesToContainer = (
-  viewedResponseContainer,
-  options = {},
-) => {
+export const applyDecryptedQuestionResponseValuesToContainer = (viewedResponseContainer, options = {}) => {
   if (!viewedResponseContainer || typeof viewedResponseContainer !== 'object') {
     return viewedResponseContainer;
   }
 
   if (Array.isArray(viewedResponseContainer.responses)) {
-    const qid = String(options?.questionId || '').trim().toLowerCase();
+    const qid = String(options?.questionId || '')
+      .trim()
+      .toLowerCase();
     let changed = false;
     const nextResponses = viewedResponseContainer.responses.map((responseRecord) => {
-      const rid = String(
-        responseRecord?.questionID || responseRecord?.questionId || '',
-      ).trim().toLowerCase();
+      const rid = String(responseRecord?.questionID || responseRecord?.questionId || '')
+        .trim()
+        .toLowerCase();
       if (qid && rid !== qid) return responseRecord;
       const nextResponseRecord = applyDecryptedQuestionResponseValues(responseRecord, options);
       changed = changed || nextResponseRecord !== responseRecord;
@@ -1582,29 +1371,23 @@ export const buildViewedResponseDecryptSuccessState = (
     decryptedConviction = null,
   } = {},
 ) => {
-  const nextViewed = applyDecryptedQuestionResponseValuesToContainer(
-    prevState?.parsedViewAddressAnswers,
-    {
-      questionId,
-      decryptedStateSlice,
-      decryptedImportance,
-      decryptedConviction,
-    },
-  );
+  const nextViewed = applyDecryptedQuestionResponseValuesToContainer(prevState?.parsedViewAddressAnswers, {
+    questionId,
+    decryptedStateSlice,
+    decryptedImportance,
+    decryptedConviction,
+  });
 
-  const viewAddressAnswers = nextViewed && nextViewed !== prevState?.parsedViewAddressAnswers
-    ? JSON.stringify(nextViewed)
-    : prevState?.viewAddressAnswers;
+  const viewAddressAnswers =
+    nextViewed && nextViewed !== prevState?.parsedViewAddressAnswers
+      ? JSON.stringify(nextViewed)
+      : prevState?.viewAddressAnswers;
 
   return {
     parsedViewAddressAnswers: nextViewed,
     viewAddressAnswers,
     isDecrypting: false,
-    decryptingByKey: clearQuestionFieldBusyMap(
-      prevState?.decryptingByKey,
-      questionId,
-      clearMode,
-    ),
+    decryptingByKey: clearQuestionFieldBusyMap(prevState?.decryptingByKey, questionId, clearMode),
     ...(didUpdate ? {} : { submissionError: 'Decryption failed.' }),
   };
 };
@@ -1619,7 +1402,9 @@ export const applyDecryptedQuestionStateToSurveySlice = (
     decryptedConviction = null,
   } = {},
 ) => {
-  const qid = String(questionId || '').trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   if (!qid) return targetStateSlice;
 
   const nextTargetStateSlice = {
@@ -1633,15 +1418,13 @@ export const applyDecryptedQuestionStateToSurveySlice = (
     nextTargetStateSlice.answers[qid] = {
       ...(nextTargetStateSlice.answers[qid] || {}),
       value: incoming.value,
-      encrypted: (typeof prevEncrypted === 'boolean')
-        ? prevEncrypted
-        : !!(
-            baselineSlice?.answers?.[qid]?.value === '*' &&
-            (
-              baselineSlice?.answers?.[qid]?.encryptedPortion ||
-              baselineSlice?.answers?.[qid]?.encrypted
-            )
-          ),
+      encrypted:
+        typeof prevEncrypted === 'boolean'
+          ? prevEncrypted
+          : !!(
+              baselineSlice?.answers?.[qid]?.value === '*' &&
+              (baselineSlice?.answers?.[qid]?.encryptedPortion || baselineSlice?.answers?.[qid]?.encrypted)
+            ),
       ...(incoming.zkSalt ? { zkSalt: incoming.zkSalt } : {}),
     };
   }
@@ -1655,15 +1438,14 @@ export const applyDecryptedQuestionStateToSurveySlice = (
     nextTargetStateSlice.additionalComments[qid] = {
       ...(nextTargetStateSlice.additionalComments[qid] || {}),
       value: incoming.value,
-      encrypted: (typeof prevEncrypted === 'boolean')
-        ? prevEncrypted
-        : !!(
-            baselineSlice?.additionalComments?.[qid]?.value === '*' &&
-            (
-              baselineSlice?.additionalComments?.[qid]?.encryptedPortion ||
-              baselineSlice?.additionalComments?.[qid]?.encrypted
-            )
-          ),
+      encrypted:
+        typeof prevEncrypted === 'boolean'
+          ? prevEncrypted
+          : !!(
+              baselineSlice?.additionalComments?.[qid]?.value === '*' &&
+              (baselineSlice?.additionalComments?.[qid]?.encryptedPortion ||
+                baselineSlice?.additionalComments?.[qid]?.encrypted)
+            ),
       ...(incoming.zkSalt ? { zkSalt: incoming.zkSalt } : {}),
     };
   }
@@ -1714,11 +1496,7 @@ export const buildSelfQuestionDecryptSuccessState = (
     displayAnswerMode: false,
     isDecrypting: false,
     suppressPrefill: true,
-    decryptingByKey: clearQuestionFieldBusyMap(
-      prevState?.decryptingByKey,
-      questionId,
-      clearMode,
-    ),
+    decryptingByKey: clearQuestionFieldBusyMap(prevState?.decryptingByKey, questionId, clearMode),
     editBaseline: syncDecryptedQuestionIntoBaseline(
       prevState?.editBaseline,
       baselineSlice,
@@ -1737,12 +1515,7 @@ export const buildSelfQuestionDecryptSuccessState = (
 
 export const buildSurveyDecryptSuccessState = (
   prevState,
-  {
-    surveyIndex = 0,
-    decryptedSlice = {},
-    decryptedImportanceFromEnv = {},
-    decryptedConvictionFromEnv = {},
-  } = {},
+  { surveyIndex = 0, decryptedSlice = {}, decryptedImportanceFromEnv = {}, decryptedConvictionFromEnv = {} } = {},
   deepClone = (value) => value,
 ) => {
   const surveysResponseStateCopy = [...(prevState?.surveysResponseState || [])];
@@ -1802,10 +1575,7 @@ export const buildSurveyDecryptSuccessState = (
 
 export const normalizeBulkDecryptedSliceForSurveyState = (
   decryptedSlice = {},
-  {
-    previousStateSlice = null,
-    baselineSlice = null,
-  } = {},
+  { previousStateSlice = null, baselineSlice = null } = {},
 ) => {
   const nextDecryptedSlice = {
     ...(decryptedSlice || {}),
@@ -1818,15 +1588,14 @@ export const normalizeBulkDecryptedSliceForSurveyState = (
     const prevEncrypted = previousStateSlice?.answers?.[questionId]?.encrypted;
     nextDecryptedSlice.answers[questionId] = {
       ...nextAnswer,
-      encrypted: (typeof prevEncrypted === 'boolean')
-        ? prevEncrypted
-        : !!(
-            baselineSlice?.answers?.[questionId]?.value === '*' &&
-            (
-              baselineSlice?.answers?.[questionId]?.encryptedPortion ||
-              baselineSlice?.answers?.[questionId]?.encrypted
-            )
-          ),
+      encrypted:
+        typeof prevEncrypted === 'boolean'
+          ? prevEncrypted
+          : !!(
+              baselineSlice?.answers?.[questionId]?.value === '*' &&
+              (baselineSlice?.answers?.[questionId]?.encryptedPortion ||
+                baselineSlice?.answers?.[questionId]?.encrypted)
+            ),
     };
   });
 
@@ -1835,15 +1604,14 @@ export const normalizeBulkDecryptedSliceForSurveyState = (
     const prevEncrypted = previousStateSlice?.additionalComments?.[questionId]?.encrypted;
     nextDecryptedSlice.additionalComments[questionId] = {
       ...nextAdditional,
-      encrypted: (typeof prevEncrypted === 'boolean')
-        ? prevEncrypted
-        : !!(
-            baselineSlice?.additionalComments?.[questionId]?.value === '*' &&
-            (
-              baselineSlice?.additionalComments?.[questionId]?.encryptedPortion ||
-              baselineSlice?.additionalComments?.[questionId]?.encrypted
-            )
-          ),
+      encrypted:
+        typeof prevEncrypted === 'boolean'
+          ? prevEncrypted
+          : !!(
+              baselineSlice?.additionalComments?.[questionId]?.value === '*' &&
+              (baselineSlice?.additionalComments?.[questionId]?.encryptedPortion ||
+                baselineSlice?.additionalComments?.[questionId]?.encrypted)
+            ),
     };
   });
 
@@ -1854,20 +1622,15 @@ export const syncDecryptedQuestionIntoBaseline = (
   editBaseline,
   fallbackBaseline,
   nextTargetStateSlice,
-  {
-    questionId,
-    decryptedStateSlice,
-    decryptedImportance = null,
-    decryptedConviction = null,
-  } = {},
+  { questionId, decryptedStateSlice, decryptedImportance = null, decryptedConviction = null } = {},
   deepClone = (value) => value,
 ) => {
-  const qid = String(questionId || '').trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   let nextBaseline = editBaseline
     ? deepClone(editBaseline)
-    : deepClone(
-      fallbackBaseline || buildEmptyQuestionDecryptSlice(),
-    );
+    : deepClone(fallbackBaseline || buildEmptyQuestionDecryptSlice());
 
   if (!qid) return nextBaseline;
 
@@ -1878,9 +1641,7 @@ export const syncDecryptedQuestionIntoBaseline = (
     nextBaseline.answers[qid] = deepClone(nextTargetStateSlice.answers?.[qid]);
   }
   if (decryptedStateSlice?.additionalComments?.[qid]) {
-    nextBaseline.additionalComments[qid] = deepClone(
-      nextTargetStateSlice.additionalComments?.[qid],
-    );
+    nextBaseline.additionalComments[qid] = deepClone(nextTargetStateSlice.additionalComments?.[qid]);
   }
   if (decryptedImportance !== null && decryptedImportance !== undefined) {
     nextBaseline.importance = nextBaseline.importance || {};
@@ -1900,12 +1661,13 @@ export const mergeLatestEncryptedQuestionFields = (
   latestResponse,
   { includeAnswer = false, includeAdditional = false } = {},
 ) => {
-  const qid = String(questionId || '').trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   if (!qid || !latestResponse || typeof latestResponse !== 'object') return responseSlice;
 
-  let nextResponseSlice = responseSlice && typeof responseSlice === 'object'
-    ? { ...responseSlice }
-    : { answers: {}, additionalComments: {} };
+  let nextResponseSlice =
+    responseSlice && typeof responseSlice === 'object' ? { ...responseSlice } : { answers: {}, additionalComments: {} };
 
   if (includeAnswer && latestResponse.answer?.encryptedPortion) {
     nextResponseSlice.answers = { ...(nextResponseSlice.answers || {}) };
@@ -1921,10 +1683,7 @@ export const mergeLatestEncryptedQuestionFields = (
     nextResponseSlice.additionalComments = { ...(nextResponseSlice.additionalComments || {}) };
     nextResponseSlice.additionalComments[qid] = {
       ...(nextResponseSlice.additionalComments[qid] || { value: '*', encrypted: true, hash: '' }),
-      encrypted: !!(
-        latestResponse.additional.encrypted ||
-        nextResponseSlice.additionalComments?.[qid]?.encrypted
-      ),
+      encrypted: !!(latestResponse.additional.encrypted || nextResponseSlice.additionalComments?.[qid]?.encrypted),
       hash: latestResponse.additional.hash || nextResponseSlice.additionalComments?.[qid]?.hash || '',
       encryptedPortion: latestResponse.additional.encryptedPortion,
     };
@@ -1933,19 +1692,16 @@ export const mergeLatestEncryptedQuestionFields = (
   return nextResponseSlice;
 };
 
-export const mergeQuestionResponseOverrideIntoDecryptSlice = (
-  responseSlice,
-  questionId,
-  responseOverride,
-) => {
-  const qid = String(questionId || '').trim().toLowerCase();
+export const mergeQuestionResponseOverrideIntoDecryptSlice = (responseSlice, questionId, responseOverride) => {
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   if (!qid || !responseOverride || typeof responseOverride !== 'object') return responseSlice;
 
   const ans = responseOverride.answer || {};
   const add = responseOverride.additional || {};
-  const nextResponseSlice = responseSlice && typeof responseSlice === 'object'
-    ? { ...responseSlice }
-    : { answers: {}, additionalComments: {} };
+  const nextResponseSlice =
+    responseSlice && typeof responseSlice === 'object' ? { ...responseSlice } : { answers: {}, additionalComments: {} };
 
   nextResponseSlice.answers = { ...(nextResponseSlice.answers || {}) };
   nextResponseSlice.additionalComments = { ...(nextResponseSlice.additionalComments || {}) };
@@ -1960,11 +1716,7 @@ export const mergeQuestionResponseOverrideIntoDecryptSlice = (
   nextResponseSlice.additionalComments[qid] = {
     ...(nextResponseSlice.additionalComments[qid] || {}),
     ...(Object.prototype.hasOwnProperty.call(add, 'value') ? { value: add.value } : {}),
-    encrypted: !!(
-      add.encrypted ||
-      add.encryptedPortion ||
-      nextResponseSlice.additionalComments?.[qid]?.encrypted
-    ),
+    encrypted: !!(add.encrypted || add.encryptedPortion || nextResponseSlice.additionalComments?.[qid]?.encrypted),
     ...(add.hash ? { hash: add.hash } : {}),
     ...(add.encryptedPortion ? { encryptedPortion: add.encryptedPortion } : {}),
   };
@@ -1975,24 +1727,30 @@ export const mergeQuestionResponseOverrideIntoDecryptSlice = (
 export const getQuestionRatingEnvelopes = (source, questionId = null) => {
   if (!source || typeof source !== 'object') return null;
 
-  const qid = String(questionId || '').trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   let target = source;
 
   if (Array.isArray(source.responses)) {
-    target = source.responses.find(
-      (response) => String(response?.questionID || response?.questionId || '').trim().toLowerCase() === qid,
-    ) || null;
+    target =
+      source.responses.find(
+        (response) =>
+          String(response?.questionID || response?.questionId || '')
+            .trim()
+            .toLowerCase() === qid,
+      ) || null;
   } else if (qid) {
-    const sourceId = String(source.questionID || source.questionId || '').trim().toLowerCase();
+    const sourceId = String(source.questionID || source.questionId || '')
+      .trim()
+      .toLowerCase();
     if (sourceId && sourceId !== qid) return null;
   }
 
   if (!target || typeof target !== 'object') return null;
 
-  const importanceEncrypted =
-    typeof target.importanceEncrypted === 'string' ? target.importanceEncrypted : '';
-  const convictionEncrypted =
-    typeof target.convictionEncrypted === 'string' ? target.convictionEncrypted : '';
+  const importanceEncrypted = typeof target.importanceEncrypted === 'string' ? target.importanceEncrypted : '';
+  const convictionEncrypted = typeof target.convictionEncrypted === 'string' ? target.convictionEncrypted : '';
 
   if (!importanceEncrypted && !convictionEncrypted) return null;
   return { importanceEncrypted, convictionEncrypted };
@@ -2009,12 +1767,10 @@ export const mergeQuestionRatingEnvelopeState = (previousState, nextSource, ques
   };
 };
 
-export const buildViewedResponseDecryptBaseline = (
-  responseOverride,
-  questionId,
-  buildSliceFromUserAnswers,
-) => {
-  const qid = String(questionId || '').trim().toLowerCase();
+export const buildViewedResponseDecryptBaseline = (responseOverride, questionId, buildSliceFromUserAnswers) => {
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   if (!qid || !responseOverride || typeof responseOverride !== 'object') {
     return buildEmptyQuestionDecryptSlice();
   }
@@ -2046,8 +1802,6 @@ export const buildSelfQuestionDecryptBaseline = (
   }
   return {
     baselineSlice,
-    baselineForDecrypt: deepClone(
-      ensureQuestionDecryptSliceShape(baselineSlice),
-    ),
+    baselineForDecrypt: deepClone(ensureQuestionDecryptSliceShape(baselineSlice)),
   };
 };

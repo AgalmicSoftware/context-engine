@@ -34,38 +34,35 @@ type SingleQuestionResponsePayload = UnknownRecord & {
   ts?: unknown;
 };
 
-type QuestionsCache = Record<string, {
-  questionResponses?: Record<string, Record<string, SingleQuestionResponsePayload>>;
-  questionResponsesMeta?: Record<string, Record<string, UnknownRecord>>;
-} & UnknownRecord>;
+type QuestionsCache = Record<
+  string,
+  {
+    questionResponses?: Record<string, Record<string, SingleQuestionResponsePayload>>;
+    questionResponsesMeta?: Record<string, Record<string, UnknownRecord>>;
+  } & UnknownRecord
+>;
 
 type SetStateUpdate =
-  | Record<string, unknown>
-  | null
-  | ((prevState: SurveyToolLikeState) => Record<string, unknown> | null);
+  Record<string, unknown> | null | ((prevState: SurveyToolLikeState) => Record<string, unknown> | null);
 type SafeSetState = (update: SetStateUpdate) => unknown;
 
-const isObjectRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isObjectRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const asSingleQuestionResponse = (value: unknown): SingleQuestionResponsePayload | null => (
-  isObjectRecord(value) ? value as SingleQuestionResponsePayload : null
-);
+const asSingleQuestionResponse = (value: unknown): SingleQuestionResponsePayload | null =>
+  isObjectRecord(value) ? (value as SingleQuestionResponsePayload) : null;
 
 const hasEncryptedResponseFields = (response: unknown) => {
   const responsePayload = asSingleQuestionResponse(response);
   return !!(
-    responsePayload?.answer?.encryptedPortion
-    || responsePayload?.additional?.encryptedPortion
-    || responsePayload?.answer?.encrypted
-    || responsePayload?.additional?.encrypted
+    responsePayload?.answer?.encryptedPortion ||
+    responsePayload?.additional?.encryptedPortion ||
+    responsePayload?.answer?.encrypted ||
+    responsePayload?.additional?.encrypted
   );
 };
 
-const asQuestionsCache = (value: unknown): QuestionsCache => (
-  isObjectRecord(value) ? value as QuestionsCache : {}
-);
+const asQuestionsCache = (value: unknown): QuestionsCache => (isObjectRecord(value) ? (value as QuestionsCache) : {});
 
 export const readSingleQuestionCachedResponderResponse = ({
   responder = '',
@@ -172,11 +169,9 @@ export const writeSingleQuestionResponseToCache = async ({
   const currentCache = ensureQuestionsNet(await readQuestionsCacheAsync(slug), netId);
   currentCache[netId] = currentCache[netId] || {};
   currentCache[netId].questionResponses = currentCache[netId].questionResponses || {};
-  currentCache[netId].questionResponses[qid] =
-    currentCache[netId].questionResponses[qid] || {};
+  currentCache[netId].questionResponses[qid] = currentCache[netId].questionResponses[qid] || {};
   currentCache[netId].questionResponsesMeta = currentCache[netId].questionResponsesMeta || {};
-  currentCache[netId].questionResponsesMeta[qid] =
-    currentCache[netId].questionResponsesMeta[qid] || {};
+  currentCache[netId].questionResponsesMeta[qid] = currentCache[netId].questionResponsesMeta[qid] || {};
 
   const prev = currentCache[netId].questionResponsesMeta[qid][addr] || { bn: 0, txi: 0, li: 0, ts: 0 };
   const prevBn = Number(prev?.bn ?? prev?.blockNumber ?? 0) || 0;
@@ -188,23 +183,8 @@ export const writeSingleQuestionResponseToCache = async ({
   const li = Number(respObj?.logIndex ?? respObj?.li ?? 0) || 0;
   const ts = Number(respObj?.timestamp ?? respObj?.ts ?? 0) || 0;
   const isStaleResponse =
-    bn < prevBn
-    || (
-      bn === prevBn
-      && (
-        txi < prevTxi
-        || (
-          txi === prevTxi
-          && (
-            li < prevLi
-            || (
-              li === prevLi
-              && ts <= prevTs
-            )
-          )
-        )
-      )
-    );
+    bn < prevBn ||
+    (bn === prevBn && (txi < prevTxi || (txi === prevTxi && (li < prevLi || (li === prevLi && ts <= prevTs)))));
   if (isStaleResponse) return currentCache;
 
   currentCache[netId].questionResponses[qid][addr] = respObj;
@@ -371,14 +351,10 @@ export const executeViewedSingleQuestionResponseBootstrap = async ({
     const didScheduleRetry = scheduleRetry({
       questionId: qid,
       attempt: bootstrapRetryAttempt,
-      reason: responseFetchFailed
-        ? 'response-payload-fetch-failed'
-        : 'response-payload-pending',
+      reason: responseFetchFailed ? 'response-payload-fetch-failed' : 'response-payload-pending',
     });
     updateSingleQuestionDebug({
-      phase: didScheduleRetry
-        ? 'responder-hash-no-payload-retrying'
-        : 'responder-hash-no-payload-exhausted',
+      phase: didScheduleRetry ? 'responder-hash-no-payload-retrying' : 'responder-hash-no-payload-exhausted',
       runId,
       questionId: qid,
       effectiveSingleSlug: String(effectiveSingleSlug || ''),
@@ -424,9 +400,9 @@ export const executeViewedSingleQuestionResponseBootstrap = async ({
   }
 
   const isOwn = !!(
-    nextProps.account
-    && nextProps.responderAddress
-    && String(nextProps.account).toLowerCase() === String(nextProps.responderAddress).toLowerCase()
+    nextProps.account &&
+    nextProps.responderAddress &&
+    String(nextProps.account).toLowerCase() === String(nextProps.responderAddress).toLowerCase()
   );
 
   if (isOwn && latest && !nextState.startFresh && !nextState.suppressPrefill) {
@@ -457,7 +433,7 @@ export const executeViewedSingleQuestionResponseBootstrap = async ({
   safeSetState({ isLoadingResponse: false });
   return {
     applied: true,
-    reason: latest ? 'loaded' : (responseHash ? 'hash-only' : 'no-response'),
+    reason: latest ? 'loaded' : responseHash ? 'hash-only' : 'no-response',
     latest,
   };
 };

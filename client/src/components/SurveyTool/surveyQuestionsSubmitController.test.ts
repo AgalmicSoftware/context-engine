@@ -10,9 +10,7 @@ import {
   type SurveyQuestionsSubmitCompletionPorts,
   type SurveyQuestionsSubmitControllerPorts,
 } from './surveyQuestionsSubmitController';
-import type {
-  SurveyQuestionsPrimarySubmitPlan,
-} from './surveyQuestionsTypes';
+import type { SurveyQuestionsPrimarySubmitPlan } from './surveyQuestionsTypes';
 
 const createPorts = (): Required<SurveyQuestionsSubmitControllerPorts> => ({
   activateSubmitGuard: jest.fn(),
@@ -20,40 +18,51 @@ const createPorts = (): Required<SurveyQuestionsSubmitControllerPorts> => ({
   navigateToResponse: jest.fn(),
 });
 
-const createCompletionPorts = (events: string[] = []) => ({
-  clearSubmitGuard: jest.fn(() => events.push('clear-submit-guard')),
-  finishSubmitAttempt: jest.fn(() => events.push('finish-submit-attempt')),
-  setSubmitFailureState: jest.fn(() => events.push('set-submit-failure-state')),
-  setSubmitSuccessState: jest.fn((_state, afterStateApplied) => {
-    events.push('set-submit-success-state');
-    if (afterStateApplied) afterStateApplied();
-  }),
-  cacheWrite: jest.fn(),
-  decrypt: jest.fn(),
-  storageWrite: jest.fn(),
-  workerSubmit: jest.fn(),
-} as SurveyQuestionsSubmitCompletionPorts & {
-  cacheWrite: jest.Mock;
-  decrypt: jest.Mock;
-  storageWrite: jest.Mock;
-  workerSubmit: jest.Mock;
-});
+const createCompletionPorts = (events: string[] = []) =>
+  ({
+    clearSubmitGuard: jest.fn(() => events.push('clear-submit-guard')),
+    finishSubmitAttempt: jest.fn(() => events.push('finish-submit-attempt')),
+    setSubmitFailureState: jest.fn(() => events.push('set-submit-failure-state')),
+    setSubmitSuccessState: jest.fn((_state, afterStateApplied) => {
+      events.push('set-submit-success-state');
+      if (afterStateApplied) afterStateApplied();
+    }),
+    cacheWrite: jest.fn(),
+    decrypt: jest.fn(),
+    storageWrite: jest.fn(),
+    workerSubmit: jest.fn(),
+  }) as SurveyQuestionsSubmitCompletionPorts & {
+    cacheWrite: jest.Mock;
+    decrypt: jest.Mock;
+    storageWrite: jest.Mock;
+    workerSubmit: jest.Mock;
+  };
 
 describe('surveyQuestionsSubmitController', () => {
   it('falls back to the explicit session route when pile submit has no draft slug', () => {
-    expect(resolveSubmitEffectiveDraftSlug({
-      draftSlug: '',
-      routeSlug: ' demo-1 ',
-      normalizeSlug: (value) => String(value ?? '').trim().toLowerCase(),
-    })).toBe('demo-1');
+    expect(
+      resolveSubmitEffectiveDraftSlug({
+        draftSlug: '',
+        routeSlug: ' demo-1 ',
+        normalizeSlug: (value) =>
+          String(value ?? '')
+            .trim()
+            .toLowerCase(),
+      }),
+    ).toBe('demo-1');
   });
 
   it('keeps the id-derived draft slug ahead of the route slug for cross-session question submits', () => {
-    expect(resolveSubmitEffectiveDraftSlug({
-      draftSlug: 'question-session',
-      routeSlug: 'route-session',
-      normalizeSlug: (value) => String(value ?? '').trim().toLowerCase(),
-    })).toBe('question-session');
+    expect(
+      resolveSubmitEffectiveDraftSlug({
+        draftSlug: 'question-session',
+        routeSlug: 'route-session',
+        normalizeSlug: (value) =>
+          String(value ?? '')
+            .trim()
+            .toLowerCase(),
+      }),
+    ).toBe('question-session');
   });
 
   it.each([
@@ -290,11 +299,7 @@ describe('surveyQuestionsSubmitController', () => {
       ports,
     });
 
-    expect(events).toEqual([
-      'clear-submit-guard',
-      'can-update-submit-state',
-      'is-submit-attempt-active',
-    ]);
+    expect(events).toEqual(['clear-submit-guard', 'can-update-submit-state', 'is-submit-attempt-active']);
     expect(ports.finishSubmitAttempt).not.toHaveBeenCalled();
     expect(ports.setSubmitStaleState).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -317,18 +322,22 @@ describe('surveyQuestionsSubmitController', () => {
   });
 
   it('falls back to parent pending stats when no stats port is available', () => {
-    expect(resolveSurveyQuestionsSubmitPendingStats({
-      fallbackTotal: 5,
-      fallbackEncrypted: 2,
-    })).toEqual({ total: 5, encrypted: 2 });
+    expect(
+      resolveSurveyQuestionsSubmitPendingStats({
+        fallbackTotal: 5,
+        fallbackEncrypted: 2,
+      }),
+    ).toEqual({ total: 5, encrypted: 2 });
   });
 
   it('falls back to parent pending stats when the stats port returns no data', () => {
-    expect(resolveSurveyQuestionsSubmitPendingStats({
-      getPendingEditStats: () => null,
-      fallbackTotal: 4,
-      fallbackEncrypted: 1,
-    })).toEqual({ total: 4, encrypted: 1 });
+    expect(
+      resolveSurveyQuestionsSubmitPendingStats({
+        getPendingEditStats: () => null,
+        fallbackTotal: 4,
+        fallbackEncrypted: 1,
+      }),
+    ).toEqual({ total: 4, encrypted: 1 });
   });
 
   it('uses injected pending stats when available', () => {
@@ -345,43 +354,51 @@ describe('surveyQuestionsSubmitController', () => {
   });
 
   it('resolves submitted response URLs for single-question and survey success states', () => {
-    expect(resolveSurveyQuestionsSubmittedResponseUrl({
-      account: '0xABC',
-      currentPathname: '/questions',
-      questionID: 'Q1',
-      singleQuestionMode: true,
-      submissionSlug: 'edge',
-    })).toBe('/question/q1?session=edge&responder=0xabc');
+    expect(
+      resolveSurveyQuestionsSubmittedResponseUrl({
+        account: '0xABC',
+        currentPathname: '/questions',
+        questionID: 'Q1',
+        singleQuestionMode: true,
+        submissionSlug: 'edge',
+      }),
+    ).toBe('/question/q1?session=edge&responder=0xabc');
 
-    expect(resolveSurveyQuestionsSubmittedResponseUrl({
-      account: '0xABC',
-      currentPathname: '/surveys',
-      singleQuestionMode: false,
-      submissionSlug: 'edge session',
-      surveyId: '0xSURVEY',
-    })).toBe('/survey/0xsurvey/0xabc?session=edge%20session');
+    expect(
+      resolveSurveyQuestionsSubmittedResponseUrl({
+        account: '0xABC',
+        currentPathname: '/surveys',
+        singleQuestionMode: false,
+        submissionSlug: 'edge session',
+        surveyId: '0xSURVEY',
+      }),
+    ).toBe('/survey/0xsurvey/0xabc?session=edge%20session');
   });
 
   it('keeps submitted response URL fallback behavior for standalone and malformed route inputs', () => {
     const logWarn = jest.fn();
 
-    expect(resolveSurveyQuestionsSubmittedResponseUrl({
-      account: '0xABC',
-      currentPathname: '/standalone',
-      isStandalone: true,
-      logWarn,
-      singleQuestionMode: false,
-      surveyId: '0xSURVEY',
-    })).toBe('/standalone');
+    expect(
+      resolveSurveyQuestionsSubmittedResponseUrl({
+        account: '0xABC',
+        currentPathname: '/standalone',
+        isStandalone: true,
+        logWarn,
+        singleQuestionMode: false,
+        surveyId: '0xSURVEY',
+      }),
+    ).toBe('/standalone');
     expect(logWarn).not.toHaveBeenCalled();
 
-    expect(resolveSurveyQuestionsSubmittedResponseUrl({
-      account: { address: '0xabc' },
-      currentPathname: '/fallback',
-      logWarn,
-      singleQuestionMode: false,
-      surveyId: '0xSURVEY',
-    })).toBe('/fallback');
+    expect(
+      resolveSurveyQuestionsSubmittedResponseUrl({
+        account: { address: '0xabc' },
+        currentPathname: '/fallback',
+        logWarn,
+        singleQuestionMode: false,
+        surveyId: '0xSURVEY',
+      }),
+    ).toBe('/fallback');
     expect(logWarn).toHaveBeenCalledTimes(1);
     expect(logWarn).toHaveBeenCalledWith('SurveyTool: fallback', expect.any(TypeError));
   });
@@ -472,11 +489,7 @@ describe('surveyQuestionsSubmitController', () => {
       ports,
     });
 
-    expect(events).toEqual([
-      'clear-submit-guard',
-      'finish-submit-attempt',
-      'set-submit-failure-state',
-    ]);
+    expect(events).toEqual(['clear-submit-guard', 'finish-submit-attempt', 'set-submit-failure-state']);
     expect(ports.clearSubmitGuard).toHaveBeenCalledTimes(1);
     expect(ports.finishSubmitAttempt).toHaveBeenCalledWith(9);
     expect(ports.setSubmitFailureState).toHaveBeenCalledTimes(1);

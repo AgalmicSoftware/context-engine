@@ -1,32 +1,19 @@
 import { createLogger } from 'utilities/logging.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
-import {
-  SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
-} from '../../utilities/sessionResultsExport';
-import {
-  SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS,
-} from './surveyResultsHtmlReportSelection.js';
-import {
-  SURVEY_RESULTS_EXPORT_TYPES,
-} from './surveyResultsExportPlans.js';
+import { SESSION_RESULTS_EXPORT_FORMAT_VIEWER } from '../../utilities/sessionResultsExport';
+import { SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS } from './surveyResultsHtmlReportSelection.js';
+import { SURVEY_RESULTS_EXPORT_TYPES } from './surveyResultsExportPlans.js';
 import { resolveSurveyResultsExplicitSessionSlug } from './surveyResultsSessionResolution.js';
 import {
   buildSurveyResultsBookmarksCacheReadRequest,
   selectSurveyResultsBookmarkLists,
 } from './surveyResultsBookmarkCacheReadPorts';
-import type {
-  SurveyResultsFilterState,
-  SurveyResultsProps,
-  SurveyResultsState,
-} from './SurveyResults';
+import type { SurveyResultsFilterState, SurveyResultsProps, SurveyResultsState } from './SurveyResults';
 
 const surveyLog = createLogger('surveys');
 
-export const preserveSurveyResultsFilterStateValue = (
-  value: unknown
-): SurveyResultsFilterState => (
-  (value || {}) as SurveyResultsFilterState
-);
+export const preserveSurveyResultsFilterStateValue = (value: unknown): SurveyResultsFilterState =>
+  (value || {}) as SurveyResultsFilterState;
 
 /**
  * State updates accepted by the survey results reducer: a (possibly partial)
@@ -36,25 +23,20 @@ export const preserveSurveyResultsFilterStateValue = (
  * passed without the asSurveyResultsStatePatch cast (class setState accepted
  * Pick-style partials and index-signature records natively).
  */
-export type SurveyResultsStatePatch =
-  | Partial<SurveyResultsState>
-  | Record<string, unknown>;
+export type SurveyResultsStatePatch = Partial<SurveyResultsState> | Record<string, unknown>;
 
 export type SurveyResultsStateUpdate =
-  | SurveyResultsStatePatch
-  | ((prevState: Readonly<SurveyResultsState>) => SurveyResultsStatePatch);
+  SurveyResultsStatePatch | ((prevState: Readonly<SurveyResultsState>) => SurveyResultsStatePatch);
 
 export const surveyResultsReducer = (
   prevState: SurveyResultsState,
-  update: SurveyResultsStateUpdate
+  update: SurveyResultsStateUpdate,
 ): SurveyResultsState => ({
   ...prevState,
   ...(typeof update === 'function' ? update(prevState) : update),
 });
 
-export const createInitialSurveyResultsState = (
-  props: SurveyResultsProps
-): SurveyResultsState => {
+export const createInitialSurveyResultsState = (props: SurveyResultsProps): SurveyResultsState => {
   const initialSlug = resolveSurveyResultsExplicitSessionSlug(props) ?? '';
   const bookmarksReadRequest = buildSurveyResultsBookmarksCacheReadRequest({ slug: initialSlug });
   let bookmarksCacheValue: unknown = null;
@@ -63,16 +45,14 @@ export const createInitialSurveyResultsState = (
     bookmarksCacheValue = peekCacheSync(
       bookmarksReadRequest.namespace,
       bookmarksReadRequest.slug,
-      bookmarksReadRequest.options
+      bookmarksReadRequest.options,
     );
   } catch (error) {
     surveyLog.error('[SurveyResults] Error reading bookmarksCache:', error);
     bookmarksCacheValue = null;
   }
-  const {
-    surveys: bootstrapSurveyIds,
-    questions: bootstrapQuestionIds,
-  } = selectSurveyResultsBookmarkLists(bookmarksCacheValue);
+  const { surveys: bootstrapSurveyIds, questions: bootstrapQuestionIds } =
+    selectSurveyResultsBookmarkLists(bookmarksCacheValue);
 
   return {
     responses: [],

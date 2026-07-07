@@ -13,10 +13,9 @@ type SurveyQuestionsAuthoringPanelProps = {
   onScrollToTop: () => void;
   onShowJsonAtBottom: () => void;
   renderedEditableQuestions?: React.ReactNode;
-  submitDisplayState?: Partial<Pick<
-    SurveyQuestionsSubmitFooterDisplayState,
-    'showInlineSubmit' | 'showTopInlineSubmit'
-  >>;
+  submitDisplayState?: Partial<
+    Pick<SurveyQuestionsSubmitFooterDisplayState, 'showInlineSubmit' | 'showTopInlineSubmit'>
+  >;
   submittedResponseView?: React.ReactNode;
   submitResponseButton?: React.ReactNode;
 };
@@ -31,36 +30,18 @@ const SurveyQuestionsAuthoringPanel = ({
   submittedResponseView = null,
   submitResponseButton = null,
 }: SurveyQuestionsAuthoringPanelProps): React.ReactElement => {
-  const {
-    showBackToTopControl = false,
-    showJsonControl = false,
-    showLockedQuestionsBanner = false,
-  } = displayState;
-  const {
-    showInlineSubmit = false,
-    showTopInlineSubmit = false,
-  } = submitDisplayState;
+  const { showBackToTopControl = false, showJsonControl = false, showLockedQuestionsBanner = false } = displayState;
+  const { showInlineSubmit = false, showTopInlineSubmit = false } = submitDisplayState;
 
   return (
     <>
       {showTopInlineSubmit && submitResponseButton}
-      {showJsonControl && (
-        <JsonIconButton
-          label=".json"
-          onClick={onShowJsonAtBottom}
-          title="View JSON"
-        />
-      )}
+      {showJsonControl && <JsonIconButton label=".json" onClick={onShowJsonAtBottom} title="View JSON" />}
       {showLockedQuestionsBanner && lockedQuestionsBanner}
       {renderedEditableQuestions}
       {showInlineSubmit && submitResponseButton}
       {showBackToTopControl && (
-        <JsonIconButton
-          label="Back to top"
-          icon={faCaretUp}
-          onClick={onScrollToTop}
-          title="Back to top"
-        />
+        <JsonIconButton label="Back to top" icon={faCaretUp} onClick={onScrollToTop} title="Back to top" />
       )}
       {submittedResponseView}
     </>

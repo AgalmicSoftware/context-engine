@@ -29,18 +29,17 @@ type RpcSummary = {
   message?: unknown;
 };
 
-const asRpcErrorLike = (value: unknown): RpcErrorLike => (
-  value && typeof value === 'object' ? value as RpcErrorLike : {}
-);
+const asRpcErrorLike = (value: unknown): RpcErrorLike =>
+  value && typeof value === 'object' ? (value as RpcErrorLike) : {};
 
 const buildUnsupportedConfiguredDeterministicFactoryError = (
   factoryAddress = '',
-  cause: unknown = null
+  cause: unknown = null,
 ): ErrorWithCode => {
   const factorySuffix = factoryAddress ? ` (${factoryAddress})` : '';
   const wrappedError = new Error(
     `This session's SBT factory${factorySuffix} does not support predictable-address deployment yet. ` +
-    'Turn off "Make address predictable before deploy", or switch to a newer SBT factory.'
+      'Turn off "Make address predictable before deploy", or switch to a newer SBT factory.',
   ) as ErrorWithCode;
   wrappedError.code = 'UNSUPPORTED_CONFIGURED_DETERMINISTIC_FACTORY';
   if (cause) wrappedError.cause = cause;
@@ -67,11 +66,7 @@ export const isUnsupportedConfiguredDeterministicFactoryError = (error: unknown)
       ) {
         sawRevert = true;
       }
-      if (
-        raw.includes('missing revert data') ||
-        raw.includes('"data":"0x"') ||
-        raw.includes('data="0x"')
-      ) {
+      if (raw.includes('missing revert data') || raw.includes('"data":"0x"') || raw.includes('data="0x"')) {
         sawEmptyData = true;
       }
       continue;
@@ -84,10 +79,7 @@ export const isUnsupportedConfiguredDeterministicFactoryError = (error: unknown)
 
     const code = toStr(currentError.code || nestedError.code).toUpperCase();
     const message = toStr(
-      currentError.message ||
-      currentError.reason ||
-      nestedError.message ||
-      nestedError.reason
+      currentError.message || currentError.reason || nestedError.message || nestedError.reason,
     ).toLowerCase();
     const body = toStr(currentError.body || nestedError.body).toLowerCase();
     const requestBody = toStr(currentError.requestBody || nestedError.requestBody).toLowerCase();
@@ -127,7 +119,7 @@ export const isUnsupportedConfiguredDeterministicFactoryError = (error: unknown)
 
 export const maybeWrapUnsupportedConfiguredDeterministicFactoryError = (
   error: unknown,
-  factoryAddress = ''
+  factoryAddress = '',
 ): unknown => {
   if (!isUnsupportedConfiguredDeterministicFactoryError(error)) return error;
   return buildUnsupportedConfiguredDeterministicFactoryError(factoryAddress, error);
@@ -139,12 +131,12 @@ export const extractEstimateErrorMessage = (err: unknown): string => {
   const data = asRpcErrorLike(error.data);
   return toStr(
     error.reason ||
-    error.errorName ||
-    nestedError.message ||
-    nestedError.reason ||
-    data.message ||
-    error.message ||
-    err
+      error.errorName ||
+      nestedError.message ||
+      nestedError.reason ||
+      data.message ||
+      error.message ||
+      err,
   );
 };
 
@@ -169,7 +161,9 @@ export const isNonexistentTokenError = (err: unknown): boolean => {
     toStr(nestedError.message),
     toStr(nestedError.reason),
     toStr(data.message),
-  ].join(' ').toLowerCase();
+  ]
+    .join(' ')
+    .toLowerCase();
   if (!haystack) return false;
   return NONEXISTENT_TOKEN_ERROR_PATTERNS.some((pattern) => haystack.includes(pattern));
 };
@@ -211,13 +205,7 @@ export const getUserFacingTransactionError = (err: unknown, maxLen = 180): strin
   const error = asRpcErrorLike(err);
   const nestedError = asRpcErrorLike(error.error);
   const data = asRpcErrorLike(error.data);
-  const rawMessage =
-    summary?.message ||
-    error.reason ||
-    nestedError.message ||
-    data.message ||
-    error.message ||
-    err;
+  const rawMessage = summary?.message || error.reason || nestedError.message || data.message || error.message || err;
   return truncateRpcString(toStr(rawMessage).replace(/\s+/g, ' ').trim() || 'Unknown error.', maxLen);
 };
 

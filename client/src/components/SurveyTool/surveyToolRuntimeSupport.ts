@@ -10,11 +10,8 @@ type SurveyRuntimeGlobal = typeof globalThis & {
   __CE_PERF_COUNTERS__?: SurveyPerfCounters | unknown;
 };
 
-const getSurveyRuntimeGlobal = (): SurveyRuntimeGlobal | null => (
-  typeof globalThis !== 'undefined'
-    ? globalThis as unknown as SurveyRuntimeGlobal
-    : null
-);
+const getSurveyRuntimeGlobal = (): SurveyRuntimeGlobal | null =>
+  typeof globalThis !== 'undefined' ? (globalThis as unknown as SurveyRuntimeGlobal) : null;
 
 export const surveyLog = createLogger('surveys');
 export const GATE_SBT_HYDRATION_RETRY_MS = 45 * 1000;
@@ -33,10 +30,11 @@ export const QUESTION_TAG_DROPDOWN_ROW_STYLE = {
 export const isSurveyPerfCountersEnabled = (): boolean => {
   try {
     const runtimeGlobal = getSurveyRuntimeGlobal();
-    return !!runtimeGlobal && (
-      runtimeGlobal.ENABLE_CE_UI_PERF_STATS === true ||
-      runtimeGlobal.ENABLE_CE_DEBUG_COUNTERS === true ||
-      runtimeGlobal.__CE_DEBUG_COUNTERS__ === true
+    return (
+      !!runtimeGlobal &&
+      (runtimeGlobal.ENABLE_CE_UI_PERF_STATS === true ||
+        runtimeGlobal.ENABLE_CE_DEBUG_COUNTERS === true ||
+        runtimeGlobal.__CE_DEBUG_COUNTERS__ === true)
     );
   } catch (_) {
     return false;
@@ -52,10 +50,7 @@ export const bumpSurveyPerfCounter = (key: unknown, inc: unknown = 1): void => {
       runtimeGlobal.__CE_PERF_COUNTERS__ = {};
     }
     const counters = runtimeGlobal.__CE_PERF_COUNTERS__ as SurveyPerfCounters;
-    if (
-      !counters[SURVEY_TOOL_PERF_SCOPE] ||
-      typeof counters[SURVEY_TOOL_PERF_SCOPE] !== 'object'
-    ) {
+    if (!counters[SURVEY_TOOL_PERF_SCOPE] || typeof counters[SURVEY_TOOL_PERF_SCOPE] !== 'object') {
       counters[SURVEY_TOOL_PERF_SCOPE] = {};
     }
     const scope = counters[SURVEY_TOOL_PERF_SCOPE];

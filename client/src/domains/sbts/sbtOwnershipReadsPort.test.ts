@@ -1,11 +1,7 @@
 import type { SbtOwnershipReadsPort } from './sbtPorts.js';
 import { bindSbtOwnershipReadsPort } from './sbtOwnershipReadsPort.js';
 
-const readSbtOwnershipSnapshot = async (
-  port: SbtOwnershipReadsPort,
-  sbtAddress: string,
-  sessionSlug: string,
-) => {
+const readSbtOwnershipSnapshot = async (port: SbtOwnershipReadsPort, sbtAddress: string, sessionSlug: string) => {
   const [owner, tokenId, historySummary] = await Promise.all([
     port.getOwnerByTokenId('none', sbtAddress, '3', sessionSlug),
     port.getSBTTokenIdByOwner('none', sbtAddress, '0x0000000000000000000000000000000000000002', sessionSlug),
@@ -56,19 +52,23 @@ describe('SbtOwnershipReadsPort', () => {
       chainGateway: () => currentChainGateway,
     });
 
-    await expect(port.getOwnerByTokenId('none', '0x0000000000000000000000000000000000000001', '7', 'alpha'))
-      .resolves.toBe('0x0000000000000000000000000000000000000003');
+    await expect(
+      port.getOwnerByTokenId('none', '0x0000000000000000000000000000000000000001', '7', 'alpha'),
+    ).resolves.toBe('0x0000000000000000000000000000000000000003');
 
     currentChainGateway = secondChainGateway;
 
-    await expect(port.getSBTTokenIdByOwner(
-      'none',
-      '0x0000000000000000000000000000000000000002',
-      '0x0000000000000000000000000000000000000005',
-      'beta',
-    )).resolves.toBe('9');
-    await expect(port.getSbtHistorySummary('none', '0x0000000000000000000000000000000000000002', 'beta'))
-      .resolves.toEqual({ totalMinted: '10' });
+    await expect(
+      port.getSBTTokenIdByOwner(
+        'none',
+        '0x0000000000000000000000000000000000000002',
+        '0x0000000000000000000000000000000000000005',
+        'beta',
+      ),
+    ).resolves.toBe('9');
+    await expect(
+      port.getSbtHistorySummary('none', '0x0000000000000000000000000000000000000002', 'beta'),
+    ).resolves.toEqual({ totalMinted: '10' });
 
     expect(firstChainGateway.getOwnerByTokenId).toHaveBeenCalledWith(
       'none',

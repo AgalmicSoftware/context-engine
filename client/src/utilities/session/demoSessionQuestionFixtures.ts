@@ -36,25 +36,29 @@ const uniqueStrings = (values: unknown[]): string[] => {
   return out;
 };
 
-const splitSources = (value: unknown): string[] => (
+const splitSources = (value: unknown): string[] =>
   String(value || '')
     .split(',')
     .map((source) => source.trim())
-    .filter(Boolean)
-);
+    .filter(Boolean);
 
 const buildDemoQuestionFromComment = (
   comment: DemoComment,
   index: number,
   sessionConfig: DemoSessionConfig = {},
-  onchainQuestionId: unknown = ''
+  onchainQuestionId: unknown = '',
 ): DemoQuestion | null => {
   const sourceCommentId = String(comment?.commentId || '').trim();
   const prompt = String(comment?.commentBody || '').trim();
   if (!sourceCommentId || !prompt) return null;
 
-  const canonicalQuestionId = String(onchainQuestionId || '').trim().toLowerCase();
-  const fixtureType = String(comment?.type || '').trim().toLowerCase() || 'freeform';
+  const canonicalQuestionId = String(onchainQuestionId || '')
+    .trim()
+    .toLowerCase();
+  const fixtureType =
+    String(comment?.type || '')
+      .trim()
+      .toLowerCase() || 'freeform';
   const type = fixtureType === 'poll' ? 'multichoice' : fixtureType;
   const question: DemoQuestion = {
     id: canonicalQuestionId || ethers.utils.id(`${TEMPORARY_DEMO_QUESTION_SLUG}:${sourceCommentId}`),
@@ -103,7 +107,7 @@ const buildDemoQuestionFromComment = (
 
 export const getTemporaryDemoSessionQuestionFixtures = (
   slugIn: unknown,
-  sessionConfig: DemoSessionConfig = {}
+  sessionConfig: DemoSessionConfig = {},
 ): DemoQuestion[] => {
   const slug = normalizeSessionSlug(slugIn);
   if (slug !== TEMPORARY_DEMO_QUESTION_SLUG) return [];

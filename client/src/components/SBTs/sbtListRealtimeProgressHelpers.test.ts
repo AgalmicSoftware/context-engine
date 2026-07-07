@@ -6,29 +6,31 @@ import { SBT_LIST_NO_SESSION_UNIVERSE_SLUG } from './sbtListSessionUniverseHelpe
 
 describe('sbtListRealtimeProgressHelpers', () => {
   it('normalizes realtime progress inputs without deciding listener ownership', () => {
-    expect(buildSbtListRealtimeProgressInputPlan({
-      nowMs: 1234.9,
-      progressBySlug: {
-        '': {
-          currentBlock: '50.2',
-          latestBlock: '75.7',
+    expect(
+      buildSbtListRealtimeProgressInputPlan({
+        nowMs: 1234.9,
+        progressBySlug: {
+          '': {
+            currentBlock: '50.2',
+            latestBlock: '75.7',
+          },
+          Alpha: {
+            currentBlock: '100.8',
+            latestBlock: '120.4',
+            phase: 'scan',
+          },
+          beta: {
+            currentBlock: 0,
+            latestBlock: 0,
+          },
+          Gamma: 'not-progress',
+          [SBT_LIST_NO_SESSION_UNIVERSE_SLUG]: {
+            currentBlock: 4,
+            latestBlock: 5,
+          },
         },
-        Alpha: {
-          currentBlock: '100.8',
-          latestBlock: '120.4',
-          phase: 'scan',
-        },
-        beta: {
-          currentBlock: 0,
-          latestBlock: 0,
-        },
-        Gamma: 'not-progress',
-        [SBT_LIST_NO_SESSION_UNIVERSE_SLUG]: {
-          currentBlock: 4,
-          latestBlock: 5,
-        },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       propSlugs: ['Alpha', 'beta', 'Gamma'],
       updatesBySlug: {
         '': {
@@ -48,28 +50,30 @@ describe('sbtListRealtimeProgressHelpers', () => {
   });
 
   it('plans stale realtime bridge pruning while keeping active slugs parent-owned', () => {
-    expect(resolveSbtListRealtimeProgressRetentionPlan({
-      activeSlugs: ['active'],
-      bridgeMs: 2500,
-      nowMs: 3600,
-      progressBySlug: {
-        alpha: {
-          currentBlock: 10,
-          latestBlock: 20,
-          updatedAtMs: 1000,
+    expect(
+      resolveSbtListRealtimeProgressRetentionPlan({
+        activeSlugs: ['active'],
+        bridgeMs: 2500,
+        nowMs: 3600,
+        progressBySlug: {
+          alpha: {
+            currentBlock: 10,
+            latestBlock: 20,
+            updatedAtMs: 1000,
+          },
+          beta: {
+            currentBlock: 12,
+            latestBlock: 20,
+            updatedAtMs: 2000,
+          },
+          active: {
+            currentBlock: 99,
+            latestBlock: 100,
+            updatedAtMs: 100,
+          },
         },
-        beta: {
-          currentBlock: 12,
-          latestBlock: 20,
-          updatedAtMs: 2000,
-        },
-        active: {
-          currentBlock: 99,
-          latestBlock: 100,
-          updatedAtMs: 100,
-        },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       changed: true,
       nextProgressBySlug: {
         beta: {
@@ -89,23 +93,25 @@ describe('sbtListRealtimeProgressHelpers', () => {
   });
 
   it('reports stable retention when no inactive bridge has expired', () => {
-    expect(resolveSbtListRealtimeProgressRetentionPlan({
-      activeSlugs: ['alpha'],
-      bridgeMs: 2500,
-      nowMs: 3000,
-      progressBySlug: {
-        alpha: {
-          currentBlock: 10,
-          latestBlock: 20,
-          updatedAtMs: 100,
+    expect(
+      resolveSbtListRealtimeProgressRetentionPlan({
+        activeSlugs: ['alpha'],
+        bridgeMs: 2500,
+        nowMs: 3000,
+        progressBySlug: {
+          alpha: {
+            currentBlock: 10,
+            latestBlock: 20,
+            updatedAtMs: 100,
+          },
+          beta: {
+            currentBlock: 18,
+            latestBlock: 20,
+            updatedAtMs: 1000,
+          },
         },
-        beta: {
-          currentBlock: 18,
-          latestBlock: 20,
-          updatedAtMs: 1000,
-        },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       changed: false,
       nextProgressBySlug: {
         alpha: {

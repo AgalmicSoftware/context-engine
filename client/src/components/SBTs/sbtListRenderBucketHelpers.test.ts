@@ -12,22 +12,28 @@ describe('sbtListRenderBucketHelpers', () => {
       ignored_SBTs_LIST: [ignoredAddress],
     }));
 
-    expect(buildSbtListRenderBuckets({
-      allSessionsMode: true,
-      excludePasswordLocked: false,
-      getSessionListsForSlug,
-      isListModeScopeEnabled: true,
-      isMintingLive: (sbt) => sbt.sbtInfo?.mintingEndTime === 0,
-      isPasswordLocked: () => false,
-      listSlug: 'alpha',
-      resolveSbtSessionSlug: (sbt) => String(sbt.slug || ''),
-      sbtList: [
-        { sbtAddress: featuredAddress, slug: 'alpha', sbtInfo: { name: 'Featured', mintingEndTime: 0 } },
-        { sbtAddress: ignoredAddress, slug: 'alpha', sbtInfo: { name: 'Ignored', mintingEndTime: 0 } },
-        { sbtAddress: hiddenAddress, slug: SBT_LIST_NO_SESSION_UNIVERSE_SLUG, sbtInfo: { name: 'Hidden', mintingEndTime: 1 } },
-      ],
-      sectionSessionSlugs: ['alpha', SBT_LIST_NO_SESSION_UNIVERSE_SLUG],
-    }).displayedFeatured.map((sbt) => sbt.sbtAddress)).toEqual([featuredAddress]);
+    expect(
+      buildSbtListRenderBuckets({
+        allSessionsMode: true,
+        excludePasswordLocked: false,
+        getSessionListsForSlug,
+        isListModeScopeEnabled: true,
+        isMintingLive: (sbt) => sbt.sbtInfo?.mintingEndTime === 0,
+        isPasswordLocked: () => false,
+        listSlug: 'alpha',
+        resolveSbtSessionSlug: (sbt) => String(sbt.slug || ''),
+        sbtList: [
+          { sbtAddress: featuredAddress, slug: 'alpha', sbtInfo: { name: 'Featured', mintingEndTime: 0 } },
+          { sbtAddress: ignoredAddress, slug: 'alpha', sbtInfo: { name: 'Ignored', mintingEndTime: 0 } },
+          {
+            sbtAddress: hiddenAddress,
+            slug: SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
+            sbtInfo: { name: 'Hidden', mintingEndTime: 1 },
+          },
+        ],
+        sectionSessionSlugs: ['alpha', SBT_LIST_NO_SESSION_UNIVERSE_SLUG],
+      }).displayedFeatured.map((sbt) => sbt.sbtAddress),
+    ).toEqual([featuredAddress]);
     expect(getSessionListsForSlug).not.toHaveBeenCalledWith(SBT_LIST_NO_SESSION_UNIVERSE_SLUG);
   });
 
@@ -45,10 +51,11 @@ describe('sbtListRenderBucketHelpers', () => {
       isMintingLive: (sbt) => sbt.sbtInfo?.mintingEndTime === 0,
       isPasswordLocked: () => false,
       listSlug: 'demo',
-      resolveSbtSessionSlug: (sbt) => resolveSbtListItemSessionSlug(sbt, {
-        allSessionsMode: true,
-        isListModeScopeEnabled: true,
-      }),
+      resolveSbtSessionSlug: (sbt) =>
+        resolveSbtListItemSessionSlug(sbt, {
+          allSessionsMode: true,
+          isListModeScopeEnabled: true,
+        }),
       sbtList: [
         {
           sbtAddress: demoAddress,
@@ -96,10 +103,7 @@ describe('sbtListRenderBucketHelpers', () => {
       sectionSessionSlugs: ['alpha', 'beta'],
     });
 
-    expect(buckets.displayedFeatured.map((sbt) => sbt.sbtAddress)).toEqual([
-      alphaFeatured,
-      betaFeatured,
-    ]);
+    expect(buckets.displayedFeatured.map((sbt) => sbt.sbtAddress)).toEqual([alphaFeatured, betaFeatured]);
     expect(getSessionListsForSlug).toHaveBeenCalledTimes(2);
     expect(getSessionListsForSlug).toHaveBeenNthCalledWith(1, 'alpha');
     expect(getSessionListsForSlug).toHaveBeenNthCalledWith(2, 'beta');

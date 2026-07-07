@@ -2,10 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { SBTsPage } from './SBTsPage';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
-import {
-  getDemoSessionConfigBySlug,
-  getSessionLists,
-} from '../../utilities/web3/contractScripts.js';
+import { getDemoSessionConfigBySlug, getSessionLists } from '../../utilities/web3/contractScripts.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
@@ -57,10 +54,11 @@ jest.mock('../../utilities/web3/contractScripts.js', () => {
   };
 });
 
-const createSubject = (props = {}) => new SBTsPage({
-  sbtCacheRevision: 0,
-  ...props,
-});
+const createSubject = (props = {}) =>
+  new SBTsPage({
+    sbtCacheRevision: 0,
+    ...props,
+  });
 
 describe('SBTsPage auto-feature flag', () => {
   const originalPublicUrl = process.env.PUBLIC_URL;
@@ -83,48 +81,46 @@ describe('SBTsPage auto-feature flag', () => {
 
   it('keeps demo-only list-route slugs instead of collapsing back to general', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
-    contractScripts.getSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '') === '' ? { slug: '' } : null
-    ));
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === '' ? { slug: '' } : null,
+    );
     contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
-    getDemoSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '') === 'edge'
-        ? { slug: 'edge' }
-        : null
-    ));
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (String(slug || '') === 'edge' ? { slug: 'edge' } : null));
     window.history.replaceState({}, '', `${sbtsListPath()}/edge`);
 
     const subject = createSubject();
     const resolved = subject.getResolvedRouting();
 
-    expect(resolved).toEqual(expect.objectContaining({
-      canonicalSlug: 'edge',
-      onSbtsRoute: true,
-      urlHasNoSlug: false,
-      isCreateRoute: false,
-    }));
+    expect(resolved).toEqual(
+      expect.objectContaining({
+        canonicalSlug: 'edge',
+        onSbtsRoute: true,
+        urlHasNoSlug: false,
+        isCreateRoute: false,
+      }),
+    );
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('edge', { allowDemoFallback: true });
   });
 
   it('keeps an explicit demo alias as the cache slug when display config falls back to general', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
     const demoAutoAddress = '0x0000000000000000000000000000000000000d0a';
-    contractScripts.getSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '') === '' ? { slug: '' } : null
-    ));
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === '' ? { slug: '' } : null,
+    );
     contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
-    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+    getDemoSessionConfigBySlug.mockImplementation((slug) =>
       String(slug || '') === 'demo'
         ? {
             slug: '',
             featured_SBTs_LIST: [],
           }
-        : null
-    ));
+        : null,
+    );
     peekCacheSync.mockImplementation((cacheName, slug) => {
       if (cacheName !== 'sbtCache' || slug !== 'demo') return null;
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [demoAutoAddress.toLowerCase()]: {
               sbtAddress: demoAutoAddress,
@@ -149,14 +145,16 @@ describe('SBTsPage auto-feature flag', () => {
         defaultFeaturedSBTs={[]}
         sessionSlug="demo"
         sessionConfig={{ slug: 'demo', autoFeatureSBTsBySessionSlug: true }}
-      />
+      />,
     );
 
     expect(peekCacheSync).toHaveBeenCalledWith('sbtCache', 'demo', { clone: false });
-    expect(mockSBTPage).toHaveBeenCalledWith(expect.objectContaining({
-      SBTAddress: demoAutoAddress,
-      sessionSlug: 'demo',
-    }));
+    expect(mockSBTPage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        SBTAddress: demoAutoAddress,
+        sessionSlug: 'demo',
+      }),
+    );
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('demo', { allowDemoFallback: true });
   });
 
@@ -175,12 +173,14 @@ describe('SBTsPage auto-feature flag', () => {
     const subject = createSubject({ activeSessionSlug: 'rxc' });
     const resolved = subject.getResolvedRouting();
 
-    expect(resolved).toEqual(expect.objectContaining({
-      canonicalSlug: 'rxc',
-      onSbtsRoute: true,
-      urlHasNoSlug: false,
-      isCreateRoute: false,
-    }));
+    expect(resolved).toEqual(
+      expect.objectContaining({
+        canonicalSlug: 'rxc',
+        onSbtsRoute: true,
+        urlHasNoSlug: false,
+        isCreateRoute: false,
+      }),
+    );
     expect(replaceStateSpy).toHaveBeenCalledWith(null, '', `${sbtsListPath()}/rxc`);
     replaceStateSpy.mockRestore();
   });
@@ -201,12 +201,14 @@ describe('SBTsPage auto-feature flag', () => {
     const subject = createSubject({ activeSessionSlug: 'rxc' });
     const resolved = subject.getResolvedRouting();
 
-    expect(resolved).toEqual(expect.objectContaining({
-      canonicalSlug: 'rxc',
-      onSbtsRoute: true,
-      urlHasNoSlug: false,
-      isCreateRoute: false,
-    }));
+    expect(resolved).toEqual(
+      expect.objectContaining({
+        canonicalSlug: 'rxc',
+        onSbtsRoute: true,
+        urlHasNoSlug: false,
+        isCreateRoute: false,
+      }),
+    );
     expect(replaceStateSpy).toHaveBeenCalledWith(null, '', '/ce/groups/rxc');
     replaceStateSpy.mockRestore();
   });
@@ -218,7 +220,7 @@ describe('SBTsPage auto-feature flag', () => {
     const otherSessionAddress = '0x00000000000000000000000000000000000000b1';
 
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [matchingInfoAddress.toLowerCase()]: {
             sbtAddress: matchingInfoAddress,
@@ -248,11 +250,7 @@ describe('SBTsPage auto-feature flag', () => {
       isSBTCacheReady: true,
     });
 
-    expect(result).toEqual([
-      manualAddress,
-      matchingInfoAddress,
-      matchingTopLevelAddress,
-    ]);
+    expect(result).toEqual([manualAddress, matchingInfoAddress, matchingTopLevelAddress]);
   });
 
   it('auto-features default-session SBTs even when the target slug normalizes to general', () => {
@@ -260,7 +258,7 @@ describe('SBTsPage auto-feature flag', () => {
     const otherSessionAddress = '0x00000000000000000000000000000000000000c2';
 
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [generalAddress.toLowerCase()]: {
             sbtAddress: generalAddress,
@@ -297,7 +295,7 @@ describe('SBTsPage auto-feature flag', () => {
     const explicitOtherSessionAddress = '0x00000000000000000000000000000000000000d4';
 
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [legacySlugAddress.toLowerCase()]: {
             sbtAddress: legacySlugAddress,
@@ -336,9 +334,7 @@ describe('SBTsPage auto-feature flag', () => {
       isSBTCacheReady: true,
     });
 
-    expect(result).toEqual([
-      legacySlugAddress,
-    ]);
+    expect(result).toEqual([legacySlugAddress]);
   });
 
   it('strict auto-feature mode only accepts explicit session bindings', () => {
@@ -348,7 +344,7 @@ describe('SBTsPage auto-feature flag', () => {
     const inferredAddress = '0x0000000000000000000000000000000000000e14';
 
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [explicitAddress.toLowerCase()]: {
             sbtAddress: explicitAddress,
@@ -382,12 +378,7 @@ describe('SBTsPage auto-feature flag', () => {
 
     const subject = createSubject();
     const result = subject.getMemoizedFeaturedList({
-      baseFeaturedList: [
-        explicitAddress,
-        unflaggedAddress,
-        legacySlugAddress,
-        inferredAddress,
-      ],
+      baseFeaturedList: [explicitAddress, unflaggedAddress, legacySlugAddress, inferredAddress],
       effectiveSessionSlug: 'alpha',
       autoFeature: true,
       requireExplicitSessionSlug: true,
@@ -402,7 +393,7 @@ describe('SBTsPage auto-feature flag', () => {
     const fixtureAddress = '0x0000000000000000000000000000000000000d12';
 
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [visibleAddress.toLowerCase()]: {
             sbtAddress: visibleAddress,
@@ -440,7 +431,7 @@ describe('SBTsPage auto-feature flag', () => {
     const bucketOnlyAddress = '0x00000000000000000000000000000000000000e2';
 
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [inferredMatchAddress.toLowerCase()]: {
             sbtAddress: inferredMatchAddress,
@@ -483,7 +474,7 @@ describe('SBTsPage auto-feature flag', () => {
     const inferredAddress = '0x00000000000000000000000000000000000000e3';
 
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [inferredAddress.toLowerCase()]: {
             sbtAddress: inferredAddress,
@@ -500,12 +491,14 @@ describe('SBTsPage auto-feature flag', () => {
       },
     });
 
-    expect(createSubject().getMemoizedFeaturedList({
-      baseFeaturedList: [],
-      effectiveSessionSlug: 'alpha',
-      autoFeature: true,
-      isSBTCacheReady: false,
-    })).toEqual([]);
+    expect(
+      createSubject().getMemoizedFeaturedList({
+        baseFeaturedList: [],
+        effectiveSessionSlug: 'alpha',
+        autoFeature: true,
+        isSBTCacheReady: false,
+      }),
+    ).toEqual([]);
 
     render(
       <SBTsPage
@@ -522,7 +515,7 @@ describe('SBTsPage auto-feature flag', () => {
         miniaturized={true}
         hideMiniActionRow={true}
         preferCacheBackedFeaturedCards={true}
-      />
+      />,
     );
 
     expect(screen.queryByText('Inferred Alpha Group')).not.toBeInTheDocument();
@@ -533,9 +526,9 @@ describe('SBTsPage auto-feature flag', () => {
   it('keeps configured featured cards when strict embedded auto-feature filtering is enabled', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
     const configuredAddress = '0x000000000000000000000000000000000000d001';
-    contractScripts.getSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '') === 'demo-1' ? { slug: 'demo-1' } : null
-    ));
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === 'demo-1' ? { slug: 'demo-1' } : null,
+    );
     contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
     peekCacheSync.mockReturnValue({});
 
@@ -555,7 +548,7 @@ describe('SBTsPage auto-feature flag', () => {
         hideMiniActionRow={true}
         preferCacheBackedFeaturedCards={true}
         requireExplicitAutoFeatureSessionSlug={true}
-      />
+      />,
     );
 
     expect(screen.getByTestId('embedded-featured-spinner')).toBeInTheDocument();
@@ -567,7 +560,7 @@ describe('SBTsPage auto-feature flag', () => {
 
   it('does not auto-feature session matches when the flag is disabled', () => {
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           '0x00000000000000000000000000000000000000a1': {
             sbtAddress: '0x00000000000000000000000000000000000000a1',
@@ -595,7 +588,7 @@ describe('SBTsPage auto-feature flag', () => {
     const cachedAddress = '0x00000000000000000000000000000000000000f0';
 
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [cachedAddress.toLowerCase()]: {
             sbtAddress: cachedAddress,
@@ -665,7 +658,7 @@ describe('SBTsPage auto-feature flag', () => {
       if (cacheName !== 'sbtCache') return null;
       if (slug === 'alpha') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               [alphaAutoAddress.toLowerCase()]: {
                 sbtAddress: alphaAutoAddress,
@@ -679,7 +672,7 @@ describe('SBTsPage auto-feature flag', () => {
       }
       if (slug === 'beta') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               [betaAutoAddress.toLowerCase()]: {
                 sbtAddress: betaAutoAddress,
@@ -693,7 +686,7 @@ describe('SBTsPage auto-feature flag', () => {
       }
       if (slug === 'gamma') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               [gammaAutoAddress.toLowerCase()]: {
                 sbtAddress: gammaAutoAddress,
@@ -707,7 +700,7 @@ describe('SBTsPage auto-feature flag', () => {
       }
       if (slug === 'delta') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               [deltaAutoAddress.toLowerCase()]: {
                 sbtAddress: deltaAutoAddress,
@@ -758,7 +751,7 @@ describe('SBTsPage auto-feature flag', () => {
         sessionInfo="Alpha session"
         hideMiniActionRow={true}
         showCreateGroupExternal={true}
-      />
+      />,
     );
 
     expect(screen.queryByRole('button', { name: /^View All$/i })).not.toBeInTheDocument();
@@ -782,7 +775,7 @@ describe('SBTsPage auto-feature flag', () => {
         sessionSlug="alpha"
         sessionName="Alpha"
         sessionInfo="Alpha session"
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: /^Back to Groups$/i })).toBeInTheDocument();
@@ -807,32 +800,30 @@ describe('SBTsPage auto-feature flag', () => {
         hideMiniActionRow={true}
         showCreateGroupExternal={true}
         showCreateGroupAboveFeatured={true}
-      />
+      />,
     );
 
     const createPanel = screen.getByTestId('create-group-panel');
     const firstFeaturedCard = screen.getAllByTestId('mock-sbt-page')[0];
 
-    expect(
-      createPanel.compareDocumentPosition(firstFeaturedCard) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    expect(createPanel.compareDocumentPosition(firstFeaturedCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('uses demo-only featured SBT lists for embedded display readers when registry config is missing', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
     const demoFeaturedAddress = '0x00000000000000000000000000000000000000de';
-    contractScripts.getSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '') === '' ? { slug: '' } : null
-    ));
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === '' ? { slug: '' } : null,
+    );
     contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
-    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+    getDemoSessionConfigBySlug.mockImplementation((slug) =>
       String(slug || '') === 'edge'
         ? {
             slug: 'edge',
             featured_SBTs_LIST: [demoFeaturedAddress],
           }
-        : null
-    ));
+        : null,
+    );
     getSessionLists.mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
 
     render(
@@ -847,7 +838,7 @@ describe('SBTsPage auto-feature flag', () => {
         defaultFeaturedSBTs={[]}
         sessionSlug="edge"
         sessionConfig={{ autoFeatureSBTsWithFeaturedSbtTags: false }}
-      />
+      />,
     );
 
     const renderedCards = mockSBTPage.mock.calls.map(([props]) => ({
@@ -855,16 +846,14 @@ describe('SBTsPage auto-feature flag', () => {
       sessionSlug: props.sessionSlug,
     }));
 
-    expect(renderedCards).toEqual(expect.arrayContaining([
-      { address: demoFeaturedAddress, sessionSlug: 'edge' },
-    ]));
+    expect(renderedCards).toEqual(expect.arrayContaining([{ address: demoFeaturedAddress, sessionSlug: 'edge' }]));
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('edge', { allowDemoFallback: true });
   });
 
   it('renders interactive mini SBT readers once cache-backed featured cards are ready', () => {
     const featuredAddress = '0x00000000000000000000000000000000000000ab';
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [featuredAddress.toLowerCase()]: {
             sbtAddress: featuredAddress,
@@ -892,7 +881,7 @@ describe('SBTsPage auto-feature flag', () => {
         miniaturized={true}
         hideMiniActionRow={true}
         preferCacheBackedFeaturedCards={true}
-      />
+      />,
     );
 
     expect(screen.queryByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).not.toBeInTheDocument();
@@ -902,7 +891,7 @@ describe('SBTsPage auto-feature flag', () => {
         SBTAddress: featuredAddress,
         miniaturized: true,
         miniMintable: true,
-      })
+      }),
     );
   });
 
@@ -924,7 +913,7 @@ describe('SBTsPage auto-feature flag', () => {
         miniaturized={true}
         hideMiniActionRow={true}
         preferCacheBackedFeaturedCards={true}
-      />
+      />,
     );
 
     expect(screen.getByTestId('embedded-featured-spinner')).toBeInTheDocument();
@@ -932,14 +921,14 @@ describe('SBTsPage auto-feature flag', () => {
     expect(mockSBTPage.mock.calls[mockSBTPage.mock.calls.length - 1][0]).toEqual(
       expect.objectContaining({
         SBTAddress: featuredAddress,
-      })
+      }),
     );
   });
 
   it('keeps cache-backed featured cards visible without a readiness spinner once they are already cached', () => {
     const featuredAddress = '0x00000000000000000000000000000000000000ad';
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [featuredAddress.toLowerCase()]: {
             sbtAddress: featuredAddress,
@@ -968,7 +957,7 @@ describe('SBTsPage auto-feature flag', () => {
         miniaturized={true}
         hideMiniActionRow={true}
         preferCacheBackedFeaturedCards={true}
-      />
+      />,
     );
 
     expect(screen.getByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).toBeInTheDocument();
@@ -981,12 +970,12 @@ describe('SBTsPage auto-feature flag', () => {
   it('falls back to mini SBT readers when cached featured metadata is missing its image', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
     const featuredAddress = '0x00000000000000000000000000000000000000b2';
-    contractScripts.getSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '') === 'alpha' ? { slug: 'alpha' } : null
-    ));
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === 'alpha' ? { slug: 'alpha' } : null,
+    );
     contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [featuredAddress.toLowerCase()]: {
             sbtAddress: featuredAddress,
@@ -1014,7 +1003,7 @@ describe('SBTsPage auto-feature flag', () => {
         miniaturized={true}
         hideMiniActionRow={true}
         preferCacheBackedFeaturedCards={true}
-      />
+      />,
     );
 
     expect(screen.queryByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).not.toBeInTheDocument();
@@ -1024,7 +1013,7 @@ describe('SBTsPage auto-feature flag', () => {
       expect.objectContaining({
         SBTAddress: featuredAddress,
         sessionSlug: 'alpha',
-      })
+      }),
     );
   });
 
@@ -1034,7 +1023,7 @@ describe('SBTsPage auto-feature flag', () => {
     const shortenedAddress = getShortenedAddress(featuredAddress, false);
 
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [featuredAddress.toLowerCase()]: {
             sbtAddress: featuredAddress,
@@ -1062,7 +1051,7 @@ describe('SBTsPage auto-feature flag', () => {
         miniaturized={true}
         hideMiniActionRow={true}
         preferCacheBackedFeaturedCards={true}
-      />
+      />,
     );
 
     expect(screen.getByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).toBeInTheDocument();
@@ -1076,7 +1065,7 @@ describe('SBTsPage auto-feature flag', () => {
     const shortenedAddress = getShortenedAddress(featuredAddress, false);
 
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [featuredAddress.toLowerCase()]: {
             sbtAddress: featuredAddress,
@@ -1104,7 +1093,7 @@ describe('SBTsPage auto-feature flag', () => {
         miniaturized={true}
         hideMiniActionRow={true}
         preferCacheBackedFeaturedCards={true}
-      />
+      />,
     );
 
     expect(screen.getByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).toBeInTheDocument();
@@ -1115,7 +1104,7 @@ describe('SBTsPage auto-feature flag', () => {
   it('uses terminology-aware ended minting aria labels on cache-backed featured cards', () => {
     const featuredAddress = '0x00000000000000000000000000000000000000b0';
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [featuredAddress.toLowerCase()]: {
             sbtAddress: featuredAddress,
@@ -1144,7 +1133,7 @@ describe('SBTsPage auto-feature flag', () => {
         miniaturized={true}
         hideMiniActionRow={true}
         preferCacheBackedFeaturedCards={true}
-      />
+      />,
     );
 
     expect(screen.getByLabelText(`${t('minting')} Ended`)).toBeInTheDocument();
@@ -1153,7 +1142,7 @@ describe('SBTsPage auto-feature flag', () => {
   it('uses terminology-aware fallback names for unnamed cache-backed featured cards', () => {
     const featuredAddress = '0x00000000000000000000000000000000000000af';
     peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         sbtList: {
           [featuredAddress.toLowerCase()]: {
             sbtAddress: featuredAddress,
@@ -1185,7 +1174,7 @@ describe('SBTsPage auto-feature flag', () => {
         miniaturized={true}
         hideMiniActionRow={true}
         preferCacheBackedFeaturedCards={true}
-      />
+      />,
     );
 
     expect(screen.getByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).toBeInTheDocument();
@@ -1208,7 +1197,7 @@ describe('SBTsPage auto-feature flag', () => {
     expect(coldStart).toEqual([]);
 
     cacheSnapshot = {
-      '84532': {
+      84532: {
         sbtList: {
           [featuredAddress.toLowerCase()]: {
             sbtAddress: featuredAddress,
@@ -1280,7 +1269,7 @@ describe('SBTsPage auto-feature flag', () => {
         defaultFeaturedSBTs={[]}
         sessionSlug="alpha"
         sessionConfig={{ autoFeatureSBTsWithFeaturedSbtTags: false }}
-      />
+      />,
     );
 
     const renderedCards = mockSBTPage.mock.calls.map(([props]) => ({
@@ -1328,7 +1317,7 @@ describe('SBTsPage auto-feature flag', () => {
         sessionSlug="alpha"
         sessionConfig={{ autoFeatureSBTsBySessionSlug: false }}
         miniaturized={true}
-      />
+      />,
     );
 
     const renderedCards = mockSBTPage.mock.calls.map(([props]) => ({
@@ -1336,9 +1325,7 @@ describe('SBTsPage auto-feature flag', () => {
       sessionSlug: props.sessionSlug,
     }));
 
-    expect(renderedCards).toEqual([
-      { address: alphaAddress, sessionSlug: 'alpha' },
-    ]);
+    expect(renderedCards).toEqual([{ address: alphaAddress, sessionSlug: 'alpha' }]);
   });
 
   it('keeps discovered embedded cards visible and shows a corner spinner during background refreshes', () => {
@@ -1370,7 +1357,7 @@ describe('SBTsPage auto-feature flag', () => {
             latestBlock: 112,
           },
         }}
-      />
+      />,
     );
 
     expect(screen.getByTestId('embedded-featured-spinner')).toBeInTheDocument();
@@ -1379,7 +1366,7 @@ describe('SBTsPage auto-feature flag', () => {
       expect.objectContaining({
         SBTAddress: visibleAddress,
         sessionSlug: 'alpha',
-      })
+      }),
     );
   });
 });

@@ -3,10 +3,7 @@ import {
   type SurveyResultsLocalStoragePollInstance,
   type SurveyResultsLocalStoragePollPorts,
 } from './surveyResultsLocalStoragePollRuntime';
-import type {
-  SurveyResultsProps,
-  SurveyResultsState,
-} from './SurveyResults';
+import type { SurveyResultsProps, SurveyResultsState } from './SurveyResults';
 
 const createInstance = (): SurveyResultsLocalStoragePollInstance => ({
   _isMounted: true,
@@ -29,23 +26,25 @@ const createInstance = (): SurveyResultsLocalStoragePollInstance => ({
   },
 });
 
-const createProps = (): SurveyResultsProps => ({
-  network: { id: 11155420 },
-  networkChainId: 11155420,
-  provider: 'provider',
-} as SurveyResultsProps);
+const createProps = (): SurveyResultsProps =>
+  ({
+    network: { id: 11155420 },
+    networkChainId: 11155420,
+    provider: 'provider',
+  }) as SurveyResultsProps;
 
-const createState = (patch: Record<string, unknown> = {}): SurveyResultsState => ({
-  cachedQuestionsCount: 0,
-  cachedSurveyResponsesCount: 0,
-  networkLatestBlock: 20,
-  questionLocalBlock: 0,
-  responseLocalBlock: 0,
-  surveyId: '',
-  surveyLocalBlock: 0,
-  viewMode: 'questions',
-  ...patch,
-} as SurveyResultsState);
+const createState = (patch: Record<string, unknown> = {}): SurveyResultsState =>
+  ({
+    cachedQuestionsCount: 0,
+    cachedSurveyResponsesCount: 0,
+    networkLatestBlock: 20,
+    questionLocalBlock: 0,
+    responseLocalBlock: 0,
+    surveyId: '',
+    surveyLocalBlock: 0,
+    viewMode: 'questions',
+    ...patch,
+  }) as SurveyResultsState;
 
 describe('surveyResultsLocalStoragePollRuntime', () => {
   it('applies local question-cache block/count patches and queues a refresh', () => {
@@ -90,14 +89,16 @@ describe('surveyResultsLocalStoragePollRuntime', () => {
     });
 
     expect(changed).toBe(true);
-    expect(patchCalls).toEqual([{
-      cachedQuestionsCount: 2,
-      cachedSurveyResponsesCount: 0,
-      networkLatestBlock: 20,
-      questionLocalBlock: 10,
-      responseLocalBlock: 11,
-      surveyLocalBlock: 0,
-    }]);
+    expect(patchCalls).toEqual([
+      {
+        cachedQuestionsCount: 2,
+        cachedSurveyResponsesCount: 0,
+        networkLatestBlock: 20,
+        questionLocalBlock: 10,
+        responseLocalBlock: 11,
+        surveyLocalBlock: 0,
+      },
+    ]);
     expect(queuedReasons).toEqual(['poll-local-storage-change']);
   });
 });

@@ -1,11 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faBookmark,
-  faExpand,
-  faExternalLinkAlt,
-  faSpinner,
-} from '@fortawesome/free-solid-svg-icons';
+import { faBookmark, faExpand, faExternalLinkAlt, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
 
 type QuestionCardLinksProps = {
@@ -26,15 +21,16 @@ export const buildQuestionCardBookmarkClassName = ({
   baseClassName?: unknown;
   bookmarkClassName?: unknown;
   isQuestionBookmarked?: unknown;
-} = {}): string => ([
-  String(baseClassName || ''),
-  String(bookmarkClassName || ''),
-  isQuestionBookmarked ? String(activeClassName || '') : '',
-].filter(Boolean).join(' '));
+} = {}): string =>
+  [
+    String(baseClassName || ''),
+    String(bookmarkClassName || ''),
+    isQuestionBookmarked ? String(activeClassName || '') : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
-export const resolveQuestionCardBookmarkIconStyle = (
-  isQuestionBookmarked: unknown = false
-): React.CSSProperties => ({
+export const resolveQuestionCardBookmarkIconStyle = (isQuestionBookmarked: unknown = false): React.CSSProperties => ({
   color: isQuestionBookmarked ? '#ffc107' : 'white',
 });
 
@@ -65,10 +61,7 @@ const QuestionCardLinks = ({
       })}
       title={isQuestionBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
     >
-      <FontAwesomeIcon
-        icon={faBookmark}
-        style={resolveQuestionCardBookmarkIconStyle(isQuestionBookmarked)}
-      />
+      <FontAwesomeIcon icon={faBookmark} style={resolveQuestionCardBookmarkIconStyle(isQuestionBookmarked)} />
     </button>
     {arweaveHref ? (
       <a

@@ -96,9 +96,7 @@ describe('AsyncSearchSelect', () => {
   });
 
   it('renders options using formatOptionLabel', () => {
-    render(
-      <Harness formatOptionLabel={(option) => <span>{`Formatted ${option.label}`}</span>} />
-    );
+    render(<Harness formatOptionLabel={(option) => <span>{`Formatted ${option.label}`}</span>} />);
 
     openMenu();
     expect(screen.getByText('Formatted Alpha')).toBeInTheDocument();
@@ -111,7 +109,7 @@ describe('AsyncSearchSelect', () => {
         initialValue={{ value: 'beta', label: 'Beta' }}
         formatOptionLabel={(option) => <span>{`Menu ${option.label}`}</span>}
         formatValueLabel={(option) => <div>{`Selected ${option.label}`}</div>}
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: /selected beta/i })).toHaveTextContent('Selected Beta');
@@ -152,7 +150,7 @@ describe('AsyncSearchSelect', () => {
           { label: 'Alpha', value: '0xaaa' },
           { label: 'Beta', value: '0xbbb' },
         ]}
-      />
+      />,
     );
 
     openMenu();
@@ -172,7 +170,7 @@ describe('AsyncSearchSelect', () => {
           { label: 'Beta', value: '0xbbb', alias: 'second' },
         ]}
         filterOption={(option, query) => String(option?.alias || '').includes(query)}
-      />
+      />,
     );
 
     openMenu();
@@ -195,7 +193,7 @@ describe('AsyncSearchSelect', () => {
         options={keyedOptions}
         initialValue={{ slug: 'beta', value: 'other', label: 'Other Beta' }}
         getOptionValue={(option) => String(option?.slug ?? '')}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /other beta/i }));
@@ -214,7 +212,7 @@ describe('AsyncSearchSelect', () => {
         options={keyedOptions}
         initialValue={{ slug: null, label: 'Selected fallback' }}
         getOptionValue={(option) => option?.slug}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /selected fallback/i }));
@@ -230,7 +228,7 @@ describe('AsyncSearchSelect', () => {
         onChangeSpy={spy}
         loadingMessage={() => 'Searching...'}
         noOptionsMessage={() => 'Nothing here'}
-      />
+      />,
     );
 
     openMenu();
@@ -287,8 +285,10 @@ describe('AsyncSearchSelect', () => {
     render(
       <>
         <Harness />
-        <button type="button" data-testid="outside">out</button>
-      </>
+        <button type="button" data-testid="outside">
+          out
+        </button>
+      </>,
     );
 
     openMenu();
@@ -306,7 +306,7 @@ describe('AsyncSearchSelect', () => {
       <>
         <Harness />
         <button type="button">outside</button>
-      </>
+      </>,
     );
 
     openMenu();
@@ -321,8 +321,10 @@ describe('AsyncSearchSelect', () => {
     render(
       <>
         <Harness />
-        <button type="button" data-testid="outside">outside</button>
-      </>
+        <button type="button" data-testid="outside">
+          outside
+        </button>
+      </>,
     );
 
     openMenu();
@@ -350,7 +352,7 @@ describe('AsyncSearchSelect', () => {
         onChange={jest.fn()}
         placeholder="Pick one"
         getOptionValue={(option) => option!.slug}
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: /pick one/i })).toHaveTextContent('Pick one');

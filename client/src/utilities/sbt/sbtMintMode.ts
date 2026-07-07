@@ -5,29 +5,21 @@ export const SBT_MINT_MODE = Object.freeze({
   LIMITED_INVITE_SIGNATURE: 3,
 });
 
-export const normalizeSbtMintMode = (
-  value: unknown,
-  fallback: number = SBT_MINT_MODE.PUBLIC_CLAIM
-): number => {
+export const normalizeSbtMintMode = (value: unknown, fallback: number = SBT_MINT_MODE.PUBLIC_CLAIM): number => {
   const normalized = Number(value);
-  return Number.isInteger(normalized) && normalized >= 0 && normalized <= 3
-    ? normalized
-    : fallback;
+  return Number.isInteger(normalized) && normalized >= 0 && normalized <= 3 ? normalized : fallback;
 };
 
 export const hasPasswordMintForSbtMintMode = (mintMode: unknown): boolean => {
   const normalized = normalizeSbtMintMode(mintMode);
-  return normalized === SBT_MINT_MODE.PASSWORD_COMMIT_REVEAL
-    || normalized === SBT_MINT_MODE.LIMITED_INVITE_SIGNATURE;
+  return normalized === SBT_MINT_MODE.PASSWORD_COMMIT_REVEAL || normalized === SBT_MINT_MODE.LIMITED_INVITE_SIGNATURE;
 };
 
-export const usesInviteCodesForSbtMintMode = (mintMode: unknown): boolean => (
-  normalizeSbtMintMode(mintMode) === SBT_MINT_MODE.LIMITED_INVITE_SIGNATURE
-);
+export const usesInviteCodesForSbtMintMode = (mintMode: unknown): boolean =>
+  normalizeSbtMintMode(mintMode) === SBT_MINT_MODE.LIMITED_INVITE_SIGNATURE;
 
-export const usesClaimPasswordsForSbtMintMode = (mintMode: unknown): boolean => (
-  normalizeSbtMintMode(mintMode) === SBT_MINT_MODE.PASSWORD_COMMIT_REVEAL
-);
+export const usesClaimPasswordsForSbtMintMode = (mintMode: unknown): boolean =>
+  normalizeSbtMintMode(mintMode) === SBT_MINT_MODE.PASSWORD_COMMIT_REVEAL;
 
 export const deriveSbtMintModeFromDistribution = ({
   distributionOption = '',
@@ -41,9 +33,7 @@ export const deriveSbtMintModeFromDistribution = ({
   }
 
   if (distributionOption === 'groupPassword') {
-    return isLimited
-      ? SBT_MINT_MODE.LIMITED_INVITE_SIGNATURE
-      : SBT_MINT_MODE.UNLIMITED_GROUP_SIGNATURE;
+    return isLimited ? SBT_MINT_MODE.LIMITED_INVITE_SIGNATURE : SBT_MINT_MODE.UNLIMITED_GROUP_SIGNATURE;
   }
 
   return SBT_MINT_MODE.PUBLIC_CLAIM;

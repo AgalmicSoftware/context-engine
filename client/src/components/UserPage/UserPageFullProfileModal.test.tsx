@@ -4,19 +4,14 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import UserPageFullProfileModal from './UserPageFullProfileModal';
 
 jest.mock('reactstrap', () => ({
-  Modal: ({ children, isOpen }: { children: React.ReactNode; isOpen: boolean }) => (
-    isOpen ? <div data-testid="profile-modal">{children}</div> : null
-  ),
+  Modal: ({ children, isOpen }: { children: React.ReactNode; isOpen: boolean }) =>
+    isOpen ? <div data-testid="profile-modal">{children}</div> : null,
   ModalBody: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  ModalHeader: ({
-    children,
-    toggle,
-  }: {
-    children: React.ReactNode;
-    toggle: () => void;
-  }) => (
+  ModalHeader: ({ children, toggle }: { children: React.ReactNode; toggle: () => void }) => (
     <div>
-      <button type="button" onClick={toggle}>close</button>
+      <button type="button" onClick={toggle}>
+        close
+      </button>
       {children}
     </div>
   ),
@@ -35,7 +30,9 @@ jest.mock('../SBTs/SBTPage', () => ({
   }) => (
     <div data-testid="sbt-card" data-sbt-address={String(SBTAddress)} data-session-slug={String(sessionSlug)}>
       SBT {String(SBTAddress)}
-      <button type="button" onClick={() => refreshSbtData('0xrefresh')}>refresh child</button>
+      <button type="button" onClick={() => refreshSbtData('0xrefresh')}>
+        refresh child
+      </button>
     </div>
   ),
 }));
@@ -55,9 +52,7 @@ jest.mock('./UserStats', () => ({
   ),
 }));
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof UserPageFullProfileModal>> = {}
-) => ({
+const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageFullProfileModal>> = {}) => ({
   aiAnalysis: 'A useful profile summary.',
   bookmarksHref: '/bookmarks',
   collapseOpen: 'mostUniqueIdea',
@@ -83,14 +78,18 @@ const createProps = (
     shouldRenderModalSpinner: false,
   },
   sbtEmptyText: 'No SBTs yet.',
-  sbtEntries: [{
-    sbtInfo: { sbtAddress: '0x00000000000000000000000000000000000000aa' },
-    slug: 'alpha',
-  }],
-  surveyResponseEntries: [{
-    questionsCount: 3,
-    title: 'Safety Survey',
-  }],
+  sbtEntries: [
+    {
+      sbtInfo: { sbtAddress: '0x00000000000000000000000000000000000000aa' },
+      slug: 'alpha',
+    },
+  ],
+  surveyResponseEntries: [
+    {
+      questionsCount: 3,
+      title: 'Safety Survey',
+    },
+  ],
   userStats: {
     surveysResponded: 1,
   },
@@ -109,7 +108,7 @@ describe('UserPageFullProfileModal', () => {
           onStatsCollapseToggle,
           onToggle,
         })}
-      />
+      />,
     );
 
     expect(screen.getByTestId('profile-modal')).toBeInTheDocument();
@@ -119,13 +118,13 @@ describe('UserPageFullProfileModal', () => {
     expect(screen.getByText('Minted SBTs')).toBeInTheDocument();
     expect(screen.getByTestId('sbt-card')).toHaveAttribute(
       'data-sbt-address',
-      '0x00000000000000000000000000000000000000aa'
+      '0x00000000000000000000000000000000000000aa',
     );
     expect(screen.getByTestId('sbt-card')).toHaveAttribute('data-session-slug', 'alpha');
     expect(screen.getByRole('link', { name: /My Bookmarks/ })).toHaveAttribute('href', '/bookmarks');
     expect(screen.getByRole('link', { name: /View on Explorer/ })).toHaveAttribute(
       'href',
-      'https://explorer.example.test/address/0xabc'
+      'https://explorer.example.test/address/0xabc',
     );
 
     fireEvent.click(screen.getByText('close'));
@@ -156,7 +155,7 @@ describe('UserPageFullProfileModal', () => {
           sbtEntries: [],
           surveyResponseEntries: [],
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Summary not available.')).toBeInTheDocument();

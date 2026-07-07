@@ -15,9 +15,12 @@ type QuestionPayload = UnknownRecord & {
   tags?: unknown;
 };
 
-type QuestionsCache = Record<string, {
-  questions: Record<string, QuestionPayload>;
-} & UnknownRecord>;
+type QuestionsCache = Record<
+  string,
+  {
+    questions: Record<string, QuestionPayload>;
+  } & UnknownRecord
+>;
 
 type CacheState = {
   netIdStr: string;
@@ -39,15 +42,12 @@ type CacheBootstrapFlowRetryPlan = {
 type QuestionFetchCandidateSlugResolver = (
   questionId: string,
   preferredSlug: string,
-  options: { allowPinnedFallback: boolean }
+  options: { allowPinnedFallback: boolean },
 ) => string[];
 
 type BlockedQuestionIdsResolver = (sessionSlug: string) => Set<string>;
 
-type SourceRestoreRetryCleanupAction =
-  | 'none'
-  | 'clear-current-attempt'
-  | 'clear-different-question';
+type SourceRestoreRetryCleanupAction = 'none' | 'clear-current-attempt' | 'clear-different-question';
 
 type SourceRestoreCommonPlan = {
   bootstrapRetryAttempt: number;
@@ -111,9 +111,7 @@ export type CacheBootstrapFlowStop = {
   seededHydration: SeededHydrationPlan | null;
 };
 
-export type CacheBootstrapFlowPlan =
-  | CacheBootstrapFlowContinue
-  | CacheBootstrapFlowStop;
+export type CacheBootstrapFlowPlan = CacheBootstrapFlowContinue | CacheBootstrapFlowStop;
 
 export type CacheBootstrapStopHandlingContinue = {
   action: 'continue';
@@ -143,19 +141,17 @@ export type CacheBootstrapStopHandlingFallback = {
 };
 
 export type CacheBootstrapStopHandlingPlan =
-  | CacheBootstrapStopHandlingContinue
-  | CacheBootstrapStopHandlingRetry
-  | CacheBootstrapStopHandlingFallback;
+  CacheBootstrapStopHandlingContinue | CacheBootstrapStopHandlingRetry | CacheBootstrapStopHandlingFallback;
 
 export type SingleQuestionPreservedPoolPlan =
   | {
-    action: 'preserve';
-    statePatch: UnknownRecord & { questionPool: QuestionPayload[] };
-  }
+      action: 'preserve';
+      statePatch: UnknownRecord & { questionPool: QuestionPayload[] };
+    }
   | {
-    action: 'skip';
-    statePatch: null;
-  };
+      action: 'skip';
+      statePatch: null;
+    };
 
 export type SingleQuestionCacheBootstrapTarget = {
   account: string;
@@ -187,10 +183,7 @@ export type CacheBootstrapMissing = {
   target: SingleQuestionCacheBootstrapTarget;
 };
 
-export type CacheBootstrapResult =
-  | CacheBootstrapReady
-  | CacheBootstrapSeeded
-  | CacheBootstrapMissing;
+export type CacheBootstrapResult = CacheBootstrapReady | CacheBootstrapSeeded | CacheBootstrapMissing;
 
 const buildMissingCacheStateStopPlan = (
   seededHydration: SeededHydrationPlan | null = null,
@@ -204,9 +197,8 @@ const buildMissingCacheStateStopPlan = (
   seededHydration,
 });
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const buildSingleQuestionSourceRestoreContextPlan = ({
   bootstrapRetryAttempt = 0,
@@ -229,7 +221,9 @@ export const buildSingleQuestionSourceRestoreContextPlan = ({
 } = {}): SingleQuestionSourceRestoreContextPlan => {
   const retryAttempt = Number(bootstrapRetryAttempt || 0);
   const rawQuestionId = props.questionID;
-  const retrySig = String(pendingRetrySig || '').trim().toLowerCase();
+  const retrySig = String(pendingRetrySig || '')
+    .trim()
+    .toLowerCase();
   const pendingRetryQuestionId = retrySig ? retrySig.split(':')[0] : '';
 
   if (!rawQuestionId) {
@@ -252,11 +246,12 @@ export const buildSingleQuestionSourceRestoreContextPlan = ({
 
   const questionId = String(rawQuestionId).toLowerCase();
   const hasPendingRetryForQuestion = !!(pendingRetryQuestionId && pendingRetryQuestionId === questionId);
-  const retryCleanupAction: SourceRestoreRetryCleanupAction = retryAttempt > 0
-    ? 'clear-current-attempt'
-    : pendingRetryQuestionId && pendingRetryQuestionId !== questionId
-      ? 'clear-different-question'
-      : 'none';
+  const retryCleanupAction: SourceRestoreRetryCleanupAction =
+    retryAttempt > 0
+      ? 'clear-current-attempt'
+      : pendingRetryQuestionId && pendingRetryQuestionId !== questionId
+        ? 'clear-different-question'
+        : 'none';
   const slugPinned = !!getSessionSlugPinnedFromProps(props);
   const explicitSingleSlug = normalizeSessionSlugValue(getSessionSlugHintFromProps(props));
   const explicitSingleSlugKnown =
@@ -270,11 +265,9 @@ export const buildSingleQuestionSourceRestoreContextPlan = ({
     network: props.network as UnknownRecord | null | undefined,
   });
   const effectiveSingleSlug = explicitSingleSlug || resolvedSingleSlug || resolveEffectiveSlug(props);
-  const fetchCandidateSlugs = getQuestionFetchCandidateSlugs(
-    questionId,
-    effectiveSingleSlug,
-    { allowPinnedFallback: !slugPinned || retryAttempt > 0 || !explicitSingleSlugKnown }
-  ).slice(0, Math.max(0, Number(maxCandidateSlugs || 0)));
+  const fetchCandidateSlugs = getQuestionFetchCandidateSlugs(questionId, effectiveSingleSlug, {
+    allowPinnedFallback: !slugPinned || retryAttempt > 0 || !explicitSingleSlugKnown,
+  }).slice(0, Math.max(0, Number(maxCandidateSlugs || 0)));
   const startDebugPayload = {
     phase: 'start',
     runId,
@@ -337,15 +330,20 @@ export const buildSingleQuestionPreservedPoolState = ({
   questionPool?: unknown;
   extraState?: unknown;
 } = {}): SingleQuestionPreservedPoolPlan => {
-  const normalizedQuestionId = String(questionId || '').trim().toLowerCase();
+  const normalizedQuestionId = String(questionId || '')
+    .trim()
+    .toLowerCase();
   if (!normalizedQuestionId || !Array.isArray(questionPool)) {
     return { action: 'skip', statePatch: null };
   }
 
-  const existingQuestion = questionPool.find((item) => (
-    isRecord(item) &&
-    String(item.id || item.questionID || '').trim().toLowerCase() === normalizedQuestionId
-  ));
+  const existingQuestion = questionPool.find(
+    (item) =>
+      isRecord(item) &&
+      String(item.id || item.questionID || '')
+        .trim()
+        .toLowerCase() === normalizedQuestionId,
+  );
   if (!isRecord(existingQuestion)) {
     return { action: 'skip', statePatch: null };
   }
@@ -444,13 +442,13 @@ export const buildSingleQuestionSeededHydrationState = ({
   mergeSurveyResponseState?: (
     previousResponseState: unknown,
     questionPool: QuestionPayload[],
-    surveyIndex: number
+    surveyIndex: number,
   ) => unknown;
 } = {}) => {
   const seededQuestion = { ...((questionData || {}) as QuestionPayload), id: questionData?.id };
-  const previousResponseState =
-    prevState.surveysResponseState ||
-    [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }];
+  const previousResponseState = prevState.surveysResponseState || [
+    { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+  ];
 
   return {
     questionPool: [seededQuestion],
@@ -462,12 +460,8 @@ export const buildSingleQuestionSeededHydrationState = ({
   };
 };
 
-const hasObjectKeys = (value: unknown): boolean => (
-  !!value
-  && typeof value === 'object'
-  && !Array.isArray(value)
-  && Object.keys(value as UnknownRecord).length > 0
-);
+const hasObjectKeys = (value: unknown): boolean =>
+  !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value as UnknownRecord).length > 0;
 
 const buildSingleQuestionCacheBootstrapTarget = ({
   account = '',
@@ -508,7 +502,9 @@ export const resolveSingleQuestionCacheBootstrapStopHandlingPlan = ({
   }
 
   const retryAttempt = Number(bootstrapRetryAttempt || 0);
-  const normalizedQuestionId = String(questionId || '').trim().toLowerCase();
+  const normalizedQuestionId = String(questionId || '')
+    .trim()
+    .toLowerCase();
   const effectiveSlug = String(effectiveSingleSlug || '');
 
   if (cacheBootstrapPlan.retryPlan) {
@@ -535,9 +531,7 @@ export const resolveSingleQuestionCacheBootstrapStopHandlingPlan = ({
               retryAttempt,
               didScheduleRetry: !!didScheduleRetry,
             },
-            exhaustedStatePatch: didScheduleRetry
-              ? null
-              : cacheBootstrapPlan.retryPlan.exhaustedStatePatch,
+            exhaustedStatePatch: didScheduleRetry ? null : cacheBootstrapPlan.retryPlan.exhaustedStatePatch,
             shouldClearRetry: !didScheduleRetry,
           }
         : null,
@@ -550,9 +544,7 @@ export const resolveSingleQuestionCacheBootstrapStopHandlingPlan = ({
         runId,
         questionId: normalizedQuestionId,
         effectiveSingleSlug: effectiveSlug,
-        ...(cacheBootstrapPlan.debugPhase === 'recent-payload-missing-network'
-          ? { retryAttempt }
-          : {}),
+        ...(cacheBootstrapPlan.debugPhase === 'recent-payload-missing-network' ? { retryAttempt } : {}),
       }
     : null;
   const fallbackStatePatch = hasObjectKeys(cacheBootstrapPlan.fallbackStatePatch)
@@ -624,10 +616,7 @@ export const resolveSingleQuestionCacheBootstrap = async ({
     const fallbackNetId = resolveBootstrapNetworkId(effectiveSingleSlug);
     if (fallbackNetId) {
       const bootstrapCache = await updateCacheAtomic('questionsCache', effectiveSingleSlug, (current) => {
-        const nextCache = ensureQuestionsNet(
-          (current && typeof current === 'object') ? current : {},
-          fallbackNetId,
-        );
+        const nextCache = ensureQuestionsNet(current && typeof current === 'object' ? current : {}, fallbackNetId);
         nextCache[fallbackNetId].questions[questionId] = {
           ...(nextCache[fallbackNetId].questions[questionId] || {}),
           ...qData,

@@ -12,7 +12,7 @@ describe('WorkerDeployHelperToggle', () => {
         checked
         onChange={onChange}
         renderInfoTooltip={({ testId }) => <button type="button" data-testid={testId} />}
-      />
+      />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_EMBEDDED_DEPLOY_HELPER_ENABLED)).toBeChecked();

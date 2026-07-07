@@ -125,7 +125,8 @@ export const DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS = Object.freeze([
 const DEFAULT_PROFILE_ID = 'historical_baseline';
 const DEFAULT_PROFILE_LABEL = 'Historical persona baseline';
 const DEFAULT_PROFILE_CONFIDENCE = 'High';
-const DEFAULT_PROFILE_RATIONALE = 'Original historical-figure vote row anchored to the canonical demo persona fixtures.';
+const DEFAULT_PROFILE_RATIONALE =
+  'Original historical-figure vote row anchored to the canonical demo persona fixtures.';
 
 const VOTE_LABEL_BY_VALUE: Record<string, string> = Object.freeze({
   '-1': 'Disagree',
@@ -136,21 +137,25 @@ const VOTE_LABEL_BY_VALUE: Record<string, string> = Object.freeze({
 const PRIMARY_TAG_TYPE = 'category';
 const SECONDARY_TAG_TYPE = 'source';
 
-const toTitleCase = (value = ''): string => String(value || '')
-  .toLowerCase()
-  .split(/\s+/)
-  .filter(Boolean)
-  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-  .join(' ');
+const toTitleCase = (value = ''): string =>
+  String(value || '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 
-const slugify = (value = ''): string => String(value || '')
-  .trim()
-  .toLowerCase()
-  .replace(/[^a-z0-9]+/g, '-')
-  .replace(/^-+|-+$/g, '');
+const slugify = (value = ''): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
 const normalizeSourceId = (value = ''): string => {
-  const trimmed = String(value || '').trim().toLowerCase();
+  const trimmed = String(value || '')
+    .trim()
+    .toLowerCase();
   if (!trimmed) return '';
   if (trimmed === 'sci-fi' || trimmed === 'scifi') return 'scifi';
   if (trimmed === 'metr') return 'metr';
@@ -203,25 +208,30 @@ export const buildQuestionTags = (comment: DemoAnalysisComment = {}): QuestionTa
   return tags;
 };
 
-const buildQuestionSources = (comment: DemoAnalysisComment = {}): string[] => String(comment?.sources || '')
-  .split(',')
-  .map((part) => String(part || '').trim())
-  .filter(Boolean);
+const buildQuestionSources = (comment: DemoAnalysisComment = {}): string[] =>
+  String(comment?.sources || '')
+    .split(',')
+    .map((part) => String(part || '').trim())
+    .filter(Boolean);
 
-const buildQuestions = (comments: DemoAnalysisComment[] = []): DemoAnalysisQuestion[] => comments.map((comment, index) => ({
-  id: String(index),
-  commentId: String(comment?.commentId || index),
-  index,
-  text: String(comment?.commentBody || '').trim(),
-  type: 'poll',
-  sourcePromptType: String(comment?.type || '').trim().toLowerCase() || 'binary',
-  options: DEMO_ANALYSIS_RESPONSE_OPTIONS.slice(),
-  semanticOrder: DEMO_ANALYSIS_RESPONSE_OPTIONS.slice(),
-  participationCount: 0,
-  category: String(comment?.category || '').trim(),
-  keyTension: String(comment?.key_tension || comment?.keyTension || '').trim(),
-  sources: buildQuestionSources(comment),
-}));
+const buildQuestions = (comments: DemoAnalysisComment[] = []): DemoAnalysisQuestion[] =>
+  comments.map((comment, index) => ({
+    id: String(index),
+    commentId: String(comment?.commentId || index),
+    index,
+    text: String(comment?.commentBody || '').trim(),
+    type: 'poll',
+    sourcePromptType:
+      String(comment?.type || '')
+        .trim()
+        .toLowerCase() || 'binary',
+    options: DEMO_ANALYSIS_RESPONSE_OPTIONS.slice(),
+    semanticOrder: DEMO_ANALYSIS_RESPONSE_OPTIONS.slice(),
+    participationCount: 0,
+    category: String(comment?.category || '').trim(),
+    keyTension: String(comment?.key_tension || comment?.keyTension || '').trim(),
+    sources: buildQuestionSources(comment),
+  }));
 
 const incrementMapCount = (map: Map<string, number>, key: string): void => {
   map.set(key, Number(map.get(key) || 0) + 1);
@@ -239,7 +249,7 @@ const getParticipantIdentityKey = (participant: DemoAnalysisParticipant = {}, fa
 
 const getParticipantSegments = (
   participant: DemoAnalysisParticipant = {},
-  metadata: DemoAnalysisMetadata = {}
+  metadata: DemoAnalysisMetadata = {},
 ): ParticipantSegment[] => {
   const segments: ParticipantSegment[] = [{ segmentKey: 'All', category: 'All', value: 'All' }];
   DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.forEach(({ label, field }) => {
@@ -267,13 +277,13 @@ const buildParticipantProfileDescriptor = (participant: DemoAnalysisParticipant 
 
 const buildDemographicSummary = (
   participantsVotes: DemoAnalysisParticipant[] = [],
-  metadataByXid: DemoAnalysisMetadataByXid = {}
+  metadataByXid: DemoAnalysisMetadataByXid = {},
 ): Record<string, DemographicSummaryRow[]> => {
   const countsByCategory = new Map<string, Map<string, number>>(
-    DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.map(({ label }) => [label, new Map<string, number>()])
+    DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.map(({ label }) => [label, new Map<string, number>()]),
   );
   const participantKeysByCategoryValue = new Map<string, Map<string, Set<string>>>(
-    DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.map(({ label }) => [label, new Map<string, Set<string>>()])
+    DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.map(({ label }) => [label, new Map<string, Set<string>>()]),
   );
 
   participantsVotes.forEach((participant, participantIndex) => {
@@ -315,11 +325,11 @@ const buildDemographicSummary = (
 
 export const buildDemoAnalysisData = (
   sourceData: DemoAnalysisSource = EMPTY_DEMO_ANALYSIS_SOURCE,
-  metadataByXid: DemoAnalysisMetadataByXid = historicalFigureDemographics as DemoAnalysisMetadataByXid
+  metadataByXid: DemoAnalysisMetadataByXid = historicalFigureDemographics as DemoAnalysisMetadataByXid,
 ): DemoAnalysisData => {
   const comments: DemoAnalysisComment[] = Array.isArray(sourceData?.comments) ? sourceData.comments : [];
   const participantsVotes = Array.isArray(sourceData?.participantsVotes)
-    ? sourceData.participantsVotes as DemoAnalysisParticipant[]
+    ? (sourceData.participantsVotes as DemoAnalysisParticipant[])
     : [];
 
   const questions = buildQuestions(comments);
@@ -427,15 +437,18 @@ export const buildDemoAnalysisData = (
   };
 };
 
-export const getHighestParticipationQuestion = (questions: DemoAnalysisQuestion[] = []): DemoAnalysisQuestion | null => {
+export const getHighestParticipationQuestion = (
+  questions: DemoAnalysisQuestion[] = [],
+): DemoAnalysisQuestion | null => {
   if (!Array.isArray(questions) || questions.length === 0) return null;
-  return [...questions]
-    .sort((left, right) => {
+  return (
+    [...questions].sort((left, right) => {
       if (right.participationCount !== left.participationCount) {
         return right.participationCount - left.participationCount;
       }
       return left.index - right.index;
-    })[0] || null;
+    })[0] || null
+  );
 };
 
 export default buildDemoAnalysisData;

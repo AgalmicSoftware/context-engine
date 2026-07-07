@@ -47,27 +47,14 @@ const SessionMetadataEditor = ({
     const toggleLabel = wizardMode === 'advanced' ? 'More options' : 'Optional details';
     return (
       <div className={styles.moreOptionsSection}>
-        <button
-          type="button"
-          className={styles.moreOptionsToggle}
-          onClick={onToggleMoreOptions}
-        >
-          {toggleLabel}{' '}
-          <FontAwesomeIcon
-            icon={moreOptionsOpen ? faCaretUp : faCaretDown}
-            style={{ marginLeft: 6 }}
-          />
+        <button type="button" className={styles.moreOptionsToggle} onClick={onToggleMoreOptions}>
+          {toggleLabel} <FontAwesomeIcon icon={moreOptionsOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 6 }} />
         </button>
         {moreOptionsOpen ? (
           <div className={styles.moreOptionsBody}>
-            {moreOptionsEntries.map(([key, value]) => (
-              renderField(
-                key,
-                value,
-                [],
-                isNormalMode && key === 'blockLimits' ? { forceShow: true } : undefined
-              )
-            ))}
+            {moreOptionsEntries.map(([key, value]) =>
+              renderField(key, value, [], isNormalMode && key === 'blockLimits' ? { forceShow: true } : undefined),
+            )}
           </div>
         ) : null}
       </div>
@@ -90,7 +77,7 @@ const SessionMetadataEditor = ({
           {headerAccessory}
         </div>
       ) : null}
-      {(isNormalMode || !isCollapsed) ? (
+      {isNormalMode || !isCollapsed ? (
         <div className={styles.panelBody}>
           <div className={styles.objectBody}>
             {primaryEntries.map(([key, value]) => {
@@ -98,9 +85,7 @@ const SessionMetadataEditor = ({
               if (isNormalMode && key === 'sessionName') {
                 return (
                   <div key={`${key}-row`} className={styles.sessionIdentityRow}>
-                    <div className={styles.sessionIdentityPrimary}>
-                      {renderField(key, value, [])}
-                    </div>
+                    <div className={styles.sessionIdentityPrimary}>{renderField(key, value, [])}</div>
                     <div className={styles.sessionIdentitySecondary}>
                       {renderField('sessionHeader', draft?.sessionHeader ?? '', [])}
                     </div>
@@ -108,11 +93,7 @@ const SessionMetadataEditor = ({
                 );
               }
               if (isNormalMode && key === 'sessionHeader') {
-                return (
-                  <React.Fragment key={`${key}-options`}>
-                    {renderMoreOptionsSection()}
-                  </React.Fragment>
-                );
+                return <React.Fragment key={`${key}-options`}>{renderMoreOptionsSection()}</React.Fragment>;
               }
               if (key === 'sessionHeader') {
                 const blockLimitsValue = draft?.blockLimits;
@@ -138,11 +119,7 @@ const SessionMetadataEditor = ({
                 />
               </JsonButtonRow>
               {showJsonPreview ? (
-                <JsonPanel
-                  onCopy={onCopyDraftJson}
-                  copied={jsonCopied}
-                  as="pre"
-                >
+                <JsonPanel onCopy={onCopyDraftJson} copied={jsonCopied} as="pre">
                   {JSON.stringify(draft, null, 2)}
                 </JsonPanel>
               ) : null}

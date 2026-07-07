@@ -3,10 +3,7 @@ import {
   buildAutoDecryptToggleState,
   buildClearedDecryptingByKeyState,
 } from './surveyQuestionsTypes';
-import {
-  decideAutoDecryptBlocked,
-  decideAutomaticPromptDecryptByKind,
-} from './surveyQuestionsDecryptEligibility.js';
+import { decideAutoDecryptBlocked, decideAutomaticPromptDecryptByKind } from './surveyQuestionsDecryptEligibility.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 
 describe('SurveyTool auto-decrypt state', () => {

@@ -1,7 +1,4 @@
-import {
-  isPlainAnalysisObject,
-  type UserPageUnknownRecord,
-} from './userPageCoreHelpers';
+import { isPlainAnalysisObject, type UserPageUnknownRecord } from './userPageCoreHelpers';
 import { buildUserPageDeepScanRefreshCarryPatch } from './userPageDeepScanHelpers';
 
 type UserPageLengthLike = {
@@ -129,8 +126,7 @@ export type ResolveUserPageAiActionPlanArgs = {
   walletLabel?: unknown;
 };
 
-export type BuildUserPageCacheRefreshDisplayStateArgs =
-  BuildUserPageRenderLoadingStateArgs &
+export type BuildUserPageCacheRefreshDisplayStateArgs = BuildUserPageRenderLoadingStateArgs &
   BuildUserPageSectionLoadingEmptyStateArgs &
   BuildUserPageUncertainEmptyTextArgs & {
     aiAvailable?: unknown;
@@ -253,9 +249,8 @@ export const buildUserPageRenderLoadingState = ({
   const isQuestionReady = !!isQuestionCacheReady;
   const isResponsesReady = !!isResponsesCacheReady;
   const deepScanActive = !!isDeepScanning;
-  const sectionEnabled = typeof isDeepScanLoadingEnabledForSection === 'function'
-    ? isDeepScanLoadingEnabledForSection
-    : () => false;
+  const sectionEnabled =
+    typeof isDeepScanLoadingEnabledForSection === 'function' ? isDeepScanLoadingEnabledForSection : () => false;
   const surveyDeepScanLoadingActive = !!(sectionEnabled('surveys') && deepScanActive);
   const questionDeepScanLoadingActive = !!(sectionEnabled('questions') && deepScanActive);
   return {
@@ -376,17 +371,13 @@ export const buildUserPageSectionLoadingEmptyState = ({
 }: BuildUserPageSectionLoadingEmptyStateArgs = {}): UserPageSectionLoadingEmptyState => ({
   sbtSectionLoadingEmpty: Boolean(isSbtLoadingAny && sbtList.length === 0),
   surveyResponsesLoadingEmpty: Boolean(isSurveyLoadingAny && surveyResponseInfo.length === 0),
-  surveysCreatedLoadingEmpty: Boolean((
-    loadingSurveys ||
-    !isSurveyReady ||
-    surveyDeepScanLoadingActive
-  ) && surveyCreationInfo.length === 0),
+  surveysCreatedLoadingEmpty: Boolean(
+    (loadingSurveys || !isSurveyReady || surveyDeepScanLoadingActive) && surveyCreationInfo.length === 0,
+  ),
   questionResponsesLoadingEmpty: Boolean(isQuestionLoadingAny && questionResponseInfo.length === 0),
-  questionsCreatedLoadingEmpty: Boolean((
-    loadingQuestions ||
-    !isQuestionReady ||
-    questionDeepScanLoadingActive
-  ) && questionCreationInfo.length === 0),
+  questionsCreatedLoadingEmpty: Boolean(
+    (loadingQuestions || !isQuestionReady || questionDeepScanLoadingActive) && questionCreationInfo.length === 0,
+  ),
 });
 
 export const buildUserPageUncertainEmptyText = ({
@@ -417,11 +408,7 @@ export const resolveUserPageCacheReadinessDisplayPlan = ({
   const hasData = !!hasVisibleData;
   return {
     cacheActionKind: disabledByCache ? 'disabled' : 'enabled',
-    cacheDisplayKind: isLoading
-      ? 'loading'
-      : hasData
-        ? 'idle'
-        : 'stale-or-cache-miss',
+    cacheDisplayKind: isLoading ? 'loading' : hasData ? 'idle' : 'stale-or-cache-miss',
     hasMissingDataFallback: !isLoading && !hasData,
   };
 };
@@ -491,11 +478,8 @@ export const buildUserPageCacheRefreshDisplayState = ({
     sbtLabel,
     sbtsLowerLabel,
   });
-  const hasAnyLoading = (
-    loadingState.isQuestionLoadingAny ||
-    loadingState.isSbtLoadingAny ||
-    loadingState.isSurveyLoadingAny
-  );
+  const hasAnyLoading =
+    loadingState.isQuestionLoadingAny || loadingState.isSbtLoadingAny || loadingState.isSurveyLoadingAny;
   const hasVisibleData = [
     questionCreationInfo,
     questionResponseInfo,
@@ -561,19 +545,11 @@ export const buildUserPageUncertaintyLoadingFlags = ({
     hasQuestionGateUncertainty,
     hasSurveyGateUncertainty,
     keepQuestionLoadingDuringDeepScan: !!keepQuestionLoadingDuringDeepScan,
-    keepQuestionLoadingFromUserUncertainty: preserveUserDataUncertainty && (
-      !!prev.isDeepScanning ||
-      !hasQuestionSources
-    ),
-    keepSbtLoadingFromUserUncertainty: preserveUserDataUncertainty && (
-      !!prev.isDeepScanning ||
-      !hasSbtSources
-    ),
+    keepQuestionLoadingFromUserUncertainty:
+      preserveUserDataUncertainty && (!!prev.isDeepScanning || !hasQuestionSources),
+    keepSbtLoadingFromUserUncertainty: preserveUserDataUncertainty && (!!prev.isDeepScanning || !hasSbtSources),
     keepSurveyLoadingDuringDeepScan: !!keepSurveyLoadingDuringDeepScan,
-    keepSurveyLoadingFromUserUncertainty: preserveUserDataUncertainty && (
-      !!prev.isDeepScanning ||
-      !hasSurveySources
-    ),
+    keepSurveyLoadingFromUserUncertainty: preserveUserDataUncertainty && (!!prev.isDeepScanning || !hasSurveySources),
     preserveUserDataUncertainty,
   };
 };
@@ -588,19 +564,13 @@ export const buildUserPageUserStatsMergePatch = ({
   return { ...previous, ...patch };
 };
 
-const readRefreshSectionCount = (
-  section: unknown,
-  key: string,
-): number | string => {
+const readRefreshSectionCount = (section: unknown, key: string): number | string => {
   if (!isPlainAnalysisObject(section)) return 'N/A (held)';
   const maybeLength = (section[key] as UserPageLengthLike | undefined)?.length;
   return maybeLength ?? 'N/A (held)';
 };
 
-const readRefreshSectionLength = (
-  section: UserPageUnknownRecord,
-  key: string,
-): number => {
+const readRefreshSectionLength = (section: UserPageUnknownRecord, key: string): number => {
   const length = Number((section[key] as UserPageLengthLike | undefined)?.length || 0);
   return Number.isFinite(length) && length > 0 ? length : 0;
 };
@@ -627,9 +597,8 @@ export const buildUserPageCacheRefreshStatePatch = ({
   uncertainResources = null,
 }: BuildUserPageCacheRefreshStatePatchArgs = {}): UserPageCacheRefreshStatePatchPlan => {
   const prev = isPlainAnalysisObject(prevState) ? prevState : {};
-  const sectionDeepScanLoadingEnabled = typeof isDeepScanLoadingEnabledForSection === 'function'
-    ? isDeepScanLoadingEnabledForSection
-    : null;
+  const sectionDeepScanLoadingEnabled =
+    typeof isDeepScanLoadingEnabledForSection === 'function' ? isDeepScanLoadingEnabledForSection : null;
   const resolvedKeepQuestionLoadingDuringDeepScan =
     keepQuestionLoadingDuringDeepScan == null
       ? !!sectionDeepScanLoadingEnabled?.('questions')
@@ -638,13 +607,14 @@ export const buildUserPageCacheRefreshStatePatch = ({
     keepSurveyLoadingDuringDeepScan == null
       ? !!sectionDeepScanLoadingEnabled?.('surveys')
       : !!keepSurveyLoadingDuringDeepScan;
-  const resolvedDeepScanCarryPatch = deepScanCarryPatch === undefined
-    ? buildUserPageDeepScanRefreshCarryPatch({
-        deepScanProgressRows,
-        deepScanTooltipLines,
-        prevState: prev,
-      })
-    : deepScanCarryPatch;
+  const resolvedDeepScanCarryPatch =
+    deepScanCarryPatch === undefined
+      ? buildUserPageDeepScanRefreshCarryPatch({
+          deepScanProgressRows,
+          deepScanTooltipLines,
+          prevState: prev,
+        })
+      : deepScanCarryPatch;
   const next: UserPageUnknownRecord = {};
   const userStatsPatch: UserPageUnknownRecord = {};
   const uncertaintyFlags = buildUserPageUncertaintyLoadingFlags({
@@ -675,11 +645,11 @@ export const buildUserPageCacheRefreshStatePatch = ({
     next.detailedSurveyResponses = survey.detailedSurveyResponses;
     userStatsPatch.surveysResponded = survey.surveysResponded;
     userStatsPatch.surveysCreated = survey.surveysCreated;
-    next.loadingSurveys = (
-      keepSurveyLoadingFromUserUncertainty ||
-      hasSurveyGateUncertainty ||
-      (resolvedKeepSurveyLoadingDuringDeepScan && !!prev.isDeepScanning)
-    ) && readRefreshSectionLength(survey, 'surveyResponseInfo') === 0;
+    next.loadingSurveys =
+      (keepSurveyLoadingFromUserUncertainty ||
+        hasSurveyGateUncertainty ||
+        (resolvedKeepSurveyLoadingDuringDeepScan && !!prev.isDeepScanning)) &&
+      readRefreshSectionLength(survey, 'surveyResponseInfo') === 0;
   } else if (holdSurveyLoading || markLoading || !aggregatePresent) {
     next.loadingSurveys = true;
   }
@@ -691,11 +661,11 @@ export const buildUserPageCacheRefreshStatePatch = ({
     next.detailedQuestionResponses = question.detailedQuestionResponses;
     userStatsPatch.questionsCreated = question.questionsCreated;
     userStatsPatch.questionsResponded = question.questionsResponded;
-    next.loadingQuestions = (
-      keepQuestionLoadingFromUserUncertainty ||
-      hasQuestionGateUncertainty ||
-      (resolvedKeepQuestionLoadingDuringDeepScan && !!prev.isDeepScanning)
-    ) && readRefreshSectionLength(question, 'questionResponseInfo') === 0;
+    next.loadingQuestions =
+      (keepQuestionLoadingFromUserUncertainty ||
+        hasQuestionGateUncertainty ||
+        (resolvedKeepQuestionLoadingDuringDeepScan && !!prev.isDeepScanning)) &&
+      readRefreshSectionLength(question, 'questionResponseInfo') === 0;
   } else if (holdQuestionLoading || markLoading || !aggregatePresent) {
     next.loadingQuestions = true;
   }

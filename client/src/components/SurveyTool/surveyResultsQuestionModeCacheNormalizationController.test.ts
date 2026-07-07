@@ -3,17 +3,18 @@ import {
   type SurveyResultsQuestionModeCacheNormalizationPorts,
 } from './surveyResultsQuestionModeCacheNormalizationController';
 
-const toRecord = (value: unknown): Record<string, unknown> => (
-  value && typeof value === 'object' ? value as Record<string, unknown> : {}
-);
+const toRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
 const createPorts = (): SurveyResultsQuestionModeCacheNormalizationPorts => ({
-  isDemoPolisFixtureResponse: (responseData) => (
-    toRecord(responseData).source === 'demo-polis-data'
-  ),
+  isDemoPolisFixtureResponse: (responseData) => toRecord(responseData).source === 'demo-polis-data',
   isResponseAllowedForSessionSlug: (responseData, requiredSessionSlug) => {
     if (!requiredSessionSlug) return true;
-    return String(toRecord(responseData).sessionSlug || '').trim().toLowerCase() === requiredSessionSlug;
+    return (
+      String(toRecord(responseData).sessionSlug || '')
+        .trim()
+        .toLowerCase() === requiredSessionSlug
+    );
   },
   parseResponse: (responseData) => {
     if (typeof responseData !== 'string') return responseData;

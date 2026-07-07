@@ -97,7 +97,7 @@ export const shouldCommitThrottledProgress = ({
   minIntervalMs = 0,
 }: ThrottledProgressArgs = {}) => {
   if (force) return true;
-  return (Number(nowMs || 0) - Number(lastCommitMs || 0)) >= Math.max(0, Number(minIntervalMs || 0));
+  return Number(nowMs || 0) - Number(lastCommitMs || 0) >= Math.max(0, Number(minIntervalMs || 0));
 };
 
 export const mapSbtWorkProgressToBlock = ({
@@ -112,20 +112,11 @@ export const mapSbtWorkProgressToBlock = ({
   const totalBlocks = Math.max(1, toBlock - fromBlock + 1);
   const safeTotalUnits = Math.max(0, Number(totalUnits || 0));
   const safeCompletedUnits = Math.max(0, Math.min(safeTotalUnits, Number(completedUnits || 0)));
-  const safeReserveTail = Math.max(
-    0,
-    Math.min(totalBlocks - 1, Math.floor(Number(reserveTailBlocks || 0)))
-  );
+  const safeReserveTail = Math.max(0, Math.min(totalBlocks - 1, Math.floor(Number(reserveTailBlocks || 0))));
   const visibleProgressSpan = Math.max(0, totalBlocks - safeReserveTail);
-  const ratio = safeTotalUnits > 0 ? (safeCompletedUnits / safeTotalUnits) : 0;
-  const advancedBlocks = Math.min(
-    visibleProgressSpan,
-    Math.max(0, Math.floor(ratio * visibleProgressSpan))
-  );
-  return Math.max(
-    0,
-    Math.min(toBlock - safeReserveTail, (fromBlock - 1) + advancedBlocks)
-  );
+  const ratio = safeTotalUnits > 0 ? safeCompletedUnits / safeTotalUnits : 0;
+  const advancedBlocks = Math.min(visibleProgressSpan, Math.max(0, Math.floor(ratio * visibleProgressSpan)));
+  return Math.max(0, Math.min(toBlock - safeReserveTail, fromBlock - 1 + advancedBlocks));
 };
 
 export const mergeSbtLiveProgressEntry = ({
@@ -133,22 +124,18 @@ export const mergeSbtLiveProgressEntry = ({
   nextPatch = null,
   nowMs = Date.now(),
 }: MergeSbtLiveProgressArgs = {}) => {
-  const prev: SbtLiveProgressEntry = (prevEntry && typeof prevEntry === 'object') ? prevEntry : {};
-  const patch: SbtLiveProgressEntry = (nextPatch && typeof nextPatch === 'object') ? nextPatch : {};
-  const rawCurrentBlock = Number(
-    patch.currentBlock != null ? patch.currentBlock : prev.currentBlock
-  );
-  const rawLatestBlock = Number(
-    patch.latestBlock != null ? patch.latestBlock : prev.latestBlock
-  );
+  const prev: SbtLiveProgressEntry = prevEntry && typeof prevEntry === 'object' ? prevEntry : {};
+  const patch: SbtLiveProgressEntry = nextPatch && typeof nextPatch === 'object' ? nextPatch : {};
+  const rawCurrentBlock = Number(patch.currentBlock != null ? patch.currentBlock : prev.currentBlock);
+  const rawLatestBlock = Number(patch.latestBlock != null ? patch.latestBlock : prev.latestBlock);
   const currentBlock = Math.max(
     Math.floor(Number(prev.currentBlock || 0)),
-    Number.isFinite(rawCurrentBlock) ? Math.floor(rawCurrentBlock) : 0
+    Number.isFinite(rawCurrentBlock) ? Math.floor(rawCurrentBlock) : 0,
   );
   const latestBlock = Math.max(
     currentBlock,
     Math.floor(Number(prev.latestBlock || 0)),
-    Number.isFinite(rawLatestBlock) ? Math.floor(rawLatestBlock) : 0
+    Number.isFinite(rawLatestBlock) ? Math.floor(rawLatestBlock) : 0,
   );
   return {
     ...prev,
@@ -164,12 +151,12 @@ export const buildQuestionReadyStatePatch = ({
   ready = false,
   incrementNonce = false,
 }: BuildQuestionReadyArgs = {}) => {
-  const prev: QuestionReadyPrevState = (prevState && typeof prevState === 'object') ? prevState : {};
+  const prev: QuestionReadyPrevState = prevState && typeof prevState === 'object' ? prevState : {};
   const nextNonce = Number(prev.questionResponsesNonce || 0) + (incrementNonce ? 1 : 0);
   return {
     isQuestionCacheReady: !!ready,
     // Keep progress visible while cache is still not ready.
-    questionScanProgress: ready ? null : (prev.questionScanProgress || null),
+    questionScanProgress: ready ? null : prev.questionScanProgress || null,
     questionResponsesNonce: nextNonce,
   };
 };

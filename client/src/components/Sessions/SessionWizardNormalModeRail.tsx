@@ -42,9 +42,7 @@ const SessionWizardNormalModeRail = ({
           <span className={styles.normalModeCardNumber}>{card.stepNumber}</span>
           <span className={styles.normalModeCardContent}>
             <span className={styles.normalModeCardTitle}>{card.title}</span>
-            {showExpandedDetails && (
-              <span className={styles.normalModeCardSummary}>{card.summary}</span>
-            )}
+            {showExpandedDetails && <span className={styles.normalModeCardSummary}>{card.summary}</span>}
           </span>
         </button>
       );

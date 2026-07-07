@@ -7,24 +7,30 @@ jest.mock('utilities/logging', () => ({
   })),
 }));
 
-jest.mock('../../utilities/cache/cacheScripts.js', () => ({
-  __esModule: true,
-  readCache: jest.fn(),
-}), { virtual: true });
+jest.mock(
+  '../../utilities/cache/cacheScripts.js',
+  () => ({
+    __esModule: true,
+    readCache: jest.fn(),
+  }),
+  { virtual: true },
+);
 
 jest.mock('./sessionCacheConstants', () => ({
   __esModule: true,
   DG_PRIMARY_ROUTE_CACHE_NAMES: ['surveysCache', 'questionsCache', 'sbtCache'],
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
-  __esModule: true,
-  normalizeSessionSlug: jest.fn(),
-}), { virtual: true });
+jest.mock(
+  '../../utilities/web3/contractScripts.js',
+  () => ({
+    __esModule: true,
+    normalizeSessionSlug: jest.fn(),
+  }),
+  { virtual: true },
+);
 
-const {
-  createSessionCachePersistenceController,
-} = require('./sessionCachePersistenceController.js');
+const { createSessionCachePersistenceController } = require('./sessionCachePersistenceController.js');
 const { readCache } = require('../../utilities/cache/cacheScripts.js');
 const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
 
@@ -56,8 +62,10 @@ const createDeferred = () => {
 describe('createSessionCachePersistenceController', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    contractScriptsModule.normalizeSessionSlug.mockImplementation(
-      (slug) => String(slug || '').trim().toLowerCase()
+    contractScriptsModule.normalizeSessionSlug.mockImplementation((slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase(),
     );
   });
 
@@ -99,10 +107,7 @@ describe('createSessionCachePersistenceController', () => {
 
   describe('hasPersistedManagedCacheData', () => {
     it('returns true when any managed cache entry is persisted', async () => {
-      readCache
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({ ok: true })
-        .mockResolvedValueOnce(null);
+      readCache.mockResolvedValueOnce(null).mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce(null);
       const controller = createSessionCachePersistenceController(createMockHost());
 
       await expect(controller.hasPersistedManagedCacheData(' Test ')).resolves.toBe(true);
@@ -179,10 +184,7 @@ describe('createSessionCachePersistenceController', () => {
     });
 
     it('writes the cacheHasLoaded flag and updates state when mounted on the active slug', async () => {
-      readCache
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({ persisted: true })
-        .mockResolvedValueOnce(null);
+      readCache.mockResolvedValueOnce(null).mockResolvedValueOnce({ persisted: true }).mockResolvedValueOnce(null);
       const host = createMockHost({ initialState: { cacheHasLoaded: false } });
       const controller = createSessionCachePersistenceController(host);
 
@@ -194,10 +196,7 @@ describe('createSessionCachePersistenceController', () => {
     });
 
     it('skips state updates when the active slug does not match', async () => {
-      readCache
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({ persisted: true })
-        .mockResolvedValueOnce(null);
+      readCache.mockResolvedValueOnce(null).mockResolvedValueOnce({ persisted: true }).mockResolvedValueOnce(null);
       const host = createMockHost({ activeSlug: 'other-slug' });
       const controller = createSessionCachePersistenceController(host);
 

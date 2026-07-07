@@ -11,11 +11,7 @@ import type { SbtMetadataReadsPort, SbtProviderRef } from '../../sbts/sbtPorts.j
 type PublishRecord = Record<string, unknown>;
 
 export type ArweavePublishScripts = {
-  uploadDataToArweave: (
-    data: unknown,
-    format: string,
-    options?: PublishRecord
-  ) => Promise<string | undefined>;
+  uploadDataToArweave: (data: unknown, format: string, options?: PublishRecord) => Promise<string | undefined>;
   buildArweaveGatewayUrl: (txId: string) => string;
 };
 
@@ -40,22 +36,17 @@ export const bindArweavePublishAdapter = ({
   arweaveScripts: readArweaveScripts,
   resolveUploadOptions = defaultResolvePublishArweaveUploadOptions,
 }: BindArweavePublishAdapterArgs) => ({
-  uploadDataToArweave: ({ data, format, options }: ArweaveUploadInput) => (
-    readArweaveScripts().uploadDataToArweave(data, format, options)
-  ),
-  buildArweaveGatewayUrl: ({ txId }: ArweaveGatewayUrlInput) => (
-    readArweaveScripts().buildArweaveGatewayUrl(txId)
-  ),
-  resolveUploadOptions: (input: Parameters<ResolvePublishArweaveUploadOptions>[0]) => (
-    resolveUploadOptions(input)
-  ),
+  uploadDataToArweave: ({ data, format, options }: ArweaveUploadInput) =>
+    readArweaveScripts().uploadDataToArweave(data, format, options),
+  buildArweaveGatewayUrl: ({ txId }: ArweaveGatewayUrlInput) => readArweaveScripts().buildArweaveGatewayUrl(txId),
+  resolveUploadOptions: (input: Parameters<ResolvePublishArweaveUploadOptions>[0]) => resolveUploadOptions(input),
 });
 
 export type SessionRegistryPublishUtils = {
   getRegistryContract: (
     chainId: unknown,
     providerLike?: ethers.providers.Provider | null,
-    options?: { bootstrapRpc?: boolean }
+    options?: { bootstrapRpc?: boolean },
   ) => unknown;
   fetchSessionFromRegistry: (input: PublishRecord) => Promise<PublishRecord | null | undefined>;
   upsertSessionRegistryCache: (input: PublishRecord) => unknown;
@@ -87,18 +78,13 @@ export type BindSessionRegistryPublishAdapterArgs = {
 export const bindSessionRegistryPublishAdapter = ({
   sessionRegistry: readSessionRegistry,
 }: BindSessionRegistryPublishAdapterArgs) => ({
-  registerSession: (registerArgs: PublishRecord) => (
-    readSessionRegistry().registerSessionOnChain(registerArgs)
-  ),
-  getRegistryContract: ({ chainId, providerLike, options }: RegistryContractInput) => (
-    readSessionRegistry().sessionRegistryUtils.getRegistryContract(chainId, providerLike, options)
-  ),
-  fetchSessionFromRegistry: (fetchArgs: PublishRecord) => (
-    readSessionRegistry().sessionRegistryUtils.fetchSessionFromRegistry(fetchArgs)
-  ),
-  upsertSessionRegistryCache: (cacheArgs: PublishRecord) => (
-    readSessionRegistry().sessionRegistryUtils.upsertSessionRegistryCache(cacheArgs)
-  ),
+  registerSession: (registerArgs: PublishRecord) => readSessionRegistry().registerSessionOnChain(registerArgs),
+  getRegistryContract: ({ chainId, providerLike, options }: RegistryContractInput) =>
+    readSessionRegistry().sessionRegistryUtils.getRegistryContract(chainId, providerLike, options),
+  fetchSessionFromRegistry: (fetchArgs: PublishRecord) =>
+    readSessionRegistry().sessionRegistryUtils.fetchSessionFromRegistry(fetchArgs),
+  upsertSessionRegistryCache: (cacheArgs: PublishRecord) =>
+    readSessionRegistry().sessionRegistryUtils.upsertSessionRegistryCache(cacheArgs),
   refreshRegistryCache: async ({ fetchArgs }: RegistryRefreshInput) => {
     const config = await readSessionRegistry().sessionRegistryUtils.fetchSessionFromRegistry(fetchArgs);
     if (config) {
@@ -108,9 +94,7 @@ export const bindSessionRegistryPublishAdapter = ({
   },
   normalizeSlug: (value: unknown) => readSessionRegistry().sessionRegistryUtils.normalizeSlug(value),
   formatSessionId: (value: unknown) => readSessionRegistry().sessionRegistryUtils.formatSessionId(value),
-  normalizeSessionIdHex: (value: unknown) => (
-    readSessionRegistry().sessionRegistryUtils.normalizeSessionIdHex(value)
-  ),
+  normalizeSessionIdHex: (value: unknown) => readSessionRegistry().sessionRegistryUtils.normalizeSessionIdHex(value),
   toRegistrySlug: (value: unknown) => readSessionRegistry().sessionRegistryUtils.toRegistrySlug(value),
 });
 
@@ -141,16 +125,11 @@ export type WorkerAdminActionAuthInput = {
   nonce?: string;
 };
 
-export const bindWorkerAuthPublishAdapter = ({
-  workerAuth: readWorkerAuth,
-}: BindWorkerAuthPublishAdapterArgs) => ({
+export const bindWorkerAuthPublishAdapter = ({ workerAuth: readWorkerAuth }: BindWorkerAuthPublishAdapterArgs) => ({
   normalizeWorkerUrl: (value: unknown) => readWorkerAuth().normalizeWorkerUrl(value),
-  buildSignedBootstrapAdminAuth: (input: WorkerBootstrapAdminAuthInput) => (
-    readWorkerAuth().buildSignedBootstrapAdminAuth(input)
-  ),
-  buildSignedAdminActionAuth: (input: WorkerAdminActionAuthInput) => (
-    readWorkerAuth().buildSignedAdminActionAuth(input)
-  ),
+  buildSignedBootstrapAdminAuth: (input: WorkerBootstrapAdminAuthInput) =>
+    readWorkerAuth().buildSignedBootstrapAdminAuth(input),
+  buildSignedAdminActionAuth: (input: WorkerAdminActionAuthInput) => readWorkerAuth().buildSignedAdminActionAuth(input),
 });
 
 export type SponsoredBundlePublishModule = {
@@ -165,12 +144,9 @@ export type BindSponsoredBundlePublishAdapterArgs = {
 export const bindSponsoredBundlePublishAdapter = ({
   sponsoredBundles: readSponsoredBundles,
 }: BindSponsoredBundlePublishAdapterArgs) => ({
-  normalizeSparseSponsoredBundlePayload: (input: unknown) => (
-    readSponsoredBundles().normalizeSparseSponsoredBundlePayload(input)
-  ),
-  hasSponsoredBundleFields: (input: PublishRecord) => (
-    readSponsoredBundles().hasSponsoredBundleFields(input)
-  ),
+  normalizeSparseSponsoredBundlePayload: (input: unknown) =>
+    readSponsoredBundles().normalizeSparseSponsoredBundlePayload(input),
+  hasSponsoredBundleFields: (input: PublishRecord) => readSponsoredBundles().hasSponsoredBundleFields(input),
 });
 
 export type SbtFactoryReceiptModule = {
@@ -184,9 +160,8 @@ export type BindSbtFactoryReceiptPublishAdapterArgs = {
 export const bindSbtFactoryReceiptPublishAdapter = ({
   sbtFactoryReceipt: readSbtFactoryReceipt,
 }: BindSbtFactoryReceiptPublishAdapterArgs) => ({
-  resolveSbtAddressFromFactoryReceipt: ({ receipt }: { receipt: unknown }) => (
-    readSbtFactoryReceipt().resolveSbtAddressFromFactoryReceipt(receipt)
-  ),
+  resolveSbtAddressFromFactoryReceipt: ({ receipt }: { receipt: unknown }) =>
+    readSbtFactoryReceipt().resolveSbtAddressFromFactoryReceipt(receipt),
 });
 
 export type SbtMetadataReadInput = {
@@ -202,9 +177,8 @@ export type BindSessionPublishSbtMetadataAdapterArgs = {
 export const bindSessionPublishSbtMetadataAdapter = ({
   metadataReadsPort: readMetadataReadsPort,
 }: BindSessionPublishSbtMetadataAdapterArgs) => ({
-  getSbtMetadata: ({ providerName, sbtAddress, groupKeyOrCfg }: SbtMetadataReadInput) => (
-    readMetadataReadsPort().getSbtMetadata(providerName, sbtAddress, groupKeyOrCfg)
-  ),
+  getSbtMetadata: ({ providerName, sbtAddress, groupKeyOrCfg }: SbtMetadataReadInput) =>
+    readMetadataReadsPort().getSbtMetadata(providerName, sbtAddress, groupKeyOrCfg),
 });
 
 export const arweavePublishAdapter = bindArweavePublishAdapter({

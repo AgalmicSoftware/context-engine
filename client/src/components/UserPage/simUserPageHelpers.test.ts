@@ -21,10 +21,12 @@ describe('simUserPageHelpers', () => {
   });
 
   it('builds the mounted user-info state patch', () => {
-    expect(buildSimUserInfoStatePatch({
-      figures,
-      simUsername: 'Lovelace',
-    })).toEqual({
+    expect(
+      buildSimUserInfoStatePatch({
+        figures,
+        simUsername: 'Lovelace',
+      }),
+    ).toEqual({
       userInfo: figures[1],
     });
     expect(buildSimUserInfoStatePatch({ figures, simUsername: 'Missing' })).toEqual({
@@ -45,33 +47,43 @@ describe('simUserPageHelpers', () => {
   });
 
   it('builds simulated user page display classes and styles', () => {
-    expect(buildSimUserPageRootClassName({
-      baseClassName: 'sim',
-      minimized: true,
-      minimizedClassName: 'min',
-    })).toBe('sim min');
-    expect(buildSimUserPageRootClassName({
-      baseClassName: 'sim',
-      minimized: false,
-      minimizedClassName: 'min',
-    })).toBe('sim');
+    expect(
+      buildSimUserPageRootClassName({
+        baseClassName: 'sim',
+        minimized: true,
+        minimizedClassName: 'min',
+      }),
+    ).toBe('sim min');
+    expect(
+      buildSimUserPageRootClassName({
+        baseClassName: 'sim',
+        minimized: false,
+        minimizedClassName: 'min',
+      }),
+    ).toBe('sim');
     expect(resolveSimUserStanceMarkerStyle({ value: 0 })).toEqual({ left: '50%' });
     expect(resolveSimUserStanceMarkerStyle({ value: -1 })).toEqual({ left: '0%' });
-    expect(buildSimUserVoteIndicatorClassName({
-      baseClassName: 'vote',
-      negativeClassName: 'negative',
-      positiveClassName: 'positive',
-      vote: 2,
-    })).toBe('vote positive');
-    expect(buildSimUserVoteIndicatorClassName({
-      baseClassName: 'vote',
-      negativeClassName: 'negative',
-      positiveClassName: 'positive',
-      vote: -1,
-    })).toBe('vote negative');
-    expect(buildSimUserRelatedScoreClassName({
-      baseClassName: 'score',
-      disagreeClassName: 'disagree',
-    })).toBe('score disagree');
+    expect(
+      buildSimUserVoteIndicatorClassName({
+        baseClassName: 'vote',
+        negativeClassName: 'negative',
+        positiveClassName: 'positive',
+        vote: 2,
+      }),
+    ).toBe('vote positive');
+    expect(
+      buildSimUserVoteIndicatorClassName({
+        baseClassName: 'vote',
+        negativeClassName: 'negative',
+        positiveClassName: 'positive',
+        vote: -1,
+      }),
+    ).toBe('vote negative');
+    expect(
+      buildSimUserRelatedScoreClassName({
+        baseClassName: 'score',
+        disagreeClassName: 'disagree',
+      }),
+    ).toBe('score disagree');
   });
 });

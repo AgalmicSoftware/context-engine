@@ -59,7 +59,11 @@ jest.mock('../../utilities/session/resourceKeys.js', () => ({
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   registerSessionOnChain: (...args) => mockRegisterSessionOnChain(...args),
   sessionRegistryUtils: {
-    normalizeSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
+    normalizeSlug: jest.fn((value = '') =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    ),
     formatSessionId: jest.fn((value = '') => String(value || '').trim()),
     normalizeSessionIdHex: jest.fn((value = '') => String(value || '').trim()),
     toRegistrySlug: jest.fn((value = '') => String(value || '').trim()),
@@ -73,7 +77,9 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
   default: {},
   getSessionConfigBySlugOrDefault: jest.fn((slug = '') => {
-    const normalized = String(slug || '').trim().toLowerCase();
+    const normalized = String(slug || '')
+      .trim()
+      .toLowerCase();
     if (normalized && normalized !== 'general') return null;
     return {
       slug: '',
@@ -92,7 +98,9 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
     };
   }),
   getDemoSessionConfigBySlug: jest.fn((slug = '') => {
-    const normalized = String(slug || '').trim().toLowerCase();
+    const normalized = String(slug || '')
+      .trim()
+      .toLowerCase();
     if (normalized && normalized !== 'general') return null;
     return {
       slug: '',
@@ -145,9 +153,7 @@ jest.mock('../../variables/appConfig.js', () => {
   };
 });
 
-import SessionWizard, {
-  __test__resetSessionWizardSponsoredBundleCacheKey,
-} from './SessionWizard';
+import SessionWizard, { __test__resetSessionWizardSponsoredBundleCacheKey } from './SessionWizard';
 import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../../utilities/session/sponsoredBootstrapFunding.js';
 import {
   SPONSORED_DEPLOY_NOTICE,
@@ -173,12 +179,13 @@ import {
 import { createIndexedDbMock } from './SessionWizard.sponsoredBundleIndexedDb.testUtils.js';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
-const renderLoggedInSessionWizard = (props = {}) => renderSessionWizard({
-  account: TEST_ADMIN_ADDRESS,
-  loginComplete: true,
-  toggleLoginModal: jest.fn(),
-  ...props,
-});
+const renderLoggedInSessionWizard = (props = {}) =>
+  renderSessionWizard({
+    account: TEST_ADMIN_ADDRESS,
+    loginComplete: true,
+    toggleLoginModal: jest.fn(),
+    ...props,
+  });
 
 describe('SessionWizard sponsored bundle flow', () => {
   beforeEach(() => {
@@ -251,10 +258,12 @@ describe('SessionWizard sponsored bundle flow', () => {
       const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
       expect(cachedRaw).not.toContain('sponsored-openai');
       expect(cachedRaw).not.toContain('sponsored-rpc.example.test');
-      expect(JSON.parse(cachedRaw)).toEqual(expect.objectContaining({
-        persistWorkerSecrets: false,
-        workerSecretsEnabled: true,
-      }));
+      expect(JSON.parse(cachedRaw)).toEqual(
+        expect.objectContaining({
+          persistWorkerSecrets: false,
+          workerSecretsEnabled: true,
+        }),
+      );
     });
   }, 15000);
 
@@ -332,13 +341,15 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     await waitFor(() => {
       const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
-      expect(JSON.parse(cachedRaw)).toEqual(expect.objectContaining({
-        deployComplete: false,
-        deployWorkerUrl: '',
-        draft: expect.objectContaining({
-          corsWorkerUrl: '',
+      expect(JSON.parse(cachedRaw)).toEqual(
+        expect.objectContaining({
+          deployComplete: false,
+          deployWorkerUrl: '',
+          draft: expect.objectContaining({
+            corsWorkerUrl: '',
+          }),
         }),
-      }));
+      );
     });
   }, 15000);
 
@@ -370,9 +381,11 @@ describe('SessionWizard sponsored bundle flow', () => {
   it('checks duplicate slugs before sponsored publish can auto-deploy a worker', async () => {
     let publishClicked = false;
     mockSessionExists.mockImplementation(async () => publishClicked);
-    mockDecryptWithPassword.mockResolvedValueOnce(buildDecryptedSponsoredBundle({
-      deployGrantToken: 'deploy-grant-token',
-    }));
+    mockDecryptWithPassword.mockResolvedValueOnce(
+      buildDecryptedSponsoredBundle({
+        deployGrantToken: 'deploy-grant-token',
+      }),
+    );
 
     renderLoggedInSessionWizard({
       initialSponsoredBundleId: 'sponsor_tx_id',
@@ -399,15 +412,11 @@ describe('SessionWizard sponsored bundle flow', () => {
     fireEvent.click(publishButton);
 
     expect(
-      await screen.findByText('Session slug already exists on-chain: sponsored-duplicate-session')
+      await screen.findByText('Session slug already exists on-chain: sponsored-duplicate-session'),
     ).toBeInTheDocument();
     expect(mockSessionExists).toHaveBeenCalledWith('sponsored-duplicate-session');
-    expect(
-      global.fetch.mock.calls.some(([url]) => String(url).endsWith('/deploy'))
-    ).toBe(false);
-    expect(
-      global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))
-    ).toBe(false);
+    expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
+    expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(false);
     expect(mockUploadDataToArweave).not.toHaveBeenCalled();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   }, 15000);
@@ -436,11 +445,7 @@ describe('SessionWizard sponsored bundle flow', () => {
   }, 15000);
 
   it('removes the sponsored bundle hash secret after applying the bundle', async () => {
-    window.history.replaceState(
-      {},
-      '',
-      '/session/new?sponsored=sponsor_tx_id#k=bundle-secret&preview=1'
-    );
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor_tx_id#k=bundle-secret&preview=1');
 
     renderSessionWizard({
       initialSponsoredBundleId: 'sponsor_tx_id',
@@ -462,11 +467,7 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(1);
 
     rerender(
-      <SessionWizard
-        network={{ id: 84532 }}
-        initialSponsoredBundleId="sponsor_tx_id"
-        initialSponsoredBundleKey=""
-      />
+      <SessionWizard network={{ id: 84532 }} initialSponsoredBundleId="sponsor_tx_id" initialSponsoredBundleKey="" />,
     );
 
     await expectSponsoredStatus('Sponsored resources applied.');
@@ -499,13 +500,7 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
     expect(getToggleCheckbox('Require users to pay for usage')).not.toBeChecked();
 
-    rerender(
-      <SessionWizard
-        network={{ id: 84532 }}
-        initialSponsoredBundleId=""
-        initialSponsoredBundleKey=""
-      />
-    );
+    rerender(<SessionWizard network={{ id: 84532 }} initialSponsoredBundleId="" initialSponsoredBundleKey="" />);
 
     await waitFor(() => {
       expect(screen.queryByTestId('ce-wizard-sponsored-status')).not.toBeInTheDocument();
@@ -551,7 +546,7 @@ describe('SessionWizard sponsored bundle flow', () => {
         account="0x00000000000000000000000000000000000000cc"
         initialSponsoredBundleId="sponsor_tx_id"
         initialSponsoredBundleKey="bundle-secret"
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -563,7 +558,7 @@ describe('SessionWizard sponsored bundle flow', () => {
         network={{ id: 84532 }}
         initialSponsoredBundleId="sponsor_tx_id"
         initialSponsoredBundleKey="bundle-secret"
-      />
+      />,
     );
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('edited-openai');
@@ -582,13 +577,7 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
     expect(getToggleCheckbox('Require users to pay for usage')).not.toBeChecked();
 
-    rerender(
-      <SessionWizard
-        network={{ id: 84532 }}
-        initialSponsoredBundleId=""
-        initialSponsoredBundleKey=""
-      />
-    );
+    rerender(<SessionWizard network={{ id: 84532 }} initialSponsoredBundleId="" initialSponsoredBundleKey="" />);
 
     await waitFor(() => {
       expect(screen.queryByTestId('ce-wizard-sponsored-status')).not.toBeInTheDocument();
@@ -721,10 +710,12 @@ describe('SessionWizard sponsored bundle flow', () => {
   });
 
   it('shows advanced faucet provenance when faucet funding comes from a sponsored grant token', async () => {
-    mockDecryptWithPassword.mockResolvedValueOnce(buildDecryptedSponsoredBundle({
-      faucetPrivateKey: '',
-      faucetGrantToken: 'faucet-grant-token',
-    }));
+    mockDecryptWithPassword.mockResolvedValueOnce(
+      buildDecryptedSponsoredBundle({
+        faucetPrivateKey: '',
+        faucetGrantToken: 'faucet-grant-token',
+      }),
+    );
 
     renderSessionWizard({
       initialSponsoredBundleId: 'sponsor_tx_id',
@@ -740,9 +731,11 @@ describe('SessionWizard sponsored bundle flow', () => {
   });
 
   it('shows advanced deploy provenance with a blank Cloudflare token field and hides it after manual edits', async () => {
-    mockDecryptWithPassword.mockResolvedValueOnce(buildDecryptedSponsoredBundle({
-      deployGrantToken: 'deploy-grant-token',
-    }));
+    mockDecryptWithPassword.mockResolvedValueOnce(
+      buildDecryptedSponsoredBundle({
+        deployGrantToken: 'deploy-grant-token',
+      }),
+    );
 
     renderSessionWizard({
       initialSponsoredBundleId: 'sponsor_tx_id',
@@ -765,9 +758,11 @@ describe('SessionWizard sponsored bundle flow', () => {
   });
 
   it('keeps advanced provenance notices scoped to the live sponsored bundle state', async () => {
-    mockDecryptWithPassword.mockResolvedValue(buildDecryptedSponsoredBundle({
-      deployGrantToken: 'deploy-grant-token',
-    }));
+    mockDecryptWithPassword.mockResolvedValue(
+      buildDecryptedSponsoredBundle({
+        deployGrantToken: 'deploy-grant-token',
+      }),
+    );
 
     const { rerender } = renderSessionWizard({
       initialSponsoredBundleId: 'sponsor_tx_id',
@@ -781,13 +776,7 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(screen.getByText(SPONSORED_FAUCET_NOTICE)).toBeInTheDocument();
     expect(screen.getByText(SPONSORED_DEPLOY_NOTICE)).toBeInTheDocument();
 
-    rerender(
-      <SessionWizard
-        network={{ id: 84532 }}
-        initialSponsoredBundleId=""
-        initialSponsoredBundleKey=""
-      />
-    );
+    rerender(<SessionWizard network={{ id: 84532 }} initialSponsoredBundleId="" initialSponsoredBundleKey="" />);
 
     await waitFor(() => {
       expect(screen.queryByTestId('ce-wizard-sponsored-status')).not.toBeInTheDocument();
@@ -800,7 +789,7 @@ describe('SessionWizard sponsored bundle flow', () => {
         network={{ id: 84532 }}
         initialSponsoredBundleId="sponsor_tx_id"
         initialSponsoredBundleKey="bundle-secret"
-      />
+      />,
     );
 
     await expectSponsoredStatus('Sponsored resources applied.');
@@ -852,7 +841,7 @@ describe('SessionWizard sponsored bundle flow', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          'Failed to fetch bundle: getaddrinfo ENOTFOUND bundles.example.test'
+          'Failed to fetch bundle: getaddrinfo ENOTFOUND bundles.example.test',
         );
       });
 
@@ -863,9 +852,9 @@ describe('SessionWizard sponsored bundle flow', () => {
       expect(firstPayload.bundleUrl).toBe(bundleUrl);
       expect(firstPayload.bundleText).toBeUndefined();
 
-      expect(
-        global.fetch.mock.calls.some(([url]) => String(url).includes('/worker/sessionCorsWorker.bundle.js'))
-      ).toBe(false);
+      expect(global.fetch.mock.calls.some(([url]) => String(url).includes('/worker/sessionCorsWorker.bundle.js'))).toBe(
+        false,
+      );
       expect(bundleModeUrlInput).toBeChecked();
       expect(bundleUrlInput).toHaveValue(bundleUrl);
     } finally {
@@ -907,11 +896,7 @@ describe('SessionWizard sponsored bundle flow', () => {
   });
 
   it('removes the sponsored bundle hash secret after a terminal sponsored-bundle failure', async () => {
-    window.history.replaceState(
-      {},
-      '',
-      '/session/new?sponsored=sponsor_tx_id#k=bundle-secret&preview=1'
-    );
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor_tx_id#k=bundle-secret&preview=1');
     mockDecryptWithPassword.mockResolvedValue({
       openaiKey: 'expired-openai',
       meta: {
@@ -938,12 +923,14 @@ describe('SessionWizard sponsored bundle flow', () => {
         openaiKey: 'cached-openai',
       },
     });
-    mockDownloadDataFromArweave.mockResolvedValue(JSON.stringify({
-      type: 'not-a-sponsored-bundle',
-      version: 1,
-      cipher: 'password-aes-gcm',
-      encryptedData: 'encrypted-base64',
-    }));
+    mockDownloadDataFromArweave.mockResolvedValue(
+      JSON.stringify({
+        type: 'not-a-sponsored-bundle',
+        version: 1,
+        cipher: 'password-aes-gcm',
+        encryptedData: 'encrypted-base64',
+      }),
+    );
 
     renderSessionWizard({
       initialSponsoredBundleId: 'sponsor_tx_id',
@@ -994,5 +981,4 @@ describe('SessionWizard sponsored bundle flow', () => {
       }),
     ]);
   });
-
 });

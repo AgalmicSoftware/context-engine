@@ -48,11 +48,13 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
   });
 
   it('builds pure response input descriptors for supported question types', () => {
-    expect(buildSurveyQuestionsFullQuestionResponseInputDescriptor({
-      question: { id: 'q1', type: 'multichoice', options: ['A', 'B'] },
-      answer: { value: ['A'] },
-      isSubmitting: true,
-    })).toEqual({
+    expect(
+      buildSurveyQuestionsFullQuestionResponseInputDescriptor({
+        question: { id: 'q1', type: 'multichoice', options: ['A', 'B'] },
+        answer: { value: ['A'] },
+        isSubmitting: true,
+      }),
+    ).toEqual({
       kind: 'multichoice',
       questionId: 'q1',
       options: ['A', 'B'],
@@ -61,11 +63,13 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       disabled: true,
     });
 
-    expect(buildSurveyQuestionsFullQuestionResponseInputDescriptor({
-      question: { id: 'q2', type: 'rating' },
-      answer: { value: '7' },
-      singleQuestionMode: true,
-    })).toEqual({
+    expect(
+      buildSurveyQuestionsFullQuestionResponseInputDescriptor({
+        question: { id: 'q2', type: 'rating' },
+        answer: { value: '7' },
+        singleQuestionMode: true,
+      }),
+    ).toEqual({
       kind: 'rating',
       questionId: 'q2',
       ratingValue: 7,
@@ -73,12 +77,14 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       useDeferredRating: true,
     });
 
-    expect(buildSurveyQuestionsFullQuestionResponseInputDescriptor({
-      question: { id: ' Q3 ', type: 'freeform' },
-      qIndex: 4,
-      answer: { value: { ignored: true }, encrypted: true },
-      glowAnswer: true,
-    })).toEqual({
+    expect(
+      buildSurveyQuestionsFullQuestionResponseInputDescriptor({
+        question: { id: ' Q3 ', type: 'freeform' },
+        qIndex: 4,
+        answer: { value: { ignored: true }, encrypted: true },
+        glowAnswer: true,
+      }),
+    ).toEqual({
       kind: 'audio',
       questionId: ' Q3 ',
       qIndex: 4,
@@ -170,7 +176,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         qIndex={0}
         answer={{ value: ['Alpha'] }}
         onAnswerChange={onAnswerChange}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByLabelText('Beta'));
@@ -189,7 +195,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         qIndex={0}
         answer={{ value: 'Unsure' }}
         onAnswerChange={onAnswerChange}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByLabelText('Agree'));
@@ -212,7 +218,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         onDeferredRatingCommit={onDeferredRatingCommit}
         onRatingChange={onRatingChange}
         onRatingChangeComplete={onRatingChangeComplete}
-      />
+      />,
     );
 
     const slider = screen.getByRole('slider');
@@ -243,7 +249,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         onDeferredRatingCommit={onDeferredRatingCommit}
         onRatingChange={onRatingChange}
         onRatingChangeComplete={onRatingChangeComplete}
-      />
+      />,
     );
 
     const slider = screen.getByRole('slider');
@@ -271,7 +277,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         glowAnswer
         onAnswerChange={onAnswerChange}
         onToggleAnswerEncryption={onToggleAnswerEncryption}
-      />
+      />,
     );
 
     const input = screen.getByTestId('mock-survey-audio-field-input');
@@ -299,7 +305,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         isSubmitting
         onAnswerChange={onAnswerChange}
         onToggleAnswerEncryption={onToggleAnswerEncryption}
-      />
+      />,
     );
 
     expect(screen.getByTestId('mock-survey-audio-field-input')).toHaveAttribute('data-disabled', 'true');
@@ -322,7 +328,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
           context,
           workerUrl: 'https://worker.example/audio',
         }}
-      />
+      />,
     );
 
     const input = screen.getByTestId('mock-survey-audio-field-input');
@@ -348,7 +354,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         isSubmitting
         onAnswerChange={onAnswerChange}
         onToggleAnswerEncryption={onToggleAnswerEncryption}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'update answer' }));

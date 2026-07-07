@@ -60,15 +60,17 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       kind: 'ce_session_results_analysis_artifact',
     };
 
-    expect(buildSurveyResultsAnalysisArtifactWritePlan({
-      artifact,
-      cacheKey: 'sessionResultsAnalysis:v1:Base Sepolia:retry-input',
-      currentCache: {
-        existingFlag: true,
-        sessionResultsAnalysis: 'bad-artifacts',
-      },
-      slug: 'beta-session',
-    })).toEqual({
+    expect(
+      buildSurveyResultsAnalysisArtifactWritePlan({
+        artifact,
+        cacheKey: 'sessionResultsAnalysis:v1:Base Sepolia:retry-input',
+        currentCache: {
+          existingFlag: true,
+          sessionResultsAnalysis: 'bad-artifacts',
+        },
+        slug: 'beta-session',
+      }),
+    ).toEqual({
       blockedReason: '',
       payload: {
         existingFlag: true,
@@ -133,12 +135,14 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
     ];
 
     cases.forEach(({ currentCache, expectedPayload }) => {
-      expect(buildSurveyResultsAnalysisArtifactWritePlan({
-        artifact,
-        cacheKey,
-        currentCache,
-        slug: 'payload-session',
-      })).toEqual({
+      expect(
+        buildSurveyResultsAnalysisArtifactWritePlan({
+          artifact,
+          cacheKey,
+          currentCache,
+          slug: 'payload-session',
+        }),
+      ).toEqual({
         blockedReason: '',
         payload: expectedPayload,
         shouldWrite: true,
@@ -153,11 +157,13 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
   });
 
   it('blocks analysis artifact write plans without moving cache reads or writes', () => {
-    expect(buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
-      artifact: null,
-      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing',
-      slug: '',
-    })).toEqual({
+    expect(
+      buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
+        artifact: null,
+        cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing',
+        slug: '',
+      }),
+    ).toEqual({
       blockedReason: 'missing-artifact',
       shouldReadCache: false,
       shouldWrite: false,
@@ -169,16 +175,18 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       },
     });
 
-    expect(buildSurveyResultsAnalysisArtifactWritePlan({
-      artifact: null,
-      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing',
-      currentCache: {
-        sessionResultsAnalysis: {
-          existing: { inputSignature: 'existing' },
+    expect(
+      buildSurveyResultsAnalysisArtifactWritePlan({
+        artifact: null,
+        cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing',
+        currentCache: {
+          sessionResultsAnalysis: {
+            existing: { inputSignature: 'existing' },
+          },
         },
-      },
-      slug: '',
-    })).toEqual({
+        slug: '',
+      }),
+    ).toEqual({
       blockedReason: 'missing-artifact',
       payload: null,
       shouldWrite: false,
@@ -190,11 +198,13 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       },
     });
 
-    expect(buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
-      artifact: { inputSignature: 'missing-key' },
-      cacheKey: '',
-      slug: 'gamma-session',
-    })).toEqual({
+    expect(
+      buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
+        artifact: { inputSignature: 'missing-key' },
+        cacheKey: '',
+        slug: 'gamma-session',
+      }),
+    ).toEqual({
       blockedReason: 'missing-cache-key',
       shouldReadCache: false,
       shouldWrite: false,
@@ -206,11 +216,13 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       },
     });
 
-    expect(buildSurveyResultsAnalysisArtifactWritePlan({
-      artifact: { inputSignature: 'missing-key' },
-      cacheKey: '',
-      slug: 'gamma-session',
-    })).toEqual({
+    expect(
+      buildSurveyResultsAnalysisArtifactWritePlan({
+        artifact: { inputSignature: 'missing-key' },
+        cacheKey: '',
+        slug: 'gamma-session',
+      }),
+    ).toEqual({
       blockedReason: 'missing-cache-key',
       payload: null,
       shouldWrite: false,
@@ -224,15 +236,17 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
   });
 
   it('allows analysis artifact write readiness to hand off valid targets before payload construction', () => {
-    expect(buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
-      artifact: {
+    expect(
+      buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
+        artifact: {
+          inputSignature: 'ready-input',
+          kind: 'ce_session_results_analysis_artifact',
+        },
+        cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
         inputSignature: 'ready-input',
-        kind: 'ce_session_results_analysis_artifact',
-      },
-      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
-      inputSignature: 'ready-input',
-      slug: 'ready-session',
-    })).toEqual({
+        slug: 'ready-session',
+      }),
+    ).toEqual({
       blockedReason: '',
       shouldReadCache: true,
       shouldWrite: true,
@@ -251,12 +265,14 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       kind: 'ce_session_results_analysis_artifact',
     };
 
-    expect(buildSurveyResultsAnalysisArtifactWritePlan({
-      artifact,
-      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing-route-input',
-      currentCache: null,
-      slug: undefined,
-    })).toEqual({
+    expect(
+      buildSurveyResultsAnalysisArtifactWritePlan({
+        artifact,
+        cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing-route-input',
+        currentCache: null,
+        slug: undefined,
+      }),
+    ).toEqual({
       blockedReason: '',
       payload: {
         sessionResultsAnalysis: {
@@ -272,12 +288,14 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       },
     });
 
-    expect(buildSurveyResultsAnalysisArtifactWritePlan({
-      artifact,
-      cacheKey: undefined,
-      currentCache: null,
-      slug: 'missing-key-session',
-    })).toEqual({
+    expect(
+      buildSurveyResultsAnalysisArtifactWritePlan({
+        artifact,
+        cacheKey: undefined,
+        currentCache: null,
+        slug: 'missing-key-session',
+      }),
+    ).toEqual({
       blockedReason: 'missing-cache-key',
       payload: null,
       shouldWrite: false,
@@ -291,11 +309,13 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
   });
 
   it('blocks filter bookmark writes before cache reads when the results view is unmounted', () => {
-    expect(buildSurveyResultsFilterBookmarkWritePlan({
-      filterState: { type: 'radio' },
-      isMounted: false,
-      slug: 'edge',
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilterBookmarkWritePlan({
+        filterState: { type: 'radio' },
+        isMounted: false,
+        slug: 'edge',
+      }),
+    ).toEqual({
       blockedReason: 'unmounted',
       bookmarkedFiltersInvalid: false,
       payload: null,
@@ -310,11 +330,13 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
   });
 
   it('plans a read-only cache lookup before deriving a filter bookmark write payload', () => {
-    expect(buildSurveyResultsFilterBookmarkWritePlan({
-      filterState: { type: 'radio' },
-      isMounted: true,
-      slug: 'edge',
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilterBookmarkWritePlan({
+        filterState: { type: 'radio' },
+        isMounted: true,
+        slug: 'edge',
+      }),
+    ).toEqual({
       blockedReason: '',
       bookmarkedFiltersInvalid: false,
       payload: null,
@@ -345,12 +367,14 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
     ];
 
     cases.forEach(({ expectedSlug, slug }) => {
-      expect(buildSurveyResultsFilterBookmarkWritePlan({
-        filterState: { tags: ['identity'] },
-        filtersCacheLoaded: false,
-        isMounted: true,
-        slug,
-      })).toEqual({
+      expect(
+        buildSurveyResultsFilterBookmarkWritePlan({
+          filterState: { tags: ['identity'] },
+          filtersCacheLoaded: false,
+          isMounted: true,
+          slug,
+        }),
+      ).toEqual({
         blockedReason: '',
         bookmarkedFiltersInvalid: false,
         payload: null,
@@ -368,13 +392,15 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
   it('pins filter payload normalization for empty and partial cache shapes', () => {
     const filterState = { tags: ['payload-matrix'] };
 
-    expect(buildSurveyResultsFilterBookmarkWritePlan({
-      filtersCache: undefined,
-      filtersCacheLoaded: true,
-      filterState,
-      isMounted: true,
-      slug: 'payload-session',
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilterBookmarkWritePlan({
+        filtersCache: undefined,
+        filtersCacheLoaded: true,
+        filterState,
+        isMounted: true,
+        slug: 'payload-session',
+      }),
+    ).toEqual({
       blockedReason: '',
       bookmarkedFiltersInvalid: false,
       payload: {
@@ -389,15 +415,17 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       },
     });
 
-    expect(buildSurveyResultsFilterBookmarkWritePlan({
-      filtersCache: {
-        unrelated: 'kept',
-      },
-      filtersCacheLoaded: true,
-      filterState,
-      isMounted: true,
-      slug: 'payload-session',
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilterBookmarkWritePlan({
+        filtersCache: {
+          unrelated: 'kept',
+        },
+        filtersCacheLoaded: true,
+        filterState,
+        isMounted: true,
+        slug: 'payload-session',
+      }),
+    ).toEqual({
       blockedReason: '',
       bookmarkedFiltersInvalid: false,
       payload: {
@@ -448,16 +476,18 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
   });
 
   it('flags invalid bookmark cache shape while preserving unrelated payload fields', () => {
-    expect(buildSurveyResultsFilterBookmarkWritePlan({
-      filtersCache: {
-        bookmarkedFilters: 'not-an-array',
-        otherField: 'kept',
-      },
-      filtersCacheLoaded: true,
-      filterState: { type: 'slider' },
-      isMounted: true,
-      slug: '',
-    })).toEqual({
+    expect(
+      buildSurveyResultsFilterBookmarkWritePlan({
+        filtersCache: {
+          bookmarkedFilters: 'not-an-array',
+          otherField: 'kept',
+        },
+        filtersCacheLoaded: true,
+        filterState: { type: 'slider' },
+        isMounted: true,
+        slug: '',
+      }),
+    ).toEqual({
       blockedReason: '',
       bookmarkedFiltersInvalid: true,
       payload: {
@@ -518,15 +548,17 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
   });
 
   it('plans question bookmark removals and preserves current empty-slug identity', () => {
-    expect(buildSurveyResultsSurveyQuestionBookmarkWritePlan({
-      bookmarkId: 'q1',
-      bookmarkType: 'question',
-      bookmarksCache: {
-        surveys: ['s1'],
-        questions: ['q1', 'q2'],
-      },
-      slug: '',
-    })).toEqual({
+    expect(
+      buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+        bookmarkId: 'q1',
+        bookmarkType: 'question',
+        bookmarksCache: {
+          surveys: ['s1'],
+          questions: ['q1', 'q2'],
+        },
+        slug: '',
+      }),
+    ).toEqual({
       blockedReason: '',
       payload: {
         surveys: ['s1'],
@@ -550,12 +582,14 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
   });
 
   it('pins survey/question bookmark payload normalization for empty and partial cache shapes', () => {
-    expect(buildSurveyResultsSurveyQuestionBookmarkWritePlan({
-      bookmarkId: 's1',
-      bookmarkType: 'survey',
-      bookmarksCache: undefined,
-      slug: 'payload-session',
-    })).toEqual({
+    expect(
+      buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+        bookmarkId: 's1',
+        bookmarkType: 'survey',
+        bookmarksCache: undefined,
+        slug: 'payload-session',
+      }),
+    ).toEqual({
       blockedReason: '',
       payload: {
         surveys: ['s1'],
@@ -577,15 +611,17 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       },
     });
 
-    expect(buildSurveyResultsSurveyQuestionBookmarkWritePlan({
-      bookmarkId: 'q1',
-      bookmarkType: 'question',
-      bookmarksCache: {
-        surveys: ['s1'],
-        unrelated: 'kept',
-      },
-      slug: 'payload-session',
-    })).toEqual({
+    expect(
+      buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+        bookmarkId: 'q1',
+        bookmarkType: 'question',
+        bookmarksCache: {
+          surveys: ['s1'],
+          unrelated: 'kept',
+        },
+        slug: 'payload-session',
+      }),
+    ).toEqual({
       blockedReason: '',
       payload: {
         surveys: ['s1'],
@@ -610,16 +646,18 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
   });
 
   it('normalizes malformed bookmark cache lists while preserving unrelated fields', () => {
-    expect(buildSurveyResultsSurveyQuestionBookmarkWritePlan({
-      bookmarkId: 'q2',
-      bookmarkType: 'question',
-      bookmarksCache: {
-        surveys: 'bad-surveys',
-        questions: 'bad-questions',
-        otherField: 'kept',
-      },
-      slug: 'edge',
-    })).toEqual({
+    expect(
+      buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+        bookmarkId: 'q2',
+        bookmarkType: 'question',
+        bookmarksCache: {
+          surveys: 'bad-surveys',
+          questions: 'bad-questions',
+          otherField: 'kept',
+        },
+        slug: 'edge',
+      }),
+    ).toEqual({
       blockedReason: '',
       payload: {
         surveys: [],
@@ -644,15 +682,17 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
   });
 
   it('blocks invalid survey/question bookmark write plan kinds', () => {
-    expect(buildSurveyResultsSurveyQuestionBookmarkWritePlan({
-      bookmarkId: 'x1',
-      bookmarkType: 'unsupported',
-      bookmarksCache: {
-        surveys: ['s1'],
-        questions: ['q1'],
-      },
-      slug: 'edge',
-    })).toEqual({
+    expect(
+      buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+        bookmarkId: 'x1',
+        bookmarkType: 'unsupported',
+        bookmarksCache: {
+          surveys: ['s1'],
+          questions: ['q1'],
+        },
+        slug: 'edge',
+      }),
+    ).toEqual({
       blockedReason: 'invalid-bookmark-type',
       payload: null,
       shouldWrite: false,
@@ -666,15 +706,17 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
   });
 
   it('documents current parent-owned bookmark id validation boundary', () => {
-    expect(buildSurveyResultsSurveyQuestionBookmarkWritePlan({
-      bookmarkId: undefined,
-      bookmarkType: 'survey',
-      bookmarksCache: {
-        questions: ['q1'],
-        surveys: [],
-      },
-      slug: undefined,
-    })).toEqual({
+    expect(
+      buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+        bookmarkId: undefined,
+        bookmarkType: 'survey',
+        bookmarksCache: {
+          questions: ['q1'],
+          surveys: [],
+        },
+        slug: undefined,
+      }),
+    ).toEqual({
       blockedReason: '',
       payload: {
         questions: ['q1'],
@@ -696,15 +738,17 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       },
     });
 
-    expect(buildSurveyResultsSurveyQuestionBookmarkWritePlan({
-      bookmarkId: 'q-missing-kind',
-      bookmarkType: '',
-      bookmarksCache: {
-        questions: ['q1'],
-        surveys: ['s1'],
-      },
-      slug: undefined,
-    })).toEqual({
+    expect(
+      buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+        bookmarkId: 'q-missing-kind',
+        bookmarkType: '',
+        bookmarksCache: {
+          questions: ['q1'],
+          surveys: ['s1'],
+        },
+        slug: undefined,
+      }),
+    ).toEqual({
       blockedReason: 'invalid-bookmark-type',
       payload: null,
       shouldWrite: false,

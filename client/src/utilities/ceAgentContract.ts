@@ -71,14 +71,16 @@ const TOOLS: readonly AgentTool[] = Object.freeze([
   }),
   Object.freeze({
     name: 'PolisReport',
-    description: 'Open a session results view for an explicit sessionSlug or the current active session, enable demo data, run cluster analysis, and wait for ready output.',
+    description:
+      'Open a session results view for an explicit sessionSlug or the current active session, enable demo data, run cluster analysis, and wait for ready output.',
   }),
 ]);
 
-const cloneEntries = <T extends AgentAction | AgentTool>(entries: readonly T[]): T[] => entries.map((entry) => ({
-  ...entry,
-  ...(Array.isArray((entry as AgentAction).required) ? { required: [...(entry as AgentAction).required] } : {}),
-}));
+const cloneEntries = <T extends AgentAction | AgentTool>(entries: readonly T[]): T[] =>
+  entries.map((entry) => ({
+    ...entry,
+    ...(Array.isArray((entry as AgentAction).required) ? { required: [...(entry as AgentAction).required] } : {}),
+  }));
 
 export const describeCeAgentContract = (): CeAgentContract => ({
   version: CE_AGENT_CONTRACT_VERSION,

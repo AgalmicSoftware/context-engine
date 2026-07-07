@@ -38,15 +38,12 @@ export const buildPileResponseCounts = ({
   questionResponses?: UnknownRecord | null;
 } = {}): Record<string, number> => {
   const nextResponseCounts: Record<string, number> = {};
-  const responses = (questionResponses && typeof questionResponses === 'object') ? questionResponses : {};
+  const responses = questionResponses && typeof questionResponses === 'object' ? questionResponses : {};
 
   Object.keys(responses).forEach((questionId) => {
     const responderMap = responses[questionId];
-    nextResponseCounts[questionId] = (
-      responderMap && typeof responderMap === 'object'
-        ? Object.keys(responderMap).length
-        : 0
-    );
+    nextResponseCounts[questionId] =
+      responderMap && typeof responderMap === 'object' ? Object.keys(responderMap).length : 0;
   });
 
   return nextResponseCounts;
@@ -90,18 +87,14 @@ export const loadPileScopeCacheSnapshot = async ({
 
   for (const rawScopeSlug of scopeSlugs) {
     const scopeSlug = String(rawScopeSlug ?? '');
-    const questionsCache = ensureQuestionsNet(
-      (await readQuestionsCacheAsync(scopeSlug)) as UnknownRecord,
-      networkId
-    );
-    const networkCache = (
+    const questionsCache = ensureQuestionsNet((await readQuestionsCacheAsync(scopeSlug)) as UnknownRecord, networkId);
+    const networkCache =
       questionsCache &&
       typeof questionsCache === 'object' &&
       questionsCache[networkId] &&
       typeof questionsCache[networkId] === 'object'
-    )
-      ? questionsCache[networkId] as PileScopeNetworkCache
-      : { questions: {}, questionResponses: {} };
+        ? (questionsCache[networkId] as PileScopeNetworkCache)
+        : { questions: {}, questionResponses: {} };
 
     snapshot.pendingMetadataCount += Object.keys(networkCache?.pendingQuestionMetadata || {}).length;
     getHighlightedQuestionIdsSet(scopeSlug).forEach((questionId) => {

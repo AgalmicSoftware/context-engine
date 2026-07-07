@@ -2,9 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import demoPolisData from './demo_polis_data.json';
-import historicalFigureDemographics, {
-  DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS,
-} from './historical_figure_demographics.js';
+import historicalFigureDemographics, { DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS } from './historical_figure_demographics.js';
 
 describe('historicalFigureDemographics', () => {
   it('covers every demo participant xid with complete metadata', () => {
@@ -41,10 +39,7 @@ describe('historicalFigureDemographics', () => {
   });
 
   it('does not pull the demo polis vote fixture into the demographics module', () => {
-    const demographicsSource = fs.readFileSync(
-      path.join(__dirname, 'historical_figure_demographics.ts'),
-      'utf8'
-    );
+    const demographicsSource = fs.readFileSync(path.join(__dirname, 'historical_figure_demographics.ts'), 'utf8');
 
     expect(demographicsSource).not.toMatch(/demo_polis_data\.json/);
   });

@@ -6,22 +6,20 @@
  * Key exports: normalizeArweaveFailureEntry, normalizeArweaveFailureMeta, isTerminalArweaveFailureState, classifyArweaveFailureState, buildArweaveFailureError, computeArweaveFailureBackoffMs, buildHashUnavailableMetadataError
  */
 
-const TERMINAL_ARWEAVE_FAILURE_STATES = new Set([
-  'terminal_not_found',
-  'terminal_invalid',
-]);
+const TERMINAL_ARWEAVE_FAILURE_STATES = new Set(['terminal_not_found', 'terminal_invalid']);
 
 type UnknownRecord = Record<string, unknown>;
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const normalizeState = (state: unknown): string => String(state || '').trim().toLowerCase();
+const normalizeState = (state: unknown): string =>
+  String(state || '')
+    .trim()
+    .toLowerCase();
 
-export const isTerminalArweaveFailureState = (state: unknown): boolean => (
-  TERMINAL_ARWEAVE_FAILURE_STATES.has(normalizeState(state))
-);
+export const isTerminalArweaveFailureState = (state: unknown): boolean =>
+  TERMINAL_ARWEAVE_FAILURE_STATES.has(normalizeState(state));
 
 // Regression guard: keep failure-entry normalization in the Arweave layer.
 // Importing the cache module here reintroduces the HMR/runtime cycle that leaves
@@ -46,12 +44,9 @@ export const normalizeArweaveFailureEntry = (rawEntry: unknown) => {
 
 export const normalizeArweaveFailureMeta = (raw: unknown) => {
   const fromError: UnknownRecord = isRecord(raw) ? raw : {};
-  const nested: UnknownRecord = isRecord(fromError.arweaveFailure)
-    ? fromError.arweaveFailure
-    : {};
-  const read = (key: string, fallback: unknown = null): unknown => (
-    fromError[key] !== undefined ? fromError[key] : (nested[key] !== undefined ? nested[key] : fallback)
-  );
+  const nested: UnknownRecord = isRecord(fromError.arweaveFailure) ? fromError.arweaveFailure : {};
+  const read = (key: string, fallback: unknown = null): unknown =>
+    fromError[key] !== undefined ? fromError[key] : nested[key] !== undefined ? nested[key] : fallback;
   const statusRaw = Number(read('status', NaN));
   const nextRetryRaw = Number(read('nextRetryAtMs', NaN));
   const retryableRaw = read('retryable', null);
@@ -76,10 +71,7 @@ export const ARWEAVE_TX_FAILURE_TERMINAL_RECHECK_MS = 30 * 60 * 1000;
 
 export const computeArweaveFailureBackoffMs = (attempts: unknown): number => {
   const n = Math.max(0, Math.min(12, Number(attempts || 0) - 1));
-  return Math.min(
-    ARWEAVE_TX_FAILURE_MAX_RETRY_MS,
-    Math.round(ARWEAVE_TX_FAILURE_BASE_RETRY_MS * Math.pow(2, n))
-  );
+  return Math.min(ARWEAVE_TX_FAILURE_MAX_RETRY_MS, Math.round(ARWEAVE_TX_FAILURE_BASE_RETRY_MS * Math.pow(2, n)));
 };
 
 export const buildArweaveFailureError = ({
@@ -121,9 +113,7 @@ export const buildArweaveFailureError = ({
     state: err.state,
     nextRetryAtMs: err.nextRetryAtMs,
     attempts: Number(failureRecord.attempts || 0),
-    lastStatus: Number.isFinite(Number(failureRecord.lastStatus))
-      ? Number(failureRecord.lastStatus)
-      : null,
+    lastStatus: Number.isFinite(Number(failureRecord.lastStatus)) ? Number(failureRecord.lastStatus) : null,
     message: String(message || failureRecord.message || ''),
   };
   if (cause) err.cause = cause;
@@ -155,7 +145,9 @@ export const classifyArweaveFailureState = ({
   const ageMs = Math.max(0, now - firstFailedAtMs);
   const status = Number.isFinite(Number(meta.status))
     ? Number(meta.status)
-    : (Number.isFinite(Number(prev.lastStatus)) ? Number(prev.lastStatus) : null);
+    : Number.isFinite(Number(prev.lastStatus))
+      ? Number(prev.lastStatus)
+      : null;
 
   let state = 'transient';
   if (isTerminalArweaveFailureState(meta.state)) {
@@ -181,7 +173,7 @@ export const classifyArweaveFailureState = ({
   } else if (state === 'terminal_not_found') {
     nextRetryAtMs = Math.max(
       now + ARWEAVE_TX_FAILURE_TERMINAL_RECHECK_MS,
-      Number.isFinite(externalNextRetryAt) ? externalNextRetryAt : 0
+      Number.isFinite(externalNextRetryAt) ? externalNextRetryAt : 0,
     );
   }
   const errorRecord = isRecord(error) ? error : {};
@@ -200,9 +192,10 @@ export const classifyArweaveFailureState = ({
 
 export const buildHashUnavailableMetadataError = (message: unknown, meta: unknown = {}) => {
   const metaRecord = isRecord(meta) ? meta : {};
-  const retryAtMs = Number(metaRecord.nextRetryAtMs || 0) > 0
-    ? Number(metaRecord.nextRetryAtMs)
-    : (Date.now() + ARWEAVE_TX_FAILURE_TERMINAL_RECHECK_MS);
+  const retryAtMs =
+    Number(metaRecord.nextRetryAtMs || 0) > 0
+      ? Number(metaRecord.nextRetryAtMs)
+      : Date.now() + ARWEAVE_TX_FAILURE_TERMINAL_RECHECK_MS;
   const err = new Error(String(message || 'Metadata hash is unavailable')) as Error & UnknownRecord;
   err.name = 'MetadataUnavailableError';
   err.state = 'terminal_not_found';

@@ -11,7 +11,8 @@ describe('docLibrary arweaveGraphql', () => {
   });
 
   it('falls back to the next GraphQL endpoint when the first one fails', async () => {
-    const fetchMock = jest.fn()
+    const fetchMock = jest
+      .fn()
       .mockRejectedValueOnce(new TypeError('network down'))
       .mockResolvedValueOnce({
         ok: true,

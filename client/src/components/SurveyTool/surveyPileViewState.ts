@@ -1,9 +1,6 @@
 import type { ReactNode } from 'react';
 
-import {
-  isQuestionPromptMasked,
-  shouldShowPileFullLoadingState,
-} from './surveyToolViewState.js';
+import { isQuestionPromptMasked, shouldShowPileFullLoadingState } from './surveyToolViewState.js';
 
 export const NO_PENDING_PILE_SUBMIT_TEXT = 'No new or changed responses';
 
@@ -101,10 +98,9 @@ export const resolveEarlyVisiblePileQuestions = ({
 
   const normalizedQuestionPool = Array.isArray(questionPool) ? questionPool : [];
   if (normalizedQuestionPool.length === 0) return normalizedPileQuestions;
-  return normalizedQuestionPool.filter((question) => (
-    question?.id != null &&
-    !isQuestionPromptMasked(question as Record<string, unknown> | null)
-  ));
+  return normalizedQuestionPool.filter(
+    (question) => question?.id != null && !isQuestionPromptMasked(question as Record<string, unknown> | null),
+  );
 };
 
 export const shouldPreferPileGatedEmptyState = ({
@@ -176,13 +172,11 @@ export const buildPileWorkspaceViewState = ({
   const normalizedActiveIndex = Math.max(0, Number(activePileIndex || 0));
   const activeQuestion =
     normalizedPileQuestions.length > 0
-      ? (normalizedPileQuestions[normalizedActiveIndex] || normalizedPileQuestions[0] || null)
+      ? normalizedPileQuestions[normalizedActiveIndex] || normalizedPileQuestions[0] || null
       : null;
   const activePromptMasked = isQuestionPromptMasked(activeQuestion as Record<string, unknown> | null);
   const hasVisibleQuestions = normalizedPileQuestions.length > 0;
-  const normalizedHiddenMaskedQuestionIds = Array.isArray(hiddenMaskedQuestionIds)
-    ? hiddenMaskedQuestionIds
-    : [];
+  const normalizedHiddenMaskedQuestionIds = Array.isArray(hiddenMaskedQuestionIds) ? hiddenMaskedQuestionIds : [];
   const normalizedHydrateDiscovered = Math.max(0, Number(hydrateDiscovered || 0));
   const normalizedHydrateDone = Math.max(0, Number(hydrateDone || 0));
   const normalizedPendingMetadataCount = Math.max(0, Number(pendingMetadataCount || 0));
@@ -194,32 +188,17 @@ export const buildPileWorkspaceViewState = ({
   const scanErrorMessage = hasTerminalScanError
     ? String(questionScanErrorMessage || 'Unable to load questions for this session.')
     : '';
-  const hydrationProgressSettled = (
-    isHydrating &&
-    normalizedHydrateDone >= normalizedHydrateDiscovered
-  );
+  const hydrationProgressSettled = isHydrating && normalizedHydrateDone >= normalizedHydrateDiscovered;
   const priorResponsesHydrating = !!isHydratingPriorResponses;
-  const hasScanOrHydrationWork = (
+  const hasScanOrHydrationWork =
     (normalizedQuestionScanPhase === 'scan' && normalizedScanRemainingBlocks > 0) ||
-    (isHydrating && (
-      normalizedHydrateDone < normalizedHydrateDiscovered ||
-      hasPendingMetadataRetries
-    ))
-  );
-  const hasConcreteHiddenQuestions = (
-    !!hasHiddenGatedQuestions ||
-    normalizedHiddenMaskedQuestionIds.length > 0
-  );
-  const hasUnhydratedGatedQuestions = (
+    (isHydrating && (normalizedHydrateDone < normalizedHydrateDiscovered || hasPendingMetadataRetries));
+  const hasConcreteHiddenQuestions = !!hasHiddenGatedQuestions || normalizedHiddenMaskedQuestionIds.length > 0;
+  const hasUnhydratedGatedQuestions =
     !!hasSessionQuestionGate &&
     !hasVisibleQuestions &&
     !hasConcreteHiddenQuestions &&
-    (
-      normalizedHydrateDiscovered > 0 ||
-      normalizedPendingMetadataCount > 0 ||
-      !!isQuestionCacheReady
-    )
-  );
+    (normalizedHydrateDiscovered > 0 || normalizedPendingMetadataCount > 0 || !!isQuestionCacheReady);
   const preferGatedEmptyState = shouldPreferPileGatedEmptyState({
     hasConcreteHiddenQuestions,
     hasVisibleQuestions,
@@ -228,27 +207,20 @@ export const buildPileWorkspaceViewState = ({
     recentRateLimit,
     hasPendingMetadataRetries,
   });
-  const showGatedEmptyState = (
-    hasConcreteHiddenQuestions ||
-    hasUnhydratedGatedQuestions ||
-    preferGatedEmptyState
-  );
-  const showFilteredEmptyState = (
-    !hasVisibleQuestions &&
-    !!isFilterActive &&
-    !!hasFilterBaseQuestions &&
-    !showGatedEmptyState
-  );
-  const allowUnreadyEmptySettlement = (
-    !hasVisibleQuestions &&
-    !firstBoot &&
-    cacheHasLoaded !== false &&
-    !isQuestionCacheReady &&
-    !recentRateLimit &&
-    !hasScanOrHydrationWork &&
-    !hasPendingMetadataRetries &&
-    hydrationProgressSettled
-  ) || preferGatedEmptyState || hasUnhydratedGatedQuestions;
+  const showGatedEmptyState = hasConcreteHiddenQuestions || hasUnhydratedGatedQuestions || preferGatedEmptyState;
+  const showFilteredEmptyState =
+    !hasVisibleQuestions && !!isFilterActive && !!hasFilterBaseQuestions && !showGatedEmptyState;
+  const allowUnreadyEmptySettlement =
+    (!hasVisibleQuestions &&
+      !firstBoot &&
+      cacheHasLoaded !== false &&
+      !isQuestionCacheReady &&
+      !recentRateLimit &&
+      !hasScanOrHydrationWork &&
+      !hasPendingMetadataRetries &&
+      hydrationProgressSettled) ||
+    preferGatedEmptyState ||
+    hasUnhydratedGatedQuestions;
   const isStillLoading = shouldShowPileFullLoadingState({
     loading,
     hasVisibleQuestions,
@@ -260,9 +232,8 @@ export const buildPileWorkspaceViewState = ({
     allowFilteredEmptySettlement: showFilteredEmptyState,
     hasTerminalScanError,
   });
-  const showMiniBackgroundSpinner = hasVisibleQuestions && (
-    priorResponsesHydrating || loading || hasScanOrHydrationWork || recentRateLimit
-  );
+  const showMiniBackgroundSpinner =
+    hasVisibleQuestions && (priorResponsesHydrating || loading || hasScanOrHydrationWork || recentRateLimit);
 
   return {
     activeQuestion,
@@ -311,18 +282,12 @@ export const buildPileSubmitViewState = ({
   const hasPendingPileChanges = Number(pendingStats?.total || 0) > 0;
   const pileSubmittedStateActive = !!(submittedSinceLastEdit || submissionComplete);
   const showPileSubmitSuccessBadge = pileSubmittedStateActive && !isSubmitting;
-  const shouldHidePileSubmitButton = (
-    !hasPendingPileChanges &&
-    !isSubmitting &&
-    !pileSubmittedStateActive
-  );
+  const shouldHidePileSubmitButton = !hasPendingPileChanges && !isSubmitting && !pileSubmittedStateActive;
   const finalSubmitText = String(pileSubmitTempText || '') || String(pileSubmitLabel || '');
 
   const pileSubmitResponderAddress = String(account || '').trim();
   const pileSubmitResponderAddressLower =
-    pileSubmitResponderAddress && isAddress(pileSubmitResponderAddress)
-      ? pileSubmitResponderAddress.toLowerCase()
-      : '';
+    pileSubmitResponderAddress && isAddress(pileSubmitResponderAddress) ? pileSubmitResponderAddress.toLowerCase() : '';
 
   return {
     hasPendingPileChanges,
@@ -330,9 +295,7 @@ export const buildPileSubmitViewState = ({
     showPileSubmitSuccessBadge,
     shouldHidePileSubmitButton,
     finalSubmitText,
-    pileSubmitResponderHref: pileSubmitResponderAddressLower
-      ? `/u/${pileSubmitResponderAddressLower}`
-      : '',
+    pileSubmitResponderHref: pileSubmitResponderAddressLower ? `/u/${pileSubmitResponderAddressLower}` : '',
   };
 };
 
@@ -354,23 +317,13 @@ export const buildPileSubmitRailViewState = ({
     isSubmitting,
   });
 
-  const pileTopRailVisible = (
-    !!isSubmitting ||
-    submitViewState.hasPendingPileChanges ||
-    submitViewState.pileSubmittedStateActive
-  );
+  const pileTopRailVisible =
+    !!isSubmitting || submitViewState.hasPendingPileChanges || submitViewState.pileSubmittedStateActive;
   const showSubmitButton = !submitViewState.showPileSubmitSuccessBadge;
-  const showSuccessBadgeLink =
-    submitViewState.showPileSubmitSuccessBadge &&
-    !!submitViewState.pileSubmitResponderHref;
-  const showSuccessBadgeStatus =
-    submitViewState.showPileSubmitSuccessBadge &&
-    !submitViewState.pileSubmitResponderHref;
-  const showClearPendingButton = (
-    submitViewState.hasPendingPileChanges &&
-    !isSubmitting &&
-    !submitViewState.pileSubmittedStateActive
-  );
+  const showSuccessBadgeLink = submitViewState.showPileSubmitSuccessBadge && !!submitViewState.pileSubmitResponderHref;
+  const showSuccessBadgeStatus = submitViewState.showPileSubmitSuccessBadge && !submitViewState.pileSubmitResponderHref;
+  const showClearPendingButton =
+    submitViewState.hasPendingPileChanges && !isSubmitting && !submitViewState.pileSubmittedStateActive;
 
   return {
     ...submitViewState,

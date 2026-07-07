@@ -23,8 +23,8 @@ type TooltipAction = {
   payload: boolean;
 };
 
-const createTooltipStore = (tooltipsEnabled: boolean) => createStore(
-  (state: TooltipState = { sessionState: { tooltipsEnabled } }, action: TooltipAction): TooltipState => {
+const createTooltipStore = (tooltipsEnabled: boolean) =>
+  createStore((state: TooltipState = { sessionState: { tooltipsEnabled } }, action: TooltipAction): TooltipState => {
     if (action.type === 'SET_TOOLTIPS') {
       return {
         sessionState: {
@@ -34,8 +34,7 @@ const createTooltipStore = (tooltipsEnabled: boolean) => createStore(
     }
 
     return state;
-  }
-);
+  });
 
 const renderWithTooltipsEnabled = (tooltipsEnabled: boolean) => {
   const store = createTooltipStore(tooltipsEnabled);
@@ -43,7 +42,7 @@ const renderWithTooltipsEnabled = (tooltipsEnabled: boolean) => {
   return render(
     <Provider store={store}>
       <CETooltip target="provider-target">provider tooltip</CETooltip>
-    </Provider>
+    </Provider>,
   );
 };
 
@@ -74,7 +73,7 @@ describe('CETooltip', () => {
     render(
       <Provider store={store}>
         <CETooltip target="provider-target">provider tooltip</CETooltip>
-      </Provider>
+      </Provider>,
     );
 
     const visibleTooltip = document.createElement('div');

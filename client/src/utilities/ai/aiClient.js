@@ -21,8 +21,6 @@ import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolutio
 import { resolveSessionConfigAliases } from '../session/sessionNaming.js';
 import { normalizeBaseUrl } from '../urlUtils.js';
 
-
-
 import {
   pcaLiteCompass,
   computeVennEvidence,
@@ -88,23 +86,28 @@ const SUPPORTED_PHOTO_MIME_TYPES = Object.freeze({
 });
 
 const getSupportedPhotoMimeType = (file) => {
-  const declaredType = String(file?.type || '').trim().toLowerCase();
+  const declaredType = String(file?.type || '')
+    .trim()
+    .toLowerCase();
   if (Object.values(SUPPORTED_PHOTO_MIME_TYPES).includes(declaredType)) return declaredType;
-  const name = String(file?.name || '').trim().toLowerCase();
+  const name = String(file?.name || '')
+    .trim()
+    .toLowerCase();
   const extension = name.includes('.') ? name.split('.').pop() : '';
   return SUPPORTED_PHOTO_MIME_TYPES[extension] || '';
 };
 
-const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
-  if (!file) {
-    reject(new Error('Missing photo file.'));
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = () => resolve(String(reader.result || ''));
-  reader.onerror = () => reject(new Error(`Failed to read photo file: ${String(file?.name || 'upload')}`));
-  reader.readAsDataURL(file);
-});
+const readFileAsDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error('Missing photo file.'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error(`Failed to read photo file: ${String(file?.name || 'upload')}`));
+    reader.readAsDataURL(file);
+  });
 
 const stripDataUrlPrefix = (dataUrl = '') => {
   const raw = String(dataUrl || '');
@@ -113,8 +116,14 @@ const stripDataUrlPrefix = (dataUrl = '') => {
 };
 
 const resolvePhotoAnalysisSupport = ({ provider, model } = {}) => {
-  const normalizedProvider = String(provider || '').trim().toLowerCase();
-  const modelLeaf = String(model || '').trim().toLowerCase().split('/').pop();
+  const normalizedProvider = String(provider || '')
+    .trim()
+    .toLowerCase();
+  const modelLeaf = String(model || '')
+    .trim()
+    .toLowerCase()
+    .split('/')
+    .pop();
 
   if (normalizedProvider === 'openai') {
     if (/^(gpt-5|gpt-4o|gpt-4\.1)/.test(modelLeaf)) {
@@ -140,7 +149,8 @@ const resolvePhotoAnalysisSupport = ({ provider, model } = {}) => {
   return {
     supported: false,
     format: null,
-    error: `Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model. Current selection: ${normalizedProvider || 'unknown'} ${modelLeaf || ''}`.trim(),
+    error:
+      `Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model. Current selection: ${normalizedProvider || 'unknown'} ${modelLeaf || ''}`.trim(),
   };
 };
 
@@ -171,37 +181,43 @@ export const analyzePhotoForQuestionGeneration = async (file, opts = {}) => {
   const prompt = buildPhotoAnalysisPrompt(file?.name || '');
   const messages = (() => {
     if (support.format === 'openai-responses') {
-      return [{
-        role: 'user',
-        content: [
-          { type: 'input_text', text: prompt },
-          { type: 'input_image', image_url: dataUrl },
-        ],
-      }];
+      return [
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: prompt },
+            { type: 'input_image', image_url: dataUrl },
+          ],
+        },
+      ];
     }
     if (support.format === 'anthropic') {
-      return [{
+      return [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mimeType,
+                data: stripDataUrlPrefix(dataUrl),
+              },
+            },
+          ],
+        },
+      ];
+    }
+    return [
+      {
         role: 'user',
         content: [
           { type: 'text', text: prompt },
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: mimeType,
-              data: stripDataUrlPrefix(dataUrl),
-            },
-          },
+          { type: 'image_url', image_url: { url: dataUrl } },
         ],
-      }];
-    }
-    return [{
-      role: 'user',
-      content: [
-        { type: 'text', text: prompt },
-        { type: 'image_url', image_url: { url: dataUrl } },
-      ],
-    }];
+      },
+    ];
   })();
 
   const text = await callAI('', {
@@ -297,7 +313,10 @@ const buildE2eMockClusterAnalysis = (clusterData) => {
     .slice()
     .sort((a, b) => Math.abs((b.differenceScore ?? 0) - 0) - Math.abs((a.differenceScore ?? 0) - 0));
 
-  const collapseSpace = (text) => String(text || '').replace(/\s+/g, ' ').trim();
+  const collapseSpace = (text) =>
+    String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
   const truncate = (text, max = 110) => {
     const clean = collapseSpace(text);
     if (clean.length <= max) return clean;
@@ -314,9 +333,14 @@ const buildE2eMockClusterAnalysis = (clusterData) => {
 
   const short = topPrompt
     ? `Top differentiator: "${topPrompt}"${deltaText}.`
-    : (clusterSize ? `Cluster ${clusterIndex} has ${clusterSize} participant(s).` : `Cluster ${clusterIndex} has no participants.`);
+    : clusterSize
+      ? `Cluster ${clusterIndex} has ${clusterSize} participant(s).`
+      : `Cluster ${clusterIndex} has no participants.`;
 
-  const otherPrompts = withPrompt.slice(1, 4).map((s) => `"${truncate(s.prompt, 90)}"`).filter(Boolean);
+  const otherPrompts = withPrompt
+    .slice(1, 4)
+    .map((s) => `"${truncate(s.prompt, 90)}"`)
+    .filter(Boolean);
   const longParts = [];
   if (clusterSize) longParts.push(`This cluster has ${clusterSize} participant(s).`);
   if (topPrompt) longParts.push(`It stands out most on "${topPrompt}".`);
@@ -326,15 +350,12 @@ const buildE2eMockClusterAnalysis = (clusterData) => {
   return { name, short, long: longParts.join(' ') };
 };
 
-
-
-
-
-
 // === Client-side silence trimming feature flag and config (runtime-controlled from UI) ===
 let __vadTrimEnabled = true;
 let __vadTrimConfig = {};
-export function setVadTrimEnabled(v) { __vadTrimEnabled = !!v; }
+export function setVadTrimEnabled(v) {
+  __vadTrimEnabled = !!v;
+}
 export function setVadTrimConfig(cfg) {
   if (cfg && typeof cfg === 'object') {
     __vadTrimConfig = { ...__vadTrimConfig, ...cfg };
@@ -357,15 +378,7 @@ const extractMainContent = (htmlString) => {
     doc.querySelectorAll(tag).forEach((el) => el.remove());
   });
 
-  const contentSelectors = [
-    'main',
-    'article',
-    '.content',
-    '#content',
-    '.main-content',
-    '#main-content',
-    'body',
-  ];
+  const contentSelectors = ['main', 'article', '.content', '#content', '.main-content', '#main-content', 'body'];
 
   for (const selector of contentSelectors) {
     const element = doc.querySelector(selector);
@@ -380,44 +393,54 @@ const extractMainContent = (htmlString) => {
   return doc.body.textContent.replace(/\s+/g, ' ').trim();
 };
 
-const resolveSessionAliasesOpt = (opts = {}) => resolveSessionConfigAliases({
-  sessionSlug: opts?.sessionSlug,
-  sessionConfig: opts?.sessionConfig,
-});
+const resolveSessionAliasesOpt = (opts = {}) =>
+  resolveSessionConfigAliases({
+    sessionSlug: opts?.sessionSlug,
+    sessionConfig: opts?.sessionConfig,
+  });
 
 const resolveSessionSlugOpt = (opts = {}) => resolveSessionAliasesOpt(opts).sessionSlug;
 
 const resolveSessionConfigOpt = (opts = {}) => resolveSessionAliasesOpt(opts).sessionConfig;
 
 const isChatReasoningModel = (modelRaw = '') => {
-  const modelLeaf = String(modelRaw || '').trim().toLowerCase().split('/').pop();
+  const modelLeaf = String(modelRaw || '')
+    .trim()
+    .toLowerCase()
+    .split('/')
+    .pop();
   return /^o[13]/.test(modelLeaf);
 };
 
 const usesOpenAiResponsesApi = (providerRaw = '', modelRaw = '') => {
-  const provider = String(providerRaw || '').trim().toLowerCase();
-  const modelLeaf = String(modelRaw || '').trim().toLowerCase().split('/').pop();
+  const provider = String(providerRaw || '')
+    .trim()
+    .toLowerCase();
+  const modelLeaf = String(modelRaw || '')
+    .trim()
+    .toLowerCase()
+    .split('/')
+    .pop();
   return provider === 'openai' && /^gpt-5/.test(modelLeaf);
 };
 
 const inferAiTaskType = (prompt = '', opts = {}) => {
-  const explicit = String(opts?.taskType || '').trim().toLowerCase();
+  const explicit = String(opts?.taskType || '')
+    .trim()
+    .toLowerCase();
   if (explicit) return explicit;
 
   const promptText = String(prompt || '');
   // Older question-generation flows still call `callAI` directly, so fall back
   // to the seed-generation prompt signature when no explicit task type is passed.
-  if (
-    /numberOfSeedStatementsOrPrompts:/i.test(promptText) &&
-    /"surveyTitle"\s*:/i.test(promptText)
-  ) {
+  if (/numberOfSeedStatementsOrPrompts:/i.test(promptText) && /"surveyTitle"\s*:/i.test(promptText)) {
     return 'generate';
   }
   return null;
 };
 
 const pickAiRequestOpts = (input = {}) => {
-  const src = (input && typeof input === 'object') ? input : {};
+  const src = input && typeof input === 'object' ? input : {};
   const out = {};
   const copy = (key) => {
     if (Object.prototype.hasOwnProperty.call(src, key) && src[key] !== undefined) {
@@ -472,43 +495,30 @@ export const callAI = async (prompt, opts = {}) => {
 
     const thinking = thinkingRequested && ai.provider === 'anthropic';
 
-    const messages = Array.isArray(opts.messages)
-      ? opts.messages
-      : [{ role: 'user', content: prompt }];
+    const messages = Array.isArray(opts.messages) ? opts.messages : [{ role: 'user', content: prompt }];
     const usesResponsesApi = usesOpenAiResponsesApi(ai.provider, ai.model);
     const usesCompletionTokens = !usesResponsesApi && isChatReasoningModel(ai.model);
 
-    const maxTokens =
-      opts.max_tokens ??
-      opts.maxTokens ??
-      (ai.provider === 'anthropic' ? 32568 : 16384);
+    const maxTokens = opts.max_tokens ?? opts.maxTokens ?? (ai.provider === 'anthropic' ? 32568 : 16384);
 
     const requestBody = {
       action: 'ai',
       provider: ai.provider,
       model: ai.model,
       ...(usesResponsesApi ? { endpoint: 'responses' } : {}),
-      ...(
-        typeof (opts.max_output_tokens ?? (usesResponsesApi ? maxTokens : undefined)) === 'number'
-          ? { max_output_tokens: opts.max_output_tokens ?? maxTokens }
-          : {}
-      ),
-      ...(
-        typeof (opts.max_completion_tokens ?? (usesCompletionTokens ? maxTokens : undefined)) === 'number'
-          ? { max_completion_tokens: opts.max_completion_tokens ?? maxTokens }
-          : {}
-      ),
-      ...(
-        !usesResponsesApi && !usesCompletionTokens && typeof maxTokens === 'number'
-          ? { max_tokens: maxTokens }
-          : {}
-      ),
+      ...(typeof (opts.max_output_tokens ?? (usesResponsesApi ? maxTokens : undefined)) === 'number'
+        ? { max_output_tokens: opts.max_output_tokens ?? maxTokens }
+        : {}),
+      ...(typeof (opts.max_completion_tokens ?? (usesCompletionTokens ? maxTokens : undefined)) === 'number'
+        ? { max_completion_tokens: opts.max_completion_tokens ?? maxTokens }
+        : {}),
+      ...(!usesResponsesApi && !usesCompletionTokens && typeof maxTokens === 'number' ? { max_tokens: maxTokens } : {}),
       ...(opts.response_format ? { response_format: opts.response_format } : {}),
-      ...(
-        !usesResponsesApi && !usesCompletionTokens
-          ? (typeof opts.temperature === 'number' ? { temperature: opts.temperature } : { temperature: 0.7 })
-          : {}
-      ),
+      ...(!usesResponsesApi && !usesCompletionTokens
+        ? typeof opts.temperature === 'number'
+          ? { temperature: opts.temperature }
+          : { temperature: 0.7 }
+        : {}),
       messages,
       ...(thinking ? { thinking: true } : {}),
     };
@@ -547,17 +557,9 @@ export const callAI = async (prompt, opts = {}) => {
       context: opts.context,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
     });
-    const endpoint = corsWorkerUrl.endsWith('/ai')
-      ? corsWorkerUrl
-      : `${corsWorkerUrl.replace(/\/+$/, '')}/ai`;
-    const baseUrl = corsWorkerUrl
-      .replace(/\/+$/, '')
-      .replace(/\/ai$/i, '');
-    const sessionSelection = (
-      opts && typeof opts.sessionSelection === 'object'
-        ? opts.sessionSelection
-        : null
-    );
+    const endpoint = corsWorkerUrl.endsWith('/ai') ? corsWorkerUrl : `${corsWorkerUrl.replace(/\/+$/, '')}/ai`;
+    const baseUrl = corsWorkerUrl.replace(/\/+$/, '').replace(/\/ai$/i, '');
+    const sessionSelection = opts && typeof opts.sessionSelection === 'object' ? opts.sessionSelection : null;
     aiLog.log('[aiClient] worker route selected', {
       sessionSlug: String(sessionSlug || ''),
       workerUrl: baseUrl,
@@ -568,27 +570,37 @@ export const callAI = async (prompt, opts = {}) => {
       provider: ai.provider,
       model: ai.model,
       endpoint: usesResponsesApi ? 'responses' : 'chat_completions',
-      tokenBudgetKey: usesResponsesApi ? 'max_output_tokens' : (usesCompletionTokens ? 'max_completion_tokens' : 'max_tokens'),
+      tokenBudgetKey: usesResponsesApi
+        ? 'max_output_tokens'
+        : usesCompletionTokens
+          ? 'max_completion_tokens'
+          : 'max_tokens',
       tokenBudgetValue: maxTokens,
       messageCount: messages.length,
       firstMessageLength: messages[0]?.content?.length || 0,
     });
-    const gateStatus = String(sessionSelection?.gateStatus ?? '').trim().toLowerCase();
+    const gateStatus = String(sessionSelection?.gateStatus ?? '')
+      .trim()
+      .toLowerCase();
     // For open-gate sessions, skip auth fallback when gate data is unavailable.
     // Auth retries still depend on the same on-chain gate RPC resolution.
     const fallbackOnGateUnavailable = gateStatus !== 'no-gate';
-    const response = await fetchWorkerWithAuth(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    }, {
-      sessionSlug,
-      context: opts.context,
-      workerUrl: baseUrl,
-      preferAnonymous: shouldUseAnonymousFirst,
-      fallbackOnGateUnavailable,
-      allowDemoFallback: defaultStrictAllowDemoFallback(),
-    });
+    const response = await fetchWorkerWithAuth(
+      endpoint,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      },
+      {
+        sessionSlug,
+        context: opts.context,
+        workerUrl: baseUrl,
+        preferAnonymous: shouldUseAnonymousFirst,
+        fallbackOnGateUnavailable,
+        allowDemoFallback: defaultStrictAllowDemoFallback(),
+      },
+    );
 
     const data = await response.json();
     if (!response.ok) {
@@ -622,9 +634,7 @@ export const callAIQueued = (prompt, opts = {}) => {
         return await callAI(prompt, opts);
       } catch (err) {
         const msg = String(err?.message || '');
-        const isTransient = /rate\s*limit|concurrent|overload|overloaded|busy|temporarily|try\s*again|429/i.test(
-          msg,
-        );
+        const isTransient = /rate\s*limit|concurrent|overload|overloaded|busy|temporarily|try\s*again|429/i.test(msg);
         if (!isTransient || attempt >= 2) {
           throw err;
         }
@@ -677,16 +687,20 @@ export const fetchContentFromURL = async (url, opts = {}) => {
       allowDemoFallback: defaultStrictAllowDemoFallback(),
     });
     const baseUrl = corsWorkerUrl.replace(/\/+$/, '');
-    const workerResponse = await fetchWorkerWithAuth(corsWorkerUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: validatedUrl.href, action: 'fetch_url' }),
-    }, {
-      sessionSlug,
-      context: opts.context,
-      workerUrl: baseUrl,
-      allowDemoFallback: defaultStrictAllowDemoFallback(),
-    });
+    const workerResponse = await fetchWorkerWithAuth(
+      corsWorkerUrl,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: validatedUrl.href, action: 'fetch_url' }),
+      },
+      {
+        sessionSlug,
+        context: opts.context,
+        workerUrl: baseUrl,
+        allowDemoFallback: defaultStrictAllowDemoFallback(),
+      },
+    );
 
     const data = await workerResponse.json().catch(() => ({}));
     if (!workerResponse.ok) {
@@ -776,7 +790,7 @@ export async function processAdditionalSources(sources, opts = {}) {
         content = `[Error reading source '${src.name}': ${err.message}]`;
       }
       return `\n\n--- Source: ${src.name} ---\n\n${content}`;
-    })
+    }),
   );
 
   return results.join('');
@@ -939,7 +953,7 @@ export async function transcribeAudio(audioBlobOrFile, opts = {}) {
   // Optional client-side VAD-based silence trimming (runtime-configured; no hardcoded tunables here)
   try {
     const sizeThreshold =
-      (__vadTrimConfig && typeof __vadTrimConfig.sizeThresholdBytes === 'number')
+      __vadTrimConfig && typeof __vadTrimConfig.sizeThresholdBytes === 'number'
         ? __vadTrimConfig.sizeThresholdBytes
         : null;
     if (__vadTrimEnabled && sizeThreshold != null && (uploadFile?.size || 0) > sizeThreshold) {
@@ -976,13 +990,15 @@ export async function transcribeAudio(audioBlobOrFile, opts = {}) {
     return merged.trim();
   }
 
-  const fname =
-    uploadFile.name ||
-    (looksSupported ? `audio.${ext || 'wav'}` : 'audio.wav');
-  return uploadAudioForTranscription(uploadFile instanceof Blob ? toFileLike(uploadFile, fname) : uploadFile, transport, {
-    fileName: fname,
-    signal: opts?.signal,
-  });
+  const fname = uploadFile.name || (looksSupported ? `audio.${ext || 'wav'}` : 'audio.wav');
+  return uploadAudioForTranscription(
+    uploadFile instanceof Blob ? toFileLike(uploadFile, fname) : uploadFile,
+    transport,
+    {
+      fileName: fname,
+      signal: opts?.signal,
+    },
+  );
 }
 
 const downsampleMonoFloat32 = (input, srcRate, targetHz) => {
@@ -1009,7 +1025,7 @@ const float32ToInt16 = (input) => {
   const out = new Int16Array(input.length);
   for (let i = 0; i < input.length; i++) {
     const s = Math.max(-1, Math.min(1, input[i]));
-    out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
   }
   return out;
 };
@@ -1105,7 +1121,9 @@ const decodeAudioToMonoFloat32 = async (inputBlob, label = 'Audio decode failed'
     aiLog.warn(label, error);
     return null;
   } finally {
-    try { await ctx.close(); } catch {}
+    try {
+      await ctx.close();
+    } catch {}
   }
 };
 
@@ -1115,12 +1133,13 @@ const mergeTranscriptText = (prev, next) => {
   if (!a) return b;
   if (!b) return a;
 
-  const tokenize = (s) => s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  const tokenize = (s) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
 
   const A = tokenize(a);
   const B = tokenize(b);
@@ -1170,10 +1189,10 @@ const splitAudioBlobToWavChunks = async (
 
   const safeMaxBytes = Math.max(1024, Math.floor(maxUploadBytes) - TRANSCRIBE_CHUNK_HEADROOM_BYTES);
   const maxSamplesPerChunk = Math.max(1, Math.floor((safeMaxBytes - 44) / 2));
-  const overlapSamples = Math.max(0, Math.min(
-    Math.floor((overlapMs / 1000) * targetHz),
-    Math.floor(maxSamplesPerChunk / 8),
-  ));
+  const overlapSamples = Math.max(
+    0,
+    Math.min(Math.floor((overlapMs / 1000) * targetHz), Math.floor(maxSamplesPerChunk / 8)),
+  );
   const chunks = [];
   let start = 0;
   let index = 0;
@@ -1210,18 +1229,18 @@ const resolveTranscriptionTransport = async (opts = {}) => {
   }
 
   const explicitWorkerUrl = normalizeBaseUrl(opts?.workerUrl || '');
-  const corsWorkerUrl = explicitWorkerUrl || await getCorsProxyUrlOrThrow({
-    sessionSlug,
-    sessionConfig,
-    context: opts.context,
-    allowDemoFallback: defaultStrictAllowDemoFallback(),
-  });
+  const corsWorkerUrl =
+    explicitWorkerUrl ||
+    (await getCorsProxyUrlOrThrow({
+      sessionSlug,
+      sessionConfig,
+      context: opts.context,
+      allowDemoFallback: defaultStrictAllowDemoFallback(),
+    }));
   const endpoint = corsWorkerUrl.endsWith('/transcribe')
     ? corsWorkerUrl
     : `${corsWorkerUrl.replace(/\/+$/, '')}/transcribe`;
-  const baseUrl = corsWorkerUrl
-    .replace(/\/+$/, '')
-    .replace(/\/transcribe$/i, '');
+  const baseUrl = corsWorkerUrl.replace(/\/+$/, '').replace(/\/transcribe$/i, '');
 
   return {
     endpoint,
@@ -1233,18 +1252,15 @@ const resolveTranscriptionTransport = async (opts = {}) => {
   };
 };
 
-const uploadAudioForTranscription = async (
-  audioFileOrBlob,
-  transport,
-  { fileName = '', signal } = {},
-) => {
-  const fileLike = audioFileOrBlob instanceof Blob
-    ? createNamedAudioFile(
-        audioFileOrBlob,
-        fileName || audioFileOrBlob.name || 'audio.wav',
-        audioFileOrBlob.type || 'audio/wav',
-      )
-    : audioFileOrBlob;
+const uploadAudioForTranscription = async (audioFileOrBlob, transport, { fileName = '', signal } = {}) => {
+  const fileLike =
+    audioFileOrBlob instanceof Blob
+      ? createNamedAudioFile(
+          audioFileOrBlob,
+          fileName || audioFileOrBlob.name || 'audio.wav',
+          audioFileOrBlob.type || 'audio/wav',
+        )
+      : audioFileOrBlob;
   const resolvedName = fileName || fileLike?.name || 'audio.wav';
   const form = new FormData();
   form.append('file', fileLike, resolvedName);
@@ -1381,10 +1397,14 @@ function buildHeuristicClusterSummary(payload) {
     short = `Aligned around "${describe(withPrompt[0])}".`;
   }
 
-  const highlights = withPrompt.slice(0, 3).map((s) => `"${describe(s)}"`).join('; ');
-  const size = typeof payload?.clusterSize === 'number'
-    ? `This cluster has ${payload.clusterSize} participants.`
-    : 'This cluster has a distinct voting pattern.';
+  const highlights = withPrompt
+    .slice(0, 3)
+    .map((s) => `"${describe(s)}"`)
+    .join('; ');
+  const size =
+    typeof payload?.clusterSize === 'number'
+      ? `This cluster has ${payload.clusterSize} participants.`
+      : 'This cluster has a distinct voting pattern.';
   const long = `${size} The largest opinion gaps appear on ${highlights}.`;
   return { short, long };
 }
@@ -1415,9 +1435,10 @@ export async function analyzeClusterOpinions(clusterData, allClustersData = null
     let short = '';
     let long = '';
     let raw = '';
-    const aiCallOpts = opts && typeof opts === 'object'
-      ? { ...opts, taskType: opts.taskType || 'summarize' }
-      : { taskType: 'summarize' };
+    const aiCallOpts =
+      opts && typeof opts === 'object'
+        ? { ...opts, taskType: opts.taskType || 'summarize' }
+        : { taskType: 'summarize' };
 
     try {
       raw = await callAIQueued(finalPrompt, { ...aiCallOpts, thinking: true });
@@ -1474,9 +1495,10 @@ export async function analyzeUserOpinions(userData, opts = {}) {
   try {
     const { default: buildUserAnalysisPrompt } = await import('../../prompts/userAnalysisPrompt.js');
     const prompt = buildUserAnalysisPrompt(userData);
-    const aiCallOpts = opts && typeof opts === 'object'
-      ? { ...opts, taskType: opts.taskType || 'summarize' }
-      : { taskType: 'summarize' };
+    const aiCallOpts =
+      opts && typeof opts === 'object'
+        ? { ...opts, taskType: opts.taskType || 'summarize' }
+        : { taskType: 'summarize' };
     const raw = await callAIQueued(prompt, { ...aiCallOpts, thinking: true });
 
     let parsed = parseJsonFlexible(raw);
@@ -1484,11 +1506,8 @@ export async function analyzeUserOpinions(userData, opts = {}) {
 
     const name = String(parsed.name || '').trim() || 'Profile Summary';
     const summary =
-      String(parsed.summary || '').trim() ||
-      'Neutral overview of user affiliations and consistent answer themes.';
-    const details =
-      String(parsed.details || '').trim() ||
-      'No additional details were derived from the provided data.';
+      String(parsed.summary || '').trim() || 'Neutral overview of user affiliations and consistent answer themes.';
+    const details = String(parsed.details || '').trim() || 'No additional details were derived from the provided data.';
 
     // Safely parse historicalAlignment
     const ha = parsed && typeof parsed.historicalAlignment === 'object' ? parsed.historicalAlignment : {};
@@ -1523,12 +1542,11 @@ export async function analyzeUserOpinions(userData, opts = {}) {
 export async function drillDownComparisonPoint(users, pointText, type, opts = {}) {
   const safeUsers = Array.isArray(users) ? users : [];
   const safePoint = typeof pointText === 'string' ? pointText : '';
-  const t = (typeof type === 'string' && type.toLowerCase().includes('dis')) ? 'disagreement' : 'agreement';
+  const t = typeof type === 'string' && type.toLowerCase().includes('dis') ? 'disagreement' : 'agreement';
   const aiCallOpts = pickAiRequestOpts(opts);
 
   try {
-    const drillPrompt =
-`You are an impartial analyst expanding on a ${t} found in a multi-user comparison.
+    const drillPrompt = `You are an impartial analyst expanding on a ${t} found in a multi-user comparison.
 Focus ONLY on the evidence in USERS (JSON) below: overlaps/divergences in SBTs, similar/different answers (binary/rating/multichoice/freeform), optional "importance"/"additionalComment", and created content ("questionsCreated","surveysCreated","createdCounts").
 
 Point to elaborate (${t}):
@@ -1581,7 +1599,7 @@ ${JSON.stringify(safeUsers, null, 2)}`;
  */
 export async function drillDownComparisonTree(users, pointText, type, opts = {}) {
   const safeUsers = Array.isArray(users) ? users.slice(0, 10) : [];
-  const t = (typeof type === 'string' && type.toLowerCase().includes('dis')) ? 'disagreement' : 'agreement';
+  const t = typeof type === 'string' && type.toLowerCase().includes('dis') ? 'disagreement' : 'agreement';
   const aiCallOpts = pickAiRequestOpts(opts);
 
   try {
@@ -1628,13 +1646,19 @@ export async function drillDownComparisonTree(users, pointText, type, opts = {})
 
         const childrenIn = Array.isArray(n.children) ? n.children : [];
         if (depth >= 3) return { label, evidence, ...(participants ? { participants } : {}), children: [] };
-        const children = childrenIn.slice(0, 6).map((c) => sanitizeNode(c, depth + 1)).filter(Boolean);
+        const children = childrenIn
+          .slice(0, 6)
+          .map((c) => sanitizeNode(c, depth + 1))
+          .filter(Boolean);
         return { label, evidence, ...(participants ? { participants } : {}), children };
       };
 
       return {
         title: String(parsed.title || `Why this ${t} holds`).slice(0, 120),
-        nodes: parsed.nodes.slice(0, 6).map((n) => sanitizeNode(n, 0)).filter(Boolean),
+        nodes: parsed.nodes
+          .slice(0, 6)
+          .map((n) => sanitizeNode(n, 0))
+          .filter(Boolean),
       };
     }
 
@@ -1644,7 +1668,10 @@ export async function drillDownComparisonTree(users, pointText, type, opts = {})
   } catch (err) {
     aiLog.error('drillDownComparisonTree error:', err);
     const text = await drillDownComparisonPoint(users, pointText, type, aiCallOpts);
-    return { title: `Why this ${type || 'agreement'} holds`, nodes: [{ label: 'Summary', evidence: [text], children: [] }] };
+    return {
+      title: `Why this ${type || 'agreement'} holds`,
+      nodes: [{ label: 'Summary', evidence: [text], children: [] }],
+    };
   }
 }
 
@@ -1689,7 +1716,7 @@ export async function runCompareToolkit(task, payload = {}, opts = {}) {
   }
 
   const envelope = {
-    task: (t === 'compare' || t === 'drilldown' || t === 'axes' || t === 'venn') ? t : 'compare',
+    task: t === 'compare' || t === 'drilldown' || t === 'axes' || t === 'venn' ? t : 'compare',
     users: safeUsers,
     ...(t === 'drilldown'
       ? {
@@ -1773,11 +1800,14 @@ export async function getComparisonBundle(
   // Compass (prefer LLM, sanitize)
   let compassRaw = val(1) || val(3) || null;
   let compass = compassRaw
-    ? sanitizeCompassPure(compassRaw, safeUsers.map((u) => u.address))
+    ? sanitizeCompassPure(
+        compassRaw,
+        safeUsers.map((u) => u.address),
+      )
     : null;
 
   // Venn (prefer LLM, guarantee non-empty evidence for positive regions)
-  let venn = needVenn ? (val(2) || val(4) || null) : null;
+  let venn = needVenn ? val(2) || val(4) || null : null;
   if (venn && venn.counts) {
     // Compute deterministic labels as a safety net for evidence
     const ensure = computeVennEvidence(safeUsers);
@@ -1795,7 +1825,7 @@ export async function getComparisonBundle(
   }
 
   // Matrix (deterministic only)
-  const matrix = needMatrix ? (val(5) || computeOverlapMatrix(safeUsers, 20)) : null;
+  const matrix = needMatrix ? val(5) || computeOverlapMatrix(safeUsers, 20) : null;
 
   return {
     bullets,
@@ -1840,8 +1870,10 @@ export async function generateAudioDiscussionSummary(transcript, opts = {}) {
   }
 
   const aiCallOpts = opts && typeof opts === 'object' ? { ...opts } : {};
-  const style = (typeof aiCallOpts.style === 'string' && aiCallOpts.style.trim()) ? aiCallOpts.style.trim() : 'reading-group';
-  const sessionTitle = (typeof aiCallOpts.sessionTitle === 'string' && aiCallOpts.sessionTitle.trim()) ? aiCallOpts.sessionTitle.trim() : '';
+  const style =
+    typeof aiCallOpts.style === 'string' && aiCallOpts.style.trim() ? aiCallOpts.style.trim() : 'reading-group';
+  const sessionTitle =
+    typeof aiCallOpts.sessionTitle === 'string' && aiCallOpts.sessionTitle.trim() ? aiCallOpts.sessionTitle.trim() : '';
   delete aiCallOpts.style;
   delete aiCallOpts.sessionTitle;
 
@@ -1884,12 +1916,15 @@ export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
     const arweaveKey = opts?.arweaveJwk
       ? { arweaveJwk: opts.arweaveJwk }
       : {
-          arweaveJwk: (await getEffectiveArweaveKey({
-            sessionSlug,
-            sessionConfig,
-            preferLocal: opts?.preferLocal,
-            context: opts?.context,
-          }))?.arweaveJwk || '',
+          arweaveJwk:
+            (
+              await getEffectiveArweaveKey({
+                sessionSlug,
+                sessionConfig,
+                preferLocal: opts?.preferLocal,
+                context: opts?.context,
+              })
+            )?.arweaveJwk || '',
         };
     const uploadOpts = {
       ...arweaveKey,
@@ -1954,15 +1989,7 @@ export async function extractSpeechAudio(inputBlob, opts = {}) {
     if (!inputBlob || typeof inputBlob.arrayBuffer !== 'function') return null;
     if (typeof window === 'undefined') return null; // SSR guard
 
-    const {
-      thresholdDb,
-      frameMs,
-      hopMs,
-      minSilenceMs,
-      minSpeechMs,
-      targetHz,
-      crossfadeMs
-    } = opts || {};
+    const { thresholdDb, frameMs, hopMs, minSilenceMs, minSpeechMs, targetHz, crossfadeMs } = opts || {};
 
     // Require all core tunables; UI supplies them (avoids hardcoded defaults here)
     const reqNums = [thresholdDb, frameMs, hopMs, minSilenceMs, minSpeechMs, targetHz];
@@ -1981,14 +2008,21 @@ export async function extractSpeechAudio(inputBlob, opts = {}) {
       });
     } catch (error) {
       aiLog.warn('Audio decode failed during speech extraction:', error);
-      try { await ctx.close(); } catch {}
+      try {
+        await ctx.close();
+      } catch {}
       return null;
     }
 
     const sr = Math.max(8000, Math.min(192000, audioBuf.sampleRate || 44100));
     const ch = Math.max(1, audioBuf.numberOfChannels || 1);
     const len = audioBuf.length || 0;
-    if (!len) { try { await ctx.close(); } catch {}; return null; }
+    if (!len) {
+      try {
+        await ctx.close();
+      } catch {}
+      return null;
+    }
 
     // Mix to mono (average channels)
     const mono = new Float32Array(len);
@@ -1999,9 +2033,9 @@ export async function extractSpeechAudio(inputBlob, opts = {}) {
 
     // Window sizes in samples
     const frameSamples = Math.max(1, Math.round((frameMs / 1000) * sr));
-    const hopSamples   = Math.max(1, Math.round((hopMs   / 1000) * sr));
-    const minSilenceS  = Math.max(0, Math.round((minSilenceMs / 1000) * sr));
-    const minSpeechS   = Math.max(0, Math.round((minSpeechMs  / 1000) * sr));
+    const hopSamples = Math.max(1, Math.round((hopMs / 1000) * sr));
+    const minSilenceS = Math.max(0, Math.round((minSilenceMs / 1000) * sr));
+    const minSpeechS = Math.max(0, Math.round((minSpeechMs / 1000) * sr));
 
     // Prefix sum of squares for RMS
     const ps = new Float32Array(len + 1);
@@ -2036,12 +2070,20 @@ export async function extractSpeechAudio(inputBlob, opts = {}) {
         runStart = -1;
       }
     }
-    if (!segments.length) { try { await ctx.close(); } catch {}; return null; }
+    if (!segments.length) {
+      try {
+        await ctx.close();
+      } catch {}
+      return null;
+    }
 
     // Merge short silences
     const merged = [];
     for (const seg of segments) {
-      if (!merged.length) { merged.push({ ...seg }); continue; }
+      if (!merged.length) {
+        merged.push({ ...seg });
+        continue;
+      }
       const last = merged[merged.length - 1];
       const gap = seg.start - last.end;
       if (gap <= minSilenceS) {
@@ -2052,13 +2094,23 @@ export async function extractSpeechAudio(inputBlob, opts = {}) {
     }
 
     // Drop tiny speech blips
-    const kept = merged.filter(seg => (seg.end - seg.start) >= minSpeechS);
-    if (!kept.length) { try { await ctx.close(); } catch {}; return null; }
+    const kept = merged.filter((seg) => seg.end - seg.start >= minSpeechS);
+    if (!kept.length) {
+      try {
+        await ctx.close();
+      } catch {}
+      return null;
+    }
 
     // Concatenate speech segments
     let total = 0;
-    for (const seg of kept) total += (seg.end - seg.start);
-    if (!total) { try { await ctx.close(); } catch {}; return null; }
+    for (const seg of kept) total += seg.end - seg.start;
+    if (!total) {
+      try {
+        await ctx.close();
+      } catch {}
+      return null;
+    }
 
     const trimmed = new Float32Array(total);
     let w = 0;
@@ -2092,7 +2144,9 @@ export async function extractSpeechAudio(inputBlob, opts = {}) {
     const dsF32 = downsampleMonoFloat32(trimmed, sr, targetHz);
     const pcmI16 = float32ToInt16(dsF32);
 
-    try { await ctx.close(); } catch {}
+    try {
+      await ctx.close();
+    } catch {}
 
     const wavBlob = buildMonoWavBlob(pcmI16, targetHz);
     try {

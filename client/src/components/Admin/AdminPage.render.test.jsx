@@ -93,7 +93,11 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
     fetchSessionFromRegistry: (...args) => mockFetchSessionFromRegistry(...args),
     upsertSessionRegistryCache: (...args) => mockUpsertSessionRegistryCache(...args),
     normalizeSessionIdHex: jest.fn(() => ''),
-    toRegistrySlug: jest.fn((value) => String(value || '').trim().toLowerCase()),
+    toRegistrySlug: jest.fn((value) =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    ),
   },
 }));
 
@@ -109,11 +113,7 @@ jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-se
 
 const AdminPage = require('./AdminPage').default;
 
-const renderAdminPage = async ({
-  account = ADMIN_ADDRESS,
-  initialSessionId,
-  initialRegistryChainId,
-} = {}) => {
+const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, initialRegistryChainId } = {}) => {
   let utils;
   await act(async () => {
     utils = render(
@@ -124,7 +124,7 @@ const renderAdminPage = async ({
         toggleLoginModal={jest.fn()}
         initialSessionId={initialSessionId}
         initialRegistryChainId={initialRegistryChainId}
-      />
+      />,
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -154,11 +154,13 @@ describe('AdminPage rendered interactions', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    );
     sessionEntries = [['edge', buildSessionConfig()]];
     mockLoadSessionRegistryCache.mockResolvedValue(undefined);
     mockGetAllSessionEntries.mockImplementation(() => sessionEntries);
@@ -237,10 +239,12 @@ describe('AdminPage rendered interactions', () => {
     });
 
     expect(screen.getByDisplayValue('https://edited.example.test')).toBeInTheDocument();
-    expect(mockResolveCorsProxyUrl).toHaveBeenCalledWith(expect.objectContaining({
-      sessionSlug: 'edge',
-      sessionConfig: expect.objectContaining({ slug: 'edge' }),
-    }));
+    expect(mockResolveCorsProxyUrl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'edge',
+        sessionConfig: expect.objectContaining({ slug: 'edge' }),
+      }),
+    );
   });
 
   it('reveals the tests section only after the worker Test button is clicked', async () => {
@@ -259,11 +263,13 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('runs worker health, AI, and faucet probes through authenticated worker fetches', async () => {
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/health')
-        ? { ok: false, status: 401, json: async () => ({ error: 'auth required' }) }
-        : { ok: true, status: 200, json: async () => ({ ok: true }) }
-    ));
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/health')
+          ? { ok: false, status: 401, json: async () => ({ error: 'auth required' }) }
+          : { ok: true, status: 200, json: async () => ({ ok: true }) },
+      ),
+    );
     mockFetchWorkerWithAuth.mockImplementation(async (url) => ({
       ok: true,
       status: 200,
@@ -300,7 +306,7 @@ describe('AdminPage rendered interactions', () => {
       expect.objectContaining({
         sessionSlug: 'edge',
         workerUrl: 'https://worker.example.test',
-      })
+      }),
     );
     expect(mockFetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker.example.test/ai',
@@ -312,7 +318,7 @@ describe('AdminPage rendered interactions', () => {
       expect.objectContaining({
         sessionSlug: 'edge',
         workerUrl: 'https://worker.example.test',
-      })
+      }),
     );
     expect(mockFetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker.example.test/',
@@ -324,25 +330,28 @@ describe('AdminPage rendered interactions', () => {
       expect.objectContaining({
         sessionSlug: 'edge',
         workerUrl: 'https://worker.example.test',
-      })
+      }),
     );
   });
 
   it('keeps worker probe requests exclusive while a probe is in flight', async () => {
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/health')
-        ? { ok: false, status: 401, json: async () => ({ error: 'auth required' }) }
-        : { ok: true, status: 200, json: async () => ({ ok: true }) }
-    ));
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/health')
+          ? { ok: false, status: 401, json: async () => ({ error: 'auth required' }) }
+          : { ok: true, status: 200, json: async () => ({ ok: true }) },
+      ),
+    );
     let resolveHealth;
     mockFetchWorkerWithAuth.mockImplementation((url) => {
       if (String(url).endsWith('/health')) {
         return new Promise((resolve) => {
-          resolveHealth = () => resolve({
-            ok: true,
-            status: 200,
-            json: async () => ({ ts: '2026-01-02T03:04:05.000Z' }),
-          });
+          resolveHealth = () =>
+            resolve({
+              ok: true,
+              status: 200,
+              json: async () => ({ ts: '2026-01-02T03:04:05.000Z' }),
+            });
         });
       }
       return Promise.resolve({
@@ -389,7 +398,7 @@ describe('AdminPage rendered interactions', () => {
       expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
       expect(screen.getByRole('link', { name: 'OK (tx arweave_prob…)' })).toHaveAttribute(
         'href',
-        'https://arweave.example.test/arweave_probe_tx_1234567890'
+        'https://arweave.example.test/arweave_probe_tx_1234567890',
       );
     });
     expect(mockUploadDataToArweave).toHaveBeenCalledWith(
@@ -401,7 +410,7 @@ describe('AdminPage rendered interactions', () => {
       expect.objectContaining({
         sessionSlug: 'edge',
         workerUrl: 'https://worker.example.test',
-      })
+      }),
     );
     expect(mockBuildArweaveGatewayUrl).toHaveBeenCalledWith('arweave_probe_tx_1234567890');
   });
@@ -442,9 +451,7 @@ describe('AdminPage rendered interactions', () => {
     await waitFor(() => {
       expect(signMessage).toHaveBeenCalledWith('rendered-byte-exact-siwe-message');
     });
-    const loginCall = global.fetch.mock.calls.find(([url]) => (
-      String(url).endsWith('/auth/login')
-    ));
+    const loginCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/auth/login'));
     expect(loginCall?.[1]).toMatchObject({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -476,12 +483,14 @@ describe('AdminPage rendered interactions', () => {
       }
     }
     global.Image = BrokenImageMock;
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        sessionHeaderImg: 'https://broken.example.test/session-header.png',
-      }),
-    ]];
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          sessionHeaderImg: 'https://broken.example.test/session-header.png',
+        }),
+      ],
+    ];
 
     try {
       await renderAdminPage();
@@ -508,12 +517,14 @@ describe('AdminPage rendered interactions', () => {
     }
     global.Image = LoadedImageMock;
     mockNormalizeSessionMediaUrl.mockReturnValue('https://media.example.test/session-header.png');
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        sessionHeaderImg: ' ar://session_header_tx ',
-      }),
-    ]];
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          sessionHeaderImg: ' ar://session_header_tx ',
+        }),
+      ],
+    ];
 
     try {
       await renderAdminPage();
@@ -522,13 +533,12 @@ describe('AdminPage rendered interactions', () => {
       await waitFor(() => {
         expect(screen.getByAltText('edge header')).toHaveAttribute(
           'src',
-          'https://media.example.test/session-header.png'
+          'https://media.example.test/session-header.png',
         );
       });
-      expect(mockNormalizeSessionMediaUrl).toHaveBeenCalledWith(
-        ' ar://session_header_tx ',
-        { contextLabel: 'session_header_image' }
-      );
+      expect(mockNormalizeSessionMediaUrl).toHaveBeenCalledWith(' ar://session_header_tx ', {
+        contextLabel: 'session_header_image',
+      });
     } finally {
       global.Image = OriginalImage;
     }
@@ -540,7 +550,7 @@ describe('AdminPage rendered interactions', () => {
     });
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_NOT_ADMIN_WARNING)).toHaveTextContent(
-      'You are not the admin for this session; actions are disabled.'
+      'You are not the admin for this session; actions are disabled.',
     );
     expect(screen.queryByRole('button', { name: 'Save allowlist' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add recommended origins' })).not.toBeInTheDocument();
@@ -550,17 +560,19 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('retries registry loading with the default RPC path when the requested chain is still empty after bootstrap load', async () => {
-    sessionEntries = [[
-      'other-chain-session',
-      buildSessionConfig({
-        slug: 'other-chain-session',
-        __registry: {
-          registryChainId: 8453,
-          chainId: 8453,
-          adminAddress: ADMIN_ADDRESS,
-        },
-      }),
-    ]];
+    sessionEntries = [
+      [
+        'other-chain-session',
+        buildSessionConfig({
+          slug: 'other-chain-session',
+          __registry: {
+            registryChainId: 8453,
+            chainId: 8453,
+            adminAddress: ADMIN_ADDRESS,
+          },
+        }),
+      ],
+    ];
 
     await renderAdminPage({
       initialRegistryChainId: '84532',
@@ -570,14 +582,20 @@ describe('AdminPage rendered interactions', () => {
       expect(mockLoadSessionRegistryCache).toHaveBeenCalledTimes(2);
     });
 
-    expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      chainIds: [84532],
-      bootstrapRpc: true,
-    }));
-    expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      chainIds: [84532],
-      bootstrapRpc: false,
-    }));
+    expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        chainIds: [84532],
+        bootstrapRpc: true,
+      }),
+    );
+    expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        chainIds: [84532],
+        bootstrapRpc: false,
+      }),
+    );
   });
 
   it('retries the registry load with the default RPC path when bootstrap hydration stays empty', async () => {
@@ -597,12 +615,18 @@ describe('AdminPage rendered interactions', () => {
 
     const sessionSelect = await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT);
     expect(sessionSelect).toHaveValue('edge');
-    expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      bootstrapRpc: true,
-    }));
-    expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      bootstrapRpc: false,
-    }));
+    expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        bootstrapRpc: true,
+      }),
+    );
+    expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        bootstrapRpc: false,
+      }),
+    );
   });
 
   it('retries the registry load with the default RPC path when bootstrap hydration leaves stale cached sessions', async () => {
@@ -624,12 +648,18 @@ describe('AdminPage rendered interactions', () => {
     await waitFor(() => {
       expect(sessionSelect).toHaveValue('edge');
       expect(within(sessionSelect).getByRole('option', { name: 'edge — Fresh Session' })).toBeInTheDocument();
-      expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(1, expect.objectContaining({
-        bootstrapRpc: true,
-      }));
-      expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(2, expect.objectContaining({
-        bootstrapRpc: false,
-      }));
+      expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          bootstrapRpc: true,
+        }),
+      );
+      expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          bootstrapRpc: false,
+        }),
+      );
     });
   });
 
@@ -668,14 +698,16 @@ describe('AdminPage rendered interactions', () => {
     await clickAndSettle(screen.getByRole('button', { name: 'Refresh sessions' }));
 
     await waitFor(() => {
-      expect(mockFetchSessionFromRegistry).toHaveBeenCalledWith(expect.objectContaining({
-        chainId: 84532,
-        slug: 'requested-edge',
-        providerLike: null,
-        account: '',
-        lit: null,
-        bootstrapRpc: true,
-      }));
+      expect(mockFetchSessionFromRegistry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chainId: 84532,
+          slug: 'requested-edge',
+          providerLike: null,
+          account: '',
+          lit: null,
+          bootstrapRpc: true,
+        }),
+      );
       expect(mockUpsertSessionRegistryCache).toHaveBeenCalledWith({
         config: requestedConfig,
       });
@@ -690,17 +722,14 @@ describe('AdminPage rendered interactions', () => {
     try {
       const { unmount } = await renderAdminPage();
 
-      const addCall = addEventListenerSpy.mock.calls.find(([eventName]) => (
-        eventName === SESSION_REGISTRY_CACHE_UPDATED_EVENT
-      ));
+      const addCall = addEventListenerSpy.mock.calls.find(
+        ([eventName]) => eventName === SESSION_REGISTRY_CACHE_UPDATED_EVENT,
+      );
       expect(addCall).toBeTruthy();
 
       unmount();
 
-      expect(removeEventListenerSpy).toHaveBeenCalledWith(
-        SESSION_REGISTRY_CACHE_UPDATED_EVENT,
-        addCall[1]
-      );
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(SESSION_REGISTRY_CACHE_UPDATED_EVENT, addCall[1]);
     } finally {
       addEventListenerSpy.mockRestore();
       removeEventListenerSpy.mockRestore();
@@ -746,33 +775,38 @@ describe('AdminPage rendered interactions', () => {
       status: 'encrypted',
       encryptedAvailable: true,
     });
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        encryptedFields: {
-          'ai.providers.openai.apiKey': firstEnvelope,
-        },
-      }),
-    ]];
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          encryptedFields: {
+            'ai.providers.openai.apiKey': firstEnvelope,
+          },
+        }),
+      ],
+    ];
 
     await renderAdminPage();
 
-    const decryptButton = (await screen.findAllByRole('button', { name: 'Decrypt' }))
-      .find((button) => button.getAttribute('title') === 'Decrypt fields (wallet signature prompts)');
+    const decryptButton = (await screen.findAllByRole('button', { name: 'Decrypt' })).find(
+      (button) => button.getAttribute('title') === 'Decrypt fields (wallet signature prompts)',
+    );
     expect(decryptButton).toBeTruthy();
     fireEvent.click(decryptButton);
 
     expect(await screen.findByText('admin-openai-secret')).toBeInTheDocument();
     expect(encryptedFieldsUtils.resolveEncryptedValue).toHaveBeenCalledTimes(1);
 
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        encryptedFields: {
-          'ai.providers.openai.apiKey': clonedEnvelope,
-        },
-      }),
-    ]];
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          encryptedFields: {
+            'ai.providers.openai.apiKey': clonedEnvelope,
+          },
+        }),
+      ],
+    ];
     act(() => {
       window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
     });
@@ -782,5 +816,4 @@ describe('AdminPage rendered interactions', () => {
     });
     expect(encryptedFieldsUtils.resolveEncryptedValue).toHaveBeenCalledTimes(1);
   });
-
 });

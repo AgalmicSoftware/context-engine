@@ -340,10 +340,12 @@ describe('SurveyResults HTML report export controls', () => {
 
     await waitFor(() => expect(downloadSessionResultsPdfReport).toHaveBeenCalledTimes(1));
     expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
-    expect((downloadSessionResultsPdfReport as jest.Mock).mock.calls[0][0]).toEqual(expect.objectContaining({
-      filename: expect.stringMatching(/^contextEngine_sessionReport_demo_.*\.pdf$/),
-      html: expect.stringContaining('ce-report-pdf'),
-    }));
+    expect((downloadSessionResultsPdfReport as jest.Mock).mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        filename: expect.stringMatching(/^contextEngine_sessionReport_demo_.*\.pdf$/),
+        html: expect.stringContaining('ce-report-pdf'),
+      }),
+    );
   });
 
   it('blocks HTML report downloads without exporter identity before rendering artifacts', async () => {
@@ -472,6 +474,4 @@ describe('SurveyResults HTML report export controls', () => {
       expect(screen.queryByTestId('ce-surveyresults-html-report-modal')).toBeNull();
     });
   });
-
-
 });

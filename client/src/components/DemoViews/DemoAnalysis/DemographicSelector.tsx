@@ -5,11 +5,12 @@ import { faMagic, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { getSegmentDisplayName } from '../../../utilities/demo/demoAnalysisMath.js';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
-const slugify = (value = '') => String(value || '')
-  .trim()
-  .toLowerCase()
-  .replace(/[^a-z0-9]+/g, '-')
-  .replace(/^-+|-+$/g, '');
+const slugify = (value = '') =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
 const formatPersonaCount = (count = 0) => {
   const normalizedCount = Number(count || 0);
@@ -116,7 +117,7 @@ const DemographicSelector = ({
               isClearable
               onChange={(nextOptions) => {
                 const nextSegmentKeys = (Array.isArray(nextOptions) ? nextOptions : []).map(
-                  (option) => `${category}:${String(option.value || '')}`
+                  (option) => `${category}:${String(option.value || '')}`,
                 );
                 onCategoryChange(category, nextSegmentKeys);
               }}

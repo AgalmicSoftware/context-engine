@@ -23,11 +23,7 @@ import {
   resolveWorkerAllowDemoFallback,
   resolveWorkerSessionContext,
 } from './workerSessionResolution.js';
-import {
-  ADMIN_ACTION_TYPES,
-  buildAdminActionBodyHash,
-  buildAdminActionTypedData,
-} from './adminTypedData.mjs';
+import { ADMIN_ACTION_TYPES, buildAdminActionBodyHash, buildAdminActionTypedData } from './adminTypedData.mjs';
 
 const accountLog = createLogger('account');
 
@@ -42,12 +38,11 @@ const ADMIN_ACTION_EXPIRATION_WINDOW_SECONDS = 5 * 60;
 const DEFAULT_LOCAL_ADMIN_ORIGIN = 'http://localhost:3000';
 export { normalizeWorkerUrl };
 
-const shouldAllowDemoSessionFallback = (allowDemoFallback) => (
+const shouldAllowDemoSessionFallback = (allowDemoFallback) =>
   resolveWorkerAllowDemoFallback({
     allowDemoFallback,
     getDefaultAllowDemoFallback: defaultWorkerAuthAllowDemoFallback,
-  })
-);
+  });
 const resolveDefaultProviderLike = () => {
   try {
     const state = store?.getState?.();
@@ -101,13 +96,10 @@ const doesWorkerAuthAddressMatchStore = (address) => {
 
 let trackedWorkerAuthAddress = getCurrentWorkerAuthStoreAddress();
 
-const isNonceMismatchError = (message) => (
-  toStr(message).toLowerCase().includes(NONCE_MISMATCH_ERROR)
-);
+const isNonceMismatchError = (message) => toStr(message).toLowerCase().includes(NONCE_MISMATCH_ERROR);
 
-const isOnChainGateUnavailableError = (message) => (
-  toStr(message).toLowerCase().includes(ONCHAIN_GATE_UNAVAILABLE_ERROR)
-);
+const isOnChainGateUnavailableError = (message) =>
+  toStr(message).toLowerCase().includes(ONCHAIN_GATE_UNAVAILABLE_ERROR);
 
 const createAbortError = (message = 'Worker auth request aborted.') => {
   if (typeof DOMException === 'function') {
@@ -118,9 +110,7 @@ const createAbortError = (message = 'Worker auth request aborted.') => {
   return error;
 };
 
-const isAbortError = (error) => (
-  toStr(error?.name) === 'AbortError'
-);
+const isAbortError = (error) => toStr(error?.name) === 'AbortError';
 
 const abortInFlightTokenRequests = () => {
   inFlightTokenRequests.forEach((request) => {
@@ -166,48 +156,47 @@ const assertWorkerAuthRequestCurrent = (signal, requestAuthEpoch, requestAddress
   }
 };
 
-const sleep = (ms, { signal, requestAuthEpoch, requestAddress } = {}) => new Promise((resolve, reject) => {
-  const onAbort = () => {
-    clearTimeout(timerId);
-    if (signal && typeof signal.removeEventListener === 'function') {
-      signal.removeEventListener('abort', onAbort);
-    }
-    reject(createAbortError());
-  };
-  const finish = (cb) => {
-    clearTimeout(timerId);
-    if (signal && typeof signal.removeEventListener === 'function') {
-      signal.removeEventListener('abort', onAbort);
-    }
-    cb();
-  };
-  let timerId = null;
-  try {
-    assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, requestAddress);
-  } catch (error) {
-    reject(error);
-    return;
-  }
-  if (signal && typeof signal.addEventListener === 'function') {
-    signal.addEventListener('abort', onAbort, { once: true });
-  }
-  timerId = setTimeout(() => {
-    finish(() => {
-      try {
-        assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, requestAddress);
-        resolve();
-      } catch (error) {
-        reject(error);
+const sleep = (ms, { signal, requestAuthEpoch, requestAddress } = {}) =>
+  new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timerId);
+      if (signal && typeof signal.removeEventListener === 'function') {
+        signal.removeEventListener('abort', onAbort);
       }
-    });
-  }, ms);
-});
+      reject(createAbortError());
+    };
+    const finish = (cb) => {
+      clearTimeout(timerId);
+      if (signal && typeof signal.removeEventListener === 'function') {
+        signal.removeEventListener('abort', onAbort);
+      }
+      cb();
+    };
+    let timerId = null;
+    try {
+      assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, requestAddress);
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    if (signal && typeof signal.addEventListener === 'function') {
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+    timerId = setTimeout(() => {
+      finish(() => {
+        try {
+          assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, requestAddress);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }, ms);
+  });
 
 const resolveSignerAddress = async (providerLike, fallbackAddress = '') => {
   const provider = cryptoUtils._getProvider(providerLike || resolveDefaultProviderLike());
-  let address = normalizeAddress(fallbackAddress) || normalizeAddress(
-    provider?.selectedAddress || provider?.address
-  );
+  let address = normalizeAddress(fallbackAddress) || normalizeAddress(provider?.selectedAddress || provider?.address);
   if (provider && typeof provider.request === 'function') {
     try {
       const accounts = await provider.request({ method: 'eth_accounts' });
@@ -228,14 +217,17 @@ const readTokenCache = (key) => {
   }
 };
 
-const normalizeTokenCacheEntry = (entry, {
-  workerUrl,
-  sessionSlug,
-  address,
-  nowSeconds = Math.floor(Date.now() / 1000),
-  skewSeconds = TOKEN_SKEW_SECONDS,
-  maxTtlSeconds = MAX_TOKEN_CACHE_TTL_SECONDS,
-} = {}) => {
+const normalizeTokenCacheEntry = (
+  entry,
+  {
+    workerUrl,
+    sessionSlug,
+    address,
+    nowSeconds = Math.floor(Date.now() / 1000),
+    skewSeconds = TOKEN_SKEW_SECONDS,
+    maxTtlSeconds = MAX_TOKEN_CACHE_TTL_SECONDS,
+  } = {},
+) => {
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
     return { ok: false, status: 'malformed' };
   }
@@ -264,7 +256,7 @@ const normalizeTokenCacheEntry = (entry, {
     const entryAddress = normalizeAddress(entry.address);
     if (
       (expectedWorkerUrl && entryWorkerUrl && expectedWorkerUrl !== entryWorkerUrl) ||
-      (entrySlug !== expectedSlug) ||
+      entrySlug !== expectedSlug ||
       (expectedAddress && entryAddress && expectedAddress !== entryAddress)
     ) {
       return { ok: false, status: 'scope-mismatch' };
@@ -286,7 +278,9 @@ const readScopedTokenCache = (key, scope = {}) => {
   const normalized = normalizeTokenCacheEntry(parsed, scope);
   if (normalized.ok) return normalized;
   if (parsed) {
-    try { localStorage.removeItem(key); } catch (_) {}
+    try {
+      localStorage.removeItem(key);
+    } catch (_) {}
   }
   return null;
 };
@@ -317,7 +311,9 @@ const writeTokenCache = (key, payload) => {
 
 const clearTokenCache = (key) => {
   if (typeof window === 'undefined') return;
-  try { localStorage.removeItem(key); } catch (_) {}
+  try {
+    localStorage.removeItem(key);
+  } catch (_) {}
 };
 
 const buildTokenCacheKey = ({ workerUrl, slug, address }) => {
@@ -355,16 +351,15 @@ const resolveWorkerTokenRequestContext = async ({
   const authEpoch = syncWorkerAuthAddress(address);
   assertWorkerAuthRequestCurrent(null, authEpoch, address);
   const resolvedWorkerUrl = normalizeWorkerUrl(
-    workerUrl || (
-      resolveWorkerUrl
+    workerUrl ||
+      (resolveWorkerUrl
         ? await getCorsProxyUrlOrThrow({
-          sessionSlug: slug,
-          sessionConfig: resolvedSession.sessionConfig,
-          context,
-          allowDemoFallback: allowDemoFallbackResolved,
-        })
-        : ''
-    )
+            sessionSlug: slug,
+            sessionConfig: resolvedSession.sessionConfig,
+            context,
+            allowDemoFallback: allowDemoFallbackResolved,
+          })
+        : ''),
   );
   return {
     allowDemoFallbackResolved,
@@ -374,9 +369,7 @@ const resolveWorkerTokenRequestContext = async ({
     resolvedSigner,
     address,
     resolvedWorkerUrl,
-    storageKey: resolvedWorkerUrl
-      ? buildTokenCacheKey({ workerUrl: resolvedWorkerUrl, slug, address })
-      : '',
+    storageKey: resolvedWorkerUrl ? buildTokenCacheKey({ workerUrl: resolvedWorkerUrl, slug, address }) : '',
     authEpoch,
   };
 };
@@ -447,7 +440,9 @@ const WORKER_AUTH_FETCH_ERROR_PATTERNS = [
 ];
 
 const isWorkerAuthFetchReachabilityError = (error) => {
-  const message = toStr(error?.message || error).trim().toLowerCase();
+  const message = toStr(error?.message || error)
+    .trim()
+    .toLowerCase();
   if (!message || message.includes('failed to reach worker auth endpoint')) return false;
   return WORKER_AUTH_FETCH_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
 };
@@ -460,16 +455,16 @@ const buildWorkerAuthReachabilityMessage = (endpoint) => {
     } catch (_) {}
     return '';
   })();
-  const allowOriginsHint = browserOrigin
-    ? ` Check worker URL and allowOrigins includes ${browserOrigin}.`
-    : '';
+  const allowOriginsHint = browserOrigin ? ` Check worker URL and allowOrigins includes ${browserOrigin}.` : '';
   return `Failed to reach worker auth endpoint (${normalizedEndpoint}).${allowOriginsHint}`;
 };
 
 const normalizeWorkerAuthFetchError = (error, endpoint) => {
   if (!isWorkerAuthFetchReachabilityError(error)) return error;
   const normalized = new Error(buildWorkerAuthReachabilityMessage(endpoint));
-  try { normalized.cause = error; } catch (_) {}
+  try {
+    normalized.cause = error;
+  } catch (_) {}
   return normalized;
 };
 
@@ -568,12 +563,7 @@ export const buildSignedAdminActionAuth = async ({
 
   let recovered = '';
   try {
-    recovered = ethers.utils.verifyTypedData(
-      typedData.domain,
-      ADMIN_ACTION_TYPES,
-      typedData.message,
-      signature,
-    );
+    recovered = ethers.utils.verifyTypedData(typedData.domain, ADMIN_ACTION_TYPES, typedData.message, signature);
   } catch (_) {
     recovered = '';
   }
@@ -662,14 +652,16 @@ export const getWorkerSessionToken = async ({
   allowDemoFallback,
   requestContext,
 } = {}) => {
-  const resolvedRequest = requestContext || await resolveWorkerTokenRequestContext({
-    sessionSlug,
-    sessionConfig,
-    context,
-    workerUrl,
-    allowDemoFallback,
-    resolveWorkerUrl: true,
-  });
+  const resolvedRequest =
+    requestContext ||
+    (await resolveWorkerTokenRequestContext({
+      sessionSlug,
+      sessionConfig,
+      context,
+      workerUrl,
+      allowDemoFallback,
+      resolveWorkerUrl: true,
+    }));
   const {
     slug,
     wallet,
@@ -700,9 +692,8 @@ export const getWorkerSessionToken = async ({
     return inFlightTokenRequests.get(storageKey).promise;
   }
 
-  const abortController = typeof AbortController === 'function'
-    ? new AbortController()
-    : { abort: () => {}, signal: null };
+  const abortController =
+    typeof AbortController === 'function' ? new AbortController() : { abort: () => {}, signal: null };
   const requestToken = async () => {
     const signal = abortController.signal;
     const chainId = wallet.chainId || 1;
@@ -774,10 +765,8 @@ export const getWorkerSessionToken = async ({
           retriedNonceMismatch = true;
           continue;
         }
-        const canRetryGateUnavailable = (
-          isOnChainGateUnavailableError(err?.message) &&
-          attempt < LOGIN_GATE_UNAVAILABLE_RETRIES
-        );
+        const canRetryGateUnavailable =
+          isOnChainGateUnavailableError(err?.message) && attempt < LOGIN_GATE_UNAVAILABLE_RETRIES;
         if (!canRetryGateUnavailable) throw err;
         const retryInMs = LOGIN_GATE_UNAVAILABLE_RETRY_BASE_MS * (attempt + 1);
         accountLog.warn('[workerAuth] transient gate-read failure during login; retrying', {
@@ -796,24 +785,26 @@ export const getWorkerSessionToken = async ({
     // Regression guard: keep the cache write gated by the same auth epoch that
     // started this request; otherwise logout/account-switch can resurrect auth.
     assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, address);
-    writeTokenCache(storageKey, buildTokenCacheEnvelope({
-      token: loginData.token,
-      exp: Number(loginData.exp || 0),
-      workerUrl: resolvedWorkerUrl,
-      sessionSlug: slug,
-      address,
-    }));
+    writeTokenCache(
+      storageKey,
+      buildTokenCacheEnvelope({
+        token: loginData.token,
+        exp: Number(loginData.exp || 0),
+        workerUrl: resolvedWorkerUrl,
+        sessionSlug: slug,
+        address,
+      }),
+    );
 
     return loginData.token;
   };
 
   const inFlightRequest = { abortController, promise: null };
-  const inFlight = requestToken()
-    .finally(() => {
-      if (inFlightTokenRequests.get(storageKey) === inFlightRequest) {
-        inFlightTokenRequests.delete(storageKey);
-      }
-    });
+  const inFlight = requestToken().finally(() => {
+    if (inFlightTokenRequests.get(storageKey) === inFlightRequest) {
+      inFlightTokenRequests.delete(storageKey);
+    }
+  });
   inFlightRequest.promise = inFlight;
   inFlightTokenRequests.set(storageKey, inFlightRequest);
   return inFlight;
@@ -828,14 +819,16 @@ export const clearWorkerSessionToken = ({
   allowDemoFallback,
 } = {}) => {
   const clearToken = async () => {
-    const resolvedRequest = requestContext || await resolveWorkerTokenRequestContext({
-      sessionSlug,
-      sessionConfig,
-      context,
-      workerUrl,
-      allowDemoFallback,
-      resolveWorkerUrl: false,
-    });
+    const resolvedRequest =
+      requestContext ||
+      (await resolveWorkerTokenRequestContext({
+        sessionSlug,
+        sessionConfig,
+        context,
+        workerUrl,
+        allowDemoFallback,
+        resolveWorkerUrl: false,
+      }));
     const storageKey = toStr(resolvedRequest?.storageKey).trim();
     if (!storageKey) return;
     clearTokenCache(storageKey);
@@ -993,7 +986,9 @@ const stripAnonymousRateIdHeader = (baseHeaders) => {
 };
 
 const normalizeHttpMethod = (methodIn = 'GET') => {
-  const normalized = toStr(methodIn || 'GET').trim().toUpperCase();
+  const normalized = toStr(methodIn || 'GET')
+    .trim()
+    .toUpperCase();
   return normalized || 'GET';
 };
 
@@ -1125,7 +1120,7 @@ const readResponseErrorMessage = async (response) => {
 
 const shouldFallbackToAuthenticatedFlow = async (
   response,
-  { requestApiKey = '', fallbackOnGateUnavailable = false } = {}
+  { requestApiKey = '', fallbackOnGateUnavailable = false } = {},
 ) => {
   const status = Number(response?.status || 0);
   const errorMessage = await readResponseErrorMessage(response);
@@ -1216,7 +1211,11 @@ export const fetchWorkerWithAuth = async (url, options = {}, opts = {}) => {
   }
   const headers = mergeHeaders(options.headers, authHeaders);
   const response = await fetch(url, { ...options, headers });
-  if ((response.status === 401 || response.status === 403) && opts.retry !== false && await shouldRetryAuthenticatedResponse(response)) {
+  if (
+    (response.status === 401 || response.status === 403) &&
+    opts.retry !== false &&
+    (await shouldRetryAuthenticatedResponse(response))
+  ) {
     await clearWorkerSessionToken({
       requestContext: authRequestContext,
       sessionSlug: slug,

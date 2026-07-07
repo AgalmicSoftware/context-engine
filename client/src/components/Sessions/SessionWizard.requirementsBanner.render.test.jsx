@@ -21,17 +21,14 @@ const expectSponsoredStatusText = async (expectedText) => {
 describe('SessionWizard new-session requirements banner', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
-  it.each(['/new', '/session/new'])(
-    'shows the new-session requirements banner on %s',
-    async (pathname) => {
-      window.history.replaceState({}, '', pathname);
+  it.each(['/new', '/session/new'])('shows the new-session requirements banner on %s', async (pathname) => {
+    window.history.replaceState({}, '', pathname);
 
-      renderSessionWizard();
+    renderSessionWizard();
 
-      await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-      expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
-    }
-  );
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+  });
 
   it('shows the new-session requirements banner on PUBLIC_URL-prefixed new-session routes', async () => {
     process.env.PUBLIC_URL = '/ce/';
@@ -52,29 +49,27 @@ describe('SessionWizard new-session requirements banner', () => {
 
     expect(screen.getByRole('link', { name: 'OpenAI API key' })).toHaveAttribute(
       'href',
-      'https://platform.openai.com/api-keys'
+      'https://platform.openai.com/api-keys',
     );
     expect(screen.getByText(/for text and transcription/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Lit API key' })).toHaveAttribute(
       'href',
-      'https://developer.litprotocol.com/management/api_keys'
+      'https://developer.litprotocol.com/management/api_keys',
     );
     expect(screen.getByRole('link', { name: 'Arweave wallet (JWK)' })).toHaveAttribute(
       'href',
-      'https://docs.arweave.org/developers/wallets/arweave-wallet'
+      'https://docs.arweave.org/developers/wallets/arweave-wallet',
     );
     expect(screen.getByRole('link', { name: 'OP Sepolia ETH for on-chain registration' })).toHaveAttribute(
       'href',
-      'https://console.optimism.io/faucet'
+      'https://console.optimism.io/faucet',
     );
     expect(screen.getByText('(Optional) A faucet private key for sponsoring user gas')).toBeInTheDocument();
     expect(screen.getByText('A turnkey tool for bundling these resources is in development.')).toBeInTheDocument();
-    expect(
-      screen.getByText(/in the meantime, you can get a sponsored session url by contacting/i)
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '[redacted-email]' })).toHaveAttribute(
+    expect(screen.getByText(/in the meantime, you can get a sponsored session url by contacting/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'contextengine@protonmail.com' })).toHaveAttribute(
       'href',
-      'mailto:[redacted-email]'
+      'mailto:contextengine@protonmail.com',
     );
   });
 
@@ -109,7 +104,9 @@ describe('SessionWizard new-session requirements banner', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await expectSponsoredStatusText('Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.');
+    await expectSponsoredStatusText(
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
+    );
     expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
   });
 
@@ -125,7 +122,9 @@ describe('SessionWizard new-session requirements banner', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await expectSponsoredStatusText('Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key.');
+    await expectSponsoredStatusText(
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key.',
+    );
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
   });
 

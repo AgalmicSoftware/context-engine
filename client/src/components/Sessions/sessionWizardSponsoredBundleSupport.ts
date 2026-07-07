@@ -1,37 +1,24 @@
-import {
-  normalizeSparseSponsoredBundlePayload,
-} from '../../utilities/arweave/sponsoredBundles.js';
+import { normalizeSparseSponsoredBundlePayload } from '../../utilities/arweave/sponsoredBundles.js';
 import { upsertCachedSessionWorkerConfig } from '../../utilities/session/sessionWorkerConfigCache.js';
-import {
-  normalizeWorkerUrl as normalizeWorkerAuthUrl,
-} from '../../utilities/worker/workerAuth.js';
+import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { shouldCacheSessionWorkerConfigAfterDeploy } from './sessionWizardWorkerState';
-import type {
-  AnyRecord,
-  WorkerSecretsLike,
-} from '../shellTypes';
+import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
 
 type SponsoredBundleLike = AnyRecord & {
   meta?: AnyRecord;
 };
 type SponsoredBundleInput = SponsoredBundleLike | null | undefined;
 
-export const resolveSponsoredBundleBootstrapWorkerUrl = (bundle: SponsoredBundleInput = {}): string => normalizeWorkerAuthUrl(toStr(
-  bundle?.bootstrapWorkerUrl ||
-  bundle?.meta?.sourceWorkerUrl ||
-  ''
-).trim());
+export const resolveSponsoredBundleBootstrapWorkerUrl = (bundle: SponsoredBundleInput = {}): string =>
+  normalizeWorkerAuthUrl(toStr(bundle?.bootstrapWorkerUrl || bundle?.meta?.sourceWorkerUrl || '').trim());
 
 export const buildSponsoredBundleAppliedStatusMessage = (sponsoredBundle: SponsoredBundleInput = {}): string => {
   const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle) as SponsoredBundleLike;
   const appliedLabels = [];
   if (toStr(normalizedBundle?.openaiKey).trim()) appliedLabels.push('OpenAI key');
   if (toStr(normalizedBundle?.arweaveJwk).trim()) appliedLabels.push('Arweave wallet');
-  if (
-    toStr(normalizedBundle?.faucetPrivateKey).trim() ||
-    toStr(normalizedBundle?.faucetGrantToken).trim()
-  ) {
+  if (toStr(normalizedBundle?.faucetPrivateKey).trim() || toStr(normalizedBundle?.faucetGrantToken).trim()) {
     appliedLabels.push('faucet funding');
   }
   if (toStr(normalizedBundle?.customRpcUrl).trim()) appliedLabels.push('RPC URL');
@@ -65,16 +52,11 @@ export const resolveSponsoredBundleAdvancedFieldNotices = ({
   const sponsoredFaucetGrantToken = toStr(normalizedBundle?.faucetGrantToken || '').trim();
   const currentFaucetPrivateKey = toStr(workerSecrets?.faucetPrivateKey || '').trim();
   return {
-    showSponsoredFaucetNotice: (
+    showSponsoredFaucetNotice:
       !!(sponsoredFaucetPrivateKey || sponsoredFaucetGrantToken) &&
-      (sponsoredFaucetPrivateKey
-        ? currentFaucetPrivateKey === sponsoredFaucetPrivateKey
-        : !currentFaucetPrivateKey)
-    ),
-    showSponsoredDeployAccessNotice: (
-      !!toStr(normalizedBundle?.deployGrantToken || '').trim() &&
-      !toStr(deployForm?.apiToken || '').trim()
-    ),
+      (sponsoredFaucetPrivateKey ? currentFaucetPrivateKey === sponsoredFaucetPrivateKey : !currentFaucetPrivateKey),
+    showSponsoredDeployAccessNotice:
+      !!toStr(normalizedBundle?.deployGrantToken || '').trim() && !toStr(deployForm?.apiToken || '').trim(),
   };
 };
 
@@ -95,11 +77,13 @@ export const cacheSessionWorkerConfigAfterDeploy = ({
   registryChainId?: unknown;
   config?: AnyRecord | null;
 } = {}) => {
-  if (!shouldCacheSessionWorkerConfigAfterDeploy({
-    deployStatusCode,
-    configSyncStatus,
-    workerUrl,
-  })) {
+  if (
+    !shouldCacheSessionWorkerConfigAfterDeploy({
+      deployStatusCode,
+      configSyncStatus,
+      workerUrl,
+    })
+  ) {
     return false;
   }
   upsertCachedSessionWorkerConfig({

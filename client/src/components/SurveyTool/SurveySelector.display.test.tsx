@@ -78,13 +78,13 @@ describe('SurveySelector display guards', () => {
     expect(SURVEY_SELECTOR_CREATE_BUTTON_STYLE).toEqual({ marginLeft: '10px' });
     expect(SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE).toEqual({ marginLeft: 8 });
     expect(buildSurveySelectorDropdownItemClassName(styles, 'questions')).toBe(
-      `${styles.dropdownItem} ${styles.questionsItem}`
+      `${styles.dropdownItem} ${styles.questionsItem}`,
     );
     expect(buildSurveySelectorDropdownItemClassName(styles, 'survey')).toBe(
-      `${styles.dropdownItem} ${styles.surveyItem}`
+      `${styles.dropdownItem} ${styles.surveyItem}`,
     );
     expect(buildSurveySelectorHeaderSubmitButtonClassName(styles)).toBe(
-      `${styles.headerSubmitButton} ${styles.submitGlow}`
+      `${styles.headerSubmitButton} ${styles.submitGlow}`,
     );
   });
 
@@ -149,7 +149,7 @@ describe('SurveySelector display guards', () => {
     const tree = subject.render();
     const headerSubmitButton = findElement(
       tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT,
     );
 
     expect(headerSubmitButton).toBeTruthy();

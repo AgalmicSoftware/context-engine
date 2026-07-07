@@ -28,12 +28,8 @@ export type BuildSurveyResultsLockedGateDetailsArgs = {
   normalizeGateText?: ((value: unknown) => string) | null;
   questionLookup?: unknown;
   readSessionGateContext?: ((questionSlug?: unknown) => SurveyResultsLockedGateContextInput) | null;
-  resolveSbtDisplayLabel?: ((args: {
-    address: string;
-    chainId?: unknown;
-    fallback?: string;
-    preferredSlug?: unknown;
-  }) => unknown) | null;
+  resolveSbtDisplayLabel?:
+    ((args: { address: string; chainId?: unknown; fallback?: string; preferredSlug?: unknown }) => unknown) | null;
 };
 
 export type SurveyResultsLockedGateDetailsResult = {
@@ -41,11 +37,8 @@ export type SurveyResultsLockedGateDetailsResult = {
   hasGenericGateMessage: boolean;
 };
 
-const toRecord = (value: unknown): SurveyResultsLockedGateRecord => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as SurveyResultsLockedGateRecord
-    : {}
-);
+const toRecord = (value: unknown): SurveyResultsLockedGateRecord =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as SurveyResultsLockedGateRecord) : {};
 
 const defaultContext = (): SurveyResultsLockedGateContextInput => ({
   configuredGateMap: {},
@@ -54,7 +47,10 @@ const defaultContext = (): SurveyResultsLockedGateContextInput => ({
   slug: '',
 });
 
-const defaultNormalizeGateText = (value: unknown): string => String(value || '').trim().toLowerCase();
+const defaultNormalizeGateText = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
 export const buildSurveyResultsLockedGateDetails = ({
   baseSlug = '',
@@ -73,27 +69,14 @@ export const buildSurveyResultsLockedGateDetails = ({
     return { gateDetails: [], hasGenericGateMessage: false };
   }
 
-  const contextPort = typeof readSessionGateContext === 'function'
-    ? readSessionGateContext
-    : defaultContext;
-  const questionGatePort = typeof getQuestionEncryptionGates === 'function'
-    ? getQuestionEncryptionGates
-    : () => [];
-  const gateEntriesPort = typeof normalizeGateSbtEntries === 'function'
-    ? normalizeGateSbtEntries
-    : () => [];
-  const gateTextPort = typeof normalizeGateText === 'function'
-    ? normalizeGateText
-    : defaultNormalizeGateText;
-  const displayLabelPort = typeof resolveSbtDisplayLabel === 'function'
-    ? resolveSbtDisplayLabel
-    : () => '';
-  const shortenedAddressPort = typeof getShortenedAddress === 'function'
-    ? getShortenedAddress
-    : (address: string) => address;
-  const detailPathPort = typeof buildSbtDetailPath === 'function'
-    ? buildSbtDetailPath
-    : (address: string) => address;
+  const contextPort = typeof readSessionGateContext === 'function' ? readSessionGateContext : defaultContext;
+  const questionGatePort = typeof getQuestionEncryptionGates === 'function' ? getQuestionEncryptionGates : () => [];
+  const gateEntriesPort = typeof normalizeGateSbtEntries === 'function' ? normalizeGateSbtEntries : () => [];
+  const gateTextPort = typeof normalizeGateText === 'function' ? normalizeGateText : defaultNormalizeGateText;
+  const displayLabelPort = typeof resolveSbtDisplayLabel === 'function' ? resolveSbtDisplayLabel : () => '';
+  const shortenedAddressPort =
+    typeof getShortenedAddress === 'function' ? getShortenedAddress : (address: string) => address;
+  const detailPathPort = typeof buildSbtDetailPath === 'function' ? buildSbtDetailPath : (address: string) => address;
 
   const detailsByAddress = new Map<string, SurveyResultsLockedGateDetailModel>();
   let hasGenericGateMessage = false;
@@ -103,10 +86,7 @@ export const buildSurveyResultsLockedGateDetails = ({
     const context = toRecord(contextInput);
     const configuredGateMap = toRecord(context.configuredGateMap);
     const configuredGate = configuredGateMap[gateTextPort(gate.gateId || gate.id)] || null;
-    const gateEntries = [
-      ...gateEntriesPort(configuredGate),
-      ...gateEntriesPort(gate),
-    ];
+    const gateEntries = [...gateEntriesPort(configuredGate), ...gateEntriesPort(gate)];
     if (!gateEntries.length) {
       hasGenericGateMessage = true;
       return;
@@ -133,7 +113,9 @@ export const buildSurveyResultsLockedGateDetails = ({
 
   const questionsById = toRecord(questionLookup);
   rows.forEach((row) => {
-    const qid = String(row.questionId || '').trim().toLowerCase();
+    const qid = String(row.questionId || '')
+      .trim()
+      .toLowerCase();
     const question = toRecord(questionsById[qid]);
     const gateContext = contextPort(question.sessionSlug || baseSlug);
     const questionGates = questionGatePort(Object.keys(question).length ? question : null);
@@ -143,7 +125,7 @@ export const buildSurveyResultsLockedGateDetails = ({
       if (detailsByAddress.size > beforeSize) return;
     }
     const defaultGates = Array.isArray(toRecord(gateContext.defaultPolicy).gates)
-      ? toRecord(gateContext.defaultPolicy).gates as unknown[]
+      ? (toRecord(gateContext.defaultPolicy).gates as unknown[])
       : [];
     if (defaultGates.length > 0) {
       const beforeSize = detailsByAddress.size;

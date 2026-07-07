@@ -1,8 +1,6 @@
 import React from 'react';
 
-import {
-  buildSurveyResultsQuestionSummariesListDisplayPlan,
-} from './surveyResultsQuestionSummaryStatusController';
+import { buildSurveyResultsQuestionSummariesListDisplayPlan } from './surveyResultsQuestionSummaryStatusController';
 
 type SurveyResultsAggregatorEntry = [string, unknown];
 
@@ -32,9 +30,10 @@ const SurveyResultsQuestionSummariesList = ({
 
   return (
     <div className={styleMap.questionSummaries}>
-      {displayPlan.showSummaries && displayPlan.entries.map(([qId, arr]: SurveyResultsAggregatorEntry) => (
-        <div key={qId}>{renderQuestionSummary(qId, arr)}</div>
-      ))}
+      {displayPlan.showSummaries &&
+        displayPlan.entries.map(([qId, arr]: SurveyResultsAggregatorEntry) => (
+          <div key={qId}>{renderQuestionSummary(qId, arr)}</div>
+        ))}
       {displayPlan.showError && <p>{displayPlan.errorMessage as React.ReactNode}</p>}
       {displayPlan.showEmptyState && <p>{displayPlan.emptyMessage}</p>}
     </div>

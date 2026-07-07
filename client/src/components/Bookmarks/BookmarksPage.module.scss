@@ -1,4 +1,4 @@
-@use "scss/variables" as tokens;
+@use 'scss/variables' as tokens;
 
 $card-bg: tokens.$ce-card-bg;
 $card-border: tokens.$ce-card-border;
@@ -172,7 +172,9 @@ $muted-text: tokens.$ce-muted-text;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
 
   &:hover {
     border-color: rgba(255, 255, 255, 0.28);
@@ -214,7 +216,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .itemMeta {
-  font-family: var(--ce-font-mono, "SFMono-Regular", Menlo, monospace);
+  font-family: var(--ce-font-mono, 'SFMono-Regular', Menlo, monospace);
   font-size: 0.85rem;
   color: rgba(244, 247, 255, 0.6);
   word-break: break-all;
@@ -279,7 +281,10 @@ $muted-text: tokens.$ce-muted-text;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .filterCopyButton:hover {

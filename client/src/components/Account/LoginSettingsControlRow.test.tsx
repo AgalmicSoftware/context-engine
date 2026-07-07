@@ -10,13 +10,7 @@ import {
 describe('LoginSettingsControlRow', () => {
   it('renders the config toggle state and click handler', () => {
     const onToggle = jest.fn();
-    render(
-      <LoginSettingsConfigToggleControl
-        expanded
-        onToggle={onToggle}
-        testId="config-toggle"
-      />
-    );
+    render(<LoginSettingsConfigToggleControl expanded onToggle={onToggle} testId="config-toggle" />);
 
     const button = screen.getByTestId('config-toggle');
     expect(button).toHaveAttribute('aria-expanded', 'true');
@@ -31,7 +25,7 @@ describe('LoginSettingsControlRow', () => {
       <LoginSettingsSessionSummary
         activeSession={{ label: 'Edge Session', slug: 'edge' }}
         sessionHref="/session/edge"
-      />
+      />,
     );
 
     expect(screen.getByLabelText('Active session: Edge Session')).toBeInTheDocument();
@@ -47,7 +41,7 @@ describe('LoginSettingsControlRow', () => {
         tooltipsControl={<button type="button">Explainers</button>}
         demoControl={<button type="button">Demo</button>}
         afterDemo={<span>After</span>}
-      />
+      />,
     );
 
     expect(screen.getByText('Before')).toBeInTheDocument();

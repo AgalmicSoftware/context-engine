@@ -92,9 +92,7 @@ const defaultQuestions: QuestionsById = {
 
 const lower = (value: string): string => value.toLowerCase();
 
-const buildQuestionsCache = (
-  questions: QuestionsById = defaultQuestions
-): Record<string, any> => ({
+const buildQuestionsCache = (questions: QuestionsById = defaultQuestions): Record<string, any> => ({
   [NETWORK_ID]: {
     questionsLatestBlock: 1,
     questionResponsesLatestBlock: 1,
@@ -163,23 +161,24 @@ const seedCacheReads = ({
   jest.spyOn(contractScriptsDefault as any, 'getLatestBlockNumber').mockResolvedValue(0);
 };
 
-const mountSurveyResults = (
-  props: Record<string, any> = {},
-  options: Record<string, any> = {}
-) => renderSurveyResults({
-  isOpen: true,
-  isQuestionCacheReady: true,
-  isResponsesCacheReady: true,
-  isSBTCacheReady: true,
-  isSurveyCacheReady: true,
-  network: { id: Number(NETWORK_ID) },
-  networkChainId: Number(NETWORK_ID),
-  preventUrlChange: true,
-  provider: {},
-  sessionSlug: SESSION_SLUG,
-  viewMode: 'survey',
-  ...props,
-}, options);
+const mountSurveyResults = (props: Record<string, any> = {}, options: Record<string, any> = {}) =>
+  renderSurveyResults(
+    {
+      isOpen: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+      network: { id: Number(NETWORK_ID) },
+      networkChainId: Number(NETWORK_ID),
+      preventUrlChange: true,
+      provider: {},
+      sessionSlug: SESSION_SLUG,
+      viewMode: 'survey',
+      ...props,
+    },
+    options,
+  );
 
 const waitForSurveyTitle = async (title: string): Promise<void> => {
   await waitFor(() => {
@@ -216,16 +215,16 @@ const switchToAggregateView = async (_responder: string = RESPONDER_ONE): Promis
     await flushAsync();
   }
   await waitFor(() => {
-    expect(screen.getByRole('switch', { name: VIEW_MODE_SWITCH_NAME }))
-      .toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('switch', { name: VIEW_MODE_SWITCH_NAME })).toHaveAttribute('aria-checked', 'true');
   });
 };
 
 const getResponderUserLink = (responder: string): HTMLAnchorElement | null => {
   const expectedHref = `/u/${encodeURIComponent(lower(responder))}`;
-  return Array.from(document.querySelectorAll('a')).find(
-    (link) => link.getAttribute('href') === expectedHref
-  ) as HTMLAnchorElement | undefined || null;
+  return (
+    (Array.from(document.querySelectorAll('a')).find((link) => link.getAttribute('href') === expectedHref) as
+      HTMLAnchorElement | undefined) || null
+  );
 };
 
 const expandResponderCard = async (responder: string = RESPONDER_ONE): Promise<void> => {
@@ -256,21 +255,17 @@ const expandAggregateQuestion = async (prompt: string): Promise<void> => {
   });
 };
 
-const getResponseProps = (): any[] => (
-  mockSingleQuestionResponse.mock.calls.map((call) => call[0])
-);
+const getResponseProps = (): any[] => mockSingleQuestionResponse.mock.calls.map((call) => call[0]);
 
-const getIndividualResponseProps = (): any[] => (
-  getResponseProps().filter((props) => props?.aggregatorResponseMode === false)
-);
+const getIndividualResponseProps = (): any[] =>
+  getResponseProps().filter((props) => props?.aggregatorResponseMode === false);
 
-const getAggregateResponseProps = (): any[] => (
-  getResponseProps().filter((props) => props?.aggregatorResponseMode === true)
-);
+const getAggregateResponseProps = (): any[] =>
+  getResponseProps().filter((props) => props?.aggregatorResponseMode === true);
 
 const getLatestAggregateRows = (questionId: string): any[] => {
   const matchingCalls = getAggregateResponseProps().filter(
-    (props) => String(props?.question?.id || '').toLowerCase() === questionId
+    (props) => String(props?.question?.id || '').toLowerCase() === questionId,
   );
   const latest = matchingCalls[matchingCalls.length - 1];
   return Array.isArray(latest?.allResponses) ? latest.allResponses : [];
@@ -278,10 +273,7 @@ const getLatestAggregateRows = (questionId: string): any[] => {
 
 const getAnswerValue = (response: any): unknown => response?.answer?.value;
 
-const rerenderWithNonce = async (
-  view: ReturnType<typeof mountSurveyResults>,
-  nonce: number
-): Promise<void> => {
+const rerenderWithNonce = async (view: ReturnType<typeof mountSurveyResults>, nonce: number): Promise<void> => {
   await act(async () => {
     view.rerenderSurveyResults({ questionResponsesNonce: nonce });
     await flushAsync(10);
@@ -302,7 +294,9 @@ afterEach(() => {
   jest.restoreAllMocks();
   try {
     window.history.replaceState({}, '', '/');
-  } catch (_) { /* noop */ }
+  } catch (_) {
+    /* noop */
+  }
 });
 
 describe('SurveyResults survey-mode source signature', () => {
@@ -344,10 +338,12 @@ describe('SurveyResults survey-mode source signature', () => {
     });
     await waitFor(() => {
       const latestResponse = getLatestAggregateRows('q1')[0]?.response;
-      expect(latestResponse).toEqual(expect.objectContaining({
-        questionID: 'q1',
-        answer: expect.objectContaining({ value: 'A visible answer' }),
-      }));
+      expect(latestResponse).toEqual(
+        expect.objectContaining({
+          questionID: 'q1',
+          answer: expect.objectContaining({ value: 'A visible answer' }),
+        }),
+      );
       expect(latestResponse).not.toBe(firstResponse);
     });
     // port note: the literal private coarse-signature string layout is unobservable in RTL; TASK 7 should cover exact signature construction in a helper-level test if that encoding remains public to tests.
@@ -512,10 +508,7 @@ describe('SurveyResults survey-mode source signature', () => {
     });
     seedCacheReads({ surveysCache });
 
-    mountSurveyResults(
-      { viewMode: undefined },
-      { route: `/survey/${surveyId}/results?session=${SESSION_SLUG}` }
-    );
+    mountSurveyResults({ viewMode: undefined }, { route: `/survey/${surveyId}/results?session=${SESSION_SLUG}` });
     await waitForSurveyTitle('URL Survey');
     await switchToAggregateView(RESPONDER_ONE);
     await expandAggregateQuestion('Question one');
@@ -535,10 +528,12 @@ describe('SurveyResults survey-mode source signature', () => {
 
     await waitFor(() => {
       const nextResponse = getLatestAggregateRows('q1')[0]?.response;
-      expect(nextResponse).toEqual(expect.objectContaining({
-        questionID: 'q1',
-        answer: expect.objectContaining({ value: 'url answer' }),
-      }));
+      expect(nextResponse).toEqual(
+        expect.objectContaining({
+          questionID: 'q1',
+          answer: expect.objectContaining({ value: 'url answer' }),
+        }),
+      );
       expect(nextResponse).not.toBe(firstResponse);
     });
   });
@@ -547,10 +542,7 @@ describe('SurveyResults survey-mode source signature', () => {
 describe('SurveyResults survey document URLs', () => {
   it('stores survey document URLs from cache in survey mode state', async () => {
     const surveyId = 'survey-id-1';
-    const documentURLs = [
-      'https://example.com/documents/alpha',
-      'https://example.com/documents/beta',
-    ];
+    const documentURLs = ['https://example.com/documents/alpha', 'https://example.com/documents/beta'];
     const surveysCache = buildSurveyCache({
       surveyId,
       title: 'Survey One',
@@ -566,8 +558,9 @@ describe('SurveyResults survey document URLs', () => {
     mountSurveyResults({ surveyId });
     await waitForSurveyTitle('Survey One');
 
-    const documentLinks = Array.from(document.querySelectorAll('a'))
-      .filter((link) => String(link.getAttribute('href') || '').startsWith('https://example.com/documents/'));
+    const documentLinks = Array.from(document.querySelectorAll('a')).filter((link) =>
+      String(link.getAttribute('href') || '').startsWith('https://example.com/documents/'),
+    );
     expect(documentLinks.map((link) => link.getAttribute('href'))).toEqual(documentURLs);
   });
 
@@ -589,8 +582,7 @@ describe('SurveyResults survey document URLs', () => {
     const view = mountSurveyResults({ surveyId });
     await waitForSurveyTitle('Survey With Docs');
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'https://example.com/documents/stale' }))
-        .toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'https://example.com/documents/stale' })).toBeInTheDocument();
     });
 
     surveysCache[NETWORK_ID].surveys[surveyId].documentURLs = [];
@@ -598,8 +590,7 @@ describe('SurveyResults survey document URLs', () => {
     await rerenderWithNonce(view, 1);
 
     await waitFor(() => {
-      expect(screen.queryByRole('link', { name: 'https://example.com/documents/stale' }))
-        .not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'https://example.com/documents/stale' })).not.toBeInTheDocument();
     });
     // port note: the exact empty-surveyId stale-doc branch requires state injection; TASK 7 should cover buildSurveyResultsEmptySurveyModePatch directly.
   });
@@ -608,9 +599,7 @@ describe('SurveyResults survey document URLs', () => {
 describe('SurveyResults freeform aggregator summary', () => {
   it('renders the empty freeform state inside the SurveyResults-only aggregator panel', () => {
     const { container } = render(
-      <SurveyResultsFreeformAggregatorSummary
-        summary={buildSurveyResultsFreeformSummaryModel([])}
-      />
+      <SurveyResultsFreeformAggregatorSummary summary={buildSurveyResultsFreeformSummaryModel([])} />,
     );
 
     expect(screen.getByText('No freeform responses available.')).toBeInTheDocument();
@@ -714,8 +703,10 @@ describe('SurveyResults survey-mode dedupe', () => {
     await expandResponderCard(RESPONDER_ONE);
 
     const individualRows = getIndividualResponseProps();
-    expect(individualRows.map((props) => props.response?.questionID || props.response?.questionId))
-      .toEqual(['q1', 'q2']);
+    expect(individualRows.map((props) => props.response?.questionID || props.response?.questionId)).toEqual([
+      'q1',
+      'q2',
+    ]);
     expect(getAnswerValue(individualRows[0].response)).toBe('Latest first answer');
     expect(getAnswerValue(individualRows[1].response)).toBe('Second question answer');
   });
@@ -764,14 +755,15 @@ describe('SurveyResults survey-mode dedupe', () => {
 
     const individualRows = getIndividualResponseProps();
     expect(
-      individualRows.map((props) =>
-        props.response?.questionID || props.response?.questionId || props.response?.kind)
+      individualRows.map((props) => props.response?.questionID || props.response?.questionId || props.response?.kind),
     ).toEqual(['q1', 'legacyMeta', 'q2']);
     expect(getAnswerValue(individualRows[0].response)).toBe('Latest first answer');
-    expect(individualRows[1].response).toEqual(expect.objectContaining({
-      kind: 'legacyMeta',
-      note: 'Keep this row between the deduped answers',
-    }));
+    expect(individualRows[1].response).toEqual(
+      expect.objectContaining({
+        kind: 'legacyMeta',
+        note: 'Keep this row between the deduped answers',
+      }),
+    );
     // port note: the passthrough order seam is observed through the individuals renderer; TASK 7 should keep direct normalizeSurveyResponsePayloadByQuestionId coverage as the durable logic-level guard.
   });
 

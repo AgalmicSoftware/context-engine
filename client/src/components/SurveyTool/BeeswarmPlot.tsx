@@ -95,7 +95,12 @@ const TOOLTIP_VOTE_GROUPS: TooltipVoteGroup[] = [
   },
 ];
 
-const normalizePointPosition = (point: BeeswarmPoint = {}, index: number, width: number, height: number): BeeswarmPoint => {
+const normalizePointPosition = (
+  point: BeeswarmPoint = {},
+  index: number,
+  width: number,
+  height: number,
+): BeeswarmPoint => {
   const axisY = height - AXIS_BOTTOM_PADDING;
   const fallbackX = width / 2;
   const fallbackY = height / 2;
@@ -150,19 +155,19 @@ export const resolveTooltipLayout = ({
   offset?: number;
   margin?: number;
 } = {}): TooltipLayout => {
-  const usableWidth = Math.max(wrapperWidth, tooltipWidth + (margin * 2));
-  const usableHeight = Math.max(wrapperHeight, tooltipHeight + (margin * 2));
+  const usableWidth = Math.max(wrapperWidth, tooltipWidth + margin * 2);
+  const usableHeight = Math.max(wrapperHeight, tooltipHeight + margin * 2);
   const maxLeft = Math.max(margin, usableWidth - tooltipWidth - margin);
   const maxTop = Math.max(margin, usableHeight - tooltipHeight - margin);
 
   let left = anchorX + offset;
-  if ((left + tooltipWidth) > (usableWidth - margin)) {
+  if (left + tooltipWidth > usableWidth - margin) {
     left = anchorX - tooltipWidth - offset;
   }
   left = clamp(left, margin, maxLeft);
 
   let top = anchorY + offset;
-  if ((top + tooltipHeight) > (usableHeight - margin)) {
+  if (top + tooltipHeight > usableHeight - margin) {
     top = anchorY - tooltipHeight - offset;
   }
   top = clamp(top, margin, maxTop);
@@ -175,27 +180,18 @@ export const resolveTooltipLayout = ({
   };
 };
 
-export const resolveTooltipPositionStyle = (
-  layout: Pick<TooltipLayout, 'left' | 'top'>
-): React.CSSProperties => ({
+export const resolveTooltipPositionStyle = (layout: Pick<TooltipLayout, 'left' | 'top'>): React.CSSProperties => ({
   left: layout.left,
   top: layout.top,
 });
 
-export const buildBeeswarmTooltipStatClassName = (
-  styleMap: Record<string, string>,
-  statClassName: string
-) => [styleMap.tooltipStat, styleMap[statClassName]].filter(Boolean).join(' ');
+export const buildBeeswarmTooltipStatClassName = (styleMap: Record<string, string>, statClassName: string) =>
+  [styleMap.tooltipStat, styleMap[statClassName]].filter(Boolean).join(' ');
 
-export const buildBeeswarmTooltipSegmentClassName = (
-  styleMap: Record<string, string>,
-  segmentClassName: string
-) => [styleMap.tooltipResponseSegment, styleMap[segmentClassName]].filter(Boolean).join(' ');
+export const buildBeeswarmTooltipSegmentClassName = (styleMap: Record<string, string>, segmentClassName: string) =>
+  [styleMap.tooltipResponseSegment, styleMap[segmentClassName]].filter(Boolean).join(' ');
 
-export const resolveTooltipResponseSegmentStyle = (
-  value: unknown,
-  total: unknown
-): React.CSSProperties => ({
+export const resolveTooltipResponseSegmentStyle = (value: unknown, total: unknown): React.CSSProperties => ({
   width: `${((Number(value || 0) / Math.max(1, Number(total || 0))) * 100).toFixed(2)}%`,
 });
 
@@ -227,30 +223,28 @@ export default function BeeswarmPlot({
     if (!hasQuestions) return [];
     if (points.length === 1) {
       return [
-        normalizePointPosition(
-          { ...points[0], x: width / 2, y: (height - AXIS_BOTTOM_PADDING) / 2 },
-          0,
-          width,
-          height
-        ),
+        normalizePointPosition({ ...points[0], x: width / 2, y: (height - AXIS_BOTTOM_PADDING) / 2 }, 0, width, height),
       ];
     }
 
     return (beeswarmByExtremity(points, width, height) as BeeswarmPoint[]).map((point, index) =>
-      normalizePointPosition(point, index, width, height)
+      normalizePointPosition(point, index, width, height),
     );
   }, [hasQuestions, height, points, width]);
 
   const allowSinglePointAutoPreview = !!showIdleSummary;
-  const activePoint = hoveredIndex == null
-    ? (positionedPoints.length === 1 && !singlePointDeselected && allowSinglePointAutoPreview ? positionedPoints[0] : null)
-    : positionedPoints[hoveredIndex] || null;
+  const activePoint =
+    hoveredIndex == null
+      ? positionedPoints.length === 1 && !singlePointDeselected && allowSinglePointAutoPreview
+        ? positionedPoints[0]
+        : null
+      : positionedPoints[hoveredIndex] || null;
   const tooltipBreakdown = activePoint ? normalizeTooltipVoteBreakdown(activePoint) : null;
   const tooltipVoteGroups = tooltipBreakdown
     ? TOOLTIP_VOTE_GROUPS.map((group) => ({
-      ...group,
-      value: tooltipBreakdown[group.valueKey] || 0,
-    }))
+        ...group,
+        value: tooltipBreakdown[group.valueKey] || 0,
+      }))
     : [];
   const tooltipSegments = tooltipVoteGroups.filter((segment) => segment.value > 0);
 
@@ -269,12 +263,13 @@ export default function BeeswarmPlot({
       return;
     }
 
-    const targetRect = typeof event?.currentTarget?.getBoundingClientRect === 'function'
-      ? event.currentTarget.getBoundingClientRect()
-      : null;
+    const targetRect =
+      typeof event?.currentTarget?.getBoundingClientRect === 'function'
+        ? event.currentTarget.getBoundingClientRect()
+        : null;
     if (targetRect) {
       setTooltipAnchor({
-        x: targetRect.left - wrapperRect.left + (targetRect.width / 2),
+        x: targetRect.left - wrapperRect.left + targetRect.width / 2,
         y: targetRect.top - wrapperRect.top + targetRect.height,
       });
       return;
@@ -300,14 +295,14 @@ export default function BeeswarmPlot({
       tooltipHeight: tooltip.offsetHeight || 0,
     });
 
-    setTooltipLayout((prev) => (
+    setTooltipLayout((prev) =>
       prev.left === nextLayout.left &&
       prev.top === nextLayout.top &&
       prev.horizontal === nextLayout.horizontal &&
       prev.vertical === nextLayout.vertical
         ? prev
-        : nextLayout
-    ));
+        : nextLayout,
+    );
   }, [activePoint, height, tooltipAnchor.x, tooltipAnchor.y, width]);
 
   const handleHover = (point: BeeswarmPoint, index: number, event: BeeswarmTooltipEvent = null) => {
@@ -355,12 +350,7 @@ export default function BeeswarmPlot({
   }
 
   return (
-    <div
-      ref={wrapperRef}
-      className={styles.wrapper}
-      data-testid="ce-beeswarm-plot"
-      onMouseLeave={clearHover}
-    >
+    <div ref={wrapperRef} className={styles.wrapper} data-testid="ce-beeswarm-plot" onMouseLeave={clearHover}>
       {activePoint ? (
         <div
           ref={tooltipRef}
@@ -411,13 +401,7 @@ export default function BeeswarmPlot({
           role="img"
           aria-label="Community question beeswarm plot"
         >
-          <line
-            x1="24"
-            y1={axisY}
-            x2={width - 24}
-            y2={axisY}
-            className={styles.axisLine}
-          />
+          <line x1="24" y1={axisY} x2={width - 24} y2={axisY} className={styles.axisLine} />
           <text x="24" y={height - 6} className={styles.axisLabel}>
             Consensus
           </text>
@@ -426,11 +410,9 @@ export default function BeeswarmPlot({
           </text>
 
           {positionedPoints.map((point, index) => {
-            const isActive = hoveredIndex === index || (
-              hoveredIndex == null &&
-              positionedPoints.length === 1 &&
-              !singlePointDeselected
-            );
+            const isActive =
+              hoveredIndex === index ||
+              (hoveredIndex == null && positionedPoints.length === 1 && !singlePointDeselected);
             const isInteractive = true;
             return (
               <circle
@@ -442,7 +424,9 @@ export default function BeeswarmPlot({
                   styles.point,
                   isActive ? styles.pointActive : '',
                   isInteractive ? styles.pointInteractive : '',
-                ].filter(Boolean).join(' ')}
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 data-testid={`ce-beeswarm-point-${index}`}
                 role="button"
                 aria-label={point.label || `Question ${index + 1}`}
@@ -451,7 +435,12 @@ export default function BeeswarmPlot({
                 onFocus={(event) => handleHover(point, index, event)}
                 onBlur={clearHover}
                 onClick={() => handlePointClick(point, index)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePointClick(point, index); } }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handlePointClick(point, index);
+                  }
+                }}
                 tabIndex={0}
               />
             );

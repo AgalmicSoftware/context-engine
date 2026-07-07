@@ -15,7 +15,7 @@ describe('QuestionCardLinks', () => {
         onBookmarkToggle={onBookmarkToggle}
         arweaveHref="https://arweave.net/demo"
         questionHref="/question/q1?session=edge"
-      />
+      />,
     );
 
     fireEvent.click(screen.getByTitle('Remove Bookmark'));
@@ -27,18 +27,22 @@ describe('QuestionCardLinks', () => {
   });
 
   it('builds bookmark button display helpers', () => {
-    expect(buildQuestionCardBookmarkClassName({
-      activeClassName: 'active',
-      baseClassName: 'base',
-      bookmarkClassName: 'bookmark',
-      isQuestionBookmarked: true,
-    })).toBe('base bookmark active');
-    expect(buildQuestionCardBookmarkClassName({
-      activeClassName: 'active',
-      baseClassName: 'base',
-      bookmarkClassName: 'bookmark',
-      isQuestionBookmarked: false,
-    })).toBe('base bookmark');
+    expect(
+      buildQuestionCardBookmarkClassName({
+        activeClassName: 'active',
+        baseClassName: 'base',
+        bookmarkClassName: 'bookmark',
+        isQuestionBookmarked: true,
+      }),
+    ).toBe('base bookmark active');
+    expect(
+      buildQuestionCardBookmarkClassName({
+        activeClassName: 'active',
+        baseClassName: 'base',
+        bookmarkClassName: 'bookmark',
+        isQuestionBookmarked: false,
+      }),
+    ).toBe('base bookmark');
     expect(resolveQuestionCardBookmarkIconStyle(true)).toEqual({ color: '#ffc107' });
     expect(resolveQuestionCardBookmarkIconStyle(false)).toEqual({ color: 'white' });
   });

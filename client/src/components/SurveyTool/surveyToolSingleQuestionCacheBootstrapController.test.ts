@@ -7,13 +7,16 @@ import {
   resolveSingleQuestionCacheBootstrapStopHandlingPlan,
 } from './surveyToolSingleQuestionCacheBootstrapController';
 
-type TestQuestionsCache = Record<string, {
-  questions: Record<string, Record<string, unknown>>;
-}>;
+type TestQuestionsCache = Record<
+  string,
+  {
+    questions: Record<string, Record<string, unknown>>;
+  }
+>;
 
 const ensureQuestionsNet = (cache: unknown, netId: string): TestQuestionsCache => {
   const nextCache = {
-    ...((cache && typeof cache === 'object') ? cache as TestQuestionsCache : {}),
+    ...(cache && typeof cache === 'object' ? (cache as TestQuestionsCache) : {}),
   };
 
   nextCache[netId] = nextCache[netId] || { questions: {} };
@@ -26,12 +29,14 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
   it('plans missing route question ids without cache, retry, or state execution', () => {
     const getQuestionFetchCandidateSlugs = jest.fn(() => ['edge']);
 
-    expect(buildSingleQuestionSourceRestoreContextPlan({
-      bootstrapRetryAttempt: 2,
-      getQuestionFetchCandidateSlugs,
-      props: { questionID: '' },
-      runId: 9,
-    })).toEqual({
+    expect(
+      buildSingleQuestionSourceRestoreContextPlan({
+        bootstrapRetryAttempt: 2,
+        getQuestionFetchCandidateSlugs,
+        props: { questionID: '' },
+        runId: 9,
+      }),
+    ).toEqual({
       status: 'missing-question-id',
       bootstrapRetryAttempt: 2,
       debugPayload: {
@@ -52,81 +57,87 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
   it('plans source slug candidates and retry cleanup without clearing retries in the helper', () => {
     const getQuestionFetchCandidateSlugs = jest.fn(() => ['edge', 'fallback', '']);
 
-    expect(buildSingleQuestionSourceRestoreContextPlan({
-      bootstrapRetryAttempt: 0,
-      getQuestionFetchCandidateSlugs,
-      maxCandidateSlugs: 2,
-      pendingRetrySig: 'other-question:1',
-      props: {
-        questionID: 'Q1',
-        sessionName: 'Edge',
-        sessionSlug: 'edge',
-        activeSessionSlug: 'edge',
-        sessionSlugPinned: true,
-        responderAddress: '0xABCD',
-        questionResponsesNonce: 4,
-        questionsCacheNonce: 7,
-      },
-      questionPool: [{ id: 'q1', sessionName: 'edge-from-pool' }],
-      runId: 10,
-    })).toEqual(expect.objectContaining({
-      status: 'ready',
-      bootstrapRetryAttempt: 0,
-      fetchCandidateSlugs: ['edge', 'fallback'],
-      hasPendingRetryForQuestion: false,
-      pendingRetryQuestionId: 'other-question',
-      pendingRetrySig: 'other-question:1',
-      questionId: 'q1',
-      retryCleanupAction: 'clear-different-question',
-      slugPinned: true,
-      startDebugPayload: {
-        phase: 'start',
-        runId: 10,
-        questionId: 'q1',
-        responderAddress: '0xabcd',
+    expect(
+      buildSingleQuestionSourceRestoreContextPlan({
         bootstrapRetryAttempt: 0,
+        getQuestionFetchCandidateSlugs,
+        maxCandidateSlugs: 2,
         pendingRetrySig: 'other-question:1',
+        props: {
+          questionID: 'Q1',
+          sessionName: 'Edge',
+          sessionSlug: 'edge',
+          activeSessionSlug: 'edge',
+          sessionSlugPinned: true,
+          responderAddress: '0xABCD',
+          questionResponsesNonce: 4,
+          questionsCacheNonce: 7,
+        },
+        questionPool: [{ id: 'q1', sessionName: 'edge-from-pool' }],
+        runId: 10,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'ready',
+        bootstrapRetryAttempt: 0,
+        fetchCandidateSlugs: ['edge', 'fallback'],
         hasPendingRetryForQuestion: false,
-        questionResponsesNonce: 4,
-        questionsCacheNonce: 7,
-      },
-    }));
-    expect(getQuestionFetchCandidateSlugs).toHaveBeenCalledWith(
-      'q1',
-      expect.any(String),
-      { allowPinnedFallback: true }
+        pendingRetryQuestionId: 'other-question',
+        pendingRetrySig: 'other-question:1',
+        questionId: 'q1',
+        retryCleanupAction: 'clear-different-question',
+        slugPinned: true,
+        startDebugPayload: {
+          phase: 'start',
+          runId: 10,
+          questionId: 'q1',
+          responderAddress: '0xabcd',
+          bootstrapRetryAttempt: 0,
+          pendingRetrySig: 'other-question:1',
+          hasPendingRetryForQuestion: false,
+          questionResponsesNonce: 4,
+          questionsCacheNonce: 7,
+        },
+      }),
     );
+    expect(getQuestionFetchCandidateSlugs).toHaveBeenCalledWith('q1', expect.any(String), {
+      allowPinnedFallback: true,
+    });
   });
 
   it('plans blocked question state without applying parent mutations', () => {
     const getQuestionFetchCandidateSlugs = jest.fn(() => ['blocked-slug']);
 
-    expect(buildSingleQuestionSourceRestoreContextPlan({
-      getBlockedQuestionIds: jest.fn(() => new Set(['blocked-question'])),
-      getQuestionFetchCandidateSlugs,
-      maxCandidateSlugs: 3,
-      props: {
-        questionID: 'blocked-question',
-        sessionSlug: 'blocked-slug',
-        activeSessionSlug: 'blocked-slug',
-      },
-      runId: 11,
-    })).toEqual(expect.objectContaining({
-      status: 'blocked-question',
-      debugPayload: {
-        phase: 'blocked-question',
+    expect(
+      buildSingleQuestionSourceRestoreContextPlan({
+        getBlockedQuestionIds: jest.fn(() => new Set(['blocked-question'])),
+        getQuestionFetchCandidateSlugs,
+        maxCandidateSlugs: 3,
+        props: {
+          questionID: 'blocked-question',
+          sessionSlug: 'blocked-slug',
+          activeSessionSlug: 'blocked-slug',
+        },
         runId: 11,
-        questionId: 'blocked-question',
-        effectiveSingleSlug: 'blocked-slug',
-      },
-      statePatch: {
-        questionPool: [],
-        isLoadingResponse: false,
-        noResponse: true,
-        responseLookupWarning: '',
-        displayAnswerMode: true,
-      },
-    }));
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'blocked-question',
+        debugPayload: {
+          phase: 'blocked-question',
+          runId: 11,
+          questionId: 'blocked-question',
+          effectiveSingleSlug: 'blocked-slug',
+        },
+        statePatch: {
+          questionPool: [],
+          isLoadingResponse: false,
+          noResponse: true,
+          responseLookupWarning: '',
+          displayAnswerMode: true,
+        },
+      }),
+    );
   });
 
   it('plans ready cache bootstrap results as continuation without seeded hydration', () => {
@@ -141,14 +152,16 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       },
     };
 
-    expect(resolveSingleQuestionCacheBootstrapFlowPlan({
-      cacheBootstrapResult: {
-        status: 'ready',
-        cacheState,
-        questionData: { id: 'q1', prompt: 'cached' },
-        recentPayloadForAccount: null,
-      },
-    })).toEqual({
+    expect(
+      resolveSingleQuestionCacheBootstrapFlowPlan({
+        cacheBootstrapResult: {
+          status: 'ready',
+          cacheState,
+          questionData: { id: 'q1', prompt: 'cached' },
+          recentPayloadForAccount: null,
+        },
+      }),
+    ).toEqual({
       action: 'continue',
       cacheState,
       questionData: { id: 'q1', prompt: 'cached' },
@@ -158,16 +171,18 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
   });
 
   it('plans seeded recent payloads waiting on a viewed response as retry-only parent work', () => {
-    expect(resolveSingleQuestionCacheBootstrapFlowPlan({
-      cacheBootstrapResult: {
-        status: 'seeded-from-recent',
-        cacheState: null,
-        questionData: { id: 'q1', prompt: 'recent' },
-        recentPayloadForAccount: { id: 'q1', prompt: 'recent' },
-        shouldBootstrapViewedResponse: true,
-        fallbackNetId: '',
-      },
-    })).toEqual({
+    expect(
+      resolveSingleQuestionCacheBootstrapFlowPlan({
+        cacheBootstrapResult: {
+          status: 'seeded-from-recent',
+          cacheState: null,
+          questionData: { id: 'q1', prompt: 'recent' },
+          recentPayloadForAccount: { id: 'q1', prompt: 'recent' },
+          shouldBootstrapViewedResponse: true,
+          fallbackNetId: '',
+        },
+      }),
+    ).toEqual({
       action: 'stop',
       debugPhase: '',
       fallbackStatePatch: {},
@@ -193,16 +208,18 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
   });
 
   it('plans seeded recent payloads without a fallback network as a parent stop', () => {
-    expect(resolveSingleQuestionCacheBootstrapFlowPlan({
-      cacheBootstrapResult: {
-        status: 'seeded-from-recent',
-        cacheState: null,
-        questionData: { id: 'q1', prompt: 'recent' },
-        recentPayloadForAccount: { id: 'q1', prompt: 'recent' },
-        shouldBootstrapViewedResponse: false,
-        fallbackNetId: '',
-      },
-    })).toEqual({
+    expect(
+      resolveSingleQuestionCacheBootstrapFlowPlan({
+        cacheBootstrapResult: {
+          status: 'seeded-from-recent',
+          cacheState: null,
+          questionData: { id: 'q1', prompt: 'recent' },
+          recentPayloadForAccount: { id: 'q1', prompt: 'recent' },
+          shouldBootstrapViewedResponse: false,
+          fallbackNetId: '',
+        },
+      }),
+    ).toEqual({
       action: 'stop',
       debugPhase: 'recent-payload-missing-network',
       fallbackStatePatch: { isLoadingResponse: false },
@@ -217,9 +234,11 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
   });
 
   it('plans missing cache state stops without creating parent side effects', () => {
-    expect(resolveSingleQuestionCacheBootstrapFlowPlan({
-      cacheBootstrapResult: { status: 'missing-cache-state' },
-    })).toEqual({
+    expect(
+      resolveSingleQuestionCacheBootstrapFlowPlan({
+        cacheBootstrapResult: { status: 'missing-cache-state' },
+      }),
+    ).toEqual({
       action: 'stop',
       debugPhase: 'missing-cache-state',
       fallbackStatePatch: { isLoadingResponse: false },
@@ -237,14 +256,16 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       surveyIndex,
     }));
 
-    expect(buildSingleQuestionSeededHydrationState({
-      prevState: {
-        surveysResponseState: [{ answers: { q1: { value: 'old' } } }],
-      },
-      questionData: { id: 'q1', prompt: 'recent' },
-      isLoadingResponse: true,
-      mergeSurveyResponseState,
-    })).toEqual({
+    expect(
+      buildSingleQuestionSeededHydrationState({
+        prevState: {
+          surveysResponseState: [{ answers: { q1: { value: 'old' } } }],
+        },
+        questionData: { id: 'q1', prompt: 'recent' },
+        isLoadingResponse: true,
+        mergeSurveyResponseState,
+      }),
+    ).toEqual({
       questionPool: [{ id: 'q1', prompt: 'recent' }],
       surveysResponseState: {
         previous: [{ answers: { q1: { value: 'old' } } }],
@@ -260,41 +281,49 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
   });
 
   it('plans preserved current question state by normalized question identity', () => {
-    expect(buildSingleQuestionPreservedPoolState({
-      questionId: 'Q1',
-      questionPool: [
-        { id: 'q-other', prompt: 'Other' },
-        { questionID: 'Q1', prompt: 'Current shell', transient: true },
-      ],
-      extraState: { isLoadingResponse: false },
-    })).toEqual({
+    expect(
+      buildSingleQuestionPreservedPoolState({
+        questionId: 'Q1',
+        questionPool: [
+          { id: 'q-other', prompt: 'Other' },
+          { questionID: 'Q1', prompt: 'Current shell', transient: true },
+        ],
+        extraState: { isLoadingResponse: false },
+      }),
+    ).toEqual({
       action: 'preserve',
       statePatch: {
-        questionPool: [{
-          questionID: 'Q1',
-          id: 'q1',
-          prompt: 'Current shell',
-          transient: true,
-        }],
+        questionPool: [
+          {
+            questionID: 'Q1',
+            id: 'q1',
+            prompt: 'Current shell',
+            transient: true,
+          },
+        ],
         isLoadingResponse: false,
       },
     });
   });
 
   it('skips preserved current question state when identity is missing', () => {
-    expect(buildSingleQuestionPreservedPoolState({
-      questionId: 'missing',
-      questionPool: [{ id: 'q1', prompt: 'Current shell' }],
-      extraState: { isLoadingResponse: false },
-    })).toEqual({
+    expect(
+      buildSingleQuestionPreservedPoolState({
+        questionId: 'missing',
+        questionPool: [{ id: 'q1', prompt: 'Current shell' }],
+        extraState: { isLoadingResponse: false },
+      }),
+    ).toEqual({
       action: 'skip',
       statePatch: null,
     });
 
-    expect(buildSingleQuestionPreservedPoolState({
-      questionId: '',
-      questionPool: [{ id: 'q1', prompt: 'Current shell' }],
-    })).toEqual({
+    expect(
+      buildSingleQuestionPreservedPoolState({
+        questionId: '',
+        questionPool: [{ id: 'q1', prompt: 'Current shell' }],
+      }),
+    ).toEqual({
       action: 'skip',
       statePatch: null,
     });
@@ -312,14 +341,16 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       },
     });
 
-    expect(resolveSingleQuestionCacheBootstrapStopHandlingPlan({
-      bootstrapRetryAttempt: 2,
-      cacheBootstrapPlan,
-      effectiveSingleSlug: 'edge',
-      questionId: 'Q1',
-      responderAddress: '0xABCD',
-      runId: 17,
-    })).toEqual({
+    expect(
+      resolveSingleQuestionCacheBootstrapStopHandlingPlan({
+        bootstrapRetryAttempt: 2,
+        cacheBootstrapPlan,
+        effectiveSingleSlug: 'edge',
+        questionId: 'Q1',
+        responderAddress: '0xABCD',
+        runId: 17,
+      }),
+    ).toEqual({
       action: 'retry',
       retryRequest: {
         questionId: 'q1',
@@ -329,15 +360,17 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       retryOutcome: null,
     });
 
-    expect(resolveSingleQuestionCacheBootstrapStopHandlingPlan({
-      bootstrapRetryAttempt: 2,
-      cacheBootstrapPlan,
-      didScheduleRetry: false,
-      effectiveSingleSlug: 'edge',
-      questionId: 'Q1',
-      responderAddress: '0xABCD',
-      runId: 17,
-    })).toEqual({
+    expect(
+      resolveSingleQuestionCacheBootstrapStopHandlingPlan({
+        bootstrapRetryAttempt: 2,
+        cacheBootstrapPlan,
+        didScheduleRetry: false,
+        effectiveSingleSlug: 'edge',
+        questionId: 'Q1',
+        responderAddress: '0xABCD',
+        runId: 17,
+      }),
+    ).toEqual({
       action: 'retry',
       retryRequest: {
         questionId: 'q1',
@@ -378,13 +411,15 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       },
     });
 
-    expect(resolveSingleQuestionCacheBootstrapStopHandlingPlan({
-      bootstrapRetryAttempt: 3,
-      cacheBootstrapPlan,
-      effectiveSingleSlug: 'edge',
-      questionId: 'Q1',
-      runId: 18,
-    })).toEqual({
+    expect(
+      resolveSingleQuestionCacheBootstrapStopHandlingPlan({
+        bootstrapRetryAttempt: 3,
+        cacheBootstrapPlan,
+        effectiveSingleSlug: 'edge',
+        questionId: 'Q1',
+        runId: 18,
+      }),
+    ).toEqual({
       action: 'fallback',
       debugPayload: {
         phase: 'recent-payload-missing-network',
@@ -403,21 +438,23 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
   it("returns 'ready' when cache state resolves immediately and no recent payload exists", async () => {
     const questionData = { id: 'q1', prompt: 'test' };
 
-    await expect(resolveSingleQuestionCacheBootstrap({
-      questionId: 'q1',
-      effectiveSingleSlug: 'edge',
-      resolveCacheState: jest.fn().mockResolvedValue({
-        netIdStr: '84532',
-        questionsCache: {
-          '84532': {
-            questions: {
-              q1: questionData,
+    await expect(
+      resolveSingleQuestionCacheBootstrap({
+        questionId: 'q1',
+        effectiveSingleSlug: 'edge',
+        resolveCacheState: jest.fn().mockResolvedValue({
+          netIdStr: '84532',
+          questionsCache: {
+            '84532': {
+              questions: {
+                q1: questionData,
+              },
             },
           },
-        },
+        }),
+        readRecentPayload: jest.fn().mockReturnValue(null),
       }),
-      readRecentPayload: jest.fn().mockReturnValue(null),
-    })).resolves.toEqual({
+    ).resolves.toEqual({
       status: 'ready',
       cacheState: {
         netIdStr: '84532',
@@ -527,14 +564,8 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       questionId: 'q1',
       responderAddress: '',
     });
-    expect(pickBetterQuestionPayload).toHaveBeenCalledWith(
-      cachedQuestion,
-      result.recentPayloadForAccount
-    );
-    expect(areQuestionPayloadsEquivalent).toHaveBeenCalledWith(
-      cachedQuestion,
-      cachedQuestion
-    );
+    expect(pickBetterQuestionPayload).toHaveBeenCalledWith(cachedQuestion, result.recentPayloadForAccount);
+    expect(areQuestionPayloadsEquivalent).toHaveBeenCalledWith(cachedQuestion, cachedQuestion);
     expect(writeQuestionsCache).not.toHaveBeenCalled();
   });
 
@@ -601,12 +632,14 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
   });
 
   it("returns 'missing-cache-state' when no cache and no recent payload", async () => {
-    await expect(resolveSingleQuestionCacheBootstrap({
-      questionId: 'q1',
-      effectiveSingleSlug: 'edge',
-      resolveCacheState: jest.fn().mockResolvedValue(null),
-      readRecentPayload: jest.fn().mockReturnValue(null),
-    })).resolves.toEqual({
+    await expect(
+      resolveSingleQuestionCacheBootstrap({
+        questionId: 'q1',
+        effectiveSingleSlug: 'edge',
+        resolveCacheState: jest.fn().mockResolvedValue(null),
+        readRecentPayload: jest.fn().mockReturnValue(null),
+      }),
+    ).resolves.toEqual({
       status: 'missing-cache-state',
       target: {
         account: '',

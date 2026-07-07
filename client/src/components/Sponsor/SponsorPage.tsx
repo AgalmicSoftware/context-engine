@@ -4,9 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faClipboard, faLock, faLockOpen, faPen } from '@fortawesome/free-solid-svg-icons';
 import styles from '../Admin/AdminPage.module.scss';
 import CEDateTimeInput from '../Shared/CEDateTimeInput';
-import {
-  USE_ONCHAIN_SESSION_REGISTRY,
-} from '../../variables/appConfig.js';
+import { USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { sponsoredBundlePort } from '../../domains/storage/sponsoredBundlePorts.js';
 import { adminArweavePort } from '../../domains/storage/adminArweavePorts.js';
@@ -117,9 +115,8 @@ type SponsoredFieldGroup = {
   fields: readonly SponsoredField[];
 };
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const getErrorMessage = (error: unknown, fallback = 'Unknown error') => {
   if (error instanceof Error && error.message) return error.message;
@@ -165,13 +162,15 @@ const stableCreateContextValue = (value: unknown, seen = new WeakSet<object>()):
     return result;
   }
   const record = value as UnknownRecord;
-  const result = Object.keys(record).sort().reduce<UnknownRecord>((acc, key) => {
-    const nextValue = record[key];
-    if (typeof nextValue !== 'function' && typeof nextValue !== 'undefined') {
-      acc[key] = stableCreateContextValue(nextValue, seen);
-    }
-    return acc;
-  }, {});
+  const result = Object.keys(record)
+    .sort()
+    .reduce<UnknownRecord>((acc, key) => {
+      const nextValue = record[key];
+      if (typeof nextValue !== 'function' && typeof nextValue !== 'undefined') {
+        acc[key] = stableCreateContextValue(nextValue, seen);
+      }
+      return acc;
+    }, {});
   seen.delete(value);
   return result;
 };
@@ -252,11 +251,12 @@ const readSponsorPageCache = (): SponsorPageCache => {
   try {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(SPONSOR_PAGE_CACHE_KEY) || 'null');
     if (!isRecord(parsed) || Number(parsed.v || 0) !== SPONSOR_PAGE_CACHE_VERSION) return fallback;
-    const persistBundleDraft = typeof parsed.persistBundleDraft === 'boolean'
-      ? parsed.persistBundleDraft
-      : typeof parsed.persistBundleSecrets === 'boolean'
-        ? parsed.persistBundleSecrets
-        : fallback.persistBundleDraft;
+    const persistBundleDraft =
+      typeof parsed.persistBundleDraft === 'boolean'
+        ? parsed.persistBundleDraft
+        : typeof parsed.persistBundleSecrets === 'boolean'
+          ? parsed.persistBundleSecrets
+          : fallback.persistBundleDraft;
     const expiresAt = normalizeRestoredExpiryDate(parsed.expiresAt);
     return {
       persistBundleDraft,
@@ -273,22 +273,23 @@ const writeSponsorPageCache = (cache: Partial<SponsorPageCache> = {}) => {
   const bundleForm = cache.bundleForm ?? buildEmptyBundleForm();
   const expiresAt = cache.expiresAt ?? null;
   try {
-    window.localStorage.setItem(SPONSOR_PAGE_CACHE_KEY, JSON.stringify({
-      v: SPONSOR_PAGE_CACHE_VERSION,
-      persistBundleDraft: !!persistBundleDraft,
-      persistBundleSecrets: false,
-      bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(bundleForm) : {},
-      expiresAt: persistBundleDraft && expiresAt instanceof Date && Number.isFinite(expiresAt.getTime())
-        ? expiresAt.toISOString()
-        : '',
-    }));
+    window.localStorage.setItem(
+      SPONSOR_PAGE_CACHE_KEY,
+      JSON.stringify({
+        v: SPONSOR_PAGE_CACHE_VERSION,
+        persistBundleDraft: !!persistBundleDraft,
+        persistBundleSecrets: false,
+        bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(bundleForm) : {},
+        expiresAt:
+          persistBundleDraft && expiresAt instanceof Date && Number.isFinite(expiresAt.getTime())
+            ? expiresAt.toISOString()
+            : '',
+      }),
+    );
   } catch (_) {}
 };
-const getCurrentOrigin = () => (
-  typeof window !== 'undefined' && window.location
-    ? toStr(window.location.origin).trim()
-    : ''
-);
+const getCurrentOrigin = () =>
+  typeof window !== 'undefined' && window.location ? toStr(window.location.origin).trim() : '';
 const buildSponsorGrantCorsMessage = (workerBase: unknown, detail: unknown = '') => {
   const origin = getCurrentOrigin() || '<current-origin>';
   const worker = toStr(workerBase).trim() || 'sponsoring worker';
@@ -310,7 +311,10 @@ const normalizeSponsorGrantErrorMessage = ({
   const lowered = raw.toLowerCase();
   const detail = toStr(responseError).trim();
   const detailLower = detail.toLowerCase();
-  if ((Number(responseStatus || 0) === 403 && detailLower.includes('origin')) || detailLower.includes('origin not allowed')) {
+  if (
+    (Number(responseStatus || 0) === 403 && detailLower.includes('origin')) ||
+    detailLower.includes('origin not allowed')
+  ) {
     return buildSponsorGrantCorsMessage(workerBase, detail || 'Origin not allowed');
   }
   if (lowered.includes('origin not allowed')) {
@@ -346,9 +350,7 @@ const SPONSORED_FIELD_GROUPS: readonly SponsoredFieldGroup[] = Object.freeze([
   {
     key: 'faucet',
     label: 'Faucet',
-    fields: [
-      { key: 'faucetPrivateKey', label: 'Faucet private key', type: 'password', placeholder: '0x...' },
-    ],
+    fields: [{ key: 'faucetPrivateKey', label: 'Faucet private key', type: 'password', placeholder: '0x...' }],
   },
   {
     key: 'rpc',
@@ -361,7 +363,8 @@ const SPONSORED_FIELD_GROUPS: readonly SponsoredFieldGroup[] = Object.freeze([
   {
     key: 'lit',
     label: 'Lit',
-    notice: 'Account API keys are authority for bundle-owned Lit accounts. Usage API keys are scoped runtime secrets. Group, PKP, and Lit Action identifiers are operational config.',
+    notice:
+      'Account API keys are authority for bundle-owned Lit accounts. Usage API keys are scoped runtime secrets. Group, PKP, and Lit Action identifiers are operational config.',
     fields: [
       { key: 'litApiBase', label: 'Lit API base', type: 'text', placeholder: 'https://api.chipotle.litprotocol.com' },
       { key: 'litGroupId', label: 'Lit group ID', type: 'text', placeholder: 'group_...' },
@@ -374,10 +377,9 @@ const SPONSORED_FIELD_GROUPS: readonly SponsoredFieldGroup[] = Object.freeze([
   {
     key: 'deploy',
     label: 'Deploy (sponsoring session)',
-    notice: 'Issue one-time deploy grants through the selected sponsoring session worker instead of writing raw deploy credentials into the bundle.',
-    fields: [
-      { key: 'cloudflareApiToken', label: 'Cloudflare API token', type: 'password', placeholder: 'cf-...' },
-    ],
+    notice:
+      'Issue one-time deploy grants through the selected sponsoring session worker instead of writing raw deploy credentials into the bundle.',
+    fields: [{ key: 'cloudflareApiToken', label: 'Cloudflare API token', type: 'password', placeholder: 'cf-...' }],
   },
 ]);
 
@@ -446,43 +448,43 @@ const SponsorPage = ({
     return nextSessions;
   }, []);
 
-  const loadSessions = useCallback(async ({ forceOnChain, isCancelled }: LoadSessionsOptions = {}) => {
-    const cached = syncSessionsFromRegistryCache({ isCancelled });
+  const loadSessions = useCallback(
+    async ({ forceOnChain, isCancelled }: LoadSessionsOptions = {}) => {
+      const cached = syncSessionsFromRegistryCache({ isCancelled });
 
-    const chainIds = requestedChainId ? [requestedChainId] : undefined;
-    const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
-    const runRegistryLoad = async (bootstrapRpc: boolean): Promise<UnknownRecord> => {
-      try {
-        const result = await sessionRegistryReadsPort.loadSessionRegistryCache({
-          ...(chainIds ? { chainIds } : {}),
-          force: shouldForceRegistryRead,
-          providerLike: null,
-          account: '',
-          lit: null,
-          bootstrapRpc,
-        });
-        return isRecord(result) ? result : {};
-      } catch (error) {
-        return { __error: error };
+      const chainIds = requestedChainId ? [requestedChainId] : undefined;
+      const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
+      const runRegistryLoad = async (bootstrapRpc: boolean): Promise<UnknownRecord> => {
+        try {
+          const result = await sessionRegistryReadsPort.loadSessionRegistryCache({
+            ...(chainIds ? { chainIds } : {}),
+            force: shouldForceRegistryRead,
+            providerLike: null,
+            account: '',
+            lit: null,
+            bootstrapRpc,
+          });
+          return isRecord(result) ? result : {};
+        } catch (error) {
+          return { __error: error };
+        }
+      };
+
+      const primaryResult = await runRegistryLoad(true);
+      let refreshed = syncSessionsFromRegistryCache({ isCancelled });
+      if (typeof isCancelled === 'function' && isCancelled()) return refreshed;
+      const primaryCount = countSessionsForChain(refreshed, requestedChainId);
+      const loadMeta = isRecord(primaryResult.__loadMeta) ? primaryResult.__loadMeta : null;
+      const primaryLoadHadErrors = !!primaryResult?.__error || loadMeta?.hadLoadErrors === true;
+      const shouldRetryWithDefaultRpc = primaryCount <= 0 || primaryLoadHadErrors;
+      if (shouldRetryWithDefaultRpc) {
+        await runRegistryLoad(false);
+        refreshed = syncSessionsFromRegistryCache({ isCancelled });
       }
-    };
-
-    const primaryResult = await runRegistryLoad(true);
-    let refreshed = syncSessionsFromRegistryCache({ isCancelled });
-    if (typeof isCancelled === 'function' && isCancelled()) return refreshed;
-    const primaryCount = countSessionsForChain(refreshed, requestedChainId);
-    const loadMeta = isRecord(primaryResult.__loadMeta) ? primaryResult.__loadMeta : null;
-    const primaryLoadHadErrors = (
-      !!primaryResult?.__error ||
-      loadMeta?.hadLoadErrors === true
-    );
-    const shouldRetryWithDefaultRpc = primaryCount <= 0 || primaryLoadHadErrors;
-    if (shouldRetryWithDefaultRpc) {
-      await runRegistryLoad(false);
-      refreshed = syncSessionsFromRegistryCache({ isCancelled });
-    }
-    return refreshed;
-  }, [requestedChainId, syncSessionsFromRegistryCache]);
+      return refreshed;
+    },
+    [requestedChainId, syncSessionsFromRegistryCache],
+  );
 
   const handleRefreshSessions = useCallback(async () => {
     setSessionsRefreshBusy(true);
@@ -549,10 +551,12 @@ const SponsorPage = ({
   const requestedSessionMatch = useMemo(() => {
     if (!requestedSessionRaw) return null;
     if (requestedSessionIdHex) {
-      return sessionsForChain.find(([, cfg]) => {
-        const cfgId = sessionRegistryReadsPort.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
-        return cfgId && cfgId === requestedSessionIdHex;
-      }) || null;
+      return (
+        sessionsForChain.find(([, cfg]) => {
+          const cfgId = sessionRegistryReadsPort.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
+          return cfgId && cfgId === requestedSessionIdHex;
+        }) || null
+      );
     }
     return sessionsForChain.find(([slug]) => slug === requestedSessionSlug) || null;
   }, [requestedSessionIdHex, requestedSessionRaw, requestedSessionSlug, sessionsForChain]);
@@ -566,12 +570,7 @@ const SponsorPage = ({
       handleRefreshSessions();
     }, 1000);
     return () => clearTimeout(timeoutId);
-  }, [
-    handleRefreshSessions,
-    ignoreRequestedSession,
-    requestedChainId,
-    requestedSessionRaw,
-  ]);
+  }, [handleRefreshSessions, ignoreRequestedSession, requestedChainId, requestedSessionRaw]);
 
   useEffect(() => {
     if (!sessionsForChain.length) {
@@ -638,7 +637,10 @@ const SponsorPage = ({
         setSessionLookupStatus('');
       } catch (error) {
         if (!cancelled) {
-          const message = getErrorMessage(error, `Session not found on chain ${requestedChainId}: ${requestedSessionRaw}`);
+          const message = getErrorMessage(
+            error,
+            `Session not found on chain ${requestedChainId}: ${requestedSessionRaw}`,
+          );
           setSessionLookupStatus(message);
           notify.error(message);
         }
@@ -661,52 +663,56 @@ const SponsorPage = ({
     const match = sessionsForChain.find(([slug]) => slug === selectedSlug);
     return match ? match[1] : null;
   }, [selectedSlug, sessionsForChain]);
-  const relevantSessionChainId = useMemo(() => (
-    Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0) || 0
-  ), [network?.id, selectedConfig]);
-  const selectedConfigWorkerUrl = useMemo(() => (
-    adminWorkerPorts.workerUrl.normalizeWorkerUrl(getUsableSessionWorkerUrl({
-      slug: selectedSlug,
-      sessionConfig: selectedConfig,
-      allowSharedFallback: true,
-    }))
-  ), [selectedConfig, selectedSlug]);
-  const selectedSessionHasUsableWorker = useMemo(() => (
-    hasUsableSessionWorkerConfig({
-      slug: selectedSlug,
-      sessionConfig: selectedConfig,
-      allowSharedFallback: true,
-    })
-  ), [selectedConfig, selectedSlug]);
-  const normalizedEnteredWorkerUrl = useMemo(() => adminWorkerPorts.workerUrl.normalizeWorkerUrl(workerUrl), [workerUrl]);
+  const relevantSessionChainId = useMemo(
+    () => Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0) || 0,
+    [network?.id, selectedConfig],
+  );
+  const selectedConfigWorkerUrl = useMemo(
+    () =>
+      adminWorkerPorts.workerUrl.normalizeWorkerUrl(
+        getUsableSessionWorkerUrl({
+          slug: selectedSlug,
+          sessionConfig: selectedConfig,
+          allowSharedFallback: true,
+        }),
+      ),
+    [selectedConfig, selectedSlug],
+  );
+  const selectedSessionHasUsableWorker = useMemo(
+    () =>
+      hasUsableSessionWorkerConfig({
+        slug: selectedSlug,
+        sessionConfig: selectedConfig,
+        allowSharedFallback: true,
+      }),
+    [selectedConfig, selectedSlug],
+  );
+  const normalizedEnteredWorkerUrl = useMemo(
+    () => adminWorkerPorts.workerUrl.normalizeWorkerUrl(workerUrl),
+    [workerUrl],
+  );
   const hasManualWorkerUrlOverride = workerUrlOverrideDirty && !!normalizedEnteredWorkerUrl;
   const deploySponsoringWorkerUrl = normalizedEnteredWorkerUrl || selectedConfigWorkerUrl || '';
   const accountLower = toStr(account || '').toLowerCase();
-  const selectedConfigCreateSignature = useMemo(
-    () => buildCreateConfigSignature(selectedConfig),
-    [selectedConfig]
+  const selectedConfigCreateSignature = useMemo(() => buildCreateConfigSignature(selectedConfig), [selectedConfig]);
+  const createContextKey = useMemo(
+    () =>
+      [
+        normalizeSlug(selectedSlug),
+        accountLower,
+        String(relevantSessionChainId || ''),
+        deploySponsoringWorkerUrl,
+        selectedConfigCreateSignature,
+      ].join('|'),
+    [accountLower, deploySponsoringWorkerUrl, relevantSessionChainId, selectedConfigCreateSignature, selectedSlug],
   );
-  const createContextKey = useMemo(() => [
-    normalizeSlug(selectedSlug),
-    accountLower,
-    String(relevantSessionChainId || ''),
-    deploySponsoringWorkerUrl,
-    selectedConfigCreateSignature,
-  ].join('|'), [
-    accountLower,
-    deploySponsoringWorkerUrl,
-    relevantSessionChainId,
-    selectedConfigCreateSignature,
-    selectedSlug,
-  ]);
   const activeCreateContextKeyRef = useRef(createContextKey);
   activeCreateContextKeyRef.current = createContextKey;
-  const selectedSessionSupportsEmbeddedDeploy = useMemo(() => (
-    selectedConfig?.embeddedDeployHelperEnabled !== false
-  ), [selectedConfig]);
-  const canCreateSponsoredUrl = !!selectedConfig && (
-    selectedSessionHasUsableWorker || hasManualWorkerUrlOverride
+  const selectedSessionSupportsEmbeddedDeploy = useMemo(
+    () => selectedConfig?.embeddedDeployHelperEnabled !== false,
+    [selectedConfig],
   );
+  const canCreateSponsoredUrl = !!selectedConfig && (selectedSessionHasUsableWorker || hasManualWorkerUrlOverride);
 
   useEffect(() => {
     createRequestSeqRef.current += 1;
@@ -767,63 +773,92 @@ const SponsorPage = ({
   // end-to-end in the product UI and setup flows.
   const missingSupportedAdminConfig = !adminAddress;
   const isAdminForSelected = !!accountLower && !!adminAddress && adminAddress === accountLower;
-  const canAdmin = !!account && !!selectedConfig && !missingSupportedAdminConfig && isAdminForSelected && hasRegistryEntry;
+  const canAdmin =
+    !!account && !!selectedConfig && !missingSupportedAdminConfig && isAdminForSelected && hasRegistryEntry;
 
   const updateBundleField = useCallback((key: SponsorBundleFieldKey, value: string) => {
     setBundleForm((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const buildBootstrapUploadAuth = useCallback(async ({ workerUrl: overrideWorkerUrl }: WorkerUrlOverride = {}) => {
-    if (!account) {
-      if (toggleLoginModal) toggleLoginModal(true);
-      throw new Error('Connect a wallet to sign admin requests.');
-    }
-    const slug = normalizeSlug(selectedSlug);
-    const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
-    if (!baseUrl) throw new Error('Worker URL is missing.');
-    const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-    return adminWorkerPorts.adminAuth.buildSignedBootstrapAdminAuth({
-      slug,
-      workerUrl: baseUrl,
-      statement: 'Admin request: bootstrap arweave upload',
-      context: {
-        account,
-        chainId,
-        providerLike: typeof provider === 'string' ? provider : undefined,
-      },
-    });
-  }, [account, network?.id, provider, selectedConfig, selectedConfigWorkerUrl, selectedSlug, toggleLoginModal, workerUrl]);
+  const buildBootstrapUploadAuth = useCallback(
+    async ({ workerUrl: overrideWorkerUrl }: WorkerUrlOverride = {}) => {
+      if (!account) {
+        if (toggleLoginModal) toggleLoginModal(true);
+        throw new Error('Connect a wallet to sign admin requests.');
+      }
+      const slug = normalizeSlug(selectedSlug);
+      const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(
+        overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl,
+      );
+      if (!baseUrl) throw new Error('Worker URL is missing.');
+      const chainId =
+        Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
+      return adminWorkerPorts.adminAuth.buildSignedBootstrapAdminAuth({
+        slug,
+        workerUrl: baseUrl,
+        statement: 'Admin request: bootstrap arweave upload',
+        context: {
+          account,
+          chainId,
+          providerLike: typeof provider === 'string' ? provider : undefined,
+        },
+      });
+    },
+    [
+      account,
+      network?.id,
+      provider,
+      selectedConfig,
+      selectedConfigWorkerUrl,
+      selectedSlug,
+      toggleLoginModal,
+      workerUrl,
+    ],
+  );
 
-  const buildGrantIssueAuth = useCallback(async ({ workerUrl: overrideWorkerUrl, body }: GrantIssueAuthArgs = {}) => {
-    if (!account) {
-      if (toggleLoginModal) toggleLoginModal(true);
-      throw new Error('Connect a wallet to sign admin requests.');
-    }
-    const slug = normalizeSlug(selectedSlug);
-    const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
-    if (!baseUrl) throw new Error('Worker URL is missing.');
-    const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-    return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
-      action: 'issue-sponsored-grants',
-      slug,
-      body,
-      workerUrl: baseUrl,
-      context: {
-        account,
-        chainId,
-        providerLike: typeof provider === 'string' ? provider : undefined,
-      },
-    });
-  }, [account, network?.id, provider, selectedConfig, selectedConfigWorkerUrl, selectedSlug, toggleLoginModal, workerUrl]);
+  const buildGrantIssueAuth = useCallback(
+    async ({ workerUrl: overrideWorkerUrl, body }: GrantIssueAuthArgs = {}) => {
+      if (!account) {
+        if (toggleLoginModal) toggleLoginModal(true);
+        throw new Error('Connect a wallet to sign admin requests.');
+      }
+      const slug = normalizeSlug(selectedSlug);
+      const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(
+        overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl,
+      );
+      if (!baseUrl) throw new Error('Worker URL is missing.');
+      const chainId =
+        Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
+      return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
+        action: 'issue-sponsored-grants',
+        slug,
+        body,
+        workerUrl: baseUrl,
+        context: {
+          account,
+          chainId,
+          providerLike: typeof provider === 'string' ? provider : undefined,
+        },
+      });
+    },
+    [
+      account,
+      network?.id,
+      provider,
+      selectedConfig,
+      selectedConfigWorkerUrl,
+      selectedSlug,
+      toggleLoginModal,
+      workerUrl,
+    ],
+  );
 
   const handleCreateSponsoredUrl = useCallback(async () => {
     const requestSeq = createRequestSeqRef.current + 1;
     createRequestSeqRef.current = requestSeq;
     const requestContextKey = activeCreateContextKeyRef.current;
-    const isCurrentCreateRequest = () => (
-      createRequestSeqRef.current === requestSeq &&
-      activeCreateContextKeyRef.current === requestContextKey
-    );
+    const isCurrentCreateRequest = () =>
+      createRequestSeqRef.current === requestSeq && activeCreateContextKeyRef.current === requestContextKey;
     const setCreateStatusIfCurrent = (nextStatus: string) => {
       if (isCurrentCreateRequest()) setCreateStatus(nextStatus);
     };
@@ -888,25 +923,31 @@ const SponsorPage = ({
             }),
           });
         } catch (error) {
-          throw new Error(normalizeSponsorGrantErrorMessage({
-            error,
-            workerBase: resolvedWorkerUrl,
-          }));
+          throw new Error(
+            normalizeSponsorGrantErrorMessage({
+              error,
+              workerBase: resolvedWorkerUrl,
+            }),
+          );
         }
         if (!isCurrentCreateRequest()) return;
         const grantData: UnknownRecord = await grantResponse.json().catch(() => ({}));
         if (!isCurrentCreateRequest()) return;
         if (!grantResponse.ok) {
-          throw new Error(normalizeSponsorGrantErrorMessage({
-            error: grantData?.error || `Failed to issue sponsored bootstrap grants (${grantResponse.status}).`,
-            workerBase: resolvedWorkerUrl,
-            responseStatus: grantResponse.status,
-            responseError: grantData?.error || '',
-          }));
+          throw new Error(
+            normalizeSponsorGrantErrorMessage({
+              error: grantData?.error || `Failed to issue sponsored bootstrap grants (${grantResponse.status}).`,
+              workerBase: resolvedWorkerUrl,
+              responseStatus: grantResponse.status,
+              responseError: grantData?.error || '',
+            }),
+          );
         }
         deployGrantToken = toStr(grantData?.deployGrantToken).trim();
         faucetGrantToken = toStr(grantData?.faucetGrantToken).trim();
-        resolvedGrantWorkerUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(grantData?.bootstrapWorkerUrl || resolvedWorkerUrl);
+        resolvedGrantWorkerUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(
+          grantData?.bootstrapWorkerUrl || resolvedWorkerUrl,
+        );
         if (grantRequest.deploy && !deployGrantToken) {
           throw new Error('Sponsored deploy grant issuance did not return a deploy token.');
         }
@@ -1009,9 +1050,7 @@ const SponsorPage = ({
               <div className={styles.heroTitleRow}>
                 <h1>Sponsor Session URL</h1>
               </div>
-              <div className={styles.subtitle}>
-                Create a one-click setup link for future session creation.
-              </div>
+              <div className={styles.subtitle}>Create a one-click setup link for future session creation.</div>
             </div>
             {account ? (
               <div className={`${styles.connectionBadge} ${styles.connectionBadgeActive}`}>
@@ -1073,10 +1112,14 @@ const SponsorPage = ({
             {sessionLookupStatus ? <div className={styles.warningNote}>{sessionLookupStatus}</div> : null}
             {sessionsRefreshStatus ? <div className={styles.statusNote}>{sessionsRefreshStatus}</div> : null}
             {!canCreateSponsoredUrl && selectedConfig ? (
-              <div className={styles.warningNote}>Select a session with a usable worker-backed config before creating a sponsored link.</div>
+              <div className={styles.warningNote}>
+                Select a session with a usable worker-backed config before creating a sponsored link.
+              </div>
             ) : null}
             {selectedConfig && missingSupportedAdminConfig ? (
-              <div className={styles.warningNote}>Sponsor uploads currently require a session with a direct `adminAddress`.</div>
+              <div className={styles.warningNote}>
+                Sponsor uploads currently require a session with a direct `adminAddress`.
+              </div>
             ) : null}
             {selectedConfig && !missingSupportedAdminConfig && !canAdmin && account ? (
               <div className={styles.warningNote}>Connected wallet is not the admin for the selected session.</div>
@@ -1095,7 +1138,9 @@ const SponsorPage = ({
           <div className={styles.panelHeader}>
             <div className={styles.panelTitleGroup}>
               <div className={styles.panelTitle}>Sponsored bundle fields</div>
-              <div className={styles.panelHint}>Paste credentials directly. This page never reads back worker KV secrets.</div>
+              <div className={styles.panelHint}>
+                Paste credentials directly. This page never reads back worker KV secrets.
+              </div>
               <Label className={styles.workerToggle}>
                 <Input
                   type="checkbox"
@@ -1105,7 +1150,8 @@ const SponsorPage = ({
                 <span>Remember non-secret draft fields</span>
               </Label>
               <div className={styles.panelHint}>
-                Stores only non-secret metadata such as label and expiry in localStorage. API keys, private keys, tokens, JWKs, and RPC URLs are never restored.
+                Stores only non-secret metadata such as label and expiry in localStorage. API keys, private keys,
+                tokens, JWKs, and RPC URLs are never restored.
               </div>
             </div>
           </div>
@@ -1115,7 +1161,10 @@ const SponsorPage = ({
               return (
                 <div key={group.key} className={`${styles.secretOptionCard} ${styles.activeOption}`}>
                   <div className={styles.secretOptionHeader}>
-                    <FontAwesomeIcon icon={hasValue ? faLock : faLockOpen} style={{ opacity: hasValue ? 0.9 : 0.4, marginRight: 8 }} />
+                    <FontAwesomeIcon
+                      icon={hasValue ? faLock : faLockOpen}
+                      style={{ opacity: hasValue ? 0.9 : 0.4, marginRight: 8 }}
+                    />
                     <span className={styles.secretOptionText}>
                       <span>{group.label}</span>
                       <span className={styles.secretOptionMeta}>{hasValue ? 'Ready to bundle' : 'Empty'}</span>
@@ -1140,7 +1189,8 @@ const SponsorPage = ({
                     })}
                     {group.key === 'deploy' ? (
                       <div className={styles.statusNote}>
-                        Uses sponsoring worker: {deploySponsoringWorkerUrl || 'Select a session with a usable worker URL.'}
+                        Uses sponsoring worker:{' '}
+                        {deploySponsoringWorkerUrl || 'Select a session with a usable worker URL.'}
                       </div>
                     ) : null}
                     {group.notice ? <div className={styles.warningNote}>{group.notice}</div> : null}
@@ -1155,7 +1205,9 @@ const SponsorPage = ({
           <div className={styles.panelHeader}>
             <div className={styles.panelTitleGroup}>
               <div className={styles.panelTitle}>Create share URL</div>
-              <div className={styles.panelHint}>`txId` lives in the query string and the decrypt secret stays in `#k=` client-side only.</div>
+              <div className={styles.panelHint}>
+                `txId` lives in the query string and the decrypt secret stays in `#k=` client-side only.
+              </div>
             </div>
           </div>
 
@@ -1212,11 +1264,15 @@ const SponsorPage = ({
                 className={styles.heroCardInput}
                 readOnly={!workerUrlEditable}
                 data-testid={E2E_TESTIDS.SPONSOR_WORKER_URL}
-                onChange={workerUrlEditable ? (e) => {
-                  workerUrlOverrideDirtyRef.current = true;
-                  setWorkerUrlOverrideDirty(true);
-                  setWorkerUrl(e.target.value);
-                } : undefined}
+                onChange={
+                  workerUrlEditable
+                    ? (e) => {
+                        workerUrlOverrideDirtyRef.current = true;
+                        setWorkerUrlOverrideDirty(true);
+                        setWorkerUrl(e.target.value);
+                      }
+                    : undefined
+                }
               />
               <div className={styles.heroCardInputActions}>
                 <button

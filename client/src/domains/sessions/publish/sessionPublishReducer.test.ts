@@ -13,17 +13,19 @@ const publishPlan = (overrides: SessionPublishPlan = {}): SessionPublishPlan => 
   ...overrides,
 });
 
-const reduceActions = (actions: SessionPublishAction[]) => actions.reduce(
-  sessionPublishReducer,
-  createInitialSessionPublishState({ status: 'editing' })
-);
+const reduceActions = (actions: SessionPublishAction[]) =>
+  actions.reduce(sessionPublishReducer, createInitialSessionPublishState({ status: 'editing' }));
 
 describe('sessionPublishReducer', () => {
   it('keeps the publish reducer queue free of navigation effects', () => {
-    expect(buildSessionPublishEffectQueue(publishPlan({
-      autoDeployWorker: true,
-      deployPendingSbts: true,
-    }))).toEqual([
+    expect(
+      buildSessionPublishEffectQueue(
+        publishPlan({
+          autoDeployWorker: true,
+          deployPendingSbts: true,
+        }),
+      ),
+    ).toEqual([
       'checkRequirements',
       'deployWorker',
       'deployPendingSbts',
@@ -42,29 +44,30 @@ describe('sessionPublishReducer', () => {
       { type: 'effectSucceeded', effect: 'refreshRegistryCache' },
     ]);
 
-    expect(state).toEqual(expect.objectContaining({
-      status: 'published',
-      currentEffect: null,
-      metadataUri: 'ar://metadata',
-      attempt: 1,
-      cancelled: false,
-    }));
-    expect(state.completed).toEqual(expect.objectContaining({
-      checkRequirements: true,
-      uploadMetadata: true,
-      registerSession: true,
-      refreshRegistryCache: true,
-    }));
+    expect(state).toEqual(
+      expect.objectContaining({
+        status: 'published',
+        currentEffect: null,
+        metadataUri: 'ar://metadata',
+        attempt: 1,
+        cancelled: false,
+      }),
+    );
+    expect(state.completed).toEqual(
+      expect.objectContaining({
+        checkRequirements: true,
+        uploadMetadata: true,
+        registerSession: true,
+        refreshRegistryCache: true,
+      }),
+    );
   });
 
   it('orders sponsored auto-deploy before metadata upload and registration', () => {
-    const first = sessionPublishReducer(
-      createInitialSessionPublishState({ status: 'editing' }),
-      {
-        type: 'beginPublish',
-        plan: publishPlan({ autoDeployWorker: true }),
-      }
-    );
+    const first = sessionPublishReducer(createInitialSessionPublishState({ status: 'editing' }), {
+      type: 'beginPublish',
+      plan: publishPlan({ autoDeployWorker: true }),
+    });
     const afterRequirements = sessionPublishReducer(first, {
       type: 'effectSucceeded',
       effect: 'checkRequirements',
@@ -75,19 +78,25 @@ describe('sessionPublishReducer', () => {
       result: { workerUrl: 'https://worker.example.test' },
     });
 
-    expect(first).toEqual(expect.objectContaining({
-      status: 'checkingRequirements',
-      currentEffect: 'checkRequirements',
-    }));
-    expect(afterRequirements).toEqual(expect.objectContaining({
-      status: 'deployingWorker',
-      currentEffect: 'deployWorker',
-    }));
-    expect(afterWorker).toEqual(expect.objectContaining({
-      status: 'uploadingMetadata',
-      currentEffect: 'uploadMetadata',
-      workerUrl: 'https://worker.example.test',
-    }));
+    expect(first).toEqual(
+      expect.objectContaining({
+        status: 'checkingRequirements',
+        currentEffect: 'checkRequirements',
+      }),
+    );
+    expect(afterRequirements).toEqual(
+      expect.objectContaining({
+        status: 'deployingWorker',
+        currentEffect: 'deployWorker',
+      }),
+    );
+    expect(afterWorker).toEqual(
+      expect.objectContaining({
+        status: 'uploadingMetadata',
+        currentEffect: 'uploadMetadata',
+        workerUrl: 'https://worker.example.test',
+      }),
+    );
   });
 
   it('captures hosted-bundle deploy fallback as a recoverable retry plan', () => {
@@ -106,25 +115,29 @@ describe('sessionPublishReducer', () => {
       },
     ]);
 
-    expect(failed).toEqual(expect.objectContaining({
-      status: 'failedRecoverable',
-      currentEffect: null,
-      error: expect.objectContaining({
-        effect: 'deployWorker',
-        message: 'failed to fetch bundle',
-        recoverable: true,
+    expect(failed).toEqual(
+      expect.objectContaining({
+        status: 'failedRecoverable',
+        currentEffect: null,
+        error: expect.objectContaining({
+          effect: 'deployWorker',
+          message: 'failed to fetch bundle',
+          recoverable: true,
+        }),
       }),
-    }));
+    );
 
     const retry = sessionPublishReducer(failed, { type: 'retry' });
     const afterRequirements = sessionPublishReducer(retry, {
       type: 'effectSucceeded',
       effect: 'checkRequirements',
     });
-    expect(afterRequirements).toEqual(expect.objectContaining({
-      status: 'uploadingMetadata',
-      currentEffect: 'uploadMetadata',
-    }));
+    expect(afterRequirements).toEqual(
+      expect.objectContaining({
+        status: 'uploadingMetadata',
+        currentEffect: 'uploadMetadata',
+      }),
+    );
   });
 
   it('stops before registration when pending SBT deployment fails', () => {
@@ -161,13 +174,15 @@ describe('sessionPublishReducer', () => {
       },
     ]);
 
-    expect(failed).toEqual(expect.objectContaining({
-      status: 'failedRecoverable',
-      metadataUri: 'ar://metadata',
-      error: expect.objectContaining({
-        effect: 'registerSession',
+    expect(failed).toEqual(
+      expect.objectContaining({
+        status: 'failedRecoverable',
+        metadataUri: 'ar://metadata',
+        error: expect.objectContaining({
+          effect: 'registerSession',
+        }),
       }),
-    }));
+    );
     expect(failed.completed.uploadMetadata).toBe(true);
     expect(failed.completed.registerSession).toBeUndefined();
   });
@@ -190,16 +205,20 @@ describe('sessionPublishReducer', () => {
       effect: 'checkRequirements',
     });
 
-    expect(retry).toEqual(expect.objectContaining({
-      status: 'checkingRequirements',
-      currentEffect: 'checkRequirements',
-      attempt: 2,
-    }));
-    expect(afterRequirements).toEqual(expect.objectContaining({
-      status: 'registeringOnChain',
-      currentEffect: 'registerSession',
-      metadataUri: 'ar://metadata',
-    }));
+    expect(retry).toEqual(
+      expect.objectContaining({
+        status: 'checkingRequirements',
+        currentEffect: 'checkRequirements',
+        attempt: 2,
+      }),
+    );
+    expect(afterRequirements).toEqual(
+      expect.objectContaining({
+        status: 'registeringOnChain',
+        currentEffect: 'registerSession',
+        metadataUri: 'ar://metadata',
+      }),
+    );
   });
 
   it('cancels the active effect queue and ignores late completions', () => {
@@ -214,11 +233,13 @@ describe('sessionPublishReducer', () => {
       result: { workerUrl: 'https://late-worker.example.test' },
     });
 
-    expect(cancelled).toEqual(expect.objectContaining({
-      status: 'editing',
-      currentEffect: null,
-      cancelled: true,
-    }));
+    expect(cancelled).toEqual(
+      expect.objectContaining({
+        status: 'editing',
+        currentEffect: null,
+        cancelled: true,
+      }),
+    );
     expect(lateCompletion).toBe(cancelled);
     expect(getNextSessionPublishEffect(cancelled.plan, cancelled.completed)).toBe('deployWorker');
   });

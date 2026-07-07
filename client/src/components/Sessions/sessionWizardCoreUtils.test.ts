@@ -24,21 +24,23 @@ describe('sessionWizardCoreUtils', () => {
     expect(getSessionWizardErrorMessage(new Error('upload failed'), 'fallback')).toBe('upload failed');
     expect(getSessionWizardErrorMessage({ message: 'registry failed' }, 'fallback')).toBe('registry failed');
     expect(getSessionWizardErrorMessage({ code: 500 }, 'Failed to upload metadata.')).toBe(
-      'Failed to upload metadata.'
+      'Failed to upload metadata.',
     );
     expect(getSessionWizardErrorMessage('plain failure', 'fallback')).toBe('plain failure');
   });
 
   it('builds stable sponsored sbt lookup keys', () => {
-    expect(buildSponsoredSbtLookupContextKey({
-      address: '0xABC',
-      slug: ' demo ',
-      sessionName: ' Session ',
-      networkChainId: 84532,
-      contracts: { registry: '0x1' },
-      registry: { chainId: 84532 },
-    })).toBe(
-      '{"address":"0xabc","slug":"demo","sessionName":"Session","networkChainId":84532,"contracts":{"registry":"0x1"},"registry":{"chainId":84532}}'
+    expect(
+      buildSponsoredSbtLookupContextKey({
+        address: '0xABC',
+        slug: ' demo ',
+        sessionName: ' Session ',
+        networkChainId: 84532,
+        contracts: { registry: '0x1' },
+        registry: { chainId: 84532 },
+      }),
+    ).toBe(
+      '{"address":"0xabc","slug":"demo","sessionName":"Session","networkChainId":84532,"contracts":{"registry":"0x1"},"registry":{"chainId":84532}}',
     );
   });
 
@@ -49,10 +51,7 @@ describe('sessionWizardCoreUtils', () => {
     expect(clone).not.toBe(original);
     expect(clone.nested).not.toBe(original.nested);
 
-    expect(mergeDeep(
-      { nested: { a: 1 }, keep: true },
-      { nested: { b: 2 }, replace: 'yes' },
-    )).toEqual({
+    expect(mergeDeep({ nested: { a: 1 }, keep: true }, { nested: { b: 2 }, replace: 'yes' })).toEqual({
       nested: { a: 1, b: 2 },
       keep: true,
       replace: 'yes',

@@ -12,37 +12,45 @@ import {
 
 describe('userPageAnalysisSessionHelpers', () => {
   it('builds AI session scope contexts from scan globals', () => {
-    expect(buildUserPageAiSessionScopeContext({
-      scanScope: ' General ',
-      activeSessionSlug: 'alpha',
-    })).toEqual({
+    expect(
+      buildUserPageAiSessionScopeContext({
+        scanScope: ' General ',
+        activeSessionSlug: 'alpha',
+      }),
+    ).toEqual({
       mode: 'general',
       strict: true,
       allowedSlugs: [''],
     });
 
-    expect(buildUserPageAiSessionScopeContext({
-      scanScope: 'active',
-      activeSessionSlug: ' Alpha Session ',
-    })).toEqual({
+    expect(
+      buildUserPageAiSessionScopeContext({
+        scanScope: 'active',
+        activeSessionSlug: ' Alpha Session ',
+      }),
+    ).toEqual({
       mode: 'active',
       strict: true,
       allowedSlugs: ['Alpha Session'],
     });
 
-    expect(buildUserPageAiSessionScopeContext({
-      scanScope: 'active',
-      activeSessionSlug: '',
-    })).toEqual({
+    expect(
+      buildUserPageAiSessionScopeContext({
+        scanScope: 'active',
+        activeSessionSlug: '',
+      }),
+    ).toEqual({
       mode: 'active',
       strict: false,
       allowedSlugs: [],
     });
 
-    expect(buildUserPageAiSessionScopeContext({
-      scanScope: 'list',
-      scanSlugs: [' Beta ', 'beta', '', 'General'],
-    })).toEqual({
+    expect(
+      buildUserPageAiSessionScopeContext({
+        scanScope: 'list',
+        scanSlugs: [' Beta ', 'beta', '', 'General'],
+      }),
+    ).toEqual({
       mode: 'list',
       strict: true,
       allowedSlugs: ['Beta', 'beta', ''],
@@ -63,19 +71,14 @@ describe('userPageAnalysisSessionHelpers', () => {
       return ['sbt-cache-session'];
     });
 
-    expect(buildUserPageAiSessionSlugCandidates({
-      activeSessionSlug: ' active-session ',
-      listNamespaceSlugs,
-      sbtList: [{ slug: 'minted-session' }, { slug: 'cached-user' }],
-      scopeContext: { mode: 'all', strict: false, allowedSlugs: [] },
-    })).toEqual([
-      'active-session',
-      'cached-user',
-      'survey-session',
-      '',
-      'sbt-cache-session',
-      'minted-session',
-    ]);
+    expect(
+      buildUserPageAiSessionSlugCandidates({
+        activeSessionSlug: ' active-session ',
+        listNamespaceSlugs,
+        sbtList: [{ slug: 'minted-session' }, { slug: 'cached-user' }],
+        scopeContext: { mode: 'all', strict: false, allowedSlugs: [] },
+      }),
+    ).toEqual(['active-session', 'cached-user', 'survey-session', '', 'sbt-cache-session', 'minted-session']);
 
     expect(listNamespaceSlugs).toHaveBeenCalledWith('userCache');
     expect(listNamespaceSlugs).toHaveBeenCalledWith('surveysCache');
@@ -84,84 +87,102 @@ describe('userPageAnalysisSessionHelpers', () => {
   });
 
   it('keeps active AI session candidates eligible under strict scope filters', () => {
-    expect(buildUserPageAiSessionSlugCandidates({
-      activeSessionSlug: 'active-out-of-scope',
-      listNamespaceSlugs: () => ['stale-cache'],
-      scopeContext: {
-        mode: 'list',
-        strict: true,
-        allowedSlugs: ['in-scope'],
-      },
-    })).toEqual(['active-out-of-scope', 'in-scope']);
+    expect(
+      buildUserPageAiSessionSlugCandidates({
+        activeSessionSlug: 'active-out-of-scope',
+        listNamespaceSlugs: () => ['stale-cache'],
+        scopeContext: {
+          mode: 'list',
+          strict: true,
+          allowedSlugs: ['in-scope'],
+        },
+      }),
+    ).toEqual(['active-out-of-scope', 'in-scope']);
 
-    expect(buildUserPageAiSessionSlugCandidates({
-      activeSessionSlug: '',
-      listNamespaceSlugs: () => ['stale-cache'],
-      scopeContext: {
-        mode: 'general',
-        strict: true,
-        allowedSlugs: [''],
-      },
-    })).toEqual(['']);
+    expect(
+      buildUserPageAiSessionSlugCandidates({
+        activeSessionSlug: '',
+        listNamespaceSlugs: () => ['stale-cache'],
+        scopeContext: {
+          mode: 'general',
+          strict: true,
+          allowedSlugs: [''],
+        },
+      }),
+    ).toEqual(['']);
   });
 
   it('resolves question source session slugs from explicit fields, mapped names, safe names, and fallbacks', () => {
-    const getSessionSlugByName = jest.fn((name: unknown) => (
-      name === 'Mapped Session' ? ' mapped-slug ' : null
-    ));
+    const getSessionSlugByName = jest.fn((name: unknown) => (name === 'Mapped Session' ? ' mapped-slug ' : null));
 
-    expect(resolveUserPageQuestionSourceSessionSlug({
-      questionData: { sessionSlug: ' explicit ' },
-      fallbackSlug: 'fallback',
-      getSessionSlugByName,
-    })).toBe('explicit');
-    expect(resolveUserPageQuestionSourceSessionSlug({
-      questionData: { sessionName: 'Mapped Session' },
-      fallbackSlug: 'fallback',
-      getSessionSlugByName,
-    })).toBe('mapped-slug');
-    expect(resolveUserPageQuestionSourceSessionSlug({
-      questionData: { sessionName: 'Safe-Name_1' },
-      fallbackSlug: 'fallback',
-      getSessionSlugByName,
-    })).toBe('Safe-Name_1');
-    expect(resolveUserPageQuestionSourceSessionSlug({
-      questionData: { sessionName: 'Unsafe Name' },
-      fallbackSlug: ' fallback ',
-      getSessionSlugByName,
-    })).toBe('fallback');
+    expect(
+      resolveUserPageQuestionSourceSessionSlug({
+        questionData: { sessionSlug: ' explicit ' },
+        fallbackSlug: 'fallback',
+        getSessionSlugByName,
+      }),
+    ).toBe('explicit');
+    expect(
+      resolveUserPageQuestionSourceSessionSlug({
+        questionData: { sessionName: 'Mapped Session' },
+        fallbackSlug: 'fallback',
+        getSessionSlugByName,
+      }),
+    ).toBe('mapped-slug');
+    expect(
+      resolveUserPageQuestionSourceSessionSlug({
+        questionData: { sessionName: 'Safe-Name_1' },
+        fallbackSlug: 'fallback',
+        getSessionSlugByName,
+      }),
+    ).toBe('Safe-Name_1');
+    expect(
+      resolveUserPageQuestionSourceSessionSlug({
+        questionData: { sessionName: 'Unsafe Name' },
+        fallbackSlug: ' fallback ',
+        getSessionSlugByName,
+      }),
+    ).toBe('fallback');
   });
 
   it('resolves analysis session configs without demo fallback for unknown slugs', () => {
     const defaultConfig = { slug: '', ai: { enabled: true } };
     const alphaConfig = { slug: 'alpha', ai: { enabled: true } };
-    const getSessionConfigBySlug = jest.fn((slug: string) => (
-      slug === 'alpha' ? alphaConfig : null
-    ));
+    const getSessionConfigBySlug = jest.fn((slug: string) => (slug === 'alpha' ? alphaConfig : null));
     const getSessionConfigBySlugOrDefault = jest.fn(() => defaultConfig);
 
-    expect(resolveUserPageAnalysisSessionConfigForSlug({
-      getSessionConfigBySlug,
-      getSessionConfigBySlugOrDefault,
-      slugIn: '',
-    })).toBe(defaultConfig);
-    expect(resolveUserPageAnalysisSessionConfigForSlug({
-      getSessionConfigBySlug,
-      getSessionConfigBySlugOrDefault,
-      slugIn: ' alpha ',
-    })).toBe(alphaConfig);
-    expect(resolveUserPageAnalysisSessionConfigForSlug({
-      getSessionConfigBySlug,
-      getSessionConfigBySlugOrDefault,
-      slugIn: 'missing',
-    })).toBeNull();
+    expect(
+      resolveUserPageAnalysisSessionConfigForSlug({
+        getSessionConfigBySlug,
+        getSessionConfigBySlugOrDefault,
+        slugIn: '',
+      }),
+    ).toBe(defaultConfig);
+    expect(
+      resolveUserPageAnalysisSessionConfigForSlug({
+        getSessionConfigBySlug,
+        getSessionConfigBySlugOrDefault,
+        slugIn: ' alpha ',
+      }),
+    ).toBe(alphaConfig);
+    expect(
+      resolveUserPageAnalysisSessionConfigForSlug({
+        getSessionConfigBySlug,
+        getSessionConfigBySlugOrDefault,
+        slugIn: 'missing',
+      }),
+    ).toBeNull();
     expect(getSessionConfigBySlugOrDefault).toHaveBeenCalledTimes(1);
   });
 
   it('normalizes excluded analysis session slugs', () => {
-    expect(Array.from(buildUserPageAnalysisExcludeSlugSet({
-      excludeSlugs: [' alpha ', null, undefined, '', 'beta'],
-    }).values())).toEqual(['alpha', '', 'beta']);
+    expect(
+      Array.from(
+        buildUserPageAnalysisExcludeSlugSet({
+          excludeSlugs: [' alpha ', null, undefined, '', 'beta'],
+        }).values(),
+      ),
+    ).toEqual(['alpha', '', 'beta']);
     expect(buildUserPageAnalysisExcludeSlugSet({ excludeSlugs: 'alpha' }).size).toBe(0);
   });
 
@@ -170,24 +191,30 @@ describe('userPageAnalysisSessionHelpers', () => {
     const firstUsable = { slug: 'usable', status: 'unknown' };
     const firstChecked = { slug: 'first', status: 'denied' };
 
-    expect(resolveUserPageAnalysisSessionFallback({
-      activeCandidate,
-      checked: [firstChecked],
-      firstUsable,
-    })).toEqual({
+    expect(
+      resolveUserPageAnalysisSessionFallback({
+        activeCandidate,
+        checked: [firstChecked],
+        firstUsable,
+      }),
+    ).toEqual({
       candidate: activeCandidate,
       reason: 'fallback-active-session',
     });
-    expect(resolveUserPageAnalysisSessionFallback({
-      checked: [firstChecked],
-      firstUsable,
-    })).toEqual({
+    expect(
+      resolveUserPageAnalysisSessionFallback({
+        checked: [firstChecked],
+        firstUsable,
+      }),
+    ).toEqual({
       candidate: firstUsable,
       reason: 'fallback-first-usable-session',
     });
-    expect(resolveUserPageAnalysisSessionFallback({
-      checked: [firstChecked],
-    })).toEqual({
+    expect(
+      resolveUserPageAnalysisSessionFallback({
+        checked: [firstChecked],
+      }),
+    ).toEqual({
       candidate: firstChecked,
       reason: 'fallback-first-checked-session',
     });
@@ -195,11 +222,13 @@ describe('userPageAnalysisSessionHelpers', () => {
   });
 
   it('builds analysis candidate log rows with general fallback labels', () => {
-    expect(buildUserPageAnalysisCandidateLogRows([
-      { slug: 'alpha', status: 'granted' },
-      { slug: '', status: 'no-gate' },
-      null,
-    ])).toEqual([
+    expect(
+      buildUserPageAnalysisCandidateLogRows([
+        { slug: 'alpha', status: 'granted' },
+        { slug: '', status: 'no-gate' },
+        null,
+      ]),
+    ).toEqual([
       { slug: 'alpha', status: 'granted' },
       { slug: 'general', status: 'no-gate' },
       { slug: 'general', status: undefined },
@@ -208,21 +237,23 @@ describe('userPageAnalysisSessionHelpers', () => {
   });
 
   it('derives AI context from session config with provider and model precedence', () => {
-    expect(deriveAnalysisAiContextFromSessionConfig('alpha', {
-      ai: {
-        mode: ' Anthropic ',
-        modelProviders: {
-          default: 'openai',
-          reasoning: 'google',
-        },
-        models: {
-          thinking: {
-            provider: ' OpenAI ',
-            model: ' gpt-5.2 ',
+    expect(
+      deriveAnalysisAiContextFromSessionConfig('alpha', {
+        ai: {
+          mode: ' Anthropic ',
+          modelProviders: {
+            default: 'openai',
+            reasoning: 'google',
+          },
+          models: {
+            thinking: {
+              provider: ' OpenAI ',
+              model: ' gpt-5.2 ',
+            },
           },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       sessionSlug: 'alpha',
       provider: 'openai',
       model: 'gpt-5.2',
@@ -240,16 +271,18 @@ describe('userPageAnalysisSessionHelpers', () => {
       provider: ' Anthropic ',
       model: ' claude-sonnet ',
     }));
-    await expect(resolveUserPageAnalysisAiContext({
-      getEffectiveAiConfig,
-      sessionConfig: {
-        ai: {
-          provider: 'openai',
-          models: { thinking: 'gpt-5' },
+    await expect(
+      resolveUserPageAnalysisAiContext({
+        getEffectiveAiConfig,
+        sessionConfig: {
+          ai: {
+            provider: 'openai',
+            models: { thinking: 'gpt-5' },
+          },
         },
-      },
-      sessionSlug: 'alpha',
-    })).resolves.toEqual({
+        sessionSlug: 'alpha',
+      }),
+    ).resolves.toEqual({
       sessionSlug: 'alpha',
       provider: 'anthropic',
       model: 'claude-sonnet',
@@ -261,24 +294,25 @@ describe('userPageAnalysisSessionHelpers', () => {
     });
 
     const logger = { warn: jest.fn() };
-    await expect(resolveUserPageAnalysisAiContext({
-      getEffectiveAiConfig: jest.fn(async () => { throw new Error('offline'); }),
-      logger,
-      sessionConfig: {
-        ai: {
-          provider: 'Google',
-          models: { thinking: { model: 'gemini-pro' } },
+    await expect(
+      resolveUserPageAnalysisAiContext({
+        getEffectiveAiConfig: jest.fn(async () => {
+          throw new Error('offline');
+        }),
+        logger,
+        sessionConfig: {
+          ai: {
+            provider: 'Google',
+            models: { thinking: { model: 'gemini-pro' } },
+          },
         },
-      },
-      sessionSlug: 'beta',
-    })).resolves.toEqual({
+        sessionSlug: 'beta',
+      }),
+    ).resolves.toEqual({
       sessionSlug: 'beta',
       provider: 'google',
       model: 'gemini-pro',
     });
-    expect(logger.warn).toHaveBeenCalledWith(
-      '[UserPage] analysis AI context fallback:',
-      expect.any(Error)
-    );
+    expect(logger.warn).toHaveBeenCalledWith('[UserPage] analysis AI context fallback:', expect.any(Error));
   });
 });

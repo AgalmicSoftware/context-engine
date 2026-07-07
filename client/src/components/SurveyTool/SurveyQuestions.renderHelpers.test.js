@@ -57,9 +57,8 @@ const findElement = (node, predicate) => {
   return null;
 };
 
-const findFirstNodeByType = (node, targetType) => (
-  findElement(node, (candidate) => React.isValidElement(candidate) && candidate.type === targetType)
-);
+const findFirstNodeByType = (node, targetType) =>
+  findElement(node, (candidate) => React.isValidElement(candidate) && candidate.type === targetType);
 
 describe('SurveyQuestions render helpers', () => {
   afterEach(() => {
@@ -100,11 +99,13 @@ describe('SurveyQuestions render helpers', () => {
       busy: true,
       isDecrypting: true,
     });
-    expect(busy).toEqual(expect.objectContaining({
-      busy: true,
-      disabled: true,
-      title: undefined,
-    }));
+    expect(busy).toEqual(
+      expect.objectContaining({
+        busy: true,
+        disabled: true,
+        title: undefined,
+      }),
+    );
 
     const autoDecrypt = buildQuestionFieldDecryptControlDisplayState({
       actionLabel: 'Decrypt Comments',
@@ -116,14 +117,16 @@ describe('SurveyQuestions render helpers', () => {
       showBusySpinnerWhenAutoDecryptEnabled: true,
       wrapperStyle: { marginTop: '4px' },
     });
-    expect(autoDecrypt).toEqual(expect.objectContaining({
-      autoDecryptEnabled: true,
-      busy: true,
-      disabled: true,
-      showBusySpinnerWhenAutoDecryptEnabled: true,
-      title: 'Connect wallet to decrypt',
-      wrapperStyle: { marginTop: '4px' },
-    }));
+    expect(autoDecrypt).toEqual(
+      expect.objectContaining({
+        autoDecryptEnabled: true,
+        busy: true,
+        disabled: true,
+        showBusySpinnerWhenAutoDecryptEnabled: true,
+        title: 'Connect wallet to decrypt',
+        wrapperStyle: { marginTop: '4px' },
+      }),
+    );
   });
 
   it('renders pile additional comments without the extra header and keeps the lock beside the field', () => {
@@ -173,15 +176,16 @@ describe('SurveyQuestions render helpers', () => {
     });
     const button = findElement(
       tree,
-      (node) => React.isValidElement(node) &&
-        node.props['data-testid'] === E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE
+      (node) => React.isValidElement(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE,
     );
 
     expect(button).not.toBeNull();
     expect(button.props['data-ce-question-id']).toBe('q1');
     button.props.onClick();
     expect(onToggleComments).toHaveBeenCalledTimes(1);
-    expect(findElement(tree, (node) => React.isValidElement(node) && node.props['data-testid'] === 'answer-lock')).not.toBeNull();
+    expect(
+      findElement(tree, (node) => React.isValidElement(node) && node.props['data-testid'] === 'answer-lock'),
+    ).not.toBeNull();
   });
 
   it('renders full-question footer icons through the shared footer helper', () => {
@@ -208,7 +212,7 @@ describe('SurveyQuestions render helpers', () => {
           onSelectAudience={jest.fn()}
         />
         <div data-testid="tag-control" data-tags="governance" />
-      </FullQuestionFooterIcons>
+      </FullQuestionFooterIcons>,
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE));
@@ -234,10 +238,12 @@ describe('SurveyQuestions render helpers', () => {
         audioInputWorkerProps={{ workerReady: true }}
         onAnswerChange={(value) => handleAnswer(5, question.id, value)}
         onRatingChange={(value, event) => handleAnswer(5, question.id, value, { persistDraft: true, event })}
-        onDeferredRatingCommit={(value) => handleAnswer(5, question.id, value, {
-          persistDraft: false,
-          afterUpdate: sliderFlush,
-        })}
+        onDeferredRatingCommit={(value) =>
+          handleAnswer(5, question.id, value, {
+            persistDraft: false,
+            afterUpdate: sliderFlush,
+          })
+        }
         onRatingChangeComplete={sliderFlush}
         onToggleAnswerEncryption={(encrypted) => toggleAnswerEncryption(5, question.id, encrypted)}
       />
@@ -281,7 +287,7 @@ describe('SurveyQuestions render helpers', () => {
         onBookmarkToggle={onBookmarkToggle}
         arweaveHref="https://arweave.net/example"
         questionHref="/question/q1?session=edge"
-      />
+      />,
     );
 
     expect(screen.getByLabelText('Checking for existing response')).toBeInTheDocument();
@@ -387,7 +393,7 @@ describe('SurveyQuestions render helpers', () => {
         actionTitle={promptState.noticeActionTitle}
         actionTestId={E2E_TESTIDS.SURVEY_DECRYPT_PROMPT_NOTICE}
         onAction={onAction}
-      />
+      />,
     );
 
     expect(screen.getByText(/Requires/i)).toBeInTheDocument();
@@ -402,11 +408,11 @@ describe('SurveyQuestions render helpers', () => {
   it('renders encrypted full-question fields as disabled decrypt controls without a decrypt context', () => {
     const answerDecryptState = buildFieldDecryptState(
       { value: '*', encrypted: true },
-      { loginComplete: false, account: '', busy: false }
+      { loginComplete: false, account: '', busy: false },
     );
     const commentsDecryptState = buildFieldDecryptState(
       { value: '*', encrypted: true },
-      { loginComplete: false, account: '', busy: false }
+      { loginComplete: false, account: '', busy: false },
     );
     const answerControl = buildQuestionFieldDecryptControlDisplayState({
       actionLabel: 'Decrypt Answer',
@@ -434,19 +440,21 @@ describe('SurveyQuestions render helpers', () => {
       <>
         <QuestionDecryptControl {...answerControl} />
         <QuestionDecryptControl {...commentsControl} />
-      </>
+      </>,
     );
 
     expect(screen.getByRole('button', { name: 'Decrypt Answer' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Decrypt Answer' })).toHaveAttribute(
       'title',
-      'Login to decrypt this encrypted field.'
+      'Login to decrypt this encrypted field.',
     );
     expect(screen.getByRole('button', { name: 'Decrypt Comments' })).toBeDisabled();
-    expect(lockState).toEqual(expect.objectContaining({
-      lockDisabled: true,
-      lockTitle: 'Encrypted answer',
-    }));
+    expect(lockState).toEqual(
+      expect.objectContaining({
+        lockDisabled: true,
+        lockTitle: 'Encrypted answer',
+      }),
+    );
   });
 
   it('wires enabled encrypted field decrypt controls to answer and comment handlers', () => {
@@ -475,7 +483,7 @@ describe('SurveyQuestions render helpers', () => {
           })}
           onClick={() => onDecrypt('q1', 'additional')}
         />
-      </>
+      </>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Decrypt Answer' }));
@@ -491,14 +499,14 @@ describe('SurveyQuestions render helpers', () => {
       singleQuestionMode: false,
     });
     const lockedBanner = <div data-testid="locked-banner">Locked banner</div>;
-    const tree = visibility.visibleQuestionPool.length > 0
-      ? <div data-testid="editable-card" />
-      : lockedBanner;
+    const tree = visibility.visibleQuestionPool.length > 0 ? <div data-testid="editable-card" /> : lockedBanner;
 
     expect(visibility.hiddenMaskedQuestionIds).toEqual(['q-locked']);
     expect(visibility.visibleQuestionPool).toEqual([]);
     expect(tree).toBe(lockedBanner);
-    expect(findElement(tree, (node) => React.isValidElement(node) && node.props['data-testid'] === 'editable-card')).toBeNull();
+    expect(
+      findElement(tree, (node) => React.isValidElement(node) && node.props['data-testid'] === 'editable-card'),
+    ).toBeNull();
   });
 
   it('renders pile freeform answers with the shared audio field input wrapper', () => {
@@ -523,11 +531,11 @@ describe('SurveyQuestions render helpers', () => {
   it('routes pile encrypted answer and comments through the shared decrypt control wrapper', () => {
     const answerDecryptState = buildFieldDecryptState(
       { value: '*', encrypted: true, encryptedPortion: '{}' },
-      { loginComplete: true, account: '0xabc', busy: false }
+      { loginComplete: true, account: '0xabc', busy: false },
     );
     const additionalDecryptState = buildFieldDecryptState(
       { value: '*', encrypted: true, encryptedPortion: '{}' },
-      { loginComplete: true, account: '0xabc', busy: false }
+      { loginComplete: true, account: '0xabc', busy: false },
     );
     const fieldDisplay = buildQuestionFieldDisplayState({
       answer: { value: '*', encrypted: true, encryptedPortion: '{}' },

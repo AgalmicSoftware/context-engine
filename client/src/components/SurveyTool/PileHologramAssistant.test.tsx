@@ -1,6 +1,4 @@
-import PileHologramAssistant, {
-  resolvePileHologramMeshLineStyle,
-} from './PileHologramAssistant';
+import PileHologramAssistant, { resolvePileHologramMeshLineStyle } from './PileHologramAssistant';
 
 const nodeHasClassName = (node: any, className: string): boolean => {
   const value = node?.props?.className;
@@ -45,14 +43,8 @@ const findNodeByClassName = (node: any, className: string): any => {
 describe('PileHologramAssistant', () => {
   it('renders a denser hologram mesh with dedicated depth layers', () => {
     const tree = PileHologramAssistant();
-    const meshLineCount = countElements(
-      tree,
-      (node) => nodeHasClassName(node, 'pileHologramMeshLine')
-    );
-    const contourCount = countElements(
-      tree,
-      (node) => nodeHasClassName(node, 'pileHologramContourLine')
-    );
+    const meshLineCount = countElements(tree, (node) => nodeHasClassName(node, 'pileHologramMeshLine'));
+    const contourCount = countElements(tree, (node) => nodeHasClassName(node, 'pileHologramContourLine'));
 
     expect(meshLineCount).toBeGreaterThanOrEqual(30);
     expect(contourCount).toBeGreaterThanOrEqual(5);

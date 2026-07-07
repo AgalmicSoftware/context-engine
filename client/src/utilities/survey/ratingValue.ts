@@ -1,14 +1,9 @@
 export const RATING_MIN = 0;
 export const RATING_MAX = 10;
 
-const isBlankRatingValue = (value: unknown): value is string => (
-  typeof value === 'string' && value.trim() === ''
-);
+const isBlankRatingValue = (value: unknown): value is string => typeof value === 'string' && value.trim() === '';
 
-export const normalizeRatingValue = (
-  rawValue: unknown,
-  fallback: number | null = null
-): number | null => {
+export const normalizeRatingValue = (rawValue: unknown, fallback: number | null = null): number | null => {
   if (rawValue === undefined || rawValue === null || isBlankRatingValue(rawValue)) {
     return fallback;
   }

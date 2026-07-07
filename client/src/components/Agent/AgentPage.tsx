@@ -88,14 +88,10 @@ export default function AgentPage() {
     }
   }, [agent]);
   const actionLabels = Array.isArray(agentContract?.actions)
-    ? agentContract.actions
-        .map((action) => toStr(action?.type).trim())
-        .filter(Boolean)
+    ? agentContract.actions.map((action) => toStr(action?.type).trim()).filter(Boolean)
     : [];
   const toolLabels = Array.isArray(agentContract?.tools)
-    ? agentContract.tools
-        .map((tool) => toStr(tool?.name).trim())
-        .filter(Boolean)
+    ? agentContract.tools.map((tool) => toStr(tool?.name).trim()).filter(Boolean)
     : [];
 
   const startAsyncAction = () => {
@@ -103,9 +99,7 @@ export default function AgentPage() {
     return asyncActionSeqRef.current;
   };
 
-  const canUpdateForSeq = (seq: number) => (
-    mountedRef.current && asyncActionSeqRef.current === seq
-  );
+  const canUpdateForSeq = (seq: number) => mountedRef.current && asyncActionSeqRef.current === seq;
 
   const appendLog = (entry: Record<string, unknown> & { kind: string }, seq?: number) => {
     if (!mountedRef.current) return;
@@ -128,7 +122,9 @@ export default function AgentPage() {
     try {
       const agentNow = readAgent();
       if (!agentNow || typeof agentNow.run !== 'function') {
-        throw new Error('Agent Mode is not enabled. Add `?agent=1` or set localStorage `ce-agent-enabled=1`, then reload.');
+        throw new Error(
+          'Agent Mode is not enabled. Add `?agent=1` or set localStorage `ce-agent-enabled=1`, then reload.',
+        );
       }
       const actions = parseActionsOrThrow();
       appendLog({ kind: 'run:start', actions: actions.length }, seq);
@@ -144,7 +140,9 @@ export default function AgentPage() {
     try {
       const agentNow = readAgent();
       if (!agentNow || typeof agentNow.perform !== 'function') {
-        throw new Error('Agent Mode is not enabled. Add `?agent=1` or set localStorage `ce-agent-enabled=1`, then reload.');
+        throw new Error(
+          'Agent Mode is not enabled. Add `?agent=1` or set localStorage `ce-agent-enabled=1`, then reload.',
+        );
       }
       const actions = parseActionsOrThrow();
       if (stepIdx >= actions.length) {
@@ -172,16 +170,19 @@ export default function AgentPage() {
         </div>
         {agentState && (
           <div>
-            <strong>State:</strong> <code>{toStr(agentState.route)}</code> {' '}
-            {agentState.account ? <span>(wallet: <code>{toStr(agentState.account)}</code>)</span> : null}
+            <strong>State:</strong> <code>{toStr(agentState.route)}</code>{' '}
+            {agentState.account ? (
+              <span>
+                (wallet: <code>{toStr(agentState.account)}</code>)
+              </span>
+            ) : null}
           </div>
         )}
         {agentContract && (
           <>
             <div>
-              <strong>Contract:</strong> <code>v{toStr(agentContract.version || '1')}</code> {' '}
-              <span>{actionLabels.length} actions</span> {' '}
-              <span>· {toolLabels.length} tools</span>
+              <strong>Contract:</strong> <code>v{toStr(agentContract.version || '1')}</code>{' '}
+              <span>{actionLabels.length} actions</span> <span>· {toolLabels.length} tools</span>
             </div>
             {actionLabels.length ? (
               <div>
@@ -211,7 +212,8 @@ export default function AgentPage() {
             border: '1px solid rgba(255,255,255,0.18)',
             background: 'rgba(0,0,0,0.35)',
             color: '#fff',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            fontFamily:
+              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
             fontSize: 12,
             lineHeight: 1.35,
           }}
@@ -261,7 +263,8 @@ export default function AgentPage() {
             border: '1px solid rgba(255,255,255,0.18)',
             background: 'rgba(0,0,0,0.35)',
             color: '#fff',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            fontFamily:
+              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
             fontSize: 12,
             lineHeight: 1.35,
             maxHeight: 360,

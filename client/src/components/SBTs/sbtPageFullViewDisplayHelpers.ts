@@ -1,12 +1,5 @@
-import {
-  getSbtDescriptionText,
-  getSbtDisplayName,
-  isSbtFieldLocked,
-} from '../../utilities/sbt/sbtDisplayNames.js';
-import {
-  getDisplayImageRenderState,
-  type SbtPageDisplayImageState,
-} from './sbtPageMediaHelpers';
+import { getSbtDescriptionText, getSbtDisplayName, isSbtFieldLocked } from '../../utilities/sbt/sbtDisplayNames.js';
+import { getDisplayImageRenderState, type SbtPageDisplayImageState } from './sbtPageMediaHelpers';
 
 type ResolveSbtPageFullViewShellStateArgs = {
   error?: unknown;
@@ -91,9 +84,7 @@ export const resolveSbtPageIdentityPanelDisplayState = ({
     ? getDisplayImageRenderState(sbtInfo as Record<string, unknown>, fallbackState, fallbackImage)
     : null;
   const nameText = getSbtDisplayName(sbtInfo) || String(unnamedLabel || '');
-  const rawDescription = sbtInfo && typeof sbtInfo === 'object'
-    ? (sbtInfo as Record<string, unknown>).description
-    : '';
+  const rawDescription = sbtInfo && typeof sbtInfo === 'object' ? (sbtInfo as Record<string, unknown>).description : '';
 
   return {
     descriptionText: getSbtDescriptionText(sbtInfo),
@@ -119,10 +110,8 @@ export const resolveSbtPageSectionToggleDisplayState = ({
 export const buildSbtPageSectionHeaderClassName = ({
   baseClassName = '',
   roundedClassName = '',
-}: BuildSbtPageSectionHeaderClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  String(roundedClassName || ''),
-].filter(Boolean).join(' '));
+}: BuildSbtPageSectionHeaderClassNameArgs = {}): string =>
+  [String(baseClassName || ''), String(roundedClassName || '')].filter(Boolean).join(' ');
 
 export const resolveSbtPageBookmarkButtonDisplayState = ({
   bookmarked = false,
@@ -172,9 +161,7 @@ export const resolveSbtPageCopyIconState = ({
   targetKey = '',
 }: ResolveSbtPageCopyIconStateArgs = {}): SbtPageCopyIconState => {
   const target = String(targetKey || '');
-  const isCopied = typeof copied !== 'undefined'
-    ? !!copied
-    : !!target && String(copiedAddress || '') === target;
+  const isCopied = typeof copied !== 'undefined' ? !!copied : !!target && String(copiedAddress || '') === target;
   return {
     shouldRenderCopiedIcon: isCopied,
     shouldRenderDefaultIcon: !isCopied,

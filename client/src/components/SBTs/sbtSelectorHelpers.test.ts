@@ -120,16 +120,15 @@ import {
 
 describe('sbtSelectorHelpers', () => {
   it('builds unique selected SBT hydration addresses from valid selected entries', () => {
-    expect(buildSelectedSbtHydrationAddresses([
-      { address: ' 0x0000000000000000000000000000000000000001 ' },
-      { address: '0x0000000000000000000000000000000000000001' },
-      { address: 'not-an-address' },
-      null,
-      { address: '0x0000000000000000000000000000000000000002' },
-    ])).toEqual([
-      '0x0000000000000000000000000000000000000001',
-      '0x0000000000000000000000000000000000000002',
-    ]);
+    expect(
+      buildSelectedSbtHydrationAddresses([
+        { address: ' 0x0000000000000000000000000000000000000001 ' },
+        { address: '0x0000000000000000000000000000000000000001' },
+        { address: 'not-an-address' },
+        null,
+        { address: '0x0000000000000000000000000000000000000002' },
+      ]),
+    ).toEqual(['0x0000000000000000000000000000000000000001', '0x0000000000000000000000000000000000000002']);
     expect(buildSelectedSbtHydrationAddresses('bad')).toEqual([]);
   });
 
@@ -138,24 +137,27 @@ describe('sbtSelectorHelpers', () => {
     expect(normalizeSessionSlugListForSig([' Edge ', 'Edge', ''])).toEqual(['Edge', '']);
     expect(buildSessionSlugSignature(['a', 'b'])).toBe('a,b');
     expect(buildSharedLightUniverseKickoffSignature(['Beta', 'Alpha', 'Alpha', 'General'])).toBe('3:,Alpha,Beta');
-    expect(buildSbtSelectorLogContext({
-      effectiveSessionSlug: ' Edge Session ',
-      extra: { scopeMode: 'targeted' },
-      id: ' selector-a ',
-      label: 'Selector A',
-    })).toEqual({
+    expect(
+      buildSbtSelectorLogContext({
+        effectiveSessionSlug: ' Edge Session ',
+        extra: { scopeMode: 'targeted' },
+        id: ' selector-a ',
+        label: 'Selector A',
+      }),
+    ).toEqual({
       selectorId: 'selector-a',
       effectiveSessionSlug: 'Edge Session',
       scopeMode: 'targeted',
     });
-    expect(buildSbtSelectorLogContext({
-      effectiveSessionSlug: '',
-      label: '  ',
-    })?.selectorId).toBe('unnamed-selector');
-    expect(buildTargetSlugChainSignature(
-      ['Alpha', 'General', 'Alpha'],
-      (slug) => (slug ? `${slug.length}` : '11155420')
-    )).toBe('Alpha:5|:11155420');
+    expect(
+      buildSbtSelectorLogContext({
+        effectiveSessionSlug: '',
+        label: '  ',
+      })?.selectorId,
+    ).toBe('unnamed-selector');
+    expect(
+      buildTargetSlugChainSignature(['Alpha', 'General', 'Alpha'], (slug) => (slug ? `${slug.length}` : '11155420')),
+    ).toBe('Alpha:5|:11155420');
     expect(normalizeChainValue('84532')).toBe(84532);
     expect(normalizeChainValue(0)).toBeNull();
     expect(buildSbtLookupKey({ address: ' 0xABC ', chainId: '84532' })).toBe('84532:0xabc');
@@ -167,26 +169,32 @@ describe('sbtSelectorHelpers', () => {
 
   it('normalizes selectable SBT addresses and keys', () => {
     expect(normalizeSelectableSbtAddress(' 0x000000000000000000000000000000000000000A ')).toBe(
-      '0x000000000000000000000000000000000000000a'
+      '0x000000000000000000000000000000000000000a',
     );
     expect(normalizeSelectableSbtAddress('not-an-address')).toBe('');
-    expect(getSelectableSbtKey({
-      address: '0x000000000000000000000000000000000000000A',
-      chainId: '84532',
-    })).toBe('84532:0x000000000000000000000000000000000000000a');
-    expect(getSelectableSbtKey({
-      sbtAddress: '0x000000000000000000000000000000000000000B',
-      sbtInfo: { chainID: '11155420' },
-    })).toBe('11155420:0x000000000000000000000000000000000000000b');
-    expect(getSelectableSbtKey({
-      selectionKey: 'custom-key',
-      address: '0x000000000000000000000000000000000000000A',
-    })).toBe('custom-key');
+    expect(
+      getSelectableSbtKey({
+        address: '0x000000000000000000000000000000000000000A',
+        chainId: '84532',
+      }),
+    ).toBe('84532:0x000000000000000000000000000000000000000a');
+    expect(
+      getSelectableSbtKey({
+        sbtAddress: '0x000000000000000000000000000000000000000B',
+        sbtInfo: { chainID: '11155420' },
+      }),
+    ).toBe('11155420:0x000000000000000000000000000000000000000b');
+    expect(
+      getSelectableSbtKey({
+        selectionKey: 'custom-key',
+        address: '0x000000000000000000000000000000000000000A',
+      }),
+    ).toBe('custom-key');
     expect(getSelectableSbtKey('84532:0x000000000000000000000000000000000000000A')).toBe(
-      '84532:0x000000000000000000000000000000000000000a'
+      '84532:0x000000000000000000000000000000000000000a',
     );
     expect(getSelectableSbtKey('0x000000000000000000000000000000000000000A')).toBe(
-      '0x000000000000000000000000000000000000000a'
+      '0x000000000000000000000000000000000000000a',
     );
     expect(getSelectableSbtKey('bad')).toBe('');
     expect(getSelectOptionValue({ value: 'fallback-value' })).toBe('fallback-value');
@@ -229,38 +237,58 @@ describe('sbtSelectorHelpers', () => {
       '0x000000000000000000000000000000000000000a',
       '0x000000000000000000000000000000000000000b',
     ]);
-    expect(hasSelectedOrPendingSbtSelectorAddress({
-      address: '0x000000000000000000000000000000000000000A',
-      selectedAddresses: new Set(['0x000000000000000000000000000000000000000a']),
-    })).toBe(true);
-    expect(hasSelectedOrPendingSbtSelectorAddress({
-      address: '0x000000000000000000000000000000000000000C',
-      pendingAddresses: new Set(['0x000000000000000000000000000000000000000c']),
-    })).toBe(true);
-    expect(hasSelectedOrPendingSbtSelectorAddress({
-      address: 'bad',
-      pendingAddresses: new Set(['bad']),
-    })).toBe(false);
-    expect(hasSelectedOrPendingSbtSelectorKey({
-      value: first,
-      selectedKeys: new Set(['first-key']),
-    })).toBe(true);
-    expect(hasSelectedOrPendingSbtSelectorKey({
-      value: second,
-      pendingKeys: new Set(['84532:0x000000000000000000000000000000000000000b']),
-    })).toBe(true);
-    expect(hasSelectedOrPendingSbtSelectorKey({
-      value: 'bad',
-      pendingKeys: new Set(['bad']),
-    })).toBe(false);
-    expect(Array.from(buildEffectiveFeaturedAddressSet({
-      scopeFeaturedAddresses: ['0x000000000000000000000000000000000000000C'],
-      defaultFeaturedSBTs: ['0x000000000000000000000000000000000000000D'],
-    }))).toEqual(['0x000000000000000000000000000000000000000c']);
-    expect(Array.from(buildEffectiveFeaturedAddressSet({
-      scopeFeaturedAddresses: [],
-      defaultFeaturedSBTs: ['0x000000000000000000000000000000000000000D'],
-    }))).toEqual(['0x000000000000000000000000000000000000000d']);
+    expect(
+      hasSelectedOrPendingSbtSelectorAddress({
+        address: '0x000000000000000000000000000000000000000A',
+        selectedAddresses: new Set(['0x000000000000000000000000000000000000000a']),
+      }),
+    ).toBe(true);
+    expect(
+      hasSelectedOrPendingSbtSelectorAddress({
+        address: '0x000000000000000000000000000000000000000C',
+        pendingAddresses: new Set(['0x000000000000000000000000000000000000000c']),
+      }),
+    ).toBe(true);
+    expect(
+      hasSelectedOrPendingSbtSelectorAddress({
+        address: 'bad',
+        pendingAddresses: new Set(['bad']),
+      }),
+    ).toBe(false);
+    expect(
+      hasSelectedOrPendingSbtSelectorKey({
+        value: first,
+        selectedKeys: new Set(['first-key']),
+      }),
+    ).toBe(true);
+    expect(
+      hasSelectedOrPendingSbtSelectorKey({
+        value: second,
+        pendingKeys: new Set(['84532:0x000000000000000000000000000000000000000b']),
+      }),
+    ).toBe(true);
+    expect(
+      hasSelectedOrPendingSbtSelectorKey({
+        value: 'bad',
+        pendingKeys: new Set(['bad']),
+      }),
+    ).toBe(false);
+    expect(
+      Array.from(
+        buildEffectiveFeaturedAddressSet({
+          scopeFeaturedAddresses: ['0x000000000000000000000000000000000000000C'],
+          defaultFeaturedSBTs: ['0x000000000000000000000000000000000000000D'],
+        }),
+      ),
+    ).toEqual(['0x000000000000000000000000000000000000000c']);
+    expect(
+      Array.from(
+        buildEffectiveFeaturedAddressSet({
+          scopeFeaturedAddresses: [],
+          defaultFeaturedSBTs: ['0x000000000000000000000000000000000000000D'],
+        }),
+      ),
+    ).toEqual(['0x000000000000000000000000000000000000000d']);
   });
 
   it('merges selectable options while preserving cached address precedence', () => {
@@ -268,52 +296,62 @@ describe('sbtSelectorHelpers', () => {
     const duplicateAdditional = { address: '0x000000000000000000000000000000000000000a', name: 'Additional duplicate' };
     const newAdditional = { address: '0x000000000000000000000000000000000000000B', name: 'Additional' };
 
-    expect(buildSbtSelectorMergedSelectableOptions({
-      sbtOptions: [cached],
-      additionalOptions: [duplicateAdditional, newAdditional],
-    })).toEqual([cached, newAdditional]);
-    expect(buildSbtSelectorMergedSelectableOptions({
-      sbtOptions: 'bad',
-      additionalOptions: [newAdditional],
-    })).toEqual([newAdditional]);
+    expect(
+      buildSbtSelectorMergedSelectableOptions({
+        sbtOptions: [cached],
+        additionalOptions: [duplicateAdditional, newAdditional],
+      }),
+    ).toEqual([cached, newAdditional]);
+    expect(
+      buildSbtSelectorMergedSelectableOptions({
+        sbtOptions: 'bad',
+        additionalOptions: [newAdditional],
+      }),
+    ).toEqual([newAdditional]);
   });
 
   it('resolves display options using scope featured entries before defaults', () => {
     const optionA = { address: '0x000000000000000000000000000000000000000A', name: 'A' };
     const optionB = { address: '0x000000000000000000000000000000000000000B', name: 'B' };
 
-    expect(resolveSbtSelectorDisplayOptions({
-      defaultFeaturedSBTs: ['0x000000000000000000000000000000000000000A'],
-      limitToFeatured: true,
-      mergedSbtOptions: [optionA, optionB],
-      scopeFeaturedAddresses: ['0x000000000000000000000000000000000000000B'],
-    })).toEqual({
+    expect(
+      resolveSbtSelectorDisplayOptions({
+        defaultFeaturedSBTs: ['0x000000000000000000000000000000000000000A'],
+        limitToFeatured: true,
+        mergedSbtOptions: [optionA, optionB],
+        scopeFeaturedAddresses: ['0x000000000000000000000000000000000000000B'],
+      }),
+    ).toEqual({
       displayOptions: [optionB],
       effectiveFeatured: ['0x000000000000000000000000000000000000000B'],
       hasFeaturedSBTs: true,
     });
-    expect(resolveSbtSelectorDisplayOptions({
-      defaultFeaturedSBTs: ['0x000000000000000000000000000000000000000A'],
-      limitToFeatured: false,
-      mergedSbtOptions: [optionA, optionB],
-      scopeFeaturedAddresses: [],
-    }).displayOptions).toEqual([optionA, optionB]);
+    expect(
+      resolveSbtSelectorDisplayOptions({
+        defaultFeaturedSBTs: ['0x000000000000000000000000000000000000000A'],
+        limitToFeatured: false,
+        mergedSbtOptions: [optionA, optionB],
+        scopeFeaturedAddresses: [],
+      }).displayOptions,
+    ).toEqual([optionA, optionB]);
   });
 
   it('builds react-select options from display SBT options', () => {
-    expect(buildSbtSelectorSelectOptions([
-      {
-        address: '0x000000000000000000000000000000000000000A',
-        chainId: 84532,
-        image: 'badge.png',
-        name: 'Alpha',
-      },
-      {
-        address: '0x000000000000000000000000000000000000000B',
-        name: null,
-        selectionKey: 'custom-selection',
-      },
-    ])).toEqual([
+    expect(
+      buildSbtSelectorSelectOptions([
+        {
+          address: '0x000000000000000000000000000000000000000A',
+          chainId: 84532,
+          image: 'badge.png',
+          name: 'Alpha',
+        },
+        {
+          address: '0x000000000000000000000000000000000000000B',
+          name: null,
+          selectionKey: 'custom-selection',
+        },
+      ]),
+    ).toEqual([
       {
         value: '0x000000000000000000000000000000000000000A',
         selectionKey: '84532:0x000000000000000000000000000000000000000a',
@@ -333,13 +371,15 @@ describe('sbtSelectorHelpers', () => {
   });
 
   it('normalizes additional SBT options', () => {
-    expect(normalizeAdditionalSbtOptions([
-      { sbtAddress: ' 0xabc ', label: 'Labelled' },
-      { value: '0xdef' },
-      { name: 'Named', address: '0x123' },
-      { label: 'missing address' },
-      null,
-    ])).toEqual([
+    expect(
+      normalizeAdditionalSbtOptions([
+        { sbtAddress: ' 0xabc ', label: 'Labelled' },
+        { value: '0xdef' },
+        { name: 'Named', address: '0x123' },
+        { label: 'missing address' },
+        null,
+      ]),
+    ).toEqual([
       { sbtAddress: ' 0xabc ', label: 'Labelled', address: '0xabc', name: 'Labelled' },
       { value: '0xdef', address: '0xdef', name: '0xdef' },
       { name: 'Named', address: '0x123' },
@@ -399,7 +439,7 @@ describe('sbtSelectorHelpers', () => {
     expect(resolveSbtLabel).toHaveBeenCalledWith(
       { title: 'Fallback Badge' },
       '0x000000000000000000000000000000000000000b',
-      'Current'
+      'Current',
     );
   });
 
@@ -428,16 +468,20 @@ describe('sbtSelectorHelpers', () => {
       shouldAttachTextTestId: false,
       shouldUseCompactClass: true,
     });
-    expect(buildSbtSelectorLoadingStatusClassName({
-      baseClassName: 'loading-status',
-      compactClassName: 'loading-status-compact',
-      shouldUseCompactClass: false,
-    })).toBe('loading-status');
-    expect(buildSbtSelectorLoadingStatusClassName({
-      baseClassName: 'loading-status',
-      compactClassName: 'loading-status-compact',
-      shouldUseCompactClass: true,
-    })).toBe('loading-status loading-status-compact');
+    expect(
+      buildSbtSelectorLoadingStatusClassName({
+        baseClassName: 'loading-status',
+        compactClassName: 'loading-status-compact',
+        shouldUseCompactClass: false,
+      }),
+    ).toBe('loading-status');
+    expect(
+      buildSbtSelectorLoadingStatusClassName({
+        baseClassName: 'loading-status',
+        compactClassName: 'loading-status-compact',
+        shouldUseCompactClass: true,
+      }),
+    ).toBe('loading-status loading-status-compact');
     expect(resolveSbtSelectorHeaderLoadingStatusState({ isLoading: true })).toEqual({
       shouldRenderHeaderLoadingStatus: true,
     });
@@ -460,53 +504,67 @@ describe('sbtSelectorHelpers', () => {
       slug: 'Alpha',
     };
 
-    expect(resolveSbtSelectorSessionNetworkId({
-      ...baseArgs,
-      propsSessionConfig: { networkChainId: '999' },
-      shouldUsePropsSessionConfig: true,
-    })).toBe(999);
-    expect(resolveSbtSelectorSessionNetworkId({
-      ...baseArgs,
-      displayLookupSessionConfig: { networkChainId: 777 },
-      getSessionChainId: () => null,
-    })).toBe(777);
-    expect(resolveSbtSelectorSessionNetworkId({
-      ...baseArgs,
-      displayLookupSessionConfig: { __registry: { chainId: 778 } },
-      getSessionChainId: () => null,
-    })).toBe(778);
-    expect(resolveSbtSelectorSessionNetworkId({
-      ...baseArgs,
-      displayLookupSessionConfig: { contracts: { sbtFactory: { chainId: 779 } } },
-      getSessionChainId: () => null,
-    })).toBe(779);
-    expect(resolveSbtSelectorSessionNetworkId({
-      ...baseArgs,
-      getSessionChainId: () => null,
-      directChainId: '',
-    })).toBe(10);
-    expect(resolveSbtSelectorSessionNetworkId({
-      defaultFallbackChainId: 11155420,
-      getNormalizedNetworkChainValue: () => null,
-      getSessionChainId: () => null,
-    })).toBe(11155420);
+    expect(
+      resolveSbtSelectorSessionNetworkId({
+        ...baseArgs,
+        propsSessionConfig: { networkChainId: '999' },
+        shouldUsePropsSessionConfig: true,
+      }),
+    ).toBe(999);
+    expect(
+      resolveSbtSelectorSessionNetworkId({
+        ...baseArgs,
+        displayLookupSessionConfig: { networkChainId: 777 },
+        getSessionChainId: () => null,
+      }),
+    ).toBe(777);
+    expect(
+      resolveSbtSelectorSessionNetworkId({
+        ...baseArgs,
+        displayLookupSessionConfig: { __registry: { chainId: 778 } },
+        getSessionChainId: () => null,
+      }),
+    ).toBe(778);
+    expect(
+      resolveSbtSelectorSessionNetworkId({
+        ...baseArgs,
+        displayLookupSessionConfig: { contracts: { sbtFactory: { chainId: 779 } } },
+        getSessionChainId: () => null,
+      }),
+    ).toBe(779);
+    expect(
+      resolveSbtSelectorSessionNetworkId({
+        ...baseArgs,
+        getSessionChainId: () => null,
+        directChainId: '',
+      }),
+    ).toBe(10);
+    expect(
+      resolveSbtSelectorSessionNetworkId({
+        defaultFallbackChainId: 11155420,
+        getNormalizedNetworkChainValue: () => null,
+        getSessionChainId: () => null,
+      }),
+    ).toBe(11155420);
   });
 
   it('builds selector metadata lookup config with merged contracts and chain context', () => {
-    expect(buildSbtSelectorMetadataLookupConfig({
-      baseConfig: {
-        sessionName: 'Base',
-        contracts: { sbtFactory: { address: '0xBase' } },
-        __registry: { source: 'base' },
-      },
-      chainId: 84532,
-      propsConfig: {
-        sessionName: 'Props',
-        contracts: { surveys: { address: '0xSurvey' } },
-      },
-      sessionSlug: 'Alpha',
-      shouldUsePropsConfig: true,
-    })).toEqual({
+    expect(
+      buildSbtSelectorMetadataLookupConfig({
+        baseConfig: {
+          sessionName: 'Base',
+          contracts: { sbtFactory: { address: '0xBase' } },
+          __registry: { source: 'base' },
+        },
+        chainId: 84532,
+        propsConfig: {
+          sessionName: 'Props',
+          contracts: { surveys: { address: '0xSurvey' } },
+        },
+        sessionSlug: 'Alpha',
+        shouldUsePropsConfig: true,
+      }),
+    ).toEqual({
       sessionName: 'Props',
       slug: 'Alpha',
       networkChainId: 84532,
@@ -516,42 +574,54 @@ describe('sbtSelectorHelpers', () => {
       },
       __registry: { source: 'base', chainId: 84532 },
     });
-    expect(buildSbtSelectorMetadataLookupConfig({
-      baseConfig: {
-        networkChainId: 10,
-        __registry: { chainId: 10 },
-      },
-      propsConfig: {
-        networkChainId: 84532,
-      },
-      sessionSlug: null,
-      shouldUsePropsConfig: false,
-    })).toEqual({
+    expect(
+      buildSbtSelectorMetadataLookupConfig({
+        baseConfig: {
+          networkChainId: 10,
+          __registry: { chainId: 10 },
+        },
+        propsConfig: {
+          networkChainId: 84532,
+        },
+        sessionSlug: null,
+        shouldUsePropsConfig: false,
+      }),
+    ).toEqual({
       slug: '',
       networkChainId: 10,
       contracts: {},
       __registry: { chainId: 10 },
     });
-    expect(buildSbtSelectorDiscoverySessionRef({
-      metadataLookupConfig: { sessionName: 'Base', slug: 'Old' },
-      sessionSlug: 'Alpha',
-    })).toEqual({ sessionName: 'Base', slug: 'Alpha' });
-    expect(buildSbtSelectorDiscoverySessionRef({
-      metadataLookupConfig: null,
-      sessionSlug: null,
-    })).toEqual({ slug: '' });
-    expect(resolveSbtSelectorSessionLabel({
-      sessionConfig: { sessionName: 'Alpha Session' },
-      sessionSlug: 'alpha',
-    })).toBe('Alpha Session (alpha)');
-    expect(resolveSbtSelectorSessionLabel({
-      sessionConfig: { sessionName: 'alpha' },
-      sessionSlug: 'alpha',
-    })).toBe('alpha');
-    expect(resolveSbtSelectorSessionLabel({
-      sessionConfig: {},
-      sessionSlug: '',
-    })).toBe('General');
+    expect(
+      buildSbtSelectorDiscoverySessionRef({
+        metadataLookupConfig: { sessionName: 'Base', slug: 'Old' },
+        sessionSlug: 'Alpha',
+      }),
+    ).toEqual({ sessionName: 'Base', slug: 'Alpha' });
+    expect(
+      buildSbtSelectorDiscoverySessionRef({
+        metadataLookupConfig: null,
+        sessionSlug: null,
+      }),
+    ).toEqual({ slug: '' });
+    expect(
+      resolveSbtSelectorSessionLabel({
+        sessionConfig: { sessionName: 'Alpha Session' },
+        sessionSlug: 'alpha',
+      }),
+    ).toBe('Alpha Session (alpha)');
+    expect(
+      resolveSbtSelectorSessionLabel({
+        sessionConfig: { sessionName: 'alpha' },
+        sessionSlug: 'alpha',
+      }),
+    ).toBe('alpha');
+    expect(
+      resolveSbtSelectorSessionLabel({
+        sessionConfig: {},
+        sessionSlug: '',
+      }),
+    ).toBe('General');
   });
 
   it('normalizes selector slugs and scoped ignore keys', () => {
@@ -574,24 +644,33 @@ describe('sbtSelectorHelpers', () => {
     expect(resolvePropSessionSlug({ sessionSlug: 'General', activeSessionSlug: 'Beta' })).toBe('');
     expect(normalizeDiscoverySlugs(['Alpha', 'Alpha', 'General', null], { allowEmpty: true })).toEqual(['Alpha', '']);
     expect(normalizeDiscoverySlugs(['Alpha', 'General', null], { allowEmpty: false })).toEqual(['Alpha']);
-    expect(Array.from(buildSbtSelectorListScopeTargetSlugSet({
-      fallbackSlug: 'Fallback',
-      scopeMode: 'list',
-      targetSlugs: ['Alpha', 'Alpha', null],
-    }) || [])).toEqual(['Alpha', '']);
-    expect(Array.from(buildSbtSelectorListScopeTargetSlugSet({
-      fallbackSlug: 'Fallback',
-      scopeMode: 'list',
-      targetSlugs: [],
-    }) || [])).toEqual(['Fallback']);
-    expect(buildSbtSelectorListScopeTargetSlugSet({
-      fallbackSlug: 'Fallback',
-      scopeMode: 'active',
-      targetSlugs: ['Alpha'],
-    })).toBeNull();
+    expect(
+      Array.from(
+        buildSbtSelectorListScopeTargetSlugSet({
+          fallbackSlug: 'Fallback',
+          scopeMode: 'list',
+          targetSlugs: ['Alpha', 'Alpha', null],
+        }) || [],
+      ),
+    ).toEqual(['Alpha', '']);
+    expect(
+      Array.from(
+        buildSbtSelectorListScopeTargetSlugSet({
+          fallbackSlug: 'Fallback',
+          scopeMode: 'list',
+          targetSlugs: [],
+        }) || [],
+      ),
+    ).toEqual(['Fallback']);
+    expect(
+      buildSbtSelectorListScopeTargetSlugSet({
+        fallbackSlug: 'Fallback',
+        scopeMode: 'active',
+        targetSlugs: ['Alpha'],
+      }),
+    ).toBeNull();
     expect(getNormalizedDiscoveryOverride({ discoverySessionSlugs: ['Alpha', 'Alpha'] })).toEqual(['Alpha']);
     expect(getNormalizedDiscoveryOverride({ discoverySessionSlugs: [] })).toEqual([]);
     expect(getNormalizedDiscoveryOverride({})).toEqual([]);
   });
-
 });

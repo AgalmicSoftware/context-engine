@@ -24,19 +24,9 @@ import {
   shouldCommitThrottledProgress,
   shouldFlushCoalescedRun,
 } from '../session/mainSiteProgressHelpers.js';
-import {
-  MASKED_Q_DECRYPT_BACKOFF_MAX,
-  MASKED_Q_DECRYPT_BACKOFF_TTL_MS,
-} from '../cache/sessionCacheConstants.js';
-import {
-  isMaskedQuestionPayload,
-  pickBetterQuestionPayload,
-} from './questionRouting.js';
-import {
-  compareResponseRecency,
-  toResponseRecencyPair,
-  type ResponseRecencyPair,
-} from './responseRecency';
+import { MASKED_Q_DECRYPT_BACKOFF_MAX, MASKED_Q_DECRYPT_BACKOFF_TTL_MS } from '../cache/sessionCacheConstants.js';
+import { isMaskedQuestionPayload, pickBetterQuestionPayload } from './questionRouting.js';
+import { compareResponseRecency, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency';
 
 type CacheRecord = Record<string, unknown>;
 type StateRecord = {
@@ -183,7 +173,7 @@ interface QuestionCacheContractScripts {
     providerName: string,
     questionId: string,
     slug: string,
-    opts?: CacheRecord
+    opts?: CacheRecord,
   ) => Promise<QuestionMetadata | null>;
   getAllQuestionIDsChunkedWithCallback: (
     providerName: string,
@@ -192,12 +182,12 @@ interface QuestionCacheContractScripts {
     handleProgress: (progressInfo: ChunkProgressInfo) => void,
     handlePartialData: (partialQIDs: unknown, chunkToBlock: unknown) => void,
     slug: string,
-    opts?: CacheRecord
+    opts?: CacheRecord,
   ) => Promise<string[]>;
   decryptQuestionPayloadInPlace: (
     questionData: QuestionMetadata,
     slug: string,
-    opts?: { decryptContext?: QuestionDecryptContext }
+    opts?: { decryptContext?: QuestionDecryptContext },
   ) => Promise<void>;
 }
 
@@ -219,23 +209,20 @@ export interface SessionQuestionCacheHost {
   getNetwork?: () => NetworkLike | null | undefined;
   network?: NetworkLike | null | undefined;
   scanScopeNoop?: (slug: string, op: string, onSkipped?: () => void) => boolean;
-  setReadinessStateIfChanged?: (
-    nextState: CacheRecord | null | undefined,
-    cb?: () => void
-  ) => unknown;
+  setReadinessStateIfChanged?: (nextState: CacheRecord | null | undefined, cb?: () => void) => unknown;
   checkAllCachesReady?: () => void;
   mergeLegacyNumericNetworkKey?: (cache: CacheRecord, networkID: string) => boolean;
   buildMetadataSessionCacheEnvelope?: (
     questionData: CacheRecord,
     slug: string,
-    opts?: CacheRecord
+    opts?: CacheRecord,
   ) => MetadataSessionCacheEnvelope;
   writeQuestionMetadataToCache?: (
     slug: string,
     questionID: string,
     questionData: CacheRecord,
     networkID: string,
-    opts?: CacheRecord
+    opts?: CacheRecord,
   ) => boolean | void;
   queueLocalRevisionUpdate?: (opts?: QueueLocalRevisionUpdateOptions) => void;
 }
@@ -244,7 +231,7 @@ export interface SessionQuestionCacheController {
   initializeQuestionCacheForGroup: (slug: string, opts?: QuestionInitOptions) => Promise<void>;
   refreshEncryptedQuestionPayloadsForGroup: (
     slug: string,
-    opts?: RefreshEncryptedQuestionPayloadsOptions
+    opts?: RefreshEncryptedQuestionPayloadsOptions,
   ) => Promise<void>;
   hasMaskedQuestionPayloadInCache: (slug: string) => boolean;
   buildQuestionDecryptContext: (slug: string) => QuestionDecryptContext;
@@ -257,17 +244,14 @@ export interface SessionQuestionCacheController {
 const mainSiteLog = createLogger('mainSite');
 const questionCacheContractScripts = contractScripts as unknown as QuestionCacheContractScripts;
 
-const isRecord = (value: unknown): value is CacheRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is CacheRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const isPendingQuestionMetadataPlaceholder = (value: unknown): boolean => (
-  isRecord(value) && value.__ceQuestionMetadataPending === true
-);
+const isPendingQuestionMetadataPlaceholder = (value: unknown): boolean =>
+  isRecord(value) && value.__ceQuestionMetadataPending === true;
 
-const hasHydratedQuestionMetadata = (value: unknown): boolean => (
-  isRecord(value) && !isPendingQuestionMetadataPlaceholder(value)
-);
+const hasHydratedQuestionMetadata = (value: unknown): boolean =>
+  isRecord(value) && !isPendingQuestionMetadataPlaceholder(value);
 
 const countHydratedQuestionMetadata = (questionMap: unknown): number => {
   if (!isRecord(questionMap)) return 0;
@@ -277,9 +261,11 @@ const countHydratedQuestionMetadata = (questionMap: unknown): number => {
 const buildPendingQuestionMetadataPlaceholder = (
   qid: unknown,
   slug: unknown,
-  existing: unknown = null
+  existing: unknown = null,
 ): QuestionMetadata | null => {
-  const id = String(qid || '').trim().toLowerCase();
+  const id = String(qid || '')
+    .trim()
+    .toLowerCase();
   if (!id) return null;
 
   const existingQuestion = isRecord(existing) ? existing : {};
@@ -287,12 +273,12 @@ const buildPendingQuestionMetadataPlaceholder = (
   const encryption = isRecord(existingQuestion.encryption)
     ? existingQuestion.encryption
     : {
-      enabled: true,
-      status: 'metadata-pending',
-      targets: {
-        questions: true,
-      },
-    };
+        enabled: true,
+        status: 'metadata-pending',
+        targets: {
+          questions: true,
+        },
+      };
 
   return {
     ...existingQuestion,
@@ -335,11 +321,15 @@ const isRpcDebugLoggingEnabled = (): boolean => {
 
 const mergePendingQuestionInitOpts = (
   prevOpts: QuestionInitOptions | undefined,
-  nextOpts: QuestionInitOptions | undefined
+  nextOpts: QuestionInitOptions | undefined,
 ): QuestionInitOptions => {
   const nextBackground = !!(nextOpts && typeof nextOpts === 'object' && nextOpts.background === true);
   const nextSkipDiscoveryScan = !!(nextOpts && typeof nextOpts === 'object' && nextOpts.skipDiscoveryScan === true);
-  const nextForceDiscoveryRescan = !!(nextOpts && typeof nextOpts === 'object' && nextOpts.forceDiscoveryRescan === true);
+  const nextForceDiscoveryRescan = !!(
+    nextOpts &&
+    typeof nextOpts === 'object' &&
+    nextOpts.forceDiscoveryRescan === true
+  );
   if (!prevOpts || typeof prevOpts !== 'object') {
     return {
       background: nextBackground,
@@ -360,7 +350,7 @@ const mergePendingQuestionInitOpts = (
 };
 
 export const createSessionQuestionCacheController = (
-  host: SessionQuestionCacheHost = {}
+  host: SessionQuestionCacheHost = {},
 ): SessionQuestionCacheController => {
   let _questionInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _questionInitPending: Record<string, QuestionInitOptions | undefined> = {};
@@ -380,33 +370,21 @@ export const createSessionQuestionCacheController = (
     }
     if (typeof cb === 'function') cb();
   };
-  const getState = (): StateRecord => (
-    typeof host.getState === 'function' ? host.getState() || {} : {}
-  );
-  const isMounted = (): boolean => (
-    typeof host.isMounted === 'function' ? host.isMounted() : false
-  );
-  const dgRead = (...args: [string, string, CacheRecord?]): CacheRecord | null => (
-    typeof host.dgRead === 'function' ? host.dgRead(...args) || null : null
-  );
-  const dgWrite = (...args: [string, string, CacheRecord]): unknown => (
-    typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null
-  );
-  const getActiveSessionSlug = (): string => String(
-    typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : ''
-  );
-  const getSessionCfg = (slug: string): CacheRecord | null => (
-    typeof host.getSessionCfg === 'function' ? host.getSessionCfg(slug) || null : null
-  );
-  const getSessionChainId = (slug: string): string | number | null | undefined => (
-    typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null
-  );
-  const getSessionScanScope = (): string => String(
-    typeof host.getSessionScanScope === 'function' ? host.getSessionScanScope() || '' : ''
-  );
-  const getAccount = (): string | null | undefined => (
-    typeof host.getAccount === 'function' ? host.getAccount() : ''
-  );
+  const getState = (): StateRecord => (typeof host.getState === 'function' ? host.getState() || {} : {});
+  const isMounted = (): boolean => (typeof host.isMounted === 'function' ? host.isMounted() : false);
+  const dgRead = (...args: [string, string, CacheRecord?]): CacheRecord | null =>
+    typeof host.dgRead === 'function' ? host.dgRead(...args) || null : null;
+  const dgWrite = (...args: [string, string, CacheRecord]): unknown =>
+    typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null;
+  const getActiveSessionSlug = (): string =>
+    String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
+  const getSessionCfg = (slug: string): CacheRecord | null =>
+    typeof host.getSessionCfg === 'function' ? host.getSessionCfg(slug) || null : null;
+  const getSessionChainId = (slug: string): string | number | null | undefined =>
+    typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
+  const getSessionScanScope = (): string =>
+    String(typeof host.getSessionScanScope === 'function' ? host.getSessionScanScope() || '' : '');
+  const getAccount = (): string | null | undefined => (typeof host.getAccount === 'function' ? host.getAccount() : '');
   const getProviderLike = (): unknown => {
     if (typeof host.getProviderLike === 'function') return host.getProviderLike();
     if (typeof host.getProvider === 'function') return host.getProvider();
@@ -416,9 +394,8 @@ export const createSessionQuestionCacheController = (
     if (typeof host.getNetwork === 'function') return host.getNetwork();
     return host.network || null;
   };
-  const scanScopeNoop = (slug: string, op: string, onSkipped?: () => void): boolean => (
-    typeof host.scanScopeNoop === 'function' ? host.scanScopeNoop(slug, op, onSkipped) : false
-  );
+  const scanScopeNoop = (slug: string, op: string, onSkipped?: () => void): boolean =>
+    typeof host.scanScopeNoop === 'function' ? host.scanScopeNoop(slug, op, onSkipped) : false;
   const setReadinessStateIfChanged = (...args: [CacheRecord | null | undefined, (() => void)?]): void => {
     if (typeof host.setReadinessStateIfChanged === 'function') {
       host.setReadinessStateIfChanged(...args);
@@ -429,25 +406,20 @@ export const createSessionQuestionCacheController = (
       host.checkAllCachesReady();
     }
   };
-  const mergeLegacyNumericNetworkKey = (cache: CacheRecord, networkID: string): boolean => (
+  const mergeLegacyNumericNetworkKey = (cache: CacheRecord, networkID: string): boolean =>
     typeof host.mergeLegacyNumericNetworkKey === 'function'
       ? host.mergeLegacyNumericNetworkKey(cache, networkID)
-      : false
-  );
+      : false;
   const buildMetadataSessionCacheEnvelope = (
     ...args: [CacheRecord, string, CacheRecord?]
-  ): MetadataSessionCacheEnvelope => (
+  ): MetadataSessionCacheEnvelope =>
     typeof host.buildMetadataSessionCacheEnvelope === 'function'
       ? host.buildMetadataSessionCacheEnvelope(...args)
-      : { metadata: args?.[0] || {}, targetSlug: normalizeSessionSlug(args?.[1] || '') }
-  );
+      : { metadata: args?.[0] || {}, targetSlug: normalizeSessionSlug(args?.[1] || '') };
   const writeQuestionMetadataToCache = (
     ...args: [string, string, CacheRecord, string, CacheRecord?]
-  ): boolean | void => (
-    typeof host.writeQuestionMetadataToCache === 'function'
-      ? host.writeQuestionMetadataToCache(...args)
-      : false
-  );
+  ): boolean | void =>
+    typeof host.writeQuestionMetadataToCache === 'function' ? host.writeQuestionMetadataToCache(...args) : false;
   const queueLocalRevisionUpdate = (opts: QueueLocalRevisionUpdateOptions = {}): void => {
     if (typeof host.queueLocalRevisionUpdate === 'function') {
       host.queueLocalRevisionUpdate(opts);
@@ -456,15 +428,18 @@ export const createSessionQuestionCacheController = (
     const shouldBumpQuestionResponsesNonce = !!opts?.needsQuestionResponsesNonce;
     const shouldCheckAllCachesReady = !!opts?.checkAllCachesReady;
     if (!shouldBumpQuestionResponsesNonce && !shouldCheckAllCachesReady) return;
-    setState((prev) => {
-      const next: StateRecord = {};
-      if (shouldBumpQuestionResponsesNonce) {
-        next.questionResponsesNonce = Number(prev?.questionResponsesNonce || 0) + 1;
-      }
-      return Object.keys(next).length ? next : null;
-    }, () => {
-      if (shouldCheckAllCachesReady) checkAllCachesReady();
-    });
+    setState(
+      (prev) => {
+        const next: StateRecord = {};
+        if (shouldBumpQuestionResponsesNonce) {
+          next.questionResponsesNonce = Number(prev?.questionResponsesNonce || 0) + 1;
+        }
+        return Object.keys(next).length ? next : null;
+      },
+      () => {
+        if (shouldCheckAllCachesReady) checkAllCachesReady();
+      },
+    );
   };
 
   const isInitInFlight = (slugIn = ''): boolean => {
@@ -476,11 +451,19 @@ export const createSessionQuestionCacheController = (
     _destroyed = true;
     if (_pendingQuestionMetadataRetryTimers && typeof _pendingQuestionMetadataRetryTimers === 'object') {
       Object.values(_pendingQuestionMetadataRetryTimers).forEach((timer) => {
-        try { clearTimeout(timer); } catch (e: unknown) { mainSiteLog.warn('MainSite: cleanup', e); }
+        try {
+          clearTimeout(timer);
+        } catch (e: unknown) {
+          mainSiteLog.warn('MainSite: cleanup', e);
+        }
       });
     }
     _continuationTimers.forEach((timer) => {
-      try { clearTimeout(timer); } catch (e: unknown) { mainSiteLog.warn('MainSite: cleanup', e); }
+      try {
+        clearTimeout(timer);
+      } catch (e: unknown) {
+        mainSiteLog.warn('MainSite: cleanup', e);
+      }
     });
     _continuationTimers = [];
     if (_maskedQuestionDecryptBackoff instanceof Map) {
@@ -517,10 +500,7 @@ export const createSessionQuestionCacheController = (
     });
   };
 
-  const initializeQuestionCacheForGroup = async (
-    slugIn: string,
-    opts: QuestionInitOptions = {}
-  ): Promise<void> => {
+  const initializeQuestionCacheForGroup = async (slugIn: string, opts: QuestionInitOptions = {}): Promise<void> => {
     const slug = normalizeSessionSlug(slugIn || '');
     const suppressUiState = !!(opts && opts.background === true);
     const skipDiscoveryScan = !!(opts && opts.skipDiscoveryScan === true);
@@ -542,9 +522,11 @@ export const createSessionQuestionCacheController = (
       if (suppressUiState) return;
       checkAllCachesReady();
     };
-    if (scanScopeNoop(slug, 'initializeQuestionCacheForGroup', () => {
-      setQuestionState({ isQuestionCacheReady: true }, checkAllCachesReady);
-    })) {
+    if (
+      scanScopeNoop(slug, 'initializeQuestionCacheForGroup', () => {
+        setQuestionState({ isQuestionCacheReady: true }, checkAllCachesReady);
+      })
+    ) {
       return;
     }
     _questionInitInFlight = _questionInitInFlight || {};
@@ -555,16 +537,14 @@ export const createSessionQuestionCacheController = (
     }
 
     const run = (async () => {
-      mainSiteLog.log("initializeQuestionCacheForGroup() - invoked with Infura chunked scanning", { slug });
+      mainSiteLog.log('initializeQuestionCacheForGroup() - invoked with Infura chunked scanning', { slug });
       setQuestionState((prev) =>
-        prev.questionCacheInitializationError ? { questionCacheInitializationError: false } : null
+        prev.questionCacheInitializationError ? { questionCacheInitializationError: false } : null,
       );
 
       const networkID = String(getSessionChainId(slug) || '');
       const scopedSlug = normalizeSessionSlug(slug || '');
-      const QUESTION_SCAN_MAX_BLOCK_RANGE = readSessionScanMaxBlockRange(
-        DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE
-      );
+      const QUESTION_SCAN_MAX_BLOCK_RANGE = readSessionScanMaxBlockRange(DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE);
       const abortQuestionScan = ({ code = 'scan_aborted', message = 'Question scan aborted.' } = {}) => {
         const nowMs = Date.now();
         mainSiteLog.warn('[QuestionScan] Aborting question scan', {
@@ -572,20 +552,23 @@ export const createSessionQuestionCacheController = (
           code,
           message,
         });
-        setQuestionState((prev) => ({
-          isQuestionCacheReady: true,
-          questionScanProgress: {
-            ...(prev?.questionScanProgress || {}),
-            slug: scopedSlug,
-            phase: 'error',
-            errorCode: String(code || 'scan_aborted'),
-            errorMessage: String(message || 'Question scan aborted.'),
-            finishedAtMs: nowMs,
-            totalBlocks: 0,
-            scannedBlocks: 0,
-            remainingBlocks: 0,
-          },
-        }), checkAllCachesReady);
+        setQuestionState(
+          (prev) => ({
+            isQuestionCacheReady: true,
+            questionScanProgress: {
+              ...(prev?.questionScanProgress || {}),
+              slug: scopedSlug,
+              phase: 'error',
+              errorCode: String(code || 'scan_aborted'),
+              errorMessage: String(message || 'Question scan aborted.'),
+              finishedAtMs: nowMs,
+              totalBlocks: 0,
+              scannedBlocks: 0,
+              remainingBlocks: 0,
+            },
+          }),
+          checkAllCachesReady,
+        );
       };
       const sessionCfgForScan = getSessionCfg(slug);
       const shouldRequireRegistryGeneral = slug === '';
@@ -596,21 +579,16 @@ export const createSessionQuestionCacheController = (
         });
         return;
       }
-      const blockLimitsForScan = isRecord(sessionCfgForScan?.blockLimits)
-        ? sessionCfgForScan.blockLimits
-        : null;
+      const blockLimitsForScan = isRecord(sessionCfgForScan?.blockLimits) ? sessionCfgForScan.blockLimits : null;
       const cfgStartBlock = Number(blockLimitsForScan?.start || 0);
-      const initialLastBlockQuestionFromCfg = Number.isFinite(cfgStartBlock) && cfgStartBlock > 0
-        ? Math.max(0, Math.floor(cfgStartBlock) - 1)
-        : 0;
-      let questionsCache = (dgRead("questionsCache", slug) || {}) as QuestionCache;
+      const initialLastBlockQuestionFromCfg =
+        Number.isFinite(cfgStartBlock) && cfgStartBlock > 0 ? Math.max(0, Math.floor(cfgStartBlock) - 1) : 0;
+      let questionsCache = (dgRead('questionsCache', slug) || {}) as QuestionCache;
       if (questionsCache && networkID) {
         mergeLegacyNumericNetworkKey(questionsCache, networkID);
       }
       const rebucketedQuestionIds = new Set<string>();
-      const ensureLocalQuestionCacheNode = (
-        initialLastBlockQuestion: number
-      ): QuestionCacheNetworkNode => {
+      const ensureLocalQuestionCacheNode = (initialLastBlockQuestion: number): QuestionCacheNetworkNode => {
         if (!questionsCache[networkID]) {
           questionsCache[networkID] = createEmptyQuestionNetworkCacheNode(initialLastBlockQuestion);
         }
@@ -622,17 +600,13 @@ export const createSessionQuestionCacheController = (
         }
         ensureQuestionArweaveCacheBranches(questionsCache[networkID]);
         if (!Number.isFinite(Number(questionsCache[networkID].questionsDiscoveryCheckpointBlock))) {
-          questionsCache[networkID].questionsDiscoveryCheckpointBlock = Number(
-            questionsCache[networkID].questionsLatestBlock
-          ) || initialLastBlockQuestion;
+          questionsCache[networkID].questionsDiscoveryCheckpointBlock =
+            Number(questionsCache[networkID].questionsLatestBlock) || initialLastBlockQuestion;
         }
         return questionsCache[networkID];
       };
       const seedTemporaryDemoQuestionFixtures = (initialLastBlockQuestion: number): number => {
-        const fixtureQuestions = getTemporaryDemoSessionQuestionFixtures(
-          scopedSlug,
-          sessionCfgForScan || {}
-        );
+        const fixtureQuestions = getTemporaryDemoSessionQuestionFixtures(scopedSlug, sessionCfgForScan || {});
         if (!fixtureQuestions.length) return 0;
 
         const localNet = ensureLocalQuestionCacheNode(initialLastBlockQuestion);
@@ -645,7 +619,9 @@ export const createSessionQuestionCacheController = (
 
         let seeded = 0;
         fixtureQuestions.forEach((questionRaw) => {
-          const lowered = String(questionRaw?.id || '').trim().toLowerCase();
+          const lowered = String(questionRaw?.id || '')
+            .trim()
+            .toLowerCase();
           if (!lowered) return;
           if (hasHydratedQuestionMetadata(localNet.questions[lowered])) return;
 
@@ -665,30 +641,33 @@ export const createSessionQuestionCacheController = (
 
           if (targetSlug === slug) {
             localNet.questions[lowered] = preparedQuestionData;
-            try { delete localNet.pendingQuestionMetadata[lowered]; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+            try {
+              delete localNet.pendingQuestionMetadata[lowered];
+            } catch (e: unknown) {
+              mainSiteLog.warn('MainSite: fallback', e);
+            }
           } else {
             rebucketedQuestionIds.add(lowered);
-            writeQuestionMetadataToCache(
-              targetSlug,
-              lowered,
-              preparedQuestionData,
-              networkID,
-              { enforceScopedIsolation: true }
-            );
+            writeQuestionMetadataToCache(targetSlug, lowered, preparedQuestionData, networkID, {
+              enforceScopedIsolation: true,
+            });
           }
           seeded += 1;
         });
 
         if (seeded <= 0) return 0;
-        dgWrite("questionsCache", slug, questionsCache);
+        dgWrite('questionsCache', slug, questionsCache);
         mainSiteLog.info('[MainSite] Seeded temporary demo question fixture metadata', {
           group: slug,
           count: seeded,
         });
-        setQuestionState((prev) => ({
-          isQuestionCacheReady: true,
-          questionResponsesNonce: Number(prev?.questionResponsesNonce || 0) + 1,
-        }), maybeCheckAllCachesReady);
+        setQuestionState(
+          (prev) => ({
+            isQuestionCacheReady: true,
+            questionResponsesNonce: Number(prev?.questionResponsesNonce || 0) + 1,
+          }),
+          maybeCheckAllCachesReady,
+        );
         return seeded;
       };
 
@@ -701,9 +680,8 @@ export const createSessionQuestionCacheController = (
         const windowError = isRecord(windowErr) ? windowErr : {};
         abortQuestionScan({
           code: 'block_window_unavailable',
-          message: typeof windowError.message === 'string'
-            ? windowError.message
-            : 'Failed to resolve session block window.',
+          message:
+            typeof windowError.message === 'string' ? windowError.message : 'Failed to resolve session block window.',
         });
         return;
       }
@@ -726,10 +704,7 @@ export const createSessionQuestionCacheController = (
       const scanRequestedToBlock = Number.isFinite(requestedToBlockRaw)
         ? Math.max(baseTo, Math.floor(requestedToBlockRaw))
         : baseTo;
-      const scanMaxBlockRange = Math.max(
-        1,
-        Number(scanWindow.maxBlockRange || QUESTION_SCAN_MAX_BLOCK_RANGE)
-      );
+      const scanMaxBlockRange = Math.max(1, Number(scanWindow.maxBlockRange || QUESTION_SCAN_MAX_BLOCK_RANGE));
       const didCapScanRange = scanWindow.wasCapped === true;
       if (didCapScanRange) {
         mainSiteLog.warn('[QuestionScan] Capped question scan range to safety max.', {
@@ -746,10 +721,7 @@ export const createSessionQuestionCacheController = (
       }
       const initialLastBlockQuestion = Math.max(0, baseFrom - 1);
       ensureLocalQuestionCacheNode(initialLastBlockQuestion);
-      if (
-        forceDiscoveryRescan &&
-        countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions) === 0
-      ) {
+      if (forceDiscoveryRescan && countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions) === 0) {
         questionsCache[networkID].questionsLatestBlock = initialLastBlockQuestion;
         questionsCache[networkID].questionsDiscoveryCheckpointBlock = initialLastBlockQuestion;
       }
@@ -757,7 +729,7 @@ export const createSessionQuestionCacheController = (
       // Merge helper to avoid stomping concurrent responses writes
       const mergeFreshIntoLocalCopy = () => {
         try {
-          const fresh = (dgRead("questionsCache", slug) || {}) as QuestionCache;
+          const fresh = (dgRead('questionsCache', slug) || {}) as QuestionCache;
           const freshNet = fresh[networkID];
           if (!freshNet) return;
 
@@ -770,12 +742,9 @@ export const createSessionQuestionCacheController = (
           if (!localNet.questionResponsesMeta || typeof localNet.questionResponsesMeta !== 'object') {
             localNet.questionResponsesMeta = {};
           }
-          const freshQR = (freshNet && typeof freshNet.questionResponses === 'object')
-            ? freshNet.questionResponses
-            : {};
-          const freshQRMeta = (freshNet && typeof freshNet.questionResponsesMeta === 'object')
-            ? freshNet.questionResponsesMeta
-            : {};
+          const freshQR = freshNet && typeof freshNet.questionResponses === 'object' ? freshNet.questionResponses : {};
+          const freshQRMeta =
+            freshNet && typeof freshNet.questionResponsesMeta === 'object' ? freshNet.questionResponsesMeta : {};
           const shouldApplyIncomingResponse = ({
             existingMeta,
             incomingMeta,
@@ -790,27 +759,24 @@ export const createSessionQuestionCacheController = (
             const incoming = toResponseRecencyPair(incomingMeta);
             return compareResponseRecency(incoming, existing) >= 0;
           };
-          const freshQuestionIds = new Set([
-            ...Object.keys(freshQR || {}),
-            ...Object.keys(freshQRMeta || {}),
-          ]);
+          const freshQuestionIds = new Set([...Object.keys(freshQR || {}), ...Object.keys(freshQRMeta || {})]);
           freshQuestionIds.forEach((qIdRaw) => {
-            const qId = String(qIdRaw || '').trim().toLowerCase();
+            const qId = String(qIdRaw || '')
+              .trim()
+              .toLowerCase();
             if (!qId) return;
-            const freshResponsesByResponder = (
-              (freshQR[qIdRaw] && typeof freshQR[qIdRaw] === 'object')
+            const freshResponsesByResponder =
+              freshQR[qIdRaw] && typeof freshQR[qIdRaw] === 'object'
                 ? freshQR[qIdRaw]
-                : (freshQR[qId] && typeof freshQR[qId] === 'object')
+                : freshQR[qId] && typeof freshQR[qId] === 'object'
                   ? freshQR[qId]
-                  : {}
-            );
-            const freshMetaByResponder = (
-              (freshQRMeta[qIdRaw] && typeof freshQRMeta[qIdRaw] === 'object')
+                  : {};
+            const freshMetaByResponder =
+              freshQRMeta[qIdRaw] && typeof freshQRMeta[qIdRaw] === 'object'
                 ? freshQRMeta[qIdRaw]
-                : (freshQRMeta[qId] && typeof freshQRMeta[qId] === 'object')
+                : freshQRMeta[qId] && typeof freshQRMeta[qId] === 'object'
                   ? freshQRMeta[qId]
-                  : {}
-            );
+                  : {};
             if (!localNet.questionResponses[qId] || typeof localNet.questionResponses[qId] !== 'object') {
               localNet.questionResponses[qId] = {};
             }
@@ -824,31 +790,28 @@ export const createSessionQuestionCacheController = (
               ...Object.keys(freshMetaByResponder || {}),
             ]);
             responderSet.forEach((responderRaw) => {
-              const responder = String(responderRaw || '').trim().toLowerCase();
+              const responder = String(responderRaw || '')
+                .trim()
+                .toLowerCase();
               if (!responder) return;
 
-              const hasIncomingResponse = (
+              const hasIncomingResponse =
                 Object.prototype.hasOwnProperty.call(freshResponsesByResponder, responderRaw) ||
-                Object.prototype.hasOwnProperty.call(freshResponsesByResponder, responder)
-              );
+                Object.prototype.hasOwnProperty.call(freshResponsesByResponder, responder);
               const incomingResponse = hasIncomingResponse
-                ? (
-                  Object.prototype.hasOwnProperty.call(freshResponsesByResponder, responderRaw)
-                    ? freshResponsesByResponder[responderRaw]
-                    : freshResponsesByResponder[responder]
-                )
+                ? Object.prototype.hasOwnProperty.call(freshResponsesByResponder, responderRaw)
+                  ? freshResponsesByResponder[responderRaw]
+                  : freshResponsesByResponder[responder]
                 : undefined;
-              const incomingMeta = (
-                freshMetaByResponder[responderRaw] ??
-                freshMetaByResponder[responder] ??
-                null
-              );
+              const incomingMeta = freshMetaByResponder[responderRaw] ?? freshMetaByResponder[responder] ?? null;
               const hasExistingResponse = Object.prototype.hasOwnProperty.call(localResponsesByResponder, responder);
-              if (!shouldApplyIncomingResponse({
-                existingMeta: localMetaByResponder[responder],
-                incomingMeta: toResponseRecencyPair(incomingMeta, incomingResponse),
-                hasExistingResponse,
-              })) {
+              if (
+                !shouldApplyIncomingResponse({
+                  existingMeta: localMetaByResponder[responder],
+                  incomingMeta: toResponseRecencyPair(incomingMeta, incomingResponse),
+                  hasExistingResponse,
+                })
+              ) {
                 return;
               }
               if (hasIncomingResponse) {
@@ -901,9 +864,8 @@ export const createSessionQuestionCacheController = (
             localNet.pendingQuestionMetadata = {};
           }
           const localPending = localNet.pendingQuestionMetadata;
-          const freshPending = (freshNet && typeof freshNet.pendingQuestionMetadata === 'object')
-            ? freshNet.pendingQuestionMetadata
-            : {};
+          const freshPending =
+            freshNet && typeof freshNet.pendingQuestionMetadata === 'object' ? freshNet.pendingQuestionMetadata : {};
           Object.keys(freshPending || {}).forEach((qidRaw) => {
             const qid = String(qidRaw || '').toLowerCase();
             if (!qid) return;
@@ -925,10 +887,8 @@ export const createSessionQuestionCacheController = (
             const bAttempts = Number(b.attempts || 0);
             const aNextRetryAtMs = Number(a.nextRetryAtMs || 0);
             const bNextRetryAtMs = Number(b.nextRetryAtMs || 0);
-            const preferred = (
-              aAttempts > bAttempts ||
-              (aAttempts === bAttempts && aNextRetryAtMs >= bNextRetryAtMs)
-            ) ? a : b;
+            const preferred =
+              aAttempts > bAttempts || (aAttempts === bAttempts && aNextRetryAtMs >= bNextRetryAtMs) ? a : b;
             const fallback = preferred === a ? b : a;
             localPending[qid] = {
               ...fallback,
@@ -948,10 +908,18 @@ export const createSessionQuestionCacheController = (
               return qid && localNet.questions && hasHydratedQuestionMetadata(localNet.questions[qid]);
             });
             stale.forEach((qidRaw) => {
-              try { delete localPending[qidRaw]; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+              try {
+                delete localPending[qidRaw];
+              } catch (e: unknown) {
+                mainSiteLog.warn('MainSite: fallback', e);
+              }
             });
-          } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
-        } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+          } catch (e: unknown) {
+            mainSiteLog.warn('MainSite: fallback', e);
+          }
+        } catch (e: unknown) {
+          mainSiteLog.warn('MainSite: fallback', e);
+        }
       };
 
       const QUESTION_CACHE_WRITE_MIN_INTERVAL_MS = 1000;
@@ -961,19 +929,21 @@ export const createSessionQuestionCacheController = (
       let hasPendingQuestionCacheWrite = false;
       const flushQuestionCacheWrite = ({ force = false } = {}) => {
         const nowMs = Date.now();
-        if (!shouldFlushCoalescedRun({
-          force,
-          dirty: hasPendingQuestionCacheWrite,
-          nowMs,
-          lastFlushMs: lastQuestionCacheWriteMs,
-          minIntervalMs: QUESTION_CACHE_WRITE_MIN_INTERVAL_MS,
-          pendingOps: pendingQuestionCacheWriteOps,
-          maxPendingOps: QUESTION_CACHE_WRITE_MAX_PENDING_OPS,
-        })) {
+        if (
+          !shouldFlushCoalescedRun({
+            force,
+            dirty: hasPendingQuestionCacheWrite,
+            nowMs,
+            lastFlushMs: lastQuestionCacheWriteMs,
+            minIntervalMs: QUESTION_CACHE_WRITE_MIN_INTERVAL_MS,
+            pendingOps: pendingQuestionCacheWriteOps,
+            maxPendingOps: QUESTION_CACHE_WRITE_MAX_PENDING_OPS,
+          })
+        ) {
           return false;
         }
         mergeFreshIntoLocalCopy();
-        dgWrite("questionsCache", slug, questionsCache);
+        dgWrite('questionsCache', slug, questionsCache);
         hasPendingQuestionCacheWrite = false;
         pendingQuestionCacheWriteOps = 0;
         lastQuestionCacheWriteMs = nowMs;
@@ -1006,15 +976,19 @@ export const createSessionQuestionCacheController = (
       };
       const markPendingQuestion = (
         qidLower: string,
-        { bumpAttempts = true, error = null }: { bumpAttempts?: boolean; error?: unknown } = {}
+        { bumpAttempts = true, error = null }: { bumpAttempts?: boolean; error?: unknown } = {},
       ): void => {
         if (!qidLower) return;
-        if (typeof questionsCache[networkID].pendingQuestionMetadata !== 'object' || !questionsCache[networkID].pendingQuestionMetadata) {
+        if (
+          typeof questionsCache[networkID].pendingQuestionMetadata !== 'object' ||
+          !questionsCache[networkID].pendingQuestionMetadata
+        ) {
           questionsCache[networkID].pendingQuestionMetadata = {};
         }
         const slot = questionsCache[networkID].pendingQuestionMetadata;
-        const prev = slot[qidLower] && typeof slot[qidLower] === 'object' ? slot[qidLower] : { attempts: 0, nextRetryAtMs: 0 };
-        const attempts = bumpAttempts ? (Number(prev.attempts || 0) + 1) : Number(prev.attempts || 0);
+        const prev =
+          slot[qidLower] && typeof slot[qidLower] === 'object' ? slot[qidLower] : { attempts: 0, nextRetryAtMs: 0 };
+        const attempts = bumpAttempts ? Number(prev.attempts || 0) + 1 : Number(prev.attempts || 0);
         const stopDecision = shouldStopPendingMetadataRetry({
           pendingEntry: { ...prev, attempts },
           error,
@@ -1023,11 +997,7 @@ export const createSessionQuestionCacheController = (
         const failureMeta = normalizeArweaveFailureMeta(error);
         const terminalRetryAtMs = Number(failureMeta.nextRetryAtMs || 0);
         if (stopDecision.stop) {
-          if (
-            stopDecision.terminal &&
-            Number.isFinite(terminalRetryAtMs) &&
-            terminalRetryAtMs > Date.now()
-          ) {
+          if (stopDecision.terminal && Number.isFinite(terminalRetryAtMs) && terminalRetryAtMs > Date.now()) {
             slot[qidLower] = {
               attempts,
               nextRetryAtMs: terminalRetryAtMs,
@@ -1042,9 +1012,10 @@ export const createSessionQuestionCacheController = (
             const externalNextRetryAt = Number(failureMeta.nextRetryAtMs || 0);
             slot[qidLower] = {
               attempts,
-              nextRetryAtMs: Number.isFinite(externalNextRetryAt) && externalNextRetryAt > cooldownRetryAtMs
-                ? externalNextRetryAt
-                : cooldownRetryAtMs,
+              nextRetryAtMs:
+                Number.isFinite(externalNextRetryAt) && externalNextRetryAt > cooldownRetryAtMs
+                  ? externalNextRetryAt
+                  : cooldownRetryAtMs,
               state: failureMeta.state || 'transient',
               lastStatus: Number.isFinite(Number(failureMeta.status)) ? Number(failureMeta.status) : null,
               message: String(failureMeta.message || ''),
@@ -1057,7 +1028,11 @@ export const createSessionQuestionCacheController = (
             });
             return;
           }
-          try { delete slot[qidLower]; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+          try {
+            delete slot[qidLower];
+          } catch (e: unknown) {
+            mainSiteLog.warn('MainSite: fallback', e);
+          }
           mainSiteLog.warn('[MainSite] Stopping pending question metadata retry', {
             group: slug,
             questionId: qidLower,
@@ -1073,9 +1048,10 @@ export const createSessionQuestionCacheController = (
         const computedNextRetryAt = Date.now() + computeBackoffMs(attempts);
         slot[qidLower] = {
           attempts,
-          nextRetryAtMs: Number.isFinite(externalNextRetryAt) && externalNextRetryAt > computedNextRetryAt
-            ? externalNextRetryAt
-            : computedNextRetryAt,
+          nextRetryAtMs:
+            Number.isFinite(externalNextRetryAt) && externalNextRetryAt > computedNextRetryAt
+              ? externalNextRetryAt
+              : computedNextRetryAt,
           state: failureMeta.state || 'transient',
           lastStatus: Number.isFinite(Number(failureMeta.status)) ? Number(failureMeta.status) : null,
           message: String(failureMeta.message || ''),
@@ -1086,17 +1062,24 @@ export const createSessionQuestionCacheController = (
           if (questionsCache?.[networkID]?.pendingQuestionMetadata?.[qidLower]) {
             delete questionsCache[networkID].pendingQuestionMetadata[qidLower];
           }
-        } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+        } catch (e: unknown) {
+          mainSiteLog.warn('MainSite: fallback', e);
+        }
       };
       const seedPendingDiscoveredQuestionMetadata = (questionIds: string[]): number => {
         if (!Array.isArray(questionIds) || questionIds.length === 0) return 0;
-        if (typeof questionsCache[networkID].pendingQuestionMetadata !== 'object' || !questionsCache[networkID].pendingQuestionMetadata) {
+        if (
+          typeof questionsCache[networkID].pendingQuestionMetadata !== 'object' ||
+          !questionsCache[networkID].pendingQuestionMetadata
+        ) {
           questionsCache[networkID].pendingQuestionMetadata = {};
         }
         const pending = questionsCache[networkID].pendingQuestionMetadata;
         let seeded = 0;
         questionIds.forEach((qidRaw) => {
-          const qid = String(qidRaw || '').trim().toLowerCase();
+          const qid = String(qidRaw || '')
+            .trim()
+            .toLowerCase();
           if (!qid) return;
           if (hasHydratedQuestionMetadata(questionsCache?.[networkID]?.questions?.[qid])) return;
           if (pending[qid]) return;
@@ -1115,10 +1098,10 @@ export const createSessionQuestionCacheController = (
         try {
           const pending = questionsCache?.[networkID]?.pendingQuestionMetadata;
           if (!pending || typeof pending !== 'object') return 0;
-          const cachedQuestions = (
-            questionsCache?.[networkID]?.questions &&
-            typeof questionsCache[networkID].questions === 'object'
-          ) ? questionsCache[networkID].questions : {};
+          const cachedQuestions =
+            questionsCache?.[networkID]?.questions && typeof questionsCache[networkID].questions === 'object'
+              ? questionsCache[networkID].questions
+              : {};
           let removed = 0;
           Object.keys(pending).forEach((qidRaw) => {
             const qid = String(qidRaw || '').toLowerCase();
@@ -1126,16 +1109,19 @@ export const createSessionQuestionCacheController = (
             try {
               delete pending[qidRaw];
               removed += 1;
-            } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+            } catch (e: unknown) {
+              mainSiteLog.warn('MainSite: fallback', e);
+            }
           });
           return removed;
         } catch (_: unknown) {
           return 0;
         }
       };
-      const retryPendingQuestionMetadata = async (
-        { maxToProcess = 15, batchSize = 5 }: { maxToProcess?: number; batchSize?: number } = {}
-      ): Promise<number> => {
+      const retryPendingQuestionMetadata = async ({
+        maxToProcess = 15,
+        batchSize = 5,
+      }: { maxToProcess?: number; batchSize?: number } = {}): Promise<number> => {
         try {
           let recoveredCount = 0;
           const removedStalePending = pruneLoadedPendingQuestionMetadata();
@@ -1147,15 +1133,16 @@ export const createSessionQuestionCacheController = (
           const now = Date.now();
           const due = Object.keys(pending)
             .map((qid): PendingQuestionRetryRow => ({ qid, entry: pending[qid] }))
-            .filter((row) => (
-              row &&
-              row.qid &&
-              !hasHydratedQuestionMetadata(
-                questionsCache?.[networkID]?.questions?.[String(row.qid || '').toLowerCase()]
-              ) &&
-              Number(row.entry?.nextRetryAtMs || 0) <= now
-            ))
-            .sort((a, b) => (Number(a.entry?.nextRetryAtMs || 0) - Number(b.entry?.nextRetryAtMs || 0)))
+            .filter(
+              (row) =>
+                row &&
+                row.qid &&
+                !hasHydratedQuestionMetadata(
+                  questionsCache?.[networkID]?.questions?.[String(row.qid || '').toLowerCase()],
+                ) &&
+                Number(row.entry?.nextRetryAtMs || 0) <= now,
+            )
+            .sort((a, b) => Number(a.entry?.nextRetryAtMs || 0) - Number(b.entry?.nextRetryAtMs || 0))
             .slice(0, Math.max(0, Number(maxToProcess || 0)));
           if (!due.length) return 0;
 
@@ -1164,29 +1151,31 @@ export const createSessionQuestionCacheController = (
           for (let i = 0; i < due.length; i += batchSize) {
             const batch = due.slice(i, i + batchSize);
             // eslint-disable-next-line no-await-in-loop
-            const results: PendingQuestionRetryResult[] = await Promise.all(batch.map(async ({ qid }) => {
-              const lowered = String(qid || '').toLowerCase();
-              if (!lowered) return { qid: lowered, questionData: null };
-              if (hasHydratedQuestionMetadata(questionsCache?.[networkID]?.questions?.[lowered])) {
-                return {
-                  qid: lowered,
-                  questionData: questionsCache[networkID].questions[lowered],
-                  skippedCached: true,
-                };
-              }
-              try {
-                const questionData = await questionCacheContractScripts.getQuestionData('none', lowered, slug, {
-                  decryptContext: buildQuestionDecryptContext(slug),
-                  skipDecrypt: true,
-                  throwOnFailure: true,
-                  arweaveRetries: QUESTION_METADATA_BULK_ARWEAVE_RETRIES,
-                  arweaveGatewayTimeoutMs: QUESTION_METADATA_BULK_ARWEAVE_TIMEOUT_MS,
-                });
-                return { qid: lowered, questionData };
-              } catch (err: unknown) {
-                return { qid: lowered, questionData: null, err };
-              }
-            }));
+            const results: PendingQuestionRetryResult[] = await Promise.all(
+              batch.map(async ({ qid }) => {
+                const lowered = String(qid || '').toLowerCase();
+                if (!lowered) return { qid: lowered, questionData: null };
+                if (hasHydratedQuestionMetadata(questionsCache?.[networkID]?.questions?.[lowered])) {
+                  return {
+                    qid: lowered,
+                    questionData: questionsCache[networkID].questions[lowered],
+                    skippedCached: true,
+                  };
+                }
+                try {
+                  const questionData = await questionCacheContractScripts.getQuestionData('none', lowered, slug, {
+                    decryptContext: buildQuestionDecryptContext(slug),
+                    skipDecrypt: true,
+                    throwOnFailure: true,
+                    arweaveRetries: QUESTION_METADATA_BULK_ARWEAVE_RETRIES,
+                    arweaveGatewayTimeoutMs: QUESTION_METADATA_BULK_ARWEAVE_TIMEOUT_MS,
+                  });
+                  return { qid: lowered, questionData };
+                } catch (err: unknown) {
+                  return { qid: lowered, questionData: null, err };
+                }
+              }),
+            );
 
             for (const item of results) {
               const lowered = String(item.qid || '').toLowerCase();
@@ -1204,14 +1193,14 @@ export const createSessionQuestionCacheController = (
                   questionsCache[networkID].questions[lowered] = preparedQuestionData;
                 } else {
                   rebucketedQuestionIds.add(lowered);
-                  try { delete questionsCache[networkID].questions[lowered]; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
-                  writeQuestionMetadataToCache(
-                    preparedQuestion.targetSlug,
-                    lowered,
-                    preparedQuestionData,
-                    networkID,
-                    { enforceScopedIsolation: true }
-                  );
+                  try {
+                    delete questionsCache[networkID].questions[lowered];
+                  } catch (e: unknown) {
+                    mainSiteLog.warn('MainSite: fallback', e);
+                  }
+                  writeQuestionMetadataToCache(preparedQuestion.targetSlug, lowered, preparedQuestionData, networkID, {
+                    enforceScopedIsolation: true,
+                  });
                 }
                 clearPendingQuestion(lowered);
                 if (!item.skippedCached) recoveredCount += 1;
@@ -1241,7 +1230,7 @@ export const createSessionQuestionCacheController = (
           if (!pending || typeof pending !== 'object') return;
 
           const entries = Object.values(pending).filter(
-            (v): v is PendingQuestionMetadataEntry => !!v && typeof v === 'object'
+            (v): v is PendingQuestionMetadataEntry => !!v && typeof v === 'object',
           );
           if (!entries.length) return;
 
@@ -1272,46 +1261,40 @@ export const createSessionQuestionCacheController = (
                 background: suppressUiState,
                 skipDiscoveryScan: true,
               });
-            } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+            } catch (e: unknown) {
+              mainSiteLog.warn('MainSite: fallback', e);
+            }
           }, delayMs);
-        } catch (e: unknown) { mainSiteLog.warn('MainSite: cleanup', e); }
+        } catch (e: unknown) {
+          mainSiteLog.warn('MainSite: cleanup', e);
+        }
       };
 
-      const fromBlockForDiscovery = skipDiscoveryScan ? (baseTo + 1) : (resumeDiscoveryBlock + 1);
-      const latestBlock = (!skipDiscoveryScan && didCapScanRange)
-        ? Math.max(
-          floorBlock,
-          Math.min(
-            scanRequestedToBlock,
-            fromBlockForDiscovery + scanMaxBlockRange - 1
-          )
-        )
-        : baseTo;
-      const shouldContinueCappedDiscoveryScan = (
-        !skipDiscoveryScan &&
-        didCapScanRange &&
-        scanRequestedToBlock > latestBlock
-      );
+      const fromBlockForDiscovery = skipDiscoveryScan ? baseTo + 1 : resumeDiscoveryBlock + 1;
+      const latestBlock =
+        !skipDiscoveryScan && didCapScanRange
+          ? Math.max(floorBlock, Math.min(scanRequestedToBlock, fromBlockForDiscovery + scanMaxBlockRange - 1))
+          : baseTo;
+      const shouldContinueCappedDiscoveryScan =
+        !skipDiscoveryScan && didCapScanRange && scanRequestedToBlock > latestBlock;
       const queueCappedDiscoveryRerun = (): boolean => {
         if (!shouldContinueCappedDiscoveryScan) return false;
-        _questionInitPending[initRunKey] = mergePendingQuestionInitOpts(
-          _questionInitPending[initRunKey],
-          {
-            ...rerunOpts,
-            background: suppressUiState,
-            skipDiscoveryScan: false,
-          }
-        );
+        _questionInitPending[initRunKey] = mergePendingQuestionInitOpts(_questionInitPending[initRunKey], {
+          ...rerunOpts,
+          background: suppressUiState,
+          skipDiscoveryScan: false,
+        });
         return true;
       };
-      const totalScanBlocks = fromBlockForDiscovery <= latestBlock
-        ? Math.max(0, latestBlock - fromBlockForDiscovery + 1)
-        : 0;
+      const totalScanBlocks =
+        fromBlockForDiscovery <= latestBlock ? Math.max(0, latestBlock - fromBlockForDiscovery + 1) : 0;
       const requestedTotalScanBlocks = Math.max(
         totalScanBlocks,
-        Number(scanWindow.requestedRangeBlocks || totalScanBlocks || 0)
+        Number(scanWindow.requestedRangeBlocks || totalScanBlocks || 0),
       );
-      const buildQuestionScanProgressCounts = (batchScannedIn: number = 0): {
+      const buildQuestionScanProgressCounts = (
+        batchScannedIn: number = 0,
+      ): {
         scannedBlocks: number;
         remainingBlocks: number;
       } => {
@@ -1327,7 +1310,7 @@ export const createSessionQuestionCacheController = (
         const completedBeforeCurrentWindow = Math.max(0, fromBlockForDiscovery - baseFrom);
         const scannedBlocks = Math.max(
           0,
-          Math.min(requestedTotalScanBlocks, completedBeforeCurrentWindow + batchScanned)
+          Math.min(requestedTotalScanBlocks, completedBeforeCurrentWindow + batchScanned),
         );
         return {
           scannedBlocks,
@@ -1345,12 +1328,14 @@ export const createSessionQuestionCacheController = (
       const flushQueuedQuestionProgress = ({ force = false }: { force?: boolean } = {}): boolean => {
         if (!pendingQuestionProgressPatch && !pendingQuestionReadySignal) return false;
         const nowMs = Date.now();
-        if (!shouldCommitThrottledProgress({
-          force,
-          nowMs,
-          lastCommitMs: lastQuestionProgressCommitMs,
-          minIntervalMs: QUESTION_PROGRESS_MIN_INTERVAL_MS,
-        })) {
+        if (
+          !shouldCommitThrottledProgress({
+            force,
+            nowMs,
+            lastCommitMs: lastQuestionProgressCommitMs,
+            minIntervalMs: QUESTION_PROGRESS_MIN_INTERVAL_MS,
+          })
+        ) {
           return false;
         }
         const patch = pendingQuestionProgressPatch;
@@ -1374,7 +1359,7 @@ export const createSessionQuestionCacheController = (
       };
       const queueQuestionProgressPatch = (
         patch: CacheRecord | null,
-        { force = false, markReady = false }: { force?: boolean; markReady?: boolean } = {}
+        { force = false, markReady = false }: { force?: boolean; markReady?: boolean } = {},
       ): void => {
         if (patch && typeof patch === 'object') {
           pendingQuestionProgressPatch = {
@@ -1388,7 +1373,8 @@ export const createSessionQuestionCacheController = (
       const DISCOVERY_CHECKPOINT_WRITE_MIN_INTERVAL_MS = 1200;
       const DISCOVERY_CHECKPOINT_WRITE_MIN_BLOCK_DELTA = 512;
       let lastDiscoveryCheckpointWriteMs = 0;
-      let lastPersistedDiscoveryCheckpoint = Number(questionsCache?.[networkID]?.questionsDiscoveryCheckpointBlock) || 0;
+      let lastPersistedDiscoveryCheckpoint =
+        Number(questionsCache?.[networkID]?.questionsDiscoveryCheckpointBlock) || 0;
       if (lastPersistedDiscoveryCheckpoint < stableDiscoveryBlock) {
         lastPersistedDiscoveryCheckpoint = stableDiscoveryBlock;
       }
@@ -1442,10 +1428,7 @@ export const createSessionQuestionCacheController = (
         return advanceContiguousDiscoveryFrontier();
       };
 
-      const persistDiscoveryCheckpoint = (
-        blockIn: unknown,
-        { force = false }: { force?: boolean } = {}
-      ): boolean => {
+      const persistDiscoveryCheckpoint = (blockIn: unknown, { force = false }: { force?: boolean } = {}): boolean => {
         const blockNum = Number(blockIn);
         if (!Number.isFinite(blockNum)) return false;
         const nextCheckpoint = Math.max(floorBlock, Math.min(latestBlock, Math.floor(blockNum)));
@@ -1453,19 +1436,20 @@ export const createSessionQuestionCacheController = (
         const now = Date.now();
         if (
           !force &&
-          (now - lastDiscoveryCheckpointWriteMs) < DISCOVERY_CHECKPOINT_WRITE_MIN_INTERVAL_MS &&
-          (nextCheckpoint - lastPersistedDiscoveryCheckpoint) < DISCOVERY_CHECKPOINT_WRITE_MIN_BLOCK_DELTA
+          now - lastDiscoveryCheckpointWriteMs < DISCOVERY_CHECKPOINT_WRITE_MIN_INTERVAL_MS &&
+          nextCheckpoint - lastPersistedDiscoveryCheckpoint < DISCOVERY_CHECKPOINT_WRITE_MIN_BLOCK_DELTA
         ) {
           return false;
         }
 
         questionsCache[networkID].questionsDiscoveryCheckpointBlock = Math.max(
           Number(questionsCache[networkID].questionsDiscoveryCheckpointBlock) || floorBlock,
-          nextCheckpoint
+          nextCheckpoint,
         );
         queueQuestionCacheWrite({ force: true, opCount: 0 });
 
-        lastPersistedDiscoveryCheckpoint = Number(questionsCache[networkID].questionsDiscoveryCheckpointBlock) || nextCheckpoint;
+        lastPersistedDiscoveryCheckpoint =
+          Number(questionsCache[networkID].questionsDiscoveryCheckpointBlock) || nextCheckpoint;
         lastDiscoveryCheckpointWriteMs = now;
         return true;
       };
@@ -1480,9 +1464,13 @@ export const createSessionQuestionCacheController = (
         questionsCache[networkID].questionsLatestBlock = Math.max(
           Number(questionsCache[networkID].questionsLatestBlock) || floorBlock,
           checkpointBlock,
-          finalBlock
+          finalBlock,
         );
-        try { questionsCache[networkID].questionsDiscoveryCheckpointBlock = undefined; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+        try {
+          questionsCache[networkID].questionsDiscoveryCheckpointBlock = undefined;
+        } catch (e: unknown) {
+          mainSiteLog.warn('MainSite: fallback', e);
+        }
         queueQuestionCacheWrite({ force: true, opCount: 0 });
 
         lastPersistedDiscoveryCheckpoint = Number(questionsCache[networkID].questionsLatestBlock) || finalBlock;
@@ -1491,25 +1479,28 @@ export const createSessionQuestionCacheController = (
 
       if (!suppressUiState && totalScanBlocks > 0) {
         const progressCounts = buildQuestionScanProgressCounts(0);
-        queueQuestionProgressPatch({
-          slug,
-          phase: 'scan',
-          fromBlock: fromBlockForDiscovery,
-          toBlock: latestBlock,
-          totalBlocks: totalScanBlocks,
-          requestedTotalBlocks: requestedTotalScanBlocks,
-          wasCapped: didCapScanRange,
-          scannedBlocks: progressCounts.scannedBlocks,
-          remainingBlocks: progressCounts.remainingBlocks,
-          discoveredQuestions: 0,
-          hydratedQuestions: 0,
-          startedAtMs: Date.now(),
-        }, { force: true });
+        queueQuestionProgressPatch(
+          {
+            slug,
+            phase: 'scan',
+            fromBlock: fromBlockForDiscovery,
+            toBlock: latestBlock,
+            totalBlocks: totalScanBlocks,
+            requestedTotalBlocks: requestedTotalScanBlocks,
+            wasCapped: didCapScanRange,
+            scannedBlocks: progressCounts.scannedBlocks,
+            remainingBlocks: progressCounts.remainingBlocks,
+            discoveredQuestions: 0,
+            hydratedQuestions: 0,
+            startedAtMs: Date.now(),
+          },
+          { force: true },
+        );
       }
       if (fromBlockForDiscovery > latestBlock) {
         if (isRpcDebugLoggingEnabled()) {
           mainSiteLog.log(
-            `[MainSite] Question cache up-to-date: fromBlock(${fromBlockForDiscovery}) > latestBlock(${latestBlock}). Skipping scan.`
+            `[MainSite] Question cache up-to-date: fromBlock(${fromBlockForDiscovery}) > latestBlock(${latestBlock}). Skipping scan.`,
           );
         }
         // Even when logs are up-to-date, retry any pending off-chain metadata fetches.
@@ -1521,11 +1512,13 @@ export const createSessionQuestionCacheController = (
         const ready = cachedCount > 0 || pendingCount === 0;
         flushQuestionCacheWrite({ force: true });
         clearQueuedQuestionProgress();
-        setQuestionState((prev) => buildQuestionReadyStatePatch({
-          prevState: prev,
-          ready,
-          incrementNonce: recoveredPendingCount > 0,
-        }));
+        setQuestionState((prev) =>
+          buildQuestionReadyStatePatch({
+            prevState: prev,
+            ready,
+            incrementNonce: recoveredPendingCount > 0,
+          }),
+        );
         if (pendingCount > 0) schedulePendingQuestionMetadataRetry();
         return;
       }
@@ -1552,10 +1545,10 @@ export const createSessionQuestionCacheController = (
       };
 
       /********************************************
-      * 1. Fetch new question IDs via chunked scan (group-aware)
-      ********************************************/
+       * 1. Fetch new question IDs via chunked scan (group-aware)
+       ********************************************/
       mainSiteLog.log(
-        `initializeQuestionCacheForGroup: scanning for new question IDs from block ${fromBlockForDiscovery} to ${latestBlock} (group=${slug})...`
+        `initializeQuestionCacheForGroup: scanning for new question IDs from block ${fromBlockForDiscovery} to ${latestBlock} (group=${slug})...`,
       );
       let allDiscoveredQIDs: string[] | null = null;
       try {
@@ -1587,7 +1580,7 @@ export const createSessionQuestionCacheController = (
             // onChunkProgress callback
             if (isRpcDebugLoggingEnabled()) {
               mainSiteLog.debug(
-                `Question ID chunk: [${progressInfo.chunkFrom}..${progressInfo.chunkTo}] => ${progressInfo.chunkEventCount} events.`
+                `Question ID chunk: [${progressInfo.chunkFrom}..${progressInfo.chunkTo}] => ${progressInfo.chunkEventCount} events.`,
               );
             }
           },
@@ -1601,10 +1594,10 @@ export const createSessionQuestionCacheController = (
               fnTag: 'initialize-question-cache',
               scopeTag: 'question-discovery',
             },
-          }
+          },
         );
       } catch (chunkErr: unknown) {
-        mainSiteLog.error("Error fetching chunked question IDs:", chunkErr);
+        mainSiteLog.error('Error fetching chunked question IDs:', chunkErr);
         persistDiscoveryCheckpoint(contiguousDiscoveryFrontier, { force: true });
         const cachedCount = countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions);
         // If we have cached data, allow UI to proceed with it; otherwise keep the "ready" gate closed.
@@ -1628,67 +1621,58 @@ export const createSessionQuestionCacheController = (
       // questions as an empty ready cache while Arweave is still propagating.
       finalizeDiscoveryWatermark(latestBlock);
 
-      const cachedQuestionRefreshIds = (
-        slug
-          ? Object.values(questionsCache?.[networkID]?.questions || {})
+      const cachedQuestionRefreshIds = slug
+        ? Object.values(questionsCache?.[networkID]?.questions || {})
             .map((question) => String(question?.id || '').toLowerCase())
-            .filter((qid) => (
-              !!qid &&
-              !Object.prototype.hasOwnProperty.call(
-                questionsCache?.[networkID]?.questions?.[qid] || {},
-                'sessionSlugExplicit'
-              )
-            ))
-          : []
-      );
-      const hydrateTargetQIDs = Array.from(new Set([
-        ...newQIDsForDiscovery,
-        ...cachedQuestionRefreshIds,
-      ]));
+            .filter(
+              (qid) =>
+                !!qid &&
+                !Object.prototype.hasOwnProperty.call(
+                  questionsCache?.[networkID]?.questions?.[qid] || {},
+                  'sessionSlugExplicit',
+                ),
+            )
+        : [];
+      const hydrateTargetQIDs = Array.from(new Set([...newQIDsForDiscovery, ...cachedQuestionRefreshIds]));
 
       if (newQIDsForDiscovery.length > 0) {
         mainSiteLog.log(
-          `initializeQuestionCacheForGroup: discovered ${newQIDsForDiscovery.length} unique question IDs total.`
+          `initializeQuestionCacheForGroup: discovered ${newQIDsForDiscovery.length} unique question IDs total.`,
         );
       }
-      queueQuestionProgressPatch({
-        slug,
-        phase: 'hydrate',
-        discoveredQuestions: hydrateTargetQIDs.length,
-        hydratedQuestions: 0,
-        failedQuestions: 0,
-        pendingMetadataCount: Object.keys(
-          questionsCache?.[networkID]?.pendingQuestionMetadata || {}
-        ).length,
-        requestedTotalBlocks: requestedTotalScanBlocks,
-        wasCapped: didCapScanRange,
-        ...buildQuestionScanProgressCounts(totalScanBlocks),
-      }, { force: true });
+      queueQuestionProgressPatch(
+        {
+          slug,
+          phase: 'hydrate',
+          discoveredQuestions: hydrateTargetQIDs.length,
+          hydratedQuestions: 0,
+          failedQuestions: 0,
+          pendingMetadataCount: Object.keys(questionsCache?.[networkID]?.pendingQuestionMetadata || {}).length,
+          requestedTotalBlocks: requestedTotalScanBlocks,
+          wasCapped: didCapScanRange,
+          ...buildQuestionScanProgressCounts(totalScanBlocks),
+        },
+        { force: true },
+      );
 
       /**********************************************************************
-      * 2) Filter out those we already have in the cache. We only load new ones
-      **********************************************************************/
+       * 2) Filter out those we already have in the cache. We only load new ones
+       **********************************************************************/
       const existingQIDs = new Set(Object.keys(questionsCache[networkID].questions).map((id) => id.toLowerCase()));
       let finalNewQIDs = newQIDsForDiscovery.filter((id) => !existingQIDs.has(String(id || '').toLowerCase()));
-      finalNewQIDs = Array.from(new Set([
-        ...finalNewQIDs,
-        ...cachedQuestionRefreshIds,
-      ]));
-      const totalCachedQuestionsBeforeHydration = countHydratedQuestionMetadata(
-        questionsCache?.[networkID]?.questions
-      );
+      finalNewQIDs = Array.from(new Set([...finalNewQIDs, ...cachedQuestionRefreshIds]));
+      const totalCachedQuestionsBeforeHydration = countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions);
       const pendingQuestionMetadataCountBeforeHydration = Object.keys(
-        questionsCache?.[networkID]?.pendingQuestionMetadata || {}
+        questionsCache?.[networkID]?.pendingQuestionMetadata || {},
       ).length;
       // Regression guard: only raise this terminal error after the final capped window.
       // Interim empty windows must fall through so queued reruns keep scanning later blocks.
-      const shouldRaiseRangeLimitError = (
+      const shouldRaiseRangeLimitError =
         didCapScanRange &&
         scanRequestedToBlock === latestBlock &&
         totalCachedQuestionsBeforeHydration === 0 &&
         finalNewQIDs.length === 0 &&
-        pendingQuestionMetadataCountBeforeHydration === 0
-      );
+        pendingQuestionMetadataCountBeforeHydration === 0;
       if (shouldRaiseRangeLimitError) {
         clearQueuedQuestionProgress();
         setQuestionState((prev) => ({
@@ -1718,49 +1702,51 @@ export const createSessionQuestionCacheController = (
         mergeFreshIntoLocalCopy(); // <-- prevent wiping concurrent responses
         questionsCache[networkID].questionsLatestBlock = latestBlock;
         queueQuestionCacheWrite({ force: true });
-        mainSiteLog.log("No new question IDs to fetch. question cache up-to-date.");
+        mainSiteLog.log('No new question IDs to fetch. question cache up-to-date.');
         const cachedCount = countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions);
         const pendingCount = Object.keys(questionsCache?.[networkID]?.pendingQuestionMetadata || {}).length;
         const ready = cachedCount > 0 || pendingCount === 0;
         clearQueuedQuestionProgress();
-        setQuestionState((prev) => buildQuestionReadyStatePatch({
-          prevState: prev,
-          ready,
-          incrementNonce: recoveredPendingCount > 0,
-        }));
+        setQuestionState((prev) =>
+          buildQuestionReadyStatePatch({
+            prevState: prev,
+            ready,
+            incrementNonce: recoveredPendingCount > 0,
+          }),
+        );
         if (pendingCount > 0) schedulePendingQuestionMetadataRetry();
         return;
       }
       mainSiteLog.log(`We have ${finalNewQIDs.length} question IDs that are brand-new to the cache.`);
 
       /*******************************************
-      * 3) For each new question ID, fetch the data
-      *******************************************/
+       * 3) For each new question ID, fetch the data
+       *******************************************/
       const BATCH_SIZE = 10;
       let hydratedSuccessCount = 0;
       let hasHydrationDataNonceSignal = false;
-      const getPendingMetadataCount = (): number => (
-        Object.keys(questionsCache?.[networkID]?.pendingQuestionMetadata || {}).length
-      );
-      const updateHydrationProgress = (
-        {
-          hydratedCount = 0,
-          failedCount = 0,
-          force = false,
-        }: { hydratedCount?: number; failedCount?: number; force?: boolean } = {}
-      ): void => {
+      const getPendingMetadataCount = (): number =>
+        Object.keys(questionsCache?.[networkID]?.pendingQuestionMetadata || {}).length;
+      const updateHydrationProgress = ({
+        hydratedCount = 0,
+        failedCount = 0,
+        force = false,
+      }: { hydratedCount?: number; failedCount?: number; force?: boolean } = {}): void => {
         const hasAnyQuestions = countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions) > 0;
-        queueQuestionProgressPatch({
-          slug,
-          phase: 'hydrate',
-          discoveredQuestions: finalNewQIDs.length,
-          hydratedQuestions: Math.min(finalNewQIDs.length, Math.max(0, Number(hydratedCount || 0))),
-          failedQuestions: Math.max(0, Number(failedCount || 0)),
-          pendingMetadataCount: getPendingMetadataCount(),
-          requestedTotalBlocks: requestedTotalScanBlocks,
-          wasCapped: didCapScanRange,
-          ...buildQuestionScanProgressCounts(totalScanBlocks),
-        }, { force, markReady: hasAnyQuestions });
+        queueQuestionProgressPatch(
+          {
+            slug,
+            phase: 'hydrate',
+            discoveredQuestions: finalNewQIDs.length,
+            hydratedQuestions: Math.min(finalNewQIDs.length, Math.max(0, Number(hydratedCount || 0))),
+            failedQuestions: Math.max(0, Number(failedCount || 0)),
+            pendingMetadataCount: getPendingMetadataCount(),
+            requestedTotalBlocks: requestedTotalScanBlocks,
+            wasCapped: didCapScanRange,
+            ...buildQuestionScanProgressCounts(totalScanBlocks),
+          },
+          { force, markReady: hasAnyQuestions },
+        );
         if (hasAnyQuestions && !hasHydrationDataNonceSignal) {
           hasHydrationDataNonceSignal = true;
           setQuestionState((prev) => ({
@@ -1788,7 +1774,11 @@ export const createSessionQuestionCacheController = (
             questionsCache[networkID].questions[lowered] = preparedQuestionData;
           } else {
             rebucketedQuestionIds.add(lowered);
-            try { delete questionsCache[networkID].questions[lowered]; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+            try {
+              delete questionsCache[networkID].questions[lowered];
+            } catch (e: unknown) {
+              mainSiteLog.warn('MainSite: fallback', e);
+            }
             writeQuestionMetadataToCache(targetSlug, lowered, preparedQuestionData, networkID, {
               enforceScopedIsolation: true,
             });
@@ -1811,21 +1801,15 @@ export const createSessionQuestionCacheController = (
           const pendingMetadataEntry = questionsCache[networkID].pendingQuestionMetadata?.[lowered];
           const existingQuestion = questionsCache[networkID].questions[lowered] || null;
           if (pendingMetadataEntry && !hasHydratedQuestionMetadata(existingQuestion)) {
-            const placeholder = buildPendingQuestionMetadataPlaceholder(
-              lowered,
-              slug,
-              existingQuestion
-            );
+            const placeholder = buildPendingQuestionMetadataPlaceholder(lowered, slug, existingQuestion);
             if (placeholder) {
               questionsCache[networkID].questions[lowered] = placeholder;
             }
           }
         }
 
-        const forcePublish = (
-          !!item.questionData &&
-          countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions) === 1
-        );
+        const forcePublish =
+          !!item.questionData && countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions) === 1;
         // Save incremental progress as metadata arrives (merge to keep responses).
         queueQuestionCacheWrite({ force: forcePublish });
         updateHydrationProgress({
@@ -1859,7 +1843,7 @@ export const createSessionQuestionCacheController = (
               result = { qId, questionData: null, err };
             }
             processHydrationResult(result);
-          })
+          }),
         );
         // small sleep to avoid rate-limits
         await new Promise((resolve) => setTimeout(resolve, 200));
@@ -1870,12 +1854,12 @@ export const createSessionQuestionCacheController = (
       if (failedFetchCount > 0) {
         mainSiteLog.warn(
           `initializeQuestionCacheForGroup: ${failedFetchCount}/${finalNewQIDs.length} question metadata fetches failed. ` +
-          `Queued pending metadata retries; discovery watermark stays advanced.`
+            `Queued pending metadata retries; discovery watermark stays advanced.`,
         );
       }
       questionsCache[networkID].questionsLatestBlock = Math.max(
         Number(questionsCache[networkID].questionsLatestBlock) || 0,
-        latestBlock
+        latestBlock,
       );
       // Persist the final hydrated question batch before publishing the terminal
       // hydrate-progress snapshot. Embedded survey views reload off the cache when
@@ -1886,20 +1870,20 @@ export const createSessionQuestionCacheController = (
 
       // Write user cache
       if (userCacheModified) {
-        dgWrite("userCache", slug, userCache);
+        dgWrite('userCache', slug, userCache);
       }
 
       const totalCachedQuestions = countHydratedQuestionMetadata(questionsCache[networkID].questions);
       mainSiteLog.log(
         `initializeQuestionCacheForGroup: completed. We now have ${
           totalCachedQuestions
-        } total questions in local cache for network ${networkID}, up to block ${latestBlock}.`
+        } total questions in local cache for network ${networkID}, up to block ${latestBlock}.`,
       );
       if (totalCachedQuestions === 0 && fromBlockForDiscovery <= latestBlock) {
         mainSiteLog.warn(
           `initializeQuestionCacheForGroup: cache is EMPTY after scanning valid block range ` +
-          `[${fromBlockForDiscovery}..${latestBlock}] for group '${slug}'. ` +
-          `This may indicate a contract/config issue or all fetches failed.`
+            `[${fromBlockForDiscovery}..${latestBlock}] for group '${slug}'. ` +
+            `This may indicate a contract/config issue or all fetches failed.`,
         );
       }
       // If we have pending metadata but still no cached questions, keep the UI in a loading state
@@ -1910,9 +1894,10 @@ export const createSessionQuestionCacheController = (
       clearQueuedQuestionProgress();
       setQuestionState((prev) => ({
         isQuestionCacheReady: ready,
-        questionResponsesNonce: hydratedSuccessCount > 0 && !hasHydrationDataNonceSignal
-          ? (Number(prev.questionResponsesNonce || 0) + 1)
-          : Number(prev.questionResponsesNonce || 0),
+        questionResponsesNonce:
+          hydratedSuccessCount > 0 && !hasHydrationDataNonceSignal
+            ? Number(prev.questionResponsesNonce || 0) + 1
+            : Number(prev.questionResponsesNonce || 0),
       }));
       if (pendingCount > 0) schedulePendingQuestionMetadataRetry();
       // Also re-check the “all caches ready” in case we were the last piece
@@ -1926,15 +1911,15 @@ export const createSessionQuestionCacheController = (
       delete _questionInitInFlight[initRunKey];
       const hasPendingRerun = !!_questionInitPending[initRunKey];
       if (isMounted() && !hasPendingRerun) {
-        setQuestionState((prev) => (
+        setQuestionState((prev) =>
           shouldClearQuestionProgressInFinalize({
             hasPendingRerun,
             isQuestionCacheReady: !!prev?.isQuestionCacheReady,
             questionScanProgress: prev?.questionScanProgress || null,
           })
             ? { questionScanProgress: null }
-            : null
-        ));
+            : null,
+        );
       }
       if (hasPendingRerun) {
         const pendingOpts = _questionInitPending[initRunKey];
@@ -1944,7 +1929,9 @@ export const createSessionQuestionCacheController = (
           try {
             if (!isMounted()) return;
             initializeQuestionCacheForGroup(slug, pendingOpts || rerunOpts);
-          } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+          } catch (e: unknown) {
+            mainSiteLog.warn('MainSite: fallback', e);
+          }
         }, 0);
         _continuationTimers.push(rerunTimer);
       }
@@ -1971,11 +1958,9 @@ export const createSessionQuestionCacheController = (
 
   async function refreshEncryptedQuestionPayloadsForGroup(
     slug: string,
-    opts: RefreshEncryptedQuestionPayloadsOptions = {}
+    opts: RefreshEncryptedQuestionPayloadsOptions = {},
   ): Promise<void> {
-    const options = (
-      opts && typeof opts === 'object' ? opts : {}
-    ) as RefreshEncryptedQuestionPayloadsOptions;
+    const options = (opts && typeof opts === 'object' ? opts : {}) as RefreshEncryptedQuestionPayloadsOptions;
     const force = !!options.force;
     const continuation = !!options.continuation;
     const now = Date.now();
@@ -1997,7 +1982,7 @@ export const createSessionQuestionCacheController = (
 
     const MIN_GAP_MS = 4000;
     const lastStart = Number(_maskedQuestionRefreshLastStart[slug] || 0);
-    if (!force && !continuation && lastStart && (now - lastStart) < MIN_GAP_MS) return;
+    if (!force && !continuation && lastStart && now - lastStart < MIN_GAP_MS) return;
     _maskedQuestionRefreshLastStart[slug] = now;
 
     const run = (async () => {
@@ -2009,22 +1994,25 @@ export const createSessionQuestionCacheController = (
       const questionMap = networkCache?.questions || null;
       if (!questionMap || typeof questionMap !== 'object') return;
 
-      const encryptedQuestionIds = Object.keys(questionMap).filter((qid: string) => isMaskedQuestionPayload(questionMap[qid]));
+      const encryptedQuestionIds = Object.keys(questionMap).filter((qid: string) =>
+        isMaskedQuestionPayload(questionMap[qid]),
+      );
       if (!encryptedQuestionIds.length) return;
 
       const decryptContext = buildQuestionDecryptContext(slug);
-      const accountLower = String(decryptContext?.account || '').trim().toLowerCase();
+      const accountLower = String(decryptContext?.account || '')
+        .trim()
+        .toLowerCase();
       const hasProviderLike = !!String(decryptContext?.providerLike || '').trim();
-      const litOpts = (
-        isRecord(decryptContext?.litOpts)
-          ? decryptContext.litOpts
-          : {}
-      ) as CacheRecord & { getKey?: unknown };
+      const litOpts = (isRecord(decryptContext?.litOpts) ? decryptContext.litOpts : {}) as CacheRecord & {
+        getKey?: unknown;
+      };
       const hasLitKey = typeof litOpts.getKey === 'function';
       if (!accountLower || (!hasProviderLike && !hasLitKey)) return;
 
       const backoffMs = force ? 0 : 30000;
-      const backoffKey = (qid: string): string => `${accountLower}|${slug}|${networkID}|${String(qid || '').toLowerCase()}`;
+      const backoffKey = (qid: string): string =>
+        `${accountLower}|${slug}|${networkID}|${String(qid || '').toLowerCase()}`;
 
       // Time-slice: decrypt only a small number per invocation so we don't stall the app.
       const MAX_ATTEMPTS_PER_RUN = force ? 24 : 12;
@@ -2037,7 +2025,7 @@ export const createSessionQuestionCacheController = (
       const toProcess: string[] = [];
       let scanned = 0;
       while (toProcess.length < MAX_ATTEMPTS_PER_RUN && scanned < total) {
-        const idx = total > 0 ? ((cursor + scanned) % total) : 0;
+        const idx = total > 0 ? (cursor + scanned) % total : 0;
         const id = String(encryptedQuestionIds[idx] || '').toLowerCase();
         scanned += 1;
 
@@ -2046,7 +2034,7 @@ export const createSessionQuestionCacheController = (
 
         const key = backoffKey(id);
         const lastAttempt = maskedQuestionDecryptBackoff.get(key);
-        if (!force && lastAttempt && (now - Number(lastAttempt.ts || 0)) < backoffMs) {
+        if (!force && lastAttempt && now - Number(lastAttempt.ts || 0) < backoffMs) {
           continue;
         }
         toProcess.push(id);
@@ -2129,25 +2117,29 @@ export const createSessionQuestionCacheController = (
         const delayMs = Math.max(0, Number(pending.delayMs || 0));
         const continuationTimer = setTimeout(() => {
           if (_destroyed) return;
-          try { refreshEncryptedQuestionPayloadsForGroup(slug, pending); } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+          try {
+            refreshEncryptedQuestionPayloadsForGroup(slug, pending);
+          } catch (e: unknown) {
+            mainSiteLog.warn('MainSite: fallback', e);
+          }
         }, delayMs);
         _continuationTimers.push(continuationTimer);
       }
     }
   }
 
-  async function refreshQuestionMetadataForGroup(
-    slug: string,
-    opts: QuestionInitOptions = {}
-  ): Promise<void> {
-    mainSiteLog.log("refreshQuestionMetadataForGroup() - invoked", { slug });
-    if (!getSessionChainId(slug)) { mainSiteLog.warn("No group chainId for refreshQuestionMetadataForGroup"); return; }
+  async function refreshQuestionMetadataForGroup(slug: string, opts: QuestionInitOptions = {}): Promise<void> {
+    mainSiteLog.log('refreshQuestionMetadataForGroup() - invoked', { slug });
+    if (!getSessionChainId(slug)) {
+      mainSiteLog.warn('No group chainId for refreshQuestionMetadataForGroup');
+      return;
+    }
     // Re-running initializeQuestionCacheForGroup will handle fetching new QIDs and their metadata
     // from the last known block.
     setReadinessStateIfChanged({ isQuestionCacheReady: false }); // Temporarily mark as not ready
     await initializeQuestionCacheForGroup(slug, opts);
     checkAllCachesReady(); // Re-check global readiness
-    mainSiteLog.log("refreshQuestionMetadataForGroup() - done");
+    mainSiteLog.log('refreshQuestionMetadataForGroup() - done');
   }
 
   return {

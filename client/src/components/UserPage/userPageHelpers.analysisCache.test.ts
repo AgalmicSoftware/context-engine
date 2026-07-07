@@ -29,11 +29,13 @@ describe('userPageHelpers analysis cache helpers', () => {
     expect(toAnalysisRecord({ a: 1 })).toEqual({ a: 1 });
     expect(toAnalysisRecord(null)).toEqual({});
     expect(toAnalysisCacheBucket(['kept'])).toEqual(['kept']);
-    expect(sortUserAnalysisKeys({
-      z: 1,
-      a: { y: 2, x: 1 },
-      list: [{ b: 2, a: 1 }],
-    })).toEqual({
+    expect(
+      sortUserAnalysisKeys({
+        z: 1,
+        a: { y: 2, x: 1 },
+        list: [{ b: 2, a: 1 }],
+      }),
+    ).toEqual({
       a: { x: 1, y: 2 },
       list: [{ a: 1, b: 2 }],
       z: 1,
@@ -78,9 +80,9 @@ describe('userPageHelpers analysis cache helpers', () => {
     try {
       expect(formatAnalysisCacheAge(null)).toBe('');
       expect(formatAnalysisCacheAge(1_710_000_000_000 - 10_000)).toBe('just now');
-      expect(formatAnalysisCacheAge(1_710_000_000_000 - (5 * 60 * 1000))).toBe('5m ago');
-      expect(formatAnalysisCacheAge(1_710_000_000_000 - (2 * 60 * 60 * 1000))).toBe('2h ago');
-      expect(formatAnalysisCacheAge(1_710_000_000_000 - (3 * 24 * 60 * 60 * 1000))).toBe('3d ago');
+      expect(formatAnalysisCacheAge(1_710_000_000_000 - 5 * 60 * 1000)).toBe('5m ago');
+      expect(formatAnalysisCacheAge(1_710_000_000_000 - 2 * 60 * 60 * 1000)).toBe('2h ago');
+      expect(formatAnalysisCacheAge(1_710_000_000_000 - 3 * 24 * 60 * 60 * 1000)).toBe('3d ago');
     } finally {
       nowSpy.mockRestore();
     }
@@ -89,24 +91,30 @@ describe('userPageHelpers analysis cache helpers', () => {
   it('resolves analysis cache status display state', () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_710_000_000_000);
     try {
-      expect(resolveUserPageAnalysisCacheStatusState({
-        analysisCachedAt: 1_710_000_000_000 - (5 * 60 * 1000),
-        analysisServedFromCache: false,
-      })).toEqual({
+      expect(
+        resolveUserPageAnalysisCacheStatusState({
+          analysisCachedAt: 1_710_000_000_000 - 5 * 60 * 1000,
+          analysisServedFromCache: false,
+        }),
+      ).toEqual({
         analysisCacheAge: '',
         shouldRenderAnalysisCacheStatus: false,
       });
-      expect(resolveUserPageAnalysisCacheStatusState({
-        analysisCachedAt: null,
-        analysisServedFromCache: true,
-      })).toEqual({
+      expect(
+        resolveUserPageAnalysisCacheStatusState({
+          analysisCachedAt: null,
+          analysisServedFromCache: true,
+        }),
+      ).toEqual({
         analysisCacheAge: '',
         shouldRenderAnalysisCacheStatus: false,
       });
-      expect(resolveUserPageAnalysisCacheStatusState({
-        analysisCachedAt: 1_710_000_000_000 - (5 * 60 * 1000),
-        analysisServedFromCache: true,
-      })).toEqual({
+      expect(
+        resolveUserPageAnalysisCacheStatusState({
+          analysisCachedAt: 1_710_000_000_000 - 5 * 60 * 1000,
+          analysisServedFromCache: true,
+        }),
+      ).toEqual({
         analysisCacheAge: '5m ago',
         shouldRenderAnalysisCacheStatus: true,
       });
@@ -142,52 +150,68 @@ describe('userPageHelpers analysis cache helpers', () => {
     };
 
     expect(readUserPageAnalysisCacheEntry(readArgs)).toBe(validEntry);
-    expect(readUserPageAnalysisCacheEntry({
-      ...readArgs,
-      cacheObj: { 84532: { '0xabc': { 'fingerprint-a': { ...validEntry, version: 0 } } } },
-    })).toBeNull();
-    expect(readUserPageAnalysisCacheEntry({
-      ...readArgs,
-      cacheObj: { 84532: { '0xabc': { 'fingerprint-a': { ...validEntry, fingerprint: 'other' } } } },
-    })).toBeNull();
-    expect(readUserPageAnalysisCacheEntry({
-      ...readArgs,
-      cacheObj: { 84532: { '0xabc': { 'fingerprint-a': { ...validEntry, networkId: '10' } } } },
-    })).toBeNull();
-    expect(readUserPageAnalysisCacheEntry({
-      ...readArgs,
-      cacheObj: { 84532: { '0xabc': { 'fingerprint-a': { ...validEntry, address: '0xdef' } } } },
-    })).toBeNull();
-    expect(readUserPageAnalysisCacheEntry({
-      ...readArgs,
-      cacheObj: { 84532: { '0xabc': { 'fingerprint-a': { ...validEntry, expiresAt: now } } } },
-    })).toBeNull();
-    expect(readUserPageAnalysisCacheEntry({
-      ...readArgs,
-      fingerprint: 'missing',
-    })).toBeNull();
+    expect(
+      readUserPageAnalysisCacheEntry({
+        ...readArgs,
+        cacheObj: { 84532: { '0xabc': { 'fingerprint-a': { ...validEntry, version: 0 } } } },
+      }),
+    ).toBeNull();
+    expect(
+      readUserPageAnalysisCacheEntry({
+        ...readArgs,
+        cacheObj: { 84532: { '0xabc': { 'fingerprint-a': { ...validEntry, fingerprint: 'other' } } } },
+      }),
+    ).toBeNull();
+    expect(
+      readUserPageAnalysisCacheEntry({
+        ...readArgs,
+        cacheObj: { 84532: { '0xabc': { 'fingerprint-a': { ...validEntry, networkId: '10' } } } },
+      }),
+    ).toBeNull();
+    expect(
+      readUserPageAnalysisCacheEntry({
+        ...readArgs,
+        cacheObj: { 84532: { '0xabc': { 'fingerprint-a': { ...validEntry, address: '0xdef' } } } },
+      }),
+    ).toBeNull();
+    expect(
+      readUserPageAnalysisCacheEntry({
+        ...readArgs,
+        cacheObj: { 84532: { '0xabc': { 'fingerprint-a': { ...validEntry, expiresAt: now } } } },
+      }),
+    ).toBeNull();
+    expect(
+      readUserPageAnalysisCacheEntry({
+        ...readArgs,
+        fingerprint: 'missing',
+      }),
+    ).toBeNull();
   });
 
   it('describes analysis cache read identity without reading cache data', () => {
-    expect(buildUserPageAnalysisCacheReadDescriptor({
-      addressLower: ' 0xABC ',
-      fingerprint: 'fingerprint-a',
-      networkId: 84532,
-      sessionSlug: ' Session-A ',
-    })).toEqual({
+    expect(
+      buildUserPageAnalysisCacheReadDescriptor({
+        addressLower: ' 0xABC ',
+        fingerprint: 'fingerprint-a',
+        networkId: 84532,
+        sessionSlug: ' Session-A ',
+      }),
+    ).toEqual({
       action: 'read',
       addressLower: '0xabc',
       fingerprint: 'fingerprint-a',
       networkId: '84532',
       sessionSlug: ' Session-A ',
     });
-    expect(buildUserPageAnalysisCacheReadDescriptor({
-      addressLower: '0xabc',
-      fingerprint: 'fingerprint-a',
-      forceRefresh: true,
-      networkId: 84532,
-      sessionSlug: 'session-a',
-    })).toEqual({
+    expect(
+      buildUserPageAnalysisCacheReadDescriptor({
+        addressLower: '0xabc',
+        fingerprint: 'fingerprint-a',
+        forceRefresh: true,
+        networkId: 84532,
+        sessionSlug: 'session-a',
+      }),
+    ).toEqual({
       action: 'skip-force-refresh',
       addressLower: '0xabc',
       fingerprint: 'fingerprint-a',
@@ -220,47 +244,55 @@ describe('userPageHelpers analysis cache helpers', () => {
       },
     }));
 
-    expect(readUserPageAnalysisCacheThroughPort({
-      cacheVersion: 1,
-      descriptor,
-      now,
-      peekCache,
-    })).toEqual({
+    expect(
+      readUserPageAnalysisCacheThroughPort({
+        cacheVersion: 1,
+        descriptor,
+        now,
+        peekCache,
+      }),
+    ).toEqual({
       descriptor,
       entry: validEntry,
       status: 'hit',
     });
     expect(peekCache).toHaveBeenCalledWith('analysisCache', 'session-a', { clone: false });
 
-    expect(readUserPageAnalysisCacheThroughPort({
-      cacheVersion: 1,
-      descriptor: {
-        ...descriptor,
-        fingerprint: 'missing',
-      },
-      now,
-      peekCache,
-    })).toMatchObject({
+    expect(
+      readUserPageAnalysisCacheThroughPort({
+        cacheVersion: 1,
+        descriptor: {
+          ...descriptor,
+          fingerprint: 'missing',
+        },
+        now,
+        peekCache,
+      }),
+    ).toMatchObject({
       entry: null,
       status: 'miss',
     });
-    expect(readUserPageAnalysisCacheThroughPort({
-      descriptor: {
-        ...descriptor,
-        action: 'skip-force-refresh',
-      },
-      peekCache,
-    })).toMatchObject({
+    expect(
+      readUserPageAnalysisCacheThroughPort({
+        descriptor: {
+          ...descriptor,
+          action: 'skip-force-refresh',
+        },
+        peekCache,
+      }),
+    ).toMatchObject({
       entry: null,
       status: 'skipped',
     });
-    expect(readUserPageAnalysisCacheThroughPort({
-      descriptor: {
-        ...descriptor,
-        sessionSlug: '',
-      },
-      peekCache,
-    })).toMatchObject({
+    expect(
+      readUserPageAnalysisCacheThroughPort({
+        descriptor: {
+          ...descriptor,
+          sessionSlug: '',
+        },
+        peekCache,
+      }),
+    ).toMatchObject({
       entry: null,
       status: 'skipped',
     });
@@ -269,10 +301,12 @@ describe('userPageHelpers analysis cache helpers', () => {
     const throwingPeek = jest.fn(() => {
       throw thrown;
     });
-    expect(readUserPageAnalysisCacheThroughPort({
-      descriptor,
-      peekCache: throwingPeek,
-    })).toEqual({
+    expect(
+      readUserPageAnalysisCacheThroughPort({
+        descriptor,
+        peekCache: throwingPeek,
+      }),
+    ).toEqual({
       descriptor,
       entry: null,
       error: thrown,
@@ -419,15 +453,17 @@ describe('userPageHelpers analysis cache helpers', () => {
     const throwingWrite = jest.fn(async () => {
       throw thrown;
     });
-    await expect(writeUserPageAnalysisCacheThroughPort({
-      addressLower: '0xabc',
-      cachedAt,
-      fingerprint: 'fingerprint-new',
-      networkId: '84532',
-      peekCache,
-      sessionSlug: 'edge',
-      writeCache: throwingWrite,
-    })).resolves.toMatchObject({
+    await expect(
+      writeUserPageAnalysisCacheThroughPort({
+        addressLower: '0xabc',
+        cachedAt,
+        fingerprint: 'fingerprint-new',
+        networkId: '84532',
+        peekCache,
+        sessionSlug: 'edge',
+        writeCache: throwingWrite,
+      }),
+    ).resolves.toMatchObject({
       error: thrown,
       status: 'error',
     });
@@ -436,15 +472,15 @@ describe('userPageHelpers analysis cache helpers', () => {
   it('reads created-survey analysis caches through an injected port', () => {
     const surveysCache = { 84532: { surveys: { s1: { id: 's1' } } } };
     const questionsCache = { 84532: { questions: { q1: { id: 'q1' } } } };
-    const peekCache = jest.fn((namespace: string) => (
-      namespace === 'surveysCache' ? surveysCache : questionsCache
-    ));
+    const peekCache = jest.fn((namespace: string) => (namespace === 'surveysCache' ? surveysCache : questionsCache));
 
-    expect(readUserPageAnalysisCreatedSurveyCachesThroughPort({
-      networkID: 84532,
-      peekCache,
-      sessionSlug: '',
-    })).toEqual({
+    expect(
+      readUserPageAnalysisCreatedSurveyCachesThroughPort({
+        networkID: 84532,
+        peekCache,
+        sessionSlug: '',
+      }),
+    ).toEqual({
       networkID: '84532',
       questionsCache,
       sessionSlug: '',
@@ -456,11 +492,13 @@ describe('userPageHelpers analysis cache helpers', () => {
       ['questionsCache', '', { clone: false }],
     ]);
 
-    expect(readUserPageAnalysisCreatedSurveyCachesThroughPort({
-      networkID: '',
-      peekCache,
-      sessionSlug: 'edge',
-    })).toEqual({
+    expect(
+      readUserPageAnalysisCreatedSurveyCachesThroughPort({
+        networkID: '',
+        peekCache,
+        sessionSlug: 'edge',
+      }),
+    ).toEqual({
       networkID: '',
       questionsCache: {},
       sessionSlug: 'edge',
@@ -472,11 +510,13 @@ describe('userPageHelpers analysis cache helpers', () => {
     const throwingPeek = jest.fn(() => {
       throw thrown;
     });
-    expect(readUserPageAnalysisCreatedSurveyCachesThroughPort({
-      networkID: 84532,
-      peekCache: throwingPeek,
-      sessionSlug: 'edge',
-    })).toEqual({
+    expect(
+      readUserPageAnalysisCreatedSurveyCachesThroughPort({
+        networkID: 84532,
+        peekCache: throwingPeek,
+        sessionSlug: 'edge',
+      }),
+    ).toEqual({
       error: thrown,
       networkID: '84532',
       questionsCache: {},
@@ -507,19 +547,17 @@ describe('userPageHelpers analysis cache helpers', () => {
 
     expect(readUserPageDirectNetworkCacheBucket(surveysCache, 84532)).toBe(surveysCache[84532]);
     expect(readUserPageDirectNetworkCacheBucket(surveysCache, '')).toEqual({});
-    expect(buildUserPageAnalysisCreatedQuestions([
-      { id: 'q1', type: 'text', prompt: 'Question one', ignored: true },
-    ])).toEqual([
-      { id: 'q1', type: 'text', prompt: 'Question one' },
-    ]);
-    expect(buildUserPageAnalysisCreatedSurveys({
-      networkID: 84532,
-      questionsCache,
-      surveyCreationInfo: [
-        { id: 'survey_a', title: 'Survey A', questionsCount: 3 },
-      ],
-      surveysCache,
-    })).toEqual([
+    expect(
+      buildUserPageAnalysisCreatedQuestions([{ id: 'q1', type: 'text', prompt: 'Question one', ignored: true }]),
+    ).toEqual([{ id: 'q1', type: 'text', prompt: 'Question one' }]);
+    expect(
+      buildUserPageAnalysisCreatedSurveys({
+        networkID: 84532,
+        questionsCache,
+        surveyCreationInfo: [{ id: 'survey_a', title: 'Survey A', questionsCount: 3 }],
+        surveysCache,
+      }),
+    ).toEqual([
       {
         surveyId: 'survey_a',
         title: 'Survey A',
@@ -534,15 +572,12 @@ describe('userPageHelpers analysis cache helpers', () => {
   });
 
   it('builds analysis SBT, question, and survey response inputs', () => {
-    expect(buildUserPageAnalysisSbts({
-      getSbtDisplayName: (sbtInfo) => (sbtInfo as any)?.title,
-      sbtList: [
-        { sbtInfo: { title: 'Alpha Badge', sbtAddress: '0xA' } },
-        { name: 'Missing Address', sbtInfo: {} },
-      ],
-    })).toEqual([
-      { name: 'Alpha Badge', address: '0xA' },
-    ]);
+    expect(
+      buildUserPageAnalysisSbts({
+        getSbtDisplayName: (sbtInfo) => (sbtInfo as any)?.title,
+        sbtList: [{ sbtInfo: { title: 'Alpha Badge', sbtAddress: '0xA' } }, { name: 'Missing Address', sbtInfo: {} }],
+      }),
+    ).toEqual([{ name: 'Alpha Badge', address: '0xA' }]);
 
     const derivedSbtSection = buildUserPageSbtSection({
       aggregate: {
@@ -606,25 +641,29 @@ describe('userPageHelpers analysis cache helpers', () => {
         derivedSbtSample: ['0xbadgea', '0x1234567890abcdef'],
       },
     });
-    expect(buildUserPageSbtSection({
-      aggregate: { sbtAggregate: {} },
-      viewAddressLower: '0xviewer',
-    }).telemetry).toBeNull();
+    expect(
+      buildUserPageSbtSection({
+        aggregate: { sbtAggregate: {} },
+        viewAddressLower: '0xviewer',
+      }).telemetry,
+    ).toBeNull();
 
-    expect(buildUserPageAnalysisQuestions({
-      detailedQuestionResponses: {
-        q1: {
-          answer: { value: ['yes'] },
-          additionalComments: 'Useful context',
-          importance: { value: 'high' },
+    expect(
+      buildUserPageAnalysisQuestions({
+        detailedQuestionResponses: {
+          q1: {
+            answer: { value: ['yes'] },
+            additionalComments: 'Useful context',
+            importance: { value: 'high' },
+          },
+          q2: { answer: { value: '*' } },
         },
-        q2: { answer: { value: '*' } },
-      },
-      questionResponseInfo: [
-        { id: 'q1', type: 'multi', prompt: 'Question one' },
-        { id: 'q2', type: 'text', prompt: 'Encrypted' },
-      ],
-    })).toEqual([
+        questionResponseInfo: [
+          { id: 'q1', type: 'multi', prompt: 'Question one' },
+          { id: 'q2', type: 'text', prompt: 'Encrypted' },
+        ],
+      }),
+    ).toEqual([
       {
         id: 'q1',
         type: 'multi',
@@ -635,26 +674,26 @@ describe('userPageHelpers analysis cache helpers', () => {
       },
     ]);
 
-    expect(buildUserPageAnalysisSurveys({
-      detailedSurveyResponses: {
-        s1: [
-          {
-            questionData: { prompt: 'Prompt one', type: 'text' },
-            responseData: {
-              answer: { value: 'answer one' },
-              additionalComment: { value: 'Survey note' },
+    expect(
+      buildUserPageAnalysisSurveys({
+        detailedSurveyResponses: {
+          s1: [
+            {
+              questionData: { prompt: 'Prompt one', type: 'text' },
+              responseData: {
+                answer: { value: 'answer one' },
+                additionalComment: { value: 'Survey note' },
+              },
             },
-          },
-          {
-            questionData: { prompt: 'Hidden prompt' },
-            responseData: { answer: { value: '*' } },
-          },
-        ],
-      },
-      surveyResponseInfo: [
-        { id: 's1', title: 'Survey one' },
-      ],
-    })).toEqual([
+            {
+              questionData: { prompt: 'Hidden prompt' },
+              responseData: { answer: { value: '*' } },
+            },
+          ],
+        },
+        surveyResponseInfo: [{ id: 's1', title: 'Survey one' }],
+      }),
+    ).toEqual([
       {
         surveyId: 's1',
         title: 'Survey one',

@@ -57,21 +57,43 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
     });
     readSessionScanSlugs.mockReturnValue([]);
     fetchWorkerWithAuth.mockResolvedValue(jsonResp(200, { id: 'tx-default' }));
-    try { delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAYS; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
+    try {
+      delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAYS;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
   });
 
   afterEach(() => {
     jest.clearAllMocks();
-    try { delete globalThis.CE_ARWEAVE_GATEWAYS; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAYS;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS;
+    } catch (_) {}
   });
 
   it('honors preflightTxExistence=false and skips graphql precheck even for response payload categories', async () => {
@@ -116,9 +138,11 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
 
   it('honors runtime overrides that enable session-metadata GraphQL precheck', async () => {
     globalThis.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA = true;
-    global.fetch.mockResolvedValueOnce(jsonResp(200, {
-      data: { transactions: { edges: [] } },
-    }));
+    global.fetch.mockResolvedValueOnce(
+      jsonResp(200, {
+        data: { transactions: { edges: [] } },
+      }),
+    );
 
     await expect(
       arweaveScripts.downloadDataFromArweave('session-meta-with-preflight', {
@@ -126,7 +150,7 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
         retries: 0,
         bypassCache: true,
         debugContext: { category: 'session_registry_metadata' },
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -178,9 +202,11 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
 
   it('prefers healthy GraphQL endpoints before legacy gateway prechecks', async () => {
     globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA = true;
-    global.fetch.mockResolvedValueOnce(jsonResp(200, {
-      data: { transactions: { edges: [] } },
-    }));
+    global.fetch.mockResolvedValueOnce(
+      jsonResp(200, {
+        data: { transactions: { edges: [] } },
+      }),
+    );
 
     await expect(
       arweaveScripts.downloadDataFromArweave('graphql-primary-health-check', {
@@ -188,7 +214,7 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
         retries: 0,
         bypassCache: true,
         debugContext: { category: 'sbt_metadata' },
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -208,9 +234,11 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
         json: async () => null,
         text: async () => '',
       })
-      .mockResolvedValueOnce(jsonResp(200, {
-        data: { transactions: { edges: [] } },
-      }));
+      .mockResolvedValueOnce(
+        jsonResp(200, {
+          data: { transactions: { edges: [] } },
+        }),
+      );
 
     await expect(
       arweaveScripts.downloadDataFromArweave('graphql-secondary-fallback', {
@@ -218,7 +246,7 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
         retries: 0,
         bypassCache: true,
         debugContext: { category: 'sbt_metadata' },
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,

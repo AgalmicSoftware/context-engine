@@ -1,7 +1,4 @@
-import {
-  normalizeSbtHistorySummary,
-  buildSbtHistorySummaryFromCounts,
-} from './sbtHistoryHelpers.js';
+import { normalizeSbtHistorySummary, buildSbtHistorySummaryFromCounts } from './sbtHistoryHelpers.js';
 
 describe('sbtHistoryHelpers', () => {
   describe('normalizeSbtHistorySummary', () => {
@@ -13,13 +10,15 @@ describe('sbtHistoryHelpers', () => {
     });
 
     it('normalizes valid fields as canonical digit strings', () => {
-      expect(normalizeSbtHistorySummary({
-        totalMinted: '005',
-        totalBurned: '000',
-        activeSupply: '03',
-        currentHolderCount: '02',
-        historicalHolderCount: '010',
-      })).toEqual({
+      expect(
+        normalizeSbtHistorySummary({
+          totalMinted: '005',
+          totalBurned: '000',
+          activeSupply: '03',
+          currentHolderCount: '02',
+          historicalHolderCount: '010',
+        }),
+      ).toEqual({
         totalMinted: '5',
         totalBurned: '0',
         activeSupply: '3',
@@ -29,22 +28,26 @@ describe('sbtHistoryHelpers', () => {
     });
 
     it('normalizes missing required fields to null', () => {
-      expect(normalizeSbtHistorySummary({
-        totalMinted: '1',
-        totalBurned: '0',
-        activeSupply: '1',
-        currentHolderCount: '1',
-      })).toBeNull();
+      expect(
+        normalizeSbtHistorySummary({
+          totalMinted: '1',
+          totalBurned: '0',
+          activeSupply: '1',
+          currentHolderCount: '1',
+        }),
+      ).toBeNull();
     });
 
     it('normalizes non-numeric field values to null', () => {
-      expect(normalizeSbtHistorySummary({
-        totalMinted: '1',
-        totalBurned: 'x',
-        activeSupply: '1',
-        currentHolderCount: '1',
-        historicalHolderCount: '1',
-      })).toBeNull();
+      expect(
+        normalizeSbtHistorySummary({
+          totalMinted: '1',
+          totalBurned: 'x',
+          activeSupply: '1',
+          currentHolderCount: '1',
+          historicalHolderCount: '1',
+        }),
+      ).toBeNull();
     });
   });
 
@@ -60,12 +63,14 @@ describe('sbtHistoryHelpers', () => {
     });
 
     it('builds active supply and holder count from minted counts', () => {
-      expect(buildSbtHistorySummaryFromCounts({
-        mintedCountByAddress: {
-          '0xA': 2,
-          '0xB': 1,
-        },
-      })).toEqual({
+      expect(
+        buildSbtHistorySummaryFromCounts({
+          mintedCountByAddress: {
+            '0xA': 2,
+            '0xB': 1,
+          },
+        }),
+      ).toEqual({
         totalMinted: '3',
         totalBurned: '0',
         activeSupply: '3',
@@ -75,15 +80,17 @@ describe('sbtHistoryHelpers', () => {
     });
 
     it('builds net active supply from minted and burned counts', () => {
-      expect(buildSbtHistorySummaryFromCounts({
-        mintedCountByAddress: {
-          '0xA': 2,
-          '0xB': 1,
-        },
-        burnedCountByAddress: {
-          '0xA': 1,
-        },
-      })).toEqual({
+      expect(
+        buildSbtHistorySummaryFromCounts({
+          mintedCountByAddress: {
+            '0xA': 2,
+            '0xB': 1,
+          },
+          burnedCountByAddress: {
+            '0xA': 1,
+          },
+        }),
+      ).toEqual({
         totalMinted: '3',
         totalBurned: '1',
         activeSupply: '2',
@@ -93,9 +100,11 @@ describe('sbtHistoryHelpers', () => {
     });
 
     it('returns null when derived values fail history summary normalization', () => {
-      expect(buildSbtHistorySummaryFromCounts({
-        mintedEventCount: Infinity,
-      })).toBeNull();
+      expect(
+        buildSbtHistorySummaryFromCounts({
+          mintedEventCount: Infinity,
+        }),
+      ).toBeNull();
     });
   });
 });

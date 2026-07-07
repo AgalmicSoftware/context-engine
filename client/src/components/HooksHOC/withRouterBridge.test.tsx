@@ -17,7 +17,7 @@ describe('withRouterBridge', () => {
     render(
       <MemoryRouter initialEntries={['/demo-path']}>
         <RouteAwareComponent />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByTestId('router-props')).toHaveAttribute('data-params', '{}');

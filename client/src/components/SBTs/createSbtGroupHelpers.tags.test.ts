@@ -42,34 +42,42 @@ describe('createSbtGroupHelpers tag helpers', () => {
   });
 
   it('builds tag addition state while clearing matching default tag bookkeeping', () => {
-    expect(resolveCreateSbtTagInputState({
-      currentTagInput: ' Alpha ',
-    })).toEqual({
+    expect(
+      resolveCreateSbtTagInputState({
+        currentTagInput: ' Alpha ',
+      }),
+    ).toEqual({
       shouldShowAddTagButton: true,
     });
-    expect(resolveCreateSbtTagInputState({
-      currentTagInput: '   ',
-    })).toEqual({
+    expect(
+      resolveCreateSbtTagInputState({
+        currentTagInput: '   ',
+      }),
+    ).toEqual({
       shouldShowAddTagButton: false,
     });
-    expect(buildCreateSbtTagAdditionState({
-      autoAppliedDefaultTags: ['Auto', 'Keep'],
-      dismissedDefaultTags: ['auto', 'Other'],
-      tagValue: ' Auto ',
-      tags: ['Manual'],
-    })).toEqual({
+    expect(
+      buildCreateSbtTagAdditionState({
+        autoAppliedDefaultTags: ['Auto', 'Keep'],
+        dismissedDefaultTags: ['auto', 'Other'],
+        tagValue: ' Auto ',
+        tags: ['Manual'],
+      }),
+    ).toEqual({
       autoAppliedDefaultTags: ['Keep'],
       currentTagInput: '',
       dismissedDefaultTags: ['Other'],
       showTagsInput: true,
       tags: ['Manual', 'Auto'],
     });
-    expect(buildCreateSbtTagAdditionState({
-      autoAppliedDefaultTags: 'bad',
-      dismissedDefaultTags: null,
-      tagValue: 'Solo',
-      tags: 'bad',
-    })).toEqual({
+    expect(
+      buildCreateSbtTagAdditionState({
+        autoAppliedDefaultTags: 'bad',
+        dismissedDefaultTags: null,
+        tagValue: 'Solo',
+        tags: 'bad',
+      }),
+    ).toEqual({
       autoAppliedDefaultTags: [],
       currentTagInput: '',
       dismissedDefaultTags: [],
@@ -79,26 +87,30 @@ describe('createSbtGroupHelpers tag helpers', () => {
   });
 
   it('builds tag removal state with default-tag dismissal bookkeeping', () => {
-    expect(buildCreateSbtTagRemovalState({
-      autoAppliedDefaultTags: ['Auto', 'Keep'],
-      defaultTags: ['Auto', 'Other'],
-      dismissedDefaultTags: ['Existing'],
-      indexToRemove: 1,
-      removedTag: 'Auto',
-      tags: ['Manual', 'Auto', 'Keep'],
-    })).toEqual({
+    expect(
+      buildCreateSbtTagRemovalState({
+        autoAppliedDefaultTags: ['Auto', 'Keep'],
+        defaultTags: ['Auto', 'Other'],
+        dismissedDefaultTags: ['Existing'],
+        indexToRemove: 1,
+        removedTag: 'Auto',
+        tags: ['Manual', 'Auto', 'Keep'],
+      }),
+    ).toEqual({
       autoAppliedDefaultTags: ['Keep'],
       dismissedDefaultTags: ['Existing', 'Auto'],
       tags: ['Manual', 'Keep'],
     });
-    expect(buildCreateSbtTagRemovalState({
-      autoAppliedDefaultTags: ['Auto'],
-      defaultTags: ['Default'],
-      dismissedDefaultTags: ['Existing'],
-      indexToRemove: 'bad',
-      removedTag: 'Missing',
-      tags: ['Manual', 'Auto'],
-    })).toEqual({
+    expect(
+      buildCreateSbtTagRemovalState({
+        autoAppliedDefaultTags: ['Auto'],
+        defaultTags: ['Default'],
+        dismissedDefaultTags: ['Existing'],
+        indexToRemove: 'bad',
+        removedTag: 'Missing',
+        tags: ['Manual', 'Auto'],
+      }),
+    ).toEqual({
       autoAppliedDefaultTags: ['Auto'],
       dismissedDefaultTags: ['Existing'],
       tags: ['Manual', 'Auto'],
@@ -106,13 +118,15 @@ describe('createSbtGroupHelpers tag helpers', () => {
   });
 
   it('builds relevant default tag sync state', () => {
-    expect(buildCreateSbtRelevantDefaultTagSyncState({
-      autoAppliedDefaultTags: [],
-      currentShowTagsInput: false,
-      dismissedDefaultTags: [],
-      relevantDefaults: ['debate', 'governance', 'debate'],
-      tags: [],
-    })).toEqual({
+    expect(
+      buildCreateSbtRelevantDefaultTagSyncState({
+        autoAppliedDefaultTags: [],
+        currentShowTagsInput: false,
+        dismissedDefaultTags: [],
+        relevantDefaults: ['debate', 'governance', 'debate'],
+        tags: [],
+      }),
+    ).toEqual({
       autoAppliedDefaultTags: ['debate', 'governance'],
       dismissedDefaultTags: [],
       shouldUpdate: true,
@@ -120,13 +134,15 @@ describe('createSbtGroupHelpers tag helpers', () => {
       tags: ['debate', 'governance'],
     });
 
-    expect(buildCreateSbtRelevantDefaultTagSyncState({
-      autoAppliedDefaultTags: ['debate', 'governance'],
-      currentShowTagsInput: true,
-      dismissedDefaultTags: ['debate'],
-      relevantDefaults: ['debate', 'governance'],
-      tags: ['Manual', 'debate', 'governance'],
-    })).toEqual({
+    expect(
+      buildCreateSbtRelevantDefaultTagSyncState({
+        autoAppliedDefaultTags: ['debate', 'governance'],
+        currentShowTagsInput: true,
+        dismissedDefaultTags: ['debate'],
+        relevantDefaults: ['debate', 'governance'],
+        tags: ['Manual', 'debate', 'governance'],
+      }),
+    ).toEqual({
       autoAppliedDefaultTags: ['governance'],
       dismissedDefaultTags: ['debate'],
       shouldUpdate: true,
@@ -134,14 +150,16 @@ describe('createSbtGroupHelpers tag helpers', () => {
       tags: ['Manual', 'governance'],
     });
 
-    expect(buildCreateSbtRelevantDefaultTagSyncState({
-      autoAppliedDefaultTags: ['Auto'],
-      currentShowTagsInput: true,
-      dismissedDefaultTags: ['Dismissed'],
-      relevantDefaults: ['Auto'],
-      resetDismissed: true,
-      tags: ['Auto'],
-    })).toEqual({
+    expect(
+      buildCreateSbtRelevantDefaultTagSyncState({
+        autoAppliedDefaultTags: ['Auto'],
+        currentShowTagsInput: true,
+        dismissedDefaultTags: ['Dismissed'],
+        relevantDefaults: ['Auto'],
+        resetDismissed: true,
+        tags: ['Auto'],
+      }),
+    ).toEqual({
       autoAppliedDefaultTags: ['Auto'],
       dismissedDefaultTags: [],
       shouldUpdate: true,
@@ -149,19 +167,23 @@ describe('createSbtGroupHelpers tag helpers', () => {
       tags: ['Auto'],
     });
 
-    expect(buildCreateSbtRelevantDefaultTagSyncState({
-      autoAppliedDefaultTags: ['Auto'],
-      currentShowTagsInput: true,
-      dismissedDefaultTags: [],
-      relevantDefaults: ['Auto'],
-      tags: ['Auto'],
-    }).shouldUpdate).toBe(false);
-    expect(buildCreateSbtRelevantDefaultTagSyncPatch({
-      autoAppliedDefaultTags: ['Auto'],
-      dismissedDefaultTags: ['Dismissed'],
-      showTagsInput: true,
-      tags: ['Manual', 'Auto'],
-    })).toEqual({
+    expect(
+      buildCreateSbtRelevantDefaultTagSyncState({
+        autoAppliedDefaultTags: ['Auto'],
+        currentShowTagsInput: true,
+        dismissedDefaultTags: [],
+        relevantDefaults: ['Auto'],
+        tags: ['Auto'],
+      }).shouldUpdate,
+    ).toBe(false);
+    expect(
+      buildCreateSbtRelevantDefaultTagSyncPatch({
+        autoAppliedDefaultTags: ['Auto'],
+        dismissedDefaultTags: ['Dismissed'],
+        showTagsInput: true,
+        tags: ['Manual', 'Auto'],
+      }),
+    ).toEqual({
       tags: ['Manual', 'Auto'],
       autoAppliedDefaultTags: ['Auto'],
       dismissedDefaultTags: ['Dismissed'],

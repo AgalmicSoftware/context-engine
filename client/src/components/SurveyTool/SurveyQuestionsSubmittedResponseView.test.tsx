@@ -17,7 +17,7 @@ describe('SurveyQuestionsSubmittedResponseView', () => {
       <SurveyQuestionsSubmittedResponseView
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
-      />
+      />,
     );
 
     expect(container).toBeEmptyDOMElement();
@@ -32,7 +32,7 @@ describe('SurveyQuestionsSubmittedResponseView', () => {
         questionPoolReady
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
-      />
+      />,
     );
 
     expect(screen.getByText(/Loading submitted response\.\.\./)).toBeInTheDocument();
@@ -54,7 +54,7 @@ describe('SurveyQuestionsSubmittedResponseView', () => {
         renderSurveyAnswers={renderSurveyAnswers}
         singleQuestionMode
         userAnswers={userAnswers}
-      />
+      />,
     );
 
     expect(screen.getByTestId('single-submitted')).toBeInTheDocument();
@@ -71,7 +71,7 @@ describe('SurveyQuestionsSubmittedResponseView', () => {
         renderSurveyAnswers={renderSurveyAnswers}
         singleQuestionMode
         userAnswers={{ value: 'yes' }}
-      />
+      />,
     );
 
     expect(screen.getByText('Loading question...')).toBeInTheDocument();
@@ -84,7 +84,7 @@ describe('SurveyQuestionsSubmittedResponseView', () => {
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
         userAnswers={{}}
-      />
+      />,
     );
 
     expect(screen.getByText('Loading answers...')).toBeInTheDocument();
@@ -103,7 +103,7 @@ describe('SurveyQuestionsSubmittedResponseView', () => {
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
         userAnswers={{ responses }}
-      />
+      />,
     );
 
     expect(screen.getByTestId('survey-submitted')).toBeInTheDocument();

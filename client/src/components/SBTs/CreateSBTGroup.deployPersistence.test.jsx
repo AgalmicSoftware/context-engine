@@ -36,11 +36,7 @@ describe('CreateSBTGroup deploy and persistence flows', () => {
     instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'test', networkChainId: 84532 }));
     const countCreatedSpy = jest.spyOn(contractScripts, 'countSBTCreated').mockResolvedValue(11);
     const createSpy = jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
-      logs: [
-        makeFactoryReceiptLog('SBTCreated', [
-          '0x00000000000000000000000000000000000000a1',
-        ]),
-      ],
+      logs: [makeFactoryReceiptLog('SBTCreated', ['0x00000000000000000000000000000000000000a1'])],
     });
 
     await instance.mintSBT();
@@ -59,7 +55,7 @@ describe('CreateSBTGroup deploy and persistence flows', () => {
       expect.anything(),
       expect.anything(),
       expect.anything(),
-      {}
+      {},
     );
     countCreatedSpy.mockRestore();
     createSpy.mockRestore();
@@ -93,7 +89,9 @@ describe('CreateSBTGroup deploy and persistence flows', () => {
 
     await instance.mintSBT();
 
-    expect(instance.state.autoJoinUrl).toBe(`http://localhost/session/edge?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
+    expect(instance.state.autoJoinUrl).toBe(
+      `http://localhost/session/edge?sbt=${encodeURIComponent(sbtAddress)}&auto=1`,
+    );
     expect(instance.state.shareableUrl).toBe(instance.state.autoJoinUrl);
   });
 
@@ -170,31 +168,27 @@ describe('CreateSBTGroup deploy and persistence flows', () => {
     jest.spyOn(contractScripts, 'countSBTCreated').mockResolvedValue(2);
     jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(`0x${'33'.repeat(32)}`);
     jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
-      logs: [
-        makeFactoryReceiptLog('SBTCreated', [sbtAddress]),
-      ],
+      logs: [makeFactoryReceiptLog('SBTCreated', [sbtAddress])],
     });
 
     await instance.mintSBT();
 
     expect(instance.generateSBTInviteLinks).toHaveBeenCalledWith(sbtAddress, ['shared-secret']);
     const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
-    expect(recoveryStore.entries[`84532:${sbtAddress.toLowerCase()}`]).toEqual(expect.objectContaining({
-      chainId: 84532,
-      sbtAddress: sbtAddress.toLowerCase(),
-      passwords: ['shared-secret'],
-    }));
+    expect(recoveryStore.entries[`84532:${sbtAddress.toLowerCase()}`]).toEqual(
+      expect.objectContaining({
+        chainId: 84532,
+        sbtAddress: sbtAddress.toLowerCase(),
+        passwords: ['shared-secret'],
+      }),
+    );
   });
 
   it('reads bookmark cache with clone:false before mutating sbt bookmarks', async () => {
     const instance = makeInstance({ sessionSlug: 'edge' });
     instance.state.bookmarkedSbtsSet = new Set();
-    const peekSpy = jest
-      .spyOn(cacheScripts, 'peekCacheSync')
-      .mockReturnValue({ sbts: ['0xaaa'] });
-    const writeSpy = jest
-      .spyOn(cacheScripts, 'writeCache')
-      .mockResolvedValue(true);
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ sbts: ['0xaaa'] });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
 
     instance.bookmarkSBT('0xbbb');
     await Promise.resolve();
@@ -205,7 +199,7 @@ describe('CreateSBTGroup deploy and persistence flows', () => {
       'edge',
       expect.objectContaining({
         sbts: expect.arrayContaining(['0xaaa', '0xbbb']),
-      })
+      }),
     );
   });
 

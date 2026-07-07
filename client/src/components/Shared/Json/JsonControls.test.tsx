@@ -16,14 +16,7 @@ describe('JsonControls', () => {
   });
 
   it('renders JsonToggleButton with icon and active state', () => {
-    render(
-      <JsonToggleButton
-        label="Show JSON"
-        active
-        icon={faCaretUp}
-        onClick={() => {}}
-      />
-    );
+    render(<JsonToggleButton label="Show JSON" active icon={faCaretUp} onClick={() => {}} />);
 
     const button = screen.getByRole('button', { name: /show json/i });
     expect(button.className).toContain('jsonToggleButtonActive');
@@ -34,7 +27,7 @@ describe('JsonControls', () => {
     render(
       <JsonPanel onCopy={onCopy} copyTitle="Copy JSON">
         {'{}'}
-      </JsonPanel>
+      </JsonPanel>,
     );
 
     const copyButton = screen.getByRole('button', { name: /copy json/i });

@@ -5,9 +5,7 @@ import { Alert } from 'reactstrap';
 
 import { litStorage } from 'utilities/crypto/litProtocol.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
-import {
-  resolveSbtPageMutedInfoIconStyle,
-} from './sbtPageHelpers';
+import { resolveSbtPageMutedInfoIconStyle } from './sbtPageHelpers';
 import styles from './SBTPage.module.scss';
 
 type SbtPageRelevantInfoProps = {
@@ -42,15 +40,9 @@ const SbtPageRelevantInfo = ({
             const litDoc = litStorage.isLitArweaveUrl(url);
             return (
               <li key={index} className={styles.docUrlItem}>
-                <span className={styles.docUrlBadge}>
-                  {litDoc ? 'Encrypted Doc' : 'Doc URL'}
-                </span>
+                <span className={styles.docUrlBadge}>{litDoc ? 'Encrypted Doc' : 'Doc URL'}</span>
                 {litDoc ? (
-                  <button
-                    type="button"
-                    className={styles.docUrlButton}
-                    onClick={() => onOpenEncryptedDoc(url)}
-                  >
+                  <button type="button" className={styles.docUrlButton} onClick={() => onOpenEncryptedDoc(url)}>
                     Decrypt and view
                   </button>
                 ) : (

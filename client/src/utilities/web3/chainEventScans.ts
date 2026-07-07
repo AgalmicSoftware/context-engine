@@ -19,15 +19,17 @@ type SessionAddresses = {
   } | null;
 };
 
-type ProviderLike = Partial<ethers.providers.Provider> & UnknownRecord & {
-  getLogs?: (filter: UnknownRecord) => Promise<UnknownRecord[]>;
-  __CE_RPC_META?: UnknownRecord;
-};
+type ProviderLike = Partial<ethers.providers.Provider> &
+  UnknownRecord & {
+    getLogs?: (filter: UnknownRecord) => Promise<UnknownRecord[]>;
+    __CE_RPC_META?: UnknownRecord;
+  };
 
-type LogLike = Partial<ethers.providers.Log> & UnknownRecord & {
-  topics?: string[];
-  data?: string;
-};
+type LogLike = Partial<ethers.providers.Log> &
+  UnknownRecord & {
+    topics?: string[];
+    data?: string;
+  };
 
 type RpcDebugContext = UnknownRecord & {
   fnTag?: string;
@@ -63,10 +65,7 @@ type BlockWindow = {
 };
 
 type EventScanRuntime = {
-  getRelevantBlockWindowForFilter: (
-    groupKeyOrCfg: unknown,
-    opts?: UnknownRecord
-  ) => Promise<BlockWindow>;
+  getRelevantBlockWindowForFilter: (groupKeyOrCfg: unknown, opts?: UnknownRecord) => Promise<BlockWindow>;
 };
 
 type ProgressPayload = {
@@ -115,11 +114,7 @@ type ChainEventScanDeps = {
   SURVEYS_INTERFACE: ethers.utils.Interface;
   resolveSession: (groupKeyOrCfg: unknown) => unknown;
   getSessionAddresses: (cfg: UnknownRecord | null | undefined) => SessionAddresses;
-  getSurveysReadProviderForSession: (
-    groupKeyOrCfg: unknown,
-    cfg: unknown,
-    chainId: unknown
-  ) => ProviderLike;
+  getSurveysReadProviderForSession: (groupKeyOrCfg: unknown, cfg: unknown, chainId: unknown) => ProviderLike;
   fetchLogsSmartWithProvider: (
     provider: ProviderLike,
     filter: UnknownRecord,
@@ -128,50 +123,39 @@ type ChainEventScanDeps = {
     depth?: number,
     maxDepth?: number,
     progressState?: FetchLogsProgressState | null,
-    rpcDebugContext?: RpcDebugContext | null
+    rpcDebugContext?: RpcDebugContext | null,
   ) => Promise<LogLike[]>;
   normalizeRpcDebugContext: (context: unknown) => RpcDebugContext | null;
   rpcLog: (...args: unknown[]) => void;
   contractsLog: ContractsLogger;
 };
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const getCfgField = (cfg: unknown, key: string): unknown => (
-  isRecord(cfg) ? cfg[key] : undefined
-);
+const getCfgField = (cfg: unknown, key: string): unknown => (isRecord(cfg) ? cfg[key] : undefined);
 
-const toLowerIdentifier = (value: unknown): string => (
-  String(value || '').toLowerCase()
-);
+const toLowerIdentifier = (value: unknown): string => String(value || '').toLowerCase();
 
 const normalizeBlockWindow = async (
   runtime: EventScanRuntime,
   groupKeyOrCfg: unknown,
   cfg: unknown,
   fromBlock: unknown,
-  toBlock: unknown
+  toBlock: unknown,
 ): Promise<BlockWindow> => {
-  const { fromBlock: baseFrom, toBlock: baseTo } =
-    await runtime.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
+  const { fromBlock: baseFrom, toBlock: baseTo } = await runtime.getRelevantBlockWindowForFilter(groupKeyOrCfg, {
+    _resolvedCfg: cfg,
+  });
 
-  const fromBlockNum = Number.isFinite(Number(fromBlock))
-    ? Math.max(Number(fromBlock), baseFrom)
-    : baseFrom;
+  const fromBlockNum = Number.isFinite(Number(fromBlock)) ? Math.max(Number(fromBlock), baseFrom) : baseFrom;
 
-  const toBlockNum = (toBlock === 'latest' || typeof toBlock !== 'number')
-    ? baseTo
-    : Math.min(Number(toBlock), baseTo);
+  const toBlockNum = toBlock === 'latest' || typeof toBlock !== 'number' ? baseTo : Math.min(Number(toBlock), baseTo);
 
   return { fromBlock: fromBlockNum, toBlock: toBlockNum };
 };
 
-const createSurveyReadContext = (
-  deps: ChainEventScanDeps,
-  groupKeyOrCfg: unknown
-) => {
+const createSurveyReadContext = (deps: ChainEventScanDeps, groupKeyOrCfg: unknown) => {
   const cfg = deps.resolveSession(groupKeyOrCfg || '');
   const cfgRecord = isRecord(cfg) ? cfg : null;
   const gAddrs = deps.getSessionAddresses(cfgRecord);
@@ -181,7 +165,7 @@ const createSurveyReadContext = (
   const contract = new deps.ethers.Contract(
     String(addr || ''),
     deps.SURVEYS,
-    provider as ethers.providers.Provider
+    provider as ethers.providers.Provider,
   ) as SurveyReadContract;
   return {
     cfg,
@@ -191,15 +175,10 @@ const createSurveyReadContext = (
   };
 };
 
-const parseSurveyLogs = (
-  deps: ChainEventScanDeps,
-  logs: LogLike[]
-) => logs.map((log) => deps.SURVEYS_INTERFACE.parseLog(log as ethers.providers.Log));
+const parseSurveyLogs = (deps: ChainEventScanDeps, logs: LogLike[]) =>
+  logs.map((log) => deps.SURVEYS_INTERFACE.parseLog(log as ethers.providers.Log));
 
-const collectQuestionIdsFromEvents = (
-  deps: ChainEventScanDeps,
-  events: ethers.utils.LogDescription[]
-): string[] => {
+const collectQuestionIdsFromEvents = (deps: ChainEventScanDeps, events: ethers.utils.LogDescription[]): string[] => {
   const questionIDSet = new Set<string>();
   events.forEach((event) => {
     const args = event.args as UnknownRecord;
@@ -220,7 +199,7 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
       _providerName: unknown,
       fromBlock: unknown = null,
       toBlock: unknown = null,
-      groupKeyOrCfg: unknown = null
+      groupKeyOrCfg: unknown = null,
     ): Promise<string[]> {
       const { cfg, provider, contract } = createSurveyReadContext(deps, groupKeyOrCfg);
       const questionsAddedEventFilter = contract.filters.QuestionsAdded(null, null, null);
@@ -238,7 +217,7 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
         provider,
         questionsAddedEventFilter,
         blockWindow.fromBlock,
-        blockWindow.toBlock
+        blockWindow.toBlock,
       );
       return collectQuestionIdsFromEvents(deps, parseSurveyLogs(deps, rawLogs));
     },
@@ -251,7 +230,7 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
       onChunkProgress: ChunkProgressCallback | null = null,
       onPartialData: PartialQuestionDataCallback | null = null,
       groupKeyOrCfg: unknown = null,
-      scanOptions: QuestionScanOptions | null = null
+      scanOptions: QuestionScanOptions | null = null,
     ): Promise<string[]> {
       const { cfg, addr, provider, contract } = createSurveyReadContext(deps, groupKeyOrCfg);
       if (!addr) {
@@ -278,30 +257,32 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
           toBlock: blockWindow.toBlock,
         });
         const totalRangeBlocks = Math.max(0, blockWindow.toBlock - blockWindow.fromBlock + 1);
-        const progressState = onChunkProgress ? {
-          phase: 'scan',
-          fromBlock: blockWindow.fromBlock,
-          toBlock: blockWindow.toBlock,
-          totalBlocks: totalRangeBlocks,
-          scannedBlocks: 0,
-          onProgress: (payload: FetchProgressPayload) => {
-            const totalBlocks = Math.max(0, Number(payload?.totalBlocks || totalRangeBlocks));
-            const doneSoFarBlocks = Math.max(0, Math.min(totalBlocks, Number(payload?.scannedBlocks || 0)));
-            const remainingBlocks = Math.max(0, Number(payload?.remainingBlocks ?? (totalBlocks - doneSoFarBlocks)));
-            onChunkProgress({
+        const progressState = onChunkProgress
+          ? {
               phase: 'scan',
               fromBlock: blockWindow.fromBlock,
               toBlock: blockWindow.toBlock,
-              chunkFrom: Number(payload?.scanFrom ?? payload?.lastScannedBlock ?? blockWindow.fromBlock),
-              chunkTo: Number(payload?.scanTo ?? payload?.lastScannedBlock ?? blockWindow.fromBlock),
-              doneSoFarBlocks,
-              totalRangeBlocks: totalBlocks,
-              remainingBlocks,
-              chunkEventCount: 0,
-              overallEventCount: 0,
-            });
-          },
-        } : null;
+              totalBlocks: totalRangeBlocks,
+              scannedBlocks: 0,
+              onProgress: (payload: FetchProgressPayload) => {
+                const totalBlocks = Math.max(0, Number(payload?.totalBlocks || totalRangeBlocks));
+                const doneSoFarBlocks = Math.max(0, Math.min(totalBlocks, Number(payload?.scannedBlocks || 0)));
+                const remainingBlocks = Math.max(0, Number(payload?.remainingBlocks ?? totalBlocks - doneSoFarBlocks));
+                onChunkProgress({
+                  phase: 'scan',
+                  fromBlock: blockWindow.fromBlock,
+                  toBlock: blockWindow.toBlock,
+                  chunkFrom: Number(payload?.scanFrom ?? payload?.lastScannedBlock ?? blockWindow.fromBlock),
+                  chunkTo: Number(payload?.scanTo ?? payload?.lastScannedBlock ?? blockWindow.fromBlock),
+                  doneSoFarBlocks,
+                  totalRangeBlocks: totalBlocks,
+                  remainingBlocks,
+                  chunkEventCount: 0,
+                  overallEventCount: 0,
+                });
+              },
+            }
+          : null;
 
         const rawLogs = await deps.fetchLogsSmartWithProvider(
           provider,
@@ -311,7 +292,7 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
           0,
           20,
           progressState,
-          rpcDebugContext
+          rpcDebugContext,
         );
         const allEvents = parseSurveyLogs(deps, rawLogs);
         const finalQIDs = collectQuestionIdsFromEvents(deps, allEvents);
@@ -348,7 +329,7 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
       userAddress: unknown,
       fromBlock: unknown = null,
       toBlock: unknown = null,
-      groupKeyOrCfg: unknown = null
+      groupKeyOrCfg: unknown = null,
     ): Promise<unknown[]> {
       const { cfg, provider, contract } = createSurveyReadContext(deps, groupKeyOrCfg);
       const responseSubmittedEventTopic = contract.filters.ResponsesSubmitted(userAddress, null, null);
@@ -365,7 +346,7 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
         provider,
         responseSubmittedEventTopic,
         blockWindow.fromBlock,
-        blockWindow.toBlock
+        blockWindow.toBlock,
       );
       return parseSurveyLogs(deps, rawLogs).map((event) => (event.args as UnknownRecord).surveyId);
     },
@@ -376,7 +357,7 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
       userAddress: unknown,
       fromBlock: unknown = null,
       toBlock: unknown = null,
-      groupKeyOrCfg: unknown = null
+      groupKeyOrCfg: unknown = null,
     ): Promise<unknown[]> {
       const { cfg, provider, contract } = createSurveyReadContext(deps, groupKeyOrCfg);
       const surveyCreatedEventTopic = contract.filters.SurveyAdded(userAddress, null);
@@ -393,7 +374,7 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
         provider,
         surveyCreatedEventTopic,
         blockWindow.fromBlock,
-        blockWindow.toBlock
+        blockWindow.toBlock,
       );
       return parseSurveyLogs(deps, rawLogs).map((event) => (event.args as UnknownRecord).surveyId);
     },
@@ -404,7 +385,7 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
       userAddress: unknown,
       fromBlock: unknown = null,
       toBlock: unknown = null,
-      groupKeyOrCfg: unknown = null
+      groupKeyOrCfg: unknown = null,
     ): Promise<string[]> {
       const { cfg, provider, contract } = createSurveyReadContext(deps, groupKeyOrCfg);
       const questionsAddedEventFilter = contract.filters.QuestionsAdded(userAddress, null, null);
@@ -421,7 +402,7 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
         provider,
         questionsAddedEventFilter,
         blockWindow.fromBlock,
-        blockWindow.toBlock
+        blockWindow.toBlock,
       );
       const questionIDs: string[] = [];
       parseSurveyLogs(deps, rawLogs).forEach((event) => {
@@ -443,7 +424,7 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
       fromBlock: unknown = null,
       toBlock: unknown = null,
       groupKeyOrCfg: unknown = null,
-      opts: QuestionResponseByAddressOptions | null = {}
+      opts: QuestionResponseByAddressOptions | null = {},
     ): Promise<Array<string | QuestionResponseByAddressEntry>> {
       const { cfg, provider, contract } = createSurveyReadContext(deps, groupKeyOrCfg);
       const responsesSubmittedEventFilter = contract.filters.ResponsesSubmitted(userAddress, null);
@@ -461,7 +442,7 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
         provider,
         responsesSubmittedEventFilter,
         blockWindow.fromBlock,
-        blockWindow.toBlock
+        blockWindow.toBlock,
       );
       const latestByQuestion = new Map<string, QuestionResponseByAddressEntry>();
       rawLogs.forEach((log) => {
@@ -485,16 +466,9 @@ export function createChainEventScanMethods(deps: ChainEventScanDeps) {
           const isNewer =
             !prev ||
             blockNumber > Number(prev.blockNumber || 0) ||
-            (
-              blockNumber === Number(prev.blockNumber || 0) &&
-              (
-                transactionIndex > Number(prev.transactionIndex || 0) ||
-                (
-                  transactionIndex === Number(prev.transactionIndex || 0) &&
-                  logIndex > Number(prev.logIndex || 0)
-                )
-              )
-            );
+            (blockNumber === Number(prev.blockNumber || 0) &&
+              (transactionIndex > Number(prev.transactionIndex || 0) ||
+                (transactionIndex === Number(prev.transactionIndex || 0) && logIndex > Number(prev.logIndex || 0))));
           if (!isNewer) return;
           latestByQuestion.set(qid, {
             questionId: qid,

@@ -137,39 +137,49 @@ describe('sbtPageHelpers', () => {
     expect(isRecord(null)).toBe(false);
     expect(toStringList(['a', null, 2])).toEqual(['a', '', '2']);
     expect(toStringList('bad')).toEqual([]);
-    expect(buildSbtPageInitialState({ network: { id: 84532 } })).toEqual(expect.objectContaining({
-      sbtInfo: null,
-      userHasSBT: false,
-      network: { id: 84532 },
-      mintedAddresses: [],
-      burnedAddresses: [],
-      showStats: true,
-      showActions: true,
-      loadingMintersBurners: true,
-      mintingStatus: 'idle',
-      burningStatus: 'idle',
-      exportFormat: 'json',
-      hasGroupPasswordMint: false,
-      hasInviteMint: false,
-      docModalOpen: false,
-      resolvedSessionSlug: null,
-      displayImageFallbackKey: '',
-      displayImageFallbackIndex: 0,
-    }));
-    expect(buildSbtPageBooleanTogglePatch({
-      state: { showStats: false },
-      stateKey: 'showStats',
-    })).toEqual({ showStats: true });
-    expect(buildSbtPageBooleanTogglePatch({
-      state: { showActions: 'open' },
-      stateKey: 'showActions',
-    })).toEqual({ showActions: false });
-    expect(buildSbtPageAddressChangeResetMintUiPatch({
-      sbtAddressChanged: false,
-    })).toBeNull();
-    expect(buildSbtPageAddressChangeResetMintUiPatch({
-      sbtAddressChanged: true,
-    })).toEqual({
+    expect(buildSbtPageInitialState({ network: { id: 84532 } })).toEqual(
+      expect.objectContaining({
+        sbtInfo: null,
+        userHasSBT: false,
+        network: { id: 84532 },
+        mintedAddresses: [],
+        burnedAddresses: [],
+        showStats: true,
+        showActions: true,
+        loadingMintersBurners: true,
+        mintingStatus: 'idle',
+        burningStatus: 'idle',
+        exportFormat: 'json',
+        hasGroupPasswordMint: false,
+        hasInviteMint: false,
+        docModalOpen: false,
+        resolvedSessionSlug: null,
+        displayImageFallbackKey: '',
+        displayImageFallbackIndex: 0,
+      }),
+    );
+    expect(
+      buildSbtPageBooleanTogglePatch({
+        state: { showStats: false },
+        stateKey: 'showStats',
+      }),
+    ).toEqual({ showStats: true });
+    expect(
+      buildSbtPageBooleanTogglePatch({
+        state: { showActions: 'open' },
+        stateKey: 'showActions',
+      }),
+    ).toEqual({ showActions: false });
+    expect(
+      buildSbtPageAddressChangeResetMintUiPatch({
+        sbtAddressChanged: false,
+      }),
+    ).toBeNull();
+    expect(
+      buildSbtPageAddressChangeResetMintUiPatch({
+        sbtAddressChanged: true,
+      }),
+    ).toEqual({
       showMiniPasswordInput: false,
       mintStep: 0,
       mintingStatus: 'idle',
@@ -180,13 +190,15 @@ describe('sbtPageHelpers', () => {
       showPasswordAlert: false,
       error: null,
     });
-    expect(buildSbtPageNetworkUpdatePatch({
-      network: { id: 10 },
-      resetMintUiState: {
-        network: { id: 1 },
-        mintStep: 0,
-      },
-    })).toEqual({
+    expect(
+      buildSbtPageNetworkUpdatePatch({
+        network: { id: 10 },
+        resetMintUiState: {
+          network: { id: 1 },
+          mintStep: 0,
+        },
+      }),
+    ).toEqual({
       network: { id: 10 },
       mintStep: 0,
     });
@@ -213,11 +225,13 @@ describe('sbtPageHelpers', () => {
       lastTransactionType: 'mint',
       lastMintTxHash: '0xmint',
     });
-    expect(buildSbtPageMintSuccessPatch({
-      clearManualPassword: true,
-      mintStep: 3,
-      txHash: '0xclaim',
-    })).toEqual({
+    expect(
+      buildSbtPageMintSuccessPatch({
+        clearManualPassword: true,
+        mintStep: 3,
+        txHash: '0xclaim',
+      }),
+    ).toEqual({
       mintingStatus: 'success',
       transactionHash: '0xclaim',
       lastTransactionType: 'mint',
@@ -229,10 +243,12 @@ describe('sbtPageHelpers', () => {
       error: 'Denied',
       burningStatus: 'failure',
     });
-    expect(buildSbtPageBurnFailurePatch({
-      error: 'Denied',
-      resetBurnSearch: true,
-    })).toEqual({
+    expect(
+      buildSbtPageBurnFailurePatch({
+        error: 'Denied',
+        resetBurnSearch: true,
+      }),
+    ).toEqual({
       error: 'Denied',
       burningStatus: 'failure',
       burnSearchInput: '',
@@ -249,10 +265,12 @@ describe('sbtPageHelpers', () => {
       lastTransactionType: 'burn',
       lastBurnTxHash: '0xburn',
     });
-    expect(buildSbtPageBurnSuccessPatch({
-      resetBurnSearch: true,
-      txHash: '0xadminburn',
-    })).toEqual({
+    expect(
+      buildSbtPageBurnSuccessPatch({
+        resetBurnSearch: true,
+        txHash: '0xadminburn',
+      }),
+    ).toEqual({
       burningStatus: 'success',
       transactionHash: '0xadminburn',
       lastTransactionType: 'burn',
@@ -271,11 +289,13 @@ describe('sbtPageHelpers', () => {
       burnSearchResult: null,
       burnSearchType: null,
     });
-    expect(buildSbtPageBurnSearchResultPatch({
-      address: '0xOwner',
-      resultType: 'tokenId',
-      tokenId: '12',
-    })).toEqual({
+    expect(
+      buildSbtPageBurnSearchResultPatch({
+        address: '0xOwner',
+        resultType: 'tokenId',
+        tokenId: '12',
+      }),
+    ).toEqual({
       burnSearchResult: {
         address: '0xOwner',
         tokenId: '12',
@@ -297,19 +317,23 @@ describe('sbtPageHelpers', () => {
     expect(buildSbtPageMintedModalVisibilityPatch({ visible: 'true' })).toEqual({
       showModal: false,
     });
-    expect(buildSbtPageMintedModalInitialFilterPatch({
-      buildAddressListSignature: () => 'holders-signature',
-      netHolders: ['0xA'],
-    })).toEqual({
+    expect(
+      buildSbtPageMintedModalInitialFilterPatch({
+        buildAddressListSignature: () => 'holders-signature',
+        netHolders: ['0xA'],
+      }),
+    ).toEqual({
       filteredMintedUsers: ['0xA'],
       filteredMintedUsersSignature: 'holders-signature',
       mintingAddressesFilterInitialized: true,
       loadingMintedFilter: false,
     });
-    expect(buildSbtPageMintedModalInitialFilterPatch({
-      buildAddressListSignature: () => 'empty',
-      netHolders: 'bad',
-    })).toEqual({
+    expect(
+      buildSbtPageMintedModalInitialFilterPatch({
+        buildAddressListSignature: () => 'empty',
+        netHolders: 'bad',
+      }),
+    ).toEqual({
       filteredMintedUsers: [],
       filteredMintedUsersSignature: 'empty',
       mintingAddressesFilterInitialized: true,
@@ -322,10 +346,12 @@ describe('sbtPageHelpers', () => {
       loadingMintersBurners: true,
       logScanProgress: null,
     });
-    expect(buildSbtPageLoadInfoLoadingStartPatch({
-      hasExplicitSlug: true,
-      normalizedExplicitSlug: 'alpha',
-    })).toEqual({
+    expect(
+      buildSbtPageLoadInfoLoadingStartPatch({
+        hasExplicitSlug: true,
+        normalizedExplicitSlug: 'alpha',
+      }),
+    ).toEqual({
       loadingMintersBurners: true,
       logScanProgress: null,
       resolvedSessionSlug: 'alpha',
@@ -354,10 +380,12 @@ describe('sbtPageHelpers', () => {
       relevantQuestions: ['What is the purpose of this SBT?', 'How can I use this SBT?'],
       relevantDocuments: ['SBT Whitepaper', 'Community Guidelines'],
     });
-    expect(buildSbtPageLogScanProgressPatch({
-      progress: { scanned: 1 },
-      slug: 'alpha-session',
-    })).toEqual({
+    expect(
+      buildSbtPageLogScanProgressPatch({
+        progress: { scanned: 1 },
+        slug: 'alpha-session',
+      }),
+    ).toEqual({
       logScanProgress: {
         scanned: 1,
         slug: 'alpha-session',
@@ -366,66 +394,82 @@ describe('sbtPageHelpers', () => {
     expect(buildSbtPageBookmarkedPatch({ bookmarked: true })).toEqual({
       bookmarked: true,
     });
-    expect(buildSbtPagePasswordMintInputPatch({
-      inputField: 'groupPasswordInput',
-      inputValue: 'invite-token',
-    })).toEqual({
+    expect(
+      buildSbtPagePasswordMintInputPatch({
+        inputField: 'groupPasswordInput',
+        inputValue: 'invite-token',
+      }),
+    ).toEqual({
       groupPasswordInput: 'invite-token',
       mintingStatus: 'idle',
       mintStep: 0,
       error: null,
     });
-    expect(buildSbtPagePasswordMintInputPatch({
-      inputField: 'manualPasswordInput',
-      inputValue: 'claim-code',
-    })).toEqual({
+    expect(
+      buildSbtPagePasswordMintInputPatch({
+        inputField: 'manualPasswordInput',
+        inputValue: 'claim-code',
+      }),
+    ).toEqual({
       manualPasswordInput: 'claim-code',
       mintingStatus: 'idle',
       mintStep: 0,
       error: null,
     });
-    expect(buildSbtPagePasswordMintInputPatch({
-      inputField: 'unknown',
-      inputValue: null,
-    })).toEqual({
+    expect(
+      buildSbtPagePasswordMintInputPatch({
+        inputField: 'unknown',
+        inputValue: null,
+      }),
+    ).toEqual({
       groupPasswordInput: '',
       mintingStatus: 'idle',
       mintStep: 0,
       error: null,
     });
-    expect(buildSbtPagePasswordInputValuePatch({
-      inputField: 'groupPasswordInput',
-      inputValue: 'invite-token',
-    })).toEqual({
+    expect(
+      buildSbtPagePasswordInputValuePatch({
+        inputField: 'groupPasswordInput',
+        inputValue: 'invite-token',
+      }),
+    ).toEqual({
       groupPasswordInput: 'invite-token',
     });
-    expect(buildSbtPagePasswordInputValuePatch({
-      inputField: 'manualPasswordInput',
-      inputValue: 'claim-code',
-    })).toEqual({
+    expect(
+      buildSbtPagePasswordInputValuePatch({
+        inputField: 'manualPasswordInput',
+        inputValue: 'claim-code',
+      }),
+    ).toEqual({
       manualPasswordInput: 'claim-code',
     });
-    expect(buildSbtPagePasswordInputValuePatch({
-      inputField: 'unknown',
-      inputValue: null,
-    })).toEqual({
+    expect(
+      buildSbtPagePasswordInputValuePatch({
+        inputField: 'unknown',
+        inputValue: null,
+      }),
+    ).toEqual({
       groupPasswordInput: '',
     });
-    expect(buildSbtPageMintPasswordPrefillPatch({
-      currentGroupPasswordInput: 'existing-group',
-      finalPasswordToUse: 'plain-password',
-    })).toEqual({
+    expect(
+      buildSbtPageMintPasswordPrefillPatch({
+        currentGroupPasswordInput: 'existing-group',
+        finalPasswordToUse: 'plain-password',
+      }),
+    ).toEqual({
       mintPassword: 'plain-password',
       manualPasswordInput: 'plain-password',
       groupPasswordInput: 'existing-group',
       mintStep: 0,
       showPasswordAlert: true,
     });
-    expect(buildSbtPageMintPasswordPrefillPatch({
-      currentGroupPasswordInput: 'existing-group',
-      finalPasswordToUse: 'invite:raw',
-      invitePayload: { inviteCode: 'code-1' },
-    })).toEqual({
+    expect(
+      buildSbtPageMintPasswordPrefillPatch({
+        currentGroupPasswordInput: 'existing-group',
+        finalPasswordToUse: 'invite:raw',
+        invitePayload: { inviteCode: 'code-1' },
+      }),
+    ).toEqual({
       mintPassword: '',
       manualPasswordInput: '',
       groupPasswordInput: 'code-1',
@@ -443,15 +487,19 @@ describe('sbtPageHelpers', () => {
       transactionHash: '0xcommit',
     });
     const generatedPasswords = ['one', 'two'];
-    expect(buildSbtPageAdminInviteSuccessPatch({
-      passwordList: generatedPasswords,
-    })).toEqual({
+    expect(
+      buildSbtPageAdminInviteSuccessPatch({
+        passwordList: generatedPasswords,
+      }),
+    ).toEqual({
       adminGeneratedPasswords: generatedPasswords,
       passwordGenerationCount: '',
     });
-    expect(buildSbtPageAdminInviteSuccessPatch({
-      passwordList: 'bad',
-    })).toEqual({
+    expect(
+      buildSbtPageAdminInviteSuccessPatch({
+        passwordList: 'bad',
+      }),
+    ).toEqual({
       adminGeneratedPasswords: [],
       passwordGenerationCount: '',
     });
@@ -499,10 +547,12 @@ describe('sbtPageHelpers', () => {
       docModalName: '',
       docModalBlobUrl: '',
     });
-    expect(buildSbtPageDocModalOpenPatch({
-      loading: true,
-      name: 'Decrypting',
-    })).toEqual({
+    expect(
+      buildSbtPageDocModalOpenPatch({
+        loading: true,
+        name: 'Decrypting',
+      }),
+    ).toEqual({
       docModalOpen: true,
       docModalLoading: true,
       docModalError: '',
@@ -510,10 +560,12 @@ describe('sbtPageHelpers', () => {
       docModalName: 'Decrypting',
       docModalBlobUrl: '',
     });
-    expect(buildSbtPageDocModalOpenPatch({
-      error: 'Connect first.',
-      name: 'Encrypted document',
-    })).toEqual({
+    expect(
+      buildSbtPageDocModalOpenPatch({
+        error: 'Connect first.',
+        name: 'Encrypted document',
+      }),
+    ).toEqual({
       docModalOpen: true,
       docModalLoading: false,
       docModalError: 'Connect first.',
@@ -521,12 +573,14 @@ describe('sbtPageHelpers', () => {
       docModalName: 'Encrypted document',
       docModalBlobUrl: '',
     });
-    expect(buildSbtPageDocModalContentPatch({
-      blobUrl: 'blob:doc',
-      content: null,
-      error: undefined,
-      name: 'Payload',
-    })).toEqual({
+    expect(
+      buildSbtPageDocModalContentPatch({
+        blobUrl: 'blob:doc',
+        content: null,
+        error: undefined,
+        name: 'Payload',
+      }),
+    ).toEqual({
       docModalLoading: false,
       docModalError: '',
       docModalContent: '',
@@ -542,32 +596,38 @@ describe('sbtPageHelpers', () => {
     expect(coerceSbtPageStringArrayValue(' not json ')).toEqual(['not json']);
     expect(coerceSbtPageStringArrayValue('')).toEqual([]);
     expect(coerceSbtPageStringArrayValue({})).toEqual([]);
-    expect(buildSbtPageEncryptedEnvelopeFingerprint({
-      nameEnvelope: {},
-      tagsEnvelope: 'tags',
-      imageEnvelope: null,
-    })).toBe('nt');
-    expect(buildSbtPageEncryptedEnvelopeDecryptKey({
-      metaKey: 'meta',
-      activeAccount: '0xA',
-      envelopeFingerprint: 'nt',
-    })).toBe('meta:0xA:nt');
-    expect(buildSbtPageEncryptedMetadataDecryptPlan({
-      activeAccount: '0xA',
-      hasLitKey: true,
-      metaKey: 'session:84532:0xsbt',
-      sbtInfo: {
-        encryptedFields: {
-          name: 'name-envelope',
-          description: 'desc-envelope',
-          tags: 'tags-envelope',
-          documentURLs: 'docs-envelope',
-          image: { storage: 'lit-arweave', txId: 'image-tx' },
+    expect(
+      buildSbtPageEncryptedEnvelopeFingerprint({
+        nameEnvelope: {},
+        tagsEnvelope: 'tags',
+        imageEnvelope: null,
+      }),
+    ).toBe('nt');
+    expect(
+      buildSbtPageEncryptedEnvelopeDecryptKey({
+        metaKey: 'meta',
+        activeAccount: '0xA',
+        envelopeFingerprint: 'nt',
+      }),
+    ).toBe('meta:0xA:nt');
+    expect(
+      buildSbtPageEncryptedMetadataDecryptPlan({
+        activeAccount: '0xA',
+        hasLitKey: true,
+        metaKey: 'session:84532:0xsbt',
+        sbtInfo: {
+          encryptedFields: {
+            name: 'name-envelope',
+            description: 'desc-envelope',
+            tags: 'tags-envelope',
+            documentURLs: 'docs-envelope',
+            image: { storage: 'lit-arweave', txId: 'image-tx' },
+          },
+          nameEncrypted: 'legacy-name-envelope',
+          encryptedImage: 'legacy-image-envelope',
         },
-        nameEncrypted: 'legacy-name-envelope',
-        encryptedImage: 'legacy-image-envelope',
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       alreadyTried: false,
       canAttemptDecrypt: true,
       decryptKey: 'session:84532:0xsbt:0xA:ndtui',
@@ -580,93 +640,115 @@ describe('sbtPageHelpers', () => {
       shouldEnterDecryptBoundary: true,
       tagsEnvelope: 'tags-envelope',
     });
-    expect(buildSbtPageEncryptedMetadataDecryptPlan({
-      activeAccount: '0xA',
-      decryptTriedByKey: { 'session:84532:0xsbt:0xA:d': true },
-      hasLitKey: true,
-      metaKey: 'session:84532:0xsbt',
-      sbtInfo: {
-        descriptionEncrypted: 'desc-envelope',
-      },
-    })).toEqual(expect.objectContaining({
-      alreadyTried: true,
-      canAttemptDecrypt: false,
-      decryptKey: 'session:84532:0xsbt:0xA:d',
-      descriptionEnvelope: 'desc-envelope',
-      hasEncryptedMetadata: true,
-      shouldEnterDecryptBoundary: false,
-    }));
-    expect(buildSbtPageEncryptedMetadataDecryptPlan({
-      activeAccount: '',
-      hasLitKey: false,
-      metaKey: 'session:84532:0xsbt',
-      sbtInfo: {
-        encryptedDescription: 'desc-envelope',
-        docUrlsEncrypted: 'docs-envelope',
-        imageEncrypted: 'image-envelope',
-      },
-    })).toEqual(expect.objectContaining({
-      canAttemptDecrypt: false,
-      decryptKey: 'session:84532:0xsbt::dui',
-      descriptionEnvelope: 'desc-envelope',
-      documentUrlsEnvelope: 'docs-envelope',
-      hasEncryptedMetadata: true,
-      imageEnvelope: 'image-envelope',
-      shouldEnterDecryptBoundary: true,
-    }));
-    expect(buildSbtPageEncryptedMetadataDecryptPlan({
-      activeAccount: '0xA',
-      hasLitKey: true,
-      metaKey: 'session:84532:0xsbt',
-      sbtInfo: {
-        name: 'Public badge',
-      },
-    })).toEqual(expect.objectContaining({
-      canAttemptDecrypt: false,
-      decryptKey: 'session:84532:0xsbt:0xA:',
-      envelopeFingerprint: '',
-      hasEncryptedMetadata: false,
-      shouldEnterDecryptBoundary: false,
-    }));
-    expect(resolveSbtPageCachedGroupPasswordHash({
-      preferCountsOnly: true,
-      groupPasswordHashLoaded: true,
-      groupPasswordHash: '0xhash',
-    })).toEqual({
+    expect(
+      buildSbtPageEncryptedMetadataDecryptPlan({
+        activeAccount: '0xA',
+        decryptTriedByKey: { 'session:84532:0xsbt:0xA:d': true },
+        hasLitKey: true,
+        metaKey: 'session:84532:0xsbt',
+        sbtInfo: {
+          descriptionEncrypted: 'desc-envelope',
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        alreadyTried: true,
+        canAttemptDecrypt: false,
+        decryptKey: 'session:84532:0xsbt:0xA:d',
+        descriptionEnvelope: 'desc-envelope',
+        hasEncryptedMetadata: true,
+        shouldEnterDecryptBoundary: false,
+      }),
+    );
+    expect(
+      buildSbtPageEncryptedMetadataDecryptPlan({
+        activeAccount: '',
+        hasLitKey: false,
+        metaKey: 'session:84532:0xsbt',
+        sbtInfo: {
+          encryptedDescription: 'desc-envelope',
+          docUrlsEncrypted: 'docs-envelope',
+          imageEncrypted: 'image-envelope',
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canAttemptDecrypt: false,
+        decryptKey: 'session:84532:0xsbt::dui',
+        descriptionEnvelope: 'desc-envelope',
+        documentUrlsEnvelope: 'docs-envelope',
+        hasEncryptedMetadata: true,
+        imageEnvelope: 'image-envelope',
+        shouldEnterDecryptBoundary: true,
+      }),
+    );
+    expect(
+      buildSbtPageEncryptedMetadataDecryptPlan({
+        activeAccount: '0xA',
+        hasLitKey: true,
+        metaKey: 'session:84532:0xsbt',
+        sbtInfo: {
+          name: 'Public badge',
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canAttemptDecrypt: false,
+        decryptKey: 'session:84532:0xsbt:0xA:',
+        envelopeFingerprint: '',
+        hasEncryptedMetadata: false,
+        shouldEnterDecryptBoundary: false,
+      }),
+    );
+    expect(
+      resolveSbtPageCachedGroupPasswordHash({
+        preferCountsOnly: true,
+        groupPasswordHashLoaded: true,
+        groupPasswordHash: '0xhash',
+      }),
+    ).toEqual({
       groupPasswordHash: '0xhash',
       shouldReuseCachedGroupPasswordHash: true,
     });
-    expect(resolveSbtPageCachedGroupPasswordHash({
-      preferCountsOnly: false,
-      groupPasswordHashLoaded: true,
-      groupPasswordHash: '0xhash',
-    })).toEqual({
+    expect(
+      resolveSbtPageCachedGroupPasswordHash({
+        preferCountsOnly: false,
+        groupPasswordHashLoaded: true,
+        groupPasswordHash: '0xhash',
+      }),
+    ).toEqual({
       groupPasswordHash: null,
       shouldReuseCachedGroupPasswordHash: false,
     });
-    expect(resolveSbtPageGroupPasswordMintState({
-      groupPasswordHash: '0xhash',
-      hashZero: '0x0',
-      hasPasswordMint: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageGroupPasswordMintState({
+        groupPasswordHash: '0xhash',
+        hashZero: '0x0',
+        hasPasswordMint: true,
+      }),
+    ).toEqual({
       hasGroupHash: true,
       hasInviteMint: true,
       hasGroupPasswordMint: false,
     });
-    expect(resolveSbtPageGroupPasswordMintState({
-      groupPasswordHash: '0xhash',
-      hashZero: '0x0',
-      hasPasswordMint: false,
-    })).toEqual({
+    expect(
+      resolveSbtPageGroupPasswordMintState({
+        groupPasswordHash: '0xhash',
+        hashZero: '0x0',
+        hasPasswordMint: false,
+      }),
+    ).toEqual({
       hasGroupHash: true,
       hasInviteMint: false,
       hasGroupPasswordMint: true,
     });
-    expect(resolveSbtPageGroupPasswordMintState({
-      groupPasswordHash: '0x0',
-      hashZero: '0x0',
-      hasPasswordMint: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageGroupPasswordMintState({
+        groupPasswordHash: '0x0',
+        hashZero: '0x0',
+        hasPasswordMint: true,
+      }),
+    ).toEqual({
       hasGroupHash: false,
       hasInviteMint: false,
       hasGroupPasswordMint: false,
@@ -686,46 +768,54 @@ describe('sbtPageHelpers', () => {
     expect(coerceSbtPageEpochSeconds(-1)).toBe(0);
     expect(coerceSbtPageEpochSeconds('bad')).toBe(0);
 
-    expect(normalizeSbtPageHistorySummary({
-      totalMinted: '0005',
-      totalBurned: 1,
-      activeSupply: '004',
-      currentHolderCount: '4',
-      historicalHolderCount: '005',
-    })).toEqual({
+    expect(
+      normalizeSbtPageHistorySummary({
+        totalMinted: '0005',
+        totalBurned: 1,
+        activeSupply: '004',
+        currentHolderCount: '4',
+        historicalHolderCount: '005',
+      }),
+    ).toEqual({
       totalMinted: '5',
       totalBurned: '1',
       activeSupply: '4',
       currentHolderCount: '4',
       historicalHolderCount: '5',
     });
-    expect(normalizeSbtPageHistorySummary({
-      totalMinted: '5',
-      totalBurned: 'not-a-number',
-      activeSupply: '4',
-      currentHolderCount: '4',
-      historicalHolderCount: '5',
-    })).toBeNull();
+    expect(
+      normalizeSbtPageHistorySummary({
+        totalMinted: '5',
+        totalBurned: 'not-a-number',
+        activeSupply: '4',
+        currentHolderCount: '4',
+        historicalHolderCount: '5',
+      }),
+    ).toBeNull();
     expect(normalizeSbtPageHistorySummary(null)).toBeNull();
   });
 
   it('applies SBT history summary fallbacks without clobbering existing state on invalid values', () => {
-    expect(applySbtPageHistorySummaryFallback({
-      summaryValue: { currentHolderCount: '04', totalMinted: '0007' },
-      sourceLabel: 'summary-cache',
-    })).toEqual({
+    expect(
+      applySbtPageHistorySummaryFallback({
+        summaryValue: { currentHolderCount: '04', totalMinted: '0007' },
+        sourceLabel: 'summary-cache',
+      }),
+    ).toEqual({
       mintedTokensOverride: '4',
       mintedTokensSource: 'summary-cache',
       ownerLookupUpperBound: '7',
     });
 
-    expect(applySbtPageHistorySummaryFallback({
-      mintedTokensOverride: '3',
-      mintedTokensSource: 'summary-group',
-      ownerLookupUpperBound: '8',
-      summaryValue: { currentHolderCount: 'bad', totalMinted: null },
-      sourceLabel: 'ignored',
-    })).toEqual({
+    expect(
+      applySbtPageHistorySummaryFallback({
+        mintedTokensOverride: '3',
+        mintedTokensSource: 'summary-group',
+        ownerLookupUpperBound: '8',
+        summaryValue: { currentHolderCount: 'bad', totalMinted: null },
+        sourceLabel: 'ignored',
+      }),
+    ).toEqual({
       mintedTokensOverride: '3',
       mintedTokensSource: 'summary-group',
       ownerLookupUpperBound: '8',
@@ -744,28 +834,38 @@ describe('sbtPageHelpers', () => {
     };
 
     expect(needsSbtPageTokenUriFields(complete)).toBe(false);
-    expect(needsSbtPageTokenUriFields({
-      ...complete,
-      documentURLs: [],
-    })).toBe(false);
-    expect(needsSbtPageTokenUriFields({
-      ...complete,
-      image: '',
-      documentURLs: [],
-      encryptedFields: { image: { ciphertext: 'locked' } },
-    })).toBe(false);
-    expect(needsSbtPageTokenUriFields({
-      ...complete,
-      docURL: 'https://example.test/source',
-    })).toBe(false);
-    expect(needsSbtPageTokenUriFields({
-      ...complete,
-      admin: '0x0000000000000000000000000000000000000000',
-    })).toBe(true);
-    expect(needsSbtPageTokenUriFields({
-      ...complete,
-      tokenURI: '',
-    })).toBe(true);
+    expect(
+      needsSbtPageTokenUriFields({
+        ...complete,
+        documentURLs: [],
+      }),
+    ).toBe(false);
+    expect(
+      needsSbtPageTokenUriFields({
+        ...complete,
+        image: '',
+        documentURLs: [],
+        encryptedFields: { image: { ciphertext: 'locked' } },
+      }),
+    ).toBe(false);
+    expect(
+      needsSbtPageTokenUriFields({
+        ...complete,
+        docURL: 'https://example.test/source',
+      }),
+    ).toBe(false);
+    expect(
+      needsSbtPageTokenUriFields({
+        ...complete,
+        admin: '0x0000000000000000000000000000000000000000',
+      }),
+    ).toBe(true);
+    expect(
+      needsSbtPageTokenUriFields({
+        ...complete,
+        tokenURI: '',
+      }),
+    ).toBe(true);
     expect(needsSbtPageTokenUriFields(null)).toBe(true);
 
     expect(needsSbtPageDirectMetadataHydration({})).toBe(true);
@@ -782,9 +882,11 @@ describe('sbtPageHelpers', () => {
       original: '0xAbC',
       lower: '0xabc',
     });
-    expect(getCurrentSbtAddressInfo({
-      SBTAddress: [{ nope: 'x' }, { sbtAddress: '0xDef' }],
-    })).toEqual({
+    expect(
+      getCurrentSbtAddressInfo({
+        SBTAddress: [{ nope: 'x' }, { sbtAddress: '0xDef' }],
+      }),
+    ).toEqual({
       original: '0xDef',
       lower: '0xdef',
     });
@@ -822,96 +924,128 @@ describe('sbtPageHelpers', () => {
   it('resolves active and recovery chain ids by page precedence', () => {
     const getSessionChainId = jest.fn((slug: string) => (slug === 'alpha' ? 11155420 : null));
 
-    expect(resolveSbtPageActiveChainId({
-      getSessionChainId,
-      propNetwork: { id: 10 },
-      sbtInfo: { chainID: 84532 },
-      sessionSlug: 'alpha',
-      stateNetwork: { id: 84532 },
-    })).toBe(84532);
-    expect(resolveSbtPageActiveChainId({
-      getSessionChainId,
-      propNetwork: { id: 10 },
-      sbtInfo: { chainID: 84532 },
-      sessionSlug: 'alpha',
-      stateNetwork: { id: 0 },
-    })).toBe(10);
-    expect(resolveSbtPageActiveChainId({
-      getSessionChainId,
-      sbtInfo: { chainId: '84532' },
-      sessionSlug: 'alpha',
-    })).toBe(84532);
-    expect(resolveSbtPageActiveChainId({
-      getSessionChainId,
-      sessionSlug: 'alpha',
-    })).toBe(11155420);
+    expect(
+      resolveSbtPageActiveChainId({
+        getSessionChainId,
+        propNetwork: { id: 10 },
+        sbtInfo: { chainID: 84532 },
+        sessionSlug: 'alpha',
+        stateNetwork: { id: 84532 },
+      }),
+    ).toBe(84532);
+    expect(
+      resolveSbtPageActiveChainId({
+        getSessionChainId,
+        propNetwork: { id: 10 },
+        sbtInfo: { chainID: 84532 },
+        sessionSlug: 'alpha',
+        stateNetwork: { id: 0 },
+      }),
+    ).toBe(10);
+    expect(
+      resolveSbtPageActiveChainId({
+        getSessionChainId,
+        sbtInfo: { chainId: '84532' },
+        sessionSlug: 'alpha',
+      }),
+    ).toBe(84532);
+    expect(
+      resolveSbtPageActiveChainId({
+        getSessionChainId,
+        sessionSlug: 'alpha',
+      }),
+    ).toBe(11155420);
     expect(resolveSbtPageActiveChainId()).toBeNull();
 
-    expect(resolveSbtPageRecoveryCacheChainId({
-      getSessionChainId,
-      propNetwork: { id: 10 },
-      propSBTAddress: { chainId: 11155420 },
-      sbtInfo: { chainID: 84532 },
-      sessionSlug: 'alpha',
-    })).toBe(84532);
-    expect(resolveSbtPageRecoveryCacheChainId({
-      getSessionChainId,
-      propNetwork: { id: 10 },
-      propSBTAddress: { chainId: 11155420 },
-      sessionSlug: 'alpha',
-    })).toBe(11155420);
-    expect(resolveSbtPageRecoveryCacheChainId({
-      getSessionChainId,
-      propNetwork: { id: 10 },
-      sessionSlug: 'alpha',
-    })).toBe(11155420);
-    expect(resolveSbtPageRecoveryCacheChainId({
-      getSessionChainId: () => null,
-      propNetwork: { id: 10 },
-    })).toBe(10);
+    expect(
+      resolveSbtPageRecoveryCacheChainId({
+        getSessionChainId,
+        propNetwork: { id: 10 },
+        propSBTAddress: { chainId: 11155420 },
+        sbtInfo: { chainID: 84532 },
+        sessionSlug: 'alpha',
+      }),
+    ).toBe(84532);
+    expect(
+      resolveSbtPageRecoveryCacheChainId({
+        getSessionChainId,
+        propNetwork: { id: 10 },
+        propSBTAddress: { chainId: 11155420 },
+        sessionSlug: 'alpha',
+      }),
+    ).toBe(11155420);
+    expect(
+      resolveSbtPageRecoveryCacheChainId({
+        getSessionChainId,
+        propNetwork: { id: 10 },
+        sessionSlug: 'alpha',
+      }),
+    ).toBe(11155420);
+    expect(
+      resolveSbtPageRecoveryCacheChainId({
+        getSessionChainId: () => null,
+        propNetwork: { id: 10 },
+      }),
+    ).toBe(10);
   });
 
   it('derives cache net keys and direct metadata contexts from slug and chain hints', () => {
-    const getSessionChainId = jest.fn((slug: unknown) => (
-      String(slug || '').trim().toLowerCase() === 'alpha' ? 11155420 : null
-    ));
+    const getSessionChainId = jest.fn((slug: unknown) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'alpha'
+        ? 11155420
+        : null,
+    );
 
-    expect(deriveSbtPageCacheNetKey({
-      currentNetwork: { id: 10 },
-      getSessionChainId,
-      infoHint: { chainID: 84532 },
-      netKeyHint: 777,
-      slugForCache: 'alpha',
-    })).toBe('11155420');
-    expect(deriveSbtPageCacheNetKey({
-      currentNetwork: { id: 10 },
-      getSessionChainId,
-      infoHint: { chainId: '84532' },
-      slugForCache: 'missing',
-    })).toBe('84532');
-    expect(deriveSbtPageCacheNetKey({
-      currentNetwork: { id: 10 },
-      getSessionChainId,
-      netKeyHint: '84532',
-      slugForCache: 'missing',
-    })).toBe('84532');
-    expect(deriveSbtPageCacheNetKey({
-      currentNetwork: { id: 10 },
-      getSessionChainId,
-      slugForCache: 'missing',
-    })).toBe('10');
+    expect(
+      deriveSbtPageCacheNetKey({
+        currentNetwork: { id: 10 },
+        getSessionChainId,
+        infoHint: { chainID: 84532 },
+        netKeyHint: 777,
+        slugForCache: 'alpha',
+      }),
+    ).toBe('11155420');
+    expect(
+      deriveSbtPageCacheNetKey({
+        currentNetwork: { id: 10 },
+        getSessionChainId,
+        infoHint: { chainId: '84532' },
+        slugForCache: 'missing',
+      }),
+    ).toBe('84532');
+    expect(
+      deriveSbtPageCacheNetKey({
+        currentNetwork: { id: 10 },
+        getSessionChainId,
+        netKeyHint: '84532',
+        slugForCache: 'missing',
+      }),
+    ).toBe('84532');
+    expect(
+      deriveSbtPageCacheNetKey({
+        currentNetwork: { id: 10 },
+        getSessionChainId,
+        slugForCache: 'missing',
+      }),
+    ).toBe('10');
     expect(deriveSbtPageCacheNetKey()).toBe('');
 
-    expect(buildSbtPageDirectMetadataContext({
-      currentNetwork: { id: 10 },
-      getSessionChainId,
-      infoHint: { chainID: 84532 },
-      slugForRead: ' Alpha ',
-    })).toEqual({ slug: 'Alpha', networkChainId: 11155420 });
-    expect(buildSbtPageDirectMetadataContext({
-      infoHint: { chainId: '84532' },
-      slugForRead: '',
-    })).toEqual({ networkChainId: 84532 });
+    expect(
+      buildSbtPageDirectMetadataContext({
+        currentNetwork: { id: 10 },
+        getSessionChainId,
+        infoHint: { chainID: 84532 },
+        slugForRead: ' Alpha ',
+      }),
+    ).toEqual({ slug: 'Alpha', networkChainId: 11155420 });
+    expect(
+      buildSbtPageDirectMetadataContext({
+        infoHint: { chainId: '84532' },
+        slugForRead: '',
+      }),
+    ).toEqual({ networkChainId: 84532 });
     expect(buildSbtPageDirectMetadataContext()).toBe('');
   });
 
@@ -921,23 +1055,27 @@ describe('sbtPageHelpers', () => {
       '084532': legacyNode,
     }));
 
-    await expect(readSbtPageCacheBySlug({
-      netKeyForCache: '84532',
-      readCache,
-      slugForCache: 'alpha',
-    })).resolves.toEqual({
+    await expect(
+      readSbtPageCacheBySlug({
+        netKeyForCache: '84532',
+        readCache,
+        slugForCache: 'alpha',
+      }),
+    ).resolves.toEqual({
       '084532': legacyNode,
       '84532': legacyNode,
     });
     expect(readCache).toHaveBeenCalledWith('sbtCache', 'alpha');
 
-    await expect(readSbtPageCacheBySlug({
-      netKeyForCache: '84532',
-      readCache: () => {
-        throw new Error('cache unavailable');
-      },
-      slugForCache: null,
-    })).resolves.toEqual({});
+    await expect(
+      readSbtPageCacheBySlug({
+        netKeyForCache: '84532',
+        readCache: () => {
+          throw new Error('cache unavailable');
+        },
+        slugForCache: null,
+      }),
+    ).resolves.toEqual({});
   });
 
   it('finds cached SBT entries across session cache namespaces with exclusion support', () => {
@@ -967,55 +1105,67 @@ describe('sbtPageHelpers', () => {
       },
     ]);
 
-    expect(findSbtPageCachedEntryAcrossGroups({
-      addressLower: addressLower.toUpperCase(),
-      listNamespaceEntriesSync,
-    })).toEqual({
+    expect(
+      findSbtPageCachedEntryAcrossGroups({
+        addressLower: addressLower.toUpperCase(),
+        listNamespaceEntriesSync,
+      }),
+    ).toEqual({
       slug: 'Alpha',
       entry: alphaEntry,
       netKey: '84532',
     });
-    expect(findSbtPageCachedEntryAcrossGroups({
-      addressLower,
-      excludeSlug: 'alpha',
-      listNamespaceEntriesSync,
-    })).toEqual({
+    expect(
+      findSbtPageCachedEntryAcrossGroups({
+        addressLower,
+        excludeSlug: 'alpha',
+        listNamespaceEntriesSync,
+      }),
+    ).toEqual({
       slug: 'beta',
       entry: betaEntry,
       netKey: '11155420',
     });
-    expect(findSbtPageCachedEntryAcrossGroups({
-      addressLower,
-      listNamespaceEntriesSync: () => {
-        throw new Error('cache unavailable');
-      },
-    })).toBeNull();
+    expect(
+      findSbtPageCachedEntryAcrossGroups({
+        addressLower,
+        listNamespaceEntriesSync: () => {
+          throw new Error('cache unavailable');
+        },
+      }),
+    ).toBeNull();
   });
 
   it('resolves metadata hydration ownership flags', () => {
     const refreshSbtData = jest.fn();
 
-    expect(resolveSbtPageMetadataHydrationMode({
-      forceEventFetch: false,
-      isSBTCacheReady: false,
-      refreshSbtData,
-    })).toEqual({
+    expect(
+      resolveSbtPageMetadataHydrationMode({
+        forceEventFetch: false,
+        isSBTCacheReady: false,
+        refreshSbtData,
+      }),
+    ).toEqual({
       usingCentralHydration: true,
       parentOwnsInitialRefresh: true,
     });
-    expect(resolveSbtPageMetadataHydrationMode({
-      forceEventFetch: true,
-      isSBTCacheReady: false,
-      refreshSbtData,
-    })).toEqual({
+    expect(
+      resolveSbtPageMetadataHydrationMode({
+        forceEventFetch: true,
+        isSBTCacheReady: false,
+        refreshSbtData,
+      }),
+    ).toEqual({
       usingCentralHydration: true,
       parentOwnsInitialRefresh: false,
     });
-    expect(resolveSbtPageMetadataHydrationMode({
-      forceEventFetch: false,
-      isSBTCacheReady: false,
-      refreshSbtData: null,
-    })).toEqual({
+    expect(
+      resolveSbtPageMetadataHydrationMode({
+        forceEventFetch: false,
+        isSBTCacheReady: false,
+        refreshSbtData: null,
+      }),
+    ).toEqual({
       usingCentralHydration: false,
       parentOwnsInitialRefresh: false,
     });
@@ -1024,11 +1174,13 @@ describe('sbtPageHelpers', () => {
   it('keeps cache-ready metadata hydration inert while preserving the central refresh boundary', () => {
     const refreshSbtData = jest.fn();
 
-    expect(resolveSbtPageMetadataHydrationMode({
-      forceEventFetch: false,
-      isSBTCacheReady: true,
-      refreshSbtData,
-    })).toEqual({
+    expect(
+      resolveSbtPageMetadataHydrationMode({
+        forceEventFetch: false,
+        isSBTCacheReady: true,
+        refreshSbtData,
+      }),
+    ).toEqual({
       usingCentralHydration: true,
       parentOwnsInitialRefresh: false,
     });

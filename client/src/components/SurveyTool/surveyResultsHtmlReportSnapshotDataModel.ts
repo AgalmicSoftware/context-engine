@@ -52,18 +52,12 @@ export const buildSurveyResultsHtmlReportSnapshot = ({
   viewMode = '',
 }: BuildSurveyResultsHtmlReportSnapshotArgs = {}): SessionResultsHtmlSnapshot => {
   const reportQuestions = Array.isArray(questions) ? questions : [];
-  const responseCountFromRows = Array.from(countsByQuestion?.values() || [])
-    .reduce((sum, count) => sum + Number(count || 0), 0);
-  const responsesCount =
-    responseCountFromRows ||
-    Number(filteredResponsesCount) ||
-    Number(totalResponsesCount) ||
-    0;
-  const questionsCount =
-    reportQuestions.length ||
-    Number(filteredQuestionsCount) ||
-    Number(totalQuestionsCount) ||
-    0;
+  const responseCountFromRows = Array.from(countsByQuestion?.values() || []).reduce(
+    (sum, count) => sum + Number(count || 0),
+    0,
+  );
+  const responsesCount = responseCountFromRows || Number(filteredResponsesCount) || Number(totalResponsesCount) || 0;
+  const questionsCount = reportQuestions.length || Number(filteredQuestionsCount) || Number(totalQuestionsCount) || 0;
   const slug = String(sessionSlug || '').trim();
   const name = String(sessionName || slug || 'Session').trim();
   const hasReportContent = reportQuestions.length > 0 || responsesCount > 0;
@@ -113,7 +107,9 @@ export const buildSurveyResultsHtmlReportSnapshot = ({
       argumentMap: {
         available: !!analysisArtifact?.sections.argumentMap.available,
         debates: analysisArtifact?.sections.argumentMap.debates || [],
-        reason: analysisArtifact?.sections.argumentMap.reason || 'Generate analysis views to derive an argument map from this session data.',
+        reason:
+          analysisArtifact?.sections.argumentMap.reason ||
+          'Generate analysis views to derive an argument map from this session data.',
       },
       riskMatrix: {
         available: !!analysisArtifact?.sections.riskMatrix.available,
@@ -121,13 +117,17 @@ export const buildSurveyResultsHtmlReportSnapshot = ({
         comments: analysisArtifact?.sections.riskMatrix.comments || [],
         heatmap: analysisArtifact?.sections.riskMatrix.heatmap || {},
         scenarioLinks: analysisArtifact?.sections.riskMatrix.scenarioLinks || [],
-        reason: analysisArtifact?.sections.riskMatrix.reason || 'Generate analysis views to derive a custom risk matrix from this session data.',
+        reason:
+          analysisArtifact?.sections.riskMatrix.reason ||
+          'Generate analysis views to derive a custom risk matrix from this session data.',
       },
       atlas: {
         available: !!analysisArtifact?.sections.atlas.available,
         nodes: analysisArtifact?.sections.atlas.nodes || [],
         edges: analysisArtifact?.sections.atlas.edges || [],
-        reason: analysisArtifact?.sections.atlas.reason || 'Generate analysis views to derive atlas nodes from this session data.',
+        reason:
+          analysisArtifact?.sections.atlas.reason ||
+          'Generate analysis views to derive atlas nodes from this session data.',
       },
     },
   });

@@ -111,7 +111,10 @@ const sameAddress = (a: unknown, b: unknown): boolean => !!a && !!b && toLower(a
 const PATH_PROVIDER_KEYS = new Set(['path', 'pocket']);
 const PATH_RPC_ERROR_ONCE = new Set<string>();
 const PATH_RPC_SUCCESS_ONCE = new Set<string>();
-const RPC_PROVIDER_MODE_DEFAULT = String(CE_RPC_PROVIDER_MODE || 'fallback').trim().toLowerCase() || 'fallback';
+const RPC_PROVIDER_MODE_DEFAULT =
+  String(CE_RPC_PROVIDER_MODE || 'fallback')
+    .trim()
+    .toLowerCase() || 'fallback';
 const RPC_PROVIDER_SUCCESS_ONCE = new Set<string>();
 const SPONSORED_RPC_RESOURCE_KEY = 'rpc';
 const SESSION_PROVIDER_TRANSITION_PRUNE_TTL_MS = 60 * 1000;
@@ -121,13 +124,14 @@ const TRANSITIONAL_SESSION_ACCESS_STATUSES = new Set(['checking', 'unresolved'])
  * Normalize CE RPC provider mode to a supported runtime value.
  */
 const normalizeRpcProviderMode = (raw: string | null | undefined): 'infura_only' | 'fallback' => {
-  const mode = String(raw || '').trim().toLowerCase();
+  const mode = String(raw || '')
+    .trim()
+    .toLowerCase();
   return mode === 'infura_only' ? 'infura_only' : 'fallback';
 };
 
-const shouldTrackSessionProviderCacheKey = (sessionAccessStatus = ''): boolean => (
-  TRANSITIONAL_SESSION_ACCESS_STATUSES.has(toLower(sessionAccessStatus))
-);
+const shouldTrackSessionProviderCacheKey = (sessionAccessStatus = ''): boolean =>
+  TRANSITIONAL_SESSION_ACCESS_STATUSES.has(toLower(sessionAccessStatus));
 
 /**
  * Read the active CE RPC provider mode from runtime globals or app config.
@@ -149,11 +153,7 @@ const isPathTransportError = (err: unknown): boolean => {
   const errorLike = err as AnyRecord;
   const code = errorLike?.code ?? errorLike?.error?.code;
   const message = String(errorLike?.message || errorLike?.error?.message || '').toLowerCase();
-  const status =
-    errorLike?.status ??
-    errorLike?.statusCode ??
-    errorLike?.error?.status ??
-    errorLike?.error?.statusCode;
+  const status = errorLike?.status ?? errorLike?.statusCode ?? errorLike?.error?.status ?? errorLike?.error?.statusCode;
 
   if (code === 'CALL_EXCEPTION' || code === 'INVALID_ARGUMENT') return false;
   if (typeof status === 'number' && status >= 400) return true;
@@ -179,11 +179,7 @@ const isSponsoredRpcFallbackError = (err: unknown): boolean => {
   const errorLike = err as AnyRecord;
   const code = String(errorLike?.code ?? errorLike?.error?.code ?? '').toUpperCase();
   const message = String(
-    errorLike?.reason ||
-    errorLike?.shortMessage ||
-    errorLike?.message ||
-    errorLike?.error?.message ||
-    ''
+    errorLike?.reason || errorLike?.shortMessage || errorLike?.message || errorLike?.error?.message || '',
   ).toLowerCase();
 
   if (code !== 'CALL_EXCEPTION' && code !== 'UNPREDICTABLE_GAS_LIMIT') return false;
@@ -204,10 +200,10 @@ const toSponsoredRpcFallbackError = (err: unknown, meta: AnyRecord = {}): Error 
   const errorLike = err as AnyRecord;
   const message = String(
     errorLike?.reason ||
-    errorLike?.shortMessage ||
-    errorLike?.message ||
-    errorLike?.error?.message ||
-    'Sponsored RPC read failed.'
+      errorLike?.shortMessage ||
+      errorLike?.message ||
+      errorLike?.error?.message ||
+      'Sponsored RPC read failed.',
   );
   const fallbackError = new Error(message);
   Object.assign(fallbackError as AnyRecord, {
@@ -319,11 +315,12 @@ const hasRpcUrlMapEntryForChain = (rpcMap: Record<string, string[]> = {}, chainI
   return normalizeRpcUrlList(rpcMap[String(id)] || rpcMap[id] || rpcMap[String(chainId)]).length > 0;
 };
 
-const pickFirstNonEmptyRpcUrlMap = (chainId: unknown, ...candidates: unknown[]): Record<string, string[]> => candidates.reduce<Record<string, string[]>>((found, candidate) => {
-  if (hasRpcUrlMapEntryForChain(found, Number(chainId || 0))) return found;
-  const sanitized = sanitizeRpcUrlMap(candidate);
-  return hasRpcUrlMapEntryForChain(sanitized, Number(chainId || 0)) ? sanitized : found;
-}, {});
+const pickFirstNonEmptyRpcUrlMap = (chainId: unknown, ...candidates: unknown[]): Record<string, string[]> =>
+  candidates.reduce<Record<string, string[]>>((found, candidate) => {
+    if (hasRpcUrlMapEntryForChain(found, Number(chainId || 0))) return found;
+    const sanitized = sanitizeRpcUrlMap(candidate);
+    return hasRpcUrlMapEntryForChain(sanitized, Number(chainId || 0)) ? sanitized : found;
+  }, {});
 
 const normalizeAddress = (value: unknown): string => {
   const account = toStr(value).trim();
@@ -360,12 +357,14 @@ const warmSponsoredSessionRpcAccess = ({
 } = {}): void => {
   Promise.resolve()
     .then(() => import('./sponsoredAccessLazy.js'))
-    .then((mod) => mod?.primeSponsoredAccessCheck?.({
-      sessionConfig,
-      sessionSlug,
-      account,
-      resourceKey: SPONSORED_RPC_RESOURCE_KEY,
-    }))
+    .then((mod) =>
+      mod?.primeSponsoredAccessCheck?.({
+        sessionConfig,
+        sessionSlug,
+        account,
+        resourceKey: SPONSORED_RPC_RESOURCE_KEY,
+      }),
+    )
     .catch(() => {});
 };
 
@@ -384,18 +383,16 @@ const resolvePathOverrideUrls = (cfg: SessionConfigLike = {}, chainId: unknown =
   const id = Number(chainId || 0);
   const rpc = isObj(cfg?.rpc) ? cfg.rpc : {};
   const providers = isObj(rpc.providers) ? rpc.providers : {};
-  const pathCfg = isObj(rpc.path) ? rpc.path : (isObj(providers.path) ? providers.path : {});
+  const pathCfg = isObj(rpc.path) ? rpc.path : isObj(providers.path) ? providers.path : {};
   const pathMap = resolveRpcMap(pathCfg);
   const mappedUrls = id
     ? dedupeRpcUrls(pathMap[String(id)] || pathMap[id] || pathMap[String(chainId)])
     : ([] as string[]);
-  const directUrls = dedupeRpcUrls(
-    [
-      ...normalizeRpcUrlList(pathCfg?.rpcUrl),
-      ...normalizeRpcUrlList(pathCfg?.url),
-      ...normalizeRpcUrlList(pathCfg?.gatewayUrl),
-    ]
-  );
+  const directUrls = dedupeRpcUrls([
+    ...normalizeRpcUrlList(pathCfg?.rpcUrl),
+    ...normalizeRpcUrlList(pathCfg?.url),
+    ...normalizeRpcUrlList(pathCfg?.gatewayUrl),
+  ]);
   return dedupeRpcUrls([...mappedUrls, ...directUrls]);
 };
 
@@ -404,25 +401,17 @@ const resolveBrowserVisibleSessionRpcUrls = (cfg: SessionConfigLike = {}, chainI
   const rpc = isObj(cfg?.rpc) ? cfg.rpc : {};
   const defaultSessionChainId = Number(extractChainId(cfg, { strict: true }) || 0);
   const shouldUseDirectUrls = !id || !defaultSessionChainId || id === defaultSessionChainId;
-  const rpcMap = pickFirstNonEmptyRpcUrlMap(
-    id,
-    resolveRpcMap(rpc),
-    resolveRpcMap(cfg)
-  );
-  const mappedUrls = id
-    ? dedupeRpcUrls(rpcMap[String(id)] || rpcMap[id] || rpcMap[String(chainId)])
-    : ([] as string[]);
+  const rpcMap = pickFirstNonEmptyRpcUrlMap(id, resolveRpcMap(rpc), resolveRpcMap(cfg));
+  const mappedUrls = id ? dedupeRpcUrls(rpcMap[String(id)] || rpcMap[id] || rpcMap[String(chainId)]) : ([] as string[]);
   const directUrls = shouldUseDirectUrls
-    ? dedupeRpcUrls(
-        [
-          ...normalizeRpcUrlList(cfg?.rpcEndpoint),
-          ...normalizeRpcUrlList(cfg?.rpcUrl),
-          ...normalizeRpcUrlList(rpc?.rpcEndpoint),
-          ...normalizeRpcUrlList(rpc?.endpoint),
-          ...normalizeRpcUrlList(rpc?.rpcUrl),
-          ...normalizeRpcUrlList(rpc?.url),
-        ]
-      )
+    ? dedupeRpcUrls([
+        ...normalizeRpcUrlList(cfg?.rpcEndpoint),
+        ...normalizeRpcUrlList(cfg?.rpcUrl),
+        ...normalizeRpcUrlList(rpc?.rpcEndpoint),
+        ...normalizeRpcUrlList(rpc?.endpoint),
+        ...normalizeRpcUrlList(rpc?.rpcUrl),
+        ...normalizeRpcUrlList(rpc?.url),
+      ])
     : ([] as string[]);
   return dedupeRpcUrls([...mappedUrls, ...directUrls]);
 };
@@ -430,7 +419,7 @@ const resolveBrowserVisibleSessionRpcUrls = (cfg: SessionConfigLike = {}, chainI
 const resolveSponsoredSessionRpcAccess = (
   cfg: SessionConfigLike = {},
   sessionSlug = '',
-  sessionRpcUrls: string[] = []
+  sessionRpcUrls: string[] = [],
 ): SponsoredSessionRpcAccess => {
   if (!Array.isArray(sessionRpcUrls) || !sessionRpcUrls.length) {
     return {
@@ -443,11 +432,10 @@ const resolveSponsoredSessionRpcAccess = (
 
   const gateState = resolveSponsoredGateStateForResource(cfg, SPONSORED_RPC_RESOURCE_KEY);
   const gateStatus = gateState?.status || SPONSORED_GATE_STATES.UNAVAILABLE;
-  const hasExplicitParticipantRpcOptIn = (
+  const hasExplicitParticipantRpcOptIn =
     gateStatus === SPONSORED_GATE_STATES.OPEN ||
     gateStatus === SPONSORED_GATE_STATES.RESTRICTED ||
-    gateStatus === SPONSORED_GATE_STATES.UNRESOLVED
-  );
+    gateStatus === SPONSORED_GATE_STATES.UNRESOLVED;
 
   // Regression guard: Session Wizard writes top-level rpcUrl/rpcUrlsByChainId for
   // ordinary sessions, so participant reads must not honor those fields unless
@@ -545,26 +533,23 @@ function resolveGroupPathRpcPreference(cfg: SessionConfigLike = {}, chainId: unk
 
   const rpc = isObj(cfg?.rpc) ? cfg.rpc : {};
   const providers = isObj(rpc.providers) ? rpc.providers : {};
-  const pathCfg = isObj(rpc.path) ? rpc.path : (isObj(providers.path) ? providers.path : {});
+  const pathCfg = isObj(rpc.path) ? rpc.path : isObj(providers.path) ? providers.path : {};
   const activeCfg = pathCfg;
   const providerName = toLower(rpc.provider || rpc.mode || cfg?.rpcProvider || '');
   const providerIsDefault = !providerName || providerName === 'default';
   const providerIsPath = PATH_PROVIDER_KEYS.has(providerName);
-  const preferGlobal = cfg?.__CE_skipGlobalPathDefaults === true
-    ? false
-    : readPreferPathRpcFlag(id);
+  const preferGlobal = cfg?.__CE_skipGlobalPathDefaults === true ? false : readPreferPathRpcFlag(id);
   const pathDefaultUrls = dedupeRpcUrls(getPathRpcUrl(id));
   const pathOverrideUrls = resolvePathOverrideUrls(cfg, id);
   const usingCustomPathOverrides = hasCustomPathOverrides(pathOverrideUrls, pathDefaultUrls);
   const sessionRootUrls = dedupeRpcUrls(
     resolveBrowserVisibleSessionRpcUrls(cfg, id).filter(
-      (url) => !usingCustomPathOverrides || !pathOverrideUrls.some((existing) => existing.toLowerCase() === url.toLowerCase())
-    )
+      (url) =>
+        !usingCustomPathOverrides || !pathOverrideUrls.some((existing) => existing.toLowerCase() === url.toLowerCase()),
+    ),
   );
   const sessionRootAccess = resolveSponsoredSessionRpcAccess(cfg, cfg?.slug || '', sessionRootUrls);
-  const hasPathOverrides =
-    !!activeCfg?.enabled ||
-    usingCustomPathOverrides;
+  const hasPathOverrides = !!activeCfg?.enabled || usingCustomPathOverrides;
   const hasSessionRootAccess = sessionRootAccess.allowed && sessionRootUrls.length > 0;
   // Session-root RPCs can opt in session-specific reads without implicitly
   // re-enabling PATH defaults when PATH preference is disabled.
@@ -574,31 +559,24 @@ function resolveGroupPathRpcPreference(cfg: SessionConfigLike = {}, chainId: unk
     return providerIsDefault ? null : { skipGlobalPreferred: true };
   }
 
-  const preferredUrls = dedupeRpcUrls(
-    [
-      ...(usingCustomPathOverrides ? pathOverrideUrls : []),
-      ...(usingCustomPathOverrides ? [] : (hasSessionRootAccess ? sessionRootUrls : [])),
-      ...(wantsPathDefaults ? pathDefaultUrls : []),
-    ]
-  );
+  const preferredUrls = dedupeRpcUrls([
+    ...(usingCustomPathOverrides ? pathOverrideUrls : []),
+    ...(usingCustomPathOverrides ? [] : hasSessionRootAccess ? sessionRootUrls : []),
+    ...(wantsPathDefaults ? pathDefaultUrls : []),
+  ]);
 
   if (!preferredUrls.length) return null;
 
   const usingPathOverrides = usingCustomPathOverrides;
   const usingSessionRootUrls = !usingPathOverrides && sessionRootAccess.allowed && sessionRootUrls.length > 0;
-  const label = usingSessionRootUrls
-    ? 'session'
-    : (providerIsPath ? providerName : 'path');
+  const label = usingSessionRootUrls ? 'session' : providerIsPath ? providerName : 'path';
   const cacheKeyPrefix = usingSessionRootUrls ? 'session' : 'path';
   const sessionSlug = toStr(cfg?.slug).trim();
-  const shouldUseSessionSlugInCacheKey = (
-    !!sessionSlug &&
-    shouldTrackSessionProviderCacheKey(sessionRootAccess.status)
-  );
+  const shouldUseSessionSlugInCacheKey = !!sessionSlug && shouldTrackSessionProviderCacheKey(sessionRootAccess.status);
   const accessCacheKey = [
     toStr(sessionRootAccess.accessMode).trim() || 'none',
     toStr(sessionRootAccess.status).trim() || 'unavailable',
-    usingPathOverrides ? 'path' : (usingSessionRootUrls ? 'root' : 'fallback'),
+    usingPathOverrides ? 'path' : usingSessionRootUrls ? 'root' : 'fallback',
   ].join(':');
   return {
     preferredUrls,
@@ -607,11 +585,7 @@ function resolveGroupPathRpcPreference(cfg: SessionConfigLike = {}, chainId: unk
     treatPreferredUrlsAsPath: label === 'path' || label === 'pocket',
     sessionAccessStatus: sessionRootAccess.status,
     sessionAccessMode: sessionRootAccess.accessMode,
-    sessionRpcSource: usingPathOverrides
-      ? 'path'
-      : usingSessionRootUrls
-        ? 'root'
-        : 'default-path',
+    sessionRpcSource: usingPathOverrides ? 'path' : usingSessionRootUrls ? 'root' : 'default-path',
     sessionSponsoredUrls: usingSessionRootUrls ? sessionRootUrls : [],
   };
 }
@@ -622,7 +596,7 @@ const _sessionProviderCacheKeys = new Map<string, Map<string, ReturnType<typeof 
 const clearTrackedSessionProviderCacheKey = (
   sessionSlug = '',
   cacheKey = '',
-  { deleteProvider = true }: { deleteProvider?: boolean } = {}
+  { deleteProvider = true }: { deleteProvider?: boolean } = {},
 ): void => {
   const slug = toStr(sessionSlug).trim();
   const key = toStr(cacheKey).trim();
@@ -677,11 +651,7 @@ addSponsoredAccessChangeListener((payload: SponsoredAccessChangePayload | AnyRec
   clearTrackedSessionProviderCache(payload?.sessionSlug);
 });
 
-const syncTrackedSessionProviderCache = (
-  sessionSlug = '',
-  cacheKey = '',
-  sessionAccessStatus = ''
-): void => {
+const syncTrackedSessionProviderCache = (sessionSlug = '', cacheKey = '', sessionAccessStatus = ''): void => {
   if (shouldTrackSessionProviderCacheKey(sessionAccessStatus)) {
     trackSessionProviderCacheKey(sessionSlug, cacheKey);
     return;
@@ -699,12 +669,10 @@ const filterPathUrls = (urls: unknown = [], pathUrls: unknown = [], allowPath = 
 
 const buildReadProviderResolution = (
   chainId: unknown,
-  opts: ReadProviderResolutionOptions = {}
+  opts: ReadProviderResolutionOptions = {},
 ): ReadProviderResolution => {
   const requestedId = Number(chainId || 0);
-  const id = requestedId > 0
-    ? requestedId
-    : (Number(DEFAULT_CHAIN_ID || 0) || 0);
+  const id = requestedId > 0 ? requestedId : Number(DEFAULT_CHAIN_ID || 0) || 0;
   const providerMode = readRpcProviderMode();
   const configuredPaidRpcUrl = toStr(getConfiguredPaidRpcHttpUrl(id)).trim();
   const infuraOnlyForChain = providerMode === 'infura_only' && !!configuredPaidRpcUrl;
@@ -714,34 +682,31 @@ const buildReadProviderResolution = (
   const preferredUrlsRaw = Array.isArray(opts.preferredUrls)
     ? opts.preferredUrls.map((u) => toStr(u).trim()).filter(Boolean)
     : [];
-  const globalPreferred = !infuraOnlyForChain && !opts.skipGlobalPreferred && preferPathFlag
-    ? pathDefaultUrls
-    : [];
-  const preferredUrls = infuraOnlyForChain ? [] : (preferredUrlsRaw.length ? preferredUrlsRaw : globalPreferred);
+  const globalPreferred = !infuraOnlyForChain && !opts.skipGlobalPreferred && preferPathFlag ? pathDefaultUrls : [];
+  const preferredUrls = infuraOnlyForChain ? [] : preferredUrlsRaw.length ? preferredUrlsRaw : globalPreferred;
   const sessionSponsoredUrls = dedupeRpcUrls(opts.sessionSponsoredUrls);
-  const allowPathUrls = !infuraOnlyForChain && (
-    treatPreferredUrlsAsPath ||
-    (!preferredUrlsRaw.length && !opts.skipGlobalPreferred && preferPathFlag)
-  );
+  const allowPathUrls =
+    !infuraOnlyForChain &&
+    (treatPreferredUrlsAsPath || (!preferredUrlsRaw.length && !opts.skipGlobalPreferred && preferPathFlag));
   const providerLabel = infuraOnlyForChain
     ? 'infura_only'
-    : (toStr(opts.providerLabel || '') || (preferredUrls.length ? 'path' : 'default'));
+    : toStr(opts.providerLabel || '') || (preferredUrls.length ? 'path' : 'default');
   const keyBase = opts.cacheKey
     ? String(opts.cacheKey)
-    : (preferredUrls.length ? `pref:${id}:${preferredUrls.join('|')}` : String(id));
+    : preferredUrls.length
+      ? `pref:${id}:${preferredUrls.join('|')}`
+      : String(id);
   const key = `${providerMode}:${keyBase}`;
 
   const chain = (getChainById(id) as AnyRecord | null) || null;
   const publicUrls = filterPathUrls(chain?.rpcUrls?.public?.http, pathDefaultUrls, allowPathUrls);
   const defaultUrls = filterPathUrls(chain?.rpcUrls?.default?.http, pathDefaultUrls, allowPathUrls);
-  const fallbackCandidate = getDefaultHttpRpc(id, {
-    allowPath: allowPathUrls,
-  }) || null;
-  const fallbackUrl = filterPathUrls(
-    fallbackCandidate ? [fallbackCandidate] : [],
-    pathDefaultUrls,
-    allowPathUrls
-  )[0] || null;
+  const fallbackCandidate =
+    getDefaultHttpRpc(id, {
+      allowPath: allowPathUrls,
+    }) || null;
+  const fallbackUrl =
+    filterPathUrls(fallbackCandidate ? [fallbackCandidate] : [], pathDefaultUrls, allowPathUrls)[0] || null;
 
   const ordered = [
     ...(preferredUrls || []),
@@ -752,12 +717,13 @@ const buildReadProviderResolution = (
     .map((u) => (u || '').trim())
     .filter(Boolean);
 
-  const effectiveOrdered = infuraOnlyForChain && configuredPaidRpcUrl
-    ? (() => {
-        const paidOnly = ordered.filter((url) => url === configuredPaidRpcUrl);
-        return paidOnly.length ? paidOnly : ordered;
-      })()
-    : ordered;
+  const effectiveOrdered =
+    infuraOnlyForChain && configuredPaidRpcUrl
+      ? (() => {
+          const paidOnly = ordered.filter((url) => url === configuredPaidRpcUrl);
+          return paidOnly.length ? paidOnly : ordered;
+        })()
+      : ordered;
 
   const seen = new Set<string>();
   const urls = effectiveOrdered.filter((u) => (seen.has(u) ? false : (seen.add(u), true)));
@@ -841,19 +807,15 @@ function _getCachedProvider(chainId: unknown, opts: ReadProviderResolutionOption
 
   const lastIndex = urls.length - 1;
   const sessionSponsoredUrlSet = new Set(sessionSponsoredUrls.map((url) => toLower(url)));
-  const hasSessionSponsoredFallbackUrls = (
+  const hasSessionSponsoredFallbackUrls =
     toStr(opts.sessionRpcSource).trim() === 'root' &&
     sessionSponsoredUrlSet.size > 0 &&
-    urls.some((url) => !sessionSponsoredUrlSet.has(toLower(url)))
-  );
+    urls.some((url) => !sessionSponsoredUrlSet.has(toLower(url)));
 
   const providerConfigs: any[] = urls.map((url, idx) => {
     const isBackup = urls.length > 1 && idx === lastIndex;
     const provider = new ethers.providers.JsonRpcProvider(url, staticNet) as AnyRecord;
-    const isSponsoredRootUrl = (
-      hasSessionSponsoredFallbackUrls &&
-      sessionSponsoredUrlSet.has(toLower(url))
-    );
+    const isSponsoredRootUrl = hasSessionSponsoredFallbackUrls && sessionSponsoredUrlSet.has(toLower(url));
 
     const basePerform = provider.perform.bind(provider);
     provider.perform = async (method: string, params: unknown) => {
@@ -904,7 +866,7 @@ function _getCachedProvider(chainId: unknown, opts: ReadProviderResolutionOption
       provider,
       // Ethers FallbackProvider favors LOWER priority values (1 is higher priority than 10).
       // Treat the last URL (for example, a paid diagnostics RPC) as a cold fallback.
-      priority: isBackup ? 50 : (idx + 1),
+      priority: isBackup ? 50 : idx + 1,
       // Public RPCs fan out quickly; paid backup waits much longer before being tried.
       stallTimeout: isBackup ? 6000 : 1500,
       weight: 1,
@@ -951,7 +913,7 @@ function getReadProviderForChain(chainId: unknown): EthersProvider {
  */
 function getReadProviderDiagnostics(
   chainId: unknown,
-  opts: ReadProviderResolutionOptions = {}
+  opts: ReadProviderResolutionOptions = {},
 ): ReadProviderDiagnostics {
   const resolution = buildReadProviderResolution(chainId, opts);
   return {
@@ -967,8 +929,7 @@ function getReadProviderDiagnostics(
     fallbackUrl: resolution.fallbackUrl || '',
     configuredPaidRpcUrl: resolution.configuredPaidRpcUrl,
     includesConfiguredPaidRpc: !!(
-      resolution.configuredPaidRpcUrl &&
-      resolution.urls.includes(resolution.configuredPaidRpcUrl)
+      resolution.configuredPaidRpcUrl && resolution.urls.includes(resolution.configuredPaidRpcUrl)
     ),
     infuraOnlyForChain: resolution.infuraOnlyForChain,
     sessionAccessStatus: toStr(opts.sessionAccessStatus).trim() || '',
@@ -984,10 +945,12 @@ function getReadProviderDiagnostics(
 function getLocalAwareReadProviderForChain(chainId: unknown): EthersProvider {
   const id = Number(chainId || 0);
   const injectedProvider = typeof window !== 'undefined' ? (window as AnyRecord).ethereum : null;
-  if (shouldUseInjectedReadProviderForChain({
-    targetChainId: id,
-    injectedProvider,
-  })) {
+  if (
+    shouldUseInjectedReadProviderForChain({
+      targetChainId: id,
+      injectedProvider,
+    })
+  ) {
     try {
       return new ethers.providers.Web3Provider(injectedProvider, 'any') as unknown as EthersProvider;
     } catch {
@@ -1002,15 +965,17 @@ function getLocalAwareReadProviderForChain(chainId: unknown): EthersProvider {
  */
 function getLocalAwareReadProviderForGroup(
   groupKeyOrCfg: string | SessionConfigLike | null | undefined,
-  options: ReadProviderGroupOptions | null = null
+  options: ReadProviderGroupOptions | null = null,
 ): EthersProvider {
   const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg) as SessionConfigLike;
   const chId = extractChainId(cfg, options);
   const injectedProvider = typeof window !== 'undefined' ? (window as AnyRecord).ethereum : null;
-  if (shouldUseInjectedReadProviderForChain({
-    targetChainId: chId,
-    injectedProvider,
-  })) {
+  if (
+    shouldUseInjectedReadProviderForChain({
+      targetChainId: chId,
+      injectedProvider,
+    })
+  ) {
     try {
       return new ethers.providers.Web3Provider(injectedProvider, 'any') as unknown as EthersProvider;
     } catch {
@@ -1025,7 +990,7 @@ function getLocalAwareReadProviderForGroup(
  */
 export function getReadProviderForGroup(
   groupKeyOrCfg: string | SessionConfigLike | null | undefined,
-  options: ReadProviderGroupOptions | null = null
+  options: ReadProviderGroupOptions | null = null,
 ): EthersProvider {
   const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg) as SessionConfigLike;
   const slugOrEmpty = cfg && typeof cfg.slug !== 'undefined' ? cfg.slug : '';
@@ -1036,10 +1001,8 @@ export function getReadProviderForGroup(
   }
 
   let rpcPref = resolveGroupPathRpcPreference(
-    options?.skipGlobalPathDefaults === true
-      ? { ...cfg, __CE_skipGlobalPathDefaults: true }
-      : cfg,
-    chId
+    options?.skipGlobalPathDefaults === true ? { ...cfg, __CE_skipGlobalPathDefaults: true } : cfg,
+    chId,
   );
   if (options?.skipGlobalPathDefaults === true && !rpcPref) {
     rpcPref = {
@@ -1048,15 +1011,16 @@ export function getReadProviderForGroup(
     };
   }
   if (options?.skipGlobalPreferred === true) {
-    rpcPref = rpcPref?.sessionRpcSource === 'root'
-      ? {
-        ...rpcPref,
-        skipGlobalPreferred: true,
-      }
-      : {
-        skipGlobalPreferred: true,
-        providerLabel: toStr(options.providerLabel || '') || 'default',
-      };
+    rpcPref =
+      rpcPref?.sessionRpcSource === 'root'
+        ? {
+            ...rpcPref,
+            skipGlobalPreferred: true,
+          }
+        : {
+            skipGlobalPreferred: true,
+            providerLabel: toStr(options.providerLabel || '') || 'default',
+          };
   }
   if (shouldLog('rpc', 'log')) {
     rpcLog('PROVIDER_SELECT', {
@@ -1072,11 +1036,7 @@ export function getReadProviderForGroup(
   }
 
   const provider = rpcPref ? _getCachedProvider(chId, rpcPref) : _getCachedProvider(chId);
-  syncTrackedSessionProviderCache(
-    slugOrEmpty,
-    provider?.__CE_RPC_CACHE_KEY,
-    rpcPref?.sessionAccessStatus
-  );
+  syncTrackedSessionProviderCache(slugOrEmpty, provider?.__CE_RPC_CACHE_KEY, rpcPref?.sessionAccessStatus);
   return provider;
 }
 

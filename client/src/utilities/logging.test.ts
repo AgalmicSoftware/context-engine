@@ -1,11 +1,4 @@
-import {
-  createLogger,
-  emitForcedLog,
-  getLoggingConfig,
-  initLogging,
-  printLoggingGuide,
-  shouldLog,
-} from './logging.js';
+import { createLogger, emitForcedLog, getLoggingConfig, initLogging, printLoggingGuide, shouldLog } from './logging.js';
 
 type LoggingTestWindow = Window & {
   CE_LOGGING?: {

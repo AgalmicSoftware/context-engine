@@ -73,11 +73,12 @@ describe('surveyToolSlugLookup', () => {
   });
 
   it('does not resolve question ids from a borrowed general network cache when a candidate slug is unresolved', () => {
-    const strictLookup = (slug: unknown) => (
-      String(slug || '').trim().toLowerCase() === 'edge'
+    const strictLookup = (slug: unknown) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'edge'
         ? { slug: 'edge', networkChainId: 84532 }
-        : null
-    );
+        : null;
 
     mockedGetAllSessionSlugs.mockReturnValue(['ghost', 'edge']);
     mockedGetSessionConfigBySlug.mockImplementation((slug) => strictLookup(slug));

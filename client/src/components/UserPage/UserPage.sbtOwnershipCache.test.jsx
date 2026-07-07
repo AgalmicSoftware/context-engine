@@ -39,9 +39,7 @@ const makeInstance = (props = {}) => {
 
   instance._isMounted = true;
   instance.setState = jest.fn((update, cb) => {
-    const patch = typeof update === 'function'
-      ? update(instance.state, instance.props)
-      : update;
+    const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
     if (patch && typeof patch === 'object') {
       instance.state = { ...instance.state, ...patch };
     }
@@ -61,23 +59,25 @@ describe('UserPage SBT ownership cache fallback', () => {
     const dataByNamespace = {
       surveysCache: [],
       questionsCache: [],
-      sbtCache: [{
-        slug: 'edge',
-        data: {
-          [networkID]: {
-            sbtList: {
-              '0x100': {
-                sbtAddress: '0x100',
-                sbtInfo: { name: 'Badge 100', unlisted: false },
-                mintedAddresses: [viewAddress],
-                burnedAddresses: [viewAddress],
-                mintedCountByAddress: { [viewLower]: 2 },
-                burnedCountByAddress: { [viewLower]: 1 },
+      sbtCache: [
+        {
+          slug: 'edge',
+          data: {
+            [networkID]: {
+              sbtList: {
+                '0x100': {
+                  sbtAddress: '0x100',
+                  sbtInfo: { name: 'Badge 100', unlisted: false },
+                  mintedAddresses: [viewAddress],
+                  burnedAddresses: [viewAddress],
+                  mintedCountByAddress: { [viewLower]: 2 },
+                  burnedCountByAddress: { [viewLower]: 1 },
+                },
               },
             },
           },
         },
-      }],
+      ],
       userCache: [],
     };
 
@@ -94,7 +94,7 @@ describe('UserPage SBT ownership cache fallback', () => {
             sbtAddress: '0x100',
           }),
         }),
-      ])
+      ]),
     );
   });
 
@@ -212,24 +212,26 @@ describe('UserPage SBT ownership cache fallback', () => {
     const dataByNamespace = {
       surveysCache: [],
       questionsCache: [],
-      sbtCache: [{
-        slug: 'edge',
-        data: {
-          [networkID]: {
-            sbtList: {
-              '0x100': {
-                sbtAddress: '0x100',
-                sbtInfo: { name: 'Badge 100', unlisted: false },
-                mintedAddresses: [viewAddress],
-                burnedAddresses: [],
-                mintedCountByAddress: {},
-                burnedCountByAddress: {},
-                countsLoaded: false,
+      sbtCache: [
+        {
+          slug: 'edge',
+          data: {
+            [networkID]: {
+              sbtList: {
+                '0x100': {
+                  sbtAddress: '0x100',
+                  sbtInfo: { name: 'Badge 100', unlisted: false },
+                  mintedAddresses: [viewAddress],
+                  burnedAddresses: [],
+                  mintedCountByAddress: {},
+                  burnedCountByAddress: {},
+                  countsLoaded: false,
+                },
               },
             },
           },
         },
-      }],
+      ],
       userCache: [],
     };
 
@@ -246,7 +248,7 @@ describe('UserPage SBT ownership cache fallback', () => {
             sbtAddress: '0x100',
           }),
         }),
-      ])
+      ]),
     );
   });
 
@@ -258,21 +260,23 @@ describe('UserPage SBT ownership cache fallback', () => {
     const dataByNamespace = {
       surveysCache: [],
       questionsCache: [],
-      sbtCache: [{
-        slug: 'edge',
-        data: {
-          [networkID]: {
-            sbtList: {
-              '0x100': {
-                sbtAddress: '0x100',
-                sbtInfo: { name: 'Badge 100', unlisted: false },
-                mintedAddresses: [viewAddress],
-                burnedAddresses: [viewAddress],
+      sbtCache: [
+        {
+          slug: 'edge',
+          data: {
+            [networkID]: {
+              sbtList: {
+                '0x100': {
+                  sbtAddress: '0x100',
+                  sbtInfo: { name: 'Badge 100', unlisted: false },
+                  mintedAddresses: [viewAddress],
+                  burnedAddresses: [viewAddress],
+                },
               },
             },
           },
         },
-      }],
+      ],
       userCache: [],
     };
 
@@ -293,37 +297,43 @@ describe('UserPage SBT ownership cache fallback', () => {
     const dataByNamespace = {
       surveysCache: [],
       questionsCache: [],
-      sbtCache: [{
-        slug: 'edge',
-        data: {
-          [networkID]: {
-            sbtList: {
-              '0x100': {
-                sbtAddress: '0x100',
-                sbtInfo: { name: 'Badge 100', unlisted: false },
-                mintedAddresses: [viewAddress],
-                burnedAddresses: [viewAddress],
-              },
-            },
-          },
-        },
-      }],
-      userCache: [{
-        slug: 'edge',
-        data: {
-          [viewLower]: {
+      sbtCache: [
+        {
+          slug: 'edge',
+          data: {
             [networkID]: {
-              lastBlockScanned: 120,
-              data: {
-                sbts: [{
+              sbtList: {
+                '0x100': {
                   sbtAddress: '0x100',
                   sbtInfo: { name: 'Badge 100', unlisted: false },
-                }],
+                  mintedAddresses: [viewAddress],
+                  burnedAddresses: [viewAddress],
+                },
               },
             },
           },
         },
-      }],
+      ],
+      userCache: [
+        {
+          slug: 'edge',
+          data: {
+            [viewLower]: {
+              [networkID]: {
+                lastBlockScanned: 120,
+                data: {
+                  sbts: [
+                    {
+                      sbtAddress: '0x100',
+                      sbtInfo: { name: 'Badge 100', unlisted: false },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      ],
     };
 
     instance._dgHasAny = jest.fn(() => true);
@@ -344,24 +354,28 @@ describe('UserPage SBT ownership cache fallback', () => {
       surveysCache: [],
       questionsCache: [],
       sbtCache: [],
-      userCache: [{
-        slug: 'edge',
-        data: {
-          [viewLower]: {
-            [networkID]: {
-              lastBlockScanned: 120,
-              data: {
-                sbts: [{
-                  sbtAddress: '0x100',
-                  sbtInfo: { name: 'Badge 100', unlisted: false },
-                  mintedCountByAddress: { [viewLower]: 1 },
-                  burnedCountByAddress: { [viewLower]: 2 },
-                }],
+      userCache: [
+        {
+          slug: 'edge',
+          data: {
+            [viewLower]: {
+              [networkID]: {
+                lastBlockScanned: 120,
+                data: {
+                  sbts: [
+                    {
+                      sbtAddress: '0x100',
+                      sbtInfo: { name: 'Badge 100', unlisted: false },
+                      mintedCountByAddress: { [viewLower]: 1 },
+                      burnedCountByAddress: { [viewLower]: 2 },
+                    },
+                  ],
+                },
               },
             },
           },
         },
-      }],
+      ],
     };
 
     instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);

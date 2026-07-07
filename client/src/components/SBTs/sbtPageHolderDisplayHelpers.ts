@@ -144,15 +144,9 @@ export const resolveSbtPageHolderLoadingState = ({
     mintedTokensOverride == null &&
     !hasComputed &&
     !hasFiltered;
-  const holdersReady =
-    countsLoaded === true ||
-    hasComputed ||
-    hasFiltered ||
-    terminalEmptyHoldersState;
+  const holdersReady = countsLoaded === true || hasComputed || hasFiltered || terminalEmptyHoldersState;
   const holderCount = Number(netHoldersCount || 0);
-  const shouldOverrideMinted =
-    mintedTokensOverride != null &&
-    (!countsLoaded || holderCount === 0);
+  const shouldOverrideMinted = mintedTokensOverride != null && (!countsLoaded || holderCount === 0);
   const netMinted = shouldOverrideMinted ? String(mintedTokensOverride) : String(holderCount);
   const countsReady = countsLoaded === true || mintedTokensOverride != null || terminalEmptyHoldersState;
   const isGlobalLoading = !!sbtScanInProgress || (!!sbtScanPending && !countsReady);
@@ -179,17 +173,10 @@ export const resolveSbtPageHolderResolutionState = ({
   showScanProgress = false,
 }: ResolveSbtPageHolderResolutionStateArgs = {}): SbtPageHolderResolutionState => {
   const addressesNeedResolutionHint =
-    mintedTokensOverride != null &&
-    Number(mintedTokensOverride) > 0 &&
-    mintedAddresses.length === 0;
+    mintedTokensOverride != null && Number(mintedTokensOverride) > 0 && mintedAddresses.length === 0;
   const addressesAreResolving =
     addressesNeedResolutionHint &&
-    (
-      !!loadingMintersBurners ||
-      !!loadingMintedFilter ||
-      !!isRefreshing ||
-      !!showScanProgress
-  );
+    (!!loadingMintersBurners || !!loadingMintedFilter || !!isRefreshing || !!showScanProgress);
   return { addressesAreResolving, addressesNeedResolutionHint };
 };
 
@@ -197,11 +184,8 @@ export const resolveSbtPageHoldersDisplayCount = ({
   mintedTokensOverride = null,
   netHoldersCount = 0,
   shouldOverrideMinted = false,
-}: ResolveSbtPageHoldersDisplayCountArgs = {}): string => (
-  shouldOverrideMinted
-    ? `~${mintedTokensOverride}`
-    : String(netHoldersCount || 0)
-);
+}: ResolveSbtPageHoldersDisplayCountArgs = {}): string =>
+  shouldOverrideMinted ? `~${mintedTokensOverride}` : String(netHoldersCount || 0);
 
 export const resolveSbtPageHolderFilterItems = ({
   filteredMintedUsers: filteredMintedUsersRaw = [],
@@ -210,19 +194,14 @@ export const resolveSbtPageHolderFilterItems = ({
   isScanActive = false,
   netHolders = [],
 }: ResolveSbtPageHolderFilterItemsArgs = {}): SbtPageHolderFilterItems => {
-  const keepStaleFilterRowsWhileRefreshing =
-    !!hasFilteredHolders &&
-    !hasComputedHolders &&
-    !!isScanActive;
+  const keepStaleFilterRowsWhileRefreshing = !!hasFilteredHolders && !hasComputedHolders && !!isScanActive;
   const rawHolderItemsForFilter = hasComputedHolders
     ? netHolders
-    : (keepStaleFilterRowsWhileRefreshing ? filteredMintedUsersRaw : []);
-  const holderItemsForFilter = Array.isArray(rawHolderItemsForFilter)
-    ? rawHolderItemsForFilter
-    : [];
-  const filteredMintedUsers = Array.isArray(filteredMintedUsersRaw)
-    ? filteredMintedUsersRaw
-    : [];
+    : keepStaleFilterRowsWhileRefreshing
+      ? filteredMintedUsersRaw
+      : [];
+  const holderItemsForFilter = Array.isArray(rawHolderItemsForFilter) ? rawHolderItemsForFilter : [];
+  const filteredMintedUsers = Array.isArray(filteredMintedUsersRaw) ? filteredMintedUsersRaw : [];
   return {
     filteredMintedUsers,
     holderItemsForFilter,
@@ -257,17 +236,10 @@ export const resolveSbtPageHolderModalDisplayState = ({
     !shouldOverrideMinted;
   const waitingForHolderDetails =
     !!addressesAreResolving ||
-    (
-      !!shouldOverrideMinted &&
+    (!!shouldOverrideMinted &&
       !hasFilteredHolders &&
       !hasComputedHolders &&
-      (
-        !!loadingMintersBurners ||
-        !!loadingMintedFilter ||
-        !!isRefreshing ||
-        !!showScanProgress
-      )
-    );
+      (!!loadingMintersBurners || !!loadingMintedFilter || !!isRefreshing || !!showScanProgress));
   const showApproximateCountHint =
     !hasFilteredHolders &&
     !hasComputedHolders &&
@@ -283,19 +255,12 @@ export const resolveSbtPageHolderModalDisplayState = ({
   const showScanProgressInModal =
     !!showModal &&
     !!hasActiveScanProgress &&
-    (
-      !!showScanProgress ||
-      showSpinnerInModalBody ||
-      !!loadingMintedFilter ||
-      !!hasActiveScanProgress
-    );
+    (!!showScanProgress || showSpinnerInModalBody || !!loadingMintedFilter || !!hasActiveScanProgress);
   const showCornerSpinner =
-    (
-      !!hasActiveScanProgress ||
+    (!!hasActiveScanProgress ||
       !!loadingMintedFilter ||
       (!!loadingMintersBurners && (!!holdersReady || !!hasFilteredHolders)) ||
-      (!!isRefreshing && !!hasActiveScanProgress)
-    ) &&
+      (!!isRefreshing && !!hasActiveScanProgress)) &&
     (!!holdersReady || !!hasFilteredHolders);
   const showHeaderCount = !!holdersReady || !!shouldOverrideMinted;
   return {
@@ -327,9 +292,7 @@ export const resolveSbtPageHolderDisplayModel = ({
 }: ResolveSbtPageHolderDisplayModelArgs = {}): SbtPageHolderDisplayModel => {
   const netHolders = Array.isArray(netHoldersRaw) ? netHoldersRaw : [];
   const mintedAddresses = Array.isArray(mintedAddressesRaw) ? mintedAddressesRaw : [];
-  const filteredMintedUsersInput = Array.isArray(filteredMintedUsersRaw)
-    ? filteredMintedUsersRaw
-    : [];
+  const filteredMintedUsersInput = Array.isArray(filteredMintedUsersRaw) ? filteredMintedUsersRaw : [];
   const hasComputedHolders = netHolders.length > 0;
   const hasFilteredHolders = filteredMintedUsersInput.length > 0;
   const mintedTokensOverride = sanitizeSbtPageMintedTokensOverride(mintedTokensOverrideRaw);
@@ -351,9 +314,7 @@ export const resolveSbtPageHolderDisplayModel = ({
 
   const isInitialLoading = !holderLoadingState.countsReady && holderLoadingState.effectiveLoading;
   const isRefreshing = !isInitialLoading && holderLoadingState.effectiveLoading;
-  const rawRemainingBlocksCount = hasScanProgress
-    ? resolveSbtPageRemainingBlocksCount(scanProgress)
-    : 0;
+  const rawRemainingBlocksCount = hasScanProgress ? resolveSbtPageRemainingBlocksCount(scanProgress) : 0;
   const showScanProgress = shouldShowSbtPageScanProgress({
     effectiveLoading: holderLoadingState.effectiveLoading,
     hasActiveScanProgress,
@@ -375,9 +336,10 @@ export const resolveSbtPageHolderDisplayModel = ({
     shouldOverrideMinted: holderLoadingState.shouldOverrideMinted,
   });
 
-  const scanProgressSessionLabel = showScanProgress && typeof resolveScanProgressSessionLabel === 'function'
-    ? resolveScanProgressSessionLabel(scanProgress)
-    : '';
+  const scanProgressSessionLabel =
+    showScanProgress && typeof resolveScanProgressSessionLabel === 'function'
+      ? resolveScanProgressSessionLabel(scanProgress)
+      : '';
   const scanProgressDisplay = resolveSbtPageScanProgressDisplay({
     rawRemainingBlocksCount,
     sessionLabel: showScanProgress ? scanProgressSessionLabel : '',

@@ -5,7 +5,7 @@ import { renderSurveyResultsSyncStatusPanel } from './SurveyResultsPanels';
 import type { SurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
 
 const buildSyncStatusDisplay = (
-  overrides: Partial<SurveyResultsSyncStatusDisplayPlan> = {}
+  overrides: Partial<SurveyResultsSyncStatusDisplayPlan> = {},
 ): SurveyResultsSyncStatusDisplayPlan => ({
   isSynced: false,
   isSyncingOrLoading: true,
@@ -60,7 +60,7 @@ describe('renderSurveyResultsSyncStatusPanel', () => {
           onToggleSyncDetails,
           syncStatusDisplay: buildSyncStatusDisplay(),
         })}
-      </>
+      </>,
     );
 
     expect(screen.getByRole('button', { name: 'Toggle sync details' })).toHaveAttribute('aria-expanded', 'true');
@@ -108,7 +108,7 @@ describe('renderSurveyResultsSyncStatusPanel', () => {
             },
           }),
         })}
-      </>
+      </>,
     );
 
     expect(screen.getByText('In Sync')).toBeInTheDocument();
@@ -150,7 +150,7 @@ describe('renderSurveyResultsSyncStatusPanel', () => {
             },
           }),
         })}
-      </>
+      </>,
     );
 
     expect(screen.getByRole('button', { name: 'Toggle sync details' })).toHaveAttribute('aria-expanded', 'false');

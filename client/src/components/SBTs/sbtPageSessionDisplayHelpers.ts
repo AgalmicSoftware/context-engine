@@ -1,7 +1,4 @@
-import {
-  getSessionSlugByName,
-  normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+import { getSessionSlugByName, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 
 type SessionSlugPropsLike = Record<string, unknown> & {
   sessionSlug?: unknown;
@@ -13,10 +10,7 @@ type ResolveSbtPageEffectiveSessionSlugArgs = {
   sbtInfo?: unknown;
 };
 type SbtPageSessionConfigReader = (slug: string) => unknown;
-type SbtPageDemoSessionConfigReader = (
-  slug: string,
-  options?: { allowDemoFallback?: boolean }
-) => unknown;
+type SbtPageDemoSessionConfigReader = (slug: string, options?: { allowDemoFallback?: boolean }) => unknown;
 type ResolveSbtPageSessionDisplayConfigArgs = {
   getDemoSessionConfigBySlug?: SbtPageDemoSessionConfigReader | null;
   getSessionConfigBySlugOrDefault?: SbtPageSessionConfigReader | null;
@@ -31,9 +25,7 @@ export type SbtPageSessionDisplayConfig = Record<string, unknown> & {
   sessionName?: unknown;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
 export const resolveSbtPageSessionSlugFromInfo = (info: unknown): string | null => {
   const record = isRecord(info) ? info : {};
@@ -49,18 +41,13 @@ export const resolveSbtPageSessionSlugFromInfo = (info: unknown): string | null 
   return getSessionSlugByName(name);
 };
 
-export const hasExplicitSbtPageSessionSlugProp = (props: SessionSlugPropsLike = {}): boolean => (
-  !!props && (
-    Object.prototype.hasOwnProperty.call(props, 'sessionSlug') ||
-    Object.prototype.hasOwnProperty.call(props, 'slug')
-  )
-);
+export const hasExplicitSbtPageSessionSlugProp = (props: SessionSlugPropsLike = {}): boolean =>
+  !!props &&
+  (Object.prototype.hasOwnProperty.call(props, 'sessionSlug') || Object.prototype.hasOwnProperty.call(props, 'slug'));
 
 export const getExplicitSbtPageSessionSlug = (props: SessionSlugPropsLike = {}): string | null => {
   if (!hasExplicitSbtPageSessionSlugProp(props)) return null;
-  const raw = Object.prototype.hasOwnProperty.call(props || {}, 'sessionSlug')
-    ? props.sessionSlug
-    : props.slug;
+  const raw = Object.prototype.hasOwnProperty.call(props || {}, 'sessionSlug') ? props.sessionSlug : props.slug;
   return normalizeSessionSlug(raw || '');
 };
 
@@ -85,12 +72,11 @@ export const resolveSbtPageSessionDisplayConfig = ({
 }: ResolveSbtPageSessionDisplayConfigArgs = {}): SbtPageSessionDisplayConfig | null => {
   const sessionSlug = normalizeSessionSlug(sessionSlugRaw || '');
   try {
-    const config = (
-      (readSessionConfig ? readSessionConfig(sessionSlug || '') : null)
-      || (readDemoSessionConfig ? readDemoSessionConfig(sessionSlug || '', { allowDemoFallback: true }) : null)
-      || null
-    );
-    return isRecord(config) ? config as SbtPageSessionDisplayConfig : null;
+    const config =
+      (readSessionConfig ? readSessionConfig(sessionSlug || '') : null) ||
+      (readDemoSessionConfig ? readDemoSessionConfig(sessionSlug || '', { allowDemoFallback: true }) : null) ||
+      null;
+    return isRecord(config) ? (config as SbtPageSessionDisplayConfig) : null;
   } catch (_) {
     return null;
   }
@@ -101,9 +87,7 @@ export const resolveSbtPageSessionDisplayLabel = ({
   sessionSlugRaw = '',
 }: ResolveSbtPageSessionDisplayLabelArgs = {}): string => {
   const sessionSlug = normalizeSessionSlug(sessionSlugRaw || '');
-  const sessionName = String(
-    isRecord(sessionConfig) ? sessionConfig.sessionName || '' : ''
-  ).trim();
+  const sessionName = String(isRecord(sessionConfig) ? sessionConfig.sessionName || '' : '').trim();
   if (!sessionSlug) return sessionName || 'General';
   return sessionName || sessionSlug;
 };

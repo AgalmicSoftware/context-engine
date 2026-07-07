@@ -22,7 +22,9 @@ jest.mock('components/UserPage/UserPage', () => (props) => (
 
 jest.mock('../Shared/CETooltip', () => ({
   __esModule: true,
-  default: (props) => <div data-testid={`mock-tooltip-${props.target || 'unknown'}`} data-placement={props.placement || ''} />,
+  default: (props) => (
+    <div data-testid={`mock-tooltip-${props.target || 'unknown'}`} data-placement={props.placement || ''} />
+  ),
 }));
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
@@ -63,7 +65,12 @@ jest.mock('../../utilities/ai/aiSettings.js', () => {
     saveLocalAiSettings: jest.fn((next) => next),
     clearLocalAiSettings: jest.fn(),
     deriveAiPreset: jest.fn(() => 'gpt-5'),
-    toModelLeaf: jest.fn((m) => String(m || '').toLowerCase().split('/').pop()),
+    toModelLeaf: jest.fn((m) =>
+      String(m || '')
+        .toLowerCase()
+        .split('/')
+        .pop(),
+    ),
   };
 });
 
@@ -84,12 +91,14 @@ jest.mock('../../utilities/worker/workerAuth.js', () => ({
 
 jest.mock('../../utilities/session/sessionNaming.js', () => ({
   normalizeSessionSlug: jest.fn((value = '') => {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+      .trim()
+      .toLowerCase();
     return normalized === 'general' ? '' : normalized;
   }),
-  resolveActiveSessionSlug: jest.fn(({ activeSessionSlug = '', sessionSlug = '' } = {}) => (
-    activeSessionSlug || sessionSlug || ''
-  )),
+  resolveActiveSessionSlug: jest.fn(
+    ({ activeSessionSlug = '', sessionSlug = '' } = {}) => activeSessionSlug || sessionSlug || '',
+  ),
 }));
 
 jest.mock('../../utilities/session/sessionScanScope.js', () => ({
@@ -113,7 +122,11 @@ import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { saveLocalAiSettings } from '../../utilities/ai/aiSettings.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
-import { getAllSessionSlugs, getSessionConfigBySlugOrDefault, getSessionNetwork } from '../../utilities/web3/contractScripts.js';
+import {
+  getAllSessionSlugs,
+  getSessionConfigBySlugOrDefault,
+  getSessionNetwork,
+} from '../../utilities/web3/contractScripts.js';
 
 const DEFAULT_NETWORK = {
   id: 84532,
@@ -182,7 +195,8 @@ const loadIsolatedSettingsModal = () => {
     loaded = {
       LoginAndSettingsModal: require('./LoginAndSettingsModal').LoginAndSettingsModal,
       getAllSessionSlugs: require('../../utilities/web3/contractScripts.js').getAllSessionSlugs,
-      getSessionConfigBySlugOrDefault: require('../../utilities/web3/contractScripts.js').getSessionConfigBySlugOrDefault,
+      getSessionConfigBySlugOrDefault: require('../../utilities/web3/contractScripts.js')
+        .getSessionConfigBySlugOrDefault,
       checkSponsoredAccess: require('../../utilities/web3/sponsoredAccess.js').checkSponsoredAccess,
     };
   });
@@ -192,11 +206,7 @@ const loadIsolatedSettingsModal = () => {
   return loaded;
 };
 
-const buildWrongNetworkSubject = ({
-  mode = undefined,
-  aiSettingsOpen = false,
-  activeSessionSlug = 'edge',
-} = {}) => {
+const buildWrongNetworkSubject = ({ mode = undefined, aiSettingsOpen = false, activeSessionSlug = 'edge' } = {}) => {
   if (typeof mode === 'undefined') {
     delete process.env.REACT_APP_TERMINOLOGY_MODE;
   } else {
@@ -211,25 +221,29 @@ const buildWrongNetworkSubject = ({
   } = loadIsolatedSettingsModal();
 
   isolatedGetAllSessionSlugs.mockReturnValue([]);
-  isolatedGetSessionConfigBySlugOrDefault.mockImplementation((slug) => (
-    String(slug || '').trim().toLowerCase() === 'edge'
+  isolatedGetSessionConfigBySlugOrDefault.mockImplementation((slug) =>
+    String(slug || '')
+      .trim()
+      .toLowerCase() === 'edge'
       ? { slug: 'edge', sessionName: 'Edge Session' }
-      : {}
-  ));
+      : {},
+  );
   isolatedCheckSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
 
-  const subject = new IsolatedLoginAndSettingsModal(buildProps({
-    account: WAGMI_ADDRESS,
-    activeSessionSlug,
-    loginComplete: true,
-    provider: 'wagmi',
-    wagmiAddress: WAGMI_ADDRESS,
-    wagmiNetwork: {
-      id: 8453,
-      chainId: 8453,
-      name: 'Base',
-    },
-  }));
+  const subject = new IsolatedLoginAndSettingsModal(
+    buildProps({
+      account: WAGMI_ADDRESS,
+      activeSessionSlug,
+      loginComplete: true,
+      provider: 'wagmi',
+      wagmiAddress: WAGMI_ADDRESS,
+      wagmiNetwork: {
+        id: 8453,
+        chainId: 8453,
+        name: 'Base',
+      },
+    }),
+  );
 
   if (aiSettingsOpen) {
     subject.state = {
@@ -241,9 +255,8 @@ const buildWrongNetworkSubject = ({
   return subject;
 };
 
-const getPasskeyLoginButton = () => (
-  screen.getAllByRole('button').find((button) => button.textContent.trim() === 'Login')
-);
+const getPasskeyLoginButton = () =>
+  screen.getAllByRole('button').find((button) => button.textContent.trim() === 'Login');
 
 const clickAndSettle = async (element) => {
   await act(async () => {
@@ -275,9 +288,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     passkeyWallet.getPasskeyWalletChain.mockReset();
     passkeyWallet.getPasskeyWalletChain.mockReturnValue(null);
     passkeyWallet.isMissingPasskeyWalletRecordError.mockReset();
-    passkeyWallet.isMissingPasskeyWalletRecordError.mockImplementation((error) => (
-      error?.code === 'CE_PASSKEY_WALLET_RECORD_MISSING'
-    ));
+    passkeyWallet.isMissingPasskeyWalletRecordError.mockImplementation(
+      (error) => error?.code === 'CE_PASSKEY_WALLET_RECORD_MISSING',
+    );
     passkeyWallet.unlockPasskeyWallet.mockReset();
     passkeyWallet.logoutPasskeyWallet.mockReset();
     passkeyWallet.restorePasskeyWalletSession.mockReset();
@@ -304,10 +317,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   });
 
   it('shows an inline recovery hint when login has no stored passkey wallet record', async () => {
-    const missingWalletError = Object.assign(
-      new Error('No encrypted passkey wallet is saved in this browser.'),
-      { code: 'CE_PASSKEY_WALLET_RECORD_MISSING' }
-    );
+    const missingWalletError = Object.assign(new Error('No encrypted passkey wallet is saved in this browser.'), {
+      code: 'CE_PASSKEY_WALLET_RECORD_MISSING',
+    });
     passkeyWallet.unlockPasskeyWallet.mockRejectedValueOnce(missingWalletError);
 
     render(<LoginAndSettingsModal {...buildProps()} />);
@@ -318,7 +330,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
-        /No passkey wallet is saved in this browser/i
+        /No passkey wallet is saved in this browser/i,
       );
     });
   });
@@ -376,8 +388,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByRole('link', { name: 'Open session Edge Session' }))
-      .toHaveAttribute('href', '/ce/session/edge');
+    expect(screen.getByRole('link', { name: 'Open session Edge Session' })).toHaveAttribute('href', '/ce/session/edge');
   });
 
   it('preserves PUBLIC_URL when building the Bookmarks route', () => {
@@ -391,8 +402,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByRole('link', { name: 'Open session general' }))
-      .toHaveAttribute('href', '/session');
+    expect(screen.getByRole('link', { name: 'Open session general' })).toHaveAttribute('href', '/session');
   });
 
   it('renders the list-derived primary session in the summary when list scope excludes general', () => {
@@ -410,8 +420,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByRole('link', { name: 'Open session Edge Session' }))
-      .toHaveAttribute('href', '/session/edge');
+    expect(screen.getByRole('link', { name: 'Open session Edge Session' })).toHaveAttribute('href', '/session/edge');
   });
 
   it('shows network details inside the expanded panel in plain mode when wagmi is on the wrong chain', () => {
@@ -447,11 +456,13 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     function TooltipToggleHarness() {
       const [tooltipsEnabled, setTooltipsEnabled] = React.useState(true);
-      const stableProps = React.useRef(buildProps({
-        account: WAGMI_ADDRESS,
-        loginComplete: true,
-        provider: 'wagmi',
-      }));
+      const stableProps = React.useRef(
+        buildProps({
+          account: WAGMI_ADDRESS,
+          loginComplete: true,
+          provider: 'wagmi',
+        }),
+      );
       const handleToggle = React.useRef((...args) => {
         toggleTooltips(...args);
         setTooltipsEnabled((prev) => !prev);
@@ -506,23 +517,23 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
 
     await waitFor(() => {
-      expect(saveLocalAiSettings).toHaveBeenCalledWith(expect.objectContaining({
-        providers: expect.objectContaining({
-          custom: expect.objectContaining({
-            rpcUrl: 'https://self-hosted.example/v1',
+      expect(saveLocalAiSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          providers: expect.objectContaining({
+            custom: expect.objectContaining({
+              rpcUrl: 'https://self-hosted.example/v1',
+            }),
           }),
         }),
-      }));
+      );
     });
   });
 
   it('shows the signed-in-style session summary inside the logged-out settings drawer', () => {
     getAllSessionSlugs.mockReturnValue(['edge']);
-    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (
-      String(slug || '') === 'edge'
-        ? { slug: 'edge', sessionName: 'Edge Session' }
-        : {}
-    ));
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
+      String(slug || '') === 'edge' ? { slug: 'edge', sessionName: 'Edge Session' } : {},
+    );
     const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'edge' }));
     subject.state = {
       ...subject.state,
@@ -534,15 +545,16 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     render(subject.getPreLoginSettingsDisplay());
 
     expect(screen.getByText('SESSION')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open session Edge Session' }))
-      .toHaveAttribute('href', '/session/edge');
+    expect(screen.getByRole('link', { name: 'Open session Edge Session' })).toHaveAttribute('href', '/session/edge');
     expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
   });
 
   it('shows the shared network summary and sponsored-resource cards in the logged-out drawer before login', async () => {
     getAllSessionSlugs.mockReturnValue(['demo', 'edge']);
     getSessionConfigBySlugOrDefault.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'demo') {
         return {
           slug: 'demo',
@@ -606,17 +618,19 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
   it('keeps pre-login session and local AI controls behind Config while leaving the shared overview visible', async () => {
     getAllSessionSlugs.mockReturnValue(['demo']);
-    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (
-      String(slug || '').trim().toLowerCase() === 'demo'
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'demo'
         ? {
-          slug: 'demo',
-          sessionName: 'Demo Session',
-          sponsoredKeys: {
-            ai: 'demo-ai',
-          },
-        }
-        : {}
-    ));
+            slug: 'demo',
+            sessionName: 'Demo Session',
+            sponsoredKeys: {
+              ai: 'demo-ai',
+            },
+          }
+        : {},
+    );
     checkSponsoredAccess.mockImplementation(async () => ({ status: 'needs-wallet' }));
 
     render(<LoginAndSettingsModal {...buildProps({ activeSessionSlug: 'demo' })} />);
@@ -706,7 +720,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.getByLabelText('OpenAI API key')).toBeInTheDocument();
     expect(screen.getByLabelText('Anthropic API key')).toBeInTheDocument();
     expect(screen.getByText(/Anthropic powers local text tasks here/i)).toBeInTheDocument();
-    expect(screen.getByText(/Audio and transcription still use local OpenAI, session defaults, or a custom endpoint/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Audio and transcription still use local OpenAI, session defaults, or a custom endpoint/i),
+    ).toBeInTheDocument();
   });
 
   it('saves an OpenAI pre-login key and activates the local GPT-5 preset', async () => {
@@ -719,20 +735,22 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
 
     await waitFor(() => {
-      expect(saveLocalAiSettings).toHaveBeenCalledWith(expect.objectContaining({
-        useLocal: true,
-        preset: 'gpt-5',
-        mode: 'openai',
-        models: expect.objectContaining({
-          fast: 'gpt-5',
-          thinking: 'gpt-5',
-        }),
-        providers: expect.objectContaining({
-          openai: expect.objectContaining({
-            apiKey: 'sk-open-test',
+      expect(saveLocalAiSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          useLocal: true,
+          preset: 'gpt-5',
+          mode: 'openai',
+          models: expect.objectContaining({
+            fast: 'gpt-5',
+            thinking: 'gpt-5',
+          }),
+          providers: expect.objectContaining({
+            openai: expect.objectContaining({
+              apiKey: 'sk-open-test',
+            }),
           }),
         }),
-      }));
+      );
     });
   });
 
@@ -746,30 +764,30 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
 
     await waitFor(() => {
-      expect(saveLocalAiSettings).toHaveBeenCalledWith(expect.objectContaining({
-        useLocal: true,
-        preset: 'claude-sonnet',
-        mode: 'anthropic',
-        models: expect.objectContaining({
-          fast: 'claude-sonnet-4-6',
-          thinking: 'claude-sonnet-4-6',
-        }),
-        providers: expect.objectContaining({
-          anthropic: expect.objectContaining({
-            apiKey: 'sk-ant-test',
+      expect(saveLocalAiSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          useLocal: true,
+          preset: 'claude-sonnet',
+          mode: 'anthropic',
+          models: expect.objectContaining({
+            fast: 'claude-sonnet-4-6',
+            thinking: 'claude-sonnet-4-6',
+          }),
+          providers: expect.objectContaining({
+            anthropic: expect.objectContaining({
+              apiKey: 'sk-ant-test',
+            }),
           }),
         }),
-      }));
+      );
     });
   });
 
   it('lets pre-login settings switch the active session before connect', async () => {
     getAllSessionSlugs.mockReturnValue(['edge']);
-    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (
-      String(slug || '') === 'edge'
-        ? { slug: 'edge', sessionName: 'Edge Session' }
-        : {}
-    ));
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
+      String(slug || '') === 'edge' ? { slug: 'edge', sessionName: 'Edge Session' } : {},
+    );
     const props = buildProps({
       updateGlobalSessionSelection: jest.fn(),
       activeSessionSlug: '',
@@ -835,10 +853,12 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       if (normalized === 'rxc') return { slug: 'rxc', sessionName: 'Debate Session' };
       return {};
     });
-    const subject = new LoginAndSettingsModal(buildProps({
-      selectedSessionScope: 'list',
-      selectedSessionSlugs: ['edge', 'rxc'],
-    }));
+    const subject = new LoginAndSettingsModal(
+      buildProps({
+        selectedSessionScope: 'list',
+        selectedSessionSlugs: ['edge', 'rxc'],
+      }),
+    );
     subject.state = {
       ...subject.state,
       preLoginSettingsOpen: true,
@@ -871,10 +891,12 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       if (normalized === 'rxc') return { slug: 'rxc', sessionName: 'Debate Session' };
       return {};
     });
-    const subject = new LoginAndSettingsModal(buildProps({
-      selectedSessionScope: 'list',
-      selectedSessionSlugs: ['edge', 'rxc'],
-    }));
+    const subject = new LoginAndSettingsModal(
+      buildProps({
+        selectedSessionScope: 'list',
+        selectedSessionSlugs: ['edge', 'rxc'],
+      }),
+    );
     subject.state = {
       ...subject.state,
       preLoginSettingsOpen: true,
@@ -908,10 +930,12 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
 
     await waitFor(() => {
-      expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-        account: PASSKEY_ADDRESS,
-        provider: 'passkey_eoa',
-      }));
+      expect(props.changeAccount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          account: PASSKEY_ADDRESS,
+          provider: 'passkey_eoa',
+        }),
+      );
     });
 
     const payload = props.changeAccount.mock.calls[0][0];
@@ -946,11 +970,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   });
 
   it('renders logged-in controls and disconnects wagmi users from the modal', async () => {
-    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (
-      slug === 'demo-1'
-        ? { slug: 'demo-1', sessionName: 'Demo Session', networkChainId: 11155420 }
-        : {}
-    ));
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
+      slug === 'demo-1' ? { slug: 'demo-1', sessionName: 'Demo Session', networkChainId: 11155420 } : {},
+    );
     const props = buildProps({
       account: WAGMI_ADDRESS,
       activeSessionSlug: 'demo-1',
@@ -990,7 +1012,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   it('replaces the legacy settings summary strip with compact supported-resource cards', async () => {
     getAllSessionSlugs.mockReturnValue(['demo', 'edge']);
     getSessionConfigBySlugOrDefault.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'demo') {
         return {
           slug: 'demo',
@@ -1026,12 +1050,14 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       return { status: 'no-gate' };
     });
 
-    const subject = new LoginAndSettingsModal(buildProps({
-      account: WAGMI_ADDRESS,
-      activeSessionSlug: 'demo',
-      loginComplete: true,
-      provider: 'wagmi',
-    }));
+    const subject = new LoginAndSettingsModal(
+      buildProps({
+        account: WAGMI_ADDRESS,
+        activeSessionSlug: 'demo',
+        loginComplete: true,
+        provider: 'wagmi',
+      }),
+    );
     subject.state = {
       ...subject.state,
       aiSettingsOpen: true,
@@ -1074,7 +1100,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   it('separates active-session sponsorship from other sponsor sessions', async () => {
     getAllSessionSlugs.mockReturnValue(['op-session-test']);
     getSessionConfigBySlugOrDefault.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (!normalized) {
         return {
           slug: '',
@@ -1097,15 +1125,17 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     const modalRef = React.createRef();
 
-    render(<LoginAndSettingsModal
-      {...buildProps({
-        account: WAGMI_ADDRESS,
-        activeSessionSlug: '',
-        loginComplete: true,
-        provider: 'wagmi',
-      })}
-      ref={modalRef}
-    />);
+    render(
+      <LoginAndSettingsModal
+        {...buildProps({
+          account: WAGMI_ADDRESS,
+          activeSessionSlug: '',
+          loginComplete: true,
+          provider: 'wagmi',
+        })}
+        ref={modalRef}
+      />,
+    );
 
     await act(async () => {
       modalRef.current.setState({
@@ -1135,9 +1165,11 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Resource keys/i }));
 
-    expect(await screen.findByText(
-      'No active-session RPC sponsor. Other sessions with RPC: OP Session Test. Switch sessions to use one.'
-    )).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'No active-session RPC sponsor. Other sessions with RPC: OP Session Test. Switch sessions to use one.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('does not render the legacy send-testnet-funds control in settings', () => {
@@ -1162,14 +1194,16 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       if (normalized === 'rxc') return { slug: 'rxc', sessionName: 'Debate Session' };
       return {};
     });
-    const subject = new LoginAndSettingsModal(buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      activeSessionSlug: 'edge',
-      selectedSessionScope: 'list',
-      selectedSessionSlugs: ['edge', 'rxc'],
-    }));
+    const subject = new LoginAndSettingsModal(
+      buildProps({
+        account: WAGMI_ADDRESS,
+        loginComplete: true,
+        provider: 'wagmi',
+        activeSessionSlug: 'edge',
+        selectedSessionScope: 'list',
+        selectedSessionSlugs: ['edge', 'rxc'],
+      }),
+    );
     subject.state = {
       ...subject.state,
       aiSettingsOpen: true,
@@ -1236,12 +1270,14 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   });
 
   it('keeps unresolved sponsored AI access in a non-terminal state', () => {
-    const subject = new LoginAndSettingsModal(buildProps({
-      account: WAGMI_ADDRESS,
-      activeSessionSlug: 'edge',
-      loginComplete: true,
-      provider: 'wagmi',
-    }));
+    const subject = new LoginAndSettingsModal(
+      buildProps({
+        account: WAGMI_ADDRESS,
+        activeSessionSlug: 'edge',
+        loginComplete: true,
+        provider: 'wagmi',
+      }),
+    );
     subject.state = {
       ...subject.state,
       aiSettingsOpen: true,
@@ -1284,13 +1320,15 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   });
 
   it('keeps gas transaction UI hidden even when faucet success state exists', () => {
-    const subject = new LoginAndSettingsModal(buildProps({
-      account: WAGMI_ADDRESS,
-      activeSessionSlug: 'edge',
-      loginComplete: true,
-      provider: 'wagmi',
-      wagmiAddress: WAGMI_ADDRESS,
-    }));
+    const subject = new LoginAndSettingsModal(
+      buildProps({
+        account: WAGMI_ADDRESS,
+        activeSessionSlug: 'edge',
+        loginComplete: true,
+        provider: 'wagmi',
+        wagmiAddress: WAGMI_ADDRESS,
+      }),
+    );
     subject.state = {
       ...subject.state,
       aiSettingsOpen: true,
@@ -1318,14 +1356,16 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   });
 
   it('does not render manual Get test gas when only another session has faucet sponsorship', () => {
-    const subject = new LoginAndSettingsModal(buildProps({
-      account: WAGMI_ADDRESS,
-      activeSessionSlug: 'edge',
-      loginComplete: true,
-      provider: 'wagmi',
-      wagmiAddress: WAGMI_ADDRESS,
-      wagmiBalance: { data: { value: 1n } },
-    }));
+    const subject = new LoginAndSettingsModal(
+      buildProps({
+        account: WAGMI_ADDRESS,
+        activeSessionSlug: 'edge',
+        loginComplete: true,
+        provider: 'wagmi',
+        wagmiAddress: WAGMI_ADDRESS,
+        wagmiBalance: { data: { value: 1n } },
+      }),
+    );
     subject.state = {
       ...subject.state,
       aiSettingsOpen: true,
@@ -1355,13 +1395,15 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   });
 
   it('keeps gas transaction UI hidden even when auto-funding errors are present', () => {
-    const subject = new LoginAndSettingsModal(buildProps({
-      account: WAGMI_ADDRESS,
-      activeSessionSlug: 'edge',
-      loginComplete: true,
-      provider: 'wagmi',
-      wagmiAddress: WAGMI_ADDRESS,
-    }));
+    const subject = new LoginAndSettingsModal(
+      buildProps({
+        account: WAGMI_ADDRESS,
+        activeSessionSlug: 'edge',
+        loginComplete: true,
+        provider: 'wagmi',
+        wagmiAddress: WAGMI_ADDRESS,
+      }),
+    );
     subject.state = {
       ...subject.state,
       aiSettingsOpen: true,
@@ -1392,15 +1434,21 @@ describe('LoginAndSettingsModal agent token login', () => {
     window.localStorage.clear();
     window.sessionStorage.clear();
     window.history.replaceState({}, '', '/session/alpha');
-    global.fetch = jest.fn(async () => new Response(JSON.stringify({
-      ok: true,
-      tokenType: 'session_worker_jwt',
-      sessionSlug: 'alpha',
-      accountAddress: '0x3333333333333333333333333333333333333333',
-      workerUrl: 'https://session-worker.example',
-      workerToken: 'jwt-session-token',
-      expiresAt: '2027-07-05T00:00:00.000Z',
-    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    global.fetch = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            tokenType: 'session_worker_jwt',
+            sessionSlug: 'alpha',
+            accountAddress: '0x3333333333333333333333333333333333333333',
+            workerUrl: 'https://session-worker.example',
+            workerToken: 'jwt-session-token',
+            expiresAt: '2027-07-05T00:00:00.000Z',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
   });
 
   afterEach(() => {
@@ -1428,10 +1476,12 @@ describe('LoginAndSettingsModal agent token login', () => {
     });
 
     await waitFor(() => {
-      expect(props.updateLoginInfo).toHaveBeenCalledWith(expect.objectContaining({
-        loginComplete: true,
-        provider: 'telegram_agent',
-      }));
+      expect(props.updateLoginInfo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          loginComplete: true,
+          provider: 'telegram_agent',
+        }),
+      );
     });
 
     expect(input).toHaveValue('');
@@ -1443,10 +1493,14 @@ describe('LoginAndSettingsModal agent token login', () => {
   });
 
   it('hides agent-token login for normal sessions', () => {
-    render(<LoginAndSettingsModal {...buildProps({
-      activeSessionSlug: 'alpha',
-      sessionConfig: { slug: 'alpha', sessionName: 'Normal Session' },
-    })} />);
+    render(
+      <LoginAndSettingsModal
+        {...buildProps({
+          activeSessionSlug: 'alpha',
+          sessionConfig: { slug: 'alpha', sessionName: 'Normal Session' },
+        })}
+      />,
+    );
 
     expect(screen.queryByTestId('ce-agent-token-login-toggle')).not.toBeInTheDocument();
   });

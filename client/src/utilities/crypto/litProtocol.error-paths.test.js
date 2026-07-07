@@ -20,9 +20,7 @@ const CHIPOTLE_RUNTIME = {
   },
 };
 
-const loadLitHarness = ({
-  workerAuth,
-} = {}) => {
+const loadLitHarness = ({ workerAuth } = {}) => {
   jest.resetModules();
 
   jest.doMock('../logging', () => ({
@@ -60,12 +58,14 @@ describe('litProtocol chipotle error paths', () => {
   it('returns null when no Chipotle worker runtime is configured', () => {
     const { litProtocol } = loadLitHarness();
 
-    expect(litProtocol.createLitHooks({
-      providerLike: 'wagmi',
-      account: TEST_ADDRESS,
-      chainId: 84532,
-      accessControlConditions: ACCESS_CONTROL_CONDITIONS,
-    })).toBeNull();
+    expect(
+      litProtocol.createLitHooks({
+        providerLike: 'wagmi',
+        account: TEST_ADDRESS,
+        chainId: 84532,
+        accessControlConditions: ACCESS_CONTROL_CONDITIONS,
+      }),
+    ).toBeNull();
   });
 
   it('surfaces worker-side gate denial errors during decrypt', async () => {
@@ -87,12 +87,14 @@ describe('litProtocol chipotle error paths', () => {
       chipotle: CHIPOTLE_RUNTIME,
     });
 
-    await expect(hooks.getKey({
-      requesterAddress: TEST_ADDRESS,
-      ciphertext: 'ciphertext-1',
-      dataToEncryptHash: 'hash-1',
-      rpcUrl: 'https://rpc.example.test',
-    })).rejects.toThrow('Requester does not satisfy the SBT gate.');
+    await expect(
+      hooks.getKey({
+        requesterAddress: TEST_ADDRESS,
+        ciphertext: 'ciphertext-1',
+        dataToEncryptHash: 'hash-1',
+        rpcUrl: 'https://rpc.example.test',
+      }),
+    ).rejects.toThrow('Requester does not satisfy the SBT gate.');
   });
 
   it('rejects legacy Chipotle v1 metadata before worker decrypt', async () => {
@@ -113,17 +115,19 @@ describe('litProtocol chipotle error paths', () => {
       chipotle: CHIPOTLE_RUNTIME,
     });
 
-    await expect(hooks.getKey({
-      requesterAddress: TEST_ADDRESS,
-      ciphertext: 'ciphertext-1',
-      dataToEncryptHash: 'hash-1',
-      chipotle: {
-        version: 1,
-        chainId: 84532,
-        gateMode: 'any',
-        sbtAddresses: ['0x0000000000000000000000000000000000000101'],
-      },
-    })).rejects.toThrow('Lit Chipotle legacy wrapped keys are not supported.');
+    await expect(
+      hooks.getKey({
+        requesterAddress: TEST_ADDRESS,
+        ciphertext: 'ciphertext-1',
+        dataToEncryptHash: 'hash-1',
+        chipotle: {
+          version: 1,
+          chainId: 84532,
+          gateMode: 'any',
+          sbtAddresses: ['0x0000000000000000000000000000000000000101'],
+        },
+      }),
+    ).rejects.toThrow('Lit Chipotle legacy wrapped keys are not supported.');
     expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
   });
 
@@ -155,7 +159,7 @@ describe('litProtocol chipotle error paths', () => {
     await expect(
       hooks.saveKey(new Uint8Array(32).fill(7), {
         rpcUrl: 'https://rpc.example.test',
-      })
+      }),
     ).rejects.toThrow('Lit Chipotle encrypt did not return ciphertext.');
   });
 
@@ -187,7 +191,7 @@ describe('litProtocol chipotle error paths', () => {
         ciphertext: 'ciphertext-2',
         dataToEncryptHash: 'hash-2',
         resourceId: { baseUrl: 'context-engine', path: '/resource-b' },
-      })
+      }),
     ).rejects.toThrow('worker timeout');
     expect(getKeyUncached).toHaveBeenCalledTimes(2);
   });

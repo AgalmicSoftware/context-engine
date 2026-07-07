@@ -62,11 +62,8 @@ type BuildSbtListChipProgressDisplayPlanArgs = {
   status?: SbtListChipProgressStatus | null;
 };
 
-const asRecord = <TValue = unknown>(value: unknown): Record<string, TValue> => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, TValue>
-    : {}
-);
+const asRecord = <TValue = unknown>(value: unknown): Record<string, TValue> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, TValue>) : {};
 
 const normalizePositiveInteger = (value: unknown): number => {
   const numeric = Number(value || 0);
@@ -74,7 +71,7 @@ const normalizePositiveInteger = (value: unknown): number => {
 };
 
 const normalizeBooleanMap = (
-  source: SbtListChipProgressBooleanBySlug | null | undefined
+  source: SbtListChipProgressBooleanBySlug | null | undefined,
 ): SbtListChipProgressBooleanBySlug => {
   const out: SbtListChipProgressBooleanBySlug = {};
   Object.entries(asRecord<boolean | undefined>(source)).forEach(([slugRaw, visible]) => {
@@ -86,7 +83,7 @@ const normalizeBooleanMap = (
 };
 
 const normalizeMetaMap = (
-  source: Record<string, SbtListChipProgressVisibilityMeta | undefined> | null | undefined
+  source: Record<string, SbtListChipProgressVisibilityMeta | undefined> | null | undefined,
 ): Record<string, SbtListChipProgressVisibilityMeta | undefined> => {
   const out: Record<string, SbtListChipProgressVisibilityMeta | undefined> = {};
   Object.entries(asRecord<SbtListChipProgressVisibilityMeta | undefined>(source)).forEach(([slugRaw, meta]) => {
@@ -123,16 +120,12 @@ export const buildSbtListChipProgressDisplayPlan = ({
   const hasStatus = !!status;
   const hasLatest = !!status?.hasLatest;
   const showProgress = hasStatus && !!isLoading;
-  const progressWidth = showProgress
-    ? (hasLatest
-      ? `${Math.max(6, Number(status?.progressPct || 0))}%`
-      : '35%')
-    : '0%';
+  const progressWidth = showProgress ? (hasLatest ? `${Math.max(6, Number(status?.progressPct || 0))}%` : '35%') : '0%';
   const style = showProgress
     ? {
-      '--ce-chip-progress-width': progressWidth,
-      background: `linear-gradient(90deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.62) ${progressWidth}, rgba(0,0,0,0.22) ${progressWidth}, rgba(0,0,0,0.22) 100%)`,
-    }
+        '--ce-chip-progress-width': progressWidth,
+        background: `linear-gradient(90deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.62) ${progressWidth}, rgba(0,0,0,0.22) ${progressWidth}, rgba(0,0,0,0.22) 100%)`,
+      }
     : undefined;
 
   return {
@@ -153,10 +146,7 @@ export const resolveSbtListChipProgressVisibilityPlan = ({
   const desired = normalizeBooleanMap(desiredVisibilityBySlug);
   const meta = normalizeMetaMap(metaBySlug);
   const desiredSlugs = new Set(Object.keys(desired));
-  const knownSlugs = new Set([
-    ...Object.keys(meta),
-    ...Object.keys(desired),
-  ]);
+  const knownSlugs = new Set([...Object.keys(meta), ...Object.keys(desired)]);
   const normalizedNowMs = normalizePositiveInteger(nowMs);
   const normalizedMinVisibleMs = normalizePositiveInteger(minVisibleMs);
   const actions: SbtListChipProgressVisibilityAction[] = [];

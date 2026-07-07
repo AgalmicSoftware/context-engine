@@ -1,18 +1,7 @@
-import type {
-  ChangedFieldsDiffCache,
-  PendingEditStatsCache,
-} from './surveyToolChangedFieldsController';
-import type {
-  ResponseSlice as SurveyToolResponseSlice,
-  UnknownRecord,
-} from './surveyToolTypes';
-import type {
-  SurveyQuestionsProps,
-  SurveyQuestionsState,
-} from './surveyQuestionsTypes';
-import type {
-  SurveyQuestionsStateUpdate,
-} from './surveyQuestionsState';
+import type { ChangedFieldsDiffCache, PendingEditStatsCache } from './surveyToolChangedFieldsController';
+import type { ResponseSlice as SurveyToolResponseSlice, UnknownRecord } from './surveyToolTypes';
+import type { SurveyQuestionsProps, SurveyQuestionsState } from './surveyQuestionsTypes';
+import type { SurveyQuestionsStateUpdate } from './surveyQuestionsState';
 
 declare global {
   interface Window {
@@ -25,7 +14,7 @@ export type SurveyQuestionsCacheQuestion = Record<string, unknown> & { id: strin
 export type SurveyQuestionsSetStateCallback = () => unknown;
 export type SurveyQuestionsSetState = (
   update: SurveyQuestionsStateUpdate,
-  callback?: SurveyQuestionsSetStateCallback
+  callback?: SurveyQuestionsSetStateCallback,
 ) => void;
 export type SurveyQuestionsTimer = ReturnType<typeof setTimeout>;
 export type SurveyQuestionsTimerRef = SurveyQuestionsTimer | null;
@@ -77,7 +66,8 @@ type SurveyQuestionsPendingStatsSnapshot = {
   submittedSinceLastEdit: boolean;
   isSubmitting: boolean;
 };
-export type SurveyQuestionsPendingStatsInput = Partial<Pick<SurveyQuestionsPendingStatsSnapshot, 'total' | 'encrypted'>> | null | undefined;
+export type SurveyQuestionsPendingStatsInput =
+  Partial<Pick<SurveyQuestionsPendingStatsSnapshot, 'total' | 'encrypted'>> | null | undefined;
 type SurveyQuestionsAutoDecryptQueueItem = {
   qid: string;
   field: string;

@@ -40,9 +40,8 @@ export const buildClearedTransientSubmitFeedbackState = ({
   };
 };
 
-export const normalizeTransientSubmitFeedbackDurationMs = (
-  durationMs: unknown = 2000
-): number => Math.max(1000, Number(durationMs) || 2000);
+export const normalizeTransientSubmitFeedbackDurationMs = (durationMs: unknown = 2000): number =>
+  Math.max(1000, Number(durationMs) || 2000);
 
 export const buildQuestionPoolPendingSubmitFeedbackMessage = ({
   pendingCount = 0,

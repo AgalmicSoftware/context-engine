@@ -36,7 +36,9 @@ describe('adminPageDraftFormattingHelpers', () => {
       'https://a.example',
     ]);
     expect(parseAllowOriginsDraft(' https://a.example,\nhttps://a.example ')).toEqual(['https://a.example']);
-    expect(formatAllowOriginsDraft([' https://a.example ', 'https://b.example'])).toBe('https://a.example\nhttps://b.example');
+    expect(formatAllowOriginsDraft([' https://a.example ', 'https://b.example'])).toBe(
+      'https://a.example\nhttps://b.example',
+    );
   });
 
   it('formats and parses default filter state drafts', () => {

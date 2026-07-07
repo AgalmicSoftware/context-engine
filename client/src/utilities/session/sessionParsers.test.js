@@ -99,11 +99,13 @@ describe('sessionParsers', () => {
     });
 
     expect(parsed.ok).toBe(false);
-    expect(parsed.errors).toEqual(expect.arrayContaining([
-      'sessionName must be a string.',
-      'tags must be an array of strings.',
-      'lit.network must be a string.',
-    ]));
+    expect(parsed.errors).toEqual(
+      expect.arrayContaining([
+        'sessionName must be a string.',
+        'tags must be an array of strings.',
+        'lit.network must be a string.',
+      ]),
+    );
     expect(parsed.metadata.sessionName).toBeUndefined();
     expect(parsed.metadata.tags).toBeUndefined();
     expect(parsed.metadata.lit).toEqual({ network: 'chipotle' });
@@ -239,11 +241,13 @@ describe('sessionParsers', () => {
     });
 
     expect(parsed.ok).toBe(false);
-    expect(parsed.errors).toEqual(expect.arrayContaining([
-      'rpc.useLocal must be a boolean.',
-      'arweave.jwk must be a string.',
-      'faucet must be an object.',
-    ]));
+    expect(parsed.errors).toEqual(
+      expect.arrayContaining([
+        'rpc.useLocal must be a boolean.',
+        'arweave.jwk must be a string.',
+        'faucet must be an object.',
+      ]),
+    );
     expect(parsed.overrides).toEqual({
       rpc: { useLocal: false, apiKey: 'local-key' },
       arweave: { useLocal: true, jwk: '' },

@@ -9,9 +9,8 @@ type ResolveCreateSbtMetadataSessionSlugArgs = {
   sessionConfigSlug?: unknown;
 };
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const buildSessionRoutePath = (slugRaw?: string, basePath?: string): string => {
   const slug = normalizeSessionSlug(slugRaw || '');
@@ -51,9 +50,7 @@ export const resolveCreateSbtOpenMintAutoJoinUrl = ({
   if (distributionOption !== 'anyoneCanMint') return '';
   const cached = String(autoJoinUrl || '');
   if (cached) return cached;
-  return typeof buildSessionAutoJoinUrl === 'function'
-    ? String(buildSessionAutoJoinUrl(sbtAddress) || '')
-    : '';
+  return typeof buildSessionAutoJoinUrl === 'function' ? String(buildSessionAutoJoinUrl(sbtAddress) || '') : '';
 };
 
 export const resolveCreateSbtEffectiveSessionSlug = ({
@@ -79,9 +76,7 @@ export const resolveCreateSbtMetadataSessionSlug = ({
   sbtLabel = 'SBT',
   sessionConfigSlug = '',
 }: ResolveCreateSbtMetadataSessionSlugArgs = {}): string => {
-  const metadataSessionSlug = normalizeSessionSlug(
-    effectiveSessionSlug || sessionConfigSlug || ''
-  );
+  const metadataSessionSlug = normalizeSessionSlug(effectiveSessionSlug || sessionConfigSlug || '');
   if (deferredDeployMode && !metadataSessionSlug) {
     throw new Error(`Set the session URL before adding this ${String(sbtLabel || 'SBT')} to the session.`);
   }

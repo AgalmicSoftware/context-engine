@@ -1,4 +1,3 @@
-
 export const seedGenPrompt = `
 Input Metadata:
 

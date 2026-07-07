@@ -42,9 +42,7 @@ export const buildSurveyResultsQuestionSummaryDisplayPlan = ({
   question = null,
   questionId = '',
 }: SurveyResultsQuestionSummaryDisplayPlanArgs = {}): SurveyResultsQuestionSummaryDisplayPlan => {
-  const questionRecord = question && typeof question === 'object'
-    ? question as { prompt?: unknown }
-    : null;
+  const questionRecord = question && typeof question === 'object' ? (question as { prompt?: unknown }) : null;
   const questionIdText = String(questionId || '');
   return {
     metadataMissing: !questionRecord,
@@ -52,9 +50,8 @@ export const buildSurveyResultsQuestionSummaryDisplayPlan = ({
   };
 };
 
-export const getSurveyResultsQuestionCardDomId = (questionId: string = ''): string => (
-  `questionCard-${questionId.toLowerCase()}`
-);
+export const getSurveyResultsQuestionCardDomId = (questionId: string = ''): string =>
+  `questionCard-${questionId.toLowerCase()}`;
 
 export const buildSurveyResultsQuestionSummariesListDisplayPlan = ({
   emptyMessage = 'No results yet.',
@@ -62,9 +59,7 @@ export const buildSurveyResultsQuestionSummariesListDisplayPlan = ({
   errorMessage = '',
   filterLoading = false,
 }: SurveyResultsQuestionSummariesListDisplayPlanArgs = {}): SurveyResultsQuestionSummariesListDisplayPlan => {
-  const normalizedEntries = Array.isArray(entries)
-    ? entries as SurveyResultsAggregatorEntry[]
-    : [];
+  const normalizedEntries = Array.isArray(entries) ? (entries as SurveyResultsAggregatorEntry[]) : [];
   const loading = !!filterLoading;
   const normalizedErrorMessage = errorMessage ?? '';
   const showError = !!normalizedErrorMessage && !loading;

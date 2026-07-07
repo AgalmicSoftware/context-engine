@@ -1,4 +1,4 @@
-@use "scss/variables" as tokens;
+@use 'scss/variables' as tokens;
 
 $page-text-color: tokens.$ce-white;
 $card-bg: tokens.$ce-card-bg;
@@ -197,8 +197,7 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   width: 100%;
   justify-content: space-between;
   background:
-    linear-gradient(180deg, rgba($tag-route-accent-alt, 0.16), rgba($tag-route-bg, 0.1)),
-    rgba(255, 255, 255, 0.03);
+    linear-gradient(180deg, rgba($tag-route-accent-alt, 0.16), rgba($tag-route-bg, 0.1)), rgba(255, 255, 255, 0.03);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   flex: 0 0 auto;
   min-height: 68px;
@@ -634,8 +633,7 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   padding: 16px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--ce-radius-12);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.035));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.035));
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
   min-width: 0;
   max-width: 100%;

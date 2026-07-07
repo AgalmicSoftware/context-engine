@@ -13,9 +13,9 @@ const useSessionWizardNewSessionBanner = ({
   hasSponsoredBundleLink,
   newSessionBannerDismissalContextKey,
 }: UseSessionWizardNewSessionBannerOptions) => {
-  const [persistedNewSessionBannerDismissed, setPersistedNewSessionBannerDismissed] = useState(() => (
-    readSessionWizardNewSessionBannerDismissed()
-  ));
+  const [persistedNewSessionBannerDismissed, setPersistedNewSessionBannerDismissed] = useState(() =>
+    readSessionWizardNewSessionBannerDismissed(),
+  );
   const [newSessionBannerDismissedContext, setNewSessionBannerDismissedContext] = useState('');
 
   const handleDismissNewSessionRequirementsBanner = useCallback(() => {

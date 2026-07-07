@@ -4,27 +4,20 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import UserPageAnalysisModal from './UserPageAnalysisModal';
 
 jest.mock('reactstrap', () => ({
-  Modal: ({ children, isOpen }: { children: React.ReactNode; isOpen: boolean }) => (
-    isOpen ? <div data-testid="analysis-modal">{children}</div> : null
-  ),
+  Modal: ({ children, isOpen }: { children: React.ReactNode; isOpen: boolean }) =>
+    isOpen ? <div data-testid="analysis-modal">{children}</div> : null,
   ModalBody: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  ModalHeader: ({
-    children,
-    toggle,
-  }: {
-    children: React.ReactNode;
-    toggle: () => void;
-  }) => (
+  ModalHeader: ({ children, toggle }: { children: React.ReactNode; toggle: () => void }) => (
     <div>
-      <button type="button" onClick={toggle}>close</button>
+      <button type="button" onClick={toggle}>
+        close
+      </button>
       {children}
     </div>
   ),
 }));
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof UserPageAnalysisModal>> = {}
-) => ({
+const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageAnalysisModal>> = {}) => ({
   aiAnalysis: 'Profile synthesis',
   analysisCacheStatusState: {
     analysisCacheAge: '2 minutes ago',
@@ -62,7 +55,7 @@ describe('UserPageAnalysisModal', () => {
           onRefreshAnalysis,
           onToggle,
         })}
-      />
+      />,
     );
 
     expect(screen.getByTestId('analysis-modal')).toBeInTheDocument();
@@ -104,7 +97,7 @@ describe('UserPageAnalysisModal', () => {
           analyzing: true,
           onRefreshAnalysis,
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('User Analysis')).toBeInTheDocument();
@@ -137,7 +130,7 @@ describe('UserPageAnalysisModal', () => {
           analyzing: true,
           onRefreshAnalysis,
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Cached analysis from 30 seconds ago')).toBeInTheDocument();

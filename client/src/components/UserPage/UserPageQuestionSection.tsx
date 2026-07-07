@@ -1,9 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faChevronDown,
-  faChevronUp,
-} from '@fortawesome/free-solid-svg-icons';
+import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
 import { Collapse } from 'reactstrap';
 
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
@@ -78,10 +75,7 @@ const UserPageQuestionSection = ({
 }: UserPageQuestionSectionProps): React.ReactElement => (
   <div className={styles.leftColumn}>
     <div className={styles.questionSection}>
-      <h2
-        onClick={onQuestionResponsesSectionToggle}
-        className={styles.sectionHeader}
-      >
+      <h2 onClick={onQuestionResponsesSectionToggle} className={styles.sectionHeader}>
         {questionResponsesSectionToggleState.shouldRenderOpenIcon && (
           <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
         )}
@@ -133,10 +127,7 @@ const UserPageQuestionSection = ({
         ) : null}
       </Collapse>
 
-      <h2
-        onClick={onQuestionsCreatedSectionToggle}
-        className={styles.sectionHeaderWithMargin}
-      >
+      <h2 onClick={onQuestionsCreatedSectionToggle} className={styles.sectionHeaderWithMargin}>
         {questionsCreatedSectionToggleState.shouldRenderOpenIcon && (
           <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
         )}

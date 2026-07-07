@@ -4,7 +4,9 @@ const readRawPublicEnv = (key: string): string => {
       const value = process.env[key];
       if (typeof value === 'string' && value !== '') return value;
     }
-  } catch (e) { void e; /* fallback: public env lookup. */ }
+  } catch (e) {
+    void e; /* fallback: public env lookup. */
+  }
 
   return '';
 };
@@ -48,15 +50,15 @@ export const readPublicListEnv = (key: string, fallback: string[] = []): string[
           try {
             const parsed = JSON.parse(trimmed);
             return Array.isArray(parsed) ? parsed : null;
-          } catch (e) { void e; /* fallback: CSV list parsing. */ }
+          } catch (e) {
+            void e; /* fallback: CSV list parsing. */
+          }
           return null;
         })()
       : trimmed.split(',');
 
     if (Array.isArray(rawList)) {
-      return rawList
-        .map((entry) => String(entry == null ? '' : entry).trim())
-        .filter((entry) => entry !== '');
+      return rawList.map((entry) => String(entry == null ? '' : entry).trim()).filter((entry) => entry !== '');
     }
   }
 

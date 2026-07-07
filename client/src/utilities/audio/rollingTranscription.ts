@@ -24,9 +24,8 @@ export type ListeningDraft = {
 
 const normalizeDraftSegment = (segment: Partial<RollingTranscriptSegment>): RollingTranscriptSegment => {
   const rawStatus = segment.status;
-  const status: RollingTranscriptSegmentStatus = rawStatus === 'complete' || rawStatus === 'error'
-    ? rawStatus
-    : 'error';
+  const status: RollingTranscriptSegmentStatus =
+    rawStatus === 'complete' || rawStatus === 'error' ? rawStatus : 'error';
   const completedAt = Number(segment.completedAt || 0) || Date.now();
   return {
     id: String(segment.id || `segment-${segment.index || 0}`),
@@ -37,23 +36,18 @@ const normalizeDraftSegment = (segment: Partial<RollingTranscriptSegment>): Roll
     ...(status === 'error' && rawStatus !== 'error'
       ? { error: 'Recording interrupted before transcription completed.', completedAt }
       : {}),
-    ...(status === 'error' && segment.error
-      ? { error: String(segment.error), completedAt }
-      : {}),
-    ...(status === 'complete' && segment.completedAt
-      ? { completedAt: Number(segment.completedAt || 0) }
-      : {}),
+    ...(status === 'error' && segment.error ? { error: String(segment.error), completedAt } : {}),
+    ...(status === 'complete' && segment.completedAt ? { completedAt: Number(segment.completedAt || 0) } : {}),
   };
 };
 
-const normalizeTranscriptTokens = (value: string) => (
+const normalizeTranscriptTokens = (value: string) =>
   String(value || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
     .split(/\s+/)
-    .filter(Boolean)
-);
+    .filter(Boolean);
 
 export const mergeRollingTranscriptText = (previous: string, next: string): string => {
   const a = String(previous || '').trim();
@@ -94,17 +88,17 @@ export const mergeRollingTranscriptText = (previous: string, next: string): stri
   return `${a}${/\s$/.test(a) ? '' : ' '}${trimmedNext}`.trim();
 };
 
-export const stitchRollingTranscriptSegments = (
-  segments: RollingTranscriptSegment[] = [],
-): string => (
+export const stitchRollingTranscriptSegments = (segments: RollingTranscriptSegment[] = []): string =>
   [...segments]
     .filter((segment) => segment.status === 'complete' && segment.text.trim())
     .sort((a, b) => a.index - b.index)
-    .reduce((merged, segment) => mergeRollingTranscriptText(merged, segment.text), '')
-);
+    .reduce((merged, segment) => mergeRollingTranscriptText(merged, segment.text), '');
 
 export const buildListeningDraftStorageKey = (sessionSlug: unknown): string => {
-  const safeSlug = String(sessionSlug || 'default').trim().toLowerCase() || 'default';
+  const safeSlug =
+    String(sessionSlug || 'default')
+      .trim()
+      .toLowerCase() || 'default';
   return `${LISTENING_DRAFT_STORAGE_PREFIX}${safeSlug}`;
 };
 
@@ -128,9 +122,7 @@ export const readListeningDraft = (sessionSlug: unknown): ListeningDraft | null 
       version: 1,
       sessionSlug: String(parsed.sessionSlug || sessionSlug || ''),
       transcript: String(parsed.transcript || ''),
-      segments: Array.isArray(parsed.segments)
-        ? parsed.segments.map((segment) => normalizeDraftSegment(segment))
-        : [],
+      segments: Array.isArray(parsed.segments) ? parsed.segments.map((segment) => normalizeDraftSegment(segment)) : [],
       updatedAt: Number(parsed.updatedAt || 0),
     };
   } catch (_) {

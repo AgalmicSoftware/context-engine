@@ -69,12 +69,7 @@ describe('buildUsersFromCaches', () => {
       },
     ];
 
-    const users = buildUsersFromCaches(
-      addresses,
-      sbtCaches,
-      questionsCaches,
-      surveysCaches
-    );
+    const users = buildUsersFromCaches(addresses, sbtCaches, questionsCaches, surveysCaches);
 
     expect(users).toHaveLength(2);
     expect(users[0].address).toBe('0xUser1');
@@ -128,7 +123,7 @@ describe('buildUsersFromCaches', () => {
         },
       ],
       [],
-      []
+      [],
     );
 
     expect(users).toHaveLength(1);
@@ -173,13 +168,10 @@ describe('buildUsersFromCaches', () => {
         },
       ],
       [],
-      []
+      [],
     );
 
-    expect(sbtNameSets(users).map((set) => Array.from(set))).toEqual([
-      ['0xsbt1'],
-      ['0xsbt2'],
-    ]);
+    expect(sbtNameSets(users).map((set) => Array.from(set))).toEqual([['0xsbt1'], ['0xsbt2']]);
     expect(fallbackBullets(users).agreements).toEqual([]);
   });
 
@@ -228,13 +220,11 @@ describe('buildUsersFromCaches', () => {
         },
       ],
       [],
-      []
+      [],
     );
 
     expect(users).toHaveLength(1);
-    expect(users[0].sbts).toEqual([
-      expect.objectContaining({ name: 'Alpha', address: '0xSbt1' }),
-    ]);
+    expect(users[0].sbts).toEqual([expect.objectContaining({ name: 'Alpha', address: '0xSbt1' })]);
   });
 
   it('ignores checkpoint-backed partial holder counts until a full scan completes', () => {
@@ -264,7 +254,7 @@ describe('buildUsersFromCaches', () => {
         },
       ],
       [],
-      []
+      [],
     );
 
     expect(users).toHaveLength(1);

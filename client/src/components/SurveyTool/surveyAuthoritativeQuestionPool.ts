@@ -5,13 +5,16 @@ export type AuthoritativeQuestionPoolScope = {
 };
 
 export const normalizeAuthoritativeQuestionPoolSlug = (value: unknown = ''): string => {
-  const normalized = String(value || '').trim().toLowerCase();
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
   return normalized === 'general' ? '' : normalized;
 };
 
-export const normalizeAuthoritativeQuestionPoolId = (value: unknown = ''): string => (
-  String(value || '').trim().toLowerCase()
-);
+export const normalizeAuthoritativeQuestionPoolId = (value: unknown = ''): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
 export const resolveAuthoritativeQuestionPoolScope = (
   questionPool: unknown = [],
@@ -52,9 +55,9 @@ export const filterQuestionsByAuthoritativePool = <T extends any>(
   scope: AuthoritativeQuestionPoolScope | null = null,
 ): T[] => {
   if (!scope) return Array.isArray(questions) ? questions : [];
-  return (Array.isArray(questions) ? questions : []).filter((question: any) => (
-    isQuestionAllowedByAuthoritativePool(question, question?.id, scope)
-  ));
+  return (Array.isArray(questions) ? questions : []).filter((question: any) =>
+    isQuestionAllowedByAuthoritativePool(question, question?.id, scope),
+  );
 };
 
 export const appendMissingAuthoritativePoolQuestions = <T extends any>(
@@ -64,9 +67,7 @@ export const appendMissingAuthoritativePoolQuestions = <T extends any>(
 ): T[] => {
   const base = Array.isArray(questions) ? [...questions] : [];
   if (!scope) return base;
-  const seen = new Set(
-    base.map((question: any) => normalizeAuthoritativeQuestionPoolId(question?.id)).filter(Boolean)
-  );
+  const seen = new Set(base.map((question: any) => normalizeAuthoritativeQuestionPoolId(question?.id)).filter(Boolean));
   scope.byId.forEach((entry, questionId) => {
     if (!questionId || seen.has(questionId)) return;
     if (blockedQuestionIds?.has(questionId)) return;

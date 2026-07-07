@@ -3,33 +3,22 @@
 type ChainIdInput = unknown;
 type RpcUrlMap = Record<string, unknown>;
 
-const toStr = (value: unknown): string => (
-  typeof value === 'string'
-    ? value
-    : value == null
-      ? ''
-      : String(value)
-);
+const toStr = (value: unknown): string => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
 const normalizeUrl = (value: unknown): string => toStr(value).trim();
 
-const freezeUrlList = (value: unknown): readonly string[] => Object.freeze(
-  (Array.isArray(value) ? value : [value])
-    .map((entry) => normalizeUrl(entry))
-    .filter(Boolean)
-);
+const freezeUrlList = (value: unknown): readonly string[] =>
+  Object.freeze((Array.isArray(value) ? value : [value]).map((entry) => normalizeUrl(entry)).filter(Boolean));
 
-const freezeUrlListMap = (map: RpcUrlMap): Readonly<Record<string, readonly string[]>> => Object.freeze(
-  Object.fromEntries(
-    Object.entries(map || {}).map(([key, value]) => [Number(key), freezeUrlList(value)])
-  )
-) as Readonly<Record<string, readonly string[]>>;
+const freezeUrlListMap = (map: RpcUrlMap): Readonly<Record<string, readonly string[]>> =>
+  Object.freeze(
+    Object.fromEntries(Object.entries(map || {}).map(([key, value]) => [Number(key), freezeUrlList(value)])),
+  ) as Readonly<Record<string, readonly string[]>>;
 
-const freezeUrlMap = (map: RpcUrlMap): Readonly<Record<string, string>> => Object.freeze(
-  Object.fromEntries(
-    Object.entries(map || {}).map(([key, value]) => [Number(key), normalizeUrl(value)])
-  )
-) as Readonly<Record<string, string>>;
+const freezeUrlMap = (map: RpcUrlMap): Readonly<Record<string, string>> =>
+  Object.freeze(
+    Object.fromEntries(Object.entries(map || {}).map(([key, value]) => [Number(key), normalizeUrl(value)])),
+  ) as Readonly<Record<string, string>>;
 
 const readChainValue = (map: Record<string, unknown>, chainId: ChainIdInput): unknown => {
   const id = Number(chainId || 0);
@@ -40,29 +29,11 @@ const readChainValue = (map: Record<string, unknown>, chainId: ChainIdInput): un
 const cloneUrlList = (list: unknown): string[] => (Array.isArray(list) ? [...list] : []);
 
 const publicRpcUrlsByChainId = freezeUrlListMap({
-  1: [
-    'https://ethereum.publicnode.com',
-    'https://eth.merkle.io',
-    'https://rpc.flashbots.net',
-  ],
-  10: [
-    'https://mainnet.optimism.io',
-    'https://optimism.publicnode.com',
-  ],
-  56: [
-    'https://bsc-dataseed.binance.org',
-    'https://bsc.publicnode.com',
-    'https://bsc-rpc.publicnode.com',
-  ],
-  137: [
-    'https://polygon-rpc.com',
-    'https://polygon.publicnode.com',
-  ],
-  42220: [
-    'https://forno.celo.org',
-    'https://celo.publicnode.com',
-    'https://rpc.ankr.com/celo',
-  ],
+  1: ['https://ethereum.publicnode.com', 'https://eth.merkle.io', 'https://rpc.flashbots.net'],
+  10: ['https://mainnet.optimism.io', 'https://optimism.publicnode.com'],
+  56: ['https://bsc-dataseed.binance.org', 'https://bsc.publicnode.com', 'https://bsc-rpc.publicnode.com'],
+  137: ['https://polygon-rpc.com', 'https://polygon.publicnode.com'],
+  42220: ['https://forno.celo.org', 'https://celo.publicnode.com', 'https://rpc.ankr.com/celo'],
   8453: [
     'https://base.publicnode.com',
     'https://base-rpc.publicnode.com',
@@ -84,17 +55,9 @@ const publicRpcUrlsByChainId = freezeUrlListMap({
     'https://optimism-sepolia.publicnode.com',
     'https://optimism-sepolia-rpc.publicnode.com',
   ],
-  42161: [
-    'https://arb1.arbitrum.io/rpc',
-    'https://arbitrum.publicnode.com',
-  ],
-  421614: [
-    'https://sepolia-rollup.arbitrum.io/rpc',
-    'https://arbitrum-sepolia.publicnode.com',
-  ],
-  747474: [
-    'https://rpc.katana.network',
-  ],
+  42161: ['https://arb1.arbitrum.io/rpc', 'https://arbitrum.publicnode.com'],
+  421614: ['https://sepolia-rollup.arbitrum.io/rpc', 'https://arbitrum-sepolia.publicnode.com'],
+  747474: ['https://rpc.katana.network'],
 });
 
 const pathRpcUrlsByChainId = freezeUrlMap({
@@ -114,16 +77,8 @@ const pathRpcUrlsByChainId = freezeUrlMap({
 });
 
 const faucetFallbackRpcUrlsByChainId = freezeUrlListMap({
-  8453: [
-    'https://mainnet.base.org',
-    'https://base.publicnode.com',
-    'https://base-rpc.publicnode.com',
-  ],
-  84532: [
-    'https://sepolia.base.org',
-    'https://base-sepolia-rpc.publicnode.com',
-    'https://base-sepolia.drpc.org',
-  ],
+  8453: ['https://mainnet.base.org', 'https://base.publicnode.com', 'https://base-rpc.publicnode.com'],
+  84532: ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com', 'https://base-sepolia.drpc.org'],
   11155420: [
     'https://sepolia.optimism.io',
     'https://optimism-sepolia.publicnode.com',
@@ -135,24 +90,18 @@ const faucetFallbackRpcUrlsByChainId = freezeUrlListMap({
 
 const getPublicRpcUrls = (chainId: ChainIdInput, overrides: RpcUrlMap | null = null): string[] => {
   const base = readChainValue(publicRpcUrlsByChainId, chainId);
-  const override = overrides && typeof overrides === 'object'
-    ? readChainValue(overrides, chainId)
-    : undefined;
+  const override = overrides && typeof overrides === 'object' ? readChainValue(overrides, chainId) : undefined;
   return cloneUrlList(Array.isArray(override) ? freezeUrlList(override) : base);
 };
 
 const getPathRpcUrl = (chainId: ChainIdInput, overrides: RpcUrlMap | null = null): string => {
-  const override = overrides && typeof overrides === 'object'
-    ? readChainValue(overrides, chainId)
-    : undefined;
+  const override = overrides && typeof overrides === 'object' ? readChainValue(overrides, chainId) : undefined;
   return normalizeUrl(override || readChainValue(pathRpcUrlsByChainId, chainId) || '');
 };
 
 const getFaucetFallbackRpcUrls = (chainId: ChainIdInput, overrides: RpcUrlMap | null = null): string[] => {
   const base = readChainValue(faucetFallbackRpcUrlsByChainId, chainId);
-  const override = overrides && typeof overrides === 'object'
-    ? readChainValue(overrides, chainId)
-    : undefined;
+  const override = overrides && typeof overrides === 'object' ? readChainValue(overrides, chainId) : undefined;
   return cloneUrlList(Array.isArray(override) ? freezeUrlList(override) : base);
 };
 

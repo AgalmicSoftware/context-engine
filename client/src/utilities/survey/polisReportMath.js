@@ -67,7 +67,7 @@ function normalize(vector = []) {
 function mulberry32(seed = 42) {
   let value = seed >>> 0;
   return function next() {
-    value += 0x6D2B79F5;
+    value += 0x6d2b79f5;
     let t = value;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -97,7 +97,7 @@ function buildParticipantMajorMatrix(ratingMatrix = []) {
     Array.from({ length: nComments }, (_, commentIndex) => {
       const row = Array.isArray(ratingMatrix[commentIndex]) ? ratingMatrix[commentIndex] : [];
       return row[participantIndex] ?? null;
-    })
+    }),
   );
 }
 
@@ -134,9 +134,9 @@ function computeColumnMeans(participantMatrix = []) {
 function buildCenteredDenseMatrix(participantMatrix = [], center = []) {
   return participantMatrix.map((row = []) =>
     row.map((value, commentIndex) => {
-      const filled = isMissingVote(value) ? (center[commentIndex] || 0) : value;
+      const filled = isMissingVote(value) ? center[commentIndex] || 0 : value;
       return filled - (center[commentIndex] || 0);
-    })
+    }),
   );
 }
 
@@ -204,11 +204,7 @@ function computePca(centeredData = [], options = {}) {
   let working = centeredData.map((row) => [...row]);
   const comps = [];
   for (let componentIndex = 0; componentIndex < nComps; componentIndex += 1) {
-    const component = powerIteration(
-      working,
-      options.pcaIterations ?? POLIS_DEFAULTS.pcaIterations,
-      rng
-    );
+    const component = powerIteration(working, options.pcaIterations ?? POLIS_DEFAULTS.pcaIterations, rng);
     comps.push(component);
     working = factorMatrix(working, component);
   }
@@ -283,14 +279,18 @@ function weightedMeanPosition(items = [], weightsById = {}) {
 
 function sameCenters(previous = [], next = [], threshold = 0.01) {
   if (previous.length !== next.length) return false;
-  const previousSorted = previous.map((cluster) => cluster.center).sort((left, right) => {
-    if (left[0] !== right[0]) return left[0] - right[0];
-    return left[1] - right[1];
-  });
-  const nextSorted = next.map((cluster) => cluster.center).sort((left, right) => {
-    if (left[0] !== right[0]) return left[0] - right[0];
-    return left[1] - right[1];
-  });
+  const previousSorted = previous
+    .map((cluster) => cluster.center)
+    .sort((left, right) => {
+      if (left[0] !== right[0]) return left[0] - right[0];
+      return left[1] - right[1];
+    });
+  const nextSorted = next
+    .map((cluster) => cluster.center)
+    .sort((left, right) => {
+      if (left[0] !== right[0]) return left[0] - right[0];
+      return left[1] - right[1];
+    });
   return previousSorted.every((center, index) => euclideanDistance(center, nextSorted[index]) < threshold);
 }
 
@@ -430,7 +430,7 @@ function silhouetteScore(data = [], clusters = [], k = 0) {
       if (memberIndex === index) return;
       a += distanceMatrix[index][memberIndex];
     });
-    a /= (ownMembers.length - 1);
+    a /= ownMembers.length - 1;
 
     let b = Number.POSITIVE_INFINITY;
     clusterMembers.forEach((members, candidateClusterId) => {
@@ -454,7 +454,10 @@ function selectInConversationParticipantIndices(ratingMatrix = [], options = {})
   if (!nComments || !nParticipants) return [];
 
   const counts = countVotesPerParticipant(ratingMatrix);
-  const threshold = Math.min(options.inConversationThresholdCap ?? POLIS_DEFAULTS.inConversationThresholdCap, nComments);
+  const threshold = Math.min(
+    options.inConversationThresholdCap ?? POLIS_DEFAULTS.inConversationThresholdCap,
+    nComments,
+  );
   const indices = counts
     .map((count, index) => ({ count, index }))
     .filter(({ count }) => count >= threshold)
@@ -487,11 +490,13 @@ function clusterBaseClusters(baseClusters = [], options = {}) {
   if (baseClusters.length === 1) {
     return {
       clusterCount: 1,
-      groupClusters: [{
-        id: 0,
-        center: [...baseClusters[0].center],
-        members: [baseClusters[0].id],
-      }],
+      groupClusters: [
+        {
+          id: 0,
+          center: [...baseClusters[0].center],
+          members: [baseClusters[0].id],
+        },
+      ],
     };
   }
 
@@ -499,13 +504,11 @@ function clusterBaseClusters(baseClusters = [], options = {}) {
     id: cluster.id,
     position: [...cluster.center],
   }));
-  const weightsById = Object.fromEntries(
-    baseClusters.map((cluster) => [cluster.id, cluster.members.length || 1])
-  );
+  const weightsById = Object.fromEntries(baseClusters.map((cluster) => [cluster.id, cluster.members.length || 1]));
   const maxK = Math.min(
     options.maxK ?? POLIS_DEFAULTS.maxK,
     2 + Math.floor(baseClusters.length / 12),
-    baseClusters.length
+    baseClusters.length,
   );
 
   let bestScore = Number.NEGATIVE_INFINITY;
@@ -517,7 +520,7 @@ function clusterBaseClusters(baseClusters = [], options = {}) {
       items,
       k,
       weightsById,
-      options.kmeansIterations ?? POLIS_DEFAULTS.kmeansIterations
+      options.kmeansIterations ?? POLIS_DEFAULTS.kmeansIterations,
     );
     if (!clusters.length) continue;
 
@@ -531,7 +534,7 @@ function clusterBaseClusters(baseClusters = [], options = {}) {
     const silhouette = silhouetteScore(
       items.map((item) => item.position),
       items.map((item) => assignmentByBaseClusterId[item.id] ?? 0),
-      clusters.length
+      clusters.length,
     );
 
     if (silhouette > bestScore) {
@@ -543,11 +546,13 @@ function clusterBaseClusters(baseClusters = [], options = {}) {
   if (!bestClusters) {
     return {
       clusterCount: 1,
-      groupClusters: [{
-        id: 0,
-        center: weightedMeanPosition(items, weightsById),
-        members: baseClusters.map((cluster) => cluster.id),
-      }],
+      groupClusters: [
+        {
+          id: 0,
+          center: weightedMeanPosition(items, weightsById),
+          members: baseClusters.map((cluster) => cluster.id),
+        },
+      ],
     };
   }
 
@@ -606,7 +611,7 @@ function assignParticipantsToGroups(nParticipants, participantCoords = [], baseC
 function propTest(successes = 0, trials = 0) {
   const adjSuccesses = successes + 1;
   const adjTrials = trials + 1;
-  return 2 * Math.sqrt(adjTrials) * ((adjSuccesses / adjTrials) - 0.5);
+  return 2 * Math.sqrt(adjTrials) * (adjSuccesses / adjTrials - 0.5);
 }
 
 function twoPropTest(successIn = 0, successOut = 0, popIn = 0, popOut = 0) {
@@ -618,7 +623,7 @@ function twoPropTest(successIn = 0, successOut = 0, popIn = 0, popOut = 0) {
   const pi2 = adjSuccessOut / adjPopOut;
   const piHat = (adjSuccessIn + adjSuccessOut) / (adjPopIn + adjPopOut);
   if (piHat === 1) return 0;
-  return (pi1 - pi2) / Math.sqrt(piHat * (1 - piHat) * ((1 / adjPopIn) + (1 / adjPopOut)));
+  return (pi1 - pi2) / Math.sqrt(piHat * (1 - piHat) * (1 / adjPopIn + 1 / adjPopOut));
 }
 
 function zSig90(value) {
@@ -668,8 +673,7 @@ function addComparativeStats(inStats = {}, restStats = []) {
 
 function passesByTest(commentStats = {}) {
   return (
-    (zSig90(commentStats.rat) && zSig90(commentStats.pat)) ||
-    (zSig90(commentStats.rdt) && zSig90(commentStats.pdt))
+    (zSig90(commentStats.rat) && zSig90(commentStats.pat)) || (zSig90(commentStats.rdt) && zSig90(commentStats.pdt))
   );
 }
 
@@ -693,19 +697,20 @@ function beatsBestAgree(commentStats = {}, currentBest = null) {
 
 function finalizeRepresentativeComment(questionIndex, prompt, stats = {}) {
   const repfulFor = (stats.rat || 0) > (stats.rdt || 0) ? 'agree' : 'disagree';
-  const nSuccess = repfulFor === 'agree' ? (stats.agree || 0) : (stats.disagree || 0);
-  const pSuccess = repfulFor === 'agree' ? (stats.pa || 0) : (stats.pd || 0);
-  const pTest = repfulFor === 'agree' ? (stats.pat || 0) : (stats.pdt || 0);
-  const repness = repfulFor === 'agree' ? (stats.ra || 0) : (stats.rd || 0);
-  const repnessTest = repfulFor === 'agree' ? (stats.rat || 0) : (stats.rdt || 0);
+  const nSuccess = repfulFor === 'agree' ? stats.agree || 0 : stats.disagree || 0;
+  const pSuccess = repfulFor === 'agree' ? stats.pa || 0 : stats.pd || 0;
+  const pTest = repfulFor === 'agree' ? stats.pat || 0 : stats.pdt || 0;
+  const repness = repfulFor === 'agree' ? stats.ra || 0 : stats.rd || 0;
+  const repnessTest = repfulFor === 'agree' ? stats.rat || 0 : stats.rdt || 0;
   const clusterAgreeRate = stats.seen ? stats.agree / stats.seen : 0;
   const clusterDisagreeRate = stats.seen ? stats.disagree / stats.seen : 0;
   const overallSeen = (stats.seen || 0) + (stats.restSeen || 0);
   const overallAgreeRate = overallSeen ? ((stats.agree || 0) + (stats.restAgree || 0)) / overallSeen : 0;
   const overallDisagreeRate = overallSeen ? ((stats.disagree || 0) + (stats.restDisagree || 0)) / overallSeen : 0;
-  const difference = repfulFor === 'agree'
-    ? Math.abs(clusterAgreeRate - overallAgreeRate)
-    : Math.abs(clusterDisagreeRate - overallDisagreeRate);
+  const difference =
+    repfulFor === 'agree'
+      ? Math.abs(clusterAgreeRate - overallAgreeRate)
+      : Math.abs(clusterDisagreeRate - overallDisagreeRate);
 
   return {
     questionIndex,
@@ -750,9 +755,9 @@ function questionPromptForIndex(questionIndex, questionPromptsMap = {}, allQuest
 }
 
 function buildMemberIndicesByGroup(assignments = []) {
-  const groupIds = Array.from(
-    new Set(assignments.filter((clusterId) => Number.isInteger(clusterId)))
-  ).sort((left, right) => left - right);
+  const groupIds = Array.from(new Set(assignments.filter((clusterId) => Number.isInteger(clusterId)))).sort(
+    (left, right) => left - right,
+  );
 
   const byGroup = Object.fromEntries(groupIds.map((groupId) => [groupId, []]));
   assignments.forEach((groupId, participantIndex) => {
@@ -904,15 +909,9 @@ export function computePolisStats(ratingMatrix = []) {
 }
 
 export function computePolisCommentStats(ratingMatrix = [], options = {}) {
-  const {
-    pcaBundle = null,
-    ...pcaOptions
-  } = (options && typeof options === 'object') ? options : {};
-  const { commentExtremity } = (
-    pcaBundle && typeof pcaBundle === 'object'
-      ? pcaBundle
-      : computePolisPcaBundle(ratingMatrix, pcaOptions)
-  );
+  const { pcaBundle = null, ...pcaOptions } = options && typeof options === 'object' ? options : {};
+  const { commentExtremity } =
+    pcaBundle && typeof pcaBundle === 'object' ? pcaBundle : computePolisPcaBundle(ratingMatrix, pcaOptions);
   const [nComments] = matrixShape(ratingMatrix);
 
   return Array.from({ length: nComments }, (_, commentIndex) => {
@@ -937,19 +936,24 @@ export function computePolisCommentStats(ratingMatrix = [], options = {}) {
   });
 }
 
-export function findRepresentativeQuestions(ratingMatrix = [], assignments = [], questionPromptsMap = {}, allQuestions = []) {
+export function findRepresentativeQuestions(
+  ratingMatrix = [],
+  assignments = [],
+  questionPromptsMap = {},
+  allQuestions = [],
+) {
   const [nComments] = matrixShape(ratingMatrix);
   const { groupIds, byGroup } = buildMemberIndicesByGroup(assignments);
   if (!nComments || !groupIds.length) return {};
 
   const result = Object.fromEntries(
-    groupIds.map((groupId) => [groupId, { best: null, bestAgree: null, sufficient: [] }])
+    groupIds.map((groupId) => [groupId, { best: null, bestAgree: null, sufficient: [] }]),
   );
 
   for (let questionIndex = 0; questionIndex < nComments; questionIndex += 1) {
     const prompt = questionPromptForIndex(questionIndex, questionPromptsMap, allQuestions);
     const perGroupStats = groupIds.map((groupId) =>
-      computeCommentStats(collectVotesForQuestion(ratingMatrix, questionIndex, byGroup[groupId]))
+      computeCommentStats(collectVotesForQuestion(ratingMatrix, questionIndex, byGroup[groupId])),
     );
     const comparativeStats = zipRest(perGroupStats, addComparativeStats);
 
@@ -983,9 +987,7 @@ export function findRepresentativeQuestions(ratingMatrix = [], assignments = [],
         }
       : null;
 
-    const bestHead = bestAgree
-      ? [bestAgree]
-      : (state.best ? [state.best] : []);
+    const bestHead = bestAgree ? [bestAgree] : state.best ? [state.best] : [];
 
     if (!state.sufficient.length) {
       finalizedByGroup[groupId] = bestHead;
@@ -993,37 +995,34 @@ export function findRepresentativeQuestions(ratingMatrix = [], assignments = [],
     }
 
     const sufficient = state.sufficient.filter((item) => item.questionIndex !== bestAgree?.questionIndex);
-    finalizedByGroup[groupId] = agreesBeforeDisagrees(
-      [...(bestAgree ? [bestAgree] : []), ...repnessSort(sufficient)]
-    ).slice(0, 5);
+    finalizedByGroup[groupId] = agreesBeforeDisagrees([
+      ...(bestAgree ? [bestAgree] : []),
+      ...repnessSort(sufficient),
+    ]).slice(0, 5);
   });
 
   return finalizedByGroup;
 }
 
-export function computePolisConversationMath(ratingMatrix = [], questionPromptsMap = {}, allQuestions = [], options = {}) {
+export function computePolisConversationMath(
+  ratingMatrix = [],
+  questionPromptsMap = {},
+  allQuestions = [],
+  options = {},
+) {
   const mergedOptions = { ...POLIS_DEFAULTS, ...options };
   const stats = computePolisStats(ratingMatrix);
   const pcaBundle = computePolisPcaBundle(ratingMatrix, mergedOptions);
   const inConversationParticipantIndices = selectInConversationParticipantIndices(ratingMatrix, mergedOptions);
-  const baseClusters = buildBaseClusters(
-    pcaBundle.participantCoords,
-    inConversationParticipantIndices,
-    mergedOptions
-  );
+  const baseClusters = buildBaseClusters(pcaBundle.participantCoords, inConversationParticipantIndices, mergedOptions);
   const clusteredBase = clusterBaseClusters(baseClusters, mergedOptions);
   const clusterAssignments = assignParticipantsToGroups(
     stats.nParticipants,
     pcaBundle.participantCoords,
     baseClusters,
-    clusteredBase.groupClusters
+    clusteredBase.groupClusters,
   );
-  const repQuestions = findRepresentativeQuestions(
-    ratingMatrix,
-    clusterAssignments,
-    questionPromptsMap,
-    allQuestions
-  );
+  const repQuestions = findRepresentativeQuestions(ratingMatrix, clusterAssignments, questionPromptsMap, allQuestions);
 
   return {
     stats,

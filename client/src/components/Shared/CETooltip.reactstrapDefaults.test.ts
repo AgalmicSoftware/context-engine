@@ -15,7 +15,7 @@ describe('reactstrap tooltip defaults', () => {
     expect(transition).toEqual(
       expect.objectContaining({
         timeout: expect.any(Number),
-      })
+      }),
     );
     expect(transition.timeout).toBeGreaterThan(0);
   });

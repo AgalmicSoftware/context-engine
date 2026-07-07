@@ -7,9 +7,7 @@ describe('SurveyQuestionsJsonRouteSection', () => {
   it('forwards JSON display descriptors and callbacks to the JSON controls', () => {
     const onCopySurveyJson = jest.fn();
     const onToggleSurveyJson = jest.fn();
-    const renderJsonTree = jest.fn((json) => (
-      <pre data-testid="json-tree">{JSON.stringify(json)}</pre>
-    ));
+    const renderJsonTree = jest.fn((json) => <pre data-testid="json-tree">{JSON.stringify(json)}</pre>);
 
     render(
       <SurveyQuestionsJsonRouteSection
@@ -22,7 +20,7 @@ describe('SurveyQuestionsJsonRouteSection', () => {
         onToggleSurveyJson={onToggleSurveyJson}
         renderJsonTree={renderJsonTree}
         surveyJson={{ id: 'survey-1' }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Hide Survey .json' }));
@@ -35,12 +33,7 @@ describe('SurveyQuestionsJsonRouteSection', () => {
   });
 
   it('does not render JSON controls when hidden', () => {
-    render(
-      <SurveyQuestionsJsonRouteSection
-        hidden
-        jsonPanelDisplayState={{ showFullSurveyJsonControls: true }}
-      />
-    );
+    render(<SurveyQuestionsJsonRouteSection hidden jsonPanelDisplayState={{ showFullSurveyJsonControls: true }} />);
 
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });

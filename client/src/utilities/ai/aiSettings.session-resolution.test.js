@@ -19,14 +19,17 @@ describe('aiSettings session resolution', () => {
   });
 
   it('uses canonical general aliases with registry data for the default session', () => {
-    localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
-      sessions: {
-        '': {
-          slug: '',
-          sessionName: 'Registry General',
+    localStorage.setItem(
+      REGISTRY_CACHE_KEY,
+      JSON.stringify({
+        sessions: {
+          '': {
+            slug: '',
+            sessionName: 'Registry General',
+          },
         },
-      },
-    }));
+      }),
+    );
 
     const resolved = getSessionAiSettings(' GeNeRal!!! ');
 
@@ -36,23 +39,26 @@ describe('aiSettings session resolution', () => {
   });
 
   it('prefers registry cache for explicit non-general session slugs', () => {
-    localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
-      sessions: {
-        rxc: {
-          slug: 'rxc',
-          sessionName: 'Registry RXC',
-          ai: {
-            mode: 'anthropic',
-            models: {
-              fast: 'claude-sonnet-4-6',
-            },
-            modelProviders: {
-              fast: 'anthropic',
+    localStorage.setItem(
+      REGISTRY_CACHE_KEY,
+      JSON.stringify({
+        sessions: {
+          rxc: {
+            slug: 'rxc',
+            sessionName: 'Registry RXC',
+            ai: {
+              mode: 'anthropic',
+              models: {
+                fast: 'claude-sonnet-4-6',
+              },
+              modelProviders: {
+                fast: 'anthropic',
+              },
             },
           },
         },
-      },
-    }));
+      }),
+    );
 
     const resolved = getSessionAiSettings('rxc');
 

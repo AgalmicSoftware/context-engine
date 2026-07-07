@@ -4,10 +4,7 @@ import {
   type SurveyResultsHydrationInstance,
   type SurveyResultsHydrationPorts,
 } from './surveyResultsHydrationRuntime';
-import type {
-  SurveyResultsProps,
-  SurveyResultsState,
-} from './SurveyResults';
+import type { SurveyResultsProps, SurveyResultsState } from './SurveyResults';
 
 type PatchCall = {
   afterApply?: () => void;
@@ -22,24 +19,26 @@ const createInstance = (): SurveyResultsHydrationInstance => ({
   _surveysCacheChangeNonce: 0,
 });
 
-const createProps = (patch: Record<string, unknown> = {}): SurveyResultsProps => ({
-  isQuestionCacheReady: true,
-  network: { id: 11155420 },
-  networkChainId: 11155420,
-  ...patch,
-} as SurveyResultsProps);
+const createProps = (patch: Record<string, unknown> = {}): SurveyResultsProps =>
+  ({
+    isQuestionCacheReady: true,
+    network: { id: 11155420 },
+    networkChainId: 11155420,
+    ...patch,
+  }) as SurveyResultsProps;
 
-const createState = (patch: Record<string, unknown> = {}): SurveyResultsState => ({
-  filteredQuestionsCount: 0,
-  filteredResponsesCount: 0,
-  isFilterActive: false,
-  sbtFilteredAggregatorQuestionResponses: {},
-  surveyId: '',
-  viewMode: 'questions',
-  ...patch,
-} as SurveyResultsState);
+const createState = (patch: Record<string, unknown> = {}): SurveyResultsState =>
+  ({
+    filteredQuestionsCount: 0,
+    filteredResponsesCount: 0,
+    isFilterActive: false,
+    sbtFilteredAggregatorQuestionResponses: {},
+    surveyId: '',
+    viewMode: 'questions',
+    ...patch,
+  }) as SurveyResultsState;
 
-const parseResponse = <T,>(responseData: T): T | Record<string, unknown> | null => {
+const parseResponse = <T>(responseData: T): T | Record<string, unknown> | null => {
   if (typeof responseData !== 'string') return responseData;
   return JSON.parse(responseData) as Record<string, unknown>;
 };

@@ -20,7 +20,7 @@ export type ContractsSectionProps = {
   renderContractEntry?: (
     contractKey: string,
     contracts: ContractRecord | null | undefined,
-    defaults: ContractRecord | null | undefined
+    defaults: ContractRecord | null | undefined,
   ) => React.ReactNode;
 };
 
@@ -55,18 +55,16 @@ const ContractsSection = ({
       </div>
       {!isCollapsed && variant === 'grid' && (
         <div className={styles.contractsGrid}>
-          {keys.length ? keys.map((contractKey) => (
-            renderContractEntry!(contractKey, contracts, defaults)
-          )) : (
+          {keys.length ? (
+            keys.map((contractKey) => renderContractEntry!(contractKey, contracts, defaults))
+          ) : (
             <div className={styles.helperText}>{emptyMessage}</div>
           )}
         </div>
       )}
       {!isCollapsed && variant === 'object' && (
         <div className={styles.objectBody}>
-          {children.length ? children : (
-            <div className={styles.helperText}>{emptyMessage}</div>
-          )}
+          {children.length ? children : <div className={styles.helperText}>{emptyMessage}</div>}
         </div>
       )}
     </div>

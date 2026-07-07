@@ -6,10 +6,7 @@ import { readSessionScanSlugs } from '../session/sessionScanScope.js';
 import { readSponsoredBootstrapFundingContext } from '../session/sponsoredBootstrapFunding.js';
 import { getSharedFallbackWorkerUrl } from '../session/sessionWorkerAvailability.js';
 import { __mockLogger as mockLogger } from '../logging';
-import {
-  ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS,
-  arweaveScripts,
-} from './arweaveScripts.js';
+import { ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS, arweaveScripts } from './arweaveScripts.js';
 
 jest.mock('arweave', () => ({
   __esModule: true,
@@ -108,16 +105,26 @@ describe('arweaveScripts upload/download resilience', () => {
     Object.values(mockLogger).forEach((fn) => {
       if (typeof fn?.mockClear === 'function') fn.mockClear();
     });
-    try { delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAYS; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
+    try {
+      delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAYS;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
   });
 
   afterEach(() => {
     jest.useRealTimers();
     jest.clearAllMocks();
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
   });
 
   it('rejects hung direct chunk uploads with a retryable timeout error', async () => {
@@ -174,9 +181,7 @@ describe('arweaveScripts upload/download resilience', () => {
       .mockResolvedValueOnce(textResp(200, '   ', 'application/json'))
       .mockResolvedValueOnce(textResp(200, '{"ok":true}', 'application/json'));
 
-    await expect(
-      arweaveScripts.downloadDataFromArweave(txId, readOpts)
-    ).rejects.toMatchObject({
+    await expect(arweaveScripts.downloadDataFromArweave(txId, readOpts)).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       kind: 'network',
       retryable: true,
@@ -195,16 +200,18 @@ describe('arweaveScripts upload/download resilience', () => {
     await expect(
       arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
-      })
+      }),
     ).rejects.toThrow('arweave upload response malformed');
 
     const parseLog = mockLogger.error.mock.calls.find(
-      ([message]) => message === 'arweave upload response parse failed'
+      ([message]) => message === 'arweave upload response parse failed',
     );
-    expect(parseLog?.[1]).toEqual(expect.objectContaining({
-      status: 200,
-      bodyPreview: htmlBody.slice(0, 200),
-    }));
+    expect(parseLog?.[1]).toEqual(
+      expect.objectContaining({
+        status: 200,
+        bodyPreview: htmlBody.slice(0, 200),
+      }),
+    );
     expect(parseLog[1].bodyPreview.length).toBeLessThanOrEqual(200);
   });
 
@@ -229,15 +236,15 @@ describe('arweaveScripts upload/download resilience', () => {
     await assertion;
 
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(3);
-    const parseLog = mockLogger.warn.mock.calls.find(
-      ([message]) => message === 'arweave upload response parse failed'
+    const parseLog = mockLogger.warn.mock.calls.find(([message]) => message === 'arweave upload response parse failed');
+    expect(parseLog?.[1]).toEqual(
+      expect.objectContaining({
+        status: 502,
+        bodyPreview: htmlBody.slice(0, 200),
+      }),
     );
-    expect(parseLog?.[1]).toEqual(expect.objectContaining({
-      status: 502,
-      bodyPreview: htmlBody.slice(0, 200),
-    }));
-    expect(mockLogger.error.mock.calls.some(
-      ([message]) => message === 'arweave upload response parse failed'
-    )).toBe(false);
+    expect(mockLogger.error.mock.calls.some(([message]) => message === 'arweave upload response parse failed')).toBe(
+      false,
+    );
   });
 });

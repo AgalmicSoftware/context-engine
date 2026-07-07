@@ -13,10 +13,16 @@ describe('surveyToolSliderState', () => {
     expect(normalizeSliderMode('importance')).toBe('importance');
     expect(normalizeSliderMode('anything-else')).toBe('conviction');
 
-    expect(buildSliderModeStatePatch({
-      sliderModeByQuestion: { q1: 'conviction' },
-      sliderToggleExpandedByQuestion: { q1: true },
-    }, 'q2', 'importance')).toEqual({
+    expect(
+      buildSliderModeStatePatch(
+        {
+          sliderModeByQuestion: { q1: 'conviction' },
+          sliderToggleExpandedByQuestion: { q1: true },
+        },
+        'q2',
+        'importance',
+      ),
+    ).toEqual({
       sliderModeByQuestion: {
         q1: 'conviction',
         q2: 'importance',
@@ -29,64 +35,78 @@ describe('surveyToolSliderState', () => {
   });
 
   it('derives slider mode from explicit state first and from importance responses otherwise', () => {
-    expect(getQuestionSliderMode({
-      explicitMode: 'importance',
-      questionId: 'q1',
-      surveysResponseState: {
-        0: {
-          importance: { q1: 7 },
+    expect(
+      getQuestionSliderMode({
+        explicitMode: 'importance',
+        questionId: 'q1',
+        surveysResponseState: {
+          0: {
+            importance: { q1: 7 },
+          },
         },
-      },
-    })).toBe('importance');
+      }),
+    ).toBe('importance');
 
-    expect(getQuestionSliderMode({
-      questionId: 'q1',
-      surveysResponseState: {
-        0: {
-          importance: { q1: 7 },
+    expect(
+      getQuestionSliderMode({
+        questionId: 'q1',
+        surveysResponseState: {
+          0: {
+            importance: { q1: 7 },
+          },
         },
-      },
-      isStandalone: true,
-    })).toBe('importance');
+        isStandalone: true,
+      }),
+    ).toBe('importance');
 
-    expect(getQuestionSliderMode({
-      questionId: 'q1',
-      surveysResponseState: {
-        2: {
-          importance: { q1: 7 },
+    expect(
+      getQuestionSliderMode({
+        questionId: 'q1',
+        surveysResponseState: {
+          2: {
+            importance: { q1: 7 },
+          },
         },
-      },
-      surveyIndex: 2,
-    })).toBe('importance');
+        surveyIndex: 2,
+      }),
+    ).toBe('importance');
 
-    expect(getQuestionSliderMode({
-      questionId: 'q1',
-      surveysResponseState: {
-        0: {
-          conviction: { q1: 4 },
+    expect(
+      getQuestionSliderMode({
+        questionId: 'q1',
+        surveysResponseState: {
+          0: {
+            conviction: { q1: 4 },
+          },
         },
-      },
-    })).toBe('conviction');
+      }),
+    ).toBe('conviction');
   });
 
   it('expands the toggle when the question was opened or when importance mode is active', () => {
-    expect(shouldExpandSliderToggle({
-      sliderToggleExpandedByQuestion: { q1: true },
-      questionId: 'q1',
-      sliderMode: 'conviction',
-    })).toBe(true);
+    expect(
+      shouldExpandSliderToggle({
+        sliderToggleExpandedByQuestion: { q1: true },
+        questionId: 'q1',
+        sliderMode: 'conviction',
+      }),
+    ).toBe(true);
 
-    expect(shouldExpandSliderToggle({
-      sliderToggleExpandedByQuestion: {},
-      questionId: 'q1',
-      sliderMode: 'importance',
-    })).toBe(true);
+    expect(
+      shouldExpandSliderToggle({
+        sliderToggleExpandedByQuestion: {},
+        questionId: 'q1',
+        sliderMode: 'importance',
+      }),
+    ).toBe(true);
 
-    expect(shouldExpandSliderToggle({
-      sliderToggleExpandedByQuestion: {},
-      questionId: 'q1',
-      sliderMode: 'conviction',
-    })).toBe(false);
+    expect(
+      shouldExpandSliderToggle({
+        sliderToggleExpandedByQuestion: {},
+        questionId: 'q1',
+        sliderMode: 'conviction',
+      }),
+    ).toBe(false);
   });
 
   it('keeps slider draft persistence and numeric response fallbacks stable', () => {

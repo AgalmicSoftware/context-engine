@@ -20,7 +20,7 @@ describe('ArxivCard', () => {
     render(
       <MemoryRouter>
         <ArxivCard entry={entry} onTagClick={onTagClick} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByText('arXiv:2403.12345')).toBeInTheDocument();
@@ -33,7 +33,7 @@ describe('ArxivCard', () => {
     expect(screen.getByRole('button', { name: 'mechanistic interpretability' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View paper' })).toHaveAttribute(
       'href',
-      'https://arxiv.org/abs/2403.12345'
+      'https://arxiv.org/abs/2403.12345',
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'alignment' }));

@@ -10,13 +10,7 @@ const styleMap = {
 
 describe('SurveyResultsStatusMessages', () => {
   it('renders an informational alert when not filtering', () => {
-    render(
-      <SurveyResultsStatusMessages
-        alertMessage="Export complete."
-        filterLoading={false}
-        styleMap={styleMap}
-      />
-    );
+    render(<SurveyResultsStatusMessages alertMessage="Export complete." filterLoading={false} styleMap={styleMap} />);
 
     expect(screen.getByText('Export complete.')).toBeInTheDocument();
     expect(screen.queryByText('Applying filter...')).not.toBeInTheDocument();
@@ -24,11 +18,7 @@ describe('SurveyResultsStatusMessages', () => {
 
   it('renders the filter loading state instead of the alert', () => {
     render(
-      <SurveyResultsStatusMessages
-        alertMessage="Hidden while loading."
-        filterLoading={true}
-        styleMap={styleMap}
-      />
+      <SurveyResultsStatusMessages alertMessage="Hidden while loading." filterLoading={true} styleMap={styleMap} />,
     );
 
     expect(screen.getByText('Applying filter...')).toBeInTheDocument();
@@ -37,11 +27,7 @@ describe('SurveyResultsStatusMessages', () => {
 
   it('renders no status UI when idle', () => {
     const { container } = render(
-      <SurveyResultsStatusMessages
-        alertMessage=""
-        filterLoading={false}
-        styleMap={styleMap}
-      />
+      <SurveyResultsStatusMessages alertMessage="" filterLoading={false} styleMap={styleMap} />,
     );
 
     expect(container).toBeEmptyDOMElement();

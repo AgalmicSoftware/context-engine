@@ -29,7 +29,7 @@ describe('CEDateTimeInput', () => {
         selected={new Date('2026-04-06T12:30:00')}
         showTimeSelect
         timeIntervals={15}
-      />
+      />,
     );
 
     const input = screen.getByTestId('ce-date-time-input') as HTMLInputElement;
@@ -55,7 +55,7 @@ describe('CEDateTimeInput', () => {
         selected={new Date('2026-04-06T12:30:00')}
         showTimeSelect
         timeIntervals={15}
-      />
+      />,
     );
 
     const input = screen.getByTestId('ce-date-time-input') as HTMLInputElement;
@@ -157,12 +157,7 @@ describe('CEDateTimeInput', () => {
   it('shows a clear button for clearable values and emits null when cleared', () => {
     const handleChange = jest.fn();
     render(
-      <CEDateTimeInput
-        isClearable
-        onChange={handleChange}
-        selected={new Date('2026-04-06T12:30:00')}
-        showTimeSelect
-      />
+      <CEDateTimeInput isClearable onChange={handleChange} selected={new Date('2026-04-06T12:30:00')} showTimeSelect />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear date and time' }));

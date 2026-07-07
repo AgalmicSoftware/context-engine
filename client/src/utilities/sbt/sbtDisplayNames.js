@@ -17,10 +17,7 @@ import {
   subscribeCacheUpdates,
   writeCache,
 } from '../cache/cacheScripts.js';
-import {
-  ENABLE_TARGETED_SBT_METADATA_LOOKUP,
-  USE_ONCHAIN_SESSION_REGISTRY,
-} from '../../variables/appConfig.js';
+import { ENABLE_TARGETED_SBT_METADATA_LOOKUP, USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import { toStr } from '../shared/primitives.js';
 import {
   SBT_MASKED_FIELD_VALUE,
@@ -67,11 +64,7 @@ const normalizeAddress = (value) => {
   }
 };
 
-const isUnresolvedSessionConfig = (config) => (
-  !!config &&
-  typeof config === 'object' &&
-  config.__unresolved === true
-);
+const isUnresolvedSessionConfig = (config) => !!config && typeof config === 'object' && config.__unresolved === true;
 
 const getDisplaySessionConfig = (preferredSlug = '') => {
   const slug = sanitizeSlug(preferredSlug);
@@ -83,11 +76,7 @@ const getDisplaySessionConfig = (preferredSlug = '') => {
     return strictLookupConfig || null;
   }
   const demoLookupConfig = getDemoSessionConfigBySlug(slug, { allowDemoFallback: true });
-  return (
-    demoLookupConfig
-    || strictLookupConfig
-    || null
-  );
+  return demoLookupConfig || strictLookupConfig || null;
 };
 
 const resolveExpectedChainId = ({ chainId = null, preferredSlug = '' } = {}) => {
@@ -112,7 +101,7 @@ const readBoolish = (raw, defaultValue = false) => {
 const getNameLookupDelayMs = (attempts) => {
   const safeAttempts = Number(attempts || 0);
   const exponent = Math.min(Math.max(safeAttempts - 1, 0), NAME_LOOKUP_MAX_EXPONENT);
-  return Math.min(NAME_LOOKUP_BASE_DELAY_MS * (2 ** exponent), NAME_LOOKUP_MAX_DELAY_MS);
+  return Math.min(NAME_LOOKUP_BASE_DELAY_MS * 2 ** exponent, NAME_LOOKUP_MAX_DELAY_MS);
 };
 
 const getDisplayLabelMemoKey = buildSbtDisplayLabelMemoKey;
@@ -191,12 +180,7 @@ const getMetadataLookupConfig = ({ preferredSlug = '', metadataLookupConfig = nu
     slug,
   };
 
-  const resolvedChainId = Number(
-    chainId ||
-    out?.networkChainId ||
-    out?.__registry?.chainId ||
-    0
-  ) || 0;
+  const resolvedChainId = Number(chainId || out?.networkChainId || out?.__registry?.chainId || 0) || 0;
 
   if (resolvedChainId > 0) {
     out.networkChainId = resolvedChainId;
@@ -303,7 +287,9 @@ export const isTargetedSbtMetadataLookupEnabled = () => {
     if (typeof globalThis !== 'undefined' && typeof globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP !== 'undefined') {
       return readBoolish(globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP, !!ENABLE_TARGETED_SBT_METADATA_LOOKUP);
     }
-  } catch (e) { void e; /* fallback: runtime flag lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime flag lookup. */
+  }
   return !!ENABLE_TARGETED_SBT_METADATA_LOOKUP;
 };
 
@@ -502,21 +488,21 @@ export const warmSbtDisplayNamesTargeted = async ({
   chainId = null,
   writeBack = true,
 } = {}) => {
-  const unique = Array.from(new Set(
-    (Array.isArray(addresses) ? addresses : [])
-      .map((value) => normalizeAddress(value))
-      .filter(Boolean)
-  ));
+  const unique = Array.from(
+    new Set((Array.isArray(addresses) ? addresses : []).map((value) => normalizeAddress(value)).filter(Boolean)),
+  );
 
-  const results = await Promise.all(unique.map((address) => (
-    hydrateSbtDisplayNameTargeted({
-      address,
-      preferredSlug,
-      metadataLookupConfig,
-      chainId,
-      writeBack,
-    })
-  )));
+  const results = await Promise.all(
+    unique.map((address) =>
+      hydrateSbtDisplayNameTargeted({
+        address,
+        preferredSlug,
+        metadataLookupConfig,
+        chainId,
+        writeBack,
+      }),
+    ),
+  );
 
   return results.filter(Boolean);
 };

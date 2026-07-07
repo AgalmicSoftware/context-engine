@@ -114,12 +114,13 @@ const buildQuestionCache = ({
   questionResponses = {},
   questionsLatestBlock = 1,
   questionResponsesLatestBlock = 1,
-}: Record<string, any> = {}): Record<string, any> => normalizeQuestionCache({
-  questions,
-  questionResponses,
-  questionsLatestBlock,
-  questionResponsesLatestBlock,
-});
+}: Record<string, any> = {}): Record<string, any> =>
+  normalizeQuestionCache({
+    questions,
+    questionResponses,
+    questionsLatestBlock,
+    questionResponsesLatestBlock,
+  });
 
 const buildSurveyCache = ({
   surveyId,
@@ -162,11 +163,7 @@ const seedCacheEnvironment = ({
   surveysBySlug = {},
 }: CacheEnvironment = {}): void => {
   const defaultBookmarks = { surveys: [], questions: [] };
-  const lookupSlug = (
-    entries: Record<string, any>,
-    slug: any,
-    fallback: any
-  ): any => {
+  const lookupSlug = (entries: Record<string, any>, slug: any, fallback: any): any => {
     const normalizedSlug = String(slug ?? '');
     const lowerSlug = normalizedSlug.toLowerCase();
     if (Object.prototype.hasOwnProperty.call(entries, normalizedSlug)) {
@@ -209,38 +206,40 @@ const seedCacheEnvironment = ({
   jest.spyOn(contractScriptsDefault as any, 'getLatestBlockNumber').mockResolvedValue(100);
 };
 
-const renderQuestionResults = (
-  props: Record<string, any> = {},
-  route = '/questions/results'
-) => renderSurveyResults({
-  isOpen: true,
-  isQuestionCacheReady: true,
-  isResponsesCacheReady: true,
-  isSBTCacheReady: true,
-  network: { id: Number(NETWORK_ID) },
-  networkChainId: Number(NETWORK_ID),
-  preventUrlChange: true,
-  provider: {},
-  viewMode: 'questions',
-  ...props,
-}, { route });
+const renderQuestionResults = (props: Record<string, any> = {}, route = '/questions/results') =>
+  renderSurveyResults(
+    {
+      isOpen: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      network: { id: Number(NETWORK_ID) },
+      networkChainId: Number(NETWORK_ID),
+      preventUrlChange: true,
+      provider: {},
+      viewMode: 'questions',
+      ...props,
+    },
+    { route },
+  );
 
-const renderSurveyModeResults = (
-  props: Record<string, any> = {},
-  route = '/'
-) => renderSurveyResults({
-  isOpen: true,
-  isQuestionCacheReady: true,
-  isResponsesCacheReady: true,
-  isSBTCacheReady: true,
-  isSurveyCacheReady: true,
-  network: { id: Number(NETWORK_ID) },
-  networkChainId: Number(NETWORK_ID),
-  preventUrlChange: true,
-  provider: {},
-  viewMode: 'survey',
-  ...props,
-}, { route });
+const renderSurveyModeResults = (props: Record<string, any> = {}, route = '/') =>
+  renderSurveyResults(
+    {
+      isOpen: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+      network: { id: Number(NETWORK_ID) },
+      networkChainId: Number(NETWORK_ID),
+      preventUrlChange: true,
+      provider: {},
+      viewMode: 'survey',
+      ...props,
+    },
+    { route },
+  );
 
 const waitForText = async (text: string): Promise<void> => {
   await waitFor(() => {
@@ -259,7 +258,8 @@ const getFilterSummaryNode = (): HTMLElement => {
 };
 
 const getQuestionCard = (prompt: string): HTMLElement => {
-  const node = screen.getAllByText(prompt)
+  const node = screen
+    .getAllByText(prompt)
     .map((item) => item.closest('[class*="aggregatorSummaryCard"]'))
     .find(Boolean);
   expect(node).toBeTruthy();
@@ -281,8 +281,7 @@ const switchToAggregateView = async (): Promise<void> => {
     fireEvent.click(viewSwitch);
   }
   await waitFor(() => {
-    expect(screen.getByRole('switch', { name: VIEW_MODE_SWITCH_NAME }))
-      .toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('switch', { name: VIEW_MODE_SWITCH_NAME })).toHaveAttribute('aria-checked', 'true');
   });
 };
 
@@ -292,8 +291,7 @@ const switchToIndividualsView = async (): Promise<void> => {
     fireEvent.click(viewSwitch);
   }
   await waitFor(() => {
-    expect(screen.getByRole('switch', { name: VIEW_MODE_SWITCH_NAME }))
-      .toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('switch', { name: VIEW_MODE_SWITCH_NAME })).toHaveAttribute('aria-checked', 'false');
   });
 };
 
@@ -305,7 +303,8 @@ const openQuestionTable = async (): Promise<void> => {
 };
 
 const getTableRowByPrompt = (prompt: string): HTMLElement => {
-  const row = screen.getAllByText(prompt)
+  const row = screen
+    .getAllByText(prompt)
     .map((node) => node.closest('tr'))
     .find(Boolean);
   expect(row).toBeTruthy();
@@ -315,15 +314,16 @@ const getTableRowByPrompt = (prompt: string): HTMLElement => {
 const findLinkByHref = async (href: string): Promise<HTMLAnchorElement> => {
   let link: HTMLAnchorElement | null = null;
   await waitFor(() => {
-    link = Array.from(document.querySelectorAll('a'))
-      .find((candidate) => candidate.getAttribute('href') === href) as HTMLAnchorElement | undefined || null;
+    link =
+      (Array.from(document.querySelectorAll('a')).find((candidate) => candidate.getAttribute('href') === href) as
+        HTMLAnchorElement | undefined) || null;
     expect(link).toBeTruthy();
   });
   return link as HTMLAnchorElement;
 };
 
 const buildSyncStatusDisplay = (
-  overrides: Partial<SurveyResultsSyncStatusDisplayPlan> = {}
+  overrides: Partial<SurveyResultsSyncStatusDisplayPlan> = {},
 ): SurveyResultsSyncStatusDisplayPlan => ({
   isSynced: false,
   isSyncingOrLoading: true,
@@ -367,7 +367,9 @@ afterEach(() => {
   jest.restoreAllMocks();
   try {
     window.history.replaceState({}, '', '/');
-  } catch (_) { /* noop */ }
+  } catch (_) {
+    /* noop */
+  }
 });
 
 describe('SurveyResults multichoice aggregator summary', () => {
@@ -379,7 +381,7 @@ describe('SurveyResults multichoice aggregator summary', () => {
           type: 'multichoice',
           options: ['Alpha', 'Beta'],
         })}
-      />
+      />,
     );
 
     expect(container.querySelector('[class*="surveyResultsAggregatorPanel"]')).toBeTruthy();
@@ -401,7 +403,11 @@ describe('SurveyResults multichoice aggregator summary', () => {
           questionResponses: {
             q1: {
               [RESPONDER_ONE]: { type: 'multichoice', answer: { value: ['Alpha'] }, timeStamp: 1 },
-              [RESPONDER_ONE.toUpperCase()]: { type: 'multichoice', answer: { value: ['Alpha', 'Beta'] }, timeStamp: 2 },
+              [RESPONDER_ONE.toUpperCase()]: {
+                type: 'multichoice',
+                answer: { value: ['Alpha', 'Beta'] },
+                timeStamp: 2,
+              },
               [RESPONDER_TWO]: { type: 'multichoice', answer: { value: ['Alpha'] }, timeStamp: 1 },
             },
           },
@@ -438,19 +444,22 @@ describe('SurveyResults multichoice aggregator summary', () => {
         renderFreeformSummary={() => null}
         renderMultichoiceSummary={() => (
           <SurveyResultsMultichoiceAggregatorSummary
-            summary={buildSurveyResultsMultichoiceSummaryModel([
-              {
-                responder: RESPONDER_ONE,
-                timestamp: 2,
-                response: { type: 'multichoice', answer: { value: ['Alpha', 'Beta'] } },
-              },
-            ], null)}
+            summary={buildSurveyResultsMultichoiceSummaryModel(
+              [
+                {
+                  responder: RESPONDER_ONE,
+                  timestamp: 2,
+                  response: { type: 'multichoice', answer: { value: ['Alpha', 'Beta'] } },
+                },
+              ],
+              null,
+            )}
           />
         )}
         resolvedQuestionType="multichoice"
         styleMap={styles}
         viewableResponsesCount={1}
-      />
+      />,
     );
 
     expect(screen.getByText('No metadata found for this question in local cache.')).toBeInTheDocument();
@@ -475,7 +484,11 @@ describe('SurveyResults multichoice aggregator summary', () => {
           questionResponses: {
             q1: {
               [RESPONDER_ONE]: { type: 'multichoice', answer: { value: ['Alpha'] }, timeStamp: 1 },
-              [RESPONDER_ONE.toUpperCase()]: { type: 'multichoice', answer: { value: ['Alpha', 'Beta'] }, timeStamp: 2 },
+              [RESPONDER_ONE.toUpperCase()]: {
+                type: 'multichoice',
+                answer: { value: ['Alpha', 'Beta'] },
+                timeStamp: 2,
+              },
             },
           },
         }),
@@ -507,7 +520,11 @@ describe('SurveyResults selected result display wiring', () => {
           },
           questionResponses: {
             q1: {
-              [RESPONDER_ONE]: { type: 'binary', answer: { value: 'Decrypted answer' }, additional: { value: 'Decrypted note' } },
+              [RESPONDER_ONE]: {
+                type: 'binary',
+                answer: { value: 'Decrypted answer' },
+                additional: { value: 'Decrypted note' },
+              },
             },
           },
         }),
@@ -523,7 +540,7 @@ describe('SurveyResults selected result display wiring', () => {
     expect(cacheScripts.writeCache).toHaveBeenCalledWith(
       'bookmarksCache',
       'demo',
-      expect.objectContaining({ questions: [] })
+      expect.objectContaining({ questions: [] }),
     );
 
     fireEvent.click(within(card).getByText('Explain the decision'));
@@ -539,7 +556,7 @@ describe('SurveyResults selected result display wiring', () => {
               }),
             }),
           ]),
-        })
+        }),
       );
     });
     // port note: direct decryptedResponseOverrides state injection and callback identity checks were instance-only; this drives the rendered card controls and the selected response payload through the mounted component seam.
@@ -580,7 +597,7 @@ describe('SurveyResults selected result display wiring', () => {
     expect(cacheScripts.writeCache).toHaveBeenCalledWith(
       'bookmarksCache',
       'session-one',
-      expect.objectContaining({ questions: ['q1'] })
+      expect.objectContaining({ questions: ['q1'] }),
     );
 
     fireEvent.click(screen.getByRole('columnheader', { name: /Prompt/ }));
@@ -670,7 +687,7 @@ describe('SurveyResults filter summary counts', () => {
         normalizedFilteredQuestionsCount={17}
         normalizedFilteredResponsesCount={29}
         showFilteredCountSpinner={false}
-      />
+      />,
     );
 
     const summaryNode = container.querySelector('[class*="filterSummaryText"]') as HTMLElement;
@@ -687,7 +704,7 @@ describe('SurveyResults filter summary counts', () => {
         normalizedFilteredQuestionsCount={0}
         normalizedFilteredResponsesCount={0}
         showFilteredCountSpinner
-      />
+      />,
     );
 
     const summaryNode = container.querySelector('[class*="filterSummaryText"]') as HTMLElement;
@@ -702,7 +719,7 @@ describe('SurveyResults filter summary counts', () => {
         normalizedFilteredQuestionsCount={0}
         normalizedFilteredResponsesCount={0}
         showFilteredCountSpinner={false}
-      />
+      />,
     );
 
     const summaryNode = getFilterSummaryNode();
@@ -728,7 +745,7 @@ describe('SurveyResults sync status display', () => {
           miniProgressStyle: {},
           remainingSpinnerStyle: {},
         })}
-      </>
+      </>,
     );
 
     expect(screen.getByText('Syncing...')).toBeInTheDocument();
@@ -786,12 +803,11 @@ describe('SurveyResults demo results views', () => {
 
     renderQuestionResults({ sessionSlug: 'demo', activeSessionSlug: 'demo' });
     const demoNav = await screen.findByTestId('ce-surveyresults-demo-view-nav');
-    expect(within(demoNav).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual([
-      'Report',
-      'Atlas',
-      'Breakdown',
-      'Risk Matrix',
-    ]);
+    expect(
+      within(demoNav)
+        .getAllByRole('button')
+        .map((button) => button.textContent?.trim()),
+    ).toEqual(['Report', 'Atlas', 'Breakdown', 'Risk Matrix']);
 
     const reportButton = screen.getByTestId('ce-surveyresults-demo-view-report');
     const atlasButton = screen.getByTestId('ce-surveyresults-demo-view-atlas');
@@ -818,9 +834,7 @@ describe('SurveyResults demo results views', () => {
 
     fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-breakdown'));
     expect(await screen.findByTestId('surveyresults-demo-breakdown-view')).toBeInTheDocument();
-    expect(mockDemoAnalysisWorkspace).toHaveBeenLastCalledWith(
-      expect.objectContaining({ sessionSlug: 'demo' })
-    );
+    expect(mockDemoAnalysisWorkspace).toHaveBeenLastCalledWith(expect.objectContaining({ sessionSlug: 'demo' }));
 
     fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-riskMatrix'));
     const riskMatrixView = await screen.findByTestId('surveyresults-demo-risk-matrix-view');
@@ -836,19 +850,23 @@ describe('SurveyResults demo results views', () => {
 
 describe('resolveSurveyResultsSummaryQuestionType', () => {
   it('infers freeform from response.answer.type when question metadata is missing', () => {
-    expect(resolveSurveyResultsSummaryQuestionType(undefined, [
-      {
-        response: { answer: { type: 'freeform', value: 'Legacy freeform answer' } },
-      },
-    ])).toBe('freeform');
+    expect(
+      resolveSurveyResultsSummaryQuestionType(undefined, [
+        {
+          response: { answer: { type: 'freeform', value: 'Legacy freeform answer' } },
+        },
+      ]),
+    ).toBe('freeform');
   });
 
   it('normalizes legacy text response.answer.type to freeform when question metadata is null', () => {
-    expect(resolveSurveyResultsSummaryQuestionType(null, [
-      {
-        response: { answer: { type: 'text', value: 'Legacy text answer' } },
-      },
-    ])).toBe('freeform');
+    expect(
+      resolveSurveyResultsSummaryQuestionType(null, [
+        {
+          response: { answer: { type: 'text', value: 'Legacy text answer' } },
+        },
+      ]),
+    ).toBe('freeform');
   });
 });
 
@@ -914,7 +932,7 @@ describe('SurveyResults freeform summary rendering', () => {
             response: { answer: { value: 'Visible freeform answer', encrypted: false } },
           },
         ])}
-      />
+      />,
     );
 
     expect(screen.getByText('1 total responses. 1 blank not shown.')).toBeInTheDocument();
@@ -952,7 +970,7 @@ describe('SurveyResults demo surface props', () => {
             remainingBlocks: 90,
           }),
           slug: 'demo',
-        })
+        }),
       );
     });
   });
@@ -1052,12 +1070,14 @@ describe('SurveyResults survey/response links', () => {
         .filter((props) => props?.aggregatorResponseMode === false);
       expect(individualCalls.length).toBeGreaterThan(0);
       expect(JSON.stringify(individualCalls)).not.toContain('Old answer');
-      expect(individualCalls[individualCalls.length - 1]).toEqual(expect.objectContaining({
-        response: expect.objectContaining({
-          questionID: 'q1',
-          answer: expect.objectContaining({ value: 'Latest answer' }),
+      expect(individualCalls[individualCalls.length - 1]).toEqual(
+        expect.objectContaining({
+          response: expect.objectContaining({
+            questionID: 'q1',
+            answer: expect.objectContaining({ value: 'Latest answer' }),
+          }),
         }),
-      }));
+      );
     });
   });
 

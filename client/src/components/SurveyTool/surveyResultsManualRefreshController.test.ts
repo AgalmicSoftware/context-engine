@@ -1,6 +1,4 @@
-import {
-  runSurveyResultsManualRefreshDispatchController,
-} from './surveyResultsManualRefreshController';
+import { runSurveyResultsManualRefreshDispatchController } from './surveyResultsManualRefreshController';
 
 describe('surveyResultsManualRefreshController', () => {
   it('dispatches question refresh ports in existing order', async () => {
@@ -25,13 +23,15 @@ describe('surveyResultsManualRefreshController', () => {
   it('lowercases survey ids before dispatching survey response refresh', async () => {
     const refreshSurveyResponsesByID = jest.fn().mockResolvedValue(undefined);
 
-    await expect(runSurveyResultsManualRefreshDispatchController({
-      viewMode: 'survey',
-      surveyId: '0xABCDEF',
-      ports: {
-        refreshSurveyResponsesByID,
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSurveyResultsManualRefreshDispatchController({
+        viewMode: 'survey',
+        surveyId: '0xABCDEF',
+        ports: {
+          refreshSurveyResponsesByID,
+        },
+      }),
+    ).resolves.toEqual({
       dispatched: ['surveyResponses'],
       status: 'survey',
       surveyId: '0xabcdef',
@@ -42,22 +42,26 @@ describe('surveyResultsManualRefreshController', () => {
   it('stays inert when the current view has no dispatchable refresh port', async () => {
     const refreshSurveyResponsesByID = jest.fn();
 
-    await expect(runSurveyResultsManualRefreshDispatchController({
-      viewMode: 'survey',
-      surveyId: '',
-      ports: {
-        refreshSurveyResponsesByID,
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSurveyResultsManualRefreshDispatchController({
+        viewMode: 'survey',
+        surveyId: '',
+        ports: {
+          refreshSurveyResponsesByID,
+        },
+      }),
+    ).resolves.toEqual({
       dispatched: [],
       status: 'inert',
       surveyId: '',
     });
     expect(refreshSurveyResponsesByID).not.toHaveBeenCalled();
 
-    await expect(runSurveyResultsManualRefreshDispatchController({
-      viewMode: 'questions',
-    })).resolves.toEqual({
+    await expect(
+      runSurveyResultsManualRefreshDispatchController({
+        viewMode: 'questions',
+      }),
+    ).resolves.toEqual({
       dispatched: [],
       status: 'inert',
       surveyId: '',
@@ -68,13 +72,15 @@ describe('surveyResultsManualRefreshController', () => {
     const error = new Error('refresh failed');
     const refreshQuestionResponses = jest.fn();
 
-    await expect(runSurveyResultsManualRefreshDispatchController({
-      viewMode: 'questions',
-      ports: {
-        refreshQuestionMetadata: jest.fn().mockRejectedValue(error),
-        refreshQuestionResponses,
-      },
-    })).rejects.toThrow(error);
+    await expect(
+      runSurveyResultsManualRefreshDispatchController({
+        viewMode: 'questions',
+        ports: {
+          refreshQuestionMetadata: jest.fn().mockRejectedValue(error),
+          refreshQuestionResponses,
+        },
+      }),
+    ).rejects.toThrow(error);
     expect(refreshQuestionResponses).not.toHaveBeenCalled();
   });
 });

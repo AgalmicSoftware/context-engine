@@ -13,22 +13,25 @@ type QuestionPayload = UnknownRecord & {
   type?: unknown;
 };
 
-type QuestionsCache = Record<string, {
-  questions?: Record<string, QuestionPayload>;
-} & UnknownRecord>;
+type QuestionsCache = Record<
+  string,
+  {
+    questions?: Record<string, QuestionPayload>;
+  } & UnknownRecord
+>;
 
 type CacheState = {
   netIdStr: string;
   questionsCache: QuestionsCache;
 } | null;
 
-const normalizeQuestionId = (value: unknown): string => (
-  String(value || '').trim().toLowerCase()
-);
+const normalizeQuestionId = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const buildSingleQuestionEncryptedMetadataPlaceholder = ({
   questionId = '',
@@ -48,12 +51,12 @@ export const buildSingleQuestionEncryptedMetadataPlaceholder = ({
   const encryption = isRecord(existing.encryption)
     ? existing.encryption
     : {
-      enabled: true,
-      status: 'metadata-pending',
-      targets: {
-        questions: true,
-      },
-    };
+        enabled: true,
+        status: 'metadata-pending',
+        targets: {
+          questions: true,
+        },
+      };
 
   return {
     ...existing,
@@ -93,10 +96,11 @@ export const resolveSingleQuestionCacheState = async ({
       const bucket = rawQuestionsCache[key];
       return !!(bucket && bucket.questions && bucket.questions[normalizedQuestionId]);
     });
-    const fallbackNet = preferredNet || Object.keys(rawQuestionsCache).find((key) => (
-      rawQuestionsCache[key]
-      && typeof rawQuestionsCache[key] === 'object'
-    ));
+    const fallbackNet =
+      preferredNet ||
+      Object.keys(rawQuestionsCache).find(
+        (key) => rawQuestionsCache[key] && typeof rawQuestionsCache[key] === 'object',
+      );
     if (!fallbackNet) return null;
     netIdStr = String(fallbackNet || '').trim();
   }
@@ -121,26 +125,24 @@ const fetchValueWithTimeout = async ({
 }: {
   pending?: Promise<unknown>;
   timeoutMs?: number;
-}) => new Promise<{
-  value: unknown;
-  timedOut: boolean;
-  pending: Promise<unknown> | null;
-}>((resolve) => {
-  let settled = false;
-  const finalize = (result: { value: unknown; timedOut: boolean; pending: Promise<unknown> | null }) => {
-    if (settled) return;
-    settled = true;
-    clearTimeout(timeoutId);
-    resolve(result);
-  };
-  const timeoutId = setTimeout(
-    () => finalize({ value: null, timedOut: true, pending }),
-    timeoutMs,
-  );
-  pending
-    .then((value) => finalize({ value, timedOut: false, pending: null }))
-    .catch(() => finalize({ value: null, timedOut: false, pending: null }));
-});
+}) =>
+  new Promise<{
+    value: unknown;
+    timedOut: boolean;
+    pending: Promise<unknown> | null;
+  }>((resolve) => {
+    let settled = false;
+    const finalize = (result: { value: unknown; timedOut: boolean; pending: Promise<unknown> | null }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve(result);
+    };
+    const timeoutId = setTimeout(() => finalize({ value: null, timedOut: true, pending }), timeoutMs);
+    pending
+      .then((value) => finalize({ value, timedOut: false, pending: null }))
+      .catch(() => finalize({ value: null, timedOut: false, pending: null }));
+  });
 
 const waitForTimedOutFetchRecovery = async ({
   timedOutFetches = [],
@@ -216,9 +218,8 @@ export const fetchSingleQuestionMetadataCandidates = async ({
     if (attemptResult?.timedOut && attemptResult?.pending) {
       timedOutFetches.push({ slug: candidateSlug, pending: attemptResult.pending });
     }
-    const fetched = attemptResult?.value && typeof attemptResult.value === 'object'
-      ? attemptResult.value as QuestionPayload
-      : null;
+    const fetched =
+      attemptResult?.value && typeof attemptResult.value === 'object' ? (attemptResult.value as QuestionPayload) : null;
     if (!fetched) continue;
     fetchedAny = true;
     const picked = pickBetterQuestionPayload(bestQuestionData, fetched);
@@ -226,10 +227,7 @@ export const fetchSingleQuestionMetadataCandidates = async ({
       bestQuestionData = picked;
       bestSlug = candidateSlug;
     }
-    const decrypted = !!(
-      picked
-      && (picked.promptDecrypted || picked.optionsDecrypted || picked.tagsDecrypted)
-    );
+    const decrypted = !!(picked && (picked.promptDecrypted || picked.optionsDecrypted || picked.tagsDecrypted));
     if (decrypted || (picked && !isMaskedQuestionPayload(picked))) break;
   }
 
@@ -284,10 +282,7 @@ export const normalizeSingleQuestionMetadataForCache = ({
   if (!normalizedInput.creator) normalizedInput.creator = '';
   if (!Array.isArray(normalizedInput.tags)) normalizedInput.tags = [];
 
-  const selectedForCache = pickBetterQuestionPayload(
-    existingCachedQuestionData,
-    normalizedInput,
-  ) || normalizedInput;
+  const selectedForCache = pickBetterQuestionPayload(existingCachedQuestionData, normalizedInput) || normalizedInput;
   const normalizedQuestionData = {
     ...selectedForCache,
     id: normalizedQuestionId,
@@ -297,9 +292,6 @@ export const normalizeSingleQuestionMetadataForCache = ({
 
   return {
     normalizedQuestionData,
-    shouldWriteQuestionPayload: !areQuestionPayloadsEquivalent(
-      existingCachedQuestionData,
-      normalizedQuestionData,
-    ),
+    shouldWriteQuestionPayload: !areQuestionPayloadsEquivalent(existingCachedQuestionData, normalizedQuestionData),
   };
 };

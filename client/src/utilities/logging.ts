@@ -29,15 +29,15 @@ const DEFAULT_LOGGING_CONFIG = {
     wallet: false,
     inviteDebug: false,
     cache: false,
-    crypto: false
+    crypto: false,
   },
   levels: {
     log: true,
     info: true,
     debug: false,
     warn: true,
-    error: true
-  }
+    error: true,
+  },
 };
 
 const GLOBAL_KEY = 'CE_LOGGING';
@@ -82,19 +82,18 @@ const CE_ASCII = [
   '| |      | |__     window.CE_LOGGING.categories.all = true',
   '| |      |  __|    window.CE_LOGGING.levels.debug = true',
   '| |____  | |____   window.CE_LOGGING_HELP()',
-  ' \\_____| |______|'
+  ' \\_____| |______|',
 ];
 const defaultCategories = DEFAULT_LOGGING_CONFIG.categories as Record<string, boolean>;
 const defaultLevels = DEFAULT_LOGGING_CONFIG.levels as Record<string, boolean>;
 
-const getRuntimeWindow = (): LoggingRuntimeWindow | null => (
-  typeof window === 'undefined' ? null : window as LoggingRuntimeWindow
-);
+const getRuntimeWindow = (): LoggingRuntimeWindow | null =>
+  typeof window === 'undefined' ? null : (window as LoggingRuntimeWindow);
 
 const cloneDefaults = (): LoggingConfig => ({
   enabled: DEFAULT_LOGGING_CONFIG.enabled,
   categories: { ...DEFAULT_LOGGING_CONFIG.categories },
-  levels: { ...DEFAULT_LOGGING_CONFIG.levels }
+  levels: { ...DEFAULT_LOGGING_CONFIG.levels },
 });
 
 const applyDefaults = (cfg: unknown): LoggingConfig => {
@@ -157,19 +156,12 @@ const buildArgs = (prefix: string, args: unknown[]): unknown[] => {
 };
 
 export const emitForcedLog = (level: unknown, ...args: unknown[]): void => {
-  const consoleMethod = (
-    level === 'warn' ? console.warn :
-    level === 'error' ? console.error :
-    console.log
-  );
+  const consoleMethod = level === 'warn' ? console.warn : level === 'error' ? console.error : console.log;
   consoleMethod(...args);
 };
 
 export const createLogger = (category: unknown, options: LoggerOptions = {}): Logger => {
-  const prefix =
-    typeof options.prefix === 'string'
-      ? options.prefix
-      : (category ? `[${category}]` : '');
+  const prefix = typeof options.prefix === 'string' ? options.prefix : category ? `[${category}]` : '';
 
   return {
     log: (...args: unknown[]) => {
@@ -187,7 +179,7 @@ export const createLogger = (category: unknown, options: LoggerOptions = {}): Lo
     error: (...args: unknown[]) => {
       if (shouldLog(category, 'error')) console.error(...buildArgs(prefix, args));
     },
-    isEnabled: (level = 'log') => shouldLog(category, level)
+    isEnabled: (level = 'log') => shouldLog(category, level),
   };
 };
 
@@ -211,7 +203,7 @@ const buildGuideMessage = (): string => {
     'window.CE_LOGGING.levels.error = false',
     `Available categories: ${categories}`,
     'See current config: window.CE_LOGGING',
-    'Run window.CE_LOGGING_HELP() to print this again.'
+    'Run window.CE_LOGGING_HELP() to print this again.',
   ].join('\n');
 };
 

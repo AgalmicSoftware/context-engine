@@ -2,17 +2,13 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
-import {
-  buildSurveyQuestionsFullLoadingProgressState,
-} from './surveyQuestionsTypes.js';
+import { buildSurveyQuestionsFullLoadingProgressState } from './surveyQuestionsTypes.js';
 import styles from './SurveyTool.module.scss';
 
 describe('SurveyQuestionsLoadingState', () => {
   it('renders the loading headline without progress metadata when no work is active', () => {
     const { container } = render(
-      <SurveyQuestionsLoadingState
-        progressState={buildSurveyQuestionsFullLoadingProgressState()}
-      />
+      <SurveyQuestionsLoadingState progressState={buildSurveyQuestionsFullLoadingProgressState()} />,
     );
 
     expect(screen.getByText('Loading questions...')).toBeInTheDocument();
@@ -30,7 +26,7 @@ describe('SurveyQuestionsLoadingState', () => {
             scannedBlocks: 25,
           },
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('75 blocks left')).toBeInTheDocument();

@@ -37,10 +37,12 @@ describe('demoAnalysisMath', () => {
     });
 
     expect(results).toHaveLength(1);
-    expect(results[0]).toEqual(expect.objectContaining({
-      pair: ['Era:Modern', 'Era:Industrial'],
-      questionId: 'q1',
-    }));
+    expect(results[0]).toEqual(
+      expect.objectContaining({
+        pair: ['Era:Modern', 'Era:Industrial'],
+        questionId: 'q1',
+      }),
+    );
     expect(results[0].score).toBeGreaterThan(0);
   });
 
@@ -51,9 +53,7 @@ describe('demoAnalysisMath', () => {
           { value: 'Modern', count: 20 },
           { value: 'Industrial', count: 20 },
         ],
-        Country: [
-          { value: 'United States', count: 20 },
-        ],
+        Country: [{ value: 'United States', count: 20 }],
       },
       questions: [
         { id: 'q1', text: 'Outside-pair question' },
@@ -80,10 +80,12 @@ describe('demoAnalysisMath', () => {
     });
 
     expect(results).toHaveLength(1);
-    expect(results[0]).toEqual(expect.objectContaining({
-      pair: ['Era:Modern', 'Era:Industrial'],
-      questionId: 'q2',
-    }));
+    expect(results[0]).toEqual(
+      expect.objectContaining({
+        pair: ['Era:Modern', 'Era:Industrial'],
+        questionId: 'q2',
+      }),
+    );
   });
 
   it('keeps single-segment filters usable by returning pairs that include that segment', () => {
@@ -93,9 +95,7 @@ describe('demoAnalysisMath', () => {
           { value: 'Modern', count: 20 },
           { value: 'Industrial', count: 20 },
         ],
-        Country: [
-          { value: 'United States', count: 20 },
-        ],
+        Country: [{ value: 'United States', count: 20 }],
       },
       questions: [
         { id: 'q1', text: 'Selected-segment question' },
@@ -122,10 +122,12 @@ describe('demoAnalysisMath', () => {
     });
 
     expect(results).toHaveLength(1);
-    expect(results[0]).toEqual(expect.objectContaining({
-      pair: ['Era:Modern', 'Country:United States'],
-      questionId: 'q1',
-    }));
+    expect(results[0]).toEqual(
+      expect.objectContaining({
+        pair: ['Era:Modern', 'Country:United States'],
+        questionId: 'q1',
+      }),
+    );
   });
 
   it('keeps the generated demo analysis fixture rich enough to populate the default suggestions list', () => {
@@ -140,8 +142,8 @@ describe('demoAnalysisMath', () => {
 
     expect(results).toHaveLength(6);
     expect(results.every((result) => String(result.questionText || '').trim().length > 0)).toBe(true);
-    expect(
-      new Set(results.map((result) => `${result.pair.join('::')}::${result.questionId}`)).size
-    ).toBe(results.length);
+    expect(new Set(results.map((result) => `${result.pair.join('::')}::${result.questionId}`)).size).toBe(
+      results.length,
+    );
   });
 });

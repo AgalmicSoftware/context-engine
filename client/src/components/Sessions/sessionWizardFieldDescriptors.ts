@@ -11,7 +11,7 @@ export type SessionWizardRenderField = (
   key: string,
   value: unknown,
   path: string[],
-  opts?: SessionWizardRenderFieldOptions
+  opts?: SessionWizardRenderFieldOptions,
 ) => ReactNode;
 
 type SessionWizardFieldVisibilityOptions = {
@@ -24,14 +24,7 @@ type SessionWizardFieldVisibilityOptions = {
 
 const pathKey = (path: string[] = []): string => path.join('.');
 
-const NORMAL_MODE_HIDDEN_TOP_LEVEL_FIELDS = new Set([
-  'slug',
-  'contracts',
-  'blockLimits',
-  'faucet',
-  'ai',
-  'lit',
-]);
+const NORMAL_MODE_HIDDEN_TOP_LEVEL_FIELDS = new Set(['slug', 'contracts', 'blockLimits', 'faucet', 'ai', 'lit']);
 
 const HIDDEN_PATHS = new Set([
   'rpc.provider',
@@ -64,9 +57,7 @@ const TOP_LEVEL_FIELD_ORDER = [
   'defaultFilterState',
 ];
 
-const WORKER_ONLY_DRAFT_FIELDS = new Set([
-  'embeddedDeployHelperEnabled',
-]);
+const WORKER_ONLY_DRAFT_FIELDS = new Set(['embeddedDeployHelperEnabled']);
 
 const MORE_OPTIONS_FIELDS = new Set([
   'defaultTags',
@@ -82,20 +73,24 @@ const FIELD_TOOLTIPS: Record<string, string> = {
   slug: 'This becomes the session URL. Leave it unlocked if you want to choose the URL yourself, or lock it to use the generated session ID as a more private link.',
   sessionName: 'The main name people will see for this session across the app.',
   sessionInfo: 'A short description people will see on the session page, cards, and headers.',
-  sessionModeProfile: 'The session mode profile controls authority, storage, identity, authorization, encryption, surfaces, results, and export behavior.',
+  sessionModeProfile:
+    'The session mode profile controls authority, storage, identity, authorization, encryption, surfaces, results, and export behavior.',
   corsWorkerUrl: 'Base URL for the worker (AI, transcription, Arweave uploads, faucet).',
   sessionHeader: 'The banner image for this session. Paste an image URL or upload a file.',
   storageProfile: 'Advanced: choose the session-owned storage profile for documents, context, and media payloads.',
-  defaultTags: 'Suggested tags for AI-assisted question tagging. They guide the model, but they do not limit which questions or surveys appear.',
+  defaultTags:
+    'Suggested tags for AI-assisted question tagging. They guide the model, but they do not limit which questions or surveys appear.',
   defaultSbtTags: `Suggested tags for ${t('sbts')} created from this session. Matching tags are prefilled in the Create ${t('sbt')} flow, and you can still change them.`,
   questionsGenPrompt: 'Extra instructions for the AI when it generates questions for this session.',
-  defaultFilterState: 'Advanced: a saved starting state for the question filter UI. Most sessions can leave this alone unless you want the page to open with a specific preset.',
+  defaultFilterState:
+    'Advanced: a saved starting state for the question filter UI. Most sessions can leave this alone unless you want the page to open with a specific preset.',
   defaultFeaturedSBTs: `Manually feature specific ${t('sbtsLower')} for this session. These are surfaced first in ${t('sbt')} selectors and featured session views.`,
   autoFeatureSBTsBySessionSlug: `Automatically show ${t('sbtsLower')} created for this session in featured Groups areas when their metadata points to this session slug. In list scope, this session can also contribute those ${t('sbtsLower')} to the shared featured strip.`,
   sponsoredSbtAddress: `Legacy default ${t('sbt')} gate address. Most sessions should configure Privacy & Access instead.`,
   networkChainId: 'Primary chain id for the session.',
   contracts: 'Contract addresses + chain ids for this session.',
-  blockLimits: 'Optional start and end limits for indexing this session. Use this when the session should only read activity from a certain block range or time window.',
+  blockLimits:
+    'Optional start and end limits for indexing this session. Use this when the session should only read activity from a certain block range or time window.',
   perMemberSpendLimits: 'Reserved for per-member budgeting by resource.',
   arweave: 'Arweave upload credentials (can be locked).',
   rpc: 'RPC provider settings for reads.',
@@ -148,15 +143,10 @@ export const SESSION_WIZARD_HIDDEN_FIELDS = new Set([
   'litCredentials',
 ]);
 
-export const SESSION_WIZARD_ENCRYPTED_FIELD_KEYS = new Set([
-  'encryptedApiKey',
-  'encryptedJwk',
-  'encryptedPrivateKey',
-]);
+export const SESSION_WIZARD_ENCRYPTED_FIELD_KEYS = new Set(['encryptedApiKey', 'encryptedJwk', 'encryptedPrivateKey']);
 
-export const getSessionWizardFieldLabel = (keyString: string, key: string): string => (
-  FIELD_LABELS[keyString] || FIELD_LABELS[key] || key
-);
+export const getSessionWizardFieldLabel = (keyString: string, key: string): string =>
+  FIELD_LABELS[keyString] || FIELD_LABELS[key] || key;
 
 export const getSessionWizardFieldTooltip = (path: string[], value: unknown): string => {
   const keyString = pathKey(path);
@@ -188,10 +178,7 @@ export const shouldHideSessionWizardField = ({
   const keyString = pathKey(currentPath);
   const isNormalMode = wizardMode !== 'advanced';
 
-  if (path.length === 0 && (
-    SESSION_WIZARD_ADMIN_ONLY_FIELDS.has(key) ||
-    SESSION_WIZARD_HIDDEN_FIELDS.has(key)
-  )) {
+  if (path.length === 0 && (SESSION_WIZARD_ADMIN_ONLY_FIELDS.has(key) || SESSION_WIZARD_HIDDEN_FIELDS.has(key))) {
     return true;
   }
 
@@ -218,9 +205,7 @@ export const shouldHideSessionWizardField = ({
   return false;
 };
 
-export const getSessionWizardOrderedDraftEntries = (
-  draft: DraftLike | null | undefined
-): Array<[string, unknown]> => {
+export const getSessionWizardOrderedDraftEntries = (draft: DraftLike | null | undefined): Array<[string, unknown]> => {
   const source = draft && typeof draft === 'object' ? draft : {};
   const keys = Object.keys(source).filter((key) => !WORKER_ONLY_DRAFT_FIELDS.has(key));
   const orderedKeys = [
@@ -232,15 +217,15 @@ export const getSessionWizardOrderedDraftEntries = (
 
 export const splitSessionWizardDraftEntries = (
   orderedDraftEntries: Array<[string, unknown]>,
-  isNormalMode: boolean
+  isNormalMode: boolean,
 ): {
   primaryEntries: Array<[string, unknown]>;
   moreOptionsEntries: Array<[string, unknown]>;
 } => ({
   primaryEntries: orderedDraftEntries.filter(
-    ([key]) => !MORE_OPTIONS_FIELDS.has(key) && !(isNormalMode && key === 'blockLimits')
+    ([key]) => !MORE_OPTIONS_FIELDS.has(key) && !(isNormalMode && key === 'blockLimits'),
   ),
   moreOptionsEntries: orderedDraftEntries.filter(
-    ([key]) => MORE_OPTIONS_FIELDS.has(key) || (isNormalMode && key === 'blockLimits')
+    ([key]) => MORE_OPTIONS_FIELDS.has(key) || (isNormalMode && key === 'blockLimits'),
   ),
 });

@@ -5,7 +5,5 @@ export type SessionMediaUrlOptions = {
   contextLabel?: unknown;
 };
 
-export const normalizeSessionMediaUrl = (
-  value: unknown,
-  options: SessionMediaUrlOptions = {}
-): string => normalizeArweaveUrl(value, options);
+export const normalizeSessionMediaUrl = (value: unknown, options: SessionMediaUrlOptions = {}): string =>
+  normalizeArweaveUrl(value, options);

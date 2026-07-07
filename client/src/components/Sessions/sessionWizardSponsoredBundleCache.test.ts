@@ -35,7 +35,7 @@ type MockDbTransaction = {
   objectStore: jest.Mock;
 };
 
-const asEvent = (target: unknown): Event => ({ target } as unknown as Event);
+const asEvent = (target: unknown): Event => ({ target }) as unknown as Event;
 
 const originalIndexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB');
 
@@ -50,7 +50,7 @@ const createIndexedDbMock = ({ abortAfterRequestSuccess = false }: IndexedDbMock
     return stores.get(key) as Map<string, unknown>;
   };
 
-  const createRequest = <T,>(tx: MockDbTransaction, run: () => T) => {
+  const createRequest = <T>(tx: MockDbTransaction, run: () => T) => {
     const request: MockDbRequest<T> = {
       onsuccess: null as ((event?: unknown) => void) | null,
       onerror: null as ((event?: unknown) => void) | null,
@@ -108,10 +108,12 @@ const createIndexedDbMock = ({ abortAfterRequestSuccess = false }: IndexedDbMock
         objectStore: jest.fn(),
       };
       tx.objectStore.mockImplementation(() => ({
-        put: jest.fn((value: unknown, key: string) => createRequest(tx, () => {
-          ensureStore(storeName).set(key, value);
-          return key;
-        })),
+        put: jest.fn((value: unknown, key: string) =>
+          createRequest(tx, () => {
+            ensureStore(storeName).set(key, value);
+            return key;
+          }),
+        ),
       }));
       return tx as unknown as IDBTransaction;
     }),
@@ -160,7 +162,7 @@ describe('sessionWizardSponsoredBundleCache IndexedDB transaction helper', () =>
     });
 
     await expect(
-      __test__runSessionWizardSponsoredBundleKeyDbTx('readwrite', (store) => store.put('value', 'key'))
+      __test__runSessionWizardSponsoredBundleKeyDbTx('readwrite', (store) => store.put('value', 'key')),
     ).resolves.toBe('key');
   });
 
@@ -171,7 +173,7 @@ describe('sessionWizardSponsoredBundleCache IndexedDB transaction helper', () =>
     });
 
     await expect(
-      __test__runSessionWizardSponsoredBundleKeyDbTx('readwrite', (store) => store.put('value', 'key'))
+      __test__runSessionWizardSponsoredBundleKeyDbTx('readwrite', (store) => store.put('value', 'key')),
     ).rejects.toThrow('IndexedDB transaction aborted');
   });
 });

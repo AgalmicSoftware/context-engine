@@ -2,26 +2,24 @@ import store from '../../store.js';
 import { USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import { resolveSessionConfigFromSources } from '../session/canonicalSessionContext.js';
 import { getRegistrySessionConfig } from '../session/sessionRegistryReader.js';
-import { normalizeSessionSlug, resolveActiveSessionSlug, resolveSessionConfigAliases } from '../session/sessionNaming.js';
+import {
+  normalizeSessionSlug,
+  resolveActiveSessionSlug,
+  resolveSessionConfigAliases,
+} from '../session/sessionNaming.js';
 import { getDemoSessionConfigForDisplay } from '../session/sessionSourceResolver.js';
 
 const shouldPreferRegistrySessionConfig = () => true;
 
-const shouldAllowDefaultWorkerDemoFallback = (): boolean => (
-  !USE_ONCHAIN_SESSION_REGISTRY
-);
+const shouldAllowDefaultWorkerDemoFallback = (): boolean => !USE_ONCHAIN_SESSION_REGISTRY;
 
-export const defaultWorkerAuthAllowDemoFallback = (): boolean => (
-  shouldAllowDefaultWorkerDemoFallback()
-);
+export const defaultWorkerAuthAllowDemoFallback = (): boolean => shouldAllowDefaultWorkerDemoFallback();
 
 /**
  * Strict demo-fallback policy for security-sensitive callers (uploads, AI, transcription).
  * Matches defaultWorkerAuthAllowDemoFallback semantics — fail-closed in on-chain mode.
  */
-export const defaultStrictAllowDemoFallback = (): boolean => (
-  shouldAllowDefaultWorkerDemoFallback()
-);
+export const defaultStrictAllowDemoFallback = (): boolean => shouldAllowDefaultWorkerDemoFallback();
 
 export const defaultCorsProxyAllowDemoFallback = (sessionSlug = ''): boolean => {
   void sessionSlug;
@@ -89,15 +87,19 @@ export const resolveWorkerSessionContext = ({
   allowDemoFallback?: boolean;
   getDefaultAllowDemoFallback?: ((slug: string) => unknown) | null;
 } = {}) => {
-  return resolveSessionConfigAliases({
-    sessionSlug,
-    sessionConfig,
-  }, {
-    defaults: { activeSessionSlug: getActiveSessionSlugFromStore() },
-    resolveBySlug: (slug) => resolveWorkerSessionConfigBySlug({
-      sessionSlug: slug,
-      allowDemoFallback,
-      getDefaultAllowDemoFallback,
-    }),
-  });
+  return resolveSessionConfigAliases(
+    {
+      sessionSlug,
+      sessionConfig,
+    },
+    {
+      defaults: { activeSessionSlug: getActiveSessionSlugFromStore() },
+      resolveBySlug: (slug) =>
+        resolveWorkerSessionConfigBySlug({
+          sessionSlug: slug,
+          allowDemoFallback,
+          getDefaultAllowDemoFallback,
+        }),
+    },
+  );
 };

@@ -84,9 +84,8 @@ export type SbtPagePasswordExportFile = {
   mimeType: string;
 };
 
-const toSbtPagePasswordStringList = (value: unknown): string[] => (
-  Array.isArray(value) ? value.map((entry) => String(entry ?? '')) : []
-);
+const toSbtPagePasswordStringList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map((entry) => String(entry ?? '')) : [];
 
 export const resolveSbtPagePasswordExportSelection = ({
   adminGeneratedPasswords = [],
@@ -162,7 +161,9 @@ export const generateSbtPageRandomPasswords = ({
     } else {
       arr = ethers.utils.randomBytes(16);
     }
-    const token = Array.from(arr).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const token = Array.from(arr)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
     generated.add(token);
   }
   return Array.from(generated);
@@ -170,14 +171,14 @@ export const generateSbtPageRandomPasswords = ({
 
 export const encodeSbtPageGroupPasswordForUrl = (
   code: unknown,
-  codec: SbtPageGroupPasswordCodec | null | undefined = null
+  codec: SbtPageGroupPasswordCodec | null | undefined = null,
 ): string => {
-  const normalized = typeof codec?.normalizeGroupPasswordInput === 'function'
-    ? codec.normalizeGroupPasswordInput(code)
-    : String(code ?? '');
-  const encoded = typeof codec?.encodeGroupPasswordForUrl === 'function'
-    ? codec.encodeGroupPasswordForUrl(normalized)
-    : normalized;
+  const normalized =
+    typeof codec?.normalizeGroupPasswordInput === 'function'
+      ? codec.normalizeGroupPasswordInput(code)
+      : String(code ?? '');
+  const encoded =
+    typeof codec?.encodeGroupPasswordForUrl === 'function' ? codec.encodeGroupPasswordForUrl(normalized) : normalized;
   return String(encoded || '');
 };
 
@@ -195,9 +196,8 @@ export const buildSbtPagePasswordInviteLink = ({
   const address = String(sbtAddr || '');
   const codeText = String(code ?? '');
   if (isInvite) {
-    const encodePassword = typeof encodeGroupPassword === 'function'
-      ? encodeGroupPassword
-      : (password: string) => password;
+    const encodePassword =
+      typeof encodeGroupPassword === 'function' ? encodeGroupPassword : (password: string) => password;
     return `${origin}${routePath}?auto=1&sbt=${encodeURIComponent(address)}&gp=${encodeURIComponent(encodePassword(codeText))}`;
   }
   return `${origin}${String(sbtBasePathValue || '')}/${address}/${codeText}`;
@@ -236,12 +236,11 @@ export const buildSbtPagePasswordExportFile = ({
   rows = [],
   sbtSymbolOrName = 'SBT',
 }: BuildSbtPagePasswordExportFileArgs = {}): SbtPagePasswordExportFile | null => {
-  const passwordExportFormat: SbtPagePasswordExportFormat | null = format === 'json' || format === 'csv'
-    ? format
-    : null;
+  const passwordExportFormat: SbtPagePasswordExportFormat | null =
+    format === 'json' || format === 'csv' ? format : null;
   if (!passwordExportFormat) return null;
 
-  const exportRows = Array.isArray(rows) ? rows as SbtPagePasswordExportRow[] : [];
+  const exportRows = Array.isArray(rows) ? (rows as SbtPagePasswordExportRow[]) : [];
   const label = String(codeLabel || 'password');
   const fileNameBase = String(sbtSymbolOrName || 'SBT');
   const fileSuffix = String(fileLabel || 'passwords');
@@ -256,10 +255,11 @@ export const buildSbtPagePasswordExportFile = ({
   }
 
   return {
-    content: `index,${escapeSbtCsvField(label)},inviteLink\n` +
-      exportRows.map((item, index) =>
-        `${index},${escapeSbtCsvField(item[label])},${escapeSbtCsvField(item.inviteLink)}`
-      ).join('\n'),
+    content:
+      `index,${escapeSbtCsvField(label)},inviteLink\n` +
+      exportRows
+        .map((item, index) => `${index},${escapeSbtCsvField(item[label])},${escapeSbtCsvField(item.inviteLink)}`)
+        .join('\n'),
     fileName: `${fileNameBase}_${fileSuffix}_${datePart}.csv`,
     mimeType: 'text/csv',
   };

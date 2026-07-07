@@ -11,25 +11,27 @@ import {
 describe('sbtListStorageHelpers', () => {
   it('reads SBT list storage and runtime settings defensively', () => {
     const storage = {
-      getItem: jest.fn((key: string) => (
-        key === SBT_LIST_MODE_SELECTION_STORAGE_KEY
-          ? JSON.stringify(['Alpha', 'alpha', 'General', '', null])
-          : null
-      )),
+      getItem: jest.fn((key: string) =>
+        key === SBT_LIST_MODE_SELECTION_STORAGE_KEY ? JSON.stringify(['Alpha', 'alpha', 'General', '', null]) : null,
+      ),
     };
 
     expect(readStoredSbtListModeSelectedSessionSlugs(storage)).toEqual(['Alpha', 'alpha', '']);
     expect(readStoredSbtListModeSelectedSessionSlugs({ getItem: () => '{bad' })).toEqual([]);
     expect(readStoredSbtListModeSelectedSessionSlugs(null)).toEqual([]);
-    expect(resolveSbtListCreateGroupInitialVisibility({
-      hasCachedCreateSbtForm: jest.fn(() => true),
-      listSlug: ' Alpha ',
-    })).toBe(true);
+    expect(
+      resolveSbtListCreateGroupInitialVisibility({
+        hasCachedCreateSbtForm: jest.fn(() => true),
+        listSlug: ' Alpha ',
+      }),
+    ).toBe(true);
     const hasCachedCreateSbtForm = jest.fn(() => false);
-    expect(resolveSbtListCreateGroupInitialVisibility({
-      hasCachedCreateSbtForm,
-      listSlug: ' General ',
-    })).toBe(false);
+    expect(
+      resolveSbtListCreateGroupInitialVisibility({
+        hasCachedCreateSbtForm,
+        listSlug: ' General ',
+      }),
+    ).toBe(false);
     expect(hasCachedCreateSbtForm).toHaveBeenCalledWith({
       sessionSlug: '',
       migrateLegacyToSessionKey: true,
@@ -37,7 +39,13 @@ describe('sbtListStorageHelpers', () => {
     });
     expect(readSbtListUniverseCollapsedState({ getItem: () => 'true' })).toBe(true);
     expect(readSbtListUniverseCollapsedState({ getItem: () => 'false' })).toBe(false);
-    expect(readSbtListUniverseCollapsedState({ getItem: () => { throw new Error('blocked'); } })).toBe(false);
+    expect(
+      readSbtListUniverseCollapsedState({
+        getItem: () => {
+          throw new Error('blocked');
+        },
+      }),
+    ).toBe(false);
     expect(isSbtListManagedDgCacheName('sbtCache')).toBe(true);
     expect(isSbtListManagedDgCacheName('customCache')).toBe(false);
     expect(readSbtListShowDemoSessions({ SHOW_DEMO_SESSIONS: 0 }, true)).toBe(false);

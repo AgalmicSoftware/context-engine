@@ -64,56 +64,36 @@ describe('surveyGeneratorHelpers', () => {
     expect(SURVEY_GENERATOR_ERROR_STYLE).toEqual({ marginTop: '10px' });
     expect(SURVEY_GENERATOR_AI_PROMPT_ICON_STYLE).toEqual({ marginLeft: '6px' });
     expect(buildSurveyGeneratorTranscriptToggleClassName(styles, true)).toBe(
-      `${styles.transcriptToggleBtn} ${styles.active}`
+      `${styles.transcriptToggleBtn} ${styles.active}`,
     );
-    expect(buildSurveyGeneratorTranscriptToggleClassName(styles, false)).toBe(
-      `${styles.transcriptToggleBtn} `
-    );
+    expect(buildSurveyGeneratorTranscriptToggleClassName(styles, false)).toBe(`${styles.transcriptToggleBtn} `);
     expect(buildSurveyGeneratorAiPromptCopyClassName(styles, true)).toBe(
-      `${styles.aiPromptCopyCorner} ${styles.aiPromptCopyCornerSuccess}`
+      `${styles.aiPromptCopyCorner} ${styles.aiPromptCopyCornerSuccess}`,
     );
-    expect(buildSurveyGeneratorAiPromptCopyClassName(styles, false)).toBe(
-      `${styles.aiPromptCopyCorner} `
-    );
+    expect(buildSurveyGeneratorAiPromptCopyClassName(styles, false)).toBe(`${styles.aiPromptCopyCorner} `);
     const photoStyles = {
       photoStatusChip: 'photoStatusChip',
       photoStatusChipError: 'photoStatusChipError',
       photoStatusChipLoading: 'photoStatusChipLoading',
       photoStatusToggle: 'photoStatusToggle',
     };
-    expect(buildSurveyGeneratorPhotoStatusToggleClassName(photoStyles)).toBe(
-      'photoStatusChip photoStatusToggle'
-    );
+    expect(buildSurveyGeneratorPhotoStatusToggleClassName(photoStyles)).toBe('photoStatusChip photoStatusToggle');
     expect(buildSurveyGeneratorPhotoStatusChipClassName(photoStyles, 'error')).toBe(
-      'photoStatusChip photoStatusChipError'
+      'photoStatusChip photoStatusChipError',
     );
     expect(buildSurveyGeneratorPhotoStatusChipClassName(photoStyles, 'loading')).toBe(
-      'photoStatusChip photoStatusChipLoading'
+      'photoStatusChip photoStatusChipLoading',
     );
-    expect(buildSurveyGeneratorPhotoStatusChipClassName(photoStyles, 'unknown')).toBe(
-      'photoStatusChip '
-    );
+    expect(buildSurveyGeneratorPhotoStatusChipClassName(photoStyles, 'unknown')).toBe('photoStatusChip ');
     expect(buildSurveyGeneratorDocSaveAudienceOptionClassName(styles, true)).toBe(
-      `${styles.docSaveAudienceOption} ${styles.active}`
+      `${styles.docSaveAudienceOption} ${styles.active}`,
     );
-    expect(buildSurveyGeneratorDocSaveAudienceOptionClassName(styles, false)).toBe(
-      `${styles.docSaveAudienceOption} `
-    );
-    expect(buildSurveyGeneratorTypeButtonClassName(styles, true)).toBe(
-      `${styles.typeButton} ${styles.active}`
-    );
-    expect(buildSurveyGeneratorTypeButtonClassName(styles, false)).toBe(
-      `${styles.typeButton} `
-    );
-    expect(buildSurveyGeneratorTypePillClassName(styles, 'agree')).toBe(
-      `${styles.pill} ${styles.pillAgree}`
-    );
-    expect(buildSurveyGeneratorTypePillClassName(styles, 'unsure')).toBe(
-      `${styles.pill} ${styles.pillUnsure}`
-    );
-    expect(buildSurveyGeneratorTypePillClassName(styles, 'disagree')).toBe(
-      `${styles.pill} ${styles.pillDisagree}`
-    );
+    expect(buildSurveyGeneratorDocSaveAudienceOptionClassName(styles, false)).toBe(`${styles.docSaveAudienceOption} `);
+    expect(buildSurveyGeneratorTypeButtonClassName(styles, true)).toBe(`${styles.typeButton} ${styles.active}`);
+    expect(buildSurveyGeneratorTypeButtonClassName(styles, false)).toBe(`${styles.typeButton} `);
+    expect(buildSurveyGeneratorTypePillClassName(styles, 'agree')).toBe(`${styles.pill} ${styles.pillAgree}`);
+    expect(buildSurveyGeneratorTypePillClassName(styles, 'unsure')).toBe(`${styles.pill} ${styles.pillUnsure}`);
+    expect(buildSurveyGeneratorTypePillClassName(styles, 'disagree')).toBe(`${styles.pill} ${styles.pillDisagree}`);
   });
 
   it('keeps the AI prompt toggle visually quiet on the dark generator panel', () => {
@@ -122,7 +102,9 @@ describe('surveyGeneratorHelpers', () => {
 
     expect(toggleBlock).toMatch(/background:\s*transparent;/);
     expect(toggleBlock).toMatch(/color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/);
-    expect(toggleBlock).toMatch(/&:hover\s*{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.72\);/);
+    expect(toggleBlock).toMatch(
+      /&:hover\s*{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.72\);/,
+    );
   });
 
   it('builds stable additional source ids from a mutable counter ref', () => {
@@ -176,16 +158,18 @@ describe('surveyGeneratorHelpers', () => {
 
     expect(buildQueuedPhotoSourceBatch([photo, textFile, unsupported], ref)).toEqual({
       invalidCount: 2,
-      nextSources: [{
-        id: 'database-source-1',
-        type: 'photo',
-        value: photo,
-        name: 'photo.png',
-        analysisStatus: 'queued',
-        analysisError: '',
-        analysisText: '',
-        analysisExpanded: false,
-      }],
+      nextSources: [
+        {
+          id: 'database-source-1',
+          type: 'photo',
+          value: photo,
+          name: 'photo.png',
+          analysisStatus: 'queued',
+          analysisError: '',
+          analysisText: '',
+          analysisExpanded: false,
+        },
+      ],
       validFiles: [photo],
     });
 
@@ -216,11 +200,13 @@ describe('surveyGeneratorHelpers', () => {
     const ref = { current: 9 };
     const existing = [{ id: 'database-source-1', type: 'file', value: 'a', name: 'a.md' }];
 
-    expect(buildEffectiveAdditionalSourceList({
-      additionalSources: existing,
-      additionalUrlInput: ' https://example.test/doc ',
-      ref,
-    })).toEqual({
+    expect(
+      buildEffectiveAdditionalSourceList({
+        additionalSources: existing,
+        additionalUrlInput: ' https://example.test/doc ',
+        ref,
+      }),
+    ).toEqual({
       queuedAdditionalSources: existing,
       effectiveSources: [
         existing[0],
@@ -233,11 +219,13 @@ describe('surveyGeneratorHelpers', () => {
       ],
     });
     expect(ref.current).toBe(10);
-    expect(buildEffectiveAdditionalSourceList({
-      additionalSources: existing,
-      additionalUrlInput: '  ',
-      ref,
-    })).toEqual({
+    expect(
+      buildEffectiveAdditionalSourceList({
+        additionalSources: existing,
+        additionalUrlInput: '  ',
+        ref,
+      }),
+    ).toEqual({
       queuedAdditionalSources: existing,
       effectiveSources: existing,
     });
@@ -283,8 +271,9 @@ describe('surveyGeneratorHelpers', () => {
   it('returns photo analysis status labels and error details', () => {
     expect(getPhotoStatusLabel({ analysisStatus: 'loading' })).toBe('Analyzing photo...');
     expect(getPhotoStatusLabel({ analysisStatus: 'ready' })).toBe('Analysis complete');
-    expect(getPhotoStatusLabel({ analysisStatus: 'error', analysisError: 'Could not parse image' }))
-      .toBe('Could not parse image');
+    expect(getPhotoStatusLabel({ analysisStatus: 'error', analysisError: 'Could not parse image' })).toBe(
+      'Could not parse image',
+    );
     expect(getPhotoStatusLabel({ analysisStatus: 'unknown' })).toBe('Queued for analysis');
   });
 
@@ -294,10 +283,10 @@ describe('surveyGeneratorHelpers', () => {
   });
 
   it('builds photo analysis sidecar content and filenames', () => {
-    expect(buildPhotoAnalysisMarkdown({ photoName: 'whiteboard.png', analysisText: 'Detected sticky notes.' }))
-      .toBe('# Photo Analysis\n\nSource photo: whiteboard.png\n\nDetected sticky notes.');
-    expect(buildPhotoAnalysisMarkdown({ analysisText: 'No name' }))
-      .toContain('Source photo: uploaded photo');
+    expect(buildPhotoAnalysisMarkdown({ photoName: 'whiteboard.png', analysisText: 'Detected sticky notes.' })).toBe(
+      '# Photo Analysis\n\nSource photo: whiteboard.png\n\nDetected sticky notes.',
+    );
+    expect(buildPhotoAnalysisMarkdown({ analysisText: 'No name' })).toContain('Source photo: uploaded photo');
     expect(buildPhotoAnalysisFilename('whiteboard.png')).toBe('whiteboard.analysis.md');
     expect(buildPhotoAnalysisFilename('')).toBe('photo.analysis.md');
   });
@@ -344,7 +333,9 @@ describe('surveyGeneratorHelpers', () => {
     expect(hasDatabaseToolInputContent({ pastedText: '  ', additionalSources: [] })).toBe(false);
     expect(isManualLibraryUploadableContent({ additionalUrlInput: 'https://example.test/doc' })).toBe(true);
     expect(isManualLibraryUploadableContent({ additionalSources: [{ id: 'source-1' }] })).toBe(true);
-    expect(isManualLibraryUploadableContent({ pastedText: '', additionalUrlInput: '', additionalSources: [] })).toBe(false);
+    expect(isManualLibraryUploadableContent({ pastedText: '', additionalUrlInput: '', additionalSources: [] })).toBe(
+      false,
+    );
   });
 
   it('formats configured AI prompt model labels', () => {
@@ -361,12 +352,14 @@ describe('surveyGeneratorHelpers', () => {
   });
 
   it('gets selected question type keys from truthy flags', () => {
-    expect(getSelectedQuestionTypes({
-      binary: true,
-      rating: false,
-      freeform: 1,
-      multichoice: '',
-    })).toEqual(['binary', 'freeform']);
+    expect(
+      getSelectedQuestionTypes({
+        binary: true,
+        rating: false,
+        freeform: 1,
+        multichoice: '',
+      }),
+    ).toEqual(['binary', 'freeform']);
   });
 
   it('builds generated survey statements from AI question payloads', () => {
@@ -465,25 +458,23 @@ describe('surveyGeneratorHelpers', () => {
       sessionInstructions: 'Keep prompts concise.',
     });
 
-    expect(prompt).toBe([
-      'Source body',
-      '15',
-      'binary,freeform',
-      'alpha, beta|alpha, beta',
-      'document',
-      'likely_multiple_speakers',
-      'Keep prompts concise.',
-      '',
-    ].join('\n'));
+    expect(prompt).toBe(
+      [
+        'Source body',
+        '15',
+        'binary,freeform',
+        'alpha, beta|alpha, beta',
+        'document',
+        'likely_multiple_speakers',
+        'Keep prompts concise.',
+        '',
+      ].join('\n'),
+    );
   });
 
   it('inserts user prompt replacements literally when values contain dollar tokens', () => {
     const prompt = buildSingleGenerationPrompt({
-      promptTemplate: [
-        '<SourceDocContent>',
-        '<DefaultTags>',
-        '<GroupCustomInstructions>',
-      ].join('\n'),
+      promptTemplate: ['<SourceDocContent>', '<DefaultTags>', '<GroupCustomInstructions>'].join('\n'),
       sourceDocContent: "source $& $$ $` $'",
       count: 3,
       questionTypes: {
@@ -493,11 +484,7 @@ describe('surveyGeneratorHelpers', () => {
       sessionInstructions: "instructions $& $$ $` $'",
     });
 
-    expect(prompt).toBe([
-      "source $& $$ $` $'",
-      '$& default, $$ tag',
-      "instructions $& $$ $` $'",
-    ].join('\n'));
+    expect(prompt).toBe(["source $& $$ $` $'", '$& default, $$ tag', "instructions $& $$ $` $'"].join('\n'));
   });
 
   it('replaces every source type token in generation prompts', () => {

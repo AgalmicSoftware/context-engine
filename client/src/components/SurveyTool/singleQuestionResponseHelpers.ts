@@ -77,10 +77,7 @@ type SingleQuestionBookmarkFeedbackPatch = SingleQuestionBookmarkStatusPatch & {
 
 const normalizeText = (value: unknown): string => String(value || '').trim();
 
-export const collectGateAddresses = (
-  gates: unknown = [],
-  directAddresses: unknown = []
-): string[] => {
+export const collectGateAddresses = (gates: unknown = [], directAddresses: unknown = []): string[] => {
   const out: string[] = [];
   const seen = new Set<string>();
   const push = (value: unknown) => {
@@ -94,7 +91,7 @@ export const collectGateAddresses = (
 
   (Array.isArray(directAddresses) ? directAddresses : []).forEach(push);
   (Array.isArray(gates) ? gates : []).forEach((gate) => {
-    const gateRecord = gate && typeof gate === 'object' ? gate as GateLike : null;
+    const gateRecord = gate && typeof gate === 'object' ? (gate as GateLike) : null;
     (Array.isArray(gateRecord?.sbtAddresses) ? gateRecord.sbtAddresses : []).forEach(push);
     push(gateRecord?.sbtAddress);
   });
@@ -102,10 +99,7 @@ export const collectGateAddresses = (
   return out;
 };
 
-export const normalizePromptGateMode = (
-  gate: GateLike | null = null,
-  fallbackMode: unknown = ''
-): string => {
+export const normalizePromptGateMode = (gate: GateLike | null = null, fallbackMode: unknown = ''): string => {
   const raw = normalizeText(fallbackMode || gate?.mode || gate?.operator || gate?.gateMode).toLowerCase();
   if (gate?.requireAll === true || raw === 'all' || raw === 'and') return 'all';
   return raw === 'any' || !raw ? 'any' : raw;
@@ -129,9 +123,7 @@ export const resolvePromptGateTooltipProps = ({
     question?.gateConfig ||
     question?.encryption?.gate ||
     question?.gate ||
-    (questionGateList[0] && typeof questionGateList[0] === 'object'
-      ? questionGateList[0] as GateLike
-      : null) ||
+    (questionGateList[0] && typeof questionGateList[0] === 'object' ? (questionGateList[0] as GateLike) : null) ||
     null;
   const resolvedAddresses = collectGateAddresses(questionGateList, [
     ...(Array.isArray(sbtAddresses) ? sbtAddresses : []),
@@ -140,39 +132,36 @@ export const resolvePromptGateTooltipProps = ({
   ]);
 
   return {
-    gateId: normalizeText(
-      gateId ||
-      question?.gateId ||
-      question?.encryption?.gateId ||
-      resolvedGateConfig?.gateId ||
-      resolvedGateConfig?.id
-    ) || null,
+    gateId:
+      normalizeText(
+        gateId ||
+          question?.gateId ||
+          question?.encryption?.gateId ||
+          resolvedGateConfig?.gateId ||
+          resolvedGateConfig?.id,
+      ) || null,
     gateConfig: resolvedGateConfig,
     mode: normalizePromptGateMode(
       resolvedGateConfig as GateLike | null,
-      gateMode || question?.gateMode || question?.encryption?.mode
+      gateMode || question?.gateMode || question?.encryption?.mode,
     ),
     sbtAddresses: resolvedAddresses,
     userHeldSBTs: Array.isArray(userHeldSBTs) ? userHeldSBTs : [],
   };
 };
 
-export const buildSingleQuestionBookmarkStatusPatch = (
-  isBookmarked: unknown
-): SingleQuestionBookmarkStatusPatch => ({
+export const buildSingleQuestionBookmarkStatusPatch = (isBookmarked: unknown): SingleQuestionBookmarkStatusPatch => ({
   isBookmarked: !!isBookmarked,
 });
 
 export const buildSingleQuestionBookmarkFeedbackPatch = (
-  isBookmarked: unknown
+  isBookmarked: unknown,
 ): SingleQuestionBookmarkFeedbackPatch => ({
   isBookmarked: !!isBookmarked,
   bookmarkSuccess: true,
 });
 
-export const buildSingleQuestionBookmarkSuccessPatch = (
-  bookmarkSuccess: unknown
-) => ({
+export const buildSingleQuestionBookmarkSuccessPatch = (bookmarkSuccess: unknown) => ({
   bookmarkSuccess: !!bookmarkSuccess,
 });
 
@@ -212,9 +201,7 @@ export const getLatestAnsweredResponses = (allResponses: unknown = []) => {
     .filter(Boolean);
 };
 
-export const buildFreeformAggregatorSummary = (
-  parsedResponses: unknown = []
-): FreeformAggregatorSummary => {
+export const buildFreeformAggregatorSummary = (parsedResponses: unknown = []): FreeformAggregatorSummary => {
   const responses = Array.isArray(parsedResponses) ? parsedResponses : [];
   const total = responses.length;
   let encryptedCount = 0;
@@ -256,9 +243,7 @@ export const buildFreeformAggregatorSummary = (
   };
 };
 
-export const buildBinaryAggregatorSummary = (
-  parsedResponses: unknown = []
-): BinaryAggregatorSummary => {
+export const buildBinaryAggregatorSummary = (parsedResponses: unknown = []): BinaryAggregatorSummary => {
   const responses = Array.isArray(parsedResponses) ? parsedResponses : [];
   const counts = { Agree: 0, Unsure: 0, Disagree: 0 };
   let total = 0;
@@ -273,15 +258,13 @@ export const buildBinaryAggregatorSummary = (
   return { counts, total };
 };
 
-export const buildRatingAggregatorSummary = (
-  parsedResponses: unknown = []
-): RatingAggregatorSummary => {
+export const buildRatingAggregatorSummary = (parsedResponses: unknown = []): RatingAggregatorSummary => {
   const responses = Array.isArray(parsedResponses) ? parsedResponses : [];
   const values: number[] = [];
   responses.forEach((response) => {
     const ratingValue = normalizeRatingValue(
       (response as { answer?: { value?: unknown } } | null | undefined)?.answer?.value,
-      null
+      null,
     );
     if (ratingValue !== null) values.push(ratingValue);
   });
@@ -297,9 +280,7 @@ export const buildRatingAggregatorSummary = (
   const average = sum / values.length;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  const median = sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
+  const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
   return {
     average,
     median,
@@ -308,16 +289,15 @@ export const buildRatingAggregatorSummary = (
   };
 };
 
-export const extractSingleQuestionOptionsFromCandidate = (
-  candidate: unknown = null
-): string[] => {
-  const candidateRecord = candidate && typeof candidate === 'object'
-    ? candidate as Record<string, unknown> & {
-      config?: Record<string, unknown>;
-      data?: Record<string, unknown>;
-      payload?: Record<string, unknown>;
-    }
-    : null;
+export const extractSingleQuestionOptionsFromCandidate = (candidate: unknown = null): string[] => {
+  const candidateRecord =
+    candidate && typeof candidate === 'object'
+      ? (candidate as Record<string, unknown> & {
+          config?: Record<string, unknown>;
+          data?: Record<string, unknown>;
+          payload?: Record<string, unknown>;
+        })
+      : null;
   if (!candidateRecord) return [];
 
   const raw =
@@ -342,14 +322,7 @@ export const extractSingleQuestionOptionsFromCandidate = (
       text?: unknown;
       value?: unknown;
     };
-    return (
-      record.label ??
-      record.text ??
-      record.name ??
-      record.value ??
-      record.id ??
-      ''
-    );
+    return record.label ?? record.text ?? record.name ?? record.value ?? record.id ?? '';
   };
 
   let options: unknown[] = [];
@@ -376,13 +349,15 @@ export const findSingleQuestionEntryAcrossGroups = ({
   idLower?: unknown;
   netIdStr?: unknown;
 } = {}): unknown | null => {
-  const normalizedId = String(idLower || '').trim().toLowerCase();
+  const normalizedId = String(idLower || '')
+    .trim()
+    .toLowerCase();
   if (!normalizedId || !Array.isArray(entries)) return null;
   const networkKey = String(netIdStr || '');
 
   for (let i = 0; i < entries.length; i += 1) {
     const entry = entries[i] as { value?: unknown } | null | undefined;
-    const parsed = entry && typeof entry.value === 'object' ? entry.value as Record<string, unknown> : null;
+    const parsed = entry && typeof entry.value === 'object' ? (entry.value as Record<string, unknown>) : null;
     if (!parsed) continue;
 
     let netObj: unknown = null;
@@ -393,16 +368,14 @@ export const findSingleQuestionEntryAcrossGroups = ({
       const firstKey = Object.keys(parsed)[0];
       netObj = firstKey ? parsed[firstKey] : null;
     }
-    const netRecord = netObj && typeof netObj === 'object'
-      ? netObj as { questions?: Record<string, unknown> }
-      : null;
+    const netRecord = netObj && typeof netObj === 'object' ? (netObj as { questions?: Record<string, unknown> }) : null;
     const questions = netRecord?.questions || {};
     const direct = questions[normalizedId] || questions[String(normalizedId)];
     if (direct) return direct;
 
-    const hitKey = Object.keys(questions).find((questionKey) => (
-      String(questionKey || '').toLowerCase() === normalizedId
-    ));
+    const hitKey = Object.keys(questions).find(
+      (questionKey) => String(questionKey || '').toLowerCase() === normalizedId,
+    );
     if (hitKey) return questions[hitKey];
   }
 
@@ -411,11 +384,12 @@ export const findSingleQuestionEntryAcrossGroups = ({
 
 export const resolveSingleQuestionMapFromCacheValue = (
   cacheValue: unknown = null,
-  netIdStr: unknown = ''
+  netIdStr: unknown = '',
 ): Record<string, unknown> => {
-  const parsed = cacheValue && typeof cacheValue === 'object'
-    ? cacheValue as Record<string, { questions?: Record<string, unknown> } | undefined>
-    : null;
+  const parsed =
+    cacheValue && typeof cacheValue === 'object'
+      ? (cacheValue as Record<string, { questions?: Record<string, unknown> } | undefined>)
+      : null;
   if (!parsed) return {};
 
   const networkKey = String(netIdStr || '');
@@ -440,7 +414,7 @@ const getMultichoiceChoiceLabel = (choice: unknown): unknown => {
 
 export const buildMultichoiceAggregatorSummary = (
   parsedResponses: unknown = [],
-  knownOptions: unknown = []
+  knownOptions: unknown = [],
 ): MultichoiceAggregatorSummary => {
   const responses = Array.isArray(parsedResponses) ? parsedResponses : [];
   let allOptions = (Array.isArray(knownOptions) ? knownOptions : [])
@@ -453,7 +427,7 @@ export const buildMultichoiceAggregatorSummary = (
       const answer = (response as { answer?: { encrypted?: unknown; value?: unknown } } | null | undefined)?.answer;
       if (!answer || answer.encrypted) return;
       const rawValue = answer.value;
-      const choices = Array.isArray(rawValue) ? rawValue : (rawValue != null ? [rawValue] : []);
+      const choices = Array.isArray(rawValue) ? rawValue : rawValue != null ? [rawValue] : [];
       choices
         .map(getMultichoiceChoiceLabel)
         .map(normalizeText)
@@ -512,11 +486,11 @@ export const buildMultichoiceAggregatorSummary = (
 
 export const isEnvelopeAesGcm256 = (encryptedPortion: unknown): boolean => {
   try {
-    const env = typeof encryptedPortion === 'string'
-      ? JSON.parse(encryptedPortion)
-      : (encryptedPortion || {});
-    return Number((env as Record<string, unknown>)?.v) === 2 &&
-      String((env as Record<string, unknown>)?.cipher).toLowerCase() === 'aes-gcm-256';
+    const env = typeof encryptedPortion === 'string' ? JSON.parse(encryptedPortion) : encryptedPortion || {};
+    return (
+      Number((env as Record<string, unknown>)?.v) === 2 &&
+      String((env as Record<string, unknown>)?.cipher).toLowerCase() === 'aes-gcm-256'
+    );
   } catch {
     return false;
   }
@@ -524,10 +498,8 @@ export const isEnvelopeAesGcm256 = (encryptedPortion: unknown): boolean => {
 
 const parseEncryptedEnvelope = (encryptedPortion: unknown): Record<string, unknown> | null => {
   try {
-    const env = typeof encryptedPortion === 'string'
-      ? JSON.parse(encryptedPortion)
-      : encryptedPortion;
-    return env && typeof env === 'object' ? env as Record<string, unknown> : null;
+    const env = typeof encryptedPortion === 'string' ? JSON.parse(encryptedPortion) : encryptedPortion;
+    return env && typeof env === 'object' ? (env as Record<string, unknown>) : null;
   } catch {
     return null;
   }
@@ -539,22 +511,16 @@ export const hasLitSbtRecipientEncryptedPortion = (encryptedPortion: unknown): b
   return recipients.some((recipient) => {
     if (!recipient || typeof recipient !== 'object') return false;
     const record = recipient as Record<string, unknown>;
-    return String(record.type || '') === 'lit-sbt-v1' &&
-      !!record.lit &&
-      typeof record.lit === 'object';
+    return String(record.type || '') === 'lit-sbt-v1' && !!record.lit && typeof record.lit === 'object';
   });
 };
 
 export const responseHasLitSbtRecipient = (response: unknown): boolean => {
-  const record = response && typeof response === 'object'
-    ? response as Record<string, unknown>
-    : null;
+  const record = response && typeof response === 'object' ? (response as Record<string, unknown>) : null;
   if (!record) return false;
   const fields = [record.answer, record.additional];
   return fields.some((field) => {
-    const fieldRecord = field && typeof field === 'object'
-      ? field as Record<string, unknown>
-      : null;
+    const fieldRecord = field && typeof field === 'object' ? (field as Record<string, unknown>) : null;
     return hasLitSbtRecipientEncryptedPortion(fieldRecord?.encryptedPortion);
   });
 };

@@ -1,7 +1,4 @@
-import {
-  bindAdminSessionRegistryPorts,
-  type AdminSessionRegistryModule,
-} from './sessionRegistryAdminPorts';
+import { bindAdminSessionRegistryPorts, type AdminSessionRegistryModule } from './sessionRegistryAdminPorts';
 
 const buildRegistryModule = (overrides: Partial<AdminSessionRegistryModule> = {}): AdminSessionRegistryModule => ({
   SESSION_REGISTRY_CACHE_UPDATED_EVENT: 'ce:session-registry-cache-updated',
@@ -20,10 +17,18 @@ const buildRegistryModule = (overrides: Partial<AdminSessionRegistryModule> = {}
     getRegistryContract: jest.fn(),
     fetchSessionFromRegistry: jest.fn(async () => ({ slug: 'nested' })),
     upsertSessionRegistryCache: jest.fn(() => ({ ts: 2 })),
-    normalizeSlug: jest.fn((value: unknown) => String(value || '').trim().toLowerCase()),
+    normalizeSlug: jest.fn((value: unknown) =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    ),
     formatSessionId: jest.fn((value: unknown) => String(value || '')),
     normalizeSessionIdHex: jest.fn((value: unknown) => String(value || '').toLowerCase()),
-    toRegistrySlug: jest.fn((value: unknown) => String(value || '').trim().toLowerCase()),
+    toRegistrySlug: jest.fn((value: unknown) =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    ),
   },
   ...overrides,
 });
@@ -43,35 +48,45 @@ describe('admin session registry ports', () => {
       sessionRegistry: () => registryModule,
     });
 
-    expect(ports.writes.buildRegistrySessionFields({
-      onChainFields: {
-        corsWorkerUrl: ' https://worker.example ',
-        unexpected: 'skip',
-      },
-      sponsoredFields: {
-        sponsored_ai: '1',
-        sponsored_rpc: '',
-      },
-    })).toEqual({
+    expect(
+      ports.writes.buildRegistrySessionFields({
+        onChainFields: {
+          corsWorkerUrl: ' https://worker.example ',
+          unexpected: 'skip',
+        },
+        sponsoredFields: {
+          sponsored_ai: '1',
+          sponsored_rpc: '',
+        },
+      }),
+    ).toEqual({
       corsWorkerUrl: 'https://worker.example',
       sponsored_ai: '1',
     });
 
-    await expect(ports.writes.setSessionFieldsOnChain({
-      providerLike: 'provider',
-      chainId: 84532,
-      slug: 'edge',
-      fields: { sponsored_ai: '1' },
-    })).resolves.toEqual({ ok: true, source: 'first' });
+    await expect(
+      ports.writes.setSessionFieldsOnChain({
+        providerLike: 'provider',
+        chainId: 84532,
+        slug: 'edge',
+        fields: { sponsored_ai: '1' },
+      }),
+    ).resolves.toEqual({ ok: true, source: 'first' });
 
     registryModule = secondModule;
 
-    await expect(ports.writes.setResourceGatesOnChain({ slug: 'edge', gates: [] }))
-      .resolves.toEqual({ ok: true, source: 'second', txs: [] });
-    await expect(ports.writes.uploadSessionMetadata({ slug: 'edge' }, { workerUrl: 'https://worker.test' }))
-      .resolves.toEqual({ metadataUri: 'ar://second' });
-    await expect(ports.writes.updateSessionMetadataOnChain({ slug: 'edge' }))
-      .resolves.toEqual({ ok: true, txHash: '0xsecond' });
+    await expect(ports.writes.setResourceGatesOnChain({ slug: 'edge', gates: [] })).resolves.toEqual({
+      ok: true,
+      source: 'second',
+      txs: [],
+    });
+    await expect(
+      ports.writes.uploadSessionMetadata({ slug: 'edge' }, { workerUrl: 'https://worker.test' }),
+    ).resolves.toEqual({ metadataUri: 'ar://second' });
+    await expect(ports.writes.updateSessionMetadataOnChain({ slug: 'edge' })).resolves.toEqual({
+      ok: true,
+      txHash: '0xsecond',
+    });
 
     expect(firstModule.setSessionFieldsOnChain).toHaveBeenCalledWith({
       providerLike: 'provider',

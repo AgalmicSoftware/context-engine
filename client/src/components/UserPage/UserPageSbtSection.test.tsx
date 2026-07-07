@@ -26,14 +26,14 @@ jest.mock('../SBTs/SBTPage', () => ({
       data-session-slug={String(sessionSlug)}
     >
       SBT {String(SBTAddress)}
-      <button type="button" onClick={() => refreshSbtData('0xrefresh')}>refresh child</button>
+      <button type="button" onClick={() => refreshSbtData('0xrefresh')}>
+        refresh child
+      </button>
     </div>
   ),
 }));
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof UserPageSbtSection>> = {}
-) => ({
+const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageSbtSection>> = {}) => ({
   account: '0xviewer',
   heading: 'Minted SBTs:',
   isLoading: true,
@@ -48,10 +48,12 @@ const createProps = (
     shouldRenderMainEmptyText: false,
   },
   sbtEmptyText: 'No SBTs found.',
-  sbtEntries: [{
-    sbtInfo: { sbtAddress: '0x00000000000000000000000000000000000000aa' },
-    slug: 'alpha',
-  }],
+  sbtEntries: [
+    {
+      sbtInfo: { sbtAddress: '0x00000000000000000000000000000000000000aa' },
+      slug: 'alpha',
+    },
+  ],
   ...overrides,
 });
 
@@ -63,14 +65,14 @@ describe('UserPageSbtSection', () => {
         {...createProps({
           onRefreshSbtData,
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Minted SBTs:')).toBeInTheDocument();
     expect(screen.getByTestId('sbt-loading')).toBeInTheDocument();
     expect(screen.getByTestId('sbt-card')).toHaveAttribute(
       'data-sbt-address',
-      '0x00000000000000000000000000000000000000aa'
+      '0x00000000000000000000000000000000000000aa',
     );
     expect(screen.getByTestId('sbt-card')).toHaveAttribute('data-session-slug', 'alpha');
     expect(screen.getByTestId('sbt-card')).toHaveAttribute('data-account', '0xviewer');
@@ -91,7 +93,7 @@ describe('UserPageSbtSection', () => {
           },
           sbtEntries: [],
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Minted SBTs:')).toBeInTheDocument();

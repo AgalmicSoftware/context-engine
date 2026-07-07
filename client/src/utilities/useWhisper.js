@@ -25,13 +25,11 @@ let _recordRtcPromise = null;
 const loadRecordRTC = async () => {
   if (_recordRtc) return _recordRtc;
   if (!_recordRtcPromise) {
-    _recordRtcPromise = import('recordrtc')
-      .then(pickDefaultExport)
-      .catch((err) => {
-        // If the chunk fails to load once (transient network/cache issue), allow a later retry.
-        _recordRtcPromise = null;
-        throw err;
-      });
+    _recordRtcPromise = import('recordrtc').then(pickDefaultExport).catch((err) => {
+      // If the chunk fails to load once (transient network/cache issue), allow a later retry.
+      _recordRtcPromise = null;
+      throw err;
+    });
   }
   _recordRtc = await _recordRtcPromise;
   return _recordRtc;
@@ -42,21 +40,14 @@ let _harkPromise = null;
 const loadHark = async () => {
   if (_hark) return _hark;
   if (!_harkPromise) {
-    _harkPromise = import('hark')
-      .then(pickDefaultExport)
-      .catch((err) => {
-        _harkPromise = null;
-        throw err;
-      });
+    _harkPromise = import('hark').then(pickDefaultExport).catch((err) => {
+      _harkPromise = null;
+      throw err;
+    });
   }
   _hark = await _harkPromise;
   return _hark;
 };
-
-
-
-
-
 
 // Tunables
 const FADE_DURATION_MS = 300;
@@ -75,7 +66,7 @@ export const RECORDING_STATUS = {
   PAUSED: 'paused',
   PROCESSING: 'processing',
   STREAMING: 'streaming',
-  ERROR: 'error'
+  ERROR: 'error',
 };
 
 // Overlap-safe merge helper used by streaming and final transcripts.
@@ -155,7 +146,7 @@ export const useWhisper = ({
   onRecordingStop = () => {},
   // NEW: optional silence knobs (non-breaking; defaults preserved)
   silenceThresholdDb,
-  silenceDurationMs
+  silenceDurationMs,
 } = {}) => {
   const effectiveSessionSlug = sessionSlug;
   const effectiveSessionConfig = sessionConfig;
@@ -185,15 +176,23 @@ export const useWhisper = ({
 
   // NEW: gating/throttle + config + unmount guard
   const statusRef = useRef(status);
-  useEffect(() => { statusRef.current = status; }, [status]);
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
   const isPausedRef = useRef(isPaused);
-  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
 
   // NEW: live refs to avoid stale-closure reads during streaming gates
   const isStreamingRef = useRef(false);
-  useEffect(() => { isStreamingRef.current = isStreaming; }, [isStreaming]);
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+  }, [isStreaming]);
   const isProcessingRef = useRef(false);
-  useEffect(() => { isProcessingRef.current = isProcessing; }, [isProcessing]);
+  useEffect(() => {
+    isProcessingRef.current = isProcessing;
+  }, [isProcessing]);
 
   // NEW: keep latest stopRecording for timeouts/handlers to avoid stale closures
   const stopRecordingRef = useRef(null);
@@ -202,10 +201,10 @@ export const useWhisper = ({
   const lastStreamAtRef = useRef(0);
   const abortedRef = useRef(false);
   const effectiveSilenceThresholdDbRef = useRef(
-    typeof silenceThresholdDb === 'number' ? silenceThresholdDb : SILENCE_THRESHOLD_DB
+    typeof silenceThresholdDb === 'number' ? silenceThresholdDb : SILENCE_THRESHOLD_DB,
   );
   const effectiveSilenceDurationMsRef = useRef(
-    typeof silenceDurationMs === 'number' ? silenceDurationMs : SILENCE_DURATION_MS
+    typeof silenceDurationMs === 'number' ? silenceDurationMs : SILENCE_DURATION_MS,
   );
   const MIN_STREAM_INTERVAL_MS = 3500;
 
@@ -236,17 +235,29 @@ export const useWhisper = ({
     silenceTimerRef.current = null;
 
     if (finalAbortControllerRef.current) {
-      try { finalAbortControllerRef.current.abort(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+      try {
+        finalAbortControllerRef.current.abort();
+      } catch (e) {
+        whisperLog.warn('useWhisper: cleanup', e);
+      }
       finalAbortControllerRef.current = null;
     }
 
     if (streamAbortControllerRef.current) {
-      try { streamAbortControllerRef.current.abort(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+      try {
+        streamAbortControllerRef.current.abort();
+      } catch (e) {
+        whisperLog.warn('useWhisper: cleanup', e);
+      }
       streamAbortControllerRef.current = null;
     }
 
     if (speechMonitorRef.current) {
-      try { speechMonitorRef.current.stop(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+      try {
+        speechMonitorRef.current.stop();
+      } catch (e) {
+        whisperLog.warn('useWhisper: cleanup', e);
+      }
       speechMonitorRef.current = null;
     }
     if (recorderRef.current) {
@@ -254,15 +265,28 @@ export const useWhisper = ({
         if (recorderRef.current.state !== 'destroyed') {
           recorderRef.current.destroy();
         }
-      } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+      } catch (e) {
+        whisperLog.warn('useWhisper: cleanup', e);
+      }
       recorderRef.current = null;
     }
     if (streamRef.current) {
-      try { streamRef.current.getTracks().forEach(t => t.stop()); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+      try {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        whisperLog.warn('useWhisper: cleanup', e);
+      }
       streamRef.current = null;
     }
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close().catch((e) => { whisperLog.warn('useWhisper: cleanup', e); }).finally(() => { audioContextRef.current = null; });
+      audioContextRef.current
+        .close()
+        .catch((e) => {
+          whisperLog.warn('useWhisper: cleanup', e);
+        })
+        .finally(() => {
+          audioContextRef.current = null;
+        });
     }
     fadeGainNodeRef.current = null;
     chunksRef.current = [];
@@ -274,7 +298,9 @@ export const useWhisper = ({
       setIsPaused(false);
       setIsProcessing(false);
       setIsStreaming(false);
-      setStatus(prev => prev === RECORDING_STATUS.PERMISSION_DENIED ? RECORDING_STATUS.PERMISSION_DENIED : RECORDING_STATUS.IDLE);
+      setStatus((prev) =>
+        prev === RECORDING_STATUS.PERMISSION_DENIED ? RECORDING_STATUS.PERMISSION_DENIED : RECORDING_STATUS.IDLE,
+      );
     }
   }, []);
 
@@ -286,13 +312,21 @@ export const useWhisper = ({
 
     if (streamRef.current && streamRef.current.active) {
       const tracks = streamRef.current.getAudioTracks();
-      if (tracks.length > 0 && tracks.every(t => t.readyState === 'live')) {
+      if (tracks.length > 0 && tracks.every((t) => t.readyState === 'live')) {
         return streamRef.current;
       }
-      try { streamRef.current.getTracks().forEach(t => t.stop()); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+      try {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        whisperLog.warn('useWhisper: cleanup', e);
+      }
       streamRef.current = null;
     } else if (streamRef.current && !streamRef.current.active) {
-      try { streamRef.current.getTracks().forEach(t => t.stop()); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+      try {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        whisperLog.warn('useWhisper: cleanup', e);
+      }
       streamRef.current = null;
     }
 
@@ -322,7 +356,11 @@ export const useWhisper = ({
 
   const setupSilenceDetection = useCallback(async (stream) => {
     if (speechMonitorRef.current) {
-      try { speechMonitorRef.current.stop(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+      try {
+        speechMonitorRef.current.stop();
+      } catch (e) {
+        whisperLog.warn('useWhisper: cleanup', e);
+      }
     }
     const hark = await loadHark();
     const options = { threshold: effectiveSilenceThresholdDbRef.current, interval: 100 };
@@ -348,158 +386,173 @@ export const useWhisper = ({
     });
   }, []);
 
-  const callWhisperViaWorker = useCallback(async (audioBlob, isStreamingCall = false) => {
-    if (!audioBlob || audioBlob.size < 100) {
-      if (isStreamingCall) return null;
-      throw new Error('Audio blob too small');
-    }
-
-    const formData = new FormData();
-    const ext = resolveAudioExtension(audioBlob);
-    formData.append('file', audioBlob, `audio_${Date.now()}.${ext}`);
-
-    let transcriptionCfg;
-    try {
-      transcriptionCfg = await getEffectiveTranscriptionConfig({
-        sessionSlug: effectiveSessionSlug,
-        model,
-        apiKey,
-        context,
-      });
-    } catch (err) {
-      const msg = err?.message || 'Failed to resolve transcription settings.';
-      if (!abortedRef.current) {
-        setErrorMessage(msg);
-        onError(new Error(msg));
-        if (!isStreamingCall) setStatus(RECORDING_STATUS.ERROR);
-      }
-      return null;
-    }
-
-    if (transcriptionCfg.provider === 'local') {
-      const msg = 'Local transcription is not configured in this build.';
-      if (!abortedRef.current) {
-        setErrorMessage(msg);
-        onError(new Error(msg));
-        if (!isStreamingCall) setStatus(RECORDING_STATUS.ERROR);
-      }
-      return null;
-    }
-    if (transcriptionCfg.provider) formData.append('provider', transcriptionCfg.provider);
-    if (transcriptionCfg.model) formData.append('model', transcriptionCfg.model);
-    const useLocalOverride = transcriptionCfg.apiKeySource === 'local';
-    if (useLocalOverride && transcriptionCfg.apiKey) {
-      formData.append('apiKey', transcriptionCfg.apiKey);
-    }
-    if (transcriptionCfg.provider === 'custom' && transcriptionCfg.rpcUrl) {
-      formData.append('rpcUrl', transcriptionCfg.rpcUrl);
-    }
-
-    let controller = null;
-    if (isStreamingCall) {
-      controller = new AbortController();
-      // Abort any in-flight streaming before starting a new one
-      if (streamAbortControllerRef.current) {
-        try { streamAbortControllerRef.current.abort(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
-      }
-      streamAbortControllerRef.current = controller;
-      if (!abortedRef.current) setIsStreaming(true);
-    } else {
-      if (!abortedRef.current) setIsProcessing(true);
-      // Track and make abortable the final request
-      controller = new AbortController();
-      // Abort any existing final call first
-      if (finalAbortControllerRef.current) {
-        try { finalAbortControllerRef.current.abort(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
-      }
-      finalAbortControllerRef.current = controller;
-      // Ensure no lingering streaming call
-      if (streamAbortControllerRef.current) {
-        try { streamAbortControllerRef.current.abort(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
-        streamAbortControllerRef.current = null;
-        if (!abortedRef.current) setIsStreaming(false);
-      }
-    }
-
-    try {
-      const explicitWorkerUrl = normalizeBaseUrl(workerUrl || '');
-      const corsWorkerUrl = explicitWorkerUrl || await getCorsProxyUrlOrThrow({
-        sessionSlug: effectiveSessionSlug,
-        sessionConfig: effectiveSessionConfig,
-        context,
-        allowDemoFallback: defaultStrictAllowDemoFallback(),
-      });
-      const endpoint = (corsWorkerUrl.endsWith('/transcribe')
-        ? corsWorkerUrl
-        : `${corsWorkerUrl.replace(/\/+$/, '')}/transcribe`);
-
-      const fetchOpts = { method: 'POST', body: formData };
-      if (controller) fetchOpts.signal = controller.signal;
-
-      const baseUrl = corsWorkerUrl
-        .replace(/\/+$/, '')
-        .replace(/\/transcribe$/i, '');
-      const res = await fetchWorkerWithAuth(endpoint, fetchOpts, {
-        sessionSlug: effectiveSessionSlug,
-        context,
-        workerUrl: baseUrl,
-        preferAnonymous: true,
-        fallbackOnGateUnavailable: true,
-        allowDemoFallback: defaultStrictAllowDemoFallback(),
-      });
-
-      let data = null;
-      try { data = await res.json(); } catch { data = null; }
-
-      if (!res.ok) {
-        let message =
-          (data && (typeof data.error === 'string'
-            ? data.error
-            : data?.error?.message || data?.message)) ||
-          (res.status === 403
-            ? 'Forbidden (CORS): origin not allowed by server.'
-            : res.status === 401
-            ? 'Unauthorized: server missing/invalid OpenAI key.'
-            : `Transcription failed (${res.status}).`);
-        throw new Error(String(message || 'Transcription failed.'));
+  const callWhisperViaWorker = useCallback(
+    async (audioBlob, isStreamingCall = false) => {
+      if (!audioBlob || audioBlob.size < 100) {
+        if (isStreamingCall) return null;
+        throw new Error('Audio blob too small');
       }
 
-      return (data && typeof data.text === 'string') ? data.text : '';
-    } catch (err) {
-      if (err.name === 'AbortError') return null;
-      const msg = err?.message || 'Transcription error';
-      if (!abortedRef.current) {
-        setErrorMessage(msg);
-        onError(new Error(msg));
-        if (!isStreamingCall) setStatus(RECORDING_STATUS.ERROR);
+      const formData = new FormData();
+      const ext = resolveAudioExtension(audioBlob);
+      formData.append('file', audioBlob, `audio_${Date.now()}.${ext}`);
+
+      let transcriptionCfg;
+      try {
+        transcriptionCfg = await getEffectiveTranscriptionConfig({
+          sessionSlug: effectiveSessionSlug,
+          model,
+          apiKey,
+          context,
+        });
+      } catch (err) {
+        const msg = err?.message || 'Failed to resolve transcription settings.';
+        if (!abortedRef.current) {
+          setErrorMessage(msg);
+          onError(new Error(msg));
+          if (!isStreamingCall) setStatus(RECORDING_STATUS.ERROR);
+        }
+        return null;
       }
-      return null;
-    } finally {
+
+      if (transcriptionCfg.provider === 'local') {
+        const msg = 'Local transcription is not configured in this build.';
+        if (!abortedRef.current) {
+          setErrorMessage(msg);
+          onError(new Error(msg));
+          if (!isStreamingCall) setStatus(RECORDING_STATUS.ERROR);
+        }
+        return null;
+      }
+      if (transcriptionCfg.provider) formData.append('provider', transcriptionCfg.provider);
+      if (transcriptionCfg.model) formData.append('model', transcriptionCfg.model);
+      const useLocalOverride = transcriptionCfg.apiKeySource === 'local';
+      if (useLocalOverride && transcriptionCfg.apiKey) {
+        formData.append('apiKey', transcriptionCfg.apiKey);
+      }
+      if (transcriptionCfg.provider === 'custom' && transcriptionCfg.rpcUrl) {
+        formData.append('rpcUrl', transcriptionCfg.rpcUrl);
+      }
+
+      let controller = null;
       if (isStreamingCall) {
-        if (streamAbortControllerRef.current === controller) {
-          streamAbortControllerRef.current = null;
+        controller = new AbortController();
+        // Abort any in-flight streaming before starting a new one
+        if (streamAbortControllerRef.current) {
+          try {
+            streamAbortControllerRef.current.abort();
+          } catch (e) {
+            whisperLog.warn('useWhisper: cleanup', e);
+          }
         }
-        if (!abortedRef.current) setIsStreaming(false);
+        streamAbortControllerRef.current = controller;
+        if (!abortedRef.current) setIsStreaming(true);
       } else {
-        if (!abortedRef.current) setIsProcessing(false);
-        if (finalAbortControllerRef.current === controller) {
-          finalAbortControllerRef.current = null;
+        if (!abortedRef.current) setIsProcessing(true);
+        // Track and make abortable the final request
+        controller = new AbortController();
+        // Abort any existing final call first
+        if (finalAbortControllerRef.current) {
+          try {
+            finalAbortControllerRef.current.abort();
+          } catch (e) {
+            whisperLog.warn('useWhisper: cleanup', e);
+          }
+        }
+        finalAbortControllerRef.current = controller;
+        // Ensure no lingering streaming call
+        if (streamAbortControllerRef.current) {
+          try {
+            streamAbortControllerRef.current.abort();
+          } catch (e) {
+            whisperLog.warn('useWhisper: cleanup', e);
+          }
+          streamAbortControllerRef.current = null;
+          if (!abortedRef.current) setIsStreaming(false);
         }
       }
-    }
-  }, [
-    apiKey,
-    context,
-    effectiveSessionConfig,
-    effectiveSessionSlug,
-    model,
-    onError,
-    workerUrl,
-  ]);
+
+      try {
+        const explicitWorkerUrl = normalizeBaseUrl(workerUrl || '');
+        const corsWorkerUrl =
+          explicitWorkerUrl ||
+          (await getCorsProxyUrlOrThrow({
+            sessionSlug: effectiveSessionSlug,
+            sessionConfig: effectiveSessionConfig,
+            context,
+            allowDemoFallback: defaultStrictAllowDemoFallback(),
+          }));
+        const endpoint = corsWorkerUrl.endsWith('/transcribe')
+          ? corsWorkerUrl
+          : `${corsWorkerUrl.replace(/\/+$/, '')}/transcribe`;
+
+        const fetchOpts = { method: 'POST', body: formData };
+        if (controller) fetchOpts.signal = controller.signal;
+
+        const baseUrl = corsWorkerUrl.replace(/\/+$/, '').replace(/\/transcribe$/i, '');
+        const res = await fetchWorkerWithAuth(endpoint, fetchOpts, {
+          sessionSlug: effectiveSessionSlug,
+          context,
+          workerUrl: baseUrl,
+          preferAnonymous: true,
+          fallbackOnGateUnavailable: true,
+          allowDemoFallback: defaultStrictAllowDemoFallback(),
+        });
+
+        let data = null;
+        try {
+          data = await res.json();
+        } catch {
+          data = null;
+        }
+
+        if (!res.ok) {
+          let message =
+            (data && (typeof data.error === 'string' ? data.error : data?.error?.message || data?.message)) ||
+            (res.status === 403
+              ? 'Forbidden (CORS): origin not allowed by server.'
+              : res.status === 401
+                ? 'Unauthorized: server missing/invalid OpenAI key.'
+                : `Transcription failed (${res.status}).`);
+          throw new Error(String(message || 'Transcription failed.'));
+        }
+
+        return data && typeof data.text === 'string' ? data.text : '';
+      } catch (err) {
+        if (err.name === 'AbortError') return null;
+        const msg = err?.message || 'Transcription error';
+        if (!abortedRef.current) {
+          setErrorMessage(msg);
+          onError(new Error(msg));
+          if (!isStreamingCall) setStatus(RECORDING_STATUS.ERROR);
+        }
+        return null;
+      } finally {
+        if (isStreamingCall) {
+          if (streamAbortControllerRef.current === controller) {
+            streamAbortControllerRef.current = null;
+          }
+          if (!abortedRef.current) setIsStreaming(false);
+        } else {
+          if (!abortedRef.current) setIsProcessing(false);
+          if (finalAbortControllerRef.current === controller) {
+            finalAbortControllerRef.current = null;
+          }
+        }
+      }
+    },
+    [apiKey, context, effectiveSessionConfig, effectiveSessionSlug, model, onError, workerUrl],
+  );
 
   const handleStreamingTranscription = useCallback(async () => {
     // Use live refs for guards to avoid stale-closure churn
-    if (isStreamingRef.current || isProcessingRef.current || isPausedRef.current || statusRef.current !== RECORDING_STATUS.RECORDING) return;
+    if (
+      isStreamingRef.current ||
+      isProcessingRef.current ||
+      isPausedRef.current ||
+      statusRef.current !== RECORDING_STATUS.RECORDING
+    )
+      return;
 
     // Speech gate: if no speech since last slice, drop the buffered chunks to avoid waste
     if (!speechSinceLastSliceRef.current) {
@@ -526,7 +579,7 @@ export const useWhisper = ({
       const streamingText = await callWhisperViaWorker(wavBlob, true);
       if (abortedRef.current) return;
       if (typeof streamingText === 'string' && streamingText.length > 0) {
-        setTranscript(prev => {
+        setTranscript((prev) => {
           const newLive = mergeTranscript(prev.live, streamingText);
           onTranscriptionUpdate(newLive);
           return { ...prev, live: newLive };
@@ -546,11 +599,17 @@ export const useWhisper = ({
     // Start fetching the recorder library in parallel with the permission prompt.
     const recordRtcPromise = loadRecordRTC();
     // If we return early (permission denied), ensure a rejected chunk load doesn't surface as an unhandled rejection.
-    void recordRtcPromise.catch((e) => { whisperLog.warn('useWhisper: fallback', e); });
+    void recordRtcPromise.catch((e) => {
+      whisperLog.warn('useWhisper: fallback', e);
+    });
 
     // Abort any in-flight final transcription from a previous session
     if (finalAbortControllerRef.current) {
-      try { finalAbortControllerRef.current.abort(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+      try {
+        finalAbortControllerRef.current.abort();
+      } catch (e) {
+        whisperLog.warn('useWhisper: cleanup', e);
+      }
       finalAbortControllerRef.current = null;
     }
 
@@ -600,8 +659,13 @@ export const useWhisper = ({
         numberOfAudioChannels: 1,
         timeSlice: timeSlice && timeSlice > 0 ? timeSlice : 0,
         ondataavailable: (blob) => {
-          if (statusRef.current === RECORDING_STATUS.RECORDING &&
-              !isPausedRef.current && blob.size > 0 && timeSlice && timeSlice > 0) {
+          if (
+            statusRef.current === RECORDING_STATUS.RECORDING &&
+            !isPausedRef.current &&
+            blob.size > 0 &&
+            timeSlice &&
+            timeSlice > 0
+          ) {
             chunksRef.current.push(blob);
             handleStreamingTranscription();
           }
@@ -644,7 +708,7 @@ export const useWhisper = ({
         fadeGainNodeRef.current.gain.cancelScheduledValues(t);
         fadeGainNodeRef.current.gain.setValueAtTime(fadeGainNodeRef.current.gain.value, t);
         fadeGainNodeRef.current.gain.linearRampToValueAtTime(0, t + FADE_DURATION_MS / 1000);
-        await new Promise(r => setTimeout(r, FADE_DURATION_MS + 50));
+        await new Promise((r) => setTimeout(r, FADE_DURATION_MS + 50));
       }
 
       if (!recorderRef.current) {
@@ -660,22 +724,38 @@ export const useWhisper = ({
 
           // If we unmounted during stop, bail without touching state
           if (abortedRef.current) {
-            try { recorderRef.current?.destroy(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+            try {
+              recorderRef.current?.destroy();
+            } catch (e) {
+              whisperLog.warn('useWhisper: cleanup', e);
+            }
             recorderRef.current = null;
             resolve();
             return;
           }
 
           if (speechMonitorRef.current) {
-            try { speechMonitorRef.current.stop(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+            try {
+              speechMonitorRef.current.stop();
+            } catch (e) {
+              whisperLog.warn('useWhisper: cleanup', e);
+            }
             speechMonitorRef.current = null;
           }
           if (streamRef.current) {
-            try { streamRef.current.getTracks().forEach(track => track.stop()); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+            try {
+              streamRef.current.getTracks().forEach((track) => track.stop());
+            } catch (e) {
+              whisperLog.warn('useWhisper: cleanup', e);
+            }
             streamRef.current = null;
           }
           if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-            try { await audioContextRef.current.close(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+            try {
+              await audioContextRef.current.close();
+            } catch (e) {
+              whisperLog.warn('useWhisper: cleanup', e);
+            }
             audioContextRef.current = null;
           }
 
@@ -694,7 +774,9 @@ export const useWhisper = ({
           // NEW: extend onRecordingStop additively with (blob, mimeType)
           try {
             onRecordingStop?.(finalWavBlob || null, finalWavBlob ? 'audio/wav' : '');
-          } catch (e) { whisperLog.warn('useWhisper: callback', e); }
+          } catch (e) {
+            whisperLog.warn('useWhisper: callback', e);
+          }
 
           // Resolve immediately after blob is finalized + refs updated
           resolve();
@@ -705,7 +787,7 @@ export const useWhisper = ({
               const finalText = await callWhisperViaWorker(finalWavBlob, false);
               if (abortedRef.current) return;
               if (typeof finalText === 'string') {
-                setTranscript(prev => {
+                setTranscript((prev) => {
                   const merged = mergeTranscript(prev.live || prev.final || '', finalText);
                   onTranscriptionComplete(merged);
                   return { final: merged, live: '' };
@@ -731,7 +813,11 @@ export const useWhisper = ({
           }
 
           if (recorderRef.current) {
-            try { recorderRef.current.destroy(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+            try {
+              recorderRef.current.destroy();
+            } catch (e) {
+              whisperLog.warn('useWhisper: cleanup', e);
+            }
             recorderRef.current = null;
           }
           if (!abortedRef.current) setIsProcessing(false);
@@ -754,7 +840,9 @@ export const useWhisper = ({
   ]);
 
   // Keep latest stopRecording in a ref for any deferred callbacks (e.g., silence timeout)
-  useEffect(() => { stopRecordingRef.current = stopRecording; }, [stopRecording]);
+  useEffect(() => {
+    stopRecordingRef.current = stopRecording;
+  }, [stopRecording]);
 
   const pauseRecording = useCallback(async () => {
     if (!isRecording || isPaused || isProcessing || isStreaming) return;
@@ -770,7 +858,11 @@ export const useWhisper = ({
       setStatus(RECORDING_STATUS.PAUSED);
 
       if (speechMonitorRef.current) {
-        try { speechMonitorRef.current.stop(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
+        try {
+          speechMonitorRef.current.stop();
+        } catch (e) {
+          whisperLog.warn('useWhisper: cleanup', e);
+        }
       }
     } catch (error) {
       setErrorMessage(`Error pausing: ${error.message}`);

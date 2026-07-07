@@ -14,7 +14,7 @@ const { utils } = ethers;
 export const requireBigInt = () => {
   if (typeof BigInt !== 'function') {
     throw new Error(
-      'BigInt is required for commitments. Use a modern browser: Chrome >=67, Edge >=79, Firefox >=68, Safari/iOS >=14.'
+      'BigInt is required for commitments. Use a modern browser: Chrome >=67, Edge >=79, Firefox >=68, Safari/iOS >=14.',
     );
   }
 };
@@ -27,8 +27,7 @@ export const getCrypto = () => {
   return cryptoApi;
 };
 
-export const BN254_P =
-  BigInt('21888242871839275222246405745257275088548364400416034343698204186575808495617');
+export const BN254_P = BigInt('21888242871839275222246405745257275088548364400416034343698204186575808495617');
 
 /* -------------------------- Bytes and text helpers ------------------------- */
 
@@ -87,7 +86,7 @@ export const aesGcmEncrypt = async (key, plaintextBytes, { aadBytes } = {}) => {
   const ciphertext = await cryptoApi.subtle.encrypt(
     { name: 'AES-GCM', iv, ...(aadBytes ? { additionalData: aadBytes } : {}) },
     key,
-    plaintextBytes
+    plaintextBytes,
   );
   return { iv, ciphertext: new Uint8Array(ciphertext) };
 };
@@ -96,7 +95,7 @@ export const aesGcmDecrypt = async (key, iv, ciphertextBytes, { aadBytes } = {})
   const plaintext = await getCrypto().subtle.decrypt(
     { name: 'AES-GCM', iv, ...(aadBytes ? { additionalData: aadBytes } : {}) },
     key,
-    ciphertextBytes
+    ciphertextBytes,
   );
   return new Uint8Array(plaintext);
 };
@@ -111,7 +110,7 @@ export const deriveKekFromSig = async (signatureHex, contextBytes) => {
     hkdfKey,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['encrypt', 'decrypt']
+    ['encrypt', 'decrypt'],
   );
 };
 
@@ -182,8 +181,7 @@ export const encodeFreeform = (value) => utf8e(value == null ? '' : String(value
 
 export const encodeBinary = (value) => {
   const map = { Disagree: 0, Unsure: 1, Agree: 2 };
-  const v =
-    map[String(value)] ?? (map[String(value).charAt(0).toUpperCase() + String(value).slice(1)] ?? 1);
+  const v = map[String(value)] ?? map[String(value).charAt(0).toUpperCase() + String(value).slice(1)] ?? 1;
   return new Uint8Array([v & 0xff]);
 };
 
@@ -300,14 +298,7 @@ export const computeSaltedCommitments = async ({
 
 /* ------------------------------- Envelope shape --------------------------- */
 
-export const buildEnvelope = ({
-  iv,
-  ciphertextBytes,
-  aadObj,
-  recipients,
-  commitments,
-  kind,
-}) =>
+export const buildEnvelope = ({ iv, ciphertextBytes, aadObj, recipients, commitments, kind }) =>
   JSON.stringify({
     v: 1,
     cipher: 'aes-gcm-256',
@@ -383,10 +374,7 @@ export const parseEnvelope = (jsonStr) => {
     }
   }
   if (!isObj(env.commitments)) throw new Error('envelope commitments must be an object');
-  if (
-    typeof env.commitments.keccak256 !== 'string' ||
-    !/^0x[0-9a-fA-F]{64}$/.test(env.commitments.keccak256)
-  ) {
+  if (typeof env.commitments.keccak256 !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(env.commitments.keccak256)) {
     throw new Error('envelope commitments.keccak256 must be 32-byte hex');
   }
   if (
@@ -424,13 +412,7 @@ export const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId } =
 
 /* ---------------------------- Self-recipient wrap -------------------------- */
 
-export const wrapCekWithSelfRecipient = async ({
-  signTypedData,
-  account,
-  chainId,
-  contextHex,
-  cekRaw,
-}) => {
+export const wrapCekWithSelfRecipient = async ({ signTypedData, account, chainId, contextHex, cekRaw }) => {
   assertBytes32Hex(contextHex, 'context');
   if (typeof signTypedData !== 'function') {
     throw new Error('Missing signTypedData callback for self recipient.');
@@ -451,7 +433,7 @@ export const wrapCekWithSelfRecipient = async ({
   const cipher = await cryptoApi.subtle.encrypt(
     { name: 'AES-GCM', iv: wrap_iv, additionalData: contextBytes },
     kek,
-    cekRaw
+    cekRaw,
   );
 
   return {

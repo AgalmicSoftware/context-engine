@@ -54,13 +54,10 @@ export type SbtFilterSelectionPatchArgs = {
   stateKey?: unknown;
 };
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const asCacheObject = (value: unknown): UnknownRecord => (
-  isRecord(value) ? value : {}
-);
+const asCacheObject = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
 
 export const buildSbtFilterSelectionStateFromState = (state: unknown = {}): SbtFilterSelectionState => {
   const source = isRecord(state) ? state : {};
@@ -83,7 +80,7 @@ export const buildSbtFilterSnapshot = ({
   itemsSourceSignature,
   sbtCacheRevision,
   passive = false,
-}: SbtFilterSnapshotArgs): string => (
+}: SbtFilterSnapshotArgs): string =>
   [
     String(filterStateSignature || ''),
     String(mode || ''),
@@ -92,28 +89,24 @@ export const buildSbtFilterSnapshot = ({
     String(itemsSourceSignature || ''),
     String(sbtCacheRevision || 0),
     ...(passive ? ['passive'] : []),
-  ].join('|')
-);
+  ].join('|');
 
-export const readSbtOptionAddress = (sbtObject: unknown): unknown => (
-  isRecord(sbtObject) ? sbtObject.address : undefined
-);
+export const readSbtOptionAddress = (sbtObject: unknown): unknown =>
+  isRecord(sbtObject) ? sbtObject.address : undefined;
 
-export const asSelectedSbtEntry = (value: unknown): SbtFilterSelectedSbtEntry => (
-  isRecord(value) ? value as SbtFilterSelectedSbtEntry : {}
-);
+export const asSelectedSbtEntry = (value: unknown): SbtFilterSelectedSbtEntry =>
+  isRecord(value) ? (value as SbtFilterSelectedSbtEntry) : {};
 
-export const hasMatchingSbtOptionAddress = (list: unknown, address: unknown): boolean => (
-  Array.isArray(list) && list.some((sbt) => readSbtOptionAddress(sbt) === address)
-);
+export const hasMatchingSbtOptionAddress = (list: unknown, address: unknown): boolean =>
+  Array.isArray(list) && list.some((sbt) => readSbtOptionAddress(sbt) === address);
 
-export const appendSbtFilterOption = (list: unknown, sbtObject: unknown): unknown[] => (
-  [...(Array.isArray(list) ? list : []), sbtObject]
-);
+export const appendSbtFilterOption = (list: unknown, sbtObject: unknown): unknown[] => [
+  ...(Array.isArray(list) ? list : []),
+  sbtObject,
+];
 
-export const removeMatchingSbtOptionAddress = (list: unknown, address: unknown): unknown[] => (
-  (Array.isArray(list) ? list : []).filter((sbt) => readSbtOptionAddress(sbt) !== address)
-);
+export const removeMatchingSbtOptionAddress = (list: unknown, address: unknown): unknown[] =>
+  (Array.isArray(list) ? list : []).filter((sbt) => readSbtOptionAddress(sbt) !== address);
 
 export const shouldAppendSbtFilterSelection = ({
   address,
@@ -149,13 +142,16 @@ export const buildSbtFilterSelectionRemovePatch = ({
   };
 };
 
-export const buildSbtFilterQuickChipSelectedAddressSet = (selectedSBTs: unknown): Set<string> => (
+export const buildSbtFilterQuickChipSelectedAddressSet = (selectedSBTs: unknown): Set<string> =>
   new Set<string>(
     (Array.isArray(selectedSBTs) ? selectedSBTs : [])
-      .map((entry) => String(readSbtOptionAddress(entry) || '').trim().toLowerCase())
-      .filter(Boolean)
-  )
-);
+      .map((entry) =>
+        String(readSbtOptionAddress(entry) || '')
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean),
+  );
 
 export const resolveSbtFilterGroupSlug = ({
   fallbackSlug = '',
@@ -165,9 +161,8 @@ export const resolveSbtFilterGroupSlug = ({
 }: ResolveSbtFilterGroupSlugArgs = {}): string => {
   if (!sbtInput) return String(fallbackSlug || '');
   const sbt = asSelectedSbtEntry(sbtInput);
-  const normalizeSlug = typeof normalizeSessionSlug === 'function'
-    ? normalizeSessionSlug
-    : (value: unknown) => String(value || '');
+  const normalizeSlug =
+    typeof normalizeSessionSlug === 'function' ? normalizeSessionSlug : (value: unknown) => String(value || '');
   const direct = sbt.sessionSlug || sbt.slug || sbt.group;
   if (direct != null && String(direct).trim() !== '') return normalizeSlug(direct);
   if (sbt.sessionName && typeof getSessionSlugByName === 'function') {
@@ -185,9 +180,7 @@ export const resolveSbtFilterChainId = ({
 }: ResolveSbtFilterChainIdArgs = {}): number | null => {
   const sbt = asSelectedSbtEntry(sbtInput);
   const fromEntry = sbt.chainId || sbt.chainID;
-  const sessionChainId = typeof getSessionChainId === 'function'
-    ? getSessionChainId(sbtSlug)
-    : null;
+  const sessionChainId = typeof getSessionChainId === 'function' ? getSessionChainId(sbtSlug) : null;
   const chainId = sessionChainId || fromEntry || networkID || null;
   return chainId != null ? Number(chainId) : null;
 };
@@ -197,8 +190,12 @@ export const normalizeIncomingFilterState = (state: unknown = {}): SbtFilterSele
   return {
     selectedSBTGroupsCreator: Array.isArray(record.selectedSBTGroupsCreator) ? record.selectedSBTGroupsCreator : [],
     excludedSBTGroupsCreator: Array.isArray(record.excludedSBTGroupsCreator) ? record.excludedSBTGroupsCreator : [],
-    selectedSBTGroupsResponder: Array.isArray(record.selectedSBTGroupsResponder) ? record.selectedSBTGroupsResponder : [],
-    excludedSBTGroupsResponder: Array.isArray(record.excludedSBTGroupsResponder) ? record.excludedSBTGroupsResponder : [],
+    selectedSBTGroupsResponder: Array.isArray(record.selectedSBTGroupsResponder)
+      ? record.selectedSBTGroupsResponder
+      : [],
+    excludedSBTGroupsResponder: Array.isArray(record.excludedSBTGroupsResponder)
+      ? record.excludedSBTGroupsResponder
+      : [],
     selectedSBTGroups: Array.isArray(record.selectedSBTGroups) ? record.selectedSBTGroups : [],
     excludedSBTGroups: Array.isArray(record.excludedSBTGroups) ? record.excludedSBTGroups : [],
     onlyVerifiedHumans: !!record.onlyVerifiedHumans,
@@ -221,22 +218,22 @@ export const hasActiveSbtFilterState = (state: unknown = {}): boolean => {
 export const buildSbtEntrySignature = (entry: unknown): string => {
   if (!entry) return '';
   if (typeof entry === 'string') return entry.trim().toLowerCase();
-  if (!isRecord(entry)) return String(entry || '').trim().toLowerCase();
-  const addr = String(entry.address || entry.sbtAddress || '').trim().toLowerCase();
-  const slug = String(entry.sessionSlug || entry.slug || entry.group || '').trim().toLowerCase();
+  if (!isRecord(entry))
+    return String(entry || '')
+      .trim()
+      .toLowerCase();
+  const addr = String(entry.address || entry.sbtAddress || '')
+    .trim()
+    .toLowerCase();
+  const slug = String(entry.sessionSlug || entry.slug || entry.group || '')
+    .trim()
+    .toLowerCase();
   const chain = String(entry.chainId || entry.chainID || '').trim();
   return `${addr}|${slug}|${chain}`;
 };
 
-export const buildSbtListSignature = (list: unknown): string => (
-  Array.isArray(list)
-    ? list
-      .map(buildSbtEntrySignature)
-      .filter(Boolean)
-      .sort()
-      .join(',')
-    : ''
-);
+export const buildSbtListSignature = (list: unknown): string =>
+  Array.isArray(list) ? list.map(buildSbtEntrySignature).filter(Boolean).sort().join(',') : '';
 
 export const buildSbtFilterStateSignature = (state: unknown = {}): string => {
   const normalized = normalizeIncomingFilterState(state);

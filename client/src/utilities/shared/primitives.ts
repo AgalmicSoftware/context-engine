@@ -1,5 +1,9 @@
 export const toStr = (val: unknown): string => (typeof val === 'string' ? val : val == null ? '' : String(val));
-export const normalizeSlug = (raw: unknown): string => toStr(raw).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+export const normalizeSlug = (raw: unknown): string =>
+  toStr(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '');
 export const normalizeSessionIdHex = (hex: unknown): string => {
   const s = toStr(hex).trim().toLowerCase();
   if (!s || s === '0x' || /^0x0+$/.test(s)) return '';

@@ -15,10 +15,7 @@ export {
   normalizeMultichoiceValue,
   toNumberOrNull,
 } from './surveyToolResponseState.js';
-export {
-  areEnvelopesEquivalent,
-  mergeDecryptedViewedResponse,
-} from './surveyToolResponseMerge.js';
+export { areEnvelopesEquivalent, mergeDecryptedViewedResponse } from './surveyToolResponseMerge.js';
 export {
   buildQuestionIdScopeSignature,
   buildRenderedIdsSignature,
@@ -63,9 +60,7 @@ export {
   hasExplicitSessionQueryPinInPath,
   readPathSearch,
 } from './surveyToolNavigation.js';
-export {
-  resolveSlugForIds,
-} from './surveyToolSlugLookup.js';
+export { resolveSlugForIds } from './surveyToolSlugLookup.js';
 export {
   buildDraftAnswersByQuestionId,
   buildDraftHydrationPatchForQuestion,

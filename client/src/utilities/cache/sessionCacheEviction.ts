@@ -9,9 +9,7 @@ const DG_META_STORAGE_KEY = 'dg_meta_v1';
 
 type StorageRecord = Record<string, unknown>;
 
-const isStorageRecord = (value: unknown): value is StorageRecord => (
-  value !== null && typeof value === 'object'
-);
+const isStorageRecord = (value: unknown): value is StorageRecord => value !== null && typeof value === 'object';
 
 const readDgMeta = (): StorageRecord => {
   try {
@@ -38,21 +36,26 @@ export function trimLargeArrays(obj: unknown, max = 500, seen?: Set<unknown>): v
   seen.add(obj);
   if (Array.isArray(obj)) {
     if (obj.length > max) obj.splice(0, obj.length - max);
-    obj.forEach(item => trimLargeArrays(item, max, seen));
+    obj.forEach((item) => trimLargeArrays(item, max, seen));
     return;
   }
   const record = obj as StorageRecord;
-  Object.keys(record).forEach(k => trimLargeArrays(record[k], max, seen));
+  Object.keys(record).forEach((k) => trimLargeArrays(record[k], max, seen));
 }
 
 export function evictOldDgEntries(maxAgeMs = 7 * 24 * 60 * 60 * 1000): number {
   const meta = readDgMeta();
   const threshold = Date.now() - maxAgeMs;
   let deleted = 0;
-  Object.keys(meta).forEach(key => {
+  Object.keys(meta).forEach((key) => {
     if (!key.startsWith('dg:')) return;
     if (Number(meta[key] || 0) >= threshold) return;
-    try { localStorage.removeItem(key); deleted++; } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
+    try {
+      localStorage.removeItem(key);
+      deleted++;
+    } catch (e) {
+      mainSiteLog.warn('MainSite: fallback', e);
+    }
     delete meta[key];
   });
   writeDgMeta(meta);
@@ -64,7 +67,9 @@ export function updateDgMetaTimestamp(storageKey: string): void {
     const meta = readDgMeta();
     meta[storageKey] = Date.now();
     writeDgMeta(meta);
-  } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
+  } catch (e) {
+    mainSiteLog.warn('MainSite: fallback', e);
+  }
 }
 
 export function removeDgMetaTimestamp(storageKey: string): void {
@@ -74,5 +79,7 @@ export function removeDgMetaTimestamp(storageKey: string): void {
       delete meta[storageKey];
       writeDgMeta(meta);
     }
-  } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
+  } catch (e) {
+    mainSiteLog.warn('MainSite: fallback', e);
+  }
 }

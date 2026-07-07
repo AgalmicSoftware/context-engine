@@ -3,9 +3,8 @@ import { normalizeSlug as canonicalizeSlug, toStr } from '../../utilities/shared
 import { normalizeWorkerUrl as normalizeWorkerBaseUrl } from '../../utilities/worker/workerUrl.js';
 
 export const getErrorMessage = (error: unknown, fallback = 'Unknown error'): string => {
-  const message = error && typeof error === 'object' && 'message' in error
-    ? (error as { message?: unknown }).message
-    : null;
+  const message =
+    error && typeof error === 'object' && 'message' in error ? (error as { message?: unknown }).message : null;
   return typeof message === 'string' && message.trim() ? message : fallback;
 };
 
@@ -26,10 +25,11 @@ export const countSessionsForChain = (entries: unknown = [], chainId: unknown = 
   if (!chainId) return list.length;
   return list.filter((entry) => {
     const [, cfg] = Array.isArray(entry) ? entry : [];
-    const cfgRecord = cfg && typeof cfg === 'object' ? cfg as Record<string, unknown> : {};
-    const registry = cfgRecord.__registry && typeof cfgRecord.__registry === 'object'
-      ? cfgRecord.__registry as Record<string, unknown>
-      : {};
+    const cfgRecord = cfg && typeof cfg === 'object' ? (cfg as Record<string, unknown>) : {};
+    const registry =
+      cfgRecord.__registry && typeof cfgRecord.__registry === 'object'
+        ? (cfgRecord.__registry as Record<string, unknown>)
+        : {};
     const cfgChainId = Number(registry.registryChainId || registry.chainId || 0) || 0;
     return cfgChainId === chainId;
   }).length;

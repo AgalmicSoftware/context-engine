@@ -1,6 +1,4 @@
-import {
-  buildSurveyResultsCacheReadinessDisplayPlan,
-} from './surveyResultsCacheReadinessDisplayPlan';
+import { buildSurveyResultsCacheReadinessDisplayPlan } from './surveyResultsCacheReadinessDisplayPlan';
 
 describe('surveyResultsCacheReadinessDisplayPlan', () => {
   it('plans question-mode missing-cache loading without mutating inputs', () => {
@@ -48,17 +46,19 @@ describe('surveyResultsCacheReadinessDisplayPlan', () => {
   });
 
   it('uses survey hydration and aggregate counts for ready display plans', () => {
-    expect(buildSurveyResultsCacheReadinessDisplayPlan({
-      viewMode: 'survey',
-      surveyViewMode: 'aggregate',
-      aggregatorEntriesCount: 4,
-      filteredResponsesCount: 3,
-      surveyResultsHydrated: true,
-      totalQuestionsCount: 9,
-      totalResponsesCount: 12,
-      networkLatestBlock: 50,
-      surveyLocalBlock: 50,
-    })).toMatchObject({
+    expect(
+      buildSurveyResultsCacheReadinessDisplayPlan({
+        viewMode: 'survey',
+        surveyViewMode: 'aggregate',
+        aggregatorEntriesCount: 4,
+        filteredResponsesCount: 3,
+        surveyResultsHydrated: true,
+        totalQuestionsCount: 9,
+        totalResponsesCount: 12,
+        networkLatestBlock: 50,
+        surveyLocalBlock: 50,
+      }),
+    ).toMatchObject({
       areSummaryCountsHydrated: true,
       filterSummaryDisplay: {
         displayedTotalQuestionsCount: 9,
@@ -81,13 +81,15 @@ describe('surveyResultsCacheReadinessDisplayPlan', () => {
   });
 
   it('describes survey-mode readiness with survey count ownership', () => {
-    expect(buildSurveyResultsCacheReadinessDisplayPlan({
-      filterLoading: true,
-      questionResultsHydrated: false,
-      surveyResultsHydrated: true,
-      surveyViewMode: 'individual',
-      viewMode: 'survey',
-    })).toMatchObject({
+    expect(
+      buildSurveyResultsCacheReadinessDisplayPlan({
+        filterLoading: true,
+        questionResultsHydrated: false,
+        surveyResultsHydrated: true,
+        surveyViewMode: 'individual',
+        viewMode: 'survey',
+      }),
+    ).toMatchObject({
       areSummaryCountsHydrated: true,
       readinessDescriptor: {
         areSummaryCountsHydrated: true,
@@ -99,11 +101,13 @@ describe('surveyResultsCacheReadinessDisplayPlan', () => {
   });
 
   it('keeps unknown modes on the question-result count boundary used by legacy callers', () => {
-    expect(buildSurveyResultsCacheReadinessDisplayPlan({
-      questionResultsHydrated: true,
-      surveyResultsHydrated: false,
-      viewMode: 'legacy-results',
-    })).toMatchObject({
+    expect(
+      buildSurveyResultsCacheReadinessDisplayPlan({
+        questionResultsHydrated: true,
+        surveyResultsHydrated: false,
+        viewMode: 'legacy-results',
+      }),
+    ).toMatchObject({
       areSummaryCountsHydrated: true,
       readinessDescriptor: {
         areSummaryCountsHydrated: true,
@@ -115,17 +119,19 @@ describe('surveyResultsCacheReadinessDisplayPlan', () => {
   });
 
   it('keeps stale sync and long-loading notice derivation passive', () => {
-    expect(buildSurveyResultsCacheReadinessDisplayPlan({
-      viewMode: 'questions',
-      networkLatestBlock: 100,
-      questionLocalBlock: 25,
-      responseLocalBlock: 50,
-      refreshTargetQuestionBlock: 80,
-      refreshTargetResponseBlock: 75,
-      questionResultsHydrated: true,
-      syncLoadingStartedAt: 1000,
-      nowMs: 17000,
-    })).toMatchObject({
+    expect(
+      buildSurveyResultsCacheReadinessDisplayPlan({
+        viewMode: 'questions',
+        networkLatestBlock: 100,
+        questionLocalBlock: 25,
+        responseLocalBlock: 50,
+        refreshTargetQuestionBlock: 80,
+        refreshTargetResponseBlock: 75,
+        questionResultsHydrated: true,
+        syncLoadingStartedAt: 1000,
+        nowMs: 17000,
+      }),
+    ).toMatchObject({
       filterSummaryDisplay: {
         showFilteredCountSpinner: false,
       },
@@ -149,15 +155,17 @@ describe('surveyResultsCacheReadinessDisplayPlan', () => {
   });
 
   it('does not enable the long-sync notice before the readiness threshold', () => {
-    expect(buildSurveyResultsCacheReadinessDisplayPlan({
-      viewMode: 'questions',
-      networkLatestBlock: 100,
-      questionLocalBlock: 99,
-      responseLocalBlock: 100,
-      questionResultsHydrated: true,
-      syncLoadingStartedAt: 1000,
-      nowMs: 14999,
-    })).toMatchObject({
+    expect(
+      buildSurveyResultsCacheReadinessDisplayPlan({
+        viewMode: 'questions',
+        networkLatestBlock: 100,
+        questionLocalBlock: 99,
+        responseLocalBlock: 100,
+        questionResultsHydrated: true,
+        syncLoadingStartedAt: 1000,
+        nowMs: 14999,
+      }),
+    ).toMatchObject({
       syncStatusDisplay: {
         isSynced: false,
         showLongSyncNotice: false,

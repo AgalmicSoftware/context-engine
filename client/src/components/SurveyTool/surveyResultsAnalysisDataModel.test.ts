@@ -37,9 +37,7 @@ describe('surveyResultsAnalysisDataModel', () => {
         {
           responder: '0x222',
           response: JSON.stringify({
-            responses: [
-              { answer: 'Maybe', questionID: 'Q1' },
-            ],
+            responses: [{ answer: 'Maybe', questionID: 'Q1' }],
           }),
         },
       ],
@@ -117,9 +115,7 @@ describe('surveyResultsAnalysisDataModel', () => {
   it('uses injected parse and question metadata ports without owning lookup semantics', () => {
     const rows = buildSurveyResultsAnalysisResponsesForExport({
       aggregatorQuestionResponses: {
-        fallback: [
-          { responder: '0xAAA', response: 'raw-response' },
-        ],
+        fallback: [{ responder: '0xAAA', response: 'raw-response' }],
       },
       getResponseQuestionId: () => 'custom-id',
       getResponseQuestionPrompt: (_response, questionData) => questionData?.prompt,
@@ -176,7 +172,12 @@ describe('surveyResultsAnalysisDataModel', () => {
         values: [
           { count: 4, id: 'Verified humans', label: 'Verified humans', source: 'sbtFilter' },
           { count: 2, id: 'Include: alpha group', label: 'Include: alpha group', source: 'sbtFilter' },
-          { count: 1, id: 'Responder exclude: excluded group', label: 'Responder exclude: excluded group', source: 'sbtFilter' },
+          {
+            count: 1,
+            id: 'Responder exclude: excluded group',
+            label: 'Responder exclude: excluded group',
+            source: 'sbtFilter',
+          },
         ],
       },
     ]);
@@ -184,9 +185,10 @@ describe('surveyResultsAnalysisDataModel', () => {
 
   it('builds gate segment dimensions through injected gate ports', () => {
     const dimensions = buildSurveyResultsAnalysisSegmentDimensionsForExport({
-      getQuestionEncryptionGates: (question) => Array.isArray((question as { gates?: unknown[] } | null)?.gates)
-        ? (question as { gates: unknown[] }).gates
-        : [],
+      getQuestionEncryptionGates: (question) =>
+        Array.isArray((question as { gates?: unknown[] } | null)?.gates)
+          ? (question as { gates: unknown[] }).gates
+          : [],
       getSbtEntryLabel: (entry) => {
         const address = String((entry as { address?: unknown }).address || '');
         return address === '0xabc' ? 'Fallback gate' : '';
@@ -195,11 +197,8 @@ describe('surveyResultsAnalysisDataModel', () => {
         q1: { gates: ['gate-a'] },
         q2: { gates: ['gate-b'] },
       },
-      normalizeGateSbtEntries: (gate) => (
-        gate === 'gate-a'
-          ? [{ label: 'Direct gate' }, { address: '0xabc' }]
-          : [{ address: '0xmissing' }]
-      ),
+      normalizeGateSbtEntries: (gate) =>
+        gate === 'gate-a' ? [{ label: 'Direct gate' }, { address: '0xabc' }] : [{ address: '0xmissing' }],
       questions: [
         { id: 'Q1', responseCount: 2 },
         { id: 'q2', responseCount: 5 },

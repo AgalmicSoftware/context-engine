@@ -50,16 +50,16 @@ const buildQuestionFilterSessionSource = ({
   return {};
 };
 
-export const resolveQuestionFilterEffectiveSlug = (input: QuestionFilterSessionInput = {}): string => (
+export const resolveQuestionFilterEffectiveSlug = (input: QuestionFilterSessionInput = {}): string =>
   resolveCanonicalSessionConfig({
     source: buildQuestionFilterSessionSource(input),
-  }).sessionSlug || ''
-);
+  }).sessionSlug || '';
 
 export const resolveQuestionFilterSessionContext = ({
   resolveBySlug,
   ...input
-}: ResolveQuestionFilterSessionContextInput = {}): SessionResolutionResult => resolveCanonicalSessionConfig({
-  source: buildQuestionFilterSessionSource(input),
-  resolveBySlug,
-}) as SessionResolutionResult;
+}: ResolveQuestionFilterSessionContextInput = {}): SessionResolutionResult =>
+  resolveCanonicalSessionConfig({
+    source: buildQuestionFilterSessionSource(input),
+    resolveBySlug,
+  }) as SessionResolutionResult;

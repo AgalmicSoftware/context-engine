@@ -20,9 +20,8 @@ export const SURVEY_ID = '0x1111111111111111111111111111111111111111111111111111
 export const RESPONDER_ONE = '0x1111111111111111111111111111111111111111';
 export const RESPONDER_TWO = '0x2222222222222222222222222222222222222222';
 
-export const cacheStoreKey = (namespace: unknown, slug: unknown = ''): string => (
-  `${String(namespace || '')}|${String(slug || '')}`
-);
+export const cacheStoreKey = (namespace: unknown, slug: unknown = ''): string =>
+  `${String(namespace || '')}|${String(slug || '')}`;
 
 export let cacheStore: Map<string, any>;
 let analysisPeekError: Error | null;
@@ -44,41 +43,35 @@ export const setAnalysisWriteErrors = (errors: Error[]): void => {
 };
 
 const installModuleBoundarySpies = (): void => {
-  peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(
-    (namespace: any, slug: any = '') => {
-      if (analysisPeekError && String(namespace) === 'analysisCache') throw analysisPeekError;
-      const value = cacheStore.get(cacheStoreKey(namespace, slug));
-      return value === undefined ? null : value;
-    }
-  );
-  readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(
-    async (namespace: any, slug: any = '') => {
-      const value = cacheStore.get(cacheStoreKey(namespace, slug));
-      return value === undefined ? null : value;
-    }
-  );
-  writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockImplementation(
-    async (namespace: any, slug: any = '', value: any = null) => {
+  peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any, slug: any = '') => {
+    if (analysisPeekError && String(namespace) === 'analysisCache') throw analysisPeekError;
+    const value = cacheStore.get(cacheStoreKey(namespace, slug));
+    return value === undefined ? null : value;
+  });
+  readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace: any, slug: any = '') => {
+    const value = cacheStore.get(cacheStoreKey(namespace, slug));
+    return value === undefined ? null : value;
+  });
+  writeSpy = jest
+    .spyOn(cacheScripts, 'writeCache')
+    .mockImplementation(async (namespace: any, slug: any = '', value: any = null) => {
       if (analysisWriteErrors.length > 0 && String(namespace) === 'analysisCache') {
         throw analysisWriteErrors.shift();
       }
       cacheStore.set(cacheStoreKey(namespace, slug), value);
       return true;
-    }
-  );
-  listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockImplementation(
-    (namespace: any) => {
-      const prefix = `${String(namespace)}|`;
-      return Array.from(cacheStore.entries())
-        .filter(([key]) => key.startsWith(prefix))
-        .map(([key, value]) => ({
-          key,
-          namespace: String(namespace),
-          slug: key.slice(prefix.length),
-          value,
-        }));
-    }
-  );
+    });
+  listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockImplementation((namespace: any) => {
+    const prefix = `${String(namespace)}|`;
+    return Array.from(cacheStore.entries())
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, value]) => ({
+        key,
+        namespace: String(namespace),
+        slug: key.slice(prefix.length),
+        value,
+      }));
+  });
   latestBlockSpy = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(1);
 };
 
@@ -93,7 +86,7 @@ export const resetSurveyResultsExportControlsHarness = (): void => {
   window.localStorage.clear();
 };
 
-export const createDeferred = <T,>() => {
+export const createDeferred = <T>() => {
   let resolve!: (value: T | PromiseLike<T>) => void;
   let reject!: (reason?: any) => void;
   const promise = new Promise<T>((res, rej) => {
@@ -126,17 +119,18 @@ export const createAnalysisArtifact = (inputSignature = 'input-sig') => ({
   version: 1,
 });
 
-export const mountSurveyResults = (props: SurveyResultsProps = {}) => renderSurveyResults({
-  filterState: {},
-  isOpen: true,
-  isQuestionCacheReady: true,
-  isResponsesCacheReady: true,
-  isSBTCacheReady: true,
-  preventUrlChange: true,
-  sessionSlugPinned: true,
-  viewMode: 'questions',
-  ...props,
-});
+export const mountSurveyResults = (props: SurveyResultsProps = {}) =>
+  renderSurveyResults({
+    filterState: {},
+    isOpen: true,
+    isQuestionCacheReady: true,
+    isResponsesCacheReady: true,
+    isSBTCacheReady: true,
+    preventUrlChange: true,
+    sessionSlugPinned: true,
+    viewMode: 'questions',
+    ...props,
+  });
 
 type QuestionsCacheSeed = {
   netId?: number;
@@ -195,11 +189,23 @@ export const seedAnalysisEligibleSession = (slug: string, netId = 11155420): voi
     netId,
     questionResponses: {
       q1: {
-        [RESPONDER_ONE]: { answer: { encrypted: false, value: 'Use a viewer.' }, questionId: 'q1', timeStamp: '2026-05-01T00:00:00.000Z' },
-        [RESPONDER_TWO]: { answer: { encrypted: false, value: 'Keep it private.' }, questionId: 'q1', timeStamp: '2026-05-02T00:00:00.000Z' },
+        [RESPONDER_ONE]: {
+          answer: { encrypted: false, value: 'Use a viewer.' },
+          questionId: 'q1',
+          timeStamp: '2026-05-01T00:00:00.000Z',
+        },
+        [RESPONDER_TWO]: {
+          answer: { encrypted: false, value: 'Keep it private.' },
+          questionId: 'q1',
+          timeStamp: '2026-05-02T00:00:00.000Z',
+        },
       },
       q2: {
-        [RESPONDER_ONE]: { answer: { encrypted: false, value: 'Make PDF readable.' }, questionId: 'q2', timeStamp: '2026-05-03T00:00:00.000Z' },
+        [RESPONDER_ONE]: {
+          answer: { encrypted: false, value: 'Make PDF readable.' },
+          questionId: 'q2',
+          timeStamp: '2026-05-03T00:00:00.000Z',
+        },
       },
     },
     questions: {
@@ -224,12 +230,13 @@ export const openExportArea = (): void => {
 };
 
 /** jsdom Blob has no .text(); read captured download blobs through FileReader. */
-export const readBlobText = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(String(reader.result || ''));
-  reader.onerror = () => reject(reader.error);
-  reader.readAsText(blob);
-});
+export const readBlobText = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  });
 
 export const openHtmlReportModal = async (): Promise<HTMLElement> => {
   openExportArea();
@@ -237,12 +244,9 @@ export const openHtmlReportModal = async (): Promise<HTMLElement> => {
   return screen.findByTestId('ce-surveyresults-html-report-modal');
 };
 
-export const getDownloadReportButton = (): HTMLElement => (
-  screen.getByTestId('ce-surveyresults-html-report-download')
-);
-export const getGenerateAnalysisButton = (): HTMLElement => (
-  screen.getByTestId('ce-surveyresults-html-report-generate-analysis')
-);
+export const getDownloadReportButton = (): HTMLElement => screen.getByTestId('ce-surveyresults-html-report-download');
+export const getGenerateAnalysisButton = (): HTMLElement =>
+  screen.getByTestId('ce-surveyresults-html-report-generate-analysis');
 export const clickGenerateAnalysis = (): void => {
   fireEvent.click(getGenerateAnalysisButton());
 };
@@ -256,24 +260,20 @@ export const getSectionRows = (): Array<{ availability: string; label: string; r
   });
 };
 
-export const analysisCachePeeks = (): any[][] => (
-  peekSpy.mock.calls.filter((call: any[]) => String(call[0]) === 'analysisCache')
-);
-export const analysisCacheReads = (): any[][] => (
-  readSpy.mock.calls.filter((call: any[]) => String(call[0]) === 'analysisCache')
-);
-export const analysisCacheWrites = (): any[][] => (
-  writeSpy.mock.calls.filter((call: any[]) => String(call[0]) === 'analysisCache')
-);
+export const analysisCachePeeks = (): any[][] =>
+  peekSpy.mock.calls.filter((call: any[]) => String(call[0]) === 'analysisCache');
+export const analysisCacheReads = (): any[][] =>
+  readSpy.mock.calls.filter((call: any[]) => String(call[0]) === 'analysisCache');
+export const analysisCacheWrites = (): any[][] =>
+  writeSpy.mock.calls.filter((call: any[]) => String(call[0]) === 'analysisCache');
 export const analysisArtifactsFromWrite = (writeIndex: number): Array<[string, any]> => {
   const call = analysisCacheWrites()[writeIndex];
   expect(call).toBeTruthy();
   return Object.entries((call[2] || {}).sessionResultsAnalysis || {}) as Array<[string, any]>;
 };
 
-export const callAIPrompts = (): string[] => (
-  (callAI as unknown as JestMock).mock.calls.map((call: unknown[]) => String(call[0]))
-);
+export const callAIPrompts = (): string[] =>
+  (callAI as unknown as JestMock).mock.calls.map((call: unknown[]) => String(call[0]));
 
 export const waitForAnalysisCacheWrites = async (count: number): Promise<void> => {
   await waitFor(() => expect(analysisCacheWrites()).toHaveLength(count));
@@ -302,7 +302,7 @@ export const RISK_MATRIX_ANALYSIS_JSON = JSON.stringify({
 
 export const primeAnalysisArtifactCacheKey = async (
   mountProps: SurveyResultsProps,
-  seed: () => void
+  seed: () => void,
 ): Promise<{ artifact: any; cacheKey: string }> => {
   (callAI as unknown as JestMock).mockResolvedValue(BREAKDOWN_ANALYSIS_JSON);
   seed();
@@ -349,9 +349,10 @@ export const installBrowserDownloadCapture = (): BrowserDownloadCapture => {
   const originalCreateElement = document.createElement.bind(document);
   const anchor = originalCreateElement('a') as HTMLAnchorElement;
   const anchorClickSpy = jest.spyOn(anchor, 'click').mockImplementation(() => {});
-  const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tagName: any, options: any) => (
-    String(tagName).toLowerCase() === 'a' ? anchor : originalCreateElement(tagName, options)
-  )) as any);
+  const createElementSpy = jest
+    .spyOn(document, 'createElement')
+    .mockImplementation(((tagName: any, options: any) =>
+      String(tagName).toLowerCase() === 'a' ? anchor : originalCreateElement(tagName, options)) as any);
   let restored = false;
   const restore = () => {
     if (restored) return;

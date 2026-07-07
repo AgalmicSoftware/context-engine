@@ -20,115 +20,127 @@ import {
 
 describe('sbtFilterHelpers holder helpers', () => {
   it('normalizes holder count maps to positive lower-case integer counts', () => {
-    expect(normalizeAddressCountMap({
-      '0xA': 2.9,
-      '0xB': '3',
-      '0xC': 0,
-      '0xD': -2,
-      '': 5,
-      '0xE': Number.NaN,
-    })).toEqual({
+    expect(
+      normalizeAddressCountMap({
+        '0xA': 2.9,
+        '0xB': '3',
+        '0xC': 0,
+        '0xD': -2,
+        '': 5,
+        '0xE': Number.NaN,
+      }),
+    ).toEqual({
       '0xa': 2,
       '0xb': 3,
     });
     expect(normalizeAddressCountMap(null)).toEqual({});
-    expect(resolveSbtFilterEntryCountMapUsage({
-      entry: { countsLoaded: true },
-      entryBurned: null,
-      entryBurnedCountMap: {},
-      entryMinted: null,
-      entryMintedCountMap: {},
-      rawEntryBurnedCounts: {},
-      rawEntryMintedCounts: {},
-    })).toEqual({
+    expect(
+      resolveSbtFilterEntryCountMapUsage({
+        entry: { countsLoaded: true },
+        entryBurned: null,
+        entryBurnedCountMap: {},
+        entryMinted: null,
+        entryMintedCountMap: {},
+        rawEntryBurnedCounts: {},
+        rawEntryMintedCounts: {},
+      }),
+    ).toEqual({
       checkpointBackedPartialCounts: false,
       hasAuthoritativeEntryCountMaps: true,
       hasStructuredEntryCountMaps: true,
       shouldUseEntryCountMaps: true,
     });
-    expect(resolveSbtFilterEntryCountMapUsage({
-      entry: { countsLoaded: false, countsScanCheckpoint: { fromBlock: 1 } },
-      entryBurned: null,
-      entryBurnedCountMap: {},
-      entryMinted: null,
-      entryMintedCountMap: { '0xa': 1 },
-      rawEntryMintedCounts: { '0xa': 1 },
-    })).toEqual({
+    expect(
+      resolveSbtFilterEntryCountMapUsage({
+        entry: { countsLoaded: false, countsScanCheckpoint: { fromBlock: 1 } },
+        entryBurned: null,
+        entryBurnedCountMap: {},
+        entryMinted: null,
+        entryMintedCountMap: { '0xa': 1 },
+        rawEntryMintedCounts: { '0xa': 1 },
+      }),
+    ).toEqual({
       checkpointBackedPartialCounts: true,
       hasAuthoritativeEntryCountMaps: true,
       hasStructuredEntryCountMaps: true,
       shouldUseEntryCountMaps: false,
     });
-    expect(resolveSbtFilterEntryCountMapUsage({
-      entry: { countsLoaded: false },
-      entryBurned: [],
-      entryBurnedCountMap: {},
-      entryMinted: [],
-      entryMintedCountMap: {},
-      rawEntryBurnedCounts: null,
-      rawEntryMintedCounts: null,
-    }).shouldUseEntryCountMaps).toBe(false);
+    expect(
+      resolveSbtFilterEntryCountMapUsage({
+        entry: { countsLoaded: false },
+        entryBurned: [],
+        entryBurnedCountMap: {},
+        entryMinted: [],
+        entryMintedCountMap: {},
+        rawEntryBurnedCounts: null,
+        rawEntryMintedCounts: null,
+      }).shouldUseEntryCountMaps,
+    ).toBe(false);
   });
 
   it('builds stable count-map fingerprints', () => {
-    expect(countMapFingerprint({ '0xB': 2, '0xA': 1 })).toBe(
-      countMapFingerprint({ '0xa': 1, '0xb': 2 })
-    );
+    expect(countMapFingerprint({ '0xB': 2, '0xA': 1 })).toBe(countMapFingerprint({ '0xa': 1, '0xb': 2 }));
     expect(countMapFingerprint({})).toBe('nil');
     expect(countMapFingerprint({ '0xA': 2 })).not.toBe(countMapFingerprint({ '0xA': 1 }));
   });
 
   it('builds holder-list fingerprints without sorting address arrays', () => {
     expect(computeHolderListFingerprint(null)).toBe('nil');
-    expect(computeHolderListFingerprint(['0xA', '0xB'])).toBe(
-      computeHolderListFingerprint(['0xa', '0xb'])
-    );
-    expect(computeHolderListFingerprint(['0xA', '0xB'])).not.toBe(
-      computeHolderListFingerprint(['0xB', '0xA'])
-    );
+    expect(computeHolderListFingerprint(['0xA', '0xB'])).toBe(computeHolderListFingerprint(['0xa', '0xb']));
+    expect(computeHolderListFingerprint(['0xA', '0xB'])).not.toBe(computeHolderListFingerprint(['0xB', '0xA']));
   });
 
   it('builds holder revision keys for cached and fetched holder sets', () => {
-    expect(buildSbtFilterHolderRevisionKey({
-      sbtSlug: 'alpha',
-      netKey: 84532,
-      sbtAddress: '0xSBT',
-      sbtCacheRevision: 7,
-      countsLoaded: true,
-      shouldUseEntryCountMaps: true,
-      mintedCountFingerprint: 'mint-counts',
-      burnedCountFingerprint: 'burn-counts',
-      mintedListFingerprint: 'mint-list',
-      burnedListFingerprint: 'burn-list',
-      creationBlock: 123,
-    })).toBe('alpha|84532|0xSBT|7|1|1|mint-counts|burn-counts|mint-list|burn-list|123');
-    expect(buildSbtFilterHolderRevisionKey({
-      sbtSlug: '',
-      netKey: '',
-      sbtCacheRevision: 0,
-      creationBlock: null,
-    })).toBe('|||0|0|0|||||');
+    expect(
+      buildSbtFilterHolderRevisionKey({
+        sbtSlug: 'alpha',
+        netKey: 84532,
+        sbtAddress: '0xSBT',
+        sbtCacheRevision: 7,
+        countsLoaded: true,
+        shouldUseEntryCountMaps: true,
+        mintedCountFingerprint: 'mint-counts',
+        burnedCountFingerprint: 'burn-counts',
+        mintedListFingerprint: 'mint-list',
+        burnedListFingerprint: 'burn-list',
+        creationBlock: 123,
+      }),
+    ).toBe('alpha|84532|0xSBT|7|1|1|mint-counts|burn-counts|mint-list|burn-list|123');
+    expect(
+      buildSbtFilterHolderRevisionKey({
+        sbtSlug: '',
+        netKey: '',
+        sbtCacheRevision: 0,
+        creationBlock: null,
+      }),
+    ).toBe('|||0|0|0|||||');
   });
 
   it('resolves SBT holder creation block precedence', () => {
-    expect(resolveSbtFilterCreationBlock({
-      entry: { creationBlock: null },
-      entrySbtInfo: { creationBlock: '12' },
-      sbtRecord: { creationBlock: '34' },
-      sbtInfoRecord: { creationBlock: '56' },
-    })).toBe('12');
-    expect(resolveSbtFilterCreationBlock({
-      entry: {},
-      entrySbtInfo: {},
-      sbtRecord: { creationBlock: 34 },
-      sbtInfoRecord: { creationBlock: 56 },
-    })).toBe(34);
-    expect(resolveSbtFilterCreationBlock({
-      entry: 'bad',
-      entrySbtInfo: null,
-      sbtRecord: {},
-      sbtInfoRecord: {},
-    })).toBeUndefined();
+    expect(
+      resolveSbtFilterCreationBlock({
+        entry: { creationBlock: null },
+        entrySbtInfo: { creationBlock: '12' },
+        sbtRecord: { creationBlock: '34' },
+        sbtInfoRecord: { creationBlock: '56' },
+      }),
+    ).toBe('12');
+    expect(
+      resolveSbtFilterCreationBlock({
+        entry: {},
+        entrySbtInfo: {},
+        sbtRecord: { creationBlock: 34 },
+        sbtInfoRecord: { creationBlock: 56 },
+      }),
+    ).toBe(34);
+    expect(
+      resolveSbtFilterCreationBlock({
+        entry: 'bad',
+        entrySbtInfo: null,
+        sbtRecord: {},
+        sbtInfoRecord: {},
+      }),
+    ).toBeUndefined();
   });
 
   it('normalizes holder scan from-blocks and request keys', () => {
@@ -136,18 +148,22 @@ describe('sbtFilterHelpers holder helpers', () => {
     expect(resolveSbtFilterHolderScanFromBlock(-1)).toBe(0);
     expect(resolveSbtFilterHolderScanFromBlock('bad')).toBe(0);
     expect(resolveSbtFilterHolderScanFromBlock(null)).toBe(0);
-    expect(buildSbtFilterHolderRequestKey({
-      sbtSlug: 'alpha',
-      netKey: 84532,
-      sbtAddress: '0xSBT',
-      fromBlock: 12,
-    })).toBe('alpha|84532|0xSBT|12');
-    expect(buildSbtFilterHolderRequestKey({
-      sbtSlug: '',
-      netKey: '',
-      sbtAddress: '',
-      fromBlock: 0,
-    })).toBe('|||0');
+    expect(
+      buildSbtFilterHolderRequestKey({
+        sbtSlug: 'alpha',
+        netKey: 84532,
+        sbtAddress: '0xSBT',
+        fromBlock: 12,
+      }),
+    ).toBe('alpha|84532|0xSBT|12');
+    expect(
+      buildSbtFilterHolderRequestKey({
+        sbtSlug: '',
+        netKey: '',
+        sbtAddress: '',
+        fromBlock: 0,
+      }),
+    ).toBe('|||0');
   });
 
   it('sets bounded holder memo entries with refresh ordering and oldest eviction', () => {
@@ -172,12 +188,14 @@ describe('sbtFilterHelpers holder helpers', () => {
   });
 
   it('builds history summaries from event counts and net holder counts', () => {
-    expect(buildHistorySummaryFromCounts({
-      mintedCountByAddress: { '0xA': 2, '0xB': 1 },
-      burnedCountByAddress: { '0xA': 1, '0xC': 1 },
-      mintedEventCount: 0,
-      burnedEventCount: 4,
-    })).toEqual({
+    expect(
+      buildHistorySummaryFromCounts({
+        mintedCountByAddress: { '0xA': 2, '0xB': 1 },
+        burnedCountByAddress: { '0xA': 1, '0xC': 1 },
+        mintedEventCount: 0,
+        burnedEventCount: 4,
+      }),
+    ).toEqual({
       totalMinted: '3',
       totalBurned: '4',
       activeSupply: '2',
@@ -188,10 +206,7 @@ describe('sbtFilterHelpers holder helpers', () => {
 
   it('builds net holder sets from arrays and count maps', () => {
     expect(Array.from(buildNetHoldersSet(['0xA', '0xB', '0xA'], ['0xa']))).toEqual(['0xb']);
-    expect(Array.from(buildNetHoldersSetFromCounts(
-      { '0xA': 2, '0xB': 1 },
-      { '0xA': 1, '0xB': 1 }
-    ))).toEqual(['0xa']);
+    expect(Array.from(buildNetHoldersSetFromCounts({ '0xA': 2, '0xB': 1 }, { '0xA': 1, '0xB': 1 }))).toEqual(['0xa']);
   });
 
   it('builds fetched holder count results without changing count coercion', () => {
@@ -224,10 +239,7 @@ describe('sbtFilterHelpers holder helpers', () => {
       scannedToBlock: 18,
       holdersSet: new Set(['0xa']),
     });
-    expect(resolveHoldersSet).toHaveBeenCalledWith(
-      { '0xa': 2, '0xb': 1 },
-      { '0xa': 1 }
-    );
+    expect(resolveHoldersSet).toHaveBeenCalledWith({ '0xa': 2, '0xb': 1 }, { '0xa': 1 });
 
     const defaultResult = buildSbtFilterHolderFetchResult({
       counts: {
@@ -244,17 +256,19 @@ describe('sbtFilterHelpers holder helpers', () => {
   });
 
   it('builds fetched holder cache entry patches with existing fallbacks', () => {
-    expect(buildSbtFilterFetchedHolderCacheEntryPatch({
-      fetched: {
-        mintedAddresses: ['0xa'],
-        burnedAddresses: ['0xb'],
-        mintedCountByAddress: { '0xa': 2 },
-        burnedCountByAddress: { '0xb': 1 },
-        mintedEventCount: 3,
-        burnedEventCount: 1,
-        scannedToBlock: 22,
-      },
-    })).toEqual({
+    expect(
+      buildSbtFilterFetchedHolderCacheEntryPatch({
+        fetched: {
+          mintedAddresses: ['0xa'],
+          burnedAddresses: ['0xb'],
+          mintedCountByAddress: { '0xa': 2 },
+          burnedCountByAddress: { '0xb': 1 },
+          mintedEventCount: 3,
+          burnedEventCount: 1,
+          scannedToBlock: 22,
+        },
+      }),
+    ).toEqual({
       mintedAddresses: ['0xa'],
       burnedAddresses: ['0xb'],
       mintedCountByAddress: { '0xa': 2 },
@@ -293,54 +307,54 @@ describe('sbtFilterHelpers holder helpers', () => {
       burnedCountByAddress: { '0xB': 1 },
     };
 
-    expect(buildSbtFilterFetchedHolderRevisionKey({
-      sbtSlug: 'alpha',
-      netKey: 84532,
-      sbtAddress: '0xSBT',
-      sbtCacheRevision: 3,
-      fromBlock: 12,
-      fetched,
-    })).toBe(buildSbtFilterHolderRevisionKey({
-      sbtSlug: 'alpha',
-      netKey: 84532,
-      sbtAddress: '0xSBT',
-      sbtCacheRevision: 3,
-      countsLoaded: true,
-      shouldUseEntryCountMaps: true,
-      mintedCountFingerprint: countMapFingerprint(fetched.mintedCountByAddress),
-      burnedCountFingerprint: countMapFingerprint(fetched.burnedCountByAddress),
-      mintedListFingerprint: computeHolderListFingerprint(fetched.mintedAddresses),
-      burnedListFingerprint: computeHolderListFingerprint(fetched.burnedAddresses),
-      creationBlock: 12,
-    }));
+    expect(
+      buildSbtFilterFetchedHolderRevisionKey({
+        sbtSlug: 'alpha',
+        netKey: 84532,
+        sbtAddress: '0xSBT',
+        sbtCacheRevision: 3,
+        fromBlock: 12,
+        fetched,
+      }),
+    ).toBe(
+      buildSbtFilterHolderRevisionKey({
+        sbtSlug: 'alpha',
+        netKey: 84532,
+        sbtAddress: '0xSBT',
+        sbtCacheRevision: 3,
+        countsLoaded: true,
+        shouldUseEntryCountMaps: true,
+        mintedCountFingerprint: countMapFingerprint(fetched.mintedCountByAddress),
+        burnedCountFingerprint: countMapFingerprint(fetched.burnedCountByAddress),
+        mintedListFingerprint: computeHolderListFingerprint(fetched.mintedAddresses),
+        burnedListFingerprint: computeHolderListFingerprint(fetched.burnedAddresses),
+        creationBlock: 12,
+      }),
+    );
 
-    expect(buildSbtFilterFetchedHolderRevisionKey({
-      fromBlock: null,
-      fetched: null,
-    })).toBe(buildSbtFilterHolderRevisionKey({
-      countsLoaded: true,
-      shouldUseEntryCountMaps: true,
-      mintedCountFingerprint: countMapFingerprint({}),
-      burnedCountFingerprint: countMapFingerprint({}),
-      mintedListFingerprint: computeHolderListFingerprint([]),
-      burnedListFingerprint: computeHolderListFingerprint([]),
-      creationBlock: 0,
-    }));
+    expect(
+      buildSbtFilterFetchedHolderRevisionKey({
+        fromBlock: null,
+        fetched: null,
+      }),
+    ).toBe(
+      buildSbtFilterHolderRevisionKey({
+        countsLoaded: true,
+        shouldUseEntryCountMaps: true,
+        mintedCountFingerprint: countMapFingerprint({}),
+        burnedCountFingerprint: countMapFingerprint({}),
+        mintedListFingerprint: computeHolderListFingerprint([]),
+        burnedListFingerprint: computeHolderListFingerprint([]),
+        creationBlock: 0,
+      }),
+    );
   });
 
   it('unions SBT holder sets for selected SBT entries', () => {
-    const holders = buildHolderUnionSet(
-      [
-        { address: '0xA' },
-        { address: '0xB' },
-        { address: '0xMissing' },
-        '0xBad',
-      ],
-      {
-        '0xa': new Set(['0x1', '0x2']),
-        '0xb': new Set(['0x2', '0x3']),
-      }
-    );
+    const holders = buildHolderUnionSet([{ address: '0xA' }, { address: '0xB' }, { address: '0xMissing' }, '0xBad'], {
+      '0xa': new Set(['0x1', '0x2']),
+      '0xb': new Set(['0x2', '0x3']),
+    });
 
     expect(Array.from(holders)).toEqual(['0x1', '0x2', '0x3']);
     expect(Array.from(buildHolderUnionSet(null, { '0xa': new Set(['0x1']) }))).toEqual([]);

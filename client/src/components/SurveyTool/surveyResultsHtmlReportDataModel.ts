@@ -1,6 +1,4 @@
-import type {
-  SessionResultsReportQuestion,
-} from '../../utilities/sessionResultsExport';
+import type { SessionResultsReportQuestion } from '../../utilities/sessionResultsExport';
 
 type SurveyResultsRecord = Record<string, unknown>;
 
@@ -36,13 +34,10 @@ export type BuildSurveyResultsHtmlReportQuestionsArgs = {
   responseCountsByQuestion?: Map<string, number> | null;
 };
 
-const isRecord = (value: unknown): value is SurveyResultsRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is SurveyResultsRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const toRecord = (value: unknown): SurveyResultsRecord => (
-  isRecord(value) ? value : {}
-);
+const toRecord = (value: unknown): SurveyResultsRecord => (isRecord(value) ? value : {});
 
 const defaultParseResponse = (response: unknown): unknown => {
   if (isRecord(response)) return response;
@@ -62,17 +57,16 @@ const defaultQuestionId = (response: unknown): string => {
   return String(record.questionID || record.questionId || '').trim();
 };
 
-const normalizeKey = (value: unknown): string => (
-  String(value || '').trim().toLowerCase()
-);
+const normalizeKey = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
-const isSurveyIndividualsMode = (viewMode: unknown, surveyViewMode: unknown): boolean => (
-  viewMode === 'survey' && surveyViewMode === 'individuals'
-);
+const isSurveyIndividualsMode = (viewMode: unknown, surveyViewMode: unknown): boolean =>
+  viewMode === 'survey' && surveyViewMode === 'individuals';
 
-const normalizeStringList = (value: unknown): string[] => (
-  Array.isArray(value) ? value.map((entry: unknown) => String(entry || '').trim()).filter(Boolean) : []
-);
+const normalizeStringList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map((entry: unknown) => String(entry || '').trim()).filter(Boolean) : [];
 
 export const buildSurveyResultsHtmlReportResponseCountsByQuestion = ({
   aggregatorQuestionResponses = {},
@@ -89,17 +83,14 @@ export const buildSurveyResultsHtmlReportResponseCountsByQuestion = ({
     counts.set(normalized, (counts.get(normalized) || 0) + amount);
   };
   const parsePort = typeof parseResponse === 'function' ? parseResponse : defaultParseResponse;
-  const questionIdPort = typeof getResponseQuestionId === 'function'
-    ? getResponseQuestionId
-    : defaultQuestionId;
+  const questionIdPort = typeof getResponseQuestionId === 'function' ? getResponseQuestionId : defaultQuestionId;
 
   if (isSurveyIndividualsMode(viewMode, surveyViewMode)) {
     const rows = Array.isArray(filteredResponses) ? filteredResponses : [];
     rows.forEach((responseRow) => {
       const parsedResponse = parsePort(toRecord(responseRow).response);
-      const responseRows = isRecord(parsedResponse) && Array.isArray(parsedResponse.responses)
-        ? parsedResponse.responses
-        : [];
+      const responseRows =
+        isRecord(parsedResponse) && Array.isArray(parsedResponse.responses) ? parsedResponse.responses : [];
       responseRows.forEach((answer) => {
         addCount(questionIdPort(answer));
       });
@@ -147,7 +138,7 @@ export const buildSurveyResultsHtmlReportParticipantCount = ({
 export const buildSurveyResultsHtmlReportQuestionsForExport = ({
   filteredQuestions = [],
   responseCountsByQuestion = new Map<string, number>(),
-}: BuildSurveyResultsHtmlReportQuestionsArgs = {}): SessionResultsReportQuestion[] => (
+}: BuildSurveyResultsHtmlReportQuestionsArgs = {}): SessionResultsReportQuestion[] =>
   (Array.isArray(filteredQuestions) ? filteredQuestions : []).map((question) => {
     const id = String(question.id || '').trim();
     const countKey = id.toLowerCase();
@@ -159,5 +150,4 @@ export const buildSurveyResultsHtmlReportQuestionsForExport = ({
       options: normalizeStringList(question.options),
       responseCount: responseCountsByQuestion?.get(countKey) || 0,
     };
-  })
-);
+  });

@@ -59,7 +59,10 @@ const typedWrappedProps: React.ComponentProps<typeof TypedWrapped> = {
 };
 void typedWrappedProps;
 // @ts-expect-error injected wagmi props are supplied by the HOC
-const typedWrappedPropsWithInjected: React.ComponentProps<typeof TypedWrapped> = { label: 'typed-probe', wagmiAddress: '0xabc' };
+const typedWrappedPropsWithInjected: React.ComponentProps<typeof TypedWrapped> = {
+  label: 'typed-probe',
+  wagmiAddress: '0xabc',
+};
 void typedWrappedPropsWithInjected;
 
 const buildProps = (overrides: Record<string, any> = {}): any => ({
@@ -168,11 +171,13 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
     render(<Wrapped {...props} />);
 
     await waitFor(() => {
-      expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-        account: '0x0000000000000000000000000000000000000003',
-        provider: 'wagmi',
-        network: expect.objectContaining({ id: 84532 }),
-      }));
+      expect(props.changeAccount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          account: '0x0000000000000000000000000000000000000003',
+          provider: 'wagmi',
+          network: expect.objectContaining({ id: 84532 }),
+        }),
+      );
     });
 
     const payload = props.changeAccount.mock.calls[0][0];
@@ -200,10 +205,12 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
     const { rerender } = render(<Wrapped {...props} />);
 
     await waitFor(() => {
-      expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-        account: address,
-        network: expect.objectContaining({ id: 84532 }),
-      }));
+      expect(props.changeAccount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          account: address,
+          network: expect.objectContaining({ id: 84532 }),
+        }),
+      );
     });
 
     props.changeAccount.mockClear();
@@ -215,10 +222,12 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
     rerender(<Wrapped {...props} />);
 
     await waitFor(() => {
-      expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-        account: address,
-        network: expect.objectContaining({ id: 8453 }),
-      }));
+      expect(props.changeAccount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          account: address,
+          network: expect.objectContaining({ id: 8453 }),
+        }),
+      );
     });
   });
 
@@ -279,10 +288,12 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
     const { rerender } = render(<Harness showFirst={true} />);
 
     await waitFor(() => {
-      expect(firstProps.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-        account: address,
-        network: expect.objectContaining({ id: 84532 }),
-      }));
+      expect(firstProps.changeAccount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          account: address,
+          network: expect.objectContaining({ id: 84532 }),
+        }),
+      );
     });
     expect(secondProps.changeAccount).not.toHaveBeenCalled();
 
@@ -299,10 +310,12 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
     rerender(<Harness showFirst={false} />);
 
     await waitFor(() => {
-      expect(secondProps.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-        account: address,
-        network: expect.objectContaining({ id: 8453 }),
-      }));
+      expect(secondProps.changeAccount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          account: address,
+          network: expect.objectContaining({ id: 8453 }),
+        }),
+      );
     });
     expect(firstProps.changeAccount).not.toHaveBeenCalled();
   });

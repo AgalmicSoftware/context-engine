@@ -36,9 +36,7 @@ export interface SessionMetaFieldsRefreshResult {
   errors: FieldDecryptError[];
 }
 
-type SessionMetaStateUpdater = (
-  prev: Record<string, unknown>
-) => Record<string, unknown> | null;
+type SessionMetaStateUpdater = (prev: Record<string, unknown>) => Record<string, unknown> | null;
 
 export interface SessionMetaRefreshHost {
   getActiveSessionSlug: () => string;
@@ -92,18 +90,8 @@ const getEncryptedFields = (cfg: Record<string, unknown> | null | undefined): Re
 
 const getChainId = (cfg: Record<string, unknown> | null | undefined): unknown => cfg?.networkChainId || null;
 
-export const refreshSessionInfoForSlug = async (
-  args: SessionInfoRefreshArgs,
-): Promise<SessionInfoRefreshResult> => {
-  const {
-    slug,
-    cfg,
-    account,
-    providerLike,
-    getKey,
-    lastAttemptKey = '',
-    decryptEnvelopeValue,
-  } = args;
+export const refreshSessionInfoForSlug = async (args: SessionInfoRefreshArgs): Promise<SessionInfoRefreshResult> => {
+  const { slug, cfg, account, providerLike, getKey, lastAttemptKey = '', decryptEnvelopeValue } = args;
 
   const encrypted = cfg?.sessionInfoEncrypted || cfg?.encryptedSessionInfo;
   if (!encrypted) {
@@ -135,15 +123,7 @@ export const refreshSessionInfoForSlug = async (
 export const refreshSessionMetaFieldsForSlug = async (
   args: SessionMetaFieldsRefreshArgs,
 ): Promise<SessionMetaFieldsRefreshResult> => {
-  const {
-    slug,
-    cfg,
-    account,
-    providerLike,
-    getKey,
-    attempts = {},
-    decryptEnvelopeValue,
-  } = args;
+  const { slug, cfg, account, providerLike, getKey, attempts = {}, decryptEnvelopeValue } = args;
 
   const encryptedFields = getEncryptedFields(cfg);
   const nextAttempts = attempts && typeof attempts === 'object' ? { ...attempts } : {};
@@ -215,9 +195,7 @@ export const refreshSessionMetaFieldsForSlug = async (
   };
 };
 
-export const createSessionMetaRefreshController = (
-  host: SessionMetaRefreshHost,
-): SessionMetaRefreshController => {
+export const createSessionMetaRefreshController = (host: SessionMetaRefreshHost): SessionMetaRefreshController => {
   let sessionMetaAttempts: Record<string, boolean> = {};
   let lastSessionInfoAttempt = '';
 

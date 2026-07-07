@@ -1,10 +1,11 @@
-type QuestionLike = {
-  id?: unknown;
-} | null | undefined;
+type QuestionLike =
+  | {
+      id?: unknown;
+    }
+  | null
+  | undefined;
 
-const toQuestionList = (list: unknown): QuestionLike[] => (
-  Array.isArray(list) ? list : []
-);
+const toQuestionList = (list: unknown): QuestionLike[] => (Array.isArray(list) ? list : []);
 
 export const readRenderedQuestionIds = ({
   getRenderedQuestionIds = null,
@@ -13,9 +14,7 @@ export const readRenderedQuestionIds = ({
   getRenderedQuestionIds?: (() => unknown) | null;
   normalizeRenderedIds?: ((args: { renderedIds: unknown[] }) => unknown[]) | null;
 } = {}): unknown[] => {
-  const renderedIds = typeof getRenderedQuestionIds === 'function'
-    ? getRenderedQuestionIds()
-    : [];
+  const renderedIds = typeof getRenderedQuestionIds === 'function' ? getRenderedQuestionIds() : [];
   const nextRenderedIds = Array.isArray(renderedIds) ? renderedIds : [];
 
   return typeof normalizeRenderedIds === 'function'
@@ -86,9 +85,10 @@ export const buildInitialSurveyResponseQuestionIds = ({
   stateQuestionPool?: unknown;
 } = {}): unknown[] => {
   const nextQuestionPoolIds = Array.isArray(questionPoolIds) ? questionPoolIds : [];
-  const readCurrentRenderedQuestionIds = () => readRenderedQuestionIds({
-    getRenderedQuestionIds,
-  });
+  const readCurrentRenderedQuestionIds = () =>
+    readRenderedQuestionIds({
+      getRenderedQuestionIds,
+    });
 
   if (singleQuestionMode) {
     return nextQuestionPoolIds.length > 0 ? nextQuestionPoolIds : [questionId];

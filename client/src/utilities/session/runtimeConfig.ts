@@ -60,21 +60,27 @@ export const isRpcTestingModeEnabled = (): boolean => {
         return readBoolish(params.get('ceRpcTestingMode'), false);
       }
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
 
   try {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem('ce:rpcTestingMode');
       if (stored != null) return readBoolish(stored, false);
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
 
   try {
     const runtimeGlobals = getRuntimeGlobals();
     if (typeof runtimeGlobals.CE_RPC_TESTING_MODE !== 'undefined') {
       return readBoolish(runtimeGlobals.CE_RPC_TESTING_MODE, false);
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
 
   return !!CE_RPC_TESTING_MODE;
 };
@@ -107,7 +113,9 @@ export const parseStoredSessionScanSlugList = (raw: unknown): string[] => {
     try {
       const arr = JSON.parse(str);
       return normalizeSessionScanSlugList(arr);
-    } catch (e) { void e; /* fallback: runtime override lookup. */ }
+    } catch (e) {
+      void e; /* fallback: runtime override lookup. */
+    }
   }
   return normalizeSessionScanSlugList(str);
 };
@@ -121,21 +129,27 @@ export const readSessionScanSlugsForTestingMode = (): string[] => {
         return normalizeSessionScanSlugList(params.get('ceSessionScanSlugs'));
       }
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
 
   try {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem('ce:sessionScanSlugs');
       if (stored != null) return parseStoredSessionScanSlugList(stored);
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
 
   try {
     const runtimeGlobals = getRuntimeGlobals();
     if (typeof runtimeGlobals.CE_SESSION_SCAN_SLUGS !== 'undefined') {
       return normalizeSessionScanSlugList(runtimeGlobals.CE_SESSION_SCAN_SLUGS);
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
 
   return normalizeSessionScanSlugList(CE_SESSION_SCAN_SLUGS);
 };
@@ -173,9 +187,7 @@ export const initializeRuntimeConfig = (): void => {
   if (typeof runtimeGlobals.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED === 'undefined') {
     runtimeGlobals.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED = CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED;
   }
-  const hasLegacyProfileScanRuntimeOverride = (
-    typeof runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS !== 'undefined'
-  );
+  const hasLegacyProfileScanRuntimeOverride = typeof runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS !== 'undefined';
   const legacyProfileScanRuntimeValue = hasLegacyProfileScanRuntimeOverride
     ? readBoolish(runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS, !!CE_USER_PROFILE_SCAN_ALL_SESSIONS)
     : !!CE_USER_PROFILE_SCAN_ALL_SESSIONS;
@@ -183,25 +195,19 @@ export const initializeRuntimeConfig = (): void => {
     runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS = CE_USER_PROFILE_SCAN_ALL_SESSIONS;
   }
   if (typeof runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS === 'undefined') {
-    runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS = (
-      hasLegacyProfileScanRuntimeOverride
-        ? legacyProfileScanRuntimeValue
-        : CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS
-    );
+    runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS = hasLegacyProfileScanRuntimeOverride
+      ? legacyProfileScanRuntimeValue
+      : CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS;
   }
   if (typeof runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS === 'undefined') {
-    runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS = (
-      hasLegacyProfileScanRuntimeOverride
-        ? legacyProfileScanRuntimeValue
-        : CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS
-    );
+    runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS = hasLegacyProfileScanRuntimeOverride
+      ? legacyProfileScanRuntimeValue
+      : CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS;
   }
   if (typeof runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS === 'undefined') {
-    runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS = (
-      hasLegacyProfileScanRuntimeOverride
-        ? legacyProfileScanRuntimeValue
-        : CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS
-    );
+    runtimeGlobals.CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS = hasLegacyProfileScanRuntimeOverride
+      ? legacyProfileScanRuntimeValue
+      : CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS;
   }
   if (typeof runtimeGlobals.CE_PROFILE_SCAN_SBT_BURST_SIZE === 'undefined') {
     runtimeGlobals.CE_PROFILE_SCAN_SBT_BURST_SIZE = CE_PROFILE_SCAN_SBT_BURST_SIZE;
@@ -244,9 +250,11 @@ export const initializeRuntimeConfig = (): void => {
       try {
         console.info(
           `[Context Engine] CE_RPC_TESTING_MODE enabled (` +
-          `CE_SESSION_SCAN_SCOPE=${runtimeGlobals.CE_SESSION_SCAN_SCOPE}).`
+            `CE_SESSION_SCAN_SCOPE=${runtimeGlobals.CE_SESSION_SCAN_SCOPE}).`,
         );
-      } catch (e) { void e; /* fallback: runtime override lookup. */ }
+      } catch (e) {
+        void e; /* fallback: runtime override lookup. */
+      }
     }
   }
 

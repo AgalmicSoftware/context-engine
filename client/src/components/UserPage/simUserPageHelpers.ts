@@ -30,10 +30,8 @@ export type SimFullProfileModalStatePatch = {
 
 export const resolveSimUserInfoByUsername = <T extends SimUserLookupEntry>(
   figures: readonly T[] = [],
-  simUsername?: unknown
-): T | null => (
-  figures.find((figure) => figure?.username === simUsername) || null
-);
+  simUsername?: unknown,
+): T | null => figures.find((figure) => figure?.username === simUsername) || null;
 
 export const buildSimUserInfoStatePatch = <T extends SimUserLookupEntry>({
   figures = [],
@@ -57,15 +55,14 @@ export const buildSimUserPageRootClassName = ({
   baseClassName = '',
   minimized = false,
   minimizedClassName = '',
-}: BuildSimUserPageRootClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  minimized ? String(minimizedClassName || '') : '',
-].filter(Boolean).join(' '));
+}: BuildSimUserPageRootClassNameArgs = {}): string =>
+  [String(baseClassName || ''), minimized ? String(minimizedClassName || '') : ''].filter(Boolean).join(' ');
 
-export const resolveSimUserStanceMarkerStyle = ({
-  value = 0,
-}: ResolveSimUserStanceMarkerStyleArgs = {}): Record<string, string> => ({
-  left: `${(Number(value || 0) + 1) / 2 * 100}%`,
+export const resolveSimUserStanceMarkerStyle = ({ value = 0 }: ResolveSimUserStanceMarkerStyleArgs = {}): Record<
+  string,
+  string
+> => ({
+  left: `${((Number(value || 0) + 1) / 2) * 100}%`,
 });
 
 export const buildSimUserVoteIndicatorClassName = ({
@@ -73,15 +70,16 @@ export const buildSimUserVoteIndicatorClassName = ({
   negativeClassName = '',
   positiveClassName = '',
   vote = 0,
-}: BuildSimUserVoteIndicatorClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  Number(vote || 0) > 0 ? String(positiveClassName || '') : String(negativeClassName || ''),
-].filter(Boolean).join(' '));
+}: BuildSimUserVoteIndicatorClassNameArgs = {}): string =>
+  [
+    String(baseClassName || ''),
+    Number(vote || 0) > 0 ? String(positiveClassName || '') : String(negativeClassName || ''),
+  ]
+    .filter(Boolean)
+    .join(' ');
 
 export const buildSimUserRelatedScoreClassName = ({
   baseClassName = '',
   disagreeClassName = '',
-}: BuildSimUserRelatedScoreClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  String(disagreeClassName || ''),
-].filter(Boolean).join(' '));
+}: BuildSimUserRelatedScoreClassNameArgs = {}): string =>
+  [String(baseClassName || ''), String(disagreeClassName || '')].filter(Boolean).join(' ');

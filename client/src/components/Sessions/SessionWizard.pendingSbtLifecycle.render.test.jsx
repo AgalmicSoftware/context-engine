@@ -26,7 +26,7 @@ describe('SessionWizard pending SBT lifecycle rendering', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toHaveAttribute(
       'data-ce-sbt-address',
-      mockPendingSbtAddress.toLowerCase()
+      mockPendingSbtAddress.toLowerCase(),
     );
     await waitFor(() => {
       expect(screen.queryByTestId('mock-create-sbt-group')).not.toBeInTheDocument();
@@ -46,7 +46,7 @@ describe('SessionWizard pending SBT lifecycle rendering', () => {
     await waitFor(() => {
       const selectors = screen.getAllByTestId('mock-wizard-sbt-selector');
       const gateOneSelector = selectors.find(
-        (node) => node.getAttribute('data-selector-id') === 'encryption-gate-gate-1'
+        (node) => node.getAttribute('data-selector-id') === 'encryption-gate-gate-1',
       );
       expect(gateOneSelector).toHaveAttribute('data-selected-addresses', mockPendingSbtAddress);
     });
@@ -55,7 +55,7 @@ describe('SessionWizard pending SBT lifecycle rendering', () => {
 
     const chainSelect = screen.getByRole('combobox');
     const alternateOption = Array.from(chainSelect.querySelectorAll('option')).find(
-      (option) => option.value && option.value !== chainSelect.value
+      (option) => option.value && option.value !== chainSelect.value,
     );
     expect(alternateOption).toBeTruthy();
 
@@ -81,7 +81,7 @@ describe('SessionWizard pending SBT lifecycle rendering', () => {
     await waitFor(() => {
       const selectors = screen.getAllByTestId('mock-wizard-sbt-selector');
       const gateOneSelector = selectors.find(
-        (node) => node.getAttribute('data-selector-id') === 'encryption-gate-gate-1'
+        (node) => node.getAttribute('data-selector-id') === 'encryption-gate-gate-1',
       );
       expect(gateOneSelector).toHaveAttribute('data-selected-addresses', mockPendingSbtAddress);
     });

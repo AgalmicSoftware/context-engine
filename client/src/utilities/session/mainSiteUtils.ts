@@ -65,14 +65,20 @@ export const isForcedSbtSelectorDebugEnabled = (): boolean => {
     return false;
   }
   try {
-    if (typeof localStorage !== 'undefined' && readBoolishDebugFlag(localStorage.getItem(SBT_SELECTOR_DEBUG_STORAGE_KEY))) {
+    if (
+      typeof localStorage !== 'undefined' &&
+      readBoolishDebugFlag(localStorage.getItem(SBT_SELECTOR_DEBUG_STORAGE_KEY))
+    ) {
       return true;
     }
   } catch (_) {
     return false;
   }
   try {
-    if (typeof sessionStorage !== 'undefined' && readBoolishDebugFlag(sessionStorage.getItem(SBT_SELECTOR_DEBUG_STORAGE_KEY))) {
+    if (
+      typeof sessionStorage !== 'undefined' &&
+      readBoolishDebugFlag(sessionStorage.getItem(SBT_SELECTOR_DEBUG_STORAGE_KEY))
+    ) {
       return true;
     }
   } catch (_) {
@@ -103,7 +109,8 @@ export const emitMainSiteSbtDebug = (level: string, message: string, payload?: u
   }
 };
 
-export const isRouteResponderAddress = (value: unknown): boolean => /^0x[0-9a-fA-F]{40}$/.test(String(value || '').trim());
+export const isRouteResponderAddress = (value: unknown): boolean =>
+  /^0x[0-9a-fA-F]{40}$/.test(String(value || '').trim());
 
 export const hasCoreSbtMetadata = (info: unknown): boolean => {
   if (!info || typeof info !== 'object') return false;
@@ -143,10 +150,11 @@ export const buildMainSiteCacheManagerReadyStatePatch = ({
 
 export const isMainSitePerfCountersEnabled = (): boolean => {
   try {
-    return typeof globalThis !== 'undefined' && (
-      globalThis.ENABLE_CE_UI_PERF_STATS === true ||
-      globalThis.ENABLE_CE_DEBUG_COUNTERS === true ||
-      globalThis.__CE_DEBUG_COUNTERS__ === true
+    return (
+      typeof globalThis !== 'undefined' &&
+      (globalThis.ENABLE_CE_UI_PERF_STATS === true ||
+        globalThis.ENABLE_CE_DEBUG_COUNTERS === true ||
+        globalThis.__CE_DEBUG_COUNTERS__ === true)
     );
   } catch (_) {
     return false;
@@ -163,16 +171,15 @@ export const bumpMainSitePerfCounter = (key: string, inc = 1): void => {
 
     const perfCounters = globalThis.__CE_PERF_COUNTERS__ as PerfCounterStore;
 
-    if (
-      !perfCounters[MAIN_SITE_PERF_SCOPE] ||
-      typeof perfCounters[MAIN_SITE_PERF_SCOPE] !== 'object'
-    ) {
+    if (!perfCounters[MAIN_SITE_PERF_SCOPE] || typeof perfCounters[MAIN_SITE_PERF_SCOPE] !== 'object') {
       perfCounters[MAIN_SITE_PERF_SCOPE] = {};
     }
 
     const scope = perfCounters[MAIN_SITE_PERF_SCOPE] as PerfCounterScope;
     scope[key] = Number(scope[key] || 0) + Number(inc || 0);
-  } catch (e) { void e; /* fallback: perf counter update. */ }
+  } catch (e) {
+    void e; /* fallback: perf counter update. */
+  }
 };
 
 export const getMainSitePerfNow = (): number => {

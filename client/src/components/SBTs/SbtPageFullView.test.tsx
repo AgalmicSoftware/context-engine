@@ -5,23 +5,19 @@ import { renderSbtPageFullView } from './SbtPageFullView';
 
 jest.mock('reactstrap', () => ({
   Alert: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div role="alert" className={className}>{children}</div>
+    <div role="alert" className={className}>
+      {children}
+    </div>
   ),
-  Modal: ({
-    children,
-    isOpen,
-  }: {
-    children: React.ReactNode;
-    isOpen?: boolean;
-  }) => (isOpen ? <div data-testid="mock-modal">{children}</div> : null),
+  Modal: ({ children, isOpen }: { children: React.ReactNode; isOpen?: boolean }) =>
+    isOpen ? <div data-testid="mock-modal">{children}</div> : null,
   ModalBody: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  ModalHeader: ({
-    children,
-    close,
-  }: {
-    children: React.ReactNode;
-    close?: React.ReactNode;
-  }) => <div>{children}{close}</div>,
+  ModalHeader: ({ children, close }: { children: React.ReactNode; close?: React.ReactNode }) => (
+    <div>
+      {children}
+      {close}
+    </div>
+  ),
 }));
 
 jest.mock('../Shared/CETooltip', () => ({
@@ -42,19 +38,16 @@ const sbtAddress = '0x00000000000000000000000000000000000000a1';
 const holderAddress = '0x00000000000000000000000000000000000000b1';
 
 type FullViewArgs = Parameters<typeof renderSbtPageFullView>[0];
-type FullViewArgsOverrides = Partial<Omit<
-  FullViewArgs,
-  'actionLabels' | 'callbacks' | 'identityPanelDisplayState' | 'state'
->> & {
+type FullViewArgsOverrides = Partial<
+  Omit<FullViewArgs, 'actionLabels' | 'callbacks' | 'identityPanelDisplayState' | 'state'>
+> & {
   actionLabels?: Partial<FullViewArgs['actionLabels']>;
   callbacks?: Partial<FullViewArgs['callbacks']>;
   identityPanelDisplayState?: Partial<FullViewArgs['identityPanelDisplayState']>;
   state?: Partial<FullViewArgs['state']>;
 };
 
-const createArgs = (
-  overrides: FullViewArgsOverrides = {}
-): FullViewArgs => {
+const createArgs = (overrides: FullViewArgsOverrides = {}): FullViewArgs => {
   const base: FullViewArgs = {
     actionLabels: {
       burn: 'Burn',
@@ -194,15 +187,19 @@ describe('renderSbtPageFullView', () => {
   });
 
   it('preserves the loading fallback without rendering the full shell controls', () => {
-    render(renderSbtPageFullView(createArgs({
-      netHolders: [],
-      sbtInfo: null,
-      state: {
-        error: '',
-        filteredMintedUsers: [],
-        mintedAddresses: [],
-      },
-    })));
+    render(
+      renderSbtPageFullView(
+        createArgs({
+          netHolders: [],
+          sbtInfo: null,
+          state: {
+            error: '',
+            filteredMintedUsers: [],
+            mintedAddresses: [],
+          },
+        }),
+      ),
+    );
 
     expect(screen.getByText('Loading SBT Details')).toBeInTheDocument();
     expect(screen.queryByText('SBT list')).toBeNull();
@@ -214,19 +211,23 @@ describe('renderSbtPageFullView', () => {
     const toggleActions = jest.fn();
     const toggleAdminSection = jest.fn();
     const toggleMoreDetails = jest.fn();
-    render(renderSbtPageFullView(createArgs({
-      callbacks: {
-        onBackToList,
-        toggleStats,
-        toggleActions,
-        toggleAdminSection,
-        toggleMoreDetails,
-      },
-      sbtMintPassword: 'detected-password',
-      state: {
-        showPasswordAlert: true,
-      },
-    })));
+    render(
+      renderSbtPageFullView(
+        createArgs({
+          callbacks: {
+            onBackToList,
+            toggleStats,
+            toggleActions,
+            toggleAdminSection,
+            toggleMoreDetails,
+          },
+          sbtMintPassword: 'detected-password',
+          state: {
+            showPasswordAlert: true,
+          },
+        }),
+      ),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: /SBT list/ }));
     fireEvent.click(screen.getByText('STATS'));
@@ -244,17 +245,21 @@ describe('renderSbtPageFullView', () => {
 
   it('passes holder modal fallback copy and filter handler through explicit props', () => {
     const handleModalFilteredMintedUsers = jest.fn();
-    render(renderSbtPageFullView(createArgs({
-      callbacks: {
-        handleModalFilteredMintedUsers,
-      },
-      netHolders: [],
-      state: {
-        filteredMintedUsers: [],
-        mintedAddresses: [],
-        showModal: true,
-      },
-    })));
+    render(
+      renderSbtPageFullView(
+        createArgs({
+          callbacks: {
+            handleModalFilteredMintedUsers,
+          },
+          netHolders: [],
+          state: {
+            filteredMintedUsers: [],
+            mintedAddresses: [],
+            showModal: true,
+          },
+        }),
+      ),
+    );
 
     expect(screen.getByText('Holders')).toBeInTheDocument();
     expect(screen.getByText('No holders found.')).toBeInTheDocument();

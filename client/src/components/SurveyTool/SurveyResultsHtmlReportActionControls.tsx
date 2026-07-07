@@ -1,8 +1,5 @@
 import React from 'react';
-import {
-  Button,
-  ModalFooter,
-} from 'reactstrap';
+import { Button, ModalFooter } from 'reactstrap';
 
 export type SurveyResultsHtmlReportActionControlsStyleMap = {
   htmlReportCancelButton?: string;
@@ -26,11 +23,7 @@ export const renderSurveyResultsHtmlReportActionControls = ({
   styleMap,
 }: SurveyResultsHtmlReportActionControlsProps): React.ReactElement => (
   <ModalFooter className={styleMap.htmlReportModalFooter}>
-    <Button
-      color="secondary"
-      onClick={onClose}
-      className={styleMap.htmlReportCancelButton}
-    >
+    <Button color="secondary" onClick={onClose} className={styleMap.htmlReportCancelButton}>
       Cancel
     </Button>
     <Button

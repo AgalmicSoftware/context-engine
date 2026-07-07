@@ -11,9 +11,7 @@ type SessionFeaturedSbtConfig = {
   featured_SBTs_LIST?: unknown;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
 const readFeaturedEntryValue = (value: unknown): unknown => {
   if (typeof value === 'string') return value;
@@ -37,9 +35,7 @@ const normalizeFeaturedAddressList = (values: unknown = []): string[] => {
 };
 
 export const getCanonicalSessionFeaturedSBTs = (sessionConfig: unknown = null): string[] => {
-  const config: SessionFeaturedSbtConfig = isRecord(sessionConfig)
-    ? sessionConfig
-    : {};
+  const config: SessionFeaturedSbtConfig = isRecord(sessionConfig) ? sessionConfig : {};
   return normalizeFeaturedAddressList([
     ...(Array.isArray(config?.defaultFeaturedSBTs) ? config.defaultFeaturedSBTs : []),
     ...(Array.isArray(config?.featured_SBTs_LIST) ? config.featured_SBTs_LIST : []),

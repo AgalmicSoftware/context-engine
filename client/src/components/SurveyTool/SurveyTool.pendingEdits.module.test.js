@@ -12,18 +12,9 @@ import {
 } from './surveyQuestionsTypes.js';
 import { runSurveyQuestionsSubmitController } from './surveyQuestionsSubmitController';
 import { buildSliderPersistOptions } from './surveyToolSliderState';
-import {
-  buildSurveyResponseSliceSignature,
-  normalizeQuestionIdKey,
-} from './surveyToolSignatures.js';
-import {
-  executeSurveyExitEditing,
-  executeSurveyPendingRevert,
-} from './surveyToolResponseResetController';
-import {
-  getConvictionFromSlice,
-  getImportanceFromSlice,
-} from './surveyToolResponseState';
+import { buildSurveyResponseSliceSignature, normalizeQuestionIdKey } from './surveyToolSignatures.js';
+import { executeSurveyExitEditing, executeSurveyPendingRevert } from './surveyToolResponseResetController';
+import { getConvictionFromSlice, getImportanceFromSlice } from './surveyToolResponseState';
 
 const cloneValue = (value) => JSON.parse(JSON.stringify(value));
 
@@ -91,12 +82,18 @@ const runChangedQids = ({
       currentSlice,
       isLoggedIn: true,
       isLoadingResponse: false,
-      scopedIds: scopedIds || new Set([
-        ...Object.keys(currentSlice.answers || {}),
-        ...Object.keys(currentSlice.additionalComments || {}),
-        ...Object.keys(currentSlice.importance || {}),
-        ...Object.keys(currentSlice.conviction || {}),
-      ].map(normalizeQuestionIdKey).filter(Boolean)),
+      scopedIds:
+        scopedIds ||
+        new Set(
+          [
+            ...Object.keys(currentSlice.answers || {}),
+            ...Object.keys(currentSlice.additionalComments || {}),
+            ...Object.keys(currentSlice.importance || {}),
+            ...Object.keys(currentSlice.conviction || {}),
+          ]
+            .map(normalizeQuestionIdKey)
+            .filter(Boolean),
+        ),
       userAnswers,
     },
     deps,
@@ -112,24 +109,25 @@ const pendingStatsFromChanged = ({
   pileQuestions = [],
   userAnswers = null,
   depsOverrides = {},
-}) => computePendingEditStats(
-  {
-    idx: 0,
-    currentSlice,
-    userAnswers,
-    existingCache: null,
-    diffCacheRef: {},
-    questionPool,
-    pileQuestions,
-    questionId: null,
-  },
-  {
-    getChangedQidsAndFields: () => changedResult,
-    isQuestionLockedForResponse: () => false,
-    buildRatingEnvelopeQidSetFromUserAnswers: () => new Set(),
-    ...depsOverrides,
-  },
-).result;
+}) =>
+  computePendingEditStats(
+    {
+      idx: 0,
+      currentSlice,
+      userAnswers,
+      existingCache: null,
+      diffCacheRef: {},
+      questionPool,
+      pileQuestions,
+      questionId: null,
+    },
+    {
+      getChangedQidsAndFields: () => changedResult,
+      isQuestionLockedForResponse: () => false,
+      buildRatingEnvelopeQidSetFromUserAnswers: () => new Set(),
+      ...depsOverrides,
+    },
+  ).result;
 
 const mutationDeps = (questions = []) => ({
   buildEmptyResponseFieldState: (qid, fieldKey = 'answer') => emptyField('', { questionId: qid, fieldKey }),
@@ -146,32 +144,33 @@ const mutationDeps = (questions = []) => ({
     audienceMode: 'inherit',
   }),
   valuesEqual,
-  getQuestionById: (qid) => questions.find((question) => normalizeQuestionIdKey(question.id) === normalizeQuestionIdKey(qid)),
+  getQuestionById: (qid) =>
+    questions.find((question) => normalizeQuestionIdKey(question.id) === normalizeQuestionIdKey(qid)),
   computeHash: jest.fn((value) => `hash:${value}`),
 });
 
-const responsePayload = (overrides = {}) => buildResponsePayload({
-  account: '0xabc',
-  isStandalone: false,
-  singleQuestionMode: true,
-  surveyId: '',
-  surveyIndex: 0,
-  surveyResponseState: createSlice(),
-  questionPool: [],
-  pileQuestions: [],
-  resolveFieldEncryptionAudience: (field) => field?.encryptionAudience || 'self',
-  getQuestionEncryptionGates: (question) => (question?.promptEncrypted ? ['gate'] : []),
-  resolveFieldEncryptionGateId: (field) => field?.encryptionGateId || null,
-  normalizeFieldAudienceMode: (mode, fieldKey) => mode || (fieldKey === 'additional' ? 'inherit' : 'explicit'),
-  getSurveyMetadataForJson: () => null,
-  resolveSessionContext: () => ({ sessionName: '' }),
-  getConvictionFromSlice,
-  getImportanceFromSlice,
-  sanitizeQuestionPromptForResponsePayload: (question, { isLocked }) => (
-    isLocked ? '[encrypted]' : (question.prompt || '')
-  ),
-  ...overrides,
-});
+const responsePayload = (overrides = {}) =>
+  buildResponsePayload({
+    account: '0xabc',
+    isStandalone: false,
+    singleQuestionMode: true,
+    surveyId: '',
+    surveyIndex: 0,
+    surveyResponseState: createSlice(),
+    questionPool: [],
+    pileQuestions: [],
+    resolveFieldEncryptionAudience: (field) => field?.encryptionAudience || 'self',
+    getQuestionEncryptionGates: (question) => (question?.promptEncrypted ? ['gate'] : []),
+    resolveFieldEncryptionGateId: (field) => field?.encryptionGateId || null,
+    normalizeFieldAudienceMode: (mode, fieldKey) => mode || (fieldKey === 'additional' ? 'inherit' : 'explicit'),
+    getSurveyMetadataForJson: () => null,
+    resolveSessionContext: () => ({ sessionName: '' }),
+    getConvictionFromSlice,
+    getImportanceFromSlice,
+    sanitizeQuestionPromptForResponsePayload: (question, { isLocked }) =>
+      isLocked ? '[encrypted]' : question.prompt || '',
+    ...overrides,
+  });
 
 const createStateHarness = (initialState) => {
   let currentState = initialState;
@@ -251,11 +250,13 @@ describe('SurveyTool pending edit accounting', () => {
       additionalComments: { 'pile-q1': emptyField() },
     });
     const changed = runChangedQids({ baselineSlice: baseline, currentSlice: edited, scopedIds }).result;
-    expect(pendingStatsFromChanged({
-      currentSlice: edited,
-      changedResult: changed,
-      pileQuestions: [{ id: 'pile-q1' }],
-    }).total).toBe(1);
+    expect(
+      pendingStatsFromChanged({
+        currentSlice: edited,
+        changedResult: changed,
+        pileQuestions: [{ id: 'pile-q1' }],
+      }).total,
+    ).toBe(1);
   });
 
   it('tracks visible and off-screen edits from response slices while keeping unchanged baseline at zero', () => {
@@ -479,23 +480,27 @@ describe('SurveyTool pending edit accounting', () => {
       }),
     });
 
-    expect(json).toEqual(expect.objectContaining({
-      questionID: 'q1',
-      responder: '0xabc',
-      prompt: 'Prompt without session name',
-      sessionName: '',
-    }));
+    expect(json).toEqual(
+      expect.objectContaining({
+        questionID: 'q1',
+        responder: '0xabc',
+        prompt: 'Prompt without session name',
+        sessionName: '',
+      }),
+    );
   });
 
   it('masks locked question prompts in response json payloads', () => {
     const json = responsePayload({
       account: '0xabc',
-      questionPool: [{
-        id: 'q1',
-        type: 'freeform',
-        prompt: 'Secret locked prompt',
-        promptEncrypted: '{"ciphertext":"prompt-cipher"}',
-      }],
+      questionPool: [
+        {
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Secret locked prompt',
+          promptEncrypted: '{"ciphertext":"prompt-cipher"}',
+        },
+      ],
       surveyResponseState: createSlice({
         answers: { q1: emptyField('answer') },
         additionalComments: { q1: emptyField() },
@@ -638,13 +643,15 @@ describe('SurveyTool pending edit accounting', () => {
       hasEncryptedChanges: false,
     });
     const recalculateEditStats = jest.fn(() => {
-      stateHarness.setState(buildEditStatsState({
-        encryptedModifiedCount: 0,
-        hasEncryptedChanges: false,
-        isDirty: false,
-        modifiedCount: 0,
-        shouldRelatchSubmitted: true,
-      }));
+      stateHarness.setState(
+        buildEditStatsState({
+          encryptedModifiedCount: 0,
+          hasEncryptedChanges: false,
+          isDirty: false,
+          modifiedCount: 0,
+          shouldRelatchSubmitted: true,
+        }),
+      );
     });
 
     executeSurveyPendingRevert({
@@ -676,12 +683,16 @@ describe('SurveyTool pending edit accounting', () => {
       userAnswers: { answer: { value: 'self' } },
       submittedSinceLastEdit: true,
     });
-    const buildSliceFromUserAnswers = jest.fn(() => createSlice({
-      answers: { q1: { value: 'viewed' } },
-    }));
-    const buildSliceFromLocalCache = jest.fn(() => createSlice({
-      answers: { q9: { value: 'cached' } },
-    }));
+    const buildSliceFromUserAnswers = jest.fn(() =>
+      createSlice({
+        answers: { q1: { value: 'viewed' } },
+      }),
+    );
+    const buildSliceFromLocalCache = jest.fn(() =>
+      createSlice({
+        answers: { q9: { value: 'cached' } },
+      }),
+    );
     const clearDraft = jest.fn();
     const recalculateEditStats = jest.fn();
     const persistDraftSafely = jest.fn();

@@ -44,21 +44,14 @@ const LoginSettingsSectionCard = ({
           aria-expanded={!!isOpen}
         >
           <LoginSettingsSectionTitle title={title} summary={summary} />
-          <FontAwesomeIcon
-            icon={isOpen ? faCaretUp : faCaretDown}
-            className={styles.settingsSectionChevron}
-          />
+          <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} className={styles.settingsSectionChevron} />
         </button>
       ) : (
         <div className={styles.settingsSectionToggle}>
           <LoginSettingsSectionTitle title={title} summary={summary} />
         </div>
       )}
-      {isOpen && (
-        <div className={styles.settingsSectionBody}>
-          {children}
-        </div>
-      )}
+      {isOpen && <div className={styles.settingsSectionBody}>{children}</div>}
     </div>
   );
 };

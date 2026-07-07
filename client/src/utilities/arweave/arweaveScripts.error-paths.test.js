@@ -62,14 +62,20 @@ describe('error paths', () => {
     }));
     readSessionScanSlugs.mockReturnValue([]);
     fetchWorkerWithAuth.mockReset();
-    try { delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__; } catch (_) {}
+    try {
+      delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__;
+    } catch (_) {}
   });
 
   afterEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
-    try { delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
+    try {
+      delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__;
+    } catch (_) {}
   });
 
   it('throws on upload network failures without returning a partial tx id', async () => {
@@ -78,7 +84,7 @@ describe('error paths', () => {
     await expect(
       arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
-      })
+      }),
     ).rejects.toThrow('Arweave upload network error');
 
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
@@ -104,7 +110,7 @@ describe('error paths', () => {
         retries: 0,
         bypassCache: true,
         disableExistencePrecheck: true,
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -124,7 +130,7 @@ describe('error paths', () => {
         bypassCache: true,
         disableExistencePrecheck: true,
         gatewayTimeoutMs: 100,
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       kind: 'network',
@@ -163,7 +169,7 @@ describe('error paths', () => {
     await expect(
       arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
-      })
+      }),
     ).rejects.toThrow('Arweave upload succeeded but no tx id was returned by worker.');
 
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);

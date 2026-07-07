@@ -69,21 +69,22 @@ const OnboardingOverlay = () => {
     styles.mediaButton,
     slideLayout === 'flushBottom' ? styles.mediaButtonFlushBottom : null,
     slideLayout === 'centered' ? styles.mediaButtonCentered : null,
-  ].filter(Boolean).join(' ');
-  const mediaImageClassName = [
-    styles.mediaImage,
-    IMAGE_CLASS_BY_SLIDE_KEY[slideKey] || '',
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const mediaImageClassName = [styles.mediaImage, IMAGE_CLASS_BY_SLIDE_KEY[slideKey] || ''].filter(Boolean).join(' ');
   const controlsClassName = [
     styles.onboardingControls,
     hasBackButton ? styles.onboardingControlsDualArrow : styles.onboardingControlsSingleArrow,
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <div className={styles.overlay} data-testid='ce-onboarding-overlay'>
+    <div className={styles.overlay} data-testid="ce-onboarding-overlay">
       <div className={`block-gradient-slow ${styles.panelFrame}`}>
         <div className={styles.panel} data-slide-key={slideKey} data-slide-layout={slideLayout}>
-          <button type='button' className={styles.skipButton} onClick={completeOnboarding}>
+          <button type="button" className={styles.skipButton} onClick={completeOnboarding}>
             Skip
           </button>
 
@@ -96,20 +97,22 @@ const OnboardingOverlay = () => {
             <div className={styles.onboardingInfo}>
               {title ? (
                 <div className={styles.onboardingTitleArea}>
-                  <h2 className={styles.onboardingTitle} data-testid='ce-onboarding-title'>{title}</h2>
+                  <h2 className={styles.onboardingTitle} data-testid="ce-onboarding-title">
+                    {title}
+                  </h2>
                 </div>
               ) : null}
 
               <div
                 className={styles.deck}
-                data-testid='ce-onboarding-deck'
+                data-testid="ce-onboarding-deck"
                 data-slide-key={slideKey}
                 data-slide-layout={slideLayout}
               >
                 <button
-                  type='button'
+                  type="button"
                   className={mediaButtonClassName}
-                  data-testid='ce-onboarding-media'
+                  data-testid="ce-onboarding-media"
                   data-slide-key={slideKey}
                   data-slide-layout={slideLayout}
                   onClick={slideClickHandler || undefined}
@@ -124,14 +127,13 @@ const OnboardingOverlay = () => {
                 </button>
 
                 <div
-                  className={[
-                    styles.bulletListContainer,
-                    !title ? styles.titlelessBulletListContainer : '',
-                  ].filter(Boolean).join(' ')}
-                  data-testid='ce-onboarding-bullet-container'
+                  className={[styles.bulletListContainer, !title ? styles.titlelessBulletListContainer : '']
+                    .filter(Boolean)
+                    .join(' ')}
+                  data-testid="ce-onboarding-bullet-container"
                   style={{ display: bulletPoints.length > 0 ? 'flex' : 'none' }}
                 >
-                  <ul className={styles.bulletList} data-testid='ce-onboarding-bullets'>
+                  <ul className={styles.bulletList} data-testid="ce-onboarding-bullets">
                     {bulletPoints.map((point: { bold?: string; text?: string }, index: number) => (
                       <li key={`${slideKey}-${index}`}>
                         <h4 className={styles.bulletText}>
@@ -146,14 +148,14 @@ const OnboardingOverlay = () => {
               </div>
             </div>
 
-            <div className={controlsClassName} data-testid='ce-onboarding-controls'>
+            <div className={controlsClassName} data-testid="ce-onboarding-controls">
               {hasBackButton ? (
-                <div className={styles.controlSlot} data-testid='ce-onboarding-control-slot'>
+                <div className={styles.controlSlot} data-testid="ce-onboarding-control-slot">
                   <button
-                    type='button'
+                    type="button"
                     className={styles.takeSurveyButton}
                     onClick={goToPreviousStep}
-                    aria-label='Back'
+                    aria-label="Back"
                   >
                     <FontAwesomeIcon className={styles.takeSurveyIcon} icon={faArrowLeft} />
                   </button>
@@ -161,14 +163,14 @@ const OnboardingOverlay = () => {
               ) : (
                 <div
                   className={[styles.controlSlot, styles.controlSlotPlaceholder].filter(Boolean).join(' ')}
-                  data-testid='ce-onboarding-control-placeholder'
-                  aria-hidden='true'
+                  data-testid="ce-onboarding-control-placeholder"
+                  aria-hidden="true"
                 />
               )}
 
-              <div className={styles.controlSlot} data-testid='ce-onboarding-control-slot'>
+              <div className={styles.controlSlot} data-testid="ce-onboarding-control-slot">
                 <button
-                  type='button'
+                  type="button"
                   className={styles.takeSurveyButton}
                   onClick={advanceOrComplete}
                   aria-label={isLastSlide ? 'Complete onboarding' : 'Next'}

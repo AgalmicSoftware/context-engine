@@ -2,14 +2,16 @@ import { buildWorkerAllowOrigins, DEFAULT_WORKER_ALLOWED_ORIGINS } from './worke
 
 describe('workerCorsOrigins helpers', () => {
   it('includes common dev origins (localhost/127.0.0.1 ports 3000, 3001, and 7391)', () => {
-    expect(DEFAULT_WORKER_ALLOWED_ORIGINS).toEqual(expect.arrayContaining([
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'http://localhost:3001',
-      'http://127.0.0.1:3001',
-      'http://localhost:7391',
-      'http://127.0.0.1:7391',
-    ]));
+    expect(DEFAULT_WORKER_ALLOWED_ORIGINS).toEqual(
+      expect.arrayContaining([
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:3001',
+        'http://127.0.0.1:3001',
+        'http://localhost:7391',
+        'http://127.0.0.1:7391',
+      ]),
+    );
   });
 
   it('buildWorkerAllowOrigins normalizes, de-dupes, and prepends the current origin', () => {
@@ -18,11 +20,9 @@ describe('workerCorsOrigins helpers', () => {
       extraOrigins: ['http://localhost:3001', 'https://contextengine.example.test/'],
     });
     expect(out[0]).toBe('http://localhost:3001');
-    expect(out).toEqual(expect.arrayContaining([
-      'https://contextengine.example.test',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:3001',
-    ]));
+    expect(out).toEqual(
+      expect.arrayContaining(['https://contextengine.example.test', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001']),
+    );
     expect(out.filter((x: string) => x === 'http://localhost:3001')).toHaveLength(1);
   });
 
@@ -31,9 +31,6 @@ describe('workerCorsOrigins helpers', () => {
       currentOrigin: 'http://localhost:3001',
       extraOrigins: 'https://example.com,\nhttp://127.0.0.1:3999',
     });
-    expect(out).toEqual(expect.arrayContaining([
-      'https://example.com',
-      'http://127.0.0.1:3999',
-    ]));
+    expect(out).toEqual(expect.arrayContaining(['https://example.com', 'http://127.0.0.1:3999']));
   });
 });

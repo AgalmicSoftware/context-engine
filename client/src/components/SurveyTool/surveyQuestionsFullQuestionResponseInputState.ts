@@ -1,9 +1,5 @@
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import {
-  getNormalizedUiRatingValue,
-  isSingleSelectMultichoice,
-  normalizeMultichoiceValue,
-} from './surveyToolUtils.js';
+import { getNormalizedUiRatingValue, isSingleSelectMultichoice, normalizeMultichoiceValue } from './surveyToolUtils.js';
 
 type SurveyQuestionRecord = {
   id: string;
@@ -18,81 +14,81 @@ type SurveyAnswerRecord = {
 
 export type SurveyQuestionsFullQuestionResponseInputDescriptor =
   | {
-    kind: 'multichoice';
-    questionId: string;
-    options: unknown[];
-    selectedValues: unknown[];
-    isSingleSelect: boolean;
-    disabled: boolean;
-  }
+      kind: 'multichoice';
+      questionId: string;
+      options: unknown[];
+      selectedValues: unknown[];
+      isSingleSelect: boolean;
+      disabled: boolean;
+    }
   | {
-    kind: 'rating';
-    questionId: string;
-    ratingValue: number;
-    disabled: boolean;
-    useDeferredRating: boolean;
-  }
+      kind: 'rating';
+      questionId: string;
+      ratingValue: number;
+      disabled: boolean;
+      useDeferredRating: boolean;
+    }
   | {
-    kind: 'binary';
-    questionId: string;
-    value: string;
-    disabled: boolean;
-  }
+      kind: 'binary';
+      questionId: string;
+      value: string;
+      disabled: boolean;
+    }
   | {
-    kind: 'audio';
-    questionId: string;
-    qIndex: number;
-    value: string | number;
-    encrypted: boolean;
-    dataTestId: string;
-    dataCeQuestionId: string;
-    disabled: boolean;
-    forceGlow: boolean;
-    placeholder: string;
-    disableEncryption: boolean;
-  };
+      kind: 'audio';
+      questionId: string;
+      qIndex: number;
+      value: string | number;
+      encrypted: boolean;
+      dataTestId: string;
+      dataCeQuestionId: string;
+      disabled: boolean;
+      forceGlow: boolean;
+      placeholder: string;
+      disableEncryption: boolean;
+    };
 
 export type SurveyQuestionsFullQuestionResponseInputActionDescriptor =
   | {
-    kind: 'answer-change';
-    questionId: string;
-    responseKey: 'answer';
-    disabled: boolean;
-    nextValue: unknown;
-    event?: unknown;
-  }
+      kind: 'answer-change';
+      questionId: string;
+      responseKey: 'answer';
+      disabled: boolean;
+      nextValue: unknown;
+      event?: unknown;
+    }
   | {
-    kind: 'rating-change';
-    questionId: string;
-    responseKey: 'answer';
-    disabled: boolean;
-    nextValue: number;
-    event?: unknown;
-    persistStrategy: 'event-sensitive';
-  }
+      kind: 'rating-change';
+      questionId: string;
+      responseKey: 'answer';
+      disabled: boolean;
+      nextValue: number;
+      event?: unknown;
+      persistStrategy: 'event-sensitive';
+    }
   | {
-    kind: 'rating-commit';
-    questionId: string;
-    responseKey: 'answer';
-    disabled: boolean;
-    nextValue: number;
-    persistDraft: false;
-    flushAfterUpdate: true;
-  }
+      kind: 'rating-commit';
+      questionId: string;
+      responseKey: 'answer';
+      disabled: boolean;
+      nextValue: number;
+      persistDraft: false;
+      flushAfterUpdate: true;
+    }
   | {
-    kind: 'rating-change-complete';
-    questionId: string;
-    responseKey: 'answer';
-    disabled: boolean;
-    event?: unknown;
-  }
+      kind: 'rating-change-complete';
+      questionId: string;
+      responseKey: 'answer';
+      disabled: boolean;
+      event?: unknown;
+    }
   | {
-    kind: 'answer-encryption-toggle';
-    questionId: string;
-    responseKey: 'answer';
-    disabled: boolean;
-    nextEncryptedState: boolean;
-  };
+      kind: 'answer-encryption-toggle';
+      questionId: string;
+      responseKey: 'answer';
+      disabled: boolean;
+      nextEncryptedState: boolean;
+    };
 
 type BuildResponseInputActionDescriptorArgs = {
   inputDescriptor: SurveyQuestionsFullQuestionResponseInputDescriptor;
@@ -146,11 +142,10 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
       };
     default: {
       const answerValue = answer.value;
-      const audioInputValue = (
-        typeof answerValue === 'string' ||
-        typeof answerValue === 'number' ||
-        answerValue == null
-      ) ? answerValue || '' : '';
+      const audioInputValue =
+        typeof answerValue === 'string' || typeof answerValue === 'number' || answerValue == null
+          ? answerValue || ''
+          : '';
 
       return {
         kind: 'audio',
@@ -159,7 +154,9 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
         value: audioInputValue,
         encrypted: answer.encrypted || false,
         dataTestId: E2E_TESTIDS.SURVEY_ANSWER_INPUT,
-        dataCeQuestionId: String(question.id || '').trim().toLowerCase(),
+        dataCeQuestionId: String(question.id || '')
+          .trim()
+          .toLowerCase(),
         disabled,
         forceGlow: !!glowAnswer,
         placeholder: 'response (optional)',
@@ -222,8 +219,5 @@ export const buildSurveyQuestionsFullQuestionResponseInputActionDescriptor = ({
 };
 
 export const shouldDispatchSurveyQuestionsFullQuestionResponseInputAction = (
-  action: SurveyQuestionsFullQuestionResponseInputActionDescriptor
-): boolean => (
-  !action.disabled &&
-  String(action.questionId || '').trim().length > 0
-);
+  action: SurveyQuestionsFullQuestionResponseInputActionDescriptor,
+): boolean => !action.disabled && String(action.questionId || '').trim().length > 0;

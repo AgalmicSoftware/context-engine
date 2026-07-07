@@ -3,9 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import SbtPageActionFeedbackDisplay from './SbtPageActionFeedbackDisplay';
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof SbtPageActionFeedbackDisplay>> = {}
-) => ({
+const createProps = (overrides: Partial<React.ComponentProps<typeof SbtPageActionFeedbackDisplay>> = {}) => ({
   burnSuccess: {
     message: 'SBT successfully burned!',
     show: false,
@@ -62,20 +60,20 @@ describe('SbtPageActionFeedbackDisplay', () => {
             },
           },
         })}
-      />
+      />,
     );
 
     expect(screen.getByText(/SBT successfully minted!/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '0xmint' })).toHaveAttribute(
       'href',
-      'https://explorer.example.test/tx/0xmint'
+      'https://explorer.example.test/tx/0xmint',
     );
     expect(screen.getByRole('link', { name: '0xmint' })).toHaveAttribute('target', '_blank');
     expect(screen.getByRole('link', { name: '0xmint' })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByText(/SBT successfully burned!/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '0xburn' })).toHaveAttribute(
       'href',
-      'https://explorer.example.test/tx/0xburn'
+      'https://explorer.example.test/tx/0xburn',
     );
   });
 
@@ -95,13 +93,13 @@ describe('SbtPageActionFeedbackDisplay', () => {
             },
           },
         })}
-      />
+      />,
     );
 
     expect(screen.getByRole('alert')).toHaveTextContent('Transaction Failed: wallet rejected transaction');
     expect(screen.getByRole('link', { name: '0xerr' })).toHaveAttribute(
       'href',
-      'https://explorer.example.test/tx/0xerr'
+      'https://explorer.example.test/tx/0xerr',
     );
     expect(onCopyError).not.toHaveBeenCalled();
 

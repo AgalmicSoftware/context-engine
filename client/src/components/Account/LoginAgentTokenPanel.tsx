@@ -35,9 +35,7 @@ const LoginAgentTokenPanel = ({
       Log in with agent token
     </button>
     {cachedEnvelope ? (
-      <div className={styles.agentTokenLoginHint}>
-        A Telegram client session is already saved in this tab.
-      </div>
+      <div className={styles.agentTokenLoginHint}>A Telegram client session is already saved in this tab.</div>
     ) : null}
     {agentTokenLoginOpen ? (
       <form onSubmit={onSubmit}>
@@ -55,9 +53,7 @@ const LoginAgentTokenPanel = ({
             data-testid="ce-agent-token-login-input"
           />
         </label>
-        <div className={styles.agentTokenLoginHint}>
-          Telegram bot → /me → Create Agent Token
-        </div>
+        <div className={styles.agentTokenLoginHint}>Telegram bot → /me → Create Agent Token</div>
         {agentTokenError ? (
           <div className={styles.agentTokenLoginError} role="alert" data-testid="ce-agent-token-login-error">
             {agentTokenError}

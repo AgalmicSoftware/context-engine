@@ -23,25 +23,18 @@ export type SurveyResultsQuestionModeCacheNormalizationResult = {
   questions: Record<string, SurveyResultsQuestionRecord>;
 };
 
-const toQuestionResponsesByQuestion = (
-  questionResponses: unknown
-): SurveyResultsQuestionResponsesByQuestion => (
+const toQuestionResponsesByQuestion = (questionResponses: unknown): SurveyResultsQuestionResponsesByQuestion =>
   questionResponses && typeof questionResponses === 'object'
-    ? questionResponses as SurveyResultsQuestionResponsesByQuestion
-    : {}
-);
+    ? (questionResponses as SurveyResultsQuestionResponsesByQuestion)
+    : {};
 
-const toQuestionsById = (
-  questions: unknown
-): Record<string, SurveyResultsQuestionRecord> => (
-  questions && typeof questions === 'object'
-    ? questions as Record<string, SurveyResultsQuestionRecord>
-    : {}
-);
+const toQuestionsById = (questions: unknown): Record<string, SurveyResultsQuestionRecord> =>
+  questions && typeof questions === 'object' ? (questions as Record<string, SurveyResultsQuestionRecord>) : {};
 
-const normalizeQuestionIdKey = (value: unknown): string => (
-  String(value || '').trim().toLowerCase()
-);
+const normalizeQuestionIdKey = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
 const normalizeLiveQuestionResponses = ({
   ports,
@@ -105,9 +98,7 @@ export const normalizeSurveyResultsQuestionModeCache = ({
     questionResponses,
     requiredSessionSlug,
   });
-  const liveQuestionIds = new Set(
-    Object.keys(liveResponses).map((questionId) => normalizeQuestionIdKey(questionId))
-  );
+  const liveQuestionIds = new Set(Object.keys(liveResponses).map((questionId) => normalizeQuestionIdKey(questionId)));
 
   return {
     liveQuestionIds,

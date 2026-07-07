@@ -42,9 +42,7 @@ const makeInstance = (props = {}) => {
 
   instance._isMounted = true;
   instance.setState = jest.fn((update, cb) => {
-    const patch = typeof update === 'function'
-      ? update(instance.state, instance.props)
-      : update;
+    const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
     if (patch && typeof patch === 'object') {
       instance.state = { ...instance.state, ...patch };
     }
@@ -107,50 +105,47 @@ const treeHasText = (node, text) => {
   return treeHasText(node?.props?.children, text);
 };
 
-const normalizeChildrenArray = (value) => (
-  Array.isArray(value) ? value : [value].filter(Boolean)
-);
+const normalizeChildrenArray = (value) => (Array.isArray(value) ? value : [value].filter(Boolean));
 
 afterEach(() => {
   jest.clearAllMocks();
   jest.restoreAllMocks();
-  try { delete globalThis.CE_SESSION_SCAN_SCOPE; } catch (_) {}
-  try { delete globalThis.CE_SESSION_SCAN_SLUGS; } catch (_) {}
+  try {
+    delete globalThis.CE_SESSION_SCAN_SCOPE;
+  } catch (_) {}
+  try {
+    delete globalThis.CE_SESSION_SCAN_SLUGS;
+  } catch (_) {}
 });
 
 describe('UserPage deep scan tooltip formatting', () => {
   it('uses explicit demo-session display config for deep-scan tooltip labels when registry config is missing', () => {
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(null);
-    const demoConfigSpy = jest
-      .spyOn(contractScriptsModule, 'getDemoSessionConfigBySlug')
-      .mockReturnValue({
-        slug: 'edge',
-        sessionName: 'Edge Demo Session',
-        blockLimits: {
-          start: 1000,
-        },
-      });
+    const demoConfigSpy = jest.spyOn(contractScriptsModule, 'getDemoSessionConfigBySlug').mockReturnValue({
+      slug: 'edge',
+      sessionName: 'Edge Demo Session',
+      blockLimits: {
+        start: 1000,
+      },
+    });
 
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const viewLower = viewAddress.toLowerCase();
     const instance = makeInstance({ viewAddress });
-    const userCaches = [{
-      slug: 'edge',
-      data: {
-        [viewLower]: {
-          '84532': {
-            lastBlockScanned: 1600,
+    const userCaches = [
+      {
+        slug: 'edge',
+        data: {
+          [viewLower]: {
+            84532: {
+              lastBlockScanned: 1600,
+            },
           },
         },
       },
-    }];
+    ];
 
-    const rows = instance._deriveDeepScanProgressRows(
-      userCaches,
-      viewLower,
-      84532,
-      2000
-    );
+    const rows = instance._deriveDeepScanProgressRows(userCaches, viewLower, 84532, 2000);
 
     expect(rows).toEqual([
       expect.objectContaining({
@@ -171,23 +166,20 @@ describe('UserPage deep scan tooltip formatting', () => {
         start: 1000,
       },
     });
-    const userCaches = [{
-      slug: 'edge',
-      data: {
-        [viewLower]: {
-          '84532': {
-            lastBlockScanned: 1600,
+    const userCaches = [
+      {
+        slug: 'edge',
+        data: {
+          [viewLower]: {
+            84532: {
+              lastBlockScanned: 1600,
+            },
           },
         },
       },
-    }];
+    ];
 
-    const rows = instance._deriveDeepScanProgressRows(
-      userCaches,
-      viewLower,
-      84532,
-      2000
-    );
+    const rows = instance._deriveDeepScanProgressRows(userCaches, viewLower, 84532, 2000);
 
     expect(rows).toEqual([
       expect.objectContaining({
@@ -208,84 +200,66 @@ describe('UserPage deep scan tooltip formatting', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const viewLower = viewAddress.toLowerCase();
     const instance = makeInstance({ viewAddress });
-    const userCaches = [{
-      slug: 'test-session',
-      data: {
-        [viewLower]: {
-          '84532': {
-            lastBlockScanned: 15234567,
+    const userCaches = [
+      {
+        slug: 'test-session',
+        data: {
+          [viewLower]: {
+            84532: {
+              lastBlockScanned: 15234567,
+            },
           },
         },
       },
-    }];
+    ];
 
-    const lines = instance._deriveDeepScanProgressTooltipFromCaches(
-      userCaches,
-      viewLower,
-      84532,
-      18000000
-    );
+    const lines = instance._deriveDeepScanProgressTooltipFromCaches(userCaches, viewLower, 84532, 18000000);
 
-    expect(lines).toEqual([
-      'Session: test-session',
-      `${(18000000 - 15234567).toLocaleString()} blocks remaining`,
-    ]);
+    expect(lines).toEqual(['Session: test-session', `${(18000000 - 15234567).toLocaleString()} blocks remaining`]);
   });
 
   it('falls back to localized scanned blocks when latest block is unavailable', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const viewLower = viewAddress.toLowerCase();
     const instance = makeInstance({ viewAddress });
-    const userCaches = [{
-      slug: 'test-session',
-      data: {
-        [viewLower]: {
-          '84532': {
-            lastBlockScanned: 15234567,
+    const userCaches = [
+      {
+        slug: 'test-session',
+        data: {
+          [viewLower]: {
+            84532: {
+              lastBlockScanned: 15234567,
+            },
           },
         },
       },
-    }];
+    ];
 
-    const lines = instance._deriveDeepScanProgressTooltipFromCaches(
-      userCaches,
-      viewLower,
-      84532,
-      null
-    );
+    const lines = instance._deriveDeepScanProgressTooltipFromCaches(userCaches, viewLower, 84532, null);
 
-    expect(lines).toEqual([
-      'Session: test-session',
-      `${(15234567).toLocaleString()} scanned`,
-    ]);
+    expect(lines).toEqual(['Session: test-session', `${(15234567).toLocaleString()} scanned`]);
   });
 
   it('shows "Up to date" when session progress is within 100 blocks of latest', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const viewLower = viewAddress.toLowerCase();
     const instance = makeInstance({ viewAddress });
-    const userCaches = [{
-      slug: 'test-session',
-      data: {
-        [viewLower]: {
-          '84532': {
-            lastBlockScanned: 17999900,
+    const userCaches = [
+      {
+        slug: 'test-session',
+        data: {
+          [viewLower]: {
+            84532: {
+              lastBlockScanned: 17999900,
+            },
           },
         },
       },
-    }];
+    ];
 
-    const lines = instance._deriveDeepScanProgressTooltipFromCaches(
-      userCaches,
-      viewLower,
-      84532,
-      18000000
-    );
+    const lines = instance._deriveDeepScanProgressTooltipFromCaches(userCaches, viewLower, 84532, 18000000);
 
-    expect(lines).toEqual([
-      'Session: test-session',
-      'Up to date',
-    ]);
+    expect(lines).toEqual(['Session: test-session', 'Up to date']);
   });
 
   it('renders multiple entries as two-line blocks separated by a blank line', () => {
@@ -297,7 +271,7 @@ describe('UserPage deep scan tooltip formatting', () => {
         slug: 'session-a',
         data: {
           [viewLower]: {
-            '84532': {
+            84532: {
               lastBlockScanned: 1500,
             },
           },
@@ -307,7 +281,7 @@ describe('UserPage deep scan tooltip formatting', () => {
         slug: 'session-b',
         data: {
           [viewLower]: {
-            '11155111': {
+            11155111: {
               lastBlockScanned: 2500,
             },
           },
@@ -315,12 +289,7 @@ describe('UserPage deep scan tooltip formatting', () => {
       },
     ];
 
-    const lines = instance._deriveDeepScanProgressTooltipFromCaches(
-      userCaches,
-      viewLower,
-      84532,
-      3000
-    );
+    const lines = instance._deriveDeepScanProgressTooltipFromCaches(userCaches, viewLower, 84532, 3000);
 
     expect(lines).toEqual([
       'Session: session-b',
@@ -340,10 +309,10 @@ describe('UserPage deep scan tooltip formatting', () => {
         slug: 'session-a',
         data: {
           [viewLower]: {
-            '84532': {
+            84532: {
               lastBlockScanned: 2500,
             },
-            '11155111': {
+            11155111: {
               lastBlockScanned: 1500,
             },
           },
@@ -353,7 +322,7 @@ describe('UserPage deep scan tooltip formatting', () => {
         slug: 'session-b',
         data: {
           [viewLower]: {
-            '84532': {
+            84532: {
               lastBlockScanned: 500,
             },
           },
@@ -361,12 +330,7 @@ describe('UserPage deep scan tooltip formatting', () => {
       },
     ];
 
-    const lines = instance._deriveDeepScanProgressTooltipFromCaches(
-      userCaches,
-      viewLower,
-      84532,
-      3000
-    );
+    const lines = instance._deriveDeepScanProgressTooltipFromCaches(userCaches, viewLower, 84532, 3000);
 
     expect(lines).toEqual([
       'Session: session-a (chain 84532)',
@@ -390,21 +354,19 @@ describe('UserPage deep scan tooltip formatting', () => {
       viewAddress,
       activeSessionSlug: 'session-a',
     });
-    jest
-      .spyOn(instance, '_getDeepScanSessionDisplayConfig')
-      .mockImplementation((slug) => ({
-        sessionName: String(slug || '').toUpperCase(),
-        blockLimits: {
-          start: 1000,
-        },
-      }));
+    jest.spyOn(instance, '_getDeepScanSessionDisplayConfig').mockImplementation((slug) => ({
+      sessionName: String(slug || '').toUpperCase(),
+      blockLimits: {
+        start: 1000,
+      },
+    }));
 
     const userCaches = [
       {
         slug: 'session-z',
         data: {
           [viewLower]: {
-            '84532': {
+            84532: {
               lastBlockScanned: 3900,
             },
           },
@@ -414,7 +376,7 @@ describe('UserPage deep scan tooltip formatting', () => {
         slug: 'session-c',
         data: {
           [viewLower]: {
-            '84532': {
+            84532: {
               lastBlockScanned: 3300,
             },
           },
@@ -424,7 +386,7 @@ describe('UserPage deep scan tooltip formatting', () => {
         slug: 'session-b',
         data: {
           [viewLower]: {
-            '84532': {
+            84532: {
               lastBlockScanned: 2700,
             },
           },
@@ -434,7 +396,7 @@ describe('UserPage deep scan tooltip formatting', () => {
         slug: 'session-a',
         data: {
           [viewLower]: {
-            '84532': {
+            84532: {
               lastBlockScanned: 1800,
             },
           },
@@ -442,19 +404,9 @@ describe('UserPage deep scan tooltip formatting', () => {
       },
     ];
 
-    const rows = instance._deriveDeepScanProgressRows(
-      userCaches,
-      viewLower,
-      84532,
-      4000
-    );
+    const rows = instance._deriveDeepScanProgressRows(userCaches, viewLower, 84532, 4000);
 
-    expect(rows.map((row) => row.slug)).toEqual([
-      'session-a',
-      'session-b',
-      'session-c',
-      'session-z',
-    ]);
+    expect(rows.map((row) => row.slug)).toEqual(['session-a', 'session-b', 'session-c', 'session-z']);
   });
 
   it('returns memoized deep-scan tooltip lines without re-scanning cache in render path', () => {
@@ -478,14 +430,12 @@ describe('UserPage deep scan tooltip formatting', () => {
       network: { id: 84532 },
       latestBlockNumber: 120,
     });
-    const listSpy = jest
-      .spyOn(cacheScripts, 'listNamespaceSlugsSync')
-      .mockReturnValue(['']);
+    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceSlugsSync').mockReturnValue(['']);
     const peekSpy = jest
       .spyOn(cacheScripts, 'peekCacheSync')
       .mockReturnValueOnce({
         [viewLower]: {
-          '84532': {
+          84532: {
             lastBlockScanned: 10,
             lastScanTimestamp: 1,
           },
@@ -493,7 +443,7 @@ describe('UserPage deep scan tooltip formatting', () => {
       })
       .mockReturnValueOnce({
         [viewLower]: {
-          '84532': {
+          84532: {
             lastBlockScanned: 11,
             lastScanTimestamp: 2,
           },
@@ -593,8 +543,8 @@ describe('UserPage deep scan tooltip formatting', () => {
     const tree = instance.render();
     const tooltips = collectTreeNodes(
       tree,
-      (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
-        String(node?.props?.target || '').includes('surveySpinner_')
+      (node) =>
+        getNodeTypeName(node) === 'UncontrolledTooltip' && String(node?.props?.target || '').includes('surveySpinner_'),
     );
     expect(tooltips.length).toBeGreaterThan(0);
 
@@ -610,10 +560,7 @@ describe('UserPage deep scan tooltip formatting', () => {
       selectedTab: 'surveys',
       isDeepScanning: true,
       loadingSurveys: true,
-      deepScanTooltipLines: [
-        'Session: Edge Session',
-        '400 blocks remaining',
-      ],
+      deepScanTooltipLines: ['Session: Edge Session', '400 blocks remaining'],
       deepScanProgressRows: [
         {
           slug: 'edge',
@@ -632,8 +579,8 @@ describe('UserPage deep scan tooltip formatting', () => {
     const tree = instance.render();
     const tooltips = collectTreeNodes(
       tree,
-      (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
-        String(node?.props?.target || '').includes('surveySpinner_')
+      (node) =>
+        getNodeTypeName(node) === 'UncontrolledTooltip' && String(node?.props?.target || '').includes('surveySpinner_'),
     );
     expect(tooltips.length).toBeGreaterThan(0);
     expect(treeHasText(tooltips[0]?.props?.children, 'Deep scan in progress')).toBe(true);
@@ -643,7 +590,7 @@ describe('UserPage deep scan tooltip formatting', () => {
 
     const fills = collectTreeNodes(
       tooltips[0]?.props?.children,
-      (node) => node?.props?.className === styles.deepScanProgressFill
+      (node) => node?.props?.className === styles.deepScanProgressFill,
     );
     expect(fills).toHaveLength(1);
     expect(fills[0]?.props?.style).toEqual(expect.objectContaining({ width: '60%' }));
@@ -656,10 +603,7 @@ describe('UserPage deep scan tooltip formatting', () => {
       selectedTab: 'surveys',
       isDeepScanning: true,
       loadingSurveys: true,
-      deepScanTooltipLines: [
-        'Session: Edge Session',
-        '1,600 scanned',
-      ],
+      deepScanTooltipLines: ['Session: Edge Session', '1,600 scanned'],
       deepScanProgressRows: [
         {
           slug: 'edge',
@@ -678,8 +622,8 @@ describe('UserPage deep scan tooltip formatting', () => {
     const tree = instance.render();
     const tooltips = collectTreeNodes(
       tree,
-      (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
-        String(node?.props?.target || '').includes('surveySpinner_')
+      (node) =>
+        getNodeTypeName(node) === 'UncontrolledTooltip' && String(node?.props?.target || '').includes('surveySpinner_'),
     );
     expect(tooltips.length).toBeGreaterThan(0);
     expect(treeHasText(tooltips[0]?.props?.children, 'Deep scan in progress')).toBe(true);
@@ -688,21 +632,14 @@ describe('UserPage deep scan tooltip formatting', () => {
 
     const fills = collectTreeNodes(
       tooltips[0]?.props?.children,
-      (node) => node?.props?.className === styles.deepScanProgressFill
+      (node) => node?.props?.className === styles.deepScanProgressFill,
     );
     expect(fills).toHaveLength(0);
   });
 
   it('filters blank separator lines from spinner title text while preserving tooltip spacing', () => {
     const instance = makeInstance();
-    const deepLines = [
-      'Session: alpha',
-      '100 scanned',
-      '',
-      'Session: beta',
-      '200 scanned',
-      '   ',
-    ];
+    const deepLines = ['Session: alpha', '100 scanned', '', 'Session: beta', '200 scanned', '   '];
     instance.state = {
       ...instance.state,
       selectedTab: 'surveys',
@@ -714,18 +651,17 @@ describe('UserPage deep scan tooltip formatting', () => {
     const tree = instance.render();
     const surveySpinners = collectTreeNodes(
       tree,
-      (node) => getNodeTypeName(node) === 'FontAwesomeIcon' &&
-        String(node?.props?.id || '').includes('surveySpinner_')
+      (node) => getNodeTypeName(node) === 'FontAwesomeIcon' && String(node?.props?.id || '').includes('surveySpinner_'),
     );
     expect(surveySpinners.length).toBeGreaterThan(0);
     expect(surveySpinners[0]?.props?.title).toBe(
-      'Deep scan: Session: alpha | 100 scanned | Session: beta | 200 scanned'
+      'Deep scan: Session: alpha | 100 scanned | Session: beta | 200 scanned',
     );
 
     const tooltips = collectTreeNodes(
       tree,
-      (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
-        String(node?.props?.target || '').includes('surveySpinner_')
+      (node) =>
+        getNodeTypeName(node) === 'UncontrolledTooltip' && String(node?.props?.target || '').includes('surveySpinner_'),
     );
     expect(tooltips.length).toBeGreaterThan(0);
     const tooltipChildren = normalizeChildrenArray(tooltips[0]?.props?.children);
@@ -778,8 +714,8 @@ describe('UserPage deep scan tooltip formatting', () => {
 
     const tooltips = collectTreeNodes(
       tree,
-      (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
-        String(node?.props?.target || '').includes('surveySpinner_')
+      (node) =>
+        getNodeTypeName(node) === 'UncontrolledTooltip' && String(node?.props?.target || '').includes('surveySpinner_'),
     );
     expect(tooltips.length).toBeGreaterThan(0);
     expect(treeHasText(tooltips[0]?.props?.children, 'Deep scan in progress')).toBe(true);
@@ -790,18 +726,21 @@ describe('UserPage deep scan tooltip formatting', () => {
   it('sets hover/focus/click + non-autohide props on all section spinner tooltips and exposes the loading panel on each target', () => {
     const instance = makeInstance();
     const deepLines = ['Session: Edge Session', '400 blocks remaining'];
-    const progressRows = [{
-      slug: 'edge',
-      chainId: 84532,
-      lastBlockScanned: 1600,
-      latestBlock: 2000,
-      remainingBlocks: 400,
-      percentComplete: 60,
-      isDeterminate: true,
-      label: 'Edge Session',
-      displayLastBlock: 1600,
-    }];
-    const spinnerTargetPattern = /(surveySpinner_|surveysCreatedSpinner_|questionSpinner_|questionsCreatedSpinner_|sbtSpinner_)/;
+    const progressRows = [
+      {
+        slug: 'edge',
+        chainId: 84532,
+        lastBlockScanned: 1600,
+        latestBlock: 2000,
+        remainingBlocks: 400,
+        percentComplete: 60,
+        isDeterminate: true,
+        label: 'Edge Session',
+        displayLastBlock: 1600,
+      },
+    ];
+    const spinnerTargetPattern =
+      /(surveySpinner_|surveysCreatedSpinner_|questionSpinner_|questionsCreatedSpinner_|sbtSpinner_)/;
     const collectSpinnerTooltips = (tab) => {
       instance.state = {
         ...instance.state,
@@ -816,8 +755,9 @@ describe('UserPage deep scan tooltip formatting', () => {
       const tree = instance.render();
       return collectTreeNodes(
         tree,
-        (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
-          spinnerTargetPattern.test(String(node?.props?.target || ''))
+        (node) =>
+          getNodeTypeName(node) === 'UncontrolledTooltip' &&
+          spinnerTargetPattern.test(String(node?.props?.target || '')),
       );
     };
 
@@ -853,12 +793,13 @@ describe('UserPage deep scan tooltip formatting', () => {
       loadingQuestions: true,
       loadingSBTs: true,
     };
-    const spinnerTargetPattern = /(surveySpinner_|surveysCreatedSpinner_|questionSpinner_|questionsCreatedSpinner_|sbtSpinner_)/;
+    const spinnerTargetPattern =
+      /(surveySpinner_|surveysCreatedSpinner_|questionSpinner_|questionsCreatedSpinner_|sbtSpinner_)/;
     const tree = instance.render();
     const tooltipTargets = collectTreeNodes(
       tree,
-      (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
-        spinnerTargetPattern.test(String(node?.props?.target || ''))
+      (node) =>
+        getNodeTypeName(node) === 'UncontrolledTooltip' && spinnerTargetPattern.test(String(node?.props?.target || '')),
     ).map((node) => String(node?.props?.target || ''));
 
     expect(tooltipTargets.length).toBeGreaterThan(0);
@@ -871,7 +812,8 @@ describe('UserPage deep scan tooltip formatting', () => {
   it('stops spinner interactions from bubbling so section headers do not collapse on tooltip click', () => {
     const instance = makeInstance();
     const deepLines = ['edge / 84532: 150'];
-    const spinnerTargetPattern = /(surveySpinner_|surveysCreatedSpinner_|questionSpinner_|questionsCreatedSpinner_|sbtSpinner_)/;
+    const spinnerTargetPattern =
+      /(surveySpinner_|surveysCreatedSpinner_|questionSpinner_|questionsCreatedSpinner_|sbtSpinner_)/;
     const collectSpinnerIcons = (tab) => {
       instance.state = {
         ...instance.state,
@@ -885,8 +827,8 @@ describe('UserPage deep scan tooltip formatting', () => {
       const tree = instance.render();
       return collectTreeNodes(
         tree,
-        (node) => getNodeTypeName(node) === 'FontAwesomeIcon' &&
-          spinnerTargetPattern.test(String(node?.props?.id || ''))
+        (node) =>
+          getNodeTypeName(node) === 'FontAwesomeIcon' && spinnerTargetPattern.test(String(node?.props?.id || '')),
       );
     };
 
@@ -922,11 +864,14 @@ describe('UserPage deep scan tooltip formatting', () => {
     const explorerHref = `https://sepolia.basescan.org/address/${viewAddress}`;
     const addressLinks = collectTreeNodes(
       tree,
-      (node) => node?.type === 'a' && node?.props?.href === `/u/${viewAddress}` && node?.props?.className === styles.addressLink
+      (node) =>
+        node?.type === 'a' &&
+        node?.props?.href === `/u/${viewAddress}` &&
+        node?.props?.className === styles.addressLink,
     );
     const explorerLinks = collectTreeNodes(
       tree,
-      (node) => node?.type === 'a' && node?.props?.['aria-label'] === 'View address on explorer'
+      (node) => node?.type === 'a' && node?.props?.['aria-label'] === 'View address on explorer',
     );
 
     expect(treeHasText(tree, '0x000...00aa')).toBe(true);
@@ -949,7 +894,8 @@ describe('UserPage deep scan tooltip formatting', () => {
     const explorerHref = `https://sepolia.basescan.org/address/${viewAddress}`;
     const addressLinks = collectTreeNodes(
       tree,
-      (node) => node?.type === 'a' && node?.props?.href === explorerHref && node?.props?.className === styles.addressLink
+      (node) =>
+        node?.type === 'a' && node?.props?.href === explorerHref && node?.props?.className === styles.addressLink,
     );
 
     expect(addressLinks).toHaveLength(1);
@@ -974,7 +920,8 @@ describe('UserPage deep scan tooltip formatting', () => {
     const explorerHref = `https://optimism-sepolia.blockscout.com/address/${viewAddress}`;
     const addressLinks = collectTreeNodes(
       tree,
-      (node) => node?.type === 'a' && node?.props?.href === explorerHref && node?.props?.className === styles.addressLink
+      (node) =>
+        node?.type === 'a' && node?.props?.href === explorerHref && node?.props?.className === styles.addressLink,
     );
 
     expect(instance.getExplorerUrl()).toBe(explorerHref);
@@ -995,11 +942,11 @@ describe('UserPage deep scan tooltip formatting', () => {
     const tree = instance.render();
     const addressLinks = collectTreeNodes(
       tree,
-      (node) => node?.type === 'a' && node?.props?.className === styles.addressLink
+      (node) => node?.type === 'a' && node?.props?.className === styles.addressLink,
     );
     const explorerLinks = collectTreeNodes(
       tree,
-      (node) => node?.type === 'a' && node?.props?.className === styles.explorerLink
+      (node) => node?.type === 'a' && node?.props?.className === styles.explorerLink,
     );
 
     expect(instance.getExplorerUrl()).toBeNull();
@@ -1017,21 +964,25 @@ describe('UserPage deep scan tooltip formatting', () => {
       ...instance.state,
       selectedTab: 'surveys',
       showSectionSurveyResponsesOpen: true,
-      surveyResponseInfo: [{
-        id: '0xsurvey',
-        title: 'Survey 1',
-        questionsCount: 1,
-        tags: [],
-        documentURLs: [],
-        slug: 'edge',
-      }],
+      surveyResponseInfo: [
+        {
+          id: '0xsurvey',
+          title: 'Survey 1',
+          questionsCount: 1,
+          tags: [],
+          documentURLs: [],
+          slug: 'edge',
+        },
+      ],
       expandedSurveyResponses: { '0xsurvey': true },
       detailedSurveyResponses: {
-        '0xsurvey': [{
-          questionData: { id: 'q1', prompt: 'Question 1', type: 'freeform' },
-          responseData: { questionID: 'q1', answer: { value: 'visible answer' } },
-          canDecryptOtherResponses: true,
-        }],
+        '0xsurvey': [
+          {
+            questionData: { id: 'q1', prompt: 'Question 1', type: 'freeform' },
+            responseData: { questionID: 'q1', answer: { value: 'visible answer' } },
+            canDecryptOtherResponses: true,
+          },
+        ],
       },
       surveyCreationInfo: [],
       questionResponseInfo: [],
@@ -1043,12 +994,9 @@ describe('UserPage deep scan tooltip formatting', () => {
     };
 
     const tree = instance.render();
-    const responseCards = collectTreeNodes(
-      tree,
-      (node) => getNodeTypeName(node) === 'SingleQuestionResponse'
-    );
+    const responseCards = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'SingleQuestionResponse');
     const surveyResponseCard = responseCards.find(
-      (node) => node?.props?.responderAddress === instance.props.viewAddress
+      (node) => node?.props?.responderAddress === instance.props.viewAddress,
     );
 
     expect(surveyResponseCard).toBeDefined();
@@ -1066,7 +1014,7 @@ describe('UserPage deep scan tooltip formatting', () => {
     const tree = instance.render();
     const ownerBookmarkShortcuts = collectTreeNodes(
       tree,
-      (node) => String(node?.props?.['aria-label'] || '') === 'Open My Bookmarks'
+      (node) => String(node?.props?.['aria-label'] || '') === 'Open My Bookmarks',
     );
 
     expect(ownerBookmarkShortcuts).toHaveLength(0);

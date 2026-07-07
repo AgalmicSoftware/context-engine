@@ -15,14 +15,18 @@ describe('userPageDisplayStateHelpers', () => {
     expect(buildUserPageAnalysisModalStatePatch({ open: true })).toEqual({
       showAnalysisModal: true,
     });
-    expect(buildUserPageBooleanTogglePatch({
-      state: { expanded: false },
-      stateKey: 'expanded',
-    })).toEqual({ expanded: true });
-    expect(buildUserPageNicknameSaveStatePatch({
-      bookmarked: true,
-      nickname: 'Alpha',
-    })).toEqual({
+    expect(
+      buildUserPageBooleanTogglePatch({
+        state: { expanded: false },
+        stateKey: 'expanded',
+      }),
+    ).toEqual({ expanded: true });
+    expect(
+      buildUserPageNicknameSaveStatePatch({
+        bookmarked: true,
+        nickname: 'Alpha',
+      }),
+    ).toEqual({
       bookmarked: true,
       isEditingNickname: false,
       nicknameInput: 'Alpha',
@@ -50,26 +54,32 @@ describe('userPageDisplayStateHelpers', () => {
       shouldRenderUsernameError: true,
       usernameErrorText: 'Taken',
     });
-    expect(buildUserPageRootClassName({
-      baseClassName: 'root',
-      minimized: true,
-      minimizedClassName: 'mini',
-    })).toBe('root mini');
+    expect(
+      buildUserPageRootClassName({
+        baseClassName: 'root',
+        minimized: true,
+        minimizedClassName: 'mini',
+      }),
+    ).toBe('root mini');
   });
 
   it('toggles nested survey expansion state by collection and survey id', () => {
-    expect(buildUserPageSurveyExpansionTogglePatch({
-      state: { expanded: { s1: true } },
-      stateKey: 'expanded',
-      surveyId: 's1',
-    })).toEqual({
+    expect(
+      buildUserPageSurveyExpansionTogglePatch({
+        state: { expanded: { s1: true } },
+        stateKey: 'expanded',
+        surveyId: 's1',
+      }),
+    ).toEqual({
       expanded: { s1: false },
     });
-    expect(buildUserPageSurveyExpansionTogglePatch({
-      state: { expanded: { s1: true } },
-      stateKey: 'expanded',
-      surveyId: 's2',
-    })).toEqual({
+    expect(
+      buildUserPageSurveyExpansionTogglePatch({
+        state: { expanded: { s1: true } },
+        stateKey: 'expanded',
+        surveyId: 's2',
+      }),
+    ).toEqual({
       expanded: { s1: true, s2: true },
     });
   });

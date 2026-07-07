@@ -1,12 +1,7 @@
 import React from 'react';
 import type { CSSProperties } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretDown,
-  faCaretUp,
-  faLock,
-  faUnlock,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faLock, faUnlock } from '@fortawesome/free-solid-svg-icons';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -99,7 +94,9 @@ const SurveyQuestionsLockAudienceControl = ({
         showBrightLockState ? styles.iconButtonActive : '',
         isPileVisualContext ? styles.pileLockButton : '',
         pileMenuPressed ? styles.pileLockButtonMenuOpen : '',
-      ].filter(Boolean).join(' ')}
+      ]
+        .filter(Boolean)
+        .join(' ')}
       onClick={onLockClick}
       disabled={isLockDisabled}
       title={buttonTitle}
@@ -107,10 +104,12 @@ const SurveyQuestionsLockAudienceControl = ({
       aria-expanded={hasAudienceMenu ? menuOpen : undefined}
       aria-haspopup={hasAudienceMenu ? 'dialog' : undefined}
       style={lockButtonStyle}
-      data-testid={effectiveFieldKey === 'additional' ? E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK : E2E_TESTIDS.SURVEY_ANSWER_LOCK}
+      data-testid={
+        effectiveFieldKey === 'additional' ? E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK : E2E_TESTIDS.SURVEY_ANSWER_LOCK
+      }
     >
       <FontAwesomeIcon
-        icon={(fieldState?.encrypted || forcedGate) ? faLock : faUnlock}
+        icon={fieldState?.encrypted || forcedGate ? faLock : faUnlock}
         className={resolveSurveyQuestionsIconGlowClassName(styles, showBrightLockState)}
       />
     </button>
@@ -144,7 +143,10 @@ const SurveyQuestionsLockAudienceControl = ({
               <div className={styles.lockAudienceGateRow}>
                 <button
                   type="button"
-                  className={buildSurveyQuestionsLockAudienceGateClassName(styles, gateActive && currentGateId === option.gateId)}
+                  className={buildSurveyQuestionsLockAudienceGateClassName(
+                    styles,
+                    gateActive && currentGateId === option.gateId,
+                  )}
                   onClick={() => onSelectAudience?.('gate', option.gateId)}
                   data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE}
                   data-ce-gate-id={option.gateId}
@@ -158,14 +160,12 @@ const SurveyQuestionsLockAudienceControl = ({
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      onToggleGateDetails?.(
-                        qid,
-                        showGateDetails ? '' : option.gateId,
-                        effectiveFieldKey,
-                      );
+                      onToggleGateDetails?.(qid, showGateDetails ? '' : option.gateId, effectiveFieldKey);
                     }}
                     aria-expanded={showGateDetails}
-                    aria-label={showGateDetails ? `Hide ${option.label} ${t('sbts')}` : `Show ${option.label} ${t('sbts')}`}
+                    aria-label={
+                      showGateDetails ? `Hide ${option.label} ${t('sbts')}` : `Show ${option.label} ${t('sbts')}`
+                    }
                   >
                     <FontAwesomeIcon icon={showGateDetails ? faCaretUp : faCaretDown} />
                   </button>

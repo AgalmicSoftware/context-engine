@@ -24,7 +24,7 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
   static getDerivedStateFromError(error: Error | null): RouteErrorBoundaryState {
     return {
       hasError: true,
-      errorMessage: (error && error.message) ? error.message : 'An unexpected error occurred.',
+      errorMessage: error && error.message ? error.message : 'An unexpected error occurred.',
     };
   }
 
@@ -69,9 +69,7 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
             }}
           >
             <h3 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>This section encountered an error</h3>
-            <p style={{ margin: '0 0 16px 0', color: 'rgba(244, 247, 255, 0.85)' }}>
-              {this.state.errorMessage}
-            </p>
+            <p style={{ margin: '0 0 16px 0', color: 'rgba(244, 247, 255, 0.85)' }}>{this.state.errorMessage}</p>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <button
                 type="button"

@@ -19,7 +19,7 @@ describe('SurveyQuestionsLockAudienceControl', () => {
         pileMenuPressed
         normalizedSelfAudienceLabel="only me"
         onLockClick={onLockClick}
-      />
+      />,
     );
 
     const lockButton = screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK);
@@ -43,19 +43,23 @@ describe('SurveyQuestionsLockAudienceControl', () => {
         hasAudienceMenu
         menuOpen
         normalizedSelfAudienceLabel="only me"
-        gateOptions={[{
-          gateId: 'gate-1',
-          label: 'Session Gate',
-          sbtItems: [{
-            address: '0x1111111111111111111111111111111111111111',
-            href: '/sbt/0x1111111111111111111111111111111111111111',
-            label: 'Participant Pass',
-            meta: '1 required',
-          }],
-        }]}
+        gateOptions={[
+          {
+            gateId: 'gate-1',
+            label: 'Session Gate',
+            sbtItems: [
+              {
+                address: '0x1111111111111111111111111111111111111111',
+                href: '/sbt/0x1111111111111111111111111111111111111111',
+                label: 'Participant Pass',
+                meta: '1 required',
+              },
+            ],
+          },
+        ]}
         onSelectAudience={onSelectAudience}
         onToggleGateDetails={onToggleGateDetails}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE));

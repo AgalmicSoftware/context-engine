@@ -7,21 +7,16 @@ import {
   REGISTRY_CACHE_KEY,
   setupUserPageCacheRefreshTestLifecycle,
 } from './UserPage.cacheRefresh.testUtils';
-import {
-  buildUserPageGateAccessCacheKey,
-  buildUserPageGatePendingKey,
-} from './userPageHelpers';
+import { buildUserPageGateAccessCacheKey, buildUserPageGatePendingKey } from './userPageHelpers';
 
-const buildGateAccessCacheKey = (
-  instance,
-  { slug = '', resourceKey = '' } = {}
-) => buildUserPageGateAccessCacheKey({
-  account: instance.props.account,
-  networkID: instance.props.network?.id,
-  resourceKey,
-  sbtCacheRevision: instance.props.sbtCacheRevision,
-  slug,
-});
+const buildGateAccessCacheKey = (instance, { slug = '', resourceKey = '' } = {}) =>
+  buildUserPageGateAccessCacheKey({
+    account: instance.props.account,
+    networkID: instance.props.network?.id,
+    resourceKey,
+    sbtCacheRevision: instance.props.sbtCacheRevision,
+    slug,
+  });
 
 describe('UserPage cache refresh gate access', () => {
   setupUserPageCacheRefreshTestLifecycle();
@@ -36,7 +31,7 @@ describe('UserPage cache refresh gate access', () => {
     });
     instance._responseGateAccessStatusByKey.set(cacheKey, {
       status: 'granted',
-      ts: Date.now() - (61 * 1000),
+      ts: Date.now() - 61 * 1000,
     });
     checkSponsoredAccess.mockResolvedValue({
       status: 'denied',
@@ -45,7 +40,7 @@ describe('UserPage cache refresh gate access', () => {
     });
 
     instance._queueResponseGateAccessChecks(
-      new Set([buildUserPageGatePendingKey({ slug: 'edge', resourceKey: 'questionResponses' })])
+      new Set([buildUserPageGatePendingKey({ slug: 'edge', resourceKey: 'questionResponses' })]),
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -71,7 +66,7 @@ describe('UserPage cache refresh gate access', () => {
     });
 
     instance._queueResponseGateAccessChecks(
-      new Set([buildUserPageGatePendingKey({ slug: 'edge', resourceKey: 'questionResponses' })])
+      new Set([buildUserPageGatePendingKey({ slug: 'edge', resourceKey: 'questionResponses' })]),
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -94,7 +89,7 @@ describe('UserPage cache refresh gate access', () => {
     checkSponsoredAccess.mockRejectedValue(new Error('gate unavailable'));
 
     instance._queueResponseGateAccessChecks(
-      new Set([buildUserPageGatePendingKey({ slug: 'edge', resourceKey: 'questionResponses' })])
+      new Set([buildUserPageGatePendingKey({ slug: 'edge', resourceKey: 'questionResponses' })]),
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -113,15 +108,13 @@ describe('UserPage cache refresh gate access', () => {
     const account = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
-    const demoSpy = jest
-      .spyOn(contractScriptsModule, 'getDemoSessionConfigBySlug')
-      .mockReturnValue({
-        slug: 'rxc',
-        sessionName: 'Weyl v. Yarvin Debate',
-        sponsoredKeys: {
-          questionResponses: { encrypted: true },
-        },
-      });
+    const demoSpy = jest.spyOn(contractScriptsModule, 'getDemoSessionConfigBySlug').mockReturnValue({
+      slug: 'rxc',
+      sessionName: 'Weyl v. Yarvin Debate',
+      sponsoredKeys: {
+        questionResponses: { encrypted: true },
+      },
+    });
     const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'rxc',
       resourceKey: 'questionResponses',
@@ -134,18 +127,20 @@ describe('UserPage cache refresh gate access', () => {
 
     try {
       instance._queueResponseGateAccessChecks(
-        new Set([buildUserPageGatePendingKey({ slug: 'rxc', resourceKey: 'questionResponses' })])
+        new Set([buildUserPageGatePendingKey({ slug: 'rxc', resourceKey: 'questionResponses' })]),
       );
       await Promise.resolve();
       await Promise.resolve();
 
       expect(checkSponsoredAccess).toHaveBeenCalledTimes(1);
-      expect(checkSponsoredAccess).toHaveBeenCalledWith(expect.objectContaining({
-        sessionSlug: 'rxc',
-        account,
-        resourceKey: 'questionResponses',
-        sessionConfig: {},
-      }));
+      expect(checkSponsoredAccess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionSlug: 'rxc',
+          account,
+          resourceKey: 'questionResponses',
+          sessionConfig: {},
+        }),
+      );
       expect(instance._responseGateAccessStatusByKey.get(cacheKey)?.status).toBe('denied');
       expect(queueSpy).toHaveBeenCalledWith({ markLoading: false });
       expect(demoSpy).not.toHaveBeenCalled();
@@ -303,22 +298,24 @@ describe('UserPage cache refresh gate access', () => {
       surveysCache: [],
       sbtCache: [],
       userCache: [],
-      questionsCache: [{
-        slug: 'edge',
-        data: {
-          [networkID]: {
-            questions: {
-              q1: {
-                id: 'q1',
-                creator: viewAddress,
-                prompt: 'Question 1',
-                type: 'freeform',
+      questionsCache: [
+        {
+          slug: 'edge',
+          data: {
+            [networkID]: {
+              questions: {
+                q1: {
+                  id: 'q1',
+                  creator: viewAddress,
+                  prompt: 'Question 1',
+                  type: 'freeform',
+                },
               },
+              questionResponses: {},
             },
-            questionResponses: {},
           },
         },
-      }],
+      ],
     };
 
     instance._dgHasAny = jest.fn(() => true);

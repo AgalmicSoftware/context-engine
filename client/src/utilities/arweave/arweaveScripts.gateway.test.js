@@ -19,9 +19,15 @@ describe('arweaveScripts.buildArweaveGatewayUrl', () => {
   const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
 
   afterEach(() => {
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
   });
 
   it('uses AR.IO gateway when direct-to-AR.IO mode is enabled', () => {
@@ -36,14 +42,24 @@ describe('arweaveScripts.readArweaveWalletBalance', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = false;
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
   });
 
   afterEach(() => {
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
     global.fetch = originalFetch;
   });
 

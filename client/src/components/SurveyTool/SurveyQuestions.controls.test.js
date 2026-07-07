@@ -8,10 +8,7 @@ import {
   buildSurveyQuestionsSubmitFooterDisplayState,
   buildSurveyQuestionsSubmitReadinessDescriptor,
 } from './surveyQuestionsTypes.js';
-import {
-  resolveEffectiveSlug,
-  resolveExplicitSessionContext,
-} from './surveyToolScope';
+import { resolveEffectiveSlug, resolveExplicitSessionContext } from './surveyToolScope';
 import {
   resolveSurveyQuestionsSubmitPendingStats,
   runSurveyQuestionsSubmitController,
@@ -69,7 +66,7 @@ const renderSingleQuestionWithAudio = (props = {}) => {
       answer={{ value: '' }}
       singleQuestionMode
       audioInputWorkerProps={audioInputWorkerProps}
-    />
+    />,
   );
 
   return {
@@ -79,19 +76,20 @@ const renderSingleQuestionWithAudio = (props = {}) => {
   };
 };
 
-const submitPlan = (overrides = {}) => buildSurveyQuestionsPrimarySubmitPlan({
-  account: '0xabc',
-  isStandalone: false,
-  isSubmitting: false,
-  pendingEditCount: 0,
-  questionID: 'q1',
-  singleQuestionMode: false,
-  submissionComplete: false,
-  submitGuardActive: false,
-  submittedSinceLastEdit: false,
-  surveyId: '0xSurveyABC',
-  ...overrides,
-});
+const submitPlan = (overrides = {}) =>
+  buildSurveyQuestionsPrimarySubmitPlan({
+    account: '0xabc',
+    isStandalone: false,
+    isSubmitting: false,
+    pendingEditCount: 0,
+    questionID: 'q1',
+    singleQuestionMode: false,
+    submissionComplete: false,
+    submitGuardActive: false,
+    submittedSinceLastEdit: false,
+    surveyId: '0xSurveyABC',
+    ...overrides,
+  });
 
 const runPlan = (plan) => {
   const ports = {
@@ -120,10 +118,7 @@ describe('SurveyQuestions controls', () => {
       activeSessionSlug: 'other',
     });
 
-    expect(screen.getByTestId('mock-survey-audio-field-input')).toHaveAttribute(
-      'data-session-slug',
-      'edge'
-    );
+    expect(screen.getByTestId('mock-survey-audio-field-input')).toHaveAttribute('data-session-slug', 'edge');
     expect(mockSurveyAudioFieldInputProps.at(-1).sessionSlug).toBe('edge');
     // port note: the old test spied on the private `_getEffectiveDraftSlug()`
     // fallback. The portable contract is the rendered audio field receiving the
@@ -166,7 +161,7 @@ describe('SurveyQuestions controls', () => {
         sliderMode="conviction"
         sliderOpen
         sliderToggleExpandedByQuestion={{ q1: true }}
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: /conviction/i })).toHaveTextContent('4');
@@ -196,18 +191,22 @@ describe('SurveyQuestions controls', () => {
       singleQuestionMode: false,
     });
 
-    expect(buildSurveyQuestionsSubmitFooterDisplayState({
-      currentStep: readiness.currentStep,
-      hasEncryptedAnswers: readiness.hasEncryptedAnswers,
-      hasMaskedCurrentQuestionPayload: readiness.hasMaskedCurrentQuestionPayload,
-      isDirty: false,
-      isSubmitting: false,
-      pendingEditCount: readiness.pendingEditCount,
-      submittedSinceLastEdit: false,
-    })).toEqual(expect.objectContaining({
-      showInlineSubmit: false,
-      showTopInlineSubmit: false,
-    }));
+    expect(
+      buildSurveyQuestionsSubmitFooterDisplayState({
+        currentStep: readiness.currentStep,
+        hasEncryptedAnswers: readiness.hasEncryptedAnswers,
+        hasMaskedCurrentQuestionPayload: readiness.hasMaskedCurrentQuestionPayload,
+        isDirty: false,
+        isSubmitting: false,
+        pendingEditCount: readiness.pendingEditCount,
+        submittedSinceLastEdit: false,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        showInlineSubmit: false,
+        showTopInlineSubmit: false,
+      }),
+    );
   });
 
   it('renders pending survey submit controls as enabled and wires the primary click handler', () => {
@@ -217,11 +216,13 @@ describe('SurveyQuestions controls', () => {
     });
     const { ports, result } = runPlan(submitPlan({ pendingEditCount: 2 }));
 
-    expect(displayState).toEqual(expect.objectContaining({
-      showInlineSubmit: true,
-      showTopInlineSubmit: true,
-      submitDisabled: false,
-    }));
+    expect(displayState).toEqual(
+      expect.objectContaining({
+        showInlineSubmit: true,
+        showTopInlineSubmit: true,
+        submitDisabled: false,
+      }),
+    );
     expect(result.status).toBe('dispatched');
     expect(ports.activateSubmitGuard).toHaveBeenCalledTimes(1);
     expect(ports.dispatchSubmit).toHaveBeenCalledTimes(1);
@@ -232,34 +233,44 @@ describe('SurveyQuestions controls', () => {
       responseUrl: 'https://example.com/submitted',
       submittedSinceLastEdit: true,
     });
-    const { ports, result } = runPlan(submitPlan({
-      pendingEditCount: 0,
-      submittedSinceLastEdit: true,
-      submissionComplete: false,
-    }));
+    const { ports, result } = runPlan(
+      submitPlan({
+        pendingEditCount: 0,
+        submittedSinceLastEdit: true,
+        submissionComplete: false,
+      }),
+    );
 
-    expect(displayState).toEqual(expect.objectContaining({
-      showInlineSubmit: true,
-      showTopInlineSubmit: true,
-      submitDisabled: false,
-      submittedIndicatorActive: true,
-    }));
-    expect(result).toEqual(expect.objectContaining({
-      status: 'inert',
-      reason: 'submitted_without_new_edits',
-    }));
+    expect(displayState).toEqual(
+      expect.objectContaining({
+        showInlineSubmit: true,
+        showTopInlineSubmit: true,
+        submitDisabled: false,
+        submittedIndicatorActive: true,
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'inert',
+        reason: 'submitted_without_new_edits',
+      }),
+    );
     expect(ports.activateSubmitGuard).not.toHaveBeenCalled();
     expect(ports.dispatchSubmit).not.toHaveBeenCalled();
   });
 
   it('disables pending submit while an upload is already in progress', () => {
-    expect(buildSurveyQuestionsSubmitFooterDisplayState({
-      isSubmitting: true,
-      pendingEditCount: 1,
-    })).toEqual(expect.objectContaining({
-      showInlineSubmit: true,
-      submitDisabled: true,
-    }));
+    expect(
+      buildSurveyQuestionsSubmitFooterDisplayState({
+        isSubmitting: true,
+        pendingEditCount: 1,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        showInlineSubmit: true,
+        submitDisabled: true,
+      }),
+    );
   });
 
   it('disables single-question submit when the active prompt is still masked', () => {
@@ -270,16 +281,20 @@ describe('SurveyQuestions controls', () => {
       singleQuestionMode: true,
     });
 
-    expect(buildSurveyQuestionsSubmitFooterDisplayState({
-      hasMaskedCurrentQuestionPayload: readiness.hasMaskedCurrentQuestionPayload,
-      isSingleQuestionView: true,
-      pendingEditCount: readiness.pendingEditCount,
-      singleQuestionMode: true,
-    })).toEqual(expect.objectContaining({
-      showInlineSubmit: true,
-      showTopInlineSubmit: false,
-      submitDisabled: true,
-    }));
+    expect(
+      buildSurveyQuestionsSubmitFooterDisplayState({
+        hasMaskedCurrentQuestionPayload: readiness.hasMaskedCurrentQuestionPayload,
+        isSingleQuestionView: true,
+        pendingEditCount: readiness.pendingEditCount,
+        singleQuestionMode: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        showInlineSubmit: true,
+        showTopInlineSubmit: false,
+        submitDisabled: true,
+      }),
+    );
   });
 
   it('starts primary submit only when pending edits are available', () => {
@@ -287,14 +302,18 @@ describe('SurveyQuestions controls', () => {
       getPendingEditStats: () => ({ total: 1 }),
       fallbackTotal: 0,
     });
-    const { ports, result } = runPlan(submitPlan({
-      pendingEditCount: pendingStats.total,
-    }));
+    const { ports, result } = runPlan(
+      submitPlan({
+        pendingEditCount: pendingStats.total,
+      }),
+    );
 
-    expect(result).toEqual(expect.objectContaining({
-      status: 'dispatched',
-      reason: 'pending_edits',
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'dispatched',
+        reason: 'pending_edits',
+      }),
+    );
     expect(ports.activateSubmitGuard).toHaveBeenCalledTimes(1);
     expect(ports.dispatchSubmit).toHaveBeenCalledTimes(1);
   });
@@ -304,9 +323,11 @@ describe('SurveyQuestions controls', () => {
       getPendingEditStats: undefined,
       fallbackTotal: 1,
     });
-    const { ports, result } = runPlan(submitPlan({
-      pendingEditCount: pendingStats.total,
-    }));
+    const { ports, result } = runPlan(
+      submitPlan({
+        pendingEditCount: pendingStats.total,
+      }),
+    );
 
     expect(result.status).toBe('dispatched');
     expect(ports.activateSubmitGuard).toHaveBeenCalledTimes(1);
@@ -314,15 +335,19 @@ describe('SurveyQuestions controls', () => {
   });
 
   it('submits completed responses with pending edits instead of routing to the completed response', () => {
-    const { ports, result } = runPlan(submitPlan({
-      pendingEditCount: 2,
-      submissionComplete: true,
-    }));
+    const { ports, result } = runPlan(
+      submitPlan({
+        pendingEditCount: 2,
+        submissionComplete: true,
+      }),
+    );
 
-    expect(result).toEqual(expect.objectContaining({
-      status: 'dispatched',
-      reason: 'pending_edits',
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'dispatched',
+        reason: 'pending_edits',
+      }),
+    );
     expect(ports.dispatchSubmit).toHaveBeenCalledTimes(1);
     expect(ports.navigateToResponse).not.toHaveBeenCalled();
   });
@@ -332,10 +357,12 @@ describe('SurveyQuestions controls', () => {
       getPendingEditStats: undefined,
       fallbackTotal: 2,
     });
-    const { ports, result } = runPlan(submitPlan({
-      pendingEditCount: pendingStats.total,
-      submissionComplete: true,
-    }));
+    const { ports, result } = runPlan(
+      submitPlan({
+        pendingEditCount: pendingStats.total,
+        submissionComplete: true,
+      }),
+    );
 
     expect(result.status).toBe('dispatched');
     expect(ports.dispatchSubmit).toHaveBeenCalledTimes(1);
@@ -352,10 +379,12 @@ describe('SurveyQuestions controls', () => {
     });
     const { ports, result } = runPlan(inFlightPlan);
 
-    expect(result).toEqual(expect.objectContaining({
-      status: 'inert',
-      reason: 'submitting',
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'inert',
+        reason: 'submitting',
+      }),
+    );
     expect(getPendingEditStats).not.toHaveBeenCalled();
     expect(ports.dispatchSubmit).not.toHaveBeenCalled();
     expect(ports.navigateToResponse).not.toHaveBeenCalled();
@@ -366,16 +395,20 @@ describe('SurveyQuestions controls', () => {
       getPendingEditStats: () => ({ total: 0 }),
       fallbackTotal: 0,
     });
-    const { ports, result } = runPlan(submitPlan({
-      pendingEditCount: pendingStats.total,
-      submittedSinceLastEdit: true,
-      submissionComplete: false,
-    }));
+    const { ports, result } = runPlan(
+      submitPlan({
+        pendingEditCount: pendingStats.total,
+        submittedSinceLastEdit: true,
+        submissionComplete: false,
+      }),
+    );
 
-    expect(result).toEqual(expect.objectContaining({
-      status: 'inert',
-      reason: 'submitted_without_new_edits',
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'inert',
+        reason: 'submitted_without_new_edits',
+      }),
+    );
     expect(ports.dispatchSubmit).not.toHaveBeenCalled();
   });
 
@@ -391,10 +424,7 @@ describe('SurveyQuestions controls', () => {
 
     expect(result.status).toBe('navigated');
     expect(ports.dispatchSubmit).not.toHaveBeenCalled();
-    expect(ports.navigateToResponse).toHaveBeenCalledWith(
-      '/survey/0xsurveyabc/0xabc?session=edge%20session',
-      plan
-    );
+    expect(ports.navigateToResponse).toHaveBeenCalledWith('/survey/0xsurveyabc/0xabc?session=edge%20session', plan);
   });
 
   it('routes completed single-question submissions to the response view with the session slug', () => {
@@ -410,38 +440,43 @@ describe('SurveyQuestions controls', () => {
 
     expect(result.status).toBe('navigated');
     expect(ports.dispatchSubmit).not.toHaveBeenCalled();
-    expect(ports.navigateToResponse).toHaveBeenCalledWith(
-      '/question/q1?session=edge&responder=0xabc',
-      plan
-    );
+    expect(ports.navigateToResponse).toHaveBeenCalledWith('/question/q1?session=edge&responder=0xabc', plan);
   });
 
   it('keeps completed standalone submissions inert instead of routing or resubmitting', () => {
-    const { ports, result } = runPlan(submitPlan({
-      isStandalone: true,
-      pendingEditCount: 0,
-      submissionComplete: true,
-    }));
+    const { ports, result } = runPlan(
+      submitPlan({
+        isStandalone: true,
+        pendingEditCount: 0,
+        submissionComplete: true,
+      }),
+    );
 
-    expect(result).toEqual(expect.objectContaining({
-      status: 'inert',
-      reason: 'completed_standalone_response',
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'inert',
+        reason: 'completed_standalone_response',
+      }),
+    );
     expect(ports.dispatchSubmit).not.toHaveBeenCalled();
     expect(ports.navigateToResponse).not.toHaveBeenCalled();
   });
 
   it('keeps completed submissions without an account inert before resolving route slugs', () => {
-    const { ports, result } = runPlan(submitPlan({
-      account: '',
-      pendingEditCount: 0,
-      submissionComplete: true,
-    }));
+    const { ports, result } = runPlan(
+      submitPlan({
+        account: '',
+        pendingEditCount: 0,
+        submissionComplete: true,
+      }),
+    );
 
-    expect(result).toEqual(expect.objectContaining({
-      status: 'inert',
-      reason: 'missing_account',
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'inert',
+        reason: 'missing_account',
+      }),
+    );
     expect(ports.dispatchSubmit).not.toHaveBeenCalled();
     expect(ports.navigateToResponse).not.toHaveBeenCalled();
   });

@@ -10,11 +10,12 @@ type SurveyIdSource = {
   id?: unknown;
 };
 
-type SurveySelectorCacheEntry = SurveyIdSource & SurveyQuestionIdsSource & {
-  surveyID?: unknown;
-  title?: unknown;
-  [key: string]: unknown;
-};
+type SurveySelectorCacheEntry = SurveyIdSource &
+  SurveyQuestionIdsSource & {
+    surveyID?: unknown;
+    title?: unknown;
+    [key: string]: unknown;
+  };
 
 type SurveySelectorPendingSubmitStats = {
   total: number;
@@ -25,15 +26,19 @@ type SurveySelectorPendingSubmitStats = {
 
 type SurveySelectorPendingSubmitStatsSource = Partial<SurveySelectorPendingSubmitStats> | null | undefined;
 
-type SurveyQuestionsCache = Record<string, {
-  questions?: Record<string, unknown>;
-} | null | undefined>;
+type SurveyQuestionsCache = Record<
+  string,
+  | {
+      questions?: Record<string, unknown>;
+    }
+  | null
+  | undefined
+>;
 
-export const getSurveyDocumentUrls = (survey: SurveyDocumentUrlSource | null = null): string[] => (
+export const getSurveyDocumentUrls = (survey: SurveyDocumentUrlSource | null = null): string[] =>
   (Array.isArray(survey?.documentURLs) ? survey.documentURLs : [])
     .map((value) => (typeof value === 'string' ? value.trim() : ''))
-    .filter(Boolean)
-);
+    .filter(Boolean);
 
 export const getSurveyDocumentLinkTitle = (survey: SurveyDocumentUrlSource | null = null): string => {
   const documentURLs = getSurveyDocumentUrls(survey);
@@ -48,9 +53,7 @@ export const getDefaultSurveySelectorPendingSubmitStats = (): SurveySelectorPend
   isSubmitting: false,
 });
 
-export const buildSurveySelectorPendingSubmitStatsPatch = (
-  stats: SurveySelectorPendingSubmitStatsSource = {}
-) => {
+export const buildSurveySelectorPendingSubmitStatsPatch = (stats: SurveySelectorPendingSubmitStatsSource = {}) => {
   const source = stats || {};
   return {
     pendingSubmitStats: {
@@ -96,7 +99,7 @@ export const buildSurveySelectorLoadingPatch = (loading: unknown) => ({
 
 export const buildSurveySelectorQuestionCountPatch = (
   filteredQuestionCount: unknown,
-  encryptedQuestionCount: unknown
+  encryptedQuestionCount: unknown,
 ) => ({
   filteredQuestionCount,
   encryptedQuestionCount,
@@ -112,9 +115,7 @@ export const buildSurveySelectorLoadedSurveysPatch = (surveys: unknown = []) => 
   loading: false,
 });
 
-export const buildSurveySelectorSubmittedSurveyList = (
-  surveyBag: unknown = {}
-): SurveySelectorCacheEntry[] => {
+export const buildSurveySelectorSubmittedSurveyList = (surveyBag: unknown = {}): SurveySelectorCacheEntry[] => {
   if (!surveyBag || typeof surveyBag !== 'object') return [];
 
   const bag = surveyBag as Record<string, SurveySelectorCacheEntry | null | undefined>;
@@ -223,8 +224,9 @@ export const resolveSelectedSurveyIndex = ({
     return null;
   }
 
-  const idx = (Array.isArray(surveys) ? surveys : [])
-    .findIndex((survey) => (survey.id ? String(survey.id).toLowerCase() : '') === targetId);
+  const idx = (Array.isArray(surveys) ? surveys : []).findIndex(
+    (survey) => (survey.id ? String(survey.id).toLowerCase() : '') === targetId,
+  );
   if (idx !== -1) {
     return idx;
   }
@@ -249,12 +251,7 @@ export const resolveSurveyIdToCopy = ({
     const urlParams = new URLSearchParams(String(search || ''));
     idToCopy = urlParams.get('surveyID');
   }
-  if (
-    !idToCopy &&
-    selectedSurveyIndex !== null &&
-    Array.isArray(surveys) &&
-    surveys[selectedSurveyIndex]
-  ) {
+  if (!idToCopy && selectedSurveyIndex !== null && Array.isArray(surveys) && surveys[selectedSurveyIndex]) {
     idToCopy = surveys[selectedSurveyIndex].id;
   }
 

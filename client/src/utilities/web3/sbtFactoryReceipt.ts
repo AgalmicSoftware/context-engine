@@ -7,17 +7,11 @@ const SBT_FACTORY_INTERFACE = new ethers.utils.Interface(SBT_FACTORY_ABI);
 
 const toText = (value: unknown): string => (value == null ? '' : String(value).trim());
 const isSbtCreatedEventName = (value: unknown): boolean => toText(value).startsWith('SBTCreated');
-const isReceiptRecord = (value: unknown): value is ReceiptRecord => (
-  !!value && typeof value === 'object'
-);
+const isReceiptRecord = (value: unknown): value is ReceiptRecord => !!value && typeof value === 'object';
 
 const readSbtAddressFromArgs = (args: unknown): string => {
   const source = isReceiptRecord(args) ? args : {};
-  const candidates = [
-    source.sbtAddress,
-    source.address,
-    source['0'],
-  ];
+  const candidates = [source.sbtAddress, source.address, source['0']];
 
   for (const candidate of candidates) {
     const address = toText(candidate);

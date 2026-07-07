@@ -56,10 +56,10 @@ const readConfiguredPaidRpcUrl = (chainId, transport = 'http') => {
     if (runtimeField && typeof globalThis !== 'undefined' && typeof globalThis[runtimeField] !== 'undefined') {
       return String(globalThis[runtimeField] || '').trim();
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
-  const envMap = key === 'wss'
-    ? CONFIGURED_PAID_RPC_URL_WSS_BY_CHAIN
-    : CONFIGURED_PAID_RPC_URL_HTTP_BY_CHAIN;
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
+  const envMap = key === 'wss' ? CONFIGURED_PAID_RPC_URL_WSS_BY_CHAIN : CONFIGURED_PAID_RPC_URL_HTTP_BY_CHAIN;
   return String(envMap?.[id] || '').trim();
 };
 
@@ -74,26 +74,32 @@ const readUseInfuraRpcFlag = () => {
         return !!globalThis.CE_USE_INFURA_RPC;
       }
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
   return !!USE_INFURA;
 };
 
 const readRpcProviderMode = () => {
   try {
     if (typeof globalThis !== 'undefined' && typeof globalThis.CE_RPC_PROVIDER_MODE !== 'undefined') {
-      const mode = String(globalThis.CE_RPC_PROVIDER_MODE || '').trim().toLowerCase();
+      const mode = String(globalThis.CE_RPC_PROVIDER_MODE || '')
+        .trim()
+        .toLowerCase();
       if (mode === 'infura_only' || mode === 'fallback') return mode;
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
-  const mode = String(RPC_PROVIDER_MODE || '').trim().toLowerCase();
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
+  const mode = String(RPC_PROVIDER_MODE || '')
+    .trim()
+    .toLowerCase();
   if (mode === 'infura_only') return 'infura_only';
   return 'fallback';
 };
 
-const isInfuraOnlyForChain = (chainId) => (
-  readRpcProviderMode() === 'infura_only' &&
-  !!getConfiguredPaidRpcHttpUrl(chainId)
-);
+const isInfuraOnlyForChain = (chainId) =>
+  readRpcProviderMode() === 'infura_only' && !!getConfiguredPaidRpcHttpUrl(chainId);
 
 const readPreferPathRpcFlag = (chainId = null) => {
   if (chainId != null && isInfuraOnlyForChain(chainId)) return false;
@@ -103,7 +109,9 @@ const readPreferPathRpcFlag = (chainId = null) => {
         return !!globalThis.CE_PREFER_PATH_RPC;
       }
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
   return !!PREFER_PATH_RPC;
 };
 
@@ -231,10 +239,10 @@ export const base = defineChain({
   rpcUrls: {
     // PATH (Pocket) RPCs first, then public fallbacks.
     public: {
-      http: withPathRpc(8453, BASE_PUBLIC_RPC_URLS)
+      http: withPathRpc(8453, BASE_PUBLIC_RPC_URLS),
     },
     default: {
-      http: withPathRpc(8453, BASE_PUBLIC_RPC_URLS)
+      http: withPathRpc(8453, BASE_PUBLIC_RPC_URLS),
     },
     wss: [],
   },
@@ -292,10 +300,10 @@ export const optimism = defineChain({
   },
   rpcUrls: {
     public: {
-      http: withPathRpc(10, OPTIMISM_PUBLIC_RPC_URLS)
+      http: withPathRpc(10, OPTIMISM_PUBLIC_RPC_URLS),
     },
     default: {
-      http: withPathRpc(10, OPTIMISM_PUBLIC_RPC_URLS)
+      http: withPathRpc(10, OPTIMISM_PUBLIC_RPC_URLS),
     },
     wss: [],
   },
@@ -348,10 +356,10 @@ export const optimismSepolia = defineChain({
   nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: {
     public: {
-      http: withPathRpc(11155420, withConfiguredPaidRpc(11155420, OPTIMISM_SEPOLIA_PUBLIC_RPC_URLS))
+      http: withPathRpc(11155420, withConfiguredPaidRpc(11155420, OPTIMISM_SEPOLIA_PUBLIC_RPC_URLS)),
     },
     default: {
-      http: withPathRpc(11155420, withConfiguredPaidRpc(11155420, OPTIMISM_SEPOLIA_PUBLIC_RPC_URLS))
+      http: withPathRpc(11155420, withConfiguredPaidRpc(11155420, OPTIMISM_SEPOLIA_PUBLIC_RPC_URLS)),
     },
     wss: normalizeRpcList([getConfiguredPaidRpcWssUrl(11155420)]),
   },
@@ -406,10 +414,10 @@ export const arbitrum = defineChain({
   blockTime: 250,
   rpcUrls: {
     public: {
-      http: withPathRpc(42161, ARBITRUM_PUBLIC_RPC_URLS)
+      http: withPathRpc(42161, ARBITRUM_PUBLIC_RPC_URLS),
     },
     default: {
-      http: withPathRpc(42161, ARBITRUM_PUBLIC_RPC_URLS)
+      http: withPathRpc(42161, ARBITRUM_PUBLIC_RPC_URLS),
     },
     wss: [],
   },
@@ -442,10 +450,10 @@ export const arbitrumSepolia = defineChain({
   },
   rpcUrls: {
     public: {
-      http: withPathRpc(421614, ARBITRUM_SEPOLIA_PUBLIC_RPC_URLS)
+      http: withPathRpc(421614, ARBITRUM_SEPOLIA_PUBLIC_RPC_URLS),
     },
     default: {
-      http: withPathRpc(421614, ARBITRUM_SEPOLIA_PUBLIC_RPC_URLS)
+      http: withPathRpc(421614, ARBITRUM_SEPOLIA_PUBLIC_RPC_URLS),
     },
     wss: [],
   },
@@ -478,10 +486,10 @@ export const mainnet = defineChain({
   blockTime: 12_000,
   rpcUrls: {
     public: {
-      http: withPathRpc(1, ETHEREUM_PUBLIC_RPC_URLS)
+      http: withPathRpc(1, ETHEREUM_PUBLIC_RPC_URLS),
     },
     default: {
-      http: withPathRpc(1, ETHEREUM_PUBLIC_RPC_URLS)
+      http: withPathRpc(1, ETHEREUM_PUBLIC_RPC_URLS),
     },
     wss: [],
   },
@@ -514,10 +522,10 @@ export const polygon = defineChain({
   nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
   rpcUrls: {
     public: {
-      http: withPathRpc(137, POLYGON_PUBLIC_RPC_URLS)
+      http: withPathRpc(137, POLYGON_PUBLIC_RPC_URLS),
     },
     default: {
-      http: withPathRpc(137, POLYGON_PUBLIC_RPC_URLS)
+      http: withPathRpc(137, POLYGON_PUBLIC_RPC_URLS),
     },
     wss: [],
   },
@@ -550,10 +558,10 @@ export const bsc = defineChain({
   },
   rpcUrls: {
     public: {
-      http: withPathRpc(56, BSC_PUBLIC_RPC_URLS)
+      http: withPathRpc(56, BSC_PUBLIC_RPC_URLS),
     },
     default: {
-      http: withPathRpc(56, BSC_PUBLIC_RPC_URLS)
+      http: withPathRpc(56, BSC_PUBLIC_RPC_URLS),
     },
     wss: [],
   },
@@ -586,10 +594,10 @@ export const celo = defineChain({
   },
   rpcUrls: {
     public: {
-      http: withPathRpc(42220, CELO_PUBLIC_RPC_URLS)
+      http: withPathRpc(42220, CELO_PUBLIC_RPC_URLS),
     },
     default: {
-      http: withPathRpc(42220, CELO_PUBLIC_RPC_URLS)
+      http: withPathRpc(42220, CELO_PUBLIC_RPC_URLS),
     },
     wss: [],
   },
@@ -675,8 +683,8 @@ export const chainRegistry = {
   8453: base,
   84532: baseSepolia,
   31337: anvil,
-  747474: katana
-}
+  747474: katana,
+};
 
 const normalizeOptionalAddress = (value) => {
   const raw = typeof value === 'string' ? value.trim() : '';
@@ -694,49 +702,51 @@ const buildExplorerEntityUrl = (chainId, segment, value) => {
   const normalizedChainId = normalizeChainIdValue(chainId);
   const normalizedValue = typeof value === 'string' ? value.trim() : '';
   if (!normalizedChainId || !normalizedValue) return null;
-  const explorerBaseUrl = normalizeExplorerBaseUrl(
-    getChainById(normalizedChainId)?.blockExplorers?.default?.url
-  );
+  const explorerBaseUrl = normalizeExplorerBaseUrl(getChainById(normalizedChainId)?.blockExplorers?.default?.url);
   if (!explorerBaseUrl) return null;
   return `${explorerBaseUrl}/${segment}/${normalizedValue}`;
 };
 const CHAINS_WITH_FAUCET_RPC_FALLBACK = new Set([84532, 11155420]);
 
 const LOCAL_CONTRACT_CHAIN_ID = Number(localContracts?.chainId || 0) || 0;
-const normalizeLoopbackHost = (value) => String(value || '').trim().toLowerCase().replace(/^\[(.*)\]$/, '$1');
+const normalizeLoopbackHost = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\[(.*)\]$/, '$1');
 const LOCAL_SESSION_REGISTRY_LIST_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
 export const isLocalDevLoopbackHost = (value) => LOCAL_SESSION_REGISTRY_LIST_HOSTS.has(normalizeLoopbackHost(value));
-const LOCAL_SESSION_REGISTRY_ADDRESSES = (
+const LOCAL_SESSION_REGISTRY_ADDRESSES =
   LOCAL_CONTRACT_CHAIN_ID && normalizeOptionalAddress(localContracts?.SessionRegistry)
     ? { [LOCAL_CONTRACT_CHAIN_ID]: normalizeOptionalAddress(localContracts.SessionRegistry) }
-    : {}
-);
-const LOCAL_SESSION_CONTRACTS_BY_CHAIN = (
-  LOCAL_CONTRACT_CHAIN_ID
-    ? {
-        [LOCAL_CONTRACT_CHAIN_ID]: {
-          ...(normalizeOptionalAddress(localContracts?.Surveys)
-            ? { surveys: normalizeOptionalAddress(localContracts.Surveys) }
-            : {}),
-          ...(normalizeOptionalAddress(localContracts?.SBTFactory)
-            ? { sbtFactory: normalizeOptionalAddress(localContracts.SBTFactory) }
-            : {}),
-        },
-      }
-    : {}
-);
+    : {};
+const LOCAL_SESSION_CONTRACTS_BY_CHAIN = LOCAL_CONTRACT_CHAIN_ID
+  ? {
+      [LOCAL_CONTRACT_CHAIN_ID]: {
+        ...(normalizeOptionalAddress(localContracts?.Surveys)
+          ? { surveys: normalizeOptionalAddress(localContracts.Surveys) }
+          : {}),
+        ...(normalizeOptionalAddress(localContracts?.SBTFactory)
+          ? { sbtFactory: normalizeOptionalAddress(localContracts.SBTFactory) }
+          : {}),
+      },
+    }
+  : {};
 const readIncludeLocalSessionRegistryFlag = () => {
   try {
     if (typeof globalThis !== 'undefined' && typeof globalThis.CE_INCLUDE_LOCAL_SESSION_REGISTRY !== 'undefined') {
       return !!globalThis.CE_INCLUDE_LOCAL_SESSION_REGISTRY;
     }
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
   try {
-    const hostname = typeof globalThis !== 'undefined'
-      ? normalizeLoopbackHost(globalThis.location?.hostname || '')
-      : '';
+    const hostname =
+      typeof globalThis !== 'undefined' ? normalizeLoopbackHost(globalThis.location?.hostname || '') : '';
     return isLocalDevLoopbackHost(hostname);
-  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: runtime override lookup. */
+  }
   return false;
 };
 const shouldIncludeSessionRegistryChainInLists = (chainId) => {
@@ -751,17 +761,19 @@ export const SESSION_REGISTRY_ADDRESSES = Object.fromEntries(
   Object.entries({
     ...(contractsConfig.sessionRegistryAddresses || {}),
     ...LOCAL_SESSION_REGISTRY_ADDRESSES,
-  }).map(([k, v]) => [Number(k), v])
+  }).map(([k, v]) => [Number(k), v]),
 );
 
 export const SESSION_CONTRACTS_BY_CHAIN = Object.fromEntries(
   Object.entries({
     ...(contractsConfig.sessionContractsByChain || {}),
     ...LOCAL_SESSION_CONTRACTS_BY_CHAIN,
-  }).map(([k, v]) => [Number(k), v])
+  }).map(([k, v]) => [Number(k), v]),
 );
 
-export function getChainById(id) { return chainRegistry[id] || null }
+export function getChainById(id) {
+  return chainRegistry[id] || null;
+}
 export function getDefaultChainId() {
   return normalizeChainIdValue(DEFAULT_CHAIN_ID);
 }
@@ -817,8 +829,8 @@ export function getDefaultGasPriceGwei(id) {
   return '0.08';
 }
 export function getDefaultHttpRpc(id, opts = {}) {
-  const ch = chainRegistry[id]
-  if (!ch) return null
+  const ch = chainRegistry[id];
+  if (!ch) return null;
   const allowPath = opts?.allowPath !== false;
 
   // Note: chain objects are built with PATH RPCs already injected via withPathRpc(),
@@ -832,26 +844,19 @@ export function getDefaultHttpRpc(id, opts = {}) {
 
   if (allowPath && pathUrl) return pathUrl;
 
-  const filtered = allowPath || !pathUrl
-    ? candidates
-    : candidates.filter((url) => url !== pathUrl);
+  const filtered = allowPath || !pathUrl ? candidates : candidates.filter((url) => url !== pathUrl);
 
-  return filtered[0] || null
+  return filtered[0] || null;
 }
 
-
 // --- wagmi Chain adapters (DEFAULT_NETWORK / ch are wagmi Chain objects) ---
-export const chainHexId = (ch) => '0x' + Number(ch?.id ?? 0).toString(16)
+export const chainHexId = (ch) => '0x' + Number(ch?.id ?? 0).toString(16);
 
 export const chainHttpRpc = (ch) => {
   const id = Number(ch?.id ?? 0);
   const pathUrl = resolvePathRpcUrl(id);
   if (pathUrl) return pathUrl;
-  return (
-    ch?.rpcUrls?.public?.http?.[0] ||
-    ch?.rpcUrls?.default?.http?.[0] ||
-    ''
-  );
+  return ch?.rpcUrls?.public?.http?.[0] || ch?.rpcUrls?.default?.http?.[0] || '';
 };
 
 export const chainHttpRpcNoPath = (ch) => {
@@ -861,20 +866,20 @@ export const chainHttpRpcNoPath = (ch) => {
     ...(Array.isArray(ch?.rpcUrls?.public?.http) ? ch.rpcUrls.public.http : []),
     ...(Array.isArray(ch?.rpcUrls?.default?.http) ? ch.rpcUrls.default.http : []),
   ]);
-  const filtered = pathUrl
-    ? candidates.filter((url) => url !== pathUrl)
-    : candidates;
+  const filtered = pathUrl ? candidates.filter((url) => url !== pathUrl) : candidates;
   return filtered[0] || '';
 };
-export const chainCurrency = (ch) =>
-  ch?.nativeCurrency ?? { name: 'ETH', symbol: 'ETH', decimals: 18 }
+export const chainCurrency = (ch) => ch?.nativeCurrency ?? { name: 'ETH', symbol: 'ETH', decimals: 18 };
 export const isTestnetChain = (ch) => {
-  if (typeof ch?.testnet === 'boolean') return ch.testnet
+  if (typeof ch?.testnet === 'boolean') return ch.testnet;
   const bag = [
-    ch?.name, ch?.network,
+    ch?.name,
+    ch?.network,
     ch?.blockExplorers?.default?.url,
     ...(ch?.rpcUrls?.default?.http || []),
-    ...(ch?.rpcUrls?.public?.http || [])
-  ].join(' ').toLowerCase()
-  return /sepolia|goerli|test|dev|holesky|mumbai|amoy|fuji|chiado/.test(bag)
-}
+    ...(ch?.rpcUrls?.public?.http || []),
+  ]
+    .join(' ')
+    .toLowerCase();
+  return /sepolia|goerli|test|dev|holesky|mumbai|amoy|fuji|chiado/.test(bag);
+};

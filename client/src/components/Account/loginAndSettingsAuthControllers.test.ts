@@ -54,10 +54,12 @@ describe('loginAndSettings auth controllers', () => {
 
     expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
     expect(notifyInfo).toHaveBeenCalledWith('Passkey account switched.');
-    expect(changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-      account: '0xbbb',
-      provider: 'passkey_eoa',
-    }));
+    expect(changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: '0xbbb',
+        provider: 'passkey_eoa',
+      }),
+    );
     expect(updateLoginInfo).toHaveBeenCalledWith({
       loginInProgress: false,
       loginComplete: true,
@@ -66,9 +68,13 @@ describe('loginAndSettings auth controllers', () => {
   });
 
   it('formats agent-token errors with current user-facing copy', () => {
-    expect(formatAgentTokenError(new Error('expired'))).toBe('This token is expired. Create a fresh agent token in Telegram and paste it again.');
+    expect(formatAgentTokenError(new Error('expired'))).toBe(
+      'This token is expired. Create a fresh agent token in Telegram and paste it again.',
+    );
     expect(formatAgentTokenError('unsupported_format')).toBe('Paste a ceagt_ token or a Context Engine token link.');
-    expect(formatAgentTokenError('unknown')).toBe('Agent token login failed. Create a fresh token in Telegram and try again.');
+    expect(formatAgentTokenError('unknown')).toBe(
+      'Agent token login failed. Create a fresh token in Telegram and try again.',
+    );
   });
 
   it('resolves agent-token session context from prop config before fallbacks', () => {
@@ -83,7 +89,10 @@ describe('loginAndSettings auth controllers', () => {
       getSessionConfigBySlugOrDefault: () => ({ slug: 'fallback' }),
       getTargetNetwork: () => ({ id: 11155420 }),
       isTelegramFirstSessionConfig: () => true,
-      normalizeSettingsSessionSlug: (slug) => String(slug || '').trim().toLowerCase(),
+      normalizeSettingsSessionSlug: (slug) =>
+        String(slug || '')
+          .trim()
+          .toLowerCase(),
       setState: jest.fn(),
       setStateIfMounted: jest.fn(),
       updateLoginInfo: jest.fn(),

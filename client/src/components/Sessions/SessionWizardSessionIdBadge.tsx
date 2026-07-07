@@ -19,9 +19,8 @@ type SessionWizardSessionIdBadgeProps = {
   sessionIdDisplay?: string;
 };
 
-const formatSessionIdBadgeText = (sessionIdDisplay: string): string => (
-  sessionIdDisplay.length > 14 ? `${sessionIdDisplay.slice(0, 14)}…` : sessionIdDisplay
-);
+const formatSessionIdBadgeText = (sessionIdDisplay: string): string =>
+  sessionIdDisplay.length > 14 ? `${sessionIdDisplay.slice(0, 14)}…` : sessionIdDisplay;
 
 const SessionWizardSessionIdBadge = ({
   isRegenerating = false,

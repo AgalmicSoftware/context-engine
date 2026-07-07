@@ -1,9 +1,6 @@
 import { normalizeSessionSlug } from './sessionNaming.js';
 import { toStr } from '../shared/primitives.js';
-import {
-  CE_SESSION_SCAN_SCOPE,
-  CE_SESSION_SCAN_SLUGS,
-} from '../../variables/appConfig.js';
+import { CE_SESSION_SCAN_SCOPE, CE_SESSION_SCAN_SLUGS } from '../../variables/appConfig.js';
 
 type GlobalSessionScope = 'all' | 'active' | 'general' | 'list';
 type GlobalSessionSelectionInput = Record<string, unknown>;
@@ -25,20 +22,15 @@ const LEGACY_SCOPE_STORAGE_KEY = 'ce:sessionScanScope';
 const LEGACY_SLUGS_STORAGE_KEY = 'ce:sessionScanSlugs';
 const VALID_SCOPE_MODES = new Set<GlobalSessionScope>(['all', 'active', 'general', 'list']);
 const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
-const isRecord = (value: unknown): value is GlobalSessionSelectionInput => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is GlobalSessionSelectionInput => !!value && typeof value === 'object';
 export const DEFAULT_GLOBAL_SESSION_SCOPE: GlobalSessionScope = VALID_SCOPE_MODES.has(
-  toStr(CE_SESSION_SCAN_SCOPE).trim().toLowerCase() as GlobalSessionScope
+  toStr(CE_SESSION_SCAN_SCOPE).trim().toLowerCase() as GlobalSessionScope,
 )
-  ? toStr(CE_SESSION_SCAN_SCOPE).trim().toLowerCase() as GlobalSessionScope
+  ? (toStr(CE_SESSION_SCAN_SCOPE).trim().toLowerCase() as GlobalSessionScope)
   : 'active';
 
-const safeWindow = (): Window | null => (
-  typeof window !== 'undefined' && window && typeof window.addEventListener === 'function'
-    ? window
-    : null
-);
+const safeWindow = (): Window | null =>
+  typeof window !== 'undefined' && window && typeof window.addEventListener === 'function' ? window : null;
 
 const readLocalStorage = (key: string): string | null => {
   try {
@@ -64,11 +56,7 @@ export const normalizeGlobalSessionScope = (value: unknown): GlobalSessionScope 
 
 export const normalizeGlobalSessionSlugs = (value: unknown): string[] => {
   const source = Array.isArray(value)
-    ? value.flatMap((entry) => (
-      typeof entry === 'string'
-        ? entry.split(',')
-        : [entry]
-    ))
+    ? value.flatMap((entry) => (typeof entry === 'string' ? entry.split(',') : [entry]))
     : toStr(value).split(',');
   const seen = new Set<string>();
   const out: string[] = [];
@@ -82,9 +70,7 @@ export const normalizeGlobalSessionSlugs = (value: unknown): string[] => {
   return out;
 };
 
-export const normalizeGlobalPrimarySessionSlug = (value: unknown): string => (
-  normalizeSessionSlug(value)
-);
+export const normalizeGlobalPrimarySessionSlug = (value: unknown): string => normalizeSessionSlug(value);
 
 export const derivePrimarySessionSlugFromList = (slugs: unknown[] = []): string => {
   const normalizedSlugs = normalizeGlobalSessionSlugs(slugs);
@@ -114,9 +100,7 @@ const readStoredPrimarySessionExplicit = (): boolean => {
   }
 };
 
-export const normalizeGlobalSessionSelection = (
-  value: unknown = {}
-): GlobalSessionSelection => {
+export const normalizeGlobalSessionSelection = (value: unknown = {}): GlobalSessionSelection => {
   const source = isRecord(value) ? value : {};
   const hasExplicitPrimarySessionSlug =
     Object.prototype.hasOwnProperty.call(source, 'primarySessionSlug') ||
@@ -125,28 +109,27 @@ export const normalizeGlobalSessionSelection = (
   let primarySessionExplicit =
     source.primarySessionExplicit === true
       ? true
-      : (source.primarySessionExplicit === false
+      : source.primarySessionExplicit === false
         ? false
-        : hasExplicitPrimarySessionSlug);
+        : hasExplicitPrimarySessionSlug;
   const selectedSessionScope = normalizeGlobalSessionScope(
-    source.selectedSessionScope ??
-    source.sessionScanScope ??
-    source.scopeMode
+    source.selectedSessionScope ?? source.sessionScanScope ?? source.scopeMode,
   );
   const selectedSessionSlugs = normalizeGlobalSessionSlugs(
-    source.selectedSessionSlugs ??
-    source.sessionScanSlugs ??
-    source.scopeSlugs
+    source.selectedSessionSlugs ?? source.sessionScanSlugs ?? source.scopeSlugs,
   );
   let primarySessionSlug = normalizeGlobalPrimarySessionSlug(
-    source.primarySessionSlug ??
-    source.activeSessionSlug ??
-    source.sessionSlug
+    source.primarySessionSlug ?? source.activeSessionSlug ?? source.sessionSlug,
   );
   const listIncludesGeneral = selectedSessionSlugs.includes('');
 
   // Preserve the primary/default layer while still keeping the full list authoritative.
-  if (!primarySessionExplicit && !primarySessionSlug && selectedSessionScope === 'list' && selectedSessionSlugs.length > 0) {
+  if (
+    !primarySessionExplicit &&
+    !primarySessionSlug &&
+    selectedSessionScope === 'list' &&
+    selectedSessionSlugs.length > 0
+  ) {
     primarySessionSlug = derivePrimarySessionSlugFromList(selectedSessionSlugs);
   }
   // If list mode excludes the general session, keeping an explicit blank primary
@@ -191,9 +174,7 @@ export const readStoredGlobalSessionSelection = (): GlobalSessionSelection => {
   });
 };
 
-export const resolveScopedSessionSlugsFromSelection = (
-  value: unknown = {}
-): string[] => {
+export const resolveScopedSessionSlugsFromSelection = (value: unknown = {}): string[] => {
   const selection = normalizeGlobalSessionSelection(value);
   if (selection.selectedSessionScope === 'general') return [''];
   if (selection.selectedSessionScope === 'active') return [selection.primarySessionSlug || ''];
@@ -201,16 +182,16 @@ export const resolveScopedSessionSlugsFromSelection = (
   return [];
 };
 
-export const dispatchGlobalSessionSelectionUpdatedEvent = (
-  value: unknown = {}
-): GlobalSessionSelection => {
+export const dispatchGlobalSessionSelectionUpdatedEvent = (value: unknown = {}): GlobalSessionSelection => {
   const target = safeWindow();
   if (!target || typeof target.dispatchEvent !== 'function') return normalizeGlobalSessionSelection(value);
   const selection = normalizeGlobalSessionSelection(value);
   try {
-    target.dispatchEvent(new CustomEvent(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, {
-      detail: selection,
-    }));
+    target.dispatchEvent(
+      new CustomEvent(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, {
+        detail: selection,
+      }),
+    );
   } catch (_) {}
   return selection;
 };
@@ -224,52 +205,34 @@ const writeLegacyRuntimeSessionGlobals = (selection: GlobalSessionSelection): vo
   } catch (_) {}
 };
 
-export const persistGlobalSessionSelection = (
-  value: unknown = {}
-): GlobalSessionSelection => {
+export const persistGlobalSessionSelection = (value: unknown = {}): GlobalSessionSelection => {
   const source = isRecord(value) ? value : {};
   const storedSelection = readStoredGlobalSessionSelection();
   const hasPrimaryInput =
-    hasOwn(source, 'primarySessionSlug') ||
-    hasOwn(source, 'activeSessionSlug') ||
-    hasOwn(source, 'sessionSlug');
+    hasOwn(source, 'primarySessionSlug') || hasOwn(source, 'activeSessionSlug') || hasOwn(source, 'sessionSlug');
   const hasPrimaryExplicitInput = hasOwn(source, 'primarySessionExplicit');
   const hasScopeInput =
-    hasOwn(source, 'selectedSessionScope') ||
-    hasOwn(source, 'sessionScanScope') ||
-    hasOwn(source, 'scopeMode');
+    hasOwn(source, 'selectedSessionScope') || hasOwn(source, 'sessionScanScope') || hasOwn(source, 'scopeMode');
   const hasSlugInput =
-    hasOwn(source, 'selectedSessionSlugs') ||
-    hasOwn(source, 'sessionScanSlugs') ||
-    hasOwn(source, 'scopeSlugs');
-  const primarySessionExplicit =
-    hasPrimaryExplicitInput
-      ? source.primarySessionExplicit === true
-      : (
-        hasPrimaryInput ||
-        storedSelection.primarySessionExplicit === true
-      );
+    hasOwn(source, 'selectedSessionSlugs') || hasOwn(source, 'sessionScanSlugs') || hasOwn(source, 'scopeSlugs');
+  const primarySessionExplicit = hasPrimaryExplicitInput
+    ? source.primarySessionExplicit === true
+    : hasPrimaryInput || storedSelection.primarySessionExplicit === true;
   // Regression guard: scope/list edits must preserve an explicit primary default,
   // but non-explicit primaries should be re-derived from the updated scope.
   const preserveStoredPrimarySessionSlug =
-    !hasPrimaryInput && (
-      (hasPrimaryExplicitInput && source.primarySessionExplicit === true) ||
-      (!hasPrimaryExplicitInput && storedSelection.primarySessionExplicit === true)
-    );
+    !hasPrimaryInput &&
+    ((hasPrimaryExplicitInput && source.primarySessionExplicit === true) ||
+      (!hasPrimaryExplicitInput && storedSelection.primarySessionExplicit === true));
   const selection = normalizeGlobalSessionSelection({
     ...(hasScopeInput ? {} : { selectedSessionScope: storedSelection.selectedSessionScope }),
     ...(hasSlugInput ? {} : { selectedSessionSlugs: storedSelection.selectedSessionSlugs }),
-    ...(preserveStoredPrimarySessionSlug
-      ? { primarySessionSlug: storedSelection.primarySessionSlug }
-      : {}),
+    ...(preserveStoredPrimarySessionSlug ? { primarySessionSlug: storedSelection.primarySessionSlug } : {}),
     ...source,
     primarySessionExplicit,
   });
   writeLocalStorage(GLOBAL_SESSION_PRIMARY_STORAGE_KEY, selection.primarySessionSlug);
-  writeLocalStorage(
-    GLOBAL_SESSION_PRIMARY_EXPLICIT_STORAGE_KEY,
-    JSON.stringify(selection.primarySessionExplicit)
-  );
+  writeLocalStorage(GLOBAL_SESSION_PRIMARY_EXPLICIT_STORAGE_KEY, JSON.stringify(selection.primarySessionExplicit));
   writeLocalStorage(GLOBAL_SESSION_SCOPE_STORAGE_KEY, selection.selectedSessionScope);
   writeLocalStorage(GLOBAL_SESSION_SLUGS_STORAGE_KEY, JSON.stringify(selection.selectedSessionSlugs));
 
@@ -281,9 +244,7 @@ export const persistGlobalSessionSelection = (
   return selection;
 };
 
-export const writeGlobalSessionSelection = (
-  value: unknown = {}
-): GlobalSessionSelection => {
+export const writeGlobalSessionSelection = (value: unknown = {}): GlobalSessionSelection => {
   const selection = persistGlobalSessionSelection(value);
   dispatchGlobalSessionSelectionUpdatedEvent(selection);
   return selection;

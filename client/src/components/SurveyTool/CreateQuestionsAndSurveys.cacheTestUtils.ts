@@ -46,9 +46,8 @@ const peekCacheSyncMock = cacheScripts.peekCacheSync as jest.Mock;
 const subscribeCacheUpdatesMock = cacheScripts.subscribeCacheUpdates as jest.Mock;
 const writeCacheOptimisticMock = cacheScripts.writeCacheOptimistic as jest.Mock;
 
-const asTreeElement = (node: unknown): TreeElement | null => (
-  node !== null && typeof node === 'object' ? node as TreeElement : null
-);
+const asTreeElement = (node: unknown): TreeElement | null =>
+  node !== null && typeof node === 'object' ? (node as TreeElement) : null;
 
 const makeInstance = (props: Partial<CreateQuestionsAndSurveysProps> = {}): CreateQuestionsAndSurveysHarness => {
   const instance = new CreateQuestionsAndSurveys({
@@ -58,9 +57,13 @@ const makeInstance = (props: Partial<CreateQuestionsAndSurveysProps> = {}): Crea
   } as CreateQuestionsAndSurveysProps) as CreateQuestionsAndSurveysHarness;
   instance._isMounted = true;
   instance.setState = jest.fn((update: unknown, cb?: () => void) => {
-    const patch = typeof update === 'function'
-      ? (update as (state: Record<string, unknown>, props: CreateQuestionsAndSurveysProps) => unknown)(instance.state, instance.props)
-      : update;
+    const patch =
+      typeof update === 'function'
+        ? (update as (state: Record<string, unknown>, props: CreateQuestionsAndSurveysProps) => unknown)(
+            instance.state,
+            instance.props,
+          )
+        : update;
     if (patch && typeof patch === 'object') {
       instance.state = { ...instance.state, ...(patch as Record<string, unknown>) };
     }

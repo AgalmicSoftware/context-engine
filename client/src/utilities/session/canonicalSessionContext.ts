@@ -134,19 +134,12 @@ const hasOwnKeys = (value: unknown): value is UnknownRecord => isObj(value) && O
 const readTrimmedSessionSlug = (raw: unknown): string => toStr(raw).trim();
 const normalizeSessionAliasToken = (raw: unknown): string => normalizeBaseSlug(readTrimmedSessionSlug(raw));
 const RESERVED_SESSION_SLUG_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
-export const isReservedSessionSlugKey = (rawSlug: unknown): boolean => (
-  RESERVED_SESSION_SLUG_KEYS.has(normalizeSessionAliasToken(rawSlug))
-);
+export const isReservedSessionSlugKey = (rawSlug: unknown): boolean =>
+  RESERVED_SESSION_SLUG_KEYS.has(normalizeSessionAliasToken(rawSlug));
 // chainId alone is not sufficient — a partial/malformed registry record with only
 // chainId should not suppress the route identity or mark resolution as authoritative.
-const hasIdentityValue = (identity: ParsedSessionIdentity | UnknownRecord | null | undefined): boolean => !!(
-  identity &&
-  (
-    identity.slug ||
-    identity.sessionId ||
-    identity.metadataURI
-  )
-);
+const hasIdentityValue = (identity: ParsedSessionIdentity | UnknownRecord | null | undefined): boolean =>
+  !!(identity && (identity.slug || identity.sessionId || identity.metadataURI));
 const collectPrefixedErrors = (target: string[], prefix: string, entries: string[] = []): void => {
   entries.forEach((entry) => {
     target.push(`${prefix}: ${entry}`);
@@ -155,14 +148,10 @@ const collectPrefixedErrors = (target: string[], prefix: string, entries: string
 const buildRouteIdentityInput = (requestedSlug: unknown, routeContext: unknown): UnknownRecord => {
   const route = isObj(routeContext) ? routeContext : {};
   return {
-    slug: requestedSlug !== undefined
-      ? requestedSlug
-      : (
-        route.sessionSlug ??
-        route.slug ??
-        route.activeSessionSlug ??
-        route.requestedSlug
-      ),
+    slug:
+      requestedSlug !== undefined
+        ? requestedSlug
+        : (route.sessionSlug ?? route.slug ?? route.activeSessionSlug ?? route.requestedSlug),
     sessionId: route.sessionIdHex ?? route.sessionId ?? route.id,
     metadataURI: route.metadataURI,
     chainId: route.chainId ?? route.networkChainId,
@@ -176,19 +165,9 @@ const buildRegistryIdentityInput = (registrySession: unknown): UnknownRecord => 
     // Prefer hex-format IDs over UUID-format across both levels.
     // Real registry cache entries store UUID at top level (registry.sessionId)
     // and canonical hex in __registry.sessionIdHex — check hex fields first.
-    sessionId: (
-      registry.sessionIdHex ??
-      registryMeta.sessionIdHex ??
-      registry.sessionId ??
-      registryMeta.sessionId
-    ),
+    sessionId: registry.sessionIdHex ?? registryMeta.sessionIdHex ?? registry.sessionId ?? registryMeta.sessionId,
     metadataURI: registry.metadataURI ?? registryMeta.metadataURI,
-    chainId: (
-      registry.chainId ??
-      registry.networkChainId ??
-      registryMeta.chainId ??
-      registryMeta.registryChainId
-    ),
+    chainId: registry.chainId ?? registry.networkChainId ?? registryMeta.chainId ?? registryMeta.registryChainId,
   };
 };
 const buildDemoIdentityInput = (requestedSlug: unknown, demoSession: unknown): UnknownRecord => {
@@ -200,21 +179,23 @@ const buildDemoIdentityInput = (requestedSlug: unknown, demoSession: unknown): U
     chainId: demo.chainId ?? demo.networkChainId,
   };
 };
-const EFFECTIVE_METADATA_STRIP_KEYS = Array.from(new Set([
-  'slug',
-  'sessionId',
-  'metadataURI',
-  'chainId',
-  'networkChainId',
-  'rpc',
-  'arweave',
-  'faucet',
-  ...AUTHORITY_MATRIX.gates.fields,
-  ...AUTHORITY_MATRIX.workerConfig.fields,
-  ...AUTHORITY_MATRIX.secrets.fields,
-  ...SESSION_WORKER_METADATA_ALIAS_KEYS,
-  'faucetKey',
-]));
+const EFFECTIVE_METADATA_STRIP_KEYS = Array.from(
+  new Set([
+    'slug',
+    'sessionId',
+    'metadataURI',
+    'chainId',
+    'networkChainId',
+    'rpc',
+    'arweave',
+    'faucet',
+    ...AUTHORITY_MATRIX.gates.fields,
+    ...AUTHORITY_MATRIX.workerConfig.fields,
+    ...AUTHORITY_MATRIX.secrets.fields,
+    ...SESSION_WORKER_METADATA_ALIAS_KEYS,
+    'faucetKey',
+  ]),
+);
 const stripEffectiveMetadataOverrides = (metadata: unknown): UnknownRecord => {
   if (!isObj(metadata)) return {};
   const next = cloneValue(metadata);
@@ -236,19 +217,19 @@ export const canonicalizeSessionSlug = (rawSlug: unknown): string => {
 const findDemoSessionConfigBySlug = (demoSessions: unknown, slugIn: unknown = ''): SessionConfigLike | null => {
   const demo = isObj(demoSessions) ? demoSessions : {};
   const slug = canonicalizeSessionSlug(slugIn);
-  if (!slug) return isObj(demo.general) ? demo.general as SessionConfigLike : null;
+  if (!slug) return isObj(demo.general) ? (demo.general as SessionConfigLike) : null;
   const byKey = demo[slug];
   if (isObj(byKey) && canonicalizeSessionSlug(byKey.slug || slug) === slug) return byKey as SessionConfigLike;
-  const bySlug = Object.values(demo).find((entry) => (
-    isObj(entry) && canonicalizeSessionSlug(entry.slug || '') === slug
-  ));
-  return isObj(bySlug) ? bySlug as SessionConfigLike : null;
+  const bySlug = Object.values(demo).find(
+    (entry) => isObj(entry) && canonicalizeSessionSlug(entry.slug || '') === slug,
+  );
+  return isObj(bySlug) ? (bySlug as SessionConfigLike) : null;
 };
 
 const findDemoSessionConfigByAlias = (
   demoSessions: unknown,
   slugIn: unknown = '',
-  { allowSessionName = false }: { allowSessionName?: boolean } = {}
+  { allowSessionName = false }: { allowSessionName?: boolean } = {},
 ): SessionConfigLike | null => {
   const demo = isObj(demoSessions) ? demoSessions : {};
   const slug = canonicalizeSessionSlug(slugIn);
@@ -258,10 +239,12 @@ const findDemoSessionConfigByAlias = (
     if (!isObj(entry)) continue;
     if (slug && canonicalizeSessionSlug(key) === slug) return entry as SessionConfigLike;
     if (slug && canonicalizeSessionSlug(entry.slug || '') === slug) return entry as SessionConfigLike;
-    if (allowSessionName && slug && canonicalizeSessionSlug(entry.sessionName || '') === slug) return entry as SessionConfigLike;
+    if (allowSessionName && slug && canonicalizeSessionSlug(entry.sessionName || '') === slug)
+      return entry as SessionConfigLike;
     if (aliasToken && normalizeSessionAliasToken(key) === aliasToken) return entry as SessionConfigLike;
     if (aliasToken && normalizeSessionAliasToken(entry.slug || '') === aliasToken) return entry as SessionConfigLike;
-    if (allowSessionName && aliasToken && normalizeSessionAliasToken(entry.sessionName || '') === aliasToken) return entry as SessionConfigLike;
+    if (allowSessionName && aliasToken && normalizeSessionAliasToken(entry.sessionName || '') === aliasToken)
+      return entry as SessionConfigLike;
   }
   return null;
 };
@@ -277,9 +260,7 @@ export const resolveSessionSlugAliasFromDemoSessions = ({
   });
   return {
     requestedSessionSlug,
-    sessionSlug: sessionConfig
-      ? canonicalizeSessionSlug(sessionConfig.slug || '')
-      : requestedSessionSlug,
+    sessionSlug: sessionConfig ? canonicalizeSessionSlug(sessionConfig.slug || '') : requestedSessionSlug,
     sessionConfig,
     sessionConfigSource: sessionConfig ? 'demo' : 'missing',
     warnings: [],
@@ -333,27 +314,21 @@ export const resolveCanonicalSessionConfig = ({
   const sourceObj = isObj(source) ? source : {};
   const defaultsObj = isObj(defaults) ? defaults : {};
 
-  const hasExplicitSessionSlug = (
-    Object.prototype.hasOwnProperty.call(sourceObj, 'sessionSlug') &&
-    sourceObj.sessionSlug !== undefined
-  );
+  const hasExplicitSessionSlug =
+    Object.prototype.hasOwnProperty.call(sourceObj, 'sessionSlug') && sourceObj.sessionSlug !== undefined;
   const explicitSessionSlug = canonicalizeSessionSlug(
-    sourceObj.sessionSlug ??
-    defaultsObj.sessionSlug ??
-    sourceObj.slug ??
-    defaultsObj.slug
+    sourceObj.sessionSlug ?? defaultsObj.sessionSlug ?? sourceObj.slug ?? defaultsObj.slug,
   );
-  const activeSessionSlug = canonicalizeSessionSlug(
-    sourceObj.activeSessionSlug ??
-    defaultsObj.activeSessionSlug
-  );
+  const activeSessionSlug = canonicalizeSessionSlug(sourceObj.activeSessionSlug ?? defaultsObj.activeSessionSlug);
 
   let sessionConfig =
-    (isObj(sourceObj.sessionConfig) ? sourceObj.sessionConfig as SessionConfigLike : null) ||
-    (isObj(defaultsObj.sessionConfig) ? defaultsObj.sessionConfig as SessionConfigLike : null);
+    (isObj(sourceObj.sessionConfig) ? (sourceObj.sessionConfig as SessionConfigLike) : null) ||
+    (isObj(defaultsObj.sessionConfig) ? (defaultsObj.sessionConfig as SessionConfigLike) : null);
   let sessionConfigSource = isObj(sourceObj.sessionConfig)
     ? 'provided'
-    : (isObj(defaultsObj.sessionConfig) ? 'default' : 'missing');
+    : isObj(defaultsObj.sessionConfig)
+      ? 'default'
+      : 'missing';
 
   const requestedSlug = hasExplicitSessionSlug ? explicitSessionSlug : activeSessionSlug;
   if (!sessionConfig && typeof resolveBySlug === 'function') {
@@ -379,11 +354,10 @@ export const resolveCanonicalSessionConfig = ({
     warnings.push(`session config slug mismatch: requested "${explicitSessionSlug}" resolved "${configSessionSlug}"`);
   }
 
-  const sessionConfigWithSlug = (
-    isObj(sessionConfig) && !configSessionSlug && sessionSlug
+  const sessionConfigWithSlug =
+    (isObj(sessionConfig) && !configSessionSlug && sessionSlug
       ? { ...sessionConfig, slug: sessionSlug }
-      : sessionConfig
-  ) || null;
+      : sessionConfig) || null;
 
   return {
     hasExplicitSessionSlug,
@@ -398,7 +372,11 @@ export const resolveCanonicalSessionConfig = ({
     provenance: {
       sessionSlug: hasExplicitSessionSlug
         ? 'explicit'
-        : (configSessionSlug ? 'config' : (activeSessionSlug ? 'active' : 'default')),
+        : configSessionSlug
+          ? 'config'
+          : activeSessionSlug
+            ? 'active'
+            : 'default',
       sessionConfig: sessionConfigSource,
     },
   };
@@ -457,12 +435,14 @@ export const resolveCanonicalSessionContext = ({
     errors.push('Missing authoritative session identity source.');
   } else if (identityProvenance !== AUTHORITY_MATRIX.identity.authoritativeSource) {
     warnings.push(
-      `Using ${identityProvenance} session identity fallback; ${AUTHORITY_MATRIX.identity.authoritativeSource} is authoritative.`
+      `Using ${identityProvenance} session identity fallback; ${AUTHORITY_MATRIX.identity.authoritativeSource} is authoritative.`,
     );
   }
 
   if (routeIdentity.slug && effectiveIdentity.slug && routeIdentity.slug !== effectiveIdentity.slug) {
-    warnings.push(`session identity slug mismatch: requested "${routeIdentity.slug}" resolved "${effectiveIdentity.slug}"`);
+    warnings.push(
+      `session identity slug mismatch: requested "${routeIdentity.slug}" resolved "${effectiveIdentity.slug}"`,
+    );
   }
 
   const metadataProvided = metadata !== undefined && metadata !== null;
@@ -471,9 +451,10 @@ export const resolveCanonicalSessionContext = ({
     ? parseSessionMetadata(metadata)
     : { ok: true, metadata: {}, errors: [] };
   const demoMetadataAllowed = isDemoSourceAllowed('textMetadata', normalizedMode);
-  const demoMetadataParsed: ParsedSessionMetadata = demoMetadataAllowed && demoSession !== undefined && demoSession !== null
-    ? parseSessionMetadata(demoSession)
-    : { ok: true, metadata: {}, errors: [] };
+  const demoMetadataParsed: ParsedSessionMetadata =
+    demoMetadataAllowed && demoSession !== undefined && demoSession !== null
+      ? parseSessionMetadata(demoSession)
+      : { ok: true, metadata: {}, errors: [] };
 
   if (metadataProvided) {
     collectPrefixedErrors(errors, 'session metadata', metadataParsed.errors);
@@ -502,18 +483,20 @@ export const resolveCanonicalSessionContext = ({
 
   if (metadataProvenance === AUTHORITY_SOURCES.DEMO) {
     warnings.push(
-      `Using ${AUTHORITY_SOURCES.DEMO} session metadata fallback; ${AUTHORITY_MATRIX.textMetadata.authoritativeSource} is authoritative.`
+      `Using ${AUTHORITY_SOURCES.DEMO} session metadata fallback; ${AUTHORITY_MATRIX.textMetadata.authoritativeSource} is authoritative.`,
     );
   } else if (metadataProvenance === 'cache' && hasOwnKeys(effectiveMetadata)) {
     warnings.push(
-      `Using cached session metadata replica; ${AUTHORITY_MATRIX.textMetadata.authoritativeSource} metadata is authoritative.`
+      `Using cached session metadata replica; ${AUTHORITY_MATRIX.textMetadata.authoritativeSource} metadata is authoritative.`,
     );
   } else if (!hasOwnKeys(effectiveMetadata)) {
     warnings.push('Session metadata unavailable from authoritative sources.');
   }
 
   if (effectiveMetadata.slug && effectiveIdentity.slug && effectiveMetadata.slug !== effectiveIdentity.slug) {
-    warnings.push(`session metadata slug mismatch: metadata "${effectiveMetadata.slug}" ignored in favor of "${effectiveIdentity.slug}"`);
+    warnings.push(
+      `session metadata slug mismatch: metadata "${effectiveMetadata.slug}" ignored in favor of "${effectiveIdentity.slug}"`,
+    );
   }
 
   const workerProvided = workerConfig !== undefined && workerConfig !== null;

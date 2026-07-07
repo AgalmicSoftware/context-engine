@@ -11,9 +11,9 @@ export const CONTRACT_NAME_MAPPING = Object.freeze({
 
 export const CONTRACT_EXPLAINERS = Object.freeze({
   surveys: 'Keeps track of questions / surveys (+ responses) storage hashes on Arweave.',
-  sbtFactory:
-    `Allows anyone to easily create ${t('sbtFull')}s (Non-transferrable NFTs) to signify event participation, ${t('sbtLower')} membership, or public belief / association.`,
-  sessionRegistry: 'On-chain registry mapping session slugs to their contract addresses and configuration. One per chain.',
+  sbtFactory: `Allows anyone to easily create ${t('sbtFull')}s (Non-transferrable NFTs) to signify event participation, ${t('sbtLower')} membership, or public belief / association.`,
+  sessionRegistry:
+    'On-chain registry mapping session slugs to their contract addresses and configuration. One per chain.',
   customSBT: `${t('sbtFull')} contract template deployed by ${t('sbt')} Factory for each ${t('sbtLower')}. Non-transferable ERC-721.`,
 });
 
@@ -24,12 +24,7 @@ export const CONTRACT_SOURCE_FILES = Object.freeze({
   customSBT: 'CustomSBT.sol',
 });
 
-export const SUPPORTED_CONTRACT_KEYS = Object.freeze([
-  'surveys',
-  'sbtFactory',
-  'sessionRegistry',
-  'customSBT',
-]);
+export const SUPPORTED_CONTRACT_KEYS = Object.freeze(['surveys', 'sbtFactory', 'sessionRegistry', 'customSBT']);
 
 export const CONTRACT_VIEWER_SECTION_TESTID = 'ce-contract-viewer-section';
 export const CONTRACT_VIEWER_TOGGLE_TESTID = 'ce-contract-viewer-toggle';
@@ -40,29 +35,25 @@ export const normalizeContractKeyParam = (value = ''): string => {
   return SUPPORTED_CONTRACT_KEYS.includes(normalized) ? normalized : '';
 };
 
-export const getContractDisplayName = (contractKey = ''): string => (
-  (CONTRACT_NAME_MAPPING as Record<string, string>)[contractKey] || contractKey
-);
+export const getContractDisplayName = (contractKey = ''): string =>
+  (CONTRACT_NAME_MAPPING as Record<string, string>)[contractKey] || contractKey;
 
-export const getContractExplainer = (contractKey = ''): string => (
-  (CONTRACT_EXPLAINERS as Record<string, string>)[contractKey] || `Core contract for ${contractKey}.`
-);
+export const getContractExplainer = (contractKey = ''): string =>
+  (CONTRACT_EXPLAINERS as Record<string, string>)[contractKey] || `Core contract for ${contractKey}.`;
 
-export const getContractSourceFileName = (contractKey = ''): string => (
-  (CONTRACT_SOURCE_FILES as Record<string, string>)[contractKey] || ''
-);
+export const getContractSourceFileName = (contractKey = ''): string =>
+  (CONTRACT_SOURCE_FILES as Record<string, string>)[contractKey] || '';
 
 export const getContractSourcePanelId = (contractKey = ''): string => `contract-source-${contractKey}`;
 export const getContractViewerCardTestId = (contractKey = ''): string => `ce-contract-viewer-card-${contractKey}`;
 export const getContractViewerSourceTestId = (contractKey = ''): string => `ce-contract-viewer-source-${contractKey}`;
 export const getSessionWizardContractRowTestId = (contractKey = ''): string => `ce-wizard-contract-row-${contractKey}`;
-export const getSessionWizardContractTooltipTestId = (contractKey = ''): string => `ce-wizard-contract-tooltip-${contractKey}`;
-export const getSessionWizardContractModalTriggerTestId = (contractKey = ''): string => `ce-wizard-contract-modal-trigger-${contractKey}`;
+export const getSessionWizardContractTooltipTestId = (contractKey = ''): string =>
+  `ce-wizard-contract-tooltip-${contractKey}`;
+export const getSessionWizardContractModalTriggerTestId = (contractKey = ''): string =>
+  `ce-wizard-contract-modal-trigger-${contractKey}`;
 
-export const buildContractsPageHref = ({
-  contractKey = '',
-  sessionSlug = '',
-}: any = {}): string => {
+export const buildContractsPageHref = ({ contractKey = '', sessionSlug = '' }: any = {}): string => {
   const normalizedContractKey = normalizeContractKeyParam(contractKey);
   const normalizedSessionSlug = toStr(sessionSlug).trim();
   const searchParams = new URLSearchParams();

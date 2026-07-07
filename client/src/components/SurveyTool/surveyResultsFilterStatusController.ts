@@ -29,13 +29,9 @@ export type SurveyResultsStatusMessagesDisplayPlan = {
   showFilterLoading: boolean;
 };
 
-const toNonNegativeNumber = (value: unknown): number => (
-  Math.max(0, Number(value) || 0)
-);
+const toNonNegativeNumber = (value: unknown): number => Math.max(0, Number(value) || 0);
 
-const clampCount = (value: unknown, max: number): number => (
-  Math.min(max, toNonNegativeNumber(value))
-);
+const clampCount = (value: unknown, max: number): number => Math.min(max, toNonNegativeNumber(value));
 
 export const buildSurveyResultsStatusMessagesDisplayPlan = ({
   alertMessage = '',
@@ -64,14 +60,17 @@ export const buildSurveyResultsFilterSummaryDisplayPlan = ({
   const displayedTotalQuestionsCount = toNonNegativeNumber(totalQuestionsCount);
   const displayedTotalResponsesCount = toNonNegativeNumber(totalResponsesCount);
   const normalizedAggregatorEntriesCount = toNonNegativeNumber(aggregatorEntriesCount);
-  const normalizedViewMode = String(viewMode || '').trim().toLowerCase();
-  const normalizedSurveyViewMode = String(surveyViewMode || '').trim().toLowerCase();
+  const normalizedViewMode = String(viewMode || '')
+    .trim()
+    .toLowerCase();
+  const normalizedSurveyViewMode = String(surveyViewMode || '')
+    .trim()
+    .toLowerCase();
 
   let displayedFilteredQuestionsCount: unknown;
   if (normalizedViewMode === 'survey') {
     if (normalizedSurveyViewMode === 'aggregate') {
-      displayedFilteredQuestionsCount =
-        normalizedAggregatorEntriesCount || displayedTotalQuestionsCount;
+      displayedFilteredQuestionsCount = normalizedAggregatorEntriesCount || displayedTotalQuestionsCount;
     } else {
       displayedFilteredQuestionsCount = displayedTotalQuestionsCount;
     }
@@ -85,14 +84,8 @@ export const buildSurveyResultsFilterSummaryDisplayPlan = ({
   return {
     displayedTotalQuestionsCount,
     displayedTotalResponsesCount,
-    normalizedFilteredQuestionsCount: clampCount(
-      displayedFilteredQuestionsCount,
-      displayedTotalQuestionsCount
-    ),
-    normalizedFilteredResponsesCount: clampCount(
-      filteredResponsesCount,
-      displayedTotalResponsesCount
-    ),
+    normalizedFilteredQuestionsCount: clampCount(displayedFilteredQuestionsCount, displayedTotalQuestionsCount),
+    normalizedFilteredResponsesCount: clampCount(filteredResponsesCount, displayedTotalResponsesCount),
     showFilteredCountSpinner: !!filterLoading || !areSummaryCountsHydrated,
   };
 };

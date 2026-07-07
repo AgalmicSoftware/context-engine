@@ -80,25 +80,28 @@ describe('SessionWizard worker panel rendering', () => {
 
     try {
       window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
-      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-        draft: {
-          networkChainId: 84532,
-          blockLimits: {
-            start: mockSelectorSourceStartBlock,
-            end: null,
-          },
-          contracts: {
-            sbtFactory: {
-              address: mockSelectorSourceFactory,
+      localStorage.setItem(
+        'ce:sessionWizardDraft:v1',
+        JSON.stringify({
+          draft: {
+            networkChainId: 84532,
+            blockLimits: {
+              start: mockSelectorSourceStartBlock,
+              end: null,
+            },
+            contracts: {
+              sbtFactory: {
+                address: mockSelectorSourceFactory,
+                chainId: 84532,
+              },
+            },
+            __registry: {
               chainId: 84532,
+              registryChainId: 84532,
             },
           },
-          __registry: {
-            chainId: 84532,
-            registryChainId: 84532,
-          },
-        },
-      }));
+        }),
+      );
       renderLoggedInSessionWizard({
         initialSponsoredBundleId: 'sponsor-tx-id',
         initialSponsoredBundleKey: 'sponsor-secret',
@@ -136,7 +139,7 @@ describe('SessionWizard worker panel rendering', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.'
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
         );
       });
 
@@ -150,20 +153,18 @@ describe('SessionWizard worker panel rendering', () => {
       expect(screen.getByText('Worker bundle fallback (optional)')).toBeInTheDocument();
       expect(
         screen.getByText(
-          'Sponsored publish still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. Optional fallback: Run nvm use 20 && npm run worker:bundle from the repo root, then choose /dist/sessionCorsWorker.bundle.js.'
-        )
+          'Sponsored publish still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. Optional fallback: Run nvm use 20 && npm run worker:bundle from the repo root, then choose /dist/sessionCorsWorker.bundle.js.',
+        ),
       ).toBeInTheDocument();
 
       fireEvent.click(publishButton);
 
       await waitFor(() => {
-        expect(
-          global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))
-        ).toBe(true);
+        expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(true);
       });
-      expect(
-        global.fetch.mock.calls.some(([url]) => String(url).includes('/worker/sessionCorsWorker.bundle.js'))
-      ).toBe(false);
+      expect(global.fetch.mock.calls.some(([url]) => String(url).includes('/worker/sessionCorsWorker.bundle.js'))).toBe(
+        false,
+      );
       await waitFor(() => {
         expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalled();
       });
@@ -254,25 +255,28 @@ describe('SessionWizard worker panel rendering', () => {
 
     try {
       window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
-      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-        draft: {
-          networkChainId: 84532,
-          blockLimits: {
-            start: mockSelectorSourceStartBlock,
-            end: null,
-          },
-          contracts: {
-            sbtFactory: {
-              address: mockSelectorSourceFactory,
+      localStorage.setItem(
+        'ce:sessionWizardDraft:v1',
+        JSON.stringify({
+          draft: {
+            networkChainId: 84532,
+            blockLimits: {
+              start: mockSelectorSourceStartBlock,
+              end: null,
+            },
+            contracts: {
+              sbtFactory: {
+                address: mockSelectorSourceFactory,
+                chainId: 84532,
+              },
+            },
+            __registry: {
               chainId: 84532,
+              registryChainId: 84532,
             },
           },
-          __registry: {
-            chainId: 84532,
-            registryChainId: 84532,
-          },
-        },
-      }));
+        }),
+      );
       renderLoggedInSessionWizard({
         initialSponsoredBundleId: 'sponsor-tx-id',
         initialSponsoredBundleKey: 'sponsor-secret',
@@ -309,7 +313,7 @@ describe('SessionWizard worker panel rendering', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.'
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
         );
       });
 
@@ -331,9 +335,7 @@ describe('SessionWizard worker panel rendering', () => {
       fireEvent.click(publishButton);
 
       await waitFor(() => {
-        expect(
-          global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))
-        ).toBe(true);
+        expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(true);
       });
       await waitFor(() => {
         expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalled();
@@ -412,25 +414,28 @@ describe('SessionWizard worker panel rendering', () => {
 
     try {
       window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
-      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-        draft: {
-          networkChainId: 84532,
-          blockLimits: {
-            start: mockSelectorSourceStartBlock,
-            end: null,
-          },
-          contracts: {
-            sbtFactory: {
-              address: mockSelectorSourceFactory,
+      localStorage.setItem(
+        'ce:sessionWizardDraft:v1',
+        JSON.stringify({
+          draft: {
+            networkChainId: 84532,
+            blockLimits: {
+              start: mockSelectorSourceStartBlock,
+              end: null,
+            },
+            contracts: {
+              sbtFactory: {
+                address: mockSelectorSourceFactory,
+                chainId: 84532,
+              },
+            },
+            __registry: {
               chainId: 84532,
+              registryChainId: 84532,
             },
           },
-          __registry: {
-            chainId: 84532,
-            registryChainId: 84532,
-          },
-        },
-      }));
+        }),
+      );
       renderLoggedInSessionWizard({
         initialSponsoredBundleId: 'sponsor-tx-id',
         initialSponsoredBundleKey: 'sponsor-secret',
@@ -467,7 +472,7 @@ describe('SessionWizard worker panel rendering', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.'
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
         );
       });
 
@@ -484,9 +489,7 @@ describe('SessionWizard worker panel rendering', () => {
       fireEvent.click(publishButton);
 
       await waitFor(() => {
-        expect(
-          global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))
-        ).toBe(true);
+        expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(true);
       });
       await waitFor(() => {
         expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalled();
@@ -508,5 +511,4 @@ describe('SessionWizard worker panel rendering', () => {
       workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
     }
   });
-
 });

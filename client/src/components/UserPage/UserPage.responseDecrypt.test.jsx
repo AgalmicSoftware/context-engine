@@ -41,9 +41,7 @@ const makeInstance = (props = {}) => {
 
   instance._isMounted = true;
   instance.setState = jest.fn((update, cb) => {
-    const patch = typeof update === 'function'
-      ? update(instance.state, instance.props)
-      : update;
+    const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
     if (patch && typeof patch === 'object') {
       instance.state = { ...instance.state, ...patch };
     }
@@ -210,7 +208,7 @@ describe('UserPage response decrypt helpers', () => {
         acceptedSurveyIds: [surveyId, ethers.constants.HashZero],
         lit: null,
         throwOnError: true,
-      }
+      },
     );
   });
 

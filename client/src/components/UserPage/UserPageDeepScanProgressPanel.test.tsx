@@ -45,7 +45,7 @@ describe('UserPageDeepScanProgressPanel', () => {
           },
         ]}
         styles={styles}
-      />
+      />,
     );
 
     expect(screen.getByText('Deep scan in progress')).toBeInTheDocument();
@@ -60,21 +60,23 @@ describe('UserPageDeepScanProgressPanel', () => {
     render(
       <UserPageDeepScanProgressPanel
         headerText=""
-        progressRows={[{
-          chainId: 84532,
-          displayLastBlock: 1600,
-          isDeterminate: true,
-          label: 'Alpha Session',
-          lastBlockScanned: 1600,
-          latestBlock: 2000,
-          percentComplete: 60,
-          remainingBlocks: 400,
-          slug: 'alpha',
-          startBlock: 1000,
-        }]}
+        progressRows={[
+          {
+            chainId: 84532,
+            displayLastBlock: 1600,
+            isDeterminate: true,
+            label: 'Alpha Session',
+            lastBlockScanned: 1600,
+            latestBlock: 2000,
+            percentComplete: 60,
+            remainingBlocks: 400,
+            slug: 'alpha',
+            startBlock: 1000,
+          },
+        ]}
         showScannedText={false}
         styles={styles}
-      />
+      />,
     );
 
     expect(screen.queryByText('Deep scan in progress')).not.toBeInTheDocument();

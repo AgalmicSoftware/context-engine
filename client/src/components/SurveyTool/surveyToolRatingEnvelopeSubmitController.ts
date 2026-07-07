@@ -65,33 +65,40 @@ export const RATING_FIELD_SPECS = [
 export function buildRatingBaseline(
   userAnswersSource: unknown,
   deps: RatingEnvelopeDeps,
-): Map<string, {
-  importanceEncrypted: string;
-  convictionEncrypted: string;
-  importance: number | null;
-  conviction: number | null;
-}> {
-  const ratingBaselineByQid = new Map<string, {
+): Map<
+  string,
+  {
     importanceEncrypted: string;
     convictionEncrypted: string;
     importance: number | null;
     conviction: number | null;
-  }>();
+  }
+> {
+  const ratingBaselineByQid = new Map<
+    string,
+    {
+      importanceEncrypted: string;
+      convictionEncrypted: string;
+      importance: number | null;
+      conviction: number | null;
+    }
+  >();
 
   try {
     const list =
       userAnswersSource && typeof userAnswersSource === 'object'
-        ? (Array.isArray((userAnswersSource as RatingResponseObject).responses)
+        ? Array.isArray((userAnswersSource as RatingResponseObject).responses)
           ? (userAnswersSource as { responses: unknown[] }).responses
-          : [userAnswersSource])
+          : [userAnswersSource]
         : [];
 
     list.forEach((rawResponseObj) => {
-      const responseObj = rawResponseObj && typeof rawResponseObj === 'object'
-        ? rawResponseObj as RatingResponseObject
-        : null;
+      const responseObj =
+        rawResponseObj && typeof rawResponseObj === 'object' ? (rawResponseObj as RatingResponseObject) : null;
       if (!responseObj) return;
-      const qid = String(responseObj?.questionID || responseObj?.questionId || '').trim().toLowerCase();
+      const qid = String(responseObj?.questionID || responseObj?.questionId || '')
+        .trim()
+        .toLowerCase();
       if (!qid) return;
 
       const importanceEncrypted =
@@ -127,7 +134,9 @@ export function pickAudienceForRatingEncryption(
   audience: string;
   recipients: string[];
 } {
-  const qLower = String(qid || '').trim().toLowerCase();
+  const qLower = String(qid || '')
+    .trim()
+    .toLowerCase();
   if (!qLower) return { audience: 'self', recipients: [] };
 
   if (deps.isQuestionLockedForResponse(qLower)) {
@@ -183,7 +192,9 @@ export function shouldEncryptRatingForQid(
   sliceForSubmit: RatingEnvelopeContext['sliceForSubmit'],
   deps: RatingEnvelopeDeps,
 ): boolean {
-  const qLower = String(qid || '').trim().toLowerCase();
+  const qLower = String(qid || '')
+    .trim()
+    .toLowerCase();
   const locked = deps.isQuestionLockedForResponse(qLower);
   const answerState = sliceForSubmit?.answers?.[qLower];
   const additionalState = sliceForSubmit?.additionalComments?.[qLower];
@@ -210,9 +221,7 @@ export async function processRatingEnvelopesForSubmit(
 
     questionsProcessed += 1;
 
-    const changedFields =
-      (changedMapForSubmit && (changedMapForSubmit[qidRaw] || changedMapForSubmit[qid])) ||
-      {};
+    const changedFields = (changedMapForSubmit && (changedMapForSubmit[qidRaw] || changedMapForSubmit[qid])) || {};
     const baseline = ratingBaselineByQid.get(qid) || null;
     const changedByField: Record<string, boolean> = {};
 
@@ -240,8 +249,7 @@ export async function processRatingEnvelopesForSubmit(
       return !!envelope;
     });
 
-    const shouldEncryptRating =
-      hasAnyExistingEnvelope || shouldEncryptRatingForQid(qid, respObj, sliceForSubmit, deps);
+    const shouldEncryptRating = hasAnyExistingEnvelope || shouldEncryptRatingForQid(qid, respObj, sliceForSubmit, deps);
     if (!shouldEncryptRating) {
       RATING_FIELD_SPECS.forEach(({ fieldKey, envelopeKey }) => {
         if (changedByField[fieldKey]) respObj[envelopeKey] = '';
@@ -276,8 +284,7 @@ export async function processRatingEnvelopesForSubmit(
       const value = respObj?.[fieldKey];
       const existingEnvelope = typeof respObj[envelopeKey] === 'string' ? respObj[envelopeKey] : '';
       const shouldEncryptField =
-        (value !== undefined && value !== null) &&
-        (changedByField[fieldKey] || !existingEnvelope);
+        value !== undefined && value !== null && (changedByField[fieldKey] || !existingEnvelope);
 
       if (shouldEncryptField) {
         // Keep wallet prompts serialized during submit.

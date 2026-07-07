@@ -43,9 +43,7 @@ const makeInstance = (props = {}) => {
 
   instance._isMounted = true;
   instance.setState = jest.fn((update, cb) => {
-    const patch = typeof update === 'function'
-      ? update(instance.state, instance.props)
-      : update;
+    const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
     if (patch && typeof patch === 'object') {
       instance.state = { ...instance.state, ...patch };
     }
@@ -73,17 +71,21 @@ const makeAnalysisCacheInstance = (props = {}) => {
   instance.state = {
     ...instance.state,
     username: 'Cache Test User',
-    sbtList: [{
-      sbtInfo: {
-        name: 'Cache Badge',
-        sbtAddress: '0x00000000000000000000000000000000000000cc',
+    sbtList: [
+      {
+        sbtInfo: {
+          name: 'Cache Badge',
+          sbtAddress: '0x00000000000000000000000000000000000000cc',
+        },
       },
-    }],
-    questionResponseInfo: [{
-      id: 'q1',
-      type: 'freeform',
-      prompt: 'What should be cached?',
-    }],
+    ],
+    questionResponseInfo: [
+      {
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'What should be cached?',
+      },
+    ],
     detailedQuestionResponses: {
       q1: {
         answer: { value: 'A deterministic answer' },
@@ -97,18 +99,18 @@ const makeAnalysisCacheInstance = (props = {}) => {
   };
 
   jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue([slug]);
-  jest.spyOn(instance, '_getSessionConfigForSlugExact').mockImplementation((candidate) => (
+  jest.spyOn(instance, '_getSessionConfigForSlugExact').mockImplementation((candidate) =>
     candidate === slug
       ? {
-        slug,
-        ai: {
-          mode: 'openai',
-          models: { thinking: 'gpt-5' },
-          modelProviders: { thinking: 'openai' },
-        },
-      }
-      : null
-  ));
+          slug,
+          ai: {
+            mode: 'openai',
+            models: { thinking: 'gpt-5' },
+            modelProviders: { thinking: 'openai' },
+          },
+        }
+      : null,
+  );
   checkSponsoredAccess.mockResolvedValue({
     status: 'no-gate',
     gate: null,
@@ -130,13 +132,7 @@ const getSingleAnalysisCacheEntry = ({ slug, networkID, addressLower }) => {
   return { cacheObj, fingerprint, entry };
 };
 
-const writeSingleAnalysisCacheEntry = async ({
-  slug,
-  networkID,
-  addressLower,
-  fingerprint,
-  entry,
-}) => {
+const writeSingleAnalysisCacheEntry = async ({ slug, networkID, addressLower, fingerprint, entry }) => {
   const current = cacheScripts.peekCacheSync('analysisCache', slug, { clone: false }) || {};
   await cacheScripts.writeCache('analysisCache', slug, {
     ...current,
@@ -164,9 +160,15 @@ describe('UserPage analysis cache and routing', () => {
   afterEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
-    try { delete globalThis.CE_SESSION_SCAN_SCOPE; } catch (_) {}
-    try { delete globalThis.CE_SESSION_SCAN_SLUGS; } catch (_) {}
-    try { localStorage.removeItem(REGISTRY_CACHE_KEY); } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_SCOPE;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_SLUGS;
+    } catch (_) {}
+    try {
+      localStorage.removeItem(REGISTRY_CACHE_KEY);
+    } catch (_) {}
   });
 
   it('selects an AI-open session for analyze when active-session AI gate is denied', async () => {
@@ -182,11 +184,11 @@ describe('UserPage analysis cache and routing', () => {
     });
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['active-slug', 'open-slug']);
     jest.spyOn(instance, '_getSessionConfigForSlugExact').mockImplementation((slug) => ({ slug }));
-    checkSponsoredAccess.mockImplementation(async ({ sessionSlug }) => (
+    checkSponsoredAccess.mockImplementation(async ({ sessionSlug }) =>
       sessionSlug === 'open-slug'
         ? { status: 'no-gate', gate: null, resourceKey: 'ai' }
-        : { status: 'denied', gate: { type: 'sbt' }, resourceKey: 'ai' }
-    ));
+        : { status: 'denied', gate: { type: 'sbt' }, resourceKey: 'ai' },
+    );
 
     await instance.analyzeUser();
 
@@ -196,7 +198,7 @@ describe('UserPage analysis cache and routing', () => {
       expect.objectContaining({
         sessionSlug: 'open-slug',
         sessionConfig: expect.objectContaining({ slug: 'open-slug' }),
-      })
+      }),
     );
   });
 
@@ -225,7 +227,7 @@ describe('UserPage analysis cache and routing', () => {
         version: 1,
         fingerprint,
         cachedAt: now,
-        expiresAt: now + (24 * 60 * 60 * 1000),
+        expiresAt: now + 24 * 60 * 60 * 1000,
         address: addressLower,
         networkId: networkID,
         aiContext: {
@@ -261,12 +263,14 @@ describe('UserPage analysis cache and routing', () => {
       await instance.analyzeUser();
 
       expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
-      expect(writeSpy).toHaveBeenCalledWith(expect.objectContaining({
-        sessionSlug: slug,
-        result: expect.objectContaining({
-          summary: 'fresh summary despite write failure',
+      expect(writeSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionSlug: slug,
+          result: expect.objectContaining({
+            summary: 'fresh summary despite write failure',
+          }),
         }),
-      }));
+      );
       expect(instance.state.analysisName).toBe('Fresh Despite Write Failure');
       expect(instance.state.aiAnalysis).toBe('fresh summary despite write failure');
       expect(instance.state.analysisServedFromCache).toBe(false);
@@ -313,7 +317,7 @@ describe('UserPage analysis cache and routing', () => {
       });
 
       analyzeUserOpinions.mockClear();
-      nowSpy.mockReturnValue(cachedAt + (2 * 60 * 60 * 1000));
+      nowSpy.mockReturnValue(cachedAt + 2 * 60 * 60 * 1000);
 
       await instance.analyzeUser();
 
@@ -468,19 +472,14 @@ describe('UserPage analysis cache and routing', () => {
     const staleCacheSlug = 'stale-cache-session';
 
     globalThis.CE_SESSION_SCAN_SCOPE = 'list';
-    globalThis.CE_SESSION_SCAN_SLUGS = [
-      inScopeSlug,
-      secondaryScopeSlug,
-    ];
+    globalThis.CE_SESSION_SCAN_SLUGS = [inScopeSlug, secondaryScopeSlug];
     const instance = makeInstance({
       account: '0x00000000000000000000000000000000000000bb',
       activeSessionSlug: inScopeSlug,
     });
-    jest.spyOn(cacheScripts, 'listNamespaceSlugsSync').mockImplementation((namespace) => (
-      namespace === 'userCache'
-        ? [staleCacheSlug, inScopeSlug]
-        : []
-    ));
+    jest
+      .spyOn(cacheScripts, 'listNamespaceSlugsSync')
+      .mockImplementation((namespace) => (namespace === 'userCache' ? [staleCacheSlug, inScopeSlug] : []));
     jest.spyOn(instance, '_getSessionConfigForSlugExact').mockImplementation((slug) => ({ slug }));
     checkSponsoredAccess.mockResolvedValue({
       status: 'no-gate',
@@ -499,7 +498,7 @@ describe('UserPage analysis cache and routing', () => {
           gateStatus: 'no-gate',
           reason: 'open-ai-gate',
         }),
-      })
+      }),
     );
   });
 
@@ -514,18 +513,13 @@ describe('UserPage analysis cache and routing', () => {
       account: '0x00000000000000000000000000000000000000bb',
       activeSessionSlug: outOfScopeActiveSlug,
     });
-    jest.spyOn(cacheScripts, 'listNamespaceSlugsSync').mockImplementation((namespace) => (
-      namespace === 'userCache'
-        ? [staleCacheSlug]
-        : []
-    ));
+    jest
+      .spyOn(cacheScripts, 'listNamespaceSlugsSync')
+      .mockImplementation((namespace) => (namespace === 'userCache' ? [staleCacheSlug] : []));
 
     const candidates = instance._getAiSessionSlugCandidates();
 
-    expect(candidates).toEqual([
-      outOfScopeActiveSlug,
-      inScopeSlug,
-    ]);
+    expect(candidates).toEqual([outOfScopeActiveSlug, inScopeSlug]);
   });
 
   it('uses the active primary session for single-session behavior while preserving the full list scope for deep-scan ordering', () => {
@@ -554,11 +548,7 @@ describe('UserPage analysis cache and routing', () => {
       expect(analyzeUserOpinions).not.toHaveBeenCalled();
       expect(instance.state.analyzing).toBe(false);
       expect(instance.state.analysisError).toContain('Unable to generate analysis');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[account]',
-        '[UserPage] analyzeUser failed:',
-        expect.any(Error)
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[account]', '[UserPage] analyzeUser failed:', expect.any(Error));
     } finally {
       consoleErrorSpy.mockRestore();
     }
@@ -571,12 +561,10 @@ describe('UserPage analysis cache and routing', () => {
     });
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['rxc']);
     const exactSpy = jest.spyOn(instance, '_getSessionConfigForSlugExact');
-    const demoSpy = jest
-      .spyOn(contractScriptsModule, 'getDemoSessionConfigBySlug')
-      .mockReturnValue({
-        slug: 'rxc',
-        sessionName: 'Weyl v. Yarvin Debate',
-      });
+    const demoSpy = jest.spyOn(contractScriptsModule, 'getDemoSessionConfigBySlug').mockReturnValue({
+      slug: 'rxc',
+      sessionName: 'Weyl v. Yarvin Debate',
+    });
 
     try {
       const session = await instance.resolveAnalysisSessionContext();
@@ -609,23 +597,28 @@ describe('UserPage analysis cache and routing', () => {
 
   it('preserves explicit general analyze-session configs when an authoritative empty-slug config exists', () => {
     const priorRegistryCache = localStorage.getItem(REGISTRY_CACHE_KEY);
-    localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
-      sessions: {
-        '': {
-          slug: '',
-          sessionName: 'Registry General',
+    localStorage.setItem(
+      REGISTRY_CACHE_KEY,
+      JSON.stringify({
+        sessions: {
+          '': {
+            slug: '',
+            sessionName: 'Registry General',
+          },
         },
-      },
-    }));
+      }),
+    );
 
     try {
       const instance = makeInstance();
       const general = instance._getSessionConfigForSlugExact('');
 
-      expect(general).toEqual(expect.objectContaining({
-        slug: '',
-        sessionName: 'Registry General',
-      }));
+      expect(general).toEqual(
+        expect.objectContaining({
+          slug: '',
+          sessionName: 'Registry General',
+        }),
+      );
     } finally {
       if (priorRegistryCache == null) {
         localStorage.removeItem(REGISTRY_CACHE_KEY);

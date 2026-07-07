@@ -58,12 +58,13 @@ export const resolveSessionWizardWorkerVerificationUiState = ({
   const deployed = normalizeWorkerAuthUrl(toStr(deployWorkerUrl).trim());
   const fallback = normalizeWorkerAuthUrl(toStr(defaultWorkerUrl).trim());
   const deployVerifiedInUi = !!deployComplete;
-  const effectiveConfiguredWorkerUrl = (
+  const effectiveConfiguredWorkerUrl =
     deployVerifiedInUi &&
     !!normalModeRequiresCustomWorker &&
     !!deployed &&
     (!configured || (configured && fallback && configured === fallback))
-  ) ? deployed : configured;
+      ? deployed
+      : configured;
   return {
     deployVerifiedInUi,
     effectiveConfiguredWorkerUrl,
@@ -78,9 +79,6 @@ export const shouldCacheSessionWorkerConfigAfterDeploy = ({
   deployStatusCode?: unknown;
   configSyncStatus?: SessionWizardConfigSyncStatus | null;
   workerUrl?: unknown;
-} = {}) => (
-  !!normalizeWorkerAuthUrl(toStr(workerUrl).trim()) && (
-    Number(deployStatusCode || 0) === 200 ||
-    configSyncStatus?.synced === true
-  )
-);
+} = {}) =>
+  !!normalizeWorkerAuthUrl(toStr(workerUrl).trim()) &&
+  (Number(deployStatusCode || 0) === 200 || configSyncStatus?.synced === true);

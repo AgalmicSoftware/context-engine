@@ -2,11 +2,14 @@ export type AnyRecord = Record<string, any>;
 
 export type ChainIdLike = number | string | null | undefined;
 
-export type NetworkLike = {
-  id?: ChainIdLike;
-  chainId?: ChainIdLike;
-  [key: string]: any;
-} | null | undefined;
+export type NetworkLike =
+  | {
+      id?: ChainIdLike;
+      chainId?: ChainIdLike;
+      [key: string]: any;
+    }
+  | null
+  | undefined;
 
 export type SessionContractLike = {
   address?: string;
@@ -29,9 +32,12 @@ export type SessionConfigLike = AnyRecord & {
 
 export type WorkerSecretsLike = Record<string, string | null | undefined>;
 
-export type WorkerSecretsRefLike = {
-  current?: WorkerSecretsLike | null;
-} | null | undefined;
+export type WorkerSecretsRefLike =
+  | {
+      current?: WorkerSecretsLike | null;
+    }
+  | null
+  | undefined;
 
 export type WorkerSecretSyncResult = {
   warning: string;
@@ -59,13 +65,9 @@ export type ContractViewerContractLike = {
   addresses?: ContractViewerAddressLike[];
 };
 
-export type ResolveSessionConfigBySlug = (
-  slug: string
-) => SessionConfigLike | null | undefined;
+export type ResolveSessionConfigBySlug = (slug: string) => SessionConfigLike | null | undefined;
 
-export type ResolveSessionConfigById = (
-  sessionId: string | number
-) => SessionConfigLike | null | undefined;
+export type ResolveSessionConfigById = (sessionId: string | number) => SessionConfigLike | null | undefined;
 
 export type SessionResolutionResult = {
   sessionSlug: string;

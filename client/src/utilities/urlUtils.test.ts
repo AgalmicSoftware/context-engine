@@ -1,9 +1,4 @@
-import {
-  ensureHttpUrl,
-  normalizeBaseUrl,
-  normalizeOrigin,
-  normalizeOriginList,
-} from './urlUtils.js';
+import { ensureHttpUrl, normalizeBaseUrl, normalizeOrigin, normalizeOriginList } from './urlUtils.js';
 
 describe('urlUtils', () => {
   describe('ensureHttpUrl', () => {
@@ -47,21 +42,13 @@ describe('urlUtils', () => {
 
   describe('normalizeOriginList', () => {
     it('normalizes, filters, and dedupes array entries in first-seen order', () => {
-      expect(normalizeOriginList([
-        'https://example.test/a',
-        'example.test/b',
-        '/api/session',
-        'http://localhost:3000/path',
-      ])).toEqual([
-        'https://example.test',
-        'http://localhost:3000',
-      ]);
+      expect(
+        normalizeOriginList(['https://example.test/a', 'example.test/b', '/api/session', 'http://localhost:3000/path']),
+      ).toEqual(['https://example.test', 'http://localhost:3000']);
     });
 
     it('accepts a single non-array value', () => {
-      expect(normalizeOriginList('contextengine.example.test/path')).toEqual([
-        'https://contextengine.example.test',
-      ]);
+      expect(normalizeOriginList('contextengine.example.test/path')).toEqual(['https://contextengine.example.test']);
     });
   });
 });

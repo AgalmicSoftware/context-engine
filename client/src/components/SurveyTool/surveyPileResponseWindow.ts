@@ -1,6 +1,9 @@
-type PileQuestionLike = {
-  id?: unknown;
-} | null | undefined;
+type PileQuestionLike =
+  | {
+      id?: unknown;
+    }
+  | null
+  | undefined;
 
 type ResponseFieldState = Record<string, unknown>;
 
@@ -11,10 +14,7 @@ export type PileResponseSlice = {
   additionalComments: Record<string, ResponseFieldState>;
 };
 
-export type BuildEmptyResponseFieldState = (
-  questionId?: string | null,
-  fieldKey?: string
-) => ResponseFieldState;
+export type BuildEmptyResponseFieldState = (questionId?: string | null, fieldKey?: string) => ResponseFieldState;
 
 export type PileVisibleResponseWindow = {
   startIdx: number;
@@ -48,13 +48,13 @@ const EMPTY_PILE_RESPONSE_SLICE = (): PileResponseSlice => ({
   additionalComments: {},
 });
 
-const toQuestionList = (pileQuestions: unknown): PileQuestionLike[] => (
-  Array.isArray(pileQuestions) ? pileQuestions : []
-);
+const toQuestionList = (pileQuestions: unknown): PileQuestionLike[] =>
+  Array.isArray(pileQuestions) ? pileQuestions : [];
 
-const normalizeQuestionId = (value: unknown): string => (
-  String(value || '').trim().toLowerCase()
-);
+const normalizeQuestionId = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
 const cloneResponseSlice = (slice: Partial<PileResponseSlice> | null | undefined): PileResponseSlice => ({
   answers: { ...((slice && slice.answers) || {}) },

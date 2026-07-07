@@ -1,7 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import usePendingSbtDrafts, {
-  SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY,
-} from './usePendingSbtDrafts.js';
+import usePendingSbtDrafts, { SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY } from './usePendingSbtDrafts.js';
 
 const PENDING_ADDRESS = '0x00000000000000000000000000000000000000a1';
 const DEPLOYED_ADDRESS = '0x00000000000000000000000000000000000000b2';
@@ -29,7 +27,7 @@ describe('usePendingSbtDrafts', () => {
   it('hydrates initial value from the sessionStorage cache', () => {
     sessionStorage.setItem(
       SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY,
-      JSON.stringify([buildDraft({ tokenURI: 'ar://pending' })])
+      JSON.stringify([buildDraft({ tokenURI: 'ar://pending' })]),
     );
     const getItemSpy = jest.spyOn(Storage.prototype, 'getItem');
 
@@ -54,7 +52,7 @@ describe('usePendingSbtDrafts', () => {
 
     expect(setItemSpy).toHaveBeenCalledWith(
       SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY,
-      expect.stringContaining(PENDING_ADDRESS)
+      expect.stringContaining(PENDING_ADDRESS),
     );
     expect(JSON.parse(sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY) || '[]')).toEqual([
       expect.objectContaining({
@@ -93,10 +91,12 @@ describe('usePendingSbtDrafts', () => {
     expect(result.current.hasUndeployedPendingSbtDrafts).toBe(true);
 
     act(() => {
-      result.current.setPendingSbtDrafts((current) => current.map((draft) => ({
-        ...draft,
-        deployed: true,
-      })));
+      result.current.setPendingSbtDrafts((current) =>
+        current.map((draft) => ({
+          ...draft,
+          deployed: true,
+        })),
+      );
     });
 
     expect(result.current.hasUndeployedPendingSbtDrafts).toBe(false);

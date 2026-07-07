@@ -71,31 +71,37 @@ describe('sponsoredBundles', () => {
   });
 
   it('builds the expected sponsored URL shape', () => {
-    expect(buildSponsoredSessionUrl({
-      txId: 'arweave_tx_id',
-      secret: 'secret value',
-      origin: 'https://contextengine.example',
-    })).toBe('https://contextengine.example/new?sponsored=arweave_tx_id#k=secret%20value');
+    expect(
+      buildSponsoredSessionUrl({
+        txId: 'arweave_tx_id',
+        secret: 'secret value',
+        origin: 'https://contextengine.example',
+      }),
+    ).toBe('https://contextengine.example/new?sponsored=arweave_tx_id#k=secret%20value');
   });
 
   it('prepends PUBLIC_URL when building the default sponsored route', () => {
     env.PUBLIC_URL = '/ce/';
 
-    expect(buildSponsoredSessionUrl({
-      txId: 'arweave_tx_id',
-      secret: 'secret value',
-      origin: 'https://contextengine.example',
-    })).toBe('https://contextengine.example/ce/new?sponsored=arweave_tx_id#k=secret%20value');
+    expect(
+      buildSponsoredSessionUrl({
+        txId: 'arweave_tx_id',
+        secret: 'secret value',
+        origin: 'https://contextengine.example',
+      }),
+    ).toBe('https://contextengine.example/ce/new?sponsored=arweave_tx_id#k=secret%20value');
   });
 
   it('normalizes supported bundle fields and ignores unsupported customRpcKey', () => {
-    expect(normalizeSponsoredBundlePayload({
-      openaiKey: ' sk-openai ',
-      customRpcUrl: ' https://rpc.example ',
-      litApiBase: ' https://api.chipotle.litprotocol.com ',
-      customRpcKey: 'do-not-keep',
-      meta: { label: ' Test label ' },
-    })).toEqual({
+    expect(
+      normalizeSponsoredBundlePayload({
+        openaiKey: ' sk-openai ',
+        customRpcUrl: ' https://rpc.example ',
+        litApiBase: ' https://api.chipotle.litprotocol.com ',
+        customRpcKey: 'do-not-keep',
+        meta: { label: ' Test label ' },
+      }),
+    ).toEqual({
       openaiKey: 'sk-openai',
       anthropicKey: '',
       openrouterKey: '',
@@ -123,17 +129,19 @@ describe('sponsoredBundles', () => {
   });
 
   it('builds sparse sponsored bundle payloads without empty credential fields', () => {
-    expect(buildSponsoredBundlePlaintext({
-      openaiKey: ' sk-openai ',
-      litApiBase: ' https://api.chipotle.litprotocol.com ',
-      litGroupId: ' group_123 ',
-      litPkpId: ' pkp_123 ',
-      litActionCid: ' bafy123 ',
-      litAccountApiKey: ' lit-account-secret ',
-      litUsageApiKey: ' lit-secret ',
-      faucetPrivateKey: '   ',
-      meta: { label: ' Launch Week ' },
-    })).toEqual({
+    expect(
+      buildSponsoredBundlePlaintext({
+        openaiKey: ' sk-openai ',
+        litApiBase: ' https://api.chipotle.litprotocol.com ',
+        litGroupId: ' group_123 ',
+        litPkpId: ' pkp_123 ',
+        litActionCid: ' bafy123 ',
+        litAccountApiKey: ' lit-account-secret ',
+        litUsageApiKey: ' lit-secret ',
+        faucetPrivateKey: '   ',
+        meta: { label: ' Launch Week ' },
+      }),
+    ).toEqual({
       openaiKey: 'sk-openai',
       litApiBase: 'https://api.chipotle.litprotocol.com',
       litGroupId: 'group_123',
@@ -150,9 +158,13 @@ describe('sponsoredBundles', () => {
         sourceWorkerUrl: '',
       },
     });
-    expect(hasSponsoredBundleFields(buildSponsoredBundlePlaintext({
-      meta: { label: 'Metadata only' },
-    }))).toBe(false);
+    expect(
+      hasSponsoredBundleFields(
+        buildSponsoredBundlePlaintext({
+          meta: { label: 'Metadata only' },
+        }),
+      ),
+    ).toBe(false);
   });
 
   it('does not rely on a global Buffer runtime when generating sponsored secrets', () => {
@@ -211,24 +223,27 @@ describe('sponsoredBundles', () => {
       },
     });
 
-    expect(mockEncryptWithPassword).toHaveBeenCalledWith(expect.objectContaining({
-      openaiKey: 'sk-live-openai',
-      anthropicKey: 'sk-live-anthropic',
-      arweaveJwk: '{"kty":"RSA"}',
-      customRpcUrl: 'https://rpc.example',
-      litApiBase: 'https://api.chipotle.litprotocol.com',
-      litGroupId: 'group_123',
-      litPkpId: 'pkp_123',
-      litActionCid: 'bafy123',
-      litAccountApiKey: 'lit-account-secret',
-      litUsageApiKey: 'lit-secret',
-      meta: expect.objectContaining({
-        label: 'Launch Week',
-        createdBy: '0xadmin',
-        sourceSessionSlug: 'edge',
-        sourceWorkerUrl: 'https://worker.example',
+    expect(mockEncryptWithPassword).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openaiKey: 'sk-live-openai',
+        anthropicKey: 'sk-live-anthropic',
+        arweaveJwk: '{"kty":"RSA"}',
+        customRpcUrl: 'https://rpc.example',
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+        litActionCid: 'bafy123',
+        litAccountApiKey: 'lit-account-secret',
+        litUsageApiKey: 'lit-secret',
+        meta: expect.objectContaining({
+          label: 'Launch Week',
+          createdBy: '0xadmin',
+          sourceSessionSlug: 'edge',
+          sourceWorkerUrl: 'https://worker.example',
+        }),
       }),
-    }), 'bundle-secret');
+      'bundle-secret',
+    );
     expect(mockEncryptWithPassword.mock.calls[0][0]).not.toHaveProperty('openrouterKey');
     expect(mockEncryptWithPassword.mock.calls[0][0]).not.toHaveProperty('faucetPrivateKey');
     expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
@@ -244,13 +259,15 @@ describe('sponsoredBundles', () => {
     expect(JSON.stringify(envelope)).not.toContain('sk-live-openai');
     expect(JSON.stringify(envelope)).not.toContain('sk-live-anthropic');
     expect(JSON.stringify(envelope)).not.toContain('https://rpc.example');
-    expect(options).toEqual(expect.objectContaining({
-      arweaveJwk: '{"kty":"RSA"}',
-      workerUrl: 'https://worker.example',
-      sessionSlug: 'edge',
-      skipAuth: true,
-      adminAuth: expect.objectContaining({ address: '0xadmin' }),
-    }));
+    expect(options).toEqual(
+      expect.objectContaining({
+        arweaveJwk: '{"kty":"RSA"}',
+        workerUrl: 'https://worker.example',
+        sessionSlug: 'edge',
+        skipAuth: true,
+        adminAuth: expect.objectContaining({ address: '0xadmin' }),
+      }),
+    );
     expect(result).toEqual({
       txId: 'arweave_tx_id',
       envelope,
@@ -283,34 +300,40 @@ describe('sponsoredBundles', () => {
       },
     });
     expect(hasSponsoredBundleFields(payload)).toBe(true);
-    expect(hasSponsoredBundleFields({
-      bootstrapWorkerUrl: 'https://source-worker.example',
-      meta: {},
-    })).toBe(false);
+    expect(
+      hasSponsoredBundleFields({
+        bootstrapWorkerUrl: 'https://source-worker.example',
+        meta: {},
+      }),
+    ).toBe(false);
   });
 
   it('rejects empty sponsored bundles before upload', async () => {
-    await expect(uploadSponsoredBundle({
-      secret: 'bundle-secret',
-      label: 'Metadata only',
-      createdBy: '0xadmin',
-      workerUrl: 'https://worker.example',
-      sessionSlug: 'edge',
-      adminAuth: { address: '0xadmin', message: 'siwe', signature: '0xsig', sessionSlug: 'edge' },
-      bundle: {},
-    })).rejects.toThrow('Sponsored bundle must include at least one supported credential.');
+    await expect(
+      uploadSponsoredBundle({
+        secret: 'bundle-secret',
+        label: 'Metadata only',
+        createdBy: '0xadmin',
+        workerUrl: 'https://worker.example',
+        sessionSlug: 'edge',
+        adminAuth: { address: '0xadmin', message: 'siwe', signature: '0xsig', sessionSlug: 'edge' },
+        bundle: {},
+      }),
+    ).rejects.toThrow('Sponsored bundle must include at least one supported credential.');
 
     expect(mockEncryptWithPassword).not.toHaveBeenCalled();
     expect(mockUploadDataToArweave).not.toHaveBeenCalled();
   });
 
   it('reads, validates, and decrypts sponsored bundles from Arweave', async () => {
-    mockDownloadDataFromArweave.mockResolvedValue(JSON.stringify({
-      type: SPONSORED_BUNDLE_TYPE,
-      version: SPONSORED_BUNDLE_VERSION,
-      cipher: SPONSORED_BUNDLE_CIPHER,
-      encryptedData: 'encrypted-base64',
-    }));
+    mockDownloadDataFromArweave.mockResolvedValue(
+      JSON.stringify({
+        type: SPONSORED_BUNDLE_TYPE,
+        version: SPONSORED_BUNDLE_VERSION,
+        cipher: SPONSORED_BUNDLE_CIPHER,
+        encryptedData: 'encrypted-base64',
+      }),
+    );
 
     const result = await readSponsoredBundleFromArweave({
       txId: 'arweave_tx_id',
@@ -353,29 +376,35 @@ describe('sponsoredBundles', () => {
   });
 
   it('rejects unexpected sponsored bundle versions', async () => {
-    mockDownloadDataFromArweave.mockResolvedValue(JSON.stringify({
-      type: SPONSORED_BUNDLE_TYPE,
-      version: 2,
-      cipher: SPONSORED_BUNDLE_CIPHER,
-      encryptedData: 'encrypted-base64',
-    }));
+    mockDownloadDataFromArweave.mockResolvedValue(
+      JSON.stringify({
+        type: SPONSORED_BUNDLE_TYPE,
+        version: 2,
+        cipher: SPONSORED_BUNDLE_CIPHER,
+        encryptedData: 'encrypted-base64',
+      }),
+    );
 
-    await expect(readSponsoredBundleFromArweave({
-      txId: 'arweave_tx_id',
-      secret: 'bundle-secret',
-    })).rejects.toMatchObject({
+    await expect(
+      readSponsoredBundleFromArweave({
+        txId: 'arweave_tx_id',
+        secret: 'bundle-secret',
+      }),
+    ).rejects.toMatchObject({
       code: 'invalid_bundle',
       message: 'Sponsored bundle version is invalid.',
     });
   });
 
   it('rejects expired sponsored bundles', async () => {
-    mockDownloadDataFromArweave.mockResolvedValue(JSON.stringify({
-      type: SPONSORED_BUNDLE_TYPE,
-      version: SPONSORED_BUNDLE_VERSION,
-      cipher: SPONSORED_BUNDLE_CIPHER,
-      encryptedData: 'encrypted-base64',
-    }));
+    mockDownloadDataFromArweave.mockResolvedValue(
+      JSON.stringify({
+        type: SPONSORED_BUNDLE_TYPE,
+        version: SPONSORED_BUNDLE_VERSION,
+        cipher: SPONSORED_BUNDLE_CIPHER,
+        encryptedData: 'encrypted-base64',
+      }),
+    );
     mockDecryptWithPassword.mockResolvedValue({
       openaiKey: 'sk-openai',
       meta: {
@@ -386,22 +415,26 @@ describe('sponsoredBundles', () => {
       },
     });
 
-    await expect(readSponsoredBundleFromArweave({
-      txId: 'arweave_tx_id',
-      secret: 'bundle-secret',
-    })).rejects.toMatchObject({
+    await expect(
+      readSponsoredBundleFromArweave({
+        txId: 'arweave_tx_id',
+        secret: 'bundle-secret',
+      }),
+    ).rejects.toMatchObject({
       code: 'expired_bundle',
       message: 'Sponsored bundle has expired.',
     });
   });
 
   it('rejects decrypted bundles with no supported sponsored credentials', async () => {
-    mockDownloadDataFromArweave.mockResolvedValue(JSON.stringify({
-      type: SPONSORED_BUNDLE_TYPE,
-      version: SPONSORED_BUNDLE_VERSION,
-      cipher: SPONSORED_BUNDLE_CIPHER,
-      encryptedData: 'encrypted-base64',
-    }));
+    mockDownloadDataFromArweave.mockResolvedValue(
+      JSON.stringify({
+        type: SPONSORED_BUNDLE_TYPE,
+        version: SPONSORED_BUNDLE_VERSION,
+        cipher: SPONSORED_BUNDLE_CIPHER,
+        encryptedData: 'encrypted-base64',
+      }),
+    );
     mockDecryptWithPassword.mockResolvedValue({
       meta: {
         label: 'Metadata only',
@@ -410,10 +443,12 @@ describe('sponsoredBundles', () => {
       },
     });
 
-    await expect(readSponsoredBundleFromArweave({
-      txId: 'arweave_tx_id',
-      secret: 'bundle-secret',
-    })).rejects.toMatchObject({
+    await expect(
+      readSponsoredBundleFromArweave({
+        txId: 'arweave_tx_id',
+        secret: 'bundle-secret',
+      }),
+    ).rejects.toMatchObject({
       code: 'empty_bundle',
       message: 'Sponsored bundle has no supported credentials.',
     });

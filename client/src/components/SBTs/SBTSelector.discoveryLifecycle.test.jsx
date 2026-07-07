@@ -16,7 +16,9 @@ describe('SBTSelector discovery lifecycle', () => {
     sessionStorage.clear();
     globalThis.CE_SESSION_SCAN_SCOPE = 'active';
     globalThis.CE_SESSION_SCAN_SLUGS = [];
-    try { delete globalThis.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS; } catch (_) {}
+    try {
+      delete globalThis.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS;
+    } catch (_) {}
   });
 
   it('collapses scoped discovery to the manually selected source group', async () => {
@@ -29,15 +31,9 @@ describe('SBTSelector discovery lifecycle', () => {
     instance.state.groupOverride = true;
     instance.state.sourceSessionSlug = 'beta';
 
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['edge', 'alpha']);
-    const discoverSpy = jest
-      .spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached')
-      .mockResolvedValue([]);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha']);
+    const discoverSpy = jest.spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached').mockResolvedValue([]);
 
     try {
       await instance.ensureSbtUniverse({ force: true });
@@ -64,7 +60,7 @@ describe('SBTSelector discovery lifecycle', () => {
     instance.getMetadataLookupConfig = () => ({ slug: 'edge', networkChainId: 84532 });
     instance.resolveSbtLabel = jest.fn(() => 'Resolved Name');
     instance.readSbtCacheBySlug = jest.fn(async () => ({
-      '84532': {
+      84532: {
         sbtList: {
           [selectedLower]: {
             sbtAddress: selectedAddress,
@@ -79,13 +75,9 @@ describe('SBTSelector discovery lifecycle', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('all');
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('all');
     let allSlugs = ['edge', 'alpha'];
-    const allSlugsSpy = jest
-      .spyOn(contractScriptsUtils, 'getAllSessionSlugs')
-      .mockImplementation(() => allSlugs);
+    const allSlugsSpy = jest.spyOn(contractScriptsUtils, 'getAllSessionSlugs').mockImplementation(() => allSlugs);
 
     try {
       await instance.loadSBTOptions();
@@ -103,7 +95,7 @@ describe('SBTSelector discovery lifecycle', () => {
     const selectedAddress = '0x1414141414141414141414141414141414141414';
     const selectedLower = selectedAddress.toLowerCase();
     const cachedValue = {
-      '84532': {
+      84532: {
         sbtList: {
           [selectedLower]: {
             sbtAddress: selectedAddress,
@@ -126,7 +118,8 @@ describe('SBTSelector discovery lifecycle', () => {
     instance.resolveSbtLabel = jest.fn(() => 'Resolved Name');
     const cacheReadError = new Error('cache read failed');
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    instance.readSbtCacheBySlug = jest.fn()
+    instance.readSbtCacheBySlug = jest
+      .fn()
       .mockResolvedValueOnce(cachedValue)
       .mockRejectedValueOnce(cacheReadError)
       .mockResolvedValueOnce(cachedValue);
@@ -143,11 +136,7 @@ describe('SBTSelector discovery lifecycle', () => {
 
       await instance.loadSBTOptions();
       expect(instance.readSbtCacheBySlug).toHaveBeenCalledTimes(3);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[sbt]',
-        'SBTSelector option load failed:',
-        cacheReadError
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[sbt]', 'SBTSelector option load failed:', cacheReadError);
     } finally {
       consoleErrorSpy.mockRestore();
       groupListsSpy.mockRestore();
@@ -180,7 +169,7 @@ describe('SBTSelector discovery lifecycle', () => {
       const loadOne = instance.loadSBTOptions();
       const loadTwo = instance.loadSBTOptions();
       resolveRead({
-        '84532': {
+        84532: {
           sbtList: {
             [selectedLower]: {
               sbtAddress: selectedAddress,
@@ -217,7 +206,7 @@ describe('SBTSelector discovery lifecycle', () => {
       resolveFirstRead = resolve;
     });
     const cachedValue = {
-      '84532': {
+      84532: {
         sbtList: {
           [selectedLower]: {
             sbtAddress: selectedAddress,
@@ -228,7 +217,8 @@ describe('SBTSelector discovery lifecycle', () => {
         nameLookupState: {},
       },
     };
-    instance.readSbtCacheBySlug = jest.fn()
+    instance.readSbtCacheBySlug = jest
+      .fn()
       .mockImplementationOnce(() => firstRead)
       .mockResolvedValueOnce(cachedValue);
     const groupListsSpy = jest
@@ -317,9 +307,7 @@ describe('SBTSelector discovery lifecycle', () => {
     });
     instance._isMounted = false;
 
-    const discoverSpy = jest
-      .spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached')
-      .mockResolvedValueOnce([]);
+    const discoverSpy = jest.spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached').mockResolvedValueOnce([]);
 
     try {
       await instance.ensureSbtUniverse({ force: true });
@@ -338,7 +326,7 @@ describe('SBTSelector discovery lifecycle', () => {
         }),
         expect.objectContaining({
           onDiscoveredAddresses: expect.any(Function),
-        })
+        }),
       );
     } finally {
       discoverSpy.mockRestore();
@@ -354,27 +342,19 @@ describe('SBTSelector discovery lifecycle', () => {
     });
     instance._isMounted = false;
 
-    const strictSpy = jest
-      .spyOn(contractScriptsUtils, 'getSessionConfigBySlugOrDefault')
-      .mockReturnValue(null);
-    const chainSpy = jest
-      .spyOn(contractScriptsUtils, 'getSessionChainId')
-      .mockReturnValue(null);
-    const demoSpy = jest
-      .spyOn(contractScriptsUtils, 'getDemoSessionConfigBySlug')
-      .mockReturnValue({
-        slug: 'rxc',
-        networkChainId: 777777,
-        contracts: {
-          sbtFactory: {
-            address: '0x00000000000000000000000000000000000000bb',
-            chainId: 777777,
-          },
+    const strictSpy = jest.spyOn(contractScriptsUtils, 'getSessionConfigBySlugOrDefault').mockReturnValue(null);
+    const chainSpy = jest.spyOn(contractScriptsUtils, 'getSessionChainId').mockReturnValue(null);
+    const demoSpy = jest.spyOn(contractScriptsUtils, 'getDemoSessionConfigBySlug').mockReturnValue({
+      slug: 'rxc',
+      networkChainId: 777777,
+      contracts: {
+        sbtFactory: {
+          address: '0x00000000000000000000000000000000000000bb',
+          chainId: 777777,
         },
-      });
-    const discoverSpy = jest
-      .spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached')
-      .mockResolvedValueOnce([]);
+      },
+    });
+    const discoverSpy = jest.spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached').mockResolvedValueOnce([]);
 
     try {
       await instance.ensureSbtUniverse({ force: true });
@@ -387,7 +367,7 @@ describe('SBTSelector discovery lifecycle', () => {
         }),
         expect.objectContaining({
           onDiscoveredAddresses: expect.any(Function),
-        })
+        }),
       );
       expect(demoSpy).not.toHaveBeenCalled();
     } finally {
@@ -413,9 +393,7 @@ describe('SBTSelector discovery lifecycle', () => {
       ...instance.props,
       network: { chainId: 84531 },
     };
-    const registrySpy = jest
-      .spyOn(sessionRegistryUtils, 'loadSessionRegistryCache')
-      .mockResolvedValue(null);
+    const registrySpy = jest.spyOn(sessionRegistryUtils, 'loadSessionRegistryCache').mockResolvedValue(null);
 
     try {
       instance.componentDidUpdate(prevProps, prevState);
@@ -472,9 +450,7 @@ describe('SBTSelector discovery lifecycle', () => {
     });
     instance.hydrateSelectedSbtNames = jest.fn();
     instance.getSessionNetworkId = jest.fn(() => 84532);
-    const registrySpy = jest
-      .spyOn(sessionRegistryUtils, 'loadSessionRegistryCache')
-      .mockResolvedValue(null);
+    const registrySpy = jest.spyOn(sessionRegistryUtils, 'loadSessionRegistryCache').mockResolvedValue(null);
 
     try {
       instance.componentDidMount();
@@ -507,9 +483,7 @@ describe('SBTSelector discovery lifecycle', () => {
     instance.loadSBTOptions = jest.fn(() => Promise.resolve(null));
     instance.hydrateSelectedSbtNames = jest.fn();
     instance.getSessionNetworkId = jest.fn(() => 84532);
-    const registrySpy = jest
-      .spyOn(sessionRegistryUtils, 'loadSessionRegistryCache')
-      .mockResolvedValue(null);
+    const registrySpy = jest.spyOn(sessionRegistryUtils, 'loadSessionRegistryCache').mockResolvedValue(null);
 
     try {
       instance.componentDidMount();
@@ -534,9 +508,7 @@ describe('SBTSelector discovery lifecycle', () => {
     instance.loadSBTOptions = jest.fn(() => Promise.resolve(null));
     instance.hydrateSelectedSbtNames = jest.fn();
     instance.getSessionNetworkId = jest.fn(() => 84532);
-    const registrySpy = jest
-      .spyOn(sessionRegistryUtils, 'loadSessionRegistryCache')
-      .mockResolvedValue(null);
+    const registrySpy = jest.spyOn(sessionRegistryUtils, 'loadSessionRegistryCache').mockResolvedValue(null);
 
     try {
       instance.componentDidMount();
@@ -557,9 +529,7 @@ describe('SBTSelector discovery lifecycle', () => {
     instance.loadSBTOptions = jest.fn(() => Promise.resolve(null));
     instance.hydrateSelectedSbtNames = jest.fn();
     instance.getSessionNetworkId = jest.fn(() => 84532);
-    const registrySpy = jest
-      .spyOn(sessionRegistryUtils, 'loadSessionRegistryCache')
-      .mockResolvedValue(null);
+    const registrySpy = jest.spyOn(sessionRegistryUtils, 'loadSessionRegistryCache').mockResolvedValue(null);
 
     try {
       instance.componentDidMount();
@@ -567,12 +537,14 @@ describe('SBTSelector discovery lifecycle', () => {
       instance.ensureSbtUniverse.mockClear();
       instance.loadSBTOptions.mockClear();
 
-      window.dispatchEvent(new CustomEvent(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, {
-        detail: {
-          selectedSessionScope: 'list',
-          selectedSessionSlugs: ['', 'edge'],
-        },
-      }));
+      window.dispatchEvent(
+        new CustomEvent(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, {
+          detail: {
+            selectedSessionScope: 'list',
+            selectedSessionSlugs: ['', 'edge'],
+          },
+        }),
+      );
       await Promise.resolve();
 
       expect(instance.ensureSbtUniverse).toHaveBeenCalledWith({ force: true });
@@ -593,12 +565,8 @@ describe('SBTSelector discovery lifecycle', () => {
   });
 
   it('starts a fresh cold-load render in loading state so it cannot show a false empty message', () => {
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['legacyEdge', 'rxc']);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['legacyEdge', 'rxc']);
 
     try {
       const instance = makeInstance({
@@ -613,7 +581,7 @@ describe('SBTSelector discovery lifecycle', () => {
       const tree = instance.render();
       const headerStatusNode = findElement(
         tree,
-        (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SBT_SELECTOR_LOADING_STATUS
+        (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SBT_SELECTOR_LOADING_STATUS,
       );
       expect(headerStatusNode).toBeTruthy();
     } finally {
@@ -649,7 +617,7 @@ describe('SBTSelector discovery lifecycle', () => {
     instance.getMetadataLookupConfig = () => ({ slug: 'edge', networkChainId: 84532 });
     instance.resolveSbtLabel = jest.fn(() => 'Resolved Name');
     instance.readSbtCacheBySlug = jest.fn(async () => ({
-      '84532': {
+      84532: {
         sbtList: {
           [selectedLower]: {
             sbtAddress: selectedAddress,
@@ -756,9 +724,7 @@ describe('SBTSelector discovery lifecycle', () => {
         },
       },
     };
-    const registrySpy = jest
-      .spyOn(sessionRegistryUtils, 'loadSessionRegistryCache')
-      .mockResolvedValue(null);
+    const registrySpy = jest.spyOn(sessionRegistryUtils, 'loadSessionRegistryCache').mockResolvedValue(null);
 
     try {
       instance.componentDidUpdate(prevProps, prevState);
@@ -786,12 +752,9 @@ describe('SBTSelector discovery lifecycle', () => {
     const loadingNode = instance.getLoadingMessage();
     const loadingTextNode = findElement(
       loadingNode,
-      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SBT_SELECTOR_LOADING
+      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SBT_SELECTOR_LOADING,
     );
-    const spinnerNode = findElement(
-      loadingNode,
-      (node) => node?.props?.icon?.iconName === 'spinner'
-    );
+    const spinnerNode = findElement(loadingNode, (node) => node?.props?.icon?.iconName === 'spinner');
     expect(loadingTextNode).toBeTruthy();
     expect(spinnerNode).toBeTruthy();
     expect(JSON.stringify(loadingTextNode.props.children)).toContain('Loading 3');
@@ -799,7 +762,7 @@ describe('SBTSelector discovery lifecycle', () => {
     const tree = instance.render();
     const headerStatusNode = findElement(
       tree,
-      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SBT_SELECTOR_LOADING_STATUS
+      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SBT_SELECTOR_LOADING_STATUS,
     );
     expect(headerStatusNode).toBeTruthy();
     expect(JSON.stringify(headerStatusNode.props.children)).toContain('3');
@@ -813,4 +776,5 @@ describe('SBTSelector discovery lifecycle', () => {
     const instance = makeInstance();
 
     expect(instance.resolveSbtLabel(null, '')).toBe('Unnamed Group');
-  });});
+  });
+});

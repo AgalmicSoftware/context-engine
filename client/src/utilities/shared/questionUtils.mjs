@@ -10,28 +10,18 @@
 import * as ethersModule from 'ethers';
 
 const resolveEthersCompat = (loadedModule) => {
-  const direct =
-    loadedModule?.ethers ||
-    loadedModule?.default?.ethers ||
-    loadedModule?.default ||
-    loadedModule;
+  const direct = loadedModule?.ethers || loadedModule?.default?.ethers || loadedModule?.default || loadedModule;
   if (direct) return direct;
   try {
     if (typeof require === 'function') {
       const requiredModule = require('ethers');
-      return (
-        requiredModule?.ethers ||
-        requiredModule?.default?.ethers ||
-        requiredModule?.default ||
-        requiredModule
-      );
+      return requiredModule?.ethers || requiredModule?.default?.ethers || requiredModule?.default || requiredModule;
     }
   } catch (_) {}
   return loadedModule;
 };
 
-const ethers =
-  resolveEthersCompat(ethersModule);
+const ethers = resolveEthersCompat(ethersModule);
 
 // --- Question ID generation ---
 // Canonical implementation. Matches CreateQuestionsAndSurveys.jsx and SurveyGenerator.tsx.
@@ -39,9 +29,13 @@ const ethers =
 
 export function generateQuestionId(type, prompt, options = [], singleSelect = false) {
   let dataToHash = `${type}:${(prompt || '').trim().toLowerCase()}`;
-  const validOpts = Array.isArray(options) ? options.filter(o => o && o.trim() !== '') : [];
+  const validOpts = Array.isArray(options) ? options.filter((o) => o && o.trim() !== '') : [];
   if (type === 'multichoice') {
-    if (validOpts.length > 0) dataToHash += `:${validOpts.map(o => o.trim()).join(',').toLowerCase()}`;
+    if (validOpts.length > 0)
+      dataToHash += `:${validOpts
+        .map((o) => o.trim())
+        .join(',')
+        .toLowerCase()}`;
     if (singleSelect) dataToHash += ':single';
   }
   return ethers.utils.id(dataToHash);

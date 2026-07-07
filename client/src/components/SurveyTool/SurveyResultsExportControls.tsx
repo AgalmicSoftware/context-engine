@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  Button,
-  DropdownItem,
-  DropdownMenu,
-  DropdownToggle,
-  Label,
-  UncontrolledDropdown,
-} from 'reactstrap';
+import { Button, DropdownItem, DropdownMenu, DropdownToggle, Label, UncontrolledDropdown } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretUp } from '@fortawesome/free-solid-svg-icons';
 

@@ -16,13 +16,13 @@ export type GetPileVisibleQuestionIds = (questions: PileQuestionLike[], activeIn
 export type BuildPileVisibleResponseSignature = (
   questionResponses: PileQuestionResponsesMap,
   visibleIds: string[],
-  account: string
+  account: string,
 ) => string;
 
 const byResponseCountDesc = (
   left: PileQuestionLike,
   right: PileQuestionLike,
-  responseCounts: PileQuestionResponseCounts = {}
+  responseCounts: PileQuestionResponseCounts = {},
 ): number => {
   const leftCount = responseCounts[String(left?.id || '').toLowerCase()] || 0;
   const rightCount = responseCounts[String(right?.id || '').toLowerCase()] || 0;
@@ -42,18 +42,10 @@ export const sortPileQuestionsByPriority = ({
   highlightedQuestionIds?: Set<string> | null;
   account?: string | null;
 } = {}): PileQuestionLike[] => {
-  const normalizedQuestions = filterPendingQuestionMetadataPlaceholders(
-    Array.isArray(questions) ? questions : []
-  );
-  const normalizedResponses = questionResponses && typeof questionResponses === 'object'
-    ? questionResponses
-    : {};
-  const normalizedResponseCounts = responseCounts && typeof responseCounts === 'object'
-    ? responseCounts
-    : {};
-  const normalizedHighlightedIds = highlightedQuestionIds instanceof Set
-    ? highlightedQuestionIds
-    : new Set<string>();
+  const normalizedQuestions = filterPendingQuestionMetadataPlaceholders(Array.isArray(questions) ? questions : []);
+  const normalizedResponses = questionResponses && typeof questionResponses === 'object' ? questionResponses : {};
+  const normalizedResponseCounts = responseCounts && typeof responseCounts === 'object' ? responseCounts : {};
+  const normalizedHighlightedIds = highlightedQuestionIds instanceof Set ? highlightedQuestionIds : new Set<string>();
   const accountLower = String(account || '').toLowerCase();
   const isLoggedIn = !!accountLower;
 
@@ -84,9 +76,7 @@ export const sortPileQuestionsByPriority = ({
   unanswered.sort((left, right) => byResponseCountDesc(left, right, normalizedResponseCounts));
   answered.sort((left, right) => byResponseCountDesc(left, right, normalizedResponseCounts));
 
-  return isLoggedIn
-    ? [...highlighted, ...unanswered, ...answered]
-    : [...highlighted, ...unanswered];
+  return isLoggedIn ? [...highlighted, ...unanswered, ...answered] : [...highlighted, ...unanswered];
 };
 
 export const splitPileMaskedQuestions = ({
@@ -94,9 +84,7 @@ export const splitPileMaskedQuestions = ({
 }: {
   questions?: PileQuestionLike[] | null;
 } = {}) => {
-  const normalizedQuestions = filterPendingQuestionMetadataPlaceholders(
-    Array.isArray(questions) ? questions : []
-  );
+  const normalizedQuestions = filterPendingQuestionMetadataPlaceholders(Array.isArray(questions) ? questions : []);
   const hiddenQuestions = normalizedQuestions.filter((question) => isQuestionPromptMasked(question));
   const visibleQuestions = normalizedQuestions.filter((question) => !isQuestionPromptMasked(question));
 
@@ -134,11 +122,7 @@ export const buildPileQuestionPipelineState = ({
     highlightedQuestionIds,
     account,
   });
-  const {
-    hiddenQuestions,
-    visibleQuestions,
-    hasHiddenGatedQuestions,
-  } = splitPileMaskedQuestions({
+  const { hiddenQuestions, visibleQuestions, hasHiddenGatedQuestions } = splitPileMaskedQuestions({
     questions: sortedQuestions,
   });
 
@@ -166,11 +150,14 @@ export const buildPileQuestionLoadState = ({
   const normalizedVisibleQuestions = Array.isArray(visibleQuestions) ? visibleQuestions : [];
   const normalizedHiddenQuestions = Array.isArray(hiddenQuestions) ? hiddenQuestions : [];
   const hasHiddenGatedQuestions = normalizedHiddenQuestions.length > 0;
-  const loading = normalizedVisibleQuestions.length > 0
-    ? false
-    : (hasHiddenGatedQuestions
+  const loading =
+    normalizedVisibleQuestions.length > 0
       ? false
-      : (settleUnreadyEmpty ? false : (!isQuestionCacheReady || recentRateLimit)));
+      : hasHiddenGatedQuestions
+        ? false
+        : settleUnreadyEmpty
+          ? false
+          : !isQuestionCacheReady || recentRateLimit;
 
   return {
     hasHiddenGatedQuestions,
@@ -194,16 +181,12 @@ export const buildPileVisibleTransitionPlan = ({
   const normalizedPreviousActivePileIndex = Math.max(0, Number(previousActivePileIndex || 0));
   const clampedIndex = Math.min(
     normalizedPreviousActivePileIndex,
-    Math.max(normalizedNextVisibleQuestions.length - 1, 0)
+    Math.max(normalizedNextVisibleQuestions.length - 1, 0),
   );
   const pileChanged = !areQuestionListsEquivalent(normalizedPreviousPileQuestions, normalizedNextVisibleQuestions);
   const indexChanged = normalizedPreviousActivePileIndex !== clampedIndex;
-  const nextVisibleForHydration = pileChanged
-    ? normalizedNextVisibleQuestions
-    : normalizedPreviousPileQuestions;
-  const nextActiveIndexForHydration = (pileChanged || indexChanged)
-    ? clampedIndex
-    : normalizedPreviousActivePileIndex;
+  const nextVisibleForHydration = pileChanged ? normalizedNextVisibleQuestions : normalizedPreviousPileQuestions;
+  const nextActiveIndexForHydration = pileChanged || indexChanged ? clampedIndex : normalizedPreviousActivePileIndex;
 
   return {
     pileChanged,
@@ -228,11 +211,10 @@ export const shouldSkipPileFilterStateUpdate = ({
   currentHiddenGated?: boolean;
   nextFilterSignature?: string | null;
   currentFilterSignature?: string | null;
-} = {}): boolean => (
+} = {}): boolean =>
   String(nextVisibleSignature || '') === String(currentVisibleSignature || '') &&
   !!nextHiddenGated === !!currentHiddenGated &&
-  String(nextFilterSignature || '') === String(currentFilterSignature || '')
-);
+  String(nextFilterSignature || '') === String(currentFilterSignature || '');
 
 export type PileFilterResultPlan = {
   nextState: {
@@ -272,14 +254,10 @@ export const buildPileFilterResultPlan = ({
   const normalizedCurrentVisibleSignature = String(currentVisibleSignature || '');
   const nextVisibleSignature = buildQuestionListSignature(normalizedVisibleQuestions);
   const normalizedCurrentFilterState = (
-    currentFilterState && typeof currentFilterState === 'object'
-      ? currentFilterState
-      : {}
+    currentFilterState && typeof currentFilterState === 'object' ? currentFilterState : {}
   ) as PileFilterStateLike;
   const normalizedNextFilterState = (
-    nextFilterState && typeof nextFilterState === 'object'
-      ? nextFilterState
-      : {}
+    nextFilterState && typeof nextFilterState === 'object' ? nextFilterState : {}
   ) as PileFilterStateLike;
   const currentFilterSignature = serializeFilterState(normalizedCurrentFilterState);
   const nextFilterSignature = serializeFilterState(normalizedNextFilterState);
@@ -364,9 +342,7 @@ export const buildPileLoadResultPlan = ({
   const normalizedPreviousAllQuestions = Array.isArray(previousAllQuestionsForFilter)
     ? previousAllQuestionsForFilter
     : [];
-  const normalizedPreviousPileQuestions = Array.isArray(previousPileQuestions)
-    ? previousPileQuestions
-    : [];
+  const normalizedPreviousPileQuestions = Array.isArray(previousPileQuestions) ? previousPileQuestions : [];
   const normalizedSortedQuestions = Array.isArray(sortedQuestions) ? sortedQuestions : [];
   const normalizedSortedVisibleQuestions = Array.isArray(sortedVisibleQuestions) ? sortedVisibleQuestions : [];
   const normalizedHiddenQuestions = Array.isArray(hiddenQuestions) ? hiddenQuestions : [];
@@ -421,14 +397,11 @@ export const buildPileLoadResultPlan = ({
     shouldUpdateState = shouldUpdateState || pileChanged || indexChanged;
   }
 
-  const visibleWindowIds = getPileVisibleQuestionIds(
-    nextVisibleForHydration,
-    nextActiveIndexForHydration
-  );
+  const visibleWindowIds = getPileVisibleQuestionIds(nextVisibleForHydration, nextActiveIndexForHydration);
   const visibleResponseSignature = buildPileVisibleResponseSignature(
     questionResponses && typeof questionResponses === 'object' ? questionResponses : {},
     visibleWindowIds,
-    normalizedAccount
+    normalizedAccount,
   );
   const resultSignature = [
     isFilterActive ? 'f1' : 'f0',

@@ -1,6 +1,4 @@
-import type {
-  SessionModeProfile,
-} from '../../utilities/session/sessionModeProfile';
+import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import type { UnknownRecord } from '../../utilities/session/sessionTypes';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { deepClone } from './sessionWizardCoreUtils';
@@ -17,9 +15,8 @@ type SessionWizardModeDraft = UnknownRecord & {
   telegram_only?: unknown;
 };
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const applyStorageProfileChangeToModeDraft = <Draft extends SessionWizardModeDraft>(
   prev: Draft,
@@ -42,9 +39,8 @@ export const applyStorageProfileChangeToModeDraft = <Draft extends SessionWizard
     };
     modeProfile.encryption = {
       ...(isRecord(modeProfile.encryption) ? modeProfile.encryption : {}),
-      mode: backend === 'lit-arweave' || normalizedProfile.payloadAccessControl?.mode === 'lit_encrypted'
-        ? 'lit'
-        : 'none',
+      mode:
+        backend === 'lit-arweave' || normalizedProfile.payloadAccessControl?.mode === 'lit_encrypted' ? 'lit' : 'none',
     };
     if (isRecord(modeProfile.surfaces)) {
       modeProfile.surfaces.web = true;

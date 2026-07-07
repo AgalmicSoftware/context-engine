@@ -16,31 +16,32 @@ import type { RenderResult } from '@testing-library/react';
 import ConnectedSurveyResults from './SurveyResults';
 import type { SurveyResultsProps } from './SurveyResults';
 
-const SurveyResults =
-  (ConnectedSurveyResults as unknown as { WrappedComponent: React.ComponentType<SurveyResultsProps> })
-    .WrappedComponent;
+const SurveyResults = (
+  ConnectedSurveyResults as unknown as { WrappedComponent: React.ComponentType<SurveyResultsProps> }
+).WrappedComponent;
 
 export type SurveyResultsHarnessStoreState = {
   profile?: Record<string, unknown>;
   sessionState?: Record<string, unknown>;
 };
 
-export const createSurveyResultsTestStore = (
-  overrides: SurveyResultsHarnessStoreState = {}
-) => createStore(
-  (state = {
-    profile: {
-      account: '',
-      network: { id: 84532 },
-      ...(overrides.profile || {}),
-    },
-    sessionState: {
-      activeSessionSlug: '',
-      loginComplete: false,
-      ...(overrides.sessionState || {}),
-    },
-  }) => state
-);
+export const createSurveyResultsTestStore = (overrides: SurveyResultsHarnessStoreState = {}) =>
+  createStore(
+    (
+      state = {
+        profile: {
+          account: '',
+          network: { id: 84532 },
+          ...(overrides.profile || {}),
+        },
+        sessionState: {
+          activeSessionSlug: '',
+          loginComplete: false,
+          ...(overrides.sessionState || {}),
+        },
+      },
+    ) => state,
+  );
 
 export type RenderSurveyResultsOptions = {
   /**
@@ -76,13 +77,12 @@ if (typeof afterEach === 'function') {
 
 export const renderSurveyResults = (
   props: SurveyResultsProps = {},
-  options: RenderSurveyResultsOptions = {}
+  options: RenderSurveyResultsOptions = {},
 ): SurveyResultsHarness => {
   const store = options.store ?? createSurveyResultsTestStore(options.storeState);
   if (options.route) {
     if (harnessUrlToRestore === null) {
-      harnessUrlToRestore =
-        `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      harnessUrlToRestore = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     }
     window.history.replaceState({}, '', options.route);
   }

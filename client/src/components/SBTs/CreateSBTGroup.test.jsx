@@ -13,41 +13,45 @@ describe('CreateSBTGroup cache helpers', () => {
   it('initializes a blank authoring form with open mint defaults', () => {
     const instance = makeInstance({ account: '0xAdmin' });
 
-    expect(instance.state).toEqual(expect.objectContaining({
-      sbtName: '',
-      sbtDescription: '',
-      sbtImageFile: null,
-      sbtImageUrl: '',
-      useImageUrl: false,
-      tags: [],
-      currentTagInput: '',
-      documentURLs: [],
-      documentUrl: '',
-      groupPassword: '',
-      metadataLockGateIds: {
-        name: [],
-        description: [],
+    expect(instance.state).toEqual(
+      expect.objectContaining({
+        sbtName: '',
+        sbtDescription: '',
+        sbtImageFile: null,
+        sbtImageUrl: '',
+        useImageUrl: false,
         tags: [],
+        currentTagInput: '',
         documentURLs: [],
-        image: [],
-      },
-      sbtCodes: [],
-      groupSubmitted: false,
-      predictableAddressEnabled: false,
-      mintOptionsCollapsed: true,
-      distributionOptionsCollapsed: true,
-      numInviteLinks: 10,
-      exportFormat: 'json',
-    }));
-    expect(instance.state.sbtDistribution).toEqual(expect.objectContaining({
-      distributionOption: 'anyoneCanMint',
-      adminAddress: '0xAdmin',
-      burnAdmin: '0xAdmin',
-      isLimited: false,
-      isTimeLimited: false,
-      unlisted: false,
-      network: 'not connected',
-    }));
+        documentUrl: '',
+        groupPassword: '',
+        metadataLockGateIds: {
+          name: [],
+          description: [],
+          tags: [],
+          documentURLs: [],
+          image: [],
+        },
+        sbtCodes: [],
+        groupSubmitted: false,
+        predictableAddressEnabled: false,
+        mintOptionsCollapsed: true,
+        distributionOptionsCollapsed: true,
+        numInviteLinks: 10,
+        exportFormat: 'json',
+      }),
+    );
+    expect(instance.state.sbtDistribution).toEqual(
+      expect.objectContaining({
+        distributionOption: 'anyoneCanMint',
+        adminAddress: '0xAdmin',
+        burnAdmin: '0xAdmin',
+        isLimited: false,
+        isTimeLimited: false,
+        unlisted: false,
+        network: 'not connected',
+      }),
+    );
     expect(instance.state.network).toBe('');
   });
 
@@ -76,9 +80,11 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(payload.tags).toEqual(['tag1', 'tag2']);
     expect(payload.documentURLs).toEqual(['https://doc.test']);
     expect(payload.documentUrl).toBe('https://doc.test/pending');
-    expect(payload.metadataLockGateIds).toEqual(expect.objectContaining({
-      description: ['gate-description'],
-    }));
+    expect(payload.metadataLockGateIds).toEqual(
+      expect.objectContaining({
+        description: ['gate-description'],
+      }),
+    );
     expect(payload.sbtDistribution.mintingEndTime).toBe('2024-01-01T00:00:00.000Z');
     expect(payload.sbtDistribution.network).toBe(instance.getSelectedAuthoringChainId());
   });
@@ -123,11 +129,13 @@ describe('CreateSBTGroup cache helpers', () => {
     });
 
     const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
-    expect(recoveryStore.entries[`84532:${sbtAddress.toLowerCase()}`]).toEqual(expect.objectContaining({
-      chainId: 84532,
-      sbtAddress: sbtAddress.toLowerCase(),
-      passwords: ['code-one', 'code-two'],
-    }));
+    expect(recoveryStore.entries[`84532:${sbtAddress.toLowerCase()}`]).toEqual(
+      expect.objectContaining({
+        chainId: 84532,
+        sbtAddress: sbtAddress.toLowerCase(),
+        passwords: ['code-one', 'code-two'],
+      }),
+    );
   });
 
   it('skips recovery-code persistence when the SBT has no password mint path', () => {
@@ -143,10 +151,12 @@ describe('CreateSBTGroup cache helpers', () => {
       codesToStore: ['unused-code'],
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      ok: false,
-      status: 'empty-recovery-payload',
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        ok: false,
+        status: 'empty-recovery-payload',
+      }),
+    );
     expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
   });
 
@@ -343,17 +353,19 @@ describe('CreateSBTGroup cache helpers', () => {
           mintingEndTime: '2024-02-02T00:00:00.000Z',
           hasAdmin: true,
         },
-      })
+      }),
     );
 
     const loaded = instance.loadFormCache();
 
     expect(loaded).toBe(true);
     expect(instance.state.tags).toEqual(['alpha', 'beta']);
-    expect(instance.state.metadataLockGateIds).toEqual(expect.objectContaining({
-      name: ['test-sbt'],
-      description: ['test-sbt'],
-    }));
+    expect(instance.state.metadataLockGateIds).toEqual(
+      expect.objectContaining({
+        name: ['test-sbt'],
+        description: ['test-sbt'],
+      }),
+    );
     expect(instance.state.sbtDistribution.mintingEndTime).toBeInstanceOf(Date);
     expect(instance.state.tokenInfoCollapsed).toBe(false);
     expect(instance.updateGroupHash).toHaveBeenCalled();
@@ -372,7 +384,7 @@ describe('CreateSBTGroup cache helpers', () => {
         sbtDistribution: {
           network: 84532,
         },
-      })
+      }),
     );
 
     const loaded = instance.loadFormCache();
@@ -400,7 +412,7 @@ describe('CreateSBTGroup cache helpers', () => {
           burnAuth: 'AdminOnly',
           network: 84532,
         },
-      })
+      }),
     );
 
     const loaded = instance.loadFormCache();

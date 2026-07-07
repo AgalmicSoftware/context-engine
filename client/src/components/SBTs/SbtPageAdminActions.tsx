@@ -1,10 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCheck,
-  faSpinner,
-  faTimes,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
@@ -70,7 +66,10 @@ const SbtPagePasswordInviteRows = ({
       });
       return (
         <li key={index}>
-          {passwordText} - <a href={inviteLink} target="_blank" rel="noopener noreferrer">{inviteLink}</a>
+          {passwordText} -{' '}
+          <a href={inviteLink} target="_blank" rel="noopener noreferrer">
+            {inviteLink}
+          </a>
         </li>
       );
     })}
@@ -169,9 +168,7 @@ const SbtPageAdminActions = ({
           />
           {burnSearchResultRecord && (
             <div className={styles.burnSearchResult}>
-              {Boolean(burnSearchResultRecord.tokenId) && (
-                <p>Token ID: {String(burnSearchResultRecord.tokenId)}</p>
-              )}
+              {Boolean(burnSearchResultRecord.tokenId) && <p>Token ID: {String(burnSearchResultRecord.tokenId)}</p>}
               {Boolean(burnSearchResultRecord.address) && (
                 <p>Owner: {getShortenedAddress(burnSearchResultRecord.address, false)}</p>
               )}
@@ -186,10 +183,14 @@ const SbtPageAdminActions = ({
             {adminBurnButtonContentState.shouldRenderIdleLabel && adminBurnButtonContentState.idleLabel}
             {adminBurnButtonContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
             {adminBurnButtonContentState.shouldRenderSuccess && (
-              <>{adminBurnButtonContentState.successLabel} <FontAwesomeIcon icon={faCheck} /></>
+              <>
+                {adminBurnButtonContentState.successLabel} <FontAwesomeIcon icon={faCheck} />
+              </>
             )}
             {adminBurnButtonContentState.shouldRenderFailure && (
-              <>{adminBurnButtonContentState.failureLabel} <FontAwesomeIcon icon={faTimes} /></>
+              <>
+                {adminBurnButtonContentState.failureLabel} <FontAwesomeIcon icon={faTimes} />
+              </>
             )}
           </button>
         </div>
@@ -258,7 +259,10 @@ const SbtPageAdminActions = ({
     {passwordInventoryDisplayState.shouldRenderNoMoreInvitesEmptyState && (
       <div className={styles.inviteGenerationSection}>
         <h4>No Additional Password Invites</h4>
-        <p>Max tokens are set, so all invites should have been created initially. No more invites can be generated, and there are no cached passwords found.</p>
+        <p>
+          Max tokens are set, so all invites should have been created initially. No more invites can be generated, and
+          there are no cached passwords found.
+        </p>
       </div>
     )}
   </div>

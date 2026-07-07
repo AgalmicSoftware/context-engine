@@ -58,14 +58,18 @@ const createIndexedDbMock = () => {
         error: null,
         objectStore: jest.fn(() => ({
           get: jest.fn((key) => createRequest(tx, () => ensureStore(storeName).get(key))),
-          put: jest.fn((value, key) => createRequest(tx, () => {
-            ensureStore(storeName).set(key, value);
-            return key;
-          })),
-          delete: jest.fn((key) => createRequest(tx, () => {
-            ensureStore(storeName).delete(key);
-            return undefined;
-          })),
+          put: jest.fn((value, key) =>
+            createRequest(tx, () => {
+              ensureStore(storeName).set(key, value);
+              return key;
+            }),
+          ),
+          delete: jest.fn((key) =>
+            createRequest(tx, () => {
+              ensureStore(storeName).delete(key);
+              return undefined;
+            }),
+          ),
         })),
       };
       return tx;

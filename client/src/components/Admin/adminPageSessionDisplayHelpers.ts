@@ -19,19 +19,18 @@ type AdminChainRegistryDisplayArgs = {
   registryChainId?: unknown;
 };
 
-const asRecord = (value: unknown): Record<string, unknown> => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {}
-);
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
 const buildStableComparableValue = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(buildStableComparableValue);
   if (!value || typeof value !== 'object') return value;
-  return Object.keys(value as Record<string, unknown>).sort().reduce<Record<string, unknown>>((acc, key) => {
-    acc[key] = buildStableComparableValue((value as Record<string, unknown>)[key]);
-    return acc;
-  }, {});
+  return Object.keys(value as Record<string, unknown>)
+    .sort()
+    .reduce<Record<string, unknown>>((acc, key) => {
+      acc[key] = buildStableComparableValue((value as Record<string, unknown>)[key]);
+      return acc;
+    }, {});
 };
 
 export const buildAdminEncryptedEntrySignature = (entry: unknown): string => {
@@ -44,9 +43,8 @@ export const buildAdminEncryptedEntrySignature = (entry: unknown): string => {
   }
 };
 
-export const areAdminEncryptedEntriesEquivalent = (a: unknown, b: unknown): boolean => (
-  buildAdminEncryptedEntrySignature(a) === buildAdminEncryptedEntrySignature(b)
-);
+export const areAdminEncryptedEntriesEquivalent = (a: unknown, b: unknown): boolean =>
+  buildAdminEncryptedEntrySignature(a) === buildAdminEncryptedEntrySignature(b);
 
 export const buildSessionUrl = (slug: unknown, { allowGeneral = false }: BuildSessionUrlOptions = {}): string => {
   const hasExplicitSlug = slug !== undefined && slug !== null;
@@ -79,12 +77,13 @@ export const buildAdminChainRegistryDisplay = ({
   const chainId = toStr(chainIdRaw).trim();
   const chainName = getChainName(chainId);
   const registryChainId = toStr(registryChainIdRaw).trim();
-  const chainDisplay = chainName ? `${chainName} (${chainId})` : (chainId || '\u2014');
+  const chainDisplay = chainName ? `${chainName} (${chainId})` : chainId || '\u2014';
   const chainNum = Number(chainId);
   const registryNum = Number(registryChainId);
-  const sameChain = chainId && registryChainId && Number.isFinite(chainNum) && Number.isFinite(registryNum)
-    ? chainNum === registryNum
-    : registryChainId === chainId;
+  const sameChain =
+    chainId && registryChainId && Number.isFinite(chainNum) && Number.isFinite(registryNum)
+      ? chainNum === registryNum
+      : registryChainId === chainId;
   if (!registryChainId || sameChain) return chainDisplay;
   const registryName = getChainName(registryChainId);
   const registryDisplay = registryName ? `${registryName} (${registryChainId})` : registryChainId;
@@ -129,7 +128,8 @@ export const collectEncryptedEntries = (metadata: unknown): Record<string, Admin
   if (arweaveEncrypted && !entries['arweave.jwk']) entries['arweave.jwk'] = arweaveEncrypted as AdminEncryptedEntry;
 
   const faucetEncrypted = asRecord(metadataRecord.faucet).encryptedPrivateKey;
-  if (faucetEncrypted && !entries['faucet.privateKey']) entries['faucet.privateKey'] = faucetEncrypted as AdminEncryptedEntry;
+  if (faucetEncrypted && !entries['faucet.privateKey'])
+    entries['faucet.privateKey'] = faucetEncrypted as AdminEncryptedEntry;
 
   return entries;
 };

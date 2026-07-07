@@ -1,5 +1,5 @@
 /* @file DebateMap.module.scss */
-@use "sass:color";
+@use 'sass:color';
 
 /* --- Variables --- */
 $bg-dark: #0b1120;
@@ -714,7 +714,9 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         .nodeDot {
           overflow: hidden;
           border-width: 1.5px;
-          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.2);
+          box-shadow:
+            inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+            0 8px 24px rgba(0, 0, 0, 0.2);
         }
 
         .packedNodeDot {

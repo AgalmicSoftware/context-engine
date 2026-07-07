@@ -19,7 +19,5 @@ const toFiniteNumberOr = (value: unknown, fallback = 0): number => {
 export const resolvePersistedQuestionResponsesWatermark = ({
   floorBlock = 0,
   processedToBlock = 0,
-}: PersistedQuestionResponsesWatermarkInput = {}): number => Math.max(
-  toFiniteNumberOr(floorBlock, 0),
-  toFiniteNumberOr(processedToBlock, 0)
-);
+}: PersistedQuestionResponsesWatermarkInput = {}): number =>
+  Math.max(toFiniteNumberOr(floorBlock, 0), toFiniteNumberOr(processedToBlock, 0));

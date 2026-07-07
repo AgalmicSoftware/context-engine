@@ -1,9 +1,4 @@
-import {
-  generateBlockieDataUrl,
-  hashSeed,
-  hslToRgb,
-  mulberry32,
-} from './blockieAvatars.js';
+import { generateBlockieDataUrl, hashSeed, hslToRgb, mulberry32 } from './blockieAvatars.js';
 
 describe('blockieAvatars', () => {
   it('hashSeed preserves deterministic string and falsy seed normalization', () => {
@@ -39,9 +34,7 @@ describe('blockieAvatars', () => {
     }) as typeof document.createElement);
 
     try {
-      expect(generateBlockieDataUrl({ toString: () => 'Seed Value' }, 2, 3)).toBe(
-        'data:image/png;base64,mock-blockie'
-      );
+      expect(generateBlockieDataUrl({ toString: () => 'Seed Value' }, 2, 3)).toBe('data:image/png;base64,mock-blockie');
       expect(canvas.width).toBe(6);
       expect(canvas.height).toBe(6);
       expect(context.fillRect).toHaveBeenCalledWith(0, 0, 6, 6);

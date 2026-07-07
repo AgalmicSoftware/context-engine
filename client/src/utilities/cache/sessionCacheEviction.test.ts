@@ -5,18 +5,21 @@ import {
   updateDgMetaTimestamp,
 } from './sessionCacheEviction';
 
-jest.mock('utilities/logging.js', () => ({
-  __esModule: true,
-  createLogger: jest.fn(() => ({
-    warn: jest.fn(),
-  })),
-}), { virtual: true });
+jest.mock(
+  'utilities/logging.js',
+  () => ({
+    __esModule: true,
+    createLogger: jest.fn(() => ({
+      warn: jest.fn(),
+    })),
+  }),
+  { virtual: true },
+);
 
 const DG_META_STORAGE_KEY = 'dg_meta_v1';
 
-const readStoredMeta = (): Record<string, unknown> => (
-  JSON.parse(localStorage.getItem(DG_META_STORAGE_KEY) || '{}') as Record<string, unknown>
-);
+const readStoredMeta = (): Record<string, unknown> =>
+  JSON.parse(localStorage.getItem(DG_META_STORAGE_KEY) || '{}') as Record<string, unknown>;
 
 describe('sessionCacheEviction', () => {
   afterEach(() => {
@@ -47,11 +50,14 @@ describe('sessionCacheEviction', () => {
     localStorage.setItem('dg:old', 'old-value');
     localStorage.setItem('dg:new', 'new-value');
     localStorage.setItem('other:key', 'other-value');
-    localStorage.setItem(DG_META_STORAGE_KEY, JSON.stringify({
-      'dg:old': 1_000,
-      'dg:new': 9_500,
-      'other:key': 1_000,
-    }));
+    localStorage.setItem(
+      DG_META_STORAGE_KEY,
+      JSON.stringify({
+        'dg:old': 1_000,
+        'dg:new': 9_500,
+        'other:key': 1_000,
+      }),
+    );
 
     expect(evictOldDgEntries(1_000)).toBe(1);
 

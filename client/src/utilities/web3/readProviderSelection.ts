@@ -27,10 +27,7 @@ const normalizeInjectedChainId = (value: unknown): number | null => {
 export const readInjectedProviderChainId = (providerLike: unknown): number | null => {
   if (!providerLike || typeof providerLike !== 'object') return null;
   const provider = providerLike as InjectedProviderLike;
-  return (
-    normalizeInjectedChainId(provider.chainId) ??
-    normalizeInjectedChainId(provider.networkVersion)
-  );
+  return normalizeInjectedChainId(provider.chainId) ?? normalizeInjectedChainId(provider.networkVersion);
 };
 
 export const shouldUseInjectedReadProviderForChain = ({

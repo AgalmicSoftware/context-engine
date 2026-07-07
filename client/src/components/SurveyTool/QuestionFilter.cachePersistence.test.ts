@@ -1,6 +1,4 @@
-import {
-  QuestionFilter as QuestionFilterComponent,
-} from './QuestionFilter';
+import { QuestionFilter as QuestionFilterComponent } from './QuestionFilter';
 import {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
@@ -39,23 +37,10 @@ type TreePredicate = (node: TreeNode) => boolean;
 type QuestionFilterProps = Record<string, any>;
 const QuestionFilter: any = QuestionFilterComponent;
 const cacheScripts: any = cacheScriptsModule;
-const {
-  initCacheManager,
-  listNamespaceEntriesSync,
-  readCache,
-  removeCache,
-  writeCache,
-} = cacheScripts as any;
+const { initCacheManager, listNamespaceEntriesSync, readCache, removeCache, writeCache } = cacheScripts as any;
 const serializeFilterState: any = serializeFilterStateStrict;
 
-const MANAGED_NAMESPACES = [
-  'questionsCache',
-  'surveysCache',
-  'bookmarksCache',
-  'filters',
-  'sbtCache',
-  'userCache',
-];
+const MANAGED_NAMESPACES = ['questionsCache', 'surveysCache', 'bookmarksCache', 'filters', 'sbtCache', 'userCache'];
 
 const clearManagedCaches = async () => {
   await initCacheManager();
@@ -111,10 +96,7 @@ describe('QuestionFilter cache helpers', () => {
     const props = { activeSessionSlug: '', network: { id: 1 } };
     const sourceQuestions = [{ id: 'q1', prompt: 'Existing question' }];
 
-    const merged = QuestionFilter.prototype.mergeQuestionsWithCache.call(
-      { props },
-      sourceQuestions
-    );
+    const merged = QuestionFilter.prototype.mergeQuestionsWithCache.call({ props }, sourceQuestions);
 
     expect(merged).toHaveLength(2);
     expect(merged.find((q: any) => q.id === 'q2')).toBeTruthy();
@@ -238,9 +220,7 @@ describe('QuestionFilter cache helpers', () => {
 
     expect(writeSpy).toHaveBeenCalledWith('filters', slug, expect.any(Object));
     expect(instance.checkIfCurrentFilterIsBookmarked).not.toHaveBeenCalled();
-    expect(instance.setState).not.toHaveBeenCalledWith(
-      expect.objectContaining({ filterBookmarkedFeedback: true })
-    );
+    expect(instance.setState).not.toHaveBeenCalledWith(expect.objectContaining({ filterBookmarkedFeedback: true }));
 
     writeSpy.mockRestore();
   });
@@ -616,7 +596,7 @@ describe('QuestionFilter cache helpers', () => {
         filterByResponded: false,
         filterByNotResponded: false,
       },
-      expect.any(Function)
+      expect.any(Function),
     );
     expect(instance.state.filterByResponded).toBe(false);
     expect(instance.state.filterByNotResponded).toBe(false);
@@ -759,5 +739,4 @@ describe('QuestionFilter cache helpers', () => {
     expect(instance.state.filterByResponded).toBe(false);
     expect(instance.state.filterByNotResponded).toBe(false);
   });
-
 });

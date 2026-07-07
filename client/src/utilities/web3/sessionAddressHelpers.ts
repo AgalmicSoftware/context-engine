@@ -27,13 +27,7 @@ function getSessionAddresses(cfg: AnyRecord | null | undefined): Record<string, 
     }
     if (typeof value !== 'object') return {};
     const source = value as AnyRecord;
-    const address = String(
-      source.address ??
-      source.contractAddress ??
-      source.addr ??
-      source.target ??
-      ''
-    ).trim();
+    const address = String(source.address ?? source.contractAddress ?? source.addr ?? source.target ?? '').trim();
     const chainId = Number(source.chainId || source.chainID || source.networkChainId || source.chain || 0) || undefined;
     return {
       ...(address ? { address } : {}),
@@ -82,9 +76,9 @@ function getSessionAddresses(cfg: AnyRecord | null | undefined): Record<string, 
     if (!address) return;
     out[contractKey] = {
       address,
-      chainId: Number(
-        fromCfg.chainId || fromFallback.chainId || fromChainDefault.chainId || fallbackChainId || 0
-      ) || undefined,
+      chainId:
+        Number(fromCfg.chainId || fromFallback.chainId || fromChainDefault.chainId || fallbackChainId || 0) ||
+        undefined,
     };
   });
 
@@ -94,13 +88,13 @@ function getSessionAddresses(cfg: AnyRecord | null | undefined): Record<string, 
 function getSessionBlockWindow(
   cfg: AnyRecord | null,
   fromBlock: unknown,
-  toBlock: unknown
+  toBlock: unknown,
 ): { fromBlock: number; toBlock: number } {
   let f = Number(fromBlock || 0);
   let t = Number(toBlock || 0);
   const lim = cfg && cfg.blockLimits;
   if (lim && lim.start != null) f = Math.max(f, Number(lim.start));
-  if (lim && lim.end   != null) t = Math.min(t, Number(lim.end));
+  if (lim && lim.end != null) t = Math.min(t, Number(lim.end));
   return { fromBlock: f, toBlock: t };
 }
 

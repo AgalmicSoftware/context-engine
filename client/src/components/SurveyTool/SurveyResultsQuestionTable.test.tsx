@@ -41,7 +41,7 @@ describe('SurveyResultsQuestionTable', () => {
         sortAsc={false}
         sortBy="responses"
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByText('First prompt')).toBeInTheDocument();
@@ -60,17 +60,19 @@ describe('SurveyResultsQuestionTable', () => {
     const onViewQuestion = jest.fn();
     const { container } = render(
       <SurveyResultsQuestionTable
-        entries={[{
-          questionId: 'q1',
-          prompt: 'First prompt',
-          responsesCount: 3,
-          type: 'freeform',
-        }]}
+        entries={[
+          {
+            questionId: 'q1',
+            prompt: 'First prompt',
+            responsesCount: 3,
+            type: 'freeform',
+          },
+        ]}
         onSort={onSort}
         onToggleQuestionBookmark={onToggleQuestionBookmark}
         onViewQuestion={onViewQuestion}
         styleMap={styleMap}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByText('Prompt ▲▼'));

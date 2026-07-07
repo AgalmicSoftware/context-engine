@@ -141,7 +141,7 @@ export const createWorkerSoftSessionClient = (): SoftSessionClient => {
   };
 
   const callWorker = (payload: Record<string, unknown>): Promise<unknown> => {
-    const id = `wallet-worker:${seq += 1}`;
+    const id = `wallet-worker:${(seq += 1)}`;
     return new Promise((resolve, reject) => {
       pending.set(id, { resolve, reject });
       ensureWorker()
@@ -155,7 +155,7 @@ export const createWorkerSoftSessionClient = (): SoftSessionClient => {
 
   return {
     async init(options) {
-      const result = await callWorker({ type: 'init', ...options }) as { address?: string };
+      const result = (await callWorker({ type: 'init', ...options })) as { address?: string };
       return String(result?.address || '');
     },
     request(args) {

@@ -26,12 +26,15 @@ const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', over
     corsWorkerUrl: workerUrl,
     ...(overrides.draft || {}),
   };
-  localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-    ...overrides,
-    draft,
-    deployComplete: true,
-    deployWorkerUrl: workerUrl,
-  }));
+  localStorage.setItem(
+    'ce:sessionWizardDraft:v1',
+    JSON.stringify({
+      ...overrides,
+      draft,
+      deployComplete: true,
+      deployWorkerUrl: workerUrl,
+    }),
+  );
 };
 
 const enableGeneralInfoLogging = () => {
@@ -183,7 +186,7 @@ describe('SessionWizard publish boundary rendering', () => {
     expect(progressCard).toHaveTextContent('Register On-chain');
     expect(screen.getByRole('progressbar')).toHaveAttribute(
       'aria-valuetext',
-      expect.stringContaining('Register On-chain')
+      expect.stringContaining('Register On-chain'),
     );
     expect(mockRegisterSessionOnChain).toHaveBeenCalledTimes(1);
 
@@ -290,29 +293,31 @@ describe('SessionWizard publish boundary rendering', () => {
       'maxPriorityFeePerGasGwei',
       'onTxHash',
     ]);
-    expect(registerArgs).toEqual(expect.objectContaining({
-      providerLike: undefined,
-      chainId: 11155420,
-      registryAddress: expect.any(String),
-      slug: 'manual-metadata-register-boundary-session',
-      sessionId: expect.any(String),
-      sessionChainId: 11155420,
-      metadataURI: manualMetadataUri,
-      encryptedMetadataURI: '',
-      gateSelections: expect.objectContaining({
-        default: expect.objectContaining({
-          chainId: 11155420,
-          mode: 'all',
-          sbts: [],
+    expect(registerArgs).toEqual(
+      expect.objectContaining({
+        providerLike: undefined,
+        chainId: 11155420,
+        registryAddress: expect.any(String),
+        slug: 'manual-metadata-register-boundary-session',
+        sessionId: expect.any(String),
+        sessionChainId: 11155420,
+        metadataURI: manualMetadataUri,
+        encryptedMetadataURI: '',
+        gateSelections: expect.objectContaining({
+          default: expect.objectContaining({
+            chainId: 11155420,
+            mode: 'all',
+            sbts: [],
+          }),
         }),
+        sessionFields: expect.any(Object),
+        gasLimitOverride: '1200000',
+        gasPriceGwei: '',
+        maxFeePerGasGwei: '',
+        maxPriorityFeePerGasGwei: '',
+        onTxHash: expect.any(Function),
       }),
-      sessionFields: expect.any(Object),
-      gasLimitOverride: '1200000',
-      gasPriceGwei: '',
-      maxFeePerGasGwei: '',
-      maxPriorityFeePerGasGwei: '',
-      onTxHash: expect.any(Function),
-    }));
+    );
   });
 
   it('passes uploaded metadata through the register boundary without custom deploy execution', async () => {
@@ -367,29 +372,35 @@ describe('SessionWizard publish boundary rendering', () => {
       });
 
       const [metadataPayload, uploadFormat, uploadOptions] = arweaveScripts.uploadDataToArweave.mock.calls[0];
-      expect(metadataPayload).toEqual(expect.objectContaining({
-        sessionName: 'Uploaded Metadata Register Boundary Session',
-        slug: 'uploaded-metadata-register-boundary-session',
-      }));
+      expect(metadataPayload).toEqual(
+        expect.objectContaining({
+          sessionName: 'Uploaded Metadata Register Boundary Session',
+          slug: 'uploaded-metadata-register-boundary-session',
+        }),
+      );
       expect(uploadFormat).toBe('json');
-      expect(uploadOptions).toEqual(expect.objectContaining({
-        requestId: expect.stringMatching(/^arw_meta_/),
-        sessionSlug: 'uploaded-metadata-register-boundary-session',
-        forceDirectArweaveUpload: true,
-      }));
+      expect(uploadOptions).toEqual(
+        expect.objectContaining({
+          requestId: expect.stringMatching(/^arw_meta_/),
+          sessionSlug: 'uploaded-metadata-register-boundary-session',
+          forceDirectArweaveUpload: true,
+        }),
+      );
       const metadataLogIndex = uploadEvents.indexOf(
-        `log:[arweave][ui] metadata upload start:${uploadOptions.requestId}`
+        `log:[arweave][ui] metadata upload start:${uploadOptions.requestId}`,
       );
       const metadataUploadIndex = uploadEvents.indexOf(`upload:json:${uploadOptions.requestId}`);
       expect(metadataLogIndex).toBeGreaterThanOrEqual(0);
       expect(metadataUploadIndex).toBeGreaterThan(metadataLogIndex);
 
       const registerArgs = mockRegisterSessionOnChain.mock.calls[0][0];
-      expect(registerArgs).toEqual(expect.objectContaining({
-        slug: 'uploaded-metadata-register-boundary-session',
-        metadataURI: `ar://${uploadedTxId}`,
-        sessionFields: expect.any(Object),
-      }));
+      expect(registerArgs).toEqual(
+        expect.objectContaining({
+          slug: 'uploaded-metadata-register-boundary-session',
+          metadataURI: `ar://${uploadedTxId}`,
+          sessionFields: expect.any(Object),
+        }),
+      );
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_URI)).toHaveTextContent(`ar://${uploadedTxId}`);
       await waitFor(() => {
         expect(readWizardCache().workerSecrets?.arweaveJwk).toBe('');
@@ -457,19 +468,25 @@ describe('SessionWizard publish boundary rendering', () => {
       const [metadataPayload, metadataFormat, metadataOptions] = arweaveScripts.uploadDataToArweave.mock.calls[1];
       expect(headerPayload).toEqual(expect.any(File));
       expect(headerFormat).toBe('png');
-      expect(headerOptions).toEqual(expect.objectContaining({
-        requestId: expect.stringMatching(/^arw_header_/),
-        sessionSlug: 'header-upload-boundary-session',
-      }));
-      expect(metadataPayload).toEqual(expect.objectContaining({
-        sessionHeaderImg: `ar://${headerTxId}`,
-        slug: 'header-upload-boundary-session',
-      }));
+      expect(headerOptions).toEqual(
+        expect.objectContaining({
+          requestId: expect.stringMatching(/^arw_header_/),
+          sessionSlug: 'header-upload-boundary-session',
+        }),
+      );
+      expect(metadataPayload).toEqual(
+        expect.objectContaining({
+          sessionHeaderImg: `ar://${headerTxId}`,
+          slug: 'header-upload-boundary-session',
+        }),
+      );
       expect(metadataFormat).toBe('json');
-      expect(metadataOptions).toEqual(expect.objectContaining({
-        requestId: expect.stringMatching(/^arw_meta_/),
-        sessionSlug: 'header-upload-boundary-session',
-      }));
+      expect(metadataOptions).toEqual(
+        expect.objectContaining({
+          requestId: expect.stringMatching(/^arw_meta_/),
+          sessionSlug: 'header-upload-boundary-session',
+        }),
+      );
       const headerLogIndex = uploadEvents.indexOf(`log:[arweave][ui] header upload start:${headerOptions.requestId}`);
       const headerUploadIndex = uploadEvents.indexOf(`upload:png:${headerOptions.requestId}`);
       const metadataUploadIndex = uploadEvents.indexOf(`upload:json:${metadataOptions.requestId}`);
@@ -507,9 +524,11 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.click(publishButton);
 
     await waitFor(() => {
-      expect(screen.getByText(
-        'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.'
-      )).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.',
+        ),
+      ).toBeInTheDocument();
     });
     expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();

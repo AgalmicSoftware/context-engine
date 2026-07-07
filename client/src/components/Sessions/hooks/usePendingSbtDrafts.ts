@@ -36,10 +36,8 @@ export const normalizePendingSbtDrafts = (value: unknown): PendingSbtDraft[] => 
         predictedAddress,
         displayName: toStr(entry?.displayName || entry?.name || predictedAddress).trim() || predictedAddress,
         tokenURI: toStr(entry?.tokenURI).trim(),
-        metadataUploadStatus: (
-          toStr(entry?.metadataUploadStatus).trim() ||
-          (toStr(entry?.tokenURI).trim() ? 'ready' : 'pending-upload')
-        ),
+        metadataUploadStatus:
+          toStr(entry?.metadataUploadStatus).trim() || (toStr(entry?.tokenURI).trim() ? 'ready' : 'pending-upload'),
       };
     })
     .filter((entry): entry is PendingSbtDraft => !!entry);
@@ -64,22 +62,25 @@ export const writeSessionWizardPendingSbtDraftsCache = (payload: PendingSbtDraft
       return;
     }
     sessionStorage.setItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY, JSON.stringify(normalized));
-  } catch (e) { log.warn('SessionWizard: fallback', e); }
+  } catch (e) {
+    log.warn('SessionWizard: fallback', e);
+  }
 };
 
 export const clearSessionWizardPendingSbtDraftsCache = (): void => {
   if (typeof window === 'undefined' || !window.sessionStorage) return;
   try {
     sessionStorage.removeItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
-  } catch (e) { log.warn('SessionWizard: fallback', e); }
+  } catch (e) {
+    log.warn('SessionWizard: fallback', e);
+  }
 };
 
 const usePendingSbtDrafts = () => {
-  const [pendingSbtDrafts, setPendingSbtDrafts] = useState<PendingSbtDraft[]>(() => readSessionWizardPendingSbtDraftsCache());
-  const normalizedPendingSbtDrafts = useMemo(
-    () => normalizePendingSbtDrafts(pendingSbtDrafts),
-    [pendingSbtDrafts]
+  const [pendingSbtDrafts, setPendingSbtDrafts] = useState<PendingSbtDraft[]>(() =>
+    readSessionWizardPendingSbtDraftsCache(),
   );
+  const normalizedPendingSbtDrafts = useMemo(() => normalizePendingSbtDrafts(pendingSbtDrafts), [pendingSbtDrafts]);
   const hasUndeployedPendingSbtDrafts = normalizedPendingSbtDrafts.some((entry) => entry.deployed !== true);
 
   useEffect(() => {

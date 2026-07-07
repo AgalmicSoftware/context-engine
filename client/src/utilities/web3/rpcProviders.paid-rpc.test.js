@@ -72,31 +72,37 @@ describe('rpcProviders paid RPC selection', () => {
       const opProvider = getReadProviderForChain(11155420);
       const opDiagnostics = getReadProviderDiagnostics(11155420);
 
-      expect(baseProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
-        chainId: 84532,
-        providerMode: 'infura_only',
-        infuraOnlyForChain: false,
-        preferPath: true,
-      }));
-      expect(opProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
-        chainId: 11155420,
-        providerMode: 'infura_only',
-        infuraOnlyForChain: true,
-        preferPath: false,
-      }));
+      expect(baseProvider?.__CE_RPC_META).toEqual(
+        expect.objectContaining({
+          chainId: 84532,
+          providerMode: 'infura_only',
+          infuraOnlyForChain: false,
+          preferPath: true,
+        }),
+      );
+      expect(opProvider?.__CE_RPC_META).toEqual(
+        expect.objectContaining({
+          chainId: 11155420,
+          providerMode: 'infura_only',
+          infuraOnlyForChain: true,
+          preferPath: false,
+        }),
+      );
 
       const opUrls = Array.isArray(opProvider?.providerConfigs)
         ? opProvider.providerConfigs.map((cfg) => cfg?.provider?.connection?.url).filter(Boolean)
         : [];
       expect(opUrls).toEqual(['https://op-paid.example/rpc']);
-      expect(opDiagnostics).toEqual(expect.objectContaining({
-        chainId: 11155420,
-        providerMode: 'infura_only',
-        infuraOnlyForChain: true,
-        configuredPaidRpcUrl: 'https://op-paid.example/rpc',
-        includesConfiguredPaidRpc: true,
-        urls: ['https://op-paid.example/rpc'],
-      }));
+      expect(opDiagnostics).toEqual(
+        expect.objectContaining({
+          chainId: 11155420,
+          providerMode: 'infura_only',
+          infuraOnlyForChain: true,
+          configuredPaidRpcUrl: 'https://op-paid.example/rpc',
+          includesConfiguredPaidRpc: true,
+          urls: ['https://op-paid.example/rpc'],
+        }),
+      );
     });
   });
 
@@ -110,13 +116,15 @@ describe('rpcProviders paid RPC selection', () => {
 
       const opDiagnostics = getReadProviderDiagnostics(11155420);
 
-      expect(opDiagnostics).toEqual(expect.objectContaining({
-        chainId: 11155420,
-        providerMode: 'fallback',
-        infuraOnlyForChain: false,
-        configuredPaidRpcUrl: 'https://op-paid.example/rpc',
-        includesConfiguredPaidRpc: false,
-      }));
+      expect(opDiagnostics).toEqual(
+        expect.objectContaining({
+          chainId: 11155420,
+          providerMode: 'fallback',
+          infuraOnlyForChain: false,
+          configuredPaidRpcUrl: 'https://op-paid.example/rpc',
+          includesConfiguredPaidRpc: false,
+        }),
+      );
       expect(opDiagnostics.urls[0]).toBe('https://op-sepolia-testnet.api.pocket.network');
     });
   });

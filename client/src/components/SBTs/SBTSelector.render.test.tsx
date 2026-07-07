@@ -20,7 +20,7 @@ type Deferred<T = any> = {
   reject: (reason?: any) => void;
 };
 
-const createDeferred = <T = any>(): Deferred<T> => {
+const createDeferred = <T = any,>(): Deferred<T> => {
   let resolve!: Deferred<T>['resolve'];
   let reject!: Deferred<T>['reject'];
   const promise = new Promise<T>((res, rej) => {
@@ -32,17 +32,9 @@ const createDeferred = <T = any>(): Deferred<T> => {
 
 jest.mock('../Shared/AsyncSearchSelect', () => ({
   __esModule: true,
-  default: ({
-    options = [],
-    isLoading = false,
-    noOptionsMessage,
-    loadingMessage,
-    placeholder,
-  }: any) => (
+  default: ({ options = [], isLoading = false, noOptionsMessage, loadingMessage, placeholder }: any) => (
     <div data-testid="mock-sbt-select">
-      {placeholder ? (
-        <div data-testid="mock-sbt-select-placeholder">{placeholder}</div>
-      ) : null}
+      {placeholder ? <div data-testid="mock-sbt-select-placeholder">{placeholder}</div> : null}
       {isLoading && (
         <div data-testid="mock-sbt-select-loading">
           {typeof loadingMessage === 'function' ? loadingMessage() : 'Loading'}
@@ -79,12 +71,12 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => {
       if (!value) return null;
       return clone ? JSON.parse(JSON.stringify(value)) : value;
     }),
-    listNamespaceEntriesSync: jest.fn(({ cloneValues = true } = {}) => (
+    listNamespaceEntriesSync: jest.fn(({ cloneValues = true } = {}) =>
       Object.entries(store).map(([slug, value]) => ({
         slug,
         value: cloneValues ? JSON.parse(JSON.stringify(value)) : value,
-      }))
-    )),
+      })),
+    ),
     subscribeCacheUpdates: jest.fn(() => () => {}),
   };
 });
@@ -95,9 +87,7 @@ jest.mock('../../utilities/sbt/sbtDisplayNames.js', () => ({
   hasSbtDisplayName: jest.fn((info) => !!String(info?.name || '').trim()),
   hydrateSbtDisplayNameTargeted: jest.fn(async ({ address }) => ({
     info: {
-      name: String(address || '').toLowerCase() === GENERAL_ADDRESS
-        ? 'General Badge'
-        : 'Edge Badge',
+      name: String(address || '').toLowerCase() === GENERAL_ADDRESS ? 'General Badge' : 'Edge Badge',
       sessionSlug: String(address || '').toLowerCase() === GENERAL_ADDRESS ? '' : 'edge',
       sessionSlugExplicit: true,
       unlisted: false,
@@ -116,7 +106,9 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
 
 jest.mock('../../utilities/web3/contractScripts.js', () => {
   const normalizeSessionSlug = (raw = '') => {
-    const normalized = String(raw ?? '').trim().toLowerCase();
+    const normalized = String(raw ?? '')
+      .trim()
+      .toLowerCase();
     if (!normalized || normalized === 'general') return '';
     return normalized === 'legacyedge' ? 'edge' : normalized;
   };
@@ -150,9 +142,7 @@ jest.mock('../../utilities/web3/contractScripts.js', () => {
       end: null,
     },
   };
-  const getConfigForSlug = (raw = '') => (
-    normalizeSessionSlug(raw) === '' ? generalConfig : edgeConfig
-  );
+  const getConfigForSlug = (raw = '') => (normalizeSessionSlug(raw) === '' ? generalConfig : edgeConfig);
 
   return {
     __esModule: true,
@@ -186,27 +176,31 @@ const flushSelectorEffects = async (cycles = 4) => {
 
 describe('SBTSelector rendered cold-load lifecycle', () => {
   beforeEach(() => {
-    try { window.history.replaceState({}, '', '/'); } catch (_) {}
+    try {
+      window.history.replaceState({}, '', '/');
+    } catch (_) {}
     localStorage.clear();
     sessionStorage.clear();
     globalCe.CE_SESSION_SCAN_SCOPE = 'active';
     globalCe.CE_SESSION_SCAN_SLUGS = [];
-    try { delete globalCe.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS; } catch (_) {}
+    try {
+      delete globalCe.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS;
+    } catch (_) {}
     mockedCacheScripts.__resetSbtCacheStore();
     jest.clearAllMocks();
-    mockedCacheScripts.readCache.mockImplementation(async (_namespace: any, slug = '') => (
-      mockedCacheScripts.__getSbtCacheStore()[String(slug || '')] || {}
-    ));
+    mockedCacheScripts.readCache.mockImplementation(
+      async (_namespace: any, slug = '') => mockedCacheScripts.__getSbtCacheStore()[String(slug || '')] || {},
+    );
     mockedCacheScripts.writeCache.mockImplementation(async (_namespace: any, slug = '', value: any) => {
       mockedCacheScripts.__getSbtCacheStore()[String(slug || '')] = JSON.parse(JSON.stringify(value));
       return true;
     });
-    mockedCacheScripts.listNamespaceEntriesSync.mockImplementation(({ cloneValues = true } = {}) => (
+    mockedCacheScripts.listNamespaceEntriesSync.mockImplementation(({ cloneValues = true } = {}) =>
       Object.entries(mockedCacheScripts.__getSbtCacheStore()).map(([slug, value]) => ({
         slug,
         value: cloneValues ? JSON.parse(JSON.stringify(value)) : value,
-      }))
-    ));
+      })),
+    );
     mockedContractScriptsUtils.getAllSessionSlugs.mockReturnValue(['edge']);
     mockedContractScriptsUtils.getSessionLists.mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
     mockedContractScriptsUtils.getSessionChainId.mockReturnValue(84532);
@@ -216,7 +210,9 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
   });
 
   it('keeps list-scope general-session discovery in loading state until the default-session options arrive', async () => {
-    try { window.history.replaceState({}, '', '/'); } catch (_) {}
+    try {
+      window.history.replaceState({}, '', '/');
+    } catch (_) {}
     localStorage.setItem('ce:sessionScanScope', 'list');
     localStorage.setItem('ce:sessionScanSlugs', JSON.stringify(['general']));
 
@@ -239,7 +235,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
         network={{ id: 84532 }}
         defaultFeaturedSBTs={[]}
         variant="admin"
-      />
+      />,
     );
 
     expect(screen.getByText('Select Groups')).toBeInTheDocument();
@@ -258,8 +254,9 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     });
 
     await waitFor(() => {
-      const discoveredSlugs = mockedContractScripts.getAllSbtAddressesCached.mock.calls
-        .map(([, groupRef]: any[]) => mockedContractScriptsUtils.normalizeSessionSlug(groupRef?.slug || ''));
+      const discoveredSlugs = mockedContractScripts.getAllSbtAddressesCached.mock.calls.map(([, groupRef]: any[]) =>
+        mockedContractScriptsUtils.normalizeSessionSlug(groupRef?.slug || ''),
+      );
       expect(discoveredSlugs).toEqual(['']);
     });
 
@@ -269,12 +266,14 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     });
 
     await waitFor(() => {
-      expect(ref.current?.state?.sbtOptions || []).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          address: GENERAL_ADDRESS,
-          sessionSlug: '',
-        }),
-      ]));
+      expect(ref.current?.state?.sbtOptions || []).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            address: GENERAL_ADDRESS,
+            sessionSlug: '',
+          }),
+        ]),
+      );
     });
     expect(screen.queryByText('No Groups')).not.toBeInTheDocument();
   });
@@ -292,7 +291,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
         network={{ id: 84532 }}
         defaultFeaturedSBTs={[]}
         variant="admin"
-      />
+      />,
     );
 
     await flushSelectorEffects();
@@ -302,34 +301,33 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
 
     fireEvent.click(externalLinkIcon as Element);
 
-    expect(openSpy).toHaveBeenCalledWith(
-      buildSbtDetailPath(GENERAL_ADDRESS, 'edge'),
-      '_blank'
-    );
+    expect(openSpy).toHaveBeenCalledWith(buildSbtDetailPath(GENERAL_ADDRESS, 'edge'), '_blank');
     openSpy.mockRestore();
   });
 
   it('prefers metadata-derived session hints for selected SBT external links', async () => {
     mockedContractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
-    mockedContractScriptsUtils.getSessionSlugByName.mockImplementation((name: any) => (
-      name === 'Demo Session' ? 'demo' : null
-    ));
+    mockedContractScriptsUtils.getSessionSlugByName.mockImplementation((name: any) =>
+      name === 'Demo Session' ? 'demo' : null,
+    );
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
     const { container } = render(
       <SBTSelector
         id="selected-link-metadata-hint"
-        selectedSBTs={[{
-          address: GENERAL_ADDRESS,
-          name: 'General Badge',
-          sessionName: 'Demo Session',
-        }]}
+        selectedSBTs={[
+          {
+            address: GENERAL_ADDRESS,
+            name: 'General Badge',
+            sessionName: 'Demo Session',
+          },
+        ]}
         onAddSBT={jest.fn()}
         onRemoveSBT={jest.fn()}
         sessionSlug="edge"
         network={{ id: 84532 }}
         defaultFeaturedSBTs={[]}
         variant="admin"
-      />
+      />,
     );
 
     await flushSelectorEffects();
@@ -339,10 +337,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
 
     fireEvent.click(externalLinkIcon as Element);
 
-    expect(openSpy).toHaveBeenCalledWith(
-      buildSbtDetailPath(GENERAL_ADDRESS, 'demo'),
-      '_blank'
-    );
+    expect(openSpy).toHaveBeenCalledWith(buildSbtDetailPath(GENERAL_ADDRESS, 'demo'), '_blank');
     openSpy.mockRestore();
   });
 
@@ -351,7 +346,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     localStorage.setItem('ce:sessionScanSlugs', JSON.stringify(['demo']));
 
     const linkedAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-    mockedCacheScripts.listNamespaceEntriesSync.mockImplementation(() => ([
+    mockedCacheScripts.listNamespaceEntriesSync.mockImplementation(() => [
       {
         namespace: 'sbtCache',
         slug: 'archive',
@@ -374,14 +369,10 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
           },
         },
       },
-    ]));
+    ]);
     mockedContractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['demo']);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['demo']);
 
     try {
       render(
@@ -394,7 +385,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
           network={{ id: 84532 }}
           defaultFeaturedSBTs={[]}
           variant="admin"
-        />
+        />,
       );
 
       await waitFor(() => {
@@ -460,7 +451,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
         defaultFeaturedSBTs={[]}
         enableGroupSelect
         variant="admin"
-      />
+      />,
     );
 
     await flushSelectorEffects();
@@ -520,7 +511,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
         defaultFeaturedSBTs={[]}
         enableGroupSelect
         variant="admin"
-      />
+      />,
     );
 
     await flushSelectorEffects();
@@ -549,7 +540,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
         defaultFeaturedSBTs={[]}
         limitToFeatured
         variant="admin"
-      />
+      />,
     );
 
     await flushSelectorEffects(2);
@@ -567,7 +558,9 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SBT_SELECTOR_MANUAL_ADD));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Only featured Groups can be added by address in this selector.');
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Only featured Groups can be added by address in this selector.',
+      );
     });
     expect(onAddSBT).not.toHaveBeenCalled();
     expect(mockedSbtDisplayNameUtils.hydrateSbtDisplayNameTargeted).not.toHaveBeenCalled();

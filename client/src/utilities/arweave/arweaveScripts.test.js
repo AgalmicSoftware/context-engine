@@ -95,21 +95,43 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
     readSessionScanSlugs.mockReturnValue([]);
     fetchWorkerWithAuth.mockResolvedValue(jsonResp(200, { id: 'tx-default' }));
-    try { delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAYS; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
+    try {
+      delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAYS;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
   });
 
   afterEach(() => {
     jest.clearAllMocks();
-    try { delete globalThis.CE_ARWEAVE_GATEWAYS; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAYS;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS;
+    } catch (_) {}
   });
 
   it('returns text and reuses in-memory cache', async () => {
@@ -146,7 +168,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         bypassCache: true,
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -168,7 +190,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
       arweaveScripts.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -179,7 +201,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
       arweaveScripts.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -202,12 +224,12 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     const nowSpy = jest.spyOn(Date, 'now');
 
     try {
-      nowSpy.mockReturnValue(realNow + (3 * 24 * 60 * 60 * 1000));
+      nowSpy.mockReturnValue(realNow + 3 * 24 * 60 * 60 * 1000);
       await expect(
         arweaveScripts.downloadDataFromArweave(txId, {
           gateways: [TEST_ARWEAVE_GATEWAY],
           retries: 0,
-        })
+        }),
       ).rejects.toMatchObject({
         name: 'ArweaveFetchError',
         status: 404,
@@ -249,7 +271,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
       arweaveScripts.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -261,7 +283,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         bypassFailureCache: true,
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -284,7 +306,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
         gateways: [TEST_ARWEAVE_GATEWAY, TEST_ARWEAVE_BACKUP_GATEWAY],
         retries: 3,
         bypassCache: true,
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -309,7 +331,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
         bypassCache: true,
         disableExistencePrecheck: true,
         debugContext: { category: 'question_metadata' },
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -345,7 +367,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
         bypassCache: true,
         disableExistencePrecheck: true,
         debugContext: { category: 'question_metadata' },
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 502,
@@ -412,15 +434,12 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
       text: async () => '{"ok":"canonicalized"}',
     });
 
-    const text = await arweaveScripts.downloadDataFromArweave(
-      `https://example.example.test/ar/${txId}?view=1`,
-      {
-        gateways: [TEST_ARWEAVE_GATEWAY],
-        retries: 0,
-        bypassCache: true,
-        disableExistencePrecheck: true,
-      }
-    );
+    const text = await arweaveScripts.downloadDataFromArweave(`https://example.example.test/ar/${txId}?view=1`, {
+      gateways: [TEST_ARWEAVE_GATEWAY],
+      retries: 0,
+      bypassCache: true,
+      disableExistencePrecheck: true,
+    });
 
     expect(text).toBe('{"ok":"canonicalized"}');
     expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -563,7 +582,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
 
   it('returns valid html payloads without treating them as gateway failures', async () => {
     global.fetch.mockResolvedValueOnce(
-      textResp(200, '<!doctype html><html><body><h1>Valid document</h1></body></html>', 'text/html')
+      textResp(200, '<!doctype html><html><body><h1>Valid document</h1></body></html>', 'text/html'),
     );
 
     const txId = 'html-document-hit';
@@ -661,12 +680,13 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
 
     expect(text).toBe('{"ok":"wayfinder-hit"}');
-    expect(wayfinderResolver).toHaveBeenCalledWith(expect.objectContaining({
-      txId: 'wayfinder-fallback-hit',
-    }));
+    expect(wayfinderResolver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        txId: 'wayfinder-fallback-hit',
+      }),
+    );
     expect(global.fetch).toHaveBeenCalledTimes(4);
     const fallbackUrl = String(global.fetch.mock.calls[3]?.[0] || '');
     expect(fallbackUrl).toContain('wf-gateway.example.test');
   });
-
 });

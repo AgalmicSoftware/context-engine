@@ -13,13 +13,7 @@ const SurveyQuestionsTagModalSlot = ({
 
   const activeTagModalTag = layoutDisplayState.activeTagModalTag || null;
 
-  return (
-    <TagModal
-      isOpen={!!activeTagModalTag}
-      toggle={tagModalProps.onClose || noop}
-      activeTag={activeTagModalTag}
-    />
-  );
+  return <TagModal isOpen={!!activeTagModalTag} toggle={tagModalProps.onClose || noop} activeTag={activeTagModalTag} />;
 };
 
 export default SurveyQuestionsTagModalSlot;

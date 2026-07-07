@@ -24,7 +24,9 @@ export function bufferToBase64URL(buffer: ArrayBuffer | ArrayBufferView): string
 }
 
 export function base64URLToBuffer(base64url: string): ArrayBuffer {
-  const base64 = String(base64url || '').replace(/-/g, '+').replace(/_/g, '/');
+  const base64 = String(base64url || '')
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
   const padLen = (4 - (base64.length % 4)) % 4;
   const binary = atob(base64 + '='.repeat(padLen));
   const bytes = new Uint8Array(binary.length);

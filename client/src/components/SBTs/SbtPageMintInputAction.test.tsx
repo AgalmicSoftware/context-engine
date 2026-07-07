@@ -17,7 +17,7 @@ describe('SbtPageMintInputAction', () => {
         onAction={onAction}
         onInputChange={onInputChange}
         placeholder="Group Password"
-      />
+      />,
     );
 
     fireEvent.change(screen.getByPlaceholderText('Group Password'), { target: { value: 'next-secret' } });
@@ -39,7 +39,7 @@ describe('SbtPageMintInputAction', () => {
         onAction={jest.fn()}
         onInputChange={jest.fn()}
         placeholder="Claim Code"
-      />
+      />,
     );
 
     expect(screen.getByPlaceholderText('Claim Code')).toHaveAttribute('type', 'text');

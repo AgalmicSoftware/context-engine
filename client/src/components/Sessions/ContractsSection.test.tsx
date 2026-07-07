@@ -2,9 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ContractsSection from './ContractsSection';
 import type { ContractsSectionProps } from './ContractsSection';
-import {
-  getSessionWizardContractRowTestId,
-} from '../ContractPage/contractMetadata.js';
+import { getSessionWizardContractRowTestId } from '../ContractPage/contractMetadata.js';
 
 const contracts = {
   surveys: { address: '0x111' },
@@ -16,14 +14,13 @@ const defaults = {
 };
 
 const renderContractsSection = (props: Partial<ContractsSectionProps> = {}) => {
-  const renderContractEntry = props.renderContractEntry || ((contractKey: string) => (
-    <div
-      key={contractKey}
-      data-testid={getSessionWizardContractRowTestId(contractKey)}
-    >
-      {contractKey}
-    </div>
-  ));
+  const renderContractEntry =
+    props.renderContractEntry ||
+    ((contractKey: string) => (
+      <div key={contractKey} data-testid={getSessionWizardContractRowTestId(contractKey)}>
+        {contractKey}
+      </div>
+    ));
 
   return render(
     <ContractsSection
@@ -36,7 +33,7 @@ const renderContractsSection = (props: Partial<ContractsSectionProps> = {}) => {
       toggleAriaLabel="Smart contracts collapse"
       renderContractEntry={renderContractEntry}
       {...props}
-    />
+    />,
   );
 };
 

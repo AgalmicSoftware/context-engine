@@ -2,14 +2,9 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import SbtPageMiniActionArea from './SbtPageMiniActionArea';
-import type {
-  SbtPageMiniManualClaimActionRequest,
-  SbtPageMiniMintActionPlan,
-} from './sbtPageActionDisplayHelpers';
+import type { SbtPageMiniManualClaimActionRequest, SbtPageMiniMintActionPlan } from './sbtPageActionDisplayHelpers';
 
-const createMiniMintActionPlan = (
-  overrides: Partial<SbtPageMiniMintActionPlan> = {}
-): SbtPageMiniMintActionPlan => ({
+const createMiniMintActionPlan = (overrides: Partial<SbtPageMiniMintActionPlan> = {}): SbtPageMiniMintActionPlan => ({
   blockedReason: 'none',
   disabled: false,
   handlerKind: 'mini-mint',
@@ -22,7 +17,7 @@ const createMiniMintActionPlan = (
 });
 
 const createMiniManualClaimActionRequest = (
-  overrides: Partial<SbtPageMiniManualClaimActionRequest> = {}
+  overrides: Partial<SbtPageMiniManualClaimActionRequest> = {},
 ): SbtPageMiniManualClaimActionRequest => ({
   buttonState: { disabled: true, isPending: false },
   contentState: { label: '', shouldRenderLabel: false, shouldRenderPendingIcon: false },
@@ -40,7 +35,7 @@ const createMiniManualClaimActionRequest = (
 });
 
 const createProps = (
-  overrides: Partial<React.ComponentProps<typeof SbtPageMiniActionArea>> = {}
+  overrides: Partial<React.ComponentProps<typeof SbtPageMiniActionArea>> = {},
 ): React.ComponentProps<typeof SbtPageMiniActionArea> => ({
   burnLabel: 'Burn',
   burnedLabel: 'Burned',
@@ -100,7 +95,7 @@ describe('SbtPageMiniActionArea', () => {
           }),
           onShowMiniPasswordInput,
         })}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
     expect(onShowMiniPasswordInput).toHaveBeenCalledTimes(1);
@@ -116,7 +111,7 @@ describe('SbtPageMiniActionArea', () => {
           }),
           onMintUnlimitedWithGroupPassword,
         })}
-      />
+      />,
     );
     expect(screen.getByPlaceholderText('Password')).toHaveValue('group-code');
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
@@ -133,7 +128,7 @@ describe('SbtPageMiniActionArea', () => {
           }),
           onClaimWithInviteCode,
         })}
-      />
+      />,
     );
     expect(screen.getByPlaceholderText('Invite Code')).toHaveValue('invite-code');
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
@@ -158,7 +153,7 @@ describe('SbtPageMiniActionArea', () => {
           }),
           onMiniMint,
         })}
-      />
+      />,
     );
     expect(screen.getByPlaceholderText('Password')).toHaveValue('manual-code');
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
@@ -186,7 +181,7 @@ describe('SbtPageMiniActionArea', () => {
           }),
           onMiniBurn,
         })}
-      />
+      />,
     );
     expect(screen.getByText('Wait: 12s')).toBeInTheDocument();
     expect(onMiniBurn).not.toHaveBeenCalled();
@@ -200,7 +195,7 @@ describe('SbtPageMiniActionArea', () => {
           miniTokenActionDisplayState: { shouldRenderBurnButton: true },
           onMiniBurn,
         })}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Burn' }));
     expect(onMiniBurn).toHaveBeenCalledTimes(1);
@@ -211,7 +206,7 @@ describe('SbtPageMiniActionArea', () => {
           hasTokenMini: true,
           miniTokenActionDisplayState: { shouldRenderJoinedStatus: true },
         })}
-      />
+      />,
     );
     expect(screen.getByText('Joined!')).toBeInTheDocument();
 
@@ -221,7 +216,7 @@ describe('SbtPageMiniActionArea', () => {
           hasTokenMini: true,
           miniTokenActionDisplayState: { shouldRenderBurnedStatus: true },
         })}
-      />
+      />,
     );
     expect(screen.getByText('Burned!')).toBeInTheDocument();
 
@@ -230,7 +225,7 @@ describe('SbtPageMiniActionArea', () => {
         {...createProps({
           miniActionFailureState: { showMintFailedStatus: true },
         })}
-      />
+      />,
     );
     expect(screen.getByText('Mint Failed')).toBeInTheDocument();
   });

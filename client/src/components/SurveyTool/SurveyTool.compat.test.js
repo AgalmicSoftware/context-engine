@@ -20,23 +20,23 @@ const findFirstNode = (node, predicate) => {
   return findFirstNode(node?.props?.children, predicate);
 };
 
-const findFirstNodeByType = (node, targetType) => (
-  findFirstNode(node, (candidate) => candidate?.type === targetType)
-);
+const findFirstNodeByType = (node, targetType) => findFirstNode(node, (candidate) => candidate?.type === targetType);
 
-const findLazySurveyResultsNode = (node) => (
-  findFirstNode(node, (candidate) => (
-    candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-    Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen')
-  ))
-);
+const findLazySurveyResultsNode = (node) =>
+  findFirstNode(
+    node,
+    (candidate) =>
+      candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
+      Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen'),
+  );
 
-const findLazySurveyQuestionsNode = (node) => (
-  findFirstNode(node, (candidate) => (
-    candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-    Object.prototype.hasOwnProperty.call(candidate.props || {}, 'singleQuestionMode')
-  ))
-);
+const findLazySurveyQuestionsNode = (node) =>
+  findFirstNode(
+    node,
+    (candidate) =>
+      candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
+      Object.prototype.hasOwnProperty.call(candidate.props || {}, 'singleQuestionMode'),
+  );
 
 describe('SurveyTool compatibility wiring', () => {
   afterEach(() => {
@@ -49,7 +49,7 @@ describe('SurveyTool compatibility wiring', () => {
   });
 
   it('uses __registry.registryChainId when SurveyQuestions resolves the session chain', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = jest.fn((slug) =>
       slug === 'edge'
         ? {
             slug: 'edge',
@@ -57,8 +57,8 @@ describe('SurveyTool compatibility wiring', () => {
               registryChainId: 84532,
             },
           }
-        : null
-    ));
+        : null,
+    );
 
     const resolved = resolveSurveyToolQuestionReadCacheContext({
       sessionSlug: 'edge',

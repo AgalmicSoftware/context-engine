@@ -11,16 +11,18 @@ import {
 
 describe('surveyResultsLockedFieldHelpers', () => {
   it('normalizes and dedupes gate SBT entries', () => {
-    expect(normalizeGateSbtEntries({
-      sbtAddress: ' 0xCCC ',
-      sbtAddresses: ['0xbbb', '0xBBB', null],
-      sbts: [
-        ' 0xAAA ',
-        { address: '0xaaa', label: 'Duplicate' },
-        { name: 'Named gate', sbtAddress: ' 0xDDD ' },
-        { address: '', label: 'empty' },
-      ],
-    })).toEqual([
+    expect(
+      normalizeGateSbtEntries({
+        sbtAddress: ' 0xCCC ',
+        sbtAddresses: ['0xbbb', '0xBBB', null],
+        sbts: [
+          ' 0xAAA ',
+          { address: '0xaaa', label: 'Duplicate' },
+          { name: 'Named gate', sbtAddress: ' 0xDDD ' },
+          { address: '', label: 'empty' },
+        ],
+      }),
+    ).toEqual([
       { address: '0xAAA', label: '' },
       { address: '0xDDD', label: 'Named gate' },
       { address: '0xbbb', label: '' },
@@ -52,16 +54,20 @@ describe('surveyResultsLockedFieldHelpers', () => {
   });
 
   it('excludes self-audience locked fields from the shared banner', () => {
-    expect(isBannerEligibleLockedField({
-      encrypted: true,
-      encryptionAudience: ' responder ',
-      value: '*',
-    })).toBe(true);
-    expect(isBannerEligibleLockedField({
-      encrypted: true,
-      encryptionAudience: ' self ',
-      value: '*',
-    })).toBe(false);
+    expect(
+      isBannerEligibleLockedField({
+        encrypted: true,
+        encryptionAudience: ' responder ',
+        value: '*',
+      }),
+    ).toBe(true);
+    expect(
+      isBannerEligibleLockedField({
+        encrypted: true,
+        encryptionAudience: ' self ',
+        value: '*',
+      }),
+    ).toBe(false);
   });
 
   it('normalizes gate labels and object placeholders', () => {
@@ -81,9 +87,11 @@ describe('surveyResultsLockedFieldHelpers', () => {
     };
 
     expect(buildLockedResponseSignature(response)).toBe(buildLockedResponseSignature({ ...response }));
-    expect(buildLockedResponseSignature({
-      ...response,
-      answer: { hash: 'changed', value: '*' },
-    })).not.toBe(buildLockedResponseSignature(response));
+    expect(
+      buildLockedResponseSignature({
+        ...response,
+        answer: { hash: 'changed', value: '*' },
+      }),
+    ).not.toBe(buildLockedResponseSignature(response));
   });
 });

@@ -36,18 +36,20 @@ describe('runSessionWizardPublishController', () => {
     });
     const setPublishStep = jest.fn();
 
-    await expect(runSessionWizardPublishController({
-      input: {
-        publishAllowed: false,
-        publishExecutionPlan: buildPlan(),
-      },
-      ports: {
-        deployWorker,
-      },
-      callbacks: {
-        setPublishStep,
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSessionWizardPublishController({
+        input: {
+          publishAllowed: false,
+          publishExecutionPlan: buildPlan(),
+        },
+        ports: {
+          deployWorker,
+        },
+        callbacks: {
+          setPublishStep,
+        },
+      }),
+    ).resolves.toEqual({
       status: 'blocked',
       workerUrlOverride: '',
       deployedPendingDrafts: [],
@@ -71,30 +73,29 @@ describe('runSessionWizardPublishController', () => {
       events.push(`setPublishStep:${step}`);
     });
 
-    await expect(runSessionWizardPublishController({
-      input: {
-        publishExecutionPlan: buildPlan({
-          stepNumbers: {
-            'deploy-worker': 3,
-          },
-        }),
-      },
-      ports: {
-        deployWorker,
-      },
-      callbacks: {
-        setPublishStep,
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSessionWizardPublishController({
+        input: {
+          publishExecutionPlan: buildPlan({
+            stepNumbers: {
+              'deploy-worker': 3,
+            },
+          }),
+        },
+        ports: {
+          deployWorker,
+        },
+        callbacks: {
+          setPublishStep,
+        },
+      }),
+    ).resolves.toEqual({
       status: 'completed',
       workerUrlOverride: 'https://deployed-worker.example',
       deployedPendingDrafts: [],
     });
 
-    expect(events).toEqual([
-      'setPublishStep:3',
-      'deployWorker',
-    ]);
+    expect(events).toEqual(['setPublishStep:3', 'deployWorker']);
     expect(deployWorker).toHaveBeenCalledTimes(1);
   });
 
@@ -102,23 +103,25 @@ describe('runSessionWizardPublishController', () => {
     const deployWorker = jest.fn();
     const setPublishStep = jest.fn();
 
-    await expect(runSessionWizardPublishController({
-      input: {
-        publishExecutionPlan: buildPlan({
-          shouldAutoDeployWorker: false,
-          stepNumbers: {
-            'register-session': 1,
-            done: 2,
-          },
-        }),
-      },
-      ports: {
-        deployWorker,
-      },
-      callbacks: {
-        setPublishStep,
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSessionWizardPublishController({
+        input: {
+          publishExecutionPlan: buildPlan({
+            shouldAutoDeployWorker: false,
+            stepNumbers: {
+              'register-session': 1,
+              done: 2,
+            },
+          }),
+        },
+        ports: {
+          deployWorker,
+        },
+        callbacks: {
+          setPublishStep,
+        },
+      }),
+    ).resolves.toEqual({
       status: 'completed',
       workerUrlOverride: '',
       deployedPendingDrafts: [],
@@ -146,25 +149,27 @@ describe('runSessionWizardPublishController', () => {
       events.push(`setPublishStep:${step}`);
     });
 
-    await expect(runSessionWizardPublishController({
-      input: {
-        publishExecutionPlan: buildPlan({
-          shouldDeployPendingSbts: true,
-          stepNumbers: {
-            'deploy-worker': 1,
-            'deploy-sbts': 2,
-          },
-        }),
-        signerAccountOverride: '0x00000000000000000000000000000000000000aa',
-      },
-      ports: {
-        deployWorker,
-        deployPendingSbts,
-      },
-      callbacks: {
-        setPublishStep,
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSessionWizardPublishController({
+        input: {
+          publishExecutionPlan: buildPlan({
+            shouldDeployPendingSbts: true,
+            stepNumbers: {
+              'deploy-worker': 1,
+              'deploy-sbts': 2,
+            },
+          }),
+          signerAccountOverride: '0x00000000000000000000000000000000000000aa',
+        },
+        ports: {
+          deployWorker,
+          deployPendingSbts,
+        },
+        callbacks: {
+          setPublishStep,
+        },
+      }),
+    ).resolves.toEqual({
       status: 'completed',
       workerUrlOverride: 'https://deployed-worker.example',
       deployedPendingDrafts: [{ id: 'pending-sbt-1' }],
@@ -183,25 +188,27 @@ describe('runSessionWizardPublishController', () => {
     const deployPendingSbts = jest.fn().mockResolvedValue([{ id: 'pending-only' }]);
     const setPublishStep = jest.fn();
 
-    await expect(runSessionWizardPublishController({
-      input: {
-        publishExecutionPlan: buildPlan({
-          shouldAutoDeployWorker: false,
-          shouldDeployPendingSbts: true,
-          stepNumbers: {
-            'deploy-sbts': 1,
-          },
-        }),
-        signerAccountOverride: '0x00000000000000000000000000000000000000bb',
-      },
-      ports: {
-        deployWorker,
-        deployPendingSbts,
-      },
-      callbacks: {
-        setPublishStep,
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSessionWizardPublishController({
+        input: {
+          publishExecutionPlan: buildPlan({
+            shouldAutoDeployWorker: false,
+            shouldDeployPendingSbts: true,
+            stepNumbers: {
+              'deploy-sbts': 1,
+            },
+          }),
+          signerAccountOverride: '0x00000000000000000000000000000000000000bb',
+        },
+        ports: {
+          deployWorker,
+          deployPendingSbts,
+        },
+        callbacks: {
+          setPublishStep,
+        },
+      }),
+    ).resolves.toEqual({
       status: 'completed',
       workerUrlOverride: '',
       deployedPendingDrafts: [{ id: 'pending-only' }],
@@ -216,69 +223,77 @@ describe('runSessionWizardPublishController', () => {
   });
 
   it('maps failed deploy results to the existing worker deploy error message', async () => {
-    await expect(runSessionWizardPublishController({
-      input: {
-        publishExecutionPlan: buildPlan(),
-      },
-      ports: {
-        deployWorker: jest.fn().mockResolvedValue({
-          ok: false,
-          error: 'Worker deploy failed upstream.',
-        }),
-      },
-      callbacks: {
-        setPublishStep: jest.fn(),
-      },
-    })).rejects.toThrow('Worker deploy failed upstream.');
+    await expect(
+      runSessionWizardPublishController({
+        input: {
+          publishExecutionPlan: buildPlan(),
+        },
+        ports: {
+          deployWorker: jest.fn().mockResolvedValue({
+            ok: false,
+            error: 'Worker deploy failed upstream.',
+          }),
+        },
+        callbacks: {
+          setPublishStep: jest.fn(),
+        },
+      }),
+    ).rejects.toThrow('Worker deploy failed upstream.');
   });
 
   it('preserves thrown deploy errors', async () => {
     const error = new Error('network refused deploy request');
 
-    await expect(runSessionWizardPublishController({
-      input: {
-        publishExecutionPlan: buildPlan(),
-      },
-      ports: {
-        deployWorker: jest.fn().mockRejectedValue(error),
-      },
-      callbacks: {
-        setPublishStep: jest.fn(),
-      },
-    })).rejects.toBe(error);
+    await expect(
+      runSessionWizardPublishController({
+        input: {
+          publishExecutionPlan: buildPlan(),
+        },
+        ports: {
+          deployWorker: jest.fn().mockRejectedValue(error),
+        },
+        callbacks: {
+          setPublishStep: jest.fn(),
+        },
+      }),
+    ).rejects.toBe(error);
   });
 
   it('preserves thrown pending SBT deploy errors', async () => {
     const error = new Error('pending SBT deploy failed');
 
-    await expect(runSessionWizardPublishController({
-      input: {
-        publishExecutionPlan: buildPlan({
-          shouldAutoDeployWorker: false,
-          shouldDeployPendingSbts: true,
-          stepNumbers: {
-            'deploy-sbts': 1,
-          },
-        }),
-      },
-      ports: {
-        deployWorker: jest.fn(),
-        deployPendingSbts: jest.fn().mockRejectedValue(error),
-      },
-      callbacks: {
-        setPublishStep: jest.fn(),
-      },
-    })).rejects.toBe(error);
+    await expect(
+      runSessionWizardPublishController({
+        input: {
+          publishExecutionPlan: buildPlan({
+            shouldAutoDeployWorker: false,
+            shouldDeployPendingSbts: true,
+            stepNumbers: {
+              'deploy-sbts': 1,
+            },
+          }),
+        },
+        ports: {
+          deployWorker: jest.fn(),
+          deployPendingSbts: jest.fn().mockRejectedValue(error),
+        },
+        callbacks: {
+          setPublishStep: jest.fn(),
+        },
+      }),
+    ).rejects.toBe(error);
   });
 });
 
 describe('resolveSessionWizardPublishStartPreflightDescriptor', () => {
   it('keeps busy publish starts inert without resetting state or opening login', () => {
-    expect(resolveSessionWizardPublishStartPreflightDescriptor({
-      publishBusy: true,
-      draftSlug: 'writers-room',
-      loginComplete: true,
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishStartPreflightDescriptor({
+        publishBusy: true,
+        draftSlug: 'writers-room',
+        loginComplete: true,
+      }),
+    ).toEqual({
       status: 'blocked',
       blockedReason: 'busy',
       shouldResetPublishState: false,
@@ -288,11 +303,13 @@ describe('resolveSessionWizardPublishStartPreflightDescriptor', () => {
   });
 
   it('describes slug validation failures with the existing status text', () => {
-    expect(resolveSessionWizardPublishStartPreflightDescriptor({
-      publishBusy: false,
-      draftSlug: 'Writers Room',
-      loginComplete: true,
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishStartPreflightDescriptor({
+        publishBusy: false,
+        draftSlug: 'Writers Room',
+        loginComplete: true,
+      }),
+    ).toEqual({
       status: 'blocked',
       blockedReason: 'invalid-slug',
       shouldResetPublishState: true,
@@ -302,12 +319,14 @@ describe('resolveSessionWizardPublishStartPreflightDescriptor', () => {
   });
 
   it('describes login-required publish starts without owning modal or status effects', () => {
-    expect(resolveSessionWizardPublishStartPreflightDescriptor({
-      publishBusy: false,
-      draftSlug: 'writers-room',
-      loginComplete: false,
-      loginInProgress: false,
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishStartPreflightDescriptor({
+        publishBusy: false,
+        draftSlug: 'writers-room',
+        loginComplete: false,
+        loginInProgress: false,
+      }),
+    ).toEqual({
       status: 'blocked',
       blockedReason: 'login-required',
       shouldResetPublishState: true,
@@ -315,24 +334,30 @@ describe('resolveSessionWizardPublishStartPreflightDescriptor', () => {
       statusMessage: 'Connect your wallet to publish this session.',
     });
 
-    expect(resolveSessionWizardPublishStartPreflightDescriptor({
-      publishBusy: false,
-      draftSlug: 'writers-room',
-      loginComplete: false,
-      loginInProgress: true,
-    })).toEqual(expect.objectContaining({
-      shouldOpenLoginModal: true,
-      statusMessage: 'Finish logging in before publishing this session.',
-    }));
+    expect(
+      resolveSessionWizardPublishStartPreflightDescriptor({
+        publishBusy: false,
+        draftSlug: 'writers-room',
+        loginComplete: false,
+        loginInProgress: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        shouldOpenLoginModal: true,
+        statusMessage: 'Finish logging in before publishing this session.',
+      }),
+    );
   });
 
   it('marks valid connected publish starts ready for parent-owned admin resolution', () => {
-    expect(resolveSessionWizardPublishStartPreflightDescriptor({
-      publishBusy: false,
-      draftSlug: 'writers-room',
-      loginComplete: true,
-      loginInProgress: false,
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishStartPreflightDescriptor({
+        publishBusy: false,
+        draftSlug: 'writers-room',
+        loginComplete: true,
+        loginInProgress: false,
+      }),
+    ).toEqual({
       status: 'ready',
       blockedReason: '',
       shouldResetPublishState: true,
@@ -344,9 +369,11 @@ describe('resolveSessionWizardPublishStartPreflightDescriptor', () => {
 
 describe('resolveSessionWizardPublishAdminPreflightDescriptor', () => {
   it('describes missing publisher state without owning the async admin lookup', () => {
-    expect(resolveSessionWizardPublishAdminPreflightDescriptor({
-      resolvedPublisher: '',
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishAdminPreflightDescriptor({
+        resolvedPublisher: '',
+      }),
+    ).toEqual({
       status: 'blocked',
       blockedReason: 'publisher-required',
       signerAccountOverride: '',
@@ -354,18 +381,24 @@ describe('resolveSessionWizardPublishAdminPreflightDescriptor', () => {
       statusMessage: 'Connect your wallet to publish this session.',
     });
 
-    expect(resolveSessionWizardPublishAdminPreflightDescriptor({
-      resolvedPublisher: null,
-    })).toEqual(expect.objectContaining({
-      status: 'blocked',
-      shouldOpenLoginModal: true,
-    }));
+    expect(
+      resolveSessionWizardPublishAdminPreflightDescriptor({
+        resolvedPublisher: null,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'blocked',
+        shouldOpenLoginModal: true,
+      }),
+    );
   });
 
   it('passes through the resolved publisher for later parent-owned publish ports', () => {
-    expect(resolveSessionWizardPublishAdminPreflightDescriptor({
-      resolvedPublisher: '0x00000000000000000000000000000000000000aa',
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishAdminPreflightDescriptor({
+        resolvedPublisher: '0x00000000000000000000000000000000000000aa',
+      }),
+    ).toEqual({
       status: 'ready',
       blockedReason: '',
       signerAccountOverride: '0x00000000000000000000000000000000000000aa',
@@ -396,28 +429,23 @@ describe('resolveSessionWizardPublishMetadataUploadRequest', () => {
         signerAccountOverride: '0x00000000000000000000000000000000000000aa',
       },
     });
-    expect(Object.keys(request)).toEqual([
-      'shouldUploadMetadata',
-      'publishStep',
-      'uploadArgs',
-    ]);
-    expect(Object.keys(request.uploadArgs)).toEqual([
-      'workerUrlOverride',
-      'signerAccountOverride',
-    ]);
+    expect(Object.keys(request)).toEqual(['shouldUploadMetadata', 'publishStep', 'uploadArgs']);
+    expect(Object.keys(request.uploadArgs)).toEqual(['workerUrlOverride', 'signerAccountOverride']);
   });
 
   it('keeps no-upload plans inert while preserving the would-be request identity', () => {
-    expect(resolveSessionWizardPublishMetadataUploadRequest({
-      publishExecutionPlan: buildPlan({
-        shouldUploadMetadata: false,
-        stepNumbers: {
-          'upload-metadata': 2,
-        },
+    expect(
+      resolveSessionWizardPublishMetadataUploadRequest({
+        publishExecutionPlan: buildPlan({
+          shouldUploadMetadata: false,
+          stepNumbers: {
+            'upload-metadata': 2,
+          },
+        }),
+        workerUrlOverride: 'https://unused-worker.example.test',
+        signerAccountOverride: '0x00000000000000000000000000000000000000bb',
       }),
-      workerUrlOverride: 'https://unused-worker.example.test',
-      signerAccountOverride: '0x00000000000000000000000000000000000000bb',
-    })).toEqual({
+    ).toEqual({
       shouldUploadMetadata: false,
       publishStep: 2,
       uploadArgs: {
@@ -443,15 +471,17 @@ describe('runSessionWizardPublishMetadataUploadController', () => {
     const uploadMetadata = jest.fn();
     const setPublishStep = jest.fn();
 
-    await expect(runSessionWizardPublishMetadataUploadController({
-      request: buildUploadRequest({ shouldUploadMetadata: false }),
-      ports: {
-        uploadMetadata,
-      },
-      callbacks: {
-        setPublishStep,
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSessionWizardPublishMetadataUploadController({
+        request: buildUploadRequest({ shouldUploadMetadata: false }),
+        ports: {
+          uploadMetadata,
+        },
+        callbacks: {
+          setPublishStep,
+        },
+      }),
+    ).resolves.toEqual({
       status: 'skipped',
       uploadResult: null,
     });
@@ -474,15 +504,17 @@ describe('runSessionWizardPublishMetadataUploadController', () => {
       events.push(`setPublishStep:${step}`);
     });
 
-    await expect(runSessionWizardPublishMetadataUploadController({
-      request: buildUploadRequest(),
-      ports: {
-        uploadMetadata,
-      },
-      callbacks: {
-        setPublishStep,
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSessionWizardPublishMetadataUploadController({
+        request: buildUploadRequest(),
+        ports: {
+          uploadMetadata,
+        },
+        callbacks: {
+          setPublishStep,
+        },
+      }),
+    ).resolves.toEqual({
       status: 'completed',
       uploadResult,
     });
@@ -491,10 +523,7 @@ describe('runSessionWizardPublishMetadataUploadController', () => {
       'setPublishStep:3',
       'uploadMetadata:https://worker.example.test:0x00000000000000000000000000000000000000aa',
     ]);
-    expect(Object.keys(uploadMetadata.mock.calls[0][0])).toEqual([
-      'workerUrlOverride',
-      'signerAccountOverride',
-    ]);
+    expect(Object.keys(uploadMetadata.mock.calls[0][0])).toEqual(['workerUrlOverride', 'signerAccountOverride']);
   });
 
   it('preserves thrown upload errors without route, register, wallet, or contract callbacks', async () => {
@@ -503,13 +532,15 @@ describe('runSessionWizardPublishMetadataUploadController', () => {
       setPublishStep: jest.fn(),
     };
 
-    await expect(runSessionWizardPublishMetadataUploadController({
-      request: buildUploadRequest(),
-      ports: {
-        uploadMetadata: jest.fn().mockRejectedValue(error),
-      },
-      callbacks,
-    })).rejects.toBe(error);
+    await expect(
+      runSessionWizardPublishMetadataUploadController({
+        request: buildUploadRequest(),
+        ports: {
+          uploadMetadata: jest.fn().mockRejectedValue(error),
+        },
+        callbacks,
+      }),
+    ).rejects.toBe(error);
 
     expect(Object.keys(callbacks)).toEqual(['setPublishStep']);
   });
@@ -542,25 +573,21 @@ describe('resolveSessionWizardRegisterStepRequest', () => {
         },
       },
     });
-    expect(Object.keys(request)).toEqual([
-      'publishStep',
-      'registerGroupArgs',
-    ]);
-    expect(Object.keys(request.registerGroupArgs)).toEqual([
-      'metadataUriOverride',
-      'sessionFieldsOverride',
-    ]);
+    expect(Object.keys(request)).toEqual(['publishStep', 'registerGroupArgs']);
+    expect(Object.keys(request.registerGroupArgs)).toEqual(['metadataUriOverride', 'sessionFieldsOverride']);
   });
 
   it('keeps manual metadata fallback registration args unset while preserving the progress step', () => {
-    expect(resolveSessionWizardRegisterStepRequest({
-      publishExecutionPlan: buildPlan({
-        stepNumbers: {
-          'register-session': 1,
-        },
+    expect(
+      resolveSessionWizardRegisterStepRequest({
+        publishExecutionPlan: buildPlan({
+          stepNumbers: {
+            'register-session': 1,
+          },
+        }),
+        uploadResult: null,
       }),
-      uploadResult: null,
-    })).toEqual({
+    ).toEqual({
       publishStep: 1,
       registerGroupArgs: {
         metadataUriOverride: undefined,
@@ -572,13 +599,15 @@ describe('resolveSessionWizardRegisterStepRequest', () => {
 
 describe('resolveSessionWizardRegisterIdentityDescriptor', () => {
   it('normalizes register identity values without owning duplicate registry reads', () => {
-    expect(resolveSessionWizardRegisterIdentityDescriptor({
-      draftSlug: ' writers-room ',
-      sessionId: '00000000-0000-0000-0000-000000000001',
-      registryChainId: '84532',
-      sessionNetworkChainId: '11155420',
-      registryAddress: '0x0000000000000000000000000000000000000abc',
-    })).toEqual({
+    expect(
+      resolveSessionWizardRegisterIdentityDescriptor({
+        draftSlug: ' writers-room ',
+        sessionId: '00000000-0000-0000-0000-000000000001',
+        registryChainId: '84532',
+        sessionNetworkChainId: '11155420',
+        registryAddress: '0x0000000000000000000000000000000000000abc',
+      }),
+    ).toEqual({
       status: 'ready',
       blockedReason: '',
       registrySlug: 'writers-room',
@@ -589,13 +618,15 @@ describe('resolveSessionWizardRegisterIdentityDescriptor', () => {
   });
 
   it('keeps the on-chain general slug mapping and falls back to the session chain id', () => {
-    expect(resolveSessionWizardRegisterIdentityDescriptor({
-      draftSlug: '',
-      sessionId: '0x00000000000000000000000000000002',
-      registryChainId: '',
-      sessionNetworkChainId: 11155420,
-      registryAddress: '0x0000000000000000000000000000000000000abc',
-    })).toEqual({
+    expect(
+      resolveSessionWizardRegisterIdentityDescriptor({
+        draftSlug: '',
+        sessionId: '0x00000000000000000000000000000002',
+        registryChainId: '',
+        sessionNetworkChainId: 11155420,
+        registryAddress: '0x0000000000000000000000000000000000000abc',
+      }),
+    ).toEqual({
       status: 'ready',
       blockedReason: '',
       registrySlug: 'general',
@@ -606,13 +637,15 @@ describe('resolveSessionWizardRegisterIdentityDescriptor', () => {
   });
 
   it('describes missing session id and registry address using the existing messages', () => {
-    expect(resolveSessionWizardRegisterIdentityDescriptor({
-      draftSlug: 'writers-room',
-      sessionId: '',
-      registryChainId: 84532,
-      sessionNetworkChainId: 11155420,
-      registryAddress: '0x0000000000000000000000000000000000000abc',
-    })).toEqual({
+    expect(
+      resolveSessionWizardRegisterIdentityDescriptor({
+        draftSlug: 'writers-room',
+        sessionId: '',
+        registryChainId: 84532,
+        sessionNetworkChainId: 11155420,
+        registryAddress: '0x0000000000000000000000000000000000000abc',
+      }),
+    ).toEqual({
       status: 'blocked',
       blockedReason: 'session-id-required',
       registrySlug: 'writers-room',
@@ -621,13 +654,15 @@ describe('resolveSessionWizardRegisterIdentityDescriptor', () => {
       statusMessage: 'Session ID (UUID) is required.',
     });
 
-    expect(resolveSessionWizardRegisterIdentityDescriptor({
-      draftSlug: 'writers-room',
-      sessionId: '0x00000000000000000000000000000003',
-      registryChainId: 84532,
-      sessionNetworkChainId: 11155420,
-      registryAddress: '',
-    })).toEqual({
+    expect(
+      resolveSessionWizardRegisterIdentityDescriptor({
+        draftSlug: 'writers-room',
+        sessionId: '0x00000000000000000000000000000003',
+        registryChainId: 84532,
+        sessionNetworkChainId: 11155420,
+        registryAddress: '',
+      }),
+    ).toEqual({
       status: 'blocked',
       blockedReason: 'registry-address-required',
       registrySlug: 'writers-room',
@@ -667,11 +702,13 @@ describe('resolveSessionWizardRegisterDuplicateCheckDescriptor', () => {
   });
 
   it('keeps empty duplicate-check targets inert for callers that own registry execution', () => {
-    expect(resolveSessionWizardRegisterDuplicateCheckDescriptor({
-      registryChainId: '',
-      registrySlug: '',
-      sessionIdHexValue: '',
-    })).toEqual({
+    expect(
+      resolveSessionWizardRegisterDuplicateCheckDescriptor({
+        registryChainId: '',
+        registrySlug: '',
+        sessionIdHexValue: '',
+      }),
+    ).toEqual({
       chainId: 0,
       registrySlug: '',
       sessionIdHexValue: '',
@@ -689,18 +726,16 @@ describe('resolveSessionWizardRegisterDuplicateCheckDescriptor', () => {
       sessionIdHexValue: '0x00000000000000000000000000000001',
     });
 
-    expect(isSessionWizardRegisterDuplicatePreflightError(
-      'Session slug already exists on-chain: writers-room',
-      descriptor
-    )).toBe(true);
-    expect(isSessionWizardRegisterDuplicatePreflightError(
-      'Session ID already exists on-chain. Generate a new session ID.',
-      descriptor
-    )).toBe(true);
-    expect(isSessionWizardRegisterDuplicatePreflightError(
-      'could not detect network',
-      descriptor
-    )).toBe(false);
+    expect(
+      isSessionWizardRegisterDuplicatePreflightError('Session slug already exists on-chain: writers-room', descriptor),
+    ).toBe(true);
+    expect(
+      isSessionWizardRegisterDuplicatePreflightError(
+        'Session ID already exists on-chain. Generate a new session ID.',
+        descriptor,
+      ),
+    ).toBe(true);
+    expect(isSessionWizardRegisterDuplicatePreflightError('could not detect network', descriptor)).toBe(false);
   });
 });
 
@@ -778,62 +813,74 @@ describe('resolveSessionWizardRegisterArgsDescriptor', () => {
   });
 
   it('falls back to manual or uploaded metadata and pending session fields', () => {
-    expect(resolveSessionWizardRegisterArgsDescriptor({
-      registryChainId: '',
-      sessionNetworkChainId: 11155420,
-      metadataUriOverride: '',
-      manualMetadataUrl: ' ar://manual-metadata ',
-      metadataUrl: 'ar://uploaded-metadata',
-      sessionFieldsOverride: undefined,
-      pendingOnChainFields: {
-        name: 'Pending Fields',
-      },
-    })).toEqual(expect.objectContaining({
-      metadataUriMissing: false,
-      registerArgs: expect.objectContaining({
-        chainId: 11155420,
-        sessionChainId: 11155420,
-        metadataURI: 'ar://manual-metadata',
-        sessionFields: {
+    expect(
+      resolveSessionWizardRegisterArgsDescriptor({
+        registryChainId: '',
+        sessionNetworkChainId: 11155420,
+        metadataUriOverride: '',
+        manualMetadataUrl: ' ar://manual-metadata ',
+        metadataUrl: 'ar://uploaded-metadata',
+        sessionFieldsOverride: undefined,
+        pendingOnChainFields: {
           name: 'Pending Fields',
         },
       }),
-    }));
-
-    expect(resolveSessionWizardRegisterArgsDescriptor({
-      registryChainId: '',
-      sessionNetworkChainId: 11155420,
-      metadataUriOverride: '',
-      manualMetadataUrl: '',
-      metadataUrl: 'ar://uploaded-metadata',
-      sessionFieldsOverride: null,
-      pendingOnChainFields: {
-        name: 'Pending Fields',
-      },
-    })).toEqual(expect.objectContaining({
-      metadataUriMissing: false,
-      registerArgs: expect.objectContaining({
-        metadataURI: 'ar://uploaded-metadata',
-        sessionFields: {},
+    ).toEqual(
+      expect.objectContaining({
+        metadataUriMissing: false,
+        registerArgs: expect.objectContaining({
+          chainId: 11155420,
+          sessionChainId: 11155420,
+          metadataURI: 'ar://manual-metadata',
+          sessionFields: {
+            name: 'Pending Fields',
+          },
+        }),
       }),
-    }));
+    );
+
+    expect(
+      resolveSessionWizardRegisterArgsDescriptor({
+        registryChainId: '',
+        sessionNetworkChainId: 11155420,
+        metadataUriOverride: '',
+        manualMetadataUrl: '',
+        metadataUrl: 'ar://uploaded-metadata',
+        sessionFieldsOverride: null,
+        pendingOnChainFields: {
+          name: 'Pending Fields',
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        metadataUriMissing: false,
+        registerArgs: expect.objectContaining({
+          metadataURI: 'ar://uploaded-metadata',
+          sessionFields: {},
+        }),
+      }),
+    );
   });
 
   it('reports missing metadata without throwing or calling side-effect ports', () => {
-    expect(resolveSessionWizardRegisterArgsDescriptor({
-      registryChainId: 11155420,
-      sessionNetworkChainId: 11155420,
-      metadataUriOverride: '',
-      manualMetadataUrl: '',
-      metadataUrl: '',
-      gateSelectionsSnapshot: [],
-      pendingOnChainFields: {},
-    })).toEqual(expect.objectContaining({
-      metadataUriMissing: true,
-      registerArgs: expect.objectContaining({
-        metadataURI: '',
+    expect(
+      resolveSessionWizardRegisterArgsDescriptor({
+        registryChainId: 11155420,
+        sessionNetworkChainId: 11155420,
+        metadataUriOverride: '',
+        manualMetadataUrl: '',
+        metadataUrl: '',
+        gateSelectionsSnapshot: [],
+        pendingOnChainFields: {},
       }),
-    }));
+    ).toEqual(
+      expect.objectContaining({
+        metadataUriMissing: true,
+        registerArgs: expect.objectContaining({
+          metadataURI: '',
+        }),
+      }),
+    );
   });
 });
 
@@ -858,28 +905,25 @@ describe('resolveSessionWizardRegisterPreflightDescriptor', () => {
       },
     });
 
-    expect(descriptor).toEqual(expect.objectContaining({
-      canRegister: true,
-      metadataUriMissing: false,
-      statusMessage: '',
-      registerArgs: expect.objectContaining({
-        chainId: 84532,
-        registryAddress: '0x0000000000000000000000000000000000000abc',
-        slug: 'writers-room',
-        sessionId: '0x00000000000000000000000000000001',
-        sessionChainId: 11155420,
-        metadataURI: 'ar://uploaded-metadata',
-        sessionFields: {
-          name: 'Writers Room',
-        },
+    expect(descriptor).toEqual(
+      expect.objectContaining({
+        canRegister: true,
+        metadataUriMissing: false,
+        statusMessage: '',
+        registerArgs: expect.objectContaining({
+          chainId: 84532,
+          registryAddress: '0x0000000000000000000000000000000000000abc',
+          slug: 'writers-room',
+          sessionId: '0x00000000000000000000000000000001',
+          sessionChainId: 11155420,
+          metadataURI: 'ar://uploaded-metadata',
+          sessionFields: {
+            name: 'Writers Room',
+          },
+        }),
       }),
-    }));
-    expect(Object.keys(descriptor)).toEqual([
-      'metadataUriMissing',
-      'registerArgs',
-      'canRegister',
-      'statusMessage',
-    ]);
+    );
+    expect(Object.keys(descriptor)).toEqual(['metadataUriMissing', 'registerArgs', 'canRegister', 'statusMessage']);
   });
 
   it('describes missing-metadata preflight with the existing status text and no side-effect ports', () => {
@@ -892,32 +936,38 @@ describe('resolveSessionWizardRegisterPreflightDescriptor', () => {
       pendingOnChainFields: {},
     });
 
-    expect(descriptor).toEqual(expect.objectContaining({
-      canRegister: false,
-      metadataUriMissing: true,
-      statusMessage: 'Upload metadata or provide a manual Arweave URI.',
-      registerArgs: expect.objectContaining({
-        metadataURI: '',
+    expect(descriptor).toEqual(
+      expect.objectContaining({
+        canRegister: false,
+        metadataUriMissing: true,
+        statusMessage: 'Upload metadata or provide a manual Arweave URI.',
+        registerArgs: expect.objectContaining({
+          metadataURI: '',
+        }),
       }),
-    }));
+    );
   });
 
   it('allows callers to override the blocked metadata message without changing register args', () => {
-    expect(resolveSessionWizardRegisterPreflightDescriptor({
-      registryChainId: 11155420,
-      sessionNetworkChainId: 11155420,
-      metadataUriOverride: '',
-      manualMetadataUrl: '',
-      metadataUrl: '',
-      missingMetadataMessage: 'Provide metadata first.',
-    })).toEqual(expect.objectContaining({
-      canRegister: false,
-      statusMessage: 'Provide metadata first.',
-      registerArgs: expect.objectContaining({
-        chainId: 11155420,
-        metadataURI: '',
+    expect(
+      resolveSessionWizardRegisterPreflightDescriptor({
+        registryChainId: 11155420,
+        sessionNetworkChainId: 11155420,
+        metadataUriOverride: '',
+        manualMetadataUrl: '',
+        metadataUrl: '',
+        missingMetadataMessage: 'Provide metadata first.',
       }),
-    }));
+    ).toEqual(
+      expect.objectContaining({
+        canRegister: false,
+        statusMessage: 'Provide metadata first.',
+        registerArgs: expect.objectContaining({
+          chainId: 11155420,
+          metadataURI: '',
+        }),
+      }),
+    );
   });
 });
 
@@ -956,41 +1006,42 @@ describe('resolveSessionWizardRegisterSuccessSettlementDescriptor', () => {
       'nextSessionIdStatus',
       'registryRefreshArgs',
     ]);
-    expect(Object.keys(descriptor.registryRefreshArgs)).toEqual([
-      'chainId',
-      'slug',
-      'providerLike',
-      'account',
-    ]);
+    expect(Object.keys(descriptor.registryRefreshArgs)).toEqual(['chainId', 'slug', 'providerLike', 'account']);
   });
 
   it('falls back to raw session IDs and the session chain for malformed registry input', () => {
-    expect(resolveSessionWizardRegisterSuccessSettlementDescriptor({
-      registrySlug: '',
-      sessionIdHexValue: 'not-a-uuid',
-      registryChainId: '',
-      sessionNetworkChainId: 11155420,
-      origin: 'https://context.example',
-    })).toEqual(expect.objectContaining({
-      formattedSessionId: 'not-a-uuid',
-      sessionUrl: '',
-      adminUrl: 'https://context.example/admin?sessionId=not-a-uuid&chainId=11155420',
-      registryRefreshArgs: expect.objectContaining({
-        chainId: 11155420,
-        slug: '',
+    expect(
+      resolveSessionWizardRegisterSuccessSettlementDescriptor({
+        registrySlug: '',
+        sessionIdHexValue: 'not-a-uuid',
+        registryChainId: '',
+        sessionNetworkChainId: 11155420,
+        origin: 'https://context.example',
       }),
-    }));
+    ).toEqual(
+      expect.objectContaining({
+        formattedSessionId: 'not-a-uuid',
+        sessionUrl: '',
+        adminUrl: 'https://context.example/admin?sessionId=not-a-uuid&chainId=11155420',
+        registryRefreshArgs: expect.objectContaining({
+          chainId: 11155420,
+          slug: '',
+        }),
+      }),
+    );
   });
 });
 
 describe('resolveSessionWizardRegisterFailureSettlementDescriptor', () => {
   it('describes transaction hash recovery and status text for register failures', () => {
-    expect(resolveSessionWizardRegisterFailureSettlementDescriptor({
-      error: {
-        transactionHash: '0xaaa',
-        message: 'registry write reverted',
-      },
-    })).toEqual({
+    expect(
+      resolveSessionWizardRegisterFailureSettlementDescriptor({
+        error: {
+          transactionHash: '0xaaa',
+          message: 'registry write reverted',
+        },
+      }),
+    ).toEqual({
       txEntry: {
         action: 'createSession',
         hash: '0xaaa',
@@ -1000,13 +1051,15 @@ describe('resolveSessionWizardRegisterFailureSettlementDescriptor', () => {
   });
 
   it('falls back to nested transaction hashes and default failure copy', () => {
-    expect(resolveSessionWizardRegisterFailureSettlementDescriptor({
-      error: {
-        transaction: {
-          hash: '0xbbb',
+    expect(
+      resolveSessionWizardRegisterFailureSettlementDescriptor({
+        error: {
+          transaction: {
+            hash: '0xbbb',
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       txEntry: {
         action: 'createSession',
         hash: '0xbbb',
@@ -1016,9 +1069,11 @@ describe('resolveSessionWizardRegisterFailureSettlementDescriptor', () => {
   });
 
   it('keeps malformed errors inert without creating tx entries', () => {
-    expect(resolveSessionWizardRegisterFailureSettlementDescriptor({
-      error: 'failed',
-    })).toEqual({
+    expect(
+      resolveSessionWizardRegisterFailureSettlementDescriptor({
+        error: 'failed',
+      }),
+    ).toEqual({
       txEntry: null,
       errorMessage: 'Failed to register session.',
     });
@@ -1043,15 +1098,19 @@ describe('appendSessionWizardRegisterTxEntry', () => {
   it('preserves existing state for duplicate or empty tx entries', () => {
     const previousEntries = [{ action: 'createSession', hash: '0xaaa' }];
 
-    expect(appendSessionWizardRegisterTxEntry(previousEntries, {
-      action: 'createSession',
-      hash: '0xaaa',
-    })).toBe(previousEntries);
+    expect(
+      appendSessionWizardRegisterTxEntry(previousEntries, {
+        action: 'createSession',
+        hash: '0xaaa',
+      }),
+    ).toBe(previousEntries);
     expect(appendSessionWizardRegisterTxEntry(previousEntries, null)).toBe(previousEntries);
-    expect(appendSessionWizardRegisterTxEntry('not-array', {
-      action: 'createSession',
-      hash: '',
-    })).toEqual([]);
+    expect(
+      appendSessionWizardRegisterTxEntry('not-array', {
+        action: 'createSession',
+        hash: '',
+      }),
+    ).toEqual([]);
   });
 });
 
@@ -1065,12 +1124,14 @@ describe('resolveSessionWizardPublishCompletionRequest', () => {
       },
     });
 
-    expect(resolveSessionWizardPublishCompletionRequest({
-      publishExecutionPlan,
-      deployedPendingDrafts,
-      pendingDraftSnapshot,
-      sessionSlug: ' writers-room ',
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishCompletionRequest({
+        publishExecutionPlan,
+        deployedPendingDrafts,
+        pendingDraftSnapshot,
+        sessionSlug: ' writers-room ',
+      }),
+    ).toEqual({
       publishExecutionPlan,
       deployedPendingDrafts,
       pendingDraftSnapshot,
@@ -1085,12 +1146,14 @@ describe('resolveSessionWizardPublishCompletionRequest', () => {
       },
     });
 
-    expect(resolveSessionWizardPublishCompletionRequest({
-      publishExecutionPlan,
-      deployedPendingDrafts: null,
-      pendingDraftSnapshot: null,
-      sessionSlug: null,
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishCompletionRequest({
+        publishExecutionPlan,
+        deployedPendingDrafts: null,
+        pendingDraftSnapshot: null,
+        sessionSlug: null,
+      }),
+    ).toEqual({
       publishExecutionPlan,
       deployedPendingDrafts: [],
       pendingDraftSnapshot: [],
@@ -1101,18 +1164,22 @@ describe('resolveSessionWizardPublishCompletionRequest', () => {
 
 describe('resolveSessionWizardPublishFailureSettlementDescriptor', () => {
   it('describes publish failure status and progress reset without owning state effects', () => {
-    expect(resolveSessionWizardPublishFailureSettlementDescriptor({
-      error: new Error('worker deploy rejected'),
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishFailureSettlementDescriptor({
+        error: new Error('worker deploy rejected'),
+      }),
+    ).toEqual({
       errorMessage: 'worker deploy rejected',
       publishStep: 0,
     });
   });
 
   it('falls back to the existing publish failure copy for malformed errors', () => {
-    expect(resolveSessionWizardPublishFailureSettlementDescriptor({
-      error: 'failed',
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishFailureSettlementDescriptor({
+        error: 'failed',
+      }),
+    ).toEqual({
       errorMessage: 'Publish failed.',
       publishStep: 0,
     });
@@ -1122,9 +1189,11 @@ describe('resolveSessionWizardPublishFailureSettlementDescriptor', () => {
       publishStep: 0,
     });
 
-    expect(resolveSessionWizardPublishFailureSettlementDescriptor({
-      error: { message: '' },
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishFailureSettlementDescriptor({
+        error: { message: '' },
+      }),
+    ).toEqual({
       errorMessage: 'Publish failed.',
       publishStep: 0,
     });
@@ -1134,12 +1203,14 @@ describe('resolveSessionWizardPublishFailureSettlementDescriptor', () => {
 describe('runSessionWizardPublishCompletionController', () => {
   it('promotes pending drafts, publishes links, clears drafts, and marks done in order', () => {
     const events: string[] = [];
-    const normalizedDeployedDrafts = [{
-      predictedAddress: '0x00000000000000000000000000000000000000aA',
-      deployedAddress: '0x00000000000000000000000000000000000000aA',
-      displayName: 'Newly Deployed Group',
-      deployed: true,
-    }];
+    const normalizedDeployedDrafts = [
+      {
+        predictedAddress: '0x00000000000000000000000000000000000000aA',
+        deployedAddress: '0x00000000000000000000000000000000000000aA',
+        displayName: 'Newly Deployed Group',
+        deployed: true,
+      },
+    ];
     const resumedDeployedDraft = {
       predictedAddress: '0x00000000000000000000000000000000000000Bb',
       deployedAddress: '0x00000000000000000000000000000000000000Bb',
@@ -1160,11 +1231,13 @@ describe('runSessionWizardPublishCompletionController', () => {
         deployed: false,
       },
     ];
-    const publishedLinks = [{
-      address: '0x00000000000000000000000000000000000000aa',
-      href: '/sbt/0xaa',
-      label: 'Newly Deployed Group',
-    }];
+    const publishedLinks = [
+      {
+        address: '0x00000000000000000000000000000000000000aa',
+        href: '/sbt/0xaa',
+        label: 'Newly Deployed Group',
+      },
+    ];
     const normalizePendingDrafts = jest.fn((drafts) => {
       events.push('normalizePendingDrafts');
       expect(drafts).toEqual([{ id: 'raw-deployed-draft' }]);
@@ -1172,10 +1245,7 @@ describe('runSessionWizardPublishCompletionController', () => {
     });
     const promoteDeployedPendingSbtSelections = jest.fn((drafts) => {
       events.push('promoteDeployedPendingSbtSelections');
-      expect(drafts).toEqual([
-        ...normalizedDeployedDrafts,
-        resumedDeployedDraft,
-      ]);
+      expect(drafts).toEqual([...normalizedDeployedDrafts, resumedDeployedDraft]);
     });
     const buildPublishedPendingSbtLinks = jest.fn((args) => {
       events.push('buildPublishedPendingSbtLinks');
@@ -1197,28 +1267,30 @@ describe('runSessionWizardPublishCompletionController', () => {
       events.push(`setPublishStep:${step}`);
     });
 
-    expect(runSessionWizardPublishCompletionController({
-      input: {
-        publishExecutionPlan: buildPlan({
-          stepNumbers: {
-            done: 5,
-          },
-        }),
-        deployedPendingDrafts: [{ id: 'raw-deployed-draft' }],
-        pendingDraftSnapshot,
-        sessionSlug: ' writers-room ',
-      },
-      ports: {
-        normalizePendingDrafts,
-        buildPublishedPendingSbtLinks,
-      },
-      callbacks: {
-        promoteDeployedPendingSbtSelections,
-        setPublishedPendingSbtLinks,
-        clearPendingSbtDrafts,
-        setPublishStep,
-      },
-    })).toEqual({
+    expect(
+      runSessionWizardPublishCompletionController({
+        input: {
+          publishExecutionPlan: buildPlan({
+            stepNumbers: {
+              done: 5,
+            },
+          }),
+          deployedPendingDrafts: [{ id: 'raw-deployed-draft' }],
+          pendingDraftSnapshot,
+          sessionSlug: ' writers-room ',
+        },
+        ports: {
+          normalizePendingDrafts,
+          buildPublishedPendingSbtLinks,
+        },
+        callbacks: {
+          promoteDeployedPendingSbtSelections,
+          setPublishedPendingSbtLinks,
+          clearPendingSbtDrafts,
+          setPublishStep,
+        },
+      }),
+    ).toEqual({
       normalizedDeployedPendingDrafts: normalizedDeployedDrafts,
       publishedPendingSbtLinks: publishedLinks,
     });
@@ -1239,30 +1311,32 @@ describe('runSessionWizardPublishCompletionController', () => {
     const clearPendingSbtDrafts = jest.fn();
     const setPublishStep = jest.fn();
 
-    expect(() => runSessionWizardPublishCompletionController({
-      input: {
-        publishExecutionPlan: buildPlan({
-          stepNumbers: {
-            done: 3,
-          },
-        }),
-        deployedPendingDrafts: [{ predictedAddress: '0x1', deployed: true }],
-        pendingDraftSnapshot: [],
-        sessionSlug: 'writers-room',
-      },
-      ports: {
-        normalizePendingDrafts: jest.fn((drafts) => drafts),
-        buildPublishedPendingSbtLinks: jest.fn(() => []),
-      },
-      callbacks: {
-        promoteDeployedPendingSbtSelections: jest.fn(() => {
-          throw error;
-        }),
-        setPublishedPendingSbtLinks,
-        clearPendingSbtDrafts,
-        setPublishStep,
-      },
-    })).toThrow(error);
+    expect(() =>
+      runSessionWizardPublishCompletionController({
+        input: {
+          publishExecutionPlan: buildPlan({
+            stepNumbers: {
+              done: 3,
+            },
+          }),
+          deployedPendingDrafts: [{ predictedAddress: '0x1', deployed: true }],
+          pendingDraftSnapshot: [],
+          sessionSlug: 'writers-room',
+        },
+        ports: {
+          normalizePendingDrafts: jest.fn((drafts) => drafts),
+          buildPublishedPendingSbtLinks: jest.fn(() => []),
+        },
+        callbacks: {
+          promoteDeployedPendingSbtSelections: jest.fn(() => {
+            throw error;
+          }),
+          setPublishedPendingSbtLinks,
+          clearPendingSbtDrafts,
+          setPublishStep,
+        },
+      }),
+    ).toThrow(error);
 
     expect(setPublishedPendingSbtLinks).not.toHaveBeenCalled();
     expect(clearPendingSbtDrafts).not.toHaveBeenCalled();
@@ -1330,18 +1404,20 @@ describe('runSessionWizardRegisterStepController', () => {
       events.push(`setStatus:${status}`);
     });
 
-    await expect(runSessionWizardRegisterStepController({
-      input: {
-        registerArgs,
-      },
-      ports: {
-        registerSessionOnChain,
-      },
-      callbacks: {
-        setRegisterTxs,
-        setStatus,
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSessionWizardRegisterStepController({
+        input: {
+          registerArgs,
+        },
+        ports: {
+          registerSessionOnChain,
+        },
+        callbacks: {
+          setRegisterTxs,
+          setStatus,
+        },
+      }),
+    ).resolves.toEqual({
       status: 'completed',
       registerResult: { txs: finalTxs },
     });
@@ -1385,18 +1461,20 @@ describe('runSessionWizardRegisterStepController', () => {
     const error = new Error('registry write reverted');
     const setStatus = jest.fn();
 
-    await expect(runSessionWizardRegisterStepController({
-      input: {
-        registerArgs,
-      },
-      ports: {
-        registerSessionOnChain: jest.fn().mockRejectedValue(error),
-      },
-      callbacks: {
-        setRegisterTxs: jest.fn(),
-        setStatus,
-      },
-    })).rejects.toBe(error);
+    await expect(
+      runSessionWizardRegisterStepController({
+        input: {
+          registerArgs,
+        },
+        ports: {
+          registerSessionOnChain: jest.fn().mockRejectedValue(error),
+        },
+        callbacks: {
+          setRegisterTxs: jest.fn(),
+          setStatus,
+        },
+      }),
+    ).rejects.toBe(error);
 
     expect(setStatus).toHaveBeenCalledTimes(1);
     expect(setStatus).toHaveBeenCalledWith('Registering session on-chain…');

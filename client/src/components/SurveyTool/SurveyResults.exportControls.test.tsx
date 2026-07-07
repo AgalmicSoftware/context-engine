@@ -205,8 +205,9 @@ describe('SurveyResults export/view controls', () => {
 
     const menu = document.querySelector('.dropdown-menu');
     expect(menu).not.toBeNull();
-    const optionLabels = Array.from((menu as HTMLElement).querySelectorAll('button.dropdown-item'))
-      .map((item) => item.textContent?.trim());
+    const optionLabels = Array.from((menu as HTMLElement).querySelectorAll('button.dropdown-item')).map((item) =>
+      item.textContent?.trim(),
+    );
 
     expect(optionLabels).toEqual([
       'CSV: Questions',

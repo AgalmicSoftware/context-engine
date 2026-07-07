@@ -47,13 +47,13 @@ type FetchLogsWithProviderFn = (
   depth?: number,
   maxDepth?: number,
   progressState?: FetchLogsProgressState | null,
-  rpcDebugContext?: RpcDebugContext | null
+  rpcDebugContext?: RpcDebugContext | null,
 ) => Promise<AnyRecord[]>;
 type CallWithRetryFn = (
   fn: () => Promise<AnyRecord[]>,
   label: string,
   meta: AnyRecord,
-  opts: AnyRecord
+  opts: AnyRecord,
 ) => Promise<AnyRecord[]>;
 
 const rpcLogger = createLogger('rpc', { prefix: '[RPC_DEBUG]' });
@@ -127,10 +127,7 @@ export function isLogsRangeTooLargeError(err: unknown): boolean {
       if (currentRecord.data && typeof currentRecord.data === 'object') stack.push(currentRecord.data);
       if (typeof currentRecord.body === 'string') {
         const bodyStr = currentRecord.body.trim();
-        if (
-          (bodyStr.startsWith('{') && bodyStr.endsWith('}')) ||
-          (bodyStr.startsWith('[') && bodyStr.endsWith(']'))
-        ) {
+        if ((bodyStr.startsWith('{') && bodyStr.endsWith('}')) || (bodyStr.startsWith('[') && bodyStr.endsWith(']'))) {
           try {
             stack.push(JSON.parse(bodyStr));
           } catch {}
@@ -150,13 +147,14 @@ export function isLogsRangeTooLargeError(err: unknown): boolean {
       candidate?.error?.reason ||
       stringMsg ||
       ''
-    ).toString().toLowerCase();
+    )
+      .toString()
+      .toLowerCase();
     const body = typeof candidate?.body === 'string' ? candidate.body.toLowerCase() : '';
 
     const combined = `${primaryMsg} ${body}`;
 
-    const hasMoreThanResults =
-      combined.includes('more than') && combined.includes('result');
+    const hasMoreThanResults = combined.includes('more than') && combined.includes('result');
 
     const hasExceedMaxRange =
       combined.includes('exceed maximum block range') ||
@@ -165,11 +163,9 @@ export function isLogsRangeTooLargeError(err: unknown): boolean {
       combined.includes('query exceeds max block range') ||
       combined.includes('max block range');
 
-    const hasRangesOverBlocks =
-      combined.includes('ranges over') && combined.includes('blocks');
+    const hasRangesOverBlocks = combined.includes('ranges over') && combined.includes('blocks');
 
-    const hasLimitedToRange =
-      combined.includes('limited to') && combined.includes('range');
+    const hasLimitedToRange = combined.includes('limited to') && combined.includes('range');
 
     const hasResponseTooLarge =
       combined.includes('query returned more') ||
@@ -208,11 +204,7 @@ export function isLogsRangeTooLargeError(err: unknown): boolean {
  * Same as existing fetchLogsSmart but against a specific provider.
  * (We keep the original untouched for default paths.)
  */
-export const splitBlockRange = (
-  fromBlock: unknown,
-  toBlock: unknown,
-  depth: number
-): BlockRangeSegment[] => {
+export const splitBlockRange = (fromBlock: unknown, toBlock: unknown, depth: number): BlockRangeSegment[] => {
   if (!Number.isFinite(Number(fromBlock)) || !Number.isFinite(Number(toBlock))) return [];
   if (Number(fromBlock) >= Number(toBlock)) return [];
   const mid = Math.floor((Number(fromBlock) + Number(toBlock)) / 2);
@@ -263,7 +255,7 @@ export const normalizeRpcDebugContext = (contextIn: unknown): RpcDebugContext | 
 export const withProviderRpcDebugContext = async (
   provider: unknown,
   contextIn: unknown,
-  fn: (() => Promise<unknown>) | (() => unknown)
+  fn: (() => Promise<unknown>) | (() => unknown),
 ): Promise<unknown> => {
   if (typeof fn !== 'function') return undefined;
   const context = normalizeRpcDebugContext(contextIn);
@@ -283,11 +275,7 @@ export const withProviderRpcDebugContext = async (
 export const isNonRecoverableGetLogsError = (err: unknown): boolean => {
   const errorLike = err as AnyRecord;
   const msg = toLower(
-    errorLike?.message ||
-    errorLike?.error?.message ||
-    errorLike?.reason ||
-    errorLike?.error?.reason ||
-    ''
+    errorLike?.message || errorLike?.error?.message || errorLike?.reason || errorLike?.error?.reason || '',
   );
   if (!msg) return false;
   return (
@@ -322,7 +310,7 @@ export function createFetchLogsSmartWithProvider({
     depth = 0,
     maxDepth = 20,
     progressState = null,
-    rpcDebugContext = null
+    rpcDebugContext = null,
   ) {
     if (fromBlock > toBlock) return [];
 
@@ -337,16 +325,16 @@ export function createFetchLogsSmartWithProvider({
       });
     }
 
-    const providerMeta =
-      providerForLogs && typeof providerForLogs === 'object'
-        ? providerForLogs.__CE_RPC_META
-        : null;
+    const providerMeta = providerForLogs && typeof providerForLogs === 'object' ? providerForLogs.__CE_RPC_META : null;
     const maxConcurrencyOverride = Number(progressState?.maxConcurrency || 0);
-    const maxConcurrency = Number.isFinite(maxConcurrencyOverride) && maxConcurrencyOverride > 0
-      ? Math.max(1, Math.floor(maxConcurrencyOverride))
-      : readGetLogsMaxConcurrency();
+    const maxConcurrency =
+      Number.isFinite(maxConcurrencyOverride) && maxConcurrencyOverride > 0
+        ? Math.max(1, Math.floor(maxConcurrencyOverride))
+        : readGetLogsMaxConcurrency();
     const getLogsRetryMax = readGetLogsMaxRetries();
-    const queue: BlockRangeSegment[] = [{ fromBlock: Number(fromBlock), toBlock: Number(toBlock), depth: Number(depth) || 0 }];
+    const queue: BlockRangeSegment[] = [
+      { fromBlock: Number(fromBlock), toBlock: Number(toBlock), depth: Number(depth) || 0 },
+    ];
     const collectedLogs: AnyRecord[] = [];
     let didLogPreSplit = false;
     let didLogSplitOnError = false;
@@ -356,9 +344,7 @@ export function createFetchLogsSmartWithProvider({
       const scanned = Math.max(0, Number(scanTo) - Number(scanFrom) + 1);
       const totalBlocks = Number(progressState.totalBlocks || 0);
       progressState.scannedBlocks = Number(progressState.scannedBlocks || 0) + scanned;
-      const remainingBlocks = totalBlocks > 0
-        ? Math.max(0, totalBlocks - progressState.scannedBlocks)
-        : 0;
+      const remainingBlocks = totalBlocks > 0 ? Math.max(0, totalBlocks - progressState.scannedBlocks) : 0;
       progressState.onProgress({
         phase: progressState.phase,
         fromBlock: progressState.fromBlock,
@@ -373,7 +359,7 @@ export function createFetchLogsSmartWithProvider({
     };
 
     const processSegment = async (
-      segment: BlockRangeSegment
+      segment: BlockRangeSegment,
     ): Promise<{ logs: AnyRecord[]; splits: BlockRangeSegment[] }> => {
       const segFrom = Number(segment?.fromBlock);
       const segTo = Number(segment?.toBlock);
@@ -383,10 +369,7 @@ export function createFetchLogsSmartWithProvider({
       }
 
       const rangeSize = segTo - segFrom + 1;
-      const shouldPreSplit =
-        Number.isFinite(rangeSize) &&
-        rangeSize > PATH_LOG_MAX_RANGE &&
-        segDepth < maxDepth;
+      const shouldPreSplit = Number.isFinite(rangeSize) && rangeSize > PATH_LOG_MAX_RANGE && segDepth < maxDepth;
 
       if (shouldPreSplit) {
         const splits = splitBlockRange(segFrom, segTo, segDepth);
@@ -408,27 +391,30 @@ export function createFetchLogsSmartWithProvider({
       }
 
       try {
-        const requestRpcDebugContext = rpcDebugContext && typeof rpcDebugContext === 'object'
-          ? {
-            ...rpcDebugContext,
-            method: 'eth_getLogs',
-            fromBlock: segFrom,
-            toBlock: segTo,
-          }
-          : rpcDebugContext;
+        const requestRpcDebugContext =
+          rpcDebugContext && typeof rpcDebugContext === 'object'
+            ? {
+                ...rpcDebugContext,
+                method: 'eth_getLogs',
+                fromBlock: segFrom,
+                toBlock: segTo,
+              }
+            : rpcDebugContext;
         const logs = await callWithRetry(
-          () => withProviderRpcDebugContext(
-            providerForLogs,
-            requestRpcDebugContext,
-            () => providerForLogs.getLogs?.({ ...filter, fromBlock: segFrom, toBlock: segTo }) as Promise<AnyRecord[]>
-          ) as Promise<AnyRecord[]>,
+          () =>
+            withProviderRpcDebugContext(
+              providerForLogs,
+              requestRpcDebugContext,
+              () =>
+                providerForLogs.getLogs?.({ ...filter, fromBlock: segFrom, toBlock: segTo }) as Promise<AnyRecord[]>,
+            ) as Promise<AnyRecord[]>,
           `getLogs [${segFrom}-${segTo}]`,
           { op: 'getLogs', address: addr || null, fromBlock: segFrom, toBlock: segTo },
           {
             maxRetries: getLogsRetryMax,
             initialDelayMs: INITIAL_DELAY_MS_DEFAULT,
             delayMultiplier: DELAY_MULTIPLIER_DEFAULT,
-          }
+          },
         );
         if (progressState && typeof progressState.onLogs === 'function') {
           await progressState.onLogs({
@@ -460,9 +446,10 @@ export function createFetchLogsSmartWithProvider({
         if (shouldSplit && segDepth < maxDepth) {
           const splits = splitBlockRange(segFrom, segTo, segDepth);
           if (!splits.length) {
-            const unsplittableRangeError = err instanceof Error
-              ? err
-              : new Error(`RPC getLogs range too large and cannot split further [${segFrom}-${segTo}]`);
+            const unsplittableRangeError =
+              err instanceof Error
+                ? err
+                : new Error(`RPC getLogs range too large and cannot split further [${segFrom}-${segTo}]`);
             (unsplittableRangeError as AnyRecord).__ce_non_recoverable_getlogs = true;
             (unsplittableRangeError as AnyRecord).__ce_range_too_large_unsplittable = true;
             (unsplittableRangeError as AnyRecord).__ce_getlogs_segment = {

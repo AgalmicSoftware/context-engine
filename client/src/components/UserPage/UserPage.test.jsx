@@ -47,9 +47,7 @@ const makeInstance = (props = {}) => {
 
   instance._isMounted = true;
   instance.setState = jest.fn((update, cb) => {
-    const patch = typeof update === 'function'
-      ? update(instance.state, instance.props)
-      : update;
+    const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
     if (patch && typeof patch === 'object') {
       instance.state = { ...instance.state, ...patch };
     }
@@ -87,17 +85,21 @@ const makeAnalysisCacheInstance = (props = {}) => {
   instance.state = {
     ...instance.state,
     username: 'Cache Test User',
-    sbtList: [{
-      sbtInfo: {
-        name: 'Cache Badge',
-        sbtAddress: '0x00000000000000000000000000000000000000cc',
+    sbtList: [
+      {
+        sbtInfo: {
+          name: 'Cache Badge',
+          sbtAddress: '0x00000000000000000000000000000000000000cc',
+        },
       },
-    }],
-    questionResponseInfo: [{
-      id: 'q1',
-      type: 'freeform',
-      prompt: 'What should be cached?',
-    }],
+    ],
+    questionResponseInfo: [
+      {
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'What should be cached?',
+      },
+    ],
     detailedQuestionResponses: {
       q1: {
         answer: { value: 'A deterministic answer' },
@@ -111,18 +113,18 @@ const makeAnalysisCacheInstance = (props = {}) => {
   };
 
   jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue([slug]);
-  jest.spyOn(instance, '_getSessionConfigForSlugExact').mockImplementation((candidate) => (
+  jest.spyOn(instance, '_getSessionConfigForSlugExact').mockImplementation((candidate) =>
     candidate === slug
       ? {
-        slug,
-        ai: {
-          mode: 'openai',
-          models: { thinking: 'gpt-5' },
-          modelProviders: { thinking: 'openai' },
-        },
-      }
-      : null
-  ));
+          slug,
+          ai: {
+            mode: 'openai',
+            models: { thinking: 'gpt-5' },
+            modelProviders: { thinking: 'openai' },
+          },
+        }
+      : null,
+  );
   checkSponsoredAccess.mockResolvedValue({
     status: 'no-gate',
     gate: null,
@@ -144,13 +146,7 @@ const getSingleAnalysisCacheEntry = ({ slug, networkID, addressLower }) => {
   return { cacheObj, fingerprint, entry };
 };
 
-const writeSingleAnalysisCacheEntry = async ({
-  slug,
-  networkID,
-  addressLower,
-  fingerprint,
-  entry,
-}) => {
+const writeSingleAnalysisCacheEntry = async ({ slug, networkID, addressLower, fingerprint, entry }) => {
   const current = cacheScripts.peekCacheSync('analysisCache', slug, { clone: false }) || {};
   await cacheScripts.writeCache('analysisCache', slug, {
     ...current,
@@ -194,9 +190,7 @@ const treeHasText = (node, text) => {
   return treeHasText(node?.props?.children, text);
 };
 
-const normalizeChildrenArray = (value) => (
-  Array.isArray(value) ? value : [value].filter(Boolean)
-);
+const normalizeChildrenArray = (value) => (Array.isArray(value) ? value : [value].filter(Boolean));
 
 describe('UserPage clipboard helpers', () => {
   it('does not mark the address copied when clipboard write rejects', async () => {
@@ -252,25 +246,18 @@ describe('UserPage username editing', () => {
 
       expect(setItemSpy).toHaveBeenCalledWith(
         'userPageUsername_84532_0x00000000000000000000000000000000000000aa',
-        'Unsaved User'
+        'Unsaved User',
       );
       expect(instance.state.username).toBe('Unsaved User');
       expect(instance.state.isEditingUsername).toBe(true);
       expect(instance.state.usernameError).toBe('Failed to save username locally.');
       expect(instance.setState.mock.calls.some(([patch]) => patch?.isEditingUsername === false)).toBe(false);
-      const [header] = collectTreeNodes(
-        instance.render(),
-        (node) => getNodeTypeName(node) === 'UserPageHeader'
-      );
+      const [header] = collectTreeNodes(instance.render(), (node) => getNodeTypeName(node) === 'UserPageHeader');
       expect(header.props.usernameErrorDisplayState).toEqual({
         shouldRenderUsernameError: true,
         usernameErrorText: 'Failed to save username locally.',
       });
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[account]',
-        'Error saving username to localStorage:',
-        storageError
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[account]', 'Error saving username to localStorage:', storageError);
     } finally {
       setItemSpy.mockRestore();
       consoleErrorSpy.mockRestore();
@@ -283,10 +270,7 @@ describe('UserPage analyze action boundary', () => {
     const instance = makeInstance();
     instance.analyzeUser = jest.fn();
     const tree = instance.render();
-    const [header] = collectTreeNodes(
-      tree,
-      (node) => getNodeTypeName(node) === 'UserPageHeader'
-    );
+    const [header] = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageHeader');
     const event = { preventDefault: jest.fn(), type: 'click' };
 
     expect(header).toBeTruthy();
@@ -307,10 +291,7 @@ describe('UserPage analyze action boundary', () => {
     const instance = makeInstance({ isSBTCacheReady: false });
     instance.analyzeUser = jest.fn();
     const tree = instance.render();
-    const [header] = collectTreeNodes(
-      tree,
-      (node) => getNodeTypeName(node) === 'UserPageHeader'
-    );
+    const [header] = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageHeader');
     const event = { preventDefault: jest.fn(), type: 'click' };
 
     expect(header).toBeTruthy();
@@ -335,10 +316,7 @@ describe('UserPage bookmark action boundary', () => {
     });
     instance.toggleBookmark = jest.fn();
     const tree = instance.render();
-    const [header] = collectTreeNodes(
-      tree,
-      (node) => getNodeTypeName(node) === 'UserPageHeader'
-    );
+    const [header] = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageHeader');
     const event = { preventDefault: jest.fn(), type: 'click' };
 
     expect(header).toBeTruthy();
@@ -363,10 +341,7 @@ describe('UserPage bookmark action boundary', () => {
     });
     instance.toggleBookmark = jest.fn();
     const tree = instance.render();
-    const [header] = collectTreeNodes(
-      tree,
-      (node) => getNodeTypeName(node) === 'UserPageHeader'
-    );
+    const [header] = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageHeader');
     const event = { preventDefault: jest.fn(), type: 'click' };
 
     expect(header).toBeTruthy();
@@ -408,12 +383,14 @@ describe('UserPage decrypt action boundary', () => {
       loadingSBTs: false,
       loadingSurveys: false,
       questionCreationInfo: [],
-      questionResponseInfo: [{
-        canDecryptOtherResponses: true,
-        id: 'q1',
-        prompt: 'Cached gated response',
-        sessionSlug: 'edge',
-      }],
+      questionResponseInfo: [
+        {
+          canDecryptOtherResponses: true,
+          id: 'q1',
+          prompt: 'Cached gated response',
+          sessionSlug: 'edge',
+        },
+      ],
       selectedTab: 'questions',
       showSectionQuestionResponsesOpen: true,
       showSectionQuestionsCreatedOpen: true,
@@ -422,18 +399,17 @@ describe('UserPage decrypt action boundary', () => {
     };
 
     const tree = instance.render();
-    const [questionSection] = collectTreeNodes(
-      tree,
-      (node) => getNodeTypeName(node) === 'UserPageQuestionSection'
-    );
+    const [questionSection] = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageQuestionSection');
 
     expect(questionSection).toBeTruthy();
-    expect(questionSection.props.questionResponseEntries).toEqual([{
-      canDecryptOtherResponses: true,
-      id: 'q1',
-      prompt: 'Cached gated response',
-      sessionSlug: 'edge',
-    }]);
+    expect(questionSection.props.questionResponseEntries).toEqual([
+      {
+        canDecryptOtherResponses: true,
+        id: 'q1',
+        prompt: 'Cached gated response',
+        sessionSlug: 'edge',
+      },
+    ]);
     expect(questionSection.props.detailedQuestionResponseMap.q1).toBe(encryptedResponse);
     expect(questionSection.props.questionResponsesNonce).toBe(0);
     expect(questionSection.props.sbtCacheRevision).toBe(0);
@@ -453,33 +429,34 @@ describe('UserPage survey route boundaries', () => {
     instance.state = {
       ...instance.state,
       selectedTab: 'surveys',
-      surveyResponseInfo: [{
-        documentURLs: [],
-        id: 'survey response',
-        questionsCount: 1,
-        slug: 'alpha',
-        tags: [],
-        title: 'Response Survey',
-      }],
-      surveyCreationInfo: [{
-        documentURLs: [],
-        id: 'created survey',
-        questionIDs: [],
-        questionsCount: 1,
-        slug: 'beta',
-        tags: [],
-        title: 'Created Survey',
-      }],
+      surveyResponseInfo: [
+        {
+          documentURLs: [],
+          id: 'survey response',
+          questionsCount: 1,
+          slug: 'alpha',
+          tags: [],
+          title: 'Response Survey',
+        },
+      ],
+      surveyCreationInfo: [
+        {
+          documentURLs: [],
+          id: 'created survey',
+          questionIDs: [],
+          questionsCount: 1,
+          slug: 'beta',
+          tags: [],
+          title: 'Created Survey',
+        },
+      ],
     };
     const tree = instance.render();
-    const [surveySection] = collectTreeNodes(
-      tree,
-      (node) => getNodeTypeName(node) === 'UserPageSurveySection'
-    );
+    const [surveySection] = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSurveySection');
 
     expect(surveySection).toBeTruthy();
     expect(surveySection.props.getSurveyCreatedHref({ id: 'created survey' }, 'beta')).toBe(
-      '/survey/created%20survey?session=beta'
+      '/survey/created%20survey?session=beta',
     );
 
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
@@ -490,7 +467,7 @@ describe('UserPage survey route boundaries', () => {
     expect(openSpy).toHaveBeenCalledWith(
       '/survey/survey%20response?session=alpha&responder=0x00000000000000000000000000000000000000aa',
       '_blank',
-      'noopener,noreferrer'
+      'noopener,noreferrer',
     );
     openSpy.mockRestore();
   });
@@ -504,76 +481,84 @@ describe('UserPage cold-load network fallback', () => {
     const instance = makeInstance({ viewAddress, network: {} });
 
     const dataByNamespace = {
-      surveysCache: [{
-        slug: 'edge',
-        data: {
-          [cacheNetworkID]: {
-            surveys: {
-              s1: {
-                id: 's1',
-                title: 'Survey 1',
-                creator: viewAddress,
-                questionIDs: ['q1'],
-              },
-            },
-            surveyResponses: {
-              s1: {
-                [viewAddress]: JSON.stringify({
-                  responses: [{ questionID: 'q1', answer: { value: 'yes' } }],
-                }),
-              },
-            },
-          },
-        },
-      }],
-      questionsCache: [{
-        slug: 'edge',
-        data: {
-          [cacheNetworkID]: {
-            questions: {
-              q1: {
-                id: 'q1',
-                prompt: 'Question 1',
-                type: 'freeform',
-                creator: viewAddress,
-              },
-            },
-            questionResponses: {
-              q1: {
-                [viewAddress]: JSON.stringify({
-                  answer: { value: 'value' },
-                }),
-              },
-            },
-          },
-        },
-      }],
-      sbtCache: [{
-        slug: 'edge',
-        data: {
-          [cacheNetworkID]: {
-            sbtList: {
-              '0x100': {
-                sbtAddress: '0x100',
-                sbtInfo: { name: 'Badge 100', unlisted: false },
-                mintedAddresses: [viewAddress],
-                burnedAddresses: [],
-              },
-            },
-          },
-        },
-      }],
-      userCache: [{
-        slug: 'edge',
-        data: {
-          [viewLower]: {
+      surveysCache: [
+        {
+          slug: 'edge',
+          data: {
             [cacheNetworkID]: {
-              lastBlockScanned: 120,
-              data: {},
+              surveys: {
+                s1: {
+                  id: 's1',
+                  title: 'Survey 1',
+                  creator: viewAddress,
+                  questionIDs: ['q1'],
+                },
+              },
+              surveyResponses: {
+                s1: {
+                  [viewAddress]: JSON.stringify({
+                    responses: [{ questionID: 'q1', answer: { value: 'yes' } }],
+                  }),
+                },
+              },
             },
           },
         },
-      }],
+      ],
+      questionsCache: [
+        {
+          slug: 'edge',
+          data: {
+            [cacheNetworkID]: {
+              questions: {
+                q1: {
+                  id: 'q1',
+                  prompt: 'Question 1',
+                  type: 'freeform',
+                  creator: viewAddress,
+                },
+              },
+              questionResponses: {
+                q1: {
+                  [viewAddress]: JSON.stringify({
+                    answer: { value: 'value' },
+                  }),
+                },
+              },
+            },
+          },
+        },
+      ],
+      sbtCache: [
+        {
+          slug: 'edge',
+          data: {
+            [cacheNetworkID]: {
+              sbtList: {
+                '0x100': {
+                  sbtAddress: '0x100',
+                  sbtInfo: { name: 'Badge 100', unlisted: false },
+                  mintedAddresses: [viewAddress],
+                  burnedAddresses: [],
+                },
+              },
+            },
+          },
+        },
+      ],
+      userCache: [
+        {
+          slug: 'edge',
+          data: {
+            [viewLower]: {
+              [cacheNetworkID]: {
+                lastBlockScanned: 120,
+                data: {},
+              },
+            },
+          },
+        },
+      ],
     };
 
     instance._dgHasAny = jest.fn(() => true);
@@ -601,57 +586,69 @@ describe('UserPage cold-load network fallback', () => {
       surveysCache: [],
       questionsCache: [],
       sbtCache: [],
-      userCache: [{
-        slug: 'edge',
-        data: {
-          [viewLower]: {
-            [cacheNetworkID]: {
-              lastBlockScanned: 120,
-              data: {
-                createdSurveys: [{
-                  id: 's1',
-                  data: {
-                    id: 's1',
-                    title: 'Survey from userCache',
-                    questionIDs: ['q1'],
-                  },
-                }],
-                surveyResponses: [{
-                  surveyId: 's1',
-                  responder: viewLower,
-                  response: {
-                    responses: [
-                      {
-                        questionID: 'q1',
-                        answer: { value: 'yes' },
+      userCache: [
+        {
+          slug: 'edge',
+          data: {
+            [viewLower]: {
+              [cacheNetworkID]: {
+                lastBlockScanned: 120,
+                data: {
+                  createdSurveys: [
+                    {
+                      id: 's1',
+                      data: {
+                        id: 's1',
+                        title: 'Survey from userCache',
+                        questionIDs: ['q1'],
                       },
-                    ],
-                  },
-                }],
-                createdQuestions: [{
-                  id: 'q1',
-                  data: {
-                    id: 'q1',
-                    prompt: 'Question from userCache',
-                    type: 'freeform',
-                  },
-                }],
-                questionResponses: [{
-                  questionId: 'q1',
-                  responder: viewLower,
-                  response: {
-                    answer: { value: 'value' },
-                  },
-                }],
-                sbts: [{
-                  sbtAddress: '0x100',
-                  sbtInfo: { name: 'Badge from userCache', unlisted: false },
-                }],
+                    },
+                  ],
+                  surveyResponses: [
+                    {
+                      surveyId: 's1',
+                      responder: viewLower,
+                      response: {
+                        responses: [
+                          {
+                            questionID: 'q1',
+                            answer: { value: 'yes' },
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                  createdQuestions: [
+                    {
+                      id: 'q1',
+                      data: {
+                        id: 'q1',
+                        prompt: 'Question from userCache',
+                        type: 'freeform',
+                      },
+                    },
+                  ],
+                  questionResponses: [
+                    {
+                      questionId: 'q1',
+                      responder: viewLower,
+                      response: {
+                        answer: { value: 'value' },
+                      },
+                    },
+                  ],
+                  sbts: [
+                    {
+                      sbtAddress: '0x100',
+                      sbtInfo: { name: 'Badge from userCache', unlisted: false },
+                    },
+                  ],
+                },
               },
             },
           },
         },
-      }],
+      ],
     };
 
     instance._dgHasAny = jest.fn(() => true);
@@ -675,94 +672,100 @@ describe('UserPage cold-load network fallback', () => {
     const instance = makeInstance({ viewAddress, network: { id: 1 } });
 
     const dataByNamespace = {
-      surveysCache: [{
-        slug: 'edge',
-        data: {
-          '1': {
-            surveys: {
-              sActive: {
-                id: 'sActive',
-                title: 'Active Chain Survey',
-                creator: '0x00000000000000000000000000000000000000bb',
-                questionIDs: ['qActive'],
+      surveysCache: [
+        {
+          slug: 'edge',
+          data: {
+            1: {
+              surveys: {
+                sActive: {
+                  id: 'sActive',
+                  title: 'Active Chain Survey',
+                  creator: '0x00000000000000000000000000000000000000bb',
+                  questionIDs: ['qActive'],
+                },
               },
+              surveyResponses: {},
             },
-            surveyResponses: {},
-          },
-          '84532': {
-            surveys: {
-              sOther: {
-                id: 'sOther',
-                title: 'Other Chain Survey',
-                creator: viewAddress,
-                questionIDs: ['qOther'],
+            84532: {
+              surveys: {
+                sOther: {
+                  id: 'sOther',
+                  title: 'Other Chain Survey',
+                  creator: viewAddress,
+                  questionIDs: ['qOther'],
+                },
               },
-            },
-            surveyResponses: {
-              sOther: {
-                [viewLower]: JSON.stringify({
-                  responses: [{ questionID: 'qOther', answer: { value: 'yes' } }],
-                }),
-              },
-            },
-          },
-        },
-      }],
-      questionsCache: [{
-        slug: 'edge',
-        data: {
-          '1': {
-            questions: {
-              qActive: {
-                id: 'qActive',
-                prompt: 'Active Prompt',
-                type: 'freeform',
-              },
-            },
-            questionResponses: {},
-          },
-          '84532': {
-            questions: {
-              qOther: {
-                id: 'qOther',
-                prompt: 'Other Prompt',
-                type: 'freeform',
-                creator: viewAddress,
-              },
-            },
-            questionResponses: {
-              qOther: {
-                [viewLower]: JSON.stringify({ answer: { value: 'cross-chain value' } }),
+              surveyResponses: {
+                sOther: {
+                  [viewLower]: JSON.stringify({
+                    responses: [{ questionID: 'qOther', answer: { value: 'yes' } }],
+                  }),
+                },
               },
             },
           },
         },
-      }],
-      sbtCache: [{
-        slug: 'edge',
-        data: {
-          '1': {
-            sbtList: {
-              '0x111': {
-                sbtAddress: '0x111',
-                sbtInfo: { name: 'Active Badge', unlisted: false },
-                mintedAddresses: [],
-                burnedAddresses: [],
+      ],
+      questionsCache: [
+        {
+          slug: 'edge',
+          data: {
+            1: {
+              questions: {
+                qActive: {
+                  id: 'qActive',
+                  prompt: 'Active Prompt',
+                  type: 'freeform',
+                },
               },
+              questionResponses: {},
             },
-          },
-          '84532': {
-            sbtList: {
-              '0x222': {
-                sbtAddress: '0x222',
-                sbtInfo: { name: 'Cross Badge', unlisted: false },
-                mintedAddresses: [viewLower],
-                burnedAddresses: [],
+            84532: {
+              questions: {
+                qOther: {
+                  id: 'qOther',
+                  prompt: 'Other Prompt',
+                  type: 'freeform',
+                  creator: viewAddress,
+                },
+              },
+              questionResponses: {
+                qOther: {
+                  [viewLower]: JSON.stringify({ answer: { value: 'cross-chain value' } }),
+                },
               },
             },
           },
         },
-      }],
+      ],
+      sbtCache: [
+        {
+          slug: 'edge',
+          data: {
+            1: {
+              sbtList: {
+                '0x111': {
+                  sbtAddress: '0x111',
+                  sbtInfo: { name: 'Active Badge', unlisted: false },
+                  mintedAddresses: [],
+                  burnedAddresses: [],
+                },
+              },
+            },
+            84532: {
+              sbtList: {
+                '0x222': {
+                  sbtAddress: '0x222',
+                  sbtInfo: { name: 'Cross Badge', unlisted: false },
+                  mintedAddresses: [viewLower],
+                  burnedAddresses: [],
+                },
+              },
+            },
+          },
+        },
+      ],
       userCache: [],
     };
 
@@ -772,17 +775,17 @@ describe('UserPage cold-load network fallback', () => {
     instance._refreshAllDataFromCache({ force: true, markLoading: true });
 
     expect(instance.state.surveyResponseInfo).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: 'sother' })])
+      expect.arrayContaining([expect.objectContaining({ id: 'sother' })]),
     );
     expect(instance.state.questionResponseInfo).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: 'qother' })])
+      expect.arrayContaining([expect.objectContaining({ id: 'qother' })]),
     );
     expect(instance.state.sbtList).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           sbtInfo: expect.objectContaining({ sbtAddress: '0x222' }),
         }),
-      ])
+      ]),
     );
   });
 });

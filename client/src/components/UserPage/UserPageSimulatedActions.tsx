@@ -15,9 +15,7 @@ const UserPageSimulatedActions = ({
 
   return (
     <div className={styles.simulatedUserActions}>
-      <button onClick={onViewResponses}>
-        View Simulated Responses
-      </button>
+      <button onClick={onViewResponses}>View Simulated Responses</button>
     </div>
   );
 };

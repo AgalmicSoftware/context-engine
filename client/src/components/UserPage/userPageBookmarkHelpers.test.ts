@@ -213,10 +213,14 @@ describe('userPageBookmarkHelpers', () => {
     expect(isBookmarkUserEntry({ address, nickname: 'Alice' })).toBe(true);
     expect(isBookmarkUserEntry(address)).toBe(false);
     expect(isBookmarkUserObjectForAddress({ address: address.toUpperCase() }, addressLower)).toBe(true);
-    expect(isBookmarkUserObjectForAddress({ address: '0x00000000000000000000000000000000000000bb' }, addressLower)).toBe(false);
+    expect(
+      isBookmarkUserObjectForAddress({ address: '0x00000000000000000000000000000000000000bb' }, addressLower),
+    ).toBe(false);
     expect(isBookmarkValueForAddress(address.toUpperCase(), addressLower)).toBe(true);
     expect(isBookmarkValueForAddress({ address: address.toUpperCase() }, addressLower)).toBe(true);
-    expect(isBookmarkValueForAddress({ address: '0x00000000000000000000000000000000000000bb' }, addressLower)).toBe(false);
+    expect(isBookmarkValueForAddress({ address: '0x00000000000000000000000000000000000000bb' }, addressLower)).toBe(
+      false,
+    );
     expect(isBookmarkValueForAddress(null, addressLower)).toBe(false);
   });
 
@@ -250,56 +254,65 @@ describe('userPageBookmarkHelpers', () => {
 
   it('resolves bookmark status and nickname prefill from mixed user entries', () => {
     const address = '0x00000000000000000000000000000000000000aa';
-    expect(resolveUserPageBookmarkStatus({
-      address,
-      users: [
-        '0x00000000000000000000000000000000000000bb',
-        { address: address.toUpperCase(), nickname: 'Alpha' },
-      ],
-    })).toEqual({
+    expect(
+      resolveUserPageBookmarkStatus({
+        address,
+        users: ['0x00000000000000000000000000000000000000bb', { address: address.toUpperCase(), nickname: 'Alpha' }],
+      }),
+    ).toEqual({
       bookmarked: true,
       nickname: 'Alpha',
     });
-    expect(resolveUserPageBookmarkStatus({
-      address,
-      users: [address.toUpperCase()],
-    })).toEqual({
+    expect(
+      resolveUserPageBookmarkStatus({
+        address,
+        users: [address.toUpperCase()],
+      }),
+    ).toEqual({
       bookmarked: true,
       nickname: null,
     });
-    expect(resolveUserPageBookmarkStatus({
-      address,
-      users: [{ address, nickname: '' }],
-    })).toEqual({
+    expect(
+      resolveUserPageBookmarkStatus({
+        address,
+        users: [{ address, nickname: '' }],
+      }),
+    ).toEqual({
       bookmarked: true,
       nickname: null,
     });
-    expect(resolveUserPageBookmarkStatus({
-      address,
-      users: null,
-    })).toEqual({
+    expect(
+      resolveUserPageBookmarkStatus({
+        address,
+        users: null,
+      }),
+    ).toEqual({
       bookmarked: false,
       nickname: null,
     });
-    expect(buildUserPageBookmarkStatusStateUpdate({
-      bookmarked: true,
-      nickname: 'Alpha',
-      state: {
-        bookmarked: false,
-        nicknameInput: '',
-      },
-    })).toEqual({
+    expect(
+      buildUserPageBookmarkStatusStateUpdate({
+        bookmarked: true,
+        nickname: 'Alpha',
+        state: {
+          bookmarked: false,
+          nicknameInput: '',
+        },
+      }),
+    ).toEqual({
       bookmarked: true,
       nicknameInput: 'Alpha',
     });
-    expect(buildUserPageBookmarkStatusStateUpdate({
-      bookmarked: true,
-      nickname: null,
-      state: {
+    expect(
+      buildUserPageBookmarkStatusStateUpdate({
         bookmarked: true,
-        nicknameInput: 'Existing',
-      },
-    })).toBeNull();
+        nickname: null,
+        state: {
+          bookmarked: true,
+          nicknameInput: 'Existing',
+        },
+      }),
+    ).toBeNull();
   });
 
   it('resolves cached bookmark nicknames with optional trimming', () => {
@@ -311,11 +324,13 @@ describe('userPageBookmarkHelpers', () => {
 
     expect(resolveUserPageBookmarkNickname({ address, users })).toBe('  Alpha  ');
     expect(resolveUserPageBookmarkNickname({ address, users, trim: true })).toBe('Alpha');
-    expect(resolveUserPageBookmarkNickname({
-      address,
-      users: [{ address, nickname: '   ' }],
-      trim: true,
-    })).toBe('');
+    expect(
+      resolveUserPageBookmarkNickname({
+        address,
+        users: [{ address, nickname: '   ' }],
+        trim: true,
+      }),
+    ).toBe('');
     expect(resolveUserPageBookmarkNickname({ address: '', users })).toBe('');
     expect(resolveUserPageBookmarkNickname({ address, users: null })).toBe('');
   });
@@ -382,15 +397,19 @@ describe('userPageBookmarkHelpers', () => {
       bookmarksCache: { users: [], surveys: [], questions: [], filters: [] },
       nickname: 'Gamma',
     });
-    expect(created.bookmarksCache.users).toEqual([{
-      address: '0x00000000000000000000000000000000000000cc',
-      nickname: 'Gamma',
-    }]);
-    expect(applyUserPageBookmarkNicknameSave({
-      address: '0x00000000000000000000000000000000000000dd',
-      bookmarksCache: { users: [], surveys: [], questions: [], filters: [] },
-      nickname: '',
-    }).stillBookmarked).toBe(false);
+    expect(created.bookmarksCache.users).toEqual([
+      {
+        address: '0x00000000000000000000000000000000000000cc',
+        nickname: 'Gamma',
+      },
+    ]);
+    expect(
+      applyUserPageBookmarkNicknameSave({
+        address: '0x00000000000000000000000000000000000000dd',
+        bookmarksCache: { users: [], surveys: [], questions: [], filters: [] },
+        nickname: '',
+      }).stillBookmarked,
+    ).toBe(false);
   });
 
   it('applies bookmark toggles while preserving legacy add and remove behavior', () => {
@@ -444,11 +463,13 @@ describe('userPageBookmarkHelpers', () => {
       onchainUsername: 'chain.eth',
     });
     expect(objectAdd.bookmarked).toBe(true);
-    expect(objectAdd.bookmarksCache.users).toEqual([{
-      address,
-      nickname: 'Meta Nick',
-      username: 'meta.eth',
-      networkId: '11155420',
-    }]);
+    expect(objectAdd.bookmarksCache.users).toEqual([
+      {
+        address,
+        nickname: 'Meta Nick',
+        username: 'meta.eth',
+        networkId: '11155420',
+      },
+    ]);
   });
 });

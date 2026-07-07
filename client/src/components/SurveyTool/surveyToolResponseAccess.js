@@ -11,10 +11,10 @@ export const buildCanDecryptOtherResponsesSnapshot = ({
   const normalizedAccount = String(account || '').trim();
   const loggedIn = !!(loginComplete && normalizedAccount);
   const recipients = Array.isArray(policy?.recipients) ? policy.recipients : [];
-  const primaryResource = String(
-    policy?.primaryResource ||
-      ((singleQuestionMode || isStandalone) ? 'questionResponses' : 'surveyResponses')
-  ).trim() || 'default';
+  const primaryResource =
+    String(
+      policy?.primaryResource || (singleQuestionMode || isStandalone ? 'questionResponses' : 'surveyResponses'),
+    ).trim() || 'default';
   const resourceKeysToCheck = Array.from(new Set([primaryResource, 'default'].filter(Boolean)));
   const resourceKeysSig = resourceKeysToCheck.join(',');
   const baseParts = [
@@ -37,22 +37,35 @@ export const buildCanDecryptOtherResponsesSnapshot = ({
 };
 
 export const buildResponseGateConfigSignature = (cfg = {}) => {
-  const normText = (value) => String(value == null ? '' : value).trim().toLowerCase();
+  const normText = (value) =>
+    String(value == null ? '' : value)
+      .trim()
+      .toLowerCase();
   const normChain = (value) => {
     const normalizedValue = Number(value || 0);
     return Number.isFinite(normalizedValue) && normalizedValue > 0 ? String(normalizedValue) : '';
   };
-  const normAddresses = (...sources) => Array.from(new Set(
-    sources
-      .flat()
-      .map((address) => String(address || '').trim().toLowerCase())
-      .filter(Boolean)
-  )).sort().join(',');
+  const normAddresses = (...sources) =>
+    Array.from(
+      new Set(
+        sources
+          .flat()
+          .map((address) =>
+            String(address || '')
+              .trim()
+              .toLowerCase(),
+          )
+          .filter(Boolean),
+      ),
+    )
+      .sort()
+      .join(',');
   const readObj = (value) => (value && typeof value === 'object' ? value : {});
-  const stablePairs = (obj, mapper) => Object.keys(readObj(obj))
-    .sort()
-    .map((key) => `${key}:${mapper(readObj(obj)[key], key)}`)
-    .join('|');
+  const stablePairs = (obj, mapper) =>
+    Object.keys(readObj(obj))
+      .sort()
+      .map((key) => `${key}:${mapper(readObj(obj)[key], key)}`)
+      .join('|');
   const gateSnapshot = (gate = {}) => {
     const nextGate = readObj(gate);
     return [
@@ -76,15 +89,13 @@ export const buildResponseGateConfigSignature = (cfg = {}) => {
     ].join(',');
   };
 
-  const sponsoredGates = (cfg?.sponsored?.gates && typeof cfg.sponsored.gates === 'object')
-    ? cfg.sponsored.gates
-    : {};
-  const sponsoredResources = (cfg?.sponsored?.resources && typeof cfg.sponsored.resources === 'object')
-    ? cfg.sponsored.resources
-    : {};
-  const registryGates = (cfg?.__registry?.gatesByResource && typeof cfg.__registry.gatesByResource === 'object')
-    ? cfg.__registry.gatesByResource
-    : {};
+  const sponsoredGates = cfg?.sponsored?.gates && typeof cfg.sponsored.gates === 'object' ? cfg.sponsored.gates : {};
+  const sponsoredResources =
+    cfg?.sponsored?.resources && typeof cfg.sponsored.resources === 'object' ? cfg.sponsored.resources : {};
+  const registryGates =
+    cfg?.__registry?.gatesByResource && typeof cfg.__registry.gatesByResource === 'object'
+      ? cfg.__registry.gatesByResource
+      : {};
 
   return [
     Number(cfg?.networkChainId || 0) || 0,
@@ -102,7 +113,7 @@ export const resolveCanDecryptOtherResponsesVerdict = (verdicts = []) => {
   const canDecrypt = statuses.includes('granted');
   const status = canDecrypt
     ? 'granted'
-    : (statuses.includes('unknown') || statuses.includes('error'))
+    : statuses.includes('unknown') || statuses.includes('error')
       ? 'unknown'
       : statuses.includes('denied')
         ? 'denied'
@@ -110,7 +121,7 @@ export const resolveCanDecryptOtherResponsesVerdict = (verdicts = []) => {
           ? 'invalid-gate'
           : statuses.includes('no-gate')
             ? 'no-gate'
-            : (statuses[0] || 'unknown');
+            : statuses[0] || 'unknown';
 
   return {
     canDecrypt,

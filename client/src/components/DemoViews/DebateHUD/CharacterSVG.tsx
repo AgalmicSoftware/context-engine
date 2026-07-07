@@ -15,12 +15,12 @@ export const CharacterSVG = ({ name, size = 80 }: CharacterSVGProps) => {
   useTheme();
 
   const svgs: Record<string, React.ReactElement> = {
-    "Condorcet": (
+    Condorcet: (
       <svg viewBox="0 0 80 80" style={{ width: size, height: size }}>
         <defs>
           <linearGradient id="condorcet-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style={{ stopColor: "#0066ff", stopOpacity: 0.15 }} />
-            <stop offset="100%" style={{ stopColor: "#0066ff", stopOpacity: 0.05 }} />
+            <stop offset="0%" style={{ stopColor: '#0066ff', stopOpacity: 0.15 }} />
+            <stop offset="100%" style={{ stopColor: '#0066ff', stopOpacity: 0.05 }} />
           </linearGradient>
         </defs>
         <rect width="80" height="80" fill="url(#condorcet-bg)" rx="8" />
@@ -37,12 +37,12 @@ export const CharacterSVG = ({ name, size = 80 }: CharacterSVGProps) => {
         <path d="M 30 60 L 50 60" stroke="#0066ff" strokeWidth="1.5" opacity="0.5" />
       </svg>
     ),
-    "David Hume": (
+    'David Hume': (
       <svg viewBox="0 0 80 80" style={{ width: size, height: size }}>
         <defs>
           <linearGradient id="hume-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style={{ stopColor: "#e03060", stopOpacity: 0.15 }} />
-            <stop offset="100%" style={{ stopColor: "#e03060", stopOpacity: 0.05 }} />
+            <stop offset="0%" style={{ stopColor: '#e03060', stopOpacity: 0.15 }} />
+            <stop offset="100%" style={{ stopColor: '#e03060', stopOpacity: 0.05 }} />
           </linearGradient>
         </defs>
         <rect width="80" height="80" fill="url(#hume-bg)" rx="8" />
@@ -60,12 +60,12 @@ export const CharacterSVG = ({ name, size = 80 }: CharacterSVGProps) => {
         <path d="M 26 60 L 54 60" stroke="#e03060" strokeWidth="1" opacity="0.3" />
       </svg>
     ),
-    "Machiavelli": (
+    Machiavelli: (
       <svg viewBox="0 0 80 80" style={{ width: size, height: size }}>
         <defs>
           <linearGradient id="machiavelli-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style={{ stopColor: "#8b5cf6", stopOpacity: 0.15 }} />
-            <stop offset="100%" style={{ stopColor: "#8b5cf6", stopOpacity: 0.05 }} />
+            <stop offset="0%" style={{ stopColor: '#8b5cf6', stopOpacity: 0.15 }} />
+            <stop offset="100%" style={{ stopColor: '#8b5cf6', stopOpacity: 0.05 }} />
           </linearGradient>
         </defs>
         <rect width="80" height="80" fill="url(#machiavelli-bg)" rx="8" />
@@ -82,12 +82,12 @@ export const CharacterSVG = ({ name, size = 80 }: CharacterSVGProps) => {
         <path d="M 35 64 L 45 64" stroke="#8b5cf6" strokeWidth="1.2" opacity="0.6" />
       </svg>
     ),
-    "William of Ockham": (
+    'William of Ockham': (
       <svg viewBox="0 0 80 80" style={{ width: size, height: size }}>
         <defs>
           <linearGradient id="ockham-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style={{ stopColor: "#00a86b", stopOpacity: 0.15 }} />
-            <stop offset="100%" style={{ stopColor: "#00a86b", stopOpacity: 0.05 }} />
+            <stop offset="0%" style={{ stopColor: '#00a86b', stopOpacity: 0.15 }} />
+            <stop offset="100%" style={{ stopColor: '#00a86b', stopOpacity: 0.05 }} />
           </linearGradient>
         </defs>
         <rect width="80" height="80" fill="url(#ockham-bg)" rx="8" />
@@ -105,12 +105,12 @@ export const CharacterSVG = ({ name, size = 80 }: CharacterSVGProps) => {
         <path d="M 36 40 Q 40 42 44 40" stroke="#00a86b" strokeWidth="0.8" fill="none" opacity="0.4" />
       </svg>
     ),
-    "Mary Shelley": (
+    'Mary Shelley': (
       <svg viewBox="0 0 80 80" style={{ width: size, height: size }}>
         <defs>
           <linearGradient id="shelley-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style={{ stopColor: "#e07800", stopOpacity: 0.15 }} />
-            <stop offset="100%" style={{ stopColor: "#e07800", stopOpacity: 0.05 }} />
+            <stop offset="0%" style={{ stopColor: '#e07800', stopOpacity: 0.15 }} />
+            <stop offset="100%" style={{ stopColor: '#e07800', stopOpacity: 0.05 }} />
           </linearGradient>
         </defs>
         <rect width="80" height="80" fill="url(#shelley-bg)" rx="8" />
@@ -127,12 +127,12 @@ export const CharacterSVG = ({ name, size = 80 }: CharacterSVGProps) => {
         <path d="M 40 48 L 40 58" stroke="#e07800" strokeWidth="1" opacity="0.4" />
       </svg>
     ),
-    "John Stuart Mill": (
+    'John Stuart Mill': (
       <svg viewBox="0 0 80 80" style={{ width: size, height: size }}>
         <defs>
           <linearGradient id="mill-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style={{ stopColor: "#0066ff", stopOpacity: 0.15 }} />
-            <stop offset="100%" style={{ stopColor: "#0066ff", stopOpacity: 0.05 }} />
+            <stop offset="0%" style={{ stopColor: '#0066ff', stopOpacity: 0.15 }} />
+            <stop offset="100%" style={{ stopColor: '#0066ff', stopOpacity: 0.05 }} />
           </linearGradient>
         </defs>
         <rect width="80" height="80" fill="url(#mill-bg)" rx="8" />
@@ -150,7 +150,8 @@ export const CharacterSVG = ({ name, size = 80 }: CharacterSVGProps) => {
         <path d="M 44 50 L 48 50" stroke="#0066ff" strokeWidth="0.8" opacity="0.4" />
         <path d="M 28 60 L 52 60" stroke="#0066ff" strokeWidth="1" opacity="0.3" />
       </svg>
-    )};
+    ),
+  };
 
   return svgs[name] || <div style={{ width: size, height: size, background: T.border, borderRadius: 8 }} />;
 };
@@ -158,27 +159,58 @@ export const CharacterSVG = ({ name, size = 80 }: CharacterSVGProps) => {
 export const Avatar = ({ name, color, size = 36 }: AvatarProps) => {
   useTheme();
 
-  const hasSVG = ["Condorcet", "David Hume", "Machiavelli", "William of Ockham", "Mary Shelley", "John Stuart Mill"].includes(name);
+  const hasSVG = [
+    'Condorcet',
+    'David Hume',
+    'Machiavelli',
+    'William of Ockham',
+    'Mary Shelley',
+    'John Stuart Mill',
+  ].includes(name);
 
   if (hasSVG) {
     return (
-      <div style={{
-        width: size, height: size,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0}}>
+      <div
+        style={{
+          width: size,
+          height: size,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
         <CharacterSVG name={name} size={size} />
       </div>
     );
   }
 
-  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const initials = name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
   return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%",
-      background: `linear-gradient(135deg, ${soften(color, 0.15)}, ${soften(color, 0.08)})`,
-      border: `2px solid ${soften(color, 0.3)}`,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontFamily: T.font, fontSize: size * 0.38, fontWeight: "700",
-      color, flexShrink: 0, letterSpacing: "-0.02em"}}>{initials}</div>
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: `linear-gradient(135deg, ${soften(color, 0.15)}, ${soften(color, 0.08)})`,
+        border: `2px solid ${soften(color, 0.3)}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: T.font,
+        fontSize: size * 0.38,
+        fontWeight: '700',
+        color,
+        flexShrink: 0,
+        letterSpacing: '-0.02em',
+      }}
+    >
+      {initials}
+    </div>
   );
 };

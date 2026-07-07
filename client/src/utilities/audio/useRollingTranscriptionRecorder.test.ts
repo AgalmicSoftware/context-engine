@@ -59,9 +59,7 @@ describe('useRollingTranscriptionRecorder', () => {
     jest.useFakeTimers();
     window.localStorage.clear();
     instances.length = 0;
-    (transcribeAudio as jest.Mock).mockImplementation(async (_blob: Blob) => (
-      `transcript ${instances.length}`
-    ));
+    (transcribeAudio as jest.Mock).mockImplementation(async (_blob: Blob) => `transcript ${instances.length}`);
 
     originalMediaRecorder = (globalThis as any).MediaRecorder;
     originalMediaDevices = navigator.mediaDevices;
@@ -96,10 +94,12 @@ describe('useRollingTranscriptionRecorder', () => {
   });
 
   it('rotates to a fresh recorder segment and transcribes the flushed chunk', async () => {
-    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({
-      sessionSlug: 'demo',
-      chunkMs: 15_000,
-    }));
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({
+        sessionSlug: 'demo',
+        chunkMs: 15_000,
+      }),
+    );
 
     await act(async () => {
       await result.current.startRecording();
@@ -135,10 +135,12 @@ describe('useRollingTranscriptionRecorder', () => {
   });
 
   it('manual stop flushes and transcribes the current partial segment', async () => {
-    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({
-      sessionSlug: 'demo',
-      chunkMs: 15_000,
-    }));
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({
+        sessionSlug: 'demo',
+        chunkMs: 15_000,
+      }),
+    );
 
     await act(async () => {
       await result.current.startRecording();
@@ -160,15 +162,18 @@ describe('useRollingTranscriptionRecorder', () => {
 
   it('finalizes a paused recorder and waits for the flushed transcription when requested', async () => {
     let resolveTranscription: ((value: string) => void) | null = null;
-    (transcribeAudio as jest.Mock).mockImplementation(() => (
-      new Promise((resolve) => {
-        resolveTranscription = resolve;
-      })
-    ));
-    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({
-      sessionSlug: 'demo',
-      chunkMs: 15_000,
-    }));
+    (transcribeAudio as jest.Mock).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveTranscription = resolve;
+        }),
+    );
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({
+        sessionSlug: 'demo',
+        chunkMs: 15_000,
+      }),
+    );
 
     await act(async () => {
       await result.current.startRecording();
@@ -205,10 +210,12 @@ describe('useRollingTranscriptionRecorder', () => {
   });
 
   it('pauses and resumes without rotating or advancing the visible timer while paused', async () => {
-    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({
-      sessionSlug: 'demo',
-      chunkMs: 15_000,
-    }));
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({
+        sessionSlug: 'demo',
+        chunkMs: 15_000,
+      }),
+    );
 
     await act(async () => {
       await result.current.startRecording();

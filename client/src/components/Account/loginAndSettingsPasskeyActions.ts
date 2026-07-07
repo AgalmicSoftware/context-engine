@@ -37,9 +37,8 @@ export type LoginPasskeyActions = {
   syncPasskeyWalletChain: (targetNetwork?: unknown) => unknown;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const buildPasskeyWalletNetwork = (targetNetwork: unknown): unknown => {
   if (!isRecord(targetNetwork)) return targetNetwork;
@@ -60,15 +59,13 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
     return tn;
   };
 
-  const getPasskeyWalletNetwork = (targetNetwork: unknown = null): unknown => (
-    buildPasskeyWalletNetwork(syncPasskeyWalletChain(targetNetwork))
-  );
+  const getPasskeyWalletNetwork = (targetNetwork: unknown = null): unknown =>
+    buildPasskeyWalletNetwork(syncPasskeyWalletChain(targetNetwork));
 
   const _finalizePasskeyWalletLogin = (address: unknown, targetNetwork: unknown = null): void => {
     const passkeyNetwork = getPasskeyWalletNetwork(targetNetwork);
-    const previousPasskeyAccount = deps.getProvider() === 'passkey_eoa'
-      ? deps.normalizeAccountForComparison(deps.getAccount())
-      : '';
+    const previousPasskeyAccount =
+      deps.getProvider() === 'passkey_eoa' ? deps.normalizeAccountForComparison(deps.getAccount()) : '';
     const nextPasskeyAccount = deps.normalizeAccountForComparison(address);
     if (previousPasskeyAccount && nextPasskeyAccount && previousPasskeyAccount !== nextPasskeyAccount) {
       deps.clearAllWorkerSessionTokens();
@@ -111,19 +108,14 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
       if (!deps.isCurrentAction(passkeyActionId)) return;
       _finalizePasskeyWalletLogin(address, passkeyNetwork);
     } catch (error) {
-      deps.accountLogError(
-        mode === 'create' ? 'Passkey wallet create error:' : 'Passkey wallet sign-in error:',
-        error,
-      );
+      deps.accountLogError(mode === 'create' ? 'Passkey wallet create error:' : 'Passkey wallet sign-in error:', error);
       if (!deps.isCurrentAction(passkeyActionId)) return;
       const isMissingWallet = mode === 'sign-in' && deps.passkeyWallet.isMissingPasskeyWalletRecordError?.(error);
       const message = isMissingWallet
         ? 'No passkey wallet is saved in this browser for this app. Use Create to make one under this RP ID.'
-        : (
-            mode === 'create'
-              ? `Create failed: ${deps.getErrorMessage(error).trim() || 'Could not create passkey wallet.'}`
-              : `Login failed: ${deps.getErrorMessage(error).trim() || 'Could not unlock passkey wallet.'}`
-          );
+        : mode === 'create'
+          ? `Create failed: ${deps.getErrorMessage(error).trim() || 'Could not create passkey wallet.'}`
+          : `Login failed: ${deps.getErrorMessage(error).trim() || 'Could not unlock passkey wallet.'}`;
       deps.setStatus({
         passkeyWalletStatusMessage: message,
         passkeyWalletStatusTone: 'error',
@@ -135,14 +127,16 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
   return {
     _finalizePasskeyWalletLogin,
     getPasskeyWalletNetwork,
-    handlePasskeyWalletCreate: () => runPasskeyWalletAction({
-      action: deps.passkeyWallet.createPasskeyWallet,
-      mode: 'create',
-    }),
-    handlePasskeyWalletSignIn: () => runPasskeyWalletAction({
-      action: deps.passkeyWallet.unlockPasskeyWallet,
-      mode: 'sign-in',
-    }),
+    handlePasskeyWalletCreate: () =>
+      runPasskeyWalletAction({
+        action: deps.passkeyWallet.createPasskeyWallet,
+        mode: 'create',
+      }),
+    handlePasskeyWalletSignIn: () =>
+      runPasskeyWalletAction({
+        action: deps.passkeyWallet.unlockPasskeyWallet,
+        mode: 'sign-in',
+      }),
     syncPasskeyWalletChain,
   };
 };

@@ -1,8 +1,4 @@
-import {
-  getEffectiveFaucetConfig,
-  getLocalResourceKeys,
-  saveLocalResourceKeys,
-} from './resourceKeys.js';
+import { getEffectiveFaucetConfig, getLocalResourceKeys, saveLocalResourceKeys } from './resourceKeys.js';
 
 describe('resourceKeys session fallback policy', () => {
   beforeEach(() => {
@@ -57,7 +53,7 @@ describe('resourceKeys session fallback policy', () => {
   it('skips reserved local-storage session keys instead of collapsing them into the general session', () => {
     localStorage.setItem(
       'ce:resourceKeys:v1',
-      '{"bySession":{"":{"rpc":{"useLocal":true,"apiKey":"general-key"}},"__proto__":{"rpc":{"useLocal":true,"apiKey":"proto-key"}},"constructor":{"rpc":{"useLocal":true,"apiKey":"constructor-key"}},"prototype":{"rpc":{"useLocal":true,"apiKey":"prototype-key"}},"alpha":{"rpc":{"useLocal":true,"apiKey":"alpha-key"}}}}'
+      '{"bySession":{"":{"rpc":{"useLocal":true,"apiKey":"general-key"}},"__proto__":{"rpc":{"useLocal":true,"apiKey":"proto-key"}},"constructor":{"rpc":{"useLocal":true,"apiKey":"constructor-key"}},"prototype":{"rpc":{"useLocal":true,"apiKey":"prototype-key"}},"alpha":{"rpc":{"useLocal":true,"apiKey":"alpha-key"}}}}',
     );
 
     const general = getLocalResourceKeys('');

@@ -1,9 +1,7 @@
 import React from 'react';
 
 import styles from './SBTPage.module.scss';
-import SbtPageMiniActionArea, {
-  type SbtPageMiniActionAreaProps,
-} from './SbtPageMiniActionArea';
+import SbtPageMiniActionArea, { type SbtPageMiniActionAreaProps } from './SbtPageMiniActionArea';
 import SbtPageMiniCardDisplay from './SbtPageMiniCardDisplay';
 
 type SbtPageMiniCardProps = SbtPageMiniActionAreaProps & {
@@ -68,59 +66,59 @@ const SbtPageMiniCard = ({
   showLockIcon = false,
   showMiniSbtAddress = false,
 }: SbtPageMiniCardProps): React.ReactElement => (
-    <div
-      className={styles.sbtItem}
-      style={cardStyle}
-      role="button"
-      tabIndex={0}
-      onClick={onCardClick}
-      onKeyDown={onCardKeyDown}
-    >
-      <SbtPageMiniCardDisplay
-        imageUrl={imageUrl}
-        isMintingActive={isMintingActive}
-        mintStatusId={mintStatusId}
-        mintingLabel={mintingLabel}
-        onImageError={onImageError}
-        sbtAddress={sbtAddress}
-        sbtName={sbtName}
-        shouldRenderEndedIndicator={shouldRenderEndedIndicator}
-        shouldRenderLiveIndicator={shouldRenderLiveIndicator}
-        showLockIcon={showLockIcon}
-        showMiniSbtAddress={showMiniSbtAddress}
-      />
-      <SbtPageMiniActionArea
-        burnLabel={burnLabel}
-        burnedLabel={burnedLabel}
-        groupPasswordInput={groupPasswordInput}
-        hasTokenMini={hasTokenMini}
-        miniActionFailureState={miniActionFailureState}
-        miniActionFailureStatusStyle={miniActionFailureStatusStyle}
-        miniActionStatusStyle={miniActionStatusStyle}
-        miniBurnActionButtonClassName={miniBurnActionButtonClassName}
-        miniBurnButtonState={miniBurnButtonState}
-        miniBurnContentState={miniBurnContentState}
-        miniControlTopMarginStyle={miniControlTopMarginStyle}
-        miniInviteInputStyle={miniInviteInputStyle}
-        miniManualClaimActionRequest={miniManualClaimActionRequest}
-        miniMintActionPlan={miniMintActionPlan}
-        miniMintActionButtonClassName={miniMintActionButtonClassName}
-        miniOpenMintButtonState={miniOpenMintButtonState}
-        miniPasswordControlInputStyle={miniPasswordControlInputStyle}
-        miniPasswordJoinButtonState={miniPasswordJoinButtonState}
-        miniPasswordJoinContentState={miniPasswordJoinContentState}
-        miniTokenActionDisplayState={miniTokenActionDisplayState}
-        mintFailedLabel={mintFailedLabel}
-        mintedLabel={mintedLabel}
-        onClaimWithInviteCode={onClaimWithInviteCode}
-        onGroupPasswordInputChange={onGroupPasswordInputChange}
-        onManualPasswordInputChange={onManualPasswordInputChange}
-        onMiniBurn={onMiniBurn}
-        onMiniMint={onMiniMint}
-        onMintUnlimitedWithGroupPassword={onMintUnlimitedWithGroupPassword}
-        onShowMiniPasswordInput={onShowMiniPasswordInput}
-      />
-    </div>
+  <div
+    className={styles.sbtItem}
+    style={cardStyle}
+    role="button"
+    tabIndex={0}
+    onClick={onCardClick}
+    onKeyDown={onCardKeyDown}
+  >
+    <SbtPageMiniCardDisplay
+      imageUrl={imageUrl}
+      isMintingActive={isMintingActive}
+      mintStatusId={mintStatusId}
+      mintingLabel={mintingLabel}
+      onImageError={onImageError}
+      sbtAddress={sbtAddress}
+      sbtName={sbtName}
+      shouldRenderEndedIndicator={shouldRenderEndedIndicator}
+      shouldRenderLiveIndicator={shouldRenderLiveIndicator}
+      showLockIcon={showLockIcon}
+      showMiniSbtAddress={showMiniSbtAddress}
+    />
+    <SbtPageMiniActionArea
+      burnLabel={burnLabel}
+      burnedLabel={burnedLabel}
+      groupPasswordInput={groupPasswordInput}
+      hasTokenMini={hasTokenMini}
+      miniActionFailureState={miniActionFailureState}
+      miniActionFailureStatusStyle={miniActionFailureStatusStyle}
+      miniActionStatusStyle={miniActionStatusStyle}
+      miniBurnActionButtonClassName={miniBurnActionButtonClassName}
+      miniBurnButtonState={miniBurnButtonState}
+      miniBurnContentState={miniBurnContentState}
+      miniControlTopMarginStyle={miniControlTopMarginStyle}
+      miniInviteInputStyle={miniInviteInputStyle}
+      miniManualClaimActionRequest={miniManualClaimActionRequest}
+      miniMintActionPlan={miniMintActionPlan}
+      miniMintActionButtonClassName={miniMintActionButtonClassName}
+      miniOpenMintButtonState={miniOpenMintButtonState}
+      miniPasswordControlInputStyle={miniPasswordControlInputStyle}
+      miniPasswordJoinButtonState={miniPasswordJoinButtonState}
+      miniPasswordJoinContentState={miniPasswordJoinContentState}
+      miniTokenActionDisplayState={miniTokenActionDisplayState}
+      mintFailedLabel={mintFailedLabel}
+      mintedLabel={mintedLabel}
+      onClaimWithInviteCode={onClaimWithInviteCode}
+      onGroupPasswordInputChange={onGroupPasswordInputChange}
+      onManualPasswordInputChange={onManualPasswordInputChange}
+      onMiniBurn={onMiniBurn}
+      onMiniMint={onMiniMint}
+      onMintUnlimitedWithGroupPassword={onMintUnlimitedWithGroupPassword}
+      onShowMiniPasswordInput={onShowMiniPasswordInput}
+    />
+  </div>
 );
 
 export default SbtPageMiniCard;

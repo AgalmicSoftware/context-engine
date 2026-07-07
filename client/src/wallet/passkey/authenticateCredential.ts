@@ -31,15 +31,17 @@ export const authenticatePasskeyCredential = async ({
     extensions: buildPrfExtension(salt),
   };
   if (credentialId) {
-    publicKey.allowCredentials = [{
-      id: base64URLToBuffer(credentialId),
-      type: 'public-key',
-      transports: ['internal', 'hybrid'],
-    }];
+    publicKey.allowCredentials = [
+      {
+        id: base64URLToBuffer(credentialId),
+        type: 'public-key',
+        transports: ['internal', 'hybrid'],
+      },
+    ];
   }
-  const credential = await credentials.get({
+  const credential = (await credentials.get({
     publicKey,
-  } as CredentialRequestOptions) as PublicKeyCredential | null;
+  } as CredentialRequestOptions)) as PublicKeyCredential | null;
   if (!credential) throw new Error('No passkey assertion was returned.');
   return { credential, prfOutput: getCredentialPrfOutput(credential) };
 };

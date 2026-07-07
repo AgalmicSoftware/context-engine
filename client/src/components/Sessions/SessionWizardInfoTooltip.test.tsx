@@ -22,7 +22,7 @@ describe('SessionWizardInfoTooltip', () => {
         placement="bottom"
         testId="ce-wizard-tooltip-gw-tip-test"
         ariaLabel="Test info"
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: 'Test info' })).toHaveAttribute('id', 'gw-tip-test');
@@ -33,13 +33,7 @@ describe('SessionWizardInfoTooltip', () => {
   });
 
   it('uses default trigger metadata when optional display props are omitted', () => {
-    render(
-      <SessionWizardInfoTooltip
-        enabled={true}
-        id="gw-tip-default"
-        content="Default metadata."
-      />
-    );
+    render(<SessionWizardInfoTooltip enabled={true} id="gw-tip-default" content="Default metadata." />);
 
     const trigger = screen.getByRole('button', { name: 'Show more info' });
 

@@ -10,9 +10,11 @@ import type { PendingSbtDraftLike } from './sessionWizardSbtSelections';
 
 describe('sessionWizardPendingSbtPublish', () => {
   it('normalizes featured draft auto-links and deploy context signatures', () => {
-    expect(normalizeFeaturedDraftGateAutoLink({
-      address: '0x59c6995e998f97a5a0044976f1d8fa9f2b5f0d2c',
-    })).toEqual({
+    expect(
+      normalizeFeaturedDraftGateAutoLink({
+        address: '0x59c6995e998f97a5a0044976f1d8fa9f2b5f0d2c',
+      }),
+    ).toEqual({
       gateId: 'gate-1',
       address: '0x59c6995e998f97a5a0044976f1d8fa9f2b5f0d2c',
       dismissed: false,
@@ -21,10 +23,12 @@ describe('sessionWizardPendingSbtPublish', () => {
 
     expect(normalizeFeaturedDraftGateAutoLink({ address: 'not-an-address' })).toBeNull();
 
-    expect(buildPendingSbtDeployContextSignature({
-      networkChainId: 84532,
-      contracts: { sbtFactory: { address: '0xABCDEF' } },
-    })).toBe('84532|0xabcdef');
+    expect(
+      buildPendingSbtDeployContextSignature({
+        networkChainId: 84532,
+        contracts: { sbtFactory: { address: '0xABCDEF' } },
+      }),
+    ).toBe('84532|0xabcdef');
   });
 
   it('finalizes, deploys, and persists recovery codes for pending sbt drafts', async () => {
@@ -47,12 +51,14 @@ describe('sessionWizardPendingSbtPublish', () => {
       finalizeDeferredDraftUpload,
     });
 
-    expect(finalizedDraft).toEqual(expect.objectContaining({
-      tokenURI: 'ar://finalized-token',
-      metadataUploadStatus: 'ready',
-      metadataPreview: { phase: 'finalized' },
-      authoringPayload: { step: 'finalized' },
-    }));
+    expect(finalizedDraft).toEqual(
+      expect.objectContaining({
+        tokenURI: 'ar://finalized-token',
+        metadataUploadStatus: 'ready',
+        metadataPreview: { phase: 'finalized' },
+        authoringPayload: { step: 'finalized' },
+      }),
+    );
 
     const createSBT = jest.fn(async () => ({ transactionHash: '0xreceipt' }));
     const deployed = await deploySessionWizardPendingSbtDraft({
@@ -73,15 +79,17 @@ describe('sessionWizardPendingSbtPublish', () => {
     expect(createSBT).toHaveBeenCalled();
 
     const writeRecoveryCodes = jest.fn(() => ({ ok: true, status: 'ok' }));
-    expect(persistSessionWizardSbtRecoveryCodes({
-      finalizedDraft: {
-        hasPasswordMintOnChain: true,
-        passwordList: ['claim-code-1'],
-      },
-      sbtAddress: '0x59c6995e998f97a5a0044976f1d8fa9f2b5f0d2c',
-      sessionConfigForDeploy: { networkChainId: 84532 },
-      writeRecoveryCodes,
-    })).toEqual({ ok: true, status: 'ok' });
+    expect(
+      persistSessionWizardSbtRecoveryCodes({
+        finalizedDraft: {
+          hasPasswordMintOnChain: true,
+          passwordList: ['claim-code-1'],
+        },
+        sbtAddress: '0x59c6995e998f97a5a0044976f1d8fa9f2b5f0d2c',
+        sessionConfigForDeploy: { networkChainId: 84532 },
+        writeRecoveryCodes,
+      }),
+    ).toEqual({ ok: true, status: 'ok' });
   });
 
   it('derives protected recovery and deploy flags from mintMode when legacy booleans are absent', async () => {
@@ -125,15 +133,17 @@ describe('sessionWizardPendingSbtPublish', () => {
       '0x' + '11'.repeat(32),
       { slug: 'pending-sbt', contracts: {} },
       'draft/invite',
-      { useConfiguredDeterministic: true, initializeGroupPasswordHash: true }
+      { useConfiguredDeterministic: true, initializeGroupPasswordHash: true },
     );
 
     const writeRecoveryCodes = jest.fn(() => ({ ok: true, status: 'ok' }));
-    expect(persistSessionWizardSbtRecoveryCodes({
-      finalizedDraft,
-      sbtAddress: '0x59c6995e998f97a5a0044976f1d8fa9f2b5f0d2c',
-      sessionConfigForDeploy: { networkChainId: 84532 },
-      writeRecoveryCodes,
-    })).toEqual({ ok: true, status: 'ok' });
+    expect(
+      persistSessionWizardSbtRecoveryCodes({
+        finalizedDraft,
+        sbtAddress: '0x59c6995e998f97a5a0044976f1d8fa9f2b5f0d2c',
+        sessionConfigForDeploy: { networkChainId: 84532 },
+        writeRecoveryCodes,
+      }),
+    ).toEqual({ ok: true, status: 'ok' });
   });
 });

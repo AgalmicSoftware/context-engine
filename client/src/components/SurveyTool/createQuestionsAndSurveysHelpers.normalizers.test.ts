@@ -46,8 +46,7 @@ describe('createQuestionsAndSurveysHelpers gate and tag normalizers', () => {
   });
 
   it('normalizes primitive tags and drops object-like values', () => {
-    expect(normalizeTagList([' alpha ', 42, true, '', null, {}, '[object Object]']))
-      .toEqual(['alpha', '42', 'true']);
+    expect(normalizeTagList([' alpha ', 42, true, '', null, {}, '[object Object]'])).toEqual(['alpha', '42', 'true']);
   });
 
   it('removes normalized tags from a question without mutating the original question', () => {
@@ -97,11 +96,13 @@ describe('createQuestionsAndSurveysHelpers gate and tag normalizers', () => {
       questions,
       questionIndex: 0,
     });
-    expect(added).toEqual([{
-      id: 'q1',
-      tags: ['alpha', 'beta', 'gamma'],
-      currentTagInputValue: '',
-    }]);
+    expect(added).toEqual([
+      {
+        id: 'q1',
+        tags: ['alpha', 'beta', 'gamma'],
+        currentTagInputValue: '',
+      },
+    ]);
     expect(added[0]).not.toBe(originalQuestion);
     expect(originalQuestion.currentTagInputValue).toBe(' gamma ');
 

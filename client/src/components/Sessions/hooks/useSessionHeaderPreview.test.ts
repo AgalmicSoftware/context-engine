@@ -41,20 +41,24 @@ describe('useSessionHeaderPreview', () => {
   });
 
   it('uses the draft header URL while in URL mode', () => {
-    const { result } = renderHook(() => useSessionHeaderPreview({
-      draftSessionHeader: 'https://example.test/header.png',
-      updateDraftSessionHeader: jest.fn(),
-    }));
+    const { result } = renderHook(() =>
+      useSessionHeaderPreview({
+        draftSessionHeader: 'https://example.test/header.png',
+        updateDraftSessionHeader: jest.fn(),
+      }),
+    );
 
     expect(result.current.sessionHeaderMode).toBe('url');
     expect(result.current.sessionHeaderPreviewSrc).toBe('https://example.test/header.png');
   });
 
   it('creates and revokes upload preview object URLs', () => {
-    const { result, unmount } = renderHook(() => useSessionHeaderPreview({
-      draftSessionHeader: '',
-      updateDraftSessionHeader: jest.fn(),
-    }));
+    const { result, unmount } = renderHook(() =>
+      useSessionHeaderPreview({
+        draftSessionHeader: '',
+        updateDraftSessionHeader: jest.fn(),
+      }),
+    );
     const firstFile = new File(['first'], 'first.png', { type: 'image/png' });
     const secondFile = new File(['second'], 'second.png', { type: 'image/png' });
 
@@ -83,11 +87,13 @@ describe('useSessionHeaderPreview', () => {
     const file = new File(['image'], 'paste.png', { type: 'image/png' });
     const readClipboard = jest.fn().mockResolvedValue({ kind: 'file', file });
     const updateDraftSessionHeader = jest.fn();
-    const { result } = renderHook(() => useSessionHeaderPreview({
-      draftSessionHeader: '',
-      updateDraftSessionHeader,
-      readClipboard,
-    }));
+    const { result } = renderHook(() =>
+      useSessionHeaderPreview({
+        draftSessionHeader: '',
+        updateDraftSessionHeader,
+        readClipboard,
+      }),
+    );
 
     await act(async () => {
       await result.current.handlePasteSessionHeaderFromClipboard();
@@ -107,11 +113,13 @@ describe('useSessionHeaderPreview', () => {
       text: 'https://example.test/from-clipboard.png',
     });
     const updateDraftSessionHeader = jest.fn();
-    const { result } = renderHook(() => useSessionHeaderPreview({
-      draftSessionHeader: '',
-      updateDraftSessionHeader,
-      readClipboard,
-    }));
+    const { result } = renderHook(() =>
+      useSessionHeaderPreview({
+        draftSessionHeader: '',
+        updateDraftSessionHeader,
+        readClipboard,
+      }),
+    );
 
     act(() => {
       result.current.setSessionHeaderMode('upload');
@@ -134,11 +142,13 @@ describe('useSessionHeaderPreview', () => {
       kind: 'error',
       error: 'No image available.',
     });
-    const { result } = renderHook(() => useSessionHeaderPreview({
-      draftSessionHeader: '',
-      updateDraftSessionHeader: jest.fn(),
-      readClipboard,
-    }));
+    const { result } = renderHook(() =>
+      useSessionHeaderPreview({
+        draftSessionHeader: '',
+        updateDraftSessionHeader: jest.fn(),
+        readClipboard,
+      }),
+    );
 
     await act(async () => {
       await result.current.handlePasteSessionHeaderFromClipboard();
@@ -150,10 +160,12 @@ describe('useSessionHeaderPreview', () => {
 
   it('clears preview state and draft header value', () => {
     const updateDraftSessionHeader = jest.fn();
-    const { result } = renderHook(() => useSessionHeaderPreview({
-      draftSessionHeader: 'https://example.test/header.png',
-      updateDraftSessionHeader,
-    }));
+    const { result } = renderHook(() =>
+      useSessionHeaderPreview({
+        draftSessionHeader: 'https://example.test/header.png',
+        updateDraftSessionHeader,
+      }),
+    );
 
     act(() => {
       result.current.setSessionHeaderMode('upload');

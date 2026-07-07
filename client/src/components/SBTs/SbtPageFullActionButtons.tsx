@@ -3,10 +3,7 @@ import React from 'react';
 import styles from './SBTPage.module.scss';
 import SbtPageMintInputAction from './SbtPageMintInputAction';
 import SbtPageStatusActionButton from './SbtPageStatusActionButton';
-import {
-  runSbtPageBurnActionController,
-  runSbtPageMintActionController,
-} from './sbtPageActionController';
+import { runSbtPageBurnActionController, runSbtPageMintActionController } from './sbtPageActionController';
 import type {
   SbtPageBurnActionPlan,
   SbtPageBurnStatusButtonState,
@@ -86,14 +83,16 @@ export const SbtPageMintActionSurface = ({
         inputValue={groupPasswordInput || ''}
         onInputChange={onGroupPasswordInputChange}
         placeholder="Group Password"
-        onAction={(event) => runSbtPageMintActionController({
-          disabled: passwordJoinButtonState.disabled,
-          event,
-          plan: mintActionPlan,
-          ports: {
-            dispatchMint: onMintUnlimitedWithGroupPassword,
-          },
-        })}
+        onAction={(event) =>
+          runSbtPageMintActionController({
+            disabled: passwordJoinButtonState.disabled,
+            event,
+            plan: mintActionPlan,
+            ports: {
+              dispatchMint: onMintUnlimitedWithGroupPassword,
+            },
+          })
+        }
       />
     );
   }
@@ -108,41 +107,41 @@ export const SbtPageMintActionSurface = ({
         inputValue={groupPasswordInput || ''}
         onInputChange={onGroupPasswordInputChange}
         placeholder="Group Password"
-        onAction={(event) => runSbtPageMintActionController({
-          disabled: passwordJoinButtonState.disabled,
-          event,
-          mintArgs: [groupPasswordInput],
-          plan: mintActionPlan,
-          ports: {
-            dispatchMint: onClaimWithInviteCode,
-          },
-        })}
+        onAction={(event) =>
+          runSbtPageMintActionController({
+            disabled: passwordJoinButtonState.disabled,
+            event,
+            mintArgs: [groupPasswordInput],
+            plan: mintActionPlan,
+            ports: {
+              dispatchMint: onClaimWithInviteCode,
+            },
+          })
+        }
       />
     );
   }
 
   if (mintFlowDisplayState.shouldRenderOpenMintButton) {
-    const {
-      canOpenMintTx,
-      disabled,
-      title,
-    } = openMintButtonState;
+    const { canOpenMintTx, disabled, title } = openMintButtonState;
     return (
       <SbtPageStatusActionButton
         className={buttonClassName}
         contentState={openMintButtonContentState}
         disabled={disabled}
-        onClick={(event) => runSbtPageMintActionController({
-          canOpenMintTx,
-          disabled,
-          event,
-          mintArgs: [true],
-          plan: mintActionPlan,
-          ports: {
-            dispatchMint: onMint,
-            openMintTransaction: onOpenMintTransaction,
-          },
-        })}
+        onClick={(event) =>
+          runSbtPageMintActionController({
+            canOpenMintTx,
+            disabled,
+            event,
+            mintArgs: [true],
+            plan: mintActionPlan,
+            ports: {
+              dispatchMint: onMint,
+              openMintTransaction: onOpenMintTransaction,
+            },
+          })
+        }
         title={title}
       />
     );
@@ -158,15 +157,17 @@ export const SbtPageMintActionSurface = ({
         inputValue={manualClaimActionRequest.inputValue}
         onInputChange={onManualPasswordInputChange}
         placeholder={manualClaimActionRequest.placeholder}
-        onAction={(event) => runSbtPageMintActionController({
-          disabled: manualClaimActionRequest.disabled,
-          event,
-          mintArgs: manualClaimActionRequest.mintArgs,
-          plan: mintActionPlan,
-          ports: {
-            dispatchMint: onMint,
-          },
-        })}
+        onAction={(event) =>
+          runSbtPageMintActionController({
+            disabled: manualClaimActionRequest.disabled,
+            event,
+            mintArgs: manualClaimActionRequest.mintArgs,
+            plan: mintActionPlan,
+            ports: {
+              dispatchMint: onMint,
+            },
+          })
+        }
       />
     );
   }
@@ -212,14 +213,16 @@ export const SbtPageBurnActionSurface = ({
       className={buttonClassName}
       contentState={contentState}
       disabled={displayState.disabled}
-      onClick={(event) => runSbtPageBurnActionController({
-        disabled: displayState.disabled,
-        event,
-        plan,
-        ports: {
-          dispatchBurn: onBurn,
-        },
-      })}
+      onClick={(event) =>
+        runSbtPageBurnActionController({
+          disabled: displayState.disabled,
+          event,
+          plan,
+          ports: {
+            dispatchBurn: onBurn,
+          },
+        })
+      }
     />
   );
 };

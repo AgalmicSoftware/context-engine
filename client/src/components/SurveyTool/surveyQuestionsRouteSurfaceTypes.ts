@@ -14,13 +14,10 @@ type SurveyQuestionsRouteAnswerRenderer = (
   question: any,
   answers: any,
   index: number,
-  isOwnResponse: unknown
+  isOwnResponse: unknown,
 ) => React.ReactNode;
 
-type SurveyQuestionsRouteSurveyAnswersRenderer = (
-  responses: any[],
-  isOwnResponse: unknown
-) => React.ReactNode;
+type SurveyQuestionsRouteSurveyAnswersRenderer = (responses: any[], isOwnResponse: unknown) => React.ReactNode;
 
 export type SurveyQuestionsRouteTopStripProps = {
   topRef?: React.Ref<HTMLDivElement>;
@@ -152,8 +149,7 @@ export type SurveyQuestionsResponseRouteSectionProps = {
   routeViewDisplayState?: Partial<SurveyQuestionsRouteViewDisplayState>;
 };
 
-export type SurveyQuestionsJsonRouteSectionProps =
-  SurveyQuestionsRouteJsonControlsProps;
+export type SurveyQuestionsJsonRouteSectionProps = SurveyQuestionsRouteJsonControlsProps;
 
 export type SurveyQuestionsTagModalSlotProps = {
   layoutDisplayState?: Partial<SurveyQuestionsLayoutDisplayState>;

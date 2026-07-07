@@ -2,13 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { connect } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretDown,
-  faCaretUp,
-  faCog,
-  faExternalLinkAlt,
-  faPlus,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCog, faExternalLinkAlt, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
 import { callAI } from '../../utilities/ai/aiScripts.js';
 import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
@@ -25,9 +19,7 @@ import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/quest
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
 import SessionChipSelector from '../Shared/SessionChipSelector';
-import {
-  buildTagPagePath,
-} from '../SurveyTool/QuestionTagDropdown';
+import { buildTagPagePath } from '../SurveyTool/QuestionTagDropdown';
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 import type { RootState } from '../../reducers/index.js';
 import styles from './TagPage.module.scss';
@@ -51,7 +43,7 @@ export const writeTagAiCacheEntry = (
   cache: Map<string, string>,
   key: string,
   value: string,
-  limit = TAG_AI_CACHE_LIMIT
+  limit = TAG_AI_CACHE_LIMIT,
 ): void => {
   if (cache.has(key)) cache.delete(key);
   cache.set(key, value);
@@ -199,15 +191,13 @@ const parseTagPath = (pathname = ''): string[] => {
   const rawSegment = (String(pathname || '').split('/tag/')[1] || '').replace(/\/+$/, '');
   if (!rawSegment) return [];
 
-  const decodedSegments = rawSegment
-    .split('+')
-    .map((segment) => {
-      try {
-        return decodeURIComponent(segment);
-      } catch (_) {
-        return segment;
-      }
-    });
+  const decodedSegments = rawSegment.split('+').map((segment) => {
+    try {
+      return decodeURIComponent(segment);
+    } catch (_) {
+      return segment;
+    }
+  });
 
   return getQuestionTagDisplayList(decodedSegments);
 };
@@ -227,19 +217,18 @@ const dedupeSessionSlugs = (values: unknown[] | unknown = []): string[] => {
 const buildSessionScopeLabel = (slugIn = ''): string => {
   const slug = normalizeSessionSlug(slugIn);
   if (!slug) return 'General';
-  const cfg = (
-    getStrictSessionConfigBySlug(slug) ||
-    getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) ||
-    {}
-  );
+  const cfg = getStrictSessionConfigBySlug(slug) || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) || {};
   const sessionName = String(cfg?.sessionName || '').trim();
   return sessionName && sessionName.toLowerCase() !== slug.toLowerCase()
     ? `${sessionName} (${slug})`
-    : (sessionName || slug);
+    : sessionName || slug;
 };
 
 export const buildGlobalTagPageScope = (selection: SessionSelectionState = {}): ScopeState => {
-  const scopeMode = String(selection?.selectedSessionScope || '').trim().toLowerCase() || 'active';
+  const scopeMode =
+    String(selection?.selectedSessionScope || '')
+      .trim()
+      .toLowerCase() || 'active';
   if (scopeMode === 'all') {
     return { filterMode: 'all', scopeSlugs: [] };
   }
@@ -324,7 +313,9 @@ const buildTagPageSelectorHint = ({
   if (routePinned) return 'This tag page is pinned to a specific session from the URL.';
   if (localOverrideTouched) return 'Using a local Tag explorer override.';
 
-  const scopeMode = String(globalSelection?.selectedSessionScope || '').trim().toLowerCase();
+  const scopeMode = String(globalSelection?.selectedSessionScope || '')
+    .trim()
+    .toLowerCase();
   if (scopeMode === 'all') return 'Using the global all-sessions scope by default.';
   if (scopeMode === 'list') return 'Using the global session list by default.';
   if (scopeMode === 'general') return 'Using the global general-session scope by default.';
@@ -369,17 +360,18 @@ const buildTagPageSessionSelectorOptions = ({
 const sortTagEntriesByCount = ({
   counts = new Map(),
   displayMap = new Map(),
-}: SortTagEntriesArgs = {}): SortTagEntry[] => Array.from(counts.entries())
-  .sort((left, right) => {
-    if (right[1] !== left[1]) return right[1] - left[1];
-    const leftLabel = displayMap.get(left[0]) || left[0];
-    const rightLabel = displayMap.get(right[0]) || right[0];
-    return leftLabel.localeCompare(rightLabel);
-  })
-  .map(([normalizedTag]) => ({
-    normalizedTag,
-    displayTag: displayMap.get(normalizedTag) || normalizedTag,
-  }));
+}: SortTagEntriesArgs = {}): SortTagEntry[] =>
+  Array.from(counts.entries())
+    .sort((left, right) => {
+      if (right[1] !== left[1]) return right[1] - left[1];
+      const leftLabel = displayMap.get(left[0]) || left[0];
+      const rightLabel = displayMap.get(right[0]) || right[0];
+      return leftLabel.localeCompare(rightLabel);
+    })
+    .map(([normalizedTag]) => ({
+      normalizedTag,
+      displayTag: displayMap.get(normalizedTag) || normalizedTag,
+    }));
 
 const buildDemoCorpusEmptyText = (selectedTags: string[] = []): string => {
   if (selectedTags.length === 1) {
@@ -531,15 +523,17 @@ const collectTagPageData = ({
     const cacheValue = entry?.value && typeof entry.value === 'object' ? entry.value : {};
 
     Object.entries(cacheValue).forEach(([networkId, networkBucket]) => {
-      const questionsById = networkBucket?.questions && typeof networkBucket.questions === 'object'
-        ? networkBucket.questions
-        : {};
-      const responsesById = networkBucket?.questionResponses && typeof networkBucket.questionResponses === 'object'
-        ? networkBucket.questionResponses
-        : {};
+      const questionsById =
+        networkBucket?.questions && typeof networkBucket.questions === 'object' ? networkBucket.questions : {};
+      const responsesById =
+        networkBucket?.questionResponses && typeof networkBucket.questionResponses === 'object'
+          ? networkBucket.questionResponses
+          : {};
 
       Object.entries(questionsById).forEach(([questionId, question]) => {
-        const resolvedQuestionId = String(question?.id || questionId || '').trim().toLowerCase();
+        const resolvedQuestionId = String(question?.id || questionId || '')
+          .trim()
+          .toLowerCase();
         if (!resolvedQuestionId) return;
 
         const questionTags = getQuestionTagDisplayList(question?.tags);
@@ -548,7 +542,8 @@ const collectTagPageData = ({
         questionTags.forEach((tag) => {
           const normalizedTag = normalizeTagList([tag])[0];
           const displayTag = String(tag || '').trim() || normalizedTag;
-          if (!normalizedTag || normalizedSelectedTags.includes(normalizedTag) || questionSeenScoped.has(normalizedTag)) return;
+          if (!normalizedTag || normalizedSelectedTags.includes(normalizedTag) || questionSeenScoped.has(normalizedTag))
+            return;
           questionSeenScoped.add(normalizedTag);
           if (!scopedDisplay.has(normalizedTag)) {
             scopedDisplay.set(normalizedTag, displayTag);
@@ -568,7 +563,12 @@ const collectTagPageData = ({
         questionTags.forEach((tag) => {
           const normalizedTag = normalizeTagList([tag])[0];
           const displayTag = String(tag || '').trim() || normalizedTag;
-          if (!normalizedTag || normalizedSelectedTags.includes(normalizedTag) || questionSeenRelated.has(normalizedTag)) return;
+          if (
+            !normalizedTag ||
+            normalizedSelectedTags.includes(normalizedTag) ||
+            questionSeenRelated.has(normalizedTag)
+          )
+            return;
           questionSeenRelated.add(normalizedTag);
           if (!relatedDisplay.has(normalizedTag)) {
             relatedDisplay.set(normalizedTag, displayTag);
@@ -654,15 +654,12 @@ const collectSbtGroupData = ({
     const cacheValue = entry?.value && typeof entry.value === 'object' ? entry.value : {};
 
     Object.entries(cacheValue).forEach(([networkId, networkBucket]) => {
-      const sbtList = networkBucket?.sbtList && typeof networkBucket.sbtList === 'object'
-        ? networkBucket.sbtList
-        : {};
+      const sbtList = networkBucket?.sbtList && typeof networkBucket.sbtList === 'object' ? networkBucket.sbtList : {};
 
       Object.entries(sbtList).forEach(([cacheAddress, sbtEntry]) => {
         const resolvedEntry = sbtEntry && typeof sbtEntry === 'object' ? sbtEntry : {};
-        const sbtInfo = resolvedEntry?.sbtInfo && typeof resolvedEntry.sbtInfo === 'object'
-          ? resolvedEntry.sbtInfo
-          : {};
+        const sbtInfo =
+          resolvedEntry?.sbtInfo && typeof resolvedEntry.sbtInfo === 'object' ? resolvedEntry.sbtInfo : {};
         if (sbtInfo?.private === true) return;
 
         const rawTags = Array.isArray(sbtInfo?.tags) ? sbtInfo.tags : [];
@@ -774,44 +771,38 @@ export const TagPageView = ({
     setSessionSelectorOpen(false);
   }, [location.pathname, location.search]);
 
-  const routeSelectedTags = useMemo(
-    () => parseTagPath(location.pathname),
-    [location.pathname]
-  );
+  const routeSelectedTags = useMemo(() => parseTagPath(location.pathname), [location.pathname]);
   const hasSelectedTagsOverride = selectedTagsOverride !== null && typeof selectedTagsOverride !== 'undefined';
   const selectedTags = useMemo<string[]>(() => {
     if (!hasSelectedTagsOverride) return routeSelectedTags;
 
-    const overrideTags = Array.isArray(selectedTagsOverride)
-      ? selectedTagsOverride
-      : [selectedTagsOverride];
+    const overrideTags = Array.isArray(selectedTagsOverride) ? selectedTagsOverride : [selectedTagsOverride];
     return getQuestionTagDisplayList(overrideTags);
   }, [hasSelectedTagsOverride, routeSelectedTags, selectedTagsOverride]);
-  const normalizedSelectedTags = useMemo(
-    () => normalizeTagList(selectedTags),
-    [selectedTags]
-  );
+  const normalizedSelectedTags = useMemo(() => normalizeTagList(selectedTags), [selectedTags]);
   const selectedTagsCacheKey = useMemo(
-    () => normalizedSelectedTags.slice().sort((left, right) => left.localeCompare(right)).join('||'),
-    [normalizedSelectedTags]
+    () =>
+      normalizedSelectedTags
+        .slice()
+        .sort((left, right) => left.localeCompare(right))
+        .join('||'),
+    [normalizedSelectedTags],
   );
   const isDemoCorpusContext = demoCorpusMode === true;
 
-  const queryPinnedScopeSlug = useMemo(() => (
-    parseQuestionSessionSlugFromSearch(location.search)
-  ), [location.search]);
+  const queryPinnedScopeSlug = useMemo(() => parseQuestionSessionSlugFromSearch(location.search), [location.search]);
   const routePinned = queryPinnedScopeSlug !== null;
   const globalSessionSelection = useMemo<SessionSelectionState>(
     () => normalizeGlobalSessionSelection(sessionState || {}) as SessionSelectionState,
-    [sessionState]
+    [sessionState],
   );
   const globalScopeState = useMemo<ScopeState>(
     () => buildGlobalTagPageScope(globalSessionSelection),
-    [globalSessionSelection]
+    [globalSessionSelection],
   );
   const normalizedLocalOverrideSlug = useMemo(
     () => normalizeSessionSlug(localSessionOverrideSlug),
-    [localSessionOverrideSlug]
+    [localSessionOverrideSlug],
   );
   const effectiveScopeState = useMemo<ScopeState>(() => {
     if (routePinned) {
@@ -827,86 +818,77 @@ export const TagPageView = ({
       };
     }
     return globalScopeState;
-  }, [
-    globalScopeState,
-    localSessionOverrideTouched,
-    normalizedLocalOverrideSlug,
-    queryPinnedScopeSlug,
-    routePinned,
-  ]);
+  }, [globalScopeState, localSessionOverrideTouched, normalizedLocalOverrideSlug, queryPinnedScopeSlug, routePinned]);
   const effectiveScopeSlugs = useMemo(
     () => (Array.isArray(effectiveScopeState.scopeSlugs) ? effectiveScopeState.scopeSlugs : []),
-    [effectiveScopeState.scopeSlugs]
+    [effectiveScopeState.scopeSlugs],
   );
   const effectiveScopeCacheKey = useMemo(
-    () => [
+    () => [effectiveScopeState.filterMode, ...effectiveScopeSlugs].join('||'),
+    [effectiveScopeState.filterMode, effectiveScopeSlugs],
+  );
+  const effectiveSingleScopeSlug =
+    effectiveScopeState.filterMode === 'set' && effectiveScopeSlugs.length === 1 ? effectiveScopeSlugs[0] : '';
+  const hasSingleSessionScope = effectiveScopeState.filterMode === 'set' && effectiveScopeSlugs.length === 1;
+  const aiCacheKey = useMemo(
+    () =>
+      [
+        selectedTagsCacheKey,
+        effectiveSingleScopeSlug || effectiveScopeCacheKey,
+        String(cacheVersion || 0),
+        String(questionResponsesNonce || 0),
+      ].join('::'),
+    [cacheVersion, effectiveScopeCacheKey, effectiveSingleScopeSlug, questionResponsesNonce, selectedTagsCacheKey],
+  );
+  const scopeSummary = useMemo(
+    () =>
+      describeScopeSummary({
+        filterMode: effectiveScopeState.filterMode,
+        scopeSlugs: effectiveScopeSlugs,
+        routePinned,
+        localOverrideTouched: localSessionOverrideTouched,
+        sessionRegistryRevision,
+      }),
+    [
       effectiveScopeState.filterMode,
-      ...effectiveScopeSlugs,
-    ].join('||'),
-    [effectiveScopeState.filterMode, effectiveScopeSlugs]
+      effectiveScopeSlugs,
+      localSessionOverrideTouched,
+      routePinned,
+      sessionRegistryRevision,
+    ],
   );
-  const effectiveSingleScopeSlug = (
-    effectiveScopeState.filterMode === 'set' && effectiveScopeSlugs.length === 1
-      ? effectiveScopeSlugs[0]
-      : ''
+  const sessionSelectorHint = useMemo(
+    () =>
+      buildTagPageSelectorHint({
+        routePinned: isDemoCorpusContext ? false : routePinned,
+        localOverrideTouched: isDemoCorpusContext ? false : localSessionOverrideTouched,
+        globalSelection: globalSessionSelection,
+      }),
+    [globalSessionSelection, isDemoCorpusContext, localSessionOverrideTouched, routePinned],
   );
-  const hasSingleSessionScope = (
-    effectiveScopeState.filterMode === 'set' && effectiveScopeSlugs.length === 1
-  );
-  const aiCacheKey = useMemo(() => [
-    selectedTagsCacheKey,
-    effectiveSingleScopeSlug || effectiveScopeCacheKey,
-    String(cacheVersion || 0),
-    String(questionResponsesNonce || 0),
-  ].join('::'), [
-    cacheVersion,
-    effectiveScopeCacheKey,
-    effectiveSingleScopeSlug,
-    questionResponsesNonce,
-    selectedTagsCacheKey,
-  ]);
-  const scopeSummary = useMemo(() => describeScopeSummary({
-    filterMode: effectiveScopeState.filterMode,
-    scopeSlugs: effectiveScopeSlugs,
-    routePinned,
-    localOverrideTouched: localSessionOverrideTouched,
-    sessionRegistryRevision,
-  }), [
-    effectiveScopeState.filterMode,
-    effectiveScopeSlugs,
-    localSessionOverrideTouched,
-    routePinned,
-    sessionRegistryRevision,
-  ]);
-  const sessionSelectorHint = useMemo(() => buildTagPageSelectorHint({
-    routePinned: isDemoCorpusContext ? false : routePinned,
-    localOverrideTouched: isDemoCorpusContext ? false : localSessionOverrideTouched,
-    globalSelection: globalSessionSelection,
-  }), [
-    globalSessionSelection,
-    isDemoCorpusContext,
-    localSessionOverrideTouched,
-    routePinned,
-  ]);
   const selectedSessionSelectorSlug = routePinned
     ? normalizeSessionSlug(queryPinnedScopeSlug)
-    : (localSessionOverrideTouched ? normalizedLocalOverrideSlug : null);
-  const sessionSelectorOptions = useMemo<SessionSelectorOption[]>(() => (
-    isDemoCorpusContext
-      ? []
-      : buildTagPageSessionSelectorOptions({
-        selectedSlug: selectedSessionSelectorSlug,
-        primarySlug: globalSessionSelection.primarySessionSlug || '',
-        scopedSlugs: effectiveScopeSlugs,
-        sessionRegistryRevision,
-      })
-  ), [
-    effectiveScopeSlugs,
-    globalSessionSelection.primarySessionSlug,
-    isDemoCorpusContext,
-    sessionRegistryRevision,
-    selectedSessionSelectorSlug,
-  ]);
+    : localSessionOverrideTouched
+      ? normalizedLocalOverrideSlug
+      : null;
+  const sessionSelectorOptions = useMemo<SessionSelectorOption[]>(
+    () =>
+      isDemoCorpusContext
+        ? []
+        : buildTagPageSessionSelectorOptions({
+            selectedSlug: selectedSessionSelectorSlug,
+            primarySlug: globalSessionSelection.primarySessionSlug || '',
+            scopedSlugs: effectiveScopeSlugs,
+            sessionRegistryRevision,
+          }),
+    [
+      effectiveScopeSlugs,
+      globalSessionSelection.primarySessionSlug,
+      isDemoCorpusContext,
+      sessionRegistryRevision,
+      selectedSessionSelectorSlug,
+    ],
+  );
 
   useEffect(() => {
     if (!routePinned) return;
@@ -965,17 +947,16 @@ export const TagPageView = ({
     relatedTags: string[];
     pickerTags: string[];
   }>(
-    () => (
+    () =>
       isDemoCorpusContext
         ? { questions: [], relatedTags: [], pickerTags: [] }
         : collectTagPageData({
-          selectedTags,
-          scopeFilterMode: effectiveScopeState.filterMode,
-          scopeSlugs: effectiveScopeSlugs,
-          cacheVersion,
-          questionResponsesNonce,
-        })
-    ),
+            selectedTags,
+            scopeFilterMode: effectiveScopeState.filterMode,
+            scopeSlugs: effectiveScopeSlugs,
+            cacheVersion,
+            questionResponsesNonce,
+          }),
     [
       cacheVersion,
       effectiveScopeState.filterMode,
@@ -983,47 +964,41 @@ export const TagPageView = ({
       isDemoCorpusContext,
       questionResponsesNonce,
       selectedTags,
-    ]
+    ],
   );
   const demoCorpusData = useMemo<{
     entries: DemoCorpusEntry[];
     relatedTags: string[];
     pickerTags: string[];
   }>(
-    () => (
+    () =>
       isDemoCorpusContext
         ? collectDemoCorpusData({ selectedTags, demoCorpusRecords })
-        : { entries: [], relatedTags: [], pickerTags: [] }
-    ),
-    [demoCorpusRecords, isDemoCorpusContext, selectedTags]
+        : { entries: [], relatedTags: [], pickerTags: [] },
+    [demoCorpusRecords, isDemoCorpusContext, selectedTags],
   );
   const questions = questionData.questions;
   const demoCorpusEntries = demoCorpusData.entries;
   const relatedTags = isDemoCorpusContext ? demoCorpusData.relatedTags : questionData.relatedTags;
   const pickerTags = isDemoCorpusContext ? demoCorpusData.pickerTags : questionData.pickerTags;
   const sbtGroups = useMemo<SbtGroupSummary[]>(
-    () => (
+    () =>
       isDemoCorpusContext
         ? []
         : collectSbtGroupData({
-          selectedTags,
-          scopeFilterMode: effectiveScopeState.filterMode,
-          scopeSlugs: effectiveScopeSlugs,
-          cacheVersion: sbtCacheVersion,
-        })
-    ),
-    [effectiveScopeState.filterMode, effectiveScopeSlugs, isDemoCorpusContext, sbtCacheVersion, selectedTags]
+            selectedTags,
+            scopeFilterMode: effectiveScopeState.filterMode,
+            scopeSlugs: effectiveScopeSlugs,
+            cacheVersion: sbtCacheVersion,
+          }),
+    [effectiveScopeState.filterMode, effectiveScopeSlugs, isDemoCorpusContext, sbtCacheVersion, selectedTags],
   );
   const showQuestionLoadingState = !isDemoCorpusContext && !isQuestionCacheReady && !questions.length;
-  const demoCorpusEmptyText = useMemo(
-    () => buildDemoCorpusEmptyText(selectedTags),
-    [selectedTags]
+  const demoCorpusEmptyText = useMemo(() => buildDemoCorpusEmptyText(selectedTags), [selectedTags]);
+  const titleText = useMemo(
+    () => (selectedTags.length ? selectedTags.map((tag) => `#${tag}`).join(' + ') : 'Tag explorer'),
+    [selectedTags],
   );
-  const titleText = useMemo(() => (
-    selectedTags.length
-      ? selectedTags.map((tag) => `#${tag}`).join(' + ')
-      : 'Tag explorer'
-  ), [selectedTags]);
 
   const handleAddTag = (rawTag: string) => {
     const displayTag = String(rawTag || '').trim();
@@ -1119,31 +1094,23 @@ export const TagPageView = ({
     }
   };
 
-  const renderSelectedTagPills = ({ hero = false }: { hero?: boolean } = {}) => selectedTags.map((tag) => (
-    <span
-      key={tag}
-      className={[
-        styles.tagPill,
-        hero ? styles.tagPillHero : '',
-      ].filter(Boolean).join(' ')}
-    >
-      <span className={styles.tagPillLabel}>#{tag}</span>
-      <button
-        type="button"
-        className={[
-          styles.tagPillRemove,
-          hero ? styles.tagPillRemoveHero : '',
-        ].filter(Boolean).join(' ')}
-        onClick={(event) => {
-          event.stopPropagation();
-          handleRemoveTag(tag);
-        }}
-        aria-label={`Remove ${tag} tag`}
-      >
-        ×
-      </button>
-    </span>
-  ));
+  const renderSelectedTagPills = ({ hero = false }: { hero?: boolean } = {}) =>
+    selectedTags.map((tag) => (
+      <span key={tag} className={[styles.tagPill, hero ? styles.tagPillHero : ''].filter(Boolean).join(' ')}>
+        <span className={styles.tagPillLabel}>#{tag}</span>
+        <button
+          type="button"
+          className={[styles.tagPillRemove, hero ? styles.tagPillRemoveHero : ''].filter(Boolean).join(' ')}
+          onClick={(event) => {
+            event.stopPropagation();
+            handleRemoveTag(tag);
+          }}
+          aria-label={`Remove ${tag} tag`}
+        >
+          ×
+        </button>
+      </span>
+    ));
 
   const toggleDemoEntryExpanded = (entryKey: string) => {
     const normalizedKey = String(entryKey || '').trim();
@@ -1161,14 +1128,8 @@ export const TagPageView = ({
           <div className={styles.headerTopRow}>
             <div className={styles.headerLead}>
               {selectedTags.length ? (
-                <h1
-                  className={styles.titlePillHeading}
-                  data-testid="tag-page-title"
-                  aria-label={titleText}
-                >
-                  <span className={styles.titleTagRow}>
-                    {renderSelectedTagPills({ hero: true })}
-                  </span>
+                <h1 className={styles.titlePillHeading} data-testid="tag-page-title" aria-label={titleText}>
+                  <span className={styles.titleTagRow}>{renderSelectedTagPills({ hero: true })}</span>
                 </h1>
               ) : (
                 <h1
@@ -1183,11 +1144,7 @@ export const TagPageView = ({
               <div className={[styles.headerMeta, embedded ? styles.headerMetaEmbedded : ''].filter(Boolean).join(' ')}>
                 <div className={styles.scopeMeta}>
                   {!isDemoCorpusContext ? (
-                    <div
-                      className={styles.scopeBadge}
-                      data-testid="tag-page-session-scope"
-                      title={scopeSummary.title}
-                    >
+                    <div className={styles.scopeBadge} data-testid="tag-page-session-scope" title={scopeSummary.title}>
                       {scopeSummary.label}
                     </div>
                   ) : null}
@@ -1195,7 +1152,9 @@ export const TagPageView = ({
                     className={[
                       styles.sessionSelectorTriggerRow,
                       sessionSelectorOpen ? styles.sessionSelectorTriggerRowOpen : '',
-                    ].filter(Boolean).join(' ')}
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
                     data-testid="ce-tag-page-session-selector"
                     data-session-selector-open={sessionSelectorOpen ? 'true' : 'false'}
                   >
@@ -1219,10 +1178,7 @@ export const TagPageView = ({
                       <FontAwesomeIcon icon={faCog} />
                     </button>
                     {sessionSelectorOpen ? (
-                      <div
-                        className={styles.sessionSelectorPopover}
-                        data-testid="ce-tag-page-session-selector-panel"
-                      >
+                      <div className={styles.sessionSelectorPopover} data-testid="ce-tag-page-session-selector-panel">
                         <div className={styles.sessionSelectorPopoverHeader}>
                           <div className={styles.sessionSelectorHint}>
                             {isDemoCorpusContext
@@ -1241,10 +1197,7 @@ export const TagPageView = ({
                           ) : null}
                         </div>
                         {isDemoCorpusContext ? (
-                          <div
-                            className={styles.sessionSelectorInfoCard}
-                            data-testid="ce-tag-page-demo-session-info"
-                          >
+                          <div className={styles.sessionSelectorInfoCard} data-testid="ce-tag-page-demo-session-info">
                             <div className={styles.sessionSelectorInfoLabel}>Hidden session scope</div>
                             <div className={styles.sessionSelectorInfoValue}>{scopeSummary.label}</div>
                           </div>
@@ -1295,7 +1248,11 @@ export const TagPageView = ({
                       ))}
                     </div>
                   ) : (
-                    <p className={styles.tagPickerEmpty}>{demoCorpusMode ? 'No additional tags available in this demo corpus yet.' : 'No additional tags available in this session scope yet.'}</p>
+                    <p className={styles.tagPickerEmpty}>
+                      {demoCorpusMode
+                        ? 'No additional tags available in this demo corpus yet.'
+                        : 'No additional tags available in this session scope yet.'}
+                    </p>
                   )}
                 </div>
               )}
@@ -1333,9 +1290,7 @@ export const TagPageView = ({
                   <article key={entry.key} className={styles.demoCorpusCard}>
                     <div className={styles.demoCorpusCardTopRow}>
                       <span className={styles.demoCorpusBadge}>{entry.corpusLabel}</span>
-                      {entry.metaLine ? (
-                        <span className={styles.demoCorpusMeta}>{entry.metaLine}</span>
-                      ) : null}
+                      {entry.metaLine ? <span className={styles.demoCorpusMeta}>{entry.metaLine}</span> : null}
                     </div>
                     <div className={styles.demoCorpusTitleRow}>
                       <h3 className={styles.demoCorpusTitle}>{entry.title}</h3>
@@ -1356,12 +1311,7 @@ export const TagPageView = ({
                     ) : null}
                     <div className={styles.demoCorpusFooter}>
                       {entry.url && entry.corpusKey !== 'tweets' ? (
-                        <a
-                          href={entry.url}
-                          className={styles.demoCorpusLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
+                        <a href={entry.url} className={styles.demoCorpusLink} target="_blank" rel="noopener noreferrer">
                           View source
                         </a>
                       ) : null}
@@ -1375,10 +1325,9 @@ export const TagPageView = ({
                             return (
                               <span
                                 key={`${entry.key}-${tag}`}
-                                className={[
-                                  styles.demoCorpusTag,
-                                  isSelectedTag ? styles.demoCorpusTagSelected : '',
-                                ].filter(Boolean).join(' ')}
+                                className={[styles.demoCorpusTag, isSelectedTag ? styles.demoCorpusTagSelected : '']
+                                  .filter(Boolean)
+                                  .join(' ')}
                               >
                                 #{tag}
                               </span>
@@ -1465,13 +1414,7 @@ export const TagPageView = ({
                       href={buildSbtDetailPath(group.address, group.sessionSlug)}
                       className={styles.sbtGroupCard}
                     >
-                      {group.image ? (
-                        <img
-                          src={group.image}
-                          alt=""
-                          className={styles.sbtGroupImage}
-                        />
-                      ) : null}
+                      {group.image ? <img src={group.image} alt="" className={styles.sbtGroupImage} /> : null}
                       <div>
                         <div className={styles.sbtGroupName}>{group.name}</div>
                         {group.tags.length ? (

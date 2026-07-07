@@ -1,12 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, ModalBody } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faExclamationCircle,
-  faExpand,
-  faSpinner,
-  faTimes,
-} from '@fortawesome/free-solid-svg-icons';
+import { faExclamationCircle, faExpand, faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 import styles from './CompactImageChooser.module.scss';
 
 type CompactImageStatusTone = 'default' | 'loading' | 'error';
@@ -135,10 +130,7 @@ const CompactImageChooser = ({
 
   return (
     <>
-      <div
-        className={joinClassNames(styles.root, className)}
-        {...(rootTestId ? { 'data-testid': rootTestId } : {})}
-      >
+      <div className={joinClassNames(styles.root, className)} {...(rootTestId ? { 'data-testid': rootTestId } : {})}>
         <div className={styles.modeRow}>
           {showUrlModeButton ? (
             <button
@@ -204,7 +196,7 @@ const CompactImageChooser = ({
             className={joinClassNames(
               styles.message,
               statusTone === 'loading' ? styles.messageLoading : '',
-              statusTone === 'error' ? styles.messageError : ''
+              statusTone === 'error' ? styles.messageError : '',
             )}
           >
             {statusIcon}
@@ -212,11 +204,7 @@ const CompactImageChooser = ({
           </div>
         ) : null}
 
-        {hasHelp ? (
-          <div className={styles.helpText}>
-            {helpText}
-          </div>
-        ) : null}
+        {hasHelp ? <div className={styles.helpText}>{helpText}</div> : null}
 
         {hasPreview ? (
           <div className={joinClassNames(styles.previewSurface, styles.previewFill)}>
@@ -263,10 +251,7 @@ const CompactImageChooser = ({
           size="xl"
           contentClassName={styles.expandedModalContent}
         >
-          <ModalBody
-            className={styles.expandedModalBody}
-            onClick={() => setExpandedOpen(false)}
-          >
+          <ModalBody className={styles.expandedModalBody} onClick={() => setExpandedOpen(false)}>
             <img src={resolvedPreviewSrc} alt={expandedPreviewAlt} />
           </ModalBody>
         </Modal>

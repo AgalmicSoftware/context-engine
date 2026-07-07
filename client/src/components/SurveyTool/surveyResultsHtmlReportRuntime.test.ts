@@ -4,10 +4,7 @@ import {
   type SurveyResultsHtmlReportRuntimeArgs,
   type SurveyResultsHtmlReportState,
 } from './surveyResultsHtmlReportRuntime';
-import type {
-  SurveyResultsGateRecord,
-  SurveyResultsResponseRecord,
-} from './surveyResultsLockedFieldHelpers';
+import type { SurveyResultsGateRecord, SurveyResultsResponseRecord } from './surveyResultsLockedFieldHelpers';
 
 const fixedNowIso = (): string => '2026-05-28T10:00:00.000Z';
 
@@ -68,11 +65,8 @@ const createRuntime = ({
     getState: () => mutableState,
     normalizeGateSbtEntries: () => [],
     nowIso: fixedNowIso,
-    parseResponse: (response) => (
-      response && typeof response === 'object'
-        ? response as SurveyResultsResponseRecord
-        : null
-    ),
+    parseResponse: (response) =>
+      response && typeof response === 'object' ? (response as SurveyResultsResponseRecord) : null,
     readAnalysisCache: async () => ({}),
     readAnalysisCacheSync: () => ({}),
     resolveSbtDisplayLabel: ({ address }) => `SBT ${address.slice(0, 6)}`,
@@ -109,13 +103,15 @@ describe('surveyResultsHtmlReportRuntime', () => {
   it('maps selected report sections to analysis sections in stable order', () => {
     const { runtime } = createRuntime();
 
-    expect(runtime.getHtmlReportAnalysisSectionsToGenerate({
-      argumentMap: true,
-      atlas: false,
-      report: true,
-      riskMatrix: true,
-      snapshotJson: true,
-    })).toEqual(['breakdown', 'argumentMap', 'riskMatrix']);
+    expect(
+      runtime.getHtmlReportAnalysisSectionsToGenerate({
+        argumentMap: true,
+        atlas: false,
+        report: true,
+        riskMatrix: true,
+        snapshotJson: true,
+      }),
+    ).toEqual(['breakdown', 'argumentMap', 'riskMatrix']);
   });
 
   it('builds snapshots with filtered questions and response counts', () => {

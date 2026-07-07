@@ -70,7 +70,10 @@ const buildInitials = (name = '') => {
     .filter(Boolean);
 
   if (parts.length === 0) return '?';
-  return parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('');
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
 };
 
 const buildRoleCompany = (entry: InsiderEntry = {}) => {
@@ -95,9 +98,8 @@ const InsiderCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: InsiderCardPr
   const tags = Array.isArray(resolvedEntry.tags) ? resolvedEntry.tags : [];
   const summaryText = resolvedEntry.summary || 'No summary available for this interview yet.';
   const shouldClampSummary = summaryText.length > INSIDER_SUMMARY_PREVIEW_LENGTH;
-  const visibleSummary = shouldClampSummary && !expanded
-    ? `${summaryText.slice(0, INSIDER_SUMMARY_PREVIEW_LENGTH)}…`
-    : summaryText;
+  const visibleSummary =
+    shouldClampSummary && !expanded ? `${summaryText.slice(0, INSIDER_SUMMARY_PREVIEW_LENGTH)}…` : summaryText;
 
   return (
     <article className={`${styles.card} ${styles.insiderCard}`}>
@@ -106,18 +108,10 @@ const InsiderCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: InsiderCardPr
           {buildInitials(intervieweeName)}
         </div>
         <div className={styles.entryHeaderContent}>
-          <div className={styles.insiderName}>
-            {intervieweeName}
-          </div>
-          {roleCompany ? (
-            <div className={styles.insiderRole}>
-              {roleCompany}
-            </div>
-          ) : null}
+          <div className={styles.insiderName}>{intervieweeName}</div>
+          {roleCompany ? <div className={styles.insiderRole}>{roleCompany}</div> : null}
           {resolvedEntry.interviewer ? (
-            <div className={styles.insiderInterviewer}>
-              with {resolvedEntry.interviewer}
-            </div>
+            <div className={styles.insiderInterviewer}>with {resolvedEntry.interviewer}</div>
           ) : null}
         </div>
       </div>
@@ -147,24 +141,15 @@ const InsiderCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: InsiderCardPr
       ) : null}
 
       <div className={styles.insiderDetails}>
-        <div className={styles.entrySummary}>
-          {visibleSummary}
-        </div>
+        <div className={styles.entrySummary}>{visibleSummary}</div>
         {shouldClampSummary ? (
-          <button
-            type="button"
-            className={styles.insiderExpandBtn}
-            onClick={() => setExpanded((value) => !value)}
-          >
+          <button type="button" className={styles.insiderExpandBtn} onClick={() => setExpanded((value) => !value)}>
             {expanded ? 'Collapse' : 'Expand'}
           </button>
         ) : null}
-        {interviewDate ? (
-          <div className={styles.entryMeta}>
-            Interview date: {interviewDate}
-          </div>
-        ) : null}
-        {(resolvedEntry?.url || (Array.isArray(resolvedEntry?.debate_map_issues) && resolvedEntry.debate_map_issues.length > 0)) ? (
+        {interviewDate ? <div className={styles.entryMeta}>Interview date: {interviewDate}</div> : null}
+        {resolvedEntry?.url ||
+        (Array.isArray(resolvedEntry?.debate_map_issues) && resolvedEntry.debate_map_issues.length > 0) ? (
           <div className={styles.cardFooter}>
             <DebateMapSection entry={resolvedEntry} onAtlasIssueOpen={onAtlasIssueOpen} />
             {resolvedEntry?.url ? (

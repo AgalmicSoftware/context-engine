@@ -101,10 +101,7 @@ jest.mock('d3', () => {
       y: 0,
       r: 0,
       descendants() {
-        return [
-          this,
-          ...((this.children || []).flatMap((child) => child.descendants())),
-        ];
+        return [this, ...(this.children || []).flatMap((child) => child.descendants())];
       },
       sum(valueAccessor) {
         const ownValue = Number(valueAccessor ? valueAccessor(this.data) : 0) || 0;
@@ -155,17 +152,18 @@ jest.mock('d3', () => {
 
       node.children.forEach((child, index) => {
         const weight = Math.max(Number(child.value) || 0, 1) / Math.max(childTotal, 1);
-        const childRadius = count === 1
-          ? availableRadius * 0.72
-          : Math.max(availableRadius * 0.16, availableRadius * 0.68 * Math.sqrt(weight));
-        const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / count);
+        const childRadius =
+          count === 1
+            ? availableRadius * 0.72
+            : Math.max(availableRadius * 0.16, availableRadius * 0.68 * Math.sqrt(weight));
+        const angle = -Math.PI / 2 + (Math.PI * 2 * index) / count;
         const distance = count === 1 ? 0 : Math.max(ringDistanceBase - childRadius, 0) * 0.45;
 
         layoutNode(
           child,
-          x + (Math.cos(angle) * distance),
-          y + (Math.sin(angle) * distance),
-          Math.min(childRadius, availableRadius)
+          x + Math.cos(angle) * distance,
+          y + Math.sin(angle) * distance,
+          Math.min(childRadius, availableRadius),
         );
       });
 

@@ -31,10 +31,7 @@ const SessionWizardContractViewerModal = ({
     contentClassName={styles.contractViewerModalContent}
     centered
   >
-    <ModalBody
-      className={styles.contractViewerModalBody}
-      data-testid={WIZARD_CONTRACT_MODAL_TESTID}
-    >
+    <ModalBody className={styles.contractViewerModalBody} data-testid={WIZARD_CONTRACT_MODAL_TESTID}>
       {selectedWizardContract ? (
         <ContractViewer
           variant="compact"

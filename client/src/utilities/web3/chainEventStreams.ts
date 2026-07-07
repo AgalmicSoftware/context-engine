@@ -58,12 +58,7 @@ type ContractEventPayload = {
   eventSignature?: string;
 };
 type ContractEventHandler = (event: ContractEventPayload) => void;
-type SbtActivityListener = (
-  account: unknown,
-  tokenId: unknown,
-  burned: unknown,
-  event: EventMetadata
-) => void;
+type SbtActivityListener = (account: unknown, tokenId: unknown, burned: unknown, event: EventMetadata) => void;
 type AbiLike = ethers.ContractInterface;
 
 type ContractEventListenerDeps = {
@@ -76,8 +71,12 @@ type ContractEventListenerDeps = {
   };
   sbtListenerMap: Map<string, ethers.Contract>;
   surveyListenerMap: Map<string, ethers.Contract>;
-  getReadProviderForChain: ((chainId: number | string | undefined) => EventReadProvider | null | undefined) | null | undefined;
-  getReadProviderForGroup: ((groupKeyOrCfg: unknown, opts?: { contractKey?: string }) => EventReadProvider | null | undefined) | null | undefined;
+  getReadProviderForChain:
+    ((chainId: number | string | undefined) => EventReadProvider | null | undefined) | null | undefined;
+  getReadProviderForGroup:
+    | ((groupKeyOrCfg: unknown, opts?: { contractKey?: string }) => EventReadProvider | null | undefined)
+    | null
+    | undefined;
   SBT_FACTORY_ABI: AbiLike;
   CUSTOM_SBT_ABI: AbiLike;
   SURVEYS: AbiLike;
@@ -93,17 +92,29 @@ type ListenForSBTInstanceEventsMethod = ((
   providerName: unknown,
   sbtAddresses?: unknown,
   handler?: ContractEventHandler | null,
-  groupKeyOrCfg?: unknown
+  groupKeyOrCfg?: unknown,
 ) => Promise<void>) & {
   _registry?: Map<string, SBTInstanceRegistryEntry>;
 };
 
 type ContractEventListenerMethods = {
-  listenForSBTEvents: (providerName: unknown, handleNewEvent: ContractEventHandler, groupKeyOrCfg?: unknown) => Promise<void>;
+  listenForSBTEvents: (
+    providerName: unknown,
+    handleNewEvent: ContractEventHandler,
+    groupKeyOrCfg?: unknown,
+  ) => Promise<void>;
   removeSBTEventListener: (providerName: unknown, groupKeyOrCfg?: unknown) => void;
   listenForSBTInstanceEvents: ListenForSBTInstanceEventsMethod;
-  removeSBTInstanceEventsListener: (providerName: unknown, sbtAddresses?: unknown, groupKeyOrCfg?: unknown) => Promise<void>;
-  listenForSurveyEvents: (providerName: unknown, handleNewEvent: ContractEventHandler, groupKeyOrCfg?: unknown) => Promise<void>;
+  removeSBTInstanceEventsListener: (
+    providerName: unknown,
+    sbtAddresses?: unknown,
+    groupKeyOrCfg?: unknown,
+  ) => Promise<void>;
+  listenForSurveyEvents: (
+    providerName: unknown,
+    handleNewEvent: ContractEventHandler,
+    groupKeyOrCfg?: unknown,
+  ) => Promise<void>;
   removeSurveyEventsListener: (providerName: unknown, groupKeyOrCfg?: unknown) => void;
 };
 
@@ -122,20 +133,19 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
     shouldLog,
   } = deps;
 
-  const resolveChainIdForContract = (
-    cfg: SessionConfigLike,
-    contractKey: string = ''
-  ): number | null | undefined => (
-    extractChainId(cfg, { contractKey, strict: true }) as number | null | undefined
-  );
+  const resolveChainIdForContract = (cfg: SessionConfigLike, contractKey: string = ''): number | null | undefined =>
+    extractChainId(cfg, { contractKey, strict: true }) as number | null | undefined;
 
   const buildProviderScopeKey = (
     provider: EventReadProvider | null | undefined,
-    fallbackScope: string = 'default'
+    fallbackScope: string = 'default',
   ): string => {
     const providerMeta = provider && typeof provider === 'object' ? provider.__CE_RPC_META : null;
     const preferredUrls = Array.isArray(providerMeta?.preferredUrls)
-      ? providerMeta.preferredUrls.map((url) => String(url || '').trim()).filter(Boolean).join(',')
+      ? providerMeta.preferredUrls
+          .map((url) => String(url || '').trim())
+          .filter(Boolean)
+          .join(',')
       : '';
     return [
       String(providerMeta?.providerMode || 'mode-default').trim() || 'mode-default',
@@ -155,13 +165,12 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
     chainId?: string | number | null;
     provider?: EventReadProvider | null;
     fallbackScope?: string;
-  }): string => (
+  }): string =>
     [
       String(address || '').toLowerCase(),
       String(chainId || 'unknown'),
       buildProviderScopeKey(provider, fallbackScope),
-    ].join('||')
-  );
+    ].join('||');
 
   const parseListenerKey = (rawKey: unknown): { address: string; chainId: string } => {
     const [address = '', chainId = ''] = String(rawKey || '').split('||');
@@ -172,20 +181,19 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
   };
 
   const toEventId = (value: EventIdValue): string => value.toString();
-  const toEventIds = (values: EventIdValue[]): string[] => (
-    values.map((id) => toEventId(id))
-  );
+  const toEventIds = (values: EventIdValue[]): string[] => values.map((id) => toEventId(id));
 
   const listenForSBTInstanceEvents: ListenForSBTInstanceEventsMethod = async function (
     this: ContractEventListenerMethods,
     providerName: unknown,
     sbtAddresses: unknown = [],
     handler: ContractEventHandler | null = null,
-    groupKeyOrCfg: unknown = null
+    groupKeyOrCfg: unknown = null,
   ): Promise<void> {
     void providerName;
     const provider =
-      (typeof getReadProviderForGroup === 'function' && getReadProviderForGroup(groupKeyOrCfg, { contractKey: 'sbtFactory' }));
+      typeof getReadProviderForGroup === 'function' &&
+      getReadProviderForGroup(groupKeyOrCfg, { contractKey: 'sbtFactory' });
 
     if (!provider || typeof provider.on !== 'function') {
       contractsLog.error('[listenForSBTInstanceEvents] Invalid read provider resolved for group:', groupKeyOrCfg);
@@ -204,8 +212,8 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
               return null;
             }
           })
-          .filter(Boolean)
-      )
+          .filter(Boolean),
+      ),
     ) as string[];
 
     if (uniqueAddresses.length === 0) {
@@ -218,10 +226,7 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
     const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
     const derivedChainId = resolveChainIdForContract(cfg, 'sbtFactory');
     const chainId = derivedChainId ? String(derivedChainId) : 'unknown';
-    const providerScope = buildProviderScopeKey(
-      provider,
-      `group:${cfg?.slug || 'general'}:sbtFactory`
-    );
+    const providerScope = buildProviderScopeKey(provider, `group:${cfg?.slug || 'general'}:sbtFactory`);
 
     const registry = (this.listenForSBTInstanceEvents._registry ||= new Map<string, SBTInstanceRegistryEntry>());
     const keyOf = (address: string): string => [address.toLowerCase(), chainId, providerScope].join('||');
@@ -240,20 +245,21 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
 
         const onActivity: SbtActivityListener = (account, tokenId, burned, event): void => {
           try {
-            handler && handler({
-              type: 'SBTActivity',
-              address: addr,
-              args: {
-                account: String(account).toLowerCase(),
-                tokenId: tokenId?.toString?.() || String(tokenId || ''),
-                burned: burned === true,
-              },
-              transactionHash: event?.transactionHash,
-              blockNumber: event?.blockNumber,
-              transactionIndex: Number(event?.transactionIndex || 0),
-              logIndex: Number(event?.logIndex || 0),
-              eventSignature: 'SBTActivity(address,uint256,bool)',
-            });
+            handler &&
+              handler({
+                type: 'SBTActivity',
+                address: addr,
+                args: {
+                  account: String(account).toLowerCase(),
+                  tokenId: tokenId?.toString?.() || String(tokenId || ''),
+                  burned: burned === true,
+                },
+                transactionHash: event?.transactionHash,
+                blockNumber: event?.blockNumber,
+                transactionIndex: Number(event?.transactionIndex || 0),
+                logIndex: Number(event?.logIndex || 0),
+                eventSignature: 'SBTActivity(address,uint256,bool)',
+              });
           } catch (error) {
             contractsLog.error('[listenForSBTInstanceEvents] handler(SBTActivity) threw:', error);
           }
@@ -279,7 +285,7 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
     async listenForSBTEvents(
       providerName: unknown,
       handleNewEvent: ContractEventHandler,
-      groupKeyOrCfg: unknown = null
+      groupKeyOrCfg: unknown = null,
     ): Promise<void> {
       void providerName;
       const cfg = resolveSession(groupKeyOrCfg || '');
@@ -290,13 +296,12 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
         contractsLog.log('listenForSBTEvents: missing address/chain; skipping listener setup.');
         return;
       }
-      const provider = (
+      const provider =
         (typeof getReadProviderForGroup === 'function'
           ? getReadProviderForGroup(groupKeyOrCfg, { contractKey: 'sbtFactory' })
           : null) ||
         (typeof getReadProviderForChain === 'function' ? getReadProviderForChain(chId) : null) ||
-        undefined
-      );
+        undefined;
       const listenerKey = buildListenerKey({
         address: addr,
         chainId: chId,
@@ -358,7 +363,7 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
       this: ContractEventListenerMethods,
       providerName: unknown,
       sbtAddresses: unknown = [],
-      groupKeyOrCfg: unknown = null
+      groupKeyOrCfg: unknown = null,
     ): Promise<void> {
       void providerName;
       const registry = (this.listenForSBTInstanceEvents && this.listenForSBTInstanceEvents._registry) || null;
@@ -382,8 +387,8 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
               }
             })
             .filter(Boolean)
-            .map((address) => String(address).toLowerCase())
-        )
+            .map((address) => String(address).toLowerCase()),
+        ),
       ) as string[];
 
       const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
@@ -427,7 +432,7 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
     async listenForSurveyEvents(
       providerName: unknown,
       handleNewEvent: ContractEventHandler,
-      groupKeyOrCfg: unknown = null
+      groupKeyOrCfg: unknown = null,
     ): Promise<void> {
       void providerName;
       const cfg = resolveSession(groupKeyOrCfg || '');
@@ -438,13 +443,12 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
         contractsLog.log('listenForSurveyEvents: missing address/chain; skipping listener setup.');
         return;
       }
-      const provider = (
+      const provider =
         (typeof getReadProviderForGroup === 'function'
           ? getReadProviderForGroup(groupKeyOrCfg, { contractKey: 'surveys' })
           : null) ||
         (typeof getReadProviderForChain === 'function' ? getReadProviderForChain(chId) : null) ||
-        undefined
-      );
+        undefined;
       const listenerKey = buildListenerKey({
         address: addr,
         chainId: chId,
@@ -471,51 +475,47 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
         });
       });
 
-      contract.on('QuestionsAdded', (
-        creator: unknown,
-        questionIds: EventIdValue[],
-        surveyIds: EventIdValue[],
-        event: EventMetadata
-      ) => {
-        contractsLog.log('New questions added:', {
-          creator,
-          questionIds: toEventIds(questionIds),
-          surveyIds: toEventIds(surveyIds),
-        });
-        handleNewEvent({
-          type: 'QuestionsAdded',
-          creator,
-          questionIds: toEventIds(questionIds),
-          surveyIds: toEventIds(surveyIds),
-          transactionHash: event.transactionHash,
-          blockNumber: event.blockNumber,
-          transactionIndex: Number(event?.transactionIndex || 0),
-          logIndex: Number(event?.logIndex || 0),
-        });
-      });
+      contract.on(
+        'QuestionsAdded',
+        (creator: unknown, questionIds: EventIdValue[], surveyIds: EventIdValue[], event: EventMetadata) => {
+          contractsLog.log('New questions added:', {
+            creator,
+            questionIds: toEventIds(questionIds),
+            surveyIds: toEventIds(surveyIds),
+          });
+          handleNewEvent({
+            type: 'QuestionsAdded',
+            creator,
+            questionIds: toEventIds(questionIds),
+            surveyIds: toEventIds(surveyIds),
+            transactionHash: event.transactionHash,
+            blockNumber: event.blockNumber,
+            transactionIndex: Number(event?.transactionIndex || 0),
+            logIndex: Number(event?.logIndex || 0),
+          });
+        },
+      );
 
-      contract.on('ResponsesSubmitted', (
-        responder: unknown,
-        questionIds: EventIdValue[],
-        surveyId: EventIdValue,
-        event: EventMetadata
-      ) => {
-        contractsLog.log('New responses submitted:', {
-          responder,
-          questionIds: toEventIds(questionIds),
-          surveyId: toEventId(surveyId),
-        });
-        handleNewEvent({
-          type: 'ResponsesSubmitted',
-          responder,
-          questionIds: toEventIds(questionIds),
-          surveyId: toEventId(surveyId),
-          transactionHash: event.transactionHash,
-          blockNumber: event.blockNumber,
-          transactionIndex: Number(event?.transactionIndex || 0),
-          logIndex: Number(event?.logIndex || 0),
-        });
-      });
+      contract.on(
+        'ResponsesSubmitted',
+        (responder: unknown, questionIds: EventIdValue[], surveyId: EventIdValue, event: EventMetadata) => {
+          contractsLog.log('New responses submitted:', {
+            responder,
+            questionIds: toEventIds(questionIds),
+            surveyId: toEventId(surveyId),
+          });
+          handleNewEvent({
+            type: 'ResponsesSubmitted',
+            responder,
+            questionIds: toEventIds(questionIds),
+            surveyId: toEventId(surveyId),
+            transactionHash: event.transactionHash,
+            blockNumber: event.blockNumber,
+            transactionIndex: Number(event?.transactionIndex || 0),
+            logIndex: Number(event?.logIndex || 0),
+          });
+        },
+      );
 
       surveyListenerMap.set(listenerKey, contract);
       contractsLog.log(`Listening for Survey events on ${addr} (chain ${chId})...`);

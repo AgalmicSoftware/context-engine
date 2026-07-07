@@ -37,13 +37,7 @@ type HistoricalFiguresManifest = {
   figures?: DemoFigureLike[];
 };
 
-const FALLBACK_COLORS = Object.freeze([
-  '#5affc2',
-  '#5b8cff',
-  '#ffb347',
-  '#ff6bcb',
-  '#ffd166',
-]);
+const FALLBACK_COLORS = Object.freeze(['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166']);
 
 const IGNORED_INITIAL_TOKENS = new Set([
   'and',
@@ -61,29 +55,34 @@ const IGNORED_INITIAL_TOKENS = new Set([
   'von',
 ]);
 
-const transliterate = (value = ''): string => String(value || '')
-  .replace(/ß/g, 'ss')
-  .replace(/[Ææ]/g, 'ae')
-  .replace(/[Œœ]/g, 'oe')
-  .replace(/[Øø]/g, 'o')
-  .replace(/[Ðð]/g, 'd')
-  .replace(/[Þþ]/g, 'th')
-  .replace(/[Łł]/g, 'l');
+const transliterate = (value = ''): string =>
+  String(value || '')
+    .replace(/ß/g, 'ss')
+    .replace(/[Ææ]/g, 'ae')
+    .replace(/[Œœ]/g, 'oe')
+    .replace(/[Øø]/g, 'o')
+    .replace(/[Ðð]/g, 'd')
+    .replace(/[Þþ]/g, 'th')
+    .replace(/[Łł]/g, 'l');
 
-const stripDiacritics = (value = ''): string => transliterate(value)
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '');
+const stripDiacritics = (value = ''): string =>
+  transliterate(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
-const normalizeLookupKey = (value = ''): string => stripDiacritics(value)
-  .replace(/&/g, 'and')
-  .replace(/[^a-zA-Z0-9]+/g, '')
-  .toLowerCase();
+const normalizeLookupKey = (value = ''): string =>
+  stripDiacritics(value)
+    .replace(/&/g, 'and')
+    .replace(/[^a-zA-Z0-9]+/g, '')
+    .toLowerCase();
 
-const normalizeAddress = (value: unknown = '') => String(value || '').trim().toLowerCase();
+const normalizeAddress = (value: unknown = '') =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const hashString = (value = ''): number => {
   let hash = 2166136261;
@@ -130,18 +129,14 @@ const avatarByAddress = new Map<string, DemoAvatarInfo>();
 const avatarByName = new Map<string, DemoAvatarInfo>();
 
 const resolveLocalAvatarUrl = ({ names = [], usernames = [] }: AvatarRegistrationInput = {}): string => {
-  const normalizedUsernames = usernames
-    .map((username) => String(username || '').trim())
-    .filter(Boolean);
+  const normalizedUsernames = usernames.map((username) => String(username || '').trim()).filter(Boolean);
 
   const matchingUsername = normalizedUsernames.find((username) => hasHistoricalFigureAvatar(username));
   if (matchingUsername) {
     return getHistoricalFigureAvatar(matchingUsername) || '';
   }
 
-  const normalizedNames = names
-    .map((name) => String(name || '').trim())
-    .filter(Boolean);
+  const normalizedNames = names.map((name) => String(name || '').trim()).filter(Boolean);
 
   const matchingName = normalizedNames.find((name) => getHistoricalFigureAvatarByName(name));
   if (!matchingName) return '';
@@ -154,20 +149,20 @@ const registerAvatarInfo = ({
   usernames = [],
   url = '',
 }: AvatarRegistrationInput = {}): void => {
-  const normalizedNames = names
-    .map((name) => String(name || '').trim())
-    .filter(Boolean);
+  const normalizedNames = names.map((name) => String(name || '').trim()).filter(Boolean);
 
-  const resolvedUrl = String(resolveLocalAvatarUrl({
-    names: normalizedNames,
-    usernames,
-  }) || url || '').trim();
+  const resolvedUrl = String(
+    resolveLocalAvatarUrl({
+      names: normalizedNames,
+      usernames,
+    }) ||
+      url ||
+      '',
+  ).trim();
 
   if (normalizedNames.length === 0 || !resolvedUrl) return;
 
-  const existingInfo = normalizedNames
-    .map((name) => avatarByName.get(normalizeLookupKey(name)))
-    .find(Boolean);
+  const existingInfo = normalizedNames.map((name) => avatarByName.get(normalizeLookupKey(name))).find(Boolean);
 
   const avatarInfo = existingInfo || buildAvatarInfo(normalizedNames[0], resolvedUrl);
 
@@ -186,9 +181,7 @@ const registerAvatarInfo = ({
 };
 
 const mergedManifest = historicalFiguresMerged as HistoricalFiguresManifest;
-const mergedFigures = Array.isArray(mergedManifest?.figures)
-  ? mergedManifest.figures
-  : [];
+const mergedFigures = Array.isArray(mergedManifest?.figures) ? mergedManifest.figures : [];
 
 const mergedFigureByKey = new Map<string, DemoFigureLike>();
 
@@ -225,7 +218,7 @@ Object.entries(additionalHistoricalFigures || {}).forEach(([key, figure]) => {
   });
 });
 
-(Array.isArray(historicalFigures) ? historicalFigures as DemoFigureLike[] : []).forEach((figure) => {
+(Array.isArray(historicalFigures) ? (historicalFigures as DemoFigureLike[]) : []).forEach((figure) => {
   registerAvatarInfo({
     names: [figure?.name, figure?.username],
     usernames: [figure?.username],
@@ -233,7 +226,7 @@ Object.entries(additionalHistoricalFigures || {}).forEach(([key, figure]) => {
   });
 });
 
-(Array.isArray(policyAtlasCouncil) ? policyAtlasCouncil as DemoFigureLike[] : []).forEach((entry) => {
+(Array.isArray(policyAtlasCouncil) ? (policyAtlasCouncil as DemoFigureLike[]) : []).forEach((entry) => {
   registerAvatarInfo({
     names: [entry?.name],
     addresses: [entry?.id],
@@ -241,7 +234,8 @@ Object.entries(additionalHistoricalFigures || {}).forEach(([key, figure]) => {
   });
 });
 
-const cloneAvatarInfo = (avatarInfo: DemoAvatarInfo | null): DemoAvatarInfo | null => (avatarInfo ? { ...avatarInfo } : null);
+const cloneAvatarInfo = (avatarInfo: DemoAvatarInfo | null): DemoAvatarInfo | null =>
+  avatarInfo ? { ...avatarInfo } : null;
 
 export const getDemoAvatar = (address = ''): DemoAvatarInfo | null => {
   const normalizedAddress = normalizeAddress(address);

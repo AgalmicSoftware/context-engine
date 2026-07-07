@@ -11,17 +11,23 @@ import {
 
 describe('docUploadContracts', () => {
   it('builds doc viewer URLs with legacy query keys and encoded metadata', () => {
-    expect(buildSessionDocLibraryViewerUrl({
-      sessionToken: 'Edge Session',
-      storageRef: 'indexeddb://doc 1',
-      storage: 'indexeddb',
-      kind: 'note',
-      name: 'Private note.md',
-    })).toBe('/session/Edge%20Session/docs?__ceDocTx=indexeddb%3A%2F%2Fdoc+1&__ceDocStorage=indexeddb&__ceDocKind=note&__ceDocName=Private+note.md');
-    expect(buildSessionDocLibraryViewerUrl({
-      sessionToken: 'edge',
-      txId: 'tx-1',
-    })).toBe('/session/edge/docs?__ceDocTx=tx-1&__ceDocStorage=lit-arweave&__ceDocKind=file');
+    expect(
+      buildSessionDocLibraryViewerUrl({
+        sessionToken: 'Edge Session',
+        storageRef: 'indexeddb://doc 1',
+        storage: 'indexeddb',
+        kind: 'note',
+        name: 'Private note.md',
+      }),
+    ).toBe(
+      '/session/Edge%20Session/docs?__ceDocTx=indexeddb%3A%2F%2Fdoc+1&__ceDocStorage=indexeddb&__ceDocKind=note&__ceDocName=Private+note.md',
+    );
+    expect(
+      buildSessionDocLibraryViewerUrl({
+        sessionToken: 'edge',
+        txId: 'tx-1',
+      }),
+    ).toBe('/session/edge/docs?__ceDocTx=tx-1&__ceDocStorage=lit-arweave&__ceDocKind=file');
     expect(buildSessionDocLibraryViewerUrl({ sessionToken: '', txId: 'tx-1' })).toBe('');
     expect(buildSessionDocLibraryViewerUrl({ sessionToken: 'edge', txId: '' })).toBe('');
   });
@@ -34,18 +40,18 @@ describe('docUploadContracts', () => {
     const before = JSON.stringify(input);
     const record = createDocLibraryLinkRecord(input);
 
-    expect(record).toEqual(expect.objectContaining({
-      v: 1,
-      kind: 'link',
-      url: 'https://example.test/path?q=1',
-      title: 'Reference',
-    }));
+    expect(record).toEqual(
+      expect.objectContaining({
+        v: 1,
+        kind: 'link',
+        url: 'https://example.test/path?q=1',
+        title: 'Reference',
+      }),
+    );
     expect(typeof record.createdAt).toBe('string');
     expect(JSON.stringify(input)).toBe(before);
-    expect(() => createDocLibraryLinkRecord({ url: 'ftp://example.test/file' }))
-      .toThrow('URL must be http(s).');
-    expect(() => createDocLibraryLinkRecord({ url: 'not a url' }))
-      .toThrow('Invalid URL.');
+    expect(() => createDocLibraryLinkRecord({ url: 'ftp://example.test/file' })).toThrow('URL must be http(s).');
+    expect(() => createDocLibraryLinkRecord({ url: 'not a url' })).toThrow('Invalid URL.');
   });
 
   it('resolves doc upload gates from registry-like records', () => {
@@ -70,22 +76,26 @@ describe('docUploadContracts', () => {
       mode: 'all',
       hasRecipients: true,
     });
-    expect(resolveDocUploadsGate({
-      __registry: {
-        gatesByResource: {
-          docUploads: {
-            lookupStatus: 'missing',
-            mode: 'any',
-            chainId: 0,
-            sbtAddresses: ['0xabc'],
+    expect(
+      resolveDocUploadsGate({
+        __registry: {
+          gatesByResource: {
+            docUploads: {
+              lookupStatus: 'missing',
+              mode: 'any',
+              chainId: 0,
+              sbtAddresses: ['0xabc'],
+            },
           },
         },
-      },
-    })).toEqual(expect.objectContaining({
-      chainId: null,
-      mode: 'any',
-      hasRecipients: false,
-    }));
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        chainId: null,
+        mode: 'any',
+        hasRecipients: false,
+      }),
+    );
     expect(resolveDocUploadsGate(null)).toEqual({
       gate: null,
       lookupStatus: '',
@@ -135,10 +145,8 @@ describe('docUploadContracts', () => {
     expect(resolveDocUploadResultStorage(result)).toBe('cloudflare');
     expect(resolveDocUploadResultId({ arweaveTxId: ' ar-1 ', txId: 'tx-1' })).toBe('ar-1');
     expect(resolveDocUploadResultId({ id: ' fallback ' })).toBe('fallback');
-    expect(resolveDocUploadResultStorage({ storageRef: { backend: '' }, storage: 'lit-arweave' }))
-      .toBe('lit-arweave');
-    expect(resolveDocUploadResultStorage({ storageRef: { backend: '' }, storage: '' }))
-      .toBe('arweave');
+    expect(resolveDocUploadResultStorage({ storageRef: { backend: '' }, storage: 'lit-arweave' })).toBe('lit-arweave');
+    expect(resolveDocUploadResultStorage({ storageRef: { backend: '' }, storage: '' })).toBe('arweave');
     expect(resolveDocUploadResultStorage(null)).toBe('arweave');
     expect(JSON.stringify(result)).toBe(before);
   });

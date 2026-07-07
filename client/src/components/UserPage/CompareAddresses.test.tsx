@@ -39,7 +39,9 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 const mockListNamespaceEntriesSync = cacheScripts.listNamespaceEntriesSync as jest.Mock;
 const buildNicknameMap = buildNicknameByAddressMap as (entries: Array<Record<string, unknown>>) => Map<string, string>;
 const buildSbtKeySets = buildCompareSbtKeySets as (entries: Array<Record<string, unknown>>) => Set<string>[];
-const buildSbtImageMap = buildCompareSbtImageMap as (entries: Array<Record<string, unknown>>) => Map<string, { name: string; image: string | null }>;
+const buildSbtImageMap = buildCompareSbtImageMap as (
+  entries: Array<Record<string, unknown>>,
+) => Map<string, { name: string; image: string | null }>;
 const readObjectValues = readDgObjectValues as (namespace: string) => unknown[];
 
 describe('CompareAddresses cache scan helpers', () => {
@@ -57,10 +59,7 @@ describe('CompareAddresses cache scan helpers', () => {
 
     const result = readObjectValues('questionsCache');
 
-    expect(cacheScripts.listNamespaceEntriesSync).toHaveBeenCalledWith(
-      'questionsCache',
-      { cloneValues: false }
-    );
+    expect(cacheScripts.listNamespaceEntriesSync).toHaveBeenCalledWith('questionsCache', { cloneValues: false });
     expect(result).toEqual([{ a: 1 }, { b: 2 }]);
   });
 
@@ -128,10 +127,7 @@ describe('CompareAddresses cache scan helpers', () => {
       },
     ]);
 
-    expect(sets.map((set) => Array.from(set))).toEqual([
-      ['0xsbt1'],
-      ['0xsbt2'],
-    ]);
+    expect(sets.map((set) => Array.from(set))).toEqual([['0xsbt1'], ['0xsbt2']]);
   });
 
   it('keeps separate image map entries for different locked-name SBTs', () => {

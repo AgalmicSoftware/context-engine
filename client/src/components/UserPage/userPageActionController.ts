@@ -2,9 +2,7 @@ export type UserPageActionEventLike = {
   preventDefault?: () => void;
 };
 
-export type UserPageActionDispatch<Args extends readonly unknown[] = readonly unknown[]> = (
-  ...args: Args
-) => unknown;
+export type UserPageActionDispatch<Args extends readonly unknown[] = readonly unknown[]> = (...args: Args) => unknown;
 
 export type UserPageAnalyzeActionPlanLike = {
   blockedReason?: unknown;
@@ -24,36 +22,28 @@ export type UserPageCacheRefreshActionPlanLike = {
   shouldRenderCacheRefreshAction?: boolean;
 };
 
-export type UserPageAnalyzeActionControllerPorts<
-  AnalyzeArgs extends readonly unknown[] = readonly unknown[]
-> = {
+export type UserPageAnalyzeActionControllerPorts<AnalyzeArgs extends readonly unknown[] = readonly unknown[]> = {
   dispatchAnalyze?: UserPageActionDispatch<AnalyzeArgs>;
 };
 
-export type UserPageBookmarkActionControllerPorts<
-  BookmarkArgs extends readonly unknown[] = readonly unknown[]
-> = {
+export type UserPageBookmarkActionControllerPorts<BookmarkArgs extends readonly unknown[] = readonly unknown[]> = {
   dispatchBookmark?: UserPageActionDispatch<BookmarkArgs>;
 };
 
 export type UserPageCacheRefreshActionControllerPorts<
-  CacheRefreshArgs extends readonly unknown[] = readonly unknown[]
+  CacheRefreshArgs extends readonly unknown[] = readonly unknown[],
 > = {
   dispatchCacheRefresh?: UserPageActionDispatch<CacheRefreshArgs>;
 };
 
-export type RunUserPageAnalyzeActionControllerArgs<
-  AnalyzeArgs extends readonly unknown[] = readonly unknown[]
-> = {
+export type RunUserPageAnalyzeActionControllerArgs<AnalyzeArgs extends readonly unknown[] = readonly unknown[]> = {
   analyzeArgs?: AnalyzeArgs;
   event?: UserPageActionEventLike | null;
   plan?: UserPageAnalyzeActionPlanLike | null;
   ports?: UserPageAnalyzeActionControllerPorts<AnalyzeArgs>;
 };
 
-export type RunUserPageBookmarkActionControllerArgs<
-  BookmarkArgs extends readonly unknown[] = readonly unknown[]
-> = {
+export type RunUserPageBookmarkActionControllerArgs<BookmarkArgs extends readonly unknown[] = readonly unknown[]> = {
   bookmarkArgs?: BookmarkArgs;
   event?: UserPageActionEventLike | null;
   plan?: UserPageBookmarkActionPlanLike | null;
@@ -61,7 +51,7 @@ export type RunUserPageBookmarkActionControllerArgs<
 };
 
 export type RunUserPageCacheRefreshActionControllerArgs<
-  CacheRefreshArgs extends readonly unknown[] = readonly unknown[]
+  CacheRefreshArgs extends readonly unknown[] = readonly unknown[],
 > = {
   cacheRefreshArgs?: CacheRefreshArgs;
   event?: UserPageActionEventLike | null;
@@ -74,9 +64,7 @@ export type UserPageActionControllerResult = {
   status: 'blocked' | 'disabled' | 'dispatched' | 'hidden' | 'unhandled';
 };
 
-const isBlocked = (blockedReason: unknown): boolean => (
-  !!blockedReason && blockedReason !== 'none'
-);
+const isBlocked = (blockedReason: unknown): boolean => !!blockedReason && blockedReason !== 'none';
 
 const preventDefault = (event?: UserPageActionEventLike | null): void => {
   if (typeof event?.preventDefault === 'function') {
@@ -84,9 +72,7 @@ const preventDefault = (event?: UserPageActionEventLike | null): void => {
   }
 };
 
-export const runUserPageAnalyzeActionController = <
-  AnalyzeArgs extends readonly unknown[] = readonly unknown[]
->({
+export const runUserPageAnalyzeActionController = <AnalyzeArgs extends readonly unknown[] = readonly unknown[]>({
   analyzeArgs = [] as unknown as AnalyzeArgs,
   event = null,
   plan = null,
@@ -129,9 +115,7 @@ export const runUserPageAnalyzeActionController = <
   };
 };
 
-export const runUserPageBookmarkActionController = <
-  BookmarkArgs extends readonly unknown[] = readonly unknown[]
->({
+export const runUserPageBookmarkActionController = <BookmarkArgs extends readonly unknown[] = readonly unknown[]>({
   bookmarkArgs = [] as unknown as BookmarkArgs,
   event = null,
   plan = null,
@@ -175,7 +159,7 @@ export const runUserPageBookmarkActionController = <
 };
 
 export const runUserPageCacheRefreshActionController = <
-  CacheRefreshArgs extends readonly unknown[] = readonly unknown[]
+  CacheRefreshArgs extends readonly unknown[] = readonly unknown[],
 >({
   cacheRefreshArgs = [] as unknown as CacheRefreshArgs,
   event = null,

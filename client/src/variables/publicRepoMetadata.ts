@@ -11,20 +11,16 @@ export const PUBLIC_DISCOVERABILITY_URL = 'https://contextengine.xyz/discoverabi
 export const PUBLIC_LLMS_URL = 'https://contextengine.xyz/llms.txt';
 export const PUBLIC_DISCOVERABILITY_PATH = '/discoverability.html';
 export const PUBLIC_LLMS_PATH = '/llms.txt';
-export const buildPublicRepoLatestReleaseAssetUrl = (filename = ''): string => (
-  filename ? `${PUBLIC_REPO_URL}/releases/latest/download/${String(filename).replace(/^\/+/, '')}` : ''
-);
-export const buildPublicRepoBlobUrl = (pathname = ''): string => (
-  pathname ? `${PUBLIC_REPO_URL}/blob/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}` : ''
-);
-export const buildPublicRepoTreeUrl = (pathname = ''): string => (
-  pathname ? `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}` : ''
-);
-export const buildPublicRepoRawUrl = (pathname = ''): string => (
+export const buildPublicRepoLatestReleaseAssetUrl = (filename = ''): string =>
+  filename ? `${PUBLIC_REPO_URL}/releases/latest/download/${String(filename).replace(/^\/+/, '')}` : '';
+export const buildPublicRepoBlobUrl = (pathname = ''): string =>
+  pathname ? `${PUBLIC_REPO_URL}/blob/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}` : '';
+export const buildPublicRepoTreeUrl = (pathname = ''): string =>
+  pathname ? `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}` : '';
+export const buildPublicRepoRawUrl = (pathname = ''): string =>
   pathname
     ? `https://raw.githubusercontent.com/${PUBLIC_GITHUB_ORG}/${PUBLIC_GITHUB_REPO}/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}`
-    : ''
-);
+    : '';
 export const PUBLIC_README_URL = buildPublicRepoRawUrl('README.md');
 export const PUBLIC_ARCHITECTURE_URL = buildPublicRepoRawUrl('ARCHITECTURE.md');
 export const PUBLIC_CONTRIBUTING_URL = buildPublicRepoBlobUrl('CONTRIBUTING.md');
@@ -34,6 +30,5 @@ export const PUBLIC_WHITEPAPER_RAW_URL = buildPublicRepoRawUrl('whitepaper/white
 export const PUBLIC_CONTRACTS_SOURCE_BASE_URL = buildPublicRepoBlobUrl('contracts');
 export const PUBLIC_AI_DISCOURSE_CORPUS_URL = buildPublicRepoTreeUrl('ai-discourse-corpus');
 
-export const buildPublicContractSourceUrl = (filename = ''): string => (
-  filename ? `${PUBLIC_CONTRACTS_SOURCE_BASE_URL}/${filename}` : ''
-);
+export const buildPublicContractSourceUrl = (filename = ''): string =>
+  filename ? `${PUBLIC_CONTRACTS_SOURCE_BASE_URL}/${filename}` : '';

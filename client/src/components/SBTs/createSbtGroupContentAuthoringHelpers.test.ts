@@ -35,12 +35,14 @@ describe('createSbtGroupContentAuthoringHelpers', () => {
   });
 
   it('adds, removes, and syncs default tags', () => {
-    expect(buildCreateSbtTagAdditionState({
-      autoAppliedDefaultTags: ['Alpha'],
-      dismissedDefaultTags: ['Alpha'],
-      tagValue: ' Alpha ',
-      tags: ['Beta'],
-    })).toEqual({
+    expect(
+      buildCreateSbtTagAdditionState({
+        autoAppliedDefaultTags: ['Alpha'],
+        dismissedDefaultTags: ['Alpha'],
+        tagValue: ' Alpha ',
+        tags: ['Beta'],
+      }),
+    ).toEqual({
       tags: ['Beta', 'Alpha'],
       currentTagInput: '',
       autoAppliedDefaultTags: [],
@@ -48,14 +50,16 @@ describe('createSbtGroupContentAuthoringHelpers', () => {
       showTagsInput: true,
     });
 
-    expect(buildCreateSbtTagRemovalState({
-      autoAppliedDefaultTags: ['Alpha'],
-      defaultTags: ['Alpha', 'Gamma'],
-      dismissedDefaultTags: [],
-      indexToRemove: 0,
-      removedTag: 'Alpha',
-      tags: ['Alpha', 'Beta'],
-    })).toEqual({
+    expect(
+      buildCreateSbtTagRemovalState({
+        autoAppliedDefaultTags: ['Alpha'],
+        defaultTags: ['Alpha', 'Gamma'],
+        dismissedDefaultTags: [],
+        indexToRemove: 0,
+        removedTag: 'Alpha',
+        tags: ['Alpha', 'Beta'],
+      }),
+    ).toEqual({
       tags: ['Beta'],
       autoAppliedDefaultTags: [],
       dismissedDefaultTags: ['Alpha'],
@@ -86,38 +90,48 @@ describe('createSbtGroupContentAuthoringHelpers', () => {
   it('normalizes document hashes and URL draft state', () => {
     expect(buildCreateSbtDocumentIdHashList(' hash-a, hash-b ,, ')).toEqual(['hash-a', 'hash-b', '', '']);
     expect(normalizeCreateSbtDocumentUrlDraft(' https://docs.example/a ')).toBe('https://docs.example/a');
-    expect(buildEffectiveCreateSbtDocumentUrls({
-      documentURLs: [' a ', '', 'b'],
-      documentUrl: ' c ',
-    })).toEqual(['a', 'b', 'c']);
-    expect(buildEffectiveCreateSbtDocumentUrls({
-      documentURLs: ['a', 'b'],
-      documentUrl: 'c',
-      maxDocumentUrls: 2,
-    })).toEqual(['a', 'b']);
-    expect(resolveCreateSbtDocumentUrlInputState({
-      documentURLs: ['a'],
-      documentUrl: ' b ',
-      maxDocumentUrls: 2,
-    })).toEqual({
+    expect(
+      buildEffectiveCreateSbtDocumentUrls({
+        documentURLs: [' a ', '', 'b'],
+        documentUrl: ' c ',
+      }),
+    ).toEqual(['a', 'b', 'c']);
+    expect(
+      buildEffectiveCreateSbtDocumentUrls({
+        documentURLs: ['a', 'b'],
+        documentUrl: 'c',
+        maxDocumentUrls: 2,
+      }),
+    ).toEqual(['a', 'b']);
+    expect(
+      resolveCreateSbtDocumentUrlInputState({
+        documentURLs: ['a'],
+        documentUrl: ' b ',
+        maxDocumentUrls: 2,
+      }),
+    ).toEqual({
       canAddDocumentUrl: true,
       documentUrlCount: 1,
     });
   });
 
   it('builds document URL add/remove patches', () => {
-    expect(buildCreateSbtDocumentUrlAdditionPatch({
-      documentURLs: ['a'],
-      documentUrl: 'b',
-    })).toEqual({
+    expect(
+      buildCreateSbtDocumentUrlAdditionPatch({
+        documentURLs: ['a'],
+        documentUrl: 'b',
+      }),
+    ).toEqual({
       documentURLs: ['a', 'b'],
       documentUrl: '',
     });
     expect(removeCreateSbtDocumentUrlAtIndex(['a', 'b', 'c'], 1)).toEqual(['a', 'c']);
-    expect(buildCreateSbtDocumentUrlRemovalPatch({
-      documentURLs: ['a', 'b'],
-      index: 0,
-    })).toEqual({
+    expect(
+      buildCreateSbtDocumentUrlRemovalPatch({
+        documentURLs: ['a', 'b'],
+        index: 0,
+      }),
+    ).toEqual({
       documentURLs: ['b'],
     });
   });

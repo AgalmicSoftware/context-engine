@@ -1,9 +1,5 @@
 import React from 'react';
-import {
-  Modal,
-  ModalBody,
-  ModalFooter,
-} from 'reactstrap';
+import { Modal, ModalBody, ModalFooter } from 'reactstrap';
 
 import { renderSurveyResultsDisplayPanels, type SurveyResultsDisplayPanelsArgs } from './SurveyResultsDisplayPanels';
 import SurveyResultsDemoSurface, { type SurveyResultsDemoSurfaceProps } from './SurveyResultsDemoSurface';
@@ -32,8 +28,7 @@ export type SurveyResultsReportSurfaceExecutionProps = {
   onCloseResultsModal: () => void;
 };
 
-export type SurveyResultsReportSurfaceProps =
-  SurveyResultsReportSurfaceDisplayProps &
+export type SurveyResultsReportSurfaceProps = SurveyResultsReportSurfaceDisplayProps &
   SurveyResultsReportSurfaceExecutionProps;
 
 const SurveyResultsReportSurface = ({
@@ -46,22 +41,12 @@ const SurveyResultsReportSurface = ({
   reportSurfaceDisplayPlan = {},
   styleMap,
 }: SurveyResultsReportSurfaceProps): React.ReactElement => {
-  const {
-    demoResultsViewMode = 'raw',
-    isDemoAlternateResultsView = false,
-  } = reportSurfaceDisplayPlan;
+  const { demoResultsViewMode = 'raw', isDemoAlternateResultsView = false } = reportSurfaceDisplayPlan;
 
   return (
     <>
-      <Modal
-        isOpen={isOpen}
-        toggle={onCloseResultsModal}
-        className={styleMap.resultsModal}
-      >
-        <SurveyResultsModalHeader
-          {...modalHeaderProps}
-          onClose={onCloseResultsModal}
-        />
+      <Modal isOpen={isOpen} toggle={onCloseResultsModal} className={styleMap.resultsModal}>
+        <SurveyResultsModalHeader {...modalHeaderProps} onClose={onCloseResultsModal} />
 
         <ModalBody className={styleMap.modalBody}>
           {isDemoAlternateResultsView && demoSurfaceProps ? (

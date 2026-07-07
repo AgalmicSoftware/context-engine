@@ -183,42 +183,47 @@ export const renderSurveyQuestionsFullQuestionDisplay = ({
     commentsOpen,
     maskedAnswer,
     maskedAdditional,
-    renderResponseInput: () => renderResponseInput({
-      question,
-      qIndex,
-      surveyIndex,
-      answer,
-      glowAnswer,
-    }),
-    renderAnswerDecryptControl: () => renderAnswerDecryptControl({
-      questionId,
-      fieldKey: 'answer',
-      allowDecrypt: allowDecryptAnswer,
-      decryptTooltip,
-      actionLabel: 'Decrypt Answer',
-      busy: isAnswerDecrypting,
-    }),
-    renderAdditionalInput: () => renderAdditionalInput({
-      qIndex,
-      surveyIndex,
-      questionId,
-      additional,
-      glowAdditional,
-    }),
-    renderAdditionalLockControl: () => renderAdditionalLockControl({
-      surveyIndex,
-      questionId,
-      additional,
-      glowAdditional,
-    }),
-    renderAdditionalDecryptControl: () => renderAdditionalDecryptControl({
-      questionId,
-      fieldKey: 'additional',
-      allowDecrypt: allowDecryptAdditional,
-      decryptTooltip,
-      actionLabel: 'Decrypt Comments',
-      busy: isAdditionalDecrypting,
-    }),
+    renderResponseInput: () =>
+      renderResponseInput({
+        question,
+        qIndex,
+        surveyIndex,
+        answer,
+        glowAnswer,
+      }),
+    renderAnswerDecryptControl: () =>
+      renderAnswerDecryptControl({
+        questionId,
+        fieldKey: 'answer',
+        allowDecrypt: allowDecryptAnswer,
+        decryptTooltip,
+        actionLabel: 'Decrypt Answer',
+        busy: isAnswerDecrypting,
+      }),
+    renderAdditionalInput: () =>
+      renderAdditionalInput({
+        qIndex,
+        surveyIndex,
+        questionId,
+        additional,
+        glowAdditional,
+      }),
+    renderAdditionalLockControl: () =>
+      renderAdditionalLockControl({
+        surveyIndex,
+        questionId,
+        additional,
+        glowAdditional,
+      }),
+    renderAdditionalDecryptControl: () =>
+      renderAdditionalDecryptControl({
+        questionId,
+        fieldKey: 'additional',
+        allowDecrypt: allowDecryptAdditional,
+        decryptTooltip,
+        actionLabel: 'Decrypt Comments',
+        busy: isAdditionalDecrypting,
+      }),
   });
 
   return renderFullQuestionCardShell({

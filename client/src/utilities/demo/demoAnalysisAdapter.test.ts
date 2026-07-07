@@ -4,10 +4,7 @@ import path from 'path';
 import demoAnalysisData from '../../variables/demo/demo_analysis_data.json';
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import historicalFigureDemographics from '../../variables/demo/historical_figure_demographics.js';
-import buildDemoAnalysisData, {
-  DEMO_ANALYSIS_RESPONSE_OPTIONS,
-  buildQuestionTags,
-} from './demoAnalysisAdapter.js';
+import buildDemoAnalysisData, { DEMO_ANALYSIS_RESPONSE_OPTIONS, buildQuestionTags } from './demoAnalysisAdapter.js';
 import type {
   DemoAnalysisData,
   DemoAnalysisMetadataByXid,
@@ -20,7 +17,7 @@ import type {
 describe('demoAnalysisAdapter', () => {
   const metadataByXid = historicalFigureDemographics as DemoAnalysisMetadataByXid;
   const demoParticipants: DemoAnalysisParticipant[] = Array.isArray(demoPolisData?.participantsVotes)
-    ? demoPolisData.participantsVotes as DemoAnalysisParticipant[]
+    ? (demoPolisData.participantsVotes as DemoAnalysisParticipant[])
     : [];
   const analysisData: DemoAnalysisData = buildDemoAnalysisData(demoPolisData, metadataByXid);
   const modeledAnalysisData: DemoAnalysisData = buildDemoAnalysisData(demoAnalysisData, metadataByXid);
@@ -66,9 +63,9 @@ describe('demoAnalysisAdapter', () => {
     rowsByQuestionAndSegment.forEach((rows, key) => {
       const totalVotes = rows[0]?.totalVotes || 0;
       const questionId = key.split('::')[0];
-      const expectedCount = demoParticipants.filter((participant) => (
-        participant?.votes?.[questionId] !== undefined
-      )).length;
+      const expectedCount = demoParticipants.filter(
+        (participant) => participant?.votes?.[questionId] !== undefined,
+      ).length;
 
       if (key.endsWith('::All')) {
         expect(totalVotes).toBe(Number(expectedCount || 0));
@@ -103,11 +100,7 @@ describe('demoAnalysisAdapter', () => {
     const questionProfiles: QuestionProfileSummary[] = modeledAnalysisData.questionProfileSummaries['0'] || [];
     const profileIds = questionProfiles.map((profile) => profile.profileId);
 
-    expect(profileIds).toEqual([
-      'bridge_builder',
-      'consensus_echo',
-      'historical_baseline',
-    ]);
+    expect(profileIds).toEqual(['bridge_builder', 'consensus_echo', 'historical_baseline']);
     expect(questionProfiles.find((profile) => profile.profileId === 'historical_baseline')).toMatchObject({
       label: 'Historical persona baseline',
       confidence: 'High',
@@ -123,16 +116,8 @@ describe('demoAnalysisAdapter', () => {
       sources: 'metr, scifi, sci-fi, LessWrong',
     });
 
-    expect(tags.map((tag) => tag.tagID)).toEqual([
-      'source:metr',
-      'source:scifi',
-      'source:lesswrong',
-    ]);
-    expect(tags.map((tag) => tag.tagName)).toEqual([
-      'METR',
-      'Sci-Fi',
-      'LessWrong',
-    ]);
+    expect(tags.map((tag) => tag.tagID)).toEqual(['source:metr', 'source:scifi', 'source:lesswrong']);
+    expect(tags.map((tag) => tag.tagName)).toEqual(['METR', 'Sci-Fi', 'LessWrong']);
   });
 
   it('separates unique persona counts from modeled response totals when synthetic rows reuse an xid', () => {
@@ -181,13 +166,11 @@ describe('demoAnalysisAdapter', () => {
 
     const syntheticAnalysisData = buildDemoAnalysisData(sourceData, syntheticMetadataByXid);
     const overallRows = syntheticAnalysisData.flatResponses.filter(
-      (row) => row.questionId === '0' && row.segmentKey === 'All'
+      (row) => row.questionId === '0' && row.segmentKey === 'All',
     );
 
     expect(syntheticAnalysisData.questions[0].participationCount).toBe(2);
-    expect(syntheticAnalysisData.demographics.Era).toEqual([
-      { value: 'Modern', count: 2 },
-    ]);
+    expect(syntheticAnalysisData.demographics.Era).toEqual([{ value: 'Modern', count: 2 }]);
     expect(overallRows[0]?.participantCount).toBe(2);
     expect(overallRows[0]?.totalVotes).toBe(3);
   });

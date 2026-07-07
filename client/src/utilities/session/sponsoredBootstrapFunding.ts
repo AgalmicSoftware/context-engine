@@ -12,23 +12,17 @@ type SponsoredBootstrapFundingContext = {
 
 export const SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY = 'ce:sponsoredBootstrapFunding:v1';
 
-const canUseSessionStorage = (): boolean => (
-  typeof window !== 'undefined' &&
-  typeof window.sessionStorage !== 'undefined'
-);
+const canUseSessionStorage = (): boolean =>
+  typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
 
-const hasFundingContext = (
-  value: Partial<SponsoredBootstrapFundingContext> = {}
-): boolean => (
-  !!toStr(value?.sessionSlug).trim() || !!toStr(value?.workerUrl).trim()
-);
+const hasFundingContext = (value: Partial<SponsoredBootstrapFundingContext> = {}): boolean =>
+  !!toStr(value?.sessionSlug).trim() || !!toStr(value?.workerUrl).trim();
 
-const isObj = (value: unknown): value is SponsoredBootstrapFundingInput => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isObj = (value: unknown): value is SponsoredBootstrapFundingInput =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const persistSponsoredBootstrapFundingContext = (
-  normalized: SponsoredBootstrapFundingContext
+  normalized: SponsoredBootstrapFundingContext,
 ): SponsoredBootstrapFundingContext => {
   if (!canUseSessionStorage()) return normalized;
   try {
@@ -36,39 +30,20 @@ const persistSponsoredBootstrapFundingContext = (
       sessionStorage.removeItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY);
       return normalized;
     }
-    sessionStorage.setItem(
-      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
-      JSON.stringify(normalized)
-    );
+    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify(normalized));
   } catch (_) {}
   return normalized;
 };
 
-export const normalizeSponsoredBootstrapFundingContext = (
-  value: unknown = {}
-): SponsoredBootstrapFundingContext => {
+export const normalizeSponsoredBootstrapFundingContext = (value: unknown = {}): SponsoredBootstrapFundingContext => {
   const source = isObj(value) ? value : {};
-  const faucetGrantToken = toStr(
-    source.faucetGrantToken ??
-    ''
-  ).trim();
+  const faucetGrantToken = toStr(source.faucetGrantToken ?? '').trim();
   return {
-    sessionSlug: normalizeSessionSlug(
-      source.sessionSlug ??
-      source.sourceSessionSlug ??
-      ''
+    sessionSlug: normalizeSessionSlug(source.sessionSlug ?? source.sourceSessionSlug ?? ''),
+    workerUrl: normalizeBaseUrl(
+      toStr(source.bootstrapWorkerUrl ?? source.workerUrl ?? source.sourceWorkerUrl ?? '').trim(),
     ),
-    workerUrl: normalizeBaseUrl(toStr(
-      source.bootstrapWorkerUrl ??
-      source.workerUrl ??
-      source.sourceWorkerUrl ??
-      ''
-    ).trim()),
-    targetSessionSlug: normalizeSessionSlug(
-      source.targetSessionSlug ??
-      source.requestedSessionSlug ??
-      ''
-    ),
+    targetSessionSlug: normalizeSessionSlug(source.targetSessionSlug ?? source.requestedSessionSlug ?? ''),
     ...(faucetGrantToken ? { faucetGrantToken } : {}),
   };
 };
@@ -85,9 +60,7 @@ export const readSponsoredBootstrapFundingContext = (): SponsoredBootstrapFundin
   }
 };
 
-export const writeSponsoredBootstrapFundingContext = (
-  value: unknown = {}
-): SponsoredBootstrapFundingContext => {
+export const writeSponsoredBootstrapFundingContext = (value: unknown = {}): SponsoredBootstrapFundingContext => {
   const normalized = normalizeSponsoredBootstrapFundingContext(value);
   return persistSponsoredBootstrapFundingContext(normalized);
 };

@@ -2,10 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import JsonDisplay from './JsonDisplay';
-import {
-  copyJsonToClipboard,
-  formatJsonForDisplay,
-} from '../../../utilities/ui/jsonFunctions';
+import { copyJsonToClipboard, formatJsonForDisplay } from '../../../utilities/ui/jsonFunctions';
 
 jest.mock('../../../utilities/ui/jsonFunctions', () => ({
   copyJsonToClipboard: jest.fn(() => Promise.resolve()),

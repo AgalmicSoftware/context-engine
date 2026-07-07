@@ -6,36 +6,32 @@ import {
 describe('surveyResultsExportRows', () => {
   it('builds filtered question ids from aggregate buckets and parsed survey responses', () => {
     const parseResponse = jest.fn((response) => response as any);
-    const getResponseQuestionId = jest.fn((response) => (
-      String(response?.questionID || response?.questionId || '').trim()
-    ));
+    const getResponseQuestionId = jest.fn((response) =>
+      String(response?.questionID || response?.questionId || '').trim(),
+    );
 
-    expect(buildSurveyResultsFilteredQuestionIdsForExport({
-      aggregatorQuestionResponses: {
-        ' Q1 ': [{ response: {} }],
-        '': [{ response: {} }],
-      },
-      filteredResponses: [
-        {
-          response: {
-            responses: [
-              { questionID: ' Q2 ' },
-              { questionId: 'q3' },
-              { questionID: '' },
-            ],
-          },
+    expect(
+      buildSurveyResultsFilteredQuestionIdsForExport({
+        aggregatorQuestionResponses: {
+          ' Q1 ': [{ response: {} }],
+          '': [{ response: {} }],
         },
-        {
-          response: {
-            responses: [
-              { questionID: 'Q2' },
-            ],
+        filteredResponses: [
+          {
+            response: {
+              responses: [{ questionID: ' Q2 ' }, { questionId: 'q3' }, { questionID: '' }],
+            },
           },
-        },
-      ],
-      getResponseQuestionId,
-      parseResponse,
-    })).toEqual(['q1', 'q2', 'q3']);
+          {
+            response: {
+              responses: [{ questionID: 'Q2' }],
+            },
+          },
+        ],
+        getResponseQuestionId,
+        parseResponse,
+      }),
+    ).toEqual(['q1', 'q2', 'q3']);
 
     expect(parseResponse).toHaveBeenCalledTimes(2);
     expect(getResponseQuestionId).toHaveBeenCalledTimes(4);

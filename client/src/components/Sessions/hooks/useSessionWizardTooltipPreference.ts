@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
 import { readSessionWizardTooltipsEnabled } from '../sessionWizardUiSupport';
 
-type TooltipPreferenceStore = {
-  getState?: () => unknown;
-  subscribe?: (listener: () => void) => (() => void) | void;
-} | null | undefined;
+type TooltipPreferenceStore =
+  | {
+      getState?: () => unknown;
+      subscribe?: (listener: () => void) => (() => void) | void;
+    }
+  | null
+  | undefined;
 
-const useSessionWizardTooltipPreference = (
-  tooltipPreferenceStore: TooltipPreferenceStore
-) => {
-  const [sessionWizardTooltipsEnabled, setSessionWizardTooltipsEnabled] = useState(() => (
-    readSessionWizardTooltipsEnabled(tooltipPreferenceStore)
-  ));
+const useSessionWizardTooltipPreference = (tooltipPreferenceStore: TooltipPreferenceStore) => {
+  const [sessionWizardTooltipsEnabled, setSessionWizardTooltipsEnabled] = useState(() =>
+    readSessionWizardTooltipsEnabled(tooltipPreferenceStore),
+  );
 
   useEffect(() => {
     setSessionWizardTooltipsEnabled(readSessionWizardTooltipsEnabled(tooltipPreferenceStore));

@@ -2,9 +2,7 @@ import React, { createRef } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import SessionWizardPublishSection, {
-  type SessionWizardPublishSectionProps,
-} from './SessionWizardPublishSection';
+import SessionWizardPublishSection, { type SessionWizardPublishSectionProps } from './SessionWizardPublishSection';
 
 jest.mock('./SessionPublishSummary', () => ({
   __esModule: true,
@@ -15,9 +13,15 @@ jest.mock('./SessionPublishSummary', () => ({
       data-mode={props.publishUiPlan?.publishActionDisplayState?.displayMode || ''}
       data-worker-source={props.workerUrlSource || ''}
     >
-      <button type="button" onClick={props.onToggleCollapsed}>toggle publish</button>
-      <button type="button" onClick={props.onTogglePublishAdvanced}>toggle advanced</button>
-      <button type="button" onClick={props.onCopyAdminUrl}>copy admin</button>
+      <button type="button" onClick={props.onToggleCollapsed}>
+        toggle publish
+      </button>
+      <button type="button" onClick={props.onTogglePublishAdvanced}>
+        toggle advanced
+      </button>
+      <button type="button" onClick={props.onCopyAdminUrl}>
+        copy admin
+      </button>
       <button
         type="button"
         data-testid="ce-wizard-publish"
@@ -80,9 +84,7 @@ const buildPublishUiPlan = (overrides: Record<string, any> = {}) => ({
   },
 });
 
-const buildProps = (
-  overrides: Partial<SessionWizardPublishSectionProps> = {}
-): SessionWizardPublishSectionProps => ({
+const buildProps = (overrides: Partial<SessionWizardPublishSectionProps> = {}): SessionWizardPublishSectionProps => ({
   adminUrl: '',
   adminUrlStatus: '',
   bundleFile: null,
@@ -138,7 +140,7 @@ describe('SessionWizardPublishSection', () => {
           onPublish,
           onToggleCollapsed,
         })}
-      />
+      />,
     );
 
     expect(screen.queryByTestId('publish-summary')).not.toBeInTheDocument();
@@ -162,7 +164,7 @@ describe('SessionWizardPublishSection', () => {
           onToggleCollapsed,
           onTogglePublishAdvanced,
         })}
-      />
+      />,
     );
 
     expect(screen.getByTestId('publish-summary')).toHaveAttribute('data-collapsed', 'true');
@@ -194,7 +196,7 @@ describe('SessionWizardPublishSection', () => {
             },
           }),
         })}
-      />
+      />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).toBeDisabled();

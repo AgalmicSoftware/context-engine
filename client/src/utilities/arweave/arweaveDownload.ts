@@ -22,11 +22,7 @@ export interface ArweaveDownloadOpsDeps {
     groupKeyOrCfg: unknown;
     txId: string;
   }) => Promise<{ text?: string; [key: string]: unknown } | null>;
-  writeArweaveTxCacheEntry: (opts: {
-    groupKeyOrCfg: unknown;
-    txId: string;
-    text: string;
-  }) => Promise<void>;
+  writeArweaveTxCacheEntry: (opts: { groupKeyOrCfg: unknown; txId: string; text: string }) => Promise<void>;
   readArweaveTxFailureCacheEntry: (opts: {
     groupKeyOrCfg: unknown;
     txId: string;
@@ -36,10 +32,7 @@ export interface ArweaveDownloadOpsDeps {
     txId: string;
     entry: Record<string, unknown>;
   }) => Promise<void>;
-  clearArweaveTxFailureCacheEntry: (opts: {
-    groupKeyOrCfg: unknown;
-    txId: string;
-  }) => Promise<void>;
+  clearArweaveTxFailureCacheEntry: (opts: { groupKeyOrCfg: unknown; txId: string }) => Promise<void>;
   runArweaveTxFetchCoalesced: (opts: {
     chainId: number;
     txId: string;

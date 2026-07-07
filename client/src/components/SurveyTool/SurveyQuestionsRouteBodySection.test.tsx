@@ -5,9 +5,7 @@ import SurveyQuestionsRouteBodySection from './SurveyQuestionsRouteBodySection';
 
 describe('SurveyQuestionsRouteBodySection', () => {
   it('renders the response route when viewing answers', () => {
-    const renderSurveyAnswers = jest.fn(() => (
-      <div data-testid="survey-answers">Survey answers</div>
-    ));
+    const renderSurveyAnswers = jest.fn(() => <div data-testid="survey-answers">Survey answers</div>);
 
     render(
       <SurveyQuestionsRouteBodySection
@@ -18,14 +16,11 @@ describe('SurveyQuestionsRouteBodySection', () => {
           userAnswers: { responses: [{ questionID: 'q1', answer: 'Yes' }] },
         }}
         routeViewDisplayState={{ isOwnResponse: true }}
-      />
+      />,
     );
 
     expect(screen.getByTestId('survey-answers')).toBeInTheDocument();
-    expect(renderSurveyAnswers).toHaveBeenCalledWith(
-      [{ questionID: 'q1', answer: 'Yes' }],
-      true
-    );
+    expect(renderSurveyAnswers).toHaveBeenCalledWith([{ questionID: 'q1', answer: 'Yes' }], true);
   });
 
   it('renders the authoring route when not viewing answers', () => {
@@ -34,7 +29,7 @@ describe('SurveyQuestionsRouteBodySection', () => {
         authoringPanelProps={{
           renderedEditableQuestions: <div data-testid="editable-question">Question</div>,
         }}
-      />
+      />,
     );
 
     expect(screen.getByTestId('editable-question')).toBeInTheDocument();

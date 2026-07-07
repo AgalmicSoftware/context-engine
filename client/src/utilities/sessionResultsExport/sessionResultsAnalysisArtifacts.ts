@@ -46,7 +46,7 @@ export type SessionResultsAnalysisQuestionInput = {
   type?: string;
 };
 
-export type SessionResultsAnalysisSectionKey = typeof SESSION_RESULTS_ANALYSIS_SECTION_KEYS[number];
+export type SessionResultsAnalysisSectionKey = (typeof SESSION_RESULTS_ANALYSIS_SECTION_KEYS)[number];
 
 export type SessionResultsAnalysisResponseInput = {
   additional?: unknown;
@@ -155,19 +155,12 @@ export type SessionResultsAnalysisEligibility = {
   reasons: string[];
 };
 
-const toSafeString = (value: unknown): string => (
-  value === null || value === undefined ? '' : String(value)
-);
+const toSafeString = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 
-const normalizeText = (value: unknown): string => (
-  toSafeString(value)
-    .replace(/\s+/g, ' ')
-    .trim()
-);
+const normalizeText = (value: unknown): string => toSafeString(value).replace(/\s+/g, ' ').trim();
 
-const normalizeAiText = (value: unknown): string => (
-  normalizeText(value).replace(ETH_ADDRESS_TEXT_PATTERN, REDACTED_ADDRESS_PLACEHOLDER)
-);
+const normalizeAiText = (value: unknown): string =>
+  normalizeText(value).replace(ETH_ADDRESS_TEXT_PATTERN, REDACTED_ADDRESS_PLACEHOLDER);
 
 const truncateAiText = (value: unknown, maxLength: number): string => {
   const text = normalizeAiText(value);
@@ -176,15 +169,10 @@ const truncateAiText = (value: unknown, maxLength: number): string => {
   return `${text.slice(0, Math.max(0, limit - 15)).trimEnd()} [truncated]`;
 };
 
-const toPlainRecord = (value: unknown): Record<string, unknown> => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {}
-);
+const toPlainRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
-const toArray = (value: unknown): unknown[] => (
-  Array.isArray(value) ? value : []
-);
+const toArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
 const buildSyntheticId = (index: number): string => `participant_${String(index + 1).padStart(3, '0')}`;
 
@@ -202,10 +190,7 @@ const isSafeAnalysisLabel = (value: unknown): boolean => {
   return !!label && !label.includes(REDACTED_ADDRESS_PLACEHOLDER);
 };
 
-const normalizeSegmentValue = (
-  value: unknown,
-  dimensionId: string
-): SessionResultsAnalysisSegmentValue | null => {
+const normalizeSegmentValue = (value: unknown, dimensionId: string): SessionResultsAnalysisSegmentValue | null => {
   const record = toPlainRecord(value);
   const label = normalizeAiText(record.label ?? record.value ?? '');
   if (!isSafeAnalysisLabel(label)) return null;
@@ -219,9 +204,7 @@ const normalizeSegmentValue = (
   };
 };
 
-const normalizeSegmentDimension = (
-  value: unknown
-): SessionResultsAnalysisSegmentDimension | null => {
+const normalizeSegmentDimension = (value: unknown): SessionResultsAnalysisSegmentDimension | null => {
   const record = toPlainRecord(value);
   const label = normalizeAiText(record.label ?? record.dimensionLabel ?? record.dimension ?? '');
   if (!isSafeAnalysisLabel(label)) return null;
@@ -241,17 +224,14 @@ const normalizeSegmentDimension = (
   };
 };
 
-const normalizeAnalysisSegmentDimensions = (
-  value: unknown
-): SessionResultsAnalysisSegmentDimension[] => (
-  toArray(value)
-    .map(normalizeSegmentDimension)
-    .filter(Boolean) as SessionResultsAnalysisSegmentDimension[]
-).slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxSegmentDimensions);
+const normalizeAnalysisSegmentDimensions = (value: unknown): SessionResultsAnalysisSegmentDimension[] =>
+  (toArray(value).map(normalizeSegmentDimension).filter(Boolean) as SessionResultsAnalysisSegmentDimension[]).slice(
+    0,
+    SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxSegmentDimensions,
+  );
 
-const shouldDropAnalysisOutputKey = (key: string): boolean => (
-  SENSITIVE_ANALYSIS_OUTPUT_KEY_PATTERNS.some((pattern) => pattern.test(key))
-);
+const shouldDropAnalysisOutputKey = (key: string): boolean =>
+  SENSITIVE_ANALYSIS_OUTPUT_KEY_PATTERNS.some((pattern) => pattern.test(key));
 
 const sanitizeGeneratedAnalysisValue = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(sanitizeGeneratedAnalysisValue);
@@ -283,10 +263,12 @@ const normalizeSignatureValue = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(normalizeSignatureValue);
   if (!value || typeof value !== 'object') return value;
   const record = value as Record<string, unknown>;
-  return Object.keys(record).sort().reduce<Record<string, unknown>>((acc, key) => {
-    acc[key] = normalizeSignatureValue(record[key]);
-    return acc;
-  }, {});
+  return Object.keys(record)
+    .sort()
+    .reduce<Record<string, unknown>>((acc, key) => {
+      acc[key] = normalizeSignatureValue(record[key]);
+      return acc;
+    }, {});
 };
 
 const stableSerializeForSignature = (value: unknown): string => {
@@ -297,9 +279,7 @@ const stableSerializeForSignature = (value: unknown): string => {
   }
 };
 
-export const buildSessionResultsAnalysisInputSignature = (
-  payload: SessionResultsAnalysisAiPayload
-): string => {
+export const buildSessionResultsAnalysisInputSignature = (payload: SessionResultsAnalysisAiPayload): string => {
   const input = stableSerializeForSignature(payload);
   let hashA = 0x811c9dc5;
   let hashB = 0x45d9f3b;
@@ -308,11 +288,9 @@ export const buildSessionResultsAnalysisInputSignature = (
     hashA = Math.imul(hashA ^ code, 16777619) >>> 0;
     hashB = Math.imul(hashB ^ code, 1597334677) >>> 0;
   }
-  return [
-    'session-results-analysis-v1',
-    hashA.toString(16).padStart(8, '0'),
-    hashB.toString(16).padStart(8, '0'),
-  ].join('-');
+  return ['session-results-analysis-v1', hashA.toString(16).padStart(8, '0'), hashB.toString(16).padStart(8, '0')].join(
+    '-',
+  );
 };
 
 export const buildSessionResultsAnalysisAiPayload = ({
@@ -340,38 +318,50 @@ export const buildSessionResultsAnalysisAiPayload = ({
     return participant;
   };
 
-  const normalizedQuestions = questions.slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestions).map((question) => ({
-    id: normalizeAiText(question?.id),
-    options: Array.isArray(question?.options)
-      ? question.options
-        .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxOptionsPerQuestion)
-        .map((option) => truncateAiText(option, 140))
-        .filter(Boolean)
-      : [],
-    prompt: truncateAiText(question?.prompt, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestionPromptChars),
-    tags: Array.isArray(question?.tags)
-      ? question.tags
-        .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxTagsPerQuestion)
-        .map((tag) => truncateAiText(tag, 120))
-        .filter(Boolean)
-      : [],
-    type: normalizeAiText(question?.type),
-  })).filter((question) => question.id || question.prompt);
+  const normalizedQuestions = questions
+    .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestions)
+    .map((question) => ({
+      id: normalizeAiText(question?.id),
+      options: Array.isArray(question?.options)
+        ? question.options
+            .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxOptionsPerQuestion)
+            .map((option) => truncateAiText(option, 140))
+            .filter(Boolean)
+        : [],
+      prompt: truncateAiText(question?.prompt, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestionPromptChars),
+      tags: Array.isArray(question?.tags)
+        ? question.tags
+            .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxTagsPerQuestion)
+            .map((tag) => truncateAiText(tag, 120))
+            .filter(Boolean)
+        : [],
+      type: normalizeAiText(question?.type),
+    }))
+    .filter((question) => question.id || question.prompt);
 
-  const normalizedResponses = responses.slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponses).map((response) => {
-    const answer = truncateAiText(getResponseText(response?.answer), SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponseAnswerChars);
-    const additional = truncateAiText(getResponseText(response?.additional), SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponseAdditionalChars);
-    if (!answer && !additional) return null;
-    const participant = getParticipant(response?.participantAddress);
-    return {
-      ...(additional ? { additional } : {}),
-      answer,
-      participantId: participant.syntheticId,
-      questionId: normalizeAiText(response?.questionId),
-      questionPrompt: normalizeAiText(response?.questionPrompt),
-      questionType: normalizeAiText(response?.questionType),
-    };
-  }).filter(Boolean) as SessionResultsAnalysisAiResponse[];
+  const normalizedResponses = responses
+    .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponses)
+    .map((response) => {
+      const answer = truncateAiText(
+        getResponseText(response?.answer),
+        SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponseAnswerChars,
+      );
+      const additional = truncateAiText(
+        getResponseText(response?.additional),
+        SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponseAdditionalChars,
+      );
+      if (!answer && !additional) return null;
+      const participant = getParticipant(response?.participantAddress);
+      return {
+        ...(additional ? { additional } : {}),
+        answer,
+        participantId: participant.syntheticId,
+        questionId: normalizeAiText(response?.questionId),
+        questionPrompt: normalizeAiText(response?.questionPrompt),
+        questionType: normalizeAiText(response?.questionType),
+      };
+    })
+    .filter(Boolean) as SessionResultsAnalysisAiResponse[];
   const normalizedSegmentDimensions = normalizeAnalysisSegmentDimensions(segmentDimensions);
 
   return {
@@ -395,18 +385,24 @@ export const buildSessionResultsAnalysisAiPayload = ({
 };
 
 export const evaluateSessionResultsAnalysisEligibility = (
-  payload: SessionResultsAnalysisAiPayload
+  payload: SessionResultsAnalysisAiPayload,
 ): SessionResultsAnalysisEligibility => {
   const counts = payload?.counts || { participants: 0, questions: 0, responses: 0 };
   const reasons: string[] = [];
   if (counts.responses < SESSION_RESULTS_ANALYSIS_MINIMUMS.responses) {
-    reasons.push(`Needs at least ${SESSION_RESULTS_ANALYSIS_MINIMUMS.responses} viewable responses; ${counts.responses} available.`);
+    reasons.push(
+      `Needs at least ${SESSION_RESULTS_ANALYSIS_MINIMUMS.responses} viewable responses; ${counts.responses} available.`,
+    );
   }
   if (counts.participants < SESSION_RESULTS_ANALYSIS_MINIMUMS.participants) {
-    reasons.push(`Needs at least ${SESSION_RESULTS_ANALYSIS_MINIMUMS.participants} participants; ${counts.participants} available.`);
+    reasons.push(
+      `Needs at least ${SESSION_RESULTS_ANALYSIS_MINIMUMS.participants} participants; ${counts.participants} available.`,
+    );
   }
   if (counts.questions < SESSION_RESULTS_ANALYSIS_MINIMUMS.questions) {
-    reasons.push(`Needs at least ${SESSION_RESULTS_ANALYSIS_MINIMUMS.questions} hydrated question; ${counts.questions} available.`);
+    reasons.push(
+      `Needs at least ${SESSION_RESULTS_ANALYSIS_MINIMUMS.questions} hydrated question; ${counts.questions} available.`,
+    );
   }
   return {
     counts: {
@@ -419,11 +415,14 @@ export const evaluateSessionResultsAnalysisEligibility = (
   };
 };
 
-const SESSION_RESULTS_SECTION_PROMPTS: Record<SessionResultsAnalysisSectionKey, {
-  description: string;
-  jsonShape: string;
-  outputKey: SessionResultsAnalysisSectionKey;
-}> = {
+const SESSION_RESULTS_SECTION_PROMPTS: Record<
+  SessionResultsAnalysisSectionKey,
+  {
+    description: string;
+    jsonShape: string;
+    outputKey: SessionResultsAnalysisSectionKey;
+  }
+> = {
   breakdown: {
     description: 'Breakdown: infer dataset-specific comparison/filter dimensions and concise thematic groups.',
     outputKey: 'breakdown',
@@ -445,7 +444,8 @@ const SESSION_RESULTS_SECTION_PROMPTS: Record<SessionResultsAnalysisSectionKey, 
 }`,
   },
   riskMatrix: {
-    description: 'Risk Matrix: infer a custom per-session risk taxonomy, likelihood/impact values, and paraphrased evidence.',
+    description:
+      'Risk Matrix: infer a custom per-session risk taxonomy, likelihood/impact values, and paraphrased evidence.',
     outputKey: 'riskMatrix',
     jsonShape: `{
   "riskMatrix": {
@@ -468,9 +468,8 @@ const SESSION_RESULTS_SECTION_PROMPTS: Record<SessionResultsAnalysisSectionKey, 
   },
 };
 
-const isSessionResultsAnalysisSectionKey = (value: unknown): value is SessionResultsAnalysisSectionKey => (
-  (SESSION_RESULTS_ANALYSIS_SECTION_KEYS as readonly string[]).includes(String(value || ''))
-);
+const isSessionResultsAnalysisSectionKey = (value: unknown): value is SessionResultsAnalysisSectionKey =>
+  (SESSION_RESULTS_ANALYSIS_SECTION_KEYS as readonly string[]).includes(String(value || ''));
 
 const buildAllSectionsJsonShape = (): string => `{
   "breakdown": {
@@ -495,11 +494,9 @@ const buildAllSectionsJsonShape = (): string => `{
 
 export const buildSessionResultsAnalysisPrompt = (
   payload: SessionResultsAnalysisAiPayload,
-  section: SessionResultsAnalysisSectionKey | 'all' = 'all'
+  section: SessionResultsAnalysisSectionKey | 'all' = 'all',
 ): string => {
-  const sectionConfig = isSessionResultsAnalysisSectionKey(section)
-    ? SESSION_RESULTS_SECTION_PROMPTS[section]
-    : null;
+  const sectionConfig = isSessionResultsAnalysisSectionKey(section) ? SESSION_RESULTS_SECTION_PROMPTS[section] : null;
   const sectionLine = sectionConfig
     ? `Generate only this result view: ${sectionConfig.description}`
     : 'Generate all Context Engine session analysis result views.';
@@ -551,13 +548,10 @@ const parseJsonObject = (raw: unknown): Record<string, unknown> => {
   return {};
 };
 
-const sectionArray = (record: Record<string, unknown>, key: string): unknown[] => (
-  toArray(record[key]).map(sanitizeGeneratedAnalysisValue)
-);
+const sectionArray = (record: Record<string, unknown>, key: string): unknown[] =>
+  toArray(record[key]).map(sanitizeGeneratedAnalysisValue);
 
-const normalizeSectionRecord = (value: unknown): Record<string, unknown> => (
-  toPlainRecord(value)
-);
+const normalizeSectionRecord = (value: unknown): Record<string, unknown> => toPlainRecord(value);
 
 export const normalizeGeneratedSessionResultsAnalysisArtifact = ({
   generatedAt = new Date().toISOString(),
@@ -617,9 +611,11 @@ export const normalizeGeneratedSessionResultsAnalysisArtifact = ({
         dimensions,
         groups,
         summary: breakdownSummary,
-        ...(dimensions.length || groups.length || Object.keys(breakdownSummary).length ? {} : {
-          reason: 'AI generation did not return breakdown groups.',
-        }),
+        ...(dimensions.length || groups.length || Object.keys(breakdownSummary).length
+          ? {}
+          : {
+              reason: 'AI generation did not return breakdown groups.',
+            }),
       },
       riskMatrix: {
         available: categories.length > 0 || comments.length > 0,
@@ -648,13 +644,10 @@ export const mergeGeneratedSessionResultsAnalysisArtifacts = ({
   if (!next) return base;
 
   const nextSectionSet = new Set<SessionResultsAnalysisSectionKey>(
-    (Array.isArray(sections) ? sections : [])
-      .filter(isSessionResultsAnalysisSectionKey)
+    (Array.isArray(sections) ? sections : []).filter(isSessionResultsAnalysisSectionKey),
   );
 
-  const shouldUseNext = (key: SessionResultsAnalysisSectionKey): boolean => (
-    nextSectionSet.has(key)
-  );
+  const shouldUseNext = (key: SessionResultsAnalysisSectionKey): boolean => nextSectionSet.has(key);
 
   return {
     ...base,

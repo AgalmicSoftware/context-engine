@@ -8,7 +8,7 @@ describe('LoginSettingsSectionCard', () => {
     render(
       <LoginSettingsSectionCard title="Session" summary="General">
         <div>Session settings body</div>
-      </LoginSettingsSectionCard>
+      </LoginSettingsSectionCard>,
     );
 
     expect(screen.getByText('Session')).toBeInTheDocument();
@@ -19,14 +19,9 @@ describe('LoginSettingsSectionCard', () => {
   it('renders collapsible sections and forwards toggle clicks', () => {
     const onToggle = jest.fn();
     const { rerender } = render(
-      <LoginSettingsSectionCard
-        title="AI"
-        summary="Using local override"
-        isOpen={false}
-        onToggle={onToggle}
-      >
+      <LoginSettingsSectionCard title="AI" summary="Using local override" isOpen={false} onToggle={onToggle}>
         <div>AI settings body</div>
-      </LoginSettingsSectionCard>
+      </LoginSettingsSectionCard>,
     );
 
     const toggle = screen.getByRole('button', { name: /AI/i });
@@ -38,14 +33,9 @@ describe('LoginSettingsSectionCard', () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
 
     rerender(
-      <LoginSettingsSectionCard
-        title="AI"
-        summary="Using local override"
-        isOpen
-        onToggle={onToggle}
-      >
+      <LoginSettingsSectionCard title="AI" summary="Using local override" isOpen onToggle={onToggle}>
         <div>AI settings body</div>
-      </LoginSettingsSectionCard>
+      </LoginSettingsSectionCard>,
     );
 
     expect(screen.getByRole('button', { name: /AI/i })).toHaveAttribute('aria-expanded', 'true');

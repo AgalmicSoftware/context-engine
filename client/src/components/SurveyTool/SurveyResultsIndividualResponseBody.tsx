@@ -43,17 +43,19 @@ export type SurveyResultsIndividualResponseListEntry = SurveyResultsIndividualRe
   surveyId?: unknown;
 };
 
-export type SurveyResultsIndividualResponseCardDisplayProps = Partial<Record<
-  | 'aggregatorContainerClassName'
-  | 'aggregatorFreeformAnswerClassName'
-  | 'aggregatorParagraphClassName'
-  | 'aggregatorTextClassName'
-  | 'bodyClassName'
-  | 'containerClassName'
-  | 'iconButtonClassName'
-  | 'linksContainerClassName',
-  string
->>;
+export type SurveyResultsIndividualResponseCardDisplayProps = Partial<
+  Record<
+    | 'aggregatorContainerClassName'
+    | 'aggregatorFreeformAnswerClassName'
+    | 'aggregatorParagraphClassName'
+    | 'aggregatorTextClassName'
+    | 'bodyClassName'
+    | 'containerClassName'
+    | 'iconButtonClassName'
+    | 'linksContainerClassName',
+    string
+  >
+>;
 
 export type SurveyResultsIndividualLockedResponseKeyArgs = {
   questionId?: unknown;
@@ -79,7 +81,7 @@ export type SurveyResultsIndividualResponseDisplayRow = {
 export type SurveyResultsIndividualResponseBodyProps = {
   account?: string;
   applyDecryptedOverrideToResponse: (
-    args: SurveyResultsIndividualDecryptedOverrideArgs
+    args: SurveyResultsIndividualDecryptedOverrideArgs,
   ) => SurveyResultsIndividualAnswerRecord | null;
   currentSurveyId?: string;
   effectiveSlug?: string;
@@ -95,19 +97,15 @@ export type SurveyResultsIndividualResponseBodyProps = {
   styleMap: Record<string, string>;
 };
 
-const toIndividualAnswerRecord = (value: unknown): SurveyResultsIndividualAnswerRecord | null => (
-  value && typeof value === 'object' ? value as SurveyResultsIndividualAnswerRecord : null
-);
+const toIndividualAnswerRecord = (value: unknown): SurveyResultsIndividualAnswerRecord | null =>
+  value && typeof value === 'object' ? (value as SurveyResultsIndividualAnswerRecord) : null;
 
-const toIndividualAnswerRows = (value: unknown): SurveyResultsIndividualAnswerRecord[] => (
+const toIndividualAnswerRows = (value: unknown): SurveyResultsIndividualAnswerRecord[] =>
   Array.isArray(value)
     ? value.map(toIndividualAnswerRecord).filter((row): row is SurveyResultsIndividualAnswerRecord => !!row)
-    : []
-);
+    : [];
 
-const toDisplayString = (value: unknown): string => (
-  value === null || value === undefined ? '' : String(value)
-);
+const toDisplayString = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 
 export const buildSurveyResultsIndividualResponseDisplayRows = ({
   account = '',

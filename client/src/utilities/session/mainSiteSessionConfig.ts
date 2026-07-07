@@ -39,50 +39,32 @@ export type MainSiteSessionNetworkLike = Record<string, unknown> & {
   name?: string;
 };
 
-const asSessionConfigLike = (value: unknown): MainSiteSessionConfigLike | null => (
-  value && typeof value === 'object'
-    ? value as MainSiteSessionConfigLike
-    : null
-);
+const asSessionConfigLike = (value: unknown): MainSiteSessionConfigLike | null =>
+  value && typeof value === 'object' ? (value as MainSiteSessionConfigLike) : null;
 
-const asSessionNetworkLike = (value: unknown): MainSiteSessionNetworkLike | null => (
-  value && typeof value === 'object'
-    ? value as MainSiteSessionNetworkLike
-    : null
-);
+const asSessionNetworkLike = (value: unknown): MainSiteSessionNetworkLike | null =>
+  value && typeof value === 'object' ? (value as MainSiteSessionNetworkLike) : null;
 
-export const getSessionCfg = (
-  slugIn: string | null | undefined
-): MainSiteSessionConfigLike | null => {
+export const getSessionCfg = (slugIn: string | null | undefined): MainSiteSessionConfigLike | null => {
   const normalized = normalizeSessionSlug(slugIn ?? '');
   if (!normalized) {
     return asSessionConfigLike(getSessionConfigBySlugOrDefault(''));
   }
 
-  return asSessionConfigLike(resolveStrictSessionValue(
-    normalized,
-    getSessionConfigBySlug,
-    (slug) => getSessionConfigBySlug(slug)
-  ));
+  return asSessionConfigLike(
+    resolveStrictSessionValue(normalized, getSessionConfigBySlug, (slug) => getSessionConfigBySlug(slug)),
+  );
 };
 
-export const getSessionChainId = (
-  slugIn: string | null | undefined
-): number | null => {
-  const chainId = Number(resolveStrictSessionValue(
-    normalizeSessionSlug(slugIn ?? ''),
-    getSessionConfigBySlug,
-    resolveSessionChainId
-  ) || 0);
+export const getSessionChainId = (slugIn: string | null | undefined): number | null => {
+  const chainId = Number(
+    resolveStrictSessionValue(normalizeSessionSlug(slugIn ?? ''), getSessionConfigBySlug, resolveSessionChainId) || 0,
+  );
   return Number.isFinite(chainId) && chainId > 0 ? chainId : null;
 };
 
-export const getSessionNetwork = (
-  slugIn: string | null | undefined
-): MainSiteSessionNetworkLike | null => {
-  return asSessionNetworkLike(resolveStrictSessionValue(
-    normalizeSessionSlug(slugIn ?? ''),
-    getSessionConfigBySlug,
-    resolveSessionNetwork
-  ));
+export const getSessionNetwork = (slugIn: string | null | undefined): MainSiteSessionNetworkLike | null => {
+  return asSessionNetworkLike(
+    resolveStrictSessionValue(normalizeSessionSlug(slugIn ?? ''), getSessionConfigBySlug, resolveSessionNetwork),
+  );
 };

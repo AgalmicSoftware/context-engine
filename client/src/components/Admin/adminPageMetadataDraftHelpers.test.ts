@@ -21,10 +21,13 @@ describe('adminPageMetadataDraftHelpers', () => {
       },
     });
 
-    const applied = applyAdminMetadataDraft({ networkChainId: 11155420 }, {
-      ...draft,
-      contractSurveysAddress: '0x0000000000000000000000000000000000000002',
-    });
+    const applied = applyAdminMetadataDraft(
+      { networkChainId: 11155420 },
+      {
+        ...draft,
+        contractSurveysAddress: '0x0000000000000000000000000000000000000002',
+      },
+    );
 
     expect(applied.contracts.surveys).toEqual({
       address: '0x0000000000000000000000000000000000000002',

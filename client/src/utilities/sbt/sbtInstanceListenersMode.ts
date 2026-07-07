@@ -11,7 +11,6 @@ import { createLogger } from '../logging.js';
 const log = createLogger('sbtInstanceListenersMode');
 type SbtInstanceListenersMode = 'auto' | 'on' | 'off';
 
-
 const URL_PARAM_KEY = 'ceSbtInstanceListenersMode';
 const LOCAL_STORAGE_KEY = 'ce:sbtInstanceListenersMode';
 const GLOBAL_KEY = 'CE_SBT_INSTANCE_LISTENERS_MODE';
@@ -37,21 +36,27 @@ export const readSbtInstanceListenersMode = (): SbtInstanceListenersMode => {
         return normalizeSbtInstanceListenersMode(params.get(URL_PARAM_KEY));
       }
     }
-  } catch (e) { log.warn('sbtInstanceListenersMode: fallback', e); }
+  } catch (e) {
+    log.warn('sbtInstanceListenersMode: fallback', e);
+  }
 
   try {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (stored != null) return normalizeSbtInstanceListenersMode(stored);
     }
-  } catch (e) { log.warn('sbtInstanceListenersMode: fallback', e); }
+  } catch (e) {
+    log.warn('sbtInstanceListenersMode: fallback', e);
+  }
 
   try {
     const runtimeGlobal = globalThis as Record<string, unknown>;
     if (typeof globalThis !== 'undefined' && typeof runtimeGlobal[GLOBAL_KEY] !== 'undefined') {
       return normalizeSbtInstanceListenersMode(runtimeGlobal[GLOBAL_KEY]);
     }
-  } catch (e) { log.warn('sbtInstanceListenersMode: fallback', e); }
+  } catch (e) {
+    log.warn('sbtInstanceListenersMode: fallback', e);
+  }
 
   return 'auto';
 };
@@ -63,11 +68,15 @@ export const writeSbtInstanceListenersMode = (modeIn: unknown): SbtInstanceListe
     if (typeof globalThis !== 'undefined') {
       (globalThis as Record<string, unknown>)[GLOBAL_KEY] = mode;
     }
-  } catch (e) { log.warn('sbtInstanceListenersMode: fallback', e); }
+  } catch (e) {
+    log.warn('sbtInstanceListenersMode: fallback', e);
+  }
 
   try {
     if (typeof localStorage !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEY, mode);
-  } catch (e) { log.warn('sbtInstanceListenersMode: fallback', e); }
+  } catch (e) {
+    log.warn('sbtInstanceListenersMode: fallback', e);
+  }
 
   return mode;
 };

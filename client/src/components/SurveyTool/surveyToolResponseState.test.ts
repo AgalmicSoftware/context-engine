@@ -36,26 +36,34 @@ describe('surveyToolResponseState', () => {
   });
 
   it('builds rating envelope question sets from single payloads and response arrays', () => {
-    expect(Array.from(buildRatingEnvelopeQidSetFromUserAnswers({
-      responses: [
-        {
-          questionID: 'Q1',
-          importanceEncrypted: 'imp-env',
-        },
-        {
-          questionId: 'q2',
-          convictionEncrypted: 'conv-env',
-        },
-        {
-          questionIDHash: 'q3',
-        },
-      ],
-    }))).toEqual(['q1', 'q2']);
+    expect(
+      Array.from(
+        buildRatingEnvelopeQidSetFromUserAnswers({
+          responses: [
+            {
+              questionID: 'Q1',
+              importanceEncrypted: 'imp-env',
+            },
+            {
+              questionId: 'q2',
+              convictionEncrypted: 'conv-env',
+            },
+            {
+              questionIDHash: 'q3',
+            },
+          ],
+        }),
+      ),
+    ).toEqual(['q1', 'q2']);
 
-    expect(Array.from(buildRatingEnvelopeQidSetFromUserAnswers({
-      questionID: 'Q4',
-      importanceEncrypted: 'imp-env',
-    }))).toEqual(['q4']);
+    expect(
+      Array.from(
+        buildRatingEnvelopeQidSetFromUserAnswers({
+          questionID: 'Q4',
+          importanceEncrypted: 'imp-env',
+        }),
+      ),
+    ).toEqual(['q4']);
   });
 
   it('builds response hydration patches with overwrite and inherited-additional handling', () => {
@@ -73,32 +81,34 @@ describe('surveyToolResponseState', () => {
       buildEmptyResponseFieldState: jest.fn(() => ({ value: '', encrypted: false })),
     };
 
-    expect(buildQuestionResponseHydrationPatch({
-      questionId: 'Q1',
-      response: {
-        answer: {
-          value: 'hydrated answer',
-          encrypted: true,
-          encryptionAudience: 'gate',
-          encryptedPortion: 'ans-env',
+    expect(
+      buildQuestionResponseHydrationPatch({
+        questionId: 'Q1',
+        response: {
+          answer: {
+            value: 'hydrated answer',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            encryptedPortion: 'ans-env',
+          },
+          additional: {
+            value: 'hydrated notes',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            audienceMode: 'inherit',
+            encryptedPortion: 'add-env',
+          },
+          importance: 4,
+          conviction: 7,
         },
-        additional: {
-          value: 'hydrated notes',
-          encrypted: true,
-          encryptionAudience: 'gate',
-          audienceMode: 'inherit',
-          encryptedPortion: 'add-env',
-        },
-        importance: 4,
-        conviction: 7,
-      },
-      currentAnswer: { value: '' },
-      currentAdditional: { value: '' },
-      hasCurrentImportance: false,
-      hasCurrentConviction: false,
-      allowOverwrite: false,
-      deps,
-    })).toEqual({
+        currentAnswer: { value: '' },
+        currentAdditional: { value: '' },
+        hasCurrentImportance: false,
+        hasCurrentConviction: false,
+        allowOverwrite: false,
+        deps,
+      }),
+    ).toEqual({
       changed: true,
       answerState: {
         value: 'hydrated answer',
@@ -125,21 +135,23 @@ describe('surveyToolResponseState', () => {
       convictionValue: 7,
     });
 
-    expect(buildQuestionResponseHydrationPatch({
-      questionId: 'q1',
-      response: {
-        answer: { value: 'ignored answer' },
-        additional: { value: 'ignored notes' },
-        importance: 3,
-        conviction: 5,
-      },
-      currentAnswer: { value: 'keep answer' },
-      currentAdditional: { value: 'keep notes' },
-      hasCurrentImportance: true,
-      hasCurrentConviction: true,
-      allowOverwrite: false,
-      deps,
-    })).toEqual({
+    expect(
+      buildQuestionResponseHydrationPatch({
+        questionId: 'q1',
+        response: {
+          answer: { value: 'ignored answer' },
+          additional: { value: 'ignored notes' },
+          importance: 3,
+          conviction: 5,
+        },
+        currentAnswer: { value: 'keep answer' },
+        currentAdditional: { value: 'keep notes' },
+        hasCurrentImportance: true,
+        hasCurrentConviction: true,
+        allowOverwrite: false,
+        deps,
+      }),
+    ).toEqual({
       changed: false,
       answerState: undefined,
       additionalState: undefined,
@@ -165,27 +177,29 @@ describe('surveyToolResponseState', () => {
       buildEmptyResponseFieldState: jest.fn(() => ({ value: '', encrypted: false })),
     };
 
-    expect(buildQuestionCacheHydrationPatch({
-      questionId: 'Q1',
-      response: {
-        answer: {
-          value: 'plaintext answer should be masked',
-          encrypted: true,
-          encryptionAudience: 'gate',
-          encryptedPortion: 'ans-env',
+    expect(
+      buildQuestionCacheHydrationPatch({
+        questionId: 'Q1',
+        response: {
+          answer: {
+            value: 'plaintext answer should be masked',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            encryptedPortion: 'ans-env',
+          },
+          additional: {
+            value: 'plaintext additional should be masked',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            audienceMode: 'inherit',
+            encryptedPortion: 'add-env',
+          },
+          importance: 4,
+          conviction: 7,
         },
-        additional: {
-          value: 'plaintext additional should be masked',
-          encrypted: true,
-          encryptionAudience: 'gate',
-          audienceMode: 'inherit',
-          encryptedPortion: 'add-env',
-        },
-        importance: 4,
-        conviction: 7,
-      },
-      deps,
-    })).toEqual({
+        deps,
+      }),
+    ).toEqual({
       changed: true,
       answerState: {
         value: '*',
@@ -222,18 +236,20 @@ describe('surveyToolResponseState', () => {
       normalizeFieldAudienceMode: jest.fn((mode) => mode || 'explicit'),
     };
 
-    expect(buildQuestionCacheHydrationPatch({
-      questionId: 'Q1',
-      response: {
-        answer: {
-          value: 'encrypted plaintext should be masked',
-          encrypted: true,
-          encryptedPortion: 'ans-env',
+    expect(
+      buildQuestionCacheHydrationPatch({
+        questionId: 'Q1',
+        response: {
+          answer: {
+            value: 'encrypted plaintext should be masked',
+            encrypted: true,
+            encryptedPortion: 'ans-env',
+          },
+          importance: 4,
         },
-        importance: 4,
-      },
-      deps,
-    })).toEqual({
+        deps,
+      }),
+    ).toEqual({
       changed: true,
       answerState: {
         value: '*',

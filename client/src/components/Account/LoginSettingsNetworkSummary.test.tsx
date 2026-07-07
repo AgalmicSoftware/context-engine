@@ -1,10 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import {
-  LoginSettingsInlineNetworkSummary,
-  LoginSettingsPanelNetworkSummary,
-} from './LoginSettingsNetworkSummary';
+import { LoginSettingsInlineNetworkSummary, LoginSettingsPanelNetworkSummary } from './LoginSettingsNetworkSummary';
 
 describe('LoginSettingsNetworkSummary', () => {
   it('renders inline target and wallet network labels', () => {
@@ -14,7 +11,7 @@ describe('LoginSettingsNetworkSummary', () => {
         walletNetworkName="Base Sepolia"
         showWalletNetwork
         tooltipId="inline-network-tooltip"
-      />
+      />,
     );
 
     expect(screen.getByText('network:')).toBeInTheDocument();
@@ -34,7 +31,7 @@ describe('LoginSettingsNetworkSummary', () => {
         needsNetworkSwitch
         tooltipId="panel-network-tooltip"
         onSwitchNetwork={onSwitchNetwork}
-      />
+      />,
     );
 
     expect(screen.getByText('Network')).toBeInTheDocument();

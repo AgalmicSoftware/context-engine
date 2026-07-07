@@ -1,7 +1,4 @@
-import {
-  getSelectableSbtKey,
-  normalizeSelectableSbtAddress,
-} from './sbtSelectorSelectionKeyHelpers';
+import { getSelectableSbtKey, normalizeSelectableSbtAddress } from './sbtSelectorSelectionKeyHelpers';
 
 type SbtSelectorSelectedOrPendingAddressArgs = {
   address?: unknown;
@@ -36,16 +33,14 @@ type SbtSelectorSelectOption = {
   value: string;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
 export const buildSbtOptionsByAddress = <T extends Record<string, unknown> = Record<string, unknown>>(
-  sbtOptionsInput: unknown
+  sbtOptionsInput: unknown,
 ): Map<string, T> => {
   const byAddress = new Map<string, T>();
   (Array.isArray(sbtOptionsInput) ? sbtOptionsInput : []).forEach((entry: unknown) => {
-    const record = isRecord(entry) ? entry as T : null;
+    const record = isRecord(entry) ? (entry as T) : null;
     if (!record) return;
     const key = String(record.address || '').toLowerCase();
     if (!key || byAddress.has(key)) return;
@@ -55,11 +50,11 @@ export const buildSbtOptionsByAddress = <T extends Record<string, unknown> = Rec
 };
 
 export const buildSbtOptionsBySelectionKey = <T extends Record<string, unknown> = Record<string, unknown>>(
-  sbtOptionsInput: unknown
+  sbtOptionsInput: unknown,
 ): Map<string, T> => {
   const bySelectionKey = new Map<string, T>();
   (Array.isArray(sbtOptionsInput) ? sbtOptionsInput : []).forEach((entry: unknown) => {
-    const record = isRecord(entry) ? entry as T : null;
+    const record = isRecord(entry) ? (entry as T) : null;
     if (!record) return;
     const key = getSelectableSbtKey(record);
     if (!key || bySelectionKey.has(key)) return;
@@ -72,15 +67,16 @@ export const buildSbtSelectorMergedSelectableOptions = <T extends Record<string,
   additionalOptions = [],
   sbtOptions = [],
 }: BuildSbtSelectorMergedSelectableOptionsArgs = {}): T[] => {
-  const baseOptions = Array.isArray(sbtOptions) ? sbtOptions as T[] : [];
-  const extraOptions = Array.isArray(additionalOptions) ? additionalOptions as T[] : [];
+  const baseOptions = Array.isArray(sbtOptions) ? (sbtOptions as T[]) : [];
+  const extraOptions = Array.isArray(additionalOptions) ? (additionalOptions as T[]) : [];
   return [
     ...baseOptions,
-    ...extraOptions.filter((entry: T) => (
-      !baseOptions.some((existing: T) => (
-        String(existing?.address || '').toLowerCase() === String(entry?.address || '').toLowerCase()
-      ))
-    )),
+    ...extraOptions.filter(
+      (entry: T) =>
+        !baseOptions.some(
+          (existing: T) => String(existing?.address || '').toLowerCase() === String(entry?.address || '').toLowerCase(),
+        ),
+    ),
   ];
 };
 
@@ -90,30 +86,27 @@ export const resolveSbtSelectorDisplayOptions = <T extends Record<string, unknow
   mergedSbtOptions = [],
   scopeFeaturedAddresses = [],
 }: ResolveSbtSelectorDisplayOptionsArgs = {}): ResolveSbtSelectorDisplayOptionsResult<T> => {
-  const options = Array.isArray(mergedSbtOptions) ? mergedSbtOptions as T[] : [];
-  const effectiveFeatured = (
+  const options = Array.isArray(mergedSbtOptions) ? (mergedSbtOptions as T[]) : [];
+  const effectiveFeatured =
     Array.isArray(scopeFeaturedAddresses) && scopeFeaturedAddresses.length > 0
       ? scopeFeaturedAddresses
-      : (Array.isArray(defaultFeaturedSBTs) ? defaultFeaturedSBTs : [])
-  );
+      : Array.isArray(defaultFeaturedSBTs)
+        ? defaultFeaturedSBTs
+        : [];
   const hasFeaturedSBTs = effectiveFeatured.length > 0;
   if (!hasFeaturedSBTs || limitToFeatured !== true) {
     return { displayOptions: options, effectiveFeatured, hasFeaturedSBTs };
   }
 
-  const featuredLower = new Set<string>(
-    effectiveFeatured.map((addr: unknown) => String(addr || '').toLowerCase())
-  );
+  const featuredLower = new Set<string>(effectiveFeatured.map((addr: unknown) => String(addr || '').toLowerCase()));
   return {
-    displayOptions: options.filter((opt: T) => (
-      featuredLower.has(String(opt?.address || '').toLowerCase())
-    )),
+    displayOptions: options.filter((opt: T) => featuredLower.has(String(opt?.address || '').toLowerCase())),
     effectiveFeatured,
     hasFeaturedSBTs,
   };
 };
 
-export const buildSbtSelectorSelectOptions = (displayOptions: unknown): SbtSelectorSelectOption[] => (
+export const buildSbtSelectorSelectOptions = (displayOptions: unknown): SbtSelectorSelectOption[] =>
   (Array.isArray(displayOptions) ? displayOptions : []).map((sbt: unknown) => {
     const record = isRecord(sbt) ? sbt : {};
     return {
@@ -123,27 +116,22 @@ export const buildSbtSelectorSelectOptions = (displayOptions: unknown): SbtSelec
       image: record.image,
       chainId: record.chainId,
     };
-  })
-);
+  });
 
-export const buildSelectedSbtKeySet = (selectedSbts: unknown): Set<string> => (
+export const buildSelectedSbtKeySet = (selectedSbts: unknown): Set<string> =>
   new Set(
-    (Array.isArray(selectedSbts) ? selectedSbts : [])
-      .map((sbt: unknown) => getSelectableSbtKey(sbt))
-      .filter(Boolean)
-  )
-);
+    (Array.isArray(selectedSbts) ? selectedSbts : []).map((sbt: unknown) => getSelectableSbtKey(sbt)).filter(Boolean),
+  );
 
-export const buildSelectedSbtAddressSet = (selectedSbts: unknown): Set<string> => (
+export const buildSelectedSbtAddressSet = (selectedSbts: unknown): Set<string> =>
   new Set(
     (Array.isArray(selectedSbts) ? selectedSbts : [])
       .map((sbt: unknown) => {
         const record = isRecord(sbt) ? sbt : {};
         return normalizeSelectableSbtAddress(record.address);
       })
-      .filter(Boolean)
-  )
-);
+      .filter(Boolean),
+  );
 
 export const buildEffectiveFeaturedAddressSet = ({
   scopeFeaturedAddresses,
@@ -151,17 +139,17 @@ export const buildEffectiveFeaturedAddressSet = ({
 }: {
   defaultFeaturedSBTs?: unknown;
   scopeFeaturedAddresses?: unknown;
-} = {}): Set<string> => (
+} = {}): Set<string> =>
   new Set(
-    (
-      Array.isArray(scopeFeaturedAddresses) && scopeFeaturedAddresses.length > 0
-        ? scopeFeaturedAddresses
-        : (Array.isArray(defaultFeaturedSBTs) ? defaultFeaturedSBTs : [])
+    (Array.isArray(scopeFeaturedAddresses) && scopeFeaturedAddresses.length > 0
+      ? scopeFeaturedAddresses
+      : Array.isArray(defaultFeaturedSBTs)
+        ? defaultFeaturedSBTs
+        : []
     )
       .map((address: unknown) => normalizeSelectableSbtAddress(address))
-      .filter(Boolean)
-  )
-);
+      .filter(Boolean),
+  );
 
 export const hasSelectedOrPendingSbtSelectorAddress = ({
   address = '',
@@ -170,10 +158,7 @@ export const hasSelectedOrPendingSbtSelectorAddress = ({
 }: SbtSelectorSelectedOrPendingAddressArgs = {}): boolean => {
   const normalizedAddress = normalizeSelectableSbtAddress(address);
   if (!normalizedAddress) return false;
-  return !!(
-    selectedAddresses?.has(normalizedAddress) ||
-    pendingAddresses?.has(normalizedAddress)
-  );
+  return !!(selectedAddresses?.has(normalizedAddress) || pendingAddresses?.has(normalizedAddress));
 };
 
 export const hasSelectedOrPendingSbtSelectorKey = ({
@@ -183,8 +168,5 @@ export const hasSelectedOrPendingSbtSelectorKey = ({
 }: SbtSelectorSelectedOrPendingKeyArgs = {}): boolean => {
   const normalizedKey = getSelectableSbtKey(value);
   if (!normalizedKey) return false;
-  return !!(
-    selectedKeys?.has(normalizedKey) ||
-    pendingKeys?.has(normalizedKey)
-  );
+  return !!(selectedKeys?.has(normalizedKey) || pendingKeys?.has(normalizedKey));
 };

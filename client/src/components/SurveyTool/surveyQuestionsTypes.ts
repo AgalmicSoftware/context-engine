@@ -32,7 +32,7 @@ export type SurveyQuestionsRuntimeStrategy = {
   componentDidUpdate?: (
     engine: SurveyQuestionsRuntimeEngine,
     prevProps: SurveyQuestionsProps,
-    prevState: SurveyQuestionsState
+    prevState: SurveyQuestionsState,
   ) => unknown;
   componentWillUnmount?: (engine: SurveyQuestionsRuntimeEngine) => unknown;
   getAnsweredQuestionsCount?: (engine: SurveyQuestionsRuntimeEngine) => number;
@@ -42,13 +42,9 @@ export type SurveyQuestionsRuntimeStrategy = {
   showTransientSubmitFeedback?: (
     engine: SurveyQuestionsRuntimeEngine,
     message?: string,
-    durationMs?: number
+    durationMs?: number,
   ) => unknown;
-  toggleComments?: (
-    engine: SurveyQuestionsRuntimeEngine,
-    questionId: unknown,
-    defaultOpen?: boolean
-  ) => unknown;
+  toggleComments?: (engine: SurveyQuestionsRuntimeEngine, questionId: unknown, defaultOpen?: boolean) => unknown;
 };
 
 export type SurveyQuestionPoolStatePatch = {
@@ -618,12 +614,8 @@ export const buildSurveyQuestionPoolLoadState = ({
     };
   }
 
-  const expectedIds = Array.isArray(questionPoolExpectedIds)
-    ? questionPoolExpectedIds
-    : [];
-  const pendingIds = Array.isArray(questionPoolPendingIds)
-    ? questionPoolPendingIds
-    : [];
+  const expectedIds = Array.isArray(questionPoolExpectedIds) ? questionPoolExpectedIds : [];
+  const pendingIds = Array.isArray(questionPoolPendingIds) ? questionPoolPendingIds : [];
   const pendingCount = pendingIds.length;
 
   return {
@@ -634,9 +626,8 @@ export const buildSurveyQuestionPoolLoadState = ({
   };
 };
 
-export const isSurveyQuestionsMaskedPromptText = (prompt: unknown): boolean => (
-  String(prompt || '').trim() === '[encrypted]'
-);
+export const isSurveyQuestionsMaskedPromptText = (prompt: unknown): boolean =>
+  String(prompt || '').trim() === '[encrypted]';
 
 export const buildSurveyQuestionsMaskedQuestionVisibility = ({
   isMaskedPromptText = isSurveyQuestionsMaskedPromptText,
@@ -647,12 +638,9 @@ export const buildSurveyQuestionsMaskedQuestionVisibility = ({
   questionPool?: unknown;
   singleQuestionMode?: unknown;
 } = {}): SurveyQuestionsMaskedQuestionVisibilityState => {
-  const fullQuestionPool = filterPendingQuestionMetadataPlaceholders(
-    Array.isArray(questionPool) ? questionPool : []
-  );
-  const isPromptMasked = typeof isMaskedPromptText === 'function'
-    ? isMaskedPromptText
-    : isSurveyQuestionsMaskedPromptText;
+  const fullQuestionPool = filterPendingQuestionMetadataPlaceholders(Array.isArray(questionPool) ? questionPool : []);
+  const isPromptMasked =
+    typeof isMaskedPromptText === 'function' ? isMaskedPromptText : isSurveyQuestionsMaskedPromptText;
   if (singleQuestionMode) {
     return {
       fullQuestionPool,
@@ -664,18 +652,15 @@ export const buildSurveyQuestionsMaskedQuestionVisibility = ({
   const visibleQuestionPool: unknown[] = [];
   const hiddenMaskedQuestionIds: string[] = [];
   fullQuestionPool.forEach((question) => {
-    const questionRecord = question !== null && typeof question === 'object'
-      ? question as UnknownRecord
-      : {};
-    const masked = (
-      isPromptMasked(questionRecord.prompt) &&
-      !questionRecord.promptDecrypted
-    );
+    const questionRecord = question !== null && typeof question === 'object' ? (question as UnknownRecord) : {};
+    const masked = isPromptMasked(questionRecord.prompt) && !questionRecord.promptDecrypted;
     if (!masked) {
       visibleQuestionPool.push(question);
       return;
     }
-    const questionId = String(questionRecord.id || '').trim().toLowerCase();
+    const questionId = String(questionRecord.id || '')
+      .trim()
+      .toLowerCase();
     if (questionId) hiddenMaskedQuestionIds.push(questionId);
   });
 
@@ -713,15 +698,12 @@ export const buildSurveyQuestionsRenderReadinessDescriptor = ({
 } = {}): SurveyQuestionsRenderReadinessDescriptor => {
   const isSingleQuestion = !!singleQuestionMode;
   const standalone = !!isStandalone;
-  const normalizedSurveyIndex = standalone || isSingleQuestion
-    ? 0
-    : Number(surveyIndex || 0);
+  const normalizedSurveyIndex = standalone || isSingleQuestion ? 0 : Number(surveyIndex || 0);
   const responses = Array.isArray(surveysResponseState) ? surveysResponseState : [];
-  const currentSurveyResponseState = responses.length > normalizedSurveyIndex
-    ? (responses[normalizedSurveyIndex] as ResponseSlice)
-    : null;
+  const currentSurveyResponseState =
+    responses.length > normalizedSurveyIndex ? (responses[normalizedSurveyIndex] as ResponseSlice) : null;
   const normalizedQuestionPool = filterPendingQuestionMetadataPlaceholders(
-    Array.isArray(questionPool) ? questionPool : []
+    Array.isArray(questionPool) ? questionPool : [],
   );
   const normalizedFullQuestionPool = Array.isArray(fullQuestionPool)
     ? filterPendingQuestionMetadataPlaceholders(fullQuestionPool)
@@ -735,11 +717,9 @@ export const buildSurveyQuestionsRenderReadinessDescriptor = ({
   const questionPoolReady = normalizedFullQuestionPool.length > 0;
   const canFallThroughDisplayAnswerMode = !!displayAnswerMode && !!parsedViewAddressAnswers;
   const shouldShowLoadingState = !!(
-    (
-      !currentSurveyResponseState ||
+    (!currentSurveyResponseState ||
       (isSingleQuestion && !questionPoolReady && !displayAnswerMode) ||
-      (!isSingleQuestion && !standalone && !questionPoolReady && !displayAnswerMode)
-    ) &&
+      (!isSingleQuestion && !standalone && !questionPoolReady && !displayAnswerMode)) &&
     !canFallThroughDisplayAnswerMode
   );
   const gatedEmptyStateReady = !!(
@@ -795,20 +775,18 @@ export const buildShowJsonState = (showJson: unknown): SurveyShowJsonStatePatch 
   showJson: !!showJson,
 });
 
-export const toggleShowJsonState = (
-  prevState: { showJson?: unknown } = {}
-): SurveyShowJsonStatePatch => ({
+export const toggleShowJsonState = (prevState: { showJson?: unknown } = {}): SurveyShowJsonStatePatch => ({
   showJson: !prevState.showJson,
 });
 
 export const buildAutoDecryptToggleState = (
-  prevState: { autoDecryptEnabled?: unknown } = {}
+  prevState: { autoDecryptEnabled?: unknown } = {},
 ): SurveyAutoDecryptToggleStatePatch => ({
   autoDecryptEnabled: !prevState.autoDecryptEnabled,
 });
 
 export const buildDisplayAnswerModeToggleState = (
-  prevState: { displayAnswerMode?: unknown } = {}
+  prevState: { displayAnswerMode?: unknown } = {},
 ): SurveyDisplayAnswerModeToggleStatePatch => {
   const displayAnswerMode = !prevState.displayAnswerMode;
   return {
@@ -818,19 +796,19 @@ export const buildDisplayAnswerModeToggleState = (
 };
 
 export const buildQuestionsJsonToggleState = (
-  prevState: { showQuestionsJson?: unknown } = {}
+  prevState: { showQuestionsJson?: unknown } = {},
 ): SurveyQuestionsJsonToggleStatePatch => ({
   showQuestionsJson: !prevState.showQuestionsJson,
 });
 
 export const buildResponseJsonToggleState = (
-  prevState: { showResponseJson?: unknown } = {}
+  prevState: { showResponseJson?: unknown } = {},
 ): SurveyResponseJsonToggleStatePatch => ({
   showResponseJson: !prevState.showResponseJson,
 });
 
 export const buildSurveyJsonToggleState = (
-  prevState: { showSurveyJson?: unknown } = {}
+  prevState: { showSurveyJson?: unknown } = {},
 ): SurveySurveyJsonToggleStatePatch => ({
   showSurveyJson: !prevState.showSurveyJson,
 });
@@ -838,12 +816,10 @@ export const buildSurveyJsonToggleState = (
 export const buildCommentsToggleState = (
   prevState: { showComments?: Record<string, unknown> } = {},
   questionId: unknown,
-  defaultOpen: unknown = false
+  defaultOpen: unknown = false,
 ): SurveyCommentsToggleStatePatch => {
   const key = String(questionId);
-  const current = typeof prevState?.showComments?.[key] === 'boolean'
-    ? prevState.showComments[key]
-    : !!defaultOpen;
+  const current = typeof prevState?.showComments?.[key] === 'boolean' ? prevState.showComments[key] : !!defaultOpen;
   return {
     showComments: {
       ...prevState.showComments,
@@ -853,13 +829,13 @@ export const buildCommentsToggleState = (
 };
 
 export const buildGateSbtNameRevisionState = (
-  prevState: { gateSbtNameRevision?: unknown } = {}
+  prevState: { gateSbtNameRevision?: unknown } = {},
 ): SurveyGateSbtNameRevisionStatePatch => ({
   gateSbtNameRevision: Number(prevState.gateSbtNameRevision || 0) + 1,
 });
 
 export const buildLockedGateDetailsExpandedState = (
-  prevState: { lockedGateDetailsExpanded?: unknown } = {}
+  prevState: { lockedGateDetailsExpanded?: unknown } = {},
 ): SurveyLockedGateDetailsExpandedStatePatch => ({
   lockedGateDetailsExpanded: !prevState.lockedGateDetailsExpanded,
 });
@@ -869,13 +845,12 @@ export const buildLockAudienceGateDetailsState = (
   key: unknown,
   forceOpen: unknown = null,
   normalizedGateId = '',
-  normalizeGateLabelText: (value: unknown) => string = (value) => String(value || '')
+  normalizeGateLabelText: (value: unknown) => string = (value) => String(value || ''),
 ): SurveyLockAudienceGateDetailsStatePatch => {
   const stateKey = String(key || '');
   const current = normalizeGateLabelText(prevState.lockAudienceGateDetailsByQuestion?.[stateKey] || '');
-  const nextValue = typeof forceOpen === 'string'
-    ? (current === normalizedGateId ? '' : normalizedGateId)
-    : (forceOpen ? current : '');
+  const nextValue =
+    typeof forceOpen === 'string' ? (current === normalizedGateId ? '' : normalizedGateId) : forceOpen ? current : '';
   return {
     lockAudienceGateDetailsByQuestion: nextValue ? { [stateKey]: nextValue } : {},
   };
@@ -887,7 +862,7 @@ export const buildLockAudienceMenuState = (
     lockAudienceGateDetailsByQuestion?: Record<string, unknown>;
   } = {},
   key: unknown,
-  forceOpen: unknown = null
+  forceOpen: unknown = null,
 ): SurveyLockAudienceMenuStatePatch => {
   const stateKey = String(key || '');
   const current = !!prevState.lockAudienceMenuByQuestion?.[stateKey];
@@ -909,9 +884,11 @@ export const buildRenderedQuestionPayloadPoolsState = (
   deps: {
     pickBetterQuestionPayload: (existing: unknown, incoming: unknown) => unknown;
     areQuestionPayloadsEquivalent: (left: unknown, right: unknown) => boolean;
-  }
+  },
 ): SurveyRenderedQuestionPayloadPoolsStatePatch | null => {
-  const qid = String(questionId || '').trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   if (!qid || !questionPayload) return null;
 
   let didChange = false;
@@ -944,7 +921,7 @@ export const buildRenderedQuestionPayloadPoolsState = (
 export const buildDecryptingByKeyState = (
   prevState: { decryptingByKey?: Record<string, unknown> } = {},
   key: unknown,
-  isDecrypting: unknown
+  isDecrypting: unknown,
 ): SurveyDecryptingByKeyStatePatch => ({
   decryptingByKey: {
     ...(prevState.decryptingByKey || {}),
@@ -964,7 +941,7 @@ export const buildVisiblePileQuestionsAfterPromptDecryptState = (
   deps: {
     isFilterStateActive: (filterState: unknown) => boolean;
     isMaskedPromptText: (prompt: unknown) => boolean;
-  }
+  },
 ): SurveyVisiblePileQuestionsAfterPromptDecryptStatePatch | null => {
   const source = Array.isArray(prevState.allQuestionsForFilter) ? prevState.allQuestionsForFilter : null;
   if (!source || !source.length) return null;
@@ -972,33 +949,44 @@ export const buildVisiblePileQuestionsAfterPromptDecryptState = (
   if (isFilterActive) return null;
 
   const visible = source.filter(
-    (question) => !(question && deps.isMaskedPromptText((question as UnknownRecord)?.prompt) && !(question as UnknownRecord)?.promptDecrypted)
+    (question) =>
+      !(
+        question &&
+        deps.isMaskedPromptText((question as UnknownRecord)?.prompt) &&
+        !(question as UnknownRecord)?.promptDecrypted
+      ),
   );
   const hasHidden = source.some(
-    (question) => question && deps.isMaskedPromptText((question as UnknownRecord)?.prompt) && !(question as UnknownRecord)?.promptDecrypted
+    (question) =>
+      question &&
+      deps.isMaskedPromptText((question as UnknownRecord)?.prompt) &&
+      !(question as UnknownRecord)?.promptDecrypted,
   );
 
   const prevPile = Array.isArray(prevState.pileQuestions) ? prevState.pileQuestions : [];
   const activePileIndex = prevState.activePileIndex as number;
-  const currentActiveId = (
+  const currentActiveId =
     prevPile.length > 0 && prevPile[activePileIndex]
       ? String((prevPile[activePileIndex] as UnknownRecord | null | undefined)?.id || '').toLowerCase()
-      : ''
-  );
+      : '';
   const activeIdxFromId = currentActiveId
-    ? visible.findIndex((question) => String((question as UnknownRecord | null | undefined)?.id || '').toLowerCase() === currentActiveId)
+    ? visible.findIndex(
+        (question) =>
+          String((question as UnknownRecord | null | undefined)?.id || '').toLowerCase() === currentActiveId,
+      )
     : -1;
-  const nextActiveIndex = activeIdxFromId >= 0
-    ? activeIdxFromId
-    : Math.min(Number(prevState.activePileIndex || 0), Math.max(visible.length - 1, 0));
+  const nextActiveIndex =
+    activeIdxFromId >= 0
+      ? activeIdxFromId
+      : Math.min(Number(prevState.activePileIndex || 0), Math.max(visible.length - 1, 0));
 
-  const sameOrder = (
+  const sameOrder =
     prevPile.length === visible.length &&
-    prevPile.every((question, idx) => (
-      String((question as UnknownRecord | null | undefined)?.id || '').toLowerCase() ===
-      String((visible[idx] as UnknownRecord | null | undefined)?.id || '').toLowerCase()
-    ))
-  );
+    prevPile.every(
+      (question, idx) =>
+        String((question as UnknownRecord | null | undefined)?.id || '').toLowerCase() ===
+        String((visible[idx] as UnknownRecord | null | undefined)?.id || '').toLowerCase(),
+    );
   if (
     sameOrder &&
     prevState.hasHiddenGatedQuestions === hasHidden &&
@@ -1016,7 +1004,7 @@ export const buildVisiblePileQuestionsAfterPromptDecryptState = (
 
 export const buildAutoDecryptAttemptedState = (
   prevState: { autoDecryptAttempted?: Record<string, unknown> } = {},
-  key: unknown
+  key: unknown,
 ): SurveyAutoDecryptAttemptedStatePatch => ({
   autoDecryptAttempted: {
     ...(prevState.autoDecryptAttempted || {}),
@@ -1062,26 +1050,18 @@ export const buildQuestionPoolResponseMergeState = (
     surveyIndex = 0,
   }: {
     includeQuestionPool?: boolean;
-    mergeSurveyResponseState: (
-      currentState: unknown,
-      newQuestionPool: unknown,
-      surveyIndex: unknown
-    ) => unknown;
+    mergeSurveyResponseState: (currentState: unknown, newQuestionPool: unknown, surveyIndex: unknown) => unknown;
     questionPool?: unknown[];
     surveyIndex?: unknown;
-  }
+  },
 ): SurveyQuestionPoolResponseMergeStatePatch => {
   const patch: SurveyQuestionPoolResponseMergeStatePatch = {
-    surveysResponseState: mergeSurveyResponseState(
-      prevState.surveysResponseState,
-      questionPool,
-      surveyIndex
-    ),
+    surveysResponseState: mergeSurveyResponseState(prevState.surveysResponseState, questionPool, surveyIndex),
     editBaseline: (
       mergeSurveyResponseState(
         [prevState.editBaseline || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
         questionPool,
-        0
+        0,
       ) as unknown[]
     )[0],
   };
@@ -1098,20 +1078,12 @@ export const buildSurveyResponseMergeState = (
     questionPool = [],
     surveyIndex = 0,
   }: {
-    mergeSurveyResponseState: (
-      currentState: unknown,
-      newQuestionPool: unknown,
-      surveyIndex: unknown
-    ) => unknown;
+    mergeSurveyResponseState: (currentState: unknown, newQuestionPool: unknown, surveyIndex: unknown) => unknown;
     questionPool?: unknown[];
     surveyIndex?: unknown;
-  }
+  },
 ): SurveyResponseMergeStatePatch => ({
-  surveysResponseState: mergeSurveyResponseState(
-    prevState.surveysResponseState,
-    questionPool,
-    surveyIndex
-  ),
+  surveysResponseState: mergeSurveyResponseState(prevState.surveysResponseState, questionPool, surveyIndex),
 });
 
 export const buildEditStatsState = ({
@@ -1164,7 +1136,7 @@ export const buildFetchedQuestionPoolState = (
     pendingQuestionIds?: string[];
     pickBetterQuestionPayload: (existing: unknown, incoming: unknown) => unknown;
     questionPool?: unknown[];
-  }
+  },
 ): SurveyFetchedQuestionPoolStatePatch | null => {
   const prevQuestionPool = Array.isArray(prevState?.questionPool) ? prevState.questionPool : [];
   const prevExpectedQuestionIds = Array.isArray(prevState?.questionPoolExpectedIds)
@@ -1241,13 +1213,13 @@ export const buildAnswerEncryptionToggleResponseState = (
       field: 'answer',
       newEncryptedState: unknown,
       slice: UnknownRecord,
-      deps: UnknownRecord
+      deps: UnknownRecord,
     ) => UnknownRecord;
     deps: UnknownRecord;
     newEncryptedState: unknown;
     questionId: string;
     surveyIndex?: number;
-  }
+  },
 ): SurveyEncryptionResponseStatePatch => {
   const arr = Array.isArray(prevState.surveysResponseState) ? [...prevState.surveysResponseState] : [];
   while (arr.length <= surveyIndex) arr.push(createEmptyResponseSlice());
@@ -1291,13 +1263,13 @@ export const buildAdditionalEncryptionToggleResponseState = (
       field: 'additional',
       newEncryptedState: unknown,
       slice: UnknownRecord,
-      deps: UnknownRecord
+      deps: UnknownRecord,
     ) => UnknownRecord;
     deps: UnknownRecord;
     newEncryptedState: unknown;
     questionId: string;
     surveyIndex?: number;
-  }
+  },
 ): SurveyEncryptionResponseStatePatch => {
   const arr = Array.isArray(prevState.surveysResponseState) ? [...prevState.surveysResponseState] : [];
   while (arr.length <= surveyIndex) arr.push(createEmptyResponseSlice());
@@ -1336,14 +1308,14 @@ export const buildAnswerEncryptionAudienceState = (
       audience: unknown,
       gateId: string,
       slice: UnknownRecord,
-      deps: UnknownRecord
+      deps: UnknownRecord,
     ) => UnknownRecord;
     buildSurveyResponseStateArray: (args: UnknownRecord) => unknown[];
     deps: UnknownRecord;
     gateId?: string;
     questionId: string;
     surveyIndex?: number;
-  }
+  },
 ): SurveyEncryptionResponseStatePatch => {
   const arr = buildSurveyResponseStateArray({
     prevSurveysResponseState: prevState.surveysResponseState,
@@ -1385,14 +1357,14 @@ export const buildAdditionalEncryptionAudienceState = (
       audience: unknown,
       gateId: string,
       slice: UnknownRecord,
-      deps: UnknownRecord
+      deps: UnknownRecord,
     ) => UnknownRecord;
     buildSurveyResponseStateArray: (args: UnknownRecord) => unknown[];
     deps: UnknownRecord;
     gateId?: string;
     questionId: string;
     surveyIndex?: number;
-  }
+  },
 ): SurveyEncryptionResponseStatePatch => {
   const arr = buildSurveyResponseStateArray({
     prevSurveysResponseState: prevState.surveysResponseState,
@@ -1424,7 +1396,7 @@ export const buildSurveyResponseFetchLoadingState = (): SurveyResponseFetchLoadi
 export const buildViewedSurveyResponseState = (
   prevState: { parsedViewAddressAnswers?: unknown } = {},
   viewAnswers: unknown,
-  mergeDecryptedViewedResponse: (previousAnswers: unknown, nextAnswers: unknown) => unknown
+  mergeDecryptedViewedResponse: (previousAnswers: unknown, nextAnswers: unknown) => unknown,
 ): SurveyViewedResponseStatePatch => {
   const merged = mergeDecryptedViewedResponse(prevState.parsedViewAddressAnswers, viewAnswers);
   return {
@@ -1435,9 +1407,7 @@ export const buildViewedSurveyResponseState = (
   };
 };
 
-export const buildViewedSurveyNoResponseState = (
-  noResponse: unknown = true
-): SurveyViewedResponseStatePatch => ({
+export const buildViewedSurveyNoResponseState = (noResponse: unknown = true): SurveyViewedResponseStatePatch => ({
   viewAddressAnswers: '',
   parsedViewAddressAnswers: null,
   noResponse: !!noResponse,
@@ -1486,20 +1456,15 @@ export const buildSingleQuestionPlaceholderHydrationState = (
     mergeSurveyResponseState,
     placeholderQuestion,
   }: {
-    mergeSurveyResponseState: (
-      currentState: unknown,
-      newQuestionPool: unknown,
-      surveyIndex: unknown
-    ) => unknown;
+    mergeSurveyResponseState: (currentState: unknown, newQuestionPool: unknown, surveyIndex: unknown) => unknown;
     placeholderQuestion: unknown;
-  }
+  },
 ): SurveySingleQuestionPlaceholderHydrationStatePatch => ({
   questionPool: [placeholderQuestion],
   surveysResponseState: mergeSurveyResponseState(
-    prevState.surveysResponseState ||
-      [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+    prevState.surveysResponseState || [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
     [placeholderQuestion],
-    0
+    0,
   ),
   isLoadingResponse: false,
   noResponse: false,
@@ -1512,22 +1477,17 @@ export const buildSingleQuestionReadyHydrationState = (
     mergeSurveyResponseState,
     questionData,
   }: {
-    mergeSurveyResponseState: (
-      currentState: unknown,
-      newQuestionPool: unknown,
-      surveyIndex: unknown
-    ) => unknown;
+    mergeSurveyResponseState: (currentState: unknown, newQuestionPool: unknown, surveyIndex: unknown) => unknown;
     questionData: UnknownRecord;
-  }
+  },
 ): SurveySingleQuestionReadyHydrationStatePatch => {
   const hydratedQuestion = { ...questionData, id: questionData.id };
   return {
     questionPool: [hydratedQuestion],
     surveysResponseState: mergeSurveyResponseState(
-      prevState.surveysResponseState ||
-        [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      prevState.surveysResponseState || [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
       [hydratedQuestion],
-      0
+      0,
     ),
   };
 };
@@ -1539,7 +1499,7 @@ export const buildDecryptEditStartState = (): SurveyDecryptEditStartStatePatch =
 });
 
 export const buildDecryptEditFailureState = (
-  submissionError: unknown = 'Decryption failed.'
+  submissionError: unknown = 'Decryption failed.',
 ): SurveyDecryptEditFailureStatePatch => ({
   isDecrypting: false,
   submissionError: String(submissionError || 'Decryption failed.'),
@@ -1552,14 +1512,12 @@ export const buildResponseEditCompleteState = (): SurveyResponseEditCompleteStat
 });
 
 export const buildParsedViewAddressAnswersState = (
-  parsedViewAddressAnswers: unknown = null
+  parsedViewAddressAnswers: unknown = null,
 ): SurveyParsedViewAddressAnswersStatePatch => ({
   parsedViewAddressAnswers,
 });
 
-export const buildDisplayAnswerModeState = (
-  displayAnswerMode: unknown
-): SurveyDisplayAnswerModeStatePatch => ({
+export const buildDisplayAnswerModeState = (displayAnswerMode: unknown): SurveyDisplayAnswerModeStatePatch => ({
   displayAnswerMode,
 });
 
@@ -1573,14 +1531,12 @@ export const buildEditingResponseModeState = (): SurveyResponseModeStatePatch =>
   isEditing: true,
 });
 
-export const buildSubmissionErrorState = (
-  submissionError: unknown
-): SurveySubmissionErrorStatePatch => ({
+export const buildSubmissionErrorState = (submissionError: unknown): SurveySubmissionErrorStatePatch => ({
   submissionError,
 });
 
 export const buildResponseLoadingResetState = (
-  submittedSinceLastEdit: unknown
+  submittedSinceLastEdit: unknown,
 ): SurveyResponseLoadingResetStatePatch => ({
   isLoadingResponse: true,
   submissionError: '',
@@ -1588,9 +1544,7 @@ export const buildResponseLoadingResetState = (
   submittedSinceLastEdit,
 });
 
-export const buildSurveyChangedResetState = (
-  submittedSinceLastEdit: unknown
-): SurveyChangedResetStatePatch => ({
+export const buildSurveyChangedResetState = (submittedSinceLastEdit: unknown): SurveyChangedResetStatePatch => ({
   userHasResponse: false,
   userAnswers: null,
   parsedViewAddressAnswers: null,
@@ -1627,7 +1581,7 @@ export const buildSurveyAccountViewResetState = ({
 });
 
 export const buildStandaloneAuthResetState = (
-  submittedSinceLastEdit: unknown
+  submittedSinceLastEdit: unknown,
 ): SurveyStandaloneAuthResetStatePatch => ({
   isEditing: false,
   submissionError: '',
@@ -1643,7 +1597,7 @@ export const buildSubmitStartState = (): SurveySubmitStartStatePatch => ({
 });
 
 export const buildSubmitPreparationErrorState = (
-  submissionError: unknown = 'No new or changed responses to submit.'
+  submissionError: unknown = 'No new or changed responses to submit.',
 ): SurveySubmitPreparationErrorStatePatch => ({
   isSubmitting: false,
   submitProgress: 0,
@@ -1703,15 +1657,13 @@ export const buildCurrentStepState = (currentStep: unknown): SurveyCurrentStepSt
   currentStep: Number(currentStep || 0),
 });
 
-export const buildSurveysResponseStatePatch = (
-  surveysResponseState: unknown
-): SurveyResponseStatePatch => ({
+export const buildSurveysResponseStatePatch = (surveysResponseState: unknown): SurveyResponseStatePatch => ({
   surveysResponseState,
 });
 
 export const buildSurveyUserEditResponseStatePatch = (
   surveysResponseState: unknown,
-  submittedSinceLastEdit: unknown
+  submittedSinceLastEdit: unknown,
 ): SurveyUserEditResponseStatePatch => ({
   surveysResponseState,
   isEditing: true,
@@ -1719,23 +1671,21 @@ export const buildSurveyUserEditResponseStatePatch = (
 });
 
 export const buildPrefillQueuedAfterCacheState = (
-  prefillQueuedAfterCache: unknown
+  prefillQueuedAfterCache: unknown,
 ): SurveyPrefillQueuedAfterCacheStatePatch => ({
   prefillQueuedAfterCache: !!prefillQueuedAfterCache,
 });
 
 export const buildHydratingPriorResponsesState = (
-  isHydratingPriorResponses: unknown
+  isHydratingPriorResponses: unknown,
 ): SurveyHydratingPriorResponsesStatePatch => ({
   isHydratingPriorResponses: !!isHydratingPriorResponses,
 });
 
 export const buildBookmarkedQuestionsState = (
-  questions: unknown[] | null | undefined = []
+  questions: unknown[] | null | undefined = [],
 ): SurveyBookmarkedQuestionsStatePatch => ({
-  bookmarkedQuestions: new Set(
-    (Array.isArray(questions) ? questions : []).map((questionId) => String(questionId))
-  ),
+  bookmarkedQuestions: new Set((Array.isArray(questions) ? questions : []).map((questionId) => String(questionId))),
 });
 
 export const buildBulkPromptReloadingState = (bulkPromptReloading: unknown) => ({
@@ -1750,25 +1700,19 @@ export const buildSurveyQuestionsJsonTreeItemStyle = (level: unknown) => ({
   marginLeft: `${Number(level) * 20}px`,
 });
 
-export const buildSurveyQuestionsLockAudienceGateClassName = (
-  styleMap: Record<string, string>,
-  active: unknown
-) => `${styleMap.convictionToggleLine} ${styleMap.lockAudienceGateButton} ${active ? styleMap.convictionToggleButtonActive : ''}`;
+export const buildSurveyQuestionsLockAudienceGateClassName = (styleMap: Record<string, string>, active: unknown) =>
+  `${styleMap.convictionToggleLine} ${styleMap.lockAudienceGateButton} ${active ? styleMap.convictionToggleButtonActive : ''}`;
 
 export const buildSurveyQuestionsLockAudiencePopoverClassName = (
   styleMap: Record<string, string>,
-  isPileVisualContext: unknown
+  isPileVisualContext: unknown,
 ) => `${styleMap.lockAudiencePopover} ${isPileVisualContext ? styleMap.pileLockAudiencePopover : ''}`;
 
-export const buildSurveyQuestionsLockAudienceToggleClassName = (
-  styleMap: Record<string, string>,
-  active: unknown
-) => `${styleMap.convictionToggleLine} ${active ? styleMap.convictionToggleButtonActive : ''}`;
+export const buildSurveyQuestionsLockAudienceToggleClassName = (styleMap: Record<string, string>, active: unknown) =>
+  `${styleMap.convictionToggleLine} ${active ? styleMap.convictionToggleButtonActive : ''}`;
 
-export const resolveSurveyQuestionsIconGlowClassName = (
-  styleMap: Record<string, string>,
-  showGlow: unknown
-) => showGlow ? styleMap.iconGlow : undefined;
+export const resolveSurveyQuestionsIconGlowClassName = (styleMap: Record<string, string>, showGlow: unknown) =>
+  showGlow ? styleMap.iconGlow : undefined;
 
 export const SURVEY_QUESTIONS_SUBMIT_ICON_STYLE = {
   marginRight: '10px',
@@ -1792,11 +1736,13 @@ export const buildSurveyQuestionsFullLoadingProgressFillStyle = ({
   isHydrating?: unknown;
   scanPercent?: unknown;
 } = {}) => ({
-  width: `${isHydrating
-    ? (Number(hydrateDiscovered) > 0
-      ? Math.round((Math.min(Number(hydrateDone), Number(hydrateDiscovered)) / Number(hydrateDiscovered)) * 100)
-      : 0)
-    : scanPercent}%`,
+  width: `${
+    isHydrating
+      ? Number(hydrateDiscovered) > 0
+        ? Math.round((Math.min(Number(hydrateDone), Number(hydrateDiscovered)) / Number(hydrateDiscovered)) * 100)
+        : 0
+      : scanPercent
+  }%`,
 });
 
 export const buildSurveyQuestionsFullLoadingProgressState = ({
@@ -1807,15 +1753,16 @@ export const buildSurveyQuestionsFullLoadingProgressState = ({
   progressSlug?: unknown;
 } = {}): SurveyQuestionsFullLoadingProgressState => {
   const normalizedProgressSlug = normalizeQuestionProgressSlug(String(progressSlug || ''));
-  const matchedProgress = questionScanProgress &&
+  const matchedProgress =
+    questionScanProgress &&
     doesQuestionProgressMatchSlug(String(questionScanProgress.slug || ''), normalizedProgressSlug)
-    ? questionScanProgress
-    : null;
+      ? questionScanProgress
+      : null;
   const scanProgressDisplay = buildQuestionScanProgressDisplay(matchedProgress);
   const hydrateDiscovered = Math.max(0, Number(matchedProgress?.discoveredQuestions || 0));
   const hydrateDone = Math.max(0, Number(matchedProgress?.hydratedQuestions || 0));
   const isHydrating = matchedProgress?.phase === 'hydrate';
-  const hasFullLoadingProgress = (scanProgressDisplay.requestedTotalBlocks > 0) || isHydrating;
+  const hasFullLoadingProgress = scanProgressDisplay.requestedTotalBlocks > 0 || isHydrating;
   const hydrateDoneClamped = Math.min(hydrateDone, hydrateDiscovered);
 
   return {
@@ -1828,9 +1775,7 @@ export const buildSurveyQuestionsFullLoadingProgressState = ({
     metaLeftText: isHydrating
       ? `${Math.max(0, hydrateDiscovered - hydrateDoneClamped)} items left`
       : scanProgressDisplay.metaLeftText,
-    metaRightText: isHydrating
-      ? `${hydrateDoneClamped} / ${hydrateDiscovered}`
-      : scanProgressDisplay.metaRightText,
+    metaRightText: isHydrating ? `${hydrateDoneClamped} / ${hydrateDiscovered}` : scanProgressDisplay.metaRightText,
     fillStyle: buildSurveyQuestionsFullLoadingProgressFillStyle({
       hydrateDiscovered,
       hydrateDone,
@@ -1842,9 +1787,10 @@ export const buildSurveyQuestionsFullLoadingProgressState = ({
 
 export const buildSurveyQuestionsSubmitAuxIconClassName = (
   styleMap: Record<string, string>,
-  isSingleQuestionView: unknown
+  isSingleQuestionView: unknown,
 ) => {
-  const className = `${styleMap.iconButton} ${isSingleQuestionView ? styleMap.singleQuestionSubmitIconButton : ''}`.trim();
+  const className =
+    `${styleMap.iconButton} ${isSingleQuestionView ? styleMap.singleQuestionSubmitIconButton : ''}`.trim();
   return className || undefined;
 };
 
@@ -1932,18 +1878,17 @@ export const buildSurveyQuestionsJsonPanelDisplayState = ({
   const showQuestionsJsonPanel = !!showQuestionsJson && showQuestionJsonControls;
   const showResponseJsonPanel = !!showResponseJson;
   const surveyJsonToggleClassName = isSingleQuestionView ? styleMap.singleQuestionJsonToggle : undefined;
-  const surveyJsonRowClassName = [
-    styleMap.surveyJsonRow,
-    isSingleQuestionView ? styleMap.singleQuestionJsonRow : '',
-  ].filter(Boolean).join(' ') || undefined;
-  const questionJsonToggleClassName = [
-    surveyJsonToggleClassName,
-    isSingleQuestionView ? styleMap.singleQuestionJsonToggleQuestion : '',
-  ].filter(Boolean).join(' ') || undefined;
-  const responseJsonToggleClassName = [
-    surveyJsonToggleClassName,
-    isSingleQuestionView ? styleMap.singleQuestionJsonToggleResponse : '',
-  ].filter(Boolean).join(' ') || undefined;
+  const surveyJsonRowClassName =
+    [styleMap.surveyJsonRow, isSingleQuestionView ? styleMap.singleQuestionJsonRow : ''].filter(Boolean).join(' ') ||
+    undefined;
+  const questionJsonToggleClassName =
+    [surveyJsonToggleClassName, isSingleQuestionView ? styleMap.singleQuestionJsonToggleQuestion : '']
+      .filter(Boolean)
+      .join(' ') || undefined;
+  const responseJsonToggleClassName =
+    [surveyJsonToggleClassName, isSingleQuestionView ? styleMap.singleQuestionJsonToggleResponse : '']
+      .filter(Boolean)
+      .join(' ') || undefined;
 
   return {
     showFullSurveyJsonControls,
@@ -1975,7 +1920,7 @@ export const buildSurveyQuestionsJsonPreviewDisplayState = ({
 
   return {
     canUseJsonPreview,
-    jsonPreview: canUseJsonPreview ? (jsonPreview || {}) : null,
+    jsonPreview: canUseJsonPreview ? jsonPreview || {} : null,
   };
 };
 
@@ -2016,8 +1961,8 @@ export const buildSurveyQuestionsJsonForDisplayState = ({
 
   return {
     jsonForDisplay: isOwnResponse
-      ? (userAnswers || jsonPreview)
-      : (parsedViewAddressAnswers || { info: 'Loading viewed response...' }),
+      ? userAnswers || jsonPreview
+      : parsedViewAddressAnswers || { info: 'Loading viewed response...' },
   };
 };
 
@@ -2037,10 +1982,13 @@ export const buildSurveyQuestionsLayoutDisplayState = ({
   viewingAnswers?: unknown;
 } = {}): SurveyQuestionsLayoutDisplayState => {
   const useTagModal = !singleQuestionMode && !isStandalone;
-  const surveyPageClassName = [
-    isSingleQuestionView ? styleMap.singleQuestionPage : '',
-    isSingleQuestionView && viewingAnswers ? styleMap.singleQuestionReadPage : '',
-  ].filter(Boolean).join(' ') || undefined;
+  const surveyPageClassName =
+    [
+      isSingleQuestionView ? styleMap.singleQuestionPage : '',
+      isSingleQuestionView && viewingAnswers ? styleMap.singleQuestionReadPage : '',
+    ]
+      .filter(Boolean)
+      .join(' ') || undefined;
 
   return {
     activeTagModalTag: useTagModal ? String(activeTagModalTag || '').trim() : '',
@@ -2080,18 +2028,12 @@ export const buildSurveyQuestionsRouteViewDisplayState = ({
     ? (shortenAddress || ((address: string) => address))(viewedAddressRaw, false)
     : '';
   const isOwnResponse =
-    (viewAddress &&
-      account &&
-      viewAddress.toLowerCase() === account.toLowerCase()) ||
-    (responderAddress &&
-      account &&
-      responderAddress.toLowerCase() === account.toLowerCase()) ||
+    (viewAddress && account && viewAddress.toLowerCase() === account.toLowerCase()) ||
+    (responderAddress && account && responderAddress.toLowerCase() === account.toLowerCase()) ||
     (!viewAddress && !responderAddress && account && userHasResponse);
   const isSingleQuestionView =
-    singleQuestionMode ||
-    (isStandalone && Array.isArray(questionPool) && questionPool.length === 1);
-  const showViewAnswersButton =
-    (viewAddress || responderAddress) && (!isOwnResponse || !isEditing);
+    singleQuestionMode || (isStandalone && Array.isArray(questionPool) && questionPool.length === 1);
+  const showViewAnswersButton = (viewAddress || responderAddress) && (!isOwnResponse || !isEditing);
   const viewAnswersButtonText = viewingAnswers
     ? ` Fill out ${singleQuestionMode ? 'question' : 'survey'}`
     : ` View ${shortenedViewAddress} ${singleQuestionMode ? 'answer' : 'answers'}`;
@@ -2148,30 +2090,17 @@ export const buildSurveyQuestionsSubmitFooterDisplayState = ({
   const submittedIndicatorActive = submittedStateActive && !isLoadingResponse;
   const singleQuestionSubmittedIndicatorActive = !isSingle && submittedIndicatorActive;
   const showSubmitAux =
-    !isSingle && (
-      (pendingCount > 0 && !isSubmitting && !singleQuestionSubmittedIndicatorActive) ||
-      (singleQuestionSubmittedIndicatorActive && !!responseUrl)
-    );
+    !isSingle &&
+    ((pendingCount > 0 && !isSubmitting && !singleQuestionSubmittedIndicatorActive) ||
+      (singleQuestionSubmittedIndicatorActive && !!responseUrl));
   const uploadStatusText =
-    isSubmitting &&
-    Number(currentStep || 0) === 1 &&
-    !!hasEncryptedAnswers
-      ? 'Encrypting...'
-      : 'Uploading...';
-  const submitDisabled = !!(
-    isSubmitting ||
-    (singleQuestionMode && hasMaskedCurrentQuestionPayload)
-  );
+    isSubmitting && Number(currentStep || 0) === 1 && !!hasEncryptedAnswers ? 'Encrypting...' : 'Uploading...';
+  const submitDisabled = !!(isSubmitting || (singleQuestionMode && hasMaskedCurrentQuestionPayload));
   const canEditQuestions = !userHasResponse || !!startFresh || !!isEditing;
   const hasPendingEdits = !!isDirty || pendingCount > 0;
-  const genericShowInlineSubmit = !useHeaderSubmit && (
-    canEditQuestions
-      ? hasPendingEdits || submittedIndicatorActive
-      : submittedIndicatorActive
-  );
-  const showInlineSubmit = isSingle
-    ? hasPendingEdits
-    : genericShowInlineSubmit;
+  const genericShowInlineSubmit =
+    !useHeaderSubmit && (canEditQuestions ? hasPendingEdits || submittedIndicatorActive : submittedIndicatorActive);
+  const showInlineSubmit = isSingle ? hasPendingEdits : genericShowInlineSubmit;
 
   return {
     submittedStateActive,
@@ -2216,10 +2145,7 @@ export const buildSurveyQuestionsSubmitReadinessDescriptor = ({
   const hasMaskedCurrentQuestionPayload = shouldCheckMaskedCurrentQuestionPayload
     ? !!resolveMaskedCurrentQuestionPayload?.()
     : false;
-  const hasEncryptedAnswers =
-    submitting &&
-    normalizedCurrentStep === 1 &&
-    encryptedPendingEditCount > 0;
+  const hasEncryptedAnswers = submitting && normalizedCurrentStep === 1 && encryptedPendingEditCount > 0;
 
   return {
     currentStep: normalizedCurrentStep,
@@ -2327,9 +2253,7 @@ export const buildCopiedSurveyJsonState = (copiedSurveyJson: unknown) => ({
   copiedSurveyJson: !!copiedSurveyJson,
 });
 
-export const buildInitialSurveyQuestionsState = (
-  props: SurveyQuestionsProps = {}
-): SurveyQuestionsState => ({
+export const buildInitialSurveyQuestionsState = (props: SurveyQuestionsProps = {}): SurveyQuestionsState => ({
   surveysResponseState: [],
   displayAnswerMode: props.displayAnswerMode,
   viewAddressAnswers: '',

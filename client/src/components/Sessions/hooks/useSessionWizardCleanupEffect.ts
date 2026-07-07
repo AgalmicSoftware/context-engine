@@ -32,13 +32,7 @@ const useSessionWizardCleanupEffect = ({
       clearTimerRef(sessionIdStatusTimerRef);
       clearTimerRef(jsonCopiedTimerRef);
     };
-  }, [
-    isMountedRef,
-    sessionIdRotationTimerRef,
-    adminUrlStatusTimerRef,
-    sessionIdStatusTimerRef,
-    jsonCopiedTimerRef,
-  ]);
+  }, [isMountedRef, sessionIdRotationTimerRef, adminUrlStatusTimerRef, sessionIdStatusTimerRef, jsonCopiedTimerRef]);
 };
 
 export default useSessionWizardCleanupEffect;

@@ -50,29 +50,37 @@ describe('workerSessionResolution', () => {
   });
 
   it('lets explicit allowDemoFallback override the injected default policy', () => {
-    expect(resolveWorkerAllowDemoFallback({
-      sessionSlug: 'edge',
-      allowDemoFallback: true,
-      getDefaultAllowDemoFallback: () => false,
-    })).toBe(true);
+    expect(
+      resolveWorkerAllowDemoFallback({
+        sessionSlug: 'edge',
+        allowDemoFallback: true,
+        getDefaultAllowDemoFallback: () => false,
+      }),
+    ).toBe(true);
 
-    expect(resolveWorkerAllowDemoFallback({
-      sessionSlug: 'edge',
-      allowDemoFallback: false,
-      getDefaultAllowDemoFallback: () => true,
-    })).toBe(false);
+    expect(
+      resolveWorkerAllowDemoFallback({
+        sessionSlug: 'edge',
+        allowDemoFallback: false,
+        getDefaultAllowDemoFallback: () => true,
+      }),
+    ).toBe(false);
   });
 
   it('uses the injected default fallback policy when no explicit boolean is provided', () => {
-    expect(resolveWorkerAllowDemoFallback({
-      sessionSlug: 'edge',
-      getDefaultAllowDemoFallback: (slug) => slug === 'edge',
-    })).toBe(true);
+    expect(
+      resolveWorkerAllowDemoFallback({
+        sessionSlug: 'edge',
+        getDefaultAllowDemoFallback: (slug) => slug === 'edge',
+      }),
+    ).toBe(true);
 
-    expect(resolveWorkerAllowDemoFallback({
-      sessionSlug: 'general',
-      getDefaultAllowDemoFallback: () => false,
-    })).toBe(false);
+    expect(
+      resolveWorkerAllowDemoFallback({
+        sessionSlug: 'general',
+        getDefaultAllowDemoFallback: () => false,
+      }),
+    ).toBe(false);
   });
 
   it('defaults to mode-aware demo fallback when no policy is provided', () => {
@@ -95,31 +103,37 @@ describe('workerSessionResolution', () => {
   });
 
   it('resolves worker session config by slug through the shared registry/demo wrapper', () => {
-    mockGetRegistrySessionConfig.mockImplementation((slug) => (
+    mockGetRegistrySessionConfig.mockImplementation((slug) =>
       slug === 'edge'
         ? { slug: 'edge', sessionName: 'Registry Edge', corsWorkerUrl: 'https://registry-edge.example' }
-        : null
-    ));
+        : null,
+    );
 
-    expect(resolveWorkerSessionConfigBySlug({
-      sessionSlug: 'edge',
-      getDefaultAllowDemoFallback: () => false,
-    })).toEqual({
+    expect(
+      resolveWorkerSessionConfigBySlug({
+        sessionSlug: 'edge',
+        getDefaultAllowDemoFallback: () => false,
+      }),
+    ).toEqual({
       slug: 'edge',
       sessionName: 'Registry Edge',
       corsWorkerUrl: 'https://registry-edge.example',
     });
 
-    expect(resolveWorkerSessionConfigBySlug({
-      sessionSlug: 'missing',
-      getDefaultAllowDemoFallback: () => false,
-    })).toBeNull();
+    expect(
+      resolveWorkerSessionConfigBySlug({
+        sessionSlug: 'missing',
+        getDefaultAllowDemoFallback: () => false,
+      }),
+    ).toBeNull();
 
-    expect(resolveWorkerSessionConfigBySlug({
-      sessionSlug: 'edge',
-      getDefaultAllowDemoFallback: () => true,
-      allowDemoFallback: true,
-    })).toEqual({
+    expect(
+      resolveWorkerSessionConfigBySlug({
+        sessionSlug: 'edge',
+        getDefaultAllowDemoFallback: () => true,
+        allowDemoFallback: true,
+      }),
+    ).toEqual({
       slug: 'edge',
       sessionName: 'Registry Edge',
       corsWorkerUrl: 'https://registry-edge.example',
@@ -127,24 +141,28 @@ describe('workerSessionResolution', () => {
   });
 
   it('resolves worker session context from the active store slug when no explicit slug is provided', () => {
-    mockGetRegistrySessionConfig.mockImplementation((slug) => (
+    mockGetRegistrySessionConfig.mockImplementation((slug) =>
       slug === 'edge'
         ? { slug: 'edge', sessionName: 'Registry Edge', corsWorkerUrl: 'https://registry-edge.example' }
-        : null
-    ));
+        : null,
+    );
 
-    expect(resolveWorkerSessionContext({
-      getDefaultAllowDemoFallback: () => false,
-    })).toEqual(expect.objectContaining({
-      hasExplicitSessionSlug: false,
-      sessionSlug: 'edge',
-      sessionConfig: {
-        slug: 'edge',
-        sessionName: 'Registry Edge',
-        corsWorkerUrl: 'https://registry-edge.example',
-      },
-      sessionConfigSource: 'resolved',
-    }));
+    expect(
+      resolveWorkerSessionContext({
+        getDefaultAllowDemoFallback: () => false,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        hasExplicitSessionSlug: false,
+        sessionSlug: 'edge',
+        sessionConfig: {
+          slug: 'edge',
+          sessionName: 'Registry Edge',
+          corsWorkerUrl: 'https://registry-edge.example',
+        },
+        sessionConfigSource: 'resolved',
+      }),
+    );
   });
 
   it('resolves the default/general session through the shared scaffold when the active store slug is empty', () => {
@@ -154,18 +172,22 @@ describe('workerSessionResolution', () => {
       },
     });
 
-    expect(resolveWorkerSessionContext({
-      getDefaultAllowDemoFallback: () => true,
-    })).toEqual(expect.objectContaining({
-      hasExplicitSessionSlug: false,
-      sessionSlug: '',
-      sessionConfig: {
-        slug: '',
-        sessionName: 'Context Engine',
-        corsWorkerUrl: 'https://demo-general.example',
-      },
-      sessionConfigSource: 'resolved',
-    }));
+    expect(
+      resolveWorkerSessionContext({
+        getDefaultAllowDemoFallback: () => true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        hasExplicitSessionSlug: false,
+        sessionSlug: '',
+        sessionConfig: {
+          slug: '',
+          sessionName: 'Context Engine',
+          corsWorkerUrl: 'https://demo-general.example',
+        },
+        sessionConfigSource: 'resolved',
+      }),
+    );
   });
 
   it('preserves provided session config while still canonicalizing the requested slug alias', () => {
@@ -175,15 +197,19 @@ describe('workerSessionResolution', () => {
       corsWorkerUrl: 'https://provided.example',
     };
 
-    expect(resolveWorkerSessionContext({
-      sessionSlug: ' GeNeRal!!! ',
-      sessionConfig: provided,
-      getDefaultAllowDemoFallback: () => false,
-    })).toEqual(expect.objectContaining({
-      hasExplicitSessionSlug: true,
-      sessionSlug: '',
-      sessionConfig: provided,
-      sessionConfigSource: 'provided',
-    }));
+    expect(
+      resolveWorkerSessionContext({
+        sessionSlug: ' GeNeRal!!! ',
+        sessionConfig: provided,
+        getDefaultAllowDemoFallback: () => false,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        hasExplicitSessionSlug: true,
+        sessionSlug: '',
+        sessionConfig: provided,
+        sessionConfigSource: 'provided',
+      }),
+    );
   });
 });

@@ -9,10 +9,13 @@ export type FirstVisitRootRedirectTarget = {
   requiresPersistedCache?: boolean;
 };
 
-type FirstVisitRootRedirectStorage = {
-  getItem: (key: string) => string | null;
-  setItem: (key: string, value: string) => void;
-} | null | undefined;
+type FirstVisitRootRedirectStorage =
+  | {
+      getItem: (key: string) => string | null;
+      setItem: (key: string, value: string) => void;
+    }
+  | null
+  | undefined;
 
 type SessionFallbackRedirectStorageTarget = {
   slug?: string;
@@ -25,17 +28,11 @@ type SessionRegistryStoreLike = {
 
 type NormalizeSessionSlugFn = (slug: unknown) => string;
 
-const isGeneralSessionSlug = (slug: unknown, defaultAlias: string): boolean => (
-  slug === '' || slug === defaultAlias
-);
+const isGeneralSessionSlug = (slug: unknown, defaultAlias: string): boolean => slug === '' || slug === defaultAlias;
 
-export const FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY =
-  'ce:firstVisitRootAboutRedirectConsumed:v20260618b';
+export const FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY = 'ce:firstVisitRootAboutRedirectConsumed:v20260618b';
 
-const dedupeNormalizedSessionSlugs = (
-  values: unknown,
-  normalizeSessionSlug: NormalizeSessionSlugFn
-): string[] => {
+const dedupeNormalizedSessionSlugs = (values: unknown, normalizeSessionSlug: NormalizeSessionSlugFn): string[] => {
   if (!Array.isArray(values)) return [];
   const out: string[] = [];
   const seen = new Set<string>();
@@ -56,13 +53,12 @@ export const getSessionFallbackScopeSlugs = (deps: {
   sessionRegistryStore: SessionRegistryStoreLike;
   normalizeSessionSlug: NormalizeSessionSlugFn;
 }): string[] => {
-  const scope = String(deps.readSessionScanScope() || '').trim().toLowerCase();
+  const scope = String(deps.readSessionScanScope() || '')
+    .trim()
+    .toLowerCase();
   if (scope !== 'list') return [];
 
-  const runtimeScopeSlugs = dedupeNormalizedSessionSlugs(
-    deps.readSessionScanSlugs(),
-    deps.normalizeSessionSlug
-  );
+  const runtimeScopeSlugs = dedupeNormalizedSessionSlugs(deps.readSessionScanSlugs(), deps.normalizeSessionSlug);
   if (runtimeScopeSlugs.length) return runtimeScopeSlugs;
 
   try {
@@ -71,13 +67,16 @@ export const getSessionFallbackScopeSlugs = (deps: {
 
     return dedupeNormalizedSessionSlugs(
       entries.map((entry) => {
-        const cfg = (Array.isArray(entry) ? entry[1] : entry) as {
-          slug?: unknown;
-          sessionSlug?: unknown;
-        } | null | undefined;
+        const cfg = (Array.isArray(entry) ? entry[1] : entry) as
+          | {
+              slug?: unknown;
+              sessionSlug?: unknown;
+            }
+          | null
+          | undefined;
         return cfg?.slug || cfg?.sessionSlug || '';
       }),
-      deps.normalizeSessionSlug
+      deps.normalizeSessionSlug,
     );
   } catch (_) {
     return [];
@@ -86,17 +85,15 @@ export const getSessionFallbackScopeSlugs = (deps: {
 
 export const getSessionFallbackPreferredTarget = (
   scopeSlugs: string[],
-  deps: { DEFAULT_SESSION_SLUG_ALIAS: string }
+  deps: { DEFAULT_SESSION_SLUG_ALIAS: string },
 ): SessionFallbackRedirectTarget | null => {
   if (!scopeSlugs.length) return null;
 
-  const generalInScope = scopeSlugs.some(
-    (slug) => isGeneralSessionSlug(slug, deps.DEFAULT_SESSION_SLUG_ALIAS)
-  );
+  const generalInScope = scopeSlugs.some((slug) => isGeneralSessionSlug(slug, deps.DEFAULT_SESSION_SLUG_ALIAS));
   if (generalInScope) return null;
 
   const firstScopedSlug = scopeSlugs.find(
-    (slug) => slug && !isGeneralSessionSlug(slug, deps.DEFAULT_SESSION_SLUG_ALIAS)
+    (slug) => slug && !isGeneralSessionSlug(slug, deps.DEFAULT_SESSION_SLUG_ALIAS),
   );
   if (!firstScopedSlug) return null;
 
@@ -116,10 +113,7 @@ export const isFirstVisitRootRedirectEnabled = (deps: {
     if (typeof globalThis !== 'undefined') {
       const runtimeGlobals = globalThis as Record<string, unknown>;
       if (typeof runtimeGlobals.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED !== 'undefined') {
-        return deps.readBoolishRuntimeFlag(
-          runtimeGlobals.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED,
-          buildTimeFallback
-        );
+        return deps.readBoolishRuntimeFlag(runtimeGlobals.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED, buildTimeFallback);
       }
     }
   } catch (_) {}
@@ -139,7 +133,7 @@ export const getFirstVisitRootRedirectTarget = (deps: {
 
 const getTemporaryInitialLoadSessionCacheSlug = (
   normalizedPath: string,
-  normalizeSessionSlug: NormalizeSessionSlugFn
+  normalizeSessionSlug: NormalizeSessionSlugFn,
 ): string => {
   if (!normalizedPath.startsWith('/session/')) return '';
   const token = normalizedPath.slice('/session/'.length).split('/')[0];
@@ -150,7 +144,7 @@ const getTemporaryInitialLoadSessionCacheSlug = (
 // document loads may go to /about while stale pages retire.
 export const isTemporaryInitialLoadAboutRedirectPath = (
   pathIn: unknown,
-  deps: { normalizeRoutePath: NormalizeSessionSlugFn }
+  deps: { normalizeRoutePath: NormalizeSessionSlugFn },
 ): boolean => {
   const path = deps.normalizeRoutePath(pathIn || '');
   if (path === '/') return true;
@@ -167,9 +161,11 @@ export const getTemporaryInitialLoadAboutRedirectTarget = (deps: {
 }): FirstVisitRootRedirectTarget | null => {
   if (!deps.isFirstVisitRootRedirectEnabled()) return null;
   const path = deps.normalizeRoutePath(deps.pathIn || '');
-  if (!isTemporaryInitialLoadAboutRedirectPath(path, {
-    normalizeRoutePath: deps.normalizeRoutePath,
-  })) {
+  if (
+    !isTemporaryInitialLoadAboutRedirectPath(path, {
+      normalizeRoutePath: deps.normalizeRoutePath,
+    })
+  ) {
     return null;
   }
 
@@ -193,9 +189,7 @@ export const getTemporaryInitialLoadAboutRedirectTarget = (deps: {
   };
 };
 
-export const hasConsumedOneTimeFirstVisitRootRedirect = (
-  storage: FirstVisitRootRedirectStorage
-): boolean => {
+export const hasConsumedOneTimeFirstVisitRootRedirect = (storage: FirstVisitRootRedirectStorage): boolean => {
   if (!storage) return true;
 
   try {
@@ -205,13 +199,12 @@ export const hasConsumedOneTimeFirstVisitRootRedirect = (
   }
 };
 
-export const shouldForceOneTimeFirstVisitRootRedirect = (
-  storage: FirstVisitRootRedirectStorage
-): boolean => !hasConsumedOneTimeFirstVisitRootRedirect(storage);
+export const shouldForceOneTimeFirstVisitRootRedirect = (storage: FirstVisitRootRedirectStorage): boolean =>
+  !hasConsumedOneTimeFirstVisitRootRedirect(storage);
 
 export const consumeOneTimeFirstVisitRootRedirect = (
   storage: FirstVisitRootRedirectStorage,
-  deps: { firstVisitStorageKey?: string } = {}
+  deps: { firstVisitStorageKey?: string } = {},
 ): boolean => {
   if (!storage) return false;
 
@@ -232,7 +225,7 @@ export const getSessionFallbackRedirectStorageKey = (
     normalizeSessionSlug: NormalizeSessionSlugFn;
     DEFAULT_SESSION_SLUG_ALIAS: string;
     SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX: string;
-  }
+  },
 ): string => {
   const normalizedSlug = deps.normalizeSessionSlug(slugIn || '');
   const storageSlug = normalizedSlug || deps.DEFAULT_SESSION_SLUG_ALIAS;
@@ -241,7 +234,7 @@ export const getSessionFallbackRedirectStorageKey = (
 
 export const hasConsumedSessionFallbackRedirect = (
   target: SessionFallbackRedirectStorageTarget,
-  deps: { getStorageKey: (slug: unknown) => string }
+  deps: { getStorageKey: (slug: unknown) => string },
 ): boolean => {
   if (typeof window === 'undefined' || !window.sessionStorage || !target?.path) {
     return false;
@@ -256,7 +249,7 @@ export const hasConsumedSessionFallbackRedirect = (
 
 export const consumeSessionFallbackRedirect = (
   target: SessionFallbackRedirectStorageTarget,
-  deps: { getStorageKey: (slug: unknown) => string }
+  deps: { getStorageKey: (slug: unknown) => string },
 ): boolean => {
   if (typeof window === 'undefined' || !window.sessionStorage || !target?.path) {
     return false;

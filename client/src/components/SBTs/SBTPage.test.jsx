@@ -12,10 +12,7 @@ import {
   createReadCachePayload,
   setupSBTPageTestLifecycle,
 } from './SBTPage.testUtils';
-import {
-  SbtPageBurnActionSurface,
-  SbtPageMintActionSurface,
-} from './SbtPageFullActionButtons';
+import { SbtPageBurnActionSurface, SbtPageMintActionSurface } from './SbtPageFullActionButtons';
 import SbtPageMintInputAction from './SbtPageMintInputAction';
 import SbtPageStatusActionButton from './SbtPageStatusActionButton';
 import { notify } from '../../utilities/ui/notify.js';
@@ -152,27 +149,29 @@ describe('SBTPage session routing and holder loading', () => {
 
   it('uses sessionSlug routing only when metadata marks it explicit', () => {
     const subject = createSubject();
-    expect(subject.resolveSessionSlugFromInfo({
-      sessionSlug: 'beta',
-      sessionSlugExplicit: false,
-    })).toBe(null);
-    expect(subject.resolveSessionSlugFromInfo({
-      sessionSlug: 'beta',
-      sessionSlugExplicit: true,
-    })).toBe('beta');
-    expect(subject.resolveSessionSlugFromInfo({
-      sessionSlug: 'beta',
-    })).toBe('beta');
+    expect(
+      subject.resolveSessionSlugFromInfo({
+        sessionSlug: 'beta',
+        sessionSlugExplicit: false,
+      }),
+    ).toBe(null);
+    expect(
+      subject.resolveSessionSlugFromInfo({
+        sessionSlug: 'beta',
+        sessionSlugExplicit: true,
+      }),
+    ).toBe('beta');
+    expect(
+      subject.resolveSessionSlugFromInfo({
+        sessionSlug: 'beta',
+      }),
+    ).toBe('beta');
   });
 
   it('builds session SBT addresses from current context and session config', () => {
     const sessionConfigFixture = {
-      defaultFeaturedSBTs: [
-        '0x00000000000000000000000000000000000000d1',
-      ],
-      featured_SBTs_LIST: [
-        '0x00000000000000000000000000000000000000D2',
-      ],
+      defaultFeaturedSBTs: ['0x00000000000000000000000000000000000000d1'],
+      featured_SBTs_LIST: ['0x00000000000000000000000000000000000000D2'],
     };
     const sessionConfigSpy = jest
       .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
@@ -191,13 +190,15 @@ describe('SBTPage session routing and holder loading', () => {
 
     const addresses = subject.getSessionSBTAddresses();
     const cachedAddresses = subject.getSessionSBTAddresses();
-    expect(addresses).toEqual(expect.arrayContaining([
-      '0x00000000000000000000000000000000000000aa',
-      '0x00000000000000000000000000000000000000bb',
-      '0x00000000000000000000000000000000000000cc',
-      '0x00000000000000000000000000000000000000d1',
-      '0x00000000000000000000000000000000000000d2',
-    ]));
+    expect(addresses).toEqual(
+      expect.arrayContaining([
+        '0x00000000000000000000000000000000000000aa',
+        '0x00000000000000000000000000000000000000bb',
+        '0x00000000000000000000000000000000000000cc',
+        '0x00000000000000000000000000000000000000d1',
+        '0x00000000000000000000000000000000000000d2',
+      ]),
+    );
     expect(cachedAddresses).toBe(addresses);
     expect(sessionConfigSpy).toHaveBeenCalledWith('rxc');
     expect(sessionConfigSpy).toHaveBeenCalledTimes(2);
@@ -206,19 +207,11 @@ describe('SBTPage session routing and holder loading', () => {
   });
 
   it('uses explicit demo-session featured lists for display-only SBT context when registry config is missing', () => {
-    jest
-      .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
-      .mockReturnValue(null);
-    const demoConfigSpy = jest
-      .spyOn(contractScriptsModule, 'getDemoSessionConfigBySlug')
-      .mockReturnValue({
-        defaultFeaturedSBTs: [
-          '0x00000000000000000000000000000000000000f1',
-        ],
-        featured_SBTs_LIST: [
-          '0x00000000000000000000000000000000000000F2',
-        ],
-      });
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockReturnValue(null);
+    const demoConfigSpy = jest.spyOn(contractScriptsModule, 'getDemoSessionConfigBySlug').mockReturnValue({
+      defaultFeaturedSBTs: ['0x00000000000000000000000000000000000000f1'],
+      featured_SBTs_LIST: ['0x00000000000000000000000000000000000000F2'],
+    });
 
     const subject = createSubject({
       sessionSlug: 'edge',
@@ -231,11 +224,13 @@ describe('SBTPage session routing and holder loading', () => {
 
     const addresses = subject.getSessionSBTAddresses();
 
-    expect(addresses).toEqual(expect.arrayContaining([
-      '0x00000000000000000000000000000000000000cc',
-      '0x00000000000000000000000000000000000000f1',
-      '0x00000000000000000000000000000000000000f2',
-    ]));
+    expect(addresses).toEqual(
+      expect.arrayContaining([
+        '0x00000000000000000000000000000000000000cc',
+        '0x00000000000000000000000000000000000000f1',
+        '0x00000000000000000000000000000000000000f2',
+      ]),
+    );
     expect(demoConfigSpy).toHaveBeenCalledWith('edge', { allowDemoFallback: true });
   });
 
@@ -300,12 +295,8 @@ describe('SBTPage session routing and holder loading', () => {
   it('allows owner burn when burnAuth is a numeric string', async () => {
     const account = '0x00000000000000000000000000000000000000a1';
     const sbtAddress = '0x00000000000000000000000000000000000000b1';
-    const tokenIdSpy = jest
-      .spyOn(contractScripts, 'getSBTTokenIdByOwner')
-      .mockResolvedValue('7');
-    const burnSpy = jest
-      .spyOn(contractScripts, 'burnToken')
-      .mockResolvedValue({ transactionHash: '0xburn' });
+    const tokenIdSpy = jest.spyOn(contractScripts, 'getSBTTokenIdByOwner').mockResolvedValue('7');
+    const burnSpy = jest.spyOn(contractScripts, 'burnToken').mockResolvedValue({ transactionHash: '0xburn' });
     const subject = createSubject({
       account,
       provider: 'wagmi',
@@ -334,12 +325,8 @@ describe('SBTPage session routing and holder loading', () => {
   it('uses neutral provider reads for mini burn while burning with the wallet provider', async () => {
     const account = '0x00000000000000000000000000000000000000a1';
     const sbtAddress = '0x00000000000000000000000000000000000000b2';
-    const tokenIdSpy = jest
-      .spyOn(contractScripts, 'getSBTTokenIdByOwner')
-      .mockResolvedValue('8');
-    const burnSpy = jest
-      .spyOn(contractScripts, 'burnToken')
-      .mockResolvedValue({ transactionHash: '0xminiburn' });
+    const tokenIdSpy = jest.spyOn(contractScripts, 'getSBTTokenIdByOwner').mockResolvedValue('8');
+    const burnSpy = jest.spyOn(contractScripts, 'burnToken').mockResolvedValue({ transactionHash: '0xminiburn' });
     const subject = createSubject({
       account,
       provider: 'wagmi',
@@ -360,12 +347,8 @@ describe('SBTPage session routing and holder loading', () => {
   it('uses neutral provider reads for burn target searches', async () => {
     const ownerAddress = '0x00000000000000000000000000000000000000c1';
     const sbtAddress = '0x00000000000000000000000000000000000000b3';
-    const tokenIdSpy = jest
-      .spyOn(contractScripts, 'getSBTTokenIdByOwner')
-      .mockResolvedValue('9');
-    const ownerSpy = jest
-      .spyOn(contractScripts, 'getOwnerByTokenId')
-      .mockResolvedValue(ownerAddress);
+    const tokenIdSpy = jest.spyOn(contractScripts, 'getSBTTokenIdByOwner').mockResolvedValue('9');
+    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId').mockResolvedValue(ownerAddress);
     const subject = createSubject({
       provider: 'wagmi',
       SBTAddress: sbtAddress,
@@ -440,7 +423,7 @@ describe('SBTPage session routing and holder loading', () => {
     expect(openSpy).toHaveBeenCalledWith(
       `https://sepolia.etherscan.io/tx/${mintTxHash}`,
       '_blank',
-      'noopener,noreferrer'
+      'noopener,noreferrer',
     );
     expect(subject.handleMint).not.toHaveBeenCalled();
     openSpy.mockRestore();
@@ -679,9 +662,7 @@ describe('SBTPage session routing and holder loading', () => {
       lastBlock: 1250,
     });
 
-    jest.spyOn(cacheScripts, 'readCache')
-      .mockResolvedValueOnce(initialEntry)
-      .mockResolvedValueOnce(refreshedEntry);
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValueOnce(initialEntry).mockResolvedValueOnce(refreshedEntry);
     const refreshSpy = jest.fn().mockResolvedValue(undefined);
     jest.spyOn(contractScripts, 'getSbtHistorySummary').mockResolvedValue({
       totalMinted: '2',
@@ -690,10 +671,12 @@ describe('SBTPage session routing and holder loading', () => {
       currentHolderCount: '2',
       historicalHolderCount: '2',
     });
-    const groupPasswordSpy = jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
-    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId').mockResolvedValue(
-      '0x00000000000000000000000000000000000000b1'
-    );
+    const groupPasswordSpy = jest
+      .spyOn(contractScripts, 'getGroupPasswordHash')
+      .mockResolvedValue(ethers.constants.HashZero);
+    const ownerSpy = jest
+      .spyOn(contractScripts, 'getOwnerByTokenId')
+      .mockResolvedValue('0x00000000000000000000000000000000000000b1');
 
     const subject = createSubject({
       SBTAddress: sbtAddress,
@@ -713,7 +696,7 @@ describe('SBTPage session routing and holder loading', () => {
     expect(refreshSpy).toHaveBeenCalledWith(
       sbtAddress,
       'edge',
-      expect.objectContaining({ forceCounts: true, countsOnly: true })
+      expect.objectContaining({ forceCounts: true, countsOnly: true }),
     );
     expect(groupPasswordSpy).not.toHaveBeenCalled();
     expect(ownerSpy).not.toHaveBeenCalled();

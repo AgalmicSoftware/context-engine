@@ -15,7 +15,9 @@ describe('SBTSelector scoped options', () => {
     sessionStorage.clear();
     globalThis.CE_SESSION_SCAN_SCOPE = 'active';
     globalThis.CE_SESSION_SCAN_SLUGS = [];
-    try { delete globalThis.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS; } catch (_) {}
+    try {
+      delete globalThis.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS;
+    } catch (_) {}
   });
 
   it('aggregates SBT cache entries from all known sessions when scope mode is all', async () => {
@@ -38,7 +40,7 @@ describe('SBTSelector scoped options', () => {
     instance.readSbtCacheBySlug = jest.fn(async (cacheSlug) => {
       if (cacheSlug === 'alpha') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               [alphaLower]: {
                 sbtAddress: alphaAddress,
@@ -52,7 +54,7 @@ describe('SBTSelector scoped options', () => {
       }
       if (cacheSlug === 'beta') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               [betaLower]: {
                 sbtAddress: betaAddress,
@@ -65,7 +67,7 @@ describe('SBTSelector scoped options', () => {
         };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [edgeLower]: {
               sbtAddress: edgeAddress,
@@ -81,9 +83,7 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('all');
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('all');
     const allSlugsSpy = jest
       .spyOn(contractScriptsUtils, 'getAllSessionSlugs')
       .mockReturnValue(['edge', 'alpha', 'beta']);
@@ -119,7 +119,7 @@ describe('SBTSelector scoped options', () => {
     instance.readSbtCacheBySlug = jest.fn(async (cacheSlug) => {
       if (cacheSlug === '') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               [generalLower]: {
                 sbtAddress: generalAddress,
@@ -132,7 +132,7 @@ describe('SBTSelector scoped options', () => {
         };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [edgeLower]: {
               sbtAddress: edgeAddress,
@@ -148,9 +148,7 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('general');
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('general');
 
     try {
       await instance.loadSBTOptions();
@@ -171,15 +169,9 @@ describe('SBTSelector scoped options', () => {
     instance._isMounted = false;
     instance.loadSBTOptions = jest.fn().mockResolvedValue(null);
 
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['alpha', 'beta']);
-    const discoverSpy = jest
-      .spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached')
-      .mockResolvedValue([]);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['alpha', 'beta']);
+    const discoverSpy = jest.spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached').mockResolvedValue([]);
 
     try {
       await instance.ensureSbtUniverse({ force: true });
@@ -202,15 +194,9 @@ describe('SBTSelector scoped options', () => {
     instance._isMounted = false;
     instance.loadSBTOptions = jest.fn().mockResolvedValue(null);
 
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['alpha']);
-    const discoverSpy = jest
-      .spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached')
-      .mockResolvedValue([]);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['alpha']);
+    const discoverSpy = jest.spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached').mockResolvedValue([]);
 
     try {
       await instance.ensureSbtUniverse({ force: true });
@@ -235,15 +221,9 @@ describe('SBTSelector scoped options', () => {
     instance._isMounted = false;
     instance.loadSBTOptions = jest.fn().mockResolvedValue(null);
 
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['alpha']);
-    const discoverSpy = jest
-      .spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached')
-      .mockResolvedValue([]);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['alpha']);
+    const discoverSpy = jest.spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached').mockResolvedValue([]);
 
     try {
       await instance.ensureSbtUniverse({ force: true });
@@ -267,18 +247,10 @@ describe('SBTSelector scoped options', () => {
     instance._isMounted = true;
     instance.loadSBTOptions = jest.fn().mockResolvedValue(null);
 
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['demo']);
-    const allSlugsSpy = jest
-      .spyOn(contractScriptsUtils, 'getAllSessionSlugs')
-      .mockReturnValue(['demo', 'alpha']);
-    const discoverSpy = jest
-      .spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached')
-      .mockResolvedValue([]);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['demo']);
+    const allSlugsSpy = jest.spyOn(contractScriptsUtils, 'getAllSessionSlugs').mockReturnValue(['demo', 'alpha']);
+    const discoverSpy = jest.spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached').mockResolvedValue([]);
 
     try {
       await instance.ensureSbtUniverse({ force: true });
@@ -306,7 +278,7 @@ describe('SBTSelector scoped options', () => {
     const nameHydration = createDeferred();
     const cacheStore = {
       edge: {
-        '84532': {
+        84532: {
           sbtList: {},
           nameLookupState: {},
         },
@@ -349,12 +321,10 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const writeSpy = jest
-      .spyOn(cacheScriptsUtils, 'writeCache')
-      .mockImplementation(async (_namespace, slug, value) => {
-        cacheStore[slug] = value;
-        return value;
-      });
+    const writeSpy = jest.spyOn(cacheScriptsUtils, 'writeCache').mockImplementation(async (_namespace, slug, value) => {
+      cacheStore[slug] = value;
+      return value;
+    });
     const discoverSpy = jest
       .spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached')
       .mockImplementation(async (_provider, _cfg, options = {}) => {
@@ -428,7 +398,7 @@ describe('SBTSelector scoped options', () => {
     const factoryAddress = '0x00000000000000000000000000000000000000bb';
     const cacheStore = {
       edge: {
-        '84532': {
+        84532: {
           sbtList: {},
           nameLookupState: {},
         },
@@ -436,7 +406,7 @@ describe('SBTSelector scoped options', () => {
     };
     const ensureLightSbtUniverse = jest.fn(async () => {
       cacheStore.edge = {
-        '84532': {
+        84532: {
           sbtList: {
             [lower]: {
               sbtAddress: address,
@@ -477,34 +447,28 @@ describe('SBTSelector scoped options', () => {
     }));
     instance.getMetadataLookupConfig = jest.fn(() => ({ slug: 'edge', networkChainId: 84532 }));
     instance.resolveSbtLabel = jest.fn((sbtInfo, value) => sbtInfo?.name || value);
-    instance.scheduleProgressiveOptionsReload = jest.fn(({ force = false } = {}) => (
-      instance.loadSBTOptions({ force })
-    ));
+    instance.scheduleProgressiveOptionsReload = jest.fn(({ force = false } = {}) => instance.loadSBTOptions({ force }));
     instance.readSbtCacheBySlug = jest.fn(async (slug) => cacheStore[slug] || {});
 
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const writeSpy = jest
-      .spyOn(cacheScriptsUtils, 'writeCache')
-      .mockImplementation(async (_namespace, slug, value) => {
-        cacheStore[slug] = value;
-        return value;
-      });
+    const writeSpy = jest.spyOn(cacheScriptsUtils, 'writeCache').mockImplementation(async (_namespace, slug, value) => {
+      cacheStore[slug] = value;
+      return value;
+    });
     const discoverSpy = jest
       .spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached')
       .mockImplementation(async (_provider, _cfg, options = {}) => {
         options.onDiscoveredAddresses?.({ addresses: [address] });
         return [address];
       });
-    const hydrateSpy = jest
-      .spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted')
-      .mockResolvedValue({
-        info: {
-          name: 'Shared Progressive Badge',
-          unlisted: false,
-        },
-      });
+    const hydrateSpy = jest.spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted').mockResolvedValue({
+      info: {
+        name: 'Shared Progressive Badge',
+        unlisted: false,
+      },
+    });
 
     try {
       await instance.ensureSbtUniverse({ force: true });
@@ -512,10 +476,12 @@ describe('SBTSelector scoped options', () => {
 
       expect(ensureLightSbtUniverse).toHaveBeenCalledWith(['edge'], { forceExactSlugs: true });
       expect(instance.state.sbtOptions).toHaveLength(1);
-      expect(instance.state.sbtOptions[0]).toEqual(expect.objectContaining({
-        address: lower,
-        name: 'Shared Progressive Badge',
-      }));
+      expect(instance.state.sbtOptions[0]).toEqual(
+        expect.objectContaining({
+          address: lower,
+          name: 'Shared Progressive Badge',
+        }),
+      );
     } finally {
       hydrateSpy.mockRestore();
       discoverSpy.mockRestore();
@@ -538,7 +504,7 @@ describe('SBTSelector scoped options', () => {
     instance.getMetadataLookupConfig = (slug) => ({ slug, networkChainId: 84532 });
     instance.resolveSbtLabel = jest.fn((sbtInfo, address) => sbtInfo?.name || address);
     instance.readSbtCacheBySlug = jest.fn(async () => ({
-      '84532': {
+      84532: {
         sbtList: {
           [cachedLower]: {
             sbtAddress: cachedAddress,
@@ -551,19 +517,15 @@ describe('SBTSelector scoped options', () => {
     }));
 
     const featuredLookup = createDeferred();
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['alpha']);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['alpha']);
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
-      .mockImplementation((slug) => (
+      .mockImplementation((slug) =>
         slug === 'alpha'
           ? { featured_SBTs_LIST: [featuredAddress], ignored_SBTs_LIST: [] }
-          : { featured_SBTs_LIST: [], ignored_SBTs_LIST: [] }
-      ));
+          : { featured_SBTs_LIST: [], ignored_SBTs_LIST: [] },
+      );
     const hydrateSpy = jest
       .spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted')
       .mockImplementation(async ({ address }) => {
@@ -584,7 +546,7 @@ describe('SBTSelector scoped options', () => {
       const treeWhileLoading = instance.render();
       const headerStatusNode = findElement(
         treeWhileLoading,
-        (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SBT_SELECTOR_LOADING_STATUS
+        (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SBT_SELECTOR_LOADING_STATUS,
       );
       expect(headerStatusNode).toBeTruthy();
 
@@ -595,10 +557,12 @@ describe('SBTSelector scoped options', () => {
 
       expect(instance.state.loadingOptions).toBe(false);
       expect(instance.state.sbtOptions.map((option) => option.address)).toEqual([featuredLower, cachedLower]);
-      expect(instance.state.sbtOptions[0]).toEqual(expect.objectContaining({
-        address: featuredLower,
-        name: 'Featured Badge',
-      }));
+      expect(instance.state.sbtOptions[0]).toEqual(
+        expect.objectContaining({
+          address: featuredLower,
+          name: 'Featured Badge',
+        }),
+      );
     } finally {
       hydrateSpy.mockRestore();
       groupListsSpy.mockRestore();
@@ -622,7 +586,7 @@ describe('SBTSelector scoped options', () => {
     instance.readSbtCacheBySlug = jest.fn(async (cacheSlug) => {
       if (cacheSlug === '') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               [generalLower]: {
                 sbtAddress: generalAddress,
@@ -635,7 +599,7 @@ describe('SBTSelector scoped options', () => {
         };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {},
           nameLookupState: {},
         },
@@ -645,12 +609,8 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['general']);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['general']);
 
     try {
       await instance.loadSBTOptions({ force: true });
@@ -678,9 +638,7 @@ describe('SBTSelector scoped options', () => {
       sbtCacheRevision: 'rev-multi-chain-shared-address',
     });
     instance._isMounted = true;
-    instance.getSessionNetworkId = (slug) => (
-      String(slug || '').trim() === 'beta' ? 10 : 84532
-    );
+    instance.getSessionNetworkId = (slug) => (String(slug || '').trim() === 'beta' ? 10 : 84532);
     instance.getMetadataLookupConfig = (slug) => ({
       slug,
       networkChainId: instance.getSessionNetworkId(slug),
@@ -689,7 +647,7 @@ describe('SBTSelector scoped options', () => {
     instance.readSbtCacheBySlug = jest.fn(async (cacheSlug) => {
       if (cacheSlug === 'beta') {
         return {
-          '10': {
+          10: {
             sbtList: {
               [sharedLower]: {
                 sbtAddress: sharedAddress,
@@ -708,7 +666,7 @@ describe('SBTSelector scoped options', () => {
         };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [sharedLower]: {
               sbtAddress: sharedAddress,
@@ -730,31 +688,21 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['alpha', 'beta']);
-    const namespaceSpy = jest
-      .spyOn(cacheScriptsUtils, 'listNamespaceEntriesSync')
-      .mockReturnValue([]);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['alpha', 'beta']);
+    const namespaceSpy = jest.spyOn(cacheScriptsUtils, 'listNamespaceEntriesSync').mockReturnValue([]);
 
     try {
       await instance.loadSBTOptions({ force: true });
 
       expect(instance.state.sbtOptions).toHaveLength(2);
-      expect(instance.state.sbtOptions.map((entry) => entry.name).sort()).toEqual([
-        'Alpha Badge',
-        'Beta Badge',
-      ]);
+      expect(instance.state.sbtOptions.map((entry) => entry.name).sort()).toEqual(['Alpha Badge', 'Beta Badge']);
       expect(instance.state.sbtOptions.map((entry) => entry.selectionKey).sort()).toEqual([
         `10:${sharedLower}`,
         `84532:${sharedLower}`,
       ]);
       expect(instance.state.sbtOptions.map((entry) => entry.chainId).sort((left, right) => left - right)).toEqual([
-        10,
-        84532,
+        10, 84532,
       ]);
     } finally {
       namespaceSpy.mockRestore();
@@ -779,7 +727,7 @@ describe('SBTSelector scoped options', () => {
     instance.readSbtCacheBySlug = jest.fn(async (cacheSlug) => {
       if (cacheSlug === 'beta') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               [ignoredLower]: {
                 sbtAddress: ignoredAddress,
@@ -797,7 +745,7 @@ describe('SBTSelector scoped options', () => {
         };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {},
           nameLookupState: {},
         },
@@ -806,20 +754,14 @@ describe('SBTSelector scoped options', () => {
 
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
-      .mockImplementation((slug) => (
+      .mockImplementation((slug) =>
         slug === 'beta'
           ? { featured_SBTs_LIST: [], ignored_SBTs_LIST: [ignoredAddress] }
-          : { featured_SBTs_LIST: [], ignored_SBTs_LIST: [] }
-      ));
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['beta']);
-    const namespaceSpy = jest
-      .spyOn(cacheScriptsUtils, 'listNamespaceEntriesSync')
-      .mockReturnValue([]);
+          : { featured_SBTs_LIST: [], ignored_SBTs_LIST: [] },
+      );
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['beta']);
+    const namespaceSpy = jest.spyOn(cacheScriptsUtils, 'listNamespaceEntriesSync').mockReturnValue([]);
 
     try {
       await instance.loadSBTOptions({ force: true });
@@ -846,7 +788,7 @@ describe('SBTSelector scoped options', () => {
     instance.getMetadataLookupConfig = (slug) => ({ slug, networkChainId: 84532 });
     instance.resolveSbtLabel = jest.fn((sbtInfo, address) => sbtInfo?.name || address);
     instance.readSbtCacheBySlug = jest.fn(async () => ({
-      '84532': {
+      84532: {
         sbtList: {},
         nameLookupState: {},
       },
@@ -855,38 +797,32 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['demo']);
-    const namespaceSpy = jest
-      .spyOn(cacheScriptsUtils, 'listNamespaceEntriesSync')
-      .mockReturnValue([
-        {
-          namespace: 'sbtCache',
-          slug: 'archive',
-          key: 'dg:sbtCache:archive',
-          value: {
-            '84532': {
-              sbtList: {
-                [linkedLower]: {
-                  sbtAddress: linkedAddress,
-                  sbtInfo: {
-                    name: 'Linked Demo Badge',
-                    sessionSlug: 'demo',
-                    sessionSlugExplicit: true,
-                    unlisted: false,
-                  },
-                  slug: 'archive',
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['demo']);
+    const namespaceSpy = jest.spyOn(cacheScriptsUtils, 'listNamespaceEntriesSync').mockReturnValue([
+      {
+        namespace: 'sbtCache',
+        slug: 'archive',
+        key: 'dg:sbtCache:archive',
+        value: {
+          84532: {
+            sbtList: {
+              [linkedLower]: {
+                sbtAddress: linkedAddress,
+                sbtInfo: {
+                  name: 'Linked Demo Badge',
+                  sessionSlug: 'demo',
+                  sessionSlugExplicit: true,
+                  unlisted: false,
                 },
+                slug: 'archive',
               },
-              nameLookupState: {},
             },
+            nameLookupState: {},
           },
         },
-      ]);
+      },
+    ]);
 
     try {
       await instance.loadSBTOptions({ force: true });
@@ -919,7 +855,7 @@ describe('SBTSelector scoped options', () => {
     instance.getMetadataLookupConfig = (slug) => ({ slug, networkChainId: 84532 });
     instance.resolveSbtLabel = jest.fn((sbtInfo, address) => sbtInfo?.name || address);
     instance.readSbtCacheBySlug = jest.fn(async () => ({
-      '84532': {
+      84532: {
         sbtList: {},
         nameLookupState: {},
       },
@@ -928,40 +864,34 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['demo']);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['demo']);
     const slugByNameSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionSlugByName')
       .mockImplementation((name) => (name === 'Demo Session' ? 'demo' : null));
-    const namespaceSpy = jest
-      .spyOn(cacheScriptsUtils, 'listNamespaceEntriesSync')
-      .mockReturnValue([
-        {
-          namespace: 'sbtCache',
-          slug: 'archive',
-          key: 'dg:sbtCache:archive',
-          value: {
-            '84532': {
-              sbtList: {
-                [linkedLower]: {
-                  sbtAddress: linkedAddress,
-                  sbtInfo: {
-                    name: 'Inferred Demo Badge',
-                    sessionName: 'Demo Session',
-                    unlisted: false,
-                  },
-                  slug: 'archive',
+    const namespaceSpy = jest.spyOn(cacheScriptsUtils, 'listNamespaceEntriesSync').mockReturnValue([
+      {
+        namespace: 'sbtCache',
+        slug: 'archive',
+        key: 'dg:sbtCache:archive',
+        value: {
+          84532: {
+            sbtList: {
+              [linkedLower]: {
+                sbtAddress: linkedAddress,
+                sbtInfo: {
+                  name: 'Inferred Demo Badge',
+                  sessionName: 'Demo Session',
+                  unlisted: false,
                 },
+                slug: 'archive',
               },
-              nameLookupState: {},
             },
+            nameLookupState: {},
           },
         },
-      ]);
+      },
+    ]);
 
     try {
       await instance.loadSBTOptions({ force: true });
@@ -991,14 +921,14 @@ describe('SBTSelector scoped options', () => {
     instance.readSbtCacheBySlug = jest.fn(async (cacheSlug) => {
       if (cacheSlug !== 'demo') {
         return {
-          '84532': {
+          84532: {
             sbtList: {},
             nameLookupState: {},
           },
         };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [leakedLower]: {
               sbtAddress: leakedAddress,
@@ -1018,12 +948,8 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['demo']);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['demo']);
 
     try {
       await instance.loadSBTOptions({ force: true });
@@ -1051,14 +977,14 @@ describe('SBTSelector scoped options', () => {
     instance.readSbtCacheBySlug = jest.fn(async (cacheSlug) => {
       if (cacheSlug !== 'demo') {
         return {
-          '84532': {
+          84532: {
             sbtList: {},
             nameLookupState: {},
           },
         };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [placeholderLower]: {
               sbtAddress: placeholderAddress,
@@ -1074,15 +1000,9 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['demo']);
-    const hydrateSpy = jest
-      .spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted')
-      .mockResolvedValue(null);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['demo']);
+    const hydrateSpy = jest.spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted').mockResolvedValue(null);
 
     try {
       await instance.loadSBTOptions({ force: true });
@@ -1112,10 +1032,12 @@ describe('SBTSelector scoped options', () => {
       defaultFeaturedSBTs: [],
       limitToFeatured: true,
       sbtCacheRevision: 'rev-limit-to-featured-scope',
-      additionalSBTOptions: [{
-        address: featuredAddress,
-        name: 'Featured Additional',
-      }],
+      additionalSBTOptions: [
+        {
+          address: featuredAddress,
+          name: 'Featured Additional',
+        },
+      ],
     });
     instance._isMounted = true;
     instance.getSessionNetworkId = () => 84532;
@@ -1124,7 +1046,7 @@ describe('SBTSelector scoped options', () => {
     instance.readSbtCacheBySlug = jest.fn(async (cacheSlug) => {
       if (cacheSlug === 'alpha') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               [featuredLower]: {
                 sbtAddress: featuredAddress,
@@ -1137,7 +1059,7 @@ describe('SBTSelector scoped options', () => {
         };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [nonFeaturedLower]: {
               sbtAddress: nonFeaturedAddress,
@@ -1152,17 +1074,13 @@ describe('SBTSelector scoped options', () => {
 
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
-      .mockImplementation((slug) => (
+      .mockImplementation((slug) =>
         slug === 'alpha'
           ? { featured_SBTs_LIST: [featuredAddress], ignored_SBTs_LIST: [] }
-          : { featured_SBTs_LIST: [], ignored_SBTs_LIST: [] }
-      ));
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['alpha']);
+          : { featured_SBTs_LIST: [], ignored_SBTs_LIST: [] },
+      );
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['alpha']);
 
     try {
       await instance.loadSBTOptions({ force: true });
@@ -1190,55 +1108,49 @@ describe('SBTSelector scoped options', () => {
     instance._isMounted = true;
     instance.getSessionNetworkId = () => 84532;
     instance.readSbtCacheBySlug = jest.fn(async () => ({
-      '84532': {
+      84532: {
         sbtList: {},
         nameLookupState: {},
       },
     }));
 
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['edge']);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['edge']);
     const listsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const strictSpy = jest
-      .spyOn(contractScriptsUtils, 'getSessionConfigBySlugOrDefault')
-      .mockImplementation((slug) => {
-        const normalized = String(slug || '').trim().toLowerCase();
-        if (normalized === 'edge') {
-          return {
-            slug: 'edge',
-            networkChainId: 84532,
-            defaultFeaturedSBTs: [featuredAddress],
-            contracts: {
-              sbtFactory: {
-                address: '0x00000000000000000000000000000000000000ee',
-                chainId: 84532,
-              },
+    const strictSpy = jest.spyOn(contractScriptsUtils, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => {
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
+      if (normalized === 'edge') {
+        return {
+          slug: 'edge',
+          networkChainId: 84532,
+          defaultFeaturedSBTs: [featuredAddress],
+          contracts: {
+            sbtFactory: {
+              address: '0x00000000000000000000000000000000000000ee',
+              chainId: 84532,
             },
-          };
-        }
-        if (normalized === 'rxc') {
-          return {
-            slug: 'rxc',
-            networkChainId: 84532,
-            contracts: {
-              sbtFactory: {
-                address: '0x00000000000000000000000000000000000000rr',
-                chainId: 84532,
-              },
+          },
+        };
+      }
+      if (normalized === 'rxc') {
+        return {
+          slug: 'rxc',
+          networkChainId: 84532,
+          contracts: {
+            sbtFactory: {
+              address: '0x00000000000000000000000000000000000000rr',
+              chainId: 84532,
             },
-          };
-        }
-        return null;
-      });
-    const demoSpy = jest
-      .spyOn(contractScriptsUtils, 'getDemoSessionConfigBySlug')
-      .mockReturnValue(null);
+          },
+        };
+      }
+      return null;
+    });
+    const demoSpy = jest.spyOn(contractScriptsUtils, 'getDemoSessionConfigBySlug').mockReturnValue(null);
     const hydrateSpy = jest
       .spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted')
       .mockImplementation(async ({ address }) => ({
@@ -1253,17 +1165,21 @@ describe('SBTSelector scoped options', () => {
     try {
       await instance.loadSBTOptions({ force: true });
 
-      expect(instance.state.sbtOptions).toEqual(expect.arrayContaining([
+      expect(instance.state.sbtOptions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            address: featuredLower,
+            name: 'Scoped Default Featured',
+            sessionSlug: 'edge',
+          }),
+        ]),
+      );
+      expect(hydrateSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          address: featuredLower,
-          name: 'Scoped Default Featured',
-          sessionSlug: 'edge',
+          address: featuredAddress,
+          preferredSlug: 'edge',
         }),
-      ]));
-      expect(hydrateSpy).toHaveBeenCalledWith(expect.objectContaining({
-        address: featuredAddress,
-        preferredSlug: 'edge',
-      }));
+      );
     } finally {
       hydrateSpy.mockRestore();
       demoSpy.mockRestore();
@@ -1273,5 +1189,4 @@ describe('SBTSelector scoped options', () => {
       scopeSpy.mockRestore();
     }
   });
-
 });

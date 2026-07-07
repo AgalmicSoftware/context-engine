@@ -91,16 +91,11 @@ export const buildSponsoredSbtLookupContextKey = ({
   try {
     return JSON.stringify(payload);
   } catch (_) {
-    return [
-      payload.address,
-      payload.slug,
-      payload.sessionName,
-      payload.networkChainId,
-    ].join('|');
+    return [payload.address, payload.slug, payload.sessionName, payload.networkChainId].join('|');
   }
 };
 
-export const deepClone = <T,>(obj: T): T => JSON.parse(JSON.stringify(obj ?? {}));
+export const deepClone = <T>(obj: T): T => JSON.parse(JSON.stringify(obj ?? {}));
 
 export const mergeDeep = (target: AnyRecord, source: AnyRecord): AnyRecord => {
   const out: AnyRecord = { ...(target || {}) };

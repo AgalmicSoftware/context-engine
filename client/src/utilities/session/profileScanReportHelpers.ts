@@ -50,33 +50,15 @@ export const createProfileScanFanoutPlan = ({
   const scope = scopeContext || {};
   const mode = allSessionsMode || {};
   const isListScope = scope.scope === 'list';
-  const allowListScopeSbtFanout = (
-    isListScope &&
-    !mode.legacyAllSessions &&
-    mode.useAllSessionsSbtScan === true
-  );
-  const allowListScopeSurveyActivityFanout = (
-    isListScope &&
-    !mode.legacyAllSessions &&
-    mode.useAllSessionsSurveyActivityScan === true
-  );
-  const allowListScopeQuestionActivityFanout = (
-    isListScope &&
-    !mode.legacyAllSessions &&
-    mode.useAllSessionsQuestionActivityScan === true
-  );
-  const allowListScopeAnyFanout = (
-    allowListScopeSbtFanout ||
-    allowListScopeSurveyActivityFanout ||
-    allowListScopeQuestionActivityFanout
-  );
-  const useAllSessionsScan = isListScope
-    ? allowListScopeAnyFanout
-    : mode.useAllSessionsScan === true;
-  const shouldHydrateRegistry = (
-    mode.useAllSessionsScan === true ||
-    isListScope
-  );
+  const allowListScopeSbtFanout = isListScope && !mode.legacyAllSessions && mode.useAllSessionsSbtScan === true;
+  const allowListScopeSurveyActivityFanout =
+    isListScope && !mode.legacyAllSessions && mode.useAllSessionsSurveyActivityScan === true;
+  const allowListScopeQuestionActivityFanout =
+    isListScope && !mode.legacyAllSessions && mode.useAllSessionsQuestionActivityScan === true;
+  const allowListScopeAnyFanout =
+    allowListScopeSbtFanout || allowListScopeSurveyActivityFanout || allowListScopeQuestionActivityFanout;
+  const useAllSessionsScan = isListScope ? allowListScopeAnyFanout : mode.useAllSessionsScan === true;
+  const shouldHydrateRegistry = mode.useAllSessionsScan === true || isListScope;
 
   return {
     isListScope,
@@ -104,20 +86,17 @@ export const resolveProfileScanAttemptedCoverageSlugs = ({
 } => {
   const scope = scopeContext || {};
   const listScopeCoverageSlugs = fanoutPlan.isListScope
-    ? Array.from(new Set(
-        getAllowedSessionSlugs('list', scope.list, scope.activeSlug)
-          .map((slug) => normalizeSessionSlug(slug || ''))
-      ))
+    ? Array.from(
+        new Set(
+          getAllowedSessionSlugs('list', scope.list, scope.activeSlug).map((slug) => normalizeSessionSlug(slug || '')),
+        ),
+      )
     : [];
-  const attemptedCoverageSlugs = (
-    fanoutPlan.allowListScopeAnyFanout &&
-    listScopeCoverageSlugs.length > 0
-  )
-    ? listScopeCoverageSlugs
-    : [...(Array.isArray(allSlugs) ? allSlugs : [])];
-  const attemptedCoverageSlugSet = new Set(
-    attemptedCoverageSlugs.map((slug) => normalizeSessionSlug(slug || ''))
-  );
+  const attemptedCoverageSlugs =
+    fanoutPlan.allowListScopeAnyFanout && listScopeCoverageSlugs.length > 0
+      ? listScopeCoverageSlugs
+      : [...(Array.isArray(allSlugs) ? allSlugs : [])];
+  const attemptedCoverageSlugSet = new Set(attemptedCoverageSlugs.map((slug) => normalizeSessionSlug(slug || '')));
 
   return {
     listScopeCoverageSlugs,
@@ -154,22 +133,10 @@ export const createInitialProfileScanReport = ({
   return {
     targetAddress: targetLower,
     usedAllSessions: !!plan.usedAllSessions,
-    useAllSessionsSbtScan: !!(
-      plan.usedAllSessions &&
-      mode.useAllSessionsSbtScan
-    ),
-    useAllSessionsSurveyActivityScan: !!(
-      plan.usedAllSessions &&
-      mode.useAllSessionsSurveyActivityScan
-    ),
-    useAllSessionsQuestionActivityScan: !!(
-      plan.usedAllSessions &&
-      mode.useAllSessionsQuestionActivityScan
-    ),
-    useAllSessionsActivityScan: !!(
-      plan.usedAllSessions &&
-      mode.useAllSessionsActivityScan
-    ),
+    useAllSessionsSbtScan: !!(plan.usedAllSessions && mode.useAllSessionsSbtScan),
+    useAllSessionsSurveyActivityScan: !!(plan.usedAllSessions && mode.useAllSessionsSurveyActivityScan),
+    useAllSessionsQuestionActivityScan: !!(plan.usedAllSessions && mode.useAllSessionsQuestionActivityScan),
+    useAllSessionsActivityScan: !!(plan.usedAllSessions && mode.useAllSessionsActivityScan),
     listScopeSbtFanout: !!fanoutPlan.allowListScopeSbtFanout,
     listScopeSurveyActivityFanout: !!fanoutPlan.allowListScopeSurveyActivityFanout,
     listScopeQuestionActivityFanout: !!fanoutPlan.allowListScopeQuestionActivityFanout,
@@ -190,9 +157,7 @@ export const createInitialProfileScanReport = ({
     rawAllSlugCount: Number(plan.rawAllSlugCount || 0),
     activeChainSlugCount: Number(plan.activeChainSlugCount || 0),
     scopedFallbackSlugCount: Number(plan.scopedFallbackSlugCount || 0),
-    relevantSlugs: Array.isArray(plan.relevantSlugs)
-      ? [...plan.relevantSlugs]
-      : [],
+    relevantSlugs: Array.isArray(plan.relevantSlugs) ? [...plan.relevantSlugs] : [],
     prioritizedGeneralFirst: !!plan.prioritizedGeneralFirst,
     scanOrdering: String(plan.scanOrdering || ''),
     slugFetchTimeoutMs: Number(slugFetchTimeoutMs || 0),

@@ -107,14 +107,9 @@ export const buildSurveyResultsLocalStoragePollCountPlan = ({
 
   const stableCycleCount = Math.max(0, toNumber(stableCycles));
   const forceEvery = toNumber(forceRescanEvery);
-  const forceRescanOnStableCycle =
-    stableCycleCount > 0 &&
-    forceEvery > 0 &&
-    (stableCycleCount % forceEvery) === 0;
+  const forceRescanOnStableCycle = stableCycleCount > 0 && forceEvery > 0 && stableCycleCount % forceEvery === 0;
   const coarseSignatureUnchanged = coarseSignature === String(previousCoarseSignature || '');
-  const shouldForceCountRescan =
-    !inFlight &&
-    (!coarseSignatureUnchanged || forceRescanOnStableCycle);
+  const shouldForceCountRescan = !inFlight && (!coarseSignatureUnchanged || forceRescanOnStableCycle);
 
   return {
     blockOrRespChanged,
@@ -165,16 +160,18 @@ export const buildSurveyResultsLocalStoragePollPatchPlan = ({
     cachedQuestionsCount: nextQuestionsCount,
     cachedSurveyResponsesCount: nextSurveyResponsesCount,
     detailedSignature,
-    ...(shouldApplyPatch ? {
-      patch: {
-        questionLocalBlock: toNumber(localQBlock),
-        responseLocalBlock: toNumber(localRespBlock),
-        surveyLocalBlock: toNumber(localSBlock),
-        cachedQuestionsCount: nextQuestionsCount,
-        cachedSurveyResponsesCount: nextSurveyResponsesCount,
-        networkLatestBlock: nextNetLatest,
-      },
-    } : {}),
+    ...(shouldApplyPatch
+      ? {
+          patch: {
+            questionLocalBlock: toNumber(localQBlock),
+            responseLocalBlock: toNumber(localRespBlock),
+            surveyLocalBlock: toNumber(localSBlock),
+            cachedQuestionsCount: nextQuestionsCount,
+            cachedSurveyResponsesCount: nextSurveyResponsesCount,
+            networkLatestBlock: nextNetLatest,
+          },
+        }
+      : {}),
     shouldApplyPatch,
     shouldReturnFalseForUnchangedSignature: false,
   };

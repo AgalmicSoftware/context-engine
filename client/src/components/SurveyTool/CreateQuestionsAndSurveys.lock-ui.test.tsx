@@ -38,9 +38,7 @@ const makeInstance = (props: Record<string, unknown> = {}) => {
   }) as any;
   instance._isMounted = true;
   instance.setState = jest.fn((update: any, cb?: () => void) => {
-    const patch = typeof update === 'function'
-      ? update(instance.state, instance.props)
-      : update;
+    const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
     if (patch && typeof patch === 'object') {
       instance.state = { ...instance.state, ...patch };
     }
@@ -87,13 +85,13 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
       borderRadius: 4,
     });
     expect(buildCreateSurveyTypePillClassName(surveyStyles, 'agree')).toBe(
-      `${surveyStyles.pill} ${surveyStyles.pillAgree}`
+      `${surveyStyles.pill} ${surveyStyles.pillAgree}`,
     );
     expect(buildCreateSurveyTypePillClassName(surveyStyles, 'unsure')).toBe(
-      `${surveyStyles.pill} ${surveyStyles.pillUnsure}`
+      `${surveyStyles.pill} ${surveyStyles.pillUnsure}`,
     );
     expect(buildCreateSurveyTypePillClassName(surveyStyles, 'disagree')).toBe(
-      `${surveyStyles.pill} ${surveyStyles.pillDisagree}`
+      `${surveyStyles.pill} ${surveyStyles.pillDisagree}`,
     );
     expect(CREATE_SURVEY_SUBMIT_ICON_STYLE).toEqual({ marginRight: 8 });
     expect(CREATE_SURVEY_UPLOADED_QUESTION_LINK_STYLE).toEqual({
@@ -105,10 +103,10 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(CREATE_SURVEY_SMALL_ICON_BUTTON_STYLE).toEqual({ padding: '0 5px' });
     expect(CREATE_SURVEY_ACTION_ICON_STYLE).toEqual({ marginRight: '5px' });
     expect(buildCreateSurveySubmitButtonClassName(surveyStyles, true, false)).toBe(
-      `${surveyStyles.createSurveyButton} ${surveyStyles.submitSurveyBtn} ${surveyStyles.submittingButton} `
+      `${surveyStyles.createSurveyButton} ${surveyStyles.submitSurveyBtn} ${surveyStyles.submittingButton} `,
     );
     expect(buildCreateSurveySubmitButtonClassName(surveyStyles, false, true)).toBe(
-      `${surveyStyles.createSurveyButton} ${surveyStyles.submitSurveyBtn}  ${surveyStyles.errorButton}`
+      `${surveyStyles.createSurveyButton} ${surveyStyles.submitSurveyBtn}  ${surveyStyles.errorButton}`,
     );
     expect(resolveCreateSurveyProgressFillStyle(120)).toEqual({ width: '100%' });
     expect(resolveCreateSurveyProgressFillStyle(-20)).toEqual({ width: '0%' });
@@ -117,7 +115,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(resolveCreateSurveyBookmarkSurveyStyle(true)).toEqual({ color: '#ffe082' });
     expect(resolveCreateSurveyBookmarkSurveyStyle(false)).toEqual({ color: undefined });
     expect(buildCreateSurveyActionLinkClassName(surveyStyles)).toBe(
-      `${surveyStyles.actionBtn} ${surveyStyles.actionLink}`
+      `${surveyStyles.actionBtn} ${surveyStyles.actionLink}`,
     );
     expect(CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE).toEqual({
       left: '31px',
@@ -134,17 +132,13 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(buildCreateSurveyProgressStepClassName(surveyStyles, 2, 1)).toBe(surveyStyles.stepCompleted);
     expect(buildCreateSurveyProgressStepClassName(surveyStyles, 2, 3)).toBe(surveyStyles.step);
     expect(buildCreateSurveyAiPromptCopyClassName(surveyStyles, true)).toBe(
-      `${surveyStyles.aiPromptCopyCorner} ${surveyStyles.aiPromptCopyCornerSuccess}`
+      `${surveyStyles.aiPromptCopyCorner} ${surveyStyles.aiPromptCopyCornerSuccess}`,
     );
-    expect(buildCreateSurveyAiPromptCopyClassName(surveyStyles, false)).toBe(
-      `${surveyStyles.aiPromptCopyCorner} `
-    );
+    expect(buildCreateSurveyAiPromptCopyClassName(surveyStyles, false)).toBe(`${surveyStyles.aiPromptCopyCorner} `);
     expect(buildCreateSurveyContainerClassName(surveyStyles, true)).toBe(
-      `${surveyStyles.createSurveyContainer} ${surveyStyles.miniaturized}`
+      `${surveyStyles.createSurveyContainer} ${surveyStyles.miniaturized}`,
     );
-    expect(buildCreateSurveyContainerClassName(surveyStyles, false)).toBe(
-      `${surveyStyles.createSurveyContainer} `
-    );
+    expect(buildCreateSurveyContainerClassName(surveyStyles, false)).toBe(`${surveyStyles.createSurveyContainer} `);
     expect(resolveCreateSurveyToggleKnobStyle(true)).toBe(CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE);
     expect(resolveCreateSurveyToggleKnobStyle(false)).toBe(CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE);
   });
@@ -182,9 +176,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
 
     const callbacks: Array<() => void> = [];
     for (const item of queued.splice(0)) {
-      const patch = typeof item.update === 'function'
-        ? item.update(instance.state, instance.props)
-        : item.update;
+      const patch = typeof item.update === 'function' ? item.update(instance.state, instance.props) : item.update;
       if (patch && typeof patch === 'object') {
         instance.state = { ...instance.state, ...patch };
       }
@@ -192,9 +184,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     }
 
     instance.setState = jest.fn((update: any, cb?: () => void) => {
-      const patch = typeof update === 'function'
-        ? update(instance.state, instance.props)
-        : update;
+      const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
       if (patch && typeof patch === 'object') {
         instance.state = { ...instance.state, ...patch };
       }
@@ -202,8 +192,11 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     });
     callbacks.forEach((cb) => cb());
 
-    expect(instance.state.questions.map((question: { type?: string }) => question.type))
-      .toEqual(['binary', 'rating', 'freeform']);
+    expect(instance.state.questions.map((question: { type?: string }) => question.type)).toEqual([
+      'binary',
+      'rating',
+      'freeform',
+    ]);
   });
 
   it('does not schedule a save when the placeholder question type is added', () => {
@@ -236,16 +229,18 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
       isStandaloneQuestion: false,
       title: 'Survey Title',
       surveyLockGateIds: ['gate_1', 'gate_2'],
-      questions: [{
-        uiKey: 'q1',
-        id: 'q1',
-        type: 'freeform',
-        prompt: 'Question 1',
-        tags: [],
-        currentTagInputValue: '',
-        aiGeneratedTagsFromSource: [],
-        isGeneratingTags: false,
-      }],
+      questions: [
+        {
+          uiKey: 'q1',
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        },
+      ],
     };
 
     const { container } = render(instance.render());
@@ -280,17 +275,19 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
       isStandaloneQuestion: false,
       title: 'Survey Title',
       surveyLockGateIds: [],
-      questions: [{
-        uiKey: 'q1',
-        id: 'q1',
-        type: 'freeform',
-        prompt: 'Question 1',
-        lockGateIds: ['gate_1', 'gate_2'],
-        tags: [],
-        currentTagInputValue: '',
-        aiGeneratedTagsFromSource: [],
-        isGeneratingTags: false,
-      }],
+      questions: [
+        {
+          uiKey: 'q1',
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          lockGateIds: ['gate_1', 'gate_2'],
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        },
+      ],
     };
 
     const { container } = render(instance.render());
@@ -312,27 +309,27 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
       gateMap: {
         gate_1: { id: 'gate_1' },
       },
-      gateOptions: [
-        { id: 'gate_1', label: 'Edge Alpha', badgeLabel: 'Edge Alpha', color: '#5affc2' },
-      ],
+      gateOptions: [{ id: 'gate_1', label: 'Edge Alpha', badgeLabel: 'Edge Alpha', color: '#5affc2' }],
       defaultGateId: 'gate_1',
     }));
     instance.state = {
       ...instance.state,
       showAutoTool: false,
       isStandaloneQuestion: true,
-      questions: [{
-        uiKey: 'q1',
-        id: 'q1',
-        type: 'freeform',
-        prompt: 'Question 1',
-        lockGateIds: [],
-        lockGateIdsTouched: true,
-        tags: [],
-        currentTagInputValue: '',
-        aiGeneratedTagsFromSource: [],
-        isGeneratingTags: false,
-      }],
+      questions: [
+        {
+          uiKey: 'q1',
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          lockGateIds: [],
+          lockGateIdsTouched: true,
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        },
+      ],
     };
 
     const { container } = render(instance.render());
@@ -351,9 +348,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
       gateMap: {
         gate_1: { id: 'gate_1' },
       },
-      gateOptions: [
-        { id: 'gate_1', label: 'Edge Alpha', badgeLabel: 'Edge Alpha', color: '#5affc2' },
-      ],
+      gateOptions: [{ id: 'gate_1', label: 'Edge Alpha', badgeLabel: 'Edge Alpha', color: '#5affc2' }],
       defaultGateId: 'gate_1',
     }));
     instance.state = {
@@ -362,16 +357,18 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
       isStandaloneQuestion: false,
       title: 'Survey title',
       surveyLockGateIds: [],
-      questions: [{
-        uiKey: 'q1',
-        id: 'q1',
-        type: 'freeform',
-        prompt: 'Question 1',
-        tags: [],
-        currentTagInputValue: '',
-        aiGeneratedTagsFromSource: [],
-        isGeneratingTags: false,
-      }],
+      questions: [
+        {
+          uiKey: 'q1',
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        },
+      ],
     };
 
     const { container } = render(instance.render());
@@ -427,23 +424,25 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
 
     instance.confirmClearForm();
 
-    expect(instance.state).toEqual(expect.objectContaining({
-      title: '',
-      questions: [],
-      documentURLs: [],
-      docURLInput: '',
-      surveyHash: '',
-      isStandaloneQuestion: true,
-      surveyLockGateIds: [],
-      openLockKey: '',
-      surveyAddedSuccessfully: false,
-      questionsAddedSuccessfully: false,
-      isSubmitting: false,
-      submissionError: '',
-      lastSubmittedSurveyId: '',
-      lastSubmittedSurveyArweaveTxId: '',
-      showClearFormConfirm: false,
-    }));
+    expect(instance.state).toEqual(
+      expect.objectContaining({
+        title: '',
+        questions: [],
+        documentURLs: [],
+        docURLInput: '',
+        surveyHash: '',
+        isStandaloneQuestion: true,
+        surveyLockGateIds: [],
+        openLockKey: '',
+        surveyAddedSuccessfully: false,
+        questionsAddedSuccessfully: false,
+        isSubmitting: false,
+        submissionError: '',
+        lastSubmittedSurveyId: '',
+        lastSubmittedSurveyArweaveTxId: '',
+        showClearFormConfirm: false,
+      }),
+    );
     expect(instance.clearUnfinishedSurveyDraft).toHaveBeenCalledTimes(1);
     expect(instance.updateSurveyHash).toHaveBeenCalledTimes(1);
   });

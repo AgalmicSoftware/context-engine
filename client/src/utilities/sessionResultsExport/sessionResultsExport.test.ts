@@ -18,14 +18,18 @@ import {
 
 describe('sessionResultsExport utilities', () => {
   it('builds safe report filenames from session identifiers and timestamps', () => {
-    expect(buildSessionResultsHtmlReportFilename({
-      exportedAt: '2026-05-25T18:30:00.000Z',
-      slug: '../Demo Session?<x>',
-    })).toBe('contextEngine_sessionReport_Demo_Session_x_2026-05-25T18_30_00_000Z.html');
-    expect(buildSessionResultsPdfReportFilename({
-      exportedAt: '2026-05-25T18:30:00.000Z',
-      slug: '../Demo Session?<x>',
-    })).toBe('contextEngine_sessionReport_Demo_Session_x_2026-05-25T18_30_00_000Z.pdf');
+    expect(
+      buildSessionResultsHtmlReportFilename({
+        exportedAt: '2026-05-25T18:30:00.000Z',
+        slug: '../Demo Session?<x>',
+      }),
+    ).toBe('contextEngine_sessionReport_Demo_Session_x_2026-05-25T18_30_00_000Z.html');
+    expect(
+      buildSessionResultsPdfReportFilename({
+        exportedAt: '2026-05-25T18:30:00.000Z',
+        slug: '../Demo Session?<x>',
+      }),
+    ).toBe('contextEngine_sessionReport_Demo_Session_x_2026-05-25T18_30_00_000Z.pdf');
   });
 
   it('escapes dynamic HTML text', () => {
@@ -70,11 +74,13 @@ describe('sessionResultsExport utilities', () => {
       },
       sections: {
         report: {
-          dimensions: [{
-            id: 'sbt_groups',
-            label: 'SBT / Groups',
-            values: [{ id: 'builders', label: 'Builders Guild', count: 1 }],
-          }],
+          dimensions: [
+            {
+              id: 'sbt_groups',
+              label: 'SBT / Groups',
+              values: [{ id: 'builders', label: 'Builders Guild', count: 1 }],
+            },
+          ],
           questions: [
             {
               id: 'q1',
@@ -120,15 +126,11 @@ describe('sessionResultsExport utilities', () => {
         responseCount: 2,
       },
     ]);
-    expect(snapshot.sections.argumentMap.debates).toEqual([
-      { claim: 'Export helps audits for [redacted-address]' },
-    ]);
+    expect(snapshot.sections.argumentMap.debates).toEqual([{ claim: 'Export helps audits for [redacted-address]' }]);
     expect(snapshot.sections.riskMatrix.available).toBe(false);
-    expect(snapshot.redactions).toEqual(expect.arrayContaining([
-      'encrypted_payloads',
-      'raw_responses',
-      'wallet_addresses',
-    ]));
+    expect(snapshot.redactions).toEqual(
+      expect.arrayContaining(['encrypted_payloads', 'raw_responses', 'wallet_addresses']),
+    );
   });
 
   it('renders a self-contained HTML report with anchors, unavailable states, and safe embedded JSON', () => {
@@ -151,11 +153,13 @@ describe('sessionResultsExport utilities', () => {
       },
       sections: {
         report: {
-          dimensions: [{
-            id: 'sbt_groups',
-            label: 'SBT / Groups',
-            values: [{ id: 'builders', label: 'Builders Guild', count: 1 }],
-          }],
+          dimensions: [
+            {
+              id: 'sbt_groups',
+              label: 'SBT / Groups',
+              values: [{ id: 'builders', label: 'Builders Guild', count: 1 }],
+            },
+          ],
           questions: [
             {
               id: 'q1',
@@ -216,11 +220,13 @@ describe('sessionResultsExport utilities', () => {
 
   it('builds AI payloads with synthetic participant IDs and normalizes generated artifacts', () => {
     const built = buildSessionResultsAnalysisAiPayload({
-      questions: [{
-        id: 'q1',
-        prompt: 'How should reports work for 0x3333333333333333333333333333333333333333?',
-        type: 'freeform',
-      }],
+      questions: [
+        {
+          id: 'q1',
+          prompt: 'How should reports work for 0x3333333333333333333333333333333333333333?',
+          type: 'freeform',
+        },
+      ],
       responses: [
         {
           answer: 'Use a viewer for 0x1111111111111111111111111111111111111111',
@@ -233,15 +239,21 @@ describe('sessionResultsExport utilities', () => {
           questionId: 'q1',
         },
       ],
-      segmentDimensions: [{
-        id: 'sbt-groups',
-        label: 'SBT / Groups',
-        source: 'sbt',
-        values: [
-          { id: '0x9999999999999999999999999999999999999999', label: 'Builders Guild', count: 2 },
-          { id: '0x8888888888888888888888888888888888888888', label: '0x8888888888888888888888888888888888888888', count: 1 },
-        ],
-      }],
+      segmentDimensions: [
+        {
+          id: 'sbt-groups',
+          label: 'SBT / Groups',
+          source: 'sbt',
+          values: [
+            { id: '0x9999999999999999999999999999999999999999', label: 'Builders Guild', count: 2 },
+            {
+              id: '0x8888888888888888888888888888888888888888',
+              label: '0x8888888888888888888888888888888888888888',
+              count: 1,
+            },
+          ],
+        },
+      ],
       session: { name: 'Demo', slug: 'demo' },
     });
     const prompt = buildSessionResultsAnalysisPrompt(built.aiPayload);
@@ -253,12 +265,14 @@ describe('sessionResultsExport utilities', () => {
       expect.objectContaining({ answer: 'Make PDFs readable', participantId: 'participant_002' }),
     ]);
     expect(built.aiPayload.questions[0].prompt).toContain('[redacted-address]');
-    expect(built.aiPayload.segmentDimensions).toEqual([{
-      id: 'sbt_groups',
-      label: 'SBT / Groups',
-      source: 'sbt',
-      values: [{ id: 'sbt_groups_builders_guild', label: 'Builders Guild', count: 2 }],
-    }]);
+    expect(built.aiPayload.segmentDimensions).toEqual([
+      {
+        id: 'sbt_groups',
+        label: 'SBT / Groups',
+        source: 'sbt',
+        values: [{ id: 'sbt_groups_builders_guild', label: 'Builders Guild', count: 2 }],
+      },
+    ]);
     expect(built.participants).toEqual([
       expect.objectContaining({
         address: '0x1111111111111111111111111111111111111111',
@@ -294,11 +308,15 @@ describe('sessionResultsExport utilities', () => {
             overview: 'Address should not survive 0x4444444444444444444444444444444444444444',
             walletAddress: '0x5555555555555555555555555555555555555555',
           },
-          dimensions: [{
-            id: 'sbt_groups',
-            label: 'SBT / Groups',
-            values: [{ id: 'builders_guild', label: 'Builders Guild 0x6666666666666666666666666666666666666666', count: 2 }],
-          }],
+          dimensions: [
+            {
+              id: 'sbt_groups',
+              label: 'SBT / Groups',
+              values: [
+                { id: 'builders_guild', label: 'Builders Guild 0x6666666666666666666666666666666666666666', count: 2 },
+              ],
+            },
+          ],
         },
         argumentMap: { debates: [{ id: 'debate_1' }] },
         riskMatrix: { categories: [{ id: 'risk_1' }], comments: [{ id: 'c1' }] },
@@ -335,18 +353,17 @@ describe('sessionResultsExport utilities', () => {
     });
     expect(merged?.sections.breakdown.available).toBe(true);
     expect(merged?.sections.argumentMap.available).toBe(true);
-    expect(merged?.sections.riskMatrix.categories).toEqual([
-      { id: 'risk_2', label: 'Export confusion' },
-    ]);
+    expect(merged?.sections.riskMatrix.categories).toEqual([{ id: 'risk_2', label: 'Export confusion' }]);
   });
 
   it('downloads browser files with object URLs and revokes them', () => {
     const originalCreateElement = document.createElement.bind(document);
     const anchor = originalCreateElement('a');
     const clickSpy = jest.spyOn(anchor, 'click').mockImplementation(() => {});
-    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tagName: string) => (
-      tagName.toLowerCase() === 'a' ? anchor : originalCreateElement(tagName)
-    )) as typeof document.createElement);
+    const createElementSpy = jest
+      .spyOn(document, 'createElement')
+      .mockImplementation(((tagName: string) =>
+        tagName.toLowerCase() === 'a' ? anchor : originalCreateElement(tagName)) as typeof document.createElement);
     const appendChildSpy = jest.spyOn(document.body, 'appendChild');
     const removeChildSpy = jest.spyOn(document.body, 'removeChild');
     const urlApi = {
@@ -409,14 +426,9 @@ describe('sessionResultsExport utilities', () => {
     expect(addImage).toHaveBeenCalledTimes(3);
     expect(addPage).toHaveBeenCalledTimes(2);
     expect(addImage.mock.calls.map((call) => call[3])).toEqual([0, -842, -1684]);
-    expect(addImage.mock.calls[0]).toEqual(expect.arrayContaining([
-      'data:image/jpeg;base64,report',
-      'JPEG',
-      0,
-      0,
-      595,
-      2380,
-    ]));
+    expect(addImage.mock.calls[0]).toEqual(
+      expect.arrayContaining(['data:image/jpeg;base64,report', 'JPEG', 0, 0, 595, 2380]),
+    );
     expect(save).toHaveBeenCalledWith('report.pdf');
     expect(document.querySelector('iframe[title="Context Engine PDF export"]')).toBeNull();
   });

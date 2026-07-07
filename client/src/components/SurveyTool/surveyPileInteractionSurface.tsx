@@ -162,42 +162,27 @@ export const resolvePileNavCounterStyle = (navCounterVisible: unknown): React.CS
   transition: 'opacity 0.5s ease-in-out',
 });
 
-export const resolvePileFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties => (
-  isFilterActive
-    ? { color: ACTIVE_GREEN, borderColor: ACTIVE_GREEN, opacity: 0.75 }
-    : {}
-);
+export const resolvePileFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties =>
+  isFilterActive ? { color: ACTIVE_GREEN, borderColor: ACTIVE_GREEN, opacity: 0.75 } : {};
 
-export const resolvePileFilterIconStyle = (isFilterActive: unknown): React.CSSProperties => (
-  isFilterActive ? { color: ACTIVE_GREEN } : {}
-);
+export const resolvePileFilterIconStyle = (isFilterActive: unknown): React.CSSProperties =>
+  isFilterActive ? { color: ACTIVE_GREEN } : {};
 
-export const buildPileFilterButtonClassName = (
-  styleMap: Record<string, string>,
-  isFilterActive: unknown
-) => [
-  styleMap.actionButton,
-  isFilterActive ? styleMap.actionButtonActive : '',
-].filter(Boolean).join(' ');
+export const buildPileFilterButtonClassName = (styleMap: Record<string, string>, isFilterActive: unknown) =>
+  [styleMap.actionButton, isFilterActive ? styleMap.actionButtonActive : ''].filter(Boolean).join(' ');
 
-export const buildPileFooterClassName = (
-  styleMap: Record<string, string>,
-  pileTopRailVisible: unknown
-) => `${styleMap.pileFooter}${pileTopRailVisible ? '' : ` ${styleMap.pileFooterHidden}`}`;
+export const buildPileFooterClassName = (styleMap: Record<string, string>, pileTopRailVisible: unknown) =>
+  `${styleMap.pileFooter}${pileTopRailVisible ? '' : ` ${styleMap.pileFooterHidden}`}`;
 
-export const buildPileActionsClassName = (
-  styleMap: Record<string, string>,
-  collapseActionsIntoMenu: unknown
-) => [
-  styleMap.pileActions,
-  collapseActionsIntoMenu ? styleMap.pileActionsMenuEligible : '',
-].filter(Boolean).join(' ');
+export const buildPileActionsClassName = (styleMap: Record<string, string>, collapseActionsIntoMenu: unknown) =>
+  [styleMap.pileActions, collapseActionsIntoMenu ? styleMap.pileActionsMenuEligible : ''].filter(Boolean).join(' ');
 
 export const buildPileSubmitButtonClassName = (
   styleMap: Record<string, string>,
   hasPendingPileChanges: unknown,
-  shouldHidePileSubmitButton: unknown
-) => `${styleMap.pileSubmitButton}${hasPendingPileChanges ? ` ${styleMap.submitGlow}` : ''}${shouldHidePileSubmitButton ? ` ${styleMap.pileSubmitButtonInactive}` : ''}`;
+  shouldHidePileSubmitButton: unknown,
+) =>
+  `${styleMap.pileSubmitButton}${hasPendingPileChanges ? ` ${styleMap.submitGlow}` : ''}${shouldHidePileSubmitButton ? ` ${styleMap.pileSubmitButtonInactive}` : ''}`;
 
 export const shouldCollapsePileActionsIntoMenu = ({
   pileTopRailVisible,
@@ -211,17 +196,13 @@ export const shouldCollapsePileActionsIntoMenu = ({
   hasPendingPileChanges: unknown;
   isSubmitting: unknown;
   shouldHidePileSubmitButton: unknown;
-}): boolean => (
+}): boolean =>
   !!pileTopRailVisible &&
   !!showSubmitButton &&
   (!!hasPendingPileChanges || !!isSubmitting) &&
-  !shouldHidePileSubmitButton
-);
+  !shouldHidePileSubmitButton;
 
-export const resolvePileCardStatusClassName = (
-  styleMap: Record<string, string>,
-  offset: number
-) => {
+export const resolvePileCardStatusClassName = (styleMap: Record<string, string>, offset: number) => {
   if (offset === 0) return styleMap.pileCardActive;
   if (offset === 1) return styleMap.pileCardNext;
   if (offset === -1) return styleMap.pileCardPrev;
@@ -229,10 +210,8 @@ export const resolvePileCardStatusClassName = (
   return styleMap.pileCardBefore;
 };
 
-export const buildPileCardClassName = (
-  styleMap: Record<string, string>,
-  statusClassName: string
-) => `${styleMap.pileCard} ${statusClassName}`;
+export const buildPileCardClassName = (styleMap: Record<string, string>, statusClassName: string) =>
+  `${styleMap.pileCard} ${statusClassName}`;
 
 export const resolvePileLoadingProgressFillStyle = ({
   isHydrating,
@@ -245,21 +224,19 @@ export const resolvePileLoadingProgressFillStyle = ({
   hydrateDiscovered: number;
   scanPercent: number;
 }): React.CSSProperties => ({
-  width: `${isHydrating
-    ? (hydrateDiscovered > 0
-      ? Math.round((Math.min(hydrateDone, hydrateDiscovered) / hydrateDiscovered) * 100)
-      : 0)
-    : scanPercent}%`,
+  width: `${
+    isHydrating
+      ? hydrateDiscovered > 0
+        ? Math.round((Math.min(hydrateDone, hydrateDiscovered) / hydrateDiscovered) * 100)
+        : 0
+      : scanPercent
+  }%`,
 });
 
-export const buildPileHologramToggleClassName = (
-  styleMap: Record<string, string>,
-  showHologramAssistant: unknown
-) => `${styleMap.pileHologramToggle}${showHologramAssistant ? ` ${styleMap.pileHologramToggleActive}` : ''}`;
+export const buildPileHologramToggleClassName = (styleMap: Record<string, string>, showHologramAssistant: unknown) =>
+  `${styleMap.pileHologramToggle}${showHologramAssistant ? ` ${styleMap.pileHologramToggleActive}` : ''}`;
 
-export const resolvePileMiniLoaderStyle = (
-  priorResponsesHydrating: unknown
-): React.CSSProperties => ({
+export const resolvePileMiniLoaderStyle = (priorResponsesHydrating: unknown): React.CSSProperties => ({
   opacity: priorResponsesHydrating ? 0.5 : 1,
 });
 
@@ -279,18 +256,12 @@ const renderPileNavControls = ({
     >
       <FontAwesomeIcon icon={faChevronLeft} />
     </button>
-    <span
-      className={styles.pileNavCounterText}
-      style={resolvePileNavCounterStyle(navCounterVisible)}
-    >
+    <span className={styles.pileNavCounterText} style={resolvePileNavCounterStyle(navCounterVisible)}>
       {pileQuestions.length === 0 ? 0 : activePileIndex + 1} / {pileQuestions.length}
     </span>
     <button
       onClick={handleNext}
-      disabled={
-        pileQuestions.length === 0 ||
-        activePileIndex === pileQuestions.length - 1
-      }
+      disabled={pileQuestions.length === 0 || activePileIndex === pileQuestions.length - 1}
       className={styles.pileNavArrow}
       aria-label="Next Question"
     >
@@ -458,11 +429,7 @@ const renderPileDeckWindow = ({
 
     return (
       <div key={q.id} className={buildPileCardClassName(styles, status)}>
-        {offset === 0 ? (
-          renderActiveQuestion(q)
-        ) : (
-          <div className={styles.pileCardInner}></div>
-        )}
+        {offset === 0 ? renderActiveQuestion(q) : <div className={styles.pileCardInner}></div>}
       </div>
     );
   });
@@ -493,9 +460,7 @@ const renderPileEmptyState = ({
     return (
       <>
         <div>Cache initialization error (RPC or metadata fetch failed).</div>
-        <div style={PILE_SCAN_ERROR_DETAIL_STYLE}>
-          Try refreshing questions/responses or reloading the page.
-        </div>
+        <div style={PILE_SCAN_ERROR_DETAIL_STYLE}>Try refreshing questions/responses or reloading the page.</div>
       </>
     );
   }
@@ -506,13 +471,13 @@ const renderPileEmptyState = ({
         <div style={PILE_LOADING_ICON_WRAP_STYLE}>
           <FontAwesomeIcon icon={faSpinner} spin size="1x" />
         </div>
-        <div className={styles.pileLoadingHeadline}>
-          Loading... {Math.max(0, Number(loadingElapsedSec || 0))}s
-        </div>
+        <div className={styles.pileLoadingHeadline}>Loading... {Math.max(0, Number(loadingElapsedSec || 0))}s</div>
         <div className={styles.pileLoadingSubhead}>
           {isHydrating
             ? `Loading Metadata (${Math.min(hydrateDone, hydrateDiscovered)} / ${hydrateDiscovered})`
-            : (showLongLoading ? '' : '')}
+            : showLongLoading
+              ? ''
+              : ''}
         </div>
         {(scanTotalBlocks > 0 || isHydrating) && (
           <div className={styles.pileLoadingProgressWrap}>
@@ -629,7 +594,9 @@ export const renderPileInteractionSurface = ({
           title={
             priorResponsesHydrating
               ? 'Loading your previous responses...'
-              : (showLongLoading ? 'Still scanning... checking network' : 'Background refresh active')
+              : showLongLoading
+                ? 'Still scanning... checking network'
+                : 'Background refresh active'
           }
         />
       </div>

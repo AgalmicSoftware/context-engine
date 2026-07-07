@@ -13,10 +13,7 @@ export type CryptoGateDecryptOptions = {
 };
 
 export type CryptoGateCryptoUtilsModule = {
-  decryptEnvelopeValue: (
-    envelopeJson: unknown,
-    options?: CryptoGateDecryptOptions
-  ) => Promise<unknown>;
+  decryptEnvelopeValue: (envelopeJson: unknown, options?: CryptoGateDecryptOptions) => Promise<unknown>;
 };
 
 export type CryptoGatePort = {
@@ -25,22 +22,15 @@ export type CryptoGatePort = {
    * SurveyResults uses this first; SurveyQuestions should reuse the same method
    * when its locked response decrypt path moves behind a domain port.
    */
-  decryptEnvelopeValue: (
-    envelopeJson: unknown,
-    options?: CryptoGateDecryptOptions
-  ) => Promise<unknown>;
+  decryptEnvelopeValue: (envelopeJson: unknown, options?: CryptoGateDecryptOptions) => Promise<unknown>;
 };
 
 export type BindCryptoGatePortArgs = {
   crypto: () => CryptoGateCryptoUtilsModule;
 };
 
-export const bindCryptoGatePort = ({
-  crypto,
-}: BindCryptoGatePortArgs): CryptoGatePort => ({
-  decryptEnvelopeValue: (envelopeJson, options) => (
-    crypto().decryptEnvelopeValue(envelopeJson, options)
-  ),
+export const bindCryptoGatePort = ({ crypto }: BindCryptoGatePortArgs): CryptoGatePort => ({
+  decryptEnvelopeValue: (envelopeJson, options) => crypto().decryptEnvelopeValue(envelopeJson, options),
 });
 
 export const cryptoGatePort = bindCryptoGatePort({

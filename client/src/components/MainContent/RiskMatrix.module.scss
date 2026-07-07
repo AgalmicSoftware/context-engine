@@ -1,4 +1,4 @@
-@use "scss/variables" as tokens;
+@use 'scss/variables' as tokens;
 
 $background: tokens.$ce-panel-bg;
 $surface: #1f234f;
@@ -333,8 +333,7 @@ button.cell {
   gap: 16px;
   padding: 20px 20px 0;
   margin-bottom: 18px;
-  background:
-    linear-gradient(90deg, rgba(77, 255, 164, 0.08), rgba(77, 255, 164, 0));
+  background: linear-gradient(90deg, rgba(77, 255, 164, 0.08), rgba(77, 255, 164, 0));
   color: $text;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -384,7 +383,9 @@ button.cell {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--ce-radius-14);
   background: rgba(12, 16, 42, 0.78);
-  transition: border-color 0.18s ease, background-color 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
 
   &:hover,
   &:focus-within {
@@ -604,7 +605,9 @@ button.cell {
   font-size: 0.82rem;
   font-weight: 800;
   text-decoration: none;
-  transition: color 0.18s ease, opacity 0.18s ease;
+  transition:
+    color 0.18s ease,
+    opacity 0.18s ease;
 
   &:hover,
   &:focus-visible {
@@ -780,16 +783,12 @@ button.cell {
 
 .commentItemOpportunity {
   border-color: $accent-border;
-  background:
-    linear-gradient(135deg, rgba(77, 255, 164, 0.09), rgba(77, 255, 164, 0.02)),
-    rgba(13, 31, 25, 0.96);
+  background: linear-gradient(135deg, rgba(77, 255, 164, 0.09), rgba(77, 255, 164, 0.02)), rgba(13, 31, 25, 0.96);
 }
 
 .commentItemRisk {
   border-color: $risk-border;
-  background:
-    linear-gradient(135deg, rgba(255, 107, 114, 0.09), rgba(255, 107, 114, 0.02)),
-    rgba(39, 17, 24, 0.96);
+  background: linear-gradient(135deg, rgba(255, 107, 114, 0.09), rgba(255, 107, 114, 0.02)), rgba(39, 17, 24, 0.96);
 }
 
 .commentHeader {

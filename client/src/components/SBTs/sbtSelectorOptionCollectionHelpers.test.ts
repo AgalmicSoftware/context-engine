@@ -57,20 +57,26 @@ describe('sbtSelectorOptionCollectionHelpers', () => {
     });
 
     expect(merged).toEqual([cached, newAdditional]);
-    expect(resolveSbtSelectorDisplayOptions({
-      defaultFeaturedSBTs: ['0x000000000000000000000000000000000000000A'],
-      limitToFeatured: true,
-      mergedSbtOptions: merged,
-      scopeFeaturedAddresses: ['0x000000000000000000000000000000000000000B'],
-    })).toEqual({
+    expect(
+      resolveSbtSelectorDisplayOptions({
+        defaultFeaturedSBTs: ['0x000000000000000000000000000000000000000A'],
+        limitToFeatured: true,
+        mergedSbtOptions: merged,
+        scopeFeaturedAddresses: ['0x000000000000000000000000000000000000000B'],
+      }),
+    ).toEqual({
       displayOptions: [newAdditional],
       effectiveFeatured: ['0x000000000000000000000000000000000000000B'],
       hasFeaturedSBTs: true,
     });
-    expect(Array.from(buildEffectiveFeaturedAddressSet({
-      scopeFeaturedAddresses: [],
-      defaultFeaturedSBTs: ['0x000000000000000000000000000000000000000D'],
-    }))).toEqual(['0x000000000000000000000000000000000000000d']);
+    expect(
+      Array.from(
+        buildEffectiveFeaturedAddressSet({
+          scopeFeaturedAddresses: [],
+          defaultFeaturedSBTs: ['0x000000000000000000000000000000000000000D'],
+        }),
+      ),
+    ).toEqual(['0x000000000000000000000000000000000000000d']);
   });
 
   it('builds react-select options and selected/pending predicates', () => {
@@ -102,17 +108,23 @@ describe('sbtSelectorOptionCollectionHelpers', () => {
         chainId: undefined,
       },
     ]);
-    expect(hasSelectedOrPendingSbtSelectorAddress({
-      address: first.address,
-      selectedAddresses: new Set(['0x000000000000000000000000000000000000000a']),
-    })).toBe(true);
-    expect(hasSelectedOrPendingSbtSelectorKey({
-      value: second,
-      pendingKeys: new Set(['custom-selection']),
-    })).toBe(true);
-    expect(hasSelectedOrPendingSbtSelectorKey({
-      value: 'bad',
-      pendingKeys: new Set(['bad']),
-    })).toBe(false);
+    expect(
+      hasSelectedOrPendingSbtSelectorAddress({
+        address: first.address,
+        selectedAddresses: new Set(['0x000000000000000000000000000000000000000a']),
+      }),
+    ).toBe(true);
+    expect(
+      hasSelectedOrPendingSbtSelectorKey({
+        value: second,
+        pendingKeys: new Set(['custom-selection']),
+      }),
+    ).toBe(true);
+    expect(
+      hasSelectedOrPendingSbtSelectorKey({
+        value: 'bad',
+        pendingKeys: new Set(['bad']),
+      }),
+    ).toBe(false);
   });
 });

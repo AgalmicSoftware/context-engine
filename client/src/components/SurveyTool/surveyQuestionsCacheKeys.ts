@@ -21,10 +21,14 @@ export function buildDecryptContextKeyFromContext(context: DecryptContextKeyFiel
     (context.sessionSlug as string) || '',
     (context.networkID as string) || '',
     (context.responder as string) || '',
-    context.singleQuestionMode ? 'single' : (context.isStandalone ? 'standalone' : 'survey'),
+    context.singleQuestionMode ? 'single' : context.isStandalone ? 'standalone' : 'survey',
     String(context.surveyIndex ?? '').trim(),
-    String(context.surveyId || '').trim().toLowerCase(),
-    String(context.questionID || '').trim().toLowerCase(),
+    String(context.surveyId || '')
+      .trim()
+      .toLowerCase(),
+    String(context.questionID || '')
+      .trim()
+      .toLowerCase(),
   ].join('|');
 }
 

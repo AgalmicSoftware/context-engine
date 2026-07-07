@@ -66,7 +66,7 @@ const emptyData: BookmarkData = {
   questions: [],
   sbts: [],
   filters: [],
-  atlasNodes: []
+  atlasNodes: [],
 };
 
 const toText = (value: unknown) => (value == null ? '' : String(value)).trim();
@@ -88,20 +88,24 @@ const normalizeList = (value: unknown): string[] => {
 const normalizeBookmarkRefs = (value: unknown, fallbackSessionSlug: unknown): SessionBoundBookmark[] => {
   if (!Array.isArray(value)) return [];
   const fallbackSlug = normalizeSessionSlug(fallbackSessionSlug || '');
-  return value.map((entry) => {
-    let id = '';
-    let sessionSlug = fallbackSlug;
-    if (typeof entry === 'string') {
-      id = entry;
-    } else if (entry && typeof entry === 'object') {
-      const record = entry as Record<string, unknown>;
-      id = toText(record.id || record.surveyId || record.surveyID || record.questionId || record.questionID || record.value);
-      sessionSlug = normalizeSessionSlug(record.sessionSlug ?? record.slug ?? fallbackSlug);
-    }
-    id = toText(id);
-    if (!id) return null;
-    return { id, sessionSlug };
-  }).filter((entry): entry is SessionBoundBookmark => !!entry);
+  return value
+    .map((entry) => {
+      let id = '';
+      let sessionSlug = fallbackSlug;
+      if (typeof entry === 'string') {
+        id = entry;
+      } else if (entry && typeof entry === 'object') {
+        const record = entry as Record<string, unknown>;
+        id = toText(
+          record.id || record.surveyId || record.surveyID || record.questionId || record.questionID || record.value,
+        );
+        sessionSlug = normalizeSessionSlug(record.sessionSlug ?? record.slug ?? fallbackSlug);
+      }
+      id = toText(id);
+      if (!id) return null;
+      return { id, sessionSlug };
+    })
+    .filter((entry): entry is SessionBoundBookmark => !!entry);
 };
 
 const normalizeFilterEntries = (value: unknown): unknown[] => {
@@ -125,13 +129,12 @@ const sortAlpha = (list: string[]) => {
   return [...list].sort((a, b) => String(a).localeCompare(String(b)));
 };
 
-const sortBookmarkRefs = (list: SessionBoundBookmark[]) => (
+const sortBookmarkRefs = (list: SessionBoundBookmark[]) =>
   [...list].sort((a, b) => {
     const idCmp = a.id.localeCompare(b.id);
     if (idCmp !== 0) return idCmp;
     return a.sessionSlug.localeCompare(b.sessionSlug);
-  })
-);
+  });
 
 const shortenId = (value: unknown, lead = 8, tail = 6) => {
   const text = toText(value);
@@ -140,15 +143,16 @@ const shortenId = (value: unknown, lead = 8, tail = 6) => {
   return `${text.slice(0, lead)}...${text.slice(-tail)}`;
 };
 
-const getBookmarkRefKey = (entry: SessionBoundBookmark) => (
-  `${entry.id.toLowerCase()}|${normalizeSessionSlug(entry.sessionSlug).toLowerCase()}`
-);
+const getBookmarkRefKey = (entry: SessionBoundBookmark) =>
+  `${entry.id.toLowerCase()}|${normalizeSessionSlug(entry.sessionSlug).toLowerCase()}`;
 
 const asBookmarkRef = (value: unknown, sessionSlug: unknown = ''): SessionBoundBookmark => {
   if (value && typeof value === 'object') {
     const record = value as Record<string, unknown>;
     return {
-      id: toText(record.id || record.surveyId || record.surveyID || record.questionId || record.questionID || record.value),
+      id: toText(
+        record.id || record.surveyId || record.surveyID || record.questionId || record.questionID || record.value,
+      ),
       sessionSlug: normalizeSessionSlug(record.sessionSlug ?? record.slug ?? sessionSlug),
     };
   }
@@ -196,7 +200,7 @@ const normalizeUsers = (entries: unknown): BookmarkUser[] => {
       address,
       nickname: toText(nickname),
       username: toText(username),
-      networkId: toText(networkId)
+      networkId: toText(networkId),
     });
   });
   return out;
@@ -212,7 +216,7 @@ const sectionConfigs: SectionConfig[] = [
   { key: 'questions', label: 'Questions', emptyText: 'No question bookmarks yet.' },
   { key: 'sbts', label: t('sbts'), emptyText: `No ${t('sbtLower')} bookmarks yet.` },
   { key: 'filters', label: 'Filters', emptyText: 'No filter bookmarks yet.' },
-  { key: 'atlasNodes', label: 'Atlas Nodes', emptyText: 'No atlas bookmarks yet.' }
+  { key: 'atlasNodes', label: 'Atlas Nodes', emptyText: 'No atlas bookmarks yet.' },
 ];
 
 const getFilterCopyValue = (filterEntry: FilterEntry) => {
@@ -286,12 +290,13 @@ export const buildBookmarkPageSourceSignature = ({
   atlasNodesRaw?: string;
   getRefId?: (value: unknown) => string;
 } = {}) => {
-  const resolveRefId = typeof getRefId === 'function'
-    ? getRefId
-    : (value: unknown) => {
-      if (!value || typeof value !== 'object') return `p:${String(value)}`;
-      return `o:${Object.keys(value).length}`;
-    };
+  const resolveRefId =
+    typeof getRefId === 'function'
+      ? getRefId
+      : (value: unknown) => {
+          if (!value || typeof value !== 'object') return `p:${String(value)}`;
+          return `o:${Object.keys(value).length}`;
+        };
   const parts = [
     `bookmarkEntries:${bookmarkEntries.length}`,
     `filtersEntries:${filtersEntries.length}`,
@@ -299,14 +304,10 @@ export const buildBookmarkPageSourceSignature = ({
     `atlasRaw:${String(atlasNodesRaw || '').length}`,
   ];
   bookmarkEntries.forEach((entry, index) => {
-    parts.push(
-      `b:${index}:${String(entry?.key || entry?.slug || '')}:${resolveRefId(entry?.value)}`
-    );
+    parts.push(`b:${index}:${String(entry?.key || entry?.slug || '')}:${resolveRefId(entry?.value)}`);
   });
   filtersEntries.forEach((entry, index) => {
-    parts.push(
-      `f:${index}:${String(entry?.key || entry?.slug || '')}:${resolveRefId(entry?.value)}`
-    );
+    parts.push(`f:${index}:${String(entry?.key || entry?.slug || '')}:${resolveRefId(entry?.value)}`);
   });
   if (legacyBookmarksRaw) parts.push(`legacy:${legacyBookmarksRaw}`);
   if (atlasNodesRaw) parts.push(`atlas:${atlasNodesRaw}`);
@@ -402,12 +403,15 @@ const buildFilterChips = (filterState: unknown): FilterChip[] => {
 
 const BookmarksPage = () => {
   const [data, setData] = useState<BookmarkData>(emptyData);
-  const [expandedSections, setExpandedSections] = useState<Record<BookmarkSectionKey, boolean>>(() => (
-    sectionConfigs.reduce((acc, section) => {
-      acc[section.key] = false;
-      return acc;
-    }, {} as Record<BookmarkSectionKey, boolean>)
-  ));
+  const [expandedSections, setExpandedSections] = useState<Record<BookmarkSectionKey, boolean>>(() =>
+    sectionConfigs.reduce(
+      (acc, section) => {
+        acc[section.key] = false;
+        return acc;
+      },
+      {} as Record<BookmarkSectionKey, boolean>,
+    ),
+  );
   const [copiedFilterKey, setCopiedFilterKey] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -509,7 +513,7 @@ const BookmarksPage = () => {
         [...merged.filters, ...normalizedFiltersFromCache]
           .map(parseFilterEntry)
           .filter((entry): entry is FilterEntry => !!entry),
-        (entry) => entry.key
+        (entry) => entry.key,
       );
 
       const nextData = {
@@ -518,7 +522,7 @@ const BookmarksPage = () => {
         questions: sortBookmarkRefs(uniqBy(merged.questions, getBookmarkRefKey)),
         sbts: sortAlpha(uniqBy([...merged.sbts, ...legacySbts], (v) => v.toLowerCase())),
         filters: filterEntries,
-        atlasNodes: sortAlpha(uniqBy(atlasNodes, (v) => v))
+        atlasNodes: sortAlpha(uniqBy(atlasNodes, (v) => v)),
       };
       const nextDataSig = buildBookmarkPageDataSignature(nextData);
       if (nextDataSig === dataSignatureRef.current) return;
@@ -563,10 +567,7 @@ const BookmarksPage = () => {
         scheduleReadBookmarks();
         return;
       }
-      if (
-        e.key === 'bookmarks' ||
-        e.key === 'bookmarkedNodes'
-      ) {
+      if (e.key === 'bookmarks' || e.key === 'bookmarkedNodes') {
         scheduleReadBookmarks();
       }
     };
@@ -584,7 +585,11 @@ const BookmarksPage = () => {
     return () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('bookmarksCacheUpdated', onCustom);
-      try { unsubscribeCache(); } catch (e) { log.warn('BookmarksPage: cleanup', e); }
+      try {
+        unsubscribeCache();
+      } catch (e) {
+        log.warn('BookmarksPage: cleanup', e);
+      }
     };
   }, [readBookmarks, scheduleReadBookmarks]);
 

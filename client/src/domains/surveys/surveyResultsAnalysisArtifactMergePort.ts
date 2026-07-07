@@ -21,19 +21,19 @@ export type SurveyResultsAnalysisArtifactMergeArgs = {
 
 export type SurveyResultsAnalysisArtifactMergeRuntime = {
   mergeGeneratedSessionResultsAnalysisArtifacts: (
-    args?: SurveyResultsAnalysisArtifactMergeArgs
+    args?: SurveyResultsAnalysisArtifactMergeArgs,
   ) => SessionResultsGeneratedAnalysisArtifact | null;
   normalizeGeneratedSessionResultsAnalysisArtifact: (
-    args?: SurveyResultsAnalysisArtifactNormalizeArgs
+    args?: SurveyResultsAnalysisArtifactNormalizeArgs,
   ) => SessionResultsGeneratedAnalysisArtifact;
 };
 
 export type SurveyResultsAnalysisArtifactMergePort = {
   mergeGeneratedArtifacts: (
-    args?: SurveyResultsAnalysisArtifactMergeArgs
+    args?: SurveyResultsAnalysisArtifactMergeArgs,
   ) => SessionResultsGeneratedAnalysisArtifact | null;
   normalizeGeneratedArtifact: (
-    args?: SurveyResultsAnalysisArtifactNormalizeArgs
+    args?: SurveyResultsAnalysisArtifactNormalizeArgs,
   ) => SessionResultsGeneratedAnalysisArtifact;
 };
 
@@ -44,16 +44,14 @@ export type BindSurveyResultsAnalysisArtifactMergePortArgs = {
 export const bindSurveyResultsAnalysisArtifactMergePort = ({
   runtime: readRuntime,
 }: BindSurveyResultsAnalysisArtifactMergePortArgs): SurveyResultsAnalysisArtifactMergePort => ({
-  mergeGeneratedArtifacts: (args) => (
+  mergeGeneratedArtifacts: (args) =>
     args === undefined
       ? readRuntime().mergeGeneratedSessionResultsAnalysisArtifacts()
-      : readRuntime().mergeGeneratedSessionResultsAnalysisArtifacts(args)
-  ),
-  normalizeGeneratedArtifact: (args) => (
+      : readRuntime().mergeGeneratedSessionResultsAnalysisArtifacts(args),
+  normalizeGeneratedArtifact: (args) =>
     args === undefined
       ? readRuntime().normalizeGeneratedSessionResultsAnalysisArtifact()
-      : readRuntime().normalizeGeneratedSessionResultsAnalysisArtifact(args)
-  ),
+      : readRuntime().normalizeGeneratedSessionResultsAnalysisArtifact(args),
 });
 
 export const surveyResultsAnalysisArtifactMergePort = bindSurveyResultsAnalysisArtifactMergePort({

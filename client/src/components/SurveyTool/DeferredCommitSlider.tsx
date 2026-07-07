@@ -9,9 +9,12 @@ import {
 } from './deferredCommitSliderHelpers.js';
 import type { DeferredCommitSliderState } from './deferredCommitSliderHelpers.js';
 
-type SliderEventLike = {
-  type?: string;
-} | null | undefined;
+type SliderEventLike =
+  | {
+      type?: string;
+    }
+  | null
+  | undefined;
 
 export type DeferredCommitSliderRenderProps = {
   min: number;
@@ -37,16 +40,10 @@ export type DeferredCommitSliderProps = {
   className?: string;
   style?: CSSProperties;
   onCommit?: (value: number) => void;
-  children: (args: {
-    value: number;
-    sliderProps: DeferredCommitSliderRenderProps;
-  }) => ReactNode;
+  children: (args: { value: number; sliderProps: DeferredCommitSliderRenderProps }) => ReactNode;
 };
 
-export class DeferredCommitSlider extends React.PureComponent<
-  DeferredCommitSliderProps,
-  DeferredCommitSliderState
-> {
+export class DeferredCommitSlider extends React.PureComponent<DeferredCommitSliderProps, DeferredCommitSliderState> {
   constructor(props: DeferredCommitSliderProps) {
     super(props);
     this.state = buildDeferredCommitSliderInitialState(this.normalizeValue(props.value));
@@ -61,9 +58,7 @@ export class DeferredCommitSlider extends React.PureComponent<
     this.setState(buildDeferredCommitSliderLiveValuePatch(nextValue));
   }
 
-  normalizeValue = (value: unknown): number => (
-    clampSliderValue(value, this.props.min, this.props.max)
-  );
+  normalizeValue = (value: unknown): number => clampSliderValue(value, this.props.min, this.props.max);
 
   handleChangeStart = (): void => {
     if (this.state.isInteracting) return;
@@ -110,16 +105,7 @@ export class DeferredCommitSlider extends React.PureComponent<
   };
 
   render() {
-    const {
-      children,
-      min,
-      max,
-      step = 1,
-      disabled = false,
-      tooltip = false,
-      className,
-      style,
-    } = this.props;
+    const { children, min, max, step = 1, disabled = false, tooltip = false, className, style } = this.props;
     const sliderProps: DeferredCommitSliderRenderProps = {
       min,
       max,

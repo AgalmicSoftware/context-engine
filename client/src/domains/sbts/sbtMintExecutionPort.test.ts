@@ -33,14 +33,7 @@ describe('SbtMintExecutionPort', () => {
     const providerRef = { selectedAddress: '0x0000000000000000000000000000000000000002' };
 
     await expect(
-      executeSbtMintFlows(
-        fakePort,
-        providerRef,
-        sbtAddress,
-        '7',
-        '0xinviteSignature',
-        '0xgroupSignature',
-      )
+      executeSbtMintFlows(fakePort, providerRef, sbtAddress, '7', '0xinviteSignature', '0xgroupSignature'),
     ).resolves.toEqual({
       publicTx: { transactionHash: '0xpublic' },
       inviteTx: { transactionHash: '0xinvite' },
@@ -48,17 +41,8 @@ describe('SbtMintExecutionPort', () => {
     });
 
     expect(fakePort.claim).toHaveBeenCalledWith(providerRef, sbtAddress);
-    expect(fakePort.claimWithInvite).toHaveBeenCalledWith(
-      providerRef,
-      sbtAddress,
-      '7',
-      '0xinviteSignature',
-    );
-    expect(fakePort.mintWithGroupSignature).toHaveBeenCalledWith(
-      providerRef,
-      sbtAddress,
-      '0xgroupSignature',
-    );
+    expect(fakePort.claimWithInvite).toHaveBeenCalledWith(providerRef, sbtAddress, '7', '0xinviteSignature');
+    expect(fakePort.mintWithGroupSignature).toHaveBeenCalledWith(providerRef, sbtAddress, '0xgroupSignature');
   });
 
   it('binds mint execution through a call-time chainGateway getter', async () => {
@@ -77,31 +61,20 @@ describe('SbtMintExecutionPort', () => {
       chainGateway: () => currentChainGateway,
     });
 
-    await expect(port.claim('injected', '0x0000000000000000000000000000000000000001'))
-      .resolves.toEqual({ transactionHash: '0xfirstClaim' });
+    await expect(port.claim('injected', '0x0000000000000000000000000000000000000001')).resolves.toEqual({
+      transactionHash: '0xfirstClaim',
+    });
 
     currentChainGateway = secondChainGateway;
 
     await expect(
-      port.claimWithInvite(
-        'injected',
-        '0x0000000000000000000000000000000000000002',
-        '8',
-        '0xinviteSignature',
-      )
+      port.claimWithInvite('injected', '0x0000000000000000000000000000000000000002', '8', '0xinviteSignature'),
     ).resolves.toEqual({ transactionHash: '0xsecondInvite' });
     await expect(
-      port.mintWithGroupSignature(
-        'injected',
-        '0x0000000000000000000000000000000000000002',
-        '0xgroupSignature',
-      )
+      port.mintWithGroupSignature('injected', '0x0000000000000000000000000000000000000002', '0xgroupSignature'),
     ).resolves.toEqual({ transactionHash: '0xsecondGroup' });
 
-    expect(firstChainGateway.claim).toHaveBeenCalledWith(
-      'injected',
-      '0x0000000000000000000000000000000000000001',
-    );
+    expect(firstChainGateway.claim).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000001');
     expect(secondChainGateway.claimWithInvite).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',

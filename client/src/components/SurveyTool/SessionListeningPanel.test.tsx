@@ -3,9 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import SessionListeningPanel from './SessionListeningPanel';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import {
-  generateQuestionsFromListeningTranscript,
-} from './sessionListeningQuestions';
+import { generateQuestionsFromListeningTranscript } from './sessionListeningQuestions';
 
 jest.mock('../../utilities/audio/useRollingTranscriptionRecorder', () => ({
   useRollingTranscriptionRecorder: jest.fn(),
@@ -58,9 +56,11 @@ describe('SessionListeningPanel', () => {
 
   it('starts recording only from the explicit Record control', () => {
     const startRecording = jest.fn();
-    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({
-      startRecording,
-    }));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        startRecording,
+      }),
+    );
 
     render(<SessionListeningPanel sessionSlug="demo" />);
 
@@ -80,9 +80,11 @@ describe('SessionListeningPanel', () => {
     expect(screen.queryByText(/pending/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/failed/i)).not.toBeInTheDocument();
 
-    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({
-      transcript: 'Short transcript',
-    }));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript: 'Short transcript',
+      }),
+    );
     rerender(<SessionListeningPanel sessionSlug="demo" />);
 
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeDisabled();
@@ -91,13 +93,15 @@ describe('SessionListeningPanel', () => {
   it('shows waveform, elapsed time, stop, and pause controls while recording', () => {
     const pauseRecording = jest.fn();
     const stopRecording = jest.fn();
-    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({
-      isRecording: true,
-      status: 'recording',
-      elapsedSeconds: 125,
-      pauseRecording,
-      stopRecording,
-    }));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        isRecording: true,
+        status: 'recording',
+        elapsedSeconds: 125,
+        pauseRecording,
+        stopRecording,
+      }),
+    );
 
     render(<SessionListeningPanel sessionSlug="demo" />);
 
@@ -115,12 +119,14 @@ describe('SessionListeningPanel', () => {
 
   it('shows a resume control and keeps the elapsed timer visible while paused', () => {
     const resumeRecording = jest.fn();
-    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({
-      isPaused: true,
-      status: 'paused',
-      elapsedSeconds: 45,
-      resumeRecording,
-    }));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        isPaused: true,
+        status: 'paused',
+        elapsedSeconds: 45,
+        resumeRecording,
+      }),
+    );
 
     render(<SessionListeningPanel sessionSlug="demo" />);
 
@@ -131,14 +137,22 @@ describe('SessionListeningPanel', () => {
   });
 
   it('does not expose internal chunk counters when a transcription segment fails', () => {
-    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({
-      transcript: 'The conversation included enough captured text to keep working.',
-      segments: [
-        { id: 's1', index: 0, status: 'complete', text: 'The conversation included enough captured text to keep working.', startedAt: 1 },
-        { id: 's2', index: 1, status: 'error', text: '', startedAt: 2 },
-      ],
-      errorMessage: 'The audio file could not be decoded or its format is not supported.',
-    }));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript: 'The conversation included enough captured text to keep working.',
+        segments: [
+          {
+            id: 's1',
+            index: 0,
+            status: 'complete',
+            text: 'The conversation included enough captured text to keep working.',
+            startedAt: 1,
+          },
+          { id: 's2', index: 1, status: 'error', text: '', startedAt: 2 },
+        ],
+        errorMessage: 'The audio file could not be decoded or its format is not supported.',
+      }),
+    );
 
     render(<SessionListeningPanel sessionSlug="demo" />);
 
@@ -149,15 +163,24 @@ describe('SessionListeningPanel', () => {
   });
 
   it('suppresses stale transcription failure warnings after a newer successful chunk', () => {
-    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({
-      transcript: 'The conversation recovered with enough later transcript text to keep working.',
-      segments: [
-        { id: 's1', index: 0, status: 'complete', text: 'Opening text.', startedAt: 1, completedAt: 2 },
-        { id: 's2', index: 1, status: 'error', text: '', startedAt: 3, completedAt: 4 },
-        { id: 's3', index: 2, status: 'complete', text: 'The conversation recovered with enough later transcript text to keep working.', startedAt: 5, completedAt: 6 },
-      ],
-      errorMessage: 'The audio file could not be decoded or its format is not supported.',
-    }));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript: 'The conversation recovered with enough later transcript text to keep working.',
+        segments: [
+          { id: 's1', index: 0, status: 'complete', text: 'Opening text.', startedAt: 1, completedAt: 2 },
+          { id: 's2', index: 1, status: 'error', text: '', startedAt: 3, completedAt: 4 },
+          {
+            id: 's3',
+            index: 2,
+            status: 'complete',
+            text: 'The conversation recovered with enough later transcript text to keep working.',
+            startedAt: 5,
+            completedAt: 6,
+          },
+        ],
+        errorMessage: 'The audio file could not be decoded or its format is not supported.',
+      }),
+    );
 
     render(<SessionListeningPanel sessionSlug="demo" />);
 
@@ -166,11 +189,14 @@ describe('SessionListeningPanel', () => {
   });
 
   it('generates reviewable draft questions from the stitched transcript', async () => {
-    const transcript = 'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
-    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({
-      transcript,
-      segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, startedAt: 1 }],
-    }));
+    const transcript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, startedAt: 1 }],
+      }),
+    );
     (generateQuestionsFromListeningTranscript as jest.Mock).mockResolvedValue({
       surveyTitle: 'Listening Follow-up',
       statements: [{ id: 'q1', type: 'freeform', prompt: 'What evidence matters?', tags: [] }],
@@ -183,7 +209,7 @@ describe('SessionListeningPanel', () => {
         sessionConfig={{ questionsGenPrompt: 'Prefer operational questions.' }}
         defaultTags={['ops']}
         workerUrl="https://worker.example"
-      />
+      />,
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE));
@@ -198,7 +224,7 @@ describe('SessionListeningPanel', () => {
           sessionInstructions: 'Prefer operational questions.',
           sourceTypeOverride: 'transcript',
           workerUrl: 'https://worker.example',
-        })
+        }),
       );
     });
     expect(await screen.findByTestId('mock-create-questions')).toHaveAttribute('data-title', 'Listening Follow-up');
@@ -210,11 +236,14 @@ describe('SessionListeningPanel', () => {
 
   it('keeps the transcript behind a compact button and clears it from the textarea overlay control', () => {
     const clearDraft = jest.fn();
-    const transcript = 'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
-    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({
-      transcript,
-      clearDraft,
-    }));
+    const transcript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        clearDraft,
+      }),
+    );
 
     render(<SessionListeningPanel sessionSlug="demo" />);
 
@@ -233,17 +262,21 @@ describe('SessionListeningPanel', () => {
 
   it('shows elapsed seconds while question generation is running', async () => {
     jest.useFakeTimers();
-    const transcript = 'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    const transcript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
     let resolveGeneration: ((value: unknown) => void) | null = null;
-    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({
-      transcript,
-      segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, startedAt: 1 }],
-    }));
-    (generateQuestionsFromListeningTranscript as jest.Mock).mockImplementation(() => (
-      new Promise((resolve) => {
-        resolveGeneration = resolve;
-      })
-    ));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, startedAt: 1 }],
+      }),
+    );
+    (generateQuestionsFromListeningTranscript as jest.Mock).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveGeneration = resolve;
+        }),
+    );
 
     render(<SessionListeningPanel sessionSlug="demo" />);
 
@@ -270,18 +303,21 @@ describe('SessionListeningPanel', () => {
 
   it('finalizes active recorder audio before closing the panel', async () => {
     const resolveFinalizeRef: { current: (() => void) | null } = { current: null };
-    const finalizeRecording = jest.fn(() => (
-      new Promise<void>((resolve) => {
-        resolveFinalizeRef.current = resolve;
-      })
-    ));
+    const finalizeRecording = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveFinalizeRef.current = resolve;
+        }),
+    );
     const onClose = jest.fn();
-    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({
-      isPaused: true,
-      status: 'paused',
-      elapsedSeconds: 9,
-      finalizeRecording,
-    }));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        isPaused: true,
+        status: 'paused',
+        elapsedSeconds: 9,
+        finalizeRecording,
+      }),
+    );
 
     render(<SessionListeningPanel sessionSlug="demo" onClose={onClose} />);
 

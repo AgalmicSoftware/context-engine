@@ -4,32 +4,26 @@ import { buildPublicUrlPath } from '../ui/publicUrl.js';
 
 type DocUploadRecord = Record<string, unknown>;
 
-const isDocUploadRecord = (value: unknown): value is DocUploadRecord => (
-  !!value && typeof value === 'object'
-);
+const isDocUploadRecord = (value: unknown): value is DocUploadRecord => !!value && typeof value === 'object';
 
-const readRecord = (value: unknown, key: string): unknown => (
-  isDocUploadRecord(value) ? value[key] : undefined
-);
+const readRecord = (value: unknown, key: string): unknown => (isDocUploadRecord(value) ? value[key] : undefined);
 
 export const resolveDocUploadsGate = (sessionConfig: unknown) => {
   const registry = readRecord(sessionConfig, '__registry');
   const gatesByResource = readRecord(registry, 'gatesByResource');
   const gate = readRecord(gatesByResource, 'docUploads') || null;
   const sbtAddressesValue = readRecord(gate, 'sbtAddresses');
-  const sbtAddresses = Array.isArray(sbtAddressesValue)
-    ? sbtAddressesValue.filter(Boolean)
-    : [];
+  const sbtAddresses = Array.isArray(sbtAddressesValue) ? sbtAddressesValue.filter(Boolean) : [];
   const chainId = Number(readRecord(gate, 'chainId') || 0) || null;
   const rawMode = readRecord(gate, 'mode');
-  const normalizedMode = toStr(rawMode || '').trim().toLowerCase();
-  const mode = (
-    rawMode === 1 ||
-    normalizedMode === '1' ||
-    normalizedMode === 'all' ||
-    normalizedMode === 'and'
-  ) ? 'all' : 'any';
-  const lookupStatus = toStr(readRecord(gate, 'lookupStatus') || '').trim().toLowerCase();
+  const normalizedMode = toStr(rawMode || '')
+    .trim()
+    .toLowerCase();
+  const mode =
+    rawMode === 1 || normalizedMode === '1' || normalizedMode === 'all' || normalizedMode === 'and' ? 'all' : 'any';
+  const lookupStatus = toStr(readRecord(gate, 'lookupStatus') || '')
+    .trim()
+    .toLowerCase();
   return {
     gate,
     lookupStatus,
@@ -40,33 +34,22 @@ export const resolveDocUploadsGate = (sessionConfig: unknown) => {
   };
 };
 
-export const normalizeDocUploadTagsForTagMap = (tags: unknown) => (
+export const normalizeDocUploadTagsForTagMap = (tags: unknown) =>
   (Array.isArray(tags) ? tags : [])
     .filter((tag) => tag && typeof tag === 'object')
     .map((tag) => ({ name: toStr(readRecord(tag, 'name')).trim(), value: toStr(readRecord(tag, 'value')).trim() }))
-    .filter((tag) => tag.name && tag.value !== '')
-);
+    .filter((tag) => tag.name && tag.value !== '');
 
-export const buildDocUploadTagMap = (tags: unknown) => Object.fromEntries(
-  normalizeDocUploadTagsForTagMap(tags).map((tag) => [tag.name, tag.value])
-);
+export const buildDocUploadTagMap = (tags: unknown) =>
+  Object.fromEntries(normalizeDocUploadTagsForTagMap(tags).map((tag) => [tag.name, tag.value]));
 
-export const resolveDocUploadResultId = (result: unknown): string => (
-  toStr(
-    readRecord(result, 'arweaveTxId') ||
-    readRecord(result, 'txId') ||
-    readRecord(result, 'id')
-  ).trim()
-);
+export const resolveDocUploadResultId = (result: unknown): string =>
+  toStr(readRecord(result, 'arweaveTxId') || readRecord(result, 'txId') || readRecord(result, 'id')).trim();
 
 export const resolveDocUploadResultStorage = (result: unknown): string => {
   const storageRef = readRecord(result, 'storageRef');
   return (
-    toStr(
-      readRecord(storageRef, 'backend') ||
-      readRecord(result, 'storage') ||
-      STORAGE_BACKENDS.ARWEAVE
-    ).trim() ||
+    toStr(readRecord(storageRef, 'backend') || readRecord(result, 'storage') || STORAGE_BACKENDS.ARWEAVE).trim() ||
     STORAGE_BACKENDS.ARWEAVE
   );
 };
@@ -100,7 +83,10 @@ export const buildSessionDocLibraryViewerUrl = ({
   return `${pathname}?${query.toString()}`;
 };
 
-export const createDocLibraryLinkRecord = ({ url, title }: {
+export const createDocLibraryLinkRecord = ({
+  url,
+  title,
+}: {
   url?: unknown;
   title?: unknown;
 } = {}) => {
@@ -129,10 +115,10 @@ export const createDocLibraryLinkRecord = ({ url, title }: {
 
 export const isSelfRecipientDocEncryption = (encryption: unknown = {}) => {
   const raw = toStr(
-    readRecord(encryption, 'recipientType') ||
-    readRecord(encryption, 'mode') ||
-    readRecord(encryption, 'audience')
-  ).trim().toLowerCase();
+    readRecord(encryption, 'recipientType') || readRecord(encryption, 'mode') || readRecord(encryption, 'audience'),
+  )
+    .trim()
+    .toLowerCase();
   return (
     readRecord(encryption, 'selfRecipient') === true ||
     raw === 'self' ||

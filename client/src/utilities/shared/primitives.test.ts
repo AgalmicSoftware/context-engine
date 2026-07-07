@@ -1,9 +1,4 @@
-import {
-  isValidEthAddress,
-  normalizeSessionIdHex,
-  normalizeSlug,
-  toStr,
-} from './primitives.js';
+import { isValidEthAddress, normalizeSessionIdHex, normalizeSlug, toStr } from './primitives.js';
 
 describe('shared primitives', () => {
   describe('toStr', () => {

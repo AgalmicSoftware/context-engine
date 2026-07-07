@@ -4,11 +4,7 @@ import type {
   QuestionGroupSlugLookupDeps,
   SbtSlugResolveDeps,
 } from './groupSlugLookup.js';
-import {
-  findGroupSlugForQuestion,
-  findGroupSlugForSurvey,
-  resolveGroupSlugForSbtAddress,
-} from './groupSlugLookup.js';
+import { findGroupSlugForQuestion, findGroupSlugForSurvey, resolveGroupSlugForSbtAddress } from './groupSlugLookup.js';
 
 type CollectionCache = Record<string, Record<string, GroupSlugLookupRecord>>;
 type SessionCfgMap = Record<string, GroupSlugLookupRecord>;
@@ -16,13 +12,13 @@ type SessionCfgMap = Record<string, GroupSlugLookupRecord>;
 const ADDRESS = '0x1234567890abcdef1234567890abcdef12345678';
 
 const normalizeSessionSlug = (value: unknown): string => {
-  const normalized = String(value ?? '').trim().toLowerCase();
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
   return normalized === 'general' ? '' : normalized;
 };
 
-const isLookupRecord = (value: unknown): value is GroupSlugLookupRecord => (
-  value !== null && typeof value === 'object'
-);
+const isLookupRecord = (value: unknown): value is GroupSlugLookupRecord => value !== null && typeof value === 'object';
 
 const readMetadataSessionSlug = (metadata: unknown, fallbackSlug: string): string => {
   if (!isLookupRecord(metadata)) return normalizeSessionSlug(fallbackSlug);
@@ -62,7 +58,7 @@ const buildGroupDeps = ({
 const buildQuestionDeps = (
   overrides: Parameters<typeof buildGroupDeps>[0] & {
     isKnownOrGeneralSessionSlug?: (slug: string) => boolean;
-  } = {}
+  } = {},
 ): QuestionGroupSlugLookupDeps => ({
   ...buildGroupDeps(overrides),
   isKnownOrGeneralSessionSlug: overrides.isKnownOrGeneralSessionSlug ?? (() => false),
@@ -90,7 +86,7 @@ const buildSbtDeps = ({
   getSbtMetadata?: (
     provider: string,
     address: string,
-    slug: string
+    slug: string,
   ) => Promise<GroupSlugLookupRecord | null | undefined>;
   getSbtCreationBlockByAddress?: (provider: string, address: string, slug: string) => Promise<number | null>;
   getSessionSlugByName?: (name: unknown) => string | null;
@@ -347,9 +343,7 @@ describe('groupSlugLookup sbt resolution', () => {
       getSbtMetadata: async () => ({
         sessionName: 'Alpha Group',
       }),
-      getSessionSlugByName: (name: unknown) => (
-        name === 'Alpha Group' ? 'alpha-group' : null
-      ),
+      getSessionSlugByName: (name: unknown) => (name === 'Alpha Group' ? 'alpha-group' : null),
     });
 
     await expect(resolveGroupSlugForSbtAddress(ADDRESS, deps)).resolves.toBe('alpha-group');
@@ -366,11 +360,12 @@ describe('groupSlugLookup sbt resolution', () => {
       getSbtMetadata: async () => ({}),
       getSessionConfigBySlugOrDefault: (slug: string) => ({
         blockLimits: {
-          start: {
-            older: 10,
-            newer: 100,
-            middle: 50,
-          }[slug] ?? -1,
+          start:
+            {
+              older: 10,
+              newer: 100,
+              middle: 50,
+            }[slug] ?? -1,
         },
       }),
       getSbtCreationBlockByAddress,

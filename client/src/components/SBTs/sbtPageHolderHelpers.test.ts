@@ -16,20 +16,14 @@ import {
 
 describe('sbtPageHolderHelpers', () => {
   it('builds holder occurrence maps, net counts, holder lists, and signatures', () => {
-    expect(Array.from(buildSbtPageAddressOccurrenceMap(['0xA', '0xa', '', null]).entries())).toEqual([
-      ['0xa', 2],
-    ]);
+    expect(Array.from(buildSbtPageAddressOccurrenceMap(['0xA', '0xa', '', null]).entries())).toEqual([['0xa', 2]]);
     expect(Array.from(computeSbtPageNetCounts(['0xA', '0xB'], ['0xa']).entries())).toEqual([
       ['0xa', 0],
       ['0xb', 1],
     ]);
     expect(computeSbtPageNetHoldersList(['0xA', '0xB', '0xA'], ['0xa'])).toEqual(['0xa', '0xb']);
-    expect(buildSbtPageHolderListSignature(['0xA', '0xB'])).toBe(
-      buildSbtPageHolderListSignature(['0xa', '0xb'])
-    );
-    expect(buildSbtPageHolderListSignature(['0xA', '0xB'])).not.toBe(
-      buildSbtPageHolderListSignature(['0xB', '0xA'])
-    );
+    expect(buildSbtPageHolderListSignature(['0xA', '0xB'])).toBe(buildSbtPageHolderListSignature(['0xa', '0xb']));
+    expect(buildSbtPageHolderListSignature(['0xA', '0xB'])).not.toBe(buildSbtPageHolderListSignature(['0xB', '0xA']));
   });
 
   it('reuses holder list and net-holder memo state by identity or signature', () => {
@@ -45,10 +39,12 @@ describe('sbtPageHolderHelpers', () => {
     });
     expect(reusedMemoState).toEqual(firstMemoState);
     expect(buildSignature).not.toHaveBeenCalled();
-    expect(buildSbtPageAddressListSignatureMemoState({
-      buildAddressListSignature: () => '',
-      list: ['0xC'],
-    }).signature).toBe('1:0');
+    expect(
+      buildSbtPageAddressListSignatureMemoState({
+        buildAddressListSignature: () => '',
+        list: ['0xC'],
+      }).signature,
+    ).toBe('1:0');
 
     const minted = ['0xA', '0xB', '0xA'];
     const burned = ['0xa'];
@@ -79,34 +75,40 @@ describe('sbtPageHolderHelpers', () => {
   });
 
   it('builds modal filtered holder patches and normalized count-map address lists', () => {
-    expect(buildSbtPageModalFilteredMintedUsersPatch({
-      filtered: [],
-      isHolderScanActive: true,
-      state: {
-        filteredMintedUsers: ['0xA'],
-        loadingMintedFilter: true,
-      },
-    })).toEqual({ loadingMintedFilter: false });
-    expect(buildSbtPageModalFilteredMintedUsersPatch({
-      buildAddressListSignature: () => 'next',
-      filtered: ['0xB'],
-      state: {
-        filteredMintedUsersSignature: 'prev',
-        loadingMintedFilter: true,
-      },
-    })).toEqual({
+    expect(
+      buildSbtPageModalFilteredMintedUsersPatch({
+        filtered: [],
+        isHolderScanActive: true,
+        state: {
+          filteredMintedUsers: ['0xA'],
+          loadingMintedFilter: true,
+        },
+      }),
+    ).toEqual({ loadingMintedFilter: false });
+    expect(
+      buildSbtPageModalFilteredMintedUsersPatch({
+        buildAddressListSignature: () => 'next',
+        filtered: ['0xB'],
+        state: {
+          filteredMintedUsersSignature: 'prev',
+          loadingMintedFilter: true,
+        },
+      }),
+    ).toEqual({
       filteredMintedUsers: ['0xB'],
       filteredMintedUsersSignature: 'next',
       loadingMintedFilter: false,
     });
-    expect(buildSbtPageModalFilteredMintedUsersPatch({
-      buildAddressListSignature: () => 'same',
-      filtered: ['0xC'],
-      state: {
-        filteredMintedUsersSignature: 'same',
-        loadingMintedFilter: false,
-      },
-    })).toBeNull();
+    expect(
+      buildSbtPageModalFilteredMintedUsersPatch({
+        buildAddressListSignature: () => 'same',
+        filtered: ['0xC'],
+        state: {
+          filteredMintedUsersSignature: 'same',
+          loadingMintedFilter: false,
+        },
+      }),
+    ).toBeNull();
 
     expect(normalizeSbtPageCountMap({ '0xA': 2.9, '0xB': '1', '0xC': 0 })).toEqual({
       '0xa': 2,
@@ -118,35 +120,31 @@ describe('sbtPageHolderHelpers', () => {
   });
 
   it('builds next filtered rows and preserves new burn evidence', () => {
-    expect(buildSbtPageNextFilteredHolderRows({
-      prevFilteredRows: ['0xA', '0xB'],
-      prevNetHolders: ['0xA', '0xB'],
-      nextNetHolders: ['0xC'],
-      replaceRows: true,
-    })).toEqual(['0xc']);
-    expect(buildSbtPageNextFilteredHolderRows({
-      prevFilteredRows: ['0xA'],
-      prevNetHolders: ['0xA', '0xB'],
-      nextNetHolders: ['0xA', '0xC'],
-      replaceRows: true,
-    })).toEqual(['0xa']);
+    expect(
+      buildSbtPageNextFilteredHolderRows({
+        prevFilteredRows: ['0xA', '0xB'],
+        prevNetHolders: ['0xA', '0xB'],
+        nextNetHolders: ['0xC'],
+        replaceRows: true,
+      }),
+    ).toEqual(['0xc']);
+    expect(
+      buildSbtPageNextFilteredHolderRows({
+        prevFilteredRows: ['0xA'],
+        prevNetHolders: ['0xA', '0xB'],
+        nextNetHolders: ['0xA', '0xC'],
+        replaceRows: true,
+      }),
+    ).toEqual(['0xa']);
 
-    expect(mergeSbtPageBurnEvidenceIntoPreservedHolderState(
-      ['0xA', '0xA', '0xB'],
-      ['0xB'],
-      ['0xA', '0xB'],
-      ['0xA', '0xB']
-    )).toEqual({
+    expect(
+      mergeSbtPageBurnEvidenceIntoPreservedHolderState(['0xA', '0xA', '0xB'], ['0xB'], ['0xA', '0xB'], ['0xA', '0xB']),
+    ).toEqual({
       mintedAddresses: ['0xa', '0xa', '0xb'],
       burnedAddresses: ['0xb', '0xa'],
       burnDiscovered: true,
     });
-    expect(mergeSbtPageBurnEvidenceIntoPreservedHolderState(
-      ['0xA'],
-      [],
-      ['0xA'],
-      []
-    ).burnDiscovered).toBe(false);
+    expect(mergeSbtPageBurnEvidenceIntoPreservedHolderState(['0xA'], [], ['0xA'], []).burnDiscovered).toBe(false);
   });
 
   it('normalizes load-SBT-info options from booleans and option records', () => {

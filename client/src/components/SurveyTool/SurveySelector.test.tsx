@@ -1,8 +1,5 @@
 import { LazyCreateQuestionsAndSurveys, LazySurveyResults, SurveySelector } from './SurveySelector';
-import {
-  normalizeSurveyToolFilterState,
-  serializeSurveyToolFilterState,
-} from './surveyToolUtils.js';
+import { normalizeSurveyToolFilterState, serializeSurveyToolFilterState } from './surveyToolUtils.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -80,9 +77,7 @@ describe('SurveySelector', () => {
     expect(subject.setState).toHaveBeenCalledTimes(1);
     const patch = (subject.setState as jest.Mock).mock.calls[0][0];
     expect(patch).toMatchObject({ showResults: true });
-    expect(patch.filterState).toEqual(
-      normalizeSurveyToolFilterState({ questionTypes: ['rating'] })
-    );
+    expect(patch.filterState).toEqual(normalizeSurveyToolFilterState({ questionTypes: ['rating'] }));
   });
 
   it('does not read SurveySelector survey list from a borrowed general network when the slug is unresolved', async () => {
@@ -90,15 +85,16 @@ describe('SurveySelector', () => {
       slug: '',
       networkChainId: 84532,
     };
-    const strictLookup = (slug: unknown) => (
-      String(slug || '').trim().toLowerCase() === ''
+    const strictLookup = (slug: unknown) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === ''
         ? generalCfg
-        : null
-    );
+        : null;
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug: any) => (
-      (strictLookup(slug) || generalCfg) as any
-    ));
+    jest
+      .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
+      .mockImplementation((slug: any) => (strictLookup(slug) || generalCfg) as any);
     jest.spyOn(console, 'error').mockImplementation(() => {});
     const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace: string) => {
       if (namespace === 'surveysCache') {
@@ -261,7 +257,7 @@ describe('SurveySelector', () => {
     window.history.replaceState(
       {},
       '',
-      '/questions?session=edge&sessionSlug=alias&sessionId=0xabc&sid=short&chainId=84532&view=list#question-list'
+      '/questions?session=edge&sessionSlug=alias&sessionId=0xabc&sid=short&chainId=84532&view=list#question-list',
     );
     try {
       const subject = new SurveySelector({
@@ -310,7 +306,7 @@ describe('SurveySelector', () => {
     window.history.replaceState(
       {},
       '',
-      `/questions?session=edge&sessionSlug=alias&sessionId=0xabc&sid=short&chainId=84532&filter=${activeFilter}#question-list`
+      `/questions?session=edge&sessionSlug=alias&sessionId=0xabc&sid=short&chainId=84532&filter=${activeFilter}#question-list`,
     );
     try {
       const subject = new SurveySelector({
@@ -476,5 +472,4 @@ describe('SurveySelector', () => {
     expect(authoringNode.props.sessionName).toBe('Edge Session');
     expect(authoringNode.props.surveyIndex).toBe(0);
   });
-
 });

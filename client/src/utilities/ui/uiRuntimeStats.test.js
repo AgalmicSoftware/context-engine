@@ -66,7 +66,10 @@ describe('uiRuntimeStats', () => {
     });
     PerformanceObserverMock.supportedEntryTypes = ['longtask'];
     setGlobalValue('PerformanceObserver', PerformanceObserverMock);
-    setGlobalValue('requestAnimationFrame', jest.fn(() => 1));
+    setGlobalValue(
+      'requestAnimationFrame',
+      jest.fn(() => 1),
+    );
     setGlobalValue('cancelAnimationFrame', jest.fn());
 
     startCeRuntimeStats({ sampleIntervalMs: 250 });
@@ -136,10 +139,13 @@ describe('uiRuntimeStats', () => {
     setGlobalValue('PerformanceObserver', PerformanceObserverMock);
 
     const rafQueue = [];
-    setGlobalValue('requestAnimationFrame', jest.fn((cb) => {
-      rafQueue.push(cb);
-      return rafQueue.length;
-    }));
+    setGlobalValue(
+      'requestAnimationFrame',
+      jest.fn((cb) => {
+        rafQueue.push(cb);
+        return rafQueue.length;
+      }),
+    );
     setGlobalValue('cancelAnimationFrame', jest.fn());
 
     startCeRuntimeStats({ sampleIntervalMs: 1000, maxSamples: 10 });
@@ -192,13 +198,15 @@ describe('uiRuntimeStats', () => {
     const snapshot = snapshotCeRuntimeStats();
     const latest = snapshot.latestSample;
 
-    expect(snapshot).toEqual(expect.objectContaining({
-      v: 1,
-      running: true,
-      cachePressure: expect.any(Object),
-      latestSample: expect.any(Object),
-      recentSamples: expect.any(Array),
-    }));
+    expect(snapshot).toEqual(
+      expect.objectContaining({
+        v: 1,
+        running: true,
+        cachePressure: expect.any(Object),
+        latestSample: expect.any(Object),
+        recentSamples: expect.any(Array),
+      }),
+    );
     expect(latest.perfCounterDelta['onePageDemo.renderPasses']).toBe(3);
     expect(latest.uiPerf).toEqual(expect.objectContaining({ enabled: true }));
     expect(snapshot.cachePressure.perMinute.questionsCache).toBeGreaterThanOrEqual(2);

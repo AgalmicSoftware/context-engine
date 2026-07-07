@@ -37,9 +37,7 @@ const SurveyQuestionsUserResponseNotice = ({
 
   return (
     <div className={styles.userResponseNotice} data-testid={E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE}>
-      <p className={styles.userResponseNoticeTitle}>
-        Existing survey response detected
-      </p>
+      <p className={styles.userResponseNoticeTitle}>Existing survey response detected</p>
       <div className={styles.userResponseNoticeActions}>
         <Button
           onClick={onStartFresh}

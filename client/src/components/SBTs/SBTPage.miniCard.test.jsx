@@ -42,10 +42,7 @@ const createSubject = (props = {}) => {
   return subject;
 };
 
-const RESOLVABLE_TREE_COMPONENTS = new Set([
-  SbtPageMiniActionArea,
-  SbtPageMiniCardDisplay,
-]);
+const RESOLVABLE_TREE_COMPONENTS = new Set([SbtPageMiniActionArea, SbtPageMiniCardDisplay]);
 const resolvedTreeComponentCache = new WeakMap();
 
 const findElementInTree = (node, predicate) => {
@@ -85,9 +82,10 @@ const flattenText = (node) => {
   return '';
 };
 
-const nodeHasClassName = (node, className) => String(node?.props?.className || '')
-  .split(/\s+/)
-  .includes(className);
+const nodeHasClassName = (node, className) =>
+  String(node?.props?.className || '')
+    .split(/\s+/)
+    .includes(className);
 
 const renderMiniCardNode = (props = {}, stateOverrides = {}, configureSubject = null) => {
   const sbtAddress = '0x00000000000000000000000000000000000000f1';
@@ -119,10 +117,7 @@ const renderMiniCardNode = (props = {}, stateOverrides = {}, configureSubject = 
   };
   if (typeof configureSubject === 'function') configureSubject(subject);
   const tree = subject.render();
-  const cardNode = findElementInTree(
-    tree,
-    (element) => element?.type === SbtPageMiniCard
-  );
+  const cardNode = findElementInTree(tree, (element) => element?.type === SbtPageMiniCard);
   return { cardNode, sbtAddress, subject };
 };
 
@@ -153,7 +148,7 @@ describe('SBTPage mini-card', () => {
     expect(openSpy).toHaveBeenCalledWith(
       `${window.location.origin}${buildSbtDetailPath(sbtAddress)}`,
       '_blank',
-      'noopener,noreferrer'
+      'noopener,noreferrer',
     );
     expect(preventDefault).toHaveBeenCalledTimes(1);
     expect(stopPropagation).toHaveBeenCalledTimes(1);
@@ -247,16 +242,16 @@ describe('SBTPage mini-card', () => {
       },
       (subject) => {
         subject.miniMintHandler = miniMintHandler;
-      }
+      },
     );
     const cardTree = SbtPageMiniCard(cardNode.props);
     const passwordInput = findElementInTree(
       cardTree,
-      (element) => element?.type === 'input' && element?.props?.placeholder === 'Password'
+      (element) => element?.type === 'input' && element?.props?.placeholder === 'Password',
     );
     const actionButton = findElementInTree(
       cardTree,
-      (element) => element?.type === 'button' && element?.props?.onClick === cardNode.props.onMiniMint
+      (element) => element?.type === 'button' && element?.props?.onClick === cardNode.props.onMiniMint,
     );
     const preventDefault = jest.fn();
 
@@ -309,7 +304,7 @@ describe('SBTPage mini-card', () => {
       },
       (subject) => {
         subject.miniMintHandler = miniMintHandler;
-      }
+      },
     );
     const cardTree = SbtPageMiniCard(cardNode.props);
     const preventDefault = jest.fn();
@@ -347,7 +342,7 @@ describe('SBTPage mini-card', () => {
       },
       (subject) => {
         subject.claimWithInviteCode = claimWithInviteCode;
-      }
+      },
     );
 
     inviteCardNode.props.onClaimWithInviteCode({ preventDefault: jest.fn() });
@@ -364,7 +359,7 @@ describe('SBTPage mini-card', () => {
       },
       (subject) => {
         subject.mintUnlimitedWithGroupPassword = mintUnlimitedWithGroupPassword;
-      }
+      },
     );
 
     groupPasswordCardNode.props.onMintUnlimitedWithGroupPassword({ preventDefault: jest.fn() });
@@ -384,12 +379,12 @@ describe('SBTPage mini-card', () => {
       },
       (subject) => {
         subject.claimWithInviteCode = claimWithInviteCode;
-      }
+      },
     );
     const inviteCardTree = SbtPageMiniCard(inviteCardNode.props);
     const inviteButton = findElementInTree(
       inviteCardTree,
-      (element) => element?.type === 'button' && element?.props?.onClick === inviteCardNode.props.onClaimWithInviteCode
+      (element) => element?.type === 'button' && element?.props?.onClick === inviteCardNode.props.onClaimWithInviteCode,
     );
 
     expect(inviteCardNode.props.miniMintActionPlan).toMatchObject({
@@ -413,12 +408,14 @@ describe('SBTPage mini-card', () => {
       },
       (subject) => {
         subject.mintUnlimitedWithGroupPassword = mintUnlimitedWithGroupPassword;
-      }
+      },
     );
     const groupPasswordCardTree = SbtPageMiniCard(groupPasswordCardNode.props);
     const groupPasswordButton = findElementInTree(
       groupPasswordCardTree,
-      (element) => element?.type === 'button' && element?.props?.onClick === groupPasswordCardNode.props.onMintUnlimitedWithGroupPassword
+      (element) =>
+        element?.type === 'button' &&
+        element?.props?.onClick === groupPasswordCardNode.props.onMintUnlimitedWithGroupPassword,
     );
 
     expect(groupPasswordCardNode.props.miniMintActionPlan).toMatchObject({
@@ -433,10 +430,13 @@ describe('SBTPage mini-card', () => {
   });
 
   it('routes mini-card disclosure clicks through the parent password input action', () => {
-    const { cardNode, subject } = renderMiniCardNode({}, {
-      hasInviteMint: true,
-      showMiniPasswordInput: false,
-    });
+    const { cardNode, subject } = renderMiniCardNode(
+      {},
+      {
+        hasInviteMint: true,
+        showMiniPasswordInput: false,
+      },
+    );
     const preventDefault = jest.fn();
 
     cardNode.props.onShowMiniPasswordInput({ preventDefault });
@@ -462,7 +462,7 @@ describe('SBTPage mini-card', () => {
     expect(openSpy).toHaveBeenCalledWith(
       `${window.location.origin}${buildSbtDetailPath(sbtAddress, 'edge-private')}`,
       '_blank',
-      'noopener,noreferrer'
+      'noopener,noreferrer',
     );
     expect(preventDefault).toHaveBeenCalledTimes(1);
     expect(stopPropagation).toHaveBeenCalledTimes(1);

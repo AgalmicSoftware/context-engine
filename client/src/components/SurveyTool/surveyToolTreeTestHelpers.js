@@ -124,9 +124,8 @@ export const nodeHasClassName = (node, className) => {
   return value.split(/\s+/).includes(className);
 };
 
-export const findNodeByClassName = (node, className) => (
-  findElement(node, (candidate) => nodeHasClassName(candidate, className))
-);
+export const findNodeByClassName = (node, className) =>
+  findElement(node, (candidate) => nodeHasClassName(candidate, className));
 
 export const getElementChildren = (node) => {
   const children = node?.props?.children;

@@ -1,9 +1,5 @@
 import reducer from './accountReducer';
-import {
-  CHANGE_NETWORK,
-  FETCH_ACCOUNT,
-  LOGIN_ACCOUNT,
-} from '../actions/types';
+import { CHANGE_NETWORK, FETCH_ACCOUNT, LOGIN_ACCOUNT } from '../actions/types';
 
 const buildAccountPayload = (overrides = {}) => ({
   account: '0xabc',

@@ -1,4 +1,11 @@
-import { analyzeClusterOpinions, analyzePhotoForQuestionGeneration, callAI, rankQuestionsAI, runCompareToolkit, transcribeAudio } from './aiScripts.js';
+import {
+  analyzeClusterOpinions,
+  analyzePhotoForQuestionGeneration,
+  callAI,
+  rankQuestionsAI,
+  runCompareToolkit,
+  transcribeAudio,
+} from './aiScripts.js';
 import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSettings.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
@@ -111,7 +118,7 @@ describe('aiScripts worker auth options', () => {
       expect.objectContaining({
         sessionSlug,
         sessionConfig,
-      })
+      }),
     );
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker-25bf.example/ai',
@@ -156,7 +163,7 @@ describe('aiScripts worker auth options', () => {
     const photo = new File(['binary'], 'memo.png', { type: 'image/png' });
 
     await expect(analyzePhotoForQuestionGeneration(photo, { sessionSlug: '' })).rejects.toThrow(
-      'Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model.'
+      'Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model.',
     );
     expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
   });
@@ -176,12 +183,14 @@ describe('aiScripts worker auth options', () => {
     const photo = new File(['photo-bytes'], 'memo.png', { type: 'image/png' });
     const out = await analyzePhotoForQuestionGeneration(photo, { sessionSlug: '' });
 
-    expect(out).toEqual(expect.objectContaining({
-      text: 'Readable analysis',
-      provider: 'openai',
-      model: 'gpt-5',
-      requestFormat: 'openai-responses',
-    }));
+    expect(out).toEqual(
+      expect.objectContaining({
+        text: 'Readable analysis',
+        provider: 'openai',
+        model: 'gpt-5',
+        requestFormat: 'openai-responses',
+      }),
+    );
     const requestInit = fetchWorkerWithAuth.mock.calls[0]?.[1] || {};
     const body = JSON.parse(String(requestInit.body || '{}'));
     expect(body.endpoint).toBe('responses');

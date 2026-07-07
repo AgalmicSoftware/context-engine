@@ -1,14 +1,10 @@
-import {
-  getConvictionFromResponse,
-  getImportanceFromResponse,
-} from './surveyToolUtils.js';
+import { getConvictionFromResponse, getImportanceFromResponse } from './surveyToolUtils.js';
 
 type UnknownRecord = Record<string, unknown>;
 type IndexedValue = Record<string | number, unknown>;
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const buildSurveyQuestionsJson = ({
   singleQuestionMode = false,
@@ -35,10 +31,7 @@ export const shouldUseSubmittedResponseJson = ({
   parsedViewAddressAnswers?: unknown;
   isEditing?: unknown;
   userAnswers?: unknown;
-} = {}) => !!(
-  ((viewAddress || responderAddress) && parsedViewAddressAnswers) ||
-  (!isEditing && userAnswers)
-);
+} = {}) => !!(((viewAddress || responderAddress) && parsedViewAddressAnswers) || (!isEditing && userAnswers));
 
 const withConvictionImportance = (response: UnknownRecord) => {
   const convictionValue = getConvictionFromResponse(response);
@@ -114,10 +107,12 @@ export const buildSurveyDefinitionJson = ({
   const surveyDetails = { ...(currentSurvey as UnknownRecord) };
 
   if (Array.isArray(surveyDetails.questionIDs) && Array.isArray(questionPool)) {
-    const questionMap = new Map(questionPool.map((question) => {
-      const questionRecord = question as UnknownRecord & { id: { toLowerCase: () => string } };
-      return [questionRecord.id.toLowerCase(), question];
-    }));
+    const questionMap = new Map(
+      questionPool.map((question) => {
+        const questionRecord = question as UnknownRecord & { id: { toLowerCase: () => string } };
+        return [questionRecord.id.toLowerCase(), question];
+      }),
+    );
 
     surveyDetails.questions = surveyDetails.questionIDs.map((id) => {
       const questionData = questionMap.get((id as { toLowerCase: () => string }).toLowerCase());

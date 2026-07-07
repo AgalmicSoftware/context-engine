@@ -1,7 +1,4 @@
-import {
-  normalizeSessionWizardArweaveUri,
-  parseSessionWizardArweaveTxId,
-} from './sessionWizardUrlSupport';
+import { normalizeSessionWizardArweaveUri, parseSessionWizardArweaveTxId } from './sessionWizardUrlSupport';
 import {
   buildSessionWizardPublishExecutionPlan,
   resolveSessionWizardPublishProgressDisplayState,
@@ -30,11 +27,7 @@ export type SessionWizardPublishReadinessDescriptor = {
 };
 
 export type SessionWizardPublishReadinessKind =
-  | 'blocked'
-  | 'manual-metadata'
-  | 'sponsored-auto-deploy'
-  | 'uploaded-metadata'
-  | 'worker-upload';
+  'blocked' | 'manual-metadata' | 'sponsored-auto-deploy' | 'uploaded-metadata' | 'worker-upload';
 
 export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput & {
   buildMetadataGatewayUrl?: SessionWizardPublishMetadataGatewayUrlBuilder | null;
@@ -119,26 +112,20 @@ export function resolveSessionWizardPublishReadiness({
   manualMetadataUrl,
   metadataUrl,
 }: SessionWizardPublishReadinessInput): SessionWizardPublishReadinessDescriptor {
-  const canUploadMetadataNow = !!resolvedWorkerBaseUrl && (
-    workerMode === 'default' ||
-    usesDefaultWorkerUrl ||
-    (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl)
-  );
+  const canUploadMetadataNow =
+    !!resolvedWorkerBaseUrl &&
+    (workerMode === 'default' || usesDefaultWorkerUrl || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
   const uploadBlockedReason = !resolvedWorkerBaseUrl
     ? 'Set a worker URL before uploading metadata.'
-    : (workerMode !== 'default' && !usesDefaultWorkerUrl && !deployVerifiedInUi)
+    : workerMode !== 'default' && !usesDefaultWorkerUrl && !deployVerifiedInUi
       ? 'Custom worker mode requires a successful deploy in this run before metadata upload.'
-      : (workerMode !== 'default' && !usesDefaultWorkerUrl && deployVerifiedInUi && !deployWorkerMatchesConfiguredUrl)
+      : workerMode !== 'default' && !usesDefaultWorkerUrl && deployVerifiedInUi && !deployWorkerMatchesConfiguredUrl
         ? 'Configured worker URL differs from the last successful deploy URL; re-deploy or reset to the verified URL.'
         : 'Deploy the worker and ensure the worker URL is set before uploading metadata.';
   const hasManualMetadata = !!normalizeSessionWizardArweaveUri(manualMetadataUrl);
   const hasUploadedMetadata = !!normalizeSessionWizardArweaveUri(metadataUrl);
-  const canPublishNow = (
-    canUploadMetadataNow ||
-    canUseSponsoredAutoDeployNow ||
-    hasManualMetadata ||
-    hasUploadedMetadata
-  );
+  const canPublishNow =
+    canUploadMetadataNow || canUseSponsoredAutoDeployNow || hasManualMetadata || hasUploadedMetadata;
   const readinessKind: SessionWizardPublishReadinessKind = hasManualMetadata
     ? 'manual-metadata'
     : hasUploadedMetadata
@@ -202,9 +189,10 @@ export function resolveSessionWizardPublishMetadataIdentityState({
   const uploadedMetadataUri = String(metadataUrl || '').trim();
   const effectiveMetadataUri = normalizedManualMetadataUri || uploadedMetadataUri;
   const effectiveMetadataTxId = parseSessionWizardArweaveTxId(effectiveMetadataUri);
-  const effectiveMetadataGatewayUrl = effectiveMetadataTxId && typeof buildGatewayUrl === 'function'
-    ? String(buildGatewayUrl(effectiveMetadataTxId) || '').trim()
-    : '';
+  const effectiveMetadataGatewayUrl =
+    effectiveMetadataTxId && typeof buildGatewayUrl === 'function'
+      ? String(buildGatewayUrl(effectiveMetadataTxId) || '').trim()
+      : '';
 
   return {
     effectiveMetadataGatewayUrl,
@@ -235,9 +223,7 @@ export function resolveSessionWizardPublishMetadataDisplayState({
     effectiveMetadataTxId: normalizedTxId,
     manualMetadataDisplayUri: normalizedManualMetadataUri,
     metadataUri: normalizedMetadataUri || String(metadataUrl || '').trim(),
-    metadataUriLabel: showMetadataUri
-      ? (showManualMetadataUri ? 'Uploaded metadata URI' : 'Metadata URI')
-      : '',
+    metadataUriLabel: showMetadataUri ? (showManualMetadataUri ? 'Uploaded metadata URI' : 'Metadata URI') : '',
     showArweaveTx: !!normalizedTxId && !!normalizedGatewayUrl,
     showManualMetadataUri,
     showMetadataUri,
@@ -302,10 +288,9 @@ export function resolveSessionWizardPublishUiPlan({
     metadataUrl: readinessInput.metadataUrl,
   });
   const publishMetadataDisplayState = resolveSessionWizardPublishMetadataDisplayState({
-    effectiveMetadataGatewayUrl: effectiveMetadataGatewayUrlOverride ||
-      publishMetadataIdentityState.effectiveMetadataGatewayUrl,
-    effectiveMetadataTxId: effectiveMetadataTxIdOverride ||
-      publishMetadataIdentityState.effectiveMetadataTxId,
+    effectiveMetadataGatewayUrl:
+      effectiveMetadataGatewayUrlOverride || publishMetadataIdentityState.effectiveMetadataGatewayUrl,
+    effectiveMetadataTxId: effectiveMetadataTxIdOverride || publishMetadataIdentityState.effectiveMetadataTxId,
     manualMetadataUrl: readinessInput.manualMetadataUrl,
     metadataUrl: readinessInput.metadataUrl,
   });

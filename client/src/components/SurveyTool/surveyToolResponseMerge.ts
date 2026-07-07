@@ -21,7 +21,7 @@ export const areEnvelopesEquivalent = (
   envA: unknown,
   envB: unknown,
   isEncryptedA = false,
-  isEncryptedB = false
+  isEncryptedB = false,
 ): boolean => {
   const a = typeof envA === 'string' ? envA : '';
   const b = typeof envB === 'string' ? envB : '';
@@ -33,14 +33,14 @@ export const areEnvelopesEquivalent = (
 const mergeDecryptedViewedResponseField = (
   prevResp: ResponseRow | null | undefined,
   latestResp: ResponseRow | null | undefined,
-  fieldKey: 'answer' | 'additional'
+  fieldKey: 'answer' | 'additional',
 ) => {
-  const prev = (prevResp && typeof prevResp === 'object') ? prevResp : null;
-  const next = (latestResp && typeof latestResp === 'object') ? latestResp : null;
+  const prev = prevResp && typeof prevResp === 'object' ? prevResp : null;
+  const next = latestResp && typeof latestResp === 'object' ? latestResp : null;
   if (!prev || !next) return latestResp;
 
-  const prevField = (prev[fieldKey] && typeof prev[fieldKey] === 'object') ? prev[fieldKey] as ResponseField : {};
-  const nextField = (next[fieldKey] && typeof next[fieldKey] === 'object') ? next[fieldKey] as ResponseField : {};
+  const prevField = prev[fieldKey] && typeof prev[fieldKey] === 'object' ? (prev[fieldKey] as ResponseField) : {};
+  const nextField = next[fieldKey] && typeof next[fieldKey] === 'object' ? (next[fieldKey] as ResponseField) : {};
 
   const prevValue = prevField.value;
   const nextValue = nextField.value;
@@ -67,10 +67,10 @@ const mergeDecryptedViewedResponseRating = (
   prevResp: ResponseRow | null | undefined,
   latestResp: ResponseRow | null | undefined,
   ratingKey: 'importance' | 'conviction',
-  envelopeKey: 'importanceEncrypted' | 'convictionEncrypted'
+  envelopeKey: 'importanceEncrypted' | 'convictionEncrypted',
 ) => {
-  const prev = (prevResp && typeof prevResp === 'object') ? prevResp : null;
-  const next = (latestResp && typeof latestResp === 'object') ? latestResp : null;
+  const prev = prevResp && typeof prevResp === 'object' ? prevResp : null;
+  const next = latestResp && typeof latestResp === 'object' ? latestResp : null;
   if (!prev || !next) return latestResp;
 
   const prevValue = prev[ratingKey];
@@ -79,13 +79,8 @@ const mergeDecryptedViewedResponseRating = (
   const nextEnv = typeof next[envelopeKey] === 'string' ? next[envelopeKey] : '';
 
   const prevIsDecrypted =
-    prevValue !== '*' &&
-    prevValue !== undefined &&
-    prevValue !== null &&
-    typeof prevValue !== 'object';
-  const nextIsMasked =
-    (nextValue === '*' || nextValue === undefined || nextValue === null) &&
-    !!nextEnv;
+    prevValue !== '*' && prevValue !== undefined && prevValue !== null && typeof prevValue !== 'object';
+  const nextIsMasked = (nextValue === '*' || nextValue === undefined || nextValue === null) && !!nextEnv;
 
   if (!prevIsDecrypted || !nextIsMasked) return latestResp;
   if (!prevEnv || !nextEnv || prevEnv !== nextEnv) return latestResp;
@@ -95,20 +90,24 @@ const mergeDecryptedViewedResponseRating = (
 
 export function mergeDecryptedViewedResponse(
   prevViewed: UnknownRecord | null | undefined,
-  latestViewed: UnknownRecord | null | undefined
+  latestViewed: UnknownRecord | null | undefined,
 ) {
-  const prev = (prevViewed && typeof prevViewed === 'object') ? prevViewed : null;
-  const next = (latestViewed && typeof latestViewed === 'object') ? latestViewed : null;
+  const prev = prevViewed && typeof prevViewed === 'object' ? prevViewed : null;
+  const next = latestViewed && typeof latestViewed === 'object' ? latestViewed : null;
   if (!prev || !next) return latestViewed;
 
   if (Array.isArray(next.responses) && Array.isArray(prev.responses)) {
     const prevByQid = new Map<string, ResponseRow>();
     (prev.responses as ResponseRow[]).forEach((row) => {
-      const id = String(row?.questionID || row?.questionId || '').trim().toLowerCase();
+      const id = String(row?.questionID || row?.questionId || '')
+        .trim()
+        .toLowerCase();
       if (id) prevByQid.set(id, row);
     });
     const mergedResponses = (next.responses as ResponseRow[]).map((row) => {
-      const id = String(row?.questionID || row?.questionId || '').trim().toLowerCase();
+      const id = String(row?.questionID || row?.questionId || '')
+        .trim()
+        .toLowerCase();
       const prevResp = id ? prevByQid.get(id) : null;
       let merged = mergeDecryptedViewedResponseField(prevResp, row, 'answer');
       merged = mergeDecryptedViewedResponseField(prevResp, merged as ResponseRow, 'additional');
@@ -121,7 +120,17 @@ export function mergeDecryptedViewedResponse(
 
   let merged = mergeDecryptedViewedResponseField(prev as ResponseRow, next as ResponseRow, 'answer');
   merged = mergeDecryptedViewedResponseField(prev as ResponseRow, merged as ResponseRow, 'additional');
-  merged = mergeDecryptedViewedResponseRating(prev as ResponseRow, merged as ResponseRow, 'importance', 'importanceEncrypted');
-  merged = mergeDecryptedViewedResponseRating(prev as ResponseRow, merged as ResponseRow, 'conviction', 'convictionEncrypted');
+  merged = mergeDecryptedViewedResponseRating(
+    prev as ResponseRow,
+    merged as ResponseRow,
+    'importance',
+    'importanceEncrypted',
+  );
+  merged = mergeDecryptedViewedResponseRating(
+    prev as ResponseRow,
+    merged as ResponseRow,
+    'conviction',
+    'convictionEncrypted',
+  );
   return merged;
 }

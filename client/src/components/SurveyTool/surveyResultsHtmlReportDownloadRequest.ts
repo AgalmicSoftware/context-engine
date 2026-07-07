@@ -7,18 +7,10 @@ import {
   type SessionResultsHtmlSnapshot,
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
-import {
-  buildSurveyResultsHtmlReportReadinessPlan,
-} from './surveyResultsHtmlReportReadiness';
-import {
-  buildSurveyResultsHtmlReportDownloadAttemptPlan,
-} from './surveyResultsHtmlReportDownloadAttempt.js';
-import type {
-  SurveyResultsHtmlReportReadinessPlan,
-} from './surveyResultsHtmlReportReadiness';
-import type {
-  SurveyResultsHtmlReportDownloadAttemptPlan,
-} from './surveyResultsHtmlReportDownloadAttempt.js';
+import { buildSurveyResultsHtmlReportReadinessPlan } from './surveyResultsHtmlReportReadiness';
+import { buildSurveyResultsHtmlReportDownloadAttemptPlan } from './surveyResultsHtmlReportDownloadAttempt.js';
+import type { SurveyResultsHtmlReportReadinessPlan } from './surveyResultsHtmlReportReadiness';
+import type { SurveyResultsHtmlReportDownloadAttemptPlan } from './surveyResultsHtmlReportDownloadAttempt.js';
 
 export type SurveyResultsHtmlReportDownloadKind = 'html' | 'pdf';
 
@@ -45,19 +37,19 @@ type SurveyResultsHtmlReportBlockedDownloadAttemptPlan = Extract<
 
 export type SurveyResultsHtmlReportDownloadExecutionPlan =
   | {
-    blockedReason: SurveyResultsHtmlReportBlockedDownloadAttemptPlan['blockedReason'];
-    downloadRequest: null;
-    readinessPlan: SurveyResultsHtmlReportReadinessPlan;
-    statePatch: SurveyResultsHtmlReportBlockedDownloadAttemptPlan['statePatch'];
-    status: 'blocked';
-  }
+      blockedReason: SurveyResultsHtmlReportBlockedDownloadAttemptPlan['blockedReason'];
+      downloadRequest: null;
+      readinessPlan: SurveyResultsHtmlReportReadinessPlan;
+      statePatch: SurveyResultsHtmlReportBlockedDownloadAttemptPlan['statePatch'];
+      status: 'blocked';
+    }
   | {
-    blockedReason: '';
-    downloadRequest: SurveyResultsHtmlReportDownloadRequest;
-    readinessPlan: SurveyResultsHtmlReportReadinessPlan;
-    statePatch: null;
-    status: 'ready';
-  };
+      blockedReason: '';
+      downloadRequest: SurveyResultsHtmlReportDownloadRequest;
+      readinessPlan: SurveyResultsHtmlReportReadinessPlan;
+      statePatch: null;
+      status: 'ready';
+    };
 
 export const buildSurveyResultsHtmlReportDownloadRequest = ({
   format = SESSION_RESULTS_EXPORT_FORMAT_VIEWER,

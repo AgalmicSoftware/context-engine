@@ -31,7 +31,7 @@ describe('createSbtFormCache helpers', () => {
       JSON.stringify({
         sbtName: 'Alpha',
         sbtDescription: 'Cached draft details',
-      })
+      }),
     );
 
     expect(hasCachedCreateSbtForm()).toBe(true);
@@ -52,9 +52,7 @@ describe('createSbtFormCache helpers', () => {
 
     expect(found).toBe(true);
     expect(sessionStorage.getItem(LEGACY_CREATE_SBT_FORM_CACHE_KEY)).toBeNull();
-    expect(sessionStorage.getItem(getScopedCreateSbtFormCacheKey('edge'))).toBe(
-      JSON.stringify(legacyPayload)
-    );
+    expect(sessionStorage.getItem(getScopedCreateSbtFormCacheKey('edge'))).toBe(JSON.stringify(legacyPayload));
   });
 
   it('leaves a legacy cache entry untouched when its stored session slug targets another session', () => {
@@ -72,9 +70,7 @@ describe('createSbtFormCache helpers', () => {
     });
 
     expect(found).toBe(false);
-    expect(sessionStorage.getItem(LEGACY_CREATE_SBT_FORM_CACHE_KEY)).toBe(
-      JSON.stringify(legacyPayload)
-    );
+    expect(sessionStorage.getItem(LEGACY_CREATE_SBT_FORM_CACHE_KEY)).toBe(JSON.stringify(legacyPayload));
     expect(sessionStorage.getItem(getScopedCreateSbtFormCacheKey('edge'))).toBeNull();
   });
 
@@ -84,7 +80,7 @@ describe('createSbtFormCache helpers', () => {
       JSON.stringify({
         sbtName: 'Alpha',
         tags: ['alpha'],
-      })
+      }),
     );
 
     expect(getScopedCreateSbtFormCacheKey('general')).toBe('dg:createSbtFormCache:');
@@ -95,10 +91,12 @@ describe('createSbtFormCache helpers', () => {
     const scopedKey = getScopedCreateSbtFormCacheKey('edge');
     sessionStorage.setItem(scopedKey, '{bad json');
 
-    expect(hasCachedCreateSbtForm({
-      sessionSlug: 'edge',
-      clearInvalid: true,
-    })).toBe(false);
+    expect(
+      hasCachedCreateSbtForm({
+        sessionSlug: 'edge',
+        clearInvalid: true,
+      }),
+    ).toBe(false);
     expect(sessionStorage.getItem(scopedKey)).toBeNull();
   });
 
@@ -106,40 +104,52 @@ describe('createSbtFormCache helpers', () => {
     const scopedKey = getScopedCreateSbtFormCacheKey('edge');
     sessionStorage.setItem(scopedKey, JSON.stringify('not-a-draft'));
 
-    expect(hasCachedCreateSbtForm({
-      sessionSlug: 'edge',
-      clearInvalid: true,
-    })).toBe(false);
+    expect(
+      hasCachedCreateSbtForm({
+        sessionSlug: 'edge',
+        clearInvalid: true,
+      }),
+    ).toBe(false);
     expect(sessionStorage.getItem(scopedKey)).toBeNull();
   });
 
   it('requires a name plus additional draft data before treating a cache payload as meaningful', () => {
     expect(hasMeaningfulCreateSbtFormPayload({ sbtName: 'Alpha' })).toBe(false);
     expect(hasMeaningfulCreateSbtFormPayload({ tags: ['alpha'] })).toBe(false);
-    expect(hasMeaningfulCreateSbtFormPayload({
-      sbtName: 'Alpha',
-      documentUrl: 'https://example.com/pending-doc.pdf',
-    })).toBe(true);
-    expect(hasMeaningfulCreateSbtFormPayload({
-      sbtName: 'Alpha',
-      documentURLs: ['https://example.com/doc.pdf'],
-    })).toBe(true);
-    expect(hasMeaningfulCreateSbtFormPayload({
-      sbtName: 'Alpha',
-      sbtDistribution: { isLimited: true },
-    })).toBe(true);
-    expect(hasMeaningfulCreateSbtFormPayload({
-      sbtName: 'Alpha',
-      metadataLockGateIds: { description: ['test-gate'] },
-    })).toBe(true);
-    expect(hasMeaningfulCreateSbtFormPayload({
-      sbtName: 'Alpha',
-      sbtDistribution: {
-        distributionOption: 'anyoneCanMint',
-        burnAuth: 'AdminOnly',
-        network: 84532,
-      },
-    })).toBe(false);
+    expect(
+      hasMeaningfulCreateSbtFormPayload({
+        sbtName: 'Alpha',
+        documentUrl: 'https://example.com/pending-doc.pdf',
+      }),
+    ).toBe(true);
+    expect(
+      hasMeaningfulCreateSbtFormPayload({
+        sbtName: 'Alpha',
+        documentURLs: ['https://example.com/doc.pdf'],
+      }),
+    ).toBe(true);
+    expect(
+      hasMeaningfulCreateSbtFormPayload({
+        sbtName: 'Alpha',
+        sbtDistribution: { isLimited: true },
+      }),
+    ).toBe(true);
+    expect(
+      hasMeaningfulCreateSbtFormPayload({
+        sbtName: 'Alpha',
+        metadataLockGateIds: { description: ['test-gate'] },
+      }),
+    ).toBe(true);
+    expect(
+      hasMeaningfulCreateSbtFormPayload({
+        sbtName: 'Alpha',
+        sbtDistribution: {
+          distributionOption: 'anyoneCanMint',
+          burnAuth: 'AdminOnly',
+          network: 84532,
+        },
+      }),
+    ).toBe(false);
     expect(hasMeaningfulCreateSbtFormPayload({})).toBe(false);
   });
 });

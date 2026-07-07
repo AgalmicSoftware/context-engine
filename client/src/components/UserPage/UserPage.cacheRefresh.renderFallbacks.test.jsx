@@ -13,9 +13,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
   setupUserPageCacheRefreshTestLifecycle();
 
   it('wires cache display state into disabled header actions and loading indicators', () => {
-    const toDataUrlSpy = jest
-      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
-      .mockReturnValue('data:image/png;base64,');
+    const toDataUrlSpy = jest.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,');
     try {
       const instance = makeInstance({
         isQuestionCacheReady: false,
@@ -41,15 +39,15 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       const tree = instance.render();
       const analyzeButton = collectTreeNodes(
         tree,
-        (node) => node?.type === 'button' && treeHasText(node, 'Analyze')
+        (node) => node?.type === 'button' && treeHasText(node, 'Analyze'),
       )[0];
       const compareButton = collectTreeNodes(
         tree,
-        (node) => node?.type === 'button' && treeHasText(node, 'Compare')
+        (node) => node?.type === 'button' && treeHasText(node, 'Compare'),
       )[0];
       const loadingIndicators = collectTreeNodes(
         tree,
-        (node) => getNodeTypeName(node) === 'UserPageDeepScanStatusIndicator'
+        (node) => getNodeTypeName(node) === 'UserPageDeepScanStatusIndicator',
       );
 
       expect(analyzeButton.props.disabled).toBe(true);
@@ -66,9 +64,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
   });
 
   it('renders ready empty-cache fallbacks without loading or route drift', () => {
-    const toDataUrlSpy = jest
-      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
-      .mockReturnValue('data:image/png;base64,');
+    const toDataUrlSpy = jest.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,');
     try {
       const instance = makeInstance({
         isQuestionCacheReady: true,
@@ -99,15 +95,15 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       const tree = instance.render();
       const analyzeButton = collectTreeNodes(
         tree,
-        (node) => node?.type === 'button' && treeHasText(node, 'Analyze')
+        (node) => node?.type === 'button' && treeHasText(node, 'Analyze'),
       )[0];
       const compareButton = collectTreeNodes(
         tree,
-        (node) => node?.type === 'button' && treeHasText(node, 'Compare')
+        (node) => node?.type === 'button' && treeHasText(node, 'Compare'),
       )[0];
       const loadingIndicators = collectTreeNodes(
         tree,
-        (node) => getNodeTypeName(node) === 'UserPageDeepScanStatusIndicator'
+        (node) => getNodeTypeName(node) === 'UserPageDeepScanStatusIndicator',
       );
       expect(analyzeButton.props.disabled).toBe(false);
       expect(analyzeButton.props.title).toBeUndefined();
@@ -130,35 +126,35 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       viewAddress,
     });
     const retrySpy = jest.spyOn(instance, 'scheduleResponseGateRetry').mockImplementation(() => {});
-    const toDataUrlSpy = jest
-      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
-      .mockReturnValue('data:image/png;base64,');
+    const toDataUrlSpy = jest.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,');
     try {
       const dataByNamespace = {
         surveysCache: [],
         sbtCache: [],
         userCache: [],
-        questionsCache: [{
-          slug: 'edge',
-          data: {
-            [networkID]: {
-              questions: {
-                q1: {
-                  id: 'q1',
-                  prompt: 'Private prompt',
-                  type: 'freeform',
+        questionsCache: [
+          {
+            slug: 'edge',
+            data: {
+              [networkID]: {
+                questions: {
+                  q1: {
+                    id: 'q1',
+                    prompt: 'Private prompt',
+                    type: 'freeform',
+                  },
                 },
-              },
-              questionResponses: {
-                q1: {
-                  [viewAddress.toLowerCase()]: JSON.stringify({
-                    answer: { value: '*', encrypted: true, encryptionAudience: 'gate' },
-                  }),
+                questionResponses: {
+                  q1: {
+                    [viewAddress.toLowerCase()]: JSON.stringify({
+                      answer: { value: '*', encrypted: true, encryptionAudience: 'gate' },
+                    }),
+                  },
                 },
               },
             },
           },
-        }],
+        ],
       };
 
       instance._dgHasAny = jest.fn(() => true);
@@ -183,7 +179,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       const tree = instance.render();
       const loadingIndicators = collectTreeNodes(
         tree,
-        (node) => getNodeTypeName(node) === 'UserPageDeepScanStatusIndicator'
+        (node) => getNodeTypeName(node) === 'UserPageDeepScanStatusIndicator',
       );
 
       expect(loadingIndicators).toHaveLength(2);
@@ -212,9 +208,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
 
   it('preserves SBT refresh argument order through rendered cache-boundary props', () => {
     const refreshSbtData = jest.fn();
-    const toDataUrlSpy = jest
-      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
-      .mockReturnValue('data:image/png;base64,');
+    const toDataUrlSpy = jest.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,');
     try {
       const instance = makeInstance({ refreshSbtData });
       instance.state = {
@@ -225,23 +219,22 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
         loadingSurveys: false,
         questionCreationInfo: [],
         questionResponseInfo: [],
-        sbtList: [{
-          sbtInfo: {
-            name: 'Cache Boundary Badge',
-            sbtAddress: '0x0000000000000000000000000000000000000abc',
+        sbtList: [
+          {
+            sbtInfo: {
+              name: 'Cache Boundary Badge',
+              sbtAddress: '0x0000000000000000000000000000000000000abc',
+            },
+            slug: 'edge',
           },
-          slug: 'edge',
-        }],
+        ],
         selectedTab: 'questions',
         surveyCreationInfo: [],
         surveyResponseInfo: [],
       };
 
       const tree = instance.render();
-      const sbtCards = collectTreeNodes(
-        tree,
-        (node) => getNodeTypeName(node) === 'SBTPage'
-      );
+      const sbtCards = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'SBTPage');
 
       expect(sbtCards).toHaveLength(1);
       expect(sbtCards[0].props).toMatchObject({
@@ -255,10 +248,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       sbtCards[0].props.refreshSbtData('0x0000000000000000000000000000000000000def');
 
       expect(refreshSbtData).toHaveBeenCalledTimes(1);
-      expect(refreshSbtData).toHaveBeenCalledWith(
-        '0x0000000000000000000000000000000000000def',
-        'edge'
-      );
+      expect(refreshSbtData).toHaveBeenCalledWith('0x0000000000000000000000000000000000000def', 'edge');
     } finally {
       toDataUrlSpy.mockRestore();
     }
@@ -316,14 +306,16 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       showSectionSurveyResponsesOpen: true,
       showSectionSurveysCreatedOpen: true,
       surveyCreationInfo: [],
-      surveyResponseInfo: [{
-        id: 's1',
-        title: 'Survey 1',
-        questionsCount: 1,
-        tags: [],
-        documentURLs: [],
-        slug: 'edge',
-      }],
+      surveyResponseInfo: [
+        {
+          id: 's1',
+          title: 'Survey 1',
+          questionsCount: 1,
+          tags: [],
+          documentURLs: [],
+          slug: 'edge',
+        },
+      ],
       detailedSurveyResponses: { s1: [] },
     };
 
@@ -337,21 +329,25 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     instance._dgHasAny = jest.fn(() => true);
     instance._dgReadAll = jest.fn((name) => {
       if (name === 'userCache') {
-        return [{
-          slug: 'edge',
-          data: {
-            [viewLower]: {
-              [instance.props.network.id]: {
-                data: {
-                  createdSurveys: [{
-                    id: 's100',
-                    data: { title: 'User Cache Survey' },
-                  }],
+        return [
+          {
+            slug: 'edge',
+            data: {
+              [viewLower]: {
+                [instance.props.network.id]: {
+                  data: {
+                    createdSurveys: [
+                      {
+                        id: 's100',
+                        data: { title: 'User Cache Survey' },
+                      },
+                    ],
+                  },
                 },
               },
             },
           },
-        }];
+        ];
       }
       return [];
     });
@@ -364,9 +360,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
   });
 
   it('canonicalizes created survey display links for reserved session aliases', () => {
-    const toDataUrlSpy = jest
-      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
-      .mockReturnValue('data:image/png;base64,');
+    const toDataUrlSpy = jest.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,');
     try {
       const instance = makeInstance();
       instance.state = {
@@ -401,7 +395,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       const tree = instance.render();
       const surveyLinks = collectTreeNodes(
         tree,
-        (node) => node?.type === 'a' && typeof node?.props?.href === 'string' && node.props.href.startsWith('/survey/')
+        (node) => node?.type === 'a' && typeof node?.props?.href === 'string' && node.props.href.startsWith('/survey/'),
       ).map((node) => node.props.href);
 
       expect(surveyLinks).toContain('/survey/survey-debate?session=DEBATE');
@@ -417,9 +411,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     const previousPublicUrl = process.env.PUBLIC_URL;
     process.env.PUBLIC_URL = '/ce';
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
-    const toDataUrlSpy = jest
-      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
-      .mockReturnValue('data:image/png;base64,');
+    const toDataUrlSpy = jest.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,');
     try {
       const viewAddress = '0x00000000000000000000000000000000000000aa';
       const instance = makeInstance({
@@ -459,10 +451,9 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       expect(openSpy).toHaveBeenCalledWith(`/ce/u/${viewAddress}`);
 
       const tree = instance.render();
-      const hrefs = collectTreeNodes(
-        tree,
-        (node) => node?.type === 'a' && typeof node?.props?.href === 'string'
-      ).map((node) => node.props.href);
+      const hrefs = collectTreeNodes(tree, (node) => node?.type === 'a' && typeof node?.props?.href === 'string').map(
+        (node) => node.props.href,
+      );
 
       expect(hrefs).toContain('/ce/bookmarks');
       expect(hrefs).toContain('/ce/survey/survey-debate?session=DEBATE');
@@ -487,37 +478,36 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       surveysCache: [],
       questionsCache: [],
       userCache: [],
-      sbtCache: [{
-        slug: 'edge',
-        data: {
-          '84532': {
-            sbtList: {
-              '0x1000000000000000000000000000000000000001': {
-                sbtAddress: '0x1000000000000000000000000000000000000001',
-                sbtInfo: { unlisted: false },
-                mintedAddresses: [viewLower],
-                burnedAddresses: [],
-              },
-              '0x2000000000000000000000000000000000000002': {
-                sbtAddress: '0x2000000000000000000000000000000000000002',
-                sbtInfo: { unlisted: true },
-                mintedAddresses: [viewLower],
-                burnedAddresses: [],
+      sbtCache: [
+        {
+          slug: 'edge',
+          data: {
+            84532: {
+              sbtList: {
+                '0x1000000000000000000000000000000000000001': {
+                  sbtAddress: '0x1000000000000000000000000000000000000001',
+                  sbtInfo: { unlisted: false },
+                  mintedAddresses: [viewLower],
+                  burnedAddresses: [],
+                },
+                '0x2000000000000000000000000000000000000002': {
+                  sbtAddress: '0x2000000000000000000000000000000000000002',
+                  sbtInfo: { unlisted: true },
+                  mintedAddresses: [viewLower],
+                  burnedAddresses: [],
+                },
               },
             },
           },
         },
-      }],
+      ],
     };
 
     instance._dgHasAny = jest.fn(() => true);
     instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
     instance._refreshAllDataFromCache({ force: true, markLoading: true });
     const tree = instance.render();
-    const [sbtSection] = collectTreeNodes(
-      tree,
-      (node) => getNodeTypeName(node) === 'UserPageSbtSection'
-    );
+    const [sbtSection] = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSbtSection');
 
     expect(sbtSection).toBeTruthy();
     expect(sbtSection.props.sbtEntries).toHaveLength(1);
@@ -534,36 +524,35 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       surveysCache: [],
       questionsCache: [],
       userCache: [],
-      sbtCache: [{
-        slug: 'edge',
-        data: {
-          '84532': {
-            sbtList: {
-              '0x1000000000000000000000000000000000000001': {
-                sbtAddress: '0x1000000000000000000000000000000000000001',
-                sbtInfo: {
-                  name: '',
-                  contractName: 'CE-SBT-12',
-                  nameLocked: true,
-                  unlisted: false,
+      sbtCache: [
+        {
+          slug: 'edge',
+          data: {
+            84532: {
+              sbtList: {
+                '0x1000000000000000000000000000000000000001': {
+                  sbtAddress: '0x1000000000000000000000000000000000000001',
+                  sbtInfo: {
+                    name: '',
+                    contractName: 'CE-SBT-12',
+                    nameLocked: true,
+                    unlisted: false,
+                  },
+                  mintedAddresses: [viewLower],
+                  burnedAddresses: [],
                 },
-                mintedAddresses: [viewLower],
-                burnedAddresses: [],
               },
             },
           },
         },
-      }],
+      ],
     };
 
     instance._dgHasAny = jest.fn(() => true);
     instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
     instance._refreshAllDataFromCache({ force: true, markLoading: true });
     const tree = instance.render();
-    const [sbtSection] = collectTreeNodes(
-      tree,
-      (node) => getNodeTypeName(node) === 'UserPageSbtSection'
-    );
+    const [sbtSection] = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSbtSection');
 
     expect(sbtSection).toBeTruthy();
     expect(sbtSection.props.sbtEntries).toHaveLength(1);
@@ -587,35 +576,33 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       surveyCreationInfo: [{ id: 's1', title: 'Survey 1', questionsCount: 1 }],
     };
 
-    const peekSpy = jest
-      .spyOn(cacheScripts, 'peekCacheSync')
-      .mockImplementation((namespace) => {
-        if (namespace === 'surveysCache') {
-          return {
-            '84532': {
-              surveys: {
-                s1: {
-                  questionIDs: ['q1'],
-                },
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace === 'surveysCache') {
+        return {
+          84532: {
+            surveys: {
+              s1: {
+                questionIDs: ['q1'],
               },
             },
-          };
-        }
-        if (namespace === 'questionsCache') {
-          return {
-            '84532': {
-              questions: {
-                q1: {
-                  id: 'q1',
-                  type: 'freeform',
-                  prompt: 'Question 1',
-                },
+          },
+        };
+      }
+      if (namespace === 'questionsCache') {
+        return {
+          84532: {
+            questions: {
+              q1: {
+                id: 'q1',
+                type: 'freeform',
+                prompt: 'Question 1',
               },
             },
-          };
-        }
-        return {};
-      });
+          },
+        };
+      }
+      return {};
+    });
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     await instance.analyzeUser();

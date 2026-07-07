@@ -31,12 +31,14 @@ describe('surveyResultsLocalStoragePollDecision', () => {
   });
 
   it('forces count rescans when the coarse signature changes or stable cycles hit the cadence', () => {
-    expect(buildSurveyResultsLocalStoragePollCountPlan({
-      forceRescanEvery: 6,
-      previousCoarseSignature: 'old',
-      stableCycles: 1,
-      viewMode: 'questions',
-    }).shouldForceCountRescan).toBe(true);
+    expect(
+      buildSurveyResultsLocalStoragePollCountPlan({
+        forceRescanEvery: 6,
+        previousCoarseSignature: 'old',
+        stableCycles: 1,
+        viewMode: 'questions',
+      }).shouldForceCountRescan,
+    ).toBe(true);
 
     const stablePlan = buildSurveyResultsLocalStoragePollCountPlan({
       forceRescanEvery: 6,
@@ -48,13 +50,15 @@ describe('surveyResultsLocalStoragePollDecision', () => {
   });
 
   it('returns unchanged-signature no-op patch plans', () => {
-    expect(buildSurveyResultsLocalStoragePollPatchPlan({
-      coarseSignature: 'sig',
-      localSurveyResponsesCount: 2,
-      netLatest: 9,
-      newQuestionsCount: 1,
-      previousDetailedSignature: 'sig|1|2|9',
-    })).toEqual({
+    expect(
+      buildSurveyResultsLocalStoragePollPatchPlan({
+        coarseSignature: 'sig',
+        localSurveyResponsesCount: 2,
+        netLatest: 9,
+        newQuestionsCount: 1,
+        previousDetailedSignature: 'sig|1|2|9',
+      }),
+    ).toEqual({
       cachedQuestionsCount: 1,
       cachedSurveyResponsesCount: 2,
       detailedSignature: 'sig|1|2|9',
@@ -64,19 +68,21 @@ describe('surveyResultsLocalStoragePollDecision', () => {
   });
 
   it('builds state patch fields when blocks or counts changed', () => {
-    expect(buildSurveyResultsLocalStoragePollPatchPlan({
-      blockOrRespChanged: true,
-      cachedQuestionsCount: 1,
-      cachedSurveyResponsesCount: 2,
-      coarseSignature: 'sig',
-      localQBlock: 10,
-      localRespBlock: 11,
-      localSBlock: 12,
-      localSurveyResponsesCount: 4,
-      netLatest: 20,
-      newQuestionsCount: 3,
-      previousDetailedSignature: 'previous',
-    })).toEqual({
+    expect(
+      buildSurveyResultsLocalStoragePollPatchPlan({
+        blockOrRespChanged: true,
+        cachedQuestionsCount: 1,
+        cachedSurveyResponsesCount: 2,
+        coarseSignature: 'sig',
+        localQBlock: 10,
+        localRespBlock: 11,
+        localSBlock: 12,
+        localSurveyResponsesCount: 4,
+        netLatest: 20,
+        newQuestionsCount: 3,
+        previousDetailedSignature: 'previous',
+      }),
+    ).toEqual({
       cachedQuestionsCount: 3,
       cachedSurveyResponsesCount: 4,
       detailedSignature: 'sig|3|4|20',

@@ -15,9 +15,8 @@ type CacheIdbEntry = [IDBValidKey, unknown];
 
 const dbPromises = new Map<string, Promise<IDBDatabase>>();
 
-const getStoreIdentity = (store: Partial<CacheIdbStore> = {}): string => (
-  `${String(store.dbName || 'keyval-store')}::${String(store.storeName || 'keyval')}`
-);
+const getStoreIdentity = (store: Partial<CacheIdbStore> = {}): string =>
+  `${String(store.dbName || 'keyval-store')}::${String(store.storeName || 'keyval')}`;
 
 const getStoreShape = (store: Partial<CacheIdbStore> = {}): CacheIdbStore => ({
   dbName: String(store.dbName || 'keyval-store'),
@@ -72,7 +71,7 @@ const getOrOpenDatabase = (store: Partial<CacheIdbStore>): Promise<IDBDatabase> 
 const runTransaction = async <T>(
   store: Partial<CacheIdbStore> | undefined,
   mode: IDBTransactionMode,
-  executeRequest: (objectStore: IDBObjectStore) => IDBRequest<T>
+  executeRequest: (objectStore: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T | undefined> => {
   const normalizedStore = getStoreShape(store);
   const db = await getOrOpenDatabase(normalizedStore);
@@ -93,11 +92,11 @@ const runTransaction = async <T>(
   });
 };
 
-export const createStore = (dbName?: unknown, storeName?: unknown): CacheIdbStore => getStoreShape({ dbName: String(dbName || ''), storeName: String(storeName || '') });
+export const createStore = (dbName?: unknown, storeName?: unknown): CacheIdbStore =>
+  getStoreShape({ dbName: String(dbName || ''), storeName: String(storeName || '') });
 
-export const get = async (key: IDBValidKey, store?: Partial<CacheIdbStore>): Promise<unknown> => (
-  runTransaction(store, 'readonly', (objectStore) => objectStore.get(key))
-);
+export const get = async (key: IDBValidKey, store?: Partial<CacheIdbStore>): Promise<unknown> =>
+  runTransaction(store, 'readonly', (objectStore) => objectStore.get(key));
 
 export const set = async (key: IDBValidKey, value: unknown, store?: Partial<CacheIdbStore>): Promise<void> => {
   await runTransaction(store, 'readwrite', (objectStore) => objectStore.put(value, key));

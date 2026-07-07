@@ -40,10 +40,14 @@ type EthereumRequest = { method: string; params?: unknown[] };
 type Eip1193Provider = UnknownRecord & {
   request: (request: EthereumRequest) => Promise<unknown>;
 };
-type ProviderLike = string | (UnknownRecord & {
-  provider?: unknown;
-  request?: Eip1193Provider['request'];
-}) | null | undefined;
+type ProviderLike =
+  | string
+  | (UnknownRecord & {
+      provider?: unknown;
+      request?: Eip1193Provider['request'];
+    })
+  | null
+  | undefined;
 type ProviderKind = 'wagmi' | 'passkey-eoa' | 'web3auth';
 type ByteInput = Uint8Array | ArrayBuffer | ArrayBufferView | ArrayLike<number>;
 type MaybePromise<T> = T | Promise<T>;
@@ -201,21 +205,19 @@ declare global {
   }
 }
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 const toErrorMessage = (err: unknown, fallback = ''): string => {
   if (isRecord(err) && typeof err.message === 'string') return err.message;
   const message = String(err || '').trim();
   return message || fallback;
 };
-const isPromiseLike = <T>(value: unknown): value is PromiseLike<T> => (
-  !!value && (typeof value === 'object' || typeof value === 'function') &&
-  typeof (value as { then?: unknown }).then === 'function'
-);
-const toOptionalString = (value: unknown): string | undefined => (
-  value === undefined || value === null ? undefined : String(value)
-);
+const isPromiseLike = <T>(value: unknown): value is PromiseLike<T> =>
+  !!value &&
+  (typeof value === 'object' || typeof value === 'function') &&
+  typeof (value as { then?: unknown }).then === 'function';
+const toOptionalString = (value: unknown): string | undefined =>
+  value === undefined || value === null ? undefined : String(value);
 const toUint8Array = (value: unknown): Uint8Array => {
   if (value instanceof Uint8Array) return value;
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
@@ -332,7 +334,7 @@ const logCryptoFallback = (e: unknown) => log.warn('crypto fallback:', e);
 const requireBigInt = () => {
   if (typeof BigInt !== 'function') {
     throw new Error(
-      'BigInt is required for commitments. Use a modern browser: Chrome ≥67, Edge ≥79, Firefox ≥68, Safari/iOS ≥14.'
+      'BigInt is required for commitments. Use a modern browser: Chrome ≥67, Edge ≥79, Firefox ≥68, Safari/iOS ≥14.',
     );
   }
 };
@@ -385,7 +387,9 @@ const base64UrlEncode = (bytesOrStr: string | ByteInput) => {
 };
 
 const base64UrlDecode = (b64url: unknown) => {
-  const s = String(b64url || '').replace(/-/g, '+').replace(/_/g, '/');
+  const s = String(b64url || '')
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
   const pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : '';
   return Buffer.from(s + pad, 'base64');
 };
@@ -395,14 +399,14 @@ const buildGroupPasswordSalt = (sbtAddress: unknown) => {
   const addr = rawAddress && ethers.utils.isAddress(rawAddress) ? ethers.utils.getAddress(rawAddress) : '';
   return ethers.utils.solidityKeccak256(
     ['string', 'address'],
-    ['sbt-group-password-v3', addr || ethers.constants.AddressZero]
+    ['sbt-group-password-v3', addr || ethers.constants.AddressZero],
   );
 };
 
 const deriveGroupPasswordWallet = ({ password, sbtAddress }: GroupPasswordInput) => {
   const pwHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(String(password || '')));
   const salt = buildGroupPasswordSalt(sbtAddress);
-  const seed = ethers.utils.solidityKeccak256(['bytes32','bytes32'], [pwHash, salt]);
+  const seed = ethers.utils.solidityKeccak256(['bytes32', 'bytes32'], [pwHash, salt]);
   const tmpSk = ethers.utils.keccak256(ethers.utils.arrayify(seed));
   return new ethers.Wallet(tmpSk);
 };
@@ -413,12 +417,10 @@ const computeGroupPasswordHash = ({ password, sbtAddress }: GroupPasswordInput) 
   return ethers.utils.solidityKeccak256(['address'], [tmpAddress]);
 };
 
-const resolveGroupPasswordWalletScopeAddress = ({
-  password,
-  sbtAddress,
-  groupPasswordHash
-}: GroupPasswordInput) => {
-  const expectedHash = String(groupPasswordHash || '').trim().toLowerCase();
+const resolveGroupPasswordWalletScopeAddress = ({ password, sbtAddress, groupPasswordHash }: GroupPasswordInput) => {
+  const expectedHash = String(groupPasswordHash || '')
+    .trim()
+    .toLowerCase();
   if (!expectedHash || expectedHash === ethers.constants.HashZero.toLowerCase()) {
     return null;
   }
@@ -451,7 +453,7 @@ const signGroupMintAuthorization = async ({
   password,
   sbtAddress,
   userAddress,
-  walletScopeSbtAddress = sbtAddress
+  walletScopeSbtAddress = sbtAddress,
 }: GroupMintAuthorizationInput) => {
   const tmpWallet = deriveGroupPasswordWallet({ password, sbtAddress: walletScopeSbtAddress });
   const messageHash = computeGroupMintMessageHash(String(sbtAddress || ''), String(userAddress || ''));
@@ -469,15 +471,10 @@ const buildInviteMessageHash = ({ sbtAddress, nonce }: InviteInput) => {
   if (!ethers.utils.isAddress(normalizedSbtAddress)) {
     throw new Error('Invalid sbtAddress passed to buildInviteMessageHash');
   }
-  return ethers.utils.solidityKeccak256(['address','uint256'], [normalizedSbtAddress, nonce]);
+  return ethers.utils.solidityKeccak256(['address', 'uint256'], [normalizedSbtAddress, nonce]);
 };
 
-const signInvite = async ({
-  password,
-  sbtAddress,
-  nonce,
-  walletScopeSbtAddress = sbtAddress
-}: InviteInput) => {
+const signInvite = async ({ password, sbtAddress, nonce, walletScopeSbtAddress = sbtAddress }: InviteInput) => {
   const tmpWallet = deriveGroupPasswordWallet({ password, sbtAddress: walletScopeSbtAddress });
   const messageHash = buildInviteMessageHash({ sbtAddress, nonce });
   const signature = await tmpWallet.signMessage(ethers.utils.arrayify(messageHash));
@@ -508,7 +505,7 @@ const decodeInvite = (inviteCode: unknown) => {
     if (parsedRecord.c !== undefined && parsedRecord.c !== null) return null; // legacy chain-bound invites are not supported
     return {
       nonce: typeof nonce === 'string' ? nonce : String(nonce),
-      signature
+      signature,
     };
   } catch (e) {
     logCryptoFallback(e);
@@ -527,7 +524,6 @@ const generateInviteNonce = () => {
   const hex = ethers.utils.hexlify(bytes);
   return ethers.BigNumber.from(hex).toString();
 };
-
 
 const normalizeGroupPasswordInput = (raw: unknown) => {
   const trimmed = String(raw || '').trim();
@@ -593,16 +589,12 @@ const verifyInviteSignature = ({
 /**
  * AES-GCM with AAD (additional authenticated data).
  */
-const aesGcmEncrypt = async (
-  key: CryptoKey,
-  plaintextBytes: BufferSource,
-  { aadBytes }: AesGcmOptions = {}
-) => {
+const aesGcmEncrypt = async (key: CryptoKey, plaintextBytes: BufferSource, { aadBytes }: AesGcmOptions = {}) => {
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = await window.crypto.subtle.encrypt(
     { name: 'AES-GCM', iv, ...(aadBytes ? { additionalData: aadBytes } : {}) },
     key,
-    plaintextBytes
+    plaintextBytes,
   );
   return { iv, ciphertext: new Uint8Array(ciphertext) };
 };
@@ -611,12 +603,12 @@ const aesGcmDecrypt = async (
   key: CryptoKey,
   iv: BufferSource,
   ciphertextBytes: BufferSource,
-  { aadBytes }: AesGcmOptions = {}
+  { aadBytes }: AesGcmOptions = {},
 ) => {
   const plaintext = await window.crypto.subtle.decrypt(
     { name: 'AES-GCM', iv, ...(aadBytes ? { additionalData: aadBytes } : {}) },
     key,
-    ciphertextBytes
+    ciphertextBytes,
   );
   return new Uint8Array(plaintext);
 };
@@ -638,11 +630,10 @@ const getProviderKind = (providerLike: ProviderLike): ProviderKind => {
       return 'wagmi';
     }
     const providerRecord = isRecord(providerLike) ? providerLike : null;
-    const p = (
-      (providerRecord && providerRecord.provider) ||
+    const p = ((providerRecord && providerRecord.provider) ||
       providerLike ||
-      (typeof window !== 'undefined' ? window.ethereum : null)
-    ) as (UnknownRecord & { provider?: UnknownRecord }) | null;
+      (typeof window !== 'undefined' ? window.ethereum : null)) as
+      (UnknownRecord & { provider?: UnknownRecord }) | null;
 
     // Check for the embedded passkey provider first (must come before other checks).
     if (p && p.isPasskeyEoa === true) {
@@ -656,7 +647,9 @@ const getProviderKind = (providerLike: ProviderLike): ProviderKind => {
         p._isWeb3Auth === true ||
         (isRecord(p.session) && (p.session.userInfo || p.session.sessionToken)) ||
         (isRecord(p.provider) && p.provider.isWeb3Auth === true) ||
-        String(p?.constructor?.name || '').toLowerCase().includes('web3auth'))
+        String(p?.constructor?.name || '')
+          .toLowerCase()
+          .includes('web3auth'))
     ) {
       return 'web3auth';
     }
@@ -702,7 +695,11 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
             : null;
         if (globalBuildPasskeyProvider) {
           const passkeyProvider = globalBuildPasskeyProvider();
-          if (passkeyProvider && passkeyProvider.isPasskeyEoa === true && typeof passkeyProvider.request === 'function') {
+          if (
+            passkeyProvider &&
+            passkeyProvider.isPasskeyEoa === true &&
+            typeof passkeyProvider.request === 'function'
+          ) {
             if (typeof window !== 'undefined') {
               window.__passkeyEoaProvider = passkeyProvider;
             }
@@ -713,11 +710,8 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
         // eslint-disable-next-line global-require
         const walletModule = require('../../wallet/passkeyWallet.js');
         const buildPasskeyProvider =
-          walletModule?.createPasskeyEip1193Provider ||
-          walletModule?.default?.createPasskeyEip1193Provider;
-        const passkeyProvider = typeof buildPasskeyProvider === 'function'
-          ? buildPasskeyProvider()
-          : null;
+          walletModule?.createPasskeyEip1193Provider || walletModule?.default?.createPasskeyEip1193Provider;
+        const passkeyProvider = typeof buildPasskeyProvider === 'function' ? buildPasskeyProvider() : null;
         if (passkeyProvider && passkeyProvider.isPasskeyEoa === true && typeof passkeyProvider.request === 'function') {
           if (typeof window !== 'undefined') {
             window.__passkeyEoaProvider = passkeyProvider;
@@ -753,7 +747,7 @@ const buildEip712KeyWrap = (
   account: string,
   chainId: ChainIdInput,
   contextHex: string,
-  nonce: string | number | null = null
+  nonce: string | number | null = null,
 ) => {
   const checksummedAccount = utils.getAddress(account);
   const keyDerivationTypes: Array<{ name: string; type: string }> = [
@@ -803,13 +797,17 @@ const buildEip712KeyWrap = (
  */
 const _resolveFromAndChainId = async (
   providerLike: ProviderLike,
-  opts: { account?: unknown; chainId?: ChainIdInput } = {}
+  opts: { account?: unknown; chainId?: ChainIdInput } = {},
 ) => {
   const p = _getProvider(providerLike);
 
   const isValidHexAddr = (s: unknown): s is string => typeof s === 'string' && /^0x[0-9a-fA-F]{40}$/.test(s);
   const toChecksum = (addr: string) => {
-    try { return utils.getAddress(addr); } catch (_) { return addr; }
+    try {
+      return utils.getAddress(addr);
+    } catch (_) {
+      return addr;
+    }
   };
   const normalizeChain = (id: unknown): number | null => {
     if (typeof id === 'number' && Number.isFinite(id)) return id;
@@ -858,19 +856,13 @@ const _resolveFromAndChainId = async (
   return { from, chainId: chainIdNum, provider: p };
 };
 
-
 /**
  * Hardened EIP-712 v4 signer.
  * Call shapes supported:
  *   1) signEip712V4(provider, typedData, opts?)
  *   2) signEip712V4(provider, fromAddress, typedData, opts?)
  */
-const signEip712V4 = async (
-  providerLike: ProviderLike,
-  a: unknown,
-  b?: unknown,
-  c?: unknown
-): Promise<string> => {
+const signEip712V4 = async (providerLike: ProviderLike, a: unknown, b?: unknown, c?: unknown): Promise<string> => {
   let suppliedFrom: string | null = null;
   let typedData: unknown = null;
   let opts: CryptoDecryptOptions = {};
@@ -879,22 +871,26 @@ const signEip712V4 = async (
     // (provider, from, typedData, opts?)
     suppliedFrom = a;
     typedData = b;
-    opts = isRecord(c) ? c as CryptoDecryptOptions : {};
+    opts = isRecord(c) ? (c as CryptoDecryptOptions) : {};
   } else {
     // (provider, typedData, opts?)
     typedData = a;
-    opts = isRecord(b) ? b as CryptoDecryptOptions : {};
+    opts = isRecord(b) ? (b as CryptoDecryptOptions) : {};
   }
 
   const { from, chainId, provider } = await _resolveFromAndChainId(providerLike, {
     account: suppliedFrom || opts.account,
-    chainId: opts.chainId
+    chainId: opts.chainId,
   });
 
   // Ensure domain.chainId is numeric (MetaMask requires number here)
   let td = typedData;
   if (typeof td === 'string') {
-    try { td = JSON.parse(td); } catch { /* leave as string */ }
+    try {
+      td = JSON.parse(td);
+    } catch {
+      /* leave as string */
+    }
   }
   if (td && typeof td === 'object') {
     const tdRecord = td as UnknownRecord & { domain?: UnknownRecord };
@@ -902,7 +898,7 @@ const signEip712V4 = async (
     const valid = typeof tdRecord.domain.chainId === 'number' && Number.isFinite(tdRecord.domain.chainId);
     if (!valid) tdRecord.domain.chainId = chainId;
   }
-  const payload = (typeof td === 'string') ? td : JSON.stringify(td);
+  const payload = typeof td === 'string' ? td : JSON.stringify(td);
 
   try {
     const signature = await provider.request({
@@ -918,8 +914,6 @@ const signEip712V4 = async (
     throw e;
   }
 };
-
-
 
 /* -------------------------- Context & AAD -------------------------------- */
 
@@ -953,14 +947,16 @@ const buildAAD = ({ contextHex, chainId, surveyId, qId, fieldKey }: SurveyContex
  * - Otherwise → keccak256(toUtf8Bytes(identifier)) via utils.id.
  */
 const hashIdentifier = (identifier: unknown) => {
-  const s = (identifier === null || identifier === undefined) ? '' : String(identifier);
+  const s = identifier === null || identifier === undefined ? '' : String(identifier);
 
   // Accept exact 32-byte hex inputs as-is (normalized to lowercase)
   try {
     if (utils.isHexString(s, 32)) {
       return s.toLowerCase();
     }
-  } catch (_) { /* fall through to hashing */ }
+  } catch (_) {
+    /* fall through to hashing */
+  }
 
   // Empty/null → bytes32 zero
   if (s.trim() === '') {
@@ -990,7 +986,7 @@ const encodeFreeform = (value: unknown) => utf8e(value == null ? '' : String(val
 const encodeBinary = (value: unknown) => {
   const map: Record<string, number> = { Disagree: 0, Unsure: 1, Agree: 2 };
   const raw = String(value);
-  const v = map[raw] ?? (map[raw.charAt(0).toUpperCase() + raw.slice(1)] ?? 1);
+  const v = map[raw] ?? map[raw.charAt(0).toUpperCase() + raw.slice(1)] ?? 1;
   return new Uint8Array([v & 0xff]);
 };
 
@@ -1012,17 +1008,13 @@ const encodeMultichoiceBitset = (valueArr: unknown, options: unknown[]) => {
     if (chosen.has(String(opts[i]))) {
       const byteIdx = Math.floor(i / 8);
       const bitIdx = i % 8;
-      bytes[byteIdx] |= (1 << bitIdx);
+      bytes[byteIdx] |= 1 << bitIdx;
     }
   }
   return bytes;
 };
 
-const encodeValueBytes = (
-  kind: unknown,
-  value: unknown,
-  { options = [] }: { options?: unknown[] } = {}
-) => {
+const encodeValueBytes = (kind: unknown, value: unknown, { options = [] }: { options?: unknown[] } = {}) => {
   switch (kind) {
     case 'binary':
       return encodeBinary(value);
@@ -1043,8 +1035,7 @@ const encodeValueBytes = (
  * - If a real Poseidon is available (e.g., window.poseidon from circomlibjs), we use it.
  * - Otherwise the caller must provide a hasher, or Poseidon commitments are unavailable.
  */
-const BN254_P =
-  BigInt('21888242871839275222246405745257275088548364400416034343698204186575808495617');
+const BN254_P = BigInt('21888242871839275222246405745257275088548364400416034343698204186575808495617');
 
 const toField = (bytes: Uint8Array) => {
   // Reduce bytes mod p to a field element.
@@ -1066,43 +1057,42 @@ const normalizePoseidonHashOutput = (out: PoseidonHashValue) => bigIntToHex32(Bi
 
 const poseidonHashBytes = (
   parts: Uint8Array[],
-  customHasher: PoseidonHasher | null = null
+  customHasher: PoseidonHasher | null = null,
 ): string | Promise<string> => {
-    requireBigInt();
-    const inputs = parts.map((b) => toField(b));
+  requireBigInt();
+  const inputs = parts.map((b) => toField(b));
 
-    // 1. Dependency Injection (Highest Priority)
-    // Allows caller to provide a ZK-compatible implementation (e.g. poseidon-lite)
-    if (customHasher && typeof customHasher === 'function') {
-      try {
+  // 1. Dependency Injection (Highest Priority)
+  // Allows caller to provide a ZK-compatible implementation (e.g. poseidon-lite)
+  if (customHasher && typeof customHasher === 'function') {
+    try {
       const out = customHasher(inputs);
       if (isPromiseLike<PoseidonHashValue>(out)) {
         return out.then((value) => normalizePoseidonHashOutput(value));
       }
-        return normalizePoseidonHashOutput(out);
-      } catch (e) {
-        logCryptoFallback(e);
-        // Fall through if custom hasher fails
-      }
-    }
-
-    try {
-      const poseidon =
-        (typeof window !== 'undefined' && (window.poseidon || window.poseidon1 || window.Poseidon)) || null;
-      if (poseidon && typeof poseidon === 'function') {
-        const out = poseidon(inputs); // expected BigInt
-        if (isPromiseLike<PoseidonHashValue>(out)) {
-          return out.then((value) => normalizePoseidonHashOutput(value));
-        }
-        return normalizePoseidonHashOutput(out);
-      }
+      return normalizePoseidonHashOutput(out);
     } catch (e) {
       logCryptoFallback(e);
-      // fall through to required-hasher error
+      // Fall through if custom hasher fails
     }
-    throw new Error('Poseidon hasher required but not available');
-};
+  }
 
+  try {
+    const poseidon =
+      (typeof window !== 'undefined' && (window.poseidon || window.poseidon1 || window.Poseidon)) || null;
+    if (poseidon && typeof poseidon === 'function') {
+      const out = poseidon(inputs); // expected BigInt
+      if (isPromiseLike<PoseidonHashValue>(out)) {
+        return out.then((value) => normalizePoseidonHashOutput(value));
+      }
+      return normalizePoseidonHashOutput(out);
+    }
+  } catch (e) {
+    logCryptoFallback(e);
+    // fall through to required-hasher error
+  }
+  throw new Error('Poseidon hasher required but not available');
+};
 
 /**
  * Attach top-level `poseidon` to a field ONLY when non-empty.
@@ -1125,14 +1115,16 @@ async function addTopLevelPoseidonIfRequired(
     kind?: unknown;
     optionsForKind?: unknown[];
     hasher?: PoseidonHasher | null;
-  } = {}
+  } = {},
 ) {
   try {
     if (!field || typeof field !== 'object') return;
 
     // Always start from a clean slate: omit poseidon unless we positively add it below.
     if (Object.prototype.hasOwnProperty.call(field, 'poseidon')) {
-      try { delete field.poseidon; } catch (_) {}
+      try {
+        delete field.poseidon;
+      } catch (_) {}
     }
 
     const { qId, kind: rawKind, chainId, surveyId, optionsForKind, hasher } = ctx;
@@ -1140,16 +1132,12 @@ async function addTopLevelPoseidonIfRequired(
     const v = field.value;
 
     /* ---------- Encrypted masked case: copy salted commitment from envelope ---------- */
-    const hasMaskedEncrypted =
-      v === '*' && !!field.encryptedPortion; // treat '*' + envelope as non-empty (even if encrypted=true/false flags vary)
+    const hasMaskedEncrypted = v === '*' && !!field.encryptedPortion; // treat '*' + envelope as non-empty (even if encrypted=true/false flags vary)
 
     if (hasMaskedEncrypted) {
       let env: UnknownRecord | null = null;
       try {
-        env =
-          typeof field.encryptedPortion === 'string'
-            ? JSON.parse(field.encryptedPortion)
-            : field.encryptedPortion;
+        env = typeof field.encryptedPortion === 'string' ? JSON.parse(field.encryptedPortion) : field.encryptedPortion;
       } catch (e) {
         logCryptoFallback(e);
         env = null;
@@ -1170,24 +1158,24 @@ async function addTopLevelPoseidonIfRequired(
     } else if (kind === 'binary') {
       nonEmpty = v === 'Agree' || v === 'Unsure' || v === 'Disagree';
     } else if (kind === 'rating') {
-      const hasRatingValue = typeof v === 'string'
-        ? v.trim().length > 0
-        : v !== null && v !== undefined;
+      const hasRatingValue = typeof v === 'string' ? v.trim().length > 0 : v !== null && v !== undefined;
       const n = hasRatingValue ? Number(v) : NaN;
       nonEmpty = Number.isFinite(n);
     } else if (kind === 'multichoice') {
       nonEmpty = Array.isArray(v) && v.length > 0;
     } else {
       // Fallback: be conservative — only obvious non-empties
-      nonEmpty = typeof v === 'string' ? v.trim().length > 0 : (Array.isArray(v) ? v.length > 0 : v != null);
+      nonEmpty = typeof v === 'string' ? v.trim().length > 0 : Array.isArray(v) ? v.length > 0 : v != null;
     }
 
     if (!nonEmpty) return; // empty → omit top-level poseidon
 
     // Required canonicalization + domain sep helpers (already present in this module per context)
-    if (typeof encodeValueBytes !== 'function' ||
-        typeof buildCommitDomainBytes !== 'function' ||
-        typeof poseidonHashBytes !== 'function') {
+    if (
+      typeof encodeValueBytes !== 'function' ||
+      typeof buildCommitDomainBytes !== 'function' ||
+      typeof poseidonHashBytes !== 'function'
+    ) {
       // Missing primitives — do not block submission; just skip surfacing.
       return;
     }
@@ -1209,7 +1197,6 @@ async function addTopLevelPoseidonIfRequired(
     // Best-effort only; never throw from serialization path.
   }
 }
-
 
 /**
  * Build domain separation bytes for commitments.
@@ -1296,7 +1283,7 @@ const deriveKekFromSig = async (signatureHex: string, contextBytes: BufferSource
     hkdfKey,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['encrypt', 'decrypt']
+    ['encrypt', 'decrypt'],
   );
   return kek;
 };
@@ -1335,7 +1322,7 @@ const wrapCekWithSelfRecipient = async ({
   const cipher = await window.crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: wrap_iv, additionalData: contextBytes },
     kek,
-    cekRaw
+    cekRaw,
   );
   return {
     type: 'self-eip712-v1',
@@ -1348,7 +1335,7 @@ const wrapCekWithSelfRecipient = async ({
 
 const maybeAddOneLitRecipient = async (
   cekRaw: Uint8Array,
-  litOpts?: LitOptions | null
+  litOpts?: LitOptions | null,
 ): Promise<{ type: 'lit-sbt-v1'; lit: UnknownRecord } | null> => {
   if (!isObj(litOpts) || typeof litOpts.saveKey !== 'function') return null;
   const saveKey = litOpts.saveKey as (key: Uint8Array, opts?: UnknownRecord) => Promise<unknown> | unknown;
@@ -1373,7 +1360,7 @@ const maybeAddOneLitRecipient = async (
       providerLike: litOpts.providerLike,
       resourceAbilityRequests: litOpts.resourceAbilityRequests,
     });
-    result = isRecord(rawResult) ? rawResult as LitSaveKeyResult : {};
+    result = isRecord(rawResult) ? (rawResult as LitSaveKeyResult) : {};
   } catch (err) {
     if (typeof console !== 'undefined') {
       log.error('[lit][recipient] saveKey failed', {
@@ -1388,9 +1375,7 @@ const maybeAddOneLitRecipient = async (
     log.info('[lit][recipient] saveKey ok', {
       litNetwork: litOpts.litNetwork || null,
       chain: litOpts.chain || null,
-      mode: result?.encryptedSymmetricKey
-        ? 'encryptedSymmetricKey'
-        : (result?.ciphertext ? 'ciphertext' : 'unknown'),
+      mode: result?.encryptedSymmetricKey ? 'encryptedSymmetricKey' : result?.ciphertext ? 'ciphertext' : 'unknown',
     });
   }
 
@@ -1432,13 +1417,9 @@ const maybeAddOneLitRecipient = async (
 const maybeAddLitRecipients = async (cekRaw: Uint8Array, litOpts?: LitOptions | null) => {
   if (!isObj(litOpts)) return [];
 
-  const configuredRecipients = Array.isArray(litOpts.recipients)
-    ? litOpts.recipients.filter(Boolean)
-    : [];
+  const configuredRecipients = Array.isArray(litOpts.recipients) ? litOpts.recipients.filter(Boolean) : [];
 
-  const recipientSpecs = configuredRecipients.length
-    ? configuredRecipients
-    : [litOpts];
+  const recipientSpecs = configuredRecipients.length ? configuredRecipients : [litOpts];
 
   const out: Array<{ type: 'lit-sbt-v1'; lit: UnknownRecord }> = [];
   const dedupe = new Set();
@@ -1522,10 +1503,7 @@ const parseEnvelope = (jsonStr: string): Envelope => {
   if (!ctBytes || ctBytes.length === 0) throw new Error('Envelope ciphertext is empty after decode.');
   for (const r of env.recipients) {
     if (!r || !r.type) throw new Error('Envelope recipient missing type.');
-    if (
-      r.type === 'lit-sbt-v1' &&
-      (!r.lit || (!r.lit.ciphertext && !r.lit.encryptedSymmetricKey))
-    ) {
+    if (r.type === 'lit-sbt-v1' && (!r.lit || (!r.lit.ciphertext && !r.lit.encryptedSymmetricKey))) {
       throw new Error('Lit recipient missing ciphertext or encryptedSymmetricKey.');
     }
     if (r.type === 'self-eip712-v1' && (!r.wrap_iv || !r.wrapped_cek)) {
@@ -1545,11 +1523,15 @@ const normalizeBindingValue = (value: unknown) => safeLower(value == null ? '' :
 
 const validateEnvelopeBinding = (
   env: Envelope,
-  { expectedSurveyId, expectedQId, expectedFieldKey }: {
+  {
+    expectedSurveyId,
+    expectedQId,
+    expectedFieldKey,
+  }: {
     expectedSurveyId?: unknown;
     expectedQId?: unknown;
     expectedFieldKey?: unknown;
-  } = {}
+  } = {},
 ) => {
   if (!env || !isObj(env.aad)) return;
 
@@ -1635,8 +1617,8 @@ const encryptField = async ({
   // Plaintext package (salt kept ONLY here)
   const plaintextObj = {
     v: 1,
-    value,          // exact JS value (string | number | array)
-    kind,           // freeform | binary | rating | multichoice | additional (freeform)
+    value, // exact JS value (string | number | array)
+    kind, // freeform | binary | rating | multichoice | additional (freeform)
     salt: commits.saltHex, // keep inside CEK-encrypted payload only
   };
   const plaintextBytes = utf8e(JSON.stringify(plaintextObj));
@@ -1769,12 +1751,11 @@ const unwrapCekFromRecipients = async ({
 const DECRYPT_ENVELOPE_CACHE_MAX = 1500;
 const DECRYPT_ENVELOPE_FAIL_TTL_MS = 3000;
 const DECRYPT_ENVELOPE_SUCCESS_TTL_MS = 1000 * 60 * 10;
-const _decryptEnvelopeCache = new Map<string, DecryptCacheEntry>();   // key -> { ok, ts, value? , errMsg? }
+const _decryptEnvelopeCache = new Map<string, DecryptCacheEntry>(); // key -> { ok, ts, value? , errMsg? }
 const _decryptEnvelopeInFlight = new Map<string, Promise<DecryptEnvelopeResult>>(); // key -> Promise<{ value, kind, zkSalt }>
 
-const normalizeEnvelopeJsonToString = (envelopeJson: unknown) => (
-  typeof envelopeJson === 'string' ? envelopeJson : JSON.stringify(envelopeJson || {})
-);
+const normalizeEnvelopeJsonToString = (envelopeJson: unknown) =>
+  typeof envelopeJson === 'string' ? envelopeJson : JSON.stringify(envelopeJson || {});
 
 const hashEnvelopeJson = (jsonStr: unknown) => {
   try {
@@ -1820,13 +1801,24 @@ const buildDecryptEnvelopeCacheKey = ({
   litOpts?: LitOptions;
   preferLitRecipients?: boolean;
 }) => {
-  const acct = String(account || '').trim().toLowerCase() || '<anon>';
+  const acct =
+    String(account || '')
+      .trim()
+      .toLowerCase() || '<anon>';
   const ch = String(chainId ?? '');
   const providerKind = getProviderKind(providerLike);
   const litReady = !!(litOpts && typeof litOpts.getKey === 'function');
   const litNet = litOpts && litOpts.litNetwork ? String(litOpts.litNetwork) : '';
   const envHash = hashEnvelopeJson(jsonStr);
-  return [acct, ch, providerKind, litReady ? 'lit' : 'no-lit', litNet, preferLitRecipients ? 'lit-first' : 'self-first', envHash].join('|');
+  return [
+    acct,
+    ch,
+    providerKind,
+    litReady ? 'lit' : 'no-lit',
+    litNet,
+    preferLitRecipients ? 'lit-first' : 'self-first',
+    envHash,
+  ].join('|');
 };
 
 const decryptEnvelopeToValue = async ({
@@ -1867,14 +1859,14 @@ const decryptEnvelopeToValue = async ({
   if (cached) {
     const ts = Number(cached.ts || 0);
     if (cached.ok) {
-      if (cached.value && ts && (Date.now() - ts) < DECRYPT_ENVELOPE_SUCCESS_TTL_MS) {
+      if (cached.value && ts && Date.now() - ts < DECRYPT_ENVELOPE_SUCCESS_TTL_MS) {
         perfDebugDecryptEnvelope('cache_hit');
         return { ...(cached.value || {}) };
       }
       _decryptEnvelopeCache.delete(cacheKey);
     }
     if (!cached.ok) {
-      if (ts && (Date.now() - ts) < DECRYPT_ENVELOPE_FAIL_TTL_MS) {
+      if (ts && Date.now() - ts < DECRYPT_ENVELOPE_FAIL_TTL_MS) {
         perfDebugDecryptEnvelope('error');
         throw new Error(cached.errMsg || 'Decryption failed.');
       }
@@ -1948,18 +1940,16 @@ const decryptEnvelopeToValue = async ({
 const encryptMultipleAnswers = async (
   surveyState: CryptoAnswerSlice = {},
   optsOrPubKey?: unknown,
-  extraOpts?: CryptoEncryptOptions
+  extraOpts?: CryptoEncryptOptions,
 ): Promise<CryptoAnswerOutput> => {
-  const opts = (
-    isRecord(optsOrPubKey) ? optsOrPubKey as CryptoEncryptOptions : extraOpts
-  ) || {};
+  const opts = (isRecord(optsOrPubKey) ? (optsOrPubKey as CryptoEncryptOptions) : extraOpts) || {};
   const providerKind = opts.providerKind || 'wagmi';
   const providerLike = (opts.provider || providerKind) as ProviderLike; // match decryptMultipleAnswers pattern
   const account = toOptionalString(opts.account);
   const chainId = opts.chainId;
   const surveyId = toOptionalString(opts.surveyId) || utils.hexZeroPad('0x0', 32);
   const onlySet = Array.isArray(opts.onlyTheseQids) ? new Set(opts.onlyTheseQids.map(String)) : null;
-  const questionPool = Array.isArray(opts.questionPool) ? opts.questionPool as QuestionLike[] : undefined;
+  const questionPool = Array.isArray(opts.questionPool) ? (opts.questionPool as QuestionLike[]) : undefined;
   const litOpts = isObj(opts.lit) ? opts.lit : undefined;
   const hasher = (opts.hasher || opts.poseidon || null) as PoseidonHasher | null;
 
@@ -1972,7 +1962,7 @@ const encryptMultipleAnswers = async (
   const handleOne = async (
     qId: string,
     fieldKind: 'answer' | 'additional',
-    fieldObj?: CryptoFieldEntry
+    fieldObj?: CryptoFieldEntry,
   ): Promise<CryptoFieldEntry | undefined> => {
     if (!fieldObj || fieldObj.value === '*' || fieldObj.encrypted !== true) return;
     if (onlySet && !onlySet.has(String(qId))) return;
@@ -2029,7 +2019,7 @@ const decryptMultipleAnswers = async (
   questionPool: QuestionLike[] = [],
   a?: unknown,
   b?: unknown,
-  c: CryptoDecryptOptions = {}
+  c: CryptoDecryptOptions = {},
 ): Promise<CryptoAnswerOutput> => {
   let account: string | undefined;
   let providerKind: ProviderLike;
@@ -2060,7 +2050,7 @@ const decryptMultipleAnswers = async (
   const tryField = async (
     qId: string,
     fieldKey: 'answer' | 'additional',
-    fieldObj?: CryptoFieldEntry
+    fieldObj?: CryptoFieldEntry,
   ): Promise<CryptoFieldEntry | null> => {
     if (!fieldObj || fieldObj.value !== '*') return null;
     if (!fieldObj.encryptedPortion) {
@@ -2117,7 +2107,6 @@ const decryptMultipleAnswers = async (
   return out;
 };
 
-
 /**
  * Decrypt a single field. Supports BOTH old and new call shapes:
  *   old: decryptSingleField(slice, qId, fieldToDecrypt, account, providerKind, opts)
@@ -2129,7 +2118,7 @@ const decryptSingleField = async (
   fieldToDecrypt: 'answer' | 'additional' | 'both',
   a?: unknown,
   b?: unknown,
-  c: CryptoDecryptOptions = {}
+  c: CryptoDecryptOptions = {},
 ): Promise<CryptoAnswerOutput> => {
   let account: string | undefined;
   let providerKind: ProviderLike;
@@ -2155,14 +2144,9 @@ const decryptSingleField = async (
   const out: CryptoAnswerOutput = { answers: {}, additionalComments: {}, importance: {} };
   let firstErr: Error | null = null;
 
-  const workAnswer =
-    fieldToDecrypt === 'answer' || fieldToDecrypt === 'both'
-      ? slice?.answers?.[qId]
-      : null;
+  const workAnswer = fieldToDecrypt === 'answer' || fieldToDecrypt === 'both' ? slice?.answers?.[qId] : null;
   const workAdditional =
-    fieldToDecrypt === 'additional' || fieldToDecrypt === 'both'
-      ? slice?.additionalComments?.[qId]
-      : null;
+    fieldToDecrypt === 'additional' || fieldToDecrypt === 'both' ? slice?.additionalComments?.[qId] : null;
 
   if (workAnswer && workAnswer.value === '*' && !workAnswer.encryptedPortion && throwOnError) {
     firstErr = firstErr || new Error(`Encrypted payload missing for answer (${String(qId)}).`);
@@ -2209,7 +2193,12 @@ const decryptSingleField = async (
     }
   }
 
-  if (throwOnError && firstErr && Object.keys(out.answers).length === 0 && Object.keys(out.additionalComments).length === 0) {
+  if (
+    throwOnError &&
+    firstErr &&
+    Object.keys(out.answers).length === 0 &&
+    Object.keys(out.additionalComments).length === 0
+  ) {
     throw firstErr;
   }
 
@@ -2228,13 +2217,7 @@ const encryptWithPassword = async (data: unknown, password: string) => {
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const passwordBytes = enc.encode(password);
 
-  const keyMaterial = await window.crypto.subtle.importKey(
-    'raw',
-    passwordBytes,
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  );
+  const keyMaterial = await window.crypto.subtle.importKey('raw', passwordBytes, 'PBKDF2', false, ['deriveKey']);
 
   const key = await window.crypto.subtle.deriveKey(
     {
@@ -2246,15 +2229,11 @@ const encryptWithPassword = async (data: unknown, password: string) => {
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['encrypt']
+    ['encrypt'],
   );
 
   const plaintext = enc.encode(JSON.stringify(data));
-  const ciphertext = await window.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv },
-    key,
-    plaintext
-  );
+  const ciphertext = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, plaintext);
 
   const output = {
     iv: Buffer.from(iv).toString('base64'),
@@ -2294,13 +2273,7 @@ const decryptWithPassword = async (encryptedData: string | UnknownRecord, passwo
   const enc = new TextEncoder();
   const passwordBytes = enc.encode(password);
 
-  const keyMaterial = await window.crypto.subtle.importKey(
-    'raw',
-    passwordBytes,
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  );
+  const keyMaterial = await window.crypto.subtle.importKey('raw', passwordBytes, 'PBKDF2', false, ['deriveKey']);
 
   const key = await window.crypto.subtle.deriveKey(
     {
@@ -2312,15 +2285,11 @@ const decryptWithPassword = async (encryptedData: string | UnknownRecord, passwo
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['decrypt']
+    ['decrypt'],
   );
 
   try {
-    const decrypted = await window.crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: iv },
-      key,
-      ciphertext
-    );
+    const decrypted = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, ciphertext);
     const dec = new TextDecoder();
     return JSON.parse(dec.decode(decrypted));
   } catch (e) {
@@ -2333,8 +2302,7 @@ const decryptWithPassword = async (encryptedData: string | UnknownRecord, passwo
  * Useful for non-survey payloads (e.g., group-level secrets).
  */
 const decryptEnvelopeValue = async (envelopeJson: unknown, opts: CryptoDecryptOptions = {}) => {
-  const jsonStr =
-    typeof envelopeJson === 'string' ? envelopeJson : JSON.stringify(envelopeJson || {});
+  const jsonStr = typeof envelopeJson === 'string' ? envelopeJson : JSON.stringify(envelopeJson || {});
   const { account, chainId, providerLike, litOpts, preferLitRecipients } = opts || {};
   const { value } = await decryptEnvelopeToValue({
     envelopeJson: jsonStr,
@@ -2369,7 +2337,7 @@ const encryptEnvelopeValue = async (value: unknown, opts: CryptoEncryptOptions =
     qId,
     kind,
     value,
-    questionPool: Array.isArray(opts.questionPool) ? opts.questionPool as QuestionLike[] : undefined,
+    questionPool: Array.isArray(opts.questionPool) ? (opts.questionPool as QuestionLike[]) : undefined,
     litOpts,
     hasher,
   });

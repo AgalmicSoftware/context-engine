@@ -10,14 +10,8 @@ import {
   resolveQuestionCountContext,
   shouldInheritResolvedTagSessionScope,
 } from './surveyToolScope.js';
-import {
-  getAllSessionSlugs,
-  getSessionConfigBySlug,
-} from '../../utilities/web3/contractScripts.js';
-import {
-  readSessionScanScope,
-  readSessionScanSlugs,
-} from '../../utilities/session/sessionScanScope.js';
+import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
+import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   getAllSessionSlugs: jest.fn(() => []),
@@ -73,12 +67,7 @@ describe('surveyToolScope', () => {
   });
 
   it('dedupes normalized read slugs while preserving first-seen order', () => {
-    expect(dedupeQuestionReadSlugs(['Edge', 'general', '', 'edge', 'OTHER'])).toEqual([
-      'Edge',
-      '',
-      'edge',
-      'OTHER',
-    ]);
+    expect(dedupeQuestionReadSlugs(['Edge', 'general', '', 'edge', 'OTHER'])).toEqual(['Edge', '', 'edge', 'OTHER']);
   });
 
   it('inherits tag session scope only for pinned, session-routed, or survey-scoped views', () => {
@@ -92,20 +81,24 @@ describe('surveyToolScope', () => {
   it('resolves current tag session slug with local overrides before query and inherited scope', () => {
     window.history.pushState({}, '', '/questions?session=edge');
 
-    expect(resolveCurrentTagSessionSlug({
-      props: { surveyID: '123', activeSessionSlug: 'other' },
-      state: {
-        localSessionOverrideTouched: true,
-        localSessionOverrideSlug: 'override-session',
-      },
-      getEffectiveDraftSlug: () => 'draft-session',
-    })).toBe('override-session');
+    expect(
+      resolveCurrentTagSessionSlug({
+        props: { surveyID: '123', activeSessionSlug: 'other' },
+        state: {
+          localSessionOverrideTouched: true,
+          localSessionOverrideSlug: 'override-session',
+        },
+        getEffectiveDraftSlug: () => 'draft-session',
+      }),
+    ).toBe('override-session');
 
-    expect(resolveCurrentTagSessionSlug({
-      props: { surveyID: '123', activeSessionSlug: 'other' },
-      state: {},
-      getEffectiveDraftSlug: () => 'draft-session',
-    })).toBe('edge');
+    expect(
+      resolveCurrentTagSessionSlug({
+        props: { surveyID: '123', activeSessionSlug: 'other' },
+        state: {},
+        getEffectiveDraftSlug: () => 'draft-session',
+      }),
+    ).toBe('edge');
   });
 
   it('returns extra read slugs from list and all-scope modes unless the view is explicitly pinned', () => {
@@ -128,28 +121,29 @@ describe('surveyToolScope', () => {
     mockedReadSessionScanScope.mockReturnValue('list');
     mockedReadSessionScanSlugs.mockReturnValue(['other', 'general', 'edge']);
 
-    expect(buildQuestionFilterStorageKeyPrefix({}, 'edge')).toBe(
-      'dg:filters:__scope__:__general__|edge|other'
-    );
+    expect(buildQuestionFilterStorageKeyPrefix({}, 'edge')).toBe('dg:filters:__scope__:__general__|edge|other');
 
-    expect(buildQuestionCountScopeContextKey(['other', 'general', 'other'], 84532)).toBe(
-      '__general__|other|84532'
-    );
+    expect(buildQuestionCountScopeContextKey(['other', 'general', 'other'], 84532)).toBe('__general__|other|84532');
 
-    expect(buildQuestionDashboardLoadContextSignature({
-      effectiveSlug: 'EDGE',
-      scopedSessionSlugs: ['other', 'general', 'other'],
-      networkID: 84532,
-    })).toBe('EDGE|__general__|other|84532');
+    expect(
+      buildQuestionDashboardLoadContextSignature({
+        effectiveSlug: 'EDGE',
+        scopedSessionSlugs: ['other', 'general', 'other'],
+        networkID: 84532,
+      }),
+    ).toBe('EDGE|__general__|other|84532');
   });
 
   it('threads fallback scan-scope slugs into question count context resolution', () => {
     mockedReadSessionScanScope.mockReturnValue('list');
     mockedReadSessionScanSlugs.mockReturnValue(['other']);
 
-    const resolved = resolveQuestionCountContext({
-      networkChainId: 11155420,
-    }, 'edge');
+    const resolved = resolveQuestionCountContext(
+      {
+        networkChainId: 11155420,
+      },
+      'edge',
+    );
 
     expect(resolved.scopedSessionSlugs).toEqual(['edge', 'other']);
     expect(resolved.networkId).toBe(84532);

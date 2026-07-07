@@ -8,10 +8,7 @@ type ResponseFieldState = UnknownRecord & {
   audienceMode?: unknown;
 };
 
-type SurveyResponsePayloadState = Omit<
-  ResponseSlice,
-  'answers' | 'additionalComments'
-> & {
+type SurveyResponsePayloadState = Omit<ResponseSlice, 'answers' | 'additionalComments'> & {
   answers?: Record<string, ResponseFieldState> | null;
   additionalComments?: Record<string, ResponseFieldState> | null;
 };
@@ -81,29 +78,19 @@ export interface BuildResponsePayloadOptions {
   // Imported helpers (already pure, just pass them through)
   getConvictionFromSlice: (state: ResponseSlice, qid: string) => number | null;
   getImportanceFromSlice: (state: ResponseSlice, qid: string) => number | null;
-  sanitizeQuestionPromptForResponsePayload: (
-    q: ResponseQuestionSource,
-    opts: { isLocked: boolean },
-  ) => string;
+  sanitizeQuestionPromptForResponsePayload: (q: ResponseQuestionSource, opts: { isLocked: boolean }) => string;
 }
 
-export const buildResponsePayload = (
-  opts: BuildResponsePayloadOptions,
-): ResponsePayload => {
+export const buildResponsePayload = (opts: BuildResponsePayloadOptions): ResponsePayload => {
   let surveyIndex = opts.surveyIndex;
   surveyIndex = opts.isStandalone || opts.singleQuestionMode ? 0 : surveyIndex;
   void surveyIndex;
 
-  const surveyHash =
-    opts.isStandalone || opts.singleQuestionMode ? undefined : opts.surveyId;
+  const surveyHash = opts.isStandalone || opts.singleQuestionMode ? undefined : opts.surveyId;
 
   const surveyResponseState = opts.surveyResponseState as SurveyResponsePayloadState | null;
-  const poolFromState = Array.isArray(opts.questionPool)
-    ? opts.questionPool as ResponseQuestionSource[]
-    : [];
-  const pilePool = Array.isArray(opts.pileQuestions)
-    ? opts.pileQuestions as ResponseQuestionSource[]
-    : [];
+  const poolFromState = Array.isArray(opts.questionPool) ? (opts.questionPool as ResponseQuestionSource[]) : [];
+  const pilePool = Array.isArray(opts.pileQuestions) ? (opts.pileQuestions as ResponseQuestionSource[]) : [];
 
   if (!surveyResponseState) return {};
 
@@ -122,12 +109,8 @@ export const buildResponsePayload = (
     candidateQuestions = Array.from(ids).map((id) => ({ id, type: 'freeform', prompt: '' }));
   }
 
-  const hasMainAnswer = (ans: unknown) => (
-    ans !== undefined &&
-    ans !== null &&
-    ans !== '' &&
-    (!Array.isArray(ans) || ans.length > 0)
-  );
+  const hasMainAnswer = (ans: unknown) =>
+    ans !== undefined && ans !== null && ans !== '' && (!Array.isArray(ans) || ans.length > 0);
 
   const hasAdditional = (val: unknown) => {
     if (val === undefined || val === null) return false;
@@ -136,11 +119,9 @@ export const buildResponsePayload = (
     if (typeof val === 'object') return Object.keys(val).length > 0;
     return true;
   };
-  const hasConviction = (qid: string) =>
-    opts.getConvictionFromSlice(surveyResponseState, qid) !== null;
+  const hasConviction = (qid: string) => opts.getConvictionFromSlice(surveyResponseState, qid) !== null;
 
-  const shouldFilterByAnswered =
-    opts.isStandalone || opts.singleQuestionMode || poolFromState.length === 0;
+  const shouldFilterByAnswered = opts.isStandalone || opts.singleQuestionMode || poolFromState.length === 0;
 
   const answeredQuestions = shouldFilterByAnswered
     ? candidateQuestions.filter((q) => {
@@ -174,12 +155,10 @@ export const buildResponsePayload = (
         value: answer.value !== undefined ? answer.value : '',
         encrypted: !!answer.encrypted,
         encryptionAudience: answerAudience,
-        encryptionGateId: answer.encrypted
-          ? opts.resolveFieldEncryptionGateId(answer, q.id, 'answer')
-          : null,
+        encryptionGateId: answer.encrypted ? opts.resolveFieldEncryptionGateId(answer, q.id, 'answer') : null,
         audienceMode: 'explicit',
         hash: answer.hash || '',
-        encryptedPortion: answer.encrypted ? (answer.encryptedPortion || '') : '',
+        encryptedPortion: answer.encrypted ? answer.encryptedPortion || '' : '',
       },
       additional: {
         value: additional.value !== undefined ? additional.value : '',
@@ -188,13 +167,9 @@ export const buildResponsePayload = (
         encryptionGateId: additionalEncrypted
           ? opts.resolveFieldEncryptionGateId(additional, q.id, 'additional')
           : null,
-        audienceMode: opts.normalizeFieldAudienceMode(
-          additional?.audienceMode,
-          'additional',
-          additional,
-        ),
+        audienceMode: opts.normalizeFieldAudienceMode(additional?.audienceMode, 'additional', additional),
         hash: additional.hash || '',
-        encryptedPortion: additionalEncrypted ? (additional.encryptedPortion || '') : '',
+        encryptedPortion: additionalEncrypted ? additional.encryptedPortion || '' : '',
       },
     };
   });

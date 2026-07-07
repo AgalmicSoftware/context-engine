@@ -48,7 +48,10 @@ export interface ChangedFieldsOrchestrationDeps {
   resolveFieldEncryptionGateId: (field: ResponseFieldState, qid: string | null, fieldKey: string) => unknown;
   normalizeFieldAudienceMode: (mode: unknown, fieldKey: string, field: ResponseFieldState) => unknown;
   valuesEqual: (left: unknown, right: unknown) => boolean;
-  buildSurveyResponseSliceSignature: (slice: ResponseSlice, opts?: { normalizedIdFilter?: Set<string> | null }) => string;
+  buildSurveyResponseSliceSignature: (
+    slice: ResponseSlice,
+    opts?: { normalizedIdFilter?: Set<string> | null },
+  ) => string;
   buildRatingEnvelopeQidSetFromUserAnswers: (userAnswers: unknown) => Set<string>;
   hasMeaningfulFieldValue: (value: unknown) => boolean;
   bumpPerfCounter: (name: string) => void;
@@ -154,17 +157,11 @@ export const orchestrateGetChangedQidsAndFields = (
     existingCache.idsScopeKey === idsScopeKey &&
     existingCache.result
   ) {
-    if (
-      existingCache.currentSlice === params.currentSlice &&
-      existingCache.baselineSlice === baselineSlice
-    ) {
+    if (existingCache.currentSlice === params.currentSlice && existingCache.baselineSlice === baselineSlice) {
       deps.bumpPerfCounter('noopSkipCount');
       return { result: existingCache.result, newCache: existingCache };
     }
-    const {
-      currentSliceSignature,
-      baselineSliceSignature,
-    } = getSliceSignatures(scopedIds);
+    const { currentSliceSignature, baselineSliceSignature } = getSliceSignatures(scopedIds);
     if (
       existingCache.currentSliceSignature === currentSliceSignature &&
       existingCache.baselineSliceSignature === baselineSliceSignature
@@ -214,18 +211,12 @@ export const orchestrateGetChangedQidsAndFields = (
       existingCache.idsScopeKey === idsScopeKey &&
       existingCache.result
     ) {
-      if (
-        existingCache.currentSlice === params.currentSlice &&
-        existingCache.baselineSlice === baselineSlice
-      ) {
+      if (existingCache.currentSlice === params.currentSlice && existingCache.baselineSlice === baselineSlice) {
         deps.bumpPerfCounter('noopSkipCount');
         return { result: existingCache.result, newCache: existingCache };
       }
       const normalizedIdFilter = ids.size > 0 ? ids : null;
-      const {
-        currentSliceSignature,
-        baselineSliceSignature,
-      } = getSliceSignatures(normalizedIdFilter);
+      const { currentSliceSignature, baselineSliceSignature } = getSliceSignatures(normalizedIdFilter);
       if (
         existingCache.currentSliceSignature === currentSliceSignature &&
         existingCache.baselineSliceSignature === baselineSliceSignature
@@ -272,10 +263,7 @@ export const orchestrateGetChangedQidsAndFields = (
     resolveAudienceMode: (field, fieldKey) => deps.normalizeFieldAudienceMode(field?.audienceMode, fieldKey, field),
   });
   const normalizedIdFilter = ids.size > 0 ? ids : null;
-  const {
-    currentSliceSignature,
-    baselineSliceSignature,
-  } = getSliceSignatures(normalizedIdFilter);
+  const { currentSliceSignature, baselineSliceSignature } = getSliceSignatures(normalizedIdFilter);
   return {
     result,
     newCache: {
@@ -320,17 +308,21 @@ export const computePendingEditStats = (
   let encrypted = 0;
   if (total > 0) {
     for (const qId of changedQids) {
-      const qLower = String(qId || '').trim().toLowerCase();
+      const qLower = String(qId || '')
+        .trim()
+        .toLowerCase();
       const fields = changedMap[qId] || {};
-      const aEnc = (fields.answer || fields.encryptedAnswer) && !!(params.currentSlice.answers?.[qId]?.encrypted);
-      const dEnc = (fields.additional || fields.encryptedAdditional) && !!(params.currentSlice.additionalComments?.[qId]?.encrypted);
+      const aEnc = (fields.answer || fields.encryptedAnswer) && !!params.currentSlice.answers?.[qId]?.encrypted;
+      const dEnc =
+        (fields.additional || fields.encryptedAdditional) && !!params.currentSlice.additionalComments?.[qId]?.encrypted;
       const questionLocked = deps.isQuestionLockedForResponse(qId);
       const baselineRatingEncrypted = qLower ? ratingEnvelopeQids.has(qLower) : false;
       const ratingEnc =
         (fields.importance || fields.conviction) &&
-        (baselineRatingEncrypted || questionLocked ||
-          !!(params.currentSlice.answers?.[qId]?.encrypted) ||
-          !!(params.currentSlice.additionalComments?.[qId]?.encrypted));
+        (baselineRatingEncrypted ||
+          questionLocked ||
+          !!params.currentSlice.answers?.[qId]?.encrypted ||
+          !!params.currentSlice.additionalComments?.[qId]?.encrypted);
       if (aEnc || dEnc || ratingEnc) encrypted += 1;
     }
   }
@@ -408,9 +400,7 @@ export const pickBestNumber = (
   const matchingKeys = getMatchingKeys(source, indexed, qidLower);
   if (matchingKeys.length === 0) return null;
   if (!source) return null;
-  const toNum = (v: unknown) => (
-    v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v)
-  );
+  const toNum = (v: unknown) => (v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v));
   const exactKey = matchingKeys.find((key) => key === qidLower);
   const exactNum = toNum(exactKey ? source[exactKey] : undefined);
   if (exactNum !== null) return exactNum;
@@ -462,30 +452,10 @@ export const computeChangedQidsAndFields = ({
   const changedMap: ChangedFieldMap = {};
 
   ids.forEach((qId) => {
-    const bAns = pickBestField(
-      baselineSlice.answers,
-      baselineAnswerKeys,
-      qId,
-      hasMeaningfulFieldValue,
-    );
-    const cAns = pickBestField(
-      currentSlice.answers,
-      currentAnswerKeys,
-      qId,
-      hasMeaningfulFieldValue,
-    );
-    const bAdd = pickBestField(
-      baselineSlice.additionalComments,
-      baselineAdditionalKeys,
-      qId,
-      hasMeaningfulFieldValue,
-    );
-    const cAdd = pickBestField(
-      currentSlice.additionalComments,
-      currentAdditionalKeys,
-      qId,
-      hasMeaningfulFieldValue,
-    );
+    const bAns = pickBestField(baselineSlice.answers, baselineAnswerKeys, qId, hasMeaningfulFieldValue);
+    const cAns = pickBestField(currentSlice.answers, currentAnswerKeys, qId, hasMeaningfulFieldValue);
+    const bAdd = pickBestField(baselineSlice.additionalComments, baselineAdditionalKeys, qId, hasMeaningfulFieldValue);
+    const cAdd = pickBestField(currentSlice.additionalComments, currentAdditionalKeys, qId, hasMeaningfulFieldValue);
     const bImpN = pickBestNumber(baselineSlice.importance, baselineImportanceKeys, qId);
     const cImpN = pickBestNumber(currentSlice.importance, currentImportanceKeys, qId);
     const bConvN = pickBestNumber(baselineSlice.conviction, baselineConvictionKeys, qId);
@@ -495,42 +465,29 @@ export const computeChangedQidsAndFields = ({
     const ansChanged = !valuesEqual(bAns.value, cAns.value);
     const addChanged = !valuesEqual(bAdd.value, cAdd.value);
 
-    const qLower = String(qId || '').trim().toLowerCase();
-    const baselineAnswerEncrypted = !!(
-      bAns &&
-      (bAns.encrypted || bAns.encryptedPortion || bAns.value === '*')
-    );
-    const baselineAdditionalEncrypted = !!(
-      bAdd &&
-      (bAdd.encrypted || bAdd.encryptedPortion || bAdd.value === '*')
-    );
-    const currentAnswerEncrypted = !!(
-      cAns &&
-      (cAns.encrypted || cAns.encryptedPortion || cAns.value === '*')
-    );
-    const currentAdditionalEncrypted = !!(
-      cAdd &&
-      (cAdd.encrypted || cAdd.encryptedPortion || cAdd.value === '*')
-    );
+    const qLower = String(qId || '')
+      .trim()
+      .toLowerCase();
+    const baselineAnswerEncrypted = !!(bAns && (bAns.encrypted || bAns.encryptedPortion || bAns.value === '*'));
+    const baselineAdditionalEncrypted = !!(bAdd && (bAdd.encrypted || bAdd.encryptedPortion || bAdd.value === '*'));
+    const currentAnswerEncrypted = !!(cAns && (cAns.encrypted || cAns.encryptedPortion || cAns.value === '*'));
+    const currentAdditionalEncrypted = !!(cAdd && (cAdd.encrypted || cAdd.encryptedPortion || cAdd.value === '*'));
     const responseEncrypted =
-      baselineAnswerEncrypted ||
-      baselineAdditionalEncrypted ||
-      currentAnswerEncrypted ||
-      currentAdditionalEncrypted;
+      baselineAnswerEncrypted || baselineAdditionalEncrypted || currentAnswerEncrypted || currentAdditionalEncrypted;
     const ratingEncrypted = qLower ? ratingEnvelopeQids.has(qLower) : false;
     const allowMissingRatings = responseEncrypted || ratingEncrypted;
     const missingCurrentImportance = cImpN === null && bImpN !== null;
     const missingCurrentConviction = cConvN === null && bConvN !== null;
 
-    const impChanged = (bImpN !== cImpN) && !(allowMissingRatings && missingCurrentImportance);
-    const convChanged = (bConvN !== cConvN) && !(allowMissingRatings && missingCurrentConviction);
+    const impChanged = bImpN !== cImpN && !(allowMissingRatings && missingCurrentImportance);
+    const convChanged = bConvN !== cConvN && !(allowMissingRatings && missingCurrentConviction);
 
     const ansHasContent = hasMeaningfulFieldValue(bAns) || hasMeaningfulFieldValue(cAns);
     const addHasContent = hasMeaningfulFieldValue(bAdd) || hasMeaningfulFieldValue(cAdd);
 
     // include encryption-flag deltas only when a field actually has content
-    const encAnsChanged = ansHasContent && (!!bAns.encrypted !== !!cAns.encrypted);
-    const encAddChanged = addHasContent && (!!bAdd.encrypted !== !!cAdd.encrypted);
+    const encAnsChanged = ansHasContent && !!bAns.encrypted !== !!cAns.encrypted;
+    const encAddChanged = addHasContent && !!bAdd.encrypted !== !!cAdd.encrypted;
 
     const bAnsAudience = resolveAudience(bAns, qId);
     const cAnsAudience = resolveAudience(cAns, qId);
@@ -567,8 +524,10 @@ export const computeChangedQidsAndFields = ({
         ...(addChanged ? { additional: 1 } : null),
         ...(impChanged ? { importance: 1 } : null),
         ...(convChanged ? { conviction: 1 } : null),
-        ...((encAnsChanged || ansAudienceChanged || ansGateChanged) ? { encryptedAnswer: 1 } : null),
-        ...((encAddChanged || addAudienceChanged || addGateChanged || addAudienceModeChanged) ? { encryptedAdditional: 1 } : null),
+        ...(encAnsChanged || ansAudienceChanged || ansGateChanged ? { encryptedAnswer: 1 } : null),
+        ...(encAddChanged || addAudienceChanged || addGateChanged || addAudienceModeChanged
+          ? { encryptedAdditional: 1 }
+          : null),
       };
     }
   });

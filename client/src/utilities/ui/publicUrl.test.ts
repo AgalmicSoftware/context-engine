@@ -54,36 +54,40 @@ describe('stripPublicUrlBasePath', () => {
 
 describe('readWindowLocationPath', () => {
   it('combines pathname, search, and hash from the current location', () => {
-    expect(readWindowLocationPath({
-      location: {
-        pathname: '/ce/su/Franklin',
-        search: '?tab=atlas',
-        hash: '#positions',
-      },
-    })).toBe('/ce/su/Franklin?tab=atlas#positions');
+    expect(
+      readWindowLocationPath({
+        location: {
+          pathname: '/ce/su/Franklin',
+          search: '?tab=atlas',
+          hash: '#positions',
+        },
+      }),
+    ).toBe('/ce/su/Franklin?tab=atlas#positions');
   });
 });
 
 describe('buildAtlasNodeRoute', () => {
   it('builds demo atlas node routes with a return target under PUBLIC_URL', () => {
-    expect(buildAtlasNodeRoute(
-      '0xabc',
-      { demo: true, returnTo: '/ce/su/Franklin' },
-      { env: { PUBLIC_URL: '/ce/' } }
-    )).toBe('/ce/atlas/0xabc?demo=1&returnTo=%2Fce%2Fsu%2FFranklin');
+    expect(
+      buildAtlasNodeRoute('0xabc', { demo: true, returnTo: '/ce/su/Franklin' }, { env: { PUBLIC_URL: '/ce/' } }),
+    ).toBe('/ce/atlas/0xabc?demo=1&returnTo=%2Fce%2Fsu%2FFranklin');
   });
 });
 
 describe('readSafeInternalReturnTo', () => {
   it('accepts same-origin relative app paths', () => {
-    expect(readSafeInternalReturnTo('/ce/su/Franklin?tab=atlas#positions', {
-      location: { origin: 'https://ce.example' },
-    })).toBe('/ce/su/Franklin?tab=atlas#positions');
+    expect(
+      readSafeInternalReturnTo('/ce/su/Franklin?tab=atlas#positions', {
+        location: { origin: 'https://ce.example' },
+      }),
+    ).toBe('/ce/su/Franklin?tab=atlas#positions');
   });
 
   it('rejects external return targets', () => {
-    expect(readSafeInternalReturnTo('https://evil.example/phish', {
-      location: { origin: 'https://ce.example' },
-    })).toBe('');
+    expect(
+      readSafeInternalReturnTo('https://evil.example/phish', {
+        location: { origin: 'https://ce.example' },
+      }),
+    ).toBe('');
   });
 });

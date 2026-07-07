@@ -31,9 +31,15 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   afterEach(() => {
-    try { delete (globalThis as any).CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete (globalThis as any).CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try {
+      delete (globalThis as any).CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete (globalThis as any).CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
   });
 
   it('treats question cache seeding as best-effort when write-through fails', async () => {
@@ -44,9 +50,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         questionResponsesMeta: {},
       },
     });
-    writeCacheOptimisticMock
-      .mockRejectedValueOnce(new Error('quota exceeded'))
-      .mockResolvedValue(undefined);
+    writeCacheOptimisticMock.mockRejectedValueOnce(new Error('quota exceeded')).mockResolvedValue(undefined);
 
     const instance = makeInstance();
     instance.getSessionConfig = jest.fn(() => ({
@@ -55,17 +59,13 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       contracts: { surveys: { chainId: 84532 } },
     }));
 
-    await expect(instance.seedUploadedQuestionsCache({
-      questionDataArray: [
-        { id: 'q1', type: 'freeform', prompt: 'Question 1', creator: '0xabc' },
-      ],
-      uploadedQuestions: [
-        { questionId: 'q1', arweaveTxId: 'arweave-tx-1' },
-      ],
-      sourceQuestions: [
-        { id: 'q1', type: 'freeform', prompt: 'Question 1' },
-      ],
-    })).resolves.toBe(false);
+    await expect(
+      instance.seedUploadedQuestionsCache({
+        questionDataArray: [{ id: 'q1', type: 'freeform', prompt: 'Question 1', creator: '0xabc' }],
+        uploadedQuestions: [{ questionId: 'q1', arweaveTxId: 'arweave-tx-1' }],
+        sourceQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Question 1' }],
+      }),
+    ).resolves.toBe(false);
 
     expect(writeCacheOptimisticMock).toHaveBeenCalled();
   });
@@ -91,28 +91,16 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       contracts: {},
     }));
 
-    await expect(instance.seedUploadedQuestionsCache({
-      questionDataArray: [
-        { id: 'q1', type: 'freeform', prompt: 'Question 1', creator: '0xabc' },
-      ],
-      uploadedQuestions: [
-        { questionId: 'q1', arweaveTxId: 'arweave-tx-1' },
-      ],
-      sourceQuestions: [
-        { id: 'q1', type: 'freeform', prompt: 'Question 1' },
-      ],
-    })).resolves.toBe(true);
+    await expect(
+      instance.seedUploadedQuestionsCache({
+        questionDataArray: [{ id: 'q1', type: 'freeform', prompt: 'Question 1', creator: '0xabc' }],
+        uploadedQuestions: [{ questionId: 'q1', arweaveTxId: 'arweave-tx-1' }],
+        sourceQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Question 1' }],
+      }),
+    ).resolves.toBe(true);
 
-    expect(writeCacheOptimisticMock).toHaveBeenCalledWith(
-      'questionsCache',
-      'missing-session',
-      expect.any(Object)
-    );
-    expect(writeCacheOptimisticMock).not.toHaveBeenCalledWith(
-      'questionsCache',
-      '',
-      expect.anything()
-    );
+    expect(writeCacheOptimisticMock).toHaveBeenCalledWith('questionsCache', 'missing-session', expect.any(Object));
+    expect(writeCacheOptimisticMock).not.toHaveBeenCalledWith('questionsCache', '', expect.anything());
   });
 
   it('seeds uploaded question cache with storageRef-first compatibility fields', async () => {
@@ -132,26 +120,26 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       contracts: { surveys: { chainId: 84532 } },
     }));
 
-    await expect(instance.seedUploadedQuestionsCache({
-      questionDataArray: [
-        {
-          id: 'q1',
-          type: 'freeform',
-          prompt: 'Question 1',
-          creator: '0xabc',
-          arweaveTxId: 'legacy-tx',
-        },
-      ],
-      uploadedQuestions: [
-        {
-          questionId: 'q1',
-          storageRef: { backend: 'arweave', id: 'preferred-tx', resource: 'questions' },
-        },
-      ],
-      sourceQuestions: [
-        { id: 'q1', type: 'freeform', prompt: 'Question 1' },
-      ],
-    })).resolves.toBe(true);
+    await expect(
+      instance.seedUploadedQuestionsCache({
+        questionDataArray: [
+          {
+            id: 'q1',
+            type: 'freeform',
+            prompt: 'Question 1',
+            creator: '0xabc',
+            arweaveTxId: 'legacy-tx',
+          },
+        ],
+        uploadedQuestions: [
+          {
+            questionId: 'q1',
+            storageRef: { backend: 'arweave', id: 'preferred-tx', resource: 'questions' },
+          },
+        ],
+        sourceQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Question 1' }],
+      }),
+    ).resolves.toBe(true);
 
     const cacheWrite = writeCacheOptimisticMock.mock.calls.find(([namespace]) => namespace === 'questionsCache');
     const writtenQuestions = cacheWrite?.[2]?.['84532']?.questions || {};
@@ -185,23 +173,15 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       contracts: {},
     }));
 
-    await expect(instance.seedUploadedQuestionsCache({
-      questionDataArray: [
-        { id: 'q1', type: 'freeform', prompt: 'Question 1', creator: '0xabc' },
-      ],
-      uploadedQuestions: [
-        { questionId: 'q1', arweaveTxId: 'arweave-tx-1' },
-      ],
-      sourceQuestions: [
-        { id: 'q1', type: 'freeform', prompt: 'Question 1' },
-      ],
-    })).resolves.toBe(true);
+    await expect(
+      instance.seedUploadedQuestionsCache({
+        questionDataArray: [{ id: 'q1', type: 'freeform', prompt: 'Question 1', creator: '0xabc' }],
+        uploadedQuestions: [{ questionId: 'q1', arweaveTxId: 'arweave-tx-1' }],
+        sourceQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Question 1' }],
+      }),
+    ).resolves.toBe(true);
 
-    expect(writeCacheOptimisticMock).toHaveBeenCalledWith(
-      'questionsCache',
-      '',
-      expect.any(Object)
-    );
+    expect(writeCacheOptimisticMock).toHaveBeenCalledWith('questionsCache', '', expect.any(Object));
   });
 
   it('seeds question cache only for the primary authoring slug when stale slug hints exist', async () => {
@@ -226,24 +206,16 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     }));
     instance.getActiveSessionSlug = jest.fn(() => 'stale-session');
 
-    await expect(instance.seedUploadedQuestionsCache({
-      questionDataArray: [
-        { id: 'q1', type: 'freeform', prompt: 'Question 1', creator: '0xabc' },
-      ],
-      uploadedQuestions: [
-        { questionId: 'q1', arweaveTxId: 'arweave-tx-1' },
-      ],
-      sourceQuestions: [
-        { id: 'q1', type: 'freeform', prompt: 'Question 1' },
-      ],
-    })).resolves.toBe(true);
+    await expect(
+      instance.seedUploadedQuestionsCache({
+        questionDataArray: [{ id: 'q1', type: 'freeform', prompt: 'Question 1', creator: '0xabc' }],
+        uploadedQuestions: [{ questionId: 'q1', arweaveTxId: 'arweave-tx-1' }],
+        sourceQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Question 1' }],
+      }),
+    ).resolves.toBe(true);
 
     expect(writeCacheOptimisticMock).toHaveBeenCalledTimes(1);
-    expect(writeCacheOptimisticMock).toHaveBeenCalledWith(
-      'questionsCache',
-      'primary-session',
-      expect.any(Object)
-    );
+    expect(writeCacheOptimisticMock).toHaveBeenCalledWith('questionsCache', 'primary-session', expect.any(Object));
   });
 
   it('does not clear managed caches after standalone question submit success', async () => {
@@ -274,12 +246,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       ...instance.state,
       isStandaloneQuestion: true,
       title: '',
-      questions: [{
-        id: 'q1',
-        type: 'freeform',
-        prompt: 'Question 1',
-        tags: [],
-      }],
+      questions: [
+        {
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+        },
+      ],
       documentURLs: [],
       surveyHash: '',
     };
@@ -326,16 +300,18 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         showAutoTool: false,
         isStandaloneQuestion: true,
         title: '',
-        questions: [{
-          id: 'q1',
-          uiKey: 'q1',
-          type: 'freeform',
-          prompt: 'Question 1',
-          tags: [42, null, true, false, ' topic ', {}, ['nested']],
-          aiGeneratedTagsFromSource: [42, null, true, false, ' topic ', {}, ['nested']],
-          currentTagInputValue: '',
-          isGeneratingTags: false,
-        }],
+        questions: [
+          {
+            id: 'q1',
+            uiKey: 'q1',
+            type: 'freeform',
+            prompt: 'Question 1',
+            tags: [42, null, true, false, ' topic ', {}, ['nested']],
+            aiGeneratedTagsFromSource: [42, null, true, false, ' topic ', {}, ['nested']],
+            currentTagInputValue: '',
+            isGeneratingTags: false,
+          },
+        ],
         documentURLs: [],
         surveyHash: '',
       };
@@ -355,7 +331,9 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   it('keeps standalone question submit scoped to the unresolved requested slug when exact session config is missing', async () => {
     const addQuestionsSpy = jest
       .spyOn(contractScripts, 'addQuestions')
-      .mockRejectedValue(new Error('[addQuestions] Missing surveys contract address for session slug "missing-session".'));
+      .mockRejectedValue(
+        new Error('[addQuestions] Missing surveys contract address for session slug "missing-session".'),
+      );
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     try {
@@ -377,12 +355,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         ...instance.state,
         isStandaloneQuestion: true,
         title: '',
-        questions: [{
-          id: 'q1',
-          type: 'freeform',
-          prompt: 'Question 1',
-          tags: [],
-        }],
+        questions: [
+          {
+            id: 'q1',
+            type: 'freeform',
+            prompt: 'Question 1',
+            tags: [],
+          },
+        ],
         documentURLs: [],
         surveyHash: '',
       };
@@ -397,7 +377,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         expect.objectContaining({
           slug: 'missing-session',
           networkChainId: 84532,
-        })
+        }),
       );
       expect(instance.state.isSubmitting).toBe(false);
       expect(instance.state.submissionError).toContain('missing-session');
@@ -406,5 +386,4 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       addQuestionsSpy.mockRestore();
     }
   });
-
 });

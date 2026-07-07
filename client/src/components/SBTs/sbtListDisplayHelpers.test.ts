@@ -16,31 +16,41 @@ import {
 
 describe('sbtListDisplayHelpers', () => {
   it('builds loading class names and styles', () => {
-    expect(buildSbtListLoadingGroupStatusClassName({
-      activeClassName: 'status-active',
-      baseClassName: 'status',
-      pendingClassName: 'status-pending',
-      scanInProgress: true,
-    })).toBe('status status-active');
-    expect(buildSbtListLoadingGroupStatusClassName({
-      activeClassName: 'status-active',
-      baseClassName: 'status',
-      pendingClassName: 'status-pending',
-      scanInProgress: false,
-    })).toBe('status status-pending');
-    expect(buildSbtListLoadingProgressFillClassName({
-      baseClassName: 'fill',
-      hasLatest: false,
-      indeterminateClassName: 'indeterminate',
-    })).toBe('fill indeterminate');
-    expect(resolveSbtListLoadingProgressFillStyle({
-      hasLatest: true,
-      progressPct: 42,
-    })).toEqual({ width: '42%' });
-    expect(resolveSbtListLoadingProgressFillStyle({
-      hasLatest: false,
-      progressPct: 42,
-    })).toEqual({ width: undefined });
+    expect(
+      buildSbtListLoadingGroupStatusClassName({
+        activeClassName: 'status-active',
+        baseClassName: 'status',
+        pendingClassName: 'status-pending',
+        scanInProgress: true,
+      }),
+    ).toBe('status status-active');
+    expect(
+      buildSbtListLoadingGroupStatusClassName({
+        activeClassName: 'status-active',
+        baseClassName: 'status',
+        pendingClassName: 'status-pending',
+        scanInProgress: false,
+      }),
+    ).toBe('status status-pending');
+    expect(
+      buildSbtListLoadingProgressFillClassName({
+        baseClassName: 'fill',
+        hasLatest: false,
+        indeterminateClassName: 'indeterminate',
+      }),
+    ).toBe('fill indeterminate');
+    expect(
+      resolveSbtListLoadingProgressFillStyle({
+        hasLatest: true,
+        progressPct: 42,
+      }),
+    ).toEqual({ width: '42%' });
+    expect(
+      resolveSbtListLoadingProgressFillStyle({
+        hasLatest: false,
+        progressPct: 42,
+      }),
+    ).toEqual({ width: undefined });
     expect(resolveSbtListRelativeImageStyle()).toEqual({ position: 'relative' });
     expect(resolveSbtListHeaderSpinnerWrapStyle()).toEqual({
       alignItems: 'center',
@@ -54,40 +64,54 @@ describe('sbtListDisplayHelpers', () => {
   });
 
   it('builds SBT list shell and filter class names', () => {
-    expect(buildSbtListExpandedCardShellClassName({
-      baseClassName: 'card',
-      expandedClassName: 'card-expanded',
-      isExpanded: true,
-    })).toBe('card card-expanded');
-    expect(buildSbtListExpandedCardShellClassName({
-      baseClassName: 'card',
-      expandedClassName: 'card-expanded',
-      isExpanded: false,
-    })).toBe('card');
-    expect(buildSbtListRootClassName({
-      baseClassName: 'base',
-      rootClassName: 'root',
-    })).toBe('base root');
-    expect(buildSbtListSessionUniversePanelClassName({
-      baseClassName: 'panel',
-      closedClassName: 'panel-closed',
-      isClosed: true,
-    })).toBe('panel panel-closed');
-    expect(buildSbtListMiniSettingsButtonClassName({
-      activeClassName: 'settings-active',
-      baseClassName: 'settings',
-      isActive: true,
-    })).toBe('settings settings-active');
-    expect(buildSbtListFilterContainerClassName({
-      baseClassName: 'filters',
-      panelClassName: 'filters-panel',
-    })).toBe('filters filters-panel');
-    expect(buildSbtListFilterLabelClassName({
-      activeClassName: 'filter-active',
-      baseClassName: 'filter',
-      isActive: true,
-      toggleClassName: 'filter-toggle',
-    })).toBe('filter filter-toggle filter-active');
+    expect(
+      buildSbtListExpandedCardShellClassName({
+        baseClassName: 'card',
+        expandedClassName: 'card-expanded',
+        isExpanded: true,
+      }),
+    ).toBe('card card-expanded');
+    expect(
+      buildSbtListExpandedCardShellClassName({
+        baseClassName: 'card',
+        expandedClassName: 'card-expanded',
+        isExpanded: false,
+      }),
+    ).toBe('card');
+    expect(
+      buildSbtListRootClassName({
+        baseClassName: 'base',
+        rootClassName: 'root',
+      }),
+    ).toBe('base root');
+    expect(
+      buildSbtListSessionUniversePanelClassName({
+        baseClassName: 'panel',
+        closedClassName: 'panel-closed',
+        isClosed: true,
+      }),
+    ).toBe('panel panel-closed');
+    expect(
+      buildSbtListMiniSettingsButtonClassName({
+        activeClassName: 'settings-active',
+        baseClassName: 'settings',
+        isActive: true,
+      }),
+    ).toBe('settings settings-active');
+    expect(
+      buildSbtListFilterContainerClassName({
+        baseClassName: 'filters',
+        panelClassName: 'filters-panel',
+      }),
+    ).toBe('filters filters-panel');
+    expect(
+      buildSbtListFilterLabelClassName({
+        activeClassName: 'filter-active',
+        baseClassName: 'filter',
+        isActive: true,
+        toggleClassName: 'filter-toggle',
+      }),
+    ).toBe('filter filter-toggle filter-active');
   });
 
   it('finds interactive ancestors only for targets with closest support', () => {

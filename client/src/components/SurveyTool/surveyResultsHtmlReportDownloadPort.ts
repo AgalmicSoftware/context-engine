@@ -15,12 +15,8 @@ export type BindSurveyResultsHtmlReportDownloadPortArgs = {
 export const bindSurveyResultsHtmlReportDownloadPort = ({
   sessionResultsExport,
 }: BindSurveyResultsHtmlReportDownloadPortArgs): SurveyResultsHtmlReportDownloadPort => ({
-  downloadHtmlReport: (html, filename) => (
-    sessionResultsExport().downloadSessionResultsHtmlReport(html, filename)
-  ),
-  downloadPdfReport: (request) => (
-    sessionResultsExport().downloadSessionResultsPdfReport(request)
-  ),
+  downloadHtmlReport: (html, filename) => sessionResultsExport().downloadSessionResultsHtmlReport(html, filename),
+  downloadPdfReport: (request) => sessionResultsExport().downloadSessionResultsPdfReport(request),
 });
 
 export const surveyResultsHtmlReportDownloadPort = bindSurveyResultsHtmlReportDownloadPort({

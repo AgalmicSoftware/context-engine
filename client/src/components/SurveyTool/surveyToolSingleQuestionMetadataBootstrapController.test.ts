@@ -15,15 +15,17 @@ describe('surveyToolSingleQuestionMetadataBootstrapController', () => {
       q1: { id: 'q1' },
     });
 
-    await expect(resolveSingleQuestionMetadataBootstrap({
-      questionId: 'q1',
-      questionData: { id: 'q1', prompt: 'existing' },
-      effectiveSingleSlug: 'edge',
-      cacheState,
-      forceRefetch: false,
-      loginComplete: false,
-      hasAccount: false,
-    })).resolves.toEqual({
+    await expect(
+      resolveSingleQuestionMetadataBootstrap({
+        questionId: 'q1',
+        questionData: { id: 'q1', prompt: 'existing' },
+        effectiveSingleSlug: 'edge',
+        cacheState,
+        forceRefetch: false,
+        loginComplete: false,
+        hasAccount: false,
+      }),
+    ).resolves.toEqual({
       status: 'skipped',
       questionData: { id: 'q1', prompt: 'existing' },
       cacheState,
@@ -62,18 +64,20 @@ describe('surveyToolSingleQuestionMetadataBootstrapController', () => {
   });
 
   it("returns 'missing-cache-state' when cache rebind fails after fetch", async () => {
-    await expect(resolveSingleQuestionMetadataBootstrap({
-      questionId: 'q1',
-      questionData: null,
-      effectiveSingleSlug: 'edge',
-      fetchSingleQuestionMetadataCandidates: jest.fn().mockResolvedValue({
-        questionData: { id: 'q1', prompt: 'fetched' },
+    await expect(
+      resolveSingleQuestionMetadataBootstrap({
+        questionId: 'q1',
+        questionData: null,
         effectiveSingleSlug: 'edge',
-        fetchedAny: true,
-        timedOutFetchCount: 0,
+        fetchSingleQuestionMetadataCandidates: jest.fn().mockResolvedValue({
+          questionData: { id: 'q1', prompt: 'fetched' },
+          effectiveSingleSlug: 'edge',
+          fetchedAny: true,
+          timedOutFetchCount: 0,
+        }),
+        resolveCacheState: jest.fn().mockResolvedValue(null),
       }),
-      resolveCacheState: jest.fn().mockResolvedValue(null),
-    })).resolves.toEqual({ status: 'missing-cache-state' });
+    ).resolves.toEqual({ status: 'missing-cache-state' });
   });
 
   it("returns 'unavailable' with retry reason when no data fetched", async () => {

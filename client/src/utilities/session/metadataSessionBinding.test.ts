@@ -26,18 +26,28 @@ describe('metadataSessionBinding', () => {
 
   describe('resolveMetadataSessionBinding', () => {
     it('uses an explicit sessionSlug field with explicit authority', () => {
-      expect(resolveMetadataSessionBinding({
-        sessionSlug: ' edge ',
-      }, 'fallback')).toEqual({
+      expect(
+        resolveMetadataSessionBinding(
+          {
+            sessionSlug: ' edge ',
+          },
+          'fallback',
+        ),
+      ).toEqual({
         sessionSlug: normalizeSessionSlug('edge'),
         authority: 'explicit',
       });
     });
 
     it('uses an explicit slug field with explicit authority', () => {
-      expect(resolveMetadataSessionBinding({
-        slug: ' debate ',
-      }, 'fallback')).toEqual({
+      expect(
+        resolveMetadataSessionBinding(
+          {
+            slug: ' debate ',
+          },
+          'fallback',
+        ),
+      ).toEqual({
         sessionSlug: normalizeSessionSlug('debate'),
         authority: 'explicit',
       });
@@ -46,12 +56,17 @@ describe('metadataSessionBinding', () => {
     it('ignores slug fields when sessionSlugExplicit is false and falls back to the session name', () => {
       mockGetSessionSlugByName.mockReturnValue('named-session');
 
-      expect(resolveMetadataSessionBinding({
-        sessionSlugExplicit: false,
-        sessionSlug: 'explicit-session',
-        slug: 'explicit-slug',
-        sessionName: 'Named Session',
-      }, 'fallback')).toEqual({
+      expect(
+        resolveMetadataSessionBinding(
+          {
+            sessionSlugExplicit: false,
+            sessionSlug: 'explicit-session',
+            slug: 'explicit-slug',
+            sessionName: 'Named Session',
+          },
+          'fallback',
+        ),
+      ).toEqual({
         sessionSlug: normalizeSessionSlug('named-session'),
         authority: 'name',
       });
@@ -60,9 +75,14 @@ describe('metadataSessionBinding', () => {
     });
 
     it('treats a slug field as authoritative when the explicit flag is absent', () => {
-      expect(resolveMetadataSessionBinding({
-        slug: 'alpha-session',
-      }, 'fallback')).toEqual({
+      expect(
+        resolveMetadataSessionBinding(
+          {
+            slug: 'alpha-session',
+          },
+          'fallback',
+        ),
+      ).toEqual({
         sessionSlug: normalizeSessionSlug('alpha-session'),
         authority: 'explicit',
       });
@@ -71,9 +91,14 @@ describe('metadataSessionBinding', () => {
     it('falls back to the resolved session name when lookup succeeds', () => {
       mockGetSessionSlugByName.mockReturnValue('edge-session');
 
-      expect(resolveMetadataSessionBinding({
-        sessionName: 'Edge Session',
-      }, 'fallback')).toEqual({
+      expect(
+        resolveMetadataSessionBinding(
+          {
+            sessionName: 'Edge Session',
+          },
+          'fallback',
+        ),
+      ).toEqual({
         sessionSlug: normalizeSessionSlug('edge-session'),
         authority: 'name',
       });
@@ -82,9 +107,14 @@ describe('metadataSessionBinding', () => {
     it('falls back to the provided fallback slug when the session name lookup misses', () => {
       mockGetSessionSlugByName.mockReturnValue(null);
 
-      expect(resolveMetadataSessionBinding({
-        sessionName: 'Missing Session',
-      }, 'fallback-session')).toEqual({
+      expect(
+        resolveMetadataSessionBinding(
+          {
+            sessionName: 'Missing Session',
+          },
+          'fallback-session',
+        ),
+      ).toEqual({
         sessionSlug: normalizeSessionSlug('fallback-session'),
         authority: 'fallback',
       });
@@ -115,10 +145,15 @@ describe('metadataSessionBinding', () => {
     });
 
     it('skips blank explicit slug candidates and continues to the next candidate', () => {
-      expect(resolveMetadataSessionBinding({
-        sessionSlug: '   ',
-        slug: 'edge-session',
-      }, 'fallback')).toEqual({
+      expect(
+        resolveMetadataSessionBinding(
+          {
+            sessionSlug: '   ',
+            slug: 'edge-session',
+          },
+          'fallback',
+        ),
+      ).toEqual({
         sessionSlug: normalizeSessionSlug('edge-session'),
         authority: 'explicit',
       });
@@ -129,25 +164,40 @@ describe('metadataSessionBinding', () => {
     it('returns only the resolved session slug', () => {
       mockGetSessionSlugByName.mockReturnValue('edge-session');
 
-      expect(resolveMetadataSessionSlug({
-        sessionName: 'Edge Session',
-      }, 'fallback-session')).toBe(normalizeSessionSlug('edge-session'));
+      expect(
+        resolveMetadataSessionSlug(
+          {
+            sessionName: 'Edge Session',
+          },
+          'fallback-session',
+        ),
+      ).toBe(normalizeSessionSlug('edge-session'));
     });
   });
 
   describe('resolveScopedMetadataSessionSlug', () => {
     it('returns the slug for explicit authority', () => {
-      expect(resolveScopedMetadataSessionSlug({
-        sessionSlug: 'edge-session',
-      }, 'fallback-session')).toBe(normalizeSessionSlug('edge-session'));
+      expect(
+        resolveScopedMetadataSessionSlug(
+          {
+            sessionSlug: 'edge-session',
+          },
+          'fallback-session',
+        ),
+      ).toBe(normalizeSessionSlug('edge-session'));
     });
 
     it('returns the slug for name authority', () => {
       mockGetSessionSlugByName.mockReturnValue('named-session');
 
-      expect(resolveScopedMetadataSessionSlug({
-        sessionName: 'Named Session',
-      }, 'fallback-session')).toBe(normalizeSessionSlug('named-session'));
+      expect(
+        resolveScopedMetadataSessionSlug(
+          {
+            sessionName: 'Named Session',
+          },
+          'fallback-session',
+        ),
+      ).toBe(normalizeSessionSlug('named-session'));
     });
 
     it('returns an empty string for fallback authority', () => {
@@ -183,9 +233,12 @@ describe('metadataSessionBinding', () => {
     });
 
     it('sets sessionSlug and sessionSlugExplicit on explicit output metadata', () => {
-      const result = buildMetadataSessionCacheEnvelope({
-        sessionSlug: 'edge-session',
-      }, 'fallback-session');
+      const result = buildMetadataSessionCacheEnvelope(
+        {
+          sessionSlug: 'edge-session',
+        },
+        'fallback-session',
+      );
 
       expect(result.metadata.sessionSlug).toBe(normalizeSessionSlug('edge-session'));
       expect(result.metadata.sessionSlugExplicit).toBe(true);
@@ -193,32 +246,44 @@ describe('metadataSessionBinding', () => {
     });
 
     it('adds a slug field when includeSlugField is true', () => {
-      const result = buildMetadataSessionCacheEnvelope({
-        sessionSlug: 'edge-session',
-      }, 'fallback-session', {
-        includeSlugField: true,
-      });
+      const result = buildMetadataSessionCacheEnvelope(
+        {
+          sessionSlug: 'edge-session',
+        },
+        'fallback-session',
+        {
+          includeSlugField: true,
+        },
+      );
 
       expect(result.metadata.slug).toBe(normalizeSessionSlug('edge-session'));
     });
 
     it('does not add a slug field when includeSlugField is false', () => {
-      const result = buildMetadataSessionCacheEnvelope({
-        sessionName: 'Missing Session',
-      }, 'fallback-session', {
-        includeSlugField: false,
-      });
+      const result = buildMetadataSessionCacheEnvelope(
+        {
+          sessionName: 'Missing Session',
+        },
+        'fallback-session',
+        {
+          includeSlugField: false,
+        },
+      );
 
       expect(Object.prototype.hasOwnProperty.call(result.metadata, 'slug')).toBe(false);
     });
 
     it('preserves an existing slug field when includeSlugField is false', () => {
-      const result = buildMetadataSessionCacheEnvelope({
-        slug: 'preserve-me',
-        sessionSlugExplicit: false,
-      }, 'fallback-session', {
-        includeSlugField: false,
-      });
+      const result = buildMetadataSessionCacheEnvelope(
+        {
+          slug: 'preserve-me',
+          sessionSlugExplicit: false,
+        },
+        'fallback-session',
+        {
+          includeSlugField: false,
+        },
+      );
 
       expect(result.metadata.slug).toBe('preserve-me');
       expect(result.metadata.sessionSlug).toBe(normalizeSessionSlug('fallback-session'));

@@ -60,27 +60,19 @@ export type SurveyResultsAnalysisLifecyclePlan = {
 };
 
 const normalizeSections = (
-  sections: readonly SessionResultsAnalysisSectionKey[] | undefined
-): SessionResultsAnalysisSectionKey[] => (
-  Array.isArray(sections) ? sections.filter(Boolean) : []
-);
+  sections: readonly SessionResultsAnalysisSectionKey[] | undefined,
+): SessionResultsAnalysisSectionKey[] => (Array.isArray(sections) ? sections.filter(Boolean) : []);
 
 const artifactCoversSections = (
   artifact: SessionResultsGeneratedAnalysisArtifact | null,
-  sections: readonly SessionResultsAnalysisSectionKey[]
-): boolean => (
-  !!artifact &&
-  sections.every((section) => !!artifact.sections?.[section]?.available)
-);
+  sections: readonly SessionResultsAnalysisSectionKey[],
+): boolean => !!artifact && sections.every((section) => !!artifact.sections?.[section]?.available);
 
 const getAvailableSections = (
   artifact: SessionResultsGeneratedAnalysisArtifact | null,
-  sections: readonly SessionResultsAnalysisSectionKey[]
-): SessionResultsAnalysisSectionKey[] => (
-  artifact
-    ? sections.filter((section) => !!artifact.sections?.[section]?.available)
-    : []
-);
+  sections: readonly SessionResultsAnalysisSectionKey[],
+): SessionResultsAnalysisSectionKey[] =>
+  artifact ? sections.filter((section) => !!artifact.sections?.[section]?.available) : [];
 
 const buildPayloadDescriptor = ({
   allSections,
@@ -129,26 +121,22 @@ export const buildSurveyResultsAnalysisLifecyclePlan = ({
   const normalizedInputSignature = String(inputSignature || '');
   const all = normalizeSections(allSections);
   const requested = normalizeSections(requestedSections);
-  const sectionsToGenerate = requested.length > 0
-    ? requested
-    : all;
-  const currentMatches = currentArtifact?.inputSignature === normalizedInputSignature
-    ? currentArtifact
-    : null;
-  const cachedMatches = cachedArtifact?.inputSignature === normalizedInputSignature
-    ? cachedArtifact
-    : null;
+  const sectionsToGenerate = requested.length > 0 ? requested : all;
+  const currentMatches = currentArtifact?.inputSignature === normalizedInputSignature ? currentArtifact : null;
+  const cachedMatches = cachedArtifact?.inputSignature === normalizedInputSignature ? cachedArtifact : null;
   const artifact = currentMatches || cachedMatches || null;
-  const source: SurveyResultsAnalysisLifecyclePlan['target']['source'] =
-    currentMatches ? 'current' : cachedMatches ? 'cache' : 'none';
+  const source: SurveyResultsAnalysisLifecyclePlan['target']['source'] = currentMatches
+    ? 'current'
+    : cachedMatches
+      ? 'cache'
+      : 'none';
   const target = {
     artifactInputSignature: String(artifact?.inputSignature || ''),
     inputSignature: normalizedInputSignature,
     source,
   };
-  const blockedReason: SurveyResultsAnalysisLifecycleBlockedReason = sectionsToGenerate.length > 0
-    ? ''
-    : 'missing-analysis-sections';
+  const blockedReason: SurveyResultsAnalysisLifecycleBlockedReason =
+    sectionsToGenerate.length > 0 ? '' : 'missing-analysis-sections';
   const failureRecovery = buildFailureRecovery();
 
   if (blockedReason) {

@@ -129,14 +129,10 @@ export const resolveCreateSbtMemoizedImageDataUrl = ({
   imageFile?: unknown;
   memoizedImageDataUrl?: unknown;
   memoizedImageFileRef?: unknown;
-} = {}): string | null => (
-  imageFile &&
-  imageFile === memoizedImageFileRef &&
-  typeof memoizedImageDataUrl === 'string' &&
-  memoizedImageDataUrl
+} = {}): string | null =>
+  imageFile && imageFile === memoizedImageFileRef && typeof memoizedImageDataUrl === 'string' && memoizedImageDataUrl
     ? memoizedImageDataUrl
-    : null
-);
+    : null;
 
 export const resolveCreateSbtMetadataImageSource = ({
   defaultImageUrl = '',
@@ -144,9 +140,10 @@ export const resolveCreateSbtMetadataImageSource = ({
   sbtImageUrl = '',
   useImageUrl = false,
 }: ResolveCreateSbtMetadataImageSourceArgs = {}): string => {
-  const normalizeImage = typeof getCanonicalMetadataImageUrl === 'function'
-    ? getCanonicalMetadataImageUrl
-    : (value: unknown) => String(value || '');
+  const normalizeImage =
+    typeof getCanonicalMetadataImageUrl === 'function'
+      ? getCanonicalMetadataImageUrl
+      : (value: unknown) => String(value || '');
   const explicit = normalizeImage(sbtImageUrl);
   if (useImageUrl && explicit) return explicit;
   if (explicit) return explicit;
@@ -158,7 +155,7 @@ export const getFetchableCreateSbtImageUrl = (value: unknown): string => {
   if (!normalizedValue) return '';
   try {
     const urlObj = new URL(normalizedValue);
-    return (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') ? normalizedValue : '';
+    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:' ? normalizedValue : '';
   } catch (_) {
     return '';
   }
@@ -184,15 +181,13 @@ export const buildCreateSbtImagePreviewState = ({
 }: BuildCreateSbtImagePreviewStateArgs = {}): CreateSbtImagePreviewState => {
   const trimmedImageUrl = String(sbtImageUrl || '').trim();
   const hasImagePreview = !!(sbtImageFile && !imageLoadError);
-  const hasPendingImagePreview = Boolean(useImageUrl && trimmedImageUrl.length > 0 && !hasImagePreview && !imageLoadError);
-  const showImagePreviewError = Boolean(useImageUrl && trimmedImageUrl.length > 0 && imageLoadError);
-  const effectiveImageStatusText = imageChooserStatusText || (
-    hasPendingImagePreview
-      ? 'Loading preview...'
-      : showImagePreviewError
-        ? 'Image preview unavailable.'
-        : ''
+  const hasPendingImagePreview = Boolean(
+    useImageUrl && trimmedImageUrl.length > 0 && !hasImagePreview && !imageLoadError,
   );
+  const showImagePreviewError = Boolean(useImageUrl && trimmedImageUrl.length > 0 && imageLoadError);
+  const effectiveImageStatusText =
+    imageChooserStatusText ||
+    (hasPendingImagePreview ? 'Loading preview...' : showImagePreviewError ? 'Image preview unavailable.' : '');
   const effectiveImageStatusTone = imageChooserStatusText
     ? imageChooserStatusTone
     : hasPendingImagePreview
@@ -206,7 +201,7 @@ export const buildCreateSbtImagePreviewState = ({
     effectiveImageStatusTone,
     hasImagePreview,
     hasPendingImagePreview,
-    previewFile: hasImagePreview ? sbtImageFile as Blob : null,
+    previewFile: hasImagePreview ? (sbtImageFile as Blob) : null,
     showImagePreviewError,
   };
 };

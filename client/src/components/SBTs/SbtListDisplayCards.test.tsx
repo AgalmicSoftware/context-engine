@@ -1,10 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import {
-  SbtListCompactLinkCard,
-  SbtListStandardCard,
-} from './SbtListDisplayCards';
+import { SbtListCompactLinkCard, SbtListStandardCard } from './SbtListDisplayCards';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 
 const styles = {
@@ -41,7 +38,7 @@ describe('SbtListDisplayCards', () => {
         onClick={jest.fn()}
         sbtLabel="Group"
         styles={styles}
-      />
+      />,
     );
 
     expect(screen.getByRole('link', { name: /Badge/ })).toHaveAttribute('href', '/groups/0xabc');
@@ -61,7 +58,7 @@ describe('SbtListDisplayCards', () => {
         sbtLabel="Group"
         shellClassName="standard"
         styles={styles}
-      />
+      />,
     );
 
     expect(screen.getByRole('link', { name: /Badge/ })).toHaveAttribute('href', '/groups/0xabc');
@@ -79,7 +76,7 @@ describe('SbtListDisplayCards', () => {
         sbtLabel="Group"
         shellClassName="standard"
         styles={styles}
-      />
+      />,
     );
 
     expect(screen.getByText('Meta row')).toBeInTheDocument();
@@ -95,7 +92,7 @@ describe('SbtListDisplayCards', () => {
         sbtLabel="Group"
         shellClassName="standard"
         styles={styles}
-      />
+      />,
     );
 
     expect(screen.getByRole('img', { name: 'Group Thumbnail' })).toHaveAttribute('src', defaultSbtImage);
@@ -110,7 +107,7 @@ describe('SbtListDisplayCards', () => {
         onClick={jest.fn()}
         sbtLabel="Group"
         styles={styles}
-      />
+      />,
     );
 
     const image = screen.getByRole('img', { name: 'Group Thumbnail' });

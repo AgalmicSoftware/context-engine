@@ -56,25 +56,31 @@ describe('sessionWizardLocalStateSupport', () => {
   it('clears pending sbt drafts and only warns for non-missing storage failures', () => {
     const logger = { warn: jest.fn() };
     const clearPendingSbtDrafts = jest.fn();
-    const clearDraftCache: any = jest.fn(({ clearPendingSbtDrafts: clearPending }: { clearPendingSbtDrafts?: () => void } = {}) => {
-      clearPending?.();
-      return { ok: false, removed: 0, failed: 1, status: 'partial-failure' as const };
-    });
+    const clearDraftCache: any = jest.fn(
+      ({ clearPendingSbtDrafts: clearPending }: { clearPendingSbtDrafts?: () => void } = {}) => {
+        clearPending?.();
+        return { ok: false, removed: 0, failed: 1, status: 'partial-failure' as const };
+      },
+    );
 
-    expect(clearSessionWizardCache({
-      clearDraftCache,
-      clearPendingSbtDrafts,
-      logger,
-    })).toEqual({ ok: false, removed: 0, failed: 1, status: 'partial-failure' });
+    expect(
+      clearSessionWizardCache({
+        clearDraftCache,
+        clearPendingSbtDrafts,
+        logger,
+      }),
+    ).toEqual({ ok: false, removed: 0, failed: 1, status: 'partial-failure' });
     expect(clearPendingSbtDrafts).toHaveBeenCalledTimes(1);
     expect(logger.warn).toHaveBeenCalledWith('SessionWizard: fallback', 'partial-failure');
 
     logger.warn.mockClear();
     clearPendingSbtDrafts.mockClear();
-    clearDraftCache.mockImplementation(({ clearPendingSbtDrafts: clearPending }: { clearPendingSbtDrafts?: () => void } = {}) => {
-      clearPending?.();
-      return { ok: false, removed: 0, failed: 1, status: 'missing-storage' as const };
-    });
+    clearDraftCache.mockImplementation(
+      ({ clearPendingSbtDrafts: clearPending }: { clearPendingSbtDrafts?: () => void } = {}) => {
+        clearPending?.();
+        return { ok: false, removed: 0, failed: 1, status: 'missing-storage' as const };
+      },
+    );
     clearSessionWizardCache({ clearDraftCache, clearPendingSbtDrafts, logger });
     expect(clearPendingSbtDrafts).toHaveBeenCalledTimes(1);
     expect(logger.warn).not.toHaveBeenCalled();

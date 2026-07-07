@@ -1,11 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import {
-  NotFoundRoute,
-  readHashQueryParam,
-  SessionLoadingSkeleton,
-} from './routeStatusViews';
+import { NotFoundRoute, readHashQueryParam, SessionLoadingSkeleton } from './routeStatusViews';
 
 describe('routeStatusViews', () => {
   it('reads query params from hash values', () => {

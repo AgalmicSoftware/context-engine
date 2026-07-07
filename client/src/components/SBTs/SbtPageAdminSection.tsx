@@ -30,15 +30,10 @@ const SbtPageAdminSection = ({
   return (
     <div className={styles.adminSection}>
       <h2 className={sectionHeaderClassName} onClick={onToggle}>
-        ADMIN{' '}
-        {toggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
+        ADMIN {toggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
         {toggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
       </h2>
-      {toggleState.isOpen && (
-        <div className={styles.adminContainer}>
-          {adminActions}
-        </div>
-      )}
+      {toggleState.isOpen && <div className={styles.adminContainer}>{adminActions}</div>}
     </div>
   );
 };

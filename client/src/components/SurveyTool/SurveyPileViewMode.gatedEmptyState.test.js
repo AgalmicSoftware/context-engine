@@ -26,30 +26,30 @@ const defaultNetworkCache = {
   pendingQuestionMetadata: {},
 };
 
-const mockQuestionsCache = (networkCache = defaultNetworkCache) => (
-  jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace) => (
-    namespace === 'questionsCache'
-      ? { '84532': { ...defaultNetworkCache, ...networkCache } }
-      : {}
-  ))
-);
+const mockQuestionsCache = (networkCache = defaultNetworkCache) =>
+  jest
+    .spyOn(cacheScripts, 'readCache')
+    .mockImplementation(async (namespace) =>
+      namespace === 'questionsCache' ? { 84532: { ...defaultNetworkCache, ...networkCache } } : {},
+    );
 
-const renderPile = (props = {}) => renderSurveyPileViewMode({
-  minifiedMode: 'pile',
-  network: { id: 84532 },
-  networkChainId: 84532,
-  account: '',
-  loginComplete: false,
-  sessionSlug: 'edge',
-  cacheHasLoaded: true,
-  isQuestionCacheReady: false,
-  questionResponsesNonce: 2,
-  questionsCacheNonce: 2,
-  questionScanProgress: defaultQuestionScanProgress,
-  onFilterChange: jest.fn(),
-  runtimeStrategy: createPileViewRuntimeStrategy(),
-  ...props,
-});
+const renderPile = (props = {}) =>
+  renderSurveyPileViewMode({
+    minifiedMode: 'pile',
+    network: { id: 84532 },
+    networkChainId: 84532,
+    account: '',
+    loginComplete: false,
+    sessionSlug: 'edge',
+    cacheHasLoaded: true,
+    isQuestionCacheReady: false,
+    questionResponsesNonce: 2,
+    questionsCacheNonce: 2,
+    questionScanProgress: defaultQuestionScanProgress,
+    onFilterChange: jest.fn(),
+    runtimeStrategy: createPileViewRuntimeStrategy(),
+    ...props,
+  });
 
 const createDefaultGatedSessionConfig = () => ({
   slug: 'edge',
@@ -67,13 +67,12 @@ const createDefaultGatedSessionConfig = () => ({
   },
 });
 
-const mockSbtLabels = () => (
-  jest.spyOn(sbtDisplayNameUtils, 'resolveSbtDisplayLabel').mockImplementation(({ address }) => (
-    String(address || '').toLowerCase() === SESSION_SBT.toLowerCase()
-      ? 'Session SBT'
-      : 'VIP SBT'
-  ))
-);
+const mockSbtLabels = () =>
+  jest
+    .spyOn(sbtDisplayNameUtils, 'resolveSbtDisplayLabel')
+    .mockImplementation(({ address }) =>
+      String(address || '').toLowerCase() === SESSION_SBT.toLowerCase() ? 'Session SBT' : 'VIP SBT',
+    );
 
 describe('SurveyPileViewMode gated empty states', () => {
   afterEach(() => {
@@ -100,9 +99,9 @@ describe('SurveyPileViewMode gated empty states', () => {
     });
 
     expect(await screen.findByText(`This session's questions are ${t('gatedLower')}.`)).toBeInTheDocument();
-    expect(screen.getByText(
-      `${t('sbt')} required: Session SBT. Connect an eligible ${t('walletLower')} to decrypt.`
-    )).toBeInTheDocument();
+    expect(
+      screen.getByText(`${t('sbt')} required: Session SBT. Connect an eligible ${t('walletLower')} to decrypt.`),
+    ).toBeInTheDocument();
     expect(screen.queryByText('No questions available.')).toBeNull();
     expect(screen.queryByText(/Loading Metadata/)).toBeNull();
   });
@@ -149,12 +148,14 @@ describe('SurveyPileViewMode gated empty states', () => {
     const lockedBanner = await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER);
     expect(lockedBanner).toBeInTheDocument();
     expect(screen.getByText(`This session's questions are ${t('gatedLower')}`)).toBeInTheDocument();
-    expect(screen.getByText(
-      `Connect an eligible ${t('walletLower')} and decrypt to view the questions.`
-    )).toBeInTheDocument();
-    expect(screen.queryByText(
-      `These questions are ${t('gatedLower')} by a ${t('sbt')}. Connect an eligible ${t('walletLower')} to decrypt.`
-    )).toBeNull();
+    expect(
+      screen.getByText(`Connect an eligible ${t('walletLower')} and decrypt to view the questions.`),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        `These questions are ${t('gatedLower')} by a ${t('sbt')}. Connect an eligible ${t('walletLower')} to decrypt.`,
+      ),
+    ).toBeNull();
     expect(screen.queryByText('Retry decrypt')).toBeNull();
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_LOCKED_DECRYPT)).toHaveTextContent('Decrypt');
     expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER_CARET)).toBeNull();
@@ -183,11 +184,14 @@ describe('SurveyPileViewMode gated empty states', () => {
     expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBeInTheDocument();
     expect(screen.getByText(`This session's questions are ${t('gatedLower')}`)).toBeInTheDocument();
     const expectedRequirementText = `${t('sbt')} required: VIP SBT. Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`;
-    expect(screen.getByText((_, element) => (
-      typeof element?.className === 'string' &&
-      element.className.includes('lockedQuestionsSubtext') &&
-      element.textContent?.replace(/\s+/g, ' ').trim() === expectedRequirementText
-    ))).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_, element) =>
+          typeof element?.className === 'string' &&
+          element.className.includes('lockedQuestionsSubtext') &&
+          element.textContent?.replace(/\s+/g, ' ').trim() === expectedRequirementText,
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText('VIP Gate')).toBeNull();
     expect(screen.getByText(/VIP SBT/)).toBeInTheDocument();
     expect(screen.queryByText('Retry decrypt')).toBeNull();

@@ -3,9 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SurveyQuestionsRouteSurface from './SurveyQuestionsRouteSurface';
-import {
-  buildSurveyQuestionsFullLoadingProgressState,
-} from './surveyQuestionsTypes.js';
+import { buildSurveyQuestionsFullLoadingProgressState } from './surveyQuestionsTypes.js';
 
 const loadingProgressState = buildSurveyQuestionsFullLoadingProgressState();
 
@@ -52,12 +50,8 @@ const renderSurface = (overrides = {}) => {
   const onToggleSurveyJson = jest.fn();
   const onCopySurveyJson = jest.fn();
   const onToggleDisplayAnswerMode = jest.fn();
-  const renderJsonTree = jest.fn((json) => (
-    <pre data-testid="json-tree">{JSON.stringify(json)}</pre>
-  ));
-  const renderSurveyAnswers = jest.fn(() => (
-    <div data-testid="survey-answers">Survey answers</div>
-  ));
+  const renderJsonTree = jest.fn((json) => <pre data-testid="json-tree">{JSON.stringify(json)}</pre>);
+  const renderSurveyAnswers = jest.fn(() => <div data-testid="survey-answers">Survey answers</div>);
 
   const result = render(
     <SurveyQuestionsRouteSurface
@@ -109,7 +103,7 @@ const renderSurface = (overrides = {}) => {
         surveyJson: { id: 'survey-1' },
       }}
       {...overrides}
-    />
+    />,
   );
 
   return {
@@ -138,12 +132,7 @@ describe('SurveyQuestionsRouteSurface', () => {
   });
 
   it('renders the authoring route with submit and JSON callbacks wired through', () => {
-    const {
-      onCopySurveyJson,
-      onPrimarySubmitClick,
-      onToggleSurveyJson,
-      renderJsonTree,
-    } = renderSurface();
+    const { onCopySurveyJson, onPrimarySubmitClick, onToggleSurveyJson, renderJsonTree } = renderSurface();
 
     expect(screen.getByTestId('editable-question')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT));
@@ -163,9 +152,6 @@ describe('SurveyQuestionsRouteSurface', () => {
 
     expect(screen.getByTestId('survey-answers')).toBeInTheDocument();
     expect(screen.queryByTestId('editable-question')).not.toBeInTheDocument();
-    expect(renderSurveyAnswers).toHaveBeenCalledWith(
-      [{ questionID: 'q1', answer: 'Yes' }],
-      true
-    );
+    expect(renderSurveyAnswers).toHaveBeenCalledWith([{ questionID: 'q1', answer: 'Yes' }], true);
   });
 });

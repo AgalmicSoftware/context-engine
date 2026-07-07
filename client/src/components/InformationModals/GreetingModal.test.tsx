@@ -18,11 +18,13 @@ jest.mock('utilities/logging.js', () => ({
 jest.mock('reactstrap', () => {
   const React = require('react');
 
-  const wrap = (Tag = 'div') => ({ children, ...props }: any) => {
-    const { check, modalClassName, isOpen, ...rest } = props;
+  const wrap =
+    (Tag = 'div') =>
+    ({ children, ...props }: any) => {
+      const { check, modalClassName, isOpen, ...rest } = props;
 
-    return <Tag {...rest}>{children}</Tag>;
-  };
+      return <Tag {...rest}>{children}</Tag>;
+    };
 
   return {
     __esModule: true,
@@ -39,22 +41,24 @@ jest.mock('reactstrap', () => {
   };
 });
 
-const buildStore = () => createStore((state = {
-  profile: {
-    account: null,
-    provider: null,
-  },
-}) => state);
+const buildStore = () =>
+  createStore(
+    (
+      state = {
+        profile: {
+          account: null,
+          provider: null,
+        },
+      },
+    ) => state,
+  );
 
-const renderGreetingModal = (props: Record<string, unknown> = {}) => render(
-  <Provider store={buildStore()}>
-    <GreetingModal
-      visible
-      closeExplainerFunction={jest.fn()}
-      {...props}
-    />
-  </Provider>
-);
+const renderGreetingModal = (props: Record<string, unknown> = {}) =>
+  render(
+    <Provider store={buildStore()}>
+      <GreetingModal visible closeExplainerFunction={jest.fn()} {...props} />
+    </Provider>,
+  );
 
 describe('GreetingModal', () => {
   it('replaces the legacy placeholder and ownership copy with neutral updates copy', () => {

@@ -60,15 +60,12 @@ type SessionWizardResolvedResourceGate = {
   registryUnsupportedReason: string;
 };
 
-export const buildSessionWizardGateOptions = (
-  gates: SessionWizardResourceGate[] = []
-): SessionWizardGateOption[] => (
+export const buildSessionWizardGateOptions = (gates: SessionWizardResourceGate[] = []): SessionWizardGateOption[] =>
   gates.map((gate) => ({
     id: gate.id,
     label: gate.label,
     color: gate.color,
-  }))
-);
+  }));
 
 export const normalizeSessionWizardGateIds = (value: unknown): string[] => {
   if (Array.isArray(value)) {
@@ -78,21 +75,19 @@ export const normalizeSessionWizardGateIds = (value: unknown): string[] => {
   return raw ? [raw] : [];
 };
 
-const getSessionWizardGateOptionValue = (
-  option: SessionWizardResourceGateOptionLike
-): string => toStr(option?.value ?? option?.id).trim();
+const getSessionWizardGateOptionValue = (option: SessionWizardResourceGateOptionLike): string =>
+  toStr(option?.value ?? option?.id).trim();
 
 export const resolveSessionWizardResourceGateSelectionState = ({
   value = '',
   fallbackGateId = '',
   gateOptions = [],
 }: SessionWizardResourceGateSelectionInput = {}): SessionWizardResourceGateSelectionStatePlan => {
-  const availableGateIds = gateOptions
-    .map((option) => getSessionWizardGateOptionValue(option))
-    .filter(Boolean);
+  const availableGateIds = gateOptions.map((option) => getSessionWizardGateOptionValue(option)).filter(Boolean);
   const resolvedFallbackGateId = toStr(fallbackGateId).trim() || availableGateIds[0] || '';
-  const selectedGateIds = normalizeSessionWizardGateIds(value || resolvedFallbackGateId)
-    .filter((id) => availableGateIds.includes(id));
+  const selectedGateIds = normalizeSessionWizardGateIds(value || resolvedFallbackGateId).filter((id) =>
+    availableGateIds.includes(id),
+  );
 
   return {
     availableGateIds,
@@ -107,8 +102,7 @@ export const resolveSessionWizardResourceGateSelectionUpdate = ({
   availableGateIds = [],
   fallbackGateId = '',
 }: SessionWizardResourceGateSelectionUpdateInput = {}): SessionWizardResourceGateSelectionState => {
-  const filteredGateIds = normalizeSessionWizardGateIds(nextIds)
-    .filter((id) => availableGateIds.includes(id));
+  const filteredGateIds = normalizeSessionWizardGateIds(nextIds).filter((id) => availableGateIds.includes(id));
   if (!filteredGateIds.length) return toStr(fallbackGateId).trim() || '';
   return filteredGateIds.length === 1 ? filteredGateIds[0] : filteredGateIds;
 };
@@ -154,15 +148,9 @@ export const resolveSessionWizardResourceGate = (
 
   const primaryGate = selectedGates[0];
   const gateId = toStr(primaryGate?.id).trim();
-  const modeSet = new Set(
-    selectedGates.map((gate) => (toStr(gate?.mode).trim() === 'all' ? 'all' : 'any')),
-  );
-  const chainIdSet = new Set(
-    selectedGates.map((gate) => Number(gate?.chainId || 0) || null),
-  );
-  const perMemberLimitSet = new Set(
-    selectedGates.map((gate) => Number(gate?.perMemberLimit || 0) || 0),
-  );
+  const modeSet = new Set(selectedGates.map((gate) => (toStr(gate?.mode).trim() === 'all' ? 'all' : 'any')));
+  const chainIdSet = new Set(selectedGates.map((gate) => Number(gate?.chainId || 0) || null));
+  const perMemberLimitSet = new Set(selectedGates.map((gate) => Number(gate?.perMemberLimit || 0) || 0));
   const modeConflicts = modeSet.size > 1;
   const chainIdConflicts = chainIdSet.size > 1;
   const perMemberLimitConflicts = perMemberLimitSet.size > 1;

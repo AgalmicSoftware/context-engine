@@ -78,11 +78,14 @@ describe('sessionRegistryReader', () => {
   });
 
   it('overlays cached worker config onto registry session reads', () => {
-    localStorage.setItem('dg:sessionRegistryCache:v1', JSON.stringify({
-      sessions: {
-        edge: { slug: 'edge', sessionName: 'Edge', corsWorkerUrl: 'https://registry-mirror.example' },
-      },
-    }));
+    localStorage.setItem(
+      'dg:sessionRegistryCache:v1',
+      JSON.stringify({
+        sessions: {
+          edge: { slug: 'edge', sessionName: 'Edge', corsWorkerUrl: 'https://registry-mirror.example' },
+        },
+      }),
+    );
     upsertCachedSessionWorkerConfig({
       slug: 'edge',
       config: {

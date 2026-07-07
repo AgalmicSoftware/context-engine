@@ -41,7 +41,7 @@ export const normalizeAiProvider = (value: unknown, fallback = 'openai'): string
 const normalizeAiModelEntry = (
   entry: AnyRecord | string | null | undefined,
   fallbackModel: string,
-  fallbackProvider: string
+  fallbackProvider: string,
 ): { model: string; provider: string } => {
   if (entry && typeof entry === 'object') {
     const model = toStr(entry.model || entry.name || entry.value || fallbackModel).trim();
@@ -64,12 +64,11 @@ const normalizeAiTranscriptionEntry = (entry: AnyRecord | null | undefined): Any
 export const normalizeAiModels = (
   raw: AnyRecord | null | undefined,
   fallbackProvider: string,
-  transcriptionRaw: AnyRecord | null | undefined
+  transcriptionRaw: AnyRecord | null | undefined,
 ): AnyRecord => {
   const obj: AnyRecord = raw && typeof raw === 'object' ? raw : {};
-  const transcriptionSource = transcriptionRaw && typeof transcriptionRaw === 'object'
-    ? transcriptionRaw
-    : obj.transcription;
+  const transcriptionSource =
+    transcriptionRaw && typeof transcriptionRaw === 'object' ? transcriptionRaw : obj.transcription;
   return {
     fast: normalizeAiModelEntry(obj.fast || obj.default, DEFAULT_AI_MODELS.fast, fallbackProvider),
     thinking: normalizeAiModelEntry(obj.thinking || obj.reasoning, DEFAULT_AI_MODELS.thinking, fallbackProvider),
@@ -81,15 +80,11 @@ export const getAiModelOptions = (modelType: string, providerValue: unknown): st
   if (modelType === 'transcription') return AI_MODEL_OPTIONS.transcription;
   const provider = normalizeAiProvider(providerValue, 'openai');
   const providerOptions = (AI_MODEL_OPTIONS as Record<string, AnyRecord>)[provider] || {};
-  const openAiOptions = (AI_MODEL_OPTIONS.openai as Record<string, string[] | undefined>);
+  const openAiOptions = AI_MODEL_OPTIONS.openai as Record<string, string[] | undefined>;
   return providerOptions[modelType] || openAiOptions[modelType] || [];
 };
 
-export const normalizeAiModelForProvider = (
-  modelType: string,
-  providerValue: unknown,
-  modelValue: unknown
-): string => {
+export const normalizeAiModelForProvider = (modelType: string, providerValue: unknown, modelValue: unknown): string => {
   const options = getAiModelOptions(modelType, providerValue);
   const model = toStr(modelValue).trim();
   if (!options.length) return model;
@@ -103,23 +98,17 @@ export type SessionWizardAiModelProviderPatch = {
   models: Partial<Record<AiModelPatchKey, string>>;
 };
 
-const isAiConfigRecord = (value: unknown): value is AnyRecord => (
-  value !== null && typeof value === 'object' && !Array.isArray(value)
-);
+const isAiConfigRecord = (value: unknown): value is AnyRecord =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
 
-const readAiModelRecord = (
-  ai: unknown,
-  modelKey: AiModelPatchKey
-): AnyRecord => {
+const readAiModelRecord = (ai: unknown, modelKey: AiModelPatchKey): AnyRecord => {
   const aiRecord = isAiConfigRecord(ai) ? ai : {};
   const models = isAiConfigRecord(aiRecord.models) ? aiRecord.models : {};
   const model = models[modelKey];
   return isAiConfigRecord(model) ? model : {};
 };
 
-export const resolveSessionWizardAiModelProviderPatch = (
-  ai: unknown
-): SessionWizardAiModelProviderPatch => {
+export const resolveSessionWizardAiModelProviderPatch = (ai: unknown): SessionWizardAiModelProviderPatch => {
   const fast = readAiModelRecord(ai, 'fast');
   const thinking = readAiModelRecord(ai, 'thinking');
   const fastProvider = normalizeAiProvider(fast.provider || 'openai');
@@ -141,10 +130,7 @@ export const resolveSessionWizardAiModelProviderPatch = (
   };
 };
 
-export const resolveSessionWizardAutoFeatureBySessionSlug = (
-  metadata: AnyRecord | null | undefined
-) => (
+export const resolveSessionWizardAutoFeatureBySessionSlug = (metadata: AnyRecord | null | undefined) =>
   metadata?.autoFeatureSBTsBySessionSlug !== undefined
     ? metadata.autoFeatureSBTsBySessionSlug
-    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
-);
+    : metadata?.autoFeatureSBTsWithFeaturedSbtTags;

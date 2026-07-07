@@ -84,36 +84,28 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
         questionPool,
       });
 
-      await cryptoUtils.decryptMultipleAnswers(
-        encrypted,
-        questionPool,
-        {
-          provider: providerDecrypt,
-          account: ACCOUNT,
-          chainId: CHAIN_ID,
-          surveyId: SURVEY_ID,
-        }
-      );
+      await cryptoUtils.decryptMultipleAnswers(encrypted, questionPool, {
+        provider: providerDecrypt,
+        account: ACCOUNT,
+        chainId: CHAIN_ID,
+        surveyId: SURVEY_ID,
+      });
 
       const signCallsAfterFirstDecrypt = providerDecrypt.request.mock.calls.filter(
-        ([payload]) => payload?.method === 'eth_signTypedData_v4'
+        ([payload]) => payload?.method === 'eth_signTypedData_v4',
       ).length;
       expect(signCallsAfterFirstDecrypt).toBe(1);
 
-      nowSpy.mockReturnValue(1_000 + (1000 * 60 * 10) + 1);
-      await cryptoUtils.decryptMultipleAnswers(
-        encrypted,
-        questionPool,
-        {
-          provider: providerDecrypt,
-          account: ACCOUNT,
-          chainId: CHAIN_ID,
-          surveyId: SURVEY_ID,
-        }
-      );
+      nowSpy.mockReturnValue(1_000 + 1000 * 60 * 10 + 1);
+      await cryptoUtils.decryptMultipleAnswers(encrypted, questionPool, {
+        provider: providerDecrypt,
+        account: ACCOUNT,
+        chainId: CHAIN_ID,
+        surveyId: SURVEY_ID,
+      });
 
       const signCallsAfterSecondDecrypt = providerDecrypt.request.mock.calls.filter(
-        ([payload]) => payload?.method === 'eth_signTypedData_v4'
+        ([payload]) => payload?.method === 'eth_signTypedData_v4',
       ).length;
       expect(signCallsAfterSecondDecrypt).toBe(2);
     } finally {
@@ -158,7 +150,7 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
         chainId: CHAIN_ID,
         surveyId: SURVEY_ID,
         throwOnError: true,
-      })
+      }),
     ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
   });
 
@@ -188,7 +180,7 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
         chainId: CHAIN_ID,
         surveyId: OTHER_SURVEY_ID,
         throwOnError: true,
-      })
+      }),
     ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
   });
 
@@ -214,35 +206,45 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
     });
 
     await expect(
-      cryptoUtils.decryptSingleField({
-        answers: {},
-        additionalComments: {
-          q1: { ...encrypted.answers.q1 },
+      cryptoUtils.decryptSingleField(
+        {
+          answers: {},
+          additionalComments: {
+            q1: { ...encrypted.answers.q1 },
+          },
+          importance: {},
         },
-        importance: {},
-      }, 'q1', 'additional', {
-        provider,
-        account: ACCOUNT,
-        chainId: CHAIN_ID,
-        surveyId: SURVEY_ID,
-        throwOnError: true,
-      })
+        'q1',
+        'additional',
+        {
+          provider,
+          account: ACCOUNT,
+          chainId: CHAIN_ID,
+          surveyId: SURVEY_ID,
+          throwOnError: true,
+        },
+      ),
     ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
 
     await expect(
-      cryptoUtils.decryptSingleField({
-        answers: {
-          q1: { ...encrypted.additionalComments.q1 },
+      cryptoUtils.decryptSingleField(
+        {
+          answers: {
+            q1: { ...encrypted.additionalComments.q1 },
+          },
+          additionalComments: {},
+          importance: {},
         },
-        additionalComments: {},
-        importance: {},
-      }, 'q1', 'answer', {
-        provider,
-        account: ACCOUNT,
-        chainId: CHAIN_ID,
-        surveyId: SURVEY_ID,
-        throwOnError: true,
-      })
+        'q1',
+        'answer',
+        {
+          provider,
+          account: ACCOUNT,
+          chainId: CHAIN_ID,
+          surveyId: SURVEY_ID,
+          throwOnError: true,
+        },
+      ),
     ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
   });
 });

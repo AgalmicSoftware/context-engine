@@ -1,12 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCheck,
-  faImage,
-  faQuestionCircle,
-  faSpinner,
-  faTimes,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faImage, faQuestionCircle, faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
@@ -54,16 +48,13 @@ const resolveFirstTargetName = ({
   sbtNames: Record<string, React.ReactNode>;
 }): React.ReactNode => {
   const firstTargetAddrLower =
-    (autoMintTargets && autoMintTargets[0] && autoMintTargets[0].sbt)
-      ? String(autoMintTargets[0].sbt).toLowerCase()
-      : '';
+    autoMintTargets && autoMintTargets[0] && autoMintTargets[0].sbt ? String(autoMintTargets[0].sbt).toLowerCase() : '';
   return firstTargetAddrLower ? sbtNames[firstTargetAddrLower] : null;
 };
 
-const isTerminalAutoMintError = (error: React.ReactNode): boolean => (
+const isTerminalAutoMintError = (error: React.ReactNode): boolean =>
   !!error &&
-  /max(imum)?\s*(tokens?\s*)?mint|supply\s*exhaust|mint.*expir|period.*end|group\s*limit/i.test(String(error))
-);
+  /max(imum)?\s*(tokens?\s*)?mint|supply\s*exhaust|mint.*expir|period.*end|group\s*limit/i.test(String(error));
 
 const renderStatusIcon = (status: string): React.ReactNode => {
   if (status === 'pending') return <FontAwesomeIcon icon={faSpinner} spin />;
@@ -114,9 +105,11 @@ const OnePageSessionAutoMintAlerts = ({
           closeClassName={alertCloseClass}
         >
           {`Login to Join ${t('sbt')}:`}&nbsp;
-          {firstTargetName
-            ? firstTargetName
-            : <FontAwesomeIcon icon={faSpinner} spin aria-label="loading group name" />}
+          {firstTargetName ? (
+            firstTargetName
+          ) : (
+            <FontAwesomeIcon icon={faSpinner} spin aria-label="loading group name" />
+          )}
         </Alert>
       )}
 
@@ -149,15 +142,17 @@ const OnePageSessionAutoMintAlerts = ({
         <div className={styles.sbtMintBannerContainer}>
           {statusEntries.map(([addrKey, statusValue]) => {
             const key = statusKey(addrKey);
-            const status = String(statusValue.status || '').trim().toLowerCase();
+            const status = String(statusValue.status || '')
+              .trim()
+              .toLowerCase();
             const color =
               status === 'success'
                 ? 'success'
                 : status === 'failed'
-                ? 'danger'
-                : status === 'skipped'
-                ? 'secondary'
-                : 'info';
+                  ? 'danger'
+                  : status === 'skipped'
+                    ? 'secondary'
+                    : 'info';
             const isOpen = !dismissedStatusItems[key];
             const isExpanded = !!expandedImages[key];
             const sbtImage = sbtImages[key];

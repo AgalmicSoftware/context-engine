@@ -1,8 +1,4 @@
-import {
-  isPlainAnalysisObject,
-  toAnalysisRecord,
-  type UserPageUnknownRecord,
-} from './userPageCoreHelpers';
+import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 
 export type UserPageBookmarkUserEntry = UserPageUnknownRecord & {
   address?: unknown;
@@ -95,19 +91,14 @@ export const resolveUserPageBookmarkButtonDisplayState = ({
 export const buildUserPageHeaderBookmarkClassName = ({
   baseClassName = '',
   headerClassName = '',
-}: BuildUserPageHeaderBookmarkClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  String(headerClassName || ''),
-].filter(Boolean).join(' '));
+}: BuildUserPageHeaderBookmarkClassNameArgs = {}): string =>
+  [String(baseClassName || ''), String(headerClassName || '')].filter(Boolean).join(' ');
 
 export const resolveUserPageBookmarksLinkDisplayState = ({
   baseClassName = '',
   inlineClassName = '',
 }: ResolveUserPageBookmarksLinkDisplayStateArgs = {}): UserPageBookmarksLinkDisplayState => ({
-  className: [
-    String(baseClassName || ''),
-    String(inlineClassName || ''),
-  ].filter(Boolean).join(' '),
+  className: [String(baseClassName || ''), String(inlineClassName || '')].filter(Boolean).join(' '),
   style: { marginLeft: '12px' },
 });
 
@@ -128,25 +119,17 @@ export const buildUserPageBookmarkStatusStateUpdate = ({
   return Object.keys(nextState).length > 0 ? nextState : null;
 };
 
-export const isBookmarkUserEntry = (value: unknown): value is UserPageBookmarkUserEntry => (
-  isPlainAnalysisObject(value)
-);
+export const isBookmarkUserEntry = (value: unknown): value is UserPageBookmarkUserEntry => isPlainAnalysisObject(value);
 
 export const isBookmarkUserObjectForAddress = (
   value: unknown,
-  addressLower: string
-): value is UserPageBookmarkUserEntry => (
-  isBookmarkUserEntry(value) &&
-  String(value.address || '').toLowerCase() === addressLower
-);
+  addressLower: string,
+): value is UserPageBookmarkUserEntry =>
+  isBookmarkUserEntry(value) && String(value.address || '').toLowerCase() === addressLower;
 
-export const isBookmarkValueForAddress = (
-  value: unknown,
-  addressLower: string
-): boolean => (
+export const isBookmarkValueForAddress = (value: unknown, addressLower: string): boolean =>
   (typeof value === 'string' && String(value).toLowerCase() === addressLower) ||
-  isBookmarkUserObjectForAddress(value, addressLower)
-);
+  isBookmarkUserObjectForAddress(value, addressLower);
 
 export const buildDefaultUserPageBookmarksCache = (): UserPageBookmarksCache => ({
   surveys: [],
@@ -163,7 +146,7 @@ export const normalizeUserPageBookmarksCache = (value: unknown): UserPageBookmar
     ...value,
     surveys: Array.isArray(value.surveys) ? [...value.surveys] : [],
     questions: Array.isArray(value.questions) ? [...value.questions] : [],
-    users: Array.isArray(value.users) ? [...value.users] as UserPageBookmarkUserValue[] : [],
+    users: Array.isArray(value.users) ? ([...value.users] as UserPageBookmarkUserValue[]) : [],
     filters: Array.isArray(value.filters) ? [...value.filters] : [],
   };
 };
@@ -204,9 +187,7 @@ export const resolveUserPageBookmarkNickname = ({
 }: ResolveUserPageBookmarkNicknameArgs = {}): string => {
   const addressLower = String(address || '').toLowerCase();
   if (!addressLower) return '';
-  const user = (Array.isArray(users) ? users : []).find((entry) => (
-    isBookmarkUserObjectForAddress(entry, addressLower)
-  ));
+  const user = (Array.isArray(users) ? users : []).find((entry) => isBookmarkUserObjectForAddress(entry, addressLower));
   if (!user || typeof user.nickname !== 'string') return '';
   const nickname = trim ? user.nickname.trim() : user.nickname;
   return nickname || '';
@@ -225,7 +206,7 @@ export const applyUserPageBookmarkNicknameSave = ({
   const networkIdStr = networkId != null ? String(networkId) : null;
   const username = String(onchainUsername || '').trim();
   const cache = isPlainAnalysisObject(bookmarksCache)
-    ? bookmarksCache as UserPageBookmarksCache
+    ? (bookmarksCache as UserPageBookmarksCache)
     : buildDefaultUserPageBookmarksCache();
 
   cache.surveys = Array.isArray(cache.surveys) ? cache.surveys : [];
@@ -242,12 +223,8 @@ export const applyUserPageBookmarkNicknameSave = ({
   }
 
   const users = cache.users;
-  const objIdx = users.findIndex((user) => (
-    isBookmarkUserObjectForAddress(user, addrLower)
-  ));
-  const strIdx = users.findIndex((user) => (
-    typeof user === 'string' && String(user).toLowerCase() === addrLower
-  ));
+  const objIdx = users.findIndex((user) => isBookmarkUserObjectForAddress(user, addrLower));
+  const strIdx = users.findIndex((user) => typeof user === 'string' && String(user).toLowerCase() === addrLower);
   const baseObj: UserPageBookmarkUserEntry = {
     address: addrLower,
     ...(normalizedNickname ? { nickname: normalizedNickname } : {}),
@@ -295,7 +272,7 @@ export const applyUserPageBookmarkToggle = ({
   const rawAddr = String(address || '');
   const addrLower = rawAddr.toLowerCase();
   const cache = isPlainAnalysisObject(bookmarksCache)
-    ? bookmarksCache as UserPageBookmarksCache
+    ? (bookmarksCache as UserPageBookmarksCache)
     : buildDefaultUserPageBookmarksCache();
   cache.surveys = Array.isArray(cache.surveys) ? cache.surveys : [];
   cache.questions = Array.isArray(cache.questions) ? cache.questions : [];
@@ -326,10 +303,7 @@ export const applyUserPageBookmarkToggle = ({
 
   const meta = isPlainAnalysisObject(bookmarkMeta) ? bookmarkMeta : {};
   const username = onchainUsername || '';
-  const shouldUseObject =
-    Boolean(meta.nickname || meta.username) ||
-    Boolean(currentNickname) ||
-    Boolean(username);
+  const shouldUseObject = Boolean(meta.nickname || meta.username) || Boolean(currentNickname) || Boolean(username);
   if (shouldUseObject) {
     const entry: UserPageBookmarkUserEntry = {
       address: addrLower,

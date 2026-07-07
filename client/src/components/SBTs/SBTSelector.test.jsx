@@ -13,20 +13,18 @@ describe('SBTSelector targeted hydration', () => {
     sessionStorage.clear();
     globalThis.CE_SESSION_SCAN_SCOPE = 'active';
     globalThis.CE_SESSION_SCAN_SLUGS = [];
-    try { delete globalThis.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS; } catch (_) {}
+    try {
+      delete globalThis.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS;
+    } catch (_) {}
   });
 
   it('does not use demo-session metadata for labels when the strict shared lookup misses in live mode', () => {
     const instance = makeInstance();
-    const strictSpy = jest
-      .spyOn(contractScriptsUtils, 'getSessionConfigBySlugOrDefault')
-      .mockReturnValueOnce(null);
-    const demoSpy = jest
-      .spyOn(contractScriptsUtils, 'getDemoSessionConfigBySlug')
-      .mockReturnValueOnce({
-        slug: 'rxc',
-        sessionName: 'Weyl v. Yarvin Debate',
-      });
+    const strictSpy = jest.spyOn(contractScriptsUtils, 'getSessionConfigBySlugOrDefault').mockReturnValueOnce(null);
+    const demoSpy = jest.spyOn(contractScriptsUtils, 'getDemoSessionConfigBySlug').mockReturnValueOnce({
+      slug: 'rxc',
+      sessionName: 'Weyl v. Yarvin Debate',
+    });
 
     try {
       expect(instance.getSessionLabel('rxc')).toBe('rxc');
@@ -48,25 +46,23 @@ describe('SBTSelector targeted hydration', () => {
       .spyOn(contractScriptsUtils, 'getSessionConfigBySlugOrDefault')
       .mockReturnValueOnce(null)
       .mockReturnValueOnce(null);
-    const chainSpy = jest
-      .spyOn(contractScriptsUtils, 'getSessionChainId')
-      .mockReturnValueOnce(null);
-    const demoSpy = jest
-      .spyOn(contractScriptsUtils, 'getDemoSessionConfigBySlug')
-      .mockReturnValue({
-        slug: 'rxc',
-        networkChainId: 777777,
-      });
+    const chainSpy = jest.spyOn(contractScriptsUtils, 'getSessionChainId').mockReturnValueOnce(null);
+    const demoSpy = jest.spyOn(contractScriptsUtils, 'getDemoSessionConfigBySlug').mockReturnValue({
+      slug: 'rxc',
+      networkChainId: 777777,
+    });
 
     try {
       expect(instance.getSessionNetworkId('rxc')).toBe(10);
-      expect(instance.getMetadataLookupConfig('rxc')).toEqual(expect.objectContaining({
-        slug: 'rxc',
-        networkChainId: 10,
-        __registry: expect.objectContaining({
-          chainId: 10,
+      expect(instance.getMetadataLookupConfig('rxc')).toEqual(
+        expect.objectContaining({
+          slug: 'rxc',
+          networkChainId: 10,
+          __registry: expect.objectContaining({
+            chainId: 10,
+          }),
         }),
-      }));
+      );
       expect(demoSpy).not.toHaveBeenCalled();
     } finally {
       strictSpy.mockRestore();
@@ -82,32 +78,30 @@ describe('SBTSelector targeted hydration', () => {
       chainId: null,
       network: null,
     });
-    const strictSpy = jest
-      .spyOn(contractScriptsUtils, 'getSessionConfigBySlugOrDefault')
-      .mockReturnValue({
-        slug: 'legacyEdge',
-        contracts: {},
-        __unresolved: true,
-      });
-    const demoSpy = jest
-      .spyOn(contractScriptsUtils, 'getDemoSessionConfigBySlug')
-      .mockReturnValue({
-        slug: 'edge',
-        sessionName: 'Edge 2025',
-        networkChainId: 84532,
-        contracts: {
-          sbtFactory: {
-            address: '0x00000000000000000000000000000000000000dd',
-            chainId: 84532,
-          },
+    const strictSpy = jest.spyOn(contractScriptsUtils, 'getSessionConfigBySlugOrDefault').mockReturnValue({
+      slug: 'legacyEdge',
+      contracts: {},
+      __unresolved: true,
+    });
+    const demoSpy = jest.spyOn(contractScriptsUtils, 'getDemoSessionConfigBySlug').mockReturnValue({
+      slug: 'edge',
+      sessionName: 'Edge 2025',
+      networkChainId: 84532,
+      contracts: {
+        sbtFactory: {
+          address: '0x00000000000000000000000000000000000000dd',
+          chainId: 84532,
         },
-      });
+      },
+    });
 
     try {
-      expect(instance.getDisplayLookupSessionConfig('legacyEdge')).toEqual(expect.objectContaining({
-        slug: 'legacyEdge',
-        __unresolved: true,
-      }));
+      expect(instance.getDisplayLookupSessionConfig('legacyEdge')).toEqual(
+        expect.objectContaining({
+          slug: 'legacyEdge',
+          __unresolved: true,
+        }),
+      );
       expect(instance.getSessionNetworkId('legacyEdge')).toBe(DEFAULT_CHAIN_ID);
       expect(demoSpy).not.toHaveBeenCalled();
     } finally {
@@ -123,12 +117,14 @@ describe('SBTSelector targeted hydration', () => {
       selectedSBTs: [],
       onAddSBT,
     });
-    instance.state.sbtOptions = [{
-      address: selectedAddress.toLowerCase(),
-      name: 'Debate Badge',
-      sessionSlug: 'edge',
-      sessionName: 'Weyl v. Yarvin Debate',
-    }];
+    instance.state.sbtOptions = [
+      {
+        address: selectedAddress.toLowerCase(),
+        name: 'Debate Badge',
+        sessionSlug: 'edge',
+        sessionName: 'Weyl v. Yarvin Debate',
+      },
+    ];
 
     const slugByNameSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionSlugByName')
@@ -137,11 +133,13 @@ describe('SBTSelector targeted hydration', () => {
     try {
       await instance.handleSBTSelection({ value: selectedAddress });
 
-      expect(onAddSBT).toHaveBeenCalledWith(expect.objectContaining({
-        address: selectedAddress.toLowerCase(),
-        sessionSlug: 'debate',
-        sessionName: 'Weyl v. Yarvin Debate',
-      }));
+      expect(onAddSBT).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address: selectedAddress.toLowerCase(),
+          sessionSlug: 'debate',
+          sessionName: 'Weyl v. Yarvin Debate',
+        }),
+      );
     } finally {
       slugByNameSpy.mockRestore();
     }
@@ -154,26 +152,30 @@ describe('SBTSelector targeted hydration', () => {
       selectedSBTs: [],
       onAddSBT,
     });
-    instance.state.sbtOptions = [{
-      address: selectedAddress.toLowerCase(),
-      name: 'Demo Badge',
-      sessionSlug: 'demo',
-      sessionBindingSlug: 'demo',
-      sessionName: 'Demo Session',
-      chainId: 84532,
-      selectionKey: `84532:${selectedAddress.toLowerCase()}`,
-    }];
+    instance.state.sbtOptions = [
+      {
+        address: selectedAddress.toLowerCase(),
+        name: 'Demo Badge',
+        sessionSlug: 'demo',
+        sessionBindingSlug: 'demo',
+        sessionName: 'Demo Session',
+        chainId: 84532,
+        selectionKey: `84532:${selectedAddress.toLowerCase()}`,
+      },
+    ];
 
     await instance.handleSBTSelection({
       value: selectedAddress,
       selectionKey: `84532:${selectedAddress.toLowerCase()}`,
     });
 
-    expect(onAddSBT).toHaveBeenCalledWith(expect.objectContaining({
-      address: selectedAddress.toLowerCase(),
-      sessionSlug: 'demo',
-      sessionBindingSlug: 'demo',
-    }));
+    expect(onAddSBT).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: selectedAddress.toLowerCase(),
+        sessionSlug: 'demo',
+        sessionBindingSlug: 'demo',
+      }),
+    );
   });
 
   it('does not emit duplicate onAddSBT calls when repeated picks race during metadata hydration', async () => {
@@ -208,10 +210,12 @@ describe('SBTSelector targeted hydration', () => {
       await Promise.all([firstSelection, secondSelection]);
 
       expect(onAddSBT).toHaveBeenCalledTimes(1);
-      expect(onAddSBT).toHaveBeenCalledWith(expect.objectContaining({
-        address: selectedAddress.toLowerCase(),
-        name: 'Deferred Badge',
-      }));
+      expect(onAddSBT).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address: selectedAddress.toLowerCase(),
+          name: 'Deferred Badge',
+        }),
+      );
     } finally {
       hydrateSpy.mockRestore();
     }
@@ -222,11 +226,13 @@ describe('SBTSelector targeted hydration', () => {
     const selectedAddressLower = selectedAddress.toLowerCase();
     const onAddSBT = jest.fn();
     const instance = makeInstance({
-      selectedSBTs: [{
-        address: selectedAddressLower,
-        chainId: 84532,
-        selectionKey: `84532:${selectedAddressLower}`,
-      }],
+      selectedSBTs: [
+        {
+          address: selectedAddressLower,
+          chainId: 84532,
+          selectionKey: `84532:${selectedAddressLower}`,
+        },
+      ],
       onAddSBT,
       sessionSlug: 'op-session',
       network: { id: 11155420 },
@@ -235,25 +241,25 @@ describe('SBTSelector targeted hydration', () => {
     instance.getSessionNetworkId = jest.fn(() => 11155420);
     instance.readSbtCacheBySlug = jest.fn(async () => ({}));
 
-    const hydrateSpy = jest
-      .spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted')
-      .mockResolvedValue({
-        info: {
-          name: 'OP Badge',
-          chainID: 11155420,
-        },
-      });
+    const hydrateSpy = jest.spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted').mockResolvedValue({
+      info: {
+        name: 'OP Badge',
+        chainID: 11155420,
+      },
+    });
 
     try {
       await instance.handleAddCustomSBT();
 
       expect(onAddSBT).toHaveBeenCalledTimes(1);
-      expect(onAddSBT).toHaveBeenCalledWith(expect.objectContaining({
-        address: selectedAddressLower,
-        chainId: 11155420,
-        name: 'OP Badge',
-        selectionKey: `11155420:${selectedAddressLower}`,
-      }));
+      expect(onAddSBT).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address: selectedAddressLower,
+          chainId: 11155420,
+          name: 'OP Badge',
+          selectionKey: `11155420:${selectedAddressLower}`,
+        }),
+      );
     } finally {
       hydrateSpy.mockRestore();
     }
@@ -268,7 +274,7 @@ describe('SBTSelector targeted hydration', () => {
         nameLocked: true,
       },
       '0x9999999999999999999999999999999999999999',
-      'edge'
+      'edge',
     );
 
     expect(label).toBe('[encrypted]');
@@ -286,7 +292,7 @@ describe('SBTSelector targeted hydration', () => {
     instance.getSessionNetworkId = () => 84532;
     instance.getMetadataLookupConfig = () => ({ slug: 'edge', networkChainId: 84532 });
     instance.readSbtCacheBySlug = jest.fn(async () => ({
-      '84532': {
+      84532: {
         sbtList: {
           [visibleLower]: {
             sbtAddress: visibleAddress,
@@ -310,14 +316,8 @@ describe('SBTSelector targeted hydration', () => {
     try {
       await instance.loadSBTOptions({ force: true });
 
-      expect(instance.state.sbtOptions.map((entry) => entry.address)).toEqual([
-        visibleLower,
-        encryptedLower,
-      ]);
-      expect(instance.state.sbtOptions.map((entry) => entry.name)).toEqual([
-        'Visible Group',
-        '[encrypted]',
-      ]);
+      expect(instance.state.sbtOptions.map((entry) => entry.address)).toEqual([visibleLower, encryptedLower]);
+      expect(instance.state.sbtOptions.map((entry) => entry.name)).toEqual(['Visible Group', '[encrypted]']);
     } finally {
       groupListsSpy.mockRestore();
     }
@@ -335,7 +335,7 @@ describe('SBTSelector targeted hydration', () => {
     instance.getSessionNetworkId = () => 84532;
     instance.getMetadataLookupConfig = () => ({ slug: 'edge', networkChainId: 84532 });
     instance.readSbtCacheBySlug = jest.fn(async () => ({
-      '84532': {
+      84532: {
         sbtList: {
           [visibleLockedLower]: {
             sbtAddress: visibleLockedAddress,
@@ -364,14 +364,8 @@ describe('SBTSelector targeted hydration', () => {
     try {
       await instance.loadSBTOptions({ force: true });
 
-      expect(instance.state.sbtOptions.map((entry) => entry.address)).toEqual([
-        visibleLockedLower,
-        plainLower,
-      ]);
-      expect(instance.state.sbtOptions.map((entry) => entry.name)).toEqual([
-        'Visible Locked Group',
-        'Plain Group',
-      ]);
+      expect(instance.state.sbtOptions.map((entry) => entry.address)).toEqual([visibleLockedLower, plainLower]);
+      expect(instance.state.sbtOptions.map((entry) => entry.name)).toEqual(['Visible Locked Group', 'Plain Group']);
     } finally {
       groupListsSpy.mockRestore();
     }
@@ -422,7 +416,7 @@ describe('SBTSelector targeted hydration', () => {
     instance.getSessionNetworkId = () => 84532;
     instance.getMetadataLookupConfig = () => ({ slug: 'edge', networkChainId: 84532 });
     instance.readSbtCacheBySlug = jest.fn(async () => ({
-      '84532': {
+      84532: {
         sbtList: {
           [selectedLower]: {
             sbtAddress: selectedAddress,
@@ -437,12 +431,14 @@ describe('SBTSelector targeted hydration', () => {
 
     await instance.loadSBTOptions();
 
-    expect(instance.state.sbtOptions).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        address: selectedLower,
-        name: resolvedLabel,
-      }),
-    ]));
+    expect(instance.state.sbtOptions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          address: selectedLower,
+          name: resolvedLabel,
+        }),
+      ]),
+    );
 
     const rendered = JSON.stringify(instance.render());
     expect(rendered).toContain(resolvedLabel);
@@ -519,9 +515,7 @@ describe('SBTSelector targeted hydration', () => {
     instance.scheduleSelectedSbtHydrationRetry = jest.fn();
     instance.loadSBTOptions = jest.fn();
 
-    const warmSpy = jest
-      .spyOn(sbtDisplayNameUtils, 'warmSbtDisplayNamesTargeted')
-      .mockResolvedValueOnce([]);
+    const warmSpy = jest.spyOn(sbtDisplayNameUtils, 'warmSbtDisplayNamesTargeted').mockResolvedValueOnce([]);
 
     try {
       await instance.hydrateSelectedSbtNames();
@@ -550,7 +544,7 @@ describe('SBTSelector targeted hydration', () => {
     instance.getMetadataLookupConfig = () => ({ slug: 'edge', networkChainId: 84532 });
     instance.resolveSbtLabel = jest.fn(() => 'Resolved Name');
     instance.readSbtCacheBySlug = jest.fn(async () => ({
-      '84532': {
+      84532: {
         sbtList: {
           [selectedLower]: {
             sbtAddress: selectedAddress,
@@ -573,5 +567,4 @@ describe('SBTSelector targeted hydration', () => {
       groupListsSpy.mockRestore();
     }
   });
-
 });

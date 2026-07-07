@@ -19,7 +19,7 @@ describe('WorkerResourceInputs', () => {
         effectiveDefaultWorkerRpcUrl="https://rpc.example"
         getSecretFieldTestId={buildSecretFieldTestId}
         onUpdateSecret={onUpdateSecret}
-      />
+      />,
     );
 
     const input = screen.getByTestId('secret-customRpcUrl');
@@ -50,7 +50,7 @@ describe('WorkerResourceInputs', () => {
         effectiveDefaultWorkerRpcUrl=""
         getSecretFieldTestId={buildSecretFieldTestId}
         onUpdateSecret={onUpdateSecret}
-      />
+      />,
     );
 
     expect(screen.getByTestId('secret-litAccountApiKey')).toHaveValue('account-secret');
@@ -77,7 +77,7 @@ describe('WorkerResourceInputs', () => {
         effectiveDefaultWorkerRpcUrl=""
         getSecretFieldTestId={buildSecretFieldTestId}
         onUpdateSecret={() => {}}
-      />
+      />,
     );
 
     expect(screen.getByTestId('secret-litAccountApiKey')).toBeInTheDocument();

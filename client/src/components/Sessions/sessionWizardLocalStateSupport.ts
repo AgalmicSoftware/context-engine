@@ -10,9 +10,8 @@ import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
 
 const log = createLogger('general');
 
-const normalizeStableObjectValue = (value: unknown): AnyRecord => (
-  value && typeof value === 'object' && !Array.isArray(value) ? value : {}
-);
+const normalizeStableObjectValue = (value: unknown): AnyRecord =>
+  value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 
 const getStableObjectSignature = (value: AnyRecord = {}): string => {
   try {
@@ -67,11 +66,13 @@ export type SessionWizardCachedState = Record<string, unknown> & {
   manualMaxFeePerGasGwei?: unknown;
   manualMaxPriorityFeePerGasGwei?: unknown;
   privateSlugMode?: unknown;
-  provisionedSponsoredContext?: (AnyRecord & {
-    fields?: AnyRecord;
-    sessionSlug?: unknown;
-    workerUrl?: unknown;
-  }) | null;
+  provisionedSponsoredContext?:
+    | (AnyRecord & {
+        fields?: AnyRecord;
+        sessionSlug?: unknown;
+        workerUrl?: unknown;
+      })
+    | null;
   resourceGateMap?: Record<string, string | string[]>;
   sessionId?: unknown;
   workerSecrets?: WorkerSecretsLike;
@@ -79,9 +80,8 @@ export type SessionWizardCachedState = Record<string, unknown> & {
   persistWorkerSecrets?: unknown;
 };
 
-const isSessionWizardCachedState = (value: unknown): value is SessionWizardCachedState => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isSessionWizardCachedState = (value: unknown): value is SessionWizardCachedState =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const readSessionWizardCache = ({
   readDraftCache = readSessionWizardDraftCache,
@@ -92,10 +92,7 @@ export const readSessionWizardCache = ({
 
 export const writeSessionWizardCache = (
   payload: unknown,
-  {
-    logger = log,
-    writeDraftCache = writeSessionWizardDraftCache,
-  }: WriteCacheDeps = {}
+  { logger = log, writeDraftCache = writeSessionWizardDraftCache }: WriteCacheDeps = {},
 ) => {
   const result = writeDraftCache(payload);
   if (!result.ok) logger.warn?.('SessionWizard: fallback', result.error || result.status);

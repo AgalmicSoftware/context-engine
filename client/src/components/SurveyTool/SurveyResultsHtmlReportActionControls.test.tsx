@@ -21,7 +21,7 @@ describe('SurveyResultsHtmlReportActionControls', () => {
         onClose={onClose}
         onDownload={onDownload}
         styleMap={styleMap}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
@@ -42,7 +42,7 @@ describe('SurveyResultsHtmlReportActionControls', () => {
         onClose={onClose}
         onDownload={onDownload}
         styleMap={styleMap}
-      />
+      />,
     );
 
     const downloadButton = screen.getByTestId('ce-surveyresults-html-report-download');

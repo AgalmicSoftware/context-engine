@@ -4,9 +4,12 @@ type QuestionPayload = UnknownRecord & {
   id?: string;
 };
 
-type QuestionsCache = Record<string, {
-  questions: Record<string, QuestionPayload | null>;
-} & UnknownRecord>;
+type QuestionsCache = Record<
+  string,
+  {
+    questions: Record<string, QuestionPayload | null>;
+  } & UnknownRecord
+>;
 
 export type MetadataBootstrapCacheState = {
   netIdStr: string;
@@ -39,10 +42,7 @@ export type MetadataBootstrapSkipped = {
 };
 
 export type MetadataBootstrapResult =
-  | MetadataBootstrapReady
-  | MetadataBootstrapUnavailable
-  | MetadataBootstrapMissingCacheState
-  | MetadataBootstrapSkipped;
+  MetadataBootstrapReady | MetadataBootstrapUnavailable | MetadataBootstrapMissingCacheState | MetadataBootstrapSkipped;
 
 export type MetadataBootstrapFetchResult = {
   questionData: QuestionPayload | null;
@@ -105,12 +105,7 @@ export const resolveSingleQuestionMetadataBootstrap = async ({
   resolveCacheState = async () => null,
   writeQuestionsCache = async () => {},
 }: ResolveSingleQuestionMetadataBootstrapArgs = {}): Promise<MetadataBootstrapResult> => {
-  const shouldRefetchMasked = (
-    !!questionData
-    && isMaskedQuestionPayload(questionData)
-    && loginComplete
-    && hasAccount
-  );
+  const shouldRefetchMasked = !!questionData && isMaskedQuestionPayload(questionData) && loginComplete && hasAccount;
 
   if (!questionData || shouldRefetchMasked || forceRefetch) {
     const metadataFetchResult = await fetchMetadata({
@@ -148,11 +143,9 @@ export const resolveSingleQuestionMetadataBootstrap = async ({
         timedOutFetchCount: Number(metadataFetchResult.timedOutFetchCount || 0),
         retryReason: metadataFetchResult.fetchedAny
           ? 'no-question-data-yet'
-          : (
-            metadataFetchResult.timedOutFetchCount > 0
-              ? 'question-fetch-timeout'
-              : 'question-fetch-unavailable'
-          ),
+          : metadataFetchResult.timedOutFetchCount > 0
+            ? 'question-fetch-timeout'
+            : 'question-fetch-unavailable',
       };
     }
 
@@ -161,10 +154,7 @@ export const resolveSingleQuestionMetadataBootstrap = async ({
     }
 
     const existingCached = questionsCache[netIdStr].questions?.[questionId] || null;
-    const {
-      normalizedQuestionData,
-      shouldWriteQuestionPayload,
-    } = normalizeMetadata({
+    const { normalizedQuestionData, shouldWriteQuestionPayload } = normalizeMetadata({
       questionId,
       questionData: qData,
       existingCachedQuestionData: existingCached,

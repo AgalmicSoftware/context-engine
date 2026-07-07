@@ -34,21 +34,19 @@ const buildEmptyResponseSlice = (): ResponseSlice => ({
   additionalComments: {},
 });
 
-const normalizeQuestionId = (value: unknown): string => (
-  String(value || '').trim().toLowerCase()
-);
+const normalizeQuestionId = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
-const isObjectRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isObjectRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const asResponseSlice = (value: unknown): ResponseSlice | null => (
-  isObjectRecord(value) ? value as ResponseSlice : null
-);
+const asResponseSlice = (value: unknown): ResponseSlice | null =>
+  isObjectRecord(value) ? (value as ResponseSlice) : null;
 
-const asLatestResponseRecord = (value: unknown): LatestResponseRecord | null => (
-  isObjectRecord(value) ? value as LatestResponseRecord : null
-);
+const asLatestResponseRecord = (value: unknown): LatestResponseRecord | null =>
+  isObjectRecord(value) ? (value as LatestResponseRecord) : null;
 
 const buildLatestResponseByQuestionId = (latest: unknown): Map<string, LatestResponseRecord> => {
   const latestByQid = new Map<string, LatestResponseRecord>();
@@ -57,9 +55,7 @@ const buildLatestResponseByQuestionId = (latest: unknown): Map<string, LatestRes
     if (!responseObject) return;
 
     const id = normalizeQuestionId(
-      responseObject.questionID
-      || responseObject.questionId
-      || responseObject.questionIDHash
+      responseObject.questionID || responseObject.questionId || responseObject.questionIDHash,
     );
     if (!id) return;
     latestByQid.set(id, responseObject);
@@ -83,13 +79,13 @@ export const resolveSurveyUserAnswersSlice = ({
   userAnswersSliceCache?: SliceCache;
   buildSliceFromUserAnswers?: (sourceAnswers: unknown) => unknown;
 } = {}) => {
-  const existingCache = (
-    userAnswersSliceCache
-    && typeof userAnswersSliceCache === 'object'
-  ) ? userAnswersSliceCache : {
-    source: null,
-    value: null,
-  };
+  const existingCache =
+    userAnswersSliceCache && typeof userAnswersSliceCache === 'object'
+      ? userAnswersSliceCache
+      : {
+          source: null,
+          value: null,
+        };
 
   if (!userAnswers || typeof buildSliceFromUserAnswers !== 'function') {
     return {
@@ -99,10 +95,7 @@ export const resolveSurveyUserAnswersSlice = ({
     };
   }
 
-  if (
-    existingCache.source === userAnswers
-    && existingCache.value
-  ) {
+  if (existingCache.source === userAnswers && existingCache.value) {
     return {
       slice: existingCache.value,
       nextCache: existingCache,
@@ -144,10 +137,7 @@ export const resolveSurveyBaselineSourceSlice = ({
     };
   }
 
-  const {
-    slice: userAnswerSlice,
-    nextCache,
-  } = resolveSurveyUserAnswersSlice({
+  const { slice: userAnswerSlice, nextCache } = resolveSurveyUserAnswersSlice({
     userAnswers,
     userAnswersSliceCache,
     buildSliceFromUserAnswers,
@@ -210,38 +200,32 @@ export const areSurveyResponsesConsistent = ({
 
     const baseAdd = baselineSlice.additionalComments?.[qid];
     const chainAdd = latestSlice.additionalComments?.[qid];
-    const baselineAnswerEncrypted = !!(baseAns && (
-      baseAns.encrypted
-      || baseAns.encryptedPortion
-      || baseAns.value === '*'
-    ));
-    const baselineAdditionalEncrypted = !!(baseAdd && (
-      baseAdd.encrypted
-      || baseAdd.encryptedPortion
-      || baseAdd.value === '*'
-    ));
+    const baselineAnswerEncrypted = !!(
+      baseAns &&
+      (baseAns.encrypted || baseAns.encryptedPortion || baseAns.value === '*')
+    );
+    const baselineAdditionalEncrypted = !!(
+      baseAdd &&
+      (baseAdd.encrypted || baseAdd.encryptedPortion || baseAdd.value === '*')
+    );
     const baselineResponseEncrypted = baselineAnswerEncrypted || baselineAdditionalEncrypted;
 
-    const latestRespObj = normalizedQid ? (latestByQid.get(normalizedQid) || null) : null;
+    const latestRespObj = normalizedQid ? latestByQid.get(normalizedQid) || null : null;
     const latestRatingEncrypted = !!(
-      latestRespObj && (
-        (typeof latestRespObj.importanceEncrypted === 'string' && latestRespObj.importanceEncrypted) ||
-        (typeof latestRespObj.convictionEncrypted === 'string' && latestRespObj.convictionEncrypted)
-      )
+      latestRespObj &&
+      ((typeof latestRespObj.importanceEncrypted === 'string' && latestRespObj.importanceEncrypted) ||
+        (typeof latestRespObj.convictionEncrypted === 'string' && latestRespObj.convictionEncrypted))
     );
 
     if (!valuesEqual(baseAns?.value, chainAns?.value)) return false;
     if (!valuesEqual(baseAdd?.value, chainAdd?.value)) return false;
 
-    if (
-      baselineSlice.importance
-      && Object.prototype.hasOwnProperty.call(baselineSlice.importance, qid)
-    ) {
+    if (baselineSlice.importance && Object.prototype.hasOwnProperty.call(baselineSlice.importance, qid)) {
       const baseImp = Number(baselineSlice.importance[qid]);
-      const chainImp = latestSlice.importance
-        && Object.prototype.hasOwnProperty.call(latestSlice.importance, qid)
-        ? Number(latestSlice.importance[qid])
-        : null;
+      const chainImp =
+        latestSlice.importance && Object.prototype.hasOwnProperty.call(latestSlice.importance, qid)
+          ? Number(latestSlice.importance[qid])
+          : null;
       if (chainImp === null) {
         if (!baselineResponseEncrypted && !latestRatingEncrypted) return false;
       } else if (baseImp !== chainImp) {
@@ -249,15 +233,12 @@ export const areSurveyResponsesConsistent = ({
       }
     }
 
-    if (
-      baselineSlice.conviction
-      && Object.prototype.hasOwnProperty.call(baselineSlice.conviction, qid)
-    ) {
+    if (baselineSlice.conviction && Object.prototype.hasOwnProperty.call(baselineSlice.conviction, qid)) {
       const baseConv = Number(baselineSlice.conviction[qid]);
-      const chainConv = latestSlice.conviction
-        && Object.prototype.hasOwnProperty.call(latestSlice.conviction, qid)
-        ? Number(latestSlice.conviction[qid])
-        : null;
+      const chainConv =
+        latestSlice.conviction && Object.prototype.hasOwnProperty.call(latestSlice.conviction, qid)
+          ? Number(latestSlice.conviction[qid])
+          : null;
       if (chainConv === null) {
         if (!baselineResponseEncrypted && !latestRatingEncrypted) return false;
       } else if (baseConv !== chainConv) {

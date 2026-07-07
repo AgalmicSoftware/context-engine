@@ -1,4 +1,3 @@
-
 import {
   buildAdditionalAudienceSelectionPlan,
   buildAnswerAudienceSelectionPlan,
@@ -72,13 +71,7 @@ describe('surveyToolFieldEncryptionController', () => {
     });
 
     it('toggle answer off - sets encrypted false, audience self, clearMenus true', () => {
-      const plan: EncryptionTogglePlan = buildEncryptionTogglePlan(
-        'q1',
-        'answer',
-        false,
-        makeSlice(),
-        makeDeps(),
-      );
+      const plan: EncryptionTogglePlan = buildEncryptionTogglePlan('q1', 'answer', false, makeSlice(), makeDeps());
 
       expect(plan.nextFieldState).toMatchObject({
         encrypted: false,
@@ -93,13 +86,7 @@ describe('surveyToolFieldEncryptionController', () => {
         isQuestionLockedForResponse: () => true,
       });
 
-      const plan: EncryptionTogglePlan = buildEncryptionTogglePlan(
-        'q1',
-        'answer',
-        false,
-        makeSlice(),
-        deps,
-      );
+      const plan: EncryptionTogglePlan = buildEncryptionTogglePlan('q1', 'answer', false, makeSlice(), deps);
 
       expect(plan.nextFieldState.encrypted).toBe(true);
       expect(plan.nextFieldState.encryptionAudience).toBe('gate');
@@ -186,13 +173,7 @@ describe('surveyToolFieldEncryptionController', () => {
     });
 
     it('toggle additional off - clearMenus true, nextAdditionalState null', () => {
-      const plan: EncryptionTogglePlan = buildEncryptionTogglePlan(
-        'q1',
-        'additional',
-        false,
-        makeSlice(),
-        makeDeps(),
-      );
+      const plan: EncryptionTogglePlan = buildEncryptionTogglePlan('q1', 'additional', false, makeSlice(), makeDeps());
 
       expect(plan.clearMenus).toBe(true);
       expect(plan.nextAdditionalState).toBeNull();
@@ -374,13 +355,7 @@ describe('surveyToolFieldEncryptionController', () => {
     });
 
     it('none - sets explicit unencrypted', () => {
-      const plan = buildAdditionalAudienceSelectionPlan(
-        'q1',
-        'none',
-        '',
-        makeSlice(),
-        makeDeps(),
-      );
+      const plan = buildAdditionalAudienceSelectionPlan('q1', 'none', '', makeSlice(), makeDeps());
 
       expect(plan.nextAdditionalState).toMatchObject({
         encrypted: false,
@@ -391,13 +366,7 @@ describe('surveyToolFieldEncryptionController', () => {
     });
 
     it('plaintext - same as none', () => {
-      const plan = buildAdditionalAudienceSelectionPlan(
-        'q1',
-        'plaintext',
-        '',
-        makeSlice(),
-        makeDeps(),
-      );
+      const plan = buildAdditionalAudienceSelectionPlan('q1', 'plaintext', '', makeSlice(), makeDeps());
 
       expect(plan.nextAdditionalState).toMatchObject({
         encrypted: false,

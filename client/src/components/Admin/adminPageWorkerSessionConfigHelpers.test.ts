@@ -20,68 +20,83 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
     expect(normalizeRpcUrlList(' https://single.example ')).toEqual(['https://single.example']);
     expect(normalizeRpcUrlList('   ')).toEqual([]);
 
-    expect(sanitizeRpcUrlMap({
-      8453: [' https://base.example ', ''],
-      empty: ['   '],
-      84532: ' https://base-sepolia.example ',
-    })).toEqual({
+    expect(
+      sanitizeRpcUrlMap({
+        8453: [' https://base.example ', ''],
+        empty: ['   '],
+        84532: ' https://base-sepolia.example ',
+      }),
+    ).toEqual({
       8453: ['https://base.example'],
       84532: ['https://base-sepolia.example'],
     });
 
-    expect(pickFirstNonEmptyRpcUrlMap(
-      null,
-      { 8453: ['  '] },
-      { 8453: ['https://first.example'] },
-      { 8453: ['https://ignored.example'] },
-    )).toEqual({
+    expect(
+      pickFirstNonEmptyRpcUrlMap(
+        null,
+        { 8453: ['  '] },
+        { 8453: ['https://first.example'] },
+        { 8453: ['https://ignored.example'] },
+      ),
+    ).toEqual({
       8453: ['https://first.example'],
     });
   });
 
   it('builds worker URL resolution display state without changing missing-url semantics', () => {
-    const normalizeWorkerUrl = (value: unknown) => String(value || '').trim().replace(/\/+$/, '');
+    const normalizeWorkerUrl = (value: unknown) =>
+      String(value || '')
+        .trim()
+        .replace(/\/+$/, '');
 
-    expect(buildWorkerUrlResolutionDisplay({
-      resolved: {
-        url: ' https://worker.example.test/ ',
-        source: 'session-config',
-        status: 'ok',
-      },
-      normalizeWorkerUrl,
-    })).toEqual({
+    expect(
+      buildWorkerUrlResolutionDisplay({
+        resolved: {
+          url: ' https://worker.example.test/ ',
+          source: 'session-config',
+          status: 'ok',
+        },
+        normalizeWorkerUrl,
+      }),
+    ).toEqual({
       url: 'https://worker.example.test',
       debug: 'source=session-config status=ok url=https://worker.example.test',
       status: 'Resolved (ok)',
     });
-    expect(buildWorkerUrlResolutionDisplay({
-      resolved: {
-        url: '',
-        source: 'registry',
-        status: 'not-found',
-      },
-      normalizeWorkerUrl,
-    })).toEqual({
+    expect(
+      buildWorkerUrlResolutionDisplay({
+        resolved: {
+          url: '',
+          source: 'registry',
+          status: 'not-found',
+        },
+        normalizeWorkerUrl,
+      }),
+    ).toEqual({
       url: '',
       debug: 'source=registry status=not-found url=(none)',
       status: 'Missing (not-found)',
     });
-    expect(buildWorkerUrlResolutionDisplay({
-      resolved: {},
-      normalizeWorkerUrl,
-    })).toEqual({
+    expect(
+      buildWorkerUrlResolutionDisplay({
+        resolved: {},
+        normalizeWorkerUrl,
+      }),
+    ).toEqual({
       url: '',
       debug: 'source=unknown status=ok url=(none)',
       status: 'Missing worker URL',
     });
-    expect(buildWorkerUrlResolutionDisplay({
-      resolved: {
-        url: '',
-        source: 'registry',
-        status: 0,
-      },
-      normalizeWorkerUrl,
-    })).toEqual({
+    expect(
+      buildWorkerUrlResolutionDisplay({
+        resolved: {
+          url: '',
+          source: 'registry',
+          status: 0,
+        },
+        normalizeWorkerUrl,
+      }),
+    ).toEqual({
       url: '',
       debug: 'source=registry status=ok url=(none)',
       status: 'Missing worker URL',
@@ -112,18 +127,20 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
   });
 
   it('uses the first non-empty RPC map and preserves faucet RPC priority for reads', () => {
-    expect(getSessionReadRpcConfig({
-      sessionConfig: {
-        networkChainId: 8453,
-        faucet: { rpcUrl: ' https://faucet.example ' },
-        rpc: {
-          providers: { path: { rpcUrlsByChainId: {} } },
-          rpcUrlsByChainId: { 8453: ['https://root.example'] },
+    expect(
+      getSessionReadRpcConfig({
+        sessionConfig: {
+          networkChainId: 8453,
+          faucet: { rpcUrl: ' https://faucet.example ' },
+          rpc: {
+            providers: { path: { rpcUrlsByChainId: {} } },
+            rpcUrlsByChainId: { 8453: ['https://root.example'] },
+          },
+          rpcUrlsByChainId: { 8453: ['https://config.example'] },
         },
-        rpcUrlsByChainId: { 8453: ['https://config.example'] },
-      },
-      fallbackChainId: 84532,
-    })).toEqual({
+        fallbackChainId: 84532,
+      }),
+    ).toEqual({
       chainId: 8453,
       rpcUrl: 'https://faucet.example',
     });
@@ -148,7 +165,7 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
     expect(payload.rpcUrlsByChainId).toEqual(
       expect.objectContaining({
         [String(DEFAULT_CHAIN_ID)]: [getDefaultHttpRpc(DEFAULT_CHAIN_ID)],
-      })
+      }),
     );
   });
 
@@ -278,35 +295,37 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
       fallbackChainId: 84532,
     });
 
-    expect(payload).toEqual(expect.objectContaining({
-      adminAddress: ACCOUNT,
-      slug: 'session-admin',
-      registryAddress: '0x1111111111111111111111111111111111111111',
-      registryChainId: 84532,
-      networkChainId: 8453,
-      hatsAddress: '0x3333333333333333333333333333333333333333',
-      adminHatId: '42',
-      sessionId: '0xabc123',
-      rpcUrl: 'https://path-rpc.example',
-      rpcUrlsByChainId: {
-        8453: ['https://path-rpc.example'],
-        84532: ['https://path-registry.example'],
-      },
-      allowOrigins: ['https://app.example', 'https://admin.example'],
-      limits: { requestsPerMinute: 10 },
-      scopes: { ai: true },
-      blockLimits: { start: 12345, end: 13000 },
-      contracts: {
-        surveys: {
-          address: '0x2222222222222222222222222222222222222222',
-          chainId: 8453,
-        },
-      },
-      faucet: {
+    expect(payload).toEqual(
+      expect.objectContaining({
+        adminAddress: ACCOUNT,
+        slug: 'session-admin',
+        registryAddress: '0x1111111111111111111111111111111111111111',
+        registryChainId: 84532,
+        networkChainId: 8453,
+        hatsAddress: '0x3333333333333333333333333333333333333333',
+        adminHatId: '42',
+        sessionId: '0xabc123',
         rpcUrl: 'https://path-rpc.example',
-        amountEth: '0.0001',
-        balanceThresholdEth: '0.001',
-      },
-    }));
+        rpcUrlsByChainId: {
+          8453: ['https://path-rpc.example'],
+          84532: ['https://path-registry.example'],
+        },
+        allowOrigins: ['https://app.example', 'https://admin.example'],
+        limits: { requestsPerMinute: 10 },
+        scopes: { ai: true },
+        blockLimits: { start: 12345, end: 13000 },
+        contracts: {
+          surveys: {
+            address: '0x2222222222222222222222222222222222222222',
+            chainId: 8453,
+          },
+        },
+        faucet: {
+          rpcUrl: 'https://path-rpc.example',
+          amountEth: '0.0001',
+          balanceThresholdEth: '0.001',
+        },
+      }),
+    );
   });
 });

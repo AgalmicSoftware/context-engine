@@ -55,15 +55,10 @@ export const normalizeResponseStatusFilterState = ({
   };
 };
 
-export const normalizeFilterSelectionList = (value: unknown): unknown[] => (
-  Array.isArray(value) ? [...value] : []
-);
+export const normalizeFilterSelectionList = (value: unknown): unknown[] => (Array.isArray(value) ? [...value] : []);
 
-export const normalizeSbtFilterLocalState = (value: unknown): SbtFilterLocalState | null => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? { ...(value as SbtFilterLocalState) }
-    : null
-);
+export const normalizeSbtFilterLocalState = (value: unknown): SbtFilterLocalState | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? { ...(value as SbtFilterLocalState) } : null;
 
 export const isQuestionFilterStateDefault = (filterStateToTest: unknown): boolean => {
   if (!filterStateToTest) {
@@ -81,8 +76,7 @@ export const isQuestionFilterStateDefault = (filterStateToTest: unknown): boolea
     topQuestions?: unknown;
   };
   const isTopQuestionsDefault = filterState.topQuestions === null;
-  const isQuestionTypesDefault =
-    Array.isArray(filterState.questionTypes) && filterState.questionTypes.length === 0;
+  const isQuestionTypesDefault = Array.isArray(filterState.questionTypes) && filterState.questionTypes.length === 0;
 
   const sbtFilter = filterState.sbtFilter as Record<string, { length?: number } | undefined> | null | undefined;
   let isSbtFilterDefault = sbtFilter === null;
@@ -100,32 +94,29 @@ export const isQuestionFilterStateDefault = (filterStateToTest: unknown): boolea
   const isAiFilterDefault = filterState.aiFilter === null || filterState.aiFilter === '';
   const isAiTopNDefault = filterState.aiTopN == null;
   const isAiCombineDefault = filterState.aiCombine !== true;
-  const isSelectedTagsDefault =
-    Array.isArray(filterState.selectedTags) && filterState.selectedTags.length === 0;
+  const isSelectedTagsDefault = Array.isArray(filterState.selectedTags) && filterState.selectedTags.length === 0;
   const responseStatus = filterState.responseStatus;
   const responded = responseStatus?.responded === true;
   const notResponded = responseStatus?.notResponded === true;
-  const isResponseStatusDefault = (
+  const isResponseStatusDefault =
     responseStatus === null ||
     responseStatus === undefined ||
     (!responded && !notResponded) ||
-    (responded && notResponded)
-  );
+    (responded && notResponded);
 
-  return isTopQuestionsDefault &&
+  return (
+    isTopQuestionsDefault &&
     isQuestionTypesDefault &&
     isSbtFilterDefault &&
     isAiFilterDefault &&
     isAiTopNDefault &&
     isAiCombineDefault &&
     isSelectedTagsDefault &&
-    isResponseStatusDefault;
+    isResponseStatusDefault
+  );
 };
 
-export const buildQuestionFilterStateFromComponentState = (
-  state: unknown = {},
-  defaultAiTopN = 10
-) => {
+export const buildQuestionFilterStateFromComponentState = (state: unknown = {}, defaultAiTopN = 10) => {
   const stateRecord = state as {
     aiAppliedTopN?: unknown;
     aiCombineWithOtherFilters?: unknown;
@@ -147,24 +138,20 @@ export const buildQuestionFilterStateFromComponentState = (
     topQuestionsValue = { count: stateRecord.topQuestionsCount, by: 'responses' };
   }
 
-  const aiFilterIsActive = (
-    !!stateRecord.aiFilterApplied &&
-    String(stateRecord.aiSearchQuery || '').trim() !== ''
-  );
+  const aiFilterIsActive = !!stateRecord.aiFilterApplied && String(stateRecord.aiSearchQuery || '').trim() !== '';
   const filterByResponded = stateRecord.filterByResponded === true;
   const filterByNotResponded = stateRecord.filterByNotResponded === true;
-  const responseStatus = (filterByResponded || filterByNotResponded) && !(filterByResponded && filterByNotResponded)
-    ? { responded: filterByResponded, notResponded: filterByNotResponded }
-    : null;
+  const responseStatus =
+    (filterByResponded || filterByNotResponded) && !(filterByResponded && filterByNotResponded)
+      ? { responded: filterByResponded, notResponded: filterByNotResponded }
+      : null;
 
   return {
     topQuestions: topQuestionsValue,
     questionTypes: stateRecord.selectedTypes,
     sbtFilter: stateRecord.sbtFilterLocalState,
     aiFilter: aiFilterIsActive ? stateRecord.aiSearchQuery : null,
-    aiTopN: aiFilterIsActive
-      ? normalizePositiveInt(stateRecord.aiAppliedTopN, defaultAiTopN)
-      : null,
+    aiTopN: aiFilterIsActive ? normalizePositiveInt(stateRecord.aiAppliedTopN, defaultAiTopN) : null,
     aiCombine: aiFilterIsActive && stateRecord.aiCombineWithOtherFilters === true,
     selectedTags: stateRecord.selectedTags,
     responseStatus,
@@ -173,11 +160,10 @@ export const buildQuestionFilterStateFromComponentState = (
 
 export const buildQuestionFilterSbtItemRemovalState = (
   localStateInput: unknown = {},
-  item: { role?: unknown; sbtAddress?: unknown } = {}
+  item: { role?: unknown; sbtAddress?: unknown } = {},
 ): SbtFilterLocalState => {
-  const localState = localStateInput && typeof localStateInput === 'object'
-    ? localStateInput as SbtFilterLocalState
-    : {};
+  const localState =
+    localStateInput && typeof localStateInput === 'object' ? (localStateInput as SbtFilterLocalState) : {};
   const updatedState: SbtFilterLocalState = { ...localState };
   const role = String(item?.role || '');
   const sbtAddress = String(item?.sbtAddress || '');
@@ -192,9 +178,9 @@ export const buildQuestionFilterSbtItemRemovalState = (
   const listKey = roleKeyByName[role];
   const list = listKey ? updatedState[listKey] : null;
   if (Array.isArray(list)) {
-    updatedState[listKey] = list.filter((entry) => (
-      (entry as { address: string }).address.toLowerCase() !== sbtAddress.toLowerCase()
-    ));
+    updatedState[listKey] = list.filter(
+      (entry) => (entry as { address: string }).address.toLowerCase() !== sbtAddress.toLowerCase(),
+    );
   }
   return updatedState;
 };
@@ -220,10 +206,7 @@ export const buildQuestionFilterAiDraftQueryPatch = (aiDraftQuery: unknown) => (
   aiApplyError: '',
 });
 
-export const buildQuestionFilterAiRankingCountPatch = (
-  aiRankingCount: unknown,
-  fallback: number
-) => ({
+export const buildQuestionFilterAiRankingCountPatch = (aiRankingCount: unknown, fallback: number) => ({
   aiRankingCount: normalizePositiveInt(aiRankingCount, fallback),
   aiApplyError: '',
 });
@@ -316,7 +299,7 @@ export const buildQuestionFilterSelectedTagsPatch = (selectedTags: unknown) => (
 
 export const buildQuestionFilterTopQuestionsCountPatch = (
   pendingTopQuestionsCount: unknown,
-  fallback = DEFAULT_TOP_QUESTIONS_COUNT
+  fallback = DEFAULT_TOP_QUESTIONS_COUNT,
 ) => ({
   pendingTopQuestionsCount: normalizePositiveInt(pendingTopQuestionsCount, fallback),
 });
@@ -347,7 +330,7 @@ export const buildQuestionFilterUrlInputPatch = (filterUrlInput: unknown) => ({
 });
 
 export const buildQuestionFilterLoadInputTogglePatch = (
-  state: { showLoadInput?: unknown } | null | undefined = {}
+  state: { showLoadInput?: unknown } | null | undefined = {},
 ) => ({
-  showLoadInput: !(state?.showLoadInput),
+  showLoadInput: !state?.showLoadInput,
 });

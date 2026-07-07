@@ -48,19 +48,12 @@ export interface SessionScanPolicy {
   shouldSkipSessionScanForSlug: (
     slugIn: string,
     operation: string,
-    scopeContextIn?: SessionScanScopeContext | null
+    scopeContextIn?: SessionScanScopeContext | null,
   ) => boolean;
   scanScopeNoop: (slugIn: string, operation: string, onSkipped?: () => void) => boolean;
   getScopeFilteredSlugs: (slugs?: string[], scopeIn?: string | null) => string[];
-  isSessionSlugAllowedForScan: (
-    slugIn: string,
-    scopeContextIn?: SessionScanScopeContext | null
-  ) => boolean;
-  logScopeSkipOnce: (
-    operation: string,
-    slugIn: string,
-    scopeContextIn?: SessionScanScopeContext | null
-  ) => void;
+  isSessionSlugAllowedForScan: (slugIn: string, scopeContextIn?: SessionScanScopeContext | null) => boolean;
+  logScopeSkipOnce: (operation: string, slugIn: string, scopeContextIn?: SessionScanScopeContext | null) => void;
   destroy: () => void;
 }
 
@@ -72,7 +65,9 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
   const scopeSkipLogOnce = new Set<string>();
 
   const normalizeListenerGroupSlug = (slugIn: unknown): string => {
-    const slug = String(slugIn ?? '').trim().toLowerCase();
+    const slug = String(slugIn ?? '')
+      .trim()
+      .toLowerCase();
     if (!slug || slug === 'general') return '';
     return slug;
   };
@@ -101,9 +96,7 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
         return null;
       }
     })();
-    const activeSlug = normalizeSessionSlug(
-      querySlug !== null ? querySlug : (host.getActiveSessionSlug() || '')
-    );
+    const activeSlug = normalizeSessionSlug(querySlug !== null ? querySlug : host.getActiveSessionSlug() || '');
     const activeSlugFromRoute = (() => {
       if (querySlug !== null) return true;
       if (!activeSlug) return false;
@@ -121,7 +114,7 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
 
   const isSessionSlugAllowedForScan = (
     slugIn: string,
-    scopeContextIn: SessionScanScopeContext | null = null
+    scopeContextIn: SessionScanScopeContext | null = null,
   ): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
     const scopeContext = scopeContextIn || getSessionScanScopeContext();
@@ -131,7 +124,7 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
   const logScopeSkipOnce = (
     operation: string,
     slugIn: string,
-    scopeContextIn: SessionScanScopeContext | null = null
+    scopeContextIn: SessionScanScopeContext | null = null,
   ): void => {
     const slug = normalizeSessionSlug(slugIn || '');
     const slugLabel = slug || 'general';
@@ -139,11 +132,7 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
     if (scopeSkipLogOnce.has(key)) return;
     scopeSkipLogOnce.add(key);
     const scopeContext = scopeContextIn || getSessionScanScopeContext();
-    const allowed = getAllowedSessionSlugs(
-      scopeContext.scope,
-      scopeContext.list,
-      scopeContext.activeSlug
-    );
+    const allowed = getAllowedSessionSlugs(scopeContext.scope, scopeContext.list, scopeContext.activeSlug);
     log.info('[SessionScanScope] skipped out-of-scope scan/listener', {
       operation,
       slug: slugLabel,
@@ -164,7 +153,7 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
           try {
             console.info(
               `[Context Engine] SBT instance listeners suppressed (auto) because CE_SESSION_SCAN_SCOPE=${scope}. ` +
-              'Set CE_SBT_INSTANCE_LISTENERS_MODE=on to override.'
+                'Set CE_SBT_INSTANCE_LISTENERS_MODE=on to override.',
             );
           } catch (e) {
             log.warn('MainSite: telemetry', e);
@@ -180,9 +169,8 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
     if (typeof window === 'undefined') return false;
     if (areSbtInstanceListenersSuppressedByMode()) return false;
     if (window.DISABLE_SBT_INSTANCE_LISTENERS === true) return false;
-    const raw = typeof window.SBT_INSTANCE_LISTENER_GROUPS !== 'undefined'
-      ? window.SBT_INSTANCE_LISTENER_GROUPS
-      : ['general'];
+    const raw =
+      typeof window.SBT_INSTANCE_LISTENER_GROUPS !== 'undefined' ? window.SBT_INSTANCE_LISTENER_GROUPS : ['general'];
     const list = Array.isArray(raw) ? raw : [raw];
     if (!list.length) return false;
     const normalized = new Set(list.map((s) => normalizeListenerGroupSlug(s)));
@@ -224,11 +212,7 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
     const scope = typeof scopeIn === 'string' ? scopeIn : getSessionScanScope();
     if (scope === 'all') return getAllSessionSlugs();
     const scopeContext = getSessionScanScopeContext(scope);
-    const scoped = getAllowedSessionSlugs(
-      scopeContext.scope,
-      scopeContext.list,
-      scopeContext.activeSlug
-    );
+    const scoped = getAllowedSessionSlugs(scopeContext.scope, scopeContext.list, scopeContext.activeSlug);
     if (!scoped.length && scopeContext.scope === 'list') {
       logScopeSkipOnce('getScopedSessionSlugs:list-empty', '', scopeContext);
     }
@@ -238,7 +222,7 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
   const shouldSkipSessionScanForSlug = (
     slugIn: string,
     operation: string,
-    scopeContextIn: SessionScanScopeContext | null = null
+    scopeContextIn: SessionScanScopeContext | null = null,
   ): boolean => {
     const scopeContext = scopeContextIn || getSessionScanScopeContext();
     if (scopeContext.scope === 'all') return false;
@@ -247,11 +231,7 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
     return !allowed;
   };
 
-  const scanScopeNoop = (
-    slugIn: string,
-    operation: string,
-    onSkipped?: () => void
-  ): boolean => {
+  const scanScopeNoop = (slugIn: string, operation: string, onSkipped?: () => void): boolean => {
     const scopeContext = getSessionScanScopeContext();
     if (!shouldSkipSessionScanForSlug(slugIn, operation, scopeContext)) return false;
     try {
@@ -262,10 +242,7 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
     return true;
   };
 
-  const getScopeFilteredSlugs = (
-    slugs: string[] = [],
-    scopeIn: string | null = null
-  ): string[] => {
+  const getScopeFilteredSlugs = (slugs: string[] = [], scopeIn: string | null = null): string[] => {
     const scopeContext = getSessionScanScopeContext(scopeIn || undefined);
     const input = Array.isArray(slugs) ? slugs : [];
     if (scopeContext.scope === 'all') {

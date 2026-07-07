@@ -7,18 +7,20 @@ type DeployFormState = {
   workerName?: unknown;
 };
 
-const renderWorkerSync = (overrides: Partial<{
-  account: unknown;
-  deployFormAdminAddress: unknown;
-  deployFormWorkerName: unknown;
-  draftSessionName: unknown;
-  draftCorsWorkerUrl: unknown;
-  buildWorkerName: jest.Mock<string, [unknown]>;
-  deployComplete: boolean;
-  deployWorkerUrl: unknown;
-  wizardMode: string;
-  workerMode: string;
-}> = {}) => {
+const renderWorkerSync = (
+  overrides: Partial<{
+    account: unknown;
+    deployFormAdminAddress: unknown;
+    deployFormWorkerName: unknown;
+    draftSessionName: unknown;
+    draftCorsWorkerUrl: unknown;
+    buildWorkerName: jest.Mock<string, [unknown]>;
+    deployComplete: boolean;
+    deployWorkerUrl: unknown;
+    wizardMode: string;
+    workerMode: string;
+  }> = {},
+) => {
   const setDeployForm = jest.fn();
   const setDeployComplete = jest.fn();
   const setWorkerMode = jest.fn();
@@ -26,23 +28,25 @@ const renderWorkerSync = (overrides: Partial<{
   const updateDraftValue = jest.fn();
   const buildWorkerName = overrides.buildWorkerName || jest.fn(() => 'existing-worker');
 
-  renderHook(() => useSessionWizardWorkerSyncEffects<DeployFormState>({
-    account: overrides.account ?? '',
-    deployFormAdminAddress: overrides.deployFormAdminAddress,
-    deployFormWorkerName: overrides.deployFormWorkerName ?? 'existing-worker',
-    setDeployForm,
-    draftSessionName: overrides.draftSessionName ?? '',
-    draftCorsWorkerUrl: overrides.draftCorsWorkerUrl ?? '',
-    buildWorkerName,
-    deployComplete: overrides.deployComplete ?? false,
-    deployWorkerUrl: overrides.deployWorkerUrl ?? '',
-    setDeployComplete,
-    wizardMode: overrides.wizardMode ?? 'advanced',
-    workerMode: overrides.workerMode ?? 'custom',
-    setWorkerMode,
-    setWorkerUrlAutoFilled,
-    updateDraftValueRef: { current: updateDraftValue },
-  }));
+  renderHook(() =>
+    useSessionWizardWorkerSyncEffects<DeployFormState>({
+      account: overrides.account ?? '',
+      deployFormAdminAddress: overrides.deployFormAdminAddress,
+      deployFormWorkerName: overrides.deployFormWorkerName ?? 'existing-worker',
+      setDeployForm,
+      draftSessionName: overrides.draftSessionName ?? '',
+      draftCorsWorkerUrl: overrides.draftCorsWorkerUrl ?? '',
+      buildWorkerName,
+      deployComplete: overrides.deployComplete ?? false,
+      deployWorkerUrl: overrides.deployWorkerUrl ?? '',
+      setDeployComplete,
+      wizardMode: overrides.wizardMode ?? 'advanced',
+      workerMode: overrides.workerMode ?? 'custom',
+      setWorkerMode,
+      setWorkerUrlAutoFilled,
+      updateDraftValueRef: { current: updateDraftValue },
+    }),
+  );
 
   return {
     buildWorkerName,
@@ -108,11 +112,7 @@ describe('useSessionWizardWorkerSyncEffects', () => {
     const defaultWorkerUrl = getSessionWizardDefaultWorkerUrl();
     expect(defaultWorkerUrl).toBeTruthy();
 
-    const {
-      setWorkerMode,
-      setWorkerUrlAutoFilled,
-      updateDraftValue,
-    } = renderWorkerSync({
+    const { setWorkerMode, setWorkerUrlAutoFilled, updateDraftValue } = renderWorkerSync({
       draftCorsWorkerUrl: defaultWorkerUrl,
       wizardMode: 'normal',
       workerMode: 'default',

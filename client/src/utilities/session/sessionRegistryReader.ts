@@ -17,9 +17,7 @@ type RegistryCache = Record<string, unknown> & {
   sessions?: unknown;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
 export const readRegistryCache = (): unknown => {
   if (typeof window === 'undefined') return null;

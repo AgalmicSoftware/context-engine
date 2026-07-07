@@ -12,7 +12,7 @@ describe('SbtPageStatsScanProgressDisplay', () => {
         scanProgressSessionText="Session: Alpha"
         scanProgressText="Loading holders: 12 blocks remaining"
         showScanProgress={true}
-      />
+      />,
     );
 
     expect(screen.getByText('Loading holders: 12 blocks remaining')).toBeInTheDocument();
@@ -21,12 +21,7 @@ describe('SbtPageStatsScanProgressDisplay', () => {
   });
 
   it('returns no progressbar when the parent display state is hidden', () => {
-    render(
-      <SbtPageStatsScanProgressDisplay
-        scanProgressPct={0}
-        showScanProgress={false}
-      />
-    );
+    render(<SbtPageStatsScanProgressDisplay scanProgressPct={0} showScanProgress={false} />);
 
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });

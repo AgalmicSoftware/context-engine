@@ -1,8 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import ConvictionImportanceLabel, {
-  buildConvictionImportanceToggleLineClassName,
-} from './ConvictionImportanceLabel';
+import ConvictionImportanceLabel, { buildConvictionImportanceToggleLineClassName } from './ConvictionImportanceLabel';
 
 describe('ConvictionImportanceLabel', () => {
   it('renders a simple conviction row when the importance toggle is disabled', () => {
@@ -14,7 +12,7 @@ describe('ConvictionImportanceLabel', () => {
         convictionValue={4}
         importanceValue={7}
         onSelectMode={jest.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText('Conviction')).toBeInTheDocument();
@@ -33,7 +31,7 @@ describe('ConvictionImportanceLabel', () => {
         convictionValue={3}
         importanceValue={8}
         onSelectMode={onSelectMode}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /conviction 3/i }));
@@ -41,7 +39,7 @@ describe('ConvictionImportanceLabel', () => {
 
     expect(screen.getByRole('heading', { name: /conviction 3 importance 8/i })).toHaveClass(
       'importanceText',
-      'convictionToggleText'
+      'convictionToggleText',
     );
     expect(onSelectMode).toHaveBeenNthCalledWith(1, 'conviction');
     expect(onSelectMode).toHaveBeenNthCalledWith(2, 'importance');
@@ -56,7 +54,7 @@ describe('ConvictionImportanceLabel', () => {
         convictionValue={2}
         importanceValue={6}
         onSelectMode={jest.fn()}
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: /conviction 2/i })).toBeInTheDocument();
@@ -64,15 +62,19 @@ describe('ConvictionImportanceLabel', () => {
   });
 
   it('builds conviction/importance toggle line classes', () => {
-    expect(buildConvictionImportanceToggleLineClassName({
-      activeClassName: 'active',
-      baseClassName: 'line',
-      isActive: true,
-    })).toBe('line active');
-    expect(buildConvictionImportanceToggleLineClassName({
-      activeClassName: 'active',
-      baseClassName: 'line',
-      isActive: false,
-    })).toBe('line');
+    expect(
+      buildConvictionImportanceToggleLineClassName({
+        activeClassName: 'active',
+        baseClassName: 'line',
+        isActive: true,
+      }),
+    ).toBe('line active');
+    expect(
+      buildConvictionImportanceToggleLineClassName({
+        activeClassName: 'active',
+        baseClassName: 'line',
+        isActive: false,
+      }),
+    ).toBe('line');
   });
 });

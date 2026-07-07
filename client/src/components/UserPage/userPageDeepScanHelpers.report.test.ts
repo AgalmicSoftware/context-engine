@@ -10,38 +10,44 @@ import {
 
 describe('userPageDeepScanHelpers report helpers', () => {
   it('builds stable deep-scan report signatures for background event dedupe', () => {
-    expect(buildUserPageDeepScanReportSignature({
-      reportTargetLower: '0xabc',
-      report: {
-        hadRpcErrors: true,
-        coverageReason: 'partial',
-        coverageComplete: false,
-        attemptedSlugs: ['alpha', 'beta'],
-        scannedSlugs: ['alpha'],
-        skippedSlugs: ['gamma'],
-        failedSlugs: ['delta'],
-        failedActivitySlugs: ['epsilon'],
-      },
-    })).toBe('0xabc|1|partial|0|alpha,beta|alpha|gamma|delta|epsilon');
+    expect(
+      buildUserPageDeepScanReportSignature({
+        reportTargetLower: '0xabc',
+        report: {
+          hadRpcErrors: true,
+          coverageReason: 'partial',
+          coverageComplete: false,
+          attemptedSlugs: ['alpha', 'beta'],
+          scannedSlugs: ['alpha'],
+          skippedSlugs: ['gamma'],
+          failedSlugs: ['delta'],
+          failedActivitySlugs: ['epsilon'],
+        },
+      }),
+    ).toBe('0xabc|1|partial|0|alpha,beta|alpha|gamma|delta|epsilon');
 
-    expect(buildUserPageDeepScanReportSignature({
-      reportTargetLower: '0xabc',
-      report: {
-        attemptedSlugs: 'bad',
-        scannedSlugs: ['alpha'],
-      },
-    })).toBe('0xabc|0||||alpha|||');
+    expect(
+      buildUserPageDeepScanReportSignature({
+        reportTargetLower: '0xabc',
+        report: {
+          attemptedSlugs: 'bad',
+          scannedSlugs: ['alpha'],
+        },
+      }),
+    ).toBe('0xabc|0||||alpha|||');
   });
 
   it('classifies deep-scan report uncertainty from coverage and failure evidence', () => {
-    expect(buildUserPageDeepScanReportStatus({
-      report: {
-        hadRpcErrors: true,
-        attemptedSlugs: ['alpha', 'beta'],
-        scannedSlugs: [],
-        failedActivitySlugs: ['alpha', 'beta'],
-      },
-    })).toMatchObject({
+    expect(
+      buildUserPageDeepScanReportStatus({
+        report: {
+          hadRpcErrors: true,
+          attemptedSlugs: ['alpha', 'beta'],
+          scannedSlugs: [],
+          failedActivitySlugs: ['alpha', 'beta'],
+        },
+      }),
+    ).toMatchObject({
       attemptedSlugs: ['alpha', 'beta'],
       scannedSlugs: [],
       failedActivitySlugs: ['alpha', 'beta'],
@@ -54,15 +60,17 @@ describe('userPageDeepScanHelpers report helpers', () => {
       hasUncertainSbtData: false,
     });
 
-    expect(buildUserPageDeepScanReportStatus({
-      report: {
-        hadRpcErrors: true,
-        coverageComplete: false,
-        attemptedSlugs: ['alpha', 'beta'],
-        scannedSlugs: ['alpha'],
-        failedSlugs: ['beta'],
-      },
-    })).toMatchObject({
+    expect(
+      buildUserPageDeepScanReportStatus({
+        report: {
+          hadRpcErrors: true,
+          coverageComplete: false,
+          attemptedSlugs: ['alpha', 'beta'],
+          scannedSlugs: ['alpha'],
+          failedSlugs: ['beta'],
+        },
+      }),
+    ).toMatchObject({
       totalActivityFailure: false,
       totalSbtFailure: false,
       totalSkippedScan: false,
@@ -84,57 +92,69 @@ describe('userPageDeepScanHelpers report helpers', () => {
       hasUncertainSbtData: false,
       hasUncertainGateAccess: false,
     });
-    expect(buildUserPageDeepScanReportStatePatch({
-      hasUncertainUserData: 1,
-      hasUncertainSbtData: '',
-    })).toEqual({
+    expect(
+      buildUserPageDeepScanReportStatePatch({
+        hasUncertainUserData: 1,
+        hasUncertainSbtData: '',
+      }),
+    ).toEqual({
       isDeepScanning: false,
       hasUncertainUserData: true,
       hasUncertainSbtData: false,
       hasUncertainGateAccess: false,
     });
 
-    expect(shouldApplyUserPageDeepScanResponse({
-      activeRequestSeq: 3,
-      currentViewAddress: '0xABC',
-      isMounted: true,
-      requestSeq: 3,
-      targetLower: '0xabc',
-    })).toBe(true);
-    expect(shouldApplyUserPageDeepScanResponse({
-      activeRequestSeq: 4,
-      currentViewAddress: '0xABC',
-      isMounted: true,
-      requestSeq: 3,
-      targetLower: '0xabc',
-    })).toBe(false);
-    expect(shouldApplyUserPageDeepScanResponse({
-      activeRequestSeq: 3,
-      currentViewAddress: '0xABC',
-      isMounted: false,
-      requestSeq: 3,
-      targetLower: '0xabc',
-    })).toBe(false);
-    expect(shouldApplyUserPageDeepScanResponse({
-      activeRequestSeq: 3,
-      currentViewAddress: '0xDEF',
-      isMounted: true,
-      requestSeq: 3,
-      targetLower: '0xabc',
-    })).toBe(false);
+    expect(
+      shouldApplyUserPageDeepScanResponse({
+        activeRequestSeq: 3,
+        currentViewAddress: '0xABC',
+        isMounted: true,
+        requestSeq: 3,
+        targetLower: '0xabc',
+      }),
+    ).toBe(true);
+    expect(
+      shouldApplyUserPageDeepScanResponse({
+        activeRequestSeq: 4,
+        currentViewAddress: '0xABC',
+        isMounted: true,
+        requestSeq: 3,
+        targetLower: '0xabc',
+      }),
+    ).toBe(false);
+    expect(
+      shouldApplyUserPageDeepScanResponse({
+        activeRequestSeq: 3,
+        currentViewAddress: '0xABC',
+        isMounted: false,
+        requestSeq: 3,
+        targetLower: '0xabc',
+      }),
+    ).toBe(false);
+    expect(
+      shouldApplyUserPageDeepScanResponse({
+        activeRequestSeq: 3,
+        currentViewAddress: '0xDEF',
+        isMounted: true,
+        requestSeq: 3,
+        targetLower: '0xabc',
+      }),
+    ).toBe(false);
   });
 
   it('limits deep-scan report telemetry samples', () => {
-    expect(buildUserPageDeepScanReportSamples({
-      limit: 2,
-      report: {
-        sampleSbtAddresses: ['sbt-1', 'sbt-2', 'sbt-3'],
-        sampleCreatedSurveyIds: ['survey-1', 'survey-2', 'survey-3'],
-        sampleCreatedQuestionIds: ['question-1'],
-        sampleSurveyResponseIds: 'bad',
-        sampleQuestionResponseIds: ['response-1', 'response-2', 'response-3'],
-      },
-    })).toEqual({
+    expect(
+      buildUserPageDeepScanReportSamples({
+        limit: 2,
+        report: {
+          sampleSbtAddresses: ['sbt-1', 'sbt-2', 'sbt-3'],
+          sampleCreatedSurveyIds: ['survey-1', 'survey-2', 'survey-3'],
+          sampleCreatedQuestionIds: ['question-1'],
+          sampleSurveyResponseIds: 'bad',
+          sampleQuestionResponseIds: ['response-1', 'response-2', 'response-3'],
+        },
+      }),
+    ).toEqual({
       sampleSbtAddresses: ['sbt-1', 'sbt-2'],
       sampleCreatedSurveyIds: ['survey-1', 'survey-2'],
       sampleCreatedQuestionIds: ['question-1'],
@@ -175,11 +195,13 @@ describe('userPageDeepScanHelpers report helpers', () => {
       usedAllSessions: true,
     };
     const status = buildUserPageDeepScanReportStatus({ report });
-    expect(buildUserPageDeepScanReportTelemetryPayloads({
-      report,
-      status,
-      viewAddress: '0x00000000000000000000000000000000000000AA',
-    })).toEqual({
+    expect(
+      buildUserPageDeepScanReportTelemetryPayloads({
+        report,
+        status,
+        viewAddress: '0x00000000000000000000000000000000000000AA',
+      }),
+    ).toEqual({
       coldDiagPayload: {
         viewAddress: '0x00000000000000000000000000000000000000aa',
         attemptedSlugs: ['alpha', 'beta'],
@@ -232,9 +254,11 @@ describe('userPageDeepScanHelpers report helpers', () => {
         sampleQuestionResponseIds: ['qr1', 'qr2'],
       },
     });
-    expect(buildUserPageDeepScanReportTelemetryPayloads({
-      report: { attemptedSlugs: 'bad' },
-      viewAddress: '',
-    }).telemetryPayload.coverageComplete).toBeNull();
+    expect(
+      buildUserPageDeepScanReportTelemetryPayloads({
+        report: { attemptedSlugs: 'bad' },
+        viewAddress: '',
+      }).telemetryPayload.coverageComplete,
+    ).toBeNull();
   });
 });

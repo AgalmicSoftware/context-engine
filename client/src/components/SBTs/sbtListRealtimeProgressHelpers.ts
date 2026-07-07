@@ -34,9 +34,8 @@ type ResolveSbtListRealtimeProgressRetentionPlanArgs = {
   progressBySlug?: SbtListRealtimeProgressBySlug | null;
 };
 
-const isRealtimeProgressRecord = (value: unknown): value is SbtListRealtimeProgressRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRealtimeProgressRecord = (value: unknown): value is SbtListRealtimeProgressRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const normalizeProgressNowMs = (value: unknown): number => {
   const numeric = Number(value || 0);
@@ -53,7 +52,7 @@ const normalizeSlugSet = (slugs: unknown): Set<string> => {
   return new Set(
     source
       .map((slugRaw) => normalizeSessionSlug(slugRaw || ''))
-      .filter((slug) => !isSbtListSyntheticNoSessionSlug(slug))
+      .filter((slug) => !isSbtListSyntheticNoSessionSlug(slug)),
   );
 };
 
@@ -76,10 +75,7 @@ export const buildSbtListRealtimeProgressInputPlan = ({
 
     const currentBlock = Number(progress.currentBlock || 0);
     const latestBlock = Number(progress.latestBlock || 0);
-    if (
-      (!Number.isFinite(currentBlock) || currentBlock <= 0) &&
-      (!Number.isFinite(latestBlock) || latestBlock <= 0)
-    ) {
+    if ((!Number.isFinite(currentBlock) || currentBlock <= 0) && (!Number.isFinite(latestBlock) || latestBlock <= 0)) {
       return;
     }
 
@@ -135,9 +131,7 @@ export const resolveSbtListRealtimeProgressRetentionPlan = ({
     if (updatedAtMs > 0) {
       const expiryAtMs = updatedAtMs + normalizedBridgeMs;
       if (expiryAtMs > normalizedNowMs) {
-        nextPruneAtMs = nextPruneAtMs == null
-          ? expiryAtMs
-          : Math.min(nextPruneAtMs, expiryAtMs);
+        nextPruneAtMs = nextPruneAtMs == null ? expiryAtMs : Math.min(nextPruneAtMs, expiryAtMs);
       }
     }
   });

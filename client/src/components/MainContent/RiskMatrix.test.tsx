@@ -70,8 +70,8 @@ describe('RiskMatrix', () => {
     expect(screen.getByText('Interaction: Capabilities vs Labor')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'AI-driven productivity gains could reshape knowledge work within 2 years. Early adopters may compress reporting, research, and drafting cycles.'
-      )
+        'AI-driven productivity gains could reshape knowledge work within 2 years. Early adopters may compress reporting, research, and drafting cycles.',
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByTestId('ce-risk-matrix-aggregate-note')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-risk-matrix-comment-input')).not.toBeInTheDocument();
@@ -89,8 +89,8 @@ describe('RiskMatrix', () => {
     expect(screen.getByText('Interaction: Crypto vs Governance')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Elinor Ostrom: Durable rules reduce friction when cooperation does not rely on a single referee. Trustless agreements reduce need for enforcement bureaucracy.'
-      )
+        'Elinor Ostrom: Durable rules reduce friction when cooperation does not rely on a single referee. Trustless agreements reduce need for enforcement bureaucracy.',
+      ),
     ).toBeInTheDocument();
   });
 
@@ -114,7 +114,7 @@ describe('RiskMatrix', () => {
     expect(screen.getByText('1-3 years')).toBeInTheDocument();
     expect(screen.getByAltText(/alan turing portrait anchoring the audit-aware agents overlap/i)).toHaveAttribute(
       'src',
-      '/historical-avatars/alanturing.jpg'
+      '/historical-avatars/alanturing.jpg',
     );
     expect(screen.getAllByText('Alan Turing').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Ada Lovelace').length).toBeGreaterThan(0);
@@ -148,10 +148,12 @@ describe('RiskMatrix', () => {
 
     expect(screen.getByAltText(/alan turing portrait anchoring the audit-aware agents overlap/i)).toHaveAttribute(
       'src',
-      '/ce/historical-avatars/alanturing.jpg'
+      '/ce/historical-avatars/alanturing.jpg',
     );
     expect(
-      screen.getAllByAltText('Alan Turing').some((image) => image.getAttribute('src') === '/ce/historical-avatars/alanturing.jpg')
+      screen
+        .getAllByAltText('Alan Turing')
+        .some((image) => image.getAttribute('src') === '/ce/historical-avatars/alanturing.jpg'),
     ).toBe(true);
   });
 
@@ -165,10 +167,10 @@ describe('RiskMatrix', () => {
     expect(screen.getByText('Reasoning agents can accelerate post-quantum migration')).toBeInTheDocument();
     expect(screen.getAllByTestId('ce-risk-matrix-atlas-scenario-card')).toHaveLength(2);
     expect(
-      screen.getByTestId('ce-risk-matrix-atlas-link-capabilities-reasoning-crypto-post-quantum')
+      screen.getByTestId('ce-risk-matrix-atlas-link-capabilities-reasoning-crypto-post-quantum'),
     ).toHaveTextContent('Reasoning & Planning');
     expect(
-      screen.getByTestId('ce-risk-matrix-atlas-link-capabilities-reasoning-crypto-post-quantum')
+      screen.getByTestId('ce-risk-matrix-atlas-link-capabilities-reasoning-crypto-post-quantum'),
     ).not.toHaveTextContent(/open .* in atlas/i);
   });
 
@@ -180,7 +182,9 @@ describe('RiskMatrix', () => {
     fireEvent.click(screen.getByTestId('ce-risk-matrix-atlas-link-labor-automation-capabilities-scaling'));
 
     expect(onOpenAtlasNode).toHaveBeenCalledTimes(1);
-    expect(onOpenAtlasNode.mock.calls[0]?.[0]).toBe('0x4110000000000000000000000000000000000000000000000000000000000000');
+    expect(onOpenAtlasNode.mock.calls[0]?.[0]).toBe(
+      '0x4110000000000000000000000000000000000000000000000000000000000000',
+    );
     const restoreState = onOpenAtlasNode.mock.calls[0]?.[1] as RiskMatrixRestoreState;
     expect(restoreState).toMatchObject({
       modal: true,
@@ -199,11 +203,9 @@ describe('RiskMatrix', () => {
 
       fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-capabilities-vs-labor'));
 
-      expect(
-        screen.getByTestId('ce-risk-matrix-atlas-link-labor-automation-capabilities-scaling')
-      ).toHaveAttribute(
+      expect(screen.getByTestId('ce-risk-matrix-atlas-link-labor-automation-capabilities-scaling')).toHaveAttribute(
         'href',
-        '/atlas/0x4110000000000000000000000000000000000000000000000000000000000000?demo=1&returnTo=%2Fmatrix%3Fpanel%3Dcapabilities%23scenario'
+        '/atlas/0x4110000000000000000000000000000000000000000000000000000000000000?demo=1&returnTo=%2Fmatrix%3Fpanel%3Dcapabilities%23scenario',
       );
     } finally {
       window.history.replaceState({}, '', priorUrl);
@@ -265,9 +267,11 @@ describe('RiskMatrix', () => {
 
   it('keeps every seeded atlas scenario linked to a real atlas node id', () => {
     const atlasNodeIds = collectAtlasNodeIds(debateMapDemoData as any[]);
-    const uniqueScenarioNodeIds = Array.from(new Set(
-      riskMatrixAtlasScenarioSamples.map((scenario) => String(scenario.atlasNodeId || '').trim()).filter(Boolean)
-    ));
+    const uniqueScenarioNodeIds = Array.from(
+      new Set(
+        riskMatrixAtlasScenarioSamples.map((scenario) => String(scenario.atlasNodeId || '').trim()).filter(Boolean),
+      ),
+    );
 
     expect(uniqueScenarioNodeIds.length).toBeGreaterThan(0);
     uniqueScenarioNodeIds.forEach((nodeId) => {
@@ -292,7 +296,7 @@ describe('RiskMatrix', () => {
           intensity: 7,
         }}
         onRestoreApplied={onRestoreApplied}
-      />
+      />,
     );
 
     expect(screen.getByTestId('ce-risk-matrix-modal')).toBeInTheDocument();
@@ -325,7 +329,9 @@ describe('RiskMatrix', () => {
     fireEvent.click(screen.getByTestId('ce-risk-matrix-save-comment'));
 
     expect(
-      screen.getByText('Deskilling pressure can surface before firms or governments fund credible retraining pathways.')
+      screen.getByText(
+        'Deskilling pressure can surface before firms or governments fund credible retraining pathways.',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByTestId(subcellTestId)).toHaveTextContent('-1');
   });

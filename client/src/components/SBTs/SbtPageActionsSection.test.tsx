@@ -7,9 +7,7 @@ const mintTxHash = '0x1111111111111111111111111111111111111111111111111111111111
 const burnTxHash = '0x2222222222222222222222222222222222222222222222222222222222222222';
 const errorTxHash = '0x3333333333333333333333333333333333333333333333333333333333333333';
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof SbtPageActionsSection>> = {}
-) => ({
+const createProps = (overrides: Partial<React.ComponentProps<typeof SbtPageActionsSection>> = {}) => ({
   actionFeedbackState: {
     showBurnSuccess: false,
     showErrorTransactionHash: false,
@@ -54,7 +52,7 @@ describe('SbtPageActionsSection', () => {
         {...createProps({
           onToggle,
         })}
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: 'Mint Action' })).toBeInTheDocument();
@@ -73,20 +71,20 @@ describe('SbtPageActionsSection', () => {
             showMintSuccess: true,
           },
         })}
-      />
+      />,
     );
 
     expect(screen.getByText(/SBT successfully minted!/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '0x1111...111111' })).toHaveAttribute(
       'href',
-      `https://explorer.example.test/tx/${mintTxHash}`
+      `https://explorer.example.test/tx/${mintTxHash}`,
     );
     expect(screen.getByRole('link', { name: '0x1111...111111' })).toHaveAttribute('target', '_blank');
     expect(screen.getByRole('link', { name: '0x1111...111111' })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByText(/SBT successfully burned!/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '0x2222...222222' })).toHaveAttribute(
       'href',
-      `https://explorer.example.test/tx/${burnTxHash}`
+      `https://explorer.example.test/tx/${burnTxHash}`,
     );
     expect(screen.getByRole('link', { name: '0x2222...222222' })).toHaveAttribute('target', '_blank');
     expect(screen.getByRole('link', { name: '0x2222...222222' })).toHaveAttribute('rel', 'noopener noreferrer');
@@ -103,13 +101,13 @@ describe('SbtPageActionsSection', () => {
           },
           onCopyError,
         })}
-      />
+      />,
     );
 
     expect(screen.getByRole('alert')).toHaveTextContent('Transaction Failed: wallet rejected transaction');
     expect(screen.getByRole('link', { name: '0x3333...333333' })).toHaveAttribute(
       'href',
-      `https://explorer.example.test/tx/${errorTxHash}`
+      `https://explorer.example.test/tx/${errorTxHash}`,
     );
     expect(screen.getByRole('link', { name: '0x3333...333333' })).toHaveAttribute('target', '_blank');
     expect(screen.getByRole('link', { name: '0x3333...333333' })).toHaveAttribute('rel', 'noopener noreferrer');
@@ -128,7 +126,7 @@ describe('SbtPageActionsSection', () => {
             shouldRenderOpenIcon: false,
           },
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('ACTIONS')).toBeInTheDocument();

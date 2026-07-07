@@ -13,7 +13,7 @@ const SurveyQuestionsRouteBodySection = ({
   submitDisplayState,
   submitFooterProps,
   viewingAnswers = false,
-}: SurveyQuestionsRouteBodySectionProps): React.ReactElement => (
+}: SurveyQuestionsRouteBodySectionProps): React.ReactElement =>
   viewingAnswers ? (
     <SurveyQuestionsResponseRouteSection
       layoutDisplayState={layoutDisplayState}
@@ -27,7 +27,6 @@ const SurveyQuestionsRouteBodySection = ({
       submitDisplayState={submitDisplayState}
       submitFooterProps={submitFooterProps}
     />
-  )
-);
+  );
 
 export default SurveyQuestionsRouteBodySection;

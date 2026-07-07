@@ -20,7 +20,8 @@ import {
 
 type SurveyToolLikeProps = Record<string, unknown>;
 type SurveyToolLikeState = Record<string, unknown>;
-type SetStateUpdate = Record<string, unknown> | null | ((prevState: SurveyToolLikeState) => Record<string, unknown> | null);
+type SetStateUpdate =
+  Record<string, unknown> | null | ((prevState: SurveyToolLikeState) => Record<string, unknown> | null);
 type SetState = (update: SetStateUpdate, callback?: () => void) => unknown;
 type CloneValue = (value: unknown) => unknown;
 type PrefillStateUpdate = Record<string, unknown> | ((prevState: SurveyToolLikeState) => Record<string, unknown>);
@@ -31,12 +32,10 @@ const readUserAnswerResponses = (userAnswers: unknown): unknown[] | null => {
   return Array.isArray(responses) ? responses : null;
 };
 
-const buildSetStateApplyHandler = (
-  setState: SetState = () => {},
-) => (
-  nextUpdates: PrefillStateUpdate,
-  done?: () => void,
-) => setState(nextUpdates as SetStateUpdate, done);
+const buildSetStateApplyHandler =
+  (setState: SetState = () => {}) =>
+  (nextUpdates: PrefillStateUpdate, done?: () => void) =>
+    setState(nextUpdates as SetStateUpdate, done);
 
 const executeSurveyPrefillPlan = ({
   updates = null,
@@ -48,12 +47,13 @@ const executeSurveyPrefillPlan = ({
   setState?: SetState;
   updateJsonPreview?: () => void;
   recalculateEditStats?: () => void;
-} = {}) => applyPrefillUpdatePlan({
-  updates,
-  applyStateUpdates: buildSetStateApplyHandler(setState),
-  updateJsonPreview,
-  recalculateEditStats,
-});
+} = {}) =>
+  applyPrefillUpdatePlan({
+    updates,
+    applyStateUpdates: buildSetStateApplyHandler(setState),
+    updateJsonPreview,
+    recalculateEditStats,
+  });
 
 export const buildSurveyLocalCacheSlice = ({
   props = {},
@@ -167,7 +167,10 @@ export const resolveSurveyMissingRenderedResponseLookup = ({
   slug?: unknown;
   fallbackSlug?: unknown;
   renderedIds?: unknown[];
-  resolveQuestionSlugMapForIds?: (questionIds: string[], context?: Record<string, unknown>) => Map<string, unknown> | null | undefined;
+  resolveQuestionSlugMapForIds?: (
+    questionIds: string[],
+    context?: Record<string, unknown>,
+  ) => Map<string, unknown> | null | undefined;
   resolveResponseHydrationContext?: ((rawSlug: unknown) => Record<string, unknown> | null | undefined) | null;
   normalizeSessionSlugValue?: ((value: unknown) => string) | null;
   getExtraScopeSlugs?: ((slug: string) => unknown[] | null | undefined) | null;
@@ -232,9 +235,7 @@ export const executeSurveyResponsePrefill = ({
         applyResponseHydrationListToSlice,
         buildSliceFromUserAnswers,
       });
-      return (updatePlan?.updates && typeof updatePlan.updates === 'object')
-        ? updatePlan.updates
-        : {};
+      return updatePlan?.updates && typeof updatePlan.updates === 'object' ? updatePlan.updates : {};
     },
     setState,
     updateJsonPreview,
@@ -283,9 +284,7 @@ export const executeSurveySingleQuestionPrefill = ({
         applyResponseHydrationListToSlice,
         buildSliceFromUserAnswers,
       });
-      return (updatePlan?.updates && typeof updatePlan.updates === 'object')
-        ? updatePlan.updates
-        : {};
+      return updatePlan?.updates && typeof updatePlan.updates === 'object' ? updatePlan.updates : {};
     },
     setState,
     updateJsonPreview,
@@ -332,45 +331,50 @@ export const executeSurveyPriorResponseBackfill = ({
 } = {}): false | Promise<boolean> => {
   const nextProps = props || {};
   const nextState = state || {};
-  if (!shouldBackfill({
-    loginComplete: nextProps.loginComplete,
-    account: nextProps.account,
-    displayAnswerMode: nextProps.displayAnswerMode,
-    viewAddress: nextProps.viewAddress,
-    singleQuestionMode: nextProps.singleQuestionMode,
-    responderAddress: nextProps.responderAddress,
-    hasRefreshQuestionResponses: typeof nextProps.refreshQuestionResponses === 'function',
-    submissionComplete: nextState.submissionComplete,
-    isSubmitting: nextState.isSubmitting,
-  })) {
+  if (
+    !shouldBackfill({
+      loginComplete: nextProps.loginComplete,
+      account: nextProps.account,
+      displayAnswerMode: nextProps.displayAnswerMode,
+      viewAddress: nextProps.viewAddress,
+      singleQuestionMode: nextProps.singleQuestionMode,
+      responderAddress: nextProps.responderAddress,
+      hasRefreshQuestionResponses: typeof nextProps.refreshQuestionResponses === 'function',
+      submissionComplete: nextState.submissionComplete,
+      isSubmitting: nextState.isSubmitting,
+    })
+  ) {
     return false;
   }
 
-  const inFlight = typeof getCurrentInFlight === 'function'
-    ? getCurrentInFlight()
-    : null;
+  const inFlight = typeof getCurrentInFlight === 'function' ? getCurrentInFlight() : null;
   if (inFlight) {
     return inFlight;
   }
 
-  const responderLower = String(nextProps.account || '').trim().toLowerCase();
+  const responderLower = String(nextProps.account || '')
+    .trim()
+    .toLowerCase();
   let trackedPromise: Promise<boolean> | null = null;
-  const runPromise = Promise.resolve().then(() => runBackfillAttempt({
-    responderLower,
-    slug,
-    attemptedSet,
-    loadMissingInfo: ({ responder, slug: nextSlug }: { responder: string; slug?: string | null }) => getMissingRenderedResponseIdsForAccount({
-      responder,
-      slug: nextSlug,
+  const runPromise = Promise.resolve().then(() =>
+    runBackfillAttempt({
+      responderLower,
+      slug,
+      attemptedSet,
+      loadMissingInfo: ({ responder, slug: nextSlug }: { responder: string; slug?: string | null }) =>
+        getMissingRenderedResponseIdsForAccount({
+          responder,
+          slug: nextSlug,
+        }),
+      setHydratingState,
+      isMounted,
+      refreshQuestionResponses: nextProps.refreshQuestionResponses,
+      readQuestionsCacheAsync,
+      onFailure,
+      resetLocalCacheMemo,
+      triggerRehydrate,
     }),
-    setHydratingState,
-    isMounted,
-    refreshQuestionResponses: nextProps.refreshQuestionResponses,
-    readQuestionsCacheAsync,
-    onFailure,
-    resetLocalCacheMemo,
-    triggerRehydrate,
-  }));
+  );
 
   trackedPromise = runPromise.finally(() => {
     if (typeof getCurrentInFlight === 'function' && getCurrentInFlight() === trackedPromise) {
@@ -409,18 +413,23 @@ export const executeSurveyDraftHydration = ({
   onError?: (error: unknown) => void;
   skipDraftHydrationRun?: (args?: Record<string, unknown>) => boolean;
   buildDraftSeedContext?: (args?: Record<string, unknown>) => { surveyIndex?: number; prevSlice?: unknown };
-  buildDraftRunPlan?: (args?: Record<string, unknown>) => { renderedQuestionIds?: string[]; updates?: Record<string, unknown> };
+  buildDraftRunPlan?: (args?: Record<string, unknown>) => {
+    renderedQuestionIds?: string[];
+    updates?: Record<string, unknown>;
+  };
   applyDraftEffects?: (args?: Record<string, unknown>) => void;
 } = {}) => {
   try {
     const nextProps = props || {};
     const nextState = state || {};
     const draft = loadDraft();
-    if (skipDraftHydrationRun({
-      suppressPrefill: nextState.suppressPrefill,
-      submissionError: nextState.submissionError,
-      draft,
-    })) {
+    if (
+      skipDraftHydrationRun({
+        suppressPrefill: nextState.suppressPrefill,
+        submissionError: nextState.submissionError,
+        draft,
+      })
+    ) {
       return { reason: 'skip', applied: false, renderedQuestionIds: [] };
     }
 
@@ -430,9 +439,9 @@ export const executeSurveyDraftHydration = ({
       surveyIndex: nextProps.surveyIndex,
       surveysResponseState: nextState.surveysResponseState,
     });
-    const pendingStats =
-      (typeof getPendingEditStats === 'function' && getPendingEditStats()) ||
-      { total: nextState.modifiedCount || 0 };
+    const pendingStats = (typeof getPendingEditStats === 'function' && getPendingEditStats()) || {
+      total: nextState.modifiedCount || 0,
+    };
     const draftRunPlan = buildDraftRunPlan({
       hydrationQuestionIds: getHydrationQuestionIds(),
       pileQuestions: nextState.pileQuestions,
@@ -450,12 +459,8 @@ export const executeSurveyDraftHydration = ({
       cloneBaseline,
       applyDraftEntryToSlice: applyDraftHydrationEntryToSlice,
     });
-    const renderedQuestionIds = Array.isArray(draftRunPlan.renderedQuestionIds)
-      ? draftRunPlan.renderedQuestionIds
-      : [];
-    const updates = draftRunPlan.updates && typeof draftRunPlan.updates === 'object'
-      ? draftRunPlan.updates
-      : {};
+    const renderedQuestionIds = Array.isArray(draftRunPlan.renderedQuestionIds) ? draftRunPlan.renderedQuestionIds : [];
+    const updates = draftRunPlan.updates && typeof draftRunPlan.updates === 'object' ? draftRunPlan.updates : {};
 
     if (renderedQuestionIds.length === 0) {
       return { reason: 'no-rendered-ids', applied: false, renderedQuestionIds: [] };
@@ -468,9 +473,11 @@ export const executeSurveyDraftHydration = ({
       };
     }
 
-    setState(updates, () => applyDraftEffects({
-      updateJsonPreview,
-    }));
+    setState(updates, () =>
+      applyDraftEffects({
+        updateJsonPreview,
+      }),
+    );
     return {
       reason: 'applied',
       applied: true,
@@ -530,9 +537,18 @@ export const executeSurveyLocalCacheRehydrate = async ({
   bumpNoop?: () => void;
   onNoChange?: () => void;
   onError?: (error: unknown) => void;
-  prepareRehydrateRun?: (args?: Record<string, unknown>) => { shouldSkip?: boolean; shouldBumpNoop?: boolean; hydrationSig?: string; baseSlice?: unknown };
+  prepareRehydrateRun?: (args?: Record<string, unknown>) => {
+    shouldSkip?: boolean;
+    shouldBumpNoop?: boolean;
+    hydrationSig?: string;
+    baseSlice?: unknown;
+  };
   loadDraftAnswersByQid?: (args?: Record<string, unknown>) => Record<string, unknown>;
-  buildRehydrationUpdatePlan?: (args?: Record<string, unknown>) => { changed?: boolean; baselineChanged?: boolean; updates?: Record<string, unknown> };
+  buildRehydrationUpdatePlan?: (args?: Record<string, unknown>) => {
+    changed?: boolean;
+    baselineChanged?: boolean;
+    updates?: Record<string, unknown>;
+  };
   applyRehydrateMissEffects?: (args?: Record<string, unknown>) => void;
   applyRehydrateUpdatePlan?: (args?: Record<string, unknown>) => boolean;
   isStaleRun?: () => boolean;
@@ -540,10 +556,7 @@ export const executeSurveyLocalCacheRehydrate = async ({
   try {
     const nextProps = props || {};
     const nextState = state || {};
-    const surveyIndex =
-      nextProps.isStandalone || nextProps.singleQuestionMode
-        ? 0
-        : nextProps.surveyIndex;
+    const surveyIndex = nextProps.isStandalone || nextProps.singleQuestionMode ? 0 : nextProps.surveyIndex;
     const renderedQuestionIds = getHydrationQuestionIds();
     const rehydrateRun = prepareRehydrateRun({
       state: nextState,
@@ -627,9 +640,7 @@ export const executeSurveyLocalCacheRehydrate = async ({
     });
 
     return {
-      reason: rehydrationUpdatePlan.changed || rehydrationUpdatePlan.baselineChanged
-        ? 'applied'
-        : 'no-change',
+      reason: rehydrationUpdatePlan.changed || rehydrationUpdatePlan.baselineChanged ? 'applied' : 'no-change',
       applied: !!(rehydrationUpdatePlan.changed || rehydrationUpdatePlan.baselineChanged),
       renderedQuestionIds,
       hydrationSig,

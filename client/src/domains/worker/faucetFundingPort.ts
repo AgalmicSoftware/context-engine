@@ -15,9 +15,7 @@ type BindFaucetFundingPortArgs = {
 export const bindFaucetFundingPort = ({
   chainGateway: readChainGateway,
 }: BindFaucetFundingPortArgs): FaucetFundingPort => ({
-  sendTestnetFunds: (recipientAddress) => (
-    readChainGateway().sendTestnetFunds(recipientAddress)
-  ),
+  sendTestnetFunds: (recipientAddress) => readChainGateway().sendTestnetFunds(recipientAddress),
 });
 
 export const faucetFundingPort = bindFaucetFundingPort({

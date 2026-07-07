@@ -28,9 +28,8 @@ export const createSoftSessionPolicy = ({
   maxTransactionValueWei,
 });
 
-export const isSoftSessionExpired = (policy: SoftSessionPolicy, now = Date.now()): boolean => (
-  now >= Number(policy.expiresAt || 0)
-);
+export const isSoftSessionExpired = (policy: SoftSessionPolicy, now = Date.now()): boolean =>
+  now >= Number(policy.expiresAt || 0);
 
 const normalizeAddress = (value: unknown): string => {
   try {
@@ -59,9 +58,7 @@ const valueToWei = (value: unknown): bigint => {
 
 const chainIdToNumber = (value: unknown): number | null => {
   if (value == null || value === '') return null;
-  if (typeof value === 'bigint') return value > 0n && value <= BigInt(Number.MAX_SAFE_INTEGER)
-    ? Number(value)
-    : null;
+  if (typeof value === 'bigint') return value > 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
   if (typeof value === 'number') return Number.isSafeInteger(value) && value > 0 ? value : null;
   const raw = String(value || '').trim();
   if (!raw) return null;

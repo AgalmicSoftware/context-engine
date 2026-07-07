@@ -9,9 +9,7 @@ jest.mock('../Shared/CETooltip', () => ({
   default: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof UserPageHeader>> = {}
-) => ({
+const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageHeader>> = {}) => ({
   addressDisplay: <span>Profile Label</span>,
   analyzeButtonDisplayState: {
     ariaBusy: false,
@@ -103,20 +101,25 @@ describe('UserPageHeader', () => {
           onNicknameEdit,
           onUsernameEdit,
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Profile Label')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'User avatar' })).toHaveStyle({
       backgroundImage: 'url(blockie)',
     });
-    expect(screen.getByText('This is a simulated user whose answers are generated based on documents.')).toBeInTheDocument();
+    expect(
+      screen.getByText('This is a simulated user whose answers are generated based on documents.'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View address on explorer' })).toHaveAttribute(
       'href',
-      'https://explorer.example.test/address/0xabc'
+      'https://explorer.example.test/address/0xabc',
     );
     expect(screen.getByRole('link', { name: 'View address on explorer' })).toHaveAttribute('target', '_blank');
-    expect(screen.getByRole('link', { name: 'View address on explorer' })).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByRole('link', { name: 'View address on explorer' })).toHaveAttribute(
+      'rel',
+      'noopener noreferrer',
+    );
     expect(screen.getByRole('link', { name: /My Bookmarks/ })).toHaveAttribute('href', '/bookmarks');
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit nickname' }));
@@ -159,7 +162,7 @@ describe('UserPageHeader', () => {
           onAnalyzeUser,
           onCollapseToggle,
         })}
-      />
+      />,
     );
 
     const compareButton = screen.getByRole('button', { name: /Compare/ });
@@ -209,7 +212,7 @@ describe('UserPageHeader', () => {
             shouldRenderEnteredIndicator: true,
           },
         })}
-      />
+      />,
     );
 
     const nicknameInput = screen.getByLabelText('Set nickname');
@@ -244,7 +247,7 @@ describe('UserPageHeader', () => {
             usernameErrorText: 'Cannot persist username.',
           },
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Cannot persist username.')).toBeInTheDocument();

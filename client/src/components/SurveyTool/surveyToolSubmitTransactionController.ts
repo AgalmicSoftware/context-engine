@@ -15,9 +15,8 @@ type SubmitTransaction = UnknownRecord & {
   wait?: () => Promise<unknown>;
 };
 
-const isObjectRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isObjectRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export interface FilteredSubmitPayload {
   questionIds: string[];
@@ -34,15 +33,8 @@ export function filterChangedResponsesForSubmit(opts: {
   surveyId: string;
   HashZero: string;
 }): FilteredSubmitPayload {
-  const {
-    data,
-    changedSet,
-    singleQuestionMode,
-    isStandalone,
-    surveyId,
-    HashZero,
-  } = opts;
-  const dataRecord = isObjectRecord(data) ? data as SubmittedSurveyResponse & SubmittedQuestionResponse : null;
+  const { data, changedSet, singleQuestionMode, isStandalone, surveyId, HashZero } = opts;
+  const dataRecord = isObjectRecord(data) ? (data as SubmittedSurveyResponse & SubmittedQuestionResponse) : null;
 
   if (singleQuestionMode) {
     const qid = typeof dataRecord?.questionID === 'string' ? dataRecord.questionID : '';
@@ -58,9 +50,7 @@ export function filterChangedResponsesForSubmit(opts: {
   }
 
   const all = Array.isArray(dataRecord?.responses) ? dataRecord.responses : [];
-  const filtered = all.filter((response) => (
-    response && response.questionID && changedSet.has(response.questionID)
-  ));
+  const filtered = all.filter((response) => response && response.questionID && changedSet.has(response.questionID));
 
   if (filtered.length === 0) {
     throw new Error('No new or changed responses to submit.');
@@ -84,13 +74,7 @@ export function ensureIdentifierHash(
     warn?: (msg: string, err?: unknown) => void;
   },
 ): string {
-  const {
-    hashIdentifier,
-    isHexString,
-    id,
-    HashZero,
-    warn,
-  } = deps;
+  const { hashIdentifier, isHexString, id, HashZero, warn } = deps;
 
   try {
     if (typeof hashIdentifier === 'function') {
@@ -108,7 +92,7 @@ export function ensureIdentifierHash(
     warn?.('SurveyTool: fallback', error);
   }
 
-  const stringValue = (value === null || value === undefined) ? '' : String(value);
+  const stringValue = value === null || value === undefined ? '' : String(value);
   if (stringValue.trim() === '') return HashZero;
   if (typeof id !== 'function') {
     throw new Error('ensureIdentifierHash: id() is required for non-empty values');
@@ -138,13 +122,7 @@ export async function normalizeSubmitReceipt(
     deepClone: <T>(obj: T) => T;
   },
 ): Promise<NormalizedSubmitReceipt> {
-  const {
-    questionResponses,
-    surveyResponse,
-    surveyId,
-    submissionGroupKey,
-    deepClone,
-  } = opts;
+  const { questionResponses, surveyResponse, surveyId, submissionGroupKey, deepClone } = opts;
 
   const submittedPayloadMeta: SubmitReceiptResult['submittedPayloadMeta'] = {
     __ceQuestionResponses: deepClone(questionResponses || []),
@@ -153,7 +131,7 @@ export async function normalizeSubmitReceipt(
     __ceSubmissionGroupKey: submissionGroupKey,
   };
 
-  const txRecord = isObjectRecord(tx) ? tx as SubmitTransaction : null;
+  const txRecord = isObjectRecord(tx) ? (tx as SubmitTransaction) : null;
 
   if (txRecord && typeof txRecord.wait === 'function') {
     const receipt = await txRecord.wait();

@@ -26,9 +26,7 @@ const SbtPageStatsScanProgressDisplay = ({
       <FontAwesomeIcon icon={faSpinner} spin className={styles.scanSpinner} />
       <div className={styles.scanProgressContent}>
         <span className={styles.scanProgressText}>{scanProgressText}</span>
-        {scanProgressSessionText ? (
-          <span className={styles.scanProgressSession}>{scanProgressSessionText}</span>
-        ) : null}
+        {scanProgressSessionText ? <span className={styles.scanProgressSession}>{scanProgressSessionText}</span> : null}
         <div
           className={styles.scanProgressBar}
           role="progressbar"

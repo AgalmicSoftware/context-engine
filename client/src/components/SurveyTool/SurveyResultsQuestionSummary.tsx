@@ -106,37 +106,26 @@ type SurveyResultsQuestionSummaryProps = {
   surveyId?: unknown;
 };
 
-const toRecord = (value: unknown): SurveyResultsRecord => (
-  value && typeof value === 'object' ? value as SurveyResultsRecord : {}
-);
+const toRecord = (value: unknown): SurveyResultsRecord =>
+  value && typeof value === 'object' ? (value as SurveyResultsRecord) : {};
 
-const normalizeResponseRows = (responses: unknown): SurveyResultsSummaryResponseRow[] => (
-  Array.isArray(responses) ? responses as SurveyResultsSummaryResponseRow[] : []
-);
+const normalizeResponseRows = (responses: unknown): SurveyResultsSummaryResponseRow[] =>
+  Array.isArray(responses) ? (responses as SurveyResultsSummaryResponseRow[]) : [];
 
-export const countSurveyResultsViewableResponses = (
-  responses: unknown,
-  questionType: unknown = ''
-): number => {
+export const countSurveyResultsViewableResponses = (responses: unknown, questionType: unknown = ''): number => {
   const normalizedQuestionType = String(questionType || '').toLowerCase();
-  return getSurveyResultsLatestResponsesByResponder(normalizeResponseRows(responses)).reduce(
-    (acc: number, row) => {
-      const parsedResponse = row?.response && typeof row.response === 'object'
-        ? row.response as SurveyResultsSummaryResponsePayload
-        : null;
-      if (!parsedResponse || !parsedResponse.answer) {
-        return acc;
-      }
-      if (isFreeformBlankAnswer(normalizedQuestionType, parsedResponse)) {
-        return acc;
-      }
-      const isEncryptedPlaceholder =
-        parsedResponse.answer.encrypted === true &&
-        parsedResponse.answer.value === '*';
-      return isEncryptedPlaceholder ? acc : acc + 1;
-    },
-    0
-  );
+  return getSurveyResultsLatestResponsesByResponder(normalizeResponseRows(responses)).reduce((acc: number, row) => {
+    const parsedResponse =
+      row?.response && typeof row.response === 'object' ? (row.response as SurveyResultsSummaryResponsePayload) : null;
+    if (!parsedResponse || !parsedResponse.answer) {
+      return acc;
+    }
+    if (isFreeformBlankAnswer(normalizedQuestionType, parsedResponse)) {
+      return acc;
+    }
+    const isEncryptedPlaceholder = parsedResponse.answer.encrypted === true && parsedResponse.answer.value === '*';
+    return isEncryptedPlaceholder ? acc : acc + 1;
+  }, 0);
 };
 
 export const buildSurveyResultsQuestionSummaryRenderModel = ({
@@ -193,10 +182,7 @@ export const buildSurveyResultsQuestionSummaryRenderModel = ({
     question,
     questionPrompt: questionDisplay.questionPrompt as React.ReactNode,
     resolvedQuestionType,
-    viewableResponsesCount: countSurveyResultsViewableResponses(
-      displayResponses,
-      resolvedQuestionType
-    ),
+    viewableResponsesCount: countSurveyResultsViewableResponses(displayResponses, resolvedQuestionType),
   };
 };
 
@@ -232,11 +218,8 @@ const SurveyResultsQuestionSummary = ({
     responses,
     surveyId,
   });
-  const questionForResponse =
-    model.question || getFallbackQuestion(questionId, 'summary');
-  const responseActiveSessionSlug = String(
-    toRecord(questionForResponse).sessionSlug || activeSessionSlug || ''
-  );
+  const questionForResponse = model.question || getFallbackQuestion(questionId, 'summary');
+  const responseActiveSessionSlug = String(toRecord(questionForResponse).sessionSlug || activeSessionSlug || '');
 
   return (
     <SurveyResultsQuestionSummaryCard

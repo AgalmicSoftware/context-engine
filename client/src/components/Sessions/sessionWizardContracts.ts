@@ -50,7 +50,7 @@ export const getSessionWizardContractDefaults = (chainId: unknown): SessionWizar
 
 export const resolveSessionWizardRegistryAddress = (
   chainId: unknown,
-  contracts: SessionWizardContractsRecord | null | undefined
+  contracts: SessionWizardContractsRecord | null | undefined,
 ): string => {
   const entry = contracts?.sessionRegistry;
   if (entry && typeof entry === 'object') {
@@ -64,14 +64,12 @@ export const resolveSessionWizardRegistryAddress = (
   return toStr(getSessionRegistryAddress(chainId)).trim();
 };
 
-export const getVisibleSessionWizardContractKeys = (
-  ..._args: unknown[]
-): VisibleSessionWizardContractKey[] => (
-  [...SESSION_WIZARD_VISIBLE_CONTRACT_KEYS]
-);
+export const getVisibleSessionWizardContractKeys = (..._args: unknown[]): VisibleSessionWizardContractKey[] => [
+  ...SESSION_WIZARD_VISIBLE_CONTRACT_KEYS,
+];
 
 export const sanitizeSessionWizardContracts = (
-  contracts: SessionWizardContractsRecord | null | undefined
+  contracts: SessionWizardContractsRecord | null | undefined,
 ): Partial<Record<VisibleSessionWizardContractKey, Record<string, unknown>>> => {
   if (!contracts || typeof contracts !== 'object') return {};
   const nextContracts: Partial<Record<VisibleSessionWizardContractKey, Record<string, unknown>>> = {};
@@ -94,22 +92,16 @@ export const resolveSessionWizardContractViewerPlan = ({
   selectedContractKey = '',
   selectorSourceSessionSlug = '',
 }: SessionWizardContractViewerPlanInput = {}): SessionWizardContractViewerPlan => {
-  const sessionContracts = draftContracts && typeof draftContracts === 'object'
-    ? draftContracts
-    : {};
+  const sessionContracts = draftContracts && typeof draftContracts === 'object' ? draftContracts : {};
   const defaults = getSessionWizardContractDefaults(registryChainId);
   const visibleKeys = getVisibleSessionWizardContractKeys(sessionContracts, defaults);
-  const resolvedChainId = Number(
-    registryChainId ||
-    draftNetworkChainId ||
-    network?.id ||
-    network?.chainId ||
-    0
-  ) || null;
+  const resolvedChainId =
+    Number(registryChainId || draftNetworkChainId || network?.id || network?.chainId || 0) || null;
   const mergedContracts = visibleKeys.reduce<SessionContractsLike>((acc, contractKey) => {
-    const entry = sessionContracts[contractKey] && typeof sessionContracts[contractKey] === 'object'
-      ? sessionContracts[contractKey] as SessionContractLike
-      : {};
+    const entry =
+      sessionContracts[contractKey] && typeof sessionContracts[contractKey] === 'object'
+        ? (sessionContracts[contractKey] as SessionContractLike)
+        : {};
     const address = toStr(entry.address || '').trim() || toStr(defaults?.[contractKey] || '').trim();
     acc[contractKey] = {
       ...entry,
@@ -125,14 +117,9 @@ export const resolveSessionWizardContractViewerPlan = ({
     includeCustomSBT: false,
   });
   const normalizedSelectedContractKey = toStr(selectedContractKey).trim();
-  const selectedContract = contracts.find(
-    (contract) => contract.key === normalizedSelectedContractKey
-  ) || null;
+  const selectedContract = contracts.find((contract) => contract.key === normalizedSelectedContractKey) || null;
   const selectedContractSessionSlug = toStr(
-    selectorSourceSessionSlug ||
-    activeSessionSlug ||
-    resolvedActiveSessionSlug ||
-    ''
+    selectorSourceSessionSlug || activeSessionSlug || resolvedActiveSessionSlug || '',
   ).trim();
   const selectedContractHref = buildContractsPageHref({
     contractKey: selectedContract?.key || '',

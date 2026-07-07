@@ -19,11 +19,13 @@ import {
 
 describe('userPageAnalysisStateHelpers', () => {
   it('canonicalizes inputs and builds stable fingerprints', async () => {
-    expect(sortUserAnalysisKeys({
-      z: 1,
-      a: { y: 2, x: 1 },
-      list: [{ b: 2, a: 1 }],
-    })).toEqual({
+    expect(
+      sortUserAnalysisKeys({
+        z: 1,
+        a: { y: 2, x: 1 },
+        list: [{ b: 2, a: 1 }],
+      }),
+    ).toEqual({
       a: { x: 1, y: 2 },
       list: [{ a: 1, b: 2 }],
       z: 1,
@@ -54,11 +56,13 @@ describe('userPageAnalysisStateHelpers', () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_710_000_000_000);
     try {
       expect(formatAnalysisCacheAge(null)).toBe('');
-      expect(formatAnalysisCacheAge(1_710_000_000_000 - (5 * 60 * 1000))).toBe('5m ago');
-      expect(resolveUserPageAnalysisCacheStatusState({
-        analysisCachedAt: 1_710_000_000_000 - (5 * 60 * 1000),
-        analysisServedFromCache: true,
-      })).toEqual({
+      expect(formatAnalysisCacheAge(1_710_000_000_000 - 5 * 60 * 1000)).toBe('5m ago');
+      expect(
+        resolveUserPageAnalysisCacheStatusState({
+          analysisCachedAt: 1_710_000_000_000 - 5 * 60 * 1000,
+          analysisServedFromCache: true,
+        }),
+      ).toEqual({
         analysisCacheAge: '5m ago',
         shouldRenderAnalysisCacheStatus: true,
       });
@@ -66,12 +70,14 @@ describe('userPageAnalysisStateHelpers', () => {
       nowSpy.mockRestore();
     }
 
-    expect(resolveUserPageAnalysisModalDisplayState({
-      analysisDetails: 'detail',
-      analysisHistoricalFigure: 'Ada Lovelace',
-      analysisHistoricalReasoning: 'reasoning',
-      analyzing: false,
-    })).toEqual({
+    expect(
+      resolveUserPageAnalysisModalDisplayState({
+        analysisDetails: 'detail',
+        analysisHistoricalFigure: 'Ada Lovelace',
+        analysisHistoricalReasoning: 'reasoning',
+        analyzing: false,
+      }),
+    ).toEqual({
       shouldRenderAnalysisBody: true,
       shouldRenderAnalyzing: false,
       shouldRenderDetails: true,
@@ -83,13 +89,15 @@ describe('userPageAnalysisStateHelpers', () => {
   });
 
   it('builds profile modal and tooltip display state', () => {
-    expect(resolveUserPageFullProfileModalDisplayState({
-      account: '0xabc',
-      explorerUrl: 'https://explorer.test/address/0xabc',
-      minimized: false,
-      propViewAddress: '0xABC',
-      surveyResponseInfo: [{ id: 'survey-1' }],
-    })).toEqual({
+    expect(
+      resolveUserPageFullProfileModalDisplayState({
+        account: '0xabc',
+        explorerUrl: 'https://explorer.test/address/0xabc',
+        minimized: false,
+        propViewAddress: '0xABC',
+        surveyResponseInfo: [{ id: 'survey-1' }],
+      }),
+    ).toEqual({
       shouldRenderBookmarksLink: true,
       shouldRenderModalActions: true,
       shouldRenderSurveyEmptyText: false,
@@ -116,22 +124,24 @@ describe('userPageAnalysisStateHelpers', () => {
         reasoning: '',
       },
     });
-    expect(buildUserPageAnalysisResultStatePatch({
-      cachedAt: '1710000000000',
-      includeElapsed: true,
-      includeError: true,
-      includeModal: true,
-      result: {
-        name: 'Cached',
-        summary: 'Summary',
-        details: 'Details',
-        historicalAlignment: {
-          figure: 'Ada',
-          reasoning: 'Reason',
+    expect(
+      buildUserPageAnalysisResultStatePatch({
+        cachedAt: '1710000000000',
+        includeElapsed: true,
+        includeError: true,
+        includeModal: true,
+        result: {
+          name: 'Cached',
+          summary: 'Summary',
+          details: 'Details',
+          historicalAlignment: {
+            figure: 'Ada',
+            reasoning: 'Reason',
+          },
         },
-      },
-      servedFromCache: true,
-    })).toMatchObject({
+        servedFromCache: true,
+      }),
+    ).toMatchObject({
       showAnalysisModal: true,
       aiAnalysis: 'Summary',
       analysisDetails: 'Details',
@@ -157,14 +167,16 @@ describe('userPageAnalysisStateHelpers', () => {
 
   it('builds AI options and visible response analysis fields', () => {
     const sessionConfig = { ai: { provider: 'openai' } };
-    expect(buildUserPageAnalysisAiOptions({
-      analysisSession: {
-        slug: 'analysis-session',
-        sessionConfig,
-        status: 'allowed',
-        reason: 'selected',
-      },
-    })).toEqual({
+    expect(
+      buildUserPageAnalysisAiOptions({
+        analysisSession: {
+          slug: 'analysis-session',
+          sessionConfig,
+          status: 'allowed',
+          reason: 'selected',
+        },
+      }),
+    ).toEqual({
       sessionSlug: 'analysis-session',
       sessionConfig,
       sessionSelection: {
@@ -172,10 +184,12 @@ describe('userPageAnalysisStateHelpers', () => {
         reason: 'selected',
       },
     });
-    expect(extractUserPageAnalysisAdditionalComment({
-      additionalComment: { value: '*' },
-      additionalComments: { value: 'extra context' },
-    })).toBe('extra context');
+    expect(
+      extractUserPageAnalysisAdditionalComment({
+        additionalComment: { value: '*' },
+        additionalComments: { value: 'extra context' },
+      }),
+    ).toBe('extra context');
     expect(extractUserPageAnalysisImportance({ meta: { importance: 2 } })).toBe(2);
     expect(extractUserPageAnalysisImportance({ answer: { conviction: { encrypted: true } } })).toBeUndefined();
   });

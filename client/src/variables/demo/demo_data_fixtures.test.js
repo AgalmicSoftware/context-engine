@@ -31,18 +31,17 @@ describe('demo data fixture cleanup', () => {
 
   it('keeps the dedicated breakdown analysis fixture separate from the canonical Polis demo fixture', () => {
     const demoDir = __dirname;
-    const syntheticVariantCount = Array.isArray(demoAnalysisGenerationConfig?.syntheticParticipantConfig?.variantProfiles)
+    const syntheticVariantCount = Array.isArray(
+      demoAnalysisGenerationConfig?.syntheticParticipantConfig?.variantProfiles,
+    )
       ? demoAnalysisGenerationConfig.syntheticParticipantConfig.variantProfiles.length
       : 0;
 
     expect(fs.existsSync(path.join(demoDir, 'demo_analysis_data.json'))).toBe(true);
-    expect(Object.keys(demoAnalysisData)).toEqual([
-      'comments',
-      'participantsVotes',
-    ]);
+    expect(Object.keys(demoAnalysisData)).toEqual(['comments', 'participantsVotes']);
     expect(demoAnalysisData.comments).toHaveLength(demoPolisData.comments.length);
     expect(demoAnalysisData.participantsVotes).toHaveLength(
-      demoPolisData.participantsVotes.length * (syntheticVariantCount + 1)
+      demoPolisData.participantsVotes.length * (syntheticVariantCount + 1),
     );
   });
 
@@ -106,21 +105,13 @@ describe('demo data fixture cleanup', () => {
         'https://x.com/Gregory_C_Allen/status/1898040379611504983',
         'https://x.com/PalisadeAI/status/1926084635903025621',
       ],
-      ai_laws_policy: [
-        'eu_ai_act',
-        'eu_gdpr_article_22',
-        'council_of_europe_ai_convention',
-      ],
+      ai_laws_policy: ['eu_ai_act', 'eu_gdpr_article_22', 'council_of_europe_ai_convention'],
       arxiv_ai_safety: [
         'gpt3_language_models_few_shot',
         'gpt4_technical_report',
         'attention_all_you_need_vaswani_2017',
       ],
-      lesswrong_posts: [
-        'yudkowsky_ai_box',
-        'bostrom_dragon_tyrant',
-        'sequences_rationality_az',
-      ],
+      lesswrong_posts: ['yudkowsky_ai_box', 'bostrom_dragon_tyrant', 'sequences_rationality_az'],
       cross_corpus: [
         'debate_exponential_progress',
         'debate_reward_hacking_misalignment',
@@ -131,11 +122,7 @@ describe('demo data fixture cleanup', () => {
         'hassabis_demis_dwarkesh_2024_superhuman',
         'amodei_dario_dwarkesh_2023_scaling',
       ],
-      ai_scifi_books: [
-        'shelley_frankenstein',
-        'butler_erewhon',
-        'forster_machine_stops',
-      ],
+      ai_scifi_books: ['shelley_frankenstein', 'butler_erewhon', 'forster_machine_stops'],
       metr_evals_metrics: [
         'metr_time_horizon_paper_2025',
         'metr_reward_hacking_2025',
@@ -152,14 +139,14 @@ describe('demo data fixture cleanup', () => {
     });
 
     expect(corpusSample.corpuses.tweets.entries.slice(0, 3).map((entry) => entry.url)).toEqual(
-      expectedFeaturedLeads.tweets
+      expectedFeaturedLeads.tweets,
     );
 
     Object.entries(expectedFeaturedLeads)
       .filter(([corpusKey]) => corpusKey !== 'tweets')
       .forEach(([corpusKey, expectedIds]) => {
         expect(corpusSample.corpuses[corpusKey].entries.slice(0, expectedIds.length).map((entry) => entry.id)).toEqual(
-          expectedIds
+          expectedIds,
         );
       });
   });
@@ -198,9 +185,9 @@ describe('demo data fixture cleanup', () => {
   it('covers every atlas leaf node with at least one Loophole historical case', () => {
     const leafNodeIds = [];
     const coveredNodeIds = new Set(
-      (Array.isArray(loopholeHistoricalCases) ? loopholeHistoricalCases : []).flatMap((entry) => (
-        Array.isArray(entry?.debate_map_issues) ? entry.debate_map_issues : []
-      ))
+      (Array.isArray(loopholeHistoricalCases) ? loopholeHistoricalCases : []).flatMap((entry) =>
+        Array.isArray(entry?.debate_map_issues) ? entry.debate_map_issues : [],
+      ),
     );
 
     const visit = (nodes) => {
@@ -220,14 +207,7 @@ describe('demo data fixture cleanup', () => {
   });
 
   it('keeps every Loophole historical case on the enriched schema contract', () => {
-    const requiredExploitFields = [
-      'institution',
-      'actor',
-      'action',
-      'victims',
-      'why_legal',
-      'why_immoral',
-    ];
+    const requiredExploitFields = ['institution', 'actor', 'action', 'victims', 'why_legal', 'why_immoral'];
     const requiredOverreachFields = [
       'institution',
       'actor',
@@ -243,7 +223,11 @@ describe('demo data fixture cleanup', () => {
     loopholeHistoricalCases.forEach((historicalCase) => {
       expect(Array.isArray(historicalCase?.draft_legal_code?.articles)).toBe(true);
       expect(historicalCase.draft_legal_code.articles.length).toBeGreaterThan(0);
-      expect(historicalCase.draft_legal_code.articles.every((article) => typeof article === 'string' && article.trim().length > 0)).toBe(true);
+      expect(
+        historicalCase.draft_legal_code.articles.every(
+          (article) => typeof article === 'string' && article.trim().length > 0,
+        ),
+      ).toBe(true);
 
       requiredExploitFields.forEach((fieldName) => {
         expect(typeof historicalCase?.loophole_exploit?.[fieldName]).toBe('string');
@@ -274,14 +258,20 @@ describe('demo data fixture cleanup', () => {
   });
 
   it('provides principle lists for every historical figure used in Loophole cases', () => {
-    const caseAuthors = Array.from(new Set(
-      (Array.isArray(loopholeHistoricalCases) ? loopholeHistoricalCases : []).flatMap((entry) => (
-        Array.isArray(entry?.authors) ? entry.authors : []
-      ))
-    )).sort();
+    const caseAuthors = Array.from(
+      new Set(
+        (Array.isArray(loopholeHistoricalCases) ? loopholeHistoricalCases : []).flatMap((entry) =>
+          Array.isArray(entry?.authors) ? entry.authors : [],
+        ),
+      ),
+    ).sort();
 
     expect(caseAuthors).toHaveLength(38);
-    expect(caseAuthors.filter((authorName) => !Array.isArray(loopholeHistoricalFigurePrinciples?.[authorName]))).toEqual([]);
-    expect(caseAuthors.filter((authorName) => (loopholeHistoricalFigurePrinciples?.[authorName] || []).length < 2)).toEqual([]);
+    expect(
+      caseAuthors.filter((authorName) => !Array.isArray(loopholeHistoricalFigurePrinciples?.[authorName])),
+    ).toEqual([]);
+    expect(
+      caseAuthors.filter((authorName) => (loopholeHistoricalFigurePrinciples?.[authorName] || []).length < 2),
+    ).toEqual([]);
   });
 });

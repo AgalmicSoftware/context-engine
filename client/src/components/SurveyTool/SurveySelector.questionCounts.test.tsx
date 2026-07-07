@@ -75,15 +75,16 @@ describe('SurveySelector question counts', () => {
       slug: '',
       networkChainId: 84532,
     };
-    const strictLookup = (slug: unknown) => (
-      String(slug || '').trim().toLowerCase() === ''
+    const strictLookup = (slug: unknown) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === ''
         ? generalCfg
-        : null
-    );
+        : null;
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug: any) => (
-      strictLookup(slug) || generalCfg
-    ));
+    jest
+      .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
+      .mockImplementation((slug: any) => strictLookup(slug) || generalCfg);
     const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
       '84532': {
         questions: {
@@ -126,15 +127,16 @@ describe('SurveySelector question counts', () => {
       networkChainId: 84532,
       BLOCKED_QUESTION_IDS: ['q1'],
     };
-    const strictLookup = (slug: unknown) => (
-      String(slug || '').trim().toLowerCase() === ''
+    const strictLookup = (slug: unknown) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === ''
         ? generalCfg
-        : null
-    );
+        : null;
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug: any) => (
-      strictLookup(slug) || generalCfg
-    ));
+    jest
+      .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
+      .mockImplementation((slug: any) => strictLookup(slug) || generalCfg);
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
       '84532': {
         questions: {
@@ -187,29 +189,31 @@ describe('SurveySelector question counts', () => {
       };
       jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);
       jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup as any);
-      const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace?: string, slug?: string) => {
-        if (namespace !== 'questionsCache') return {};
-        if (slug === 'alpha') {
-          return {
-            '84532': {
-              questions: {
-                q1: { id: 'q1', prompt: 'Alpha 1' },
+      const readCacheSpy = jest
+        .spyOn(cacheScripts, 'readCache')
+        .mockImplementation(async (namespace?: string, slug?: string) => {
+          if (namespace !== 'questionsCache') return {};
+          if (slug === 'alpha') {
+            return {
+              '84532': {
+                questions: {
+                  q1: { id: 'q1', prompt: 'Alpha 1' },
+                },
               },
-            },
-          };
-        }
-        if (slug === 'beta') {
-          return {
-            '84532': {
-              questions: {
-                q2: { id: 'q2', prompt: '[encrypted]' },
-                qBlockedBeta: { id: 'qBlockedBeta', prompt: 'Blocked beta' },
+            };
+          }
+          if (slug === 'beta') {
+            return {
+              '84532': {
+                questions: {
+                  q2: { id: 'q2', prompt: '[encrypted]' },
+                  qBlockedBeta: { id: 'qBlockedBeta', prompt: 'Blocked beta' },
+                },
               },
-            },
-          };
-        }
-        return {};
-      });
+            };
+          }
+          return {};
+        });
 
       const subject = new SurveySelector({
         autoOpenResults: false,
@@ -245,7 +249,9 @@ describe('SurveySelector question counts', () => {
     window.history.replaceState({}, '', '/session/edge');
     try {
       jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
-      const readScopeSlugsSpy = jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+      const readScopeSlugsSpy = jest
+        .spyOn(sessionScanScope, 'readSessionScanSlugs')
+        .mockReturnValue(['edge', 'alpha', 'beta']);
       const strictLookup = (slug: unknown) => {
         if (slug === 'edge') return { slug: 'edge', networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
         if (slug === 'alpha') return { slug: 'alpha', networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
@@ -254,37 +260,39 @@ describe('SurveySelector question counts', () => {
       };
       jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);
       jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup as any);
-      const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace?: string, slug?: string) => {
-        if (namespace !== 'questionsCache') return {};
-        if (slug === 'edge') {
-          return {
-            '84532': {
-              questions: {
-                q1: { id: 'q1', prompt: 'Edge 1' },
+      const readCacheSpy = jest
+        .spyOn(cacheScripts, 'readCache')
+        .mockImplementation(async (namespace?: string, slug?: string) => {
+          if (namespace !== 'questionsCache') return {};
+          if (slug === 'edge') {
+            return {
+              '84532': {
+                questions: {
+                  q1: { id: 'q1', prompt: 'Edge 1' },
+                },
               },
-            },
-          };
-        }
-        if (slug === 'alpha') {
-          return {
-            '84532': {
-              questions: {
-                q2: { id: 'q2', prompt: '[encrypted]' },
+            };
+          }
+          if (slug === 'alpha') {
+            return {
+              '84532': {
+                questions: {
+                  q2: { id: 'q2', prompt: '[encrypted]' },
+                },
               },
-            },
-          };
-        }
-        if (slug === 'beta') {
-          return {
-            '84532': {
-              questions: {
-                q3: { id: 'q3', prompt: 'Beta 3' },
+            };
+          }
+          if (slug === 'beta') {
+            return {
+              '84532': {
+                questions: {
+                  q3: { id: 'q3', prompt: 'Beta 3' },
+                },
               },
-            },
-          };
-        }
-        return {};
-      });
+            };
+          }
+          return {};
+        });
 
       const subject = new SurveySelector({
         autoOpenResults: false,
@@ -329,29 +337,31 @@ describe('SurveySelector question counts', () => {
       };
       jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);
       jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup as any);
-      const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace?: string, slug?: string) => {
-        if (namespace !== 'questionsCache') return {};
-        if (slug === 'alpha') {
-          return {
-            '84532': {
-              questions: {
-                q1: { id: 'q1', prompt: 'Alpha question' },
+      const readCacheSpy = jest
+        .spyOn(cacheScripts, 'readCache')
+        .mockImplementation(async (namespace?: string, slug?: string) => {
+          if (namespace !== 'questionsCache') return {};
+          if (slug === 'alpha') {
+            return {
+              '84532': {
+                questions: {
+                  q1: { id: 'q1', prompt: 'Alpha question' },
+                },
               },
-            },
-          };
-        }
-        if (slug === 'beta') {
-          return {
-            '84532': {
-              questions: {
-                q1: { id: 'q1', prompt: '[encrypted]' },
-                q2: { id: 'q2', prompt: '[encrypted]' },
+            };
+          }
+          if (slug === 'beta') {
+            return {
+              '84532': {
+                questions: {
+                  q1: { id: 'q1', prompt: '[encrypted]' },
+                  q2: { id: 'q2', prompt: '[encrypted]' },
+                },
               },
-            },
-          };
-        }
-        return {};
-      });
+            };
+          }
+          return {};
+        });
 
       const subject = new SurveySelector({
         autoOpenResults: false,

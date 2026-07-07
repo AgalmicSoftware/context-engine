@@ -25,28 +25,23 @@ export const buildQuestionDecryptContextForSession = ({
   litHooks?: unknown;
   fallbackChainId?: unknown;
 } = {}): QuestionDecryptContext => {
-  const chainId = Number(
-    cfg?.networkChainId || fallbackChainId || 0
-  ) || null;
-  const normalizedLitHooks = (
-    litHooks && typeof litHooks === 'object'
-      ? litHooks as QuestionDecryptLitHooks
-      : null
-  );
+  const chainId = Number(cfg?.networkChainId || fallbackChainId || 0) || null;
+  const normalizedLitHooks = litHooks && typeof litHooks === 'object' ? (litHooks as QuestionDecryptLitHooks) : null;
   return {
     account,
     providerLike,
     chainId,
     litHooks: normalizedLitHooks,
-    litOpts: normalizedLitHooks && typeof normalizedLitHooks.getKey === 'function'
-      ? { getKey: normalizedLitHooks.getKey }
-      : null,
+    litOpts:
+      normalizedLitHooks && typeof normalizedLitHooks.getKey === 'function'
+        ? { getKey: normalizedLitHooks.getKey }
+        : null,
   };
 };
 
 export const hasMaskedQuestionPayloadImproved = (
   prevQuestion?: Record<string, unknown> | null,
-  nextQuestion?: Record<string, unknown> | null
+  nextQuestion?: Record<string, unknown> | null,
 ): boolean => {
   if (!prevQuestion || !nextQuestion) return false;
   if (isMaskedQuestionPayload(prevQuestion) && !isMaskedQuestionPayload(nextQuestion)) return true;

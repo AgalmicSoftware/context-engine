@@ -21,10 +21,7 @@ describe('SurveyQuestionsTopStrip', () => {
 
   it('renders an empty top strip when route and response controls are hidden', () => {
     const { container } = render(
-      <SurveyQuestionsTopStrip
-        {...baseProps}
-        layoutDisplayState={{ topSectionClassName: 'top-strip' }}
-      />
+      <SurveyQuestionsTopStrip {...baseProps} layoutDisplayState={{ topSectionClassName: 'top-strip' }} />,
     );
 
     const strip = container.firstElementChild;
@@ -36,11 +33,7 @@ describe('SurveyQuestionsTopStrip', () => {
     const ref = React.createRef<HTMLDivElement>();
 
     const { container } = render(
-      <SurveyQuestionsTopStrip
-        {...baseProps}
-        ref={ref}
-        layoutDisplayState={{ topSectionClassName: 'top-strip' }}
-      />
+      <SurveyQuestionsTopStrip {...baseProps} ref={ref} layoutDisplayState={{ topSectionClassName: 'top-strip' }} />,
     );
 
     expect(ref.current).toBe(container.firstElementChild);
@@ -56,7 +49,7 @@ describe('SurveyQuestionsTopStrip', () => {
           showViewAnswersButton: true,
           viewAnswersButtonText: ' View 0xabc answers',
         }}
-      />
+      />,
     );
 
     const toggle = screen.getByRole('button', { name: 'View 0xabc answers' });
@@ -83,7 +76,7 @@ describe('SurveyQuestionsTopStrip', () => {
         submitDisplayState={{ submittedStateActive: true }}
         userHasResponse
         userResponseEncrypted
-      />
+      />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBeInTheDocument();
@@ -96,7 +89,7 @@ describe('SurveyQuestionsTopStrip', () => {
     expect(baseProps.onExitEditing).toHaveBeenCalledTimes(1);
     expect(screen.getByTitle('View submitted response')).toHaveAttribute(
       'href',
-      'https://example.com/submitted-response'
+      'https://example.com/submitted-response',
     );
   });
 
@@ -114,7 +107,7 @@ describe('SurveyQuestionsTopStrip', () => {
         submitDisplayState={{ submittedStateActive: true }}
         userHasResponse
         userResponseEncrypted
-      />
+      />,
     );
 
     expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).not.toBeInTheDocument();

@@ -14,10 +14,7 @@ const noopClick: React.MouseEventHandler<HTMLAnchorElement> = (event) => {
   event.preventDefault();
 };
 
-const TelegramBucketCards = ({
-  cards,
-  onReconnect,
-}: TelegramBucketCardsProps): React.ReactElement => {
+const TelegramBucketCards = ({ cards, onReconnect }: TelegramBucketCardsProps): React.ReactElement => {
   if (cards === null) {
     return (
       <section className={styles.telegramListPanel} data-testid="ce-session-telegram-buckets">
@@ -53,9 +50,7 @@ const TelegramBucketCards = ({
             sbtAddressLower: card.categoryId.toLowerCase(),
             sessionSlug: 'telegram',
             name: card.categoryLabel,
-            description: selected.length
-              ? selected.map((option) => option.label).join(', ')
-              : 'No bucket selected.',
+            description: selected.length ? selected.map((option) => option.label).join(', ') : 'No bucket selected.',
             imageSrc: '',
             locked: false,
           };
@@ -68,7 +63,7 @@ const TelegramBucketCards = ({
               sbtLabel="Group"
               shellClassName={sbtStyles.standardCardShell}
               styles={sbtStyles}
-              detailsPanel={(
+              detailsPanel={
                 <label className={styles.telegramBucketSelect}>
                   <span>{card.categoryLabel}</span>
                   <select
@@ -78,11 +73,13 @@ const TelegramBucketCards = ({
                   >
                     <option value="">No selection</option>
                     {card.options.map((option) => (
-                      <option key={option.optionId} value={option.optionId}>{option.label}</option>
+                      <option key={option.optionId} value={option.optionId}>
+                        {option.label}
+                      </option>
                     ))}
                   </select>
                 </label>
-              )}
+              }
               isExpanded={true}
             />
           );

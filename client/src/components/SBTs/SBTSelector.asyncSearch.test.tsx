@@ -50,7 +50,9 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
 
 jest.mock('../../utilities/web3/contractScripts.js', () => {
   const normalizeSessionSlug = (raw: unknown = '') => {
-    const normalized = String(raw ?? '').trim().toLowerCase();
+    const normalized = String(raw ?? '')
+      .trim()
+      .toLowerCase();
     if (!normalized || normalized === 'general') return '';
     return normalized;
   };
@@ -126,7 +128,7 @@ describe('SBTSelector AsyncSearchSelect integration', () => {
           variant="admin"
         />
         <button type="button">outside</button>
-      </div>
+      </div>,
     );
 
     await waitFor(() => {
@@ -143,10 +145,12 @@ describe('SBTSelector AsyncSearchSelect integration', () => {
     fireEvent.click(screen.getByRole('option', { name: 'Beta Badge' }));
 
     await waitFor(() => {
-      expect(onAddSBT).toHaveBeenCalledWith(expect.objectContaining({
-        address: betaAddress.toLowerCase(),
-        name: 'Beta Badge',
-      }));
+      expect(onAddSBT).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address: betaAddress.toLowerCase(),
+          name: 'Beta Badge',
+        }),
+      );
     });
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
 

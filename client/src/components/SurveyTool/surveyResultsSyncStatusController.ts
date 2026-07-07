@@ -63,10 +63,7 @@ const buildSyncStatusTrackPlan = ({
   const localBlockNumber = normalizeSurveyResultsBlockNumber(localBlock);
   const refreshTargetBlockNumber = normalizeSurveyResultsBlockNumber(refreshTargetBlock);
   const clampedLocalBlock = Math.min(localBlockNumber, latestBlock);
-  const clampedRefreshTargetBlock =
-    refreshTargetBlockNumber > 0
-      ? Math.min(refreshTargetBlockNumber, latestBlock)
-      : 0;
+  const clampedRefreshTargetBlock = refreshTargetBlockNumber > 0 ? Math.min(refreshTargetBlockNumber, latestBlock) : 0;
 
   if (clampedLocalBlock === 0 || latestBlock === 0) {
     return buildLoadingTrack();
@@ -109,9 +106,7 @@ const buildSyncStatusTrackPlan = ({
   }
 
   const remainingBlocks = clampedRefreshTargetBlock - clampedLocalBlock;
-  const progress = denominator
-    ? Math.floor((clampedLocalBlock / denominator) * 100)
-    : 0;
+  const progress = denominator ? Math.floor((clampedLocalBlock / denominator) * 100) : 0;
   return {
     color: progress < 100 ? 'info' : 'success',
     label: `Remaining Blocks: ${remainingBlocks}`,
@@ -138,17 +133,15 @@ export const buildSurveyResultsSyncStatusDisplayPlan = ({
   const isSurveyView = normalizedViewMode === 'survey';
   const question = isQuestionView
     ? buildSyncStatusTrackPlan({
-      localBlock: questionLocalBlock,
-      networkLatestBlock,
-      refreshTargetBlock: refreshTargetQuestionBlock,
-    })
+        localBlock: questionLocalBlock,
+        networkLatestBlock,
+        refreshTargetBlock: refreshTargetQuestionBlock,
+      })
     : buildIdleTrack();
   const response = buildSyncStatusTrackPlan({
     localBlock: isSurveyView ? surveyLocalBlock : responseLocalBlock,
     networkLatestBlock,
-    refreshTargetBlock: isSurveyView
-      ? refreshTargetSurveyBlock
-      : refreshTargetResponseBlock,
+    refreshTargetBlock: isSurveyView ? refreshTargetSurveyBlock : refreshTargetResponseBlock,
   });
 
   const isSynced = isQuestionView
@@ -156,9 +149,7 @@ export const buildSurveyResultsSyncStatusDisplayPlan = ({
     : response.color === 'success';
   const isLoading = question.showSpinner || response.showSpinner;
   const isSyncingOrLoading = isLoading || !isSynced;
-  const syncStatusText = isLoading
-    ? 'Loading...'
-    : (isSynced ? 'In Sync' : 'Syncing...');
+  const syncStatusText = isLoading ? 'Loading...' : isSynced ? 'In Sync' : 'Syncing...';
 
   return {
     isSynced,

@@ -27,7 +27,10 @@ const valuesEqual = (left: unknown, right: unknown) => {
 };
 
 const buildIndexedKeys = () => new Map([['q1', ['q1']]]);
-const normalizeKey = (value: string) => String(value || '').trim().toLowerCase();
+const normalizeKey = (value: string) =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 const buildEmptySlice = () => ({
   answers: {},
   importance: {},
@@ -51,64 +54,63 @@ const computeChangedFields = ({
   resolveAudience?: (field: ResponseFieldState) => string;
   resolveGateId?: (field: ResponseFieldState) => string;
   resolveAudienceMode?: (field: ResponseFieldState) => string;
-}) => computeChangedQidsAndFields({
-  ids,
-  baselineSlice,
-  currentSlice,
-  baselineAnswerKeys: buildIndexedKeys(),
-  currentAnswerKeys: buildIndexedKeys(),
-  baselineAdditionalKeys: buildIndexedKeys(),
-  currentAdditionalKeys: buildIndexedKeys(),
-  baselineImportanceKeys: buildIndexedKeys(),
-  currentImportanceKeys: buildIndexedKeys(),
-  baselineConvictionKeys: buildIndexedKeys(),
-  currentConvictionKeys: buildIndexedKeys(),
-  ratingEnvelopeQids,
-  valuesEqual,
-  hasMeaningfulFieldValue,
-  resolveAudience,
-  resolveGateId,
-  resolveAudienceMode,
-});
+}) =>
+  computeChangedQidsAndFields({
+    ids,
+    baselineSlice,
+    currentSlice,
+    baselineAnswerKeys: buildIndexedKeys(),
+    currentAnswerKeys: buildIndexedKeys(),
+    baselineAdditionalKeys: buildIndexedKeys(),
+    currentAdditionalKeys: buildIndexedKeys(),
+    baselineImportanceKeys: buildIndexedKeys(),
+    currentImportanceKeys: buildIndexedKeys(),
+    baselineConvictionKeys: buildIndexedKeys(),
+    currentConvictionKeys: buildIndexedKeys(),
+    ratingEnvelopeQids,
+    valuesEqual,
+    hasMeaningfulFieldValue,
+    resolveAudience,
+    resolveGateId,
+    resolveAudienceMode,
+  });
 
 describe('surveyToolChangedFieldsController', () => {
   describe('pickBestField', () => {
     it('returns empty object when no matching keys', () => {
-      expect(pickBestField(
-        { q1: { value: 'a' } },
-        new Map(),
-        'q2',
-        hasMeaningfulFieldValue,
-      )).toEqual({});
+      expect(pickBestField({ q1: { value: 'a' } }, new Map(), 'q2', hasMeaningfulFieldValue)).toEqual({});
     });
 
     it('returns exact key match with meaningful value immediately', () => {
-      expect(pickBestField(
-        { q1: { value: 'answer' } },
-        new Map([['q1', ['q1']]]),
-        'q1',
-        hasMeaningfulFieldValue,
-      ).value).toBe('answer');
+      expect(
+        pickBestField({ q1: { value: 'answer' } }, new Map([['q1', ['q1']]]), 'q1', hasMeaningfulFieldValue).value,
+      ).toBe('answer');
     });
 
     it('prefers first meaningful value over exact empty match', () => {
-      expect(pickBestField(
-        { q1: {}, Q1: { value: 'better' } },
-        new Map([['q1', ['q1', 'Q1']]]),
-        'q1',
-        hasMeaningfulFieldValue,
-      ).value).toBe('better');
+      expect(
+        pickBestField(
+          { q1: {}, Q1: { value: 'better' } },
+          new Map([['q1', ['q1', 'Q1']]]),
+          'q1',
+          hasMeaningfulFieldValue,
+        ).value,
+      ).toBe('better');
     });
 
     it('falls back to encrypted value when nothing meaningful', () => {
-      expect(pickBestField(
-        { q1: { encrypted: true, encryptedPortion: 'data' } },
-        new Map([['q1', ['q1']]]),
-        'q1',
-        () => false,
-      )).toEqual(expect.objectContaining({
-        encrypted: true,
-      }));
+      expect(
+        pickBestField(
+          { q1: { encrypted: true, encryptedPortion: 'data' } },
+          new Map([['q1', ['q1']]]),
+          'q1',
+          () => false,
+        ),
+      ).toEqual(
+        expect.objectContaining({
+          encrypted: true,
+        }),
+      );
     });
   });
 
@@ -118,31 +120,22 @@ describe('surveyToolChangedFieldsController', () => {
     });
 
     it('returns exact key numeric value', () => {
-      expect(pickBestNumber(
-        { q1: 7 },
-        new Map([['q1', ['q1']]]),
-        'q1',
-      )).toBe(7);
+      expect(pickBestNumber({ q1: 7 }, new Map([['q1', ['q1']]]), 'q1')).toBe(7);
     });
 
     it('skips non-numeric values', () => {
-      expect(pickBestNumber(
-        { q1: null, Q1: 5 },
-        new Map([['q1', ['q1', 'Q1']]]),
-        'q1',
-      )).toBe(5);
+      expect(pickBestNumber({ q1: null, Q1: 5 }, new Map([['q1', ['q1', 'Q1']]]), 'q1')).toBe(5);
     });
   });
 
   describe('buildIndexedQuestionEntryKeys', () => {
     it('groups raw keys by normalized question id', () => {
-      expect(buildIndexedQuestionEntryKeys(
-        { q1: 1, Q1: 2, '  ': 3, q2: 4 },
-        normalizeKey,
-      )).toEqual(new Map([
-        ['q1', ['q1', 'Q1']],
-        ['q2', ['q2']],
-      ]));
+      expect(buildIndexedQuestionEntryKeys({ q1: 1, Q1: 2, '  ': 3, q2: 4 }, normalizeKey)).toEqual(
+        new Map([
+          ['q1', ['q1', 'Q1']],
+          ['q2', ['q2']],
+        ]),
+      );
     });
   });
 
@@ -611,7 +604,7 @@ describe('surveyToolChangedFieldsController', () => {
           conviction: {},
           additionalComments: {},
         },
-        resolveAudience: (field) => field === baselineAns ? 'audience-a' : 'audience-b',
+        resolveAudience: (field) => (field === baselineAns ? 'audience-a' : 'audience-b'),
       });
 
       expect(changedQids.has('q1')).toBe(true);
@@ -634,7 +627,7 @@ describe('surveyToolChangedFieldsController', () => {
           conviction: {},
           additionalComments: { q1: currentAdditional },
         },
-        resolveGateId: (field) => field === baselineAdditional ? 'gate-1' : 'gate-2',
+        resolveGateId: (field) => (field === baselineAdditional ? 'gate-1' : 'gate-2'),
       });
 
       expect(changedQids.has('q1')).toBe(true);
@@ -657,7 +650,7 @@ describe('surveyToolChangedFieldsController', () => {
           conviction: {},
           additionalComments: { q1: currentAdditional },
         },
-        resolveAudienceMode: (field) => field === baselineAdditional ? 'mode-a' : 'mode-b',
+        resolveAudienceMode: (field) => (field === baselineAdditional ? 'mode-a' : 'mode-b'),
       });
 
       expect(changedQids.has('q1')).toBe(true);

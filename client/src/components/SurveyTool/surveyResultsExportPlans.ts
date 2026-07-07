@@ -1,7 +1,4 @@
-import {
-  formatTsForCsv,
-  pickTimestampMs,
-} from './surveyResultsHelpers.js';
+import { formatTsForCsv, pickTimestampMs } from './surveyResultsHelpers.js';
 
 export type SurveyResultsExportOption = {
   label: string;
@@ -92,10 +89,7 @@ export const SURVEY_RESULTS_EXPORT_OPTIONS: readonly SurveyResultsExportOption[]
 ]);
 
 export type SurveyResultsExportGeneratorKey =
-  | 'questions-csv'
-  | 'questions-json'
-  | 'questions-responses-csv'
-  | 'questions-responses-json';
+  'questions-csv' | 'questions-json' | 'questions-responses-csv' | 'questions-responses-json';
 
 export type SurveyResultsExportGenerationPlanInvalid = {
   alertMessage: string;
@@ -116,8 +110,7 @@ export type SurveyResultsExportGenerationPlanReady = {
 };
 
 export type SurveyResultsExportGenerationPlan =
-  | SurveyResultsExportGenerationPlanInvalid
-  | SurveyResultsExportGenerationPlanReady;
+  SurveyResultsExportGenerationPlanInvalid | SurveyResultsExportGenerationPlanReady;
 
 export type SurveyResultsExportDownloadPlanEmpty = {
   alertMessage: string;
@@ -136,8 +129,7 @@ export type SurveyResultsExportDownloadPlanReady = {
 };
 
 export type SurveyResultsExportDownloadPlan =
-  | SurveyResultsExportDownloadPlanEmpty
-  | SurveyResultsExportDownloadPlanReady;
+  SurveyResultsExportDownloadPlanEmpty | SurveyResultsExportDownloadPlanReady;
 
 const NO_SURVEY_RESULTS_EXPORT_DATA_MESSAGE = 'No data available to download for this export type.';
 
@@ -311,22 +303,18 @@ export const buildSurveyResultsExportBaseFileName = ({
   return questionsOnly ? 'contextEngine_filteredQuestions' : 'contextEngine_questionResults';
 };
 
-const quoteCsvCell = (value: unknown): string => (
-  `"${String(value !== undefined && value !== null ? value : '').replace(/"/g, '""')}"`
-);
+const quoteCsvCell = (value: unknown): string =>
+  `"${String(value !== undefined && value !== null ? value : '').replace(/"/g, '""')}"`;
 
 const quoteResponseCsvCell = (value: unknown): string => {
   const cellValue = Array.isArray(value) ? value.join(', ') : value;
   return quoteCsvCell(cellValue);
 };
 
-const isSurveyResultsRecord = (value: unknown): value is SurveyResultsRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isSurveyResultsRecord = (value: unknown): value is SurveyResultsRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
-  isSurveyResultsRecord(value) ? value : {}
-);
+const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (isSurveyResultsRecord(value) ? value : {});
 
 const defaultParseResponseForCsv = (response: unknown): unknown => {
   if (isSurveyResultsRecord(response)) return response;
@@ -341,23 +329,14 @@ const defaultParseResponseForCsv = (response: unknown): unknown => {
   }
 };
 
-const getResponseQuestionIdForCsv = (response: SurveyResultsRecord): string => (
-  String(response.questionID || response.questionId || '').trim()
-);
+const getResponseQuestionIdForCsv = (response: SurveyResultsRecord): string =>
+  String(response.questionID || response.questionId || '').trim();
 
-const getResponseQuestionPromptForCsv = (
-  response: SurveyResultsRecord,
-  questionData: SurveyResultsRecord
-): unknown => (
-  response.prompt || questionData.prompt || ''
-);
+const getResponseQuestionPromptForCsv = (response: SurveyResultsRecord, questionData: SurveyResultsRecord): unknown =>
+  response.prompt || questionData.prompt || '';
 
-const getResponseQuestionTypeForCsv = (
-  response: SurveyResultsRecord,
-  questionData: SurveyResultsRecord
-): unknown => (
-  response.type || questionData.type || ''
-);
+const getResponseQuestionTypeForCsv = (response: SurveyResultsRecord, questionData: SurveyResultsRecord): unknown =>
+  response.type || questionData.type || '';
 
 const getConvictionValueForCsv = (response: SurveyResultsRecord): unknown => {
   if (response.conviction !== undefined && response.conviction !== null) return response.conviction;
@@ -368,10 +347,8 @@ const getConvictionValueForCsv = (response: SurveyResultsRecord): unknown => {
 const getResponseFieldValueForCsv = (
   response: SurveyResultsRecord,
   fieldName: 'additional' | 'answer',
-  key: 'encrypted' | 'hash' | 'value'
-): unknown => (
-  toSurveyResultsRecord(response[fieldName])[key]
-);
+  key: 'encrypted' | 'hash' | 'value',
+): unknown => toSurveyResultsRecord(response[fieldName])[key];
 
 const readResponderAddressForCsv = (value: unknown): unknown => {
   if (typeof value === 'string') return value;
@@ -380,24 +357,16 @@ const readResponderAddressForCsv = (value: unknown): unknown => {
   return value || '';
 };
 
-const readQuestionDataForCsv = (
-  networkQuestions: unknown,
-  questionId: string
-): SurveyResultsRecord => {
+const readQuestionDataForCsv = (networkQuestions: unknown, questionId: string): SurveyResultsRecord => {
   const questionLookup = toSurveyResultsRecord(networkQuestions);
-  return toSurveyResultsRecord(
-    questionLookup[questionId.toLowerCase()] ?? questionLookup[questionId]
-  );
+  return toSurveyResultsRecord(questionLookup[questionId.toLowerCase()] ?? questionLookup[questionId]);
 };
 
-const readQuestionOptionsForCsv = (questionData: SurveyResultsRecord): string => (
-  questionData.type === 'multichoice' && Array.isArray(questionData.options)
-    ? questionData.options.join(';')
-    : ''
-);
+const readQuestionOptionsForCsv = (questionData: SurveyResultsRecord): string =>
+  questionData.type === 'multichoice' && Array.isArray(questionData.options) ? questionData.options.join(';') : '';
 
 export const buildSurveyResultsQuestionsCsvExport = (
-  filteredQuestions: readonly SurveyResultsQuestionCsvExportRecord[] = []
+  filteredQuestions: readonly SurveyResultsQuestionCsvExportRecord[] = [],
 ): string => {
   const header = '"questionID","prompt","type","tags","options"\n';
   const csvRows = filteredQuestions.map((question) => {
@@ -423,13 +392,12 @@ export const buildSurveyResultsResponsesCsvExport = ({
   surveyViewMode = '',
   viewMode = '',
 }: SurveyResultsResponsesCsvExportArgs = {}): string => {
-  const parsePort = typeof parseResponse === 'function'
-    ? parseResponse
-    : defaultParseResponseForCsv;
+  const parsePort = typeof parseResponse === 'function' ? parseResponse : defaultParseResponseForCsv;
   const csvRows: string[] = [];
 
   if (viewMode === 'survey' && surveyViewMode === 'individuals') {
-    const header = 'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp\n';
+    const header =
+      'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp\n';
     const latest = new Map<string, SurveyResultsCsvLatestEntry>();
     const passthroughRows: string[] = [];
     const rows = Array.isArray(filteredResponses) ? filteredResponses : [];
@@ -460,7 +428,9 @@ export const buildSurveyResultsResponsesCsvExport = ({
           getResponseFieldValueForCsv(answer, 'additional', 'encrypted'),
           getResponseFieldValueForCsv(answer, 'additional', 'hash'),
           formatTsForCsv(ms),
-        ].map(quoteResponseCsvCell).join(',');
+        ]
+          .map(quoteResponseCsvCell)
+          .join(',');
 
         if (!responderAddress || !qid) {
           passthroughRows.push(row);
@@ -479,50 +449,55 @@ export const buildSurveyResultsResponsesCsvExport = ({
     return header + csvRows.join('\n');
   }
 
-  const header = 'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp\n';
+  const header =
+    'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp\n';
   const latest = new Map<string, SurveyResultsCsvLatestEntry>();
   const passthroughRows: string[] = [];
 
-  Object.entries(toSurveyResultsRecord(aggregatorQuestionResponses)).forEach(([questionIdFromBucket, responsesArray]) => {
-    const rows = Array.isArray(responsesArray) ? responsesArray : [];
-    rows.forEach((responseRow) => {
-      const responseRecord = toSurveyResultsRecord(responseRow);
-      const parsedValue = parsePort(responseRecord.response);
-      if (!isSurveyResultsRecord(parsedValue)) return;
+  Object.entries(toSurveyResultsRecord(aggregatorQuestionResponses)).forEach(
+    ([questionIdFromBucket, responsesArray]) => {
+      const rows = Array.isArray(responsesArray) ? responsesArray : [];
+      rows.forEach((responseRow) => {
+        const responseRecord = toSurveyResultsRecord(responseRow);
+        const parsedValue = parsePort(responseRecord.response);
+        if (!isSurveyResultsRecord(parsedValue)) return;
 
-      const responderAddress = readResponderAddressForCsv(responseRecord.responder);
-      const qid = getResponseQuestionIdForCsv(parsedValue) || String(questionIdFromBucket || '');
-      const questionData = readQuestionDataForCsv(networkQuestions, qid);
-      const optionsString = readQuestionOptionsForCsv(questionData);
-      const ms = pickTimestampMs(parsedValue, null, responseRecord);
-      const row = [
-        qid,
-        getResponseQuestionPromptForCsv(parsedValue, questionData),
-        getResponseQuestionTypeForCsv(parsedValue, questionData),
-        optionsString,
-        responderAddress,
-        getConvictionValueForCsv(parsedValue),
-        getResponseFieldValueForCsv(parsedValue, 'answer', 'value'),
-        getResponseFieldValueForCsv(parsedValue, 'answer', 'hash'),
-        getResponseFieldValueForCsv(parsedValue, 'additional', 'value'),
-        getResponseFieldValueForCsv(parsedValue, 'answer', 'encrypted'),
-        getResponseFieldValueForCsv(parsedValue, 'additional', 'encrypted'),
-        getResponseFieldValueForCsv(parsedValue, 'additional', 'hash'),
-        formatTsForCsv(ms),
-      ].map(quoteResponseCsvCell).join(',');
+        const responderAddress = readResponderAddressForCsv(responseRecord.responder);
+        const qid = getResponseQuestionIdForCsv(parsedValue) || String(questionIdFromBucket || '');
+        const questionData = readQuestionDataForCsv(networkQuestions, qid);
+        const optionsString = readQuestionOptionsForCsv(questionData);
+        const ms = pickTimestampMs(parsedValue, null, responseRecord);
+        const row = [
+          qid,
+          getResponseQuestionPromptForCsv(parsedValue, questionData),
+          getResponseQuestionTypeForCsv(parsedValue, questionData),
+          optionsString,
+          responderAddress,
+          getConvictionValueForCsv(parsedValue),
+          getResponseFieldValueForCsv(parsedValue, 'answer', 'value'),
+          getResponseFieldValueForCsv(parsedValue, 'answer', 'hash'),
+          getResponseFieldValueForCsv(parsedValue, 'additional', 'value'),
+          getResponseFieldValueForCsv(parsedValue, 'answer', 'encrypted'),
+          getResponseFieldValueForCsv(parsedValue, 'additional', 'encrypted'),
+          getResponseFieldValueForCsv(parsedValue, 'additional', 'hash'),
+          formatTsForCsv(ms),
+        ]
+          .map(quoteResponseCsvCell)
+          .join(',');
 
-      if (!responderAddress || !qid) {
-        passthroughRows.push(row);
-        return;
-      }
+        if (!responderAddress || !qid) {
+          passthroughRows.push(row);
+          return;
+        }
 
-      const key = `${String(responderAddress).toLowerCase()}|${String(qid).toLowerCase()}`;
-      const prev = latest.get(key);
-      if (!prev || ms > prev.ms) {
-        latest.set(key, { ms, row });
-      }
-    });
-  });
+        const key = `${String(responderAddress).toLowerCase()}|${String(qid).toLowerCase()}`;
+        const prev = latest.get(key);
+        if (!prev || ms > prev.ms) {
+          latest.set(key, { ms, row });
+        }
+      });
+    },
+  );
 
   csvRows.push(...passthroughRows, ...Array.from(latest.values()).map((entry) => entry.row));
   return header + csvRows.join('\n');
@@ -555,24 +530,20 @@ const buildCommonSurveyResultsJsonExport = ({
   filteredQuestions,
 });
 
-export const buildSurveyResultsQuestionsJsonExport = (
-  args: SurveyResultsQuestionsJsonExportArgs = {}
-): string => JSON.stringify(
-  buildCommonSurveyResultsJsonExport(args),
-  null,
-  2
-);
+export const buildSurveyResultsQuestionsJsonExport = (args: SurveyResultsQuestionsJsonExportArgs = {}): string =>
+  JSON.stringify(buildCommonSurveyResultsJsonExport(args), null, 2);
 
 export const buildSurveyResultsResponsesJsonExport = ({
   filteredQuestionResponses = {},
   filteredResponses = [],
   ...args
-}: SurveyResultsResponsesJsonExportArgs = {}): string => JSON.stringify(
-  {
-    ...buildCommonSurveyResultsJsonExport(args),
-    filteredQuestionResponses: filteredQuestionResponses || {},
-    filteredResponses: filteredResponses || [],
-  },
-  null,
-  2
-);
+}: SurveyResultsResponsesJsonExportArgs = {}): string =>
+  JSON.stringify(
+    {
+      ...buildCommonSurveyResultsJsonExport(args),
+      filteredQuestionResponses: filteredQuestionResponses || {},
+      filteredResponses: filteredResponses || [],
+    },
+    null,
+    2,
+  );

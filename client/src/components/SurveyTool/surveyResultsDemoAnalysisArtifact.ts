@@ -21,9 +21,10 @@ export const buildSurveyResultsDemoAnalysisArtifact = ({
     if (!key) return;
     responseCounts.set(key, (responseCounts.get(key) || 0) + 1);
   });
-  const questionModels = questions.length > 0
-    ? questions.slice(0, 6)
-    : [{ id: 'demo-results', prompt: 'Demo results', type: 'demo', options: [], tags: [] }];
+  const questionModels =
+    questions.length > 0
+      ? questions.slice(0, 6)
+      : [{ id: 'demo-results', prompt: 'Demo results', type: 'demo', options: [], tags: [] }];
   const groups = questionModels.slice(0, 4).map((question, index) => ({
     id: `demo_group_${index + 1}`,
     label: question.prompt || `Demo theme ${index + 1}`,

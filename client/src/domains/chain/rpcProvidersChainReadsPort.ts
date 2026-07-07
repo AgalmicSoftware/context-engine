@@ -15,10 +15,7 @@ type RpcProvidersReadsModule = {
 
 export type RpcProvidersChainReadsPort = {
   getLatestBlockNumberForChain: (chainId: RpcProviderChainId) => Promise<number>;
-  getNativeBalanceWeiForChain: (
-    chainId: RpcProviderChainId,
-    address: string
-  ) => Promise<NativeBalanceWei>;
+  getNativeBalanceWeiForChain: (chainId: RpcProviderChainId, address: string) => Promise<NativeBalanceWei>;
 };
 
 type BindRpcProvidersChainReadsPortArgs = {
@@ -28,18 +25,13 @@ type BindRpcProvidersChainReadsPortArgs = {
 export const bindRpcProvidersChainReadsPort = ({
   rpcProviders: readRpcProviders,
 }: BindRpcProvidersChainReadsPortArgs): RpcProvidersChainReadsPort => ({
-  getLatestBlockNumberForChain: (chainId) => (
-    readRpcProviders().getReadProviderForChain(chainId).getBlockNumber()
-  ),
-  getNativeBalanceWeiForChain: (chainId, address) => (
-    readRpcProviders().getReadProviderForChain(chainId).getBalance(address)
-  ),
+  getLatestBlockNumberForChain: (chainId) => readRpcProviders().getReadProviderForChain(chainId).getBlockNumber(),
+  getNativeBalanceWeiForChain: (chainId, address) =>
+    readRpcProviders().getReadProviderForChain(chainId).getBalance(address),
 });
 
 const readRealRpcProviders = (): RpcProvidersReadsModule => ({
-  getReadProviderForChain: (chainId) => (
-    rpcProviders.getReadProviderForChain(chainId) as RpcReadProvider
-  ),
+  getReadProviderForChain: (chainId) => rpcProviders.getReadProviderForChain(chainId) as RpcReadProvider,
 });
 
 export const rpcProvidersChainReadsPort = bindRpcProvidersChainReadsPort({

@@ -13,20 +13,16 @@ type SbtNameLookupCacheNetNode = Record<string, unknown> & {
   nameLookupState?: SbtNameLookupState;
 };
 
-const isNameLookupRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isNameLookupRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const getNameLookupDelayMs = (attempts: unknown): number => {
   const safeAttempts = Number(attempts || 0);
   const exponent = Math.min(Math.max(safeAttempts - 1, 0), NAME_LOOKUP_MAX_EXPONENT);
-  return Math.min(NAME_LOOKUP_BASE_DELAY_MS * (2 ** exponent), NAME_LOOKUP_MAX_DELAY_MS);
+  return Math.min(NAME_LOOKUP_BASE_DELAY_MS * 2 ** exponent, NAME_LOOKUP_MAX_DELAY_MS);
 };
 
-export const ensureNameLookupState = (
-  sbtCache: Record<string, unknown>,
-  netKey: unknown
-): SbtNameLookupState => {
+export const ensureNameLookupState = (sbtCache: Record<string, unknown>, netKey: unknown): SbtNameLookupState => {
   const key = String(netKey || '');
   if (!isNameLookupRecord(sbtCache[key])) {
     sbtCache[key] = { sbtList: {}, nameLookupState: {} };
@@ -41,7 +37,7 @@ export const ensureNameLookupState = (
 export const canRetryNameLookup = (
   nameLookupState: SbtNameLookupState,
   addressLower: unknown,
-  now: unknown = Date.now()
+  now: unknown = Date.now(),
 ): boolean => {
   const retryAt = Number(nameLookupState?.[String(addressLower || '')]?.nextRetryAt || 0);
   return !Number.isFinite(retryAt) || retryAt <= Number(now);
@@ -50,7 +46,7 @@ export const canRetryNameLookup = (
 export const markNameLookupFailure = (
   nameLookupState: SbtNameLookupState,
   addressLower: unknown,
-  now: unknown = Date.now()
+  now: unknown = Date.now(),
 ): void => {
   const addressKey = String(addressLower || '');
   const timestamp = Number(now);

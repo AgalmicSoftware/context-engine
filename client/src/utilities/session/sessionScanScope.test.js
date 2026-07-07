@@ -18,13 +18,27 @@ const ORIGINAL_SESSION_SCAN_MAX_BLOCK_RANGE = process.env.REACT_APP_SESSION_SCAN
 
 describe('sessionScanScope helpers', () => {
   beforeEach(() => {
-    try { window.history.replaceState({}, '', '/'); } catch (_) {}
-    try { localStorage.removeItem('ce:sessionScanScope'); } catch (_) {}
-    try { localStorage.removeItem('ce:sessionScanSlugs'); } catch (_) {}
-    try { delete globalThis.CE_SESSION_SCAN_SCOPE; } catch (_) {}
-    try { delete globalThis.CE_SESSION_SCAN_SLUGS; } catch (_) {}
-    try { delete globalThis.CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES; } catch (_) {}
-    try { delete process.env.REACT_APP_SESSION_SCAN_MAX_BLOCK_RANGE; } catch (_) {}
+    try {
+      window.history.replaceState({}, '', '/');
+    } catch (_) {}
+    try {
+      localStorage.removeItem('ce:sessionScanScope');
+    } catch (_) {}
+    try {
+      localStorage.removeItem('ce:sessionScanSlugs');
+    } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_SCOPE;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_SLUGS;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES;
+    } catch (_) {}
+    try {
+      delete process.env.REACT_APP_SESSION_SCAN_MAX_BLOCK_RANGE;
+    } catch (_) {}
   });
 
   afterAll(() => {
@@ -61,17 +75,17 @@ describe('sessionScanScope helpers', () => {
     const workerHost = 'test-3-worker-022226.account-subdomain.workers.dev'; // intentional: real URL — tests allowlist enforcement
     expect(normalizeSessionScanSlug(workerHost)).toBe('test-3');
     expect(normalizeSessionScanSlug(`https://${workerHost}/health`)).toBe('test-3');
-    expect(
-      normalizeSessionScanSlugs([
-        workerHost,
-        `https://${workerHost}`,
-      ])
-    ).toEqual(['test-3']);
+    expect(normalizeSessionScanSlugs([workerHost, `https://${workerHost}`])).toEqual(['test-3']);
   });
 
   it('normalizes session slug lists (csv/array, dedupe, general alias)', () => {
     expect(normalizeSessionScanSlugs('general, alpha,ALPHA,,beta')).toEqual(['', 'alpha', 'ALPHA', 'beta']);
-    expect(normalizeSessionScanSlugs([' general ', 'alpha', '', 'ALPHA', 'beta'])).toEqual(['', 'alpha', 'ALPHA', 'beta']);
+    expect(normalizeSessionScanSlugs([' general ', 'alpha', '', 'ALPHA', 'beta'])).toEqual([
+      '',
+      'alpha',
+      'ALPHA',
+      'beta',
+    ]);
     expect(normalizeSessionScanSlugs('debate,rxc')).toEqual(['debate', 'rxc']);
     expect(normalizeSessionScanSlugs(['test-10, test-12', 'test-12'])).toEqual(['test-10', 'test-12']);
     expect(normalizeSessionScanSlugs('')).toEqual([]);

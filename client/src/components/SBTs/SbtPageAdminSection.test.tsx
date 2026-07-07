@@ -14,7 +14,7 @@ describe('SbtPageAdminSection', () => {
         onToggle={onToggle}
         sectionHeaderClassName="section-header"
         toggleState={{ isOpen: true, shouldRenderOpenIcon: true }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('heading', { name: /ADMIN/i }));
@@ -25,10 +25,7 @@ describe('SbtPageAdminSection', () => {
 
   it('does not render for non-admin users', () => {
     const { container } = render(
-      <SbtPageAdminSection
-        adminActions={<button type="button">Admin action</button>}
-        isAdmin={false}
-      />
+      <SbtPageAdminSection adminActions={<button type="button">Admin action</button>} isAdmin={false} />,
     );
 
     expect(container).toBeEmptyDOMElement();

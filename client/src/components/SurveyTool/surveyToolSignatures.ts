@@ -4,7 +4,10 @@ const SLICE_TOKEN_HASH_SEED_PRIMARY = 2166136261;
 const SLICE_TOKEN_HASH_SEED_SECONDARY = 2246822519;
 const SLICE_TOKEN_MAX_DEPTH = 24;
 
-export const normalizeQuestionIdKey = (value: unknown): string => String(value || '').trim().toLowerCase();
+export const normalizeQuestionIdKey = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
 const mixFnvHashText = (hash: number, input: unknown): number => {
   let next = hash >>> 0;
@@ -19,18 +22,11 @@ const mixFnvHashText = (hash: number, input: unknown): number => {
 const buildTextHashToken = (prefix: string, value: unknown): string => {
   const text = String(value || '');
   const primary = mixFnvHashText(SLICE_TOKEN_HASH_SEED_PRIMARY, text);
-  const secondary = mixFnvHashText(
-    SLICE_TOKEN_HASH_SEED_SECONDARY,
-    `${text.length}|${text}`
-  );
+  const secondary = mixFnvHashText(SLICE_TOKEN_HASH_SEED_SECONDARY, `${text.length}|${text}`);
   return `${prefix}:${text.length}:${primary >>> 0}:${secondary >>> 0}`;
 };
 
-const buildSliceTokenInternal = (
-  value: unknown,
-  depth: number,
-  traversal: { seen: WeakSet<object> }
-): string => {
+const buildSliceTokenInternal = (value: unknown, depth: number, traversal: { seen: WeakSet<object> }): string => {
   if (value === undefined) return 'u';
   if (value === null) return 'n';
   if (typeof value === 'string') return buildTextHashToken('s', value);
@@ -78,9 +74,8 @@ const buildSliceTokenInternal = (
   return `${typeof value}:${String(value)}`;
 };
 
-export const buildSliceToken = (value: unknown): string => (
-  buildSliceTokenInternal(value, 0, { seen: new WeakSet<object>() })
-);
+export const buildSliceToken = (value: unknown): string =>
+  buildSliceTokenInternal(value, 0, { seen: new WeakSet<object>() });
 
 const buildResponseFieldToken = (field: unknown): string => {
   if (!field || typeof field !== 'object') {
@@ -102,7 +97,7 @@ const buildQuestionMapSignature = (
   {
     responseField = false,
     normalizedIdFilter = null,
-  }: { responseField?: boolean; normalizedIdFilter?: Set<string> | null } = {}
+  }: { responseField?: boolean; normalizedIdFilter?: Set<string> | null } = {},
 ): string => {
   if (!map || typeof map !== 'object') return '0:0:0';
   const keys = Object.keys(map as UnknownRecord).sort();
@@ -129,9 +124,9 @@ const buildQuestionMapSignature = (
 
 export const buildSurveyResponseSliceSignature = (
   slice: UnknownRecord = {},
-  { normalizedIdFilter = null }: { normalizedIdFilter?: Set<string> | null } = {}
+  { normalizedIdFilter = null }: { normalizedIdFilter?: Set<string> | null } = {},
 ): string => {
-  const safeSlice = (slice && typeof slice === 'object') ? slice : {};
+  const safeSlice = slice && typeof slice === 'object' ? slice : {};
   return [
     buildQuestionMapSignature(safeSlice.answers, { responseField: true, normalizedIdFilter }),
     buildQuestionMapSignature(safeSlice.additionalComments, { responseField: true, normalizedIdFilter }),
@@ -140,21 +135,27 @@ export const buildSurveyResponseSliceSignature = (
   ].join('|');
 };
 
-export const buildRenderedIdsSignature = (ids: unknown = []): string => (
+export const buildRenderedIdsSignature = (ids: unknown = []): string =>
   Array.isArray(ids)
     ? ids
-      .map((id) => normalizeQuestionIdKey(id))
-      .filter(Boolean)
-      .join('|')
-    : ''
-);
-
-export const buildQuestionIdScopeSignature = (list: unknown = []): string => (
-  Array.isArray(list)
-    ? Array.from(new Set(
-      list
-        .map((question) => String((question as UnknownRecord)?.id || '').trim().toLowerCase())
+        .map((id) => normalizeQuestionIdKey(id))
         .filter(Boolean)
-    )).sort().join('|')
-    : ''
-);
+        .join('|')
+    : '';
+
+export const buildQuestionIdScopeSignature = (list: unknown = []): string =>
+  Array.isArray(list)
+    ? Array.from(
+        new Set(
+          list
+            .map((question) =>
+              String((question as UnknownRecord)?.id || '')
+                .trim()
+                .toLowerCase(),
+            )
+            .filter(Boolean),
+        ),
+      )
+        .sort()
+        .join('|')
+    : '';

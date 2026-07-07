@@ -1,10 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCheck,
-  faExclamationCircle,
-  faSpinner,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faExclamationCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
 import type { SessionWizardPublishProgressDisplayState } from './sessionWizardPublishFlow';
@@ -32,12 +28,8 @@ const SessionPublishProgressPanel = ({
     <div className={styles.publishProgressCard} data-testid="ce-wizard-publish-progress">
       <div className={styles.publishProgressHeader}>
         <div className={styles.publishProgressCopy}>
-          <span className={styles.publishProgressEyebrow}>
-            {publishProgressEyebrow}
-          </span>
-          <strong className={styles.publishProgressStage}>
-            {activePublishProgressStepLabel || 'Preparing'}
-          </strong>
+          <span className={styles.publishProgressEyebrow}>{publishProgressEyebrow}</span>
+          <strong className={styles.publishProgressStage}>{activePublishProgressStepLabel || 'Preparing'}</strong>
         </div>
         <span className={styles.publishProgressPercent}>{publishProgressPercentRounded}%</span>
       </div>
@@ -49,10 +41,7 @@ const SessionPublishProgressPanel = ({
         aria-valuenow={publishProgressPercentRounded}
         aria-valuetext={publishProgressAriaValueText}
       >
-        <div
-          className={styles.publishProgressFill}
-          style={{ width: `${publishProgressPercent}%` }}
-        />
+        <div className={styles.publishProgressFill} style={{ width: `${publishProgressPercent}%` }} />
       </div>
       <div className={styles.progressIndicator}>
         {publishProgressSteps.map((step) => {

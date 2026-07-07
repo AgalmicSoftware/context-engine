@@ -1,24 +1,15 @@
-import {
-  runSurveyResultsAnalysisLifecycleController,
-} from './surveyResultsAnalysisLifecycleController';
-import {
-  buildSurveyResultsAnalysisLifecyclePlan,
-} from './surveyResultsAnalysisLifecyclePlan';
+import { runSurveyResultsAnalysisLifecycleController } from './surveyResultsAnalysisLifecycleController';
+import { buildSurveyResultsAnalysisLifecyclePlan } from './surveyResultsAnalysisLifecyclePlan';
 import type {
   SessionResultsAnalysisSectionKey,
   SessionResultsGeneratedAnalysisArtifact,
 } from '../../utilities/sessionResultsExport';
 
-const allSections: SessionResultsAnalysisSectionKey[] = [
-  'breakdown',
-  'argumentMap',
-  'riskMatrix',
-  'atlas',
-];
+const allSections: SessionResultsAnalysisSectionKey[] = ['breakdown', 'argumentMap', 'riskMatrix', 'atlas'];
 
 const createArtifact = (
   inputSignature = 'input-sig',
-  availableSections: SessionResultsAnalysisSectionKey[] = allSections
+  availableSections: SessionResultsAnalysisSectionKey[] = allSections,
 ): SessionResultsGeneratedAnalysisArtifact => ({
   generatedAt: '2026-06-01T00:00:00.000Z',
   inputSignature,
@@ -195,15 +186,17 @@ describe('surveyResultsAnalysisLifecycleController', () => {
     const applyGenerateStartState = jest.fn();
     const applyFailureRecoveryState = jest.fn();
 
-    expect(runSurveyResultsAnalysisLifecycleController({
-      plan: null,
-      ports: {
-        applyBlockedState,
-        applyFailureRecoveryState,
-        applyGenerateStartState,
-        applyReadyState,
-      },
-    })).toEqual({
+    expect(
+      runSurveyResultsAnalysisLifecycleController({
+        plan: null,
+        ports: {
+          applyBlockedState,
+          applyFailureRecoveryState,
+          applyGenerateStartState,
+          applyReadyState,
+        },
+      }),
+    ).toEqual({
       appliedPort: '',
       handled: false,
       patch: null,

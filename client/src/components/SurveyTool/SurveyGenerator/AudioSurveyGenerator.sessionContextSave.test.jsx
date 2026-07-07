@@ -30,18 +30,20 @@ describe('AudioSurveyGenerator session context saves', () => {
     const scopedSaveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
     const onQuestionsGenerated = jest.fn();
     mockProcessAdditionalSources.mockResolvedValue(
-      'This additional source content is long enough to drive question generation on its own.'
+      'This additional source content is long enough to drive question generation on its own.',
     );
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Private Context Survey',
-      questions: [
-        {
-          prompt: 'Should private context stay wallet-scoped?',
-          questionType: 'binary',
-          tags: ['docs'],
-        },
-      ],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Private Context Survey',
+        questions: [
+          {
+            prompt: 'Should private context stay wallet-scoped?',
+            questionType: 'binary',
+            tags: ['docs'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -62,7 +64,7 @@ describe('AudioSurveyGenerator session context saves', () => {
           },
         })}
         onQuestionsGenerated={onQuestionsGenerated}
-      />
+      />,
     );
 
     await addAdditionalUrl('https://example.com/private-context');
@@ -78,14 +80,18 @@ describe('AudioSurveyGenerator session context saves', () => {
     });
 
     expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledTimes(1);
-    expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption).toEqual(expect.objectContaining({
-      enabled: true,
-      saveKey: scopedSaveKey,
-      chainId: 11155420,
-      litChain: 'optimismSepolia',
-      contextLabel: 'doc-link:edge',
-    }));
-    expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption.accessControlConditions).toEqual(expect.any(Array));
+    expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption).toEqual(
+      expect.objectContaining({
+        enabled: true,
+        saveKey: scopedSaveKey,
+        chainId: 11155420,
+        litChain: 'optimismSepolia',
+        contextLabel: 'doc-link:edge',
+      }),
+    );
+    expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption.accessControlConditions).toEqual(
+      expect.any(Array),
+    );
     expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption).not.toHaveProperty('selfRecipient');
     expect(onQuestionsGenerated).toHaveBeenCalledTimes(1);
   });
@@ -94,16 +100,18 @@ describe('AudioSurveyGenerator session context saves', () => {
     const photo = new File(['photo-source'], 'briefing.png', { type: 'image/png' });
     const onQuestionsGenerated = jest.fn();
     mockAnalyzePhotoForQuestionGeneration.mockResolvedValue('Briefing image analysis for generated questions.');
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Photo Context Survey',
-      questions: [
-        {
-          prompt: 'Should photo context be saved without an analysis sidecar?',
-          questionType: 'binary',
-          tags: ['photo'],
-        },
-      ],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Photo Context Survey',
+        questions: [
+          {
+            prompt: 'Should photo context be saved without an analysis sidecar?',
+            questionType: 'binary',
+            tags: ['photo'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -117,10 +125,12 @@ describe('AudioSurveyGenerator session context saves', () => {
           sessionIdHex: `0x${'8'.repeat(32)}`,
         })}
         onQuestionsGenerated={onQuestionsGenerated}
-      />
+      />,
     );
 
-    setAudioInputValue('This primary source text is long enough to generate questions while a photo source is also saved as context.');
+    setAudioInputValue(
+      'This primary source text is long enough to generate questions while a photo source is also saved as context.',
+    );
     addAdditionalPhoto(photo);
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}"]`));
@@ -148,18 +158,20 @@ describe('AudioSurveyGenerator session context saves', () => {
       return {};
     });
     mockProcessAdditionalSources.mockResolvedValue(
-      'This saved source has enough content to drive question generation.'
+      'This saved source has enough content to drive question generation.',
     );
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Slug Resolved Survey',
-      questions: [
-        {
-          prompt: 'Can saved doc sources resolve session config by slug?',
-          questionType: 'binary',
-          tags: ['docs'],
-        },
-      ],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Slug Resolved Survey',
+        questions: [
+          {
+            prompt: 'Can saved doc sources resolve session config by slug?',
+            questionType: 'binary',
+            tags: ['docs'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -170,7 +182,7 @@ describe('AudioSurveyGenerator session context saves', () => {
         toggleLoginModal={jest.fn()}
         activeSessionSlug="edge"
         onQuestionsGenerated={onQuestionsGenerated}
-      />
+      />,
     );
 
     await addAdditionalUrl('https://example.com/slug-only');
@@ -191,18 +203,20 @@ describe('AudioSurveyGenerator session context saves', () => {
     const onQuestionsGenerated = jest.fn();
     const file = new File(['file-source-content'], 'notes.txt', { type: 'text/plain' });
     mockProcessAdditionalSources.mockResolvedValue(
-      'This uploaded file contributes enough content for question generation.'
+      'This uploaded file contributes enough content for question generation.',
     );
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Saved File Survey',
-      questions: [
-        {
-          prompt: 'Should saved file sources use doc-library refs?',
-          questionType: 'binary',
-          tags: ['docs'],
-        },
-      ],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Saved File Survey',
+        questions: [
+          {
+            prompt: 'Should saved file sources use doc-library refs?',
+            questionType: 'binary',
+            tags: ['docs'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -217,7 +231,7 @@ describe('AudioSurveyGenerator session context saves', () => {
           sessionIdHex: `0x${'5'.repeat(32)}`,
         })}
         onQuestionsGenerated={onQuestionsGenerated}
-      />
+      />,
     );
 
     addAdditionalFile(file);
@@ -229,12 +243,12 @@ describe('AudioSurveyGenerator session context saves', () => {
     });
 
     expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
-    expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
-      file,
-    }));
-    expect(onQuestionsGenerated.mock.calls[0][1]).toEqual([
-      expect.stringContaining('/session/0xSessionToken/docs?'),
-    ]);
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file,
+      }),
+    );
+    expect(onQuestionsGenerated.mock.calls[0][1]).toEqual([expect.stringContaining('/session/0xSessionToken/docs?')]);
     expect(onQuestionsGenerated.mock.calls[0][1][0].startsWith('/session/0xSessionToken/docs?')).toBe(true);
   });
 
@@ -244,19 +258,24 @@ describe('AudioSurveyGenerator session context saves', () => {
     const firstFile = new File(['first-source-content'], 'first-notes.txt', { type: 'text/plain' });
     const secondFile = new File(['second-source-content'], 'second-notes.txt', { type: 'text/plain' });
 
-    mockUploadDocLibraryFile.mockImplementationOnce(() => new Promise((resolve) => {
-      resolveFirstUpload = resolve;
-    }));
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Aborted Save Survey',
-      questions: [
-        {
-          prompt: 'Should aborted uploads stop?',
-          questionType: 'binary',
-          tags: ['docs'],
-        },
-      ],
-    }));
+    mockUploadDocLibraryFile.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirstUpload = resolve;
+        }),
+    );
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Aborted Save Survey',
+        questions: [
+          {
+            prompt: 'Should aborted uploads stop?',
+            questionType: 'binary',
+            tags: ['docs'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -271,7 +290,7 @@ describe('AudioSurveyGenerator session context saves', () => {
           sessionIdHex: `0x${'5'.repeat(32)}`,
         })}
         onQuestionsGenerated={onQuestionsGenerated}
-      />
+      />,
     );
 
     setAudioInputValue('This primary context is long enough to generate questions after source uploads finish.');
@@ -310,16 +329,18 @@ describe('AudioSurveyGenerator session context saves', () => {
     mockAnalyzePhotoForQuestionGeneration.mockResolvedValueOnce({
       text: 'This document photo summarizes a draft charter with enough detail to drive question generation without additional text input.',
     });
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Ephemeral Photo Survey',
-      questions: [
-        {
-          prompt: 'Should ephemeral photo analysis stay unsaved?',
-          questionType: 'binary',
-          tags: ['photo'],
-        },
-      ],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Ephemeral Photo Survey',
+        questions: [
+          {
+            prompt: 'Should ephemeral photo analysis stay unsaved?',
+            questionType: 'binary',
+            tags: ['photo'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -330,7 +351,7 @@ describe('AudioSurveyGenerator session context saves', () => {
         toggleLoginModal={jest.fn()}
         activeSessionSlug="edge"
         sessionConfig={makeSessionConfig()}
-      />
+      />,
     );
 
     addAdditionalPhoto();
@@ -367,16 +388,18 @@ describe('AudioSurveyGenerator session context saves', () => {
         tagMap: {},
         data: { size: null, type: 'application/json' },
       });
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Saved Photo Survey',
-      questions: [
-        {
-          prompt: 'Should the policy note analysis be saved beside the image?',
-          questionType: 'binary',
-          tags: ['photo'],
-        },
-      ],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Saved Photo Survey',
+        questions: [
+          {
+            prompt: 'Should the policy note analysis be saved beside the image?',
+            questionType: 'binary',
+            tags: ['photo'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -391,7 +414,7 @@ describe('AudioSurveyGenerator session context saves', () => {
           sessionIdHex: `0x${'6'.repeat(32)}`,
         })}
         onQuestionsGenerated={onQuestionsGenerated}
-      />
+      />,
     );
 
     addAdditionalPhoto(photo);
@@ -403,28 +426,30 @@ describe('AudioSurveyGenerator session context saves', () => {
     });
 
     expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(2);
-    expect(mockUploadDocLibraryFile.mock.calls[0][0]).toEqual(expect.objectContaining({
-      file: photo,
-      encryption: expect.objectContaining({
-        contextLabel: 'doc:edge',
+    expect(mockUploadDocLibraryFile.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        file: photo,
+        encryption: expect.objectContaining({
+          contextLabel: 'doc:edge',
+        }),
+        tags: expect.arrayContaining([expect.objectContaining({ name: 'CE-DocRole', value: 'photo' })]),
       }),
-      tags: expect.arrayContaining([
-        expect.objectContaining({ name: 'CE-DocRole', value: 'photo' }),
-      ]),
-    }));
-    expect(mockUploadDocLibraryFile.mock.calls[1][0]).toEqual(expect.objectContaining({
-      file: expect.objectContaining({
-        name: 'policy-note.analysis.md',
-        type: 'text/markdown',
+    );
+    expect(mockUploadDocLibraryFile.mock.calls[1][0]).toEqual(
+      expect.objectContaining({
+        file: expect.objectContaining({
+          name: 'policy-note.analysis.md',
+          type: 'text/markdown',
+        }),
+        encryption: expect.objectContaining({
+          contextLabel: 'doc:edge',
+        }),
+        tags: expect.arrayContaining([
+          expect.objectContaining({ name: 'CE-DocRole', value: 'photo-analysis' }),
+          expect.objectContaining({ name: 'CE-DocDerivedFromTx', value: 'C'.repeat(43) }),
+        ]),
       }),
-      encryption: expect.objectContaining({
-        contextLabel: 'doc:edge',
-      }),
-      tags: expect.arrayContaining([
-        expect.objectContaining({ name: 'CE-DocRole', value: 'photo-analysis' }),
-        expect.objectContaining({ name: 'CE-DocDerivedFromTx', value: 'C'.repeat(43) }),
-      ]),
-    }));
+    );
     expect(onQuestionsGenerated).toHaveBeenCalledTimes(1);
     expect(onQuestionsGenerated.mock.calls[0][1]).toEqual([
       expect.stringContaining(`/session/0xSessionToken/docs?__ceDocTx=${'C'.repeat(43)}`),
@@ -437,13 +462,7 @@ describe('AudioSurveyGenerator session context saves', () => {
     const secondPhoto = new File(['photo-two'], 'diagram.webp', { type: 'image/webp' });
 
     await renderSubject(
-      <AudioSurveyGenerator
-        provider={{}}
-        network={{}}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-      />
+      <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
     );
 
     addAdditionalPhoto([firstPhoto, secondPhoto]);

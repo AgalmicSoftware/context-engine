@@ -50,10 +50,7 @@ describe('SBTFilter render guards', () => {
   });
 
   it('passes defaultFeaturedSBTs through to address-mode SBT selectors', () => {
-    const featured = [
-      '0x00000000000000000000000000000000000000aa',
-      '0x00000000000000000000000000000000000000bb',
-    ];
+    const featured = ['0x00000000000000000000000000000000000000aa', '0x00000000000000000000000000000000000000bb'];
     const subject = createSubject({
       mode: 'addresses',
       autoExpand: true,
@@ -61,9 +58,8 @@ describe('SBTFilter render guards', () => {
     });
 
     const tree = subject.render();
-    const addressSelectors = findElementsInTree(
-      tree,
-      (element) => ['includeAddresses', 'excludeAddresses'].includes(element?.props?.id)
+    const addressSelectors = findElementsInTree(tree, (element) =>
+      ['includeAddresses', 'excludeAddresses'].includes(element?.props?.id),
     );
 
     expect(addressSelectors).toHaveLength(2);
@@ -85,9 +81,8 @@ describe('SBTFilter render guards', () => {
     });
 
     const tree = subject.render();
-    const addressSelectors = findElementsInTree(
-      tree,
-      (element) => ['includeAddresses', 'excludeAddresses'].includes(element?.props?.id)
+    const addressSelectors = findElementsInTree(tree, (element) =>
+      ['includeAddresses', 'excludeAddresses'].includes(element?.props?.id),
     );
 
     expect(addressSelectors).toHaveLength(2);
@@ -108,7 +103,7 @@ describe('SBTFilter render guards', () => {
       {
         loading: true,
         showFilterOptions: true,
-      }
+      },
     ).render();
 
     const withoutOverlay = createSubject(
@@ -120,22 +115,20 @@ describe('SBTFilter render guards', () => {
       {
         loading: true,
         showFilterOptions: true,
-      }
+      },
     ).render();
 
     const spinnerNodesWithOverlay = findElementsInTree(
       withOverlay,
-      (element) => element?.props?.icon?.iconName === 'spinner'
+      (element) => element?.props?.icon?.iconName === 'spinner',
     );
     const spinnerNodesWithoutOverlay = findElementsInTree(
       withoutOverlay,
-      (element) => element?.props?.icon?.iconName === 'spinner'
+      (element) => element?.props?.icon?.iconName === 'spinner',
     );
     const [filterOptions] = findElementsInTree(
       withoutOverlay,
-      (element) =>
-        typeof element?.props?.className === 'string' &&
-        element.props.className.includes('filterOptions')
+      (element) => typeof element?.props?.className === 'string' && element.props.className.includes('filterOptions'),
     );
 
     expect(spinnerNodesWithOverlay).toHaveLength(1);
@@ -152,21 +145,18 @@ describe('SBTFilter render guards', () => {
       },
       {
         showFilterOptions: true,
-      }
+      },
     );
 
     const tree = subject.render();
     const [filterButton] = findElementsInTree(
       tree,
-      (element) =>
-        typeof element?.props?.className === 'string' &&
-        element.props.className.includes('filterButton')
+      (element) => typeof element?.props?.className === 'string' && element.props.className.includes('filterButton'),
     );
     const [filterOptions] = findElementsInTree(
       tree,
       (element) =>
-        typeof element?.props?.className === 'string' &&
-        element.props.className.includes('filterOptionsOnLight')
+        typeof element?.props?.className === 'string' && element.props.className.includes('filterOptionsOnLight'),
     );
 
     expect(filterButton).toBeTruthy();

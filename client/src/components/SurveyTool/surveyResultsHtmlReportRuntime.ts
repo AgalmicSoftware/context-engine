@@ -10,15 +10,9 @@ import {
   type SessionResultsHtmlSnapshot,
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
-import {
-  SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS as DEFAULT_HTML_REPORT_SELECTED_SECTIONS,
-} from './surveyResultsHtmlReportSelection.js';
-import type {
-  SurveyResultsHtmlReportSectionKey,
-} from './surveyResultsHtmlReportReadiness.js';
-import {
-  buildSurveyResultsDemoAnalysisArtifact,
-} from './surveyResultsDemoAnalysisArtifact.js';
+import { SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS as DEFAULT_HTML_REPORT_SELECTED_SECTIONS } from './surveyResultsHtmlReportSelection.js';
+import type { SurveyResultsHtmlReportSectionKey } from './surveyResultsHtmlReportReadiness.js';
+import { buildSurveyResultsDemoAnalysisArtifact } from './surveyResultsDemoAnalysisArtifact.js';
 import {
   buildSurveyResultsAnalysisResponsesForExport,
   buildSurveyResultsAnalysisSegmentDimensionsForExport,
@@ -29,9 +23,7 @@ import {
   buildSurveyResultsHtmlReportQuestionsForExport,
   buildSurveyResultsHtmlReportResponseCountsByQuestion,
 } from './surveyResultsHtmlReportDataModel';
-import {
-  buildSurveyResultsHtmlReportSnapshot,
-} from './surveyResultsHtmlReportSnapshotDataModel';
+import { buildSurveyResultsHtmlReportSnapshot } from './surveyResultsHtmlReportSnapshotDataModel';
 import {
   buildSurveyResultsAnalysisArtifactWritePlan,
   buildSurveyResultsAnalysisArtifactWriteReadinessPlan,
@@ -42,19 +34,10 @@ import {
   type SurveyResultsAnalysisArtifactCacheReadPort,
   type SurveyResultsAnalysisArtifactCacheWritePort,
 } from './surveyResultsAnalysisArtifactCachePorts';
-import {
-  runSurveyResultsAnalysisArtifactReadController,
-} from './surveyResultsAnalysisArtifactReadController';
-import {
-  runSurveyResultsAnalysisArtifactWriteController,
-} from './surveyResultsAnalysisArtifactWriteController';
-import type {
-  SurveyResultsGateRecord,
-  SurveyResultsResponseRecord,
-} from './surveyResultsLockedFieldHelpers';
-import type {
-  SurveyResultsQuestionExportRecord,
-} from './surveyResultsExportRows';
+import { runSurveyResultsAnalysisArtifactReadController } from './surveyResultsAnalysisArtifactReadController';
+import { runSurveyResultsAnalysisArtifactWriteController } from './surveyResultsAnalysisArtifactWriteController';
+import type { SurveyResultsGateRecord, SurveyResultsResponseRecord } from './surveyResultsLockedFieldHelpers';
+import type { SurveyResultsQuestionExportRecord } from './surveyResultsExportRows';
 
 type SurveyResultsHtmlReportRecord = Record<string, unknown>;
 
@@ -109,7 +92,7 @@ export type SurveyResultsHtmlReportRuntime = {
   buildSessionResultsHtmlReportSnapshot: (exportedAt?: unknown) => SessionResultsHtmlSnapshot;
   getHtmlReportAnalysisArtifact: () => SessionResultsGeneratedAnalysisArtifact | null;
   getHtmlReportAnalysisSectionsToGenerate: (
-    sections?: Required<SessionResultsSectionSelection>
+    sections?: Required<SessionResultsSectionSelection>,
   ) => SessionResultsAnalysisSectionKey[];
   getHtmlReportChainId: () => number | null;
   getHtmlReportExporterMetadata: () => SurveyResultsHtmlReportExporterMetadata | null;
@@ -121,10 +104,10 @@ export type SurveyResultsHtmlReportRuntime = {
   isHtmlReportDemoSession: () => boolean;
   isHtmlReportExportAuthorized: () => boolean;
   readSessionResultsAnalysisArtifactFromCache: (
-    inputSignature: unknown
+    inputSignature: unknown,
   ) => SessionResultsGeneratedAnalysisArtifact | null;
   writeSessionResultsAnalysisArtifactToCache: (
-    artifact: SessionResultsGeneratedAnalysisArtifact | null
+    artifact: SessionResultsGeneratedAnalysisArtifact | null,
   ) => Promise<void>;
 };
 
@@ -137,11 +120,11 @@ export type SurveyResultsHtmlReportRuntimeArgs = {
   getResponseQuestionId: (response: SurveyResultsResponseRecord | null | undefined) => string;
   getResponseQuestionPrompt: (
     response: SurveyResultsResponseRecord | null | undefined,
-    questionData?: SurveyResultsHtmlReportRecord | null
+    questionData?: SurveyResultsHtmlReportRecord | null,
   ) => unknown;
   getResponseQuestionType: (
     response: SurveyResultsResponseRecord | null | undefined,
-    questionData?: SurveyResultsHtmlReportRecord | null
+    questionData?: SurveyResultsHtmlReportRecord | null,
   ) => unknown;
   getState: () => SurveyResultsHtmlReportState;
   normalizeGateSbtEntries: (gate: SurveyResultsGateRecord) => Array<{ address?: unknown; label?: unknown }>;
@@ -153,16 +136,17 @@ export type SurveyResultsHtmlReportRuntimeArgs = {
   writeAnalysisArtifact: SurveyResultsAnalysisArtifactCacheWritePort;
 };
 
-const HTML_REPORT_SECTION_TO_ANALYSIS_SECTION: Partial<Record<SurveyResultsHtmlReportSectionKey, SessionResultsAnalysisSectionKey>> = {
+const HTML_REPORT_SECTION_TO_ANALYSIS_SECTION: Partial<
+  Record<SurveyResultsHtmlReportSectionKey, SessionResultsAnalysisSectionKey>
+> = {
   argumentMap: 'argumentMap',
   atlas: 'atlas',
   report: 'breakdown',
   riskMatrix: 'riskMatrix',
 };
 
-const toRecord = (value: unknown): SurveyResultsHtmlReportRecord => (
-  value && typeof value === 'object' ? value as SurveyResultsHtmlReportRecord : {}
-);
+const toRecord = (value: unknown): SurveyResultsHtmlReportRecord =>
+  value && typeof value === 'object' ? (value as SurveyResultsHtmlReportRecord) : {};
 
 export const createSurveyResultsHtmlReportRuntime = ({
   getEffectiveSlug,
@@ -220,28 +204,25 @@ export const createSurveyResultsHtmlReportRuntime = ({
     });
   };
 
-  const getHtmlReportQuestionsForExport = () => (
+  const getHtmlReportQuestionsForExport = () =>
     buildSurveyResultsHtmlReportQuestionsForExport({
       filteredQuestions: getFilteredQuestionsForExport(),
       responseCountsByQuestion: getHtmlReportResponseCountsByQuestion(),
-    })
-  );
+    });
 
   const isHtmlReportDemoSession = (): boolean => {
     const props = getProps();
     const state = getState();
-    const candidates = [
-      getEffectiveSlug(),
-      props.sessionSlug,
-      props.activeSessionSlug,
-      state.surveyTitle,
-    ].map((value) => String(value || '').trim().toLowerCase());
+    const candidates = [getEffectiveSlug(), props.sessionSlug, props.activeSessionSlug, state.surveyTitle].map(
+      (value) =>
+        String(value || '')
+          .trim()
+          .toLowerCase(),
+    );
     return candidates.some((value) => isDemoSessionSlug(value));
   };
 
-  const isHtmlReportDemoModeActive = (): boolean => (
-    isHtmlReportDemoSession() && !!getState().htmlReportDemoMode
-  );
+  const isHtmlReportDemoModeActive = (): boolean => isHtmlReportDemoSession() && !!getState().htmlReportDemoMode;
 
   const getHtmlReportExporterMetadata = (): SurveyResultsHtmlReportExporterMetadata | null => {
     const props = getProps();
@@ -284,14 +265,10 @@ export const createSurveyResultsHtmlReportRuntime = ({
         aggregatorQuestionResponses: state.sbtFilteredAggregatorQuestionResponses,
         filteredResponses: state.sbtFilteredResponses,
         getResponseQuestionId: (response) => getResponseQuestionId(toRecord(response) as SurveyResultsResponseRecord),
-        getResponseQuestionPrompt: (response, questionData) => getResponseQuestionPrompt(
-          toRecord(response) as SurveyResultsResponseRecord,
-          toRecord(questionData)
-        ),
-        getResponseQuestionType: (response, questionData) => getResponseQuestionType(
-          toRecord(response) as SurveyResultsResponseRecord,
-          toRecord(questionData)
-        ),
+        getResponseQuestionPrompt: (response, questionData) =>
+          getResponseQuestionPrompt(toRecord(response) as SurveyResultsResponseRecord, toRecord(questionData)),
+        getResponseQuestionType: (response, questionData) =>
+          getResponseQuestionType(toRecord(response) as SurveyResultsResponseRecord, toRecord(questionData)),
         networkQuestions: getNetworkQuestionsForCurrentContext(),
         parseResponse,
         surveyViewMode: state.surveyViewMode,
@@ -299,16 +276,16 @@ export const createSurveyResultsHtmlReportRuntime = ({
       }),
       segmentDimensions: buildSurveyResultsAnalysisSegmentDimensionsForExport({
         filterState: state.filterState,
-        getQuestionEncryptionGates: (question) => (
-          getQuestionEncryptionGates(toRecord(question))
-        ),
+        getQuestionEncryptionGates: (question) => getQuestionEncryptionGates(toRecord(question)),
         getSbtEntryLabel: (entry) => {
           const record = toRecord(entry);
           const direct = readSurveyResultsAnalysisSafeLabel(
-            record.label || record.name || record.title || record.sessionName || record.group || record.slug
+            record.label || record.name || record.title || record.sessionName || record.group || record.slug,
           );
           if (direct) return direct;
-          const address = String(record.address || record.sbtAddress || (typeof entry === 'string' ? entry : '') || '').trim();
+          const address = String(
+            record.address || record.sbtAddress || (typeof entry === 'string' ? entry : '') || '',
+          ).trim();
           if (!address) return '';
           const resolved = resolveSbtDisplayLabel({
             address,
@@ -344,9 +321,7 @@ export const createSurveyResultsHtmlReportRuntime = ({
     });
   };
 
-  const buildSessionResultsHtmlReportSnapshot = (
-    exportedAt: unknown = nowIso()
-  ): SessionResultsHtmlSnapshot => {
+  const buildSessionResultsHtmlReportSnapshot = (exportedAt: unknown = nowIso()): SessionResultsHtmlSnapshot => {
     const state = getState();
     const props = getProps();
     const sessionSlug = getEffectiveSlug() || '';
@@ -376,7 +351,7 @@ export const createSurveyResultsHtmlReportRuntime = ({
   };
 
   const getHtmlReportAnalysisSectionsToGenerate = (
-    sections: Required<SessionResultsSectionSelection> = getHtmlReportSelectedSections()
+    sections: Required<SessionResultsSectionSelection> = getHtmlReportSelectedSections(),
   ): SessionResultsAnalysisSectionKey[] => {
     const keys = new Set<SessionResultsAnalysisSectionKey>();
     Object.entries(sections).forEach(([sectionKey, selected]) => {
@@ -389,16 +364,15 @@ export const createSurveyResultsHtmlReportRuntime = ({
 
   const getSessionResultsAnalysisCacheSlug = (): string => getEffectiveSlug() || 'general';
 
-  const getSessionResultsAnalysisCacheKey = (inputSignature: unknown): string => (
+  const getSessionResultsAnalysisCacheKey = (inputSignature: unknown): string =>
     buildSurveyResultsAnalysisArtifactCacheKey({
       chainId: getHtmlReportChainId(),
       inputSignature,
       networkLabel: getHtmlReportNetworkLabel(),
-    })
-  );
+    });
 
   const readSessionResultsAnalysisArtifactFromCache = (
-    inputSignature: unknown
+    inputSignature: unknown,
   ): SessionResultsGeneratedAnalysisArtifact | null => {
     const cacheKey = getSessionResultsAnalysisCacheKey(inputSignature);
     const readPlan = buildSurveyResultsAnalysisArtifactCacheReadRequestPlan({
@@ -417,7 +391,7 @@ export const createSurveyResultsHtmlReportRuntime = ({
   };
 
   const writeSessionResultsAnalysisArtifactToCache = async (
-    artifact: SessionResultsGeneratedAnalysisArtifact | null
+    artifact: SessionResultsGeneratedAnalysisArtifact | null,
   ): Promise<void> => {
     const slug = getSessionResultsAnalysisCacheSlug();
     const cacheKey = artifact ? getSessionResultsAnalysisCacheKey(artifact.inputSignature) : '';

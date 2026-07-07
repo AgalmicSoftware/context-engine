@@ -1,8 +1,4 @@
-import {
-  isPlainAnalysisObject,
-  toAnalysisRecord,
-  type UserPageUnknownRecord,
-} from './userPageCoreHelpers';
+import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 import {
   extractUserPageAnalysisAdditionalComment,
   extractUserPageAnalysisImportance,
@@ -86,31 +82,23 @@ export const isUserPageSbtAggregateEntry = (value: unknown): boolean => {
   return record.mintedSet instanceof Set && record.burnedSet instanceof Set;
 };
 
-export const buildUserPageAnalysisCreatedQuestions = (
-  questionCreationInfo: unknown = []
-): UserPageUnknownRecord[] => (
-  (Array.isArray(questionCreationInfo) ? questionCreationInfo as UserPageAnalysisQuestionRecord[] : []).map((q) => ({
+export const buildUserPageAnalysisCreatedQuestions = (questionCreationInfo: unknown = []): UserPageUnknownRecord[] =>
+  (Array.isArray(questionCreationInfo) ? (questionCreationInfo as UserPageAnalysisQuestionRecord[]) : []).map((q) => ({
     id: q.id,
     type: q.type,
     prompt: q.prompt,
-  }))
-);
+  }));
 
 export const buildUserPageAnalysisSbts = ({
   getSbtDisplayName = null,
   sbtList = [],
-}: BuildUserPageAnalysisSbtsArgs = {}): UserPageUnknownRecord[] => (
+}: BuildUserPageAnalysisSbtsArgs = {}): UserPageUnknownRecord[] =>
   (Array.isArray(sbtList) ? sbtList : [])
     .map((item: UserPageAnalysisSbtEntry) => ({
-      name: (
-        typeof getSbtDisplayName === 'function'
-          ? getSbtDisplayName(item?.sbtInfo)
-          : ''
-      ) || item?.name || '',
+      name: (typeof getSbtDisplayName === 'function' ? getSbtDisplayName(item?.sbtInfo) : '') || item?.name || '',
       address: item?.sbtInfo?.sbtAddress,
     }))
-    .filter((s: UserPageUnknownRecord) => s && s.name && s.address)
-);
+    .filter((s: UserPageUnknownRecord) => s && s.name && s.address);
 
 export const buildUserPageSbtSection = ({
   aggregate = null,
@@ -123,31 +111,26 @@ export const buildUserPageSbtSection = ({
   const viewAddressKey = String(viewAddressLower || '').toLowerCase();
   const sbtAggregate = toAnalysisRecord(toAnalysisRecord(aggregate).sbtAggregate);
   const aggregateKeys = Object.keys(sbtAggregate);
-  const translateSbt = (): unknown => (
-    typeof translate === 'function' ? translate('sbt') : 'SBT'
-  );
+  const translateSbt = (): unknown => (typeof translate === 'function' ? translate('sbt') : 'SBT');
 
   aggregateKeys.forEach((key: string) => {
     const entryRecord = toAnalysisRecord(sbtAggregate[key]);
     if (!isUserPageSbtAggregateEntry(entryRecord)) return;
-    const sbtInfo = isPlainAnalysisObject(entryRecord.sbtInfo)
-      ? entryRecord.sbtInfo
-      : {};
+    const sbtInfo = isPlainAnalysisObject(entryRecord.sbtInfo) ? entryRecord.sbtInfo : {};
     if (sbtInfo.unlisted === true) return;
     const mintedSet = entryRecord.mintedSet as Set<string>;
     const burnedSet = entryRecord.burnedSet as Set<string>;
     if (mintedSet.has(viewAddressKey) && !burnedSet.has(viewAddressKey)) {
       const sbtAddress = String(entryRecord.sbtAddress || key || sbtInfo.sbtAddress || '');
-      const preferredName = String((
-        typeof getSbtDisplayName === 'function' ? getSbtDisplayName(sbtInfo) : ''
-      ) || '').trim();
-      const shortenedAddress = (sbtAddress && sbtAddress.length > 10)
-        ? (
-          typeof getShortenedAddress === 'function'
+      const preferredName = String(
+        (typeof getSbtDisplayName === 'function' ? getSbtDisplayName(sbtInfo) : '') || '',
+      ).trim();
+      const shortenedAddress =
+        sbtAddress && sbtAddress.length > 10
+          ? typeof getShortenedAddress === 'function'
             ? getShortenedAddress(sbtAddress, false)
             : sbtAddress
-        )
-        : sbtAddress;
+          : sbtAddress;
       const fallbackName = shortenedAddress ? `${translateSbt()} ${shortenedAddress}` : translateSbt();
       userSBTs.push({
         sbtInfo: {
@@ -204,10 +187,11 @@ export const buildUserPageSbtSection = ({
 export const buildUserPageAnalysisQuestions = ({
   detailedQuestionResponses = {},
   questionResponseInfo = [],
-}: BuildUserPageAnalysisQuestionsArgs = {}): UserPageUnknownRecord[] => (
+}: BuildUserPageAnalysisQuestionsArgs = {}): UserPageUnknownRecord[] =>
   (Array.isArray(questionResponseInfo) ? questionResponseInfo : [])
     .map((q: UserPageAnalysisQuestionRecord) => {
-      const resp = (detailedQuestionResponses as Record<string, UserPageUnknownRecord> | null | undefined)?.[q.id as string] || {};
+      const resp =
+        (detailedQuestionResponses as Record<string, UserPageUnknownRecord> | null | undefined)?.[q.id as string] || {};
       const ans = toAnalysisRecord(resp.answer).value;
       if (ans === '*' || ans === '' || ans == null) return null;
       return {
@@ -219,16 +203,15 @@ export const buildUserPageAnalysisQuestions = ({
         additionalComment: extractUserPageAnalysisAdditionalComment(resp) || undefined,
       };
     })
-    .filter(Boolean) as UserPageUnknownRecord[]
-);
+    .filter(Boolean) as UserPageUnknownRecord[];
 
 export const buildUserPageAnalysisSurveys = ({
   detailedSurveyResponses = {},
   surveyResponseInfo = [],
-}: BuildUserPageAnalysisSurveysArgs = {}): UserPageUnknownRecord[] => (
-  (Array.isArray(surveyResponseInfo) ? surveyResponseInfo as UserPageAnalysisSurveyRecord[] : []).map((s) => {
+}: BuildUserPageAnalysisSurveysArgs = {}): UserPageUnknownRecord[] =>
+  (Array.isArray(surveyResponseInfo) ? (surveyResponseInfo as UserPageAnalysisSurveyRecord[]) : []).map((s) => {
     const arr = (detailedSurveyResponses as Record<string, unknown> | null | undefined)?.[s.id as string] || [];
-    const answered = (Array.isArray(arr) ? arr as UserPageAnalysisSurveyResponseItem[] : []).filter((it) => {
+    const answered = (Array.isArray(arr) ? (arr as UserPageAnalysisSurveyResponseItem[]) : []).filter((it) => {
       const responseData = toAnalysisRecord(it?.responseData);
       const v = toAnalysisRecord(responseData.answer).value;
       return v && v !== '*';
@@ -259,13 +242,9 @@ export const buildUserPageAnalysisSurveys = ({
       sample,
       additionalCommentsSample: additionalCommentsSample.length > 0 ? additionalCommentsSample : undefined,
     };
-  })
-);
+  });
 
-export const readUserPageDirectNetworkCacheBucket = (
-  cacheObj: unknown,
-  netKey: unknown
-): UserPageUnknownRecord => {
+export const readUserPageDirectNetworkCacheBucket = (cacheObj: unknown, netKey: unknown): UserPageUnknownRecord => {
   if (!isPlainAnalysisObject(cacheObj) || !netKey) return {};
   const bucket = cacheObj[String(netKey)];
   return isPlainAnalysisObject(bucket) ? bucket : {};
@@ -279,22 +258,18 @@ export const buildUserPageAnalysisCreatedSurveys = ({
 }: BuildUserPageAnalysisCreatedSurveysArgs = {}): UserPageUnknownRecord[] => {
   const netSurv = readUserPageDirectNetworkCacheBucket(surveysCache, networkID);
   const netQs = readUserPageDirectNetworkCacheBucket(questionsCache, networkID);
-  const surveyBucket = netSurv.surveys && typeof netSurv.surveys === 'object'
-    ? netSurv.surveys as UserPageUnknownRecord
-    : {};
-  const questionBucket = netQs.questions && typeof netQs.questions === 'object'
-    ? netQs.questions as UserPageUnknownRecord
-    : {};
-  return (Array.isArray(surveyCreationInfo) ? surveyCreationInfo as UserPageAnalysisSurveyRecord[] : []).map((sv) => {
+  const surveyBucket =
+    netSurv.surveys && typeof netSurv.surveys === 'object' ? (netSurv.surveys as UserPageUnknownRecord) : {};
+  const questionBucket =
+    netQs.questions && typeof netQs.questions === 'object' ? (netQs.questions as UserPageUnknownRecord) : {};
+  return (Array.isArray(surveyCreationInfo) ? (surveyCreationInfo as UserPageAnalysisSurveyRecord[]) : []).map((sv) => {
     const sData = toAnalysisRecord(surveyBucket[sv.id as string]);
     const qIds = Array.isArray(sData.questionIDs) ? sData.questionIDs : [];
     const sampleQuestions = (qIds.slice(0, 5) as string[]).map((qid) => {
       const qidLower = qid.toLowerCase();
       const qRaw = questionBucket[qidLower];
       const q = toAnalysisRecord(qRaw);
-      return qRaw
-        ? { id: (q.id || qidLower), type: q.type, prompt: q.prompt }
-        : { id: qidLower };
+      return qRaw ? { id: q.id || qidLower, type: q.type, prompt: q.prompt } : { id: qidLower };
     });
     return {
       surveyId: sv.id,

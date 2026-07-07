@@ -169,7 +169,7 @@ const buildEncryptedUploadArgs = ({
   providerLike,
   chainId,
   encryption,
-} = {}) => (
+} = {}) =>
   litStorage.uploadEncryptedArweaveData({
     data,
     name,
@@ -194,8 +194,7 @@ const buildEncryptedUploadArgs = ({
       ...(encryption?.providerLike ? { providerLike: encryption.providerLike } : {}),
       ...(encryption?.resourceAbilityRequests ? { resourceAbilityRequests: encryption.resourceAbilityRequests } : {}),
     },
-  })
-);
+  });
 
 const buildSelfRecipientUploadArgs = ({
   data,
@@ -208,7 +207,7 @@ const buildSelfRecipientUploadArgs = ({
   providerLike,
   chainId,
   encryption,
-} = {}) => (
+} = {}) =>
   uploadSelfRecipientEncryptedDocData({
     data,
     name,
@@ -224,8 +223,7 @@ const buildSelfRecipientUploadArgs = ({
       sessionConfig,
       context: buildBaseUploadContext({ account, providerLike, chainId }),
     },
-  })
-);
+  });
 
 export const uploadDocLibraryFile = async ({
   file,
@@ -289,9 +287,12 @@ export const uploadDocLibraryFile = async ({
 
   return {
     txId,
-    url: storage === STORAGE_BACKENDS.CLOUDFLARE
-      ? toStr(result?.storageRef?.uri).trim()
-      : (txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : ''),
+    url:
+      storage === STORAGE_BACKENDS.CLOUDFLARE
+        ? toStr(result?.storageRef?.uri).trim()
+        : txId
+          ? arweaveScripts.buildArweaveGatewayUrl(txId)
+          : '',
     storage,
     storageRef: result?.storageRef || null,
     kind: 'file',
@@ -366,9 +367,12 @@ export const uploadDocLibraryUrlRecord = async ({
 
   return {
     txId,
-    url: storage === STORAGE_BACKENDS.CLOUDFLARE
-      ? toStr(result?.storageRef?.uri).trim()
-      : (txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : ''),
+    url:
+      storage === STORAGE_BACKENDS.CLOUDFLARE
+        ? toStr(result?.storageRef?.uri).trim()
+        : txId
+          ? arweaveScripts.buildArweaveGatewayUrl(txId)
+          : '',
     storage,
     storageRef: result?.storageRef || null,
     kind: 'link',

@@ -3,75 +3,81 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import EncryptionPanel, { EncryptionPanelProps } from './EncryptionPanel';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-jest.mock('../SBTs/SBTSelector', () => function MockSBTSelector(props: {
-  id?: string;
-  selectedSBTs?: unknown[];
-  additionalSBTOptions?: unknown[];
-  chainId?: number | string | null;
-  sessionSlug?: string;
-  onAddSBT?: (sbt: { address: string; name: string }) => void;
-  onRemoveSBT?: (address: string) => void;
-}) {
-  return (
-    <div
-      data-testid="mock-sbt-selector"
-      data-selector-id={props.id || ''}
-      data-selected-count={Array.isArray(props.selectedSBTs) ? String(props.selectedSBTs.length) : '0'}
-      data-option-count={Array.isArray(props.additionalSBTOptions) ? String(props.additionalSBTOptions.length) : '0'}
-      data-chain-id={props.chainId == null ? '' : String(props.chainId)}
-      data-session-slug={props.sessionSlug || ''}
-    >
-      <button
-        type="button"
-        onClick={() => props.onAddSBT?.({ address: '0xabc', name: 'Mock SBT' })}
-      >
-        Mock add selector SBT
-      </button>
-      <button type="button" onClick={() => props.onRemoveSBT?.('0xabc')}>
-        Mock remove selector SBT
-      </button>
-    </div>
-  );
-});
+jest.mock(
+  '../SBTs/SBTSelector',
+  () =>
+    function MockSBTSelector(props: {
+      id?: string;
+      selectedSBTs?: unknown[];
+      additionalSBTOptions?: unknown[];
+      chainId?: number | string | null;
+      sessionSlug?: string;
+      onAddSBT?: (sbt: { address: string; name: string }) => void;
+      onRemoveSBT?: (address: string) => void;
+    }) {
+      return (
+        <div
+          data-testid="mock-sbt-selector"
+          data-selector-id={props.id || ''}
+          data-selected-count={Array.isArray(props.selectedSBTs) ? String(props.selectedSBTs.length) : '0'}
+          data-option-count={
+            Array.isArray(props.additionalSBTOptions) ? String(props.additionalSBTOptions.length) : '0'
+          }
+          data-chain-id={props.chainId == null ? '' : String(props.chainId)}
+          data-session-slug={props.sessionSlug || ''}
+        >
+          <button type="button" onClick={() => props.onAddSBT?.({ address: '0xabc', name: 'Mock SBT' })}>
+            Mock add selector SBT
+          </button>
+          <button type="button" onClick={() => props.onRemoveSBT?.('0xabc')}>
+            Mock remove selector SBT
+          </button>
+        </div>
+      );
+    },
+);
 
 const t = (key: string) => key;
 
-const renderEncryptionPanel = (props: Partial<EncryptionPanelProps> = {}) => render(
-  <EncryptionPanel
-    isNormalMode
-    t={t}
-    renderSessionWizardInfoTooltip={() => null}
-    isCollapsed={false}
-    onToggleCollapsed={() => {}}
-    launchCreateSbtModal={() => {}}
-    activeCreateSbtTargetGateId="gate-1"
-    activeCreateSbtTargetGate={{ id: 'gate-1', label: 'Gate A' }}
-    encryptionGates={[{
-      id: 'gate-1',
-      label: 'Gate A',
-      mode: 'any',
-      color: '#4dffa4',
-      sbts: [],
-    }]}
-    focusCreateSbtTargetGate={() => {}}
-    updateEncryptionGate={() => {}}
-    removeEncryptionGate={() => {}}
-    normalizeSbtSelection={(value: unknown[]) => value}
-    handleGateAddSbt={() => {}}
-    handleGateRemoveSbt={() => {}}
-    network="optimism-sepolia"
-    pendingSbtSelectorOptions={[]}
-    selectorSourceChainId={11155420}
-    selectorSourceSessionConfig={{ slug: 'demo-session' }}
-    resolvedActiveSessionSlug="demo-session"
-    sbtCacheRevision={0}
-    ensureLightSbtUniverse={() => {}}
-    addEncryptionGate={() => {}}
-    pendingSbtDrafts={[]}
-    removePendingSbtDraft={() => {}}
-    {...props}
-  />
-);
+const renderEncryptionPanel = (props: Partial<EncryptionPanelProps> = {}) =>
+  render(
+    <EncryptionPanel
+      isNormalMode
+      t={t}
+      renderSessionWizardInfoTooltip={() => null}
+      isCollapsed={false}
+      onToggleCollapsed={() => {}}
+      launchCreateSbtModal={() => {}}
+      activeCreateSbtTargetGateId="gate-1"
+      activeCreateSbtTargetGate={{ id: 'gate-1', label: 'Gate A' }}
+      encryptionGates={[
+        {
+          id: 'gate-1',
+          label: 'Gate A',
+          mode: 'any',
+          color: '#4dffa4',
+          sbts: [],
+        },
+      ]}
+      focusCreateSbtTargetGate={() => {}}
+      updateEncryptionGate={() => {}}
+      removeEncryptionGate={() => {}}
+      normalizeSbtSelection={(value: unknown[]) => value}
+      handleGateAddSbt={() => {}}
+      handleGateRemoveSbt={() => {}}
+      network="optimism-sepolia"
+      pendingSbtSelectorOptions={[]}
+      selectorSourceChainId={11155420}
+      selectorSourceSessionConfig={{ slug: 'demo-session' }}
+      resolvedActiveSessionSlug="demo-session"
+      sbtCacheRevision={0}
+      ensureLightSbtUniverse={() => {}}
+      addEncryptionGate={() => {}}
+      pendingSbtDrafts={[]}
+      removePendingSbtDraft={() => {}}
+      {...props}
+    />,
+  );
 
 describe('EncryptionPanel', () => {
   it('renders without crashing with a minimal prop set', () => {
@@ -118,13 +124,15 @@ describe('EncryptionPanel', () => {
     const handleGateAddSbt = jest.fn();
     const handleGateRemoveSbt = jest.fn();
     renderEncryptionPanel({
-      encryptionGates: [{
-        id: 'gate-1',
-        label: 'Gate A',
-        mode: 'any',
-        color: '#4dffa4',
-        sbts: [{ address: '0x111', name: 'First SBT' }],
-      }],
+      encryptionGates: [
+        {
+          id: 'gate-1',
+          label: 'Gate A',
+          mode: 'any',
+          color: '#4dffa4',
+          sbts: [{ address: '0x111', name: 'First SBT' }],
+        },
+      ],
       pendingSbtSelectorOptions: [{ address: '0x222', name: 'Pending SBT' }],
       selectorSourceChainId: 84532,
       selectorSourceSessionConfig: { slug: 'source-session' },
@@ -202,13 +210,15 @@ describe('EncryptionPanel', () => {
         launchCreateSbtModal={() => {}}
         activeCreateSbtTargetGateId="gate-1"
         activeCreateSbtTargetGate={{ id: 'gate-1', label: 'Gate A' }}
-        encryptionGates={[{
-          id: 'gate-1',
-          label: 'Gate A',
-          mode: 'any',
-          color: '#4dffa4',
-          sbts: [],
-        }]}
+        encryptionGates={[
+          {
+            id: 'gate-1',
+            label: 'Gate A',
+            mode: 'any',
+            color: '#4dffa4',
+            sbts: [],
+          },
+        ]}
         focusCreateSbtTargetGate={() => {}}
         updateEncryptionGate={() => {}}
         removeEncryptionGate={() => {}}
@@ -225,7 +235,7 @@ describe('EncryptionPanel', () => {
         addEncryptionGate={() => {}}
         pendingSbtDrafts={[]}
         removePendingSbtDraft={() => {}}
-      />
+      />,
     );
 
     expect(screen.queryByDisplayValue('Gate A')).not.toBeInTheDocument();

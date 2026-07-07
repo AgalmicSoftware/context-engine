@@ -24,7 +24,7 @@ describe('SurveyQuestionsAuthoringPanel', () => {
           showTopInlineSubmit: true,
         }}
         submitResponseButton={<button type="button">Submit responses</button>}
-      />
+      />,
     );
 
     const submitButtons = screen.getAllByRole('button', { name: 'Submit responses' });
@@ -40,7 +40,7 @@ describe('SurveyQuestionsAuthoringPanel', () => {
           showBackToTopControl: true,
           showJsonControl: true,
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'View JSON' }));
@@ -56,7 +56,7 @@ describe('SurveyQuestionsAuthoringPanel', () => {
         {...baseProps}
         lockedQuestionsBanner={<div data-testid="locked-banner">Locked prompts</div>}
         submittedResponseView={<div data-testid="submitted-response">Submitted response</div>}
-      />
+      />,
     );
 
     expect(screen.queryByTestId('locked-banner')).toBeNull();
@@ -70,7 +70,7 @@ describe('SurveyQuestionsAuthoringPanel', () => {
         }}
         lockedQuestionsBanner={<div data-testid="locked-banner">Locked prompts</div>}
         submittedResponseView={null}
-      />
+      />,
     );
 
     expect(screen.getByTestId('locked-banner')).toBeInTheDocument();

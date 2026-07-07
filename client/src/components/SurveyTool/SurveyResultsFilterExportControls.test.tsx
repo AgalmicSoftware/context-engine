@@ -87,7 +87,7 @@ const styleMap = {
 };
 
 const createProps = (
-  overrides: Partial<Parameters<typeof renderSurveyResultsFilterExportControls>[0]> = {}
+  overrides: Partial<Parameters<typeof renderSurveyResultsFilterExportControls>[0]> = {},
 ): Parameters<typeof renderSurveyResultsFilterExportControls>[0] => {
   const { exportControlsDisplay, filterState, ...restOverrides } = overrides;
 
@@ -152,61 +152,81 @@ describe('renderSurveyResultsFilterExportControls', () => {
   it('renders aggregate survey SBT filtering with light surface props and export controls', () => {
     const onSbtFilter = jest.fn();
     const onToggleExportArea = jest.fn();
-    render(renderSurveyResultsFilterExportControls(createProps({
-      isQuestionCacheReady: false,
-      isSBTCacheReady: false,
-      onSbtFilter,
-      onToggleExportArea,
-    })));
+    render(
+      renderSurveyResultsFilterExportControls(
+        createProps({
+          isQuestionCacheReady: false,
+          isSBTCacheReady: false,
+          onSbtFilter,
+          onToggleExportArea,
+        }),
+      ),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'SBT Filter' }));
     fireEvent.click(screen.getByRole('button', { name: 'Export Data' }));
 
-    expect(mockSbtFilter).toHaveBeenCalledWith(expect.objectContaining({
-      autoExpand: false,
-      buttonSurface: 'light',
-      externalSBTFilterState: { selected: ['0xaaa'] },
-      hideLoadingOverlay: true,
-      isQuestionCacheReady: false,
-      isSBTCacheReady: false,
-      items: [{ responder: '0xaaa' }],
-      mode: 'responder',
-      activeSessionSlug: 'demo',
-      sessionConfig: expect.objectContaining({ slug: 'demo' }),
-      sessionSlug: 'demo',
-      ensureLightSbtUniverse: expect.any(Function),
-    }));
+    expect(mockSbtFilter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        autoExpand: false,
+        buttonSurface: 'light',
+        externalSBTFilterState: { selected: ['0xaaa'] },
+        hideLoadingOverlay: true,
+        isQuestionCacheReady: false,
+        isSBTCacheReady: false,
+        items: [{ responder: '0xaaa' }],
+        mode: 'responder',
+        activeSessionSlug: 'demo',
+        sessionConfig: expect.objectContaining({ slug: 'demo' }),
+        sessionSlug: 'demo',
+        ensureLightSbtUniverse: expect.any(Function),
+      }),
+    );
     expect(onSbtFilter).toHaveBeenCalledWith(['sbt-filtered']);
-    expect(mockExportControls).toHaveBeenCalledWith(expect.objectContaining({
-      exportOptions: [{ label: 'CSV', value: 'csv' }],
-      exportTypeLabel: 'CSV',
-    }));
+    expect(mockExportControls).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exportOptions: [{ label: 'CSV', value: 'csv' }],
+        exportTypeLabel: 'CSV',
+      }),
+    );
     expect(onToggleExportArea).toHaveBeenCalledTimes(1);
   });
 
   it('uses response rows for individual survey filtering', () => {
-    render(renderSurveyResultsFilterExportControls(createProps({
-      surveyViewMode: 'individuals',
-    })));
+    render(
+      renderSurveyResultsFilterExportControls(
+        createProps({
+          surveyViewMode: 'individuals',
+        }),
+      ),
+    );
 
-    expect(mockSbtFilter).toHaveBeenCalledWith(expect.objectContaining({
-      items: [{ responder: '0xbbb' }],
-      mode: 'responder',
-    }));
+    expect(mockSbtFilter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: [{ responder: '0xbbb' }],
+        mode: 'responder',
+      }),
+    );
   });
 
   it('preserves an explicit general session slug for results filters', () => {
-    render(renderSurveyResultsFilterExportControls(createProps({
-      activeSessionSlug: 'demo',
-      sessionSlug: '',
-      viewMode: 'questions',
-      showQuestionFilter: true,
-    })));
+    render(
+      renderSurveyResultsFilterExportControls(
+        createProps({
+          activeSessionSlug: 'demo',
+          sessionSlug: '',
+          viewMode: 'questions',
+          showQuestionFilter: true,
+        }),
+      ),
+    );
 
-    expect(mockQuestionFilter).toHaveBeenCalledWith(expect.objectContaining({
-      activeSessionSlug: 'demo',
-      sessionSlug: '',
-    }));
+    expect(mockQuestionFilter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeSessionSlug: 'demo',
+        sessionSlug: '',
+      }),
+    );
   });
 
   it('renders question-mode filter controls with parent-owned handlers and storage context', () => {
@@ -214,43 +234,51 @@ describe('renderSurveyResultsFilterExportControls', () => {
     const onExportHtmlReport = jest.fn();
     const onQuestionFilter = jest.fn();
     const onToggleQuestionFilter = jest.fn();
-    render(renderSurveyResultsFilterExportControls(createProps({
-      currentViewModeForUrl: 'questions',
-      isFilterActive: true,
-      isQuestionCacheReady: false,
-      isSBTCacheReady: false,
-      onDownload,
-      onExportHtmlReport,
-      onQuestionFilter,
-      onToggleQuestionFilter,
-      showQuestionFilter: true,
-      storageKeyPrefix: 'question:filters',
-      surveyViewMode: 'aggregate',
-      viewMode: 'questions',
-    })));
+    render(
+      renderSurveyResultsFilterExportControls(
+        createProps({
+          currentViewModeForUrl: 'questions',
+          isFilterActive: true,
+          isQuestionCacheReady: false,
+          isSBTCacheReady: false,
+          onDownload,
+          onExportHtmlReport,
+          onQuestionFilter,
+          onToggleQuestionFilter,
+          showQuestionFilter: true,
+          storageKeyPrefix: 'question:filters',
+          surveyViewMode: 'aggregate',
+          viewMode: 'questions',
+        }),
+      ),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: /^Filter$/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Question Filter' }));
 
-    expect(mockQuestionFilter).toHaveBeenCalledWith(expect.objectContaining({
-      activeSessionSlug: 'demo',
-      creatorAndResponderMode: true,
-      currentSurveyIdForUrl: 'survey-1',
-      currentViewModeForUrl: 'questions',
-      filterModalOpen: true,
-      isQuestionCacheReady: false,
-      isSBTCacheReady: false,
-      questions: [{ id: 'q1' }],
-      resultsMode: true,
-      sessionConfig: expect.objectContaining({ slug: 'demo' }),
-      sessionSlug: 'demo',
-      ensureLightSbtUniverse: expect.any(Function),
-      storageKeyPrefix: 'question:filters',
-    }));
-    expect(mockExportControls).toHaveBeenCalledWith(expect.objectContaining({
-      onDownload,
-      onExportHtmlReport,
-    }));
+    expect(mockQuestionFilter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeSessionSlug: 'demo',
+        creatorAndResponderMode: true,
+        currentSurveyIdForUrl: 'survey-1',
+        currentViewModeForUrl: 'questions',
+        filterModalOpen: true,
+        isQuestionCacheReady: false,
+        isSBTCacheReady: false,
+        questions: [{ id: 'q1' }],
+        resultsMode: true,
+        sessionConfig: expect.objectContaining({ slug: 'demo' }),
+        sessionSlug: 'demo',
+        ensureLightSbtUniverse: expect.any(Function),
+        storageKeyPrefix: 'question:filters',
+      }),
+    );
+    expect(mockExportControls).toHaveBeenCalledWith(
+      expect.objectContaining({
+        onDownload,
+        onExportHtmlReport,
+      }),
+    );
     expect(onToggleQuestionFilter).toHaveBeenCalledTimes(1);
     expect(onQuestionFilter).toHaveBeenCalledWith(['question-filtered']);
   });

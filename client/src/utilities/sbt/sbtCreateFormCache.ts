@@ -1,7 +1,4 @@
-import {
-  removeKeys,
-  safeJsonRead,
-} from '../cache/storageJson.js';
+import { removeKeys, safeJsonRead } from '../cache/storageJson.js';
 
 const LEGACY_CREATE_SBT_FORM_CACHE_KEY = 'createSbtFormCache';
 const SCOPED_CREATE_SBT_FORM_CACHE_KEY_PREFIX = 'dg:createSbtFormCache:';
@@ -22,9 +19,7 @@ export const CREATE_SBT_FORM_CACHE_LEGACY_POLICY = Object.freeze({
   removeAfter: 'one public release after scoped create-SBT draft writes are verified',
 });
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
 const getSessionStorage = (storageIn?: StorageLike | null): StorageLike | null => {
   if (storageIn !== undefined) return storageIn;
@@ -42,21 +37,19 @@ const removeCacheKey = (storage: StorageLike | null, key: string) => {
 };
 
 export const normalizeCreateSbtFormCacheSessionSlug = (value: unknown = ''): string => {
-  const normalized = String(value || '').trim().toLowerCase();
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
   return normalized === 'general' ? '' : normalized;
 };
 
-export const getScopedCreateSbtFormCacheKey = (sessionSlug = ''): string => (
-  `${SCOPED_CREATE_SBT_FORM_CACHE_KEY_PREFIX}${normalizeCreateSbtFormCacheSessionSlug(sessionSlug)}`
-);
+export const getScopedCreateSbtFormCacheKey = (sessionSlug = ''): string =>
+  `${SCOPED_CREATE_SBT_FORM_CACHE_KEY_PREFIX}${normalizeCreateSbtFormCacheSessionSlug(sessionSlug)}`;
 
 const hasNonEmptyText = (value: unknown): boolean => String(value || '').trim().length > 0;
 
-const hasNonEmptyList = (value: unknown): boolean => (
-  Array.isArray(value)
-    ? value.some((entry) => hasNonEmptyText(entry))
-    : false
-);
+const hasNonEmptyList = (value: unknown): boolean =>
+  Array.isArray(value) ? value.some((entry) => hasNonEmptyText(entry)) : false;
 
 const hasTagDraft = (value: unknown): boolean => {
   if (Array.isArray(value)) {
@@ -95,7 +88,7 @@ export const hasMeaningfulCreateSbtFormPayload = (parsed: unknown): boolean => {
   const hasName = hasNonEmptyText(parsed.sbtName);
   if (!hasName) return false;
 
-  const hasAdditionalDraftData = (
+  const hasAdditionalDraftData =
     hasNonEmptyText(parsed.sbtDescription) ||
     hasNonEmptyText(parsed.sbtImageUrl) ||
     hasNonEmptyText(parsed._imageDataUrl) ||
@@ -105,8 +98,7 @@ export const hasMeaningfulCreateSbtFormPayload = (parsed: unknown): boolean => {
     hasNonEmptyText(parsed.documentIDHashes) ||
     hasNonEmptyText(parsed.groupPassword) ||
     hasMetadataLockDraft(parsed.metadataLockGateIds) ||
-    hasSubstantiveDistributionDraft(parsed.sbtDistribution)
-  );
+    hasSubstantiveDistributionDraft(parsed.sbtDistribution);
 
   return hasAdditionalDraftData;
 };
@@ -128,7 +120,7 @@ const readCreateSbtFormPayload = ({
       if (isRecord(parsed)) return parsed;
       throw new Error('Create SBT form cache payload must be a JSON object.');
     },
-    { clearInvalid }
+    { clearInvalid },
   );
   return result.ok ? result.value : null;
 };
@@ -149,14 +141,11 @@ const migrateLegacyCreateSbtFormCache = ({
       storage,
       key: LEGACY_CREATE_SBT_FORM_CACHE_KEY,
     });
-    const legacySessionSlug = legacyPayload &&
-      Object.prototype.hasOwnProperty.call(legacyPayload, '_sessionSlug')
-      ? normalizeCreateSbtFormCacheSessionSlug(legacyPayload._sessionSlug)
-      : null;
-    if (
-      legacySessionSlug !== null &&
-      legacySessionSlug !== normalizeCreateSbtFormCacheSessionSlug(sessionSlug)
-    ) {
+    const legacySessionSlug =
+      legacyPayload && Object.prototype.hasOwnProperty.call(legacyPayload, '_sessionSlug')
+        ? normalizeCreateSbtFormCacheSessionSlug(legacyPayload._sessionSlug)
+        : null;
+    if (legacySessionSlug !== null && legacySessionSlug !== normalizeCreateSbtFormCacheSessionSlug(sessionSlug)) {
       return;
     }
     storage.setItem(scopedKey, legacyValue);

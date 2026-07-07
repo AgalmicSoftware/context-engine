@@ -31,24 +31,30 @@ describe('sbtPageScanProgressHelpers', () => {
     expect(formatSbtPageBlockCount('bad')).toBe('-');
     expect(resolveSbtPageRemainingBlocksCount({ remainingBlocks: 12.5 })).toBe(12.5);
     expect(resolveSbtPageRemainingBlocksCount({ totalBlocks: 20, scannedBlocks: 7 })).toBe(13);
-    expect(shouldShowSbtPageScanProgress({
-      effectiveLoading: false,
-      hasActiveScanProgress: true,
-      rawRemainingBlocksCount: 2,
-    })).toBe(true);
-    expect(resolveSbtPageScanProgressPercent({
-      progress: { totalBlocks: 10, scannedBlocks: 4 },
-      showScanProgress: true,
-    })).toBe(40);
+    expect(
+      shouldShowSbtPageScanProgress({
+        effectiveLoading: false,
+        hasActiveScanProgress: true,
+        rawRemainingBlocksCount: 2,
+      }),
+    ).toBe(true);
+    expect(
+      resolveSbtPageScanProgressPercent({
+        progress: { totalBlocks: 10, scannedBlocks: 4 },
+        showScanProgress: true,
+      }),
+    ).toBe(40);
     expect(resolveSbtPageScanProgressFillStyle({ percent: 25 })).toEqual({
       width: '25%',
     });
-    expect(resolveSbtPageScanProgressDisplay({
-      phaseLabel: 'Loading holders',
-      rawRemainingBlocksCount: 1200,
-      sessionLabel: ' Alpha ',
-      showScanProgress: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageScanProgressDisplay({
+        phaseLabel: 'Loading holders',
+        rawRemainingBlocksCount: 1200,
+        sessionLabel: ' Alpha ',
+        showScanProgress: true,
+      }),
+    ).toEqual({
       remainingBlocksCount: 1200,
       scanProgressSessionText: 'Session: Alpha',
       scanProgressText: 'Loading holders: 1,200 blocks remaining',
@@ -61,12 +67,14 @@ describe('sbtPageScanProgressHelpers', () => {
   });
 
   it('builds parent and effective holder scan progress records', () => {
-    expect(buildSbtPageParentSessionScanProgress({
-      progress: { currentBlock: 15, latestBlock: 20, phase: 'holders' },
-      sessionConfig: { blockLimits: { start: 11 } },
-      sessionLabel: 'Alpha',
-      sessionSlug: 'alpha',
-    })).toEqual({
+    expect(
+      buildSbtPageParentSessionScanProgress({
+        progress: { currentBlock: 15, latestBlock: 20, phase: 'holders' },
+        sessionConfig: { blockLimits: { start: 11 } },
+        sessionLabel: 'Alpha',
+        sessionSlug: 'alpha',
+      }),
+    ).toEqual({
       currentBlock: 15,
       latestBlock: 20,
       phase: 'holders',
@@ -80,28 +88,34 @@ describe('sbtPageScanProgressHelpers', () => {
       sessionLabel: 'Alpha',
     });
     expect(buildSbtPageParentSessionScanProgress({ progress: null })).toBeNull();
-    expect(buildSbtPageEffectiveHolderScanProgress({
-      getSessionLabel: () => 'Local Session',
-      getSessionSlug: () => 'local',
-      localProgress: { totalBlocks: 3, scannedBlocks: 1 },
-    })).toMatchObject({
+    expect(
+      buildSbtPageEffectiveHolderScanProgress({
+        getSessionLabel: () => 'Local Session',
+        getSessionSlug: () => 'local',
+        localProgress: { totalBlocks: 3, scannedBlocks: 1 },
+      }),
+    ).toMatchObject({
       sessionSlug: 'local',
       sessionLabel: 'Local Session',
       totalBlocks: 3,
     });
-    expect(buildSbtPageEffectiveHolderScanProgress({
-      getParentProgress: () => ({ currentBlock: 1, latestBlock: 2 }),
-      localProgress: null,
-    })).toEqual({ currentBlock: 1, latestBlock: 2 });
+    expect(
+      buildSbtPageEffectiveHolderScanProgress({
+        getParentProgress: () => ({ currentBlock: 1, latestBlock: 2 }),
+        localProgress: null,
+      }),
+    ).toEqual({ currentBlock: 1, latestBlock: 2 });
   });
 
   it('builds parent session scan progress from block ranges and labels', () => {
-    expect(buildSbtPageParentSessionScanProgress({
-      progress: { currentBlock: 15.9, latestBlock: 20, phase: '', extra: 'kept' },
-      sessionConfig: { blockLimits: { start: 10 } },
-      sessionLabel: 'Review Session',
-      sessionSlug: 'review-session',
-    })).toEqual({
+    expect(
+      buildSbtPageParentSessionScanProgress({
+        progress: { currentBlock: 15.9, latestBlock: 20, phase: '', extra: 'kept' },
+        sessionConfig: { blockLimits: { start: 10 } },
+        sessionLabel: 'Review Session',
+        sessionSlug: 'review-session',
+      }),
+    ).toEqual({
       currentBlock: 15,
       extra: 'kept',
       fromBlock: 10,
@@ -115,26 +129,34 @@ describe('sbtPageScanProgressHelpers', () => {
       toBlock: 20,
       totalBlocks: 11,
     });
-    expect(buildSbtPageParentSessionScanProgress({
-      progress: { currentBlock: 3, latestBlock: 5, phase: 'metadata' },
-      sessionConfig: {},
-    })).toMatchObject({
+    expect(
+      buildSbtPageParentSessionScanProgress({
+        progress: { currentBlock: 3, latestBlock: 5, phase: 'metadata' },
+        sessionConfig: {},
+      }),
+    ).toMatchObject({
       currentBlock: 3,
       latestBlock: 5,
       phase: 'metadata',
       remainingBlocks: 2,
       toBlock: 5,
     });
-    expect(buildSbtPageParentSessionScanProgress({
-      progress: { currentBlock: 3, latestBlock: 5 },
-      sessionConfig: {},
-    })?.totalBlocks).toBeUndefined();
-    expect(buildSbtPageParentSessionScanProgress({
-      progress: { currentBlock: 3, latestBlock: 0 },
-    })?.remainingBlocks).toBe(0);
-    expect(buildSbtPageParentSessionScanProgress({
-      progress: { currentBlock: 'bad', latestBlock: 10 },
-    })).toBeNull();
+    expect(
+      buildSbtPageParentSessionScanProgress({
+        progress: { currentBlock: 3, latestBlock: 5 },
+        sessionConfig: {},
+      })?.totalBlocks,
+    ).toBeUndefined();
+    expect(
+      buildSbtPageParentSessionScanProgress({
+        progress: { currentBlock: 3, latestBlock: 0 },
+      })?.remainingBlocks,
+    ).toBe(0);
+    expect(
+      buildSbtPageParentSessionScanProgress({
+        progress: { currentBlock: 'bad', latestBlock: 10 },
+      }),
+    ).toBeNull();
     expect(buildSbtPageParentSessionScanProgress({ progress: null })).toBeNull();
   });
 
@@ -143,12 +165,14 @@ describe('sbtPageScanProgressHelpers', () => {
     const getSessionLabel = jest.fn(() => 'Local Session');
     const getSessionSlug = jest.fn(() => 'local-session');
 
-    expect(buildSbtPageEffectiveHolderScanProgress({
-      getParentProgress,
-      getSessionLabel,
-      getSessionSlug,
-      localProgress: { totalBlocks: 10, scannedBlocks: 2, sessionLabel: 'Override Label' },
-    })).toEqual({
+    expect(
+      buildSbtPageEffectiveHolderScanProgress({
+        getParentProgress,
+        getSessionLabel,
+        getSessionSlug,
+        localProgress: { totalBlocks: 10, scannedBlocks: 2, sessionLabel: 'Override Label' },
+      }),
+    ).toEqual({
       totalBlocks: 10,
       scannedBlocks: 2,
       sessionSlug: 'local-session',
@@ -158,14 +182,18 @@ describe('sbtPageScanProgressHelpers', () => {
     expect(getSessionLabel).toHaveBeenCalledTimes(1);
     expect(getSessionSlug).toHaveBeenCalledTimes(1);
 
-    expect(buildSbtPageEffectiveHolderScanProgress({
-      getParentProgress,
-      localProgress: { currentBlock: 'bad' },
-    })).toEqual({ currentBlock: 1, latestBlock: 2 });
+    expect(
+      buildSbtPageEffectiveHolderScanProgress({
+        getParentProgress,
+        localProgress: { currentBlock: 'bad' },
+      }),
+    ).toEqual({ currentBlock: 1, latestBlock: 2 });
     expect(getParentProgress).toHaveBeenCalledTimes(1);
-    expect(buildSbtPageEffectiveHolderScanProgress({
-      getParentProgress: () => ({ nope: true }),
-      localProgress: null,
-    })).toBeNull();
+    expect(
+      buildSbtPageEffectiveHolderScanProgress({
+        getParentProgress: () => ({ nope: true }),
+        localProgress: null,
+      }),
+    ).toBeNull();
   });
 });

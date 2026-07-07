@@ -174,11 +174,13 @@ describe('buildSurveyResultsHtmlReportDownloadExecutionPlan', () => {
       snapshot: buildSnapshot(),
     });
 
-    expect(plan).toEqual(expect.objectContaining({
-      blockedReason: '',
-      statePatch: null,
-      status: 'ready',
-    }));
+    expect(plan).toEqual(
+      expect.objectContaining({
+        blockedReason: '',
+        statePatch: null,
+        status: 'ready',
+      }),
+    );
     expect(plan.readinessPlan.canDownload).toBe(true);
     expect(plan.downloadRequest).toEqual({
       filename: 'contextEngine_sessionReport_demo-session_2026-05-25T18_30_00_000Z.pdf',

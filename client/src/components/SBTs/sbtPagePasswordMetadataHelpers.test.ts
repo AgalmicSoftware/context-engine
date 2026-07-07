@@ -171,81 +171,101 @@ describe('sbtPage password and metadata helpers', () => {
   });
 
   it('resolves password export selection from cached and generated codes', () => {
-    expect(resolveSbtPagePasswordExportSelection({
-      cachedPasswords: ['cached-one'],
-      adminGeneratedPasswords: [],
-      includePreviousPasswords: false,
-    })).toMatchObject({
+    expect(
+      resolveSbtPagePasswordExportSelection({
+        cachedPasswords: ['cached-one'],
+        adminGeneratedPasswords: [],
+        includePreviousPasswords: false,
+      }),
+    ).toMatchObject({
       onlyCachedPasswords: true,
       effectiveIncludePreviousPasswords: true,
       passwordsToExport: ['cached-one'],
     });
-    expect(resolveSbtPagePasswordExportSelection({
-      cachedPasswords: ['cached-one'],
-      adminGeneratedPasswords: ['admin-one'],
-      includePreviousPasswords: false,
-    }).passwordsToExport).toEqual(['admin-one']);
-    expect(resolveSbtPagePasswordExportSelection({
-      cachedPasswords: ['cached-one'],
-      adminGeneratedPasswords: ['admin-one'],
-      includePreviousPasswords: true,
-    }).passwordsToExport).toEqual(['cached-one', 'admin-one']);
-    expect(resolveSbtPagePasswordExportSelection({
-      cachedPasswords: 'bad',
-      adminGeneratedPasswords: [2, null, 'admin-two'],
-    }).adminGeneratedPasswordList).toEqual(['2', '', 'admin-two']);
-    expect(resolveSbtPagePasswordExportControlsState({
-      adminGeneratedPasswordList: ['admin-one'],
-      effectiveIncludePreviousPasswords: true,
-      onlyCachedPasswords: false,
-    })).toEqual({
+    expect(
+      resolveSbtPagePasswordExportSelection({
+        cachedPasswords: ['cached-one'],
+        adminGeneratedPasswords: ['admin-one'],
+        includePreviousPasswords: false,
+      }).passwordsToExport,
+    ).toEqual(['admin-one']);
+    expect(
+      resolveSbtPagePasswordExportSelection({
+        cachedPasswords: ['cached-one'],
+        adminGeneratedPasswords: ['admin-one'],
+        includePreviousPasswords: true,
+      }).passwordsToExport,
+    ).toEqual(['cached-one', 'admin-one']);
+    expect(
+      resolveSbtPagePasswordExportSelection({
+        cachedPasswords: 'bad',
+        adminGeneratedPasswords: [2, null, 'admin-two'],
+      }).adminGeneratedPasswordList,
+    ).toEqual(['2', '', 'admin-two']);
+    expect(
+      resolveSbtPagePasswordExportControlsState({
+        adminGeneratedPasswordList: ['admin-one'],
+        effectiveIncludePreviousPasswords: true,
+        onlyCachedPasswords: false,
+      }),
+    ).toEqual({
       effectiveIncludePreviousPasswordsChecked: true,
       renderIncludePreviousCheckbox: true,
       showCachedPasswordsIncludedNote: false,
     });
-    expect(resolveSbtPagePasswordExportControlsState({
-      adminGeneratedPasswordList: [],
-      effectiveIncludePreviousPasswords: true,
-      onlyCachedPasswords: true,
-    })).toEqual({
+    expect(
+      resolveSbtPagePasswordExportControlsState({
+        adminGeneratedPasswordList: [],
+        effectiveIncludePreviousPasswords: true,
+        onlyCachedPasswords: true,
+      }),
+    ).toEqual({
       effectiveIncludePreviousPasswordsChecked: true,
       renderIncludePreviousCheckbox: false,
       showCachedPasswordsIncludedNote: true,
     });
-    expect(resolveSbtPagePasswordExportControlsState({
-      adminGeneratedPasswordList: [],
-      effectiveIncludePreviousPasswords: false,
-      onlyCachedPasswords: false,
-    })).toEqual({
+    expect(
+      resolveSbtPagePasswordExportControlsState({
+        adminGeneratedPasswordList: [],
+        effectiveIncludePreviousPasswords: false,
+        onlyCachedPasswords: false,
+      }),
+    ).toEqual({
       effectiveIncludePreviousPasswordsChecked: false,
       renderIncludePreviousCheckbox: false,
       showCachedPasswordsIncludedNote: false,
     });
-    expect(resolveSbtPagePasswordInventoryDisplayState({
-      combinedPasswords: ['cached-one'],
-      showNoMoreInvites: false,
-      showPasswordGen: true,
-    })).toEqual({
+    expect(
+      resolveSbtPagePasswordInventoryDisplayState({
+        combinedPasswords: ['cached-one'],
+        showNoMoreInvites: false,
+        showPasswordGen: true,
+      }),
+    ).toEqual({
       shouldRenderGeneratedPasswordList: true,
       shouldRenderNoMoreInvitesEmptyState: false,
       shouldRenderPasswordGenerationSection: true,
       shouldRenderPreviousPasswordsSection: false,
     });
-    expect(resolveSbtPagePasswordInventoryDisplayState({
-      combinedPasswords: ['cached-one'],
-      showNoMoreInvites: true,
-      showPasswordGen: false,
-    })).toEqual({
+    expect(
+      resolveSbtPagePasswordInventoryDisplayState({
+        combinedPasswords: ['cached-one'],
+        showNoMoreInvites: true,
+        showPasswordGen: false,
+      }),
+    ).toEqual({
       shouldRenderGeneratedPasswordList: false,
       shouldRenderNoMoreInvitesEmptyState: false,
       shouldRenderPasswordGenerationSection: false,
       shouldRenderPreviousPasswordsSection: true,
     });
-    expect(resolveSbtPagePasswordInventoryDisplayState({
-      combinedPasswords: [],
-      showNoMoreInvites: true,
-      showPasswordGen: false,
-    })).toEqual({
+    expect(
+      resolveSbtPagePasswordInventoryDisplayState({
+        combinedPasswords: [],
+        showNoMoreInvites: true,
+        showPasswordGen: false,
+      }),
+    ).toEqual({
       shouldRenderGeneratedPasswordList: false,
       shouldRenderNoMoreInvitesEmptyState: true,
       shouldRenderPasswordGenerationSection: false,
@@ -256,26 +276,35 @@ describe('sbtPage password and metadata helpers', () => {
   it('builds password export rows and files', () => {
     const encodeGroupPassword = (code: string) => `enc:${code}`;
 
-    expect(encodeSbtPageGroupPasswordForUrl(' One Two ', {
-      normalizeGroupPasswordInput: (raw) => String(raw || '').trim().toLowerCase(),
-      encodeGroupPasswordForUrl: (raw) => `encoded:${raw}`,
-    })).toBe('encoded:one two');
-    expect(buildSbtPagePasswordInviteLink({
-      baseUrl: 'https://app.example',
-      code: 'one two',
-      demoPath: '/s/alpha',
-      encodeGroupPassword,
-      isInvite: true,
-      sbtAddr: '0xabc',
-      sbtBasePathValue: '/sbt',
-    })).toBe('https://app.example/s/alpha?auto=1&sbt=0xabc&gp=enc%3Aone%20two');
-    expect(buildSbtPagePasswordInviteLink({
-      baseUrl: 'https://app.example',
-      code: 'pw1',
-      isInvite: false,
-      sbtAddr: '0xdef',
-      sbtBasePathValue: '/sbt',
-    })).toBe('https://app.example/sbt/0xdef/pw1');
+    expect(
+      encodeSbtPageGroupPasswordForUrl(' One Two ', {
+        normalizeGroupPasswordInput: (raw) =>
+          String(raw || '')
+            .trim()
+            .toLowerCase(),
+        encodeGroupPasswordForUrl: (raw) => `encoded:${raw}`,
+      }),
+    ).toBe('encoded:one two');
+    expect(
+      buildSbtPagePasswordInviteLink({
+        baseUrl: 'https://app.example',
+        code: 'one two',
+        demoPath: '/s/alpha',
+        encodeGroupPassword,
+        isInvite: true,
+        sbtAddr: '0xabc',
+        sbtBasePathValue: '/sbt',
+      }),
+    ).toBe('https://app.example/s/alpha?auto=1&sbt=0xabc&gp=enc%3Aone%20two');
+    expect(
+      buildSbtPagePasswordInviteLink({
+        baseUrl: 'https://app.example',
+        code: 'pw1',
+        isInvite: false,
+        sbtAddr: '0xdef',
+        sbtBasePathValue: '/sbt',
+      }),
+    ).toBe('https://app.example/sbt/0xdef/pw1');
 
     const inviteRows = buildSbtPagePasswordExportRows({
       baseUrl: 'https://app.example',
@@ -288,10 +317,12 @@ describe('sbtPage password and metadata helpers', () => {
       sbtBasePathValue: '/sbt',
     });
 
-    expect(inviteRows).toEqual([{
-      groupPassword: 'one two',
-      inviteLink: 'https://app.example/s/alpha?auto=1&sbt=0xabc&gp=enc%3Aone%20two',
-    }]);
+    expect(inviteRows).toEqual([
+      {
+        groupPassword: 'one two',
+        inviteLink: 'https://app.example/s/alpha?auto=1&sbt=0xabc&gp=enc%3Aone%20two',
+      },
+    ]);
 
     const passwordRows = buildSbtPagePasswordExportRows({
       baseUrl: 'https://app.example',
@@ -301,32 +332,38 @@ describe('sbtPage password and metadata helpers', () => {
       sbtAddr: '0xdef',
       sbtBasePathValue: '/sbt',
     });
-    expect(passwordRows).toEqual([{
-      password: 'pw1',
-      inviteLink: 'https://app.example/sbt/0xdef/pw1',
-    }]);
+    expect(passwordRows).toEqual([
+      {
+        password: 'pw1',
+        inviteLink: 'https://app.example/sbt/0xdef/pw1',
+      },
+    ]);
 
-    expect(buildSbtPagePasswordExportFile({
-      codeLabel: 'password',
-      date: '2026-05-05',
-      fileLabel: 'passwords',
-      format: 'csv',
-      rows: passwordRows,
-      sbtSymbolOrName: 'ALPHA',
-    })).toEqual({
+    expect(
+      buildSbtPagePasswordExportFile({
+        codeLabel: 'password',
+        date: '2026-05-05',
+        fileLabel: 'passwords',
+        format: 'csv',
+        rows: passwordRows,
+        sbtSymbolOrName: 'ALPHA',
+      }),
+    ).toEqual({
       content: 'index,password,inviteLink\n0,pw1,https://app.example/sbt/0xdef/pw1',
       fileName: 'ALPHA_passwords_2026-05-05.csv',
       mimeType: 'text/csv',
     });
 
-    expect(buildSbtPagePasswordExportFile({
-      codeLabel: 'groupPassword',
-      date: '2026-05-05',
-      fileLabel: 'group-passwords',
-      format: 'json',
-      rows: inviteRows,
-      sbtSymbolOrName: 'ALPHA',
-    })).toMatchObject({
+    expect(
+      buildSbtPagePasswordExportFile({
+        codeLabel: 'groupPassword',
+        date: '2026-05-05',
+        fileLabel: 'group-passwords',
+        format: 'json',
+        rows: inviteRows,
+        sbtSymbolOrName: 'ALPHA',
+      }),
+    ).toMatchObject({
       content: JSON.stringify(inviteRows, null, 2),
       fileName: 'ALPHA_group-passwords_2026-05-05.json',
       mimeType: 'application/json',
@@ -349,37 +386,37 @@ describe('sbtPage password and metadata helpers', () => {
       },
     });
 
-    expect(browserPasswords).toEqual([
-      '01010101010101010101010101010101',
-      '02020202020202020202020202020202',
-    ]);
+    expect(browserPasswords).toEqual(['01010101010101010101010101010101', '02020202020202020202020202020202']);
 
     let fallbackCall = 0;
-    expect(generateSbtPageRandomPasswords({
-      count: 2,
-      getRandomValues: null,
-      randomBytes: () => {
-        fallbackCall += 1;
-        return new Uint8Array(16).fill(fallbackCall === 1 ? 3 : 4);
-      },
-    })).toEqual([
-      '03030303030303030303030303030303',
-      '04040404040404040404040404040404',
-    ]);
+    expect(
+      generateSbtPageRandomPasswords({
+        count: 2,
+        getRandomValues: null,
+        randomBytes: () => {
+          fallbackCall += 1;
+          return new Uint8Array(16).fill(fallbackCall === 1 ? 3 : 4);
+        },
+      }),
+    ).toEqual(['03030303030303030303030303030303', '04040404040404040404040404040404']);
 
-    expect(generateSbtPageRandomPasswords({
-      count: 'bad',
-      randomBytes: () => new Uint8Array(16),
-    })).toEqual([]);
+    expect(
+      generateSbtPageRandomPasswords({
+        count: 'bad',
+        randomBytes: () => new Uint8Array(16),
+      }),
+    ).toEqual([]);
   });
 
   it('decodes JSON data URIs and detects image-like URIs', () => {
-    expect(decodeSbtPageJsonDataUri(
-      `data:application/json,${encodeURIComponent(JSON.stringify({ name: 'Badge' }))}`
-    )).toEqual({ name: 'Badge' });
-    expect(decodeSbtPageJsonDataUri(
-      `data:application/json;base64,${Buffer.from(JSON.stringify({ name: 'Encoded' })).toString('base64')}`
-    )).toEqual({ name: 'Encoded' });
+    expect(
+      decodeSbtPageJsonDataUri(`data:application/json,${encodeURIComponent(JSON.stringify({ name: 'Badge' }))}`),
+    ).toEqual({ name: 'Badge' });
+    expect(
+      decodeSbtPageJsonDataUri(
+        `data:application/json;base64,${Buffer.from(JSON.stringify({ name: 'Encoded' })).toString('base64')}`,
+      ),
+    ).toEqual({ name: 'Encoded' });
     expect(decodeSbtPageJsonDataUri('data:application/json,not-json')).toBeNull();
     expect(decodeSbtPageJsonDataUri('https://example.test/metadata.json')).toBeNull();
 
@@ -399,7 +436,7 @@ describe('sbtPage password and metadata helpers', () => {
     expect(normalizeSbtPageCanonicalMetadataHref('data:application/json,%7B%7D')).toBe('');
     expect(normalizeSbtPageCanonicalMetadataHref('https://cdn.example.test/preview.png')).toBe('');
     expect(normalizeSbtPageCanonicalMetadataHref('https://example.test/metadata.json')).toBe(
-      'https://example.test/metadata.json'
+      'https://example.test/metadata.json',
     );
   });
 
@@ -408,11 +445,14 @@ describe('sbtPage password and metadata helpers', () => {
     const sessionTxId = 'ue3Ek_Mh1ypNvvCaGlfrntt_8HxJ9CDiwDlG06uoTpY';
     arweaveGlobals.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     arweaveGlobals.CE_ARWEAVE_AR_IO_URL = 'https://ar-io.dev';
-    const dataUriPayload = Buffer.from(JSON.stringify({
-      tokenURI: `ar://${sbtTxId}`,
-      metadataUri: `ar://${sessionTxId}`,
-      uri: 'https://cdn.example.test/banner.webp',
-    }), 'utf8').toString('base64');
+    const dataUriPayload = Buffer.from(
+      JSON.stringify({
+        tokenURI: `ar://${sbtTxId}`,
+        metadataUri: `ar://${sessionTxId}`,
+        uri: 'https://cdn.example.test/banner.webp',
+      }),
+      'utf8',
+    ).toString('base64');
 
     const href = resolveSbtPageTokenMetadataHref(`data:application/json;base64,${dataUriPayload}`);
 
@@ -422,20 +462,29 @@ describe('sbtPage password and metadata helpers', () => {
 
   it('uses later embedded metadata fields when earlier token fields are image-like', () => {
     const txId = '4kpvO6qf-tN4l0R9vQh-Sz6ekU2xq9j5qM4R1X3vZkA';
-    const dataUriPayload = Buffer.from(JSON.stringify({
-      tokenURI: 'https://cdn.example.test/also-image.jpg',
-      uri: 'https://cdn.example.test/banner.webp',
-      metadataUri: `ar://${txId}`,
-    }), 'utf8').toString('base64');
+    const dataUriPayload = Buffer.from(
+      JSON.stringify({
+        tokenURI: 'https://cdn.example.test/also-image.jpg',
+        uri: 'https://cdn.example.test/banner.webp',
+        metadataUri: `ar://${txId}`,
+      }),
+      'utf8',
+    ).toString('base64');
 
     const href = resolveSbtPageTokenMetadataHref(`data:application/json;base64,${dataUriPayload}`);
 
     expect(href).toContain(txId);
     expect(href).not.toContain('also-image.jpg');
-    expect(resolveSbtPageTokenMetadataHref(`data:application/json,${encodeURIComponent(JSON.stringify({
-      tokenURI: 'https://cdn.example.test/also-image.jpg',
-      uri: 'https://cdn.example.test/banner.webp',
-    }))}`)).toBe('');
+    expect(
+      resolveSbtPageTokenMetadataHref(
+        `data:application/json,${encodeURIComponent(
+          JSON.stringify({
+            tokenURI: 'https://cdn.example.test/also-image.jpg',
+            uri: 'https://cdn.example.test/banner.webp',
+          }),
+        )}`,
+      ),
+    ).toBe('');
   });
 
   it('builds display image candidates and falls back to the default image', () => {
@@ -472,18 +521,24 @@ describe('sbtPage password and metadata helpers', () => {
       needMax: false,
       shouldRead: false,
     });
-    expect(resolveSbtPageChainMetadataReadNeeds({
-      info: { ...completeInfo, burnAuthNeedsOnChainRefresh: true },
-      zeroAddress,
-    }).needBurn).toBe(true);
-    expect(resolveSbtPageChainMetadataReadNeeds({
-      info: { ...completeInfo, admin: zeroAddress },
-      zeroAddress,
-    }).needAdmin).toBe(true);
-    expect(resolveSbtPageChainMetadataReadNeeds({
-      info: { ...completeInfo, maxTokens: null, mintingEndTime: undefined, hasPasswordMint: undefined },
-      zeroAddress,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageChainMetadataReadNeeds({
+        info: { ...completeInfo, burnAuthNeedsOnChainRefresh: true },
+        zeroAddress,
+      }).needBurn,
+    ).toBe(true);
+    expect(
+      resolveSbtPageChainMetadataReadNeeds({
+        info: { ...completeInfo, admin: zeroAddress },
+        zeroAddress,
+      }).needAdmin,
+    ).toBe(true);
+    expect(
+      resolveSbtPageChainMetadataReadNeeds({
+        info: { ...completeInfo, maxTokens: null, mintingEndTime: undefined, hasPasswordMint: undefined },
+        zeroAddress,
+      }),
+    ).toMatchObject({
       needEnd: true,
       needHasPw: true,
       needMax: true,
@@ -502,10 +557,7 @@ describe('sbtPage password and metadata helpers', () => {
     expect(firstState.activeIndex).toBe(0);
     expect(firstState.src).toBe(`https://arweave.net/${txId}`);
     expect(firstState.canRetry).toBe(true);
-    expect(firstState.candidates).toEqual([
-      `https://arweave.net/${txId}`,
-      `https://gateway.irys.xyz/${txId}`,
-    ]);
+    expect(firstState.candidates).toEqual([`https://arweave.net/${txId}`, `https://gateway.irys.xyz/${txId}`]);
 
     const fallbackState = getDisplayImageRenderState(
       { image },
@@ -513,7 +565,7 @@ describe('sbtPage password and metadata helpers', () => {
         displayImageFallbackKey: image,
         displayImageFallbackIndex: 1,
       },
-      '/default.png'
+      '/default.png',
     );
     expect(fallbackState.activeIndex).toBe(1);
     expect(fallbackState.src).toBe(`https://gateway.irys.xyz/${txId}`);
@@ -524,7 +576,7 @@ describe('sbtPage password and metadata helpers', () => {
         displayImageFallbackKey: image,
         displayImageFallbackIndex: 2,
       },
-      '/default.png'
+      '/default.png',
     );
     expect(defaultFallbackState.activeIndex).toBe(2);
     expect(defaultFallbackState.src).toBe('/default.png');
@@ -536,7 +588,7 @@ describe('sbtPage password and metadata helpers', () => {
         displayImageFallbackKey: 'https://example.test/old.png',
         displayImageFallbackIndex: 1,
       },
-      '/default.png'
+      '/default.png',
     );
     expect(staleFallbackState.activeIndex).toBe(0);
     expect(staleFallbackState.src).toBe(`https://arweave.net/${txId}`);
@@ -545,41 +597,36 @@ describe('sbtPage password and metadata helpers', () => {
   it('builds the next display image fallback state only from the active failed candidate', () => {
     expect(getDisplayImageFallbackCandidateCount(['a', 'b'])).toBe(2);
     expect(getDisplayImageFallbackCandidateCount('bad')).toBe(0);
-    expect(getNextDisplayImageFallbackState(
-      { sourceKey: 'image-a', activeIndex: 0, maxIndex: 2 },
-      {}
-    )).toEqual({
+    expect(getNextDisplayImageFallbackState({ sourceKey: 'image-a', activeIndex: 0, maxIndex: 2 }, {})).toEqual({
       displayImageFallbackKey: 'image-a',
       displayImageFallbackIndex: 1,
     });
-    expect(getNextDisplayImageFallbackState(
-      { sourceKey: 'image-a', activeIndex: 1, maxIndex: 2 },
-      { displayImageFallbackKey: 'image-a', displayImageFallbackIndex: 1 }
-    )).toEqual({
+    expect(
+      getNextDisplayImageFallbackState(
+        { sourceKey: 'image-a', activeIndex: 1, maxIndex: 2 },
+        { displayImageFallbackKey: 'image-a', displayImageFallbackIndex: 1 },
+      ),
+    ).toEqual({
       displayImageFallbackKey: 'image-a',
       displayImageFallbackIndex: 2,
     });
-    expect(getNextDisplayImageFallbackState(
-      { sourceKey: 'image-a', activeIndex: 1, maxIndex: 2 },
-      { displayImageFallbackKey: 'image-a', displayImageFallbackIndex: 0 }
-    )).toBeNull();
+    expect(
+      getNextDisplayImageFallbackState(
+        { sourceKey: 'image-a', activeIndex: 1, maxIndex: 2 },
+        { displayImageFallbackKey: 'image-a', displayImageFallbackIndex: 0 },
+      ),
+    ).toBeNull();
   });
 
   it('builds holder occurrence maps, net counts, holder lists, and signatures', () => {
-    expect(Array.from(buildSbtPageAddressOccurrenceMap(['0xA', '0xa', '', null]).entries())).toEqual([
-      ['0xa', 2],
-    ]);
+    expect(Array.from(buildSbtPageAddressOccurrenceMap(['0xA', '0xa', '', null]).entries())).toEqual([['0xa', 2]]);
     expect(Array.from(computeSbtPageNetCounts(['0xA', '0xB'], ['0xa']).entries())).toEqual([
       ['0xa', 0],
       ['0xb', 1],
     ]);
     expect(computeSbtPageNetHoldersList(['0xA', '0xB', '0xA'], ['0xa'])).toEqual(['0xa', '0xb']);
-    expect(buildSbtPageHolderListSignature(['0xA', '0xB'])).toBe(
-      buildSbtPageHolderListSignature(['0xa', '0xb'])
-    );
-    expect(buildSbtPageHolderListSignature(['0xA', '0xB'])).not.toBe(
-      buildSbtPageHolderListSignature(['0xB', '0xA'])
-    );
+    expect(buildSbtPageHolderListSignature(['0xA', '0xB'])).toBe(buildSbtPageHolderListSignature(['0xa', '0xb']));
+    expect(buildSbtPageHolderListSignature(['0xA', '0xB'])).not.toBe(buildSbtPageHolderListSignature(['0xB', '0xA']));
     const list = ['0xA', '0xB'];
     const firstMemoState = buildSbtPageAddressListSignatureMemoState({ list });
     expect(firstMemoState.signature).toBe(buildSbtPageHolderListSignature(list));
@@ -591,10 +638,12 @@ describe('sbtPage password and metadata helpers', () => {
     });
     expect(reusedMemoState).toEqual(firstMemoState);
     expect(buildSignature).not.toHaveBeenCalled();
-    expect(buildSbtPageAddressListSignatureMemoState({
-      buildAddressListSignature: () => '',
-      list: ['0xC'],
-    }).signature).toBe('1:0');
+    expect(
+      buildSbtPageAddressListSignatureMemoState({
+        buildAddressListSignature: () => '',
+        list: ['0xC'],
+      }).signature,
+    ).toBe('1:0');
     const minted = ['0xA', '0xB', '0xA'];
     const burned = ['0xa'];
     const firstNetState = buildSbtPageNetHoldersMemoState({
@@ -619,34 +668,40 @@ describe('sbtPage password and metadata helpers', () => {
     });
     expect(sameSignatureNetState.netHolders).toEqual(firstNetState.netHolders);
     expect(computeNetHolders).not.toHaveBeenCalled();
-    expect(buildSbtPageModalFilteredMintedUsersPatch({
-      filtered: [],
-      isHolderScanActive: true,
-      state: {
-        filteredMintedUsers: ['0xA'],
-        loadingMintedFilter: true,
-      },
-    })).toEqual({ loadingMintedFilter: false });
-    expect(buildSbtPageModalFilteredMintedUsersPatch({
-      buildAddressListSignature: () => 'next',
-      filtered: ['0xB'],
-      state: {
-        filteredMintedUsersSignature: 'prev',
-        loadingMintedFilter: true,
-      },
-    })).toEqual({
+    expect(
+      buildSbtPageModalFilteredMintedUsersPatch({
+        filtered: [],
+        isHolderScanActive: true,
+        state: {
+          filteredMintedUsers: ['0xA'],
+          loadingMintedFilter: true,
+        },
+      }),
+    ).toEqual({ loadingMintedFilter: false });
+    expect(
+      buildSbtPageModalFilteredMintedUsersPatch({
+        buildAddressListSignature: () => 'next',
+        filtered: ['0xB'],
+        state: {
+          filteredMintedUsersSignature: 'prev',
+          loadingMintedFilter: true,
+        },
+      }),
+    ).toEqual({
       filteredMintedUsers: ['0xB'],
       filteredMintedUsersSignature: 'next',
       loadingMintedFilter: false,
     });
-    expect(buildSbtPageModalFilteredMintedUsersPatch({
-      buildAddressListSignature: () => 'same',
-      filtered: ['0xC'],
-      state: {
-        filteredMintedUsersSignature: 'same',
-        loadingMintedFilter: false,
-      },
-    })).toBeNull();
+    expect(
+      buildSbtPageModalFilteredMintedUsersPatch({
+        buildAddressListSignature: () => 'same',
+        filtered: ['0xC'],
+        state: {
+          filteredMintedUsersSignature: 'same',
+          loadingMintedFilter: false,
+        },
+      }),
+    ).toBeNull();
   });
 
   it('normalizes minted-token overrides and count-map address expansion', () => {
@@ -669,9 +724,7 @@ describe('sbtPage password and metadata helpers', () => {
     expect(normalizeSbtInviteCode('invite:def')).toBe('def');
     expect(normalizeSbtInviteCode(' raw ')).toBe('raw');
     expect(normalizeSbtInviteCode('')).toBe('');
-    const decodeInvite = jest.fn((code: string) => (
-      code === 'abc' ? { nonce: 'nonce-1', signature: 'sig-1' } : null
-    ));
+    const decodeInvite = jest.fn((code: string) => (code === 'abc' ? { nonce: 'nonce-1', signature: 'sig-1' } : null));
     expect(decodeSbtPageInviteInput(' inv:abc ', decodeInvite)).toEqual({
       inviteCode: 'abc',
       nonce: 'nonce-1',
@@ -695,12 +748,12 @@ describe('sbtPage password and metadata helpers', () => {
     expect(hasSbtPageAutoMintFlag('?sbt=0xA&auto=1')).toBe(true);
     expect(hasSbtPageAutoMintFlag('sbt1=0xA&auto1=1')).toBe(true);
     expect(hasSbtPageAutoMintFlag('sbt=0xA&auto=0')).toBe(false);
-    expect(buildSbtPageAutoMintCleanPath(
-      'https://example.test/sbt/0xA?auto=1&sbt=0xA&gp=secret&keep=yes#section'
-    )).toBe('/sbt/0xA?keep=yes');
-    expect(buildSbtPageAutoMintCleanPath(
-      'https://example.test/sbt/0xA?auto1=1&sbt1=0xA&gp1=secret&keep=yes'
-    )).toBe('/sbt/0xA?keep=yes');
+    expect(
+      buildSbtPageAutoMintCleanPath('https://example.test/sbt/0xA?auto=1&sbt=0xA&gp=secret&keep=yes#section'),
+    ).toBe('/sbt/0xA?keep=yes');
+    expect(buildSbtPageAutoMintCleanPath('https://example.test/sbt/0xA?auto1=1&sbt1=0xA&gp1=secret&keep=yes')).toBe(
+      '/sbt/0xA?keep=yes',
+    );
     expect(buildSbtPageAutoMintCleanPath('https://example.test/sbt/0xA?keep=yes')).toBeNull();
   });
 
@@ -711,11 +764,13 @@ describe('sbtPage password and metadata helpers', () => {
     };
     const state = { userHasSBT: false, mintingStatus: 'idle' };
 
-    expect(resolveSbtPageUrlAutoMintIntent({
-      propsIn,
-      searchRaw: '?sbt=0x00000000000000000000000000000000000000aa&gp=secret&auto=1',
-      state,
-    })).toEqual({
+    expect(
+      resolveSbtPageUrlAutoMintIntent({
+        propsIn,
+        searchRaw: '?sbt=0x00000000000000000000000000000000000000aa&gp=secret&auto=1',
+        state,
+      }),
+    ).toEqual({
       currentSbtAddress: propsIn.SBTAddress,
       targetInvite: null,
       targetPassword: 'secret',
@@ -723,115 +778,135 @@ describe('sbtPage password and metadata helpers', () => {
       shouldAttemptAuto: true,
       autoKey: 'autoMint:unknown-chain:general:0x00000000000000000000000000000000000000aa:success',
     });
-    expect(resolveSbtPageUrlAutoMintIntent({
-      propsIn,
-      searchRaw: '?inv=invite-code&auto=1',
-      state,
-    })?.targetInvite).toBe('invite-code');
-    expect(resolveSbtPageUrlAutoMintIntent({
-      propsIn,
-      searchRaw: '?sbt=0x00000000000000000000000000000000000000bb&gp=secret&auto=1',
-      state,
-    })?.shouldAttemptAuto).toBe(false);
-    expect(resolveSbtPageUrlAutoMintIntent({
-      propsIn,
-      searchRaw: '?sbt=0x00000000000000000000000000000000000000aa&gp=secret&auto=1',
-      sessionStorageRef: { getItem: () => 'done' },
-      state,
-    })?.shouldAttemptAuto).toBe(false);
-    expect(resolveSbtPageUrlAutoMintIntent({
-      propsIn: { ...propsIn, loginComplete: false },
-      searchRaw: '?sbt=0x00000000000000000000000000000000000000aa&gp=secret&auto=1',
-      state,
-    })?.shouldAttemptAuto).toBe(false);
-    expect(resolveSbtPageUrlAutoMintIntent({
-      propsIn: {},
-      searchRaw: '?auto=1',
-      state,
-    })).toBeNull();
+    expect(
+      resolveSbtPageUrlAutoMintIntent({
+        propsIn,
+        searchRaw: '?inv=invite-code&auto=1',
+        state,
+      })?.targetInvite,
+    ).toBe('invite-code');
+    expect(
+      resolveSbtPageUrlAutoMintIntent({
+        propsIn,
+        searchRaw: '?sbt=0x00000000000000000000000000000000000000bb&gp=secret&auto=1',
+        state,
+      })?.shouldAttemptAuto,
+    ).toBe(false);
+    expect(
+      resolveSbtPageUrlAutoMintIntent({
+        propsIn,
+        searchRaw: '?sbt=0x00000000000000000000000000000000000000aa&gp=secret&auto=1',
+        sessionStorageRef: { getItem: () => 'done' },
+        state,
+      })?.shouldAttemptAuto,
+    ).toBe(false);
+    expect(
+      resolveSbtPageUrlAutoMintIntent({
+        propsIn: { ...propsIn, loginComplete: false },
+        searchRaw: '?sbt=0x00000000000000000000000000000000000000aa&gp=secret&auto=1',
+        state,
+      })?.shouldAttemptAuto,
+    ).toBe(false);
+    expect(
+      resolveSbtPageUrlAutoMintIntent({
+        propsIn: {},
+        searchRaw: '?auto=1',
+        state,
+      }),
+    ).toBeNull();
   });
 
   it('resolves prop-driven auto-mint gates', () => {
-    expect(shouldRunSbtPagePropPasswordAutoMint({
-      autoMintingMode: true,
-      mintingStatus: 'idle',
-      sbtInfo: { address: '0xSBT' },
-      sbtMintPassword: 'secret',
-      userHasSBT: false,
-    })).toBe(true);
-    expect(shouldRunSbtPagePropPasswordAutoMint({
-      autoMintingMode: true,
-      mintingStatus: 'pending',
-      sbtInfo: { address: '0xSBT' },
-      sbtMintPassword: 'secret',
-      userHasSBT: false,
-    })).toBe(false);
-    expect(shouldRunSbtPagePropPasswordAutoMint({
-      autoMintingMode: true,
-      mintingStatus: 'idle',
-      sbtInfo: { address: '0xSBT' },
-      sbtMintPassword: ['secret'],
-      userHasSBT: false,
-    })).toBe(false);
-    expect(shouldRunSbtPagePropPasswordAutoMint({
-      autoMintingMode: true,
-      mintingStatus: 'idle',
-      sbtInfo: null,
-      sbtMintPassword: 'secret',
-      userHasSBT: false,
-    })).toBe(false);
-    expect(shouldRunSbtPagePropListAutoMint({
-      autoMintingMode: true,
-      hasAttemptedListMint: false,
-      loginComplete: true,
-      sbtMintPassword: ['one', 'two'],
-    })).toBe(true);
-    expect(shouldRunSbtPagePropListAutoMint({
-      autoMintingMode: true,
-      hasAttemptedListMint: true,
-      loginComplete: true,
-      sbtMintPassword: ['one', 'two'],
-    })).toBe(false);
-    expect(shouldRunSbtPagePropListAutoMint({
-      autoMintingMode: true,
-      hasAttemptedListMint: false,
-      loginComplete: true,
-      sbtMintPassword: 'one',
-    })).toBe(false);
+    expect(
+      shouldRunSbtPagePropPasswordAutoMint({
+        autoMintingMode: true,
+        mintingStatus: 'idle',
+        sbtInfo: { address: '0xSBT' },
+        sbtMintPassword: 'secret',
+        userHasSBT: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRunSbtPagePropPasswordAutoMint({
+        autoMintingMode: true,
+        mintingStatus: 'pending',
+        sbtInfo: { address: '0xSBT' },
+        sbtMintPassword: 'secret',
+        userHasSBT: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRunSbtPagePropPasswordAutoMint({
+        autoMintingMode: true,
+        mintingStatus: 'idle',
+        sbtInfo: { address: '0xSBT' },
+        sbtMintPassword: ['secret'],
+        userHasSBT: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRunSbtPagePropPasswordAutoMint({
+        autoMintingMode: true,
+        mintingStatus: 'idle',
+        sbtInfo: null,
+        sbtMintPassword: 'secret',
+        userHasSBT: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRunSbtPagePropListAutoMint({
+        autoMintingMode: true,
+        hasAttemptedListMint: false,
+        loginComplete: true,
+        sbtMintPassword: ['one', 'two'],
+      }),
+    ).toBe(true);
+    expect(
+      shouldRunSbtPagePropListAutoMint({
+        autoMintingMode: true,
+        hasAttemptedListMint: true,
+        loginComplete: true,
+        sbtMintPassword: ['one', 'two'],
+      }),
+    ).toBe(false);
+    expect(
+      shouldRunSbtPagePropListAutoMint({
+        autoMintingMode: true,
+        hasAttemptedListMint: false,
+        loginComplete: true,
+        sbtMintPassword: 'one',
+      }),
+    ).toBe(false);
   });
 
   it('builds next filtered holder rows while preserving narrowed filters', () => {
-    expect(buildSbtPageNextFilteredHolderRows({
-      prevFilteredRows: ['0xA', '0xB'],
-      prevNetHolders: ['0xA', '0xB'],
-      nextNetHolders: ['0xC'],
-      replaceRows: true,
-    })).toEqual(['0xc']);
-    expect(buildSbtPageNextFilteredHolderRows({
-      prevFilteredRows: ['0xA'],
-      prevNetHolders: ['0xA', '0xB'],
-      nextNetHolders: ['0xA', '0xC'],
-      replaceRows: true,
-    })).toEqual(['0xa']);
+    expect(
+      buildSbtPageNextFilteredHolderRows({
+        prevFilteredRows: ['0xA', '0xB'],
+        prevNetHolders: ['0xA', '0xB'],
+        nextNetHolders: ['0xC'],
+        replaceRows: true,
+      }),
+    ).toEqual(['0xc']);
+    expect(
+      buildSbtPageNextFilteredHolderRows({
+        prevFilteredRows: ['0xA'],
+        prevNetHolders: ['0xA', '0xB'],
+        nextNetHolders: ['0xA', '0xC'],
+        replaceRows: true,
+      }),
+    ).toEqual(['0xa']);
   });
 
   it('merges new burn evidence into preserved holder state', () => {
-    expect(mergeSbtPageBurnEvidenceIntoPreservedHolderState(
-      ['0xA', '0xA', '0xB'],
-      ['0xB'],
-      ['0xA', '0xB'],
-      ['0xA', '0xB']
-    )).toEqual({
+    expect(
+      mergeSbtPageBurnEvidenceIntoPreservedHolderState(['0xA', '0xA', '0xB'], ['0xB'], ['0xA', '0xB'], ['0xA', '0xB']),
+    ).toEqual({
       mintedAddresses: ['0xa', '0xa', '0xb'],
       burnedAddresses: ['0xb', '0xa'],
       burnDiscovered: true,
     });
-    expect(mergeSbtPageBurnEvidenceIntoPreservedHolderState(
-      ['0xA'],
-      [],
-      ['0xA'],
-      []
-    ).burnDiscovered).toBe(false);
+    expect(mergeSbtPageBurnEvidenceIntoPreservedHolderState(['0xA'], [], ['0xA'], []).burnDiscovered).toBe(false);
   });
 
   it('normalizes load-SBT-info options from booleans and option records', () => {
@@ -851,4 +926,5 @@ describe('sbtPage password and metadata helpers', () => {
       forceEventFetch: false,
       preferCountsOnly: false,
     });
-  });});
+  });
+});

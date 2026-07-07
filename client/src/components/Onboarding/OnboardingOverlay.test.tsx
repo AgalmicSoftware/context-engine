@@ -44,7 +44,7 @@ describe('OnboardingOverlay', () => {
     render(
       <Provider store={store}>
         <OnboardingOverlay />
-      </Provider>
+      </Provider>,
     );
 
     const greetingImage = screen.getByAltText('Context Engine welcome slide');
@@ -79,7 +79,7 @@ describe('OnboardingOverlay', () => {
     render(
       <Provider store={store}>
         <OnboardingOverlay />
-      </Provider>
+      </Provider>,
     );
 
     expect(screen.getByTestId('ce-onboarding-step-2')).toBeInTheDocument();
@@ -127,7 +127,7 @@ describe('OnboardingOverlay', () => {
     render(
       <Provider store={store}>
         <OnboardingOverlay />
-      </Provider>
+      </Provider>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
@@ -143,7 +143,7 @@ describe('OnboardingOverlay', () => {
     render(
       <Provider store={store}>
         <OnboardingOverlay />
-      </Provider>
+      </Provider>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Complete onboarding' }));

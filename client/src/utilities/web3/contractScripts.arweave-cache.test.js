@@ -91,7 +91,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
       __test__contractScriptsArweaveCache.downloadArweaveTextForGroup({
         txId: 'tx_cooldown',
         groupKeyOrCfg: groupCtx,
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveTxFailureError',
       kind: 'cooldown',
@@ -120,7 +120,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
       __test__contractScriptsArweaveCache.downloadArweaveTextForGroup({
         txId: 'tx_terminal',
         groupKeyOrCfg: groupCtx,
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveTxFailureError',
       state: 'terminal_not_found',
@@ -154,16 +154,15 @@ describe('contractScripts arweave tx cache + failure cache', () => {
 
     // Simulate another tab clearing the persistent failure entry while this tab keeps memo state.
     await updateCacheAtomic('questionsCache', TEST_SLUG, (current) => {
-      const cache = (current && typeof current === 'object') ? current : {};
+      const cache = current && typeof current === 'object' ? current : {};
       const netKey = String(groupCtx.networkChainId);
-      const net = (cache[netKey] && typeof cache[netKey] === 'object') ? cache[netKey] : {};
-      const failureCache = (
-        net.arweaveTxFailureCache && typeof net.arweaveTxFailureCache === 'object'
-      )
-        ? net.arweaveTxFailureCache
-        : {};
+      const net = cache[netKey] && typeof cache[netKey] === 'object' ? cache[netKey] : {};
+      const failureCache =
+        net.arweaveTxFailureCache && typeof net.arweaveTxFailureCache === 'object' ? net.arweaveTxFailureCache : {};
       if (Object.prototype.hasOwnProperty.call(failureCache, txId)) {
-        try { delete failureCache[txId]; } catch (_) {}
+        try {
+          delete failureCache[txId];
+        } catch (_) {}
       }
       net.arweaveTxFailureCache = failureCache;
       cache[netKey] = net;
@@ -249,7 +248,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
 
   it('coalesces concurrent tx downloads to a single network fetch', async () => {
     arweaveScripts.downloadDataFromArweave.mockImplementation(
-      async () => new Promise((resolve) => setTimeout(() => resolve('{"ok":true}'), 20))
+      async () => new Promise((resolve) => setTimeout(() => resolve('{"ok":true}'), 20)),
     );
 
     const [a, b] = await Promise.all([
@@ -270,7 +269,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
 
   it('coalesces concurrent tx downloads across slugs on the same chain', async () => {
     arweaveScripts.downloadDataFromArweave.mockImplementation(
-      async () => new Promise((resolve) => setTimeout(() => resolve('{"ok":true}'), 20))
+      async () => new Promise((resolve) => setTimeout(() => resolve('{"ok":true}'), 20)),
     );
 
     const [a, b] = await Promise.all([
@@ -305,8 +304,8 @@ describe('contractScripts arweave tx cache + failure cache', () => {
       contractScripts.getQuestionHash(
         'none',
         '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        missingAddressGroup
-      )
+        missingAddressGroup,
+      ),
     ).resolves.toBeNull();
   });
 
@@ -318,8 +317,8 @@ describe('contractScripts arweave tx cache + failure cache', () => {
           'none',
           '0x1111111111111111111111111111111111111111111111111111111111111111',
           groupCtx,
-          { throwOnFailure: true }
-        )
+          { throwOnFailure: true },
+        ),
       ).rejects.toMatchObject({
         name: 'MetadataUnavailableError',
         arweaveFailure: expect.objectContaining({
@@ -367,18 +366,20 @@ describe('contractScripts arweave tx cache + failure cache', () => {
   it('passes strict hash lookup mode so transient hash errors propagate', async () => {
     const transientHashError = new Error('temporary hash RPC failure');
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const spy = jest.spyOn(contractScripts, 'getQuestionHash').mockImplementation(async (_provider, _qid, _group, hashOpts = {}) => {
-      if (hashOpts?.throwOnError) throw transientHashError;
-      return null;
-    });
+    const spy = jest
+      .spyOn(contractScripts, 'getQuestionHash')
+      .mockImplementation(async (_provider, _qid, _group, hashOpts = {}) => {
+        if (hashOpts?.throwOnError) throw transientHashError;
+        return null;
+      });
     try {
       const qid = '0x3333333333333333333333333333333333333333333333333333333333333333';
       await expect(
-        contractScripts.getQuestionData('none', qid, groupCtx, { throwOnFailure: false })
+        contractScripts.getQuestionData('none', qid, groupCtx, { throwOnFailure: false }),
       ).resolves.toBeNull();
-      await expect(
-        contractScripts.getQuestionData('none', qid, groupCtx, { throwOnFailure: true })
-      ).rejects.toBe(transientHashError);
+      await expect(contractScripts.getQuestionData('none', qid, groupCtx, { throwOnFailure: true })).rejects.toBe(
+        transientHashError,
+      );
       expect(spy).toHaveBeenCalledWith('none', qid, groupCtx, expect.objectContaining({ throwOnError: false }));
       expect(spy).toHaveBeenCalledWith('none', qid, groupCtx, expect.objectContaining({ throwOnError: true }));
     } finally {
@@ -412,11 +413,13 @@ describe('contractScripts arweave tx cache + failure cache', () => {
         contractScripts.getSurveyDataById('none', surveyId, groupCtx, {
           throwOnFailure: true,
           forceArweaveFetch: true,
-        })
-      ).resolves.toEqual(expect.objectContaining({
-        title: 'Recovered survey',
-        questionIDs: ['q1'],
-      }));
+        }),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          title: 'Recovered survey',
+          questionIDs: ['q1'],
+        }),
+      );
 
       expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(
         surveyTxId,
@@ -424,7 +427,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
           forceRetry: true,
           cacheBypass: true,
           bypassFailureCache: true,
-        })
+        }),
       );
     } finally {
       hashSpy.mockRestore();
@@ -436,14 +439,17 @@ describe('contractScripts arweave tx cache + failure cache', () => {
     const surveyTxId = 'force_inflight_survey_tx';
     const hashSpy = jest.spyOn(contractScripts, 'getSurveyHash').mockResolvedValue(surveyTxId);
     arweaveScripts.downloadDataFromArweave.mockImplementation(
-      (_txId, opts = {}) => new Promise((resolve) => {
-        setTimeout(() => {
-          resolve(JSON.stringify({
-            title: opts?.forceRetry ? 'Forced survey' : 'Normal survey',
-            questionIDs: [],
-          }));
-        }, 20);
-      })
+      (_txId, opts = {}) =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            resolve(
+              JSON.stringify({
+                title: opts?.forceRetry ? 'Forced survey' : 'Normal survey',
+                questionIDs: [],
+              }),
+            );
+          }, 20);
+        }),
     );
 
     try {
@@ -457,14 +463,18 @@ describe('contractScripts arweave tx cache + failure cache', () => {
         }),
       ]);
 
-      expect(normalRead).toEqual(expect.objectContaining({
-        title: 'Normal survey',
-        questionIDs: [],
-      }));
-      expect(forcedRead).toEqual(expect.objectContaining({
-        title: 'Forced survey',
-        questionIDs: [],
-      }));
+      expect(normalRead).toEqual(
+        expect.objectContaining({
+          title: 'Normal survey',
+          questionIDs: [],
+        }),
+      );
+      expect(forcedRead).toEqual(
+        expect.objectContaining({
+          title: 'Forced survey',
+          questionIDs: [],
+        }),
+      );
       expect(hashSpy).toHaveBeenCalledTimes(2);
       expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledTimes(2);
       expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(
@@ -473,7 +483,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
           forceRetry: false,
           cacheBypass: false,
           bypassFailureCache: false,
-        })
+        }),
       );
       expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(
         surveyTxId,
@@ -481,7 +491,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
           forceRetry: true,
           cacheBypass: true,
           bypassFailureCache: true,
-        })
+        }),
       );
     } finally {
       hashSpy.mockRestore();

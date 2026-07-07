@@ -4,12 +4,7 @@ type SurveyQuestionsSurveyAnswersViewProps = {
   isOwnResponse?: unknown;
   onWarning?: (...args: unknown[]) => void;
   questionPool?: any[];
-  renderQuestionAnswer: (
-    question: any,
-    response: any,
-    index: number,
-    isOwnResponse: unknown
-  ) => React.ReactNode;
+  renderQuestionAnswer: (question: any, response: any, index: number, isOwnResponse: unknown) => React.ReactNode;
   responses?: any[];
 };
 

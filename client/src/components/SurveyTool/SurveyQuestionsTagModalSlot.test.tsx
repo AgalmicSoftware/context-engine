@@ -3,27 +3,31 @@ import { render, screen } from '@testing-library/react';
 
 import SurveyQuestionsTagModalSlot from './SurveyQuestionsTagModalSlot';
 
-jest.mock('../TagPage/TagModal', () => function MockTagModal({
-  activeTag,
-  isOpen,
-  toggle,
-}: {
-  activeTag?: string | null;
-  isOpen?: boolean;
-  toggle?: () => void;
-}) {
-  return (
-    <button
-      data-testid="tag-modal"
-      data-active-tag={activeTag || ''}
-      data-open={isOpen ? 'true' : 'false'}
-      onClick={toggle}
-      type="button"
-    >
-      Tag modal
-    </button>
-  );
-});
+jest.mock(
+  '../TagPage/TagModal',
+  () =>
+    function MockTagModal({
+      activeTag,
+      isOpen,
+      toggle,
+    }: {
+      activeTag?: string | null;
+      isOpen?: boolean;
+      toggle?: () => void;
+    }) {
+      return (
+        <button
+          data-testid="tag-modal"
+          data-active-tag={activeTag || ''}
+          data-open={isOpen ? 'true' : 'false'}
+          onClick={toggle}
+          type="button"
+        >
+          Tag modal
+        </button>
+      );
+    },
+);
 
 describe('SurveyQuestionsTagModalSlot', () => {
   it('renders the tag modal when the layout display state enables it', () => {
@@ -36,7 +40,7 @@ describe('SurveyQuestionsTagModalSlot', () => {
           useTagModal: true,
         }}
         tagModalProps={{ onClose }}
-      />
+      />,
     );
 
     const modal = screen.getByTestId('tag-modal');
@@ -54,7 +58,7 @@ describe('SurveyQuestionsTagModalSlot', () => {
           activeTagModalTag: 'research',
           useTagModal: false,
         }}
-      />
+      />,
     );
 
     expect(screen.queryByTestId('tag-modal')).not.toBeInTheDocument();

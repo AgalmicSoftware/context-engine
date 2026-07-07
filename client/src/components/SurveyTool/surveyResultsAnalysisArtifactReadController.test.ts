@@ -1,6 +1,4 @@
-import {
-  runSurveyResultsAnalysisArtifactReadController,
-} from './surveyResultsAnalysisArtifactReadController';
+import { runSurveyResultsAnalysisArtifactReadController } from './surveyResultsAnalysisArtifactReadController';
 import type {
   SurveyResultsAnalysisArtifactCacheReadRequest,
   SurveyResultsAnalysisArtifactCacheTarget,
@@ -38,11 +36,13 @@ describe('surveyResultsAnalysisArtifactReadController', () => {
   it('skips when no read request is provided', () => {
     const readAnalysisArtifactCache = jest.fn();
 
-    expect(runSurveyResultsAnalysisArtifactReadController({
-      ports: { readAnalysisArtifactCache },
-      readRequest: null,
-      target,
-    })).toEqual({
+    expect(
+      runSurveyResultsAnalysisArtifactReadController({
+        ports: { readAnalysisArtifactCache },
+        readRequest: null,
+        target,
+      }),
+    ).toEqual({
       artifact: null,
       error: null,
       ok: true,
@@ -55,11 +55,13 @@ describe('surveyResultsAnalysisArtifactReadController', () => {
   });
 
   it('skips when the read port is missing', () => {
-    expect(runSurveyResultsAnalysisArtifactReadController({
-      ports: {},
-      readRequest,
-      target,
-    })).toEqual({
+    expect(
+      runSurveyResultsAnalysisArtifactReadController({
+        ports: {},
+        readRequest,
+        target,
+      }),
+    ).toEqual({
       artifact: null,
       error: null,
       ok: true,
@@ -79,14 +81,16 @@ describe('surveyResultsAnalysisArtifactReadController', () => {
     const readAnalysisArtifactCache = jest.fn(() => cacheValue);
     const selectAnalysisArtifact = jest.fn(() => artifact);
 
-    expect(runSurveyResultsAnalysisArtifactReadController({
-      ports: {
-        readAnalysisArtifactCache,
-        selectAnalysisArtifact,
-      },
-      readRequest,
-      target,
-    })).toEqual({
+    expect(
+      runSurveyResultsAnalysisArtifactReadController({
+        ports: {
+          readAnalysisArtifactCache,
+          selectAnalysisArtifact,
+        },
+        readRequest,
+        target,
+      }),
+    ).toEqual({
       artifact,
       error: null,
       ok: true,
@@ -112,11 +116,13 @@ describe('surveyResultsAnalysisArtifactReadController', () => {
       },
     }));
 
-    expect(runSurveyResultsAnalysisArtifactReadController({
-      ports: { readAnalysisArtifactCache },
-      readRequest,
-      target,
-    })).toEqual({
+    expect(
+      runSurveyResultsAnalysisArtifactReadController({
+        ports: { readAnalysisArtifactCache },
+        readRequest,
+        target,
+      }),
+    ).toEqual({
       artifact: null,
       error: null,
       ok: true,
@@ -139,11 +145,13 @@ describe('surveyResultsAnalysisArtifactReadController', () => {
       },
     });
 
-    expect(runSurveyResultsAnalysisArtifactReadController({
-      ports: { readAnalysisArtifactCache },
-      readRequest,
-      target,
-    }).artifact).toBeNull();
+    expect(
+      runSurveyResultsAnalysisArtifactReadController({
+        ports: { readAnalysisArtifactCache },
+        readRequest,
+        target,
+      }).artifact,
+    ).toBeNull();
   });
 
   it('returns a failed result when the read port throws', () => {
@@ -152,11 +160,13 @@ describe('surveyResultsAnalysisArtifactReadController', () => {
       throw error;
     });
 
-    expect(runSurveyResultsAnalysisArtifactReadController({
-      ports: { readAnalysisArtifactCache },
-      readRequest,
-      target,
-    })).toEqual({
+    expect(
+      runSurveyResultsAnalysisArtifactReadController({
+        ports: { readAnalysisArtifactCache },
+        readRequest,
+        target,
+      }),
+    ).toEqual({
       artifact: null,
       error,
       ok: false,

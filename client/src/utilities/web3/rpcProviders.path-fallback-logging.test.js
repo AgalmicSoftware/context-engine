@@ -55,21 +55,25 @@ const buildGroupCfg = () => ({
 describe('rpcProviders PATH fallback logging', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    try { globalThis.CE_PREFER_PATH_RPC = true; } catch (_) {}
+    try {
+      globalThis.CE_PREFER_PATH_RPC = true;
+    } catch (_) {}
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
-    try { delete globalThis.CE_PREFER_PATH_RPC; } catch (_) {}
+    try {
+      delete globalThis.CE_PREFER_PATH_RPC;
+    } catch (_) {}
   });
 
   it('logs PATH transport fallback failures as warnings instead of errors', async () => {
-    const performSpy = jest
-      .spyOn(ethers.providers.JsonRpcProvider.prototype, 'perform')
-      .mockRejectedValue(Object.assign(new Error('bad response'), {
+    const performSpy = jest.spyOn(ethers.providers.JsonRpcProvider.prototype, 'perform').mockRejectedValue(
+      Object.assign(new Error('bad response'), {
         code: 'SERVER_ERROR',
         status: 500,
-      }));
+      }),
+    );
 
     const provider = getReadProviderForGroup(buildGroupCfg());
     const pathProvider = provider?.providerConfigs?.[0]?.provider;
@@ -83,7 +87,7 @@ describe('rpcProviders PATH fallback logging', () => {
         code: 'SERVER_ERROR',
         chainId: 11155420,
         method: 'getLogs',
-      })
+      }),
     );
     expect(mockRpcLogger.error).not.toHaveBeenCalled();
 
@@ -95,9 +99,7 @@ describe('rpcProviders PATH fallback logging', () => {
       contractKey: 'sbtFactory',
       skipGlobalPreferred: true,
     });
-    const urls = (provider?.providerConfigs || [])
-      .map((entry) => entry?.provider?.connection?.url)
-      .filter(Boolean);
+    const urls = (provider?.providerConfigs || []).map((entry) => entry?.provider?.connection?.url).filter(Boolean);
 
     expect(urls[0]).not.toBe(PATH_DEFAULT_OP_SEPOLIA);
     expect(urls).not.toContain(PATH_DEFAULT_OP_SEPOLIA);

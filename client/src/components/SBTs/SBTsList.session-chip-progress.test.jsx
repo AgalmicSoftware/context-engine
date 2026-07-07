@@ -34,13 +34,10 @@ jest.mock('./SBTPage', () => (props) => {
   mockSBTPage(props);
   return (
     <div data-testid="mock-sbt-page">
-      <button type="button" data-testid="mock-sbt-nested-button">Nested Action</button>
-      <div
-        role="button"
-        tabIndex={0}
-        data-testid="mock-sbt-ignore-nav"
-        data-featured-card-ignore-nav="true"
-      >
+      <button type="button" data-testid="mock-sbt-nested-button">
+        Nested Action
+      </button>
+      <div role="button" tabIndex={0} data-testid="mock-sbt-ignore-nav" data-featured-card-ignore-nav="true">
         Nested Custom Action
       </div>
     </div>
@@ -56,11 +53,7 @@ jest.mock('./CreateSBTGroup', () => {
 jest.mock('../TagPage/TagModal', () => (props) => {
   mockTagModal(props);
   if (!props.isOpen) return null;
-  return (
-    <div data-testid="mock-tag-modal">
-      {props.activeTag}
-    </div>
-  );
+  return <div data-testid="mock-tag-modal">{props.activeTag}</div>;
 });
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
@@ -132,7 +125,11 @@ jest.mock('../../utilities/session/sessionDemoCompat.js', () => {
 });
 
 const setupGroupMocks = () => {
-  mockNormalizeSessionSlug.mockImplementation((value = '') => String(value || '').trim().toLowerCase());
+  mockNormalizeSessionSlug.mockImplementation((value = '') =>
+    String(value || '')
+      .trim()
+      .toLowerCase(),
+  );
   mockGetAllSessionEntries.mockReturnValue([
     ['alpha', { slug: 'alpha' }],
     ['beta', { slug: 'beta' }],
@@ -156,14 +153,18 @@ const setupGroupMocks = () => {
   mockReadSessionScanScope.mockReturnValue('all');
   mockReadSessionScanSlugs.mockReturnValue([]);
   mockGetSessionSlugByName.mockImplementation((sessionName) => {
-    const normalized = String(sessionName || '').trim().toLowerCase();
+    const normalized = String(sessionName || '')
+      .trim()
+      .toLowerCase();
     if (normalized === 'alpha') return 'alpha';
     if (normalized === 'beta') return 'beta';
     if (normalized === 'general' || normalized === 'context engine') return '';
     return '';
   });
   mockGetDemoSessionConfigBySlug.mockImplementation((slug) => {
-    const normalized = String(slug || '').trim().toLowerCase();
+    const normalized = String(slug || '')
+      .trim()
+      .toLowerCase();
     if (normalized === 'edge') {
       return {
         slug: 'edge',
@@ -173,7 +174,9 @@ const setupGroupMocks = () => {
     return null;
   });
   mockGetSessionConfigBySlug.mockImplementation((slug) => {
-    const normalized = String(slug || '').trim().toLowerCase();
+    const normalized = String(slug || '')
+      .trim()
+      .toLowerCase();
     if (normalized === 'alpha') {
       return {
         sessionName: 'Alpha',
@@ -202,34 +205,34 @@ const setupGroupMocks = () => {
     };
   });
   mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-    const normalized = String(slug || '').trim().toLowerCase();
+    const normalized = String(slug || '')
+      .trim()
+      .toLowerCase();
     if (normalized === 'alpha') {
       return {
-        '84532': { lastBlock: 1050, sbtList: {} },
+        84532: { lastBlock: 1050, sbtList: {} },
       };
     }
     if (normalized === 'beta') {
       return {
-        '84532': { lastBlock: 2060, sbtList: {} },
+        84532: { lastBlock: 2060, sbtList: {} },
       };
     }
     return {
-      '84532': { lastBlock: 0, sbtList: {} },
+      84532: { lastBlock: 0, sbtList: {} },
     };
   });
   mockReadCache.mockResolvedValue({
-    '84532': {
+    84532: {
       sbtList: {},
       lastBlock: 0,
     },
   });
   mockListNamespaceEntriesSync.mockReturnValue([]);
   mockGetRelevantBlockWindowForFilter.mockImplementation(async (slugInput) => {
-    const normalized = String(
-      slugInput && typeof slugInput === 'object'
-        ? (slugInput.slug || '')
-        : (slugInput || '')
-    ).trim().toLowerCase();
+    const normalized = String(slugInput && typeof slugInput === 'object' ? slugInput.slug || '' : slugInput || '')
+      .trim()
+      .toLowerCase();
     if (normalized === 'alpha') return { fromBlock: 1000, toBlock: 1100 };
     if (normalized === 'beta') return { fromBlock: 2000, toBlock: 2200 };
     return { fromBlock: 1, toBlock: 1 };
@@ -273,7 +276,9 @@ describe('SBTsList session chip progress display', () => {
 
   afterAll(() => {
     if (typeof ORIGINAL_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP === 'undefined') {
-      try { delete globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP; } catch (_) {}
+      try {
+        delete globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP;
+      } catch (_) {}
     } else {
       globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP = ORIGINAL_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP;
     }
@@ -305,7 +310,7 @@ describe('SBTsList session chip progress display', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -318,10 +323,12 @@ describe('SBTsList session chip progress display', () => {
     localStorage.removeItem('dg:sbt:fullScanInProgress:alpha');
     localStorage.removeItem('dg:sbt:fullScanInProgress:beta');
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized === 'alpha') return { '84532': { lastBlock: 1050, sbtList: {} } };
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
+      if (normalized === 'alpha') return { 84532: { lastBlock: 1050, sbtList: {} } };
       if (normalized === 'beta') return null;
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
 
     render(
@@ -341,7 +348,7 @@ describe('SBTsList session chip progress display', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -374,7 +381,7 @@ describe('SBTsList session chip progress display', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -394,12 +401,8 @@ describe('SBTsList session chip progress display', () => {
   });
 
   it('prefers live session scan progress over the cached watermark while loading', async () => {
-    mockGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
     localStorage.setItem('dg:sbt:fullScanInProgress:alpha', 'true');
     localStorage.removeItem('dg:sbt:fullScanInProgress:beta');
     localStorage.removeItem('dg:sbt:deferredFullScanNeeded:alpha');
@@ -427,14 +430,12 @@ describe('SBTsList session chip progress display', () => {
           },
         }}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
     await waitFor(() => {
-      expect(screen.getByTestId('session-chip-progress-text-alpha')).toHaveTextContent(
-        /^15 remaining$/
-      );
+      expect(screen.getByTestId('session-chip-progress-text-alpha')).toHaveTextContent(/^15 remaining$/);
     });
     expect(mockGetRelevantBlockWindowForFilter).not.toHaveBeenCalled();
   });
@@ -470,41 +471,34 @@ describe('SBTsList session chip progress display', () => {
             latestBlock: 1100,
           },
         }}
-      />
+      />,
     );
 
     await openSessionSelector();
     await waitFor(() => {
-      expect(screen.getByTestId('session-chip-progress-text-alpha')).toHaveTextContent(
-        /^15 remaining$/
-      );
+      expect(screen.getByTestId('session-chip-progress-text-alpha')).toHaveTextContent(/^15 remaining$/);
     });
 
-    rerender(
-      <SBTsList
-        {...baseProps}
-        sbtScanProgressBySlug={{}}
-      />
-    );
+    rerender(<SBTsList {...baseProps} sbtScanProgressBySlug={{}} />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('session-chip-progress-text-alpha')).toHaveTextContent(
-        /^50 remaining$/
-      );
+      expect(screen.getByTestId('session-chip-progress-text-alpha')).toHaveTextContent(/^50 remaining$/);
     });
   });
 
   it('hides chip progress after scan completion even if bridged live progress is still available', async () => {
     let alphaLastBlock = 1050;
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') {
-        return { '84532': { lastBlock: alphaLastBlock, sbtList: {} } };
+        return { 84532: { lastBlock: alphaLastBlock, sbtList: {} } };
       }
       if (normalized === 'beta') {
-        return { '84532': { lastBlock: 2060, sbtList: {} } };
+        return { 84532: { lastBlock: 2060, sbtList: {} } };
       }
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
 
     localStorage.removeItem('dg:sbt:fullScanInProgress:alpha');
@@ -537,29 +531,18 @@ describe('SBTsList session chip progress display', () => {
             latestBlock: 1100,
           },
         }}
-      />
+      />,
     );
 
     await openSessionSelector();
     expect(screen.queryByTestId('session-chip-progress-text-alpha')).not.toBeInTheDocument();
 
-    rerender(
-      <SBTsList
-        {...baseProps}
-        sbtScanProgressBySlug={{}}
-      />
-    );
+    rerender(<SBTsList {...baseProps} sbtScanProgressBySlug={{}} />);
 
     expect(screen.queryByTestId('session-chip-progress-text-alpha')).not.toBeInTheDocument();
 
     alphaLastBlock = 1100;
-    rerender(
-      <SBTsList
-        {...baseProps}
-        sbtCacheRevision={1}
-        sbtScanProgressBySlug={{}}
-      />
-    );
+    rerender(<SBTsList {...baseProps} sbtCacheRevision={1} sbtScanProgressBySlug={{}} />);
 
     expect(screen.queryByTestId('session-chip-progress-text-alpha')).not.toBeInTheDocument();
   });
@@ -567,11 +550,13 @@ describe('SBTsList session chip progress display', () => {
   it('keeps chip progress visibility sticky for 5 seconds after loading settles', async () => {
     let alphaLastBlock = 1050;
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') {
-        return { '84532': { lastBlock: alphaLastBlock, sbtList: {} } };
+        return { 84532: { lastBlock: alphaLastBlock, sbtList: {} } };
       }
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
 
     const baseProps = {
@@ -592,11 +577,7 @@ describe('SBTsList session chip progress display', () => {
       ensureLightSbtDiscovery: jest.fn(),
     };
 
-    const { rerender } = render(
-      <SBTsList
-        {...baseProps}
-      />
-    );
+    const { rerender } = render(<SBTsList {...baseProps} />);
 
     await openSessionSelector();
     await waitFor(() => {
@@ -606,12 +587,7 @@ describe('SBTsList session chip progress display', () => {
     localStorage.removeItem('dg:sbt:fullScanInProgress:alpha');
     localStorage.removeItem('dg:sbt:deferredFullScanNeeded:alpha');
     alphaLastBlock = 1100;
-    rerender(
-      <SBTsList
-        {...baseProps}
-        sbtCacheRevision={1}
-      />
-    );
+    rerender(<SBTsList {...baseProps} sbtCacheRevision={1} />);
 
     expect(screen.getByTestId('session-chip-progress-wrap-alpha')).toBeInTheDocument();
 
@@ -629,18 +605,16 @@ describe('SBTsList session chip progress display', () => {
   }, 15000);
 
   it('uses session startBlock as current progress baseline when cache lastBlock is zero', async () => {
-    mockGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') {
-        return { '84532': { lastBlock: 0, sbtList: {} } };
+        return { 84532: { lastBlock: 0, sbtList: {} } };
       }
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
     localStorage.setItem('dg:sbt:fullScanInProgress:alpha', 'true');
     localStorage.removeItem('dg:sbt:deferredFullScanNeeded:alpha');
@@ -662,30 +636,26 @@ describe('SBTsList session chip progress display', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
     await waitFor(() => {
-      expect(screen.getByTestId('session-chip-progress-text-alpha')).toHaveTextContent(
-        /^100 remaining$/
-      );
+      expect(screen.getByTestId('session-chip-progress-text-alpha')).toHaveTextContent(/^100 remaining$/);
     });
   });
 
   it('refresh updates chip remaining count using a forced latest-block read', async () => {
-    mockGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') {
-        return { '84532': { lastBlock: 0, sbtList: {} } };
+        return { 84532: { lastBlock: 0, sbtList: {} } };
       }
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
 
     let forcedLatestCallCount = 0;
@@ -718,7 +688,7 @@ describe('SBTsList session chip progress display', () => {
         allSessionsMode
         embeddedMode={false}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -736,18 +706,16 @@ describe('SBTsList session chip progress display', () => {
   });
 
   it('skips passive latest-block research when MainSite reports realtime SBT listener coverage', async () => {
-    mockGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') {
-        return { '84532': { lastBlock: 1000, sbtList: {} } };
+        return { 84532: { lastBlock: 1000, sbtList: {} } };
       }
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
 
     localStorage.setItem('dg:sbt:fullScanInProgress:alpha', 'true');
@@ -771,7 +739,7 @@ describe('SBTsList session chip progress display', () => {
         embeddedMode
         sbtRealtimeCoverageBySlug={{ alpha: true }}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -783,20 +751,18 @@ describe('SBTsList session chip progress display', () => {
   });
 
   it('rechecks passive latest-block research only after the configured 50-block step', async () => {
-    mockGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
 
     let alphaLastBlock = 1000;
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') {
-        return { '84532': { lastBlock: alphaLastBlock, sbtList: {} } };
+        return { 84532: { lastBlock: alphaLastBlock, sbtList: {} } };
       }
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
     mockGetRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1000, toBlock: 1100 });
 
@@ -821,11 +787,7 @@ describe('SBTsList session chip progress display', () => {
       ensureLightSbtDiscovery: jest.fn(),
     };
 
-    const { rerender } = render(
-      <SBTsList
-        {...baseProps}
-      />
-    );
+    const { rerender } = render(<SBTsList {...baseProps} />);
 
     await openSessionSelector();
     await waitFor(() => {
@@ -833,24 +795,14 @@ describe('SBTsList session chip progress display', () => {
     });
 
     alphaLastBlock = 1049;
-    rerender(
-      <SBTsList
-        {...baseProps}
-        sbtCacheRevision={1}
-      />
-    );
+    rerender(<SBTsList {...baseProps} sbtCacheRevision={1} />);
     await act(async () => {
       await Promise.resolve();
     });
     expect(mockGetRelevantBlockWindowForFilter).toHaveBeenCalledTimes(1);
 
     alphaLastBlock = 1050;
-    rerender(
-      <SBTsList
-        {...baseProps}
-        sbtCacheRevision={2}
-      />
-    );
+    rerender(<SBTsList {...baseProps} sbtCacheRevision={2} />);
 
     await waitFor(() => {
       expect(mockGetRelevantBlockWindowForFilter).toHaveBeenCalledTimes(2);
@@ -858,28 +810,28 @@ describe('SBTsList session chip progress display', () => {
   });
 
   it('uses async cache-read metadata to clear stale chip remaining counts after cards load', async () => {
-    mockGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['alpha', { slug: 'alpha' }]]);
 
     const alphaAddress = '0x0000000000000000000000000000000000000a11';
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') {
-        return { '84532': { lastBlock: 0, sbtList: {} } };
+        return { 84532: { lastBlock: 0, sbtList: {} } };
       }
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           lastBlock: 1100,
           sbtList: {
             [alphaAddress.toLowerCase()]: {
@@ -902,11 +854,9 @@ describe('SBTsList session chip progress display', () => {
       };
     });
     mockGetRelevantBlockWindowForFilter.mockImplementation(async (slugInput) => {
-      const normalized = String(
-        slugInput && typeof slugInput === 'object'
-          ? (slugInput.slug || '')
-          : (slugInput || '')
-      ).trim().toLowerCase();
+      const normalized = String(slugInput && typeof slugInput === 'object' ? slugInput.slug || '' : slugInput || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') return { fromBlock: 1000, toBlock: 1100 };
       return { fromBlock: 1, toBlock: 1 };
     });
@@ -931,7 +881,7 @@ describe('SBTsList session chip progress display', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {

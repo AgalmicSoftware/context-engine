@@ -4,22 +4,15 @@ import {
   parseQuestionSessionIdFromSearch,
   parseQuestionSessionSlugFromSearch,
 } from '../../utilities/survey/questionRouting.js';
-import type {
-  ResolveSessionConfigById,
-  ResolveSessionConfigBySlug,
-  SessionConfigLike,
-} from '../shellTypes';
+import type { ResolveSessionConfigById, ResolveSessionConfigBySlug, SessionConfigLike } from '../shellTypes';
 
 type FormatSessionId = ((value: string) => string | null | undefined) | undefined;
 type ResolveSessionSlugFromPathToken = ((sessionToken: string) => string | null | undefined) | undefined;
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const hasAuthoritativeRegistryIdentity = (
-  sessionConfig: SessionConfigLike | null | undefined
-): boolean => {
+const hasAuthoritativeRegistryIdentity = (sessionConfig: SessionConfigLike | null | undefined): boolean => {
   if (!isRecord(sessionConfig)) return false;
   const registry = isRecord(sessionConfig.__registry) ? sessionConfig.__registry : {};
   return !!(
@@ -33,7 +26,9 @@ const hasAuthoritativeRegistryIdentity = (
 };
 
 const readSessionTokenFromPath = (path = ''): string => {
-  const clean = String(path || '').split('?')[0].split('#')[0];
+  const clean = String(path || '')
+    .split('?')[0]
+    .split('#')[0];
   const parts = clean.split('/').filter(Boolean);
   if (parts[0] !== 'session' || !parts[1]) return '';
   return String(parts[1] || '').trim();
@@ -54,11 +49,10 @@ const resolveExplicitSessionSlugFromPathToken = ({
     return { hasExplicitSessionSlug: false, sessionSlug: '' };
   }
 
-  const resolvedSessionSlug = (
+  const resolvedSessionSlug =
     typeof resolveSessionSlugFromPathToken === 'function'
       ? resolveSessionSlugFromPathToken(rawToken)
-      : normalizeSessionSlug(rawToken)
-  );
+      : normalizeSessionSlug(rawToken);
   if (resolvedSessionSlug) {
     return { hasExplicitSessionSlug: true, sessionSlug: resolvedSessionSlug };
   }
@@ -93,9 +87,7 @@ export const resolveMainSiteExplicitSessionSlugFromPath = ({
   });
 };
 
-const readSessionStateStringList = (value: unknown): unknown[] => (
-  Array.isArray(value) ? value : []
-);
+const readSessionStateStringList = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
 export const resolveMainSiteGlobalPrimarySessionSlug = ({
   sessionState = {},
@@ -107,7 +99,9 @@ export const resolveMainSiteGlobalPrimarySessionSlug = ({
   const state = sessionState || {};
   const primarySessionSlug = normalizeSessionSlug(state.primarySessionSlug || '');
   const primarySessionExplicit = state.primarySessionExplicit === true;
-  const selectedSessionScope = String(state.selectedSessionScope || '').trim().toLowerCase();
+  const selectedSessionScope = String(state.selectedSessionScope || '')
+    .trim()
+    .toLowerCase();
   const selectedSessionSlugs = readSessionStateStringList(state.selectedSessionSlugs);
   const listIncludesGeneral = selectedSessionSlugs.some((slug: unknown) => normalizeSessionSlug(slug || '') === '');
   if (primarySessionSlug) return primarySessionSlug;
@@ -148,7 +142,9 @@ export const resolveMainSiteSessionSlugFromProps = ({
 
   const state = sessionState || {};
   const primarySessionExplicit = state.primarySessionExplicit === true;
-  const selectedSessionScope = String(state.selectedSessionScope || '').trim().toLowerCase();
+  const selectedSessionScope = String(state.selectedSessionScope || '')
+    .trim()
+    .toLowerCase();
   const selectedSessionSlugs = readSessionStateStringList(state.selectedSessionSlugs);
   const listIncludesGeneral = selectedSessionSlugs.some((slug: unknown) => normalizeSessionSlug(slug || '') === '');
   if (activeSessionSlug) return activeSessionSlug;
@@ -170,12 +166,11 @@ export const resolveMainSiteSessionSlugFromProps = ({
 
 const readResolvedSessionConfigById = (
   resolveSessionConfigById?: ResolveSessionConfigById,
-  sessionId?: string | number | null
-): SessionConfigLike | null => (
+  sessionId?: string | number | null,
+): SessionConfigLike | null =>
   typeof resolveSessionConfigById === 'function'
-    ? (resolveSessionConfigById(sessionId as string | number) || null)
-    : null
-);
+    ? resolveSessionConfigById(sessionId as string | number) || null
+    : null;
 
 const DEMO_DISPLAY_ARRAY_FIELDS = [
   'defaultFeaturedSBTs',
@@ -198,23 +193,12 @@ const DEMO_DISPLAY_VALUE_FIELDS = [
   'demoCompatibilitySeed',
 ] as const;
 
-const DEMO_DISPLAY_OBJECT_FIELDS = [
-  'contracts',
-  'blockLimits',
-  'ai',
-] as const;
+const DEMO_DISPLAY_OBJECT_FIELDS = ['contracts', 'blockLimits', 'ai'] as const;
 
-const isMissingDisplayValue = (value: unknown): boolean => (
-  value === null ||
-  value === undefined ||
-  value === '' ||
-  (Array.isArray(value) && value.length === 0)
-);
+const isMissingDisplayValue = (value: unknown): boolean =>
+  value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0);
 
-const sameRouteSessionSlug = (
-  strictConfig: SessionConfigLike,
-  displayConfig: SessionConfigLike
-): boolean => {
+const sameRouteSessionSlug = (strictConfig: SessionConfigLike, displayConfig: SessionConfigLike): boolean => {
   const strictSlug = normalizeSessionSlug(strictConfig.slug || strictConfig.sessionSlug || '');
   const displaySlug = normalizeSessionSlug(displayConfig.slug || displayConfig.sessionSlug || '');
   return !strictSlug || !displaySlug || strictSlug === displaySlug;
@@ -222,20 +206,17 @@ const sameRouteSessionSlug = (
 
 const shouldApplyDemoDisplayOverlay = (
   strictConfig: SessionConfigLike | null | undefined,
-  displayConfig: SessionConfigLike | null | undefined
-): strictConfig is SessionConfigLike => (
+  displayConfig: SessionConfigLike | null | undefined,
+): strictConfig is SessionConfigLike =>
   isRecord(strictConfig) &&
   isRecord(displayConfig) &&
   sameRouteSessionSlug(strictConfig, displayConfig) &&
-  (
-    isRecord(displayConfig.demoCompatibilitySeed) ||
-    normalizeSessionSlug(displayConfig.slug || displayConfig.sessionSlug || '').startsWith('demo-')
-  )
-);
+  (isRecord(displayConfig.demoCompatibilitySeed) ||
+    normalizeSessionSlug(displayConfig.slug || displayConfig.sessionSlug || '').startsWith('demo-'));
 
 export const mergeMainSiteSessionDisplayConfig = (
   strictConfig: SessionConfigLike | null | undefined,
-  displayConfig: SessionConfigLike | null | undefined
+  displayConfig: SessionConfigLike | null | undefined,
 ): SessionConfigLike | null => {
   if (!strictConfig) return displayConfig || null;
   if (!shouldApplyDemoDisplayOverlay(strictConfig, displayConfig)) return strictConfig;
@@ -244,10 +225,7 @@ export const mergeMainSiteSessionDisplayConfig = (
   const merged: SessionConfigLike = { ...display, ...strictConfig };
 
   for (const field of DEMO_DISPLAY_ARRAY_FIELDS) {
-    if (
-      Array.isArray(display[field]) &&
-      display[field].length > 0
-    ) {
+    if (Array.isArray(display[field]) && display[field].length > 0) {
       merged[field] = [...display[field]];
     }
   }
@@ -302,11 +280,7 @@ export const resolveMainSiteRouteSessionIdHint = ({
   const raw = parseQuestionSessionIdFromSearch(search);
   if (!raw) return null;
 
-  const normalized = (
-    typeof formatSessionId === 'function'
-      ? formatSessionId(raw)
-      : null
-  ) || raw;
+  const normalized = (typeof formatSessionId === 'function' ? formatSessionId(raw) : null) || raw;
 
   if (!requireResolved) return normalized;
 
@@ -347,10 +321,8 @@ export const resolveMainSiteQuestionRouteSessionContext = ({
     formatSessionId,
     resolveSessionConfigById,
   });
-  const sessionSlugKnown = sessionSlug !== null &&
-    isKnownOrGeneralSessionSlug(sessionSlug, getSessionConfigBySlug);
-  const sessionSlugPinned = sessionSlug !== null &&
-    (sessionSlugKnown || !isCacheManagerReady);
+  const sessionSlugKnown = sessionSlug !== null && isKnownOrGeneralSessionSlug(sessionSlug, getSessionConfigBySlug);
+  const sessionSlugPinned = sessionSlug !== null && (sessionSlugKnown || !isCacheManagerReady);
 
   return {
     sessionSlug,
@@ -395,13 +367,10 @@ export const resolveMainSiteRenderActiveSessionSlug = ({
     allowSessionIdLookup: true,
     resolveSessionConfigById,
   });
-  const querySlugKnown = querySlug !== null && (
-    isKnownOrGeneralSessionSlug(querySlug, getSessionConfigBySlug) ||
-    (
-      typeof resolveDisplaySessionConfigBySlug === 'function' &&
-      !!resolveDisplaySessionConfigBySlug(querySlug)
-    )
-  );
+  const querySlugKnown =
+    querySlug !== null &&
+    (isKnownOrGeneralSessionSlug(querySlug, getSessionConfigBySlug) ||
+      (typeof resolveDisplaySessionConfigBySlug === 'function' && !!resolveDisplaySessionConfigBySlug(querySlug)));
   if (querySlug !== null && (querySlugKnown || !isCacheManagerReady)) {
     return querySlug;
   }
@@ -430,30 +399,27 @@ export const resolveMainSiteSessionRouteContext = ({
   sessionConfig: SessionConfigLike | null;
   hasUnresolvedSessionId: boolean;
 } => {
-  const sessionIdFromPath = typeof formatSessionId === 'function'
-    ? (formatSessionId(sessionTokenRaw) || null)
-    : null;
+  const sessionIdFromPath = typeof formatSessionId === 'function' ? formatSessionId(sessionTokenRaw) || null : null;
   const configBySessionId = sessionIdFromPath
     ? readResolvedSessionConfigById(resolveSessionConfigById, sessionIdFromPath)
     : null;
   const sessionSlug = normalizeSessionSlug(
     sessionTokenRaw
-      ? (
-        typeof resolveSessionSlugFromPathToken === 'function'
-          ? resolveSessionSlugFromPathToken(sessionTokenRaw)
-          : sessionTokenRaw
-      )
-      : ''
+      ? typeof resolveSessionSlugFromPathToken === 'function'
+        ? resolveSessionSlugFromPathToken(sessionTokenRaw)
+        : sessionTokenRaw
+      : '',
   );
   const hasUnresolvedSessionId = !!(sessionIdFromPath && !configBySessionId && !sessionSlug);
-  const sessionConfig = configBySessionId || (
-    !hasUnresolvedSessionId && typeof resolveSessionConfigBySlug === 'function'
-      ? (resolveSessionConfigBySlug(sessionSlug) || null)
-      : null
-  );
-  const displaySessionConfig = !hasUnresolvedSessionId && typeof resolveDisplaySessionConfigBySlug === 'function'
-    ? (resolveDisplaySessionConfigBySlug(sessionSlug) || null)
-    : null;
+  const sessionConfig =
+    configBySessionId ||
+    (!hasUnresolvedSessionId && typeof resolveSessionConfigBySlug === 'function'
+      ? resolveSessionConfigBySlug(sessionSlug) || null
+      : null);
+  const displaySessionConfig =
+    !hasUnresolvedSessionId && typeof resolveDisplaySessionConfigBySlug === 'function'
+      ? resolveDisplaySessionConfigBySlug(sessionSlug) || null
+      : null;
 
   return {
     sessionIdFromPath,
@@ -473,15 +439,12 @@ export const resolveMainSiteSessionRouteSourceSlug = ({
   sessionSlug?: string;
   sessionConfig?: SessionConfigLike | null;
 } = {}): string => {
-  const token = String(sessionTokenRaw || '').trim().toLowerCase();
-  const configHasSlug = isRecord(sessionConfig) &&
-    Object.prototype.hasOwnProperty.call(sessionConfig, 'slug');
+  const token = String(sessionTokenRaw || '')
+    .trim()
+    .toLowerCase();
+  const configHasSlug = isRecord(sessionConfig) && Object.prototype.hasOwnProperty.call(sessionConfig, 'slug');
   const configSlug = configHasSlug ? normalizeSessionSlug(sessionConfig.slug || '') : '';
-  if (
-    token === 'demo' &&
-    (!sessionConfig || configSlug === '') &&
-    !hasAuthoritativeRegistryIdentity(sessionConfig)
-  ) {
+  if (token === 'demo' && (!sessionConfig || configSlug === '') && !hasAuthoritativeRegistryIdentity(sessionConfig)) {
     return '';
   }
   return normalizeSessionSlug(configHasSlug ? configSlug : sessionSlug);
@@ -502,17 +465,13 @@ export const resolveMainSiteSessionSlugFromPathToken = ({
   if (!token) return '';
   if (token.toLowerCase() === 'new') return '';
 
-  const sessionId = typeof formatSessionId === 'function'
-    ? (formatSessionId(token) || null)
-    : null;
+  const sessionId = typeof formatSessionId === 'function' ? formatSessionId(token) || null : null;
 
   if (!sessionId) {
     return normalizeSessionSlug(token);
   }
 
-  const cfgById = typeof resolveSessionConfigById === 'function'
-    ? (resolveSessionConfigById(sessionId) || null)
-    : null;
+  const cfgById = typeof resolveSessionConfigById === 'function' ? resolveSessionConfigById(sessionId) || null : null;
 
   if (cfgById) {
     return normalizeSessionSlug(cfgById.slug || '');
@@ -520,9 +479,8 @@ export const resolveMainSiteSessionSlugFromPathToken = ({
 
   const normalizedSlug = normalizeSessionSlug(token);
   if (normalizedSlug) {
-    const cfgBySlug = typeof resolveSessionConfigBySlug === 'function'
-      ? (resolveSessionConfigBySlug(normalizedSlug) || null)
-      : null;
+    const cfgBySlug =
+      typeof resolveSessionConfigBySlug === 'function' ? resolveSessionConfigBySlug(normalizedSlug) || null : null;
     if (cfgBySlug) {
       return normalizeSessionSlug(cfgBySlug.slug || normalizedSlug);
     }

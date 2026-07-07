@@ -12,7 +12,9 @@ const AI_PROVIDER_LABELS: Record<string, string> = Object.freeze({
 });
 
 export const formatAiPromptModelLabel = (config: AiPromptModelConfig = {}) => {
-  const providerKey = String(config?.provider || '').trim().toLowerCase();
+  const providerKey = String(config?.provider || '')
+    .trim()
+    .toLowerCase();
   const model = String(config?.model || '').trim();
   const provider =
     AI_PROVIDER_LABELS[providerKey] ||

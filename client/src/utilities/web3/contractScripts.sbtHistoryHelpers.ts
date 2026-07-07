@@ -18,9 +18,7 @@ export const normalizeHistorySummaryCount = (value: unknown): string | null => {
   if (value == null) return null;
   let raw = '';
   try {
-    raw = ethers.BigNumber.isBigNumber(value)
-      ? value.toString()
-      : String(value).trim();
+    raw = ethers.BigNumber.isBigNumber(value) ? value.toString() : String(value).trim();
   } catch {
     raw = '';
   }

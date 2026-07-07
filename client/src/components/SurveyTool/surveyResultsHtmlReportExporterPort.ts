@@ -1,10 +1,5 @@
-import {
-  renderSessionResultsHtmlReport,
-  type SessionResultsHtmlSnapshot,
-} from '../../utilities/sessionResultsExport';
-import type {
-  SurveyResultsHtmlReportDownloadRequest,
-} from './surveyResultsHtmlReportDownloadRequest';
+import { renderSessionResultsHtmlReport, type SessionResultsHtmlSnapshot } from '../../utilities/sessionResultsExport';
+import type { SurveyResultsHtmlReportDownloadRequest } from './surveyResultsHtmlReportDownloadRequest';
 import {
   surveyResultsHtmlReportDownloadPort,
   type SurveyResultsHtmlReportDownloadPort,
@@ -24,9 +19,7 @@ export type SurveyResultsHtmlReportExportResult = {
 export type SurveyResultsHtmlReportRenderPort = typeof renderSessionResultsHtmlReport;
 
 export type SurveyResultsHtmlReportExporterPort = {
-  exportReport: (
-    request: SurveyResultsHtmlReportExportRequest
-  ) => Promise<SurveyResultsHtmlReportExportResult>;
+  exportReport: (request: SurveyResultsHtmlReportExportRequest) => Promise<SurveyResultsHtmlReportExportResult>;
 };
 
 export type BindSurveyResultsHtmlReportExporterPortArgs = {

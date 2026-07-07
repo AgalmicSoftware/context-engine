@@ -5,73 +5,74 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const t = (key: string) => key;
 
-const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) => render(
-  <WorkerPanel
-    isNormalMode
-    t={t}
-    renderSessionWizardInfoTooltip={() => null}
-    isCollapsed={false}
-    onToggleCollapsed={() => {}}
-    showSharedWorkerChoice
-    workerMode="default"
-    onWorkerModeChange={() => {}}
-    setWorkerUrlAutoFilled={() => {}}
-    updateDraftValue={() => {}}
-    getDefaultWorkerUrl={() => 'https://default-worker.example'}
-    draft={{ corsWorkerUrl: '', slug: 'demo-session' }}
-    deployWorkerUrl=""
-    deployComplete={false}
-    devPersistWorkerSecrets={false}
-    persistWorkerSecrets={false}
-    setPersistWorkerSecrets={() => {}}
-    workerSecretsEnabled
-    setWorkerSecretsEnabled={() => {}}
-    clearWorkerSecretFields={() => {}}
-    effectivePersistWorkerSecrets={false}
-    workerResourceKeys={[]}
-    renderResourceCard={() => null}
-    workerAllowOrigins="https://app.example"
-    setWorkerAllowOrigins={() => {}}
-    defaultAllowedOrigins="https://app.example"
-    shouldUseSponsoredAutoDeployFlow={false}
-    deployForm={{}}
-    deployHelperToggle={null}
-    shouldShowDeployHelperUrlInput={false}
-    deployHelperUrl=""
-    setDeployHelperUrl={() => {}}
-    bundleMode="upload"
-    setBundleMode={() => {}}
-    normalModeBundleUrl=""
-    normalModeBundleHelpText=""
-    showNormalModeManualBundleControls={false}
-    normalModeBundleUrlOverride=""
-    setNormalModeBundleUrlOverride={() => {}}
-    normalModeBundleUrlOverrideValidationError=""
-    manualBundleUrlOverrideHelp=""
-    normalModeRetryBundleFileInputRef={{ current: null }}
-    setBundleFile={() => {}}
-    clearSelectedBundleFile={() => {}}
-    bundleFile={null}
-    normalModeManualBundleHelpText=""
-    localWorkerBundleFallbackFilePath="/dist/sessionCorsWorker.bundle.js"
-    advancedBundleFileInputRef={{ current: null }}
-    showSponsoredDeployAccessNotice={false}
-    account=""
-    resolvedActiveSessionSlug="demo-session"
-    setDeployForm={() => {}}
-    handleDeployWorker={() => {}}
-    deployStatusDisplayState={{
-      deployButtonDisabled: false,
-      deployStatusText: '',
-      isError: false,
-    }}
-    showWorkerUrlField={false}
-    displayedWorkerUrl=""
-    renderField={() => null}
-    workerUrlAutoFilled={false}
-    {...props}
-  />
-);
+const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) =>
+  render(
+    <WorkerPanel
+      isNormalMode
+      t={t}
+      renderSessionWizardInfoTooltip={() => null}
+      isCollapsed={false}
+      onToggleCollapsed={() => {}}
+      showSharedWorkerChoice
+      workerMode="default"
+      onWorkerModeChange={() => {}}
+      setWorkerUrlAutoFilled={() => {}}
+      updateDraftValue={() => {}}
+      getDefaultWorkerUrl={() => 'https://default-worker.example'}
+      draft={{ corsWorkerUrl: '', slug: 'demo-session' }}
+      deployWorkerUrl=""
+      deployComplete={false}
+      devPersistWorkerSecrets={false}
+      persistWorkerSecrets={false}
+      setPersistWorkerSecrets={() => {}}
+      workerSecretsEnabled
+      setWorkerSecretsEnabled={() => {}}
+      clearWorkerSecretFields={() => {}}
+      effectivePersistWorkerSecrets={false}
+      workerResourceKeys={[]}
+      renderResourceCard={() => null}
+      workerAllowOrigins="https://app.example"
+      setWorkerAllowOrigins={() => {}}
+      defaultAllowedOrigins="https://app.example"
+      shouldUseSponsoredAutoDeployFlow={false}
+      deployForm={{}}
+      deployHelperToggle={null}
+      shouldShowDeployHelperUrlInput={false}
+      deployHelperUrl=""
+      setDeployHelperUrl={() => {}}
+      bundleMode="upload"
+      setBundleMode={() => {}}
+      normalModeBundleUrl=""
+      normalModeBundleHelpText=""
+      showNormalModeManualBundleControls={false}
+      normalModeBundleUrlOverride=""
+      setNormalModeBundleUrlOverride={() => {}}
+      normalModeBundleUrlOverrideValidationError=""
+      manualBundleUrlOverrideHelp=""
+      normalModeRetryBundleFileInputRef={{ current: null }}
+      setBundleFile={() => {}}
+      clearSelectedBundleFile={() => {}}
+      bundleFile={null}
+      normalModeManualBundleHelpText=""
+      localWorkerBundleFallbackFilePath="/dist/sessionCorsWorker.bundle.js"
+      advancedBundleFileInputRef={{ current: null }}
+      showSponsoredDeployAccessNotice={false}
+      account=""
+      resolvedActiveSessionSlug="demo-session"
+      setDeployForm={() => {}}
+      handleDeployWorker={() => {}}
+      deployStatusDisplayState={{
+        deployButtonDisabled: false,
+        deployStatusText: '',
+        isError: false,
+      }}
+      showWorkerUrlField={false}
+      displayedWorkerUrl=""
+      renderField={() => null}
+      workerUrlAutoFilled={false}
+      {...props}
+    />,
+  );
 
 describe('WorkerPanel', () => {
   it('renders without crashing with a minimal prop set', () => {

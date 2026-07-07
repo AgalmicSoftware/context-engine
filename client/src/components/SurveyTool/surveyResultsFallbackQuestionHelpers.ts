@@ -35,12 +35,10 @@ export const createSurveyResultsFallbackQuestionBuckets = (): SurveyResultsFallb
 export const buildSurveyResultsFallbackQuestionWritePlan = (
   buckets: SurveyResultsFallbackQuestionBuckets,
   questionId: unknown,
-  mode: unknown = 'summary'
+  mode: unknown = 'summary',
 ): SurveyResultsFallbackQuestionWritePlan => {
   const cacheKey = String(questionId || '');
-  const bucketName: SurveyResultsFallbackQuestionBucketName = mode === 'individual'
-    ? 'individual'
-    : 'summary';
+  const bucketName: SurveyResultsFallbackQuestionBucketName = mode === 'individual' ? 'individual' : 'summary';
   const bucket = buckets[bucketName];
   const cached = bucket.get(cacheKey);
   const target = { bucketName, cacheKey };
@@ -54,17 +52,18 @@ export const buildSurveyResultsFallbackQuestionWritePlan = (
     };
   }
 
-  const fallback: SurveyResultsFallbackQuestion = mode === 'individual'
-    ? {
-      id: questionId,
-      creator: '',
-      type: '',
-      prompt: '',
-    }
-    : {
-      id: questionId,
-      prompt: 'Unknown question',
-    };
+  const fallback: SurveyResultsFallbackQuestion =
+    mode === 'individual'
+      ? {
+          id: questionId,
+          creator: '',
+          type: '',
+          prompt: '',
+        }
+      : {
+          id: questionId,
+          prompt: 'Unknown question',
+        };
 
   return {
     blockedReason: '',
@@ -78,7 +77,7 @@ export const buildSurveyResultsFallbackQuestionWritePlan = (
 export const getSurveyResultsStableFallbackQuestion = (
   buckets: SurveyResultsFallbackQuestionBuckets,
   questionId: unknown,
-  mode: unknown = 'summary'
+  mode: unknown = 'summary',
 ): SurveyResultsFallbackQuestion => {
   const plan = buildSurveyResultsFallbackQuestionWritePlan(buckets, questionId, mode);
   const result = runSurveyResultsFallbackQuestionWriteController({

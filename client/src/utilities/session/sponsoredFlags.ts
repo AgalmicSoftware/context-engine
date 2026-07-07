@@ -9,7 +9,7 @@ export const SPONSORED_FIELD_KEYS = Object.freeze({
   transcribe: 'sponsored_transcribe',
 } as const);
 
-type SponsoredFieldKey = typeof SPONSORED_FIELD_KEYS[keyof typeof SPONSORED_FIELD_KEYS];
+type SponsoredFieldKey = (typeof SPONSORED_FIELD_KEYS)[keyof typeof SPONSORED_FIELD_KEYS];
 type SponsoredFieldSnapshot = Record<SponsoredFieldKey, '0' | '1'>;
 type LooseRecord = Record<string, unknown>;
 
@@ -20,14 +20,15 @@ type BuildSponsoredFlagFieldsOptions = {
   includeCustomRpcInAi?: boolean;
 };
 
-const createEmptySponsoredFieldSnapshot = (): SponsoredFieldSnapshot => ({
-  [SPONSORED_FIELD_KEYS.ai]: '0',
-  [SPONSORED_FIELD_KEYS.rpc]: '0',
-  [SPONSORED_FIELD_KEYS.faucet]: '0',
-  [SPONSORED_FIELD_KEYS.arweave]: '0',
-  [SPONSORED_FIELD_KEYS.lit]: '0',
-  [SPONSORED_FIELD_KEYS.transcribe]: '0',
-} as SponsoredFieldSnapshot);
+const createEmptySponsoredFieldSnapshot = (): SponsoredFieldSnapshot =>
+  ({
+    [SPONSORED_FIELD_KEYS.ai]: '0',
+    [SPONSORED_FIELD_KEYS.rpc]: '0',
+    [SPONSORED_FIELD_KEYS.faucet]: '0',
+    [SPONSORED_FIELD_KEYS.arweave]: '0',
+    [SPONSORED_FIELD_KEYS.lit]: '0',
+    [SPONSORED_FIELD_KEYS.transcribe]: '0',
+  }) as SponsoredFieldSnapshot;
 
 export const normalizeSponsoredFieldSnapshot = (value: LooseRecord = {}): SponsoredFieldSnapshot => {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -60,16 +61,12 @@ export const buildSponsoredFlagFields = ({
   const litUsageApiKey = toStr(secrets.litUsageApiKey).trim();
 
   const current = {
-    [SPONSORED_FIELD_KEYS.ai]: (
-      openaiKey ||
-      anthropicKey ||
-      openrouterKey ||
-      (includeCustomRpcInAi ? customRpcUrl : '')
-    ) ? '1' : '0',
-    [SPONSORED_FIELD_KEYS.rpc]: (customRpcUrl || customRpcKey) ? '1' : '0',
+    [SPONSORED_FIELD_KEYS.ai]:
+      openaiKey || anthropicKey || openrouterKey || (includeCustomRpcInAi ? customRpcUrl : '') ? '1' : '0',
+    [SPONSORED_FIELD_KEYS.rpc]: customRpcUrl || customRpcKey ? '1' : '0',
     [SPONSORED_FIELD_KEYS.faucet]: faucetKey ? '1' : '0',
     [SPONSORED_FIELD_KEYS.arweave]: arweaveJwk ? '1' : '0',
-    [SPONSORED_FIELD_KEYS.lit]: (litUsageApiKey || litAccountApiKey) ? '1' : '0',
+    [SPONSORED_FIELD_KEYS.lit]: litUsageApiKey || litAccountApiKey ? '1' : '0',
     [SPONSORED_FIELD_KEYS.transcribe]: openaiKey ? '1' : '0',
   };
 

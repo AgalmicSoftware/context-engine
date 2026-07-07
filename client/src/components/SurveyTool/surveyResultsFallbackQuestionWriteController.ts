@@ -7,7 +7,7 @@ import type {
 export type SurveyResultsFallbackQuestionWritePort = (
   bucketName: SurveyResultsFallbackQuestionBucketName,
   cacheKey: string,
-  payload: SurveyResultsFallbackQuestion
+  payload: SurveyResultsFallbackQuestion,
 ) => unknown;
 
 export type SurveyResultsFallbackQuestionWriteControllerPorts = {
@@ -50,11 +50,7 @@ export const runSurveyResultsFallbackQuestionWriteController = ({
     };
   }
 
-  ports.writeFallbackQuestion(
-    plan.target.bucketName,
-    plan.target.cacheKey,
-    plan.payload
-  );
+  ports.writeFallbackQuestion(plan.target.bucketName, plan.target.cacheKey, plan.payload);
 
   return {
     attempted: true,

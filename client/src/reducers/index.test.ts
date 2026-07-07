@@ -1,8 +1,5 @@
 import reducer from './index';
-import {
-  CHANGE_ACTIVE_SESSION_SLUG,
-  LOGIN_ACCOUNT,
-} from '../actions/types';
+import { CHANGE_ACTIVE_SESSION_SLUG, LOGIN_ACCOUNT } from '../actions/types';
 
 describe('root reducer', () => {
   it('builds the expected slice keys on init', () => {

@@ -5,7 +5,7 @@ import SbtPageStatusActionButton from './SbtPageStatusActionButton';
 import type { SbtPageStatusActionButtonContentState } from './SbtPageStatusActionButton';
 
 const buildContentState = (
-  overrides: Partial<SbtPageStatusActionButtonContentState> = {}
+  overrides: Partial<SbtPageStatusActionButtonContentState> = {},
 ): SbtPageStatusActionButtonContentState => ({
   failureLabel: 'Failed',
   idleLabel: 'Join',
@@ -27,7 +27,7 @@ describe('SbtPageStatusActionButton', () => {
         contentState={buildContentState({ shouldRenderIdleLabel: true })}
         onClick={onClick}
         title="View transaction"
-      />
+      />,
     );
 
     const button = screen.getByRole('button', { name: 'Join' });
@@ -47,7 +47,7 @@ describe('SbtPageStatusActionButton', () => {
         contentState={buildContentState({ shouldRenderPendingIcon: true })}
         disabled
         onClick={jest.fn()}
-      />
+      />,
     );
 
     const button = screen.getByRole('button');
@@ -63,7 +63,7 @@ describe('SbtPageStatusActionButton', () => {
         className="mint-button"
         contentState={buildContentState({ shouldRenderSuccess: true })}
         onClick={jest.fn()}
-      />
+      />,
     );
 
     expect(screen.getByRole('button')).toHaveTextContent('Done');
@@ -76,7 +76,7 @@ describe('SbtPageStatusActionButton', () => {
         className="mint-button"
         contentState={buildContentState({ shouldRenderFailure: true })}
         onClick={jest.fn()}
-      />
+      />,
     );
 
     expect(screen.getByRole('button')).toHaveTextContent('Failed');

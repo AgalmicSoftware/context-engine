@@ -1,14 +1,5 @@
-import {
-  baseSepolia,
-  optimismSepolia,
-  getDefaultHttpRpc,
-  getPreferredPathRpcUrl,
-} from '../../variables/chains.js';
-import {
-  getFallbackRpcUrlForChain,
-  getPrimaryRpcUrlForChain,
-  normalizeRpcCandidateList,
-} from './rpcSelection.js';
+import { baseSepolia, optimismSepolia, getDefaultHttpRpc, getPreferredPathRpcUrl } from '../../variables/chains.js';
+import { getFallbackRpcUrlForChain, getPrimaryRpcUrlForChain, normalizeRpcCandidateList } from './rpcSelection.js';
 
 const probeChainRpcWithFallback = async (chain, request) => {
   const primary = getPrimaryRpcUrlForChain(chain);
@@ -39,20 +30,18 @@ describe('App RPC selection + fallback smoke', () => {
     const basePrimary = getPrimaryRpcUrlForChain(baseSepolia);
     const opPrimary = getPrimaryRpcUrlForChain(optimismSepolia);
 
-    const expectedBasePrimary = (
+    const expectedBasePrimary =
       getPreferredPathRpcUrl(84532) ||
       getDefaultHttpRpc(84532, { allowPath: false }) ||
       baseSepolia?.rpcUrls?.default?.http?.[0] ||
       baseSepolia?.rpcUrls?.public?.http?.[0] ||
-      ''
-    );
-    const expectedOpPrimary = (
+      '';
+    const expectedOpPrimary =
       getPreferredPathRpcUrl(11155420) ||
       getDefaultHttpRpc(11155420, { allowPath: false }) ||
       optimismSepolia?.rpcUrls?.default?.http?.[0] ||
       optimismSepolia?.rpcUrls?.public?.http?.[0] ||
-      ''
-    );
+      '';
 
     expect(basePrimary).toBe(expectedBasePrimary);
     expect(opPrimary).toBe(expectedOpPrimary);

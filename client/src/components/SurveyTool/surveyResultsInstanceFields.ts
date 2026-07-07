@@ -1,6 +1,4 @@
-import {
-  EMPTY_SCOPED_QUESTION_NETWORK_DATA,
-} from './surveyResultsQuestionNetworkReadController';
+import { EMPTY_SCOPED_QUESTION_NETWORK_DATA } from './surveyResultsQuestionNetworkReadController';
 
 export const createSurveyResultsInstanceFields = (): Record<string, unknown> => ({
   _syncLoadingStartedAt: null,

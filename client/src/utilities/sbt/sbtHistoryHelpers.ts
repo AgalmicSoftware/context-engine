@@ -1,7 +1,4 @@
-import {
-  normalizeSbtCountMap,
-  sumSbtCountMap,
-} from './sbtCountHelpers.js';
+import { normalizeSbtCountMap, sumSbtCountMap } from './sbtCountHelpers.js';
 
 export interface SbtHistorySummary {
   totalMinted: string;
@@ -43,13 +40,14 @@ export const normalizeSbtHistorySummary = (summaryIn: unknown): SbtHistorySummar
   };
 };
 
-
-export const buildSbtHistorySummaryFromCounts = (counts?: {
-  mintedCountByAddress?: Record<string, unknown> | null;
-  burnedCountByAddress?: Record<string, unknown> | null;
-  mintedEventCount?: unknown;
-  burnedEventCount?: unknown;
-} | null): SbtHistorySummary | null => {
+export const buildSbtHistorySummaryFromCounts = (
+  counts?: {
+    mintedCountByAddress?: Record<string, unknown> | null;
+    burnedCountByAddress?: Record<string, unknown> | null;
+    mintedEventCount?: unknown;
+    burnedEventCount?: unknown;
+  } | null,
+): SbtHistorySummary | null => {
   const mintedCountByAddress = normalizeSbtCountMap(counts?.mintedCountByAddress);
   const burnedCountByAddress = normalizeSbtCountMap(counts?.burnedCountByAddress);
   const mintedEventCount = Math.max(0, Math.floor(Number(counts?.mintedEventCount || 0)));

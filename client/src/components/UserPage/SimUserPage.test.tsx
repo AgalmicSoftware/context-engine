@@ -40,11 +40,7 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => (props: MockSingleQuesti
   const answerText = Array.isArray(rawValue) ? rawValue.join(' | ') : String(rawValue ?? '');
 
   return (
-    <div
-      data-testid="sim-question-card"
-      data-mode={props.mode}
-      data-type={props.question?.type || ''}
-    >
+    <div data-testid="sim-question-card" data-mode={props.mode} data-type={props.question?.type || ''}>
       <span>{props.question?.prompt}</span>
       <span>{answerText}</span>
     </div>
@@ -55,21 +51,23 @@ describe('SimUserPage', () => {
   const mockCanvasAvatar = (value = 'data:image/png;base64,mock-blockie') => {
     const nativeCreateElement = document.createElement.bind(document) as (
       tagName: string,
-      options?: ElementCreationOptions
+      options?: ElementCreationOptions,
     ) => HTMLElement;
     const getContext = jest.fn(() => ({ fillStyle: '', fillRect: jest.fn() }));
     const toDataURL = jest.fn(() => value);
-    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName: string, options?: ElementCreationOptions) => {
-      if (tagName === 'canvas') {
-        return {
-          width: 0,
-          height: 0,
-          getContext,
-          toDataURL,
-        } as unknown as HTMLCanvasElement;
-      }
-      return nativeCreateElement(tagName, options);
-    });
+    const createElementSpy = jest
+      .spyOn(document, 'createElement')
+      .mockImplementation((tagName: string, options?: ElementCreationOptions) => {
+        if (tagName === 'canvas') {
+          return {
+            width: 0,
+            height: 0,
+            getContext,
+            toDataURL,
+          } as unknown as HTMLCanvasElement;
+        }
+        return nativeCreateElement(tagName, options);
+      });
 
     return { createElementSpy, getContext, toDataURL };
   };
@@ -93,12 +91,14 @@ describe('SimUserPage', () => {
     expect(screen.getByText(figure.questions[0].question)).toBeInTheDocument();
     expect(screen.getAllByText(String(firstBinary?.answer.value)).length).toBeGreaterThan(0);
     expect(
-      screen.getByText((content: string) => content.includes(String(firstFreeform?.answer.value).substring(0, 40)))
+      screen.getByText((content: string) => content.includes(String(firstFreeform?.answer.value).substring(0, 40))),
     ).toBeInTheDocument();
     expect(screen.queryByText(/^Question 1$/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Binary$/i)).not.toBeInTheDocument();
     expect(screen.getByText(figure.biggestHope)).toBeInTheDocument();
-    expect(screen.getByAltText(figure.name).getAttribute('src')).toMatch(/^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/)/);
+    expect(screen.getByAltText(figure.name).getAttribute('src')).toMatch(
+      /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/)/,
+    );
   });
 
   it('prepends PUBLIC_URL when building atlas links', async () => {
@@ -113,11 +113,12 @@ describe('SimUserPage', () => {
       const atlasLinks = await screen.findAllByRole('link', { name: /Open .* in the atlas/i });
       const atlasLink = atlasLinks[0];
       expect(atlasLink.getAttribute('href')).toMatch(
-        /^\/ce\/atlas\/.+\?demo=1&returnTo=%2Fce%2Fsu%2FFranklin%3Ftab%3Datlas%23positions$/
+        /^\/ce\/atlas\/.+\?demo=1&returnTo=%2Fce%2Fsu%2FFranklin%3Ftab%3Datlas%23positions$/,
       );
 
-      const profileLinks = (await screen.findAllByRole('link'))
-        .filter((link) => /^\/ce\/su\//.test(link.getAttribute('href') || ''));
+      const profileLinks = (await screen.findAllByRole('link')).filter((link) =>
+        /^\/ce\/su\//.test(link.getAttribute('href') || ''),
+      );
       expect(profileLinks.length).toBeGreaterThan(0);
     } finally {
       window.history.replaceState({}, '', priorUrl);

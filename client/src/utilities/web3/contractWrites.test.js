@@ -62,17 +62,19 @@ describe('contractWrites gas override fallbacks', () => {
 
     expect(signingProvider.request).toHaveBeenCalledWith({
       method: 'eth_sendTransaction',
-      params: [expect.objectContaining({
-        from: '0x00000000000000000000000000000000000000aa',
-        to: '0x00000000000000000000000000000000000000bb',
-        data: '0xdeadbeef',
-        gas: ethers.BigNumber.from('550000').toHexString(),
-        value: ethers.BigNumber.from('123').toHexString(),
-        gasPrice: ethers.BigNumber.from('3000000000').toHexString(),
-        maxFeePerGas: ethers.BigNumber.from('4000000000').toHexString(),
-        maxPriorityFeePerGas: ethers.BigNumber.from('1000000000').toHexString(),
-        nonce: ethers.BigNumber.from('9').toHexString(),
-      })],
+      params: [
+        expect.objectContaining({
+          from: '0x00000000000000000000000000000000000000aa',
+          to: '0x00000000000000000000000000000000000000bb',
+          data: '0xdeadbeef',
+          gas: ethers.BigNumber.from('550000').toHexString(),
+          value: ethers.BigNumber.from('123').toHexString(),
+          gasPrice: ethers.BigNumber.from('3000000000').toHexString(),
+          maxFeePerGas: ethers.BigNumber.from('4000000000').toHexString(),
+          maxPriorityFeePerGas: ethers.BigNumber.from('1000000000').toHexString(),
+          nonce: ethers.BigNumber.from('9').toHexString(),
+        }),
+      ],
     });
     expect(ethersProvider.waitForTransaction).toHaveBeenCalledWith('0xtxhash');
     expect(result).toEqual({
@@ -140,15 +142,17 @@ describe('contractWrites gas override fallbacks', () => {
       },
     };
 
-    await expect(sendContractWriteViaProvider({
-      signingProvider,
-      ethersProvider,
-      signer,
-      contract,
-      method: 'mintThing',
-      args: ['value'],
-      revertMessage: 'mintThing transaction reverted on-chain.',
-    })).rejects.toThrow('Max tokens reached');
+    await expect(
+      sendContractWriteViaProvider({
+        signingProvider,
+        ethersProvider,
+        signer,
+        contract,
+        method: 'mintThing',
+        args: ['value'],
+        revertMessage: 'mintThing transaction reverted on-chain.',
+      }),
+    ).rejects.toThrow('Max tokens reached');
 
     expect(ethersProvider.call).not.toHaveBeenCalled();
     expect(contract.callStatic.mintThing).toHaveBeenCalledWith('value', {

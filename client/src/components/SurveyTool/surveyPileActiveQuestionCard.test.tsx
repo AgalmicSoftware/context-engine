@@ -53,9 +53,15 @@ describe('surveyPileActiveQuestionCard', () => {
       footerSection: <div data-testid="footer-section">Footer</div>,
     });
 
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'prompt-header')).not.toBeNull();
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'question-component')).not.toBeNull();
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'footer-section')).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'prompt-header'),
+    ).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'question-component'),
+    ).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'footer-section'),
+    ).not.toBeNull();
     expect(findElement(tree, (node) => nodeHasClassName(node, 'pileCardMainContent'))).not.toBeNull();
     expect(findElement(tree, (node) => nodeHasClassName(node, 'customQuestionContainer'))).not.toBeNull();
   });
@@ -66,15 +72,17 @@ describe('surveyPileActiveQuestionCard', () => {
       gatedPromptNotice: <div data-testid="gated-notice">Locked</div>,
     });
 
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'prompt-header')).not.toBeNull();
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'gated-notice')).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'prompt-header'),
+    ).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'gated-notice'),
+    ).not.toBeNull();
     expect(findElement(tree, (node) => nodeHasClassName(node, 'pileCardMainContent'))).toBeNull();
   });
 
   it('renders the unmasked pile question path through the shared shell and skips the masked callback', () => {
-    const renderQuestionMaskedPromptCard = jest.fn(() => (
-      <div data-testid="masked-card">Masked</div>
-    ));
+    const renderQuestionMaskedPromptCard = jest.fn(() => <div data-testid="masked-card">Masked</div>);
     const question: PileActiveQuestionLike = { id: 'q2' };
 
     const tree = renderPileActiveQuestionCard({
@@ -88,16 +96,20 @@ describe('surveyPileActiveQuestionCard', () => {
     });
 
     expect(renderQuestionMaskedPromptCard).not.toHaveBeenCalled();
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'prompt-header')).not.toBeNull();
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'question-component')).not.toBeNull();
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'footer-section')).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'prompt-header'),
+    ).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'question-component'),
+    ).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'footer-section'),
+    ).not.toBeNull();
     expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'masked-card')).toBeNull();
   });
 
   it('delegates masked prompts through the shared masked-card callback', () => {
-    const renderQuestionMaskedPromptCard = jest.fn(() => (
-      <div data-testid="masked-card">Masked</div>
-    ));
+    const renderQuestionMaskedPromptCard = jest.fn(() => <div data-testid="masked-card">Masked</div>);
     const question: PileActiveQuestionLike = { id: 'q1' };
 
     const tree = renderPileActiveQuestionCard({
@@ -114,7 +126,11 @@ describe('surveyPileActiveQuestionCard', () => {
       mode: 'pile',
       question,
     });
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'masked-card')).not.toBeNull();
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'question-component')).toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'masked-card'),
+    ).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'question-component'),
+    ).toBeNull();
   });
 });

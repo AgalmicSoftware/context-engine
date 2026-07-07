@@ -29,10 +29,7 @@ const SurveyResultsSurveyViewModeToggle = ({
       onClick={onToggle}
       onKeyDown={onKeyDown}
     >
-      <div
-        className={styleMap.toggleKnob}
-        style={knobStyle}
-      />
+      <div className={styleMap.toggleKnob} style={knobStyle} />
     </div>
     <Label className={styleMap.toggleLabel} style={trailingLabelStyle}>
       Aggregate

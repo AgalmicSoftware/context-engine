@@ -125,81 +125,109 @@ describe('sbtSelector scoped entry helpers', () => {
     expect(hasAuthoritativeSessionSlug({ sessionSlug: 'Alpha', sessionSlugExplicit: false })).toBe(false);
     expect(hasAuthoritativeSessionSlug({ slug: 'Alpha' })).toBe(false);
 
-    expect(resolveAuthoritativeSbtSessionBindingSlug({
-      sbtInfo: { sessionSlug: 'Alpha', sessionSlugExplicit: true },
-    })).toBe('Alpha');
-    expect(resolveAuthoritativeSbtSessionBindingSlug({
-      sessionSlug: 'Beta',
-    })).toBe('Beta');
-    expect(resolveAuthoritativeSbtSessionBindingSlug({
-      sbtInfo: { slug: 'Legacy' },
-    })).toBe('Legacy');
-    expect(resolveAuthoritativeSbtSessionBindingSlug({
-      sessionSlug: 'Inferred',
-      sessionSlugExplicit: false,
-    })).toBeNull();
+    expect(
+      resolveAuthoritativeSbtSessionBindingSlug({
+        sbtInfo: { sessionSlug: 'Alpha', sessionSlugExplicit: true },
+      }),
+    ).toBe('Alpha');
+    expect(
+      resolveAuthoritativeSbtSessionBindingSlug({
+        sessionSlug: 'Beta',
+      }),
+    ).toBe('Beta');
+    expect(
+      resolveAuthoritativeSbtSessionBindingSlug({
+        sbtInfo: { slug: 'Legacy' },
+      }),
+    ).toBe('Legacy');
+    expect(
+      resolveAuthoritativeSbtSessionBindingSlug({
+        sessionSlug: 'Inferred',
+        sessionSlugExplicit: false,
+      }),
+    ).toBeNull();
 
-    expect(resolveDeclaredSbtSessionSlug({
-      sbtInfo: { sessionSlug: 'Declared' },
-      sessionSlug: 'Fallback',
-    })).toBe('Declared');
+    expect(
+      resolveDeclaredSbtSessionSlug({
+        sbtInfo: { sessionSlug: 'Declared' },
+        sessionSlug: 'Fallback',
+      }),
+    ).toBe('Declared');
     expect(resolveDeclaredSbtSessionSlug({ sessionSlug: 'Fallback' })).toBe('Fallback');
     expect(resolveDeclaredSbtSessionSlug({})).toBeNull();
     const listScopeTargetSlugSet = new Set(['alpha']);
-    expect(shouldIncludeSbtSelectorEntryForListScope({
-      declaredSessionSlug: 'alpha',
-      hasVisibleMetadata: true,
-      listScopeTargetSlugSet,
-      scopedBucketSlug: 'beta',
-    })).toBe(true);
-    expect(shouldIncludeSbtSelectorEntryForListScope({
-      declaredSessionSlug: 'beta',
-      listScopeTargetSlugSet,
-      scopedBucketSlug: 'alpha',
-    })).toBe(false);
-    expect(shouldIncludeSbtSelectorEntryForListScope({
-      declaredSessionSlug: null,
-      hasVisibleMetadata: false,
-      listScopeTargetSlugSet,
-      scopedBucketSlug: 'alpha',
-    })).toBe(true);
-    expect(shouldIncludeSbtSelectorEntryForListScope({
-      declaredSessionSlug: null,
-      hasVisibleMetadata: true,
-      listScopeTargetSlugSet,
-      scopedBucketSlug: 'alpha',
-    })).toBe(false);
-    expect(shouldSkipSbtSelectorEntryForOptions({
-      address: '0xabc',
-      ignoredAddressSet: new Set(['alpha|0xabc']),
-      resolvedSlug: 'alpha',
-    })).toBe(true);
-    expect(shouldSkipSbtSelectorEntryForOptions({
-      address: '0xabc',
-      isManual: false,
-      sbtInfo: { unlisted: true },
-    })).toBe(true);
-    expect(shouldSkipSbtSelectorEntryForOptions({
-      address: '0xabc',
-      isManual: true,
-      sbtInfo: { unlisted: true },
-    })).toBe(false);
-    expect(shouldSkipSbtSelectorEntryForOptions({
-      address: '0xabc',
-      sbtOptionsMap: new Map([['0xabc:1', {}]]),
-      selectionKey: '0xabc:1',
-    })).toBe(true);
-    expect(resolveSbtSelectorOptionEntryContext({
-      fallbackSlug: 'fallback',
-      sbt: {
-        chainId: '11155420',
-        manual: true,
-        sbtAddress: '0xABC',
-        sbtInfo: { name: 'Visible Badge' },
-        sessionBindingSlug: 'Binding',
-        slug: 'alpha',
-      },
-    })).toEqual({
+    expect(
+      shouldIncludeSbtSelectorEntryForListScope({
+        declaredSessionSlug: 'alpha',
+        hasVisibleMetadata: true,
+        listScopeTargetSlugSet,
+        scopedBucketSlug: 'beta',
+      }),
+    ).toBe(true);
+    expect(
+      shouldIncludeSbtSelectorEntryForListScope({
+        declaredSessionSlug: 'beta',
+        listScopeTargetSlugSet,
+        scopedBucketSlug: 'alpha',
+      }),
+    ).toBe(false);
+    expect(
+      shouldIncludeSbtSelectorEntryForListScope({
+        declaredSessionSlug: null,
+        hasVisibleMetadata: false,
+        listScopeTargetSlugSet,
+        scopedBucketSlug: 'alpha',
+      }),
+    ).toBe(true);
+    expect(
+      shouldIncludeSbtSelectorEntryForListScope({
+        declaredSessionSlug: null,
+        hasVisibleMetadata: true,
+        listScopeTargetSlugSet,
+        scopedBucketSlug: 'alpha',
+      }),
+    ).toBe(false);
+    expect(
+      shouldSkipSbtSelectorEntryForOptions({
+        address: '0xabc',
+        ignoredAddressSet: new Set(['alpha|0xabc']),
+        resolvedSlug: 'alpha',
+      }),
+    ).toBe(true);
+    expect(
+      shouldSkipSbtSelectorEntryForOptions({
+        address: '0xabc',
+        isManual: false,
+        sbtInfo: { unlisted: true },
+      }),
+    ).toBe(true);
+    expect(
+      shouldSkipSbtSelectorEntryForOptions({
+        address: '0xabc',
+        isManual: true,
+        sbtInfo: { unlisted: true },
+      }),
+    ).toBe(false);
+    expect(
+      shouldSkipSbtSelectorEntryForOptions({
+        address: '0xabc',
+        sbtOptionsMap: new Map([['0xabc:1', {}]]),
+        selectionKey: '0xabc:1',
+      }),
+    ).toBe(true);
+    expect(
+      resolveSbtSelectorOptionEntryContext({
+        fallbackSlug: 'fallback',
+        sbt: {
+          chainId: '11155420',
+          manual: true,
+          sbtAddress: '0xABC',
+          sbtInfo: { name: 'Visible Badge' },
+          sessionBindingSlug: 'Binding',
+          slug: 'alpha',
+        },
+      }),
+    ).toEqual({
       address: '0xabc',
       chainId: 11155420,
       isManual: true,
@@ -207,48 +235,56 @@ describe('sbtSelector scoped entry helpers', () => {
       sbtInfo: { name: 'Visible Badge' },
       selectionKey: '11155420:0xabc',
     });
-    expect(resolveSbtSelectorOptionEntryContext({
-      fallbackSlug: 'fallback',
-      sbt: {
-        sbtAddress: '',
+    expect(
+      resolveSbtSelectorOptionEntryContext({
+        fallbackSlug: 'fallback',
+        sbt: {
+          sbtAddress: '',
+        },
+      }),
+    ).toBeNull();
+    expect(
+      buildSbtSelectorNameHydrationEntries({
+        fallbackSlug: 'fallback',
+        sbtList: {
+          '0x1111111111111111111111111111111111111111': {
+            sbtAddress: '0x1111111111111111111111111111111111111111',
+            sessionBindingSlug: 'Binding',
+            slug: 'alpha',
+          },
+          '0x2222222222222222222222222222222222222222': {
+            sbtAddress: '0x2222222222222222222222222222222222222222',
+            sbtInfo: { name: 'Already Named' },
+            slug: 'beta',
+          },
+          invalid: {
+            sbtAddress: 'not-an-address',
+          },
+        },
+      }),
+    ).toEqual([
+      {
+        address: '0x1111111111111111111111111111111111111111',
+        slug: 'Binding',
       },
-    })).toBeNull();
-    expect(buildSbtSelectorNameHydrationEntries({
-      fallbackSlug: 'fallback',
-      sbtList: {
-        '0x1111111111111111111111111111111111111111': {
-          sbtAddress: '0x1111111111111111111111111111111111111111',
+    ]);
+    expect(
+      buildSbtSelectorOptionFromEntry({
+        address: '0xabc',
+        chainId: 11155420,
+        resolvedName: 'Visible Badge',
+        resolvedSlug: 'alpha',
+        sbt: {
           sessionBindingSlug: 'Binding',
-          slug: 'alpha',
+          sessionName: 'Entry Session',
         },
-        '0x2222222222222222222222222222222222222222': {
-          sbtAddress: '0x2222222222222222222222222222222222222222',
-          sbtInfo: { name: 'Already Named' },
-          slug: 'beta',
+        sbtInfo: {
+          image: 'ar://image',
+          sessionName: 'Metadata Session',
         },
-        invalid: {
-          sbtAddress: 'not-an-address',
-        },
-      },
-    })).toEqual([{
-      address: '0x1111111111111111111111111111111111111111',
-      slug: 'Binding',
-    }]);
-    expect(buildSbtSelectorOptionFromEntry({
-      address: '0xabc',
-      chainId: 11155420,
-      resolvedName: 'Visible Badge',
-      resolvedSlug: 'alpha',
-      sbt: {
-        sessionBindingSlug: 'Binding',
-        sessionName: 'Entry Session',
-      },
-      sbtInfo: {
-        image: 'ar://image',
-        sessionName: 'Metadata Session',
-      },
-      selectionKey: '0xabc:11155420',
-    })).toEqual({
+        selectionKey: '0xabc:11155420',
+      }),
+    ).toEqual({
       address: '0xabc',
       chainId: 11155420,
       image: 'ar://image',
@@ -259,18 +295,20 @@ describe('sbtSelector scoped entry helpers', () => {
       sessionName: 'Metadata Session',
       sessionSlug: 'alpha',
     });
-    expect(buildSbtSelectorOptionFromEntry({
-      address: '0xdef',
-      chainId: 0,
-      resolvedName: '[encrypted]',
-      resolvedSlug: 'beta',
-      sbt: {
-        sessionName: 'Entry Session',
-      },
-      sbtInfo: {
-        nameLocked: true,
-      },
-    })).toEqual({
+    expect(
+      buildSbtSelectorOptionFromEntry({
+        address: '0xdef',
+        chainId: 0,
+        resolvedName: '[encrypted]',
+        resolvedSlug: 'beta',
+        sbt: {
+          sessionName: 'Entry Session',
+        },
+        sbtInfo: {
+          nameLocked: true,
+        },
+      }),
+    ).toEqual({
       address: '0xdef',
       chainId: null,
       image: null,
@@ -282,9 +320,7 @@ describe('sbtSelector scoped entry helpers', () => {
     });
 
     const onMissingAddress = jest.fn();
-    const resolveSbtLabel = jest.fn((sbtInfo, address, slug) => (
-      `${String(sbtInfo?.name || address)}@${slug}`
-    ));
+    const resolveSbtLabel = jest.fn((sbtInfo, address, slug) => `${String(sbtInfo?.name || address)}@${slug}`);
     const options = buildSbtSelectorOptions({
       fallbackSlug: 'alpha',
       featuredEntries: [{ address: '0xbbbb', slug: 'alpha' }],
@@ -329,14 +365,18 @@ describe('sbtSelector scoped entry helpers', () => {
     expect(options.map((option) => option.name)).toEqual(['0xbbbb@alpha', 'Alpha Badge@alpha']);
     expect(onMissingAddress).toHaveBeenCalledWith({ sbtInfo: { name: 'Missing Address' } });
 
-    expect(resolveConcreteSbtSessionBindingSlug({
-      sessionSlug: 'Concrete',
-      sessionSlugExplicit: true,
-    })).toBe('Concrete');
-    expect(resolveConcreteSbtSessionBindingSlug({
-      sessionSlug: 'Inferred',
-      sessionSlugExplicit: false,
-    })).toBeNull();
+    expect(
+      resolveConcreteSbtSessionBindingSlug({
+        sessionSlug: 'Concrete',
+        sessionSlugExplicit: true,
+      }),
+    ).toBe('Concrete');
+    expect(
+      resolveConcreteSbtSessionBindingSlug({
+        sessionSlug: 'Inferred',
+        sessionSlugExplicit: false,
+      }),
+    ).toBeNull();
   });
 
   it('builds stable selector request signatures', () => {
@@ -346,60 +386,68 @@ describe('sbtSelector scoped entry helpers', () => {
       blockLimits: { start: '10', end: '20' },
     });
     expect(sessionConfigSig).toBe('alpha|0xf00|84532|10|20');
-    expect(buildFeaturedEntrySignature([
-      { slug: 'alpha', address: ' 0xB ' },
-      { slug: 'General', address: '' },
-      null,
-    ])).toBe('alpha:0xb');
-    expect(buildSbtOptionsRequestSignature({
-      slug: 'alpha',
-      cacheRevision: 3,
-      sessionConfigSig,
-      targetSlugChainSig: 'alpha:84532',
-      featuredEntries: [{ slug: 'alpha', address: '0xB' }],
-      ignoredFromConfig: ['0xC', '0xc'],
-    })).toBe('alpha|3|alpha|0xf00|84532|10|20|alpha:84532|alpha:0xb|0xc');
+    expect(
+      buildFeaturedEntrySignature([{ slug: 'alpha', address: ' 0xB ' }, { slug: 'General', address: '' }, null]),
+    ).toBe('alpha:0xb');
+    expect(
+      buildSbtOptionsRequestSignature({
+        slug: 'alpha',
+        cacheRevision: 3,
+        sessionConfigSig,
+        targetSlugChainSig: 'alpha:84532',
+        featuredEntries: [{ slug: 'alpha', address: '0xB' }],
+        ignoredFromConfig: ['0xC', '0xc'],
+      }),
+    ).toBe('alpha|3|alpha|0xf00|84532|10|20|alpha:84532|alpha:0xb|0xc');
   });
 
   it('resolves load-options request decisions', () => {
-    expect(resolveSbtSelectorLoadOptionsRequestDecision({
-      forceReload: false,
-      inflightRequest: null,
-      lastRequestSig: 'same',
-      requestSig: 'same',
-    })).toEqual({
+    expect(
+      resolveSbtSelectorLoadOptionsRequestDecision({
+        forceReload: false,
+        inflightRequest: null,
+        lastRequestSig: 'same',
+        requestSig: 'same',
+      }),
+    ).toEqual({
       shouldQueueRerun: false,
       shouldReturnInflight: false,
       shouldSkipUnchanged: true,
     });
 
     const inflight = Promise.resolve();
-    expect(resolveSbtSelectorLoadOptionsRequestDecision({
-      forceReload: false,
-      inflightRequest: inflight,
-      inflightSig: 'same',
-      requestSig: 'same',
-    })).toEqual({
+    expect(
+      resolveSbtSelectorLoadOptionsRequestDecision({
+        forceReload: false,
+        inflightRequest: inflight,
+        inflightSig: 'same',
+        requestSig: 'same',
+      }),
+    ).toEqual({
       shouldQueueRerun: false,
       shouldReturnInflight: true,
       shouldSkipUnchanged: false,
     });
-    expect(resolveSbtSelectorLoadOptionsRequestDecision({
-      forceReload: false,
-      inflightRequest: inflight,
-      inflightSig: 'old',
-      requestSig: 'new',
-    })).toEqual({
+    expect(
+      resolveSbtSelectorLoadOptionsRequestDecision({
+        forceReload: false,
+        inflightRequest: inflight,
+        inflightSig: 'old',
+        requestSig: 'new',
+      }),
+    ).toEqual({
       shouldQueueRerun: true,
       shouldReturnInflight: true,
       shouldSkipUnchanged: false,
     });
-    expect(resolveSbtSelectorLoadOptionsRequestDecision({
-      forceReload: true,
-      inflightRequest: inflight,
-      inflightSig: 'same',
-      requestSig: 'same',
-    }).shouldQueueRerun).toBe(true);
+    expect(
+      resolveSbtSelectorLoadOptionsRequestDecision({
+        forceReload: true,
+        inflightRequest: inflight,
+        inflightSig: 'same',
+        requestSig: 'same',
+      }).shouldQueueRerun,
+    ).toBe(true);
   });
 
   it('resolves SBT entry chain IDs with fallbacks', () => {
@@ -410,14 +458,19 @@ describe('sbtSelector scoped entry helpers', () => {
   });
 
   it('decorates scoped SBT entries with source, binding, and chain context', () => {
-    expect(decorateScopedSbtEntry({
-      slug: 'Alpha',
-      sbtInfo: {
-        chainID: '84532',
-        sessionSlug: 'Concrete',
-        sessionSlugExplicit: true,
-      },
-    }, 'Fallback')).toMatchObject({
+    expect(
+      decorateScopedSbtEntry(
+        {
+          slug: 'Alpha',
+          sbtInfo: {
+            chainID: '84532',
+            sessionSlug: 'Concrete',
+            sessionSlugExplicit: true,
+          },
+        },
+        'Fallback',
+      ),
+    ).toMatchObject({
       chainId: 84532,
       slug: 'Alpha',
       __sourceSessionSlug: 'Alpha',
@@ -445,7 +498,7 @@ describe('sbtSelector scoped entry helpers', () => {
           name: 'Named Badge',
         },
       },
-      'Fallback'
+      'Fallback',
     );
 
     expect(merged).toMatchObject({
@@ -458,22 +511,23 @@ describe('sbtSelector scoped entry helpers', () => {
         name: 'Named Badge',
       },
     });
-    expect(mergeScopedSbtEntry(
-      {
-        slug: 'Alpha',
-        sbtInfo: { name: 'Existing Badge' },
-      },
-      {
-        slug: 'Beta',
-        sbtInfo: { name: 'Incoming Badge' },
-      },
-      'Fallback'
-    )?.sbtInfo).toEqual({ name: 'Existing Badge' });
-    expect(mergeScopedSbtEntry(
-      { slug: 'Alpha', sbtInfo: {} },
-      { slug: 'Beta', sbtInfo: { nameLocked: true } },
-      'Fallback'
-    )?.sbtInfo).toEqual({ nameLocked: true });
+    expect(
+      mergeScopedSbtEntry(
+        {
+          slug: 'Alpha',
+          sbtInfo: { name: 'Existing Badge' },
+        },
+        {
+          slug: 'Beta',
+          sbtInfo: { name: 'Incoming Badge' },
+        },
+        'Fallback',
+      )?.sbtInfo,
+    ).toEqual({ name: 'Existing Badge' });
+    expect(
+      mergeScopedSbtEntry({ slug: 'Alpha', sbtInfo: {} }, { slug: 'Beta', sbtInfo: { nameLocked: true } }, 'Fallback')
+        ?.sbtInfo,
+    ).toEqual({ nameLocked: true });
   });
 
   it('merges linked scoped SBT entries into the active selector list', () => {
@@ -511,22 +565,22 @@ describe('sbtSelector scoped entry helpers', () => {
   });
 
   it('identifies when incoming scoped SBT entries should replace existing metadata', () => {
-    expect(shouldPreferIncomingScopedSbtEntry(
-      { sbtInfo: {} },
-      { sbtInfo: { name: 'Named Badge' } }
-    )).toBe(true);
-    expect(shouldPreferIncomingScopedSbtEntry(
-      { sbtInfo: { name: 'Existing Badge' } },
-      { sbtInfo: { name: 'Incoming Badge' } }
-    )).toBe(false);
-    expect(shouldPreferIncomingScopedSbtEntry(
-      { sbtInfo: { name: 'Existing Badge' } },
-      { sbtInfo: { image: 'ar://image' } }
-    )).toBe(true);
-    expect(shouldPreferIncomingScopedSbtEntry(
-      { sbtInfo: { image: 'ar://existing' } },
-      { sbtInfo: { image: 'ar://incoming' } }
-    )).toBe(false);
+    expect(shouldPreferIncomingScopedSbtEntry({ sbtInfo: {} }, { sbtInfo: { name: 'Named Badge' } })).toBe(true);
+    expect(
+      shouldPreferIncomingScopedSbtEntry(
+        { sbtInfo: { name: 'Existing Badge' } },
+        { sbtInfo: { name: 'Incoming Badge' } },
+      ),
+    ).toBe(false);
+    expect(
+      shouldPreferIncomingScopedSbtEntry({ sbtInfo: { name: 'Existing Badge' } }, { sbtInfo: { image: 'ar://image' } }),
+    ).toBe(true);
+    expect(
+      shouldPreferIncomingScopedSbtEntry(
+        { sbtInfo: { image: 'ar://existing' } },
+        { sbtInfo: { image: 'ar://incoming' } },
+      ),
+    ).toBe(false);
   });
 
   it('applies discovered SBT addresses to scoped cache lists', () => {
@@ -708,22 +762,28 @@ describe('sbtSelector scoped entry helpers', () => {
     const first = '0x00000000000000000000000000000000000000aa';
     const second = '0x00000000000000000000000000000000000000bb';
 
-    expect(buildSelectedSbtHydrationSignature({
-      addresses: [first, second],
-      networkID: '84532',
-      slug: 'Alpha',
-    })).toBe(`Alpha|84532|${first},${second}`);
-    expect(buildSelectedSbtHydrationSignature({
-      addresses: 'bad',
-      networkID: 'bad',
-      slug: null,
-    })).toBe('|NaN|');
+    expect(
+      buildSelectedSbtHydrationSignature({
+        addresses: [first, second],
+        networkID: '84532',
+        slug: 'Alpha',
+      }),
+    ).toBe(`Alpha|84532|${first},${second}`);
+    expect(
+      buildSelectedSbtHydrationSignature({
+        addresses: 'bad',
+        networkID: 'bad',
+        slug: null,
+      }),
+    ).toBe('|NaN|');
 
-    expect(resolveSbtSelectorTargetedHydrationDecision({
-      addresses: [first],
-      hits: null,
-      targetedLookupEnabled: false,
-    })).toEqual({
+    expect(
+      resolveSbtSelectorTargetedHydrationDecision({
+        addresses: [first],
+        hits: null,
+        targetedLookupEnabled: false,
+      }),
+    ).toEqual({
       hasHits: false,
       hasUnresolvedAddresses: true,
       shouldClearRetry: true,
@@ -731,11 +791,13 @@ describe('sbtSelector scoped entry helpers', () => {
       shouldRetry: false,
     });
 
-    expect(resolveSbtSelectorTargetedHydrationDecision({
-      addresses: [first],
-      hits: [],
-      targetedLookupEnabled: true,
-    })).toEqual({
+    expect(
+      resolveSbtSelectorTargetedHydrationDecision({
+        addresses: [first],
+        hits: [],
+        targetedLookupEnabled: true,
+      }),
+    ).toEqual({
       hasHits: false,
       hasUnresolvedAddresses: true,
       shouldClearRetry: false,
@@ -743,11 +805,13 @@ describe('sbtSelector scoped entry helpers', () => {
       shouldRetry: true,
     });
 
-    expect(resolveSbtSelectorTargetedHydrationDecision({
-      addresses: [first, second],
-      hits: [{ address: first.toUpperCase() }],
-      targetedLookupEnabled: true,
-    })).toEqual({
+    expect(
+      resolveSbtSelectorTargetedHydrationDecision({
+        addresses: [first, second],
+        hits: [{ address: first.toUpperCase() }],
+        targetedLookupEnabled: true,
+      }),
+    ).toEqual({
       hasHits: true,
       hasUnresolvedAddresses: true,
       shouldClearRetry: false,
@@ -755,19 +819,19 @@ describe('sbtSelector scoped entry helpers', () => {
       shouldRetry: true,
     });
 
-    expect(resolveSbtSelectorTargetedHydrationDecision({
-      addresses: [first],
-      hits: [{ address: first.toUpperCase() }],
-      targetedLookupEnabled: true,
-    })).toEqual({
+    expect(
+      resolveSbtSelectorTargetedHydrationDecision({
+        addresses: [first],
+        hits: [{ address: first.toUpperCase() }],
+        targetedLookupEnabled: true,
+      }),
+    ).toEqual({
       hasHits: true,
       hasUnresolvedAddresses: false,
       shouldClearRetry: true,
       shouldReloadOptions: true,
       shouldRetry: false,
     });
-
-
   });
 
   it('aggregates scoped SBT cache contexts by chain-scoped lookup key', () => {
@@ -881,63 +945,73 @@ describe('sbtSelector scoped entry helpers', () => {
       sessionBindingSlug: 'Beta',
       slug: 'Beta',
     });
-    expect(buildLinkedSbtSelectorListFromKnownCache({
-      knownEntries,
-      targetSlugs: [],
-    })).toEqual({});
+    expect(
+      buildLinkedSbtSelectorListFromKnownCache({
+        knownEntries,
+        targetSlugs: [],
+      }),
+    ).toEqual({});
   });
 
   it('resolves linked scoped entries against source and binding scope', () => {
-    expect(resolveLinkedSbtSelectorScopeEntry({
-      scopedEntry: {
-        __sourceSessionSlug: 'Outside',
-        sessionBindingSlug: 'Beta',
-        slug: 'Outside',
-      },
-      sourceSlug: 'Outside',
-      targetSlugSet: new Set(['Beta']),
-    })).toMatchObject({
+    expect(
+      resolveLinkedSbtSelectorScopeEntry({
+        scopedEntry: {
+          __sourceSessionSlug: 'Outside',
+          sessionBindingSlug: 'Beta',
+          slug: 'Outside',
+        },
+        sourceSlug: 'Outside',
+        targetSlugSet: new Set(['Beta']),
+      }),
+    ).toMatchObject({
       __sourceSessionSlug: 'Outside',
       sessionBindingSlug: 'Beta',
       slug: 'Beta',
     });
-    expect(resolveLinkedSbtSelectorScopeEntry({
-      requireConcreteBinding: true,
-      scopedEntry: {
-        __sourceSessionSlug: 'Outside',
-        sbtInfo: {
-          sessionSlug: 'Beta',
-          sessionSlugExplicit: true,
+    expect(
+      resolveLinkedSbtSelectorScopeEntry({
+        requireConcreteBinding: true,
+        scopedEntry: {
+          __sourceSessionSlug: 'Outside',
+          sbtInfo: {
+            sessionSlug: 'Beta',
+            sessionSlugExplicit: true,
+          },
+          slug: 'Outside',
         },
-        slug: 'Outside',
-      },
-      sourceSlug: 'Outside',
-      targetSlugSet: new Set(['Beta']),
-    })).toMatchObject({
+        sourceSlug: 'Outside',
+        targetSlugSet: new Set(['Beta']),
+      }),
+    ).toMatchObject({
       sessionBindingSlug: 'Beta',
       slug: 'Beta',
     });
-    expect(resolveLinkedSbtSelectorScopeEntry({
-      requireConcreteBinding: true,
-      scopedEntry: {
-        __sourceSessionSlug: 'Alpha',
-        slug: 'Alpha',
-      },
-      sourceSlug: 'Alpha',
-      targetSlugSet: new Set(['Alpha']),
-    })).toMatchObject({
+    expect(
+      resolveLinkedSbtSelectorScopeEntry({
+        requireConcreteBinding: true,
+        scopedEntry: {
+          __sourceSessionSlug: 'Alpha',
+          slug: 'Alpha',
+        },
+        sourceSlug: 'Alpha',
+        targetSlugSet: new Set(['Alpha']),
+      }),
+    ).toMatchObject({
       __sourceSessionSlug: 'Alpha',
       slug: 'Alpha',
     });
-    expect(resolveLinkedSbtSelectorScopeEntry({
-      scopedEntry: {
-        __sourceSessionSlug: 'Outside',
-        sessionBindingSlug: 'Other',
-        slug: 'Outside',
-      },
-      sourceSlug: 'Outside',
-      targetSlugSet: new Set(['Beta']),
-    })).toBeNull();
+    expect(
+      resolveLinkedSbtSelectorScopeEntry({
+        scopedEntry: {
+          __sourceSessionSlug: 'Outside',
+          sessionBindingSlug: 'Other',
+          slug: 'Outside',
+        },
+        sourceSlug: 'Outside',
+        targetSlugSet: new Set(['Beta']),
+      }),
+    ).toBeNull();
   });
 
   it('compares option display fields and unresolved configs', () => {
@@ -965,22 +1039,30 @@ describe('sbtSelector scoped entry helpers', () => {
     expect(isMaskedSbtOptionLabel(' [ENCRYPTED] ')).toBe(true);
     expect(isMaskedSbtOptionLabel('Visible title')).toBe(false);
     expect(isMaskedHiddenTitle({ label: '[encrypted]', sbtInfo: null })).toBe(true);
-    expect(isMaskedHiddenTitle({
-      label: '[encrypted]',
-      sbtInfo: { nameLocked: true },
-    })).toBe(true);
-    expect(isMaskedHiddenTitle({
-      label: '[encrypted]',
-      sbtInfo: { name: 'Visible name', nameLocked: true },
-    })).toBe(false);
-    expect(isMaskedHiddenTitle({
-      label: '[encrypted]',
-      sbtInfo: { nameLocked: true, nameDecrypted: true },
-    })).toBe(false);
-    expect(isMaskedHiddenTitle({
-      label: 'Visible title',
-      sbtInfo: { nameLocked: true },
-    })).toBe(false);
+    expect(
+      isMaskedHiddenTitle({
+        label: '[encrypted]',
+        sbtInfo: { nameLocked: true },
+      }),
+    ).toBe(true);
+    expect(
+      isMaskedHiddenTitle({
+        label: '[encrypted]',
+        sbtInfo: { name: 'Visible name', nameLocked: true },
+      }),
+    ).toBe(false);
+    expect(
+      isMaskedHiddenTitle({
+        label: '[encrypted]',
+        sbtInfo: { nameLocked: true, nameDecrypted: true },
+      }),
+    ).toBe(false);
+    expect(
+      isMaskedHiddenTitle({
+        label: 'Visible title',
+        sbtInfo: { nameLocked: true },
+      }),
+    ).toBe(false);
   });
 
   it('sorts SBT selector options by masked state, featured rank, label, address, and chain', () => {
@@ -1003,19 +1085,20 @@ describe('sbtSelector scoped entry helpers', () => {
       { address: '0xe', name: 'Alpha', chainId: 2, maskedTitleHidden: false },
     ];
 
-    expect(options.sort((left, right) => compareSbtSelectorOptions(left, right, featuredOrder)))
-      .toEqual([
-        { address: '0xb', name: 'Zulu', chainId: 1, maskedTitleHidden: false },
-        { address: '0xa', name: 'Beta', chainId: 1, maskedTitleHidden: false },
-        { address: '0xd', name: 'Alpha', chainId: 1, maskedTitleHidden: false },
-        { address: '0xe', name: 'Alpha', chainId: 2, maskedTitleHidden: false },
-        { address: '0xc', name: 'Alpha', chainId: 10, maskedTitleHidden: true },
-      ]);
-    expect(compareSbtSelectorOptions(
-      { address: '0xf', name: 'Same', chainId: 2 },
-      { address: '0xf', name: 'Same', chainId: 1 },
-      featuredOrder
-    )).toBe(1);
+    expect(options.sort((left, right) => compareSbtSelectorOptions(left, right, featuredOrder))).toEqual([
+      { address: '0xb', name: 'Zulu', chainId: 1, maskedTitleHidden: false },
+      { address: '0xa', name: 'Beta', chainId: 1, maskedTitleHidden: false },
+      { address: '0xd', name: 'Alpha', chainId: 1, maskedTitleHidden: false },
+      { address: '0xe', name: 'Alpha', chainId: 2, maskedTitleHidden: false },
+      { address: '0xc', name: 'Alpha', chainId: 10, maskedTitleHidden: true },
+    ]);
+    expect(
+      compareSbtSelectorOptions(
+        { address: '0xf', name: 'Same', chainId: 2 },
+        { address: '0xf', name: 'Same', chainId: 1 },
+        featuredOrder,
+      ),
+    ).toBe(1);
     expect(compareSbtSelectorOptions('bad', { address: '0x1' }, featuredOrder)).toBeLessThan(0);
   });
 
@@ -1044,60 +1127,77 @@ describe('sbtSelector scoped entry helpers', () => {
     };
     const nextOption = { ...currentOption, name: 'Beta' };
 
-    expect(buildSbtSelectorOptionsStatePatch({
-      currentLoadingOptions: true,
-      currentSbtOptions: [currentOption],
-      currentScopeFeaturedAddresses: ['0xa'],
-      featuredEntries: [{ address: '0xA' }],
-      loadingOptions: true,
-      sbtOptions: [{ ...currentOption, extraIgnored: 'same' }],
-    })).toEqual({});
-    expect(buildSbtSelectorOptionsStatePatch({
-      currentLoadingOptions: true,
-      currentSbtOptions: [currentOption],
-      currentScopeFeaturedAddresses: ['0xa'],
-      featuredEntries: [{ address: '0xB' }],
-      loadingOptions: false,
-      sbtOptions: [nextOption],
-    })).toEqual({
+    expect(
+      buildSbtSelectorOptionsStatePatch({
+        currentLoadingOptions: true,
+        currentSbtOptions: [currentOption],
+        currentScopeFeaturedAddresses: ['0xa'],
+        featuredEntries: [{ address: '0xA' }],
+        loadingOptions: true,
+        sbtOptions: [{ ...currentOption, extraIgnored: 'same' }],
+      }),
+    ).toEqual({});
+    expect(
+      buildSbtSelectorOptionsStatePatch({
+        currentLoadingOptions: true,
+        currentSbtOptions: [currentOption],
+        currentScopeFeaturedAddresses: ['0xa'],
+        featuredEntries: [{ address: '0xB' }],
+        loadingOptions: false,
+        sbtOptions: [nextOption],
+      }),
+    ).toEqual({
       loadingOptions: false,
       sbtOptions: [nextOption],
       scopeFeaturedAddresses: ['0xb'],
     });
-    expect(buildSbtSelectorOptionsStatePatch({
-      currentSbtOptions: [currentOption],
-      sbtOptions: 'bad',
-    })).toEqual({
+    expect(
+      buildSbtSelectorOptionsStatePatch({
+        currentSbtOptions: [currentOption],
+        sbtOptions: 'bad',
+      }),
+    ).toEqual({
       sbtOptions: [],
     });
   });
 
   it('resolves SBT detail link session slug precedence', () => {
-    expect(resolveSbtDetailLinkSessionSlug({
-      sbt: {
-        sessionBindingSlug: 'Binding',
-        sbtInfo: { sessionSlug: 'Info', sessionSlugExplicit: true },
-        sessionSlug: 'Selected',
-      },
-      fallbackSlug: 'Fallback',
-    })).toBe('Binding');
-    expect(resolveSbtDetailLinkSessionSlug({
-      sbt: {
-        sbtInfo: { sessionSlug: 'Info', sessionSlugExplicit: true },
-        sessionSlug: 'Selected',
-      },
-      fallbackSlug: 'Fallback',
-    })).toBe('Info');
-    expect(resolveSbtDetailLinkSessionSlug({
-      sbt: { sessionSlug: 'Selected', sessionSlugExplicit: true },
-      fallbackSlug: 'Fallback',
-    })).toBe('Selected');
-    expect(resolveSbtDetailLinkSessionSlug({
-      sbt: { sessionSlug: 'Selected', sessionSlugExplicit: false },
-      fallbackSlug: 'Fallback',
-    })).toBe('Selected');
-    expect(resolveSbtDetailLinkSessionSlug({
-      sbt: {},
-      fallbackSlug: 'Fallback',
-    })).toBe('Fallback');
-  });});
+    expect(
+      resolveSbtDetailLinkSessionSlug({
+        sbt: {
+          sessionBindingSlug: 'Binding',
+          sbtInfo: { sessionSlug: 'Info', sessionSlugExplicit: true },
+          sessionSlug: 'Selected',
+        },
+        fallbackSlug: 'Fallback',
+      }),
+    ).toBe('Binding');
+    expect(
+      resolveSbtDetailLinkSessionSlug({
+        sbt: {
+          sbtInfo: { sessionSlug: 'Info', sessionSlugExplicit: true },
+          sessionSlug: 'Selected',
+        },
+        fallbackSlug: 'Fallback',
+      }),
+    ).toBe('Info');
+    expect(
+      resolveSbtDetailLinkSessionSlug({
+        sbt: { sessionSlug: 'Selected', sessionSlugExplicit: true },
+        fallbackSlug: 'Fallback',
+      }),
+    ).toBe('Selected');
+    expect(
+      resolveSbtDetailLinkSessionSlug({
+        sbt: { sessionSlug: 'Selected', sessionSlugExplicit: false },
+        fallbackSlug: 'Fallback',
+      }),
+    ).toBe('Selected');
+    expect(
+      resolveSbtDetailLinkSessionSlug({
+        sbt: {},
+        fallbackSlug: 'Fallback',
+      }),
+    ).toBe('Fallback');
+  });
+});

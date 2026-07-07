@@ -12,9 +12,7 @@ const log = createLogger('uiRuntimeStats');
 const DEFAULT_SAMPLE_INTERVAL_MS = 5000;
 const DEFAULT_RETENTION_MINUTES = 30;
 const DEFAULT_UA_MEMORY_INTERVAL_MS = 60 * 1000;
-const DEFAULT_MAX_SAMPLES = Math.floor(
-  (DEFAULT_RETENTION_MINUTES * 60 * 1000) / DEFAULT_SAMPLE_INTERVAL_MS
-);
+const DEFAULT_MAX_SAMPLES = Math.floor((DEFAULT_RETENTION_MINUTES * 60 * 1000) / DEFAULT_SAMPLE_INTERVAL_MS);
 const FRAME_STALL_THRESHOLD_MS = 50;
 const CACHE_RATE_WINDOW_MS = 60 * 1000;
 const CACHE_RATE_PRUNE_WINDOW_MS = 5 * 60 * 1000;
@@ -47,22 +45,22 @@ const safeClone = (value) => {
 const getGlobal = () => {
   try {
     if (typeof globalThis !== 'undefined') return globalThis;
-  } catch (e) { void e; /* fallback: feature detection. */ }
+  } catch (e) {
+    void e; /* fallback: feature detection. */
+  }
   return null;
 };
 
 const getPerformance = () => {
   try {
     if (typeof performance !== 'undefined') return performance;
-  } catch (e) { void e; /* fallback: feature detection. */ }
+  } catch (e) {
+    void e; /* fallback: feature detection. */
+  }
   return null;
 };
 
-const isPlainObject = (value) => (
-  !!value &&
-  typeof value === 'object' &&
-  !Array.isArray(value)
-);
+const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 
 const createFrameCounter = () => ({
   frames: 0,
@@ -134,7 +132,9 @@ const isCeRuntimeStatsEnabled = () => {
 };
 
 const normalizeNamespace = (namespaceIn = '') => {
-  const raw = String(namespaceIn || '').trim().toLowerCase();
+  const raw = String(namespaceIn || '')
+    .trim()
+    .toLowerCase();
   if (!raw) return '';
   if (raw === 'questionscache' || raw === 'questions' || raw === 'question') {
     return 'questionsCache';
@@ -245,7 +245,7 @@ const maybeSampleUaMemory = (state, nowTs) => {
   if (!perf || typeof perf.measureUserAgentSpecificMemory !== 'function') return;
   if (state.uaMemoryInFlight) return;
   const minGap = toPositiveInt(state.config.uaMemoryIntervalMs, DEFAULT_UA_MEMORY_INTERVAL_MS);
-  if ((nowTs - toFinite(state.lastUaMemoryAt, 0)) < minGap) return;
+  if (nowTs - toFinite(state.lastUaMemoryAt, 0) < minGap) return;
 
   state.uaMemoryInFlight = true;
   Promise.resolve()
@@ -385,9 +385,7 @@ const readCachePressureSnapshot = (state, nowTs = safeNow(), { resetSinceLast = 
 
   namespaceSet.forEach((namespace) => {
     const key = String(namespace || '');
-    const events = Array.isArray(state.cacheEventTsByNamespace[key])
-      ? state.cacheEventTsByNamespace[key]
-      : [];
+    const events = Array.isArray(state.cacheEventTsByNamespace[key]) ? state.cacheEventTsByNamespace[key] : [];
     state.cacheEventTsByNamespace[key] = events;
     pruneNamespaceEvents(events, nowTs, CACHE_RATE_PRUNE_WINDOW_MS);
     const minuteCutoff = nowTs - CACHE_RATE_WINDOW_MS;
@@ -488,7 +486,9 @@ const handleLongTaskEntries = (entryList) => {
       if (entryList && typeof entryList.getEntries === 'function') {
         return entryList.getEntries();
       }
-    } catch (e) { log.warn('uiRuntimeStats: fallback', e); }
+    } catch (e) {
+      log.warn('uiRuntimeStats: fallback', e);
+    }
     return Array.isArray(entryList) ? entryList : [];
   })();
   if (!Array.isArray(entries) || entries.length === 0) return;
@@ -530,7 +530,9 @@ const stopLongTaskObserver = () => {
   if (!observer) return;
   try {
     if (typeof observer.disconnect === 'function') observer.disconnect();
-  } catch (e) { log.warn('uiRuntimeStats: cleanup', e); }
+  } catch (e) {
+    log.warn('uiRuntimeStats: cleanup', e);
+  }
   state.longTaskObserver = null;
 };
 
@@ -592,7 +594,9 @@ const stopRafLoop = () => {
     if (g && typeof g.cancelAnimationFrame === 'function') {
       g.cancelAnimationFrame(id);
     }
-  } catch (e) { log.warn('uiRuntimeStats: cleanup', e); }
+  } catch (e) {
+    log.warn('uiRuntimeStats: cleanup', e);
+  }
 };
 
 const startSampleTimer = () => {
@@ -610,7 +614,9 @@ const stopSampleTimer = () => {
   if (state.timerId == null) return;
   try {
     clearInterval(state.timerId);
-  } catch (e) { log.warn('uiRuntimeStats: cleanup', e); }
+  } catch (e) {
+    log.warn('uiRuntimeStats: cleanup', e);
+  }
   state.timerId = null;
 };
 

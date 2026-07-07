@@ -1,13 +1,7 @@
 import { executeSurveyResponsePrefill } from './surveyToolHydrationController';
-import {
-  buildResponseHydrationInvalidatedState,
-  buildResponseLoadingResetState,
-} from './surveyQuestionsTypes';
+import { buildResponseHydrationInvalidatedState, buildResponseLoadingResetState } from './surveyQuestionsTypes';
 import { buildSurveyStartFreshStatePatch } from './surveyToolResponseResetController';
-import {
-  prepareLocalCacheRehydrateRun,
-  shouldSkipDraftHydrationRun,
-} from './surveyToolHydrationFlow';
+import { prepareLocalCacheRehydrateRun, shouldSkipDraftHydrationRun } from './surveyToolHydrationFlow';
 
 const cloneValue = (value) => JSON.parse(JSON.stringify(value));
 
@@ -19,9 +13,7 @@ const buildEmptySlice = () => ({
 });
 
 const buildSynchronousSetState = (stateRef) => (update, callback) => {
-  const patch = typeof update === 'function'
-    ? update(stateRef.current)
-    : update;
+  const patch = typeof update === 'function' ? update(stateRef.current) : update;
   if (patch && typeof patch === 'object') {
     stateRef.current = { ...stateRef.current, ...patch };
   }
@@ -76,20 +68,26 @@ describe('SurveyTool response hydration', () => {
     expect(stateRef.current.isLoadingResponse).toBe(false);
     expect(stateRef.current.userAnswers).toBeNull();
     expect(stateRef.current.surveysResponseState[0].answers.q1.value).toBe('');
-    expect(shouldSkipDraftHydrationRun({
-      suppressPrefill: stateRef.current.suppressPrefill,
-      draft: { answers: { q1: { value: 'late draft' } } },
-    })).toBe(true);
-    expect(prepareLocalCacheRehydrateRun({
-      state: stateRef.current,
-      surveyIndex: 0,
-      renderedIds: ['q1'],
-      buildHydrationSignature: () => 'late|cache',
-    })).toEqual(expect.objectContaining({
-      shouldSkip: true,
-      hydrationSig: '',
-      baseSlice: null,
-    }));
+    expect(
+      shouldSkipDraftHydrationRun({
+        suppressPrefill: stateRef.current.suppressPrefill,
+        draft: { answers: { q1: { value: 'late draft' } } },
+      }),
+    ).toBe(true);
+    expect(
+      prepareLocalCacheRehydrateRun({
+        state: stateRef.current,
+        surveyIndex: 0,
+        renderedIds: ['q1'],
+        buildHydrationSignature: () => 'late|cache',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        shouldSkip: true,
+        hydrationSig: '',
+        baseSlice: null,
+      }),
+    );
     // port note: dropped direct `fetchSurveyResponse()` deferred-run invocation.
     // The hooks-portable contract is that start-fresh sets suppressPrefill and
     // clears loading, so later hydration paths skip instead of repopulating q1.

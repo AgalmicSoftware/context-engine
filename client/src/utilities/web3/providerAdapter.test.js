@@ -28,11 +28,13 @@ describe('providerAdapter', () => {
       },
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      ok: false,
-      status: 'read-provider-unavailable',
-      error: 'configured RPC unavailable',
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        ok: false,
+        status: 'read-provider-unavailable',
+        error: 'configured RPC unavailable',
+      }),
+    );
   });
 
   it('allows injected read fallback only when the caller opts in', () => {
@@ -56,23 +58,29 @@ describe('providerAdapter', () => {
   it('keeps unknown signer providers from silently using injected wallet', () => {
     const injectedProvider = { request: jest.fn() };
 
-    expect(resolveSignerProvider({
-      providerName: 'surprise-wallet',
-      injectedProvider,
-      allowInjectedSignerFallback: true,
-    })).toEqual(expect.objectContaining({
-      ok: false,
-      status: 'unknown-provider',
-    }));
+    expect(
+      resolveSignerProvider({
+        providerName: 'surprise-wallet',
+        injectedProvider,
+        allowInjectedSignerFallback: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        ok: false,
+        status: 'unknown-provider',
+      }),
+    );
   });
 
   it('allows explicit injected signer provider selection', () => {
     const injectedProvider = { request: jest.fn() };
 
-    expect(resolveSignerProvider({
-      providerName: 'injected',
-      injectedProvider,
-    })).toEqual({
+    expect(
+      resolveSignerProvider({
+        providerName: 'injected',
+        injectedProvider,
+      }),
+    ).toEqual({
       ok: true,
       provider: injectedProvider,
       source: 'injected-wallet',
@@ -82,10 +90,12 @@ describe('providerAdapter', () => {
   it('resolves passkey EOA signer providers through the adapter factory', () => {
     const passkeyProvider = { isPasskeyEoa: true };
 
-    expect(resolveSignerProvider({
-      providerName: 'passkey_eoa',
-      passkeyProviderFactory: () => passkeyProvider,
-    })).toEqual({
+    expect(
+      resolveSignerProvider({
+        providerName: 'passkey_eoa',
+        passkeyProviderFactory: () => passkeyProvider,
+      }),
+    ).toEqual({
       ok: true,
       provider: passkeyProvider,
       source: 'passkey-eoa',
@@ -93,23 +103,26 @@ describe('providerAdapter', () => {
   });
 
   it('normalizes user-rejected wallet errors', () => {
-    expect(normalizeWalletError({ code: 4001, message: 'User rejected the request.' }))
-      .toEqual(expect.objectContaining({
+    expect(normalizeWalletError({ code: 4001, message: 'User rejected the request.' })).toEqual(
+      expect.objectContaining({
         ok: false,
         status: 'user-rejected',
         error: 'Wallet request was cancelled.',
-      }));
+      }),
+    );
   });
 
   it('switches wallet chains with an injected provider request', async () => {
     const injectedProvider = { request: jest.fn().mockResolvedValue(null) };
     const chain = { id: 11155420, name: 'OP Sepolia' };
 
-    await expect(switchWalletChain({ chain, injectedProvider })).resolves.toEqual(expect.objectContaining({
-      ok: true,
-      status: 'switched',
-      provider: injectedProvider,
-    }));
+    await expect(switchWalletChain({ chain, injectedProvider })).resolves.toEqual(
+      expect.objectContaining({
+        ok: true,
+        status: 'switched',
+        provider: injectedProvider,
+      }),
+    );
     expect(injectedProvider.request).toHaveBeenCalledWith({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: '0xaa37dc' }],
@@ -127,7 +140,7 @@ describe('providerAdapter', () => {
         ok: false,
         status: 'wallet-error',
         error: 'transport offline',
-      })
+      }),
     );
     expect(injectedProvider.request).toHaveBeenCalledTimes(1);
     expect(injectedProvider.request).toHaveBeenCalledWith({
@@ -140,11 +153,13 @@ describe('providerAdapter', () => {
     const injectedProvider = { request: jest.fn().mockResolvedValue(null) };
     const chain = { chainId: 11155420, name: 'OP Sepolia' };
 
-    await expect(switchWalletChain({ chain, injectedProvider })).resolves.toEqual(expect.objectContaining({
-      ok: true,
-      status: 'switched',
-      provider: injectedProvider,
-    }));
+    await expect(switchWalletChain({ chain, injectedProvider })).resolves.toEqual(
+      expect.objectContaining({
+        ok: true,
+        status: 'switched',
+        provider: injectedProvider,
+      }),
+    );
     expect(injectedProvider.request).toHaveBeenCalledWith({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: '0xaa37dc' }],
@@ -153,7 +168,8 @@ describe('providerAdapter', () => {
 
   it('adds wallet chains when switch reports an unknown chain', async () => {
     const injectedProvider = {
-      request: jest.fn()
+      request: jest
+        .fn()
         .mockRejectedValueOnce({ code: 4902, message: 'Unrecognized chain ID' })
         .mockResolvedValueOnce(null),
     };
@@ -165,19 +181,23 @@ describe('providerAdapter', () => {
       blockExplorers: { default: { url: 'https://explorer.example' } },
     };
 
-    await expect(switchWalletChain({ chain, injectedProvider })).resolves.toEqual(expect.objectContaining({
-      ok: true,
-      status: 'added',
-    }));
+    await expect(switchWalletChain({ chain, injectedProvider })).resolves.toEqual(
+      expect.objectContaining({
+        ok: true,
+        status: 'added',
+      }),
+    );
     expect(injectedProvider.request).toHaveBeenNthCalledWith(2, {
       method: 'wallet_addEthereumChain',
-      params: [{
-        chainId: '0xaa37dc',
-        chainName: 'OP Sepolia',
-        nativeCurrency: chain.nativeCurrency,
-        rpcUrls: ['https://rpc.example'],
-        blockExplorerUrls: ['https://explorer.example'],
-      }],
+      params: [
+        {
+          chainId: '0xaa37dc',
+          chainName: 'OP Sepolia',
+          nativeCurrency: chain.nativeCurrency,
+          rpcUrls: ['https://rpc.example'],
+          blockExplorerUrls: ['https://explorer.example'],
+        },
+      ],
     });
   });
 
@@ -191,27 +211,32 @@ describe('providerAdapter', () => {
       blockExplorers: { default: { url: 'https://explorer.example' } },
     };
 
-    await expect(addWalletChain({ chain, injectedProvider })).resolves.toEqual(expect.objectContaining({
-      ok: true,
-      status: 'added',
-    }));
+    await expect(addWalletChain({ chain, injectedProvider })).resolves.toEqual(
+      expect.objectContaining({
+        ok: true,
+        status: 'added',
+      }),
+    );
     expect(injectedProvider.request).toHaveBeenCalledWith({
       method: 'wallet_addEthereumChain',
-      params: [{
-        chainId: '0xaa37dc',
-        chainName: 'OP Sepolia',
-        nativeCurrency: chain.nativeCurrency,
-        rpcUrls: ['https://rpc.example'],
-        blockExplorerUrls: ['https://explorer.example'],
-      }],
+      params: [
+        {
+          chainId: '0xaa37dc',
+          chainName: 'OP Sepolia',
+          nativeCurrency: chain.nativeCurrency,
+          rpcUrls: ['https://rpc.example'],
+          blockExplorerUrls: ['https://explorer.example'],
+        },
+      ],
     });
   });
 
   it('returns missing-provider status for add chain without an injected provider', async () => {
-    await expect(addWalletChain({ chain: { id: 11155420 }, injectedProvider: null }))
-      .resolves.toEqual(expect.objectContaining({
+    await expect(addWalletChain({ chain: { id: 11155420 }, injectedProvider: null })).resolves.toEqual(
+      expect.objectContaining({
         ok: false,
         status: 'missing-provider',
-      }));
+      }),
+    );
   });
 });

@@ -58,30 +58,31 @@ const LockableFieldFrame = ({
   children,
 }: LockableFieldFrameProps) => {
   const normalizedTooltipText = toStr(tooltipText).trim();
-  const tooltipControl = tooltipsEnabled && tooltipId && normalizedTooltipText ? (
-    <>
-      <span
-        id={tooltipId}
-        className={styles.tooltipTrigger}
-        data-testid={tooltipTestId || undefined}
-        role="button"
-        tabIndex={0}
-        aria-label={tooltipAriaLabel || `${label} info`}
-      >
-        <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} />
-      </span>
-      <CETooltip
-        placement={tooltipPlacement}
-        trigger="hover focus click"
-        target={tooltipId}
-        className={styles.tooltipBubble}
-        delay={0}
-        container="body"
-      >
-        {tooltipText}
-      </CETooltip>
-    </>
-  ) : null;
+  const tooltipControl =
+    tooltipsEnabled && tooltipId && normalizedTooltipText ? (
+      <>
+        <span
+          id={tooltipId}
+          className={styles.tooltipTrigger}
+          data-testid={tooltipTestId || undefined}
+          role="button"
+          tabIndex={0}
+          aria-label={tooltipAriaLabel || `${label} info`}
+        >
+          <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} />
+        </span>
+        <CETooltip
+          placement={tooltipPlacement}
+          trigger="hover focus click"
+          target={tooltipId}
+          className={styles.tooltipBubble}
+          delay={0}
+          container="body"
+        >
+          {tooltipText}
+        </CETooltip>
+      </>
+    ) : null;
 
   const labelControl = labelInlineControl ? (
     <label className={`${styles.fieldLabelRow} ${styles.fieldLabelRowCheckbox}`}>
@@ -105,10 +106,7 @@ const LockableFieldFrame = ({
           {canLock && (
             <div className={styles.lockMeta}>
               {lockBadgeLabel && (
-                <span
-                  className={styles.lockBadge}
-                  style={lockBadgeStyle}
-                >
+                <span className={styles.lockBadge} style={lockBadgeStyle}>
                   {lockBadgeLabel}
                 </span>
               )}

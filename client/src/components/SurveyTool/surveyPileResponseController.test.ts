@@ -53,7 +53,7 @@ type PatchLiveNextState = {
   surveysResponseState: TestResponseSlice[];
 };
 
-const cloneValue = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+const cloneValue = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
 const buildEmptyResponseFieldState = (questionId: string | null = null, fieldKey = 'answer'): TestResponseField => ({
   value: '',
@@ -64,18 +64,16 @@ const buildEmptyResponseFieldState = (questionId: string | null = null, fieldKey
 
 type TestSetStateUpdate<State> = Partial<State> | null | ((prevState: State) => Partial<State> | null);
 
-const buildSynchronousSetState = <State extends Record<string, unknown>>(stateRef: { current: State }) => (
+const buildSynchronousSetState =
+  <State extends Record<string, unknown>>(stateRef: { current: State }) =>
   (update: TestSetStateUpdate<State>, callback?: () => void) => {
-    const patch = typeof update === 'function'
-      ? update(stateRef.current)
-      : update;
+    const patch = typeof update === 'function' ? update(stateRef.current) : update;
     if (patch && typeof patch === 'object') {
       stateRef.current = { ...stateRef.current, ...patch };
     }
     if (typeof callback === 'function') callback();
     return patch;
-  }
-);
+  };
 
 describe('surveyPileResponseController', () => {
   it('seeds pile baseline from cache-prefilled responses when no edit baseline exists', () => {
@@ -102,7 +100,10 @@ describe('surveyPileResponseController', () => {
       applyCachedResponseEntryToSlice: ({ targetSlice, questionId, response }) => {
         const responseRecord = response as CachedResponseRecord;
         targetSlice.answers[questionId] = { value: responseRecord.answer?.value || '', encrypted: false };
-        targetSlice.additionalComments[questionId] = { value: responseRecord.additional?.value || '', encrypted: false };
+        targetSlice.additionalComments[questionId] = {
+          value: responseRecord.additional?.value || '',
+          encrypted: false,
+        };
         return true;
       },
     });
@@ -145,7 +146,10 @@ describe('surveyPileResponseController', () => {
       applyCachedResponseEntryToSlice: ({ targetSlice, questionId, response }) => {
         const responseRecord = response as CachedResponseRecord;
         targetSlice.answers[questionId] = { value: responseRecord.answer?.value || '', encrypted: false };
-        targetSlice.additionalComments[questionId] = { value: responseRecord.additional?.value || '', encrypted: false };
+        targetSlice.additionalComments[questionId] = {
+          value: responseRecord.additional?.value || '',
+          encrypted: false,
+        };
         return true;
       },
     });
@@ -208,16 +212,18 @@ describe('surveyPileResponseController', () => {
       current: {
         pileQuestions: [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }],
         activePileIndex: 0,
-        surveysResponseState: [{
-          answers: {
-            q1: { value: '', encrypted: false },
+        surveysResponseState: [
+          {
+            answers: {
+              q1: { value: '', encrypted: false },
+            },
+            importance: {},
+            conviction: {},
+            additionalComments: {
+              q1: { value: '', encrypted: false },
+            },
           },
-          importance: {},
-          conviction: {},
-          additionalComments: {
-            q1: { value: '', encrypted: false },
-          },
-        }],
+        ],
         editBaseline: {
           answers: {
             q1: { value: '', encrypted: false },
@@ -242,14 +248,18 @@ describe('surveyPileResponseController', () => {
 
     expect(plan?.reason).toBe('backfill');
     expect(onRehydrateVisibleWindow).toHaveBeenCalledTimes(1);
-    expect(stateRef.current.surveysResponseState?.[0]?.answers?.q2).toEqual(expect.objectContaining({
-      questionId: 'q2',
-      fieldKey: 'answer',
-    }));
-    expect(stateRef.current.editBaseline?.additionalComments?.q3).toEqual(expect.objectContaining({
-      questionId: 'q3',
-      fieldKey: 'additional',
-    }));
+    expect(stateRef.current.surveysResponseState?.[0]?.answers?.q2).toEqual(
+      expect.objectContaining({
+        questionId: 'q2',
+        fieldKey: 'answer',
+      }),
+    );
+    expect(stateRef.current.editBaseline?.additionalComments?.q3).toEqual(
+      expect.objectContaining({
+        questionId: 'q3',
+        fieldKey: 'additional',
+      }),
+    );
   });
 
   it('skips duplicate pile question-set hydration signatures', () => {

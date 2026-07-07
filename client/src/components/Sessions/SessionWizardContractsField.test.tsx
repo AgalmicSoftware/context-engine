@@ -13,9 +13,7 @@ describe('SessionWizardContractsField', () => {
     const onAddressChange = jest.fn();
     const onOpenContractViewer = jest.fn();
     const onToggleCollapsed = jest.fn();
-    const renderInfoTooltip = jest.fn(({ testId, ariaLabel }) => (
-      <span data-testid={testId} aria-label={ariaLabel} />
-    ));
+    const renderInfoTooltip = jest.fn(({ testId, ariaLabel }) => <span data-testid={testId} aria-label={ariaLabel} />);
 
     render(
       <SessionWizardContractsField
@@ -29,7 +27,7 @@ describe('SessionWizardContractsField', () => {
         onToggleCollapsed={onToggleCollapsed}
         renderInfoTooltip={renderInfoTooltip}
         {...props}
-      />
+      />,
     );
 
     return {

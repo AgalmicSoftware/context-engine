@@ -12,7 +12,7 @@ describe('AccountDisplayTorus', () => {
         account="0x1111111111111111111111111111111111111111"
         launchAccountSettings={launchAccountSettings}
         avatarUrl="data:image/png;base64,blockie"
-      />
+      />,
     );
 
     const button = screen.getByTestId(E2E_TESTIDS.WALLET_DISPLAY);
@@ -31,7 +31,7 @@ describe('AccountDisplayTorus', () => {
         launchAccountSettings={() => {}}
         userImageURL="https://example.invalid/avatar.png"
         avatarUrl="data:image/png;base64,blockie"
-      />
+      />,
     );
 
     const images = Array.from(container.querySelectorAll('img'));

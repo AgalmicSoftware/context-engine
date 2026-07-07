@@ -3,21 +3,19 @@ export type DeferredCommitSliderState = {
   isInteracting: boolean;
 };
 
-export const buildDeferredCommitSliderInitialState = (
-  liveValue: number
-): DeferredCommitSliderState => ({
+export const buildDeferredCommitSliderInitialState = (liveValue: number): DeferredCommitSliderState => ({
   liveValue,
   isInteracting: false,
 });
 
 export const buildDeferredCommitSliderLiveValuePatch = (
-  liveValue: number
+  liveValue: number,
 ): Pick<DeferredCommitSliderState, 'liveValue'> => ({
   liveValue,
 });
 
 export const buildDeferredCommitSliderInteractingPatch = (
-  isInteracting: boolean
+  isInteracting: boolean,
 ): Pick<DeferredCommitSliderState, 'isInteracting'> => ({
   isInteracting,
 });

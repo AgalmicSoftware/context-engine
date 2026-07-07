@@ -1,6 +1,4 @@
-import {
-  buildSbtListPassiveLatestLookupPlan,
-} from './sbtListPassiveLatestLookupHelpers';
+import { buildSbtListPassiveLatestLookupPlan } from './sbtListPassiveLatestLookupHelpers';
 import { SBT_LIST_NO_SESSION_UNIVERSE_SLUG } from './sbtListSessionUniverseHelpers';
 
 describe('sbtListPassiveLatestLookupHelpers', () => {
@@ -38,9 +36,7 @@ describe('sbtListPassiveLatestLookupHelpers', () => {
     });
 
     expect(plan).toEqual({
-      requests: [
-        { slug: 'alpha', currentWatermark: 1050 },
-      ],
+      requests: [{ slug: 'alpha', currentWatermark: 1050 }],
       staleSlugs: ['stale'],
     });
   });
@@ -90,9 +86,7 @@ describe('sbtListPassiveLatestLookupHelpers', () => {
     });
 
     expect(plan).toEqual({
-      requests: [
-        { slug: 'beta', currentWatermark: 1050 },
-      ],
+      requests: [{ slug: 'beta', currentWatermark: 1050 }],
       staleSlugs: ['delta', 'epsilon'],
     });
   });

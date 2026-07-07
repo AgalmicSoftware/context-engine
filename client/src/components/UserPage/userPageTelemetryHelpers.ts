@@ -1,7 +1,4 @@
-import {
-  toAnalysisRecord,
-  type UserPageUnknownRecord,
-} from './userPageCoreHelpers';
+import { toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 
 type UserPageLengthLike = {
   length: number;
@@ -80,17 +77,23 @@ export const buildUserPageDeriveTelemetrySnapshot = ({
       ? Object.keys((aggregateRecord?.combinedQuestionResponses || {}) as object).length
       : 0,
     sbtAggregateKeys: aggregate ? Object.keys((aggregateRecord?.sbtAggregate || {}) as object).length : 0,
-    surveySection: surveySection ? {
-      responseCount: (surveyRecord?.surveyResponseInfo as UserPageLengthLike | null | undefined)?.length,
-      createdCount: (surveyRecord?.surveyCreationInfo as UserPageLengthLike | null | undefined)?.length,
-    } : null,
-    questionSection: questionSection ? {
-      responseCount: (questionRecord?.questionResponseInfo as UserPageLengthLike | null | undefined)?.length,
-      createdCount: (questionRecord?.questionCreationInfo as UserPageLengthLike | null | undefined)?.length,
-    } : null,
-    sbtSection: sbtSection ? {
-      sbtCount: (sbtRecord?.sbtList as UserPageLengthLike | null | undefined)?.length,
-    } : null,
+    surveySection: surveySection
+      ? {
+          responseCount: (surveyRecord?.surveyResponseInfo as UserPageLengthLike | null | undefined)?.length,
+          createdCount: (surveyRecord?.surveyCreationInfo as UserPageLengthLike | null | undefined)?.length,
+        }
+      : null,
+    questionSection: questionSection
+      ? {
+          responseCount: (questionRecord?.questionResponseInfo as UserPageLengthLike | null | undefined)?.length,
+          createdCount: (questionRecord?.questionCreationInfo as UserPageLengthLike | null | undefined)?.length,
+        }
+      : null,
+    sbtSection: sbtSection
+      ? {
+          sbtCount: (sbtRecord?.sbtList as UserPageLengthLike | null | undefined)?.length,
+        }
+      : null,
   };
 };
 
@@ -190,21 +193,19 @@ export const buildUserPageRefreshTelemetrySnapshot = ({
   const aggregateSurveyResponseIds = Object.keys(aggregateSurveyResponseMap as object).filter((sidRaw: string) => {
     const sid = String(sidRaw || '').toLowerCase();
     if (!sid) return false;
-    const row = (
+    const row =
       (aggregateSurveyResponseMap as UserPageUnknownRecord)[sidRaw] ||
       (aggregateSurveyResponseMap as UserPageUnknownRecord)[sid] ||
-      {}
-    );
+      {};
     return !!(row && Object.prototype.hasOwnProperty.call(row, viewAddressLower as PropertyKey));
   });
   const aggregateQuestionResponseIds = Object.keys(aggregateQuestionResponseMap as object).filter((qidRaw: string) => {
     const qid = String(qidRaw || '').toLowerCase();
     if (!qid) return false;
-    const row = (
+    const row =
       (aggregateQuestionResponseMap as UserPageUnknownRecord)[qidRaw] ||
       (aggregateQuestionResponseMap as UserPageUnknownRecord)[qid] ||
-      {}
-    );
+      {};
     return !!(row && Object.prototype.hasOwnProperty.call(row, viewAddressLower as PropertyKey));
   });
 
@@ -229,23 +230,15 @@ export const buildUserPageRefreshTelemetrySnapshot = ({
     aggregateQuestionResponseCount: aggregateQuestionResponseIds.length,
     aggregateSurveyResponseSample: aggregateSurveyResponseIds.slice(0, 12),
     aggregateQuestionResponseSample: aggregateQuestionResponseIds.slice(0, 12),
-    derivedSbtCount: Array.isArray(sbtSectionRecord?.sbtList)
-      ? sbtSectionRecord.sbtList.length
-      : null,
+    derivedSbtCount: Array.isArray(sbtSectionRecord?.sbtList) ? sbtSectionRecord.sbtList.length : null,
     sourcePresence,
-    deepScanTooltipLines: Array.isArray(deepScanTooltipLines)
-      ? deepScanTooltipLines.slice(0, 8)
-      : [],
+    deepScanTooltipLines: Array.isArray(deepScanTooltipLines) ? deepScanTooltipLines.slice(0, 8) : [],
   };
 };
 
-export const buildUserPageRefreshTelemetrySignature = (
-  refreshTelemetry: unknown = {}
-): string => {
+export const buildUserPageRefreshTelemetrySignature = (refreshTelemetry: unknown = {}): string => {
   const telemetry = refreshTelemetry as UserPageUnknownRecord;
-  const deepScanTooltipLines = Array.isArray(telemetry.deepScanTooltipLines)
-    ? telemetry.deepScanTooltipLines
-    : [];
+  const deepScanTooltipLines = Array.isArray(telemetry.deepScanTooltipLines) ? telemetry.deepScanTooltipLines : [];
   return [
     telemetry.viewAddress,
     telemetry.networkID,

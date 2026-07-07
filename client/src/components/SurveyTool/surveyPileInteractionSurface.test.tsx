@@ -60,9 +60,8 @@ const nodeHasClassName = (node: unknown, className: string): boolean => {
   return value.split(/\s+/).includes(className);
 };
 
-const findNodeByClassName = (node: TestTreeNode, className: string): TestElementNode | null => (
-  (findElement(node, (candidate) => nodeHasClassName(candidate, className)) as TestElementNode | null)
-);
+const findNodeByClassName = (node: TestTreeNode, className: string): TestElementNode | null =>
+  findElement(node, (candidate) => nodeHasClassName(candidate, className)) as TestElementNode | null;
 
 const countElements = (node: TestTreeNode, predicate: TestTreePredicate): number => {
   let count = 0;
@@ -105,9 +104,7 @@ const collectTreeText = (node: TestTreeNode): string => {
   return collectTreeText(node.props.children);
 };
 
-const treeTextIncludes = (node: TestTreeNode, text: string): boolean => (
-  collectTreeText(node).includes(text)
-);
+const treeTextIncludes = (node: TestTreeNode, text: string): boolean => collectTreeText(node).includes(text);
 
 const getElementChildren = (node: TestTreeNode): TestElementNode[] => {
   if (!isElementNode(node)) return [];
@@ -188,58 +185,58 @@ describe('surveyPileInteractionSurface', () => {
     expect(resolvePileFilterButtonStyle(false)).toEqual({});
     expect(resolvePileFilterIconStyle(true)).toEqual({ color: '#4cd964' });
     expect(resolvePileFilterIconStyle(false)).toEqual({});
-    expect(buildPileFilterButtonClassName(styles, true)).toBe(
-      `${styles.actionButton} ${styles.actionButtonActive}`
-    );
-    expect(buildPileActionsClassName(styles, true)).toBe(
-      `${styles.pileActions} ${styles.pileActionsMenuEligible}`
-    );
+    expect(buildPileFilterButtonClassName(styles, true)).toBe(`${styles.actionButton} ${styles.actionButtonActive}`);
+    expect(buildPileActionsClassName(styles, true)).toBe(`${styles.pileActions} ${styles.pileActionsMenuEligible}`);
     expect(buildPileActionsClassName(styles, false)).toBe(styles.pileActions);
-    expect(buildPileFooterClassName(styles, false)).toBe(
-      `${styles.pileFooter} ${styles.pileFooterHidden}`
-    );
+    expect(buildPileFooterClassName(styles, false)).toBe(`${styles.pileFooter} ${styles.pileFooterHidden}`);
     expect(buildPileSubmitButtonClassName(styles, true, true)).toBe(
-      `${styles.pileSubmitButton} ${styles.submitGlow} ${styles.pileSubmitButtonInactive}`
+      `${styles.pileSubmitButton} ${styles.submitGlow} ${styles.pileSubmitButtonInactive}`,
     );
     expect(resolvePileCardStatusClassName(styles, 0)).toBe(styles.pileCardActive);
     expect(resolvePileCardStatusClassName(styles, 1)).toBe(styles.pileCardNext);
     expect(resolvePileCardStatusClassName(styles, -1)).toBe(styles.pileCardPrev);
     expect(resolvePileCardStatusClassName(styles, 2)).toBe(styles.pileCardAfter);
     expect(resolvePileCardStatusClassName(styles, -2)).toBe(styles.pileCardBefore);
-    expect(buildPileCardClassName(styles, styles.pileCardActive)).toBe(
-      `${styles.pileCard} ${styles.pileCardActive}`
-    );
-    expect(resolvePileLoadingProgressFillStyle({
-      isHydrating: true,
-      hydrateDone: 3,
-      hydrateDiscovered: 5,
-      scanPercent: 80,
-    })).toEqual({ width: '60%' });
-    expect(resolvePileLoadingProgressFillStyle({
-      isHydrating: false,
-      hydrateDone: 0,
-      hydrateDiscovered: 0,
-      scanPercent: 72,
-    })).toEqual({ width: '72%' });
+    expect(buildPileCardClassName(styles, styles.pileCardActive)).toBe(`${styles.pileCard} ${styles.pileCardActive}`);
+    expect(
+      resolvePileLoadingProgressFillStyle({
+        isHydrating: true,
+        hydrateDone: 3,
+        hydrateDiscovered: 5,
+        scanPercent: 80,
+      }),
+    ).toEqual({ width: '60%' });
+    expect(
+      resolvePileLoadingProgressFillStyle({
+        isHydrating: false,
+        hydrateDone: 0,
+        hydrateDiscovered: 0,
+        scanPercent: 72,
+      }),
+    ).toEqual({ width: '72%' });
     expect(buildPileHologramToggleClassName(styles, true)).toBe(
-      `${styles.pileHologramToggle} ${styles.pileHologramToggleActive}`
+      `${styles.pileHologramToggle} ${styles.pileHologramToggleActive}`,
     );
     expect(resolvePileMiniLoaderStyle(true)).toEqual({ opacity: 0.5 });
     expect(resolvePileMiniLoaderStyle(false)).toEqual({ opacity: 1 });
-    expect(shouldCollapsePileActionsIntoMenu({
-      pileTopRailVisible: true,
-      showSubmitButton: true,
-      hasPendingPileChanges: true,
-      isSubmitting: false,
-      shouldHidePileSubmitButton: false,
-    })).toBe(true);
-    expect(shouldCollapsePileActionsIntoMenu({
-      pileTopRailVisible: true,
-      showSubmitButton: true,
-      hasPendingPileChanges: false,
-      isSubmitting: false,
-      shouldHidePileSubmitButton: true,
-    })).toBe(false);
+    expect(
+      shouldCollapsePileActionsIntoMenu({
+        pileTopRailVisible: true,
+        showSubmitButton: true,
+        hasPendingPileChanges: true,
+        isSubmitting: false,
+        shouldHidePileSubmitButton: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldCollapsePileActionsIntoMenu({
+        pileTopRailVisible: true,
+        showSubmitButton: true,
+        hasPendingPileChanges: false,
+        isSubmitting: false,
+        shouldHidePileSubmitButton: true,
+      }),
+    ).toBe(false);
   });
 
   it('renders the gated empty panel before the generic empty copy when gating is active', () => {
@@ -250,9 +247,9 @@ describe('surveyPileInteractionSurface', () => {
       gatedEmptyPanel: <div data-testid="gated-empty">Locked by gate</div>,
     });
 
-    expect(findElement(tree, (node) => (
-      isElementNode(node) && node.props['data-testid'] === 'gated-empty'
-    ))).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'gated-empty'),
+    ).not.toBeNull();
     expect(treeHasText(tree, 'No questions available.')).toBe(false);
   });
 
@@ -277,17 +274,19 @@ describe('surveyPileInteractionSurface', () => {
     const loadingSubhead = findNodeByClassName(tree, 'pileLoadingSubhead');
     const progressList = findNodeByClassName(tree, 'pileLoadingProgressList');
     const progressFillCount = countElements(tree, (node) => nodeHasClassName(node, 'pileLoadingProgressFill'));
-    const progressFill = findElement(tree, (node) => (
-      nodeHasClassName(node, 'pileLoadingProgressFill')
-    )) as TestElementNode | null;
+    const progressFill = findElement(tree, (node) =>
+      nodeHasClassName(node, 'pileLoadingProgressFill'),
+    ) as TestElementNode | null;
 
     expect(treeTextIncludes(loadingHeadline, 'Loading... 12s')).toBe(true);
     expect(treeHasText(loadingSubhead, 'Loading Metadata (3 / 5)')).toBe(true);
     expect(progressList).toBeNull();
     expect(progressFillCount).toBe(1);
-    expect(progressFill?.props?.style).toEqual(expect.objectContaining({
-      width: '60%',
-    }));
+    expect(progressFill?.props?.style).toEqual(
+      expect.objectContaining({
+        width: '60%',
+      }),
+    );
     expect(treeHasText(tree, 'Session')).toBe(false);
     expect(treeHasText(tree, 'Groups')).toBe(false);
     expect(treeHasText(tree, 'Questions')).toBe(false);
@@ -313,9 +312,10 @@ describe('surveyPileInteractionSurface', () => {
 
     const progressList = findNodeByClassName(tree, 'pileLoadingProgressList');
     const progressFillCount = countElements(tree, (node) => nodeHasClassName(node, 'pileLoadingProgressFill'));
-    const activeRowCount = countElements(tree, (node) => (
-      isElementNode(node) && node.props['data-progress-status'] === 'active'
-    ));
+    const activeRowCount = countElements(
+      tree,
+      (node) => isElementNode(node) && node.props['data-progress-status'] === 'active',
+    );
 
     expect(treeTextIncludes(tree, 'Loading... 101s')).toBe(true);
     expect(progressList).toBeNull();
@@ -357,9 +357,9 @@ describe('surveyPileInteractionSurface', () => {
 
     expect(renderActiveQuestion).toHaveBeenCalledTimes(1);
     expect(renderActiveQuestion).toHaveBeenCalledWith(expect.objectContaining({ id: 'q4' }));
-    expect(findElement(tree, (node) => (
-      isElementNode(node) && node.props['data-testid'] === 'active-q4'
-    ))).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'active-q4'),
+    ).not.toBeNull();
     expect(deckCardCount).toBe(5);
     expect(spinnerNode).not.toBeNull();
     expect(controlsNode).not.toBeNull();
@@ -371,9 +371,10 @@ describe('surveyPileInteractionSurface', () => {
     expect(findNodeByClassName(tree, 'pileActionMenuToggle')).not.toBeNull();
     expect(findNodeByClassName(tree, 'pileActionButtonGroup')).not.toBeNull();
 
-    const listeningToggle = findElement(tree, (node) => (
-      isElementNode(node) && node.props['data-testid'] === 'ce-session-listening-toggle'
-    )) as TestElementNode | null;
+    const listeningToggle = findElement(
+      tree,
+      (node) => isElementNode(node) && node.props['data-testid'] === 'ce-session-listening-toggle',
+    ) as TestElementNode | null;
     expect(listeningToggle).not.toBeNull();
     expect(listeningToggle?.props['aria-pressed']).toBe(true);
     expect(nodeHasClassName(listeningToggle, 'actionButtonActive')).toBe(true);
@@ -408,9 +409,7 @@ describe('surveyPileInteractionSurface', () => {
       renderActiveQuestion,
     });
 
-    expect(findElement(tree, (node) => (
-      isElementNode(node) && node.type === PileHologramAssistant
-    ))).not.toBeNull();
+    expect(findElement(tree, (node) => isElementNode(node) && node.type === PileHologramAssistant)).not.toBeNull();
     expect(findNodeByClassName(tree, 'pileControls')).toBeNull();
     expect(findNodeByClassName(tree, 'miniSpinnerWrapper')).toBeNull();
     expect(renderActiveQuestion).not.toHaveBeenCalled();

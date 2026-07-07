@@ -20,7 +20,7 @@ describe('SurveyResultsSurveyViewModeToggle', () => {
         onToggle={jest.fn()}
         styleMap={styleMap}
         trailingLabelStyle={{ marginLeft: '10px' }}
-      />
+      />,
     );
 
     expect(screen.getByText('Individual')).toBeInTheDocument();
@@ -42,7 +42,7 @@ describe('SurveyResultsSurveyViewModeToggle', () => {
         onKeyDown={onKeyDown}
         onToggle={onToggle}
         styleMap={styleMap}
-      />
+      />,
     );
 
     const switchControl = screen.getByRole('switch', {

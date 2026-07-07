@@ -12,11 +12,13 @@ describe('CEConfirmDialog', () => {
         confirmLabel="Clear"
         cancelLabel="Keep editing"
         testId="ce-survey-clear-confirm"
-      />
+      />,
     );
 
     expect(screen.getByTestId('ce-survey-clear-confirm-title')).toHaveTextContent('Clear draft?');
-    expect(screen.getByTestId('ce-survey-clear-confirm-body')).toHaveTextContent('This removes unsaved survey changes.');
+    expect(screen.getByTestId('ce-survey-clear-confirm-body')).toHaveTextContent(
+      'This removes unsaved survey changes.',
+    );
     expect(screen.getByTestId('ce-survey-clear-confirm-cancel')).toHaveTextContent('Keep editing');
     expect(screen.getByTestId('ce-survey-clear-confirm-confirm')).toHaveTextContent('Clear');
   });
@@ -34,7 +36,7 @@ describe('CEConfirmDialog', () => {
         cancelLabel="Keep editing"
         onCancel={onCancel}
         onConfirm={onConfirm}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByTestId('ce-confirm-dialog-cancel'));
@@ -45,13 +47,7 @@ describe('CEConfirmDialog', () => {
   });
 
   it('stays out of the DOM while closed', () => {
-    render(
-      <CEConfirmDialog
-        isOpen={false}
-        title="Hidden"
-        body="Closed dialog body"
-      />
-    );
+    render(<CEConfirmDialog isOpen={false} title="Hidden" body="Closed dialog body" />);
 
     expect(screen.queryByText('Hidden')).not.toBeInTheDocument();
     expect(screen.queryByText('Closed dialog body')).not.toBeInTheDocument();

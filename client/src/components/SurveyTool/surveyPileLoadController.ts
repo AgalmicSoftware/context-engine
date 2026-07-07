@@ -1,13 +1,13 @@
 import { buildPileResponseCounts } from './surveyPileScopeCacheData';
 
-type PileQuestionLike = {
-  id?: unknown;
-} | null | undefined;
+type PileQuestionLike =
+  | {
+      id?: unknown;
+    }
+  | null
+  | undefined;
 
-type AreQuestionListsEquivalent = (
-  left: PileQuestionLike[],
-  right: PileQuestionLike[]
-) => boolean;
+type AreQuestionListsEquivalent = (left: PileQuestionLike[], right: PileQuestionLike[]) => boolean;
 
 export type PileNoNetworkLoadPlan = {
   shouldSkipStateUpdate: boolean;
@@ -56,11 +56,7 @@ export const buildPileResponseCountsCachePlan = ({
 } = {}): PileResponseCountsCachePlan => {
   const normalizedCacheKey = String(cacheKey || '');
   const normalizedPreviousCacheKey = String(previousCacheKey || '');
-  const reusableCacheValue = (
-    previousCacheValue && typeof previousCacheValue === 'object'
-      ? previousCacheValue
-      : null
-  );
+  const reusableCacheValue = previousCacheValue && typeof previousCacheValue === 'object' ? previousCacheValue : null;
 
   if (normalizedCacheKey && normalizedCacheKey === normalizedPreviousCacheKey && reusableCacheValue) {
     return {
@@ -72,9 +68,7 @@ export const buildPileResponseCountsCachePlan = ({
   }
 
   const nextResponseCounts = buildPileResponseCounts({
-    questionResponses: questionResponses && typeof questionResponses === 'object'
-      ? questionResponses
-      : {},
+    questionResponses: questionResponses && typeof questionResponses === 'object' ? questionResponses : {},
   });
 
   return {
@@ -114,9 +108,7 @@ export const buildPileEmptyProbeStatePlan = ({
   previousLoading?: boolean;
   areQuestionListsEquivalent?: AreQuestionListsEquivalent;
 } = {}): PileEmptyProbeStatePlan => {
-  const normalizedPreviousPileQuestions = Array.isArray(previousPileQuestions)
-    ? previousPileQuestions
-    : [];
+  const normalizedPreviousPileQuestions = Array.isArray(previousPileQuestions) ? previousPileQuestions : [];
   const normalizedPreviousAllQuestions = Array.isArray(previousAllQuestionsForFilter)
     ? previousAllQuestionsForFilter
     : [];
@@ -131,9 +123,7 @@ export const buildPileEmptyProbeStatePlan = ({
       shouldClearLastResultSignature: true,
       shouldIncrementPileQuestionsGeneration: !shouldBumpNoop,
       shouldBumpNoop,
-      nextState: shouldBumpNoop
-        ? null
-        : { pileQuestions: [], allQuestionsForFilter: [], loading: true },
+      nextState: shouldBumpNoop ? null : { pileQuestions: [], allQuestionsForFilter: [], loading: true },
       nextProbeStartedAtMs: 0,
       nextProbeDelayMs: 0,
     };

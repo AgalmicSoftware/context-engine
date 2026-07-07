@@ -48,17 +48,15 @@ export const normalizeSbtCountMap = (value: Record<string, unknown> | null = nul
   return out;
 };
 
-
-export const sumSbtCountMap = (value: Record<string, unknown> | null = null): number => (
-  Object.values(normalizeSbtCountMap(value)).reduce((sum, count) => (
-    sum + Math.max(0, Math.floor(Number(count || 0)))
-  ), 0)
-);
-
+export const sumSbtCountMap = (value: Record<string, unknown> | null = null): number =>
+  Object.values(normalizeSbtCountMap(value)).reduce(
+    (sum, count) => sum + Math.max(0, Math.floor(Number(count || 0))),
+    0,
+  );
 
 export const mergeSbtCountMaps = (
   base: Record<string, unknown> | null = {},
-  delta: Record<string, unknown> | null = {}
+  delta: Record<string, unknown> | null = {},
 ): SbtCountMap => {
   const out: SbtCountMap = { ...((base || {}) as SbtCountMap) };
   Object.entries(delta || {}).forEach(([addr, count]) => {
@@ -72,35 +70,23 @@ export const mergeSbtCountMaps = (
   return out;
 };
 
-
 export const mergeSbtCountsPayload = (
   base: Partial<SbtCountsPayloadInput> = {},
-  delta: Partial<SbtCountsPayloadInput> = {}
+  delta: Partial<SbtCountsPayloadInput> = {},
 ): SbtCountsPayload => {
-  const mintedCountByAddress = mergeSbtCountMaps(
-    base.mintedCountByAddress || {},
-    delta.mintedCountByAddress || {}
-  );
-  const burnedCountByAddress = mergeSbtCountMaps(
-    base.burnedCountByAddress || {},
-    delta.burnedCountByAddress || {}
-  );
+  const mintedCountByAddress = mergeSbtCountMaps(base.mintedCountByAddress || {}, delta.mintedCountByAddress || {});
+  const burnedCountByAddress = mergeSbtCountMaps(base.burnedCountByAddress || {}, delta.burnedCountByAddress || {});
   return {
     mintedCountByAddress,
     burnedCountByAddress,
-    mintedEventCount:
-      (Number(base.mintedEventCount) || 0) +
-      (Number(delta.mintedEventCount) || 0),
-    burnedEventCount:
-      (Number(base.burnedEventCount) || 0) +
-      (Number(delta.burnedEventCount) || 0),
+    mintedEventCount: (Number(base.mintedEventCount) || 0) + (Number(delta.mintedEventCount) || 0),
+    burnedEventCount: (Number(base.burnedEventCount) || 0) + (Number(delta.burnedEventCount) || 0),
   };
 };
 
-
 export const seedSbtCountMapFromLegacyAddresses = (
   countMapIn: Record<string, unknown> | null = null,
-  addresses: Array<string | null | undefined> | null | undefined = []
+  addresses: Array<string | null | undefined> | null | undefined = [],
 ): SbtCountMap => {
   const out = normalizeSbtCountMap(countMapIn);
   (Array.isArray(addresses) ? addresses : []).forEach((addrRaw) => {
@@ -113,35 +99,27 @@ export const seedSbtCountMapFromLegacyAddresses = (
   return out;
 };
 
-
 export const hydrateLegacySbtCountState = (entry: SbtCountState | null = {}): SbtCountState | null => {
   if (!entry || typeof entry !== 'object') return entry;
-  const normalizeAddressList = (value: unknown = []): string[] => Array.from(
-    new Set(
-      (Array.isArray(value) ? value : [])
-        .map((addrRaw) => String(addrRaw || '').toLowerCase())
-        .filter(Boolean)
-    )
-  );
+  const normalizeAddressList = (value: unknown = []): string[] =>
+    Array.from(
+      new Set(
+        (Array.isArray(value) ? value : []).map((addrRaw) => String(addrRaw || '').toLowerCase()).filter(Boolean),
+      ),
+    );
   const mintedAddresses = normalizeAddressList(entry.mintedAddresses);
   const burnedAddresses = normalizeAddressList(entry.burnedAddresses);
-  const mintedCountByAddress = seedSbtCountMapFromLegacyAddresses(
-    entry.mintedCountByAddress,
-    mintedAddresses
-  );
-  const burnedCountByAddress = seedSbtCountMapFromLegacyAddresses(
-    entry.burnedCountByAddress,
-    burnedAddresses
-  );
+  const mintedCountByAddress = seedSbtCountMapFromLegacyAddresses(entry.mintedCountByAddress, mintedAddresses);
+  const burnedCountByAddress = seedSbtCountMapFromLegacyAddresses(entry.burnedCountByAddress, burnedAddresses);
   const mintedEventCount = Math.max(
     0,
     Math.floor(Number(entry.mintedEventCount || 0)),
-    sumSbtCountMap(mintedCountByAddress)
+    sumSbtCountMap(mintedCountByAddress),
   );
   const burnedEventCount = Math.max(
     0,
     Math.floor(Number(entry.burnedEventCount || 0)),
-    sumSbtCountMap(burnedCountByAddress)
+    sumSbtCountMap(burnedCountByAddress),
   );
 
   entry.mintedAddresses = mintedAddresses;
@@ -153,7 +131,6 @@ export const hydrateLegacySbtCountState = (entry: SbtCountState | null = {}): Sb
   return entry;
 };
 
-
 export const getCurrentHolderAddressesFromCounts = (counts: Partial<SbtCountsPayloadInput> = {}): string[] => {
   const mintedCountByAddress = normalizeSbtCountMap(counts?.mintedCountByAddress);
   const burnedCountByAddress = normalizeSbtCountMap(counts?.burnedCountByAddress);
@@ -161,13 +138,12 @@ export const getCurrentHolderAddressesFromCounts = (counts: Partial<SbtCountsPay
   Object.keys(mintedCountByAddress).forEach((addr) => {
     const minted = Math.max(0, Math.floor(Number(mintedCountByAddress?.[addr] || 0)));
     const burned = Math.max(0, Math.floor(Number(burnedCountByAddress?.[addr] || 0)));
-    if ((minted - burned) > 0) {
+    if (minted - burned > 0) {
       holders.push(addr);
     }
   });
   return holders;
 };
-
 
 export const normalizeSbtCountsScanCheckpoint = (
   checkpointIn: SbtCountsScanCheckpointInput | null | undefined,
@@ -177,7 +153,7 @@ export const normalizeSbtCountsScanCheckpoint = (
   }: {
     startBlock: unknown;
     toBlock: unknown;
-  }
+  },
 ): SbtCountsScanCheckpoint | null => {
   if (!checkpointIn || typeof checkpointIn !== 'object') return null;
   const phase = String(checkpointIn.phase || '').trim();
@@ -190,7 +166,7 @@ export const normalizeSbtCountsScanCheckpoint = (
   const checkpointFloor = scanStartBlock - 1;
   const blockNumber = Math.max(
     checkpointFloor,
-    Math.min(scanToBlock, Math.floor(Number(checkpointIn.blockNumber ?? checkpointFloor)))
+    Math.min(scanToBlock, Math.floor(Number(checkpointIn.blockNumber ?? checkpointFloor))),
   );
   const mintedCountByAddress = normalizeSbtCountMap(checkpointIn.mintedCountByAddress);
   const burnedCountByAddress = normalizeSbtCountMap(checkpointIn.burnedCountByAddress);

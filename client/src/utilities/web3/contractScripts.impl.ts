@@ -73,10 +73,7 @@ import { cryptoUtils } from '../crypto/cryptography.js';
 import { arweaveScripts } from '../arweave/arweaveScripts.js';
 import { normalizeArweaveUrl, parseArweaveTxId } from '../arweave/arweaveUrls.js';
 import { createArweaveDownloadOps } from '../arweave/arweaveDownload.js';
-import {
-  buildArweaveUploadTags,
-  resolveArweaveUploadOpts,
-} from '../arweave/arweaveUploadHelpers.js';
+import { buildArweaveUploadTags, resolveArweaveUploadOpts } from '../arweave/arweaveUploadHelpers.js';
 import { validateNoLockedPlaintextInPayload } from '../arweave/noLeakPayloads.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
@@ -105,10 +102,7 @@ import {
   memoizedResolveSession,
   setTimedMemoValue,
 } from '../cache/contractScriptsCache.js';
-import {
-  isCallExceptionError,
-  logArweaveMetadataFetchFailure,
-} from '../arweave/arweaveMetadataFailureLog.js';
+import { isCallExceptionError, logArweaveMetadataFetchFailure } from '../arweave/arweaveMetadataFailureLog.js';
 import {
   buildHashUnavailableMetadataError,
   normalizeArweaveFailureMeta,
@@ -126,10 +120,7 @@ import {
   deriveStorageRefFromLegacyArweaveTxId,
   normalizeStorageRef,
 } from '../storage/storageRefs.js';
-import {
-  readSessionStorageBlob,
-  uploadDataToSessionStorage,
-} from '../storage/storageClient.js';
+import { readSessionStorageBlob, uploadDataToSessionStorage } from '../storage/storageClient.js';
 import { resolveSessionStorageBackend } from '../storage/sessionStorageConfig.js';
 import store from '../../store';
 import { sessionRegistryStore, sessionRegistryUtils } from './sessionRegistry.js';
@@ -203,23 +194,15 @@ import {
   isNonRecoverableGetLogsError,
   createFetchLogsSmartWithProvider,
 } from './rpcSmartLogFetch.js';
-import {
-  normalizeCreate2Salt,
-  hasNonZeroHashValue,
-} from './deterministicFactoryHelpers.js';
+import { normalizeCreate2Salt, hasNonZeroHashValue } from './deterministicFactoryHelpers.js';
 import {
   GAS_FALLBACKS,
   SBT_TOKENURI_METADATA_TIMEOUT_MS,
   runWithSoftTimeout,
   extractChainId,
 } from './contractScripts.corePureHelpers.js';
-import {
-  normalizeConvictionImportance,
-  normalizeQuestionFlags,
-} from './contractScripts.payloadNormalizers.js';
-import {
-  uploadDataToArweaveWithRetry,
-} from './contractArweaveUploadRuntime.js';
+import { normalizeConvictionImportance, normalizeQuestionFlags } from './contractScripts.payloadNormalizers.js';
+import { uploadDataToArweaveWithRetry } from './contractArweaveUploadRuntime.js';
 
 declare global {
   interface Window {
@@ -259,14 +242,13 @@ const sbtListenerMap = new Map();
 /** @type {Map<string, any>} */
 const surveyListenerMap = new Map();
 
-
 /* ------------------------------------------------------------------ */
 /* 1.  UNIVERSAL rate‑limit‑aware RETRY WRAPPER                       */
 /* ------------------------------------------------------------------ */
 
-const MAX_RETRIES_DEFAULT       = 10;    // up to ~5 min worst-case
-const INITIAL_DELAY_MS_DEFAULT  = 1500;  // 1.5 s
-const DELAY_MULTIPLIER_DEFAULT  = 2;
+const MAX_RETRIES_DEFAULT = 10; // up to ~5 min worst-case
+const INITIAL_DELAY_MS_DEFAULT = 1500; // 1.5 s
+const DELAY_MULTIPLIER_DEFAULT = 2;
 
 // --- NEW: global rate-limit / quota circuit breaker ---
 let GLOBAL_QUOTA_LOCK_UNTIL_MS = 0;
@@ -302,9 +284,7 @@ function applyWindowDebugDefaults() {
   setIfUndef('DISABLE_SBT_INSTANCE_LISTENERS', DISABLE_SBT_INSTANCE_LISTENERS);
   setIfUndef(
     'SBT_INSTANCE_LISTENER_GROUPS',
-    Array.isArray(SBT_INSTANCE_LISTENER_GROUPS)
-      ? [...SBT_INSTANCE_LISTENER_GROUPS]
-      : SBT_INSTANCE_LISTENER_GROUPS
+    Array.isArray(SBT_INSTANCE_LISTENER_GROUPS) ? [...SBT_INSTANCE_LISTENER_GROUPS] : SBT_INSTANCE_LISTENER_GROUPS,
   );
   setIfUndef('ENABLE_SBT_HISTORY_SCAN', ENABLE_SBT_HISTORY_SCAN);
   if (
@@ -348,7 +328,8 @@ const isRetryableSurveyResponseReadError = (error: any) => {
 
   if (error?.name === 'AbortError') return false;
   if (code === 'CALL_EXCEPTION' || code === 'INVALID_ARGUMENT') return false;
-  if (code === 402 || code === 408 || code === 429 || code === 500 || code === 502 || code === 503 || code === 504) return true;
+  if (code === 402 || code === 408 || code === 429 || code === 500 || code === 502 || code === 503 || code === 504)
+    return true;
   if (
     code === 'NETWORK_ERROR' ||
     code === 'SERVER_ERROR' ||
@@ -361,7 +342,15 @@ const isRetryableSurveyResponseReadError = (error: any) => {
   }
 
   if (typeof status === 'number') {
-    if (status === 402 || status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504) {
+    if (
+      status === 402 ||
+      status === 408 ||
+      status === 429 ||
+      status === 500 ||
+      status === 502 ||
+      status === 503 ||
+      status === 504
+    ) {
       return true;
     }
     if (status >= 400) return false;
@@ -417,9 +406,11 @@ const normalizeWeb3ContextCacheValue = (value: any, seen: any = new WeakSet()): 
     return value.map((item: any) => normalizeWeb3ContextCacheValue(item, seen));
   }
   const out: any = {};
-  Object.keys(value).sort().forEach((key: any) => {
-    out[key] = normalizeWeb3ContextCacheValue(value[key], seen);
-  });
+  Object.keys(value)
+    .sort()
+    .forEach((key: any) => {
+      out[key] = normalizeWeb3ContextCacheValue(value[key], seen);
+    });
   return out;
 };
 
@@ -468,19 +459,15 @@ const SURVEYS_READ_PROVIDER_OPTIONS = Object.freeze({
   providerLabel: 'surveys-archive',
 });
 
-const getSurveysReadProviderForSession = (groupKeyOrCfg: any, cfg: any, chainId: any) => (
-  getReadProviderForGroup(cfg || groupKeyOrCfg, SURVEYS_READ_PROVIDER_OPTIONS) ||
-  getReadProviderForChain(chainId)
-);
+const getSurveysReadProviderForSession = (groupKeyOrCfg: any, cfg: any, chainId: any) =>
+  getReadProviderForGroup(cfg || groupKeyOrCfg, SURVEYS_READ_PROVIDER_OPTIONS) || getReadProviderForChain(chainId);
 
 let contractMetadataResolutionHelpers: ReturnType<typeof createChainMetadataResolutionHelpers>;
 
 function recordRpcStat(fnName: any, meta: any) {
   try {
     if (typeof window === 'undefined') return;
-    const enabled =
-      window.ENABLE_RPC_DEBUG_STATS === true ||
-      shouldLog('rpc', 'log');
+    const enabled = window.ENABLE_RPC_DEBUG_STATS === true || shouldLog('rpc', 'log');
     if (!enabled) return;
 
     const key = String(fnName || 'unknown');
@@ -504,12 +491,13 @@ function recordRpcStat(fnName: any, meta: any) {
 
 async function withRetry(
   taskFn: any,
-  functionName: any          = 'anonymous-fn',
-  maxRetries: any            = MAX_RETRIES_DEFAULT,
-  initialDelayMs: any        = INITIAL_DELAY_MS_DEFAULT,
-  delayMultiplier: any       = DELAY_MULTIPLIER_DEFAULT
+  functionName: any = 'anonymous-fn',
+  maxRetries: any = MAX_RETRIES_DEFAULT,
+  initialDelayMs: any = INITIAL_DELAY_MS_DEFAULT,
+  delayMultiplier: any = DELAY_MULTIPLIER_DEFAULT,
 ) {
-  let attempt = 0, delayMs = initialDelayMs;
+  let attempt = 0,
+    delayMs = initialDelayMs;
 
   while (true) {
     // --- NEW: global hard lock for known quota-exhausted windows ---
@@ -527,7 +515,7 @@ async function withRetry(
       const rawCode = err?.code ?? err?.error?.code;
       let code = Number.isFinite(Number(rawCode)) ? Number(rawCode) : null;
       const message = (err?.message || err?.error?.message || '').toLowerCase();
-      const bodyStr = (typeof err?.body === 'string') ? err.body.toLowerCase() : '';
+      const bodyStr = typeof err?.body === 'string' ? err.body.toLowerCase() : '';
 
       // Some browsers surface 429 responses as CORS/preflight failures without a numeric code.
       // Example: "Preflight response is not successful. Status code: 429" / "access control checks".
@@ -538,19 +526,24 @@ async function withRetry(
         bodyStr.includes('status code: 429') ||
         bodyStr.includes('status: 429');
       const mentionsPreflightOrCors =
-        message.includes('preflight') ||
-        message.includes('access control') ||
-        message.includes('cors');
+        message.includes('preflight') || message.includes('access control') || message.includes('cors');
       if (!code && mentions429 && mentionsPreflightOrCors) {
         code = 429;
       }
 
-      const is429   = code === 429;
-      const is402   = code === 402 || message.includes('payment required') || bodyStr.includes('payment required') || message.includes('quota exceeded') || bodyStr.includes('quota exceeded');
-      const is503   = code === 503;
+      const is429 = code === 429;
+      const is402 =
+        code === 402 ||
+        message.includes('payment required') ||
+        bodyStr.includes('payment required') ||
+        message.includes('quota exceeded') ||
+        bodyStr.includes('quota exceeded');
+      const is503 = code === 503;
 
-      const isRate  =
-        is429 || is402 || is503 ||
+      const isRate =
+        is429 ||
+        is402 ||
+        is503 ||
         message.includes('rate limit') ||
         message.includes('too many requests') ||
         message.includes('quota exceeded') ||
@@ -558,9 +551,7 @@ async function withRetry(
         bodyStr.includes('too many requests') ||
         bodyStr.includes('quota exceeded');
 
-      const isInfuraRatelimit =
-        code === -32005 &&
-        (message.includes('rate limit') || bodyStr.includes('rate limit'));
+      const isInfuraRatelimit = code === -32005 && (message.includes('rate limit') || bodyStr.includes('rate limit'));
 
       // Not a rate limit / quota error → bubble up immediately
       if (!(isRate || isInfuraRatelimit)) {
@@ -574,11 +565,11 @@ async function withRetry(
       if (is402) {
         GLOBAL_QUOTA_LOCK_UNTIL_MS = Math.max(
           GLOBAL_QUOTA_LOCK_UNTIL_MS,
-          Date.now() + 10 * 60 * 1000   // 10-minute lock for all further RPC calls this session
+          Date.now() + 10 * 60 * 1000, // 10-minute lock for all further RPC calls this session
         );
         contractsLog.error(
           `[withRetry] ❌  ${functionName}: 402 Payment Required / quota exceeded; ` +
-          `locking further RPC calls for 10 minutes and aborting immediately.`
+            `locking further RPC calls for 10 minutes and aborting immediately.`,
         );
         throw err; // no retries for 402
       }
@@ -593,14 +584,13 @@ async function withRetry(
       const capped = Math.min(delayMs, 30000);
       contractsLog.warn(
         `[withRetry] 🔄  ${functionName}: rate-limited (code=${code}), ` +
-        `retry ${attempt}/${maxRetries} in ${capped} ms.`
+          `retry ${attempt}/${maxRetries} in ${capped} ms.`,
       );
       await new Promise((r: any) => setTimeout(r, capped));
       delayMs *= delayMultiplier;
     }
   }
 }
-
 
 const callWithRetry = (fn: any, fnName: any, meta?: any, retryOpts: any = null) => {
   const maxRetries = Number(retryOpts?.maxRetries);
@@ -615,7 +605,7 @@ const callWithRetry = (fn: any, fnName: any, meta?: any, retryOpts: any = null) 
     fnName,
     Number.isFinite(maxRetries) ? maxRetries : MAX_RETRIES_DEFAULT,
     Number.isFinite(initialDelayMs) ? initialDelayMs : INITIAL_DELAY_MS_DEFAULT,
-    Number.isFinite(delayMultiplier) ? delayMultiplier : DELAY_MULTIPLIER_DEFAULT
+    Number.isFinite(delayMultiplier) ? delayMultiplier : DELAY_MULTIPLIER_DEFAULT,
   );
 };
 
@@ -704,14 +694,14 @@ const resolveStorageSessionSlug = (groupKeyOrCfg: any, cfg: any = null) => {
   return normalizeSessionSlug(groupKeyOrCfg?.slug || groupKeyOrCfg?.sessionSlug || '');
 };
 
-const resolveStorageBackendForResource = (cfg: any, resource: any, opts: any = {}) => resolveSessionStorageBackend(cfg, {
-  resource,
-  encrypted: opts.encrypted === true,
-});
+const resolveStorageBackendForResource = (cfg: any, resource: any, opts: any = {}) =>
+  resolveSessionStorageBackend(cfg, {
+    resource,
+    encrypted: opts.encrypted === true,
+  });
 
-const isCloudflareStorageResource = (cfg: any, resource: any, opts: any = {}) => (
-  resolveStorageBackendForResource(cfg, resource, opts) === STORAGE_BACKENDS.CLOUDFLARE
-);
+const isCloudflareStorageResource = (cfg: any, resource: any, opts: any = {}) =>
+  resolveStorageBackendForResource(cfg, resource, opts) === STORAGE_BACKENDS.CLOUDFLARE;
 
 const payloadPointerIdToBytes32 = (id: any, label: any = 'storage pointer') => {
   const pointerId = toStr(id).trim();
@@ -771,18 +761,16 @@ const uploadJsonPayloadForContractPointer = async ({
   };
 };
 
-const readCloudflarePointerTextForGroup = async ({
-  pointerId,
-  resource,
-  groupKeyOrCfg,
-  cfg,
-}: any) => {
-  const storageRef = normalizeStorageRef({
-    backend: STORAGE_BACKENDS.CLOUDFLARE,
-    id: pointerId,
-    resource,
-    contentType: 'application/json',
-  }, { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE, resource });
+const readCloudflarePointerTextForGroup = async ({ pointerId, resource, groupKeyOrCfg, cfg }: any) => {
+  const storageRef = normalizeStorageRef(
+    {
+      backend: STORAGE_BACKENDS.CLOUDFLARE,
+      id: pointerId,
+      resource,
+      contentType: 'application/json',
+    },
+    { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE, resource },
+  );
   if (!storageRef) throw new Error(`Invalid Cloudflare ${resource} storage pointer.`);
   const response = await readSessionStorageBlob({
     storageRef,
@@ -796,13 +784,7 @@ const readCloudflarePointerTextForGroup = async ({
   };
 };
 
-const readPayloadPointerTextForGroup = async ({
-  pointerId,
-  resource,
-  groupKeyOrCfg,
-  cfg,
-  arweaveOpts,
-}: any) => {
+const readPayloadPointerTextForGroup = async ({ pointerId, resource, groupKeyOrCfg, cfg, arweaveOpts }: any) => {
   if (isCloudflareStorageResource(cfg, resource)) {
     try {
       return await readCloudflarePointerTextForGroup({ pointerId, resource, groupKeyOrCfg, cfg });
@@ -822,15 +804,15 @@ const readPayloadPointerTextForGroup = async ({
   };
 };
 
-const attachPayloadPointerFields = (payload: any, pointerId: any, resource: any, storageRef: any = null) => (
-  attachStorageRefCompatibilityFields({
-    ...(payload || {}),
-    ...(storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE
-      ? { storageRef }
-      : { arweaveTxId: pointerId }),
-    resource,
-  }, { resource })
-);
+const attachPayloadPointerFields = (payload: any, pointerId: any, resource: any, storageRef: any = null) =>
+  attachStorageRefCompatibilityFields(
+    {
+      ...(payload || {}),
+      ...(storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE ? { storageRef } : { arweaveTxId: pointerId }),
+      resource,
+    },
+    { resource },
+  );
 
 const recordInFlightStat = (kind: any = 'miss') => {
   try {
@@ -1090,10 +1072,9 @@ const contractScripts: any = {
   ...createContractScriptsSbtMintMethods(contractScriptsRuntimeDeps),
   ...createProfileChainReadMethods(contractProfileDeps),
 
-
   // SBT Functionality Ends -----------------------------
 
-  getProviderLocation: function(providerName: any) {
+  getProviderLocation: function (providerName: any) {
     const win: any = typeof window !== 'undefined' ? window : {};
     const resolved = resolveSignerProvider({
       providerName,
@@ -1115,7 +1096,6 @@ const contractScripts: any = {
   getJsNumberFromBN,
   objectIsBN,
   timeout,
-
 };
 
 // Convenience: expose named read-provider resolver on default export

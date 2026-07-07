@@ -13,13 +13,17 @@ describe('surveyToolSignatures', () => {
   });
 
   it('builds stable slice tokens for equivalent structured payloads regardless of key order', () => {
-    expect(buildSliceToken({
-      b: ['x', { y: 2 }],
-      a: { nested: true },
-    })).toBe(buildSliceToken({
-      a: { nested: true },
-      b: ['x', { y: 2 }],
-    }));
+    expect(
+      buildSliceToken({
+        b: ['x', { y: 2 }],
+        a: { nested: true },
+      }),
+    ).toBe(
+      buildSliceToken({
+        a: { nested: true },
+        b: ['x', { y: 2 }],
+      }),
+    );
   });
 
   it('changes survey response slice signatures when filtered question payloads change', () => {
@@ -55,25 +59,29 @@ describe('surveyToolSignatures', () => {
       },
     };
 
-    expect(buildSurveyResponseSliceSignature(base, {
-      normalizedIdFilter: new Set(['q1']),
-    })).not.toBe(buildSurveyResponseSliceSignature(next, {
-      normalizedIdFilter: new Set(['q1']),
-    }));
+    expect(
+      buildSurveyResponseSliceSignature(base, {
+        normalizedIdFilter: new Set(['q1']),
+      }),
+    ).not.toBe(
+      buildSurveyResponseSliceSignature(next, {
+        normalizedIdFilter: new Set(['q1']),
+      }),
+    );
 
-    expect(buildSurveyResponseSliceSignature(base, {
-      normalizedIdFilter: new Set(['q2']),
-    })).toBe(buildSurveyResponseSliceSignature(next, {
-      normalizedIdFilter: new Set(['q2']),
-    }));
+    expect(
+      buildSurveyResponseSliceSignature(base, {
+        normalizedIdFilter: new Set(['q2']),
+      }),
+    ).toBe(
+      buildSurveyResponseSliceSignature(next, {
+        normalizedIdFilter: new Set(['q2']),
+      }),
+    );
   });
 
   it('builds rendered-id and question-scope signatures from normalized ids', () => {
     expect(buildRenderedIdsSignature(['Q1', 'q2', '', 'Q3'])).toBe('q1|q2|q3');
-    expect(buildQuestionIdScopeSignature([
-      { id: 'Q2' },
-      { id: 'q1' },
-      { id: 'Q2' },
-    ])).toBe('q1|q2');
+    expect(buildQuestionIdScopeSignature([{ id: 'Q2' }, { id: 'q1' }, { id: 'Q2' }])).toBe('q1|q2');
   });
 });

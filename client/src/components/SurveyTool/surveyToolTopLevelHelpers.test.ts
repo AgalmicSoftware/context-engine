@@ -79,11 +79,14 @@ describe('surveyToolTopLevelHelpers', () => {
 
   it('builds URL filter hydration state without mutating browser history', () => {
     window.history.pushState({}, '', '/questions');
-    const path = buildSurveyToolFilterStateUrlPath({
-      sessionSlug: 'Demo Session',
-    }, {
-      questionTypes: ['freeform'],
-    });
+    const path = buildSurveyToolFilterStateUrlPath(
+      {
+        sessionSlug: 'Demo Session',
+      },
+      {
+        questionTypes: ['freeform'],
+      },
+    );
     const result = buildSurveyToolHydratedFilterState({
       props: {},
       href: new URL(path, 'https://example.test').toString(),
@@ -100,18 +103,22 @@ describe('surveyToolTopLevelHelpers', () => {
   it('skips URL filter hydration for pile mode and active prop filters', () => {
     const href = 'https://example.test/questions/results?filter=abc';
 
-    expect(buildSurveyToolHydratedFilterState({
-      props: { minifiedMode: 'pile' },
-      href,
-    })).toEqual({
+    expect(
+      buildSurveyToolHydratedFilterState({
+        props: { minifiedMode: 'pile' },
+        href,
+      }),
+    ).toEqual({
       filterState: null,
       cleanUrl: null,
       error: null,
     });
-    expect(buildSurveyToolHydratedFilterState({
-      props: { filterState: { questionTypes: ['rating'] } },
-      href,
-    })).toEqual({
+    expect(
+      buildSurveyToolHydratedFilterState({
+        props: { filterState: { questionTypes: ['rating'] } },
+        href,
+      }),
+    ).toEqual({
       filterState: null,
       cleanUrl: null,
       error: null,
@@ -153,26 +160,32 @@ describe('surveyToolTopLevelHelpers', () => {
   });
 
   it('normalizes surveyId before legacy surveyID', () => {
-    expect(getNormalizedSurveyIdFromPropsValue({
-      surveyId: ' 0xABC ',
-      surveyID: '0xdef',
-    })).toBe('0xabc');
+    expect(
+      getNormalizedSurveyIdFromPropsValue({
+        surveyId: ' 0xABC ',
+        surveyID: '0xdef',
+      }),
+    ).toBe('0xabc');
     expect(getNormalizedSurveyIdFromPropsValue({ surveyID: ' 0xDEF ' })).toBe('0xdef');
     expect(getNormalizedSurveyIdFromPropsValue({})).toBeNull();
   });
 
   it('resolves top-level render mode precedence', () => {
-    expect(resolveSurveyToolRenderMode({
-      minifiedMode: 'pile',
-      singleQuestionMode: true,
-    })).toEqual({
+    expect(
+      resolveSurveyToolRenderMode({
+        minifiedMode: 'pile',
+        singleQuestionMode: true,
+      }),
+    ).toEqual({
       shouldRenderPileMode: true,
       shouldRenderSingleQuestionMode: false,
       shouldRenderSurveySelectorMode: false,
     });
-    expect(resolveSurveyToolRenderMode({
-      singleQuestionMode: true,
-    })).toEqual({
+    expect(
+      resolveSurveyToolRenderMode({
+        singleQuestionMode: true,
+      }),
+    ).toEqual({
       shouldRenderPileMode: false,
       shouldRenderSingleQuestionMode: true,
       shouldRenderSurveySelectorMode: false,
@@ -185,23 +198,28 @@ describe('surveyToolTopLevelHelpers', () => {
   });
 
   it('resolves selector survey id precedence and mismatch warnings', () => {
-    expect(resolveSurveyToolSelectorRenderState({
-      props: {
-        surveyId: ' 0xABC ',
-        surveyID: '0xdef',
-      },
-    })).toMatchObject({
+    expect(
+      resolveSurveyToolSelectorRenderState({
+        props: {
+          surveyId: ' 0xABC ',
+          surveyID: '0xdef',
+        },
+      }),
+    ).toMatchObject({
       normalizedSurveyId: '0xabc',
       shouldWarnMismatchedSurveyIds: true,
-      mismatchedSurveyIdWarning: '[SurveyTool] Both surveyId and surveyID props were provided with different values. Preferring surveyId: " 0xABC " over surveyID: "0xdef"',
+      mismatchedSurveyIdWarning:
+        '[SurveyTool] Both surveyId and surveyID props were provided with different values. Preferring surveyId: " 0xABC " over surveyID: "0xdef"',
     });
 
-    expect(resolveSurveyToolSelectorRenderState({
-      props: {
-        surveyId: ' 0xABC ',
-        surveyID: '0xabc',
-      },
-    })).toMatchObject({
+    expect(
+      resolveSurveyToolSelectorRenderState({
+        props: {
+          surveyId: ' 0xABC ',
+          surveyID: '0xabc',
+        },
+      }),
+    ).toMatchObject({
       normalizedSurveyId: '0xabc',
       shouldWarnMismatchedSurveyIds: false,
       mismatchedSurveyIdWarning: '',
@@ -209,102 +227,138 @@ describe('surveyToolTopLevelHelpers', () => {
   });
 
   it('resolves selector filter state with prop precedence before hydrated URL state', () => {
-    expect(resolveSurveyToolSelectorRenderState({
-      props: {
-        filterState: { questionTypes: ['rating'] },
-      },
-      hydratedFilterState: { questionTypes: ['freeform'] },
-    }).effectiveFilterState).toMatchObject({
+    expect(
+      resolveSurveyToolSelectorRenderState({
+        props: {
+          filterState: { questionTypes: ['rating'] },
+        },
+        hydratedFilterState: { questionTypes: ['freeform'] },
+      }).effectiveFilterState,
+    ).toMatchObject({
       questionTypes: ['rating'],
     });
 
-    expect(resolveSurveyToolSelectorRenderState({
-      props: {},
-      hydratedFilterState: { questionTypes: ['freeform'] },
-    }).effectiveFilterState).toMatchObject({
+    expect(
+      resolveSurveyToolSelectorRenderState({
+        props: {},
+        hydratedFilterState: { questionTypes: ['freeform'] },
+      }).effectiveFilterState,
+    ).toMatchObject({
       questionTypes: ['freeform'],
     });
   });
 
   it('resolves mount-time questions route guards', () => {
-    expect(shouldRouteSurveyToolMountToQuestions({
-      pathname: '/home',
-      props: {},
-    })).toBe(true);
-    expect(shouldRouteSurveyToolMountToQuestions({
-      pathname: '/questions',
-      props: {},
-    })).toBe(false);
-    expect(shouldRouteSurveyToolMountToQuestions({
-      pathname: '/home',
-      props: { minifiedMode: 'pile' },
-    })).toBe(false);
-    expect(shouldRouteSurveyToolMountToQuestions({
-      pathname: '/home',
-      props: { preventUrlChange: true },
-    })).toBe(false);
+    expect(
+      shouldRouteSurveyToolMountToQuestions({
+        pathname: '/home',
+        props: {},
+      }),
+    ).toBe(true);
+    expect(
+      shouldRouteSurveyToolMountToQuestions({
+        pathname: '/questions',
+        props: {},
+      }),
+    ).toBe(false);
+    expect(
+      shouldRouteSurveyToolMountToQuestions({
+        pathname: '/home',
+        props: { minifiedMode: 'pile' },
+      }),
+    ).toBe(false);
+    expect(
+      shouldRouteSurveyToolMountToQuestions({
+        pathname: '/home',
+        props: { preventUrlChange: true },
+      }),
+    ).toBe(false);
   });
 
   it('resolves SurveyTool prop-change lifecycle guards', () => {
-    expect(shouldFetchSurveyToolSurveysOnPropsChange({
-      prevProps: { network: { id: 1 }, isSurveyCacheReady: false },
-      props: { network: { id: 2 }, isSurveyCacheReady: false },
-    })).toBe(true);
-    expect(shouldFetchSurveyToolSurveysOnPropsChange({
-      prevProps: { network: { id: 1 }, isSurveyCacheReady: false },
-      props: { network: { id: 1 }, isSurveyCacheReady: true },
-    })).toBe(true);
-    expect(shouldFetchSurveyToolSurveysOnPropsChange({
-      prevProps: { network: { id: 1 }, isSurveyCacheReady: true },
-      props: { network: { id: 1 }, isSurveyCacheReady: false },
-    })).toBe(false);
+    expect(
+      shouldFetchSurveyToolSurveysOnPropsChange({
+        prevProps: { network: { id: 1 }, isSurveyCacheReady: false },
+        props: { network: { id: 2 }, isSurveyCacheReady: false },
+      }),
+    ).toBe(true);
+    expect(
+      shouldFetchSurveyToolSurveysOnPropsChange({
+        prevProps: { network: { id: 1 }, isSurveyCacheReady: false },
+        props: { network: { id: 1 }, isSurveyCacheReady: true },
+      }),
+    ).toBe(true);
+    expect(
+      shouldFetchSurveyToolSurveysOnPropsChange({
+        prevProps: { network: { id: 1 }, isSurveyCacheReady: true },
+        props: { network: { id: 1 }, isSurveyCacheReady: false },
+      }),
+    ).toBe(false);
 
-    expect(shouldOpenSurveyToolResultsOnPropsChange({
-      prevProps: { autoOpenResults: false },
-      props: { autoOpenResults: true },
-      showResultsModal: false,
-    })).toBe(true);
-    expect(shouldOpenSurveyToolResultsOnPropsChange({
-      prevProps: { autoOpenResults: false },
-      props: { autoOpenResults: true },
-      showResultsModal: true,
-    })).toBe(false);
+    expect(
+      shouldOpenSurveyToolResultsOnPropsChange({
+        prevProps: { autoOpenResults: false },
+        props: { autoOpenResults: true },
+        showResultsModal: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldOpenSurveyToolResultsOnPropsChange({
+        prevProps: { autoOpenResults: false },
+        props: { autoOpenResults: true },
+        showResultsModal: true,
+      }),
+    ).toBe(false);
 
-    expect(shouldBumpSurveyToolQuestionsCacheNonce({
-      prevProps: { isQuestionCacheReady: false },
-      props: { isQuestionCacheReady: true },
-    })).toBe(true);
-    expect(shouldBumpSurveyToolQuestionsCacheNonce({
-      prevProps: { isResponsesCacheReady: false },
-      props: { isResponsesCacheReady: true },
-    })).toBe(true);
-    expect(shouldBumpSurveyToolQuestionsCacheNonce({
-      prevProps: { questionResponsesNonce: 1 },
-      props: { questionResponsesNonce: 2 },
-    })).toBe(true);
-    expect(shouldBumpSurveyToolQuestionsCacheNonce({
-      prevProps: { network: { id: 1 } },
-      props: { network: { id: 2 } },
-    })).toBe(true);
-    expect(shouldBumpSurveyToolQuestionsCacheNonce({
-      prevProps: { isQuestionCacheReady: true, questionResponsesNonce: 1, network: { id: 1 } },
-      props: { isQuestionCacheReady: false, questionResponsesNonce: 1, network: { id: 1 } },
-    })).toBe(false);
+    expect(
+      shouldBumpSurveyToolQuestionsCacheNonce({
+        prevProps: { isQuestionCacheReady: false },
+        props: { isQuestionCacheReady: true },
+      }),
+    ).toBe(true);
+    expect(
+      shouldBumpSurveyToolQuestionsCacheNonce({
+        prevProps: { isResponsesCacheReady: false },
+        props: { isResponsesCacheReady: true },
+      }),
+    ).toBe(true);
+    expect(
+      shouldBumpSurveyToolQuestionsCacheNonce({
+        prevProps: { questionResponsesNonce: 1 },
+        props: { questionResponsesNonce: 2 },
+      }),
+    ).toBe(true);
+    expect(
+      shouldBumpSurveyToolQuestionsCacheNonce({
+        prevProps: { network: { id: 1 } },
+        props: { network: { id: 2 } },
+      }),
+    ).toBe(true);
+    expect(
+      shouldBumpSurveyToolQuestionsCacheNonce({
+        prevProps: { isQuestionCacheReady: true, questionResponsesNonce: 1, network: { id: 1 } },
+        props: { isQuestionCacheReady: false, questionResponsesNonce: 1, network: { id: 1 } },
+      }),
+    ).toBe(false);
   });
 
   it('resolves results modal close URL state', () => {
-    expect(resolveSurveyToolResultsModalCloseState({
-      pathname: '/session/edge/questions/results',
-      hasExternalCloseHandler: false,
-    })).toEqual({
+    expect(
+      resolveSurveyToolResultsModalCloseState({
+        pathname: '/session/edge/questions/results',
+        hasExternalCloseHandler: false,
+      }),
+    ).toEqual({
       shouldTrimResultsPath: true,
       nextPathname: '/session/edge/questions',
       shouldCallExternalCloseHandler: false,
     });
-    expect(resolveSurveyToolResultsModalCloseState({
-      pathname: '/session/edge/questions/results',
-      hasExternalCloseHandler: true,
-    })).toEqual({
+    expect(
+      resolveSurveyToolResultsModalCloseState({
+        pathname: '/session/edge/questions/results',
+        hasExternalCloseHandler: true,
+      }),
+    ).toEqual({
       shouldTrimResultsPath: false,
       nextPathname: '/session/edge/questions/results',
       shouldCallExternalCloseHandler: true,
@@ -364,10 +418,12 @@ describe('surveyToolTopLevelHelpers', () => {
 
   it('ignores invalid cache entries and returns null for missing surveys', () => {
     expect(findSurveyInSurveyCacheEntries(null, [])).toBeNull();
-    expect(findSurveyInSurveyCacheEntries('0xabc', [
-      { slug: 'bad-session', value: null },
-      { slug: 'empty-session', value: { '11155420': { surveys: {} } } },
-    ])).toBeNull();
+    expect(
+      findSurveyInSurveyCacheEntries('0xabc', [
+        { slug: 'bad-session', value: null },
+        { slug: 'empty-session', value: { '11155420': { surveys: {} } } },
+      ]),
+    ).toBeNull();
   });
 
   it('builds survey list entries from a cache bag while preserving first-seen ids', () => {
@@ -391,23 +447,28 @@ describe('surveyToolTopLevelHelpers', () => {
 
   it('skips malformed cached surveys and empty question lists', () => {
     expect(buildSurveyToolSurveyListFromBag(null)).toEqual([]);
-    expect(buildSurveyToolSurveyListFromBag({
-      missingTitle: { questionIDs: ['0xQ1'] },
-      missingQuestionIds: { title: 'No questions' },
-      emptyQuestionIds: { title: 'Empty questions', questionIDs: [] },
-      valid: { title: 'Valid', questionIDs: [''] },
-    })).toEqual([
-      { title: 'Valid', questionIDs: [''], id: 'valid' },
-    ]);
+    expect(
+      buildSurveyToolSurveyListFromBag({
+        missingTitle: { questionIDs: ['0xQ1'] },
+        missingQuestionIds: { title: 'No questions' },
+        emptyQuestionIds: { title: 'Empty questions', questionIDs: [] },
+        valid: { title: 'Valid', questionIDs: [''] },
+      }),
+    ).toEqual([{ title: 'Valid', questionIDs: [''], id: 'valid' }]);
   });
 
   it('builds survey result URL paths with normalized ids and explicit session hints', () => {
     window.history.pushState({}, '', '/questions');
 
-    expect(buildSurveyToolFilterStateUrlPath({
-      surveyId: ' 0xABC ',
-      sessionSlug: ' Demo Session ',
-    }, {})).toBe('/survey/0xabc/results?session=Demo%20Session');
+    expect(
+      buildSurveyToolFilterStateUrlPath(
+        {
+          surveyId: ' 0xABC ',
+          sessionSlug: ' Demo Session ',
+        },
+        {},
+      ),
+    ).toBe('/survey/0xabc/results?session=Demo%20Session');
   });
 
   it('builds question result URL paths with serialized filters and route session hints', () => {

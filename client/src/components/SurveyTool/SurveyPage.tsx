@@ -1,10 +1,10 @@
 /** @file SurveyPage.tsx */
 
-import React, { Component } from "react";
+import React, { Component } from 'react';
 
-import SurveyTool from "components/SurveyTool/SurveyTool";
+import SurveyTool from 'components/SurveyTool/SurveyTool';
 
-import styles from "./SurveyPage.module.scss";
+import styles from './SurveyPage.module.scss';
 
 type SurveyPageCallback = (...args: unknown[]) => unknown;
 
@@ -73,80 +73,76 @@ class SurveyComponent extends Component<SurveyPageProps> {
     // If minifiedMode is passed, render only SurveyTool with all props
     if (this.props.minifiedMode) {
       return <SurveyTool {...sharedSurveyToolProps} />;
-    }
+    } else
+      return (
+        <div>
+          <SurveyTool
+            {...sharedSurveyToolProps}
+            /* ---- routing / mode props ---- */
+            surveyID={this.props.surveyID}
+            displayAnswerMode={this.props.displayAnswerMode}
+            viewAddress={this.props.viewAddress}
+            autoOpenResults={this.props.autoOpenResults}
+            filterState={this.props.filterState}
+            singleQuestionMode={this.props.singleQuestionMode}
 
-    else return (
-      <div>
-            <SurveyTool
-              {...sharedSurveyToolProps}
-              /* ---- routing / mode props ---- */
-              surveyID={this.props.surveyID}
-              displayAnswerMode={this.props.displayAnswerMode}
-              viewAddress={this.props.viewAddress}
-              autoOpenResults={this.props.autoOpenResults}
-              filterState={this.props.filterState}
-              singleQuestionMode={this.props.singleQuestionMode}
+            /* ---- login / account props ---- */
+            toggleLoginModal={this.props.toggleLoginModal}
+            account={this.props.account}
+            provider={this.props.provider}
+            loginComplete={this.props.loginComplete}
+            loginInProgress={this.props.loginInProgress}
+            network={this.props.network}
 
-              /* ---- login / account props ---- */
-              toggleLoginModal={this.props.toggleLoginModal}
-              account={this.props.account}
-              provider={this.props.provider}
-              loginComplete={this.props.loginComplete}
-              loginInProgress={this.props.loginInProgress}
-              network={this.props.network}
+            /* ---- cache-status flags ---- */
+            isSBTCacheReady={this.props.isSBTCacheReady}
+            isSurveyCacheReady={this.props.isSurveyCacheReady}
+            isQuestionCacheReady={this.props.isQuestionCacheReady}
+            isResponsesCacheReady={this.props.isResponsesCacheReady}
+            cacheHasLoaded={this.props.cacheHasLoaded}
 
-              /* ---- cache-status flags ---- */
-              isSBTCacheReady={this.props.isSBTCacheReady}
-              isSurveyCacheReady={this.props.isSurveyCacheReady}
-              isQuestionCacheReady={this.props.isQuestionCacheReady}
-              isResponsesCacheReady={this.props.isResponsesCacheReady}
-              cacheHasLoaded={this.props.cacheHasLoaded}
+            scanForSurveyGroup={this.props.scanForSurveyGroup}
 
-              scanForSurveyGroup={this.props.scanForSurveyGroup}
+            /* ---- reactivity nonce ---- */
+            questionResponsesNonce={this.props.questionResponsesNonce}
+            questionScanProgress={this.props.questionScanProgress}
+            questionPool={this.props.questionPool}
 
+            /* ---- refresh callbacks ---- */
+            refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+            refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+            refreshQuestionResponses={this.props.refreshQuestionResponses}
 
-              /* ---- reactivity nonce ---- */
-              questionResponsesNonce={this.props.questionResponsesNonce}
-              questionScanProgress={this.props.questionScanProgress}
-              questionPool={this.props.questionPool}
+            /* ---- org/session customisation ---- */
+            defaultTags={this.props.defaultTags}
+            defaultFilterState={this.props.defaultFilterState}
+            sessionInfo={this.props.sessionInfo}
+            sessionName={this.props.sessionName}
+            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+            onViewAllClick={this.props.onViewAllClick}
 
-              /* ---- refresh callbacks ---- */
-              refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-              refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-              refreshQuestionResponses={this.props.refreshQuestionResponses}
+            hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
+            onResultsModalClose={this.props.onResultsModalClose}
 
-              /* ---- org/session customisation ---- */
-              defaultTags={this.props.defaultTags}
-              defaultFilterState={this.props.defaultFilterState}
-              sessionInfo={this.props.sessionInfo}
-              sessionName={this.props.sessionName}
-              defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-              onViewAllClick={this.props.onViewAllClick}
+            /* ---- lifted filter handler ---- */
+            onFilterChange={this.props.onFilterChange}
 
-              hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
-              onResultsModalClose={this.props.onResultsModalClose}
+            /* ---- Session props ---- */
+            activeSessionSlug={effectiveActiveSessionSlug}
+            sessionSlug={effectiveSessionSlug}
+            sessionSlugPinned={effectiveSessionSlugPinned}
+            sessionConfig={effectiveSessionConfig}
+            contracts={this.props.contracts}
+            blockLimits={this.props.blockLimits}
+            networkChainId={this.props.networkChainId}
 
-              /* ---- lifted filter handler ---- */
-              onFilterChange={this.props.onFilterChange}
+            preventUrlChange={true}
 
-              /* ---- Session props ---- */
-              activeSessionSlug={effectiveActiveSessionSlug}
-              sessionSlug={effectiveSessionSlug}
-              sessionSlugPinned={effectiveSessionSlugPinned}
-              sessionConfig={effectiveSessionConfig}
-              contracts={this.props.contracts}
-              blockLimits={this.props.blockLimits}
-              networkChainId={this.props.networkChainId}
-
-              preventUrlChange={true}
-
-              litHooks={this.props.litHooks}
-            />
-
-      </div>
-    );
+            litHooks={this.props.litHooks}
+          />
+        </div>
+      );
   }
 }
-
 
 export default SurveyComponent;

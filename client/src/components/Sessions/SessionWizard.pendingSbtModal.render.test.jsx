@@ -37,10 +37,10 @@ describe('SessionWizard pending SBT modal rendering', () => {
     await waitFor(() => {
       const selectors = screen.getAllByTestId('mock-wizard-sbt-selector');
       const gateOneSelector = selectors.find(
-        (node) => node.getAttribute('data-selector-id') === 'encryption-gate-gate-1'
+        (node) => node.getAttribute('data-selector-id') === 'encryption-gate-gate-1',
       );
       const gateTwoSelector = selectors.find(
-        (node) => node.getAttribute('data-selector-id') === 'encryption-gate-gate-2'
+        (node) => node.getAttribute('data-selector-id') === 'encryption-gate-gate-2',
       );
 
       expect(gateOneSelector).toHaveAttribute('data-selected-addresses', '');

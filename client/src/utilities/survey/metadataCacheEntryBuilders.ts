@@ -1,8 +1,5 @@
 import { normalizeSessionSlug } from '../session/sessionNaming.js';
-import {
-  buildMetadataSessionCacheEnvelope,
-  type MetadataRecord,
-} from '../session/metadataSessionBinding.js';
+import { buildMetadataSessionCacheEnvelope, type MetadataRecord } from '../session/metadataSessionBinding.js';
 
 export type MetadataEntry = MetadataRecord;
 export type SurveyMetadataCacheEntry = MetadataEntry & {
@@ -45,9 +42,7 @@ export type PrepareQuestionMetadataCacheEntryArgs = {
   enforceScopedIsolation?: boolean;
 };
 
-const isMetadataEntry = (value: unknown): value is MetadataEntry => (
-  value !== null && typeof value === 'object'
-);
+const isMetadataEntry = (value: unknown): value is MetadataEntry => value !== null && typeof value === 'object';
 
 export const prepareSurveyMetadataCacheEntry = ({
   surveyId,
@@ -75,11 +70,12 @@ export const prepareSurveyMetadataCacheEntry = ({
     ...normalizedSurveyData,
     ...sessionEnvelope.metadata,
   };
-  if (!Object.prototype.hasOwnProperty.call(normalizedSurveyData, 'slug') || normalizedSurveyData.slug == null || String(normalizedSurveyData.slug).trim() === '') {
-    normalizedSurveyData.slug = normalizeSessionSlug(
-      normalizedSurveyData.sessionSlug ||
-      (scoped ? '' : slug)
-    );
+  if (
+    !Object.prototype.hasOwnProperty.call(normalizedSurveyData, 'slug') ||
+    normalizedSurveyData.slug == null ||
+    String(normalizedSurveyData.slug).trim() === ''
+  ) {
+    normalizedSurveyData.slug = normalizeSessionSlug(normalizedSurveyData.sessionSlug || (scoped ? '' : slug));
   }
   if (Number.isFinite(Number(creationBlock))) {
     normalizedSurveyData.creationBlock = Number(creationBlock);

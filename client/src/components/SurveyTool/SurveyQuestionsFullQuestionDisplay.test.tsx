@@ -20,12 +20,17 @@ const buildRenderers = () => ({
   renderFullQuestionCardShell: jest.fn((args) => (
     <section>
       <div>{args.mainContent}</div>
-      <footer>{args.sliderSection}{args.footerIcons}</footer>
+      <footer>
+        {args.sliderSection}
+        {args.footerIcons}
+      </footer>
       <aside>{args.commentsSection}</aside>
     </section>
   )),
   renderFullQuestionFooterIcons: jest.fn(({ onToggleComments }) => (
-    <button type="button" onClick={onToggleComments}>Toggle comments</button>
+    <button type="button" onClick={onToggleComments}>
+      Toggle comments
+    </button>
   )),
   renderFullQuestionSliderSection: jest.fn(() => <div>Slider</div>),
   renderResponseInput: jest.fn(() => <input aria-label="Answer" />),
@@ -96,11 +101,13 @@ describe('SurveyQuestionsFullQuestionDisplay', () => {
       hasConvictionImportanceValue: true,
       sliderOpen: true,
     });
-    expect(renderers.renderFullQuestionCardShell).toHaveBeenCalledWith(expect.objectContaining({
-      cardKey: 'q1-0',
-      question: { id: 'q1' },
-      cardIcons: <span>Links</span>,
-    }));
+    expect(renderers.renderFullQuestionCardShell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cardKey: 'q1-0',
+        question: { id: 'q1' },
+        cardIcons: <span>Links</span>,
+      }),
+    );
 
     renderers.renderFullQuestionFooterIcons.mock.calls[0][0].onToggleComments();
 

@@ -6,17 +6,10 @@ import {
   ensureQuestionArweaveCacheBranches,
   mergeQuestionArweaveCacheBranches,
 } from '../arweave/arweaveRetryHelpers.js';
-import {
-  DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE,
-  readSessionScanMaxBlockRange,
-} from '../session/sessionScanScope.js';
+import { DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE, readSessionScanMaxBlockRange } from '../session/sessionScanScope.js';
 import { resolvePersistedQuestionResponsesWatermark } from './questionResponsesWatermark.js';
 import { shouldFlushCoalescedRun } from '../session/mainSiteProgressHelpers.js';
-import {
-  compareResponseRecency,
-  toResponseRecencyPair,
-  type ResponseRecencyPair,
-} from './responseRecency';
+import { compareResponseRecency, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency';
 
 type CacheRecord = Record<string, unknown>;
 type StateRecord = {
@@ -26,12 +19,7 @@ type StateRecord = {
   [key: string]: unknown;
 };
 type SetStateArg = StateRecord | ((prev: StateRecord) => StateRecord | null) | null;
-type UserDataListKey =
-  | 'sbts'
-  | 'createdSurveys'
-  | 'createdQuestions'
-  | 'surveyResponses'
-  | 'questionResponses';
+type UserDataListKey = 'sbts' | 'createdSurveys' | 'createdQuestions' | 'surveyResponses' | 'questionResponses';
 
 interface QueueLocalRevisionUpdateOptions {
   needsQuestionResponsesNonce?: boolean;
@@ -129,9 +117,7 @@ interface HandlePartialResponseDataOptions {
 const RECENT_RESPONSE_PREFETCH_WINDOW_COUNT = 12;
 
 interface ResponseHydrationContractScripts {
-  getRelevantBlockWindowForFilter: (
-    slug: string
-  ) => Promise<{ fromBlock: number; toBlock: number }>;
+  getRelevantBlockWindowForFilter: (slug: string) => Promise<{ fromBlock: number; toBlock: number }>;
   getQuestionResponsesChunkedWithCallback: (
     providerName: string,
     fromBlock: number,
@@ -139,14 +125,9 @@ interface ResponseHydrationContractScripts {
     handleProgress: unknown,
     handlePartialData: unknown,
     slug: string,
-    opts?: CacheRecord
+    opts?: CacheRecord,
   ) => Promise<unknown>;
-  getResponse: (
-    providerName: string,
-    responder: string,
-    questionId: string,
-    slug: string
-  ) => Promise<unknown>;
+  getResponse: (providerName: string, responder: string, questionId: string, slug: string) => Promise<unknown>;
 }
 
 interface ResponseHydrationCryptoUtils {
@@ -163,37 +144,22 @@ export interface SessionResponseHydrationHost {
   getSessionChainId?: (slug: string) => string | number | null | undefined;
   getAccount?: () => string | null | undefined;
   scanScopeNoop?: (slug: string, op: string, onSkipped?: () => void) => boolean;
-  setReadinessStateIfChanged?: (
-    nextState: Record<string, unknown> | null | undefined,
-    cb?: () => void
-  ) => unknown;
+  setReadinessStateIfChanged?: (nextState: Record<string, unknown> | null | undefined, cb?: () => void) => unknown;
   checkAllCachesReady?: () => void;
   mergeLegacyNumericNetworkKey?: (cache: Record<string, unknown>, networkID: string) => boolean;
   queueLocalRevisionUpdate?: (opts?: QueueLocalRevisionUpdateOptions) => void;
 }
 
 export interface SessionResponseHydrationController {
-  fetchQuestionResponsesChunkedForGroup: (
-    slug: string,
-    opts?: ResponseInitOptions
-  ) => Promise<void>;
-  refreshQuestionResponses: (
-    questionIds?: string[] | null,
-    opts?: RefreshQuestionResponsesOptions
-  ) => Promise<void>;
+  fetchQuestionResponsesChunkedForGroup: (slug: string, opts?: ResponseInitOptions) => Promise<void>;
+  refreshQuestionResponses: (questionIds?: string[] | null, opts?: RefreshQuestionResponsesOptions) => Promise<void>;
   isInitInFlight: (slugIn?: string) => boolean;
   destroy: () => void;
 }
 
 interface SessionResponseHydrationControllerRuntime {
-  fetchQuestionResponsesChunkedForGroup: (
-    slug: string,
-    opts?: ResponseInitOptions
-  ) => Promise<void>;
-  refreshQuestionResponses: (
-    questionIds?: string[] | null,
-    opts?: RefreshQuestionResponsesOptions
-  ) => Promise<void>;
+  fetchQuestionResponsesChunkedForGroup: (slug: string, opts?: ResponseInitOptions) => Promise<void>;
+  refreshQuestionResponses: (questionIds?: string[] | null, opts?: RefreshQuestionResponsesOptions) => Promise<void>;
   isInitInFlight: (slugIn?: string) => boolean;
   destroy: () => void;
 }
@@ -202,27 +168,19 @@ const mainSiteLog = createLogger('mainSite');
 const responseHydrationContractScripts = contractScripts as unknown as ResponseHydrationContractScripts;
 const responseHydrationCryptoUtils = cryptoUtils as unknown as ResponseHydrationCryptoUtils;
 
-const isRecord = (value: unknown): value is CacheRecord => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is CacheRecord => !!value && typeof value === 'object';
 
-const toRecord = (value: unknown): CacheRecord => (
-  isRecord(value) ? value : {}
-);
+const toRecord = (value: unknown): CacheRecord => (isRecord(value) ? value : {});
 
 const readString = (value: unknown = ''): string => String(value || '').trim();
 
-const normalizeSessionIdentity = (value: unknown = ''): string => (
-  normalizeSessionSlug(readString(value))
-);
+const normalizeSessionIdentity = (value: unknown = ''): string => normalizeSessionSlug(readString(value));
 
-const isPendingQuestionMetadataPlaceholder = (value: unknown): boolean => (
-  isRecord(value) && value.__ceQuestionMetadataPending === true
-);
+const isPendingQuestionMetadataPlaceholder = (value: unknown): boolean =>
+  isRecord(value) && value.__ceQuestionMetadataPending === true;
 
-const hasHydratedQuestionMetadata = (value: unknown): boolean => (
-  isRecord(value) && !isPendingQuestionMetadataPlaceholder(value)
-);
+const hasHydratedQuestionMetadata = (value: unknown): boolean =>
+  isRecord(value) && !isPendingQuestionMetadataPlaceholder(value);
 
 const readRecordFromResponsePayload = (value: unknown): CacheRecord | null => {
   if (isRecord(value)) return value;
@@ -246,7 +204,7 @@ const firstNonEmptyString = (...values: unknown[]): string => {
 const buildQuestionMetadataFromResponsePayload = (
   questionId: string,
   responseValue: unknown,
-  slug: unknown
+  slug: unknown,
 ): CacheRecord | null => {
   const response = readRecordFromResponsePayload(responseValue);
   if (!response) return null;
@@ -265,7 +223,7 @@ const buildQuestionMetadataFromResponsePayload = (
     nestedQuestion.text,
     nestedQuestion.questionText,
     nestedMetadata.prompt,
-    nestedMeta.prompt
+    nestedMeta.prompt,
   );
   if (!prompt) return null;
 
@@ -276,22 +234,22 @@ const buildQuestionMetadataFromResponsePayload = (
     nestedQuestion.type,
     nestedQuestion.questionType,
     nestedMetadata.type,
-    nestedMeta.type
+    nestedMeta.type,
   ).toLowerCase();
   const inferredBinaryType = readString(answer.value) ? 'binary' : '';
   const questionType = responseType || inferredBinaryType || 'binary';
-  const payloadSessionSlug = normalizeSessionIdentity(firstNonEmptyString(
-    response.sessionSlug,
-    response.slug,
-    nestedQuestion.sessionSlug,
-    nestedMetadata.sessionSlug,
-    nestedMeta.sessionSlug
-  ));
+  const payloadSessionSlug = normalizeSessionIdentity(
+    firstNonEmptyString(
+      response.sessionSlug,
+      response.slug,
+      nestedQuestion.sessionSlug,
+      nestedMetadata.sessionSlug,
+      nestedMeta.sessionSlug,
+    ),
+  );
   const hasScopedBucketSlug = slug !== undefined && slug !== null;
   const bucketSessionSlug = normalizeSessionIdentity(slug);
-  const resolvedSessionSlug = hasScopedBucketSlug
-    ? bucketSessionSlug
-    : payloadSessionSlug;
+  const resolvedSessionSlug = hasScopedBucketSlug ? bucketSessionSlug : payloadSessionSlug;
 
   return {
     id: questionId,
@@ -317,9 +275,11 @@ const seedPendingQuestionMetadataFromResponse = (
   net: QuestionCacheNetworkNode,
   qid: unknown,
   slug: unknown,
-  responseValue: unknown = null
+  responseValue: unknown = null,
 ): boolean => {
-  const questionId = String(qid || '').trim().toLowerCase();
+  const questionId = String(qid || '')
+    .trim()
+    .toLowerCase();
   if (!questionId || !net || typeof net !== 'object') return false;
 
   if (!net.questions || typeof net.questions !== 'object') net.questions = {};
@@ -370,13 +330,7 @@ const collectSessionIdentityCandidates = (value: unknown, target: Set<string> = 
   addSessionIdentityCandidate(target, value.groupName);
   addSessionIdentityCandidate(target, value.group);
 
-  [
-    value.metadata,
-    value.meta,
-    value.session,
-    value.sessionMetadata,
-    value.context,
-  ].forEach((nested) => {
+  [value.metadata, value.meta, value.session, value.sessionMetadata, value.context].forEach((nested) => {
     if (typeof nested === 'string') {
       addSessionIdentityCandidate(target, nested);
       return;
@@ -427,9 +381,8 @@ const buildAllowedResponseSessionIdentities = (slug: string): Set<string> => {
     }
   }
 
-  const readDemoConfig = scriptsAny.getDemoSessionConfigBySlug as (
-    (slug: string, opts?: { allowDemoFallback?: boolean }) => unknown
-  ) | undefined;
+  const readDemoConfig = scriptsAny.getDemoSessionConfigBySlug as
+    ((slug: string, opts?: { allowDemoFallback?: boolean }) => unknown) | undefined;
   if (typeof readDemoConfig === 'function') {
     try {
       addConfigIdentities(readDemoConfig(normalizedSlug || slug));
@@ -454,7 +407,7 @@ const buildAllowedResponseSessionIdentities = (slug: string): Set<string> => {
 const shouldKeepResponseForSession = (
   row: PartialResponseAggregateRow,
   slug: string,
-  allowedIdentities: Set<string>
+  allowedIdentities: Set<string>,
 ): boolean => {
   const explicitCandidates = new Set<string>();
   collectSessionIdentityCandidates(row, explicitCandidates);
@@ -478,27 +431,20 @@ const shouldKeepResponseForSession = (
 
 const filterPartialResponseAggregateForSession = (
   partialAgg: PartialResponseAggregate,
-  slug: string
+  slug: string,
 ): PartialResponseAggregate => {
   const allowedIdentities = buildAllowedResponseSessionIdentities(slug);
   const scoped: PartialResponseAggregate = {};
   Object.keys(partialAgg || {}).forEach((qId) => {
     const rows = Array.isArray(partialAgg[qId]) ? partialAgg[qId] : [];
-    const kept = rows.filter((row) => shouldKeepResponseForSession(
-      row,
-      slug,
-      allowedIdentities
-    ));
+    const kept = rows.filter((row) => shouldKeepResponseForSession(row, slug, allowedIdentities));
     if (kept.length) scoped[qId] = kept;
   });
   return scoped;
 };
 
-const countPartialResponseRows = (partialAgg: PartialResponseAggregate): number => (
-  Object.values(partialAgg || {}).reduce((sum, rows) => (
-    sum + (Array.isArray(rows) ? rows.length : 0)
-  ), 0)
-);
+const countPartialResponseRows = (partialAgg: PartialResponseAggregate): number =>
+  Object.values(partialAgg || {}).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0);
 
 const createEmptyQuestionCacheNetworkNode = (initialLastBlockQR: number): QuestionCacheNetworkNode => ({
   questionsLatestBlock: initialLastBlockQR,
@@ -532,7 +478,7 @@ const ensureUserDataRecord = (value: unknown): UserDataRecord => {
 };
 
 export const createSessionResponseHydrationController = (
-  host: SessionResponseHydrationHost = {}
+  host: SessionResponseHydrationHost = {},
 ): SessionResponseHydrationControllerRuntime => {
   let _responseInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _responseInitPending: Record<string, ResponseInitOptions | undefined> = {};
@@ -546,30 +492,19 @@ export const createSessionResponseHydrationController = (
     }
     if (typeof cb === 'function') cb();
   };
-  const isMounted = (): boolean => (
-    typeof host.isMounted === 'function' ? host.isMounted() : false
-  );
-  const dgRead = (...args: [string, string]): CacheRecord | null => (
-    typeof host.dgRead === 'function' ? (host.dgRead(...args) as CacheRecord | null) : null
-  );
-  const dgWrite = (...args: [string, string, CacheRecord]): unknown => (
-    typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null
-  );
-  const getActiveSessionSlug = (): string => String(
-    typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : ''
-  );
-  const getSessionChainId = (slug: string): string | number | null | undefined => (
-    typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null
-  );
-  const getAccount = (): string | null | undefined => (
-    typeof host.getAccount === 'function' ? host.getAccount() : ''
-  );
-  const scanScopeNoop = (slug: string, op: string, onSkipped?: () => void): boolean => (
-    typeof host.scanScopeNoop === 'function' ? host.scanScopeNoop(slug, op, onSkipped) : false
-  );
-  const setReadinessStateIfChanged = (
-    ...args: [StateRecord | null | undefined, (() => void)?]
-  ): void => {
+  const isMounted = (): boolean => (typeof host.isMounted === 'function' ? host.isMounted() : false);
+  const dgRead = (...args: [string, string]): CacheRecord | null =>
+    typeof host.dgRead === 'function' ? (host.dgRead(...args) as CacheRecord | null) : null;
+  const dgWrite = (...args: [string, string, CacheRecord]): unknown =>
+    typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null;
+  const getActiveSessionSlug = (): string =>
+    String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
+  const getSessionChainId = (slug: string): string | number | null | undefined =>
+    typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
+  const getAccount = (): string | null | undefined => (typeof host.getAccount === 'function' ? host.getAccount() : '');
+  const scanScopeNoop = (slug: string, op: string, onSkipped?: () => void): boolean =>
+    typeof host.scanScopeNoop === 'function' ? host.scanScopeNoop(slug, op, onSkipped) : false;
+  const setReadinessStateIfChanged = (...args: [StateRecord | null | undefined, (() => void)?]): void => {
     if (typeof host.setReadinessStateIfChanged === 'function') {
       host.setReadinessStateIfChanged(...args);
     }
@@ -579,11 +514,10 @@ export const createSessionResponseHydrationController = (
       host.checkAllCachesReady();
     }
   };
-  const mergeLegacyNumericNetworkKey = (cache: CacheRecord, networkID: string): boolean => (
+  const mergeLegacyNumericNetworkKey = (cache: CacheRecord, networkID: string): boolean =>
     typeof host.mergeLegacyNumericNetworkKey === 'function'
       ? host.mergeLegacyNumericNetworkKey(cache, networkID)
-      : false
-  );
+      : false;
   const queueLocalRevisionUpdate = (opts: QueueLocalRevisionUpdateOptions = {}): void => {
     if (typeof host.queueLocalRevisionUpdate === 'function') {
       host.queueLocalRevisionUpdate(opts);
@@ -592,15 +526,18 @@ export const createSessionResponseHydrationController = (
     const shouldBumpQuestionResponsesNonce = !!opts?.needsQuestionResponsesNonce;
     const shouldCheckAllCachesReady = !!opts?.checkAllCachesReady;
     if (!shouldBumpQuestionResponsesNonce && !shouldCheckAllCachesReady) return;
-    setState((prev) => {
-      const next: StateRecord = {};
-      if (shouldBumpQuestionResponsesNonce) {
-        next.questionResponsesNonce = Number(prev?.questionResponsesNonce || 0) + 1;
-      }
-      return Object.keys(next).length ? next : null;
-    }, () => {
-      if (shouldCheckAllCachesReady) checkAllCachesReady();
-    });
+    setState(
+      (prev) => {
+        const next: StateRecord = {};
+        if (shouldBumpQuestionResponsesNonce) {
+          next.questionResponsesNonce = Number(prev?.questionResponsesNonce || 0) + 1;
+        }
+        return Object.keys(next).length ? next : null;
+      },
+      () => {
+        if (shouldCheckAllCachesReady) checkAllCachesReady();
+      },
+    );
   };
 
   const isInitInFlight = (slugIn: string = ''): boolean => {
@@ -624,7 +561,7 @@ export const createSessionResponseHydrationController = (
 
   const fetchQuestionResponsesChunkedForGroup = async (
     slugIn: string,
-    opts: ResponseInitOptions = {}
+    opts: ResponseInitOptions = {},
   ): Promise<void> => {
     const slug = normalizeSessionSlug(slugIn || '');
     const suppressUiState = !!(opts && opts.background === true);
@@ -639,18 +576,10 @@ export const createSessionResponseHydrationController = (
     };
     const mergePendingResponseInitOpts = (
       prevOpts: ResponseInitOptions | undefined,
-      nextOpts: ResponseInitOptions | undefined
+      nextOpts: ResponseInitOptions | undefined,
     ): ResponseInitOptions => {
-      const nextBackground = !!(
-        nextOpts &&
-        typeof nextOpts === 'object' &&
-        nextOpts.background === true
-      );
-      const nextForceArweaveFetch = !!(
-        nextOpts &&
-        typeof nextOpts === 'object' &&
-        nextOpts.forceArweaveFetch === true
-      );
+      const nextBackground = !!(nextOpts && typeof nextOpts === 'object' && nextOpts.background === true);
+      const nextForceArweaveFetch = !!(nextOpts && typeof nextOpts === 'object' && nextOpts.forceArweaveFetch === true);
       const nextNotifyOnCompletion = !!(
         nextOpts &&
         typeof nextOpts === 'object' &&
@@ -684,22 +613,24 @@ export const createSessionResponseHydrationController = (
       if (suppressUiState) return;
       checkAllCachesReady();
     };
-    if (scanScopeNoop(slug, 'fetchQuestionResponsesChunkedForGroup', () => {
-      setResponseState((prev) => ({
-        isResponsesCacheReady: true,
-        questionResponsesNonce: (prev.questionResponsesNonce as number) + 1,
-      }), checkAllCachesReady);
-      notifyBackgroundCompletion();
-    })) {
+    if (
+      scanScopeNoop(slug, 'fetchQuestionResponsesChunkedForGroup', () => {
+        setResponseState(
+          (prev) => ({
+            isResponsesCacheReady: true,
+            questionResponsesNonce: (prev.questionResponsesNonce as number) + 1,
+          }),
+          checkAllCachesReady,
+        );
+        notifyBackgroundCompletion();
+      })
+    ) {
       return;
     }
     _responseInitInFlight = _responseInitInFlight || {};
     _responseInitPending = _responseInitPending || {};
     if (_responseInitInFlight[initRunKey]) {
-      _responseInitPending[initRunKey] = mergePendingResponseInitOpts(
-        _responseInitPending[initRunKey],
-        rerunOpts
-      );
+      _responseInitPending[initRunKey] = mergePendingResponseInitOpts(_responseInitPending[initRunKey], rerunOpts);
       return _responseInitInFlight[initRunKey];
     }
 
@@ -712,10 +643,13 @@ export const createSessionResponseHydrationController = (
       const chainId = getSessionChainId(slug);
       if (!chainId) {
         mainSiteLog.warn('No group chainId for fetchQuestionResponsesChunkedForGroup; aborting.');
-        setResponseState((prev) => ({
-          isResponsesCacheReady: true,
-          questionResponsesNonce: (prev.questionResponsesNonce as number) + 1,
-        }), checkAllCachesReady);
+        setResponseState(
+          (prev) => ({
+            isResponsesCacheReady: true,
+            questionResponsesNonce: (prev.questionResponsesNonce as number) + 1,
+          }),
+          checkAllCachesReady,
+        );
         notifyBackgroundCompletion();
         return;
       }
@@ -724,10 +658,13 @@ export const createSessionResponseHydrationController = (
       const { fromBlock: baseFrom, toBlock: baseTo } =
         await responseHydrationContractScripts.getRelevantBlockWindowForFilter(slug);
       if (baseFrom > baseTo) {
-        setResponseState((prev) => ({
-          isResponsesCacheReady: true,
-          questionResponsesNonce: (prev.questionResponsesNonce as number) + 1,
-        }), checkAllCachesReady);
+        setResponseState(
+          (prev) => ({
+            isResponsesCacheReady: true,
+            questionResponsesNonce: (prev.questionResponsesNonce as number) + 1,
+          }),
+          checkAllCachesReady,
+        );
         notifyBackgroundCompletion();
         return;
       }
@@ -741,43 +678,39 @@ export const createSessionResponseHydrationController = (
       if (!questionsCache[networkID]) {
         questionsCache[networkID] = createEmptyQuestionCacheNetworkNode(initialLastBlockQR);
       }
-      ensureQuestionArweaveCacheBranches(
-        questionsCache[networkID] as QuestionCacheNetworkNode
-      );
+      ensureQuestionArweaveCacheBranches(questionsCache[networkID] as QuestionCacheNetworkNode);
       const mergeFreshArweaveBranches = (): void => {
         try {
           const freshCache = (dgRead('questionsCache', slug) || {}) as QuestionCache;
           const freshNet = freshCache?.[networkID];
           if (!freshNet || typeof freshNet !== 'object') return;
-          ensureQuestionArweaveCacheBranches(
-            questionsCache[networkID] as QuestionCacheNetworkNode
-          );
+          ensureQuestionArweaveCacheBranches(questionsCache[networkID] as QuestionCacheNetworkNode);
           mergeQuestionArweaveCacheBranches(
             questionsCache[networkID] as QuestionCacheNetworkNode,
-            freshNet as QuestionCacheNetworkNode
+            freshNet as QuestionCacheNetworkNode,
           );
         } catch (e: unknown) {
           mainSiteLog.warn('MainSite: fallback', e);
         }
       };
 
-      let lastProcessedQRBlock = Number(
-        (questionsCache[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock
-      ) || 0;
+      let lastProcessedQRBlock =
+        Number((questionsCache[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock) || 0;
       const floorBlock = initialLastBlockQR;
       if (lastProcessedQRBlock < floorBlock) lastProcessedQRBlock = floorBlock;
 
       const latestBlock = baseTo;
-      const responseScanMaxBlockRange = readSessionScanMaxBlockRange(
-        DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE
-      );
+      const responseScanMaxBlockRange = readSessionScanMaxBlockRange(DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE);
 
       if (lastProcessedQRBlock >= latestBlock) {
         mainSiteLog.log('No new question responses to fetch: already up-to-date.');
-        setResponseState((prev) => ({
-          isResponsesCacheReady: true,
-          questionResponsesNonce: (prev.questionResponsesNonce as number) + 1,
-        }), maybeCheckAllCachesReady);
+        setResponseState(
+          (prev) => ({
+            isResponsesCacheReady: true,
+            questionResponsesNonce: (prev.questionResponsesNonce as number) + 1,
+          }),
+          maybeCheckAllCachesReady,
+        );
         notifyBackgroundCompletion();
         return;
       }
@@ -813,9 +746,8 @@ export const createSessionResponseHydrationController = (
         return tracked;
       };
 
-      const awaitManagedWrite = (key: string, writePromise: unknown): Promise<boolean> => (
-        settleManagedWrite(key, writePromise)
-      );
+      const awaitManagedWrite = (key: string, writePromise: unknown): Promise<boolean> =>
+        settleManagedWrite(key, writePromise);
 
       const RESPONSE_CACHE_WRITE_MIN_INTERVAL_MS = 1000;
       const RESPONSE_CACHE_WRITE_MAX_PENDING_CHUNKS = 4;
@@ -838,9 +770,7 @@ export const createSessionResponseHydrationController = (
         mergeLegacyNumericNetworkKey(cacheObj, networkID);
       };
       const ensureResponseQuestionCacheBucket = (cacheObj: CacheRecord): QuestionCache => {
-        const cacheRef = (cacheObj && typeof cacheObj === 'object')
-          ? (cacheObj as QuestionCache)
-          : ({} as QuestionCache);
+        const cacheRef = cacheObj && typeof cacheObj === 'object' ? (cacheObj as QuestionCache) : ({} as QuestionCache);
         normalizeResponseCacheNetworkKey(cacheRef as CacheRecord);
         if (!cacheRef[networkID]) {
           cacheRef[networkID] = createEmptyQuestionCacheNetworkNode(initialLastBlockQR);
@@ -878,57 +808,59 @@ export const createSessionResponseHydrationController = (
       };
       const mergeResponseMapsByRecency = (
         targetNet: QuestionCacheNetworkNode,
-        sourceNet: QuestionCacheNetworkNode
+        sourceNet: QuestionCacheNetworkNode,
       ): void => {
         const targetResponses = targetNet.questionResponses || {};
         const targetMeta = targetNet.questionResponsesMeta || {};
-        const sourceResponses = (
+        const sourceResponses =
           sourceNet &&
           typeof sourceNet === 'object' &&
           sourceNet.questionResponses &&
           typeof sourceNet.questionResponses === 'object'
-        )
-          ? sourceNet.questionResponses
-          : {};
-        const sourceMeta = (
+            ? sourceNet.questionResponses
+            : {};
+        const sourceMeta =
           sourceNet &&
           typeof sourceNet === 'object' &&
           sourceNet.questionResponsesMeta &&
           typeof sourceNet.questionResponsesMeta === 'object'
-        )
-          ? sourceNet.questionResponsesMeta
-          : {};
+            ? sourceNet.questionResponsesMeta
+            : {};
         Object.keys(sourceResponses).forEach((qidRaw) => {
           const sourceByResponder = sourceResponses[qidRaw];
           if (!sourceByResponder || typeof sourceByResponder !== 'object') return;
-          const qid = String(qidRaw || '').trim().toLowerCase();
+          const qid = String(qidRaw || '')
+            .trim()
+            .toLowerCase();
           if (!qid) return;
           if (!targetResponses[qid] || typeof targetResponses[qid] !== 'object') targetResponses[qid] = {};
           if (!targetMeta[qid] || typeof targetMeta[qid] !== 'object') targetMeta[qid] = {};
           Object.keys(sourceByResponder).forEach((responderRaw) => {
-            const responder = String(responderRaw || '').trim().toLowerCase();
+            const responder = String(responderRaw || '')
+              .trim()
+              .toLowerCase();
             if (!responder) return;
-            const incomingResponse = (
-              Object.prototype.hasOwnProperty.call(sourceByResponder, responderRaw)
-                ? sourceByResponder[responderRaw]
-                : sourceByResponder[responder]
-            );
+            const incomingResponse = Object.prototype.hasOwnProperty.call(sourceByResponder, responderRaw)
+              ? sourceByResponder[responderRaw]
+              : sourceByResponder[responder];
             const targetByResponder = targetResponses[qid] || {};
             const targetMetaByResponder = targetMeta[qid] || {};
             const hasExistingResponse = Object.prototype.hasOwnProperty.call(targetByResponder, responder);
             const existingMeta = targetMetaByResponder[responder];
-            const incomingMeta = (
+            const incomingMeta =
               sourceMeta?.[qidRaw]?.[responderRaw] ||
               sourceMeta?.[qidRaw]?.[responder] ||
               sourceMeta?.[qid]?.[responderRaw] ||
               sourceMeta?.[qid]?.[responder] ||
-              null
-            );
-            if (!shouldApplyIncomingResponse({
-              existingMeta,
-              incomingMeta: toResponseRecencyPair(incomingMeta, incomingResponse),
-              hasExistingResponse,
-            })) return;
+              null;
+            if (
+              !shouldApplyIncomingResponse({
+                existingMeta,
+                incomingMeta: toResponseRecencyPair(incomingMeta, incomingResponse),
+                hasExistingResponse,
+              })
+            )
+              return;
             targetByResponder[responder] = incomingResponse;
             targetMetaByResponder[responder] = toResponseRecencyPair(incomingMeta, incomingResponse);
             targetResponses[qid] = targetByResponder;
@@ -940,7 +872,7 @@ export const createSessionResponseHydrationController = (
       };
       const mergeFreshQuestionsCacheIntoPendingSnapshot = (
         pendingCache: QuestionCache | CacheRecord,
-        freshCache: QuestionCache | CacheRecord
+        freshCache: QuestionCache | CacheRecord,
       ): QuestionCache => {
         const targetCache = ensureResponseQuestionCacheBucket(pendingCache as CacheRecord);
         const sourceCache = ensureResponseQuestionCacheBucket(freshCache as CacheRecord);
@@ -948,11 +880,11 @@ export const createSessionResponseHydrationController = (
         const sourceNet = sourceCache[networkID] as QuestionCacheNetworkNode;
         targetNet.questionsLatestBlock = Math.max(
           Number(targetNet.questionsLatestBlock || 0),
-          Number(sourceNet?.questionsLatestBlock || 0)
+          Number(sourceNet?.questionsLatestBlock || 0),
         );
         targetNet.questionsDiscoveryCheckpointBlock = Math.max(
           Number(targetNet.questionsDiscoveryCheckpointBlock || 0),
-          Number(sourceNet?.questionsDiscoveryCheckpointBlock || 0)
+          Number(sourceNet?.questionsDiscoveryCheckpointBlock || 0),
         );
         targetNet.questions = {
           ...(targetNet.questions || {}),
@@ -970,39 +902,55 @@ export const createSessionResponseHydrationController = (
         mergeResponseMapsByRecency(targetNet, sourceNet);
         targetNet.questionResponsesLatestBlock = Math.max(
           Number(targetNet.questionResponsesLatestBlock || 0),
-          Number(sourceNet?.questionResponsesLatestBlock || 0)
+          Number(sourceNet?.questionResponsesLatestBlock || 0),
         );
         return targetCache;
       };
       const buildUserCacheEntryKey = (listKey: UserDataListKey, entry: unknown): string => {
-        const item = (entry && typeof entry === 'object') ? (entry as UserCacheEntry) : {};
+        const item = entry && typeof entry === 'object' ? (entry as UserCacheEntry) : {};
         if (listKey === 'questionResponses') {
-          const qid = String(item.questionId || item.id || '').trim().toLowerCase();
-          const responder = String(item.responder || '').trim().toLowerCase();
+          const qid = String(item.questionId || item.id || '')
+            .trim()
+            .toLowerCase();
+          const responder = String(item.responder || '')
+            .trim()
+            .toLowerCase();
           return qid ? `${qid}|${responder}` : '';
         }
         if (listKey === 'createdQuestions') {
-          const qid = String(item.id || item.questionId || '').trim().toLowerCase();
+          const qid = String(item.id || item.questionId || '')
+            .trim()
+            .toLowerCase();
           return qid;
         }
         if (listKey === 'createdSurveys') {
-          const sid = String(item.id || item.surveyID || item.surveyId || '').trim().toLowerCase();
+          const sid = String(item.id || item.surveyID || item.surveyId || '')
+            .trim()
+            .toLowerCase();
           return sid;
         }
         if (listKey === 'surveyResponses') {
-          const sid = String(item.id || item.surveyID || item.surveyId || '').trim().toLowerCase();
-          const responder = String(item.responder || '').trim().toLowerCase();
+          const sid = String(item.id || item.surveyID || item.surveyId || '')
+            .trim()
+            .toLowerCase();
+          const responder = String(item.responder || '')
+            .trim()
+            .toLowerCase();
           return sid ? `${sid}|${responder}` : '';
         }
         if (listKey === 'sbts') {
-          const addr = String(item.address || item.sbtAddress || '').trim().toLowerCase();
-          const token = String(item.tokenId || item.id || '').trim().toLowerCase();
+          const addr = String(item.address || item.sbtAddress || '')
+            .trim()
+            .toLowerCase();
+          const token = String(item.tokenId || item.id || '')
+            .trim()
+            .toLowerCase();
           return addr || token ? `${addr}|${token}` : '';
         }
         return '';
       };
       const readUserCacheRowRecency = (entry: unknown): ResponseRecencyPair => {
-        const row = (entry && typeof entry === 'object') ? (entry as UserCacheEntry) : {};
+        const row = entry && typeof entry === 'object' ? (entry as UserCacheEntry) : {};
         const bn = Number(row.blockNumber ?? row.bn ?? 0);
         const txi = Number(row.transactionIndex ?? row.txIndex ?? row.txi ?? 0);
         const li = Number(row.logIndex ?? row.li ?? 0);
@@ -1018,13 +966,10 @@ export const createSessionResponseHydrationController = (
         const recency = readUserCacheRowRecency(entry);
         return recency.bn > 0 || recency.txi > 0 || recency.li > 0 || recency.ts > 0;
       };
-      const compareUserCacheRowsByRecency = (
-        incomingRow: unknown,
-        existingRow: unknown
-      ): number => {
+      const compareUserCacheRowsByRecency = (incomingRow: unknown, existingRow: unknown): number => {
         const incoming = readUserCacheRowRecency(incomingRow);
         const existing = readUserCacheRowRecency(existingRow);
-        const hasBlockHints = (
+        const hasBlockHints =
           incoming.bn > 0 ||
           existing.bn > 0 ||
           incoming.txi > 0 ||
@@ -1032,8 +977,7 @@ export const createSessionResponseHydrationController = (
           incoming.li > 0 ||
           existing.li > 0 ||
           incoming.ts > 0 ||
-          existing.ts > 0
-        );
+          existing.ts > 0;
         if (!hasBlockHints) return 0;
         if (incoming.bn > existing.bn) return 1;
         if (incoming.bn < existing.bn) return -1;
@@ -1048,7 +992,7 @@ export const createSessionResponseHydrationController = (
       const mergeUserDataArray = (
         targetData: UserDataRecord,
         sourceData: UserDataRecord,
-        listKey: UserDataListKey
+        listKey: UserDataListKey,
       ): void => {
         const sourceArr = Array.isArray(sourceData?.[listKey]) ? sourceData[listKey] : [];
         if (!sourceArr.length) return;
@@ -1059,10 +1003,7 @@ export const createSessionResponseHydrationController = (
         }
         const merged: UserCacheEntry[] = [];
         const keyedIndex = new Map<string, number>();
-        const upsert = (
-          entry: UserCacheEntry,
-          { allowReplace = true }: { allowReplace?: boolean } = {}
-        ): void => {
+        const upsert = (entry: UserCacheEntry, { allowReplace = true }: { allowReplace?: boolean } = {}): void => {
           const key = buildUserCacheEntryKey(listKey, entry);
           if (!key) {
             merged.push(entry);
@@ -1076,23 +1017,14 @@ export const createSessionResponseHydrationController = (
           if (!allowReplace) return;
           const idx = keyedIndex.get(key);
           if (idx == null) return;
-          if (
-            listKey === 'questionResponses' ||
-            listKey === 'surveyResponses'
-          ) {
+          if (listKey === 'questionResponses' || listKey === 'surveyResponses') {
             const existing = merged[idx];
             const cmp = compareUserCacheRowsByRecency(entry, existing);
             if (cmp > 0) {
               merged[idx] = entry;
               return;
             }
-            if (
-              cmp === 0 &&
-              existing &&
-              typeof existing === 'object' &&
-              entry &&
-              typeof entry === 'object'
-            ) {
+            if (cmp === 0 && existing && typeof existing === 'object' && entry && typeof entry === 'object') {
               const hasIncomingHints = hasUserCacheRowRecencyHints(entry);
               const hasExistingHints = hasUserCacheRowRecencyHints(existing);
               if (!hasIncomingHints && !hasExistingHints) {
@@ -1119,31 +1051,30 @@ export const createSessionResponseHydrationController = (
         sourceArr.forEach((entry) => upsert(entry, { allowReplace: true }));
         targetData[listKey] = merged;
       };
-      const mergeUserNetworkBucket = (
-        targetBucket: unknown,
-        sourceBucket: unknown
-      ): UserNetworkCache => {
-        const targetRef = (targetBucket && typeof targetBucket === 'object')
-          ? (targetBucket as UserNetworkCache)
-          : ({
-            lastBlockScanned: 0,
-            lastScanTimestamp: 0,
-            data: createEmptyUserDataRecord(),
-          } as UserNetworkCache);
-        const sourceRef = (sourceBucket && typeof sourceBucket === 'object')
-          ? (sourceBucket as UserNetworkCache)
-          : ({
-            lastBlockScanned: 0,
-            lastScanTimestamp: 0,
-            data: createEmptyUserDataRecord(),
-          } as UserNetworkCache);
+      const mergeUserNetworkBucket = (targetBucket: unknown, sourceBucket: unknown): UserNetworkCache => {
+        const targetRef =
+          targetBucket && typeof targetBucket === 'object'
+            ? (targetBucket as UserNetworkCache)
+            : ({
+                lastBlockScanned: 0,
+                lastScanTimestamp: 0,
+                data: createEmptyUserDataRecord(),
+              } as UserNetworkCache);
+        const sourceRef =
+          sourceBucket && typeof sourceBucket === 'object'
+            ? (sourceBucket as UserNetworkCache)
+            : ({
+                lastBlockScanned: 0,
+                lastScanTimestamp: 0,
+                data: createEmptyUserDataRecord(),
+              } as UserNetworkCache);
         targetRef.lastBlockScanned = Math.max(
           Number(targetRef.lastBlockScanned || 0),
-          Number(sourceRef.lastBlockScanned || 0)
+          Number(sourceRef.lastBlockScanned || 0),
         );
         targetRef.lastScanTimestamp = Math.max(
           Number(targetRef.lastScanTimestamp || 0),
-          Number(sourceRef.lastScanTimestamp || 0)
+          Number(sourceRef.lastScanTimestamp || 0),
         );
         targetRef.data = ensureUserDataRecord(targetRef.data);
         const sourceData = ensureUserDataRecord(sourceRef.data);
@@ -1154,18 +1085,18 @@ export const createSessionResponseHydrationController = (
       };
       const mergeFreshUserCacheIntoPendingSnapshot = (
         pendingCache: UserCache | CacheRecord,
-        freshCache: UserCache | CacheRecord
+        freshCache: UserCache | CacheRecord,
       ): UserCache => {
-        const targetCache = (pendingCache && typeof pendingCache === 'object')
-          ? (pendingCache as UserCache)
-          : ({} as UserCache);
-        const sourceCache = (freshCache && typeof freshCache === 'object')
-          ? (freshCache as UserCache)
-          : ({} as UserCache);
+        const targetCache =
+          pendingCache && typeof pendingCache === 'object' ? (pendingCache as UserCache) : ({} as UserCache);
+        const sourceCache =
+          freshCache && typeof freshCache === 'object' ? (freshCache as UserCache) : ({} as UserCache);
         Object.keys(sourceCache).forEach((addrRaw) => {
           const sourceByNetwork = sourceCache[addrRaw];
           if (!sourceByNetwork || typeof sourceByNetwork !== 'object') return;
-          const lowerAddr = String(addrRaw || '').trim().toLowerCase();
+          const lowerAddr = String(addrRaw || '')
+            .trim()
+            .toLowerCase();
           if (!lowerAddr) return;
           if (!targetCache[lowerAddr] || typeof targetCache[lowerAddr] !== 'object') {
             targetCache[lowerAddr] = {};
@@ -1178,25 +1109,24 @@ export const createSessionResponseHydrationController = (
             if (!targetByNetwork[netKey] || typeof targetByNetwork[netKey] !== 'object') {
               targetByNetwork[netKey] = {};
             }
-            targetByNetwork[netKey] = mergeUserNetworkBucket(
-              targetByNetwork[netKey],
-              sourceBucket
-            );
+            targetByNetwork[netKey] = mergeUserNetworkBucket(targetByNetwork[netKey], sourceBucket);
           });
         });
         return targetCache;
       };
       const flushResponsePartialWrites = ({ force = false }: { force?: boolean } = {}): boolean => {
         const nowMs = Date.now();
-        if (!shouldFlushCoalescedRun({
-          force,
-          dirty: hasPendingQuestionsCacheWrite || hasPendingUserCacheWrite,
-          nowMs,
-          lastFlushMs: lastResponseCacheWriteMs,
-          minIntervalMs: RESPONSE_CACHE_WRITE_MIN_INTERVAL_MS,
-          pendingOps: pendingResponseChunkCount,
-          maxPendingOps: RESPONSE_CACHE_WRITE_MAX_PENDING_CHUNKS,
-        })) {
+        if (
+          !shouldFlushCoalescedRun({
+            force,
+            dirty: hasPendingQuestionsCacheWrite || hasPendingUserCacheWrite,
+            nowMs,
+            lastFlushMs: lastResponseCacheWriteMs,
+            minIntervalMs: RESPONSE_CACHE_WRITE_MIN_INTERVAL_MS,
+            pendingOps: pendingResponseChunkCount,
+            maxPendingOps: RESPONSE_CACHE_WRITE_MAX_PENDING_CHUNKS,
+          })
+        ) {
           return false;
         }
         const questionsSnapshot = hasPendingQuestionsCacheWrite ? pendingQuestionsCacheSnapshot : null;
@@ -1214,12 +1144,12 @@ export const createSessionResponseHydrationController = (
         if (questionsSnapshot) {
           const latestQuestionsSnapshot = mergeFreshQuestionsCacheIntoPendingSnapshot(
             questionsSnapshot,
-            (dgRead('questionsCache', slug) || {}) as QuestionCache
+            (dgRead('questionsCache', slug) || {}) as QuestionCache,
           );
           questionsCache = latestQuestionsSnapshot;
           const questionsWrite = trackManagedWrite(
             'questionsCache',
-            dgWrite('questionsCache', slug, latestQuestionsSnapshot as CacheRecord)
+            dgWrite('questionsCache', slug, latestQuestionsSnapshot as CacheRecord),
           );
           questionsWrite.then((ok) => {
             if (ok) {
@@ -1230,7 +1160,7 @@ export const createSessionResponseHydrationController = (
         if (userSnapshot) {
           const latestUserSnapshot = mergeFreshUserCacheIntoPendingSnapshot(
             userSnapshot,
-            (dgRead('userCache', slug) || {}) as UserCache
+            (dgRead('userCache', slug) || {}) as UserCache,
           );
           responseUserCache = latestUserSnapshot;
           trackManagedWrite('userCache', dgWrite('userCache', slug, latestUserSnapshot as CacheRecord));
@@ -1245,7 +1175,7 @@ export const createSessionResponseHydrationController = (
         overallEventCount: number;
       }): void => {
         mainSiteLog.debug(
-          `Chunk ${info.chunkFrom}-${info.chunkTo}, events=${info.chunkEventCount}, soFar=${info.overallEventCount}`
+          `Chunk ${info.chunkFrom}-${info.chunkTo}, events=${info.chunkEventCount}, soFar=${info.overallEventCount}`,
         );
       };
 
@@ -1253,7 +1183,7 @@ export const createSessionResponseHydrationController = (
         partialAgg: PartialResponseAggregate,
         chunkToBlock: number,
         extra: CacheRecord = {},
-        options: HandlePartialResponseDataOptions = {}
+        options: HandlePartialResponseDataOptions = {},
       ): number => {
         const shouldAdvanceWatermark = options.advanceWatermark !== false;
         const scopedPartialAgg = filterPartialResponseAggregateForSession(partialAgg, slug);
@@ -1264,12 +1194,12 @@ export const createSessionResponseHydrationController = (
         const persistedQuestionsCache = (dgRead('questionsCache', slug) || {}) as QuestionCache;
         const fresh = mergeFreshQuestionsCacheIntoPendingSnapshot(
           (pendingQuestionsCacheSnapshot || questionsCache || {}) as QuestionCache,
-          persistedQuestionsCache
+          persistedQuestionsCache,
         );
         ensureQuestionArweaveCacheBranches(fresh[networkID] as QuestionCacheNetworkNode);
         mergeQuestionArweaveCacheBranches(
           fresh[networkID] as QuestionCacheNetworkNode,
-          questionsCache?.[networkID] as QuestionCacheNetworkNode
+          questionsCache?.[networkID] as QuestionCacheNetworkNode,
         );
 
         const freshNet = fresh[networkID] as QuestionCacheNetworkNode;
@@ -1279,7 +1209,7 @@ export const createSessionResponseHydrationController = (
         // Proactive user cache population
         const userCache = mergeFreshUserCacheIntoPendingSnapshot(
           (pendingUserCacheSnapshot || responseUserCache || {}) as UserCache,
-          (dgRead('userCache', slug) || {}) as UserCache
+          (dgRead('userCache', slug) || {}) as UserCache,
         );
         let userCacheModified = false;
 
@@ -1329,7 +1259,7 @@ export const createSessionResponseHydrationController = (
               const uData = ensureUserNode(responderKey, bn);
               if (!uData.questionResponses) uData.questionResponses = [];
               const existingIndex = uData.questionResponses.findIndex(
-                (row) => String(row?.questionId || '').toLowerCase() === String(qId || '').toLowerCase()
+                (row) => String(row?.questionId || '').toLowerCase() === String(qId || '').toLowerCase(),
               );
               const nextEntry: UserCacheEntry = {
                 questionId: qId,
@@ -1354,7 +1284,7 @@ export const createSessionResponseHydrationController = (
                 const prevResponse = prevEntry?.response;
                 const prevBlockNumber = Number(prevEntry?.blockNumber ?? 0);
                 const prevTransactionIndex = Number(
-                  prevEntry?.transactionIndex ?? prevEntry?.txIndex ?? prevEntry?.txi ?? 0
+                  prevEntry?.transactionIndex ?? prevEntry?.txIndex ?? prevEntry?.txi ?? 0,
                 );
                 const prevLogIndex = Number(prevEntry?.logIndex ?? 0);
                 const prevTimestamp = Number(prevEntry?.timestamp ?? prevEntry?.ts ?? 0);
@@ -1363,9 +1293,8 @@ export const createSessionResponseHydrationController = (
                   prevResponder !== String(mergedEntry.responder || '') ||
                   prevResponse !== mergedEntry.response ||
                   prevBlockNumber !== Number(mergedEntry.blockNumber ?? 0) ||
-                  prevTransactionIndex !== Number(
-                    mergedEntry.transactionIndex ?? mergedEntry.txIndex ?? mergedEntry.txi ?? 0
-                  ) ||
+                  prevTransactionIndex !==
+                    Number(mergedEntry.transactionIndex ?? mergedEntry.txIndex ?? mergedEntry.txi ?? 0) ||
                   prevLogIndex !== Number(mergedEntry.logIndex ?? 0) ||
                   prevTimestamp !== Number(mergedEntry.timestamp ?? mergedEntry.ts ?? 0)
                 ) {
@@ -1380,12 +1309,11 @@ export const createSessionResponseHydrationController = (
         const thisChunkTo = Number(chunkToBlock) || 0;
         if (shouldAdvanceWatermark) {
           // Optimistically advance chunk watermark; final clamp uses processedToBlock.
-          const prevWatermark = Number(
-            (fresh[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock
-          ) || 0;
+          const prevWatermark =
+            Number((fresh[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock) || 0;
           (fresh[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock = Math.max(
             prevWatermark,
-            thisChunkTo
+            thisChunkTo,
           );
         }
 
@@ -1393,10 +1321,7 @@ export const createSessionResponseHydrationController = (
         hasPendingQuestionsCacheWrite = true;
         pendingQuestionsCacheSnapshot = fresh;
         if (shouldAdvanceWatermark) {
-          pendingQuestionsCacheWatermark = Math.max(
-            Number(pendingQuestionsCacheWatermark || 0),
-            thisChunkTo
-          );
+          pendingQuestionsCacheWatermark = Math.max(Number(pendingQuestionsCacheWatermark || 0), thisChunkTo);
         }
 
         // Write user cache
@@ -1443,26 +1368,17 @@ export const createSessionResponseHydrationController = (
           'none',
           fromBlock,
           toBlock,
-          (info: {
-            chunkFrom: number;
-            chunkTo: number;
-            chunkEventCount: number;
-            overallEventCount: number;
-          }) => {
+          (info: { chunkFrom: number; chunkTo: number; chunkEventCount: number; overallEventCount: number }) => {
             handleProgress(info);
           },
-          (
-            partialAgg: PartialResponseAggregate,
-            chunkToBlock: number,
-            extra: CacheRecord = {}
-          ) => {
+          (partialAgg: PartialResponseAggregate, chunkToBlock: number, extra: CacheRecord = {}) => {
             sawPartialData = true;
             const completedBlock = Number(chunkToBlock) || 0;
             processedWindowToBlock = Math.max(processedWindowToBlock, completedBlock);
             responseRowsMerged += handlePartialData(partialAgg, chunkToBlock, extra, { advanceWatermark });
           },
           slug,
-          { forceArweaveFetch }
+          { forceArweaveFetch },
         );
 
         if (!sawPartialData) {
@@ -1480,31 +1396,18 @@ export const createSessionResponseHydrationController = (
 
       const firstHistoricalResponseBlock = lastProcessedQRBlock + 1;
       const recentPrefetchBlockSpan = responseScanMaxBlockRange * RECENT_RESPONSE_PREFETCH_WINDOW_COUNT;
-      const recentPrefetchFrom = Math.max(
-        firstHistoricalResponseBlock,
-        latestBlock - recentPrefetchBlockSpan + 1
-      );
+      const recentPrefetchFrom = Math.max(firstHistoricalResponseBlock, latestBlock - recentPrefetchBlockSpan + 1);
       let nextResponseScanFrom = lastProcessedQRBlock + 1;
       let ranRecentPrefetch = false;
       const runRecentResponsePrefetch = async (): Promise<void> => {
         if (ranRecentPrefetch) return;
         ranRecentPrefetch = true;
-        if (
-          recentPrefetchFrom <= nextResponseScanFrom ||
-          responseScanMaxBlockRange <= 0
-        ) {
+        if (recentPrefetchFrom <= nextResponseScanFrom || responseScanMaxBlockRange <= 0) {
           return;
         }
         let recentWindowFrom = recentPrefetchFrom;
-        while (
-          recentWindowFrom <= latestBlock &&
-          !_destroyed &&
-          isMounted()
-        ) {
-          const recentWindowTo = Math.min(
-            latestBlock,
-            recentWindowFrom + responseScanMaxBlockRange - 1
-          );
+        while (recentWindowFrom <= latestBlock && !_destroyed && isMounted()) {
+          const recentWindowTo = Math.min(latestBlock, recentWindowFrom + responseScanMaxBlockRange - 1);
           try {
             const { responseRowsMerged } = await scanResponseWindow({
               fromBlock: recentWindowFrom,
@@ -1521,15 +1424,8 @@ export const createSessionResponseHydrationController = (
           recentWindowFrom = recentWindowTo + 1;
         }
       };
-      while (
-        nextResponseScanFrom <= latestBlock &&
-        !_destroyed &&
-        isMounted()
-      ) {
-        const responseScanTo = Math.min(
-          latestBlock,
-          nextResponseScanFrom + responseScanMaxBlockRange - 1
-        );
+      while (nextResponseScanFrom <= latestBlock && !_destroyed && isMounted()) {
+        const responseScanTo = Math.min(latestBlock, nextResponseScanFrom + responseScanMaxBlockRange - 1);
         let windowProcessedToBlock = nextResponseScanFrom - 1;
         try {
           const result = await scanResponseWindow({
@@ -1568,22 +1464,19 @@ export const createSessionResponseHydrationController = (
           processedToBlock,
         });
       mergeFreshArweaveBranches();
-      await awaitManagedWrite(
-        'questionsCache',
-        dgWrite('questionsCache', slug, questionsCache as CacheRecord)
-      );
+      await awaitManagedWrite('questionsCache', dgWrite('questionsCache', slug, questionsCache as CacheRecord));
 
       if (persistenceFailureCount > 0) {
         mainSiteLog.warn(
           '[MainSite] response-cache initialization finished with persistence failures; continuing with in-memory data',
-          { slug, persistenceFailureCount }
+          { slug, persistenceFailureCount },
         );
       }
 
       mainSiteLog.log(
         `Finished responses. Watermark now ${
           (questionsCache[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock
-        } (latest=${latestBlock}).`
+        } (latest=${latestBlock}).`,
       );
 
       setResponseState((prev) => ({
@@ -1617,18 +1510,20 @@ export const createSessionResponseHydrationController = (
 
   const refreshQuestionResponses = async (
     questionIds: string[] | null = null,
-    opts: RefreshQuestionResponsesOptions = {}
+    opts: RefreshQuestionResponsesOptions = {},
   ): Promise<void> => {
     const slug = normalizeSessionSlug((opts?.slug ?? getActiveSessionSlug()) || '');
     const forceFull = !!opts?.forceFull;
-    const responderLower = String(opts?.responder || getAccount() || '').trim().toLowerCase();
+    const responderLower = String(opts?.responder || getAccount() || '')
+      .trim()
+      .toLowerCase();
     const migrateQuestionCacheNetworkKey = (cacheObj: CacheRecord, netId: string): void => {
       mergeLegacyNumericNetworkKey(cacheObj, netId);
     };
     const ensureQuestionCacheNetworkNode = (
       cacheObj: QuestionCache,
       netId: string,
-      initialLastBlockQR: number
+      initialLastBlockQR: number,
     ): QuestionCacheNetworkNode => {
       if (!cacheObj[netId]) {
         cacheObj[netId] = createEmptyQuestionCacheNetworkNode(initialLastBlockQR);
@@ -1650,9 +1545,11 @@ export const createSessionResponseHydrationController = (
       cacheObj: UserCache,
       responder: string,
       netId: string,
-      initialLastBlockQR: number
+      initialLastBlockQR: number,
     ): UserNetworkCache | null => {
-      const responderKey = String(responder || '').trim().toLowerCase();
+      const responderKey = String(responder || '')
+        .trim()
+        .toLowerCase();
       if (!responderKey) return null;
       if (!cacheObj[responderKey] || typeof cacheObj[responderKey] !== 'object') {
         cacheObj[responderKey] = {};
@@ -1692,15 +1589,11 @@ export const createSessionResponseHydrationController = (
       new Set(
         (Array.isArray(questionIds) ? questionIds : [])
           .map((id) => ensureHash(id))
-          .filter((id) => !!id && ethers.utils.isHexString(id, 32))
-      )
+          .filter((id) => !!id && ethers.utils.isHexString(id, 32)),
+      ),
     );
 
-    const canTarget =
-      !forceFull &&
-      !!responderLower &&
-      normalizedQids.length > 0 &&
-      !!getSessionChainId(slug);
+    const canTarget = !forceFull && !!responderLower && normalizedQids.length > 0 && !!getSessionChainId(slug);
 
     if (canTarget) {
       mainSiteLog.log('refreshQuestionResponses() - targeted refresh', {
@@ -1723,7 +1616,7 @@ export const createSessionResponseHydrationController = (
             mainSiteLog.warn(`refreshQuestionResponses(targeted): failed qId=${qId}`, e);
             return { qId, response: null };
           }
-        })
+        }),
       );
 
       let updatedAny = false;
@@ -1739,12 +1632,7 @@ export const createSessionResponseHydrationController = (
         const freshUserCache = (dgRead('userCache', slug) || {}) as UserCache;
         migrateQuestionCacheNetworkKey(freshCache as CacheRecord, networkID);
         const net = ensureQuestionCacheNetworkNode(freshCache, networkID, initialLastBlockQR);
-        const userNode = ensureUserCacheNetworkNode(
-          freshUserCache,
-          responderLower,
-          networkID,
-          initialLastBlockQR
-        );
+        const userNode = ensureUserCacheNetworkNode(freshUserCache, responderLower, networkID, initialLastBlockQR);
         let userCacheUpdated = false;
 
         nextByQid.forEach((response, qId) => {
@@ -1769,11 +1657,11 @@ export const createSessionResponseHydrationController = (
           net.questionResponsesMeta[qId][responderLower] = hadLegacySyntheticLi
             ? { bn: 0, txi: 0, li: 0, ts: 0 }
             : {
-              bn: Number.isFinite(prevBn) && prevBn >= 0 ? prevBn : 0,
-              txi: Number.isFinite(prevTxi) && prevTxi >= 0 ? prevTxi : 0,
-              li: Number.isFinite(prevLi) && prevLi >= 0 ? prevLi : 0,
-              ts: Number.isFinite(prevTs) && prevTs >= 0 ? prevTs : 0,
-            };
+                bn: Number.isFinite(prevBn) && prevBn >= 0 ? prevBn : 0,
+                txi: Number.isFinite(prevTxi) && prevTxi >= 0 ? prevTxi : 0,
+                li: Number.isFinite(prevLi) && prevLi >= 0 ? prevLi : 0,
+                ts: Number.isFinite(prevTs) && prevTs >= 0 ? prevTs : 0,
+              };
           updatedAny = true;
 
           if (userNode) {
@@ -1781,22 +1669,21 @@ export const createSessionResponseHydrationController = (
             const responseMetaBn = Number((responseMeta as ResponseRecencyPair).bn ?? 0);
             const responseMetaTxi = Number(
               (responseMeta as CacheRecord).txi ??
-              (responseMeta as CacheRecord).transactionIndex ??
-              (responseMeta as CacheRecord).txIndex ??
-              0
+                (responseMeta as CacheRecord).transactionIndex ??
+                (responseMeta as CacheRecord).txIndex ??
+                0,
             );
             const responseMetaLi = Number(
-              (responseMeta as CacheRecord).li ?? (responseMeta as CacheRecord).logIndex ?? 0
+              (responseMeta as CacheRecord).li ?? (responseMeta as CacheRecord).logIndex ?? 0,
             );
             const responseMetaTs = Number(
-              (responseMeta as CacheRecord).ts ?? (responseMeta as CacheRecord).timestamp ?? 0
+              (responseMeta as CacheRecord).ts ?? (responseMeta as CacheRecord).timestamp ?? 0,
             );
-            const hasResponseRecencyHint = (
+            const hasResponseRecencyHint =
               (Number.isFinite(responseMetaBn) && responseMetaBn > 0) ||
               (Number.isFinite(responseMetaTxi) && responseMetaTxi > 0) ||
               (Number.isFinite(responseMetaLi) && responseMetaLi > 0) ||
-              (Number.isFinite(responseMetaTs) && responseMetaTs > 0)
-            );
+              (Number.isFinite(responseMetaTs) && responseMetaTs > 0);
             const nextEntry: UserCacheEntry = {
               questionId: qId,
               responder: responderLower,
@@ -1809,9 +1696,7 @@ export const createSessionResponseHydrationController = (
               nextEntry.timestamp = Math.max(0, responseMetaTs);
             }
             const responses = userNode.data.questionResponses;
-            const existingIdx = responses.findIndex(
-              (item) => String(item?.questionId || '').toLowerCase() === qId
-            );
+            const existingIdx = responses.findIndex((item) => String(item?.questionId || '').toLowerCase() === qId);
             if (existingIdx === -1) {
               if (!hasResponseRecencyHint) {
                 // Brand-new targeted rows may lack ordering metadata; store explicit neutral hints.

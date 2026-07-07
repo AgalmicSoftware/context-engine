@@ -1,9 +1,6 @@
 import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import type { SbtListHelperItem, SbtListHelperRecord } from './sbtListCardDetailsHelpers';
-import {
-  normalizeSbtListItems,
-  type SbtCacheMetaSnapshot,
-} from './sbtListItemNormalizationHelpers';
+import { normalizeSbtListItems, type SbtCacheMetaSnapshot } from './sbtListItemNormalizationHelpers';
 import { isSbtListSyntheticNoSessionSlug } from './sbtListSessionUniverseHelpers';
 
 export type SbtListCacheReadPlan = {
@@ -28,9 +25,7 @@ type BuildSbtListCacheReadPlanArgs = {
   targetSlug?: unknown;
 };
 
-const isSbtListCacheRecord = (value: unknown): value is SbtListHelperRecord => (
-  !!value && typeof value === 'object'
-);
+const isSbtListCacheRecord = (value: unknown): value is SbtListHelperRecord => !!value && typeof value === 'object';
 
 export const buildSbtListCacheReadPlan = ({
   currentItems = [],
@@ -50,15 +45,9 @@ export const buildSbtListCacheReadPlan = ({
   const sbtList = isSbtListCacheRecord(networkCache.sbtList) ? networkCache.sbtList : {};
   const hydrated = normalizeSbtListItems(Object.values(sbtList));
   const existingItems = Array.isArray(currentItems) ? currentItems : [];
-  const shouldKeepExistingCards = (
-    hydrated.length === 0 &&
-    !forceRefresh &&
-    !!hasLoadedBefore &&
-    existingItems.length > 0
-  );
-  const passwordFlagItems = hydrated.map((item) => (
-    item.slug == null ? { ...item, slug: targetSlug } : item
-  ));
+  const shouldKeepExistingCards =
+    hydrated.length === 0 && !forceRefresh && !!hasLoadedBefore && existingItems.length > 0;
+  const passwordFlagItems = hydrated.map((item) => (item.slug == null ? { ...item, slug: targetSlug } : item));
 
   return {
     hasCacheRecord,

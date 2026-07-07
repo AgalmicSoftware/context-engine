@@ -29,16 +29,13 @@ describe('SurveyResultsIndividualResponseCard', () => {
         response={{ responder: '0xabc123/def456' }}
         responseId="survey id/with spaces:0xabc123/def456"
         styleMap={styleMap}
-      />
+      />,
     );
 
-    expect(screen.getAllByRole('link')[0]).toHaveAttribute(
-      'href',
-      `/u/${encodeURIComponent('0xabc123/def456')}`
-    );
+    expect(screen.getAllByRole('link')[0]).toHaveAttribute('href', `/u/${encodeURIComponent('0xabc123/def456')}`);
     expect(screen.getAllByRole('link')[1]).toHaveAttribute(
       'href',
-      `/survey/${encodeURIComponent('survey id/with spaces')}/${encodeURIComponent('0xabc123/def456')}?session=${encodeURIComponent('alpha session')}`
+      `/survey/${encodeURIComponent('survey id/with spaces')}/${encodeURIComponent('0xabc123/def456')}?session=${encodeURIComponent('alpha session')}`,
     );
     expect(screen.getAllByRole('link')[1]).toHaveAttribute('target', '_blank');
     expect(screen.getAllByRole('link')[1]).toHaveAttribute('rel', 'noopener noreferrer');
@@ -52,11 +49,13 @@ describe('SurveyResultsIndividualResponseCard', () => {
       <SurveyResultsIndividualResponseCard
         index={4}
         onToggleResponse={onToggleResponse}
-        renderResponseBody={jest.fn(() => <div>Response body</div>)}
+        renderResponseBody={jest.fn(() => (
+          <div>Response body</div>
+        ))}
         response={{ responder: '0xabc123/def456' }}
         responseId="survey-1:0xabc123/def456"
         styleMap={styleMap}
-      />
+      />,
     );
 
     fireEvent.click(screen.getAllByRole('link')[0]);

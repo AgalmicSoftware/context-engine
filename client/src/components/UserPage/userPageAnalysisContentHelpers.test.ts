@@ -11,14 +11,18 @@ import {
 
 describe('userPageAnalysisContentHelpers', () => {
   it('detects aggregate SBT entries', () => {
-    expect(isUserPageSbtAggregateEntry({
-      mintedSet: new Set(['0xA']),
-      burnedSet: new Set(['0xB']),
-    })).toBe(true);
-    expect(isUserPageSbtAggregateEntry({
-      mintedSet: new Set(['0xA']),
-      burnedSet: [],
-    })).toBe(false);
+    expect(
+      isUserPageSbtAggregateEntry({
+        mintedSet: new Set(['0xA']),
+        burnedSet: new Set(['0xB']),
+      }),
+    ).toBe(true);
+    expect(
+      isUserPageSbtAggregateEntry({
+        mintedSet: new Set(['0xA']),
+        burnedSet: [],
+      }),
+    ).toBe(false);
   });
 
   it('builds created question and survey analysis payloads from cache buckets', () => {
@@ -42,19 +46,17 @@ describe('userPageAnalysisContentHelpers', () => {
 
     expect(readUserPageDirectNetworkCacheBucket(surveysCache, 84532)).toBe(surveysCache[84532]);
     expect(readUserPageDirectNetworkCacheBucket(surveysCache, '')).toEqual({});
-    expect(buildUserPageAnalysisCreatedQuestions([
-      { id: 'q1', type: 'text', prompt: 'Question one', ignored: true },
-    ])).toEqual([
-      { id: 'q1', type: 'text', prompt: 'Question one' },
-    ]);
-    expect(buildUserPageAnalysisCreatedSurveys({
-      networkID: 84532,
-      questionsCache,
-      surveyCreationInfo: [
-        { id: 'survey_a', title: 'Survey A', questionsCount: 3 },
-      ],
-      surveysCache,
-    })).toEqual([
+    expect(
+      buildUserPageAnalysisCreatedQuestions([{ id: 'q1', type: 'text', prompt: 'Question one', ignored: true }]),
+    ).toEqual([{ id: 'q1', type: 'text', prompt: 'Question one' }]);
+    expect(
+      buildUserPageAnalysisCreatedSurveys({
+        networkID: 84532,
+        questionsCache,
+        surveyCreationInfo: [{ id: 'survey_a', title: 'Survey A', questionsCount: 3 }],
+        surveysCache,
+      }),
+    ).toEqual([
       {
         surveyId: 'survey_a',
         title: 'Survey A',
@@ -69,15 +71,12 @@ describe('userPageAnalysisContentHelpers', () => {
   });
 
   it('builds analysis SBT section and response inputs', () => {
-    expect(buildUserPageAnalysisSbts({
-      getSbtDisplayName: (sbtInfo) => (sbtInfo as any)?.title,
-      sbtList: [
-        { sbtInfo: { title: 'Alpha Badge', sbtAddress: '0xA' } },
-        { name: 'Missing Address', sbtInfo: {} },
-      ],
-    })).toEqual([
-      { name: 'Alpha Badge', address: '0xA' },
-    ]);
+    expect(
+      buildUserPageAnalysisSbts({
+        getSbtDisplayName: (sbtInfo) => (sbtInfo as any)?.title,
+        sbtList: [{ sbtInfo: { title: 'Alpha Badge', sbtAddress: '0xA' } }, { name: 'Missing Address', sbtInfo: {} }],
+      }),
+    ).toEqual([{ name: 'Alpha Badge', address: '0xA' }]);
 
     const derivedSbtSection = buildUserPageSbtSection({
       aggregate: {
@@ -141,25 +140,29 @@ describe('userPageAnalysisContentHelpers', () => {
         derivedSbtSample: ['0xbadgea', '0x1234567890abcdef'],
       },
     });
-    expect(buildUserPageSbtSection({
-      aggregate: { sbtAggregate: {} },
-      viewAddressLower: '0xviewer',
-    }).telemetry).toBeNull();
+    expect(
+      buildUserPageSbtSection({
+        aggregate: { sbtAggregate: {} },
+        viewAddressLower: '0xviewer',
+      }).telemetry,
+    ).toBeNull();
 
-    expect(buildUserPageAnalysisQuestions({
-      detailedQuestionResponses: {
-        q1: {
-          answer: { value: ['yes'] },
-          additionalComments: 'Useful context',
-          importance: { value: 'high' },
+    expect(
+      buildUserPageAnalysisQuestions({
+        detailedQuestionResponses: {
+          q1: {
+            answer: { value: ['yes'] },
+            additionalComments: 'Useful context',
+            importance: { value: 'high' },
+          },
+          q2: { answer: { value: '*' } },
         },
-        q2: { answer: { value: '*' } },
-      },
-      questionResponseInfo: [
-        { id: 'q1', type: 'multi', prompt: 'Question one' },
-        { id: 'q2', type: 'text', prompt: 'Encrypted' },
-      ],
-    })).toEqual([
+        questionResponseInfo: [
+          { id: 'q1', type: 'multi', prompt: 'Question one' },
+          { id: 'q2', type: 'text', prompt: 'Encrypted' },
+        ],
+      }),
+    ).toEqual([
       {
         id: 'q1',
         type: 'multi',
@@ -170,26 +173,26 @@ describe('userPageAnalysisContentHelpers', () => {
       },
     ]);
 
-    expect(buildUserPageAnalysisSurveys({
-      detailedSurveyResponses: {
-        s1: [
-          {
-            questionData: { prompt: 'Prompt one', type: 'text' },
-            responseData: {
-              answer: { value: 'answer one' },
-              additionalComment: { value: 'Survey note' },
+    expect(
+      buildUserPageAnalysisSurveys({
+        detailedSurveyResponses: {
+          s1: [
+            {
+              questionData: { prompt: 'Prompt one', type: 'text' },
+              responseData: {
+                answer: { value: 'answer one' },
+                additionalComment: { value: 'Survey note' },
+              },
             },
-          },
-          {
-            questionData: { prompt: 'Hidden prompt' },
-            responseData: { answer: { value: '*' } },
-          },
-        ],
-      },
-      surveyResponseInfo: [
-        { id: 's1', title: 'Survey one' },
-      ],
-    })).toEqual([
+            {
+              questionData: { prompt: 'Hidden prompt' },
+              responseData: { answer: { value: '*' } },
+            },
+          ],
+        },
+        surveyResponseInfo: [{ id: 's1', title: 'Survey one' }],
+      }),
+    ).toEqual([
       {
         surveyId: 's1',
         title: 'Survey one',

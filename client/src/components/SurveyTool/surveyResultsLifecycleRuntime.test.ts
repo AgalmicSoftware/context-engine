@@ -1,7 +1,4 @@
-import type {
-  SurveyResultsProps,
-  SurveyResultsState,
-} from './SurveyResults';
+import type { SurveyResultsProps, SurveyResultsState } from './SurveyResults';
 import {
   runSurveyResultsComponentDidMount,
   runSurveyResultsComponentDidUpdate,
@@ -14,38 +11,40 @@ type PatchCall = {
   patch: Record<string, unknown>;
 };
 
-const createProps = (patch: Record<string, unknown> = {}): SurveyResultsProps => ({
-  filterState: {},
-  filteredQuestionsCount: 0,
-  isOpen: false,
-  isQuestionCacheReady: false,
-  isResponsesCacheReady: false,
-  isSurveyCacheReady: false,
-  preventUrlChange: false,
-  questionResponsesNonce: 0,
-  surveyId: '',
-  viewMode: 'questions',
-  ...patch,
-} as SurveyResultsProps);
+const createProps = (patch: Record<string, unknown> = {}): SurveyResultsProps =>
+  ({
+    filterState: {},
+    filteredQuestionsCount: 0,
+    isOpen: false,
+    isQuestionCacheReady: false,
+    isResponsesCacheReady: false,
+    isSurveyCacheReady: false,
+    preventUrlChange: false,
+    questionResponsesNonce: 0,
+    surveyId: '',
+    viewMode: 'questions',
+    ...patch,
+  }) as SurveyResultsProps;
 
-const createState = (patch: Record<string, unknown> = {}): SurveyResultsState => ({
-  demoResultsAtlasNodeId: null,
-  demoResultsViewMode: 'raw',
-  filterState: {},
-  filteredQuestionsCount: 0,
-  networkLatestBlock: 0,
-  questionLocalBlock: 0,
-  questionResultsHydrated: false,
-  refreshTargetQuestionBlock: 0,
-  refreshTargetResponseBlock: 0,
-  refreshTargetSurveyBlock: 0,
-  responseLocalBlock: 0,
-  surveyId: '',
-  surveyLocalBlock: 0,
-  surveyResultsHydrated: false,
-  viewMode: 'questions',
-  ...patch,
-} as SurveyResultsState);
+const createState = (patch: Record<string, unknown> = {}): SurveyResultsState =>
+  ({
+    demoResultsAtlasNodeId: null,
+    demoResultsViewMode: 'raw',
+    filterState: {},
+    filteredQuestionsCount: 0,
+    networkLatestBlock: 0,
+    questionLocalBlock: 0,
+    questionResultsHydrated: false,
+    refreshTargetQuestionBlock: 0,
+    refreshTargetResponseBlock: 0,
+    refreshTargetSurveyBlock: 0,
+    responseLocalBlock: 0,
+    surveyId: '',
+    surveyLocalBlock: 0,
+    surveyResultsHydrated: false,
+    viewMode: 'questions',
+    ...patch,
+  }) as SurveyResultsState;
 
 const createInstance = (): SurveyResultsLifecycleInstance => ({
   _lastNotifiedFilterStateSignature: 'already-notified',
@@ -168,15 +167,11 @@ describe('runSurveyResultsComponentDidUpdate', () => {
       filterState: { type: 'new' },
       questionResultsHydrated: false,
     });
-    expect(harness.events.indexOf('applyStatePatch')).toBeLessThan(
-      harness.events.indexOf('updateParentFilters')
-    );
+    expect(harness.events.indexOf('applyStatePatch')).toBeLessThan(harness.events.indexOf('updateParentFilters'));
     expect(window.location.pathname).toBe('/questions/results');
     expect(window.location.search).toBe('?session=edge');
     expect(harness.queuedRefreshes).toContain('modal-open');
-    expect(harness.resetReasons).toEqual(
-      expect.arrayContaining(['modal-open', 'modal-open-state-change'])
-    );
+    expect(harness.resetReasons).toEqual(expect.arrayContaining(['modal-open', 'modal-open-state-change']));
     expect(instance._lastNotifiedFilterStateSignature).toBeNull();
   });
 
@@ -253,7 +248,7 @@ describe('runSurveyResultsComponentDidUpdate', () => {
       totalResponsesCount: 0,
     });
     expect(harness.events.indexOf('applyStatePatch')).toBeLessThan(
-      harness.events.indexOf('queue:question-scope-change')
+      harness.events.indexOf('queue:question-scope-change'),
     );
     expect(harness.queuedRefreshes).toContain('question-scope-change');
   });
@@ -323,13 +318,15 @@ describe('runSurveyResultsComponentDidMount', () => {
     });
     expect(refreshQuestionMetadata).toHaveBeenCalledTimes(1);
     expect(refreshQuestionResponses).toHaveBeenCalledTimes(1);
-    expect(events).toEqual(expect.arrayContaining([
-      'urlBasedView',
-      'updatePolling',
-      'manualRefresh',
-      'queue:mount-open',
-      'updateParentFilters',
-    ]));
+    expect(events).toEqual(
+      expect.arrayContaining([
+        'urlBasedView',
+        'updatePolling',
+        'manualRefresh',
+        'queue:mount-open',
+        'updateParentFilters',
+      ]),
+    );
     expect(window.location.pathname).toBe('/questions/results');
     expect(window.location.search).toBe('?session=edge');
 
@@ -343,11 +340,7 @@ describe('runSurveyResultsComponentDidMount', () => {
     expect(unsubscribe).toHaveBeenCalledTimes(1);
     expect(instance._scrollMutationObserver).toBeNull();
     expect(instance._scrollToQuestionRetryTimer).toBeNull();
-    expect(events).toEqual(expect.arrayContaining([
-      'destroyFetch',
-      'destroyQueue',
-      'destroyPolling',
-    ]));
+    expect(events).toEqual(expect.arrayContaining(['destroyFetch', 'destroyQueue', 'destroyPolling']));
     expect(window.location.pathname).toBe('/questions');
     expect(window.location.search).toBe('?session=edge');
   });

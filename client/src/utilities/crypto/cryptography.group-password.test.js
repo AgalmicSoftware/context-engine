@@ -31,7 +31,7 @@ describe('cryptoUtils group password derivation', () => {
         password: PASSWORD,
         sbtAddress: SBT_A,
         groupPasswordHash: hashA,
-      })
+      }),
     ).toBe(ethers.utils.getAddress(SBT_A));
 
     expect(
@@ -39,7 +39,7 @@ describe('cryptoUtils group password derivation', () => {
         password: PASSWORD,
         sbtAddress: SBT_A,
         groupPasswordHash: zeroScopedHash,
-      })
+      }),
     ).toBe('');
 
     expect(
@@ -47,7 +47,7 @@ describe('cryptoUtils group password derivation', () => {
         password: PASSWORD,
         sbtAddress: SBT_A,
         groupPasswordHash: hashB,
-      })
+      }),
     ).toBeNull();
   });
 
@@ -80,7 +80,7 @@ describe('cryptoUtils group password derivation', () => {
         nonce: '1',
         signature,
         groupPasswordHash: zeroScopedHash,
-      })
+      }),
     ).toEqual(expect.objectContaining({ ok: true }));
 
     expect(
@@ -89,7 +89,7 @@ describe('cryptoUtils group password derivation', () => {
         nonce: '1',
         signature,
         groupPasswordHash: scopedHash,
-      })
+      }),
     ).toEqual(expect.objectContaining({ ok: false }));
   });
 });

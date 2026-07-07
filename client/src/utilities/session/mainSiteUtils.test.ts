@@ -72,29 +72,11 @@ describe('readBoolishDebugFlag', () => {
     clearMainSiteTestState();
   });
 
-  it.each([
-    true,
-    'true',
-    '1',
-    'yes',
-    'on',
-    'TRUE',
-    ' true ',
-  ])('returns true for %p', (value) => {
+  it.each([true, 'true', '1', 'yes', 'on', 'TRUE', ' true '])('returns true for %p', (value) => {
     expect(readBoolishDebugFlag(value)).toBe(true);
   });
 
-  it.each([
-    false,
-    null,
-    undefined,
-    '',
-    '0',
-    'false',
-    'no',
-    'off',
-    'random',
-  ])('returns false for %p', (value) => {
+  it.each([false, null, undefined, '', '0', 'false', 'no', 'off', 'random'])('returns false for %p', (value) => {
     expect(readBoolishDebugFlag(value)).toBe(false);
   });
 });
@@ -174,15 +156,12 @@ describe('isRouteResponderAddress', () => {
     expect(isRouteResponderAddress('0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD')).toBe(true);
   });
 
-  it.each([
-    '0x1234',
-    '0xzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
-    '',
-    null,
-    undefined,
-  ])('returns false for %p', (value) => {
-    expect(isRouteResponderAddress(value)).toBe(false);
-  });
+  it.each(['0x1234', '0xzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz', '', null, undefined])(
+    'returns false for %p',
+    (value) => {
+      expect(isRouteResponderAddress(value)).toBe(false);
+    },
+  );
 });
 
 describe('hasCoreSbtMetadata', () => {
@@ -209,10 +188,12 @@ describe('hasCoreSbtMetadata', () => {
   });
 
   it('returns false when admin is the zero address', () => {
-    expect(hasCoreSbtMetadata({
-      ...validMetadata,
-      admin: '0x0000000000000000000000000000000000000000',
-    })).toBe(false);
+    expect(
+      hasCoreSbtMetadata({
+        ...validMetadata,
+        admin: '0x0000000000000000000000000000000000000000',
+      }),
+    ).toBe(false);
   });
 
   it('returns true when all required fields are present', () => {

@@ -61,23 +61,27 @@ describe('BeeswarmPlot', () => {
   });
 
   it('normalizes tooltip vote breakdowns so the response bar can render unsure votes', () => {
-    expect(normalizeTooltipVoteBreakdown({
-      agrees: 4,
-      disagrees: 1,
-      unsure: 2,
-      total: 8,
-    })).toEqual({
+    expect(
+      normalizeTooltipVoteBreakdown({
+        agrees: 4,
+        disagrees: 1,
+        unsure: 2,
+        total: 8,
+      }),
+    ).toEqual({
       agrees: 4,
       disagrees: 1,
       unsure: 3,
       total: 8,
     });
 
-    expect(normalizeTooltipVoteBreakdown({
-      agrees: 3,
-      disagrees: 2,
-      total: 0,
-    })).toEqual({
+    expect(
+      normalizeTooltipVoteBreakdown({
+        agrees: 3,
+        disagrees: 2,
+        total: 0,
+      }),
+    ).toEqual({
       agrees: 3,
       disagrees: 2,
       unsure: 0,
@@ -91,38 +95,46 @@ describe('BeeswarmPlot', () => {
       top: 36,
     });
     expect(buildBeeswarmTooltipStatClassName(styles, 'tooltipStatAgree')).toBe(
-      `${styles.tooltipStat} ${styles.tooltipStatAgree}`
+      `${styles.tooltipStat} ${styles.tooltipStatAgree}`,
     );
     expect(buildBeeswarmTooltipSegmentClassName(styles, 'tooltipResponseSegmentAgree')).toBe(
-      `${styles.tooltipResponseSegment} ${styles.tooltipResponseSegmentAgree}`
+      `${styles.tooltipResponseSegment} ${styles.tooltipResponseSegmentAgree}`,
     );
     expect(resolveTooltipResponseSegmentStyle(3, 12)).toEqual({ width: '25.00%' });
     expect(resolveTooltipResponseSegmentStyle(3, 0)).toEqual({ width: '300.00%' });
   });
 
   it('repositions right-edge tooltips to the left so the card keeps its full width', () => {
-    expect(resolveTooltipLayout({
-      anchorX: 320,
-      anchorY: 60,
-      wrapperWidth: 360,
-      wrapperHeight: 220,
-      tooltipWidth: 220,
-      tooltipHeight: 120,
-    })).toEqual(expect.objectContaining({
-      horizontal: 'left',
-      vertical: 'bottom',
-    }));
+    expect(
+      resolveTooltipLayout({
+        anchorX: 320,
+        anchorY: 60,
+        wrapperWidth: 360,
+        wrapperHeight: 220,
+        tooltipWidth: 220,
+        tooltipHeight: 120,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        horizontal: 'left',
+        vertical: 'bottom',
+      }),
+    );
 
-    expect(resolveTooltipLayout({
-      anchorX: 44,
-      anchorY: 196,
-      wrapperWidth: 360,
-      wrapperHeight: 220,
-      tooltipWidth: 220,
-      tooltipHeight: 120,
-    })).toEqual(expect.objectContaining({
-      horizontal: 'right',
-      vertical: 'top',
-    }));
+    expect(
+      resolveTooltipLayout({
+        anchorX: 44,
+        anchorY: 196,
+        wrapperWidth: 360,
+        wrapperHeight: 220,
+        tooltipWidth: 220,
+        tooltipHeight: 120,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        horizontal: 'right',
+        vertical: 'top',
+      }),
+    );
   });
 });

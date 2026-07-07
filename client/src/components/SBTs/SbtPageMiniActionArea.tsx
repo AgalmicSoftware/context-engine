@@ -1,10 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCheck,
-  faSpinner,
-  faTimes,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SBTPage.module.scss';
 import {
@@ -82,10 +78,14 @@ const renderPendingButtonContent = (contentState: SbtPagePendingContentState): R
     {contentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
     {contentState.shouldRenderLabel && contentState.label}
     {contentState.shouldRenderFailure && (
-      <>{contentState.failureLabel} <FontAwesomeIcon icon={faTimes} /></>
+      <>
+        {contentState.failureLabel} <FontAwesomeIcon icon={faTimes} />
+      </>
     )}
     {contentState.shouldRenderSuccess && (
-      <>{contentState.successLabel} <FontAwesomeIcon icon={faCheck} /></>
+      <>
+        {contentState.successLabel} <FontAwesomeIcon icon={faCheck} />
+      </>
     )}
   </>
 );
@@ -198,7 +198,11 @@ const SbtPageMiniActionArea = ({
             onChange={onManualPasswordInputChange}
             placeholder={miniManualClaimActionRequest.placeholder}
             disabled={miniManualClaimActionRequest.inputDisabled}
-            style={miniManualClaimActionRequest.viewKind === 'manual-password-start-input' ? miniPasswordControlInputStyle : undefined}
+            style={
+              miniManualClaimActionRequest.viewKind === 'manual-password-start-input'
+                ? miniPasswordControlInputStyle
+                : undefined
+            }
           />
           <button
             onClick={onMiniMint}
@@ -216,7 +220,11 @@ const SbtPageMiniActionArea = ({
         </div>
       );
     } else if (miniManualClaimActionRequest.viewKind === 'manual-claim-success') {
-      miniMintArea = <div className={styles.miniActionStatus} style={miniActionStatusStyle}>{miniManualClaimActionRequest.statusText}</div>;
+      miniMintArea = (
+        <div className={styles.miniActionStatus} style={miniActionStatusStyle}>
+          {miniManualClaimActionRequest.statusText}
+        </div>
+      );
     } else if (miniMintActionPlan.viewKind === 'open-mint-button') {
       miniMintArea = (
         <button
@@ -243,14 +251,24 @@ const SbtPageMiniActionArea = ({
       </button>
     );
   } else if (miniTokenActionDisplayState?.shouldRenderJoinedStatus) {
-    miniMintArea = <div className={styles.miniActionStatus} style={miniActionStatusStyle}>Joined!</div>;
+    miniMintArea = (
+      <div className={styles.miniActionStatus} style={miniActionStatusStyle}>
+        Joined!
+      </div>
+    );
   }
 
   if (miniActionFailureState.showMintFailedStatus) {
-    miniMintArea = <div className={styles.miniActionStatus} style={miniActionFailureStatusStyle}>{mintFailedLabel}</div>;
+    miniMintArea = (
+      <div className={styles.miniActionStatus} style={miniActionFailureStatusStyle}>
+        {mintFailedLabel}
+      </div>
+    );
   }
   if (miniActionFailureState.showBurnFailedStatus) {
-    miniMintArea = <div className={styles.miniActionStatus} style={miniActionFailureStatusStyle}>{`${burnLabel} Failed`}</div>;
+    miniMintArea = (
+      <div className={styles.miniActionStatus} style={miniActionFailureStatusStyle}>{`${burnLabel} Failed`}</div>
+    );
   }
 
   return <>{miniMintArea}</>;

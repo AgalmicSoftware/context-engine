@@ -84,7 +84,9 @@ const loadCacheScripts = ({
       emitMessage(data) {
         const evt = { data };
         this.listeners.forEach((handler) => {
-          try { handler(evt); } catch (_) {}
+          try {
+            handler(evt);
+          } catch (_) {}
         });
         if (typeof this.onmessage === 'function') {
           this.onmessage(evt);
@@ -134,9 +136,7 @@ const loadCacheScripts = ({
       const state = getStoreState(store);
       return Array.from(state.entries()).map(([key, value]) => [key, deepClone(value)]);
     }),
-    getStoreState: (dbName, storeName) => (
-      getStoreState({ dbName, storeName })
-    ),
+    getStoreState: (dbName, storeName) => getStoreState({ dbName, storeName }),
   };
 
   jest.doMock('./cacheScripts.idb.impl.js', () => ({
@@ -172,13 +172,13 @@ describe('cacheScripts', () => {
 
   it('reconciles managed namespace dg keys from localStorage into IDB and mirror during init', async () => {
     const seed = {
-      'dg:questionsCache:alpha': { '1': { questions: { q1: { id: 'q1' } } } },
-      'dg:surveysCache:alpha': { '1': { surveys: { s1: { id: 's1' } } } },
+      'dg:questionsCache:alpha': { 1: { questions: { q1: { id: 'q1' } } } },
+      'dg:surveysCache:alpha': { 1: { surveys: { s1: { id: 's1' } } } },
       'dg:bookmarksCache:alpha': { users: [{ address: '0xabc' }] },
       'dg:filters:alpha': { active: ['x'] },
-      'dg:sbtCache:alpha': { '1': { sbtList: {} } },
-      'dg:userCache:alpha': { '0xabc': { '1': { lastBlockScanned: 12 } } },
-      'dg:analysisCache:alpha': { '1': { '0xabc': { 'sha': { version: 1 } } } },
+      'dg:sbtCache:alpha': { 1: { sbtList: {} } },
+      'dg:userCache:alpha': { '0xabc': { 1: { lastBlockScanned: 12 } } },
+      'dg:analysisCache:alpha': { 1: { '0xabc': { sha: { version: 1 } } } },
     };
     Object.entries(seed).forEach(([key, value]) => {
       localStorage.setItem(key, JSON.stringify(value));
@@ -192,9 +192,7 @@ describe('cacheScripts', () => {
       expect(idbState.get(key)).toEqual(seed[key]);
     });
 
-    expect(cacheScripts.peekCacheSync('questionsCache', 'alpha')).toEqual(
-      seed['dg:questionsCache:alpha']
-    );
+    expect(cacheScripts.peekCacheSync('questionsCache', 'alpha')).toEqual(seed['dg:questionsCache:alpha']);
     expect(cacheScripts.listNamespaceEntriesSync('sbtCache')).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -203,15 +201,13 @@ describe('cacheScripts', () => {
           key: 'dg:sbtCache:alpha',
           value: seed['dg:sbtCache:alpha'],
         }),
-      ])
+      ]),
     );
 
     const report = await cacheScripts.migrateLocalStorageToIDB();
     expect(report).toMatchObject({ migrated: false, idb: true, moved: 0, removed: 0, failed: 0 });
 
-    expect(await cacheScripts.readCache('questionsCache', 'alpha')).toEqual(
-      seed['dg:questionsCache:alpha']
-    );
+    expect(await cacheScripts.readCache('questionsCache', 'alpha')).toEqual(seed['dg:questionsCache:alpha']);
     expect(idbState.get('dg:questionsCache:alpha')).toEqual(seed['dg:questionsCache:alpha']);
     expect(localStorage.getItem('dg:questionsCache:alpha')).toBeNull();
   });
@@ -219,7 +215,7 @@ describe('cacheScripts', () => {
   it('merges overlapping fallback localStorage data into existing IDB data during init', async () => {
     const key = 'dg:questionsCache:alpha';
     const idbSeed = {
-      '1': {
+      1: {
         questions: {
           q1: { id: 'q1', prompt: 'old prompt' },
           q2: { id: 'q2', prompt: 'keep me' },
@@ -229,7 +225,7 @@ describe('cacheScripts', () => {
       preserved: { marker: true },
     };
     const localSeed = {
-      '1': {
+      1: {
         questions: {
           q1: { id: 'q1', prompt: 'new prompt' },
         },
@@ -238,7 +234,7 @@ describe('cacheScripts', () => {
       recovered: { source: 'localStorage' },
     };
     const merged = {
-      '1': {
+      1: {
         questions: {
           q1: { id: 'q1', prompt: 'new prompt' },
           q2: { id: 'q2', prompt: 'keep me' },
@@ -316,7 +312,7 @@ describe('cacheScripts', () => {
 
   it('keeps managed keys readable when initial IDB reads fail transiently', async () => {
     const key = 'dg:questionsCache:alpha';
-    const seed = { '1': { questions: { q1: { id: 'q1' } } } };
+    const seed = { 1: { questions: { q1: { id: 'q1' } } } };
     localStorage.setItem(key, JSON.stringify(seed));
 
     const { cacheScripts, idbState } = loadCacheScripts({
@@ -335,7 +331,7 @@ describe('cacheScripts', () => {
 
   it('falls back to localStorage when IndexedDB is unavailable', async () => {
     const key = 'dg:questionsCache:beta';
-    const seed = { '1': { questions: { q1: { id: 'q1' } } } };
+    const seed = { 1: { questions: { q1: { id: 'q1' } } } };
     localStorage.setItem(key, JSON.stringify(seed));
 
     const { cacheScripts } = loadCacheScripts({ failProbe: true });
@@ -344,7 +340,7 @@ describe('cacheScripts', () => {
     expect(cacheScripts.peekCacheSync('questionsCache', 'beta')).toEqual(seed);
     expect(JSON.parse(localStorage.getItem(key))).toEqual(seed);
 
-    const next = { '1': { questions: { q2: { id: 'q2' } } } };
+    const next = { 1: { questions: { q2: { id: 'q2' } } } };
     await cacheScripts.writeCache('questionsCache', 'beta', next);
     expect(JSON.parse(localStorage.getItem(key))).toEqual(next);
     expect(await cacheScripts.readCache('questionsCache', 'beta')).toEqual(next);
@@ -357,24 +353,28 @@ describe('cacheScripts', () => {
     const { cacheScripts } = loadCacheScripts();
     await cacheScripts.initCacheManager();
 
-    expect(cacheScripts.getCacheBackendDiagnostics()).toEqual(expect.objectContaining({
-      persistentBackend: 'indexeddb',
-      probeState: 'ready',
-      idbAvailable: true,
-      didHydrateMirror: true,
-    }));
+    expect(cacheScripts.getCacheBackendDiagnostics()).toEqual(
+      expect.objectContaining({
+        persistentBackend: 'indexeddb',
+        probeState: 'ready',
+        idbAvailable: true,
+        didHydrateMirror: true,
+      }),
+    );
   });
 
   it('reports localstorage fallback as the managed cache backend when the idb probe fails', async () => {
     const { cacheScripts } = loadCacheScripts({ failProbe: true });
     await cacheScripts.initCacheManager();
 
-    expect(cacheScripts.getCacheBackendDiagnostics()).toEqual(expect.objectContaining({
-      persistentBackend: 'localstorage',
-      probeState: 'ready',
-      idbAvailable: false,
-      didHydrateMirror: true,
-    }));
+    expect(cacheScripts.getCacheBackendDiagnostics()).toEqual(
+      expect.objectContaining({
+        persistentBackend: 'localstorage',
+        probeState: 'ready',
+        idbAvailable: false,
+        didHydrateMirror: true,
+      }),
+    );
   });
 
   it('serializes atomic updates per key to avoid lost merges', async () => {
@@ -480,7 +480,7 @@ describe('cacheScripts', () => {
       cacheScripts.updateCacheAtomic('questionsCache', 'atomic-fail', (current) => ({
         ...(current || {}),
         value: 1,
-      }))
+      })),
     ).rejects.toThrow('Failed to persist atomic update');
     expect(cacheScripts.peekCacheSync('questionsCache', 'atomic-fail')).toBeNull();
     expect(idbState.has(key)).toBe(false);
@@ -514,7 +514,7 @@ describe('cacheScripts', () => {
           key: 'dg:userCache:sub',
           source: 'local',
         }),
-      ])
+      ]),
     );
   });
 
@@ -554,7 +554,7 @@ describe('cacheScripts', () => {
   it('recovers IndexedDB backend by reconciling fallback localStorage data before rehydrating mirror', async () => {
     const key = 'dg:questionsCache:recover';
     const idbSeed = {
-      '1': {
+      1: {
         questions: {
           q1: { id: 'q1', prompt: 'old prompt' },
           q2: { id: 'q2', prompt: 'keep me' },
@@ -564,7 +564,7 @@ describe('cacheScripts', () => {
       preserved: { marker: true },
     };
     const fallbackSeed = {
-      '1': {
+      1: {
         questions: {
           q1: { id: 'q1', prompt: 'new prompt' },
         },
@@ -573,7 +573,7 @@ describe('cacheScripts', () => {
       recovered: { source: 'localStorage' },
     };
     const merged = {
-      '1': {
+      1: {
         questions: {
           q1: { id: 'q1', prompt: 'new prompt' },
           q2: { id: 'q2', prompt: 'keep me' },
@@ -655,7 +655,7 @@ describe('cacheScripts', () => {
           slug: 'recovery-unrelated',
           value: { value: 'keep' },
         }),
-      ])
+      ]),
     );
 
     releaseOptimisticPersist();

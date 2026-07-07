@@ -14,14 +14,11 @@ import {
   resolvePayloadSingleSelect,
   resolveQuestionSingleSelect,
 } from './createQuestionsAndSurveysHelpers.js';
-import {
-  buildCreateSurveyHashValue,
-} from './createQuestionsAndSurveysSignatureHelpers';
+import { buildCreateSurveyHashValue } from './createQuestionsAndSurveysSignatureHelpers';
 
 describe('createQuestionsAndSurveysHelpers question options', () => {
   it('keeps empty authoring option rows for multichoice drafts', () => {
-    expect(normalizeAuthoringQuestionOptions('multichoice', ['Alpha', '', '  ']))
-      .toEqual(['Alpha', '', '  ']);
+    expect(normalizeAuthoringQuestionOptions('multichoice', ['Alpha', '', '  '])).toEqual(['Alpha', '', '  ']);
   });
 
   it('provides an empty authoring option list for multichoice drafts without options', () => {
@@ -33,21 +30,22 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
   });
 
   it('filters blank options only for submit and JSON payloads', () => {
-    expect(normalizePayloadQuestionOptions('multichoice', ['Alpha', '', '  ', 'Beta']))
-      .toEqual(['Alpha', 'Beta']);
+    expect(normalizePayloadQuestionOptions('multichoice', ['Alpha', '', '  ', 'Beta'])).toEqual(['Alpha', 'Beta']);
   });
 
   it('rejects duplicate multichoice option labels during authoring validation', () => {
-    expect(getCreateSurveyValidationError({
-      title: 'Survey',
-      questions: [
-        {
-          type: 'multichoice',
-          prompt: 'Pick one',
-          options: ['Alpha', 'Beta', ' alpha '],
-        },
-      ],
-    })).toBe('Question 1 has duplicate multichoice option "alpha". Option labels must be unique.');
+    expect(
+      getCreateSurveyValidationError({
+        title: 'Survey',
+        questions: [
+          {
+            type: 'multichoice',
+            prompt: 'Pick one',
+            options: ['Alpha', 'Beta', ' alpha '],
+          },
+        ],
+      }),
+    ).toBe('Question 1 has duplicate multichoice option "alpha". Option labels must be unique.');
   });
 
   it('omits payload options when a multichoice question has no option array', () => {
@@ -55,9 +53,10 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
   });
 
   it('updates multichoice draft options and regenerates the question id', () => {
-    const generateQuestionId = jest.fn((type, prompt, options, singleSelect) => (
-      `${type}:${prompt}:${(options as unknown[]).join(',')}:${singleSelect ? 'one' : 'many'}`
-    ));
+    const generateQuestionId = jest.fn(
+      (type, prompt, options, singleSelect) =>
+        `${type}:${prompt}:${(options as unknown[]).join(',')}:${singleSelect ? 'one' : 'many'}`,
+    );
     const questions = [
       {
         id: 'old-id',
@@ -108,9 +107,10 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
   });
 
   it('updates question fields and only regenerates ids for identity fields', () => {
-    const generateQuestionId = jest.fn((type, prompt, options, singleSelect) => (
-      `${type}:${prompt}:${(options as unknown[]).join(',')}:${singleSelect ? 'one' : 'many'}`
-    ));
+    const generateQuestionId = jest.fn(
+      (type, prompt, options, singleSelect) =>
+        `${type}:${prompt}:${(options as unknown[]).join(',')}:${singleSelect ? 'one' : 'many'}`,
+    );
     const questions = [
       {
         id: 'old-id',
@@ -150,18 +150,21 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
   });
 
   it('builds new authoring question drafts with stable testable ui keys', () => {
-    const generateQuestionId = jest.fn((type, prompt, options, singleSelect) => (
-      `${type}:${prompt}:${(options as unknown[]).join(',')}:${singleSelect ? 'one' : 'many'}`
-    ));
+    const generateQuestionId = jest.fn(
+      (type, prompt, options, singleSelect) =>
+        `${type}:${prompt}:${(options as unknown[]).join(',')}:${singleSelect ? 'one' : 'many'}`,
+    );
 
-    expect(buildCreateSurveyNewQuestionDraft({
-      addingQuestionType: 'multichoice',
-      generateQuestionId,
-      isStandaloneQuestion: true,
-      now: () => 12345,
-      questionCount: 2,
-      random: () => 0.5,
-    })).toEqual({
+    expect(
+      buildCreateSurveyNewQuestionDraft({
+        addingQuestionType: 'multichoice',
+        generateQuestionId,
+        isStandaloneQuestion: true,
+        now: () => 12345,
+        questionCount: 2,
+        random: () => 0.5,
+      }),
+    ).toEqual({
       uiKey: 'new-2-12345-i',
       question: {
         id: 'multichoice:::many',
@@ -179,34 +182,40 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
       },
     });
 
-    expect(buildCreateSurveyNewQuestionDraft({
-      addingQuestionType: 'freeform',
-      generateQuestionId,
-      isStandaloneQuestion: false,
-      now: () => 1,
-      questionCount: 0,
-      random: () => 0,
-    })?.question).toMatchObject({
+    expect(
+      buildCreateSurveyNewQuestionDraft({
+        addingQuestionType: 'freeform',
+        generateQuestionId,
+        isStandaloneQuestion: false,
+        now: () => 1,
+        questionCount: 0,
+        random: () => 0,
+      })?.question,
+    ).toMatchObject({
       type: 'freeform',
       options: undefined,
       singleSelect: undefined,
       lockGateIds: null,
     });
 
-    expect(buildCreateSurveyNewQuestionDraft({
-      addingQuestionType: 'Question Type',
-    })).toBeNull();
+    expect(
+      buildCreateSurveyNewQuestionDraft({
+        addingQuestionType: 'Question Type',
+      }),
+    ).toBeNull();
   });
 
   it('builds standalone toggle state while normalizing question lock gates', () => {
-    expect(buildCreateSurveyStandaloneToggleState({
-      isStandaloneQuestion: false,
-      surveyLockGateIds: [' survey-gate '],
-      questions: [
-        { id: 'q1', lockGateIds: null },
-        { id: 'q2', lockGateIds: [' gate-a ', '', 'gate-b'] },
-      ],
-    })).toMatchObject({
+    expect(
+      buildCreateSurveyStandaloneToggleState({
+        isStandaloneQuestion: false,
+        surveyLockGateIds: [' survey-gate '],
+        questions: [
+          { id: 'q1', lockGateIds: null },
+          { id: 'q2', lockGateIds: [' gate-a ', '', 'gate-b'] },
+        ],
+      }),
+    ).toMatchObject({
       isStandaloneQuestion: true,
       surveyAddedSuccessfully: false,
       questionsAddedSuccessfully: false,
@@ -221,15 +230,17 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
       ],
     });
 
-    expect(buildCreateSurveyStandaloneToggleState({
-      isStandaloneQuestion: true,
-      surveyLockGateIds: [' survey-gate '],
-      questions: [
-        { id: 'q1', lockGateIds: [] },
-        { id: 'q2', lockGateIds: [' gate-a '] },
-        { id: 'q3', lockGateIds: null },
-      ],
-    })).toMatchObject({
+    expect(
+      buildCreateSurveyStandaloneToggleState({
+        isStandaloneQuestion: true,
+        surveyLockGateIds: [' survey-gate '],
+        questions: [
+          { id: 'q1', lockGateIds: [] },
+          { id: 'q2', lockGateIds: [' gate-a '] },
+          { id: 'q3', lockGateIds: null },
+        ],
+      }),
+    ).toMatchObject({
       isStandaloneQuestion: false,
       surveyLockGateIds: ['survey-gate'],
       questions: [
@@ -258,10 +269,10 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
 
     expect(surveyPlan.defaultSubmitGateIds).toEqual(['default-gate']);
     expect(surveyPlan.resolvedSurveyLockGateIds).toEqual(['default-gate']);
-    expect(surveyPlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: null }))
-      .toEqual(['default-gate']);
-    expect(surveyPlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: [' question-gate ', 'missing-gate'] }))
-      .toEqual(['question-gate']);
+    expect(surveyPlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: null })).toEqual(['default-gate']);
+    expect(
+      surveyPlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: [' question-gate ', 'missing-gate'] }),
+    ).toEqual(['question-gate']);
     expect(surveyPlan.needsLit).toBe(true);
 
     const standalonePlan = buildCreateSurveySubmitGatePlan({
@@ -280,14 +291,14 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
     });
 
     expect(standalonePlan.resolvedSurveyLockGateIds).toEqual([]);
-    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: [] }))
-      .toEqual(['default-gate']);
-    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q1-public', lockGateIds: [], lockGateIdsTouched: true }))
-      .toEqual([]);
-    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q-missing-lock' }))
-      .toEqual(['default-gate']);
-    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: ['question-gate'] }))
-      .toEqual(['question-gate']);
+    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: [] })).toEqual(['default-gate']);
+    expect(
+      standalonePlan.resolveQuestionSubmitGateIds({ id: 'q1-public', lockGateIds: [], lockGateIdsTouched: true }),
+    ).toEqual([]);
+    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q-missing-lock' })).toEqual(['default-gate']);
+    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: ['question-gate'] })).toEqual([
+      'question-gate',
+    ]);
     expect(standalonePlan.needsLit).toBe(true);
   });
 
@@ -347,20 +358,16 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
       sessionLabel: 'FOR TEST 12',
     });
     expect(surveyOptions.defaultGateId).toBe('survey_gate');
-    expect(surveyOptions.gateOptions.map((option) => option.id)).toEqual([
-      'default_gate',
-      'survey_gate',
-    ]);
+    expect(surveyOptions.gateOptions.map((option) => option.id)).toEqual(['default_gate', 'survey_gate']);
     expect(surveyOptions.gateOptions.map((option) => option.displayLabel)).toEqual([
       'FOR TEST 12 (default)',
       'FOR TEST 12 (survey)',
     ]);
-    expect(surveyOptions.gateOptions.find((option) => option.id === 'survey_gate'))
-      .toMatchObject({
-        mode: 'all',
-        resourceKey: 'surveyResponses',
-        sbtAddress: '0x1111111111111111111111111111111111111111',
-      });
+    expect(surveyOptions.gateOptions.find((option) => option.id === 'survey_gate')).toMatchObject({
+      mode: 'all',
+      resourceKey: 'surveyResponses',
+      sbtAddress: '0x1111111111111111111111111111111111111111',
+    });
 
     const standaloneOptions = buildCreateSurveyGateOptions({
       cfg,
@@ -368,10 +375,7 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
       sessionLabel: 'FOR TEST 12',
     });
     expect(standaloneOptions.defaultGateId).toBe('question_gate');
-    expect(standaloneOptions.gateOptions.map((option) => option.id)).toEqual([
-      'default_gate',
-      'question_gate',
-    ]);
+    expect(standaloneOptions.gateOptions.map((option) => option.id)).toEqual(['default_gate', 'question_gate']);
     expect(standaloneOptions.gateOptions.map((option) => option.displayLabel)).toEqual([
       'FOR TEST 12 (default)',
       'FOR TEST 12 (questions)',
@@ -384,17 +388,15 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
     const missingId = { prompt: 'Missing id' };
     const secondMissingId = { prompt: 'Second missing id' };
 
-    expect(removeDuplicateCreateSurveyQuestions([
-      first,
-      { id: 'q2', prompt: 'Second' },
-      duplicate,
-      missingId,
-      secondMissingId,
-    ])).toEqual([
-      first,
-      { id: 'q2', prompt: 'Second' },
-      missingId,
-    ]);
+    expect(
+      removeDuplicateCreateSurveyQuestions([
+        first,
+        { id: 'q2', prompt: 'Second' },
+        duplicate,
+        missingId,
+        secondMissingId,
+      ]),
+    ).toEqual([first, { id: 'q2', prompt: 'Second' }, missingId]);
     expect(removeDuplicateCreateSurveyQuestions([])).toEqual([]);
   });
 });
@@ -438,21 +440,20 @@ describe('createQuestionsAndSurveysHelpers survey signatures', () => {
     }));
     const scriptUrl = ['java', 'script:alert(1)'].join('');
 
-    expect(buildCreateSurveyHashValue({
-      digest,
-      documentURLs: [
-        ' https://docs.example/a ',
-        'HTTPS://docs.example/a',
-        '/local/doc',
-        scriptUrl,
-      ],
-      title: 'Survey title',
-    })).toBe('0xdigest:{"title":"Survey title","documentURLs":["https://docs.example/a","/local/doc"]}');
+    expect(
+      buildCreateSurveyHashValue({
+        digest,
+        documentURLs: [' https://docs.example/a ', 'HTTPS://docs.example/a', '/local/doc', scriptUrl],
+        title: 'Survey title',
+      }),
+    ).toBe('0xdigest:{"title":"Survey title","documentURLs":["https://docs.example/a","/local/doc"]}');
 
-    expect(digest).toHaveBeenCalledWith(JSON.stringify({
-      title: 'Survey title',
-      documentURLs: ['https://docs.example/a', '/local/doc'],
-    }));
+    expect(digest).toHaveBeenCalledWith(
+      JSON.stringify({
+        title: 'Survey title',
+        documentURLs: ['https://docs.example/a', '/local/doc'],
+      }),
+    );
   });
 
   it('keeps standalone question mode hashless without calling the digest', () => {
@@ -460,11 +461,13 @@ describe('createQuestionsAndSurveysHelpers survey signatures', () => {
       toString: () => `digest:${value}`,
     }));
 
-    expect(buildCreateSurveyHashValue({
-      digest,
-      isStandaloneQuestion: true,
-      title: 'Standalone prompt',
-    })).toBe('');
+    expect(
+      buildCreateSurveyHashValue({
+        digest,
+        isStandaloneQuestion: true,
+        title: 'Standalone prompt',
+      }),
+    ).toBe('');
     expect(digest).not.toHaveBeenCalled();
   });
 });

@@ -46,9 +46,7 @@ export interface CanDecryptContext {
 }
 
 export type CanDecryptPreCheckResult =
-  | { earlyExit: true; status: 'needs-wallet' }
-  | { earlyExit: true; status: 'no-gate' }
-  | { earlyExit: false };
+  { earlyExit: true; status: 'needs-wallet' } | { earlyExit: true; status: 'no-gate' } | { earlyExit: false };
 
 export interface ResolveCanDecryptGateAccessParams {
   cfg: CanDecryptSessionConfig | null;
@@ -64,9 +62,7 @@ export type CheckAccessFn = (params: {
   resourceKey: string;
 }) => Promise<{ status: string }>;
 
-export const buildCanDecryptContext = (
-  inputs: CanDecryptContextInputs,
-): CanDecryptContext => {
+export const buildCanDecryptContext = (inputs: CanDecryptContextInputs): CanDecryptContext => {
   const slug = inputs.getEffectiveDraftSlug() || inputs.resolveEffectiveSlugFromProps();
   const cfg = inputs.resolveEffectiveResponseGateConfig(slug);
   const policy = inputs.getResponseGatePolicy();
@@ -84,9 +80,7 @@ export const buildCanDecryptContext = (
   return { slug, cfg, policy, snapshot };
 };
 
-export const evaluateCanDecryptPreCheck = (
-  snapshot: CanDecryptSnapshot,
-): CanDecryptPreCheckResult => {
+export const evaluateCanDecryptPreCheck = (snapshot: CanDecryptSnapshot): CanDecryptPreCheckResult => {
   if (!snapshot.loggedIn) {
     return { earlyExit: true, status: 'needs-wallet' };
   }
@@ -102,12 +96,14 @@ export const resolveCanDecryptGateAccess = async (
 ): Promise<{ canDecrypt: boolean; status: string }> => {
   const verdicts: Array<{ status: string }> = [];
   for (const resourceKey of params.resourceKeysToCheck) {
-    verdicts.push(await checkAccess({
-      sessionConfig: params.cfg,
-      sessionSlug: params.slug,
-      account: params.account,
-      resourceKey,
-    }));
+    verdicts.push(
+      await checkAccess({
+        sessionConfig: params.cfg,
+        sessionSlug: params.slug,
+        account: params.account,
+        resourceKey,
+      }),
+    );
   }
 
   return resolveCanDecryptOtherResponsesVerdict(verdicts);

@@ -1,23 +1,24 @@
-const createDefaultFetchMock = () => jest.fn(async (url) => {
-  const normalizedUrl = String(url);
-  if (
-    normalizedUrl === 'test-file-stub' ||
-    normalizedUrl.includes('sessionCorsWorker') ||
-    normalizedUrl.endsWith('.txt')
-  ) {
+const createDefaultFetchMock = () =>
+  jest.fn(async (url) => {
+    const normalizedUrl = String(url);
+    if (
+      normalizedUrl === 'test-file-stub' ||
+      normalizedUrl.includes('sessionCorsWorker') ||
+      normalizedUrl.endsWith('.txt')
+    ) {
+      return {
+        ok: true,
+        text: async () => 'export default { fetch() { return new Response("ok"); } };',
+        headers: { get: jest.fn(() => 'application/javascript') },
+      };
+    }
     return {
       ok: true,
-      text: async () => 'export default { fetch() { return new Response("ok"); } };',
-      headers: { get: jest.fn(() => 'application/javascript') },
+      json: async () => ({ ok: true }),
+      text: async () => '',
+      headers: { get: jest.fn(() => 'application/json') },
     };
-  }
-  return {
-    ok: true,
-    json: async () => ({ ok: true }),
-    text: async () => '',
-    headers: { get: jest.fn(() => 'application/json') },
-  };
-});
+  });
 
 const buildDecryptedSponsoredBundle = (overrides = {}) => {
   const base = {
@@ -56,30 +57,34 @@ const seedWizardCache = ({
   deployComplete = false,
   deployWorkerUrl = '',
 } = {}) => {
-  localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-    draft: {
-      ai: {
-        models: {
-          fast: { provider: 'openrouter', model: 'test-fast' },
-          thinking: { provider: 'anthropic', model: 'test-thinking' },
+  localStorage.setItem(
+    'ce:sessionWizardDraft:v1',
+    JSON.stringify({
+      draft: {
+        ai: {
+          models: {
+            fast: { provider: 'openrouter', model: 'test-fast' },
+            thinking: { provider: 'anthropic', model: 'test-thinking' },
+          },
         },
+        ...draft,
       },
-      ...draft,
-    },
-    workerSecrets,
-    workerSecretsEnabled,
-    persistWorkerSecrets,
-    deployComplete,
-    deployWorkerUrl,
-  }));
+      workerSecrets,
+      workerSecretsEnabled,
+      persistWorkerSecrets,
+      deployComplete,
+      deployWorkerUrl,
+    }),
+  );
 };
 
-const buildEnvelope = () => JSON.stringify({
-  type: 'contextengine-sponsored-bundle',
-  version: 1,
-  cipher: 'password-aes-gcm',
-  encryptedData: 'encrypted-base64',
-});
+const buildEnvelope = () =>
+  JSON.stringify({
+    type: 'contextengine-sponsored-bundle',
+    version: 1,
+    cipher: 'password-aes-gcm',
+    encryptedData: 'encrypted-base64',
+  });
 
 const createDeferred = () => {
   let resolve;
@@ -91,7 +96,7 @@ const createDeferred = () => {
   return { promise, resolve, reject };
 };
 
-const buildMockContractViewerContracts = ({ sessionContracts = {} } = {}) => (
+const buildMockContractViewerContracts = ({ sessionContracts = {} } = {}) =>
   Object.keys(sessionContracts).map((contractKey) => ({
     key: contractKey,
     name:
@@ -113,15 +118,16 @@ const buildMockContractViewerContracts = ({ sessionContracts = {} } = {}) => (
             : 'Contract.sol',
     source: `contract ${contractKey} {}`,
     addresses: sessionContracts[contractKey]?.address
-      ? [{
-          address: sessionContracts[contractKey].address,
-          id: sessionContracts[contractKey].chainId || 84532,
-          testnet: true,
-          explorerUrl: `https://example.example.test/${contractKey}`,
-        }]
+      ? [
+          {
+            address: sessionContracts[contractKey].address,
+            id: sessionContracts[contractKey].chainId || 84532,
+            testnet: true,
+            explorerUrl: `https://example.example.test/${contractKey}`,
+          },
+        ]
       : [],
-  }))
-);
+  }));
 
 export {
   buildDecryptedSponsoredBundle,

@@ -7,11 +7,7 @@
  * Key exports: normalizeArweaveUrl, parseArweaveTxId, isArweaveTxId, arweaveUrlUtils
  */
 import { arweaveScripts } from './arweaveScripts.js';
-import {
-  ARWEAVE_GATEWAY_URL,
-  CE_ARWEAVE_AR_IO_URL,
-  CE_ARWEAVE_DIRECT_TO_AR_IO,
-} from '../../variables/appConfig.js';
+import { ARWEAVE_GATEWAY_URL, CE_ARWEAVE_AR_IO_URL, CE_ARWEAVE_DIRECT_TO_AR_IO } from '../../variables/appConfig.js';
 import {
   ARWEAVE_DEFAULT_GATEWAY_CANDIDATES,
   ARWEAVE_GATEWAY_EXACT_HOSTS,
@@ -22,20 +18,18 @@ import { createLogger } from '../logging.js';
 
 const log = createLogger('arweaveUrls');
 
-
 const ARWEAVE_TXID_RE = /^[a-z0-9_-]{43}$/i;
-export const DEFAULT_ARWEAVE_LINK_GATEWAY = toStr(ARWEAVE_DEFAULT_GATEWAY_CANDIDATES?.[0]).trim() || 'https://arweave.net';
+export const DEFAULT_ARWEAVE_LINK_GATEWAY =
+  toStr(ARWEAVE_DEFAULT_GATEWAY_CANDIDATES?.[0]).trim() || 'https://arweave.net';
 export const DEFAULT_AR_IO_GATEWAY = 'https://ar-io.dev';
 
 const KNOWN_GATEWAY_EXACT_HOST_SET = new Set(
   (Array.isArray(ARWEAVE_GATEWAY_EXACT_HOSTS) ? ARWEAVE_GATEWAY_EXACT_HOSTS : [])
     .map((host) => toStr(host).trim().toLowerCase())
-    .filter(Boolean)
+    .filter(Boolean),
 );
 
-const KNOWN_GATEWAY_HOST_SUFFIXES = (
-  Array.isArray(ARWEAVE_GATEWAY_HOST_SUFFIXES) ? ARWEAVE_GATEWAY_HOST_SUFFIXES : []
-)
+const KNOWN_GATEWAY_HOST_SUFFIXES = (Array.isArray(ARWEAVE_GATEWAY_HOST_SUFFIXES) ? ARWEAVE_GATEWAY_HOST_SUFFIXES : [])
   .map((suffix) => toStr(suffix).trim().toLowerCase())
   .filter(Boolean);
 
@@ -47,17 +41,18 @@ export const isArweaveGatewayHost = (hostRaw: unknown): boolean => {
 };
 
 export const readArweaveTxIdFromPathSegments = (segments: unknown[] = []): string => {
-  const parts = Array.isArray(segments)
-    ? segments.map((segment) => toStr(segment).trim()).filter(Boolean)
-    : [];
+  const parts = Array.isArray(segments) ? segments.map((segment) => toStr(segment).trim()).filter(Boolean) : [];
   if (!parts.length) return '';
   const directCandidate = parts[parts.length - 1] || '';
   if (ARWEAVE_TXID_RE.test(directCandidate)) return directCandidate;
-  const maybeTxDataRoute = (
+  const maybeTxDataRoute =
     parts.length >= 3 &&
-    toStr(parts[parts.length - 3]).trim().toLowerCase() === 'tx' &&
-    toStr(parts[parts.length - 1]).trim().toLowerCase() === 'data'
-  );
+    toStr(parts[parts.length - 3])
+      .trim()
+      .toLowerCase() === 'tx' &&
+    toStr(parts[parts.length - 1])
+      .trim()
+      .toLowerCase() === 'data';
   if (!maybeTxDataRoute) return '';
   const txDataCandidate = parts[parts.length - 2] || '';
   return ARWEAVE_TXID_RE.test(txDataCandidate) ? txDataCandidate : '';
@@ -126,7 +121,9 @@ export const isDirectToArIoEnabled = (opts: { directToArIo?: boolean } = {}): bo
     if (typeof globalThis !== 'undefined' && typeof runtimeGlobal.CE_ARWEAVE_DIRECT_TO_AR_IO !== 'undefined') {
       return normalizeBoolish(runtimeGlobal.CE_ARWEAVE_DIRECT_TO_AR_IO, !!CE_ARWEAVE_DIRECT_TO_AR_IO);
     }
-  } catch (e) { void e; /* fallback to static config. */ }
+  } catch (e) {
+    void e; /* fallback to static config. */
+  }
   return !!CE_ARWEAVE_DIRECT_TO_AR_IO;
 };
 
@@ -139,30 +136,29 @@ export const getRuntimeArIoGatewayOverride = (): string => {
   }
 };
 
-export const getPreferredArIoGateway = (gatewayOverride: unknown = ''): string => (
+export const getPreferredArIoGateway = (gatewayOverride: unknown = ''): string =>
   normalizeGatewayBase(gatewayOverride) ||
   getRuntimeArIoGatewayOverride() ||
   normalizeGatewayBase(CE_ARWEAVE_AR_IO_URL) ||
-  DEFAULT_AR_IO_GATEWAY
-);
+  DEFAULT_AR_IO_GATEWAY;
 
-export const getPreferredArweaveGateway = (gatewayOverride: unknown = ''): string => (
+export const getPreferredArweaveGateway = (gatewayOverride: unknown = ''): string =>
   normalizeGatewayBase(gatewayOverride) ||
   getRuntimeArweaveGatewayOverride() ||
   (isDirectToArIoEnabled() ? getPreferredArIoGateway() : '') ||
   normalizeGatewayBase(ARWEAVE_GATEWAY_URL) ||
-  DEFAULT_ARWEAVE_LINK_GATEWAY
-);
+  DEFAULT_ARWEAVE_LINK_GATEWAY;
 
-export const getDefaultArweaveGateways = (opts: { directToArIo?: boolean; arIoGateway?: unknown; gateway?: unknown } = {}): string[] => (
+export const getDefaultArweaveGateways = (
+  opts: { directToArIo?: boolean; arIoGateway?: unknown; gateway?: unknown } = {},
+): string[] =>
   isDirectToArIoEnabled(opts)
     ? normalizeGatewayList([getPreferredArIoGateway(opts?.arIoGateway)])
     : normalizeGatewayList([
-      getPreferredArweaveGateway(opts?.gateway),
-      ...getRuntimeArweaveGatewayFallbacks(),
-      ...ARWEAVE_DEFAULT_GATEWAY_CANDIDATES,
-    ])
-);
+        getPreferredArweaveGateway(opts?.gateway),
+        ...getRuntimeArweaveGatewayFallbacks(),
+        ...ARWEAVE_DEFAULT_GATEWAY_CANDIDATES,
+      ]);
 
 export const isArweaveTxId = (value: unknown): boolean => ARWEAVE_TXID_RE.test(toStr(value).trim());
 
@@ -174,7 +170,7 @@ export const parseArweaveTxId = (
   }: {
     allowQueryParams?: boolean;
     allowUnknownGatewayHost?: boolean;
-  } = {}
+  } = {},
 ): string => {
   const raw = toStr(value).trim();
   if (!raw) return '';
@@ -190,11 +186,7 @@ export const parseArweaveTxId = (
     const segments = parsed.pathname.split('/').filter(Boolean);
     const candidate = readArweaveTxIdFromPathSegments(segments);
     const queryCandidate = allowQueryParams
-      ? toStr(
-        parsed.searchParams?.get?.('tx') ||
-        parsed.searchParams?.get?.('id') ||
-        ''
-      ).trim()
+      ? toStr(parsed.searchParams?.get?.('tx') || parsed.searchParams?.get?.('id') || '').trim()
       : '';
 
     if (isArweaveGatewayHost(host)) {
@@ -206,7 +198,9 @@ export const parseArweaveTxId = (
       if (isArweaveTxId(candidate)) return candidate;
       if (isArweaveTxId(queryCandidate)) return queryCandidate;
     }
-  } catch (e) { log.warn('arweaveUrls: fallback', e); }
+  } catch (e) {
+    log.warn('arweaveUrls: fallback', e);
+  }
 
   return isArweaveTxId(raw) ? raw : '';
 };
@@ -215,10 +209,13 @@ export const parseArweaveTxId = (
 // Otherwise return the original value unchanged.
 export const normalizeArweaveUrl = (
   value: unknown,
-  { gateway = '', contextLabel = 'ui_media' }: {
+  {
+    gateway = '',
+    contextLabel = 'ui_media',
+  }: {
     gateway?: unknown;
     contextLabel?: unknown;
-  } = {}
+  } = {},
 ): string => {
   const raw = toStr(value).trim();
   if (!raw) return '';
@@ -227,23 +224,29 @@ export const normalizeArweaveUrl = (
   try {
     if (arweaveScripts && typeof arweaveScripts.registerTxContext === 'function') {
       arweaveScripts.registerTxContext(txId, {
-        category: String(contextLabel || 'ui_media').trim().toLowerCase() || 'ui_media',
+        category:
+          String(contextLabel || 'ui_media')
+            .trim()
+            .toLowerCase() || 'ui_media',
         caller: 'normalizeArweaveUrl',
         source: 'ui_resource',
       });
     }
-  } catch (e) { log.warn('arweaveUrls: fallback', e); }
+  } catch (e) {
+    log.warn('arweaveUrls: fallback', e);
+  }
   const base = getPreferredArweaveGateway(gateway);
   return `${base}/${txId}`;
 };
 
-export const buildArweaveGatewayUrl = (value: unknown, options: { gateway?: unknown; contextLabel?: unknown } = {}): string => (
-  normalizeArweaveUrl(value, options)
-);
+export const buildArweaveGatewayUrl = (
+  value: unknown,
+  options: { gateway?: unknown; contextLabel?: unknown } = {},
+): string => normalizeArweaveUrl(value, options);
 
 export const buildArweaveGatewayUrlCandidates = (
   value: unknown,
-  { gateway = '' }: { gateway?: unknown } = {}
+  { gateway = '' }: { gateway?: unknown } = {},
 ): string[] => {
   const raw = toStr(value).trim();
   if (!raw) return [];

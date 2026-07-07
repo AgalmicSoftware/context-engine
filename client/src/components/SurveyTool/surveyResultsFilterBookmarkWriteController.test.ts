@@ -1,6 +1,4 @@
-import {
-  runSurveyResultsFilterBookmarkWriteController,
-} from './surveyResultsFilterBookmarkWriteController';
+import { runSurveyResultsFilterBookmarkWriteController } from './surveyResultsFilterBookmarkWriteController';
 
 describe('surveyResultsFilterBookmarkWriteController', () => {
   it('dispatches one injected filter bookmark write and returns a plain success result', async () => {
@@ -45,23 +43,25 @@ describe('surveyResultsFilterBookmarkWriteController', () => {
   it('does not write when the plan is blocked or missing a payload', async () => {
     const writeFilterBookmark = jest.fn();
 
-    await expect(runSurveyResultsFilterBookmarkWriteController({
-      plan: {
-        blockedReason: 'unmounted',
-        bookmarkedFiltersInvalid: false,
-        payload: null,
-        shouldReadCache: false,
-        shouldWrite: false,
-        successFeedback: false,
-        target: {
-          namespace: 'filters',
-          slug: 'edge',
+    await expect(
+      runSurveyResultsFilterBookmarkWriteController({
+        plan: {
+          blockedReason: 'unmounted',
+          bookmarkedFiltersInvalid: false,
+          payload: null,
+          shouldReadCache: false,
+          shouldWrite: false,
+          successFeedback: false,
+          target: {
+            namespace: 'filters',
+            slug: 'edge',
+          },
         },
-      },
-      ports: {
-        writeFilterBookmark,
-      },
-    })).resolves.toEqual({
+        ports: {
+          writeFilterBookmark,
+        },
+      }),
+    ).resolves.toEqual({
       attempted: false,
       error: null,
       ok: false,
@@ -74,23 +74,25 @@ describe('surveyResultsFilterBookmarkWriteController', () => {
     });
     expect(writeFilterBookmark).not.toHaveBeenCalled();
 
-    await expect(runSurveyResultsFilterBookmarkWriteController({
-      plan: {
-        blockedReason: '',
-        bookmarkedFiltersInvalid: false,
-        payload: null,
-        shouldReadCache: true,
-        shouldWrite: true,
-        successFeedback: true,
-        target: {
-          namespace: 'filters',
-          slug: 'edge',
+    await expect(
+      runSurveyResultsFilterBookmarkWriteController({
+        plan: {
+          blockedReason: '',
+          bookmarkedFiltersInvalid: false,
+          payload: null,
+          shouldReadCache: true,
+          shouldWrite: true,
+          successFeedback: true,
+          target: {
+            namespace: 'filters',
+            slug: 'edge',
+          },
         },
-      },
-      ports: {
-        writeFilterBookmark,
-      },
-    })).resolves.toEqual({
+        ports: {
+          writeFilterBookmark,
+        },
+      }),
+    ).resolves.toEqual({
       attempted: false,
       error: null,
       ok: false,

@@ -29,10 +29,7 @@ import { litStorage } from '../crypto/litProtocol.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { normalizeSessionNaming, stripAuthoritativeSessionGateFields } from '../session/sessionMetadata.js';
 import { overlayCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
-import {
-  mergeSessionContractMaps,
-  validateRegistrySessionSlugForWrite,
-} from '../session/sessionNaming.js';
+import { mergeSessionContractMaps, validateRegistrySessionSlugForWrite } from '../session/sessionNaming.js';
 import { toStr } from '../shared/primitives.js';
 import { createLogger } from '../logging.js';
 import { wrapEthersJsonRpcSend } from './rpcReadCache.js';
@@ -90,7 +87,7 @@ const REGISTRY_SESSION_LOAD_CONCURRENCY = 4;
 const mapWithConcurrency = async <T, R>(
   items: T[] = [],
   limitIn: number = 4,
-  mapper: (item: T, index: number) => Promise<R>
+  mapper: (item: T, index: number) => Promise<R>,
 ): Promise<R[]> => {
   const results = new Array<R>(items.length);
   const limit = Math.max(1, Math.min(items.length || 1, Math.floor(Number(limitIn) || 1)));
@@ -118,11 +115,12 @@ const SPONSORED_FIELD_KEY_SET = new Set(Object.values(SPONSORED_FIELD_KEYS));
 // Dynamic functions accept input size and scale linearly.
 const REGISTRY_GAS_FALLBACKS = {
   createSession: 550_000,
-  setSessionFields: (numFields: number) => 250_000 + (50_000 * Math.max(numFields, 1)),
+  setSessionFields: (numFields: number) => 250_000 + 50_000 * Math.max(numFields, 1),
   setSessionField: 300_000,
   updateSessionMetadata: 350_000,
-  setResourceGates: (numGates: number, totalSbtAddresses = 0) => 300_000 + (150_000 * Math.max(numGates, 1)) + (30_000 * Math.max(totalSbtAddresses, 0)),
-  setResourceGate: (numSbtAddresses = 1) => 300_000 + (150_000 * Math.max(numSbtAddresses, 1)),
+  setResourceGates: (numGates: number, totalSbtAddresses = 0) =>
+    300_000 + 150_000 * Math.max(numGates, 1) + 30_000 * Math.max(totalSbtAddresses, 0),
+  setResourceGate: (numSbtAddresses = 1) => 300_000 + 150_000 * Math.max(numSbtAddresses, 1),
   default: 1_000_000,
 };
 const REGISTRY_GAS_BUFFER_PERCENT = 20;
@@ -132,15 +130,13 @@ const isExecutionRevert = (err: unknown) => {
   if (!err) return false;
   const code = String(error?.code || error?.error?.code || '').toUpperCase();
   if (code === 'CALL_EXCEPTION') return true;
-  const msg = String(error?.shortMessage || error?.message || error?.error?.message || error?.data?.message || '').toLowerCase();
+  const msg = String(
+    error?.shortMessage || error?.message || error?.error?.message || error?.data?.message || '',
+  ).toLowerCase();
   return msg.includes('execution reverted') || msg.includes('always failing transaction') || msg.includes('panic code');
 };
 
-const DEFAULT_FIELDS = [
-  'corsWorkerUrl',
-  'rpcUrl',
-  ...Object.values(SPONSORED_FIELD_KEYS),
-];
+const DEFAULT_FIELDS = ['corsWorkerUrl', 'rpcUrl', ...Object.values(SPONSORED_FIELD_KEYS)];
 const FIELD_PATHS = {
   corsWorkerUrl: ['corsWorkerUrl'],
   rpcUrl: ['rpc', 'providers', 'path', 'rpcUrl'],
@@ -162,7 +158,9 @@ const notifySessionRegistryCacheUpdated = () => {
   if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
   try {
     window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
-  } catch (e) { surveysLog.warn('sessionRegistry: telemetry', e); }
+  } catch (e) {
+    surveysLog.warn('sessionRegistry: telemetry', e);
+  }
 };
 
 const normalizeSessionIdHex = (raw: unknown) => {
@@ -212,7 +210,7 @@ const buildGateSnapshot = (gatesByResource: RegistryGateMap = {}) => {
   DEFAULT_RESOURCES.forEach((resourceKey) => {
     const gate = gatesByResource?.[resourceKey];
     snapshot[resourceKey] = {
-      lookupStatus: didGateLookupSucceed(gate) ? 'ok' : (toStr(gate?.lookupStatus).trim() || 'unavailable'),
+      lookupStatus: didGateLookupSucceed(gate) ? 'ok' : toStr(gate?.lookupStatus).trim() || 'unavailable',
       sbtAddresses: Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses.filter(Boolean) : [],
       chainId: Number(gate?.chainId || 0) || null,
       mode: normalizeGateMode(gate?.mode),
@@ -230,18 +228,16 @@ const resolveBufferedGasLimit = (estimateValue: ethers.BigNumberish, fallbackGas
   return bufferedGasLimit.lt(fallback) ? fallback : bufferedGasLimit;
 };
 
-const isNonZeroBigNumber = (value: unknown): value is ethers.BigNumber => ethers.BigNumber.isBigNumber(value) && value.gt(0);
+const isNonZeroBigNumber = (value: unknown): value is ethers.BigNumber =>
+  ethers.BigNumber.isBigNumber(value) && value.gt(0);
 
-const hasExplicitTxFeeOverrides = (overrides: TxFeeOverrides | null = null) => (
+const hasExplicitTxFeeOverrides = (overrides: TxFeeOverrides | null = null) =>
   isNonZeroBigNumber(overrides?.gasPrice) ||
   isNonZeroBigNumber(overrides?.maxFeePerGas) ||
-  ethers.BigNumber.isBigNumber(overrides?.maxPriorityFeePerGas)
-);
+  ethers.BigNumber.isBigNumber(overrides?.maxPriorityFeePerGas);
 
-const hasExplicitEip1559TxFeeOverrides = (overrides: TxFeeOverrides | null = null) => (
-  isNonZeroBigNumber(overrides?.maxFeePerGas) &&
-  ethers.BigNumber.isBigNumber(overrides?.maxPriorityFeePerGas)
-);
+const hasExplicitEip1559TxFeeOverrides = (overrides: TxFeeOverrides | null = null) =>
+  isNonZeroBigNumber(overrides?.maxFeePerGas) && ethers.BigNumber.isBigNumber(overrides?.maxPriorityFeePerGas);
 
 const extractRpcFeeOverrides = (feeData: ethers.providers.FeeData | null = null): TxFeeOverrides => {
   const maxFeePerGas = feeData?.maxFeePerGas;
@@ -261,11 +257,7 @@ const isMalformedProviderValueError = (err: unknown) => {
   const error = err as AnyRecord;
   if (!err) return false;
   const message = toStr(
-    error?.shortMessage ||
-    error?.reason ||
-    error?.message ||
-    error?.error?.message ||
-    error?.data?.message
+    error?.shortMessage || error?.reason || error?.message || error?.error?.message || error?.data?.message,
   ).toLowerCase();
   if (!message) return false;
   if (message.includes('invalid bignumber value') && message.includes('value=null')) return true;
@@ -293,9 +285,7 @@ const resolveRpcTxFeeOverrides = async ({ chainId } = {} as AnyRecord): Promise<
       let feeOverrides: TxFeeOverrides = {};
       try {
         feeOverrides = extractRpcFeeOverrides(
-          typeof provider.getFeeData === 'function'
-            ? await provider.getFeeData()
-            : null,
+          typeof provider.getFeeData === 'function' ? await provider.getFeeData() : null,
         );
       } catch (_) {
         feeOverrides = {};
@@ -318,10 +308,7 @@ const resolveRpcTxFeeOverrides = async ({ chainId } = {} as AnyRecord): Promise<
   return {};
 };
 
-const resolveRpcPendingNonce = async ({
-  chainId,
-  address,
-} = {} as AnyRecord): Promise<number | null> => {
+const resolveRpcPendingNonce = async ({ chainId, address } = {} as AnyRecord): Promise<number | null> => {
   const id = Number(chainId || 0) || 0;
   const normalizedAddress = toStr(address).trim();
   if (!id || !ethers.utils.isAddress(normalizedAddress)) return null;
@@ -402,7 +389,9 @@ const collectErrorText = (err: unknown, depth = 0) => {
 
 const isNonceError = (err: unknown) => {
   const msg = collectErrorText(err).toLowerCase();
-  return msg.includes('nonce') && (msg.includes('too low') || msg.includes('already been used') || msg.includes('expired'));
+  return (
+    msg.includes('nonce') && (msg.includes('too low') || msg.includes('already been used') || msg.includes('expired'))
+  );
 };
 
 const extractNextNonceFromError = (err: unknown) => {
@@ -472,10 +461,11 @@ const sendWithNonceRetry = async ({
       const tx = await sendWithGasFallback({
         estimate,
         // eslint-disable-next-line no-loop-func
-        send: (overrides: TxFeeOverrides) => send({
-          ...overrides,
-          ...(nonceOverride != null ? { nonce: nonceOverride } : {}),
-        }),
+        send: (overrides: TxFeeOverrides) =>
+          send({
+            ...overrides,
+            ...(nonceOverride != null ? { nonce: nonceOverride } : {}),
+          }),
         gasLimitOverride,
         txOverrides: resolvedTxOverrides,
         fallbackGasLimit,
@@ -556,13 +546,9 @@ const parseGweiToWei = (value: unknown, label: unknown) => {
   }
 };
 
-const resolveTxFeeOverrides = async ({
-  signer,
-  chainId,
-  gasPriceGwei,
-  maxFeePerGasGwei,
-  maxPriorityFeePerGasGwei,
-} = {} as AnyRecord): Promise<TxFeeOverrides> => {
+const resolveTxFeeOverrides = async (
+  { signer, chainId, gasPriceGwei, maxFeePerGasGwei, maxPriorityFeePerGasGwei } = {} as AnyRecord,
+): Promise<TxFeeOverrides> => {
   const normalizedChainId = Number(chainId || 0) || 0;
   const gasPriceWei = parseGweiToWei(gasPriceGwei, 'gas price');
   if (gasPriceWei) {
@@ -578,9 +564,10 @@ const resolveTxFeeOverrides = async ({
   if (!hasExplicitTxFeeOverrides(suggestedFeeOverrides)) {
     let feeData = null;
     try {
-      feeData = signer?.provider && typeof signer.provider.getFeeData === 'function'
-        ? await signer.provider.getFeeData()
-        : null;
+      feeData =
+        signer?.provider && typeof signer.provider.getFeeData === 'function'
+          ? await signer.provider.getFeeData()
+          : null;
     } catch (_) {
       feeData = null;
     }
@@ -591,10 +578,7 @@ const resolveTxFeeOverrides = async ({
     if (hasExplicitTxFeeOverrides(suggestedFeeOverrides)) {
       return suggestedFeeOverrides;
     }
-    const chainFallbackGasPriceWei = parseGweiToWei(
-      getDefaultGasPriceGwei(normalizedChainId),
-      'gas price'
-    );
+    const chainFallbackGasPriceWei = parseGweiToWei(getDefaultGasPriceGwei(normalizedChainId), 'gas price');
     return chainFallbackGasPriceWei ? { gasPrice: chainFallbackGasPriceWei } : {};
   }
 
@@ -693,9 +677,7 @@ const getReadProviderForChain = (chainId: unknown, opts: { bootstrapRpc?: boolea
   const pathUrl = toStr(getPathRpcUrl(id)).trim();
 
   const merged = normalizeRpcUrlList([...(publicUrls || []), ...(defaultUrls || [])]);
-  const urls = (opts.bootstrapRpc && pathUrl)
-    ? merged.filter((url) => url !== pathUrl)
-    : merged;
+  const urls = opts.bootstrapRpc && pathUrl ? merged.filter((url) => url !== pathUrl) : merged;
 
   const ordered = urls.length
     ? urls
@@ -738,27 +720,21 @@ const getOrderedRegistryRpcUrls = (chainId: unknown, opts: { bootstrapRpc?: bool
   const defaultUrls = Array.isArray(chain?.rpcUrls?.default?.http) ? chain.rpcUrls.default.http : [];
   const pathUrl = toStr(getPathRpcUrl(id)).trim();
   const merged = normalizeRpcUrlList([...(publicUrls || []), ...(defaultUrls || [])]);
-  const urls = (opts.bootstrapRpc && pathUrl)
-    ? merged.filter((url) => url !== pathUrl)
-    : merged;
+  const urls = opts.bootstrapRpc && pathUrl ? merged.filter((url) => url !== pathUrl) : merged;
   return urls.length
     ? urls
     : normalizeRpcUrlList([opts.bootstrapRpc ? resolveBootstrapRpcUrl(id) : getDefaultHttpRpc(id)].filter(Boolean));
 };
 
-const readRegistryMethodWithRpcFallback = async ({
-  chainId,
-  registryAddress,
-  method,
-  args = [],
-  contract = null,
-} = {} as {
-  chainId?: unknown;
-  registryAddress?: string;
-  method?: string;
-  args?: unknown[];
-  contract?: AnyRecord | null;
-}): Promise<any> => {
+const readRegistryMethodWithRpcFallback = async (
+  { chainId, registryAddress, method, args = [], contract = null } = {} as {
+    chainId?: unknown;
+    registryAddress?: string;
+    method?: string;
+    args?: unknown[];
+    contract?: AnyRecord | null;
+  },
+): Promise<any> => {
   const callArgs = Array.isArray(args) ? args : [];
   let lastError: unknown = null;
   const methodName = method as string;
@@ -814,7 +790,7 @@ const getRegistryContract = (
 
 const getWriteContextFromProviderLike = (providerLike: unknown) => {
   const signingProvider = cryptoUtils._getProvider(
-    (providerLike || 'wagmi') as Parameters<typeof cryptoUtils._getProvider>[0]
+    (providerLike || 'wagmi') as Parameters<typeof cryptoUtils._getProvider>[0],
   ) as AnyRecord;
   if (!signingProvider || typeof signingProvider.request !== 'function') {
     throw new Error('Wallet provider not available.');
@@ -828,39 +804,38 @@ const getWriteContextFromProviderLike = (providerLike: unknown) => {
   };
 };
 
-const toBroadcastTxResponse = ({
-  txHash,
-  receipt,
-} = {} as AnyRecord): TxLike => ({
+const toBroadcastTxResponse = ({ txHash, receipt } = {} as AnyRecord): TxLike => ({
   hash: txHash,
   transactionHash: txHash,
   receipt,
   wait: async () => receipt,
 });
 
-const sendRegistryContractWriteViaProvider = async ({
-  signingProvider,
-  ethersProvider,
-  signer,
-  contract,
-  method,
-  args = [],
-  txOverrides = {},
-  onBroadcastTxHash,
-  rpcFunction = method,
-  revertMessage = `${method} transaction reverted on-chain.`,
-} = {} as {
-  signingProvider?: AnyRecord;
-  ethersProvider?: ethers.providers.Web3Provider;
-  signer?: AnyRecord;
-  contract?: ethers.Contract;
-  method?: string;
-  args?: unknown[];
-  txOverrides?: TxFeeOverrides;
-  onBroadcastTxHash?: ((txHash: unknown) => unknown) | null;
-  rpcFunction?: string;
-  revertMessage?: string;
-}): Promise<TxLike> => {
+const sendRegistryContractWriteViaProvider = async (
+  {
+    signingProvider,
+    ethersProvider,
+    signer,
+    contract,
+    method,
+    args = [],
+    txOverrides = {},
+    onBroadcastTxHash,
+    rpcFunction = method,
+    revertMessage = `${method} transaction reverted on-chain.`,
+  } = {} as {
+    signingProvider?: AnyRecord;
+    ethersProvider?: ethers.providers.Web3Provider;
+    signer?: AnyRecord;
+    contract?: ethers.Contract;
+    method?: string;
+    args?: unknown[];
+    txOverrides?: TxFeeOverrides;
+    onBroadcastTxHash?: ((txHash: unknown) => unknown) | null;
+    rpcFunction?: string;
+    revertMessage?: string;
+  },
+): Promise<TxLike> => {
   const { txHash, receipt } = await sendContractWriteViaProvider({
     signingProvider,
     ethersProvider,
@@ -880,12 +855,13 @@ const describeChainTarget = (chainId: unknown) => {
   const id = Number(chainId || 0) || 0;
   if (!id) return 'the required chain';
   const chain = getChainById(id);
-  return chain?.name
-    ? `${chain.name} (${id})`
-    : `chain ${id}`;
+  return chain?.name ? `${chain.name} (${id})` : `chain ${id}`;
 };
 
-const readSignerChainId = async (signer: AnyRecord | null, ethersProvider: ethers.providers.Web3Provider | null = null) => {
+const readSignerChainId = async (
+  signer: AnyRecord | null,
+  ethersProvider: ethers.providers.Web3Provider | null = null,
+) => {
   try {
     if (typeof signer?.getChainId === 'function') {
       const signerChainId = Number(await signer.getChainId());
@@ -952,12 +928,16 @@ const decodeBase64Utf8 = (raw = '') => {
       for (let i = 0; i < bytes.length; i += 1) out += String.fromCharCode(bytes[i]);
       return decodeURIComponent(escape(out));
     }
-  } catch (e) { void e; /* fallback: base64 decoder compatibility. */ }
+  } catch (e) {
+    void e; /* fallback: base64 decoder compatibility. */
+  }
   try {
     if (typeof Buffer !== 'undefined') {
       return Buffer.from(value, 'base64').toString('utf8');
     }
-  } catch (e) { void e; /* fallback: base64 decoder compatibility. */ }
+  } catch (e) {
+    void e; /* fallback: base64 decoder compatibility. */
+  }
   return '';
 };
 
@@ -1002,7 +982,9 @@ const parseArweaveTxId = (uri: unknown) => {
     const segments = parsed.pathname.split('/').filter(Boolean);
     const candidate = segments[segments.length - 1] || '';
     if (isArweaveGatewayHost(host) && isArweaveTxId(candidate)) return candidate;
-  } catch (e) { surveysLog.warn('sessionRegistry: fallback', e); }
+  } catch (e) {
+    surveysLog.warn('sessionRegistry: fallback', e);
+  }
   const litTx = litStorage.parseLitArweaveUrl(raw);
   if (litTx) return litTx;
   return isArweaveTxId(raw) ? raw : '';
@@ -1113,16 +1095,21 @@ const buildSponsoredFromGates = ({
 
 const normalizeGateMode = (mode: unknown): RegistryGateMode => {
   if (mode === 'all') return 'all';
-  const numeric = typeof mode === 'number'
-    ? mode
-    : (mode && typeof (mode as AnyRecord).toNumber === 'function')
-      ? (mode as AnyRecord).toNumber()
-      : Number(mode);
+  const numeric =
+    typeof mode === 'number'
+      ? mode
+      : mode && typeof (mode as AnyRecord).toNumber === 'function'
+        ? (mode as AnyRecord).toNumber()
+        : Number(mode);
   if (numeric === 1) return 'all';
   return 'any';
 };
 
-const fetchGateForResource = async (contract: AnyRecord, slug: unknown, resourceKey: string): Promise<RegistryGateSnapshot> => {
+const fetchGateForResource = async (
+  contract: AnyRecord,
+  slug: unknown,
+  resourceKey: string,
+): Promise<RegistryGateSnapshot> => {
   try {
     const res = await contract.getResourceGate(slug, resourceKey);
     const sbtAddresses = Array.isArray(res?.[0]) ? (res[0].filter(Boolean) as string[]) : [];
@@ -1163,7 +1150,9 @@ const fetchSessionFields = async (
         if (value) out[key] = value;
       });
       return out;
-    } catch (e) { surveysLog.warn('sessionRegistry: fallback', e); }
+    } catch (e) {
+      surveysLog.warn('sessionRegistry: fallback', e);
+    }
   }
 
   if (typeof contract.getSessionField !== 'function') return {};
@@ -1173,7 +1162,9 @@ const fetchSessionFields = async (
       const value = await contract.getSessionField(slug, key);
       const cleaned = toStr(value || '').trim();
       if (cleaned) out[key] = cleaned;
-    } catch (e) { surveysLog.warn('sessionRegistry: fallback', e); }
+    } catch (e) {
+      surveysLog.warn('sessionRegistry: fallback', e);
+    }
   }
   return out;
 };
@@ -1186,7 +1177,9 @@ const buildSessionConfigFromRegistry = ({
   registryChainId,
   metadataLoadState = 'loaded',
 }: AnyRecord) => {
-  const metadataObj = normalizeSessionNaming(metadata && typeof metadata === 'object' ? { ...metadata } : {}) as AnyRecord;
+  const metadataObj = normalizeSessionNaming(
+    metadata && typeof metadata === 'object' ? { ...metadata } : {},
+  ) as AnyRecord;
   const gateSnapshot = buildGateSnapshot(gatesByResource);
   const hasOnChainGateData = Object.values(gateSnapshot).some((gate) => gate.lookupStatus === 'ok');
 
@@ -1214,11 +1207,8 @@ const buildSessionConfigFromRegistry = ({
   if (registryAddress) {
     chainContracts.sessionRegistry = { address: registryAddress, chainId: resolvedChainId };
   }
-  const metadataContracts: AnyRecord = (
-    metadataObj.contracts && typeof metadataObj.contracts === 'object'
-      ? metadataObj.contracts
-      : {}
-  );
+  const metadataContracts: AnyRecord =
+    metadataObj.contracts && typeof metadataObj.contracts === 'object' ? metadataObj.contracts : {};
   const metadataDefaultedContractKeys = Object.keys(chainContracts).filter((key) => {
     const entry = metadataContracts[key];
     const address = toStr(entry?.address || entry?.contractAddress || '').trim();
@@ -1243,7 +1233,11 @@ const buildSessionConfigFromRegistry = ({
 
   const sponsored = buildSponsoredFromGates({
     gatesByResource: gateSnapshot,
-    defaultProvider: metadataObj?.ai?.models?.fast?.provider || metadataObj?.ai?.models?.thinking?.provider || metadataObj?.ai?.mode || '',
+    defaultProvider:
+      metadataObj?.ai?.models?.fast?.provider ||
+      metadataObj?.ai?.models?.thinking?.provider ||
+      metadataObj?.ai?.mode ||
+      '',
   });
   if (sponsored) {
     nextConfig.sponsored = sponsored;
@@ -1282,11 +1276,9 @@ const mergeSessionFieldsIntoCachedConfig = ({
   registryChainId?: number | string | null;
 }) => {
   const base = normalizeSessionNaming(
-    baseConfig && typeof baseConfig === 'object' ? { ...baseConfig } : {}
+    baseConfig && typeof baseConfig === 'object' ? { ...baseConfig } : {},
   ) as AnyRecord;
-  const registryMeta = base.__registry && typeof base.__registry === 'object'
-    ? base.__registry
-    : {};
+  const registryMeta = base.__registry && typeof base.__registry === 'object' ? base.__registry : {};
   const sessionIdHex = normalizeSessionIdHex(session?.sessionIdHex || session?.sessionId || registryMeta.sessionIdHex);
   const sessionId = formatSessionId(sessionIdHex);
   const networkChainId = Number(session?.chainId || base.networkChainId || registryMeta.chainId || 0) || null;
@@ -1363,20 +1355,17 @@ const addSessionConfigToCache = (cache: RegistryCache | null, config: AnyRecord 
     if (sessionId) cache.sessionsById[sessionId] = config;
   }
 
-  const registryChainId = Number(
-    opts.registryChainId ||
-    config?.__registry?.registryChainId ||
-    config?.__registry?.chainId ||
-    0
-  ) || null;
+  const registryChainId =
+    Number(opts.registryChainId || config?.__registry?.registryChainId || config?.__registry?.chainId || 0) || null;
   if (registryChainId) {
     const chainKey = String(registryChainId);
-    const chainEntry = opts.chainEntry || cache.chains[chainKey] || {
-      registryAddress: resolveRegistryAddress(registryChainId),
-      chainId: registryChainId,
-      sessions: {},
-      sessionsById: {},
-    };
+    const chainEntry = opts.chainEntry ||
+      cache.chains[chainKey] || {
+        registryAddress: resolveRegistryAddress(registryChainId),
+        chainId: registryChainId,
+        sessions: {},
+        sessionsById: {},
+      };
     chainEntry.sessions = chainEntry.sessions || {};
     chainEntry.sessionsById = chainEntry.sessionsById || {};
     chainEntry.sessions[slug] = config;
@@ -1390,15 +1379,16 @@ const addSessionConfigToCache = (cache: RegistryCache | null, config: AnyRecord 
 };
 
 const getCachedSessionRegistryChainId = (config: AnyRecord | null) => {
-  const chainId = Number(
-    config?.__registry?.registryChainId ||
-    config?.__registry?.chainId ||
-    config?.networkChainId ||
-    config?.contracts?.sessionRegistry?.chainId ||
-    config?.contracts?.surveys?.chainId ||
-    config?.contracts?.sbtFactory?.chainId ||
-    0
-  ) || 0;
+  const chainId =
+    Number(
+      config?.__registry?.registryChainId ||
+        config?.__registry?.chainId ||
+        config?.networkChainId ||
+        config?.contracts?.sessionRegistry?.chainId ||
+        config?.contracts?.surveys?.chainId ||
+        config?.contracts?.sbtFactory?.chainId ||
+        0,
+    ) || 0;
   return chainId > 0 ? chainId : 0;
 };
 
@@ -1457,15 +1447,9 @@ const resolveSessionTuple = async ({
   }
 };
 
-export const fetchSessionFromRegistry = async ({
-  chainId,
-  slug,
-  sessionId,
-  providerLike,
-  account,
-  lit,
-  bootstrapRpc,
-} = {} as AnyRecord) => {
+export const fetchSessionFromRegistry = async (
+  { chainId, slug, sessionId, providerLike, account, lit, bootstrapRpc } = {} as AnyRecord,
+) => {
   const resolvedChainId = Number(chainId || 0) || 0;
   if (!resolvedChainId) throw new Error('Registry chain id is required.');
   const useBootstrapRpc = typeof bootstrapRpc === 'boolean' ? bootstrapRpc : true;
@@ -1476,11 +1460,9 @@ export const fetchSessionFromRegistry = async ({
   let contract: AnyRecord | null = getRegistryContract(resolvedChainId, null, { bootstrapRpc: useBootstrapRpc });
   if (!contract && providerLike) {
     const provider = cryptoUtils._getProvider(providerLike || 'wagmi') as ethers.providers.ExternalProvider;
-    contract = getRegistryContract(
-      resolvedChainId,
-      new ethers.providers.Web3Provider(provider, 'any'),
-      { bootstrapRpc: useBootstrapRpc }
-    );
+    contract = getRegistryContract(resolvedChainId, new ethers.providers.Web3Provider(provider, 'any'), {
+      bootstrapRpc: useBootstrapRpc,
+    });
   }
   if (!contract) throw new Error('Session registry contract not configured.');
 
@@ -1512,10 +1494,12 @@ export const fetchSessionFromRegistry = async ({
   }
 
   const gatesByResource: RegistryGateMap = {};
-  const gateEntries = await Promise.all(DEFAULT_RESOURCES.map(async (resourceKey) => {
-    const gate = await fetchGateForResource(contract, session.slug, resourceKey);
-    return { resourceKey, gate };
-  }));
+  const gateEntries = await Promise.all(
+    DEFAULT_RESOURCES.map(async (resourceKey) => {
+      const gate = await fetchGateForResource(contract, session.slug, resourceKey);
+      return { resourceKey, gate };
+    }),
+  );
   gateEntries.forEach(({ resourceKey, gate }) => {
     gatesByResource[resourceKey] = gate;
   });
@@ -1536,11 +1520,7 @@ export const upsertSessionRegistryCache = ({ config } = {} as AnyRecord) => {
   if (typeof window === 'undefined') return null;
   if (!config || typeof config !== 'object') return null;
   const slug = normalizeSlug(config.slug);
-  const registryChainId = Number(
-    config?.__registry?.registryChainId ||
-    config?.__registry?.chainId ||
-    0
-  ) || null;
+  const registryChainId = Number(config?.__registry?.registryChainId || config?.__registry?.chainId || 0) || null;
   const sessionIdHex = normalizeSessionIdHex(config?.__registry?.sessionIdHex || config?.sessionId);
   const sessionId = sessionIdHex ? formatSessionId(sessionIdHex) : '';
 
@@ -1586,7 +1566,9 @@ export const upsertSessionRegistryCache = ({ config } = {} as AnyRecord) => {
 
   try {
     localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify(cache));
-  } catch (e) { surveysLog.warn('sessionRegistry: fallback', e); }
+  } catch (e) {
+    surveysLog.warn('sessionRegistry: fallback', e);
+  }
 
   notifySessionRegistryCacheUpdated();
 
@@ -1603,27 +1585,21 @@ export const refreshSessionRegistryFieldsCache = async ({
 }: AnyRecord = {}) => {
   const registrySlug = toRegistrySlug(slug || '');
   const existingConfig = sessionRegistryStore.getSessionConfig(registrySlug);
-  const existingRegistry = existingConfig?.__registry && typeof existingConfig.__registry === 'object'
-    ? existingConfig.__registry
-    : {};
-  const resolvedChainId = Number(
-    chainId ||
-    existingRegistry.registryChainId ||
-    existingRegistry.chainId ||
-    existingConfig?.networkChainId ||
-    0
-  ) || 0;
+  const existingRegistry =
+    existingConfig?.__registry && typeof existingConfig.__registry === 'object' ? existingConfig.__registry : {};
+  const resolvedChainId =
+    Number(
+      chainId || existingRegistry.registryChainId || existingRegistry.chainId || existingConfig?.networkChainId || 0,
+    ) || 0;
   if (!resolvedChainId) throw new Error('Registry chain id is required.');
 
   const useBootstrapRpc = typeof bootstrapRpc === 'boolean' ? bootstrapRpc : true;
   let contract = getRegistryContract(resolvedChainId, null, { bootstrapRpc: useBootstrapRpc });
   if (!contract && providerLike) {
     const provider = cryptoUtils._getProvider(providerLike || 'wagmi');
-    contract = getRegistryContract(
-      resolvedChainId,
-      new ethers.providers.Web3Provider(provider, 'any'),
-      { bootstrapRpc: useBootstrapRpc }
-    );
+    contract = getRegistryContract(resolvedChainId, new ethers.providers.Web3Provider(provider, 'any'), {
+      bootstrapRpc: useBootstrapRpc,
+    });
   }
   if (!contract) throw new Error('Session registry contract not configured.');
 
@@ -1639,7 +1615,7 @@ export const refreshSessionRegistryFieldsCache = async ({
   const fieldsByKey = await fetchSessionFields(
     contract,
     session.slug,
-    Array.isArray(fieldKeys) && fieldKeys.length ? fieldKeys : DEFAULT_FIELDS
+    Array.isArray(fieldKeys) && fieldKeys.length ? fieldKeys : DEFAULT_FIELDS,
   );
   const config = mergeSessionFieldsIntoCachedConfig({
     baseConfig: existingConfig,
@@ -1651,14 +1627,9 @@ export const refreshSessionRegistryFieldsCache = async ({
   return config;
 };
 
-export const loadSessionRegistryCache = async ({
-  chainIds,
-  providerLike,
-  account,
-  lit,
-  force,
-  bootstrapRpc,
-} = {} as AnyRecord) => {
+export const loadSessionRegistryCache = async (
+  { chainIds, providerLike, account, lit, force, bootstrapRpc } = {} as AnyRecord,
+) => {
   if (!USE_ONCHAIN_SESSION_REGISTRY && !force) return null;
   const useBootstrapRpc = typeof bootstrapRpc === 'boolean' ? bootstrapRpc : true;
 
@@ -1682,9 +1653,7 @@ export const loadSessionRegistryCache = async ({
     }
   }
 
-  const ids = Array.isArray(chainIds) && chainIds.length
-    ? chainIds
-    : getSessionRegistryChainIds();
+  const ids = Array.isArray(chainIds) && chainIds.length ? chainIds : getSessionRegistryChainIds();
 
   const cache: RegistryCache = {
     ts: Date.now(),
@@ -1700,7 +1669,7 @@ export const loadSessionRegistryCache = async ({
     const contract = getRegistryContract(
       chainId,
       walletProvider && walletChainId === Number(chainId || 0) ? walletProvider : null,
-      { bootstrapRpc: useBootstrapRpc }
+      { bootstrapRpc: useBootstrapRpc },
     );
     if (!contract) return null;
 
@@ -1760,10 +1729,12 @@ export const loadSessionRegistryCache = async ({
       }
 
       const gatesByResource: RegistryGateMap = {};
-      const gateEntries = await Promise.all(DEFAULT_RESOURCES.map(async (resourceKey) => {
-        const gate = await fetchGateForResource(contract, slug, resourceKey);
-        return { resourceKey, gate };
-      }));
+      const gateEntries = await Promise.all(
+        DEFAULT_RESOURCES.map(async (resourceKey) => {
+          const gate = await fetchGateForResource(contract, slug, resourceKey);
+          return { resourceKey, gate };
+        }),
+      );
       gateEntries.forEach(({ resourceKey, gate }) => {
         gatesByResource[resourceKey] = gate;
       });
@@ -1784,9 +1755,7 @@ export const loadSessionRegistryCache = async ({
     return {
       chainId,
       chainEntry,
-      configs: sessionResults
-        .map((result) => result?.config)
-        .filter((config): config is AnyRecord => !!config),
+      configs: sessionResults.map((result) => result?.config).filter((config): config is AnyRecord => !!config),
       hadLoadErrors: sessionResults.some((result) => !!result?.hadLoadErrors),
     };
   });
@@ -1804,14 +1773,13 @@ export const loadSessionRegistryCache = async ({
     cache.chains[String(result.chainId)] = result.chainEntry;
   });
 
-  const previousSessions = previousCache?.sessions && typeof previousCache.sessions === 'object'
-    ? previousCache.sessions
-    : null;
+  const previousSessions =
+    previousCache?.sessions && typeof previousCache.sessions === 'object' ? previousCache.sessions : null;
   const requestedChainIds = new Set(
     (Array.isArray(ids) ? ids : [])
       .map((id) => Number(id))
       .filter((id) => Number.isFinite(id) && id > 0)
-      .map((id) => Math.floor(id))
+      .map((id) => Math.floor(id)),
   );
   const previousCount = previousSessions ? Object.keys(previousSessions).length : 0;
   const currentCount = Object.keys(cache.sessions || {}).length;
@@ -1833,7 +1801,9 @@ export const loadSessionRegistryCache = async ({
   cache.__hadLoadErrors = !!hadLoadErrors;
   try {
     localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify(cache));
-  } catch (e) { surveysLog.warn('sessionRegistry: fallback', e); }
+  } catch (e) {
+    surveysLog.warn('sessionRegistry: fallback', e);
+  }
   notifySessionRegistryCacheUpdated();
 
   try {
@@ -1876,23 +1846,25 @@ export const uploadSessionMetadata = async (metadata: AnyRecord, opts: AnyRecord
   };
 };
 
-export const registerSessionOnChain = async ({
-  providerLike,
-  chainId,
-  registryAddress: registryAddressOverride,
-  slug,
-  sessionId,
-  sessionChainId,
-  metadataURI,
-  encryptedMetadataURI,
-  gateSelections,
-  sessionFields,
-  gasLimitOverride,
-  gasPriceGwei,
-  maxFeePerGasGwei,
-  maxPriorityFeePerGasGwei,
-  onTxHash,
-} = {} as AnyRecord) => {
+export const registerSessionOnChain = async (
+  {
+    providerLike,
+    chainId,
+    registryAddress: registryAddressOverride,
+    slug,
+    sessionId,
+    sessionChainId,
+    metadataURI,
+    encryptedMetadataURI,
+    gateSelections,
+    sessionFields,
+    gasLimitOverride,
+    gasPriceGwei,
+    maxFeePerGasGwei,
+    maxPriorityFeePerGasGwei,
+    onTxHash,
+  } = {} as AnyRecord,
+) => {
   const registryAddress = toStr(registryAddressOverride).trim() || resolveRegistryAddress(chainId);
   if (!registryAddress) {
     throw new Error('Session registry address not configured for this chain.');
@@ -1951,9 +1923,7 @@ export const registerSessionOnChain = async ({
   }
 
   const gasOverride = Number(gasLimitOverride || 0);
-  const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0
-    ? Math.floor(gasOverride)
-    : null;
+  const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0 ? Math.floor(gasOverride) : null;
   // Registry writes default to a deterministic fallback gas limit unless the caller supplied an override.
   const effectiveGasLimit = normalizedGasOverride;
 
@@ -1971,22 +1941,22 @@ export const registerSessionOnChain = async ({
     }
   };
 
-  const fieldEntries = sessionFields && typeof sessionFields === 'object'
-    ? Object.entries(sessionFields)
-    : [];
+  const fieldEntries = sessionFields && typeof sessionFields === 'object' ? Object.entries(sessionFields) : [];
   const fieldInputs = fieldEntries.map(([key, value]) => ({
     key: String(key),
     value: serializeFieldValue(value),
   }));
 
   const selections: AnyRecord = gateSelections && typeof gateSelections === 'object' ? gateSelections : {};
-  const gateInputs = Object.entries(selections).reduce<Array<{
-    resourceKey: string;
-    sbtAddresses: string[];
-    chainId: number;
-    mode: number;
-    perMemberLimit: number;
-  }>>((acc, [resourceKey, gate]) => {
+  const gateInputs = Object.entries(selections).reduce<
+    Array<{
+      resourceKey: string;
+      sbtAddresses: string[];
+      chainId: number;
+      mode: number;
+      perMemberLimit: number;
+    }>
+  >((acc, [resourceKey, gate]) => {
     const gateRecord = gate as AnyRecord;
     if (!gateRecord || !Array.isArray(gateRecord.sbts) || !gateRecord.sbts.length) return acc;
     const sbtAddresses = gateRecord.sbts.map((sbt: AnyRecord) => sbt.address).filter(Boolean);
@@ -2036,24 +2006,25 @@ export const registerSessionOnChain = async ({
   const createSessionOverrides = creationFee != null ? { value: creationFee } : {};
   const createTx = await sendWithNonceRetry({
     estimate: null,
-    send: (overrides: TxFeeOverrides) => sendRegistryContractWriteViaProvider({
-      signingProvider,
-      ethersProvider,
-      signer,
-      contract,
-      method: 'createSession',
-      args: [
-        registrySlug,
-        sessionIdHex,
-        Number(sessionChainId || chainId || 0),
-        toStr(metadataURI),
-        toStr(encryptedMetadataURI),
-      ],
-      txOverrides: { ...overrides, ...createSessionOverrides },
-      onBroadcastTxHash: (txHash: unknown) => recordTx('createSession', { hash: txHash as string }),
-      rpcFunction: 'createSession',
-      revertMessage: 'createSession transaction reverted on-chain.',
-    }),
+    send: (overrides: TxFeeOverrides) =>
+      sendRegistryContractWriteViaProvider({
+        signingProvider,
+        ethersProvider,
+        signer,
+        contract,
+        method: 'createSession',
+        args: [
+          registrySlug,
+          sessionIdHex,
+          Number(sessionChainId || chainId || 0),
+          toStr(metadataURI),
+          toStr(encryptedMetadataURI),
+        ],
+        txOverrides: { ...overrides, ...createSessionOverrides },
+        onBroadcastTxHash: (txHash: unknown) => recordTx('createSession', { hash: txHash as string }),
+        rpcFunction: 'createSession',
+        revertMessage: 'createSession transaction reverted on-chain.',
+      }),
     gasLimitOverride: effectiveGasLimit,
     signer,
     txOverrides: txFeeOverrides,
@@ -2072,18 +2043,19 @@ export const registerSessionOnChain = async ({
     if (typeof contract.setSessionFields === 'function') {
       const tx = await sendWithNonceRetry({
         estimate: null,
-        send: (overrides: TxFeeOverrides) => sendRegistryContractWriteViaProvider({
-          signingProvider,
-          ethersProvider,
-          signer,
-          contract,
-          method: 'setSessionFields',
-          args: [registrySlug, fieldKeys, fieldValues],
-          txOverrides: overrides,
-          onBroadcastTxHash: (txHash: unknown) => recordTx('setSessionFields', { hash: txHash as string }),
-          rpcFunction: 'setSessionFields',
-          revertMessage: 'setSessionFields transaction reverted on-chain.',
-        }),
+        send: (overrides: TxFeeOverrides) =>
+          sendRegistryContractWriteViaProvider({
+            signingProvider,
+            ethersProvider,
+            signer,
+            contract,
+            method: 'setSessionFields',
+            args: [registrySlug, fieldKeys, fieldValues],
+            txOverrides: overrides,
+            onBroadcastTxHash: (txHash: unknown) => recordTx('setSessionFields', { hash: txHash as string }),
+            rpcFunction: 'setSessionFields',
+            revertMessage: 'setSessionFields transaction reverted on-chain.',
+          }),
         gasLimitOverride: effectiveGasLimit,
         signer,
         txOverrides: txFeeOverrides,
@@ -2099,18 +2071,19 @@ export const registerSessionOnChain = async ({
       for (let i = 0; i < fieldKeys.length; i += 1) {
         const tx = await sendWithNonceRetry({
           estimate: null,
-          send: (overrides: TxFeeOverrides) => sendRegistryContractWriteViaProvider({
-            signingProvider,
-            ethersProvider,
-            signer,
-            contract,
-            method: 'setSessionField',
-            args: [registrySlug, fieldKeys[i], fieldValues[i]],
-            txOverrides: overrides,
-            onBroadcastTxHash: (txHash: unknown) => recordTx('setSessionField', { hash: txHash as string }),
-            rpcFunction: 'setSessionField',
-            revertMessage: 'setSessionField transaction reverted on-chain.',
-          }),
+          send: (overrides: TxFeeOverrides) =>
+            sendRegistryContractWriteViaProvider({
+              signingProvider,
+              ethersProvider,
+              signer,
+              contract,
+              method: 'setSessionField',
+              args: [registrySlug, fieldKeys[i], fieldValues[i]],
+              txOverrides: overrides,
+              onBroadcastTxHash: (txHash: unknown) => recordTx('setSessionField', { hash: txHash as string }),
+              rpcFunction: 'setSessionField',
+              revertMessage: 'setSessionField transaction reverted on-chain.',
+            }),
           gasLimitOverride: effectiveGasLimit,
           signer,
           txOverrides: txFeeOverrides,
@@ -2130,22 +2103,26 @@ export const registerSessionOnChain = async ({
     if (typeof contract.setResourceGates === 'function') {
       const tx = await sendWithNonceRetry({
         estimate: null,
-        send: (overrides: TxFeeOverrides) => sendRegistryContractWriteViaProvider({
-          signingProvider,
-          ethersProvider,
-          signer,
-          contract,
-          method: 'setResourceGates',
-          args: [registrySlug, gateInputs],
-          txOverrides: overrides,
-          onBroadcastTxHash: (txHash: unknown) => recordTx('setResourceGates', { hash: txHash as string }),
-          rpcFunction: 'setResourceGates',
-          revertMessage: 'setResourceGates transaction reverted on-chain.',
-        }),
+        send: (overrides: TxFeeOverrides) =>
+          sendRegistryContractWriteViaProvider({
+            signingProvider,
+            ethersProvider,
+            signer,
+            contract,
+            method: 'setResourceGates',
+            args: [registrySlug, gateInputs],
+            txOverrides: overrides,
+            onBroadcastTxHash: (txHash: unknown) => recordTx('setResourceGates', { hash: txHash as string }),
+            rpcFunction: 'setResourceGates',
+            revertMessage: 'setResourceGates transaction reverted on-chain.',
+          }),
         gasLimitOverride: effectiveGasLimit,
         signer,
         txOverrides: txFeeOverrides,
-        fallbackGasLimit: REGISTRY_GAS_FALLBACKS.setResourceGates(gateInputs.length, gateInputs.reduce((sum, g) => sum + (g.sbtAddresses?.length || 0), 0)),
+        fallbackGasLimit: REGISTRY_GAS_FALLBACKS.setResourceGates(
+          gateInputs.length,
+          gateInputs.reduce((sum, g) => sum + (g.sbtAddresses?.length || 0), 0),
+        ),
         feeFallbackChainId: writeChainId,
         txLabel: 'setResourceGates',
         preferFallbackGasLimit: true,
@@ -2158,24 +2135,18 @@ export const registerSessionOnChain = async ({
         const gate = gateInputs[i];
         const tx = await sendWithNonceRetry({
           estimate: null,
-          send: (overrides: TxFeeOverrides) => sendRegistryContractWriteViaProvider({
-            signingProvider,
-            ethersProvider,
-            signer,
-            contract,
-            method: 'setResourceGate',
-            args: [
-              registrySlug,
-              gate.resourceKey,
-              gate.sbtAddresses,
-              gate.chainId,
-              gate.mode,
-              gate.perMemberLimit,
-            ],
-            txOverrides: overrides,
-            rpcFunction: 'setResourceGate',
-            revertMessage: 'setResourceGate transaction reverted on-chain.',
-          }),
+          send: (overrides: TxFeeOverrides) =>
+            sendRegistryContractWriteViaProvider({
+              signingProvider,
+              ethersProvider,
+              signer,
+              contract,
+              method: 'setResourceGate',
+              args: [registrySlug, gate.resourceKey, gate.sbtAddresses, gate.chainId, gate.mode, gate.perMemberLimit],
+              txOverrides: overrides,
+              rpcFunction: 'setResourceGate',
+              revertMessage: 'setResourceGate transaction reverted on-chain.',
+            }),
           gasLimitOverride: effectiveGasLimit,
           signer,
           txOverrides: txFeeOverrides,
@@ -2196,16 +2167,18 @@ export const registerSessionOnChain = async ({
 
 export const registerGroupOnChain = registerSessionOnChain;
 
-export const setSessionFieldsOnChain = async ({
-  providerLike,
-  chainId,
-  slug,
-  fields,
-  gasLimitOverride,
-  gasPriceGwei,
-  maxFeePerGasGwei,
-  maxPriorityFeePerGasGwei,
-} = {} as AnyRecord) => {
+export const setSessionFieldsOnChain = async (
+  {
+    providerLike,
+    chainId,
+    slug,
+    fields,
+    gasLimitOverride,
+    gasPriceGwei,
+    maxFeePerGasGwei,
+    maxPriorityFeePerGasGwei,
+  } = {} as AnyRecord,
+) => {
   if (slug == null) throw new Error('Slug is required.');
   const registryAddress = resolveRegistryAddress(chainId);
   if (!registryAddress) {
@@ -2224,13 +2197,10 @@ export const setSessionFieldsOnChain = async ({
   });
   const nonceTracker: NonceTracker = { nextNonce: null };
   const gasOverride = Number(gasLimitOverride || 0);
-  const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0
-    ? Math.floor(gasOverride)
-    : null;
+  const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0 ? Math.floor(gasOverride) : null;
 
-  const entries = fields && typeof fields === 'object'
-    ? Object.entries(fields).filter(([, value]) => value != null)
-    : [];
+  const entries =
+    fields && typeof fields === 'object' ? Object.entries(fields).filter(([, value]) => value != null) : [];
   if (!entries.length) return { skipped: true };
 
   const fieldKeys = entries.map(([key]) => String(key));
@@ -2238,17 +2208,18 @@ export const setSessionFieldsOnChain = async ({
   if (typeof contract.setSessionFields === 'function') {
     const tx = await sendWithNonceRetry({
       estimate: null,
-      send: (overrides: TxFeeOverrides) => sendRegistryContractWriteViaProvider({
-        signingProvider,
-        ethersProvider,
-        signer,
-        contract,
-        method: 'setSessionFields',
-        args: [registrySlug, fieldKeys, fieldValues],
-        txOverrides: overrides,
-        rpcFunction: 'setSessionFields',
-        revertMessage: 'setSessionFields transaction reverted on-chain.',
-      }),
+      send: (overrides: TxFeeOverrides) =>
+        sendRegistryContractWriteViaProvider({
+          signingProvider,
+          ethersProvider,
+          signer,
+          contract,
+          method: 'setSessionFields',
+          args: [registrySlug, fieldKeys, fieldValues],
+          txOverrides: overrides,
+          rpcFunction: 'setSessionFields',
+          revertMessage: 'setSessionFields transaction reverted on-chain.',
+        }),
       gasLimitOverride: normalizedGasOverride,
       signer,
       txOverrides: txFeeOverrides,
@@ -2269,17 +2240,18 @@ export const setSessionFieldsOnChain = async ({
   for (let i = 0; i < fieldKeys.length; i += 1) {
     const tx = await sendWithNonceRetry({
       estimate: null,
-      send: (overrides: TxFeeOverrides) => sendRegistryContractWriteViaProvider({
-        signingProvider,
-        ethersProvider,
-        signer,
-        contract,
-        method: 'setSessionField',
-        args: [registrySlug, fieldKeys[i], fieldValues[i]],
-        txOverrides: overrides,
-        rpcFunction: 'setSessionField',
-        revertMessage: 'setSessionField transaction reverted on-chain.',
-      }),
+      send: (overrides: TxFeeOverrides) =>
+        sendRegistryContractWriteViaProvider({
+          signingProvider,
+          ethersProvider,
+          signer,
+          contract,
+          method: 'setSessionField',
+          args: [registrySlug, fieldKeys[i], fieldValues[i]],
+          txOverrides: overrides,
+          rpcFunction: 'setSessionField',
+          revertMessage: 'setSessionField transaction reverted on-chain.',
+        }),
       gasLimitOverride: normalizedGasOverride,
       signer,
       txOverrides: txFeeOverrides,
@@ -2296,17 +2268,19 @@ export const setSessionFieldsOnChain = async ({
 
 export const setGroupFieldsOnChain = setSessionFieldsOnChain;
 
-export const updateSessionMetadataOnChain = async ({
-  providerLike,
-  chainId,
-  slug,
-  metadataURI,
-  encryptedMetadataURI,
-  gasLimitOverride,
-  gasPriceGwei,
-  maxFeePerGasGwei,
-  maxPriorityFeePerGasGwei,
-} = {} as AnyRecord) => {
+export const updateSessionMetadataOnChain = async (
+  {
+    providerLike,
+    chainId,
+    slug,
+    metadataURI,
+    encryptedMetadataURI,
+    gasLimitOverride,
+    gasPriceGwei,
+    maxFeePerGasGwei,
+    maxPriorityFeePerGasGwei,
+  } = {} as AnyRecord,
+) => {
   if (slug == null) throw new Error('Slug is required.');
   const registryAddress = resolveRegistryAddress(chainId);
   if (!registryAddress) {
@@ -2327,22 +2301,21 @@ export const updateSessionMetadataOnChain = async ({
     maxPriorityFeePerGasGwei,
   });
   const gasOverride = Number(gasLimitOverride || 0);
-  const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0
-    ? Math.floor(gasOverride)
-    : null;
+  const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0 ? Math.floor(gasOverride) : null;
   const tx = await sendWithNonceRetry({
     estimate: null,
-    send: (overrides: TxFeeOverrides) => sendRegistryContractWriteViaProvider({
-      signingProvider,
-      ethersProvider,
-      signer,
-      contract,
-      method: 'updateSessionMetadata',
-      args: [registrySlug, toStr(metadataURI), toStr(encryptedMetadataURI)],
-      txOverrides: overrides,
-      rpcFunction: 'updateSessionMetadata',
-      revertMessage: 'updateSessionMetadata transaction reverted on-chain.',
-    }),
+    send: (overrides: TxFeeOverrides) =>
+      sendRegistryContractWriteViaProvider({
+        signingProvider,
+        ethersProvider,
+        signer,
+        contract,
+        method: 'updateSessionMetadata',
+        args: [registrySlug, toStr(metadataURI), toStr(encryptedMetadataURI)],
+        txOverrides: overrides,
+        rpcFunction: 'updateSessionMetadata',
+        revertMessage: 'updateSessionMetadata transaction reverted on-chain.',
+      }),
     gasLimitOverride: normalizedGasOverride,
     signer,
     txOverrides: txFeeOverrides,
@@ -2355,16 +2328,18 @@ export const updateSessionMetadataOnChain = async ({
   return { ok: true, txHash: toStr(tx?.hash).trim() };
 };
 
-export const setResourceGatesOnChain = async ({
-  providerLike,
-  chainId,
-  slug,
-  gates,
-  gasLimitOverride,
-  gasPriceGwei,
-  maxFeePerGasGwei,
-  maxPriorityFeePerGasGwei,
-} = {} as AnyRecord) => {
+export const setResourceGatesOnChain = async (
+  {
+    providerLike,
+    chainId,
+    slug,
+    gates,
+    gasLimitOverride,
+    gasPriceGwei,
+    maxFeePerGasGwei,
+    maxPriorityFeePerGasGwei,
+  } = {} as AnyRecord,
+) => {
   if (slug == null) throw new Error('Slug is required.');
   const registryAddress = resolveRegistryAddress(chainId);
   if (!registryAddress) {
@@ -2383,9 +2358,7 @@ export const setResourceGatesOnChain = async ({
   });
   const nonceTracker: NonceTracker = { nextNonce: null };
   const gasOverride = Number(gasLimitOverride || 0);
-  const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0
-    ? Math.floor(gasOverride)
-    : null;
+  const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0 ? Math.floor(gasOverride) : null;
 
   const gateInputs = (Array.isArray(gates) ? gates : [])
     .filter((gate: AnyRecord) => gate && Array.isArray(gate.sbtAddresses) && gate.sbtAddresses.length)
@@ -2407,17 +2380,18 @@ export const setResourceGatesOnChain = async ({
     const totalSbtAddresses = gateInputs.reduce((sum, g) => sum + (g.sbtAddresses?.length || 0), 0);
     const tx = await sendWithNonceRetry({
       estimate: null,
-      send: (overrides: TxFeeOverrides) => sendRegistryContractWriteViaProvider({
-        signingProvider,
-        ethersProvider,
-        signer,
-        contract,
-        method: 'setResourceGates',
-        args: [registrySlug, gateInputs],
-        txOverrides: overrides,
-        rpcFunction: 'setResourceGates',
-        revertMessage: 'setResourceGates transaction reverted on-chain.',
-      }),
+      send: (overrides: TxFeeOverrides) =>
+        sendRegistryContractWriteViaProvider({
+          signingProvider,
+          ethersProvider,
+          signer,
+          contract,
+          method: 'setResourceGates',
+          args: [registrySlug, gateInputs],
+          txOverrides: overrides,
+          rpcFunction: 'setResourceGates',
+          revertMessage: 'setResourceGates transaction reverted on-chain.',
+        }),
       gasLimitOverride: normalizedGasOverride,
       signer,
       txOverrides: txFeeOverrides,
@@ -2436,24 +2410,18 @@ export const setResourceGatesOnChain = async ({
       const gate = gateInputs[i];
       const tx = await sendWithNonceRetry({
         estimate: null,
-        send: (overrides: TxFeeOverrides) => sendRegistryContractWriteViaProvider({
-          signingProvider,
-          ethersProvider,
-          signer,
-          contract,
-          method: 'setResourceGate',
-          args: [
-            registrySlug,
-            gate.resourceKey,
-            gate.sbtAddresses,
-            gate.chainId,
-            gate.mode,
-            gate.perMemberLimit,
-          ],
-          txOverrides: overrides,
-          rpcFunction: 'setResourceGate',
-          revertMessage: 'setResourceGate transaction reverted on-chain.',
-        }),
+        send: (overrides: TxFeeOverrides) =>
+          sendRegistryContractWriteViaProvider({
+            signingProvider,
+            ethersProvider,
+            signer,
+            contract,
+            method: 'setResourceGate',
+            args: [registrySlug, gate.resourceKey, gate.sbtAddresses, gate.chainId, gate.mode, gate.perMemberLimit],
+            txOverrides: overrides,
+            rpcFunction: 'setResourceGate',
+            revertMessage: 'setResourceGate transaction reverted on-chain.',
+          }),
         gasLimitOverride: normalizedGasOverride,
         signer,
         txOverrides: txFeeOverrides,
@@ -2525,13 +2493,13 @@ export const sessionRegistryStore = {
   getAllSessionEntries: (): SessionRegistryCacheEntry[] => {
     const cache = sessionRegistryStore.readCache();
     if (!cache || !cache.sessions) return [];
-    return Object.entries(cache.sessions).map(([slug, cfg]): SessionRegistryCacheEntry => ([
+    return Object.entries(cache.sessions).map(([slug, cfg]): SessionRegistryCacheEntry => [
       slug,
       overlayCachedSessionWorkerConfig({
         slug,
         sessionConfig: cfg,
       }) || cfg,
-    ]));
+    ]);
   },
   getAllSessionSlugs: () => {
     const cache = sessionRegistryStore.readCache();

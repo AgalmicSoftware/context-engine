@@ -15,15 +15,13 @@ export type PolisDemoQuestionPoolEntry = {
   nodeId?: string;
 };
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const readString = (value: unknown = ''): string => String(value || '').trim();
 
-const normalizePathname = (value: unknown = ''): string => (
-  readString(value).split('?')[0].split('#')[0].replace(/\/+$/, '').toLowerCase()
-);
+const normalizePathname = (value: unknown = ''): string =>
+  readString(value).split('?')[0].split('#')[0].replace(/\/+$/, '').toLowerCase();
 
 const isBuiltInDemoPathname = (value: unknown = ''): boolean => {
   const routePath = normalizePathname(value);
@@ -37,36 +35,36 @@ const normalizePolisQuestionType = (value: unknown = ''): string => {
 
 export const buildPolisDemoQuestionPool = (
   source: unknown = demoPolisData,
-  { sessionSlug = '' }: { sessionSlug?: string } = {}
+  { sessionSlug = '' }: { sessionSlug?: string } = {},
 ): PolisDemoQuestionPoolEntry[] => {
-  const comments = isRecord(source) && Array.isArray(source.comments)
-    ? source.comments.filter(isRecord)
-    : [];
+  const comments = isRecord(source) && Array.isArray(source.comments) ? source.comments.filter(isRecord) : [];
 
-  return comments.map((comment, index) => {
-    const id = readString(comment.commentId || `demo-polis-${index + 1}`).toLowerCase();
-    const prompt = readString(comment.commentBody || comment.prompt || comment.question);
-    if (!id || !prompt) return null;
+  return comments
+    .map((comment, index) => {
+      const id = readString(comment.commentId || `demo-polis-${index + 1}`).toLowerCase();
+      const prompt = readString(comment.commentBody || comment.prompt || comment.question);
+      if (!id || !prompt) return null;
 
-    const category = readString(comment.category);
-    const nodeId = readString(comment.nodeId);
-    const tags = [category, nodeId].filter(Boolean);
-    const keyTension = readString(comment.key_tension);
-    const sources = readString(comment.sources);
+      const category = readString(comment.category);
+      const nodeId = readString(comment.nodeId);
+      const tags = [category, nodeId].filter(Boolean);
+      const keyTension = readString(comment.key_tension);
+      const sources = readString(comment.sources);
 
-    return {
-      id,
-      prompt,
-      type: normalizePolisQuestionType(comment.type),
-      tags,
-      sessionSlug,
-      source: 'demo-polis-data',
-      ...(category ? { category } : {}),
-      ...(keyTension ? { key_tension: keyTension } : {}),
-      ...(sources ? { sources } : {}),
-      ...(nodeId ? { nodeId } : {}),
-    };
-  }).filter((question): question is PolisDemoQuestionPoolEntry => !!question);
+      return {
+        id,
+        prompt,
+        type: normalizePolisQuestionType(comment.type),
+        tags,
+        sessionSlug,
+        source: 'demo-polis-data',
+        ...(category ? { category } : {}),
+        ...(keyTension ? { key_tension: keyTension } : {}),
+        ...(sources ? { sources } : {}),
+        ...(nodeId ? { nodeId } : {}),
+      };
+    })
+    .filter((question): question is PolisDemoQuestionPoolEntry => !!question);
 };
 
 let memoizedDefaultPolisDemoQuestionPool: PolisDemoQuestionPoolEntry[] | null = null;
@@ -87,9 +85,7 @@ export const shouldUseBuiltInPolisDemoQuestionPool = ({
   sourceSlug?: unknown;
   pathname?: unknown;
 } = {}): boolean => {
-  const isBuiltInDemoRoute =
-    readString(displaySlug).toLowerCase() === 'demo' ||
-    isBuiltInDemoPathname(pathname);
+  const isBuiltInDemoRoute = readString(displaySlug).toLowerCase() === 'demo' || isBuiltInDemoPathname(pathname);
   if (!isBuiltInDemoRoute) return false;
   return readString(sourceSlug).toLowerCase() === '' || isBuiltInDemoPathname(pathname);
 };
@@ -102,8 +98,5 @@ export const resolvePolisDemoQuestionPool = ({
   displaySlug?: unknown;
   sourceSlug?: unknown;
   pathname?: unknown;
-} = {}): PolisDemoQuestionPoolEntry[] => (
-  shouldUseBuiltInPolisDemoQuestionPool({ displaySlug, sourceSlug, pathname })
-    ? getPolisDemoQuestionPool()
-    : []
-);
+} = {}): PolisDemoQuestionPoolEntry[] =>
+  shouldUseBuiltInPolisDemoQuestionPool({ displaySlug, sourceSlug, pathname }) ? getPolisDemoQuestionPool() : [];

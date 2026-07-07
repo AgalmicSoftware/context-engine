@@ -3,10 +3,7 @@ import {
   createInitialSurveyQuestionsState,
   surveyQuestionsReducer,
 } from './surveyQuestionsState';
-import type {
-  SurveyQuestionsRuntimeEngine,
-  SurveyQuestionsRuntimeStrategy,
-} from './surveyQuestionsTypes';
+import type { SurveyQuestionsRuntimeEngine, SurveyQuestionsRuntimeStrategy } from './surveyQuestionsTypes';
 
 describe('surveyQuestionsReducer', () => {
   const baseState = createInitialSurveyQuestionsState({
@@ -75,15 +72,19 @@ describe('createInitialSurveyQuestionsState', () => {
   it('preserves the provided question pool for standalone and single-question flows', () => {
     const questionPool = [{ id: 'q1' }];
 
-    expect(createInitialSurveyQuestionsState({
-      isStandalone: true,
-      questionPool,
-    }).questionPool).toBe(questionPool);
+    expect(
+      createInitialSurveyQuestionsState({
+        isStandalone: true,
+        questionPool,
+      }).questionPool,
+    ).toBe(questionPool);
 
-    expect(createInitialSurveyQuestionsState({
-      singleQuestionMode: true,
-      questionPool,
-    }).questionPool).toBe(questionPool);
+    expect(
+      createInitialSurveyQuestionsState({
+        singleQuestionMode: true,
+        questionPool,
+      }).questionPool,
+    ).toBe(questionPool);
   });
 });
 

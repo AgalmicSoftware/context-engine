@@ -53,11 +53,9 @@ describe('SessionWizard reserved slug validation', () => {
 
   it('uses the exact slug validation error copy', () => {
     expect(REQUIRED_SESSION_SLUG_ERROR).toBe('A session slug is required.');
-    expect(INVALID_SESSION_SLUG_FORMAT_ERROR).toBe(
-      'Session slugs must use lowercase letters, numbers, "_" or "-".'
-    );
+    expect(INVALID_SESSION_SLUG_FORMAT_ERROR).toBe('Session slugs must use lowercase letters, numbers, "_" or "-".');
     expect(RESERVED_SESSION_SLUG_ERROR).toBe(
-      'This slug is reserved for the default session or legacy compatibility aliases ("general"). Please choose a different slug.'
+      'This slug is reserved for the default session or legacy compatibility aliases ("general"). Please choose a different slug.',
     );
   });
 });

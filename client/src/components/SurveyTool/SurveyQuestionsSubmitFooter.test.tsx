@@ -28,13 +28,7 @@ describe('SurveyQuestionsSubmitFooter', () => {
   });
 
   it('renders pending clear changes while preserving its handler', () => {
-    render(
-      <SurveyQuestionsSubmitFooter
-        {...baseProps}
-        displayState={{ showSubmitAux: true }}
-        pendingEditCount={2}
-      />
-    );
+    render(<SurveyQuestionsSubmitFooter {...baseProps} displayState={{ showSubmitAux: true }} pendingEditCount={2} />);
 
     const submitButton = screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT);
     expect(submitButton).toHaveClass('submitGlow');
@@ -53,7 +47,7 @@ describe('SurveyQuestionsSubmitFooter', () => {
           uploadStatusText: 'Encrypting...',
         }}
         isSubmitting
-      />
+      />,
     );
 
     const submitButton = screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT);
@@ -68,7 +62,7 @@ describe('SurveyQuestionsSubmitFooter', () => {
           submittedIndicatorActive: true,
         }}
         responseUrl="https://example.test/response"
-      />
+      />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toHaveTextContent('Submitted');
@@ -81,18 +75,12 @@ describe('SurveyQuestionsSubmitFooter', () => {
       <SurveyQuestionsSubmitFooter
         {...baseProps}
         submissionError="This failure message is intentionally long enough to require truncation in the footer"
-      />
+      />,
     );
 
     expect(screen.getByText('This failure message is intentionally long enou...')).toBeInTheDocument();
 
-    rerender(
-      <SurveyQuestionsSubmitFooter
-        {...baseProps}
-        isSingleQuestionView
-        submitButtonText="SUBMIT"
-      />
-    );
+    rerender(<SurveyQuestionsSubmitFooter {...baseProps} isSingleQuestionView submitButtonText="SUBMIT" />);
 
     expect(screen.getByText('SUBMIT')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('singleQuestionSubmitButton');
@@ -108,7 +96,7 @@ describe('SurveyQuestionsSubmitFooter', () => {
         }}
         isSubmitting
         pendingEditCount={3}
-      />
+      />,
     );
 
     expect(screen.getByText('Uploading...')).toBeInTheDocument();
@@ -129,7 +117,7 @@ describe('SurveyQuestionsSubmitFooter', () => {
         pendingEditCount={1}
         responseUrl="https://example.test/question-response"
         submitButtonText="SUBMIT"
-      />
+      />,
     );
 
     const submitButton = screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT);

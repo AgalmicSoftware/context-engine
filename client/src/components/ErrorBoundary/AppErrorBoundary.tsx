@@ -22,7 +22,7 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
   static getDerivedStateFromError(error: Error | null): AppErrorBoundaryState {
     return {
       hasError: true,
-      errorMessage: (error && error.message) ? error.message : 'An unexpected error occurred.',
+      errorMessage: error && error.message ? error.message : 'An unexpected error occurred.',
     };
   }
 
@@ -56,9 +56,7 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
             }}
           >
             <h2 style={{ margin: '0 0 12px 0', color: '#ffffff' }}>Something went wrong</h2>
-            <p style={{ margin: '0 0 20px 0', color: 'rgba(244, 247, 255, 0.85)' }}>
-              {this.state.errorMessage}
-            </p>
+            <p style={{ margin: '0 0 20px 0', color: 'rgba(244, 247, 255, 0.85)' }}>{this.state.errorMessage}</p>
             <button
               type="button"
               onClick={() => window.location.reload()}

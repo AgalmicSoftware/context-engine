@@ -79,7 +79,7 @@ const SurveyQuestionsFullQuestionSliderSection = ({
         />
       ) : (
         <ConvictionImportanceSliderControl
-          label={(
+          label={
             <ConvictionImportanceLabel
               importanceToggleEnabled={importanceToggleEnabled}
               sliderMode={sliderMode}
@@ -88,7 +88,7 @@ const SurveyQuestionsFullQuestionSliderSection = ({
               importanceValue={importanceValue}
               onSelectMode={onSelectMode}
             />
-          )}
+          }
           value={activeSliderValue}
           disabled={isSubmitting}
           onChange={onChange}

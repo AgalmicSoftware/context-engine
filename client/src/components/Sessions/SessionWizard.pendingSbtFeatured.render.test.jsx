@@ -57,9 +57,11 @@ describe('SessionWizard pending featured SBT rendering', () => {
     await createPendingFeaturedDraft();
     await ensureGateASelectorVisible();
 
-    fireEvent.click(screen.getByRole('button', {
-      name: `Mock remove ${mockPendingSbtAddress} from encryption-gate-gate-1`,
-    }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: `Mock remove ${mockPendingSbtAddress} from encryption-gate-gate-1`,
+      }),
+    );
 
     await expectSelectorAddresses('encryption-gate-gate-1', []);
     await expectSelectorAddresses('default-featured-sbts', [mockPendingSbtAddress]);
@@ -82,9 +84,11 @@ describe('SessionWizard pending featured SBT rendering', () => {
     await createPendingFeaturedDraft();
     await ensureGateASelectorVisible();
 
-    fireEvent.click(screen.getByRole('button', {
-      name: `Mock remove ${mockPendingSbtAddress} from default-featured-sbts`,
-    }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: `Mock remove ${mockPendingSbtAddress} from default-featured-sbts`,
+      }),
+    );
 
     await expectSelectorAddresses('default-featured-sbts', []);
     await expectSelectorAddresses('encryption-gate-gate-1', []);
@@ -111,9 +115,11 @@ describe('SessionWizard pending featured SBT rendering', () => {
 
     await expectSelectorAddresses('encryption-gate-gate-1', [mockPendingSbtAddress, mockReplacementSbtAddress]);
 
-    fireEvent.click(screen.getByRole('button', {
-      name: `Mock remove ${mockPendingSbtAddress} from encryption-gate-gate-1`,
-    }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: `Mock remove ${mockPendingSbtAddress} from encryption-gate-gate-1`,
+      }),
+    );
 
     await expectSelectorAddresses('encryption-gate-gate-1', [mockReplacementSbtAddress]);
     await expectSelectorAddresses('default-featured-sbts', [mockPendingSbtAddress]);
@@ -164,9 +170,9 @@ describe('SessionWizard pending featured SBT rendering', () => {
     fireEvent.click(screen.getByRole('button', { name: /more options/i }));
 
     const featuredCreateButton = await waitFor(() => {
-      const button = screen.getAllByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT).find(
-        (node) => node.getAttribute('data-ce-sbt-target') === 'defaultFeaturedSBTs'
-      );
+      const button = screen
+        .getAllByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT)
+        .find((node) => node.getAttribute('data-ce-sbt-target') === 'defaultFeaturedSBTs');
       expect(button).toBeTruthy();
       return button;
     });
@@ -177,7 +183,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     await waitFor(() => {
       const selectors = screen.getAllByTestId('mock-wizard-sbt-selector');
       const featuredSelector = selectors.find(
-        (node) => node.getAttribute('data-selector-id') === 'default-featured-sbts'
+        (node) => node.getAttribute('data-selector-id') === 'default-featured-sbts',
       );
       expect(featuredSelector).toHaveAttribute('data-selected-addresses', mockPendingSbtAddress);
     });
@@ -193,7 +199,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     await waitFor(() => {
       const selectors = screen.getAllByTestId('mock-wizard-sbt-selector');
       const featuredSelector = selectors.find(
-        (node) => node.getAttribute('data-selector-id') === 'default-featured-sbts'
+        (node) => node.getAttribute('data-selector-id') === 'default-featured-sbts',
       );
       expect(featuredSelector).toHaveAttribute('data-selected-addresses', '');
     });

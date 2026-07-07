@@ -57,10 +57,12 @@ describe('getUserAddressFromPath', () => {
 
 describe('buildSbtDetailRouteStatePatch', () => {
   it('builds the pinned SBT detail route state patch', () => {
-    expect(buildSbtDetailRouteStatePatch({
-      detailSlug: 'demo',
-      address: VALID_ADDRESS,
-    })).toEqual({
+    expect(
+      buildSbtDetailRouteStatePatch({
+        detailSlug: 'demo',
+        address: VALID_ADDRESS,
+      }),
+    ).toEqual({
       sbtDetailGroupSlug: 'demo',
       sbtDetailAddress: VALID_ADDRESS,
     });

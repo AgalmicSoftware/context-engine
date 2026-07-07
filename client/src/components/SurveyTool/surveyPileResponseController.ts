@@ -11,9 +11,12 @@ import {
 
 type CloneValue = <T>(value: T) => T;
 
-type PileQuestionLike = {
-  id?: unknown;
-} | null | undefined;
+type PileQuestionLike =
+  | {
+      id?: unknown;
+    }
+  | null
+  | undefined;
 
 type ApplyCachedResponseEntryToSlice = ({
   targetSlice,
@@ -32,9 +35,7 @@ type PileControllerState = Record<string, unknown> & {
   editBaseline?: Partial<PileResponseSlice> | null;
 };
 type SetStateUpdate =
-  | Record<string, unknown>
-  | null
-  | ((prevState: PileControllerState) => Record<string, unknown> | null);
+  Record<string, unknown> | null | ((prevState: PileControllerState) => Record<string, unknown> | null);
 type SetState = (update: SetStateUpdate, callback?: () => void) => unknown;
 
 const EMPTY_PILE_RESPONSE_SLICE = (): PileResponseSlice => ({
@@ -44,7 +45,7 @@ const EMPTY_PILE_RESPONSE_SLICE = (): PileResponseSlice => ({
   additionalComments: {},
 });
 
-const defaultCloneValue: CloneValue = <T,>(value: T): T => {
+const defaultCloneValue: CloneValue = <T>(value: T): T => {
   try {
     return JSON.parse(JSON.stringify(value));
   } catch {
@@ -94,9 +95,10 @@ export const buildPileCachePrefillStatePlan = ({
   const nextSlice = normalizeResponseSlice(currentSlice, cloneValue);
   const accountLower = String(account || '').toLowerCase();
   const questionList = Array.isArray(pileQuestions) ? pileQuestions : [];
-  const responseLookup = questionResponsesByQuestionId && typeof questionResponsesByQuestionId === 'object'
-    ? questionResponsesByQuestionId
-    : {};
+  const responseLookup =
+    questionResponsesByQuestionId && typeof questionResponsesByQuestionId === 'object'
+      ? questionResponsesByQuestionId
+      : {};
 
   questionList.forEach((question) => {
     const questionId = String(question?.id || '');
@@ -107,9 +109,8 @@ export const buildPileCachePrefillStatePlan = ({
 
     let parsedResponse: Record<string, unknown> | null = null;
     try {
-      parsedResponse = typeof rawResponse === 'string'
-        ? JSON.parse(rawResponse)
-        : rawResponse as Record<string, unknown>;
+      parsedResponse =
+        typeof rawResponse === 'string' ? JSON.parse(rawResponse) : (rawResponse as Record<string, unknown>);
     } catch {
       parsedResponse = null;
     }
@@ -245,7 +246,7 @@ export const executeEnsureVisiblePileResponseState = ({
       () => {
         if (!shouldRehydrateVisibleWindow) return;
         onRehydrateVisibleWindow();
-      }
+      },
     );
   } catch (error) {
     onError(error);

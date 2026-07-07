@@ -22,19 +22,20 @@ const renderSubmitFooter = ({
   responseUrl = '',
   submitButtonText = 'SUBMIT',
   submissionError = '',
-} = {}) => render(
-  <SurveyQuestionsSubmitFooter
-    displayState={displayState}
-    isSingleQuestionView={isSingleQuestionView}
-    isSubmitting={isSubmitting}
-    onPrimarySubmitClick={noop}
-    onRevertPendingChanges={noop}
-    pendingEditCount={pendingEditCount}
-    responseUrl={responseUrl}
-    submitButtonText={submitButtonText}
-    submissionError={submissionError}
-  />
-);
+} = {}) =>
+  render(
+    <SurveyQuestionsSubmitFooter
+      displayState={displayState}
+      isSingleQuestionView={isSingleQuestionView}
+      isSubmitting={isSubmitting}
+      onPrimarySubmitClick={noop}
+      onRevertPendingChanges={noop}
+      pendingEditCount={pendingEditCount}
+      responseUrl={responseUrl}
+      submitButtonText={submitButtonText}
+      submissionError={submissionError}
+    />,
+  );
 
 const baseRenderReadiness = {
   shouldShowLoadingState: false,
@@ -56,11 +57,7 @@ const baseSubmitDisplayState = {
   showTopInlineSubmit: false,
 };
 
-const renderSingleQuestionSurface = ({
-  responseUrl = '',
-  showSubmit = true,
-  viewingAnswers = false,
-} = {}) => {
+const renderSingleQuestionSurface = ({ responseUrl = '', showSubmit = true, viewingAnswers = false } = {}) => {
   const layoutDisplayState = buildSurveyQuestionsLayoutDisplayState({
     isSingleQuestionView: true,
     singleQuestionMode: true,
@@ -106,9 +103,7 @@ const renderSingleQuestionSurface = ({
         parsedViewAddressAnswers: { answer: { value: '*', encrypted: true } },
         questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
         questionPoolReady: true,
-        renderQuestionAnswer: jest.fn(() => (
-          <div data-testid="response-card-stub">Response Card</div>
-        )),
+        renderQuestionAnswer: jest.fn(() => <div data-testid="response-card-stub">Response Card</div>),
         responderAddress: viewingAnswers ? '0xdef' : '',
         singleQuestionMode: true,
       }}
@@ -149,12 +144,10 @@ const renderSingleQuestionSurface = ({
         onToggleResponseJson: noop,
         onToggleSurveyJson: noop,
         questionsJson: { questionID: 'q1' },
-        renderJsonTree: (json) => (
-          <pre>{JSON.stringify(json)}</pre>
-        ),
+        renderJsonTree: (json) => <pre>{JSON.stringify(json)}</pre>,
         responseJson: { responder: '0xdef' },
       }}
-    />
+    />,
   );
 };
 
@@ -210,7 +203,7 @@ describe('SurveyTool pending edit render affordances', () => {
         onStartFresh={noop}
         show={!routeViewDisplayState.isSingleQuestionView}
         userResponseEncrypted
-      />
+      />,
     );
 
     expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBeNull();
@@ -233,7 +226,7 @@ describe('SurveyTool pending edit render affordances', () => {
         onStartFresh={noop}
         show={!routeViewDisplayState.isSingleQuestionView}
         userResponseEncrypted
-      />
+      />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBeInTheDocument();
@@ -324,10 +317,12 @@ describe('SurveyTool pending edit render affordances', () => {
     // port note: the old unmounted class render asserted a private method call count.
     // The portable contract is that render-time display state consumes the already
     // snapshotted pending stats and does not need to invoke the recomputation seam.
-    expect(submitReadiness).toEqual(expect.objectContaining({
-      encryptedPendingEditCount: 1,
-      pendingEditCount: 2,
-    }));
+    expect(submitReadiness).toEqual(
+      expect.objectContaining({
+        encryptedPendingEditCount: 1,
+        pendingEditCount: 2,
+      }),
+    );
     expect(getPendingEditStats).not.toHaveBeenCalled();
   });
 });

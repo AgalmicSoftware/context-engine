@@ -17,25 +17,24 @@ import {
   faBookmark,
   faQrcode,
   faTimes,
-  faEraser
+  faEraser,
 } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import { arweaveClient as arweaveScripts } from '../../utilities/arweave/arweaveClient.js';
 import { resolvePublishArweaveUploadOptions } from '../../utilities/arweave/publishUploadAuth.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
-import contractScripts, { getSessionConfigBySlugOrDefault, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import contractScripts, {
+  getSessionConfigBySlugOrDefault,
+  normalizeSessionSlug,
+} from '../../utilities/web3/contractScripts.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import { fetchImageFromURL } from '../../utilities/ui/imageFetchClient.js'
+import { fetchImageFromURL } from '../../utilities/ui/imageFetchClient.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import styles from './CreateSBTGroup.module.scss';
 import { QRCodeSVG } from 'qrcode.react';
-import {
-  getChainById,
-  getSessionContractsForChain,
-  getSessionRegistryChains,
-} from '../../variables/chains.js';
+import { getChainById, getSessionContractsForChain, getSessionRegistryChains } from '../../variables/chains.js';
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import JsonDisplay from '../Shared/Json/JsonDisplay';
 import CETooltip from '../Shared/CETooltip';
@@ -45,19 +44,14 @@ import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
 import CreateSbtShareableBlock from './CreateSbtShareableBlock';
 
-import { cryptoUtils }  from '../../utilities/crypto/cryptography.js';
-import {
-  getGlobalLitHooks,
-  uploadEncryptedArweaveData,
-} from '../../utilities/crypto/litProtocol.js';
+import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
+import { getGlobalLitHooks, uploadEncryptedArweaveData } from '../../utilities/crypto/litProtocol.js';
 import { createLogger } from '../../utilities/logging.js';
 import { peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { getRelevantDefaultTags } from '../../utilities/defaultTags.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import {
-  normalizeGateMode,
-} from '../../utilities/web3/sponsoredAccess.js';
+import { normalizeGateMode } from '../../utilities/web3/sponsoredAccess.js';
 import { resolveSbtAddressFromFactoryReceipt } from '../../utilities/web3/sbtFactoryReceipt.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import {
@@ -74,10 +68,7 @@ import {
 import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { isCryptoMode, t } from '../../utilities/ui/terminology.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerAuth.js';
-import {
-  renderCreateSbtDistributionOptionsSection,
-  renderCreateSbtMintOptionsSection,
-} from './CreateSBTGroupSections';
+import { renderCreateSbtDistributionOptionsSection, renderCreateSbtMintOptionsSection } from './CreateSBTGroupSections';
 import {
   areMetadataLockGateMapsEqual,
   buildCreateSbtAutoCreate2SaltSource,
@@ -266,23 +257,24 @@ type CreateSbtRecoveryPersistArgs = {
   hasPasswordMintOnChain?: unknown;
   codesToStore?: unknown;
 };
-type CreateSbtRecoveryPersistResult = SbtPasswordRecoveryUpsertResult | {
-  ok: false;
-  status: 'empty-recovery-payload';
-};
+type CreateSbtRecoveryPersistResult =
+  | SbtPasswordRecoveryUpsertResult
+  | {
+      ok: false;
+      status: 'empty-recovery-payload';
+    };
 const createSbtContractScripts = contractScripts as unknown as CreateSbtContractScripts;
 const upsertSbtPasswordRecoveryCodesTyped = upsertSbtPasswordRecoveryCodes as unknown as (
-  args?: SbtPasswordRecoveryUpsertArgs
+  args?: SbtPasswordRecoveryUpsertArgs,
 ) => SbtPasswordRecoveryUpsertResult;
 
 const DEFAULT_SBT_IMAGE_ARWEAVE_TX = 'h8Z3ZLldhuZafwvUODixAeGZKg8ZBAuwH86UvNzRCuw';
 const DEFERRED_DRAFT_CREATE2_SALT_PREFIX = 'draft/';
-const buildDeferredDraftCreate2Salt = () => (
+const buildDeferredDraftCreate2Salt = () =>
   buildCreateSbtDeferredDraftCreate2Salt({
     prefix: DEFERRED_DRAFT_CREATE2_SALT_PREFIX,
     randomBytes: ethers.utils.randomBytes,
-  })
-);
+  });
 const LOCKED_FIELD_MASK = '[encrypted]';
 const DEFERRED_MODAL_SURFACE_BG = '#11182c';
 const DISTRIBUTION_OPTION_CONFIGS = Object.freeze([
@@ -309,18 +301,19 @@ const DISTRIBUTION_OPTION_CONFIGS = Object.freeze([
   },
 ]);
 
-type DistributionOptionConfig = typeof DISTRIBUTION_OPTION_CONFIGS[number];
+type DistributionOptionConfig = (typeof DISTRIBUTION_OPTION_CONFIGS)[number];
 type SelectableDistributionOptionConfig = DistributionOptionConfig & {
   selected: boolean;
   shouldUseActiveClass: boolean;
 };
 
-type CreateSbtSessionConfig = SessionConfig & Record<string, unknown> & {
-  contracts?: Record<string, unknown>;
-  corsWorkerUrl?: unknown;
-  networkChainId?: unknown;
-  slug?: unknown;
-};
+type CreateSbtSessionConfig = SessionConfig &
+  Record<string, unknown> & {
+    contracts?: Record<string, unknown>;
+    corsWorkerUrl?: unknown;
+    networkChainId?: unknown;
+    slug?: unknown;
+  };
 type CreateSbtSessionConfigSources = {
   slug: string;
   sessionConfigOverride: CreateSbtSessionConfig | null;
@@ -382,10 +375,7 @@ type CreateSbtSelectChangeEvent = {
     value: unknown;
   };
 };
-type CreateSbtCollapsibleSectionKey =
-  | 'tokenInfoCollapsed'
-  | 'mintOptionsCollapsed'
-  | 'distributionOptionsCollapsed';
+type CreateSbtCollapsibleSectionKey = 'tokenInfoCollapsed' | 'mintOptionsCollapsed' | 'distributionOptionsCollapsed';
 
 type SbtGateBoundary = NonNullable<Parameters<typeof normalizeGateMode>[0]> & Record<string, unknown>;
 type LitGateChainId = number | string | null;
@@ -671,8 +661,7 @@ type FinalizeDeferredCreateSbtDraftUploadResult = {
   authoringPayload: unknown;
 };
 type FinalizeDeferredCreateSbtStateUpdate =
-  | Record<string, unknown>
-  | ((state: Record<string, unknown>) => Record<string, unknown>);
+  Record<string, unknown> | ((state: Record<string, unknown>) => Record<string, unknown>);
 type FinalizeDeferredCreateSbtStateCallback = (() => void) | undefined;
 type CreateSbtLitHooks = Record<string, unknown> & {
   connectTimeout?: unknown;
@@ -690,11 +679,11 @@ const hasUsableSbtFactoryForChain = (chainId: unknown): boolean => {
 };
 
 const buildGateOptionsFromConfig = buildCreateSbtGateOptionsFromConfig as (
-  args?: BuildGateOptionsFromConfigArgs
+  args?: BuildGateOptionsFromConfigArgs,
 ) => GateOptionsResult;
 
 const buildGateOptionsFromSessionSources = buildCreateSbtGateOptionsFromSessionSources as (
-  args?: BuildGateOptionsFromSessionSourcesArgs
+  args?: BuildGateOptionsFromSessionSourcesArgs,
 ) => GateOptionsResult;
 
 class CreateSBTGroup extends Component<any, any> {
@@ -755,9 +744,8 @@ class CreateSBTGroup extends Component<any, any> {
     return new Blob([arr], { type: mime });
   };
 
-  getNormalizedDocumentUrlDraft = (value: unknown = this.state.documentUrl): string => (
-    normalizeCreateSbtDocumentUrlDraft(value)
-  );
+  getNormalizedDocumentUrlDraft = (value: unknown = this.state.documentUrl): string =>
+    normalizeCreateSbtDocumentUrlDraft(value);
 
   getEffectiveDocumentURLs = ({
     documentURLs = this.state.documentURLs,
@@ -787,9 +775,7 @@ class CreateSBTGroup extends Component<any, any> {
   _memoizedImageDataUrl: string | null = null;
   _memoizedImageFileRef: Blob | null = null;
 
-  getScopedFormCacheKey = (): string => (
-    getScopedCreateSbtFormCacheKey(this.getEffectiveSessionSlug())
-  );
+  getScopedFormCacheKey = (): string => getScopedCreateSbtFormCacheKey(this.getEffectiveSessionSlug());
 
   persistFormCache = (): void => {
     try {
@@ -821,25 +807,33 @@ class CreateSBTGroup extends Component<any, any> {
       // Async: serialize new image file (only if file ref changed)
       if (imageFile && imageFile !== this._memoizedImageFileRef) {
         const seq = ++this._cacheWriteSeq;
-        this._fileToDataUrl(imageFile).then((dataUrl: string) => {
-          if (seq !== this._cacheWriteSeq) return; // stale — discard
-          this._memoizedImageDataUrl = dataUrl;
-          this._memoizedImageFileRef = imageFile;
-          try {
-            const freshPayload = this.buildCachePayload();
-            freshPayload._imageDataUrl = dataUrl;
-            const fullJson = JSON.stringify(freshPayload);
-            sessionStorage.setItem(scopedCacheKey, fullJson);
-            sessionStorage.removeItem(LEGACY_CREATE_SBT_FORM_CACHE_KEY);
-            this._lastSavedCacheJSON = fullJson;
-          } catch (e) { sbtLog.warn('CreateSBTGroup: fallback', e); }
-        }).catch((e: unknown) => { sbtLog.warn('CreateSBTGroup: fallback', e); });
+        this._fileToDataUrl(imageFile)
+          .then((dataUrl: string) => {
+            if (seq !== this._cacheWriteSeq) return; // stale — discard
+            this._memoizedImageDataUrl = dataUrl;
+            this._memoizedImageFileRef = imageFile;
+            try {
+              const freshPayload = this.buildCachePayload();
+              freshPayload._imageDataUrl = dataUrl;
+              const fullJson = JSON.stringify(freshPayload);
+              sessionStorage.setItem(scopedCacheKey, fullJson);
+              sessionStorage.removeItem(LEGACY_CREATE_SBT_FORM_CACHE_KEY);
+              this._lastSavedCacheJSON = fullJson;
+            } catch (e) {
+              sbtLog.warn('CreateSBTGroup: fallback', e);
+            }
+          })
+          .catch((e: unknown) => {
+            sbtLog.warn('CreateSBTGroup: fallback', e);
+          });
       } else if (!imageFile) {
         ++this._cacheWriteSeq; // Invalidate any in-flight serialization
         this._memoizedImageDataUrl = null;
         this._memoizedImageFileRef = null;
       }
-    } catch (e) { sbtLog.warn('CreateSBTGroup: fallback', e); }
+    } catch (e) {
+      sbtLog.warn('CreateSBTGroup: fallback', e);
+    }
   };
 
   buildSerializableAuthoringPayload = async (): Promise<CreateSbtFormCachePayload> => {
@@ -905,22 +899,23 @@ class CreateSBTGroup extends Component<any, any> {
       documentUrl: this.getNormalizedDocumentUrlDraft(parsed.documentUrl),
       metadataLockGateIds: normalizeCreateSbtMetadataLockGateIdsForValidGates(
         restoredMetadataLockGateIds,
-        validGateIds
+        validGateIds,
       ),
       lockedImageAsset: null,
       openLockKey: '',
       deferredCreate2Salt: resolveCreateSbtRestoredDeferredCreate2Salt(
         parsed.deferredCreate2Salt,
-        this.state.deferredCreate2Salt
+        this.state.deferredCreate2Salt,
       ),
       predictableAddressEnabled: resolveCreateSbtRestoredPredictableAddressEnabled(
         parsed.predictableAddressEnabled,
-        this.state.predictableAddressEnabled
+        this.state.predictableAddressEnabled,
       ),
       imageLoadError: false,
-      sbtImageFile: typeof parsed._imageDataUrl === 'string' && parsed._imageDataUrl
-        ? this._dataUrlToBlob(parsed._imageDataUrl)
-        : null,
+      sbtImageFile:
+        typeof parsed._imageDataUrl === 'string' && parsed._imageDataUrl
+          ? this._dataUrlToBlob(parsed._imageDataUrl)
+          : null,
       ...buildCreateSbtRestoredCollapseState({
         currentDistributionOptionsCollapsed: this.state.distributionOptionsCollapsed,
         currentMintOptionsCollapsed: this.state.mintOptionsCollapsed,
@@ -967,7 +962,9 @@ class CreateSBTGroup extends Component<any, any> {
       try {
         sessionStorage.setItem(scopedCacheKey, raw);
         sessionStorage.removeItem(LEGACY_CREATE_SBT_FORM_CACHE_KEY);
-      } catch (e) { sbtLog.warn('CreateSBTGroup: fallback', e); }
+      } catch (e) {
+        sbtLog.warn('CreateSBTGroup: fallback', e);
+      }
       if (!this.applyAuthoringPayload(parsedRecord)) return false;
 
       // Keep last snapshot so we don't immediately rewrite
@@ -987,7 +984,9 @@ class CreateSBTGroup extends Component<any, any> {
       sessionStorage.removeItem(this.getScopedFormCacheKey());
 
       this._lastSavedCacheJSON = null;
-    } catch (e) { sbtLog.warn('CreateSBTGroup: fallback', e); }
+    } catch (e) {
+      sbtLog.warn('CreateSBTGroup: fallback', e);
+    }
   };
 
   getEffectiveSessionSlug = (): string => {
@@ -997,20 +996,20 @@ class CreateSBTGroup extends Component<any, any> {
     });
   };
 
-  getActiveLitHooks = (): CreateSbtLitHooks | null => (
-    (this.props.litHooks && typeof this.props.litHooks === 'object' ? this.props.litHooks : null) ||
-    getGlobalLitHooks()
-  ) as CreateSbtLitHooks | null;
+  getActiveLitHooks = (): CreateSbtLitHooks | null =>
+    ((this.props.litHooks && typeof this.props.litHooks === 'object' ? this.props.litHooks : null) ||
+      getGlobalLitHooks()) as CreateSbtLitHooks | null;
 
   getSessionConfigSources = (): CreateSbtSessionConfigSources => {
     const slug = this.getEffectiveSessionSlug();
     const sessionConfigOverride = isPlainObject(this.props.sessionConfigOverride)
       ? this.props.sessionConfigOverride
-      : (isPlainObject(this.props.sessionConfig) ? this.props.sessionConfig : null);
+      : isPlainObject(this.props.sessionConfig)
+        ? this.props.sessionConfig
+        : null;
     const registrySessionConfig = getSessionConfigBySlugOrDefault(slug);
-    const resolvedSessionConfig = sessionConfigOverride || (
-      isPlainObject(registrySessionConfig) ? registrySessionConfig : null
-    );
+    const resolvedSessionConfig =
+      sessionConfigOverride || (isPlainObject(registrySessionConfig) ? registrySessionConfig : null);
     return {
       slug,
       sessionConfigOverride,
@@ -1018,23 +1017,21 @@ class CreateSBTGroup extends Component<any, any> {
     };
   };
 
-  getAuthoringChainOptions = (): CreateSbtChainOption[] => (
+  getAuthoringChainOptions = (): CreateSbtChainOption[] =>
     resolveCreateSbtAuthoringChainOptions({
       getSessionRegistryChains,
       hasUsableSbtFactoryForChain,
-    }) as CreateSbtChainOption[]
-  );
+    }) as CreateSbtChainOption[];
 
   resolveAuthoringChainId = ({
     selectedChainId = null,
     sessionConfigOverride = undefined,
     resolvedSessionConfig = undefined,
   }: ResolveAuthoringChainIdArgs = {}): number | null => {
-    const sources = (
+    const sources =
       sessionConfigOverride === undefined || resolvedSessionConfig === undefined
         ? this.getSessionConfigSources()
-        : { sessionConfigOverride, resolvedSessionConfig }
-    );
+        : { sessionConfigOverride, resolvedSessionConfig };
     return resolveCreateSbtPreferredAuthoringChainId({
       selectedChainId,
       sessionConfigOverride: sources.sessionConfigOverride,
@@ -1044,17 +1041,16 @@ class CreateSBTGroup extends Component<any, any> {
     });
   };
 
-  getSelectedAuthoringChainId = (): number | null => (
-    this.resolveAuthoringChainId({ selectedChainId: this.state?.network })
-  );
+  getSelectedAuthoringChainId = (): number | null =>
+    this.resolveAuthoringChainId({ selectedChainId: this.state?.network });
 
   getSelectedAuthoringChain = (): CreateSbtChainOption | null => {
     const selectedChainId = this.getSelectedAuthoringChainId();
     if (!selectedChainId) return null;
-    const selectedChain = this.getAuthoringChainOptions().find((chain) => chain.id === selectedChainId) ||
-      getChainById(selectedChainId);
+    const selectedChain =
+      this.getAuthoringChainOptions().find((chain) => chain.id === selectedChainId) || getChainById(selectedChainId);
     return isPlainObject(selectedChain)
-      ? selectedChain as CreateSbtChainOption
+      ? (selectedChain as CreateSbtChainOption)
       : { id: selectedChainId, name: `Chain ${selectedChainId}` };
   };
 
@@ -1099,7 +1095,7 @@ class CreateSBTGroup extends Component<any, any> {
       ...resolvedSessionConfig,
       networkChainId: networkId,
       sbtFactoryAddress: getConfiguredContractAddress(contracts?.sbtFactory),
-      contracts
+      contracts,
     };
   };
 
@@ -1117,9 +1113,9 @@ class CreateSBTGroup extends Component<any, any> {
     const sessionConfig = this.getSessionConfigForNetwork();
     const authoringChainId = normalizePositiveChainId(
       sessionConfig?.networkChainId ||
-      this.getSelectedAuthoringChainId() ||
-      this.props.network?.id ||
-      this.props.network?.chainId
+        this.getSelectedAuthoringChainId() ||
+        this.props.network?.id ||
+        this.props.network?.chainId,
     );
     return {
       sessionSlug: toStr(this.getEffectiveSessionSlug() || sessionConfig?.slug || '').trim(),
@@ -1150,21 +1146,20 @@ class CreateSBTGroup extends Component<any, any> {
         providerLike: this.props.provider,
         chainId: normalizePositiveChainId(
           this.getSessionConfigForNetwork()?.networkChainId ||
-          this.getSelectedAuthoringChainId() ||
-          this.props.network?.id ||
-          this.props.network?.chainId
+            this.getSelectedAuthoringChainId() ||
+            this.props.network?.id ||
+            this.props.network?.chainId,
         ),
       },
     }) as Promise<ArweaveUploadKeyResult>;
   };
 
-  shouldSkipArweaveWorkerAuth = (): boolean => (
-    toStr(this.props.arweaveJwkOverride).trim() !== ''
-  );
+  shouldSkipArweaveWorkerAuth = (): boolean => toStr(this.props.arweaveJwkOverride).trim() !== '';
 
-  getArweaveUploadBootstrapAuth = async ({
-    workerUrl = '',
-  }: ArweaveBootstrapAuthArgs = {}): Promise<Record<string, unknown> | null> => {
+  getArweaveUploadBootstrapAuth = async ({ workerUrl = '' }: ArweaveBootstrapAuthArgs = {}): Promise<Record<
+    string,
+    unknown
+  > | null> => {
     if (!this.shouldSkipArweaveWorkerAuth()) return null;
     if (typeof this.props.signAdminAction !== 'function') {
       throw new Error('Arweave bootstrap signing is unavailable for this draft upload.');
@@ -1196,9 +1191,10 @@ class CreateSBTGroup extends Component<any, any> {
         allowDirectFallbackOnBootstrapFailure: true,
         requireAdminAuthWithoutJwk: false,
         missingAdminAuthMessage: 'Arweave bootstrap signing is unavailable for this draft upload.',
-        buildAdminAuth: ({ workerUrl: resolvedWorkerUrl }) => this.getArweaveUploadBootstrapAuth({
-          workerUrl: resolvedWorkerUrl,
-        }),
+        buildAdminAuth: ({ workerUrl: resolvedWorkerUrl }) =>
+          this.getArweaveUploadBootstrapAuth({
+            workerUrl: resolvedWorkerUrl,
+          }),
       })),
     };
   };
@@ -1208,7 +1204,8 @@ class CreateSBTGroup extends Component<any, any> {
       ? this.props.lockGateSessionSources
       : [];
     const sessionConfig = this.getSessionConfigForNetwork();
-    const chainIdFallback = this.getSelectedAuthoringChainId() ||
+    const chainIdFallback =
+      this.getSelectedAuthoringChainId() ||
       Number(sessionConfig?.networkChainId || this.props.network?.id || this.props.network?.chainId || 0) ||
       null;
     if (lockGateSessionSources.length > 0) {
@@ -1228,15 +1225,16 @@ class CreateSBTGroup extends Component<any, any> {
 
   getMetadataEncryptionContextBase = (): string => {
     const slug = normalizeSessionSlug(this.getEffectiveSessionSlug() || '');
-    const hashSuffix = String(this.state.groupHash || '').replace(/^0x/i, '').slice(0, 12);
+    const hashSuffix = String(this.state.groupHash || '')
+      .replace(/^0x/i, '')
+      .slice(0, 12);
     if (slug && hashSuffix) return `${slug}:${hashSuffix}`;
     if (hashSuffix) return `group:${hashSuffix}`;
     return slug || 'group';
   };
 
-  getMetadataLockGateIds = (fieldKey = ''): string[] => (
-    getMetadataFieldLockGateIds(this.state.metadataLockGateIds, fieldKey)
-  );
+  getMetadataLockGateIds = (fieldKey = ''): string[] =>
+    getMetadataFieldLockGateIds(this.state.metadataLockGateIds, fieldKey);
 
   normalizeSelectedGateIds = (value: unknown, validGateIds: unknown[] = []): string[] => {
     const normalized = normalizeGateIds(value);
@@ -1248,17 +1246,18 @@ class CreateSBTGroup extends Component<any, any> {
   setLockGateIds = (fieldKey: string, nextIds: unknown, validGateIds: unknown[] = []): void => {
     this.resetFormStateForEdit();
     this.setState(
-      (prev: MetadataLockStateDraft) => buildCreateSbtMetadataLockSelectionPatch({
-        fieldKey,
-        metadataLockGateIds: prev.metadataLockGateIds,
-        openLockKey: prev.openLockKey,
-        selectedGateIds: nextIds,
-        validGateIds,
-      }),
+      (prev: MetadataLockStateDraft) =>
+        buildCreateSbtMetadataLockSelectionPatch({
+          fieldKey,
+          metadataLockGateIds: prev.metadataLockGateIds,
+          openLockKey: prev.openLockKey,
+          selectedGateIds: nextIds,
+          validGateIds,
+        }),
       () => {
         this.updateGroupHash();
         this.persistFormCache();
-      }
+      },
     );
   };
 
@@ -1279,15 +1278,18 @@ class CreateSBTGroup extends Component<any, any> {
     const fallbackGateIds = this.normalizeSelectedGateIds(defaultGateId ? [defaultGateId] : [], validGateIds);
     if (normalizedSelected.length === 0 && fallbackGateIds.length > 0) {
       this.resetFormStateForEdit();
-      this.setState(buildCreateSbtMetadataLockFallbackPatch({
-        fallbackGateIds,
-        fieldKey,
-        lockKey,
-        metadataLockGateIds: this.state.metadataLockGateIds,
-      }), () => {
-        this.updateGroupHash();
-        this.persistFormCache();
-      });
+      this.setState(
+        buildCreateSbtMetadataLockFallbackPatch({
+          fallbackGateIds,
+          fieldKey,
+          lockKey,
+          metadataLockGateIds: this.state.metadataLockGateIds,
+        }),
+        () => {
+          this.updateGroupHash();
+          this.persistFormCache();
+        },
+      );
       return;
     }
 
@@ -1297,7 +1299,7 @@ class CreateSBTGroup extends Component<any, any> {
   buildGateObjectsAndRecipients = (
     gateIds: unknown,
     gateMap: Record<string, unknown> = {},
-    chainIdFallback: unknown = null
+    chainIdFallback: unknown = null,
   ): GateObjectsAndRecipientsResult => {
     return buildCreateSbtGateObjectsAndRecipients({
       gateIds,
@@ -1374,9 +1376,8 @@ class CreateSBTGroup extends Component<any, any> {
     return buildCreateSbtEncryptedImageAsset({ uploadResult }) as EncryptedImageAsset | null;
   };
 
-  buildPreviewEncryptedImageAsset = (): EncryptedImageAsset => (
-    buildCreateSbtPreviewEncryptedImageAsset(LOCKED_FIELD_MASK) as EncryptedImageAsset
-  );
+  buildPreviewEncryptedImageAsset = (): EncryptedImageAsset =>
+    buildCreateSbtPreviewEncryptedImageAsset(LOCKED_FIELD_MASK) as EncryptedImageAsset;
 
   buildFieldAccessDescriptor = ({
     gateIds = [],
@@ -1434,22 +1435,19 @@ class CreateSBTGroup extends Component<any, any> {
         syncedAuthoringChain: syncedChain,
       });
       if (chainSyncPatch) {
-        this.setState((currentState: { sbtDistribution: Record<string, unknown> }) => (
+        this.setState((currentState: { sbtDistribution: Record<string, unknown> }) =>
           buildCreateSbtAuthoringChainSyncStatePatch({
             currentDistribution: currentState.sbtDistribution,
             syncPatch: chainSyncPatch,
-          })
-        ));
+          }),
+        );
         return;
       }
     }
     if (lockAudienceChanged) {
       const validGateIds = Object.keys(this.resolveLockGateOptions().gateMap || {});
       const normalizedLocks = normalizeMetadataLockGateIds(this.state.metadataLockGateIds);
-      const scrubbedLocks = normalizeCreateSbtMetadataLockGateIdsForValidGates(
-        normalizedLocks,
-        validGateIds
-      );
+      const scrubbedLocks = normalizeCreateSbtMetadataLockGateIdsForValidGates(normalizedLocks, validGateIds);
       if (!areMetadataLockGateMapsEqual(normalizedLocks, scrubbedLocks)) {
         this.setState(buildCreateSbtMetadataLockGateIdsPatch({ metadataLockGateIds: scrubbedLocks }));
         return;
@@ -1461,22 +1459,19 @@ class CreateSBTGroup extends Component<any, any> {
       prevAccount: prevProps.account,
     });
     if (accountDistributionPatch) {
-      this.setState((currentState: { sbtDistribution: Record<string, unknown> }) => (
+      this.setState((currentState: { sbtDistribution: Record<string, unknown> }) =>
         buildCreateSbtAccountDistributionSyncStatePatch({
           currentDistribution: currentState.sbtDistribution,
           syncPatch: accountDistributionPatch,
-        })
-      ));
+        }),
+      );
       return;
     }
     if (prevProps.defaultSbtTags !== this.props.defaultSbtTags) {
       this.syncRelevantDefaultTags({ replaceAutoApplied: true, resetDismissed: true });
     }
 
-    if (
-      this.state.sbtName !== prevState.sbtName ||
-      this.state.sbtDescription !== prevState.sbtDescription
-    ) {
+    if (this.state.sbtName !== prevState.sbtName || this.state.sbtDescription !== prevState.sbtDescription) {
       this.syncRelevantDefaultTags();
     }
 
@@ -1534,24 +1529,23 @@ class CreateSBTGroup extends Component<any, any> {
     this.countdownTimer = null;
   };
 
-  scheduleTrackedStateReset = (
-    timerKey: string,
-    nextState: Record<string, unknown>,
-    delayMs: unknown
-  ): void => {
+  scheduleTrackedStateReset = (timerKey: string, nextState: Record<string, unknown>, delayMs: unknown): void => {
     if (!timerKey) return;
     const existing = this._trackedTimeouts.get(timerKey);
     if (existing) {
       clearTimeout(existing);
       this._trackedTimeouts.delete(timerKey);
     }
-    const timeoutId = setTimeout(() => {
-      if (this._trackedTimeouts.get(timerKey) === timeoutId) {
-        this._trackedTimeouts.delete(timerKey);
-      }
-      if (!this._isMounted) return;
-      this.setState(nextState);
-    }, Math.max(0, Number(delayMs) || 0));
+    const timeoutId = setTimeout(
+      () => {
+        if (this._trackedTimeouts.get(timerKey) === timeoutId) {
+          this._trackedTimeouts.delete(timerKey);
+        }
+        if (!this._isMounted) return;
+        this.setState(nextState);
+      },
+      Math.max(0, Number(delayMs) || 0),
+    );
     this._trackedTimeouts.set(timerKey, timeoutId);
   };
 
@@ -1567,19 +1561,17 @@ class CreateSBTGroup extends Component<any, any> {
     this.predictAddressTimer = null;
   };
 
-  setStateAsync = (update: Parameters<CreateSBTGroup['setState']>[0]): Promise<void> => (
-    new Promise((resolve) => this.setState(update, () => resolve()))
-  );
+  setStateAsync = (update: Parameters<CreateSBTGroup['setState']>[0]): Promise<void> =>
+    new Promise((resolve) => this.setState(update, () => resolve()));
 
   isDeferredDeployMode = (): boolean => !!this.props.deferredDeploy;
 
-  isPredictableAddressEnabled = (): boolean => (
+  isPredictableAddressEnabled = (): boolean =>
     resolveCreateSbtPredictableAddressActive({
       create2Salt: this.state.create2Salt,
       deferredDeployMode: this.isDeferredDeployMode(),
       predictableAddressEnabled: this.state.predictableAddressEnabled,
-    })
-  );
+    });
 
   maybeClearAutoPredictableAddressForGroupPasswordExit = (prevState: CreateSbtLifecycleState): boolean => {
     const prevDistributionOption = prevState?.sbtDistribution?.distributionOption;
@@ -1615,12 +1607,11 @@ class CreateSBTGroup extends Component<any, any> {
     return true;
   };
 
-  shouldHideNetworkSelector = (): boolean => (
+  shouldHideNetworkSelector = (): boolean =>
     shouldHideCreateSbtNetworkSelector({
       deferredDeploy: this.props.deferredDeploy,
       hideNetworkSelector: this.props.hideNetworkSelector,
-    })
-  );
+    });
 
   buildAutoCreate2SaltSource = (): string => {
     return buildCreateSbtAutoCreate2SaltSource({
@@ -1680,28 +1671,17 @@ class CreateSBTGroup extends Component<any, any> {
       groupPassword: rawGroupPassword,
       metadataLockGateIds,
     } = this.state;
-    const {
-      isLimited,
-      limitedNumber,
-      burnAdmin,
-      isTimeLimited,
-      burnAuth,
-      distributionOption,
-      mintingEndTime,
-    } = sbtDistribution || {};
-    const {
-      adminAddress,
-      limitedCount,
-      sbtNameTrimmed,
-      unavailableReason,
-    } = resolveCreateSbtPredictableDeployBaseState({
-      account: this.props.account,
-      burnAdmin,
-      isLimited,
-      limitedNumber,
-      sbtName,
-      walletLowerLabel: t('walletLower'),
-    });
+    const { isLimited, limitedNumber, burnAdmin, isTimeLimited, burnAuth, distributionOption, mintingEndTime } =
+      sbtDistribution || {};
+    const { adminAddress, limitedCount, sbtNameTrimmed, unavailableReason } =
+      resolveCreateSbtPredictableDeployBaseState({
+        account: this.props.account,
+        burnAdmin,
+        isLimited,
+        limitedNumber,
+        sbtName,
+        walletLowerLabel: t('walletLower'),
+      });
     if (unavailableReason) return { unavailableReason };
 
     const mintModeOnChain = deriveSbtMintModeFromDistribution({ distributionOption, isLimited: !!isLimited });
@@ -1710,7 +1690,9 @@ class CreateSBTGroup extends Component<any, any> {
     const hasPasswordMintOnChain = hasPasswordMintForSbtMintMode(mintModeOnChain);
 
     const targetPasswordCount = usesClaimCodes
-      ? (isLimited && limitedCount > 0 ? limitedCount : Math.max(1, Number(numInviteLinks || 0) || 0))
+      ? isLimited && limitedCount > 0
+        ? limitedCount
+        : Math.max(1, Number(numInviteLinks || 0) || 0)
       : 0;
     const passwordList = this.ensurePredictablePasswordList({
       usesClaimCodes,
@@ -1744,9 +1726,7 @@ class CreateSBTGroup extends Component<any, any> {
       symbol,
       limitedNumber: isLimited ? limitedCount : 0,
       adminAddress,
-      mintingEndTimeUnix: (isTimeLimited && mintingEndTime)
-        ? Math.floor(new Date(mintingEndTime).getTime() / 1000)
-        : 0,
+      mintingEndTimeUnix: isTimeLimited && mintingEndTime ? Math.floor(new Date(mintingEndTime).getTime() / 1000) : 0,
       mintModeOnChain,
       hasPasswordMintOnChain,
       burnAuthEnum,
@@ -1789,7 +1769,7 @@ class CreateSBTGroup extends Component<any, any> {
 
   resolvePredictedAddressForShape = async (
     predictionShape: PredictableDeployShape,
-    { allowCached = true }: ResolvePredictedAddressOptions = {}
+    { allowCached = true }: ResolvePredictedAddressOptions = {},
   ): Promise<PredictedAddressResult> => {
     const predictionSignature = this.buildPredictableDeploySignature(predictionShape);
     const cachedResult = resolveCreateSbtPredictedAddressCacheHit({
@@ -1817,7 +1797,7 @@ class CreateSBTGroup extends Component<any, any> {
       {
         useConfiguredDeterministic: true,
         initializeGroupPasswordHash: predictionShape.initializeGroupPasswordHash,
-      }
+      },
     );
 
     return {
@@ -1826,58 +1806,61 @@ class CreateSBTGroup extends Component<any, any> {
     };
   };
 
-  refreshPredictedAddress = async ({
-    requestSeq = null,
-  }: RefreshPredictedAddressArgs = {}): Promise<void> => {
-    const activeRequestSeq = requestSeq == null
-      ? (this._predictAddressRequestSeq += 1)
-      : requestSeq;
+  refreshPredictedAddress = async ({ requestSeq = null }: RefreshPredictedAddressArgs = {}): Promise<void> => {
+    const activeRequestSeq = requestSeq == null ? (this._predictAddressRequestSeq += 1) : requestSeq;
     const predictionShape = this.buildPredictableDeployShape();
     if (!predictionShape) {
       if (activeRequestSeq !== this._predictAddressRequestSeq) return;
       this._predictedAddressShapeSignature = '';
-      this.setState(buildCreateSbtPredictedAddressPatch({
-        predictedAddress: '',
-        predictedAddressStatus: '',
-        predictedAddressBusy: false,
-      }));
+      this.setState(
+        buildCreateSbtPredictedAddressPatch({
+          predictedAddress: '',
+          predictedAddressStatus: '',
+          predictedAddressBusy: false,
+        }),
+      );
       return;
     }
     if (predictionShape.pendingStateUpdate) return;
     if (predictionShape.unavailableReason) {
       if (activeRequestSeq !== this._predictAddressRequestSeq) return;
       this._predictedAddressShapeSignature = '';
-      this.setState(buildCreateSbtPredictedAddressPatch({
-        predictedAddress: '',
-        predictedAddressStatus: predictionShape.unavailableReason,
-        predictedAddressBusy: false,
-      }));
+      this.setState(
+        buildCreateSbtPredictedAddressPatch({
+          predictedAddress: '',
+          predictedAddressStatus: predictionShape.unavailableReason,
+          predictedAddressBusy: false,
+        }),
+      );
       return;
     }
 
     this.setState(buildCreateSbtPredictedAddressBusyPatch());
     try {
-      const { predictedAddress, predictionSignature } = await this.resolvePredictedAddressForShape(
-        predictionShape,
-        { allowCached: false }
-      );
+      const { predictedAddress, predictionSignature } = await this.resolvePredictedAddressForShape(predictionShape, {
+        allowCached: false,
+      });
       if (activeRequestSeq !== this._predictAddressRequestSeq || !this._isMounted) return;
       // Regression guard: older async predictions can resolve after later edits.
       // Only the latest request may publish a preview as authoritative.
       this._predictedAddressShapeSignature = predictionSignature;
-      this.setState(buildCreateSbtPredictedAddressPatch({
-        predictedAddress,
-        predictedAddressStatus: predictedAddress ? '' : `No ${t('sbt')} factory configured for this session.`,
-        predictedAddressBusy: false,
-      }));
+      this.setState(
+        buildCreateSbtPredictedAddressPatch({
+          predictedAddress,
+          predictedAddressStatus: predictedAddress ? '' : `No ${t('sbt')} factory configured for this session.`,
+          predictedAddressBusy: false,
+        }),
+      );
     } catch (error) {
       if (activeRequestSeq !== this._predictAddressRequestSeq || !this._isMounted) return;
       this._predictedAddressShapeSignature = '';
-      this.setState(buildCreateSbtPredictedAddressPatch({
-        predictedAddress: '',
-        predictedAddressStatus: getErrorMessage(error, 'Unable to calculate the predicted address.'),
-        predictedAddressBusy: false,
-      }));
+      this.setState(
+        buildCreateSbtPredictedAddressPatch({
+          predictedAddress: '',
+          predictedAddressStatus: getErrorMessage(error, 'Unable to calculate the predicted address.'),
+          predictedAddressBusy: false,
+        }),
+      );
     }
   };
 
@@ -1886,11 +1869,13 @@ class CreateSBTGroup extends Component<any, any> {
     this._predictedAddressShapeSignature = '';
     if (!this.isPredictableAddressEnabled()) {
       this._predictAddressRequestSeq += 1;
-      this.setState(buildCreateSbtPredictedAddressPatch({
-        predictedAddress: '',
-        predictedAddressStatus: '',
-        predictedAddressBusy: false,
-      }));
+      this.setState(
+        buildCreateSbtPredictedAddressPatch({
+          predictedAddress: '',
+          predictedAddressStatus: '',
+          predictedAddressBusy: false,
+        }),
+      );
       return;
     }
     const requestSeq = ++this._predictAddressRequestSeq;
@@ -1909,7 +1894,7 @@ class CreateSBTGroup extends Component<any, any> {
   loadBookmarks = (): void => {
     try {
       const parsedRaw = peekCacheSync('bookmarksCache', this.getBookmarksSlug(), { clone: false });
-      const parsed = isPlainObject(parsedRaw) ? parsedRaw as BookmarkCachePayload : { sbts: [] };
+      const parsed = isPlainObject(parsedRaw) ? (parsedRaw as BookmarkCachePayload) : { sbts: [] };
       // Handle legacy cache structure or missing keys
       const list = Array.isArray(parsed.sbts) ? parsed.sbts : [];
       const s = new Set<string>(list.map((x) => String(x).toLowerCase()));
@@ -1956,12 +1941,8 @@ class CreateSBTGroup extends Component<any, any> {
     return parseDefaultSbtTags(this.props.defaultSbtTags);
   };
 
-  getRelevantDefaultTags = (): string[] => (
-    getRelevantDefaultTags(
-      [this.state.sbtName, this.state.sbtDescription],
-      this.getDefaultTags()
-    )
-  );
+  getRelevantDefaultTags = (): string[] =>
+    getRelevantDefaultTags([this.state.sbtName, this.state.sbtDescription], this.getDefaultTags());
 
   buildUniqueTags = (rawTags: unknown = []): string[] => {
     return buildUniqueTagList(rawTags);
@@ -1992,14 +1973,17 @@ class CreateSBTGroup extends Component<any, any> {
     this.clearFormCache();
     this._autoCreate2SaltForGroupPassword = false;
 
-    this.setState(buildCreateSbtResetFormState({
-      account: this.props.account,
-      authoringChain: nextAuthoringChain,
-      deferredCreate2SaltBuilder: buildDeferredDraftCreate2Salt,
-      deferredDeploy: this.props.deferredDeploy,
-    }), () => {
-      this.updateGroupHash();
-    });
+    this.setState(
+      buildCreateSbtResetFormState({
+        account: this.props.account,
+        authoringChain: nextAuthoringChain,
+        deferredCreate2SaltBuilder: buildDeferredDraftCreate2Salt,
+        deferredDeploy: this.props.deferredDeploy,
+      }),
+      () => {
+        this.updateGroupHash();
+      },
+    );
   };
 
   resetFormStateForEdit = (): void => {
@@ -2010,17 +1994,20 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   toggleShowJson = (): void => {
-    this.setState((prevState: Record<string, unknown>) => buildCreateSbtBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showJson',
-    }));
+    this.setState((prevState: Record<string, unknown>) =>
+      buildCreateSbtBooleanTogglePatch({
+        state: prevState,
+        stateKey: 'showJson',
+      }),
+    );
   };
 
   buildSessionAutoJoinUrl = (sbtAddressOverride: unknown = null): string => {
     const sbtAddress = String(sbtAddressOverride || this.state?.sbtAddress || '').trim();
-    const origin = (typeof window !== 'undefined' && window.location?.origin)
-      ? String(window.location.origin).replace(/\/+$/, '')
-      : '';
+    const origin =
+      typeof window !== 'undefined' && window.location?.origin
+        ? String(window.location.origin).replace(/\/+$/, '')
+        : '';
     return buildCreateSbtAutoJoinUrl({
       origin,
       basePath: readPublicUrlBasePath(),
@@ -2029,12 +2016,11 @@ class CreateSBTGroup extends Component<any, any> {
     });
   };
 
-  buildSbtPagePath = (sbtAddressOverride: unknown = null): string => (
+  buildSbtPagePath = (sbtAddressOverride: unknown = null): string =>
     buildSbtDetailPath(
       String(sbtAddressOverride || this.state?.sbtAddress || '').trim(),
-      this.getEffectiveSessionSlug()
-    )
-  );
+      this.getEffectiveSessionSlug(),
+    );
 
   copySbtLinkToClipboard = (): void => {
     const { shareableUrl } = this.state;
@@ -2046,7 +2032,7 @@ class CreateSBTGroup extends Component<any, any> {
       this.scheduleTrackedStateReset(
         'copyLinkSuccess',
         buildCreateSbtCopySuccessPatch({ stateKey: 'copyLinkSuccess', copied: false }),
-        2000
+        2000,
       );
     });
   };
@@ -2061,7 +2047,7 @@ class CreateSBTGroup extends Component<any, any> {
       this.scheduleTrackedStateReset(
         'copyIdSuccess',
         buildCreateSbtCopySuccessPatch({ stateKey: 'copyIdSuccess', copied: false }),
-        2000
+        2000,
       );
     });
   };
@@ -2076,10 +2062,13 @@ class CreateSBTGroup extends Component<any, any> {
         this.scheduleTrackedStateReset(
           'copyJsonSuccess',
           buildCreateSbtCopySuccessPatch({ stateKey: 'copyJsonSuccess', copied: false }),
-          1500
+          1500,
         );
       });
-    } catch (e) { void e; notify.warn('Copy failed'); }
+    } catch (e) {
+      void e;
+      notify.warn('Copy failed');
+    }
   };
 
   handleInputChange = (event: CreateSbtInputChangeEvent): void => {
@@ -2097,12 +2086,16 @@ class CreateSBTGroup extends Component<any, any> {
     if (name.startsWith('sbtDistribution.')) {
       const key = name.split('.')[1];
       this.setState(
-        (prevState: CreateSbtLifecycleState) => buildCreateSbtDistributionFieldPatch({
-          fieldKey: key,
-          fieldValue: value,
-          state: prevState,
-        }),
-        () => { this.updateGroupHash(); this.persistFormCache(); }
+        (prevState: CreateSbtLifecycleState) =>
+          buildCreateSbtDistributionFieldPatch({
+            fieldKey: key,
+            fieldValue: value,
+            state: prevState,
+          }),
+        () => {
+          this.updateGroupHash();
+          this.persistFormCache();
+        },
       );
     } else {
       this.setState(buildCreateSbtInputChangePatch({ name, value }), () => {
@@ -2118,20 +2111,26 @@ class CreateSBTGroup extends Component<any, any> {
           if (trimmedUrl !== '' && fetchableUrl) {
             try {
               const file = await fetchImageFromURL(fetchableUrl);
-              this.setState(buildCreateSbtImageFilePatch({
-                clearLockedAsset: true,
-                file,
-              }), () => {
-                this.updateGroupHash();
-                this.persistFormCache();
-              });
+              this.setState(
+                buildCreateSbtImageFilePatch({
+                  clearLockedAsset: true,
+                  file,
+                }),
+                () => {
+                  this.updateGroupHash();
+                  this.persistFormCache();
+                },
+              );
             } catch (error) {
-              sbtLog.error("Failed to fetch image via worker:", error);
-              this.setState(buildCreateSbtImageLoadErrorPatch({
-                clearLockedAsset: true,
-              }), () => {
-                this.persistFormCache();
-              });
+              sbtLog.error('Failed to fetch image via worker:', error);
+              this.setState(
+                buildCreateSbtImageLoadErrorPatch({
+                  clearLockedAsset: true,
+                }),
+                () => {
+                  this.persistFormCache();
+                },
+              );
             }
           } else {
             this.setState(buildCreateSbtImageFileClearPatch({ clearLockedAsset: true }), () => this.persistFormCache());
@@ -2141,24 +2140,24 @@ class CreateSBTGroup extends Component<any, any> {
     }
   };
 
-
   handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0] || null;
     this.applySelectedImageFile(file);
   };
 
-  applySelectedImageFile = (file: Blob | null | undefined, {
-    useImageUrl = false,
-    statusText = '',
-    statusTone = 'default',
-  }: ApplySelectedImageFileOptions = {}): boolean => {
+  applySelectedImageFile = (
+    file: Blob | null | undefined,
+    { useImageUrl = false, statusText = '', statusTone = 'default' }: ApplySelectedImageFileOptions = {},
+  ): boolean => {
     if (file && file.size > 10 * 1024 * 1024) {
-      sbtLog.error("Image too large (>10MB)");
+      sbtLog.error('Image too large (>10MB)');
       if (statusText) {
-        this.setState(buildCreateSbtImageChooserStatusPatch({
-          statusText,
-          statusTone,
-        }));
+        this.setState(
+          buildCreateSbtImageChooserStatusPatch({
+            statusText,
+            statusTone,
+          }),
+        );
       }
       return false;
     }
@@ -2170,7 +2169,10 @@ class CreateSBTGroup extends Component<any, any> {
         statusTone,
         useImageUrl,
       }),
-      () => { this.updateGroupHash(); this.persistFormCache(); }
+      () => {
+        this.updateGroupHash();
+        this.persistFormCache();
+      },
     );
     return true;
   };
@@ -2193,10 +2195,12 @@ class CreateSBTGroup extends Component<any, any> {
         useImageUrl: false,
       });
       if (!applied) {
-        this.setState(buildCreateSbtImageChooserStatusPatch({
-          statusText: 'Image too large (>10MB)',
-          statusTone: 'error',
-        }));
+        this.setState(
+          buildCreateSbtImageChooserStatusPatch({
+            statusText: 'Image too large (>10MB)',
+            statusTone: 'error',
+          }),
+        );
       }
       return;
     }
@@ -2205,42 +2209,52 @@ class CreateSBTGroup extends Component<any, any> {
       const pastedUrl = String(clipboardResult.text || '').trim();
       const fetchableUrl = this.getFetchableImageUrl(pastedUrl);
       if (!fetchableUrl) {
-        this.setState(buildCreateSbtImageChooserStatusPatch({
-          statusText: clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
-          statusTone: 'error',
-        }));
+        this.setState(
+          buildCreateSbtImageChooserStatusPatch({
+            statusText: clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
+            statusTone: 'error',
+          }),
+        );
         return;
       }
 
-      this.setState(buildCreateSbtImageChooserStatusPatch({
-        statusText: 'Loading preview...',
-        statusTone: 'loading',
-      }));
+      this.setState(
+        buildCreateSbtImageChooserStatusPatch({
+          statusText: 'Loading preview...',
+          statusTone: 'loading',
+        }),
+      );
 
       try {
         const file = await fetchImageFromURL(fetchableUrl);
         this.resetFormStateForEdit();
-        await this.setStateAsync(buildCreateSbtSelectedImageFilePatch({
-          file,
-          sbtImageUrl: pastedUrl,
-          useImageUrl: true,
-        }));
+        await this.setStateAsync(
+          buildCreateSbtSelectedImageFilePatch({
+            file,
+            sbtImageUrl: pastedUrl,
+            useImageUrl: true,
+          }),
+        );
         this.updateGroupHash();
         this.persistFormCache();
       } catch (error) {
-        sbtLog.error("Failed to fetch pasted image via worker:", error);
-        this.setState(buildCreateSbtImageChooserStatusPatch({
-          statusText: getErrorMessage(error, 'Image preview unavailable.'),
-          statusTone: 'error',
-        }));
+        sbtLog.error('Failed to fetch pasted image via worker:', error);
+        this.setState(
+          buildCreateSbtImageChooserStatusPatch({
+            statusText: getErrorMessage(error, 'Image preview unavailable.'),
+            statusTone: 'error',
+          }),
+        );
       }
       return;
     }
 
-    this.setState(buildCreateSbtImageChooserStatusPatch({
-      statusText: clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
-      statusTone: 'error',
-    }));
+    this.setState(
+      buildCreateSbtImageChooserStatusPatch({
+        statusText: clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
+        statusTone: 'error',
+      }),
+    );
   };
 
   toggleImageUploadMethod = (): void => {
@@ -2249,11 +2263,14 @@ class CreateSBTGroup extends Component<any, any> {
 
   setImageUploadMethod = (useImageUrl: unknown, afterUpdate: (() => void) | null = null): void => {
     this.resetFormStateForEdit();
-    this.setState(() => buildCreateSbtImageUploadMethodPatch({ useImageUrl }), () => {
-      this.updateGroupHash();
-      this.persistFormCache();
-      if (typeof afterUpdate === 'function') afterUpdate();
-    });
+    this.setState(
+      () => buildCreateSbtImageUploadMethodPatch({ useImageUrl }),
+      () => {
+        this.updateGroupHash();
+        this.persistFormCache();
+        if (typeof afterUpdate === 'function') afterUpdate();
+      },
+    );
   };
 
   openImageUploadPicker = (): void => {
@@ -2267,16 +2284,19 @@ class CreateSBTGroup extends Component<any, any> {
 
   resetImage = (): void => {
     this.resetFormStateForEdit();
-    this.setState(buildCreateSbtImageResetPatch(), () => { this.updateGroupHash(); this.persistFormCache(); });
+    this.setState(buildCreateSbtImageResetPatch(), () => {
+      this.updateGroupHash();
+      this.persistFormCache();
+    });
   };
 
   toggleCollapse = (section: CreateSbtCollapsibleSectionKey): void => {
-    this.setState((prevState: Record<CreateSbtCollapsibleSectionKey, boolean>) => (
+    this.setState((prevState: Record<CreateSbtCollapsibleSectionKey, boolean>) =>
       buildCreateSbtCollapseTogglePatch({
         section,
         state: prevState,
-      })
-    ));
+      }),
+    );
   };
 
   renderCollapsibleHeader = (title: string, sectionKey: CreateSbtCollapsibleSectionKey): JSX.Element => {
@@ -2338,25 +2358,31 @@ class CreateSBTGroup extends Component<any, any> {
   handleMintingEndTimeChange = (date: unknown): void => {
     this.resetFormStateForEdit();
     this.setState(
-      (prevState: { sbtDistribution: Record<string, unknown> }) => buildCreateSbtDistributionFieldPatch({
-        fieldKey: 'mintingEndTime',
-        fieldValue: date,
-        state: prevState,
-      }),
-      () => { this.updateGroupHash(); this.persistFormCache(); }
+      (prevState: { sbtDistribution: Record<string, unknown> }) =>
+        buildCreateSbtDistributionFieldPatch({
+          fieldKey: 'mintingEndTime',
+          fieldValue: date,
+          state: prevState,
+        }),
+      () => {
+        this.updateGroupHash();
+        this.persistFormCache();
+      },
     );
   };
 
   handleBurnAuthChange = (event: CreateSbtSelectChangeEvent): void => {
     this.resetFormStateForEdit();
     const value = event.target.value;
-    this.setState((prevState: { sbtDistribution: Record<string, unknown> }) => (
-      buildCreateSbtDistributionFieldPatch({
-        fieldKey: 'burnAuth',
-        fieldValue: value,
-        state: prevState,
-      })
-    ), this.persistFormCache);
+    this.setState(
+      (prevState: { sbtDistribution: Record<string, unknown> }) =>
+        buildCreateSbtDistributionFieldPatch({
+          fieldKey: 'burnAuth',
+          fieldValue: value,
+          state: prevState,
+        }),
+      this.persistFormCache,
+    );
   };
 
   /* =========================
@@ -2379,31 +2405,38 @@ class CreateSBTGroup extends Component<any, any> {
       return;
     }
 
-    this.setState((prev: CreateSbtTagStateDraft) => buildCreateSbtTagAdditionState({
-      autoAppliedDefaultTags: prev.autoAppliedDefaultTags,
-      dismissedDefaultTags: prev.dismissedDefaultTags,
-      tagValue: val,
-      tags: prev.tags,
-    }), () => {
-      this.persistFormCache();
-    });
+    this.setState(
+      (prev: CreateSbtTagStateDraft) =>
+        buildCreateSbtTagAdditionState({
+          autoAppliedDefaultTags: prev.autoAppliedDefaultTags,
+          dismissedDefaultTags: prev.dismissedDefaultTags,
+          tagValue: val,
+          tags: prev.tags,
+        }),
+      () => {
+        this.persistFormCache();
+      },
+    );
   };
 
   removeTag = (indexToRemove: unknown): void => {
     const removeIndex = Number(indexToRemove);
     const removedTag = this.state.tags[removeIndex];
-    this.setState((prev: CreateSbtTagStateDraft) => ({
-      ...buildCreateSbtTagRemovalState({
-        autoAppliedDefaultTags: prev.autoAppliedDefaultTags,
-        defaultTags: this.getDefaultTags(),
-        dismissedDefaultTags: prev.dismissedDefaultTags,
-        indexToRemove: removeIndex,
-        removedTag,
-        tags: prev.tags,
+    this.setState(
+      (prev: CreateSbtTagStateDraft) => ({
+        ...buildCreateSbtTagRemovalState({
+          autoAppliedDefaultTags: prev.autoAppliedDefaultTags,
+          defaultTags: this.getDefaultTags(),
+          dismissedDefaultTags: prev.dismissedDefaultTags,
+          indexToRemove: removeIndex,
+          removedTag,
+          tags: prev.tags,
+        }),
       }),
-    }), () => {
-      this.persistFormCache();
-    });
+      () => {
+        this.persistFormCache();
+      },
+    );
   };
 
   startClaim = async (): Promise<void> => {
@@ -2412,13 +2445,14 @@ class CreateSBTGroup extends Component<any, any> {
     this.setState(buildCreateSbtCountdownStartPatch());
     this.countdownTimer = setInterval(() => {
       if (!this._isMounted) return;
-      this.setState((prevState: Record<string, unknown>) => (
-        buildCreateSbtCountdownTickPatch({ state: prevState })
-      ), () => {
-        if (this.state.countdown === 0) {
-          this.clearCountdownTimer();
-        }
-      });
+      this.setState(
+        (prevState: Record<string, unknown>) => buildCreateSbtCountdownTickPatch({ state: prevState }),
+        () => {
+          if (this.state.countdown === 0) {
+            this.clearCountdownTimer();
+          }
+        },
+      );
     }, 1000);
   };
 
@@ -2435,31 +2469,22 @@ class CreateSBTGroup extends Component<any, any> {
 
   generateInviteNonces = (count: unknown): string[] => {
     return generateCreateSbtInviteNonces({
-      bytesToNonce: (bytes: Uint8Array | number[]) => (
-        ethers.BigNumber.from(ethers.utils.hexlify(bytes)).toString()
-      ),
+      bytesToNonce: (bytes: Uint8Array | number[]) => ethers.BigNumber.from(ethers.utils.hexlify(bytes)).toString(),
       count,
-      getRandomValues: (
-        typeof window !== 'undefined' &&
-        window.crypto &&
-        typeof window.crypto.getRandomValues === 'function'
-      )
-        ? (arr: Uint8Array) => window.crypto.getRandomValues(arr)
-        : null,
+      getRandomValues:
+        typeof window !== 'undefined' && window.crypto && typeof window.crypto.getRandomValues === 'function'
+          ? (arr: Uint8Array) => window.crypto.getRandomValues(arr)
+          : null,
       randomBytes: ethers.utils.randomBytes,
     });
   };
 
-
   generateRandomString = (length: unknown): string => {
     return generateCreateSbtRandomHexString({
-      getRandomValues: (
-        typeof window !== 'undefined' &&
-        window.crypto &&
-        typeof window.crypto.getRandomValues === 'function'
-      )
-        ? (arr: Uint8Array) => window.crypto.getRandomValues(arr)
-        : null,
+      getRandomValues:
+        typeof window !== 'undefined' && window.crypto && typeof window.crypto.getRandomValues === 'function'
+          ? (arr: Uint8Array) => window.crypto.getRandomValues(arr)
+          : null,
       length,
       randomBytes: ethers.utils.randomBytes,
     });
@@ -2472,19 +2497,14 @@ class CreateSBTGroup extends Component<any, any> {
 
     await this.setStateAsync({ currentStep: 1, mintingFailed: false });
 
-    const {
-      sbtImageFile,
-      sbtImageUrl,
-      useImageUrl,
-      metadataLockGateIds,
-    } = this.state;
+    const { sbtImageFile, sbtImageUrl, useImageUrl, metadataLockGateIds } = this.state;
 
     try {
       const { gateMap } = this.resolveLockGateOptions();
       const chainID = this.getSelectedAuthoringChainId();
       const selectedImageGateIds = this.normalizeSelectedGateIds(
         getMetadataFieldLockGateIds(metadataLockGateIds, 'image'),
-        Object.keys(gateMap || {})
+        Object.keys(gateMap || {}),
       );
       const isImageLocked = selectedImageGateIds.length > 0;
       const shouldUseLockedUrlFlow = isImageLocked && useImageUrl;
@@ -2569,7 +2589,7 @@ class CreateSBTGroup extends Component<any, any> {
         arweaveJwk: arweaveKey?.arweaveJwk || '',
         ...arweaveRequestOptions,
       });
-      sbtLog.log("Image uploaded to Arweave with transaction ID:", imageTxId);
+      sbtLog.log('Image uploaded to Arweave with transaction ID:', imageTxId);
 
       await this.setStateAsync({
         imageUploaded: true,
@@ -2583,10 +2603,12 @@ class CreateSBTGroup extends Component<any, any> {
         lockedImageAsset: null,
       };
     } catch (error) {
-      sbtLog.error("Failed to upload image to Arweave:", error);
-      this.setState(buildCreateSbtMintResetFailurePatch({
-        error: getErrorMessage(error, 'Failed to upload image to Arweave.'),
-      }));
+      sbtLog.error('Failed to upload image to Arweave:', error);
+      this.setState(
+        buildCreateSbtMintResetFailurePatch({
+          error: getErrorMessage(error, 'Failed to upload image to Arweave.'),
+        }),
+      );
       throw error;
     }
   }
@@ -2634,8 +2656,8 @@ class CreateSBTGroup extends Component<any, any> {
       });
 
       let finalImageUrl = imageSourceValue;
-      let finalName = sbtName || "";
-      let finalDescription = sbtDescription || "";
+      let finalName = sbtName || '';
+      let finalDescription = sbtDescription || '';
       let finalTags = tokenTags;
       let finalDocumentURLs = finalDocURLs;
       const encryptedFields: Record<string, unknown> = {};
@@ -2820,9 +2842,11 @@ class CreateSBTGroup extends Component<any, any> {
       return `${tokenUriTxId}`;
     } catch (error) {
       sbtLog.error('uploadTokenUriToArweave failed:', error);
-      this.setState(buildCreateSbtMintResetFailurePatch({
-        error: getErrorMessage(error, 'Failed to upload tokenURI.'),
-      }));
+      this.setState(
+        buildCreateSbtMintResetFailurePatch({
+          error: getErrorMessage(error, 'Failed to upload tokenURI.'),
+        }),
+      );
       throw error;
     }
   }
@@ -2869,7 +2893,10 @@ class CreateSBTGroup extends Component<any, any> {
     metadataSessionSlug = normalizeSessionSlug(this.getEffectiveSessionSlug() || ''),
     tokenTags = this.state.tags.filter((tag: unknown) => String(tag || '').trim().length > 0),
     docIDHashesArray = (this.state.documentIDHashes || '').trim().length > 0
-      ? this.state.documentIDHashes.split(',').map((hash: string) => hash.trim()).filter(Boolean)
+      ? this.state.documentIDHashes
+          .split(',')
+          .map((hash: string) => hash.trim())
+          .filter(Boolean)
       : [],
     finalDocURLs = this.getEffectiveDocumentURLs(),
     burnAuth = this.state.sbtDistribution.burnAuth,
@@ -2931,15 +2958,7 @@ class CreateSBTGroup extends Component<any, any> {
   buildMetadataPreview = ({
     gateOptionsResult = null,
   }: { gateOptionsResult?: GateOptionsResult | null } = {}): TokenUriMetadata => {
-    const {
-      sbtName,
-      sbtDescription,
-      sbtImageUrl,
-      tags,
-      metadataLockGateIds,
-      useImageUrl,
-      sbtImageFile,
-    } = this.state;
+    const { sbtName, sbtDescription, sbtImageUrl, tags, metadataLockGateIds, useImageUrl, sbtImageFile } = this.state;
     const chainID = this.getSelectedAuthoringChainId();
     const { gateMap, defaultGateId } = gateOptionsResult || this.resolveLockGateOptions();
     const validGateIds = Object.keys(gateMap || {});
@@ -2999,9 +3018,8 @@ class CreateSBTGroup extends Component<any, any> {
     if ((previewImage || '').trim().length > 0) {
       if (registerPreviewField('image', normalizedLockMap.image)) {
         previewImage = '';
-        previewEncryptedFields.image = (!useImageUrl && sbtImageFile)
-          ? this.buildPreviewEncryptedImageAsset()
-          : LOCKED_FIELD_MASK;
+        previewEncryptedFields.image =
+          !useImageUrl && sbtImageFile ? this.buildPreviewEncryptedImageAsset() : LOCKED_FIELD_MASK;
       }
     }
 
@@ -3055,9 +3073,10 @@ class CreateSBTGroup extends Component<any, any> {
     tokenURI,
     useImageUrl,
   }: any) => {
-    const imageFileKey = sbtImageFile && typeof sbtImageFile === 'object'
-      ? `${sbtImageFile.name || ''}:${sbtImageFile.size || ''}:${sbtImageFile.lastModified || ''}`
-      : '';
+    const imageFileKey =
+      sbtImageFile && typeof sbtImageFile === 'object'
+        ? `${sbtImageFile.name || ''}:${sbtImageFile.size || ''}:${sbtImageFile.lastModified || ''}`
+        : '';
     const memoKey = JSON.stringify({
       account,
       authoringChain,
@@ -3226,12 +3245,8 @@ class CreateSBTGroup extends Component<any, any> {
 
     if (!tokenURI && shouldAttemptImmediateDeferredUpload) {
       const hasConnectedCreator = ethers.utils.isAddress(toStr(this.props.account).trim());
-      const hasImmediateUploadPath = (
-        hasConnectedCreator && (
-          !!toStr(arweaveKey?.arweaveJwk).trim() ||
-          !!this.getResolvedArweaveUploadWorkerUrl()
-        )
-      );
+      const hasImmediateUploadPath =
+        hasConnectedCreator && (!!toStr(arweaveKey?.arweaveJwk).trim() || !!this.getResolvedArweaveUploadWorkerUrl());
       if (hasImmediateUploadPath) {
         try {
           await this.uploadImageToArweave();
@@ -3297,14 +3312,7 @@ class CreateSBTGroup extends Component<any, any> {
       metadataLockGateIds,
     } = this.state;
 
-    const {
-      isLimited,
-      limitedNumber,
-      burnAdmin,
-      isTimeLimited,
-      burnAuth,
-      distributionOption
-    } = sbtDistribution;
+    const { isLimited, limitedNumber, burnAdmin, isTimeLimited, burnAuth, distributionOption } = sbtDistribution;
 
     // Validation: require name
     const sbtNameTrimmed = (sbtName || '').trim();
@@ -3316,7 +3324,9 @@ class CreateSBTGroup extends Component<any, any> {
     // Validation: require group password when using groupPassword distribution
     const groupPassword = cryptoUtils.normalizeGroupPasswordInput(rawGroupPassword);
     if (distributionOption === 'groupPassword' && !groupPassword) {
-      this.setState(buildCreateSbtMintValidationFailurePatch({ error: 'Group password is required for group minting.' }));
+      this.setState(
+        buildCreateSbtMintValidationFailurePatch({ error: 'Group password is required for group minting.' }),
+      );
       return;
     }
 
@@ -3332,18 +3342,22 @@ class CreateSBTGroup extends Component<any, any> {
     const tokenUriFull = String(tokenURI || '').trim();
 
     if (isLimited && limitedCount <= 0) {
-      this.setState(buildCreateSbtMintValidationFailurePatch({ error: 'Limited groups require a positive token limit.' }));
+      this.setState(
+        buildCreateSbtMintValidationFailurePatch({ error: 'Limited groups require a positive token limit.' }),
+      );
       return;
     }
     if (!tokenUriFull) {
-      this.setState(buildCreateSbtMintValidationFailurePatch({ error: 'Token metadata must be uploaded before minting.' }));
+      this.setState(
+        buildCreateSbtMintValidationFailurePatch({ error: 'Token metadata must be uploaded before minting.' }),
+      );
       return;
     }
 
     try {
       const groupCfg = this.getSessionConfigForNetwork();
       let deploymentExpectation: PredictableDeployPlan | null = null;
-      let finalPasswordList: string[] = Array.isArray(passwordList) ? passwordList as string[] : [];
+      let finalPasswordList: string[] = Array.isArray(passwordList) ? (passwordList as string[]) : [];
       let hashedPasswords: string[] = [];
       let mintingEndTimeUnix = 0;
       let groupPasswordHashForCreate = ethers.constants.HashZero;
@@ -3355,7 +3369,9 @@ class CreateSBTGroup extends Component<any, any> {
       if (this.isPredictableAddressEnabled()) {
         deploymentExpectation = await this.resolvePredictableDeployPlan({ tokenURI: tokenUriFull });
         finalPasswordList = Array.isArray(deploymentExpectation.passwordList) ? deploymentExpectation.passwordList : [];
-        hashedPasswords = Array.isArray(deploymentExpectation.hashedPasswords) ? deploymentExpectation.hashedPasswords : [];
+        hashedPasswords = Array.isArray(deploymentExpectation.hashedPasswords)
+          ? deploymentExpectation.hashedPasswords
+          : [];
         mintingEndTimeUnix = deploymentExpectation.mintingEndTimeUnix;
         groupPasswordHashForCreate = deploymentExpectation.finalGroupPasswordHash;
         sbtSymbol = deploymentExpectation.symbol;
@@ -3365,18 +3381,17 @@ class CreateSBTGroup extends Component<any, any> {
       } else {
         const sbtCount = await createSbtContractScripts.countSBTCreated(this.props.provider, groupCfg);
         sbtSymbol = `CE-SBT-${sbtCount + 1}`;
-        contractName = getMetadataFieldLockGateIds(metadataLockGateIds, 'name').length > 0
-          ? sbtSymbol
-          : sbtNameTrimmed;
+        contractName = getMetadataFieldLockGateIds(metadataLockGateIds, 'name').length > 0 ? sbtSymbol : sbtNameTrimmed;
         if (usesClaimCodes && (!finalPasswordList || finalPasswordList.length === 0)) {
           finalPasswordList = this.generatePasswords();
         }
         hashedPasswords = usesClaimCodes
           ? finalPasswordList.map((password: string) => ethers.utils.keccak256(ethers.utils.toUtf8Bytes(password)))
           : [];
-        mintingEndTimeUnix = (isTimeLimited && sbtDistribution.mintingEndTime)
-          ? Math.floor(sbtDistribution.mintingEndTime.getTime() / 1000)
-          : 0;
+        mintingEndTimeUnix =
+          isTimeLimited && sbtDistribution.mintingEndTime
+            ? Math.floor(sbtDistribution.mintingEndTime.getTime() / 1000)
+            : 0;
       }
 
       this.setState(buildCreateSbtSymbolPatch({ sbtSymbol }));
@@ -3395,7 +3410,7 @@ class CreateSBTGroup extends Component<any, any> {
         groupPasswordHashForCreate,
         groupCfg,
         effectiveCreate2Salt,
-        createOptions
+        createOptions,
       );
 
       const sbtAddress = resolveSbtAddressFromFactoryReceipt(receipt);
@@ -3408,7 +3423,7 @@ class CreateSBTGroup extends Component<any, any> {
         deploymentExpectation.predictedAddress.toLowerCase() !== sbtAddress.toLowerCase()
       ) {
         throw new Error(
-          `Deterministic deployment mismatch: expected ${deploymentExpectation.predictedAddress}, received ${sbtAddress}.`
+          `Deterministic deployment mismatch: expected ${deploymentExpectation.predictedAddress}, received ${sbtAddress}.`,
         );
       }
 
@@ -3419,10 +3434,12 @@ class CreateSBTGroup extends Component<any, any> {
       }
       this.suppressFormCachePersistenceAfterSuccess();
 
-      this.setState(buildCreateSbtMintSuccessPatch({
-        sbtAddress,
-        passwordList: codesToStore,
-      }));
+      this.setState(
+        buildCreateSbtMintSuccessPatch({
+          sbtAddress,
+          passwordList: codesToStore,
+        }),
+      );
 
       // Shareable links
       const publicAutoJoinUrl = this.buildSessionAutoJoinUrl(sbtAddress);
@@ -3430,7 +3447,7 @@ class CreateSBTGroup extends Component<any, any> {
 
       if (distributionOption === 'groupPassword' && !isLimited) {
         const secureUrl = publicAutoJoinUrl; // no password in URL
-        const oneClick  = `${secureUrl}&gp=${encodeURIComponent(encodedGroupPassword)}`; // password embedded
+        const oneClick = `${secureUrl}&gp=${encodeURIComponent(encodedGroupPassword)}`; // password embedded
 
         this.setState(buildCreateSbtShareableUrlPatch({ autoJoinUrl: oneClick }));
       } else if (distributionOption === 'groupPassword' && isLimited) {
@@ -3443,15 +3460,15 @@ class CreateSBTGroup extends Component<any, any> {
       } else if (distributionOption === 'hasPasswords') {
         await this.generateSBTInviteLinks(sbtAddress);
       }
-
     } catch (error) {
       sbtLog.error('[CreateSBTGroup] Mint failed:', error);
-      this.setState(buildCreateSbtMintResetFailurePatch({
-        error: getErrorMessage(error, 'Create failed.'),
-      }));
+      this.setState(
+        buildCreateSbtMintResetFailurePatch({
+          error: getErrorMessage(error, 'Create failed.'),
+        }),
+      );
     }
   }
-
 
   async generateSBTInviteLinks(sbtAddress: unknown, listOverride: unknown = null): Promise<void> {
     const list = resolveCreateSbtInviteCodeList({
@@ -3484,17 +3501,28 @@ class CreateSBTGroup extends Component<any, any> {
 
   massSendSBTs = async (): Promise<void> => {
     const { csvAddresses } = this.state;
-    const addresses = String(csvAddresses || '').split(',').map((address) => address.trim());
+    const addresses = String(csvAddresses || '')
+      .split(',')
+      .map((address) => address.trim());
     try {
       // placeholder
-    } catch (e) { sbtLog.warn('CreateSBTGroup: fallback', e); }
+    } catch (e) {
+      sbtLog.warn('CreateSBTGroup: fallback', e);
+    }
   };
 
   updateNumInviteLinks = (): void => {
-    if (this.state.sbtDistribution.isLimited && (this.state.sbtDistribution.distributionOption === 'hasPasswords' || this.state.sbtDistribution.distributionOption === 'groupPassword')) {
-      this.setState(buildCreateSbtNumInviteLinksPatch({
-        numInviteLinks: this.state.sbtDistribution.limitedNumber,
-      }), this.persistFormCache);
+    if (
+      this.state.sbtDistribution.isLimited &&
+      (this.state.sbtDistribution.distributionOption === 'hasPasswords' ||
+        this.state.sbtDistribution.distributionOption === 'groupPassword')
+    ) {
+      this.setState(
+        buildCreateSbtNumInviteLinksPatch({
+          numInviteLinks: this.state.sbtDistribution.limitedNumber,
+        }),
+        this.persistFormCache,
+      );
     }
   };
 
@@ -3513,21 +3541,16 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   handleExportFormatChange = (event: CreateSbtValueChangeEvent): void => {
-    this.setState(buildCreateSbtExportFormatPatch({
-      exportFormat: event.target.value,
-    }), this.persistFormCache);
+    this.setState(
+      buildCreateSbtExportFormatPatch({
+        exportFormat: event.target.value,
+      }),
+      this.persistFormCache,
+    );
   };
 
   exportPasswords = (): void => {
-    const {
-      passwordList,
-      sbtInviteLinks,
-      exportFormat,
-      sbtSymbol,
-      sbtName,
-      sbtDistribution,
-      autoJoinUrl,
-    } = this.state;
+    const { passwordList, sbtInviteLinks, exportFormat, sbtSymbol, sbtName, sbtDistribution, autoJoinUrl } = this.state;
     const date = new Date().toISOString().slice(0, 10);
     const exportFile = buildCreateSbtPasswordExportFile({
       autoJoinUrl,
@@ -3551,7 +3574,6 @@ class CreateSBTGroup extends Component<any, any> {
     URL.revokeObjectURL(url);
   };
 
-
   handleMintClick = async (): Promise<void> => {
     // Must be connected
     if (!this.props.account) {
@@ -3567,7 +3589,9 @@ class CreateSBTGroup extends Component<any, any> {
     // Validation: require a name
     const sbtNameTrimmed = (this.state.sbtName || '').trim();
     if (!sbtNameTrimmed) {
-      this.setState(buildCreateSbtErrorPatch({ error: `Please enter a group name (${t('sbt')} Name) before creating.` }));
+      this.setState(
+        buildCreateSbtErrorPatch({ error: `Please enter a group name (${t('sbt')} Name) before creating.` }),
+      );
       return;
     }
 
@@ -3610,16 +3634,17 @@ class CreateSBTGroup extends Component<any, any> {
       }
     } catch (error) {
       if (this.state.error) return;
-      this.setState(buildCreateSbtMintResetFailurePatch({
-        error: getErrorMessage(error, `Unable to create this ${t('sbt')}.`),
-      }));
+      this.setState(
+        buildCreateSbtMintResetFailurePatch({
+          error: getErrorMessage(error, `Unable to create this ${t('sbt')}.`),
+        }),
+      );
     }
   };
 
-
   async handleImageLoaded(imgRef: HTMLImageElement): Promise<void> {
     try {
-      imgRef.crossOrigin = "anonymous";
+      imgRef.crossOrigin = 'anonymous';
       const imageElement = imgRef;
       if (!imageElement.complete || imageElement.naturalWidth === 0) {
         this.setState(buildCreateSbtImageLoadErrorPatch(), this.persistFormCache);
@@ -3640,7 +3665,7 @@ class CreateSBTGroup extends Component<any, any> {
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((b: Blob | null) => {
           if (!b) {
-            reject(new Error("Failed to create blob from canvas"));
+            reject(new Error('Failed to create blob from canvas'));
             return;
           }
           resolve(b);
@@ -3650,7 +3675,7 @@ class CreateSBTGroup extends Component<any, any> {
         this.setState(buildCreateSbtImageLoadErrorPatch(), this.persistFormCache);
         return;
       }
-      const file = new File([blob], "url_image.png", { type: "image/png" });
+      const file = new File([blob], 'url_image.png', { type: 'image/png' });
       this.setState(buildCreateSbtImageFilePatch({ file }), () => {
         this.updateGroupHash();
         this.persistFormCache();
@@ -3667,12 +3692,12 @@ class CreateSBTGroup extends Component<any, any> {
       return false;
     }
 
-    await this.setStateAsync((prevState: { documentURLs: string[] }) => (
+    await this.setStateAsync((prevState: { documentURLs: string[] }) =>
       buildCreateSbtDocumentUrlAdditionPatch({
         documentURLs: prevState.documentURLs,
         documentUrl: pendingDocumentUrl,
-      })
-    ));
+      }),
+    );
     this.updateGroupHash();
     if (persist) this.persistFormCache();
     return true;
@@ -3692,91 +3717,96 @@ class CreateSBTGroup extends Component<any, any> {
   removeDocumentURL = (index: number): void => {
     this.resetFormStateForEdit();
     this.setState(
-      (prevState: { documentURLs: string[] }) => buildCreateSbtDocumentUrlRemovalPatch({
-        documentURLs: prevState.documentURLs,
-        index,
-      }),
-      () => { this.updateGroupHash(); this.persistFormCache(); }
+      (prevState: { documentURLs: string[] }) =>
+        buildCreateSbtDocumentUrlRemovalPatch({
+          documentURLs: prevState.documentURLs,
+          index,
+        }),
+      () => {
+        this.updateGroupHash();
+        this.persistFormCache();
+      },
     );
   };
 
   processQrImage = (elementId: string): Promise<Blob> => {
     return new Promise<Blob>((resolve, reject) => {
       const svg = document.getElementById(elementId);
-      if (!svg) return reject(new Error("QR Code not found"));
+      if (!svg) return reject(new Error('QR Code not found'));
 
       const svgData = new XMLSerializer().serializeToString(svg);
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
       const img = new Image();
 
       // Add white background for PNG transparency safety
       img.onload = () => {
         if (!ctx) {
-          reject(new Error("QR canvas context unavailable"));
+          reject(new Error('QR canvas context unavailable'));
           return;
         }
         canvas.width = img.width;
         canvas.height = img.height;
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
         canvas.toBlob((blob: Blob | null) => {
           if (!blob) {
-            reject(new Error("QR image export failed"));
+            reject(new Error('QR image export failed'));
             return;
           }
           resolve(blob);
-        }, "image/png");
+        }, 'image/png');
       };
 
-      img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
     });
-  }
+  };
 
   downloadQR = async (elementId: string, filename: string): Promise<void> => {
     try {
-        const blob = await this.processQrImage(elementId);
-        if (!(blob instanceof Blob)) throw new Error("QR image export failed");
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+      const blob = await this.processQrImage(elementId);
+      if (!(blob instanceof Blob)) throw new Error('QR image export failed');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (error: unknown) {
-        sbtLog.warn("QR download failed", error);
-        notify.warn('QR download failed');
+      sbtLog.warn('QR download failed', error);
+      notify.warn('QR download failed');
     }
-  }
+  };
 
   copyQRImage = async (elementId: string, indexKey: unknown): Promise<void> => {
-     try {
-        const blob = await this.processQrImage(elementId);
-        if (!(blob instanceof Blob)) throw new Error("QR image export failed");
-        if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
-          throw new Error("Clipboard image write is unavailable");
-        }
-        // Clipboard API usually requires secure context (https or localhost)
-        const item = new ClipboardItem({ "image/png": blob });
-        await navigator.clipboard.write([item]);
-        if (!this._isMounted) return;
-        this.setState(buildCreateSbtCopiedLinkIndexPatch({ index: indexKey }));
-        this.scheduleTrackedStateReset('copiedLinkIndex', buildCreateSbtCopiedLinkIndexPatch(), 2000);
-     } catch (error: unknown) {
-        sbtLog.warn("QR clipboard write failed", error);
-        notify.warn('QR copy failed');
-     }
-  }
+    try {
+      const blob = await this.processQrImage(elementId);
+      if (!(blob instanceof Blob)) throw new Error('QR image export failed');
+      if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
+        throw new Error('Clipboard image write is unavailable');
+      }
+      // Clipboard API usually requires secure context (https or localhost)
+      const item = new ClipboardItem({ 'image/png': blob });
+      await navigator.clipboard.write([item]);
+      if (!this._isMounted) return;
+      this.setState(buildCreateSbtCopiedLinkIndexPatch({ index: indexKey }));
+      this.scheduleTrackedStateReset('copiedLinkIndex', buildCreateSbtCopiedLinkIndexPatch(), 2000);
+    } catch (error: unknown) {
+      sbtLog.warn('QR clipboard write failed', error);
+      notify.warn('QR copy failed');
+    }
+  };
 
   handleNetworkChange = async (event: CreateSbtSelectChangeEvent): Promise<void> => {
     const targetChainId = normalizePositiveChainId(event.target.value);
     if (!targetChainId) return;
-    const nextChain = this.getAuthoringChainOptions().find((chain: CreateSbtChainOption) => chain.id === targetChainId) ||
-      getChainById(targetChainId) ||
-      { id: targetChainId, name: `Chain ${targetChainId}` };
+    const nextChain = this.getAuthoringChainOptions().find(
+      (chain: CreateSbtChainOption) => chain.id === targetChainId,
+    ) ||
+      getChainById(targetChainId) || { id: targetChainId, name: `Chain ${targetChainId}` };
     if (window.ethereum && this.props.account) {
       try {
         // Hexlify the chain ID for the wallet request.
@@ -3790,16 +3820,16 @@ class CreateSBTGroup extends Component<any, any> {
         return;
       }
     }
-    this.setState((currentState: { sbtDistribution: Record<string, unknown> }) => (
+    this.setState((currentState: { sbtDistribution: Record<string, unknown> }) =>
       buildCreateSbtNetworkChangePatch({
         chain: nextChain,
         currentDistribution: currentState.sbtDistribution,
         network: targetChainId,
-      })
-    ));
+      }),
+    );
   };
 
-/* FUNCTION: renderShareableBlock */
+  /* FUNCTION: renderShareableBlock */
   renderShareableBlock = (
     title: string,
     tooltipText: string,
@@ -3807,7 +3837,7 @@ class CreateSBTGroup extends Component<any, any> {
     url: string,
     qrId: string,
     fileSuffix: string,
-    testId: string | null = null
+    testId: string | null = null,
   ): JSX.Element => {
     const { copiedLinkIndex, sbtAddress } = this.state;
     return (
@@ -3826,7 +3856,7 @@ class CreateSBTGroup extends Component<any, any> {
         url={url}
       />
     );
-  }
+  };
 
   render() {
     const {
@@ -3874,7 +3904,7 @@ class CreateSBTGroup extends Component<any, any> {
       showJson,
       copyJsonSuccess,
       create2Salt,
-      predictedAddressBusy
+      predictedAddressBusy,
     } = this.state;
 
     const authoringChain = this.getSelectedAuthoringChain();
@@ -3933,18 +3963,9 @@ class CreateSBTGroup extends Component<any, any> {
       docsSelectedGateIds,
       imageSelectedGateIds,
     } = metadataLockSelectionState;
-    const {
-      effectiveImageStatusText,
-      effectiveImageStatusTone,
-      previewFile,
-    } = imagePreviewState;
-    const {
-      createActionLabel,
-      headerTitle,
-      isDirty,
-      predictableAddressLocked,
-      rootSurfaceStyle,
-    } = createSbtRenderState;
+    const { effectiveImageStatusText, effectiveImageStatusTone, previewFile } = imagePreviewState;
+    const { createActionLabel, headerTitle, isDirty, predictableAddressLocked, rootSurfaceStyle } =
+      createSbtRenderState;
     const distributionOptions = createSbtRenderState.distributionOptions as SelectableDistributionOptionConfig[];
     const hiddenQrDisplayState = resolveCreateSbtHiddenQrDisplayState();
     const successActionLinkClassName = buildCreateSbtActionLinkClassName({
@@ -4033,26 +4054,25 @@ class CreateSBTGroup extends Component<any, any> {
         selectedGateIds={selectedGateIds}
         onChangeSelectedGateIds={(nextIds: unknown) => this.setLockGateIds(fieldKey, nextIds, validGateIds)}
         open={openLockKey === lockKey}
-        onToggleOpen={(nextOpen: unknown) => this.toggleLockPopover({
-          lockKey,
-          fieldKey,
-          nextOpen,
-          selectedGateIds,
-          defaultGateId,
-          validGateIds,
-        })}
+        onToggleOpen={(nextOpen: unknown) =>
+          this.toggleLockPopover({
+            lockKey,
+            fieldKey,
+            nextOpen,
+            selectedGateIds,
+            defaultGateId,
+            validGateIds,
+          })
+        }
         disabled={!gateOptions.length}
         showDots={false}
       />
     );
     const onPredictableAddressToggle = (checked: boolean): void => {
-      this.setState(
-        { predictableAddressEnabled: checked },
-        () => {
-          this.persistFormCache();
-          this.schedulePredictedAddressRefresh();
-        }
-      );
+      this.setState({ predictableAddressEnabled: checked }, () => {
+        this.persistFormCache();
+        this.schedulePredictedAddressRefresh();
+      });
     };
 
     return (
@@ -4067,7 +4087,12 @@ class CreateSBTGroup extends Component<any, any> {
               style={resolveCreateSbtTooltipIconStyle()}
             />
           </div>
-          <CETooltip placement="right" target="learnMoreTooltip" delay={{ show: 0, hide: 5000 }} className={styles.tooltipBubble}>
+          <CETooltip
+            placement="right"
+            target="learnMoreTooltip"
+            delay={{ show: 0, hide: 5000 }}
+            className={styles.tooltipBubble}
+          >
             {SBT_TOOLTIP_LABEL} enable groups to organize membership, roles, and permissions on-chain. <br />
             <a href="https://www.radicalxchange.org/wiki/social-identity/" target="_blank" rel="noopener noreferrer">
               Learn More
@@ -4075,18 +4100,19 @@ class CreateSBTGroup extends Component<any, any> {
           </CETooltip>
 
           {clearFormButtonState.shouldShowClearFormButton && (
-             <button onClick={this.resetForm} className={styles.clearFormButton} title="Clear all fields and reset to defaults">
-               <FontAwesomeIcon icon={faEraser} /> Clear
-             </button>
+            <button
+              onClick={this.resetForm}
+              className={styles.clearFormButton}
+              title="Clear all fields and reset to defaults"
+            >
+              <FontAwesomeIcon icon={faEraser} /> Clear
+            </button>
           )}
         </div>
 
         {/* Visible error surface for contract rejections and other failures */}
         {errorBannerState.shouldRenderErrorBanner && (
-          <div
-            style={errorBannerState.style}
-            data-testid={E2E_TESTIDS.SBT_CREATE_ERROR}
-          >
+          <div style={errorBannerState.style} data-testid={E2E_TESTIDS.SBT_CREATE_ERROR}>
             {errorBannerState.errorMessage}
           </div>
         )}
@@ -4113,7 +4139,8 @@ class CreateSBTGroup extends Component<any, any> {
                   </div>
                   {infoDisplayState.shouldRenderNameLockHelp && (
                     <div className={styles.fieldHelpText}>
-                      Locked names deploy with a public placeholder contract name like <code>CE-SBT-12</code> and render as {LOCKED_FIELD_MASK} until decrypted.
+                      Locked names deploy with a public placeholder contract name like <code>CE-SBT-12</code> and render
+                      as {LOCKED_FIELD_MASK} until decrypted.
                     </div>
                   )}
                   <div className={styles.fieldLockRow} data-testid={E2E_TESTIDS.SBT_CREATE_DESCRIPTION_LOCK_ROW}>
@@ -4152,7 +4179,9 @@ class CreateSBTGroup extends Component<any, any> {
                       onPaste={this.handlePasteImage}
                       onUploadClick={this.openImageUploadPicker}
                       onFileChange={this.handleImageUpload}
-                      fileInputRef={(fileInput: HTMLInputElement | null) => { this.fileInput = fileInput; }}
+                      fileInputRef={(fileInput: HTMLInputElement | null) => {
+                        this.fileInput = fileInput;
+                      }}
                       fileInputTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_FILE_INPUT}
                       pasteButtonTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_PASTE}
                       urlInputTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT}
@@ -4164,9 +4193,11 @@ class CreateSBTGroup extends Component<any, any> {
                       onClear={this.resetImage}
                       statusText={effectiveImageStatusText}
                       statusTone={effectiveImageStatusTone}
-                      helpText={infoDisplayState.shouldRenderImageLockHelp
-                        ? 'URL mode encrypts the image URL. Upload mode encrypts the image bytes into a Lit-Arweave asset.'
-                        : ''}
+                      helpText={
+                        infoDisplayState.shouldRenderImageLockHelp
+                          ? 'URL mode encrypts the image URL. Upload mode encrypts the image bytes into a Lit-Arweave asset.'
+                          : ''
+                      }
                     />
                   </div>
                 </div>
@@ -4203,17 +4234,16 @@ class CreateSBTGroup extends Component<any, any> {
                       {documentURLs.map((url: string, index: number) => (
                         <li key={index}>
                           <span>{url}</span>
-                          <button type="button" onClick={() => this.removeDocumentURL(index)}>Remove</button>
+                          <button type="button" onClick={() => this.removeDocumentURL(index)}>
+                            Remove
+                          </button>
                         </li>
                       ))}
                     </ul>
                   )}
                 </div>
 
-                <div
-                  className={tokenInfoMetaCardClassName}
-                  data-testid={E2E_TESTIDS.SBT_CREATE_TAGS_LOCK_ROW}
-                >
+                <div className={tokenInfoMetaCardClassName} data-testid={E2E_TESTIDS.SBT_CREATE_TAGS_LOCK_ROW}>
                   <div className={styles.tagsContainer}>
                     <div className={styles.tagsInlineRow}>
                       <div className={styles.tagInputGroup}>
@@ -4221,9 +4251,13 @@ class CreateSBTGroup extends Component<any, any> {
                           type="text"
                           className={styles.tagInput}
                           value={currentTagInput}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => this.setState(buildCreateSbtCurrentTagInputPatch({
-                            value: e.target.value,
-                          }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            this.setState(
+                              buildCreateSbtCurrentTagInputPatch({
+                                value: e.target.value,
+                              }),
+                            )
+                          }
                           onKeyDown={this.handleTagInputKeyDown}
                           placeholder="Add tag..."
                           aria-label="Add tag"
@@ -4244,16 +4278,17 @@ class CreateSBTGroup extends Component<any, any> {
                         {renderFieldLock('tags', 'tags', tagsSelectedGateIds)}
                       </div>
                     </div>
-                    {infoDisplayState.shouldRenderTagPills && tags.map((tag: string, index: number) => (
-                      <span key={index} className={styles.tagPill}>
-                        {tag}
-                        <FontAwesomeIcon
-                          icon={faTimes}
-                          className={styles.removeTagIcon}
-                          onClick={() => this.removeTag(index)}
-                        />
-                      </span>
-                    ))}
+                    {infoDisplayState.shouldRenderTagPills &&
+                      tags.map((tag: string, index: number) => (
+                        <span key={index} className={styles.tagPill}>
+                          {tag}
+                          <FontAwesomeIcon
+                            icon={faTimes}
+                            className={styles.removeTagIcon}
+                            onClick={() => this.removeTag(index)}
+                          />
+                        </span>
+                      ))}
                   </div>
                 </div>
               </div>
@@ -4263,7 +4298,7 @@ class CreateSBTGroup extends Component<any, any> {
 
         <div className={styles.collapsibleSection}>
           {this.renderCollapsibleHeader('Create Options', 'mintOptionsCollapsed')}
-          {!mintOptionsCollapsed && (
+          {!mintOptionsCollapsed &&
             renderCreateSbtMintOptionsSection({
               sbtDistribution,
               mintOptionsDisplayState,
@@ -4278,21 +4313,19 @@ class CreateSBTGroup extends Component<any, any> {
               handleNetworkChange: this.handleNetworkChange,
               handleMintingEndTimeChange: this.handleMintingEndTimeChange,
               onPredictableAddressToggle,
-            })
-          )}
+            })}
         </div>
 
         <div className={styles.collapsibleSection}>
           {this.renderCollapsibleHeader('Distribution Options', 'distributionOptionsCollapsed')}
-          {!distributionOptionsCollapsed && (
+          {!distributionOptionsCollapsed &&
             renderCreateSbtDistributionOptionsSection({
               distributionOptions,
               actionDisplayState,
               groupPassword,
               sbtDistribution,
               handleInputChange: this.handleInputChange,
-            })
-          )}
+            })}
         </div>
 
         <div className={styles.mintingSteps}>
@@ -4304,18 +4337,16 @@ class CreateSBTGroup extends Component<any, any> {
           >
             <span className={styles.primaryCreateButtonContent}>
               {primaryActionLabel}
-              {actionDisplayState.shouldRenderMintingFailureIcon && <FontAwesomeIcon icon={faExclamationCircle} style={resolveCreateSbtFailureIconStyle()} />}
+              {actionDisplayState.shouldRenderMintingFailureIcon && (
+                <FontAwesomeIcon icon={faExclamationCircle} style={resolveCreateSbtFailureIconStyle()} />
+              )}
             </span>
           </button>
 
           {actionDisplayState.shouldRenderStartFreshButton && (
-             <button
-               onClick={this.resetForm}
-               className={styles.startFreshBtn}
-               title="Reset form to start fresh"
-             >
-               Create New (Start Fresh)
-             </button>
+            <button onClick={this.resetForm} className={styles.startFreshBtn} title="Reset form to start fresh">
+              Create New (Start Fresh)
+            </button>
           )}
         </div>
 
@@ -4405,16 +4436,16 @@ class CreateSBTGroup extends Component<any, any> {
               <button
                 type="button"
                 className={styles.actionBtn}
-                onClick={() => this.copyQRImage("hidden-page-qr", "page_qr_copy")}
+                onClick={() => this.copyQRImage('hidden-page-qr', 'page_qr_copy')}
                 title="Copy QR for Page Link"
               >
-                 {copyQrActionState.shouldRenderCopiedIcon && (
-                   <FontAwesomeIcon icon={faCheck} style={resolveCreateSbtActionIconStyle()} />
-                 )}
-                 {copyQrActionState.shouldRenderDefaultIcon && (
-                   <FontAwesomeIcon icon={faQrcode} style={resolveCreateSbtActionIconStyle()} />
-                 )}
-                 {copyQrActionState.label}
+                {copyQrActionState.shouldRenderCopiedIcon && (
+                  <FontAwesomeIcon icon={faCheck} style={resolveCreateSbtActionIconStyle()} />
+                )}
+                {copyQrActionState.shouldRenderDefaultIcon && (
+                  <FontAwesomeIcon icon={faQrcode} style={resolveCreateSbtActionIconStyle()} />
+                )}
+                {copyQrActionState.label}
               </button>
 
               <a
@@ -4449,10 +4480,7 @@ class CreateSBTGroup extends Component<any, any> {
                 className={styles.actionBtn}
                 title="Bookmark"
               >
-                <FontAwesomeIcon
-                  icon={faBookmark}
-                  style={bookmarkActionState.iconStyle}
-                />
+                <FontAwesomeIcon icon={faBookmark} style={bookmarkActionState.iconStyle} />
                 Bookmark
               </button>
 
@@ -4474,8 +4502,8 @@ class CreateSBTGroup extends Component<any, any> {
                 id="hidden-page-qr"
                 value={shareableUrl}
                 size={1024}
-                bgColor={"#ffffff"}
-                fgColor={"#000000"}
+                bgColor={'#ffffff'}
+                fgColor={'#000000'}
                 level="L"
                 includeMargin={true}
               />
@@ -4483,32 +4511,32 @@ class CreateSBTGroup extends Component<any, any> {
 
             {/* Visual QR Blocks: "Auto-Join" only. "Page Link" block is removed. */}
             {successDisplayState.shouldRenderOpenMintAutoJoin && (
-                <>
-                    {/* Auto-Join URL */}
-                    {this.renderShareableBlock(
-                      "URL Where Anyone Can Join",
-                      "Anyone with this link can open the session page and trigger the open-mint flow immediately.",
-                      null,
-                      openMintAutoJoinUrl,
-                      "qr-code-auto-join",
-                      "autojoin",
-                      E2E_TESTIDS.SBT_CREATE_OPEN_MINT_URL
-                    )}
-                </>
+              <>
+                {/* Auto-Join URL */}
+                {this.renderShareableBlock(
+                  'URL Where Anyone Can Join',
+                  'Anyone with this link can open the session page and trigger the open-mint flow immediately.',
+                  null,
+                  openMintAutoJoinUrl,
+                  'qr-code-auto-join',
+                  'autojoin',
+                  E2E_TESTIDS.SBT_CREATE_OPEN_MINT_URL,
+                )}
+              </>
             )}
 
             {successDisplayState.shouldRenderGroupPasswordAutoJoin && (
-                <>
-                    {/* Auto-Join URL (Group Password) */}
-                    {this.renderShareableBlock(
-                      sbtDistribution.isLimited ? "Auto-Join URL (Group Password)" : "Auto-Join URL (One-Click)",
-                      "Password embedded - use with caution. Anyone with this link can join immediately.",
-                      null,
-                      autoJoinUrl,
-                      "qr-code-one-click",
-                      "oneclick"
-                    )}
-                </>
+              <>
+                {/* Auto-Join URL (Group Password) */}
+                {this.renderShareableBlock(
+                  sbtDistribution.isLimited ? 'Auto-Join URL (Group Password)' : 'Auto-Join URL (One-Click)',
+                  'Password embedded - use with caution. Anyone with this link can join immediately.',
+                  null,
+                  autoJoinUrl,
+                  'qr-code-one-click',
+                  'oneclick',
+                )}
+              </>
             )}
 
             <JsonButtonRow align="center">
@@ -4538,11 +4566,17 @@ class CreateSBTGroup extends Component<any, any> {
             <h3>Password Recovery</h3>
             <p>Saved to the local recovery cache on this device and available to export.</p>
             <div className={styles.exportOptions}>
-              <select value={exportFormat} onChange={this.handleExportFormatChange} className={styles.exportFormatSelect}>
+              <select
+                value={exportFormat}
+                onChange={this.handleExportFormatChange}
+                className={styles.exportFormatSelect}
+              >
                 <option value="json">JSON</option>
                 <option value="csv">CSV</option>
               </select>
-              <button onClick={this.exportPasswords} className={styles.exportButton}>Export Passwords</button>
+              <button onClick={this.exportPasswords} className={styles.exportButton}>
+                Export Passwords
+              </button>
             </div>
           </div>
         )}
@@ -4568,11 +4602,17 @@ class CreateSBTGroup extends Component<any, any> {
             </ul>
             <p>Saved to the local recovery cache on this device and available to export.</p>
             <div className={styles.exportOptions}>
-              <select value={exportFormat} onChange={this.handleExportFormatChange} className={styles.exportFormatSelect}>
+              <select
+                value={exportFormat}
+                onChange={this.handleExportFormatChange}
+                className={styles.exportFormatSelect}
+              >
                 <option value="json">JSON</option>
                 <option value="csv">CSV</option>
               </select>
-              <button onClick={this.exportPasswords} className={styles.exportButton}>Export Passwords</button>
+              <button onClick={this.exportPasswords} className={styles.exportButton}>
+                Export Passwords
+              </button>
             </div>
           </div>
         )}
@@ -4596,13 +4636,8 @@ export const finalizeDeferredCreateSbtDraftUpload = async ({
     toggleLoginModal: () => {},
     ...componentProps,
   });
-  instance.setState = (
-    update: FinalizeDeferredCreateSbtStateUpdate,
-    cb: FinalizeDeferredCreateSbtStateCallback
-  ) => {
-    const next = typeof update === 'function'
-      ? update(instance.state as Record<string, unknown>)
-      : update;
+  instance.setState = (update: FinalizeDeferredCreateSbtStateUpdate, cb: FinalizeDeferredCreateSbtStateCallback) => {
+    const next = typeof update === 'function' ? update(instance.state as Record<string, unknown>) : update;
     instance.state = { ...instance.state, ...next };
     if (cb) cb();
   };

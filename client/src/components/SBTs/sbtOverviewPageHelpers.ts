@@ -116,29 +116,24 @@ export const resolveSBTsPageCacheFeaturedCardLinkStyle = (): Record<string, stri
   cursor: 'pointer',
 });
 
-export const isSBTsPageRecord = (value: unknown): value is SBTsPageUnknownRecord => (
-  !!value && typeof value === 'object'
-);
+export const isSBTsPageRecord = (value: unknown): value is SBTsPageUnknownRecord =>
+  !!value && typeof value === 'object';
 
-export const asSBTsPageSessionConfig = (value: unknown): SBTsPageSessionConfigLike | null => (
-  isSBTsPageRecord(value) ? value as SBTsPageSessionConfigLike : null
-);
+export const asSBTsPageSessionConfig = (value: unknown): SBTsPageSessionConfigLike | null =>
+  isSBTsPageRecord(value) ? (value as SBTsPageSessionConfigLike) : null;
 
-export const asSBTsPageFeaturedProgress = (value: unknown): SBTsPageFeaturedProgressLike | null => (
-  isSBTsPageRecord(value) ? value as SBTsPageFeaturedProgressLike : null
-);
+export const asSBTsPageFeaturedProgress = (value: unknown): SBTsPageFeaturedProgressLike | null =>
+  isSBTsPageRecord(value) ? (value as SBTsPageFeaturedProgressLike) : null;
 
-export const asSBTsPageFeaturedSbt = (value: unknown): SBTsPageFeaturedSbtLike | null => (
-  isSBTsPageRecord(value) ? value as SBTsPageFeaturedSbtLike : null
-);
+export const asSBTsPageFeaturedSbt = (value: unknown): SBTsPageFeaturedSbtLike | null =>
+  isSBTsPageRecord(value) ? (value as SBTsPageFeaturedSbtLike) : null;
 
 export const resolveSBTsPageInitialCreateGroupSessionSlug = ({
   activeSessionSlug = '',
   sessionConfig = null,
   sessionSlug = '',
-}: ResolveSBTsPageInitialCreateGroupSessionSlugArgs = {}): string => (
-  normalizeSessionSlug(sessionSlug || sessionConfig?.slug || activeSessionSlug || '')
-);
+}: ResolveSBTsPageInitialCreateGroupSessionSlugArgs = {}): string =>
+  normalizeSessionSlug(sessionSlug || sessionConfig?.slug || activeSessionSlug || '');
 
 export const buildSBTsPageInitialState = ({
   activeSessionSlug = '',
@@ -156,13 +151,14 @@ export const buildSBTsPageInitialState = ({
   });
   return {
     showSBTsList: false,
-    showCreateGroup: typeof hasCachedCreateSbtForm === 'function'
-      ? hasCachedCreateSbtForm({
-        sessionSlug: initialCreateGroupSessionSlug,
-        migrateLegacyToSessionKey: true,
-        clearInvalid: true,
-      })
-      : false,
+    showCreateGroup:
+      typeof hasCachedCreateSbtForm === 'function'
+        ? hasCachedCreateSbtForm({
+            sessionSlug: initialCreateGroupSessionSlug,
+            migrateLegacyToSessionKey: true,
+            clearInvalid: true,
+          })
+        : false,
   };
 };
 
@@ -195,10 +191,7 @@ export const hasSBTsPageCacheFeaturedCardImageMetadata = (infoInput: unknown): b
     info.imageLocked === true ||
     !!info.imageEncrypted ||
     !!info.encryptedImage ||
-    !!(
-      isSBTsPageRecord(info.encryptedFields) &&
-      info.encryptedFields.image
-    )
+    !!(isSBTsPageRecord(info.encryptedFields) && info.encryptedFields.image)
   );
 };
 
@@ -226,7 +219,7 @@ export const buildSBTsPageCacheFeaturedCardModel = ({
   return {
     imageUrl,
     isMintingActive: mintingEndTime === 0 || mintingEndTime > resolvedNowSeconds,
-    isPasswordLocked: !!(sbtInfo?.hasPasswordMint),
+    isPasswordLocked: !!sbtInfo?.hasPasswordMint,
     resolvedSessionSlug,
     sbt,
     sbtAddress,
@@ -262,15 +255,11 @@ export const resolveSBTsPageDisplaySessionConfig = ({
   const slug = normalizeSessionSlug(slugIn || '');
   if (!slug) {
     return asSBTsPageSessionConfig(
-      getSessionConfigBySlugOrDefault?.('')
-      || getDemoSessionConfigBySlug?.('', { allowDemoFallback: true })
-      || null
+      getSessionConfigBySlugOrDefault?.('') || getDemoSessionConfigBySlug?.('', { allowDemoFallback: true }) || null,
     );
   }
   return asSBTsPageSessionConfig(
-    getSessionConfigBySlug?.(slug)
-    || getDemoSessionConfigBySlug?.(slug, { allowDemoFallback: true })
-    || null
+    getSessionConfigBySlug?.(slug) || getDemoSessionConfigBySlug?.(slug, { allowDemoFallback: true }) || null,
   );
 };
 
@@ -281,9 +270,8 @@ export const resolveSBTsPageDisplaySessionLists = ({
   featured_SBTs_LIST: unknown[];
   ignored_SBTs_LIST: unknown[];
 } => {
-  const resolvedSessionConfig = asSBTsPageSessionConfig(sessionConfig)
-    || resolveSBTsPageDisplaySessionConfig(configArgs)
-    || {};
+  const resolvedSessionConfig =
+    asSBTsPageSessionConfig(sessionConfig) || resolveSBTsPageDisplaySessionConfig(configArgs) || {};
   return {
     featured_SBTs_LIST: Array.isArray(resolvedSessionConfig?.featured_SBTs_LIST)
       ? resolvedSessionConfig.featured_SBTs_LIST
@@ -322,41 +310,35 @@ export const dedupeSBTsPageSessionSlugList = (list: unknown): string[] => {
 
 export const buildSBTsPageFeaturedProgressSignature = (
   progressBySlug: Record<string, SBTsPageFeaturedProgressLike | unknown> = {},
-  slugs: unknown[] = []
-): string => (
-  dedupeSBTsPageSessionSlugList(slugs).map((slug) => {
-    const progress = asSBTsPageFeaturedProgress(progressBySlug?.[slug]);
-    if (!progress) return `${slug}:idle`;
-    return [
-      slug,
-      Number(progress.currentBlock || 0),
-      Number(progress.latestBlock || 0),
-      Number(progress.displayCurrentBlock || 0),
-      Number(progress.liveCurrentBlock || 0),
-      Number(progress.lastBlock || 0),
-      progress.scanInProgress ? '1' : '0',
-      progress.deferred ? '1' : '0',
-    ].join(':');
-  }).join('|')
-);
+  slugs: unknown[] = [],
+): string =>
+  dedupeSBTsPageSessionSlugList(slugs)
+    .map((slug) => {
+      const progress = asSBTsPageFeaturedProgress(progressBySlug?.[slug]);
+      if (!progress) return `${slug}:idle`;
+      return [
+        slug,
+        Number(progress.currentBlock || 0),
+        Number(progress.latestBlock || 0),
+        Number(progress.displayCurrentBlock || 0),
+        Number(progress.liveCurrentBlock || 0),
+        Number(progress.lastBlock || 0),
+        progress.scanInProgress ? '1' : '0',
+        progress.deferred ? '1' : '0',
+      ].join(':');
+    })
+    .join('|');
 
-export const resolveSBTsPageAutoFeatureBySessionSlug = (
-  metadata: SBTsPageMaybeRecord = null
-): unknown => (
+export const resolveSBTsPageAutoFeatureBySessionSlug = (metadata: SBTsPageMaybeRecord = null): unknown =>
   metadata?.autoFeatureSBTsBySessionSlug !== undefined
     ? metadata.autoFeatureSBTsBySessionSlug
-    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
-);
+    : metadata?.autoFeatureSBTsWithFeaturedSbtTags;
 
-export const isSBTsPageSessionAutoFeatureEnabled = (
-  sessionConfig: SBTsPageSessionConfigLike | null = null
-): boolean => (
-  resolveSBTsPageAutoFeatureBySessionSlug(sessionConfig) !== false
-);
+export const isSBTsPageSessionAutoFeatureEnabled = (sessionConfig: SBTsPageSessionConfigLike | null = null): boolean =>
+  resolveSBTsPageAutoFeatureBySessionSlug(sessionConfig) !== false;
 
-export const hasSBTsPageOwn = (obj: unknown, key: string): obj is SBTsPageUnknownRecord => (
-  isSBTsPageRecord(obj) && Object.prototype.hasOwnProperty.call(obj, key)
-);
+export const hasSBTsPageOwn = (obj: unknown, key: string): obj is SBTsPageUnknownRecord =>
+  isSBTsPageRecord(obj) && Object.prototype.hasOwnProperty.call(obj, key);
 
 export const hasSBTsPageAuthoritativeSessionSlug = (obj: unknown): boolean => {
   if (!hasSBTsPageOwn(obj, 'sessionSlug')) return false;
@@ -364,16 +346,12 @@ export const hasSBTsPageAuthoritativeSessionSlug = (obj: unknown): boolean => {
   return obj.sessionSlugExplicit === true || !hasExplicitFlag;
 };
 
-export const hasSBTsPageExplicitSessionSlug = (obj: unknown): boolean => (
-  hasSBTsPageOwn(obj, 'sessionSlug') &&
-  (obj as SBTsPageUnknownRecord).sessionSlugExplicit === true
-);
+export const hasSBTsPageExplicitSessionSlug = (obj: unknown): boolean =>
+  hasSBTsPageOwn(obj, 'sessionSlug') && (obj as SBTsPageUnknownRecord).sessionSlugExplicit === true;
 
 export const resolveSBTsPageFeaturedSbtSessionSlug = (
   sbt: unknown,
-  {
-    requireExplicitSessionSlug = false,
-  }: ResolveSBTsPageFeaturedSbtSessionSlugOptions = {}
+  { requireExplicitSessionSlug = false }: ResolveSBTsPageFeaturedSbtSessionSlugOptions = {},
 ): string | null => {
   const sbtRecord = asSBTsPageFeaturedSbt(sbt);
   if (!sbtRecord) return null;
@@ -405,9 +383,7 @@ export const resolveSBTsPageFeaturedSbtSessionSlug = (
   return null;
 };
 
-export const normalizeSBTsPageFeaturedEntries = (
-  featuredEntries: unknown
-): SBTsPageNormalizedFeaturedEntry[] => (
+export const normalizeSBTsPageFeaturedEntries = (featuredEntries: unknown): SBTsPageNormalizedFeaturedEntry[] =>
   (Array.isArray(featuredEntries) ? featuredEntries : [])
     .map((rawEntry) => {
       const entry = isSBTsPageRecord(rawEntry) ? rawEntry : {};
@@ -418,8 +394,7 @@ export const normalizeSBTsPageFeaturedEntries = (
         sessionSlug: normalizeSessionSlug(entry?.sessionSlug || ''),
       };
     })
-    .filter((entry) => entry.address && entry.lowerAddress)
-);
+    .filter((entry) => entry.address && entry.lowerAddress);
 
 export const resolveSBTsPageReferrerSessionSlug = (referrer: unknown): string => {
   const match = String(referrer || '').match(/\/session\/([^/?#]+)/i);

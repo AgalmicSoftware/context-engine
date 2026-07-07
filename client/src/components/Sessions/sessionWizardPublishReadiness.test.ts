@@ -35,121 +35,155 @@ describe('resolveSessionWizardPublishReadiness', () => {
   });
 
   it('blocks custom worker upload until a matching deploy is verified', () => {
-    expect(resolveSessionWizardPublishReadiness({
-      ...baseInput,
-      workerMode: 'custom',
-      usesDefaultWorkerUrl: false,
-      deployVerifiedInUi: false,
-      deployWorkerMatchesConfiguredUrl: false,
-    })).toEqual(expect.objectContaining({
-      canUploadMetadataNow: false,
-      uploadBlockedReason: 'Custom worker mode requires a successful deploy in this run before metadata upload.',
-      canPublishNow: false,
-      readinessKind: 'blocked',
-      showUploadBlockedReason: true,
-    }));
+    expect(
+      resolveSessionWizardPublishReadiness({
+        ...baseInput,
+        workerMode: 'custom',
+        usesDefaultWorkerUrl: false,
+        deployVerifiedInUi: false,
+        deployWorkerMatchesConfiguredUrl: false,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canUploadMetadataNow: false,
+        uploadBlockedReason: 'Custom worker mode requires a successful deploy in this run before metadata upload.',
+        canPublishNow: false,
+        readinessKind: 'blocked',
+        showUploadBlockedReason: true,
+      }),
+    );
 
-    expect(resolveSessionWizardPublishReadiness({
-      ...baseInput,
-      workerMode: 'custom',
-      usesDefaultWorkerUrl: false,
-      deployVerifiedInUi: true,
-      deployWorkerMatchesConfiguredUrl: false,
-    })).toEqual(expect.objectContaining({
-      canUploadMetadataNow: false,
-      uploadBlockedReason: 'Configured worker URL differs from the last successful deploy URL; re-deploy or reset to the verified URL.',
-      canPublishNow: false,
-      readinessKind: 'blocked',
-    }));
+    expect(
+      resolveSessionWizardPublishReadiness({
+        ...baseInput,
+        workerMode: 'custom',
+        usesDefaultWorkerUrl: false,
+        deployVerifiedInUi: true,
+        deployWorkerMatchesConfiguredUrl: false,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canUploadMetadataNow: false,
+        uploadBlockedReason:
+          'Configured worker URL differs from the last successful deploy URL; re-deploy or reset to the verified URL.',
+        canPublishNow: false,
+        readinessKind: 'blocked',
+      }),
+    );
 
-    expect(resolveSessionWizardPublishReadiness({
-      ...baseInput,
-      workerMode: 'custom',
-      usesDefaultWorkerUrl: false,
-      deployVerifiedInUi: true,
-      deployWorkerMatchesConfiguredUrl: true,
-    })).toEqual(expect.objectContaining({
-      canUploadMetadataNow: true,
-      canPublishNow: true,
-      readinessKind: 'worker-upload',
-    }));
+    expect(
+      resolveSessionWizardPublishReadiness({
+        ...baseInput,
+        workerMode: 'custom',
+        usesDefaultWorkerUrl: false,
+        deployVerifiedInUi: true,
+        deployWorkerMatchesConfiguredUrl: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canUploadMetadataNow: true,
+        canPublishNow: true,
+        readinessKind: 'worker-upload',
+      }),
+    );
   });
 
   it('lets manual or uploaded metadata satisfy publish readiness without worker upload readiness', () => {
-    expect(resolveSessionWizardPublishReadiness({
-      ...baseInput,
-      resolvedWorkerBaseUrl: '',
-      usesDefaultWorkerUrl: false,
-      manualMetadataUrl: `ar://${txId}`,
-    })).toEqual(expect.objectContaining({
-      canUploadMetadataNow: false,
-      uploadBlockedReason: 'Set a worker URL before uploading metadata.',
-      hasManualMetadata: true,
-      hasUploadedMetadata: false,
-      canPublishNow: true,
-      readinessKind: 'manual-metadata',
-    }));
+    expect(
+      resolveSessionWizardPublishReadiness({
+        ...baseInput,
+        resolvedWorkerBaseUrl: '',
+        usesDefaultWorkerUrl: false,
+        manualMetadataUrl: `ar://${txId}`,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canUploadMetadataNow: false,
+        uploadBlockedReason: 'Set a worker URL before uploading metadata.',
+        hasManualMetadata: true,
+        hasUploadedMetadata: false,
+        canPublishNow: true,
+        readinessKind: 'manual-metadata',
+      }),
+    );
 
-    expect(resolveSessionWizardPublishReadiness({
-      ...baseInput,
-      resolvedWorkerBaseUrl: '',
-      usesDefaultWorkerUrl: false,
-      metadataUrl: `ar://${txId}`,
-    })).toEqual(expect.objectContaining({
-      hasManualMetadata: false,
-      hasUploadedMetadata: true,
-      canPublishNow: true,
-      readinessKind: 'uploaded-metadata',
-    }));
+    expect(
+      resolveSessionWizardPublishReadiness({
+        ...baseInput,
+        resolvedWorkerBaseUrl: '',
+        usesDefaultWorkerUrl: false,
+        metadataUrl: `ar://${txId}`,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        hasManualMetadata: false,
+        hasUploadedMetadata: true,
+        canPublishNow: true,
+        readinessKind: 'uploaded-metadata',
+      }),
+    );
   });
 
   it('keeps custom-worker metadata upload blocked while metadata fallbacks allow publish readiness', () => {
-    expect(resolveSessionWizardPublishReadiness({
-      ...baseInput,
-      workerMode: 'custom',
-      usesDefaultWorkerUrl: false,
-      deployVerifiedInUi: false,
-      deployWorkerMatchesConfiguredUrl: false,
-      manualMetadataUrl: `https://arweave.net/${txId}`,
-    })).toEqual(expect.objectContaining({
-      canUploadMetadataNow: false,
-      uploadBlockedReason: 'Custom worker mode requires a successful deploy in this run before metadata upload.',
-      hasManualMetadata: true,
-      hasUploadedMetadata: false,
-      canPublishNow: true,
-      readinessKind: 'manual-metadata',
-    }));
+    expect(
+      resolveSessionWizardPublishReadiness({
+        ...baseInput,
+        workerMode: 'custom',
+        usesDefaultWorkerUrl: false,
+        deployVerifiedInUi: false,
+        deployWorkerMatchesConfiguredUrl: false,
+        manualMetadataUrl: `https://arweave.net/${txId}`,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canUploadMetadataNow: false,
+        uploadBlockedReason: 'Custom worker mode requires a successful deploy in this run before metadata upload.',
+        hasManualMetadata: true,
+        hasUploadedMetadata: false,
+        canPublishNow: true,
+        readinessKind: 'manual-metadata',
+      }),
+    );
 
-    expect(resolveSessionWizardPublishReadiness({
-      ...baseInput,
-      workerMode: 'custom',
-      usesDefaultWorkerUrl: false,
-      deployVerifiedInUi: true,
-      deployWorkerMatchesConfiguredUrl: false,
-      metadataUrl: txId,
-    })).toEqual(expect.objectContaining({
-      canUploadMetadataNow: false,
-      uploadBlockedReason: 'Configured worker URL differs from the last successful deploy URL; re-deploy or reset to the verified URL.',
-      hasManualMetadata: false,
-      hasUploadedMetadata: true,
-      canPublishNow: true,
-      readinessKind: 'uploaded-metadata',
-    }));
+    expect(
+      resolveSessionWizardPublishReadiness({
+        ...baseInput,
+        workerMode: 'custom',
+        usesDefaultWorkerUrl: false,
+        deployVerifiedInUi: true,
+        deployWorkerMatchesConfiguredUrl: false,
+        metadataUrl: txId,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canUploadMetadataNow: false,
+        uploadBlockedReason:
+          'Configured worker URL differs from the last successful deploy URL; re-deploy or reset to the verified URL.',
+        hasManualMetadata: false,
+        hasUploadedMetadata: true,
+        canPublishNow: true,
+        readinessKind: 'uploaded-metadata',
+      }),
+    );
   });
 
   it('allows sponsored auto-deploy publish readiness without upload readiness', () => {
-    expect(resolveSessionWizardPublishReadiness({
-      ...baseInput,
-      resolvedWorkerBaseUrl: '',
-      usesDefaultWorkerUrl: false,
-      canUseSponsoredAutoDeployNow: true,
-    })).toEqual(expect.objectContaining({
-      canUploadMetadataNow: false,
-      hasManualMetadata: false,
-      hasUploadedMetadata: false,
-      canPublishNow: true,
-      readinessKind: 'sponsored-auto-deploy',
-    }));
+    expect(
+      resolveSessionWizardPublishReadiness({
+        ...baseInput,
+        resolvedWorkerBaseUrl: '',
+        usesDefaultWorkerUrl: false,
+        canUseSponsoredAutoDeployNow: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canUploadMetadataNow: false,
+        hasManualMetadata: false,
+        hasUploadedMetadata: false,
+        canPublishNow: true,
+        readinessKind: 'sponsored-auto-deploy',
+      }),
+    );
   });
 
   it('keeps no-worker no-metadata publish readiness blocked without execution ports', () => {
@@ -178,17 +212,21 @@ describe('resolveSessionWizardPublishReadiness', () => {
       readinessKind: 'blocked',
       showUploadBlockedReason: true,
     });
-    expect(plan.publishExecutionPlan).toEqual(expect.objectContaining({
-      shouldAutoDeployWorker: false,
-      shouldDeployPendingSbts: false,
-      shouldUploadMetadata: false,
-      shouldRegisterSession: true,
-    }));
-    expect(plan.publishMetadataDisplayState).toEqual(expect.objectContaining({
-      showArweaveTx: false,
-      showManualMetadataUri: false,
-      showMetadataUri: false,
-    }));
+    expect(plan.publishExecutionPlan).toEqual(
+      expect.objectContaining({
+        shouldAutoDeployWorker: false,
+        shouldDeployPendingSbts: false,
+        shouldUploadMetadata: false,
+        shouldRegisterSession: true,
+      }),
+    );
+    expect(plan.publishMetadataDisplayState).toEqual(
+      expect.objectContaining({
+        showArweaveTx: false,
+        showManualMetadataUri: false,
+        showMetadataUri: false,
+      }),
+    );
     expect(plan.publishActionDisplayState).toEqual({
       canPublishNow: false,
       displayMode: 'advanced',
@@ -218,26 +256,30 @@ describe('resolveSessionWizardPublishReadiness', () => {
 
     const plan = resolveSessionWizardPublishUiPlan(input);
 
-    expect(plan.publishReadiness).toEqual(expect.objectContaining({
-      canUploadMetadataNow: true,
-      hasManualMetadata: false,
-      hasUploadedMetadata: true,
-      canPublishNow: true,
-      readinessKind: 'uploaded-metadata',
-    }));
-    expect(plan.publishExecutionPlan).toEqual(expect.objectContaining({
-      shouldAutoDeployWorker: false,
-      shouldDeployPendingSbts: true,
-      shouldUploadMetadata: true,
-      shouldRegisterSession: true,
-      steps: ['deploy-sbts', 'upload-metadata', 'register-session', 'done'],
-      stepNumbers: {
-        'deploy-sbts': 1,
-        'upload-metadata': 2,
-        'register-session': 3,
-        done: 4,
-      },
-    }));
+    expect(plan.publishReadiness).toEqual(
+      expect.objectContaining({
+        canUploadMetadataNow: true,
+        hasManualMetadata: false,
+        hasUploadedMetadata: true,
+        canPublishNow: true,
+        readinessKind: 'uploaded-metadata',
+      }),
+    );
+    expect(plan.publishExecutionPlan).toEqual(
+      expect.objectContaining({
+        shouldAutoDeployWorker: false,
+        shouldDeployPendingSbts: true,
+        shouldUploadMetadata: true,
+        shouldRegisterSession: true,
+        steps: ['deploy-sbts', 'upload-metadata', 'register-session', 'done'],
+        stepNumbers: {
+          'deploy-sbts': 1,
+          'upload-metadata': 2,
+          'register-session': 3,
+          done: 4,
+        },
+      }),
+    );
     expect(plan.publishProgressDisplayState).toMatchObject({
       activePublishProgressStepLabel: 'Upload Arweave',
       publishProgressPercentRounded: expect.any(Number),
@@ -283,21 +325,25 @@ describe('resolveSessionWizardPublishReadiness', () => {
       publishStep: 1,
     });
 
-    expect(plan.publishReadiness).toEqual(expect.objectContaining({
-      hasManualMetadata: true,
-      hasUploadedMetadata: false,
-      canPublishNow: true,
-      readinessKind: 'manual-metadata',
-    }));
-    expect(plan.publishExecutionPlan).toEqual(expect.objectContaining({
-      shouldUploadMetadata: false,
-      shouldRegisterSession: true,
-      steps: ['register-session', 'done'],
-      stepNumbers: {
-        'register-session': 1,
-        done: 2,
-      },
-    }));
+    expect(plan.publishReadiness).toEqual(
+      expect.objectContaining({
+        hasManualMetadata: true,
+        hasUploadedMetadata: false,
+        canPublishNow: true,
+        readinessKind: 'manual-metadata',
+      }),
+    );
+    expect(plan.publishExecutionPlan).toEqual(
+      expect.objectContaining({
+        shouldUploadMetadata: false,
+        shouldRegisterSession: true,
+        steps: ['register-session', 'done'],
+        stepNumbers: {
+          'register-session': 1,
+          done: 2,
+        },
+      }),
+    );
     expect(plan.publishProgressDisplayState).toMatchObject({
       activePublishProgressStepLabel: 'Register On-chain',
       showPublishProgress: true,
@@ -320,19 +366,23 @@ describe('resolveSessionWizardPublishReadiness', () => {
       publishStepElapsedMs: 500,
     });
 
-    expect(plan.publishReadiness).toEqual(expect.objectContaining({
-      canUploadMetadataNow: false,
-      canPublishNow: true,
-      readinessKind: 'sponsored-auto-deploy',
-      uploadBlockedReason: 'Set a worker URL before uploading metadata.',
-    }));
-    expect(plan.publishExecutionPlan).toEqual(expect.objectContaining({
-      shouldAutoDeployWorker: true,
-      shouldDeployPendingSbts: true,
-      shouldUploadMetadata: true,
-      shouldRegisterSession: true,
-      steps: ['deploy-worker', 'deploy-sbts', 'upload-metadata', 'register-session', 'done'],
-    }));
+    expect(plan.publishReadiness).toEqual(
+      expect.objectContaining({
+        canUploadMetadataNow: false,
+        canPublishNow: true,
+        readinessKind: 'sponsored-auto-deploy',
+        uploadBlockedReason: 'Set a worker URL before uploading metadata.',
+      }),
+    );
+    expect(plan.publishExecutionPlan).toEqual(
+      expect.objectContaining({
+        shouldAutoDeployWorker: true,
+        shouldDeployPendingSbts: true,
+        shouldUploadMetadata: true,
+        shouldRegisterSession: true,
+        steps: ['deploy-worker', 'deploy-sbts', 'upload-metadata', 'register-session', 'done'],
+      }),
+    );
     expect(Object.keys(plan)).toEqual([
       'publishActionDisplayState',
       'publishReadiness',
@@ -346,42 +396,50 @@ describe('resolveSessionWizardPublishReadiness', () => {
   it('describes uploaded and manual metadata fallback display without upload execution ports', () => {
     const buildGatewayUrl = jest.fn((metadataTxId: string) => `https://gateway.example/${metadataTxId}`);
 
-    expect(resolveSessionWizardPublishMetadataIdentityState({
-      buildGatewayUrl,
-      manualMetadataUrl: `https://arweave.net/${txId}`,
-      metadataUrl: 'https://example.test/ignored-uploaded-metadata.json',
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishMetadataIdentityState({
+        buildGatewayUrl,
+        manualMetadataUrl: `https://arweave.net/${txId}`,
+        metadataUrl: 'https://example.test/ignored-uploaded-metadata.json',
+      }),
+    ).toEqual({
       effectiveMetadataGatewayUrl: `https://gateway.example/${txId}`,
       effectiveMetadataTxId: txId,
       effectiveMetadataUri: `ar://${txId}`,
     });
     expect(buildGatewayUrl).toHaveBeenCalledWith(txId);
 
-    expect(resolveSessionWizardPublishMetadataIdentityState({
-      buildGatewayUrl,
-      manualMetadataUrl: '',
-      metadataUrl: txId,
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishMetadataIdentityState({
+        buildGatewayUrl,
+        manualMetadataUrl: '',
+        metadataUrl: txId,
+      }),
+    ).toEqual({
       effectiveMetadataGatewayUrl: `https://gateway.example/${txId}`,
       effectiveMetadataTxId: txId,
       effectiveMetadataUri: txId,
     });
 
-    expect(resolveSessionWizardPublishMetadataIdentityState({
-      buildGatewayUrl,
-      manualMetadataUrl: 'https://example.test/custom-metadata.json',
-      metadataUrl: txId,
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishMetadataIdentityState({
+        buildGatewayUrl,
+        manualMetadataUrl: 'https://example.test/custom-metadata.json',
+        metadataUrl: txId,
+      }),
+    ).toEqual({
       effectiveMetadataGatewayUrl: '',
       effectiveMetadataTxId: '',
       effectiveMetadataUri: 'https://example.test/custom-metadata.json',
     });
 
-    expect(resolveSessionWizardPublishMetadataDisplayState({
-      effectiveMetadataGatewayUrl: `https://arweave.net/${txId}`,
-      effectiveMetadataTxId: txId,
-      metadataUrl: `ar://${txId}`,
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishMetadataDisplayState({
+        effectiveMetadataGatewayUrl: `https://arweave.net/${txId}`,
+        effectiveMetadataTxId: txId,
+        metadataUrl: `ar://${txId}`,
+      }),
+    ).toEqual({
       effectiveMetadataGatewayUrl: `https://arweave.net/${txId}`,
       effectiveMetadataTxId: txId,
       manualMetadataDisplayUri: '',
@@ -392,26 +450,34 @@ describe('resolveSessionWizardPublishReadiness', () => {
       showMetadataUri: true,
     });
 
-    expect(resolveSessionWizardPublishMetadataDisplayState({
-      manualMetadataUrl: `https://arweave.net/${txId}`,
-      metadataUrl: txId,
-    })).toEqual(expect.objectContaining({
-      manualMetadataDisplayUri: `ar://${txId}`,
-      metadataUri: `ar://${txId}`,
-      metadataUriLabel: 'Uploaded metadata URI',
-      showArweaveTx: false,
-      showManualMetadataUri: true,
-      showMetadataUri: true,
-    }));
+    expect(
+      resolveSessionWizardPublishMetadataDisplayState({
+        manualMetadataUrl: `https://arweave.net/${txId}`,
+        metadataUrl: txId,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        manualMetadataDisplayUri: `ar://${txId}`,
+        metadataUri: `ar://${txId}`,
+        metadataUriLabel: 'Uploaded metadata URI',
+        showArweaveTx: false,
+        showManualMetadataUri: true,
+        showMetadataUri: true,
+      }),
+    );
 
-    expect(resolveSessionWizardPublishMetadataDisplayState({
-      effectiveMetadataTxId: txId,
-      metadataUrl: `ar://${txId}`,
-    })).toEqual(expect.objectContaining({
-      effectiveMetadataGatewayUrl: '',
-      effectiveMetadataTxId: txId,
-      showArweaveTx: false,
-    }));
+    expect(
+      resolveSessionWizardPublishMetadataDisplayState({
+        effectiveMetadataTxId: txId,
+        metadataUrl: `ar://${txId}`,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        effectiveMetadataGatewayUrl: '',
+        effectiveMetadataTxId: txId,
+        showArweaveTx: false,
+      }),
+    );
 
     expect(resolveSessionWizardPublishMetadataDisplayState()).toEqual({
       effectiveMetadataGatewayUrl: '',
@@ -433,22 +499,26 @@ describe('resolveSessionWizardPublishReadiness', () => {
       metadataUrl: txId,
     });
 
-    expect(plan.publishMetadataDisplayState).toEqual(expect.objectContaining({
-      effectiveMetadataGatewayUrl: `https://gateway.example/${txId}`,
-      effectiveMetadataTxId: txId,
-      metadataUri: `ar://${txId}`,
-      showArweaveTx: true,
-      showMetadataUri: true,
-    }));
+    expect(plan.publishMetadataDisplayState).toEqual(
+      expect.objectContaining({
+        effectiveMetadataGatewayUrl: `https://gateway.example/${txId}`,
+        effectiveMetadataTxId: txId,
+        metadataUri: `ar://${txId}`,
+        showArweaveTx: true,
+        showMetadataUri: true,
+      }),
+    );
   });
 
   it('describes publish action controls without execution callbacks', () => {
-    expect(resolveSessionWizardPublishActionDisplayState({
-      canPublishNow: true,
-      isNormalMode: true,
-      publishAdvancedOpen: true,
-      publishBusy: false,
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishActionDisplayState({
+        canPublishNow: true,
+        isNormalMode: true,
+        publishAdvancedOpen: true,
+        publishBusy: false,
+      }),
+    ).toEqual({
       canPublishNow: true,
       displayMode: 'normal',
       publishAdvancedOpen: true,
@@ -458,12 +528,14 @@ describe('resolveSessionWizardPublishReadiness', () => {
       settingsButtonActive: true,
     });
 
-    expect(resolveSessionWizardPublishActionDisplayState({
-      canPublishNow: false,
-      isNormalMode: false,
-      publishAdvancedOpen: false,
-      publishBusy: true,
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishActionDisplayState({
+        canPublishNow: false,
+        isNormalMode: false,
+        publishAdvancedOpen: false,
+        publishBusy: true,
+      }),
+    ).toEqual({
       canPublishNow: false,
       displayMode: 'advanced',
       publishAdvancedOpen: false,
@@ -522,17 +594,19 @@ describe('resolveSessionWizardPublishRequestDescriptor', () => {
       canUploadMetadataNow: true,
     });
 
-    expect(descriptor).toEqual(expect.objectContaining({
-      pendingDraftSnapshot: [],
-      hasPendingDrafts: false,
-      hasManualMetadata: false,
-      publishExecutionPlan: expect.objectContaining({
-        shouldAutoDeployWorker: false,
-        shouldDeployPendingSbts: false,
-        shouldUploadMetadata: true,
-        shouldRegisterSession: true,
-        steps: ['upload-metadata', 'register-session', 'done'],
+    expect(descriptor).toEqual(
+      expect.objectContaining({
+        pendingDraftSnapshot: [],
+        hasPendingDrafts: false,
+        hasManualMetadata: false,
+        publishExecutionPlan: expect.objectContaining({
+          shouldAutoDeployWorker: false,
+          shouldDeployPendingSbts: false,
+          shouldUploadMetadata: true,
+          shouldRegisterSession: true,
+          steps: ['upload-metadata', 'register-session', 'done'],
+        }),
       }),
-    }));
+    );
   });
 });

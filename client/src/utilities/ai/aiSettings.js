@@ -20,7 +20,6 @@ import { createLogger } from '../logging.js';
 
 const log = createLogger('aiSettings');
 
-
 export const AI_PROVIDERS = Object.freeze({
   ANTHROPIC: 'anthropic',
   OPENAI: 'openai',
@@ -141,29 +140,26 @@ export const deriveAiPreset = ({ mode, models, modelProviders } = {}) => {
   if (!fastModel || !thinkingModel || fastModel !== thinkingModel) return 'custom';
   if (!fastProvider || !thinkingProvider || fastProvider !== thinkingProvider) return 'custom';
 
-  const match = Object.entries(AI_PRESET_CONFIGS).find(([, preset]) => (
-    preset.provider === fastProvider &&
-    toModelLeaf(preset.models.fast) === fastModel &&
-    toModelLeaf(preset.models.thinking) === thinkingModel
-  ));
+  const match = Object.entries(AI_PRESET_CONFIGS).find(
+    ([, preset]) =>
+      preset.provider === fastProvider &&
+      toModelLeaf(preset.models.fast) === fastModel &&
+      toModelLeaf(preset.models.thinking) === thinkingModel,
+  );
   return match ? match[0] : 'custom';
 };
 const normalizeTaskReasoningEffort = (raw = {}) => {
-  const obj = (raw && typeof raw === 'object') ? raw : {};
+  const obj = raw && typeof raw === 'object' ? raw : {};
   const hasOwn = (key) => Object.prototype.hasOwnProperty.call(obj, key);
   return {
     generate: hasOwn('generate')
       ? normalizeOptionalReasoningEffort(obj.generate)
       : DEFAULT_TASK_REASONING_EFFORT.generate,
-    rewrite: hasOwn('rewrite')
-      ? normalizeOptionalReasoningEffort(obj.rewrite)
-      : DEFAULT_TASK_REASONING_EFFORT.rewrite,
+    rewrite: hasOwn('rewrite') ? normalizeOptionalReasoningEffort(obj.rewrite) : DEFAULT_TASK_REASONING_EFFORT.rewrite,
     summarize: hasOwn('summarize')
       ? normalizeOptionalReasoningEffort(obj.summarize)
       : DEFAULT_TASK_REASONING_EFFORT.summarize,
-    rank: hasOwn('rank')
-      ? normalizeOptionalReasoningEffort(obj.rank)
-      : DEFAULT_TASK_REASONING_EFFORT.rank,
+    rank: hasOwn('rank') ? normalizeOptionalReasoningEffort(obj.rank) : DEFAULT_TASK_REASONING_EFFORT.rank,
   };
 };
 
@@ -175,10 +171,7 @@ const WORKER_KEY_META = Object.freeze({
 const buildSkippedKeyMeta = (providerEntry = {}) => ({
   apiKey: '',
   status: 'skipped',
-  encryptedAvailable: !!(
-    toStr(providerEntry.apiKey).trim() ||
-    providerEntry.encryptedApiKey
-  ),
+  encryptedAvailable: !!(toStr(providerEntry.apiKey).trim() || providerEntry.encryptedApiKey),
 });
 
 const stripProviderKeys = (settings = {}) => {
@@ -214,9 +207,7 @@ const hasProviderEncryptedKey = (entry = {}) => !!toStr(entry?.encryptedApiKey).
 let volatileLocalAiProviderKeys = {};
 
 const summarizeAiSettingsSecretMetadata = (settings = {}) => {
-  const providers = settings?.providers && typeof settings.providers === 'object'
-    ? settings.providers
-    : {};
+  const providers = settings?.providers && typeof settings.providers === 'object' ? settings.providers : {};
   const entries = Object.values(providers);
   return {
     encryptedAvailable: entries.some((entry) => hasProviderEncryptedKey(entry)),
@@ -225,9 +216,7 @@ const summarizeAiSettingsSecretMetadata = (settings = {}) => {
 };
 
 const rememberVolatilePlaintextProviderKeys = (settings = {}) => {
-  const providers = settings?.providers && typeof settings.providers === 'object'
-    ? settings.providers
-    : {};
+  const providers = settings?.providers && typeof settings.providers === 'object' ? settings.providers : {};
   volatileLocalAiProviderKeys = {
     ...volatileLocalAiProviderKeys,
     ...Object.entries(providers).reduce((acc, [provider, entry]) => {
@@ -263,9 +252,7 @@ const overlayVolatilePlaintextProviderKeys = (settings = {}) => {
 
 const stripPlaintextProviderKeys = (settings = {}) => {
   const normalized = normalizeAiSettings(settings, { includeUseLocal: true });
-  const providers = normalized.providers && typeof normalized.providers === 'object'
-    ? normalized.providers
-    : {};
+  const providers = normalized.providers && typeof normalized.providers === 'object' ? normalized.providers : {};
   return {
     ...normalized,
     providers: Object.entries(providers).reduce((acc, [provider, entry]) => {
@@ -279,7 +266,7 @@ const stripPlaintextProviderKeys = (settings = {}) => {
 };
 
 const normalizeProvider = (raw = {}, extras = {}) => {
-  const obj = (raw && typeof raw === 'object') ? raw : {};
+  const obj = raw && typeof raw === 'object' ? raw : {};
   return {
     ...extras,
     apiKey: toStr(obj.apiKey || obj.key || obj.token || ''),
@@ -288,9 +275,9 @@ const normalizeProvider = (raw = {}, extras = {}) => {
 };
 
 const normalizeModels = (raw = {}, fallbackProvider, providerOverridesRaw = {}) => {
-  const obj = (raw && typeof raw === 'object') ? raw : {};
+  const obj = raw && typeof raw === 'object' ? raw : {};
   const providerOverrides =
-    (providerOverridesRaw && typeof providerOverridesRaw === 'object') ? providerOverridesRaw : {};
+    providerOverridesRaw && typeof providerOverridesRaw === 'object' ? providerOverridesRaw : {};
   const fastProviderOverride = toLower(providerOverrides.fast || providerOverrides.default || '');
   const thinkingProviderOverride = toLower(providerOverrides.thinking || providerOverrides.reasoning || '');
   const normalizeEntry = (entry, fallbackModel, providerFallback) => {
@@ -328,7 +315,7 @@ const normalizeModels = (raw = {}, fallbackProvider, providerOverridesRaw = {}) 
 };
 
 const normalizeTranscription = (raw = {}) => {
-  const obj = (raw && typeof raw === 'object') ? raw : {};
+  const obj = raw && typeof raw === 'object' ? raw : {};
   return {
     provider: toLower(obj.provider || DEFAULT_TRANSCRIPTION.provider) || DEFAULT_TRANSCRIPTION.provider,
     model: toStr(obj.model || DEFAULT_TRANSCRIPTION.model),
@@ -370,10 +357,7 @@ const applyAiPresetConfig = (settings = {}, presetKey = '') => {
   };
 };
 
-export const applyPreLoginAiProviderKeyChange = (settings = {}, {
-  provider,
-  apiKey,
-} = {}) => {
+export const applyPreLoginAiProviderKeyChange = (settings = {}, { provider, apiKey } = {}) => {
   const nextProvider = toLower(provider || '');
   const current = normalizeAiSettings(settings, { includeUseLocal: true });
   const nextKey = toStr(apiKey || '');
@@ -391,10 +375,13 @@ export const applyPreLoginAiProviderKeyChange = (settings = {}, {
 
   if (!presetKey) return nextSettings;
   if (toStr(nextKey).trim()) {
-    return applyAiPresetConfig({
-      ...nextSettings,
-      useLocal: true,
-    }, presetKey);
+    return applyAiPresetConfig(
+      {
+        ...nextSettings,
+        useLocal: true,
+      },
+      presetKey,
+    );
   }
 
   const activeProvider = toLower(nextSettings.mode || '');
@@ -402,15 +389,17 @@ export const applyPreLoginAiProviderKeyChange = (settings = {}, {
     return nextSettings;
   }
 
-  const fallbackProvider = Object.keys(PRELOGIN_PROVIDER_PRESETS).find((candidate) => (
-    candidate !== nextProvider &&
-    !!toStr(nextSettings.providers?.[candidate]?.apiKey).trim()
-  ));
+  const fallbackProvider = Object.keys(PRELOGIN_PROVIDER_PRESETS).find(
+    (candidate) => candidate !== nextProvider && !!toStr(nextSettings.providers?.[candidate]?.apiKey).trim(),
+  );
   if (fallbackProvider) {
-    return applyAiPresetConfig({
-      ...nextSettings,
-      useLocal: true,
-    }, PRELOGIN_PROVIDER_PRESETS[fallbackProvider]);
+    return applyAiPresetConfig(
+      {
+        ...nextSettings,
+        useLocal: true,
+      },
+      PRELOGIN_PROVIDER_PRESETS[fallbackProvider],
+    );
   }
 
   return {
@@ -421,7 +410,7 @@ export const applyPreLoginAiProviderKeyChange = (settings = {}, {
 
 export const normalizeAiSettings = (raw = {}, opts = {}) => {
   const includeUseLocal = opts.includeUseLocal !== false;
-  const obj = (raw && typeof raw === 'object') ? raw : {};
+  const obj = raw && typeof raw === 'object' ? raw : {};
 
   const mode = toLower(obj.mode || obj.provider || DEFAULT_SETTINGS.mode) || DEFAULT_SETTINGS.mode;
   const reasoningEffort = normalizeReasoningEffort(obj.reasoningEffort || obj.reasoning_effort);
@@ -438,10 +427,7 @@ export const normalizeAiSettings = (raw = {}, opts = {}) => {
   });
 
   const providersRaw = obj.providers && typeof obj.providers === 'object' ? obj.providers : {};
-  const customRaw =
-    providersRaw.custom ||
-    obj.custom ||
-    {};
+  const customRaw = providersRaw.custom || obj.custom || {};
   let customFunctions = '';
   if (typeof customRaw.functions === 'string') {
     customFunctions = customRaw.functions;
@@ -475,9 +461,7 @@ export const normalizeAiSettings = (raw = {}, opts = {}) => {
   };
 };
 
-const buildDefaultAiSettings = (includeUseLocal = true) => (
-  normalizeAiSettings(DEFAULT_SETTINGS, { includeUseLocal })
-);
+const buildDefaultAiSettings = (includeUseLocal = true) => normalizeAiSettings(DEFAULT_SETTINGS, { includeUseLocal });
 
 export const normalizeLocalAiSettingsEnvelopeRecord = (raw = null) => {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -648,9 +632,10 @@ export const getSessionAiSettings = (slugIn = '') => {
 
 export const getLocalAiSettings = () => {
   const result = readLocalAiSettingsEnvelope();
-  const settings = result.ok && result.settings
-    ? normalizeAiSettings(result.settings, { includeUseLocal: true })
-    : buildDefaultAiSettings(true);
+  const settings =
+    result.ok && result.settings
+      ? normalizeAiSettings(result.settings, { includeUseLocal: true })
+      : buildDefaultAiSettings(true);
   return overlayVolatilePlaintextProviderKeys(settings);
 };
 
@@ -658,52 +643,55 @@ export const saveLocalAiSettings = (nextSettings = {}) => {
   if (typeof window === 'undefined') return buildDefaultAiSettings(true);
   try {
     const current = getLocalAiSettings();
-    const next = (nextSettings && typeof nextSettings === 'object') ? nextSettings : {};
-    const merged = normalizeAiSettings({
-      ...current,
-      ...next,
-      models: {
-        ...(current.models || {}),
-        ...(next.models || {}),
-      },
-      modelProviders: {
-        ...(current.modelProviders || {}),
-        ...(next.modelProviders || {}),
-      },
-      taskReasoningEffort: {
-        ...(current.taskReasoningEffort || {}),
-        ...(next.taskReasoningEffort || {}),
-      },
-      transcription: {
-        ...(current.transcription || {}),
-        ...(next.transcription || {}),
-      },
-      providers: {
-        ...(current.providers || {}),
-        ...(next.providers || {}),
-        anthropic: {
-          ...(current.providers?.anthropic || {}),
-          ...(next.providers?.anthropic || {}),
+    const next = nextSettings && typeof nextSettings === 'object' ? nextSettings : {};
+    const merged = normalizeAiSettings(
+      {
+        ...current,
+        ...next,
+        models: {
+          ...(current.models || {}),
+          ...(next.models || {}),
         },
-        openai: {
-          ...(current.providers?.openai || {}),
-          ...(next.providers?.openai || {}),
+        modelProviders: {
+          ...(current.modelProviders || {}),
+          ...(next.modelProviders || {}),
         },
-        openrouter: {
-          ...(current.providers?.openrouter || {}),
-          ...(next.providers?.openrouter || {}),
+        taskReasoningEffort: {
+          ...(current.taskReasoningEffort || {}),
+          ...(next.taskReasoningEffort || {}),
         },
-        custom: {
-          ...(current.providers?.custom || {}),
-          ...(next.providers?.custom || {}),
+        transcription: {
+          ...(current.transcription || {}),
+          ...(next.transcription || {}),
+        },
+        providers: {
+          ...(current.providers || {}),
+          ...(next.providers || {}),
+          anthropic: {
+            ...(current.providers?.anthropic || {}),
+            ...(next.providers?.anthropic || {}),
+          },
+          openai: {
+            ...(current.providers?.openai || {}),
+            ...(next.providers?.openai || {}),
+          },
+          openrouter: {
+            ...(current.providers?.openrouter || {}),
+            ...(next.providers?.openrouter || {}),
+          },
+          custom: {
+            ...(current.providers?.custom || {}),
+            ...(next.providers?.custom || {}),
+          },
         },
       },
-    }, { includeUseLocal: true });
+      { includeUseLocal: true },
+    );
     rememberVolatilePlaintextProviderKeys(next);
     const result = writeLocalAiSettingsEnvelope(merged);
     if (!result.ok) throw new Error(result.error || result.status || 'Failed to save local AI settings.');
     return overlayVolatilePlaintextProviderKeys(
-      normalizeAiSettings(result.envelope?.settings || merged, { includeUseLocal: true })
+      normalizeAiSettings(result.envelope?.settings || merged, { includeUseLocal: true }),
     );
   } catch {
     return buildDefaultAiSettings(true);
@@ -713,24 +701,26 @@ export const saveLocalAiSettings = (nextSettings = {}) => {
 export const clearLocalAiSettings = () => {
   volatileLocalAiProviderKeys = {};
   if (typeof window === 'undefined') return;
-  try { localStorage.removeItem(AI_SETTINGS_STORAGE_KEY); } catch (e) { log.warn('aiSettings: fallback', e); }
+  try {
+    localStorage.removeItem(AI_SETTINGS_STORAGE_KEY);
+  } catch (e) {
+    log.warn('aiSettings: fallback', e);
+  }
 };
 
 export const resolveAiSettings = ({ sessionSlug, preferLocal } = {}) => {
   const effectiveSlug =
-    (typeof sessionSlug === 'string' && sessionSlug.length >= 0)
-      ? sessionSlug
-      : getActiveSessionSlugFromStore();
+    typeof sessionSlug === 'string' && sessionSlug.length >= 0 ? sessionSlug : getActiveSessionSlugFromStore();
   const local = getLocalAiSettings();
   const session = getSessionAiSettings(effectiveSlug || '');
-  const useLocal = (typeof preferLocal === 'boolean') ? preferLocal : !!local.useLocal;
+  const useLocal = typeof preferLocal === 'boolean' ? preferLocal : !!local.useLocal;
   const settings = useLocal ? local : session;
   return {
     settings,
     source: useLocal ? 'local' : 'session',
     local,
     session,
-    group: session
+    group: session,
   };
 };
 
@@ -739,11 +729,7 @@ const getWalletContext = (override = {}) => {
     const state = store?.getState?.();
     const profile = state?.profile || {};
     const network = profile.network || {};
-    const chainId =
-      override.chainId ||
-      network.id ||
-      network.chainId ||
-      null;
+    const chainId = override.chainId || network.id || network.chainId || null;
     return {
       account: override.account || profile.account || '',
       providerLike: override.providerLike || profile.provider || 'wagmi',
@@ -778,37 +764,27 @@ const resolveApiKey = async (providerEntry = {}, context = {}, opts = {}) => {
   const includeMeta = !!opts.includeMeta;
   const apiKey = toStr(providerEntry.apiKey).trim();
   if (apiKey) {
-    return includeMeta
-      ? { apiKey, status: 'plain', encryptedAvailable: false }
-      : apiKey;
+    return includeMeta ? { apiKey, status: 'plain', encryptedAvailable: false } : apiKey;
   }
 
   const encrypted = providerEntry.encryptedApiKey;
   if (!encrypted) {
-    return includeMeta
-      ? { apiKey: '', status: 'missing', encryptedAvailable: false }
-      : '';
+    return includeMeta ? { apiKey: '', status: 'missing', encryptedAvailable: false } : '';
   }
 
   const envelopeJson = typeof encrypted === 'string' ? encrypted : JSON.stringify(encrypted);
   if (!envelopeJson || envelopeJson === 'null') {
-    return includeMeta
-      ? { apiKey: '', status: 'missing', encryptedAvailable: false }
-      : '';
+    return includeMeta ? { apiKey: '', status: 'missing', encryptedAvailable: false } : '';
   }
 
   const wallet = getWalletContext(context);
   const lit = getLitHooks(context);
 
   if (!wallet.account) {
-    return includeMeta
-      ? { apiKey: '', status: 'wallet-required', encryptedAvailable: true }
-      : '';
+    return includeMeta ? { apiKey: '', status: 'wallet-required', encryptedAvailable: true } : '';
   }
   if (!lit || typeof lit.getKey !== 'function') {
-    return includeMeta
-      ? { apiKey: '', status: 'lit-unavailable', encryptedAvailable: true }
-      : '';
+    return includeMeta ? { apiKey: '', status: 'lit-unavailable', encryptedAvailable: true } : '';
   }
 
   try {
@@ -823,9 +799,7 @@ const resolveApiKey = async (providerEntry = {}, context = {}, opts = {}) => {
       ? { apiKey: decoded, status: decoded ? 'encrypted' : 'locked', encryptedAvailable: true }
       : decoded;
   } catch {
-    return includeMeta
-      ? { apiKey: '', status: 'locked', encryptedAvailable: true }
-      : '';
+    return includeMeta ? { apiKey: '', status: 'locked', encryptedAvailable: true } : '';
   }
 };
 
@@ -839,7 +813,7 @@ export const getEffectiveAiConfig = async ({
   resolveSecrets = true,
 } = {}) => {
   const { source, settings, local, session } = resolveAiSettings({ sessionSlug, preferLocal });
-  const preferLocalResolved = (typeof preferLocal === 'boolean') ? preferLocal : !!local.useLocal;
+  const preferLocalResolved = typeof preferLocal === 'boolean' ? preferLocal : !!local.useLocal;
   const modelType = thinking ? AI_MODEL_TYPES.THINKING : AI_MODEL_TYPES.FAST;
   const sessionProvider =
     toLower(provider || session.modelProviders?.[modelType] || session.mode || DEFAULT_SETTINGS.mode) ||
@@ -847,12 +821,11 @@ export const getEffectiveAiConfig = async ({
   const localProvider =
     toLower(provider || local.modelProviders?.[modelType] || local.mode || DEFAULT_SETTINGS.mode) ||
     DEFAULT_SETTINGS.mode;
-  const sessionModel =
-    toStr(model || session.models?.[modelType] || DEFAULT_SETTINGS.models[modelType]);
-  const localModel =
-    toStr(model || local.models?.[modelType] || DEFAULT_SETTINGS.models[modelType]);
+  const sessionModel = toStr(model || session.models?.[modelType] || DEFAULT_SETTINGS.models[modelType]);
+  const localModel = toStr(model || local.models?.[modelType] || DEFAULT_SETTINGS.models[modelType]);
 
-  const sessionProviderEntry = session.providers?.[sessionProvider] || DEFAULT_SETTINGS.providers[sessionProvider] || {};
+  const sessionProviderEntry =
+    session.providers?.[sessionProvider] || DEFAULT_SETTINGS.providers[sessionProvider] || {};
   const localProviderEntry = local.providers?.[localProvider] || DEFAULT_SETTINGS.providers[localProvider] || {};
   const sessionKey = { ...WORKER_KEY_META };
   const shouldResolveLocalKey = preferLocalResolved && resolveSecrets;
@@ -870,11 +843,16 @@ export const getEffectiveAiConfig = async ({
     provider: selectedProvider,
     model: selectedModel,
     modelType,
-    preset: toStr(settings?.preset || deriveAiPreset({
-      mode: settings?.mode,
-      models: settings?.models,
-      modelProviders: settings?.modelProviders,
-    }) || DEFAULT_PRESET) || DEFAULT_PRESET,
+    preset:
+      toStr(
+        settings?.preset ||
+          deriveAiPreset({
+            mode: settings?.mode,
+            models: settings?.models,
+            modelProviders: settings?.modelProviders,
+          }) ||
+          DEFAULT_PRESET,
+      ) || DEFAULT_PRESET,
     reasoningEffort: normalizeReasoningEffort(settings?.reasoningEffort || DEFAULT_REASONING_EFFORT),
     reasoning_effort: normalizeReasoningEffort(settings?.reasoningEffort || DEFAULT_REASONING_EFFORT),
     taskReasoningEffort: normalizeTaskReasoningEffort(settings?.taskReasoningEffort),
@@ -894,7 +872,8 @@ export const getEffectiveAiConfig = async ({
     group: session,
     customRpcUrl: selectedProvider === AI_PROVIDERS.CUSTOM ? toStr(providerEntry.rpcUrl || '') : '',
     customFunctions: selectedProvider === AI_PROVIDERS.CUSTOM ? toStr(providerEntry.functions || '') : '',
-    customFunctionsParsed: selectedProvider === AI_PROVIDERS.CUSTOM ? parseFunctionsJson(providerEntry.functions) : null,
+    customFunctionsParsed:
+      selectedProvider === AI_PROVIDERS.CUSTOM ? parseFunctionsJson(providerEntry.functions) : null,
   };
 };
 
@@ -908,7 +887,7 @@ export const getEffectiveTranscriptionConfig = async ({
   context,
 } = {}) => {
   const { local, session } = resolveAiSettings({ sessionSlug, preferLocal });
-  const preferLocalResolved = (typeof preferLocal === 'boolean') ? preferLocal : !!local.useLocal;
+  const preferLocalResolved = typeof preferLocal === 'boolean' ? preferLocal : !!local.useLocal;
   const hasExplicitKey = !!toStr(apiKey).trim();
   const sessionTranscription = session.models?.transcription || session.transcription;
   const localTranscription = local.models?.transcription || local.transcription;
@@ -920,25 +899,21 @@ export const getEffectiveTranscriptionConfig = async ({
     DEFAULT_TRANSCRIPTION.provider;
   const sessionModel = toStr(model || sessionTranscription?.model || DEFAULT_TRANSCRIPTION.model);
   const localModel = toStr(model || localTranscription?.model || DEFAULT_TRANSCRIPTION.model);
-  const sessionProviderEntry = session.providers?.[sessionProvider] || DEFAULT_SETTINGS.providers[sessionProvider] || {};
+  const sessionProviderEntry =
+    session.providers?.[sessionProvider] || DEFAULT_SETTINGS.providers[sessionProvider] || {};
   const localProviderEntry = local.providers?.[localProvider] || DEFAULT_SETTINGS.providers[localProvider] || {};
   const sessionKey = { ...WORKER_KEY_META };
   const localKey = preferLocalResolved
     ? await resolveApiKey(localProviderEntry, context, { includeMeta: true })
     : buildSkippedKeyMeta(localProviderEntry);
-  const localRpcUrl = toStr(
-    rpcUrl ||
-    localTranscription?.rpcUrl ||
-    localProviderEntry.rpcUrl ||
-    ''
-  );
+  const localRpcUrl = toStr(rpcUrl || localTranscription?.rpcUrl || localProviderEntry.rpcUrl || '');
   const useInlineKey = hasExplicitKey;
   const localTranscriptionHasKey = !!(toStr(apiKey).trim() || toStr(localKey.apiKey).trim());
-  const shouldUseLocalSettings = preferLocalResolved && (
-    localProvider === AI_PROVIDERS.LOCAL ||
-    (localProvider === AI_PROVIDERS.OPENAI && localTranscriptionHasKey) ||
-    (localProvider === AI_PROVIDERS.CUSTOM && !!localRpcUrl)
-  );
+  const shouldUseLocalSettings =
+    preferLocalResolved &&
+    (localProvider === AI_PROVIDERS.LOCAL ||
+      (localProvider === AI_PROVIDERS.OPENAI && localTranscriptionHasKey) ||
+      (localProvider === AI_PROVIDERS.CUSTOM && !!localRpcUrl));
   if (preferLocalResolved && localProvider === AI_PROVIDERS.CUSTOM && !localRpcUrl) {
     throw new Error('Custom transcription requires an RPC URL.');
   }
@@ -950,19 +925,16 @@ export const getEffectiveTranscriptionConfig = async ({
   const selectedModel = shouldUseLocalSettings ? localModel : sessionModel;
   const providerEntry = shouldUseLocalSettings ? localProviderEntry : sessionProviderEntry;
   const resolvedMeta = shouldUseLocalSettings ? localKey : sessionKey;
-  const resolvedKey =
-    selectedProvider === AI_PROVIDERS.LOCAL
-      ? ''
-      : (toStr(apiKey).trim() || resolvedMeta.apiKey || '');
+  const resolvedKey = selectedProvider === AI_PROVIDERS.LOCAL ? '' : toStr(apiKey).trim() || resolvedMeta.apiKey || '';
 
   const finalRpcUrl =
     selectedProvider === AI_PROVIDERS.CUSTOM
       ? toStr(
-        rpcUrl ||
-        (shouldUseLocalSettings ? localTranscription?.rpcUrl : sessionTranscription?.rpcUrl) ||
-        providerEntry.rpcUrl ||
-        ''
-      )
+          rpcUrl ||
+            (shouldUseLocalSettings ? localTranscription?.rpcUrl : sessionTranscription?.rpcUrl) ||
+            providerEntry.rpcUrl ||
+            '',
+        )
       : '';
   if (selectedProvider === AI_PROVIDERS.CUSTOM && !finalRpcUrl) {
     throw new Error('Custom transcription requires an RPC URL.');
@@ -974,8 +946,8 @@ export const getEffectiveTranscriptionConfig = async ({
     apiKey: resolvedKey,
     apiKeyStatus: resolvedMeta.status || 'missing',
     apiKeyEncryptedAvailable: !!resolvedMeta.encryptedAvailable,
-    apiKeySource: (shouldUseLocalSettings || useInlineKey) ? 'local' : 'session',
-    sessionApiKeySource: (shouldUseLocalSettings || useInlineKey) ? 'local' : 'session',
+    apiKeySource: shouldUseLocalSettings || useInlineKey ? 'local' : 'session',
+    sessionApiKeySource: shouldUseLocalSettings || useInlineKey ? 'local' : 'session',
     preferLocal: preferLocalResolved,
     sessionKeyStatus: sessionKey.status || 'missing',
     groupKeyStatus: sessionKey.status || 'missing',
