@@ -1,4 +1,4 @@
-/** @file uploads.js */
+/** @file uploads.ts */
 
 import { Buffer } from 'buffer';
 import { arweaveClient as arweaveScripts } from '../arweave/arweaveClient.js';
@@ -16,6 +16,96 @@ import {
   resolveDocUploadResultStorage,
 } from './docUploadContracts.js';
 
+type UnknownRecord = Record<string, unknown>;
+
+type BaseUploadContextArgs = {
+  account?: unknown;
+  providerLike?: unknown;
+  chainId?: unknown;
+};
+
+type DocPayloadOptions = {
+  name?: unknown;
+  format?: unknown;
+  mime?: unknown;
+  type?: unknown;
+};
+
+type DocEncryptionOptions = UnknownRecord & {
+  enabled?: boolean;
+  arweaveJwk?: unknown;
+  chainId?: unknown;
+  contextLabel?: unknown;
+  saveKey?: unknown;
+  accessControlConditions?: unknown;
+  litChain?: unknown;
+  chain?: unknown;
+  litNetwork?: unknown;
+  connectTimeout?: unknown;
+  providerLike?: unknown;
+  resourceAbilityRequests?: unknown;
+};
+
+type EncryptedDocUploadArgs = BaseUploadContextArgs & {
+  data?: unknown;
+  name?: unknown;
+  mime?: unknown;
+  tags?: unknown;
+  sessionSlug?: unknown;
+  sessionConfig?: unknown;
+  encryption?: DocEncryptionOptions | null;
+};
+
+type SelfRecipientDocUploadArgs = EncryptedDocUploadArgs & {
+  format?: unknown;
+  arweaveJwk?: unknown;
+  arweave?: unknown;
+  contextLabel?: unknown;
+};
+
+type UploadDocLibraryFileArgs = BaseUploadContextArgs & {
+  file?: (Blob & { name?: string }) | null;
+  sessionSlug?: unknown;
+  sessionConfig?: unknown;
+  tags?: unknown;
+  encryption?: DocEncryptionOptions | null;
+};
+
+type UploadDocLibraryUrlRecordArgs = BaseUploadContextArgs & {
+  url?: unknown;
+  title?: unknown;
+  sessionSlug?: unknown;
+  sessionConfig?: unknown;
+  tags?: unknown;
+  encryption?: DocEncryptionOptions | null;
+};
+
+type EncryptedUploadResult = {
+  txId?: unknown;
+  url?: unknown;
+  arweaveUrl?: unknown;
+  envelope?: unknown;
+};
+
+type EncryptedUploadFn = (args: EncryptedDocUploadArgs) => Promise<EncryptedUploadResult>;
+type LitUploadOptions = NonNullable<Parameters<typeof litStorage.uploadEncryptedArweaveData>[0]>;
+type LitUploadHookOptions = NonNullable<LitUploadOptions['lit']>;
+type LitSaveKey = NonNullable<LitUploadHookOptions['saveKey']>;
+
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+const readRecord = (value: unknown, key: string): unknown => (isRecord(value) ? value[key] : undefined);
+
+const spreadRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
+
+const isLitSaveKey = (value: unknown): value is LitSaveKey => typeof value === 'function';
+
+const resolveLitSaveKey = (value: unknown): LitSaveKey | null => (isLitSaveKey(value) ? value : null);
+
+const resolveLitAccessControlConditions = (value: unknown): LitUploadHookOptions['accessControlConditions'] =>
+  Array.isArray(value) ? (value as LitUploadHookOptions['accessControlConditions']) : undefined;
+
 export {
   buildSessionDocLibraryViewerUrl,
   createDocLibraryLinkRecord,
@@ -23,18 +113,24 @@ export {
   resolveDocUploadsGate,
 } from './docUploadContracts.js';
 
-const buildBaseUploadContext = ({ account, providerLike, chainId } = {}) => ({
+const buildBaseUploadContext = ({ account, providerLike, chainId }: BaseUploadContextArgs = {}) => ({
   account,
   providerLike,
   chainId: chainId || null,
 });
 
-const readDocBlobAsArrayBuffer = (blob) => {
+const readDocBlobAsArrayBuffer = (blob: Blob): Promise<ArrayBuffer> => {
   if (blob && typeof blob.arrayBuffer === 'function') return blob.arrayBuffer();
   return new Promise((resolve, reject) => {
     try {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
+      reader.onload = () => {
+        if (reader.result instanceof ArrayBuffer) {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Failed to read file data.'));
+        }
+      };
       reader.onerror = () => reject(new Error('Failed to read file data.'));
       reader.readAsArrayBuffer(blob);
     } catch (err) {
@@ -43,7 +139,7 @@ const readDocBlobAsArrayBuffer = (blob) => {
   });
 };
 
-const DOC_MIME_BY_EXT = Object.freeze({
+const DOC_MIME_BY_EXT: Readonly<Record<string, string>> = Object.freeze({
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
@@ -61,7 +157,7 @@ const DOC_MIME_BY_EXT = Object.freeze({
   wav: 'audio/wav',
 });
 
-const resolveDocExt = ({ name, format } = {}) => {
+const resolveDocExt = ({ name, format }: DocPayloadOptions = {}) => {
   const fmt = toStr(format).trim().toLowerCase();
   if (fmt) return fmt;
   const rawName = toStr(name).trim();
@@ -70,7 +166,7 @@ const resolveDocExt = ({ name, format } = {}) => {
   return '';
 };
 
-const resolveDocMime = ({ mime, name, format, type } = {}) => {
+const resolveDocMime = ({ mime, name, format, type }: DocPayloadOptions = {}) => {
   const raw = toStr(mime || type).trim();
   const ext = resolveDocExt({ name, format });
   if (raw && raw !== 'application/octet-stream') return raw;
@@ -78,14 +174,17 @@ const resolveDocMime = ({ mime, name, format, type } = {}) => {
   return raw || 'application/octet-stream';
 };
 
-const encodeDocEncryptedPayload = async (data, opts = {}) => {
+const isDocBlob = (value: unknown): value is Blob & { name?: string } =>
+  typeof Blob !== 'undefined' && value instanceof Blob;
+
+const encodeDocEncryptedPayload = async (data: unknown, opts: DocPayloadOptions = {}) => {
   const name = toStr(opts.name || '');
   const format = toStr(opts.format || '');
   const mime = toStr(opts.mime || '');
 
-  if (typeof File !== 'undefined' && (data instanceof File || data instanceof Blob)) {
+  if (isDocBlob(data)) {
     const buf = await readDocBlobAsArrayBuffer(data);
-    const b64 = Buffer.from(new Uint8Array(buf || [])).toString('base64');
+    const b64 = Buffer.from(new Uint8Array(buf)).toString('base64');
     const resolvedName = name || data.name || 'encrypted-file';
     const resolvedFormat = resolveDocExt({ name: resolvedName, format });
     const resolvedMime = resolveDocMime({
@@ -128,7 +227,7 @@ export const uploadSelfRecipientEncryptedDocData = async ({
   account,
   chainId,
   contextLabel,
-} = {}) => {
+}: SelfRecipientDocUploadArgs = {}) => {
   if (!toStr(account).trim()) {
     throw new Error('Wallet account is required for private document encryption.');
   }
@@ -147,7 +246,7 @@ export const uploadSelfRecipientEncryptedDocData = async ({
   const txId = await arweaveScripts.uploadDataToArweave(envelope, 'json', {
     arweaveJwk,
     tags,
-    ...(arweave && typeof arweave === 'object' ? arweave : {}),
+    ...spreadRecord(arweave),
   });
 
   return {
@@ -169,7 +268,7 @@ const buildEncryptedUploadArgs = ({
   providerLike,
   chainId,
   encryption,
-} = {}) =>
+}: EncryptedDocUploadArgs = {}) =>
   litStorage.uploadEncryptedArweaveData({
     data,
     name,
@@ -186,8 +285,8 @@ const buildEncryptedUploadArgs = ({
       context: buildBaseUploadContext({ account, providerLike, chainId }),
     },
     lit: {
-      saveKey: encryption?.saveKey,
-      accessControlConditions: encryption?.accessControlConditions,
+      saveKey: resolveLitSaveKey(encryption?.saveKey),
+      accessControlConditions: resolveLitAccessControlConditions(encryption?.accessControlConditions),
       chain: encryption?.litChain || encryption?.chain || null,
       ...(encryption?.litNetwork ? { litNetwork: encryption.litNetwork } : {}),
       ...(encryption?.connectTimeout ? { connectTimeout: encryption.connectTimeout } : {}),
@@ -207,7 +306,7 @@ const buildSelfRecipientUploadArgs = ({
   providerLike,
   chainId,
   encryption,
-} = {}) =>
+}: EncryptedDocUploadArgs = {}) =>
   uploadSelfRecipientEncryptedDocData({
     data,
     name,
@@ -234,13 +333,13 @@ export const uploadDocLibraryFile = async ({
   chainId,
   tags,
   encryption = null,
-} = {}) => {
+}: UploadDocLibraryFileArgs = {}) => {
   if (!file) throw new Error('Missing file.');
 
   const normalizedTags = normalizeTagsForTagMap(tags);
   const contentType = file.type || 'application/octet-stream';
   if (encryption?.enabled) {
-    const uploadEncrypted = isSelfRecipientDocEncryption(encryption)
+    const uploadEncrypted: EncryptedUploadFn = isSelfRecipientDocEncryption(encryption)
       ? buildSelfRecipientUploadArgs
       : buildEncryptedUploadArgs;
     const result = await uploadEncrypted({
@@ -284,17 +383,18 @@ export const uploadDocLibraryFile = async ({
   });
   const txId = resolveDocUploadResultId(result);
   const storage = resolveDocUploadResultStorage(result);
+  const resultStorageRef = readRecord(result, 'storageRef');
 
   return {
     txId,
     url:
       storage === STORAGE_BACKENDS.CLOUDFLARE
-        ? toStr(result?.storageRef?.uri).trim()
+        ? toStr(readRecord(resultStorageRef, 'uri')).trim()
         : txId
           ? arweaveScripts.buildArweaveGatewayUrl(txId)
           : '',
     storage,
-    storageRef: result?.storageRef || null,
+    storageRef: resultStorageRef || null,
     kind: 'file',
     tagMap: buildTagMap(normalizedTags),
     data: { size: file.size || null, type: file.type || null },
@@ -311,12 +411,12 @@ export const uploadDocLibraryUrlRecord = async ({
   chainId,
   tags,
   encryption = null,
-} = {}) => {
+}: UploadDocLibraryUrlRecordArgs = {}) => {
   const record = createDocLibraryLinkRecord({ url, title });
   const normalizedTags = normalizeTagsForTagMap(tags);
 
   if (encryption?.enabled) {
-    const uploadEncrypted = isSelfRecipientDocEncryption(encryption)
+    const uploadEncrypted: EncryptedUploadFn = isSelfRecipientDocEncryption(encryption)
       ? buildSelfRecipientUploadArgs
       : buildEncryptedUploadArgs;
     const result = await uploadEncrypted({
@@ -364,17 +464,18 @@ export const uploadDocLibraryUrlRecord = async ({
   });
   const txId = resolveDocUploadResultId(result);
   const storage = resolveDocUploadResultStorage(result);
+  const resultStorageRef = readRecord(result, 'storageRef');
 
   return {
     txId,
     url:
       storage === STORAGE_BACKENDS.CLOUDFLARE
-        ? toStr(result?.storageRef?.uri).trim()
+        ? toStr(readRecord(resultStorageRef, 'uri')).trim()
         : txId
           ? arweaveScripts.buildArweaveGatewayUrl(txId)
           : '',
     storage,
-    storageRef: result?.storageRef || null,
+    storageRef: resultStorageRef || null,
     kind: 'link',
     tagMap: buildTagMap(normalizedTags),
     data: { size: null, type: 'application/json' },
