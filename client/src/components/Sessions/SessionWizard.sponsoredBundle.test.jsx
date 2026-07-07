@@ -167,7 +167,7 @@ import {
   openWorkerPanel,
   selectNormalModeCard,
   setCloudflareTokenValue,
-} from './SessionWizard.sponsoredBundleDom.testUtils.js';
+} from './SessionWizard.sponsoredBundleDom.testUtils';
 import {
   buildDecryptedSponsoredBundle,
   buildEnvelope,
@@ -175,8 +175,8 @@ import {
   createDefaultFetchMock,
   createDeferred,
   seedWizardCache,
-} from './SessionWizard.sponsoredBundleFixtures.testUtils.js';
-import { createIndexedDbMock } from './SessionWizard.sponsoredBundleIndexedDb.testUtils.js';
+} from './SessionWizard.sponsoredBundleFixtures.testUtils';
+import { createIndexedDbMock } from './SessionWizard.sponsoredBundleIndexedDb.testUtils';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
 const renderLoggedInSessionWizard = (props = {}) =>
