@@ -198,6 +198,18 @@ type SingleQuestionGlobalCacheWindow = Window & {
 
 const joinClassNames = (...parts: unknown[]) => parts.filter(Boolean).join(' ');
 
+const shallowEqualSingleQuestionRecord = (
+  left: Record<string, unknown> | null | undefined,
+  right: Record<string, unknown> | null | undefined,
+): boolean => {
+  if (Object.is(left, right)) return true;
+  if (!left || !right) return false;
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && Object.is(left[key], right[key]));
+};
+
 export const SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE: React.CSSProperties = {
   width: '200px',
 };
@@ -279,6 +291,13 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       this._bookmarkSuccessTimer = null;
     }
     this.clearQuestionLookupMemo();
+  }
+
+  shouldComponentUpdate(nextProps: SingleQuestionResponseProps, nextState: SingleQuestionResponseState): boolean {
+    return (
+      !shallowEqualSingleQuestionRecord(this.props, nextProps) ||
+      !shallowEqualSingleQuestionRecord(this.state, nextState)
+    );
   }
 
   componentDidUpdate(prevProps: SingleQuestionResponseProps) {
