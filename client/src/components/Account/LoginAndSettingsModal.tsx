@@ -2163,7 +2163,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
           afterDemo:
             cryptoTerminology && needsNetworkSwitch ? (
               <Button onClick={this.switchToCorrectNetwork} className={`${styles.networkSwitchButton} ${styles.glow}`}>
-                Switch to {targetNetwork?.name || overview.targetNetworkName}
+                Switch to {overview.targetNetworkName}
               </Button>
             ) : null,
           tooltipsInfoId: 'postLoginTooltipsToggleTooltip',

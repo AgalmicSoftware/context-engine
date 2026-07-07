@@ -1,5 +1,6 @@
 /** @file chains.js */
 /** @typedef {import('wagmi').Chain} Chain */
+import type { Chain } from 'wagmi';
 import { chainConfig as opStackChainConfig } from 'viem/op-stack';
 import { defineChain } from 'viem/utils';
 import rpcDefaults from './rpcDefaults.js';
@@ -10,28 +11,70 @@ import localContracts from './local-contracts.json';
 
 const { getPathRpcUrl, getPublicRpcUrls } = rpcDefaults;
 
+type UnknownRecord = Record<string, unknown>;
+type RpcTransport = 'http' | 'wss';
+type RpcUrlMap = Readonly<Record<number, string>>;
+type PaidRpcRuntimeGlobals = Readonly<Record<number, Readonly<Record<RpcTransport, string>>>>;
+type CeChain = Chain & {
+  blockTime?: number;
+  chainId?: number | string;
+  defaultGasPriceGwei?: string | number;
+  network: string;
+  sourceId?: number;
+  testnet?: boolean;
+};
+type ChainRegistry = Record<number, CeChain>;
+type RuntimeGlobal = typeof globalThis & {
+  CE_USE_INFURA_RPC?: unknown;
+  CE_RPC_PROVIDER_MODE?: unknown;
+  CE_PREFER_PATH_RPC?: unknown;
+  CE_INCLUDE_LOCAL_SESSION_REGISTRY?: unknown;
+  [key: string]: unknown;
+};
+type DefaultHttpRpcOptions = {
+  allowPath?: boolean;
+};
+
+const readRecord = (value: unknown, key: string): unknown =>
+  value && typeof value === 'object' ? (value as UnknownRecord)[key] : undefined;
+const asRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' ? (value as UnknownRecord) : {};
+const readStringList = (value: unknown): string[] => (Array.isArray(value) ? normalizeRpcList(value) : []);
+
+const runtimeGlobal = (): RuntimeGlobal | null => {
+  try {
+    return typeof globalThis !== 'undefined' ? (globalThis as RuntimeGlobal) : null;
+  } catch (e) {
+    void e; /* fallback: runtime global lookup. */
+    return null;
+  }
+};
+
+const defineCompatChain = (config: UnknownRecord): CeChain =>
+  defineChain(config as Parameters<typeof defineChain>[0]) as CeChain;
+
 const SEPOLIA_SOURCE_ID = 11_155_111;
 const OP_MAINNET_SOURCE_ID = 1;
-const BASE_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(84532));
-const BASE_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(8453));
-const OPTIMISM_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(10));
-const OPTIMISM_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(11155420));
-const ARBITRUM_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(42161));
-const ARBITRUM_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(421614));
-const ETHEREUM_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(1));
-const POLYGON_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(137));
-const BSC_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(56));
-const CELO_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(42220));
-const KATANA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(747474));
-const CONFIGURED_PAID_RPC_URL_HTTP_BY_CHAIN = Object.freeze({
+const BASE_SEPOLIA_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(84532));
+const BASE_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(8453));
+const OPTIMISM_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(10));
+const OPTIMISM_SEPOLIA_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(11155420));
+const ARBITRUM_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(42161));
+const ARBITRUM_SEPOLIA_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(421614));
+const ETHEREUM_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(1));
+const POLYGON_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(137));
+const BSC_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(56));
+const CELO_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(42220));
+const KATANA_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(747474));
+const CONFIGURED_PAID_RPC_URL_HTTP_BY_CHAIN: RpcUrlMap = Object.freeze({
   84532: readPublicEnv('REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_HTTP', ''),
   11155420: readPublicEnv('REACT_APP_CE_OP_SEPOLIA_PAID_RPC_URL_HTTP', ''),
 });
-const CONFIGURED_PAID_RPC_URL_WSS_BY_CHAIN = Object.freeze({
+const CONFIGURED_PAID_RPC_URL_WSS_BY_CHAIN: RpcUrlMap = Object.freeze({
   84532: readPublicEnv('REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_WSS', ''),
   11155420: readPublicEnv('REACT_APP_CE_OP_SEPOLIA_PAID_RPC_URL_WSS', ''),
 });
-const PAID_RPC_RUNTIME_GLOBALS_BY_CHAIN = Object.freeze({
+const PAID_RPC_RUNTIME_GLOBALS_BY_CHAIN: PaidRpcRuntimeGlobals = Object.freeze({
   84532: Object.freeze({
     http: 'CE_BASE_SEPOLIA_PAID_RPC_URL_HTTP',
     wss: 'CE_BASE_SEPOLIA_PAID_RPC_URL_WSS',
@@ -48,13 +91,14 @@ const PAID_RPC_RUNTIME_GLOBALS_BY_CHAIN = Object.freeze({
 export const USE_INFURA = CE_USE_INFURA_RPC;
 export const RPC_PROVIDER_MODE = CE_RPC_PROVIDER_MODE;
 
-const readConfiguredPaidRpcUrl = (chainId, transport = 'http') => {
+const readConfiguredPaidRpcUrl = (chainId: unknown, transport: RpcTransport = 'http') => {
   const id = Number(chainId || 0);
   const key = transport === 'wss' ? 'wss' : 'http';
   const runtimeField = PAID_RPC_RUNTIME_GLOBALS_BY_CHAIN?.[id]?.[key];
   try {
-    if (runtimeField && typeof globalThis !== 'undefined' && typeof globalThis[runtimeField] !== 'undefined') {
-      return String(globalThis[runtimeField] || '').trim();
+    const g = runtimeGlobal();
+    if (runtimeField && g && typeof g[runtimeField] !== 'undefined') {
+      return String(g[runtimeField] || '').trim();
     }
   } catch (e) {
     void e; /* fallback: runtime override lookup. */
@@ -63,15 +107,16 @@ const readConfiguredPaidRpcUrl = (chainId, transport = 'http') => {
   return String(envMap?.[id] || '').trim();
 };
 
-export const getConfiguredPaidRpcHttpUrl = (chainId) => readConfiguredPaidRpcUrl(chainId, 'http');
-export const getConfiguredPaidRpcWssUrl = (chainId) => readConfiguredPaidRpcUrl(chainId, 'wss');
+export const getConfiguredPaidRpcHttpUrl = (chainId: unknown) => readConfiguredPaidRpcUrl(chainId, 'http');
+export const getConfiguredPaidRpcWssUrl = (chainId: unknown) => readConfiguredPaidRpcUrl(chainId, 'wss');
 export const getConfiguredBaseSepoliaPaidRpcHttpUrl = () => getConfiguredPaidRpcHttpUrl(84532);
 
 const readUseInfuraRpcFlag = () => {
   try {
-    if (typeof globalThis !== 'undefined') {
-      if (typeof globalThis.CE_USE_INFURA_RPC !== 'undefined') {
-        return !!globalThis.CE_USE_INFURA_RPC;
+    const g = runtimeGlobal();
+    if (g) {
+      if (typeof g.CE_USE_INFURA_RPC !== 'undefined') {
+        return !!g.CE_USE_INFURA_RPC;
       }
     }
   } catch (e) {
@@ -82,8 +127,9 @@ const readUseInfuraRpcFlag = () => {
 
 const readRpcProviderMode = () => {
   try {
-    if (typeof globalThis !== 'undefined' && typeof globalThis.CE_RPC_PROVIDER_MODE !== 'undefined') {
-      const mode = String(globalThis.CE_RPC_PROVIDER_MODE || '')
+    const g = runtimeGlobal();
+    if (g && typeof g.CE_RPC_PROVIDER_MODE !== 'undefined') {
+      const mode = String(g.CE_RPC_PROVIDER_MODE || '')
         .trim()
         .toLowerCase();
       if (mode === 'infura_only' || mode === 'fallback') return mode;
@@ -98,15 +144,16 @@ const readRpcProviderMode = () => {
   return 'fallback';
 };
 
-const isInfuraOnlyForChain = (chainId) =>
+const isInfuraOnlyForChain = (chainId: unknown) =>
   readRpcProviderMode() === 'infura_only' && !!getConfiguredPaidRpcHttpUrl(chainId);
 
-const readPreferPathRpcFlag = (chainId = null) => {
+const readPreferPathRpcFlag = (chainId: unknown = null) => {
   if (chainId != null && isInfuraOnlyForChain(chainId)) return false;
   try {
-    if (typeof globalThis !== 'undefined') {
-      if (typeof globalThis.CE_PREFER_PATH_RPC !== 'undefined') {
-        return !!globalThis.CE_PREFER_PATH_RPC;
+    const g = runtimeGlobal();
+    if (g) {
+      if (typeof g.CE_PREFER_PATH_RPC !== 'undefined') {
+        return !!g.CE_PREFER_PATH_RPC;
       }
     }
   } catch (e) {
@@ -115,17 +162,17 @@ const readPreferPathRpcFlag = (chainId = null) => {
   return !!PREFER_PATH_RPC;
 };
 
-const resolvePathRpcUrl = (chainId) => {
+const resolvePathRpcUrl = (chainId: unknown) => {
   if (!readPreferPathRpcFlag(chainId)) return '';
   const url = getPathRpcUrl(chainId);
   return typeof url === 'string' ? url.trim() : '';
 };
 
-export const getPreferredPathRpcUrl = (chainId) => resolvePathRpcUrl(chainId);
+export const getPreferredPathRpcUrl = (chainId: unknown) => resolvePathRpcUrl(chainId);
 
-const normalizeRpcList = (urls = []) => {
-  const seen = new Set();
-  const out = [];
+const normalizeRpcList = (urls: readonly unknown[] = []): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
   urls.forEach((raw) => {
     if (typeof raw !== 'string') return;
     const url = raw.trim();
@@ -136,7 +183,7 @@ const normalizeRpcList = (urls = []) => {
   return out;
 };
 
-const withConfiguredPaidRpc = (chainId, urls = []) => {
+const withConfiguredPaidRpc = (chainId: unknown, urls: readonly unknown[] = []): string[] => {
   const list = normalizeRpcList(urls);
   const providerMode = readRpcProviderMode();
   const includePaidRpc = readUseInfuraRpcFlag() || providerMode === 'infura_only';
@@ -149,7 +196,7 @@ const withConfiguredPaidRpc = (chainId, urls = []) => {
   return [paidRpcUrl, ...filtered];
 };
 
-const withPathRpc = (chainId, urls = []) => {
+const withPathRpc = (chainId: unknown, urls: readonly unknown[] = []): string[] => {
   const pathUrl = resolvePathRpcUrl(chainId);
   const list = normalizeRpcList(urls);
   if (pathUrl) {
@@ -160,7 +207,7 @@ const withPathRpc = (chainId, urls = []) => {
 };
 
 /** @type {Chain} */
-export const baseSepolia = defineChain({
+export const baseSepolia = defineCompatChain({
   ...opStackChainConfig,
   id: 84532,
   name: 'Base Sepolia',
@@ -224,7 +271,7 @@ export const baseSepolia = defineChain({
 });
 
 /** @type {Chain} */
-export const base = defineChain({
+export const base = defineCompatChain({
   ...opStackChainConfig,
   id: 8453,
   name: 'Base',
@@ -287,7 +334,7 @@ export const base = defineChain({
 });
 
 /** @type {Chain} */
-export const optimism = defineChain({
+export const optimism = defineCompatChain({
   ...opStackChainConfig,
   id: 10,
   name: 'OP Mainnet',
@@ -346,7 +393,7 @@ export const optimism = defineChain({
 });
 
 /** @type {Chain} */
-export const optimismSepolia = defineChain({
+export const optimismSepolia = defineCompatChain({
   ...opStackChainConfig,
   id: 11155420,
   name: 'OP Sepolia',
@@ -402,7 +449,7 @@ export const optimismSepolia = defineChain({
 });
 
 /** @type {Chain} */
-export const arbitrum = defineChain({
+export const arbitrum = defineCompatChain({
   id: 42161,
   name: 'Arbitrum One',
   network: 'arbitrum',
@@ -438,7 +485,7 @@ export const arbitrum = defineChain({
 });
 
 /** @type {Chain} */
-export const arbitrumSepolia = defineChain({
+export const arbitrumSepolia = defineCompatChain({
   id: 421614,
   name: 'Arbitrum Sepolia',
   network: 'arbitrum-sepolia',
@@ -474,7 +521,7 @@ export const arbitrumSepolia = defineChain({
 });
 
 /** @type {Chain} */
-export const mainnet = defineChain({
+export const mainnet = defineCompatChain({
   id: 1,
   name: 'Ethereum',
   network: 'mainnet',
@@ -514,7 +561,7 @@ export const mainnet = defineChain({
 });
 
 /** @type {Chain} */
-export const polygon = defineChain({
+export const polygon = defineCompatChain({
   id: 137,
   name: 'Polygon',
   network: 'polygon',
@@ -546,7 +593,7 @@ export const polygon = defineChain({
 });
 
 /** @type {Chain} */
-export const bsc = defineChain({
+export const bsc = defineCompatChain({
   id: 56,
   name: 'BNB Smart Chain',
   network: 'bsc',
@@ -582,7 +629,7 @@ export const bsc = defineChain({
 });
 
 /** @type {Chain} */
-export const celo = defineChain({
+export const celo = defineCompatChain({
   id: 42220,
   name: 'Celo',
   network: 'celo',
@@ -618,7 +665,7 @@ export const celo = defineChain({
 });
 
 /** @type {Chain} */
-export const katana = defineChain({
+export const katana = defineCompatChain({
   id: 747474,
   name: 'Katana',
   network: 'katana',
@@ -647,7 +694,7 @@ export const katana = defineChain({
 });
 
 /** @type {Chain} */
-export const anvil = defineChain({
+export const anvil = defineCompatChain({
   id: 31337,
   name: 'Anvil',
   network: 'anvil',
@@ -671,7 +718,7 @@ export const anvil = defineChain({
   testnet: true,
 });
 
-export const chainRegistry = {
+export const chainRegistry: ChainRegistry = {
   1: mainnet,
   10: optimism,
   11155420: optimismSepolia,
@@ -686,19 +733,19 @@ export const chainRegistry = {
   747474: katana,
 };
 
-const normalizeOptionalAddress = (value) => {
+const normalizeOptionalAddress = (value: unknown): string => {
   const raw = typeof value === 'string' ? value.trim() : '';
   return raw || '';
 };
-const normalizeChainIdValue = (value) => {
+const normalizeChainIdValue = (value: unknown): number | null => {
   const parsed = Number(value || 0);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
-const normalizeExplorerBaseUrl = (value) => {
+const normalizeExplorerBaseUrl = (value: unknown): string => {
   const raw = typeof value === 'string' ? value.trim() : '';
   return raw ? raw.replace(/\/+$/, '') : '';
 };
-const buildExplorerEntityUrl = (chainId, segment, value) => {
+const buildExplorerEntityUrl = (chainId: unknown, segment: string, value: unknown): string | null => {
   const normalizedChainId = normalizeChainIdValue(chainId);
   const normalizedValue = typeof value === 'string' ? value.trim() : '';
   if (!normalizedChainId || !normalizedValue) return null;
@@ -706,16 +753,17 @@ const buildExplorerEntityUrl = (chainId, segment, value) => {
   if (!explorerBaseUrl) return null;
   return `${explorerBaseUrl}/${segment}/${normalizedValue}`;
 };
-const CHAINS_WITH_FAUCET_RPC_FALLBACK = new Set([84532, 11155420]);
+const CHAINS_WITH_FAUCET_RPC_FALLBACK = new Set<number>([84532, 11155420]);
 
 const LOCAL_CONTRACT_CHAIN_ID = Number(localContracts?.chainId || 0) || 0;
-const normalizeLoopbackHost = (value) =>
+const normalizeLoopbackHost = (value: unknown): string =>
   String(value || '')
     .trim()
     .toLowerCase()
     .replace(/^\[(.*)\]$/, '$1');
 const LOCAL_SESSION_REGISTRY_LIST_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
-export const isLocalDevLoopbackHost = (value) => LOCAL_SESSION_REGISTRY_LIST_HOSTS.has(normalizeLoopbackHost(value));
+export const isLocalDevLoopbackHost = (value: unknown): boolean =>
+  LOCAL_SESSION_REGISTRY_LIST_HOSTS.has(normalizeLoopbackHost(value));
 const LOCAL_SESSION_REGISTRY_ADDRESSES =
   LOCAL_CONTRACT_CHAIN_ID && normalizeOptionalAddress(localContracts?.SessionRegistry)
     ? { [LOCAL_CONTRACT_CHAIN_ID]: normalizeOptionalAddress(localContracts.SessionRegistry) }
@@ -734,22 +782,23 @@ const LOCAL_SESSION_CONTRACTS_BY_CHAIN = LOCAL_CONTRACT_CHAIN_ID
   : {};
 const readIncludeLocalSessionRegistryFlag = () => {
   try {
-    if (typeof globalThis !== 'undefined' && typeof globalThis.CE_INCLUDE_LOCAL_SESSION_REGISTRY !== 'undefined') {
-      return !!globalThis.CE_INCLUDE_LOCAL_SESSION_REGISTRY;
+    const g = runtimeGlobal();
+    if (g && typeof g.CE_INCLUDE_LOCAL_SESSION_REGISTRY !== 'undefined') {
+      return !!g.CE_INCLUDE_LOCAL_SESSION_REGISTRY;
     }
   } catch (e) {
     void e; /* fallback: runtime override lookup. */
   }
   try {
-    const hostname =
-      typeof globalThis !== 'undefined' ? normalizeLoopbackHost(globalThis.location?.hostname || '') : '';
+    const g = runtimeGlobal();
+    const hostname = g ? normalizeLoopbackHost(g.location?.hostname || '') : '';
     return isLocalDevLoopbackHost(hostname);
   } catch (e) {
     void e; /* fallback: runtime override lookup. */
   }
   return false;
 };
-const shouldIncludeSessionRegistryChainInLists = (chainId) => {
+const shouldIncludeSessionRegistryChainInLists = (chainId: unknown): boolean => {
   const id = Number(chainId || 0) || 0;
   if (!LOCAL_CONTRACT_CHAIN_ID || id !== LOCAL_CONTRACT_CHAIN_ID) return true;
   return readIncludeLocalSessionRegistryFlag();
@@ -757,42 +806,43 @@ const shouldIncludeSessionRegistryChainInLists = (chainId) => {
 
 // Session registry + contract defaults are bundled client-side for now.
 // TODO: Resolve from registry.contextengine.eth and <chainId>.contracts.contextengine.eth in the future.
-export const SESSION_REGISTRY_ADDRESSES = Object.fromEntries(
+export const SESSION_REGISTRY_ADDRESSES: Record<number, string> = Object.fromEntries(
   Object.entries({
     ...(contractsConfig.sessionRegistryAddresses || {}),
     ...LOCAL_SESSION_REGISTRY_ADDRESSES,
-  }).map(([k, v]) => [Number(k), v]),
+  }).map(([k, v]) => [Number(k), normalizeOptionalAddress(v)]),
 );
 
-export const SESSION_CONTRACTS_BY_CHAIN = Object.fromEntries(
+export const SESSION_CONTRACTS_BY_CHAIN: Record<number, UnknownRecord> = Object.fromEntries(
   Object.entries({
     ...(contractsConfig.sessionContractsByChain || {}),
     ...LOCAL_SESSION_CONTRACTS_BY_CHAIN,
-  }).map(([k, v]) => [Number(k), v]),
+  }).map(([k, v]) => [Number(k), v && typeof v === 'object' ? (v as UnknownRecord) : {}]),
 );
 
-export function getChainById(id) {
-  return chainRegistry[id] || null;
+export function getChainById(id: unknown): CeChain | null {
+  const normalizedId = normalizeChainIdValue(id);
+  return normalizedId ? chainRegistry[normalizedId] || null : null;
 }
-export function getDefaultChainId() {
+export function getDefaultChainId(): number | null {
   return normalizeChainIdValue(DEFAULT_CHAIN_ID);
 }
-export function buildExplorerAddressUrl(chainId, address) {
+export function buildExplorerAddressUrl(chainId: unknown, address: unknown): string | null {
   return buildExplorerEntityUrl(chainId, 'address', address);
 }
-export function buildExplorerTxUrl(chainId, txHash) {
+export function buildExplorerTxUrl(chainId: unknown, txHash: unknown): string | null {
   return buildExplorerEntityUrl(chainId, 'tx', txHash);
 }
-export function isChainWithFaucetRpcFallback(chainId) {
+export function isChainWithFaucetRpcFallback(chainId: unknown): boolean {
   const id = normalizeChainIdValue(chainId);
   return !!id && CHAINS_WITH_FAUCET_RPC_FALLBACK.has(id);
 }
-export function getSessionRegistryAddress(chainId) {
+export function getSessionRegistryAddress(chainId: unknown): string {
   const id = Number(chainId || 0) || 0;
   if (!shouldIncludeSessionRegistryChainInLists(id)) return '';
   return SESSION_REGISTRY_ADDRESSES?.[id] || '';
 }
-export function getSessionRegistryChains() {
+export function getSessionRegistryChains(): Array<CeChain & { registryAddress: string }> {
   return Object.entries(SESSION_REGISTRY_ADDRESSES || {})
     .map(([id, address]) => {
       if (!address) return null;
@@ -801,25 +851,25 @@ export function getSessionRegistryChains() {
       if (!chain) return null;
       return { ...chain, registryAddress: address };
     })
-    .filter(Boolean);
+    .filter((chain): chain is CeChain & { registryAddress: string } => !!chain);
 }
-export function getSessionRegistryChainIds() {
+export function getSessionRegistryChainIds(): number[] {
   return Object.keys(SESSION_REGISTRY_ADDRESSES || {})
     .map((id) => Number(id))
     .filter((id) => id && SESSION_REGISTRY_ADDRESSES?.[id] && shouldIncludeSessionRegistryChainInLists(id));
 }
-export function getSessionContractsForChain(chainId) {
+export function getSessionContractsForChain(chainId: unknown): UnknownRecord {
   const id = Number(chainId || 0) || 0;
   if (!shouldIncludeSessionRegistryChainInLists(id)) return {};
   const contracts = SESSION_CONTRACTS_BY_CHAIN?.[id];
   return contracts && typeof contracts === 'object' ? { ...contracts } : {};
 }
-export function getChainBlockTimeMs(chainId) {
+export function getChainBlockTimeMs(chainId: unknown): number {
   const chain = getChainById(Number(chainId || 0));
   const blockTime = Number(chain?.blockTime || 0);
   return Number.isFinite(blockTime) && blockTime > 0 ? blockTime : 12000;
 }
-export function getDefaultGasPriceGwei(id) {
+export function getDefaultGasPriceGwei(id: unknown): string {
   const chain = getChainById(Number(id || 0));
   const configured = chain?.defaultGasPriceGwei;
   if (typeof configured === 'string' && configured.trim()) return configured.trim();
@@ -828,14 +878,15 @@ export function getDefaultGasPriceGwei(id) {
   }
   return '0.08';
 }
-export function getDefaultHttpRpc(id, opts = {}) {
-  const ch = chainRegistry[id];
+export function getDefaultHttpRpc(id: unknown, opts: DefaultHttpRpcOptions = {}): string | null {
+  const normalizedId = normalizeChainIdValue(id);
+  const ch = normalizedId ? chainRegistry[normalizedId] : null;
   if (!ch) return null;
   const allowPath = opts?.allowPath !== false;
 
   // Note: chain objects are built with PATH RPCs already injected via withPathRpc(),
   // so when allowPath=false we must actively filter the PATH URL back out.
-  const pathUrl = resolvePathRpcUrl(id);
+  const pathUrl = resolvePathRpcUrl(normalizedId);
 
   const candidates = normalizeRpcList([
     ...(Array.isArray(ch.rpcUrls?.public?.http) ? ch.rpcUrls.public.http : []),
@@ -850,34 +901,53 @@ export function getDefaultHttpRpc(id, opts = {}) {
 }
 
 // --- wagmi Chain adapters (DEFAULT_NETWORK / ch are wagmi Chain objects) ---
-export const chainHexId = (ch) => '0x' + Number(ch?.id ?? 0).toString(16);
+export const chainHexId = (ch: unknown): string => '0x' + Number(readRecord(ch, 'id') ?? 0).toString(16);
 
-export const chainHttpRpc = (ch) => {
-  const id = Number(ch?.id ?? 0);
+export const chainHttpRpc = (ch: unknown): string => {
+  const id = Number(readRecord(ch, 'id') ?? 0);
   const pathUrl = resolvePathRpcUrl(id);
   if (pathUrl) return pathUrl;
-  return ch?.rpcUrls?.public?.http?.[0] || ch?.rpcUrls?.default?.http?.[0] || '';
+  const rpcUrls = asRecord(readRecord(ch, 'rpcUrls'));
+  const publicRpcUrls = asRecord(readRecord(rpcUrls, 'public'));
+  const defaultRpcUrls = asRecord(readRecord(rpcUrls, 'default'));
+  return (
+    readStringList(readRecord(publicRpcUrls, 'http'))[0] || readStringList(readRecord(defaultRpcUrls, 'http'))[0] || ''
+  );
 };
 
-export const chainHttpRpcNoPath = (ch) => {
-  const id = Number(ch?.id ?? 0);
+export const chainHttpRpcNoPath = (ch: unknown): string => {
+  const id = Number(readRecord(ch, 'id') ?? 0);
   const pathUrl = resolvePathRpcUrl(id);
+  const rpcUrls = asRecord(readRecord(ch, 'rpcUrls'));
+  const publicRpcUrls = asRecord(readRecord(rpcUrls, 'public'));
+  const defaultRpcUrls = asRecord(readRecord(rpcUrls, 'default'));
   const candidates = normalizeRpcList([
-    ...(Array.isArray(ch?.rpcUrls?.public?.http) ? ch.rpcUrls.public.http : []),
-    ...(Array.isArray(ch?.rpcUrls?.default?.http) ? ch.rpcUrls.default.http : []),
+    ...readStringList(readRecord(publicRpcUrls, 'http')),
+    ...readStringList(readRecord(defaultRpcUrls, 'http')),
   ]);
   const filtered = pathUrl ? candidates.filter((url) => url !== pathUrl) : candidates;
   return filtered[0] || '';
 };
-export const chainCurrency = (ch) => ch?.nativeCurrency ?? { name: 'ETH', symbol: 'ETH', decimals: 18 };
-export const isTestnetChain = (ch) => {
-  if (typeof ch?.testnet === 'boolean') return ch.testnet;
+export const chainCurrency = (ch: unknown) => {
+  const nativeCurrency = readRecord(ch, 'nativeCurrency');
+  return nativeCurrency && typeof nativeCurrency === 'object'
+    ? nativeCurrency
+    : { name: 'ETH', symbol: 'ETH', decimals: 18 };
+};
+export const isTestnetChain = (ch: unknown): boolean => {
+  const chain = asRecord(ch);
+  if (typeof chain.testnet === 'boolean') return chain.testnet;
+  const rpcUrls = asRecord(chain.rpcUrls);
+  const defaultRpcUrls = asRecord(readRecord(rpcUrls, 'default'));
+  const publicRpcUrls = asRecord(readRecord(rpcUrls, 'public'));
+  const blockExplorers = asRecord(chain.blockExplorers);
+  const defaultBlockExplorer = asRecord(readRecord(blockExplorers, 'default'));
   const bag = [
-    ch?.name,
-    ch?.network,
-    ch?.blockExplorers?.default?.url,
-    ...(ch?.rpcUrls?.default?.http || []),
-    ...(ch?.rpcUrls?.public?.http || []),
+    chain.name,
+    chain.network,
+    defaultBlockExplorer.url,
+    ...readStringList(readRecord(defaultRpcUrls, 'http')),
+    ...readStringList(readRecord(publicRpcUrls, 'http')),
   ]
     .join(' ')
     .toLowerCase();
