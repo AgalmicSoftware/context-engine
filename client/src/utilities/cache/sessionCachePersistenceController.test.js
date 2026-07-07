@@ -7,14 +7,10 @@ jest.mock('utilities/logging', () => ({
   })),
 }));
 
-jest.mock(
-  '../../utilities/cache/cacheScripts.js',
-  () => ({
-    __esModule: true,
-    readCache: jest.fn(),
-  }),
-  { virtual: true },
-);
+jest.mock('../../utilities/cache/cacheScripts', () => ({
+  __esModule: true,
+  readCache: jest.fn(),
+}));
 
 jest.mock('./sessionCacheConstants', () => ({
   __esModule: true,
@@ -30,7 +26,7 @@ jest.mock(
 );
 
 const { createSessionCachePersistenceController } = require('./sessionCachePersistenceController.js');
-const { readCache } = require('../../utilities/cache/cacheScripts.js');
+const { readCache } = require('../../utilities/cache/cacheScripts');
 const contractScriptsModule = require('../../utilities/web3/chainGateway');
 
 const createMockHost = (opts = {}) => {

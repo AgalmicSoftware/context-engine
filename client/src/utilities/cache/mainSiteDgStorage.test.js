@@ -11,16 +11,12 @@ jest.mock('utilities/logging', () => ({
   createLogger: jest.fn(() => mockLogger),
 }));
 
-jest.mock(
-  '../../utilities/cache/cacheScripts.js',
-  () => ({
-    __esModule: true,
-    peekCacheSync: jest.fn(),
-    removeCache: jest.fn(),
-    writeCacheOptimistic: jest.fn(),
-  }),
-  { virtual: true },
-);
+jest.mock('../../utilities/cache/cacheScripts', () => ({
+  __esModule: true,
+  peekCacheSync: jest.fn(),
+  removeCache: jest.fn(),
+  writeCacheOptimistic: jest.fn(),
+}));
 
 jest.mock('./sessionCacheConstants', () => ({
   __esModule: true,
@@ -50,7 +46,7 @@ jest.mock('../session/mainSiteUtils', () => ({
 }));
 
 const { createMainSiteDgStorage } = require('./mainSiteDgStorage.js');
-const cacheScripts = require('../../utilities/cache/cacheScripts.js');
+const cacheScripts = require('../../utilities/cache/cacheScripts');
 const storageEviction = require('./sessionCacheEviction');
 const mainSiteUtils = require('../session/mainSiteUtils');
 
