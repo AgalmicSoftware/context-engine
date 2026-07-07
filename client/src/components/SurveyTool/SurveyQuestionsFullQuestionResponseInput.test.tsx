@@ -337,6 +337,42 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
     expect(props.context).toBe(context);
   });
 
+  it('skips non-edited answer inputs when stable parent props are reused', () => {
+    const audioInputWorkerProps = { sessionSlug: 'edge' };
+    const onAnswerChange = jest.fn();
+    const onToggleAnswerEncryption = jest.fn();
+    const firstQuestion = { id: 'q-one', type: 'freeform' };
+    const secondQuestion = { id: 'q-two', type: 'freeform' };
+    const firstAnswer = { value: 'first', encrypted: false };
+    const secondAnswer = { value: 'second', encrypted: false };
+    const secondAnswerUpdated = { value: 'second edited', encrypted: false };
+    const renderInputs = (nextSecondAnswer = secondAnswer) => (
+      <>
+        <SurveyQuestionsFullQuestionResponseInput
+          question={firstQuestion}
+          answer={firstAnswer}
+          audioInputWorkerProps={audioInputWorkerProps}
+          onAnswerChange={onAnswerChange}
+          onToggleAnswerEncryption={onToggleAnswerEncryption}
+        />
+        <SurveyQuestionsFullQuestionResponseInput
+          question={secondQuestion}
+          answer={nextSecondAnswer}
+          audioInputWorkerProps={audioInputWorkerProps}
+          onAnswerChange={onAnswerChange}
+          onToggleAnswerEncryption={onToggleAnswerEncryption}
+        />
+      </>
+    );
+    const { rerender } = render(renderInputs());
+
+    expect(mockSurveyAudioFieldInputProps.map((props) => props.dataCeQuestionId)).toEqual(['q-one', 'q-two']);
+
+    rerender(renderInputs(secondAnswerUpdated));
+
+    expect(mockSurveyAudioFieldInputProps.map((props) => props.dataCeQuestionId)).toEqual(['q-one', 'q-two', 'q-two']);
+  });
+
   it('keeps submitting default answer actions inert even if a child emits', () => {
     const onAnswerChange = jest.fn();
     const onToggleAnswerEncryption = jest.fn();
