@@ -1,5 +1,5 @@
-import contractScripts from './contractScripts.js';
-import { __test__contractScriptsReadCaches } from './contractScripts.js';
+import contractScripts from './chainGateway.js';
+import { __test__contractScriptsReadCaches } from './chainGateway.js';
 import { ethers } from 'ethers';
 import { arweaveClient } from '../arweave/arweaveClient.js';
 

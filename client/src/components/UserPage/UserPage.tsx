@@ -1488,7 +1488,7 @@ class UserPage extends Component<any, any> {
 
   getOnchainUsername = (_address: unknown, _network: unknown): string | null => {
     return null;
-    // should go in contractScripts.js when enabled
+    // should go in the chain gateway when enabled
   };
 
   saveNickname = (): void => {

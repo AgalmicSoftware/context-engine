@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { isPublishUploadBootstrapReachabilityError } from '../../utilities/arweave/publishUploadAuth.js';

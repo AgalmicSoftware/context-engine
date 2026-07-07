@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { renderSurveyResults } from './surveyResultsTestHarness';
 

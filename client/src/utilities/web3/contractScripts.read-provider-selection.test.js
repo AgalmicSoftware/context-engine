@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import contractScripts, { getReadProviderForGroup } from './contractScripts.js';
+import contractScripts, { getReadProviderForGroup } from './chainGateway.js';
 
 const SESSION_RPC_URL = 'https://session-specific.example/rpc';
 const CROSS_CHAIN_SESSION_RPC_URL = 'https://session-cross-chain.example/rpc';

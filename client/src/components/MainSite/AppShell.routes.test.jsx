@@ -3,13 +3,13 @@ import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import { initCacheManager } from '../../utilities/cache/cacheScripts.js';
 import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
   normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import {
   SESSION_REGISTRY_CACHE_UPDATED_EVENT,
   loadGroupRegistryCache,
@@ -247,7 +247,7 @@ jest.mock('../DebateMap/DebateMap', () => {
   };
 });
 
-jest.mock('../../utilities/web3/contractScripts.js', () => {
+jest.mock('../../utilities/web3/chainGateway.js', () => {
   const contractScripts = {
     decryptQuestionPayloadInPlace: jest.fn(),
     getAllSbtAddressesCached: jest.fn(),

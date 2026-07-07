@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { __test__contractScriptsSbtHistory } from './contractScripts.js';
+import { __test__contractScriptsSbtHistory } from './chainGateway.js';
 
 describe('contractScripts SBT history helpers', () => {
   const { normalizeHistorySummaryCount, normalizeSbtHistorySummary, deriveSbtHistorySummaryFromCounts } =

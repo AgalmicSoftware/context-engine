@@ -22,7 +22,7 @@ jest.mock('./sessionCacheConstants', () => ({
 }));
 
 jest.mock(
-  '../../utilities/web3/contractScripts.js',
+  '../../utilities/web3/chainGateway.js',
   () => ({
     __esModule: true,
     normalizeSessionSlug: jest.fn(),
@@ -32,7 +32,7 @@ jest.mock(
 
 const { createSessionCachePersistenceController } = require('./sessionCachePersistenceController.js');
 const { readCache } = require('../../utilities/cache/cacheScripts.js');
-const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
+const contractScriptsModule = require('../../utilities/web3/chainGateway.js');
 
 const createMockHost = (opts = {}) => {
   const state = { cacheHasLoaded: false, ...opts.initialState };

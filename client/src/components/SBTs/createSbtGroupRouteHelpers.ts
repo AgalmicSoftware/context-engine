@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 
 type CreateSbtAutoJoinUrlBuilder = (sbtAddress: unknown) => unknown;
 

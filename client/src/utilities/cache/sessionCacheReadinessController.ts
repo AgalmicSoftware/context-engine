@@ -1,6 +1,6 @@
 import { createLogger } from 'utilities/logging.js';
 import { recordCeRuntimeCacheEvent } from '../../utilities/ui/uiRuntimeStats.js';
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 
 type CacheInitMode = 'auto' | 'partial' | 'full';
 

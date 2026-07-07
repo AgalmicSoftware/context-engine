@@ -30,7 +30,7 @@ import AudioInput from '../Shared/AudioInput/AudioInput';
 import { rankQuestionsAI } from '../../utilities/ai/aiClient.js';
 import { getLocalAiSettings } from '../../utilities/ai/aiSettings.js';
 import { resolveEncryptionGate } from '../../utilities/crypto/encryptionGates.js';
-import { getSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
+import { getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import {
   getGateSbtAddresses,
   normalizeGateMode,

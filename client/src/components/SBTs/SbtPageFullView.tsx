@@ -4,7 +4,7 @@ import { faArrowLeft, faInfinity, faQuestionCircle } from '@fortawesome/free-sol
 import { Alert } from 'reactstrap';
 
 import contextEngineLoadingGif from '../../assets/img/context_engine_logo_animation.gif';
-import { getChainLabelById } from '../../utilities/web3/contractScripts.js';
+import { getChainLabelById } from '../../utilities/web3/chainGateway.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import CETooltip from '../Shared/CETooltip';
 import styles from './SBTPage.module.scss';

@@ -23,7 +23,7 @@ import {
 } from './SurveyResults';
 import { renderSurveyResults } from './surveyResultsTestHarness';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 
 type SurveyResultsProps = Record<string, any>;

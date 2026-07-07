@@ -3,7 +3,7 @@ jest.mock('utilities/logging.js', () => ({
   createLogger: jest.fn(),
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   getAllSessionSlugs: jest.fn(),
   normalizeSessionSlug: jest.fn(),
@@ -64,7 +64,7 @@ describe('createSessionScanPolicy', () => {
   beforeEach(() => {
     jest.resetModules();
 
-    contractScriptsModule = jest.requireMock('../../utilities/web3/contractScripts.js');
+    contractScriptsModule = jest.requireMock('../../utilities/web3/chainGateway.js');
     scanScopeModule = jest.requireMock('../../utilities/session/sessionScanScope.js');
     listenersModule = jest.requireMock('../../utilities/sbt/sbtInstanceListenersMode.js');
     fullScanModule = jest.requireMock('../../utilities/sbt/sbtFullScanPolicy.js');

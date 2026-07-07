@@ -94,7 +94,7 @@ jest.mock('utilities/ui/historicalFigureAvatars.js', () => ({
   getHistoricalFigureAvatarOrBlockie: jest.fn(() => 'data:image/png;base64,mock-avatar'),
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {},
   getAllSessionSlugs: jest.fn(() => []),

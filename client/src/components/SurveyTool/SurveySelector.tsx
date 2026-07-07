@@ -70,7 +70,7 @@ import contractScripts, {
   getAllSessionSlugs,
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
   getSessionSlugByName,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import { ethers, utils } from 'ethers';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';

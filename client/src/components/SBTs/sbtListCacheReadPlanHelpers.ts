@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import type { SbtListHelperItem, SbtListHelperRecord } from './sbtListCardDetailsHelpers';
 import { normalizeSbtListItems, type SbtCacheMetaSnapshot } from './sbtListItemNormalizationHelpers';
 import { isSbtListSyntheticNoSessionSlug } from './sbtListSessionUniverseHelpers';

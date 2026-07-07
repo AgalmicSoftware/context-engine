@@ -11,7 +11,7 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { arweaveClient } from '../../utilities/arweave/arweaveClient';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import * as resourceKeys from '../../utilities/session/resourceKeys.js';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import { sessionRegistryStore, sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { getChainById, getDefaultHttpRpc } from '../../variables/chains.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';

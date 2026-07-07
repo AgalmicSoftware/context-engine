@@ -1,5 +1,5 @@
 import SBTPage from './SBTPage';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { buildSbtPageAutoMintStorageKey } from './sbtPageAutoMintHelpers';

@@ -29,7 +29,7 @@ import {
   analyzePhotoForQuestionGeneration,
 } from '../../../utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from '../../../utilities/ai/aiSettings.js';
-import { getAllSessionSlugs, getSessionConfigBySlug } from '../../../utilities/web3/contractScripts.js';
+import { getAllSessionSlugs, getSessionConfigBySlug } from '../../../utilities/web3/chainGateway.js';
 import AudioInput from '../../Shared/AudioInput/AudioInput';
 import CompactImageChooser from '../../Shared/CompactImageChooser';
 import { readCompactImageClipboard } from '../../Shared/compactImageClipboard.js';

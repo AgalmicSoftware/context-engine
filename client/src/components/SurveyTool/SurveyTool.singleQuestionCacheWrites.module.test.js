@@ -27,7 +27,7 @@ import {
   resolveUpdateCacheContext,
 } from './surveyToolScope';
 import { buildSurveyToolSurveyListStatePatch } from './surveyToolTopLevelHelpers';
-import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import contractScripts, * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));

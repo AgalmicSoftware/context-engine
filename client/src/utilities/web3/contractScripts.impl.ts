@@ -6,7 +6,7 @@
  *
  * Key exports: contractScripts (default), getSessionConfigBySlug, getSBTsForUser, createSession, mintSBT
  */
-/*  my‑app/client/src/utilities/contractScripts.js
+/*  my-app/client/src/utilities/web3/contractScripts.impl.ts
     ------------------------------------------------------------------
     Resilient Infura / ethers.js helper library
     ------------------------------------------------------------------ */
@@ -883,7 +883,7 @@ const contractEventListenerDeps: any = {
   shouldLog,
 };
 
-const contractProfileDeps: any = {
+const profileChainReadDeps: any = {
   resolveSession,
   getReadProviderForChain: getLocalAwareReadProviderForChain,
   getReadProviderForGroup: getLocalAwareReadProviderForGroup,
@@ -1070,7 +1070,7 @@ const contractScripts: any = {
   ...createContractScriptsSbtRegistryMethods(contractScriptsRuntimeDeps),
   ...createContractScriptsSurveyPayloadReadMethods(contractScriptsRuntimeDeps),
   ...createContractScriptsSbtMintMethods(contractScriptsRuntimeDeps),
-  ...createProfileChainReadMethods(contractProfileDeps),
+  ...createProfileChainReadMethods(profileChainReadDeps),
 
   // SBT Functionality Ends -----------------------------
 

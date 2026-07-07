@@ -4,7 +4,7 @@ import {
   getSessionChainId as resolveSessionChainId,
   getSessionNetwork as resolveSessionNetwork,
   normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import { resolveStrictSessionValue } from '../../utilities/survey/questionRouting.js';
 
 type NullableChainIdInput = number | string | null | undefined;

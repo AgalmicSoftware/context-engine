@@ -3,14 +3,14 @@ import { LoginAndSettingsModal } from './LoginAndSettingsModal';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import {
   getDemoSessionConfigBySlug,
   getAllSessionSlugs,
   getSessionConfigBySlugOrDefault,
   getSessionNetwork,
   getProviderLocation,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
 import { notify } from '../../utilities/ui/notify.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -24,7 +24,7 @@ jest.mock('../HooksHOC/withWagmiBridge', () => ({
   WagmiHooksHOC: (Comp: any) => Comp,
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     getProviderLocation: jest.fn(() => ({})),

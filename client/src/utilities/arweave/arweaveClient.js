@@ -36,7 +36,7 @@ import {
 const log = createLogger('general');
 
 /* ==========================================================================
-   Arweave utilities extracted from contractScripts.js
+   Arweave utilities used by the chain gateway.
    - Standalone functions with identical logic and preserved formatting/comments
    - Exported together as `arweaveClient`
    ========================================================================== */

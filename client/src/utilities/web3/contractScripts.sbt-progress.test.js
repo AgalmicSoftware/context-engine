@@ -1,4 +1,4 @@
-import { __test__contractScriptsSbtProgress } from './contractScripts.js';
+import { __test__contractScriptsSbtProgress } from './chainGateway.js';
 
 describe('contractScripts SBT scan progress', () => {
   const { createSbtEventScanProgressState } = __test__contractScriptsSbtProgress;

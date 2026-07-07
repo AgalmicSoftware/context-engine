@@ -1,11 +1,9 @@
-import contractScripts, { getReadProviderForGroup, getSessionConfigBySlug } from './contractScripts.js';
-import * as contractScriptsModule from './contractScripts.js';
 import chainGateway, {
-  getReadProviderForGroup as getReadProviderForGroupGateway,
-  getSessionConfigBySlug as getSessionConfigBySlugGateway,
+  getReadProviderForGroup,
+  getSessionConfigBySlug,
 } from './chainGateway.js';
 import * as chainGatewayModule from './chainGateway.js';
-import contractScriptsImpl, {
+import chainGatewayImpl, {
   getReadProviderForGroup as getReadProviderForGroupImpl,
   getSessionConfigBySlug as getSessionConfigBySlugImpl,
 } from './contractScripts.impl.js';
@@ -15,17 +13,9 @@ const path = require('path');
 const vm = require('vm');
 const { execFileSync } = require('child_process');
 
-describe('contractScripts compatibility barrel', () => {
+describe('chainGateway barrel', () => {
   afterEach(() => {
     jest.restoreAllMocks();
-  });
-
-  it('keeps the legacy js entrypoint spyable for Jest callers', () => {
-    const mocked = { slug: 'mock-session' };
-    const spy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(mocked);
-
-    expect(contractScriptsModule.getSessionConfigBySlug('ignored')).toBe(mocked);
-    expect(spy).toHaveBeenCalledWith('ignored');
   });
 
   it('keeps the canonical chainGateway entrypoint spyable for Jest callers', () => {
@@ -37,22 +27,18 @@ describe('contractScripts compatibility barrel', () => {
   });
 
   it('re-exports the implementation default and named helpers unchanged', () => {
-    expect(contractScripts).toBe(contractScriptsImpl);
-    expect(chainGateway).toBe(contractScriptsImpl);
+    expect(chainGateway).toBe(chainGatewayImpl);
     expect(getSessionConfigBySlug).toBe(getSessionConfigBySlugImpl);
     expect(getReadProviderForGroup).toBe(getReadProviderForGroupImpl);
-    expect(getSessionConfigBySlugGateway).toBe(getSessionConfigBySlugImpl);
-    expect(getReadProviderForGroupGateway).toBe(getReadProviderForGroupImpl);
 
-    expect(typeof contractScripts.getLatestBlockNumber).toBe('function');
     expect(typeof chainGateway.getLatestBlockNumber).toBe('function');
-    expect(typeof contractScripts.listenForSurveyEvents).toBe('function');
-    expect(typeof contractScripts.getUserActivity).toBe('function');
+    expect(typeof chainGateway.listenForSurveyEvents).toBe('function');
+    expect(typeof chainGateway.getUserActivity).toBe('function');
   });
 
   it('can load through a browser-targeted Vite bundle without CommonJS exports', () => {
     const clientRoot = path.resolve(__dirname, '../../..');
-    const tmpDir = fs.mkdtempSync(path.join(clientRoot, '.tmp-contract-scripts-barrel-'));
+    const tmpDir = fs.mkdtempSync(path.join(clientRoot, '.tmp-chain-gateway-barrel-'));
     const outputDir = path.join(tmpDir, 'dist');
     const entryPath = path.join(tmpDir, 'entry.js');
     const implStubPath = path.join(tmpDir, 'contractScripts.impl.stub.js');
@@ -64,7 +50,7 @@ describe('contractScripts compatibility barrel', () => {
     fs.writeFileSync(
       implStubPath,
       `
-      const contractScripts = {
+      const chainGateway = {
         marker: 'stub-default',
         getProviderLocation: () => 'stub-provider',
         getNativeBalance: () => '1',
@@ -97,20 +83,20 @@ describe('contractScripts compatibility barrel', () => {
       export const __test__contractScriptsErrors = {
         isNonexistentTokenError: () => true,
       };
-      export default contractScripts;
+      export default chainGateway;
     `,
     );
     fs.writeFileSync(
       entryPath,
       `
-      import contractScripts, {
+      import chainGateway, {
         __test__contractScriptsErrors,
         getReadProviderForGroup,
         getSessionConfigBySlug,
       } from ${JSON.stringify(barrelPath)};
 
-      window.__contractScriptsBarrelSmoke = {
-        defaultMarker: contractScripts.marker,
+      window.__chainGatewayBarrelSmoke = {
+        defaultMarker: chainGateway.marker,
         errorHelper: __test__contractScriptsErrors.isNonexistentTokenError(new Error('stub')),
         provider: getReadProviderForGroup().provider,
         slug: getSessionConfigBySlug('edge').slug,
@@ -140,7 +126,7 @@ describe('contractScripts compatibility barrel', () => {
             output: {
               entryFileNames: 'bundle.js',
               format: 'iife',
-              name: 'ContractScriptsBarrelSmoke',
+              name: 'ChainGatewayBarrelSmoke',
               inlineDynamicImports: true,
             },
           },
@@ -165,7 +151,7 @@ describe('contractScripts compatibility barrel', () => {
       const context = { console, window: {} };
       vm.runInNewContext(fs.readFileSync(path.join(outputDir, 'bundle.js'), 'utf8'), context);
 
-      expect(context.window.__contractScriptsBarrelSmoke).toEqual({
+      expect(context.window.__chainGatewayBarrelSmoke).toEqual({
         defaultMarker: 'stub-default',
         errorHelper: true,
         provider: 'group',

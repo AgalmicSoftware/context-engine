@@ -3,7 +3,7 @@ import { expect, jest } from '@jest/globals';
 
 import type { SurveyResultsProps } from './SurveyResults';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { renderSurveyResults } from './surveyResultsTestHarness';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import {

@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import { CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP, SHOW_DEMO_SESSIONS } from '../../variables/appConfig.js';
 
 type SbtListRuntimeRecord = Record<string, unknown>;

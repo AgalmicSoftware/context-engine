@@ -1,9 +1,9 @@
 import store from '../../store.js';
-import contractScripts from './contractScripts.js';
+import contractScripts from './chainGateway.js';
 import { getReadProviderDiagnostics, getReadProviderForGroup, resolveGroupPathRpcPreference } from './rpcProviders.js';
 import { checkSponsoredAccess } from './sponsoredAccess.js';
 
-jest.mock('./contractScripts.js', () => ({
+jest.mock('./chainGateway.js', () => ({
   __esModule: true,
   default: {
     userHasSBT: jest.fn(),

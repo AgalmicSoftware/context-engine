@@ -10,10 +10,10 @@ import {
   resolveQuestionCountContext,
   shouldInheritResolvedTagSessionScope,
 } from './surveyToolScope.js';
-import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
+import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   getAllSessionSlugs: jest.fn(() => []),
   getSessionConfigBySlug: jest.fn(() => null),
 }));

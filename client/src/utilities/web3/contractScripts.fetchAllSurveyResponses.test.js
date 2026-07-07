@@ -32,7 +32,7 @@ jest.mock('./rpcProviders.js', () => {
 });
 
 const { ethers } = require('ethers');
-const contractScriptsBarrel = require('./contractScripts.js');
+const contractScriptsBarrel = require('./chainGateway.js');
 
 const contractScripts = contractScriptsBarrel.default;
 const { isRetryableSurveyResponseReadError } = contractScriptsBarrel.__test__contractScriptsErrors;

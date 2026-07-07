@@ -24,7 +24,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   subscribeCacheUpdates: (...args: any[]) => (mockSubscribeCacheUpdates as any)(...args),
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {},
   getAllSessionSlugs: (...args: any[]) => mockGetAllSessionSlugs(...args),

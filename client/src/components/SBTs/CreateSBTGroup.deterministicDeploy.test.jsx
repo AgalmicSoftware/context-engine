@@ -2,7 +2,7 @@ import { act } from '@testing-library/react';
 import { ethers } from 'ethers';
 
 import CreateSBTGroup from './CreateSBTGroup';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 
 const SBT_FACTORY_RECEIPT_TEST_IFACE = new ethers.utils.Interface([
   'event SBTCreated(address indexed sbtAddress)',

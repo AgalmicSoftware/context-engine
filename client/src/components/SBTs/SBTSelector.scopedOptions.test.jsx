@@ -1,6 +1,6 @@
 import SBTSelector from './SBTSelector';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
-import * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsUtils from '../../utilities/web3/chainGateway.js';
 import * as sessionScanScopeUtils from '../../utilities/session/sessionScanScope.js';
 import * as cacheScriptsUtils from '../../utilities/cache/cacheScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';

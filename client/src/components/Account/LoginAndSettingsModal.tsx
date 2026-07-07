@@ -55,7 +55,7 @@ import contractScripts, {
   getSessionConfigBySlugOrDefault,
   getProviderLocation,
   getSessionNetwork,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import {

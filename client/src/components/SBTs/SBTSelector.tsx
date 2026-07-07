@@ -8,7 +8,7 @@ import { faCog, faExternalLinkAlt, faSpinner, faTimes } from '@fortawesome/free-
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import AsyncSearchSelect from '../Shared/AsyncSearchSelect';
 
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
@@ -17,7 +17,7 @@ import {
   getSessionLists,
   getSessionSlugByName,
   normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import {
   loadSessionRegistryCache,
   SESSION_REGISTRY_CACHE_UPDATED_EVENT,

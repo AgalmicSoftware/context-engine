@@ -1,5 +1,5 @@
 import { SurveySelector } from './SurveySelector';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 

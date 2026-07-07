@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { SBTsPage } from './SBTsPage';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
-import { getDemoSessionConfigBySlug, getSessionLists } from '../../utilities/web3/contractScripts.js';
+import { getDemoSessionConfigBySlug, getSessionLists } from '../../utilities/web3/chainGateway.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
@@ -41,8 +41,8 @@ jest.mock('../../utilities/ui/terminology.js', () => {
   };
 });
 
-jest.mock('../../utilities/web3/contractScripts.js', () => {
-  const actual = jest.requireActual('../../utilities/web3/contractScripts.js');
+jest.mock('../../utilities/web3/chainGateway.js', () => {
+  const actual = jest.requireActual('../../utilities/web3/chainGateway.js');
   return {
     __esModule: true,
     ...actual,
@@ -80,7 +80,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('keeps demo-only list-route slugs instead of collapsing back to general', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
       String(slug || '') === '' ? { slug: '' } : null,
     );
@@ -103,7 +103,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('keeps an explicit demo alias as the cache slug when display config falls back to general', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const demoAutoAddress = '0x0000000000000000000000000000000000000d0a';
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
       String(slug || '') === '' ? { slug: '' } : null,
@@ -159,7 +159,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('uses explicit active session slugs when the list route rewrites to a session slug', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) => {
       const normalized = String(slug || '');
       if (normalized === '') return { slug: '' };
@@ -186,7 +186,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('recognizes and canonicalizes PUBLIC_URL-prefixed groups routes', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     process.env.PUBLIC_URL = '/ce/';
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) => {
       const normalized = String(slug || '');
@@ -524,7 +524,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('keeps configured featured cards when strict embedded auto-feature filtering is enabled', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const configuredAddress = '0x000000000000000000000000000000000000d001';
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
       String(slug || '') === 'demo-1' ? { slug: 'demo-1' } : null,
@@ -612,7 +612,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('uses per-session auto-feature toggles when aggregating list-scope featured entries', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const alphaManualAddress = '0x00000000000000000000000000000000000000a1';
     const alphaAutoAddress = '0x00000000000000000000000000000000000000a2';
     const betaManualAddress = '0x00000000000000000000000000000000000000b1';
@@ -810,7 +810,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('uses demo-only featured SBT lists for embedded display readers when registry config is missing', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const demoFeaturedAddress = '0x00000000000000000000000000000000000000de';
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
       String(slug || '') === '' ? { slug: '' } : null,
@@ -968,7 +968,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('falls back to mini SBT readers when cached featured metadata is missing its image', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const featuredAddress = '0x00000000000000000000000000000000000000b2';
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
       String(slug || '') === 'alpha' ? { slug: 'alpha' } : null,
@@ -1237,7 +1237,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('aggregates embedded featured cards across all listed sessions in list scope', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const alphaAddress = '0x00000000000000000000000000000000000000a1';
     const betaAddress = '0x00000000000000000000000000000000000000b2';
 
@@ -1284,7 +1284,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('keeps mini embedded SBT views scoped to the active session even when explorer list scope is active', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const alphaAddress = '0x00000000000000000000000000000000000000c1';
     const betaAddress = '0x00000000000000000000000000000000000000d2';
 
@@ -1330,7 +1330,7 @@ describe('SBTsPage auto-feature flag', () => {
 
   it('keeps discovered embedded cards visible and shows a corner spinner during background refreshes', () => {
     const visibleAddress = '0x00000000000000000000000000000000000000f1';
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) => {
       const normalized = String(slug || '');
       if (normalized === 'alpha') return { slug: 'alpha' };

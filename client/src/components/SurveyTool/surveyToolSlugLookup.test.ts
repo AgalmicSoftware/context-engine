@@ -3,10 +3,10 @@ import {
   getAllSessionSlugs,
   getSessionConfigBySlug,
   getSessionSlugByName,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   getAllSessionSlugs: jest.fn(() => []),
   getSessionConfigBySlug: jest.fn(() => null),
   getSessionSlugByName: jest.fn(() => null),

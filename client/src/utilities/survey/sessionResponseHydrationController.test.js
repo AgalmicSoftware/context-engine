@@ -25,7 +25,7 @@ jest.mock('ethers', () => ({
   },
 }));
 
-jest.mock('../web3/contractScripts.js', () => ({
+jest.mock('../web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     getSessionConfigBySlug: jest.fn(),
@@ -62,7 +62,7 @@ jest.mock('../session/mainSiteProgressHelpers.js', () => ({
 
 const { createSessionResponseHydrationController } = require('./sessionResponseHydrationController.js');
 const { ethers } = require('ethers');
-const contractScriptsModule = require('../web3/contractScripts.js');
+const contractScriptsModule = require('../web3/chainGateway.js');
 const contractScripts = contractScriptsModule.default;
 const { normalizeSessionSlug } = contractScriptsModule;
 const { cryptoUtils } = require('../crypto/cryptography.js');

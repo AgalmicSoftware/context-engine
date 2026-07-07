@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../web3/contractScripts.js';
+import { normalizeSessionSlug } from '../web3/chainGateway.js';
 import { getAllowedSessionSlugs } from './sessionScanScope.js';
 
 type ProfileScanScopeContext = {

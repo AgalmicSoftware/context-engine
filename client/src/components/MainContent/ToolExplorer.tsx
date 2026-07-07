@@ -8,7 +8,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
-import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
+import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 

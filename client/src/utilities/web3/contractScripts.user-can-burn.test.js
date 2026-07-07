@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import contractScripts from './contractScripts.js';
+import contractScripts from './chainGateway.js';
 
 describe('contractScripts.userCanBurnSBTs', () => {
   const sbtAddress = '0x1111111111111111111111111111111111111111';

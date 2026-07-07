@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
-import contractScriptsDefault from '../../utilities/web3/contractScripts.js';
+import contractScriptsDefault from '../../utilities/web3/chainGateway.js';
 import {
   SurveyResultsFreeformAggregatorSummary,
   SurveyResultsMultichoiceAggregatorSummary,

@@ -27,7 +27,7 @@ jest.mock('../Shared/CETooltip', () => ({
   ),
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     sendTestnetFunds: jest.fn(),
@@ -117,7 +117,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 }));
 
 import { LoginAndSettingsModal, buildBookmarksRoutePath } from './LoginAndSettingsModal';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { saveLocalAiSettings } from '../../utilities/ai/aiSettings.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
@@ -126,7 +126,7 @@ import {
   getAllSessionSlugs,
   getSessionConfigBySlugOrDefault,
   getSessionNetwork,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 
 const DEFAULT_NETWORK = {
   id: 84532,
@@ -194,8 +194,8 @@ const loadIsolatedSettingsModal = () => {
   jest.isolateModules(() => {
     loaded = {
       LoginAndSettingsModal: require('./LoginAndSettingsModal').LoginAndSettingsModal,
-      getAllSessionSlugs: require('../../utilities/web3/contractScripts.js').getAllSessionSlugs,
-      getSessionConfigBySlugOrDefault: require('../../utilities/web3/contractScripts.js')
+      getAllSessionSlugs: require('../../utilities/web3/chainGateway.js').getAllSessionSlugs,
+      getSessionConfigBySlugOrDefault: require('../../utilities/web3/chainGateway.js')
         .getSessionConfigBySlugOrDefault,
       checkSponsoredAccess: require('../../utilities/web3/sponsoredAccess.js').checkSponsoredAccess,
     };

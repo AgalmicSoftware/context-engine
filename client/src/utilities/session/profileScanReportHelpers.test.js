@@ -1,4 +1,4 @@
-jest.mock('../web3/contractScripts.js', () => ({
+jest.mock('../web3/chainGateway.js', () => ({
   __esModule: true,
   normalizeSessionSlug: jest.fn((value = '') =>
     String(value || '')

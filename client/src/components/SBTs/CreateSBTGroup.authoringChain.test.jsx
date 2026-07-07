@@ -2,7 +2,7 @@ import { act, render, screen, within } from '@testing-library/react';
 
 import CreateSBTGroup from './CreateSBTGroup';
 import styles from './CreateSBTGroup.module.scss';
-import { getDemoSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
+import { getDemoSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { getSessionContractsForChain, getSessionRegistryChains } from '../../variables/chains.js';
 
 const makeInstance = (props = {}) => {

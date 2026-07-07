@@ -14,7 +14,7 @@ const mockAudioSurveyGenerator = jest.fn();
 const mutableEnv = process.env as Record<string, string | undefined>;
 const originalPublicUrl = process.env.PUBLIC_URL;
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   getAllSessionSlugs: (...args: any[]) => mockGetAllSessionSlugs(...args),
   getSessionConfigBySlug: (...args: any[]) => mockGetSessionConfigBySlug(...args),

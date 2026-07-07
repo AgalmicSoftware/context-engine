@@ -26,7 +26,7 @@ import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveC
 import CETooltip from '../Shared/CETooltip';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
-import contractScripts, { getSessionConfigBySlug, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import contractScripts, { getSessionConfigBySlug, normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import {
   buildSbtAccessControlConditions,
   createLitHooks,

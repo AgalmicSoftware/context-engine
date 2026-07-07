@@ -1,7 +1,7 @@
 import {
   getAllSessionSlugs,
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import {
   parseQuestionSessionIdFromSearch,
   parseQuestionSessionSlugFromSearch,

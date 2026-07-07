@@ -1,4 +1,4 @@
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 
 export type SessionBalance = {
   gte(value: string | number | { toString: () => string }): boolean;

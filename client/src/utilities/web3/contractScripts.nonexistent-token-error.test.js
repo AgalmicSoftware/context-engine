@@ -1,4 +1,4 @@
-import { __test__contractScriptsErrors } from './contractScripts.js';
+import { __test__contractScriptsErrors } from './chainGateway.js';
 
 describe('contractScripts nonexistent token error detection', () => {
   const { isNonexistentTokenError } = __test__contractScriptsErrors;

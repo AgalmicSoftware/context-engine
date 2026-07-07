@@ -1,5 +1,5 @@
 import SBTPage from './SBTPage';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import {
   SBT_PASSWORD_RECOVERY_KIND,
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,

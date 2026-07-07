@@ -383,7 +383,7 @@ used directly as the per-question payload in `contractScripts.submitResponses`.
 These are the canonical object shapes expected by `contractScripts` calls.
 
 ```js
-import contractScripts from 'client/src/utilities/web3/contractScripts.js';
+import contractScripts from 'client/src/utilities/web3/chainGateway.js';
 
 // Survey + questions (survey + question payloads are the JSON above)
 await contractScripts.addSurveyWithQuestions(

@@ -1,4 +1,4 @@
-import contractScripts from './contractScripts.js';
+import contractScripts from './chainGateway.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import store from '../../store.js';
 

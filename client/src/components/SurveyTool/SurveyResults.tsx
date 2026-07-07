@@ -20,7 +20,7 @@ import {
   faExclamationCircle,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
+import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { createLogger } from 'utilities/logging.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';

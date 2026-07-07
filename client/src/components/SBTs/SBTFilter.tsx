@@ -97,7 +97,7 @@ import contractScripts, {
   getSessionChainId,
   getSessionSlugByName,
   normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
 import { bindSbtFilterRuntimePorts } from './sbtFilterRuntimePorts';
 

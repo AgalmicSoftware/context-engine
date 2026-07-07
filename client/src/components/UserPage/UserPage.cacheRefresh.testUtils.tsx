@@ -2,7 +2,7 @@
 import UserPage from './UserPage';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   getGlobalLitHooks: jest.fn(() => null),

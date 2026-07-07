@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import { hasPasswordMintForSbtMintMode } from '../../utilities/sbt/sbtMintMode.js';
 import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';

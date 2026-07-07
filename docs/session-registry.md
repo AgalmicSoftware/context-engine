@@ -322,7 +322,7 @@ When `USE_ONCHAIN_SESSION_REGISTRY` is enabled:
 
 - Deploy `SessionRegistry.sol` and populate `SESSION_REGISTRY_ADDRESSES`.
 - When ready, set `USE_ONCHAIN_SESSION_REGISTRY = true` by default and remove the
-  fallback to `demo_sessions.json` in `contractScripts.js`.
+  fallback to `demo_sessions.json` through the chain gateway.
 - Clean up `demo_sessions.json` after production cutover.
 - Consider splitting large metadata into multiple Arweave objects if size grows.
 
@@ -333,4 +333,4 @@ When `USE_ONCHAIN_SESSION_REGISTRY` is enabled:
 - Populate on-chain sessions (use `/session/new` to create entries).
 - Verify Arweave metadata loads + Lit decryption works for locked fields.
 - Set `USE_ONCHAIN_SESSION_REGISTRY = true`.
-- Remove the demoSessions fallback TODOs in `contractScripts.js`.
+- Remove the demoSessions fallback TODOs in the chain gateway.

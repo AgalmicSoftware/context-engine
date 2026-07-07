@@ -6,7 +6,7 @@
  *
  * Key exports: checkSponsoredAccess, getDefaultSponsoredGate, getGateSbtAddresses, SPONSORED_GATE_STATES, normalizeGateMode
  */
-import contractScripts from './contractScripts.js';
+import contractScripts from './chainGateway.js';
 import {
   SPONSORED_GATE_STATES,
   getDefaultSponsoredGate as getDefaultSponsoredGateImpl,

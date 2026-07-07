@@ -9,7 +9,7 @@ jest.mock('utilities/logging.js', () => ({
   }),
 }));
 
-jest.mock('../web3/contractScripts.js', () => ({
+jest.mock('../web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     getRelevantBlockWindowForFilter: jest.fn(),
@@ -39,7 +39,7 @@ jest.mock('../session/metadataSessionBinding.js', () => ({
 }));
 
 const { createSessionSurveyCacheController } = require('./sessionSurveyCacheController.js');
-const contractScriptsModule = require('../web3/contractScripts.js');
+const contractScriptsModule = require('../web3/chainGateway.js');
 const contractScripts = contractScriptsModule.default;
 const { normalizeSessionSlug } = contractScriptsModule;
 const { normalizeArweaveFailureMeta, shouldStopPendingMetadataRetry } = require('../arweave/arweaveRetryHelpers.js');

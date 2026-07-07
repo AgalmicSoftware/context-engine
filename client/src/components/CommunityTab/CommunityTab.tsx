@@ -22,7 +22,7 @@ import contractScripts, {
   getSessionChainId,
   getSessionLists,
   normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
 import BeeswarmPlot from '../SurveyTool/BeeswarmPlot';

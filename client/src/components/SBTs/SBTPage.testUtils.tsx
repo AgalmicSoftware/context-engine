@@ -1,8 +1,8 @@
 // Shared harness for SBTPage coverage.
 import SBTPage from './SBTPage';
 import { ethers } from 'ethers';
-import contractScripts from '../../utilities/web3/contractScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';

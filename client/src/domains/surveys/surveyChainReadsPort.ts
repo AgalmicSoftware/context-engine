@@ -1,4 +1,4 @@
-import chainGateway from '../../utilities/web3/contractScripts.js';
+import chainGateway from '../../utilities/web3/chainGateway.js';
 
 export type SurveyMetadataRecord = Record<string, unknown>;
 export type SurveyResponseRecord = Record<string, unknown>;

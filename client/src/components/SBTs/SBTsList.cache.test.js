@@ -5,12 +5,12 @@ import {
   readSbtCacheMetaSnapshot,
 } from './SBTsList';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 
 jest.mock('./SBTPage', () => () => null);
 jest.mock('./CreateSBTGroup', () => () => null);
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {},
   getAllSessionEntries: jest.fn(() => []),

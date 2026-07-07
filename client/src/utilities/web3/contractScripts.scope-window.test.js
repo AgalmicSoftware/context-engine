@@ -1,4 +1,4 @@
-import contractScripts from './contractScripts.js';
+import contractScripts from './chainGateway.js';
 import { sessionRegistryUtils } from './sessionRegistry.js';
 
 const makeGroupCfg = (slug, startBlock) => ({

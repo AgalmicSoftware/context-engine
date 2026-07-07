@@ -2,7 +2,7 @@ import React from 'react';
 import { act, screen, waitFor } from '@testing-library/react';
 
 import { renderSurveyQuestions } from './surveyQuestionsTestHarness';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { executeSurveyDraftHydration, executeSurveySingleQuestionPrefill } from './surveyToolHydrationController';
 import {

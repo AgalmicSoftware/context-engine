@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
-import contractScriptsDefault, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import contractScriptsDefault, * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import {
   resolveSurveyResultsQuestionReadScope,

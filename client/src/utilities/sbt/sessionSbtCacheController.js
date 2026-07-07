@@ -2,7 +2,7 @@ import contractScripts, {
   getAllSessionSlugs,
   getReadProviderForSession,
   normalizeSessionSlug,
-} from '../web3/contractScripts.js';
+} from '../web3/chainGateway.js';
 import { createLogger } from 'utilities/logging.js';
 import { emitMainSiteSbtDebug, hasCoreSbtMetadata, isForcedSbtSelectorDebugEnabled } from '../session/mainSiteUtils.js';
 import {

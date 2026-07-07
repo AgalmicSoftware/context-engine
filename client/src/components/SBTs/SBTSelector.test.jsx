@@ -1,6 +1,6 @@
 import SBTSelector from './SBTSelector';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
-import * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsUtils from '../../utilities/web3/chainGateway.js';
 import { makeInstance, createDeferred, flushAsync } from './SBTSelector.testUtils';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 

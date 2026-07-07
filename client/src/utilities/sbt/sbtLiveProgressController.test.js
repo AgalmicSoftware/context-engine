@@ -1,10 +1,10 @@
-jest.mock('../web3/contractScripts.js', () => ({
+jest.mock('../web3/chainGateway.js', () => ({
   __esModule: true,
   normalizeSessionSlug: jest.fn((s) => String(s || '')),
 }));
 
 const { buildSbtCountsInitialProgress, createSbtLiveProgressController } = require('./sbtLiveProgressController.js');
-const { normalizeSessionSlug } = require('../web3/contractScripts.js');
+const { normalizeSessionSlug } = require('../web3/chainGateway.js');
 
 const createStateHost = () => {
   let state = {

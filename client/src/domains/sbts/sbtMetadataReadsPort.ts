@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import chainGateway from '../../utilities/web3/contractScripts.js';
+import chainGateway from '../../utilities/web3/chainGateway.js';
 import type {
   SbtGroupKeyOrConfig,
   SbtMetadataReadsPort,

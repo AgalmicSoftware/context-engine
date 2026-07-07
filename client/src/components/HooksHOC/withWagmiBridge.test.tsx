@@ -2,7 +2,7 @@ import React from 'react';
 import { render, waitFor, cleanup, act } from '@testing-library/react';
 import { WagmiHooksHOC } from './withWagmiBridge';
 import type { WagmiInjectedProps } from './withWagmiBridge';
-import { getSessionNetwork } from '../../utilities/web3/contractScripts.js';
+import { getSessionNetwork } from '../../utilities/web3/chainGateway.js';
 import { clearUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
 
 const mockUseAccount = jest.fn();
@@ -27,7 +27,7 @@ jest.mock('@rainbow-me/rainbowkit', () => ({
   useChainModal: () => ({ openChainModal: jest.fn() }),
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   getSessionNetwork: jest.fn(() => null),
 }));
 

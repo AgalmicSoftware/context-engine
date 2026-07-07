@@ -6,9 +6,9 @@ import {
   resolveSponsoredGateForResource,
   resolveSponsoredGateStateForResource,
 } from './sponsoredAccess.js';
-import contractScripts from './contractScripts.js';
+import contractScripts from './chainGateway.js';
 
-jest.mock('./contractScripts.js', () => ({
+jest.mock('./chainGateway.js', () => ({
   __esModule: true,
   default: {
     userHasSBT: jest.fn(),

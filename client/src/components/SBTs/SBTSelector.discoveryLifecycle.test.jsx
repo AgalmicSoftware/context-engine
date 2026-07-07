@@ -1,5 +1,5 @@
 import SBTSelector from './SBTSelector';
-import * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsUtils from '../../utilities/web3/chainGateway.js';
 import * as sessionRegistryUtils from '../../utilities/web3/sessionRegistry.js';
 import * as sessionScanScopeUtils from '../../utilities/session/sessionScanScope.js';
 import { GLOBAL_SESSION_SELECTION_UPDATED_EVENT } from '../../utilities/session/globalSessionState.js';

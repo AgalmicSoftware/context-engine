@@ -36,7 +36,7 @@ jest.mock('../../Shared/compactImageClipboard.js', () => ({
   readCompactImageClipboard: (...args) => mockReadCompactImageClipboard(...args),
 }));
 
-jest.mock('../../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   getAllSessionSlugs: (...args) => mockGetAllSessionSlugs(...args),
   getSessionConfigBySlug: (...args) => mockGetSessionConfigBySlug(...args),

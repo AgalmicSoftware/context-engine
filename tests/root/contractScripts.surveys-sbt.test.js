@@ -5,7 +5,7 @@ import SBT_FACTORY_ABI from '../../client/src/contractsABI/SBT_FACTORY_ABI.json'
 import SURVEYS_ABI from '../../client/src/contractsABI/SURVEYS_ABI.json';
 import * as localArweaveDb from '../helpers/localArweaveDb.js';
 
-import contractScripts from '../../client/src/utilities/web3/contractScripts.js';
+import contractScripts from '../../client/src/utilities/web3/chainGateway.js';
 import { arweaveClient } from '../../client/src/utilities/arweave/arweaveClient.js';
 
 const LOCAL_RPC_URL = process.env.LOCAL_RPC_URL || 'http://127.0.0.1:8545';

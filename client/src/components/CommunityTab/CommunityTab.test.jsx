@@ -9,7 +9,7 @@ import {
   writeCache,
 } from '../../utilities/cache/cacheScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import BeeswarmPlot from '../SurveyTool/BeeswarmPlot';
 import SBTsList from '../SBTs/SBTsList';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';

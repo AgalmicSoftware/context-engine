@@ -66,7 +66,7 @@ describe('SessionWizard worker panel rendering', () => {
   });
 
   it('hydrates the embedded deploy-helper toggle from the default-session source config', async () => {
-    const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
+    const contractScriptsModule = require('../../utilities/web3/chainGateway.js');
     const originalStrictConfig = contractScriptsModule.getSessionConfigBySlugOrDefault.getMockImplementation();
 
     contractScriptsModule.getSessionConfigBySlugOrDefault.mockImplementation((slug = '') => {
@@ -98,7 +98,7 @@ describe('SessionWizard worker panel rendering', () => {
   });
 
   it('does not refetch default sponsored SBT metadata after unrelated draft edits once seeded', async () => {
-    const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
+    const contractScriptsModule = require('../../utilities/web3/chainGateway.js');
     const sponsoredAddress = ethers.utils.getAddress('0x1111111111111111111111111111111111111111');
     const getSbtMetadataMock = contractScriptsModule.default.getSbtMetadata;
     getSbtMetadataMock.mockResolvedValue({

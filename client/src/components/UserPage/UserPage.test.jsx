@@ -4,7 +4,7 @@ import styles from './UserPage.module.scss';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
 import { ethers } from 'ethers';
 import { notify } from '../../utilities/ui/notify.js';

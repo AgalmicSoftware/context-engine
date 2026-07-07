@@ -283,13 +283,12 @@ describe('client package modernization contract', () => {
     expect(jestConfig).not.toContain('@babel/plugin-syntax-import-meta');
   });
 
-  it('keeps Vite browser-loaded compatibility shims free of runtime require calls', () => {
+  it('keeps Vite browser-loaded TS entrypoints free of runtime require calls', () => {
     [
       'src/components/DebateMap/DebateMap.tsx',
       'src/components/SurveyTool/CreateQuestionsAndSurveys.tsx',
       'src/components/ContractPage/contractSourceLoader.ts',
       'src/utilities/web3/chainGateway.ts',
-      'src/utilities/web3/contractScripts.ts',
     ].forEach((relativePath) => {
       expect(readClientFile(relativePath)).not.toMatch(/\brequire\(/);
     });

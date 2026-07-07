@@ -1,4 +1,4 @@
-import * as contractScripts from '../../utilities/web3/contractScripts.js';
+import * as contractScripts from '../../utilities/web3/chainGateway.js';
 
 export type SessionConfig = Record<string, unknown> & {
   slug?: string;

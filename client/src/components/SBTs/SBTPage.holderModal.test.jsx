@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import SBTPage from './SBTPage';
 import styles from './SBTPage.module.scss';
 import { renderSbtPageHolderModal } from './SBTPageModals';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 
 const mockIsCryptoMode = jest.fn(() => true);

@@ -12,7 +12,7 @@ import {
 import contractScripts, {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
-} from '../web3/contractScripts.js';
+} from '../web3/chainGateway.js';
 import {
   initCacheManager,
   listNamespaceEntriesSync,
@@ -21,7 +21,7 @@ import {
   readCache,
 } from '../cache/cacheScripts.js';
 
-jest.mock('../web3/contractScripts.js', () => ({
+jest.mock('../web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     getSbtMetadata: jest.fn(),

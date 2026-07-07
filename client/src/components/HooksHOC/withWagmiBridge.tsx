@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import { useAccount, useBalance, useBlockNumber, useNetwork, useProvider, useDisconnect } from 'wagmi';
 import { useConnectModal, useAccountModal, useChainModal } from '@rainbow-me/rainbowkit';
 import { base, baseSepolia } from '../../variables/chains.js';
-import { getSessionNetwork } from '../../utilities/web3/contractScripts.js';
+import { getSessionNetwork } from '../../utilities/web3/chainGateway.js';
 import { clearUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
 import { createLogger } from 'utilities/logging.js';
 
@@ -97,7 +97,7 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
 
     // Removed: local JsonRpcProvider + window.defaultProvider anti-pattern.
     // Downstream components should use the centralized, group-aware read provider
-    // from contractScripts.js (getReadProviderForGroup).
+    // from the chain gateway (getReadProviderForGroup).
 
     const { openConnectModal } = useConnectModal();
     const { openAccountModal } = useAccountModal();

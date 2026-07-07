@@ -2,7 +2,7 @@ import React, { act } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import SBTSelector from './SBTSelector';
-import contractScripts, * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
+import contractScripts, * as contractScriptsUtils from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionRegistryUtils from '../../utilities/web3/sessionRegistry.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
@@ -104,7 +104,7 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   loadSessionRegistryCache: jest.fn(async () => null),
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => {
+jest.mock('../../utilities/web3/chainGateway.js', () => {
   const normalizeSessionSlug = (raw = '') => {
     const normalized = String(raw ?? '')
       .trim()

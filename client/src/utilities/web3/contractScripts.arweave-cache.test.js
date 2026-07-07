@@ -1,7 +1,7 @@
 import { arweaveClient } from '../arweave/arweaveClient.js';
 import { initCacheManager, removeCache, updateCacheAtomic } from '../cache/cacheScripts.js';
-import contractScripts from './contractScripts.js';
-import { __test__contractScriptsArweaveCache } from './contractScripts.js';
+import contractScripts from './chainGateway.js';
+import { __test__contractScriptsArweaveCache } from './chainGateway.js';
 
 jest.mock('../arweave/arweaveClient.js', () => ({
   arweaveClient: {

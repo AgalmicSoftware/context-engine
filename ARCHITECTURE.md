@@ -181,7 +181,7 @@ Decrypt:  Client ──▸ Lit SDK decrypt(payload) ──▸ Lit nodes verify S
 | SBT management | `components/SBTs/SBTsList.tsx`, `SBTPage.tsx`, `CreateSBTGroup.tsx` |
 | Gate components | `components/Gates/` |
 | **Utilities** | |
-| Web3 / contracts | `utilities/web3/contractScripts.js` (compat barrel), `contractScripts.impl.ts`, `contractHelpers.ts`, `contractEventListeners.ts`, `contractProfile.ts`, `sessionRegistry.ts` |
+| Web3 / contracts | `utilities/web3/chainGateway.ts`, `contractScripts.impl.ts`, `contractHelpers.ts`, `chainEventStreams.ts`, `profileChainReads.ts`, `sessionRegistry.ts` |
 | Wallet | `client/src/wallet/` passkey EOA wallet config, encrypted keystore, EIP-1193 provider, and soft-session worker |
 | Crypto / Lit | `utilities/crypto/litProtocol.js`, `cryptography.js`, `encryptedFields.js` |
 | Arweave | `utilities/arweave/arweaveClient.js`, `arweaveUrls.js` |

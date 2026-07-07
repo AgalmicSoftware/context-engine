@@ -11,7 +11,7 @@ import {
 } from '../../utilities/session/sessionScanScope.js';
 import { readSbtInstanceListenersMode } from '../../utilities/sbt/sbtInstanceListenersMode.js';
 import { readSbtFullScanPolicy } from '../../utilities/sbt/sbtFullScanPolicy.js';
-import { getAllSessionSlugs, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { getAllSessionSlugs, normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 
 declare global {
   interface Window {

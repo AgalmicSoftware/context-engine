@@ -1,4 +1,4 @@
-import { __test__contractScriptsSessionNameFields } from './contractScripts.js';
+import { __test__contractScriptsSessionNameFields } from './chainGateway.js';
 
 describe('contractScripts session name normalization', () => {
   const { normalizeSessionNameFields } = __test__contractScriptsSessionNameFields;

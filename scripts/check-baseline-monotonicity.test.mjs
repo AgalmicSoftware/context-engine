@@ -60,7 +60,7 @@ function withTempRepo(run) {
 const BASE_VIOLATION = {
   rule: 'route-page-no-low-level',
   source: 'client/src/components/Page.tsx',
-  import: '../../utilities/web3/contractScripts.js',
+  import: '../../utilities/web3/chainGateway.js',
   resolved: 'client/src/utilities/web3/contractScripts',
 };
 

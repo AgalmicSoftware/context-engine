@@ -1,4 +1,4 @@
-import * as contractScripts from '../../utilities/web3/contractScripts.js';
+import * as contractScripts from '../../utilities/web3/chainGateway.js';
 import {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
@@ -9,7 +9,7 @@ import {
   normalizeSessionSlug,
 } from './sessionConfig.js';
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   normalizeSessionSlug: jest.fn((slug) => `normalized:${slug}`),
   getSessionConfigBySlug: jest.fn((slug) => ({ slug, source: 'strict' })),

@@ -10,7 +10,7 @@ jest.mock('utilities/logging', () => ({
   }),
 }));
 
-jest.mock('../web3/contractScripts.js', () => {
+jest.mock('../web3/chainGateway.js', () => {
   const defaultExport = {
     getRelevantBlockWindowForFilter: jest.fn(),
     getAllSessionSlugs: jest.fn(() => []),
@@ -88,7 +88,7 @@ jest.mock('../session/mainSiteProgressHelpers', () => ({
 }));
 
 const { createSessionSbtCacheController } = require('./sessionSbtCacheController.js');
-const contractScriptsModule = require('../web3/contractScripts.js');
+const contractScriptsModule = require('../web3/chainGateway.js');
 const contractScripts = contractScriptsModule.default;
 const { normalizeSessionSlug } = contractScriptsModule;
 const {

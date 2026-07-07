@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 
 import SBTPage from './SBTPage';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 import { litStorage } from 'utilities/crypto/litProtocol.js';

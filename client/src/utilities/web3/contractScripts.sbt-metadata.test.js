@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import contractScripts from './contractScripts.js';
+import contractScripts from './chainGateway.js';
 import { getWeb3Context } from './contractScripts.impl.js';
 import { arweaveClient } from '../arweave/arweaveClient.js';
 

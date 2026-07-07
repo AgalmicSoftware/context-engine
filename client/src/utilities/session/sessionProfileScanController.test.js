@@ -28,7 +28,7 @@ jest.mock('../../utilities/session/registryBootstrapChainIds.js', () => ({
   resolveSessionRegistryBootstrapChainIds: jest.fn(() => undefined),
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   normalizeSessionSlug: jest.fn((s) =>
     String(s || '')
@@ -83,7 +83,7 @@ const { createSessionProfileScanController } = require('./sessionProfileScanCont
 const litProtocolModule = require('../../utilities/crypto/litProtocol.js');
 const sessionScanScopeModule = require('../../utilities/session/sessionScanScope.js');
 const registryBootstrapModule = require('../../utilities/session/registryBootstrapChainIds.js');
-const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
+const contractScriptsModule = require('../../utilities/web3/chainGateway.js');
 const sessionRegistryModule = require('../../utilities/web3/sessionRegistry.js');
 const chainsModule = require('../../variables/chains.js');
 const debugTelemetryModule = require('./profileScanTelemetry.js');

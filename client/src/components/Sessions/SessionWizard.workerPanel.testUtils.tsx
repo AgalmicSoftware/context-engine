@@ -212,7 +212,7 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   },
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     createSBT: (...args) => mockCreateSBT(...args),

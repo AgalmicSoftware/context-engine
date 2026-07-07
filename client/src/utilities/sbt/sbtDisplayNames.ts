@@ -9,7 +9,7 @@ import { ethers } from 'ethers';
 import contractScripts, {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
-} from '../web3/contractScripts.js';
+} from '../web3/chainGateway.js';
 import {
   listNamespaceEntriesSync,
   peekCacheSync,

@@ -7,7 +7,7 @@ import {
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
   normalizeSessionSlug,
-} from './contractScripts.js';
+} from './chainGateway.js';
 import { upsertCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
 
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';

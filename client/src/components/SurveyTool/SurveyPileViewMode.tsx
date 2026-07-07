@@ -182,7 +182,7 @@ import contractScripts, {
   getAllSessionSlugs,
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
   getSessionSlugByName,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import { ethers, utils } from 'ethers';
 import CESlider from '../Shared/CESlider';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';

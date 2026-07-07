@@ -14,7 +14,7 @@ jest.mock(
 );
 
 jest.mock(
-  '../../utilities/web3/contractScripts.js',
+  '../../utilities/web3/chainGateway.js',
   () => ({
     __esModule: true,
     normalizeSessionSlug: jest.fn(),
@@ -29,7 +29,7 @@ const {
   startCeRuntimeStats,
   stopCeRuntimeStats,
 } = require('../../utilities/ui/uiRuntimeStats.js');
-const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
+const contractScriptsModule = require('../../utilities/web3/chainGateway.js');
 
 const createMockHost = (overrides = {}) => {
   const { initialState, mounted, activeSlug, ...rest } = overrides;

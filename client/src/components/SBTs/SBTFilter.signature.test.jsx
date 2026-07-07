@@ -3,7 +3,7 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('./SBTSelector', () => () => null);
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     getSbtMintBurnCountsByAddress: jest.fn(),

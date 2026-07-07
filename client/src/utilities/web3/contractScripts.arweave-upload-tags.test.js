@@ -3,7 +3,7 @@ import { ethers } from 'ethers';
 import { getEffectiveArweaveKey } from '../session/resourceKeys.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { buildSiweMessage } from '../worker/workerAuth.js';
-import { __test__contractScriptsArweaveUploads } from './contractScripts.js';
+import { __test__contractScriptsArweaveUploads } from './chainGateway.js';
 
 jest.mock('../session/resourceKeys.js', () => ({
   getEffectiveArweaveKey: jest.fn(),
