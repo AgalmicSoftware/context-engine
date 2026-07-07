@@ -980,6 +980,7 @@ export const createSurveyQuestionsRuntimeMethods = (
   });
 
   const {
+    beginQuestionDisplayRender,
     flushDraftPersistAfterSliderChange,
     getAnswerLockDisplayState,
     getConvictionValueForSlice,
@@ -2665,6 +2666,7 @@ export const createSurveyQuestionsRuntimeMethods = (
   const { getMemoizedMaskedQuestionVisibility, renderDefaultSurveyQuestionsRoute } = createSurveyQuestionsRouteRuntime({
     ...context,
     closeQuestionTagModal,
+    beginQuestionDisplayRender,
     copyJsonToClipboard,
     getMemoizedLockedQuestionGateDetails,
     getPendingStatsSnapshot,

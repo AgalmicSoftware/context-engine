@@ -23,6 +23,7 @@ export const createSurveyQuestionsRouteRuntime = (
     EMPTY_QUESTION_POOL,
     SurveyQuestionsRouteSurface,
     bottomRef,
+    beginQuestionDisplayRender,
     buildSurveyQuestionsAuthoringPanelDisplayState,
     buildSurveyQuestionsAuthoringRouteReadinessDescriptor,
     buildSurveyQuestionsFullLoadingProgressState,
@@ -269,6 +270,7 @@ export const createSurveyQuestionsRouteRuntime = (
         questionPoolReady,
         visibleQuestionPool,
       });
+    beginQuestionDisplayRender?.();
     const renderedEditableQuestions: React.ReactNode = authoringRouteReadiness.shouldRenderEditableQuestions
       ? visibleQuestionPool.map((question: SurveyQuestionsLegacyValue, qIndex: SurveyQuestionsLegacyValue) =>
           renderQuestion(question, qIndex, currentSurveyResponseState),

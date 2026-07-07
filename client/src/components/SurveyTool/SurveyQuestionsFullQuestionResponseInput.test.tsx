@@ -80,14 +80,12 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
     expect(
       buildSurveyQuestionsFullQuestionResponseInputDescriptor({
         question: { id: ' Q3 ', type: 'freeform' },
-        qIndex: 4,
         answer: { value: { ignored: true }, encrypted: true },
         glowAnswer: true,
       }),
     ).toEqual({
       kind: 'audio',
       questionId: ' Q3 ',
-      qIndex: 4,
       value: '',
       encrypted: true,
       dataTestId: E2E_TESTIDS.SURVEY_ANSWER_INPUT,
@@ -95,7 +93,6 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       disabled: false,
       forceGlow: true,
       placeholder: 'response (optional)',
-      disableEncryption: true,
     });
   });
 

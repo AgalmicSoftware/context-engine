@@ -169,6 +169,9 @@ export type SurveyQuestionsInstanceFields = {
   _surveyJsonMetaCache: SurveyQuestionsMemoValue;
   _lockedQuestionGateDetailsMemo: SurveyQuestionsLockedGateDetailsMemo;
   _maskedQuestionVisibilityMemoByPool: WeakMap<object, unknown>;
+  // These property names survive minification in the SurveyQuestions chunk.
+  _a: SurveyQuestionsRuntimeRecord | null;
+  _q: Map<string, SurveyQuestionsRuntimeRecord>;
   _canDecryptOtherResponsesKey: string;
   _canDecryptOtherResponsesInFlight: SurveyQuestionsCanDecryptRun;
   _canDecryptOtherResponsesSig: string;
@@ -248,6 +251,8 @@ export const createSurveyQuestionsInstanceFields = (): SurveyQuestionsInstanceFi
   _surveyJsonMetaCache: { key: '', source: null, value: null },
   _lockedQuestionGateDetailsMemo: { key: '', poolRef: null, poolVersion: 0, value: [] },
   _maskedQuestionVisibilityMemoByPool: new WeakMap(),
+  _a: null,
+  _q: new Map(),
   _canDecryptOtherResponsesKey: '',
   _canDecryptOtherResponsesInFlight: null,
   _canDecryptOtherResponsesSig: '',

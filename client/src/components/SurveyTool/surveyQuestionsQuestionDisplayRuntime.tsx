@@ -98,6 +98,43 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
     persistDraftSafely && persistDraftSafely(0);
   };
 
+  const getCachedAudioInputWorkerProps = () => {
+    if (inst._a) {
+      return inst._a;
+    }
+    inst._a = getAudioInputWorkerProps();
+    return inst._a;
+  };
+
+  const beginQuestionDisplayRender = () => {
+    inst._a = null;
+  };
+
+  const getQuestionInputHandlers = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    questionId: SurveyQuestionsLegacyValue,
+  ) => {
+    const cacheKey = `${String(surveyIndex ?? '')}:${String(questionId ?? '')}`;
+    const cached = inst._q.get(cacheKey);
+    if (cached) return cached;
+
+    const handlers = {
+      onAnswerChange: (answerValue: SurveyQuestionsLegacyValue) => handleAnswer(surveyIndex, questionId, answerValue),
+      onDeferredRatingCommit: (committedRating: SurveyQuestionsLegacyValue) =>
+        handleAnswer(surveyIndex, questionId, committedRating, {
+          persistDraft: false,
+          afterUpdate: flushDraftPersistAfterSliderChange,
+        }),
+      onRatingChange: (ratingAnswer: SurveyQuestionsLegacyValue, event: SurveyQuestionsLegacyValue) =>
+        handleAnswer(surveyIndex, questionId, ratingAnswer, buildSliderPersistOptions(event)),
+      onRatingChangeComplete: flushDraftPersistAfterSliderChange,
+      onToggleAnswerEncryption: (newEncryptedState: SurveyQuestionsLegacyValue) =>
+        toggleAnswerEncryption(surveyIndex, questionId, newEncryptedState),
+    };
+    inst._q.set(cacheKey, handlers);
+    return handlers;
+  };
+
   const handleConvictionImportanceChange = (
     surveyIndex: SurveyQuestionsLegacyValue,
     questionId: SurveyQuestionsLegacyValue,
@@ -150,63 +187,55 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
 
   const renderFullQuestionResponseInput = ({
     question,
-    qIndex,
     surveyIndex,
     answer,
     glowAnswer,
-  }: SurveyQuestionsLegacyValue) => (
-    <SurveyQuestionsFullQuestionResponseInput
-      question={question}
-      qIndex={qIndex}
-      answer={answer}
-      glowAnswer={glowAnswer}
-      isSubmitting={stateRef.current.isSubmitting}
-      singleQuestionMode={propsRef.current.singleQuestionMode}
-      audioInputWorkerProps={getAudioInputWorkerProps()}
-      onAnswerChange={(answerValue: SurveyQuestionsLegacyValue) => handleAnswer(surveyIndex, question.id, answerValue)}
-      onDeferredRatingCommit={(committedRating: SurveyQuestionsLegacyValue) =>
-        handleAnswer(surveyIndex, question.id, committedRating, {
-          persistDraft: false,
-          afterUpdate: flushDraftPersistAfterSliderChange,
-        })
-      }
-      onRatingChange={(ratingAnswer: SurveyQuestionsLegacyValue, event: SurveyQuestionsLegacyValue) =>
-        handleAnswer(surveyIndex, question.id, ratingAnswer, buildSliderPersistOptions(event))
-      }
-      onRatingChangeComplete={flushDraftPersistAfterSliderChange}
-      onToggleAnswerEncryption={(newEncryptedState: SurveyQuestionsLegacyValue) =>
-        toggleAnswerEncryption(surveyIndex, question.id, newEncryptedState)
-      }
-    />
-  );
+  }: SurveyQuestionsLegacyValue) => {
+    const handlers = getQuestionInputHandlers(surveyIndex, question.id);
+    return (
+      <SurveyQuestionsFullQuestionResponseInput
+        question={question}
+        answer={answer}
+        glowAnswer={glowAnswer}
+        isSubmitting={stateRef.current.isSubmitting}
+        singleQuestionMode={propsRef.current.singleQuestionMode}
+        audioInputWorkerProps={getCachedAudioInputWorkerProps()}
+        onAnswerChange={handlers.onAnswerChange}
+        onDeferredRatingCommit={handlers.onDeferredRatingCommit}
+        onRatingChange={handlers.onRatingChange}
+        onRatingChangeComplete={handlers.onRatingChangeComplete}
+        onToggleAnswerEncryption={handlers.onToggleAnswerEncryption}
+      />
+    );
+  };
 
   const renderFullQuestionAdditionalInput = ({
-    qIndex,
     surveyIndex,
     questionId,
     additional,
     glowAdditional,
-  }: SurveyQuestionsLegacyValue) => (
-    <SurveyAudioFieldInput
-      qIndex={qIndex}
-      {...getAudioInputWorkerProps()}
-      placeholder={'related thoughts or URLs (optional)'}
-      value={additional?.value || ''}
-      encrypted={additional?.encrypted || false}
-      dataTestId={E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT}
-      dataCeQuestionId={String(questionId || '')
-        .trim()
-        .toLowerCase()}
-      disabled={stateRef.current.isSubmitting}
-      forceGlow={glowAdditional}
-      updateFunction={(additionalCommentsValue: SurveyQuestionsLegacyValue) =>
-        handleAdditional(surveyIndex, questionId, additionalCommentsValue)
-      }
-      toggleEncryption={(newEncryptedState: SurveyQuestionsLegacyValue) =>
-        toggleAdditionalCommentsEncryption(surveyIndex, questionId, newEncryptedState)
-      }
-    />
-  );
+  }: SurveyQuestionsLegacyValue) => {
+    return (
+      <SurveyAudioFieldInput
+        {...getCachedAudioInputWorkerProps()}
+        placeholder={'related thoughts or URLs (optional)'}
+        value={additional?.value || ''}
+        encrypted={additional?.encrypted || false}
+        dataTestId={E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT}
+        dataCeQuestionId={String(questionId || '')
+          .trim()
+          .toLowerCase()}
+        disabled={stateRef.current.isSubmitting}
+        forceGlow={glowAdditional}
+        updateFunction={(additionalCommentsValue: SurveyQuestionsLegacyValue) =>
+          handleAdditional(surveyIndex, questionId, additionalCommentsValue)
+        }
+        toggleEncryption={(newEncryptedState: SurveyQuestionsLegacyValue) =>
+          toggleAdditionalCommentsEncryption(surveyIndex, questionId, newEncryptedState)
+        }
+      />
+    );
+  };
 
   const parseEncryptedEnvelope = (field: SurveyQuestionsLegacyValue) =>
     (parseEncryptedEnvelopeHelper as SurveyQuestionsLegacyValue)(field);
@@ -527,6 +556,7 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
   );
 
   return {
+    beginQuestionDisplayRender,
     flushDraftPersistAfterSliderChange,
     getAnswerLockDisplayState,
     getConvictionValueForSlice,

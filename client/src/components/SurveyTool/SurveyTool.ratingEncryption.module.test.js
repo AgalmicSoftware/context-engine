@@ -6,7 +6,7 @@ import { buildFieldEncryptionWorkGroups } from './surveyToolSubmitPrepController
 import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmitController';
 import { buildAdditionalEncryptionAudienceState, buildAnswerEncryptionAudienceState } from './surveyQuestionsTypes';
 import { buildSurveyResponseStateArray } from './surveyToolHydrationFlow';
-import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
+import { SurveyQuestionsFullQuestionResponseInput } from './SurveyQuestionsFullQuestionResponseInput';
 import FullQuestionRatingInput from './FullQuestionRatingInput';
 import DeferredRatingSlider from './DeferredRatingSlider';
 

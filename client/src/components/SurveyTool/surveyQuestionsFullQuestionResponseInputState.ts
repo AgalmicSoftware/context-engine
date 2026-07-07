@@ -37,7 +37,6 @@ export type SurveyQuestionsFullQuestionResponseInputDescriptor =
   | {
       kind: 'audio';
       questionId: string;
-      qIndex: number;
       value: string | number;
       encrypted: boolean;
       dataTestId: string;
@@ -45,7 +44,6 @@ export type SurveyQuestionsFullQuestionResponseInputDescriptor =
       disabled: boolean;
       forceGlow: boolean;
       placeholder: string;
-      disableEncryption: boolean;
     };
 
 export type SurveyQuestionsFullQuestionResponseInputActionDescriptor =
@@ -100,14 +98,12 @@ type BuildResponseInputActionDescriptorArgs = {
 
 export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
   question,
-  qIndex = 0,
   answer,
   glowAnswer = false,
   isSubmitting = false,
   singleQuestionMode = false,
 }: {
   question: SurveyQuestionRecord;
-  qIndex?: number;
   answer: SurveyAnswerRecord;
   glowAnswer?: boolean;
   isSubmitting?: boolean;
@@ -150,7 +146,6 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
       return {
         kind: 'audio',
         questionId: question.id,
-        qIndex,
         value: audioInputValue,
         encrypted: answer.encrypted || false,
         dataTestId: E2E_TESTIDS.SURVEY_ANSWER_INPUT,
@@ -160,7 +155,6 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
         disabled,
         forceGlow: !!glowAnswer,
         placeholder: 'response (optional)',
-        disableEncryption: true,
       };
     }
   }

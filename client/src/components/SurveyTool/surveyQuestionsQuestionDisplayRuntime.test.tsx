@@ -53,7 +53,9 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   hasConvictionOrImportanceValueForQuestion: jest.fn(() => true),
   hasMeaningfulFieldValue: jest.fn((field) => !!field?.value),
   inst: {
+    _a: null,
     _getEffectiveDraftSlug: jest.fn(() => 'edge'),
+    _q: new Map(),
   },
   isMaskedPromptText: jest.fn(() => false),
   isQuestionFieldBusy: jest.fn(() => false),
@@ -151,5 +153,90 @@ describe('surveyQuestionsQuestionDisplayRuntime', () => {
         }),
       }),
     );
+  });
+
+  it('reuses per-question input handlers while preserving answer semantics', () => {
+    const handleAnswer = jest.fn();
+    const toggleAnswerEncryption = jest.fn();
+    const context = createContext({ handleAnswer, toggleAnswerEncryption });
+    const runtime = createSurveyQuestionsQuestionDisplayRuntime(context);
+    const question = { id: 'q1', type: 'freeform' };
+
+    const first = runtime.renderFullQuestionResponseInput({
+      question,
+      qIndex: 0,
+      surveyIndex: 2,
+      answer: { value: '' },
+    });
+    const second = runtime.renderFullQuestionResponseInput({
+      question,
+      qIndex: 0,
+      surveyIndex: 2,
+      answer: { value: '' },
+    });
+    const otherQuestion = runtime.renderFullQuestionResponseInput({
+      question: { id: 'q2', type: 'freeform' },
+      qIndex: 1,
+      surveyIndex: 2,
+      answer: { value: '' },
+    });
+
+    expect(first.props.onAnswerChange).toBe(second.props.onAnswerChange);
+    expect(first.props.onToggleAnswerEncryption).toBe(second.props.onToggleAnswerEncryption);
+    expect(first.props.onAnswerChange).not.toBe(otherQuestion.props.onAnswerChange);
+
+    first.props.onAnswerChange('answer text');
+    first.props.onToggleAnswerEncryption(true);
+
+    expect(handleAnswer).toHaveBeenCalledWith(2, 'q1', 'answer text');
+    expect(toggleAnswerEncryption).toHaveBeenCalledWith(2, 'q1', true);
+  });
+
+  it('computes audio input worker props once per question display render', () => {
+    const firstWorkerProps = {
+      context: { account: '0xabc', chainId: 11155420 },
+      sessionConfig: { slug: 'edge' },
+      sessionSlug: 'edge',
+    };
+    const secondWorkerProps = {
+      context: { account: '0xdef', chainId: 11155420 },
+      sessionConfig: { slug: 'next' },
+      sessionSlug: 'next',
+    };
+    const getAudioInputWorkerProps = jest
+      .fn()
+      .mockReturnValueOnce(firstWorkerProps)
+      .mockReturnValueOnce(secondWorkerProps);
+    const runtime = createSurveyQuestionsQuestionDisplayRuntime(createContext({ getAudioInputWorkerProps }));
+
+    runtime.beginQuestionDisplayRender();
+    const answerInput = runtime.renderFullQuestionResponseInput({
+      question: { id: 'q1', type: 'freeform' },
+      qIndex: 0,
+      surveyIndex: 0,
+      answer: { value: '' },
+    });
+    const additionalInput = runtime.renderFullQuestionAdditionalInput({
+      qIndex: 0,
+      surveyIndex: 0,
+      questionId: 'q1',
+      additional: { value: '' },
+    });
+
+    expect(getAudioInputWorkerProps).toHaveBeenCalledTimes(1);
+    expect(answerInput.props.audioInputWorkerProps).toBe(firstWorkerProps);
+    expect(additionalInput.props.sessionSlug).toBe('edge');
+    expect(additionalInput.props.context).toBe(firstWorkerProps.context);
+
+    runtime.beginQuestionDisplayRender();
+    const nextInput = runtime.renderFullQuestionResponseInput({
+      question: { id: 'q1', type: 'freeform' },
+      qIndex: 0,
+      surveyIndex: 0,
+      answer: { value: '' },
+    });
+
+    expect(getAudioInputWorkerProps).toHaveBeenCalledTimes(2);
+    expect(nextInput.props.audioInputWorkerProps).toBe(secondWorkerProps);
   });
 });
