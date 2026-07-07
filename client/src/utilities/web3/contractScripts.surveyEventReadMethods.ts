@@ -33,6 +33,50 @@ type SbtMintBurnCountsByAddressResult = {
   ok?: boolean;
   [key: string]: unknown;
 };
+type ProviderName = string;
+type AddressInput = string;
+type Bytes32Input = string | number | null | undefined;
+type BlockRangeInput = number | 'latest' | string | null | undefined;
+type GroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
+type ScanOptions = Record<string, unknown> | null;
+type ProgressCallback = ((progress: Record<string, unknown>) => void) | null;
+type PartialDataCallback = ((data: Record<string, unknown>, cursor?: number) => void) | null;
+type ParsedSurveyEvent = {
+  args: {
+    responder: string;
+    surveyId: string;
+    questionIds?: string[];
+  };
+  blockNumber: number;
+  transactionIndex?: number;
+  logIndex?: number;
+};
+type ContractLogLike = {
+  blockNumber?: number | string | null;
+  transactionIndex?: number | string | null;
+  logIndex?: number | string | null;
+  [key: string]: unknown;
+};
+type ParsedEventWithPosition = {
+  event: ParsedSurveyEvent;
+  blockNumber: number;
+  transactionIndex: number;
+  logIndex: number;
+};
+type LatestQuestionPair = {
+  responder: string;
+  qId: string;
+  blockNumber: number;
+  transactionIndex: number;
+  logIndex: number;
+};
+type LatestResponder = {
+  responder: string;
+  blockNumber: number;
+  logIndex: number;
+};
+type SurveyResponseLookup = Record<string, Record<string, unknown>>;
+type QuestionResponseLookup = Record<string, Record<string, unknown>>;
 
 export const createContractScriptsSurveyEventReadMethods = (
   deps: ContractScriptsRuntimeDeps,
@@ -137,23 +181,23 @@ export const createContractScriptsSurveyEventReadMethods = (
 
   return {
     async fetchAllQuestionIDs(
-      providerName: any,
-      fromBlock: any = null,
-      toBlock: any = null,
-      groupKeyOrCfg: any = null,
+      providerName: ProviderName,
+      fromBlock: BlockRangeInput = null,
+      toBlock: BlockRangeInput = null,
+      groupKeyOrCfg: GroupKeyOrConfig = null,
     ) {
       return contractEventScanMethods.fetchAllQuestionIDs(this, providerName, fromBlock, toBlock, groupKeyOrCfg);
     },
 
     // === CHANGED: +groupKeyOrCfg (optional). Uses group provider/addr and clamps
     async getAllQuestionIDsChunkedWithCallback(
-      providerName: any,
-      fromBlock: any = 0,
-      toBlock: any = 'latest',
-      onChunkProgress: any = null,
-      onPartialData: any = null,
-      groupKeyOrCfg: any,
-      scanOptions: any = null,
+      providerName: ProviderName,
+      fromBlock: BlockRangeInput = 0,
+      toBlock: BlockRangeInput = 'latest',
+      onChunkProgress: ProgressCallback = null,
+      onPartialData: PartialDataCallback = null,
+      groupKeyOrCfg: GroupKeyOrConfig,
+      scanOptions: ScanOptions = null,
     ) {
       return contractEventScanMethods.getAllQuestionIDsChunkedWithCallback(
         this,
@@ -168,11 +212,11 @@ export const createContractScriptsSurveyEventReadMethods = (
     },
 
     async getResponsesByQuestionID(
-      providerName: any,
-      questionId: any,
-      fromBlock: any = null,
-      toBlock: any = null,
-      groupKeyOrCfg: any = null,
+      providerName: ProviderName,
+      questionId: Bytes32Input,
+      fromBlock: BlockRangeInput = null,
+      toBlock: BlockRangeInput = null,
+      groupKeyOrCfg: GroupKeyOrConfig = null,
     ) {
       const cfg = resolveSession(groupKeyOrCfg || '');
       const gAddrs = getSessionAddresses(cfg);
@@ -184,7 +228,7 @@ export const createContractScriptsSurveyEventReadMethods = (
       const responseSubmittedEventFilter = SurveyContract.filters.ResponsesSubmitted();
 
       // 🔐 Normalize
-      const ensureHash = (v: any) => {
+      const ensureHash = (v: Bytes32Input) => {
         try {
           if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
         } catch {}
@@ -220,19 +264,19 @@ export const createContractScriptsSurveyEventReadMethods = (
         fromBlockNum,
         toBlockNum,
       );
-      const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
+      const events: ParsedSurveyEvent[] = rawLogs.map((log: ContractLogLike) => SURVEYS_INTERFACE.parseLog(log));
 
       const responses = await Promise.all(
         events
-          .filter((event: any) => {
+          .filter((event: ParsedSurveyEvent) => {
             try {
-              const evIds = (event.args.questionIds || []).map((x: any) => String(x).toLowerCase());
+              const evIds = (event.args.questionIds || []).map((x) => String(x).toLowerCase());
               return evIds.includes(qIdB32.toLowerCase());
             } catch {
               return false;
             }
           })
-          .map(async (event: any) => {
+          .map(async (event: ParsedSurveyEvent) => {
             const responder = event.args.responder;
             const surveyId = event.args.surveyId;
             let blockTimestamp = 0;
@@ -241,7 +285,7 @@ export const createContractScriptsSurveyEventReadMethods = (
               if (blockData) {
                 blockTimestamp = blockData.timestamp;
               }
-            } catch (e: any) {
+            } catch {
               /* ignore */
             }
             let responseData = null;
@@ -249,11 +293,11 @@ export const createContractScriptsSurveyEventReadMethods = (
               responseData = await this.getResponse(providerName, responder, qIdB32, groupKeyOrCfg, {
                 _resolvedCfg: cfg,
               });
-            } catch (e: any) {
+            } catch (e: unknown) {
               contractsLog.warn('[getResponsesByQuestionID] individual response read failed; skipping', {
                 responder,
                 qId: qIdB32,
-                error: e?.message,
+                error: e instanceof Error ? e.message : String(e),
               });
             }
             return {
@@ -269,11 +313,11 @@ export const createContractScriptsSurveyEventReadMethods = (
     },
 
     async getSurveyResponsesByAddress(
-      providerName: any,
-      userAddress: any,
-      fromBlock: any = null,
-      toBlock: any = null,
-      groupKeyOrCfg: any = null,
+      providerName: ProviderName,
+      userAddress: AddressInput,
+      fromBlock: BlockRangeInput = null,
+      toBlock: BlockRangeInput = null,
+      groupKeyOrCfg: GroupKeyOrConfig = null,
     ) {
       return contractEventScanMethods.getSurveyResponsesByAddress(
         this,
@@ -286,10 +330,10 @@ export const createContractScriptsSurveyEventReadMethods = (
     },
 
     async getSurveyResponses(
-      providerName: any,
-      fromCustomBlock: any = 0,
-      toCustomBlock: any = 'latest',
-      groupKeyOrCfg: any = null,
+      providerName: ProviderName,
+      fromCustomBlock: BlockRangeInput = 0,
+      toCustomBlock: BlockRangeInput = 'latest',
+      groupKeyOrCfg: GroupKeyOrConfig = null,
     ) {
       const cfg = resolveSession(groupKeyOrCfg || '');
       const gAddrs = getSessionAddresses(cfg);
@@ -322,11 +366,11 @@ export const createContractScriptsSurveyEventReadMethods = (
         toBlock,
       });
       const rawLogs = await fetchLogsSmartWithProvider(provider, responsesSubmittedEventFilter, fromBlock, toBlock);
-      const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
+      const events: ParsedSurveyEvent[] = rawLogs.map((log: ContractLogLike) => SURVEYS_INTERFACE.parseLog(log));
 
-      const surveyResponses: any = {};
+      const surveyResponses: SurveyResponseLookup = {};
       const responseEntries = await Promise.all(
-        events.map(async (event: any) => {
+        events.map(async (event: ParsedSurveyEvent) => {
           const responder = event.args.responder.toLowerCase();
           const surveyId = event.args.surveyId.toLowerCase();
           const responseData = await this.getSurveyResponse(providerName, responder, surveyId, groupKeyOrCfg);
@@ -345,11 +389,11 @@ export const createContractScriptsSurveyEventReadMethods = (
     },
 
     async getSurveysCreatedByAddress(
-      providerName: any,
-      userAddress: any,
-      fromBlock: any = null,
-      toBlock: any = null,
-      groupKeyOrCfg: any = null,
+      providerName: ProviderName,
+      userAddress: AddressInput,
+      fromBlock: BlockRangeInput = null,
+      toBlock: BlockRangeInput = null,
+      groupKeyOrCfg: GroupKeyOrConfig = null,
     ) {
       return contractEventScanMethods.getSurveysCreatedByAddress(
         this,
@@ -362,11 +406,11 @@ export const createContractScriptsSurveyEventReadMethods = (
     },
 
     async getQuestionResponses(
-      providerName: any,
-      fromCustomBlock: any = 0,
-      toCustomBlock: any = 'latest',
-      onChunkProgress: any = null,
-      groupKeyOrCfg: any = null,
+      providerName: ProviderName,
+      fromCustomBlock: BlockRangeInput = 0,
+      toCustomBlock: BlockRangeInput = 'latest',
+      onChunkProgress: ProgressCallback = null,
+      groupKeyOrCfg: GroupKeyOrConfig = null,
     ) {
       const cfg = resolveSession(groupKeyOrCfg || '');
       const gAddrs = getSessionAddresses(cfg);
@@ -401,29 +445,29 @@ export const createContractScriptsSurveyEventReadMethods = (
         toBlock,
       });
       const rawLogs = await fetchLogsSmartWithProvider(provider, responsesSubmittedEventFilter, fromBlock, toBlock);
-      const allEventData = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
+      const allEventData: ParsedSurveyEvent[] = rawLogs.map((log: ContractLogLike) => SURVEYS_INTERFACE.parseLog(log));
 
-      const questionResponses: any = {};
+      const questionResponses: QuestionResponseLookup = {};
       await Promise.all(
-        allEventData.map(async (event: any) => {
+        allEventData.map(async (event: ParsedSurveyEvent) => {
           const responder = event.args.responder.toLowerCase();
-          const questionIds = event.args.questionIds.map((q: any) => q.toLowerCase());
+          const questionIds = (event.args.questionIds || []).map((q) => q.toLowerCase());
 
           const respArray = await Promise.all(
-            questionIds.map((qId: any) =>
+            questionIds.map((qId) =>
               this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
                 _resolvedCfg: cfg,
-              }).catch((e: any) => {
+              }).catch((e: unknown) => {
                 contractsLog.warn('[getQuestionResponses] individual response read failed; skipping', {
                   qId,
-                  error: e?.message,
+                  error: e instanceof Error ? e.message : String(e),
                 });
                 return null;
               }),
             ),
           );
 
-          respArray.forEach((responseData: any, idx: any) => {
+          respArray.forEach((responseData: unknown, idx: number) => {
             if (responseData) {
               const qId = questionIds[idx];
               if (!questionResponses[qId]) questionResponses[qId] = {};
@@ -448,12 +492,12 @@ export const createContractScriptsSurveyEventReadMethods = (
     },
 
     async getQuestionResponsesChunkedWithCallback(
-      providerName: any,
-      fromCustomBlock: any = 0,
-      toCustomBlock: any = 'latest',
-      onChunkProgress: any = null,
-      onPartialData: any = null,
-      groupKeyOrCfg: any,
+      providerName: ProviderName,
+      fromCustomBlock: BlockRangeInput = 0,
+      toCustomBlock: BlockRangeInput = 'latest',
+      onChunkProgress: ProgressCallback = null,
+      onPartialData: PartialDataCallback = null,
+      groupKeyOrCfg: GroupKeyOrConfig,
       opts: { forceArweaveFetch?: boolean } = {},
     ) {
       let resolvedFromBlockNum;
@@ -508,7 +552,7 @@ export const createContractScriptsSurveyEventReadMethods = (
           resolvedFromBlockNum,
           resolvedToBlockNum,
         );
-        const parsedEvents = rawLogs.map((log: any) => ({
+        const parsedEvents: ParsedEventWithPosition[] = rawLogs.map((log: ContractLogLike) => ({
           event: SURVEYS_INTERFACE.parseLog(log),
           blockNumber: Number(log?.blockNumber || 0),
           transactionIndex: Number(log?.transactionIndex || 0),
@@ -516,13 +560,13 @@ export const createContractScriptsSurveyEventReadMethods = (
         }));
 
         // Deduplicate by (questionId,responder), keeping only the latest event for each pair.
-        const latestByPair = new Map();
-        parsedEvents.forEach(({ event, blockNumber, transactionIndex, logIndex }: any) => {
+        const latestByPair = new Map<string, LatestQuestionPair>();
+        parsedEvents.forEach(({ event, blockNumber, transactionIndex, logIndex }) => {
           const responder = String(event?.args?.responder || '').toLowerCase();
           const questionIds = Array.isArray(event?.args?.questionIds)
-            ? event.args.questionIds.map((id: any) => String(id || '').toLowerCase())
+            ? event.args.questionIds.map((id) => String(id || '').toLowerCase())
             : [];
-          questionIds.forEach((qId: any) => {
+          questionIds.forEach((qId) => {
             if (!qId) return;
             const pairKey = `${qId}|${responder}`;
             const prev = latestByPair.get(pairKey);
@@ -539,14 +583,14 @@ export const createContractScriptsSurveyEventReadMethods = (
         });
 
         const uniquePairs = Array.from(latestByPair.values());
-        const fullRangeAggregator: any = {};
+        const fullRangeAggregator: Record<string, unknown[]> = {};
         await Promise.all(
-          uniquePairs.map(async ({ responder, qId, blockNumber, transactionIndex, logIndex }: any) => {
+          uniquePairs.map(async ({ responder, qId, blockNumber, transactionIndex, logIndex }) => {
             let blockTimestamp = 0;
             try {
               const blockData = await this.getBlockWithCaching(provider, blockNumber, providerName, String(chId));
               blockTimestamp = blockData ? blockData.timestamp || 0 : 0;
-            } catch (error: any) {
+            } catch {
               blockTimestamp = Math.floor(Date.now() / 1000);
             }
 
@@ -556,11 +600,11 @@ export const createContractScriptsSurveyEventReadMethods = (
                 _resolvedCfg: cfg,
                 forceArweaveFetch,
               });
-            } catch (e: any) {
+            } catch (e: unknown) {
               contractsLog.warn('[getQuestionResponsesFullRange] individual response read failed; skipping', {
                 responder,
                 qId,
-                error: e?.message,
+                error: e instanceof Error ? e.message : String(e),
               });
             }
             if (!respData) return;
@@ -593,7 +637,7 @@ export const createContractScriptsSurveyEventReadMethods = (
         if (onPartialData) {
           onPartialData(fullRangeAggregator, resolvedToBlockNum);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         contractsLog.error('Critical Error in getQuestionResponsesChunkedWithCallback:', err);
         if (onPartialData && resolvedFromBlockNum !== undefined) {
           onPartialData({}, resolvedFromBlockNum - 1);
@@ -602,11 +646,11 @@ export const createContractScriptsSurveyEventReadMethods = (
     },
 
     async getQuestionsCreatedByAddress(
-      providerName: any,
-      userAddress: any,
-      fromBlock: any = null,
-      toBlock: any = null,
-      groupKeyOrCfg: any = null,
+      providerName: ProviderName,
+      userAddress: AddressInput,
+      fromBlock: BlockRangeInput = null,
+      toBlock: BlockRangeInput = null,
+      groupKeyOrCfg: GroupKeyOrConfig = null,
     ) {
       return contractEventScanMethods.getQuestionsCreatedByAddress(
         this,
@@ -619,12 +663,12 @@ export const createContractScriptsSurveyEventReadMethods = (
     },
 
     async getQuestionResponsesByAddress(
-      providerName: any,
-      userAddress: any,
-      fromBlock: any = null,
-      toBlock: any = null,
-      groupKeyOrCfg: any = null,
-      opts: any = {},
+      providerName: ProviderName,
+      userAddress: AddressInput,
+      fromBlock: BlockRangeInput = null,
+      toBlock: BlockRangeInput = null,
+      groupKeyOrCfg: GroupKeyOrConfig = null,
+      opts: Record<string, unknown> = {},
     ) {
       return contractEventScanMethods.getQuestionResponsesByAddress(
         this,
@@ -638,13 +682,13 @@ export const createContractScriptsSurveyEventReadMethods = (
     },
 
     async fetchUserSubmittedSurveyIDs(
-      providerName: any,
-      fromBlock: any = null,
-      toBlock: any = null,
-      groupKeyOrCfg: any,
+      providerName: ProviderName,
+      fromBlock: BlockRangeInput = null,
+      toBlock: BlockRangeInput = null,
+      groupKeyOrCfg: GroupKeyOrConfig,
     ) {
       const cfg = resolveSession(groupKeyOrCfg || '');
-      const blocklist = new Set((cfg?.BLOCKED_SURVEY_IDS || []).map((id: any) => id.toLowerCase()));
+      const blocklist = new Set((cfg?.BLOCKED_SURVEY_IDS || []).map((id: string) => id.toLowerCase()));
 
       const gAddrs = getSessionAddresses(cfg);
       const addr = gAddrs.surveys?.address;
@@ -680,30 +724,31 @@ export const createContractScriptsSurveyEventReadMethods = (
         toBlock: toBlockNum,
       });
       const rawLogs = await fetchLogsSmartWithProvider(provider, surveyAddedEventFilter, fromBlockNum, toBlockNum);
-      const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
+      const events: ParsedSurveyEvent[] = rawLogs.map((log: ContractLogLike) => SURVEYS_INTERFACE.parseLog(log));
 
       // Refactored to return object with creationBlock
-      const surveyMap = new Map();
-      events.forEach((event: any) => {
+      const surveyMap = new Map<string, number>();
+      events.forEach((event: ParsedSurveyEvent) => {
         const id = event.args.surveyId.toLowerCase();
         if (id && id !== ethers.constants.HashZero.toLowerCase() && !blocklist.has(id)) {
           // Keep the earliest block number if duplicates exist (though unlikely for creation)
-          if (!surveyMap.has(id) || event.blockNumber < surveyMap.get(id)) {
+          const previousCreationBlock = surveyMap.get(id);
+          if (previousCreationBlock === undefined || event.blockNumber < previousCreationBlock) {
             surveyMap.set(id, event.blockNumber);
           }
         }
       });
 
       // Return array of objects: { surveyId, creationBlock }
-      return Array.from(surveyMap.entries()).map(([sid, bn]: any) => ({ surveyId: sid, creationBlock: bn }));
+      return Array.from(surveyMap.entries()).map(([sid, bn]) => ({ surveyId: sid, creationBlock: bn }));
     },
 
     async fetchAllSurveyResponses(
-      providerName: any,
-      surveyId: any,
-      fromBlockParam: any = null,
-      toBlockParam: any = null,
-      groupKeyOrCfg: any,
+      providerName: ProviderName,
+      surveyId: Bytes32Input,
+      fromBlockParam: BlockRangeInput = null,
+      toBlockParam: BlockRangeInput = null,
+      groupKeyOrCfg: GroupKeyOrConfig,
     ) {
       const cfg = resolveSession(groupKeyOrCfg || '');
       const gAddrs = getSessionAddresses(cfg);
@@ -715,7 +760,7 @@ export const createContractScriptsSurveyEventReadMethods = (
       const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
 
       // 🔐 Normalize
-      const ensureHash = (v: any) => {
+      const ensureHash = (v: Bytes32Input) => {
         try {
           if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
         } catch {}
@@ -755,15 +800,15 @@ export const createContractScriptsSurveyEventReadMethods = (
         surveyId: sId,
       });
       const rawLogs = await fetchLogsSmartWithProvider(provider, responseSubmittedEventTopic, fromBlockNum, toBlockNum);
-      const parsedEvents = rawLogs.map((log: any) => ({
+      const parsedEvents: Array<Pick<ParsedEventWithPosition, 'event' | 'blockNumber' | 'logIndex'>> = rawLogs.map((log: ContractLogLike) => ({
         event: SURVEYS_INTERFACE.parseLog(log),
         blockNumber: Number(log?.blockNumber || 0),
         logIndex: Number(log?.logIndex || 0),
       }));
 
       // Deduplicate by responder; keep only the newest event to avoid repeated response fetches.
-      const latestByResponder = new Map();
-      parsedEvents.forEach(({ event, blockNumber, logIndex }: any) => {
+      const latestByResponder = new Map<string, LatestResponder>();
+      parsedEvents.forEach(({ event, blockNumber, logIndex }) => {
         const responder = String(event?.args?.responder || '').toLowerCase();
         if (!responder) return;
         const prev = latestByResponder.get(responder);
@@ -778,7 +823,7 @@ export const createContractScriptsSurveyEventReadMethods = (
 
       const responderEntries = Array.from(latestByResponder.values());
       const responseReadResults = await Promise.all(
-        responderEntries.map(async ({ responder, blockNumber, logIndex }: any) => {
+        responderEntries.map(async ({ responder, blockNumber, logIndex }) => {
           let blockTimestamp = 0;
           try {
             const blockData = await this.getBlockWithCaching(provider, blockNumber, providerName, String(chId));
@@ -789,10 +834,10 @@ export const createContractScriptsSurveyEventReadMethods = (
             surveyResponseData = await this.getSurveyResponse(providerName, responder, sId, groupKeyOrCfg, {
               throwOnError: true,
             });
-          } catch (error: any) {
+          } catch (error: unknown) {
             const retryable = isRetryableSurveyResponseReadError(error);
             contractsLog.warn('[fetchAllSurveyResponses] individual response read failed; skipping', {
-              error: error?.message,
+              error: error instanceof Error ? error.message : String(error),
               retryable,
             });
             return { failed: true, blockNumber, retryable };
@@ -814,7 +859,7 @@ export const createContractScriptsSurveyEventReadMethods = (
 
       let hadPartialFailure = false;
       let lowestFailedBlock: number | null = null;
-      const responses = responseReadResults.reduce((acc: any, result: any) => {
+      const responses = responseReadResults.reduce<unknown[]>((acc, result) => {
         if (!result) return acc;
         if (result.failed) {
           if (!result.retryable) return acc;
