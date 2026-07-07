@@ -48,6 +48,16 @@ const hasCachedStorageProfile = (draft: AnyRecord | null): boolean =>
       (draft.sessionStorageProfile && typeof draft.sessionStorageProfile === 'object') ||
       (draft.storage && typeof draft.storage === 'object'))
   );
+const getCachedStorageProfileOverride = (draft: AnyRecord | null): AnyRecord | null => {
+  if (!draft || draft.storageProfile) return null;
+  if (draft.sessionStorageProfile && typeof draft.sessionStorageProfile === 'object') {
+    return draft.sessionStorageProfile as AnyRecord;
+  }
+  if (draft.storage && typeof draft.storage === 'object') {
+    return draft.storage as AnyRecord;
+  }
+  return null;
+};
 const getCachedStorageProfilePayloadAccessMode = (draft: AnyRecord): string => {
   const storageProfile =
     draft.storageProfile && typeof draft.storageProfile === 'object' ? (draft.storageProfile as AnyRecord) : {};
@@ -277,6 +287,10 @@ export const buildSessionWizardInitialDraftFromCache = ({
     base.embeddedDeployHelperEnabled = sourceEmbeddedDeployHelperDefault;
   }
   const merged = cachedDraft ? mergeSessionWizardDraftDeep(base, cachedDraft) : base;
+  const cachedStorageProfileOverride = getCachedStorageProfileOverride(cachedDraft);
+  if (cachedStorageProfileOverride) {
+    merged.storageProfile = cachedStorageProfileOverride;
+  }
   const shouldBuildCachedStorageModeProfile =
     cachedDraft && !merged.sessionModeProfile && hasCachedStorageProfile(cachedDraft);
   const normalized = normalizeSessionWizardDraftShape(merged);

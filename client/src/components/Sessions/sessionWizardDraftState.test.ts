@@ -182,6 +182,61 @@ describe('sessionWizardDraftState', () => {
     );
   });
 
+  it('gates cached storage profile migration on cache-owned storage fields', () => {
+    const normalized = buildSessionWizardInitialDraftFromCache({
+      cachedWizard: {
+        draft: {
+          sessionName: 'Cached Legacy Storage Alias',
+          sessionStorageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { mode: 'lit_encrypted' },
+          },
+        },
+      },
+    });
+
+    expect(normalized.sessionModeProfile).toEqual(
+      expect.objectContaining({
+        preset: 'custom',
+        storage: expect.objectContaining({ backend: 'cloudflare' }),
+        encryption: { mode: 'lit' },
+      }),
+    );
+    expect(normalized.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        payloadAccessControl: expect.objectContaining({ mode: 'lit_encrypted' }),
+      }),
+    );
+    expect(normalized.sessionStorageProfile).toBeUndefined();
+  });
+
+  it('does not infer a session mode profile from default storage when cache lacks storage fields', () => {
+    const normalized = buildSessionWizardInitialDraftFromCache({
+      defaultTemplate: {
+        ...buildSessionWizardDefaultTemplate(),
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { mode: 'lit_encrypted' },
+        },
+      },
+      cachedWizard: {
+        draft: {
+          sessionName: 'Cached No Storage',
+        },
+      },
+    });
+
+    expect(normalized.sessionName).toBe('Cached No Storage');
+    expect(normalized.sessionModeProfile).toBeUndefined();
+    expect(normalized.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        payloadAccessControl: expect.objectContaining({ mode: 'lit_encrypted' }),
+      }),
+    );
+  });
+
   it('applies registry-chain contract defaults and worker RPC fallbacks without mutating the draft', () => {
     const draft = {
       networkChainId: 84532,
