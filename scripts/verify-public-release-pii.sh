@@ -116,6 +116,12 @@ function addWarning(warnings, kind, file, line, detail) {
   warnings.push({ kind, file, line, detail });
 }
 
+function isAllowedPublicEmailPath(relativePath) {
+  return relativePath.endsWith('package-lock.json')
+    || relativePath.startsWith('ai-discourse-corpus/corpuses/')
+    || relativePath.startsWith('client/src/data/ai-discourse-corpus/');
+}
+
 function scanTextFile(relativePath, text, findings, warnings) {
   const lines = text.split(/\r?\n/);
   const emailRe = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig;
@@ -132,8 +138,11 @@ function scanTextFile(relativePath, text, findings, warnings) {
 
     emailRe.lastIndex = 0;
     while ((match = emailRe.exec(line)) !== null) {
-      if (isAllowedPublicEmail(match[0])) continue;
-      addFinding(findings, 'email', relativePath, lineNumber, match[0]);
+      if (isAllowedPublicEmailPath(relativePath)) {
+        addWarning(warnings, 'public-email', relativePath, lineNumber, match[0]);
+      } else {
+        addFinding(findings, 'email', relativePath, lineNumber, match[0]);
+      }
     }
 
     homePathRe.lastIndex = 0;

@@ -106,7 +106,7 @@ After building the artifact, run the public PII and secrets scanner before publi
 npm run verify:public-release-pii -- release-public
 ```
 
-The scanner fails on email addresses, local home-directory paths, concrete secret assignments, PEM private-key blocks, and private-key-shaped 64-hex values. It warns on bare `0x` values because published contract addresses, transaction hashes, and demo IDs are often legitimate public data.
+The scanner fails on email addresses outside known public metadata/contact surfaces, local home-directory paths, concrete secret assignments, PEM private-key blocks, and private-key-shaped 64-hex values. It warns on package-lock/corpus contact emails and bare `0x` values because published maintainer contacts, contract addresses, transaction hashes, and demo IDs may be legitimate public data.
 
 ## Workflow
 
