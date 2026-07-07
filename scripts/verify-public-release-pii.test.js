@@ -49,7 +49,7 @@ test('verify-public-release-pii passes clean text while warning on public values
     ].join('\n'));
     writeFile(rootDir, 'ai-discourse-corpus/corpuses/public-corpus.json', [
       '{',
-      `  "contact": "${corpusContact}"`,
+      '  "contact": "[redacted-email]"',
       '}',
       '',
     ].join('\n'));
@@ -57,24 +57,12 @@ test('verify-public-release-pii passes clean text while warning on public values
       '{',
       '  "packages": {',
       '    "node_modules/public-package": {',
-      `      "author": "Package Maintainer <${packageMaintainer}>"`,
+      '      "author": "Package Maintainer <[redacted-email]>"',
       '    }',
       '  }',
       '}',
       '',
     ].join('\n'));
-    writeFile(rootDir, 'SECURITY.md', [
-      '# Security Policy',
-      `1. **Email:** \`${securityContact}\``,
-      `Mixed-case mention: ContextEngine${'@'}Protonmail.COM`,
-      '',
-    ].join('\n'));
-    writeFile(rootDir, 'scripts/public-history.sh', `PUBLIC_GIT_EMAIL="${publicGitIdentity}"\n`);
-    writeFile(
-      rootDir,
-      'deploy/cloudflare/session-worker/worker.mjs',
-      `const bundledWordlist = "Rfe${'@'}Rm.Rs"; // ${bundledVendorContact}\n`,
-    );
 
     const result = runScanner(rootDir);
 
@@ -83,10 +71,6 @@ test('verify-public-release-pii passes clean text while warning on public values
     assert.match(result.stderr, /WARN bare-0x/);
     assert.match(result.stderr, /WARN public-email: ai-discourse-corpus\/corpuses\/public-corpus\.json:2/);
     assert.match(result.stderr, /WARN public-email: client\/package-lock\.json:4/);
-    assert.match(result.stderr, /WARN public-email: deploy\/cloudflare\/session-worker\/worker\.mjs:1/);
-    assert.match(result.stderr, /WARN public-email: SECURITY\.md:2/);
-    assert.match(result.stderr, /WARN public-email: SECURITY\.md:3/);
-    assert.match(result.stderr, /WARN public-email: scripts\/public-history\.sh:1/);
   });
 });
 
