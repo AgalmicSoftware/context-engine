@@ -28,14 +28,14 @@ export interface DebateQuestion {
   question?: string;
   prompt?: string;
   options?: unknown;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface DebateComment {
   id?: string;
   comment?: string;
   username?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface HistoricalVoteEntry {
@@ -52,14 +52,14 @@ export interface DebateArgument {
   strength?: number | string;
   source?: string;
   children?: DebateArgument[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface DebateArguments {
   pro?: DebateArgument[];
   con?: DebateArgument[];
   votes?: Record<string, string[]>;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface CompassAxis {
@@ -81,7 +81,7 @@ export interface CompassData {
   xAxis?: CompassAxis;
   yAxis?: CompassAxis;
   points?: HistoricalCompassPoint[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface HistoricalFieldRow {
@@ -160,7 +160,7 @@ export interface HistoricalCase {
   open_question?: unknown;
   concrete_patch_options?: unknown;
   precedent_pressure?: Record<string, unknown>;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface DebateNode {
@@ -186,14 +186,14 @@ export interface DebateNode {
   y?: number;
   r?: number | null;
   groupId?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface HistoricalFigureRecord {
   votes?: Record<string, string | number | null | undefined>;
   comments?: DebateComment[];
   questions?: DebateQuestion[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface AtlasDimensions {
