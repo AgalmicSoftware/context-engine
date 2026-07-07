@@ -8,6 +8,95 @@
 
 import { createLogger } from '../logging.js';
 
+type UnknownRecord = Record<string, unknown>;
+type NumericMap = Record<string, number>;
+type NullableNumericMap = Record<string, number | null>;
+
+type FrameCounter = {
+  frames: number;
+  stalledFrames: number;
+  totalDeltaMs: number;
+  maxDeltaMs: number;
+};
+
+type LongTaskCounter = {
+  count: number;
+  totalDurationMs: number;
+  maxDurationMs: number;
+};
+
+type RuntimeStatsConfig = {
+  sampleIntervalMs: number;
+  retentionMinutes: number;
+  maxSamples: number;
+  uaMemoryIntervalMs: number;
+};
+
+type RuntimeStatsCapabilities = {
+  performanceMemory: boolean;
+  uaSpecificMemory: boolean;
+  longTaskObserver: boolean;
+  requestAnimationFrame: boolean;
+};
+
+type UaMemorySnapshot = {
+  supported: boolean;
+  sampledAt: number;
+  success: boolean;
+  bytes: number | null;
+  breakdownCount: number;
+  error?: string;
+};
+
+type RuntimeStatsState = {
+  v: number;
+  running: boolean;
+  startedAt: number;
+  stoppedAt: number;
+  lastSampleAt: number;
+  seq: number;
+  config: RuntimeStatsConfig;
+  capabilities: RuntimeStatsCapabilities;
+  samples: unknown[];
+  timerId: ReturnType<typeof setInterval> | null;
+  rafId: number | null;
+  lastRafTs: number;
+  longTaskObserver: PerformanceObserver | null;
+  frameTotals: FrameCounter;
+  frameSinceLast: FrameCounter;
+  longTaskTotals: LongTaskCounter;
+  longTaskSinceLast: LongTaskCounter;
+  lastPerfCountersFlat: NumericMap;
+  lastUaMemoryAt: number;
+  lastUaMemory: UaMemorySnapshot | null;
+  uaMemoryInFlight: boolean;
+  cacheEventTsByNamespace: Record<string, number[]>;
+  cacheEventTotalsByNamespace: NumericMap;
+  cacheEventSinceLastByNamespace: NumericMap;
+};
+
+type ExtendedPerformance = Performance & {
+  memory?: {
+    usedJSHeapSize?: unknown;
+    totalJSHeapSize?: unknown;
+    jsHeapSizeLimit?: unknown;
+  };
+  measureUserAgentSpecificMemory?: () => Promise<{
+    bytes?: unknown;
+    breakdown?: unknown;
+  }>;
+};
+
+type RuntimeStatsGlobal = typeof globalThis & {
+  ENABLE_CE_RUNTIME_STATS?: unknown;
+  __CE_RUNTIME_STATS_STATE__?: RuntimeStatsState;
+  __CE_PERF_COUNTERS__?: unknown;
+  __CE_UI_PERF__?: {
+    snapshot?: unknown;
+  };
+  __CE_RUNTIME_STATS__?: UnknownRecord;
+};
+
 const log = createLogger('uiRuntimeStats');
 const DEFAULT_SAMPLE_INTERVAL_MS = 5000;
 const DEFAULT_RETENTION_MINUTES = 30;
@@ -18,21 +107,21 @@ const CACHE_RATE_WINDOW_MS = 60 * 1000;
 const CACHE_RATE_PRUNE_WINDOW_MS = 5 * 60 * 1000;
 const TRACKED_CACHE_NAMESPACES = ['questionsCache', 'surveysCache', 'sbtCache'];
 
-const toFinite = (value, fallback = 0) => {
+const toFinite = (value: unknown, fallback = 0) => {
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
 };
 
-const toPositiveInt = (value, fallback) => {
+const toPositiveInt = (value: unknown, fallback: number) => {
   const num = Math.floor(toFinite(value, Number.NaN));
   return Number.isFinite(num) && num > 0 ? num : fallback;
 };
 
-const roundTo3 = (value) => Number(toFinite(value, 0).toFixed(3));
+const roundTo3 = (value: unknown) => Number(toFinite(value, 0).toFixed(3));
 
 const safeNow = () => Date.now();
 
-const safeClone = (value) => {
+const safeClone = (value: unknown): unknown | null => {
   if (value === undefined) return null;
   if (value === null) return null;
   try {
@@ -42,7 +131,7 @@ const safeClone = (value) => {
   }
 };
 
-const getGlobal = () => {
+const getGlobal = (): RuntimeStatsGlobal | null => {
   try {
     if (typeof globalThis !== 'undefined') return globalThis;
   } catch (e) {
@@ -51,7 +140,7 @@ const getGlobal = () => {
   return null;
 };
 
-const getPerformance = () => {
+const getPerformance = (): ExtendedPerformance | null => {
   try {
     if (typeof performance !== 'undefined') return performance;
   } catch (e) {
@@ -60,22 +149,25 @@ const getPerformance = () => {
   return null;
 };
 
-const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+const isPlainObject = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const createFrameCounter = () => ({
+const readRecord = (value: unknown, key: string): unknown => (isPlainObject(value) ? value[key] : undefined);
+
+const createFrameCounter = (): FrameCounter => ({
   frames: 0,
   stalledFrames: 0,
   totalDeltaMs: 0,
   maxDeltaMs: 0,
 });
 
-const createLongTaskCounter = () => ({
+const createLongTaskCounter = (): LongTaskCounter => ({
   count: 0,
   totalDurationMs: 0,
   maxDurationMs: 0,
 });
 
-const createInitialState = () => ({
+const createInitialState = (): RuntimeStatsState => ({
   v: 1,
   running: false,
   startedAt: 0,
@@ -112,7 +204,7 @@ const createInitialState = () => ({
   cacheEventSinceLastByNamespace: {},
 });
 
-const getState = () => {
+const getState = (): RuntimeStatsState => {
   const g = getGlobal();
   if (!g) return createInitialState();
   if (!isPlainObject(g.__CE_RUNTIME_STATS_STATE__)) {
@@ -131,7 +223,7 @@ const isCeRuntimeStatsEnabled = () => {
   }
 };
 
-const normalizeNamespace = (namespaceIn = '') => {
+const normalizeNamespace = (namespaceIn: unknown = '') => {
   const raw = String(namespaceIn || '')
     .trim()
     .toLowerCase();
@@ -148,7 +240,7 @@ const normalizeNamespace = (namespaceIn = '') => {
   return String(namespaceIn || '').trim();
 };
 
-const flattenNumericLeaves = (value, prefix = '', out = {}) => {
+const flattenNumericLeaves = (value: unknown, prefix = '', out: NumericMap = {}): NumericMap => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     if (prefix) out[prefix] = value;
     return out;
@@ -168,8 +260,8 @@ const flattenNumericLeaves = (value, prefix = '', out = {}) => {
   return out;
 };
 
-const computeDeltaMap = (prevMap = {}, nextMap = {}) => {
-  const delta = {};
+const computeDeltaMap = (prevMap: NumericMap = {}, nextMap: NumericMap = {}) => {
+  const delta: NumericMap = {};
   Object.keys(nextMap || {}).forEach((key) => {
     const next = toFinite(nextMap[key], Number.NaN);
     if (!Number.isFinite(next)) return;
@@ -180,7 +272,7 @@ const computeDeltaMap = (prevMap = {}, nextMap = {}) => {
   return delta;
 };
 
-const sanitizeStartOptions = (opts = {}) => {
+const sanitizeStartOptions = (opts: UnknownRecord = {}): RuntimeStatsConfig => {
   const sampleIntervalMs = toPositiveInt(opts.sampleIntervalMs, DEFAULT_SAMPLE_INTERVAL_MS);
   const retentionMinutes = toPositiveInt(opts.retentionMinutes, DEFAULT_RETENTION_MINUTES);
   const computedMaxSamples = Math.max(1, Math.floor((retentionMinutes * 60 * 1000) / sampleIntervalMs));
@@ -207,7 +299,7 @@ const canUseLongTaskObserver = () => {
   }
 };
 
-const refreshCapabilities = (state) => {
+const refreshCapabilities = (state: RuntimeStatsState) => {
   const perf = getPerformance();
   const hasRaf = (() => {
     const g = getGlobal();
@@ -240,9 +332,10 @@ const readHeapMemory = () => {
   };
 };
 
-const maybeSampleUaMemory = (state, nowTs) => {
+const maybeSampleUaMemory = (state: RuntimeStatsState, nowTs: number) => {
   const perf = getPerformance();
-  if (!perf || typeof perf.measureUserAgentSpecificMemory !== 'function') return;
+  const measureUaMemory = perf?.measureUserAgentSpecificMemory;
+  if (!perf || typeof measureUaMemory !== 'function') return;
   if (state.uaMemoryInFlight) return;
   const minGap = toPositiveInt(state.config.uaMemoryIntervalMs, DEFAULT_UA_MEMORY_INTERVAL_MS);
   if (nowTs - toFinite(state.lastUaMemoryAt, 0) < minGap) return;
@@ -250,7 +343,7 @@ const maybeSampleUaMemory = (state, nowTs) => {
   state.uaMemoryInFlight = true;
   Promise.resolve()
     .then(async () => {
-      const result = await perf.measureUserAgentSpecificMemory();
+      const result = await measureUaMemory.call(perf);
       state.lastUaMemoryAt = safeNow();
       state.lastUaMemory = {
         supported: true,
@@ -297,20 +390,20 @@ const readUiPerfSnapshot = () => {
   }
 };
 
-const mergeCounter = (target, source) => {
+const mergeCounter = (target: FrameCounter, source: Partial<FrameCounter>) => {
   target.frames += Number(source.frames || 0);
   target.stalledFrames += Number(source.stalledFrames || 0);
   target.totalDeltaMs += Number(source.totalDeltaMs || 0);
   target.maxDeltaMs = Math.max(Number(target.maxDeltaMs || 0), Number(source.maxDeltaMs || 0));
 };
 
-const mergeLongTaskCounter = (target, source) => {
+const mergeLongTaskCounter = (target: LongTaskCounter, source: Partial<LongTaskCounter>) => {
   target.count += Number(source.count || 0);
   target.totalDurationMs += Number(source.totalDurationMs || 0);
   target.maxDurationMs = Math.max(Number(target.maxDurationMs || 0), Number(source.maxDurationMs || 0));
 };
 
-const flushFrameSinceLast = (state) => {
+const flushFrameSinceLast = (state: RuntimeStatsState) => {
   const current = state.frameSinceLast;
   const frames = Number(current.frames || 0);
   const totalDeltaMs = Number(current.totalDeltaMs || 0);
@@ -325,7 +418,7 @@ const flushFrameSinceLast = (state) => {
   return out;
 };
 
-const flushLongTaskSinceLast = (state) => {
+const flushLongTaskSinceLast = (state: RuntimeStatsState) => {
   const current = state.longTaskSinceLast;
   const count = Number(current.count || 0);
   const totalDurationMs = Number(current.totalDurationMs || 0);
@@ -339,7 +432,7 @@ const flushLongTaskSinceLast = (state) => {
   return out;
 };
 
-const readTotalsFrame = (state) => {
+const readTotalsFrame = (state: RuntimeStatsState) => {
   const totals = state.frameTotals || createFrameCounter();
   const frames = Number(totals.frames || 0);
   const totalDeltaMs = Number(totals.totalDeltaMs || 0);
@@ -352,7 +445,7 @@ const readTotalsFrame = (state) => {
   };
 };
 
-const readTotalsLongTask = (state) => {
+const readTotalsLongTask = (state: RuntimeStatsState) => {
   const totals = state.longTaskTotals || createLongTaskCounter();
   const count = Number(totals.count || 0);
   const totalDurationMs = Number(totals.totalDurationMs || 0);
@@ -364,24 +457,28 @@ const readTotalsLongTask = (state) => {
   };
 };
 
-const pruneNamespaceEvents = (arr = [], nowTs = safeNow(), windowMs = CACHE_RATE_PRUNE_WINDOW_MS) => {
+const pruneNamespaceEvents = (arr: number[] = [], nowTs = safeNow(), windowMs = CACHE_RATE_PRUNE_WINDOW_MS) => {
   const cutoff = nowTs - windowMs;
   while (arr.length > 0 && Number(arr[0] || 0) < cutoff) {
     arr.shift();
   }
 };
 
-const readCachePressureSnapshot = (state, nowTs = safeNow(), { resetSinceLast = false } = {}) => {
+const readCachePressureSnapshot = (
+  state: RuntimeStatsState,
+  nowTs = safeNow(),
+  { resetSinceLast = false }: { resetSinceLast?: boolean } = {},
+) => {
   const namespaceSet = new Set([
     ...TRACKED_CACHE_NAMESPACES,
     ...Object.keys(state.cacheEventTsByNamespace || {}),
     ...Object.keys(state.cacheEventTotalsByNamespace || {}),
   ]);
 
-  const perMinute = {};
-  const totals = {};
-  const sinceLast = {};
-  const lastEventTsByNamespace = {};
+  const perMinute: NumericMap = {};
+  const totals: NumericMap = {};
+  const sinceLast: NumericMap = {};
+  const lastEventTsByNamespace: NullableNumericMap = {};
 
   namespaceSet.forEach((namespace) => {
     const key = String(namespace || '');
@@ -421,7 +518,7 @@ const readCachePressureSnapshot = (state, nowTs = safeNow(), { resetSinceLast = 
   };
 };
 
-const pushSample = (state, sample) => {
+const pushSample = (state: RuntimeStatsState, sample: unknown) => {
   state.samples.push(sample);
   while (state.samples.length > Number(state.config.maxSamples || DEFAULT_MAX_SAMPLES)) {
     state.samples.shift();
@@ -478,13 +575,14 @@ const collectSample = (reason = 'timer') => {
   return sample;
 };
 
-const handleLongTaskEntries = (entryList) => {
+const handleLongTaskEntries = (entryList: unknown) => {
   const state = getState();
   if (!state.running) return;
   const entries = (() => {
     try {
-      if (entryList && typeof entryList.getEntries === 'function') {
-        return entryList.getEntries();
+      const getEntries = readRecord(entryList, 'getEntries');
+      if (typeof getEntries === 'function') {
+        return getEntries.call(entryList);
       }
     } catch (e) {
       log.warn('uiRuntimeStats: fallback', e);
@@ -495,7 +593,7 @@ const handleLongTaskEntries = (entryList) => {
 
   const next = createLongTaskCounter();
   entries.forEach((entry) => {
-    const duration = toFinite(entry?.duration, 0);
+    const duration = toFinite(readRecord(entry, 'duration'), 0);
     if (!Number.isFinite(duration) || duration <= 0) return;
     next.count += 1;
     next.totalDurationMs += duration;
@@ -536,7 +634,7 @@ const stopLongTaskObserver = () => {
   state.longTaskObserver = null;
 };
 
-const rafLoop = (ts) => {
+const rafLoop = (ts: number) => {
   const state = getState();
   if (!state.running) return;
   const nowTs = toFinite(ts, safeNow());
@@ -620,7 +718,7 @@ const stopSampleTimer = () => {
   state.timerId = null;
 };
 
-const getStatusInternal = (state) => ({
+const getStatusInternal = (state: RuntimeStatsState) => ({
   v: 1,
   running: !!state.running,
   enabledByFlag: isCeRuntimeStatsEnabled(),
@@ -661,7 +759,7 @@ const resetCeRuntimeStats = () => {
   return snapshotCeRuntimeStats();
 };
 
-const startCeRuntimeStats = (opts = {}) => {
+const startCeRuntimeStats = (opts: UnknownRecord = {}) => {
   const state = getState();
   if (state.running) {
     return getStatusInternal(state);
@@ -719,10 +817,10 @@ const snapshotCeRuntimeStats = () => {
   };
 };
 
-const recordCeRuntimeCacheEvent = (evt = {}) => {
+const recordCeRuntimeCacheEvent = (evt: unknown = {}) => {
   const state = getState();
   if (!state.running) return false;
-  const namespace = normalizeNamespace(evt?.namespace || evt);
+  const namespace = normalizeNamespace(readRecord(evt, 'namespace') || evt);
   if (!namespace) return false;
   const ts = safeNow();
   if (!Array.isArray(state.cacheEventTsByNamespace[namespace])) {
