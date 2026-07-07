@@ -27,17 +27,13 @@ It does two things:
   - `client/src/components/Agent/AgentPage.tsx`
   - activation: `/agent?agent=1` or `localStorage["ce-agent-enabled"]="1"`
   - current methods: `getState()`, `describe()`, `perform(action)`, `run(actions[])`
-- Local Claude Code companion:
-  - `contextEngine-cc/README.md`
-  - `contextEngine-cc/lib/routeInventory.mjs`
 
 ## Recommended Current Path
 
 1. Bootstrap against `AGENTS.md`, `README.md`, `ARCHITECTURE.md`, and `docs/run-modes.md` before making assumptions about runtime mode.
 2. Prefer the documented TestID API for deterministic browser interaction instead of ad hoc selectors.
 3. If you are driving the dev browser surface, inspect `window.__ceAgent.describe()` first so the supported actions and higher-level tools are explicit.
-4. If you are integrating through `contextEngine-cc`, treat `contextEngine-cc/lib/routeInventory.mjs` as the canonical local HTTP route inventory until the MCP surface lands.
-5. Keep live-vs-mock and chain-runtime intent explicit in E2E work; decide upfront whether a run is `onchain`, `local`, or today’s manual-fork workaround, and do not rely on silent fallback sessions, workers, or credentials.
+4. Keep live-vs-mock and chain-runtime intent explicit in E2E work; decide upfront whether a run is `onchain`, `local`, or today’s manual-fork workaround, and do not rely on silent fallback sessions, workers, or credentials.
 
 ## Practical Rule Of Thumb
 
@@ -47,7 +43,6 @@ The current safe path is:
 
 - bootstrap from the canonical docs
 - automate through stable TestIDs or `window.__ceAgent`
-- use `contextEngine-cc` for local companion flows
 - verify with explicit E2E mode choices
 
 Private planning tracks the roadmap for turning that into a fuller MCP, JSON, and deterministic-local-verification platform.

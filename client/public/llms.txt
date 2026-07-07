@@ -12,7 +12,6 @@ Latest GitHub source tree: https://github.com/AgalmicSoftware/context-engine/tre
 - README: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/README.md
 - AI agent bootstrap: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/ai-agent-bootstrap.md
 - Architecture: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ARCHITECTURE.md
-- contextEngine-cc README: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/contextEngine-cc/README.md
 - Whitepaper: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/whitepaper/whitepaper.md
 
 ## Focus areas
@@ -22,5 +21,4 @@ Latest GitHub source tree: https://github.com/AgalmicSoftware/context-engine/tre
 - SBT-gated access control and encrypted fields
 - Passkey-oriented onboarding and account UX
 - Cloudflare Worker support, Arweave storage, and EVM integrations
-- Deterministic browser automation via a stable TestID API and dev agent bridge
-- Claude Code companion flows via `contextEngine-cc`
+- Deterministic browser automation via a stable TestID API

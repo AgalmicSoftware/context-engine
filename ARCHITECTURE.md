@@ -332,4 +332,3 @@ SBTFactory                      ────────────────
 - [`docs/forking-wallet.md`](docs/forking-wallet.md) — fork-owned RP ID setup
 - [`docs/security-model.md`](docs/security-model.md) — embedded wallet security model
 - [`docs/local-chain.md`](docs/local-chain.md) — Local Anvil development
-- [`CLAUDE.md`](CLAUDE.md) — AI agent workflow and conventions
