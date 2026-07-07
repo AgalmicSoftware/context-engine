@@ -585,6 +585,7 @@ import {
   buildUserSurveyResponseFoundState,
   buildUserSurveyResponseMissingState,
   isSurveyQuestionsMaskedPromptText,
+  publishSurveyQuestionPoolIfCurrent,
   type SurveyQuestionsAuthoringPanelDisplayState,
   type SurveyQuestionsAuthoringRouteReadinessDescriptor,
   type SurveyQuestionsFullLoadingProgressState,
@@ -697,6 +698,7 @@ const _applyDraftTrackingState = (tracking: SurveyQuestionsDraftTrackingState = 
 const invalidateResponseHydrationRuns = () => {
     inst._fetchSurveyResponseRunId = (Number(inst._fetchSurveyResponseRunId) || 0) + 1;
     inst._fetchSingleQuestionRunId = (Number(inst._fetchSingleQuestionRunId) || 0) + 1;
+    inst._questionPoolHydrationRunId = (Number(inst._questionPoolHydrationRunId) || 0) + 1;
     inst._localCacheRehydrateRunId = (Number(inst._localCacheRehydrateRunId) || 0) + 1;
     if (inst._isMounted && stateRef.current.isLoadingResponse) {
       setState(buildResponseHydrationInvalidatedState());
@@ -1160,6 +1162,7 @@ const surveyQuestionsRuntimeMethods = createSurveyQuestionsRuntimeMethods({
     buildEmptyResponseFieldStateCore,
     buildEncryptionTogglePlan,
     buildFetchedQuestionPoolState,
+    publishSurveyQuestionPoolIfCurrent,
     buildFieldDecryptStateHelper,
     buildFieldEncryptionWorkGroupsCore,
     buildGateAudienceSbtItemsController,

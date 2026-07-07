@@ -584,6 +584,20 @@ export const buildClearedSurveyQuestionPoolState = (): SurveyQuestionPoolStatePa
   questionPoolPendingIds: [],
 });
 
+export const publishSurveyQuestionPoolIfCurrent = ({
+  isStaleRun = () => false,
+  publishQuestionPool = () => {},
+  warnMissing = false,
+}: {
+  isStaleRun?: () => boolean;
+  publishQuestionPool?: (options: { warnMissing: boolean }) => void;
+  warnMissing?: boolean;
+} = {}): boolean => {
+  if (isStaleRun()) return false;
+  publishQuestionPool({ warnMissing });
+  return true;
+};
+
 export const buildSurveyQuestionPoolLoadState = ({
   isStandalone = false,
   singleQuestionMode = false,

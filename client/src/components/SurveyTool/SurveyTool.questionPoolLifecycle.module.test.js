@@ -4,6 +4,7 @@ import {
   buildFetchedQuestionPoolState,
   buildRenderedQuestionPayloadPoolsState,
   buildSurveyQuestionPoolLoadState,
+  publishSurveyQuestionPoolIfCurrent,
 } from './surveyQuestionsTypes.js';
 import {
   executeSurveyFormStateReset,
@@ -258,6 +259,19 @@ describe('SurveyTool question pool lifecycle', () => {
       questionPoolExpectedIds: ['q1'],
       questionPoolPendingIds: [],
     });
+  });
+
+  it('does not publish a stale survey question-pool hydration result after start fresh', () => {
+    const publishQuestionPool = jest.fn();
+
+    const published = publishSurveyQuestionPoolIfCurrent({
+      isStaleRun: () => true,
+      publishQuestionPool,
+      warnMissing: true,
+    });
+
+    expect(published).toBe(false);
+    expect(publishQuestionPool).not.toHaveBeenCalled();
   });
 
   it('hydrates all survey question ids into the direct-route question pool', async () => {

@@ -185,6 +185,7 @@ export type SurveyQuestionsInstanceFields = {
   _canDecryptOtherResponsesRunId: number;
   _fetchSurveyResponseRunId: number;
   _fetchSingleQuestionRunId: number;
+  _questionPoolHydrationRunId: number;
   _localCacheRehydrateRunId: number;
   _responseHydrationStateUpdateDepth: number;
   _surveyDecryptAttemptSeq: number;
@@ -263,6 +264,7 @@ export const createSurveyQuestionsInstanceFields = (): SurveyQuestionsInstanceFi
   _canDecryptOtherResponsesRunId: 0,
   _fetchSurveyResponseRunId: 0,
   _fetchSingleQuestionRunId: 0,
+  _questionPoolHydrationRunId: 0,
   _localCacheRehydrateRunId: 0,
   _responseHydrationStateUpdateDepth: 0,
   _surveyDecryptAttemptSeq: 0,

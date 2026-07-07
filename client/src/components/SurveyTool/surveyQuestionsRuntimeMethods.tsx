@@ -133,6 +133,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     buildEmptyResponseFieldStateCore,
     buildEncryptionTogglePlan,
     buildFetchedQuestionPoolState,
+    publishSurveyQuestionPoolIfCurrent,
     buildFieldDecryptStateHelper,
     buildFieldEncryptionWorkGroupsCore,
     buildGateAudienceSbtItemsController,
@@ -4122,9 +4123,20 @@ const maybeBlockSubmitUntilQuestionPoolComplete = () => {
 
 async function fetchQuestionPool() {
     if (propsRef.current.isStandalone || propsRef.current.singleQuestionMode) return;
+    const runId: SurveyQuestionsLegacyValue = (Number(inst._questionPoolHydrationRunId) || 0) + 1;
+    inst._questionPoolHydrationRunId = runId;
+    const isStaleQuestionPoolRun: SurveyQuestionsLegacyValue = () => (
+      !inst._isMounted ||
+      inst._questionPoolHydrationRunId !== runId
+    );
+    const setQuestionPoolState: SurveyQuestionsLegacyValue = (...args: SurveyQuestionsLegacyValue[]) => {
+      if (!isStaleQuestionPoolRun()) {
+        setState(...args);
+      }
+    };
     if (!propsRef.current.surveyId) {
       surveyLog.warn("SurveyQuestions: fetchQuestionPool – no surveyID supplied");
-      setState(buildClearedSurveyQuestionPoolState());
+      setQuestionPoolState(buildClearedSurveyQuestionPoolState());
       return;
     }
 
@@ -4137,7 +4149,7 @@ async function fetchQuestionPool() {
     const netIdStr: SurveyQuestionsLegacyValue = questionReadContext.networkIdStr;
     if (!netIdStr) {
       surveyLog.error("SurveyQuestions: fetchQuestionPool – network.id undefined");
-      setState(buildClearedSurveyQuestionPoolState());
+      setQuestionPoolState(buildClearedSurveyQuestionPoolState());
       return;
     }
 
@@ -4237,6 +4249,7 @@ async function fetchQuestionPool() {
           surveyIdLower,
           effectiveSlug
         );
+        if (isStaleQuestionPoolRun()) return;
         if (surveyData) {
           if (!Array.isArray(surveyData.questionIDs))
             surveyData.questionIDs = [];
@@ -4264,7 +4277,7 @@ async function fetchQuestionPool() {
 
     if (!surveyData || !Array.isArray(surveyData.questionIDs) || surveyData.questionIDs.length === 0) {
       surveyLog.warn(`SurveyQuestions: survey ${surveyIdLower} still has no questionIDs – aborting pool build`);
-      setState(buildClearedSurveyQuestionPoolState());
+      setQuestionPoolState(buildClearedSurveyQuestionPoolState());
       return;
     }
 
@@ -4283,7 +4296,7 @@ async function fetchQuestionPool() {
       const questionPool = expectedQuestionIds
         .map((qid: SurveyQuestionsLegacyValue) => fixtureQuestionById.get(qid))
         .filter(Boolean);
-      setState({
+      setQuestionPoolState({
         questionPool,
         questionPoolExpectedIds: expectedQuestionIds,
         questionPoolPendingIds: expectedQuestionIds.filter((qid: SurveyQuestionsLegacyValue) => !fixtureQuestionById.has(qid)),
@@ -4293,6 +4306,10 @@ async function fetchQuestionPool() {
 
     let lastPublishedQuestionPoolSnapshotSig = '';
     const publishQuestionPoolFromCache = ({ warnMissing = false } = {}) => {
+      return publishSurveyQuestionPoolIfCurrent({
+        isStaleRun: isStaleQuestionPoolRun,
+        warnMissing,
+        publishQuestionPool: ({ warnMissing: shouldWarnMissing }: SurveyQuestionsLegacyValue = {}) => {
       const questionsCacheFromStorage = readQuestionsCache(effectiveSlug) || {};
       const questionsNet = questionsCacheFromStorage[netIdStr] || {
         questionsLatestBlock: 0,
@@ -4307,7 +4324,7 @@ async function fetchQuestionPool() {
           const qData = networkQuestions[qid] as SurveyQuestionsCacheQuestion | undefined;
           if (isPendingQuestionMetadataPlaceholder(qData)) return null;
           if (qData) return { ...qData, id: qData.id.toLowerCase() };
-          if (warnMissing) {
+          if (shouldWarnMissing) {
             surveyLog.warn(`SurveyQuestions: Question data for ID ${qid} not found in cache after ensureQuestionCached.`);
           }
           return null;
@@ -4328,7 +4345,7 @@ async function fetchQuestionPool() {
       });
       if (snapshotSig === lastPublishedQuestionPoolSnapshotSig) return;
       lastPublishedQuestionPoolSnapshotSig = snapshotSig;
-      setState((prev: SurveyQuestionsLegacyValue) => {
+      setQuestionPoolState((prev: SurveyQuestionsLegacyValue) => {
         const prevQuestionPool = Array.isArray(prev?.questionPool) ? prev.questionPool : [];
         const prevExpectedQuestionIds = Array.isArray(prev?.questionPoolExpectedIds)
           ? prev.questionPoolExpectedIds
@@ -4375,6 +4392,8 @@ async function fetchQuestionPool() {
           questionPoolExpectedIds: expectedQuestionIds,
           questionPoolPendingIds: pendingQuestionIds,
         };
+      });
+        },
       });
     };
 
