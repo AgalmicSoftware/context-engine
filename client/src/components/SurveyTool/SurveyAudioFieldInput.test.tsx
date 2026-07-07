@@ -100,4 +100,31 @@ describe('SurveyAudioFieldInput', () => {
     expect(props.updateFunction).toBe(updateFunction);
     expect(props.toggleEncryption).toBe(toggleEncryption);
   });
+
+  it('does not re-render the AudioInput wrapper when field props are unchanged', () => {
+    const sessionConfig = { worker: 'config' };
+    const context = { chainId: 84532 };
+    const updateFunction = jest.fn();
+    const toggleEncryption = jest.fn();
+    const props = {
+      placeholder: 'response (optional)',
+      value: 'hello',
+      dataCeQuestionId: 'q4',
+      sessionSlug: 'edge',
+      sessionConfig,
+      context,
+      workerUrl: 'https://worker.example/audio',
+      updateFunction,
+      toggleEncryption,
+    };
+
+    const { rerender } = render(<SurveyAudioFieldInput {...props} />);
+    expect(mockAudioInputProps).toHaveLength(1);
+
+    rerender(<SurveyAudioFieldInput {...props} />);
+    expect(mockAudioInputProps).toHaveLength(1);
+
+    rerender(<SurveyAudioFieldInput {...props} value="updated" />);
+    expect(mockAudioInputProps).toHaveLength(2);
+  });
 });

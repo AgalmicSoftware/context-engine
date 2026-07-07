@@ -1,3 +1,5 @@
+import React from 'react';
+
 import AudioInput from '../Shared/AudioInput/AudioInput';
 
 type SurveyAudioWorkerProps = {
@@ -61,4 +63,4 @@ const SurveyAudioFieldInput = ({
   />
 );
 
-export default SurveyAudioFieldInput;
+export default React.memo(SurveyAudioFieldInput);
