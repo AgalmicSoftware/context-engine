@@ -848,20 +848,25 @@ describe('SessionWizard rendered validation', () => {
     expect(await screen.findByText(REQUIRED_SESSION_SLUG_ERROR)).toBeInTheDocument();
   });
 
-  it('shows only session mode on /session/new until Continue reveals the prefilled setup', async () => {
+  it.each(['/new', '/session/new'])(
+    'shows only session mode on %s until Continue reveals the prefilled setup',
+    async (pathname) => {
     localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
       draft: {
         sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
         storageProfile: { backend: 'cloudflare' },
       },
     }));
-    window.history.replaceState({}, '', '/session/new');
+    window.history.replaceState({}, '', pathname);
     renderSessionWizard();
 
     expect(screen.getByTestId('ce-new-preset-continue')).toBeDisabled();
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
     expect(screen.queryByText('Custom')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeInTheDocument();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
@@ -874,12 +879,16 @@ describe('SessionWizard rendered validation', () => {
     fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
     expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /advanced options/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
 
     enableAdvancedMode();
     fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
     expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'false');
-  });
+    }
+  );
 
   it('checks session slug collisions before publish upload or register side effects', async () => {
     const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');

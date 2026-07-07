@@ -4420,6 +4420,7 @@ const SessionWizard = ({
   const handleSessionModeProfileContinue = useCallback(() => {
     setSessionModeProfileStepComplete(true);
   }, []);
+  const showSessionModeProfileEntryStep = isNewSessionWizardRoute && !effectiveSessionModeProfileStepComplete;
   const sessionModeProfileControl = (
     <SessionWizardSessionModeProfileControl
       registryChainId={registryChainId}
@@ -4432,6 +4433,8 @@ const SessionWizard = ({
         });
       }}
       onContinue={handleSessionModeProfileContinue}
+      entryOnly={showSessionModeProfileEntryStep}
+      showContinue={showSessionModeProfileEntryStep || !isNewSessionWizardRoute}
     />
   );
 
@@ -4539,7 +4542,7 @@ const SessionWizard = ({
       selectorSourceSessionConfig={selectorSourceSessionConfig} sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
       sessionHeaderPreviewSrc={sessionHeaderPreviewSrc} sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
       sessionModeProfileControl={sessionModeProfileControl}
-      showSessionModeProfileControlInSetup={!isNewSessionWizardRoute}
+      showSessionModeProfileControlInSetup={effectiveSessionModeProfileStepComplete}
       sessionModeProfileStepComplete={effectiveSessionModeProfileStepComplete}
       sessionUrl={sessionUrl}
       setBundleFile={setBundleFile} setBundleMode={setBundleMode}

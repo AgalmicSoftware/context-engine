@@ -10,11 +10,12 @@ import {
 describe('SessionModeProfileField', () => {
   it('starts with no selected preset and gates Continue', () => {
     const onChange = jest.fn();
-    render(<SessionModeProfileField registryChainId={11155420} onChange={onChange} />);
+    render(<SessionModeProfileField registryChainId={11155420} onChange={onChange} entryOnly />);
 
     expect(screen.getByTestId('ce-new-preset-continue')).toBeDisabled();
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
     expect(screen.getByText(/Hosted on Cloudflare\. Session-scoped by default\./)).toBeInTheDocument();
     expect(screen.getByText(/Published publicly and permanently unless you enable encryption\./)).toBeInTheDocument();
     expect(screen.getByText('Cloudflare API token')).toBeInTheDocument();
@@ -24,6 +25,24 @@ describe('SessionModeProfileField', () => {
     expect(screen.getAllByText('RPC URL/key')).toHaveLength(2);
     expect(screen.getByText('Lit key only for Lit encryption')).toBeInTheDocument();
     expect(screen.getByText('Lit API key if encryption is enabled')).toBeInTheDocument();
+  });
+
+  it('can render selected setup mode without the entry Continue button', () => {
+    const onChange = jest.fn();
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+
+    render(
+      <SessionModeProfileField
+        registryChainId={11155420}
+        value={profile}
+        onChange={onChange}
+        showContinue={false}
+      />
+    );
+
+    expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('button', { name: /advanced options/i })).toBeInTheDocument();
   });
 
   it('selects a preset and emits the compiled storage profile', () => {

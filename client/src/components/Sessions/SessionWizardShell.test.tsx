@@ -398,16 +398,16 @@ describe('SessionWizardShell', () => {
     expect(props.onCloseSessionHeaderPreviewModal).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps setup status visible while the mode profile gates setup sections', () => {
+  it('renders only the mode profile while it gates setup sections', () => {
     const props = baseProps();
     props.sessionModeProfileStepComplete = false;
 
     render(<SessionWizardShell {...props} />);
 
-    expect(screen.getByTestId('shell-header')).toBeInTheDocument();
-    expect(screen.getByTestId('shell-requirements')).toBeInTheDocument();
-    expect(screen.getByTestId('shell-sponsored-status')).toBeInTheDocument();
     expect(screen.getByTestId('shell-mode-profile')).toBeInTheDocument();
+    expect(screen.queryByTestId('shell-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('shell-requirements')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('shell-sponsored-status')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shell-normal-rail')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shell-encryption')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shell-metadata')).not.toBeInTheDocument();

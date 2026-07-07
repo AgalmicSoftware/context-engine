@@ -366,6 +366,14 @@ const SessionWizardShell = ({
 }: SessionWizardShellProps) => {
   const showSessionModeProfileGate = !!sessionModeProfileControl && !sessionModeProfileStepComplete;
 
+  if (showSessionModeProfileGate) {
+    return (
+      <div className={styles.groupWizard}>
+        {sessionModeProfileControl}
+      </div>
+    );
+  }
+
   return (
     <div className={styles.groupWizard}>
       <SessionWizardHeader
@@ -397,15 +405,12 @@ const SessionWizardShell = ({
         onFocusNormalModeSection={focusNormalModeSection}
         onRetrySponsoredBundle={onRetrySponsoredBundle}
         showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
-        showNormalModeRail={!showSessionModeProfileGate}
+        showNormalModeRail
         sponsoredBundleStatus={sponsoredBundleStatus}
       />
 
-      {showSessionModeProfileGate ? (
-        sessionModeProfileControl
-      ) : (
-        <>
-          {showSessionModeProfileControlInSetup ? sessionModeProfileControl : null}
+      <>
+        {showSessionModeProfileControlInSetup ? sessionModeProfileControl : null}
 
           {(!isNormalMode || !collapsedSections.encryption) && (
             <EncryptionPanel
@@ -568,33 +573,32 @@ const SessionWizardShell = ({
             status={status}
           />
 
-          <SessionWizardModals
-            account={account}
-            provider={provider}
-            createSbtModalState={createSbtModalState}
-            closeCreateSbtModal={closeCreateSbtModal}
-            createSbtModalNetwork={createSbtModalNetwork}
-            toggleLoginModal={toggleLoginModal}
-            createSbtModalSessionSlug={createSbtModalSessionSlug}
-            draft={draft}
-            createSbtModalChainId={createSbtModalChainId}
-            createSbtModalArweaveJwkOverride={createSbtModalArweaveJwkOverride}
-            encryptionGates={encryptionGates}
-            normalizeSbtSelection={normalizeSbtSelection}
-            defaultGateId={defaultGateId}
-            signBootstrapAdminAction={signBootstrapAdminAction}
-            handleSavePendingSbtDraft={handleSavePendingSbtDraft}
-            contractViewerModalState={contractViewerModalState}
-            selectedWizardContract={selectedWizardContract}
-            closeContractViewerModal={closeContractViewerModal}
-            selectedWizardContractHref={selectedWizardContractHref}
-            sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
-            onCloseSessionHeaderPreviewModal={onCloseSessionHeaderPreviewModal}
-            sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
-            t={t}
-          />
-        </>
-      )}
+        <SessionWizardModals
+          account={account}
+          provider={provider}
+          createSbtModalState={createSbtModalState}
+          closeCreateSbtModal={closeCreateSbtModal}
+          createSbtModalNetwork={createSbtModalNetwork}
+          toggleLoginModal={toggleLoginModal}
+          createSbtModalSessionSlug={createSbtModalSessionSlug}
+          draft={draft}
+          createSbtModalChainId={createSbtModalChainId}
+          createSbtModalArweaveJwkOverride={createSbtModalArweaveJwkOverride}
+          encryptionGates={encryptionGates}
+          normalizeSbtSelection={normalizeSbtSelection}
+          defaultGateId={defaultGateId}
+          signBootstrapAdminAction={signBootstrapAdminAction}
+          handleSavePendingSbtDraft={handleSavePendingSbtDraft}
+          contractViewerModalState={contractViewerModalState}
+          selectedWizardContract={selectedWizardContract}
+          closeContractViewerModal={closeContractViewerModal}
+          selectedWizardContractHref={selectedWizardContractHref}
+          sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
+          onCloseSessionHeaderPreviewModal={onCloseSessionHeaderPreviewModal}
+          sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
+          t={t}
+        />
+      </>
     </div>
   );
 };

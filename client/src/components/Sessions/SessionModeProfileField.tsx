@@ -23,6 +23,8 @@ type SessionModeProfileFieldProps = {
   value?: unknown;
   onChange: (profile: SessionModeProfile, compiled: { storageProfile: AnyRecord }) => void;
   onContinue?: () => void;
+  entryOnly?: boolean;
+  showContinue?: boolean;
 };
 
 const PRESET_CARDS = [
@@ -133,6 +135,8 @@ const SessionModeProfileField = ({
   value = null,
   onChange,
   onContinue,
+  entryOnly = false,
+  showContinue = true,
 }: SessionModeProfileFieldProps): React.ReactElement => {
   const profile = isProfile(value) ? value : null;
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -187,15 +191,17 @@ const SessionModeProfileField = ({
             <span className={styles.modeProfileChip}>Custom</span>
           ) : null}
         </div>
-        <Button
-          type="button"
-          color="primary"
-          disabled={!profile}
-          data-testid="ce-new-preset-continue"
-          onClick={onContinue}
-        >
-          Continue
-        </Button>
+        {showContinue ? (
+          <Button
+            type="button"
+            color="primary"
+            disabled={!profile}
+            data-testid="ce-new-preset-continue"
+            onClick={onContinue}
+          >
+            Continue
+          </Button>
+        ) : null}
       </div>
 
       <div className={styles.modePresetGrid} role="radiogroup" aria-label="Session mode presets">
@@ -232,17 +238,19 @@ const SessionModeProfileField = ({
         })}
       </div>
 
-      <button
-        type="button"
-        className={styles.moreOptionsToggle}
-        onClick={() => setAdvancedOpen((prev) => !prev)}
-        aria-expanded={advancedOpen}
-      >
-        Advanced options{' '}
-        <FontAwesomeIcon icon={advancedOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 6 }} />
-      </button>
+      {!entryOnly ? (
+        <button
+          type="button"
+          className={styles.moreOptionsToggle}
+          onClick={() => setAdvancedOpen((prev) => !prev)}
+          aria-expanded={advancedOpen}
+        >
+          Advanced options{' '}
+          <FontAwesomeIcon icon={advancedOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 6 }} />
+        </button>
+      ) : null}
 
-      {advancedOpen ? (
+      {!entryOnly && advancedOpen ? (
         <div className={styles.modeAdvancedGrid}>
           {!profile ? (
             <div className={styles.helperText}>Choose a preset before editing per-axis options.</div>
