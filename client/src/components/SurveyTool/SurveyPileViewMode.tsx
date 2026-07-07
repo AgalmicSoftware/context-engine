@@ -84,6 +84,15 @@ import {
   readPileScopedQuestionResponses,
 } from './surveyPileBaselineSync';
 import {
+  bindPileEngineMethod,
+  bindPileMethod,
+  createPileViewInstanceFields,
+  type PileControllerStateLike,
+  type PileQuestionRecord,
+  type PileQuestionResponsesMap,
+  type PileViewModeEngine,
+} from './surveyPileRuntimeBinding';
+import {
   buildPileComponentUpdatePlan,
   buildPileContextResetState,
   buildPileQuestionProgressSignals,
@@ -626,28 +635,6 @@ export const createPileViewRuntimeStrategy = (): SurveyQuestionsRuntimeStrategy 
   },
 });
 
-type PileViewModeEngine = SurveyQuestionsRuntimeEngine;
-type PileQuestionRecord = {
-  id?: string;
-  creator?: unknown;
-  tags?: unknown;
-  type?: unknown;
-  prompt?: unknown;
-  promptDecrypted?: boolean;
-  arweaveTxId?: unknown;
-  singleSelect?: unknown;
-  singleChoice?: unknown;
-  options?: unknown;
-  [key: string]: unknown;
-};
-type PileQuestionResponsesMap = Record<string, Record<string, unknown>>;
-type PileControllerStateLike = Record<string, unknown> & {
-  pileQuestions?: unknown;
-  activePileIndex?: unknown;
-  surveysResponseState?: Array<Partial<PileResponseSlice> | null | undefined>;
-  editBaseline?: Partial<PileResponseSlice> | null;
-};
-
 const mergeQuestionResponsesForPile = mergeQuestionResponses as unknown as (
   target?: PileQuestionResponsesMap,
   source?: unknown,
@@ -657,34 +644,6 @@ const doesQuestionProgressMatchSlugForPile = doesQuestionProgressMatchSlug as un
   progressSlugValue: unknown,
   currentSlug: string,
 ) => boolean;
-
-const createPileViewInstanceFields = () => ({
-  _pileQuestionsGeneration: 0,
-  _currentRenderedQuestionIdsCacheKey: '',
-  _questionObjectSignatureCache: new WeakMap(),
-  _questionListSignatureCache: new WeakMap(),
-  _currentPileQuestionsSignature: '0:0',
-  _currentPileQuestionsSignatureListRef: null,
-  _responseCountsCacheKey: '',
-  _responseCountsCacheValue: null,
-  _emptyReadyProbeStartedAtMs: 0,
-  _pileScanDisplayBaselineKey: '',
-  _pileScanDisplayBaselineRemaining: 0,
-  _lastGatedEmptyRecoveryKey: '',
-});
-
-const bindPileEngineMethod =
-  <Args extends unknown[], Result>(
-    engine: PileViewModeEngine,
-    method: (engine: PileViewModeEngine, ...args: Args) => Result,
-  ) =>
-  (...args: Args): Result =>
-    method(engine, ...args);
-
-const bindPileMethod =
-  <Args extends unknown[], Result>(method: (...args: Args) => Result) =>
-  (...args: Args): Result =>
-    method(...args);
 
 const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEngine => {
   if (!engine || typeof engine !== 'object') return engine;
