@@ -1,4 +1,56 @@
-import { buildUsersFromCaches, fallbackBullets, sbtNameSets } from './compareUsers';
+import {
+  buildUsersFromCaches,
+  computeOverlapMatrix,
+  computeVennEvidence,
+  encodeStancesForUser,
+  fallbackBullets,
+  getCompareSbtKey,
+  getCompareSbtLabel,
+  isValidAddress,
+  opinionVennTriplet,
+  pcaLiteCompass,
+  sanitizeCompass,
+  sbtNameSets,
+  selectTopOpinionTokens,
+  shortenPlain,
+} from './compareUsers';
+
+const ADDRESS_A = '0x0000000000000000000000000000000000000001';
+const ADDRESS_B = '0x0000000000000000000000000000000000000002';
+const ADDRESS_C = '0x0000000000000000000000000000000000000003';
+
+const opinionUsers = [
+  {
+    address: ADDRESS_A,
+    sbts: [{ name: 'Alpha' }],
+    questions: [
+      { id: 'q1', type: 'binary', answer: 'yes', importance: 2, prompt: 'Adopt durable tests?', tags: ['testing'] },
+      { id: 'q2', type: 'binary', answer: 'no', importance: 1, prompt: 'Ship quickly?', tags: ['ship'] },
+      { id: 'q3', type: 'rating', answer: 5, importance: 4, prompt: 'Rate confidence', tags: ['confidence'] },
+      { id: 'q4', type: 'multichoice', answer: ['CLI', 'UI'], prompt: 'Tooling choices', tags: ['tools'] },
+    ],
+  },
+  {
+    address: ADDRESS_B,
+    sbts: [{ name: 'Beta' }],
+    questions: [
+      { id: 'q1', type: 'binary', answer: true, prompt: 'Adopt durable tests?', tags: ['testing'] },
+      { id: 'q2', type: 'binary', answer: 'agree', prompt: 'Ship quickly?', tags: ['ship'] },
+      { id: 'q3', type: 'rating', answer: 2, prompt: 'Rate confidence', tags: ['confidence'] },
+      { id: 'q4', type: 'multichoice', answer: ['CLI'], prompt: 'Tooling choices', tags: ['tools'] },
+    ],
+  },
+  {
+    address: ADDRESS_C,
+    sbts: [{ name: 'Gamma' }],
+    questions: [
+      { id: 'q1', type: 'binary', answer: 'disagree', prompt: 'Adopt durable tests?', tags: ['testing'] },
+      { id: 'q2', type: 'binary', answer: 'yes', prompt: 'Ship quickly?', tags: ['ship'] },
+      { id: 'q3', type: 'rating', answer: 1, prompt: 'Rate confidence', tags: ['confidence'] },
+      { id: 'q4', type: 'multichoice', answer: ['API'], prompt: 'Tooling choices', tags: ['tools'] },
+    ],
+  },
+];
 
 describe('buildUsersFromCaches', () => {
   it('merges SBTs, questions, and surveys across caches', () => {
@@ -259,5 +311,119 @@ describe('buildUsersFromCaches', () => {
 
     expect(users).toHaveLength(1);
     expect(users[0].sbts).toEqual([]);
+  });
+});
+
+describe('compare user pure helpers', () => {
+  it('normalizes SBT labels, keys, shortened addresses, and address validity', () => {
+    expect(getCompareSbtLabel({ sbtInfo: { name: '  Alpha Ring  ' } })).toBe('Alpha Ring');
+    expect(getCompareSbtKey({ sbtInfo: { name: 'Alpha Ring' } })).toBe('alpha ring');
+    expect(getCompareSbtKey({ name: '[encrypted]', address: ADDRESS_A })).toBe(ADDRESS_A);
+    expect(shortenPlain('0x1234567890abcdef1234567890abcdef1234abcd')).toBe('0x1234\u2026abcd');
+    expect(shortenPlain('not-an-address')).toBe('not-an-address');
+    expect(isValidAddress(ADDRESS_A)).toBe(true);
+    expect(isValidAddress('alice.eth')).toBe(true);
+    expect(isValidAddress('0xshort')).toBe(false);
+  });
+
+  it('encodes binary, rating, and multichoice stances with signs and weights', () => {
+    const { tokens } = encodeStancesForUser(opinionUsers[0]);
+
+    expect(tokens.get('q1')).toEqual({ sign: 1, weight: 1.2 });
+    expect(tokens.get('q2')).toEqual({ sign: -1, weight: 1.1 });
+    expect(tokens.get('q3')).toEqual({ sign: 1, weight: 1.4 });
+    expect(tokens.get('q4::cli')).toEqual({ sign: 1, weight: 1 });
+    expect(tokens.get('q4::ui')).toEqual({ sign: 1, weight: 1 });
+  });
+
+  it('selects top opinion tokens and builds opinion overlap rows', () => {
+    const topTokens = selectTopOpinionTokens(opinionUsers, 4);
+    const matrix = computeOverlapMatrix(opinionUsers, 4);
+
+    expect(topTokens.length).toBeGreaterThan(0);
+    expect(topTokens.length).toBeLessThanOrEqual(4);
+    expect(matrix.mode).toBe('opinion');
+    expect(matrix.columns).toHaveLength(topTokens.length);
+    expect(matrix.rows).toHaveLength(3);
+    expect(matrix.rows.flat().every((value) => [-1, 0, 1].includes(value))).toBe(true);
+  });
+
+  it('falls back to an SBT presence matrix when opinion signal is sparse', () => {
+    const matrix = computeOverlapMatrix(
+      [
+        { address: ADDRESS_A, sbts: [{ name: 'Alpha' }], questions: [{ id: 'q1', type: 'binary', answer: 'yes' }] },
+        { address: ADDRESS_B, sbts: [{ name: 'Alpha' }, { name: 'Beta' }], questions: [] },
+      ],
+      3,
+    );
+
+    expect(matrix.mode).toBe('sbt');
+    expect(matrix.columns.map((column) => column.label)).toEqual(['Alpha', 'Beta']);
+    expect(matrix.rows).toEqual([
+      [{ has: true }, { has: false }],
+      [{ has: true }, { has: true }],
+    ]);
+  });
+
+  it('computes sign-aware Venn regions with evidence for overlapping opinions', () => {
+    const venn = opinionVennTriplet([
+      {
+        tokens: new Map([
+          ['a', { sign: 1 }],
+          ['ab', { sign: 1 }],
+          ['ac', { sign: 1 }],
+          ['abc', { sign: 1 }],
+        ]),
+      },
+      {
+        tokens: new Map([
+          ['b', { sign: 1 }],
+          ['ab', { sign: 1 }],
+          ['bc', { sign: 1 }],
+          ['abc', { sign: 1 }],
+        ]),
+      },
+      {
+        tokens: new Map([
+          ['c', { sign: 1 }],
+          ['ac', { sign: 1 }],
+          ['bc', { sign: 1 }],
+          ['abc', { sign: 1 }],
+        ]),
+      },
+    ]);
+    const evidence = computeVennEvidence(opinionUsers.slice(0, 2));
+
+    expect(venn).toEqual({ a: 1, b: 1, c: 1, ab: 1, ac: 1, bc: 1, abc: 1 });
+    expect(evidence.counts.ab).toBeGreaterThan(0);
+    expect(evidence.evidenceMap.ab.some((entry) => entry.includes('q1'))).toBe(true);
+    expect(computeVennEvidence([opinionUsers[0]]).counts).toEqual({ a: 0, b: 0, c: 0, ab: 0, ac: 0, bc: 0, abc: 0 });
+  });
+
+  it('creates and sanitizes deterministic compass points', () => {
+    const compass = pcaLiteCompass(opinionUsers);
+    const sanitized = sanitizeCompass(
+      {
+        axes: [{ id: 'x', label: 'Custom X', description: 'Provided x axis' }],
+        points: [{ address: ADDRESS_B, x: 2, y: -2 }],
+        evidence: { x: ['one', 'two', 'three', 'four', 'five', 'six'], y: ['north'] },
+      },
+      [ADDRESS_A, ADDRESS_B],
+    );
+
+    expect(compass.points).toHaveLength(3);
+    expect(compass.points.every((point) => point.x >= -1 && point.x <= 1 && point.y >= -1 && point.y <= 1)).toBe(true);
+    expect(sanitized).toEqual({
+      axes: [
+        { id: 'x', label: 'Custom X', description: 'Provided x axis' },
+        { id: 'y', label: 'Axis 2', description: 'Second principal direction of encoded opinions.' },
+      ],
+      points: [
+        { address: ADDRESS_A, x: 0, y: 0 },
+        { address: ADDRESS_B, x: 1, y: -1 },
+      ],
+      evidence: { x: ['one', 'two', 'three', 'four', 'five'], y: ['north'] },
+    });
+    expect(sanitizeCompass(null)).toBeNull();
   });
 });
