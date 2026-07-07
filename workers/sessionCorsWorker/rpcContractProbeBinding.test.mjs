@@ -108,6 +108,39 @@ test('createRpcContractProbeHelpersWithWorkerDeps preserves rpc request payloads
   );
 });
 
+test('createRpcContractProbeHelpersWithWorkerDeps rejects blocked rpc request targets before fetch', async () => {
+  let fetchCount = 0;
+  const { rpcRequest } = createRpcContractProbeHelpersWithWorkerDeps({
+    deps: {
+      toStr: (value) => (typeof value === 'string' ? value : value == null ? '' : String(value)),
+      isBlockedOutboundUrl: (url) => String(url).includes('127.0.0.1'),
+      fetch: async () => {
+        fetchCount += 1;
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ result: '0x1' }),
+        };
+      },
+    },
+  });
+
+  await assert.rejects(
+    rpcRequest({
+      rpcUrl: 'http://127.0.0.1:8545',
+      method: 'eth_chainId',
+      params: [],
+    }),
+    (err) => {
+      assert.equal(err.message, 'Blocked RPC URL');
+      assert.equal(err.rpcStatus, 403);
+      assert.equal(err.rpcBlocked, true);
+      return true;
+    },
+  );
+  assert.equal(fetchCount, 0);
+});
+
 test('createRpcContractProbeHelpersWithWorkerDeps preserves contract and registry eth_call encoding/decoding', async () => {
   const fetchCalls = [];
   const contractIface = {
@@ -186,6 +219,43 @@ test('createRpcContractProbeHelpersWithWorkerDeps preserves contract and registr
       params: [{ to: '0xregistry-address', data: '0xregistry' }, 'latest'],
     },
   ]);
+});
+
+test('createRpcContractProbeHelpersWithWorkerDeps rejects blocked rpc probe targets before fetch', async () => {
+  let fetchCount = 0;
+  const logs = [];
+  const helpers = createRpcContractProbeHelpersWithWorkerDeps({
+    deps: {
+      toStr: (value) => (typeof value === 'string' ? value : value == null ? '' : String(value)),
+      isBlockedOutboundUrl: (url) => String(url).includes('metadata.google.internal'),
+      fetch: async () => {
+        fetchCount += 1;
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ result: '0x1' }),
+        };
+      },
+      log: (...args) => {
+        logs.push(args);
+      },
+    },
+  });
+
+  await helpers.probeRpcUrl({
+    rpcUrl: 'http://metadata.google.internal/computeMetadata/v1',
+    label: 'metadata',
+  });
+
+  assert.equal(fetchCount, 0);
+  assert.deepEqual(logs, [[
+    '[rpc-probe] failed',
+    {
+      label: 'metadata',
+      rpcUrl: 'http://metadata.google.internal/computeMetadata/v1',
+      error: 'Blocked RPC URL',
+    },
+  ]]);
 });
 
 test('createRpcContractProbeHelpersWithWorkerDeps preserves rpc probe logging and sequential iteration', async () => {

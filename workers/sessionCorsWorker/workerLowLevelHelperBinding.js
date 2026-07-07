@@ -110,6 +110,7 @@ export const createWorkerLowLevelHelpersWithWorkerDeps = ({
       toStr: deps?.toStr,
       fetch: deps?.rpcFetch,
       URL: deps?.URL,
+      isBlockedOutboundUrl: outboundHelpers.isBlockedOutboundUrl,
       getRegistryInterface: ethersInterfaceProviderGateHelpers.getRegistryInterface,
       now: deps?.now,
       log: deps?.log,

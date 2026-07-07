@@ -207,6 +207,7 @@ test('createWorkerLowLevelHelpersWithWorkerDeps preserves low-level worker assem
         assert.equal(value.deps.toStr, 'toStr');
         assert.equal(value.deps.fetch, 'rpcFetch');
         assert.equal(value.deps.URL, 'URL');
+        assert.equal(value.deps.isBlockedOutboundUrl, 'isBlockedOutboundUrl');
         assert.equal(value.deps.now, 'now');
         assert.equal(value.deps.log, 'log');
         assert.equal(value.deps.getRegistryInterface(), 'getRegistryInterface');
