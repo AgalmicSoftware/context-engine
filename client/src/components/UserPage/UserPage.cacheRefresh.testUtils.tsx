@@ -1,4 +1,4 @@
-/** @file UserPage.cacheRefresh.testUtils.jsx */
+/** @file UserPage.cacheRefresh.testUtils.tsx */
 import UserPage from './UserPage';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
