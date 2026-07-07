@@ -14,13 +14,15 @@ reviewing future test additions.
 
 | Command | Result | Wall time |
 |---|---:|---:|
-| `npm run test:client` | 1,006 suites, 7,415 passed, 1 skipped | 307.803s |
+| `npm run test:ci` | passed: wiring, type-debt, release, contracts, client coverage, root/worker/cc/node/cache | 522.023s |
+| `npm run test:client` | 1,009 suites, 7,434 passed, 1 skipped | 244.954s |
 | `cd client && npm test -- --watchAll=false --runInBand --json --outputFile=/tmp/prd655-jest-results.json` | 997 suites, 7,399 passed, 1 skipped | 150.899s |
-| `npm run test:node` | 222 passed | 28.657s |
+| `npm run test:node` | 239 passed | 33.279s |
 
-Against a 25-minute ceiling, the full client coverage run leaves about 19m52s
+Against a 25-minute ceiling, the full `test:ci` run leaves about 16m18s of
+headroom. The full client coverage run leaves about 20m55s
 of headroom inside the client job. The local full client coverage run plus
-`test:node` totals about 336.460s, leaving about 19m24s against a single
+`test:node` totals about 278.233s, leaving about 20m22s against a single
 25-minute budget.
 
 ## Slowest Client Suites
@@ -48,10 +50,10 @@ budget trend or a targeted developer-loop need.
 
 The measured global coverage from `npm run test:client` was:
 
-- Statements: 75.74% (74,620 / 98,517)
-- Branches: 61.00% (64,374 / 105,514)
-- Functions: 77.08% (13,860 / 17,981)
-- Lines: 79.14% (69,366 / 87,642)
+- Statements: 76.58% (75,454 / 98,519)
+- Branches: 61.33% (64,720 / 105,519)
+- Functions: 77.81% (13,995 / 17,985)
+- Lines: 79.36% (70,002 / 88,200)
 
 Selected top-level `client/src` buckets from `client/coverage/lcov.info`:
 
