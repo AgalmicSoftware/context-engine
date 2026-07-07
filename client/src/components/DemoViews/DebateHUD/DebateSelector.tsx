@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { debateData } from '../../../variables/demo/debateData.js';
+import { debateData } from '../../../variables/demo/debateData';
 import { darkTheme as T, soften, useTheme } from './debateHudTheme';
 
 type DebateSelectorProps = {

@@ -9,7 +9,7 @@ import styles from './RiskMatrix.module.scss';
 import {
   getRiskMatrixAtlasScenarioCountForCell,
   getRiskMatrixAtlasScenariosForCell,
-} from '../../variables/demo/riskMatrixAtlasScenarioData.js';
+} from '../../variables/demo/riskMatrixAtlasScenarioData';
 import seedComments from '../../variables/demo/riskMatrixSeedComments.json';
 import {
   enrichRiskMatrixCommentRecord,

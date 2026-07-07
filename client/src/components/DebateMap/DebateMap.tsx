@@ -29,7 +29,7 @@ import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
 import loopholeHistoricalCases from '../../variables/demo/loophole_historical_cases.json';
 import loopholeHistoricalFigurePrinciples from '../../variables/demo/loophole_historical_figure_principles.json';
-import { getRiskMatrixAtlasScenariosForAtlasNode } from '../../variables/demo/riskMatrixAtlasScenarioData.js';
+import { getRiskMatrixAtlasScenariosForAtlasNode } from '../../variables/demo/riskMatrixAtlasScenarioData';
 import styles from './DebateMap.module.scss';
 import { createLogger } from 'utilities/logging.js';
 import {

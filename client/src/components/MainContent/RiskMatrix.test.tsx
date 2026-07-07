@@ -5,7 +5,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import RiskMatrix, { type RiskMatrixRestoreState } from './RiskMatrix';
 import debateMapDemoData from '../../variables/demo/debate_map_demo_data.json';
-import { riskMatrixAtlasScenarioSamples } from '../../variables/demo/riskMatrixAtlasScenarioData.js';
+import { riskMatrixAtlasScenarioSamples } from '../../variables/demo/riskMatrixAtlasScenarioData';
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 const originalPublicUrl = process.env.PUBLIC_URL;

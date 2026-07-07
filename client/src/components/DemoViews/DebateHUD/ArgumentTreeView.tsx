@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 import { Avatar } from './CharacterSVG';
-import { debateData, sourceLinks } from '../../../variables/demo/debateData.js';
+import { debateData, sourceLinks } from '../../../variables/demo/debateData';
 import { darkTheme as T, soften, useTheme } from './debateHudTheme';
 
 type DebateSideKey = 'A' | 'B';

@@ -1,6 +1,6 @@
-const historicalAvatar = (filename) => `/historical-avatars/${filename}`;
+const historicalAvatar = (filename: string) => `/historical-avatars/${filename}`;
 
-const anchor = (name, filename, role) => ({
+const anchor = (name: string, filename: string, role: string) => ({
   name,
   avatar: historicalAvatar(filename),
   role,
@@ -311,7 +311,7 @@ export const riskMatrixAtlasScenarioSamples = [
   },
 ];
 
-const parseRiskMatrixCell = (cell) => {
+const parseRiskMatrixCell = (cell: string) => {
   const [categoryX, subcategoryX, categoryY, subcategoryY] = String(cell || '').split('.');
   if (!categoryX || !subcategoryX || !categoryY || !subcategoryY) return null;
   return { categoryX, subcategoryX, categoryY, subcategoryY };

@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 
-import { audienceRoster, audienceVotes, debateData } from '../../../variables/demo/debateData.js';
+import { audienceRoster, audienceVotes, debateData } from '../../../variables/demo/debateData';
 import { darkTheme as T, soften, useTheme } from './debateHudTheme';
 
 type VoteSide = 'A' | 'B';

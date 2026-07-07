@@ -11,4 +11,4 @@ export { default as demoSbtCollection } from './demo_sbt_collection.json';
 export { default as expandedTagList } from './expanded_tag_list.json';
 export { default as policyAtlasCouncil } from './policy_atlas_council.json';
 export { default as additionalFigures } from './additional_historical_figures.json';
-export { audienceRoster, audienceVotes, debateData, sourceLinks, voterProfiles } from './debateData.js';
+export { audienceRoster, audienceVotes, debateData, sourceLinks, voterProfiles } from './debateData';
