@@ -1,5 +1,5 @@
 /** @file App.tsx */
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import store from '../store.js';
@@ -12,7 +12,6 @@ import CEToaster from './Shared/CEToaster';
 import 'assets/css/contextEngine.scss';
 
 import withRouter from './HooksHOC/withRouterBridge';
-import AppShell from './MainSite/AppShell';
 import AppErrorBoundary from './ErrorBoundary/AppErrorBoundary';
 import { readColdLoadOnboardingState } from './Onboarding/onboardingConfig.js';
 import { toastTheme } from '../utilities/ui/toastTheme.js';
@@ -22,6 +21,8 @@ import '@rainbow-me/rainbowkit/styles.css';
 import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { WagmiConfig } from 'wagmi';
 import { chains, wagmiClient } from '../app/runtime/appWagmiRuntime';
+
+const AppShell = React.lazy(() => import('./MainSite/AppShell'));
 
 const log = createLogger('general');
 
@@ -258,7 +259,14 @@ class App extends React.Component<AppProps, AppState> {
             <AppErrorBoundary>
               <CEToaster position="bottom-right" toastOptions={{ style: toastTheme }} />
               <Routes>
-                <Route path="*" element={<AppShell path={urlPath} {...siteProps} />} />
+                <Route
+                  path="*"
+                  element={
+                    <Suspense fallback={null}>
+                      <AppShell path={urlPath} {...siteProps} />
+                    </Suspense>
+                  }
+                />
               </Routes>
             </AppErrorBoundary>
           </Provider>
