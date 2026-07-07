@@ -1,6 +1,5 @@
 /** @file LoginAndSettingsModal.tsx */
-import React, { Component, Suspense } from 'react';
-import PropTypes from 'prop-types';
+import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { ethers } from 'ethers';
 import { changeAccount } from '../../actions/accountActions.js';
@@ -24,33 +23,25 @@ import type { WagmiInjectedProps } from '../HooksHOC/withWagmiBridge';
 import '../../assets/css/contextEngine.scss';
 import styles from './Account.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faWindowClose,
-  faSpinner,
-  faQuestionCircle,
-  faWallet,
-  faBookmark,
-  faSignOutAlt,
-  faFingerprint,
-  faCog,
-  faCaretDown,
-  faCaretUp,
-} from '@fortawesome/free-solid-svg-icons';
-import MetaMaskLogo from 'assets/img/metamask_icon_white.png';
+import { faWindowClose, faQuestionCircle, faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 
 // Reactstrap components
-import { Button, Card, CardHeader, CardBody, CardFooter, Modal } from 'reactstrap';
+import { Button, Card, CardHeader, CardFooter, Modal } from 'reactstrap';
 
 import CETooltip from '../Shared/CETooltip';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import { LoginSettingsSupportedResourceCard } from './LoginSettingsResourceSummary';
 import { LoginSettingsInlineNetworkSummary, LoginSettingsPanelNetworkSummary } from './LoginSettingsNetworkSummary';
-import {
-  LoginSettingsConfigToggleControl,
-  LoginSettingsControlRow,
-  LoginSettingsSessionSummary,
-} from './LoginSettingsControlRow';
+import { LoginSettingsConfigToggleControl, LoginSettingsControlRow } from './LoginSettingsControlRow';
 import LoginSettingsSectionCard from './LoginSettingsSectionCard';
+import LoginSettingsAiConfigContent from './LoginSettingsAiConfigContent';
+import LoginSettingsResourceKeysContent from './LoginSettingsResourceKeysContent';
+import { assignLoginAndSettingsModalLegacyStatics } from './loginAndSettingsModalLegacyStatics';
+import LoginModalDisplayBody from './LoginModalDisplayBody';
+import LoginTooltipsToggleControl from './LoginTooltipsToggleControl';
+import LoginPreLoginConfigPanel from './LoginPreLoginConfigPanel';
+import LoginPreLoginSettingsDisplay from './LoginPreLoginSettingsDisplay';
+import LoginDemoSurfaceToggleControl from './LoginDemoSurfaceToggleControl';
 
 // Smart contract interactions and config
 import {
@@ -133,20 +124,6 @@ const normalizeAccountForComparison = (value: unknown): string =>
   String(value || '')
     .trim()
     .toLowerCase();
-type AccountUserPageProps = {
-  viewAddress?: string;
-  account?: string;
-  provider?: string;
-  minimized?: boolean;
-  network?: unknown;
-  activeSessionSlug?: string;
-  sessionConfig?: unknown;
-  networkChainId?: unknown;
-};
-const AccountUserPage = React.lazy(() => import('components/UserPage/UserPage')) as React.LazyExoticComponent<
-  React.ComponentType<AccountUserPageProps>
->;
-
 interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'network'>> {
   provider: string;
   network: WagmiInjectedProps['network'] | null;
@@ -1430,7 +1407,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  handlePreLoginAiEndpointChange = (event: any) => {
+  handlePreLoginAiEndpointChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const rpcUrl = toStr(event?.target?.value || '');
     const current = this.cloneAiSettings(this.state.aiSettings || getLocalAiSettings());
     const saved = saveLocalAiSettings({
@@ -1450,7 +1427,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  handlePreLoginAiProviderKeyChange = (provider: any, event: any) => {
+  handlePreLoginAiProviderKeyChange = (provider: string, event: React.ChangeEvent<HTMLInputElement>) => {
     const current = this.cloneAiSettings(this.state.aiSettings || getLocalAiSettings());
     const saved = saveLocalAiSettings(
       applyPreLoginAiProviderKeyChange(current, {
@@ -1548,14 +1525,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       testId,
     });
 
-  renderSessionSummary = (activeSessionIn: any = null) => {
-    const activeSession = activeSessionIn || this.getSessionDescriptor(this.getActiveSessionSlug());
-    return LoginSettingsSessionSummary({
-      activeSession,
-      sessionHref: buildSettingsSessionHref(activeSession.slug),
-    });
-  };
-
   renderSettingsControlRow = ({
     activeSession = this.getSessionDescriptor(this.getActiveSessionSlug()),
     configOpen = false,
@@ -1577,11 +1546,16 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       beforeConfig,
       betweenSessionAndTooltips,
       afterDemo,
-      tooltipsControl: this.renderTooltipsToggleControl({
+      tooltipsControl: LoginTooltipsToggleControl({
         infoId: tooltipsInfoId,
+        onToggle: () => this.props.toggleTooltips?.(),
         tooltipPlacement,
+        tooltipsEnabled: this.props.tooltipsEnabled !== false,
       }),
-      demoControl: this.renderDemoSurfaceToggleControl(),
+      demoControl: LoginDemoSurfaceToggleControl({
+        demoSurfaceEnabled: this.props.demoSurfaceMode !== false,
+        onToggle: () => this.props.setDemoSurfaceMode?.(this.props.demoSurfaceMode === false),
+      }),
       containerClassName,
       rowClassName,
       sessionHref: buildSettingsSessionHref(activeSession.slug),
@@ -1916,48 +1890,18 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const customRpcUrl = toStr(aiSettings?.providers?.custom?.rpcUrl || '');
 
     return (
-      <div className={styles.preLoginSettingsConfigPanel} data-testid="ce-prelogin-config-panel">
-        {this.renderGlobalSessionSettings({
+      <LoginPreLoginConfigPanel
+        anthropicApiKey={anthropicApiKey}
+        customRpcUrl={customRpcUrl}
+        onAiEndpointChange={this.handlePreLoginAiEndpointChange}
+        onAiProviderKeyChange={this.handlePreLoginAiProviderKeyChange}
+        openAiApiKey={openAiApiKey}
+        sessionSettings={this.renderGlobalSessionSettings({
           compact: true,
           sessionSelectTestId: 'ce-prelogin-session-select',
           scopePrefix: 'ce-prelogin-session-scope',
         })}
-        <div className={styles.preLoginSettingsTitle}>AI settings</div>
-        <label className={styles.preLoginSettingsField}>
-          <span className={styles.preLoginSettingsLabel}>OpenAI API key</span>
-          <input
-            type="password"
-            className={styles.preLoginSettingsInput}
-            value={openAiApiKey}
-            onChange={(event: any) => this.handlePreLoginAiProviderKeyChange('openai', event)}
-            placeholder="sk-..."
-          />
-        </label>
-        <label className={styles.preLoginSettingsField}>
-          <span className={styles.preLoginSettingsLabel}>Anthropic API key</span>
-          <input
-            type="password"
-            className={styles.preLoginSettingsInput}
-            value={anthropicApiKey}
-            onChange={(event: any) => this.handlePreLoginAiProviderKeyChange('anthropic', event)}
-            placeholder="sk-ant-..."
-          />
-        </label>
-        <label className={styles.preLoginSettingsField}>
-          <span className={styles.preLoginSettingsLabel}>AI endpoint</span>
-          <input
-            type="text"
-            className={styles.preLoginSettingsInput}
-            value={customRpcUrl}
-            onChange={this.handlePreLoginAiEndpointChange}
-            placeholder="https://your-ai-endpoint.example/v1"
-          />
-        </label>
-        <div className={styles.preLoginSettingsHint}>
-          Anthropic powers local text tasks here. Audio and transcription still use local OpenAI, session defaults, or a
-          custom endpoint until downloadable local transcription lands.
-        </div>
-      </div>
+      />
     );
   };
 
@@ -2252,355 +2196,68 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                 {renderSection({
                   key: 'aiConfig',
                   title: 'AI config',
-                  summary: `${useLocalAi ? 'Local override on' : 'Using session defaults'} · ${aiPresetLabel}`,
+                  summary: (useLocalAi ? 'Local override on' : 'Using session defaults') + ' · ' + aiPresetLabel,
                   children: (
-                    <>
-                      <label className={styles.aiSettingsInlineToggle}>
-                        <input type="checkbox" checked={useLocalAi} onChange={this.handleAiToggleLocal} />
-                        <span>Use local override</span>
-                      </label>
-                      <div className={styles.aiSessionDefault}>
-                        <span>{sessionDefaultBadgeText}</span>
-                        {useLocalAi ? (
-                          <Button size="sm" color="secondary" outline onClick={this.handleClearAiSettings}>
-                            Clear
-                          </Button>
-                        ) : null}
-                      </div>
-                      <div className={styles.aiSettingsGrid}>
-                        <div className={styles.aiSettingsRow}>
-                          <label className={styles.aiSettingsLabel}>Model preset</label>
-                          <select
-                            className={`${styles.aiSettingsSelect} ${styles.aiPresetSelect}`}
-                            value={aiPresetKey}
-                            onChange={this.handleAiPresetChange}
-                            disabled={!useLocalAi}
-                          >
-                            {AI_PRESET_OPTIONS.map((option: any) => (
-                              <option key={option.key} value={option.key}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <div className={styles.aiSettingsHint}>
-                            Presets keep provider and model selection in sync. Choose Custom to edit provider/model
-                            details directly.
-                          </div>
-                        </div>
-
-                        <div className={styles.aiSettingsRow}>
-                          <label className={styles.aiSettingsLabel}>API key ({aiProviderLabel})</label>
-                          <input
-                            className={styles.aiSettingsInput}
-                            type="password"
-                            value={useLocalAi ? providerLocalEntry.apiKey || '' : ''}
-                            placeholder={keyPlaceholder}
-                            onChange={(e: any) => this.updateAiProviderField(localProvider, 'apiKey', e.target.value)}
-                            disabled={!useLocalAi}
-                          />
-                          {providerKeyHint ? <div className={styles.aiSettingsHint}>{providerKeyHint}</div> : null}
-                        </div>
-                      </div>
-
-                      {showReasoningControls && (
-                        <>
-                          <div className={styles.aiReasoningControl}>
-                            <label className={styles.aiSettingsLabel}>Reasoning effort</label>
-                            <div className={styles.aiReasoningButtons}>
-                              {AI_REASONING_LEVELS.map((level: any) => (
-                                <button
-                                  key={level}
-                                  type="button"
-                                  className={`${styles.aiReasoningBtn} ${reasoningEffort === level ? styles.aiReasoningBtnActive : ''}`}
-                                  onClick={() => this.updateAiSettings((s: any) => ({ ...s, reasoningEffort: level }))}
-                                  disabled={!useLocalAi}
-                                  aria-pressed={reasoningEffort === level}
-                                >
-                                  {level.charAt(0).toUpperCase() + level.slice(1)}
-                                </button>
-                              ))}
-                            </div>
-                            <div className={styles.aiSettingsHint}>
-                              Applied only to GPT-5 and OpenAI-compatible reasoning models.
-                            </div>
-                          </div>
-
-                          <div className={styles.aiPerTaskSection}>
-                            <button
-                              type="button"
-                              className={styles.aiAdvancedToggle}
-                              onClick={() => this.toggleAiSettingsSection('aiPerTask')}
-                              aria-expanded={isPerTaskOpen}
-                            >
-                              <span>Per-Task Reasoning</span>
-                              <FontAwesomeIcon
-                                icon={isPerTaskOpen ? faCaretUp : faCaretDown}
-                                className={styles.aiSettingsToggleIcon}
-                              />
-                            </button>
-                            {isPerTaskOpen && (
-                              <div className={styles.aiSettingsGrid}>
-                                {AI_TASK_REASONING_ROWS.map((row: any) => (
-                                  <div key={row.key} className={styles.aiPerTaskRow}>
-                                    <div>
-                                      <label className={styles.aiSettingsLabel}>{row.label}</label>
-                                      <div className={styles.aiSettingsHint}>{row.hint}</div>
-                                    </div>
-                                    <select
-                                      className={styles.aiSettingsSelect}
-                                      value={taskReasoningEffort?.[row.key] || ''}
-                                      onChange={(e: any) => this.updateAiTaskReasoningField(row.key, e.target.value)}
-                                      disabled={!useLocalAi}
-                                    >
-                                      <option value="">Global default</option>
-                                      <option value="low">Low</option>
-                                      <option value="medium">Medium</option>
-                                      <option value="high">High</option>
-                                    </select>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                      <div>
-                        <button
-                          type="button"
-                          className={styles.aiAdvancedToggle}
-                          onClick={() => this.toggleAiSettingsSection('aiAdvanced')}
-                          aria-expanded={isAdvancedOpen}
-                        >
-                          <span>Advanced</span>
-                          <FontAwesomeIcon
-                            icon={isAdvancedOpen ? faCaretUp : faCaretDown}
-                            className={styles.aiSettingsToggleIcon}
-                          />
-                        </button>
-                        {isAdvancedOpen && (
-                          <div className={styles.aiSettingsGrid}>
-                            <div className={styles.aiSettingsRow}>
-                              <label className={styles.aiSettingsLabel}>Provider</label>
-                              <select
-                                className={styles.aiSettingsSelect}
-                                value={aiDisplay.mode || 'openai'}
-                                onChange={this.handleAiModeChange}
-                                disabled={!useLocalAi}
-                              >
-                                <option value="anthropic">Anthropic</option>
-                                <option value="openai">OpenAI</option>
-                                <option value="openrouter">OpenRouter</option>
-                                <option value="custom">Custom RPC</option>
-                              </select>
-                            </div>
-
-                            <div className={styles.aiSettingsRow}>
-                              <label className={styles.aiSettingsLabel}>Fast model</label>
-                              <input
-                                className={styles.aiSettingsInput}
-                                type="text"
-                                value={aiDisplay.models?.fast || ''}
-                                onChange={(e: any) => this.updateAiModelField('fast', e.target.value)}
-                                disabled={!useLocalAi}
-                              />
-                            </div>
-
-                            <div className={styles.aiSettingsRow}>
-                              <label className={styles.aiSettingsLabel}>Thinking model</label>
-                              <input
-                                className={styles.aiSettingsInput}
-                                type="text"
-                                value={aiDisplay.models?.thinking || ''}
-                                onChange={(e: any) => this.updateAiModelField('thinking', e.target.value)}
-                                disabled={!useLocalAi}
-                              />
-                            </div>
-
-                            {showCustomFields && (
-                              <>
-                                <div className={styles.aiSettingsRow}>
-                                  <label className={styles.aiSettingsLabel}>Custom RPC URL</label>
-                                  <input
-                                    className={styles.aiSettingsInput}
-                                    type="text"
-                                    value={aiDisplay.providers?.custom?.rpcUrl || ''}
-                                    onChange={(e: any) =>
-                                      this.updateAiProviderField('custom', 'rpcUrl', e.target.value)
-                                    }
-                                    disabled={!useLocalAi}
-                                  />
-                                </div>
-                                <div className={`${styles.aiSettingsRow} ${styles.aiSettingsRowFull}`}>
-                                  <label className={styles.aiSettingsLabel}>Functions JSON</label>
-                                  <textarea
-                                    className={styles.aiSettingsTextarea}
-                                    value={aiDisplay.providers?.custom?.functions || ''}
-                                    onChange={(e: any) =>
-                                      this.updateAiProviderField('custom', 'functions', e.target.value)
-                                    }
-                                    disabled={!useLocalAi}
-                                  />
-                                </div>
-                              </>
-                            )}
-
-                            <div className={styles.aiSettingsRow}>
-                              <label className={styles.aiSettingsLabel}>Transcription provider</label>
-                              <select
-                                className={styles.aiSettingsSelect}
-                                value={aiDisplay.transcription?.provider || 'openai'}
-                                onChange={(e: any) => this.updateAiTranscriptionField('provider', e.target.value)}
-                                disabled={!useLocalAi}
-                              >
-                                <option value="openai">OpenAI</option>
-                                <option value="custom">Custom RPC</option>
-                                <option value="local">Local (future)</option>
-                              </select>
-                            </div>
-
-                            <div className={styles.aiSettingsRow}>
-                              <label className={styles.aiSettingsLabel}>Transcription model</label>
-                              <input
-                                className={styles.aiSettingsInput}
-                                type="text"
-                                value={aiDisplay.transcription?.model || ''}
-                                onChange={(e: any) => this.updateAiTranscriptionField('model', e.target.value)}
-                                disabled={!useLocalAi}
-                              />
-                            </div>
-
-                            {showCustomTranscription && (
-                              <div className={styles.aiSettingsRow}>
-                                <label className={styles.aiSettingsLabel}>Transcription RPC URL</label>
-                                <input
-                                  className={styles.aiSettingsInput}
-                                  type="text"
-                                  value={aiDisplay.transcription?.rpcUrl || ''}
-                                  onChange={(e: any) => this.updateAiTranscriptionField('rpcUrl', e.target.value)}
-                                  disabled={!useLocalAi}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className={styles.aiSettingsFooterRow}>
-                        <div className={styles.aiSettingsStatus}>
-                          {usingSessionDefaultsLabel}
-                          {this.state.aiSettingsStatus ? ` ${this.state.aiSettingsStatus}` : ''}
-                        </div>
-                        <div className={styles.aiSettingsActions}>
-                          <Button
-                            size="sm"
-                            color="info"
-                            onClick={this.handleSaveAiSettings}
-                            disabled={!this.state.aiSettingsDirty}
-                          >
-                            Save
-                          </Button>
-                          <Button size="sm" color="secondary" outline onClick={this.handleClearAiSettings}>
-                            Clear local
-                          </Button>
-                        </div>
-                      </div>
-                    </>
+                    <LoginSettingsAiConfigContent
+                      aiDisplay={aiDisplay}
+                      aiPresetKey={aiPresetKey}
+                      aiPresetOptions={AI_PRESET_OPTIONS}
+                      aiProviderLabel={aiProviderLabel}
+                      aiSettingsDirty={this.state.aiSettingsDirty}
+                      aiSettingsStatus={this.state.aiSettingsStatus}
+                      handleAiModeChange={this.handleAiModeChange}
+                      handleAiPresetChange={this.handleAiPresetChange}
+                      handleAiToggleLocal={this.handleAiToggleLocal}
+                      handleClearAiSettings={this.handleClearAiSettings}
+                      handleSaveAiSettings={this.handleSaveAiSettings}
+                      isAdvancedOpen={isAdvancedOpen}
+                      isPerTaskOpen={isPerTaskOpen}
+                      keyPlaceholder={keyPlaceholder}
+                      localProvider={localProvider}
+                      providerKeyHint={providerKeyHint}
+                      providerLocalEntry={providerLocalEntry}
+                      reasoningEffort={reasoningEffort}
+                      sessionDefaultBadgeText={sessionDefaultBadgeText}
+                      showCustomFields={showCustomFields}
+                      showCustomTranscription={showCustomTranscription}
+                      showReasoningControls={showReasoningControls}
+                      taskReasoningEffort={taskReasoningEffort}
+                      taskReasoningRows={AI_TASK_REASONING_ROWS}
+                      reasoningLevels={AI_REASONING_LEVELS}
+                      toggleAiSettingsSection={this.toggleAiSettingsSection}
+                      updateAiModelField={this.updateAiModelField}
+                      updateAiProviderField={this.updateAiProviderField}
+                      updateAiSettings={this.updateAiSettings}
+                      updateAiTaskReasoningField={this.updateAiTaskReasoningField}
+                      updateAiTranscriptionField={this.updateAiTranscriptionField}
+                      useLocalAi={useLocalAi}
+                      usingSessionDefaultsLabel={usingSessionDefaultsLabel}
+                    />
                   ),
                 })}
 
                 {renderSection({
                   key: 'resourceKeys',
                   title: 'Resource keys',
-                  summary: `${useLocalRpc || useLocalArweave ? 'Local key overrides enabled' : 'Using session-sponsored fallbacks'}`,
+                  summary:
+                    useLocalRpc || useLocalArweave
+                      ? 'Local key overrides enabled'
+                      : 'Using session-sponsored fallbacks',
                   children: (
-                    <>
-                      <div className={styles.aiSettingsGrid}>
-                        <div className={styles.aiSettingsRow}>
-                          <label className={styles.aiSettingsLabel}>RPC API key</label>
-                          <input
-                            className={styles.aiSettingsInput}
-                            type="password"
-                            value={useLocalRpc ? resourceKeys?.rpc?.apiKey || '' : ''}
-                            onChange={(e: any) => this.updateResourceKeyField('rpc', 'apiKey', e.target.value)}
-                            disabled={!useLocalRpc}
-                            placeholder={
-                              useLocalRpc
-                                ? 'Enter RPC API key'
-                                : sponsoredKeys.rpc
-                                  ? 'Sponsored key configured'
-                                  : 'No sponsored key set'
-                            }
-                          />
-                          <label className={styles.aiSettingsInlineToggle}>
-                            <input
-                              type="checkbox"
-                              checked={useLocalRpc}
-                              onChange={(e: any) => this.handleResourceToggleLocal('rpc', e)}
-                            />
-                            <span>Use local override</span>
-                          </label>
-                          <div className={styles.aiSettingsHint}>
-                            {this.formatResourceSponsorHint({
-                              resourceKey: 'rpc',
-                              resourceLabel: 'RPC',
-                              sponsoredKeys,
-                              sponsorSessions,
-                            })}
-                          </div>
-                        </div>
-
-                        <div className={`${styles.aiSettingsRow} ${styles.aiSettingsRowFull}`}>
-                          <label className={styles.aiSettingsLabel}>Arweave JWK (JSON)</label>
-                          <textarea
-                            className={styles.aiSettingsTextarea}
-                            value={useLocalArweave ? resourceKeys?.arweave?.jwk || '' : ''}
-                            onChange={(e: any) => this.updateResourceKeyField('arweave', 'jwk', e.target.value)}
-                            disabled={!useLocalArweave}
-                            placeholder={
-                              useLocalArweave
-                                ? '{ "kty": "...", ... }'
-                                : sponsoredKeys.arweave
-                                  ? 'Sponsored key configured'
-                                  : 'No sponsored key set'
-                            }
-                          />
-                          <label className={styles.aiSettingsInlineToggle}>
-                            <input
-                              type="checkbox"
-                              checked={useLocalArweave}
-                              onChange={(e: any) => this.handleResourceToggleLocal('arweave', e)}
-                            />
-                            <span>Use local override</span>
-                          </label>
-                          <div className={styles.aiSettingsHint}>
-                            {this.formatResourceSponsorHint({
-                              resourceKey: 'arweave',
-                              resourceLabel: 'Arweave',
-                              sponsoredKeys,
-                              sponsorSessions,
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                      <div className={styles.aiSettingsFooterRow}>
-                        <div className={styles.aiSettingsStatus}>
-                          {this.state.resourceKeysStatus || 'Stored locally; only sent on the request that needs them.'}
-                        </div>
-                        <div className={styles.aiSettingsActions}>
-                          <Button
-                            size="sm"
-                            color="info"
-                            onClick={this.handleSaveResourceKeys}
-                            disabled={!this.state.resourceKeysDirty}
-                          >
-                            Save keys
-                          </Button>
-                          <Button size="sm" color="secondary" outline onClick={this.handleClearResourceKeys}>
-                            Clear keys
-                          </Button>
-                        </div>
-                      </div>
-                    </>
+                    <LoginSettingsResourceKeysContent
+                      formatResourceSponsorHint={this.formatResourceSponsorHint}
+                      handleClearResourceKeys={this.handleClearResourceKeys}
+                      handleResourceToggleLocal={this.handleResourceToggleLocal}
+                      handleSaveResourceKeys={this.handleSaveResourceKeys}
+                      resourceKeys={resourceKeys}
+                      resourceKeysDirty={this.state.resourceKeysDirty}
+                      resourceKeysStatus={this.state.resourceKeysStatus}
+                      sponsorSessions={sponsorSessions}
+                      sponsoredKeys={sponsoredKeys}
+                      updateResourceKeyField={this.updateResourceKeyField}
+                      useLocalArweave={useLocalArweave}
+                      useLocalRpc={useLocalRpc}
+                    />
                   ),
                 })}
               </>
@@ -2699,255 +2356,61 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  renderTooltipsToggleControl = ({ infoId, tooltipPlacement = 'top' }: any) => {
-    const tooltipsEnabled = this.props.tooltipsEnabled !== false;
-
-    return (
-      <div className={styles.tooltipsToggleControl}>
-        <Button
-          type="button"
-          onClick={() => this.props.toggleTooltips?.()}
-          className={`${styles.sendTestnetFundsButton} ${styles.aiSettingsToggleButton} ${styles.tooltipsToggleButton}`}
-          aria-pressed={tooltipsEnabled}
-        >
-          Explainers {tooltipsEnabled ? 'On' : 'Off'}
-        </Button>
-        {tooltipsEnabled ? (
-          <>
-            <FontAwesomeIcon
-              icon={faQuestionCircle}
-              className={`${styles.infoIcon} ${styles.tooltipsToggleInfoIcon}`}
-              id={infoId}
-            />
-            <CETooltip
-              placement={tooltipPlacement}
-              target={infoId}
-              delay={0}
-              trigger="hover click focus"
-              autohide={false}
-              className={styles.networkTooltip}
-            >
-              <div style={{ padding: '10px' }}>Toggle explainers throughout the app.</div>
-            </CETooltip>
-          </>
-        ) : null}
-      </div>
-    );
-  };
-
-  renderDemoSurfaceToggleControl = () => {
-    const demoSurfaceEnabled = this.props.demoSurfaceMode !== false;
-
-    return (
-      <div className={styles.tooltipsToggleControl}>
-        <Button
-          type="button"
-          onClick={() => this.props.setDemoSurfaceMode?.(!demoSurfaceEnabled)}
-          className={`${styles.sendTestnetFundsButton} ${styles.aiSettingsToggleButton} ${styles.tooltipsToggleButton}`}
-          aria-pressed={demoSurfaceEnabled}
-        >
-          Demo Mode {demoSurfaceEnabled ? 'On' : 'Off'}
-        </Button>
-      </div>
-    );
-  };
-
   getPreLoginSettingsDisplay = () => {
     const overview = this.getSettingsOverviewContext();
-    const { activeSession, cryptoTerminology } = overview;
 
-    return (
-      <div className={styles.preLoginSettingsShell}>
-        <div className={styles.preLoginSettingsTopRow}>
-          <button
-            type="button"
-            aria-label="Toggle pre-login settings"
-            className={styles.preLoginSettingsGear}
-            onClick={this.togglePreLoginSettingsPanel}
-            aria-expanded={this.state.preLoginSettingsOpen}
-          >
-            <FontAwesomeIcon icon={faCog} />
-          </button>
-        </div>
-        {this.state.preLoginSettingsOpen ? (
-          <div className={styles.preLoginSettingsPanel} data-testid="ce-prelogin-settings-panel">
-            {this.renderSettingsControlRow({
-              activeSession,
-              configOpen: this.state.preLoginConfigOpen,
-              onToggleConfig: this.togglePreLoginConfigPanel,
-              configTestId: 'ce-prelogin-config-toggle',
-              betweenSessionAndTooltips: cryptoTerminology
-                ? this.renderInlineNetworkSummary({
-                    targetNetworkName: overview.targetNetworkName,
-                    walletNetworkName: overview.walletNetworkName,
-                    showWalletNetwork: overview.showWalletNetwork,
-                    tooltipId: 'preLoginNetworkInfoTooltipInline',
-                  })
-                : null,
-              tooltipsInfoId: 'preLoginTooltipsToggleTooltip',
-              tooltipPlacement: 'right',
-              containerClassName: styles.preLoginSettingsSummaryContainer,
-            })}
-            {this.renderSettingsOverviewPanel({
-              overview,
-              networkTooltipId: 'preLoginNetworkInfoTooltipPanel',
-              extraContent: this.state.preLoginConfigOpen
-                ? this.renderStaticSettingsSection({
-                    title: 'Config',
-                    summary: 'Session selection and local AI overrides',
-                    children: this.renderPreLoginConfigPanel(),
-                  })
-                : null,
-            })}
-          </div>
-        ) : null}
-      </div>
-    );
-  };
-
-  openBookmarks = () => {
-    this.closeLoginModal();
-    if (typeof window !== 'undefined') {
-      window.location.href = buildBookmarksRoutePath();
-    }
+    return LoginPreLoginSettingsDisplay({
+      overview,
+      preLoginConfigOpen: this.state.preLoginConfigOpen,
+      preLoginSettingsOpen: this.state.preLoginSettingsOpen,
+      renderInlineNetworkSummary: this.renderInlineNetworkSummary,
+      renderPreLoginConfigPanel: this.renderPreLoginConfigPanel,
+      renderSettingsControlRow: this.renderSettingsControlRow,
+      renderSettingsOverviewPanel: this.renderSettingsOverviewPanel,
+      renderStaticSettingsSection: this.renderStaticSettingsSection,
+      togglePreLoginConfigPanel: this.togglePreLoginConfigPanel,
+      togglePreLoginSettingsPanel: this.togglePreLoginSettingsPanel,
+    });
   };
 
   getModalDisplay = () => {
     const activeChain = this.props.wagmiNetwork || this.props.network || this.getTargetNetwork();
     const showTestnetOnly = !!activeChain?.testnet;
+    const activeSessionSlug = this.props.loginComplete ? this.getActiveSessionSlug() : '';
+    const activeSessionConfig = this.props.loginComplete ? this.getDisplaySessionConfig(activeSessionSlug) : null;
 
-    // Login view
-    if (!this.props.loginComplete && !this.props.loginInProgress) {
-      return (
-        <CardBody>
-          <div className={styles.accountWarningContainer}>
-            <div className={styles.accountWarningMessage}>
-              <p>
-                Account is an{' '}
-                <a href="https://ethereum.org/en/wallets/" target="_blank" rel="noopener noreferrer">
-                  Ethereum wallet
-                </a>
-                :
-              </p>
-              <ul>
-                <li>controlled by you</li>
-                <li>no password</li>
-                {showTestnetOnly && <li>test network only</li>}
-              </ul>
-            </div>
-
-            {/* Passkey wallet buttons */}
-            <div className={styles.passkeyButtonContainer}>
-              <Button
-                onClick={this.handlePasskeyWalletCreate}
-                color="primary"
-                className={`${styles.passkeyButton} ${styles.passkeyButtonPrimary}`}
-              >
-                <FontAwesomeIcon icon={faFingerprint} size="2x" />
-                <span>Create </span>
-              </Button>
-              <Button
-                onClick={this.handlePasskeyWalletSignIn}
-                color="secondary"
-                outline
-                className={`${styles.passkeyButton} ${styles.passkeyButtonOutline}`}
-              >
-                <FontAwesomeIcon icon={faFingerprint} size="2x" />
-                <span> Login</span>
-              </Button>
-            </div>
-            {this.state.passkeyWalletStatusMessage && (
-              <div
-                className={`${styles.passkeyWalletStatus} ${
-                  this.state.passkeyWalletStatusTone === 'error' ? styles.passkeyWalletStatusError : ''
-                }`}
-                role="status"
-                data-testid="ce-passkey-wallet-status"
-              >
-                {this.state.passkeyWalletStatusMessage}
-              </div>
-            )}
-
-            {this.renderAgentTokenLoginPanel()}
-
-            <button
-              type="button"
-              aria-label="Open Crypto Login (RainbowKit)"
-              onClick={this.openCryptoModal}
-              className={styles.cryptoLoginLink}
-            >
-              <img src={MetaMaskLogo} alt="MetaMask" className={styles.cryptoLoginIcon} />
-            </button>
-          </div>
-        </CardBody>
-      );
-    }
-
-    if (this.props.loginInProgress) {
-      return (
-        <CardBody>
-          <div id={styles.loadingIconContainer}>
-            <h3 id={styles.verifyingText}> logging in... </h3>
-            <FontAwesomeIcon icon={faSpinner} pulse id={styles.verifyingTXloadingIcon} />
-          </div>
-        </CardBody>
-      );
-    }
-
-    // Logged-in view for all providers (passkey wallet, Wagmi)
-    if (this.props.loginComplete) {
-      const activeSessionSlug = this.getActiveSessionSlug();
-      const activeSessionConfig = this.getDisplaySessionConfig(activeSessionSlug);
-      return (
-        <CardBody id={styles.accountModalCard}>
-          <div id={styles.accountModalPanel}>
-            <div className={styles.accountModalBody}>
-              {this.props.account && (
-                <div className={styles.accountModalProfileShell}>
-                  <Suspense fallback={null}>
-                    <AccountUserPage
-                      viewAddress={this.props.account}
-                      account={this.props.account}
-                      provider={this.props.provider}
-                      minimized={true}
-                      network={this.props.network}
-                      activeSessionSlug={activeSessionSlug}
-                      sessionConfig={activeSessionConfig}
-                      networkChainId={activeSessionConfig?.networkChainId}
-                    />
-                  </Suspense>
-                </div>
-              )}
-              <div className={styles.accountModalControls}>
-                <Button color="secondary" size="sm" onClick={this.openBookmarks} className={styles.walletButton}>
-                  <FontAwesomeIcon icon={faBookmark} /> Bookmarks
-                </Button>
-                <Button color="danger" size="sm" onClick={this.handleLogout} className={styles.disconnectButton}>
-                  <FontAwesomeIcon icon={faSignOutAlt} /> Disconnect
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardBody>
-      );
-    }
-
-    return (
-      <CardBody>
-        <p>Please log in.</p>
-      </CardBody>
-    );
-  };
-
-  getModalTitle = () => {
-    if (!this.props.loginComplete && !this.props.loginInProgress) return 'LOGIN';
-    if (this.props.loginInProgress) return 'ACCOUNT';
-    if (this.props.loginComplete) return 'ACCOUNT';
-    return 'CONNECT';
+    return LoginModalDisplayBody({
+      account: this.props.account,
+      activeSessionConfig,
+      activeSessionSlug,
+      handleLogout: this.handleLogout,
+      handlePasskeyWalletCreate: this.handlePasskeyWalletCreate,
+      handlePasskeyWalletSignIn: this.handlePasskeyWalletSignIn,
+      loginComplete: this.props.loginComplete,
+      loginInProgress: this.props.loginInProgress,
+      network: this.props.network,
+      openBookmarks: () => {
+        this.closeLoginModal();
+        if (typeof window !== 'undefined') {
+          window.location.href = buildBookmarksRoutePath();
+        }
+      },
+      openCryptoModal: this.openCryptoModal,
+      passkeyWalletStatusMessage: this.state.passkeyWalletStatusMessage,
+      passkeyWalletStatusTone: this.state.passkeyWalletStatusTone,
+      provider: this.props.provider,
+      renderAgentTokenLoginPanel: this.renderAgentTokenLoginPanel,
+      showTestnetOnly,
+    });
   };
 
   render() {
-    const modalTitle = this.getModalTitle();
+    const modalTitle =
+      !this.props.loginComplete && !this.props.loginInProgress
+        ? 'LOGIN'
+        : this.props.loginInProgress || this.props.loginComplete
+          ? 'ACCOUNT'
+          : 'CONNECT';
     const modalContent = this.getModalDisplay();
     const settingsFooterContent = this.props.loginComplete ? this.getSettingsDisplay() : null;
     const preLoginFooterContent =
@@ -2992,51 +2455,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   }
 }
 
-(LoginAndSettingsModal as any).displayName = 'LoginAndSettingsModal';
-
-(LoginAndSettingsModal as any).propTypes = {
-  loginModalToggled: PropTypes.bool,
-  loginInProgress: PropTypes.bool,
-  loginComplete: PropTypes.bool,
-  provider: PropTypes.string,
-  account: PropTypes.string,
-  network: PropTypes.object,
-  demoMode: PropTypes.oneOfType([PropTypes.bool, PropTypes.object]),
-  demoSurfaceMode: PropTypes.oneOfType([PropTypes.bool, PropTypes.oneOf([null])]),
-  changeAccount: PropTypes.func.isRequired,
-  toggleLoginModal: PropTypes.func.isRequired,
-  updateLoginInfo: PropTypes.func.isRequired,
-  toggleDemoMode: PropTypes.func.isRequired,
-  setDemoSurfaceMode: PropTypes.func,
-  toggleTooltips: PropTypes.func,
-  changeFocusedTab: PropTypes.func.isRequired,
-  wagmiProvider: PropTypes.object,
-  wagmiNetwork: PropTypes.object,
-  wagmiAddress: PropTypes.string,
-  wagmiBalance: PropTypes.object,
-  openConnectModal: PropTypes.func,
-  focusedTab: PropTypes.number,
-  activeSessionSlug: PropTypes.string,
-  primarySessionExplicit: PropTypes.bool,
-  selectedSessionScope: PropTypes.string,
-  selectedSessionSlugs: PropTypes.arrayOf(PropTypes.string),
-  tooltipsEnabled: PropTypes.bool,
-  changeActiveSessionSlug: PropTypes.func,
-  updateGlobalSessionSelection: PropTypes.func,
-};
-
-(LoginAndSettingsModal as any).defaultProps = {
-  setDemoSurfaceMode: () => {},
-  toggleTooltips: () => {},
-  tooltipsEnabled: true,
-  changeActiveSessionSlug: () => {},
-  updateGlobalSessionSelection: () => {},
-  demoSurfaceMode: true,
-  primarySessionExplicit: false,
-  selectedSessionScope: 'active',
-  selectedSessionSlugs: [],
-};
-
 const mapStateToProps = (state: RootState) => ({
   provider: state.profile.provider,
   network: state.profile.network,
@@ -3055,7 +2473,7 @@ const mapStateToProps = (state: RootState) => ({
 });
 
 const LoginAndSettingsModalWithWagmiHooks = WagmiHooksHOC(LoginAndSettingsModal);
-(LoginAndSettingsModalWithWagmiHooks as any).displayName = 'LoginAndSettingsModal';
+assignLoginAndSettingsModalLegacyStatics(LoginAndSettingsModal, LoginAndSettingsModalWithWagmiHooks);
 
 export default connect(mapStateToProps, {
   changeAccount,
