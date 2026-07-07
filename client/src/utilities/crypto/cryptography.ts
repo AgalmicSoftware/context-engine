@@ -356,7 +356,13 @@ const concatBytes = (...arrs: Array<Uint8Array | null | undefined>): Uint8Array 
   }
   return out;
 };
-const b64encode = (bytes: ByteInput) => Buffer.from(bytes).toString('base64');
+const normalizeBufferInput = (bytes: ByteInput): Uint8Array | ArrayLike<number> => {
+  if (bytes instanceof ArrayBuffer) return new Uint8Array(bytes);
+  if (ArrayBuffer.isView(bytes)) return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return bytes;
+};
+const bufferFromBytes = (bytes: ByteInput) => Buffer.from(normalizeBufferInput(bytes));
+const b64encode = (bytes: ByteInput) => bufferFromBytes(bytes).toString('base64');
 const b64decode = (b64: unknown): Uint8Array => new Uint8Array(Buffer.from(String(b64 || ''), 'base64'));
 
 const utf8e = (s: unknown): Uint8Array => new TextEncoder().encode(String(s));
@@ -386,7 +392,7 @@ const sha256 = async (bytes: BufferSource): Promise<Uint8Array> => {
 /* ------------------------- Invite + group helpers ------------------------ */
 
 const base64UrlEncode = (bytesOrStr: string | ByteInput) => {
-  const buf = typeof bytesOrStr === 'string' ? Buffer.from(bytesOrStr, 'utf8') : Buffer.from(bytesOrStr);
+  const buf = typeof bytesOrStr === 'string' ? Buffer.from(bytesOrStr, 'utf8') : bufferFromBytes(bytesOrStr);
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 };
 
@@ -396,6 +402,13 @@ const base64UrlDecode = (b64url: unknown) => {
     .replace(/_/g, '/');
   const pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : '';
   return Buffer.from(s + pad, 'base64');
+};
+
+const decodeBase64Field = (value: unknown, fieldName: string): Uint8Array => {
+  if (typeof value !== 'string') {
+    throw new Error(`Invalid encrypted ${fieldName} field format`);
+  }
+  return new Uint8Array(Buffer.from(value, 'base64'));
 };
 
 const buildGroupPasswordSalt = (sbtAddress: unknown) => {
@@ -2272,9 +2285,9 @@ const decryptWithPassword = async (encryptedData: string | UnknownRecord, passwo
     throw new Error('Missing encryption fields (salt, iv, ciphertext)');
   }
 
-  const salt = new Uint8Array(Buffer.from(parsed.salt, 'base64'));
-  const iv = new Uint8Array(Buffer.from(parsed.iv, 'base64'));
-  const ciphertext = new Uint8Array(Buffer.from(parsed.ciphertext, 'base64'));
+  const salt = decodeBase64Field(parsed.salt, 'salt');
+  const iv = decodeBase64Field(parsed.iv, 'iv');
+  const ciphertext = decodeBase64Field(parsed.ciphertext, 'ciphertext');
 
   const enc = new TextEncoder();
   const passwordBytes = enc.encode(password);

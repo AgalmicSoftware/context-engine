@@ -133,13 +133,16 @@ type LitGetKeyCacheEntry = {
   errMsg?: string;
 };
 type BufferBigUIntWriter = {
-  writeBigUInt64BE?: (value: string | number | bigint, offset?: number) => unknown;
-  writeBigUint64BE?: (value: string | number | bigint, offset?: number) => unknown;
+  writeBigUInt64BE?(value: string | number | bigint, offset?: number): unknown;
+  writeBigUint64BE?(value: string | number | bigint, offset?: number): unknown;
 };
 
 type BufferCtorLike = {
   prototype?: BufferBigUIntWriter;
   alloc?: (size: number) => Uint8Array & BufferBigUIntWriter;
+};
+type RuntimeBufferScope = {
+  Buffer?: BufferCtorLike;
 };
 
 declare global {
@@ -329,9 +332,11 @@ const DEFAULT_LIT_CHAIN = 'ethereum';
 const DEFAULT_LIT_CONNECT_TIMEOUT = 45000;
 const DEFAULT_LIT_SESSION_TTL_MS = 1000 * 60 * 10;
 
-const getGlobalScope = (): (typeof globalThis & { Buffer?: BufferCtorLike }) | null => {
-  if (typeof globalThis !== 'undefined') return globalThis;
-  if (typeof window !== 'undefined') return window;
+const asRuntimeBufferScope = (scope: object): RuntimeBufferScope => scope;
+
+const getGlobalScope = (): RuntimeBufferScope | null => {
+  if (typeof globalThis !== 'undefined') return asRuntimeBufferScope(globalThis);
+  if (typeof window !== 'undefined') return asRuntimeBufferScope(window);
   return null;
 };
 
