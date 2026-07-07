@@ -14,14 +14,33 @@ import { defaultStrictAllowDemoFallback } from './worker/workerSessionResolution
 import { normalizeBaseUrl } from './urlUtils.js';
 import { createLogger } from './logging.js';
 
+type WhisperLegacyValue = any;
+type WhisperCallback = (...args: WhisperLegacyValue[]) => void;
+type UseWhisperOptions = {
+  apiKey?: string;
+  model?: string;
+  sessionSlug?: WhisperLegacyValue;
+  sessionConfig?: WhisperLegacyValue;
+  context?: WhisperLegacyValue;
+  workerUrl?: string;
+  silenceDetection?: boolean;
+  timeSlice?: number;
+  onTranscriptionUpdate?: WhisperCallback;
+  onTranscriptionComplete?: WhisperCallback;
+  onError?: WhisperCallback;
+  onRecordingStop?: WhisperCallback;
+  silenceThresholdDb?: number;
+  silenceDurationMs?: number;
+};
+
 const whisperLog = createLogger('whisper');
 
 // Heavy audio deps are dynamically imported so they don't inflate initial bundle size.
 // Each is cached so it only loads once per session.
-const pickDefaultExport = (mod) => (mod && (mod.default || mod)) || mod;
+const pickDefaultExport = (mod: WhisperLegacyValue): WhisperLegacyValue => (mod && (mod.default || mod)) || mod;
 
-let _recordRtc = null;
-let _recordRtcPromise = null;
+let _recordRtc: WhisperLegacyValue = null;
+let _recordRtcPromise: Promise<WhisperLegacyValue> | null = null;
 const loadRecordRTC = async () => {
   if (_recordRtc) return _recordRtc;
   if (!_recordRtcPromise) {
@@ -35,8 +54,8 @@ const loadRecordRTC = async () => {
   return _recordRtc;
 };
 
-let _hark = null;
-let _harkPromise = null;
+let _hark: WhisperLegacyValue = null;
+let _harkPromise: Promise<WhisperLegacyValue> | null = null;
 const loadHark = async () => {
   if (_hark) return _hark;
   if (!_harkPromise) {
@@ -70,7 +89,7 @@ export const RECORDING_STATUS = {
 };
 
 // Overlap-safe merge helper used by streaming and final transcripts.
-const mergeTranscript = (prev, next) => {
+const mergeTranscript = (prev: WhisperLegacyValue, next: WhisperLegacyValue): string => {
   const a = String(prev || '');
   const b = String(next || '');
   if (!a.trim()) {
@@ -78,7 +97,7 @@ const mergeTranscript = (prev, next) => {
   }
   if (!b.trim()) return a;
 
-  const tokenize = (s) =>
+  const tokenize = (s: string): string[] =>
     s
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, ' ')
@@ -121,7 +140,7 @@ const mergeTranscript = (prev, next) => {
   return `${a}${a && bTrimmed && !/\s$/.test(a) ? ' ' : ''}${bTrimmed}`.trim();
 };
 
-const resolveAudioExtension = (blob) => {
+const resolveAudioExtension = (blob: WhisperLegacyValue): string => {
   const type = String(blob?.type || '').toLowerCase();
   if (type.includes('wav')) return 'wav';
   if (type.includes('webm')) return 'webm';
@@ -129,6 +148,21 @@ const resolveAudioExtension = (blob) => {
   if (type.includes('mpeg') || type.includes('mp3')) return 'mp3';
   return 'wav';
 };
+
+const readErrorField = (error: unknown, field: 'message' | 'name'): string => {
+  if (error instanceof Error) {
+    return String(error[field] || '');
+  }
+  if (error && typeof error === 'object' && field in error) {
+    const value = (error as Record<typeof field, unknown>)[field];
+    return typeof value === 'string' ? value : '';
+  }
+  return '';
+};
+
+const getErrorName = (error: unknown): string => readErrorField(error, 'name');
+
+const getErrorMessage = (error: unknown, fallback: string): string => readErrorField(error, 'message') || fallback;
 
 export const useWhisper = ({
   // apiKey intentionally unused (worker holds the secret)
@@ -147,7 +181,7 @@ export const useWhisper = ({
   // NEW: optional silence knobs (non-breaking; defaults preserved)
   silenceThresholdDb,
   silenceDurationMs,
-} = {}) => {
+}: UseWhisperOptions = {}) => {
   const effectiveSessionSlug = sessionSlug;
   const effectiveSessionConfig = sessionConfig;
   const [status, setStatus] = useState(RECORDING_STATUS.IDLE);
@@ -160,19 +194,19 @@ export const useWhisper = ({
   const [errorMessage, setErrorMessage] = useState('');
 
   // refs
-  const streamRef = useRef(null);
-  const recorderRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const silenceTimerRef = useRef(null);
-  const speechMonitorRef = useRef(null);
-  const fadeGainNodeRef = useRef(null);
-  const chunksRef = useRef([]);
-  const streamAbortControllerRef = useRef(null);
+  const streamRef = useRef<WhisperLegacyValue>(null);
+  const recorderRef = useRef<WhisperLegacyValue>(null);
+  const audioContextRef = useRef<WhisperLegacyValue>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speechMonitorRef = useRef<WhisperLegacyValue>(null);
+  const fadeGainNodeRef = useRef<WhisperLegacyValue>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamAbortControllerRef = useRef<AbortController | null>(null);
   // NEW: expose last session's raw recording (native recorder format)
-  const lastRecordingBlobRef = useRef({ blob: null, mimeType: '' });
+  const lastRecordingBlobRef = useRef<{ blob: Blob | null; mimeType: string }>({ blob: null, mimeType: '' });
 
   // NEW: abort controller for final (non-streaming) transcription
-  const finalAbortControllerRef = useRef(null);
+  const finalAbortControllerRef = useRef<AbortController | null>(null);
 
   // NEW: gating/throttle + config + unmount guard
   const statusRef = useRef(status);
@@ -195,7 +229,7 @@ export const useWhisper = ({
   }, [isProcessing]);
 
   // NEW: keep latest stopRecording for timeouts/handlers to avoid stale closures
-  const stopRecordingRef = useRef(null);
+  const stopRecordingRef = useRef<WhisperLegacyValue>(null);
 
   const speechSinceLastSliceRef = useRef(false);
   const lastStreamAtRef = useRef(0);
@@ -226,83 +260,92 @@ export const useWhisper = ({
     };
   }, []);
 
-  const log = useCallback((msg, ...args) => {
+  const log = useCallback((msg: string, ...args: WhisperLegacyValue[]) => {
     whisperLog.log(`[useWhisper] ${msg}`, ...args);
   }, []);
 
-  const cleanupResources = useCallback((fromUnmount = false) => {
-    clearTimeout(silenceTimerRef.current);
-    silenceTimerRef.current = null;
-
-    if (finalAbortControllerRef.current) {
-      try {
-        finalAbortControllerRef.current.abort();
-      } catch (e) {
-        whisperLog.warn('useWhisper: cleanup', e);
-      }
-      finalAbortControllerRef.current = null;
-    }
-
-    if (streamAbortControllerRef.current) {
-      try {
-        streamAbortControllerRef.current.abort();
-      } catch (e) {
-        whisperLog.warn('useWhisper: cleanup', e);
-      }
-      streamAbortControllerRef.current = null;
-    }
-
-    if (speechMonitorRef.current) {
-      try {
-        speechMonitorRef.current.stop();
-      } catch (e) {
-        whisperLog.warn('useWhisper: cleanup', e);
-      }
-      speechMonitorRef.current = null;
-    }
-    if (recorderRef.current) {
-      try {
-        if (recorderRef.current.state !== 'destroyed') {
-          recorderRef.current.destroy();
-        }
-      } catch (e) {
-        whisperLog.warn('useWhisper: cleanup', e);
-      }
-      recorderRef.current = null;
-    }
-    if (streamRef.current) {
-      try {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-      } catch (e) {
-        whisperLog.warn('useWhisper: cleanup', e);
-      }
-      streamRef.current = null;
-    }
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current
-        .close()
-        .catch((e) => {
-          whisperLog.warn('useWhisper: cleanup', e);
-        })
-        .finally(() => {
-          audioContextRef.current = null;
-        });
-    }
-    fadeGainNodeRef.current = null;
-    chunksRef.current = [];
-    // NEW: reset surfaced blob when tearing down
-    lastRecordingBlobRef.current = { blob: null, mimeType: '' };
-
-    if (!fromUnmount) {
-      setIsRecording(false);
-      setIsPaused(false);
-      setIsProcessing(false);
-      setIsStreaming(false);
-      setStatus((prev) =>
-        prev === RECORDING_STATUS.PERMISSION_DENIED ? RECORDING_STATUS.PERMISSION_DENIED : RECORDING_STATUS.IDLE,
-      );
+  const clearSilenceTimer = useCallback(() => {
+    if (silenceTimerRef.current !== null) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
     }
   }, []);
+
+  const cleanupResources = useCallback(
+    (fromUnmount = false) => {
+      clearSilenceTimer();
+
+      if (finalAbortControllerRef.current) {
+        try {
+          finalAbortControllerRef.current.abort();
+        } catch (e) {
+          whisperLog.warn('useWhisper: cleanup', e);
+        }
+        finalAbortControllerRef.current = null;
+      }
+
+      if (streamAbortControllerRef.current) {
+        try {
+          streamAbortControllerRef.current.abort();
+        } catch (e) {
+          whisperLog.warn('useWhisper: cleanup', e);
+        }
+        streamAbortControllerRef.current = null;
+      }
+
+      if (speechMonitorRef.current) {
+        try {
+          speechMonitorRef.current.stop();
+        } catch (e) {
+          whisperLog.warn('useWhisper: cleanup', e);
+        }
+        speechMonitorRef.current = null;
+      }
+      if (recorderRef.current) {
+        try {
+          if (recorderRef.current.state !== 'destroyed') {
+            recorderRef.current.destroy();
+          }
+        } catch (e) {
+          whisperLog.warn('useWhisper: cleanup', e);
+        }
+        recorderRef.current = null;
+      }
+      if (streamRef.current) {
+        try {
+          streamRef.current.getTracks().forEach((t: WhisperLegacyValue) => t.stop());
+        } catch (e) {
+          whisperLog.warn('useWhisper: cleanup', e);
+        }
+        streamRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current
+          .close()
+          .catch((e: WhisperLegacyValue) => {
+            whisperLog.warn('useWhisper: cleanup', e);
+          })
+          .finally(() => {
+            audioContextRef.current = null;
+          });
+      }
+      fadeGainNodeRef.current = null;
+      chunksRef.current = [];
+      // NEW: reset surfaced blob when tearing down
+      lastRecordingBlobRef.current = { blob: null, mimeType: '' };
+
+      if (!fromUnmount) {
+        setIsRecording(false);
+        setIsPaused(false);
+        setIsProcessing(false);
+        setIsStreaming(false);
+        setStatus((prev) =>
+          prev === RECORDING_STATUS.PERMISSION_DENIED ? RECORDING_STATUS.PERMISSION_DENIED : RECORDING_STATUS.IDLE,
+        );
+      }
+    },
+    [clearSilenceTimer],
+  );
 
   const requestMicrophonePermission = async () => {
     if (status === RECORDING_STATUS.PERMISSION_DENIED) {
@@ -312,18 +355,18 @@ export const useWhisper = ({
 
     if (streamRef.current && streamRef.current.active) {
       const tracks = streamRef.current.getAudioTracks();
-      if (tracks.length > 0 && tracks.every((t) => t.readyState === 'live')) {
+      if (tracks.length > 0 && tracks.every((t: WhisperLegacyValue) => t.readyState === 'live')) {
         return streamRef.current;
       }
       try {
-        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current.getTracks().forEach((t: WhisperLegacyValue) => t.stop());
       } catch (e) {
         whisperLog.warn('useWhisper: cleanup', e);
       }
       streamRef.current = null;
     } else if (streamRef.current && !streamRef.current.active) {
       try {
-        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current.getTracks().forEach((t: WhisperLegacyValue) => t.stop());
       } catch (e) {
         whisperLog.warn('useWhisper: cleanup', e);
       }
@@ -338,14 +381,15 @@ export const useWhisper = ({
       setStatus(RECORDING_STATUS.READY);
       return stream;
     } catch (error) {
-      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      const errorName = getErrorName(error);
+      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
         setErrorMessage('Microphone permission denied. Please allow microphone access in your browser settings.');
         setStatus(RECORDING_STATUS.PERMISSION_DENIED);
-      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      } else if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
         setErrorMessage('No microphone found. Please connect a mic or select one in your system/browser settings.');
         setStatus(RECORDING_STATUS.ERROR);
       } else {
-        setErrorMessage(`Error accessing microphone: ${error.message}`);
+        setErrorMessage(`Error accessing microphone: ${getErrorMessage(error, 'Unknown microphone error')}`);
         setStatus(RECORDING_STATUS.ERROR);
         onError(error);
       }
@@ -354,40 +398,42 @@ export const useWhisper = ({
     }
   };
 
-  const setupSilenceDetection = useCallback(async (stream) => {
-    if (speechMonitorRef.current) {
-      try {
-        speechMonitorRef.current.stop();
-      } catch (e) {
-        whisperLog.warn('useWhisper: cleanup', e);
+  const setupSilenceDetection = useCallback(
+    async (stream: WhisperLegacyValue) => {
+      if (speechMonitorRef.current) {
+        try {
+          speechMonitorRef.current.stop();
+        } catch (e) {
+          whisperLog.warn('useWhisper: cleanup', e);
+        }
       }
-    }
-    const hark = await loadHark();
-    const options = { threshold: effectiveSilenceThresholdDbRef.current, interval: 100 };
-    speechMonitorRef.current = hark(stream, options);
+      const hark = await loadHark();
+      const options = { threshold: effectiveSilenceThresholdDbRef.current, interval: 100 };
+      speechMonitorRef.current = hark(stream, options);
 
-    speechMonitorRef.current.on('speaking', () => {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-      // NEW: mark that speech occurred since the last slice
-      speechSinceLastSliceRef.current = true;
-    });
+      speechMonitorRef.current.on('speaking', () => {
+        clearSilenceTimer();
+        // NEW: mark that speech occurred since the last slice
+        speechSinceLastSliceRef.current = true;
+      });
 
-    speechMonitorRef.current.on('stopped_speaking', () => {
-      if (statusRef.current === RECORDING_STATUS.RECORDING && !isPausedRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = setTimeout(() => {
-          // Use live refs to avoid stale closures and double-check state at fire time
-          if (statusRef.current === RECORDING_STATUS.RECORDING && !isPausedRef.current) {
-            stopRecordingRef.current?.();
-          }
-        }, effectiveSilenceDurationMsRef.current);
-      }
-    });
-  }, []);
+      speechMonitorRef.current.on('stopped_speaking', () => {
+        if (statusRef.current === RECORDING_STATUS.RECORDING && !isPausedRef.current) {
+          clearSilenceTimer();
+          silenceTimerRef.current = setTimeout(() => {
+            // Use live refs to avoid stale closures and double-check state at fire time
+            if (statusRef.current === RECORDING_STATUS.RECORDING && !isPausedRef.current) {
+              stopRecordingRef.current?.();
+            }
+          }, effectiveSilenceDurationMsRef.current);
+        }
+      });
+    },
+    [clearSilenceTimer],
+  );
 
   const callWhisperViaWorker = useCallback(
-    async (audioBlob, isStreamingCall = false) => {
+    async (audioBlob: Blob, isStreamingCall = false) => {
       if (!audioBlob || audioBlob.size < 100) {
         if (isStreamingCall) return null;
         throw new Error('Audio blob too small');
@@ -406,7 +452,7 @@ export const useWhisper = ({
           context,
         });
       } catch (err) {
-        const msg = err?.message || 'Failed to resolve transcription settings.';
+        const msg = getErrorMessage(err, 'Failed to resolve transcription settings.');
         if (!abortedRef.current) {
           setErrorMessage(msg);
           onError(new Error(msg));
@@ -434,7 +480,7 @@ export const useWhisper = ({
         formData.append('rpcUrl', transcriptionCfg.rpcUrl);
       }
 
-      let controller = null;
+      let controller: AbortController | null = null;
       if (isStreamingCall) {
         controller = new AbortController();
         // Abort any in-flight streaming before starting a new one
@@ -486,7 +532,7 @@ export const useWhisper = ({
           ? corsWorkerUrl
           : `${corsWorkerUrl.replace(/\/+$/, '')}/transcribe`;
 
-        const fetchOpts = { method: 'POST', body: formData };
+        const fetchOpts: RequestInit = { method: 'POST', body: formData };
         if (controller) fetchOpts.signal = controller.signal;
 
         const baseUrl = corsWorkerUrl.replace(/\/+$/, '').replace(/\/transcribe$/i, '');
@@ -519,8 +565,8 @@ export const useWhisper = ({
 
         return data && typeof data.text === 'string' ? data.text : '';
       } catch (err) {
-        if (err.name === 'AbortError') return null;
-        const msg = err?.message || 'Transcription error';
+        if (getErrorName(err) === 'AbortError') return null;
+        const msg = getErrorMessage(err, 'Transcription error');
         if (!abortedRef.current) {
           setErrorMessage(msg);
           onError(new Error(msg));
@@ -658,7 +704,7 @@ export const useWhisper = ({
         sampleRate: 44100,
         numberOfAudioChannels: 1,
         timeSlice: timeSlice && timeSlice > 0 ? timeSlice : 0,
-        ondataavailable: (blob) => {
+        ondataavailable: (blob: Blob) => {
           if (
             statusRef.current === RECORDING_STATUS.RECORDING &&
             !isPausedRef.current &&
@@ -675,7 +721,7 @@ export const useWhisper = ({
 
       if (silenceDetection) await setupSilenceDetection(stream);
     } catch (error) {
-      setErrorMessage(`Error starting recording: ${error.message}`);
+      setErrorMessage(`Error starting recording: ${getErrorMessage(error, 'Unknown recording start error')}`);
       setStatus(RECORDING_STATUS.ERROR);
       onError(error);
       cleanupResources();
@@ -688,8 +734,7 @@ export const useWhisper = ({
       if (!recorderRef.current) return;
     }
 
-    clearTimeout(silenceTimerRef.current);
-    silenceTimerRef.current = null;
+    clearSilenceTimer();
 
     const duration = Date.now() - lastRecordingTimestamp;
     if (duration < MIN_RECORDING_DURATION_MS && currentStatus !== RECORDING_STATUS.PAUSED) {
@@ -708,7 +753,7 @@ export const useWhisper = ({
         fadeGainNodeRef.current.gain.cancelScheduledValues(t);
         fadeGainNodeRef.current.gain.setValueAtTime(fadeGainNodeRef.current.gain.value, t);
         fadeGainNodeRef.current.gain.linearRampToValueAtTime(0, t + FADE_DURATION_MS / 1000);
-        await new Promise((r) => setTimeout(r, FADE_DURATION_MS + 50));
+        await new Promise<void>((resolve) => setTimeout(resolve, FADE_DURATION_MS + 50));
       }
 
       if (!recorderRef.current) {
@@ -718,7 +763,7 @@ export const useWhisper = ({
       }
 
       // Ensure callers awaiting stopRecording() resolve AFTER blob is finalized & refs updated
-      await new Promise((resolve) => {
+      await new Promise<void>((resolve) => {
         recorderRef.current.stopRecording(async () => {
           const finalWavBlob = recorderRef.current.getBlob();
 
@@ -744,7 +789,7 @@ export const useWhisper = ({
           }
           if (streamRef.current) {
             try {
-              streamRef.current.getTracks().forEach((track) => track.stop());
+              streamRef.current.getTracks().forEach((track: WhisperLegacyValue) => track.stop());
             } catch (e) {
               whisperLog.warn('useWhisper: cleanup', e);
             }
@@ -799,7 +844,7 @@ export const useWhisper = ({
               }
             } catch (apiErr) {
               if (!abortedRef.current) {
-                setErrorMessage(`Final transcription error: ${apiErr.message}`);
+                setErrorMessage(`Final transcription error: ${getErrorMessage(apiErr, 'Unknown transcription error')}`);
                 setStatus(RECORDING_STATUS.ERROR);
                 onError(apiErr);
                 setTranscript({ final: '', live: '' });
@@ -824,7 +869,7 @@ export const useWhisper = ({
         });
       });
     } catch (error) {
-      setErrorMessage(`Error stopping recording: ${error.message}`);
+      setErrorMessage(`Error stopping recording: ${getErrorMessage(error, 'Unknown recording stop error')}`);
       setStatus(RECORDING_STATUS.ERROR);
       onError(error);
       cleanupResources();
@@ -832,6 +877,7 @@ export const useWhisper = ({
     }
   }, [
     callWhisperViaWorker,
+    clearSilenceTimer,
     cleanupResources,
     lastRecordingTimestamp,
     onError,
@@ -846,8 +892,7 @@ export const useWhisper = ({
 
   const pauseRecording = useCallback(async () => {
     if (!isRecording || isPaused || isProcessing || isStreaming) return;
-    clearTimeout(silenceTimerRef.current);
-    silenceTimerRef.current = null;
+    clearSilenceTimer();
 
     if (!recorderRef.current) return;
 
@@ -865,11 +910,11 @@ export const useWhisper = ({
         }
       }
     } catch (error) {
-      setErrorMessage(`Error pausing: ${error.message}`);
+      setErrorMessage(`Error pausing: ${getErrorMessage(error, 'Unknown pause error')}`);
       setStatus(RECORDING_STATUS.ERROR);
       onError(error);
     }
-  }, [isRecording, isPaused, isProcessing, isStreaming, onError]);
+  }, [clearSilenceTimer, isRecording, isPaused, isProcessing, isStreaming, onError]);
 
   const resumeRecording = useCallback(async () => {
     if (!isPaused || isRecording || isProcessing || isStreaming) return;
@@ -889,7 +934,7 @@ export const useWhisper = ({
         await setupSilenceDetection(streamRef.current);
       }
     } catch (error) {
-      setErrorMessage(`Error resuming: ${error.message}`);
+      setErrorMessage(`Error resuming: ${getErrorMessage(error, 'Unknown resume error')}`);
       setStatus(RECORDING_STATUS.ERROR);
       onError(error);
     }
