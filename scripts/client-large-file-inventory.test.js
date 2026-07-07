@@ -12,8 +12,8 @@ const LARGE_FILE_GROWTH_TOLERANCE = 25;
 const LARGE_FILE_SHRINK_TOLERANCE = 100;
 
 const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
-  'client/src/components/Account/LoginAndSettingsModal.tsx': 3071,
-  'client/src/components/Admin/AdminPage.tsx': 3673,
+  'client/src/components/Account/LoginAndSettingsModal.tsx': 2489,
+  'client/src/components/Admin/AdminPage.tsx': 2915,
   'client/src/components/CommunityTab/CommunityTab.tsx': 2137,
   'client/src/components/DebateMap/DebateMap.tsx': 3522,
   'client/src/components/DemoViews/CorpusViewer.tsx': 1031,
@@ -22,7 +22,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/MainSite/AppShell.tsx': 4093,
   'client/src/components/MainSite/mainSiteProfileScanRuntime.ts': 1366,
   'client/src/components/MainSite/mainSiteRouteRenderers.tsx': 1372,
-  'client/src/components/OnePageSession/OnePageSession.tsx': 2949,
+  'client/src/components/OnePageSession/OnePageSession.tsx': 2497,
   'client/src/components/PolisReport/PolisReport.tsx': 3952,
   'client/src/components/SBTs/CreateSBTGroup.tsx': 4664,
   'client/src/components/SBTs/SBTFilter.tsx': 1398,
@@ -34,7 +34,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/SBTs/sbtPageActionDisplayHelpers.ts': 1588,
   'client/src/components/SBTs/sbtPageHelpers.ts': 1260,
   'client/src/components/SBTs/sbtSelectorHelpers.ts': 1319,
-  'client/src/components/Sessions/SessionWizard.tsx': 4571,
+  'client/src/components/Sessions/SessionWizard.tsx': 2949,
   'client/src/components/Shared/AudioInput/AudioInput.tsx': 1202,
   'client/src/components/Sponsor/SponsorPage.tsx': 1356,
   'client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx': 3999,
@@ -47,7 +47,8 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/SurveyTool/SurveySelector.tsx': 2073,
   'client/src/components/SurveyTool/SurveyTool.tsx': 1264,
   'client/src/components/SurveyTool/createQuestionsAndSurveysHelpers.ts': 1238,
-  'client/src/components/SurveyTool/surveyQuestionsRuntimeMethods.tsx': 9019,
+  'client/src/components/SurveyTool/surveyQuestionsDataRuntime.ts': 1527,
+  'client/src/components/SurveyTool/surveyQuestionsRuntimeMethods.tsx': 2975,
   'client/src/components/SurveyTool/surveyQuestionsTypes.ts': 2312,
   'client/src/components/SurveyTool/surveyResultsHelpers.ts': 1005,
   'client/src/components/SurveyTool/surveyToolDecryptFlow.js': 1808,
