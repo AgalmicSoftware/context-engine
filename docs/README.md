@@ -61,6 +61,7 @@ Local development:
 
 Release:
 - `docs/dependency-audit-hotspots.md`: dependency audit remediations, accepted residuals, and package-specific audit commands.
+- `docs/dependency-audit.md`: current client npm audit disposition ledger and blocked/deferred package-family decisions.
 - `docs/release-runbook.md`: operator release checklist, gates, public strip policy, worker bundle publishing, and rollback notes.
 - `docs/releasing.md`: Public-history replay, stripped artifact export, and release hygiene checks.
 - `docs/security/audit-prep-2026-07-06.md`: built-in audit-prep snapshot covering npm audit disposition, secrets/config sweeps, and contracts/worker inventory.
