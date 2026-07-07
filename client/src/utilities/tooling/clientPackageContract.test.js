@@ -6,6 +6,11 @@ const readClientPackageJson = () => {
   return JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 };
 
+const readRootJson = (relativePath) => {
+  const filePath = path.resolve(__dirname, '../../../..', relativePath);
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+};
+
 const readClientFile = (relativePath) => {
   const filePath = path.resolve(__dirname, '../../..', relativePath);
   return fs.readFileSync(filePath, 'utf8');
@@ -129,14 +134,10 @@ describe('client package modernization contract', () => {
 
   it('keeps the client coverage floor pinned to the measured ratchet baseline', () => {
     const jestConfig = readClientJestConfig();
+    const coverageBaseline = readRootJson('scripts/coverage-baseline.json');
 
     expect(jestConfig.coverageThreshold).toEqual({
-      global: {
-        statements: 75.7,
-        branches: 61,
-        functions: 77,
-        lines: 79.1,
-      },
+      global: coverageBaseline.global,
     });
   });
 

@@ -87,6 +87,9 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/check-client-boundaries.test.mjs');
   expectFile('scripts/client-boundaries-baseline.json');
   expectFile('scripts/check-type-debt-ratchet.mjs');
+  expectFile('scripts/check-coverage-floor.mjs');
+  expectFile('scripts/check-coverage-floor.test.mjs');
+  expectFile('scripts/coverage-baseline.json');
   expectFile('scripts/check-baseline-monotonicity.mjs');
   expectFile('scripts/check-baseline-monotonicity.test.mjs');
   expectFile('scripts/testInventoryConfig.js');
@@ -131,6 +134,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:ci', 'npm run test:wiring');
   expectScriptContains('test:ci', 'npm run type-debt:check');
   expectScriptContains('test:ci', 'npm run verify:release');
+  expectScriptContains('test:ci', 'npm run coverage-floor:check');
   expectScriptContains('test:ci', 'npm run test:root:jest');
   expectScriptContains('test:ci', 'npm run test:worker:session-cors');
   expectScriptContains('test:ci', 'npm run test:node');
@@ -139,6 +143,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('tests', 'npm run test:ci');
   expectScriptContains('tests', 'npm run test:surveys-sbt');
   expectScriptContains('test:client', '--coverage');
+  expectScriptContains('test:client', '--coverageReporters=json-summary');
   expectScriptContains('test:release:client', 'npm test -- --watchAll=false --runInBand');
   expectScriptContains('typecheck:client', 'npm --prefix client run typecheck');
   expectScriptContains('worker:bundle', 'scripts/worker-bundle.mjs');
@@ -146,6 +151,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:worker-bundle', 'scripts/verify-worker-bundle-sync.mjs');
   expectScriptContains('verify:public-release-surface', 'scripts/verify-public-release-surface.js');
   expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
+  expectScriptContains('coverage-floor:check', 'scripts/check-coverage-floor.mjs');
   expectScriptContains('verify:release', 'npm run lint');
   expectScriptContains('verify:release', 'npm run typecheck:client');
   expectScriptContains('verify:release', 'npm run test:release:client');
