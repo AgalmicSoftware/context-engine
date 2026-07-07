@@ -9,6 +9,7 @@ import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import { normalizeScssContract } from 'testUtils/scssContractAssertions';
 import {
   SurveyResultsLockedResponsesBanner,
   SurveyResultsLockedResponsesToggle,
@@ -572,6 +573,7 @@ describe('SurveyResults module styles', () => {
   it('keeps survey-results controls readable on the light modal surface', () => {
     const scssPath = path.join(__dirname, 'SurveyResults.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
+    const normalizedScss = normalizeScssContract(scss);
 
     expect(scss).toMatch(/\.toggleLabel\s*{[\s\S]*?color:\s*#1f2733;/);
     expect(scss).toMatch(/\.exportAndFilterContainer\s*{[\s\S]*?background:\s*#f3f5f9;/);
@@ -579,8 +581,8 @@ describe('SurveyResults module styles', () => {
     expect(scss).toMatch(/\.filterSummaryBox\s*{[\s\S]*?color:\s*#4b5563;/);
     expect(scss).toMatch(/\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?padding:\s*1rem;/);
     expect(scss).toMatch(/\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?border:\s*1px solid rgba\(19,\s*34,\s*86,\s*0\.2\);/);
-    expect(scss).toMatch(/\.demoResultsAtlasSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*rgba\(21,\s*31,\s*74,\s*0\.98\)[^;]*rgba\(8,\s*12,\s*28,\s*0\.995\)[^;]*;/);
+    expect(normalizedScss).toMatch(/\.demoResultsAtlasSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*rgba\(21,\s*31,\s*74,\s*0\.98\)[^;]*rgba\(8,\s*12,\s*28,\s*0\.995\)[^;]*;/);
     expect(scss).not.toMatch(/\.demoResultsAtlasSurface\s*{[^}]*radial-gradient\(circle at top/);
-    expect(scss).toMatch(/\.demoResultsRiskMatrixSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*rgba\(23,\s*25,\s*65,\s*0\.98\)[^;]*rgba\(9,\s*13,\s*30,\s*0\.995\)[^;]*;/);
+    expect(normalizedScss).toMatch(/\.demoResultsRiskMatrixSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*rgba\(23,\s*25,\s*65,\s*0\.98\)[^;]*rgba\(9,\s*13,\s*30,\s*0\.995\)[^;]*;/);
   });
 });

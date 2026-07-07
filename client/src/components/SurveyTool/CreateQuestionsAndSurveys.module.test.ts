@@ -1,11 +1,13 @@
 import fs from 'fs';
 import path from 'path';
+import { normalizeScssContract } from 'testUtils/scssContractAssertions';
 
 describe('CreateQuestionsAndSurveys.module.scss final submit CTA guards', () => {
   it('uses the shared final submit shell while keeping progress and submit states intact', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'CreateQuestionsAndSurveys.module.scss'), 'utf8');
+    const normalizedScss = normalizeScssContract(scss);
 
-    expect(scss).toMatch(/@use\s+"scss\/finalSubmitCta"\s+as\s+finalSubmitCta;/);
+    expect(normalizedScss).toMatch(/@use\s+'scss\/finalSubmitCta'\s+as\s+finalSubmitCta;/);
     expect(scss).toMatch(/\.createSurveyButton,\s*#submitNewSurveyButton\s*{[\s\S]*?@include\s+finalSubmitCta\.final-submit-cta-shell\([\s\S]*?\);[\s\S]*?position:\s*relative;[\s\S]*?overflow:\s*hidden;/);
     expect(scss).toMatch(/\.buttonProgressFill\s*{[\s\S]*?position:\s*absolute;[\s\S]*?width:\s*0%;/);
     expect(scss).toMatch(/\.submittingButton\s*{[\s\S]*?border-color:\s*#0d6efd !important;/);

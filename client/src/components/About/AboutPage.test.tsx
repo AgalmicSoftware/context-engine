@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import fs from 'fs';
 import path from 'path';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
+import { normalizeScssContract } from 'testUtils/scssContractAssertions';
 
 import AboutPage, {
   getAboutDemoSessionPath,
@@ -407,6 +408,7 @@ describe('AboutPage', () => {
 
   it('uses large muted OnePageSession-style section headings on the about page', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
+    const normalizedScss = normalizeScssContract(scss);
 
     expect(scss).toMatch(/\.sectionTitle\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?font-size:\s*clamp\(1\.6rem,\s*4vw,\s*2\.1rem\);[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/);
     expect(scss).not.toMatch(/&:hover\s+\.sectionTitle\s*{[\s\S]*?#4dffa4;/);
@@ -414,7 +416,7 @@ describe('AboutPage', () => {
     expect(scss).toMatch(/\.featureLabel\s*{[\s\S]*?font-size:\s*clamp\(1\.08rem,\s*1\.6vw,\s*1\.22rem\);[\s\S]*?font-weight:\s*700;/);
     expect(scss).toMatch(/\.featureItem\s*{[\s\S]*?border-radius:\s*16px;[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.05\);/);
     expect(scss).toMatch(/\.roadmapChecklistItem\s*{[\s\S]*?grid-template-columns:\s*auto minmax\(0,\s*1fr\);[\s\S]*?font-size:\s*0\.98rem;/);
-    expect(scss).toMatch(/\.roadmapCheck\s*{[\s\S]*?border-radius:\s*999px;[\s\S]*?content:\s*'\\2713';/);
+    expect(normalizedScss).toMatch(/\.roadmapCheck\s*{[\s\S]*?border-radius:\s*999px;[\s\S]*?content:\s*'\\2713';/);
     expect(scss).toMatch(/\.roadmapChecklistItemPlanned\s*{[\s\S]*?color:\s*rgba\(244,\s*247,\s*255,\s*0\.62\);/);
     expect(scss).toMatch(/\.roadmapChecklistItemPlanned\s+\.roadmapCheck\s*{[\s\S]*?background:\s*transparent;/);
     expect(scss).toMatch(/\.heroPrimaryButton\s*{[\s\S]*?font-size:\s*1\.14rem;[\s\S]*?font-weight:\s*700;/);

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { normalizeScssContract } from 'testUtils/scssContractAssertions';
 
 const readSurveyToolScss = () => (
   fs.readFileSync(path.join(__dirname, 'SurveyTool.module.scss'), 'utf8')
@@ -134,8 +135,9 @@ describe('SurveyTool styles', () => {
 
   it('ports the recovered animLine border motion onto pile submit rails at every size', () => {
     const scss = readSurveyToolScss();
+    const normalizedScss = normalizeScssContract(scss);
 
-    expect(scss).toMatch(/\.pileFooter\s+\.pileSubmitButton\.submitGlow::before\s*{[\s\S]*?background:\s*linear-gradient\(90deg,\s*#fff 40%,\s*transparent 40%\);[\s\S]*?background-size:\s*200% 4px;[\s\S]*?filter:\s*drop-shadow\(0 0 8px #fff\);/);
+    expect(normalizedScss).toMatch(/\.pileFooter\s+\.pileSubmitButton\.submitGlow::before\s*{[\s\S]*?background:\s*linear-gradient\(90deg,\s*#fff 40%,\s*transparent 40%\);[\s\S]*?background-size:\s*200% 4px;[\s\S]*?filter:\s*drop-shadow\(0 0 8px #fff\);/);
     expect(scss).toMatch(/@keyframes beforeLineAnim\s*{[\s\S]*?45%,\s*50%\s*{[\s\S]*?background-position:\s*-100% 0;[\s\S]*?}[\s\S]*?50%,\s*95%\s*{[\s\S]*?transform:\s*scale\(1,\s*-1\);/);
     expect(scss).toMatch(/\.pileFooter\s+\.pileSubmitButton\.submitGlow::before\s*{[\s\S]*?animation:\s*beforeLineAnim 5\.4s linear infinite;/);
     expect(scss).not.toMatch(/pileSubmitRailAfterLineAnim/);
@@ -145,9 +147,10 @@ describe('SurveyTool styles', () => {
 
   it('ports the recovered animLine border motion onto the SurveySelector header submit CTA', () => {
     const scss = readSurveyToolScss();
+    const normalizedScss = normalizeScssContract(scss);
 
     expect(scss).toMatch(/\.headerSubmitButton\s*{[\s\S]*?position:\s*relative;[\s\S]*?isolation:\s*isolate;[\s\S]*?overflow:\s*visible;/);
-    expect(scss).toMatch(/\.headerSubmitButton\s*{[\s\S]*?&\.submitGlow::before\s*{[\s\S]*?background:\s*linear-gradient\(90deg,\s*#fff 40%,\s*transparent 40%\);[\s\S]*?background-size:\s*200% 4px;[\s\S]*?filter:\s*drop-shadow\(0 0 8px #fff\);[\s\S]*?pointer-events:\s*none;/);
+    expect(normalizedScss).toMatch(/\.headerSubmitButton\s*{[\s\S]*?&\.submitGlow::before\s*{[\s\S]*?background:\s*linear-gradient\(90deg,\s*#fff 40%,\s*transparent 40%\);[\s\S]*?background-size:\s*200% 4px;[\s\S]*?filter:\s*drop-shadow\(0 0 8px #fff\);[\s\S]*?pointer-events:\s*none;/);
     expect(scss).toMatch(/\.headerSubmitButton\s*{[\s\S]*?&\.submitGlow::before\s*{[\s\S]*?animation:\s*beforeLineAnim 5\.4s linear infinite;/);
     expect(scss).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*{[\s\S]*?\.headerSubmitButton\.submitGlow::before,\s*[\s\S]*?animation:\s*none !important;/);
   });
@@ -182,15 +185,16 @@ describe('SurveyTool styles', () => {
   it('keeps embedded listening-mode question authoring readable on the light panel', () => {
     const scss = readSurveyToolScss();
     const listeningCreateWrap = scss.match(/\.sessionListeningCreateWrap\s*{[\s\S]*?^}/m)?.[0] || '';
+    const normalizedListeningCreateWrap = normalizeScssContract(listeningCreateWrap);
 
-    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="createSurveyContainer"\]\)\s*{[\s\S]*?background:\s*#edf2f7\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
-    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="questionPromptInput"\]\),[\s\S]*?background:\s*#fff\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
-    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="questionContainer"\]\),[\s\S]*?background:\s*#fff\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
-    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="toggleLabel"\]\),[\s\S]*?color:\s*#18243a\s*!important;[\s\S]*?opacity:\s*1\s*!important;/);
-    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="typeButton"\]\)\s*{[\s\S]*?background:\s*#f8fafc\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
-    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="removeQuestionButton"\]\),[\s\S]*?background:\s*#fff\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
-    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="tagInputField"\]\)\s*{[\s\S]*?color:\s*#18243a\s*!important;/);
-    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="filterBubble"\]\)\s*{[\s\S]*?background:\s*#dff7ea\s*!important;[\s\S]*?color:\s*#123a2d\s*!important;/);
+    expect(normalizedListeningCreateWrap).toMatch(/:global\(\[class\*='createSurveyContainer'\]\)\s*{[\s\S]*?background:\s*#edf2f7\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
+    expect(normalizedListeningCreateWrap).toMatch(/:global\(\[class\*='questionPromptInput'\]\),[\s\S]*?background:\s*#fff\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
+    expect(normalizedListeningCreateWrap).toMatch(/:global\(\[class\*='questionContainer'\]\),[\s\S]*?background:\s*#fff\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
+    expect(normalizedListeningCreateWrap).toMatch(/:global\(\[class\*='toggleLabel'\]\),[\s\S]*?color:\s*#18243a\s*!important;[\s\S]*?opacity:\s*1\s*!important;/);
+    expect(normalizedListeningCreateWrap).toMatch(/:global\(\[class\*='typeButton'\]\)\s*{[\s\S]*?background:\s*#f8fafc\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
+    expect(normalizedListeningCreateWrap).toMatch(/:global\(\[class\*='removeQuestionButton'\]\),[\s\S]*?background:\s*#fff\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
+    expect(normalizedListeningCreateWrap).toMatch(/:global\(\[class\*='tagInputField'\]\)\s*{[\s\S]*?color:\s*#18243a\s*!important;/);
+    expect(normalizedListeningCreateWrap).toMatch(/:global\(\[class\*='filterBubble'\]\)\s*{[\s\S]*?background:\s*#dff7ea\s*!important;[\s\S]*?color:\s*#123a2d\s*!important;/);
   });
 
   it('keeps listening mode from changing the pile card vertical layout', () => {
