@@ -102,6 +102,7 @@ import {
   memoizedResolveSession,
   setTimedMemoValue,
 } from '../cache/contractScriptsCache.js';
+import { resolveWeb3ContextCacheEntry } from '../cache/web3ContextCache.js';
 import { isCallExceptionError, logArweaveMetadataFetchFailure } from '../arweave/arweaveMetadataFailureLog.js';
 import {
   buildHashUnavailableMetadataError,
@@ -377,79 +378,26 @@ const isRetryableSurveyResponseReadError = (error: any) => {
   );
 };
 
-const WEB3_CONTEXT_CACHE = new Map();
-let web3ContextCacheClearQueued = false;
-
-const scheduleWeb3ContextCacheClear = () => {
-  if (web3ContextCacheClearQueued) return;
-  web3ContextCacheClearQueued = true;
-  const clearCache = () => {
-    WEB3_CONTEXT_CACHE.clear();
-    web3ContextCacheClearQueued = false;
-  };
-  try {
-    Promise.resolve().then(clearCache);
-  } catch {
-    setTimeout(clearCache, 100);
-  }
-};
-
-const normalizeWeb3ContextCacheValue = (value: any, seen: any = new WeakSet()): any => {
-  if (value === undefined) return '__undefined__';
-  if (value === null) return null;
-  if (typeof value === 'symbol') return value.toString();
-  if (typeof value === 'function') return `__fn:${value.name || 'anonymous'}__`;
-  if (typeof value !== 'object') return value;
-  if (seen.has(value)) return '__circular__';
-  seen.add(value);
-  if (Array.isArray(value)) {
-    return value.map((item: any) => normalizeWeb3ContextCacheValue(item, seen));
-  }
-  const out: any = {};
-  Object.keys(value)
-    .sort()
-    .forEach((key: any) => {
-      out[key] = normalizeWeb3ContextCacheValue(value[key], seen);
-    });
-  return out;
-};
-
-const serializeWeb3ContextCacheKey = (groupKeyOrCfg: any) => {
-  try {
-    return JSON.stringify(normalizeWeb3ContextCacheValue(groupKeyOrCfg));
-  } catch {
-    try {
-      return String(groupKeyOrCfg);
-    } catch {
-      return '__unserializable__';
-    }
-  }
-};
-
 export function getWeb3Context(groupKeyOrCfg: any) {
   if (groupKeyOrCfg && typeof groupKeyOrCfg === 'object' && groupKeyOrCfg._isWeb3Context === true) {
     return groupKeyOrCfg;
   }
 
-  scheduleWeb3ContextCacheClear();
-  const cacheKey = serializeWeb3ContextCacheKey(groupKeyOrCfg);
-  const cached = WEB3_CONTEXT_CACHE.get(cacheKey);
-  if (cached) return cached;
-
-  const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-  const chainId = extractChainId(cfg);
-  const readProvider = getLocalAwareReadProviderForGroup(groupKeyOrCfg);
-  const addresses = getSessionAddresses(cfg);
-  const ctx: any = {
-    _isWeb3Context: true,
-    cfg,
-    chainId,
-    readProvider,
-    addresses,
-    groupKeyOrCfg,
-  };
-  WEB3_CONTEXT_CACHE.set(cacheKey, ctx);
-  return ctx;
+  return resolveWeb3ContextCacheEntry(groupKeyOrCfg, () => {
+    const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
+    const chainId = extractChainId(cfg);
+    const readProvider = getLocalAwareReadProviderForGroup(groupKeyOrCfg);
+    const addresses = getSessionAddresses(cfg);
+    const ctx: any = {
+      _isWeb3Context: true,
+      cfg,
+      chainId,
+      readProvider,
+      addresses,
+      groupKeyOrCfg,
+    };
+    return ctx;
+  });
 }
 
 const SBT_READ_PROVIDER_OPTIONS = Object.freeze({ contractKey: 'sbtFactory' });
