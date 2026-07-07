@@ -44,6 +44,7 @@ import { toStr } from '../../utilities/shared/primitives.js';
 import SBTSelector from '../SBTs/SBTSelector';
 import { JsonPanel } from '../Shared/Json/JsonControls';
 import CETooltip from '../Shared/CETooltip';
+import AdminPageMetadataEditor from './AdminPageMetadataEditor';
 import AdminPageTestsPanel from './AdminPageTestsPanel';
 import AdminPageWorkerSecretsPanel from './AdminPageWorkerSecretsPanel';
 import { createLogger } from '../../utilities/logging';
@@ -2236,13 +2237,15 @@ const AdminPage = ({
     if (metadataLoadState === 'unavailable') return 'Metadata unavailable; contracts below may be chain defaults';
     return 'No registry metadata URI configured';
   })();
-  const metadataContracts =
-    groupMetadata?.contracts && typeof groupMetadata.contracts === 'object' ? groupMetadata.contracts : {};
+  const metadataContracts = asAdminSessionConfig(groupMetadata?.contracts);
   const visibleMetadataContracts = Object.entries(metadataContracts).filter(
-    ([, value]: any) => value && typeof value === 'object',
+    (entry): entry is [string, Record<string, unknown>] => {
+      const value = entry[1];
+      return !!value && typeof value === 'object' && !Array.isArray(value);
+    },
   );
   const readonlyMetadataContracts = visibleMetadataContracts.filter(
-    ([key]: any) => !ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key),
+    ([key]) => !ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key),
   );
   const sessionCardTone = selectedConfig ? 'ready' : availableSessions.length ? 'idle' : 'warning';
   const showHeroMedia = !!resolvedSessionHeader && heroHeaderImageReady;
@@ -2250,10 +2253,10 @@ const AdminPage = ({
   const defaultGateOpen = openSection === 'defaultGate';
   const workerSecretsOpen = openSection === 'workerSecrets';
   const testsOpen = openSection === 'tests';
-  const toggleSection = (key: any) => {
-    setOpenSection((prev: any) => (prev === key ? '' : key));
+  const toggleSection = (key: string) => {
+    setOpenSection((prev) => (prev === key ? '' : key));
   };
-  const renderInfoTooltip = (id: any, content: any) => {
+  const renderInfoTooltip = (id: string, content: React.ReactNode) => {
     if (!content) return null;
     return (
       <>
@@ -2644,376 +2647,35 @@ const AdminPage = ({
                 </div>
               )}
               {canAdmin && (
-                <div className={styles.metadataEditorCard}>
-                  <div className={styles.metadataEditorIntro}>
-                    Publish session defaults and curation metadata here. Block limits, faucet settings, contracts, and
-                    registry/RPC context are also synced to worker config when a worker URL is available.
-                  </div>
-                  <div className={styles.metadataSectionGrid}>
-                    <div className={styles.metadataSectionCard}>
-                      <div className={styles.panelSubtitle}>Session defaults</div>
-                      <div className={styles.metadataEditorGrid}>
-                        <FormGroup>
-                          <Label>Default tags</Label>
-                          <Input
-                            value={metadataConfigDraft.defaultTags}
-                            placeholder="ai, governance, survey"
-                            onChange={(e: any) => updateMetadataConfigDraft('defaultTags', e.target.value)}
-                          />
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Default SBT tags</Label>
-                          <Input
-                            value={metadataConfigDraft.defaultSbtTags}
-                            placeholder="member, contributor"
-                            onChange={(e: any) => updateMetadataConfigDraft('defaultSbtTags', e.target.value)}
-                          />
-                        </FormGroup>
-                      </div>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Question generation prompt</Label>
-                        <Input
-                          type="textarea"
-                          rows={4}
-                          value={metadataConfigDraft.questionsGenPrompt}
-                          placeholder="Optional prompt used when auto-generating questions"
-                          onChange={(e: any) => updateMetadataConfigDraft('questionsGenPrompt', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Default filter state</Label>
-                        <Input
-                          type="textarea"
-                          rows={4}
-                          value={metadataConfigDraft.defaultFilterState}
-                          placeholder='{"sort":"recent"} or tag=ai&sort=recent'
-                          onChange={(e: any) => updateMetadataConfigDraft('defaultFilterState', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup check className={styles.metadataToggle}>
-                        <Label check className={styles.metadataToggleLabel}>
-                          <Input
-                            type="checkbox"
-                            checked={metadataAutoFeatureDraft}
-                            onChange={(e: any) => {
-                              setMetadataDraftTouched(true);
-                              setMetadataAutoFeatureTouched(true);
-                              setMetadataAutoFeatureDraft(!!e.target.checked);
-                            }}
-                          />
-                          Auto-feature by session slug
-                        </Label>
-                      </FormGroup>
-                      <FormGroup className={styles.metadataSelectorGroup}>
-                        <Label>Default featured SBTs</Label>
-                        <SBTSelector
-                          id="admin-default-featured-sbts"
-                          label=""
-                          selectedSBTs={metadataConfigDraft.defaultFeaturedSBTs}
-                          onAddSBT={(sbt: any) => {
-                            updateMetadataConfigDraft(
-                              'defaultFeaturedSBTs',
-                              dedupeSbtSelections([...(metadataConfigDraft.defaultFeaturedSBTs || []), sbt]),
-                            );
-                          }}
-                          onRemoveSBT={(address: any) => {
-                            updateMetadataConfigDraft(
-                              'defaultFeaturedSBTs',
-                              dedupeSbtSelections(metadataConfigDraft.defaultFeaturedSBTs || []).filter(
-                                (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase(),
-                              ),
-                            );
-                          }}
-                          network={network}
-                          chainId={relevantSessionChainId || network?.id || null}
-                          sessionSlug={normalizeSlug(selectedSlug)}
-                          variant="admin"
-                          ensureLightSbtUniverse={ensureLightSbtUniverse}
-                          defaultFeaturedSBTs={(metadataConfigDraft.defaultFeaturedSBTs || []).map(
-                            (entry: any) => entry.address,
-                          )}
-                        />
-                      </FormGroup>
-                    </div>
-
-                    <div className={styles.metadataSectionCard}>
-                      <div className={styles.panelSubtitle}>AI defaults</div>
-                      <div className={styles.metadataEditorGrid}>
-                        <FormGroup>
-                          <Label>Fast provider</Label>
-                          <Input
-                            type="select"
-                            value={metadataConfigDraft.aiFastProvider}
-                            onChange={(e: any) => updateMetadataConfigDraft('aiFastProvider', e.target.value)}
-                          >
-                            {ADMIN_AI_PROVIDER_OPTIONS.map((option: any) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </Input>
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Fast model</Label>
-                          <Input
-                            value={metadataConfigDraft.aiFastModel}
-                            onChange={(e: any) => updateMetadataConfigDraft('aiFastModel', e.target.value)}
-                          />
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Thinking provider</Label>
-                          <Input
-                            type="select"
-                            value={metadataConfigDraft.aiThinkingProvider}
-                            onChange={(e: any) => updateMetadataConfigDraft('aiThinkingProvider', e.target.value)}
-                          >
-                            {ADMIN_AI_PROVIDER_OPTIONS.map((option: any) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </Input>
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Thinking model</Label>
-                          <Input
-                            value={metadataConfigDraft.aiThinkingModel}
-                            onChange={(e: any) => updateMetadataConfigDraft('aiThinkingModel', e.target.value)}
-                          />
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Transcription provider</Label>
-                          <Input
-                            type="select"
-                            value={metadataConfigDraft.aiTranscriptionProvider}
-                            onChange={(e: any) => updateMetadataConfigDraft('aiTranscriptionProvider', e.target.value)}
-                          >
-                            <option value="openai">OpenAI</option>
-                          </Input>
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Transcription model</Label>
-                          <Input
-                            value={metadataConfigDraft.aiTranscriptionModel}
-                            onChange={(e: any) => updateMetadataConfigDraft('aiTranscriptionModel', e.target.value)}
-                          />
-                        </FormGroup>
-                      </div>
-                    </div>
-
-                    <div className={styles.metadataSectionCard}>
-                      <div className={styles.panelSubtitle}>Runtime sync</div>
-                      <div className={styles.metadataEditorGrid}>
-                        <FormGroup>
-                          <Label>Start block</Label>
-                          <Input
-                            type="number"
-                            value={metadataBlockLimitsDraft.start}
-                            onChange={(e: any) => {
-                              setMetadataDraftTouched(true);
-                              setMetadataBlockLimitsDraft((prev) => ({
-                                ...(prev || {}),
-                                start: e.target.value,
-                              }));
-                            }}
-                          />
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>End block</Label>
-                          <Input
-                            type="number"
-                            value={metadataBlockLimitsDraft.end}
-                            placeholder="Optional"
-                            onChange={(e: any) => {
-                              setMetadataDraftTouched(true);
-                              setMetadataBlockLimitsDraft((prev) => ({
-                                ...(prev || {}),
-                                end: e.target.value,
-                              }));
-                            }}
-                          />
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Faucet amount (ETH)</Label>
-                          <Input
-                            value={metadataConfigDraft.faucetAmountEth}
-                            placeholder="0.0002"
-                            onChange={(e: any) => updateMetadataConfigDraft('faucetAmountEth', e.target.value)}
-                          />
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Faucet threshold (ETH)</Label>
-                          <Input
-                            value={metadataConfigDraft.faucetBalanceThresholdEth}
-                            placeholder="0.001"
-                            onChange={(e: any) =>
-                              updateMetadataConfigDraft('faucetBalanceThresholdEth', e.target.value)
-                            }
-                          />
-                        </FormGroup>
-                      </div>
-                      {currentBlockSummary && <div className={styles.statusNote}>{currentBlockSummary}</div>}
-                      <Button
-                        size="sm"
-                        color="secondary"
-                        outline
-                        className={styles.actionButton}
-                        onClick={handleUseCurrentBlockForMetadata}
-                        disabled={metadataUpdateBusy || !metadataLatestBlock}
-                      >
-                        Use current block
-                      </Button>
-                    </div>
-
-                    <div className={styles.metadataSectionCard}>
-                      <div className={styles.panelSubtitle}>Contracts</div>
-                      <div className={styles.metadataEditorGrid}>
-                        <FormGroup>
-                          <Label>Surveys contract</Label>
-                          <Input
-                            value={metadataConfigDraft.contractSurveysAddress}
-                            placeholder="0x..."
-                            onChange={(e: any) => updateMetadataConfigDraft('contractSurveysAddress', e.target.value)}
-                          />
-                          <FormText color="muted">Chain: {relevantSessionChainLabel || 'Uses session chain'}</FormText>
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>SBT factory contract</Label>
-                          <Input
-                            value={metadataConfigDraft.contractSbtFactoryAddress}
-                            placeholder="0x..."
-                            onChange={(e: any) =>
-                              updateMetadataConfigDraft('contractSbtFactoryAddress', e.target.value)
-                            }
-                          />
-                          <FormText color="muted">Chain: {relevantSessionChainLabel || 'Uses session chain'}</FormText>
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>SessionRegistry contract</Label>
-                          <Input
-                            value={metadataConfigDraft.contractSessionRegistryAddress}
-                            placeholder="0x..."
-                            onChange={(e: any) =>
-                              updateMetadataConfigDraft('contractSessionRegistryAddress', e.target.value)
-                            }
-                          />
-                          <FormText color="muted">
-                            Chain: {relevantRegistryChainLabel || relevantSessionChainLabel || 'Uses registry chain'}
-                          </FormText>
-                        </FormGroup>
-                      </div>
-                      {metadataContractsNeedVerification && metadataDefaultedEditableContractKeys.length > 0 && (
-                        <FormGroup check className={styles.metadataToggle}>
-                          <Label check className={styles.metadataToggleLabel}>
-                            <Input
-                              type="checkbox"
-                              checked={metadataContractsVerified}
-                              onChange={(e: any) => setMetadataContractsVerified(!!e.target.checked)}
-                            />
-                            I verified these fallback defaults and want to publish them if I save metadata
-                          </Label>
-                        </FormGroup>
-                      )}
-                      {metadataContractsNeedVerification && !metadataContractsReadyForSave && (
-                        <div className={styles.warningNote}>
-                          Saving is blocked until you verify or edit the synthesized contract addresses above.
-                        </div>
-                      )}
-                      {readonlyMetadataContracts.length ? (
-                        <div className={styles.metadataReadonlyGrid}>
-                          {readonlyMetadataContracts.map(([key, value]: any) => (
-                            <div key={key} className={styles.metadataReadonlyItem}>
-                              <span>{key}</span>
-                              <strong>{toStr(value?.address).trim() || '—'}</strong>
-                              <span>{toStr(value?.chainId).trim() || '—'}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                      {!visibleMetadataContracts.length && (
-                        <div className={styles.statusNote}>No contract metadata found for this session.</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className={styles.metadataSectionCard}>
-                    <div className={styles.panelSubtitle}>Curated lists</div>
-                    <div className={styles.metadataSectionGrid}>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Highlighted question IDs</Label>
-                        <Input
-                          type="textarea"
-                          rows={3}
-                          value={metadataConfigDraft.highlightedQuestionIds}
-                          placeholder="One question id per line"
-                          onChange={(e: any) => updateMetadataConfigDraft('highlightedQuestionIds', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Blocked question IDs</Label>
-                        <Input
-                          type="textarea"
-                          rows={3}
-                          value={metadataConfigDraft.blockedQuestionIds}
-                          placeholder="One question id per line"
-                          onChange={(e: any) => updateMetadataConfigDraft('blockedQuestionIds', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Highlighted survey IDs</Label>
-                        <Input
-                          type="textarea"
-                          rows={3}
-                          value={metadataConfigDraft.highlightedSurveyIds}
-                          placeholder="One survey id per line"
-                          onChange={(e: any) => updateMetadataConfigDraft('highlightedSurveyIds', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Blocked survey IDs</Label>
-                        <Input
-                          type="textarea"
-                          rows={3}
-                          value={metadataConfigDraft.blockedSurveyIds}
-                          placeholder="One survey id per line"
-                          onChange={(e: any) => updateMetadataConfigDraft('blockedSurveyIds', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Ignored SBT list</Label>
-                        <Input
-                          type="textarea"
-                          rows={3}
-                          value={metadataConfigDraft.ignoredSbtsList}
-                          placeholder="One SBT address per line"
-                          onChange={(e: any) => updateMetadataConfigDraft('ignoredSbtsList', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Featured SBT list</Label>
-                        <Input
-                          type="textarea"
-                          rows={3}
-                          value={metadataConfigDraft.featuredSbtsList}
-                          placeholder="One SBT address per line"
-                          onChange={(e: any) => updateMetadataConfigDraft('featuredSbtsList', e.target.value)}
-                        />
-                      </FormGroup>
-                    </div>
-                  </div>
-
-                  <div className={styles.metadataEditorActions}>
-                    <Button
-                      color="primary"
-                      className={styles.actionButton}
-                      onClick={handleSaveSessionMetadata}
-                      disabled={metadataUpdateBusy}
-                    >
-                      {metadataUpdateBusy ? 'Updating metadata…' : 'Update metadata'}
-                    </Button>
-                  </div>
-                  {metadataUpdateStatus && <div className={styles.statusNote}>{metadataUpdateStatus}</div>}
-                </div>
+                <AdminPageMetadataEditor
+                  metadataConfigDraft={metadataConfigDraft}
+                  updateMetadataConfigDraft={updateMetadataConfigDraft}
+                  metadataAutoFeatureDraft={metadataAutoFeatureDraft}
+                  setMetadataDraftTouched={setMetadataDraftTouched}
+                  setMetadataAutoFeatureTouched={setMetadataAutoFeatureTouched}
+                  setMetadataAutoFeatureDraft={setMetadataAutoFeatureDraft}
+                  network={network}
+                  relevantSessionChainId={relevantSessionChainId}
+                  relevantSessionChainLabel={relevantSessionChainLabel}
+                  relevantRegistryChainLabel={relevantRegistryChainLabel}
+                  selectedSlug={selectedSlug}
+                  ensureLightSbtUniverse={ensureLightSbtUniverse}
+                  metadataBlockLimitsDraft={metadataBlockLimitsDraft}
+                  setMetadataBlockLimitsDraft={setMetadataBlockLimitsDraft}
+                  currentBlockSummary={currentBlockSummary}
+                  handleUseCurrentBlockForMetadata={handleUseCurrentBlockForMetadata}
+                  metadataUpdateBusy={metadataUpdateBusy}
+                  metadataLatestBlock={metadataLatestBlock}
+                  metadataContractsNeedVerification={metadataContractsNeedVerification}
+                  metadataDefaultedEditableContractKeys={metadataDefaultedEditableContractKeys}
+                  metadataContractsVerified={metadataContractsVerified}
+                  setMetadataContractsVerified={setMetadataContractsVerified}
+                  metadataContractsReadyForSave={metadataContractsReadyForSave}
+                  readonlyMetadataContracts={readonlyMetadataContracts}
+                  visibleMetadataContracts={visibleMetadataContracts}
+                  handleSaveSessionMetadata={handleSaveSessionMetadata}
+                  metadataUpdateStatus={metadataUpdateStatus}
+                />
               )}
               <div className={styles.metadataJsonSection}>
                 <div className={styles.resultBoxLabel}>Raw metadata</div>
