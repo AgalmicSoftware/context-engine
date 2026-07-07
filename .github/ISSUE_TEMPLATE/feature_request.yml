@@ -1,0 +1,29 @@
+name: Feature Request
+description: Suggest a public feature or workflow improvement.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep requests public-facing. Do not include secrets, private keys, private deployment details, or real user data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or workflow
+      description: What user workflow should this improve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest behavior change that would solve the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Relevant route, session mode, storage profile, chain, or worker surface.
