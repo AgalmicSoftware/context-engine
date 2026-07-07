@@ -2,8 +2,56 @@ const BOOT_RELOAD_PARAM = 'ceBootReload';
 const STALE_CHUNK_RELOAD_PARAM = 'ceChunkReload';
 export const STALE_CHUNK_RELOAD_STORAGE_KEY = 'ce:staleChunkReloadAttempted:v20260618b';
 
-export const isStaleChunkLoadError = (error) => {
-  const message = [error?.name, error?.message, error?.stack, String(error || '')]
+type BootStorage = {
+  clear?: () => void;
+  getItem?: (key: string) => string | null;
+  setItem?: (key: string, value: string) => void;
+};
+
+type BootCacheApi = {
+  keys?: () => Promise<string[]>;
+  delete?: (cacheName: string) => Promise<boolean> | boolean;
+};
+
+type BootLocation = {
+  href: string;
+  assign?: (url: string) => void;
+  reload?: () => void;
+};
+
+type BootWindow = {
+  caches?: BootCacheApi;
+  localStorage?: BootStorage;
+  location?: BootLocation;
+  sessionStorage?: BootStorage;
+  setTimeout?: (handler: TimerHandler, timeout?: number, ...args: unknown[]) => unknown;
+};
+
+type BootRecoveryOptions = {
+  autoRefreshDelayMs?: number;
+  clearCaches?: () => Promise<void> | void;
+  document?: Document;
+  reload?: () => void;
+  reloadParam?: string;
+  root?: HTMLElement | null;
+  storage?: BootStorage;
+  storageKey?: string;
+  window?: BootWindow;
+};
+
+const readErrorField = (error: unknown, key: 'name' | 'message' | 'stack'): string => {
+  if (!error || typeof error !== 'object') return '';
+  const value = (error as Record<string, unknown>)[key];
+  return typeof value === 'string' ? value : '';
+};
+
+export const isStaleChunkLoadError = (error: unknown): boolean => {
+  const message = [
+    readErrorField(error, 'name'),
+    readErrorField(error, 'message'),
+    readErrorField(error, 'stack'),
+    String(error || ''),
+  ]
     .filter(Boolean)
     .join('\n')
     .toLowerCase();
@@ -17,7 +65,7 @@ export const isStaleChunkLoadError = (error) => {
   );
 };
 
-export const getBootErrorMessage = (error) => {
+export const getBootErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message) {
     return error.message;
   }
@@ -26,7 +74,7 @@ export const getBootErrorMessage = (error) => {
   return message || 'Unknown startup error';
 };
 
-export const clearBootCaches = async (win = globalThis.window) => {
+export const clearBootCaches = async (win: BootWindow = globalThis.window): Promise<void> => {
   try {
     win?.localStorage?.clear?.();
   } catch {
@@ -41,24 +89,28 @@ export const clearBootCaches = async (win = globalThis.window) => {
 
   try {
     const cacheApi = win?.caches;
-    if (cacheApi?.keys && cacheApi?.delete) {
-      const cacheNames = await cacheApi.keys();
-      await Promise.all(cacheNames.map((cacheName) => cacheApi.delete(cacheName)));
+    const listCaches = cacheApi?.keys;
+    const deleteCache = cacheApi?.delete;
+    if (listCaches && deleteCache) {
+      const cacheNames = await listCaches();
+      await Promise.all(cacheNames.map((cacheName) => deleteCache(cacheName)));
     }
   } catch {
     // Cache API can be unavailable or permission-blocked in embedded browsers.
   }
 };
 
-export const reloadWithCacheBuster = (win = globalThis.window, reloadParam = BOOT_RELOAD_PARAM) => {
+export const reloadWithCacheBuster = (win: BootWindow = globalThis.window, reloadParam = BOOT_RELOAD_PARAM): void => {
   if (!win?.location) {
     return;
   }
 
   try {
-    const url = new URL(win.location.href);
+    const location = win.location;
+    const url = new URL(location.href);
     url.searchParams.set(reloadParam, String(Date.now()));
-    win.location.assign(url.toString());
+    if (!location.assign) throw new Error('Navigation assignment is unavailable.');
+    location.assign(url.toString());
     return;
   } catch {
     // Fall back to a plain reload when URL parsing or navigation assignment fails.
@@ -67,15 +119,15 @@ export const reloadWithCacheBuster = (win = globalThis.window, reloadParam = BOO
   win.location.reload?.();
 };
 
-const hasReloadParam = (win, reloadParam) => {
+const hasReloadParam = (win: BootWindow, reloadParam: string): boolean => {
   try {
-    return new URL(win.location.href).searchParams.has(reloadParam);
+    return win.location ? new URL(win.location.href).searchParams.has(reloadParam) : false;
   } catch {
     return false;
   }
 };
 
-export const recoverFromStaleChunkLoadError = (error, options = {}) => {
+export const recoverFromStaleChunkLoadError = (error: unknown, options: BootRecoveryOptions = {}): boolean => {
   if (!isStaleChunkLoadError(error)) {
     return false;
   }
@@ -105,7 +157,13 @@ export const recoverFromStaleChunkLoadError = (error, options = {}) => {
   return true;
 };
 
-const appendTextNode = (doc, parent, tagName, text, style) => {
+const appendTextNode = (
+  doc: Document,
+  parent: Element,
+  tagName: keyof HTMLElementTagNameMap,
+  text: string,
+  style?: string,
+): HTMLElement => {
   const node = doc.createElement(tagName);
   node.textContent = text;
   if (style) {
@@ -115,7 +173,7 @@ const appendTextNode = (doc, parent, tagName, text, style) => {
   return node;
 };
 
-const appendButton = (doc, parent, label, onClick) => {
+const appendButton = (doc: Document, parent: Element, label: string, onClick: EventListener): HTMLButtonElement => {
   const button = doc.createElement('button');
   button.type = 'button';
   button.textContent = label;
@@ -136,7 +194,7 @@ const appendButton = (doc, parent, label, onClick) => {
   return button;
 };
 
-export const renderBootFailure = (error, options = {}) => {
+export const renderBootFailure = (error: unknown, options: BootRecoveryOptions = {}): boolean => {
   const doc = options.document || globalThis.document;
   const win = options.window || globalThis.window;
   const root = options.root || doc?.getElementById?.('root');
@@ -150,7 +208,7 @@ export const renderBootFailure = (error, options = {}) => {
   const clearCaches = options.clearCaches || (() => clearBootCaches(win));
   const autoReloadDelayMs = typeof options.autoRefreshDelayMs === 'number' ? options.autoRefreshDelayMs : 3000;
   let refreshStarted = false;
-  const refresh = async (button) => {
+  const refresh = async (button: HTMLButtonElement | null) => {
     if (refreshStarted) return;
     refreshStarted = true;
     if (button) {
