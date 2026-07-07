@@ -3,7 +3,7 @@ import {
   preserveSurveyResultsFilterStateValue,
   surveyResultsReducer,
 } from './surveyResultsState';
-import { SURVEY_RESULTS_EXPORT_TYPES } from './surveyResultsExportDisplayHelpers';
+import { SURVEY_RESULTS_EXPORT_TYPES } from './surveyResultsExportPlans';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({

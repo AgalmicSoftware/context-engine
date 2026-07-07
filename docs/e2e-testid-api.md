@@ -32,7 +32,7 @@ Component: `client/src/components/E2E/DevE2eNav.tsx`
 
 ## Page Roots (Route Readiness)
 
-Route branches in `client/src/components/MainSite/MainSite.tsx` wrap their rendered output with a stable page-root TestID. E2E should prefer waiting on these roots instead of `networkidle`.
+Route branches in `client/src/components/MainSite/AppShell.tsx` wrap their rendered output with a stable page-root TestID. E2E should prefer waiting on these roots instead of `networkidle`.
 The `/about` route renders `client/src/components/About/AboutPage.tsx`.
 The `/` home route renders `client/src/components/MainContent/MainAreaTabs.tsx`, which now mounts `ToolExplorer.tsx` as the tool-launcher tab and `OnboardingWalkthrough.tsx` as the welcome tab.
 

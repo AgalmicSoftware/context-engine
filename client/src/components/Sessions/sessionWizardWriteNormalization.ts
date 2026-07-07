@@ -6,19 +6,31 @@ import {
 } from '../../utilities/session/sessionMetadata.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { SESSION_WORKER_METADATA_ALIAS_KEYS } from '../../utilities/session/sessionWorkerUrlCompatibility.js';
-import { toStr } from '../../utilities/shared/primitives.js';
 import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import {
   getSessionWizardContractDefaults,
   getVisibleSessionWizardContractKeys,
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
-import { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS } from './sessionWizardOnChainCompat.js';
+import {
+  SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
+  buildSessionWizardRegistrySessionFields,
+  cloneValue,
+  isObj,
+  trimString,
+} from '../../domains/sessions/registry/sessionRegistryWriteNormalization.js';
 import { buildWorkerLitCredentialsConfig } from './sessionWizardWorkerSecretSupport';
 import {
   isWorkerSbtGateCloudflareStorageProfile,
   normalizeSessionStorageProfileConfig,
 } from './sessionWizardStorageProfile';
+import {
+  compileSessionModeProfile,
+  hasLegacyTelegramFirstSessionFlags,
+  mergeSessionModeProfileStorageAccess,
+  profileFromLegacyConfig,
+  type SessionModeProfile,
+} from '../../utilities/session/sessionModeProfile';
 import type {
   AnyRecord,
   ChainIdLike,
@@ -26,19 +38,6 @@ import type {
   SessionContractsLike,
   WorkerSecretsLike,
 } from '../shellTypes';
-
-const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
-const trimString = (value: unknown): string => toStr(value).trim();
-const cloneValue = <T = unknown>(value: T): T => {
-  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
-  if (isObj(value)) {
-    return Object.keys(value).reduce<AnyRecord>((acc, key) => {
-      acc[key] = cloneValue(value[key]);
-      return acc;
-    }, {}) as T;
-  }
-  return (typeof value === 'string' ? value.trim() : value) as T;
-};
 
 const WORKER_METADATA_ALIAS_KEYS = Object.freeze([
   ...SESSION_WORKER_METADATA_ALIAS_KEYS,
@@ -48,7 +47,10 @@ const WORKER_METADATA_ALIAS_KEYS = Object.freeze([
   'deployHelperEnabled',
 ]);
 
-export { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS };
+export {
+  SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
+  buildSessionWizardRegistrySessionFields,
+};
 
 const orderMetadataFields = (metadata: AnyRecord, fieldOrder: string[] = []): AnyRecord => {
   if (!isObj(metadata)) return metadata;
@@ -114,33 +116,18 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   next = normalizeSessionNaming(next) as AnyRecord;
   next.sessionName = trimString(next.sessionName);
   next.sessionInfo = trimString(next.sessionInfo);
-  next.telegramOnly = next.telegramOnly === true ||
-    next.telegram_only === true ||
-    trimString(next.sessionMode).toLowerCase() === 'telegram_only' ||
-    trimString(next.telegramMode).toLowerCase() === 'telegram_only' ||
-    (isObj(next.telegram) && (
-      next.telegram.only === true ||
-      trimString(next.telegram.mode).toLowerCase() === 'telegram_only'
-    ));
   delete next.telegram_only;
+  if (!next.sessionModeProfile && hasLegacyTelegramFirstSessionFlags(next)) {
+    next.sessionModeProfile = profileFromLegacyConfig(next);
+  }
+  delete next.telegramOnly;
   delete next.telegramMode;
-  if (next.telegramOnly) {
-    next.sessionMode = 'telegram_only';
-    next.telegramBridgeEnabled = true;
-    next.telegram = {
-      ...(isObj(next.telegram) ? next.telegram : {}),
-      mode: 'telegram_only',
-      only: true,
-    };
-  } else {
-    delete next.telegramOnly;
-    delete next.telegramBridgeEnabled;
-    delete next.sessionMode;
-    if (isObj(next.telegram)) {
-      delete next.telegram.only;
-      delete next.telegram.mode;
-      if (!Object.keys(next.telegram).length) delete next.telegram;
-    }
+  delete next.telegramBridgeEnabled;
+  delete next.sessionMode;
+  if (isObj(next.telegram)) {
+    delete next.telegram.only;
+    delete next.telegram.mode;
+    if (!Object.keys(next.telegram).length) delete next.telegram;
   }
   if (!next.sessionName) delete next.sessionName;
   if (!next.sessionInfo) delete next.sessionInfo;
@@ -158,7 +145,7 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   delete next.orderHeaderImg;
 
   if (isObj(next.ai)) {
-    const ai = next.ai;
+    const ai = next.ai as AnyRecord;
     const fallbackProvider = normalizeAiProvider(ai.mode || ai.provider || 'openai');
     ai.models = normalizeAiModels(ai.models, fallbackProvider, ai.transcription);
     if (isObj(ai.models?.fast)) {
@@ -191,7 +178,15 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(next, 'storageProfile')) {
+  if (isObj(next.sessionModeProfile)) {
+    const sessionModeProfile = mergeSessionModeProfileStorageAccess(
+      next.sessionModeProfile as SessionModeProfile,
+      next.storageProfile
+    );
+    next.sessionModeProfile = sessionModeProfile;
+    const compiled = compileSessionModeProfile(sessionModeProfile);
+    next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+  } else if (Object.prototype.hasOwnProperty.call(next, 'storageProfile')) {
     next.storageProfile = normalizeSessionStorageProfileConfig(next.storageProfile);
   }
 
@@ -220,43 +215,42 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   }
 
   if (isObj(next.contracts)) {
-    next.contracts = sanitizeContracts(next.contracts);
+    next.contracts = sanitizeContracts(next.contracts as SessionContractsLike);
   }
 
   return orderMetadataFields(next, fieldOrder);
 };
 
-export const buildSessionWizardRegistrySessionFields = ({
-  onChainFields = {},
-  sponsoredFields = {},
-  compatibilityFieldPaths = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
+export const resolveSessionWizardWorkerStorageProfilePayload = ({
+  draft = {},
+  deployPayload = {},
 }: {
-  onChainFields?: AnyRecord;
-  sponsoredFields?: AnyRecord;
-  compatibilityFieldPaths?: Record<string, string[]>;
-} = {}): AnyRecord => {
-  const next: AnyRecord = {};
-  const compatPaths = isObj(compatibilityFieldPaths) ? compatibilityFieldPaths : {};
-  const rawOnChainFields = isObj(onChainFields) ? onChainFields : {};
-
-  Object.keys(compatPaths).forEach((fieldKey) => {
-    if (!Object.prototype.hasOwnProperty.call(rawOnChainFields, fieldKey)) return;
-    const rawValue = rawOnChainFields[fieldKey];
-    if (typeof rawValue === 'string') {
-      next[fieldKey] = trimString(rawValue);
-      return;
-    }
-    if (rawValue != null) {
-      next[fieldKey] = cloneValue(rawValue);
-    }
-  });
-
-  Object.entries(isObj(sponsoredFields) ? sponsoredFields : {}).forEach(([key, value]) => {
-    const trimmed = trimString(value);
-    if (trimmed) next[key] = trimmed;
-  });
-
-  return next;
+  draft?: AnyRecord | null;
+  deployPayload?: AnyRecord | null;
+} = {}): {
+  storageProfile: AnyRecord;
+  sessionModeProfile: SessionModeProfile | null;
+} => {
+  const resolvedDraft = isObj(draft) ? draft : {};
+  const resolvedDeployPayload = isObj(deployPayload) ? deployPayload : {};
+  const rawStorageProfile = resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile;
+  const sessionModeProfile = isObj(resolvedDraft.sessionModeProfile)
+    ? resolvedDraft.sessionModeProfile as SessionModeProfile
+    : (hasLegacyTelegramFirstSessionFlags(resolvedDraft)
+      ? profileFromLegacyConfig(resolvedDraft)
+      : null);
+  const effectiveSessionModeProfile = sessionModeProfile
+    ? mergeSessionModeProfileStorageAccess(sessionModeProfile, rawStorageProfile)
+    : null;
+  const compiledProfile = effectiveSessionModeProfile ? compileSessionModeProfile(effectiveSessionModeProfile) : null;
+  const storageProfile = normalizeSessionStorageProfileConfig(
+    compiledProfile?.storageProfile ||
+    rawStorageProfile
+  );
+  return {
+    storageProfile,
+    sessionModeProfile: effectiveSessionModeProfile,
+  };
 };
 
 export const buildSessionWizardWorkerConfigPayload = ({
@@ -312,7 +306,13 @@ export const buildSessionWizardWorkerConfigPayload = ({
     };
   });
 
-  const storageProfile = normalizeSessionStorageProfileConfig(resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile);
+  const {
+    storageProfile,
+    sessionModeProfile: effectiveSessionModeProfile,
+  } = resolveSessionWizardWorkerStorageProfilePayload({
+    draft: resolvedDraft,
+    deployPayload: resolvedDeployPayload,
+  });
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
@@ -335,13 +335,9 @@ export const buildSessionWizardWorkerConfigPayload = ({
     litCredentials: isWorkerSbtGateCloudflareStorageProfile(storageProfile)
       ? {}
       : buildWorkerLitCredentialsConfig(workerSecrets),
+    ...(effectiveSessionModeProfile ? { sessionModeProfile: cloneValue(effectiveSessionModeProfile) } : {}),
     storageProfile,
   };
-  if (resolvedDraft.telegramOnly === true) {
-    next.telegramOnly = true;
-    next.sessionMode = 'telegram_only';
-    next.telegramBridgeEnabled = true;
-  }
 
   if (
     typeof resolvedDeployPayload.embeddedDeployHelperEnabled === 'boolean' ||

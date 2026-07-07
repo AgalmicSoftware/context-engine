@@ -289,6 +289,78 @@ test('dispatchAdminRequest returns allowed-key secret presence without exposing 
   assert.doesNotMatch(JSON.stringify(result.body), /sk-existing|rpc\.example|do-not-report|RSA/);
 });
 
+test('dispatchAdminRequest routes signed worker group CRUD through admin auth', async () => {
+  let authorityCalled = false;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        group: {
+          groupId: 'reviewers',
+          label: 'Reviewers',
+          joinMode: 'admin_add',
+          memberVisibility: 'members',
+        },
+      }),
+    },
+    env: { CE_WORKER_GROUPS_KV: {
+      store: new Map(),
+      async put(key, value) { this.store.set(key, value); },
+      async get(key) { return this.store.get(key) || null; },
+      async list({ prefix = '' } = {}) {
+        return { keys: [...this.store.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })) };
+      },
+    } },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'groups/create',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => {
+        authorityCalled = true;
+        return {
+          ok: true,
+          address: '0x0000000000000000000000000000000000000abc',
+          existingConfig: { adminAddress: '0x0000000000000000000000000000000000000abc' },
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+          targetSlug: 'session-a',
+        };
+      },
+      now: () => Date.parse('2026-02-03T04:05:06.000Z'),
+    }),
+  });
+
+  assert.equal(authorityCalled, true);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(result.body.group.groupId, 'reviewers');
+  assert.equal(result.body.group.createdBy.kind, 'evm_address');
+});
+
+test('dispatchAdminRequest does not touch groups when admin auth fails', async () => {
+  const response = { body: { error: 'Admin denied.' }, status: 403, headers: {} };
+  let groupDispatchCalled = false;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        group: { groupId: 'blocked', label: 'Blocked', joinMode: 'admin_add' },
+      }),
+    },
+    env: {},
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'groups/create',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: false, response }),
+      dispatchAdminWorkerGroupRequest: async () => {
+        groupDispatchCalled = true;
+        return null;
+      },
+    }),
+  });
+
+  assert.equal(result, response);
+  assert.equal(groupDispatchCalled, false);
+});
+
 test('dispatchAdminRequest reads Lit Chipotle status from worker config plus session secrets', async () => {
   const result = await dispatchAdminRequest({
     request: {
@@ -679,6 +751,124 @@ test('dispatchAdminRequest merges limits and persists the result for set-limits'
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
+});
+
+test('dispatchAdminRequest exports encrypted storage envelopes through the admin gate', async () => {
+  const calls = [];
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({ resource: 'responses' }),
+    },
+    env: { CE_STORAGE_INDEX_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: 'session-a',
+    action: 'export-storage-envelopes',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: { storageProfile: { backend: 'cloudflare' } },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      exportCloudflareEncryptedPayloadEnvelopes: async (value) => {
+        calls.push(value);
+        return {
+          ok: true,
+          manifest: {
+            exportScope: 'encrypted_envelopes_only',
+            encryptedPayloadCount: 1,
+          },
+          payloads: [{ storageRef: { id: 'payload-1' } }],
+        };
+      },
+    }),
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].slug, 'session-a');
+  assert.equal(calls[0].resource, 'responses');
+  assert.equal(calls[0].includeSessionEnvelope, true);
+  assert.deepEqual(result, {
+    body: {
+      ok: true,
+      manifest: {
+        exportScope: 'encrypted_envelopes_only',
+        encryptedPayloadCount: 1,
+      },
+      payloads: [{ storageRef: { id: 'payload-1' } }],
+    },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
+test('dispatchAdminRequest does not export envelopes when admin authority fails', async () => {
+  let exportCalled = false;
+  const response = { body: { error: 'Admin authorization failed.' }, status: 403, headers: {} };
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({ resource: 'responses' }),
+    },
+    env: { CE_STORAGE_INDEX_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: 'session-a',
+    action: 'export-storage-envelopes',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: false, response }),
+      exportCloudflareEncryptedPayloadEnvelopes: async () => {
+        exportCalled = true;
+        return { ok: true };
+      },
+    }),
+  });
+
+  assert.equal(result, response);
+  assert.equal(exportCalled, false);
+});
+
+test('dispatchAdminRequest rewraps deployment KEK without returning secret material', async () => {
+  const calls = [];
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        newDeploymentKek: 'new deployment envelope kek',
+      }),
+    },
+    env: { CE_STORAGE_INDEX_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: 'session-a',
+    action: 'rewrap-envelope-deployment-key',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: { storageEnvelope: { keyProvider: 'worker_secret' } },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      rewrapStorageEnvelopeSessionKeyForDeployment: async (value) => {
+        calls.push(value);
+        return {
+          ok: true,
+          rewrappedAt: '2026-01-04T03:04:05.000Z',
+          keyProvider: 'worker_secret',
+        };
+      },
+    }),
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].slug, 'session-a');
+  assert.equal(calls[0].newDeploymentKek, 'new deployment envelope kek');
+  assert.deepEqual(result, {
+    body: {
+      ok: true,
+      rewrappedAt: '2026-01-04T03:04:05.000Z',
+      keyProvider: 'worker_secret',
+    },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+  assert.doesNotMatch(JSON.stringify(result), /new deployment envelope kek/);
 });
 
 test('dispatchAdminRequest returns explicit unknown-action failures after admin verification', async () => {

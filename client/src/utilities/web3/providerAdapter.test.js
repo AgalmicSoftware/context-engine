@@ -59,22 +59,36 @@ describe('providerAdapter', () => {
     expect(resolveSignerProvider({
       providerName: 'surprise-wallet',
       injectedProvider,
+      allowInjectedSignerFallback: true,
     })).toEqual(expect.objectContaining({
       ok: false,
       status: 'unknown-provider',
     }));
   });
 
-  it('resolves Porto signer providers through the adapter factory', () => {
-    const portoProvider = { isPorto: true };
+  it('allows explicit injected signer provider selection', () => {
+    const injectedProvider = { request: jest.fn() };
 
     expect(resolveSignerProvider({
-      providerName: 'porto_passkey',
-      portoProviderFactory: () => portoProvider,
+      providerName: 'injected',
+      injectedProvider,
     })).toEqual({
       ok: true,
-      provider: portoProvider,
-      source: 'porto',
+      provider: injectedProvider,
+      source: 'injected-wallet',
+    });
+  });
+
+  it('resolves passkey EOA signer providers through the adapter factory', () => {
+    const passkeyProvider = { isPasskeyEoa: true };
+
+    expect(resolveSignerProvider({
+      providerName: 'passkey_eoa',
+      passkeyProviderFactory: () => passkeyProvider,
+    })).toEqual({
+      ok: true,
+      provider: passkeyProvider,
+      source: 'passkey-eoa',
     });
   });
 

@@ -38,6 +38,13 @@ describe('sbtPageHelpers refresh helpers', () => {
     })).toBe(true);
     expect(resolveSbtPageShouldRefreshCounts({
       burnedAddresses: [],
+      countsLoaded: false,
+      forceEventFetch: false,
+      mintedAddresses: ['0x1'],
+      mintedTokensOverride: null,
+    })).toBe(true);
+    expect(resolveSbtPageShouldRefreshCounts({
+      burnedAddresses: [],
       countsLoaded: true,
       forceEventFetch: false,
       mintedAddresses: [],
@@ -56,7 +63,14 @@ describe('sbtPageHelpers refresh helpers', () => {
       forceEventFetch: false,
       mintedAddresses: [],
       mintedTokensOverride: { total: 1 },
-    })).toBe(false);
+    })).toBe(true);
+    expect(resolveSbtPageShouldRefreshCounts({
+      burnedAddresses: [],
+      countsLoaded: false,
+      forceEventFetch: false,
+      mintedAddresses: [],
+      mintedTokensOverride: '1',
+    })).toBe(true);
     expect(resolveSbtPageOwnerLookupFallbackDecision({
       burnedAddresses: [],
       countsLoaded: false,

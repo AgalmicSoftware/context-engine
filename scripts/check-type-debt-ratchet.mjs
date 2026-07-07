@@ -29,6 +29,11 @@ export const TYPE_DEBT_PATTERNS = Object.freeze([
     pattern: /\bas\s+any\b/g,
   },
   {
+    key: 'asUnknownAs',
+    label: 'as unknown as',
+    pattern: /\bas\s+unknown\s+as\b/g,
+  },
+  {
     key: 'promiseAny',
     label: 'Promise<any>',
     pattern: /\bPromise\s*<\s*any\s*>/g,
@@ -59,6 +64,7 @@ const TEST_DIRECTORY_SEGMENTS = new Set([
 const TEST_FILE_PATTERN = /\.(?:test|spec)\.tsx?$/;
 const TEST_UTILITY_FILE_PATTERN =
   /(?:^|[._-])(?:test-?utils?|testing|fixtures?)(?:[._-]|\.)|(?:testFixtures|testUtils|testingUtils)/i;
+const TEST_HARNESS_FILE_PATTERN = /harness\.tsx?$/i;
 
 export const createZeroCounts = () => Object.fromEntries(
   TYPE_DEBT_PATTERNS.map(({ key }) => [key, 0]),
@@ -87,7 +93,7 @@ export const isProductionTypeScriptFile = (filePath) => {
     return false;
   }
 
-  if (TEST_UTILITY_FILE_PATTERN.test(basename)) {
+  if (TEST_UTILITY_FILE_PATTERN.test(basename) || TEST_HARNESS_FILE_PATTERN.test(basename)) {
     return false;
   }
 
@@ -181,6 +187,21 @@ export const compareTypeDebtCounts = (currentCounts, baselineCounts) => TYPE_DEB
   })
   .filter(({ delta }) => delta > 0);
 
+export const compareTypeDebtReductions = (currentCounts, baselineCounts) => TYPE_DEBT_PATTERNS
+  .map(({ key, label }) => {
+    const current = currentCounts[key] || 0;
+    const baseline = baselineCounts[key] || 0;
+
+    return {
+      key,
+      label,
+      current,
+      baseline,
+      delta: current - baseline,
+    };
+  })
+  .filter(({ delta }) => delta < 0);
+
 export const readBaseline = (rootDir = DEFAULT_ROOT_DIR) => {
   const baselinePath = path.join(rootDir, BASELINE_PATH);
   return JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
@@ -260,6 +281,7 @@ export const runTypeDebtRatchet = ({
 
   const baselineCounts = normalizeBaselineCounts(readBaseline(rootDir));
   const increases = compareTypeDebtCounts(debt.counts, baselineCounts);
+  const reductions = compareTypeDebtReductions(debt.counts, baselineCounts);
 
   stdout(`Type debt ratchet checked ${debt.filesChecked} production TS/TSX files in ${SOURCE_ROOT}.`);
   stdout('Current counts (current / baseline):');
@@ -276,6 +298,13 @@ export const runTypeDebtRatchet = ({
       stderr(`- ${label}: ${current} exceeds baseline ${baseline} by ${delta}`);
     });
     return 1;
+  }
+
+  if (reductions.length > 0) {
+    stdout('Type debt baseline has headroom; re-bank the baseline with --write-baseline in the same commit.');
+    reductions.forEach(({ label, current, baseline, delta }) => {
+      stdout(`- ${label}: ${current} is below baseline ${baseline} by ${Math.abs(delta)}`);
+    });
   }
 
   stdout('Type debt ratchet passed: no count increased above baseline.');

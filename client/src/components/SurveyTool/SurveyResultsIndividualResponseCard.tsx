@@ -19,9 +19,10 @@ type SurveyResultsIndividualResponseCardProps = {
   effectiveSlug?: string;
   index: number;
   isOpen?: boolean;
-  onToggleResponse: (index: number) => void;
+  onToggleResponse: (responseId: string) => void;
   renderResponseBody: (response: SurveyResultsResponseListEntry, index: number) => React.ReactNode;
   response: SurveyResultsResponseListEntry;
+  responseId: string;
   styleMap: Record<string, string>;
 };
 
@@ -33,11 +34,12 @@ const SurveyResultsIndividualResponseCard = ({
   onToggleResponse,
   renderResponseBody,
   response,
+  responseId,
   styleMap,
 }: SurveyResultsIndividualResponseCardProps): React.ReactElement => (
   <Card className={styleMap.singleResponseCard}>
     <CardHeader
-      onClick={() => onToggleResponse(index)}
+      onClick={() => onToggleResponse(responseId)}
       className={styleMap.responseHeader}
     >
       <span className={styleMap.responderAddress}>
@@ -63,9 +65,11 @@ const SurveyResultsIndividualResponseCard = ({
       />
     </CardHeader>
     <Collapse isOpen={isOpen} id={styleMap.surveyResultsCollapse}>
-      <CardBody className={styleMap.responseCard}>
-        {renderResponseBody(response, index)}
-      </CardBody>
+      {isOpen && (
+        <CardBody className={styleMap.responseCard}>
+          {renderResponseBody(response, index)}
+        </CardBody>
+      )}
     </Collapse>
   </Card>
 );

@@ -43,7 +43,7 @@ function verifyPackageScript(pkg, scriptName, expectedFragment, failures, label 
 }
 
 function verifyClassifiedRootTests(rootDir, failures) {
-  const existingRootTests = listDirectTestFiles(rootDir, 'test', ROOT_TEST_FILE_RE);
+  const existingRootTests = listDirectTestFiles(rootDir, path.join('tests', 'root'), ROOT_TEST_FILE_RE);
   const classified = new Set(ROOT_TEST_FILES);
 
   const unclassified = existingRootTests.filter(

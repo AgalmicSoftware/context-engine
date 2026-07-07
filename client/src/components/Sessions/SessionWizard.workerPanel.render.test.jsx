@@ -32,7 +32,7 @@ describe('SessionWizard worker panel rendering', () => {
     selectNormalModeCard('Worker');
 
     expect(await screen.findByText('Bring your own worker')).toBeInTheDocument();
-    expect(await screen.findByText('Cloudflare API token')).toBeInTheDocument();
+    expect((await screen.findAllByText('Cloudflare API token')).length).toBeGreaterThan(0);
     expect(screen.queryByText('Upload bundle file')).not.toBeInTheDocument();
     expect(screen.queryByText('Using Default Worker')).not.toBeInTheDocument();
     expect(screen.queryByText('Use My Own')).not.toBeInTheDocument();

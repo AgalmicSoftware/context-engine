@@ -11,7 +11,7 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 | `ai-laws-policy-corpus.json` | 223 | Global AI legislation, regulatory proposals, policy frameworks, agency guidance, and official reports with governance-focused analysis. |
 | `ai-scifi-books-corpus.json` | 151 | Science fiction works curated for AI safety, alignment, ethics, and policy discourse. |
 | `arxiv-ai-safety-corpus.json` | 266 | Academic papers on AI safety, alignment, interpretability, and governance. |
-| `cross-corpus-debates.json` | 13 | Structured debate trees that synthesize evidence across multiple AI discourse sources. |
+| `cross-corpus-debates.json` | 16 | Structured debate trees that synthesize evidence across multiple AI discourse sources. |
 | `dwarkesh-lab-insiders-corpus.json` | 149 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
 | `enriched-tweets.json` | 4036 | Enriched social-media discourse with summaries, tags, relevance signals, and linked context. |
 | `lesswrong-posts-corpus.json` | 211 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |

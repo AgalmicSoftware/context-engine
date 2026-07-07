@@ -9,7 +9,7 @@ import styles from './DocumentLibraryPanel.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { DOC_LIBRARY_ARWEAVE_GATEWAYS } from '../../variables/arweaveGateways.js';
 
-import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
+import { arweaveClient as arweaveScripts } from '../../utilities/arweave/arweaveClient.js';
 import {
   buildSbtAccessControlConditions,
   getUnsupportedLitContractAccessControlError,
@@ -796,9 +796,10 @@ export default function DocumentLibraryPanel({
       if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
       setError(getErrorMessage(err, 'Failed to load docs.'));
     } finally {
-      if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
-      loadingRef.current = false;
-      setLoading(false);
+      if (listRequestSeqRef.current === requestSeq && activeListQueryKeyRef.current === expectedQueryKey) {
+        loadingRef.current = false;
+        setLoading(false);
+      }
     }
   }, [account, canList, docProvider, graphqlUrl, graphqlUrls, listFilters, network?.id, pageSize, provider, sessionConfig, sessionSlug, listRunKey]);
 

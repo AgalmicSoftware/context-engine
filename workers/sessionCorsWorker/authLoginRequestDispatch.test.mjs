@@ -32,6 +32,8 @@ const createAuthDeps = (overrides = {}) => ({
   }),
   signToken: async () => 'signed-token',
   getAddress: (value) => value,
+  buildAuthTokenJti: () => 'jti-default',
+  persistAuthTokenRecord: async () => {},
   now: () => 1_700_000_000_000,
   TOKEN_TTL_SECONDS: 60 * 60 * 24,
   MISSING_SLUG_ERROR: 'Missing sessionSlug.',
@@ -102,6 +104,7 @@ test('dispatchAuthLoginRequest preserves authority failure passthrough before to
 });
 
 test('dispatchAuthLoginRequest preserves token-signing failure contract', async () => {
+  let persistCalled = false;
   const result = await dispatchAuthLoginRequest({
     request: {
       json: async () => createSignedBody(),
@@ -113,9 +116,13 @@ test('dispatchAuthLoginRequest preserves token-signing failure contract', async 
       signToken: async () => {
         throw new Error('Token signing failed.');
       },
+      persistAuthTokenRecord: async () => {
+        persistCalled = true;
+      },
     }),
   });
 
+  assert.equal(persistCalled, false);
   assert.deepEqual(result, {
     body: { error: 'Token signing failed.' },
     status: 500,
@@ -123,7 +130,7 @@ test('dispatchAuthLoginRequest preserves token-signing failure contract', async 
   });
 });
 
-test('dispatchAuthLoginRequest signs tokens with the resolved slug, scopes, and ttl', async () => {
+test('dispatchAuthLoginRequest signs tokens with jti and persists the token marker', async () => {
   const scopes = {
     ai: true,
     arweave: false,
@@ -162,9 +169,16 @@ test('dispatchAuthLoginRequest signs tokens with the resolved slug, scopes, and 
         calls.push(['getAddress', value]);
         return '0xABC';
       },
+      buildAuthTokenJti: () => {
+        calls.push(['buildAuthTokenJti']);
+        return 'jti-1';
+      },
       signToken: async (payload, secret) => {
         calls.push(['signToken', payload, secret]);
         return 'signed-token';
+      },
+      persistAuthTokenRecord: async (value) => {
+        calls.push(['persistAuthTokenRecord', value]);
       },
       now: () => 1_700_000_000_000,
     }),
@@ -180,16 +194,56 @@ test('dispatchAuthLoginRequest signs tokens with the resolved slug, scopes, and 
       baseHeaders: { 'Access-Control-Allow-Origin': '*' },
     }],
     ['getAddress', '0xabc'],
+    ['buildAuthTokenJti'],
     ['signToken', {
       sub: '0xABC',
       slug: 'session-a',
       scopes,
       exp: expectedExp,
+      jti: 'jti-1',
     }, 'test-secret'],
+    ['persistAuthTokenRecord', {
+      env: { GROUP_KV: {}, TOKEN_HMAC_SECRET: 'test-secret' },
+      slug: 'session-a',
+      sub: '0xABC',
+      jti: 'jti-1',
+      ttlSeconds: 60 * 60 * 24,
+    }],
   ]);
   assert.deepEqual(result, {
     body: { token: 'signed-token', exp: expectedExp },
     status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
+
+test('dispatchAuthLoginRequest fails closed when token marker persistence fails', async () => {
+  const calls = [];
+
+  const result = await dispatchAuthLoginRequest({
+    request: {
+      json: async () => createSignedBody(),
+    },
+    env: { GROUP_KV: {}, TOKEN_HMAC_SECRET: 'test-secret' },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    deps: createAuthDeps({
+      buildAuthTokenJti: () => 'jti-1',
+      signToken: async () => {
+        calls.push('signToken');
+        return 'signed-token';
+      },
+      persistAuthTokenRecord: async () => {
+        calls.push('persistAuthTokenRecord');
+        throw new Error('KV unavailable.');
+      },
+    }),
+  });
+
+  assert.deepEqual(calls, ['signToken', 'persistAuthTokenRecord']);
+  assert.deepEqual(result, {
+    body: { error: 'KV unavailable.' },
+    status: 500,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
   });
 });

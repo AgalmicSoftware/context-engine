@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import styles from './MainSite.module.scss';
+import styles from './AppShell.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   ROUTE_STATUS_BODY_STYLE,

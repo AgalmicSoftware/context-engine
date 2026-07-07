@@ -350,7 +350,7 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                     <span className={styles.sectionEyebrow}>Atlas Positions</span>
                     <h2>Where They Stand</h2>
                     <p className={styles.sectionDescription}>
-                      Strongest convictions across AI policy topics. Positive = agrees with the topic's
+                      Strongest convictions across AI policy topics. Positive = agrees with the topic&apos;s
                       framing, negative = challenges it.
                     </p>
                     <div className={styles.positionList}>

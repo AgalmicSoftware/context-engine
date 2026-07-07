@@ -1,4 +1,5 @@
 import {
+  runSurveyResultsBrowserDownload,
   runSurveyResultsExportController,
   type SurveyResultsExportContentGenerators,
 } from './surveyResultsExportController';
@@ -169,5 +170,58 @@ describe('surveyResultsExportController', () => {
       timestamp: '2026_05_28T10_00_00_000Z',
     })).toThrow(error);
     expect(generators['questions-responses-json']).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates a hidden browser download anchor with the planned Blob metadata', async () => {
+    const urlConstructor = window.URL as typeof window.URL & {
+      createObjectURL?: (blob: Blob) => string;
+    };
+    const originalCreateObjectURL = urlConstructor.createObjectURL;
+    const createObjectURL = jest.fn(() => 'blob:survey-results-download');
+    let clickedAnchor: HTMLAnchorElement | null = null;
+    Object.defineProperty(urlConstructor, 'createObjectURL', {
+      configurable: true,
+      value: createObjectURL,
+    });
+    const clickSpy = jest
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function recordClickedAnchor(this: HTMLAnchorElement) {
+        clickedAnchor = this;
+      });
+
+    try {
+      runSurveyResultsBrowserDownload({
+        fileContent: 'downloaded contents',
+        filename: 'contextEngine_questionResults_2026_05_28.json',
+        mimeType: 'application/json;charset=utf-8;',
+      });
+
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      const blob = createObjectURL.mock.calls[0][0];
+      expect(blob).toBeInstanceOf(Blob);
+      expect(blob.type).toBe('application/json;charset=utf-8;');
+      await expect(new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error || new Error('Unable to read Blob'));
+        reader.readAsText(blob);
+      })).resolves.toBe('downloaded contents');
+      expect(clickedAnchor).not.toBeNull();
+      expect(clickedAnchor?.getAttribute('hidden')).toBe('');
+      expect(clickedAnchor?.getAttribute('href')).toBe('blob:survey-results-download');
+      expect(clickedAnchor?.getAttribute('download')).toBe('contextEngine_questionResults_2026_05_28.json');
+      expect(document.body.contains(clickedAnchor)).toBe(false);
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      clickSpy.mockRestore();
+      if (originalCreateObjectURL) {
+        Object.defineProperty(urlConstructor, 'createObjectURL', {
+          configurable: true,
+          value: originalCreateObjectURL,
+        });
+      } else {
+        delete urlConstructor.createObjectURL;
+      }
+    }
   });
 });

@@ -6,6 +6,8 @@ Primary product and system specification:
 Canonical reference set:
 - root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `spec.md`
 - the `docs/` reference docs listed below
+- `docs/architecture-overview.md` is the first-read architecture and verification
+  map for new engineers and auditors
 
 Non-canonical / historical planning material:
 - private planning files under ignored local paths
@@ -27,13 +29,11 @@ Code navigation maps:
 - `docs/MainSite.MAP.md`: app-shell route/runtime orchestration map.
 - `docs/SurveyTool.MAP.md`: survey/question runtime and encryption flow map.
 - `docs/SessionWizard.MAP.md`: session creation, worker deploy, and publish-flow map.
-- `docs/contractScripts.MAP.md`: web3 integration/navigation map for the `contractScripts` surface.
+- `docs/contractScripts.MAP.md`: web3 integration/navigation map for the `chainGateway` / legacy `contractScripts` surface.
 
 Session, gates, and the Worker:
 - `docs/session-creation-guide.md`: End-to-end setup guide for creating a session from `/new`, including the "what a new session needs" checklist, sponsored bundle handoff, worker deploy paths, on-chain registration, and `/admin` verification.
 - `docs/session-listening-mode.md`: `?mode=listening` pile-adjacent microphone workflow, rolling 3-minute transcription, local recovery metadata, and question-generation output.
-- `docs/session-demo-progressive-loading-prd.md`: PRD for rendering questions as soon as the first question is hydrated, showing compact scan progress while remaining blocks load, warming Demo targets from `/about`, and future Cloudflare-hosted session snapshots.
-- `docs/session-results-html-report-prd.md`: PRD for exporting point-in-time session results as an HTML viewer, static HTML, or PDF report with redacted snapshots, downloader metadata, optional AI-derived analysis sections, and embedded snapshot JSON.
 - `docs/standard-sponsored-links-fixture.md`: Temporary tracked fixture for publishing a small set of public sponsored setup links with minimal onboarding friction.
 - `docs/session-registry.md`: SessionRegistry migration and on-chain gate authority model.
 - `docs/session-cors-worker.md`: Cloudflare `sessionCorsWorker` behavior, endpoints, KV layouts, and wizard flow.
@@ -61,13 +61,21 @@ Local development:
 
 Release:
 - `docs/dependency-audit-hotspots.md`: dependency audit remediations, accepted residuals, and package-specific audit commands.
+- `docs/release-runbook.md`: operator release checklist, gates, public strip policy, worker bundle publishing, and rollback notes.
 - `docs/releasing.md`: Public-history replay, stripped artifact export, and release hygiene checks.
+- `docs/security/audit-prep-2026-07-06.md`: built-in audit-prep snapshot covering npm audit disposition, secrets/config sweeps, and contracts/worker inventory.
+- `docs/testing-budget.md`: full client/test:node runtime budget, coverage snapshot, and slowest-suite report.
+- `docs/typescript-strictness-plan.md`: plan for moving from count ratchets toward directory-level compiler strictness.
 
 Wallets:
-- `docs/porto-information.md`: Porto passkey wallet wiring and deterministic test wallet workflow.
+- `docs/passkey-wallet.md`: passkey-unlocked EOA wallet wiring and deterministic test wallet workflow.
+- `docs/forking-wallet.md`: RP ID and wallet setup checklist for forks.
+- `docs/security-model.md`: embedded wallet and soft-session security model.
+- `docs/passkey-wallet-migration-audit.md`: Porto migration audit and remaining risks.
 
 E2E workflows:
 - `docs/e2e-setup.md`: End-to-end workflow scripts, chain runtime modes, and the current manual-fork workflow for repeated verification against live deployments.
+- `docs/e2e-cadence.md`: operator cadence for nightly, pre-release, and per-lane E2E runs plus the E2E-BLOCKED protocol.
 - `docs/e2e-testid-api.md`: Stable `data-testid` hooks used by Playwright runners (TestID API).
 
 Public discovery:

@@ -22,7 +22,7 @@ type AccountReducerAction =
 
 const initialState: AccountState = {
   account: '',          // ETH address connected to site
-  provider: 'none',     // 'none' | 'wagmi' | 'web3auth' | 'porto_passkey'
+  provider: 'none',     // 'none' | 'wagmi' | 'web3auth' | 'passkey_eoa'
   network: null,
   alerts: [],
   userImageURL: null,

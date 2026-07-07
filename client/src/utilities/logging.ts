@@ -26,7 +26,7 @@ const DEFAULT_LOGGING_CONFIG = {
     account: false,
     ui: false,
     whisper: false,
-    porto: false,
+    wallet: false,
     inviteDebug: false,
     cache: false,
     crypto: false
@@ -70,10 +70,11 @@ type Logger = {
 };
 
 type LoggingRuntimeWindow = Window & {
+  [GLOBAL_KEY]?: PartialLoggingConfig | LoggingConfig;
+  [GUIDE_SHOWN_KEY]?: unknown;
   CE_LOGGING_HELP?: () => void;
   ENABLE_RPC_DEBUG_LOGGING?: unknown;
-} & Record<typeof GLOBAL_KEY, PartialLoggingConfig | LoggingConfig | undefined>
-  & Record<typeof GUIDE_SHOWN_KEY, unknown>;
+};
 
 const CE_ASCII = [
   '  _____  ______   CE LOGGING',
@@ -87,7 +88,7 @@ const defaultCategories = DEFAULT_LOGGING_CONFIG.categories as Record<string, bo
 const defaultLevels = DEFAULT_LOGGING_CONFIG.levels as Record<string, boolean>;
 
 const getRuntimeWindow = (): LoggingRuntimeWindow | null => (
-  typeof window === 'undefined' ? null : window as unknown as LoggingRuntimeWindow
+  typeof window === 'undefined' ? null : window as LoggingRuntimeWindow
 );
 
 const cloneDefaults = (): LoggingConfig => ({

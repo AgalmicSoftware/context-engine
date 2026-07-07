@@ -20,12 +20,18 @@ npm test
 ```
 
 This runs the canonical root gate (`npm run test:ci`), which includes wiring
-checks, the release-sanity gate, contract tests, client coverage, public-safe
-root Jest tests, public `sessionCorsWorker` module tests, Node-side tests, and
-cache guards.
+checks, the type-debt ratchet, the release-sanity gate, contract tests, client
+coverage, public-safe root Jest tests, public `sessionCorsWorker` module tests,
+Node-side tests, and cache guards.
 The release-sanity gate also runs the full client Jest suite without coverage
 before build or deploy verification proceeds, so failing component and style
 regression tests are caught before push/deploy instead of only in main CI.
+
+GitHub Actions runs the same required gates as separate jobs so slow lanes are
+visible and the workflow does not fail at the timeout edge. The final `test` job
+is an aggregate status check that fails if any split lane fails, is canceled, or
+is skipped. Keep local `npm test` / `npm run test:ci` as the serial developer
+gate.
 
 ### Client-Only Tests
 
@@ -75,8 +81,11 @@ npm run test:node
 npm run test:client
 ```
 
-`npm run test:wiring` also runs `scripts/verify-test-inventory.js`. That
-inventory check keeps root `test/*.test.*` files classified as one of:
+`npm run test:wiring` also runs `scripts/verify-test-inventory.js` and the
+client architecture boundary checker. The boundary checker runs in
+fail-on-new-violation mode against `scripts/client-boundaries-baseline.json`, so
+existing legacy imports stay visible while new direct violations fail the gate.
+The inventory check keeps root `tests/root/*.test.*` files classified as one of:
 
 - public-safe Node tests run by `npm run test:node`
 - public-safe Jest tests run by `npm run test:root:jest`
@@ -107,4 +116,4 @@ For required env setup, wallet flows, and the full command catalog, use:
 
 - [docs/e2e-setup.md](e2e-setup.md)
 - [docs/e2e-commands.md](e2e-commands.md)
-- [docs/porto-information.md](porto-information.md)
+- [docs/passkey-wallet.md](passkey-wallet.md)

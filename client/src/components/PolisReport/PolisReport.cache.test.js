@@ -16,7 +16,9 @@ import PolisReport, {
   PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
   REPORT_DEFAULT_EMBEDDING_LABEL,
   REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
+  resolveExploratoryClusterCount,
   resolveJsPdfConstructor,
+  resolvePrecomputedClusterDifference,
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
 import { getCommentBarData } from '../../utilities/survey/polisMath';
@@ -208,6 +210,18 @@ describe('PolisReport cache read options', () => {
         expect.objectContaining({ randomSeed: 42 })
       );
     });
+  });
+
+  it('falls back to zero for invalid precomputed cluster difference inputs', () => {
+    expect(resolvePrecomputedClusterDifference(undefined, undefined, undefined)).toBe(0);
+    expect(resolvePrecomputedClusterDifference(undefined, 70, 40)).toBe(30);
+    expect(resolvePrecomputedClusterDifference(12, undefined, undefined)).toBe(12);
+  });
+
+  it('resolves exploratory cluster counts without allowing zero-cluster k-means', () => {
+    expect(resolveExploratoryClusterCount({ activeClusterCount: 0, manualClusterCountValue: null })).toBe(0);
+    expect(resolveExploratoryClusterCount({ activeClusterCount: 0, manualClusterCountValue: '2' })).toBe(2);
+    expect(resolveExploratoryClusterCount({ activeClusterCount: 3, manualClusterCountValue: null })).toBe(3);
   });
 
   it('excludes seeded demo fixture rows from real report calculations', async () => {

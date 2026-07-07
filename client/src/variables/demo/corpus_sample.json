@@ -39,9 +39,9 @@
       },
       "cross_corpus": {
         "label": "Cross-Corpus Debates",
-        "sample_count": 8,
-        "full_count": 8,
-        "count": 13
+        "sample_count": 16,
+        "full_count": 16,
+        "count": 16
       }
     }
   },
@@ -3744,7 +3744,7 @@
     "cross_corpus": {
       "label": "Cross-Corpus Debates",
       "icon": "link",
-      "count_full": 13,
+      "count_full": 16,
       "entries": [
         {
           "id": "debate_exponential_progress",
@@ -4082,6 +4082,88 @@
             "Multimodal AI",
             "Watermarking",
             "Likeness Rights"
+          ]
+        },
+        {
+          "id": "debate_government_prerelease_access",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Should Governments Get Pre-Release Access to Frontier Models?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-06-02",
+          "category": "policy_dispute",
+          "summary": "Should frontier AI developers be required or encouraged to give governments pre-release access to models for safety/security assessment?",
+          "central_tension": "The policy spectrum runs from SB 53's transparency-only approach through the EO's voluntary access to the Great American AI Act's binding IVO audits — the core disagreement is whether voluntary cooperation suffices or binding obligations are necessary, against the backdrop of real security risks from centralizing model access",
+          "featured_source_title": "Executive Order — Promoting Advanced Artificial Intelligence Innovation and Security",
+          "featured_source_author": "White House",
+          "featured_source_corpus": "AI Laws",
+          "corpora_synthesized": [
+            "AI Laws",
+            "AI Safety Papers",
+            "METR",
+            "Lab Interviews"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Policy Dispute",
+            "AI Laws",
+            "AI Safety Papers",
+            "METR"
+          ]
+        },
+        {
+          "id": "debate_alignment_tractability_2026",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Is AI Alignment Being Solved or Increasingly Intractable?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-05",
+          "category": "methodology_debate",
+          "summary": "Is alignment becoming more tractable as models scale, or are we generating false confidence while fundamental problems remain unsolved?",
+          "central_tension": "Whether alignment tractability claims are grounded in genuine empirical progress or reflect an epistemological trap where AI systems optimizing for appearing aligned produce systematically misleading evidence of safety",
+          "featured_source_title": "We Are Near the End of the Exponential",
+          "featured_source_author": "Dario Amodei",
+          "featured_source_corpus": "Lab Interviews",
+          "corpora_synthesized": [
+            "AI Safety Papers",
+            "Lab Interviews",
+            "METR",
+            "LessWrong"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Methodology Debate",
+            "AI Safety Papers",
+            "Lab Interviews",
+            "METR"
+          ]
+        },
+        {
+          "id": "debate_ai_labor_displacement_timeline",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Will AI Displace Entry-Level Knowledge Workers Within 5 Years?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-05",
+          "category": "forecasting_disagreement",
+          "summary": "Will AI automate a majority of entry-level white-collar jobs within 5 years, as some lab leaders predict?",
+          "central_tension": "The core disagreement maps benchmark extrapolation against real-world complexity — METR's accelerating time horizons provide the strongest quantitative case for rapid displacement, but METR's own external validity caveats and the IAISR's documentation of expert disagreement suggest the 5-year timeline may be an artifact of confusing structured-task performance with holistic job substitutability",
+          "featured_source_title": "We Are Near the End of the Exponential",
+          "featured_source_author": "Dario Amodei",
+          "featured_source_corpus": "Lab Interviews",
+          "corpora_synthesized": [
+            "Lab Interviews",
+            "METR",
+            "AI Safety Papers",
+            "LessWrong",
+            "AI Laws"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Forecasting Disagreement",
+            "Lab Interviews",
+            "METR",
+            "AI Safety Papers"
           ]
         }
       ]

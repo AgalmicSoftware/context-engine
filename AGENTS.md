@@ -39,7 +39,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 ## Project map
 | Path | What it is |
 |------|------------|
-| `client/src/components/MainSite/MainSite.tsx` | See [`docs/MainSite.MAP.md`](docs/MainSite.MAP.md) for the MainSite section index |
+| `client/src/components/MainSite/AppShell.tsx` | See [`docs/MainSite.MAP.md`](docs/MainSite.MAP.md) for the app shell section index |
 | `client/src/components/MainContent/` | Home tab surface: `MainAreaTabs.tsx`, `ToolExplorer.tsx`, `OnboardingWalkthrough.tsx`, `RiskMatrix.tsx` |
 | `client/src/components/Account/` | Account/login/settings surface: `LoginAndSettingsModal.tsx`, `LoginButton.tsx` |
 | `client/src/components/SurveyTool/SurveyTool.tsx` | See [`docs/SurveyTool.MAP.md`](docs/SurveyTool.MAP.md) for the SurveyTool component hierarchy |
@@ -58,6 +58,9 @@ npm run ai:seed-survey:question-types            # seed question type data
 | `dist/sessionCorsWorker.bundle.js` | Generated local/manual worker bundle fallback used by the client build and E2E upload flows when rebuilt locally |
 | `client/src/contractsABI/` | Contract ABI JSON files |
 | `contracts/` | Solidity smart contracts |
+| `foundry/script/` | Foundry Solidity deploy scripts |
+| `foundry/test/` | Foundry Solidity tests |
+| `tests/root/` | Root Node/Jest tests for workers, deploy helpers, and compatibility harnesses |
 | `scripts/test-*.ui.js` | Playwright E2E tests |
 | `contextEngine-cc/` | Claude Code integration (hook + passkey auth) |
 | `ARCHITECTURE.md` | System diagram, data flows, contract addresses |

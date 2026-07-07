@@ -35,13 +35,13 @@ describe('accountReducer', () => {
       type: FETCH_ACCOUNT,
       payload: buildAccountPayload({
         account: '0xdef',
-        provider: 'porto_passkey',
+        provider: 'passkey_eoa',
         userImageURL: 'https://example.com/other.png',
       }),
     });
 
     expect(fetched.account).toBe('0xdef');
-    expect(fetched.provider).toBe('porto_passkey');
+    expect(fetched.provider).toBe('passkey_eoa');
     expect(fetched.userImageURL).toBe('https://example.com/other.png');
     expect(fetched.alerts).toEqual([]);
   });
@@ -126,15 +126,15 @@ describe('accountReducer', () => {
     expect(next.userImageURL).toBe('https://example.com/user.png');
   });
 
-  it('stores porto passkey as the canonical Porto provider value', () => {
+  it('stores passkey EOA as the canonical embedded-wallet provider value', () => {
     const next = reducer(undefined, {
       type: LOGIN_ACCOUNT,
       payload: buildAccountPayload({
-        provider: 'porto_passkey',
+        provider: 'passkey_eoa',
       }),
     });
 
-    expect(next.provider).toBe('porto_passkey');
+    expect(next.provider).toBe('passkey_eoa');
     expect(next.account).toBe('0xabc');
   });
 

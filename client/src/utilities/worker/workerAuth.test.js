@@ -936,6 +936,9 @@ describe('workerAuth fetchWorkerWithAuth', () => {
 
     const retryAuthedHeaders = new Headers(global.fetch.mock.calls[6][1].headers);
     expect(retryAuthedHeaders.get('Authorization')).toBe('Bearer token-2');
+    expect(
+      mockProviderRequest.mock.calls.filter(([payload]) => payload?.method === 'eth_accounts')
+    ).toHaveLength(1);
   });
 
   it('does not retry worker login when authenticated storage read is denied by SBT gate', async () => {

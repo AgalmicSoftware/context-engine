@@ -10,6 +10,7 @@ import {
   sessionRegistryStore,
   upsertSessionRegistryCache,
 } from '../web3/sessionRegistry.js';
+import type { SessionConfigLike as SharedSessionConfigLike } from './sessionTypes.js';
 import {
   CE_PROFILE_SCAN_ACTIVITY_TIMEOUT_MS,
   CE_PROFILE_SCAN_REGISTRY_TIMEOUT_MS,
@@ -27,8 +28,8 @@ import {
   emitProfileScanTelemetry as emitMainSiteProfileScanTelemetry,
   isProfileScanColdDiagEnabled as isMainSiteProfileScanColdDiagEnabled,
   isProfileScanTelemetryEnabled as isMainSiteProfileScanTelemetryEnabled,
-} from '../../components/MainSite/debugTelemetry.js';
-import { shouldEnableSessionRegistryRefresh } from '../../components/MainSite/progressHelpers.js';
+} from './profileScanTelemetry.js';
+import { shouldEnableSessionRegistryRefresh } from './mainSiteProgressHelpers.js';
 
 const mainSiteLog = createLogger('mainSite');
 
@@ -47,10 +48,10 @@ interface SessionContractsLike {
   sbtFactory?: SessionContractConfigLike | null;
 }
 
-interface SessionConfigLike extends Record<string, unknown> {
+type ProfileScanSessionConfig = Omit<SharedSessionConfigLike, 'contracts' | 'networkChainId'> & {
   networkChainId?: NullableChainIdInput;
   contracts?: SessionContractsLike | null;
-}
+};
 
 interface SessionScanScopeContext {
   scope: string;
@@ -189,7 +190,7 @@ export interface SessionProfileScanController {
   resolveListScopeSessionConfigFromRegistry: (
     slugIn: string,
     opts?: ResolveListScopeSessionConfigOptions
-  ) => Promise<SessionConfigLike | null>;
+  ) => Promise<ProfileScanSessionConfig | null>;
   ensureRegistryHydratedForProfileScan: (
     opts?: Record<string, unknown>
   ) => Promise<RegistryHydrationStatus>;
@@ -222,8 +223,8 @@ const asRecord = (value: unknown): Record<string, unknown> | null => {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
 };
 
-const asSessionConfigLike = (value: unknown): SessionConfigLike | null => {
-  return value && typeof value === 'object' ? (value as SessionConfigLike) : null;
+const asProfileScanSessionConfig = (value: unknown): ProfileScanSessionConfig | null => {
+  return value && typeof value === 'object' ? (value as ProfileScanSessionConfig) : null;
 };
 
 const asRegistryLoadMeta = (value: unknown): RegistryLoadMeta | null => {
@@ -243,7 +244,7 @@ const getSessionConfigChainId = (
   config: unknown,
   fallbackChainId: NullableChainIdInput = 0
 ): number => {
-  const cfg = asSessionConfigLike(config);
+  const cfg = asProfileScanSessionConfig(config);
   return Number(
     cfg?.networkChainId ||
     cfg?.contracts?.surveys?.chainId ||
@@ -547,19 +548,19 @@ export const createSessionProfileScanController = (
   const resolveListScopeSessionConfigFromRegistry = async (
     slugIn: string,
     opts: ResolveListScopeSessionConfigOptions = {}
-  ): Promise<SessionConfigLike | null> => {
+  ): Promise<ProfileScanSessionConfig | null> => {
     const slug = normalizeSessionSlug(slugIn || '');
     if (!slug && slug !== '') return null;
     const activeChainId = Number(getActiveProfileScanChainId() || 0) || 0;
     const cacheKey = getProfileScanListScopeSessionConfigCacheKey(slug, activeChainId);
 
     const cachedCfg = _profileScanListScopeSessionConfigCache.get(cacheKey);
-    const cachedConfig = asSessionConfigLike(cachedCfg);
+    const cachedConfig = asProfileScanSessionConfig(cachedCfg);
     if (cachedConfig) return cachedConfig;
 
     const existingCfg = hostApi.getSessionCfg(slug);
     const existingChainId = Number(hostApi.getSessionChainId(slug) || 0) || 0;
-    const existingConfig = asSessionConfigLike(existingCfg);
+    const existingConfig = asProfileScanSessionConfig(existingCfg);
     if (existingConfig && existingChainId > 0) {
       _profileScanListScopeSessionConfigCache.set(cacheKey, existingConfig);
       _profileScanListScopeSessionConfigCache.set(
@@ -623,7 +624,7 @@ export const createSessionProfileScanController = (
             registryChainId,
             bootstrapRpc
           );
-          const resolvedConfig = asSessionConfigLike(config);
+          const resolvedConfig = asProfileScanSessionConfig(config);
           if (!resolvedConfig) continue;
           upsertSessionRegistryCache({ config: resolvedConfig });
           const resolvedChainId = Number(

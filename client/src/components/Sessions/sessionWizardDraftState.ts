@@ -19,6 +19,13 @@ import {
   resolveSessionWizardAutoFeatureBySessionSlug,
 } from './sessionWizardAiConfig';
 import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
+import {
+  compileSessionModeProfile,
+  hasLegacyTelegramFirstSessionFlags,
+  mergeSessionModeProfileStorageAccess,
+  profileFromLegacyConfig,
+  type SessionModeProfile,
+} from '../../utilities/session/sessionModeProfile';
 import type { AnyRecord } from '../shellTypes';
 
 const { getPathRpcUrl } = rpcDefaults;
@@ -37,20 +44,81 @@ const mergeSessionWizardDraftDeep = (target: AnyRecord, source: AnyRecord): AnyR
   });
   return out;
 };
+const hasCachedStorageProfile = (draft: AnyRecord | null): boolean => (
+  !!(
+    draft &&
+    (
+      (draft.storageProfile && typeof draft.storageProfile === 'object') ||
+      (draft.sessionStorageProfile && typeof draft.sessionStorageProfile === 'object') ||
+      (draft.storage && typeof draft.storage === 'object')
+    )
+  )
+);
+const getCachedStorageProfilePayloadAccessMode = (draft: AnyRecord): string => {
+  const storageProfile = (
+    draft.storageProfile &&
+    typeof draft.storageProfile === 'object'
+  ) ? draft.storageProfile as AnyRecord : {};
+  const payloadAccessControl = (
+    storageProfile.payloadAccessControl &&
+    typeof storageProfile.payloadAccessControl === 'object'
+  ) ? storageProfile.payloadAccessControl as AnyRecord : {};
+  const cloudflare = (
+    storageProfile.cloudflare &&
+    typeof storageProfile.cloudflare === 'object'
+  ) ? storageProfile.cloudflare as AnyRecord : {};
+  return toStr(
+    payloadAccessControl.mode ||
+    cloudflare.payloadAccessMode ||
+    storageProfile.payloadAccessMode ||
+    storageProfile.accessControlMode
+  ).trim().toLowerCase();
+};
+const buildCachedDraftSessionModeProfile = (draft: AnyRecord): SessionModeProfile => {
+  const profile = profileFromLegacyConfig(draft);
+  const storageProfile = (
+    draft.storageProfile &&
+    typeof draft.storageProfile === 'object'
+  ) ? draft.storageProfile as AnyRecord : {};
+  const backend = toStr(storageProfile.backend).trim().toLowerCase();
+  if (
+    backend === 'cloudflare' &&
+    getCachedStorageProfilePayloadAccessMode(draft) === 'lit_encrypted'
+  ) {
+    const nextProfile: SessionModeProfile = {
+      ...profile,
+      storage: {
+        ...profile.storage,
+        backend: 'cloudflare',
+      },
+      encryption: {
+        ...profile.encryption,
+        mode: 'lit',
+      },
+    };
+    return nextProfile;
+  }
+  return profile;
+};
 
 export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRecord => {
   const draft = normalizeSessionNaming(draftIn && typeof draftIn === 'object' ? draftIn : {}) as AnyRecord;
   const chainId = Number(draft.networkChainId || DEFAULT_CHAIN_ID || 0) || DEFAULT_CHAIN_ID;
   draft.sessionName = toStr(draft.sessionName || '').trim();
   draft.sessionInfo = toStr(draft.sessionInfo || '').trim();
-  draft.telegramOnly = draft.telegramOnly === true ||
-    draft.telegram_only === true ||
-    draft.sessionMode === 'telegram_only' ||
-    draft.telegramMode === 'telegram_only' ||
-    draft.telegram?.mode === 'telegram_only' ||
-    draft.telegram?.only === true;
   delete draft.telegram_only;
+  delete draft.telegramOnly;
   delete draft.telegramMode;
+  delete draft.sessionMode;
+  delete draft.telegramBridgeEnabled;
+  if (draft.telegram && typeof draft.telegram === 'object') {
+    delete draft.telegram.only;
+    delete draft.telegram.mode;
+    if (!Object.keys(draft.telegram).length) delete draft.telegram;
+  }
+  if (!draft.sessionModeProfile && hasLegacyTelegramFirstSessionFlags(draftIn)) {
+    draft.sessionModeProfile = profileFromLegacyConfig(draftIn);
+  }
   if (!draft.sessionInfoEncrypted) {
     delete draft.sessionInfoEncrypted;
   }
@@ -115,7 +183,16 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   if (typeof draft.embeddedDeployHelperEnabled !== 'boolean') {
     draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
   }
-  draft.storageProfile = normalizeSessionStorageProfileConfig(draft.storageProfile || draft.sessionStorageProfile || draft.storage);
+  if (draft.sessionModeProfile && typeof draft.sessionModeProfile === 'object') {
+    draft.sessionModeProfile = mergeSessionModeProfileStorageAccess(
+      draft.sessionModeProfile as SessionModeProfile,
+      draft.storageProfile
+    );
+    const compiled = compileSessionModeProfile(draft.sessionModeProfile as SessionModeProfile);
+    draft.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+  } else {
+    draft.storageProfile = normalizeSessionStorageProfileConfig(draft.storageProfile || draft.sessionStorageProfile || draft.storage);
+  }
   delete draft.sessionStorageProfile;
   delete draft.storage;
 
@@ -129,7 +206,13 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   draft.sessionName = '';
   draft.sessionInfo = '';
   draft.sessionHeader = '';
-  draft.telegramOnly = false;
+  delete draft.sessionModeProfile;
+  delete draft.telegramOnly;
+  delete draft.telegram_only;
+  delete draft.telegramMode;
+  delete draft.sessionMode;
+  delete draft.telegramBridgeEnabled;
+  delete draft.telegram;
   delete draft.sessionHeaderImg;
   delete draft.sessionInfoEncrypted;
   draft.corsWorkerUrl = '';
@@ -210,7 +293,17 @@ export const buildSessionWizardInitialDraftFromCache = ({
     base.embeddedDeployHelperEnabled = sourceEmbeddedDeployHelperDefault;
   }
   const merged = cachedDraft ? mergeSessionWizardDraftDeep(base, cachedDraft) : base;
+  const shouldBuildCachedStorageModeProfile = (
+    cachedDraft &&
+    !merged.sessionModeProfile &&
+    hasCachedStorageProfile(cachedDraft)
+  );
   const normalized = normalizeSessionWizardDraftShape(merged);
+  if (shouldBuildCachedStorageModeProfile && !normalized.sessionModeProfile) {
+    normalized.sessionModeProfile = buildCachedDraftSessionModeProfile(normalized);
+    const compiled = compileSessionModeProfile(normalized.sessionModeProfile as SessionModeProfile);
+    normalized.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+  }
   if (normalModeSharedHostedWorkerEnabled === false && !cachedWizard?.deployComplete) {
     normalized.corsWorkerUrl = '';
   }

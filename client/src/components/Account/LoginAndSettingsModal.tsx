@@ -71,7 +71,7 @@ import contractScripts, {
   getSessionNetwork,
 } from '../../utilities/web3/contractScripts.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
+import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import {
   getSessionAiSettings,
   getLocalAiSettings,
@@ -88,6 +88,7 @@ import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
 import { resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { markUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
+import { notify } from '../../utilities/ui/notify.js';
 import {
   normalizeSessionScanScope,
   normalizeSessionScanSlugs,
@@ -98,6 +99,12 @@ import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../u
 import { toStr } from '../../utilities/shared/primitives.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import { isCryptoMode } from '../../utilities/ui/terminology.js';
+import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
+import {
+  exchangeAgentClientLogin,
+  extractAgentClientToken,
+  readAgentClientLoginEnvelope,
+} from '../../utilities/session/agentClientLogin';
 
 // Chain helpers
 import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainById } from '../../variables/chains.js'
@@ -118,10 +125,12 @@ import {
   LOGIN_SETTINGS_AI_TASK_REASONING_ROWS as AI_TASK_REASONING_ROWS,
   formatLoginSettingsAiProviderLabel,
 } from './loginSettingsAiDisplayHelpers';
+import LoginAgentTokenPanel from './LoginAgentTokenPanel';
+import { createLoginAgentActions } from './loginAndSettingsAgentTokenActions';
+import { createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
 
-const accountLog = createLogger('account');
-type AccountUserPageProps = {
-  viewAddress?: string;
+const accountLog = createLogger('account'); const normalizeAccountForComparison = (value: unknown): string => String(value || '').trim().toLowerCase();
+type AccountUserPageProps = { viewAddress?: string;
   account?: string;
   provider?: string;
   minimized?: boolean;
@@ -133,8 +142,6 @@ type AccountUserPageProps = {
 const AccountUserPage = React.lazy(
   () => import("components/UserPage/UserPage")
 ) as React.LazyExoticComponent<React.ComponentType<AccountUserPageProps>>;
-
-type LoginAndSettingsRecord = Record<string, any>;
 
 interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'network'>> {
   provider: string;
@@ -171,6 +178,8 @@ interface LoginAndSettingsModalState {
   sentTxHash: string;
   testFundsStatusMessage: string;
   testFundsStatusTone: string;
+  passkeyWalletStatusMessage: string;
+  passkeyWalletStatusTone: string;
   autoRequestTestnetFundsEnabled: boolean;
   autoSendTriggered: boolean;
   aiSettings: any;
@@ -191,12 +200,91 @@ interface LoginAndSettingsModalState {
   sessionScanStatus: string;
   preLoginSettingsOpen: boolean;
   preLoginConfigOpen: boolean;
+  agentTokenLoginOpen: boolean;
+  agentTokenInput: string;
+  agentTokenStatus: string;
+  agentTokenError: string;
   walletBalanceWei: ethers.BigNumber | null;
 }
+
+type SponsoredSessionEntry = Record<string, unknown> & {
+  slug: string;
+  label: string;
+  sponsoredKeys: Record<string, unknown>;
+  isActive?: boolean;
+  inRpcScope?: boolean;
+};
+
+type AiSettingsLike = Record<string, unknown> & {
+  mode?: unknown;
+  models?: Record<string, unknown>;
+  modelProviders?: Record<string, unknown>;
+  providers?: Record<string, unknown>;
+  preset?: unknown;
+  taskReasoningEffort?: Record<string, unknown>;
+  transcription?: Record<string, unknown>;
+};
+
+type AiPresetOption = {
+  key: string;
+  label: string;
+  badgeLabel: string;
+  provider?: unknown;
+  models?: Readonly<Record<string, unknown>>;
+};
+
+type AiPresetConfig = {
+  provider?: unknown;
+  models?: Readonly<Record<string, unknown>>;
+};
+
+type ChainIdLike = {
+  id?: unknown;
+  chainId?: unknown;
+} | null | undefined;
+
+type WagmiBalanceLike = {
+  data?: { value?: unknown };
+  value?: unknown;
+} | null | undefined;
+
+type TestFundsRequestOptions = {
+  source?: 'manual' | 'auto';
+};
+
+type SettingsSessionDescriptor = Record<string, unknown> & {
+  label: string;
+};
+
+type SponsoredSessionSources = {
+  byResource: Record<string, SponsoredSessionEntry[]>;
+  rpcScope: SponsoredSessionEntry[];
+};
+
+type SettingsOverviewContext = {
+  activeSession: SettingsSessionDescriptor;
+  cryptoTerminology: boolean;
+  needsNetworkSwitch: boolean;
+  showWalletNetwork: boolean;
+  sponsorshipCards: ReturnType<typeof buildLoginSettingsSponsorshipCards>;
+  sponsorSessions: SponsoredSessionSources;
+  targetNetworkName: string;
+  targetNetwork: unknown;
+  walletNetworkName: string;
+};
 
 export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
+);
+const getErrorMessage = (error: unknown): string => (
+  error instanceof Error
+    ? error.message
+    : (
+      error && typeof error === 'object'
+        ? toStr((error as { message?: unknown }).message)
+        : toStr(error)
+    )
 );
 const uniqueList = <T = unknown>(values: T[] = []) => (
   Array.from(
@@ -205,6 +293,16 @@ const uniqueList = <T = unknown>(values: T[] = []) => (
     )
   )
 );
+const readChainIdLike = (value: ChainIdLike): unknown => (
+  value && typeof value === 'object'
+    ? value.id ?? value.chainId ?? 0
+    : 0
+);
+const readWagmiBalanceValue = (value: WagmiBalanceLike): unknown => (
+  value && typeof value === 'object'
+    ? value.data?.value ?? value.value ?? null
+    : null
+);
 const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = Object.freeze({
   'gpt-5': { label: 'GPT-5 (default)', badgeLabel: 'GPT-5' },
   'gpt-4o': { label: 'GPT-4o', badgeLabel: 'GPT-4o' },
@@ -212,8 +310,8 @@ const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = 
   'claude-opus': { label: 'Claude Opus 4.6', badgeLabel: 'Claude Opus 4.6' },
 });
 
-const AI_PRESET_OPTIONS: readonly any[] = Object.freeze([
-  ...Object.entries(AI_PRESET_CONFIGS).map(([key, config]: any) => Object.freeze({
+const AI_PRESET_OPTIONS: readonly AiPresetOption[] = Object.freeze([
+  ...Object.entries(AI_PRESET_CONFIGS as Record<string, AiPresetConfig>).map(([key, config]) => Object.freeze({
     key,
     label: AI_PRESET_LABELS[key]?.label || key,
     badgeLabel: AI_PRESET_LABELS[key]?.badgeLabel || key,
@@ -227,18 +325,18 @@ const AI_PRESET_OPTIONS: readonly any[] = Object.freeze([
   }),
 ]);
 
-const deriveAiPresetKey = (settings: any = {}) => deriveAiPreset({
+const deriveAiPresetKey = (settings: AiSettingsLike = {}) => deriveAiPreset({
   mode: settings?.mode,
   models: settings?.models,
   modelProviders: settings?.modelProviders,
 });
 
-const getAiPresetMeta = (presetKey: any = ''): any => (
-  AI_PRESET_OPTIONS.find((entry: any) => entry.key === presetKey) ||
+const getAiPresetMeta = (presetKey: unknown = ''): AiPresetOption => (
+  AI_PRESET_OPTIONS.find((entry) => entry.key === presetKey) ||
   AI_PRESET_OPTIONS[AI_PRESET_OPTIONS.length - 1]
 );
 
-const formatAiPresetBadgeLabel = (settings: any = {}) => {
+const formatAiPresetBadgeLabel = (settings: AiSettingsLike = {}) => {
   const hasModelShape = !!(
     settings?.models?.fast ||
     settings?.models?.thinking ||
@@ -254,10 +352,10 @@ const formatAiPresetBadgeLabel = (settings: any = {}) => {
   return toStr(settings?.models?.thinking || settings?.models?.fast || settings?.mode || 'Custom model') || 'Custom model';
 };
 
-const settingsSupportReasoning = (settings: any = {}) => (
+const settingsSupportReasoning = (settings: AiSettingsLike = {}) => (
   [settings?.models?.fast, settings?.models?.thinking]
-    .map((model: any) => toModelLeaf(model))
-    .some((modelLeaf: any) => /^(gpt-5|o[13])/.test(modelLeaf))
+    .map((model) => toModelLeaf(model))
+    .some((modelLeaf) => /^(gpt-5|o[13])/.test(toStr(modelLeaf)))
 );
 
 export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps, LoginAndSettingsModalState> {
@@ -272,6 +370,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       sentTxHash: '',
       testFundsStatusMessage: '',
       testFundsStatusTone: '',
+      passkeyWalletStatusMessage: '',
+      passkeyWalletStatusTone: '',
       autoRequestTestnetFundsEnabled: DEFAULT_AUTO_REQUEST_TESTNET_FUNDS,
       autoSendTriggered: false,
       aiSettings: null,
@@ -300,10 +400,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         Array.isArray(initialSessionScanSlugs)
           ? initialSessionScanSlugs
           : []
-      ).map((slug: any) => (slug ? slug : 'general')).join(', '),
+      ).map((slug: string) => (slug ? slug : 'general')).join(', '),
       sessionScanStatus: '',
       preLoginSettingsOpen: false,
       preLoginConfigOpen: false,
+      agentTokenLoginOpen: false,
+      agentTokenInput: '',
+      agentTokenStatus: '',
+      agentTokenError: '',
       walletBalanceWei: null,
     };
   })();
@@ -312,6 +416,38 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _sponsoredReqId: number = 0;
   _cacheClearInFlight: boolean = false;
   _testFundsRequestId: number = 0;
+  _passkeyWalletRestoreReqId: number = 0;
+  _passkeyWalletActionId: number = 0;
+  _sponsoredSessionSourcesMemo: { key: string; value: SponsoredSessionSources } | null = null;
+  _settingsOverviewMemo: { key: string; value: SettingsOverviewContext } | null = null;
+  _passkeyActions = createLoginPasskeyActions({
+    accountLogError: (message, error) => accountLog.error(message, error),
+    changeAccount: (payload) => this.props.changeAccount(payload), clearAllWorkerSessionTokens,
+    getAccount: () => this.props.account, getErrorMessage,
+    getProvider: () => this.props.provider, getTargetNetwork: () => this.getTargetNetwork(),
+    isCurrentAction: (actionId) => this.isCurrentPasskeyWalletAction(actionId),
+    normalizeAccountForComparison, notifyInfo: (message) => notify.info(message), passkeyWallet,
+    setStatus: (patch) => this.setStateIfMounted(patch), startAction: () => this.startPasskeyWalletAction(),
+    updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
+  });
+  syncPasskeyWalletChain = this._passkeyActions.syncPasskeyWalletChain;
+  getPasskeyWalletNetwork = this._passkeyActions.getPasskeyWalletNetwork;
+  handlePasskeyWalletCreate = this._passkeyActions.handlePasskeyWalletCreate; handlePasskeyWalletSignIn = this._passkeyActions.handlePasskeyWalletSignIn;
+  _finalizePasskeyWalletLogin = this._passkeyActions._finalizePasskeyWalletLogin;
+  _agentTokenActions = createLoginAgentActions({
+    changeAccount: (payload) => this.props.changeAccount(payload),
+    exchangeAgentClientLogin, extractAgentClientToken,
+    getActiveSessionSlug: () => this.getActiveSessionSlug(), getAgentTokenInput: () => this.state.agentTokenInput, getDemoSessionConfigBySlug,
+    getPropSessionConfig: () => this.props.sessionConfig, getSessionConfigBySlugOrDefault,
+    getTargetNetwork: () => this.getTargetNetwork(), isTelegramFirstSessionConfig, normalizeSettingsSessionSlug,
+    setState: (patch) => { if (typeof patch === 'function') {
+      this.setState((prev) => patch(prev) as Pick<LoginAndSettingsModalState, 'agentTokenError' | 'agentTokenInput' | 'agentTokenStatus' | 'agentTokenLoginOpen'>); return; }
+      this.setState(patch as Pick<LoginAndSettingsModalState, 'agentTokenError' | 'agentTokenInput' | 'agentTokenStatus'>); }, setStateIfMounted: (patch) => this.setStateIfMounted(patch),
+    updateLoginInfo: (payload) => this.props.updateLoginInfo(payload), windowTarget: typeof window !== 'undefined' ? window : null,
+  });
+  getDisplaySessionConfig = this._agentTokenActions.getDisplaySessionConfig; getAgentTokenLoginSessionContext = this._agentTokenActions.getAgentTokenLoginSessionContext;
+  shouldShowAgentTokenLogin = this._agentTokenActions.shouldShowAgentTokenLogin; toggleAgentTokenLogin = this._agentTokenActions.toggleAgentTokenLogin;
+  handleAgentTokenLoginSubmit = this._agentTokenActions.handleAgentTokenLoginSubmit;
 
   getListModePrimarySessionSlug = (state: Partial<LoginAndSettingsModalState> = this.state) => {
     const scope = this.getSessionScanScopeValue(state);
@@ -376,47 +512,35 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     };
   };
 
-  syncPortoChain = (targetNetwork: any = null) => {
-    const tn = targetNetwork || this.getTargetNetwork();
-    portoFunctions.setPortoChain(tn);
-    if (typeof portoFunctions.getPortoChain === 'function') {
-      return portoFunctions.getPortoChain();
-    }
-    return tn;
-  };
-
-  getPortoNetwork = (targetNetwork: any = null) => {
-    const tn = this.syncPortoChain(targetNetwork);
-    if (!tn) return tn;
-    const chainId = Number(tn?.id ?? tn?.chainId ?? 0);
-    if (!chainId) return tn;
-    const nameBase = tn?.name || `Chain ${chainId}`;
-    const name = /\(Porto\)$/.test(nameBase) ? nameBase : `${nameBase} (Porto)`;
-    return { ...tn, id: chainId, chainId, name };
-  };
-
   async componentDidMount() {
     this._isMounted = true;
     this.checkAndSendTestFundsIfNeeded();
 
-    // Porto session rehydration
-    const portoNetwork = this.getPortoNetwork();
-    const restoredAddress = await portoFunctions.restoreSession({ requireSigner: false });
+    // Passkey wallet session rehydration
+    const passkeyNetwork = this.getPasskeyWalletNetwork();
+    const passkeyRestoreReqId = this._passkeyWalletRestoreReqId + 1;
+    this._passkeyWalletRestoreReqId = passkeyRestoreReqId;
+    const passkeyActionIdAtRestoreStart = this._passkeyWalletActionId;
+    const restoredAddress = await passkeyWallet.restorePasskeyWalletSession({ requireSigner: false });
     if (!this._isMounted) return;
 
-    if (restoredAddress) {
-       accountLog.log("Restored Porto Session:", restoredAddress);
+    const restoreStillCurrent = (
+      passkeyRestoreReqId === this._passkeyWalletRestoreReqId &&
+      passkeyActionIdAtRestoreStart === this._passkeyWalletActionId
+    );
+    if (restoredAddress && restoreStillCurrent) {
+       accountLog.log("Restored passkey wallet session:", restoredAddress);
        const web3info = {
         account: restoredAddress,
-        provider: 'porto_passkey',
-        network: portoNetwork,
+        provider: 'passkey_eoa',
+        network: passkeyNetwork,
         userImageURL: undefined,
       };
       this.props.changeAccount(web3info);
       this.props.updateLoginInfo({
         loginInProgress: false,
         loginComplete: true,
-        provider: "porto_passkey",
+        provider: "passkey_eoa",
       });
     }
 
@@ -448,8 +572,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       !Array.isArray(nextState)
     ) {
       const keys = Object.keys(nextState);
-      const currentState = this.state as unknown as Record<string, unknown>;
-      const changed = keys.some((key: any) => currentState[key] !== nextState[key]);
+      const changed = keys.some((key) => (
+        this.state[key as keyof LoginAndSettingsModalState] !== nextState[key]
+      ));
       if (!changed) {
         if (typeof cb === 'function') cb();
         return;
@@ -461,16 +586,16 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   getWalletChainId = (props: LoginAndSettingsModalProps = this.props) => (
     Number(
       props.provider === 'wagmi'
-        ? ((props.wagmiNetwork as any)?.id ?? (props.wagmiNetwork as any)?.chainId ?? (props.network as any)?.id ?? (props.network as any)?.chainId ?? 0)
-        : ((props.network as any)?.id ?? (props.network as any)?.chainId ?? 0)
+        ? (readChainIdLike(props.wagmiNetwork) || readChainIdLike(props.network))
+        : readChainIdLike(props.network)
     ) || null
   );
 
   getWagmiBalanceInput = (props: LoginAndSettingsModalProps = this.props) => (
-    (props.wagmiBalance as any)?.data?.value ?? (props.wagmiBalance as any)?.value ?? null
+    readWagmiBalanceValue(props.wagmiBalance)
   );
 
-  areWalletBalanceInputsEqual = (leftBalance: any, rightBalance: any) => {
+  areWalletBalanceInputsEqual = (leftBalance: unknown, rightBalance: unknown) => {
     if (leftBalance === rightBalance) return true;
     if (leftBalance == null || rightBalance == null) return leftBalance == null && rightBalance == null;
     try {
@@ -524,7 +649,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     `${this.getWalletBalanceContextKey(props)}|${this.getActiveSessionSlug(props, state)}`
   );
 
-  normalizeWalletBalance = (rawBalance: any) => {
+  normalizeWalletBalance = (rawBalance: unknown) => {
     if (rawBalance == null) return null;
     if (ethers.BigNumber.isBigNumber(rawBalance)) return rawBalance;
     if (typeof rawBalance === 'bigint') return ethers.BigNumber.from(String(rawBalance));
@@ -539,7 +664,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       return this.normalizeWalletBalance(this.getWagmiBalanceInput(props));
     }
 
-    if (props.provider === 'porto_passkey' || props.provider === 'web3auth') {
+    if (props.provider === 'passkey_eoa' || props.provider === 'web3auth') {
       const providerResolver = (
         typeof getProviderLocation === 'function'
           ? getProviderLocation
@@ -564,7 +689,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   syncWalletBalance = async (props: LoginAndSettingsModalProps = this.props) => {
     const balanceContextKey = this.getWalletBalanceContextKey(props);
-    let nextBalance: any = null;
+    let nextBalance: ethers.BigNumber | null = null;
 
     try {
       nextBalance = await this.readWalletBalance(props);
@@ -599,24 +724,25 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  buildTestFundsSuccessMessage = (result: any = {}) => {
+  buildTestFundsSuccessMessage = (result: Record<string, unknown> = {}) => {
     const amountEth = toStr(result?.amountEth).trim();
     const networkName = this.getTargetNetwork()?.name || 'the session network';
     if (amountEth) return `Test gas sent: ${amountEth} ETH on ${networkName}.`;
     return `Test gas sent on ${networkName}.`;
   };
 
-  buildTestFundsErrorMessage = (error: any, { source = 'manual' }: any = {}) => {
+  buildTestFundsErrorMessage = (error: unknown, { source = 'manual' }: TestFundsRequestOptions = {}) => {
     const prefix = source === 'auto' ? 'Auto-funding failed' : 'Get test gas failed';
-    const baseMessage = toStr(error?.message).trim() || 'Failed to request test gas.';
-    const status = Number(error?.status || 0) || 0;
+    const errorRecord = error && typeof error === 'object' ? error as Record<string, unknown> : {};
+    const baseMessage = toStr(errorRecord.message).trim() || 'Failed to request test gas.';
+    const status = Number(errorRecord.status || 0) || 0;
     if (status && !baseMessage.includes(`(${status})`) && !baseMessage.includes(`HTTP ${status}`)) {
       return `${prefix}: ${baseMessage} (HTTP ${status}).`;
     }
     return `${prefix}: ${baseMessage}`;
   };
 
-  requestTestFunds = async ({ source = 'manual' }: any = {}) => {
+  requestTestFunds = async ({ source = 'manual' }: TestFundsRequestOptions = {}) => {
     if (this.state.sendingTestFunds) return null;
     const walletAccount = this.getWalletAccount();
     if (!walletAccount) return null;
@@ -674,62 +800,21 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     await this.requestTestFunds({ source: 'manual' });
   };
 
-  // Porto / passkey handlers
+  // Passkey wallet handlers
 
-  handlePortoSignUp = async () => {
-    this.props.updateLoginInfo({
-      loginInProgress: true,
-      loginComplete: false,
-      provider: "porto_passkey",
-    });
-
-    try {
-      const portoNetwork = this.getPortoNetwork();
-      const address = await portoFunctions.authenticatePorto();
-      this._finalizePortoLogin(address, portoNetwork);
-    } catch (error) {
-      accountLog.error("Porto Sign Up Error:", error);
-      this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
-    }
+  startPasskeyWalletAction = (): number => {
+    this._passkeyWalletActionId += 1;
+    return this._passkeyWalletActionId;
   };
 
-  handlePortoSignIn = async () => {
-    this.props.updateLoginInfo({
-      loginInProgress: true,
-      loginComplete: false,
-      provider: "porto_passkey",
-    });
-
-    try {
-      const portoNetwork = this.getPortoNetwork();
-      const address = await portoFunctions.loginWithPorto();
-      this._finalizePortoLogin(address, portoNetwork);
-    } catch (error) {
-      accountLog.error("Porto Sign In Error:", error);
-      this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
-    }
-  };
-
-  _finalizePortoLogin = (address: any, targetNetwork: any = null) => {
-      const portoNetwork = this.getPortoNetwork(targetNetwork);
-      const web3info = {
-        account: address,
-        provider: 'porto_passkey',
-        network: portoNetwork,
-        userImageURL: undefined,
-      };
-
-      this.props.changeAccount(web3info);
-      this.props.updateLoginInfo({
-        loginInProgress: false,
-        loginComplete: true,
-        provider: "porto_passkey",
-      });
-  };
+  isCurrentPasskeyWalletAction = (actionId: number): boolean => (
+    this._isMounted && actionId === this._passkeyWalletActionId
+  );
 
   handleLogout = async () => {
-    if (this.props.provider === 'porto_passkey') {
-       portoFunctions.logoutPorto();
+    this._passkeyWalletActionId += 1;
+    if (this.props.provider === 'passkey_eoa') {
+       await passkeyWallet.logoutPasskeyWallet();
     }
 
     if (this.props.provider === 'wagmi' && this.props.wagmiDisconnect) {
@@ -750,7 +835,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     clearAllWorkerSessionTokens();
   };
 
-  componentDidUpdate(prevProps: any, prevState: any) {
+  componentDidUpdate(
+    prevProps: Readonly<LoginAndSettingsModalProps>,
+    prevState: Readonly<LoginAndSettingsModalState>,
+  ) {
     let needsBalanceCheck = false;
     const activeSessionChanged = (
       this.getActiveSessionSlug(this.props, this.state) !== this.getActiveSessionSlug(prevProps, prevState)
@@ -813,7 +901,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.loadAiSettings();
       this.loadResourceKeys();
       this.loadSponsoredAccess();
-      this.syncPortoChain();
+      this.syncPasskeyWalletChain();
     }
 
     const prevScope = normalizeSessionScanScope(prevProps.selectedSessionScope || '');
@@ -1337,13 +1425,29 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }));
   };
 
-  getDisplaySessionConfig = (slugIn: any = '', cfgIn: any = null) => {
-    const slug = normalizeSettingsSessionSlug(slugIn || cfgIn?.slug || '');
+  handleAgentTokenInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    this.setState({
+      agentTokenInput: event.target.value,
+      agentTokenError: '',
+      agentTokenStatus: '',
+    });
+  };
+
+  renderAgentTokenLoginPanel = () => {
+    if (!this.shouldShowAgentTokenLogin()) return null;
+    const { sessionSlug } = this.getAgentTokenLoginSessionContext();
+    const cachedEnvelope = readAgentClientLoginEnvelope(sessionSlug);
     return (
-      cfgIn
-      || getSessionConfigBySlugOrDefault(slug)
-      || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })
-      || {}
+      <LoginAgentTokenPanel
+        agentTokenError={this.state.agentTokenError}
+        agentTokenInput={this.state.agentTokenInput}
+        agentTokenLoginOpen={this.state.agentTokenLoginOpen}
+        agentTokenStatus={this.state.agentTokenStatus}
+        cachedEnvelope={cachedEnvelope}
+        onInputChange={this.handleAgentTokenInputChange}
+        onSubmit={this.handleAgentTokenLoginSubmit}
+        onToggle={this.toggleAgentTokenLogin}
+      />
     );
   };
 
@@ -1550,11 +1654,43 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     sessionScanSlugsInput = this.state.sessionScanSlugsInput,
   }: any = {}) => {
     const active = normalizeSettingsSessionSlug(activeSlug);
+    const scope = normalizeSessionScanScope(sessionScanScope || '');
+    const listSlugs = this.getConfiguredSessionScanSlugs({
+      sessionScanSlugs,
+      sessionScanSlugsInput,
+    });
+    const allSessionSlugs = getAllSessionSlugs({ includeEmpty: true }) || [];
+    const sourceSlugs = uniqueList([
+      ...allSessionSlugs.map((slug: unknown) => normalizeSettingsSessionSlug(slug)),
+      active,
+      '',
+    ]);
+    const configBySlug = new Map<string, Record<string, unknown>>();
+    const sponsoredSourceSignature = sourceSlugs.map((slug: string) => {
+      const cfg = this.getDisplaySessionConfig(slug);
+      configBySlug.set(slug, cfg);
+      return {
+        slug,
+        sessionName: cfg?.sessionName || cfg?.name || cfg?.title || '',
+        networkChainId: cfg?.networkChainId || cfg?.chainId || '',
+        sponsoredKeys: cfg?.sponsoredKeys && typeof cfg.sponsoredKeys === 'object' ? cfg.sponsoredKeys : {},
+      };
+    });
+    const memoKey = JSON.stringify({
+      active,
+      scope,
+      listSlugs,
+      allSessionSlugs,
+      sponsoredSourceSignature,
+    });
+    if (this._sponsoredSessionSourcesMemo?.key === memoKey) {
+      return this._sponsoredSessionSourcesMemo.value;
+    }
     const entries: any = new Map();
     const pushSession = (slugIn: any) => {
       const slug = normalizeSettingsSessionSlug(slugIn);
       if (entries.has(slug)) return;
-      const cfg = this.getDisplaySessionConfig(slug);
+      const cfg = configBySlug.has(slug) ? configBySlug.get(slug) : this.getDisplaySessionConfig(slug);
       const descriptor = this.getSessionDescriptor(slug, cfg, active);
       entries.set(slug, {
         ...descriptor,
@@ -1562,7 +1698,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       });
     };
 
-    (getAllSessionSlugs({ includeEmpty: true }) || []).forEach(pushSession);
+    allSessionSlugs.forEach(pushSession);
     pushSession(active);
     pushSession('');
 
@@ -1570,8 +1706,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const knownSlugs = allSessions.map((entry: any) => entry.slug);
     const rpcScopeSlugs = this.getScanScopeSessionSlugs({
       activeSlug: active,
-      sessionScanScope,
-      sessionScanSlugs,
+      sessionScanScope: scope,
+      sessionScanSlugs: listSlugs,
       sessionScanSlugsInput,
       knownSlugs,
     });
@@ -1592,10 +1728,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       return acc;
     }, {});
 
-    return {
+    const value = {
       byResource,
       rpcScope: byResource.rpc.filter((entry: any) => rpcScopeSlugs.includes(entry.slug)),
     };
+    this._sponsoredSessionSourcesMemo = { key: memoKey, value };
+    return value;
   };
 
   toggleAiSettingsPanel = () => {
@@ -1874,13 +2012,32 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const activeSession = this.getSessionDescriptor(sessionSlug, sessionConfig);
     const sponsoredAccess = this.state.sponsoredAccess || {};
     const sponsorSessions = this.getSponsoredSessionSources({ activeSlug: sessionSlug });
+    const memoKey = JSON.stringify({
+      activeSession,
+      loginComplete: this.props.loginComplete,
+      provider: this.props.provider,
+      selectedSessionScope: this.props.selectedSessionScope,
+      selectedSessionSlugs: this.props.selectedSessionSlugs || [],
+      sessionScanScope: this.getSessionScanScopeValue(),
+      sessionScanSlugs: this.state.sessionScanSlugs,
+      sessionScanSlugsInput: this.state.sessionScanSlugsInput,
+      sponsoredAccess,
+      sponsorSessions,
+      targetNetworkId: tn?.id,
+      targetNetworkName,
+      walletNetworkId: walletNet?.id,
+      walletNetworkName,
+    });
+    if (this._settingsOverviewMemo?.key === memoKey) {
+      return this._settingsOverviewMemo.value;
+    }
     const sponsorshipCards = buildLoginSettingsSponsorshipCards({
       activeSession,
       sponsoredAccess,
       sponsorSessions,
     });
 
-    return {
+    const value = {
       activeSession,
       cryptoTerminology: isCryptoMode(),
       needsNetworkSwitch,
@@ -1891,6 +2048,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       targetNetwork: tn,
       walletNetworkName,
     };
+    this._settingsOverviewMemo = { key: memoKey, value };
+    return value;
   };
 
   renderInlineNetworkSummary = ({
@@ -2545,6 +2704,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
 
     if (this.state.wagmiLoginUpdateNeeded && wagmiAddr && !reduxIsWagmi) {
+      this.startPasskeyWalletAction();
       this.setState({ wagmiLoginUpdateNeeded: false });
       this.props.updateLoginInfo({ loginInProgress: true, loginComplete: false, provider: 'wagmi' });
       try {
@@ -2564,6 +2724,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
 
     if (!wagmiAddr && this.props.provider === 'wagmi') {
+      this.startPasskeyWalletAction();
       this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
       this.props.changeAccount({});
       this.setState({ wagmiLoginUpdateNeeded: false });
@@ -2718,10 +2879,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
               </ul>
             </div>
 
-            {/* Porto / passkey buttons */}
+            {/* Passkey wallet buttons */}
              <div className={styles.passkeyButtonContainer}>
                <Button
-                  onClick={this.handlePortoSignUp}
+                  onClick={this.handlePasskeyWalletCreate}
                   color="primary"
                   className={`${styles.passkeyButton} ${styles.passkeyButtonPrimary}`}
                 >
@@ -2729,7 +2890,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                   <span>Create  </span>
                </Button>
                <Button
-                  onClick={this.handlePortoSignIn}
+                  onClick={this.handlePasskeyWalletSignIn}
                   color="secondary"
                   outline
                   className={`${styles.passkeyButton} ${styles.passkeyButtonOutline}`}
@@ -2738,6 +2899,19 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                   <span> Login</span>
                </Button>
             </div>
+            {this.state.passkeyWalletStatusMessage && (
+              <div
+                className={`${styles.passkeyWalletStatus} ${
+                  this.state.passkeyWalletStatusTone === 'error' ? styles.passkeyWalletStatusError : ''
+                }`}
+                role="status"
+                data-testid="ce-passkey-wallet-status"
+              >
+                {this.state.passkeyWalletStatusMessage}
+              </div>
+            )}
+
+            {this.renderAgentTokenLoginPanel()}
 
             <button
               type="button"
@@ -2763,7 +2937,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       );
     }
 
-    // Logged-in view for all providers (Porto, Wagmi)
+    // Logged-in view for all providers (passkey wallet, Wagmi)
     if (this.props.loginComplete) {
       const activeSessionSlug = this.getActiveSessionSlug();
       const activeSessionConfig = this.getDisplaySessionConfig(activeSessionSlug);

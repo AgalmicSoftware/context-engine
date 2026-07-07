@@ -8,7 +8,7 @@ import {
   emitMainSiteSbtDebug,
   hasCoreSbtMetadata,
   isForcedSbtSelectorDebugEnabled,
-} from '../../components/MainSite/mainSiteUtils.js';
+} from '../session/mainSiteUtils.js';
 import {
   mapSbtWorkProgressToBlock,
   SBT_FULL_SCAN_DISCOVERY_UNITS,
@@ -16,7 +16,7 @@ import {
   SBT_LIGHT_DISCOVERY_HYDRATION_UNITS,
   SBT_LIGHT_DISCOVERY_SCAN_UNITS,
   SBT_PROGRESS_FINAL_TAIL_BLOCKS,
-} from '../../components/MainSite/progressHelpers.js';
+} from '../session/mainSiteProgressHelpers.js';
 import {
   normalizeSbtCountMap,
   sumSbtCountMap,
@@ -46,6 +46,7 @@ import { getSbtInstanceListenerPlan } from './sbtRealtimeListenerPlan.js';
 import { resolveSbtRealtimeEventBlockNumber } from './sbtRealtimeEventBlockResolver.js';
 import { getSbtRealtimeEventCursorGuard } from './sbtRealtimeEventCursorGuard.js';
 import { updateSbtRealtimeCursorForNetworkCache } from './sbtRealtimeCursorCache.js';
+import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 
 const mainSiteLog = createLogger('mainSite');
 
@@ -238,10 +239,11 @@ export const createSessionSbtCacheController = (host = {}) => {
   const sbtRealtimeCoverageController = createSbtRealtimeCoverageController({ setState });
   const setSbtRealtimeCoverageForGroup = sbtRealtimeCoverageController.setSbtRealtimeCoverageForGroup;
   const clearSbtRealtimeCoverageForGroup = sbtRealtimeCoverageController.clearSbtRealtimeCoverageForGroup;
+  const eventStreamsPort = host.sbtEventStreamsPort || host.eventStreamsPort || sbtEventStreamsPort;
 
   const sbtRealtimeListenerCleanupController = createSbtRealtimeListenerCleanupController({
     clearCoverage: clearSbtRealtimeCoverageForGroup,
-    contractScripts,
+    contractScripts: eventStreamsPort,
   });
   const removeSbtRealtimeListenersForGroup =
     sbtRealtimeListenerCleanupController.removeSbtRealtimeListenersForGroup;
@@ -1761,7 +1763,7 @@ export const createSessionSbtCacheController = (host = {}) => {
     try {
       // Ensure we’re not double‑subscribed on this group’s chain
       if (shouldSkipSessionScanForSlug(slug, 'startSbtEventListenerForGroup')) return;
-      contractScripts.listenForSBTEvents('none', (e) => onNewSbtEventDetectedForGroup(slug, e), slug);
+      eventStreamsPort.listenForSBTEvents('none', (e) => onNewSbtEventDetectedForGroup(slug, e), slug);
 
       const networkID = String(getSessionChainId(slug) || '');
       if (!networkID) {
@@ -1822,7 +1824,7 @@ export const createSessionSbtCacheController = (host = {}) => {
         return;
       }
 
-      contractScripts.listenForSBTInstanceEvents(
+      eventStreamsPort.listenForSBTInstanceEvents(
         'none',
         instanceListenerPlan.addresses,
         (e) => onNewSbtEventDetectedForGroup(slug, e),
@@ -1846,7 +1848,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       .filter(Boolean);
     if (!slug || addresses.length === 0) return false;
 
-    contractScripts.listenForSBTInstanceEvents(
+    eventStreamsPort.listenForSBTInstanceEvents(
       'none',
       addresses,
       (e) => onNewSbtEventDetectedForGroup(slug, e),

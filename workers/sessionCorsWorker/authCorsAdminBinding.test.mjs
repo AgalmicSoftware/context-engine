@@ -62,6 +62,7 @@ test('createAuthCorsAdminAdaptersWithWorkerDeps preserves worker-specific auth/C
         assert.equal(value.slugHint, 'slug-hint');
         assert.deepEqual(value.deps, {
           verifyToken: 'verifyToken',
+          validateAuthTokenRecord: 'validateAuthTokenRecord',
           resolveWorkerRequestSlugContext: 'resolveWorkerRequestSlugContext',
           json: 'json',
           MISSING_SLUG_ERROR: 'Missing sessionSlug.',
@@ -92,6 +93,7 @@ test('createAuthCorsAdminAdaptersWithWorkerDeps preserves worker-specific auth/C
       getSessionConfig: 'getSessionConfig',
       resolveTrustedAdminOrigins: 'resolveTrustedAdminOrigins',
       verifyToken: 'verifyToken',
+      validateAuthTokenRecord: 'validateAuthTokenRecord',
       resolveWorkerRequestSlugContext: 'resolveWorkerRequestSlugContext',
       toStr: 'toStr',
       isAddress: 'isAddress',

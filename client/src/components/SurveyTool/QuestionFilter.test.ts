@@ -365,6 +365,7 @@ describe('QuestionFilter session resolution', () => {
 
     expect(sbtFilterNode).toBeTruthy();
     expect(sbtFilterNode?.props.sessionSlug).toBe('edge');
+    expect(sbtFilterNode?.props.activeSessionSlug).toBe('edge');
     expect(sbtFilterNode?.props.sessionConfig).toBe(sessionConfig);
     expect(sbtFilterNode?.props.ensureLightSbtUniverse).toBe(ensureLightSbtUniverse);
   });
