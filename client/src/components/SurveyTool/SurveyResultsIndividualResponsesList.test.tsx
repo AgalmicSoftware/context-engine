@@ -13,6 +13,8 @@ const styleMap = {
   responseCard: 'responseCard',
   responseHeader: 'responseHeader',
   responseList: 'responseList',
+  responseListLoadMoreButton: 'responseListLoadMoreButton',
+  responseListWindowStatus: 'responseListWindowStatus',
   singleResponseCard: 'singleResponseCard',
   surveyResultsCollapse: 'surveyResultsCollapse',
 };
@@ -121,6 +123,68 @@ describe('SurveyResultsIndividualResponsesList', () => {
 
     expect(screen.queryByTestId('response-body')).not.toBeInTheDocument();
     expect(renderResponseBody).not.toHaveBeenCalled();
+  });
+
+  it('bounds large response lists and loads the next response window on demand', () => {
+    const responses = Array.from({ length: 5 }, (_, index) => ({
+      responder: `0x${String(index).padStart(4, '0')}`,
+      surveyId: 'survey-1',
+    }));
+    render(
+      <SurveyResultsIndividualResponsesList
+        currentSurveyId="survey-1"
+        filterLoading={false}
+        initialVisibleCount={2}
+        onToggleResponse={jest.fn()}
+        renderResponseBody={jest.fn()}
+        responses={responses}
+        styleMap={styleMap}
+        visibleIncrement={2}
+      />,
+    );
+
+    expect(screen.getAllByRole('link')).toHaveLength(4);
+    expect(screen.getByTestId('ce-survey-results-response-window-status')).toHaveTextContent(
+      '3 more responses are hidden.',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show 2 more responses' }));
+    expect(screen.getAllByRole('link')).toHaveLength(8);
+    expect(screen.getByTestId('ce-survey-results-response-window-status')).toHaveTextContent(
+      '1 more response is hidden.',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show 1 more response' }));
+    expect(screen.getAllByRole('link')).toHaveLength(10);
+    expect(screen.queryByTestId('ce-survey-results-response-window-status')).not.toBeInTheDocument();
+  });
+
+  it('keeps an active responder visible when the open row lands past the initial window', () => {
+    const renderResponseBody = jest.fn((response) => <div data-testid="response-body">{response.responder}</div>);
+    const responses = Array.from({ length: 5 }, (_, index) => ({
+      responder: `0x${String(index).padStart(4, '0')}`,
+      surveyId: 'survey-1',
+    }));
+
+    render(
+      <SurveyResultsIndividualResponsesList
+        activeToggles={{ 'survey-1:0x0003': true }}
+        currentSurveyId="survey-1"
+        filterLoading={false}
+        initialVisibleCount={2}
+        onToggleResponse={jest.fn()}
+        renderResponseBody={renderResponseBody}
+        responses={responses}
+        styleMap={styleMap}
+      />,
+    );
+
+    expect(screen.getAllByRole('link')).toHaveLength(8);
+    expect(screen.getByTestId('response-body')).toHaveTextContent('0x0003');
+    expect(renderResponseBody).toHaveBeenCalledWith(responses[3], 3);
+    expect(screen.getByTestId('ce-survey-results-response-window-status')).toHaveTextContent(
+      '1 more response is hidden.',
+    );
   });
 
   it('suppresses the empty copy while filters are loading', () => {

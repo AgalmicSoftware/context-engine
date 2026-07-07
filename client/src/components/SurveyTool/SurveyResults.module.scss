@@ -644,6 +644,38 @@
   margin-bottom: 1rem;
 }
 
+.responseListWindowStatus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(31, 39, 51, 0.12);
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.82);
+  color: #334155;
+  font-size: 0.95rem;
+}
+
+.responseListLoadMoreButton {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid rgba(0, 123, 255, 0.35);
+  border-radius: var(--ce-radius-8);
+  background: #007bff;
+  color: var(--ce-color-white);
+  font-weight: 700;
+  line-height: 1.1;
+  cursor: pointer;
+
+  &:hover,
+  &:focus {
+    background: #0056b3;
+    outline: none;
+  }
+}
+
 .lockedSummaryToggle {
   display: inline-flex;
   align-items: center;
