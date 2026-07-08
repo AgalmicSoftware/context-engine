@@ -35,9 +35,12 @@ import {
   isE2eAiMockEnabled,
 } from './aiClientE2eMocks.js';
 import {
+  asParsedJsonRecord,
   buildHeuristicClusterSummary,
   deriveFallbackClusterName,
   parseJsonFlexible,
+  pickParsedString,
+  readParsedString,
   stripEnclosingMarkdownFences as _stripEnclosingMarkdownFences,
 } from './aiClientParsing.js';
 import {
@@ -550,11 +553,11 @@ export async function analyzeClusterOpinions(clusterData, allClustersData = null
       }
     }
 
-    const parsed = parseJsonFlexible(raw);
-    if (parsed && typeof parsed === 'object') {
-      short = String(parsed.short || '').trim() || '';
-      long = String(parsed.long || '').trim() || '';
-      name = parsed.name ? String(parsed.name).trim() : null;
+    const parsed = asParsedJsonRecord(parseJsonFlexible(raw));
+    if (parsed) {
+      short = readParsedString(parsed, 'short').trim() || '';
+      long = readParsedString(parsed, 'long').trim() || '';
+      name = readParsedString(parsed, 'name').trim() || null;
     } else {
       // Fallback for older/freeform responses
       long = String(raw || '').trim();
@@ -600,19 +603,20 @@ export async function analyzeUserOpinions(userData, opts = {}) {
         : { taskType: 'summarize' };
     const raw = await callAIQueued(prompt, { ...aiCallOpts, thinking: true });
 
-    let parsed = parseJsonFlexible(raw);
-    if (!parsed || typeof parsed !== 'object') parsed = {};
+    const parsed = asParsedJsonRecord(parseJsonFlexible(raw)) || {};
 
-    const name = String(parsed.name || '').trim() || 'Profile Summary';
+    const name = readParsedString(parsed, 'name').trim() || 'Profile Summary';
     const summary =
-      String(parsed.summary || '').trim() || 'Neutral overview of user affiliations and consistent answer themes.';
-    const details = String(parsed.details || '').trim() || 'No additional details were derived from the provided data.';
+      readParsedString(parsed, 'summary').trim() ||
+      'Neutral overview of user affiliations and consistent answer themes.';
+    const details =
+      readParsedString(parsed, 'details').trim() || 'No additional details were derived from the provided data.';
 
     // Safely parse historicalAlignment
-    const ha = parsed && typeof parsed.historicalAlignment === 'object' ? parsed.historicalAlignment : {};
+    const ha = asParsedJsonRecord(parsed.historicalAlignment) || {};
     const historicalAlignment = {
-      figure: String(ha?.figure || '').trim() || '',
-      reasoning: String(ha?.reasoning || '').trim() || '',
+      figure: readParsedString(ha, 'figure').trim() || '',
+      reasoning: readParsedString(ha, 'reasoning').trim() || '',
     };
 
     return { name, summary, details, historicalAlignment };
@@ -663,15 +667,9 @@ ${JSON.stringify(safeUsers, null, 2)}`;
 
     // Parse/sanitize to plain string
     let text = '';
-    const parsed = parseJsonFlexible(String(raw || ''));
-    if (parsed && typeof parsed === 'object') {
-      const candidate =
-        (typeof parsed.text === 'string' && parsed.text) ||
-        (typeof parsed.explanation === 'string' && parsed.explanation) ||
-        (typeof parsed.message === 'string' && parsed.message) ||
-        (typeof parsed.output === 'string' && parsed.output) ||
-        (typeof parsed.content === 'string' && parsed.content) ||
-        '';
+    const parsed = asParsedJsonRecord(parseJsonFlexible(String(raw || '')));
+    if (parsed) {
+      const candidate = pickParsedString(parsed, ['text', 'explanation', 'message', 'output', 'content']);
       if (candidate) text = candidate;
     }
     if (!text) {
@@ -769,7 +767,8 @@ export async function runCompareToolkit(task, payload = {}, opts = {}) {
     const parsed = parseJsonFlexible(raw);
 
     if (t === 'drilldown') {
-      if (parsed && typeof parsed === 'object' && typeof parsed.title === 'string' && Array.isArray(parsed.nodes)) {
+      const parsedTree = asParsedJsonRecord(parsed);
+      if (readParsedString(parsedTree, 'title') && Array.isArray(parsedTree?.nodes)) {
         return parsed;
       }
       // Provide plain-text fallback (string)

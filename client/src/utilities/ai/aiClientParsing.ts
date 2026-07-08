@@ -7,6 +7,20 @@ const aiLog = createLogger('ai');
 const asRecord = (value: unknown): UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 
+export const asParsedJsonRecord = (value: unknown): UnknownRecord | null =>
+  !!value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : null;
+
+export const readParsedString = (record: UnknownRecord | null | undefined, key: string): string =>
+  typeof record?.[key] === 'string' ? String(record[key]) : '';
+
+export const pickParsedString = (record: UnknownRecord | null | undefined, keys: readonly string[]): string => {
+  for (const key of keys) {
+    const value = readParsedString(record, key);
+    if (value) return value;
+  }
+  return '';
+};
+
 /**
  * Try to parse JSON from a string that may include ```json code fences
  * or extra text around the JSON object.
