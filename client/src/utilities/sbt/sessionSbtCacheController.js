@@ -34,6 +34,7 @@ import { resolveSbtRealtimeEventBlockNumber } from './sbtRealtimeEventBlockResol
 import { getSbtRealtimeEventCursorGuard } from './sbtRealtimeEventCursorGuard.js';
 import { updateSbtRealtimeCursorForNetworkCache } from './sbtRealtimeCursorCache.js';
 import { withSessionScopedSbtCacheBinding } from './sessionSbtCacheBinding.js';
+import { applySbtActivityCacheEntryUpdate, buildSbtActivityCacheEntry } from './sbtActivityCacheEntry.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 
 const mainSiteLog = createLogger('mainSite');
@@ -1933,26 +1934,10 @@ export const createSessionSbtCacheController = (host = {}) => {
           );
           return;
         }
-        sbtEntry = {
+        sbtEntry = buildSbtActivityCacheEntry({
           sbtAddress: sbtAddressOriginalCase,
           sbtInfo,
-          mintedAddresses: [],
-          burnedAddresses: [],
-          blockNumber: 0,
-          creationBlock: sbtInfo?.creationBlock ?? null,
-          mintedCountByAddress: {},
-          burnedCountByAddress: {},
-          mintedEventCount: 0,
-          burnedEventCount: 0,
-          historySummary: {
-            totalMinted: '0',
-            totalBurned: '0',
-            activeSupply: '0',
-            currentHolderCount: '0',
-            historicalHolderCount: '0',
-          },
-          countsLoaded: false,
-        };
+        });
         networkCache.sbtList[sbtAddressLower] = sbtEntry;
       } catch (e) {
         mainSiteLog.error(
@@ -1963,45 +1948,11 @@ export const createSessionSbtCacheController = (host = {}) => {
       }
     }
 
-    // Ensure arrays/maps exist
-    if (!Array.isArray(sbtEntry.mintedAddresses)) sbtEntry.mintedAddresses = [];
-    if (!Array.isArray(sbtEntry.burnedAddresses)) sbtEntry.burnedAddresses = [];
-    if (typeof sbtEntry.mintedCountByAddress !== 'object' || !sbtEntry.mintedCountByAddress)
-      sbtEntry.mintedCountByAddress = {};
-    if (typeof sbtEntry.burnedCountByAddress !== 'object' || !sbtEntry.burnedCountByAddress)
-      sbtEntry.burnedCountByAddress = {};
-    if (typeof sbtEntry.mintedEventCount !== 'number') sbtEntry.mintedEventCount = 0;
-    if (typeof sbtEntry.burnedEventCount !== 'number') sbtEntry.burnedEventCount = 0;
-    if (typeof sbtEntry.countsLoaded !== 'boolean') sbtEntry.countsLoaded = false;
-    hydrateLegacySbtCountState(sbtEntry);
-
-    if (burned) {
-      const hasBurnedAddress = sbtEntry.burnedAddresses.includes(accountLower);
-      if (!hasBurnedAddress) {
-        sbtEntry.burnedAddresses.push(accountLower);
-      }
-      const previousBurnedCount = Math.max(0, Math.floor(Number(sbtEntry.burnedCountByAddress[accountLower] || 0)));
-      sbtEntry.burnedCountByAddress[accountLower] = previousBurnedCount + 1;
-      sbtEntry.burnedEventCount += 1;
-    } else {
-      const hasMintedAddress = sbtEntry.mintedAddresses.includes(accountLower);
-      if (!hasMintedAddress) {
-        sbtEntry.mintedAddresses.push(accountLower);
-      }
-      const previousMintedCount = Math.max(0, Math.floor(Number(sbtEntry.mintedCountByAddress[accountLower] || 0)));
-      sbtEntry.mintedCountByAddress[accountLower] = previousMintedCount + 1;
-      sbtEntry.mintedEventCount += 1;
-    }
-
-    sbtEntry.historySummary =
-      buildSbtHistorySummaryFromCounts({
-        mintedCountByAddress: sbtEntry.mintedCountByAddress,
-        burnedCountByAddress: sbtEntry.burnedCountByAddress,
-        mintedEventCount: sbtEntry.mintedEventCount,
-        burnedEventCount: sbtEntry.burnedEventCount,
-      }) || normalizeSbtHistorySummary(sbtEntry.historySummary);
-
-    sbtEntry.blockNumber = Math.max(sbtEntry.blockNumber || 0, eventBlockNumber);
+    applySbtActivityCacheEntryUpdate(sbtEntry, {
+      account: accountLower,
+      burned,
+      eventBlockNumber,
+    });
     networkCache.lastBlock = Math.max(networkCache.lastBlock || 0, eventBlockNumber);
     updateSbtRealtimeCursorForNetworkCache(networkCache, eventCursor);
 
