@@ -11,7 +11,6 @@ import { getCorsProxyUrlOrThrow, resolveCorsProxyUrl } from '../worker/corsProxy
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { normalizeBaseUrl } from '../urlUtils.js';
-import { getCacheBackendDiagnostics } from '../cache/cacheScripts.js';
 import { readSessionScanSlugs } from '../session/sessionScanScope.js';
 import { readSponsoredBootstrapFundingContext } from '../session/sponsoredBootstrapFunding.js';
 import { getSharedFallbackWorkerUrl } from '../session/sessionWorkerAvailability.js';
@@ -51,6 +50,16 @@ import {
   recordFailureCacheEntry,
 } from './arweaveFailureCache.js';
 import {
+  createArweaveFetchDebugLogger,
+  normalizeArweaveDebugContext,
+  readArweaveRuntimeDiagnostics,
+  resolveDirectToArIoForContext,
+  resolveDownloadGatewaysForContext,
+  resolvePreflightTxExistenceDecision,
+  shouldStopOnFirstNotFound,
+  shouldUseShortNotFoundCooldown,
+} from './arweaveRuntimeDiagnostics.js';
+import {
   getAvailableGatewaysForAttempt,
   getGraphqlEndpointSortScore,
   isGraphqlEndpointCoolingDown,
@@ -59,20 +68,10 @@ import {
   markGraphqlEndpointFailure,
   markGraphqlEndpointSuccess,
 } from './arweaveGatewayHealth.js';
-import {
-  CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS,
-  CE_ARWEAVE_PREFLIGHT_SBT_METADATA,
-  CE_ARWEAVE_PREFLIGHT_SESSION_METADATA,
-} from '../../variables/appConfig.js';
-import {
-  getDefaultArweaveGateways,
-  getPreferredArIoGateway,
-  isDirectToArIoEnabled,
-  normalizeGatewayBase,
-  normalizeGatewayList,
-} from './arweaveUrls.js';
+import { getPreferredArIoGateway, isDirectToArIoEnabled, normalizeGatewayBase } from './arweaveUrls.js';
 
 const log = createLogger('general');
+const logArweaveFetchDebug = createArweaveFetchDebugLogger(log);
 
 /* ==========================================================================
    Arweave utilities used by the chain gateway.
@@ -756,180 +755,6 @@ const ensureArweaveResourceErrorListener = () => {
   } catch (e) {
     log.warn('arweaveClient: fallback', e);
   }
-};
-
-const normalizeArweaveDebugContext = (raw) => {
-  if (!raw) return null;
-  if (typeof raw === 'string') {
-    const category = raw.trim();
-    return category ? { category } : null;
-  }
-  if (typeof raw !== 'object') return null;
-  const category = String(raw.category || raw.kind || raw.source || '').trim();
-  const caller = String(raw.caller || raw.fn || '').trim();
-  const slug = String(raw.slug || '').trim();
-  const scope = String(raw.scope || '').trim();
-  const chainId = Number(raw.chainId || 0) || 0;
-  const normalized = {};
-  if (category) normalized.category = category;
-  if (caller) normalized.caller = caller;
-  if (scope) normalized.scope = scope;
-  if (slug) normalized.slug = slug;
-  if (chainId) normalized.chainId = chainId;
-  if (raw.enabled === true) normalized.enabled = true;
-  return Object.keys(normalized).length ? normalized : null;
-};
-
-const shouldStopOnFirstNotFound = (opts = {}) => opts?.stopOnFirst404 === true || opts?.shortCircuitNotFound === true;
-
-const readBoolish = (raw, defaultVal = false) => {
-  if (typeof raw === 'boolean') return raw;
-  const value = String(raw == null ? '' : raw)
-    .trim()
-    .toLowerCase();
-  if (value === '1' || value === 'true' || value === 'yes' || value === 'on') return true;
-  if (value === '0' || value === 'false' || value === 'no' || value === 'off') return false;
-  return defaultVal;
-};
-
-const readGlobalBool = (key, defaultVal = false) => {
-  try {
-    if (typeof globalThis !== 'undefined' && typeof globalThis[key] !== 'undefined') {
-      return readBoolish(globalThis[key], defaultVal);
-    }
-  } catch (e) {
-    void e; /* fallback: runtime override lookup. */
-  }
-  return defaultVal;
-};
-
-const readArweaveRuntimeDiagnostics = () => {
-  let userAgent = null;
-  let viewportWidth = null;
-  let viewportHeight = null;
-  let devicePixelRatio = null;
-  try {
-    if (typeof navigator !== 'undefined' && navigator?.userAgent) {
-      userAgent = String(navigator.userAgent);
-    }
-  } catch (e) {
-    void e; /* fallback: runtime override lookup. */
-  }
-  try {
-    if (typeof window !== 'undefined') {
-      viewportWidth = Number(window.innerWidth || 0) || null;
-      viewportHeight = Number(window.innerHeight || 0) || null;
-      devicePixelRatio = Number(window.devicePixelRatio || 0) || null;
-    }
-  } catch (e) {
-    void e; /* fallback: runtime override lookup. */
-  }
-
-  const cacheBackend = getCacheBackendDiagnostics();
-  return {
-    cacheBackend: String(cacheBackend?.persistentBackend || 'unknown'),
-    cacheBackendProbeState: String(cacheBackend?.probeState || 'unprobed'),
-    userAgent,
-    viewportWidth,
-    viewportHeight,
-    devicePixelRatio,
-  };
-};
-
-const isResponsePayloadCategory = (debugContext = null) => {
-  const category = String(debugContext?.category || '')
-    .trim()
-    .toLowerCase();
-  return category === 'question_response_payload' || category === 'survey_response_payload';
-};
-
-const isDisplayCriticalMetadataCategory = (debugContext = null) => {
-  const category = String(debugContext?.category || '')
-    .trim()
-    .toLowerCase();
-  return (
-    category === 'session_registry_metadata' ||
-    category === 'sbt_metadata' ||
-    category === 'question_metadata' ||
-    category === 'survey_metadata'
-  );
-};
-
-const resolvePreflightTxExistenceDecision = (opts = {}, debugContext = null) => {
-  if (opts?.disableExistencePrecheck === true) {
-    return { enabled: false, source: 'opts:disableExistencePrecheck' };
-  }
-  if (opts?.preflightTxExistence === false) {
-    return { enabled: false, source: 'opts:preflightTxExistence=false' };
-  }
-  if (opts?.preflightTxExistence === true) {
-    return { enabled: true, source: 'opts:preflightTxExistence=true' };
-  }
-  const category = String(debugContext?.category || '')
-    .trim()
-    .toLowerCase();
-  if (category === 'session_registry_metadata') {
-    return {
-      enabled: readGlobalBool('CE_ARWEAVE_PREFLIGHT_SESSION_METADATA', !!CE_ARWEAVE_PREFLIGHT_SESSION_METADATA),
-      source: 'config:session_metadata',
-    };
-  }
-  if (category === 'sbt_metadata') {
-    return {
-      enabled: readGlobalBool('CE_ARWEAVE_PREFLIGHT_SBT_METADATA', !!CE_ARWEAVE_PREFLIGHT_SBT_METADATA),
-      source: 'config:sbt_metadata',
-    };
-  }
-  if (isResponsePayloadCategory(debugContext)) {
-    return {
-      enabled: readGlobalBool('CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS', !!CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS),
-      source: 'config:response_payloads',
-    };
-  }
-  return { enabled: false, source: 'default:skip' };
-};
-
-const shouldUseShortNotFoundCooldown = (debugContext = null) => {
-  if (isResponsePayloadCategory(debugContext)) return true;
-  if (!isDisplayCriticalMetadataCategory(debugContext)) return false;
-  const category = String(debugContext?.category || '')
-    .trim()
-    .toLowerCase();
-  if (category === 'question_metadata' || category === 'survey_metadata') return true;
-  return resolvePreflightTxExistenceDecision({}, debugContext).enabled === false;
-};
-
-const resolveDownloadGatewaysForContext = (opts = {}, debugContext = null) => {
-  void debugContext;
-  const configuredGateways =
-    Array.isArray(opts.gateways) && opts.gateways.length ? normalizeGatewayList(opts.gateways) : [];
-  if (configuredGateways.length) return configuredGateways;
-  return getDefaultArweaveGateways(opts);
-};
-
-const resolveDirectToArIoForContext = (opts = {}, debugContext = null) => {
-  void debugContext;
-  return isDirectToArIoEnabled(opts);
-};
-
-const shouldLogArweaveFetchDebug = (opts = {}, debugContext = null) => {
-  if (opts?.debugArweave === true) return true;
-  if (debugContext?.enabled === true) return true;
-  try {
-    if (typeof window !== 'undefined') {
-      if (window.__CE_ARWEAVE_DEBUG__ === true) return true;
-      if (window.ENABLE_RPC_DEBUG_LOGGING === true) return true;
-    }
-  } catch (e) {
-    void e; /* fallback: runtime override lookup. */
-  }
-  return false;
-};
-
-const logArweaveFetchDebug = (level, message, payload, opts = {}, debugContext = null) => {
-  if (!shouldLogArweaveFetchDebug(opts, debugContext)) return;
-  const method = typeof log[level] === 'function' ? level : 'log';
-  log[method](message, payload);
 };
 
 const getTxExistenceCacheEntry = (txId) => {
