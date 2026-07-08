@@ -56,13 +56,24 @@ import {
   buildTranscriptionConfigRequest,
   inferAiTaskType,
   pickAiRequestOpts,
+  readAiErrorMessage,
+  readAiOptionTaskType,
+  readAiOptionThinking,
+  readAiOptionThrowOnError,
+  readAiOptionWorkerUrl,
+  readArweaveJwkOption,
+  readNumericOption,
+  resolveAudioSummaryOptions,
   resolveAiSessionOptions,
   resolveAiSessionSelection,
+  resolveTranscriptionUploadOptions,
+  withAiTaskTypeFallback,
 } from './aiClientRequestOptions.js';
 import { mergeCompareVennWithEvidence, normalizeCompareBullets } from './aiCompareContracts.js';
 import {
   buildAiWorkerRequestPlan,
   parseAiWorkerCompletion,
+  readAiWorkerFirstMessageContentLength,
   resolveAiWorkerEndpoint,
 } from './aiClientWorkerTransport.js';
 import {
@@ -191,7 +202,7 @@ export function setVadTrimConfig(cfg) {
  */
 export const callAI = async (prompt, opts = {}) => {
   try {
-    const thinkingRequested = !!opts.thinking;
+    const thinkingRequested = readAiOptionThinking(opts);
     const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
     const ai = await getEffectiveAiConfig(buildAiConfigRequest(opts, { thinking: thinkingRequested }));
     const taskType = inferAiTaskType(prompt, opts);
@@ -230,7 +241,7 @@ export const callAI = async (prompt, opts = {}) => {
       tokenBudgetKey,
       tokenBudgetValue: maxTokens,
       messageCount: messages.length,
-      firstMessageLength: messages[0]?.content?.length || 0,
+      firstMessageLength: readAiWorkerFirstMessageContentLength(messages),
     });
     const gateStatus = String(sessionSelection?.gateStatus ?? '')
       .trim()
@@ -301,7 +312,7 @@ export const analyzeSurveyResponses = async (responses, opts = {}) => {
  * descending order of relevance.
  */
 export async function rankQuestionsAI(userQuery, questionList, topX = 10, opts = {}) {
-  const throwOnError = !!opts?.throwOnError;
+  const throwOnError = readAiOptionThrowOnError(opts);
   try {
     const candidates = (Array.isArray(questionList) ? questionList : [])
       .map((q) => ({
@@ -318,7 +329,7 @@ export async function rankQuestionsAI(userQuery, questionList, topX = 10, opts =
 
     const rawOutput = await callAI(finalPrompt.trim(), {
       ...pickAiRequestOpts(opts),
-      taskType: opts?.taskType || 'rank',
+      taskType: readAiOptionTaskType(opts, 'rank'),
     });
 
     let parsed;
@@ -370,7 +381,7 @@ export async function requestAiRewrite(originalText, opts = {}) {
     const finalPrompt = aiRewritePrompt.replace('<USER_TEXT>', originalText);
     const cleaned = await callAI(finalPrompt, {
       ...(opts && typeof opts === 'object' ? opts : {}),
-      taskType: opts?.taskType || 'rewrite',
+      taskType: readAiOptionTaskType(opts, 'rewrite'),
     });
     return cleaned.trim();
   } catch (error) {
@@ -391,9 +402,9 @@ export async function requestAiRewrite(originalText, opts = {}) {
  */
 export async function transcribeAudio(audioBlobOrFile, opts = {}) {
   if (!audioBlobOrFile) throw new Error('No audio provided');
-  const maxUploadBytes = Number.isFinite(opts?.maxUploadBytes)
-    ? Math.max(1024, Math.floor(Number(opts.maxUploadBytes)))
-    : TRANSCRIBE_MAX_UPLOAD_BYTES;
+  const { maxUploadBytes, signal } = resolveTranscriptionUploadOptions(opts, {
+    defaultMaxUploadBytes: TRANSCRIBE_MAX_UPLOAD_BYTES,
+  });
 
   // Helper: coerce to a File when available to preserve filename
   const toFileLike = (blob, nameFallback) => {
@@ -409,7 +420,7 @@ export async function transcribeAudio(audioBlobOrFile, opts = {}) {
 
   const originalName = String(audioBlobOrFile.name || 'audio').trim();
   const lowerName = originalName.toLowerCase();
-  const ext = lowerName.includes('.') ? lowerName.split('.').pop() : '';
+  const ext = lowerName.includes('.') ? lowerName.split('.').pop() || '' : '';
   const mime = String(audioBlobOrFile.type || '').toLowerCase();
 
   // Phone-format coverage
@@ -433,10 +444,7 @@ export async function transcribeAudio(audioBlobOrFile, opts = {}) {
 
   // Optional client-side VAD-based silence trimming (runtime-configured; no hardcoded tunables here)
   try {
-    const sizeThreshold =
-      __vadTrimConfig && typeof __vadTrimConfig.sizeThresholdBytes === 'number'
-        ? __vadTrimConfig.sizeThresholdBytes
-        : null;
+    const sizeThreshold = readNumericOption(__vadTrimConfig, 'sizeThresholdBytes');
     if (__vadTrimEnabled && sizeThreshold != null && (uploadFile?.size || 0) > sizeThreshold) {
       const trimmed = await extractSpeechAudio(uploadFile, __vadTrimConfig || {});
       if (trimmed && trimmed.size > 0 && trimmed.size < (uploadFile.size || Infinity)) {
@@ -465,7 +473,7 @@ export async function transcribeAudio(audioBlobOrFile, opts = {}) {
     for (const chunk of chunkedUploads) {
       const chunkText = await uploadAudioForTranscription(chunk, transport, {
         onJsonParseError: (error) => aiLog.warn('Transcription response JSON parse failed:', error),
-        signal: opts?.signal,
+        signal,
       });
       merged = mergeTranscriptText(merged, chunkText);
     }
@@ -479,7 +487,7 @@ export async function transcribeAudio(audioBlobOrFile, opts = {}) {
     {
       fileName: fname,
       onJsonParseError: (error) => aiLog.warn('Transcription response JSON parse failed:', error),
-      signal: opts?.signal,
+      signal,
     },
   );
 }
@@ -492,7 +500,7 @@ const resolveTranscriptionTransport = async (opts = {}) => {
     throw new Error('Local transcription is not configured in this build.');
   }
 
-  const explicitWorkerUrl = normalizeBaseUrl(opts?.workerUrl || '');
+  const explicitWorkerUrl = normalizeBaseUrl(readAiOptionWorkerUrl(opts) || '');
   const corsWorkerUrl =
     explicitWorkerUrl ||
     (await getCorsProxyUrlOrThrow({
@@ -539,10 +547,7 @@ export async function analyzeClusterOpinions(clusterData, allClustersData = null
     let short = '';
     let long = '';
     let raw = '';
-    const aiCallOpts =
-      opts && typeof opts === 'object'
-        ? { ...opts, taskType: opts.taskType || 'summarize' }
-        : { taskType: 'summarize' };
+    const aiCallOpts = withAiTaskTypeFallback(opts, 'summarize');
 
     try {
       raw = await callAIQueued(finalPrompt, { ...aiCallOpts, thinking: true });
@@ -550,7 +555,7 @@ export async function analyzeClusterOpinions(clusterData, allClustersData = null
       try {
         raw = await callAIQueued(finalPrompt, { ...aiCallOpts, thinking: false });
       } catch (fallbackErr) {
-        const message = fallbackErr?.message || err?.message || 'AI request failed';
+        const message = readAiErrorMessage(fallbackErr, readAiErrorMessage(err, 'AI request failed'));
         throw new Error(message);
       }
     }
@@ -599,10 +604,7 @@ export async function analyzeUserOpinions(userData, opts = {}) {
   try {
     const { default: buildUserAnalysisPrompt } = await import('../../prompts/userAnalysisPrompt.js');
     const prompt = buildUserAnalysisPrompt(userData);
-    const aiCallOpts =
-      opts && typeof opts === 'object'
-        ? { ...opts, taskType: opts.taskType || 'summarize' }
-        : { taskType: 'summarize' };
+    const aiCallOpts = withAiTaskTypeFallback(opts, 'summarize');
     const raw = await callAIQueued(prompt, { ...aiCallOpts, thinking: true });
 
     const parsed = asParsedJsonRecord(parseJsonFlexible(raw)) || {};
@@ -624,7 +626,7 @@ export async function analyzeUserOpinions(userData, opts = {}) {
     return { name, summary, details, historicalAlignment };
   } catch (err) {
     // Let gate-unavailable errors propagate for session-level retry.
-    if (/on-chain gate data unavailable/i.test(String(err?.message || ''))) {
+    if (/on-chain gate data unavailable/i.test(readAiErrorMessage(err, ''))) {
       throw err;
     }
     aiLog.error('analyzeUserOpinions error:', err);
@@ -879,13 +881,7 @@ export async function generateAudioDiscussionSummary(transcript, opts = {}) {
     throw new Error('Transcript is empty or too short (need ≥ 20 characters).');
   }
 
-  const aiCallOpts = opts && typeof opts === 'object' ? { ...opts } : {};
-  const style =
-    typeof aiCallOpts.style === 'string' && aiCallOpts.style.trim() ? aiCallOpts.style.trim() : 'reading-group';
-  const sessionTitle =
-    typeof aiCallOpts.sessionTitle === 'string' && aiCallOpts.sessionTitle.trim() ? aiCallOpts.sessionTitle.trim() : '';
-  delete aiCallOpts.style;
-  delete aiCallOpts.sessionTitle;
+  const { aiCallOptions: aiCallOpts, sessionTitle, style } = resolveAudioSummaryOptions(opts);
 
   try {
     const { audioSummaryPrompt } = await import('../../prompts/audioSummaryPrompt.js');
@@ -901,7 +897,7 @@ export async function generateAudioDiscussionSummary(transcript, opts = {}) {
     if (!md) throw new Error('AI returned an empty summary.');
     return md;
   } catch (err) {
-    const msg = String(err?.message || 'Failed to generate audio discussion summary.');
+    const msg = readAiErrorMessage(err, 'Failed to generate audio discussion summary.');
     throw new Error(msg);
   }
 }
@@ -922,8 +918,9 @@ export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
   try {
     const { arweaveClient } = await import('../arweave/arweaveClientLazy.js');
     const { context, preferLocal, sessionConfig, sessionSlug } = buildArweaveKeyRequest(opts);
-    const arweaveKey = opts?.arweaveJwk
-      ? { arweaveJwk: opts.arweaveJwk }
+    const { arweaveJwk, hasArweaveJwk } = readArweaveJwkOption(opts);
+    const arweaveKey = hasArweaveJwk
+      ? { arweaveJwk }
       : {
           arweaveJwk:
             (
@@ -948,7 +945,7 @@ export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
       txId = await arweaveClient.uploadDataToArweave(md, 'md', uploadOpts);
     } catch (e) {
       // Graceful fallback for environments where 'md' is not supported by the uploader
-      if (/Unsupported format:\s*md/i.test(String(e?.message || ''))) {
+      if (/Unsupported format:\s*md/i.test(readAiErrorMessage(e, ''))) {
         txId = await arweaveClient.uploadDataToArweave(md, 'json', uploadOpts);
       } else {
         throw e;
@@ -963,7 +960,7 @@ export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
     const mdUrl = `[${url}](${url})`;
     return { txId, url, mdUrl };
   } catch (err) {
-    const msg = String(err?.message || 'Failed to upload summary to Arweave.');
+    const msg = readAiErrorMessage(err, 'Failed to upload summary to Arweave.');
     throw new Error(msg);
   }
 }

@@ -1,4 +1,9 @@
-import { buildAiWorkerRequestPlan, parseAiWorkerCompletion, resolveAiWorkerEndpoint } from './aiClientWorkerTransport';
+import {
+  buildAiWorkerRequestPlan,
+  parseAiWorkerCompletion,
+  readAiWorkerFirstMessageContentLength,
+  resolveAiWorkerEndpoint,
+} from './aiClientWorkerTransport';
 
 describe('aiClientWorkerTransport', () => {
   it('builds responses-api token budgets for gpt-5 worker requests', () => {
@@ -80,5 +85,13 @@ describe('aiClientWorkerTransport', () => {
     expect(parseAiWorkerCompletion({ completion: completionObject })).toBe(completionObject);
     expect(parseAiWorkerCompletion({ content: [{ text: 'content text' }] })).toBe('content text');
     expect(() => parseAiWorkerCompletion({ content: [] })).toThrow('Unexpected AI response format');
+  });
+
+  it('reads the first message content length for logging without assuming shape', () => {
+    expect(readAiWorkerFirstMessageContentLength([{ content: 'hello' }])).toBe(5);
+    expect(readAiWorkerFirstMessageContentLength([{ content: ['hello', 'there'] }])).toBe(2);
+    expect(readAiWorkerFirstMessageContentLength([{ content: { length: 7 } }])).toBe(7);
+    expect(readAiWorkerFirstMessageContentLength([{ content: { length: '7' } }])).toBe(0);
+    expect(readAiWorkerFirstMessageContentLength('not-messages')).toBe(0);
   });
 });

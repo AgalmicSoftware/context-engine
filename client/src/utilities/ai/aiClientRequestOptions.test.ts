@@ -4,8 +4,17 @@ import {
   buildTranscriptionConfigRequest,
   inferAiTaskType,
   pickAiRequestOpts,
+  readAiErrorMessage,
+  readAiOptionTaskType,
+  readAiOptionThinking,
+  readAiOptionThrowOnError,
+  readArweaveJwkOption,
+  readNumericOption,
+  resolveAudioSummaryOptions,
   resolveAiSessionOptions,
   resolveAiSessionSelection,
+  resolveTranscriptionUploadOptions,
+  withAiTaskTypeFallback,
 } from './aiClientRequestOptions.js';
 
 describe('aiClientRequestOptions', () => {
@@ -144,5 +153,77 @@ describe('aiClientRequestOptions', () => {
       sessionConfig,
       sessionSlug: 'alpha-session',
     });
+  });
+
+  it('preserves legacy truthy option-control semantics', () => {
+    expect(readAiOptionThinking({ thinking: 1 })).toBe(true);
+    expect(readAiOptionThrowOnError({ throwOnError: 'yes' })).toBe(true);
+    expect(readAiOptionTaskType({ taskType: 'rank' }, 'summarize')).toBe('rank');
+    expect(readAiOptionTaskType({ taskType: 0 }, 'summarize')).toBe('summarize');
+    expect(withAiTaskTypeFallback({ taskType: '', provider: 'openai' }, 'rewrite')).toEqual({
+      provider: 'openai',
+      taskType: 'rewrite',
+    });
+  });
+
+  it('resolves transcription upload controls without accepting numeric strings', () => {
+    const signal = new AbortController().signal;
+
+    expect(
+      resolveTranscriptionUploadOptions(
+        {
+          maxUploadBytes: 512,
+          signal,
+        },
+        { defaultMaxUploadBytes: 25 },
+      ),
+    ).toEqual({
+      maxUploadBytes: 1024,
+      signal,
+    });
+    expect(resolveTranscriptionUploadOptions({ maxUploadBytes: '4096' }, { defaultMaxUploadBytes: 25 })).toEqual({
+      maxUploadBytes: 25,
+      signal: undefined,
+    });
+  });
+
+  it('reads numeric and summary option contracts without mutating AI call options', () => {
+    expect(readNumericOption({ sizeThresholdBytes: 2048 }, 'sizeThresholdBytes')).toBe(2048);
+    expect(readNumericOption({ sizeThresholdBytes: '2048' }, 'sizeThresholdBytes')).toBeNull();
+
+    expect(
+      resolveAudioSummaryOptions({
+        model: 'gpt-5',
+        sessionTitle: '  Test Session  ',
+        style: '  seminar  ',
+        taskType: 'summarize',
+      }),
+    ).toEqual({
+      aiCallOptions: {
+        model: 'gpt-5',
+        taskType: 'summarize',
+      },
+      sessionTitle: 'Test Session',
+      style: 'seminar',
+    });
+    expect(resolveAudioSummaryOptions(null)).toEqual({
+      aiCallOptions: {},
+      sessionTitle: '',
+      style: 'reading-group',
+    });
+  });
+
+  it('preserves Arweave JWK truthiness and error-message fallback semantics', () => {
+    expect(readArweaveJwkOption({ arweaveJwk: { kty: 'RSA' } })).toEqual({
+      arweaveJwk: { kty: 'RSA' },
+      hasArweaveJwk: true,
+    });
+    expect(readArweaveJwkOption({ arweaveJwk: '' })).toEqual({
+      arweaveJwk: '',
+      hasArweaveJwk: false,
+    });
+    expect(readAiErrorMessage({ message: 'specific failure' }, 'fallback')).toBe('specific failure');
+    expect(readAiErrorMessage({ message: '' }, 'fallback')).toBe('fallback');
+    expect(readAiErrorMessage('not-an-error', 'fallback')).toBe('fallback');
   });
 });

@@ -33,11 +33,16 @@ export type AiClientOptionRecord = UnknownRecord & {
   preferLocal?: unknown;
   provider?: unknown;
   rpcUrl?: unknown;
+  signal?: unknown;
   sessionConfig?: SessionConfig | null | unknown;
   sessionSelection?: unknown;
   sessionSlug?: unknown;
+  sessionTitle?: unknown;
+  sizeThresholdBytes?: unknown;
+  style?: unknown;
   taskType?: unknown;
   thinking?: unknown;
+  throwOnError?: unknown;
   workerUrl?: unknown;
 };
 
@@ -70,6 +75,82 @@ const readAiClientContext = (input: unknown): AiClientContext | undefined =>
 const readPreferLocal = (input: unknown): boolean | undefined => (typeof input === 'boolean' ? input : undefined);
 
 export const normalizeAiClientOptions = (input: unknown = {}): AiClientOptionRecord => asOptionRecord(input);
+
+export const readAiOptionThinking = (input: unknown = {}): boolean => !!asOptionRecord(input).thinking;
+
+export const readAiOptionThrowOnError = (input: unknown = {}): boolean => !!asOptionRecord(input).throwOnError;
+
+export const readAiOptionTaskType = (input: unknown = {}, fallback: unknown = ''): unknown =>
+  asOptionRecord(input).taskType || fallback;
+
+export const readAiOptionWorkerUrl = (input: unknown = {}): unknown => asOptionRecord(input).workerUrl;
+
+export const withAiTaskTypeFallback = (input: unknown = {}, fallback: unknown): AiClientOptionRecord => {
+  const opts = asOptionRecord(input);
+  return {
+    ...opts,
+    taskType: opts.taskType || fallback,
+  };
+};
+
+export const readAiErrorMessage = (input: unknown, fallback: string): string => {
+  const message = asOptionRecord(input).message;
+  return String(message || fallback);
+};
+
+export const readNumericOption = (input: unknown = {}, key: keyof AiClientOptionRecord): number | null => {
+  const value = asOptionRecord(input)[key];
+  return typeof value === 'number' ? value : null;
+};
+
+export const resolveTranscriptionUploadOptions = (
+  input: unknown = {},
+  { defaultMaxUploadBytes }: { defaultMaxUploadBytes: number },
+): {
+  maxUploadBytes: number;
+  signal: AbortSignal | undefined;
+} => {
+  const opts = asOptionRecord(input);
+  const maxUploadBytes = Number.isFinite(opts.maxUploadBytes)
+    ? Math.max(1024, Math.floor(Number(opts.maxUploadBytes)))
+    : defaultMaxUploadBytes;
+  return {
+    maxUploadBytes,
+    signal: opts.signal == null ? undefined : (opts.signal as AbortSignal),
+  };
+};
+
+export const resolveAudioSummaryOptions = (
+  input: unknown = {},
+): {
+  aiCallOptions: AiClientOptionRecord;
+  sessionTitle: string;
+  style: string;
+} => {
+  const opts = asOptionRecord(input);
+  const { sessionTitle: _sessionTitle, style: _style, ...aiCallOptions } = opts;
+  const style = typeof opts.style === 'string' && opts.style.trim() ? opts.style.trim() : 'reading-group';
+  const sessionTitle =
+    typeof opts.sessionTitle === 'string' && opts.sessionTitle.trim() ? opts.sessionTitle.trim() : '';
+  return {
+    aiCallOptions,
+    sessionTitle,
+    style,
+  };
+};
+
+export const readArweaveJwkOption = (
+  input: unknown = {},
+): {
+  arweaveJwk: unknown;
+  hasArweaveJwk: boolean;
+} => {
+  const arweaveJwk = asOptionRecord(input).arweaveJwk;
+  return {
+    arweaveJwk,
+    hasArweaveJwk: !!arweaveJwk,
+  };
+};
 
 export const resolveAiSessionOptions = (input: unknown = {}): AiSessionOptions => {
   const opts = asOptionRecord(input);

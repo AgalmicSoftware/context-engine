@@ -129,3 +129,11 @@ export const parseAiWorkerCompletion = (data: unknown): string => {
   if (first.text) return first.text as string;
   throw new Error('Unexpected AI response format');
 };
+
+export const readAiWorkerFirstMessageContentLength = (messages: unknown): number => {
+  const list = Array.isArray(messages) ? messages : [];
+  const content = asRecord(list[0]).content;
+  if (typeof content === 'string' || Array.isArray(content)) return content.length;
+  const length = asRecord(content).length;
+  return typeof length === 'number' ? length : 0;
+};
