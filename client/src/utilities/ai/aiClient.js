@@ -69,7 +69,12 @@ import {
   resolveTranscriptionUploadOptions,
   withAiTaskTypeFallback,
 } from './aiClientRequestOptions.js';
-import { mergeCompareVennWithEvidence, normalizeCompareBullets } from './aiCompareContracts.js';
+import {
+  mergeCompareVennWithEvidence,
+  normalizeCompareBullets,
+  readCompareToolkitTask,
+  resolveCompareToolkitPayload,
+} from './aiCompareContracts.js';
 import {
   buildAiWorkerRequestPlan,
   parseAiWorkerCompletion,
@@ -568,7 +573,7 @@ export async function analyzeClusterOpinions(clusterData, allClustersData = null
     } else {
       // Fallback for older/freeform responses
       long = String(raw || '').trim();
-      short = long.split('\n').shift().slice(0, 200);
+      short = (long.split('\n').shift() || '').slice(0, 200);
     }
 
     if (!short || !long) {
@@ -739,8 +744,9 @@ export async function drillDownComparisonTree(users, pointText, type, opts = {})
  * @returns {Promise<any>} Parsed JSON per task, or a plain string for drilldown fallback.
  */
 export async function runCompareToolkit(task, payload = {}, opts = {}) {
-  const t = String(task || '').toLowerCase();
-  const safeUsers = Array.isArray(payload.users) ? payload.users.slice(0, 10) : [];
+  const t = readCompareToolkitTask(task);
+  const comparePayload = resolveCompareToolkitPayload(payload);
+  const safeUsers = comparePayload.users;
   const aiCallOpts = {
     ...pickAiRequestOpts(payload),
     ...pickAiRequestOpts(opts),
@@ -759,8 +765,8 @@ export async function runCompareToolkit(task, payload = {}, opts = {}) {
     users: safeUsers,
     ...(t === 'drilldown'
       ? {
-          pointText: String(payload.pointText || ''),
-          type: payload.type === 'disagreement' ? 'disagreement' : 'agreement',
+          pointText: comparePayload.pointText,
+          type: comparePayload.type,
         }
       : {}),
   };

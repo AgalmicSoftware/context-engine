@@ -1,4 +1,9 @@
-import { mergeCompareVennWithEvidence, normalizeCompareBullets } from './aiCompareContracts';
+import {
+  mergeCompareVennWithEvidence,
+  normalizeCompareBullets,
+  readCompareToolkitTask,
+  resolveCompareToolkitPayload,
+} from './aiCompareContracts';
 
 describe('aiCompareContracts', () => {
   it('normalizes compare bullets with fallback and max-item semantics', () => {
@@ -53,5 +58,26 @@ describe('aiCompareContracts', () => {
 
   it('rejects venn candidates without a counts record', () => {
     expect(mergeCompareVennWithEvidence({ evidenceMap: {} }, { counts: {}, evidenceMap: {} })).toBeNull();
+  });
+
+  it('normalizes compare toolkit tasks and payloads without changing fallbacks', () => {
+    expect(readCompareToolkitTask('DRILLDOWN')).toBe('drilldown');
+    expect(readCompareToolkitTask(null)).toBe('');
+    expect(
+      resolveCompareToolkitPayload({
+        pointText: 42,
+        type: 'disagreement',
+        users: Array.from({ length: 12 }, (_, index) => ({ address: `0x${index}` })),
+      }),
+    ).toEqual({
+      pointText: '42',
+      type: 'disagreement',
+      users: Array.from({ length: 10 }, (_, index) => ({ address: `0x${index}` })),
+    });
+    expect(resolveCompareToolkitPayload({ type: 'other', users: 'not-users' })).toEqual({
+      pointText: '',
+      type: 'agreement',
+      users: [],
+    });
   });
 });
