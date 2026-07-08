@@ -49,6 +49,7 @@ import {
   stripDataUrlPrefix,
   usesOpenAiResponsesApi,
 } from './aiClientPhotoSupport.js';
+import { extractMainContent, readFileContent } from './aiClientSourceReaders.js';
 
 import {
   pcaLiteCompass,
@@ -169,33 +170,6 @@ export function setVadTrimConfig(cfg) {
 /* ======================================================================
  * Core fetch + AI helpers
  * ====================================================================== */
-
-/**
- * Extract main content from HTML by removing scripts, styles, footers, etc.
- */
-const extractMainContent = (htmlString) => {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlString, 'text/html');
-
-  const elementsToRemove = ['script', 'style', 'iframe', 'nav', 'footer', 'header', 'aside'];
-  elementsToRemove.forEach((tag) => {
-    doc.querySelectorAll(tag).forEach((el) => el.remove());
-  });
-
-  const contentSelectors = ['main', 'article', '.content', '#content', '.main-content', '#main-content', 'body'];
-
-  for (const selector of contentSelectors) {
-    const element = doc.querySelector(selector);
-    if (element) {
-      const text = element.textContent.replace(/\s+/g, ' ').trim();
-      if (text.length > 100) {
-        return text;
-      }
-    }
-  }
-
-  return doc.body.textContent.replace(/\s+/g, ' ').trim();
-};
 
 const resolveSessionAliasesOpt = (opts = {}) =>
   resolveSessionConfigAliases({
@@ -501,50 +475,6 @@ export const fetchContentFromURL = async (url, opts = {}) => {
     throw new Error(`URL Error: ${error.message}`);
   }
 };
-
-/**
- * Reads a File object as text.
- * - Text-like types (.txt, .md, .csv) are read directly.
- * - Binary types (.pdf, .ppt) return a placeholder to prevent hallucination on raw bytes.
- */
-function readFileContent(file) {
-  return new Promise((resolve, reject) => {
-    const name = file.name.toLowerCase();
-    // Basic text-like extensions
-    const isText =
-      name.endsWith('.txt') ||
-      name.endsWith('.md') ||
-      name.endsWith('.csv') ||
-      name.endsWith('.json') ||
-      name.endsWith('.xml') ||
-      file.type.startsWith('text/');
-
-    // Known binaries that we explicitly don't parse client-side yet
-    const isBinary =
-      name.endsWith('.pdf') ||
-      name.endsWith('.ppt') ||
-      name.endsWith('.pptx') ||
-      name.endsWith('.doc') ||
-      name.endsWith('.docx') ||
-      name.endsWith('.xls') ||
-      name.endsWith('.xlsx');
-
-    if (isBinary) {
-      resolve(`[Binary content parsing not currently supported client-side for file: ${file.name}]`);
-      return;
-    }
-
-    if (!isText) {
-      // Fallback: try reading as text, but might be garbage if unknown binary.
-      // Given constraints, we attempt reading.
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = (e) => reject(new Error(`Failed to read file: ${file.name}`));
-    reader.readAsText(file);
-  });
-}
 
 /**
  * processAdditionalSources(sources)
