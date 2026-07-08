@@ -1,4 +1,5 @@
 import { createContractHelperMethods } from './contractHelpers.js';
+import { __test__contractBlockCache } from '../cache/contractBlockCache.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../session/sponsoredBootstrapFunding.js';
 
@@ -1027,5 +1028,90 @@ describe('contractHelpers resolved cfg pass-through', () => {
 
     expect(result).toEqual({ fromBlock: 120, toBlock: 4321 });
     expect(resolveSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('contractHelpers getBlockWithCaching', () => {
+  const buildHelper = ({ maxEntries = 50, ttlMs = 1000 } = {}) => {
+    const callWithRetry = jest.fn((fn) => fn());
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => ({ slug: 'alpha', networkChainId: 84532 })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: ttlMs,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry,
+      MAX_CACHE_SIZE: maxEntries,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: { getState: () => ({}) },
+      getSessionConfigBySlug: jest.fn(() => null),
+      getCorsProxyUrlOrThrow: jest.fn(),
+      fetchWorkerWithAuth: jest.fn(),
+    });
+    return { helper, callWithRetry };
+  };
+
+  afterEach(() => {
+    __test__contractBlockCache.clear();
+    jest.restoreAllMocks();
+  });
+
+  it('caches same-chain block lookups without caller-owned cache state', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1000);
+    const provider = {
+      getBlock: jest.fn(async (blockNumber) => ({ number: Number(blockNumber), hash: `0x${blockNumber}` })),
+    };
+    const { helper, callWithRetry } = buildHelper();
+
+    const first = await helper.getBlockWithCaching(provider, 123, 'none', '84532');
+    const second = await helper.getBlockWithCaching(provider, 123, 'none', '84532');
+
+    expect(second).toBe(first);
+    expect(provider.getBlock).toHaveBeenCalledTimes(1);
+    expect(callWithRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not share block cache entries across chain keys', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1000);
+    const provider = {
+      getBlock: jest.fn(async (blockNumber) => ({ number: Number(blockNumber), hash: `0x${blockNumber}` })),
+    };
+    const { helper } = buildHelper();
+
+    await helper.getBlockWithCaching(provider, 123, 'none', '84532');
+    await helper.getBlockWithCaching(provider, 123, 'none', '11155420');
+
+    expect(provider.getBlock).toHaveBeenCalledTimes(2);
+  });
+
+  it('evicts the oldest cached block when the cache reaches its size limit', async () => {
+    let now = 1000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const provider = {
+      getBlock: jest.fn(async (blockNumber) => ({ number: Number(blockNumber), hash: `0x${blockNumber}` })),
+    };
+    const { helper } = buildHelper({ maxEntries: 2, ttlMs: 1000 });
+
+    await helper.getBlockWithCaching(provider, 1, 'none', '84532');
+    now += 10;
+    await helper.getBlockWithCaching(provider, 2, 'none', '84532');
+    now += 10;
+    await helper.getBlockWithCaching(provider, 3, 'none', '84532');
+    now += 10;
+    await helper.getBlockWithCaching(provider, 1, 'none', '84532');
+
+    expect(provider.getBlock).toHaveBeenCalledTimes(4);
+    expect(provider.getBlock.mock.calls.map(([blockNumber]) => blockNumber)).toEqual([1, 2, 3, 1]);
   });
 });

@@ -165,6 +165,13 @@ export const BLOCK_CACHE_MS = 30000;
 export const latestBlockCache = { value: null, promise: null, ts: 0 };
 export const gasPriceCache = { value: null, promise: null, ts: 0 };
 
+export const clearLatestBlockCache = (): void => {
+  delete (latestBlockCache as { _map?: unknown })._map;
+  latestBlockCache.value = null;
+  latestBlockCache.promise = null;
+  latestBlockCache.ts = 0;
+};
+
 export const HASH_READ_TTL_MS = 30 * 60 * 1000;
 export const HASH_READ_MAX_ENTRIES = 2000;
 export const ARWEAVE_TX_CACHE_MAX_ENTRIES = 1200;

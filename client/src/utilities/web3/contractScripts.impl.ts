@@ -94,6 +94,7 @@ import {
   READ_MEMO,
   buildHashReadInflightKey,
   buildHashReadMemoKey,
+  clearLatestBlockCache,
   createContractScriptsCache,
   gasPriceCache,
   getTimedMemoValue,
@@ -1002,8 +1003,6 @@ async function resolveGroupPasswordWalletScopeSbtAddress({
 /* ------------------------------------------------------------------ */
 
 const contractScripts: any = {
-  _blockCache: {}, // For the memoized getBlockWithCaching
-
   // Expose embedded passkey wallet auth for UI.
   createPasskeyWallet: passkeyWallet.createPasskeyWallet,
 
@@ -1088,7 +1087,7 @@ export const __test__contractScriptsErrors: any = {
 };
 export const __test__contractScriptsReadCaches: any = {
   clearLatestBlockCache: () => {
-    (latestBlockCache as any)._map = {};
+    clearLatestBlockCache();
   },
 };
 export default contractScripts;
