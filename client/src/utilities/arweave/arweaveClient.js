@@ -7,7 +7,6 @@
  * Key exports: arweaveClient
  */
 import Arweave from 'arweave';
-import { ethers } from 'ethers';
 import { getCorsProxyUrlOrThrow, resolveCorsProxyUrl } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
@@ -17,6 +16,7 @@ import { readSessionScanSlugs } from '../session/sessionScanScope.js';
 import { readSponsoredBootstrapFundingContext } from '../session/sponsoredBootstrapFunding.js';
 import { getSharedFallbackWorkerUrl } from '../session/sessionWorkerAvailability.js';
 import { createLogger } from '../logging';
+import { base64DecodeURL, base64urlToBase64, base64urlToHex, hexToBase64url } from './arweaveEncoding.js';
 import {
   CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS,
   CE_ARWEAVE_PREFLIGHT_SBT_METADATA,
@@ -2713,68 +2713,6 @@ async function downloadDataFromArweave(txID, opts = {}) {
       arweaveTextInFlight.delete(inFlightKey);
     }
   }
-}
-
-function padBase64String(b64string) {
-  const remainder = b64string.length % 4;
-  return remainder === 0 ? b64string : `${b64string}${'='.repeat(4 - remainder)}`;
-}
-
-function encodeBytesToBase64(byteArray) {
-  const bytes = byteArray instanceof Uint8Array ? byteArray : Uint8Array.from(byteArray);
-  if (typeof globalThis !== 'undefined' && typeof globalThis.btoa === 'function') {
-    let binary = '';
-    for (let i = 0; i < bytes.length; i += 1) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return globalThis.btoa(binary);
-  }
-  if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
-    return Buffer.from(bytes).toString('base64');
-  }
-  throw new Error('No base64 encoder is available.');
-}
-
-function decodeBase64ToBytes(b64string) {
-  const padded = padBase64String(b64string);
-  if (typeof globalThis !== 'undefined' && typeof globalThis.atob === 'function') {
-    const binary = globalThis.atob(padded);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes;
-  }
-  if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
-    return Uint8Array.from(Buffer.from(padded, 'base64'));
-  }
-  throw new Error('No base64 decoder is available.');
-}
-
-function hexToBase64url(hexString) {
-  if (!hexString || hexString === '0x') return '';
-  let byteArray = ethers.utils.arrayify(hexString);
-  let b64string = encodeBytesToBase64(byteArray);
-  let b64urlstring = b64string.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return b64urlstring;
-}
-
-function base64urlToHex(b64urlstring) {
-  if (!b64urlstring) return '0x';
-  let byteArray = base64DecodeURL(b64urlstring);
-  let hexString = ethers.utils.hexlify(byteArray);
-  return hexString;
-}
-
-function base64DecodeURL(b64urlstring) {
-  let b64string = b64urlstring.replace(/-/g, '+').replace(/_/g, '/');
-  let byteArray = decodeBase64ToBytes(b64string);
-  return byteArray;
-}
-
-function base64urlToBase64(b64urlstring) {
-  let b64string = b64urlstring.replace(/-/g, '+').replace(/_/g, '/');
-  return b64string;
 }
 
 export const arweaveClient = {
