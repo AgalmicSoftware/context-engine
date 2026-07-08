@@ -13,19 +13,25 @@ Agent Village Wrapped, and its associated evaluation, was created to begin measu
 
 **The Agent Village** at Edge Esmeralda 2026 gave attendees ([personal AI agents for a month](https://x.com/JoinEdgeCity/status/2049205479704776723)), with pre-loaded skills allowed them to use emerging software tools (like Index Network) to find connections with other attendees, navigate the schedule, and participate in experiments.
 
-**Context Engine** is an open-source toolkit for deliberation, sensemaking, and negotiation in large groups — for humans and AI agents ([whitepaper](https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md)). Sessions support public or encrypted responses, durable records, and AI-assisted input and analysis, aiming at privacy-preserving large-scale discourse. An agent running the Context Engine skill can raise appropriate questions from sessions to a user, based on context, and draft responses to reduce input friction.
+**Context Engine** is an open-source toolkit for deliberation, sensemaking, and negotiation in large groups — for ([humans and AI agents](https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md)). Sessions support public or private questions, AI-assisted input and analysis of results, and decentralized or centralized deployments made easy for non-developers. An agent running the Context Engine skill can raise appropriate questions from sessions to a user, based on context, and draft responses to reduce input friction.
 
-**Agent Village Wrapped** is a quiz your agent takes about you. You forward one message; your agent predicts your answers to a 58-question session on delegation, privacy, and AI futures, with a confidence score on every answer. You get back a shareable poster of what it thinks it knows about you, plus a link to review and correct each prediction.
+**Agent Village Wrapped** is a quiz your agent takes about you. You forward one message; your agent predicts your answers to a 58-question session on delegation, privacy, and AI futures, with a confidence score on every answer. You get back a shareable poster of what it thinks it knows about you, plus a link to review and correct each prediction in a Telegram app. Telegram was a practical delivery surface at Edge, since users interacted with their Hermes agents via Telegram.
 
 ![Example Agent Village Wrapped output](attachments/example-wrapped-poster.jpeg)
 
-For this event, Telegram was the practical delivery surface. Telegram has issues, but it worked well at Edge as the interface for the Hermes agents.
+## Norms compass
+
+The same quiz output can include a compass meme: where your agent thinks you land on a specific claim, compared with historical figures, fictional characters, and other reference points. This makes a predicted view legible as a position in a social landscape rather than a raw survey answer.
+
+![Agent Village norms map comparing a predicted view with historical and fictional reference figures](attachments/norms-map-compass.jpeg)
 
 ## The eval
 
-A valuable thing to measure is which predicted responses are changed by the principal, and how confident the incorrect response was. 
+A valuable thing to measure is which predicted responses are changed by the principal, and how confident the incorrect response was. How quickly does the agent become better at predicting preferences over time? 
 
-It is our view that agents could help solve the participation problem which has plagued many civic tech approaches: most people read, few react, and almost nobody writes. A pre-filled draft of your predicted views you can easily correct (and questions which are raised contextually by your agent) are better UX than an empty survey.
+Agents could help solve the participation challenge which has plagued many attempts at civic tech approaches, and lead to a future where your agent is always [bargaining and coalition-building on your behalf](https://blog.cosmos-institute.org/p/coasean-bargaining-at-scale).
+
+A pre-filled draft of your predicted views (on questions relevant to you) is better UX than an empty survey.
 
 ## A small launch sample
 
