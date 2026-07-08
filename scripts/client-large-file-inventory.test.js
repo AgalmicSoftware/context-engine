@@ -59,7 +59,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/UserPage/UserPage.tsx': 3848,
   'client/src/components/UserPage/userPageGateHelpers.ts': 1070,
   'client/src/components/UserPage/userPageHelpers.ts': 1481,
-  'client/src/utilities/ai/aiClient.js': 1118,
+  'client/src/utilities/ai/aiClient.js': 1015,
   'client/src/utilities/ai/aiSettings.ts': 1125,
   'client/src/utilities/arweave/arweaveClient.js': 1806,
   'client/src/utilities/cache/cacheScripts.ts': 1088,

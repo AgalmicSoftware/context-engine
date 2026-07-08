@@ -48,7 +48,6 @@ import {
   stripDataUrlPrefix,
 } from './aiClientPhotoSupport.js';
 import { inferAiTaskType, pickAiRequestOpts } from './aiClientRequestOptions.js';
-import { extractMainContent, readFileContent } from './aiClientSourceReaders.js';
 import {
   buildAiWorkerRequestPlan,
   parseAiWorkerCompletion,
@@ -72,6 +71,7 @@ import { createLogger } from '../logging.js';
 const aiLog = createLogger('ai');
 export { TRANSCRIBE_MAX_UPLOAD_BYTES, extractSpeechAudio } from './aiClientAudioTranscription.js';
 export { isE2eAiMockEnabled } from './aiClientE2eMocks.js';
+export { fetchContentFromURL, processAdditionalSources } from './aiClientSourceFetch.js';
 
 /* ======================================================================
  * Dev/E2E-only AI mock mode
@@ -291,109 +291,6 @@ export const callAI = async (prompt, opts = {}) => {
 export const callAIQueued = (prompt, opts = {}) => {
   return enqueueAiCallWithRetry(() => callAI(prompt, opts));
 };
-
-/**
- * Attempt to fetch HTML content from a URL directly; if it fails or is blocked,
- * fallback to the worker. Then parse the HTML to extract text.
- */
-export const fetchContentFromURL = async (url, opts = {}) => {
-  try {
-    const validatedUrl = new URL(url);
-    if (!validatedUrl.protocol.match(/^https?:$/)) {
-      throw new Error('URL must start with http:// or https://');
-    }
-
-    // Try direct fetch first
-    try {
-      const directResp = await fetch(validatedUrl.href);
-      if (!directResp.ok) throw new Error(`HTTP error! status: ${directResp.status}`);
-      const contentType = directResp.headers.get('content-type');
-      if (contentType && contentType.includes('text/html')) {
-        const htmlContent = await directResp.text();
-        const extractedContent = extractMainContent(htmlContent);
-        if (extractedContent && extractedContent.length > 100) {
-          return extractedContent;
-        }
-      }
-    } catch (error) {
-      aiLog.warn('Direct URL fetch failed; falling back to worker proxy:', error);
-      // Fallback to worker below
-    }
-
-    // Fallback to Worker proxy
-    const sessionSlug = resolveSessionSlugOpt(opts);
-    const sessionConfig = resolveSessionConfigOpt(opts);
-    const corsWorkerUrl = await getCorsProxyUrlOrThrow({
-      sessionSlug,
-      sessionConfig,
-      context: opts.context,
-      allowDemoFallback: defaultStrictAllowDemoFallback(),
-    });
-    const baseUrl = corsWorkerUrl.replace(/\/+$/, '');
-    const workerResponse = await fetchWorkerWithAuth(
-      corsWorkerUrl,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: validatedUrl.href, action: 'fetch_url' }),
-      },
-      {
-        sessionSlug,
-        context: opts.context,
-        workerUrl: baseUrl,
-        allowDemoFallback: defaultStrictAllowDemoFallback(),
-      },
-    );
-
-    const data = await workerResponse.json().catch(() => ({}));
-    if (!workerResponse.ok) {
-      throw new Error(data?.error || 'Failed to fetch URL content');
-    }
-    if (!data.content) throw new Error('No content received from URL');
-
-    // Clean up HTML if needed
-    if (typeof data.content === 'string' && data.content.includes('<')) {
-      return extractMainContent(data.content);
-    }
-    return data.content;
-  } catch (error) {
-    aiLog.error('Error fetching URL content:', error);
-    throw new Error(`URL Error: ${error.message}`);
-  }
-};
-
-/**
- * processAdditionalSources(sources)
- * Iterates through the list of additional sources (files/URLs),
- * fetches or reads their content, and returns a single concatenated string
- * with delimiters.
- *
- * @param {Array<{type: 'url'|'file', value: string|File, name: string}>} sources
- * @returns {Promise<string>}
- */
-export async function processAdditionalSources(sources, opts = {}) {
-  if (!sources || sources.length === 0) return '';
-
-  const results = await Promise.all(
-    sources.map(async (src) => {
-      let content = '';
-      try {
-        if (src.type === 'url') {
-          content = await fetchContentFromURL(src.value, opts);
-        } else if (src.type === 'file') {
-          content = await readFileContent(src.value);
-        } else if (src.type === 'photo') {
-          throw new Error('Photo sources must be analyzed before text extraction.');
-        }
-      } catch (err) {
-        content = `[Error reading source '${src.name}': ${err.message}]`;
-      }
-      return `\n\n--- Source: ${src.name} ---\n\n${content}`;
-    }),
-  );
-
-  return results.join('');
-}
 
 /* ======================================================================
  * Lightweight utilities for other product areas (unchanged behavior)
