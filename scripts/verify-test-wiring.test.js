@@ -43,6 +43,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
             "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../tests/root/deployHelper.worker.test.js' '<rootDir>/../tests/root/sessionCorsWorker.auth.test.js'",
           'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
           'test:node': 'node scripts/run-node-tests.js',
+          'test:node:tracked': 'node scripts/run-node-tests.js --tracked-only',
           'client-boundaries:check': 'node scripts/check-client-boundaries.mjs',
           'dead-exports:advisory': 'node scripts/check-dead-exports-advisory.mjs',
           'test:e2e': 'npm run -s test:e2e:smoke',
@@ -65,7 +66,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'verify:public-release-surface': 'node scripts/verify-public-release-surface.js',
           'verify:public-release-pii': 'bash scripts/verify-public-release-pii.sh',
           'verify:release':
-            'npm run lint && npm run typecheck:client && npm run test:release:client && npm run verify:public-release-surface && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
+            'npm run lint && npm run typecheck:client && npm run -s test:node:tracked && npm run test:release:client && npm run verify:public-release-surface && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
         },
       }),
     );

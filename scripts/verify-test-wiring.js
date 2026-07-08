@@ -124,6 +124,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:contracts', 'SessionRegistryFuzzTest');
   expectScriptContains('test:contracts', 'CustomSBTInvariantTest');
   expectScriptContains('test:node', 'scripts/run-node-tests.js');
+  expectScriptContains('test:node:tracked', 'scripts/run-node-tests.js --tracked-only');
   expectScriptContains('client-boundaries:check', 'scripts/check-client-boundaries.mjs');
   expectScriptContains('test:root:jest', '--testMatch');
   expectScriptContains('test:root:jest', '../tests/root/sessionCorsWorker.auth.test.js');
@@ -157,6 +158,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('dead-exports:advisory', 'scripts/check-dead-exports-advisory.mjs');
   expectScriptContains('verify:release', 'npm run lint');
   expectScriptContains('verify:release', 'npm run typecheck:client');
+  expectScriptContains('verify:release', 'npm run -s test:node:tracked');
   expectScriptContains('verify:release', 'npm run test:release:client');
   expectScriptContains('verify:release', 'npm run verify:public-release-surface');
   expectScriptContains('verify:release', 'npm run worker:bundle');
