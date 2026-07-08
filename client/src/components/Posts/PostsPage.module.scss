@@ -960,6 +960,7 @@ h3.postHeading {
 }
 
 .beeswarmDot {
+  appearance: none;
   position: absolute;
   z-index: 1;
   width: 30px;
@@ -967,10 +968,12 @@ h3.postHeading {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
   transform: translate(-50%, -50%);
   border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: 999px;
   color: #061018;
+  cursor: pointer;
   font-family: var(--ce-font-mono);
   font-size: 0.68rem;
   font-weight: 800;
@@ -978,6 +981,22 @@ h3.postHeading {
   box-shadow:
     0 7px 20px rgba(0, 0, 0, 0.32),
     0 0 0 3px rgba(255, 255, 255, 0.06);
+  transition: border-color 0.14s ease, opacity 0.14s ease;
+
+  &:hover {
+    opacity: 1 !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(77, 255, 164, 0.8);
+    outline-offset: 2px;
+  }
+}
+
+.beeswarmDotActive {
+  z-index: 2;
+  border-color: #ffffff;
+  opacity: 1 !important;
 }
 
 .beeswarmMissing,
@@ -1026,6 +1045,27 @@ h3.postHeading {
   stroke-width: 1;
 }
 
+.binaryBeeswarmGridline {
+  stroke: rgba(244, 247, 255, 0.09);
+  stroke-dasharray: 3 5;
+  stroke-width: 1;
+}
+
+.binaryBeeswarmYTickLabel {
+  fill: rgba(244, 247, 255, 0.62);
+  font-family: var(--ce-font-mono);
+  font-size: 11px;
+}
+
+.binaryBeeswarmYAxisLabel {
+  fill: rgba(244, 247, 255, 0.72);
+  font-family: var(--ce-font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .binaryBeeswarmAxisLabel {
   fill: rgba(244, 247, 255, 0.72);
   font-family: var(--ce-font-mono);
@@ -1039,7 +1079,7 @@ h3.postHeading {
 }
 
 .binaryBeeswarmPoint {
-  cursor: help;
+  cursor: pointer;
   outline: none;
 
   &:focus-visible .binaryBeeswarmDot {
@@ -1103,6 +1143,173 @@ h3.postHeading {
   span {
     font-family: var(--ce-font-mono);
   }
+}
+
+.binaryBeeswarmTooltipPinned {
+  padding-right: 34px;
+  border-color: rgba(77, 255, 164, 0.6);
+  pointer-events: auto;
+}
+
+.binaryBeeswarmTooltipClose {
+  appearance: none;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(244, 247, 255, 0.88);
+  cursor: pointer;
+  font-size: 0.92rem;
+  line-height: 1;
+
+  &:hover,
+  &:focus-visible {
+    border-color: rgba(77, 255, 164, 0.6);
+    background: rgba(77, 255, 164, 0.14);
+    color: #ffffff;
+    outline: none;
+  }
+}
+
+.beeswarmTooltip {
+  width: min(280px, calc(100% - 20px));
+  transform: translate(-50%, calc(-100% - 24px));
+}
+
+.binaryTooltipSplitBar {
+  display: flex;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(7, 12, 31, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.binaryTooltipSplitSegment {
+  min-width: 0;
+  height: 100%;
+}
+
+.binaryBeeswarmHint {
+  margin: 0;
+  color: rgba(244, 247, 255, 0.5);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.vizToolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vizToggleGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid $input-border;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.vizToggleButton {
+  appearance: none;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: $muted;
+  cursor: pointer;
+  font-family: var(--ce-post-font-ui);
+  font-size: 0.84rem;
+  line-height: 1.2;
+  transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+
+  &:hover {
+    color: $text;
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(77, 255, 164, 0.7);
+    outline-offset: 1px;
+  }
+}
+
+.vizToggleButtonActive {
+  background: rgba(122, 167, 255, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(122, 167, 255, 0.4);
+  color: #ffffff;
+}
+
+.vizToolbarLabel {
+  padding-left: 8px;
+  color: $muted;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.binaryList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.binaryListRow {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.binaryListPrompt {
+  margin: 0;
+  color: rgba(244, 247, 255, 0.94);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.binaryListMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.binaryListBar {
+  flex: 1 1 140px;
+  min-width: 90px;
+  display: flex;
+}
+
+.binaryListCounts {
+  color: $muted;
+  font-family: var(--ce-font-mono);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.binaryListConfidence {
+  margin-left: auto;
+  color: $amber;
+  font-family: var(--ce-font-mono);
+  font-size: 0.78rem;
+  white-space: nowrap;
 }
 
 .binaryBeeswarmHitArea {

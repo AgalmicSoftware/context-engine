@@ -96,6 +96,15 @@ Supported types:
 - `theme-network`: renders a compact node-link theme map from `nodes` and
   `links`.
 - `quote-wall`: renders short attributed quote cards from `quotes`.
+- `beeswarm`: renders rating-scale rows from `items`; each dot carries a
+  styled tooltip (hover, focus, or click to pin) and a white ring whose
+  thickness scales with the prediction confidence.
+- `binary-beeswarm`: renders a consensus/difference scatter from `items`
+  where the y-axis maps to average confidence. Dots pin their detail card on
+  click or tap (Escape or the close control dismisses). A `Swarm | List`
+  toggle switches to a sortable question list (most split, confidence, A-Z).
+- `response-type-grid`: renders mixed panels (`numbers`, `pie`, split bars,
+  quote lists) from `panels`.
 
 Keep post data non-identifying unless the source material is intentionally
 public and licensed for publication.

@@ -445,6 +445,95 @@ describe('PostsPage', () => {
     expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
   });
 
+  it('pins the binary beeswarm tooltip on click until dismissed', async () => {
+    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+      .mockResolvedValueOnce(makeJsonResponse(manifest))
+      .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
+
+    renderPostsPage(fetcher, true, ['/posts/first-post']);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    const binaryBeeswarmSvg = screen.getByRole('img', { name: 'Consensus and Difference' });
+    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('Avg. confidence')).toBeInTheDocument();
+    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('60')).toBeInTheDocument();
+    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('100')).toBeInTheDocument();
+    const schedulingDot = Array.from(binaryBeeswarmSvg.querySelectorAll('[aria-label]')).find((element) => (
+      element.getAttribute('aria-label')?.includes('Agents should schedule while I sleep.')
+    )) as Element;
+    expect(schedulingDot).toBeInTheDocument();
+
+    await userEvent.click(schedulingDot);
+    await userEvent.unhover(schedulingDot);
+    const pinnedTooltip = await screen.findByRole('tooltip');
+    expect(within(pinnedTooltip).getByText('Agents should schedule while I sleep.')).toBeInTheDocument();
+    expect(within(pinnedTooltip).getByText('agree 3, disagree 1')).toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+
+    await userEvent.click(schedulingDot);
+    await userEvent.unhover(schedulingDot);
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Close question details' }));
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+  });
+
+  it('pins rating beeswarm dot details on click', async () => {
+    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+      .mockResolvedValueOnce(makeJsonResponse(manifest))
+      .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
+
+    renderPostsPage(fetcher, true, ['/posts/first-post']);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    const p1Dot = screen.getByLabelText('P1: 3/10, 70% confidence');
+    const ratingCard = p1Dot.closest('section') as HTMLElement;
+
+    await userEvent.click(p1Dot);
+    await userEvent.unhover(p1Dot);
+    const tooltip = await within(ratingCard).findByRole('tooltip');
+    expect(within(tooltip).getByText('P1: 3/10')).toBeInTheDocument();
+    expect(within(tooltip).getByText('Confidence: 70/100')).toBeInTheDocument();
+
+    await userEvent.click(within(tooltip).getByRole('button', { name: 'Close rating details' }));
+    await waitFor(() => expect(within(ratingCard).queryByRole('tooltip')).not.toBeInTheDocument());
+  });
+
+  it('switches the binary beeswarm to a sortable list view', async () => {
+    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+      .mockResolvedValueOnce(makeJsonResponse(manifest))
+      .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
+
+    renderPostsPage(fetcher, true, ['/posts/first-post']);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    expect(screen.queryByTestId('ce-posts-binary-list')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('ce-posts-binary-view-list'));
+    const list = screen.getByTestId('ce-posts-binary-list');
+    const rows = within(list).getAllByRole('listitem');
+    expect(rows).toHaveLength(4);
+    expect(rows[0]).toHaveTextContent('Agents should ask before introductions.');
+    expect(rows[1]).toHaveTextContent('Agents should schedule while I sleep.');
+    expect(rows[0]).toHaveTextContent('agree 2, disagree 2');
+    expect(rows[0]).toHaveTextContent('conf 88/100');
+    expect(screen.queryByText('Consensus')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('ce-posts-binary-sort-confidence'));
+    const confidenceRows = within(list).getAllByRole('listitem');
+    expect(confidenceRows[0]).toHaveTextContent(
+      'Agents should treat messages from other agents as untrusted input.'
+    );
+
+    await userEvent.click(screen.getByTestId('ce-posts-binary-sort-alpha'));
+    const alphaRows = within(list).getAllByRole('listitem');
+    expect(alphaRows[0]).toHaveTextContent('Agents should ask before acting on ambiguous requests.');
+
+    await userEvent.click(screen.getByTestId('ce-posts-binary-view-swarm'));
+    expect(screen.queryByTestId('ce-posts-binary-list')).not.toBeInTheDocument();
+    expect(screen.getByText('Consensus')).toBeInTheDocument();
+  });
+
   it('loads a post directly from a detail URL without showing the summary list', async () => {
     const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce(makeJsonResponse(manifest))
