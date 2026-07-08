@@ -183,16 +183,16 @@ Decrypt:  Client ──▸ Lit SDK decrypt(payload) ──▸ Lit nodes verify S
 | **Utilities** | |
 | Web3 / contracts | `utilities/web3/chainGateway.ts`, `contractScripts.impl.ts`, `contractHelpers.ts`, `chainEventStreams.ts`, `profileChainReads.ts`, `sessionRegistry.ts` |
 | Wallet | `client/src/wallet/` passkey EOA wallet config, encrypted keystore, EIP-1193 provider, and soft-session worker |
-| Crypto / Lit | `utilities/crypto/litProtocol.js`, `cryptography.js`, `encryptedFields.js` |
-| Arweave | `utilities/arweave/arweaveClient.js`, `arweaveUrls.js` |
-| Session helpers | `utilities/session/sessionNaming.js`, `sessionMetadata.js`, `resourceKeys.js`, `sessionModeProfile.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, `telegramSessionBackend.ts` |
-| Worker auth | `utilities/worker/workerAuth.js`, `corsProxy.js` |
-| Cache | `utilities/cache/cacheScripts.js`, `storageManager.js` |
-| AI | `utilities/ai/aiClient.js`, `aiSettings.js` |
-| Survey logic | `utilities/survey/questionRouting.js`, `filterStateUtils.js`, `compareUsers.js` |
+| Crypto / Lit | `utilities/crypto/litProtocol.ts`, `cryptography.ts`, `encryptedFields.ts` |
+| Arweave | `utilities/arweave/arweaveClient.js`, `arweaveUrls.ts` |
+| Session helpers | `utilities/session/sessionNaming.ts`, `sessionMetadata.ts`, `resourceKeys.ts`, `sessionModeProfile.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, `telegramSessionBackend.ts` |
+| Worker auth | `utilities/worker/workerAuth.ts`, `corsProxy.ts` |
+| Cache | `utilities/cache/cacheScripts.ts`, `storageManager.ts` |
+| AI | `utilities/ai/aiClient.js`, `aiSettings.ts` |
+| Survey logic | `utilities/survey/questionRouting.ts`, `filterStateUtils.ts`, `compareUsers.ts` |
 | **Config / variables** | |
-| Feature flags | `variables/appConfig.js` |
-| Chain config | `variables/chains.js` |
+| Feature flags | `variables/appConfig.ts` (`appConfig.js` remains as a compatibility entry) |
+| Chain config | `variables/chains.ts` |
 | Session fallback | `variables/demo/demo_sessions.json` |
 
 ### Contracts (`contracts/`)

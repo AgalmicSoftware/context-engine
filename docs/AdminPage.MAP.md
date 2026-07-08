@@ -4,9 +4,10 @@
 
 - Entry wrapper: `client/src/components/Admin/AdminPage.tsx`
 - Current shape: function component, 3561 lines, 45 `useState`, 20 `useEffect`, 17 `useCallback`, 18 `useMemo`, and 11 `useRef` calls.
-- Boundary debt: `AdminPage.tsx` owns 0 `route-page-no-low-level` baseline entries. The former `arweaveClient.js`, `arweaveUrls.js`, `sessionRegistry.js`, `corsProxy.js`, `workerAuth.js`, and `workerCorsOrigins.js` seams now route through domain ports.
+- Boundary debt: `AdminPage.tsx` owns 0 `route-page-no-low-level` baseline entries. The former `arweaveClient.js`, `arweaveUrls.ts`, `sessionRegistry.ts`, `corsProxy.ts`, `workerAuth.ts`, and `workerCorsOrigins.ts` seams now route through domain ports.
 - Existing test surface: 16 Admin files cover worker config payloads, signed admin actions, allowlist normalization, metadata writes, render gating and registry retry, resource balances, helper formatting, worker errors, and test-result rendering.
 - Port architecture: `AdminPage.tsx` remains the route/page shell and UI state owner while concrete worker, storage, and session-registry operations route through typed domain ports under `client/src/domains/**`.
+- Import note: source imports may use `.js` specifiers so Vite/TypeScript resolve the current `.ts` modules at build time.
 
 ## Current Runtime Hierarchy
 
@@ -63,10 +64,10 @@ AdminPage.tsx  [route/page shell and execution owner]
 
 | Domain port | Concrete low-level imports | AdminPage surface |
 |---|---|---|
-| `client/src/domains/worker/adminWorkerPorts.ts` | `worker/corsProxy.js`, `worker/workerCorsOrigins.js`, `worker/workerAuth.js` | Worker URL resolution, suggested CORS origins, signed admin-action auth, authenticated worker probes, and SIWE nonce/message preparation. Wallet signing remains parent-owned in `AdminPage.tsx`. |
-| `client/src/domains/storage/adminArweavePorts.ts` | `arweave/arweaveClient.js` (`arweaveClient.js` alias), `arweave/arweaveUrls.js` | Arweave wallet balance reads, Winston formatting, admin upload probe, gateway URL building, and registry metadata URL normalization. |
-| `client/src/domains/sessions/sessionMediaUrls.ts` | `arweave/arweaveUrls.js` | Session-header media URL normalization for the hero image. |
-| `client/src/domains/sessions/registry/sessionRegistryAdminPorts.ts` | `web3/sessionRegistry.js` | Registry cache load/read/upsert, requested session fetch, cache update subscription, field/gate/metadata writes, and shared session-field normalization. |
+| `client/src/domains/worker/adminWorkerPorts.ts` | `worker/corsProxy.ts`, `worker/workerCorsOrigins.ts`, `worker/workerAuth.ts` | Worker URL resolution, suggested CORS origins, signed admin-action auth, authenticated worker probes, and SIWE nonce/message preparation. Wallet signing remains parent-owned in `AdminPage.tsx`. |
+| `client/src/domains/storage/adminArweavePorts.ts` | `arweave/arweaveClient.js`, `arweave/arweaveUrls.ts` | Arweave wallet balance reads, Winston formatting, admin upload probe, gateway URL building, and registry metadata URL normalization. |
+| `client/src/domains/sessions/sessionMediaUrls.ts` | `arweave/arweaveUrls.ts` | Session-header media URL normalization for the hero image. |
+| `client/src/domains/sessions/registry/sessionRegistryAdminPorts.ts` | `web3/sessionRegistry.ts` | Registry cache load/read/upsert, requested session fetch, cache update subscription, field/gate/metadata writes, and shared session-field normalization. |
 | `client/src/domains/sessions/registry/sessionRegistryWriteNormalization.ts` | None | Shared sponsored-field and compatibility-mirror normalization used by SessionWizard and AdminPage registry field writes. |
 
 ## Frontend Architecture Readiness Matrix

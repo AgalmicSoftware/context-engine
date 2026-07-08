@@ -44,7 +44,7 @@ SurveyTool.tsx  [top-level wrapper]
         -> surveyQuestionsState.ts  [initial state factory + reducer for hook state]
         -> surveyQuestionsTypes.ts  [shared state/display builders, including submit readiness]
         -> surveyToolSingleQuestionCacheBootstrapController.ts  [single-question source-restore, cache-bootstrap flow, seeded hydration, and current-pool preservation planning]
-        -> surveyToolDecryptFlow.js  [decrypt planning, state builders, and question-decrypt attempt/status helpers]
+        -> surveyToolDecryptFlow.ts  [decrypt planning, state builders, and question-decrypt attempt/status helpers]
         -> SurveyPileViewMode.tsx  [pile/card UX strategy wrapper over SurveyQuestions]
         -> surveyPileQuestionListEquivalence.ts  [pile question-list equivalence descriptors]
         -> surveyPileVisibleQuestionIds.ts  [pile visible-question ID window descriptors]
@@ -179,7 +179,7 @@ SurveyTool.tsx  [top-level wrapper]
 | `surveyQuestionsSubmitController.ts` | Primary-submit dispatch/status handoff | Runs already-built primary-submit plans through injected navigation and submit-dispatch ports, activates the submit guard before dispatch, normalizes parent-provided pending-stat fallbacks, plans submitted-response URLs after a receipt, applies submit-start/stale/completion/failure status callbacks in parent-defined order, and does not own pending-edit computation, live route state, submit execution, decrypt, cache, storage, worker, wallet, or JSON behavior |
 | `surveyQuestionsTypes.ts` | Shared state/display/readiness builders | Defines SurveyQuestions state patches, display state builders, route authoring readiness, route JSON-preview availability, primary-submit plans, and submit-readiness descriptors from passed-in values while leaving question rendering, JSON generation, submit execution, route mutation, cache/decrypt/fetch/worker behavior, and state application in `SurveyQuestions` |
 | `surveyToolSingleQuestionCacheBootstrapController.ts` | Single-question source-restore and cache-bootstrap planning | Resolves route question-id gating, retry cleanup decisions, scoped slug/candidate planning, blocked-question state descriptors, cache/recent-payload bootstrap status, pure parent flow plans, stop-handling descriptors, seeded response hydration patch shape, and current-question preservation state shape while leaving cache reads/writes, metadata fetches, response fetches, retry scheduling, route/session state, and state application in `SurveyQuestions` |
-| `surveyToolDecryptFlow.js` | Decrypt planning and state helpers | Builds decrypt display state, task keys, source baselines, success/failure/stale state patches, question-decrypt attempt/status plans, and bulk survey decrypt source/stale status plans while `SurveyQuestions` keeps real decrypt invocation, wallet/provider behavior, cache, storage, and UI side effects parent-owned |
+| `surveyToolDecryptFlow.ts` | Decrypt planning and state helpers | Builds decrypt display state, task keys, source baselines, success/failure/stale state patches, question-decrypt attempt/status plans, and bulk survey decrypt source/stale status plans while `SurveyQuestions` keeps real decrypt invocation, wallet/provider behavior, cache, storage, and UI side effects parent-owned |
 | `../../domains/surveys/surveyQuestionReadsPort.ts` | SurveyQuestions chain read port | Late-binds the chain gateway for question metadata, survey metadata, question response, response hash, and survey response reads while preserving call-time spy seams and leaving slug selection, cache writes, retry scheduling, decrypt, route state, and React state application in `SurveyQuestions` |
 | `../../domains/surveys/surveyResponseSubmitPort.ts` | SurveyQuestions submit broadcast port | Late-binds `submitResponses` behind a narrow mutation port while leaving payload hashing, rating-envelope preparation, receipt normalization, cache writes, route state, and submit-status state application in `SurveyQuestions` and existing submit controllers |
 | `../../domains/storage/surveyResponseStoragePort.ts` | SurveyQuestions response storage port | Late-binds submitted-payload sanitizer utilities, legacy Arweave tx-id extraction, and Arweave href normalization while leaving JSON assembly, copy state, link rendering, and cache/storage mutation in `SurveyQuestions` |
@@ -466,7 +466,7 @@ The first shared-core move is no longer hypothetical. The following seams are al
 - `SurveyQuestionsFullQuestionGatedPromptCard.tsx`
   - full-question gated-prompt card chrome from parent-provided content nodes
   - card/header/notice/tag dropdown placement without owning prompt decrypt, gate display derivation, submit, route, cache, storage, or field mutation behavior
-- `surveyToolDecryptFlow.js`
+- `surveyToolDecryptFlow.ts`
   - shared decrypt display, task-key, baseline/source, and state-patch helpers
   - question-decrypt attempt-start status, busy-token ownership checks, owned stale/failure cleanup, success-status handoff planning, and bulk survey decrypt source/stale status planning
 - `surveyToolPostSubmitCacheController.ts`

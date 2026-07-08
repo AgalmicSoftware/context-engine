@@ -1,7 +1,7 @@
 # Managed Client Cache Overview
 
 This folder documents the client-side managed cache namespaces backed by
-`client/src/utilities/cache/cacheScripts.js`.
+`client/src/utilities/cache/cacheScripts.ts`.
 
 ## Managed namespaces
 
