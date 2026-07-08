@@ -17,7 +17,6 @@ import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSetti
 import {
   TRANSCRIBE_MAX_UPLOAD_BYTES,
   TRANSCRIBE_WAV_TARGET_HZ,
-  createNamedAudioFile,
   extractSpeechAudio,
   mergeTranscriptText,
   normalizeAudioToWav,
@@ -55,6 +54,10 @@ import {
   parseAiWorkerCompletion,
   resolveAiWorkerEndpoint,
 } from './aiClientWorkerTransport.js';
+import {
+  resolveTranscriptionWorkerEndpoint,
+  uploadAudioForTranscription,
+} from './aiClientTranscriptionWorkerTransport.js';
 
 import {
   pcaLiteCompass,
@@ -599,6 +602,7 @@ export async function transcribeAudio(audioBlobOrFile, opts = {}) {
     let merged = '';
     for (const chunk of chunkedUploads) {
       const chunkText = await uploadAudioForTranscription(chunk, transport, {
+        onJsonParseError: (error) => aiLog.warn('Transcription response JSON parse failed:', error),
         signal: opts?.signal,
       });
       merged = mergeTranscriptText(merged, chunkText);
@@ -612,6 +616,7 @@ export async function transcribeAudio(audioBlobOrFile, opts = {}) {
     transport,
     {
       fileName: fname,
+      onJsonParseError: (error) => aiLog.warn('Transcription response JSON parse failed:', error),
       signal: opts?.signal,
     },
   );
@@ -643,10 +648,7 @@ const resolveTranscriptionTransport = async (opts = {}) => {
       context: opts.context,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
     }));
-  const endpoint = corsWorkerUrl.endsWith('/transcribe')
-    ? corsWorkerUrl
-    : `${corsWorkerUrl.replace(/\/+$/, '')}/transcribe`;
-  const baseUrl = corsWorkerUrl.replace(/\/+$/, '').replace(/\/transcribe$/i, '');
+  const { endpoint, baseUrl } = resolveTranscriptionWorkerEndpoint(corsWorkerUrl);
 
   return {
     endpoint,
@@ -656,56 +658,6 @@ const resolveTranscriptionTransport = async (opts = {}) => {
     context: opts?.context,
     transcriptionCfg,
   };
-};
-
-const uploadAudioForTranscription = async (audioFileOrBlob, transport, { fileName = '', signal } = {}) => {
-  const fileLike =
-    audioFileOrBlob instanceof Blob
-      ? createNamedAudioFile(
-          audioFileOrBlob,
-          fileName || audioFileOrBlob.name || 'audio.wav',
-          audioFileOrBlob.type || 'audio/wav',
-        )
-      : audioFileOrBlob;
-  const resolvedName = fileName || fileLike?.name || 'audio.wav';
-  const form = new FormData();
-  form.append('file', fileLike, resolvedName);
-  if (transport?.transcriptionCfg?.provider) form.append('provider', transport.transcriptionCfg.provider);
-  if (transport?.transcriptionCfg?.model) form.append('model', transport.transcriptionCfg.model);
-  if (transport?.transcriptionCfg?.apiKey) form.append('apiKey', transport.transcriptionCfg.apiKey);
-  if (transport?.transcriptionCfg?.rpcUrl) form.append('rpcUrl', transport.transcriptionCfg.rpcUrl);
-
-  const resp = await fetchWorkerWithAuth(
-    transport.endpoint,
-    { method: 'POST', body: form, ...(signal ? { signal } : {}) },
-    {
-      sessionSlug: transport.sessionSlug,
-      sessionConfig: transport.sessionConfig,
-      context: transport.context,
-      workerUrl: transport.baseUrl,
-      preferAnonymous: true,
-      fallbackOnGateUnavailable: true,
-      allowDemoFallback: defaultStrictAllowDemoFallback(),
-    },
-  );
-  let data = {};
-  try {
-    data = await resp.json();
-  } catch (error) {
-    aiLog.warn('Transcription response JSON parse failed:', error);
-    data = {};
-  }
-
-  if (!resp.ok) {
-    const msg =
-      (typeof data?.error === 'string' && data.error) ||
-      data?.error?.message ||
-      data?.message ||
-      `Transcription failed (${resp.status}).`;
-    throw new Error(msg);
-  }
-
-  return typeof data.text === 'string' ? data.text : '';
 };
 
 /**
