@@ -58,6 +58,7 @@ import {
   resolveTranscriptionWorkerEndpoint,
   uploadAudioForTranscription,
 } from './aiClientTranscriptionWorkerTransport.js';
+import { enqueueAiCallWithRetry } from './aiClientQueue.js';
 
 import {
   pcaLiteCompass,
@@ -287,29 +288,8 @@ export const callAI = async (prompt, opts = {}) => {
  *
  * Attempts: up to 3 (initial + 2 retries).
  */
-let __aiQueue = Promise.resolve();
-
 export const callAIQueued = (prompt, opts = {}) => {
-  const run = async () => {
-    let attempt = 0;
-    while (attempt < 3) {
-      try {
-        return await callAI(prompt, opts);
-      } catch (err) {
-        const msg = String(err?.message || '');
-        const isTransient = /rate\s*limit|concurrent|overload|overloaded|busy|temporarily|try\s*again|429/i.test(msg);
-        if (!isTransient || attempt >= 2) {
-          throw err;
-        }
-        const delay = 500 * Math.pow(2, attempt) + Math.floor(Math.random() * 200);
-        await new Promise((r) => setTimeout(r, delay));
-        attempt += 1;
-      }
-    }
-  };
-
-  __aiQueue = __aiQueue.then(run, run);
-  return __aiQueue;
+  return enqueueAiCallWithRetry(() => callAI(prompt, opts));
 };
 
 /**
