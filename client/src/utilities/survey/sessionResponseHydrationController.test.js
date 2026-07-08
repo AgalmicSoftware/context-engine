@@ -358,24 +358,32 @@ describe('createSessionResponseHydrationController', () => {
       expect(controller.isInitInFlight(SESSION_SLUG)).toBe(false);
     });
 
-    it.skip('returns the same promise identity for concurrent calls', async () => {
+    it('settles concurrent calls after the shared in-flight run completes', async () => {
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);
       const deferred = createDeferred();
+      const firstSettled = jest.fn();
+      const secondSettled = jest.fn();
 
       contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(deferred.promise);
 
       const firstPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
       const secondPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+      firstPromise.then(firstSettled);
+      secondPromise.then(secondSettled);
 
       expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledTimes(1);
       expect(controller.isInitInFlight(SESSION_SLUG)).toBe(true);
+      await flushMicrotasks();
+      expect(firstSettled).not.toHaveBeenCalled();
+      expect(secondSettled).not.toHaveBeenCalled();
 
       deferred.resolve({ fromBlock: 12, toBlock: 11 });
       await Promise.all([firstPromise, secondPromise]);
 
       expect(controller.isInitInFlight(SESSION_SLUG)).toBe(false);
-      expect(firstPromise).toBe(secondPromise);
+      expect(firstSettled).toHaveBeenCalledTimes(1);
+      expect(secondSettled).toHaveBeenCalledTimes(1);
     });
 
     it('queues pending hydration when one is already in flight', async () => {
