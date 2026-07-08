@@ -27,7 +27,6 @@ import { getEffectiveArweaveKey } from '../session/resourceKeys.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
-import { resolveSessionConfigAliases } from '../session/sessionNaming.js';
 import { normalizeBaseUrl } from '../urlUtils.js';
 import {
   buildE2eMockClusterAnalysis,
@@ -47,7 +46,15 @@ import {
   resolvePhotoAnalysisSupport,
   stripDataUrlPrefix,
 } from './aiClientPhotoSupport.js';
-import { inferAiTaskType, pickAiRequestOpts } from './aiClientRequestOptions.js';
+import {
+  buildAiConfigRequest,
+  buildArweaveKeyRequest,
+  buildTranscriptionConfigRequest,
+  inferAiTaskType,
+  pickAiRequestOpts,
+  resolveAiSessionOptions,
+  resolveAiSessionSelection,
+} from './aiClientRequestOptions.js';
 import {
   buildAiWorkerRequestPlan,
   parseAiWorkerCompletion,
@@ -85,16 +92,7 @@ export const analyzePhotoForQuestionGeneration = async (file, opts = {}) => {
     throw new Error('Unsupported photo format. Use png, jpg, jpeg, webp, or gif.');
   }
 
-  const sessionSlug = resolveSessionSlugOpt(opts);
-  const sessionConfig = resolveSessionConfigOpt(opts);
-  const ai = await getEffectiveAiConfig({
-    sessionSlug,
-    sessionConfig,
-    preferLocal: opts.preferLocal,
-    provider: opts.provider,
-    model: opts.model,
-    context: opts.context,
-  });
+  const ai = await getEffectiveAiConfig(buildAiConfigRequest(opts));
   const support = resolvePhotoAnalysisSupport(ai);
   if (!support.supported) {
     throw new Error(support.error || 'Configured AI provider/model does not support photo analysis.');
@@ -180,16 +178,6 @@ export function setVadTrimConfig(cfg) {
  * Core fetch + AI helpers
  * ====================================================================== */
 
-const resolveSessionAliasesOpt = (opts = {}) =>
-  resolveSessionConfigAliases({
-    sessionSlug: opts?.sessionSlug,
-    sessionConfig: opts?.sessionConfig,
-  });
-
-const resolveSessionSlugOpt = (opts = {}) => resolveSessionAliasesOpt(opts).sessionSlug;
-
-const resolveSessionConfigOpt = (opts = {}) => resolveSessionAliasesOpt(opts).sessionConfig;
-
 /**
  * Call AI via the Cloudflare Worker AI proxy using resolved settings.
  * The worker must support:
@@ -199,16 +187,8 @@ const resolveSessionConfigOpt = (opts = {}) => resolveSessionAliasesOpt(opts).se
 export const callAI = async (prompt, opts = {}) => {
   try {
     const thinkingRequested = !!opts.thinking;
-    const sessionSlug = resolveSessionSlugOpt(opts);
-    const sessionConfig = resolveSessionConfigOpt(opts);
-    const ai = await getEffectiveAiConfig({
-      sessionSlug,
-      preferLocal: opts.preferLocal,
-      provider: opts.provider,
-      model: opts.model,
-      thinking: thinkingRequested,
-      context: opts.context,
-    });
+    const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
+    const ai = await getEffectiveAiConfig(buildAiConfigRequest(opts, { thinking: thinkingRequested }));
     const taskType = inferAiTaskType(prompt, opts);
 
     const thinking = thinkingRequested && ai.provider === 'anthropic';
@@ -227,11 +207,11 @@ export const callAI = async (prompt, opts = {}) => {
     const corsWorkerUrl = await getCorsProxyUrlOrThrow({
       sessionSlug,
       sessionConfig,
-      context: opts.context,
+      context,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
     });
     const { endpoint, baseUrl } = resolveAiWorkerEndpoint(corsWorkerUrl);
-    const sessionSelection = opts && typeof opts.sessionSelection === 'object' ? opts.sessionSelection : null;
+    const sessionSelection = resolveAiSessionSelection(opts);
     aiLog.log('[aiClient] worker route selected', {
       sessionSlug: String(sessionSlug || ''),
       workerUrl: baseUrl,
@@ -262,7 +242,7 @@ export const callAI = async (prompt, opts = {}) => {
       },
       {
         sessionSlug,
-        context: opts.context,
+        context,
         workerUrl: baseUrl,
         preferAnonymous: shouldUseAnonymousFirst,
         fallbackOnGateUnavailable,
@@ -500,17 +480,8 @@ export async function transcribeAudio(audioBlobOrFile, opts = {}) {
 }
 
 const resolveTranscriptionTransport = async (opts = {}) => {
-  const sessionSlug = resolveSessionSlugOpt(opts);
-  const sessionConfig = resolveSessionConfigOpt(opts);
-  const transcriptionCfg = await getEffectiveTranscriptionConfig({
-    sessionSlug,
-    preferLocal: opts.preferLocal,
-    provider: opts.provider,
-    model: opts.model,
-    apiKey: opts.apiKey,
-    rpcUrl: opts.rpcUrl,
-    context: opts.context,
-  });
+  const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
+  const transcriptionCfg = await getEffectiveTranscriptionConfig(buildTranscriptionConfigRequest(opts));
 
   if (transcriptionCfg.provider === 'local') {
     throw new Error('Local transcription is not configured in this build.');
@@ -522,7 +493,7 @@ const resolveTranscriptionTransport = async (opts = {}) => {
     (await getCorsProxyUrlOrThrow({
       sessionSlug,
       sessionConfig,
-      context: opts.context,
+      context,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
     }));
   const { endpoint, baseUrl } = resolveTranscriptionWorkerEndpoint(corsWorkerUrl);
@@ -532,7 +503,7 @@ const resolveTranscriptionTransport = async (opts = {}) => {
     baseUrl,
     sessionSlug,
     sessionConfig,
-    context: opts?.context,
+    context,
     transcriptionCfg,
   };
 };
@@ -965,8 +936,7 @@ export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
 
   try {
     const { arweaveClient } = await import('../arweave/arweaveClientLazy.js');
-    const sessionSlug = resolveSessionSlugOpt(opts);
-    const sessionConfig = resolveSessionConfigOpt(opts);
+    const { context, preferLocal, sessionConfig, sessionSlug } = buildArweaveKeyRequest(opts);
     const arweaveKey = opts?.arweaveJwk
       ? { arweaveJwk: opts.arweaveJwk }
       : {
@@ -975,8 +945,8 @@ export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
               await getEffectiveArweaveKey({
                 sessionSlug,
                 sessionConfig,
-                preferLocal: opts?.preferLocal,
-                context: opts?.context,
+                preferLocal,
+                context,
               })
             )?.arweaveJwk || '',
         };
@@ -984,7 +954,7 @@ export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
       ...arweaveKey,
       sessionSlug,
       sessionConfig,
-      context: opts?.context,
+      context,
     };
 
     let txId;

@@ -1,3 +1,6 @@
+import { resolveSessionConfigAliases } from '../session/sessionNaming.js';
+import type { SessionConfig, UnknownRecord } from '../session/sessionTypes.js';
+
 const AI_REQUEST_OPTION_KEYS = [
   'sessionSlug',
   'sessionConfig',
@@ -20,6 +23,124 @@ const AI_REQUEST_OPTION_KEYS = [
   'taskType',
   'messages',
 ] as const;
+
+export type AiClientOptionRecord = UnknownRecord & {
+  apiKey?: unknown;
+  arweaveJwk?: unknown;
+  context?: unknown;
+  maxUploadBytes?: unknown;
+  model?: unknown;
+  preferLocal?: unknown;
+  provider?: unknown;
+  rpcUrl?: unknown;
+  sessionConfig?: SessionConfig | null | unknown;
+  sessionSelection?: unknown;
+  sessionSlug?: unknown;
+  taskType?: unknown;
+  thinking?: unknown;
+  workerUrl?: unknown;
+};
+
+export type AiSessionSelection = UnknownRecord & {
+  gateStatus?: unknown;
+  reason?: unknown;
+};
+
+export type AiSessionOptions = {
+  context: unknown;
+  sessionConfig: SessionConfig | null;
+  sessionSlug: string;
+};
+
+const asOptionRecord = (input: unknown = {}): AiClientOptionRecord =>
+  input && typeof input === 'object' && !Array.isArray(input) ? (input as AiClientOptionRecord) : {};
+
+export const normalizeAiClientOptions = (input: unknown = {}): AiClientOptionRecord => asOptionRecord(input);
+
+export const resolveAiSessionOptions = (input: unknown = {}): AiSessionOptions => {
+  const opts = asOptionRecord(input);
+  const aliases = resolveSessionConfigAliases(opts);
+  return {
+    context: opts.context,
+    sessionConfig: aliases.sessionConfig,
+    sessionSlug: aliases.sessionSlug,
+  };
+};
+
+export const resolveAiSessionSlug = (input: unknown = {}): string => resolveAiSessionOptions(input).sessionSlug;
+
+export const resolveAiSessionConfig = (input: unknown = {}): SessionConfig | null =>
+  resolveAiSessionOptions(input).sessionConfig;
+
+export const resolveAiSessionSelection = (input: unknown = {}): AiSessionSelection | null => {
+  const sessionSelection = asOptionRecord(input).sessionSelection;
+  return sessionSelection && typeof sessionSelection === 'object' && !Array.isArray(sessionSelection)
+    ? (sessionSelection as AiSessionSelection)
+    : null;
+};
+
+export const buildAiConfigRequest = (
+  input: unknown = {},
+  { thinking = false }: { thinking?: unknown } = {},
+): {
+  context: unknown;
+  model: unknown;
+  preferLocal: unknown;
+  provider: unknown;
+  sessionSlug: string;
+  thinking: boolean;
+} => {
+  const opts = asOptionRecord(input);
+  return {
+    context: opts.context,
+    model: opts.model,
+    preferLocal: opts.preferLocal,
+    provider: opts.provider,
+    sessionSlug: resolveAiSessionSlug(opts),
+    thinking: !!thinking,
+  };
+};
+
+export const buildTranscriptionConfigRequest = (
+  input: unknown = {},
+): {
+  apiKey: unknown;
+  context: unknown;
+  model: unknown;
+  preferLocal: unknown;
+  provider: unknown;
+  rpcUrl: unknown;
+  sessionSlug: string;
+} => {
+  const opts = asOptionRecord(input);
+  return {
+    apiKey: opts.apiKey,
+    context: opts.context,
+    model: opts.model,
+    preferLocal: opts.preferLocal,
+    provider: opts.provider,
+    rpcUrl: opts.rpcUrl,
+    sessionSlug: resolveAiSessionSlug(opts),
+  };
+};
+
+export const buildArweaveKeyRequest = (
+  input: unknown = {},
+): {
+  context: unknown;
+  preferLocal: unknown;
+  sessionConfig: SessionConfig | null;
+  sessionSlug: string;
+} => {
+  const opts = asOptionRecord(input);
+  const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
+  return {
+    context,
+    preferLocal: opts.preferLocal,
+    sessionConfig,
+    sessionSlug,
+  };
+};
 
 export const inferAiTaskType = (prompt: unknown = '', opts: Record<string, unknown> = {}): string | null => {
   const explicit = String(opts?.taskType || '')
