@@ -60,7 +60,12 @@ export const parsePostMarkdown = (markdown: string): PostMarkdownBlock[] => {
       const language = fenceMatch[1] || '';
       const codeLines: string[] = [];
       index += 1;
-      while (index < lines.length && !String(lines[index] || '').trim().startsWith('```')) {
+      while (
+        index < lines.length &&
+        !String(lines[index] || '')
+          .trim()
+          .startsWith('```')
+      ) {
         codeLines.push(lines[index] || '');
         index += 1;
       }
@@ -71,12 +76,12 @@ export const parsePostMarkdown = (markdown: string): PostMarkdownBlock[] => {
         blocks.push({ type: 'viz', raw: code, spec: parsed.spec, ...(parsed.error ? { error: parsed.error } : {}) });
       } else if (language.toLowerCase() === 'ce-viz-group') {
         const parsed = parseVizSpec(code);
-        const record = parsed.spec && typeof parsed.spec === 'object' && !Array.isArray(parsed.spec)
-          ? parsed.spec as Record<string, unknown>
-          : {};
-        const title = typeof record.title === 'string' && record.title.trim()
-          ? record.title.trim()
-          : 'Data Exploration';
+        const record =
+          parsed.spec && typeof parsed.spec === 'object' && !Array.isArray(parsed.spec)
+            ? (parsed.spec as Record<string, unknown>)
+            : {};
+        const title =
+          typeof record.title === 'string' && record.title.trim() ? record.title.trim() : 'Data Exploration';
         blocks.push({
           type: 'vizGroupStart',
           raw: code,
@@ -134,9 +139,7 @@ export const parsePostMarkdown = (markdown: string): PostMarkdownBlock[] => {
       const items: string[] = [];
       while (index < lines.length) {
         const itemLine = String(lines[index] || '').trim();
-        const itemMatch = ordered
-          ? itemLine.match(/^\d+\.\s+(.+)$/)
-          : itemLine.match(/^[-*]\s+(.+)$/);
+        const itemMatch = ordered ? itemLine.match(/^\d+\.\s+(.+)$/) : itemLine.match(/^[-*]\s+(.+)$/);
         if (!itemMatch) break;
         items.push(itemMatch[1].trim());
         index += 1;

@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  PostMarkdownBlock,
-  parsePostMarkdown,
-} from './postMarkdownParser.js';
+import { PostMarkdownBlock, parsePostMarkdown } from './postMarkdownParser.js';
 import { buildPostAssetUrl } from './postsContent.js';
 import PostViz from './PostViz.js';
 import styles from './PostsPage.module.scss';
@@ -72,18 +69,20 @@ const renderInline = (text: string): React.ReactNode[] => {
       parts.push(<code key={`code-${match.index}`}>{match[3]}</code>);
     } else if (match[4] && match[5]) {
       const href = sanitizeHref(match[5]);
-      parts.push(href ? (
-        <a
-          key={`link-${match.index}`}
-          href={href}
-          target={href.startsWith('http') ? '_blank' : undefined}
-          rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
-        >
-          {match[4]}
-        </a>
-      ) : (
-        <span key={`unsafe-link-${match.index}`}>{match[4]}</span>
-      ));
+      parts.push(
+        href ? (
+          <a
+            key={`link-${match.index}`}
+            href={href}
+            target={href.startsWith('http') ? '_blank' : undefined}
+            rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
+          >
+            {match[4]}
+          </a>
+        ) : (
+          <span key={`unsafe-link-${match.index}`}>{match[4]}</span>
+        ),
+      );
     }
 
     cursor = match.index + match[0].length;
@@ -96,13 +95,7 @@ const renderInline = (text: string): React.ReactNode[] => {
   return parts;
 };
 
-const PostImageFigure = ({
-  block,
-  assetBasePath,
-}: {
-  block: ImageBlock;
-  assetBasePath?: string;
-}) => {
+const PostImageFigure = ({ block, assetBasePath }: { block: ImageBlock; assetBasePath?: string }) => {
   const [isPreviewOpen, setPreviewOpen] = useState(false);
   const src = sanitizeImageSrc(block.src, assetBasePath);
 
@@ -131,13 +124,7 @@ const PostImageFigure = ({
         onClick={() => setPreviewOpen(true)}
         aria-label={openLabel}
       >
-        <img
-          className={styles.postImage}
-          src={src}
-          alt={block.alt}
-          loading="lazy"
-          decoding="async"
-        />
+        <img className={styles.postImage} src={src} alt={block.alt} loading="lazy" decoding="async" />
       </button>
       {isPreviewOpen && (
         <button
@@ -146,30 +133,17 @@ const PostImageFigure = ({
           onClick={() => setPreviewOpen(false)}
           aria-label="Close image preview"
         >
-          <img
-            className={styles.postImageFullscreenImage}
-            src={src}
-            alt=""
-            decoding="async"
-          />
+          <img className={styles.postImageFullscreenImage} src={src} alt="" decoding="async" />
         </button>
       )}
-      {block.caption && (
-        <figcaption className={styles.postImageCaption}>{renderInline(block.caption)}</figcaption>
-      )}
+      {block.caption && <figcaption className={styles.postImageCaption}>{renderInline(block.caption)}</figcaption>}
     </figure>
   );
 };
 
-const renderBlock = ({
-  block,
-  index,
-  assetBasePath,
-  vizDefaultOpen,
-  nestedViz = false,
-}: RenderBlockArgs) => {
+const renderBlock = ({ block, index, assetBasePath, vizDefaultOpen, nestedViz = false }: RenderBlockArgs) => {
   if (block.type === 'heading') {
-    const HeadingTag = (`h${block.level}` as 'h1' | 'h2' | 'h3');
+    const HeadingTag = `h${block.level}` as 'h1' | 'h2' | 'h3';
     return (
       <HeadingTag key={`heading-${index}`} className={styles.postHeading}>
         {renderInline(block.text)}
@@ -244,15 +218,15 @@ const renderBlock = ({
         </summary>
         <section className={`${styles.vizCard} ${styles.vizGroupCard}`} aria-label={block.title}>
           <div className={styles.vizGroupItems}>
-            {block.blocks.map((childBlock, childIndex) => (
+            {block.blocks.map((childBlock, childIndex) =>
               renderBlock({
                 block: childBlock,
                 index: childIndex,
                 assetBasePath,
                 vizDefaultOpen: block.childrenOpen,
                 nestedViz: childBlock.type === 'viz',
-              })
-            ))}
+              }),
+            )}
           </div>
         </section>
       </details>
@@ -298,17 +272,12 @@ const groupVizBlocks = (blocks: PostMarkdownBlock[]): RenderablePostBlock[] => {
 
 const normalizeHeadingText = (value: string): string => value.trim().replace(/\s+/g, ' ').toLowerCase();
 
-const suppressDuplicateTitleHeading = (
-  blocks: PostMarkdownBlock[],
-  title?: string
-): PostMarkdownBlock[] => {
+const suppressDuplicateTitleHeading = (blocks: PostMarkdownBlock[], title?: string): PostMarkdownBlock[] => {
   if (!title || blocks[0]?.type !== 'heading' || blocks[0].level !== 1) {
     return blocks;
   }
 
-  return normalizeHeadingText(blocks[0].text) === normalizeHeadingText(title)
-    ? blocks.slice(1)
-    : blocks;
+  return normalizeHeadingText(blocks[0].text) === normalizeHeadingText(title) ? blocks.slice(1) : blocks;
 };
 
 const PostMarkdownRenderer = ({ markdown, assetBasePath = '', title }: PostMarkdownRendererProps) => {

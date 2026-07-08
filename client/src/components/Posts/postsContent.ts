@@ -26,19 +26,14 @@ export type LoadedPost = PostManifestEntry & {
   markdown: string;
 };
 
-export type PostsFetch = (
-  input: RequestInfo | URL,
-  init?: RequestInit
-) => Promise<Response>;
+export type PostsFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 export const POSTS_MANIFEST_PATH = '/posts/manifest.json';
 
 const ABSOLUTE_URL_RE = /^[a-z][a-z\d+\-.]*:\/\//i;
 const HTTP_URL_RE = /^https?:\/\//i;
 
-const toTrimmedString = (value: unknown): string => (
-  typeof value === 'string' ? value.trim() : ''
-);
+const toTrimmedString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 const isSafeRelativePostPath = (value: string): boolean => {
   if (!value) return false;
@@ -58,9 +53,7 @@ const isSafePostAssetPath = (value: string): boolean => {
   return normalized.startsWith('posts/') || !normalized.startsWith('.');
 };
 
-const stripPostsPrefix = (value: string): string => (
-  value.replace(/^\/+/, '').replace(/^posts\//, '')
-);
+const stripPostsPrefix = (value: string): string => value.replace(/^\/+/, '').replace(/^posts\//, '');
 
 export const getPostAssetBasePath = (postFile: unknown): string => {
   const value = toTrimmedString(postFile);
@@ -82,30 +75,26 @@ export const buildPostAssetUrl = (pathOrUrl: unknown, assetBasePath = ''): strin
 
   const normalized = value.replace(/^\/+/, '');
   const normalizedBase = stripPostsPrefix(assetBasePath).replace(/\/+$/, '');
-  const resolvedPath = normalized.startsWith('posts/') || value.startsWith('/') || !normalizedBase
-    ? normalized
-    : `${normalizedBase}/${normalized}`;
-  const postsPath = resolvedPath.startsWith('posts/')
-    ? `/${resolvedPath}`
-    : `/posts/${resolvedPath}`;
+  const resolvedPath =
+    normalized.startsWith('posts/') || value.startsWith('/') || !normalizedBase
+      ? normalized
+      : `${normalizedBase}/${normalized}`;
+  const postsPath = resolvedPath.startsWith('posts/') ? `/${resolvedPath}` : `/posts/${resolvedPath}`;
   return buildPublicRoute(postsPath);
 };
 
-const normalizeTags = (value: unknown): string[] => (
+const normalizeTags = (value: unknown): string[] =>
   Array.isArray(value)
     ? value
         .map((tag) => toTrimmedString(tag))
         .filter(Boolean)
         .slice(0, 8)
-    : []
-);
+    : [];
 
 const normalizePostImage = (value: unknown): PostImage | undefined => {
   if (!value) return undefined;
 
-  const record = typeof value === 'object'
-    ? value as Record<string, unknown>
-    : { src: value };
+  const record = typeof value === 'object' ? (value as Record<string, unknown>) : { src: value };
 
   const rawSrc = toTrimmedString(record.src);
   if (!isSafePostAssetPath(rawSrc)) return undefined;
@@ -127,9 +116,7 @@ const normalizePostAttachmentDirectory = (value: unknown): string | undefined =>
 };
 
 export const normalizePostsManifest = (value: unknown): PostManifestEntry[] => {
-  const posts = !!value && typeof value === 'object'
-    ? (value as { posts?: unknown }).posts
-    : null;
+  const posts = !!value && typeof value === 'object' ? (value as { posts?: unknown }).posts : null;
 
   if (!Array.isArray(posts)) return [];
 
@@ -169,7 +156,7 @@ export const normalizePostsManifest = (value: unknown): PostManifestEntry[] => {
 
 export const loadPostsManifest = async (
   fetcher: PostsFetch,
-  manifestPath: string = POSTS_MANIFEST_PATH
+  manifestPath: string = POSTS_MANIFEST_PATH,
 ): Promise<PostManifestEntry[]> => {
   const response = await fetcher(buildPostAssetUrl(manifestPath), {
     headers: { accept: 'application/json' },
@@ -182,10 +169,7 @@ export const loadPostsManifest = async (
   return normalizePostsManifest(await response.json());
 };
 
-export const loadPostMarkdown = async (
-  post: PostManifestEntry,
-  fetcher: PostsFetch
-): Promise<LoadedPost> => {
+export const loadPostMarkdown = async (post: PostManifestEntry, fetcher: PostsFetch): Promise<LoadedPost> => {
   const response = await fetcher(buildPostAssetUrl(post.file), {
     headers: { accept: 'text/markdown,text/plain' },
     cache: 'no-store',

@@ -16,11 +16,8 @@ const RESPONSE_TONE_COLORS: Record<string, string> = {
 
 const normalizeResponseSplitLabel = (label: string) => label.trim().toLowerCase();
 
-const asRecord = (value: unknown): VizRecord | null => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-    ? value as VizRecord
-    : null
-);
+const asRecord = (value: unknown): VizRecord | null =>
+  !!value && typeof value === 'object' && !Array.isArray(value) ? (value as VizRecord) : null;
 
 const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
@@ -33,9 +30,7 @@ const toNumber = (value: unknown, fallback = 0): number => {
 
 const toBoolean = (value: unknown): boolean => value === true || value === 'true';
 
-const clamp = (value: number, min: number, max: number): number => (
-  Math.min(max, Math.max(min, value))
-);
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 const useEscapeToClear = (active: boolean, onClear: () => void) => {
   React.useEffect(() => {
@@ -57,14 +52,11 @@ const toSafeColor = (value: unknown, fallback: string): string => {
   return /^#[0-9a-f]{3,8}$/i.test(color) ? color : fallback;
 };
 
-const resolveResponseCountColor = (label: string, value: unknown, fallback: string): string => (
-  RESPONSE_TONE_COLORS[normalizeResponseSplitLabel(label)] || toSafeColor(value, fallback)
-);
+const resolveResponseCountColor = (label: string, value: unknown, fallback: string): string =>
+  RESPONSE_TONE_COLORS[normalizeResponseSplitLabel(label)] || toSafeColor(value, fallback);
 
 const formatValue = (value: number, suffix = ''): string => {
-  const rounded = Math.abs(value) >= 10
-    ? Math.round(value)
-    : Number(value.toFixed(1));
+  const rounded = Math.abs(value) >= 10 ? Math.round(value) : Number(value.toFixed(1));
   return `${rounded}${suffix}`;
 };
 
@@ -89,15 +81,7 @@ const renderFormattedText = (text: string): React.ReactNode[] => {
   return parts;
 };
 
-const VizHeader = ({
-  title,
-  subtitle,
-  hidden = false,
-}: {
-  title: string;
-  subtitle?: string;
-  hidden?: boolean;
-}) => {
+const VizHeader = ({ title, subtitle, hidden = false }: { title: string; subtitle?: string; hidden?: boolean }) => {
   if (hidden && !subtitle) return null;
 
   return (
@@ -120,7 +104,7 @@ type CategoryDatum = {
   color: string;
 };
 
-const readCategories = (spec: VizRecord): CategoryDatum[] => (
+const readCategories = (spec: VizRecord): CategoryDatum[] =>
   asArray(spec.categories)
     .map((entry, index): CategoryDatum | null => {
       const record = asRecord(entry);
@@ -134,8 +118,7 @@ const readCategories = (spec: VizRecord): CategoryDatum[] => (
         color: toSafeColor(record.color, PALETTE[index % PALETTE.length]),
       };
     })
-    .filter((entry): entry is CategoryDatum => !!entry)
-);
+    .filter((entry): entry is CategoryDatum => !!entry);
 
 const CategoryDotsViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const title = toText(spec.title) || 'Distribution';
@@ -162,10 +145,7 @@ const CategoryDotsViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                   {formatValue(category.value, suffix)}
                 </span>
               </div>
-              <div
-                className={styles.dotGrid}
-                aria-label={`${category.label}: ${formatValue(category.value, suffix)}`}
-              >
+              <div className={styles.dotGrid} aria-label={`${category.label}: ${formatValue(category.value, suffix)}`}>
                 {Array.from({ length: dotCount }).map((_, index) => (
                   <span
                     // eslint-disable-next-line react/no-array-index-key
@@ -189,7 +169,7 @@ type QuoteDatum = {
   label: string;
 };
 
-const readQuotes = (spec: VizRecord): QuoteDatum[] => (
+const readQuotes = (spec: VizRecord): QuoteDatum[] =>
   asArray(spec.quotes)
     .map((entry): QuoteDatum | null => {
       const record = asRecord(entry);
@@ -201,8 +181,7 @@ const readQuotes = (spec: VizRecord): QuoteDatum[] => (
         label: toText(record.label),
       };
     })
-    .filter((entry): entry is QuoteDatum => !!entry)
-);
+    .filter((entry): entry is QuoteDatum => !!entry);
 
 const QuoteWallViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const title = toText(spec.title) || 'Voices';
@@ -238,7 +217,7 @@ type RankedThemeDatum = {
   color: string;
 };
 
-const readRankedThemes = (spec: VizRecord): RankedThemeDatum[] => (
+const readRankedThemes = (spec: VizRecord): RankedThemeDatum[] =>
   asArray(spec.items || spec.categories)
     .map((entry, index): RankedThemeDatum | null => {
       const record = asRecord(entry);
@@ -255,8 +234,7 @@ const readRankedThemes = (spec: VizRecord): RankedThemeDatum[] => (
         color: toSafeColor(record.color, PALETTE[index % PALETTE.length]),
       };
     })
-    .filter((entry): entry is RankedThemeDatum => !!entry)
-);
+    .filter((entry): entry is RankedThemeDatum => !!entry);
 
 const RankedThemesViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const title = toText(spec.title) || 'Ranked themes';
@@ -322,7 +300,7 @@ type NetworkLinkDatum = {
   label: string;
 };
 
-const readNetworkNodes = (spec: VizRecord): NetworkNodeDatum[] => (
+const readNetworkNodes = (spec: VizRecord): NetworkNodeDatum[] =>
   asArray(spec.nodes)
     .map((entry, index): NetworkNodeDatum | null => {
       const record = asRecord(entry);
@@ -340,10 +318,9 @@ const readNetworkNodes = (spec: VizRecord): NetworkNodeDatum[] => (
         color: toSafeColor(record.color, PALETTE[index % PALETTE.length]),
       };
     })
-    .filter((entry): entry is NetworkNodeDatum => !!entry)
-);
+    .filter((entry): entry is NetworkNodeDatum => !!entry);
 
-const readNetworkLinks = (spec: VizRecord, nodeIds: Set<string>): NetworkLinkDatum[] => (
+const readNetworkLinks = (spec: VizRecord, nodeIds: Set<string>): NetworkLinkDatum[] =>
   asArray(spec.links)
     .map((entry): NetworkLinkDatum | null => {
       const record = asRecord(entry);
@@ -358,8 +335,7 @@ const readNetworkLinks = (spec: VizRecord, nodeIds: Set<string>): NetworkLinkDat
         label: toText(record.label),
       };
     })
-    .filter((entry): entry is NetworkLinkDatum => !!entry)
-);
+    .filter((entry): entry is NetworkLinkDatum => !!entry);
 
 const ThemeNetworkViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const title = toText(spec.title) || 'Theme network';
@@ -398,19 +374,8 @@ const ThemeNetworkViz = ({ spec, hideHeader = false }: VizBodyProps) => {
             const radius = 2.8 + (node.value / maxValue) * 5.5;
             return (
               <g key={node.id}>
-                <circle
-                  className={styles.networkNode}
-                  cx={node.x}
-                  cy={node.y}
-                  r={radius}
-                  fill={node.color}
-                />
-                <text
-                  className={styles.networkLabel}
-                  x={node.x}
-                  y={node.y + radius + 4.2}
-                  textAnchor="middle"
-                >
+                <circle className={styles.networkNode} cx={node.x} cy={node.y} r={radius} fill={node.color} />
+                <text className={styles.networkLabel} x={node.x} y={node.y + radius + 4.2} textAnchor="middle">
                   {node.label}
                 </text>
               </g>
@@ -448,7 +413,7 @@ type BeeswarmRowDatum = {
   missing: string[];
 };
 
-const readBeeswarmRows = (spec: VizRecord): BeeswarmRowDatum[] => (
+const readBeeswarmRows = (spec: VizRecord): BeeswarmRowDatum[] =>
   asArray(spec.items || spec.questions)
     .map((entry, rowIndex): BeeswarmRowDatum | null => {
       const record = asRecord(entry);
@@ -478,8 +443,7 @@ const readBeeswarmRows = (spec: VizRecord): BeeswarmRowDatum[] => (
         missing: asArray(record.missing).map(toText).filter(Boolean),
       };
     })
-    .filter((entry): entry is BeeswarmRowDatum => !!entry)
-);
+    .filter((entry): entry is BeeswarmRowDatum => !!entry);
 
 const duplicateValueKey = (value: number) => value.toFixed(4);
 
@@ -573,7 +537,8 @@ const BeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                   const pointKey = `${rowIndex}-${index}`;
                   const left = clamp(((point.value - min) / (max - min)) * 100, 0, 100);
                   const placement = placements[index];
-                  const confidenceLabel = point.confidence > 0 ? `, ${formatValue(point.confidence, '%')} confidence` : '';
+                  const confidenceLabel =
+                    point.confidence > 0 ? `, ${formatValue(point.confidence, '%')} confidence` : '';
                   const isActive = activeKey === pointKey;
                   const ringWidth = 1 + (point.confidence / 100) * 3;
                   const ringOpacity = 0.12 + (point.confidence / 100) * 0.36;
@@ -625,7 +590,9 @@ const BeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                           &times;
                         </button>
                       )}
-                      <strong>{point.label}: {formatValue(point.value, suffix)}</strong>
+                      <strong>
+                        {point.label}: {formatValue(point.value, suffix)}
+                      </strong>
                       {point.confidence > 0 && <span>Confidence: {formatValue(point.confidence)}/100</span>}
                       {point.detail && <p>{point.detail}</p>}
                     </div>
@@ -666,7 +633,7 @@ type ResponsePanelDatum = {
   quotes: ResponseQuoteDatum[];
 };
 
-const readResponsePanels = (spec: VizRecord): ResponsePanelDatum[] => (
+const readResponsePanels = (spec: VizRecord): ResponsePanelDatum[] =>
   asArray(spec.panels || spec.items)
     .map((entry, panelIndex): ResponsePanelDatum | null => {
       const record = asRecord(entry);
@@ -685,7 +652,7 @@ const readResponsePanels = (spec: VizRecord): ResponsePanelDatum[] => (
             color: resolveResponseCountColor(
               label,
               countRecord.color,
-              PALETTE[(panelIndex + countIndex) % PALETTE.length]
+              PALETTE[(panelIndex + countIndex) % PALETTE.length],
             ),
           };
         })
@@ -713,8 +680,7 @@ const readResponsePanels = (spec: VizRecord): ResponsePanelDatum[] => (
         quotes,
       };
     })
-    .filter((entry): entry is ResponsePanelDatum => !!entry)
-);
+    .filter((entry): entry is ResponsePanelDatum => !!entry);
 
 const buildPieGradient = (counts: ResponseCountDatum[]) => {
   const total = counts.reduce((sum, count) => sum + count.value, 0);
@@ -746,15 +712,14 @@ const isResponseSplitPanel = (panel: ResponsePanelDatum) => {
   return panel.counts.every((count) => RESPONSE_SPLIT_LABELS.has(normalizeResponseSplitLabel(count.label)));
 };
 
-const orderedResponseSplitCounts = (counts: ResponseCountDatum[]) => (
+const orderedResponseSplitCounts = (counts: ResponseCountDatum[]) =>
   [...counts].sort((a, b) => {
     const aIndex = RESPONSE_SPLIT_ORDER.indexOf(normalizeResponseSplitLabel(a.label));
     const bIndex = RESPONSE_SPLIT_ORDER.indexOf(normalizeResponseSplitLabel(b.label));
     const normalizedA = aIndex === -1 ? RESPONSE_SPLIT_ORDER.length : aIndex;
     const normalizedB = bIndex === -1 ? RESPONSE_SPLIT_ORDER.length : bIndex;
     return normalizedA - normalizedB;
-  })
-);
+  });
 
 type BinaryBeeswarmQuestionDatum = {
   label: string;
@@ -767,7 +732,7 @@ type BinaryBeeswarmQuestionDatum = {
   majorityLabel: string;
 };
 
-const readBinaryBeeswarmItems = (spec: VizRecord): BinaryBeeswarmQuestionDatum[] => (
+const readBinaryBeeswarmItems = (spec: VizRecord): BinaryBeeswarmQuestionDatum[] =>
   asArray(spec.items || spec.questions)
     .map((entry, itemIndex): BinaryBeeswarmQuestionDatum | null => {
       const record = asRecord(entry);
@@ -787,11 +752,11 @@ const readBinaryBeeswarmItems = (spec: VizRecord): BinaryBeeswarmQuestionDatum[]
               color: resolveResponseCountColor(
                 countLabel,
                 countRecord.color,
-                PALETTE[(itemIndex + countIndex) % PALETTE.length]
+                PALETTE[(itemIndex + countIndex) % PALETTE.length],
               ),
             };
           })
-          .filter((count): count is ResponseCountDatum => !!count)
+          .filter((count): count is ResponseCountDatum => !!count),
       );
       const total = counts.reduce((sum, count) => sum + count.value, 0);
       if (total <= 0) return null;
@@ -809,8 +774,7 @@ const readBinaryBeeswarmItems = (spec: VizRecord): BinaryBeeswarmQuestionDatum[]
         majorityLabel: majority?.label || 'split',
       };
     })
-    .filter((entry): entry is BinaryBeeswarmQuestionDatum => !!entry)
-);
+    .filter((entry): entry is BinaryBeeswarmQuestionDatum => !!entry);
 
 type BinaryBeeswarmPlacement = {
   x: number;
@@ -833,14 +797,11 @@ const BINARY_SWARM_AXIS_Y = 254;
 const BINARY_SWARM_DOMAIN_MAX = 0.5;
 const BINARY_SWARM_DOT_GAP = 15;
 
-const getBinarySwarmX = (difference: number) => (
-  BINARY_SWARM_LEFT + (difference / BINARY_SWARM_DOMAIN_MAX) * (BINARY_SWARM_RIGHT - BINARY_SWARM_LEFT)
-);
+const getBinarySwarmX = (difference: number) =>
+  BINARY_SWARM_LEFT + (difference / BINARY_SWARM_DOMAIN_MAX) * (BINARY_SWARM_RIGHT - BINARY_SWARM_LEFT);
 
 const buildBinaryConfidenceScale = (items: BinaryBeeswarmQuestionDatum[]): BinaryConfidenceScale => {
-  const confidences = items
-    .map((item) => item.averageConfidence)
-    .filter((confidence) => confidence > 0);
+  const confidences = items.map((item) => item.averageConfidence).filter((confidence) => confidence > 0);
 
   if (confidences.length === 0) {
     return { min: 0, max: 100, ticks: [0, 50, 100] };
@@ -863,10 +824,7 @@ const getBinarySwarmY = (confidence: number, scale: BinaryConfidenceScale) => {
   return BINARY_SWARM_BOTTOM - ratio * (BINARY_SWARM_BOTTOM - BINARY_SWARM_TOP);
 };
 
-const buildBinaryBeeswarmPlacements = (
-  items: BinaryBeeswarmQuestionDatum[],
-  scale: BinaryConfidenceScale
-) => {
+const buildBinaryBeeswarmPlacements = (items: BinaryBeeswarmQuestionDatum[], scale: BinaryConfidenceScale) => {
   const placements = new Map<number, BinaryBeeswarmPlacement>();
   const placed: BinaryBeeswarmPlacement[] = [];
 
@@ -878,9 +836,8 @@ const buildBinaryBeeswarmPlacements = (
     let candidate = base;
     let attempt = 0;
 
-    const collides = (point: BinaryBeeswarmPlacement) => placed.some((existing) => (
-      Math.hypot(existing.x - point.x, existing.y - point.y) < BINARY_SWARM_DOT_GAP
-    ));
+    const collides = (point: BinaryBeeswarmPlacement) =>
+      placed.some((existing) => Math.hypot(existing.x - point.x, existing.y - point.y) < BINARY_SWARM_DOT_GAP);
 
     while (collides(candidate) && attempt < 12) {
       attempt += 1;
@@ -899,11 +856,10 @@ const buildBinaryBeeswarmPlacements = (
   return placements;
 };
 
-const formatBinaryCountsLabel = (counts: ResponseCountDatum[]) => (
+const formatBinaryCountsLabel = (counts: ResponseCountDatum[]) =>
   orderedResponseSplitCounts(counts)
     .map((count) => `${count.label} ${formatValue(count.value)}`)
-    .join(', ')
-);
+    .join(', ');
 
 const BinaryTooltipSplitBar = ({ counts }: { counts: ResponseCountDatum[] }) => {
   const total = counts.reduce((sum, count) => sum + count.value, 0);
@@ -942,12 +898,8 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const activeItem = activeIndex === null ? null : items[activeIndex] || null;
   const activePlacement = activeIndex === null ? null : placements.get(activeIndex) || null;
   const isPinned = pinnedIndex !== null;
-  const tooltipLeft = activePlacement
-    ? `${clamp((activePlacement.x / BINARY_SWARM_WIDTH) * 100, 18, 82)}%`
-    : '50%';
-  const tooltipTop = activePlacement
-    ? `${clamp((activePlacement.y / BINARY_SWARM_HEIGHT) * 100, 16, 84)}%`
-    : '50%';
+  const tooltipLeft = activePlacement ? `${clamp((activePlacement.x / BINARY_SWARM_WIDTH) * 100, 18, 82)}%` : '50%';
+  const tooltipTop = activePlacement ? `${clamp((activePlacement.y / BINARY_SWARM_HEIGHT) * 100, 16, 84)}%` : '50%';
 
   const clearPin = React.useCallback(() => setPinnedIndex(null), []);
   useEscapeToClear(pinnedIndex !== null, clearPin);
@@ -968,7 +920,7 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const sortedItems = [...items].sort((a, b) => {
     if (sortKey === 'alpha') return a.label.localeCompare(b.label);
     if (sortKey === 'confidence') return b.averageConfidence - a.averageConfidence;
-    return (b.difference - a.difference) || (b.averageConfidence - a.averageConfidence);
+    return b.difference - a.difference || b.averageConfidence - a.averageConfidence;
   });
 
   const viewButtons: Array<{ id: 'swarm' | 'list'; label: string }> = [
@@ -1028,9 +980,7 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                 </span>
                 <span className={styles.binaryListCounts}>{formatBinaryCountsLabel(item.counts)}</span>
                 {item.averageConfidence > 0 && (
-                  <span className={styles.binaryListConfidence}>
-                    conf {formatValue(item.averageConfidence)}/100
-                  </span>
+                  <span className={styles.binaryListConfidence}>conf {formatValue(item.averageConfidence)}/100</span>
                 )}
               </div>
             </li>
@@ -1038,181 +988,180 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
         </ul>
       )}
       {view === 'swarm' && (
-      <div className={styles.binaryBeeswarmFrame}>
-        <svg
-          className={styles.binaryBeeswarmSvg}
-          viewBox={`0 0 ${BINARY_SWARM_WIDTH} ${BINARY_SWARM_HEIGHT}`}
-          role="img"
-          aria-label={title}
-          onClick={() => setPinnedIndex(null)}
-        >
-          <defs>
-            <linearGradient id={gradientId} x1="0%" x2="100%" y1="0%" y2="0%">
-              <stop offset="0%" stopColor={RESPONSE_TONE_COLORS.agree} />
-              <stop offset="48%" stopColor={RESPONSE_TONE_COLORS.unsure} />
-              <stop offset="100%" stopColor="#ff6bcb" />
-            </linearGradient>
-          </defs>
-          {scale.ticks.map((tick) => {
-            const y = getBinarySwarmY(tick, scale);
-            return (
-              <g key={`confidence-${tick}`}>
+        <div className={styles.binaryBeeswarmFrame}>
+          <svg
+            className={styles.binaryBeeswarmSvg}
+            viewBox={`0 0 ${BINARY_SWARM_WIDTH} ${BINARY_SWARM_HEIGHT}`}
+            role="img"
+            aria-label={title}
+            onClick={() => setPinnedIndex(null)}
+          >
+            <defs>
+              <linearGradient id={gradientId} x1="0%" x2="100%" y1="0%" y2="0%">
+                <stop offset="0%" stopColor={RESPONSE_TONE_COLORS.agree} />
+                <stop offset="48%" stopColor={RESPONSE_TONE_COLORS.unsure} />
+                <stop offset="100%" stopColor="#ff6bcb" />
+              </linearGradient>
+            </defs>
+            {scale.ticks.map((tick) => {
+              const y = getBinarySwarmY(tick, scale);
+              return (
+                <g key={`confidence-${tick}`}>
+                  <line
+                    className={styles.binaryBeeswarmGridline}
+                    x1={BINARY_SWARM_LEFT}
+                    y1={y}
+                    x2={BINARY_SWARM_RIGHT}
+                    y2={y}
+                  />
+                  <text
+                    className={styles.binaryBeeswarmYTickLabel}
+                    x={BINARY_SWARM_LEFT - 10}
+                    y={y + 4}
+                    textAnchor="end"
+                  >
+                    {tick}
+                  </text>
+                </g>
+              );
+            })}
+            <text
+              className={styles.binaryBeeswarmYAxisLabel}
+              transform={`rotate(-90 16 ${(BINARY_SWARM_TOP + BINARY_SWARM_BOTTOM) / 2})`}
+              x={16}
+              y={(BINARY_SWARM_TOP + BINARY_SWARM_BOTTOM) / 2}
+              textAnchor="middle"
+            >
+              Avg. confidence
+            </text>
+            <line
+              className={styles.binaryBeeswarmAxisBase}
+              x1={BINARY_SWARM_LEFT}
+              y1={BINARY_SWARM_AXIS_Y}
+              x2={BINARY_SWARM_RIGHT}
+              y2={BINARY_SWARM_AXIS_Y}
+            />
+            <line
+              className={styles.binaryBeeswarmAxis}
+              x1={BINARY_SWARM_LEFT}
+              y1={BINARY_SWARM_AXIS_Y}
+              x2={BINARY_SWARM_RIGHT}
+              y2={BINARY_SWARM_AXIS_Y}
+              stroke={`url(#${gradientId})`}
+            />
+            {ticks.map((tick) => {
+              const x = getBinarySwarmX(tick);
+              return (
                 <line
-                  className={styles.binaryBeeswarmGridline}
-                  x1={BINARY_SWARM_LEFT}
-                  y1={y}
-                  x2={BINARY_SWARM_RIGHT}
-                  y2={y}
+                  key={tick}
+                  className={styles.binaryBeeswarmTick}
+                  x1={x}
+                  y1={BINARY_SWARM_TOP - 6}
+                  x2={x}
+                  y2={BINARY_SWARM_AXIS_Y + 6}
                 />
-                <text
-                  className={styles.binaryBeeswarmYTickLabel}
-                  x={BINARY_SWARM_LEFT - 10}
-                  y={y + 4}
-                  textAnchor="end"
+              );
+            })}
+            <text className={styles.binaryBeeswarmAxisLabel} x={BINARY_SWARM_LEFT} y={BINARY_SWARM_HEIGHT - 8}>
+              Consensus
+            </text>
+            <text
+              className={styles.binaryBeeswarmAxisLabel}
+              x={BINARY_SWARM_RIGHT}
+              y={BINARY_SWARM_HEIGHT - 8}
+              textAnchor="end"
+            >
+              Difference
+            </text>
+            {items.map((item, index) => {
+              const placement = placements.get(index) || {
+                x: getBinarySwarmX(item.difference),
+                y: (BINARY_SWARM_TOP + BINARY_SWARM_BOTTOM) / 2,
+              };
+              const countsLabel = formatBinaryCountsLabel(item.counts);
+              const confidenceLabel =
+                item.averageConfidence > 0 ? `, average confidence: ${formatValue(item.averageConfidence)}/100` : '';
+              const promptLabel = item.prompt || item.label;
+              const ariaLabel = `${promptLabel}: ${countsLabel}${confidenceLabel}`;
+              const isActive = activeIndex === index;
+              const showTooltip = () => setHoverIndex(index);
+              const hideTooltip = () => setHoverIndex(null);
+              const togglePin = (event: React.SyntheticEvent) => {
+                event.stopPropagation();
+                setPinnedIndex((current) => (current === index ? null : index));
+              };
+              return (
+                <g
+                  key={`${item.label}-${index}`}
+                  className={`${styles.binaryBeeswarmPoint} ${isActive ? styles.binaryBeeswarmPointActive : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={ariaLabel}
+                  aria-pressed={pinnedIndex === index}
+                  aria-describedby={isActive ? tooltipId : undefined}
+                  onMouseEnter={showTooltip}
+                  onMouseLeave={hideTooltip}
+                  onFocus={showTooltip}
+                  onBlur={hideTooltip}
+                  onClick={togglePin}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      togglePin(event);
+                    }
+                  }}
                 >
-                  {tick}
-                </text>
-              </g>
-            );
-          })}
-          <text
-            className={styles.binaryBeeswarmYAxisLabel}
-            transform={`rotate(-90 16 ${(BINARY_SWARM_TOP + BINARY_SWARM_BOTTOM) / 2})`}
-            x={16}
-            y={(BINARY_SWARM_TOP + BINARY_SWARM_BOTTOM) / 2}
-            textAnchor="middle"
-          >
-            Avg. confidence
-          </text>
-          <line
-            className={styles.binaryBeeswarmAxisBase}
-            x1={BINARY_SWARM_LEFT}
-            y1={BINARY_SWARM_AXIS_Y}
-            x2={BINARY_SWARM_RIGHT}
-            y2={BINARY_SWARM_AXIS_Y}
-          />
-          <line
-            className={styles.binaryBeeswarmAxis}
-            x1={BINARY_SWARM_LEFT}
-            y1={BINARY_SWARM_AXIS_Y}
-            x2={BINARY_SWARM_RIGHT}
-            y2={BINARY_SWARM_AXIS_Y}
-            stroke={`url(#${gradientId})`}
-          />
-          {ticks.map((tick) => {
-            const x = getBinarySwarmX(tick);
-            return (
-              <line
-                key={tick}
-                className={styles.binaryBeeswarmTick}
-                x1={x}
-                y1={BINARY_SWARM_TOP - 6}
-                x2={x}
-                y2={BINARY_SWARM_AXIS_Y + 6}
-              />
-            );
-          })}
-          <text className={styles.binaryBeeswarmAxisLabel} x={BINARY_SWARM_LEFT} y={BINARY_SWARM_HEIGHT - 8}>
-            Consensus
-          </text>
-          <text
-            className={styles.binaryBeeswarmAxisLabel}
-            x={BINARY_SWARM_RIGHT}
-            y={BINARY_SWARM_HEIGHT - 8}
-            textAnchor="end"
-          >
-            Difference
-          </text>
-          {items.map((item, index) => {
-            const placement = placements.get(index) || {
-              x: getBinarySwarmX(item.difference),
-              y: (BINARY_SWARM_TOP + BINARY_SWARM_BOTTOM) / 2,
-            };
-            const countsLabel = formatBinaryCountsLabel(item.counts);
-            const confidenceLabel = item.averageConfidence > 0
-              ? `, average confidence: ${formatValue(item.averageConfidence)}/100`
-              : '';
-            const promptLabel = item.prompt || item.label;
-            const ariaLabel = `${promptLabel}: ${countsLabel}${confidenceLabel}`;
-            const isActive = activeIndex === index;
-            const showTooltip = () => setHoverIndex(index);
-            const hideTooltip = () => setHoverIndex(null);
-            const togglePin = (event: React.SyntheticEvent) => {
-              event.stopPropagation();
-              setPinnedIndex((current) => (current === index ? null : index));
-            };
-            return (
-              <g
-                key={`${item.label}-${index}`}
-                className={`${styles.binaryBeeswarmPoint} ${isActive ? styles.binaryBeeswarmPointActive : ''}`}
-                role="button"
-                tabIndex={0}
-                aria-label={ariaLabel}
-                aria-pressed={pinnedIndex === index}
-                aria-describedby={isActive ? tooltipId : undefined}
-                onMouseEnter={showTooltip}
-                onMouseLeave={hideTooltip}
-                onFocus={showTooltip}
-                onBlur={hideTooltip}
-                onClick={togglePin}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    togglePin(event);
-                  }
-                }}
-              >
-                <circle
-                  className={styles.binaryBeeswarmHitArea}
-                  cx={placement.x}
-                  cy={placement.y}
-                  r={18}
-                  fill="transparent"
-                  onMouseEnter={showTooltip}
-                  onMouseLeave={hideTooltip}
-                />
-                <circle
-                  className={styles.binaryBeeswarmDot}
-                  cx={placement.x}
-                  cy={placement.y}
-                  r={8.5}
-                  fill={item.color}
-                  onMouseEnter={showTooltip}
-                  onMouseLeave={hideTooltip}
-                />
-                <title>{ariaLabel}</title>
-              </g>
-            );
-          })}
-        </svg>
-        {activeItem && activePlacement && (
-          <div
-            id={tooltipId}
-            role="tooltip"
-            className={`${styles.binaryBeeswarmTooltip} ${isPinned ? styles.binaryBeeswarmTooltipPinned : ''}`}
-            style={{ left: tooltipLeft, top: tooltipTop }}
-          >
-            {isPinned && (
-              <button
-                type="button"
-                className={styles.binaryBeeswarmTooltipClose}
-                onClick={() => setPinnedIndex(null)}
-                aria-label="Close question details"
-                data-testid="ce-posts-binary-swarm-tooltip-close"
-              >
-                &times;
-              </button>
-            )}
-            <strong>{activeItem.label}</strong>
-            {activeItem.prompt && activeItem.prompt !== activeItem.label && <p>{activeItem.prompt}</p>}
-            <BinaryTooltipSplitBar counts={activeItem.counts} />
-            <span>{formatBinaryCountsLabel(activeItem.counts)}</span>
-            {activeItem.averageConfidence > 0 && (
-              <span>Average confidence: {formatValue(activeItem.averageConfidence)}/100</span>
-            )}
-          </div>
-        )}
-      </div>
+                  <circle
+                    className={styles.binaryBeeswarmHitArea}
+                    cx={placement.x}
+                    cy={placement.y}
+                    r={18}
+                    fill="transparent"
+                    onMouseEnter={showTooltip}
+                    onMouseLeave={hideTooltip}
+                  />
+                  <circle
+                    className={styles.binaryBeeswarmDot}
+                    cx={placement.x}
+                    cy={placement.y}
+                    r={8.5}
+                    fill={item.color}
+                    onMouseEnter={showTooltip}
+                    onMouseLeave={hideTooltip}
+                  />
+                  <title>{ariaLabel}</title>
+                </g>
+              );
+            })}
+          </svg>
+          {activeItem && activePlacement && (
+            <div
+              id={tooltipId}
+              role="tooltip"
+              className={`${styles.binaryBeeswarmTooltip} ${isPinned ? styles.binaryBeeswarmTooltipPinned : ''}`}
+              style={{ left: tooltipLeft, top: tooltipTop }}
+            >
+              {isPinned && (
+                <button
+                  type="button"
+                  className={styles.binaryBeeswarmTooltipClose}
+                  onClick={() => setPinnedIndex(null)}
+                  aria-label="Close question details"
+                  data-testid="ce-posts-binary-swarm-tooltip-close"
+                >
+                  &times;
+                </button>
+              )}
+              <strong>{activeItem.label}</strong>
+              {activeItem.prompt && activeItem.prompt !== activeItem.label && <p>{activeItem.prompt}</p>}
+              <BinaryTooltipSplitBar counts={activeItem.counts} />
+              <span>{formatBinaryCountsLabel(activeItem.counts)}</span>
+              {activeItem.averageConfidence > 0 && (
+                <span>Average confidence: {formatValue(activeItem.averageConfidence)}/100</span>
+              )}
+            </div>
+          )}
+        </div>
       )}
       {view === 'swarm' && (
         <p className={styles.binaryBeeswarmHint}>
@@ -1320,7 +1269,10 @@ const ResponseTypeGridViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                         <span>{count.label}</span>
                         <span>{formatValue(count.value)}</span>
                       </div>
-                      <div className={styles.responseBarTrack} aria-label={`${count.label}: ${formatValue(count.value)}`}>
+                      <div
+                        className={styles.responseBarTrack}
+                        aria-label={`${count.label}: ${formatValue(count.value)}`}
+                      >
                         <span
                           className={styles.responseBarFill}
                           style={{
@@ -1383,12 +1335,7 @@ const renderVizBody = (record: VizRecord, type: string) => {
   return <p className={styles.vizFallback}>Unsupported visualization type: {type}</p>;
 };
 
-const PostViz = ({
-  spec,
-  error = '',
-  defaultOpen = true,
-  nested = false,
-}: PostVizProps) => {
+const PostViz = ({ spec, error = '', defaultOpen = true, nested = false }: PostVizProps) => {
   if (error) {
     return <p className={styles.vizFallback}>Visualization JSON is invalid.</p>;
   }
@@ -1407,10 +1354,7 @@ const PostViz = ({
   }
 
   return (
-    <details
-      className={`${styles.vizDisclosure} ${nested ? styles.vizDisclosureNested : ''}`}
-      open={defaultOpen}
-    >
+    <details className={`${styles.vizDisclosure} ${nested ? styles.vizDisclosureNested : ''}`} open={defaultOpen}>
       <summary className={styles.vizDisclosureSummary}>
         <span>{title}</span>
         <span className={styles.vizDisclosureIcon} aria-hidden="true">

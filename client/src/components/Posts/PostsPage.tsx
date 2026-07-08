@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import {
-  buildPublicRoute,
-  stripPublicUrlBasePath,
-} from '../../utilities/ui/publicUrl.js';
+import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { CE_ABOUT_POSTS_ENABLED } from '../../variables/appConfig.js';
 import {
   LoadedPost,
@@ -58,24 +55,16 @@ const readPostSlugFromPathname = (pathname: string): string => {
   return decodePathSegment(segments[1] || '').trim();
 };
 
-const buildPostRoute = (slug: string): string => (
-  buildPublicRoute(`/posts/${encodeURIComponent(slug)}`)
-);
+const buildPostRoute = (slug: string): string => buildPublicRoute(`/posts/${encodeURIComponent(slug)}`);
 
-const PostsPage = ({
-  enabled = CE_ABOUT_POSTS_ENABLED,
-  fetcher = defaultFetch,
-}: PostsPageProps) => {
+const PostsPage = ({ enabled = CE_ABOUT_POSTS_ENABLED, fetcher = defaultFetch }: PostsPageProps) => {
   const location = useLocation();
   const [status, setStatus] = useState<PostsPageStatus>('idle');
   const [postStatus, setPostStatus] = useState<PostLoadStatus>('idle');
   const [posts, setPosts] = useState<PostManifestEntry[]>([]);
   const [loadedPost, setLoadedPost] = useState<LoadedPost | null>(null);
 
-  const selectedSlug = useMemo(
-    () => readPostSlugFromPathname(location.pathname),
-    [location.pathname]
-  );
+  const selectedSlug = useMemo(() => readPostSlugFromPathname(location.pathname), [location.pathname]);
 
   useEffect(() => {
     if (!enabled) {
@@ -108,7 +97,7 @@ const PostsPage = ({
 
   const selectedPostMeta = useMemo(
     () => (selectedSlug ? posts.find((post) => post.slug === selectedSlug) || null : null),
-    [posts, selectedSlug]
+    [posts, selectedSlug],
   );
 
   useEffect(() => {
@@ -146,10 +135,7 @@ const PostsPage = ({
   const showPageTitle = !selectedSlug;
 
   return (
-    <main
-      className={styles.postsPage}
-      data-testid="ce-posts-surface"
-    >
+    <main className={styles.postsPage} data-testid="ce-posts-surface">
       <div className={styles.pageShell}>
         {showPageTitle && (
           <header className={styles.hero}>
@@ -181,11 +167,7 @@ const PostsPage = ({
           <section className={styles.postIndex}>
             <nav className={styles.postNav} aria-label="Posts">
               {posts.map((post) => (
-                <Link
-                  key={post.slug}
-                  to={buildPostRoute(post.slug)}
-                  className={styles.postNavItem}
-                >
+                <Link key={post.slug} to={buildPostRoute(post.slug)} className={styles.postNavItem}>
                   {post.headerImage && (
                     <span className={styles.postNavMedia} aria-hidden="true">
                       <img
@@ -239,7 +221,9 @@ const PostsPage = ({
                     {selectedPostMeta.tags.length > 0 && (
                       <div className={styles.tagList} aria-label="Post tags">
                         {selectedPostMeta.tags.map((tag) => (
-                          <span key={tag} className={styles.tag}>{tag}</span>
+                          <span key={tag} className={styles.tag}>
+                            {tag}
+                          </span>
                         ))}
                       </div>
                     )}
@@ -253,13 +237,9 @@ const PostsPage = ({
               </header>
             )}
 
-            {!selectedPostMeta && (
-              <p className={styles.postStatus}>This post could not be found.</p>
-            )}
+            {!selectedPostMeta && <p className={styles.postStatus}>This post could not be found.</p>}
             {postStatus === 'loading' && <p className={styles.postStatus}>Loading post...</p>}
-            {postStatus === 'unavailable' && (
-              <p className={styles.postStatus}>This post could not be loaded.</p>
-            )}
+            {postStatus === 'unavailable' && <p className={styles.postStatus}>This post could not be loaded.</p>}
             {postStatus === 'ready' && loadedPost && (
               <PostMarkdownRenderer
                 markdown={loadedPost.markdown}

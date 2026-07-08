@@ -8,33 +8,32 @@ import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import PostsPage from './PostsPage';
 import type { PostsFetch } from './postsContent';
 
-const makeJsonResponse = (body: unknown): Response => ({
-  ok: true,
-  status: 200,
-  json: async () => body,
-} as Response);
+const makeJsonResponse = (body: unknown): Response =>
+  ({
+    ok: true,
+    status: 200,
+    json: async () => body,
+  }) as Response;
 
-const makeTextResponse = (body: string): Response => ({
-  ok: true,
-  status: 200,
-  text: async () => body,
-} as Response);
+const makeTextResponse = (body: string): Response =>
+  ({
+    ok: true,
+    status: 200,
+    text: async () => body,
+  }) as Response;
 
 const LocationProbe = () => {
   const location = useLocation();
   return <output data-testid="test-location">{location.pathname}</output>;
 };
 
-const renderPostsPage = (
-  fetcher: PostsFetch,
-  enabled = true,
-  initialEntries = ['/posts']
-) => render(
-  <MemoryRouter initialEntries={initialEntries}>
-    <PostsPage fetcher={fetcher} enabled={enabled} />
-    <LocationProbe />
-  </MemoryRouter>
-);
+const renderPostsPage = (fetcher: PostsFetch, enabled = true, initialEntries = ['/posts']) =>
+  render(
+    <MemoryRouter initialEntries={initialEntries}>
+      <PostsPage fetcher={fetcher} enabled={enabled} />
+      <LocationProbe />
+    </MemoryRouter>,
+  );
 
 const manifest = {
   posts: [
@@ -265,7 +264,8 @@ const firstPostMarkdown = [
 
 describe('PostsPage', () => {
   it('loads the root posts manifest as summary links without rendering a post body', async () => {
-    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce(makeJsonResponse(manifest));
 
     renderPostsPage(fetcher);
@@ -283,15 +283,19 @@ describe('PostsPage', () => {
     expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
     expect(screen.queryByText('Theme distribution')).not.toBeInTheDocument();
     expect(screen.getByTestId('test-location')).toHaveTextContent('/posts');
-    expect(fetcher).toHaveBeenCalledWith('/posts/manifest.json', expect.objectContaining({
-      headers: { accept: 'application/json' },
-      cache: 'no-store',
-    }));
+    expect(fetcher).toHaveBeenCalledWith(
+      '/posts/manifest.json',
+      expect.objectContaining({
+        headers: { accept: 'application/json' },
+        cache: 'no-store',
+      }),
+    );
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it('opens a post URL from the summary list and returns to the posts index', async () => {
-    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce(makeJsonResponse(manifest))
       .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
 
@@ -316,10 +320,14 @@ describe('PostsPage', () => {
     expect(metaRow).toContainElement(tagViz);
     expect(tagAnalysis.compareDocumentPosition(detailDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(tagViz.compareDocumentPosition(detailDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole('img', { name: 'First post header graphic' }))
-      .toHaveAttribute('src', '/posts/first-post/attachments/first-hero.jpeg');
-    expect(screen.getByRole('img', { name: 'Two robots read papers at an outdoor table.' }))
-      .toHaveAttribute('src', '/posts/first-post/attachments/agent-village.png');
+    expect(screen.getByRole('img', { name: 'First post header graphic' })).toHaveAttribute(
+      'src',
+      '/posts/first-post/attachments/first-hero.jpeg',
+    );
+    expect(screen.getByRole('img', { name: 'Two robots read papers at an outdoor table.' })).toHaveAttribute(
+      'src',
+      '/posts/first-post/attachments/agent-village.png',
+    );
     const postImageButton = screen.getByRole('button', {
       name: 'Open image preview: Two robots read papers at an outdoor table.',
     });
@@ -341,7 +349,9 @@ describe('PostsPage', () => {
     expect(within(dataExploration).getByText('Theme distribution')).toBeInTheDocument();
     expect(within(dataExploration).getByText('Other response shapes')).toBeInTheDocument();
     expect(within(dataExploration).queryByText('Respondent notes')).not.toBeInTheDocument();
-    const nestedBinaryBeeswarm = within(dataExploration).getByText('Consensus and Difference').closest('details') as HTMLElement;
+    const nestedBinaryBeeswarm = within(dataExploration)
+      .getByText('Consensus and Difference')
+      .closest('details') as HTMLElement;
     expect(nestedBinaryBeeswarm).toBeInTheDocument();
     expect(nestedBinaryBeeswarm).not.toHaveAttribute('open');
     expect(screen.getByText('Theme distribution')).toBeInTheDocument();
@@ -379,9 +389,9 @@ describe('PostsPage', () => {
     expect(binaryBeeswarmSvg.querySelector('circle[fill="#ff6bcb"]')).toBeInTheDocument();
     expect(binaryBeeswarmSvg.querySelector('circle[fill="#4dffa4"]')).toBeInTheDocument();
     expect(binaryBeeswarmSvg.querySelector('circle[fill="#ffd166"]')).toBeInTheDocument();
-    const schedulingDot = Array.from(binaryBeeswarmSvg.querySelectorAll('[aria-label]')).find((element) => (
-      element.getAttribute('aria-label')?.includes('Agents should schedule while I sleep.')
-    )) as Element;
+    const schedulingDot = Array.from(binaryBeeswarmSvg.querySelectorAll('[aria-label]')).find((element) =>
+      element.getAttribute('aria-label')?.includes('Agents should schedule while I sleep.'),
+    ) as Element;
     expect(schedulingDot).toBeInTheDocument();
     await userEvent.hover(schedulingDot);
     const binaryTooltip = await screen.findByRole('tooltip');
@@ -400,8 +410,9 @@ describe('PostsPage', () => {
     expect(within(metricPanel).getByText('232')).toHaveStyle({ color: '#4dffa4' });
     expect(screen.queryByLabelText('agent_autofill predictions: 232')).not.toBeInTheDocument();
     const responseMixPanel = screen.getByText('Response mix').closest('article') as HTMLElement;
-    expect(within(responseMixPanel).getByRole('img', { name: 'Response mix: binary 2, freeform 1' }))
-      .toBeInTheDocument();
+    expect(
+      within(responseMixPanel).getByRole('img', { name: 'Response mix: binary 2, freeform 1' }),
+    ).toBeInTheDocument();
     expect(within(responseMixPanel).getByText('3 total')).toBeInTheDocument();
     expect(screen.queryByLabelText('binary: 2')).not.toBeInTheDocument();
     const splitPanel = screen.getByText('Split decision').closest('article') as HTMLElement;
@@ -412,13 +423,20 @@ describe('PostsPage', () => {
     expect(splitSegments[1]).toHaveStyle({ width: '25%', backgroundColor: '#ff6b6b' });
     expect(within(splitPanel).queryByLabelText('agree: 3')).not.toBeInTheDocument();
     expect(screen.queryByText('Open-source AI safety')).not.toBeInTheDocument();
-    const questionTitle = screen.getByText('Open-source AI models are more likely to make the world safer than more dangerous.');
+    const questionTitle = screen.getByText(
+      'Open-source AI models are more likely to make the world safer than more dangerous.',
+    );
     expect(questionTitle.tagName).toBe('H4');
     const unsureSplitPanel = questionTitle.closest('article') as HTMLElement;
     expect(within(unsureSplitPanel).queryByText('Open-source AI safety')).not.toBeInTheDocument();
-    expect(within(unsureSplitPanel).queryByText('Open-source AI models are more likely to make the world safer than more dangerous.', {
-      selector: 'p',
-    })).not.toBeInTheDocument();
+    expect(
+      within(unsureSplitPanel).queryByText(
+        'Open-source AI models are more likely to make the world safer than more dangerous.',
+        {
+          selector: 'p',
+        },
+      ),
+    ).not.toBeInTheDocument();
     const unsureSplitBar = within(unsureSplitPanel).getByRole('img', {
       name: 'Open-source AI models are more likely to make the world safer than more dangerous.: agree 3, unsure 1',
     });
@@ -431,10 +449,13 @@ describe('PostsPage', () => {
     expect(screen.getByText('A privacy-line crossing.')).toBeInTheDocument();
     expect(screen.getByText('Respondent notes')).toBeInTheDocument();
     expect(screen.getByText('Show the structure without hiding the source.')).toBeInTheDocument();
-    expect(fetcher).toHaveBeenCalledWith('/posts/first-post/index.md', expect.objectContaining({
-      headers: { accept: 'text/markdown,text/plain' },
-      cache: 'no-store',
-    }));
+    expect(fetcher).toHaveBeenCalledWith(
+      '/posts/first-post/index.md',
+      expect.objectContaining({
+        headers: { accept: 'text/markdown,text/plain' },
+        cache: 'no-store',
+      }),
+    );
 
     await userEvent.click(screen.getByRole('link', { name: /Posts/i }));
 
@@ -446,7 +467,8 @@ describe('PostsPage', () => {
   });
 
   it('pins the binary beeswarm tooltip on click until dismissed', async () => {
-    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce(makeJsonResponse(manifest))
       .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
 
@@ -457,9 +479,9 @@ describe('PostsPage', () => {
     expect(within(binaryBeeswarmSvg as HTMLElement).getByText('Avg. confidence')).toBeInTheDocument();
     expect(within(binaryBeeswarmSvg as HTMLElement).getByText('60')).toBeInTheDocument();
     expect(within(binaryBeeswarmSvg as HTMLElement).getByText('100')).toBeInTheDocument();
-    const schedulingDot = Array.from(binaryBeeswarmSvg.querySelectorAll('[aria-label]')).find((element) => (
-      element.getAttribute('aria-label')?.includes('Agents should schedule while I sleep.')
-    )) as Element;
+    const schedulingDot = Array.from(binaryBeeswarmSvg.querySelectorAll('[aria-label]')).find((element) =>
+      element.getAttribute('aria-label')?.includes('Agents should schedule while I sleep.'),
+    ) as Element;
     expect(schedulingDot).toBeInTheDocument();
 
     await userEvent.click(schedulingDot);
@@ -479,7 +501,8 @@ describe('PostsPage', () => {
   });
 
   it('pins rating beeswarm dot details on click', async () => {
-    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce(makeJsonResponse(manifest))
       .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
 
@@ -500,7 +523,8 @@ describe('PostsPage', () => {
   });
 
   it('switches the binary beeswarm to a sortable list view', async () => {
-    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce(makeJsonResponse(manifest))
       .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
 
@@ -522,9 +546,7 @@ describe('PostsPage', () => {
 
     await userEvent.click(screen.getByTestId('ce-posts-binary-sort-confidence'));
     const confidenceRows = within(list).getAllByRole('listitem');
-    expect(confidenceRows[0]).toHaveTextContent(
-      'Agents should treat messages from other agents as untrusted input.'
-    );
+    expect(confidenceRows[0]).toHaveTextContent('Agents should treat messages from other agents as untrusted input.');
 
     await userEvent.click(screen.getByTestId('ce-posts-binary-sort-alpha'));
     const alphaRows = within(list).getAllByRole('listitem');
@@ -536,7 +558,8 @@ describe('PostsPage', () => {
   });
 
   it('loads a post directly from a detail URL without showing the summary list', async () => {
-    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce(makeJsonResponse(manifest))
       .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
 
@@ -586,14 +609,16 @@ describe('PostsPage', () => {
   });
 
   it('shows a quiet unavailable state when the manifest fetch fails', async () => {
-    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce({ ok: false, status: 404, json: async () => ({}) } as Response);
 
     renderPostsPage(fetcher);
 
     const status = await screen.findByText('Posts unavailable');
     expect(status).toBeInTheDocument();
-    expect(within(status.closest('section') as HTMLElement).getByText(/rest of Context Engine is unaffected/i))
-      .toBeInTheDocument();
+    expect(
+      within(status.closest('section') as HTMLElement).getByText(/rest of Context Engine is unaffected/i),
+    ).toBeInTheDocument();
   });
 });
