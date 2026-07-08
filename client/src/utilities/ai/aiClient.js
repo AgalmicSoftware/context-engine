@@ -41,6 +41,14 @@ import {
   parseJsonFlexible,
   stripEnclosingMarkdownFences as _stripEnclosingMarkdownFences,
 } from './aiClientParsing.js';
+import {
+  getSupportedPhotoMimeType,
+  isChatReasoningModel,
+  readFileAsDataUrl,
+  resolvePhotoAnalysisSupport,
+  stripDataUrlPrefix,
+  usesOpenAiResponsesApi,
+} from './aiClientPhotoSupport.js';
 
 import {
   pcaLiteCompass,
@@ -58,83 +66,6 @@ export { isE2eAiMockEnabled } from './aiClientE2eMocks.js';
 /* ======================================================================
  * Dev/E2E-only AI mock mode
  * ====================================================================== */
-
-const SUPPORTED_PHOTO_MIME_TYPES = Object.freeze({
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  webp: 'image/webp',
-  gif: 'image/gif',
-});
-
-const getSupportedPhotoMimeType = (file) => {
-  const declaredType = String(file?.type || '')
-    .trim()
-    .toLowerCase();
-  if (Object.values(SUPPORTED_PHOTO_MIME_TYPES).includes(declaredType)) return declaredType;
-  const name = String(file?.name || '')
-    .trim()
-    .toLowerCase();
-  const extension = name.includes('.') ? name.split('.').pop() : '';
-  return SUPPORTED_PHOTO_MIME_TYPES[extension] || '';
-};
-
-const readFileAsDataUrl = (file) =>
-  new Promise((resolve, reject) => {
-    if (!file) {
-      reject(new Error('Missing photo file.'));
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error(`Failed to read photo file: ${String(file?.name || 'upload')}`));
-    reader.readAsDataURL(file);
-  });
-
-const stripDataUrlPrefix = (dataUrl = '') => {
-  const raw = String(dataUrl || '');
-  const commaIndex = raw.indexOf(',');
-  return commaIndex >= 0 ? raw.slice(commaIndex + 1) : raw;
-};
-
-const resolvePhotoAnalysisSupport = ({ provider, model } = {}) => {
-  const normalizedProvider = String(provider || '')
-    .trim()
-    .toLowerCase();
-  const modelLeaf = String(model || '')
-    .trim()
-    .toLowerCase()
-    .split('/')
-    .pop();
-
-  if (normalizedProvider === 'openai') {
-    if (/^(gpt-5|gpt-4o|gpt-4\.1)/.test(modelLeaf)) {
-      return {
-        supported: true,
-        format: usesOpenAiResponsesApi(normalizedProvider, modelLeaf) ? 'openai-responses' : 'openai-chat',
-      };
-    }
-  }
-
-  if (normalizedProvider === 'anthropic') {
-    if (/^claude-(3|4)/.test(modelLeaf)) {
-      return { supported: true, format: 'anthropic' };
-    }
-  }
-
-  if (normalizedProvider === 'openrouter') {
-    if (/^(gpt-5|gpt-4o|gpt-4\.1)/.test(modelLeaf) || /claude-(3|4)/.test(modelLeaf)) {
-      return { supported: true, format: 'openai-chat' };
-    }
-  }
-
-  return {
-    supported: false,
-    format: null,
-    error:
-      `Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model. Current selection: ${normalizedProvider || 'unknown'} ${modelLeaf || ''}`.trim(),
-  };
-};
 
 export const analyzePhotoForQuestionGeneration = async (file, opts = {}) => {
   if (!file) throw new Error('Missing photo file.');
@@ -275,27 +206,6 @@ const resolveSessionAliasesOpt = (opts = {}) =>
 const resolveSessionSlugOpt = (opts = {}) => resolveSessionAliasesOpt(opts).sessionSlug;
 
 const resolveSessionConfigOpt = (opts = {}) => resolveSessionAliasesOpt(opts).sessionConfig;
-
-const isChatReasoningModel = (modelRaw = '') => {
-  const modelLeaf = String(modelRaw || '')
-    .trim()
-    .toLowerCase()
-    .split('/')
-    .pop();
-  return /^o[13]/.test(modelLeaf);
-};
-
-const usesOpenAiResponsesApi = (providerRaw = '', modelRaw = '') => {
-  const provider = String(providerRaw || '')
-    .trim()
-    .toLowerCase();
-  const modelLeaf = String(modelRaw || '')
-    .trim()
-    .toLowerCase()
-    .split('/')
-    .pop();
-  return provider === 'openai' && /^gpt-5/.test(modelLeaf);
-};
 
 const inferAiTaskType = (prompt = '', opts = {}) => {
   const explicit = String(opts?.taskType || '')
