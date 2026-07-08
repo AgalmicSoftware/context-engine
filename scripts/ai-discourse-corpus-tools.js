@@ -105,6 +105,19 @@ function getEntryIdentifier(entry) {
   return entry.id || entry.url || null;
 }
 
+function getEntryLookupKeys(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return [];
+  }
+  const keys = new Set();
+  [entry.id, entry.url].forEach((value) => {
+    if (typeof value === 'string' && value) {
+      keys.add(value);
+    }
+  });
+  return [...keys];
+}
+
 function createCorpusAliasMap() {
   const aliasMap = new Map();
   Object.values(CORPUS_FILES).forEach((config) => {
@@ -149,8 +162,11 @@ function buildRecordIndex(corpusFiles = loadCorpusFiles()) {
       if (!id) {
         return;
       }
-      const scopedKey = `${file.corpusKey}:${id}`;
-      byCorpusAndId.set(scopedKey, { file, entry });
+      // Index every lookup key (id and url) so debate references can resolve
+      // records by either form; duplicate detection stays on the primary id.
+      getEntryLookupKeys(entry).forEach((lookupKey) => {
+        byCorpusAndId.set(`${file.corpusKey}:${lookupKey}`, { file, entry });
+      });
       if (seenGlobalIds.has(id)) {
         duplicateIds.push({
           id,
@@ -346,7 +362,7 @@ function compactRecord(record) {
 function extractRecord(id, rootDir = ROOT_DIR) {
   const corpusFiles = loadCorpusFiles(rootDir);
   for (const file of corpusFiles) {
-    const entry = file.entries.find((candidate) => getEntryIdentifier(candidate) === id);
+    const entry = file.entries.find((candidate) => getEntryLookupKeys(candidate).includes(id));
     if (entry) {
       return {
         corpus: file.corpusKey,
