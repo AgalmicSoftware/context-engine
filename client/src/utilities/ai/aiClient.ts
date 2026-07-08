@@ -55,6 +55,7 @@ import {
   buildArweaveKeyRequest,
   buildTranscriptionConfigRequest,
   inferAiTaskType,
+  normalizeAiClientOptions,
   pickAiRequestOpts,
   readAiErrorMessage,
   readAiOptionTaskType,
@@ -93,10 +94,34 @@ import {
   computeOverlapMatrix,
   sanitizeCompass as sanitizeCompassPure,
   fallbackBullets,
+  type CompareUser,
 } from '../survey/compareUsers.js';
 import { createLogger } from '../logging.js';
+import type { UnknownRecord } from '../session/sessionTypes.js';
 
 const aiLog = createLogger('ai');
+type PhotoUploadFile = {
+  name?: string;
+  type?: string;
+};
+type AudioUploadBlob = Blob & {
+  name?: string;
+  size?: number;
+  type?: string;
+};
+type AiClientOptions = Record<string, unknown>;
+type CompareBundleOptions = AiClientOptions & {
+  needCompass?: unknown;
+  needMatrix?: unknown;
+  needVenn?: unknown;
+};
+
+const asRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
+
+const readCompareUsers = (value: unknown, maxUsers = Infinity): CompareUser[] =>
+  (Array.isArray(value) ? value.slice(0, maxUsers) : []) as CompareUser[];
+
 export { TRANSCRIBE_MAX_UPLOAD_BYTES, extractSpeechAudio } from './aiClientAudioTranscription.js';
 export { isE2eAiMockEnabled } from './aiClientE2eMocks.js';
 export { fetchContentFromURL, processAdditionalSources } from './aiClientSourceFetch.js';
@@ -105,7 +130,7 @@ export { fetchContentFromURL, processAdditionalSources } from './aiClientSourceF
  * Dev/E2E-only AI mock mode
  * ====================================================================== */
 
-export const analyzePhotoForQuestionGeneration = async (file, opts = {}) => {
+export const analyzePhotoForQuestionGeneration = async (file: PhotoUploadFile, opts: unknown = {}) => {
   if (!file) throw new Error('Missing photo file.');
 
   const mimeType = getSupportedPhotoMimeType(file);
@@ -119,7 +144,7 @@ export const analyzePhotoForQuestionGeneration = async (file, opts = {}) => {
     throw new Error(support.error || 'Configured AI provider/model does not support photo analysis.');
   }
 
-  const dataUrl = await readFileAsDataUrl(file);
+  const dataUrl = await readFileAsDataUrl(file as Blob & { name?: unknown; type?: unknown });
   const prompt = buildPhotoAnalysisPrompt(file?.name || '');
   const messages = (() => {
     if (support.format === 'openai-responses') {
@@ -185,11 +210,11 @@ export const analyzePhotoForQuestionGeneration = async (file, opts = {}) => {
 
 // === Client-side silence trimming feature flag and config (runtime-controlled from UI) ===
 let __vadTrimEnabled = true;
-let __vadTrimConfig = {};
-export function setVadTrimEnabled(v) {
+let __vadTrimConfig: UnknownRecord = {};
+export function setVadTrimEnabled(v: unknown) {
   __vadTrimEnabled = !!v;
 }
-export function setVadTrimConfig(cfg) {
+export function setVadTrimConfig(cfg: unknown) {
   if (cfg && typeof cfg === 'object') {
     __vadTrimConfig = { ...__vadTrimConfig, ...cfg };
   }
@@ -205,12 +230,13 @@ export function setVadTrimConfig(cfg) {
  *   POST { action:'ai', provider, model, temperature?, max_tokens?, messages:[{role, content}] }
  * And respond with: { completion: "<text>" }
  */
-export const callAI = async (prompt, opts = {}) => {
+export const callAI = async (prompt: unknown, opts: unknown = {}): Promise<string> => {
   try {
     const thinkingRequested = readAiOptionThinking(opts);
+    const aiRequestOpts = normalizeAiClientOptions(opts);
     const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
     const ai = await getEffectiveAiConfig(buildAiConfigRequest(opts, { thinking: thinkingRequested }));
-    const taskType = inferAiTaskType(prompt, opts);
+    const taskType = inferAiTaskType(prompt, aiRequestOpts);
 
     const thinking = thinkingRequested && ai.provider === 'anthropic';
 
@@ -219,7 +245,7 @@ export const callAI = async (prompt, opts = {}) => {
         ai,
         prompt,
         opts: {
-          ...opts,
+          ...aiRequestOpts,
           thinking,
         },
         taskType,
@@ -289,7 +315,7 @@ export const callAI = async (prompt, opts = {}) => {
  *
  * Attempts: up to 3 (initial + 2 retries).
  */
-export const callAIQueued = (prompt, opts = {}) => {
+export const callAIQueued = (prompt: unknown, opts: unknown = {}): Promise<string> => {
   return enqueueAiCallWithRetry(() => callAI(prompt, opts));
 };
 
@@ -297,7 +323,7 @@ export const callAIQueued = (prompt, opts = {}) => {
  * Lightweight utilities for other product areas (unchanged behavior)
  * ====================================================================== */
 
-export const analyzeSurveyResponses = async (responses, opts = {}) => {
+export const analyzeSurveyResponses = async (responses: unknown, opts: unknown = {}): Promise<string> => {
   const prompt = `Analyze the following survey responses and provide a summary of the key findings: ${JSON.stringify(
     responses,
   )}`;
@@ -316,14 +342,22 @@ export const analyzeSurveyResponses = async (responses, opts = {}) => {
  * calls the AI to produce a JSON object with a "selectedQuestionIDs" array in
  * descending order of relevance.
  */
-export async function rankQuestionsAI(userQuery, questionList, topX = 10, opts = {}) {
+export async function rankQuestionsAI(
+  userQuery: unknown,
+  questionList: unknown,
+  topX = 10,
+  opts: unknown = {},
+): Promise<string[]> {
   const throwOnError = readAiOptionThrowOnError(opts);
   try {
     const candidates = (Array.isArray(questionList) ? questionList : [])
-      .map((q) => ({
-        id: String(q?.id || '').trim(),
-        prompt: String(q?.prompt || ''),
-      }))
+      .map((q: unknown) => {
+        const question = asRecord(q);
+        return {
+          id: String(question.id || '').trim(),
+          prompt: String(question.prompt || ''),
+        };
+      })
       .filter((q) => q.id.trim());
     const questionListJson = JSON.stringify(candidates, null, 2);
 
@@ -337,7 +371,7 @@ export async function rankQuestionsAI(userQuery, questionList, topX = 10, opts =
       taskType: readAiOptionTaskType(opts, 'rank'),
     });
 
-    let parsed;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(rawOutput.trim());
     } catch (_err) {
@@ -351,7 +385,8 @@ export async function rankQuestionsAI(userQuery, questionList, topX = 10, opts =
       }
     }
 
-    if (!parsed || !Array.isArray(parsed.selectedQuestionIDs)) {
+    const selectedQuestionIDs = asRecord(parsed).selectedQuestionIDs;
+    if (!parsed || !Array.isArray(selectedQuestionIDs)) {
       if (throwOnError) {
         throw new Error('AI ranking response missing selectedQuestionIDs array');
       }
@@ -360,10 +395,10 @@ export async function rankQuestionsAI(userQuery, questionList, topX = 10, opts =
 
     const allowedIds = new Set(candidates.map((q) => q.id));
     const seenIds = new Set();
-    const ids = parsed.selectedQuestionIDs
-      .filter((id) => typeof id === 'string' && id.trim() !== '')
-      .map((id) => id.trim())
-      .filter((id) => {
+    const ids = selectedQuestionIDs
+      .filter((id: unknown) => typeof id === 'string' && id.trim() !== '')
+      .map((id: string) => id.trim())
+      .filter((id: string) => {
         if (!allowedIds.has(id) || seenIds.has(id)) return false;
         seenIds.add(id);
         return true;
@@ -381,9 +416,9 @@ export async function rankQuestionsAI(userQuery, questionList, topX = 10, opts =
  * Minimal rewriting of user text to remove filler words and add punctuation.
  * Uses the imported aiRewritePrompt and callAI to do minimal edits.
  */
-export async function requestAiRewrite(originalText, opts = {}) {
+export async function requestAiRewrite(originalText: unknown, opts: unknown = {}): Promise<unknown> {
   try {
-    const finalPrompt = aiRewritePrompt.replace('<USER_TEXT>', originalText);
+    const finalPrompt = aiRewritePrompt.replace('<USER_TEXT>', String(originalText));
     const cleaned = await callAI(finalPrompt, {
       ...(opts && typeof opts === 'object' ? opts : {}),
       taskType: readAiOptionTaskType(opts, 'rewrite'),
@@ -405,14 +440,14 @@ export async function requestAiRewrite(originalText, opts = {}) {
  *
  * Return contract unchanged: resolves to string (may be empty) or throws on error.
  */
-export async function transcribeAudio(audioBlobOrFile, opts = {}) {
+export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: unknown = {}): Promise<string> {
   if (!audioBlobOrFile) throw new Error('No audio provided');
   const { maxUploadBytes, signal } = resolveTranscriptionUploadOptions(opts, {
     defaultMaxUploadBytes: TRANSCRIBE_MAX_UPLOAD_BYTES,
   });
 
   // Helper: coerce to a File when available to preserve filename
-  const toFileLike = (blob, nameFallback) => {
+  const toFileLike = (blob: Blob & { name?: string }, nameFallback?: string): File | (Blob & { name?: string }) => {
     try {
       return new File([blob], nameFallback || 'audio.wav', { type: blob.type || 'audio/wav' });
     } catch (error) {
@@ -435,7 +470,7 @@ export async function transcribeAudio(audioBlobOrFile, opts = {}) {
   const isTooBig = typeof audioBlobOrFile.size === 'number' && audioBlobOrFile.size > maxUploadBytes;
   const needsNormalization = !looksSupported;
 
-  let uploadFile = audioBlobOrFile;
+  let uploadFile: AudioUploadBlob = audioBlobOrFile;
 
   if (needsNormalization) {
     try {
@@ -497,7 +532,7 @@ export async function transcribeAudio(audioBlobOrFile, opts = {}) {
   );
 }
 
-const resolveTranscriptionTransport = async (opts = {}) => {
+const resolveTranscriptionTransport = async (opts: unknown = {}) => {
   const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
   const transcriptionCfg = await getEffectiveTranscriptionConfig(buildTranscriptionConfigRequest(opts));
 
@@ -537,7 +572,11 @@ const resolveTranscriptionTransport = async (opts = {}) => {
  * Returns: { name: string, short: string, long: string }
  * Backward compatible with older prompts that only returned { short, long }.
  */
-export async function analyzeClusterOpinions(clusterData, allClustersData = null, opts = {}) {
+export async function analyzeClusterOpinions(
+  clusterData: unknown,
+  allClustersData: unknown = null,
+  opts: unknown = {},
+) {
   try {
     if (isE2eAiMockEnabled()) {
       return buildE2eMockClusterAnalysis(clusterData);
@@ -605,7 +644,7 @@ export async function analyzeClusterOpinions(clusterData, allClustersData = null
  * @param {object} userData - { address, username?, sbts: [{name,address}], questions: [{id,type,prompt,answer}], surveys: [{surveyId,title,answeredCount,sample?}] }
  * @returns {Promise<{name:string, summary:string, details:string, historicalAlignment?:{figure:string, reasoning:string}}>}
  */
-export async function analyzeUserOpinions(userData, opts = {}) {
+export async function analyzeUserOpinions(userData: unknown, opts: unknown = {}) {
   try {
     const { default: buildUserAnalysisPrompt } = await import('../../prompts/userAnalysisPrompt.js');
     const prompt = buildUserAnalysisPrompt(userData);
@@ -651,8 +690,13 @@ export async function analyzeUserOpinions(userData, opts = {}) {
 /**
  * Plain-text drilldown explainer as a minimal fallback (≤ ~6 sentences).
  */
-export async function drillDownComparisonPoint(users, pointText, type, opts = {}) {
-  const safeUsers = Array.isArray(users) ? users : [];
+export async function drillDownComparisonPoint(
+  users: unknown,
+  pointText: unknown,
+  type: unknown,
+  opts: unknown = {},
+): Promise<string> {
+  const safeUsers = readCompareUsers(users, Number.POSITIVE_INFINITY);
   const safePoint = typeof pointText === 'string' ? pointText : '';
   const t = typeof type === 'string' && type.toLowerCase().includes('dis') ? 'disagreement' : 'agreement';
   const aiCallOpts = pickAiRequestOpts(opts);
@@ -703,8 +747,8 @@ ${JSON.stringify(safeUsers, null, 2)}`;
  * Hierarchical drill-down explanation (tree). AI-only; if invalid, falls back to a tiny tree
  * wrapping the plain-text explainer above.
  */
-export async function drillDownComparisonTree(users, pointText, type, opts = {}) {
-  const safeUsers = Array.isArray(users) ? users.slice(0, 10) : [];
+export async function drillDownComparisonTree(users: unknown, pointText: unknown, type: unknown, opts: unknown = {}) {
+  const safeUsers = readCompareUsers(users, 10);
   const t = typeof type === 'string' && type.toLowerCase().includes('dis') ? 'disagreement' : 'agreement';
   const aiCallOpts = pickAiRequestOpts(opts);
 
@@ -741,9 +785,9 @@ export async function drillDownComparisonTree(users, pointText, type, opts = {})
  *
  * @param {"compare"|"drilldown"|"axes"|"venn"} task
  * @param {{users:Array, pointText?:string, type?:"agreement"|"disagreement"}} payload
- * @returns {Promise<any>} Parsed JSON per task, or a plain string for drilldown fallback.
+ * @returns {Promise<unknown>} Parsed JSON per task, or a plain string for drilldown fallback.
  */
-export async function runCompareToolkit(task, payload = {}, opts = {}) {
+export async function runCompareToolkit(task: unknown, payload: unknown = {}, opts: unknown = {}) {
   const t = readCompareToolkitTask(task);
   const comparePayload = resolveCompareToolkitPayload(payload);
   const safeUsers = comparePayload.users;
@@ -807,14 +851,14 @@ export async function runCompareToolkit(task, payload = {}, opts = {}) {
  * - Always sanitizes compass; guarantees non-empty Venn evidence where counts>0.
  */
 export async function getComparisonBundle(
-  users,
-  opts = {
+  users: unknown,
+  opts: CompareBundleOptions = {
     needCompass: true,
     needVenn: false,
     needMatrix: false,
   },
 ) {
-  const safeUsers = Array.isArray(users) ? users.slice(0, 10) : [];
+  const safeUsers = readCompareUsers(users, 10);
   const needCompass = !!opts.needCompass;
   const needVenn = !!opts.needVenn && safeUsers.length === 3;
   const needMatrix = !!opts.needMatrix;
@@ -831,7 +875,10 @@ export async function getComparisonBundle(
   const fMatrix = needMatrix ? computeOverlapMatrix(safeUsers, 20) : null;
 
   const settled = await Promise.allSettled([pBullets, pAxes, pVenn, fAxes, fVenn, fMatrix]);
-  const val = (i) => (settled[i] && settled[i].status === 'fulfilled' ? settled[i].value : null);
+  const val = (i: number) => {
+    const result = settled[i];
+    return result && result.status === 'fulfilled' ? result.value : null;
+  };
 
   // Bullets (prefer LLM)
   const bullets = normalizeCompareBullets(val(0), fallbackBullets(safeUsers));
@@ -881,8 +928,8 @@ export async function getComparisonBundle(
  * @param {{style?: string, sessionTitle?: string}} opts
  * @returns {Promise<string>} Markdown
  */
-export async function generateAudioDiscussionSummary(transcript, opts = {}) {
-  const t = (transcript || '').trim();
+export async function generateAudioDiscussionSummary(transcript: unknown, opts: unknown = {}): Promise<string> {
+  const t = String(transcript || '').trim();
   if (!t || t.length < 20) {
     throw new Error('Transcript is empty or too short (need ≥ 20 characters).');
   }
@@ -917,8 +964,8 @@ export async function generateAudioDiscussionSummary(transcript, opts = {}) {
  * Note: Tries "md" format first as requested. If the helper does not support
  *       "md", falls back to "json" to avoid breaking the flow.
  */
-export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
-  const md = (markdown || '').trim();
+export async function uploadMarkdownSummaryToArweave(markdown: unknown, opts: unknown = {}) {
+  const md = String(markdown || '').trim();
   if (!md) throw new Error('Cannot upload empty Markdown summary.');
 
   try {
