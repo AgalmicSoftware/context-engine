@@ -106,6 +106,11 @@ $amber: #ffb347;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 
   &:visited {
     color: $text;
@@ -115,7 +120,18 @@ $amber: #ffb347;
   &:focus-visible {
     border-color: rgba(77, 255, 164, 0.36);
     background: rgba(77, 255, 164, 0.09);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.26);
     outline: none;
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .postNavItem,
+  .postNavItem:hover,
+  .postNavItem:focus-visible {
+    transform: none;
+    transition: none;
   }
 }
 
@@ -223,6 +239,11 @@ $amber: #ffb347;
   border-radius: 7px;
   background: transparent;
   cursor: zoom-in;
+  transition: filter 0.16s ease;
+
+  &:hover {
+    filter: brightness(1.07);
+  }
 
   &:focus-visible {
     outline: 2px solid rgba(77, 255, 164, 0.7);
@@ -327,24 +348,46 @@ $amber: #ffb347;
   font-family: var(--ce-post-font-body);
 
   a {
-    color: $link-blue;
-    text-decoration-color: rgba(156, 201, 255, 0.5);
-    text-decoration-thickness: 0.08em;
-    text-underline-offset: 0.16em;
+    padding: 0.06em 0.3em;
+    border-radius: 5px;
+    background: rgba(122, 167, 255, 0.16);
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    box-shadow: inset 0 0 0 1px rgba(122, 167, 255, 0.24);
+    color: $link-blue-hover;
+    text-decoration: underline;
+    text-decoration-color: rgba(156, 201, 255, 0.34);
+    text-decoration-thickness: 0.07em;
+    text-underline-offset: 0.18em;
     transition:
       color 0.14s ease,
+      background-color 0.14s ease,
+      box-shadow 0.14s ease,
       text-decoration-color 0.14s ease;
 
-    &:hover,
-    &:focus-visible {
+    &:visited {
       color: $link-blue-hover;
+    }
+
+    &:hover {
+      background: rgba(122, 167, 255, 0.3);
+      box-shadow: inset 0 0 0 1px rgba(156, 201, 255, 0.5);
+      color: #ffffff;
       text-decoration-color: currentColor;
     }
 
     &:focus-visible {
-      outline: 2px solid rgba(156, 201, 255, 0.58);
-      outline-offset: 3px;
-      border-radius: 4px;
+      outline: 2px solid rgba(156, 201, 255, 0.65);
+      outline-offset: 2px;
+      background: rgba(122, 167, 255, 0.3);
+      color: #ffffff;
+    }
+
+    &[target="_blank"]::after {
+      content: "\2197";
+      margin-left: 0.22em;
+      font-size: 0.72em;
+      opacity: 0.75;
     }
   }
 }
@@ -366,6 +409,8 @@ h1.postHeading {
 }
 
 h2.postHeading {
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(122, 167, 255, 0.18);
   font-size: 1.78rem;
 }
 
@@ -392,7 +437,8 @@ h3.postHeading {
   code {
     padding: 0.1rem 0.28rem;
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(122, 167, 255, 0.14);
+    color: rgba(219, 231, 255, 0.96);
   }
 }
 
@@ -400,6 +446,10 @@ h3.postHeading {
   display: grid;
   gap: 8px;
   padding-left: 1.25rem;
+
+  li::marker {
+    color: $accent;
+  }
 }
 
 .postBlockquote {
