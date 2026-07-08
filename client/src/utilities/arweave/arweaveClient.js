@@ -29,19 +29,25 @@ import {
   withTimeout,
 } from './arweaveFetchErrors.js';
 import {
+  buildArweaveGatewayRouteCandidates,
+  buildArweaveGatewayUrl,
+  extractArweaveTxId,
+  formatWinstonToAr,
+  getArweaveGatewayClientConfig,
+  normalizeArweaveUploadId,
+  normalizeTagsPayload,
+} from './arweaveGatewayPayloads.js';
+import {
   CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS,
   CE_ARWEAVE_PREFLIGHT_SBT_METADATA,
   CE_ARWEAVE_PREFLIGHT_SESSION_METADATA,
 } from '../../variables/appConfig.js';
 import {
-  DEFAULT_ARWEAVE_LINK_GATEWAY,
   getDefaultArweaveGateways,
   getPreferredArIoGateway,
-  getPreferredArweaveGateway,
   isDirectToArIoEnabled,
   normalizeGatewayBase,
   normalizeGatewayList,
-  parseArweaveTxId,
 } from './arweaveUrls.js';
 
 const log = createLogger('general');
@@ -52,49 +58,6 @@ const log = createLogger('general');
    - Exported together as `arweaveClient`
    ========================================================================== */
 
-const getArweaveGatewayClientConfig = (gatewayOverride = '') => {
-  const gatewayBase = getPreferredArweaveGateway(gatewayOverride);
-  try {
-    const parsed = new URL(gatewayBase);
-    const normalizedBase = String(parsed.pathname || '').replace(/\/+$/, '')
-      ? `${parsed.origin}${String(parsed.pathname || '').replace(/\/+$/, '')}`
-      : parsed.origin;
-    return {
-      gatewayBase: normalizedBase,
-      init: {
-        host: parsed.hostname,
-        port: Number(parsed.port || (parsed.protocol === 'https:' ? 443 : 80)),
-        protocol: parsed.protocol === 'http:' ? 'http' : 'https',
-      },
-    };
-  } catch {
-    return {
-      gatewayBase: DEFAULT_ARWEAVE_LINK_GATEWAY,
-      init: {
-        host: 'arweave.net',
-        port: 443,
-        protocol: 'https',
-      },
-    };
-  }
-};
-const formatWinstonToAr = (winston, decimals = 6) => {
-  const normalized = String(winston ?? '').trim();
-  if (!/^\d+$/.test(normalized)) {
-    throw new Error('Invalid Arweave balance.');
-  }
-  const safeDecimals = Number.isFinite(Number(decimals)) ? Math.max(0, Math.min(12, Number(decimals))) : 6;
-  const whole = normalized.length > 12 ? normalized.slice(0, -12) : '0';
-  const fractionFull = normalized.padStart(13, '0').slice(-12);
-  if (safeDecimals === 0) return whole;
-  return `${whole}.${fractionFull.slice(0, safeDecimals).padEnd(safeDecimals, '0')}`;
-};
-
-const normalizeArweaveUploadId = (value) => {
-  const normalized = extractArweaveTxId(value);
-  if (normalized) return normalized;
-  return String(value || '').trim();
-};
 const WORKER_ENDPOINT_SUFFIXES = [
   '/auth/nonce',
   '/auth/login',
@@ -412,88 +375,6 @@ const buildUploadSessionCandidates = async ({
   return [first, ...rest];
 };
 
-const buildArweaveGatewayUrl = (txId, gateway) => {
-  const normalizedTxId = normalizeArweaveUploadId(txId);
-  if (!normalizedTxId) return '';
-  const base = getPreferredArweaveGateway(gateway);
-  return `${base}/${normalizedTxId}`;
-};
-
-const buildArweaveGatewayTxDataUrl = (txId, gateway) => {
-  const normalizedTxId = normalizeArweaveUploadId(txId);
-  if (!normalizedTxId) return '';
-  const base = getPreferredArweaveGateway(gateway);
-  return `${base}/tx/${normalizedTxId}/data`;
-};
-
-const buildArweaveGatewayRawUrl = (txId, gateway) => {
-  const normalizedTxId = normalizeArweaveUploadId(txId);
-  if (!normalizedTxId) return '';
-  const base = getPreferredArweaveGateway(gateway);
-  return `${base}/raw/${normalizedTxId}`;
-};
-
-const AR_IO_GATEWAY_HOST_SET = new Set(['ar-io.dev', 'ar-io.net', 'ar.io']);
-const AR_IO_GATEWAY_HOST_SUFFIXES = ['.ar-io.dev', '.ar-io.net', '.ar.io'];
-const isArIoGatewayHost = (host = '') => {
-  const lowered = String(host || '')
-    .trim()
-    .toLowerCase();
-  if (!lowered) return false;
-  if (AR_IO_GATEWAY_HOST_SET.has(lowered)) return true;
-  return AR_IO_GATEWAY_HOST_SUFFIXES.some((suffix) => lowered.endsWith(suffix));
-};
-const isArIoGatewayBase = (gateway = '') => {
-  const normalized = normalizeGatewayBase(gateway);
-  if (!normalized) return false;
-  try {
-    const parsed = new URL(normalized);
-    return isArIoGatewayHost(parsed.hostname);
-  } catch {
-    return false;
-  }
-};
-
-const buildArweaveGatewayRouteCandidates = (txId, gateway, opts = {}) => {
-  const gatewayBase = getPreferredArweaveGateway(gateway);
-  const isArIoGateway = isArIoGatewayBase(gatewayBase);
-  const includeRawRoute = opts?.includeRawRoute !== false && !isArIoGateway;
-  const includeTxDataRoute = opts?.includeTxDataRoute !== false && !isArIoGateway;
-  const routeCandidates = [
-    { route: 'direct', url: buildArweaveGatewayUrl(txId, gatewayBase) },
-    ...(includeRawRoute ? [{ route: 'raw', url: buildArweaveGatewayRawUrl(txId, gatewayBase) }] : []),
-    ...(includeTxDataRoute ? [{ route: 'tx-data', url: buildArweaveGatewayTxDataUrl(txId, gateway) }] : []),
-  ].filter((entry) => !!entry.url);
-  const seen = new Set();
-  return routeCandidates.filter((entry) => {
-    if (seen.has(entry.url)) return false;
-    seen.add(entry.url);
-    return true;
-  });
-};
-
-const normalizeTagsPayload = (raw) => {
-  if (!raw) return null;
-  if (Array.isArray(raw)) {
-    const tags = raw
-      .filter((t) => t && typeof t === 'object')
-      .map((t) => ({
-        name: typeof t.name === 'string' ? t.name : String(t.name || ''),
-        value: typeof t.value === 'string' ? t.value : String(t.value || ''),
-      }))
-      .map((t) => ({ name: String(t.name || '').trim(), value: String(t.value || '').trim() }))
-      .filter((t) => t.name && t.value !== '');
-    return tags.length ? tags : null;
-  }
-  if (raw && typeof raw === 'object') {
-    const tags = Object.entries(raw)
-      .map(([name, value]) => ({ name: String(name || '').trim(), value: String(value ?? '').trim() }))
-      .filter((t) => t.name && t.value !== '');
-    return tags.length ? tags : null;
-  }
-  return null;
-};
-
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const readResponseBodyPreview = async (response) => {
@@ -592,13 +473,6 @@ const setArweaveTextCacheEntry = (txId, text) => {
     if (!oldest) break;
     arweaveTextCache.delete(oldest);
   }
-};
-
-const extractArweaveTxId = (value) => {
-  return parseArweaveTxId(value, {
-    allowQueryParams: true,
-    allowUnknownGatewayHost: true,
-  });
 };
 
 const dedupeTxEvent = (key) => {
