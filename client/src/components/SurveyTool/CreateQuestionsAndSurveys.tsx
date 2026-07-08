@@ -1,21 +1,51 @@
-import { Component } from 'react';
+/** @file CreateQuestionsAndSurveys.tsx */
+
+import React, { Component } from 'react';
 import sha256 from 'crypto-js/sha256';
+import { Button, Label, Input, FormGroup } from 'reactstrap';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faSpinner,
+  faClipboard,
+  faPlus,
+  faTimes,
+  faBookmark,
+  faCheck,
+  faPenNib,
+  faGlobe,
+  faExternalLinkAlt,
+  faMagic,
+  faExclamationCircle,
+  faCaretDown,
+  faCaretUp,
+  faEraser,
+  faQuestionCircle,
+} from '@fortawesome/free-solid-svg-icons';
+import styles from './CreateQuestionsAndSurveys.module.scss';
 import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient';
+import CETooltip from '../Shared/CETooltip';
+import CEConfirmDialog from '../Shared/CEConfirmDialog';
+import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import contractScripts, { getSessionConfigBySlug, normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import {
   buildSbtAccessControlConditions,
   createLitHooks,
   resolveLitChain,
   getGlobalLitHooks,
+  litStorage,
 } from '../../utilities/crypto/litProtocol.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import { sessionRegistryStore, sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { ethers } from 'ethers';
+import AudioSurveyGenerator from './SurveyGenerator/SurveyGenerator';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from '../../utilities/ai/aiSettings.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
+import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
+import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import { createLogger } from 'utilities/logging.js';
+import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
 import {
   attachStorageRefCompatibilityFields,
@@ -24,6 +54,7 @@ import {
 } from '../../utilities/storage/storageRefs.js';
 import { usesCloudflareSessionStorage } from '../../utilities/storage/sessionStorageConfig.js';
 import { mergeSessionContractMaps, resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   peekCacheSync,
   subscribeCacheUpdates,
@@ -106,9 +137,32 @@ import {
 } from './createQuestionsAndSurveysCacheHelpers';
 import { buildCreateSurveyHashValue } from './createQuestionsAndSurveysSignatureHelpers';
 import {
-  renderCreateQuestionsAndSurveysSurface,
-  type RenderCreateQuestionsAndSurveysSurfaceController,
-} from './createQuestionsAndSurveysRenderSurface';
+  CREATE_SURVEY_ACTION_ICON_STYLE,
+  CREATE_SURVEY_AUTO_TOOL_PANEL_STYLE,
+  CREATE_SURVEY_CLEAR_FORM_BUTTON_STYLE,
+  CREATE_SURVEY_FREEFORM_PREVIEW_STYLE,
+  CREATE_SURVEY_HEADER_ICON_STYLE,
+  CREATE_SURVEY_RATING_PREVIEW_TRACK_STYLE,
+  CREATE_SURVEY_SMALL_ICON_BUTTON_STYLE,
+  CREATE_SURVEY_SUBMIT_ICON_STYLE,
+  CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE,
+  CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE,
+  CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE,
+  CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE,
+  CREATE_SURVEY_TYPE_PREVIEW_HEADING_STYLE,
+  CREATE_SURVEY_TYPE_PREVIEW_PILL_STYLE,
+  CREATE_SURVEY_UPLOADED_QUESTION_LINK_STYLE,
+  buildCreateSurveyActionLinkClassName,
+  buildCreateSurveyAiPromptCopyClassName,
+  buildCreateSurveyContainerClassName,
+  buildCreateSurveyProgressStepClassName,
+  buildCreateSurveySubmitButtonClassName,
+  buildCreateSurveyTypePillClassName,
+  resolveCreateSurveyBookmarkSurveyStyle,
+  resolveCreateSurveyProgressFillStyle,
+  resolveCreateSurveyQuestionBookmarkStyle,
+  resolveCreateSurveyToggleKnobStyle,
+} from './createQuestionsAndSurveysDisplayHelpers';
 export { sanitizeDocumentUrls } from './createQuestionsAndSurveysDocumentUrlHelpers';
 export {
   hasSubmittedResourcesInManagedCache,
@@ -256,6 +310,12 @@ type CreateSurveyInputValueEvent = {
     value: string;
   };
 };
+type CreateSurveyCheckboxChangeEvent = {
+  target: {
+    checked: boolean;
+    name: string;
+  };
+};
 type CreateSurveyDraftSaveOptions = {
   immediate?: unknown;
 };
@@ -331,6 +391,16 @@ interface CreateQuestionsAndSurveysUploadedQuestion {
   id?: string;
   [key: string]: unknown;
 }
+
+type CreateSurveyRenderedQuestion = CreateQuestionsAndSurveysQuestion & {
+  prompt: string;
+  type: string;
+  uiKey: string;
+};
+
+type CreateSurveyUploadedQuestionEntry = CreateQuestionsAndSurveysUploadedQuestion & {
+  questionId: string;
+};
 
 type CreateSurveyGateOption = {
   id: string;
@@ -627,6 +697,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       documentURLs: sanitizeDocumentUrls(props.documentURLs || []),
       autoPopulateAiTags: true,
 
+      // New UX state
       showSubmitSteps: false,
       submitStep: 0, // 0=none, 1=arweave, 2=contracts, 3=done
       copyJsonSuccess: false,
@@ -634,21 +705,26 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       bookmarkedSurveysSet: new Set(),
       cacheLoaded: false,
 
+      // Minimal manual doc URL field (single source buffer)
       docURLInput: sanitizeDocumentUrls(props.documentURLs || [])[0] || '',
       docURLError: '',
       formValidationError: '',
 
+      // Auto-focus target (replaces scrollTargetUiKey)
       focusTargetUiKey: null,
 
+      // Show AI Prompt panel
       showAIPrompt: false,
       aiPromptText: '',
       aiPromptLoaded: false,
       aiPromptCopySuccess: false,
       aiPromptModelLabel: 'Configured model',
 
+      // Wagmi network switch requirement
       needsNetworkSwitch: false,
       showClearFormConfirm: false,
 
+      // Lock-driven Lit encryption
       surveyLockGateIds: [],
       openLockKey: '',
     };
@@ -1035,6 +1111,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     if (this.state.focusTargetUiKey) {
       const el = this._promptRefs[this.state.focusTargetUiKey];
       if (el) {
+        // Simple focus
         el.focus();
         this.setState(buildCreateSurveyFocusTargetPatch());
       } else {
@@ -2038,6 +2115,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }
   };
 
+  // Handle clearing the form
   handleClearForm: () => void = () => {
     this.setState(buildCreateSurveyClearFormConfirmPatch(true));
   };
@@ -2047,7 +2125,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   confirmClearForm: () => void = () => {
+    // Reset state
     this.setState(buildCreateSurveyClearFormStatePatch(), () => {
+      // Clear localStorage
       this.clearUnfinishedSurveyDraft();
       this.updateSurveyHash();
     });
@@ -2941,51 +3021,977 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       });
   };
 
+  /** Highlight <Variables> using React nodes (no HTML injection) */
+  highlightPromptVariables = (str: unknown): React.ReactNode[] | null => {
+    if (!str) return null;
+    const text = String(str);
+    const re = /<([A-Za-z][A-Za-z0-9_]*)>/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = re.exec(text)) !== null) {
+      if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+      parts.push(
+        <span key={match.index} className={styles.aiVar}>
+          {'<'}
+          {match[1]}
+          {'>'}
+        </span>,
+      );
+      lastIndex = re.lastIndex;
+    }
+
+    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+    return parts;
+  };
+
+  renderTypePreview: (type: unknown) => React.ReactNode = (type) => {
+    if (!type || type === 'Question Type') return null;
+    const pill = (txt: string) => (
+      <span key={txt} style={CREATE_SURVEY_TYPE_PREVIEW_PILL_STYLE}>
+        {txt}
+      </span>
+    );
+    if (type === 'binary') {
+      return (
+        <div style={CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE}>
+          <div style={CREATE_SURVEY_TYPE_PREVIEW_HEADING_STYLE}>Example:</div>
+          {pill('Agree')}
+          {pill('Unsure')}
+          {pill('Disagree')}
+        </div>
+      );
+    }
+    if (type === 'multichoice') {
+      return (
+        <div style={CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE}>
+          <div style={CREATE_SURVEY_TYPE_PREVIEW_HEADING_STYLE}>Example options:</div>
+          {pill('Option A')}
+          {pill('Option B')}
+          {pill('Option C')}
+        </div>
+      );
+    }
+    if (type === 'rating') {
+      return (
+        <div style={CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE}>
+          <div style={CREATE_SURVEY_TYPE_PREVIEW_HEADING_STYLE}>Example slider (0–10)</div>
+          <div style={CREATE_SURVEY_RATING_PREVIEW_TRACK_STYLE} />
+        </div>
+      );
+    }
+    return (
+      <div style={CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE}>
+        <div style={CREATE_SURVEY_TYPE_PREVIEW_HEADING_STYLE}>Example freeform input</div>
+        <div style={CREATE_SURVEY_FREEFORM_PREVIEW_STYLE} />
+      </div>
+    );
+  };
+
+  // Visual type selector
+  renderTypeSelector: () => React.ReactNode = () => {
+    return (
+      <div className={styles.typeSelectorBlock}>
+        <div className={styles.typeSelectorLabel}>Choose Question Type</div>
+        <div className={styles.typeSelectorGrid} role="group" aria-label="Question types">
+          <button
+            type="button"
+            className={styles.typeButton}
+            onClick={() => this.quickAdd('binary')}
+            aria-label="Add Binary question"
+          >
+            <div className={styles.typeTitle}>Binary</div>
+            <div className={styles.typePreviewRow}>
+              <span className={buildCreateSurveyTypePillClassName(styles, 'agree')}>Agree</span>
+              <span className={buildCreateSurveyTypePillClassName(styles, 'unsure')}>Unsure</span>
+              <span className={buildCreateSurveyTypePillClassName(styles, 'disagree')}>Disagree</span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            className={styles.typeButton}
+            onClick={() => this.quickAdd('rating')}
+            aria-label="Add Rating question"
+          >
+            <div className={styles.typeTitle}>Rating</div>
+            <div className={styles.ratingPreviewWrap} aria-hidden="true">
+              <div className={styles.ratingPreviewFill} />
+              <div className={styles.ratingPreviewHandle} />
+            </div>
+          </button>
+
+          <button
+            type="button"
+            className={styles.typeButton}
+            onClick={() => this.quickAdd('multichoice')}
+            aria-label="Add Multichoice question"
+          >
+            <div className={styles.typeTitle}>Multichoice</div>
+            <div className={styles.typePreviewRow}>
+              <span className={styles.pill}>Option 1</span>
+              <span className={styles.pill}>Option 2</span>
+              <span className={styles.pill}>Option 3</span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            className={styles.typeButton}
+            onClick={() => this.quickAdd('freeform')}
+            aria-label="Add Freeform question"
+          >
+            <div className={styles.typeTitle}>Freeform</div>
+            <div className={styles.freeformPreview} aria-hidden="true">
+              ...
+            </div>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   render() {
-    return renderCreateQuestionsAndSurveysSurface({
-      props: this.props,
-      state: this.state,
-      setState: this.setState.bind(this) as RenderCreateQuestionsAndSurveysSurfaceController['setState'],
-      promptRefs: this._promptRefs,
-      addDocumentURL: this.addDocumentURL,
-      addOption: this.addOption,
-      bookmarkQuestion: this.bookmarkQuestion,
-      bookmarkSurvey: this.bookmarkSurvey,
-      cancelClearForm: this.cancelClearForm,
-      confirmClearForm: this.confirmClearForm,
-      copyAIPromptToClipboard: this.copyAIPromptToClipboard,
-      copyJsonPreview: this.copyJsonPreview,
-      copyQuestionIdToClipboard: this.copyQuestionIdToClipboard,
-      copySurveyIdToClipboard: this.copySurveyIdToClipboard,
-      copySurveyLinkToClipboard: this.copySurveyLinkToClipboard,
-      getActiveSessionSlug: this.getActiveSessionSlug,
-      getResolvedSessionConfig: this.getResolvedSessionConfig,
-      getSessionConfig: this.getSessionConfig,
-      handleAutoQuestionsGenerated: this.handleAutoQuestionsGenerated,
-      handleClearForm: this.handleClearForm,
-      handleCurrentTagInputChange: this.handleCurrentTagInputChange,
-      handleDocURLInputChange: this.handleDocURLInputChange,
-      handleDocUrlKeyDown: this.handleDocUrlKeyDown,
-      handleOptionChange: this.handleOptionChange,
-      handleQuestionChange: this.handleQuestionChange,
-      handleSubmitButtonClick: this.handleSubmitButtonClick,
-      handleTagInputKeyDown: this.handleTagInputKeyDown,
-      handleTitleChange: this.handleTitleChange,
-      processTagInput: this.processTagInput,
-      quickAdd: this.quickAdd,
-      removeDocumentURL: this.removeDocumentURL,
-      removeOption: this.removeOption,
-      removeQuestion: this.removeQuestion,
-      removeTagFromQuestion: this.removeTagFromQuestion,
-      resolveGateOptions: this.resolveGateOptions,
-      saveToLocalStorage: this.saveToLocalStorage,
-      suggestTagsForQuestion: this.suggestTagsForQuestion,
-      switchToCorrectNetwork: this.switchToCorrectNetwork,
-      toggleAIPrompt: this.toggleAIPrompt,
-      toggleAutoTool: this.toggleAutoTool,
-      toggleShowJson: this.toggleShowJson,
-      toggleStandaloneQuestion: this.toggleStandaloneQuestion,
-    });
+    const {
+      title,
+      questions,
+      isSubmitting,
+      progress,
+      showJson,
+      isStandaloneQuestion,
+      surveyAddedSuccessfully,
+      questionsAddedSuccessfully,
+      uploadedQuestions,
+      submissionError,
+      showAutoTool,
+      documentURLs,
+      lastSubmittedSurveyId,
+      autoPopulateAiTags,
+      lastSubmittedSurveyArweaveTxId,
+      submitStep,
+      surveyLockGateIds,
+      openLockKey,
+      formValidationError,
+    } = this.state;
+    const docUrlErrorId = 'ce-create-doc-url-error';
+    const safeDocumentUrls = sanitizeDocumentUrls(documentURLs);
+    const renderedQuestions = questions as CreateSurveyRenderedQuestion[];
+    const uploadedQuestionEntries = uploadedQuestions as CreateSurveyUploadedQuestionEntry[];
+    const hasAuthoredDraftContent =
+      questions.length > 0 ||
+      title.trim() !== '' ||
+      safeDocumentUrls.length > 0 ||
+      surveyAddedSuccessfully ||
+      questionsAddedSuccessfully;
+    // Pile entry starts in AI mode, so hide the survey/questions switch until
+    // the user either starts manual authoring or generation produces content.
+    const showModeToggle =
+      !this.props.hideSurveyQuestionToggleUntilAuthoring || !showAutoTool || hasAuthoredDraftContent;
+
+    const surveyIDForDisplay = lastSubmittedSurveyId || this.state.surveyHash;
+    const sessionConfig = this.getSessionConfig();
+    const resolvedSessionConfig = this.getResolvedSessionConfig();
+    const { gateOptions, defaultGateId } = this.resolveGateOptions(resolvedSessionConfig, { isStandaloneQuestion });
+    const gateOptionsList = (Array.isArray(gateOptions) ? gateOptions : []) as CreateSurveyGateOption[];
+    const hasSelectableGateOptions = gateOptionsList.length > 0;
+    const gateIdSet: Set<string> = new Set(gateOptionsList.map((opt) => opt.id));
+    const resolvedContracts = mergeSessionContractMaps(
+      resolvedSessionConfig?.contracts,
+      this.props.contracts,
+      sessionConfig?.contracts,
+    );
+
+    const normalizeSelectedGateIds = (value: unknown) =>
+      normalizeGateIds(value).filter((gateId: string) => gateIdSet.has(gateId));
+    const applyDefaultSelectedGateIds = (value: unknown) => {
+      const normalized = normalizeSelectedGateIds(value);
+      if (normalized.length) return normalized;
+      return defaultGateId ? [defaultGateId] : [];
+    };
+    const applyStandaloneSelectedGateIds = (value: unknown, touched: unknown) => {
+      const normalized = normalizeSelectedGateIds(value);
+      if (normalized.length) return normalized;
+      if (touched && Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
+      return defaultGateId ? [defaultGateId] : [];
+    };
+    const surveySelectedGateIds = !isStandaloneQuestion ? applyDefaultSelectedGateIds(surveyLockGateIds) : [];
+
+    // JSON preview (only questions; no questionIDs)
+    let jsonData: Record<string, unknown> = {};
+    if (isStandaloneQuestion) {
+      jsonData = {
+        questions: renderedQuestions.map((q) => ({
+          id: q.id,
+          type: q.type,
+          prompt: q.prompt,
+          options: normalizePayloadQuestionOptions(q.type, q.options),
+          singleSelect: resolvePayloadSingleSelect(q.type, q.singleSelect),
+          tags: normalizeTagList(q.tags),
+          associatedSurveyId: q.associatedSurveyId || '',
+        })),
+      };
+    } else {
+      jsonData = {
+        surveyID: this.state.surveyHash,
+        title: title,
+        documentURLs: safeDocumentUrls,
+        questions: renderedQuestions.map((q) => ({
+          id: q.id,
+          type: q.type,
+          prompt: q.prompt,
+          options: normalizePayloadQuestionOptions(q.type, q.options),
+          singleSelect: resolvePayloadSingleSelect(q.type, q.singleSelect),
+          tags: normalizeTagList(q.tags),
+        })),
+      };
+    }
+    // Note: lock-driven encryption is applied at submit-time per survey/question.
+
+    const manualCreationUI = (
+      <>
+        {!isStandaloneQuestion && (
+          <div className={styles.surveyTitleRow}>
+            <Input
+              className={styles.surveyTitleInput}
+              placeholder="Title"
+              data-testid={E2E_TESTIDS.CREATE_TITLE}
+              value={title}
+              onChange={this.handleTitleChange}
+              required={!isStandaloneQuestion}
+            />
+            {hasSelectableGateOptions ? (
+              <div className={styles.surveyTitleLock}>
+                <GateMultiSelectLock
+                  gateOptions={gateOptions}
+                  selectedGateIds={surveySelectedGateIds}
+                  onChangeSelectedGateIds={(nextIds: unknown) => {
+                    const normalized = normalizeSelectedGateIds(nextIds);
+                    this.setState(buildCreateSurveySurveyLockGateIdsPatch(normalized), this.saveToLocalStorage);
+                    if (!normalized.length) {
+                      this.setState(buildCreateSurveyOpenLockKeyPatch());
+                    }
+                  }}
+                  open={openLockKey === 'survey'}
+                  onToggleOpen={(nextOpen: unknown) => {
+                    if (nextOpen && surveySelectedGateIds.length === 0 && defaultGateId) {
+                      this.setState(buildCreateSurveySurveyLockGateIdsPatch([defaultGateId]), this.saveToLocalStorage);
+                    }
+                    this.setState(buildCreateSurveyOpenLockKeyPatch(nextOpen ? 'survey' : ''));
+                  }}
+                  disabled={!hasSelectableGateOptions}
+                  showDots={false}
+                />
+                <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="cs-survey-gate-tip" />
+                <CETooltip
+                  placement="right"
+                  trigger="hover focus click"
+                  target="cs-survey-gate-tip"
+                  className={styles.tooltipBubble}
+                >
+                  {`Only holders of selected ${t('sbtsLower')} can access locked content.`}
+                </CETooltip>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {/* Multi Document URL Input Group */}
+        {!isStandaloneQuestion && (
+          <div className={styles.docUrlSection}>
+            <div className={styles.docUrlInputGroup}>
+              <Input
+                className={styles.docUrlInput}
+                placeholder="Source document URL (optional)"
+                value={this.state.docURLInput || ''}
+                onChange={this.handleDocURLInputChange}
+                onKeyDown={this.handleDocUrlKeyDown}
+                aria-invalid={this.state.docURLError ? 'true' : undefined}
+                aria-describedby={this.state.docURLError ? docUrlErrorId : undefined}
+              />
+              <button
+                type="button"
+                className={styles.addDocUrlButton}
+                onClick={this.addDocumentURL}
+                disabled={!this.state.docURLInput.trim()}
+              >
+                <FontAwesomeIcon icon={faPlus} />
+              </button>
+            </div>
+            {this.state.docURLError && (
+              <div id={docUrlErrorId} className={styles.inlineValidationError} data-testid="ce-create-doc-url-error">
+                {this.state.docURLError}
+              </div>
+            )}
+
+            {safeDocumentUrls.length > 0 && (
+              <div className={styles.documentUrlDisplay}>
+                <strong>Attached Document URL(s):</strong>
+                <ul>
+                  {safeDocumentUrls.map((url: string, idx: number) => (
+                    <li key={idx} className={styles.documentUrlItem}>
+                      {litStorage.isLitArweaveUrl(url) ? (
+                        <span className={styles.documentUrlEncrypted}>Encrypted doc ({url})</span>
+                      ) : (
+                        <a
+                          href={normalizeArweaveUrl(url, { contextLabel: 'create_survey_document_url' })}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {url}
+                        </a>
+                      )}
+                      <span
+                        className={styles.removeDocumentUrlButton}
+                        onClick={() => this.removeDocumentURL(idx)}
+                        title="Remove URL"
+                      >
+                        <FontAwesomeIcon icon={faTimes} />
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {formValidationError && (
+          <div className={styles.inlineValidationError} data-testid="ce-create-validation-error" role="alert">
+            {formValidationError}
+          </div>
+        )}
+
+        {renderedQuestions.map((question, qIndex: number) => {
+          const questionTags = normalizeTagList(question.tags);
+          const aiSourceTags = normalizeTagList(question.aiGeneratedTagsFromSource);
+          // Logic to determine if the "Magic Wand" (Generate Tags) button should be visible
+          // It hides if tags are already fully populated from AI source
+          const hasAiSourceTags = aiSourceTags.length > 0;
+          const aiSourceTagsFullyInQuestionTags =
+            hasAiSourceTags &&
+            aiSourceTags.every((aiTag: string) => questionTags.includes(aiTag)) &&
+            questionTags.length === aiSourceTags.length;
+
+          let showGenerateTagsButton = false;
+          if (!hasAiSourceTags) {
+            showGenerateTagsButton = true;
+          } else {
+            if (!autoPopulateAiTags && !aiSourceTagsFullyInQuestionTags) {
+              showGenerateTagsButton = true;
+            }
+          }
+          if (question.isGeneratingTags) showGenerateTagsButton = true;
+
+          return (
+            <div
+              key={question.uiKey || `question-${qIndex}`}
+              className={styles.questionContainer}
+              data-testid={E2E_TESTIDS.CREATE_QUESTION}
+              data-ce-question-index={qIndex}
+            >
+              <div className={styles.questionHeader}>
+                <strong className={styles.questionTypeText}>
+                  #{qIndex + 1}:{' '}
+                  {question.type ? question.type.charAt(0).toUpperCase() + question.type.slice(1) : 'Unknown Type'}{' '}
+                  Question
+                </strong>
+                <div className={styles.questionHeaderActions}>
+                  {(() => {
+                    const lockKey = `q-lock:${question.uiKey || qIndex}`;
+                    const inheritsSurvey =
+                      !isStandaloneQuestion &&
+                      (!Object.prototype.hasOwnProperty.call(question || {}, 'lockGateIds') ||
+                        question.lockGateIds === null);
+                    const selectedGateIds = isStandaloneQuestion
+                      ? applyStandaloneSelectedGateIds(question.lockGateIds, question.lockGateIdsTouched)
+                      : inheritsSurvey
+                        ? surveySelectedGateIds
+                        : applyDefaultSelectedGateIds(question.lockGateIds);
+
+                    return hasSelectableGateOptions ? (
+                      <>
+                        {!isStandaloneQuestion && (
+                          <label className={styles.inheritToggle}>
+                            <input
+                              type="checkbox"
+                              checked={inheritsSurvey}
+                              onChange={(e: CreateSurveyCheckboxChangeEvent) => {
+                                const checked = !!e.target.checked;
+                                this.setState((prev: CreateQuestionsAndSurveysState) => {
+                                  const updated = Array.isArray(prev.questions) ? [...prev.questions] : [];
+                                  const nextQ = { ...(updated[qIndex] || {}) };
+                                  if (checked) {
+                                    nextQ.lockGateIds = null;
+                                  } else {
+                                    const base = normalizeSelectedGateIds(prev.surveyLockGateIds);
+                                    nextQ.lockGateIds = base.length ? base : defaultGateId ? [defaultGateId] : [];
+                                  }
+                                  updated[qIndex] = nextQ;
+                                  return { questions: updated, openLockKey: '' };
+                                }, this.saveToLocalStorage);
+                              }}
+                            />
+                            inherit
+                          </label>
+                        )}
+
+                        <GateMultiSelectLock
+                          gateOptions={gateOptions}
+                          selectedGateIds={selectedGateIds}
+                          onChangeSelectedGateIds={(nextIds: unknown) => {
+                            const normalized = normalizeSelectedGateIds(nextIds);
+                            this.setState((prev: CreateQuestionsAndSurveysState) => {
+                              const updated = Array.isArray(prev.questions) ? [...prev.questions] : [];
+                              const nextQ = { ...(updated[qIndex] || {}) };
+                              nextQ.lockGateIds = normalized;
+                              nextQ.lockGateIdsTouched = true;
+                              updated[qIndex] = nextQ;
+                              return {
+                                questions: updated,
+                                openLockKey: normalized.length ? prev.openLockKey : '',
+                              };
+                            }, this.saveToLocalStorage);
+                          }}
+                          open={openLockKey === lockKey}
+                          onToggleOpen={(nextOpen: unknown) => {
+                            if (nextOpen && selectedGateIds.length === 0 && defaultGateId) {
+                              if (!isStandaloneQuestion && inheritsSurvey) {
+                                this.setState(
+                                  buildCreateSurveySurveyLockGateIdsPatch([defaultGateId]),
+                                  this.saveToLocalStorage,
+                                );
+                              } else {
+                                this.setState((prev: CreateQuestionsAndSurveysState) => {
+                                  const updated = Array.isArray(prev.questions) ? [...prev.questions] : [];
+                                  const nextQ = { ...(updated[qIndex] || {}) };
+                                  nextQ.lockGateIds = [defaultGateId];
+                                  nextQ.lockGateIdsTouched = true;
+                                  updated[qIndex] = nextQ;
+                                  return { questions: updated };
+                                }, this.saveToLocalStorage);
+                              }
+                            }
+                            this.setState(buildCreateSurveyOpenLockKeyPatch(nextOpen ? lockKey : ''));
+                          }}
+                          disabled={!hasSelectableGateOptions}
+                          showDots={false}
+                        />
+                      </>
+                    ) : null;
+                  })()}
+
+                  <Button className={styles.removeQuestionButton} onClick={() => this.removeQuestion(qIndex)}>
+                    <FontAwesomeIcon icon={faTimes} />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Ref attached to the prompt textarea for auto-focus */}
+              <Input
+                innerRef={(el: FocusablePromptElement | null) => {
+                  this._promptRefs[question.uiKey] = el;
+                }}
+                type="textarea"
+                rows="2"
+                className={styles.questionPromptInput}
+                placeholder="Question prompt"
+                data-testid={E2E_TESTIDS.CREATE_QUESTION_PROMPT}
+                value={question.prompt || ''}
+                onChange={(e: CreateSurveyInputValueEvent) =>
+                  this.handleQuestionChange(qIndex, 'prompt', e.target.value)
+                }
+              />
+
+              {question.type === 'multichoice' && (
+                <div className={styles.optionsContainer}>
+                  {(question.options || []).map((option: string, oIndex: number) => (
+                    <div key={`option-${question.uiKey || qIndex}-${oIndex}`} className={styles.optionItem}>
+                      <Input
+                        placeholder={`Option ${oIndex + 1}`}
+                        value={option}
+                        onChange={(e: CreateSurveyInputValueEvent) =>
+                          this.handleOptionChange(qIndex, oIndex, e.target.value)
+                        }
+                        className={styles.optionInput}
+                      />
+                      <Button className={styles.removeOptionButton} onClick={() => this.removeOption(qIndex, oIndex)}>
+                        <FontAwesomeIcon icon={faTimes} />
+                      </Button>
+                    </div>
+                  ))}
+                  {(question.options || []).length < 10 && (
+                    <Button
+                      className={styles.addOptionButton}
+                      data-testid={E2E_TESTIDS.CREATE_QUESTION_ADD_OPTION}
+                      onClick={() => this.addOption(qIndex)}
+                    >
+                      <FontAwesomeIcon icon={faPlus} /> Add Option
+                    </Button>
+                  )}
+                  {/* Single-select limits multichoice answers to one option. */}
+                  <div className={styles.singleSelectToggle}>
+                    <label className={styles.singleSelectLabel}>
+                      <input
+                        type="checkbox"
+                        data-testid={E2E_TESTIDS.CREATE_QUESTION_SINGLE_SELECT}
+                        checked={!!question.singleSelect}
+                        onChange={(e: CreateSurveyCheckboxChangeEvent) =>
+                          this.handleQuestionChange(qIndex, 'singleSelect', e.target.checked)
+                        }
+                      />
+                      <span>One Selection Only</span>
+                      <FontAwesomeIcon
+                        icon={faQuestionCircle}
+                        className={styles.tooltip}
+                        id={`singleSelectTooltip-${question.uiKey || qIndex}`}
+                      />
+                      <CETooltip
+                        placement="right"
+                        trigger="hover focus click"
+                        target={`singleSelectTooltip-${question.uiKey || qIndex}`}
+                        className={styles.tooltipBubble}
+                      >
+                        Single-select limits respondents to one option. Multi-select allows multiple choices.
+                      </CETooltip>
+                    </label>
+                  </div>
+                </div>
+              )}
+              <div className={styles.questionMetadata}>
+                <div className={styles.tagsManagerContainer}>
+                  <div className={styles.tagsContainer}>
+                    {questionTags.map((tag: string, tagIndex: number) => (
+                      <span key={`${qIndex}-${tagIndex}-${tag}`} className={styles.filterBubble}>
+                        {tag}
+                        <FontAwesomeIcon
+                          icon={faTimes}
+                          className={styles.removeIcon}
+                          onClick={() => this.removeTagFromQuestion(qIndex, tagIndex)}
+                        />
+                      </span>
+                    ))}
+
+                    {/* Updated Tag Input UX */}
+                    <div className={styles.tagInputGroup}>
+                      <Input
+                        type="text"
+                        placeholder="Add tag"
+                        data-testid={E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT}
+                        value={question.currentTagInputValue || ''}
+                        onChange={(e: CreateSurveyInputValueEvent) =>
+                          this.handleCurrentTagInputChange(qIndex, e.target.value)
+                        }
+                        onKeyDown={(e: CreateSurveyTagInputKeyEvent) => this.handleTagInputKeyDown(qIndex, e)}
+                        className={styles.tagInputField}
+                      />
+
+                      {/* Checkmark: Only visible when user is typing */}
+                      {(question.currentTagInputValue || '').trim() !== '' && (
+                        <button
+                          type="button"
+                          className={styles.addTagButton}
+                          data-testid={E2E_TESTIDS.CREATE_QUESTION_ADD_TAG}
+                          onClick={() => this.processTagInput(qIndex)}
+                          title="Add Tag"
+                        >
+                          <FontAwesomeIcon icon={faCheck} />
+                        </button>
+                      )}
+
+                      {/* Magic Wand: Replaces old generate button, hidden if tags populated */}
+                      {showGenerateTagsButton && (
+                        <button
+                          type="button"
+                          className={styles.magicTagButton}
+                          onClick={() => this.suggestTagsForQuestion(qIndex)}
+                          disabled={question.isGeneratingTags || !question.prompt.trim()}
+                          title={
+                            !question.prompt.trim()
+                              ? 'Enter a question prompt to generate tags'
+                              : 'Generate tags using AI'
+                          }
+                        >
+                          {question.isGeneratingTags ? (
+                            <FontAwesomeIcon icon={faSpinner} spin />
+                          ) : (
+                            <FontAwesomeIcon icon={faMagic} />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Visual type selector */}
+        {this.renderTypeSelector()}
+
+        {/* Submit Button: only render if at least one question exists */}
+        {questions.length > 0 && (
+          <>
+            <Button
+              className={buildCreateSurveySubmitButtonClassName(styles, isSubmitting, submissionError)}
+              data-testid={E2E_TESTIDS.CREATE_SUBMIT}
+              onClick={
+                this.state.needsNetworkSwitch && this.props.provider === 'wagmi' && this.props.loginComplete
+                  ? this.switchToCorrectNetwork
+                  : this.handleSubmitButtonClick
+              }
+              disabled={
+                isSubmitting ||
+                (this.state.needsNetworkSwitch && this.props.provider === 'wagmi' && this.props.loginComplete
+                  ? false
+                  : submissionError
+                    ? false
+                    : (!isStandaloneQuestion && !title.trim()) || renderedQuestions.some((q) => q.isGeneratingTags))
+              }
+              aria-busy={isSubmitting ? 'true' : 'false'}
+              title={submissionError ? 'Click to copy error' : undefined}
+            >
+              {isSubmitting && (
+                <span
+                  className={styles.buttonProgressFill}
+                  style={resolveCreateSurveyProgressFillStyle(progress)}
+                  aria-hidden="true"
+                />
+              )}
+              <span className={styles.buttonContent}>
+                {isSubmitting ? (
+                  <>
+                    <FontAwesomeIcon icon={faSpinner} spin style={CREATE_SURVEY_SUBMIT_ICON_STYLE} />
+                    Submitting...
+                  </>
+                ) : submissionError ? (
+                  <>
+                    <FontAwesomeIcon icon={faExclamationCircle} style={CREATE_SURVEY_SUBMIT_ICON_STYLE} />
+                    {submissionError}
+                    <span className={styles.copyHint}>&nbsp;— click to copy</span>
+                  </>
+                ) : this.state.needsNetworkSwitch && this.props.provider === 'wagmi' && this.props.loginComplete ? (
+                  'Switch to correct network → Submit'
+                ) : isStandaloneQuestion ? (
+                  'Create Questions'
+                ) : (
+                  'Create Survey'
+                )}
+              </span>
+            </Button>
+
+            {/* Progress Indicator: Only visible during/after submission steps */}
+            {(isSubmitting || this.state.showSubmitSteps) && (
+              <div className={styles.progressIndicator}>
+                <div className={buildCreateSurveyProgressStepClassName(styles, submitStep, 1)}>
+                  <FontAwesomeIcon
+                    icon={submitStep === 1 ? faSpinner : submitStep > 1 ? faCheck : faExclamationCircle}
+                    spin={submitStep === 1}
+                  />
+                  <span>Upload Arweave</span>
+                </div>
+                <div className={buildCreateSurveyProgressStepClassName(styles, submitStep, 2)}>
+                  <FontAwesomeIcon
+                    icon={submitStep === 2 ? faSpinner : submitStep > 2 ? faCheck : faExclamationCircle}
+                    spin={submitStep === 2}
+                  />
+                  <span>Submit Contract</span>
+                </div>
+                <div className={buildCreateSurveyProgressStepClassName(styles, submitStep, 3)}>
+                  <FontAwesomeIcon icon={submitStep === 3 ? faCheck : faExclamationCircle} />
+                  <span>Done</span>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {submissionError && !isSubmitting && <div className={styles.errorMessage}>Error: {submissionError}</div>}
+
+        {questionsAddedSuccessfully && (
+          <div className={styles.surveySubmissionConfirmation} data-testid={E2E_TESTIDS.CREATE_SUCCESS}>
+            <h3>Questions Added Successfully!</h3>
+            {uploadedQuestions && uploadedQuestions.length > 0 && (
+              <div className={styles.uploadedQuestionsList} data-testid={E2E_TESTIDS.CREATE_UPLOADED_QUESTIONS}>
+                <h4>Uploaded Questions:</h4>
+                <ul>
+                  {uploadedQuestionEntries.map((entry, index: number) => {
+                    const { questionId } = entry;
+                    const arweaveTxId = getLegacyArweaveTxId(entry);
+                    const idL = String(questionId).toLowerCase();
+                    const bookmarked = this.state.bookmarkedQuestionsSet.has(idL);
+                    const sessionSlug = this.getActiveSessionSlug();
+                    return (
+                      <li
+                        key={`uploaded-${questionId}-${index}`}
+                        className={styles.uploadedQuestionItem}
+                        data-testid={E2E_TESTIDS.CREATE_UPLOADED_QUESTION}
+                        data-ce-question-id={String(questionId || '')
+                          .trim()
+                          .toLowerCase()}
+                      >
+                        <a href={`${window.location.origin}${buildQuestionRoutePath(questionId, { sessionSlug })}`}>
+                          {questionId.substring(0, 10)}...{questionId.substring(questionId.length - 8)}
+                        </a>
+                        {arweaveTxId && (
+                          <a
+                            href={normalizeArweaveUrl(arweaveTxId, { contextLabel: 'create_survey_question_link' })}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="View on Arweave"
+                            style={CREATE_SURVEY_UPLOADED_QUESTION_LINK_STYLE}
+                          >
+                            <FontAwesomeIcon icon={faExternalLinkAlt} size="sm" />
+                          </a>
+                        )}
+                        <Button
+                          className={styles.copyQuestionIdButton}
+                          onClick={() => this.copyQuestionIdToClipboard(questionId)}
+                          title="Copy Question ID"
+                          size="sm"
+                          color="link"
+                          style={CREATE_SURVEY_SMALL_ICON_BUTTON_STYLE}
+                        >
+                          <FontAwesomeIcon icon={faClipboard} />
+                        </Button>
+                        <Button
+                          className={styles.bookmarkQuestionButton}
+                          onClick={() => this.bookmarkQuestion(questionId)}
+                          title="Bookmark Question ID"
+                          size="sm"
+                          color="link"
+                          style={CREATE_SURVEY_SMALL_ICON_BUTTON_STYLE}
+                        >
+                          <FontAwesomeIcon
+                            icon={faBookmark}
+                            style={resolveCreateSurveyQuestionBookmarkStyle(bookmarked)}
+                          />
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {surveyAddedSuccessfully && surveyIDForDisplay && (
+          <div className={styles.surveySubmissionConfirmation} data-testid={E2E_TESTIDS.CREATE_SUCCESS}>
+            <h3>Survey Created</h3>
+
+            <div className={styles.successActionsRow}>
+              <button
+                type="button"
+                className={styles.actionBtn}
+                onClick={() => this.copySurveyLinkToClipboard(surveyIDForDisplay)}
+                title="Copy Link to Survey Page"
+              >
+                <FontAwesomeIcon
+                  icon={this.state.copySurveyLinkSuccess ? faCheck : faClipboard}
+                  style={CREATE_SURVEY_ACTION_ICON_STYLE}
+                />
+                Copy Link
+              </button>
+
+              <a
+                href={`/survey/${surveyIDForDisplay}${this.getActiveSessionSlug() ? `?session=${encodeURIComponent(this.getActiveSessionSlug())}` : ''}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buildCreateSurveyActionLinkClassName(styles)}
+                title="Open Survey Page in New Tab"
+              >
+                <FontAwesomeIcon icon={faExternalLinkAlt} />
+                View Survey
+              </a>
+
+              {lastSubmittedSurveyArweaveTxId && (
+                <a
+                  href={normalizeArweaveUrl(lastSubmittedSurveyArweaveTxId, { contextLabel: 'create_survey_link' })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={buildCreateSurveyActionLinkClassName(styles)}
+                  title="View on Arweave"
+                >
+                  <FontAwesomeIcon icon={faExternalLinkAlt} />
+                  Arweave
+                </a>
+              )}
+
+              <button
+                type="button"
+                onClick={() => this.bookmarkSurvey(surveyIDForDisplay)}
+                className={styles.actionBtn}
+                title="Bookmark Survey"
+              >
+                <FontAwesomeIcon
+                  icon={faBookmark}
+                  style={resolveCreateSurveyBookmarkSurveyStyle(
+                    this.state.bookmarkedSurveysSet.has(String(surveyIDForDisplay).toLowerCase()),
+                  )}
+                />
+                Bookmark
+              </button>
+
+              <button
+                type="button"
+                onClick={() => this.copySurveyIdToClipboard(surveyIDForDisplay)}
+                className={styles.actionBtn}
+                title="Copy Survey ID"
+              >
+                <FontAwesomeIcon icon={this.state.copySurveyIdSuccess ? faCheck : faClipboard} />
+                {this.state.copySurveyIdSuccess ? 'Copied!' : 'Copy ID'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* JSON preview area */}
+        {showJson && (
+          <JsonPanel
+            as="pre"
+            onCopy={() => this.copyJsonPreview(jsonData)}
+            copied={this.state.copyJsonSuccess}
+            copyTitle="Copy JSON"
+          >
+            {JSON.stringify(jsonData, null, 2)}
+          </JsonPanel>
+        )}
+
+        {/* Shared toolbar */}
+        <JsonButtonRow align="end" className={styles.jsonPromptBar}>
+          <JsonToggleButton
+            label={showJson ? 'Hide JSON' : 'Show JSON'}
+            active={showJson}
+            onClick={this.toggleShowJson}
+          />
+          <JsonToggleButton
+            label={this.state.showAIPrompt ? 'Hide AI Prompt' : 'Show AI Prompt'}
+            active={this.state.showAIPrompt}
+            onClick={this.toggleAIPrompt}
+            icon={this.state.showAIPrompt ? faCaretUp : faCaretDown}
+          />
+        </JsonButtonRow>
+
+        {/* AI Prompt panel */}
+        {this.state.showAIPrompt && (
+          <div className={styles.aiPromptWrapper}>
+            <button
+              type="button"
+              className={buildCreateSurveyAiPromptCopyClassName(styles, this.state.aiPromptCopySuccess)}
+              onClick={this.copyAIPromptToClipboard}
+              title="Copy prompt"
+            >
+              <FontAwesomeIcon icon={this.state.aiPromptCopySuccess ? faCheck : faClipboard} />
+            </button>
+
+            <div className={styles.aiPromptHeader}>
+              <strong>{`AI Prompt — ${this.state.aiPromptModelLabel}`}</strong>
+            </div>
+
+            <div className={styles.aiPromptMeta}>
+              Variables:&nbsp;
+              <span className={styles.aiVar}>&lt;SourceDocContent&gt;</span>,{' '}
+              <span className={styles.aiVar}>&lt;NumSeedStatements&gt;</span>,{' '}
+              <span className={styles.aiVar}>&lt;Types&gt;</span>,{' '}
+              <span className={styles.aiVar}>&lt;DefaultTags&gt;</span>
+            </div>
+
+            <div className={styles.jsonDisplayWrapper}>
+              <pre className={styles.jsonDisplay}>
+                {this.highlightPromptVariables(this.state.aiPromptText || '(Prompt not available)')}
+              </pre>
+            </div>
+          </div>
+        )}
+      </>
+    );
+
+    return (
+      <div
+        className={buildCreateSurveyContainerClassName(styles, this.props.miniaturized)}
+        data-testid={E2E_TESTIDS.CREATE_PANEL}
+      >
+        {/* Header: Survey/Questions toggle + single context-aware mode switch */}
+        <div className={styles.modeHeader}>
+          {showModeToggle && (
+            <div className={styles.modeToggle}>
+              <Label className={styles.toggleLabel}> Survey</Label>
+              <div className={styles.toggleSwitch} onClick={this.toggleStandaloneQuestion}>
+                <div className={styles.toggleKnob} style={resolveCreateSurveyToggleKnobStyle(isStandaloneQuestion)} />
+              </div>
+              <Label className={styles.toggleLabel} style={CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE}>
+                Questions
+              </Label>
+            </div>
+          )}
+
+          {!this.props.miniaturized && !this.props.preformedQuestions && (
+            <Button
+              className={styles.modeSwitchButton}
+              data-testid={E2E_TESTIDS.CREATE_MODE_SWITCH}
+              onClick={this.toggleAutoTool}
+              color="secondary"
+              outline
+            >
+              <FontAwesomeIcon icon={showAutoTool ? faPenNib : faMagic} style={CREATE_SURVEY_HEADER_ICON_STYLE} />
+              {showAutoTool ? 'Manual' : 'from URL / Content'}
+            </Button>
+          )}
+
+          {/* Clear Form Button */}
+          {!this.props.preformedQuestions &&
+            !this.state.showAutoTool &&
+            (this.state.questions.length > 0 || this.state.title.trim() !== '') && (
+              <button
+                type="button"
+                className={styles.clearFormButton}
+                data-testid={E2E_TESTIDS.CREATE_CLEAR}
+                onClick={this.handleClearForm}
+                title="Clear entire form"
+                style={CREATE_SURVEY_CLEAR_FORM_BUTTON_STYLE}
+              >
+                <FontAwesomeIcon icon={faEraser} style={CREATE_SURVEY_HEADER_ICON_STYLE} />
+                Clear
+              </button>
+            )}
+        </div>
+
+        {this.state.showAutoTool && !this.props.miniaturized && !this.props.preformedQuestions ? (
+          <div style={CREATE_SURVEY_AUTO_TOOL_PANEL_STYLE}>
+            <AudioSurveyGenerator
+              minified={true}
+              hideEncryption={true}
+              provider={this.props.provider}
+              network={this.props.network}
+              account={this.props.account}
+              loginComplete={this.props.loginComplete}
+              toggleLoginModal={this.props.toggleLoginModal}
+              defaultTags={this.props.defaultTags || []}
+              onQuestionsGenerated={this.handleAutoQuestionsGenerated}
+              sessionConfig={resolvedSessionConfig}
+              contracts={resolvedContracts}
+              activeSessionSlug={this.getActiveSessionSlug()}
+              litHooks={this.props.litHooks}
+            />
+          </div>
+        ) : (
+          manualCreationUI
+        )}
+        <CEConfirmDialog
+          isOpen={!!this.state.showClearFormConfirm}
+          title="Clear form?"
+          body="This removes the unsaved survey or question draft from this browser."
+          confirmLabel="Clear"
+          cancelLabel="Keep editing"
+          danger
+          onCancel={this.cancelClearForm}
+          onConfirm={this.confirmClearForm}
+          testId="ce-survey-clear-confirm"
+        />
+      </div>
+    );
   }
 }
 
