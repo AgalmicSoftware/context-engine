@@ -141,14 +141,12 @@ The export currently has four non-test Agent Village Wrapped principals. The res
 Show a person their agent's model of them, and score what survives contact. Three numbers per model, scaffold, and time window:
 
 - **Mirror Score** — graded agreement between prediction and final answer: exact match for binary and choice questions, distance-based credit for ratings, overlap for multi-select.
-- **Correction Rate** — the fraction of viewed predictions whose meaning changed.
+- **Correction Rate** — the fraction of viewed predictions which were changed.
 - **Calibration Error** — whether a stated confidence of 90 means the person keeps the answer 90% of the time.
-
-One known limitation: seeing a prediction anchors people, so acceptance overstates accuracy. The fix is a blind holdout — a few questions answered before the agent's guess is shown. The gap between blind and post-view agreement measures the anchoring itself.
 
 ## Extensions
 
-- **Blind holdouts** — quantify anchoring.
+- **Blind holdouts** — gap between blind and post-view agreement measures anchoring itself
 - **Cross-model mirrors** — two models predict the same person from the same context; the corrections become a head-to-head.
 - **Memory curves** — does Mirror Score rise with months of shared context?
 - **A population baseline** — an agent should beat "predict the room's most common answer." 
