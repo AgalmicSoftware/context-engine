@@ -10,7 +10,6 @@ import Arweave from 'arweave';
 import { getCorsProxyUrlOrThrow, resolveCorsProxyUrl } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
-import { normalizeBaseUrl } from '../urlUtils.js';
 import { readSessionScanSlugs } from '../session/sessionScanScope.js';
 import { readSponsoredBootstrapFundingContext } from '../session/sponsoredBootstrapFunding.js';
 import { getSharedFallbackWorkerUrl } from '../session/sessionWorkerAvailability.js';
@@ -70,6 +69,18 @@ import {
   markGraphqlEndpointSuccess,
 } from './arweaveGatewayHealth.js';
 import { getPreferredArIoGateway, isDirectToArIoEnabled, normalizeGatewayBase } from './arweaveUrls.js';
+import {
+  classifyUploadGateStatus,
+  getUploadCandidateReasonPriority,
+  hasSponsoredArweaveKey,
+  isTransientWorkerUploadError,
+  isWorkerMissingSessionSecretsError,
+  normalizeUploadSessionSlug,
+  normalizeWorkerBaseUrl,
+  resolveUploadSessionSlug,
+  resolveUploadSlugField,
+  shouldFallbackUploadCandidate,
+} from './arweaveUploadFallbackPolicy.js';
 
 const log = createLogger('general');
 const logArweaveFetchDebug = createArweaveFetchDebugLogger(log);
@@ -80,55 +91,6 @@ const logArweaveFetchDebug = createArweaveFetchDebugLogger(log);
    - Exported together as `arweaveClient`
    ========================================================================== */
 
-const WORKER_ENDPOINT_SUFFIXES = [
-  '/auth/nonce',
-  '/auth/login',
-  '/admin/set-config',
-  '/admin/set-secrets',
-  '/admin/set-limits',
-  '/admin/secret-presence',
-  '/transcribe',
-  '/ai',
-  '/arweave/upload',
-  '/fetch_url',
-  '/fetch_image',
-  '/fetch',
-  '/health',
-];
-const normalizeWorkerBaseUrl = (rawUrl) => {
-  const base = normalizeBaseUrl(rawUrl || '');
-  if (!base) return '';
-  try {
-    const parsed = new URL(base);
-    const rawPath = String(parsed.pathname || '').replace(/\/+$/, '');
-    const lowerPath = rawPath.toLowerCase();
-    for (const suffix of WORKER_ENDPOINT_SUFFIXES) {
-      if (lowerPath === suffix) {
-        return parsed.origin;
-      }
-      if (lowerPath.endsWith(suffix)) {
-        const nextPath = rawPath.slice(0, rawPath.length - suffix.length).replace(/\/+$/, '');
-        return nextPath ? `${parsed.origin}${nextPath}` : parsed.origin;
-      }
-    }
-    return base;
-  } catch {
-    return base;
-  }
-};
-const normalizeSessionSlug = (raw) => {
-  const slug = String(raw ?? '').trim();
-  if (!slug || slug === 'general') return '';
-  return slug;
-};
-const resolveUploadSessionSlug = (opts = {}) => {
-  if (Object.prototype.hasOwnProperty.call(opts, 'sessionSlug')) {
-    return normalizeSessionSlug(opts.sessionSlug);
-  }
-  const config = opts?.sessionConfig || {};
-  return normalizeSessionSlug(config?.slug || '');
-};
-const resolveUploadSlugField = () => 'sessionSlug';
 const ARWEAVE_UPLOAD_FALLBACK_TELEMETRY_KEY = '__CE_ARWEAVE_UPLOAD_FALLBACK__';
 
 const emitArweaveUploadFallbackTelemetry = (payload = {}) => {
@@ -150,37 +112,6 @@ const emitArweaveUploadFallbackTelemetry = (payload = {}) => {
   }
 };
 
-const isGateUnavailableError = (message = '') => /on-chain gate data unavailable/i.test(String(message || ''));
-
-const isWorkerAuthRouteUnsupportedError = (message = '') =>
-  /worker auth (?:nonce|login) route not supported \(404\)/i.test(String(message || ''));
-
-const isWorkerMissingArweaveKeyError = (message = '') => /arweave key not configured/i.test(String(message || ''));
-
-const isWorkerMissingSessionSecretsError = (message = '') =>
-  /session secrets not configured/i.test(String(message || ''));
-
-const isTransientWorkerUploadError = ({ message = '', status = null } = {}) => {
-  const normalizedMessage = String(message || '')
-    .trim()
-    .toLowerCase();
-  const normalizedStatus = Number(status || 0) || 0;
-  if (
-    normalizedMessage.includes('could not getprice') ||
-    normalizedMessage.includes('bad gateway') ||
-    normalizedMessage.includes('gateway timeout') ||
-    normalizedMessage.includes('temporary internal error')
-  ) {
-    return true;
-  }
-  return normalizedStatus === 502 || normalizedStatus === 503 || normalizedStatus === 504;
-};
-
-const shouldFallbackUploadCandidate = ({ message = '' } = {}) =>
-  isGateUnavailableError(message) ||
-  isWorkerAuthRouteUnsupportedError(message) ||
-  isWorkerMissingArweaveKeyError(message);
-
 const readScopeUploadSlugs = () => {
   try {
     const slugs = readSessionScanSlugs();
@@ -194,10 +125,10 @@ const readSponsoredUploadContext = (selectedSessionSlug = '') => {
   try {
     const context = readSponsoredBootstrapFundingContext();
     if (!context || typeof context !== 'object') return null;
-    const selectedSlug = normalizeSessionSlug(selectedSessionSlug);
-    const targetSlug = normalizeSessionSlug(context.targetSessionSlug || '');
+    const selectedSlug = normalizeUploadSessionSlug(selectedSessionSlug);
+    const targetSlug = normalizeUploadSessionSlug(context.targetSessionSlug || '');
     if (targetSlug && selectedSlug && targetSlug !== selectedSlug) return null;
-    const sessionSlug = normalizeSessionSlug(context.sessionSlug || '');
+    const sessionSlug = normalizeUploadSessionSlug(context.sessionSlug || '');
     const workerUrl = normalizeWorkerBaseUrl(context.workerUrl || '');
     if (!sessionSlug && !workerUrl) return null;
     return {
@@ -210,106 +141,12 @@ const readSponsoredUploadContext = (selectedSessionSlug = '') => {
   }
 };
 
-const getGateSnapshotSbtAddresses = (snapshot = null) => {
-  const seen = new Set();
-  const out = [];
-  const push = (value) => {
-    const addr = String(value || '').trim();
-    if (!addr) return;
-    const key = addr.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    out.push(addr);
-  };
-  if (Array.isArray(snapshot?.sbtAddresses)) {
-    snapshot.sbtAddresses.forEach(push);
-  }
-  push(snapshot?.sbtAddress);
-  return out;
-};
-
-const hasSponsoredArweaveKey = (sessionConfig = null) => {
-  const value = sessionConfig?.sponsoredKeys?.arweave;
-  if (typeof value === 'boolean') return value;
-  const normalized = String(value ?? '')
-    .trim()
-    .toLowerCase();
-  return normalized === '1' || normalized === 'true' || normalized === 'yes';
-};
-
-const getUploadCandidateReasonPriority = (reason = '') => {
-  const normalized = String(reason || '')
-    .trim()
-    .toLowerCase();
-  if (normalized === 'sponsored-referrer') return 0;
-  if (normalized === 'shared-fallback') return 1;
-  if (normalized === 'scope-list') return 2;
-  return 3;
-};
-
-const classifyUploadGateStatus = (sessionConfig = null, resourceKey = 'arweave') => {
-  const registry =
-    sessionConfig?.__registry && typeof sessionConfig.__registry === 'object' ? sessionConfig.__registry : {};
-  const gateAuthority = String(registry?.gateAuthority || '')
-    .trim()
-    .toLowerCase();
-  const gatesByResource =
-    registry?.gatesByResource && typeof registry.gatesByResource === 'object' ? registry.gatesByResource : null;
-  const primaryKey = String(resourceKey || '').trim() || 'arweave';
-
-  const readStatusForKey = (key) => {
-    if (gateAuthority !== 'onchain') {
-      return { key, status: 'unknown' };
-    }
-    if (!gatesByResource) {
-      return { key, status: 'unavailable' };
-    }
-    const snapshot = gatesByResource[key];
-    if (!snapshot || typeof snapshot !== 'object') {
-      return { key, status: 'missing' };
-    }
-    const lookupStatus = String(snapshot.lookupStatus || '')
-      .trim()
-      .toLowerCase();
-    if (lookupStatus !== 'ok') {
-      return { key, status: 'unresolved' };
-    }
-    const sbtAddresses = getGateSnapshotSbtAddresses(snapshot);
-    if (!sbtAddresses.length) {
-      return { key, status: 'no-gate' };
-    }
-    return { key, status: 'restricted' };
-  };
-
-  const primary = readStatusForKey(primaryKey);
-  const fallback = primaryKey === 'default' ? null : readStatusForKey('default');
-  const allowsPrimary = primary.status === 'no-gate';
-  const allowsFallback = fallback?.status === 'no-gate';
-  const selectedKey = allowsPrimary ? primary.key : allowsFallback ? fallback.key : primary.key;
-  const selectedStatus = allowsPrimary ? primary.status : allowsFallback ? fallback.status : primary.status;
-  const preferenceRank =
-    selectedStatus === 'no-gate'
-      ? selectedKey === primaryKey
-        ? 0
-        : 1
-      : selectedStatus === 'unknown' || selectedStatus === 'missing'
-        ? 2
-        : 3;
-  return {
-    gateStatus: fallback
-      ? `${primary.key}:${primary.status}|default:${fallback.status}`
-      : `${primary.key}:${primary.status}`,
-    allowsArweaveUpload: selectedStatus === 'no-gate',
-    preferenceRank,
-  };
-};
-
 const buildUploadSessionCandidates = async ({
   selectedSessionSlug = '',
   initialWorkerUrl = '',
   context = null,
 } = {}) => {
-  const selectedSlug = normalizeSessionSlug(selectedSessionSlug);
+  const selectedSlug = normalizeUploadSessionSlug(selectedSessionSlug);
   const normalizedInitialWorker = normalizeWorkerBaseUrl(initialWorkerUrl || '');
   const scopedSlugs = readScopeUploadSlugs();
   const sponsoredContext = readSponsoredUploadContext(selectedSlug);
@@ -317,7 +154,7 @@ const buildUploadSessionCandidates = async ({
   const orderedSources = [];
   const seenSourceKeys = new Set();
   const pushSource = ({ slug = '', reason = 'scope-list', explicitWorkerUrl = '' } = {}) => {
-    const normalizedSlug = normalizeSessionSlug(slug || '');
+    const normalizedSlug = normalizeUploadSessionSlug(slug || '');
     const normalizedWorkerUrl = normalizeWorkerBaseUrl(explicitWorkerUrl || '');
     const sourceKey = `${normalizedSlug}|${normalizedWorkerUrl}`;
     if (seenSourceKeys.has(sourceKey)) return;
@@ -989,7 +826,7 @@ async function uploadDataToArweave(data, format, opts = {}) {
   const adminAuth = (() => {
     if (!opts?.adminAuth || typeof opts.adminAuth !== 'object') return null;
     const source = opts.adminAuth;
-    const authSlug = normalizeSessionSlug(
+    const authSlug = normalizeUploadSessionSlug(
       Object.prototype.hasOwnProperty.call(source, 'sessionSlug')
         ? source.sessionSlug
         : Object.prototype.hasOwnProperty.call(source, 'slug')
