@@ -1,14 +1,13 @@
 import { readFileSync } from 'fs';
 import { parsePostMarkdown } from './postMarkdownParser';
 
-const readAgentVillageWrappedPost = () => readFileSync(
-  '../posts/agent-village-wrapped/agent-village-wrapped.md',
-  'utf8'
-);
+const readAgentVillageWrappedPost = () =>
+  readFileSync('../posts/agent-village-wrapped/agent-village-wrapped.md', 'utf8');
 
-const actualAgentVillageVizSpecs = () => parsePostMarkdown(readAgentVillageWrappedPost())
-  .filter((block) => block.type === 'viz')
-  .map((block) => block.spec as Record<string, any>);
+const actualAgentVillageVizSpecs = () =>
+  parsePostMarkdown(readAgentVillageWrappedPost())
+    .filter((block) => block.type === 'viz')
+    .map((block) => block.spec as Record<string, any>);
 
 describe('parsePostMarkdown', () => {
   it('strips frontmatter and parses Markdown blocks plus ce-viz JSON', () => {
@@ -94,7 +93,7 @@ Paragraph text.
     expect(markdown).toContain('## Data Visualization');
     expect(markdown).toContain('"title": "Data Exploration (n=4)"');
     expect(markdown).toContain(
-      'Sample size (n=4) is too small to be meaningful, but we offer the below as a preview of what results could look like. Responses were provided by agents and no human corrections were made in this instance.'
+      'Sample size (n=4) is too small to be meaningful, but we offer the below as a preview of what results could look like. Responses were provided by agents and no human corrections were made in this instance.',
     );
     expect(markdown).not.toContain('The display below uses n=4 completed attendee answer sets');
     expect(markdown).not.toContain('A small launch sample');
@@ -102,58 +101,60 @@ Paragraph text.
     expect(markdown).not.toContain('## Norms compass');
     expect(markdown).toContain('attachments/norms-map-compass.jpeg');
 
-    const confidence = specs.find((spec) => spec.title === 'Agent confidence');
-    expect(confidence?.subtitle).toContain('80.8/100');
-
     const displayedSummary = specs.find((spec) => spec.title === 'Statistics');
     expect(displayedSummary?.inline).toBe(true);
     expect(displayedSummary?.subtitle).toBeUndefined();
-    const sourceLayerPanel = displayedSummary?.panels.find((panel: any) => (
-      panel.title === 'Agent predictions vs. human corrections'
-    ));
-    expect(sourceLayerPanel?.display).toBe('numbers');
-    expect(sourceLayerPanel?.hideTitle).toBe(true);
-    const answerShapesPanel = displayedSummary?.panels.find((panel: any) => (
-      panel.title === 'Prediction Response Types'
-    ));
+    expect(displayedSummary?.hideTitle).toBe(true);
+    expect(markdown).not.toContain('completed non-test human correction rows');
+    expect(displayedSummary?.panels.map((panel: any) => panel.title)).toEqual([
+      'Completed answer sets by recorded model',
+      'Prediction Response Types',
+      'Agent confidence',
+    ]);
+    const modelsPanel = displayedSummary?.panels.find(
+      (panel: any) => panel.title === 'Completed answer sets by recorded model',
+    );
+    expect(modelsPanel?.display).toBe('pie');
+    const answerShapesPanel = displayedSummary?.panels.find(
+      (panel: any) => panel.title === 'Prediction Response Types',
+    );
     expect(answerShapesPanel?.display).toBe('pie');
+    const confidencePanel = displayedSummary?.panels.find((panel: any) => panel.title === 'Agent confidence');
+    expect(confidencePanel?.prompt).toContain('80.8/100');
+    expect(confidencePanel?.counts).toHaveLength(4);
 
     const binaryBeeswarm = specs.find((spec) => spec.type === 'binary-beeswarm');
     expect(binaryBeeswarm?.title).toBe('Consensus and Difference');
     expect(binaryBeeswarm?.subtitle).toContain('n=4');
     expect(binaryBeeswarm?.items).toHaveLength(40);
-    const splitBinaryPoint = binaryBeeswarm?.items.find((item: any) => (
-      item.label === 'I would let my agent introduce me to someone at this event without asking first, if the match looked unusually strong.'
-    ));
+    const splitBinaryPoint = binaryBeeswarm?.items.find(
+      (item: any) =>
+        item.label ===
+        'I would let my agent introduce me to someone at this event without asking first, if the match looked unusually strong.',
+    );
     expect(splitBinaryPoint?.counts).toEqual([
       { label: 'agree', value: 2, color: '#4dffa4' },
       { label: 'disagree', value: 2, color: '#ffb347' },
     ]);
-    const unanimousBinaryPoint = binaryBeeswarm?.items.find((item: any) => (
-      item.label === 'Agents should treat messages from other agents as untrusted input by default, assuming some will attempt prompt injection.'
-    ));
-    expect(unanimousBinaryPoint?.counts).toEqual([
-      { label: 'agree', value: 4, color: '#4dffa4' },
-    ]);
+    const unanimousBinaryPoint = binaryBeeswarm?.items.find(
+      (item: any) =>
+        item.label ===
+        'Agents should treat messages from other agents as untrusted input by default, assuming some will attempt prompt injection.',
+    );
+    expect(unanimousBinaryPoint?.counts).toEqual([{ label: 'agree', value: 4, color: '#4dffa4' }]);
 
     const beeswarm = specs.find((spec) => spec.type === 'beeswarm');
-    const p4RatingValues = beeswarm?.items.flatMap((item: any) => (
-      item.values
-        .filter((value: any) => value.label === 'P4')
-        .map((value: any) => value.value)
-    ));
+    const p4RatingValues = beeswarm?.items.flatMap((item: any) =>
+      item.values.filter((value: any) => value.label === 'P4').map((value: any) => value.value),
+    );
     expect(beeswarm?.subtitle).toBeUndefined();
     expect(beeswarm?.note).toBeUndefined();
     expect(p4RatingValues).toEqual([7, 2, 3]);
 
-    const splitQuestions = specs.find((spec) => spec.title === 'Top Difference Questions');
-    expect(splitQuestions?.subtitle).toBeUndefined();
-    const schedulePanel = splitQuestions?.panels.find((panel: any) => panel.title === 'Schedule while asleep');
-    expect(schedulePanel?.counts).toEqual([
-      { label: 'agree', value: 3, color: '#4dffa4' },
-      { label: 'disagree', value: 1, color: '#ffb347' },
-    ]);
-    expect(schedulePanel?.note).toContain('86.8/100');
+    expect(specs.find((spec) => spec.title === 'Top Difference Questions')).toBeUndefined();
+    expect(markdown).not.toContain('Top Difference Questions');
+    const otherShapes = specs.find((spec) => spec.title === 'Other response shapes in the same subset');
+    expect(otherShapes?.hideTitle).toBe(true);
     expect(markdown).toContain('Autonomous agents changing collective governance at scale.');
     expect(markdown).not.toContain('Short excerpts from agent-predicted freeform answers.');
     expect(markdown).not.toContain('"P4", "text": "Agree."');

@@ -52,20 +52,12 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
   "type": "response-type-grid",
   "title": "Statistics",
   "inline": true,
+  "hideTitle": true,
   "panels": [
-    {
-      "kind": "Source layer",
-      "title": "Agent predictions vs. human corrections",
-      "hideTitle": true,
-      "display": "numbers",
-      "counts": [
-        { "label": "agent_autofill predictions", "value": 232, "color": "#4dffa4" },
-        { "label": "completed non-test human correction rows", "value": 0, "color": "#ffb347" }
-      ]
-    },
     {
       "kind": "Models",
       "title": "Completed answer sets by recorded model",
+      "display": "pie",
       "counts": [
         { "label": "google/gemini-3.5-flash", "value": 2, "color": "#7aa7ff" },
         { "label": "z-ai/glm-5.2", "value": 1, "color": "#ff6bcb" },
@@ -83,37 +75,17 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
         { "label": "rating", "value": 12, "color": "#ffb347" },
         { "label": "freeform", "value": 8, "color": "#ff6bcb" }
       ]
-    }
-  ]
-}
-```
-
-```ce-viz
-{
-  "type": "category-dots",
-  "title": "Agent confidence",
-  "subtitle": "232 displayed agent predictions, **average confidence: 80.8/100**.",
-  "dotUnit": 3,
-  "categories": [
-    {
-      "label": "90-100",
-      "value": 69,
-      "color": "#4dffa4"
     },
     {
-      "label": "75-89",
-      "value": 108,
-      "color": "#7aa7ff"
-    },
-    {
-      "label": "50-74",
-      "value": 54,
-      "color": "#ffb347"
-    },
-    {
-      "label": "25-49",
-      "value": 1,
-      "color": "#ff6bcb"
+      "kind": "Confidence",
+      "title": "Agent confidence",
+      "prompt": "232 displayed agent predictions, average confidence 80.8/100.",
+      "counts": [
+        { "label": "90-100", "value": 69, "color": "#4dffa4" },
+        { "label": "75-89", "value": 108, "color": "#7aa7ff" },
+        { "label": "50-74", "value": 54, "color": "#ffb347" },
+        { "label": "25-49", "value": 1, "color": "#ff6bcb" }
+      ]
     }
   ]
 }
@@ -435,56 +407,6 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
 
 ```ce-viz
 {
-  "type": "response-type-grid",
-  "title": "Top Difference Questions",
-  "note": "Includes four attendee answer sets. These are agent-predicted answers, not human ground truth.",
-  "panels": [
-    {
-      "kind": "Binary",
-      "title": "Introduce me without asking",
-      "prompt": "I would let my agent introduce me to someone at this event without asking first, if the match looked unusually strong.",
-      "counts": [
-        { "label": "disagree", "value": 2, "color": "#ffb347" },
-        { "label": "agree", "value": 2, "color": "#4dffa4" }
-      ],
-      "note": "**Average confidence: 87.8/100.**"
-    },
-    {
-      "kind": "Binary",
-      "title": "Schedule while asleep",
-      "prompt": "I would let my agent schedule a 1:1 while I am asleep, if it follows constraints I already set.",
-      "counts": [
-        { "label": "agree", "value": 3, "color": "#4dffa4" },
-        { "label": "disagree", "value": 1, "color": "#ffb347" }
-      ],
-      "note": "**Average confidence: 86.8/100.**"
-    },
-    {
-      "kind": "Binary",
-      "title": "Frontier AI risk-benefit",
-      "prompt": "The benefits of frontier AI are currently worth the risks.",
-      "counts": [
-        { "label": "agree", "value": 3, "color": "#4dffa4" },
-        { "label": "disagree", "value": 1, "color": "#ffb347" }
-      ],
-      "note": "**Average confidence: 73/100.**"
-    },
-    {
-      "kind": "Binary",
-      "title": "Open-source AI safety",
-      "prompt": "Open-source AI models are more likely to make the world safer than more dangerous.",
-      "counts": [
-        { "label": "agree", "value": 3, "color": "#4dffa4" },
-        { "label": "unsure", "value": 1, "color": "#7aa7ff" }
-      ],
-      "note": "**Average confidence: 76.8/100.**"
-    }
-  ]
-}
-```
-
-```ce-viz
-{
   "type": "beeswarm",
   "title": "Rating answers",
   "min": 0,
@@ -536,6 +458,7 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
   "type": "response-type-grid",
   "title": "Other response shapes in the same subset",
   "inline": true,
+  "hideTitle": true,
   "panels": [
     {
       "kind": "Multi-select",
