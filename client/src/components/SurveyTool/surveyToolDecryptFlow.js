@@ -3,6 +3,21 @@ import {
   buildSurveyQuestionDecryptRequestPlan,
 } from './surveyQuestionDecryptRequestPlan';
 import {
+  buildClearedQuestionDecryptBusyTokens,
+  buildQuestionDecryptBusyTokenRegistration,
+  buildQuestionDecryptFailureState,
+  buildQuestionDecryptOwnedClearState,
+  buildQuestionDecryptStartState,
+  clearQuestionFieldBusyMap,
+  getQuestionFieldDecryptSelection,
+  getQuestionFieldTaskKey,
+  getQuestionFieldTaskKeys,
+  hasQuestionDecryptBusy,
+  markQuestionFieldBusyMap,
+  ownsQuestionDecryptBusyTokens,
+  runDedupedDecryptTask,
+} from './surveyToolDecryptBusyState';
+import {
   buildAutoDecryptMaskedFieldSignature,
   buildDecryptTaskKey,
   buildEmptyQuestionDecryptSlice,
@@ -35,194 +50,21 @@ export {
   resolveQuestionDecryptHandlingMode,
 } from './surveyToolDecryptState';
 
-export const runDedupedDecryptTask = (inFlightMap, taskKey, runner) => {
-  const key = String(taskKey || '');
-  if (!key || typeof runner !== 'function') {
-    return Promise.resolve(false);
-  }
-  const existing = inFlightMap.get(key);
-  if (existing) return existing;
-  const task = Promise.resolve()
-    .then(() => runner())
-    .finally(() => {
-      if (inFlightMap.get(key) === task) {
-        inFlightMap.delete(key);
-      }
-    });
-  inFlightMap.set(key, task);
-  return task;
-};
-
-export const getQuestionFieldTaskKey = (questionId, fieldKey = 'answer') => {
-  const qid = String(questionId || '')
-    .trim()
-    .toLowerCase();
-  const normalizedFieldKey = String(fieldKey || 'answer')
-    .trim()
-    .toLowerCase();
-  if (!qid) return '';
-  return `${qid}:${normalizedFieldKey}`;
-};
-
-export const getQuestionFieldTaskKeys = (questionId, { includeAnswer = false, includeAdditional = false } = {}) => {
-  const keys = [];
-  if (includeAnswer) {
-    const answerKey = getQuestionFieldTaskKey(questionId, 'answer');
-    if (answerKey) keys.push(answerKey);
-  }
-  if (includeAdditional) {
-    const additionalKey = getQuestionFieldTaskKey(questionId, 'additional');
-    if (additionalKey) keys.push(additionalKey);
-  }
-  return keys;
-};
-
-export const markQuestionFieldBusyMap = (busyMap, keysToMark = []) => {
-  const next = { ...(busyMap || {}) };
-  keysToMark.forEach((key) => {
-    if (key) next[key] = true;
-  });
-  return next;
-};
-
-export const clearQuestionFieldBusyMap = (busyMap, questionId, fieldToDecrypt = 'both') => {
-  const cleared = { ...(busyMap || {}) };
-  const keysToClear = getQuestionFieldTaskKeys(questionId, {
-    includeAnswer: fieldToDecrypt === 'answer' || fieldToDecrypt === 'both',
-    includeAdditional: fieldToDecrypt === 'additional' || fieldToDecrypt === 'both',
-  });
-  keysToClear.forEach((key) => {
-    cleared[key] = false;
-  });
-  return cleared;
-};
-
-export const hasQuestionDecryptBusy = (busyMap = {}) => Object.values(busyMap || {}).some(Boolean);
-
-export const buildQuestionDecryptBusyTokenRegistration = ({ tokenSeq = 0, busyTokens = {}, keysToMark = [] } = {}) => {
-  const token = (Number(tokenSeq) || 0) + 1;
-  const nextBusyTokens = { ...(busyTokens || {}) };
-  keysToMark.forEach((key) => {
-    if (key) nextBusyTokens[key] = token;
-  });
-  return {
-    token,
-    busyTokens: nextBusyTokens,
-  };
-};
-
-export const buildClearedQuestionDecryptBusyTokens = ({ busyTokens = {}, keysToClear = [], token = null } = {}) => {
-  const nextBusyTokens = { ...(busyTokens || {}) };
-  keysToClear.forEach((key) => {
-    if (!key) return;
-    if (token == null || nextBusyTokens[key] === token) {
-      delete nextBusyTokens[key];
-    }
-  });
-  return nextBusyTokens;
-};
-
-export const ownsQuestionDecryptBusyTokens = ({ busyTokens = {}, keysToCheck = [], token = null } = {}) => {
-  if (token == null) return true;
-  const keys = keysToCheck.filter(Boolean);
-  return keys.length > 0 && keys.every((key) => busyTokens?.[key] === token);
-};
-
-export const buildQuestionDecryptOwnedClearState = ({
-  prevState = null,
-  questionId = '',
-  fieldToDecrypt = 'both',
-  token = null,
-  busyTokens = {},
-  activeSurveyDecryptAttemptSeq = 0,
-  extraPatch = {},
-} = {}) => {
-  const keysToClear = getQuestionFieldTaskKeys(questionId, {
-    includeAnswer: fieldToDecrypt === 'answer' || fieldToDecrypt === 'both',
-    includeAdditional: fieldToDecrypt === 'additional' || fieldToDecrypt === 'both',
-  }).filter((key) => key && token != null && busyTokens?.[key] === token);
-
-  if (keysToClear.length === 0) {
-    return {
-      busyTokens: { ...(busyTokens || {}) },
-      statePatch:
-        token == null
-          ? {
-              ...extraPatch,
-              isDecrypting:
-                Number(activeSurveyDecryptAttemptSeq || 0) > 0 ||
-                hasQuestionDecryptBusy(prevState?.decryptingByKey || {}),
-              decryptingByKey: prevState?.decryptingByKey || {},
-            }
-          : null,
-    };
-  }
-
-  const decryptingByKey = { ...(prevState?.decryptingByKey || {}) };
-  keysToClear.forEach((key) => {
-    decryptingByKey[key] = false;
-  });
-
-  return {
-    busyTokens: buildClearedQuestionDecryptBusyTokens({
-      busyTokens,
-      keysToClear,
-      token,
-    }),
-    statePatch: {
-      ...extraPatch,
-      isDecrypting: Number(activeSurveyDecryptAttemptSeq || 0) > 0 || hasQuestionDecryptBusy(decryptingByKey),
-      decryptingByKey,
-    },
-  };
-};
-
-export const getQuestionFieldDecryptSelection = (questionId, fieldToDecrypt = 'both', responseSlice = null) => {
-  const qid = String(questionId || '')
-    .trim()
-    .toLowerCase();
-  const maskedAnswer = !!(
-    (fieldToDecrypt === 'answer' || fieldToDecrypt === 'both') &&
-    responseSlice?.answers?.[qid]?.value === '*' &&
-    (responseSlice?.answers?.[qid]?.encryptedPortion || responseSlice?.answers?.[qid]?.encrypted)
-  );
-
-  const maskedAdditional = !!(
-    (fieldToDecrypt === 'additional' || fieldToDecrypt === 'both') &&
-    responseSlice?.additionalComments?.[qid]?.value === '*' &&
-    (responseSlice?.additionalComments?.[qid]?.encryptedPortion || responseSlice?.additionalComments?.[qid]?.encrypted)
-  );
-
-  return {
-    maskedAnswer,
-    maskedAdditional,
-    hasMaskedField: !!(maskedAnswer || maskedAdditional),
-    clearMode:
-      maskedAnswer && maskedAdditional ? 'both' : maskedAnswer ? 'answer' : maskedAdditional ? 'additional' : '',
-    keysToMark: getQuestionFieldTaskKeys(qid, {
-      includeAnswer: maskedAnswer,
-      includeAdditional: maskedAdditional,
-    }),
-  };
-};
-
-export const buildQuestionDecryptStartState = (prevState, keysToMark = []) => ({
-  isDecrypting: true,
-  submissionError: '',
-  suppressPrefill: true,
-  decryptingByKey: markQuestionFieldBusyMap(prevState?.decryptingByKey, keysToMark),
-});
-
-export const buildQuestionDecryptFailureState = (
-  prevState,
-  questionId,
-  fieldToDecrypt = 'both',
-  errorMessage = '',
-) => ({
-  isDecrypting: false,
-  submissionError: errorMessage || 'Decryption failed.',
-  decryptingByKey: clearQuestionFieldBusyMap(prevState?.decryptingByKey, questionId, fieldToDecrypt),
-});
+export {
+  buildClearedQuestionDecryptBusyTokens,
+  buildQuestionDecryptBusyTokenRegistration,
+  buildQuestionDecryptFailureState,
+  buildQuestionDecryptOwnedClearState,
+  buildQuestionDecryptStartState,
+  clearQuestionFieldBusyMap,
+  getQuestionFieldDecryptSelection,
+  getQuestionFieldTaskKey,
+  getQuestionFieldTaskKeys,
+  hasQuestionDecryptBusy,
+  markQuestionFieldBusyMap,
+  ownsQuestionDecryptBusyTokens,
+  runDedupedDecryptTask,
+} from './surveyToolDecryptBusyState';
 
 export const startQuestionDecryptAttemptStatus = ({
   host = null,
