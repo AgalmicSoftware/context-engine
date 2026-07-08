@@ -23,6 +23,7 @@ import {
   normalizeAudioToWav,
   splitAudioBlobToWavChunks,
 } from './aiClientAudioTranscription.js';
+import { buildCompareFallbackTree, sanitizeCompareTreePayload } from './aiClientCompareTree.js';
 import { getEffectiveArweaveKey } from '../session/resourceKeys.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
@@ -962,65 +963,18 @@ export async function drillDownComparisonTree(users, pointText, type, opts = {})
     const raw = await callAIQueued(prompt, { ...aiCallOpts, thinking: true });
     const parsed = parseJsonFlexible(raw);
 
-    const ok = parsed && typeof parsed === 'object' && typeof parsed.title === 'string' && Array.isArray(parsed.nodes);
-    if (ok) {
-      // Micro-sanitize (depth/len clamps), preserving optional participants
-      const sanitizeNode = (n, depth = 0) => {
-        if (!n || typeof n !== 'object') return null;
-        const label = String(n.label || '').slice(0, 240);
-        const evidence = Array.isArray(n.evidence)
-          ? n.evidence.slice(0, 4).map((s) => String(s || '').slice(0, 280))
-          : [];
-
-        // NEW: participants passthrough (optional, compact)
-        let participants = undefined;
-        if (Array.isArray(n.participants)) {
-          participants = n.participants
-            .slice(0, 10)
-            .map((p) => {
-              if (typeof p === 'string') {
-                const a = String(p).toLowerCase();
-                return a ? { address: a } : null;
-              }
-              if (p && typeof p === 'object') {
-                const a = String(p.address || '').toLowerCase();
-                const stance = p.stance != null ? String(p.stance).slice(0, 32) : undefined;
-                return a ? { address: a, ...(stance ? { stance } : {}) } : null;
-              }
-              return null;
-            })
-            .filter(Boolean);
-          if (participants.length === 0) participants = undefined;
-        }
-
-        const childrenIn = Array.isArray(n.children) ? n.children : [];
-        if (depth >= 3) return { label, evidence, ...(participants ? { participants } : {}), children: [] };
-        const children = childrenIn
-          .slice(0, 6)
-          .map((c) => sanitizeNode(c, depth + 1))
-          .filter(Boolean);
-        return { label, evidence, ...(participants ? { participants } : {}), children };
-      };
-
-      return {
-        title: String(parsed.title || `Why this ${t} holds`).slice(0, 120),
-        nodes: parsed.nodes
-          .slice(0, 6)
-          .map((n) => sanitizeNode(n, 0))
-          .filter(Boolean),
-      };
+    const sanitizedTree = sanitizeCompareTreePayload(parsed, `Why this ${t} holds`);
+    if (sanitizedTree) {
+      return sanitizedTree;
     }
 
     // Fallback to plain-text summary wrapped as a tiny tree
     const text = await drillDownComparisonPoint(safeUsers, pointText, t, aiCallOpts);
-    return { title: `Why this ${t} holds`, nodes: [{ label: 'Summary', evidence: [text], children: [] }] };
+    return buildCompareFallbackTree(`Why this ${t} holds`, text);
   } catch (err) {
     aiLog.error('drillDownComparisonTree error:', err);
     const text = await drillDownComparisonPoint(users, pointText, type, aiCallOpts);
-    return {
-      title: `Why this ${type || 'agreement'} holds`,
-      nodes: [{ label: 'Summary', evidence: [text], children: [] }],
-    };
+    return buildCompareFallbackTree(`Why this ${type || 'agreement'} holds`, text);
   }
 }
 
