@@ -628,6 +628,50 @@ describe('surveyToolDecryptFlow', () => {
     ]);
   });
 
+  it('preserves decrypt keys fallback shape for busy-token registration', () => {
+    const nonArrayKeysToMark = { answer: 'q1:answer' };
+    const registerBusyTokens = jest.fn(() => 13);
+    const buildStartState = jest.fn(() => ({ started: true }));
+    const setState = jest.fn((updater) => updater({ decryptingByKey: {} }));
+
+    const started = startQuestionDecryptAttemptStatus({
+      prepareQuestionDecryptAttempt: jest.fn(() => ({
+        shouldDecrypt: true,
+        decryptSelection: {
+          keysToMark: nonArrayKeysToMark,
+          clearMode: 'answer',
+        },
+      })),
+      registerQuestionDecryptBusyTokens: registerBusyTokens,
+      buildQuestionDecryptStartState: buildStartState,
+      setState,
+    });
+
+    expect(started.keysToMark).toBe(nonArrayKeysToMark);
+    expect(registerBusyTokens).toHaveBeenCalledWith(nonArrayKeysToMark);
+    expect(buildStartState).toHaveBeenCalledWith({ decryptingByKey: {} }, nonArrayKeysToMark);
+
+    const registerEmptyKeys = jest.fn(() => 14);
+    const buildEmptyStartState = jest.fn(() => ({ started: true }));
+
+    const startedWithEmptyKeys = startQuestionDecryptAttemptStatus({
+      prepareQuestionDecryptAttempt: jest.fn(() => ({
+        shouldDecrypt: true,
+        decryptSelection: {
+          keysToMark: '',
+          clearMode: 'answer',
+        },
+      })),
+      registerQuestionDecryptBusyTokens: registerEmptyKeys,
+      buildQuestionDecryptStartState: buildEmptyStartState,
+      setState: (updater) => updater({ decryptingByKey: { stale: 1 } }),
+    });
+
+    expect(startedWithEmptyKeys.keysToMark).toEqual([]);
+    expect(registerEmptyKeys).toHaveBeenCalledWith([]);
+    expect(buildEmptyStartState).toHaveBeenCalledWith({ decryptingByKey: { stale: 1 } }, []);
+  });
+
   it('applies question decrypt failure status through stale or owned failure patches', () => {
     const staleSetState = jest.fn((updater) => updater({ decryptingByKey: { 'q1:answer': true } }));
     const buildStaleState = jest.fn(() => ({ decryptingByKey: { 'q1:answer': false } }));
