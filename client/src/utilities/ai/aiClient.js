@@ -44,14 +44,17 @@ import {
 } from './aiClientParsing.js';
 import {
   getSupportedPhotoMimeType,
-  isChatReasoningModel,
   readFileAsDataUrl,
   resolvePhotoAnalysisSupport,
   stripDataUrlPrefix,
-  usesOpenAiResponsesApi,
 } from './aiClientPhotoSupport.js';
 import { inferAiTaskType, pickAiRequestOpts } from './aiClientRequestOptions.js';
 import { extractMainContent, readFileContent } from './aiClientSourceReaders.js';
+import {
+  buildAiWorkerRequestPlan,
+  parseAiWorkerCompletion,
+  resolveAiWorkerEndpoint,
+} from './aiClientWorkerTransport.js';
 
 import {
   pcaLiteCompass,
@@ -206,61 +209,16 @@ export const callAI = async (prompt, opts = {}) => {
 
     const thinking = thinkingRequested && ai.provider === 'anthropic';
 
-    const messages = Array.isArray(opts.messages) ? opts.messages : [{ role: 'user', content: prompt }];
-    const usesResponsesApi = usesOpenAiResponsesApi(ai.provider, ai.model);
-    const usesCompletionTokens = !usesResponsesApi && isChatReasoningModel(ai.model);
-
-    const maxTokens = opts.max_tokens ?? opts.maxTokens ?? (ai.provider === 'anthropic' ? 32568 : 16384);
-
-    const requestBody = {
-      action: 'ai',
-      provider: ai.provider,
-      model: ai.model,
-      ...(usesResponsesApi ? { endpoint: 'responses' } : {}),
-      ...(typeof (opts.max_output_tokens ?? (usesResponsesApi ? maxTokens : undefined)) === 'number'
-        ? { max_output_tokens: opts.max_output_tokens ?? maxTokens }
-        : {}),
-      ...(typeof (opts.max_completion_tokens ?? (usesCompletionTokens ? maxTokens : undefined)) === 'number'
-        ? { max_completion_tokens: opts.max_completion_tokens ?? maxTokens }
-        : {}),
-      ...(!usesResponsesApi && !usesCompletionTokens && typeof maxTokens === 'number' ? { max_tokens: maxTokens } : {}),
-      ...(opts.response_format ? { response_format: opts.response_format } : {}),
-      ...(!usesResponsesApi && !usesCompletionTokens
-        ? typeof opts.temperature === 'number'
-          ? { temperature: opts.temperature }
-          : { temperature: 0.7 }
-        : {}),
-      messages,
-      ...(thinking ? { thinking: true } : {}),
-    };
-    const taskOverride = taskType ? ai.taskReasoningEffort?.[taskType] : null;
-    const reasoningEffort =
-      opts.reasoning_effort ||
-      opts.reasoningEffort ||
-      taskOverride ||
-      ai.reasoning_effort ||
-      ai.reasoningEffort ||
-      'medium';
-    const modelLeaf = (ai.model || '').toLowerCase().split('/').pop();
-    if (modelLeaf && /^(gpt-5|o[13])/.test(modelLeaf)) {
-      requestBody.reasoning_effort = reasoningEffort;
-    }
-
-    const useLocalOverride = ai.apiKeySource === 'local';
-    if (useLocalOverride && ai.apiKey) {
-      requestBody.apiKey = ai.apiKey;
-    }
-    if (ai.provider === 'custom') {
-      if (ai.customFunctionsParsed) requestBody.functions = ai.customFunctionsParsed;
-      else if (ai.customFunctions) requestBody.functions = ai.customFunctions;
-      if (useLocalOverride && ai.customRpcUrl) requestBody.rpcUrl = ai.customRpcUrl;
-    }
-    const shouldUseAnonymousFirst = !(
-      ai.provider === 'custom' &&
-      useLocalOverride &&
-      !!String(ai.apiKey || '').trim() &&
-      !String(ai.customRpcUrl || '').trim()
-    );
+    const { endpointLabel, maxTokens, messages, requestBody, shouldUseAnonymousFirst, tokenBudgetKey } =
+      buildAiWorkerRequestPlan({
+        ai,
+        prompt,
+        opts: {
+          ...opts,
+          thinking,
+        },
+        taskType,
+      });
 
     const corsWorkerUrl = await getCorsProxyUrlOrThrow({
       sessionSlug,
@@ -268,8 +226,7 @@ export const callAI = async (prompt, opts = {}) => {
       context: opts.context,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
     });
-    const endpoint = corsWorkerUrl.endsWith('/ai') ? corsWorkerUrl : `${corsWorkerUrl.replace(/\/+$/, '')}/ai`;
-    const baseUrl = corsWorkerUrl.replace(/\/+$/, '').replace(/\/ai$/i, '');
+    const { endpoint, baseUrl } = resolveAiWorkerEndpoint(corsWorkerUrl);
     const sessionSelection = opts && typeof opts.sessionSelection === 'object' ? opts.sessionSelection : null;
     aiLog.log('[aiClient] worker route selected', {
       sessionSlug: String(sessionSlug || ''),
@@ -280,12 +237,8 @@ export const callAI = async (prompt, opts = {}) => {
     aiLog.log('[aiClient] AI request params', {
       provider: ai.provider,
       model: ai.model,
-      endpoint: usesResponsesApi ? 'responses' : 'chat_completions',
-      tokenBudgetKey: usesResponsesApi
-        ? 'max_output_tokens'
-        : usesCompletionTokens
-          ? 'max_completion_tokens'
-          : 'max_tokens',
+      endpoint: endpointLabel,
+      tokenBudgetKey,
       tokenBudgetValue: maxTokens,
       messageCount: messages.length,
       firstMessageLength: messages[0]?.content?.length || 0,
@@ -318,11 +271,7 @@ export const callAI = async (prompt, opts = {}) => {
       throw new Error(data?.error || 'AI request failed');
     }
 
-    if (data?.completion) return data.completion;
-    if (data?.content && Array.isArray(data.content) && data.content[0]?.text) {
-      return data.content[0].text;
-    }
-    throw new Error('Unexpected AI response format');
+    return parseAiWorkerCompletion(data);
   } catch (error) {
     aiLog.error('Error calling AI via Worker:', error);
     throw error;
