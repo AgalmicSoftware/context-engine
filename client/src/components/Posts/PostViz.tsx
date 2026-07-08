@@ -1444,7 +1444,9 @@ const PostViz = ({
   const inline = toBoolean(record.inline);
 
   if (presentation === 'slide') {
-    return renderVizBody(record, type, false);
+    // hideTitle only affects the visible header; the title still names the
+    // slide and its dot via getPostVizTitle, so accessible labels survive.
+    return renderVizBody(record, type, toBoolean(record.hideTitle));
   }
 
   if (inline) {

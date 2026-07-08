@@ -580,6 +580,36 @@ describe('PostsPage', () => {
     expect(within(carousel).getByTestId('ce-posts-viz-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
   });
 
+  it('hides slide titles for hideTitle viz while keeping slide labels', async () => {
+    const hideTitleMarkdown = [
+      '# First Post',
+      '',
+      '```ce-viz-group',
+      '{ "title": "Hidden Titles", "defaultOpen": true, "childrenOpen": true }',
+      '```',
+      '',
+      '```ce-viz',
+      '{',
+      '  "type": "quote-wall",',
+      '  "title": "Quiet quotes",',
+      '  "hideTitle": true,',
+      '  "quotes": [{ "label": "P1", "text": "Visible quote body." }]',
+      '}',
+      '```',
+      '',
+      '```ce-viz-group-end',
+      '```',
+    ].join('\n');
+    renderFirstPostMarkdown(hideTitleMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    const carousel = await screen.findByTestId('ce-posts-viz-carousel');
+
+    expect(within(carousel).getByText('Visible quote body.')).toBeInTheDocument();
+    expect(within(carousel).queryByText('Quiet quotes')).not.toBeInTheDocument();
+    expect(within(carousel).getByRole('group', { name: '1 of 1: Quiet quotes' })).toBeInTheDocument();
+  });
+
   it('pins the binary beeswarm tooltip on click until dismissed', async () => {
     const fetcher = jest
       .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()

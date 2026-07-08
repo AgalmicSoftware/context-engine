@@ -112,5 +112,10 @@ controls whether the group disclosure starts open. `childrenOpen` is retained
 for older posts and parser compatibility, but grouped child visualizations are
 always visible on their carousel slide.
 
+A grouped `ce-viz` block may set `"hideTitle": true` to suppress its visible
+header on the slide (useful when panel headings already carry the meaning).
+The `title` is still required: it names the slide and its dot for assistive
+technology and tooltips.
+
 Keep post data non-identifying unless the source material is intentionally
 public and licensed for publication.
