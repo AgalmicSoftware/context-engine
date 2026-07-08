@@ -161,26 +161,87 @@ import {
   type UserPageEffectiveAiConfigResult,
   type UserPageSourceSlugMap,
 } from './userPageHelpers';
-import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
-import UserPageAnalysisModal from './UserPageAnalysisModal';
-import UserPageComparePanel from './UserPageComparePanel';
-import UserPageDeepScanStatusIndicator from './UserPageDeepScanStatusIndicator';
-import UserPageFullProfileModal from './UserPageFullProfileModal';
-import UserPageHeader from './UserPageHeader';
-import UserPageQuestionSection from './UserPageQuestionSection';
-import UserPageSbtSection from './UserPageSbtSection';
-import UserPageSimulatedActions from './UserPageSimulatedActions';
-import UserPageSurveySection from './UserPageSurveySection';
+import { createInitialUserPageState, createUserPageSectionDeriveMemo } from './userPageInitialState';
+import { renderUserPageSurface } from './userPageRenderSurface';
 import {
-  runUserPageAnalyzeActionController,
-  runUserPageBookmarkActionController,
-  runUserPageCacheRefreshActionController,
-} from './userPageActionController';
+  PROFILE_SCAN_REPORT_EVENT,
+  USERPAGE_GATE_TERMINAL_RECHECK_MS,
+  USERPAGE_GATE_UNKNOWN_RETRY_MS,
+  USERPAGE_RESPONSE_PARSE_MEMO_LIMIT,
+  USER_ANALYSIS_CACHE_VERSION,
+  USER_ANALYSIS_TTL_MS,
+  type AiSessionCandidate,
+  type AiSessionResolution,
+  type BookmarkToggleMeta,
+  type CacheRefreshOptions,
+  type CacheSourceSnapshot,
+  type CryptoUtilsWithSingleField,
+  type DeepScanProgressRow,
+  type DeepScanProgressSnapshot,
+  type DeepScanSessionDisplayConfig,
+  type DecryptSingleFieldOptions,
+  type DerivedSbtListItem,
+  type EncryptedVisibilityInput,
+  type EncryptedVisibilityResult,
+  type EntityCacheMap,
+  type GateAccessContext,
+  type GateAccessContextSnapshot,
+  type GateAccessKeyInput,
+  type GateAccessStatusEntry,
+  type ManagedCacheUpdateEvent,
+  type NamespaceCacheSourceEntry,
+  type NicknameChangeEvent,
+  type NicknameKeyEvent,
+  type NormalizedQuestionResponsePayload,
+  type ProfileDeepScanReport,
+  type ProfileScanReportEvent,
+  type ProfileTelemetryEntry,
+  type QueuedCacheRefreshOptions,
+  type QuestionSectionResult,
+  type QuestionResponseInfoEntry,
+  type QuestionResponseRecencyUpsertInput,
+  type ResponseBucketMap,
+  type ResponseEncryptionSummary,
+  type ResponseGateAccessCheckPromise,
+  type ResponseRecency,
+  type ResponseRecencyBucketMap,
+  type ResponseRecencyWithHints,
+  type SbtAggregateEntry,
+  type SbtAggregateMap,
+  type SbtSectionResult,
+  type SponsoredAccessResult,
+  type SectionDeriveMemo,
+  type SourceSlugMap,
+  type StoppableEvent,
+  type SurveyQuestionResponseDetail,
+  type SurveyResponseRecencyUpsertInput,
+  type SurveySectionResult,
+  type UnifiedCacheAggregateInput,
+  type UnknownRecord,
+  type UserAnalysisAiContext,
+  type UserAnalysisCacheContext,
+  type UserAnalysisCacheContextArgs,
+  type UserAnalysisCacheEntry,
+  type UserAnalysisCacheWriteArgs,
+  type UserCachePayload,
+  type UserCacheSourceEntry,
+  type UserChainNode,
+  type UserPageGlobalState,
+  type UserPageIntervalHandle,
+  type UserPagePreviousProps,
+  type UserPageRenderQuestionEntry,
+  type UserPageRenderSurveyEntry,
+  type UserPageTimeoutHandle,
+  type PrioritizedCacheNode,
+  type PrioritizedUserChainNode,
+} from './userPageRuntimeTypes';
+import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
+import UserPageDeepScanStatusIndicator from './UserPageDeepScanStatusIndicator';
+import { runUserPageCacheRefreshActionController } from './userPageActionController';
 
 import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
 
-import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { createLogger } from 'utilities/logging.js';
 import { checkSponsoredAccess } from '../../domains/sessions/sponsoredAccess.js';
 import {
@@ -214,432 +275,6 @@ import { buildExplorerAddressUrl } from '../../variables/chains.js';
 import { ethers } from 'ethers';
 
 const accountLog = createLogger('account');
-const CompareAddressSection = React.lazy(() => import('./CompareAddresses'));
-const USERPAGE_GATE_UNKNOWN_RETRY_MS = 30 * 1000;
-const USERPAGE_GATE_TERMINAL_RECHECK_MS = 60 * 1000;
-const USERPAGE_RESPONSE_PARSE_MEMO_LIMIT = 300;
-const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
-const USER_ANALYSIS_CACHE_VERSION = 1;
-const USER_ANALYSIS_TTL_MS = 24 * 60 * 60 * 1000;
-
-type UnknownRecord = Record<string, unknown>;
-type UserPagePreviousProps = UnknownRecord & {
-  network?: {
-    id?: unknown;
-  } | null;
-};
-
-type UserPageGlobalState = typeof globalThis & {
-  CE_USER_PROFILE_DEEP_SCAN_LOADING?: unknown;
-  CE_PROFILE_SCAN_TELEMETRY?: unknown;
-  CE_PROFILE_SCAN_COLD_DIAG?: unknown;
-  CE_SESSION_SCAN_SCOPE?: unknown;
-  CE_SESSION_SCAN_SLUGS?: unknown;
-  [key: string]: unknown;
-};
-
-type UserCacheSourceEntry = {
-  slug?: unknown;
-  data?: UnknownRecord;
-  [key: string]: unknown;
-};
-
-type NamespaceCacheSourceEntry = {
-  slug: string;
-  data: UnknownRecord;
-};
-
-type CacheSourcePresence = {
-  hasSurveysCache: boolean;
-  hasQuestionsCache: boolean;
-  hasSbtCache: boolean;
-  hasUserCache: boolean;
-};
-
-type CacheSourceSnapshot = CacheSourcePresence & {
-  hasSurveySources: boolean;
-  hasQuestionSources: boolean;
-  hasSbtSources: boolean;
-  surveySourcesSignature: string;
-  questionSourcesSignature: string;
-  sbtSourcesSignature: string;
-  membershipSignature: string;
-};
-
-type UserPageTimeoutHandle = ReturnType<typeof setTimeout>;
-type UserPageIntervalHandle = ReturnType<typeof setInterval>;
-
-type QueuedCacheRefreshOptions = {
-  force?: unknown;
-  markLoading?: unknown;
-  bypassSignature?: unknown;
-};
-
-type CacheRefreshOptions = {
-  force: boolean;
-  markLoading: boolean;
-  bypassSignature?: boolean;
-};
-
-type UnifiedCacheAggregateInput = {
-  networkID?: unknown;
-  viewAddressLower?: unknown;
-};
-
-type CacheNetworkBucket = UnknownRecord & {
-  surveys?: unknown;
-  surveyResponses?: unknown;
-  questions?: unknown;
-  questionResponses?: unknown;
-  questionResponsesMeta?: unknown;
-  sbtList?: unknown;
-};
-
-type PrioritizedCacheNode = {
-  key: string;
-  value: CacheNetworkBucket;
-};
-
-type UserCachePayload = UnknownRecord & {
-  sbts?: unknown;
-  createdSurveys?: unknown;
-  createdQuestions?: unknown;
-  surveyResponses?: unknown;
-  questionResponses?: unknown;
-};
-
-type UserChainNode = UnknownRecord & {
-  data?: unknown;
-};
-
-type PrioritizedUserChainNode = {
-  chainKey: string;
-  node: UserChainNode;
-};
-
-type GateAccessKeyInput = {
-  slug?: unknown;
-  resourceKey?: unknown;
-};
-
-type GateAccessStatusEntry = {
-  status: string;
-  ts: number;
-};
-
-type SponsoredAccessResult = {
-  status?: unknown;
-  [key: string]: unknown;
-};
-
-type ResponseGateAccessCheckPromise = Promise<void>;
-
-type GateAccessContext = {
-  pendingKeys: Set<string>;
-  uncertainResources: Set<string>;
-};
-
-type GateAccessContextSnapshot = {
-  pendingKeys: string[];
-  uncertainResources: string[];
-};
-
-type SourceSlugMap = UserPageSourceSlugMap;
-
-type EntityCacheMap = Record<string, UnknownRecord>;
-
-type ResponseByResponderMap = Record<string, unknown>;
-
-type ResponseBucketMap = Record<string, ResponseByResponderMap>;
-
-type ResponseRecencyWithHints = ResponseRecency & {
-  hasHints: boolean;
-};
-
-type ResponseRecencyBucketMap = Record<string, Record<string, ResponseRecencyWithHints>>;
-
-type SbtAggregateEntry = UnknownRecord & {
-  sbtAddress?: unknown;
-  sbtInfo?: unknown;
-  mintedSet: Set<string>;
-  burnedSet: Set<string>;
-  viewerCountsAuthoritative?: boolean;
-  blockNumber: number;
-  slug?: unknown;
-};
-
-type SbtAggregateMap = Record<string, SbtAggregateEntry>;
-
-type DerivedSbtListItem = {
-  sbtInfo: UnknownRecord;
-  slug?: unknown;
-};
-
-type UserPageRenderSurveyEntry = UnknownRecord & {
-  id: string;
-  title: React.ReactNode;
-  questionsCount: React.ReactNode;
-  slug?: string;
-  tags: React.ReactNode[];
-  documentURLs: string[];
-};
-
-type UserPageRenderQuestionEntry = UnknownRecord & {
-  id: string;
-  canDecryptOtherResponses?: unknown;
-  sessionSlug?: unknown;
-  slug?: unknown;
-};
-
-type SbtSectionResult = {
-  sbtList: DerivedSbtListItem[];
-  badgesReceived: number;
-};
-
-type ResponseEncryptionSummary = {
-  answerEncrypted: boolean;
-  additionalEncrypted: boolean;
-};
-
-type SurveyQuestionResponseDetail = {
-  questionData: UnknownRecord;
-  responseData: NormalizedQuestionResponsePayload;
-  canDecryptOtherResponses: boolean;
-  responseEncryption: ResponseEncryptionSummary;
-};
-
-type SurveySectionResult = {
-  surveyResponseInfo: UnknownRecord[];
-  surveyCreationInfo: UnknownRecord[];
-  detailedSurveyResponses: Record<string, SurveyQuestionResponseDetail[]>;
-  surveysResponded: number;
-  surveysCreated: number;
-};
-
-type QuestionResponseInfoEntry = UnknownRecord & {
-  _responseRecency?: ResponseRecency;
-};
-
-type QuestionSectionResult = {
-  questionCreationInfo: UnknownRecord[];
-  questionResponseInfo: UnknownRecord[];
-  detailedQuestionResponses: Record<string, NormalizedQuestionResponsePayload>;
-  questionsCreated: number;
-  questionsResponded: number;
-};
-
-type SurveyResponseRecencyUpsertInput = {
-  sid?: unknown;
-  responder?: unknown;
-  responseValue?: unknown;
-  metaValue?: unknown;
-  slug?: unknown;
-};
-
-type QuestionResponseRecencyUpsertInput = {
-  qid?: unknown;
-  responder?: unknown;
-  responseValue?: unknown;
-  metaValue?: unknown;
-  slug?: unknown;
-};
-
-type EncryptedVisibilityInput = {
-  resourceKey?: unknown;
-  slug?: unknown;
-  viewAddressLower?: unknown;
-  encryptionAudience?: unknown;
-  gateContext?: GateAccessContext | null;
-};
-
-type EncryptedVisibilityResult = {
-  visible: boolean;
-  canDecryptOtherResponses: boolean;
-  uncertain?: boolean;
-};
-
-type DecryptSingleFieldOptions = UnknownRecord & {
-  account: string;
-  provider?: unknown;
-  providerKind?: unknown;
-  chainId: number;
-  surveyId: string;
-  acceptedSurveyIds: string[];
-  lit: unknown;
-  throwOnError: boolean;
-};
-
-type CryptoUtilsWithSingleField = {
-  decryptSingleField: (
-    responseSlice: unknown,
-    questionId: string,
-    fieldToDecrypt: unknown,
-    options: DecryptSingleFieldOptions,
-  ) => Promise<unknown>;
-};
-
-type SectionDeriveMemoEntry = {
-  signature: string;
-  result: unknown;
-  gateSnapshot?: GateAccessContextSnapshot;
-} | null;
-
-type SectionDeriveMemo = {
-  survey: SectionDeriveMemoEntry;
-  question: SectionDeriveMemoEntry;
-  sbt: SectionDeriveMemoEntry;
-};
-
-type DeepScanSessionDisplayConfig = UnknownRecord & {
-  sessionName?: unknown;
-  blockLimits?: UnknownRecord & {
-    start?: unknown;
-  };
-};
-
-type DeepScanProgressRow = {
-  slug: string;
-  chainId: number | null;
-  lastBlockScanned: number;
-  latestBlock: number | null;
-  remainingBlocks: number | null;
-  percentComplete: number | null;
-  isDeterminate: boolean;
-  label: string;
-  startBlock: number | null;
-  displayLastBlock: number;
-};
-
-type DeepScanProgressSnapshot = {
-  rows: DeepScanProgressRow[] | null;
-  lines: string[] | null;
-};
-
-type NormalizedResponseField = UnknownRecord & {
-  value?: unknown;
-};
-
-type NormalizedQuestionResponsePayload = UnknownRecord & {
-  answer: NormalizedResponseField;
-  additional: NormalizedResponseField;
-  __ceMalformedPayload?: boolean;
-};
-
-type ResponseRecency = {
-  bn: number;
-  txi: number;
-  li: number;
-  ts: number;
-};
-
-type ManagedCacheUpdateEvent =
-  | {
-      namespace?: unknown;
-      slug?: unknown;
-      [key: string]: unknown;
-    }
-  | null
-  | undefined;
-
-type StoppableEvent =
-  | {
-      stopPropagation?: () => void;
-    }
-  | null
-  | undefined;
-
-type BookmarkToggleMeta = UnknownRecord & {
-  nickname?: unknown;
-  username?: unknown;
-};
-
-type AiSessionCandidate = {
-  slug: string;
-  sessionConfig: UnknownRecord;
-  status: string;
-};
-
-type AiSessionResolution = AiSessionCandidate & {
-  reason: string;
-};
-
-type UserAnalysisAiContext = {
-  sessionSlug: string;
-  provider: string;
-  model: string;
-};
-
-type UserAnalysisCacheContextArgs = {
-  userData: unknown;
-  analysisSession: AiSessionResolution;
-  addressLower: string;
-  networkId: string;
-};
-
-type UserAnalysisCacheContext = {
-  sessionSlug: string;
-  aiContext: UserAnalysisAiContext;
-  fingerprint: string;
-};
-
-type UserAnalysisCacheEntry = UnknownRecord & {
-  version?: unknown;
-  fingerprint?: unknown;
-  cachedAt?: unknown;
-  expiresAt?: unknown;
-  address?: unknown;
-  networkId?: unknown;
-  result?: unknown;
-};
-
-type UserAnalysisCacheWriteArgs = {
-  sessionSlug: string;
-  networkId: string;
-  addressLower: string;
-  fingerprint: string;
-  aiContext: UserAnalysisAiContext;
-  result: unknown;
-};
-
-type ProfileTelemetryEntry = UnknownRecord & {
-  ts: string;
-  seq: number;
-  source: 'UserPage';
-  event: string;
-};
-
-type ProfileDeepScanReport = UnknownRecord & {
-  targetAddress?: unknown;
-  attemptedSlugs?: unknown;
-  scannedSlugs?: unknown;
-  skippedSlugs?: unknown;
-  failedSlugs?: unknown;
-  failedActivitySlugs?: unknown;
-  hadRpcErrors?: unknown;
-  coverageComplete?: unknown;
-  coverageReason?: unknown;
-  anyNewData?: unknown;
-  usedAllSessions?: unknown;
-};
-
-type ProfileScanReportEvent =
-  | Event
-  | {
-      detail?: unknown;
-    }
-  | null
-  | undefined;
-
-type NicknameKeyEvent = {
-  key?: unknown;
-};
-
-type NicknameChangeEvent = {
-  target?: {
-    value?: unknown;
-  };
-};
-
 const globalState = globalThis as UserPageGlobalState;
 const getEffectiveAiConfigTyped = getEffectiveAiConfig as (
   request: UserPageEffectiveAiConfigRequest,
@@ -712,112 +347,10 @@ class UserPage extends Component<any, any> {
   _unifiedCacheAggregateMemoKey: string = '';
   _unifiedCacheAggregateMemo: unknown = null;
   _unsubscribeCacheUpdates: (() => void) | null = null;
-  _sectionDeriveMemo: SectionDeriveMemo = {
-    survey: null,
-    question: null,
-    sbt: null,
-  };
+  _sectionDeriveMemo: SectionDeriveMemo = createUserPageSectionDeriveMemo();
   constructor(props: unknown) {
     super(props);
-    this.state = {
-      viewAddress: '', // Set from props
-      surveyResponseInfo: [], // Basic info about responded-to surveys
-      surveyCreationInfo: [], // Basic info about created surveys
-      questionCreationInfo: [], // Basic info about created questions
-      questionResponseInfo: [], // Basic info about responded-to questions
-
-      detailedSurveyResponses: {}, // { [surveyId]: [ array of { questionData, responseData } ] }
-      detailedQuestionResponses: {}, // { [questionId]: responseObject }
-
-      userStats: {
-        surveysResponded: 0,
-        surveysCreated: 0,
-        questionsResponded: 0,
-        questionsCreated: 0,
-        mostUniqueIdea: ' ... ',
-        badgesReceived: 0,
-        worryScore: 'x%',
-        enthusiasmScore: 'y%',
-        topTags: ['#cybersecurity', '#ubi', '#mechinterp'],
-      },
-      copied: false,
-      collapseOpen: false,
-      username: '',
-      usernameError: '',
-      isEditingUsername: false, // NEW: state for username edit mode
-      bookmarked: false,
-      sbtList: [],
-      loadingSBTs: true,
-      loadingSurveys: true,
-      loadingQuestions: true,
-      showAnalysisModal: false,
-      aiAnalysis: '',
-      analysisName: '',
-      analysisDetails: '',
-      analysisError: '',
-      analyzing: false,
-      aiAvailable: null, // null = unchecked, true = available, false = unavailable
-      // Added for elapsed timer + historical alignment
-      analysisElapsedMs: 0,
-      analysisHistoricalFigure: '',
-      analysisHistoricalReasoning: '',
-      analysisServedFromCache: false,
-      analysisCachedAt: null,
-      showFullProfileModal: false,
-      isSimulated: false,
-      // Default: Questions tab
-      selectedTab: 'questions',
-      expandedSurveyResponses: {},
-      expandedSurveysCreated: {},
-
-      // NEW: section collapsibles
-      showSectionSurveyResponsesOpen: true,
-      showSectionSurveysCreatedOpen: true,
-      showSectionQuestionResponsesOpen: true,
-      showSectionQuestionsCreatedOpen: true,
-
-      // NEW: nickname (inline, header actions; visible on any user page)
-      nicknameInput: '',
-      // NEW: inline edit toggle for nickname
-      isEditingNickname: false,
-
-      // NEW: Track deep search status to prevent "No Data" flash
-      isDeepScanning: false,
-      hasUncertainUserData: false,
-      hasUncertainSbtData: false,
-      hasUncertainGateAccess: false,
-      deepScanProgressTick: 0,
-      deepScanTooltipLines: null,
-      deepScanProgressRows: null,
-    };
-    this._queuedCacheRefreshTimer = null;
-    this._queuedCacheRefreshForce = false;
-    this._queuedCacheRefreshLoading = false;
-    this._queuedCacheRefreshBypassSignature = false;
-    this._responseGateRetryTimer = null;
-    this._responseGateRetryDueAt = 0;
-    this._responseGateAccessStatusByKey = new Map();
-    this._responseGateAccessInFlightByKey = new Map();
-    this._responseGateAccessGeneration = 0;
-    this._responseGateAccessStatusVersion = 0;
-    this._lastCacheRefreshInputSignature = '';
-    this._responsePayloadParseMemo = new Map();
-    this._deepScanTooltipInputSignature = null;
-    this._deepScanTooltipOutputSignature = '';
-    this._profileTelemetrySeq = 0;
-    this._lastProfileRefreshTelemetrySignature = '';
-    this._lastProfileDeriveTelemetrySignature = '';
-    this._lastNoSbtVisibleTelemetrySignature = '';
-    this._lastProfileRefreshTelemetry = null;
-    this._lastBackgroundDeepScanReportSignature = '';
-    this._unifiedCacheAggregateMemoKey = '';
-    this._unifiedCacheAggregateMemo = null;
-    this._unsubscribeCacheUpdates = null;
-    this._sectionDeriveMemo = {
-      survey: null,
-      question: null,
-      sbt: null,
-    };
+    this.state = createInitialUserPageState();
   }
 
   getActiveSessionSlug = (): string =>
@@ -3335,512 +2868,64 @@ class UserPage extends Component<any, any> {
     );
   };
 
+  showQuestionsTab = (): void => {
+    if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' }));
+  };
+
+  showSurveysTab = (): void => {
+    if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' }));
+  };
+
+  openFullProfileModal = (): void => {
+    if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch({ open: true }));
+  };
+
+  toggleFullProfileModal = (): void => {
+    if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch());
+  };
+
+  toggleAnalysisModal = (): void => {
+    if (!this._isMounted) return;
+    this.setState(buildUserPageAnalysisModalStatePatch());
+    this.clearAnalysisTimer();
+  };
+
   render() {
-    const {
-      surveyResponseInfo,
-      surveyCreationInfo,
-      questionCreationInfo,
-      questionResponseInfo,
-      userStats,
-      copied,
-      collapseOpen,
-      username,
-      usernameError,
-      bookmarked,
-      sbtList,
-      loadingSBTs,
-      loadingSurveys,
-      loadingQuestions,
-      showAnalysisModal,
-      aiAnalysis,
-      analysisDetails,
-      analysisName,
-      analysisError,
-      analyzing,
-      analysisElapsedMs,
-      analysisHistoricalFigure,
-      analysisHistoricalReasoning,
-      analysisServedFromCache,
-      analysisCachedAt,
-      showFullProfileModal,
-      isSimulated,
-      selectedTab,
-      expandedSurveyResponses,
-      expandedSurveysCreated,
-      detailedSurveyResponses,
-      detailedQuestionResponses,
-
-      // NEW: section toggles
-      showSectionSurveyResponsesOpen,
-      showSectionSurveysCreatedOpen,
-      showSectionQuestionResponsesOpen,
-      showSectionQuestionsCreatedOpen,
-
-      // NEW: Deep scan flag
-      isDeepScanning,
-    } = this.state;
-
-    const { minimized, account, viewAddress: propViewAddress, provider, network, loginComplete } = this.props;
-    const surveyResponseEntries = surveyResponseInfo as UserPageRenderSurveyEntry[];
-    const surveyCreationEntries = surveyCreationInfo as UserPageRenderSurveyEntry[];
-    const questionResponseEntries = questionResponseInfo as UserPageRenderQuestionEntry[];
-    const questionCreationEntries = questionCreationInfo as UserPageRenderQuestionEntry[];
-    const sbtEntries = sbtList as DerivedSbtListItem[];
-    const expandedSurveyResponseMap = expandedSurveyResponses as Record<string, boolean | undefined>;
-    const expandedSurveyCreatedMap = expandedSurveysCreated as Record<string, boolean | undefined>;
-    const detailedSurveyResponseMap = detailedSurveyResponses as Record<
-      string,
-      SurveyQuestionResponseDetail[] | undefined
-    >;
-    const detailedQuestionResponseMap = detailedQuestionResponses as Record<
-      string,
-      NormalizedQuestionResponsePayload | null | undefined
-    >;
-
-    // === Compute display label with nickname priority (scoped strictly to current viewAddress) ===
-    let cachedNicknameForThis = '';
-    try {
-      const parsed = this.getBookmarksCache();
-      cachedNicknameForThis = resolveUserPageBookmarkNickname({
-        address: propViewAddress,
-        trim: true,
-        users: parsed?.users,
-      });
-    } catch (e) {
-      accountLog.warn('UserPage: fallback', e);
-    }
-
-    const explorerUrl = this.getExplorerUrl();
-    const {
-      addressHref,
-      addressLabel,
-      pendingNicknameForThis: pendingForThis,
-      shouldLinkAddressLabel,
-    } = resolveUserPageAddressDisplayState({
-      bookmarked,
-      cachedNickname: cachedNicknameForThis,
-      explorerUrl,
-      getShortenedAddress,
-      isEditingNickname: this.state.isEditingNickname,
-      isSimulated,
-      minimized,
-      nicknameInput: this.state.nicknameInput,
-      propViewAddress,
-      stateViewAddress: this.state.viewAddress,
-      username,
-    });
-    const renderedAddressHref = String(addressHref || '').startsWith('/')
-      ? buildPublicRoute(String(addressHref || ''))
-      : addressHref;
-    const addressDisplay = shouldLinkAddressLabel ? (
-      <a
-        href={renderedAddressHref}
-        {...(!minimized
-          ? {
-              target: '_blank',
-              rel: 'noopener noreferrer',
-            }
-          : {})}
-        className={styles.addressLink}
-      >
-        {addressLabel}
-      </a>
-    ) : (
-      addressLabel
-    );
-
-    // === Blockie seed & URL (deterministic across minimized/maximized) ===
-    const blockieSeed = resolveUserPageBlockieSeed({ propViewAddress, username });
-    const blockieUrl = generateBlockieDataUrl(blockieSeed, 8, 4);
-
-    // --------- NEW: Readiness & spinner glue (defensive) ----------
-    const cacheRefreshDisplayState = buildUserPageCacheRefreshDisplayState({
-      aiAvailable: this.state.aiAvailable,
-      analyzing,
-      collapseOpen,
-      hasUncertainGateAccess: this.state.hasUncertainGateAccess,
-      hasUncertainSbtData: this.state.hasUncertainSbtData,
-      hasUncertainUserData: this.state.hasUncertainUserData,
+    return renderUserPageSurface({
+      analyzeUser: this.analyzeUser,
+      buildDeepScanProgressRows: this.buildDeepScanProgressRows,
+      buildDeepScanProgressTooltip: this.buildDeepScanProgressTooltip,
+      copyToClipboard: this.copyToClipboard,
+      dispatchSbtDataRefresh: this.dispatchSbtDataRefresh,
+      getBookmarksCache: this.getBookmarksCache,
+      getExplorerUrl: this.getExplorerUrl,
+      handleDecryptQuestionAnswer: this.handleDecryptQuestionAnswer,
+      handleNicknameChange: this.handleNicknameChange,
+      handleNicknameKeyDown: this.handleNicknameKeyDown,
+      handleUsernameChange: this.handleUsernameChange,
+      handleUsernameKeyDown: this.handleUsernameKeyDown,
       isDeepScanLoadingEnabledForSection: this.isDeepScanLoadingEnabledForSection,
-      isDeepScanning,
-      isQuestionCacheReady: this.props.isQuestionCacheReady,
-      isResponsesCacheReady: this.props.isResponsesCacheReady,
-      isSBTCacheReady: this.props.isSBTCacheReady,
-      isSurveyCacheReady: this.props.isSurveyCacheReady,
-      loadingQuestions,
-      loadingSBTs,
-      loadingSurveys,
-      questionCreationInfo,
-      questionResponseInfo,
-      sbtLabel: t('sbt'),
-      sbtList,
-      sbtsLowerLabel: t('sbtsLower'),
-      surveyCreationInfo,
-      surveyResponseInfo,
-      walletLabel: t('walletLower'),
+      onPenClick: this.onPenClick,
+      onUsernamePenClick: this.onUsernamePenClick,
+      openFullProfileModal: this.openFullProfileModal,
+      props: this.props,
+      renderDeepScanStatusIndicator: this.renderDeepScanStatusIndicator,
+      saveNickname: this.saveNickname,
+      setUsername: this.setUsername,
+      showQuestionsTab: this.showQuestionsTab,
+      showSurveysTab: this.showSurveysTab,
+      state: this.state,
+      toggleAnalysisModal: this.toggleAnalysisModal,
+      toggleBookmark: this.toggleBookmark,
+      toggleCollapse: this.toggleCollapse,
+      toggleFullProfileModal: this.toggleFullProfileModal,
+      toggleQuestionResponsesSection: this.toggleQuestionResponsesSection,
+      toggleQuestionsCreatedSection: this.toggleQuestionsCreatedSection,
+      toggleSurveyCreated: this.toggleSurveyCreated,
+      toggleSurveyResponses: this.toggleSurveyResponses,
+      toggleSurveyResponsesSection: this.toggleSurveyResponsesSection,
+      toggleSurveysCreatedSection: this.toggleSurveysCreatedSection,
     });
-    const { isQuestionLoadingAny, isSbtLoadingAny, isSurveyLoadingAny } = cacheRefreshDisplayState.loadingState;
-    const aiActionPlan = cacheRefreshDisplayState.aiActionPlan;
-    const { analyzeButtonDisplayState, compareButtonDisplayState } = aiActionPlan;
-    const analyzeActionPlan = {
-      blockedReason: 'none',
-      disabled: analyzeButtonDisplayState.disabled,
-      shouldRenderAnalyzeAction: !minimized,
-    };
-    const analysisCacheStatusState = resolveUserPageAnalysisCacheStatusState({
-      analysisCachedAt,
-      analysisServedFromCache,
-    });
-    const analysisModalDisplayState = resolveUserPageAnalysisModalDisplayState({
-      analysisDetails,
-      analysisError,
-      analysisHistoricalFigure,
-      analysisHistoricalReasoning,
-      analyzing,
-    });
-
-    // --- Loading States Logic ---
-    // 2. "Empty" flags: Used to determine if we show the "No items" message.
-    // NOTE: We suppress the large white body spinner in favor of the green corner spinner.
-    const {
-      sbtSectionLoadingEmpty,
-      surveyResponsesLoadingEmpty,
-      surveysCreatedLoadingEmpty,
-      questionResponsesLoadingEmpty,
-      questionsCreatedLoadingEmpty,
-    } = cacheRefreshDisplayState.sectionLoadingEmptyState;
-    const { questionResponsesEmptyText, sbtEmptyText } = cacheRefreshDisplayState.uncertainEmptyText;
-    const questionSectionDisplayState = resolveUserPageQuestionSectionDisplayState({
-      questionCreationInfo,
-      questionResponseInfo,
-      questionResponsesLoadingEmpty,
-      questionsCreatedLoadingEmpty,
-    });
-    const surveySectionDisplayState = resolveUserPageSurveySectionDisplayState({
-      isDeepScanning: this.state.isDeepScanning,
-      surveyCreationInfo,
-      surveyResponseInfo,
-      surveyResponsesLoadingEmpty,
-      surveysCreatedLoadingEmpty,
-    });
-    const sbtDisplayState = resolveUserPageSbtDisplayState({
-      isSBTCacheReady: this.props.isSBTCacheReady,
-      loadingSBTs,
-      sbtList,
-      sbtSectionLoadingEmpty,
-    });
-
-    // Unique tooltip targets (wrapping spans) for disabled buttons.
-    // Sanitize route-derived values to avoid invalid selector chars (e.g. "/")
-    // in reactstrap tooltip `target` selectors.
-    const {
-      analyzeBtnWrapId,
-      compareBtnWrapId,
-      questionSpinnerId,
-      questionsCreatedSpinnerId,
-      sbtSpinnerId,
-      surveySpinnerId,
-      surveysCreatedSpinnerId,
-    } = buildUserPageTooltipTargetIds(propViewAddress);
-    const deepScanTooltipLines = this.buildDeepScanProgressTooltip();
-    const deepScanProgressRows = this.buildDeepScanProgressRows();
-    const { deepScanTooltipContent, deepScanTooltipTitle } = buildUserPageDeepScanTooltipDisplayState({
-      deepScanProgressRows,
-      deepScanTooltipLines,
-      isDeepScanning,
-    });
-    const renderDeepScanIndicator = (isLoading: boolean, spinnerId: string) =>
-      isLoading
-        ? this.renderDeepScanStatusIndicator(
-            spinnerId,
-            deepScanTooltipContent,
-            deepScanProgressRows,
-            deepScanTooltipTitle,
-          )
-        : null;
-
-    const headerPassiveDisplayState = resolveUserPageHeaderPassiveDisplayState({
-      account,
-      cachedNickname: cachedNicknameForThis,
-      explorerUrl,
-      isEditingNickname: this.state.isEditingNickname,
-      isEditingUsername: this.state.isEditingUsername,
-      isSimulated,
-      minimized,
-      pendingNickname: pendingForThis,
-      propViewAddress,
-      viewAddress: propViewAddress,
-    });
-    const { isOwner, showPen, showUsernamePen } = headerPassiveDisplayState.profileEditVisibility;
-    const headerActionVisibility = headerPassiveDisplayState.headerActionVisibility;
-    const bookmarkActionPlan = {
-      blockedReason: 'none',
-      disabled: false,
-      shouldRenderBookmarkAction: headerActionVisibility.showBookmarkButton,
-    };
-    const copyIconDisplayState = resolveUserPageCopyIconDisplayState({ copied });
-    const bookmarkButtonDisplayState = resolveUserPageBookmarkButtonDisplayState({ bookmarked });
-    const nicknameEnteredIndicatorDisplayState = resolveUserPageInlineEnteredIndicatorDisplayState({
-      value: this.state.nicknameInput,
-    });
-    const usernameEnteredIndicatorDisplayState = resolveUserPageInlineEnteredIndicatorDisplayState({
-      value: this.state.username,
-    });
-    const usernameErrorDisplayState = resolveUserPageUsernameErrorDisplayState({
-      usernameError,
-    });
-    const surveyResponsesSectionToggleState = resolveUserPageSectionToggleDisplayState({
-      open: showSectionSurveyResponsesOpen,
-    });
-    const surveysCreatedSectionToggleState = resolveUserPageSectionToggleDisplayState({
-      open: showSectionSurveysCreatedOpen,
-    });
-    const questionResponsesSectionToggleState = resolveUserPageSectionToggleDisplayState({
-      open: showSectionQuestionResponsesOpen,
-    });
-    const questionsCreatedSectionToggleState = resolveUserPageSectionToggleDisplayState({
-      open: showSectionQuestionsCreatedOpen,
-    });
-    const fullProfileModalDisplayState = resolveUserPageFullProfileModalDisplayState({
-      account,
-      explorerUrl,
-      minimized,
-      propViewAddress,
-      surveyResponseInfo,
-      surveyResponsesLoadingEmpty,
-    });
-    const rootClassName = buildUserPageRootClassName({
-      baseClassName: styles.userPage,
-      minimized,
-      minimizedClassName: styles.minimized,
-    });
-    const headerBookmarkClassName = buildUserPageHeaderBookmarkClassName({
-      baseClassName: styles.bookmarkButton,
-      headerClassName: styles.headerBookmark,
-    });
-    const avatarDisplayState = resolveUserPageAvatarDisplayState({
-      blockieUrl,
-    });
-    const bookmarksLinkDisplayState = resolveUserPageBookmarksLinkDisplayState({
-      baseClassName: styles.bookmarksLink,
-      inlineClassName: styles.bookmarksLinkInline,
-    });
-    const createdQuestionWrapperClassName = buildUserPageCreatedQuestionWrapperClassName({
-      baseClassName: styles.createdQuestionWrapper,
-      bolderClassName: styles.createdQuestionBolder,
-    });
-
-    return (
-      <div className={rootClassName}>
-        <UserPageHeader
-          addressDisplay={addressDisplay}
-          analyzeButtonDisplayState={analyzeButtonDisplayState}
-          avatarDisplayState={avatarDisplayState}
-          bookmarkButtonDisplayState={bookmarkButtonDisplayState}
-          bookmarksHref={buildPublicRoute('/bookmarks')}
-          bookmarksLinkDisplayState={bookmarksLinkDisplayState}
-          compareButtonDisplayState={compareButtonDisplayState}
-          copyIconDisplayState={copyIconDisplayState}
-          explorerUrl={explorerUrl}
-          headerActionVisibility={headerActionVisibility}
-          headerBookmarkClassName={headerBookmarkClassName}
-          isEditingUsername={this.state.isEditingUsername}
-          isOwner={isOwner}
-          minimized={minimized}
-          nicknameEnteredIndicatorDisplayState={nicknameEnteredIndicatorDisplayState}
-          nicknameInput={this.state.nicknameInput || ''}
-          onAnalyzeUser={(event) =>
-            runUserPageAnalyzeActionController({
-              analyzeArgs: [event],
-              event,
-              plan: analyzeActionPlan,
-              ports: { dispatchAnalyze: this.analyzeUser },
-            })
-          }
-          onBookmark={(event) =>
-            runUserPageBookmarkActionController({
-              bookmarkArgs: [event],
-              event,
-              plan: bookmarkActionPlan,
-              ports: { dispatchBookmark: this.toggleBookmark },
-            })
-          }
-          onCollapseToggle={this.toggleCollapse}
-          onCopyAddress={this.copyToClipboard}
-          onNicknameBlur={this.saveNickname}
-          onNicknameChange={this.handleNicknameChange}
-          onNicknameEdit={this.onPenClick}
-          onNicknameKeyDown={this.handleNicknameKeyDown}
-          onUsernameBlur={this.setUsername}
-          onUsernameChange={this.handleUsernameChange}
-          onUsernameEdit={this.onUsernamePenClick}
-          onUsernameKeyDown={this.handleUsernameKeyDown}
-          showPen={showPen}
-          showUsernamePen={showUsernamePen}
-          username={this.state.username}
-          usernameEnteredIndicatorDisplayState={usernameEnteredIndicatorDisplayState}
-          usernameErrorDisplayState={usernameErrorDisplayState}
-        />
-
-        <UserPageComparePanel collapseOpen={collapseOpen} minimized={minimized}>
-          <CompareAddressSection
-            firstAddress={propViewAddress}
-            account={account}
-            scanSpecificUserProfile={this.props.scanSpecificUserProfile}
-          />
-        </UserPageComparePanel>
-
-        {!minimized && (
-          <div className={styles.content}>
-            {selectedTab === 'surveys' && (
-              <UserPageSurveySection
-                detailedSurveyResponseMap={detailedSurveyResponseMap}
-                expandedSurveyCreatedMap={expandedSurveyCreatedMap}
-                expandedSurveyResponseMap={expandedSurveyResponseMap}
-                getSurveyCreatedHref={(survey, surveyLinkSlug) =>
-                  buildPublicRoute(
-                    `/survey/${encodeURIComponent(String(survey.id))}${surveyLinkSlug ? `?session=${encodeURIComponent(String(surveyLinkSlug))}` : ''}`,
-                  )
-                }
-                isSurveyLoadingAny={isSurveyLoadingAny}
-                onDecryptQuestion={this.handleDecryptQuestionAnswer}
-                onOpenSurveyResponse={(survey, e: React.MouseEvent<HTMLElement>) => {
-                  e.stopPropagation();
-                  const surveyUrlParams = new URLSearchParams();
-                  if (survey.slug) {
-                    surveyUrlParams.set('session', survey.slug);
-                  }
-                  surveyUrlParams.set('responder', String(propViewAddress));
-                  window.open(
-                    buildPublicRoute(
-                      `/survey/${encodeURIComponent(String(survey.id))}${surveyUrlParams.toString() ? `?${surveyUrlParams.toString()}` : ''}`,
-                    ),
-                    '_blank',
-                    'noopener,noreferrer',
-                  );
-                }}
-                onShowQuestionsTab={(e: React.MouseEvent<HTMLElement>) => {
-                  e.stopPropagation();
-                  if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' }));
-                }}
-                onSurveyCreatedToggle={this.toggleSurveyCreated}
-                onSurveyResponsesSectionToggle={this.toggleSurveyResponsesSection}
-                onSurveyResponseToggle={this.toggleSurveyResponses}
-                onSurveysCreatedSectionToggle={this.toggleSurveysCreatedSection}
-                questionResponsesNonce={this.props.questionResponsesNonce}
-                responderAddress={propViewAddress}
-                sbtCacheRevision={this.props.sbtCacheRevision}
-                surveyCreationEntries={surveyCreationEntries}
-                surveyResponseEntries={surveyResponseEntries}
-                surveyResponsesLoadingIndicator={renderDeepScanIndicator(isSurveyLoadingAny, surveySpinnerId)}
-                surveyResponsesSectionToggleState={surveyResponsesSectionToggleState}
-                surveySectionDisplayState={surveySectionDisplayState}
-                surveysCreatedLoadingIndicator={renderDeepScanIndicator(isSurveyLoadingAny, surveysCreatedSpinnerId)}
-                surveysCreatedSectionToggleState={surveysCreatedSectionToggleState}
-              />
-            )}
-
-            {selectedTab === 'questions' && (
-              <UserPageQuestionSection
-                activeSessionSlug={this.props.activeSessionSlug}
-                createdQuestionWrapperClassName={createdQuestionWrapperClassName}
-                detailedQuestionResponseMap={detailedQuestionResponseMap}
-                isQuestionLoadingAny={isQuestionLoadingAny}
-                network={network}
-                onDecryptQuestion={this.handleDecryptQuestionAnswer}
-                onQuestionResponsesSectionToggle={this.toggleQuestionResponsesSection}
-                onQuestionsCreatedSectionToggle={this.toggleQuestionsCreatedSection}
-                onShowSurveysTab={(e: React.MouseEvent<HTMLElement>) => {
-                  e.stopPropagation();
-                  if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' }));
-                }}
-                questionCreationEntries={questionCreationEntries}
-                questionResponsesEmptyText={questionResponsesEmptyText}
-                questionResponsesLoadingIndicator={renderDeepScanIndicator(isQuestionLoadingAny, questionSpinnerId)}
-                questionResponsesNonce={this.props.questionResponsesNonce}
-                questionResponseEntries={questionResponseEntries}
-                questionResponsesSectionToggleState={questionResponsesSectionToggleState}
-                questionSectionDisplayState={questionSectionDisplayState}
-                questionsCreatedLoadingIndicator={renderDeepScanIndicator(
-                  isQuestionLoadingAny,
-                  questionsCreatedSpinnerId,
-                )}
-                questionsCreatedSectionToggleState={questionsCreatedSectionToggleState}
-                responderAddress={propViewAddress}
-                sbtCacheRevision={this.props.sbtCacheRevision}
-              />
-            )}
-
-            <UserPageSbtSection
-              account={account}
-              heading={`${t('minted')} ${t('sbts')}:`}
-              isLoading={isSbtLoadingAny}
-              isSBTCacheReady={this.props.isSBTCacheReady}
-              loadingIndicator={renderDeepScanIndicator(isSbtLoadingAny, sbtSpinnerId)}
-              loginComplete={loginComplete}
-              network={network}
-              onRefreshSbtData={this.dispatchSbtDataRefresh}
-              provider={provider}
-              sbtDisplayState={sbtDisplayState}
-              sbtEmptyText={sbtEmptyText}
-              sbtEntries={sbtEntries}
-            />
-          </div>
-        )}
-
-        <UserPageSimulatedActions
-          isSimulated={isSimulated}
-          onViewResponses={() => {
-            if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch({ open: true }));
-          }}
-        />
-
-        <UserPageAnalysisModal
-          aiAnalysis={aiAnalysis}
-          analysisCacheStatusState={analysisCacheStatusState}
-          analysisDetails={analysisDetails}
-          analysisElapsedMs={analysisElapsedMs}
-          analysisError={analysisError}
-          analysisHistoricalFigure={analysisHistoricalFigure}
-          analysisHistoricalReasoning={analysisHistoricalReasoning}
-          analysisModalDisplayState={analysisModalDisplayState}
-          analysisName={analysisName}
-          analyzing={analyzing}
-          isOpen={showAnalysisModal}
-          onRefreshAnalysis={() => this.analyzeUser(true)}
-          onToggle={() => {
-            if (this._isMounted) {
-              this.setState(buildUserPageAnalysisModalStatePatch());
-              this.clearAnalysisTimer();
-            }
-          }}
-        />
-
-        <UserPageFullProfileModal
-          aiAnalysis={aiAnalysis}
-          bookmarksHref={buildPublicRoute('/bookmarks')}
-          collapseOpen={collapseOpen}
-          explorerUrl={explorerUrl}
-          fullProfileModalDisplayState={fullProfileModalDisplayState}
-          isOpen={showFullProfileModal}
-          isSBTCacheReady={this.props.isSBTCacheReady}
-          loginComplete={loginComplete}
-          mintedSbtsHeading={`${t('minted')} ${t('sbts')}`}
-          network={network}
-          onRefreshSbtData={this.dispatchSbtDataRefresh}
-          onStatsCollapseToggle={this.toggleCollapse}
-          onToggle={() => {
-            if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch());
-          }}
-          provider={provider}
-          sbtDisplayState={sbtDisplayState}
-          sbtEmptyText={sbtEmptyText}
-          sbtEntries={sbtEntries}
-          surveyResponseEntries={surveyResponseEntries}
-          userStats={userStats}
-        />
-      </div>
-    );
   }
 }
 
