@@ -35,6 +35,12 @@ import {
   buildE2eMockDrilldownTree,
   isE2eAiMockEnabled,
 } from './aiClientE2eMocks.js';
+import {
+  buildHeuristicClusterSummary,
+  deriveFallbackClusterName,
+  parseJsonFlexible,
+  stripEnclosingMarkdownFences as _stripEnclosingMarkdownFences,
+} from './aiClientParsing.js';
 
 import {
   pcaLiteCompass,
@@ -959,94 +965,6 @@ const uploadAudioForTranscription = async (audioFileOrBlob, transport, { fileNam
   return typeof data.text === 'string' ? data.text : '';
 };
 
-/* =========================
- * Helpers for AI JSON parsing / fallbacks
- * ========================= */
-
-/**
- * Try to parse JSON from a string that may include ```json code fences
- * or extra text around the JSON object.
- */
-function parseJsonFlexible(text) {
-  if (!text || typeof text !== 'string') return null;
-  let body = text.trim();
-
-  const fenced = body.match(/```json\s*([\s\S]*?)```/i) || body.match(/```\s*([\s\S]*?)```/);
-  if (fenced && fenced[1]) {
-    body = fenced[1].trim();
-  }
-
-  try {
-    return JSON.parse(body);
-  } catch (error) {
-    aiLog.warn('Flexible JSON parse failed on primary body:', error);
-    const firstBrace = body.indexOf('{');
-    const lastBrace = body.lastIndexOf('}');
-    if (firstBrace >= 0 && lastBrace > firstBrace) {
-      try {
-        return JSON.parse(body.slice(firstBrace, lastBrace + 1));
-      } catch (innerError) {
-        aiLog.warn('Flexible JSON parse failed on extracted body:', innerError);
-        return null;
-      }
-    }
-    return null;
-  }
-}
-
-/**
- * Fallback name when the model doesn't provide one.
- */
-function deriveFallbackClusterName(payload) {
-  const size = payload?.clusterSize ?? 0;
-  return size >= 12 ? 'Large Cohort' : size >= 6 ? 'Small Cohort' : 'Tiny Cohort';
-}
-
-function buildHeuristicClusterSummary(payload) {
-  const statements = Array.isArray(payload?.topStatements) ? payload.topStatements : [];
-  const withPrompt = statements.filter((s) => s && typeof s.prompt === 'string' && s.prompt.trim());
-
-  if (!withPrompt.length) {
-    return {
-      short: 'Summary unavailable.',
-      long: 'Not enough statement data to summarize this cluster.',
-    };
-  }
-
-  const collapseSpace = (text) => text.replace(/\s+/g, ' ').trim();
-  const truncate = (text, max = 90) => {
-    const clean = collapseSpace(text);
-    if (clean.length <= max) return clean;
-    return `${clean.slice(0, max - 3)}...`;
-  };
-  const describe = (s) => truncate(s.prompt || '');
-
-  const positive = withPrompt.filter((s) => (s.differenceScore ?? 0) > 0).slice(0, 1);
-  const negative = withPrompt.filter((s) => (s.differenceScore ?? 0) < 0).slice(0, 1);
-
-  let short = '';
-  if (positive.length && negative.length) {
-    short = `More agreement with "${describe(positive[0])}" and more disagreement with "${describe(negative[0])}".`;
-  } else if (positive.length) {
-    short = `Stronger agreement with "${describe(positive[0])}" compared to the overall group.`;
-  } else if (negative.length) {
-    short = `More disagreement with "${describe(negative[0])}" compared to the overall group.`;
-  } else {
-    short = `Aligned around "${describe(withPrompt[0])}".`;
-  }
-
-  const highlights = withPrompt
-    .slice(0, 3)
-    .map((s) => `"${describe(s)}"`)
-    .join('; ');
-  const size =
-    typeof payload?.clusterSize === 'number'
-      ? `This cluster has ${payload.clusterSize} participants.`
-      : 'This cluster has a distinct voting pattern.';
-  const long = `${size} The largest opinion gaps appear on ${highlights}.`;
-  return { short, long };
-}
-
 /**
  * Analyze a single cluster's opinions using the new prompt with naming support.
  * Expects `clusterData` to include:
@@ -1463,18 +1381,6 @@ export async function getComparisonBundle(
 /* ======================================================================
  * NEW (appended): Audio discussion summary generator + Arweave uploader
  * ====================================================================== */
-
-/** Tiny local helper: strip a single pair of enclosing ``` fences (if present). */
-function _stripEnclosingMarkdownFences(s) {
-  if (typeof s !== 'string') return '';
-  let out = s.trim();
-  // Match one outer code fence with optional language tag
-  const m = out.match(/^\s*```(?:md|markdown|text|json)?\s*\n?([\s\S]*?)\n?\s*```\s*$/i);
-  if (m && m[1]) out = m[1];
-  // Trim stray leading/trailing quotes/backticks and any BOM
-  out = out.replace(/^\uFEFF/, '').replace(/^[`'"]+|[`'"]+$/g, '');
-  return out.trim();
-}
 
 /**
  * generateAudioDiscussionSummary(transcript, opts?)
