@@ -49,6 +49,7 @@ import {
   stripDataUrlPrefix,
   usesOpenAiResponsesApi,
 } from './aiClientPhotoSupport.js';
+import { inferAiTaskType, pickAiRequestOpts } from './aiClientRequestOptions.js';
 import { extractMainContent, readFileContent } from './aiClientSourceReaders.js';
 
 import {
@@ -180,54 +181,6 @@ const resolveSessionAliasesOpt = (opts = {}) =>
 const resolveSessionSlugOpt = (opts = {}) => resolveSessionAliasesOpt(opts).sessionSlug;
 
 const resolveSessionConfigOpt = (opts = {}) => resolveSessionAliasesOpt(opts).sessionConfig;
-
-const inferAiTaskType = (prompt = '', opts = {}) => {
-  const explicit = String(opts?.taskType || '')
-    .trim()
-    .toLowerCase();
-  if (explicit) return explicit;
-
-  const promptText = String(prompt || '');
-  // Older question-generation flows still call `callAI` directly, so fall back
-  // to the seed-generation prompt signature when no explicit task type is passed.
-  if (/numberOfSeedStatementsOrPrompts:/i.test(promptText) && /"surveyTitle"\s*:/i.test(promptText)) {
-    return 'generate';
-  }
-  return null;
-};
-
-const pickAiRequestOpts = (input = {}) => {
-  const src = input && typeof input === 'object' ? input : {};
-  const out = {};
-  const copy = (key) => {
-    if (Object.prototype.hasOwnProperty.call(src, key) && src[key] !== undefined) {
-      out[key] = src[key];
-    }
-  };
-  [
-    'sessionSlug',
-    'sessionConfig',
-    'context',
-    'workerUrl',
-    'preferLocal',
-    'provider',
-    'model',
-    'apiKey',
-    'rpcUrl',
-    'max_tokens',
-    'maxTokens',
-    'max_completion_tokens',
-    'max_output_tokens',
-    'response_format',
-    'temperature',
-    'endpoint',
-    'reasoning_effort',
-    'reasoningEffort',
-    'taskType',
-    'messages',
-  ].forEach(copy);
-  return out;
-};
 
 /**
  * Call AI via the Cloudflare Worker AI proxy using resolved settings.
