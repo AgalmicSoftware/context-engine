@@ -59,6 +59,7 @@ import {
   resolveAiSessionOptions,
   resolveAiSessionSelection,
 } from './aiClientRequestOptions.js';
+import { mergeCompareVennWithEvidence, normalizeCompareBullets } from './aiCompareContracts.js';
 import {
   buildAiWorkerRequestPlan,
   parseAiWorkerCompletion,
@@ -825,14 +826,7 @@ export async function getComparisonBundle(
   const val = (i) => (settled[i] && settled[i].status === 'fulfilled' ? settled[i].value : null);
 
   // Bullets (prefer LLM)
-  let bullets = val(0);
-  if (!bullets || !Array.isArray(bullets.agreements) || !Array.isArray(bullets.disagreements)) {
-    bullets = fallbackBullets(safeUsers);
-  }
-  bullets = {
-    agreements: (bullets.agreements || []).slice(0, 12),
-    disagreements: (bullets.disagreements || []).slice(0, 12),
-  };
+  const bullets = normalizeCompareBullets(val(0), fallbackBullets(safeUsers));
 
   // Compass (prefer LLM, sanitize)
   let compassRaw = val(1) || val(3) || null;
@@ -844,21 +838,12 @@ export async function getComparisonBundle(
     : null;
 
   // Venn (prefer LLM, guarantee non-empty evidence for positive regions)
-  let venn = needVenn ? val(2) || val(4) || null : null;
-  if (venn && venn.counts) {
+  let venn = null;
+  const vennCandidate = needVenn ? val(2) || val(4) || null : null;
+  if (vennCandidate) {
     // Compute deterministic labels as a safety net for evidence
     const ensure = computeVennEvidence(safeUsers);
-    const out = {
-      counts: { ...ensure.counts, ...venn.counts },
-      semantics: venn.semantics || ensure.semantics,
-      evidenceMap: { ...ensure.evidenceMap, ...(venn.evidenceMap || {}) },
-    };
-    for (const k of ['a', 'b', 'c', 'ab', 'ac', 'bc', 'abc']) {
-      if ((out.counts[k] || 0) > 0 && (!Array.isArray(out.evidenceMap[k]) || out.evidenceMap[k].length === 0)) {
-        out.evidenceMap[k] = ensure.evidenceMap[k];
-      }
-    }
-    venn = out;
+    venn = mergeCompareVennWithEvidence(vennCandidate, ensure);
   }
 
   // Matrix (deterministic only)

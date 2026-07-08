@@ -39,6 +39,11 @@ import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 
 // NEW: single public entry for comparison bundle + drilldown stays on toolkit path
 import { runCompareToolkit } from 'utilities/ai/aiClient.js';
+import {
+  mergeCompareVennWithEvidence,
+  normalizeCompareBullets,
+  type CompareVennResult as AiCompareVennResult,
+} from 'utilities/ai/aiCompareContracts.js';
 
 // Keep small deterministic helpers (labels/bookmarks/builders) from utilities
 import {
@@ -200,12 +205,7 @@ interface CompareCompassData {
   [key: string]: unknown;
 }
 
-interface CompareVennResult {
-  counts: Partial<Record<VennRegionKey, number>>;
-  semantics?: string | null;
-  evidenceMap?: Partial<Record<VennRegionKey, unknown[]>>;
-  [key: string]: unknown;
-}
+type CompareVennResult = AiCompareVennResult;
 
 interface CompareMatrixData {
   mode?: string;
@@ -916,14 +916,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     const aiScope = activeSessionSlug ? { sessionSlug: activeSessionSlug } : {};
     try {
       const bulletsRaw = await runCompareToolkit('compare', { users, ...aiScope });
-      let bullets = bulletsRaw as ComparisonBullets | null;
-      if (!bullets || !Array.isArray(bullets.agreements) || !Array.isArray(bullets.disagreements)) {
-        bullets = fallbackBullets(users);
-      }
-      bullets = {
-        agreements: (bullets.agreements || []).slice(0, 12),
-        disagreements: (bullets.disagreements || []).slice(0, 12),
-      };
+      const bullets = normalizeCompareBullets(bulletsRaw, fallbackBullets(users));
       if (!isStale()) setComparisonResult(bullets);
     } catch (err) {
       accountLog.error('compare bullets failed:', err);
@@ -965,27 +958,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
       if (users.length === 3) {
         try {
           const vennRaw = await runCompareToolkit('venn', { users, ...aiScope });
-          if (vennRaw && vennRaw.counts) {
-            const ensure = computeVennEvidence(users);
-            const out: CompareVennResult = {
-              counts: { ...ensure.counts, ...vennRaw.counts },
-              semantics: vennRaw.semantics || ensure.semantics,
-              evidenceMap: { ...ensure.evidenceMap, ...(vennRaw.evidenceMap || {}) } as Partial<
-                Record<VennRegionKey, unknown[]>
-              >,
-            };
-            const vennKeys: VennRegionKey[] = ['a', 'b', 'c', 'ab', 'ac', 'bc', 'abc'];
-            for (const k of vennKeys) {
-              if (
-                (out.counts[k] || 0) > 0 &&
-                (!Array.isArray(out.evidenceMap?.[k]) || out.evidenceMap[k]?.length === 0)
-              ) {
-                out.evidenceMap = out.evidenceMap || {};
-                out.evidenceMap[k] = ensure.evidenceMap[k];
-              }
-            }
-            venn = out;
-          }
+          venn = mergeCompareVennWithEvidence(vennRaw, computeVennEvidence(users));
         } catch (err) {
           accountLog.error('compare venn failed:', err);
         }

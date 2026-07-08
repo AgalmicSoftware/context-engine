@@ -55,7 +55,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/SurveyTool/surveyToolDraftState.ts': 1354,
   'client/src/components/SurveyTool/surveyToolHydrationFlow.ts': 2880,
   'client/src/components/TagPage/TagPage.tsx': 1493,
-  'client/src/components/UserPage/CompareAddresses.tsx': 3044,
+  'client/src/components/UserPage/CompareAddresses.tsx': 2931,
   'client/src/components/UserPage/UserPage.tsx': 3848,
   'client/src/components/UserPage/userPageGateHelpers.ts': 1070,
   'client/src/components/UserPage/userPageHelpers.ts': 1481,
