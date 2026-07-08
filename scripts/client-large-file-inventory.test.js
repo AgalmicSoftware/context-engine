@@ -20,7 +20,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/DocumentLibrary/DocumentLibraryPanel.tsx': 1697,
   'client/src/components/MainContent/RiskMatrix.tsx': 1220,
   'client/src/components/MainSite/AppShell.tsx': 4093,
-  'client/src/components/MainSite/mainSiteProfileScanRuntime.ts': 1366,
+  'client/src/components/MainSite/mainSiteProfileScanRuntime.ts': 1503,
   'client/src/components/MainSite/mainSiteRouteRenderers.tsx': 1372,
   'client/src/components/OnePageSession/OnePageSession.tsx': 2497,
   'client/src/components/PolisReport/PolisReport.tsx': 2787,

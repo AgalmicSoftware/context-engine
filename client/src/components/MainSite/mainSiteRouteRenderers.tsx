@@ -1,5 +1,8 @@
 import React, { Suspense } from 'react';
 import { ethers } from 'ethers';
+import type { AppShell } from './AppShell';
+import type { SessionConfigLike as ShellSessionConfigLike } from '../shellTypes';
+import type { MainSiteSessionConfigLike } from '../../utilities/session/mainSiteSessionConfig.js';
 import stylesRaw from './AppShell.module.scss';
 import MainAreaTabsRaw from '../MainContent/MainAreaTabs';
 import RightSideRaw from '../RightSidebar/RightSide';
@@ -68,13 +71,34 @@ import {
   UserPage as UserPageRaw,
 } from './routeLazyComponents.js';
 
-type MainSiteRouteRendererHost = any;
-type MainSiteRouteRendererMap = any;
+type MainSiteRouteRendererHost = AppShell;
 type MainSiteRouteComponent = React.ComponentType<Record<string, unknown>>;
-type RouteRenderCtx = any;
-type RefreshQuestionResponsesOptions = any;
-type MainSiteSurveyMetadataCache = any;
-type SessionConfigLike = any;
+type RouteRenderCtx = {
+  fullPath: string;
+  searchStr: string;
+  hashStr: string;
+  searchParams: URLSearchParams;
+  pathWithoutQuery: string;
+  pathSegments: string[];
+  firstPathSegment: string;
+  routeDemoMode: boolean;
+  requestedSessionId: string;
+  requestedChainId: number | null;
+  requestedSponsoredBundleId: string;
+  requestedSponsoredBundleKey: string | null;
+  defaultSlug: string;
+  defaultSessionCfg: SessionConfigLike | null;
+  defaultSessionChainId: number | null | undefined;
+  defaultSessionNetwork: MainSiteRouteNetwork;
+  cacheInitializationError: boolean;
+  surveyIDFromPath: string | null;
+  autoOpenResults: boolean;
+  parsedFilterStateFromUrl: Record<string, unknown>;
+  isResultsRoute: boolean;
+};
+type RefreshQuestionResponsesOptions = Record<string, unknown>;
+type MainSiteSurveyMetadataCache = Record<string, { surveys?: Record<string, unknown> } | undefined>;
+type SessionConfigLike = MainSiteSessionConfigLike;
 type MainSiteRouteNetwork = Record<string, unknown> | null | undefined;
 
 const styles = stylesRaw as Record<string, string>;
@@ -122,7 +146,7 @@ const hasMainSiteRegistryIdentity = (sessionConfig: unknown): boolean => {
   );
 };
 
-export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): MainSiteRouteRendererMap => ({
+export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) => ({
   _renderDebateRoute: (fullPath: string) => <ExperimentalStub featureName="Debate view" path={fullPath} />,
 
   _renderBookmarksRoute: () => (
@@ -658,7 +682,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
       ? resolveMainSiteQuestionRouteSessionContext({
           search: searchStr,
           isCacheManagerReady: host.state.isCacheManagerReady,
-          getSessionConfigBySlug: (slug: string) => host.getDisplaySessionCfg(slug) as SessionConfigLike | null,
+          getSessionConfigBySlug: (slug: string) => host.getDisplaySessionCfg(slug) as ShellSessionConfigLike | null,
           formatSessionId: sessionRegistryReadsPort.formatSessionId,
           resolveSessionConfigById: (sessionId: string | number) =>
             sessionRegistryReadsPort.getSessionConfigById(sessionId),
@@ -863,7 +887,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     const questionRouteSession = resolveMainSiteQuestionRouteSessionContext({
       search: searchStr,
       isCacheManagerReady: host.state.isCacheManagerReady,
-      getSessionConfigBySlug: (slug: string) => host.getDisplaySessionCfg(slug) as SessionConfigLike | null,
+      getSessionConfigBySlug: (slug: string) => host.getDisplaySessionCfg(slug) as ShellSessionConfigLike | null,
       formatSessionId: sessionRegistryReadsPort.formatSessionId,
       resolveSessionConfigById: (sessionId: string | number) =>
         sessionRegistryReadsPort.getSessionConfigById(sessionId),

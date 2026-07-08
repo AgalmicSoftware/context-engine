@@ -41,6 +41,11 @@ const narrowed = input as unknown as string;
 type AsyncValue = Promise<any>;
 type ListValue = Array<any>;
 type MapValue = Record<string, any>;
+type AliasValue = any;
+export type ExportedAliasValue<T = unknown> = any;
+type Callback<T = any> = (value: T) => void;
+const lookup = new Map<string, any>();
+const set = new Set<any>();
 `);
 
   assert.equal(counts.tsNocheck, 1);
@@ -50,6 +55,8 @@ type MapValue = Record<string, any>;
   assert.equal(counts.promiseAny, 1);
   assert.equal(counts.arrayAny, 1);
   assert.equal(counts.recordAny, 1);
+  assert.equal(counts.aliasAny, 2);
+  assert.equal(counts.mapSetAny, 2);
 });
 
 test('isProductionTypeScriptFile excludes tests and test utilities', () => {

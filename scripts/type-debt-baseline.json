@@ -81,6 +81,8 @@
     "asUnknownAs": 47,
     "promiseAny": 2,
     "arrayAny": 0,
-    "recordAny": 45
+    "recordAny": 45,
+    "aliasAny": 3,
+    "mapSetAny": 4
   }
 }

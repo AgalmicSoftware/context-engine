@@ -7,7 +7,7 @@ explicit escape hatches that the compiler still permits.
 
 ## Current Ratchet
 
-`scripts/check-type-debt-ratchet.mjs --list` checked 928 production TS/TSX files
+`scripts/check-type-debt-ratchet.mjs --list` checked 974 production TS/TSX files
 under `client/src` and reported:
 
 | Debt kind | Current baseline |
@@ -19,6 +19,8 @@ under `client/src` and reported:
 | `Promise<any>` | 2 |
 | `Array<any>` | 0 |
 | `Record<...any...>` | 45 |
+| `type alias = any` | 3 |
+| `Map/Set<...any...>` | 4 |
 
 `scripts/type-debt-baseline.json` also lists `strictDebtFreeDirectories`. Those
 directories are compiler-owned for explicit-debt purposes: `type-debt:check`
@@ -30,12 +32,12 @@ Largest current clusters:
 | File | Debt |
 |---|---:|
 | `client/src/components/CommunityTab/CommunityTab.tsx` | `: any=148`, `Record<...any...>=4` |
-| `client/src/components/OnePageSession/OnePageSession.tsx` | `: any=103`, `as any=1`, `Record<...any...>=17` |
-| `client/src/utilities/web3/contractScripts.sbtRegistryMethods.ts` | `: any=101`, `as any=11` |
 | `client/src/components/Account/LoginAndSettingsModal.tsx` | `: any=106`, `as any=2` |
 | `client/src/components/SurveyTool/SurveyPileViewMode.tsx` | `: any=104`, `as any=1`, `as unknown as=2` |
+| `client/src/components/OnePageSession/OnePageSession.tsx` | `: any=103`, `as any=1`, `Record<...any...>=17` |
+| `client/src/utilities/web3/contractScripts.sbtRegistryMethods.ts` | `: any=101`, `as any=11` |
 | `client/src/utilities/web3/contractScripts.sbtMintMethods.ts` | `: any=65`, `as any=29` |
-| `client/src/utilities/web3/contractScripts.impl.ts` | `: any=65`, `as any=7` |
+| `client/src/utilities/web3/contractScripts.impl.ts` | `: any=65`, `as any=6`, `Map/Set<...any...>=2` |
 | `client/src/utilities/web3/contractScripts.surveyPayloadReadMethods.ts` | `: any=61`, `as any=5` |
 | `client/src/components/Admin/AdminPage.tsx` | `: any=51`, `Record<...any...>=1` |
 | `client/src/components/Admin/adminPageMetadataDraftHelpers.ts` | `: any=17` |
@@ -74,17 +76,18 @@ Rules for new exceptions:
 - Prefer a named domain type over `Record<string, any>`.
 - Keep casts close to the validation or adapter boundary.
 - Do not add `@ts-nocheck`.
-- Do not introduce new `: any`, `as any`, `as unknown as`, `Promise<any>`, or
-  broad `Record<...any...>` debt without rebanking and an explicit follow-up.
+- Do not introduce new `: any`, `as any`, `as unknown as`, `Promise<any>`,
+  broad `Record<...any...>`, bare `type = any`, or `Map`/`Set` `any` debt
+  without rebanking and an explicit follow-up.
 
 ## Retiring The Count Ratchet
 
 The count ratchet can be replaced by compiler enforcement only when:
 
 - Production `client/src` has no `@ts-nocheck`.
-- `: any`, `as any`, `as unknown as`, `Promise<any>`, and
-  `Record<...any...>` are either zero or limited to a short checked exception
-  file.
+- `: any`, `as any`, `as unknown as`, `Promise<any>`,
+  `Record<...any...>`, bare `type = any`, and `Map`/`Set` `any` debt are
+  either zero or limited to a short checked exception file.
 - Every remaining exception is tied to a boundary parser, third-party interop
   adapter, or test seam.
 - Strict debt-free directory checks are green for domains, utilities, and

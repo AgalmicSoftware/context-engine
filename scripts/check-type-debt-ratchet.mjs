@@ -48,6 +48,16 @@ export const TYPE_DEBT_PATTERNS = Object.freeze([
     label: 'Record<...any...>',
     pattern: /\bRecord\s*<(?=[^>\n]*\bany\b)[^>\n]*>/g,
   },
+  {
+    key: 'aliasAny',
+    label: 'type alias = any',
+    pattern: /^\s*(?:export\s+)?type\s+[A-Za-z_$][\w$]*(?:\s*<[^>\n]*>)?\s*=\s*any\s*;?\s*(?=\/\/.*$|$)/gm,
+  },
+  {
+    key: 'mapSetAny',
+    label: 'Map/Set<...any...>',
+    pattern: /\b(?:Map|Set)\s*<(?=[^>\n]*\bany\b)[^>\n]*>/g,
+  },
 ]);
 
 const TEST_DIRECTORY_SEGMENTS = new Set([

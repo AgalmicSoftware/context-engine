@@ -1,4 +1,6 @@
 import { ethers } from 'ethers';
+import type { AppShell } from './AppShell';
+import type { MainSiteState } from './MainSiteTypes';
 import { chainScanReadsPort } from '../../domains/chain/chainScanReadsPort.js';
 import { profileScanPort } from '../../domains/profiles/profileScanPort.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
@@ -15,29 +17,164 @@ import {
 } from '../../utilities/session/profileScanReportHelpers.js';
 import { createLogger } from 'utilities/logging.js';
 
-type MainSiteProfileScanHost = any;
-type MainSiteProfileScanReport = any;
-type MainSiteProfileActivityEntry = any;
-type MainSiteProfileActivityPayload = any;
+type MainSiteProfileScanHost = AppShell;
+type MainSiteMutableMetadata = Record<string, unknown> & {
+  id?: string;
+  slug?: string;
+  sessionSlug?: string;
+  surveyID?: string;
+};
+type MainSiteProfileScanReport = {
+  targetAddress: string;
+  usedAllSessions: boolean;
+  useAllSessionsSbtScan: boolean;
+  useAllSessionsSurveyActivityScan: boolean;
+  useAllSessionsQuestionActivityScan: boolean;
+  useAllSessionsActivityScan: boolean;
+  listScopeSbtFanout: boolean;
+  listScopeSurveyActivityFanout: boolean;
+  listScopeQuestionActivityFanout: boolean;
+  attemptedSlugs: string[];
+  scannedSlugs: string[];
+  skippedSlugs: string[];
+  skippedSlugReasons: Record<string, string>;
+  failedSlugs: string[];
+  failedActivitySlugs: string[];
+  allActivityFailed: boolean;
+  allSbtFailed: boolean;
+  hadRpcErrors: boolean;
+  anyNewData: boolean;
+  coverageComplete: boolean;
+  coverageReason: string;
+  registryEntryCount: number;
+  hadLoadErrors: boolean;
+  rawAllSlugCount: number;
+  activeChainSlugCount: number;
+  scopedFallbackSlugCount: number;
+  relevantSlugs: string[];
+  prioritizedGeneralFirst: boolean;
+  scanOrdering: string;
+  slugFetchTimeoutMs: number;
+  sbtFetchTimeoutMs: number;
+  activityFetchTimeoutMs: number;
+  activityLookbackBlocks: number;
+  sbtBurstSize: number;
+  totalSbtContractsFound: number;
+  totalCreatedSurveysFound: number;
+  totalCreatedQuestionsFound: number;
+  totalSurveyResponsesFound: number;
+  totalQuestionResponsesFound: number;
+  sampleSbtAddresses: string[];
+  sampleCreatedSurveyIds: string[];
+  sampleCreatedQuestionIds: string[];
+  sampleSurveyResponseIds: string[];
+  sampleQuestionResponseIds: string[];
+};
+type MainSiteProfileActivityEntry = Record<string, unknown> & {
+  id?: string;
+  surveyId?: string;
+  surveyID?: string;
+  questionId?: string;
+  questionID?: string;
+  responder?: string;
+  response?: unknown;
+  data?: MainSiteMutableMetadata | null;
+  blockNumber?: unknown;
+  transactionIndex?: unknown;
+  txIndex?: unknown;
+  logIndex?: unknown;
+  timestamp?: unknown;
+  bn?: unknown;
+  txi?: unknown;
+  li?: unknown;
+  ts?: unknown;
+};
+type MainSiteProfileActivityPayload = {
+  createdSurveys: MainSiteProfileActivityEntry[];
+  createdQuestions: MainSiteProfileActivityEntry[];
+  surveyResponses: MainSiteProfileActivityEntry[];
+  questionResponses: MainSiteProfileActivityEntry[];
+};
 type MainSiteProfileMetaResult<T> = {
   data: T;
   hadError: boolean;
   error?: string;
 };
-type MainSiteMutableMetadata = any;
-type MainSiteProfileUserCache = any;
-type MainSiteProfileUserChainEntry = any;
-type MainSiteProfileActivityWindow = any;
-type MainSiteProfileTimeoutOutcome<T = unknown> = any;
-type MainSiteProfileBackfillTimeoutOptions = any;
-type MainSiteProfileScanSbt = any;
-type MainSiteSbtMetadataCache = any;
-type MainSiteSbtNetworkCache = any;
-type MainSiteSurveyMetadataCache = any;
-type MainSiteSurveyNetworkCache = any;
-type MainSiteQuestionMetadataCache = any;
-type MainSiteQuestionNetworkCache = any;
-type MainSiteState = any;
+type MainSiteProfileUserChainData = MainSiteProfileActivityPayload & {
+  sbts: MainSiteProfileScanSbt[];
+};
+type MainSiteProfileUserChainEntry = {
+  data?: MainSiteProfileUserChainData;
+  lastBlockScanned?: number;
+  lastScanTimestamp?: number;
+  scanIncomplete?: boolean;
+  surveyActivityLastBlockScanned?: number;
+  surveyActivityScanIncomplete?: boolean;
+  questionActivityLastBlockScanned?: number;
+  questionActivityScanIncomplete?: boolean;
+  sbtLastBlockScanned?: number;
+  sbtScanIncomplete?: boolean;
+  sbtBackfillComplete?: boolean;
+  [key: string]: unknown;
+};
+type MainSiteProfileUserCache = Record<string, Record<string, MainSiteProfileUserChainEntry>>;
+type MainSiteProfileActivityWindow = {
+  fromBlock: number;
+  shouldForceBackfill: boolean;
+};
+type MainSiteProfileTimeoutOutcome<T = unknown> = {
+  timedOut: boolean;
+  value?: T | null;
+  error?: unknown;
+};
+type MainSiteProfileBackfillTimeoutOptions = {
+  spanStepBlocks?: unknown;
+  floorTimeoutMs?: unknown;
+  timeoutCapMs?: unknown;
+};
+type MainSiteProfileScanSbt = Record<string, unknown> & {
+  sbtAddress?: string;
+  sbtInfo?: Record<string, unknown>;
+};
+type MainSiteSbtCacheEntry = MainSiteMutableMetadata & {
+  sbtAddress?: string;
+  sbtInfo?: Record<string, unknown>;
+  mintedAddresses?: string[];
+  blockNumber?: number;
+};
+type MainSiteSbtMetadataCache = Record<string, MainSiteSbtNetworkCache | undefined>;
+type MainSiteSbtNetworkCache = {
+  sbtList: Record<string, MainSiteSbtCacheEntry>;
+  lastBlock?: number;
+  [key: string]: unknown;
+};
+type MainSiteSurveyMetadataCache = Record<string, MainSiteSurveyNetworkCache | undefined>;
+type MainSiteSurveyNetworkCache = {
+  surveys: Record<string, MainSiteMutableMetadata>;
+  surveyResponses: Record<string, Record<string, Record<string, unknown>>>;
+  surveyResponsesLatestBlock?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+type MainSiteQuestionResponseMeta = {
+  bn?: number;
+  blockNumber?: number;
+  txi?: number;
+  transactionIndex?: number;
+  txIndex?: number;
+  li?: number;
+  logIndex?: number;
+  ts?: number;
+  timestamp?: number;
+};
+type MainSiteQuestionMetadataCache = Record<string, MainSiteQuestionNetworkCache | undefined>;
+type MainSiteQuestionNetworkCache = {
+  questions: Record<string, MainSiteMutableMetadata>;
+  questionResponses: Record<string, Record<string, Record<string, unknown>>>;
+  questionResponsesMeta: Record<string, Record<string, MainSiteQuestionResponseMeta>>;
+  arweaveTxCache?: Record<string, unknown>;
+  arweaveTxFailureCache?: Record<string, unknown>;
+  [key: string]: unknown;
+};
 type MainSiteProfileResponseRecency = {
   bn: number;
   txi: number;
