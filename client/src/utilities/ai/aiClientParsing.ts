@@ -13,6 +13,9 @@ export const asParsedJsonRecord = (value: unknown): UnknownRecord | null =>
 export const readParsedString = (record: UnknownRecord | null | undefined, key: string): string =>
   typeof record?.[key] === 'string' ? String(record[key]) : '';
 
+export const readParsedLegacyString = (record: UnknownRecord | null | undefined, key: string): string =>
+  String(record?.[key] || '');
+
 export const pickParsedString = (record: UnknownRecord | null | undefined, keys: readonly string[]): string => {
   for (const key of keys) {
     const value = readParsedString(record, key);

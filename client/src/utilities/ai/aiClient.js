@@ -40,6 +40,7 @@ import {
   deriveFallbackClusterName,
   parseJsonFlexible,
   pickParsedString,
+  readParsedLegacyString,
   readParsedString,
   stripEnclosingMarkdownFences as _stripEnclosingMarkdownFences,
 } from './aiClientParsing.js';
@@ -555,9 +556,9 @@ export async function analyzeClusterOpinions(clusterData, allClustersData = null
 
     const parsed = asParsedJsonRecord(parseJsonFlexible(raw));
     if (parsed) {
-      short = readParsedString(parsed, 'short').trim() || '';
-      long = readParsedString(parsed, 'long').trim() || '';
-      name = readParsedString(parsed, 'name').trim() || null;
+      short = readParsedLegacyString(parsed, 'short').trim() || '';
+      long = readParsedLegacyString(parsed, 'long').trim() || '';
+      name = readParsedLegacyString(parsed, 'name').trim() || null;
     } else {
       // Fallback for older/freeform responses
       long = String(raw || '').trim();
@@ -605,18 +606,18 @@ export async function analyzeUserOpinions(userData, opts = {}) {
 
     const parsed = asParsedJsonRecord(parseJsonFlexible(raw)) || {};
 
-    const name = readParsedString(parsed, 'name').trim() || 'Profile Summary';
+    const name = readParsedLegacyString(parsed, 'name').trim() || 'Profile Summary';
     const summary =
-      readParsedString(parsed, 'summary').trim() ||
+      readParsedLegacyString(parsed, 'summary').trim() ||
       'Neutral overview of user affiliations and consistent answer themes.';
     const details =
-      readParsedString(parsed, 'details').trim() || 'No additional details were derived from the provided data.';
+      readParsedLegacyString(parsed, 'details').trim() || 'No additional details were derived from the provided data.';
 
     // Safely parse historicalAlignment
     const ha = asParsedJsonRecord(parsed.historicalAlignment) || {};
     const historicalAlignment = {
-      figure: readParsedString(ha, 'figure').trim() || '',
-      reasoning: readParsedString(ha, 'reasoning').trim() || '',
+      figure: readParsedLegacyString(ha, 'figure').trim() || '',
+      reasoning: readParsedLegacyString(ha, 'reasoning').trim() || '',
     };
 
     return { name, summary, details, historicalAlignment };
