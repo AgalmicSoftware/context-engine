@@ -326,33 +326,6 @@ const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; asse
       tabIndex={0}
       onKeyDown={onCarouselKeyDown}
     >
-      <div className={styles.vizCarouselControls}>
-        <button
-          type="button"
-          className={styles.vizCarouselButton}
-          aria-label="Previous visualization"
-          data-testid="ce-posts-viz-carousel-prev"
-          data-carousel-control="true"
-          disabled={activeIndex === 0}
-          onClick={() => setSlideIndex(activeIndex - 1)}
-        >
-          <FontAwesomeIcon icon={faArrowLeft} aria-hidden="true" />
-        </button>
-        <span className={styles.vizCarouselCounter} aria-live="polite">
-          {activeIndex + 1} / {slideCount}
-        </span>
-        <button
-          type="button"
-          className={styles.vizCarouselButton}
-          aria-label="Next visualization"
-          data-testid="ce-posts-viz-carousel-next"
-          data-carousel-control="true"
-          disabled={activeIndex === slideCount - 1}
-          onClick={() => setSlideIndex(activeIndex + 1)}
-        >
-          <FontAwesomeIcon icon={faArrowRight} aria-hidden="true" />
-        </button>
-      </div>
       <div className={styles.vizCarouselTrack} ref={trackRef}>
         {block.blocks.map((childBlock, childIndex) => (
           <div
@@ -378,20 +351,47 @@ const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; asse
           </div>
         ))}
       </div>
-      <div className={styles.vizCarouselDots} role="group" aria-label="Choose visualization slide">
-        {slideTitles.map((slideTitle, slideIndex) => (
-          <button
-            // eslint-disable-next-line react/no-array-index-key
-            key={`${slideTitle}-${slideIndex}`}
-            type="button"
-            className={styles.vizCarouselDot}
-            aria-label={`Go to slide ${slideIndex + 1}: ${slideTitle}`}
-            aria-current={activeIndex === slideIndex ? 'true' : undefined}
-            data-testid={`ce-posts-viz-carousel-dot-${slideIndex}`}
-            data-carousel-control="true"
-            onClick={() => setSlideIndex(slideIndex)}
-          />
-        ))}
+      <div className={styles.vizCarouselControls}>
+        <button
+          type="button"
+          className={styles.vizCarouselButton}
+          aria-label="Previous visualization"
+          data-testid="ce-posts-viz-carousel-prev"
+          data-carousel-control="true"
+          disabled={activeIndex === 0}
+          onClick={() => setSlideIndex(activeIndex - 1)}
+        >
+          <FontAwesomeIcon icon={faArrowLeft} aria-hidden="true" />
+        </button>
+        <div className={styles.vizCarouselDots} role="group" aria-label="Choose visualization slide">
+          {slideTitles.map((slideTitle, slideIndex) => (
+            <button
+              // eslint-disable-next-line react/no-array-index-key
+              key={`${slideTitle}-${slideIndex}`}
+              type="button"
+              className={styles.vizCarouselDot}
+              aria-label={`Go to slide ${slideIndex + 1}: ${slideTitle}`}
+              aria-current={activeIndex === slideIndex ? 'true' : undefined}
+              data-testid={`ce-posts-viz-carousel-dot-${slideIndex}`}
+              data-carousel-control="true"
+              onClick={() => setSlideIndex(slideIndex)}
+            />
+          ))}
+        </div>
+        <span className={styles.vizCarouselCounter} aria-live="polite">
+          {activeIndex + 1} / {slideCount}
+        </span>
+        <button
+          type="button"
+          className={styles.vizCarouselButton}
+          aria-label="Next visualization"
+          data-testid="ce-posts-viz-carousel-next"
+          data-carousel-control="true"
+          disabled={activeIndex === slideCount - 1}
+          onClick={() => setSlideIndex(activeIndex + 1)}
+        >
+          <FontAwesomeIcon icon={faArrowRight} aria-hidden="true" />
+        </button>
       </div>
     </section>
   );

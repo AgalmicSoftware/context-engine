@@ -490,7 +490,9 @@ h3.postHeading {
 
 .vizCard {
   display: grid;
-  gap: $viz-gap-lg;
+  // start-packed rows: never distribute extra height as gaps between sections
+  align-content: start;
+  gap: $viz-gap-md;
   padding: $viz-gap-xl;
   border: 1px solid $viz-panel-border;
   border-radius: $viz-radius;
@@ -605,7 +607,7 @@ h3.postHeading {
 .vizCarousel {
   min-width: 0;
   display: grid;
-  gap: $viz-gap-lg;
+  gap: $viz-gap-md;
 
   &:focus-visible {
     outline: 2px solid rgba(77, 255, 164, 0.7);
@@ -616,14 +618,16 @@ h3.postHeading {
 .vizCarouselControls {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: $viz-gap-sm;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: $viz-gap-md;
+  padding: 2px 0;
 }
 
 .vizCarouselButton {
   appearance: none;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -666,10 +670,10 @@ h3.postHeading {
 }
 
 .vizCarouselCounter {
-  min-width: 56px;
+  min-width: 44px;
   color: rgba(244, 247, 255, 0.86);
   font-family: var(--ce-font-mono);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   line-height: 1;
@@ -681,10 +685,14 @@ h3.postHeading {
   position: relative;
   min-width: 0;
   display: flex;
+  // natural card heights: short slides must not stretch to the tallest sibling
+  align-items: flex-start;
   gap: $viz-gap-lg;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 2px;
+  // headroom inside the clip box for the hover lift + card shadow
+  padding: 6px 0 4px;
+  margin-top: -6px;
   perspective: 900px;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
@@ -709,7 +717,6 @@ h3.postHeading {
 
   > .vizCard {
     position: relative;
-    min-height: 100%;
     border-color: rgba(244, 247, 255, 0.14);
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
 
@@ -1157,7 +1164,7 @@ h3.postHeading {
 
 .beeswarmViz {
   display: grid;
-  gap: $viz-gap-lg;
+  gap: $viz-gap-md;
 }
 
 .beeswarmRow {
@@ -1190,8 +1197,8 @@ h3.postHeading {
 
 .beeswarmPlot {
   position: relative;
-  height: 62px;
-  margin: 0 14px 2px;
+  height: 56px;
+  margin: 0 12px;
 }
 
 .beeswarmAxis {
@@ -1304,9 +1311,9 @@ h3.postHeading {
 }
 
 .binaryBeeswarmAxisBase {
-  stroke: rgba(244, 247, 255, 0.16);
+  stroke: rgba(244, 247, 255, 0.11);
   stroke-linecap: round;
-  stroke-width: 10;
+  stroke-width: 3;
 }
 
 .binaryBeeswarmAxis {
@@ -1654,7 +1661,8 @@ h3.postHeading {
 
 .responseTypeGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  // container-driven columns: 2-3 across on wide slides, 1 on narrow, no breakpoint cliff
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: $viz-gap-md;
 }
 
@@ -1882,7 +1890,8 @@ h3.postHeading {
 
 .responseQuotes {
   display: grid;
-  gap: $viz-gap-xs;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: $viz-gap-sm;
 
   figure {
     margin: 0;
@@ -1935,16 +1944,14 @@ h3.postHeading {
     grid-template-columns: 1fr;
   }
 
-  .responseTypeGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .responsePie {
-    grid-template-columns: 1fr;
-  }
-
   .networkCanvas {
     min-height: 220px;
+  }
+}
+
+@media (max-width: 460px) {
+  .responsePie {
+    grid-template-columns: 1fr;
   }
 }
 
