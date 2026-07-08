@@ -43,7 +43,8 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
 {
   "title": "Data Exploration (n=4)",
   "defaultOpen": false,
-  "childrenOpen": false
+  "childrenOpen": false,
+  "layout": "stack"
 }
 ```
 

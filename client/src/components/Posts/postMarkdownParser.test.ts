@@ -105,6 +105,7 @@ Paragraph text.
 
     expect(markdown).toContain('## Data Visualization');
     expect(markdown).toContain('"title": "Data Exploration (n=4)"');
+    expect(markdown).toContain('"layout": "stack"');
     expect(markdown).toContain(
       'Sample size (n=4) is too small to be meaningful, but we offer the below as a preview of what results could look like. Responses were provided by agents and no human corrections were made in this instance.',
     );
