@@ -361,6 +361,7 @@ const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; asse
             role="group"
             aria-roledescription="slide"
             aria-label={`${childIndex + 1} of ${slideCount}: ${slideTitles[childIndex]}`}
+            data-active={childIndex === activeIndex ? 'true' : 'false'}
             ref={(element) => {
               slideRefs.current[childIndex] = element;
             }}

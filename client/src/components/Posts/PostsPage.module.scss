@@ -647,7 +647,7 @@ h3.postHeading {
     background: rgba(77, 255, 164, 0.12);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
     color: #ffffff;
-    transform: translateY(-1px);
+    transform: translateY(-1px) scale(1.05);
   }
 
   &:focus-visible {
@@ -670,6 +670,7 @@ h3.postHeading {
   color: rgba(244, 247, 255, 0.86);
   font-family: var(--ce-font-mono);
   font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   line-height: 1;
   text-align: center;
@@ -684,6 +685,7 @@ h3.postHeading {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 2px;
+  perspective: 900px;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -694,13 +696,96 @@ h3.postHeading {
 }
 
 .vizCarouselSlide {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   flex: 0 0 calc(100% - 28px);
+  // Keep inactive slides at a 0.9 opacity floor so muted descendants remain AA-readable.
+  filter: saturate(0.85);
+  opacity: 0.9;
   scroll-snap-align: start;
   scroll-snap-stop: always;
+  transform-origin: center;
 
   > .vizCard {
+    position: relative;
     min-height: 100%;
+    border-color: rgba(244, 247, 255, 0.14);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 1px;
+      right: 1px;
+      left: 1px;
+      height: 44%;
+      border-radius: calc(#{$viz-radius} - 1px) calc(#{$viz-radius} - 1px) 0 0;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 30%);
+      pointer-events: none;
+    }
+  }
+
+  > .vizCard > * {
+    position: relative;
+  }
+
+  &[data-active='true'] {
+    z-index: 2;
+    filter: saturate(1);
+    opacity: 1;
+
+    > .vizCard {
+      border-color: rgba(77, 255, 164, 0.22);
+      box-shadow:
+        0 18px 42px rgba(0, 0, 0, 0.32),
+        0 0 0 1px rgba(77, 255, 164, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+  }
+
+  &:hover > .vizCard {
+    border-color: rgba(77, 255, 164, 0.25);
+    box-shadow:
+      0 12px 24px rgba(0, 0, 0, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  }
+
+  &[data-active='true']:hover > .vizCard {
+    border-color: rgba(77, 255, 164, 0.32);
+    box-shadow:
+      0 20px 48px rgba(0, 0, 0, 0.34),
+      0 0 0 1px rgba(77, 255, 164, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vizCarouselSlide {
+    transform: scale(0.97);
+    transition:
+      transform 0.3s ease,
+      opacity 0.3s ease,
+      filter 0.3s ease;
+
+    > .vizCard {
+      transition:
+        transform 0.08s ease,
+        border-color 0.16s ease,
+        box-shadow 0.2s ease;
+    }
+
+    &[data-active='true'] {
+      transform: scale(1);
+    }
+
+    &:hover > .vizCard {
+      transform: translateY(-1px);
+    }
+
+    &[data-active='true']:hover > .vizCard {
+      transform: translateY(-2px);
+    }
   }
 }
 
@@ -744,7 +829,7 @@ h3.postHeading {
     border-color: rgba(77, 255, 164, 0.78);
     background: $accent;
     box-shadow:
-      0 0 0 3px rgba(77, 255, 164, 0.14),
+      0 0 0 3px rgba(77, 255, 164, 0.25),
       0 8px 18px rgba(0, 0, 0, 0.18);
   }
 }
@@ -935,6 +1020,7 @@ h3.postHeading {
 }
 
 .rankedThemeTrack {
+  position: relative;
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
@@ -1007,6 +1093,20 @@ h3.postHeading {
   stroke: rgba(255, 255, 255, 0.55);
   stroke-width: 0.35;
   filter: drop-shadow(0 0 4px rgba(77, 255, 164, 0.24));
+}
+
+.networkNodeShadow,
+.networkNodeHighlight {
+  pointer-events: none;
+}
+
+.networkNodeShadow {
+  fill: rgba(0, 0, 0, 0.28);
+  opacity: 0.72;
+}
+
+.networkNodeHighlight {
+  opacity: 0.82;
 }
 
 .networkLabel {
@@ -1137,8 +1237,15 @@ h3.postHeading {
   transform: translate(-50%, -50%);
   border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: 999px;
+  background-image: radial-gradient(
+    circle at 30% 30%,
+    rgba(255, 255, 255, 0.4),
+    rgba(255, 255, 255, 0.16) 22%,
+    transparent 45%
+  );
   color: #061018;
   cursor: pointer;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.24));
   font-family: var(--ce-font-mono);
   font-size: 0.62rem;
   font-weight: 800;
@@ -1148,9 +1255,11 @@ h3.postHeading {
     0 0 0 3px rgba(255, 255, 255, 0.06);
   transition:
     border-color 0.14s ease,
+    filter 0.14s ease,
     opacity 0.14s ease;
 
   &:hover {
+    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.3)) saturate(1.08);
     opacity: 1 !important;
   }
 
@@ -1264,12 +1373,33 @@ h3.postHeading {
   filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.28));
 }
 
+.binaryBeeswarmDotShadow,
+.binaryBeeswarmDotHighlight {
+  pointer-events: none;
+}
+
+.binaryBeeswarmDotShadow {
+  fill: rgba(0, 0, 0, 0.28);
+  opacity: 0.74;
+}
+
+.binaryBeeswarmDotHighlight {
+  opacity: 0.82;
+}
+
 .binaryBeeswarmPointActive .binaryBeeswarmDot,
 .binaryBeeswarmPoint:hover .binaryBeeswarmDot {
   r: 10px;
   stroke: rgba(255, 255, 255, 0.9);
   stroke-width: 2;
   filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.34)) drop-shadow(0 0 10px rgba(77, 255, 164, 0.2));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beeswarmDot,
+  .binaryBeeswarmDot {
+    transition: none;
+  }
 }
 
 .binaryBeeswarmTooltip {
@@ -1372,6 +1502,7 @@ h3.postHeading {
 }
 
 .binaryTooltipSplitBar {
+  position: relative;
   display: flex;
   width: 100%;
   height: 8px;
@@ -1379,6 +1510,18 @@ h3.postHeading {
   border-radius: 999px;
   background: rgba(7, 12, 31, 0.5);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.rankedThemeTrack::after,
+.binaryTooltipSplitBar::after,
+.responseSplitBar::after,
+.responseBarTrack::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08) 36%, transparent 72%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  pointer-events: none;
 }
 
 .binaryTooltipSplitSegment {
@@ -1599,11 +1742,41 @@ h3.postHeading {
 }
 
 .responsePieChart {
+  position: relative;
   width: min(124px, 100%);
   aspect-ratio: 1;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.24),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 -12px 24px rgba(0, 0, 0, 0.18);
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  &::before {
+    inset: 24%;
+    border: 1px solid rgba(244, 247, 255, 0.18);
+    background: rgba(18, 23, 54, 0.94);
+    box-shadow:
+      inset 0 2px 8px rgba(0, 0, 0, 0.42),
+      0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+
+  &::after {
+    inset: 0;
+    background:
+      radial-gradient(circle at 31% 24%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08) 18%, transparent 42%),
+      radial-gradient(circle at 54% 62%, transparent 46%, rgba(0, 0, 0, 0.16) 100%);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.18);
+  }
 }
 
 .responsePieLegend {
@@ -1677,6 +1850,7 @@ h3.postHeading {
 }
 
 .responseSplitBar {
+  position: relative;
   display: flex;
   width: 100%;
   height: 20px;
@@ -1693,6 +1867,7 @@ h3.postHeading {
 }
 
 .responseBarTrack {
+  position: relative;
   height: 6px;
   overflow: hidden;
   border-radius: 999px;

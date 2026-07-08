@@ -347,6 +347,9 @@ const ThemeNetworkViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const nodesById = new Map(nodes.map((node) => [node.id, node]));
   const links = readNetworkLinks(spec, new Set(nodesById.keys()));
   const maxValue = Math.max(...nodes.map((node) => node.value), 1);
+  const reactId = React.useId().replace(/:/g, '');
+  const nodeHighlightId = `theme-network-node-highlight-${reactId}`;
+  const nodeShadowId = `theme-network-node-shadow-${reactId}`;
 
   if (nodes.length === 0) {
     return <p className={styles.vizFallback}>Visualization has no network nodes.</p>;
@@ -357,6 +360,16 @@ const ThemeNetworkViz = ({ spec, hideHeader = false }: VizBodyProps) => {
       <VizHeader title={title} subtitle={subtitle} hidden={hideHeader} />
       <div className={styles.networkFrame}>
         <svg className={styles.networkCanvas} viewBox="0 0 100 64" role="img" aria-label={title}>
+          <defs>
+            <radialGradient id={nodeHighlightId} cx="30%" cy="30%" r="68%">
+              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.68)" />
+              <stop offset="34%" stopColor="rgba(255, 255, 255, 0.28)" />
+              <stop offset="72%" stopColor="rgba(255, 255, 255, 0)" />
+            </radialGradient>
+            <filter id={nodeShadowId} x="-70%" y="-70%" width="240%" height="240%" colorInterpolationFilters="sRGB">
+              <feDropShadow dx="0" dy="1.4" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.34" />
+            </filter>
+          </defs>
           {links.map((link) => {
             const source = nodesById.get(link.source);
             const target = nodesById.get(link.target);
@@ -377,7 +390,27 @@ const ThemeNetworkViz = ({ spec, hideHeader = false }: VizBodyProps) => {
             const radius = 2.8 + (node.value / maxValue) * 5.5;
             return (
               <g key={node.id}>
+                <circle
+                  className={styles.networkNodeShadow}
+                  cx={node.x}
+                  cy={node.y + radius * 0.16}
+                  r={radius}
+                  filter={`url(#${nodeShadowId})`}
+                  aria-hidden="true"
+                  focusable="false"
+                  pointerEvents="none"
+                />
                 <circle className={styles.networkNode} cx={node.x} cy={node.y} r={radius} fill={node.color} />
+                <circle
+                  className={styles.networkNodeHighlight}
+                  cx={node.x}
+                  cy={node.y}
+                  r={radius}
+                  fill={`url(#${nodeHighlightId})`}
+                  aria-hidden="true"
+                  focusable="false"
+                  pointerEvents="none"
+                />
                 <text className={styles.networkLabel} x={node.x} y={node.y + radius + 4.2} textAnchor="middle">
                   {node.label}
                 </text>
@@ -913,6 +946,8 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const tooltipLeft = activePlacement ? clamp((activePlacement.x / BINARY_SWARM_WIDTH) * 100, 18, 82) : 50;
   const tooltipTop = activePlacement ? clamp((activePlacement.y / BINARY_SWARM_HEIGHT) * 100, 16, 84) : 50;
   const renderTooltipBelow = tooltipTop <= SWARM_TOOLTIP_FLIP_TOP_PERCENT;
+  const sphereHighlightId = `binary-beeswarm-sphere-highlight-${reactId}`;
+  const sphereShadowId = `binary-beeswarm-sphere-shadow-${reactId}`;
   const tooltipStyle: TooltipPositionStyle = {
     '--post-viz-tooltip-x': `${tooltipLeft}%`,
     top: `${tooltipTop}%`,
@@ -1019,6 +1054,14 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                 <stop offset="48%" stopColor={RESPONSE_TONE_COLORS.unsure} />
                 <stop offset="100%" stopColor="#ff6bcb" />
               </linearGradient>
+              <radialGradient id={sphereHighlightId} cx="30%" cy="30%" r="68%">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.7)" />
+                <stop offset="36%" stopColor="rgba(255, 255, 255, 0.28)" />
+                <stop offset="72%" stopColor="rgba(255, 255, 255, 0)" />
+              </radialGradient>
+              <filter id={sphereShadowId} x="-70%" y="-70%" width="240%" height="240%" colorInterpolationFilters="sRGB">
+                <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000000" floodOpacity="0.34" />
+              </filter>
             </defs>
             {scale.ticks.map((tick) => {
               const y = getBinarySwarmY(tick, scale);
@@ -1138,6 +1181,16 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                     onMouseLeave={hideTooltip}
                   />
                   <circle
+                    className={styles.binaryBeeswarmDotShadow}
+                    cx={placement.x}
+                    cy={placement.y + 1.2}
+                    r={8.4}
+                    filter={`url(#${sphereShadowId})`}
+                    aria-hidden="true"
+                    focusable="false"
+                    pointerEvents="none"
+                  />
+                  <circle
                     className={styles.binaryBeeswarmDot}
                     cx={placement.x}
                     cy={placement.y}
@@ -1145,6 +1198,16 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                     fill={item.color}
                     onMouseEnter={showTooltip}
                     onMouseLeave={hideTooltip}
+                  />
+                  <circle
+                    className={styles.binaryBeeswarmDotHighlight}
+                    cx={placement.x}
+                    cy={placement.y}
+                    r={7.5}
+                    fill={`url(#${sphereHighlightId})`}
+                    aria-hidden="true"
+                    focusable="false"
+                    pointerEvents="none"
                   />
                   <title>{ariaLabel}</title>
                 </g>
