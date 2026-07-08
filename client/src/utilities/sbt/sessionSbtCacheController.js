@@ -35,6 +35,7 @@ import { getSbtRealtimeEventCursorGuard } from './sbtRealtimeEventCursorGuard.js
 import { updateSbtRealtimeCursorForNetworkCache } from './sbtRealtimeCursorCache.js';
 import { withSessionScopedSbtCacheBinding } from './sessionSbtCacheBinding.js';
 import { applySbtActivityCacheEntryUpdate, buildSbtActivityCacheEntry } from './sbtActivityCacheEntry.js';
+import { needsSbtListMetadataHydration } from './sbtMetadataHydrationReadiness.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 
 const mainSiteLog = createLogger('mainSite');
@@ -222,33 +223,7 @@ export const createSessionSbtCacheController = (host = {}) => {
         let netCache = cache[networkID];
 
         const scannedUpTo = Number(netCache.lastBlock) || 0;
-        const hasListVisibleTokenUriMetadata = (info) => {
-          if (!info || typeof info !== 'object') return false;
-          if (info.tokenUriMetadataFetched === true) return true;
-          const hasText = (value) => value !== undefined && value !== null && String(value).trim() !== '';
-          const hasItems = (value) => Array.isArray(value) && value.length > 0;
-          const encryptedFields =
-            info.encryptedFields && typeof info.encryptedFields === 'object' ? info.encryptedFields : {};
-          return (
-            hasText(info.description) ||
-            hasText(info.image) ||
-            hasText(info.descriptionEncrypted) ||
-            hasText(info.encryptedDescription) ||
-            hasText(info.imageEncrypted) ||
-            hasText(info.encryptedImage) ||
-            hasText(encryptedFields.description) ||
-            hasText(encryptedFields.image) ||
-            hasItems(info.tags) ||
-            hasItems(info.documentURLs) ||
-            hasItems(info.documentUrls) ||
-            hasItems(info.docURLs) ||
-            hasItems(info.documents)
-          );
-        };
-
-        const needsHydration = (info) => {
-          return !hasCoreSbtMetadata(info) || !hasListVisibleTokenUriMetadata(info);
-        };
+        const needsHydration = (info) => needsSbtListMetadataHydration(info, hasCoreSbtMetadata);
 
         const existingHydrationTargets = Object.entries(netCache.sbtList || {})
           .map(([addrLower, entry]) => String(entry?.sbtAddress || addrLower || '').trim())
