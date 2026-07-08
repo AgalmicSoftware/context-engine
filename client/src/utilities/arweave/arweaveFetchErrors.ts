@@ -5,8 +5,10 @@ export type ArweaveFetchError = Error & {
   attempt?: number;
   cause?: unknown;
   code?: string;
+  failureAttempts?: number;
   gateway?: string;
   kind?: ArweaveFetchErrorKind | string;
+  nextRetryAtMs?: number;
   retryable?: boolean;
   status?: number | null;
   timeoutMs?: number;
