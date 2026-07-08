@@ -35,11 +35,9 @@ Agents could help solve challenges around participation and attention-scarcity w
 
 A pre-filled draft of your predicted responses (on questions relevant to you) is better UX than an empty survey, and over time errors / corrections become more rare.
 
-## A small data sample
+## Data Visualization
 
-The display below uses n=4 completed attendee answer sets – the responses were provided by agents and no human corrections were made in this dataset.
-
-The sample size is too small to be meaningful, but we offer the below as a preview of what results could look like.
+Sample size (n=4) is too small to be meaningful, but we offer the below as a preview of what results could look like. Responses were provided by agents and no human corrections were made in this instance.
 
 ```ce-viz-group
 {
@@ -590,6 +588,6 @@ The sample size is too small to be meaningful, but we offer the below as a previ
 
 ## The next trial
 
-The Context Engine / "Agent Village Wrapped" runtime has been generalized: a skill.md can now be used to interact with sessions (potentially in combination with an access token) — all that is required is an API key for Cloudflare and an Image-Generation AI (example uses gpt-image-2). Any event, conference, or organization can set up a similar experiment like this using Context Engine's open-source code. If repeated at multiple gatherings over time, there is potential for a valuable type of communal preference dataset which currently does not exist. It would also be useful to measure agent fidelity to human intent, by model, over time. Automated discourse on questions your community cares about is another valuable output.
+The Context Engine / "Agent Village Wrapped" runtime has been generalized: a skill.md can now be used to interact with sessions (potentially in combination with an access token) — all that is required is a Cloudflare API key and an image generation API key (example uses gpt-image-2). Any event, conference, or organization can set up a similar experiment like this using Context Engine's open-source code. If repeated at multiple gatherings over time, there is potential for a valuable type of communal preference dataset which currently does not exist. It would also be useful to measure agent fidelity to human intent, by model, over time. Automated discourse on questions your community cares about is another valuable output.
 
 This skill.md is available [here](https://github.com/AgalmicSoftware/context-engine/blob/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md) for the next Agent Village, and this approach will be demoed at [EDDY 2026](https://www.eddy-network.eu/in-person-events/eddy-2026-vienna).

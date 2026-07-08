@@ -91,14 +91,12 @@ Paragraph text.
     const markdown = readAgentVillageWrappedPost();
     const specs = actualAgentVillageVizSpecs();
 
-    expect(markdown).toContain('## A small data sample');
+    expect(markdown).toContain('## Data Visualization');
     expect(markdown).toContain('"title": "Data Exploration (n=4)"');
     expect(markdown).toContain(
-      'The display below uses n=4 completed attendee answer sets – the responses were provided by agents and no human corrections were made in this dataset.'
+      'Sample size (n=4) is too small to be meaningful, but we offer the below as a preview of what results could look like. Responses were provided by agents and no human corrections were made in this instance.'
     );
-    expect(markdown).toContain(
-      'The sample size is too small to be meaningful, but we offer the below as a preview of what results could look like.'
-    );
+    expect(markdown).not.toContain('The display below uses n=4 completed attendee answer sets');
     expect(markdown).not.toContain('A small launch sample');
     expect(markdown).not.toContain('The completed row-level data below is prediction-layer data.');
     expect(markdown).not.toContain('## Norms compass');
