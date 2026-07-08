@@ -157,10 +157,14 @@ export const startQuestionDecryptAttemptStatus = ({
   const registerBusyPort =
     registerQuestionDecryptBusyTokens || ((keys) => host?.registerQuestionDecryptBusyTokens?.(keys));
   const setStatePort = setState || (host?.setState ? host.setState.bind(host) : () => {});
+  const buildQuestionDecryptStartStatePort = buildQuestionDecryptStartState as (
+    prevState: unknown,
+    keysToMark: unknown,
+  ) => unknown;
   const buildStartPort =
     buildStartState ||
-    ((prev: unknown, keys: unknown[]) =>
-      host?.buildQuestionDecryptStartState?.(prev, keys) || buildQuestionDecryptStartState(prev, keys));
+    ((prev: unknown, keys: unknown) =>
+      host?.buildQuestionDecryptStartState?.(prev, keys) || buildQuestionDecryptStartStatePort(prev, keys));
 
   const preparedAttempt = preparePort({ questionId, fieldToDecrypt, baselineForDecrypt }) || {};
   if (!preparedAttempt.shouldDecrypt) {
@@ -168,7 +172,7 @@ export const startQuestionDecryptAttemptStatus = ({
   }
 
   const decryptSelection = preparedAttempt.decryptSelection || {};
-  const keysToMark = Array.isArray(decryptSelection.keysToMark) ? decryptSelection.keysToMark : [];
+  const keysToMark = decryptSelection.keysToMark || [];
   const decryptAttemptToken = registerBusyPort(keysToMark);
   setStatePort((prev: unknown) => buildStartPort(prev, keysToMark));
 
