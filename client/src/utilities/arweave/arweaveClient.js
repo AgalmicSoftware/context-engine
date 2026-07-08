@@ -76,6 +76,7 @@ import {
   shouldFallbackUploadCandidate,
 } from './arweaveUploadFallbackPolicy.js';
 import { buildUploadSessionCandidates } from './arweaveUploadCandidates.js';
+import { parseWorkerUploadResponseJson } from './arweaveUploadWorkerResponse.js';
 
 const log = createLogger('general');
 const logArweaveFetchDebug = createArweaveFetchDebugLogger(log);
@@ -108,39 +109,6 @@ const emitArweaveUploadFallbackTelemetry = (payload = {}) => {
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const readResponseBodyPreview = async (response) => {
-  if (!response || typeof response.text !== 'function') return '';
-  try {
-    return String(await response.text()).slice(0, 200);
-  } catch (_) {
-    return '';
-  }
-};
-
-const parseWorkerUploadResponseJson = async (response) => {
-  let previewResponse = null;
-  try {
-    previewResponse = typeof response?.clone === 'function' ? response.clone() : response;
-  } catch (_) {
-    previewResponse = response;
-  }
-  try {
-    return await response.json();
-  } catch (_) {
-    const bodyPreview = await readResponseBodyPreview(previewResponse);
-    const details = {
-      status: Number(response?.status || 0) || null,
-      bodyPreview,
-    };
-    if (!response?.ok) {
-      log.warn('arweave upload response parse failed', details);
-      return {};
-    }
-    log.error('arweave upload response parse failed', details);
-    throw new Error('arweave upload response malformed');
-  }
-};
 
 const ARWEAVE_GRAPHQL_URL = 'https://permagate.io/graphql';
 const ARWEAVE_GRAPHQL_ENDPOINTS = [
@@ -892,7 +860,7 @@ async function uploadDataToArweave(data, format, opts = {}) {
       ts: new Date().toISOString(),
     });
 
-    let payload = await parseWorkerUploadResponseJson(response);
+    let payload = await parseWorkerUploadResponseJson(response, log);
     let message =
       payload?.error || payload?.message || (response.ok ? '' : `Arweave upload failed (${response.status})`);
 
@@ -912,7 +880,7 @@ async function uploadDataToArweave(data, format, opts = {}) {
               sessionSlug: candidate?.sessionSlug || '',
               workerUrl: candidateBaseUrl,
             });
-        const bootstrapPayload = await parseWorkerUploadResponseJson(bootstrapResponse);
+        const bootstrapPayload = await parseWorkerUploadResponseJson(bootstrapResponse, log);
         const bootstrapMessage =
           bootstrapPayload?.error ||
           bootstrapPayload?.message ||
