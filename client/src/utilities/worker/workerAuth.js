@@ -32,6 +32,14 @@ import {
   readScopedTokenCache,
   writeTokenCache,
 } from './workerAuthTokenCache.js';
+import {
+  buildAnonymousHeaders,
+  buildWorkerAuthNonceHeaders,
+  isStreamBody,
+  mergeHeaders,
+  shouldRetryAnonymousWithoutRateId,
+  stripAnonymousRateIdHeader,
+} from './workerAuthAnonymousHeaders.js';
 import { ADMIN_ACTION_TYPES, buildAdminActionBodyHash, buildAdminActionTypedData } from './adminTypedData.mjs';
 
 const accountLog = createLogger('account');
@@ -789,141 +797,6 @@ export const getWorkerAuthHeaders = async ({
     allowDemoFallback,
   });
   return headers;
-};
-
-const mergeHeaders = (base, extra) => {
-  const out = new Headers(base || {});
-  Object.entries(extra || {}).forEach(([key, value]) => {
-    if (value !== undefined) out.set(key, value);
-  });
-  return out;
-};
-
-const ANONYMOUS_RATE_ID_STORAGE_KEY = 'ce:anonClientId:v1';
-
-const normalizeAnonymousRateId = (raw) => {
-  const cleaned = toStr(raw).trim().toLowerCase();
-  if (!cleaned) return '';
-  if (!/^[a-z0-9_-]{8,128}$/.test(cleaned)) return '';
-  return cleaned;
-};
-
-const createAnonymousRateId = () => {
-  try {
-    if (
-      typeof globalThis !== 'undefined' &&
-      globalThis.crypto &&
-      typeof globalThis.crypto.getRandomValues === 'function'
-    ) {
-      const bytes = new Uint8Array(16);
-      globalThis.crypto.getRandomValues(bytes);
-      return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-    }
-  } catch (_) {}
-  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 14)}`;
-};
-
-const getAnonymousRateId = () => {
-  if (typeof window === 'undefined') return '';
-  try {
-    const cached = normalizeAnonymousRateId(localStorage.getItem(ANONYMOUS_RATE_ID_STORAGE_KEY) || '');
-    if (cached) return cached;
-  } catch (_) {}
-  const generated = normalizeAnonymousRateId(createAnonymousRateId());
-  if (!generated) return '';
-  try {
-    localStorage.setItem(ANONYMOUS_RATE_ID_STORAGE_KEY, generated);
-  } catch (_) {}
-  return generated;
-};
-
-const buildWorkerAuthNonceHeaders = (baseHeaders) => {
-  const headers = mergeHeaders(baseHeaders, {});
-  const anonRateId = getAnonymousRateId();
-  if (anonRateId && !headers.has('X-Anonymous-Client-Id')) {
-    headers.set('X-Anonymous-Client-Id', anonRateId);
-  }
-  return headers;
-};
-
-const isStreamBody = (body) => {
-  if (!body) return false;
-  if (typeof ReadableStream !== 'undefined' && body instanceof ReadableStream) return true;
-  return typeof body?.getReader === 'function';
-};
-
-const buildAnonymousHeaders = ({ baseHeaders, slug }) => {
-  const headers = mergeHeaders(baseHeaders, {});
-  headers.delete('Authorization');
-  headers.delete('authorization');
-  const anonRateId = getAnonymousRateId();
-  if (anonRateId && !headers.has('X-Anonymous-Client-Id')) {
-    headers.set('X-Anonymous-Client-Id', anonRateId);
-  }
-  if (!headers.has('X-Session-Slug') && !headers.has('X-Group-Slug')) {
-    headers.set('X-Group-Slug', slug || 'general');
-  }
-  return headers;
-};
-
-const stripAnonymousRateIdHeader = (baseHeaders) => {
-  const headers = mergeHeaders(baseHeaders, {});
-  headers.delete('X-Anonymous-Client-Id');
-  headers.delete('x-anonymous-client-id');
-  return headers;
-};
-
-const normalizeHttpMethod = (methodIn = 'GET') => {
-  const normalized = toStr(methodIn || 'GET')
-    .trim()
-    .toUpperCase();
-  return normalized || 'GET';
-};
-
-const isIdempotentRequestMethod = (methodIn = 'GET') => {
-  const method = normalizeHttpMethod(methodIn);
-  return method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
-};
-
-const buildProbeInit = (headers, options = {}) => {
-  const init = {
-    method: 'GET',
-    headers,
-    cache: 'no-store',
-  };
-  if (options && typeof options === 'object') {
-    if (options.credentials !== undefined) init.credentials = options.credentials;
-    if (options.mode !== undefined) init.mode = options.mode;
-    if (options.redirect !== undefined) init.redirect = options.redirect;
-    if (options.referrerPolicy !== undefined) init.referrerPolicy = options.referrerPolicy;
-    if (options.signal !== undefined) init.signal = options.signal;
-  }
-  return init;
-};
-
-const shouldRetryAnonymousWithoutRateId = async ({ workerUrl, anonymousHeaders, options = {} } = {}) => {
-  if (isIdempotentRequestMethod(options?.method)) return true;
-  const baseUrl = normalizeWorkerUrl(workerUrl);
-  if (!baseUrl) return false;
-
-  // For non-idempotent requests, verify likely CORS-preflight incompatibility first.
-  const probeUrl = `${baseUrl.replace(/\/+$/, '')}/health`;
-  const probeHeadersWithRateId = mergeHeaders(anonymousHeaders, {});
-  const probeHeadersWithoutRateId = stripAnonymousRateIdHeader(probeHeadersWithRateId);
-  try {
-    await fetch(probeUrl, buildProbeInit(probeHeadersWithRateId, options));
-    // Any transport-level success means this header is not preflight-blocked.
-    // Do not replay non-idempotent writes when that signal is present.
-    return false;
-  } catch (_) {}
-  try {
-    await fetch(probeUrl, buildProbeInit(probeHeadersWithoutRateId, options));
-    // A successful transport response (even 401/403) is enough to confirm
-    // the header-triggered preflight issue has been avoided.
-    return true;
-  } catch (_) {
-    return false;
-  }
 };
 
 const AUTH_OR_GATE_DENIAL_PATTERNS = [
