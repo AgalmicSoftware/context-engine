@@ -1115,7 +1115,7 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                     className={styles.binaryBeeswarmHitArea}
                     cx={placement.x}
                     cy={placement.y}
-                    r={18}
+                    r={20}
                     fill="transparent"
                     onMouseEnter={showTooltip}
                     onMouseLeave={hideTooltip}
@@ -1124,7 +1124,7 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                     className={styles.binaryBeeswarmDot}
                     cx={placement.x}
                     cy={placement.y}
-                    r={8.5}
+                    r={7.5}
                     fill={item.color}
                     onMouseEnter={showTooltip}
                     onMouseLeave={hideTooltip}

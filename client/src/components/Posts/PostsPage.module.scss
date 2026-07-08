@@ -15,6 +15,15 @@ $blue: #7aa7ff;
 $link-blue: #9cc9ff;
 $link-blue-hover: #c8ddff;
 $amber: #ffb347;
+$viz-gap-xs: 6px;
+$viz-gap-sm: 8px;
+$viz-gap-md: 10px;
+$viz-gap-lg: 12px;
+$viz-gap-xl: 14px;
+$viz-radius: var(--ce-radius-8);
+$viz-panel-bg: rgba(255, 255, 255, 0.045);
+$viz-panel-bg-strong: rgba(255, 255, 255, 0.06);
+$viz-panel-border: rgba(255, 255, 255, 0.13);
 
 .postsPage {
   --ce-post-font-body: Avenir, 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
@@ -481,12 +490,12 @@ h3.postHeading {
 
 .vizCard {
   display: grid;
-  gap: 16px;
-  padding: 20px;
-  border: 1px solid $card-border;
-  border-radius: var(--ce-radius-8);
-  background: $card-bg;
-  box-shadow: $card-shadow;
+  gap: $viz-gap-lg;
+  padding: $viz-gap-xl;
+  border: 1px solid $viz-panel-border;
+  border-radius: $viz-radius;
+  background: $viz-panel-bg;
+  font-variant-numeric: tabular-nums;
 }
 
 .vizDisclosure {
@@ -498,17 +507,16 @@ h3.postHeading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 16px 20px;
-  border: 1px solid $card-border;
-  border-radius: var(--ce-radius-8);
-  background: linear-gradient(90deg, rgba(0, 197, 255, 0.14), rgba(255, 255, 255, 0.055)), $card-bg;
-  box-shadow: $card-shadow;
+  gap: $viz-gap-lg;
+  padding: $viz-gap-lg $viz-gap-xl;
+  border: 1px solid $viz-panel-border;
+  border-radius: $viz-radius;
+  background: rgba(255, 255, 255, 0.04);
   color: $text;
   cursor: pointer;
   font-family: var(--ce-post-font-heading);
-  font-size: 1.14rem;
-  font-weight: 700;
+  font-size: 1.05rem;
+  font-weight: 650;
   line-height: 1.25;
   list-style: none;
 
@@ -523,7 +531,7 @@ h3.postHeading {
 
   &:hover {
     border-color: rgba(77, 255, 164, 0.3);
-    background: linear-gradient(90deg, rgba(0, 197, 255, 0.18), rgba(77, 255, 164, 0.08)), $card-bg;
+    background: rgba(77, 255, 164, 0.07);
   }
 }
 
@@ -562,7 +570,6 @@ h3.postHeading {
   border-top: 0;
   border-top-left-radius: 0;
   border-top-right-radius: 0;
-  box-shadow: $card-shadow;
 }
 
 .vizInlineContent {
@@ -578,45 +585,58 @@ h3.postHeading {
 }
 
 .vizGroupDisclosure > .vizDisclosureSummary {
-  font-size: 1.2rem;
+  background: linear-gradient(90deg, rgba(0, 197, 255, 0.16), rgba(255, 255, 255, 0.055)), $card-bg;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22);
+  font-size: 1.05rem;
+  font-weight: 700;
+
+  &:hover {
+    background: linear-gradient(90deg, rgba(0, 197, 255, 0.2), rgba(77, 255, 164, 0.08)), $card-bg;
+  }
 }
 
 .vizGroupCard {
   display: grid;
-  gap: 12px;
-  padding: 14px;
+  gap: $viz-gap-md;
+  padding: $viz-gap-md;
 }
 
 .vizGroupItems {
   display: grid;
-  gap: 12px;
+  gap: $viz-gap-sm;
 }
 
 .vizDisclosureNested .vizDisclosureSummary {
-  padding: 14px 18px;
-  background: linear-gradient(90deg, rgba(0, 197, 255, 0.12), rgba(255, 255, 255, 0.045)), rgba(255, 255, 255, 0.035);
-  box-shadow: none;
+  min-height: 42px;
+  padding: $viz-gap-md $viz-gap-lg;
+  background: rgba(255, 255, 255, 0.035);
   font-size: 1rem;
+  font-weight: 600;
+
+  &:hover {
+    background: rgba(77, 255, 164, 0.06);
+  }
 }
 
 .vizHeader {
   display: grid;
-  gap: 6px;
+  gap: $viz-gap-xs;
 }
 
 .vizTitle {
   margin: 0;
   color: $text;
   font-family: var(--ce-post-font-heading);
-  font-size: 1.26rem;
+  font-size: 1.08rem;
   letter-spacing: 0;
+  line-height: 1.22;
 }
 
 .vizSubtitle {
   margin: 0;
   color: $muted;
-  font-size: 0.94rem;
-  line-height: 1.5;
+  font-size: 0.85rem;
+  line-height: 1.42;
 
   strong {
     color: $text;
@@ -625,19 +645,20 @@ h3.postHeading {
 
 .categoryViz {
   display: grid;
-  gap: 14px;
+  gap: $viz-gap-md;
 }
 
 .categoryRow {
   display: grid;
-  gap: 8px;
+  gap: $viz-gap-xs;
 }
 
 .categoryMeta {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: $viz-gap-md;
   color: rgba(244, 247, 255, 0.94);
+  font-size: 0.9rem;
 }
 
 .categoryLabel {
@@ -652,24 +673,22 @@ h3.postHeading {
 .dotGrid {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  min-height: 15px;
+  gap: 4px;
+  min-height: 12px;
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.16),
-    0 3px 8px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 
 .categoryDetail {
   margin: 0;
   color: $muted;
-  font-size: 0.9rem;
-  line-height: 1.5;
+  font-size: 0.84rem;
+  line-height: 1.4;
 }
 
 .quoteWall {
@@ -878,17 +897,17 @@ h3.postHeading {
 .beeswarmCard,
 .binaryBeeswarmCard,
 .responseTypeCard {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.045)), $card-bg;
+  background: $viz-panel-bg;
 }
 
 .beeswarmViz {
   display: grid;
-  gap: 18px;
+  gap: $viz-gap-lg;
 }
 
 .beeswarmRow {
   display: grid;
-  gap: 10px;
+  gap: $viz-gap-sm;
 }
 
 .beeswarmRowMeta {
@@ -903,21 +922,21 @@ h3.postHeading {
   h4 {
     color: $text;
     font-family: var(--ce-post-font-heading);
-    font-size: 1.1rem;
+    font-size: 1rem;
     line-height: 1.25;
   }
 
   p {
     color: $muted;
-    font-size: 0.9rem;
-    line-height: 1.45;
+    font-size: 0.84rem;
+    line-height: 1.36;
   }
 }
 
 .beeswarmPlot {
   position: relative;
-  height: 76px;
-  margin: 0 18px 4px;
+  height: 62px;
+  margin: 0 14px 2px;
 }
 
 .beeswarmAxis {
@@ -936,16 +955,16 @@ h3.postHeading {
   transform: translateX(-50%);
   color: rgba(244, 247, 255, 0.72);
   font-family: var(--ce-font-mono);
-  font-size: 0.76rem;
+  font-size: 0.7rem;
   white-space: nowrap;
 
   &::before {
     content: '';
     position: absolute;
     left: 50%;
-    bottom: 20px;
+    bottom: 18px;
     width: 1px;
-    height: 34px;
+    height: 28px;
     background: rgba(255, 255, 255, 0.12);
   }
 }
@@ -954,8 +973,8 @@ h3.postHeading {
   appearance: none;
   position: absolute;
   z-index: 1;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -966,11 +985,11 @@ h3.postHeading {
   color: #061018;
   cursor: pointer;
   font-family: var(--ce-font-mono);
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 800;
   line-height: 1;
   box-shadow:
-    0 7px 20px rgba(0, 0, 0, 0.32),
+    0 5px 14px rgba(0, 0, 0, 0.28),
     0 0 0 3px rgba(255, 255, 255, 0.06);
   transition:
     border-color 0.14s ease,
@@ -1004,19 +1023,19 @@ h3.postHeading {
 .binaryBeeswarmFrame {
   position: relative;
   display: grid;
-  gap: 12px;
+  gap: $viz-gap-sm;
 }
 
 .binaryBeeswarmSvg {
   width: 100%;
-  min-height: 230px;
+  min-height: 200px;
   display: block;
   overflow: visible;
-  border: 1px solid $input-border;
-  border-radius: var(--ce-radius-8);
+  border: 1px solid $viz-panel-border;
+  border-radius: $viz-radius;
   background:
-    radial-gradient(circle at 14% 22%, rgba(77, 255, 164, 0.12), transparent 28%),
-    radial-gradient(circle at 84% 28%, rgba(255, 107, 203, 0.1), transparent 34%), rgba(7, 12, 31, 0.34);
+    radial-gradient(circle at 14% 22%, rgba(77, 255, 164, 0.09), transparent 26%),
+    radial-gradient(circle at 84% 28%, rgba(255, 107, 203, 0.08), transparent 32%), rgba(7, 12, 31, 0.28);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
@@ -1046,13 +1065,13 @@ h3.postHeading {
 .binaryBeeswarmYTickLabel {
   fill: rgba(244, 247, 255, 0.62);
   font-family: var(--ce-font-mono);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .binaryBeeswarmYAxisLabel {
   fill: rgba(244, 247, 255, 0.72);
   font-family: var(--ce-font-mono);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1061,7 +1080,7 @@ h3.postHeading {
 .binaryBeeswarmAxisLabel {
   fill: rgba(244, 247, 255, 0.72);
   font-family: var(--ce-font-mono);
-  font-size: 13px;
+  font-size: 11px;
   letter-spacing: 0;
 }
 
@@ -1082,20 +1101,20 @@ h3.postHeading {
 
 .binaryBeeswarmDot {
   stroke: rgba(255, 255, 255, 0.66);
-  stroke-width: 1.35;
+  stroke-width: 1.2;
   transition:
     r 0.14s ease,
     stroke-width 0.14s ease,
     filter 0.14s ease;
-  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.3));
+  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.28));
 }
 
 .binaryBeeswarmPointActive .binaryBeeswarmDot,
 .binaryBeeswarmPoint:hover .binaryBeeswarmDot {
-  r: 11px;
+  r: 10px;
   stroke: rgba(255, 255, 255, 0.9);
   stroke-width: 2;
-  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.36)) drop-shadow(0 0 12px rgba(77, 255, 164, 0.22));
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.34)) drop-shadow(0 0 10px rgba(77, 255, 164, 0.2));
 }
 
 .binaryBeeswarmTooltip {
@@ -1192,8 +1211,8 @@ h3.postHeading {
 .binaryBeeswarmHint {
   margin: 0;
   color: rgba(244, 247, 255, 0.5);
-  font-size: 0.78rem;
-  line-height: 1.4;
+  font-size: 0.74rem;
+  line-height: 1.32;
 }
 
 .vizToolbar {
@@ -1201,29 +1220,31 @@ h3.postHeading {
   align-items: center;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 10px;
+  gap: $viz-gap-sm;
+  margin-top: -2px;
 }
 
 .vizToggleGroup {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px;
+  gap: 2px;
+  padding: 2px;
   border: 1px solid $input-border;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .vizToggleButton {
   appearance: none;
-  padding: 5px 12px;
+  min-height: 40px;
+  padding: 4px 10px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   color: $muted;
   cursor: pointer;
   font-family: var(--ce-post-font-ui);
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   line-height: 1.2;
   transition:
     background 0.14s ease,
@@ -1247,15 +1268,15 @@ h3.postHeading {
 }
 
 .vizToolbarLabel {
-  padding-left: 8px;
+  padding-left: 6px;
   color: $muted;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
 }
 
 .binaryList {
   display: grid;
-  gap: 8px;
+  gap: $viz-gap-xs;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -1263,25 +1284,26 @@ h3.postHeading {
 
 .binaryListRow {
   display: grid;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid $card-border;
-  border-radius: var(--ce-radius-8);
-  background: rgba(255, 255, 255, 0.045);
+  gap: $viz-gap-xs;
+  min-height: 44px;
+  padding: $viz-gap-sm $viz-gap-md;
+  border: 1px solid $viz-panel-border;
+  border-radius: $viz-radius;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .binaryListPrompt {
   margin: 0;
   color: rgba(244, 247, 255, 0.94);
-  font-size: 0.95rem;
-  line-height: 1.45;
+  font-size: 0.86rem;
+  line-height: 1.34;
 }
 
 .binaryListMeta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: $viz-gap-sm;
 }
 
 .binaryListBar {
@@ -1293,7 +1315,7 @@ h3.postHeading {
 .binaryListCounts {
   color: $muted;
   font-family: var(--ce-font-mono);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   white-space: nowrap;
 }
 
@@ -1301,7 +1323,7 @@ h3.postHeading {
   margin-left: auto;
   color: $amber;
   font-family: var(--ce-font-mono);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   white-space: nowrap;
 }
 
@@ -1312,19 +1334,18 @@ h3.postHeading {
 .responseTypeGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: $viz-gap-md;
 }
 
 .responseTypePanel {
   min-width: 0;
   display: grid;
   align-content: start;
-  gap: 10px;
-  padding: 16px;
-  border: 1px solid $card-border;
-  border-radius: var(--ce-radius-8);
-  background: rgba(255, 255, 255, 0.055);
-  box-shadow: $card-shadow;
+  gap: $viz-gap-sm;
+  padding: $viz-gap-lg;
+  border: 1px solid $viz-panel-border;
+  border-radius: $viz-radius;
+  background: $viz-panel-bg-strong;
 
   h4,
   p {
@@ -1334,52 +1355,52 @@ h3.postHeading {
   h4 {
     color: $text;
     font-family: var(--ce-post-font-heading);
-    font-size: 1.08rem;
+    font-size: 1rem;
     line-height: 1.25;
   }
 }
 
 .responseTypePrompt {
   color: $muted;
-  font-size: 0.88rem;
-  line-height: 1.45;
+  font-size: 0.82rem;
+  line-height: 1.36;
 }
 
 .responseBars {
   display: grid;
-  gap: 8px;
+  gap: $viz-gap-xs;
 }
 
 .responseBarRow {
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .responseBarMeta {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: $viz-gap-sm;
   color: rgba(244, 247, 255, 0.92);
   font-family: var(--ce-font-mono);
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   line-height: 1.35;
 }
 
 .responseMetrics {
   display: grid;
-  gap: 8px;
+  gap: 0;
 }
 
 .responseMetricRow {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 14px;
-  padding: 8px 0;
+  gap: $viz-gap-lg;
+  padding: $viz-gap-sm 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   color: rgba(244, 247, 255, 0.92);
   font-family: var(--ce-font-mono);
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   line-height: 1.35;
 
   &:last-child {
@@ -1388,47 +1409,45 @@ h3.postHeading {
 
   strong {
     flex: 0 0 auto;
-    font-size: 1.02rem;
+    font-size: 0.96rem;
   }
 }
 
 .responsePie {
   display: grid;
-  grid-template-columns: minmax(112px, 150px) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(94px, 124px) minmax(0, 1fr);
+  gap: $viz-gap-lg;
   align-items: center;
 }
 
 .responsePieChart {
-  width: min(150px, 100%);
+  width: min(124px, 100%);
   aspect-ratio: 1;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 50%;
-  box-shadow:
-    0 14px 36px rgba(0, 0, 0, 0.28),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .responsePieLegend {
   display: grid;
-  gap: 8px;
+  gap: $viz-gap-xs;
 
   p {
     margin: 4px 0 0;
     color: $muted;
     font-family: var(--ce-font-mono);
-    font-size: 0.78rem;
+    font-size: 0.74rem;
   }
 }
 
 .responsePieLegendItem {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: $viz-gap-xs;
   align-items: center;
   color: rgba(244, 247, 255, 0.92);
   font-family: var(--ce-font-mono);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   line-height: 1.35;
 
   strong {
@@ -1445,26 +1464,26 @@ h3.postHeading {
 
 .responseSplit {
   display: grid;
-  gap: 9px;
+  gap: $viz-gap-sm;
 }
 
 .responseSplitLegend {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: $viz-gap-xs;
 }
 
 .responseSplitLegendItem {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 8px;
+  gap: $viz-gap-xs;
+  padding: 4px 7px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.055);
   color: rgba(244, 247, 255, 0.9);
   font-family: var(--ce-font-mono);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   line-height: 1;
 
   strong {
@@ -1482,14 +1501,12 @@ h3.postHeading {
 .responseSplitBar {
   display: flex;
   width: 100%;
-  height: 26px;
+  height: 20px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.26);
   border-radius: 7px;
   background: rgba(7, 12, 31, 0.32);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
-    0 10px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .responseSplitSegment {
@@ -1498,7 +1515,7 @@ h3.postHeading {
 }
 
 .responseBarTrack {
-  height: 8px;
+  height: 6px;
   overflow: hidden;
   border-radius: 999px;
   background: $input-bg;
@@ -1512,27 +1529,27 @@ h3.postHeading {
 
 .responseQuotes {
   display: grid;
-  gap: 8px;
+  gap: $viz-gap-xs;
 
   figure {
     margin: 0;
-    padding: 10px;
+    padding: $viz-gap-sm $viz-gap-md;
     border: 1px solid $input-border;
-    border-radius: var(--ce-radius-8);
+    border-radius: $viz-radius;
     background: $input-bg;
   }
 
   blockquote {
     margin: 0;
     color: rgba(244, 247, 255, 0.9);
-    font-size: 0.9rem;
-    line-height: 1.45;
+    font-size: 0.82rem;
+    line-height: 1.36;
   }
 
   figcaption {
-    margin-top: 6px;
+    margin-top: 4px;
     color: $blue;
-    font-size: 0.76rem;
+    font-size: 0.72rem;
   }
 }
 
