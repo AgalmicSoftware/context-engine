@@ -409,6 +409,7 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
 {
   "type": "beeswarm",
   "title": "Rating answers",
+  "hideTitle": true,
   "min": 0,
   "max": 10,
   "valueSuffix": "/10",
@@ -459,6 +460,7 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
   "title": "Other response shapes in the same subset",
   "inline": true,
   "hideTitle": true,
+  "combineWithPrevious": true,
   "panels": [
     {
       "kind": "Multi-select",
@@ -476,10 +478,10 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
       "kind": "Freeform",
       "title": "In one sentence: what is my personal AI fire alarm?",
       "quotes": [
-        { "label": "P1", "text": "Widespread job displacement for young entrants." },
-        { "label": "P2", "text": "A fully unsupervised multi-day coordination task." },
-        { "label": "P3", "text": "A privacy-line crossing or unwanted commitment." },
-        { "label": "P4", "text": "Autonomous agents changing collective governance at scale." }
+        { "label": "P1", "text": "Widespread job displacement for young entrants.", "color": "#4dffa4" },
+        { "label": "P2", "text": "A fully unsupervised multi-day coordination task.", "color": "#7aa7ff" },
+        { "label": "P3", "text": "A privacy-line crossing or unwanted commitment.", "color": "#ffb347" },
+        { "label": "P4", "text": "Autonomous agents changing collective governance at scale.", "color": "#ff6bcb" }
       ]
     }
   ]

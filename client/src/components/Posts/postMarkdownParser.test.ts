@@ -149,12 +149,21 @@ Paragraph text.
     );
     expect(beeswarm?.subtitle).toBeUndefined();
     expect(beeswarm?.note).toBeUndefined();
+    expect(beeswarm?.hideTitle).toBe(true);
     expect(p4RatingValues).toEqual([7, 2, 3]);
 
     expect(specs.find((spec) => spec.title === 'Top Difference Questions')).toBeUndefined();
     expect(markdown).not.toContain('Top Difference Questions');
     const otherShapes = specs.find((spec) => spec.title === 'Other response shapes in the same subset');
     expect(otherShapes?.hideTitle).toBe(true);
+    expect(otherShapes?.combineWithPrevious).toBe(true);
+    const fireAlarmPanel = otherShapes?.panels.find((panel: any) => panel.kind === 'Freeform');
+    expect(fireAlarmPanel?.quotes.map((quote: any) => quote.color)).toEqual([
+      '#4dffa4',
+      '#7aa7ff',
+      '#ffb347',
+      '#ff6bcb',
+    ]);
     expect(markdown).toContain('Autonomous agents changing collective governance at scale.');
     expect(markdown).not.toContain('Short excerpts from agent-predicted freeform answers.');
     expect(markdown).not.toContain('"P4", "text": "Agree."');
