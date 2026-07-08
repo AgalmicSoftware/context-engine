@@ -8,13 +8,14 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 
 | Sub-corpus | Items | Description |
 |------------|-------|-------------|
-| `ai-laws-policy-corpus.json` | 223 | Global AI legislation, regulatory proposals, policy frameworks, agency guidance, and official reports with governance-focused analysis. |
-| `ai-scifi-books-corpus.json` | 151 | Science fiction works curated for AI safety, alignment, ethics, and policy discourse. |
-| `arxiv-ai-safety-corpus.json` | 266 | Academic papers on AI safety, alignment, interpretability, and governance. |
+| `ai-laws-policy-corpus.json` | 227 | Global AI legislation, regulatory proposals, policy frameworks, agency guidance, and official reports with governance-focused analysis. |
+| `ai-scifi-books-corpus.json` | 156 | Science fiction works curated for AI safety, alignment, ethics, and policy discourse. |
+| `arxiv-ai-safety-corpus.json` | 278 | Academic papers on AI safety, alignment, interpretability, and governance. |
 | `cross-corpus-debates.json` | 16 | Structured debate trees that synthesize evidence across multiple AI discourse sources. |
-| `dwarkesh-lab-insiders-corpus.json` | 149 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
+| `dwarkesh-lab-insiders-corpus.json` | 152 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
 | `enriched-tweets.json` | 4036 | Enriched social-media discourse with summaries, tags, relevance signals, and linked context. |
-| `lesswrong-posts-corpus.json` | 211 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
+| `lab-primary-docs-corpus.json` | 30 | Primary safety/governance documents from frontier labs: safety frameworks (RSP, Preparedness, FSF), system cards, framework compliance reports, model specs, and deployment updates. |
+| `lesswrong-posts-corpus.json` | 219 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
 | `metr-evals-metrics-corpus.json` | 95 | METR publications, benchmarks, evaluation reports, and measurement-oriented policy material. |
 | `loophole-historical-cases.json` | 40 | Mirrored copy of Context Engine's Loophole historical-case dataset, generated via the methodology from [brendanhogan/loophole](https://github.com/brendanhogan/loophole). Explores regulatory edge cases through adversarial scenario generation. |
 

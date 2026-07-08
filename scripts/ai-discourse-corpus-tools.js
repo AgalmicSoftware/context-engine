@@ -50,6 +50,13 @@ const CORPUS_FILES = Object.freeze({
     collectionKey: null,
     metaCountKeys: [],
   },
+  'lab-primary-docs': {
+    corpusKey: 'lab-primary-docs',
+    aliases: ['lab-primary-docs', 'lab_primary_docs', 'lab-docs', 'labs'],
+    relativePath: 'ai-discourse-corpus/corpuses/lab-primary-docs-corpus.json',
+    collectionKey: 'entries',
+    metaCountKeys: ['entry_count'],
+  },
   'lesswrong-posts': {
     corpusKey: 'lesswrong-posts',
     aliases: ['lesswrong-posts', 'lesswrong_posts', 'lesswrong', 'lw'],
@@ -139,6 +146,28 @@ const TAXONOMY_ENUMS = Object.freeze({
       'Substack',
       'TIME Magazine',
       'arXiv',
+    ]),
+  }),
+  'lab-primary-docs': Object.freeze({
+    lab: Object.freeze([
+      'Amazon',
+      'Anthropic',
+      'Frontier Model Forum',
+      'Google DeepMind',
+      'Meta',
+      'Microsoft',
+      'OpenAI',
+      'xAI',
+    ]),
+    doc_type: Object.freeze([
+      'deployment_update',
+      'framework_report',
+      'model_spec',
+      'policy_statement',
+      'safety_framework',
+      'safety_publication',
+      'system_card',
+      'transparency_report',
     ]),
   }),
   'dwarkesh-lab-insiders': Object.freeze({

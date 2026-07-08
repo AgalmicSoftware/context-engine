@@ -48,6 +48,12 @@ test('taxonomy fields stay within their canonical vocabularies', () => {
   assert.deepEqual(validation.unknownCorpusKeys, []);
 });
 
+test('entry ids are globally unique across corpuses', () => {
+  const validation = collectValidation();
+
+  assert.deepEqual(validation.duplicateIds, []);
+});
+
 test('extracts a compact record by ID for context-safe inspection', () => {
   const result = extractRecord('debate_ai_water_usage');
 
