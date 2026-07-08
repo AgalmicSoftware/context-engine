@@ -29,11 +29,13 @@ test('normalizes common corpus aliases used inside debate references', () => {
   assert.equal(normalizeCorpusKey('dwarkesh_lab_insiders'), 'dwarkesh-lab-insiders');
 });
 
-test('validates target debates and client mirror coverage', () => {
+test('validates all debates and client mirror coverage', () => {
   const validation = collectValidation();
 
   assert.deepEqual(validation.clientDebateMirror.missingFromClient, []);
   assert.deepEqual(validation.clientDebateMirror.extraInClient, []);
+  assert.deepEqual(validation.debateReferences.missing, []);
+  assert.deepEqual(validation.debateReferences.duplicatePositions, []);
   assert.deepEqual(validation.targetDebateReferences.missing, []);
   assert.deepEqual(validation.targetDebateReferences.duplicatePositions, []);
   assert.deepEqual(validation.malformedYears, []);
@@ -74,12 +76,10 @@ test('extracts records by url as well as by id', () => {
   assert.deepEqual(extractRecord(byUrl.record.id).record.id, byUrl.record.id);
 });
 
-test('tracks the debate IDs targeted by the corpus quality pass', () => {
-  assert.deepEqual(TARGET_DEBATE_IDS, [
-    'debate_ai_water_usage',
-    'debate_ai_labor_automation',
-    'debate_ai_education_integrity',
-    'debate_ai_copyright_training',
-    'debate_multimodal_deepfake_governance',
-  ]);
+test('the corpus quality gate covers every debate in the cross-corpus file', () => {
+  const summary = collectSummary();
+  const crossCorpus = summary.corpuses.find((entry) => entry.corpus === 'cross-corpus');
+
+  assert.equal(TARGET_DEBATE_IDS.length, crossCorpus.count);
+  assert.equal(new Set(TARGET_DEBATE_IDS).size, TARGET_DEBATE_IDS.length);
 });

@@ -74,11 +74,22 @@ const CORPUS_FILES = Object.freeze({
 });
 
 const TARGET_DEBATE_IDS = Object.freeze([
+  'debate_exponential_progress',
+  'debate_reward_hacking_misalignment',
+  'debate_predeployment_eval_adequacy',
+  'debate_ai_rd_automation',
+  'debate_open_vs_closed_safety',
+  'debate_benchmark_validity',
+  'debate_regulation_speed',
+  'debate_deceptive_alignment',
   'debate_ai_water_usage',
   'debate_ai_labor_automation',
   'debate_ai_education_integrity',
   'debate_ai_copyright_training',
   'debate_multimodal_deepfake_governance',
+  'debate_government_prerelease_access',
+  'debate_alignment_tractability_2026',
+  'debate_ai_labor_displacement_timeline',
 ]);
 
 const VALID_PRIMARY_URL_RE = /^https?:\/\//i;

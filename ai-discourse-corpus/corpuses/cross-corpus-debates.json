@@ -790,15 +790,15 @@
       "cross_corpus_references": [
         {
           "from_corpus": "dwarkesh-lab-insiders",
-          "from_id": "dwarkesh_dario_amodei_feb_2026",
+          "from_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
           "to_corpus": "metr-evals-metrics",
-          "to_id": "metr_time_horizon_11_2026",
+          "to_id": "metr_time_horizon_1_1_2026",
           "relationship": "discusses_implications_of",
           "relevance_score": 9
         },
         {
           "from_corpus": "dwarkesh-lab-insiders",
-          "from_id": "dwarkesh_elon_musk_feb_2026",
+          "from_id": "musk_elon_dwarkesh_2026_ai_in_space",
           "to_corpus": "arxiv-ai-safety",
           "to_id": "measuring_ai_rd_automation_2026",
           "relationship": "makes_claims_tested_by",
@@ -2129,7 +2129,7 @@
       "cross_corpus_references": [
         {
           "from_corpus": "metr-evals-metrics",
-          "from_id": "metr_frontier_risk_report_feb_mar_2026",
+          "from_id": "metr_frontier_risk_report_2026",
           "to_corpus": "arxiv-ai-safety",
           "to_id": "metr_evaluating_language_model_agents_2023",
           "relationship": "evaluates_methods_from",
@@ -2153,7 +2153,7 @@
         },
         {
           "from_corpus": "metr-evals-metrics",
-          "from_id": "metr_frontier_risk_report_feb_mar_2026",
+          "from_id": "metr_frontier_risk_report_2026",
           "to_corpus": "dwarkesh-lab-insiders",
           "to_id": "anthropic_claude_opus_46_system_card",
           "relationship": "evaluates_claims_in",
@@ -2622,7 +2622,7 @@
           "relevance_score": 10
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+          "entry_url_or_id": "metr_time_horizon_1_1_2026",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Time Horizon 1.1",
@@ -2671,7 +2671,7 @@
           "relevance_score": 10
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+          "entry_url_or_id": "dwarkesh_metr_time_horizon_11_2026",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
           "stance_summary": "Time Horizon 1.1",
@@ -2877,7 +2877,7 @@
       "cross_corpus_references": [
         {
           "from_corpus": "metr-evals-metrics",
-          "from_id": "metr_frontier_risk_report_feb_mar_2026",
+          "from_id": "metr_frontier_risk_report_2026",
           "to_corpus": "arxiv-ai-safety",
           "to_id": "metr_evaluating_language_model_agents_2023",
           "relationship": "evaluates_methods_from",
@@ -2901,7 +2901,7 @@
         },
         {
           "from_corpus": "dwarkesh-lab-insiders",
-          "from_id": "dwarkesh_dario_amodei_feb_2026",
+          "from_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
           "to_corpus": "metr-evals-metrics",
           "to_id": "metr_mirrorcode_2026",
           "relationship": "makes_claims_supported_by",
@@ -3512,7 +3512,7 @@
       "cross_corpus_references": [
         {
           "from_corpus": "dwarkesh-lab-insiders",
-          "from_id": "dwarkesh_elon_musk_feb_2026",
+          "from_id": "musk_elon_dwarkesh_2026_ai_in_space",
           "to_corpus": "ai-laws-policy",
           "to_id": "us_national_ai_framework_2026",
           "relationship": "advocates_against",
@@ -3923,7 +3923,7 @@
           "relevance_score": 10
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+          "entry_url_or_id": "metr_time_horizon_1_1_2026",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Time Horizon 1.1",
@@ -3944,7 +3944,7 @@
           "relevance_score": 10
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+          "entry_url_or_id": "dwarkesh_metr_time_horizon_11_2026",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
           "stance_summary": "Time Horizon 1.1",
@@ -4185,7 +4185,7 @@
       "cross_corpus_references": [
         {
           "from_corpus": "metr-evals-metrics",
-          "from_id": "metr_time_horizon_11_2026",
+          "from_id": "metr_time_horizon_1_1_2026",
           "to_corpus": "metr-evals-metrics",
           "to_id": "metr_mirrorcode_2026",
           "relationship": "extended_by",
@@ -5630,7 +5630,7 @@
       "cross_corpus_references": [
         {
           "from_corpus": "metr-evals-metrics",
-          "from_id": "metr_frontier_risk_report_feb_mar_2026",
+          "from_id": "metr_frontier_risk_report_2026",
           "to_corpus": "arxiv-ai-safety",
           "to_id": "metr_evaluating_language_model_agents_2023",
           "relationship": "evaluates_methods_from",
