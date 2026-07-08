@@ -370,7 +370,7 @@ describe('PostsPage', () => {
     expect(screen.queryByText(/No completed answer:/)).not.toBeInTheDocument();
     expect(screen.queryByText(/started only/)).not.toBeInTheDocument();
     expect(screen.getByText('Consensus and Difference')).toBeInTheDocument();
-    const binaryBeeswarmSvg = screen.getByRole('img', { name: 'Consensus and Difference' });
+    const binaryBeeswarmSvg = await screen.findByRole('img', { name: 'Consensus and Difference' });
     expect(binaryBeeswarmSvg).toBeInTheDocument();
     expect(screen.getByText('Consensus')).toBeInTheDocument();
     expect(screen.getByText('Difference')).toBeInTheDocument();
@@ -453,7 +453,7 @@ describe('PostsPage', () => {
     renderPostsPage(fetcher, true, ['/posts/first-post']);
 
     await screen.findByRole('heading', { name: 'First Post', level: 2 });
-    const binaryBeeswarmSvg = screen.getByRole('img', { name: 'Consensus and Difference' });
+    const binaryBeeswarmSvg = await screen.findByRole('img', { name: 'Consensus and Difference' });
     expect(within(binaryBeeswarmSvg as HTMLElement).getByText('Avg. confidence')).toBeInTheDocument();
     expect(within(binaryBeeswarmSvg as HTMLElement).getByText('60')).toBeInTheDocument();
     expect(within(binaryBeeswarmSvg as HTMLElement).getByText('100')).toBeInTheDocument();
@@ -486,7 +486,7 @@ describe('PostsPage', () => {
     renderPostsPage(fetcher, true, ['/posts/first-post']);
 
     await screen.findByRole('heading', { name: 'First Post', level: 2 });
-    const p1Dot = screen.getByLabelText('P1: 3/10, 70% confidence');
+    const p1Dot = await screen.findByLabelText('P1: 3/10, 70% confidence');
     const ratingCard = p1Dot.closest('section') as HTMLElement;
 
     await userEvent.click(p1Dot);
@@ -507,6 +507,7 @@ describe('PostsPage', () => {
     renderPostsPage(fetcher, true, ['/posts/first-post']);
 
     await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    await screen.findByTestId('ce-posts-binary-view-list');
     expect(screen.queryByTestId('ce-posts-binary-list')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('ce-posts-binary-view-list'));
