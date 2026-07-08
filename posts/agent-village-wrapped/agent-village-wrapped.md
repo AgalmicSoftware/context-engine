@@ -42,7 +42,7 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
 ```ce-viz-group
 {
   "title": "Data Exploration (n=4)",
-  "defaultOpen": false,
+  "defaultOpen": true,
   "childrenOpen": false,
   "layout": "stack"
 }
