@@ -58,6 +58,32 @@ import {
   decryptQuestionRatingEnvelopes,
 } from './surveyToolDecryptSurveySource';
 import { normalizeQuestionIdKey } from './surveyToolSignatures';
+import type {
+  ApplyQuestionDecryptCompletionStatusOptions,
+  ApplyQuestionDecryptFailureStatusOptions,
+  ApplySurveyDecryptStaleStatusOptions,
+  BuildQuestionDecryptExecutionContextOptions,
+  BuildSurveyDecryptExecutionContextOptions,
+  DecryptResponseSlice,
+  FinalizeQuestionDecryptAttemptOptions,
+  FinalizeQuestionDecryptAttemptPorts,
+  FinalizeSurveyDecryptAttemptOptions,
+  FinalizeSurveyDecryptPorts,
+  HydrateLatestQuestionDecryptStateOptions,
+  HydrateLatestQuestionDecryptStatePorts,
+  PrepareQuestionDecryptAttemptOptions,
+  PrepareQuestionDecryptAttemptPorts,
+  PrepareSelfQuestionDecryptStateOptions,
+  PrepareSelfQuestionDecryptStatePorts,
+  PrepareSurveyDecryptAttemptOptions,
+  PrepareSurveyDecryptAttemptPorts,
+  PrepareViewedQuestionDecryptStateOptions,
+  PrepareViewedQuestionDecryptStatePorts,
+  ResolveLatestSurveyDecryptResponseOptions,
+  ResolveLatestSurveyDecryptResponsePorts,
+  ResponseSlice,
+  StartQuestionDecryptAttemptStatusOptions,
+} from './surveyToolDecryptFlowTypes';
 
 export {
   buildAutoDecryptMaskedFieldSignature,
@@ -125,7 +151,7 @@ export const startQuestionDecryptAttemptStatus = ({
   registerQuestionDecryptBusyTokens = null,
   setState = null,
   buildQuestionDecryptStartState: buildStartState = null,
-} = {}) => {
+}: StartQuestionDecryptAttemptStatusOptions = {}) => {
   const preparePort =
     prepareQuestionDecryptAttempt || ((options) => host?.prepareQuestionDecryptAttempt?.(options) || {});
   const registerBusyPort =
@@ -133,7 +159,8 @@ export const startQuestionDecryptAttemptStatus = ({
   const setStatePort = setState || (host?.setState ? host.setState.bind(host) : () => {});
   const buildStartPort =
     buildStartState ||
-    ((prev, keys) => host?.buildQuestionDecryptStartState?.(prev, keys) || buildQuestionDecryptStartState(prev, keys));
+    ((prev: unknown, keys: unknown[]) =>
+      host?.buildQuestionDecryptStartState?.(prev, keys) || buildQuestionDecryptStartState(prev, keys));
 
   const preparedAttempt = preparePort({ questionId, fieldToDecrypt, baselineForDecrypt }) || {};
   if (!preparedAttempt.shouldDecrypt) {
@@ -141,9 +168,9 @@ export const startQuestionDecryptAttemptStatus = ({
   }
 
   const decryptSelection = preparedAttempt.decryptSelection || {};
-  const keysToMark = decryptSelection.keysToMark || [];
+  const keysToMark = Array.isArray(decryptSelection.keysToMark) ? decryptSelection.keysToMark : [];
   const decryptAttemptToken = registerBusyPort(keysToMark);
-  setStatePort((prev) => buildStartPort(prev, keysToMark));
+  setStatePort((prev: unknown) => buildStartPort(prev, keysToMark));
 
   return {
     shouldReturn: false,
@@ -176,26 +203,28 @@ export const applyQuestionDecryptCompletionStatus = ({
   successStateKind = '',
   successStateOptions = {},
   onSuccessStateApplied,
-} = {}) => {
+}: ApplyQuestionDecryptCompletionStatusOptions = {}) => {
   const setStatePort = setState || (host?.setState ? host.setState.bind(host) : () => {});
   const clearBusyPort =
     clearQuestionDecryptBusyTokens || ((keys, token) => host?.clearQuestionDecryptBusyTokens?.(keys, token));
   const isCurrentPort =
     isDecryptContextCurrent ||
-    ((snapshot) => (host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true));
+    ((snapshot: unknown) => (host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true));
   const canUpdatePort =
     canUpdateStateForAsyncSnapshot ||
-    ((snapshot) => (host?.canUpdateStateForAsyncSnapshot ? host.canUpdateStateForAsyncSnapshot(snapshot) : false));
+    ((snapshot: unknown) =>
+      host?.canUpdateStateForAsyncSnapshot ? host.canUpdateStateForAsyncSnapshot(snapshot) : false);
   const ownsBusyPort =
     ownsQuestionDecryptBusyTokens ||
-    ((keys, token) => (host?.ownsQuestionDecryptBusyTokens ? host.ownsQuestionDecryptBusyTokens(keys, token) : true));
+    ((keys: unknown, token: unknown) =>
+      host?.ownsQuestionDecryptBusyTokens ? host.ownsQuestionDecryptBusyTokens(keys, token) : true);
   const buildStalePort =
     buildQuestionDecryptStaleState ||
-    ((prev, targetQid, targetField, token) =>
+    ((prev: unknown, targetQid: unknown, targetField: unknown, token: unknown) =>
       host?.buildQuestionDecryptStaleState?.(prev, targetQid, targetField, token) || null);
   const buildSuccessPort =
     buildSuccessState ||
-    ((prev) => {
+    ((prev: unknown) => {
       if (successStateKind === 'viewed') {
         return host?.buildViewedResponseDecryptSuccessState?.(prev, successStateOptions) || null;
       }
@@ -207,18 +236,18 @@ export const applyQuestionDecryptCompletionStatus = ({
 
   if (!isCurrentPort(context)) {
     if (canUpdatePort(context)) {
-      setStatePort((prev) => buildStalePort(prev, questionId, fieldToDecrypt, decryptAttemptToken));
+      setStatePort((prev: unknown) => buildStalePort(prev, questionId, fieldToDecrypt, decryptAttemptToken));
     }
     return { shouldReturn: true, result: false, reason: 'stale-context' };
   }
 
   if (!ownsBusyPort(keysToMark, decryptAttemptToken)) {
-    setStatePort((prev) => buildStalePort(prev, questionId, fieldToDecrypt, decryptAttemptToken));
+    setStatePort((prev: unknown) => buildStalePort(prev, questionId, fieldToDecrypt, decryptAttemptToken));
     return { shouldReturn: true, result: false, reason: 'stale-busy-token' };
   }
 
   clearBusyPort(keysToMark, decryptAttemptToken);
-  setStatePort((prev) => buildSuccessPort(prev), onSuccessStateApplied);
+  setStatePort((prev: unknown) => buildSuccessPort(prev), onSuccessStateApplied);
   return { shouldReturn: false, result: null, reason: 'applied' };
 };
 
@@ -234,31 +263,34 @@ export const applyQuestionDecryptFailureStatus = ({
   canUpdateStateForAsyncSnapshot = null,
   buildQuestionDecryptStaleState = null,
   buildQuestionDecryptFailureStateForAttempt = null,
-} = {}) => {
+}: ApplyQuestionDecryptFailureStatusOptions = {}) => {
   const setStatePort = setState || (host?.setState ? host.setState.bind(host) : () => {});
   const isCurrentPort =
     isDecryptContextCurrent ||
-    ((snapshot) => (host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true));
+    ((snapshot: unknown) => (host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true));
   const canUpdatePort =
     canUpdateStateForAsyncSnapshot ||
-    ((snapshot) => (host?.canUpdateStateForAsyncSnapshot ? host.canUpdateStateForAsyncSnapshot(snapshot) : false));
+    ((snapshot: unknown) =>
+      host?.canUpdateStateForAsyncSnapshot ? host.canUpdateStateForAsyncSnapshot(snapshot) : false);
   const buildStalePort =
     buildQuestionDecryptStaleState ||
-    ((prev, targetQid, targetField, token) =>
+    ((prev: unknown, targetQid: unknown, targetField: unknown, token: unknown) =>
       host?.buildQuestionDecryptStaleState?.(prev, targetQid, targetField, token) || null);
   const buildFailurePort =
     buildQuestionDecryptFailureStateForAttempt ||
-    ((prev, targetQid, targetField, message, token) =>
+    ((prev: unknown, targetQid: unknown, targetField: unknown, message: unknown, token: unknown) =>
       host?.buildQuestionDecryptFailureStateForAttempt?.(prev, targetQid, targetField, message, token) || null);
 
   if (!isCurrentPort(context)) {
     if (decryptAttemptToken != null && canUpdatePort(context)) {
-      setStatePort((prev) => buildStalePort(prev, questionId, fieldToDecrypt, decryptAttemptToken));
+      setStatePort((prev: unknown) => buildStalePort(prev, questionId, fieldToDecrypt, decryptAttemptToken));
     }
     return false;
   }
 
-  setStatePort((prev) => buildFailurePort(prev, questionId, fieldToDecrypt, error?.message, decryptAttemptToken));
+  setStatePort((prev: unknown) =>
+    buildFailurePort(prev, questionId, fieldToDecrypt, error?.message, decryptAttemptToken),
+  );
   return false;
 };
 
@@ -271,11 +303,11 @@ export const applySurveyDecryptStaleStatus = ({
   finishSurveyDecryptAttempt = null,
   setSurveyDecryptStaleState = null,
   buildSurveyDecryptStaleState = null,
-} = {}) => {
+}: ApplySurveyDecryptStaleStatusOptions = {}) => {
   const isCurrentPort =
     typeof isDecryptContextCurrent === 'function'
       ? isDecryptContextCurrent
-      : (snapshot) => (host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true);
+      : (snapshot: unknown) => (host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true);
 
   if (isCurrentPort(context)) {
     return { shouldReturn: false, reason: 'current-context' };
@@ -284,7 +316,7 @@ export const applySurveyDecryptStaleStatus = ({
   const canUpdatePort =
     typeof canUpdateSurveyDecryptAttempt === 'function'
       ? canUpdateSurveyDecryptAttempt
-      : (snapshot, targetAttemptId) =>
+      : (snapshot: unknown, targetAttemptId: unknown) =>
           host?.canUpdateSurveyDecryptAttempt ? host.canUpdateSurveyDecryptAttempt(snapshot, targetAttemptId) : false;
 
   if (canUpdatePort(context, attemptId)) {
@@ -314,7 +346,7 @@ export const hydrateLatestQuestionDecryptState = async (
     responderForLatest = '',
     sessionSlug = '',
     networkID = '',
-  } = {},
+  }: HydrateLatestQuestionDecryptStateOptions = {},
   {
     getQuestionFieldDecryptSelection,
     readQuestionsCache,
@@ -322,19 +354,31 @@ export const hydrateLatestQuestionDecryptState = async (
     mergeLatestEncryptedQuestionFields,
     mergeQuestionRatingEnvelopeState = (previousState) => previousState,
     logWarn = () => {},
-  } = {},
+  }: HydrateLatestQuestionDecryptStatePorts = {},
 ) => {
   let nextBaselineForDecrypt = baselineForDecrypt;
   let nextRatingEnvelopes = initialRatingEnvelopes;
+  const getQuestionFieldDecryptSelectionPort = getQuestionFieldDecryptSelection as NonNullable<
+    HydrateLatestQuestionDecryptStatePorts['getQuestionFieldDecryptSelection']
+  >;
+  const readQuestionsCachePort = readQuestionsCache as NonNullable<
+    HydrateLatestQuestionDecryptStatePorts['readQuestionsCache']
+  >;
+  const getLatestQuestionResponsePort = getLatestQuestionResponse as NonNullable<
+    HydrateLatestQuestionDecryptStatePorts['getLatestQuestionResponse']
+  >;
+  const mergeLatestEncryptedQuestionFieldsPort = mergeLatestEncryptedQuestionFields as NonNullable<
+    HydrateLatestQuestionDecryptStatePorts['mergeLatestEncryptedQuestionFields']
+  >;
 
   try {
-    const hydrateSelection = getQuestionFieldDecryptSelection(questionId, fieldToDecrypt, nextBaselineForDecrypt);
+    const hydrateSelection = getQuestionFieldDecryptSelectionPort(questionId, fieldToDecrypt, nextBaselineForDecrypt);
     const { maskedAnswer: maskedAnswerForHydrate, maskedAdditional: maskedAdditionalForHydrate } = hydrateSelection;
 
     if ((maskedAnswerForHydrate || maskedAdditionalForHydrate) && account && networkID) {
-      const questionsCache = readQuestionsCache(sessionSlug) || {};
+      const questionsCache = readQuestionsCachePort(sessionSlug) || {};
       const fetchQuestionId = String(questionId || '').toLowerCase();
-      const latest = await getLatestQuestionResponse(
+      const latest = await getLatestQuestionResponsePort(
         responderForLatest || account,
         fetchQuestionId,
         networkID,
@@ -343,7 +387,7 @@ export const hydrateLatestQuestionDecryptState = async (
 
       if (latest) {
         nextRatingEnvelopes = mergeQuestionRatingEnvelopeState(nextRatingEnvelopes, latest, questionId);
-        nextBaselineForDecrypt = mergeLatestEncryptedQuestionFields(nextBaselineForDecrypt, questionId, latest, {
+        nextBaselineForDecrypt = mergeLatestEncryptedQuestionFieldsPort(nextBaselineForDecrypt, questionId, latest, {
           includeAnswer: maskedAnswerForHydrate,
           includeAdditional: maskedAdditionalForHydrate,
         });
@@ -368,14 +412,23 @@ export const prepareViewedQuestionDecryptState = async (
     responderForLatest = '',
     sessionSlug = '',
     networkID = '',
-  } = {},
-  { buildViewedResponseDecryptBaseline, hydrateLatestQuestionDecryptState: hydrateLatestQuestionDecryptStateFn } = {},
+  }: PrepareViewedQuestionDecryptStateOptions = {},
+  {
+    buildViewedResponseDecryptBaseline,
+    hydrateLatestQuestionDecryptState: hydrateLatestQuestionDecryptStateFn,
+  }: PrepareViewedQuestionDecryptStatePorts = {},
 ) => {
   const qid = String(questionId || '')
     .trim()
     .toLowerCase();
-  let baselineForDecrypt = buildViewedResponseDecryptBaseline(responseOverride, qid);
-  let ratingEnvelopes = {
+  const buildViewedResponseDecryptBaselinePort = buildViewedResponseDecryptBaseline as NonNullable<
+    PrepareViewedQuestionDecryptStatePorts['buildViewedResponseDecryptBaseline']
+  >;
+  const hydrateLatestQuestionDecryptStatePort = hydrateLatestQuestionDecryptStateFn as NonNullable<
+    PrepareViewedQuestionDecryptStatePorts['hydrateLatestQuestionDecryptState']
+  >;
+  let baselineForDecrypt = buildViewedResponseDecryptBaselinePort(responseOverride, qid);
+  let ratingEnvelopes: unknown = {
     importanceEncrypted:
       typeof responseOverride?.importanceEncrypted === 'string' ? responseOverride.importanceEncrypted : '',
     convictionEncrypted:
@@ -383,7 +436,7 @@ export const prepareViewedQuestionDecryptState = async (
   };
 
   if (qid && responseOverride && typeof responseOverride === 'object') {
-    const hydrated = await hydrateLatestQuestionDecryptStateFn({
+    const hydrated = await hydrateLatestQuestionDecryptStatePort({
       questionId: qid,
       fieldToDecrypt,
       baselineForDecrypt,
@@ -414,32 +467,45 @@ export const prepareSelfQuestionDecryptState = async (
     account = '',
     sessionSlug = '',
     networkID = '',
-  } = {},
+  }: PrepareSelfQuestionDecryptStateOptions = {},
   {
     buildSelfQuestionDecryptBaseline,
     mergeQuestionResponseOverrideIntoDecryptSlice,
     mergeQuestionRatingEnvelopeState,
     hydrateLatestQuestionDecryptState: hydrateLatestQuestionDecryptStateFn,
     logWarn = () => {},
-  } = {},
+  }: PrepareSelfQuestionDecryptStatePorts = {},
 ) => {
   const qid = String(questionId || '')
     .trim()
     .toLowerCase();
-  let { baselineSlice, baselineForDecrypt } = buildSelfQuestionDecryptBaseline(surveyIndex);
+  const buildSelfQuestionDecryptBaselinePort = buildSelfQuestionDecryptBaseline as NonNullable<
+    PrepareSelfQuestionDecryptStatePorts['buildSelfQuestionDecryptBaseline']
+  >;
+  const mergeQuestionResponseOverrideIntoDecryptSlicePort =
+    mergeQuestionResponseOverrideIntoDecryptSlice as NonNullable<
+      PrepareSelfQuestionDecryptStatePorts['mergeQuestionResponseOverrideIntoDecryptSlice']
+    >;
+  const mergeQuestionRatingEnvelopeStatePort = mergeQuestionRatingEnvelopeState as NonNullable<
+    PrepareSelfQuestionDecryptStatePorts['mergeQuestionRatingEnvelopeState']
+  >;
+  const hydrateLatestQuestionDecryptStatePort = hydrateLatestQuestionDecryptStateFn as NonNullable<
+    PrepareSelfQuestionDecryptStatePorts['hydrateLatestQuestionDecryptState']
+  >;
+  let { baselineSlice, baselineForDecrypt } = buildSelfQuestionDecryptBaselinePort(surveyIndex);
 
   if (responseOverride && typeof responseOverride === 'object') {
     try {
-      baselineForDecrypt = mergeQuestionResponseOverrideIntoDecryptSlice(baselineForDecrypt, qid, responseOverride);
+      baselineForDecrypt = mergeQuestionResponseOverrideIntoDecryptSlicePort(baselineForDecrypt, qid, responseOverride);
     } catch (error) {
       logWarn(error);
     }
   }
 
-  let ratingEnvelopes = mergeQuestionRatingEnvelopeState(null, responseOverride, qid);
-  ratingEnvelopes = mergeQuestionRatingEnvelopeState(ratingEnvelopes, userAnswers, qid);
+  let ratingEnvelopes = mergeQuestionRatingEnvelopeStatePort(null, responseOverride, qid);
+  ratingEnvelopes = mergeQuestionRatingEnvelopeStatePort(ratingEnvelopes, userAnswers, qid);
 
-  const hydrated = await hydrateLatestQuestionDecryptStateFn({
+  const hydrated = await hydrateLatestQuestionDecryptStatePort({
     questionId: qid,
     fieldToDecrypt,
     baselineForDecrypt,
@@ -470,18 +536,24 @@ export const resolveLatestSurveyDecryptResponse = async (
     slug = '',
     surveyId = '',
     fallbackUserAnswers = null,
-  } = {},
-  { getLatestQuestionResponse, getLatestSurveyResponse } = {},
+  }: ResolveLatestSurveyDecryptResponseOptions = {},
+  { getLatestQuestionResponse, getLatestSurveyResponse }: ResolveLatestSurveyDecryptResponsePorts = {},
 ) => {
   let latest = null;
+  const getLatestQuestionResponsePort = getLatestQuestionResponse as NonNullable<
+    ResolveLatestSurveyDecryptResponsePorts['getLatestQuestionResponse']
+  >;
+  const getLatestSurveyResponsePort = getLatestSurveyResponse as NonNullable<
+    ResolveLatestSurveyDecryptResponsePorts['getLatestSurveyResponse']
+  >;
 
   if (singleQuestionMode) {
     const qid = String(questionId || '')
       .trim()
       .toLowerCase();
-    latest = qid && account ? await getLatestQuestionResponse(providerLike, account, qid, slug) : null;
+    latest = qid && account ? await getLatestQuestionResponsePort(providerLike, account, qid, slug) : null;
   } else {
-    latest = account ? await getLatestSurveyResponse(account, surveyId) : null;
+    latest = account ? await getLatestSurveyResponsePort(account, surveyId) : null;
   }
 
   return latest || fallbackUserAnswers || null;
@@ -498,10 +570,24 @@ export const prepareSurveyDecryptAttempt = async (
     fallbackUserAnswers = null,
     fallbackSourceSlice = null,
     previousStateSlice = null,
-  } = {},
-  { resolveLatestSurveyDecryptResponse, buildSurveyDecryptSourceState, buildSurveyDecryptExecutionContext } = {},
+  }: PrepareSurveyDecryptAttemptOptions = {},
+  {
+    resolveLatestSurveyDecryptResponse,
+    buildSurveyDecryptSourceState,
+    buildSurveyDecryptExecutionContext,
+  }: PrepareSurveyDecryptAttemptPorts = {},
 ) => {
-  const latest = await resolveLatestSurveyDecryptResponse({
+  const resolveLatestSurveyDecryptResponsePort = resolveLatestSurveyDecryptResponse as NonNullable<
+    PrepareSurveyDecryptAttemptPorts['resolveLatestSurveyDecryptResponse']
+  >;
+  const buildSurveyDecryptSourceStatePort = buildSurveyDecryptSourceState as NonNullable<
+    PrepareSurveyDecryptAttemptPorts['buildSurveyDecryptSourceState']
+  >;
+  const buildSurveyDecryptExecutionContextPort = buildSurveyDecryptExecutionContext as NonNullable<
+    PrepareSurveyDecryptAttemptPorts['buildSurveyDecryptExecutionContext']
+  >;
+
+  const latest = await resolveLatestSurveyDecryptResponsePort({
     singleQuestionMode,
     questionId,
     account,
@@ -511,13 +597,13 @@ export const prepareSurveyDecryptAttempt = async (
     fallbackUserAnswers,
   });
 
-  const { sourceSlice, ratingEnvelopesByQid } = buildSurveyDecryptSourceState(
+  const { sourceSlice, ratingEnvelopesByQid } = buildSurveyDecryptSourceStatePort(
     latest,
     fallbackSourceSlice,
     previousStateSlice,
   );
 
-  const { chainId, lit, opts, poolForDecrypt } = buildSurveyDecryptExecutionContext(sourceSlice, questionId);
+  const { chainId, lit, opts, poolForDecrypt } = buildSurveyDecryptExecutionContextPort(sourceSlice, questionId);
 
   return {
     latest,
@@ -541,12 +627,25 @@ export const finalizeSurveyDecryptAttempt = async (
     poolForDecrypt = [],
     opts,
     previousStateSlice = null,
-  } = {},
-  { decryptMultipleAnswers, decryptQuestionRatingEnvelopeMap, normalizeBulkDecryptedSliceForSurveyState } = {},
+  }: FinalizeSurveyDecryptAttemptOptions = {},
+  {
+    decryptMultipleAnswers,
+    decryptQuestionRatingEnvelopeMap,
+    normalizeBulkDecryptedSliceForSurveyState,
+  }: Partial<FinalizeSurveyDecryptPorts> = {},
 ) => {
-  const decryptedSlice = await decryptMultipleAnswers(sourceSlice, poolForDecrypt, opts);
+  const decryptMultipleAnswersPort = decryptMultipleAnswers as NonNullable<
+    FinalizeSurveyDecryptPorts['decryptMultipleAnswers']
+  >;
+  const decryptQuestionRatingEnvelopeMapPort = decryptQuestionRatingEnvelopeMap as NonNullable<
+    FinalizeSurveyDecryptPorts['decryptQuestionRatingEnvelopeMap']
+  >;
+  const normalizeBulkDecryptedSliceForSurveyStatePort = normalizeBulkDecryptedSliceForSurveyState as NonNullable<
+    FinalizeSurveyDecryptPorts['normalizeBulkDecryptedSliceForSurveyState']
+  >;
+  const decryptedSlice = await decryptMultipleAnswersPort(sourceSlice as DecryptResponseSlice, poolForDecrypt, opts);
 
-  const { decryptedImportanceFromEnv, decryptedConvictionFromEnv } = await decryptQuestionRatingEnvelopeMap(
+  const { decryptedImportanceFromEnv, decryptedConvictionFromEnv } = await decryptQuestionRatingEnvelopeMapPort(
     ratingEnvelopesByQid,
     {
       account,
@@ -556,7 +655,7 @@ export const finalizeSurveyDecryptAttempt = async (
     },
   );
 
-  const normalizedDecryptedSlice = normalizeBulkDecryptedSliceForSurveyState(decryptedSlice, {
+  const normalizedDecryptedSlice = normalizeBulkDecryptedSliceForSurveyStatePort(decryptedSlice, {
     previousStateSlice,
     baselineSlice: sourceSlice,
   });
@@ -580,10 +679,16 @@ export const buildQuestionDecryptExecutionContext = ({
   hasher,
   resolveDecryptSurveyId,
   getProviderKind,
-} = {}) => {
-  const providerKind = getProviderKind(provider);
+}: BuildQuestionDecryptExecutionContextOptions = {}) => {
+  const getProviderKindPort = getProviderKind as NonNullable<
+    BuildQuestionDecryptExecutionContextOptions['getProviderKind']
+  >;
+  const resolveDecryptSurveyIdPort = resolveDecryptSurveyId as NonNullable<
+    BuildQuestionDecryptExecutionContextOptions['resolveDecryptSurveyId']
+  >;
+  const providerKind = getProviderKindPort(provider);
   const chainId = network?.id;
-  const surveyId = resolveDecryptSurveyId(baselineForDecrypt, questionId);
+  const surveyId = resolveDecryptSurveyIdPort(baselineForDecrypt, questionId);
   const resolvedQuestionPool =
     Array.isArray(questionPool) && questionPool.length > 0
       ? questionPool
@@ -619,17 +724,24 @@ export const buildSurveyDecryptExecutionContext = ({
   hasher,
   resolveDecryptSurveyId,
   getProviderKind,
-} = {}) => {
-  const providerKind = getProviderKind(provider);
+}: BuildSurveyDecryptExecutionContextOptions = {}) => {
+  const getProviderKindPort = getProviderKind as NonNullable<
+    BuildSurveyDecryptExecutionContextOptions['getProviderKind']
+  >;
+  const resolveDecryptSurveyIdPort = resolveDecryptSurveyId as NonNullable<
+    BuildSurveyDecryptExecutionContextOptions['resolveDecryptSurveyId']
+  >;
+  const litHooksRecord = litHooks && typeof litHooks === 'object' ? (litHooks as { getKey?: unknown }) : null;
+  const providerKind = getProviderKindPort(provider);
   const chainId = network?.id;
-  const surveyId = resolveDecryptSurveyId(sourceSlice, questionId);
+  const surveyId = resolveDecryptSurveyIdPort(sourceSlice, questionId);
   const poolForDecrypt =
     Array.isArray(questionPool) && questionPool.length > 0
       ? questionPool
       : Array.isArray(pileQuestions)
         ? pileQuestions
         : [];
-  const lit = litHooks && litHooks.getKey ? { getKey: litHooks.getKey } : undefined;
+  const lit = litHooksRecord?.getKey ? { getKey: litHooksRecord.getKey } : undefined;
 
   return {
     providerKind,
@@ -651,10 +763,17 @@ export const buildSurveyDecryptExecutionContext = ({
 };
 
 export const prepareQuestionDecryptAttempt = (
-  { questionId, fieldToDecrypt = 'both', baselineForDecrypt } = {},
-  { getQuestionFieldDecryptSelection, buildQuestionDecryptExecutionContext } = {},
+  { questionId, fieldToDecrypt = 'both', baselineForDecrypt = null }: PrepareQuestionDecryptAttemptOptions = {},
+  { getQuestionFieldDecryptSelection, buildQuestionDecryptExecutionContext }: PrepareQuestionDecryptAttemptPorts = {},
 ) => {
-  const decryptSelection = getQuestionFieldDecryptSelection(questionId, fieldToDecrypt, baselineForDecrypt);
+  const getQuestionFieldDecryptSelectionPort = getQuestionFieldDecryptSelection as NonNullable<
+    PrepareQuestionDecryptAttemptPorts['getQuestionFieldDecryptSelection']
+  >;
+  const buildQuestionDecryptExecutionContextPort = buildQuestionDecryptExecutionContext as NonNullable<
+    PrepareQuestionDecryptAttemptPorts['buildQuestionDecryptExecutionContext']
+  >;
+  const responseSlice = baselineForDecrypt as ResponseSlice | null;
+  const decryptSelection = getQuestionFieldDecryptSelectionPort(questionId, fieldToDecrypt, responseSlice);
 
   if (!decryptSelection.hasMaskedField) {
     return {
@@ -664,10 +783,10 @@ export const prepareQuestionDecryptAttempt = (
     };
   }
 
-  const { chainId, lit, opts, target } = buildQuestionDecryptExecutionContext(baselineForDecrypt, questionId);
+  const { chainId, lit, opts, target } = buildQuestionDecryptExecutionContextPort(responseSlice, questionId);
   const requestPlan = buildSurveyQuestionDecryptRequestPlan({
     account: opts?.account,
-    baselineForDecrypt,
+    baselineForDecrypt: responseSlice,
     chainId,
     decryptSelection,
     fieldToDecrypt,
@@ -706,17 +825,28 @@ export const finalizeQuestionDecryptAttempt = async (
     chainId,
     lit,
     opts,
-  } = {},
-  { decryptSingleField, decryptQuestionRatingEnvelopes } = {},
+  }: FinalizeQuestionDecryptAttemptOptions = {},
+  { decryptSingleField, decryptQuestionRatingEnvelopes }: FinalizeQuestionDecryptAttemptPorts = {},
 ) => {
   const qid = normalizeQuestionIdKey(questionId);
-  const decryptedStateSlice = await decryptSingleField(baselineForDecrypt, qid, fieldToDecrypt, opts);
+  const decryptSingleFieldPort = decryptSingleField as NonNullable<
+    FinalizeQuestionDecryptAttemptPorts['decryptSingleField']
+  >;
+  const decryptQuestionRatingEnvelopesPort = decryptQuestionRatingEnvelopes as NonNullable<
+    FinalizeQuestionDecryptAttemptPorts['decryptQuestionRatingEnvelopes']
+  >;
+  const decryptedStateSlice = await decryptSingleFieldPort(
+    baselineForDecrypt as ResponseSlice | null,
+    qid,
+    fieldToDecrypt,
+    opts,
+  );
 
   const producedAnswer = !!(decryptedStateSlice.answers && decryptedStateSlice.answers[qid]);
   const producedAdditional = !!(decryptedStateSlice.additionalComments && decryptedStateSlice.additionalComments[qid]);
   const didUpdate = producedAnswer || producedAdditional;
 
-  const { decryptedImportance, decryptedConviction } = await decryptQuestionRatingEnvelopes(ratingEnvelopes, {
+  const { decryptedImportance, decryptedConviction } = await decryptQuestionRatingEnvelopesPort(ratingEnvelopes, {
     account,
     chainId,
     lit,
