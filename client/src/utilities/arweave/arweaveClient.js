@@ -43,6 +43,7 @@ import {
   registerArweaveTxContext,
   setArweaveTextCacheEntry,
 } from './arweaveClientCaches.js';
+import { getTxExistenceCacheEntry, setTxExistenceCacheEntry } from './arweaveTxExistenceCache.js';
 import {
   buildFailureCacheError,
   clearFailureCacheEntry,
@@ -437,13 +438,10 @@ const ARWEAVE_GRAPHQL_ENDPOINTS = [
   'https://g8way.io/graphql',
   'https://arweave.net/graphql',
 ];
-const ARWEAVE_TX_EXISTENCE_CACHE_TTL_MS = 15 * 60 * 1000;
-const ARWEAVE_TX_EXISTENCE_CACHE_MAX = 2400;
 const ARWEAVE_GRAPHQL_TIMEOUT_MS = 3500;
 export const ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS = 30_000;
 const MAX_ARWEAVE_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
 const arweaveTextInFlight = new Map();
-const arweaveTxExistenceCache = new Map();
 const arweaveTxExistenceInFlight = new Map();
 
 const fetchWithTimeout = async (url, options = {}, timeoutMs = ARWEAVE_GRAPHQL_TIMEOUT_MS) => {
@@ -754,33 +752,6 @@ const ensureArweaveResourceErrorListener = () => {
     );
   } catch (e) {
     log.warn('arweaveClient: fallback', e);
-  }
-};
-
-const getTxExistenceCacheEntry = (txId) => {
-  const key = String(txId || '').trim();
-  if (!key) return null;
-  const entry = arweaveTxExistenceCache.get(key);
-  if (!entry || typeof entry !== 'object') return null;
-  const ageMs = Date.now() - Number(entry.ts || 0);
-  if (!Number.isFinite(ageMs) || ageMs > ARWEAVE_TX_EXISTENCE_CACHE_TTL_MS) {
-    arweaveTxExistenceCache.delete(key);
-    return null;
-  }
-  arweaveTxExistenceCache.delete(key);
-  arweaveTxExistenceCache.set(key, entry);
-  return entry.exists === true;
-};
-
-const setTxExistenceCacheEntry = (txId, exists) => {
-  const key = String(txId || '').trim();
-  if (!key || typeof exists !== 'boolean') return;
-  arweaveTxExistenceCache.delete(key);
-  arweaveTxExistenceCache.set(key, { exists, ts: Date.now() });
-  while (arweaveTxExistenceCache.size > ARWEAVE_TX_EXISTENCE_CACHE_MAX) {
-    const oldest = arweaveTxExistenceCache.keys().next().value;
-    if (!oldest) break;
-    arweaveTxExistenceCache.delete(oldest);
   }
 };
 
