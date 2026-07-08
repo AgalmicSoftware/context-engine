@@ -1,4 +1,21 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import {
+  applyQuestionDecryptBusyTokenRegistration,
+  canUpdateStateForAsyncSnapshot as canUpdateStateForAsyncSnapshotForHost,
+  canUpdateSurveyDecryptAttemptOnHost,
+  finishSurveyDecryptAttemptOnHost,
+  isDecryptContextCurrentForHost,
+  replaceQuestionDecryptBusyTokens,
+  startSurveyDecryptAttemptOnHost,
+} from './surveyToolDecryptHostContract.js';
+import type {
+  QuestionDecryptBusyTokenHost,
+  QuestionDecryptBusyTokenRegistration,
+  QuestionDecryptBusyTokens,
+  QuestionDecryptOwnedClearResult,
+  SurveyDecryptAttemptHost,
+  SurveyDecryptContextSnapshot,
+} from './surveyToolDecryptHostContract.js';
 
 export type SurveyQuestionsDecryptRuntime = SurveyQuestionsLegacyRecord;
 
@@ -63,6 +80,7 @@ export const createSurveyQuestionsDecryptRuntime = (
     surveyQuestionReadsPort,
     syncDecryptedQuestionIntoBaselineHelper,
   } = context;
+  const decryptHost = inst as QuestionDecryptBusyTokenHost & SurveyDecryptAttemptHost;
   const shouldUseAnimationFrameForAutoDecryptSweep = () => {
     if (typeof window === 'undefined') return false;
     if (typeof window.requestAnimationFrame !== 'function') return false;
@@ -114,7 +132,7 @@ export const createSurveyQuestionsDecryptRuntime = (
   const buildAutoDecryptMaskedFieldSignature = (field: SurveyQuestionsLegacyValue = null) =>
     (buildAutoDecryptMaskedFieldSignatureHelper as SurveyQuestionsLegacyValue)(field);
 
-  const buildDecryptContextSnapshot = () => {
+  const buildDecryptContextSnapshot = (): SurveyDecryptContextSnapshot => {
     const draftSlug: SurveyQuestionsLegacyValue = inst._getEffectiveDraftSlug
       ? inst._getEffectiveDraftSlug()
       : resolveEffectiveSlug(propsRef.current);
@@ -152,60 +170,51 @@ export const createSurveyQuestionsDecryptRuntime = (
     };
   };
 
-  const buildDecryptContextKey = (snapshot: SurveyQuestionsLegacyValue = null) =>
+  const buildDecryptContextKey = (snapshot: SurveyDecryptContextSnapshot = null) =>
     buildDecryptContextKeyFromContext(snapshot || buildDecryptContextSnapshot());
 
-  const isDecryptContextCurrent = (snapshot: SurveyQuestionsLegacyValue = null) =>
-    !!snapshot &&
-    (!snapshot.mounted || inst._isMounted) &&
-    buildDecryptContextKey(snapshot) === buildDecryptContextKey();
+  const isDecryptContextCurrent = (snapshot: SurveyDecryptContextSnapshot = null) =>
+    isDecryptContextCurrentForHost({
+      host: decryptHost,
+      snapshot,
+      currentSnapshot: buildDecryptContextSnapshot(),
+      buildDecryptContextKey,
+    });
 
-  const canUpdateStateForAsyncSnapshot = (snapshot: SurveyQuestionsLegacyValue = null) =>
-    !!snapshot && (!snapshot.mounted || inst._isMounted);
+  const canUpdateStateForAsyncSnapshot = (snapshot: SurveyDecryptContextSnapshot = null) =>
+    canUpdateStateForAsyncSnapshotForHost(decryptHost, snapshot);
 
-  const startSurveyDecryptAttempt = () => {
-    const attemptId: SurveyQuestionsLegacyValue = (Number(inst._surveyDecryptAttemptSeq) || 0) + 1;
-    inst._surveyDecryptAttemptSeq = attemptId;
-    inst._activeSurveyDecryptAttemptSeq = attemptId;
-    return attemptId;
-  };
+  const startSurveyDecryptAttempt = () => startSurveyDecryptAttemptOnHost(decryptHost);
 
   const canUpdateSurveyDecryptAttempt = (
-    snapshot: SurveyQuestionsLegacyValue = null,
-    attemptId: SurveyQuestionsLegacyValue = null,
-  ) =>
-    canUpdateStateForAsyncSnapshot(snapshot) &&
-    Number(attemptId || 0) > 0 &&
-    inst._activeSurveyDecryptAttemptSeq === attemptId;
+    snapshot: SurveyDecryptContextSnapshot = null,
+    attemptId: number | null = null,
+  ) => canUpdateSurveyDecryptAttemptOnHost(decryptHost, snapshot, attemptId);
 
-  const finishSurveyDecryptAttempt = (attemptId: SurveyQuestionsLegacyValue = null) => {
-    if (Number(attemptId || 0) > 0 && inst._activeSurveyDecryptAttemptSeq === attemptId) {
-      inst._activeSurveyDecryptAttemptSeq = 0;
-    }
-  };
+  const finishSurveyDecryptAttempt = (attemptId: number | null = null) =>
+    finishSurveyDecryptAttemptOnHost(decryptHost, attemptId);
 
   const registerQuestionDecryptBusyTokens = (keysToMark: SurveyQuestionsLegacyValue = []) => {
-    const result: SurveyQuestionsLegacyValue = (
-      buildQuestionDecryptBusyTokenRegistrationHelper as SurveyQuestionsLegacyValue
-    )({
+    const result = (buildQuestionDecryptBusyTokenRegistrationHelper as SurveyQuestionsLegacyValue)({
       tokenSeq: inst._questionDecryptBusyTokenSeq,
       busyTokens: inst._questionDecryptBusyTokens,
       keysToMark,
-    });
-    inst._questionDecryptBusyTokenSeq = result.token;
-    inst._questionDecryptBusyTokens = result.busyTokens;
-    return result.token;
+    }) as QuestionDecryptBusyTokenRegistration;
+    return applyQuestionDecryptBusyTokenRegistration(decryptHost, result);
   };
 
   const clearQuestionDecryptBusyTokens = (
     keysToClear: SurveyQuestionsLegacyValue = [],
     token: SurveyQuestionsLegacyValue = null,
   ) => {
-    inst._questionDecryptBusyTokens = (buildClearedQuestionDecryptBusyTokensHelper as SurveyQuestionsLegacyValue)({
-      busyTokens: inst._questionDecryptBusyTokens,
-      keysToClear,
-      token,
-    });
+    replaceQuestionDecryptBusyTokens(
+      decryptHost,
+      (buildClearedQuestionDecryptBusyTokensHelper as SurveyQuestionsLegacyValue)({
+        busyTokens: inst._questionDecryptBusyTokens,
+        keysToClear,
+        token,
+      }) as QuestionDecryptBusyTokens,
+    );
   };
 
   const ownsQuestionDecryptBusyTokens = (
@@ -225,9 +234,7 @@ export const createSurveyQuestionsDecryptRuntime = (
     token: SurveyQuestionsLegacyValue = null,
     extraPatch: SurveyQuestionsLegacyValue = {},
   ) => {
-    const result: SurveyQuestionsLegacyValue = (
-      buildQuestionDecryptOwnedClearStateHelper as SurveyQuestionsLegacyValue
-    )({
+    const result = (buildQuestionDecryptOwnedClearStateHelper as SurveyQuestionsLegacyValue)({
       prevState: prev,
       questionId,
       fieldToDecrypt,
@@ -235,8 +242,8 @@ export const createSurveyQuestionsDecryptRuntime = (
       busyTokens: inst._questionDecryptBusyTokens,
       activeSurveyDecryptAttemptSeq: inst._activeSurveyDecryptAttemptSeq,
       extraPatch,
-    });
-    inst._questionDecryptBusyTokens = result.busyTokens;
+    }) as QuestionDecryptOwnedClearResult;
+    replaceQuestionDecryptBusyTokens(decryptHost, result.busyTokens);
     return result.statePatch;
   };
 
