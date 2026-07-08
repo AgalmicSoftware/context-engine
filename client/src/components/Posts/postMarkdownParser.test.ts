@@ -78,12 +78,25 @@ Paragraph text.
       title: 'Data Exploration (n=4)',
       defaultOpen: false,
       childrenOpen: false,
+      layout: 'carousel',
     });
     expect(blocks[1]).toMatchObject({
       type: 'viz',
       spec: { type: 'quote-wall', quotes: [{ text: 'hello' }] },
     });
     expect(blocks[2]).toEqual({ type: 'vizGroupEnd' });
+  });
+
+  it('parses the stack layout for ce-viz groups', () => {
+    const blocks = parsePostMarkdown(`\`\`\`ce-viz-group
+{ "title": "Stacked", "defaultOpen": true, "layout": "stack" }
+\`\`\`
+
+\`\`\`ce-viz-group-end
+\`\`\`
+`);
+
+    expect(blocks[0]).toMatchObject({ type: 'vizGroupStart', title: 'Stacked', layout: 'stack' });
   });
 
   it('keeps the Agent Village P4 ratings from a completed replacement run', () => {

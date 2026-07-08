@@ -107,10 +107,12 @@ Supported types:
   quote lists) from `panels`.
 
 Wrap related `ce-viz` blocks in a `ce-viz-group` fenced JSON block to render
-them as one disclosure with a left-to-right carousel. `defaultOpen` still
-controls whether the group disclosure starts open. `childrenOpen` is retained
-for older posts and parser compatibility, but grouped child visualizations are
-always visible on their carousel slide.
+them as one disclosure. `"layout"` picks the body: `"carousel"` (default) is a
+left-to-right click-through carousel; `"stack"` renders the same compact
+cards as a single vertical stack with no scrolling controls. `defaultOpen`
+still controls whether the group disclosure starts open. `childrenOpen` is
+retained for older posts and parser compatibility, but grouped child
+visualizations are always visible in either layout.
 
 A grouped `ce-viz` block may set `"hideTitle": true` to suppress its visible
 header on the slide (useful when panel headings already carry the meaning).
@@ -120,7 +122,9 @@ technology and tooltips.
 A grouped `ce-viz` block may set `"combineWithPrevious": true` to render on
 the same carousel slide as the block before it (stacked below it) instead of
 getting its own slide. The slide keeps the first block's title for its dot
-and accessible label. The first block in a group cannot combine.
+and accessible label. The first block in a group cannot combine. The flag
+only affects the carousel layout; a stack layout already renders everything
+in order.
 
 `response-type-grid` freeform quotes accept an optional `"color"` per quote;
 it tints the attribution label (use participant colors to match other

@@ -604,6 +604,13 @@ h3.postHeading {
   padding: $viz-gap-md;
 }
 
+.vizGroupStack {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: $viz-gap-md;
+}
+
 .vizCarousel {
   min-width: 0;
   display: grid;

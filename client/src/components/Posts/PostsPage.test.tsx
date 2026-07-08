@@ -658,6 +658,38 @@ describe('PostsPage', () => {
     expect(riderLabel).toHaveStyle({ color: '#4dffa4' });
   });
 
+  it('renders stack-layout groups vertically without carousel controls', async () => {
+    const stackMarkdown = [
+      '# First Post',
+      '',
+      '```ce-viz-group',
+      '{ "title": "Stacked", "defaultOpen": true, "layout": "stack" }',
+      '```',
+      '',
+      '```ce-viz',
+      '{ "type": "quote-wall", "title": "First section", "quotes": [{ "text": "First body." }] }',
+      '```',
+      '',
+      '```ce-viz',
+      '{ "type": "quote-wall", "title": "Quiet section", "hideTitle": true, "quotes": [{ "text": "Second body." }] }',
+      '```',
+      '',
+      '```ce-viz-group-end',
+      '```',
+    ].join('\n');
+    renderFirstPostMarkdown(stackMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    await screen.findByText('First body.');
+
+    expect(screen.getByText('First section')).toBeInTheDocument();
+    expect(screen.getByText('Second body.')).toBeInTheDocument();
+    expect(screen.queryByText('Quiet section')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-posts-viz-carousel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-posts-viz-carousel-prev')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-posts-viz-carousel-dot-0')).not.toBeInTheDocument();
+  });
+
   it('pins the binary beeswarm tooltip on click until dismissed', async () => {
     const fetcher = jest
       .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()

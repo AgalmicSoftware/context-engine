@@ -186,6 +186,23 @@ const PostImageFigure = ({ block, assetBasePath }: { block: ImageBlock; assetBas
   );
 };
 
+const VizGroupStack = ({ block, assetBasePath }: { block: VizGroupBlock; assetBasePath?: string }) => (
+  <div className={styles.vizGroupStack}>
+    {block.blocks.map((childBlock, childIndex) =>
+      childBlock.type === 'viz' ? (
+        <PostViz
+          key={`viz-group-stack-${childIndex}`}
+          spec={childBlock.spec}
+          error={childBlock.error}
+          presentation="slide"
+        />
+      ) : (
+        renderBlock({ block: childBlock, index: childIndex, assetBasePath })
+      ),
+    )}
+  </div>
+);
+
 const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; assetBasePath?: string }) => {
   const slides = packCarouselSlides(block.blocks);
   const slideCount = slides.length;
@@ -502,7 +519,11 @@ const renderBlock = ({ block, index, assetBasePath, vizDefaultOpen, nestedViz = 
           </span>
         </summary>
         <section className={`${styles.vizCard} ${styles.vizGroupCard}`} aria-label={block.title}>
-          <VizGroupCarousel block={block} assetBasePath={assetBasePath} />
+          {block.layout === 'stack' ? (
+            <VizGroupStack block={block} assetBasePath={assetBasePath} />
+          ) : (
+            <VizGroupCarousel block={block} assetBasePath={assetBasePath} />
+          )}
         </section>
       </details>
     );

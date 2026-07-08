@@ -6,7 +6,15 @@ export type PostMarkdownBlock =
   | { type: 'list'; ordered: boolean; items: string[] }
   | { type: 'code'; language: string; code: string }
   | { type: 'viz'; raw: string; spec: unknown; error?: string }
-  | { type: 'vizGroupStart'; raw: string; title: string; defaultOpen: boolean; childrenOpen: boolean; error?: string }
+  | {
+      type: 'vizGroupStart';
+      raw: string;
+      title: string;
+      defaultOpen: boolean;
+      childrenOpen: boolean;
+      layout: 'carousel' | 'stack';
+      error?: string;
+    }
   | { type: 'vizGroupEnd' }
   | { type: 'rule' };
 
@@ -88,6 +96,7 @@ export const parsePostMarkdown = (markdown: string): PostMarkdownBlock[] => {
           title,
           defaultOpen: record.defaultOpen === true,
           childrenOpen: record.childrenOpen === true,
+          layout: record.layout === 'stack' ? 'stack' : 'carousel',
           ...(parsed.error ? { error: parsed.error } : {}),
         });
       } else if (language.toLowerCase() === 'ce-viz-group-end') {
