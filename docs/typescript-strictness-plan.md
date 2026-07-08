@@ -7,14 +7,14 @@ explicit escape hatches that the compiler still permits.
 
 ## Current Ratchet
 
-`scripts/check-type-debt-ratchet.mjs --list` checked 974 production TS/TSX files
+`scripts/check-type-debt-ratchet.mjs --list` checked 990 production TS/TSX files
 under `client/src` and reported:
 
 | Debt kind | Current baseline |
 |---|---:|
 | `@ts-nocheck` | 0 |
-| `: any` | 944 |
-| `as any` | 86 |
+| `: any` | 936 |
+| `as any` | 85 |
 | `as unknown as` | 47 |
 | `Promise<any>` | 2 |
 | `Array<any>` | 0 |
@@ -26,6 +26,8 @@ under `client/src` and reported:
 directories are compiler-owned for explicit-debt purposes: `type-debt:check`
 fails if any production TS/TSX file under the listed directories introduces a
 counted marker, even if another file lowers the global count enough to offset it.
+After the `aiClient.ts` typed-host rename, `client/src/utilities/ai` is also
+strict-listed because its production TypeScript surface has zero counted debt.
 
 Largest current clusters:
 

@@ -55,6 +55,7 @@
     "client/src/shims",
     "client/src/testUtils",
     "client/src/types",
+    "client/src/utilities/ai",
     "client/src/utilities/audio",
     "client/src/utilities/cache",
     "client/src/utilities/crypto",
