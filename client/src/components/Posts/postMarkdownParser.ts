@@ -6,6 +6,8 @@ export type PostMarkdownBlock =
   | { type: 'list'; ordered: boolean; items: string[] }
   | { type: 'code'; language: string; code: string }
   | { type: 'viz'; raw: string; spec: unknown; error?: string }
+  | { type: 'vizGroupStart'; raw: string; title: string; defaultOpen: boolean; childrenOpen: boolean; error?: string }
+  | { type: 'vizGroupEnd' }
   | { type: 'rule' };
 
 const stripFrontmatter = (markdown: string): string => {
@@ -67,6 +69,24 @@ export const parsePostMarkdown = (markdown: string): PostMarkdownBlock[] => {
       if (language.toLowerCase() === 'ce-viz') {
         const parsed = parseVizSpec(code);
         blocks.push({ type: 'viz', raw: code, spec: parsed.spec, ...(parsed.error ? { error: parsed.error } : {}) });
+      } else if (language.toLowerCase() === 'ce-viz-group') {
+        const parsed = parseVizSpec(code);
+        const record = parsed.spec && typeof parsed.spec === 'object' && !Array.isArray(parsed.spec)
+          ? parsed.spec as Record<string, unknown>
+          : {};
+        const title = typeof record.title === 'string' && record.title.trim()
+          ? record.title.trim()
+          : 'Data Exploration';
+        blocks.push({
+          type: 'vizGroupStart',
+          raw: code,
+          title,
+          defaultOpen: record.defaultOpen === true,
+          childrenOpen: record.childrenOpen === true,
+          ...(parsed.error ? { error: parsed.error } : {}),
+        });
+      } else if (language.toLowerCase() === 'ce-viz-group-end') {
+        blocks.push({ type: 'vizGroupEnd' });
       } else {
         blocks.push({ type: 'code', language, code });
       }

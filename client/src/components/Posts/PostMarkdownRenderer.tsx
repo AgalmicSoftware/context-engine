@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   PostMarkdownBlock,
   parsePostMarkdown,
@@ -13,10 +15,18 @@ type PostMarkdownRendererProps = {
   title?: string;
 };
 
+type ImageBlock = Extract<PostMarkdownBlock, { type: 'image' }>;
+type VizGroupBlock = Extract<PostMarkdownBlock, { type: 'vizGroupStart' }> & {
+  blocks: PostMarkdownBlock[];
+};
+type RenderablePostBlock = PostMarkdownBlock | VizGroupBlock;
+
 type RenderBlockArgs = {
-  block: PostMarkdownBlock;
+  block: RenderablePostBlock;
   index: number;
   assetBasePath?: string;
+  vizDefaultOpen?: boolean;
+  nestedViz?: boolean;
 };
 
 const sanitizeHref = (href: string): string => {
@@ -86,7 +96,78 @@ const renderInline = (text: string): React.ReactNode[] => {
   return parts;
 };
 
-const renderBlock = ({ block, index, assetBasePath }: RenderBlockArgs) => {
+const PostImageFigure = ({
+  block,
+  assetBasePath,
+}: {
+  block: ImageBlock;
+  assetBasePath?: string;
+}) => {
+  const [isPreviewOpen, setPreviewOpen] = useState(false);
+  const src = sanitizeImageSrc(block.src, assetBasePath);
+
+  useEffect(() => {
+    if (!isPreviewOpen) return undefined;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPreviewOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isPreviewOpen]);
+
+  if (!src) return null;
+
+  const openLabel = block.alt ? `Open image preview: ${block.alt}` : 'Open image preview';
+
+  return (
+    <figure className={styles.postImageFigure}>
+      <button
+        type="button"
+        className={styles.postImageButton}
+        onClick={() => setPreviewOpen(true)}
+        aria-label={openLabel}
+      >
+        <img
+          className={styles.postImage}
+          src={src}
+          alt={block.alt}
+          loading="lazy"
+          decoding="async"
+        />
+      </button>
+      {isPreviewOpen && (
+        <button
+          type="button"
+          className={`${styles.postImageFullscreen} ${styles.postImageFullscreenOpen}`}
+          onClick={() => setPreviewOpen(false)}
+          aria-label="Close image preview"
+        >
+          <img
+            className={styles.postImageFullscreenImage}
+            src={src}
+            alt=""
+            decoding="async"
+          />
+        </button>
+      )}
+      {block.caption && (
+        <figcaption className={styles.postImageCaption}>{renderInline(block.caption)}</figcaption>
+      )}
+    </figure>
+  );
+};
+
+const renderBlock = ({
+  block,
+  index,
+  assetBasePath,
+  vizDefaultOpen,
+  nestedViz = false,
+}: RenderBlockArgs) => {
   if (block.type === 'heading') {
     const HeadingTag = (`h${block.level}` as 'h1' | 'h2' | 'h3');
     return (
@@ -105,35 +186,7 @@ const renderBlock = ({ block, index, assetBasePath }: RenderBlockArgs) => {
   }
 
   if (block.type === 'image') {
-    const src = sanitizeImageSrc(block.src, assetBasePath);
-    if (!src) return null;
-    return (
-      <figure
-        key={`image-${index}`}
-        className={styles.postImageFigure}
-        tabIndex={0}
-        aria-label={block.alt ? `Preview image: ${block.alt}` : 'Preview image'}
-      >
-        <img
-          className={styles.postImage}
-          src={src}
-          alt={block.alt}
-          loading="lazy"
-          decoding="async"
-        />
-        <span className={styles.postImageFullscreen} aria-hidden="true">
-          <img
-            className={styles.postImageFullscreenImage}
-            src={src}
-            alt=""
-            decoding="async"
-          />
-        </span>
-        {block.caption && (
-          <figcaption className={styles.postImageCaption}>{renderInline(block.caption)}</figcaption>
-        )}
-      </figure>
-    );
+    return <PostImageFigure key={`image-${index}`} block={block} assetBasePath={assetBasePath} />;
   }
 
   if (block.type === 'blockquote') {
@@ -164,10 +217,83 @@ const renderBlock = ({ block, index, assetBasePath }: RenderBlockArgs) => {
   }
 
   if (block.type === 'viz') {
-    return <PostViz key={`viz-${index}`} spec={block.spec} error={block.error} />;
+    return (
+      <PostViz
+        key={`viz-${index}`}
+        spec={block.spec}
+        error={block.error}
+        defaultOpen={vizDefaultOpen}
+        nested={nestedViz}
+      />
+    );
   }
 
+  if (block.type === 'vizGroupStart' && 'blocks' in block) {
+    return (
+      <details
+        key={`viz-group-${index}`}
+        className={`${styles.vizDisclosure} ${styles.vizGroupDisclosure}`}
+        open={block.defaultOpen}
+      >
+        <summary className={styles.vizDisclosureSummary}>
+          <span>{block.title}</span>
+          <span className={styles.vizDisclosureIcon} aria-hidden="true">
+            <FontAwesomeIcon className={styles.vizDisclosureIconClosed} icon={faCaretDown} />
+            <FontAwesomeIcon className={styles.vizDisclosureIconOpen} icon={faCaretUp} />
+          </span>
+        </summary>
+        <section className={`${styles.vizCard} ${styles.vizGroupCard}`} aria-label={block.title}>
+          <div className={styles.vizGroupItems}>
+            {block.blocks.map((childBlock, childIndex) => (
+              renderBlock({
+                block: childBlock,
+                index: childIndex,
+                assetBasePath,
+                vizDefaultOpen: block.childrenOpen,
+                nestedViz: childBlock.type === 'viz',
+              })
+            ))}
+          </div>
+        </section>
+      </details>
+    );
+  }
+
+  if (block.type === 'vizGroupStart' || block.type === 'vizGroupEnd') return null;
+
   return <hr key={`rule-${index}`} className={styles.postRule} />;
+};
+
+const groupVizBlocks = (blocks: PostMarkdownBlock[]): RenderablePostBlock[] => {
+  const groupedBlocks: RenderablePostBlock[] = [];
+  let activeGroup: VizGroupBlock | null = null;
+
+  blocks.forEach((block) => {
+    if (block.type === 'vizGroupStart') {
+      if (activeGroup) groupedBlocks.push(activeGroup);
+      activeGroup = { ...block, blocks: [] };
+      return;
+    }
+
+    if (block.type === 'vizGroupEnd') {
+      if (activeGroup) {
+        groupedBlocks.push(activeGroup);
+        activeGroup = null;
+      }
+      return;
+    }
+
+    if (activeGroup) {
+      activeGroup.blocks.push(block);
+      return;
+    }
+
+    groupedBlocks.push(block);
+  });
+
+  if (activeGroup) groupedBlocks.push(activeGroup);
+
+  return groupedBlocks;
 };
 
 const normalizeHeadingText = (value: string): string => value.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -186,7 +312,7 @@ const suppressDuplicateTitleHeading = (
 };
 
 const PostMarkdownRenderer = ({ markdown, assetBasePath = '', title }: PostMarkdownRendererProps) => {
-  const blocks = suppressDuplicateTitleHeading(parsePostMarkdown(markdown), title);
+  const blocks = groupVizBlocks(suppressDuplicateTitleHeading(parsePostMarkdown(markdown), title));
 
   return (
     <div className={styles.markdownBody}>

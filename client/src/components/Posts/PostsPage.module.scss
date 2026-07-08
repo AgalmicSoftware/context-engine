@@ -3,10 +3,17 @@
 $surface: rgba(255, 255, 255, 0.065);
 $surface-strong: rgba(255, 255, 255, 0.1);
 $border: rgba(255, 255, 255, 0.14);
+$card-bg: tokens.$ce-card-bg;
+$card-border: tokens.$ce-card-border;
+$card-shadow: tokens.$ce-card-shadow;
+$input-bg: tokens.$ce-input-bg;
+$input-border: tokens.$ce-input-border;
 $text: tokens.$ce-white;
 $muted: rgba(244, 247, 255, 0.68);
-$accent: #4dffa4;
+$accent: tokens.$ce-clickable;
 $blue: #7aa7ff;
+$link-blue: #9cc9ff;
+$link-blue-hover: #c8ddff;
 $amber: #ffb347;
 
 .postsPage {
@@ -160,7 +167,7 @@ $amber: #ffb347;
   gap: 8px;
   margin-bottom: 20px;
   color: rgba(226, 236, 255, 0.94);
-  font-size: 1.16rem;
+  font-size: 1.74rem;
   font-weight: 700;
   text-decoration: none;
 
@@ -204,26 +211,31 @@ $amber: #ffb347;
   position: relative;
   display: grid;
   gap: 0;
+}
+
+.postImageButton {
+  appearance: none;
+  min-width: 0;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
   cursor: zoom-in;
 
-  &:focus {
+  &:focus-visible {
     outline: 2px solid rgba(77, 255, 164, 0.7);
     outline-offset: 3px;
   }
-
-  &:hover .postImageFullscreen,
-  &:focus .postImageFullscreen,
-  &:focus-within .postImageFullscreen {
-    opacity: 1;
-    visibility: visible;
-  }
 }
 
-.postImageFigure > .postImage {
+.postImageButton .postImage {
   border-radius: 7px;
 }
 
 .postImageFullscreen {
+  appearance: none;
   position: fixed;
   z-index: 10000;
   inset: 0;
@@ -231,11 +243,19 @@ $amber: #ffb347;
   align-items: center;
   justify-content: center;
   padding: clamp(16px, 4vw, 52px);
+  border: 0;
   background: rgba(5, 7, 22, 0.88);
+  cursor: zoom-out;
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
   transition: opacity 140ms ease, visibility 140ms ease;
+}
+
+.postImageFullscreenOpen {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
 }
 
 .postImageFullscreenImage {
@@ -263,14 +283,21 @@ $amber: #ffb347;
 
 .postMeta {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 10px;
   color: $muted;
   font-size: 1rem;
 }
 
+.postDate {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .tagList {
   display: flex;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -298,6 +325,28 @@ $amber: #ffb347;
   gap: 18px;
   color: rgba(244, 247, 255, 0.9);
   font-family: var(--ce-post-font-body);
+
+  a {
+    color: $link-blue;
+    text-decoration-color: rgba(156, 201, 255, 0.5);
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.16em;
+    transition:
+      color 0.14s ease,
+      text-decoration-color 0.14s ease;
+
+    &:hover,
+    &:focus-visible {
+      color: $link-blue-hover;
+      text-decoration-color: currentColor;
+    }
+
+    &:focus-visible {
+      outline: 2px solid rgba(156, 201, 255, 0.58);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+  }
 }
 
 .postHeading {
@@ -335,8 +384,9 @@ h3.postHeading {
 .postParagraph {
   max-width: 74ch;
 
-  a {
-    color: $accent;
+  strong {
+    color: $text;
+    font-weight: 800;
   }
 
   code {
@@ -380,10 +430,127 @@ h3.postHeading {
 .vizCard {
   display: grid;
   gap: 16px;
-  padding: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.055);
+  padding: 20px;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-8);
+  background: $card-bg;
+  box-shadow: $card-shadow;
+}
+
+.vizDisclosure {
+  display: grid;
+  min-width: 0;
+}
+
+.vizDisclosureSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 20px;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-8);
+  background:
+    linear-gradient(90deg, rgba(0, 197, 255, 0.14), rgba(255, 255, 255, 0.055)),
+    $card-bg;
+  box-shadow: $card-shadow;
+  color: $text;
+  cursor: pointer;
+  font-family: var(--ce-post-font-heading);
+  font-size: 1.14rem;
+  font-weight: 700;
+  line-height: 1.25;
+  list-style: none;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(77, 255, 164, 0.7);
+    outline-offset: 3px;
+  }
+
+  &:hover {
+    border-color: rgba(77, 255, 164, 0.3);
+    background:
+      linear-gradient(90deg, rgba(0, 197, 255, 0.18), rgba(77, 255, 164, 0.08)),
+      $card-bg;
+  }
+}
+
+.vizDisclosureIcon {
+  color: $accent;
+  display: inline-grid;
+  flex: 0 0 auto;
+  font-size: 1rem;
+  line-height: 1;
+  place-items: center;
+}
+
+.vizDisclosureIconClosed,
+.vizDisclosureIconOpen {
+  grid-area: 1 / 1;
+}
+
+.vizDisclosureIconOpen {
+  display: none;
+}
+
+.vizDisclosure[open] .vizDisclosureSummary {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  border-radius: var(--ce-radius-8) var(--ce-radius-8) 0 0;
+}
+
+.vizDisclosure[open] .vizDisclosureIconClosed {
+  display: none;
+}
+
+.vizDisclosure[open] .vizDisclosureIconOpen {
+  display: block;
+}
+
+.vizDisclosure > .vizCard {
+  border-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  box-shadow: $card-shadow;
+}
+
+.vizInlineContent {
+  display: grid;
+  min-width: 0;
+}
+
+.vizInlineContent > .vizCard {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.vizGroupDisclosure > .vizDisclosureSummary {
+  font-size: 1.2rem;
+}
+
+.vizGroupCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.vizGroupItems {
+  display: grid;
+  gap: 12px;
+}
+
+.vizDisclosureNested .vizDisclosureSummary {
+  padding: 14px 18px;
+  background:
+    linear-gradient(90deg, rgba(0, 197, 255, 0.12), rgba(255, 255, 255, 0.045)),
+    rgba(255, 255, 255, 0.035);
+  box-shadow: none;
+  font-size: 1rem;
 }
 
 .vizHeader {
@@ -395,15 +562,19 @@ h3.postHeading {
   margin: 0;
   color: $text;
   font-family: var(--ce-post-font-heading);
-  font-size: 1.2rem;
+  font-size: 1.26rem;
   letter-spacing: 0;
 }
 
 .vizSubtitle {
   margin: 0;
   color: $muted;
-  font-size: 0.92rem;
+  font-size: 0.94rem;
   line-height: 1.5;
+
+  strong {
+    color: $text;
+  }
 }
 
 .categoryViz {
@@ -420,10 +591,11 @@ h3.postHeading {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  color: rgba(244, 247, 255, 0.92);
+  color: rgba(244, 247, 255, 0.94);
 }
 
 .categoryLabel {
+  font-family: var(--ce-font-mono);
   font-weight: 700;
 }
 
@@ -442,7 +614,9 @@ h3.postHeading {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 3px 8px rgba(0, 0, 0, 0.18);
 }
 
 .categoryDetail {
@@ -461,9 +635,10 @@ h3.postHeading {
 .quoteItem {
   margin: 0;
   padding: 14px;
-  border: 1px solid rgba(122, 167, 255, 0.22);
-  border-radius: 8px;
-  background: rgba(122, 167, 255, 0.08);
+  border: 1px solid $input-border;
+  border-radius: var(--ce-radius-8);
+  background: $input-bg;
+  box-shadow: $card-shadow;
 }
 
 .quoteText {
@@ -495,9 +670,10 @@ h3.postHeading {
   grid-template-columns: 44px minmax(0, 1fr);
   gap: 14px;
   padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(9, 13, 30, 0.38);
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-8);
+  background: $card-bg;
+  box-shadow: $card-shadow;
 }
 
 .rankBadge {
@@ -506,10 +682,11 @@ h3.postHeading {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(77, 255, 164, 0.28);
+  border: 1px solid rgba(77, 255, 164, 0.36);
   border-radius: 999px;
   color: $accent;
   font-weight: 700;
+  background: rgba(77, 255, 164, 0.08);
 }
 
 .rankedThemeBody {
@@ -543,7 +720,7 @@ h3.postHeading {
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+  background: $input-bg;
 }
 
 .rankedThemeFill {
@@ -563,7 +740,7 @@ h3.postHeading {
   margin: 0;
   padding: 12px;
   border-left: 3px solid rgba(77, 255, 164, 0.48);
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 var(--ce-radius-8) var(--ce-radius-8) 0;
   background: rgba(77, 255, 164, 0.075);
 
   blockquote {
@@ -598,9 +775,10 @@ h3.postHeading {
   width: 100%;
   aspect-ratio: 100 / 64;
   min-height: 250px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(5, 8, 22, 0.46);
+  border: 1px solid $input-border;
+  border-radius: var(--ce-radius-8);
+  background: rgba(5, 8, 22, 0.54);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .networkLink {
@@ -655,8 +833,11 @@ h3.postHeading {
 }
 
 .beeswarmCard,
+.binaryBeeswarmCard,
 .responseTypeCard {
-  background: rgba(255, 255, 255, 0.06);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.045)),
+    $card-bg;
 }
 
 .beeswarmViz {
@@ -681,7 +862,7 @@ h3.postHeading {
   h4 {
     color: $text;
     font-family: var(--ce-post-font-heading);
-    font-size: 1.06rem;
+    font-size: 1.1rem;
     line-height: 1.25;
   }
 
@@ -705,14 +886,15 @@ h3.postHeading {
   top: 50%;
   height: 2px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(244, 247, 255, 0.28);
 }
 
 .beeswarmTick {
   position: absolute;
   bottom: -2px;
   transform: translateX(-50%);
-  color: rgba(226, 236, 255, 0.62);
+  color: rgba(244, 247, 255, 0.72);
+  font-family: var(--ce-font-mono);
   font-size: 0.76rem;
   white-space: nowrap;
 
@@ -736,13 +918,16 @@ h3.postHeading {
   align-items: center;
   justify-content: center;
   transform: translate(-50%, -50%);
-  border: 1px solid rgba(255, 255, 255, 0.44);
+  border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: 999px;
   color: #061018;
+  font-family: var(--ce-font-mono);
   font-size: 0.68rem;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.24);
+  box-shadow:
+    0 7px 20px rgba(0, 0, 0, 0.32),
+    0 0 0 3px rgba(255, 255, 255, 0.06);
 }
 
 .beeswarmMissing,
@@ -754,27 +939,124 @@ h3.postHeading {
   line-height: 1.45;
 }
 
-.vizLegend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  padding-top: 4px;
+.binaryBeeswarmFrame {
+  position: relative;
+  display: grid;
+  gap: 12px;
 }
 
-.vizLegendItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: rgba(226, 236, 255, 0.82);
-  font-size: 0.82rem;
-  line-height: 1.35;
+.binaryBeeswarmSvg {
+  width: 100%;
+  min-height: 230px;
+  display: block;
+  overflow: visible;
+  border: 1px solid $input-border;
+  border-radius: var(--ce-radius-8);
+  background:
+    radial-gradient(circle at 14% 22%, rgba(77, 255, 164, 0.12), transparent 28%),
+    radial-gradient(circle at 84% 28%, rgba(255, 107, 203, 0.1), transparent 34%),
+    rgba(7, 12, 31, 0.34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
-.vizLegendSwatch {
-  width: 10px;
-  height: 10px;
-  flex: 0 0 auto;
-  border-radius: 999px;
+.binaryBeeswarmAxisBase {
+  stroke: rgba(244, 247, 255, 0.16);
+  stroke-linecap: round;
+  stroke-width: 10;
+}
+
+.binaryBeeswarmAxis {
+  stroke-linecap: round;
+  stroke-width: 5;
+  filter: drop-shadow(0 0 10px rgba(77, 255, 164, 0.16));
+}
+
+.binaryBeeswarmTick {
+  stroke: rgba(244, 247, 255, 0.14);
+  stroke-width: 1;
+}
+
+.binaryBeeswarmAxisLabel {
+  fill: rgba(244, 247, 255, 0.72);
+  font-family: var(--ce-font-mono);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.binaryBeeswarmAxisLabel {
+  fill: rgba(244, 247, 255, 0.86);
+  font-weight: 700;
+}
+
+.binaryBeeswarmPoint {
+  cursor: help;
+  outline: none;
+
+  &:focus-visible .binaryBeeswarmDot {
+    stroke: $accent;
+    stroke-width: 2.8;
+  }
+}
+
+.binaryBeeswarmDot {
+  stroke: rgba(255, 255, 255, 0.66);
+  stroke-width: 1.35;
+  transition:
+    r 0.14s ease,
+    stroke-width 0.14s ease,
+    filter 0.14s ease;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.3));
+}
+
+.binaryBeeswarmPointActive .binaryBeeswarmDot,
+.binaryBeeswarmPoint:hover .binaryBeeswarmDot {
+  r: 11px;
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 2;
+  filter:
+    drop-shadow(0 10px 18px rgba(0, 0, 0, 0.36))
+    drop-shadow(0 0 12px rgba(77, 255, 164, 0.22));
+}
+
+.binaryBeeswarmTooltip {
+  position: absolute;
+  z-index: 4;
+  width: min(360px, calc(100% - 28px));
+  display: grid;
+  gap: 7px;
+  padding: 12px 14px;
+  border: 1px solid rgba(77, 255, 164, 0.34);
+  border-radius: var(--ce-radius-8);
+  background: rgba(18, 23, 54, 0.96);
+  color: $text;
+  box-shadow:
+    0 20px 45px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 12px));
+
+  strong {
+    color: #ffffff;
+    font-family: var(--ce-post-font-heading);
+    font-size: 0.96rem;
+    line-height: 1.25;
+  }
+
+  p,
+  span {
+    margin: 0;
+    color: rgba(244, 247, 255, 0.78);
+    font-size: 0.78rem;
+    line-height: 1.38;
+  }
+
+  span {
+    font-family: var(--ce-font-mono);
+  }
+}
+
+.binaryBeeswarmHitArea {
+  pointer-events: all;
 }
 
 .responseTypeGrid {
@@ -788,10 +1070,11 @@ h3.postHeading {
   display: grid;
   align-content: start;
   gap: 10px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(9, 13, 30, 0.34);
+  padding: 16px;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: $card-shadow;
 
   h4,
   p {
@@ -801,17 +1084,9 @@ h3.postHeading {
   h4 {
     color: $text;
     font-family: var(--ce-post-font-heading);
-    font-size: 1.04rem;
+    font-size: 1.08rem;
     line-height: 1.25;
   }
-}
-
-.responseTypeKind {
-  color: $accent;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
 }
 
 .responseTypePrompt {
@@ -834,16 +1109,149 @@ h3.postHeading {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  color: rgba(244, 247, 255, 0.86);
+  color: rgba(244, 247, 255, 0.92);
+  font-family: var(--ce-font-mono);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.responseMetrics {
+  display: grid;
+  gap: 8px;
+}
+
+.responseMetricRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(244, 247, 255, 0.92);
+  font-family: var(--ce-font-mono);
+  font-size: 0.84rem;
+  line-height: 1.35;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  strong {
+    flex: 0 0 auto;
+    font-size: 1.02rem;
+  }
+}
+
+.responsePie {
+  display: grid;
+  grid-template-columns: minmax(112px, 150px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+
+.responsePieChart {
+  width: min(150px, 100%);
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.responsePieLegend {
+  display: grid;
+  gap: 8px;
+
+  p {
+    margin: 4px 0 0;
+    color: $muted;
+    font-family: var(--ce-font-mono);
+    font-size: 0.78rem;
+  }
+}
+
+.responsePieLegendItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  color: rgba(244, 247, 255, 0.92);
+  font-family: var(--ce-font-mono);
   font-size: 0.82rem;
   line-height: 1.35;
+
+  strong {
+    color: $text;
+  }
+}
+
+.responsePieSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+.responseSplit {
+  display: grid;
+  gap: 9px;
+}
+
+.responseSplitLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.responseSplitLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(244, 247, 255, 0.9);
+  font-family: var(--ce-font-mono);
+  font-size: 0.78rem;
+  line-height: 1;
+
+  strong {
+    color: $text;
+  }
+}
+
+.responseSplitSwatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+.responseSplitBar {
+  display: flex;
+  width: 100%;
+  height: 26px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 7px;
+  background: rgba(7, 12, 31, 0.32);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.responseSplitSegment {
+  min-width: 0;
+  height: 100%;
 }
 
 .responseBarTrack {
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+  background: $input-bg;
 }
 
 .responseBarFill {
@@ -859,9 +1267,9 @@ h3.postHeading {
   figure {
     margin: 0;
     padding: 10px;
-    border: 1px solid rgba(122, 167, 255, 0.2);
-    border-radius: 8px;
-    background: rgba(122, 167, 255, 0.08);
+    border: 1px solid $input-border;
+    border-radius: var(--ce-radius-8);
+    background: $input-bg;
   }
 
   blockquote {
@@ -908,6 +1316,10 @@ h3.postHeading {
   }
 
   .responseTypeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .responsePie {
     grid-template-columns: 1fr;
   }
 
