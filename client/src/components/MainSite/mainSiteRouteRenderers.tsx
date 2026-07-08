@@ -58,6 +58,7 @@ import {
   ContractPage as ContractPageRaw,
   DemosIndex as DemosIndexRaw,
   OnePageSession as OnePageSessionRaw,
+  PostsPage as PostsPageRaw,
   RiskMatrixDemo as RiskMatrixDemoRaw,
   SBTPage as SBTPageRaw,
   SBTsPage as SBTsPageRaw,
@@ -119,6 +120,7 @@ const CompareAddresses = asMainSiteRouteComponent(CompareAddressesRaw);
 const ContractPage = asMainSiteRouteComponent(ContractPageRaw);
 const DemosIndex = asMainSiteRouteComponent(DemosIndexRaw);
 const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
+const PostsPage = asMainSiteRouteComponent(PostsPageRaw);
 const RiskMatrixDemo = asMainSiteRouteComponent(RiskMatrixDemoRaw);
 const SBTPage = asMainSiteRouteComponent(SBTPageRaw);
 const SBTsPage = asMainSiteRouteComponent(SBTsPageRaw);
@@ -161,6 +163,14 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     <Suspense fallback={<LazyFallback label="Loading..." />}>
       <div data-testid={E2E_TESTIDS.PAGE_ABOUT_ROOT}>
         <AboutPage />
+      </div>
+    </Suspense>
+  ),
+
+  _renderPostsRoute: () => (
+    <Suspense fallback={<LazyFallback label="Loading Posts..." />}>
+      <div data-testid={E2E_TESTIDS.PAGE_POSTS_ROOT}>
+        <PostsPage />
       </div>
     </Suspense>
   ),
@@ -1381,6 +1391,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         simUser: () => host._renderSimUserRoute(fullPath, defaultSessionNetwork),
         userProfile: () => host._renderUserProfileRoute(ctx),
         about: () => host._renderAboutRoute(),
+        posts: () => host._renderPostsRoute(),
         demos: () => host._renderDemosRoute(),
         matrix: () => host._renderMatrixRoute(),
         contracts: () => host._renderContractsRoute(ctx),

@@ -106,6 +106,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 - System design, data flows, and file map: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Docs index: [docs/README.md](docs/README.md)
 - User guide / end-to-end session setup: [docs/session-creation-guide.md](docs/session-creation-guide.md)
+- Public posts authoring: [docs/posts.md](docs/posts.md)
 - Testing guide: [docs/testing.md](docs/testing.md)
 - Run modes: [docs/run-modes.md](docs/run-modes.md)
 - Public client config and current defaults: [docs/public-client-config.md](docs/public-client-config.md)

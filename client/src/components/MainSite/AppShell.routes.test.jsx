@@ -30,6 +30,7 @@ const mockSBTsPage = jest.fn(() => null);
 const mockCompareAddresses = jest.fn(() => null);
 const mockTagPage = jest.fn(() => null);
 const mockDebateMap = jest.fn(() => null);
+const mockPostsPage = jest.fn(() => null);
 const ORIGINAL_SESSION_SCAN_SCOPE = globalThis.CE_SESSION_SCAN_SCOPE;
 const ORIGINAL_SESSION_SCAN_SLUGS = globalThis.CE_SESSION_SCAN_SLUGS;
 
@@ -242,6 +243,19 @@ jest.mock('../DebateMap/DebateMap', () => {
       return React.createElement('div', {
         'data-testid': 'mock-debate-map',
         'data-demo-mode': typeof props.demoMode === 'undefined' ? '' : String(props.demoMode),
+      });
+    },
+  };
+});
+
+jest.mock('../Posts/PostsPage', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: () => {
+      mockPostsPage();
+      return React.createElement('div', {
+        'data-testid': 'mock-posts-page',
       });
     },
   };
@@ -771,6 +785,34 @@ describe('AppShell route render smoke', () => {
     expect(mockAdminPage.mock.calls[mockAdminPage.mock.calls.length - 1][0]?.ensureLightSbtUniverse).toBe(
       subject.ensureLightSbtUniverse,
     );
+  });
+
+  it('renders the posts root without waiting for cache hydration', async () => {
+    const subject = createSubject({ path: '/posts' });
+    subject.state = {
+      ...subject.state,
+      isCacheManagerReady: false,
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_POSTS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-posts-page')).toBeInTheDocument();
+    expect(mockPostsPage).toHaveBeenCalled();
+  });
+
+  it('renders post detail URLs without waiting for cache hydration', async () => {
+    const subject = createSubject({ path: '/posts/first-post' });
+    subject.state = {
+      ...subject.state,
+      isCacheManagerReady: false,
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_POSTS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-posts-page')).toBeInTheDocument();
+    expect(mockPostsPage).toHaveBeenCalled();
   });
 
   it('prefers the live browser pathname when the path prop is stale after a direct history rewrite', async () => {

@@ -54,6 +54,8 @@ describe('AboutPage', () => {
       'href',
       'https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md',
     );
+    expect(within(hero).getByTestId('ce-about-link-posts')).toBeVisible();
+    expect(within(hero).getByTestId('ce-about-link-posts')).toHaveAttribute('href', '/posts');
     expect(within(hero).getByLabelText(/view context engine on github/i)).toBeVisible();
     expect(within(hero).getByTestId('ce-about-link-github')).toHaveAttribute(
       'href',
@@ -130,6 +132,7 @@ describe('AboutPage', () => {
     renderAboutPage();
 
     expect(screen.getByRole('link', { name: /New Session/i })).toHaveAttribute('href', '/ce/new');
+    expect(screen.getByTestId('ce-about-link-posts')).toHaveAttribute('href', '/ce/posts');
   });
 
   it('shows one use-case detail panel at a time', () => {

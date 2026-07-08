@@ -20,5 +20,6 @@ export const ContractPage = React.lazy(() => import('../ContractPage/ContractPag
 export const BookmarksPage = React.lazy(() => import('../Bookmarks/BookmarksPage'));
 export const RiskMatrixDemo = React.lazy(() => import('../DemoViews/RiskMatrixDemo'));
 export const AboutPage = React.lazy(() => import('../About/AboutPage'));
+export const PostsPage = React.lazy(() => import('../Posts/PostsPage'));
 export const AgentPage = React.lazy(() => import('../Agent/AgentPage'));
 export const TagPage = React.lazy(() => import('../TagPage/TagPage'));

@@ -24,6 +24,7 @@ describe('MainSite route table', () => {
       'simUser',
       'userProfile',
       'about',
+      'posts',
       'demos',
       'matrix',
       'contracts',
@@ -44,6 +45,8 @@ describe('MainSite route table', () => {
     [`/u/${ADDRESS}`, 'userProfile', {}],
     ['/admin', 'admin', {}],
     ['/sponsor', 'sponsor', {}],
+    ['/posts', 'posts', {}],
+    ['/posts/first-post', 'posts', {}],
   ])('classifies %s as %s', (fullPath, key, expected) => {
     expect(resolveMainSiteRouteMatch({ fullPath, isAddress })).toEqual(
       expect.objectContaining({
@@ -102,6 +105,19 @@ describe('MainSite route table', () => {
         isKnownRoutePrefix: true,
         shouldBypassCacheHydrationWait: true,
       }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/posts', isAddress })).toEqual(
+      expect.objectContaining({
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      })
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/posts/first-post', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'posts',
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      })
     );
     expect(resolveMainSiteRouteMatch({ fullPath: '/not-a-route', isAddress })).toEqual(
       expect.objectContaining({

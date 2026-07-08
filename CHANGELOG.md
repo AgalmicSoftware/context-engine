@@ -25,6 +25,12 @@ All notable changes to this project will be documented in this file.
 - Tag `v0.7.0` after the public `main` state and latest worker-bundle release
   asset smoke check are confirmed.
 
+## 2026-07-03
+
+### Completed TODOs
+
+- Added the public `/posts` route backed by root-level Markdown files, a default-on `REACT_APP_CE_ABOUT_POSTS_ENABLED` toggle, an About-page Posts link, static Vite serving/copying for `posts/`, per-post attachment directories, manifest header images, Markdown image blocks, and initial `ce-viz` post exhibits for category dot grids, ranked theme panels, theme networks, and quote walls.
+
 ## 2026-06-09
 
 ### Completed TODOs

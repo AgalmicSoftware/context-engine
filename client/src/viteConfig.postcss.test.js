@@ -15,4 +15,13 @@ describe('vite PostCSS compatibility', () => {
     expect(pkg.dependencies['@fullhuman/postcss-purgecss']).toBeUndefined();
     expect(pkg.devDependencies['@fullhuman/postcss-purgecss']).toBeUndefined();
   });
+
+  it('serves root posts Markdown as static assets', () => {
+    const config = fs.readFileSync(path.join(clientRoot, 'vite.config.mjs'), 'utf8');
+
+    expect(config).toMatch(/const postsDir = path\.resolve\(__dirname, '\.\.', 'posts'\);/);
+    expect(config).toContain("'.md': 'text/markdown; charset=utf-8'");
+    expect(config).toMatch(/name:\s*'ce-posts-assets-compatibility'/);
+    expect(config).toMatch(/fs\.cpSync\(postsDir,[\s\S]*'posts'\)/);
+  });
 });

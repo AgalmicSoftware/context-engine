@@ -12,6 +12,7 @@ const ENV_KEYS = [
   'REACT_APP_CE_SESSION_SCAN_SCOPE',
   'REACT_APP_CE_SESSION_SCAN_SLUGS',
   'REACT_APP_CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED',
+  'REACT_APP_CE_ABOUT_POSTS_ENABLED',
   'REACT_APP_CE_USER_PROFILE_SCAN_ALL_SESSIONS',
   'REACT_APP_CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS',
   'REACT_APP_CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS',
@@ -121,6 +122,7 @@ describe('appConfig env-backed config', () => {
     process.env.REACT_APP_CE_SESSION_SCAN_SCOPE = 'general';
     process.env.REACT_APP_CE_SESSION_SCAN_SLUGS = 'alpha,beta';
     process.env.REACT_APP_CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED = 'false';
+    process.env.REACT_APP_CE_ABOUT_POSTS_ENABLED = 'false';
     process.env.REACT_APP_CE_USER_PROFILE_SCAN_ALL_SESSIONS = 'true';
     process.env.REACT_APP_CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS = 'false';
     process.env.REACT_APP_CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS = 'false';
@@ -152,6 +154,7 @@ describe('appConfig env-backed config', () => {
       expect(config.CE_SESSION_SCAN_SCOPE).toBe('general');
       expect(config.CE_SESSION_SCAN_SLUGS).toEqual(['alpha', 'beta']);
       expect(config.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED).toBe(false);
+      expect(config.CE_ABOUT_POSTS_ENABLED).toBe(false);
       expect(config.CE_USER_PROFILE_SCAN_ALL_SESSIONS).toBe(true);
       expect(config.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS).toBe(false);
       expect(config.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS).toBe(false);
@@ -218,6 +221,7 @@ describe('appConfig env-backed config', () => {
       expect(config.CE_ARWEAVE_PREFLIGHT_SBT_METADATA).toBe(false);
       expect(config.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS).toBe(true);
       expect(config.CE_ENABLE_WALLETCONNECT_FALLBACK).toBe(false);
+      expect(config.CE_ABOUT_POSTS_ENABLED).toBe(true);
     });
   });
 });

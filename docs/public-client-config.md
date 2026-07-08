@@ -62,6 +62,14 @@ diagnostic flags can stay at the checked-in defaults. Any worker, chain, or
 registry override must match the worker and on-chain registry that the hosted
 frontend will actually use.
 
+The public posts route is enabled by default:
+
+- `REACT_APP_CE_ABOUT_POSTS_ENABLED=false` hides the About-page `Posts` link and
+  renders `/posts` as disabled for deployments that do not want the public posts
+  surface.
+- Authored posts live in the repository root `posts/` directory and are copied
+  into the static build output as `/posts/*`. See [`docs/posts.md`](posts.md).
+
 ### 2. Build the static bundle
 
 ```bash

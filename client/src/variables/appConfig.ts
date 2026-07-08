@@ -90,6 +90,12 @@ export const CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED',
   true,
 );
+// Shows the public /posts route and the About-page Posts link. Root-level
+// posts live under /posts in the repository and are served as static assets.
+export const CE_ABOUT_POSTS_ENABLED = readPublicBoolEnv(
+  'REACT_APP_CE_ABOUT_POSTS_ENABLED',
+  true
+);
 // Profile deep scans (/u/:address and compare) can optionally bypass CE_SESSION_SCAN_SCOPE and scan every known session.
 // Legacy all-session override is off by default; per-resource scan flags below can still enable fanout.
 export const CE_USER_PROFILE_SCAN_ALL_SESSIONS = readPublicBoolEnv(

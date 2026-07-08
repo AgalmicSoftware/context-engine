@@ -26,6 +26,7 @@ export const MAIN_SITE_ROUTE_VIEW_KEYS: MainSiteRouteViewKey[] = [
   'simUser',
   'userProfile',
   'about',
+  'posts',
   'demos',
   'matrix',
   'contracts',
