@@ -1,6 +1,13 @@
 import { buildEmptyQuestionDecryptSlice } from './surveyToolDecryptState';
 import { ensureQuestionDecryptSliceShape } from './surveyToolDecryptSliceState';
 import type {
+  DecryptEnvelopeValuePort,
+  QuestionRatingEnvelopeDecryptResult,
+  QuestionRatingEnvelopeMapDecryptResult,
+  RatingEnvelopeDecryptContext,
+  RatingEnvelopeDecryptPorts,
+} from './surveyToolDecryptExecutionContract';
+import type {
   DecryptResponseSlice,
   QuestionRatingEnvelopeMap,
   SurveyDecryptAttemptSourceInputs,
@@ -23,16 +30,11 @@ const toNum = (value: unknown): number | null => {
   return Number.isNaN(next) ? null : next;
 };
 
-type DecryptEnvelopeValuePort = (encryptedValue: unknown, options: UnknownRecord) => Promise<unknown> | unknown;
-
 export const decryptQuestionRatingEnvelopes = async (
   ratingEnvelopes: unknown = null,
-  { chainId, lit, account, providerLike }: UnknownRecord = {},
-  {
-    decryptEnvelopeValue,
-    logWarn = () => {},
-  }: { decryptEnvelopeValue?: unknown; logWarn?: (error: unknown) => void } = {},
-) => {
+  { chainId, lit, account, providerLike }: RatingEnvelopeDecryptContext = {},
+  { decryptEnvelopeValue, logWarn = () => {} }: RatingEnvelopeDecryptPorts = {},
+): Promise<QuestionRatingEnvelopeDecryptResult> => {
   let decryptedImportance = null;
   let decryptedConviction = null;
   const ratingEnvelopeRecord = asRecord(ratingEnvelopes);
@@ -73,13 +75,10 @@ export const decryptQuestionRatingEnvelopes = async (
 };
 
 export const decryptQuestionRatingEnvelopeMap = async (
-  ratingEnvelopesByQid: unknown = {},
-  { chainId, lit, account, providerLike }: UnknownRecord = {},
-  {
-    decryptEnvelopeValue,
-    logWarn = () => {},
-  }: { decryptEnvelopeValue?: unknown; logWarn?: (error: unknown) => void } = {},
-) => {
+  ratingEnvelopesByQid: QuestionRatingEnvelopeMap | unknown = {},
+  { chainId, lit, account, providerLike }: RatingEnvelopeDecryptContext = {},
+  { decryptEnvelopeValue, logWarn = () => {} }: RatingEnvelopeDecryptPorts = {},
+): Promise<QuestionRatingEnvelopeMapDecryptResult> => {
   const decryptedImportanceFromEnv: Record<string, number> = {};
   const decryptedConvictionFromEnv: Record<string, number> = {};
   const envelopeMap = Object(ratingEnvelopesByQid || {}) as UnknownRecord;

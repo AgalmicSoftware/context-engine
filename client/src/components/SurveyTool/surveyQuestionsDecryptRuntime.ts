@@ -1,4 +1,9 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import type {
+  DecryptEnvelopeValuePort,
+  DecryptMultipleAnswersPort,
+  DecryptSingleFieldPort,
+} from './surveyToolDecryptExecutionContract.js';
 import type { SurveyDecryptSourceState } from './surveyToolDecryptSourceContract.js';
 import {
   applyQuestionDecryptBusyTokenRegistration,
@@ -327,7 +332,7 @@ export const createSurveyQuestionsDecryptRuntime = (
       ratingEnvelopes,
       { chainId, lit, account, providerLike },
       {
-        decryptEnvelopeValue: (cryptoUtils as SurveyQuestionsLegacyValue).decryptEnvelopeValue,
+        decryptEnvelopeValue: (cryptoUtils as { decryptEnvelopeValue: DecryptEnvelopeValuePort }).decryptEnvelopeValue,
         logWarn: (error: SurveyQuestionsLegacyValue) => surveyLog.warn('SurveyTool: fallback', error),
       },
     );
@@ -340,7 +345,7 @@ export const createSurveyQuestionsDecryptRuntime = (
       ratingEnvelopesByQid,
       { chainId, lit, account, providerLike },
       {
-        decryptEnvelopeValue: (cryptoUtils as SurveyQuestionsLegacyValue).decryptEnvelopeValue,
+        decryptEnvelopeValue: (cryptoUtils as { decryptEnvelopeValue: DecryptEnvelopeValuePort }).decryptEnvelopeValue,
         logWarn: (error: SurveyQuestionsLegacyValue) => surveyLog.warn('SurveyTool: fallback', error),
       },
     );
@@ -507,13 +512,14 @@ export const createSurveyQuestionsDecryptRuntime = (
 
   const finalizeQuestionDecryptAttempt = async (options: SurveyQuestionsLegacyValue = {}) =>
     (finalizeQuestionDecryptAttemptHelper as SurveyQuestionsLegacyValue)(options, {
-      decryptSingleField: (cryptoUtils as SurveyQuestionsLegacyValue).decryptSingleField,
+      decryptSingleField: (cryptoUtils as { decryptSingleField: DecryptSingleFieldPort }).decryptSingleField,
       decryptQuestionRatingEnvelopes: decryptQuestionRatingEnvelopes,
     });
 
   const finalizeSurveyDecryptAttempt = async (options: SurveyQuestionsLegacyValue = {}) =>
     (finalizeSurveyDecryptAttemptHelper as SurveyQuestionsLegacyValue)(options, {
-      decryptMultipleAnswers: (cryptoUtils as SurveyQuestionsLegacyValue).decryptMultipleAnswers,
+      decryptMultipleAnswers: (cryptoUtils as { decryptMultipleAnswers: DecryptMultipleAnswersPort })
+        .decryptMultipleAnswers,
       decryptQuestionRatingEnvelopeMap: decryptQuestionRatingEnvelopeMap,
       normalizeBulkDecryptedSliceForSurveyState: normalizeBulkDecryptedSliceForSurveyState,
     });
