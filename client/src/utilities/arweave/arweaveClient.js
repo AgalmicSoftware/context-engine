@@ -16,13 +16,11 @@ import {
   buildFetchTimeoutError,
   classifyStatusKind,
   createArweaveFetchError,
-  createEmptyGatewayResponseError,
-  inferStatusFromHtmlGatewayPayload,
   isEmptyGatewayResponseText,
   isRetryableStatus,
-  looksLikeHtmlGatewayPayload,
   withTimeout,
 } from './arweaveFetchErrors.js';
+import { classifyArweaveGatewayPayloadResponse } from './arweaveGatewayPayloadResponse.js';
 import {
   buildArweaveGatewayRouteCandidates,
   buildArweaveGatewayUrl,
@@ -289,35 +287,29 @@ const tryWayfinderFallback = async ({
       const resp = await fetchWithTimeout(url, { redirect: 'follow' }, gatewayTimeoutMs);
       if (resp?.ok) {
         const text = await resp.text();
-        if (isEmptyGatewayResponseText(text)) {
-          lastError = createEmptyGatewayResponseError({
-            txId,
-            gateway: String(candidate.gateway || 'wayfinder'),
-            attempt,
-          });
-          markGatewayFailure(candidate.gateway, { status: null, kind: 'network' });
-          sawRetryableNonNotFound = true;
-          continue;
-        }
         const contentType = String(resp?.headers?.get?.('content-type') || '')
           .trim()
           .toLowerCase();
-        const derivedStatus = looksLikeHtmlGatewayPayload({ text, contentType })
-          ? inferStatusFromHtmlGatewayPayload(text)
-          : null;
-        if (derivedStatus != null) {
-          const kind = classifyStatusKind(derivedStatus);
-          const retryable = isRetryableStatus(derivedStatus);
-          lastError = createArweaveFetchError({
-            txId,
-            status: derivedStatus,
-            retryable,
-            kind,
-            gateway: String(candidate.gateway || 'wayfinder'),
-            attempt,
-            message: `Arweave gateway returned HTML payload (${derivedStatus})`,
+        const gatewayPayload = classifyArweaveGatewayPayloadResponse({
+          txId,
+          gateway: String(candidate.gateway || 'wayfinder'),
+          attempt,
+          text,
+          contentType,
+        });
+        if (!gatewayPayload.ok) {
+          lastError = gatewayPayload.error;
+          markGatewayFailure(candidate.gateway, {
+            status: gatewayPayload.status,
+            kind: gatewayPayload.statusKind,
           });
-          markGatewayFailure(candidate.gateway, { status: derivedStatus, kind });
+          if (gatewayPayload.reason === 'empty') {
+            sawRetryableNonNotFound = true;
+            continue;
+          }
+          const derivedStatus = gatewayPayload.status;
+          const kind = gatewayPayload.statusKind;
+          const retryable = gatewayPayload.retryable;
           if (derivedStatus === 404) {
             sawNotFound = true;
             if (hasNextRoute) continue;
@@ -339,7 +331,7 @@ const tryWayfinderFallback = async ({
         markGatewaySuccess(candidate.gateway);
         return {
           ok: true,
-          text,
+          text: gatewayPayload.text,
           resolvedUrl,
           route: candidate.route,
           gateway: candidate.gateway,
@@ -1302,32 +1294,25 @@ async function downloadDataFromArweave(txID, opts = {}) {
                 const resp = await fetchWithTimeout(url, { redirect: 'follow' }, gatewayTimeoutMs);
                 if (resp.ok) {
                   const text = await resp.text();
-                  if (isEmptyGatewayResponseText(text)) {
-                    throw createEmptyGatewayResponseError({
-                      txId: normalizedTxId,
-                      gateway,
-                      attempt,
-                    });
-                  }
                   const contentType = String(resp?.headers?.get?.('content-type') || '')
                     .trim()
                     .toLowerCase();
-                  const derivedStatus = looksLikeHtmlGatewayPayload({ text, contentType })
-                    ? inferStatusFromHtmlGatewayPayload(text)
-                    : null;
-                  if (derivedStatus != null) {
-                    const kind = classifyStatusKind(derivedStatus);
-                    const retryable = isRetryableStatus(derivedStatus);
+                  const gatewayPayload = classifyArweaveGatewayPayloadResponse({
+                    txId: normalizedTxId,
+                    gateway,
+                    attempt,
+                    text,
+                    contentType,
+                  });
+                  if (!gatewayPayload.ok) {
+                    if (gatewayPayload.reason === 'empty') {
+                      throw gatewayPayload.error;
+                    }
+                    const derivedStatus = gatewayPayload.status;
+                    const kind = gatewayPayload.statusKind;
+                    const retryable = gatewayPayload.retryable;
                     lastStatus = derivedStatus;
-                    lastError = createArweaveFetchError({
-                      txId: normalizedTxId,
-                      status: derivedStatus,
-                      retryable,
-                      kind,
-                      gateway,
-                      attempt,
-                      message: `Arweave gateway returned HTML payload (${derivedStatus})`,
-                    });
+                    lastError = gatewayPayload.error;
                     markGatewayFailure(gateway, { status: derivedStatus, kind });
                     logArweaveFetchDebug(
                       'warn',
@@ -1373,9 +1358,9 @@ async function downloadDataFromArweave(txID, opts = {}) {
                     opts,
                     debugContext,
                   );
-                  if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, text);
+                  if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, gatewayPayload.text);
                   if (!bypassFailureCache) clearFailureCacheEntry(normalizedTxId);
-                  return text;
+                  return gatewayPayload.text;
                 }
                 lastStatus = resp.status;
                 const kind = classifyStatusKind(resp.status);
