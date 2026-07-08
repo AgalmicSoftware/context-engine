@@ -597,13 +597,168 @@ h3.postHeading {
 
 .vizGroupCard {
   display: grid;
-  gap: $viz-gap-md;
+  gap: $viz-gap-lg;
+  overflow: hidden;
   padding: $viz-gap-md;
 }
 
-.vizGroupItems {
+.vizCarousel {
+  min-width: 0;
   display: grid;
+  gap: $viz-gap-lg;
+
+  &:focus-visible {
+    outline: 2px solid rgba(77, 255, 164, 0.7);
+    outline-offset: 3px;
+  }
+}
+
+.vizCarouselControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: $viz-gap-sm;
+}
+
+.vizCarouselButton {
+  appearance: none;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid $card-border;
+  border-radius: $viz-radius;
+  background: $card-bg;
+  color: $accent;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  transition:
+    transform 0.08s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.2s ease,
+    color 0.16s ease;
+
+  &:hover:not(:disabled) {
+    border-color: rgba(77, 255, 164, 0.42);
+    background: rgba(77, 255, 164, 0.12);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+    color: #ffffff;
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(77, 255, 164, 0.76);
+    outline-offset: 3px;
+  }
+
+  &:disabled {
+    border-color: rgba(244, 247, 255, 0.16);
+    background: rgba(255, 255, 255, 0.045);
+    color: rgba(244, 247, 255, 0.58);
+    cursor: not-allowed;
+    box-shadow: none;
+    opacity: 1;
+  }
+}
+
+.vizCarouselCounter {
+  min-width: 56px;
+  color: rgba(244, 247, 255, 0.86);
+  font-family: var(--ce-font-mono);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.vizCarouselTrack {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  gap: $viz-gap-lg;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.vizCarouselSlide {
+  min-width: 0;
+  flex: 0 0 calc(100% - 28px);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+
+  > .vizCard {
+    min-height: 100%;
+  }
+}
+
+.vizCarouselDots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $viz-gap-sm;
+}
+
+.vizCarouselDot {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid rgba(244, 247, 255, 0.34);
+  border-radius: 999px;
+  background: rgba(244, 247, 255, 0.34);
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  transition:
+    transform 0.08s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.2s ease;
+
+  &:hover {
+    border-color: rgba(77, 255, 164, 0.56);
+    background: rgba(77, 255, 164, 0.56);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(77, 255, 164, 0.76);
+    outline-offset: 3px;
+  }
+
+  &[aria-current='true'] {
+    border-color: rgba(77, 255, 164, 0.78);
+    background: $accent;
+    box-shadow:
+      0 0 0 3px rgba(77, 255, 164, 0.14),
+      0 8px 18px rgba(0, 0, 0, 0.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vizCarouselButton,
+  .vizCarouselDot {
+    transition: none;
+  }
+
+  .vizCarouselButton:hover:not(:disabled),
+  .vizCarouselDot:hover {
+    transform: none;
+  }
 }
 
 .vizDisclosureNested .vizDisclosureSummary {
@@ -1118,9 +1273,20 @@ h3.postHeading {
 }
 
 .binaryBeeswarmTooltip {
+  --post-viz-tooltip-x: 50%;
+  --post-viz-tooltip-edge: 14px;
+  --post-viz-tooltip-width: min(360px, calc(100% - 28px));
+  --post-viz-tooltip-half-width: min(180px, calc(50% - 14px));
+  --post-viz-tooltip-max-left: calc(100% - var(--post-viz-tooltip-width) - var(--post-viz-tooltip-edge));
+
   position: absolute;
+  left: clamp(
+    var(--post-viz-tooltip-edge),
+    calc(var(--post-viz-tooltip-x) - var(--post-viz-tooltip-half-width)),
+    var(--post-viz-tooltip-max-left)
+  );
   z-index: 4;
-  width: min(360px, calc(100% - 28px));
+  width: var(--post-viz-tooltip-width);
   display: grid;
   gap: 7px;
   padding: 12px 14px;
@@ -1132,7 +1298,7 @@ h3.postHeading {
     0 20px 45px rgba(0, 0, 0, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   pointer-events: none;
-  transform: translate(-50%, calc(-100% - 12px));
+  transform: translateY(calc(-100% - 12px));
 
   strong {
     color: #ffffff;
@@ -1152,6 +1318,10 @@ h3.postHeading {
   span {
     font-family: var(--ce-font-mono);
   }
+}
+
+.binaryBeeswarmTooltipBelow {
+  transform: translateY(12px);
 }
 
 .binaryBeeswarmTooltipPinned {
@@ -1189,8 +1359,16 @@ h3.postHeading {
 }
 
 .beeswarmTooltip {
-  width: min(280px, calc(100% - 20px));
-  transform: translate(-50%, calc(-100% - 24px));
+  --post-viz-tooltip-edge: 10px;
+  --post-viz-tooltip-width: min(280px, calc(100% - 20px));
+  --post-viz-tooltip-half-width: min(140px, calc(50% - 10px));
+  --post-viz-tooltip-max-left: calc(100% - var(--post-viz-tooltip-width) - var(--post-viz-tooltip-edge));
+
+  transform: translateY(calc(-100% - 24px));
+}
+
+.beeswarmTooltipBelow {
+  transform: translateY(24px);
 }
 
 .binaryTooltipSplitBar {
@@ -1615,5 +1793,17 @@ h3.postHeading {
 
   .postArticle {
     padding: 18px;
+  }
+
+  .vizGroupCard {
+    padding: $viz-gap-sm;
+  }
+
+  .vizCarouselSlide {
+    flex-basis: 100%;
+  }
+
+  .vizCarouselControls {
+    gap: $viz-gap-xs;
   }
 }

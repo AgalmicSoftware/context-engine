@@ -4,6 +4,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import styles from './PostsPage.module.scss';
 
 type VizRecord = Record<string, unknown>;
+type TooltipPositionStyle = React.CSSProperties & {
+  '--post-viz-tooltip-x'?: string;
+};
 
 const PALETTE = ['#4dffa4', '#7aa7ff', '#ffb347', '#ff6bcb', '#d8f36a', '#9ee7ff'];
 const RESPONSE_SPLIT_ORDER = ['agree', 'unsure', 'disagree'];
@@ -448,6 +451,9 @@ const readBeeswarmRows = (spec: VizRecord): BeeswarmRowDatum[] =>
 const duplicateValueKey = (value: number) => value.toFixed(4);
 
 const defaultBeeswarmTops = [32, 50, 68, 40, 60];
+// Carousel scroll tracks clip at their padding box, so top-edge pins flip below
+// their dot instead of escaping the visible slide.
+const SWARM_TOOLTIP_FLIP_TOP_PERCENT = 40;
 
 const duplicateBeeswarmOffsets = [
   { x: -14, top: 34 },
@@ -571,13 +577,19 @@ const BeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                   const pointKey = `${rowIndex}-${index}`;
                   if (activeKey !== pointKey) return null;
                   const left = clamp(((point.value - min) / (max - min)) * 100, 18, 82);
+                  const placement = placements[index];
+                  const renderBelow = placement.top <= SWARM_TOOLTIP_FLIP_TOP_PERCENT;
+                  const tooltipStyle: TooltipPositionStyle = {
+                    '--post-viz-tooltip-x': `${left}%`,
+                    top: `${placement.top}%`,
+                  };
                   return (
                     <div
                       key={`tooltip-${pointKey}`}
                       id={tooltipId}
                       role="tooltip"
-                      className={`${styles.binaryBeeswarmTooltip} ${styles.beeswarmTooltip} ${isPinned ? styles.binaryBeeswarmTooltipPinned : ''}`}
-                      style={{ left: `${left}%`, top: `${placements[index].top}%` }}
+                      className={`${styles.binaryBeeswarmTooltip} ${styles.beeswarmTooltip} ${renderBelow ? styles.beeswarmTooltipBelow : ''} ${isPinned ? styles.binaryBeeswarmTooltipPinned : ''}`}
+                      style={tooltipStyle}
                     >
                       {isPinned && (
                         <button
@@ -898,8 +910,13 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const activeItem = activeIndex === null ? null : items[activeIndex] || null;
   const activePlacement = activeIndex === null ? null : placements.get(activeIndex) || null;
   const isPinned = pinnedIndex !== null;
-  const tooltipLeft = activePlacement ? `${clamp((activePlacement.x / BINARY_SWARM_WIDTH) * 100, 18, 82)}%` : '50%';
-  const tooltipTop = activePlacement ? `${clamp((activePlacement.y / BINARY_SWARM_HEIGHT) * 100, 16, 84)}%` : '50%';
+  const tooltipLeft = activePlacement ? clamp((activePlacement.x / BINARY_SWARM_WIDTH) * 100, 18, 82) : 50;
+  const tooltipTop = activePlacement ? clamp((activePlacement.y / BINARY_SWARM_HEIGHT) * 100, 16, 84) : 50;
+  const renderTooltipBelow = tooltipTop <= SWARM_TOOLTIP_FLIP_TOP_PERCENT;
+  const tooltipStyle: TooltipPositionStyle = {
+    '--post-viz-tooltip-x': `${tooltipLeft}%`,
+    top: `${tooltipTop}%`,
+  };
 
   const clearPin = React.useCallback(() => setPinnedIndex(null), []);
   useEscapeToClear(pinnedIndex !== null, clearPin);
@@ -1138,8 +1155,8 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
             <div
               id={tooltipId}
               role="tooltip"
-              className={`${styles.binaryBeeswarmTooltip} ${isPinned ? styles.binaryBeeswarmTooltipPinned : ''}`}
-              style={{ left: tooltipLeft, top: tooltipTop }}
+              className={`${styles.binaryBeeswarmTooltip} ${renderTooltipBelow ? styles.binaryBeeswarmTooltipBelow : ''} ${isPinned ? styles.binaryBeeswarmTooltipPinned : ''}`}
+              style={tooltipStyle}
             >
               {isPinned && (
                 <button
@@ -1310,6 +1327,7 @@ type PostVizProps = {
   error?: string;
   defaultOpen?: boolean;
   nested?: boolean;
+  presentation?: 'disclosure' | 'slide';
 };
 
 const getFallbackTitle = (type: string): string => {
@@ -1323,19 +1341,32 @@ const getFallbackTitle = (type: string): string => {
   return 'Data exhibit';
 };
 
-const renderVizBody = (record: VizRecord, type: string) => {
-  if (type === 'category-dots') return <CategoryDotsViz spec={record} hideHeader />;
-  if (type === 'quote-wall') return <QuoteWallViz spec={record} hideHeader />;
-  if (type === 'ranked-themes') return <RankedThemesViz spec={record} hideHeader />;
-  if (type === 'theme-network') return <ThemeNetworkViz spec={record} hideHeader />;
-  if (type === 'beeswarm') return <BeeswarmViz spec={record} hideHeader />;
-  if (type === 'binary-beeswarm') return <BinaryBeeswarmViz spec={record} hideHeader />;
-  if (type === 'response-type-grid') return <ResponseTypeGridViz spec={record} hideHeader />;
+export const getPostVizTitle = (spec: unknown): string => {
+  const record = asRecord(spec);
+  const type = toText(record?.type);
+
+  return toText(record?.title) || getFallbackTitle(type);
+};
+
+const renderVizBody = (record: VizRecord, type: string, hideHeader = true) => {
+  if (type === 'category-dots') return <CategoryDotsViz spec={record} hideHeader={hideHeader} />;
+  if (type === 'quote-wall') return <QuoteWallViz spec={record} hideHeader={hideHeader} />;
+  if (type === 'ranked-themes') return <RankedThemesViz spec={record} hideHeader={hideHeader} />;
+  if (type === 'theme-network') return <ThemeNetworkViz spec={record} hideHeader={hideHeader} />;
+  if (type === 'beeswarm') return <BeeswarmViz spec={record} hideHeader={hideHeader} />;
+  if (type === 'binary-beeswarm') return <BinaryBeeswarmViz spec={record} hideHeader={hideHeader} />;
+  if (type === 'response-type-grid') return <ResponseTypeGridViz spec={record} hideHeader={hideHeader} />;
 
   return <p className={styles.vizFallback}>Unsupported visualization type: {type}</p>;
 };
 
-const PostViz = ({ spec, error = '', defaultOpen = true, nested = false }: PostVizProps) => {
+const PostViz = ({
+  spec,
+  error = '',
+  defaultOpen = true,
+  nested = false,
+  presentation = 'disclosure',
+}: PostVizProps) => {
   if (error) {
     return <p className={styles.vizFallback}>Visualization JSON is invalid.</p>;
   }
@@ -1346,8 +1377,12 @@ const PostViz = ({ spec, error = '', defaultOpen = true, nested = false }: PostV
     return <p className={styles.vizFallback}>Visualization block is missing a type.</p>;
   }
 
-  const title = toText(record.title) || getFallbackTitle(type);
+  const title = getPostVizTitle(record);
   const inline = toBoolean(record.inline);
+
+  if (presentation === 'slide') {
+    return renderVizBody(record, type, false);
+  }
 
   if (inline) {
     return <div className={styles.vizInlineContent}>{renderVizBody(record, type)}</div>;

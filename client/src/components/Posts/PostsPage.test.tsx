@@ -1,7 +1,7 @@
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router-dom';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
@@ -262,6 +262,24 @@ const firstPostMarkdown = [
   '```',
 ].join('\n');
 
+const openGroupPostMarkdown = firstPostMarkdown.replace('"defaultOpen": false', '"defaultOpen": true');
+
+const renderFirstPostMarkdown = (markdown = firstPostMarkdown) => {
+  const fetcher = jest
+    .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    .mockResolvedValueOnce(makeJsonResponse(manifest))
+    .mockResolvedValueOnce(makeTextResponse(markdown));
+
+  renderPostsPage(fetcher, true, ['/posts/first-post']);
+
+  return fetcher;
+};
+
+const getCarouselSlides = (carousel: HTMLElement) =>
+  within(carousel)
+    .getAllByRole('group', { hidden: true })
+    .filter((group) => group.getAttribute('aria-roledescription') === 'slide');
+
 describe('PostsPage', () => {
   it('loads the root posts manifest as summary links without rendering a post body', async () => {
     const fetcher = jest
@@ -349,15 +367,16 @@ describe('PostsPage', () => {
     expect(within(dataExploration).getByText('Theme distribution')).toBeInTheDocument();
     expect(within(dataExploration).getByText('Other response shapes')).toBeInTheDocument();
     expect(within(dataExploration).queryByText('Respondent notes')).not.toBeInTheDocument();
-    const nestedBinaryBeeswarm = within(dataExploration)
-      .getByText('Consensus and Difference')
-      .closest('details') as HTMLElement;
-    expect(nestedBinaryBeeswarm).toBeInTheDocument();
-    expect(nestedBinaryBeeswarm).not.toHaveAttribute('open');
+    const carousel = within(dataExploration).getByTestId('ce-posts-viz-carousel');
+    expect(carousel).toHaveAttribute('aria-roledescription', 'carousel');
+    expect(carousel).toHaveAccessibleName('Data Exploration (n=4) visualizations');
+    expect(carousel.querySelectorAll('details')).toHaveLength(0);
+    const carouselSlides = getCarouselSlides(carousel);
+    expect(carouselSlides).toHaveLength(6);
+    expect(carouselSlides[0]).toHaveAttribute('aria-label', '1 of 6: Theme distribution');
+    expect(carouselSlides[4]).toHaveAttribute('aria-label', '5 of 6: Consensus and Difference');
+    expect(within(carousel).getByText('1 / 6')).toBeInTheDocument();
     expect(screen.getByText('Theme distribution')).toBeInTheDocument();
-    const themeSummary = screen.getByText('Theme distribution').closest('summary') as HTMLElement;
-    expect(themeSummary).toBeInTheDocument();
-    expect(themeSummary.querySelector('[data-icon="caret-up"]')).toBeInTheDocument();
     expect(screen.queryByText('Toggle')).not.toBeInTheDocument();
     expect(screen.getByText('Legible disagreement')).toBeInTheDocument();
     expect(screen.getByText('4')).toHaveStyle({ color: '#4dffa4' });
@@ -448,6 +467,9 @@ describe('PostsPage', () => {
     expect(screen.getByText('In one sentence: what is my personal AI fire alarm?')).toBeInTheDocument();
     expect(screen.getByText('A privacy-line crossing.')).toBeInTheDocument();
     expect(screen.getByText('Respondent notes')).toBeInTheDocument();
+    const respondentNotesDisclosure = screen.getByText('Respondent notes').closest('details') as HTMLElement;
+    expect(respondentNotesDisclosure).toBeInTheDocument();
+    expect(screen.getByText('Respondent notes').closest('summary')).toBeInTheDocument();
     expect(screen.getByText('Show the structure without hiding the source.')).toBeInTheDocument();
     expect(fetcher).toHaveBeenCalledWith(
       '/posts/first-post/index.md',
@@ -464,6 +486,98 @@ describe('PostsPage', () => {
     expect(await screen.findByRole('link', { name: /First Post/i })).toBeInTheDocument();
     expect(screen.getByText('First summary')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
+  });
+
+  it('renders grouped visualizations as mounted carousel slides', async () => {
+    renderFirstPostMarkdown(openGroupPostMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    const carousel = await screen.findByTestId('ce-posts-viz-carousel');
+    const slides = getCarouselSlides(carousel);
+
+    expect(carousel).toHaveAttribute('aria-roledescription', 'carousel');
+    expect(carousel).toHaveAccessibleName('Data Exploration (n=4) visualizations');
+    expect(slides).toHaveLength(6);
+    expect(slides.map((slide) => slide.getAttribute('aria-label'))).toEqual([
+      '1 of 6: Theme distribution',
+      '2 of 6: Ranked interview themes',
+      '3 of 6: Interview theme network',
+      '4 of 6: Rating answers',
+      '5 of 6: Consensus and Difference',
+      '6 of 6: Other response shapes',
+    ]);
+    expect(within(carousel).getByText('1 / 6')).toBeInTheDocument();
+    expect(within(carousel).getByTestId('ce-posts-viz-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
+    expect(within(carousel).getByText('Theme distribution')).toBeInTheDocument();
+    expect(within(carousel).getByText('Other response shapes')).toBeInTheDocument();
+  });
+
+  it('moves carousel state with next and previous controls', async () => {
+    renderFirstPostMarkdown(openGroupPostMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    const carousel = await screen.findByTestId('ce-posts-viz-carousel');
+    const previousButton = within(carousel).getByTestId('ce-posts-viz-carousel-prev');
+    const nextButton = within(carousel).getByTestId('ce-posts-viz-carousel-next');
+    const firstDot = within(carousel).getByTestId('ce-posts-viz-carousel-dot-0');
+    const secondDot = within(carousel).getByTestId('ce-posts-viz-carousel-dot-1');
+    const lastDot = within(carousel).getByTestId('ce-posts-viz-carousel-dot-5');
+
+    expect(previousButton).toBeDisabled();
+    expect(nextButton).not.toBeDisabled();
+    expect(firstDot).toHaveAttribute('aria-current', 'true');
+
+    await userEvent.click(nextButton);
+
+    expect(within(carousel).getByText('2 / 6')).toBeInTheDocument();
+    expect(previousButton).not.toBeDisabled();
+    expect(firstDot).not.toHaveAttribute('aria-current');
+    expect(secondDot).toHaveAttribute('aria-current', 'true');
+
+    for (let index = 0; index < 4; index += 1) {
+      await userEvent.click(nextButton);
+    }
+
+    expect(within(carousel).getByText('6 / 6')).toBeInTheDocument();
+    expect(nextButton).toBeDisabled();
+    expect(lastDot).toHaveAttribute('aria-current', 'true');
+
+    await userEvent.click(previousButton);
+
+    expect(within(carousel).getByText('5 / 6')).toBeInTheDocument();
+    expect(nextButton).not.toBeDisabled();
+  });
+
+  it('jumps carousel state from dot controls', async () => {
+    renderFirstPostMarkdown(openGroupPostMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    const carousel = await screen.findByTestId('ce-posts-viz-carousel');
+    const firstDot = within(carousel).getByTestId('ce-posts-viz-carousel-dot-0');
+    const fourthDot = within(carousel).getByTestId('ce-posts-viz-carousel-dot-3');
+
+    await userEvent.click(fourthDot);
+
+    expect(within(carousel).getByText('4 / 6')).toBeInTheDocument();
+    expect(firstDot).not.toHaveAttribute('aria-current');
+    expect(fourthDot).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('handles carousel arrow keys without intercepting slide content keys', async () => {
+    renderFirstPostMarkdown(openGroupPostMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    const carousel = await screen.findByTestId('ce-posts-viz-carousel');
+
+    fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+
+    expect(within(carousel).getByText('2 / 6')).toBeInTheDocument();
+    expect(within(carousel).getByTestId('ce-posts-viz-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
+
+    fireEvent.keyDown(screen.getByTestId('ce-posts-binary-view-list'), { key: 'ArrowRight' });
+
+    expect(within(carousel).getByText('2 / 6')).toBeInTheDocument();
+    expect(within(carousel).getByTestId('ce-posts-viz-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
   });
 
   it('pins the binary beeswarm tooltip on click until dismissed', async () => {

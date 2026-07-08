@@ -106,5 +106,11 @@ Supported types:
 - `response-type-grid`: renders mixed panels (`numbers`, `pie`, split bars,
   quote lists) from `panels`.
 
+Wrap related `ce-viz` blocks in a `ce-viz-group` fenced JSON block to render
+them as one disclosure with a left-to-right carousel. `defaultOpen` still
+controls whether the group disclosure starts open. `childrenOpen` is retained
+for older posts and parser compatibility, but grouped child visualizations are
+always visible on their carousel slide.
+
 Keep post data non-identifying unless the source material is intentionally
 public and licensed for publication.
