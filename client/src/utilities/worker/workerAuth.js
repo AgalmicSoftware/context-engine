@@ -23,13 +23,19 @@ import {
   resolveWorkerAllowDemoFallback,
   resolveWorkerSessionContext,
 } from './workerSessionResolution.js';
+import {
+  buildTokenCacheEnvelope,
+  buildTokenCacheKey,
+  clearTokenCache,
+  isWorkerTokenCacheKey,
+  normalizeTokenCacheEntry,
+  readScopedTokenCache,
+  writeTokenCache,
+} from './workerAuthTokenCache.js';
 import { ADMIN_ACTION_TYPES, buildAdminActionBodyHash, buildAdminActionTypedData } from './adminTypedData.mjs';
 
 const accountLog = createLogger('account');
 
-const STORAGE_PREFIX = 'ce:workerToken:v1';
-const TOKEN_SKEW_SECONDS = 30;
-const MAX_TOKEN_CACHE_TTL_SECONDS = 24 * 60 * 60;
 const NONCE_MISMATCH_ERROR = 'nonce mismatch or expired';
 const ONCHAIN_GATE_UNAVAILABLE_ERROR = 'on-chain gate data unavailable';
 const LOGIN_GATE_UNAVAILABLE_RETRIES = 2;
@@ -206,124 +212,6 @@ const resolveSignerAddress = async (providerLike, fallbackAddress = '') => {
     } catch (_) {}
   }
   return { provider, address };
-};
-
-const readTokenCache = (key) => {
-  if (typeof window === 'undefined') return null;
-  try {
-    return JSON.parse(localStorage.getItem(key) || 'null');
-  } catch {
-    return null;
-  }
-};
-
-const normalizeTokenCacheEntry = (
-  entry,
-  {
-    workerUrl,
-    sessionSlug,
-    address,
-    nowSeconds = Math.floor(Date.now() / 1000),
-    skewSeconds = TOKEN_SKEW_SECONDS,
-    maxTtlSeconds = MAX_TOKEN_CACHE_TTL_SECONDS,
-  } = {},
-) => {
-  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-    return { ok: false, status: 'malformed' };
-  }
-
-  const token = toStr(entry.token).trim();
-  const expiresAt = Number(entry.expiresAt || entry.exp || 0);
-  if (!token) return { ok: false, status: 'missing-token' };
-  if (!Number.isFinite(expiresAt) || expiresAt <= 0) {
-    return { ok: false, status: 'missing-expiry' };
-  }
-  if (expiresAt <= Number(nowSeconds || 0) + Number(skewSeconds || 0)) {
-    return { ok: false, status: 'expired' };
-  }
-
-  if (Number(entry.v || 0) >= 1) {
-    const issuedAt = Number(entry.issuedAt || 0) || null;
-    const maxTtl = Number(maxTtlSeconds || 0);
-    if (issuedAt && Number.isFinite(maxTtl) && maxTtl > 0 && expiresAt > issuedAt + maxTtl) {
-      return { ok: false, status: 'ttl-too-long' };
-    }
-    const expectedWorkerUrl = normalizeWorkerUrl(workerUrl);
-    const expectedSlug = normalizeSessionSlug(sessionSlug);
-    const expectedAddress = normalizeAddress(address);
-    const entryWorkerUrl = normalizeWorkerUrl(entry.workerUrl);
-    const entrySlug = normalizeSessionSlug(entry.sessionSlug);
-    const entryAddress = normalizeAddress(entry.address);
-    if (
-      (expectedWorkerUrl && entryWorkerUrl && expectedWorkerUrl !== entryWorkerUrl) ||
-      entrySlug !== expectedSlug ||
-      (expectedAddress && entryAddress && expectedAddress !== entryAddress)
-    ) {
-      return { ok: false, status: 'scope-mismatch' };
-    }
-  }
-
-  return {
-    ok: true,
-    token,
-    exp: expiresAt,
-    expiresAt,
-    issuedAt: Number(entry.issuedAt || 0) || null,
-    legacy: Number(entry.v || 0) < 1,
-  };
-};
-
-const readScopedTokenCache = (key, scope = {}) => {
-  const parsed = readTokenCache(key);
-  const normalized = normalizeTokenCacheEntry(parsed, scope);
-  if (normalized.ok) return normalized;
-  if (parsed) {
-    try {
-      localStorage.removeItem(key);
-    } catch (_) {}
-  }
-  return null;
-};
-
-const buildTokenCacheEnvelope = ({
-  token,
-  exp,
-  workerUrl,
-  sessionSlug,
-  address,
-  issuedAt = Math.floor(Date.now() / 1000),
-} = {}) => ({
-  v: 1,
-  workerUrl: normalizeWorkerUrl(workerUrl),
-  sessionSlug: normalizeSessionSlug(sessionSlug),
-  address: normalizeAddress(address),
-  issuedAt: Number(issuedAt || 0) || Math.floor(Date.now() / 1000),
-  expiresAt: Number(exp || 0),
-  token: toStr(token).trim(),
-});
-
-const writeTokenCache = (key, payload) => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(key, JSON.stringify(payload));
-  } catch (_) {}
-};
-
-const clearTokenCache = (key) => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.removeItem(key);
-  } catch (_) {}
-};
-
-const buildTokenCacheKey = ({ workerUrl, slug, address }) => {
-  const resolvedUrl = normalizeWorkerUrl(workerUrl);
-  const normalizedSlug = normalizeSessionSlug(slug);
-  const normalizedAddress = normalizeAddress(address);
-  if (normalizedAddress) {
-    return `${STORAGE_PREFIX}:${resolvedUrl}:${normalizedSlug}:${normalizedAddress}`;
-  }
-  return `${STORAGE_PREFIX}:${resolvedUrl}:${normalizedSlug}`;
 };
 
 const resolveWorkerTokenRequestContext = async ({
@@ -841,7 +729,7 @@ export const clearAllWorkerSessionTokens = () => {
   if (typeof window === 'undefined') return;
   try {
     Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith(`${STORAGE_PREFIX}:`)) {
+      if (isWorkerTokenCacheKey(key)) {
         localStorage.removeItem(key);
       }
     });
