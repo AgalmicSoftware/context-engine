@@ -45,6 +45,7 @@ import {
   shouldFallbackToAuthenticatedFlow,
   shouldRetryAuthenticatedResponse,
 } from './workerAuthFallbackPolicy.js';
+import { fetchWorkerAuthEndpoint, resolveAdminActionAudience } from './workerAuthReachability.js';
 import { ADMIN_ACTION_TYPES, buildAdminActionBodyHash, buildAdminActionTypedData } from './adminTypedData.mjs';
 
 const accountLog = createLogger('account');
@@ -54,7 +55,6 @@ const ONCHAIN_GATE_UNAVAILABLE_ERROR = 'on-chain gate data unavailable';
 const LOGIN_GATE_UNAVAILABLE_RETRIES = 2;
 const LOGIN_GATE_UNAVAILABLE_RETRY_BASE_MS = 700;
 const ADMIN_ACTION_EXPIRATION_WINDOW_SECONDS = 5 * 60;
-const DEFAULT_LOCAL_ADMIN_ORIGIN = 'http://localhost:3000';
 export { normalizeWorkerUrl };
 
 const shouldAllowDemoSessionFallback = (allowDemoFallback) =>
@@ -316,76 +316,6 @@ const signMessage = async ({ message, providerLike, address }) => {
   const ethersProvider = new ethers.providers.Web3Provider(provider, 'any');
   const signer = address ? ethersProvider.getSigner(address) : ethersProvider.getSigner();
   return signer.signMessage(message);
-};
-
-const normalizeOrigin = (value) => {
-  const raw = toStr(value).trim();
-  if (!raw) return '';
-  try {
-    const parsed = new URL(raw);
-    if ((parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') && !parsed.port) {
-      return DEFAULT_LOCAL_ADMIN_ORIGIN;
-    }
-    return parsed.origin;
-  } catch {
-    return '';
-  }
-};
-
-const WORKER_AUTH_FETCH_ERROR_PATTERNS = [
-  'failed to fetch',
-  'network request failed',
-  'networkerror',
-  'load failed',
-  'fetch failed',
-];
-
-const isWorkerAuthFetchReachabilityError = (error) => {
-  const message = toStr(error?.message || error)
-    .trim()
-    .toLowerCase();
-  if (!message || message.includes('failed to reach worker auth endpoint')) return false;
-  return WORKER_AUTH_FETCH_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
-};
-
-const buildWorkerAuthReachabilityMessage = (endpoint) => {
-  const normalizedEndpoint = toStr(endpoint).trim();
-  const browserOrigin = (() => {
-    try {
-      if (typeof window !== 'undefined') return normalizeOrigin(window.location?.origin);
-    } catch (_) {}
-    return '';
-  })();
-  const allowOriginsHint = browserOrigin ? ` Check worker URL and allowOrigins includes ${browserOrigin}.` : '';
-  return `Failed to reach worker auth endpoint (${normalizedEndpoint}).${allowOriginsHint}`;
-};
-
-const normalizeWorkerAuthFetchError = (error, endpoint) => {
-  if (!isWorkerAuthFetchReachabilityError(error)) return error;
-  const normalized = new Error(buildWorkerAuthReachabilityMessage(endpoint));
-  try {
-    normalized.cause = error;
-  } catch (_) {}
-  return normalized;
-};
-
-const fetchWorkerAuthEndpoint = async (endpoint, init) => {
-  try {
-    return await fetch(endpoint, init);
-  } catch (error) {
-    throw normalizeWorkerAuthFetchError(error, endpoint);
-  }
-};
-
-const resolveAdminActionAudience = (workerUrl) => {
-  const browserOrigin = (() => {
-    try {
-      if (typeof window !== 'undefined') return normalizeOrigin(window.location?.origin);
-    } catch (_) {}
-    return '';
-  })();
-  if (browserOrigin) return browserOrigin;
-  return normalizeOrigin(normalizeWorkerUrl(workerUrl));
 };
 
 const signTypedDataV4 = async ({ typedData, provider, address }) => {
