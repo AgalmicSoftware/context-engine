@@ -8,6 +8,7 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 
 | Sub-corpus | Items | Description |
 |------------|-------|-------------|
+| `ai-forecasting-economics-corpus.json` | 17 | AI forecasting and economics: compute/capability trend data, crowd and tournament forecasts, and the formal economics of transformative AI. |
 | `ai-laws-policy-corpus.json` | 227 | Global AI legislation, regulatory proposals, policy frameworks, agency guidance, and official reports with governance-focused analysis. |
 | `ai-scifi-books-corpus.json` | 156 | Science fiction works curated for AI safety, alignment, ethics, and policy discourse. |
 | `arxiv-ai-safety-corpus.json` | 278 | Academic papers on AI safety, alignment, interpretability, and governance. |

@@ -8,6 +8,13 @@ const CORPUS_DIR = path.join(ROOT_DIR, 'ai-discourse-corpus', 'corpuses');
 const CLIENT_DEBATES_PATH = path.join(ROOT_DIR, 'client', 'src', 'variables', 'demo', 'debates.json');
 
 const CORPUS_FILES = Object.freeze({
+  'ai-forecasting-economics': {
+    corpusKey: 'ai-forecasting-economics',
+    aliases: ['ai-forecasting-economics', 'ai_forecasting_economics', 'forecasting', 'forecasting-economics', 'econ'],
+    relativePath: 'ai-discourse-corpus/corpuses/ai-forecasting-economics-corpus.json',
+    collectionKey: 'entries',
+    metaCountKeys: ['entry_count'],
+  },
   'ai-laws-policy': {
     corpusKey: 'ai-laws-policy',
     aliases: ['ai-laws-policy', 'ai_laws_policy', 'laws', 'ai-laws', 'ai_laws'],
@@ -106,6 +113,20 @@ const DATE_RANGE_RE = /^\d{4}-\d{4}$/;
 // ingestion batches (mixed casing / snake_case variants). `validate` flags any
 // value outside these sets so new batches cannot re-introduce drift.
 const TAXONOMY_ENUMS = Object.freeze({
+  'ai-forecasting-economics': Object.freeze({
+    category: Object.freeze([
+      'compute_trends',
+      'data_resource',
+      'economic_agenda',
+      'economic_model',
+      'empirical_economics',
+      'forecast_tracking',
+      'forecasting_tournament',
+      'growth_theory',
+      'organization_report',
+      'prediction_market',
+    ]),
+  }),
   'arxiv-ai-safety': Object.freeze({
     category: Object.freeze([
       'Alignment Theory',
