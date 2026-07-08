@@ -1,7 +1,8 @@
 # Testing Budget
 
-Measurements in this document were taken on 2026-07-06 and 2026-07-07 from
-local macOS development worktrees.
+Measurements in this document were taken on 2026-07-06 through 2026-07-08 from
+local macOS development worktrees. Rows marked as tracked-scratch measurements
+come from clean scratch worktrees and exclude ignored operator-local tests.
 
 ## CI Budget
 
@@ -16,7 +17,7 @@ reference for reviewing future test additions.
 | Command | Result | Wall time |
 |---|---:|---:|
 | `npm run test:ci` | passed: wiring, type-debt, release, contracts, client coverage, root/worker/cc/node/cache | 522.023s |
-| `npm run test:client` | 1,042 suites, 7,602 passed, 0 skipped | 283.960s |
+| `npm run test:client` | tracked scratch: 1,042 suites, 7,602 passed, 0 skipped | 283.960s |
 | `cd client && npm test -- --watchAll=false --runInBand --json --outputFile=/tmp/prd655-jest-results.json` | 997 suites, 7,399 passed, 1 skipped | 150.899s |
 | `npm run test:node` | 239 passed | 33.279s |
 | `BASE_URL=http://127.0.0.1:4173 SMOKE_ROUTES=/session/pe4,/about,/contracts npm run -s test:e2e:smoke` | passed against built Vite preview; 3 routes, no failures | 9.257s |
@@ -32,6 +33,11 @@ The tracked E2E smoke command leaves about 9m50s of headroom inside its
 broader than the CI route set and still includes known environment-sensitive
 routes; CI uses `/session/pe4,/about,/contracts` until those routes are stable
 enough for required PR checks.
+
+A root-checkout `npm run test:client` sanity pass on 2026-07-08, with ignored
+operator-local tests present, reported 1 skipped suite, 1,050 passing suites,
+7,875 passing tests, 27 skipped tests, and 289.130s Jest time. The tracked
+scratch row remains the release-gate sizing reference.
 
 ## Slowest Client Suites
 
@@ -56,7 +62,7 @@ budget trend or a targeted developer-loop need.
 
 ## Coverage Snapshot
 
-The measured global coverage from `npm run test:client` was:
+The measured global coverage from tracked-scratch `npm run test:client` was:
 
 - Statements: 77.13% (76,653 / 99,369)
 - Branches: 61.80% (65,206 / 105,509)
