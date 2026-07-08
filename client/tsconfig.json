@@ -46,6 +46,7 @@
     ".jest-cache",
     ".tmp-jest",
     ".jest-tmp",
+    "src/setupTests.ts",
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
     "src/**/*.test.js",
