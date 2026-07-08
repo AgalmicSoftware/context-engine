@@ -1,5 +1,5 @@
 /**
- * @file workerAuth.js
+ * @file workerAuth.ts
  * @module workerAuth
  * @description SIWE authentication flows and worker token management.
  *              Builds SIWE login messages, signs admin EIP-712 actions, obtains scoped JWT tokens from the CORS worker,
@@ -57,14 +57,106 @@ const LOGIN_GATE_UNAVAILABLE_RETRY_BASE_MS = 700;
 const ADMIN_ACTION_EXPIRATION_WINDOW_SECONDS = 5 * 60;
 export { normalizeWorkerUrl };
 
-const shouldAllowDemoSessionFallback = (allowDemoFallback) =>
+type UnknownRecord = Record<string, unknown>;
+type CryptoProviderLike = Parameters<typeof cryptoUtils._getProvider>[0];
+type WorkerAuthContext = {
+  account?: unknown;
+  chainId?: unknown;
+  provider?: unknown;
+  providerLike?: unknown;
+};
+type WorkerProvider = ethers.providers.ExternalProvider & {
+  address?: unknown;
+  request?: (request: { method: string; params?: unknown[] }) => Promise<unknown>;
+  selectedAddress?: unknown;
+};
+type WorkerAuthStoreState = {
+  profile?: {
+    account?: unknown;
+    network?: {
+      chainId?: unknown;
+      id?: unknown;
+    };
+    provider?: unknown;
+  };
+};
+type SleepOptions = {
+  requestAddress?: unknown;
+  requestAuthEpoch?: number;
+  signal?: AbortSignal | null;
+};
+type ResolveWorkerTokenRequestContextOptions = {
+  allowDemoFallback?: boolean;
+  context?: unknown;
+  resolvedAddress?: unknown;
+  resolveWorkerUrl?: boolean;
+  sessionConfig?: unknown;
+  sessionSlug?: unknown;
+  workerUrl?: unknown;
+};
+type BuildSiweMessageOptions = {
+  address?: unknown;
+  chainId?: unknown;
+  domain?: unknown;
+  expirationTime?: string;
+  issuedAt?: string;
+  nonce?: unknown;
+  statement?: unknown;
+  uri?: unknown;
+};
+type AdminActionAuthOptions = {
+  action?: unknown;
+  body?: unknown;
+  context?: unknown;
+  nonce?: unknown;
+  slug?: unknown;
+  workerUrl?: unknown;
+};
+type BootstrapAdminAuthOptions = {
+  context?: unknown;
+  nonce?: unknown;
+  slug?: unknown;
+  statement?: string;
+  workerUrl?: unknown;
+};
+type WorkerSessionTokenOptions = ResolveWorkerTokenRequestContextOptions & {
+  requestContext?: WorkerTokenRequestContext;
+};
+type WorkerFetchAuthOptions = ResolveWorkerTokenRequestContextOptions & {
+  fallbackOnGateUnavailable?: boolean;
+  preferAnonymous?: boolean;
+  retry?: boolean;
+};
+type InFlightTokenRequest = {
+  abortController: {
+    abort: () => void;
+    signal: AbortSignal | null;
+  };
+  promise: Promise<string> | null;
+};
+type WorkerLoginResponse = {
+  error?: unknown;
+  exp?: unknown;
+  token?: string;
+};
+
+const asStoreState = (value: unknown): WorkerAuthStoreState =>
+  value && typeof value === 'object' ? (value as WorkerAuthStoreState) : {};
+const asWorkerAuthContext = (value: unknown): WorkerAuthContext =>
+  value && typeof value === 'object' ? (value as WorkerAuthContext) : {};
+const getWorkerProvider = (providerLike: unknown): WorkerProvider =>
+  cryptoUtils._getProvider((providerLike || resolveDefaultProviderLike()) as CryptoProviderLike) as WorkerProvider;
+const getErrorMessage = (error: unknown): string =>
+  toStr(error && typeof error === 'object' ? (error as { message?: unknown }).message : '');
+
+const shouldAllowDemoSessionFallback = (allowDemoFallback?: boolean): boolean =>
   resolveWorkerAllowDemoFallback({
     allowDemoFallback,
     getDefaultAllowDemoFallback: defaultWorkerAuthAllowDemoFallback,
   });
 const resolveDefaultProviderLike = () => {
   try {
-    const state = store?.getState?.();
+    const state = asStoreState(store?.getState?.());
     const fromStore = toStr(state?.profile?.provider || '').trim();
     if (fromStore) return fromStore;
   } catch (_) {}
@@ -76,10 +168,11 @@ const resolveDefaultProviderLike = () => {
   // Default to the embedded passkey EOA because passkey auth is the primary wallet path.
   return 'passkey_eoa';
 };
-const getWalletContext = (override = {}) => {
+const getWalletContext = (overrideIn: unknown = {}) => {
+  const override = asWorkerAuthContext(overrideIn);
   const overrideProviderLike = toStr(override.providerLike || override.provider || '').trim();
   try {
-    const state = store?.getState?.();
+    const state = asStoreState(store?.getState?.());
     const profile = state?.profile || {};
     const network = profile?.network || {};
     const storeProviderLike = toStr(profile.provider || '').trim();
@@ -97,7 +190,7 @@ const getWalletContext = (override = {}) => {
   }
 };
 
-const inFlightTokenRequests = new Map();
+const inFlightTokenRequests = new Map<string, InFlightTokenRequest>();
 let workerAuthEpoch = 0;
 const getCurrentWorkerAuthStoreAddress = () => {
   try {
@@ -107,7 +200,7 @@ const getCurrentWorkerAuthStoreAddress = () => {
   }
 };
 
-const doesWorkerAuthAddressMatchStore = (address) => {
+const doesWorkerAuthAddressMatchStore = (address: unknown): boolean => {
   const normalizedAddress = normalizeAddress(address);
   if (!normalizedAddress) return false;
   return normalizedAddress === getCurrentWorkerAuthStoreAddress();
@@ -115,9 +208,9 @@ const doesWorkerAuthAddressMatchStore = (address) => {
 
 let trackedWorkerAuthAddress = getCurrentWorkerAuthStoreAddress();
 
-const isNonceMismatchError = (message) => toStr(message).toLowerCase().includes(NONCE_MISMATCH_ERROR);
+const isNonceMismatchError = (message: unknown): boolean => toStr(message).toLowerCase().includes(NONCE_MISMATCH_ERROR);
 
-const isOnChainGateUnavailableError = (message) =>
+const isOnChainGateUnavailableError = (message: unknown): boolean =>
   toStr(message).toLowerCase().includes(ONCHAIN_GATE_UNAVAILABLE_ERROR);
 
 const createAbortError = (message = 'Worker auth request aborted.') => {
@@ -129,7 +222,8 @@ const createAbortError = (message = 'Worker auth request aborted.') => {
   return error;
 };
 
-const isAbortError = (error) => toStr(error?.name) === 'AbortError';
+const isAbortError = (error: unknown): boolean =>
+  toStr(error && typeof error === 'object' ? (error as { name?: unknown }).name : '') === 'AbortError';
 
 const abortInFlightTokenRequests = () => {
   inFlightTokenRequests.forEach((request) => {
@@ -147,7 +241,7 @@ const invalidateWorkerAuthState = ({ nextAddress = '' } = {}) => {
   return workerAuthEpoch;
 };
 
-const syncWorkerAuthAddress = (address) => {
+const syncWorkerAuthAddress = (address: unknown): number => {
   const normalizedAddress = normalizeAddress(address);
   if (!normalizedAddress) return workerAuthEpoch;
   // The Redux store is the active-account source of truth. Stale request
@@ -162,7 +256,11 @@ const syncWorkerAuthAddress = (address) => {
   return workerAuthEpoch;
 };
 
-const assertWorkerAuthRequestCurrent = (signal, requestAuthEpoch, requestAddress = '') => {
+const assertWorkerAuthRequestCurrent = (
+  signal: AbortSignal | null,
+  requestAuthEpoch: number | undefined,
+  requestAddress: unknown = '',
+): void => {
   if (signal?.aborted) {
     throw createAbortError();
   }
@@ -175,25 +273,28 @@ const assertWorkerAuthRequestCurrent = (signal, requestAuthEpoch, requestAddress
   }
 };
 
-const sleep = (ms, { signal, requestAuthEpoch, requestAddress } = {}) =>
-  new Promise((resolve, reject) => {
+const sleep = (ms: number, { signal, requestAuthEpoch, requestAddress }: SleepOptions = {}) =>
+  new Promise<void>((resolve, reject) => {
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+    const clearTimer = () => {
+      if (timerId !== null) clearTimeout(timerId);
+    };
     const onAbort = () => {
-      clearTimeout(timerId);
+      clearTimer();
       if (signal && typeof signal.removeEventListener === 'function') {
         signal.removeEventListener('abort', onAbort);
       }
       reject(createAbortError());
     };
-    const finish = (cb) => {
-      clearTimeout(timerId);
+    const finish = (cb: () => void) => {
+      clearTimer();
       if (signal && typeof signal.removeEventListener === 'function') {
         signal.removeEventListener('abort', onAbort);
       }
       cb();
     };
-    let timerId = null;
     try {
-      assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, requestAddress);
+      assertWorkerAuthRequestCurrent(signal ?? null, requestAuthEpoch, requestAddress);
     } catch (error) {
       reject(error);
       return;
@@ -204,7 +305,7 @@ const sleep = (ms, { signal, requestAuthEpoch, requestAddress } = {}) =>
     timerId = setTimeout(() => {
       finish(() => {
         try {
-          assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, requestAddress);
+          assertWorkerAuthRequestCurrent(signal ?? null, requestAuthEpoch, requestAddress);
           resolve();
         } catch (error) {
           reject(error);
@@ -213,8 +314,8 @@ const sleep = (ms, { signal, requestAuthEpoch, requestAddress } = {}) =>
     }, ms);
   });
 
-const resolveSignerAddress = async (providerLike, fallbackAddress = '') => {
-  const provider = cryptoUtils._getProvider(providerLike || resolveDefaultProviderLike());
+const resolveSignerAddress = async (providerLike: unknown, fallbackAddress: unknown = '') => {
+  const provider = getWorkerProvider(providerLike);
   let address = normalizeAddress(fallbackAddress) || normalizeAddress(provider?.selectedAddress || provider?.address);
   if (provider && typeof provider.request === 'function') {
     try {
@@ -235,7 +336,7 @@ const resolveWorkerTokenRequestContext = async ({
   allowDemoFallback,
   resolveWorkerUrl = false,
   resolvedAddress,
-} = {}) => {
+}: ResolveWorkerTokenRequestContextOptions = {}) => {
   const allowDemoFallbackResolved = shouldAllowDemoSessionFallback(allowDemoFallback);
   const resolvedSession = resolveWorkerSessionContext({
     sessionSlug,
@@ -275,6 +376,8 @@ const resolveWorkerTokenRequestContext = async ({
   };
 };
 
+type WorkerTokenRequestContext = Awaited<ReturnType<typeof resolveWorkerTokenRequestContext>>;
+
 try {
   if (typeof store?.subscribe === 'function') {
     store.subscribe(() => {
@@ -299,7 +402,7 @@ export const buildSiweMessage = ({
   statement,
   issuedAt,
   expirationTime,
-} = {}) => {
+}: BuildSiweMessageOptions = {}) => {
   const addr = toStr(address).trim();
   const host = toStr(domain || (typeof window !== 'undefined' ? window.location.host : '')).trim();
   const origin = toStr(uri || (typeof window !== 'undefined' ? window.location.origin : '')).trim();
@@ -311,14 +414,30 @@ export const buildSiweMessage = ({
   return `${host} wants you to sign in with your Ethereum account:\n${addr}\n\n${note}\n\nURI: ${origin}\nVersion: 1\nChain ID: ${chain}\nNonce: ${nonce}\nIssued At: ${issued}\nExpiration Time: ${exp}`;
 };
 
-const signMessage = async ({ message, providerLike, address }) => {
-  const provider = cryptoUtils._getProvider(providerLike || resolveDefaultProviderLike());
+const signMessage = async ({
+  message,
+  providerLike,
+  address,
+}: {
+  address?: string;
+  message: string;
+  providerLike?: unknown;
+}) => {
+  const provider = getWorkerProvider(providerLike);
   const ethersProvider = new ethers.providers.Web3Provider(provider, 'any');
   const signer = address ? ethersProvider.getSigner(address) : ethersProvider.getSigner();
   return signer.signMessage(message);
 };
 
-const signTypedDataV4 = async ({ typedData, provider, address }) => {
+const signTypedDataV4 = async ({
+  typedData,
+  provider,
+  address,
+}: {
+  address: string;
+  provider: WorkerProvider | null | undefined;
+  typedData: unknown;
+}) => {
   if (!provider || typeof provider.request !== 'function') {
     throw new Error('Wallet provider does not support typed-data signing.');
   }
@@ -335,7 +454,7 @@ export const buildSignedAdminActionAuth = async ({
   workerUrl,
   context,
   nonce: providedNonce,
-} = {}) => {
+}: AdminActionAuthOptions = {}) => {
   const actionName = toStr(action).trim().toLowerCase();
   if (!actionName) throw new Error('Admin action is required.');
 
@@ -377,7 +496,7 @@ export const buildSignedAdminActionAuth = async ({
   }
 
   const expiration = Math.floor(Date.now() / 1000) + ADMIN_ACTION_EXPIRATION_WINDOW_SECONDS;
-  const bodyHash = buildAdminActionBodyHash(body);
+  const bodyHash = buildAdminActionBodyHash(body && typeof body === 'object' ? body : {});
   const typedData = buildAdminActionTypedData({
     action: actionName,
     slug: targetSlug,
@@ -422,7 +541,7 @@ export const buildSignedBootstrapAdminAuth = async ({
   context,
   statement = 'Admin request: bootstrap arweave upload',
   nonce: providedNonce,
-} = {}) => {
+}: BootstrapAdminAuthOptions = {}) => {
   const resolvedWorkerUrl = normalizeWorkerUrl(workerUrl);
   if (!resolvedWorkerUrl) throw new Error('Worker URL is missing.');
 
@@ -482,7 +601,7 @@ export const getWorkerSessionToken = async ({
   workerUrl,
   allowDemoFallback,
   requestContext,
-} = {}) => {
+}: WorkerSessionTokenOptions = {}) => {
   const resolvedRequest =
     requestContext ||
     (await resolveWorkerTokenRequestContext({
@@ -515,12 +634,13 @@ export const getWorkerSessionToken = async ({
     sessionSlug: slug,
     address,
   });
-  if (cached?.token) {
+  if (cached?.ok && cached.token) {
     return cached.token;
   }
 
-  if (inFlightTokenRequests.has(storageKey)) {
-    return inFlightTokenRequests.get(storageKey).promise;
+  const existingRequest = inFlightTokenRequests.get(storageKey);
+  if (existingRequest?.promise) {
+    return existingRequest.promise;
   }
 
   const abortController =
@@ -536,7 +656,7 @@ export const getWorkerSessionToken = async ({
         method: 'POST',
         headers: buildWorkerAuthNonceHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ address, sessionSlug: slug }),
-        signal,
+        signal: signal || undefined,
       });
       const nonceData = await nonceResp.json().catch(() => ({}));
       if (!nonceResp.ok) {
@@ -567,14 +687,14 @@ export const getWorkerSessionToken = async ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address, message, signature, sessionSlug: slug }),
-        signal,
+        signal: signal || undefined,
       });
-      const loginData = await loginResp.json().catch(() => ({}));
+      const loginData: WorkerLoginResponse = await loginResp.json().catch(() => ({}));
       if (!loginResp.ok) {
         if (Number(loginResp.status || 0) === 404) {
           throw new Error('Worker auth login route not supported (404).');
         }
-        throw new Error(loginData?.error || `Worker login failed (${loginResp.status}).`);
+        throw new Error(toStr(loginData?.error || `Worker login failed (${loginResp.status}).`));
       }
       if (!loginData?.token) {
         throw new Error('Worker login did not return a token.');
@@ -590,14 +710,14 @@ export const getWorkerSessionToken = async ({
         break;
       } catch (err) {
         if (isAbortError(err)) throw err;
-        if (isNonceMismatchError(err?.message) && !retriedNonceMismatch) {
+        if (isNonceMismatchError(getErrorMessage(err)) && !retriedNonceMismatch) {
           // A concurrent auth flow may have rotated nonce for this address.
           // Retry once with a fresh nonce to recover without user intervention.
           retriedNonceMismatch = true;
           continue;
         }
         const canRetryGateUnavailable =
-          isOnChainGateUnavailableError(err?.message) && attempt < LOGIN_GATE_UNAVAILABLE_RETRIES;
+          isOnChainGateUnavailableError(getErrorMessage(err)) && attempt < LOGIN_GATE_UNAVAILABLE_RETRIES;
         if (!canRetryGateUnavailable) throw err;
         const retryInMs = LOGIN_GATE_UNAVAILABLE_RETRY_BASE_MS * (attempt + 1);
         accountLog.warn('[workerAuth] transient gate-read failure during login; retrying', {
@@ -630,7 +750,7 @@ export const getWorkerSessionToken = async ({
     return loginData.token;
   };
 
-  const inFlightRequest = { abortController, promise: null };
+  const inFlightRequest: InFlightTokenRequest = { abortController, promise: null };
   const inFlight = requestToken().finally(() => {
     if (inFlightTokenRequests.get(storageKey) === inFlightRequest) {
       inFlightTokenRequests.delete(storageKey);
@@ -648,7 +768,7 @@ export const clearWorkerSessionToken = ({
   context,
   workerUrl,
   allowDemoFallback,
-} = {}) => {
+}: WorkerSessionTokenOptions = {}) => {
   const clearToken = async () => {
     const resolvedRequest =
       requestContext ||
@@ -679,8 +799,8 @@ export const clearAllWorkerSessionTokens = () => {
   } catch (_) {}
 };
 
-const buildWorkerAuthHeadersForToken = ({ token, slug } = {}) => {
-  const headers = {
+const buildWorkerAuthHeadersForToken = ({ token, slug }: { slug?: unknown; token?: unknown } = {}) => {
+  const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
   };
   if (slug) {
@@ -690,7 +810,7 @@ const buildWorkerAuthHeadersForToken = ({ token, slug } = {}) => {
     //
     // The worker-side auth handler accepts either header (it checks `x-session-slug ?? x-group-slug`),
     // so sending only `X-Group-Slug` keeps compatibility without sacrificing modern workers.
-    headers['X-Group-Slug'] = slug;
+    headers['X-Group-Slug'] = toStr(slug);
   }
   return headers;
 };
@@ -701,7 +821,7 @@ const getWorkerAuthHeadersWithMeta = async ({
   context,
   workerUrl,
   allowDemoFallback,
-} = {}) => {
+}: ResolveWorkerTokenRequestContextOptions = {}) => {
   const resolvedRequest = await resolveWorkerTokenRequestContext({
     sessionSlug,
     sessionConfig,
@@ -723,7 +843,7 @@ export const getWorkerAuthHeaders = async ({
   context,
   workerUrl,
   allowDemoFallback,
-} = {}) => {
+}: ResolveWorkerTokenRequestContextOptions = {}) => {
   const { headers } = await getWorkerAuthHeadersWithMeta({
     sessionSlug,
     sessionConfig,
@@ -734,7 +854,11 @@ export const getWorkerAuthHeaders = async ({
   return headers;
 };
 
-export const fetchWorkerWithAuth = async (url, options = {}, opts = {}) => {
+export const fetchWorkerWithAuth = async (
+  url: RequestInfo | URL,
+  options: RequestInit = {},
+  opts: WorkerFetchAuthOptions = {},
+) => {
   const resolvedSession = resolveWorkerSessionContext({
     sessionSlug: opts.sessionSlug,
     sessionConfig: opts.sessionConfig,
@@ -744,7 +868,7 @@ export const fetchWorkerWithAuth = async (url, options = {}, opts = {}) => {
   const slug = resolvedSession.sessionSlug;
   const workerUrl = normalizeWorkerUrl(opts.workerUrl || url);
   const canAttemptAnonymous = opts.preferAnonymous && !isStreamBody(options?.body);
-  let anonymousResponse = null;
+  let anonymousResponse: Response | null = null;
   if (canAttemptAnonymous) {
     const requestApiKey = readRequestApiKey(options?.body);
     const anonymousHeaders = buildAnonymousHeaders({
@@ -774,8 +898,8 @@ export const fetchWorkerWithAuth = async (url, options = {}, opts = {}) => {
       return anonymousResponse;
     }
   }
-  let authHeaders = null;
-  let authRequestContext = null;
+  let authHeaders: Record<string, string> | null = null;
+  let authRequestContext: WorkerTokenRequestContext | null = null;
   try {
     const authResult = await getWorkerAuthHeadersWithMeta({
       sessionSlug: slug,
@@ -789,7 +913,7 @@ export const fetchWorkerWithAuth = async (url, options = {}, opts = {}) => {
   } catch (err) {
     // When anonymous-first is enabled and no wallet is connected, surface
     // the original anonymous worker denial instead of a wallet-auth error.
-    if (anonymousResponse && /authenticate with the worker/i.test(toStr(err?.message))) {
+    if (anonymousResponse && /authenticate with the worker/i.test(getErrorMessage(err))) {
       return anonymousResponse;
     }
     throw err;
