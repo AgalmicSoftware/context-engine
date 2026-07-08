@@ -40,6 +40,11 @@ import {
   shouldRetryAnonymousWithoutRateId,
   stripAnonymousRateIdHeader,
 } from './workerAuthAnonymousHeaders.js';
+import {
+  readRequestApiKey,
+  shouldFallbackToAuthenticatedFlow,
+  shouldRetryAuthenticatedResponse,
+} from './workerAuthFallbackPolicy.js';
 import { ADMIN_ACTION_TYPES, buildAdminActionBodyHash, buildAdminActionTypedData } from './adminTypedData.mjs';
 
 const accountLog = createLogger('account');
@@ -797,117 +802,6 @@ export const getWorkerAuthHeaders = async ({
     allowDemoFallback,
   });
   return headers;
-};
-
-const AUTH_OR_GATE_DENIAL_PATTERNS = [
-  /missing authorization header/i,
-  /missing requester address for worker sbt gate/i,
-  /token missing .* scope/i,
-  /token does not match requested session slug/i,
-  /token expired/i,
-];
-
-const AUTHENTICATED_RETRY_DENIAL_PATTERNS = [
-  /missing authorization header/i,
-  /token missing .* scope/i,
-  /token does not match requested session slug/i,
-  /token expired/i,
-  /invalid token/i,
-];
-
-const shouldFallbackForAnonymousDeny = (normalizedError) => {
-  const msg = toStr(normalizedError).trim().toLowerCase();
-  if (!msg.includes('anonymous access denied')) return false;
-  return true;
-};
-
-const readRequestApiKey = (body) => {
-  if (!body) return '';
-  try {
-    if (typeof FormData !== 'undefined' && body instanceof FormData) {
-      return toStr(body.get('apiKey')).trim();
-    }
-  } catch (_) {}
-  try {
-    if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) {
-      return toStr(body.get('apiKey')).trim();
-    }
-  } catch (_) {}
-
-  if (typeof body === 'string') {
-    const raw = body.trim();
-    if (!raw) return '';
-    try {
-      const parsed = JSON.parse(raw);
-      return toStr(parsed?.apiKey).trim();
-    } catch (e) {
-      accountLog.warn('workerAuth: JSON parse failed', e);
-      return '';
-    }
-  }
-
-  if (typeof body === 'object') {
-    return toStr(body?.apiKey).trim();
-  }
-  return '';
-};
-
-const parseErrorMessage = (payload) => {
-  if (!payload || typeof payload !== 'object') return '';
-  const direct = typeof payload?.error === 'string' ? payload.error : '';
-  const nested = typeof payload?.error?.message === 'string' ? payload.error.message : '';
-  const message = typeof payload?.message === 'string' ? payload.message : '';
-  return toStr(direct || nested || message).trim();
-};
-
-const readResponseErrorMessage = async (response) => {
-  if (!response || typeof response.clone !== 'function') return '';
-  let text = '';
-  try {
-    text = await response.clone().text();
-  } catch {
-    return '';
-  }
-  const trimmed = toStr(text).trim();
-  if (!trimmed) return '';
-  try {
-    const parsed = JSON.parse(trimmed);
-    return parseErrorMessage(parsed) || trimmed;
-  } catch (e) {
-    accountLog.warn('workerAuth: JSON parse failed', e);
-    return trimmed;
-  }
-};
-
-const shouldFallbackToAuthenticatedFlow = async (
-  response,
-  { requestApiKey = '', fallbackOnGateUnavailable = false } = {},
-) => {
-  const status = Number(response?.status || 0);
-  const errorMessage = await readResponseErrorMessage(response);
-  if (!errorMessage) return false;
-  const normalizedError = toStr(errorMessage).trim().toLowerCase();
-  if (normalizedError.includes('on-chain gate data unavailable')) {
-    return fallbackOnGateUnavailable === true;
-  }
-  if (status === 429 && (normalizedError === 'rate limit exceeded.' || normalizedError === 'rate limit exceeded')) {
-    if (toStr(requestApiKey).trim()) return false;
-    return true;
-  }
-  if (status !== 401 && status !== 403) return false;
-  if (shouldFallbackForAnonymousDeny(normalizedError)) {
-    return true;
-  }
-  return AUTH_OR_GATE_DENIAL_PATTERNS.some((pattern) => pattern.test(errorMessage));
-};
-
-const shouldRetryAuthenticatedResponse = async (response) => {
-  const status = Number(response?.status || 0);
-  if (status === 401) return true;
-  if (status !== 403) return false;
-  const errorMessage = await readResponseErrorMessage(response);
-  if (!errorMessage) return false;
-  return AUTHENTICATED_RETRY_DENIAL_PATTERNS.some((pattern) => pattern.test(errorMessage));
 };
 
 export const fetchWorkerWithAuth = async (url, options = {}, opts = {}) => {
