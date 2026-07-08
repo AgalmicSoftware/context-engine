@@ -2,295 +2,38 @@ import {
   buildSurveyQuestionDecryptExecutionPlan,
   buildSurveyQuestionDecryptRequestPlan,
 } from './surveyQuestionDecryptRequestPlan';
+import {
+  buildAutoDecryptMaskedFieldSignature,
+  buildDecryptTaskKey,
+  buildEmptyQuestionDecryptSlice,
+  buildFieldDecryptState,
+  buildQuestionFieldDecryptControlDisplayState,
+  buildQuestionFieldDisplayState,
+  buildQuestionRenderDisplayState,
+  buildQuestionResponseDisplayState,
+  getViewedResponseOverrideForQuestion,
+  normalizeSingleQuestionViewedResponse,
+  parseEncryptedEnvelope,
+  resolveDecryptSurveyId,
+  resolveQuestionDecryptHandlingMode,
+} from './surveyToolDecryptState';
 import { normalizeQuestionIdKey } from './surveyToolSignatures';
 
-export const buildEmptyQuestionDecryptSlice = () => ({
-  answers: {},
-  importance: {},
-  conviction: {},
-  additionalComments: {},
-});
-
-export const parseEncryptedEnvelope = (field = null) => {
-  try {
-    return field?.encryptedPortion ? JSON.parse(field.encryptedPortion) : null;
-  } catch {
-    return null;
-  }
-};
-
-export const buildFieldDecryptState = (field = null, { loginComplete = false, account = '', busy = false } = {}) => {
-  const envelope = parseEncryptedEnvelope(field);
-  const masked = !!(field?.value === '*' && (field?.encryptedPortion || field?.encrypted));
-  const allowDecrypt = masked && (!!envelope || (!!loginComplete && !!account));
-
-  return {
-    envelope,
-    masked,
-    allowDecrypt,
-    busy: !!busy,
-  };
-};
-
-export const buildQuestionFieldDisplayState = ({
-  answer = null,
-  additional = null,
-  answerDecryptState = null,
-  additionalDecryptState = null,
-  hasAdditionalContent = false,
-  decryptTooltip = 'Login to decrypt this encrypted field.',
-} = {}) => ({
-  answerDecryptState: answerDecryptState || buildFieldDecryptState(answer),
-  additionalDecryptState: additionalDecryptState || buildFieldDecryptState(additional),
-  hasAdditionalContent: !!hasAdditionalContent,
-  glowAnswer: !!answer?.encrypted,
-  glowAdditional: !!(additional?.encrypted && hasAdditionalContent),
-  decryptTooltip,
-});
-
-export const buildQuestionResponseDisplayState = ({
-  answer = null,
-  additional = null,
-  convictionValue = null,
-  importanceValue = null,
-  hasConvictionImportanceValue = false,
-  sliderMode = 'conviction',
-} = {}) => ({
-  answer,
-  additional,
-  convictionValue,
-  importanceValue,
-  hasConvictionImportanceValue: !!hasConvictionImportanceValue,
-  sliderMode,
-  activeSliderValue: sliderMode === 'importance' ? importanceValue : convictionValue,
-});
-
-export const buildQuestionRenderDisplayState = ({ responseDisplayState = {}, fieldDisplayState = {} } = {}) => ({
-  ...responseDisplayState,
-  ...fieldDisplayState,
-  maskedAnswer: !!fieldDisplayState?.answerDecryptState?.masked,
-  maskedAdditional: !!fieldDisplayState?.additionalDecryptState?.masked,
-  allowDecryptAnswer: !!fieldDisplayState?.answerDecryptState?.allowDecrypt,
-  allowDecryptAdditional: !!fieldDisplayState?.additionalDecryptState?.allowDecrypt,
-  isAnswerDecrypting: !!fieldDisplayState?.answerDecryptState?.busy,
-  isAdditionalDecrypting: !!fieldDisplayState?.additionalDecryptState?.busy,
-});
-
-export const buildQuestionFieldDecryptControlDisplayState = ({
-  actionLabel = 'Decrypt Answer',
-  allowDecrypt = false,
-  autoDecryptEnabled = false,
-  busy = false,
-  decryptTooltip = 'Login to decrypt this encrypted field.',
-  isDecrypting = false,
-  showBusySpinnerWhenAutoDecryptEnabled = false,
-  wrapperStyle = undefined,
-} = {}) => ({
-  actionLabel,
-  autoDecryptEnabled: !!autoDecryptEnabled,
-  busy: !!busy,
-  disabled: !!isDecrypting || !allowDecrypt,
-  showBusySpinnerWhenAutoDecryptEnabled: !!showBusySpinnerWhenAutoDecryptEnabled,
-  title: !allowDecrypt ? decryptTooltip : undefined,
-  wrapperStyle,
-});
-
-export const buildAutoDecryptMaskedFieldSignature = (field = null) => {
-  if (!field || typeof field !== 'object') return '';
-  return [
-    String(field.value ?? ''),
-    field.encrypted ? '1' : '0',
-    String(field.encryptedPortion || ''),
-    String(field.hash || ''),
-    String(field.encryptionAudience || ''),
-  ].join('|');
-};
-
-export const buildDecryptTaskKey = (
-  mode,
-  questionId,
-  fieldToDecrypt = 'both',
-  responseOverride = null,
-  defaultResponder = '',
-) => {
-  const qid = String(questionId || '')
-    .trim()
-    .toLowerCase();
-  const field = String(fieldToDecrypt || 'both')
-    .trim()
-    .toLowerCase();
-  const responder = String(responseOverride?.responder || responseOverride?.responderAddress || defaultResponder || '')
-    .trim()
-    .toLowerCase();
-  const answerSig = buildAutoDecryptMaskedFieldSignature(responseOverride?.answer);
-  const additionalSig = buildAutoDecryptMaskedFieldSignature(responseOverride?.additional);
-  return [String(mode || 'self'), qid, field, responder, answerSig, additionalSig].join('|');
-};
-
-export const normalizeSingleQuestionViewedResponse = (rawResponse = null) => {
-  if (rawResponse == null) return null;
-
-  if (typeof rawResponse !== 'object' || Array.isArray(rawResponse)) {
-    return {
-      answer: { value: rawResponse },
-      additional: { value: '' },
-    };
-  }
-
-  const nestedResponse =
-    rawResponse.response && typeof rawResponse.response === 'object' && !Array.isArray(rawResponse.response)
-      ? rawResponse.response
-      : null;
-  const base = nestedResponse ? { ...rawResponse, ...nestedResponse } : { ...rawResponse };
-
-  const firstDefined = (...values) => {
-    for (let i = 0; i < values.length; i += 1) {
-      if (values[i] !== undefined) return values[i];
-    }
-    return undefined;
-  };
-
-  const normalizeField = (field, fallbackValue) => {
-    const nextField = field && typeof field === 'object' && !Array.isArray(field) ? { ...field } : {};
-    const scalar = field != null && typeof field !== 'object' ? field : undefined;
-    const value = firstDefined(nextField.value, scalar, fallbackValue);
-    if (value !== undefined) nextField.value = value;
-    return nextField;
-  };
-
-  const answerFallback = firstDefined(
-    base.answerValue,
-    base.value,
-    base.responseValue,
-    base.answerText,
-    base.responseText,
-    base.answer == null &&
-      (typeof base.response === 'string' || typeof base.response === 'number' || typeof base.response === 'boolean')
-      ? base.response
-      : undefined,
-  );
-  const additionalFallback = firstDefined(
-    base.additionalComment,
-    base.additionalComments,
-    base.comment,
-    base.comments,
-    base.additionalText,
-  );
-
-  const normalized = {
-    ...base,
-    answer: normalizeField(base.answer, answerFallback),
-    additional: normalizeField(base.additional, additionalFallback),
-  };
-  const hasShapeHints = !!(
-    base.answer !== undefined ||
-    base.additional !== undefined ||
-    answerFallback !== undefined ||
-    additionalFallback !== undefined ||
-    base.importance !== undefined ||
-    base.conviction !== undefined ||
-    base.storageRef ||
-    base.arweaveTxId ||
-    base.transactionHash ||
-    base.txHash ||
-    base.blockNumber !== undefined ||
-    base.transactionIndex !== undefined ||
-    base.logIndex !== undefined ||
-    base.timestamp !== undefined
-  );
-  return hasShapeHints ? normalized : null;
-};
-
-export const getViewedResponseOverrideForQuestion = (questionId, responseContainer, viewedResponder = '') => {
-  const qid = String(questionId || '')
-    .trim()
-    .toLowerCase();
-  if (!qid || !responseContainer || typeof responseContainer !== 'object') return null;
-  const normalizedViewedResponder = String(viewedResponder || '')
-    .trim()
-    .toLowerCase();
-
-  const decorateResponse = (rawResponse) => {
-    if (!rawResponse || typeof rawResponse !== 'object') return null;
-    const next = { ...rawResponse };
-    const rawId = String(next.questionID || next.questionId || '')
-      .trim()
-      .toLowerCase();
-    if (rawId && rawId !== qid) return null;
-    if (!next.questionID && !next.questionId) next.questionID = qid;
-    if (normalizedViewedResponder) {
-      if (!next.responder) next.responder = normalizedViewedResponder;
-      if (!next.responderAddress) next.responderAddress = normalizedViewedResponder;
-    }
-    return next;
-  };
-
-  if (Array.isArray(responseContainer.responses)) {
-    for (const response of responseContainer.responses) {
-      const decorated = decorateResponse(response);
-      if (decorated) return decorated;
-    }
-    return null;
-  }
-
-  return decorateResponse(responseContainer);
-};
-
-export const resolveQuestionDecryptHandlingMode = (
-  { questionId, responseOverride = null, viewerAccount = '', viewedResponder = '' } = {},
-  { getViewedResponseOverrideForQuestion } = {},
-) => {
-  const viewerLower = String(viewerAccount || '')
-    .trim()
-    .toLowerCase();
-  const viewedResponderLower = String(viewedResponder || '')
-    .trim()
-    .toLowerCase();
-  const effectiveResponseOverride =
-    responseOverride && typeof responseOverride === 'object'
-      ? responseOverride
-      : getViewedResponseOverrideForQuestion(questionId);
-  const hasResponseOverride = !!(effectiveResponseOverride && typeof effectiveResponseOverride === 'object');
-  const isViewedResponseMode = !!viewedResponderLower && viewedResponderLower !== viewerLower;
-
-  return {
-    viewerLower,
-    viewedResponderLower,
-    effectiveResponseOverride,
-    hasResponseOverride,
-    isViewedResponseMode,
-  };
-};
-
-export const resolveDecryptSurveyId = (
-  baselineForDecrypt,
-  { propSurveyId = '', questionId = null, defaultSurveyId = '' } = {},
-) => {
-  if (propSurveyId) return propSurveyId;
-
-  const getEnvelopeSurveyId = (field) => parseEncryptedEnvelope(field)?.aad?.surveyId || null;
-
-  const normalizedQuestionId = questionId == null ? '' : String(questionId).trim().toLowerCase();
-
-  if (normalizedQuestionId) {
-    const scopedSurveyId =
-      getEnvelopeSurveyId(baselineForDecrypt?.answers?.[normalizedQuestionId]) ||
-      getEnvelopeSurveyId(baselineForDecrypt?.additionalComments?.[normalizedQuestionId]);
-    if (scopedSurveyId) return scopedSurveyId;
-  }
-
-  const containers = [baselineForDecrypt?.answers, baselineForDecrypt?.additionalComments];
-
-  for (const container of containers) {
-    if (!container || typeof container !== 'object') continue;
-    for (const key of Object.keys(container)) {
-      const surveyId = getEnvelopeSurveyId(container[key]);
-      if (surveyId) return surveyId;
-    }
-  }
-
-  return defaultSurveyId;
-};
+export {
+  buildAutoDecryptMaskedFieldSignature,
+  buildDecryptTaskKey,
+  buildEmptyQuestionDecryptSlice,
+  buildFieldDecryptState,
+  buildQuestionFieldDecryptControlDisplayState,
+  buildQuestionFieldDisplayState,
+  buildQuestionRenderDisplayState,
+  buildQuestionResponseDisplayState,
+  getViewedResponseOverrideForQuestion,
+  normalizeSingleQuestionViewedResponse,
+  parseEncryptedEnvelope,
+  resolveDecryptSurveyId,
+  resolveQuestionDecryptHandlingMode,
+} from './surveyToolDecryptState';
 
 export const runDedupedDecryptTask = (inFlightMap, taskKey, runner) => {
   const key = String(taskKey || '');
