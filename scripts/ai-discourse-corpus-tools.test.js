@@ -9,6 +9,7 @@ const {
   collectSummary,
   collectValidation,
   extractRecord,
+  loadCorpusFiles,
   normalizeCorpusKey,
 } = require('./ai-discourse-corpus-tools');
 
@@ -36,8 +37,11 @@ test('validates all debates and client mirror coverage', () => {
   assert.deepEqual(validation.clientDebateMirror.extraInClient, []);
   assert.deepEqual(validation.debateReferences.missing, []);
   assert.deepEqual(validation.debateReferences.duplicatePositions, []);
+  assert.deepEqual(validation.debateReferences.ambiguousReferences, []);
   assert.deepEqual(validation.targetDebateReferences.missing, []);
   assert.deepEqual(validation.targetDebateReferences.duplicatePositions, []);
+  assert.deepEqual(validation.targetDebateReferences.ambiguousReferences, []);
+  assert.deepEqual(validation.metaCountDrift, []);
   assert.deepEqual(validation.malformedYears, []);
 });
 
@@ -90,9 +94,8 @@ test('extracts records by url as well as by id', () => {
 });
 
 test('the corpus quality gate covers every debate in the cross-corpus file', () => {
-  const summary = collectSummary();
-  const crossCorpus = summary.corpuses.find((entry) => entry.corpus === 'cross-corpus');
+  const crossCorpus = loadCorpusFiles().find((file) => file.corpusKey === 'cross-corpus');
+  const actualDebateIds = crossCorpus.entries.map((debate) => debate.id);
 
-  assert.equal(TARGET_DEBATE_IDS.length, crossCorpus.count);
-  assert.equal(new Set(TARGET_DEBATE_IDS).size, TARGET_DEBATE_IDS.length);
+  assert.deepEqual([...TARGET_DEBATE_IDS].sort(), [...actualDebateIds].sort());
 });

@@ -4,7 +4,7 @@
     "version": "1.0",
     "date_generated": "2026-07-04",
     "debate_count": 16,
-    "total_cross_corpus_sources": 374,
+    "total_cross_corpus_sources": 396,
     "corpora_synthesized": [
       "ai_laws",
       "ai_scifi",
@@ -738,21 +738,21 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2025-07-14-how-does-time-horizon-vary-across-domains/",
+          "entry_url_or_id": "metr_cross_domain_th_2025",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "How Does Time Horizon Vary Across Domains?",
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2024-08-06-update-on-evaluations/",
+          "entry_url_or_id": "metr_general_capability_evals_update_2023",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "An update on our general capability evaluations",
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
+          "entry_url_or_id": "metr_exponential_trend_evidence",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Evidence for Exponential AI Capability Growth",
@@ -1325,7 +1325,7 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2025-06-05-recent-reward-hacking/",
+          "entry_url_or_id": "metr_reward_hacking_2025",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Recent Frontier Models Are Reward Hacking",
@@ -1905,7 +1905,7 @@
       },
       "positions": [
         {
-          "entry_url_or_id": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+          "entry_url_or_id": "metr_frontier_risk_report_2026",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Frontier Risk Report (February to March 2026)",
@@ -1926,7 +1926,7 @@
           "relevance_score": 10
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2026-01-19-early-work-on-monitorability-evaluations/",
+          "entry_url_or_id": "metr_monitorability_evals_2026",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Early work on monitorability evaluations",
@@ -2150,7 +2150,7 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/notes/2026-01-29-frontier-ai-safety-regulations/",
+          "entry_url_or_id": "metr_frontier_regulations_reference_2026",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Frontier AI safety regulations: A reference for lab staff",
@@ -2178,7 +2178,7 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2025-01-17-ai-models-dangerous-before-public-deployment/",
+          "entry_url_or_id": "metr_dangerous_before_deployment_2025",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "AI models can be dangerous before public deployment",
@@ -2682,7 +2682,7 @@
       },
       "positions": [
         {
-          "entry_url_or_id": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+          "entry_url_or_id": "metr_frontier_risk_report_2026",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Frontier Risk Report (February to March 2026)",
@@ -2913,7 +2913,7 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2025-07-14-how-does-time-horizon-vary-across-domains/",
+          "entry_url_or_id": "metr_time_horizon_coding_domain_2025",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Time Horizon in Coding Domain: Detailed Analysis",
@@ -3495,7 +3495,7 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://evaluations.metr.org/",
+          "entry_url_or_id": "metr_deepseek_mid2025_eval_2025",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Details about METR's evaluation of DeepSeek mid-2025 models",
@@ -4163,7 +4163,7 @@
           "relevance_score": 8
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2025-10-14-malt-dataset-of-natural-and-prompted-behaviors/",
+          "entry_url_or_id": "metr_eval_integrity_metascience",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Evaluation Integrity as Metascience: Can We Trust AI Measurements?",
@@ -4261,14 +4261,14 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
+          "entry_url_or_id": "metr_benchmark_saturation_problem",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "The Benchmark Saturation Problem and Time Horizon as Solution",
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/hcast.pdf",
+          "entry_url_or_id": "metr_cybersecurity_eval_capabilities",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Cybersecurity Evaluation Capabilities in HCAST",
@@ -4818,7 +4818,7 @@
           "relevance_score": 8
         },
         {
-          "entry_url_or_id": "https://metr.org/notes/2026-01-29-frontier-ai-safety-regulations/",
+          "entry_url_or_id": "metr_sb53_analysis_2026",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "California SB 53 Requirements Analysis",
@@ -4972,14 +4972,14 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/common-elements",
+          "entry_url_or_id": "metr_risk_thresholds_framework",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Risk Thresholds and Capability-Based Governance",
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
+          "entry_url_or_id": "metr_exponential_trend_evidence",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Evidence for Exponential AI Capability Growth",
@@ -5000,7 +5000,7 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://www.anthropic.com/responsible-scaling-policy",
+          "entry_url_or_id": "anthropic_rsp_v1_2023",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
           "stance_summary": "Anthropic's Responsible Scaling Policy",
@@ -5561,7 +5561,7 @@
       },
       "positions": [
         {
-          "entry_url_or_id": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+          "entry_url_or_id": "metr_frontier_risk_report_2026",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Frontier Risk Report (February to March 2026)",
@@ -5575,7 +5575,7 @@
           "relevance_score": 10
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2026-01-19-early-work-on-monitorability-evaluations/",
+          "entry_url_or_id": "metr_monitorability_evals_2026",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Early work on monitorability evaluations",
@@ -5771,7 +5771,7 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://www.lesswrong.com/posts/pRkFkzwKZ2zfa3R6H/without-specific-countermeasures-the-easiest-path-to",
+          "entry_url_or_id": "cotra_ai_takeover_default",
           "corpus": "lesswrong-posts",
           "side": "a",
           "stance_summary": "Without Specific Countermeasures, the Easiest Path to Transformative AI Likely L",

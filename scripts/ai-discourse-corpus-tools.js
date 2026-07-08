@@ -41,7 +41,7 @@ const CORPUS_FILES = Object.freeze({
     aliases: ['cross-corpus', 'cross_corpus', 'debates'],
     relativePath: 'ai-discourse-corpus/corpuses/cross-corpus-debates.json',
     collectionKey: 'debates',
-    metaCountKeys: ['total_debates'],
+    metaCountKeys: ['debate_count'],
   },
   'dwarkesh-lab-insiders': {
     corpusKey: 'dwarkesh-lab-insiders',
@@ -276,6 +276,7 @@ function loadCorpusFiles(rootDir = ROOT_DIR) {
 function buildRecordIndex(corpusFiles = loadCorpusFiles()) {
   const aliasMap = createCorpusAliasMap();
   const byCorpusAndId = new Map();
+  const lookupKeyEntryCounts = new Map();
   const duplicateIds = [];
   const seenGlobalIds = new Map();
 
@@ -286,9 +287,15 @@ function buildRecordIndex(corpusFiles = loadCorpusFiles()) {
         return;
       }
       // Index every lookup key (id and url) so debate references can resolve
-      // records by either form; duplicate detection stays on the primary id.
+      // records by either form. First entry wins, matching extractRecord's
+      // first-match semantics; lookupKeyEntryCounts tracks how many distinct
+      // entries share each key so reference ambiguity can be reported.
       getEntryLookupKeys(entry).forEach((lookupKey) => {
-        byCorpusAndId.set(`${file.corpusKey}:${lookupKey}`, { file, entry });
+        const scopedKey = `${file.corpusKey}:${lookupKey}`;
+        if (!byCorpusAndId.has(scopedKey)) {
+          byCorpusAndId.set(scopedKey, { file, entry });
+        }
+        lookupKeyEntryCounts.set(scopedKey, (lookupKeyEntryCounts.get(scopedKey) || 0) + 1);
       });
       if (seenGlobalIds.has(id)) {
         duplicateIds.push({
@@ -305,8 +312,19 @@ function buildRecordIndex(corpusFiles = loadCorpusFiles()) {
   return {
     aliasMap,
     byCorpusAndId,
+    lookupKeyEntryCounts,
     duplicateIds,
   };
+}
+
+function resolveRecord(index, corpusKey, id) {
+  const normalizedCorpusKey = normalizeCorpusKey(corpusKey, index.aliasMap);
+  return index.byCorpusAndId.get(`${normalizedCorpusKey}:${id}`) || null;
+}
+
+function countEntriesForKey(index, corpusKey, id) {
+  const normalizedCorpusKey = normalizeCorpusKey(corpusKey, index.aliasMap);
+  return index.lookupKeyEntryCounts.get(`${normalizedCorpusKey}:${id}`) || 0;
 }
 
 function collectSummary(rootDir = ROOT_DIR) {
@@ -341,23 +359,40 @@ function collectDebateReferenceIssues(crossCorpusFile, index, debateIds = null) 
   const debateIdSet = debateIds ? new Set(debateIds) : null;
   const missing = [];
   const duplicatePositions = [];
+  const ambiguousReferences = [];
 
   crossCorpusFile.entries.forEach((debate) => {
     if (debateIdSet && !debateIdSet.has(debate.id)) {
       return;
     }
 
-    const seenPositionKeys = new Set();
+    const seenResolvedKeys = new Set();
     (debate.positions || []).forEach((position, positionIndex) => {
       const id = position.entry_url_or_id;
       const corpus = position.corpus;
-      const positionKey = `${corpus}:${id}`;
-      if (seenPositionKeys.has(positionKey)) {
+      if (!id || !corpus) {
+        return;
+      }
+      const resolved = resolveRecord(index, corpus, id);
+      if (!resolved) {
+        missing.push({ debateId: debate.id, field: 'positions.entry_url_or_id', corpus, id });
+        return;
+      }
+      // Duplicate detection keys on the resolved record so a url-form and an
+      // id-form reference to the same entry cannot hide a duplicate position.
+      const resolvedKey = `${normalizeCorpusKey(corpus, index.aliasMap)}:${getEntryIdentifier(resolved.entry)}`;
+      if (seenResolvedKeys.has(resolvedKey)) {
         duplicatePositions.push({ debateId: debate.id, positionIndex, corpus, id });
       }
-      seenPositionKeys.add(positionKey);
-      if (id && corpus && !hasRecord(index, corpus, id)) {
-        missing.push({ debateId: debate.id, field: 'positions.entry_url_or_id', corpus, id });
+      seenResolvedKeys.add(resolvedKey);
+      if (countEntriesForKey(index, corpus, id) > 1) {
+        ambiguousReferences.push({
+          debateId: debate.id,
+          field: 'positions.entry_url_or_id',
+          corpus,
+          id,
+          matchingEntries: countEntriesForKey(index, corpus, id),
+        });
       }
     });
 
@@ -366,19 +401,30 @@ function collectDebateReferenceIssues(crossCorpusFile, index, debateIds = null) 
         ['from', reference.from_corpus, reference.from_id],
         ['to', reference.to_corpus, reference.to_id],
       ].forEach(([side, corpus, id]) => {
-        if (id && corpus && !hasRecord(index, corpus, id)) {
+        if (!id || !corpus) {
+          return;
+        }
+        if (!hasRecord(index, corpus, id)) {
           missing.push({
             debateId: debate.id,
             field: `cross_corpus_references[${referenceIndex}].${side}_id`,
             corpus,
             id,
           });
+        } else if (countEntriesForKey(index, corpus, id) > 1) {
+          ambiguousReferences.push({
+            debateId: debate.id,
+            field: `cross_corpus_references[${referenceIndex}].${side}_id`,
+            corpus,
+            id,
+            matchingEntries: countEntriesForKey(index, corpus, id),
+          });
         }
       });
     });
   });
 
-  return { missing, duplicatePositions };
+  return { missing, duplicatePositions, ambiguousReferences };
 }
 
 function collectValidation(rootDir = ROOT_DIR) {
@@ -394,6 +440,22 @@ function collectValidation(rootDir = ROOT_DIR) {
   const invalidPrimaryUrls = [];
   const taxonomyDrift = [];
   const unknownCorpusKeys = [];
+
+  const declaredSourceTotal = crossCorpusFile.data?.meta?.total_cross_corpus_sources;
+  if (typeof declaredSourceTotal === 'number') {
+    const actualSourceTotal = crossCorpusFile.entries.reduce(
+      (sum, debate) => sum + (debate.positions || []).length,
+      0
+    );
+    if (declaredSourceTotal !== actualSourceTotal) {
+      metaCountDrift.push({
+        corpus: 'cross-corpus',
+        field: 'total_cross_corpus_sources',
+        expected: declaredSourceTotal,
+        actual: actualSourceTotal,
+      });
+    }
+  }
 
   corpusFiles.forEach((file) => {
     file.metaCountKeys.forEach((key) => {
