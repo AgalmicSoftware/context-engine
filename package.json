@@ -44,7 +44,7 @@
     "client-boundaries:check": "node scripts/check-client-boundaries.mjs",
     "dead-exports:advisory": "node scripts/check-dead-exports-advisory.mjs",
     "test:hygiene": "node scripts/check-text-hygiene.mjs",
-    "test:wiring": "node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check && npm run -s test:hygiene",
+    "test:wiring": "node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check && npm run -s test:hygiene && node --test scripts/client-large-file-inventory.test.js",
     "test:release:client": "cd client && npm test -- --watchAll=false --runInBand",
     "typecheck:client": "npm --prefix client run typecheck",
     "type-debt:check": "node scripts/check-type-debt-ratchet.mjs",
