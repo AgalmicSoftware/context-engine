@@ -50,6 +50,27 @@ const getCarouselSlideTitle = (block: PostMarkdownBlock, index: number): string 
 
 const clampSlideIndex = (index: number, slideCount: number): number => Math.min(Math.max(index, 0), slideCount - 1);
 
+const combinesWithPreviousSlide = (block: PostMarkdownBlock): boolean => {
+  if (block.type !== 'viz') return false;
+  const spec = block.spec as { combineWithPrevious?: unknown } | null;
+  return !!spec && spec.combineWithPrevious === true;
+};
+
+const packCarouselSlides = (blocks: PostMarkdownBlock[]): PostMarkdownBlock[][] => {
+  const slides: PostMarkdownBlock[][] = [];
+
+  blocks.forEach((block) => {
+    if (slides.length > 0 && combinesWithPreviousSlide(block)) {
+      slides[slides.length - 1].push(block);
+      return;
+    }
+
+    slides.push([block]);
+  });
+
+  return slides;
+};
+
 const sanitizeHref = (href: string): string => {
   const value = String(href || '').trim();
   if (!value) return '';
@@ -166,7 +187,8 @@ const PostImageFigure = ({ block, assetBasePath }: { block: ImageBlock; assetBas
 };
 
 const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; assetBasePath?: string }) => {
-  const slideCount = block.blocks.length;
+  const slides = packCarouselSlides(block.blocks);
+  const slideCount = slides.length;
   const [activeIndex, setActiveIndex] = useState(0);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -176,7 +198,7 @@ const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; asse
   // requested destination arrives or the user takes over manually.
   const pendingIndexRef = useRef<number | null>(null);
   const pendingTimeoutRef = useRef<number | null>(null);
-  const slideTitles = block.blocks.map(getCarouselSlideTitle);
+  const slideTitles = slides.map((slideBlocks, slideIndex) => getCarouselSlideTitle(slideBlocks[0], slideIndex));
 
   const clearPendingNavigation = useCallback(() => {
     pendingIndexRef.current = null;
@@ -327,26 +349,33 @@ const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; asse
       onKeyDown={onCarouselKeyDown}
     >
       <div className={styles.vizCarouselTrack} ref={trackRef}>
-        {block.blocks.map((childBlock, childIndex) => (
+        {slides.map((slideBlocks, slideIndex) => (
           <div
-            key={`viz-carousel-slide-${childIndex}`}
+            key={`viz-carousel-slide-${slideIndex}`}
             className={styles.vizCarouselSlide}
             role="group"
             aria-roledescription="slide"
-            aria-label={`${childIndex + 1} of ${slideCount}: ${slideTitles[childIndex]}`}
-            data-active={childIndex === activeIndex ? 'true' : 'false'}
+            aria-label={`${slideIndex + 1} of ${slideCount}: ${slideTitles[slideIndex]}`}
+            data-active={slideIndex === activeIndex ? 'true' : 'false'}
             ref={(element) => {
-              slideRefs.current[childIndex] = element;
+              slideRefs.current[slideIndex] = element;
             }}
           >
-            {childBlock.type === 'viz' ? (
-              <PostViz spec={childBlock.spec} error={childBlock.error} presentation="slide" />
-            ) : (
-              renderBlock({
-                block: childBlock,
-                index: childIndex,
-                assetBasePath,
-              })
+            {slideBlocks.map((childBlock, childIndex) =>
+              childBlock.type === 'viz' ? (
+                <PostViz
+                  key={`viz-carousel-slide-${slideIndex}-viz-${childIndex}`}
+                  spec={childBlock.spec}
+                  error={childBlock.error}
+                  presentation="slide"
+                />
+              ) : (
+                renderBlock({
+                  block: childBlock,
+                  index: childIndex,
+                  assetBasePath,
+                })
+              ),
             )}
           </div>
         ))}

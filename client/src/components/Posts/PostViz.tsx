@@ -665,6 +665,7 @@ type ResponseCountDatum = {
 type ResponseQuoteDatum = {
   label: string;
   text: string;
+  color: string;
 };
 
 type ResponsePanelDatum = {
@@ -711,6 +712,7 @@ const readResponsePanels = (spec: VizRecord): ResponsePanelDatum[] =>
           return {
             label: toText(quoteRecord.label),
             text,
+            color: toText(quoteRecord.color),
           };
         })
         .filter((quote): quote is ResponseQuoteDatum => !!quote);
@@ -957,7 +959,7 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   useEscapeToClear(pinnedIndex !== null, clearPin);
 
   const [view, setView] = React.useState<'swarm' | 'list'>('swarm');
-  const [sortKey, setSortKey] = React.useState<'difference' | 'confidence' | 'alpha'>('difference');
+  const [sortKey, setSortKey] = React.useState<'difference' | 'confidence'>('difference');
 
   if (items.length === 0) {
     return <p className={styles.vizFallback}>Visualization has no binary questions.</p>;
@@ -970,7 +972,6 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   };
 
   const sortedItems = [...items].sort((a, b) => {
-    if (sortKey === 'alpha') return a.label.localeCompare(b.label);
     if (sortKey === 'confidence') return b.averageConfidence - a.averageConfidence;
     return b.difference - a.difference || b.averageConfidence - a.averageConfidence;
   });
@@ -979,10 +980,9 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
     { id: 'swarm', label: 'Swarm' },
     { id: 'list', label: 'List' },
   ];
-  const sortButtons: Array<{ id: 'difference' | 'confidence' | 'alpha'; label: string }> = [
+  const sortButtons: Array<{ id: 'difference' | 'confidence'; label: string }> = [
     { id: 'difference', label: 'Most split' },
     { id: 'confidence', label: 'Confidence' },
-    { id: 'alpha', label: 'A-Z' },
   ];
 
   return (
@@ -1370,7 +1370,9 @@ const ResponseTypeGridViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                   {panel.quotes.map((quote, index) => (
                     <figure key={`${quote.label || 'quote'}-${index}`}>
                       <blockquote>{quote.text}</blockquote>
-                      {quote.label && <figcaption>{quote.label}</figcaption>}
+                      {quote.label && (
+                        <figcaption style={quote.color ? { color: quote.color } : undefined}>{quote.label}</figcaption>
+                      )}
                     </figure>
                   ))}
                 </div>

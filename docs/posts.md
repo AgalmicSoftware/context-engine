@@ -102,7 +102,7 @@ Supported types:
 - `binary-beeswarm`: renders a consensus/difference scatter from `items`
   where the y-axis maps to average confidence. Dots pin their detail card on
   click or tap (Escape or the close control dismisses). A `Swarm | List`
-  toggle switches to a sortable question list (most split, confidence, A-Z).
+  toggle switches to a sortable question list (most split, confidence).
 - `response-type-grid`: renders mixed panels (`numbers`, `pie`, split bars,
   quote lists) from `panels`.
 
@@ -116,6 +116,15 @@ A grouped `ce-viz` block may set `"hideTitle": true` to suppress its visible
 header on the slide (useful when panel headings already carry the meaning).
 The `title` is still required: it names the slide and its dot for assistive
 technology and tooltips.
+
+A grouped `ce-viz` block may set `"combineWithPrevious": true` to render on
+the same carousel slide as the block before it (stacked below it) instead of
+getting its own slide. The slide keeps the first block's title for its dot
+and accessible label. The first block in a group cannot combine.
+
+`response-type-grid` freeform quotes accept an optional `"color"` per quote;
+it tints the attribution label (use participant colors to match other
+visualizations).
 
 Keep post data non-identifying unless the source material is intentionally
 public and licensed for publication.

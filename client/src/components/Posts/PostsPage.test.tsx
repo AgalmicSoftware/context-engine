@@ -610,6 +610,54 @@ describe('PostsPage', () => {
     expect(within(carousel).getByRole('group', { name: '1 of 1: Quiet quotes' })).toBeInTheDocument();
   });
 
+  it('packs combineWithPrevious viz onto the previous slide with colored quote labels', async () => {
+    const packedMarkdown = [
+      '# First Post',
+      '',
+      '```ce-viz-group',
+      '{ "title": "Packed", "defaultOpen": true, "childrenOpen": true }',
+      '```',
+      '',
+      '```ce-viz',
+      '{ "type": "quote-wall", "title": "Lead viz", "quotes": [{ "text": "Lead body." }] }',
+      '```',
+      '',
+      '```ce-viz',
+      '{ "type": "quote-wall", "title": "Second viz", "quotes": [{ "text": "Second body." }] }',
+      '```',
+      '',
+      '```ce-viz',
+      '{',
+      '  "type": "response-type-grid",',
+      '  "title": "Rider viz",',
+      '  "combineWithPrevious": true,',
+      '  "panels": [',
+      '    {',
+      '      "kind": "Freeform",',
+      '      "title": "Rider panel",',
+      '      "quotes": [{ "label": "P1", "text": "Rider body.", "color": "#4dffa4" }]',
+      '    }',
+      '  ]',
+      '}',
+      '```',
+      '',
+      '```ce-viz-group-end',
+      '```',
+    ].join('\n');
+    renderFirstPostMarkdown(packedMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    const carousel = await screen.findByTestId('ce-posts-viz-carousel');
+
+    expect(within(carousel).getByText('1 / 2')).toBeInTheDocument();
+    expect(within(carousel).queryByTestId('ce-posts-viz-carousel-dot-2')).not.toBeInTheDocument();
+    const packedSlide = within(carousel).getByRole('group', { name: '2 of 2: Second viz' });
+    expect(within(packedSlide).getByText('Second body.')).toBeInTheDocument();
+    expect(within(packedSlide).getByText('Rider body.')).toBeInTheDocument();
+    const riderLabel = within(packedSlide).getByText('P1');
+    expect(riderLabel).toHaveStyle({ color: '#4dffa4' });
+  });
+
   it('pins the binary beeswarm tooltip on click until dismissed', async () => {
     const fetcher = jest
       .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
@@ -692,9 +740,7 @@ describe('PostsPage', () => {
     const confidenceRows = within(list).getAllByRole('listitem');
     expect(confidenceRows[0]).toHaveTextContent('Agents should treat messages from other agents as untrusted input.');
 
-    await userEvent.click(screen.getByTestId('ce-posts-binary-sort-alpha'));
-    const alphaRows = within(list).getAllByRole('listitem');
-    expect(alphaRows[0]).toHaveTextContent('Agents should ask before acting on ambiguous requests.');
+    expect(screen.queryByTestId('ce-posts-binary-sort-alpha')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('ce-posts-binary-view-swarm'));
     expect(screen.queryByTestId('ce-posts-binary-list')).not.toBeInTheDocument();

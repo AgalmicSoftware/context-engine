@@ -707,6 +707,9 @@ h3.postHeading {
   position: relative;
   z-index: 1;
   min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: $viz-gap-md;
   flex: 0 0 calc(100% - 28px);
   // Keep inactive slides at a 0.9 opacity floor so muted descendants remain AA-readable.
   filter: saturate(0.85);
