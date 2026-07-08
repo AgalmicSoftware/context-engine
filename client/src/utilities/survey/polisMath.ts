@@ -23,29 +23,96 @@ import { kmeans as Kmeans } from 'ml-kmeans';
 
 import { Network, Clustering, LeidenAlgorithm } from 'networkanalysis-ts';
 
+type NumericCell = number | null | undefined;
+type NumericMatrix = number[][];
+type RatingMatrix = NumericCell[][];
+type NumericVector = number[];
+type Point2D = {
+  index?: number | string;
+  x?: number;
+  y?: number;
+  extremity?: number;
+  [key: string]: unknown;
+};
+type PositionedPoint2D = Point2D & {
+  index: number;
+  x: number;
+  y: number;
+};
+type PcaResult = {
+  comps: NumericVector[];
+};
+type KmeansOptions = {
+  seed?: number;
+};
+type KmeansResult = {
+  clusters: number[];
+};
+type ClusterStat = {
+  sum: number;
+  cnt: number;
+};
+type RepresentativeQuestion = {
+  questionIndex: number;
+  difference: number;
+  label: string;
+  prompt: string;
+};
+type Svd2Result = {
+  U: NumericMatrix;
+  S: NumericMatrix;
+  V: NumericMatrix;
+};
+type SvdRank1Result = {
+  u: NumericVector;
+  s: number;
+  v: NumericVector;
+};
+type D3LinearScale = {
+  domain(values: [number, number]): {
+    range(values: [number, number]): (value: number) => number;
+  };
+};
+type D3Simulation<T> = {
+  force(name: string, force: unknown): D3Simulation<T>;
+  stop(): D3Simulation<T>;
+  tick(): D3Simulation<T>;
+};
+type D3Facade = {
+  min<T>(values: T[], accessor: (value: T) => number | undefined): number | undefined;
+  max<T>(values: T[], accessor: (value: T) => number | undefined): number | undefined;
+  scaleLinear(): D3LinearScale;
+  forceSimulation<T>(data: T[]): D3Simulation<T>;
+  forceX<T>(accessor: (value: T) => number): unknown & { strength(value: number): unknown };
+  forceY(value: number): unknown & { strength(value: number): unknown };
+  forceCollide(radius: number): unknown;
+};
+
+const d3Runtime = Object(d3) as D3Facade;
+
 /***************************************************************
  * Utility: shape, dot, norm, matrix multiply
  ***************************************************************/
 
-export function matrixShape(M) {
+export function matrixShape(M: readonly (readonly unknown[])[]): [number, number] {
   const rows = M.length;
   const cols = M[0].length;
   return [rows, cols];
 }
 
-function dot(a, b) {
+function dot(a: NumericVector, b: NumericVector): number {
   let s = 0;
   for (let i = 0; i < a.length; i++) s += a[i] * b[i];
   return s;
 }
 
-function norm(v) {
+function norm(v: NumericVector): number {
   return Math.sqrt(dot(v, v));
 }
 
 // M is shape [rows x cols], v is shape [cols]
-function matVec(M, v) {
-  const r = [];
+function matVec(M: NumericMatrix, v: NumericVector): NumericVector {
+  const r: NumericVector = [];
   for (let i = 0; i < M.length; i++) {
     let sum = 0;
     for (let j = 0; j < M[i].length; j++) {
@@ -57,7 +124,7 @@ function matVec(M, v) {
 }
 
 // M^T x v
-function matVecTranspose(M, v) {
+function matVecTranspose(M: NumericMatrix, v: NumericVector): NumericVector {
   const rows = M.length;
   const cols = M[0].length;
   const result = new Array(cols).fill(0);
@@ -75,7 +142,7 @@ function matVecTranspose(M, v) {
  * Mean-subtraction, row-based or column-based
  ***************************************************************/
 
-export function subtractRowMeans(M) {
+export function subtractRowMeans(M: NumericMatrix): NumericMatrix {
   for (let i = 0; i < M.length; i++) {
     const row = M[i];
     let sum = 0;
@@ -93,7 +160,7 @@ export function subtractRowMeans(M) {
   return M;
 }
 
-export function subtractColumnMeans(M) {
+export function subtractColumnMeans(M: NumericMatrix): NumericMatrix {
   const [rows, cols] = matrixShape(M);
   const colMeans = new Array(cols).fill(0);
   const colCounts = new Array(cols).fill(0);
@@ -119,7 +186,7 @@ export function subtractColumnMeans(M) {
  * PCA: power iteration approach
  ***************************************************************/
 
-function powerIteration(M, nIters = 20) {
+function powerIteration(M: NumericMatrix, nIters = 20): NumericVector {
   // M shape [rows x cols], we do vector [cols]
   const cols = M[0].length;
   let v = new Array(cols).fill(0).map(() => Math.random() - 0.5);
@@ -136,7 +203,7 @@ function powerIteration(M, nIters = 20) {
   return v;
 }
 
-function deflate(M, pc) {
+function deflate(M: NumericMatrix, pc: NumericVector): void {
   for (let i = 0; i < M.length; i++) {
     const row = M[i];
     const dp = dot(row, pc);
@@ -146,8 +213,8 @@ function deflate(M, pc) {
   }
 }
 
-export function doPCA(M, nComps = 2) {
-  const comps = [];
+export function doPCA(M: NumericMatrix, nComps = 2): NumericVector[] {
+  const comps: NumericVector[] = [];
   for (let c = 0; c < nComps; c++) {
     const pc = powerIteration(M, 30);
     comps.push(pc);
@@ -160,8 +227,8 @@ export function doPCA(M, nComps = 2) {
  * wrappedPCA
  ***************************************************************/
 
-export function wrappedPCA(ratingMatrix, subtractWhat = 'row') {
-  const M = ratingMatrix.map((r) => [...r]);
+export function wrappedPCA(ratingMatrix: RatingMatrix, subtractWhat = 'row'): PcaResult {
+  const M: NumericMatrix = ratingMatrix.map((r) => r.map((value) => value ?? 0));
   if (subtractWhat === 'row') {
     subtractRowMeans(M);
   } else {
@@ -175,8 +242,8 @@ export function wrappedPCA(ratingMatrix, subtractWhat = 'row') {
  * Project rows or columns onto PCA comps
  ***************************************************************/
 
-export function projectRows(ratingMatrix, pca) {
-  const out = [];
+export function projectRows(ratingMatrix: RatingMatrix, pca: PcaResult): PositionedPoint2D[] {
+  const out: PositionedPoint2D[] = [];
   const pc1 = pca.comps[0],
     pc2 = pca.comps[1];
   for (let i = 0; i < ratingMatrix.length; i++) {
@@ -184,8 +251,8 @@ export function projectRows(ratingMatrix, pca) {
     let x = 0,
       y = 0;
     for (let j = 0; j < row.length; j++) {
-      x += row[j] * pc1[j];
-      y += row[j] * pc2[j];
+      x += (row[j] ?? 0) * pc1[j];
+      y += (row[j] ?? 0) * pc2[j];
     }
     out.push({ index: i, x, y });
   }
@@ -196,9 +263,11 @@ export function projectRows(ratingMatrix, pca) {
  * “extremity” (used by some older demos)
  ***************************************************************/
 
-export function computeExtremity(points) {
+export function computeExtremity(points: Point2D[]): Point2D[] {
   for (let p of points) {
-    p.extremity = Math.sqrt(p.x * p.x + p.y * p.y);
+    const x = p.x ?? 0;
+    const y = p.y ?? 0;
+    p.extremity = Math.sqrt(x * x + y * y);
   }
   return points;
 }
@@ -207,33 +276,38 @@ export function computeExtremity(points) {
  * BeeSwarm by x=extremity (example usage)
  ***************************************************************/
 
-export function beeswarmByExtremity(points, width, height) {
-  const minE = d3.min(points, (d) => d.extremity) ?? 0;
-  const maxE = d3.max(points, (d) => d.extremity) ?? 1;
-  const xScale = d3
+export function beeswarmByExtremity(points: Point2D[], width: number, height: number): PositionedPoint2D[] {
+  const minE = d3Runtime.min(points, (d) => d.extremity) ?? 0;
+  const maxE = d3Runtime.max(points, (d) => d.extremity) ?? 1;
+  const xScale = d3Runtime
     .scaleLinear()
     .domain([minE, maxE])
     .range([40, width - 40]);
   const dataCopy = points.map((d) => ({ ...d }));
   const centerY = height / 2;
 
-  const sim = d3
+  const sim = d3Runtime
     .forceSimulation(dataCopy)
-    .force('x', d3.forceX((d) => xScale(d.extremity)).strength(2))
-    .force('y', d3.forceY(centerY).strength(0.2))
-    .force('collide', d3.forceCollide(7))
+    .force('x', d3Runtime.forceX<Point2D>((d) => xScale(d.extremity ?? 0)).strength(2))
+    .force('y', d3Runtime.forceY(centerY).strength(0.2))
+    .force('collide', d3Runtime.forceCollide(7))
     .stop();
 
   for (let i = 0; i < 120; i++) sim.tick();
 
-  return dataCopy;
+  return dataCopy.map((point, index) => ({
+    ...point,
+    index: typeof point.index === 'number' ? point.index : index,
+    x: Number(point.x ?? 0),
+    y: Number(point.y ?? centerY),
+  }));
 }
 
 /***************************************************************
  * Summaries
  ***************************************************************/
 
-export function computePolisStats(ratingMatrix) {
+export function computePolisStats(ratingMatrix: RatingMatrix) {
   const [nComments, nParticipants] = matrixShape(ratingMatrix);
   let participantVotes = new Array(nParticipants).fill(0);
   let totalVotes = 0;
@@ -261,10 +335,10 @@ export function computePolisStats(ratingMatrix) {
  * K-Means for participants
  ***************************************************************/
 
-export function clusterParticipantsKmeans(ratingMatrix, k = 3) {
+export function clusterParticipantsKmeans(ratingMatrix: RatingMatrix, k = 3): KmeansResult {
   const [nComments, nParticipants] = matrixShape(ratingMatrix);
   // build participant array
-  const partData = [];
+  const partData: NumericMatrix = [];
   for (let p = 0; p < nParticipants; p++) {
     const row = [];
     for (let c = 0; c < nComments; c++) {
@@ -272,25 +346,25 @@ export function clusterParticipantsKmeans(ratingMatrix, k = 3) {
     }
     partData.push(row);
   }
-  const out = Kmeans(partData, k);
+  const out = Kmeans(partData, k, {}) as KmeansResult;
   return out;
 }
 
 /***************************************************************
  * clusterUMAPPointsKmeans: cluster the 2D embedded participants
  ***************************************************************/
-export function clusterUMAPPointsKmeans(umapPoints, k = 3, seed = null) {
+export function clusterUMAPPointsKmeans(umapPoints: Point2D[], k = 3, seed: number | null = null): number[] {
   // umapPoints is array of { x, y, index }
   if (!umapPoints || !umapPoints.length) return [];
-  const data = umapPoints.map((d) => [d.x, d.y]);
+  const data: NumericMatrix = umapPoints.map((d) => [d.x ?? 0, d.y ?? 0]);
   if (data.length < k) {
     return new Array(data.length).fill(0);
   }
-  const kmeansOptions = {};
+  const kmeansOptions: KmeansOptions = {};
   if (seed !== null) {
     kmeansOptions.seed = seed;
   }
-  const result = Kmeans(data, k, kmeansOptions);
+  const result = Kmeans(data, k, kmeansOptions) as KmeansResult;
   // result.clusters is array of cluster indices
   return result.clusters;
 }
@@ -300,9 +374,9 @@ export function clusterUMAPPointsKmeans(umapPoints, k = 3, seed = null) {
  *   We do “normalized network” approach...
  ***************************************************************/
 
-function buildSimilarityMatrix(ratingMatrix) {
+function buildSimilarityMatrix(ratingMatrix: RatingMatrix): NumericMatrix {
   const [nComments, nParticipants] = matrixShape(ratingMatrix);
-  const participants = [];
+  const participants: NumericMatrix = [];
   for (let p = 0; p < nParticipants; p++) {
     let row = [];
     for (let c = 0; c < nComments; c++) {
@@ -310,7 +384,7 @@ function buildSimilarityMatrix(ratingMatrix) {
     }
     participants.push(row);
   }
-  const adjacency = [];
+  const adjacency: NumericMatrix = [];
   for (let i = 0; i < nParticipants; i++) {
     adjacency[i] = new Array(nParticipants).fill(0);
   }
@@ -329,11 +403,11 @@ function buildSimilarityMatrix(ratingMatrix) {
   return adjacency;
 }
 
-export function clusterParticipantsLeiden(ratingMatrix) {
+export function clusterParticipantsLeiden(ratingMatrix: RatingMatrix): number[] {
   const adjacency = buildSimilarityMatrix(ratingMatrix);
   const nNodes = adjacency.length;
-  let edgesRow = [];
-  let edgesCol = [];
+  const edgesRow: number[] = [];
+  const edgesCol: number[] = [];
   for (let i = 0; i < nNodes; i++) {
     for (let j = i + 1; j < nNodes; j++) {
       let weight = adjacency[i][j];
@@ -354,7 +428,7 @@ export function clusterParticipantsLeiden(ratingMatrix) {
   const leiden = new LeidenAlgorithm();
   leiden.setResolution(0.3);
   leiden.setNIterations(50);
-  let bestClustering = null;
+  let bestClustering: Clustering | null = null;
   let bestQuality = -Infinity;
   for (let i = 0; i < 5; i++) {
     let c = new Clustering({ nNodes: normed.getNNodes() });
@@ -365,9 +439,9 @@ export function clusterParticipantsLeiden(ratingMatrix) {
       bestClustering = c;
     }
   }
-  const assignment = [];
+  const assignment: number[] = [];
   for (let n = 0; n < nNodes; n++) {
-    assignment[n] = bestClustering.getCluster(n);
+    assignment[n] = bestClustering?.getCluster(n) ?? 0;
   }
   return assignment;
 }
@@ -376,7 +450,7 @@ export function clusterParticipantsLeiden(ratingMatrix) {
  * Silhouette
  ***************************************************************/
 
-function euclDist(a, b) {
+function euclDist(a: NumericVector, b: NumericVector): number {
   let s = 0;
   for (let i = 0; i < a.length; i++) {
     let d = a[i] - b[i];
@@ -385,8 +459,8 @@ function euclDist(a, b) {
   return Math.sqrt(s);
 }
 
-export function silhouetteScore(data, clusters, k) {
-  const cMembers = [];
+export function silhouetteScore(data: NumericMatrix, clusters: number[], k: number): number {
+  const cMembers: number[][] = [];
   for (let i = 0; i < k; i++) {
     cMembers[i] = [];
   }
@@ -435,12 +509,12 @@ export function silhouetteScore(data, clusters, k) {
  * UMAP
  ***************************************************************/
 
-export function doUMAP(data, nNeighbors = 15, randomSeed = null) {
-  const umapOptions = { nNeighbors };
+export function doUMAP(data: NumericMatrix, nNeighbors = 15, randomSeed: number | null = null): NumericMatrix {
+  const umapOptions: { nNeighbors: number; random?: () => number } = { nNeighbors };
 
   if (randomSeed !== null) {
     // Simple PRNG for deterministic results
-    const mulberry32 = (a) => {
+    const mulberry32 = (a: number) => {
       return function () {
         var t = (a += 0x6d2b79f5);
         t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -461,8 +535,8 @@ export function doUMAP(data, nNeighbors = 15, randomSeed = null) {
  * agreed / disagreed / passed for each comment
  ***************************************************************/
 
-export function getCommentBarData(ratingMatrix) {
-  const barData = [];
+export function getCommentBarData(ratingMatrix: RatingMatrix) {
+  const barData: Array<{ index: number; agrees: number; disagrees: number; passes: number; total: number }> = [];
   for (let c = 0; c < ratingMatrix.length; c++) {
     const row = ratingMatrix[c];
     let agrees = 0,
@@ -482,9 +556,9 @@ export function getCommentBarData(ratingMatrix) {
  * computeCommentVoteCounts
  ***************************************************************/
 
-export function computeCommentVoteCounts(ratingMatrix) {
+export function computeCommentVoteCounts(ratingMatrix: RatingMatrix) {
   // Example: compute how many participants agreed/disagreed for each comment
-  const result = [];
+  const result: Array<{ commentIndex: number; total: number; agrees: number; disagrees: number; passes: number }> = [];
   for (let c = 0; c < ratingMatrix.length; c++) {
     let agrees = 0;
     let disagrees = 0;
@@ -510,7 +584,12 @@ export function computeCommentVoteCounts(ratingMatrix) {
  * findRepresentativeQuestions
  ***************************************************************/
 
-export function findRepresentativeQuestions(ratingMatrix, assignments, questionPromptsMap, allQuestions) {
+export function findRepresentativeQuestions(
+  ratingMatrix: RatingMatrix,
+  assignments: number[],
+  questionPromptsMap: Record<string, string> | null | undefined,
+  allQuestions: string[],
+): Record<number, RepresentativeQuestion[]> {
   const [nComments, nParticipants] = matrixShape(ratingMatrix);
   if (!assignments || assignments.length !== nParticipants) return {};
 
@@ -535,7 +614,7 @@ export function findRepresentativeQuestions(ratingMatrix, assignments, questionP
   }
 
   // For each cluster, compute average for each comment
-  const clusterMaps = {};
+  const clusterMaps: Record<number, ClusterStat[]> = {};
   for (let p = 0; p < nParticipants; p++) {
     const cl = assignments[p];
     if (!clusterMaps[cl]) {
@@ -552,7 +631,7 @@ export function findRepresentativeQuestions(ratingMatrix, assignments, questionP
     }
   }
 
-  const result = {};
+  const result: Record<number, RepresentativeQuestion[]> = {};
 
   Object.keys(clusterMaps).forEach((kStr) => {
     const k = parseInt(kStr, 10);
@@ -584,10 +663,10 @@ export function findRepresentativeQuestions(ratingMatrix, assignments, questionP
  * computeJointSVD
  ***************************************************************/
 
-export function computeJointSVD(ratingMatrix, randomSeed = 42) {
+export function computeJointSVD(ratingMatrix: RatingMatrix, randomSeed = 42): { part2D: Point2D[]; stmt2D: Point2D[] } {
   const nComments = ratingMatrix.length;
   const nParticipants = ratingMatrix[0].length;
-  let M = [];
+  const M: NumericMatrix = [];
   for (let c = 0; c < nComments; c++) {
     let row = [];
     for (let p = 0; p < nParticipants; p++) {
@@ -597,7 +676,7 @@ export function computeJointSVD(ratingMatrix, randomSeed = 42) {
   }
   const { U, S, V } = approximateSVD2(M, randomSeed);
 
-  function sqrt2x2(M2) {
+  function sqrt2x2(M2: NumericMatrix): NumericMatrix {
     let s0 = Math.sqrt(M2[0][0] || 0);
     let s1 = Math.sqrt(M2[1][1] || 0);
     return [
@@ -607,7 +686,7 @@ export function computeJointSVD(ratingMatrix, randomSeed = 42) {
   }
   const sSqrt = sqrt2x2(S);
 
-  const rowCoords = [];
+  const rowCoords: Point2D[] = [];
   for (let c = 0; c < nComments; c++) {
     const ux = U[c][0] || 0;
     const uy = U[c][1] || 0;
@@ -616,7 +695,7 @@ export function computeJointSVD(ratingMatrix, randomSeed = 42) {
     rowCoords.push({ index: c, x, y });
   }
 
-  const colCoords = [];
+  const colCoords: Point2D[] = [];
   for (let p = 0; p < nParticipants; p++) {
     const vx = V[p][0] || 0;
     const vy = V[p][1] || 0;
@@ -631,12 +710,12 @@ export function computeJointSVD(ratingMatrix, randomSeed = 42) {
   };
 }
 
-function approximateSVD2(A, randomSeed = null) {
+function approximateSVD2(A: NumericMatrix, randomSeed: number | null = null): Svd2Result {
   const m = A.length;
   const n = A[0].length;
 
   // --- deterministic RNG (mulberry32) when a seed is provided ---
-  function mulberry32(a) {
+  function mulberry32(a: number): () => number {
     return function () {
       let t = (a += 0x6d2b79f5);
       t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -646,7 +725,7 @@ function approximateSVD2(A, randomSeed = null) {
   }
   const rng = randomSeed == null ? Math.random : mulberry32(randomSeed);
 
-  function matVec(mtx, vec) {
+  function matVec(mtx: NumericMatrix, vec: NumericVector): NumericVector {
     const out = new Array(mtx.length).fill(0);
     for (let i = 0; i < mtx.length; i++) {
       const row = mtx[i];
@@ -657,7 +736,7 @@ function approximateSVD2(A, randomSeed = null) {
     return out;
   }
 
-  function matTvec(mtx, vec) {
+  function matTvec(mtx: NumericMatrix, vec: NumericVector): NumericVector {
     const out = new Array(mtx[0].length).fill(0);
     for (let j = 0; j < mtx[0].length; j++) {
       let sum = 0;
@@ -667,17 +746,17 @@ function approximateSVD2(A, randomSeed = null) {
     return out;
   }
 
-  function normV(vec) {
+  function normV(vec: NumericVector): number {
     let s = 0;
     for (let x of vec) s += x * x;
     return Math.sqrt(s);
   }
 
-  function scale(vec, sc) {
-    return vec.map((x) => x * sc);
+  function scale(vec: NumericVector, sc: number): NumericVector {
+    return vec.map((x: number) => x * sc);
   }
 
-  function powerIterationRank1(Min, maxIter = 25) {
+  function powerIterationRank1(Min: NumericMatrix, maxIter = 25): SvdRank1Result {
     const nCols = Min[0].length;
     // **seeded** initialization instead of Math.random()
     let v = new Array(nCols).fill(0).map(() => rng() - 0.5);
@@ -705,7 +784,7 @@ function approximateSVD2(A, randomSeed = null) {
     return { u, s: sVal, v };
   }
 
-  function deflate(Min, { u, s, v }) {
+  function deflate(Min: NumericMatrix, { u, s, v }: SvdRank1Result): void {
     for (let i = 0; i < m; i++) {
       for (let j = 0; j < n; j++) {
         Min[i][j] = Min[i][j] - s * u[i] * v[j];
@@ -713,12 +792,12 @@ function approximateSVD2(A, randomSeed = null) {
     }
   }
 
-  let U = [],
+  const U: NumericMatrix = [],
     S = [
       [0, 0],
       [0, 0],
     ],
-    V = [];
+    V: NumericMatrix = [];
 
   const r1 = powerIterationRank1(A, 25);
   if (r1.s < 1e-12) {
@@ -761,9 +840,15 @@ function approximateSVD2(A, randomSeed = null) {
  * up to 1 for a perfect 50/50 split.
  *
  ***************************************************************/
-export function computeQuestionDivisiveness(ratingMatrix) {
+export function computeQuestionDivisiveness(ratingMatrix: RatingMatrix) {
   const [nComments, nParticipants] = matrixShape(ratingMatrix);
-  const results = [];
+  const results: Array<{
+    commentIndex: number;
+    agrees: number;
+    disagrees: number;
+    total: number;
+    divisiveness: number;
+  }> = [];
 
   for (let c = 0; c < nComments; c++) {
     let agrees = 0;
