@@ -38,6 +38,15 @@ import {
   normalizeTagsPayload,
 } from './arweaveGatewayPayloads.js';
 import {
+  getAvailableGatewaysForAttempt,
+  getGraphqlEndpointSortScore,
+  isGraphqlEndpointCoolingDown,
+  markGatewayFailure,
+  markGatewaySuccess,
+  markGraphqlEndpointFailure,
+  markGraphqlEndpointSuccess,
+} from './arweaveGatewayHealth.js';
+import {
   CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS,
   CE_ARWEAVE_PREFLIGHT_SBT_METADATA,
   CE_ARWEAVE_PREFLIGHT_SESSION_METADATA,
@@ -426,15 +435,11 @@ const ARWEAVE_GRAPHQL_ENDPOINTS = [
   'https://g8way.io/graphql',
   'https://arweave.net/graphql',
 ];
-const ARWEAVE_GATEWAY_COOLDOWN_BASE_MS = 8 * 1000;
-const ARWEAVE_GATEWAY_COOLDOWN_MAX_MS = 90 * 1000;
 const ARWEAVE_TX_EXISTENCE_CACHE_TTL_MS = 15 * 60 * 1000;
 const ARWEAVE_TX_EXISTENCE_CACHE_MAX = 2400;
 const ARWEAVE_TX_CONTEXT_CACHE_MAX = 3000;
 const ARWEAVE_TX_CONTEXT_LABEL_MAX = 8;
 const ARWEAVE_TX_EVENT_DEDUPE_TTL_MS = 30 * 1000;
-const ARWEAVE_GRAPHQL_COOLDOWN_BASE_MS = 30 * 1000;
-const ARWEAVE_GRAPHQL_COOLDOWN_MAX_MS = 5 * 60 * 1000;
 const ARWEAVE_GRAPHQL_TIMEOUT_MS = 3500;
 export const ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS = 30_000;
 const MAX_ARWEAVE_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
@@ -445,8 +450,6 @@ const arweaveTxExistenceCache = new Map();
 const arweaveTxExistenceInFlight = new Map();
 const arweaveTxContextCache = new Map();
 const arweaveTxEventDedupe = new Map();
-const arweaveGraphqlEndpointHealth = new Map();
-const arweaveGatewayHealth = new Map();
 
 const getArweaveTextCacheEntry = (txId) => {
   const key = String(txId || '').trim();
@@ -520,158 +523,6 @@ const getArweaveTxContextLabels = (txId) => {
   const entry = arweaveTxContextCache.get(normalizedTxId);
   if (!entry || !Array.isArray(entry.labels)) return [];
   return [...entry.labels];
-};
-
-const readGraphqlEndpointHealth = (endpoint) => {
-  const key = String(endpoint || '').trim();
-  if (!key) return { failures: 0, cooldownUntilMs: 0, lastStatus: null };
-  const raw = arweaveGraphqlEndpointHealth.get(key);
-  if (!raw || typeof raw !== 'object') {
-    return { failures: 0, cooldownUntilMs: 0, lastStatus: null };
-  }
-  return {
-    failures: Math.max(0, Number(raw.failures || 0)),
-    cooldownUntilMs: Math.max(0, Number(raw.cooldownUntilMs || 0)),
-    lastStatus: Number.isFinite(Number(raw.lastStatus)) ? Number(raw.lastStatus) : null,
-  };
-};
-
-const markGraphqlEndpointSuccess = (endpoint) => {
-  const key = String(endpoint || '').trim();
-  if (!key) return;
-  arweaveGraphqlEndpointHealth.set(key, {
-    failures: 0,
-    cooldownUntilMs: 0,
-    lastStatus: 200,
-  });
-};
-
-const markGraphqlEndpointFailure = (endpoint, status = null) => {
-  const key = String(endpoint || '').trim();
-  if (!key) return;
-  const prev = readGraphqlEndpointHealth(key);
-  const failures = Math.max(1, Number(prev.failures || 0) + 1);
-  const exponent = Math.max(0, Math.min(8, failures - 1));
-  const cooldownMs = Math.min(
-    ARWEAVE_GRAPHQL_COOLDOWN_MAX_MS,
-    Math.round(ARWEAVE_GRAPHQL_COOLDOWN_BASE_MS * Math.pow(2, exponent)),
-  );
-  arweaveGraphqlEndpointHealth.set(key, {
-    failures,
-    cooldownUntilMs: Date.now() + cooldownMs,
-    lastStatus: Number.isFinite(Number(status)) ? Number(status) : null,
-  });
-};
-
-const isGraphqlEndpointCoolingDown = (endpoint) => {
-  const health = readGraphqlEndpointHealth(endpoint);
-  return Number(health.cooldownUntilMs || 0) > Date.now();
-};
-
-const getGraphqlEndpointSortScore = (endpoint) => {
-  const health = readGraphqlEndpointHealth(endpoint);
-  const coolingDown = Number(health.cooldownUntilMs || 0) > Date.now();
-  if (coolingDown) return Number.MAX_SAFE_INTEGER;
-  return Math.max(0, Number(health.failures || 0));
-};
-
-const readGatewayHealth = (gateway) => {
-  const key = String(gateway || '').trim();
-  if (!key) return { failures: 0, cooldownUntilMs: 0, lastStatus: null };
-  const raw = arweaveGatewayHealth.get(key);
-  if (!raw || typeof raw !== 'object') {
-    return { failures: 0, cooldownUntilMs: 0, lastStatus: null };
-  }
-  return {
-    failures: Math.max(0, Number(raw.failures || 0)),
-    cooldownUntilMs: Math.max(0, Number(raw.cooldownUntilMs || 0)),
-    lastStatus: Number.isFinite(Number(raw.lastStatus)) ? Number(raw.lastStatus) : null,
-  };
-};
-
-const markGatewaySuccess = (gateway) => {
-  const key = normalizeGatewayBase(gateway);
-  if (!key) return;
-  arweaveGatewayHealth.set(key, {
-    failures: 0,
-    cooldownUntilMs: 0,
-    lastStatus: 200,
-  });
-};
-
-const shouldGatewayCooldown = ({ status = null, kind = '' } = {}) => {
-  const statusNum = Number(status);
-  if (kind === 'network') return true;
-  if (!Number.isFinite(statusNum)) return false;
-  if (statusNum === 429 || statusNum === 425) return true;
-  return statusNum >= 500;
-};
-
-const markGatewayFailure = (gateway, { status = null, kind = '' } = {}) => {
-  const key = normalizeGatewayBase(gateway);
-  if (!key) return;
-  const statusNum = Number(status);
-  const shouldCool = shouldGatewayCooldown({
-    status: Number.isFinite(statusNum) ? statusNum : null,
-    kind: String(kind || '')
-      .trim()
-      .toLowerCase(),
-  });
-  const prev = readGatewayHealth(key);
-  if (!shouldCool) {
-    arweaveGatewayHealth.set(key, {
-      failures: Math.max(0, Number(prev.failures || 0)),
-      cooldownUntilMs: Math.max(0, Number(prev.cooldownUntilMs || 0)),
-      lastStatus: Number.isFinite(statusNum) ? statusNum : null,
-    });
-    return;
-  }
-  const failures = Math.max(1, Number(prev.failures || 0) + 1);
-  const exponent = Math.max(0, Math.min(8, failures - 1));
-  const cooldownMs = Math.min(
-    ARWEAVE_GATEWAY_COOLDOWN_MAX_MS,
-    Math.round(ARWEAVE_GATEWAY_COOLDOWN_BASE_MS * Math.pow(2, exponent)),
-  );
-  arweaveGatewayHealth.set(key, {
-    failures,
-    cooldownUntilMs: Date.now() + cooldownMs,
-    lastStatus: Number.isFinite(statusNum) ? statusNum : null,
-  });
-};
-
-const isGatewayCoolingDown = (gateway) => {
-  const key = normalizeGatewayBase(gateway);
-  if (!key) return false;
-  const health = readGatewayHealth(key);
-  return Number(health.cooldownUntilMs || 0) > Date.now();
-};
-
-const getGatewaySortScore = (gateway) => {
-  const key = normalizeGatewayBase(gateway);
-  if (!key) return Number.MAX_SAFE_INTEGER;
-  const health = readGatewayHealth(key);
-  const coolingDown = Number(health.cooldownUntilMs || 0) > Date.now();
-  if (coolingDown) return Number.MAX_SAFE_INTEGER;
-  return Math.max(0, Number(health.failures || 0));
-};
-
-const sortGatewaysByHealth = (gateways = []) =>
-  [...(Array.isArray(gateways) ? gateways : [])]
-    .map((gateway, index) => ({
-      gateway,
-      index,
-      score: getGatewaySortScore(gateway),
-    }))
-    .sort((a, b) => {
-      if (a.score !== b.score) return a.score - b.score;
-      return a.index - b.index;
-    })
-    .map((item) => item.gateway);
-
-const getAvailableGatewaysForAttempt = (gateways = []) => {
-  const ordered = sortGatewaysByHealth(gateways);
-  const available = ordered.filter((gateway) => !isGatewayCoolingDown(gateway));
-  return available.length ? available : ordered;
 };
 
 const fetchWithTimeout = async (url, options = {}, timeoutMs = ARWEAVE_GRAPHQL_TIMEOUT_MS) => {
