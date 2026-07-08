@@ -41,13 +41,22 @@ export type AiClientOptionRecord = UnknownRecord & {
   workerUrl?: unknown;
 };
 
+export type AiClientProviderLike = string | UnknownRecord | null | undefined;
+
+export type AiClientContext = UnknownRecord & {
+  account?: string;
+  chainId?: number | string | null;
+  lit?: UnknownRecord | null;
+  providerLike?: AiClientProviderLike;
+};
+
 export type AiSessionSelection = UnknownRecord & {
   gateStatus?: unknown;
   reason?: unknown;
 };
 
 export type AiSessionOptions = {
-  context: unknown;
+  context: AiClientContext | undefined;
   sessionConfig: SessionConfig | null;
   sessionSlug: string;
 };
@@ -55,13 +64,18 @@ export type AiSessionOptions = {
 const asOptionRecord = (input: unknown = {}): AiClientOptionRecord =>
   input && typeof input === 'object' && !Array.isArray(input) ? (input as AiClientOptionRecord) : {};
 
+const readAiClientContext = (input: unknown): AiClientContext | undefined =>
+  input && typeof input === 'object' && !Array.isArray(input) ? (input as AiClientContext) : undefined;
+
+const readPreferLocal = (input: unknown): boolean | undefined => (typeof input === 'boolean' ? input : undefined);
+
 export const normalizeAiClientOptions = (input: unknown = {}): AiClientOptionRecord => asOptionRecord(input);
 
 export const resolveAiSessionOptions = (input: unknown = {}): AiSessionOptions => {
   const opts = asOptionRecord(input);
   const aliases = resolveSessionConfigAliases(opts);
   return {
-    context: opts.context,
+    context: readAiClientContext(opts.context),
     sessionConfig: aliases.sessionConfig,
     sessionSlug: aliases.sessionSlug,
   };
@@ -83,18 +97,18 @@ export const buildAiConfigRequest = (
   input: unknown = {},
   { thinking = false }: { thinking?: unknown } = {},
 ): {
-  context: unknown;
+  context: AiClientContext | undefined;
   model: unknown;
-  preferLocal: unknown;
+  preferLocal: boolean | undefined;
   provider: unknown;
   sessionSlug: string;
   thinking: boolean;
 } => {
   const opts = asOptionRecord(input);
   return {
-    context: opts.context,
+    context: readAiClientContext(opts.context),
     model: opts.model,
-    preferLocal: opts.preferLocal,
+    preferLocal: readPreferLocal(opts.preferLocal),
     provider: opts.provider,
     sessionSlug: resolveAiSessionSlug(opts),
     thinking: !!thinking,
@@ -105,9 +119,9 @@ export const buildTranscriptionConfigRequest = (
   input: unknown = {},
 ): {
   apiKey: unknown;
-  context: unknown;
+  context: AiClientContext | undefined;
   model: unknown;
-  preferLocal: unknown;
+  preferLocal: boolean | undefined;
   provider: unknown;
   rpcUrl: unknown;
   sessionSlug: string;
@@ -115,9 +129,9 @@ export const buildTranscriptionConfigRequest = (
   const opts = asOptionRecord(input);
   return {
     apiKey: opts.apiKey,
-    context: opts.context,
+    context: readAiClientContext(opts.context),
     model: opts.model,
-    preferLocal: opts.preferLocal,
+    preferLocal: readPreferLocal(opts.preferLocal),
     provider: opts.provider,
     rpcUrl: opts.rpcUrl,
     sessionSlug: resolveAiSessionSlug(opts),
@@ -127,8 +141,8 @@ export const buildTranscriptionConfigRequest = (
 export const buildArweaveKeyRequest = (
   input: unknown = {},
 ): {
-  context: unknown;
-  preferLocal: unknown;
+  context: AiClientContext | undefined;
+  preferLocal: boolean | undefined;
   sessionConfig: SessionConfig | null;
   sessionSlug: string;
 } => {
@@ -136,7 +150,7 @@ export const buildArweaveKeyRequest = (
   const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
   return {
     context,
-    preferLocal: opts.preferLocal,
+    preferLocal: readPreferLocal(opts.preferLocal),
     sessionConfig,
     sessionSlug,
   };

@@ -110,6 +110,23 @@ describe('aiClientRequestOptions', () => {
     });
   });
 
+  it('normalizes primitive context and preferLocal values before downstream API calls', () => {
+    expect(
+      buildAiConfigRequest({
+        context: 'not-a-wallet-context',
+        preferLocal: 'yes',
+        sessionSlug: 'alpha-session',
+      }),
+    ).toEqual({
+      context: undefined,
+      model: undefined,
+      preferLocal: undefined,
+      provider: undefined,
+      sessionSlug: 'alpha-session',
+      thinking: false,
+    });
+  });
+
   it('builds Arweave key requests with session config and context intact', () => {
     const context = { requestId: 'req-3' };
     const sessionConfig = { sessionName: 'Alpha', slug: 'alpha-session' };
