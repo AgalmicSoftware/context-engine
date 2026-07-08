@@ -1,4 +1,5 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import type { SurveyDecryptSourceState } from './surveyToolDecryptSourceContract.js';
 import {
   applyQuestionDecryptBusyTokenRegistration,
   canUpdateStateForAsyncSnapshot as canUpdateStateForAsyncSnapshotForHost,
@@ -453,7 +454,7 @@ export const createSurveyQuestionsDecryptRuntime = (
       fallbackSourceSlice,
       previousStateSlice,
       buildSliceFromUserAnswers,
-    );
+    ) as SurveyDecryptSourceState;
 
   const hydrateLatestQuestionDecryptState = async (options: SurveyQuestionsLegacyValue = {}) =>
     (hydrateLatestQuestionDecryptStateHelper as SurveyQuestionsLegacyValue)(options, {

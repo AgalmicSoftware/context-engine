@@ -1,7 +1,12 @@
 import { buildEmptyQuestionDecryptSlice } from './surveyToolDecryptState';
 import { ensureQuestionDecryptSliceShape } from './surveyToolDecryptSliceState';
-
-type UnknownRecord = Record<string, unknown>;
+import type {
+  DecryptResponseSlice,
+  QuestionRatingEnvelopeMap,
+  SurveyDecryptAttemptSourceInputs,
+  SurveyDecryptSourceState,
+} from './surveyToolDecryptSourceContract';
+import type { UnknownRecord } from './surveyToolTypes';
 
 const isObjectLike = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object';
 
@@ -123,8 +128,11 @@ export const decryptQuestionRatingEnvelopeMap = async (
   };
 };
 
-export const collectQuestionRatingEnvelopesByQid = (source: unknown = null) => {
-  const ratingEnvelopesByQid: Record<string, { importanceEncrypted: string; convictionEncrypted: string }> = {};
+const toDecryptResponseSlice = (value: unknown): DecryptResponseSlice =>
+  ensureQuestionDecryptSliceShape(value) as DecryptResponseSlice;
+
+export const collectQuestionRatingEnvelopesByQid = (source: unknown = null): QuestionRatingEnvelopeMap => {
+  const ratingEnvelopesByQid: QuestionRatingEnvelopeMap = {};
   try {
     const addFromResponseObject = (responseObject: unknown) => {
       if (!isObjectLike(responseObject)) return;
@@ -157,8 +165,11 @@ export const collectQuestionRatingEnvelopesByQid = (source: unknown = null) => {
   return ratingEnvelopesByQid;
 };
 
-export const carryForwardSurveyQuestionRatings = (sourceSlice: unknown = null, previousStateSlice: unknown = null) => {
-  const nextSourceSlice = ensureQuestionDecryptSliceShape(sourceSlice);
+export const carryForwardSurveyQuestionRatings = (
+  sourceSlice: unknown = null,
+  previousStateSlice: unknown = null,
+): DecryptResponseSlice => {
+  const nextSourceSlice = toDecryptResponseSlice(sourceSlice);
   const previous = asRecord(previousStateSlice);
   const previousImportance = asRecord(previous.importance);
   const previousConviction = asRecord(previous.conviction);
@@ -180,10 +191,10 @@ export const buildSurveyDecryptSourceState = (
   fallbackSourceSlice: unknown = null,
   previousStateSlice: unknown = null,
   buildSliceFromUserAnswers: (value: unknown) => unknown = (value) => value,
-) => {
+): SurveyDecryptSourceState => {
   const baseSourceSlice = latestResponse
     ? buildSliceFromUserAnswers(latestResponse)
-    : ensureQuestionDecryptSliceShape(fallbackSourceSlice || buildEmptyQuestionDecryptSlice());
+    : toDecryptResponseSlice(fallbackSourceSlice || buildEmptyQuestionDecryptSlice());
 
   return {
     sourceSlice: carryForwardSurveyQuestionRatings(baseSourceSlice, previousStateSlice),
@@ -199,7 +210,7 @@ export const buildSurveyDecryptAttemptSourceInputs = ({
   decryptContext?: unknown;
   state?: unknown;
   getEffectiveDraftSlug?: unknown;
-} = {}) => {
+} = {}): SurveyDecryptAttemptSourceInputs => {
   const context = asRecord(decryptContext);
   const stateRecord = asRecord(state);
   const surveysResponseState = (stateRecord.surveysResponseState as unknown[]) || [];
