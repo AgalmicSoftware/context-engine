@@ -29,6 +29,12 @@ import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { resolveSessionConfigAliases } from '../session/sessionNaming.js';
 import { normalizeBaseUrl } from '../urlUtils.js';
+import {
+  buildE2eMockClusterAnalysis,
+  buildE2eMockCompareBullets,
+  buildE2eMockDrilldownTree,
+  isE2eAiMockEnabled,
+} from './aiClientE2eMocks.js';
 
 import {
   pcaLiteCompass,
@@ -41,45 +47,11 @@ import { createLogger } from '../logging.js';
 
 const aiLog = createLogger('ai');
 export { TRANSCRIBE_MAX_UPLOAD_BYTES, extractSpeechAudio } from './aiClientAudioTranscription.js';
+export { isE2eAiMockEnabled } from './aiClientE2eMocks.js';
 
 /* ======================================================================
  * Dev/E2E-only AI mock mode
  * ====================================================================== */
-
-const _readLocalStorageFlag = (key) => {
-  try {
-    if (typeof window === 'undefined' || !window.localStorage) return false;
-    return window.localStorage.getItem(String(key || '')) === '1';
-  } catch (_) {
-    return false;
-  }
-};
-
-const _readQueryFlag = (key) => {
-  try {
-    if (typeof window === 'undefined' || !window.location) return false;
-    const qp = new URLSearchParams(String(window.location.search || ''));
-    return qp.get(String(key || '')) === '1';
-  } catch (_) {
-    return false;
-  }
-};
-
-export const isE2eAiMockEnabled = () => {
-  // Never enable in production bundles.
-  if (process.env.NODE_ENV === 'production') return false;
-
-  try {
-    if (globalThis && globalThis.CE_E2E_AI_MOCK === true) return true;
-  } catch (e) {
-    aiLog.warn('AI mock flag lookup failed:', e);
-  }
-
-  if (_readLocalStorageFlag('ce-e2e-ai-mock')) return true;
-  if (_readQueryFlag('aiMock')) return true;
-
-  return false;
-};
 
 const SUPPORTED_PHOTO_MIME_TYPES = Object.freeze({
   png: 'image/png',
@@ -243,115 +215,6 @@ export const analyzePhotoForQuestionGeneration = async (file, opts = {}) => {
     model: ai.model,
     requestFormat: support.format,
   };
-};
-
-const _shortAddr = (addr) => {
-  const s = String(addr || '').trim();
-  if (!s) return '';
-  if (s.length <= 12) return s;
-  return `${s.slice(0, 6)}...${s.slice(-4)}`;
-};
-
-const _hashStr32 = (value) => {
-  const s = String(value || '');
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i += 1) {
-    h ^= s.charCodeAt(i);
-    // eslint-disable-next-line no-bitwise
-    h = Math.imul(h, 16777619);
-  }
-  // eslint-disable-next-line no-bitwise
-  return h >>> 0;
-};
-
-const buildE2eMockCompareBullets = (users = []) => {
-  const safe = Array.isArray(users) ? users : [];
-  const addrs = safe.map((u) => String(u?.address || '').trim()).filter(Boolean);
-  const label = (a) => _shortAddr(a) || 'unknown';
-  const joined = addrs.slice(0, 3).map(label).join(', ');
-  const seed = addrs.join('|') || String(safe.length);
-  const h = _hashStr32(seed);
-
-  const totalSbt = safe.reduce((acc, u) => acc + (Array.isArray(u?.sbts) ? u.sbts.length : 0), 0);
-  const totalQuestions = safe.reduce((acc, u) => acc + (Array.isArray(u?.questions) ? u.questions.length : 0), 0);
-  const totalSurveys = safe.reduce((acc, u) => acc + (Array.isArray(u?.surveys) ? u.surveys.length : 0), 0);
-
-  const agreements = [
-    `Compared ${safe.length} participant(s): ${joined || '(none)'}.`,
-    `Observed signals (cache-derived): ${totalQuestions} question response(s), ${totalSurveys} survey response(s), ${totalSbt} SBT(s).`,
-  ];
-
-  const a = addrs[0] || '';
-  const b = addrs[1] || '';
-  const pick = (arr) => arr[h % arr.length];
-  const disagreements = [
-    pick([
-      `Most distinct themes: ${label(a)} vs ${label(b)} differ on participation footprint (mock).`,
-      `Most distinct themes: ${label(a)} vs ${label(b)} differ on voting certainty (mock).`,
-      `Most distinct themes: ${label(a)} vs ${label(b)} differ on observed topic clusters (mock).`,
-    ]),
-    pick([
-      `Next step: open drilldowns to see which statements drive the gap (mock).`,
-      `Next step: check SBT overlap and stance clusters for a sharper split (mock).`,
-      `Next step: review high-divergence prompts for explainers (mock).`,
-    ]),
-  ];
-
-  return {
-    agreements: agreements.filter(Boolean),
-    disagreements: disagreements.filter(Boolean),
-  };
-};
-
-const buildE2eMockClusterAnalysis = (clusterData) => {
-  const idxRaw = clusterData?.clusterIndex ?? clusterData?.cluster ?? clusterData?.index ?? 0;
-  const idx = Number(idxRaw);
-  const clusterIndex = Number.isFinite(idx) ? idx : 0;
-  const sizeRaw = clusterData?.clusterSize ?? clusterData?.size ?? 0;
-  const size = Number(sizeRaw);
-  const clusterSize = Number.isFinite(size) ? size : 0;
-
-  const statements = Array.isArray(clusterData?.topStatements) ? clusterData.topStatements : [];
-  const withPrompt = statements
-    .filter((s) => s && typeof s === 'object' && typeof s.prompt === 'string' && s.prompt.trim())
-    .slice()
-    .sort((a, b) => Math.abs((b.differenceScore ?? 0) - 0) - Math.abs((a.differenceScore ?? 0) - 0));
-
-  const collapseSpace = (text) =>
-    String(text || '')
-      .replace(/\s+/g, ' ')
-      .trim();
-  const truncate = (text, max = 110) => {
-    const clean = collapseSpace(text);
-    if (clean.length <= max) return clean;
-    return `${clean.slice(0, Math.max(0, max - 3))}...`;
-  };
-
-  const top = withPrompt[0] || null;
-  const topPrompt = top ? truncate(top.prompt, 120) : '';
-  const topDelta = top && Number.isFinite(Number(top.differenceScore)) ? Number(top.differenceScore) : null;
-  const deltaText = topDelta == null ? '' : ` (Δ=${topDelta.toFixed(2)})`;
-
-  const namePrefix = clusterSize >= 12 ? 'Large' : clusterSize >= 6 ? 'Mid' : clusterSize >= 1 ? 'Small' : 'Empty';
-  const name = `${namePrefix} Group ${clusterIndex}`;
-
-  const short = topPrompt
-    ? `Top differentiator: "${topPrompt}"${deltaText}.`
-    : clusterSize
-      ? `Cluster ${clusterIndex} has ${clusterSize} participant(s).`
-      : `Cluster ${clusterIndex} has no participants.`;
-
-  const otherPrompts = withPrompt
-    .slice(1, 4)
-    .map((s) => `"${truncate(s.prompt, 90)}"`)
-    .filter(Boolean);
-  const longParts = [];
-  if (clusterSize) longParts.push(`This cluster has ${clusterSize} participant(s).`);
-  if (topPrompt) longParts.push(`It stands out most on "${topPrompt}".`);
-  if (otherPrompts.length) longParts.push(`Other differentiators: ${otherPrompts.join('; ')}.`);
-  if (!longParts.length) longParts.push('Not enough statement data to summarize this cluster.');
-
-  return { name, short, long: longParts.join(' ') };
 };
 
 // === Client-side silence trimming feature flag and config (runtime-controlled from UI) ===
@@ -1470,22 +1333,7 @@ export async function runCompareToolkit(task, payload = {}, opts = {}) {
   if (isE2eAiMockEnabled()) {
     if (t === 'compare') return buildE2eMockCompareBullets(safeUsers);
     if (t === 'drilldown') {
-      const kind = payload.type === 'disagreement' ? 'disagreement' : 'agreement';
-      const pointText = String(payload.pointText || '').trim();
-      const evidence = safeUsers
-        .map((u) => _shortAddr(u?.address))
-        .filter(Boolean)
-        .slice(0, 4);
-      return {
-        title: `Mock drilldown (${kind})`,
-        nodes: [
-          {
-            label: pointText ? `Point: ${pointText.slice(0, 160)}` : 'Point',
-            evidence,
-            children: [],
-          },
-        ],
-      };
+      return buildE2eMockDrilldownTree(payload, safeUsers);
     }
     return null;
   }
