@@ -16,15 +16,15 @@ reference for reviewing future test additions.
 | Command | Result | Wall time |
 |---|---:|---:|
 | `npm run test:ci` | passed: wiring, type-debt, release, contracts, client coverage, root/worker/cc/node/cache | 522.023s |
-| `npm run test:client` | 1,009 suites, 7,434 passed, 1 skipped | 244.954s |
+| `npm run test:client` | 1,042 suites, 7,602 passed, 0 skipped | 283.960s |
 | `cd client && npm test -- --watchAll=false --runInBand --json --outputFile=/tmp/prd655-jest-results.json` | 997 suites, 7,399 passed, 1 skipped | 150.899s |
 | `npm run test:node` | 239 passed | 33.279s |
 | `BASE_URL=http://127.0.0.1:4173 SMOKE_ROUTES=/session/pe4,/about,/contracts npm run -s test:e2e:smoke` | passed against built Vite preview; 3 routes, no failures | 9.257s |
 
 Against a 25-minute ceiling, the full `test:ci` run leaves about 16m18s of
-headroom. The full client coverage run leaves about 20m55s
+headroom. The full client coverage run leaves about 20m16s
 of headroom inside the client job. The local full client coverage run plus
-`test:node` totals about 278.233s, leaving about 20m22s against a single
+`test:node` totals about 317.239s, leaving about 19m43s against a single
 25-minute budget.
 
 The tracked E2E smoke command leaves about 9m50s of headroom inside its
@@ -58,20 +58,20 @@ budget trend or a targeted developer-loop need.
 
 The measured global coverage from `npm run test:client` was:
 
-- Statements: 76.58% (75,454 / 98,519)
-- Branches: 61.33% (64,720 / 105,519)
-- Functions: 77.81% (13,995 / 17,985)
-- Lines: 79.36% (70,002 / 88,200)
+- Statements: 77.13% (76,653 / 99,369)
+- Branches: 61.80% (65,206 / 105,509)
+- Functions: 78.37% (14,310 / 18,259)
+- Lines: 79.90% (71,136 / 89,027)
 
 Selected top-level `client/src` buckets from `client/coverage/lcov.info`:
 
 | Bucket | Files | Lines | Branches | Functions |
 |---|---:|---:|---:|---:|
-| `src/components` | 609 | 80.53% | 62.93% | 75.99% |
-| `src/domains` | 35 | 96.86% | 74.50% | 96.07% |
-| `src/utilities` | 194 | 75.56% | 56.44% | 79.19% |
-| `src/variables` | 12 | 93.25% | 64.66% | 95.28% |
-| `src/wallet` | 13 | 65.17% | 43.59% | 54.04% |
+| `src/components` | 662 | 80.55% | 63.37% | 76.54% |
+| `src/domains` | 35 | 96.79% | 74.50% | 96.07% |
+| `src/utilities` | 231 | 78.04% | 58.11% | 82.70% |
+| `src/variables` | 12 | 92.03% | 66.21% | 95.49% |
+| `src/wallet` | 13 | 65.23% | 43.59% | 54.32% |
 
 Coverage floors are banked in both `client/jest.config.cjs` and
 `scripts/coverage-baseline.json` by rounding the measured global floor down
