@@ -587,8 +587,8 @@ h3.postHeading {
 }
 
 .vizGroupDisclosure > .vizDisclosureSummary {
-  background: linear-gradient(90deg, rgba(0, 197, 255, 0.16), rgba(255, 255, 255, 0.055)), $card-bg;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22);
+  background: linear-gradient(90deg, rgba(0, 197, 255, 0.09), rgba(255, 255, 255, 0.045)), $card-bg;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
   font-size: 1.05rem;
   font-weight: 700;
 
@@ -601,14 +601,30 @@ h3.postHeading {
   display: grid;
   gap: $viz-gap-lg;
   overflow: hidden;
-  padding: $viz-gap-md;
+  padding: 16px 18px;
 }
 
 .vizGroupStack {
   min-width: 0;
   display: grid;
   align-content: start;
-  gap: $viz-gap-md;
+  gap: 0;
+
+  // one visible chrome level: stacked sections are flattened and separated
+  // by hairline dividers instead of nested boxes
+  > .vizCard {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  // three-class selector so the divider outlives the border reset above
+  > .vizCard + .vizCard {
+    margin-top: $viz-gap-xl;
+    padding-top: $viz-gap-xl;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+  }
 }
 
 .vizCarousel {
@@ -1906,7 +1922,6 @@ h3.postHeading {
   figure {
     margin: 0;
     padding: $viz-gap-sm $viz-gap-md;
-    border: 1px solid $input-border;
     border-radius: $viz-radius;
     background: $input-bg;
   }
