@@ -29,6 +29,26 @@ describe('sbtActivityCacheEntry', () => {
     });
   });
 
+  it('supports event-block overrides for newly created SBTs', () => {
+    expect(
+      buildSbtActivityCacheEntry({
+        sbtAddress: '0xSBT',
+        sbtInfo: { creationBlock: 12 },
+        creationBlock: 24,
+        blockNumber: 24,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        sbtAddress: '0xSBT',
+        creationBlock: 24,
+        blockNumber: 24,
+        countsLoaded: false,
+        mintedCountByAddress: {},
+        burnedCountByAddress: {},
+      }),
+    );
+  });
+
   it('normalizes legacy state and applies a mint event', () => {
     const entry = {
       mintedAddresses: ['0xAAA', '0xbbb', '0xAAA'],

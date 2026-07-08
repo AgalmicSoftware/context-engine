@@ -28,6 +28,8 @@ export interface SbtActivityCacheEntry {
 export interface BuildSbtActivityCacheEntryInput {
   sbtAddress: string;
   sbtInfo?: SbtActivityCacheEntry['sbtInfo'];
+  creationBlock?: unknown;
+  blockNumber?: number;
 }
 
 export interface ApplySbtActivityCacheEntryUpdateInput {
@@ -44,13 +46,15 @@ const ensureMutableCountMap = (value: unknown): SbtCountMap => {
 export const buildSbtActivityCacheEntry = ({
   sbtAddress,
   sbtInfo = null,
+  creationBlock = sbtInfo?.creationBlock ?? null,
+  blockNumber = 0,
 }: BuildSbtActivityCacheEntryInput): SbtActivityCacheEntry => ({
   sbtAddress,
   sbtInfo,
   mintedAddresses: [],
   burnedAddresses: [],
-  blockNumber: 0,
-  creationBlock: sbtInfo?.creationBlock ?? null,
+  blockNumber,
+  creationBlock,
   mintedCountByAddress: {},
   burnedCountByAddress: {},
   mintedEventCount: 0,

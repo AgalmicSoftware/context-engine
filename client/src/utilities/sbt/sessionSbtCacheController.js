@@ -1827,26 +1827,12 @@ export const createSessionSbtCacheController = (host = {}) => {
         return;
       }
 
-      networkCache.sbtList[sbtAddressOriginalCase.toLowerCase()] = {
+      networkCache.sbtList[sbtAddressOriginalCase.toLowerCase()] = buildSbtActivityCacheEntry({
         sbtAddress: sbtAddressOriginalCase,
         sbtInfo,
-        mintedAddresses: [],
-        burnedAddresses: [],
-        mintedCountByAddress: {},
-        burnedCountByAddress: {},
-        mintedEventCount: 0,
-        burnedEventCount: 0,
-        historySummary: {
-          totalMinted: '0',
-          totalBurned: '0',
-          activeSupply: '0',
-          currentHolderCount: '0',
-          historicalHolderCount: '0',
-        },
-        countsLoaded: false,
         creationBlock: eventBlockNumber,
         blockNumber: eventBlockNumber,
-      };
+      });
       networkCache.lastBlock = Math.max(networkCache.lastBlock || 0, eventBlockNumber);
       updateSbtRealtimeCursorForNetworkCache(networkCache, eventCursor);
 
