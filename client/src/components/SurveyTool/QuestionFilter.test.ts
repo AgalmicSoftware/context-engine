@@ -64,6 +64,14 @@ const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null 
     }
     if (typeof current !== 'object') continue;
     if (predicate(current)) return current;
+    if (
+      typeof current.type === 'function' &&
+      !current.type.prototype?.render &&
+      String(current.type.name || '').startsWith('QuestionFilter')
+    ) {
+      stack.push(current.type(current.props || {}));
+      continue;
+    }
     const children = current?.props?.children;
     if (children !== undefined) stack.push(children);
   }
