@@ -20,7 +20,10 @@ import {
   isRetryableStatus,
   withTimeout,
 } from './arweaveFetchErrors.js';
-import { classifyArweaveGatewayPayloadResponse } from './arweaveGatewayPayloadResponse.js';
+import {
+  buildArweaveGatewayHttpFailure,
+  classifyArweaveGatewayPayloadResponse,
+} from './arweaveGatewayPayloadResponse.js';
 import {
   buildArweaveGatewayRouteCandidates,
   buildArweaveGatewayUrl,
@@ -337,17 +340,15 @@ const tryWayfinderFallback = async ({
           gateway: candidate.gateway,
         };
       }
-      const kind = classifyStatusKind(resp?.status);
-      const retryable = isRetryableStatus(resp?.status);
-      lastError = createArweaveFetchError({
+      const failure = buildArweaveGatewayHttpFailure({
         txId,
         status: resp?.status,
-        retryable,
-        kind,
         gateway: String(candidate.gateway || 'wayfinder'),
         attempt,
-        message: `Arweave fetch failed (${resp?.status || 'unknown'})`,
       });
+      const kind = failure.statusKind;
+      const retryable = failure.retryable;
+      lastError = failure.error;
       markGatewayFailure(candidate.gateway, { status: resp?.status, kind });
       if (resp?.status === 404) {
         sawNotFound = true;
@@ -1363,17 +1364,15 @@ async function downloadDataFromArweave(txID, opts = {}) {
                   return gatewayPayload.text;
                 }
                 lastStatus = resp.status;
-                const kind = classifyStatusKind(resp.status);
-                const retryable = isRetryableStatus(resp.status);
-                lastError = createArweaveFetchError({
+                const failure = buildArweaveGatewayHttpFailure({
                   txId: normalizedTxId,
                   status: resp.status,
-                  retryable,
-                  kind,
                   gateway,
                   attempt,
-                  message: `Arweave fetch failed (${resp.status})`,
                 });
+                const kind = failure.statusKind;
+                const retryable = failure.retryable;
+                lastError = failure.error;
                 markGatewayFailure(gateway, { status: resp.status, kind });
                 logArweaveFetchDebug(
                   'warn',

@@ -1,4 +1,4 @@
-import { classifyArweaveGatewayPayloadResponse } from './arweaveGatewayPayloadResponse';
+import { buildArweaveGatewayHttpFailure, classifyArweaveGatewayPayloadResponse } from './arweaveGatewayPayloadResponse';
 
 describe('classifyArweaveGatewayPayloadResponse', () => {
   it('keeps non-empty non-html gateway text as a usable payload', () => {
@@ -73,5 +73,73 @@ describe('classifyArweaveGatewayPayloadResponse', () => {
       expect(result.error.retryable).toBe(true);
       expect(result.error.status).toBe(429);
     }
+  });
+});
+
+describe('buildArweaveGatewayHttpFailure', () => {
+  it('builds non-retryable not-found errors for 404 gateway misses', () => {
+    const failure = buildArweaveGatewayHttpFailure({
+      status: 404,
+      txId: 'tx-missing',
+      gateway: 'https://arweave.net',
+      attempt: 2,
+    });
+
+    expect(failure).toEqual(
+      expect.objectContaining({
+        status: 404,
+        statusKind: 'not_found',
+        retryable: false,
+      }),
+    );
+    expect(failure.error.name).toBe('ArweaveFetchError');
+    expect(failure.error.message).toBe('Arweave fetch failed (404)');
+    expect(failure.error.txId).toBe('tx-missing');
+    expect(failure.error.gateway).toBe('https://arweave.net');
+    expect(failure.error.attempt).toBe(2);
+    expect(failure.error.kind).toBe('not_found');
+    expect(failure.error.retryable).toBe(false);
+    expect(failure.error.status).toBe(404);
+  });
+
+  it('builds retryable server errors for 503 gateway misses', () => {
+    const failure = buildArweaveGatewayHttpFailure({
+      status: 503,
+      txId: 'tx-pending',
+      gateway: 'wayfinder',
+      attempt: 0,
+    });
+
+    expect(failure).toEqual(
+      expect.objectContaining({
+        status: 503,
+        statusKind: 'server',
+        retryable: true,
+      }),
+    );
+    expect(failure.error.message).toBe('Arweave fetch failed (503)');
+    expect(failure.error.kind).toBe('server');
+    expect(failure.error.retryable).toBe(true);
+    expect(failure.error.status).toBe(503);
+  });
+
+  it('builds unknown non-retryable errors when no status is available', () => {
+    const failure = buildArweaveGatewayHttpFailure({
+      txId: 'tx-unknown',
+      gateway: 'wayfinder',
+      attempt: 1,
+    });
+
+    expect(failure).toEqual(
+      expect.objectContaining({
+        status: null,
+        statusKind: 'unknown',
+        retryable: false,
+      }),
+    );
+    expect(failure.error.message).toBe('Arweave fetch failed (unknown)');
+    expect(failure.error.status).toBe(0);
+    expect(failure.error.kind).toBe('unknown');
+    expect(failure.error.retryable).toBe(false);
   });
 });

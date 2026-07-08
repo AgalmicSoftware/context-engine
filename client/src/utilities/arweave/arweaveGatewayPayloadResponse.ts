@@ -32,6 +32,44 @@ export type ArweaveGatewayPayloadResponse =
       statusKind: ArweaveFetchErrorKind;
     };
 
+export interface ArweaveGatewayHttpFailure {
+  error: ArweaveFetchError;
+  retryable: boolean;
+  status: number | null;
+  statusKind: ArweaveFetchErrorKind;
+}
+
+export const buildArweaveGatewayHttpFailure = ({
+  attempt = 0,
+  gateway = '',
+  status = null,
+  txId = '',
+}: {
+  attempt?: unknown;
+  gateway?: unknown;
+  status?: unknown;
+  txId?: unknown;
+} = {}): ArweaveGatewayHttpFailure => {
+  const normalizedStatus =
+    status == null || status === '' ? null : Number.isFinite(Number(status)) ? Number(status) : null;
+  const statusKind = classifyStatusKind(normalizedStatus);
+  const retryable = isRetryableStatus(normalizedStatus);
+  return {
+    status: normalizedStatus,
+    statusKind,
+    retryable,
+    error: createArweaveFetchError({
+      txId,
+      status: normalizedStatus,
+      retryable,
+      kind: statusKind,
+      gateway: String(gateway || ''),
+      attempt,
+      message: `Arweave fetch failed (${normalizedStatus ?? 'unknown'})`,
+    }),
+  };
+};
+
 export const classifyArweaveGatewayPayloadResponse = ({
   attempt = 0,
   contentType = '',
