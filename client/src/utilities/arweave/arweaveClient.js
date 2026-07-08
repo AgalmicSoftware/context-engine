@@ -38,6 +38,13 @@ import {
   normalizeTagsPayload,
 } from './arweaveGatewayPayloads.js';
 import {
+  dedupeTxEvent,
+  getArweaveTextCacheEntry,
+  getArweaveTxContextLabels,
+  registerArweaveTxContext,
+  setArweaveTextCacheEntry,
+} from './arweaveClientCaches.js';
+import {
   getAvailableGatewaysForAttempt,
   getGraphqlEndpointSortScore,
   isGraphqlEndpointCoolingDown,
@@ -419,8 +426,6 @@ const parseWorkerUploadResponseJson = async (response) => {
   }
 };
 
-const ARWEAVE_TEXT_CACHE_TTL_MS = 10 * 60 * 1000;
-const ARWEAVE_TEXT_CACHE_MAX = 600;
 const ARWEAVE_FAILURE_CACHE_MAX = 1200;
 const ARWEAVE_FAILURE_BASE_RETRY_MS = 1500;
 const ARWEAVE_FAILURE_MAX_RETRY_MS = 2 * 60 * 1000;
@@ -437,93 +442,13 @@ const ARWEAVE_GRAPHQL_ENDPOINTS = [
 ];
 const ARWEAVE_TX_EXISTENCE_CACHE_TTL_MS = 15 * 60 * 1000;
 const ARWEAVE_TX_EXISTENCE_CACHE_MAX = 2400;
-const ARWEAVE_TX_CONTEXT_CACHE_MAX = 3000;
-const ARWEAVE_TX_CONTEXT_LABEL_MAX = 8;
-const ARWEAVE_TX_EVENT_DEDUPE_TTL_MS = 30 * 1000;
 const ARWEAVE_GRAPHQL_TIMEOUT_MS = 3500;
 export const ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS = 30_000;
 const MAX_ARWEAVE_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
-const arweaveTextCache = new Map();
 const arweaveTextInFlight = new Map();
 const arweaveFailureCache = new Map();
 const arweaveTxExistenceCache = new Map();
 const arweaveTxExistenceInFlight = new Map();
-const arweaveTxContextCache = new Map();
-const arweaveTxEventDedupe = new Map();
-
-const getArweaveTextCacheEntry = (txId) => {
-  const key = String(txId || '').trim();
-  if (!key) return null;
-  const entry = arweaveTextCache.get(key);
-  if (!entry) return null;
-  if (Date.now() - Number(entry.ts || 0) > ARWEAVE_TEXT_CACHE_TTL_MS) {
-    arweaveTextCache.delete(key);
-    return null;
-  }
-  // LRU touch
-  arweaveTextCache.delete(key);
-  arweaveTextCache.set(key, entry);
-  return entry;
-};
-
-const setArweaveTextCacheEntry = (txId, text) => {
-  const key = String(txId || '').trim();
-  if (!key || String(text ?? '').trim().length === 0) return;
-  arweaveTextCache.delete(key);
-  arweaveTextCache.set(key, { text, ts: Date.now() });
-  while (arweaveTextCache.size > ARWEAVE_TEXT_CACHE_MAX) {
-    const oldest = arweaveTextCache.keys().next().value;
-    if (!oldest) break;
-    arweaveTextCache.delete(oldest);
-  }
-};
-
-const dedupeTxEvent = (key) => {
-  if (!key) return true;
-  const now = Date.now();
-  const prev = Number(arweaveTxEventDedupe.get(key) || 0);
-  if (prev > 0 && now - prev < ARWEAVE_TX_EVENT_DEDUPE_TTL_MS) return false;
-  arweaveTxEventDedupe.set(key, now);
-  while (arweaveTxEventDedupe.size > ARWEAVE_TX_CONTEXT_CACHE_MAX) {
-    const oldest = arweaveTxEventDedupe.keys().next().value;
-    if (!oldest) break;
-    arweaveTxEventDedupe.delete(oldest);
-  }
-  return true;
-};
-
-const registerArweaveTxContext = (txId, context = {}) => {
-  const normalizedTxId = extractArweaveTxId(txId);
-  if (!normalizedTxId) return;
-  const category =
-    String(context?.category || '')
-      .trim()
-      .toLowerCase() || 'unknown';
-  const caller = String(context?.caller || context?.fn || '').trim() || '';
-  const source =
-    String(context?.source || '')
-      .trim()
-      .toLowerCase() || 'unknown';
-  const label = caller ? `${category}:${caller}:${source}` : `${category}:${source}`;
-  const prev = arweaveTxContextCache.get(normalizedTxId) || { labels: [], ts: 0 };
-  const labels = Array.isArray(prev.labels) ? [...prev.labels] : [];
-  if (!labels.includes(label)) labels.push(label);
-  while (labels.length > ARWEAVE_TX_CONTEXT_LABEL_MAX) labels.shift();
-  arweaveTxContextCache.set(normalizedTxId, { labels, ts: Date.now() });
-  while (arweaveTxContextCache.size > ARWEAVE_TX_CONTEXT_CACHE_MAX) {
-    const oldest = arweaveTxContextCache.keys().next().value;
-    if (!oldest) break;
-    arweaveTxContextCache.delete(oldest);
-  }
-};
-
-const getArweaveTxContextLabels = (txId) => {
-  const normalizedTxId = extractArweaveTxId(txId);
-  if (!normalizedTxId) return [];
-  const entry = arweaveTxContextCache.get(normalizedTxId);
-  if (!entry || !Array.isArray(entry.labels)) return [];
-  return [...entry.labels];
-};
 
 const fetchWithTimeout = async (url, options = {}, timeoutMs = ARWEAVE_GRAPHQL_TIMEOUT_MS) => {
   const timeout = Math.max(100, Number(timeoutMs || ARWEAVE_GRAPHQL_TIMEOUT_MS));
