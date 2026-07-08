@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { faArrowLeft, faArrowRight, faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { PostMarkdownBlock, parsePostMarkdown } from './postMarkdownParser.js';
+import React from 'react';
+import {
+  PostMarkdownBlock,
+  parsePostMarkdown,
+} from './postMarkdownParser.js';
 import { buildPostAssetUrl } from './postsContent.js';
-import PostViz, { getPostVizTitle } from './PostViz.js';
+import PostViz from './PostViz.js';
 import styles from './PostsPage.module.scss';
 
 type PostMarkdownRendererProps = {
@@ -12,66 +13,10 @@ type PostMarkdownRendererProps = {
   title?: string;
 };
 
-type ImageBlock = Extract<PostMarkdownBlock, { type: 'image' }>;
-type VizGroupBlock = Extract<PostMarkdownBlock, { type: 'vizGroupStart' }> & {
-  blocks: PostMarkdownBlock[];
-};
-type DisclosureBlock = Extract<PostMarkdownBlock, { type: 'disclosureStart' }> & {
-  blocks: PostMarkdownBlock[];
-};
-type RenderablePostBlock = PostMarkdownBlock | VizGroupBlock | DisclosureBlock;
-
 type RenderBlockArgs = {
-  block: RenderablePostBlock;
+  block: PostMarkdownBlock;
   index: number;
   assetBasePath?: string;
-  vizDefaultOpen?: boolean;
-  nestedViz?: boolean;
-};
-
-const getCarouselScrollBehavior = (): ScrollBehavior => {
-  if (
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  ) {
-    return 'auto';
-  }
-
-  return 'smooth';
-};
-
-const getCarouselSlideTitle = (block: PostMarkdownBlock, index: number): string => {
-  if (block.type === 'viz') return getPostVizTitle(block.spec);
-
-  if (block.type === 'heading' || block.type === 'paragraph' || block.type === 'blockquote') {
-    return block.text;
-  }
-
-  return `Visualization ${index + 1}`;
-};
-
-const clampSlideIndex = (index: number, slideCount: number): number => Math.min(Math.max(index, 0), slideCount - 1);
-
-const combinesWithPreviousSlide = (block: PostMarkdownBlock): boolean => {
-  if (block.type !== 'viz') return false;
-  const spec = block.spec as { combineWithPrevious?: unknown } | null;
-  return !!spec && spec.combineWithPrevious === true;
-};
-
-const packCarouselSlides = (blocks: PostMarkdownBlock[]): PostMarkdownBlock[][] => {
-  const slides: PostMarkdownBlock[][] = [];
-
-  blocks.forEach((block) => {
-    if (slides.length > 0 && combinesWithPreviousSlide(block)) {
-      slides[slides.length - 1].push(block);
-      return;
-    }
-
-    slides.push([block]);
-  });
-
-  return slides;
 };
 
 const sanitizeHref = (href: string): string => {
@@ -117,20 +62,18 @@ const renderInline = (text: string): React.ReactNode[] => {
       parts.push(<code key={`code-${match.index}`}>{match[3]}</code>);
     } else if (match[4] && match[5]) {
       const href = sanitizeHref(match[5]);
-      parts.push(
-        href ? (
-          <a
-            key={`link-${match.index}`}
-            href={href}
-            target={href.startsWith('http') ? '_blank' : undefined}
-            rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
-          >
-            {match[4]}
-          </a>
-        ) : (
-          <span key={`unsafe-link-${match.index}`}>{match[4]}</span>
-        ),
-      );
+      parts.push(href ? (
+        <a
+          key={`link-${match.index}`}
+          href={href}
+          target={href.startsWith('http') ? '_blank' : undefined}
+          rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
+        >
+          {match[4]}
+        </a>
+      ) : (
+        <span key={`unsafe-link-${match.index}`}>{match[4]}</span>
+      ));
     }
 
     cursor = match.index + match[0].length;
@@ -143,332 +86,12 @@ const renderInline = (text: string): React.ReactNode[] => {
   return parts;
 };
 
-const splitHeadingSampleSize = (text: string): { label: string; sampleSize: string } | null => {
-  const match = text.match(/^(.*?)(?:\s+)(\(n=\d+\))$/i);
-  if (!match) return null;
-  return { label: match[1], sampleSize: match[2] };
-};
-
-const PostImageFigure = ({ block, assetBasePath }: { block: ImageBlock; assetBasePath?: string }) => {
-  const [isPreviewOpen, setPreviewOpen] = useState(false);
-  const src = sanitizeImageSrc(block.src, assetBasePath);
-
-  useEffect(() => {
-    if (!isPreviewOpen) return undefined;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setPreviewOpen(false);
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isPreviewOpen]);
-
-  if (!src) return null;
-
-  const openLabel = block.alt ? `Open image preview: ${block.alt}` : 'Open image preview';
-
-  return (
-    <figure className={styles.postImageFigure}>
-      <button
-        type="button"
-        className={styles.postImageButton}
-        onClick={() => setPreviewOpen(true)}
-        aria-label={openLabel}
-      >
-        <img className={styles.postImage} src={src} alt={block.alt} loading="lazy" decoding="async" />
-      </button>
-      {isPreviewOpen && (
-        <button
-          type="button"
-          className={`${styles.postImageFullscreen} ${styles.postImageFullscreenOpen}`}
-          onClick={() => setPreviewOpen(false)}
-          aria-label="Close image preview"
-        >
-          <img className={styles.postImageFullscreenImage} src={src} alt="" decoding="async" />
-        </button>
-      )}
-      {block.caption && <figcaption className={styles.postImageCaption}>{renderInline(block.caption)}</figcaption>}
-    </figure>
-  );
-};
-
-const VizGroupStack = ({ block, assetBasePath }: { block: VizGroupBlock; assetBasePath?: string }) => (
-  <div className={styles.vizGroupStack}>
-    {block.blocks.map((childBlock, childIndex) =>
-      childBlock.type === 'viz' ? (
-        <PostViz
-          key={`viz-group-stack-${childIndex}`}
-          spec={childBlock.spec}
-          error={childBlock.error}
-          presentation="slide"
-        />
-      ) : (
-        renderBlock({ block: childBlock, index: childIndex, assetBasePath })
-      ),
-    )}
-  </div>
-);
-
-const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; assetBasePath?: string }) => {
-  const slides = packCarouselSlides(block.blocks);
-  const slideCount = slides.length;
-  const [activeIndex, setActiveIndex] = useState(0);
-  const trackRef = useRef<HTMLDivElement | null>(null);
-  const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const slideIntersectionRatiosRef = useRef<Map<Element, number>>(new Map());
-  // Regression guard: programmatic smooth scroll can leave the departing slide
-  // as the max-ratio slide mid-transit. Suppress observer updates until the
-  // requested destination arrives or the user takes over manually.
-  const pendingIndexRef = useRef<number | null>(null);
-  const pendingTimeoutRef = useRef<number | null>(null);
-  const slideTitles = slides.map((slideBlocks, slideIndex) => getCarouselSlideTitle(slideBlocks[0], slideIndex));
-
-  const clearPendingNavigation = useCallback(() => {
-    pendingIndexRef.current = null;
-
-    if (pendingTimeoutRef.current !== null) {
-      window.clearTimeout(pendingTimeoutRef.current);
-      pendingTimeoutRef.current = null;
-    }
-  }, []);
-
-  const restartPendingNavigationTimeout = useCallback(() => {
-    if (pendingTimeoutRef.current !== null) {
-      window.clearTimeout(pendingTimeoutRef.current);
-    }
-
-    pendingTimeoutRef.current = window.setTimeout(() => {
-      pendingIndexRef.current = null;
-      pendingTimeoutRef.current = null;
-    }, 1200);
-  }, []);
-
-  const setSlideIndex = (index: number) => {
-    if (slideCount === 0) return;
-
-    const nextIndex = clampSlideIndex(index, slideCount);
-    if (nextIndex !== activeIndex) {
-      pendingIndexRef.current = nextIndex;
-      restartPendingNavigationTimeout();
-    }
-
-    setActiveIndex(nextIndex);
-  };
-
-  useEffect(() => {
-    if (slideCount === 0) return;
-    setActiveIndex((index) => clampSlideIndex(index, slideCount));
-  }, [slideCount]);
-
-  useEffect(() => {
-    const track = trackRef.current;
-    const slide = slideRefs.current[activeIndex];
-
-    if (!track || !slide || typeof track.scrollTo !== 'function') return;
-
-    track.scrollTo({
-      left: slide.offsetLeft,
-      behavior: getCarouselScrollBehavior(),
-    });
-  }, [activeIndex]);
-
-  useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return undefined;
-
-    const track = trackRef.current;
-    if (!track) return undefined;
-    const intersectionRatios = slideIntersectionRatiosRef.current;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          intersectionRatios.set(entry.target, entry.intersectionRatio);
-        });
-
-        let maxRatio = 0;
-        let visibleIndex = -1;
-
-        slideRefs.current.forEach((slide, index) => {
-          if (!slide) return;
-
-          const ratio = intersectionRatios.get(slide) ?? 0;
-          if (ratio > maxRatio) {
-            maxRatio = ratio;
-            visibleIndex = index;
-          }
-        });
-
-        if (visibleIndex >= 0 && maxRatio >= 0.5) {
-          const pendingIndex = pendingIndexRef.current;
-          if (pendingIndex !== null) {
-            if (visibleIndex === pendingIndex) {
-              clearPendingNavigation();
-            }
-
-            return;
-          }
-
-          setActiveIndex(visibleIndex);
-        }
-      },
-      {
-        root: track,
-        threshold: [0.55, 0.75],
-      },
-    );
-
-    slideRefs.current.forEach((slide) => {
-      if (slide) observer.observe(slide);
-    });
-
-    return () => {
-      observer.disconnect();
-      intersectionRatios.clear();
-    };
-  }, [clearPendingNavigation, slideCount]);
-
-  useEffect(() => {
-    const track = trackRef.current;
-    if (!track) return undefined;
-
-    track.addEventListener('wheel', clearPendingNavigation, { passive: true });
-    track.addEventListener('touchstart', clearPendingNavigation, { passive: true });
-    track.addEventListener('pointerdown', clearPendingNavigation, { passive: true });
-
-    return () => {
-      track.removeEventListener('wheel', clearPendingNavigation);
-      track.removeEventListener('touchstart', clearPendingNavigation);
-      track.removeEventListener('pointerdown', clearPendingNavigation);
-    };
-  }, [clearPendingNavigation]);
-
-  useEffect(() => clearPendingNavigation, [clearPendingNavigation]);
-
-  const onCarouselKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-
-    const target = event.target as HTMLElement;
-    const control = target.closest('[data-carousel-control="true"]');
-    const isCarouselTarget = target === event.currentTarget;
-    const isCarouselControl = !!control && event.currentTarget.contains(control);
-
-    if (!isCarouselTarget && !isCarouselControl) return;
-
-    event.preventDefault();
-    setSlideIndex(activeIndex + (event.key === 'ArrowRight' ? 1 : -1));
-  };
-
-  if (slideCount === 0) {
-    return <p className={styles.vizFallback}>Visualization group has no items.</p>;
-  }
-
-  return (
-    <section
-      className={styles.vizCarousel}
-      role="group"
-      aria-roledescription="carousel"
-      aria-label={`${block.title} visualizations`}
-      data-testid="ce-posts-viz-carousel"
-      tabIndex={0}
-      onKeyDown={onCarouselKeyDown}
-    >
-      <div className={styles.vizCarouselTrack} ref={trackRef}>
-        {slides.map((slideBlocks, slideIndex) => (
-          <div
-            key={`viz-carousel-slide-${slideIndex}`}
-            className={styles.vizCarouselSlide}
-            role="group"
-            aria-roledescription="slide"
-            aria-label={`${slideIndex + 1} of ${slideCount}: ${slideTitles[slideIndex]}`}
-            data-active={slideIndex === activeIndex ? 'true' : 'false'}
-            ref={(element) => {
-              slideRefs.current[slideIndex] = element;
-            }}
-          >
-            {slideBlocks.map((childBlock, childIndex) =>
-              childBlock.type === 'viz' ? (
-                <PostViz
-                  key={`viz-carousel-slide-${slideIndex}-viz-${childIndex}`}
-                  spec={childBlock.spec}
-                  error={childBlock.error}
-                  presentation="slide"
-                />
-              ) : (
-                renderBlock({
-                  block: childBlock,
-                  index: childIndex,
-                  assetBasePath,
-                })
-              ),
-            )}
-          </div>
-        ))}
-      </div>
-      <div className={styles.vizCarouselControls}>
-        <button
-          type="button"
-          className={styles.vizCarouselButton}
-          aria-label="Previous visualization"
-          data-testid="ce-posts-viz-carousel-prev"
-          data-carousel-control="true"
-          disabled={activeIndex === 0}
-          onClick={() => setSlideIndex(activeIndex - 1)}
-        >
-          <FontAwesomeIcon icon={faArrowLeft} aria-hidden="true" />
-        </button>
-        <div className={styles.vizCarouselDots} role="group" aria-label="Choose visualization slide">
-          {slideTitles.map((slideTitle, slideIndex) => (
-            <button
-              key={`${slideTitle}-${slideIndex}`}
-              type="button"
-              className={styles.vizCarouselDot}
-              aria-label={`Go to slide ${slideIndex + 1}: ${slideTitle}`}
-              aria-current={activeIndex === slideIndex ? 'true' : undefined}
-              data-testid={`ce-posts-viz-carousel-dot-${slideIndex}`}
-              data-carousel-control="true"
-              onClick={() => setSlideIndex(slideIndex)}
-            />
-          ))}
-        </div>
-        <span className={styles.vizCarouselCounter} aria-live="polite">
-          {activeIndex + 1} / {slideCount}
-        </span>
-        <button
-          type="button"
-          className={styles.vizCarouselButton}
-          aria-label="Next visualization"
-          data-testid="ce-posts-viz-carousel-next"
-          data-carousel-control="true"
-          disabled={activeIndex === slideCount - 1}
-          onClick={() => setSlideIndex(activeIndex + 1)}
-        >
-          <FontAwesomeIcon icon={faArrowRight} aria-hidden="true" />
-        </button>
-      </div>
-    </section>
-  );
-};
-
-const renderBlock = ({ block, index, assetBasePath, vizDefaultOpen, nestedViz = false }: RenderBlockArgs) => {
+const renderBlock = ({ block, index, assetBasePath }: RenderBlockArgs) => {
   if (block.type === 'heading') {
-    const HeadingTag = `h${block.level}` as 'h1' | 'h2' | 'h3';
-    const headingSample = splitHeadingSampleSize(block.text);
+    const HeadingTag = (`h${block.level}` as 'h1' | 'h2' | 'h3');
     return (
-      <HeadingTag
-        key={`heading-${index}`}
-        className={`${styles.postHeading} ${headingSample ? styles.postHeadingWithSample : ''}`}
-      >
-        {headingSample ? (
-          <>
-            <span>{renderInline(headingSample.label)}</span>
-            <span className={styles.postHeadingSample}>{headingSample.sampleSize}</span>
-          </>
-        ) : (
-          renderInline(block.text)
-        )}
+      <HeadingTag key={`heading-${index}`} className={styles.postHeading}>
+        {renderInline(block.text)}
       </HeadingTag>
     );
   }
@@ -482,7 +105,35 @@ const renderBlock = ({ block, index, assetBasePath, vizDefaultOpen, nestedViz = 
   }
 
   if (block.type === 'image') {
-    return <PostImageFigure key={`image-${index}`} block={block} assetBasePath={assetBasePath} />;
+    const src = sanitizeImageSrc(block.src, assetBasePath);
+    if (!src) return null;
+    return (
+      <figure
+        key={`image-${index}`}
+        className={styles.postImageFigure}
+        tabIndex={0}
+        aria-label={block.alt ? `Preview image: ${block.alt}` : 'Preview image'}
+      >
+        <img
+          className={styles.postImage}
+          src={src}
+          alt={block.alt}
+          loading="lazy"
+          decoding="async"
+        />
+        <span className={styles.postImageFullscreen} aria-hidden="true">
+          <img
+            className={styles.postImageFullscreenImage}
+            src={src}
+            alt=""
+            decoding="async"
+          />
+        </span>
+        {block.caption && (
+          <figcaption className={styles.postImageCaption}>{renderInline(block.caption)}</figcaption>
+        )}
+      </figure>
+    );
   }
 
   if (block.type === 'blockquote') {
@@ -513,128 +164,29 @@ const renderBlock = ({ block, index, assetBasePath, vizDefaultOpen, nestedViz = 
   }
 
   if (block.type === 'viz') {
-    return (
-      <PostViz
-        key={`viz-${index}`}
-        spec={block.spec}
-        error={block.error}
-        defaultOpen={vizDefaultOpen}
-        nested={nestedViz}
-      />
-    );
-  }
-
-  if (block.type === 'vizGroupStart' && 'blocks' in block) {
-    return (
-      <details
-        key={`viz-group-${index}`}
-        className={`${styles.vizDisclosure} ${styles.vizGroupDisclosure}`}
-        open={block.defaultOpen}
-      >
-        <summary className={styles.vizDisclosureSummary}>
-          <span>{block.title}</span>
-          <span className={styles.vizDisclosureIcon} aria-hidden="true">
-            <FontAwesomeIcon className={styles.vizDisclosureIconClosed} icon={faCaretDown} />
-            <FontAwesomeIcon className={styles.vizDisclosureIconOpen} icon={faCaretUp} />
-          </span>
-        </summary>
-        <section className={`${styles.vizCard} ${styles.vizGroupCard}`} aria-label={block.title}>
-          {block.layout === 'stack' ? (
-            <VizGroupStack block={block} assetBasePath={assetBasePath} />
-          ) : (
-            <VizGroupCarousel block={block} assetBasePath={assetBasePath} />
-          )}
-        </section>
-      </details>
-    );
-  }
-
-  if (block.type === 'disclosureStart' && 'blocks' in block) {
-    return (
-      <details key={`disclosure-${index}`} className={styles.postDisclosure} open={block.defaultOpen}>
-        <summary className={styles.postDisclosureSummary}>
-          <span>{block.title}</span>
-          <span className={styles.postDisclosureIcon} aria-hidden="true">
-            <FontAwesomeIcon className={styles.postDisclosureIconClosed} icon={faCaretDown} />
-            <FontAwesomeIcon className={styles.postDisclosureIconOpen} icon={faCaretUp} />
-          </span>
-        </summary>
-        <div className={styles.postDisclosureBody}>
-          {block.blocks.map((childBlock, childIndex) =>
-            renderBlock({ block: childBlock, index: childIndex, assetBasePath }),
-          )}
-        </div>
-      </details>
-    );
-  }
-
-  if (
-    block.type === 'vizGroupStart' ||
-    block.type === 'vizGroupEnd' ||
-    block.type === 'disclosureStart' ||
-    block.type === 'disclosureEnd'
-  ) {
-    return null;
+    return <PostViz key={`viz-${index}`} spec={block.spec} error={block.error} />;
   }
 
   return <hr key={`rule-${index}`} className={styles.postRule} />;
 };
 
-const groupContainerBlocks = (blocks: PostMarkdownBlock[]): RenderablePostBlock[] => {
-  const groupedBlocks: RenderablePostBlock[] = [];
-  let activeGroup: VizGroupBlock | DisclosureBlock | null = null;
-
-  const flushActiveGroup = () => {
-    if (activeGroup) groupedBlocks.push(activeGroup);
-    activeGroup = null;
-  };
-
-  blocks.forEach((block) => {
-    if (block.type === 'vizGroupStart') {
-      flushActiveGroup();
-      activeGroup = { ...block, blocks: [] };
-      return;
-    }
-
-    if (block.type === 'disclosureStart') {
-      flushActiveGroup();
-      activeGroup = { ...block, blocks: [] };
-      return;
-    }
-
-    if (
-      (block.type === 'vizGroupEnd' && activeGroup?.type === 'vizGroupStart') ||
-      (block.type === 'disclosureEnd' && activeGroup?.type === 'disclosureStart')
-    ) {
-      flushActiveGroup();
-      return;
-    }
-
-    if (activeGroup) {
-      activeGroup.blocks.push(block);
-      return;
-    }
-
-    groupedBlocks.push(block);
-  });
-
-  flushActiveGroup();
-
-  return groupedBlocks;
-};
-
 const normalizeHeadingText = (value: string): string => value.trim().replace(/\s+/g, ' ').toLowerCase();
 
-const suppressDuplicateTitleHeading = (blocks: PostMarkdownBlock[], title?: string): PostMarkdownBlock[] => {
+const suppressDuplicateTitleHeading = (
+  blocks: PostMarkdownBlock[],
+  title?: string
+): PostMarkdownBlock[] => {
   if (!title || blocks[0]?.type !== 'heading' || blocks[0].level !== 1) {
     return blocks;
   }
 
-  return normalizeHeadingText(blocks[0].text) === normalizeHeadingText(title) ? blocks.slice(1) : blocks;
+  return normalizeHeadingText(blocks[0].text) === normalizeHeadingText(title)
+    ? blocks.slice(1)
+    : blocks;
 };
 
 const PostMarkdownRenderer = ({ markdown, assetBasePath = '', title }: PostMarkdownRendererProps) => {
-  const blocks = groupContainerBlocks(suppressDuplicateTitleHeading(parsePostMarkdown(markdown), title));
+  const blocks = suppressDuplicateTitleHeading(parsePostMarkdown(markdown), title);
 
   return (
     <div className={styles.markdownBody}>

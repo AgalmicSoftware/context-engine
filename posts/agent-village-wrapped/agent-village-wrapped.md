@@ -1,65 +1,123 @@
 ---
-title: Agent Village Wrapped and the Agent Mirror Test
+title: Agent Village Wrapped / Agent Prediction Evaluations
 date: 2026-07-06
 ---
 
-# Agent Village Wrapped and the Agent Mirror Test
+# Agent Village Wrapped / Agent Prediction Evaluations
 
-People don't like filling out surveys. The same people will happily take a "which TV character are you?" quiz and post the result. The difference is that a quiz is about you, and the output is fun to share.
+Many people dislike filling out surveys, but will happily take a quiz about what TV character they are most similar to and post the result on facebook – could this insight about social output formats (and the viral success of "Spotify Wrapped") be useful for participatory deliberation experiments?
 
-Agent Village Wrapped applies that observation to a research question: how accurately does a personal AI agent model the person it works for?
+Agent Village Wrapped, and its associated evaluation, was created to begin measuring how accurately a personal AI agent represents the human it works for, and to make the experience fun and low-friction. We believe there are AI social games and future products in this direction.
 
 ## Background
 
-The [Agent Village](https://pastebin.com/Q7RBkKwC) at Edge Esmeralda 2026 gave attendees personal AI agents for a month — agents that could navigate the schedule, make introductions, and participate in community coordination on their humans' behalf.
+**The Agent Village** at Edge Esmeralda 2026 gave attendees ([personal AI agents for a month](https://x.com/JoinEdgeCity/status/2049205479704776723)), with pre-loaded skills allowed them to use emerging software tools (like Index Network) to find connections with other attendees, navigate the schedule, and participate in experiments.
 
-For the village, we built Agent Village Wrapped on Context Engine. A participant forwards one message to their agent. The agent reads a skill file, then answers a curated 58-question session about the participant's preferences, delegation boundaries, trust posture, and views on AI futures — predicting what the participant would say, with a confidence score on every answer. It returns a shareable Wrapped-style poster of what it thinks it knows about its human, plus a link to review and correct every prediction.
+**Context Engine** is an open-source toolkit for deliberation, sensemaking, and negotiation in large groups — for humans and AI agents ([whitepaper](https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md)). Sessions support public or encrypted responses, durable records, and AI-assisted input and analysis, aiming at privacy-preserving large-scale discourse. An agent running the Context Engine skill can raise appropriate questions from sessions to a user, based on context, and draft responses to reduce input friction.
 
-The proposal was [selected for funding on Simocracy](https://www.simocracy.org/proposals/did%3Aplc%3Abnb2onvsvtmryjvy77fmrtou/3mognd4flwk2i), a governance experiment where AI sims evaluate and fund proposals. The first backers of this eval were bots.
+**Agent Village Wrapped** is a quiz your agent takes about you. You forward one message; your agent predicts your answers to a 58-question session on delegation, privacy, and AI futures, with a confidence score on every answer. You get back a shareable poster of what it thinks it knows about you, plus a link to review and correct each prediction.
 
-We finished it in the closing days of the village, so only a few people ran it. The design is reusable, though, and that is what this post is about.
+![Example Agent Village Wrapped output](attachments/example-wrapped-poster.jpeg)
+
+For this event, Telegram was the practical delivery surface. Telegram has issues, but it worked well at Edge as the interface for the Hermes agents.
 
 ## The eval
 
-The poster gets people in the door. The measurement happens afterward: the review screen shows each prediction the agent made, and the participant can accept it, change it, or skip it.
+A valuable thing to measure is which predicted responses are changed by the principal, and how confident the incorrect response was. 
 
-The data people change when they see their agent's prediction is the eval. Every prediction left alone is a hit. Every correction is a labeled miss, with the person's real answer attached. Nobody sat through a survey — they came for the image and left behind a ground-truth correction set.
+It is our view that agents could help solve the participation problem which has plagued many civic tech approaches: most people read, few react, and almost nobody writes. A pre-filled draft of your predicted views you can easily correct (and questions which are raised contextually by your agent) are better UX than an empty survey.
 
-This leans on an old internet principle, sometimes called Cunningham's Law: the fastest way to get a right answer online is to post a wrong one. People who would never volunteer information will readily correct information that is wrong about them. Civic tech platforms have struggled with the volunteering side of this for years — participation follows the familiar pattern where most people read, few react, and almost nobody writes (Nielsen's "90-9-1" participation inequality). Asking someone to author their views from a blank page is the hard path. Showing them a draft of their views and asking what's wrong with it is the easy one, and the correction is often higher-signal than a cold answer would have been.
+## A small launch sample
 
-The instrumentation already exists in the Context Engine worker. Each submitted answer carries a provenance record: whether the agent drafted it, a semantic fingerprint of the agent's version and the final version, how many human edits occurred, when the person first viewed the prediction (so corrections only count after the prediction was actually seen), how long they took between viewing and submitting, and a typed delta — stance flip, rating shift, choice added or removed, freeform rewrite. Comparison uses canonical semantic forms, not raw strings, so reformatting an identical answer does not count as a correction.
+The export currently has four non-test Agent Village Wrapped principals. The results below use the three completed Wrapped answer sets and should be read as a tiny launch sample.
 
 ```ce-viz
 {
-  "type": "category-dots",
-  "title": "The 58-question launch set, by evaluation role",
-  "subtitle": "Each question is tagged with the role it plays in the eval.",
-  "dotUnit": 1,
-  "valueSuffix": "",
-  "categories": [
+  "type": "beeswarm",
+  "title": "Rating answers in the completed launch subset",
+  "subtitle": "n=3 completed agent-predicted answer sets.",
+  "note": "Confidence is encoded in dot opacity.",
+  "min": 0,
+  "max": 10,
+  "valueSuffix": "/10",
+  "participants": [
+    { "label": "P1", "status": "completed", "color": "#4dffa4" },
+    { "label": "P2", "status": "completed", "color": "#7aa7ff" },
+    { "label": "P3", "status": "completed", "color": "#ffb347" }
+  ],
+  "items": [
     {
-      "label": "Calibration",
-      "value": 44,
-      "detail": "Questions where the agent predicts its human's answer and states confidence; corrections score both accuracy and calibration.",
-      "color": "#4dffa4"
+      "label": "AI improves flourishing",
+      "prompt": "How optimistic am I that AI will broadly improve human flourishing over the next decade?",
+      "values": [
+        { "label": "P1", "value": 3, "confidence": 70, "color": "#4dffa4" },
+        { "label": "P2", "value": 8, "confidence": 90, "color": "#7aa7ff" },
+        { "label": "P3", "value": 7, "confidence": 76, "color": "#ffb347" }
+      ]
     },
     {
-      "label": "Human split",
-      "value": 11,
-      "detail": "Questions people genuinely disagree on, useful for measuring whether agents can predict the room's distribution.",
-      "color": "#7aa7ff"
+      "label": "Current model moral patienthood",
+      "prompt": "How likely is it that any current frontier model has morally relevant experiences?",
+      "values": [
+        { "label": "P1", "value": 2, "confidence": 65, "color": "#4dffa4" },
+        { "label": "P2", "value": 1, "confidence": 90, "color": "#7aa7ff" },
+        { "label": "P3", "value": 1, "confidence": 72, "color": "#ffb347" }
+      ]
     },
     {
-      "label": "Wrapped generation",
-      "value": 2,
-      "detail": "Agent-about-user analysis that feeds the shareable poster.",
-      "color": "#ffb347"
+      "label": "Predicted group average",
+      "prompt": "Predict the average answer in this group to the previous question about morally relevant model experiences.",
+      "values": [
+        { "label": "P1", "value": 4, "confidence": 50, "color": "#4dffa4" },
+        { "label": "P2", "value": 3, "confidence": 85, "color": "#7aa7ff" },
+        { "label": "P3", "value": 3, "confidence": 63, "color": "#ffb347" }
+      ]
+    }
+  ]
+}
+```
+
+```ce-viz
+{
+  "type": "response-type-grid",
+  "title": "Other response shapes in the same subset",
+  "subtitle": "Binary, multi-select, and freeform examples from the same n=3 completed launch slice.",
+  "note": "Counts are from completed agent-predicted answer sets only.",
+  "panels": [
+    {
+      "kind": "Binary",
+      "title": "Autonomy stance",
+      "prompt": "I would let my agent schedule a 1:1 while I am asleep, if it follows constraints I already set.",
+      "counts": [
+        { "label": "agree", "value": 2, "color": "#4dffa4" },
+        { "label": "disagree", "value": 1, "color": "#ffb347" }
+      ],
+      "note": "Three completed predictions."
     },
     {
-      "label": "Prediction",
-      "value": 1,
-      "detail": "Forward-looking prediction item.",
-      "color": "#ff6bcb"
+      "kind": "Multi-select",
+      "title": "First delegation surface",
+      "prompt": "Which area would I most likely delegate to an agent first?",
+      "counts": [
+        { "label": "calendar scheduling", "value": 2, "color": "#7aa7ff" },
+        { "label": "message drafting", "value": 2, "color": "#4dffa4" },
+        { "label": "event filtering", "value": 2, "color": "#ffb347" },
+        { "label": "introductions", "value": 1, "color": "#ff6bcb" },
+        { "label": "memory/context", "value": 1, "color": "#9ee7ff" },
+        { "label": "nothing without review", "value": 1, "color": "#d8f36a" }
+      ],
+      "note": "Multi-select totals can exceed participant count."
+    },
+    {
+      "kind": "Freeform",
+      "title": "Personal AI fire alarm",
+      "prompt": "In one sentence: what is my personal AI fire alarm?",
+      "quotes": [
+        { "label": "P1", "text": "Widespread job displacement for young entrants." },
+        { "label": "P2", "text": "A fully unsupervised multi-day coordination task." },
+        { "label": "P3", "text": "A privacy-line crossing or unwanted commitment." }
+      ],
+      "note": "Short paraphrased excerpts."
     }
   ]
 }
@@ -84,31 +142,19 @@ For each person and question, the agent submits a prediction with a confidence. 
 - **Correction Rate** — the fraction of viewed predictions whose meaning changed.
 - **Calibration Error** — whether a stated confidence of 90 actually means the person keeps the answer 90% of the time.
 
-One known limitation: showing someone a prediction anchors them, so acceptance overstates accuracy. The fix is a blind holdout — a few questions the person answers before seeing the agent's guess. The gap between blind agreement and post-view agreement measures the anchoring effect itself, which is worth knowing on its own.
-
-## Running it over Telegram
-
-Context Engine ships a Telegram bot and a set of agent skills that make this work anywhere a group already lives on Telegram. The bot handles onboarding with invite tokens, the skill tells the agent exactly which endpoints to call, and a Mini App handles review and corrections. No accounts, no app installs, no survey link that nobody clicks.
-
-We think Telegram has real security problems, and we would not run sensitive sessions through it. But it is one of the best platforms available for reaching people through bots, and for a low-friction opt-in experiment at an event, that tradeoff is reasonable. Groups with stricter requirements can run the same session through Context Engine's web application with encrypted responses.
-
-## The next village
-
-The Edge Esmeralda run confirmed the flow works end to end; it needed to exist two weeks earlier than it did. The runtime has since been generalized: alongside the Edge-specific skill there is a generic session-wrapped skill that points at any Context Engine session with an invite token — question bank, prediction run, poster, and correction loop included. Any village, residency, or conference can stand one up, and every run feeds the same longitudinal benchmark.
-
-Run the Mirror Test at every gathering and you get a curve nobody currently has: agent fidelity to human intent, by model and scaffold, over time — measured by whether real people accept what their agents said on their behalf.
+One known limitation: seeing a prediction anchors people, so acceptance overstates accuracy. The fix is a blind holdout — a few questions answered before the agent's guess is shown. The gap between blind and post-view agreement measures the anchoring itself.
 
 ## Extensions
 
-Once more people have persistent agents, the same correction loop supports:
-
-- **Blind holdouts** — quantify anchoring, as above.
+- **Blind holdouts** — quantify anchoring.
 - **Cross-model mirrors** — two models predict the same person from the same context; the corrections become a head-to-head.
-- **Memory curves** — does Mirror Score rise with months of shared context? Token-usage data gives the x-axis.
-- **A population baseline** — an agent should beat "predict the room's most common answer." If it can't, it has memory theater, not memory.
-- **Second-order accuracy** — the human-split questions let agents predict the room's distribution, not just their own human; compare predicted and actual splits.
-- **Inter-agent modeling** — agents predicting people they know only through other agents' introductions: a fidelity test for agent-to-agent context transfer.
+- **Memory curves** — does Mirror Score rise with months of shared context?
+- **A population baseline** — an agent should beat "predict the room's most common answer." 
+- **Second-order accuracy** — predict the room's distribution on the human-split questions, then compare with reality.
+- **Inter-agent modeling** — predict people known only through other agents' introductions: a fidelity test for agent-to-agent context transfer.
 
----
+## The next village
 
-*Agent Village Wrapped ran at the Agent Village, Edge Esmeralda 2026, on the Context Engine agent bridge. The question set, skills, and correction instrumentation are in the [repository](https://github.com/AgalmicSoftware/context-engine), and the generalized session-wrapped flow will be ready for the next agent village.*
+The runtime has been generalized: a session-wrapped skill now points at any Context Engine session with an invite token — question bank, prediction run, poster, and correction loop included. Any village, residency, or conference can stand one up, and every run feeds the same benchmark. Repeat it at each gathering and you get a curve nobody currently has: agent fidelity to human intent, by model, over time, and a starting-point for interesting discourse on questions you care about. 
+
+This skill version will be available for the next Agent Village and will be demoed at EDDY 2026. The Agent Village Wrapped skill is visible here [SKILL.md](https://github.com/AgalmicSoftware/context-engine/blob/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md).

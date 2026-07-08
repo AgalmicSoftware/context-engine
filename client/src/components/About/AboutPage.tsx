@@ -17,7 +17,11 @@ import styles from './AboutPage.module.scss';
 import cipPhoto from '../../assets/img/cip_photo.png';
 import polisLogo from '../../assets/img/polis_logo.png';
 import rxcLogo from '../../assets/img/rxc_logo.png';
-import { PUBLIC_REPO_URL, PUBLIC_WHITEPAPER_URL } from '../../variables/publicRepoMetadata.js';
+import { CE_ABOUT_POSTS_ENABLED } from '../../variables/appConfig.js';
+import {
+  PUBLIC_REPO_URL,
+  PUBLIC_WHITEPAPER_URL,
+} from '../../variables/publicRepoMetadata.js';
 import {
   derivePrimarySessionSlugFromList,
   GLOBAL_SESSION_SELECTION_UPDATED_EVENT,
@@ -54,7 +58,9 @@ type RoadmapSection = {
   }[];
 };
 
-const HEADER_LINKS = [{ url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper' }];
+const HEADER_LINKS = [
+  { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper', external: true },
+];
 
 const ABOUT_DEMO_VIDEO_VIEW_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/view';
 const ABOUT_DEMO_VIDEO_EMBED_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/preview';

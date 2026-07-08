@@ -223,6 +223,8 @@ describe('appConfig env-backed config', () => {
       expect(config.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA).toBe(false);
       expect(config.CE_ARWEAVE_PREFLIGHT_SBT_METADATA).toBe(false);
       expect(config.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS).toBe(true);
+      expect(config.CE_ENABLE_WALLETCONNECT_FALLBACK).toBe(false);
+      expect(config.CE_ABOUT_POSTS_ENABLED).toBe(true);
     });
   });
 });

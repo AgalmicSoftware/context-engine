@@ -11,6 +11,7 @@ Use it for new files, refactors, and cleanup PRs.
 - `scripts/` holds automation, seeding, audits, migration helpers, and E2E entrypoints.
 - `foundry/` holds Foundry-specific Solidity entry points; `foundry/script/` and `foundry/test/` intentionally keep Foundry's singular directory names one level below repo root.
 - `docs/` holds canonical implementation and operations documentation.
+- `posts/` holds public Markdown posts and the `/posts` route manifest.
 - `TODO/` is an ignored local area for private planning notes and unshipped work items.
 - `contextEngine-cc/` holds the local Claude Code companion integration.
 - `tests/` holds source-of-truth root Node/Jest test harnesses that are not practical to colocate elsewhere; shared helpers live under `tests/helpers/`.

@@ -869,6 +869,34 @@ describe('AppShell route render smoke', () => {
     );
   });
 
+  it('renders the posts root without waiting for cache hydration', async () => {
+    const subject = createSubject({ path: '/posts' });
+    subject.state = {
+      ...subject.state,
+      isCacheManagerReady: false,
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_POSTS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-posts-page')).toBeInTheDocument();
+    expect(mockPostsPage).toHaveBeenCalled();
+  });
+
+  it('renders post detail URLs without waiting for cache hydration', async () => {
+    const subject = createSubject({ path: '/posts/first-post' });
+    subject.state = {
+      ...subject.state,
+      isCacheManagerReady: false,
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_POSTS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-posts-page')).toBeInTheDocument();
+    expect(mockPostsPage).toHaveBeenCalled();
+  });
+
   it('prefers the live browser pathname when the path prop is stale after a direct history rewrite', async () => {
     const sessionConfig = buildSessionConfig({
       slug: 'demo',

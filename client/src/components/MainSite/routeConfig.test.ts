@@ -20,6 +20,9 @@ describe('routeConfig', () => {
     expect(isStaticNonCacheRoute('/tag/governance')).toBe(true);
     expect(isStaticNonCacheRoute('/contracts/0xabc')).toBe(true);
     expect(isStaticNonCacheRoute('/docs/privacy')).toBe(true);
+    expect(isStaticNonCacheRoute('/posts')).toBe(true);
+    expect(isStaticNonCacheRoute('/posts/')).toBe(true);
+    expect(isStaticNonCacheRoute('/posts/first-post')).toBe(true);
     expect(isStaticNonCacheRoute('/surveys')).toBe(false);
     expect(isStaticNonCacheRoute('/session/edge')).toBe(false);
   });

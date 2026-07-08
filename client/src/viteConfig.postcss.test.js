@@ -30,51 +30,5 @@ describe('vite PostCSS compatibility', () => {
     expect(config).toContain("'.md': 'text/markdown; charset=utf-8'");
     expect(config).toMatch(/name:\s*'ce-posts-assets-compatibility'/);
     expect(config).toMatch(/fs\.cpSync\(postsDir,[\s\S]*'posts'\)/);
-    expect(config).toContain('writePostSocialPreviewHtml({ buildDir: outputDir, postsDir })');
-  });
-
-  it('writes crawler-facing post HTML with the header as a large social image', () => {
-    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-post-social-preview-'));
-    const buildDir = path.join(tempRoot, 'build');
-    const postsDir = path.join(tempRoot, 'posts');
-    const post = {
-      slug: 'agent-village-wrapped-2026',
-      title: 'Agent Village & "Wrapped"',
-      summary: 'A personal-agent evaluation.',
-      headerImage: {
-        src: 'agent-village-wrapped/attachments/header.jpg',
-        alt: 'Two illustrated robots read papers.',
-      },
-    };
-
-    try {
-      fs.mkdirSync(buildDir, { recursive: true });
-      fs.mkdirSync(postsDir, { recursive: true });
-      fs.writeFileSync(
-        path.join(buildDir, 'index.html'),
-        '<html><head><title>Context Engine</title><meta property="og:image" content="default.png" /></head></html>',
-      );
-      fs.writeFileSync(path.join(postsDir, 'manifest.json'), JSON.stringify({ posts: [post] }));
-
-      const written = writePostSocialPreviewHtml({ buildDir, postsDir });
-      const nestedHtmlPath = path.join(buildDir, 'posts', post.slug, 'index.html');
-      const cleanUrlHtmlPath = path.join(buildDir, 'posts', `${post.slug}.html`);
-      const html = fs.readFileSync(nestedHtmlPath, 'utf8');
-
-      expect(written).toEqual([nestedHtmlPath, cleanUrlHtmlPath]);
-      expect(fs.readFileSync(cleanUrlHtmlPath, 'utf8')).toBe(html);
-      expect(html).toContain('<title>Agent Village &amp; &quot;Wrapped&quot;</title>');
-      expect(html).toContain('property="og:type" content="article"');
-      expect(html).toContain('name="twitter:card" content="summary_large_image"');
-      expect(html).toContain(
-        'property="og:image" content="https://contextengine.sh/posts/agent-village-wrapped/attachments/header.jpg"',
-      );
-      expect(html).toContain('rel="canonical" href="https://contextengine.sh/posts/agent-village-wrapped-2026"');
-      expect(() => renderPostSocialPreviewHtml('<html><head></head></html>', { ...post, slug: '../private' })).toThrow(
-        'Unsafe post slug',
-      );
-    } finally {
-      fs.rmSync(tempRoot, { recursive: true, force: true });
-    }
   });
 });

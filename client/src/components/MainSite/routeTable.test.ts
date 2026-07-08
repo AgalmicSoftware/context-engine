@@ -110,6 +110,19 @@ describe('MainSite route table', () => {
         shouldBypassCacheHydrationWait: true,
       }),
     );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/posts', isAddress })).toEqual(
+      expect.objectContaining({
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      })
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/posts/first-post', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'posts',
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      })
+    );
     expect(resolveMainSiteRouteMatch({ fullPath: '/not-a-route', isAddress })).toEqual(
       expect.objectContaining({
         key: 'notFound',

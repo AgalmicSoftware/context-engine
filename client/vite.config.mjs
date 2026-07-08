@@ -7,6 +7,7 @@ import { defineConfig, loadEnv, transformWithEsbuild } from 'vite';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, 'src');
 const publicDir = path.resolve(__dirname, 'public');
+const postsDir = path.resolve(__dirname, '..', 'posts');
 const headers = {
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
   'Cross-Origin-Embedder-Policy': 'unsafe-none',
@@ -52,6 +53,7 @@ const publicAssetContentTypes = {
   '.jpg': 'image/jpeg',
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.md': 'text/markdown; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.txt': 'text/plain; charset=utf-8',
@@ -276,6 +278,24 @@ const resolvePublicAssetPath = (requestUrl) => {
   return fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile() ? resolvedPath : null;
 };
 
+const resolvePostsAssetPath = (requestUrl) => {
+  const rawPathname = String(requestUrl || '').split('?')[0].split('#')[0];
+  if (!rawPathname || rawPathname === '/' || rawPathname === '/posts') return null;
+  let pathname;
+  try {
+    pathname = decodeURIComponent(rawPathname);
+  } catch {
+    return null;
+  }
+  const relativePath = pathname.replace(/^\/+/, '');
+  if (!relativePath.startsWith('posts/')) return null;
+  const postRelativePath = relativePath.slice('posts/'.length);
+  if (!postRelativePath) return null;
+  const resolvedPath = path.resolve(postsDir, postRelativePath);
+  if (!resolvedPath.startsWith(`${postsDir}${path.sep}`)) return null;
+  return fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile() ? resolvedPath : null;
+};
+
 const readClientEnv = (mode) => {
   const loadedEnv = loadEnv(mode, __dirname, ['REACT_APP_', 'NEXT_PUBLIC_', 'PUBLIC_URL']);
   const reactAppEnv = Object.fromEntries(
@@ -407,6 +427,28 @@ const publicAssetsCompatibilityPlugin = () => ({
   },
 });
 
+const postsAssetsCompatibilityPlugin = () => ({
+  name: 'ce-posts-assets-compatibility',
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      const assetPath = resolvePostsAssetPath(req.url);
+      if (!assetPath) {
+        next();
+        return;
+      }
+      const contentType = publicAssetContentTypes[path.extname(assetPath).toLowerCase()];
+      if (contentType) res.setHeader('Content-Type', contentType);
+      fs.createReadStream(assetPath).pipe(res);
+    });
+  },
+  writeBundle(options) {
+    if (!fs.existsSync(postsDir)) return;
+    fs.cpSync(postsDir, path.resolve(options.dir || path.resolve(__dirname, 'build'), 'posts'), {
+      recursive: true,
+    });
+  },
+});
+
 export default defineConfig(({ mode }) => {
   const clientEnv = readClientEnv(mode);
 
@@ -426,6 +468,7 @@ export default defineConfig(({ mode }) => {
       rawLoaderCompatibilityPlugin(),
       copyStaticImageAssetsPlugin(),
       publicAssetsCompatibilityPlugin(),
+      postsAssetsCompatibilityPlugin(),
       {
         name: 'ce-public-url-html-compatibility',
         transformIndexHtml(html) {
