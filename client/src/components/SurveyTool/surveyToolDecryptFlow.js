@@ -32,7 +32,6 @@ import {
   resolveDecryptSurveyId,
   resolveQuestionDecryptHandlingMode,
 } from './surveyToolDecryptState';
-import { normalizeQuestionIdKey } from './surveyToolSignatures';
 import {
   applyDecryptedQuestionResponseValues,
   applyDecryptedQuestionResponseValuesToContainer,
@@ -50,6 +49,15 @@ import {
   normalizeBulkDecryptedSliceForSurveyState,
   syncDecryptedQuestionIntoBaseline,
 } from './surveyToolDecryptSliceState';
+import {
+  buildSurveyDecryptAttemptSourceInputs,
+  buildSurveyDecryptSourceState,
+  carryForwardSurveyQuestionRatings,
+  collectQuestionRatingEnvelopesByQid,
+  decryptQuestionRatingEnvelopeMap,
+  decryptQuestionRatingEnvelopes,
+} from './surveyToolDecryptSurveySource';
+import { normalizeQuestionIdKey } from './surveyToolSignatures';
 
 export {
   buildAutoDecryptMaskedFieldSignature,
@@ -83,6 +91,14 @@ export {
   normalizeBulkDecryptedSliceForSurveyState,
   syncDecryptedQuestionIntoBaseline,
 } from './surveyToolDecryptSliceState';
+export {
+  buildSurveyDecryptAttemptSourceInputs,
+  buildSurveyDecryptSourceState,
+  carryForwardSurveyQuestionRatings,
+  collectQuestionRatingEnvelopesByQid,
+  decryptQuestionRatingEnvelopeMap,
+  decryptQuestionRatingEnvelopes,
+} from './surveyToolDecryptSurveySource';
 
 export {
   buildClearedQuestionDecryptBusyTokens,
@@ -244,194 +260,6 @@ export const applyQuestionDecryptFailureStatus = ({
 
   setStatePort((prev) => buildFailurePort(prev, questionId, fieldToDecrypt, error?.message, decryptAttemptToken));
   return false;
-};
-
-export const decryptQuestionRatingEnvelopes = async (
-  ratingEnvelopes = null,
-  { chainId, lit, account, providerLike } = {},
-  { decryptEnvelopeValue, logWarn = () => {} } = {},
-) => {
-  let decryptedImportance = null;
-  let decryptedConviction = null;
-  try {
-    const toNum = (value) => {
-      if (value === undefined || value === null) return null;
-      const next = Number(value);
-      return Number.isNaN(next) ? null : next;
-    };
-
-    const litOpts = lit ? lit : undefined;
-    if (ratingEnvelopes?.importanceEncrypted) {
-      try {
-        const value = await decryptEnvelopeValue(ratingEnvelopes.importanceEncrypted, {
-          account,
-          chainId,
-          providerLike,
-          ...(litOpts ? { litOpts } : {}),
-        });
-        decryptedImportance = toNum(value);
-      } catch (error) {
-        logWarn(error);
-      }
-    }
-    if (ratingEnvelopes?.convictionEncrypted) {
-      try {
-        const value = await decryptEnvelopeValue(ratingEnvelopes.convictionEncrypted, {
-          account,
-          chainId,
-          providerLike,
-          ...(litOpts ? { litOpts } : {}),
-        });
-        decryptedConviction = toNum(value);
-      } catch (error) {
-        logWarn(error);
-      }
-    }
-  } catch (error) {
-    logWarn(error);
-  }
-
-  return { decryptedImportance, decryptedConviction };
-};
-
-export const decryptQuestionRatingEnvelopeMap = async (
-  ratingEnvelopesByQid = {},
-  { chainId, lit, account, providerLike } = {},
-  { decryptEnvelopeValue, logWarn = () => {} } = {},
-) => {
-  const decryptedImportanceFromEnv = {};
-  const decryptedConvictionFromEnv = {};
-  try {
-    const litOpts = lit ? lit : undefined;
-    const toNum = (value) => {
-      if (value === undefined || value === null) return null;
-      const next = Number(value);
-      return Number.isNaN(next) ? null : next;
-    };
-    const qids = Object.keys(ratingEnvelopesByQid || {});
-    for (const questionId of qids) {
-      const envs = ratingEnvelopesByQid[questionId] || {};
-      if (envs.importanceEncrypted) {
-        try {
-          const value = await decryptEnvelopeValue(envs.importanceEncrypted, {
-            account,
-            chainId,
-            providerLike,
-            ...(litOpts ? { litOpts } : {}),
-          });
-          const next = toNum(value);
-          if (next !== null) decryptedImportanceFromEnv[questionId] = next;
-        } catch (error) {
-          logWarn(error);
-        }
-      }
-      if (envs.convictionEncrypted) {
-        try {
-          const value = await decryptEnvelopeValue(envs.convictionEncrypted, {
-            account,
-            chainId,
-            providerLike,
-            ...(litOpts ? { litOpts } : {}),
-          });
-          const next = toNum(value);
-          if (next !== null) decryptedConvictionFromEnv[questionId] = next;
-        } catch (error) {
-          logWarn(error);
-        }
-      }
-    }
-  } catch (error) {
-    logWarn(error);
-  }
-
-  return {
-    decryptedImportanceFromEnv,
-    decryptedConvictionFromEnv,
-  };
-};
-
-export const collectQuestionRatingEnvelopesByQid = (source = null) => {
-  const ratingEnvelopesByQid = {};
-  try {
-    const addFromResponseObject = (responseObject) => {
-      if (!responseObject || typeof responseObject !== 'object') return;
-      const questionId = String(
-        responseObject?.questionID || responseObject?.questionId || responseObject?.questionIDHash || '',
-      )
-        .trim()
-        .toLowerCase();
-      if (!questionId) return;
-      const importanceEncrypted =
-        typeof responseObject?.importanceEncrypted === 'string' ? responseObject.importanceEncrypted : '';
-      const convictionEncrypted =
-        typeof responseObject?.convictionEncrypted === 'string' ? responseObject.convictionEncrypted : '';
-      if (!importanceEncrypted && !convictionEncrypted) return;
-      ratingEnvelopesByQid[questionId] = {
-        importanceEncrypted,
-        convictionEncrypted,
-      };
-    };
-
-    if (source && typeof source === 'object') {
-      if (Array.isArray(source.responses)) {
-        source.responses.forEach(addFromResponseObject);
-      } else {
-        addFromResponseObject(source);
-      }
-    }
-  } catch (_) {
-    return {};
-  }
-
-  return ratingEnvelopesByQid;
-};
-
-export const carryForwardSurveyQuestionRatings = (sourceSlice = null, previousStateSlice = null) => {
-  const nextSourceSlice = ensureQuestionDecryptSliceShape(sourceSlice);
-  Object.keys(previousStateSlice?.importance || {}).forEach((questionId) => {
-    if (nextSourceSlice.importance[questionId] === undefined || nextSourceSlice.importance[questionId] === null) {
-      nextSourceSlice.importance[questionId] = previousStateSlice.importance[questionId];
-    }
-  });
-  Object.keys(previousStateSlice?.conviction || {}).forEach((questionId) => {
-    if (nextSourceSlice.conviction[questionId] === undefined || nextSourceSlice.conviction[questionId] === null) {
-      nextSourceSlice.conviction[questionId] = previousStateSlice.conviction[questionId];
-    }
-  });
-  return nextSourceSlice;
-};
-
-export const buildSurveyDecryptSourceState = (
-  latestResponse = null,
-  fallbackSourceSlice = null,
-  previousStateSlice = null,
-  buildSliceFromUserAnswers = (value) => value,
-) => {
-  const baseSourceSlice = latestResponse
-    ? buildSliceFromUserAnswers(latestResponse)
-    : ensureQuestionDecryptSliceShape(fallbackSourceSlice || buildEmptyQuestionDecryptSlice());
-
-  return {
-    sourceSlice: carryForwardSurveyQuestionRatings(baseSourceSlice, previousStateSlice),
-    ratingEnvelopesByQid: collectQuestionRatingEnvelopesByQid(latestResponse),
-  };
-};
-
-export const buildSurveyDecryptAttemptSourceInputs = ({
-  decryptContext = null,
-  state = null,
-  getEffectiveDraftSlug = null,
-} = {}) => {
-  const surveyIndex = decryptContext?.surveyIndex || 0;
-  const fallbackSourceSlice = state?.surveysResponseState?.[surveyIndex] || buildEmptyQuestionDecryptSlice();
-
-  return {
-    surveyIndex,
-    slug: decryptContext?.sessionSlug || (typeof getEffectiveDraftSlug === 'function' ? getEffectiveDraftSlug() : ''),
-    fallbackUserAnswers: state?.userAnswers,
-    fallbackSourceSlice,
-    previousStateSlice: state?.surveysResponseState?.[surveyIndex] || {},
-  };
 };
 
 export const applySurveyDecryptStaleStatus = ({
