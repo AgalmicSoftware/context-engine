@@ -13300,7 +13300,7 @@
       ],
       "importance_score": 9,
       "citation_count": 0,
-      "category": "alignment_research",
+      "category": "Alignment Theory",
       "builds_on": [
         "alignment_faking_2024"
       ],
@@ -13350,7 +13350,7 @@
       ],
       "importance_score": 8,
       "citation_count": 0,
-      "category": "alignment_research",
+      "category": "Alignment Theory",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -13395,7 +13395,7 @@
       ],
       "importance_score": 9,
       "citation_count": 0,
-      "category": "evaluation_methodology",
+      "category": "Evaluations",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -13440,7 +13440,7 @@
       ],
       "importance_score": 9,
       "citation_count": 0,
-      "category": "governance_research",
+      "category": "Governance",
       "builds_on": [
         "metr_time_horizon_v11_2025"
       ],
@@ -13487,7 +13487,7 @@
       ],
       "importance_score": 9,
       "citation_count": 0,
-      "category": "governance_research",
+      "category": "Governance",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -13533,7 +13533,7 @@
       ],
       "importance_score": 8,
       "citation_count": 0,
-      "category": "evaluation_methodology",
+      "category": "Evaluations",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -13578,7 +13578,7 @@
       ],
       "importance_score": 9,
       "citation_count": 0,
-      "category": "alignment_research",
+      "category": "Alignment Theory",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -13623,7 +13623,7 @@
       ],
       "importance_score": 8,
       "citation_count": 0,
-      "category": "interpretability",
+      "category": "Interpretability",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -13673,7 +13673,7 @@
       ],
       "importance_score": 8,
       "citation_count": 0,
-      "category": "alignment_research",
+      "category": "Alignment Theory",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -13721,7 +13721,7 @@
       ],
       "importance_score": 9,
       "citation_count": 0,
-      "category": "evaluation_methodology",
+      "category": "Evaluations",
       "builds_on": [],
       "influenced": [
         "shade_arena_control_2025"
@@ -13767,7 +13767,7 @@
       ],
       "importance_score": 8,
       "citation_count": 0,
-      "category": "alignment_research",
+      "category": "Alignment Theory",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -13811,7 +13811,7 @@
       ],
       "importance_score": 7,
       "citation_count": 0,
-      "category": "meta_research",
+      "category": "Survey",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -13855,7 +13855,7 @@
       ],
       "importance_score": 8,
       "citation_count": 0,
-      "category": "alignment_research",
+      "category": "Alignment Theory",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -13912,7 +13912,7 @@
       ],
       "importance_score": 8,
       "citation_count": 0,
-      "category": "governance_research",
+      "category": "Governance",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -13959,7 +13959,7 @@
       ],
       "importance_score": 7,
       "citation_count": 0,
-      "category": "governance_research",
+      "category": "Governance",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -14006,7 +14006,7 @@
       ],
       "importance_score": 8,
       "citation_count": 0,
-      "category": "governance_research",
+      "category": "Governance",
       "builds_on": [],
       "influenced": [],
       "limitations_and_critiques": [
@@ -14056,7 +14056,7 @@
       ],
       "importance_score": 9,
       "citation_count": 0,
-      "category": "governance_research",
+      "category": "Governance",
       "builds_on": [],
       "influenced": [
         "environmental_impact_ai_servers_2026"
@@ -14108,7 +14108,7 @@
       ],
       "importance_score": 7,
       "citation_count": 0,
-      "category": "governance_research",
+      "category": "Governance",
       "builds_on": [
         "water_footprint_ai_models_2023"
       ],
@@ -14126,7 +14126,7 @@
     },
     {
       "type": "paper",
-      "category": "ai_governance",
+      "category": "Governance",
       "citation_count": null,
       "importance_score": 8,
       "institution": "Google",
@@ -14179,7 +14179,7 @@
     },
     {
       "type": "paper",
-      "category": "models_architecture",
+      "category": "Capabilities",
       "citation_count": null,
       "importance_score": 8,
       "institution": "Alibaba Qwen",
@@ -14266,7 +14266,7 @@
       ],
       "importance_score": 9,
       "citation_count": null,
-      "category": "governance_research",
+      "category": "Governance",
       "builds_on": [
         "hai_stanford_2024_ai_index_report"
       ],
@@ -14359,7 +14359,7 @@
       ],
       "importance_score": 10,
       "citation_count": null,
-      "category": "Safety",
+      "category": "Survey",
       "builds_on": [
         "International AI Safety Report 2025 (Bletchley/Seoul process)",
         "Bengio et al. 2024 Managing extreme AI risks amid rapid progress",
@@ -14447,7 +14447,7 @@
       ],
       "importance_score": 9,
       "citation_count": null,
-      "category": "Safety",
+      "category": "Governance",
       "builds_on": [
         "International AI Safety Report 2025/2026 (Bengio et al.)",
         "Hendrycks et al. 2023 An Overview of Catastrophic AI Risks",
@@ -14502,7 +14502,7 @@
       ],
       "importance_score": 8,
       "citation_count": null,
-      "category": "Alignment",
+      "category": "Alignment Theory",
       "builds_on": [
         "Saunders et al. 2022 Self-critiquing models for assisting human evaluators",
         "Irving et al. 2018 AI safety via debate",
@@ -14580,7 +14580,7 @@
       ],
       "importance_score": 7,
       "citation_count": null,
-      "category": "Alignment",
+      "category": "Alignment Theory",
       "builds_on": [
         "Seligman 2011 PERMA model of wellbeing",
         "Ryan and Deci 2000 Self-Determination Theory",
@@ -14640,7 +14640,7 @@
       ],
       "importance_score": 7,
       "citation_count": null,
-      "category": "Alignment",
+      "category": "Alignment Theory",
       "builds_on": [
         "Christiano et al. 2017 Deep reinforcement learning from human preferences",
         "Ouyang et al. 2022 Training language models to follow instructions (InstructGPT)",
@@ -14693,7 +14693,7 @@
       ],
       "importance_score": 8,
       "citation_count": null,
-      "category": "Alignment",
+      "category": "Alignment Theory",
       "builds_on": [
         "Sleeper Agents (Hubinger et al. 2024)",
         "Alignment faking in Claude (Anthropic 2024)"
@@ -14747,7 +14747,7 @@
       ],
       "importance_score": 8,
       "citation_count": null,
-      "category": "Safety",
+      "category": "Evaluations",
       "builds_on": [
         "Sleeper Agents (Hubinger et al. 2024)",
         "Alignment faking literature",
@@ -14797,7 +14797,7 @@
       ],
       "importance_score": 7,
       "citation_count": null,
-      "category": "Safety",
+      "category": "Technical Safety",
       "builds_on": [
         "Scheming detection literature",
         "Scalable oversight research",
@@ -14848,7 +14848,7 @@
       ],
       "importance_score": 8,
       "citation_count": null,
-      "category": "Alignment",
+      "category": "Alignment Theory",
       "builds_on": [
         "Irving et al. debate paper",
         "Recursive reward modeling",
@@ -15010,7 +15010,7 @@
       ],
       "importance_score": 9,
       "citation_count": null,
-      "category": "Safety",
+      "category": "Technical Safety",
       "builds_on": [
         "Singapore Consensus defence-in-depth model",
         "METR frontier risk report",

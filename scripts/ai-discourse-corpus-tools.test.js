@@ -41,6 +41,13 @@ test('validates all debates and client mirror coverage', () => {
   assert.deepEqual(validation.malformedYears, []);
 });
 
+test('taxonomy fields stay within their canonical vocabularies', () => {
+  const validation = collectValidation();
+
+  assert.deepEqual(validation.taxonomyDrift, []);
+  assert.deepEqual(validation.unknownCorpusKeys, []);
+});
+
 test('extracts a compact record by ID for context-safe inspection', () => {
   const result = extractRecord('debate_ai_water_usage');
 

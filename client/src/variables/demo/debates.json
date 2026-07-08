@@ -7438,7 +7438,7 @@
       },
       {
         "entry_url_or_id": "alignment_remains_hard_unsolved_2026",
-        "corpus": "lesswrong",
+        "corpus": "lesswrong-posts",
         "side": "b",
         "stance_summary": "Argues against premature confidence; benchmark performance does not equal alignment",
         "relevance_score": 9
@@ -7462,7 +7462,7 @@
         "relevance_score": 8
       },
       {
-        "from_corpus": "lesswrong",
+        "from_corpus": "lesswrong-posts",
         "from_id": "alignment_remains_hard_unsolved_2026",
         "to_corpus": "arxiv-ai-safety",
         "to_id": "automated_alignment_harder_2026",
@@ -7917,7 +7917,7 @@
       },
       {
         "entry_url_or_id": "zvi_on_dario_amodei_dwarkesh_2026",
-        "corpus": "lesswrong",
+        "corpus": "lesswrong-posts",
         "side": "b",
         "stance_summary": "Zvi's analysis identifies calibration concerns with Dario's predictions and CEO incentive structures",
         "relevance_score": 9
@@ -7940,7 +7940,7 @@
         "relevance_score": 9
       },
       {
-        "from_corpus": "lesswrong",
+        "from_corpus": "lesswrong-posts",
         "from_id": "zvi_on_dario_amodei_dwarkesh_2026",
         "to_corpus": "dwarkesh-lab-insiders",
         "to_id": "amodei_dario_dwarkesh_2026_end_of_exponential",

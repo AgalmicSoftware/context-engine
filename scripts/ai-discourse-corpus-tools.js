@@ -95,6 +95,68 @@ const TARGET_DEBATE_IDS = Object.freeze([
 const VALID_PRIMARY_URL_RE = /^https?:\/\//i;
 const DATE_RANGE_RE = /^\d{4}-\d{4}$/;
 
+// Canonical vocabularies for taxonomy fields that previously drifted across
+// ingestion batches (mixed casing / snake_case variants). `validate` flags any
+// value outside these sets so new batches cannot re-introduce drift.
+const TAXONOMY_ENUMS = Object.freeze({
+  'arxiv-ai-safety': Object.freeze({
+    category: Object.freeze([
+      'Alignment Theory',
+      'Capabilities',
+      'Evaluations',
+      'Fairness',
+      'Forecasting',
+      'Framework',
+      'Governance',
+      'Interpretability',
+      'Policy',
+      'Robustness',
+      'Survey',
+      'Technical Safety',
+    ]),
+  }),
+  'lesswrong-posts': Object.freeze({
+    platform: Object.freeze([
+      'AI Alignment Blog',
+      'AI Impacts',
+      'ARC Evals',
+      'Alignment Forum',
+      'Anthropic',
+      'Astral Codex Ten',
+      'Bounded Regret',
+      'Cold Takes',
+      'EA Forum',
+      'Epoch AI',
+      'Google DeepMind',
+      'Gwern',
+      'LessWrong',
+      'MIRI',
+      'Managing AI Risks',
+      'OpenAI',
+      'Personal Blog',
+      'Sideways View',
+      'Slate Star Codex',
+      'Substack',
+      'TIME Magazine',
+      'arXiv',
+    ]),
+  }),
+  'dwarkesh-lab-insiders': Object.freeze({
+    role_category: Object.freeze([
+      'capabilities_researcher',
+      'former_insider',
+      'governance_expert',
+      'independent_researcher',
+      'investor_strategist',
+      'lab_leader',
+      'lab_researcher',
+      'policy_advisor',
+      'researcher',
+      'safety_researcher',
+    ]),
+  }),
+});
+
 function readJson(absolutePath) {
   return JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
 }
@@ -280,6 +342,8 @@ function collectValidation(rootDir = ROOT_DIR) {
   const malformedYears = [];
   const rangeDateFields = [];
   const invalidPrimaryUrls = [];
+  const taxonomyDrift = [];
+  const unknownCorpusKeys = [];
 
   corpusFiles.forEach((file) => {
     file.metaCountKeys.forEach((key) => {
@@ -316,6 +380,30 @@ function collectValidation(rootDir = ROOT_DIR) {
           invalidPrimaryUrls.push({ corpus: file.corpusKey, id, field, value });
         }
       });
+
+      Object.entries(TAXONOMY_ENUMS[file.corpusKey] || {}).forEach(([field, allowedValues]) => {
+        if (!Object.prototype.hasOwnProperty.call(entry || {}, field)) {
+          return;
+        }
+        if (!allowedValues.includes(entry[field])) {
+          taxonomyDrift.push({ corpus: file.corpusKey, id, field, value: entry[field] });
+        }
+      });
+    });
+  });
+
+  crossCorpusFile.entries.forEach((debate) => {
+    const flagUnknown = (field, value) => {
+      if (value && !index.aliasMap.has(value) && !index.aliasMap.has(String(value).replaceAll('_', '-'))) {
+        unknownCorpusKeys.push({ debateId: debate.id, field, value });
+      }
+    };
+    (debate.positions || []).forEach((position, positionIndex) => {
+      flagUnknown(`positions[${positionIndex}].corpus`, position.corpus);
+    });
+    (debate.cross_corpus_references || []).forEach((reference, referenceIndex) => {
+      flagUnknown(`cross_corpus_references[${referenceIndex}].from_corpus`, reference.from_corpus);
+      flagUnknown(`cross_corpus_references[${referenceIndex}].to_corpus`, reference.to_corpus);
     });
   });
 
@@ -328,6 +416,8 @@ function collectValidation(rootDir = ROOT_DIR) {
     malformedYears,
     rangeDateFields,
     invalidPrimaryUrls,
+    taxonomyDrift,
+    unknownCorpusKeys,
     debateReferences: allReferenceIssues,
     targetDebateReferences: targetReferenceIssues,
     clientDebateMirror: {
@@ -425,6 +515,7 @@ module.exports = {
   CLIENT_DEBATES_PATH,
   CORPUS_FILES,
   TARGET_DEBATE_IDS,
+  TAXONOMY_ENUMS,
   buildRecordIndex,
   collectSummary,
   collectValidation,
