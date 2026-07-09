@@ -727,13 +727,15 @@ function assignParticipantsToGroups(
   return assignment.map((value) => (value === null || value === undefined ? 0 : value));
 }
 
-function propTest(successes = 0, trials = 0): number {
+// Exported for cross-implementation parity fixtures.
+export function propTest(successes = 0, trials = 0): number {
   const adjSuccesses = successes + 1;
   const adjTrials = trials + 1;
   return 2 * Math.sqrt(adjTrials) * (adjSuccesses / adjTrials - 0.5);
 }
 
-function twoPropTest(successIn = 0, successOut = 0, popIn = 0, popOut = 0): number {
+// Exported for cross-implementation parity fixtures.
+export function twoPropTest(successIn = 0, successOut = 0, popIn = 0, popOut = 0): number {
   const adjSuccessIn = successIn + 1;
   const adjSuccessOut = successOut + 1;
   const adjPopIn = popIn + 1;
@@ -749,7 +751,8 @@ function zSig90(value: number): boolean {
   return value > SIG_90_Z;
 }
 
-function computeCommentStats(votes: RatingRow = []): CommentStats {
+// Exported for cross-implementation parity fixtures.
+export function computeCommentStats(votes: RatingRow = []): CommentStats {
   const filtered = votes.filter((vote) => !isMissingVote(vote));
   const agree = filtered.filter(isAgreeVote).length;
   const disagree = filtered.filter(isDisagreeVote).length;

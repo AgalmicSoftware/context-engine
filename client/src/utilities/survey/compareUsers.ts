@@ -207,7 +207,8 @@ function normalizeBinarySign(val: unknown): number {
   if (v === 'unsure' || v === 'unknown' || v === 'neutral' || v === 'null' || v === '0') return 0;
   return 0;
 }
-function normalizeRatingSignedValue(valRaw: unknown): number {
+// Exported for cross-implementation parity fixtures.
+export function normalizeRatingSignedValue(valRaw: unknown): number {
   const v = typeof valRaw === 'number' ? valRaw : Number(valRaw);
   const span = RATING_MAX - RATING_MIN;
   if (!Number.isFinite(v) || v < RATING_MIN || v > RATING_MAX || span <= 0) return 0;
