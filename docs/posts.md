@@ -100,9 +100,11 @@ Supported types:
   styled tooltip (hover, focus, or click to pin) and a white ring whose
   thickness scales with the prediction confidence.
 - `binary-beeswarm`: renders a consensus/difference scatter from `items`
-  where the y-axis maps to average confidence. Dots pin their detail card on
-  click or tap (Escape or the close control dismisses). A `Swarm | List`
-  toggle switches to a sortable question list (most split, confidence).
+  where the y-axis maps to average confidence. All dots use one neutral color;
+  the hover, focus, or pinned detail card shows the question and response
+  breakdown. Dots pin their detail card on click or tap (Escape or the close
+  control dismisses). A `Swarm | List` toggle switches to a sortable question
+  list (most split, confidence), and narrow screens start in the List view.
 - `response-type-grid`: renders mixed panels (`numbers`, `pie`, split bars,
   quote lists) from `panels`.
 

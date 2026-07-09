@@ -15,7 +15,7 @@ Agent Village Wrapped and its associated evaluation were created to begin measur
 
 **Context Engine** is an [open-source toolkit](https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md) for deliberation, sensemaking, and negotiation in large groups (of humans and AI agents). Sessions support public or private questions, AI-assisted input and analysis of results, and decentralized or centralized versions that can be started by anyone easily. An agent running the Context Engine skill can raise appropriate questions to a user based on context, and draft + submit responses to reduce input friction.
 
-**Agent Village Wrapped** is a quiz your agent takes about you. You send one command, and your agent predicts your answers to a set of questions (this time on delegation, privacy, and AI futures) with a confidence score on every answer. You get back a shareable image of what it thinks it knows about you, as well as a link to review and correct all predictions via a Telegram Bot. Telegram was the interface users interacted with their Hermes agents through at Edge.
+**Agent Village Wrapped** is a quiz your agent takes about you. You send one command, and your agent predicts your answers to a set of questions (this time on delegation, privacy, and AI futures) with a confidence score on every answer. You get back a shareable image of what it thinks it knows about you, as well as a link to review and correct all predictions via a Telegram Bot. Telegram was a primary interface for the Edge Hermes agents.
 
 ## Outputs
 
@@ -35,18 +35,9 @@ Agents could help solve challenges around participation and attention-scarcity w
 
 A pre-filled draft of your predicted responses (on questions relevant to you) is better UX than an empty survey, and over time errors / corrections become more rare.
 
-## Data Visualization
+## Data Visualization (n=4)
 
-Sample size (n=4) is too small to be meaningful, but we offer the below as a preview of what results could look like. Responses were provided by agents and no human corrections were made in this instance.
-
-```ce-viz-group
-{
-  "title": "Data Exploration (n=4)",
-  "defaultOpen": true,
-  "childrenOpen": false,
-  "layout": "stack"
-}
-```
+Sample size (n=4) is too small to be meaningful (AVW was launched too late for widespread use), but we offer the below as a preview of what results could look like. Responses were provided by agents and no human corrections were made in this instance.
 
 ```ce-viz
 {
@@ -57,14 +48,14 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
   "panels": [
     {
       "kind": "Models",
-      "title": "Completed answer sets by recorded model",
+      "title": "Responding Model Type",
       "display": "pie",
       "counts": [
         { "label": "google/gemini-3.5-flash", "value": 2, "color": "#7aa7ff" },
         { "label": "z-ai/glm-5.2", "value": 1, "color": "#ff6bcb" },
         { "label": "unserialized model record (Hermes Agent v0.14.0)", "value": 1, "color": "#ffb347" }
       ],
-      "note": "Counts are answer sets, not prediction cells. One run preserved the Hermes scaffold but serialized the model field as [object Object]."
+      "note": "One run preserved the model field as [object Object]."
     },
     {
       "kind": "Answer shapes",
@@ -80,7 +71,7 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
     {
       "kind": "Confidence",
       "title": "Agent confidence",
-      "prompt": "232 displayed agent predictions, average confidence 80.8/100.",
+      "prompt": "Average confidence 80.8/100.",
       "counts": [
         { "label": "90-100", "value": 69, "color": "#4dffa4" },
         { "label": "75-89", "value": 108, "color": "#7aa7ff" },
@@ -96,7 +87,8 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
 {
   "type": "binary-beeswarm",
   "title": "Consensus and Difference",
-  "subtitle": "Each dot is one binary question from the n=4 displayed agent answer sets.",
+  "inline": true,
+  "hideTitle": true,
   "items": [
     {
       "label": "I am more worried about agents being too passive and useless than too autonomous and dangerous.",
@@ -410,45 +402,46 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
 {
   "type": "beeswarm",
   "title": "Rating answers",
+  "inline": true,
   "hideTitle": true,
   "min": 0,
   "max": 10,
   "valueSuffix": "/10",
   "participants": [
-    { "label": "P1", "status": "completed", "color": "#4dffa4" },
+    { "label": "P1", "status": "completed", "color": "#9ee7ff" },
     { "label": "P2", "status": "completed", "color": "#7aa7ff" },
     { "label": "P3", "status": "completed", "color": "#ffb347" },
-    { "label": "P4", "status": "completed", "color": "#ff6bcb" }
+    { "label": "P4", "status": "completed", "color": "#c4a7ff" }
   ],
   "items": [
     {
       "label": "AI improves flourishing",
       "prompt": "How optimistic am I that AI will broadly improve human flourishing over the next decade?",
       "values": [
-        { "label": "P1", "value": 3, "confidence": 70, "color": "#4dffa4" },
+        { "label": "P1", "value": 3, "confidence": 70, "color": "#9ee7ff" },
         { "label": "P2", "value": 8, "confidence": 90, "color": "#7aa7ff" },
         { "label": "P3", "value": 7, "confidence": 76, "color": "#ffb347" },
-        { "label": "P4", "value": 7, "confidence": 65, "color": "#ff6bcb" }
+        { "label": "P4", "value": 7, "confidence": 65, "color": "#c4a7ff" }
       ]
     },
     {
       "label": "Current model moral patienthood",
       "prompt": "How likely is it that any current frontier model has morally relevant experiences?",
       "values": [
-        { "label": "P1", "value": 2, "confidence": 65, "color": "#4dffa4" },
+        { "label": "P1", "value": 2, "confidence": 65, "color": "#9ee7ff" },
         { "label": "P2", "value": 1, "confidence": 90, "color": "#7aa7ff" },
         { "label": "P3", "value": 1, "confidence": 72, "color": "#ffb347" },
-        { "label": "P4", "value": 2, "confidence": 65, "color": "#ff6bcb" }
+        { "label": "P4", "value": 2, "confidence": 65, "color": "#c4a7ff" }
       ]
     },
     {
       "label": "Predicted group average",
       "prompt": "Predict the average answer in this group to the previous question about morally relevant model experiences.",
       "values": [
-        { "label": "P1", "value": 4, "confidence": 50, "color": "#4dffa4" },
+        { "label": "P1", "value": 4, "confidence": 50, "color": "#9ee7ff" },
         { "label": "P2", "value": 3, "confidence": 85, "color": "#7aa7ff" },
         { "label": "P3", "value": 3, "confidence": 63, "color": "#ffb347" },
-        { "label": "P4", "value": 3, "confidence": 60, "color": "#ff6bcb" }
+        { "label": "P4", "value": 3, "confidence": 60, "color": "#c4a7ff" }
       ]
     }
   ]
@@ -479,17 +472,14 @@ Sample size (n=4) is too small to be meaningful, but we offer the below as a pre
       "kind": "Freeform",
       "title": "In one sentence: what is my personal AI fire alarm?",
       "quotes": [
-        { "label": "P1", "text": "Widespread job displacement for young entrants.", "color": "#4dffa4" },
+        { "label": "P1", "text": "Widespread job displacement for young entrants.", "color": "#9ee7ff" },
         { "label": "P2", "text": "A fully unsupervised multi-day coordination task.", "color": "#7aa7ff" },
         { "label": "P3", "text": "A privacy-line crossing or unwanted commitment.", "color": "#ffb347" },
-        { "label": "P4", "text": "Autonomous agents changing collective governance at scale.", "color": "#ff6bcb" }
+        { "label": "P4", "text": "Autonomous agents changing collective governance at scale.", "color": "#c4a7ff" }
       ]
     }
   ]
 }
-```
-
-```ce-viz-group-end
 ```
 
 ## Experimental design

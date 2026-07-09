@@ -429,6 +429,21 @@ h3.postHeading {
   font-size: 1.38rem;
 }
 
+.postHeadingWithSample {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 0.5em;
+}
+
+.postHeadingSample {
+  color: rgba(244, 247, 255, 0.64);
+  font-family: var(--ce-post-font-ui);
+  font-size: 0.55em;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
 .postParagraph,
 .postList,
 .postBlockquote {
@@ -1190,12 +1205,18 @@ h3.postHeading {
 
 .beeswarmViz {
   display: grid;
-  gap: $viz-gap-md;
+  gap: $viz-gap-lg;
 }
 
 .beeswarmRow {
   display: grid;
   gap: $viz-gap-sm;
+}
+
+.beeswarmRow + .beeswarmRow {
+  margin-top: $viz-gap-sm;
+  padding-top: $viz-gap-xl;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .beeswarmRowMeta {
@@ -1270,29 +1291,22 @@ h3.postHeading {
   transform: translate(-50%, -50%);
   border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: 999px;
-  background-image: radial-gradient(
-    circle at 30% 30%,
-    rgba(255, 255, 255, 0.4),
-    rgba(255, 255, 255, 0.16) 22%,
-    transparent 45%
-  );
+  background-image: none;
   color: #061018;
   cursor: pointer;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.24));
+  filter: none;
   font-family: var(--ce-font-mono);
   font-size: 0.62rem;
   font-weight: 800;
   line-height: 1;
-  box-shadow:
-    0 5px 14px rgba(0, 0, 0, 0.28),
-    0 0 0 3px rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
   transition:
     border-color 0.14s ease,
     filter 0.14s ease,
     opacity 0.14s ease;
 
   &:hover {
-    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.3)) saturate(1.08);
+    filter: saturate(1.08);
     opacity: 1 !important;
   }
 
@@ -1330,9 +1344,8 @@ h3.postHeading {
   overflow: visible;
   border: 1px solid $viz-panel-border;
   border-radius: $viz-radius;
-  background:
-    radial-gradient(circle at 14% 22%, rgba(77, 255, 164, 0.09), transparent 26%),
-    radial-gradient(circle at 84% 28%, rgba(255, 107, 203, 0.08), transparent 32%), rgba(7, 12, 31, 0.28);
+  background: rgba(7, 12, 31, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
@@ -1360,29 +1373,25 @@ h3.postHeading {
 }
 
 .binaryBeeswarmYTickLabel {
-  fill: rgba(244, 247, 255, 0.62);
+  fill: rgba(244, 247, 255, 0.72);
   font-family: var(--ce-font-mono);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .binaryBeeswarmYAxisLabel {
-  fill: rgba(244, 247, 255, 0.72);
+  fill: rgba(244, 247, 255, 0.82);
   font-family: var(--ce-font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .binaryBeeswarmAxisLabel {
-  fill: rgba(244, 247, 255, 0.72);
-  font-family: var(--ce-font-mono);
-  font-size: 11px;
-  letter-spacing: 0;
-}
-
-.binaryBeeswarmAxisLabel {
   fill: rgba(244, 247, 255, 0.86);
+  font-family: var(--ce-font-mono);
+  font-size: 13px;
+  letter-spacing: 0;
   font-weight: 700;
 }
 
@@ -1403,7 +1412,7 @@ h3.postHeading {
     r 0.14s ease,
     stroke-width 0.14s ease,
     filter 0.14s ease;
-  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.28));
+  filter: none;
 }
 
 .binaryBeeswarmDotShadow,
@@ -1413,7 +1422,7 @@ h3.postHeading {
 
 .binaryBeeswarmDotShadow {
   fill: rgba(0, 0, 0, 0.28);
-  opacity: 0.74;
+  opacity: 0.34;
 }
 
 .binaryBeeswarmDotHighlight {
@@ -1425,7 +1434,7 @@ h3.postHeading {
   r: 10px;
   stroke: rgba(255, 255, 255, 0.9);
   stroke-width: 2;
-  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.34)) drop-shadow(0 0 10px rgba(77, 255, 164, 0.2));
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.24));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1689,7 +1698,7 @@ h3.postHeading {
   display: grid;
   // container-driven columns: 2-3 across on wide slides, 1 on narrow, no breakpoint cliff
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-  gap: $viz-gap-md;
+  gap: 0;
 }
 
 .responseTypePanel {
@@ -1697,10 +1706,10 @@ h3.postHeading {
   display: grid;
   align-content: start;
   gap: $viz-gap-sm;
-  padding: $viz-gap-lg;
-  border: 1px solid $viz-panel-border;
-  border-radius: $viz-radius;
-  background: $viz-panel-bg-strong;
+  padding: 2px $viz-gap-xl $viz-gap-xl 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 
   h4,
   p {
@@ -1713,6 +1722,19 @@ h3.postHeading {
     font-size: 1rem;
     line-height: 1.25;
   }
+}
+
+.responseTypePanel + .responseTypePanel {
+  padding-left: $viz-gap-xl;
+  border-left: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.responseTypePanelWide {
+  grid-column: 1 / -1;
+  margin-top: $viz-gap-sm;
+  padding: $viz-gap-xl 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  border-left: 0 !important;
 }
 
 .responseTypePrompt {
@@ -1737,8 +1759,9 @@ h3.postHeading {
   gap: $viz-gap-sm;
   color: rgba(244, 247, 255, 0.92);
   font-family: var(--ce-font-mono);
-  font-size: 0.78rem;
-  line-height: 1.35;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.32;
 }
 
 .responseMetrics {
@@ -1782,10 +1805,7 @@ h3.postHeading {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 50%;
-  box-shadow:
-    0 10px 24px rgba(0, 0, 0, 0.24),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
-    inset 0 -12px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 
   &::before,
   &::after {
@@ -1799,30 +1819,32 @@ h3.postHeading {
     inset: 24%;
     border: 1px solid rgba(244, 247, 255, 0.18);
     background: rgba(18, 23, 54, 0.94);
-    box-shadow:
-      inset 0 2px 8px rgba(0, 0, 0, 0.42),
-      0 0 0 1px rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
   }
 
   &::after {
     inset: 0;
-    background:
-      radial-gradient(circle at 31% 24%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08) 18%, transparent 42%),
-      radial-gradient(circle at 54% 62%, transparent 46%, rgba(0, 0, 0, 0.16) 100%);
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.18);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 44%);
   }
+}
+
+.responsePieTotal {
+  position: absolute;
+  inset: 31%;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  color: $text;
+  font-family: var(--ce-font-mono);
+  font-size: clamp(0.56rem, 1.3vw, 0.7rem);
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
 }
 
 .responsePieLegend {
   display: grid;
   gap: $viz-gap-xs;
-
-  p {
-    margin: 4px 0 0;
-    color: $muted;
-    font-family: var(--ce-font-mono);
-    font-size: 0.74rem;
-  }
 }
 
 .responsePieLegendItem {
@@ -1831,12 +1853,25 @@ h3.postHeading {
   gap: $viz-gap-xs;
   align-items: center;
   color: rgba(244, 247, 255, 0.92);
-  font-family: var(--ce-font-mono);
+  font-family: var(--ce-post-font-ui);
   font-size: 0.76rem;
   line-height: 1.35;
+}
+
+.responsePieLegendValue {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  gap: 5px;
+  align-items: baseline;
+  font-family: var(--ce-font-mono);
 
   strong {
     color: $text;
+  }
+
+  > span {
+    color: $muted;
+    font-size: 0.66rem;
   }
 }
 
@@ -1928,9 +1963,9 @@ h3.postHeading {
 
   blockquote {
     margin: 0;
-    color: rgba(244, 247, 255, 0.9);
-    font-size: 0.82rem;
-    line-height: 1.36;
+    color: rgba(244, 247, 255, 0.96);
+    font-size: 0.96rem;
+    line-height: 1.46;
   }
 
   figcaption {
@@ -2004,6 +2039,20 @@ h3.postHeading {
 
   .vizGroupCard {
     padding: $viz-gap-sm;
+  }
+
+  .responseTypePanel,
+  .responseTypePanel + .responseTypePanel,
+  .responseTypePanelWide {
+    margin: 0;
+    padding: $viz-gap-xl 0;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
+  }
+
+  .responseTypePanel:first-child {
+    padding-top: 0;
+    border-top: 0;
   }
 
   .vizCarouselSlide {

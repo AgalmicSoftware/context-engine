@@ -14,8 +14,10 @@ const RESPONSE_SPLIT_LABELS = new Set(RESPONSE_SPLIT_ORDER);
 const RESPONSE_TONE_COLORS: Record<string, string> = {
   agree: '#4dffa4',
   unsure: '#ffd166',
-  disagree: '#ff6b6b',
+  disagree: '#ff6bcb',
 };
+const BINARY_DOT_COLOR = '#9ee7ff';
+const BINARY_AXIS_COLOR = '#7aa7ff';
 
 const normalizeResponseSplitLabel = (label: string) => label.trim().toLowerCase();
 
@@ -775,8 +777,6 @@ type BinaryBeeswarmQuestionDatum = {
   total: number;
   averageConfidence: number;
   difference: number;
-  color: string;
-  majorityLabel: string;
 };
 
 const readBinaryBeeswarmItems = (spec: VizRecord): BinaryBeeswarmQuestionDatum[] =>
@@ -808,8 +808,6 @@ const readBinaryBeeswarmItems = (spec: VizRecord): BinaryBeeswarmQuestionDatum[]
       const total = counts.reduce((sum, count) => sum + count.value, 0);
       if (total <= 0) return null;
       const maxCount = Math.max(...counts.map((count) => count.value));
-      const leaders = counts.filter((count) => count.value === maxCount);
-      const majority = leaders.length === 1 ? leaders[0] : null;
       return {
         label,
         prompt: toText(record.prompt || record.detail),
@@ -817,8 +815,6 @@ const readBinaryBeeswarmItems = (spec: VizRecord): BinaryBeeswarmQuestionDatum[]
         total,
         averageConfidence: clamp(toNumber(record.averageConfidence || record.confidence, 0), 0, 100),
         difference: clamp((total - maxCount) / total, 0, 0.5),
-        color: majority?.color || '#ff6bcb',
-        majorityLabel: majority?.label || 'split',
       };
     })
     .filter((entry): entry is BinaryBeeswarmQuestionDatum => !!entry);
@@ -908,6 +904,13 @@ const formatBinaryCountsLabel = (counts: ResponseCountDatum[]) =>
     .map((count) => `${count.label} ${formatValue(count.value)}`)
     .join(', ');
 
+const getInitialBinaryView = (): 'swarm' | 'list' =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(max-width: 560px)').matches
+    ? 'list'
+    : 'swarm';
+
 const BinaryTooltipSplitBar = ({ counts }: { counts: ResponseCountDatum[] }) => {
   const total = counts.reduce((sum, count) => sum + count.value, 0);
   if (total <= 0) return null;
@@ -938,7 +941,6 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const [hoverIndex, setHoverIndex] = React.useState<number | null>(null);
   const [pinnedIndex, setPinnedIndex] = React.useState<number | null>(null);
   const reactId = React.useId().replace(/:/g, '');
-  const gradientId = `binary-beeswarm-gradient-${reactId}`;
   const tooltipId = `binary-beeswarm-tooltip-${reactId}`;
   const ticks = [0, 0.125, 0.25, 0.375, 0.5];
   const activeIndex = pinnedIndex ?? hoverIndex;
@@ -958,7 +960,7 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const clearPin = React.useCallback(() => setPinnedIndex(null), []);
   useEscapeToClear(pinnedIndex !== null, clearPin);
 
-  const [view, setView] = React.useState<'swarm' | 'list'>('swarm');
+  const [view, setView] = React.useState<'swarm' | 'list'>(getInitialBinaryView);
   const [sortKey, setSortKey] = React.useState<'difference' | 'confidence'>('difference');
 
   if (items.length === 0) {
@@ -1049,11 +1051,6 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
             onClick={() => setPinnedIndex(null)}
           >
             <defs>
-              <linearGradient id={gradientId} x1="0%" x2="100%" y1="0%" y2="0%">
-                <stop offset="0%" stopColor={RESPONSE_TONE_COLORS.agree} />
-                <stop offset="48%" stopColor={RESPONSE_TONE_COLORS.unsure} />
-                <stop offset="100%" stopColor="#ff6bcb" />
-              </linearGradient>
               <radialGradient id={sphereHighlightId} cx="30%" cy="30%" r="68%">
                 <stop offset="0%" stopColor="rgba(255, 255, 255, 0.7)" />
                 <stop offset="36%" stopColor="rgba(255, 255, 255, 0.28)" />
@@ -1107,7 +1104,7 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
               y1={BINARY_SWARM_AXIS_Y}
               x2={BINARY_SWARM_RIGHT}
               y2={BINARY_SWARM_AXIS_Y}
-              stroke={`url(#${gradientId})`}
+              stroke={BINARY_AXIS_COLOR}
             />
             {ticks.map((tick) => {
               const x = getBinarySwarmX(tick);
@@ -1195,7 +1192,7 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                     cx={placement.x}
                     cy={placement.y}
                     r={7.5}
-                    fill={item.color}
+                    fill={BINARY_DOT_COLOR}
                     onMouseEnter={showTooltip}
                     onMouseLeave={hideTooltip}
                   />
@@ -1243,11 +1240,6 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
           )}
         </div>
       )}
-      {view === 'swarm' && (
-        <p className={styles.binaryBeeswarmHint}>
-          Hover or tap a dot to inspect a question. Click pins the details; press Escape or click elsewhere to dismiss.
-        </p>
-      )}
       {note && <p className={styles.vizNote}>{renderFormattedText(note)}</p>}
     </section>
   );
@@ -1269,16 +1261,24 @@ const ResponseTypeGridViz = ({ spec, hideHeader = false }: VizBodyProps) => {
       <div className={styles.responseTypeGrid}>
         {panels.map((panel) => {
           const maxValue = Math.max(...panel.counts.map((count) => count.value), 1);
+          const shouldSortCounts = panel.kind.toLowerCase() === 'multi-select';
+          const orderedCounts = shouldSortCounts
+            ? [...panel.counts].sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+            : panel.counts;
           const displayAsNumbers = panel.display === 'numbers' || panel.display === 'metrics';
           const displayAsPie = panel.display === 'pie';
           const displayAsSplit = !displayAsNumbers && !displayAsPie && isResponseSplitPanel(panel);
+          const isConfidencePanel = panel.kind.toLowerCase() === 'confidence';
           const pie = displayAsPie ? buildPieGradient(panel.counts) : null;
           const splitCounts = displayAsSplit ? orderedResponseSplitCounts(panel.counts) : [];
           const splitTotal = splitCounts.reduce((sum, count) => sum + count.value, 0);
           const visibleTitle = displayAsSplit && panel.prompt ? panel.prompt : panel.title;
           const visiblePrompt = displayAsSplit && panel.prompt ? '' : panel.prompt;
           return (
-            <article key={`${panel.kind}-${panel.title}`} className={styles.responseTypePanel}>
+            <article
+              key={`${panel.kind}-${panel.title}`}
+              className={`${styles.responseTypePanel} ${isConfidencePanel ? styles.responseTypePanelWide : ''}`}
+            >
               {!panel.hideTitle && <h4>{visibleTitle}</h4>}
               {visiblePrompt && <p className={styles.responseTypePrompt}>{visiblePrompt}</p>}
               {panel.counts.length > 0 && displayAsNumbers && (
@@ -1298,16 +1298,22 @@ const ResponseTypeGridViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                     role="img"
                     aria-label={`${panel.title}: ${panel.counts.map((count) => `${count.label} ${formatValue(count.value)}`).join(', ')}`}
                     style={{ background: pie.gradient }}
-                  />
+                  >
+                    <span className={styles.responsePieTotal} aria-hidden="true">
+                      {formatValue(pie.total)} total
+                    </span>
+                  </div>
                   <div className={styles.responsePieLegend}>
                     {panel.counts.map((count) => (
                       <div key={count.label} className={styles.responsePieLegendItem}>
                         <span className={styles.responsePieSwatch} style={{ backgroundColor: count.color }} />
                         <span>{count.label}</span>
-                        <strong>{formatValue(count.value)}</strong>
+                        <span className={styles.responsePieLegendValue}>
+                          <strong>{formatValue(count.value)}</strong>
+                          <span>{formatValue((count.value / pie.total) * 100, '%')}</span>
+                        </span>
                       </div>
                     ))}
-                    <p>{formatValue(pie.total)} total</p>
                   </div>
                 </div>
               )}
@@ -1343,7 +1349,7 @@ const ResponseTypeGridViz = ({ spec, hideHeader = false }: VizBodyProps) => {
               )}
               {panel.counts.length > 0 && !displayAsNumbers && !displayAsPie && !displayAsSplit && (
                 <div className={styles.responseBars}>
-                  {panel.counts.map((count) => (
+                  {orderedCounts.map((count) => (
                     <div key={count.label} className={styles.responseBarRow}>
                       <div className={styles.responseBarMeta}>
                         <span>{count.label}</span>

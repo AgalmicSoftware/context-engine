@@ -32,10 +32,10 @@
     "policy": "Use the latest tester-attendee run with 58 accepted predictions and substantive displayed answers; later complete runs were excluded when the displayed fields were mostly placeholder-like neutral values."
   },
   "participants": [
-    { "label": "P1", "status": "completed", "color": "#4dffa4" },
+    { "label": "P1", "status": "completed", "color": "#9ee7ff" },
     { "label": "P2", "status": "completed", "color": "#7aa7ff" },
     { "label": "P3", "status": "completed", "color": "#ffb347" },
-    { "label": "P4", "status": "completed", "color": "#ff6bcb" }
+    { "label": "P4", "status": "completed", "color": "#c4a7ff" }
   ],
   "sourceLayerDisplays": [
     {
@@ -50,13 +50,13 @@
     },
     {
       "kind": "Models",
-      "title": "Completed answer sets by recorded model",
+      "title": "Responding Model Type",
       "counts": [
         { "label": "google/gemini-3.5-flash", "value": 2, "color": "#7aa7ff" },
         { "label": "z-ai/glm-5.2", "value": 1, "color": "#ff6bcb" },
         { "label": "unserialized model record (Hermes Agent v0.14.0)", "value": 1, "color": "#ffb347" }
       ],
-      "note": "Counts are answer sets, not prediction cells. One run preserved the Hermes scaffold but serialized the model field as [object Object]."
+      "note": "One run preserved the model field as [object Object]."
     },
     {
       "kind": "Answer shapes",
@@ -436,30 +436,30 @@
         "label": "AI improves flourishing",
         "prompt": "How optimistic am I that AI will broadly improve human flourishing over the next decade?",
         "values": [
-          { "label": "P1", "value": 3, "confidence": 70, "color": "#4dffa4" },
+          { "label": "P1", "value": 3, "confidence": 70, "color": "#9ee7ff" },
           { "label": "P2", "value": 8, "confidence": 90, "color": "#7aa7ff" },
           { "label": "P3", "value": 7, "confidence": 76, "color": "#ffb347" },
-          { "label": "P4", "value": 7, "confidence": 65, "color": "#ff6bcb" }
+          { "label": "P4", "value": 7, "confidence": 65, "color": "#c4a7ff" }
         ]
       },
       {
         "label": "Current model moral patienthood",
         "prompt": "How likely is it that any current frontier model has morally relevant experiences?",
         "values": [
-          { "label": "P1", "value": 2, "confidence": 65, "color": "#4dffa4" },
+          { "label": "P1", "value": 2, "confidence": 65, "color": "#9ee7ff" },
           { "label": "P2", "value": 1, "confidence": 90, "color": "#7aa7ff" },
           { "label": "P3", "value": 1, "confidence": 72, "color": "#ffb347" },
-          { "label": "P4", "value": 2, "confidence": 65, "color": "#ff6bcb" }
+          { "label": "P4", "value": 2, "confidence": 65, "color": "#c4a7ff" }
         ]
       },
       {
         "label": "Predicted group average",
         "prompt": "Predict the average answer in this group to the previous question about morally relevant model experiences.",
         "values": [
-          { "label": "P1", "value": 4, "confidence": 50, "color": "#4dffa4" },
+          { "label": "P1", "value": 4, "confidence": 50, "color": "#9ee7ff" },
           { "label": "P2", "value": 3, "confidence": 85, "color": "#7aa7ff" },
           { "label": "P3", "value": 3, "confidence": 63, "color": "#ffb347" },
-          { "label": "P4", "value": 3, "confidence": 60, "color": "#ff6bcb" }
+          { "label": "P4", "value": 3, "confidence": 60, "color": "#c4a7ff" }
         ]
       }
     ]

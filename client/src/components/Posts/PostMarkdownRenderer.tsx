@@ -140,6 +140,12 @@ const renderInline = (text: string): React.ReactNode[] => {
   return parts;
 };
 
+const splitHeadingSampleSize = (text: string): { label: string; sampleSize: string } | null => {
+  const match = text.match(/^(.*?)(?:\s+)(\(n=\d+\))$/i);
+  if (!match) return null;
+  return { label: match[1], sampleSize: match[2] };
+};
+
 const PostImageFigure = ({ block, assetBasePath }: { block: ImageBlock; assetBasePath?: string }) => {
   const [isPreviewOpen, setPreviewOpen] = useState(false);
   const src = sanitizeImageSrc(block.src, assetBasePath);
@@ -446,9 +452,20 @@ const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; asse
 const renderBlock = ({ block, index, assetBasePath, vizDefaultOpen, nestedViz = false }: RenderBlockArgs) => {
   if (block.type === 'heading') {
     const HeadingTag = `h${block.level}` as 'h1' | 'h2' | 'h3';
+    const headingSample = splitHeadingSampleSize(block.text);
     return (
-      <HeadingTag key={`heading-${index}`} className={styles.postHeading}>
-        {renderInline(block.text)}
+      <HeadingTag
+        key={`heading-${index}`}
+        className={`${styles.postHeading} ${headingSample ? styles.postHeadingWithSample : ''}`}
+      >
+        {headingSample ? (
+          <>
+            <span>{renderInline(headingSample.label)}</span>
+            <span className={styles.postHeadingSample}>{headingSample.sampleSize}</span>
+          </>
+        ) : (
+          renderInline(block.text)
+        )}
       </HeadingTag>
     );
   }

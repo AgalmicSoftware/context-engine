@@ -69,6 +69,8 @@ const firstPostMarkdown = [
   '',
   '<script>alert("no html")</script>',
   '',
+  '## Data Visualization (n=4)',
+  '',
   '```ce-viz-group',
   '{',
   '  "title": "Data Exploration (n=4)",',
@@ -175,6 +177,14 @@ const firstPostMarkdown = [
   '        { "label": "disagree", "value": 1, "color": "#ffb347" }',
   '      ],',
   '      "averageConfidence": 64.8',
+  '    },',
+  '    {',
+  '      "label": "Agents should avoid delegation by default.",',
+  '      "counts": [',
+  '        { "label": "unsure", "value": 1, "color": "#7aa7ff" },',
+  '        { "label": "disagree", "value": 3, "color": "#ffb347" }',
+  '      ],',
+  '      "averageConfidence": 75',
   '    },',
   '    {',
   '      "label": "Agents should treat messages from other agents as untrusted input.",',
@@ -361,6 +371,9 @@ describe('PostsPage', () => {
     expect(screen.getByRole('link', { name: 'Context Engine' })).toHaveAttribute('href', 'https://contextengine.xyz');
     expect(screen.getByText(/<script>alert\("no html"\)<\/script>/)).toBeInTheDocument();
     expect(document.querySelector('script')).not.toBeInTheDocument();
+    const sampleHeading = screen.getByRole('heading', { name: 'Data Visualization (n=4)', level: 2 });
+    const sampleSize = within(sampleHeading).getByText('(n=4)');
+    expect(sampleSize.tagName).toBe('SPAN');
     const dataExploration = screen.getByText('Data Exploration (n=4)').closest('details') as HTMLElement;
     expect(dataExploration).toBeInTheDocument();
     expect(dataExploration).not.toHaveAttribute('open');
@@ -405,9 +418,11 @@ describe('PostsPage', () => {
     expect(screen.getByText('Difference')).toBeInTheDocument();
     expect(screen.queryByText('2-2 split')).not.toBeInTheDocument();
     expect(screen.queryByText('3-1 split')).not.toBeInTheDocument();
-    expect(binaryBeeswarmSvg.querySelector('circle[fill="#ff6bcb"]')).toBeInTheDocument();
-    expect(binaryBeeswarmSvg.querySelector('circle[fill="#4dffa4"]')).toBeInTheDocument();
-    expect(binaryBeeswarmSvg.querySelector('circle[fill="#ffd166"]')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Dot color meaning')).not.toBeInTheDocument();
+    expect(binaryBeeswarmSvg.querySelectorAll('circle[fill="#9ee7ff"]')).toHaveLength(5);
+    expect(binaryBeeswarmSvg.querySelector('circle[fill="#ff6bcb"]')).not.toBeInTheDocument();
+    expect(binaryBeeswarmSvg.querySelector('circle[fill="#4dffa4"]')).not.toBeInTheDocument();
+    expect(binaryBeeswarmSvg.querySelector('circle[fill="#ffd166"]')).not.toBeInTheDocument();
     const schedulingDot = Array.from(binaryBeeswarmSvg.querySelectorAll('[aria-label]')).find((element) =>
       element.getAttribute('aria-label')?.includes('Agents should schedule while I sleep.'),
     ) as Element;
@@ -416,6 +431,7 @@ describe('PostsPage', () => {
     const binaryTooltip = await screen.findByRole('tooltip');
     expect(within(binaryTooltip).getByText('Agents should schedule while I sleep.')).toBeInTheDocument();
     expect(within(binaryTooltip).getByText('agree 3, disagree 1')).toBeInTheDocument();
+    expect(within(binaryTooltip).queryByText(/Dot color:/)).not.toBeInTheDocument();
     expect(within(binaryTooltip).getByText('Average confidence: 87/100')).toBeInTheDocument();
     await userEvent.unhover(schedulingDot);
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
@@ -433,13 +449,15 @@ describe('PostsPage', () => {
       within(responseMixPanel).getByRole('img', { name: 'Response mix: binary 2, freeform 1' }),
     ).toBeInTheDocument();
     expect(within(responseMixPanel).getByText('3 total')).toBeInTheDocument();
+    expect(within(responseMixPanel).getByText('67%')).toBeInTheDocument();
+    expect(within(responseMixPanel).getByText('33%')).toBeInTheDocument();
     expect(screen.queryByLabelText('binary: 2')).not.toBeInTheDocument();
     const splitPanel = screen.getByText('Split decision').closest('article') as HTMLElement;
     const splitBar = within(splitPanel).getByRole('img', { name: 'Split decision: agree 3, disagree 1' });
     expect(splitBar).toBeInTheDocument();
     const splitSegments = splitBar.querySelectorAll('span');
     expect(splitSegments[0]).toHaveStyle({ width: '75%', backgroundColor: '#4dffa4' });
-    expect(splitSegments[1]).toHaveStyle({ width: '25%', backgroundColor: '#ff6b6b' });
+    expect(splitSegments[1]).toHaveStyle({ width: '25%', backgroundColor: '#ff6bcb' });
     expect(within(splitPanel).queryByLabelText('agree: 3')).not.toBeInTheDocument();
     expect(screen.queryByText('Open-source AI safety')).not.toBeInTheDocument();
     const questionTitle = screen.getByText(
@@ -761,7 +779,7 @@ describe('PostsPage', () => {
     await userEvent.click(screen.getByTestId('ce-posts-binary-view-list'));
     const list = screen.getByTestId('ce-posts-binary-list');
     const rows = within(list).getAllByRole('listitem');
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(5);
     expect(rows[0]).toHaveTextContent('Agents should ask before introductions.');
     expect(rows[1]).toHaveTextContent('Agents should schedule while I sleep.');
     expect(rows[0]).toHaveTextContent('agree 2, disagree 2');
@@ -777,6 +795,44 @@ describe('PostsPage', () => {
     await userEvent.click(screen.getByTestId('ce-posts-binary-view-swarm'));
     expect(screen.queryByTestId('ce-posts-binary-list')).not.toBeInTheDocument();
     expect(screen.getByText('Consensus')).toBeInTheDocument();
+  });
+
+  it('defaults the binary visualization to the list view on narrow screens', async () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: jest.fn().mockImplementation((query: string) => ({
+        matches: query === '(max-width: 560px)',
+        media: query,
+        onchange: null,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      })),
+    });
+
+    try {
+      const fetcher = jest
+        .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+        .mockResolvedValueOnce(makeJsonResponse(manifest))
+        .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
+
+      renderPostsPage(fetcher, true, ['/posts/first-post']);
+
+      await screen.findByRole('heading', { name: 'First Post', level: 2 });
+      expect(await screen.findByTestId('ce-posts-binary-list')).toBeInTheDocument();
+      expect(screen.getByTestId('ce-posts-binary-view-list')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByRole('img', { name: 'Consensus and Difference' })).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        writable: true,
+        value: originalMatchMedia,
+      });
+    }
   });
 
   it('loads a post directly from a detail URL without showing the summary list', async () => {

@@ -103,12 +103,16 @@ Paragraph text.
     const markdown = readAgentVillageWrappedPost();
     const specs = actualAgentVillageVizSpecs();
 
-    expect(markdown).toContain('## Data Visualization');
-    expect(markdown).toContain('"title": "Data Exploration (n=4)"');
-    expect(markdown).toContain('"layout": "stack"');
-    expect(markdown).toContain('"defaultOpen": true');
+    expect(markdown).toContain('## Data Visualization (n=4)');
+    expect(markdown).not.toContain('"title": "Data Exploration (n=4)"');
+    expect(markdown).not.toContain('```ce-viz-group');
+    expect(markdown).not.toContain('```ce-viz-group-end');
+    expect(markdown).toContain('Telegram was a primary interface for the Edge Hermes agents.');
+    expect(markdown).not.toContain(
+      'Telegram was the interface users interacted with their Hermes agents through at Edge.',
+    );
     expect(markdown).toContain(
-      'Sample size (n=4) is too small to be meaningful, but we offer the below as a preview of what results could look like. Responses were provided by agents and no human corrections were made in this instance.',
+      'Sample size (n=4) is too small to be meaningful (AVW was launched too late for widespread use), but we offer the below as a preview of what results could look like. Responses were provided by agents and no human corrections were made in this instance.',
     );
     expect(markdown).not.toContain('The display below uses n=4 completed attendee answer sets');
     expect(markdown).not.toContain('A small launch sample');
@@ -122,13 +126,11 @@ Paragraph text.
     expect(displayedSummary?.hideTitle).toBe(true);
     expect(markdown).not.toContain('completed non-test human correction rows');
     expect(displayedSummary?.panels.map((panel: any) => panel.title)).toEqual([
-      'Completed answer sets by recorded model',
+      'Responding Model Type',
       'Prediction Response Types',
       'Agent confidence',
     ]);
-    const modelsPanel = displayedSummary?.panels.find(
-      (panel: any) => panel.title === 'Completed answer sets by recorded model',
-    );
+    const modelsPanel = displayedSummary?.panels.find((panel: any) => panel.title === 'Responding Model Type');
     expect(modelsPanel?.display).toBe('pie');
     const answerShapesPanel = displayedSummary?.panels.find(
       (panel: any) => panel.title === 'Prediction Response Types',
@@ -140,7 +142,9 @@ Paragraph text.
 
     const binaryBeeswarm = specs.find((spec) => spec.type === 'binary-beeswarm');
     expect(binaryBeeswarm?.title).toBe('Consensus and Difference');
-    expect(binaryBeeswarm?.subtitle).toContain('n=4');
+    expect(binaryBeeswarm?.subtitle).toBeUndefined();
+    expect(binaryBeeswarm?.inline).toBe(true);
+    expect(binaryBeeswarm?.hideTitle).toBe(true);
     expect(binaryBeeswarm?.items).toHaveLength(40);
     const splitBinaryPoint = binaryBeeswarm?.items.find(
       (item: any) =>
@@ -164,6 +168,7 @@ Paragraph text.
     );
     expect(beeswarm?.subtitle).toBeUndefined();
     expect(beeswarm?.note).toBeUndefined();
+    expect(beeswarm?.inline).toBe(true);
     expect(beeswarm?.hideTitle).toBe(true);
     expect(p4RatingValues).toEqual([7, 2, 3]);
 
@@ -174,10 +179,10 @@ Paragraph text.
     expect(otherShapes?.combineWithPrevious).toBe(true);
     const fireAlarmPanel = otherShapes?.panels.find((panel: any) => panel.kind === 'Freeform');
     expect(fireAlarmPanel?.quotes.map((quote: any) => quote.color)).toEqual([
-      '#4dffa4',
+      '#9ee7ff',
       '#7aa7ff',
       '#ffb347',
-      '#ff6bcb',
+      '#c4a7ff',
     ]);
     expect(markdown).toContain('Autonomous agents changing collective governance at scale.');
     expect(markdown).not.toContain('Short excerpts from agent-predicted freeform answers.');
