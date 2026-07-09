@@ -1513,6 +1513,114 @@ test('storageRoute read-normalizes legacy payloadAccessMode metadata rows into v
   assert.equal(listed.items[0].metadata.payloadAccessMode, 'worker_sbt_gate');
 });
 
+test('storageRoute filters Cloudflare list rows by per-item access conditions', async () => {
+  const kv = createMockKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const config = {
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'none', encryption: 'none' },
+    },
+    adminAddress: '0x0000000000000000000000000000000000000abc',
+  };
+  await kv.put(`ce-storage:session-a:questions:public-row`, JSON.stringify({
+    id: 'public-row',
+    backend: 'cloudflare',
+    resource: 'questions',
+    contentType: 'text/plain',
+    encrypted: false,
+    tags: [{ name: 'visibility', value: 'public' }],
+    payloadAccessControl: { gate: 'none', encryption: 'none' },
+    createdAt: '2026-01-02T03:04:05.000Z',
+  }));
+  await kv.put(`ce-storage:session-a:questions:admin-row`, JSON.stringify({
+    id: 'admin-row',
+    backend: 'cloudflare',
+    resource: 'questions',
+    contentType: 'text/plain',
+    encrypted: false,
+    tags: [{ name: 'visibility', value: 'admin-only' }],
+    payloadAccessControl: { gate: 'none', encryption: 'none' },
+    accessConditions: {
+      match: 'all',
+      conditions: [{ kind: 'worker_role', role: 'admin' }],
+    },
+    createdAt: '2026-01-02T03:04:06.000Z',
+  }));
+
+  const listResponse = await storageRoute({
+    path: '/storage/list',
+    method: 'GET',
+    request: new Request('https://worker.example/storage/list?resource=questions'),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000bad',
+    baseHeaders: {},
+    deps: { json },
+  });
+  const listed = await readJson(listResponse);
+
+  assert.equal(listResponse.status, 200);
+  assert.deepEqual(listed.items.map((item) => item.storageRef.id), ['public-row']);
+  assert.doesNotMatch(JSON.stringify(listed), /admin-row|admin-only/);
+});
+
+test('storageRoute accepts bare Cloudflare role_gate storage access for configured worker roles', async () => {
+  const kv = createMockKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const config = {
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'role_gate', encryption: 'none', role: 'reviewer' },
+    },
+    workerRoles: {
+      reviewer: ['0x0000000000000000000000000000000000000def'],
+    },
+  };
+  await kv.put(`ce-storage:session-a:questions:review-row`, JSON.stringify({
+    id: 'review-row',
+    backend: 'cloudflare',
+    resource: 'questions',
+    contentType: 'text/plain',
+    encrypted: false,
+    payloadAccessControl: { gate: 'role_gate', encryption: 'none' },
+    createdAt: '2026-01-02T03:04:05.000Z',
+  }));
+
+  const allowedResponse = await storageRoute({
+    path: '/storage/list',
+    method: 'GET',
+    request: new Request('https://worker.example/storage/list?resource=questions'),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000def',
+    baseHeaders: {},
+    deps: { json },
+  });
+  const allowed = await readJson(allowedResponse);
+  assert.equal(allowedResponse.status, 200);
+  assert.equal(allowed.items.length, 1);
+  assert.equal(allowed.items[0].storageRef.id, 'review-row');
+  assert.deepEqual(allowed.items[0].metadata.payloadAccessControl, { gate: 'role_gate', encryption: 'none' });
+
+  const deniedResponse = await storageRoute({
+    path: '/storage/list',
+    method: 'GET',
+    request: new Request('https://worker.example/storage/list?resource=questions'),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000bad',
+    baseHeaders: {},
+    deps: { json },
+  });
+  const denied = await readJson(deniedResponse);
+  assert.equal(deniedResponse.status, 403);
+  assert.equal(denied.reason, 'worker_role_denied');
+});
+
 test('storageRoute worker_envelope stores ciphertext only and audits successful key release', async () => {
   const kv = createMockKv();
   const env = {

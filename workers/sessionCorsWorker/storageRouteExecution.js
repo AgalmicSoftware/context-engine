@@ -610,6 +610,49 @@ const authorizeWorkerGroupAccess = async ({ env, slug, groupIds, requesterAddres
   };
 };
 
+const resolveBareRoleGateCondition = (config = {}) => {
+  const profile = isObj(config?.storageProfile) ? config.storageProfile : {};
+  const cloudflare = isObj(profile.cloudflare) ? profile.cloudflare : {};
+  const payloadAccessControl = isObj(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
+  return {
+    kind: 'worker_role',
+    role: trim(
+      payloadAccessControl.role ||
+      payloadAccessControl.workerRole ||
+      payloadAccessControl.roleName ||
+      cloudflare.role ||
+      cloudflare.workerRole ||
+      config.storageRoleGate ||
+      config.workerRoleGate ||
+      'admin'
+    ) || 'admin',
+  };
+};
+
+const authorizeWorkerRoleAccess = ({ config, requesterAddress, baseHeaders, deps }) => {
+  const roleAccess = evaluateWorkerRoleCondition({
+    condition: resolveBareRoleGateCondition(config),
+    config,
+    requesterAddress,
+  });
+  if (!roleAccess.ok) {
+    return {
+      ok: false,
+      response: responseJson(deps, {
+        error: 'Access denied: worker role gate failed.',
+        reason: roleAccess.reason || 'worker_role_denied',
+      }, roleAccess.reason === 'missing_principal' ? 401 : 403, baseHeaders),
+    };
+  }
+  return {
+    ok: true,
+    conditionMatched: {
+      source: 'gate_fallback',
+      ...(roleAccess.matchedCondition || resolveBareRoleGateCondition(config)),
+    },
+  };
+};
+
 const authorizeCloudflareStorageAccess = async ({
   env,
   config,
@@ -672,6 +715,21 @@ const authorizeCloudflareStorageAccess = async ({
       mode: access.mode,
       payloadAccessControl: access,
       conditionMatched: groupAccess.conditionMatched,
+    };
+  }
+  if (access.gate === PAYLOAD_ACCESS_GATES.ROLE_GATE) {
+    const roleAccess = authorizeWorkerRoleAccess({
+      config,
+      requesterAddress,
+      baseHeaders,
+      deps,
+    });
+    if (!roleAccess.ok) return roleAccess;
+    return {
+      ok: true,
+      mode: access.mode,
+      payloadAccessControl: access,
+      conditionMatched: roleAccess.conditionMatched,
     };
   }
   if (access.gate !== PAYLOAD_ACCESS_GATES.SBT_GATE) {
@@ -1160,30 +1218,41 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
       // eslint-disable-next-line no-await-in-loop
       const raw = await index.get(name);
       const metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      const storageRef = normalizeStorageRef(metadata || {});
+      if (!storageRef) continue;
+      const itemAccess = await authorizeCloudflareStorageAccess({
+        env,
+        config,
+        slug,
+        resource: storageRef.resource || trim(metadata?.resource) || resource,
+        requesterAddress: uploaderAddress,
+        authScopes,
+        metadata,
+        baseHeaders,
+        deps,
+      });
+      if (!itemAccess.ok) continue;
       const metadataAccess = normalizePayloadAccessControl(
         metadata?.payloadAccessControl ||
         metadata?.payloadAccessMode ||
         resolvePayloadAccessControl(config)
       );
-      const storageRef = normalizeStorageRef(metadata || {});
-      if (storageRef) {
-        items.push({
-          storageRef,
-          metadata: {
-            resource: storageRef.resource || resource,
-            contentType: trim(metadata?.contentType),
-            encrypted: metadata?.encrypted === true,
-            tags: normalizeTagsForMetadata(metadata?.tags),
-            size: Number(metadata?.size || 0) || 0,
-            createdAt: trim(metadata?.createdAt),
-            payloadAccessControl: {
-              gate: metadataAccess.gate,
-              encryption: metadataAccess.encryption,
-            },
-            payloadAccessMode: deriveLegacyPayloadAccessMode(metadataAccess),
+      items.push({
+        storageRef,
+        metadata: {
+          resource: storageRef.resource || resource,
+          contentType: trim(metadata?.contentType),
+          encrypted: metadata?.encrypted === true,
+          tags: normalizeTagsForMetadata(metadata?.tags),
+          size: Number(metadata?.size || 0) || 0,
+          createdAt: trim(metadata?.createdAt),
+          payloadAccessControl: {
+            gate: metadataAccess.gate,
+            encryption: metadataAccess.encryption,
           },
-        });
-      }
+          payloadAccessMode: deriveLegacyPayloadAccessMode(metadataAccess),
+        },
+      });
     } catch {
       // ignore malformed index rows
     }
