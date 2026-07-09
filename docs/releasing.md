@@ -86,7 +86,7 @@ Full-history replay guardrails:
   patch is public-safe.
 - Verify replay identities independently with
   `git log --format='%ae%n%ce' <base>..<branch> | sort -u`; the only expected
-  email is `agalmicsoftware@protonmail.com`.
+  email is `[redacted-email]`.
 - Do not proceed with a history-preserving push unless tip parity, full-history
   content/message sweeps, identity checks, PII scan, wiring, type-debt, and
   public Node tests are green. If those checks are not green, ship the single

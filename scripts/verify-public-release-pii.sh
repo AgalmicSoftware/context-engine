@@ -86,13 +86,6 @@ function isSafePlaceholder(value) {
     || normalized.startsWith('your_');
 }
 
-function isAllowedPublicEmail(value) {
-  const normalized = String(value || '').toLowerCase();
-  return normalized === 'name@example.com'
-    || normalized === 'agalmicsoftware@protonmail.com'
-    || normalized.endsWith('@users.noreply.github.com');
-}
-
 function isRepeatedHex(hex) {
   return /^([a-f0-9])\1{63}$/i.test(hex);
 }

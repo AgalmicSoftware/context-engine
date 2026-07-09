@@ -1,5 +1,5 @@
 import type { EncryptedWalletRecord, HexString, PasskeyWalletConfig } from '../types.js';
-import { bufferSourceToUint8Array, bufferToBase64URL } from '../passkey/encoding.js';
+import { bufferToBase64URL } from '../passkey/encoding.js';
 
 const textEncoder = new TextEncoder();
 

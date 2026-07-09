@@ -143,7 +143,7 @@ class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
                       name="emailInput"
                       onChange={this.emailInputChange}
                       className={styles.emailInput}
-                      placeholder="name@example.com"
+                      placeholder="[redacted-email]"
                     />
                   </FormGroup>
                 </div>

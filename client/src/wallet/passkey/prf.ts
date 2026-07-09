@@ -42,8 +42,8 @@ export const deriveAesGcmKeyFromPrf = async (prfOutput: ArrayBuffer, saltBase64U
     {
       name: 'HKDF',
       hash: 'SHA-256',
-      salt: bufferSourceToUint8Array(base64URLToBuffer(saltBase64Url)),
-      info: bufferSourceToUint8Array(PASSKEY_PRF_INFO),
+      salt: base64URLToBuffer(saltBase64Url),
+      info: PASSKEY_PRF_INFO,
     },
     baseKey,
     { name: 'AES-GCM', length: 256 },

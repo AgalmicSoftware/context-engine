@@ -64,7 +64,7 @@ describe('AboutPage', () => {
     expect(within(hero).queryByTestId('ce-about-link-slides')).not.toBeInTheDocument();
     expect(within(hero).getByRole('link', { name: /Email/i })).toHaveAttribute(
       'href',
-      'mailto:contextengine@protonmail.com',
+      'mailto:[redacted-email]',
     );
     expect(desktopDemoVideo.tagName.toLowerCase()).toBe('iframe');
     expect(desktopDemoVideo).toHaveAttribute('src', ABOUT_DEMO_VIDEO_EMBED_URL);

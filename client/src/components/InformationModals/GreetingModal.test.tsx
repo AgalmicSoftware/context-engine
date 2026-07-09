@@ -62,15 +62,13 @@ const renderGreetingModal = (props: Record<string, unknown> = {}) =>
 
 describe('GreetingModal', () => {
   it('replaces the legacy placeholder and ownership copy with neutral updates copy', () => {
-    const legacyPlaceholder = ['lol', 'memewa.rs'].join('@');
-
     renderGreetingModal();
 
     const legacyEmailPlaceholder = ['lol', 'memewa.rs'].join('@');
 
     expect(screen.getByText(/Get updates/i)).toBeInTheDocument();
     expect(screen.getByText(/Feature updates/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('name@example.com')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('[redacted-email]')).toBeInTheDocument();
     expect(screen.queryByText(/How to own a % of site/i)).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText(legacyEmailPlaceholder)).not.toBeInTheDocument();
   });

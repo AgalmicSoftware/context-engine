@@ -1,5 +1,5 @@
 import type { EncryptedWalletRecord, HexString } from '../types.js';
-import { base64URLToBuffer, bufferSourceToUint8Array } from '../passkey/encoding.js';
+import { base64URLToBuffer } from '../passkey/encoding.js';
 
 const textDecoder = new TextDecoder();
 
@@ -14,7 +14,7 @@ export const decryptPrivateKey = async ({
     throw new Error(`Unsupported wallet encryption version: ${record.encryptionVersion}`);
   }
   const plaintext = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: bufferSourceToUint8Array(base64URLToBuffer(record.iv)) },
+    { name: 'AES-GCM', iv: base64URLToBuffer(record.iv) },
     aesKey,
     base64URLToBuffer(record.encryptedPrivateKey),
   );
