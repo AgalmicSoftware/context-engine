@@ -255,6 +255,39 @@ test('sync-public-history can replay patch-new commits from a source branch dive
   });
 });
 
+test('sync-public-history resolves replay deletes over public-main edits', () => {
+  withSourceRepo(({ sourceDir }) => {
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+    fs.rmSync(path.join(sourceDir, 'README.md'));
+    commitAll(sourceDir, 'Remove stale public shim', {
+      authorDate: '2025-01-05T00:00:00Z',
+      committerDate: '2025-01-05T00:00:00Z',
+    });
+
+    git(sourceDir, ['checkout', '--quiet', 'main']);
+    writeFile(sourceDir, 'README.md', 'public main edit\n');
+    commitAll(sourceDir, 'Edit public readme on main', {
+      authorDate: '2025-01-04T00:00:00Z',
+      committerDate: '2025-01-04T00:00:00Z',
+    });
+    git(sourceDir, ['push', '--quiet', 'origin', 'main']);
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+
+    const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /Replay complete\./);
+    assert.match(result.stdout, /Replayed commits: 3/);
+    assert.match(result.stdout, /Skipped commits: 2/);
+
+    const readmeCheck = spawnSync('git', ['cat-file', '-e', 'release-candidate:README.md'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+    assert.notEqual(readmeCheck.status, 0);
+  });
+});
+
 test('sync-public-history installs the private dev push guard before replaying', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['branch', '--set-upstream-to=origin/main', 'dev'], { stdio: 'ignore' });

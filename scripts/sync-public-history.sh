@@ -311,9 +311,10 @@ resolve_theirs_cherry_pick_conflicts() {
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     found_conflict=1
-    git -C "$TEMP_CLONE" checkout --theirs -- "$path" >/dev/null 2>&1 ||
-      git -C "$TEMP_CLONE" rm -f -- "$path" >/dev/null 2>&1 ||
-      return 1
+    git -C "$TEMP_CLONE" checkout --theirs -- "$path" >/dev/null 2>&1 || true
+    if git -C "$TEMP_CLONE" ls-files -u -- "$path" | grep -q .; then
+      git -C "$TEMP_CLONE" rm -f -- "$path" >/dev/null 2>&1 || return 1
+    fi
   done < <(git -C "$TEMP_CLONE" diff --name-only --diff-filter=U)
 
   if [ "$found_conflict" -ne 1 ]; then
