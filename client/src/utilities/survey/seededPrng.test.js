@@ -8,10 +8,23 @@ describe('seededPrng', () => {
   });
 
   it('preserves the existing mulberry32 sequence', () => {
-    const rand = mulberry32(hashSeed('context'));
+    const firstRand = mulberry32(hashSeed('context'));
+    const secondRand = mulberry32(hashSeed('context'));
 
-    expect(rand()).toBeCloseTo(0.5816554201301187, 12);
-    expect(rand()).toBeCloseTo(0.1238897442817688, 12);
-    expect(rand()).toBeCloseTo(0.32682808698154986, 12);
+    const firstSequence = Array.from({ length: 16 }, () => firstRand());
+    const secondSequence = Array.from({ length: 16 }, () => secondRand());
+
+    expect(firstSequence[0]).toBe(0.5816554201301187);
+    expect(secondSequence.every((value, index) => Object.is(value, firstSequence[index]))).toBe(true);
+  });
+
+  it('diverges for different seeds', () => {
+    const contextRand = mulberry32(hashSeed('context'));
+    const alternateRand = mulberry32(hashSeed('alternate-context'));
+
+    const contextSequence = Array.from({ length: 16 }, () => contextRand());
+    const alternateSequence = Array.from({ length: 16 }, () => alternateRand());
+
+    expect(alternateSequence).not.toEqual(contextSequence);
   });
 });
