@@ -68,7 +68,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/utilities/sbt/sessionSbtCacheController.js': 2036,
   'client/src/utilities/session/sessionProfileScanController.ts': 1197,
   'client/src/utilities/survey/compareUsers.ts': 1118,
-  'client/src/utilities/survey/consensusReportMath.ts': 1281,
+  'client/src/utilities/survey/consensusReportMath.ts': 1147,
   'client/src/utilities/survey/sessionQuestionCacheController.ts': 2156,
   'client/src/utilities/survey/sessionResponseHydrationController.ts': 1766,
   'client/src/utilities/web3/contractScripts.impl.ts': 1147,

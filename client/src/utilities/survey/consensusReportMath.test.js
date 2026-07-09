@@ -1,7 +1,7 @@
 import {
-  computeGroupAwareConsensus,
   computePolisCommentStats,
   computePolisConversationMath,
+  computePolisPcaBundle,
   computePolisStats,
   findRepresentativeQuestions,
 } from './consensusReportMath';
@@ -64,6 +64,18 @@ describe('computePolisCommentStats', () => {
   });
 });
 
+describe('computePolisPcaBundle', () => {
+  it('preserves the caller-computed center when PCA returns a degenerate component set', () => {
+    const bundle = computePolisPcaBundle([[1], [-1]], { nComps: -1 });
+
+    expect(bundle.pca.center).toEqual([1, -1]);
+    expect(bundle.pca.comps).toEqual([
+      [0, 0],
+      [0, 0],
+    ]);
+  });
+});
+
 describe('computePolisConversationMath', () => {
   const ratingMatrix = [
     [1, 1, 1, -1, -1, -1],
@@ -94,6 +106,29 @@ describe('computePolisConversationMath', () => {
     expect(result.groupVotes).toBeUndefined();
     expect(result.groupAwareConsensus).toBeUndefined();
     expect(result.consensus).toBeUndefined();
+  });
+
+  it('builds base clusters from participant indexes after filtering out non-conversation participants', () => {
+    const result = computePolisConversationMath(
+      [
+        [1, null, -1],
+        [1, null, -1],
+      ],
+      { q1: 'First question', q2: 'Second question' },
+      ['q1', 'q2'],
+      {
+        randomSeed: 42,
+        baseK: 100,
+        inConversationFloor: 0,
+        inConversationThresholdCap: 2,
+      },
+    );
+
+    expect(result.inConversationParticipantIndices).toEqual([0, 2]);
+    expect(result.baseClusters.flatMap((cluster) => cluster.members).sort((left, right) => left - right)).toEqual([
+      0,
+      2,
+    ]);
   });
 });
 
@@ -127,24 +162,5 @@ describe('findRepresentativeQuestions', () => {
         repnessTest: expect.any(Number),
       }),
     );
-  });
-});
-
-describe('computeGroupAwareConsensus', () => {
-  it('matches the official per-group probability product', () => {
-    const groupVotes = {
-      0: {
-        votes: {
-          q1: { A: 2, D: 0, S: 2 },
-        },
-      },
-      1: {
-        votes: {
-          q1: { A: 0, D: 2, S: 2 },
-        },
-      },
-    };
-
-    expect(computeGroupAwareConsensus(groupVotes).q1).toBeCloseTo(0.1875);
   });
 });

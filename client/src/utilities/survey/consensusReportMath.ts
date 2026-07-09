@@ -108,30 +108,6 @@ interface RepresentativeComment {
   nAgree?: number;
 }
 
-interface ConsensusComment {
-  questionIndex: number;
-  label: string;
-  prompt: string;
-  kind: ConsensusKind;
-  nSuccess: number;
-  nTrials: number;
-  pSuccess: number;
-  pTest: number;
-}
-
-interface GroupVoteStats {
-  A: number;
-  D: number;
-  S: number;
-}
-
-interface GroupVoteBucket {
-  nMembers: number;
-  votes: Record<string, GroupVoteStats>;
-}
-
-type GroupVotes = Record<string, GroupVoteBucket>;
-
 const SIG_90_Z = 1.2816;
 const POLIS_DEFAULTS: Required<Omit<PolisReportMathOptions, 'pcaBundle'>> = Object.freeze({
   randomSeed: 42,
@@ -322,7 +298,7 @@ function powerIteration(
 function computePca(
   centeredData: NumericMatrix = [],
   options: PolisReportMathOptions = {},
-): { comps: NumericMatrix; center?: NumericVector } {
+): { comps: NumericMatrix } {
   const nRows = centeredData.length;
   const nCols = centeredData[0]?.length || 0;
   const nComps = Math.min(options.nComps || POLIS_DEFAULTS.nComps, nRows || 0, nCols || 0);
@@ -330,7 +306,6 @@ function computePca(
 
   if (!nRows || !nCols || nComps <= 0) {
     return {
-      center: new Array(nCols).fill(0),
       comps: Array.from({ length: POLIS_DEFAULTS.nComps }, () => new Array(nCols).fill(0)),
     };
   }
@@ -504,8 +479,9 @@ function buildBaseClusters(
   participantIndices: number[] = [],
   options: PolisReportMathOptions = {},
 ): Cluster[] {
+  const participantCoordByIndex = new Map(participantCoords.map((point) => [point.index, point]));
   const items = participantIndices
-    .map((participantIndex) => participantCoords.find((point) => point.index === participantIndex))
+    .map((participantIndex) => participantCoordByIndex.get(participantIndex))
     .filter((point): point is PolisPoint => Boolean(point))
     .map((point) => ({
       id: point.index,
@@ -949,115 +925,6 @@ function collectVotesForQuestion(
   return memberIndices.map((memberIndex) => row[memberIndex] ?? null);
 }
 
-function formatConsensusComment(
-  kind: ConsensusKind,
-  questionIndex: number,
-  prompt: string,
-  stats: CommentStats,
-): ConsensusComment {
-  const successKey = kind === 'agree' ? 'agree' : 'disagree';
-  const probabilityKey = kind === 'agree' ? 'pa' : 'pd';
-  const testKey = kind === 'agree' ? 'pat' : 'pdt';
-  return {
-    questionIndex,
-    label: `#${questionIndex + 1}`,
-    prompt,
-    kind,
-    nSuccess: stats[successKey] || 0,
-    nTrials: stats.seen || 0,
-    pSuccess: stats[probabilityKey] || 0,
-    pTest: stats[testKey] || 0,
-  };
-}
-
-function computeConsensusSummary(
-  ratingMatrix: PolisReportRatingMatrix = [],
-  questionPromptsMap: Record<string, string> = {},
-  allQuestions: Array<string | number> = [],
-): { agree: ConsensusComment[]; disagree: ConsensusComment[] } {
-  const [nComments] = matrixShape(ratingMatrix);
-  const stats = Array.from({ length: nComments }, (_, questionIndex) => {
-    const row = Array.isArray(ratingMatrix[questionIndex]) ? ratingMatrix[questionIndex] : [];
-    const commentStats = computeCommentStats(row);
-    return {
-      ...commentStats,
-      questionIndex,
-      prompt: questionPromptForIndex(questionIndex, questionPromptsMap, allQuestions),
-      agreeMetric: commentStats.pa * commentStats.pat,
-      disagreeMetric: commentStats.pd * commentStats.pdt,
-    };
-  });
-
-  const top = (kind: ConsensusKind) => {
-    const metricKey = kind === 'agree' ? 'agreeMetric' : 'disagreeMetric';
-    const probabilityKey = kind === 'agree' ? 'pa' : 'pd';
-    const testKey = kind === 'agree' ? 'pat' : 'pdt';
-    return stats
-      .filter((entry) => entry[probabilityKey] > 0.5 && zSig90(entry[testKey]))
-      .sort((left, right) => right[metricKey] - left[metricKey])
-      .slice(0, 5)
-      .map((entry) => formatConsensusComment(kind, entry.questionIndex, entry.prompt, entry));
-  };
-
-  return {
-    agree: top('agree'),
-    disagree: top('disagree'),
-  };
-}
-
-function computeGroupVotes(
-  ratingMatrix: PolisReportRatingMatrix = [],
-  assignments: number[] = [],
-  allQuestions: Array<string | number> = [],
-): GroupVotes {
-  const [nComments, nParticipants] = matrixShape(ratingMatrix);
-  if (!nComments || !nParticipants || !assignments.length) return {};
-
-  const { groupIds } = buildMemberIndicesByGroup(assignments);
-  const questionKeys = Array.from({ length: nComments }, (_, questionIndex) => {
-    const questionId = allQuestions[questionIndex];
-    return questionId != null ? String(questionId) : String(questionIndex);
-  });
-
-  const result: GroupVotes = {};
-  groupIds.forEach((groupId) => {
-    result[groupId] = { nMembers: 0, votes: {} };
-    questionKeys.forEach((questionKey) => {
-      result[groupId].votes[questionKey] = { A: 0, D: 0, S: 0 };
-    });
-  });
-
-  for (let participantIndex = 0; participantIndex < nParticipants; participantIndex += 1) {
-    const groupId = assignments[participantIndex];
-    if (!result[groupId]) continue;
-    result[groupId].nMembers += 1;
-    for (let questionIndex = 0; questionIndex < nComments; questionIndex += 1) {
-      const questionKey = questionKeys[questionIndex];
-      const value = ratingMatrix[questionIndex]?.[participantIndex];
-      if (!isCountedVote(value)) continue;
-      result[groupId].votes[questionKey].S += 1;
-      if (isAgreeVote(value)) result[groupId].votes[questionKey].A += 1;
-      if (isDisagreeVote(value)) result[groupId].votes[questionKey].D += 1;
-    }
-  }
-
-  return result;
-}
-
-export function computeGroupAwareConsensus(groupVotes: GroupVotes = {}): Record<string, number> {
-  const byQuestion: Record<string, number> = {};
-  Object.values(groupVotes).forEach((groupStats) => {
-    Object.entries(groupStats.votes || {}).forEach(([questionKey, voteStats]) => {
-      const probability = ((voteStats.A || 0) + 1) / ((voteStats.S || 0) + 2);
-      if (!Object.prototype.hasOwnProperty.call(byQuestion, questionKey)) {
-        byQuestion[questionKey] = 1;
-      }
-      byQuestion[questionKey] *= probability;
-    });
-  });
-  return byQuestion;
-}
-
 export function computePolisPcaBundle(
   ratingMatrix: PolisReportRatingMatrix = [],
   options: PolisReportMathOptions = {},
@@ -1269,7 +1136,6 @@ export function computePolisConversationMath(
 }
 
 const consensusReportMath = {
-  computeGroupAwareConsensus,
   computePolisCommentStats,
   computePolisConversationMath,
   computePolisPcaBundle,
