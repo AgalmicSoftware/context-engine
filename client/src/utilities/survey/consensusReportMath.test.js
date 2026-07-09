@@ -126,8 +126,7 @@ describe('computePolisConversationMath', () => {
 
     expect(result.inConversationParticipantIndices).toEqual([0, 2]);
     expect(result.baseClusters.flatMap((cluster) => cluster.members).sort((left, right) => left - right)).toEqual([
-      0,
-      2,
+      0, 2,
     ]);
   });
 });

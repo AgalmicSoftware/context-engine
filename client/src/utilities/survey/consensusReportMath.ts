@@ -286,10 +286,7 @@ function powerIteration(
   return vector;
 }
 
-function computePca(
-  centeredData: NumericMatrix = [],
-  options: PolisReportMathOptions = {},
-): { comps: NumericMatrix } {
+function computePca(centeredData: NumericMatrix = [], options: PolisReportMathOptions = {}): { comps: NumericMatrix } {
   const nRows = centeredData.length;
   const nCols = centeredData[0]?.length || 0;
   const nComps = Math.min(options.nComps || POLIS_DEFAULTS.nComps, nRows || 0, nCols || 0);
