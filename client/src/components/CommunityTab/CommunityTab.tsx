@@ -1595,6 +1595,7 @@ class CommunityTab extends Component<any, any> {
       return {
         index: result.commentIndex,
         questionId: String(comment.commentId || result.commentIndex),
+        // BeeswarmPlot expects `extremity`; this is 50/50-split divisiveness, not PCA extremity.
         extremity: result.divisiveness,
         label: String(comment.commentBody || '(No prompt)'),
         agrees: result.agrees,
@@ -1717,6 +1718,7 @@ class CommunityTab extends Component<any, any> {
       return {
         index: result.commentIndex,
         questionId,
+        // BeeswarmPlot expects `extremity`; this is 50/50-split divisiveness, not PCA extremity.
         extremity: result.divisiveness,
         label: question.prompt || '(No prompt)',
         agrees: result.agrees,
