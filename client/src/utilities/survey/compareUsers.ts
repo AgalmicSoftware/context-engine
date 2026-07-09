@@ -16,6 +16,7 @@
 
 import { createLogger } from '../logging.js';
 import { getSbtDisplayName, getSbtMaskedFieldValue } from '../sbt/sbtDisplayNames.js';
+import { RATING_MAX, RATING_MIN } from './ratingValue.js';
 
 type UnknownRecord = Record<string, unknown>;
 type AddressCountMap = Record<string, number>;
@@ -206,18 +207,9 @@ function normalizeBinarySign(val: unknown): number {
 }
 function normalizeRatingSignedValue(valRaw: unknown): number {
   const v = typeof valRaw === 'number' ? valRaw : Number(valRaw);
-  if (!isFinite(v)) return 0;
-  const scales = [
-    { min: 0, max: 1 },
-    { min: 1, max: 5 },
-    { min: 1, max: 7 },
-    { min: 0, max: 10 },
-    { min: 1, max: 10 },
-  ];
-  const s = scales.find(({ min, max }) => v >= min && v <= max);
-  if (!s) return 0;
-  const mid = (s.min + s.max) / 2;
-  const span = s.max - s.min || 1;
+  const span = RATING_MAX - RATING_MIN;
+  if (!Number.isFinite(v) || v < RATING_MIN || v > RATING_MAX || span <= 0) return 0;
+  const mid = (RATING_MIN + RATING_MAX) / 2;
   return clamp((2 * (v - mid)) / span, -1, 1);
 }
 function makeToken(qid: unknown, option: unknown = undefined): string {
