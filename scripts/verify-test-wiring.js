@@ -179,6 +179,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('run: npm run test:wiring', '"npm run test:wiring"');
   expectWorkflowContains('run: npm run type-debt:check', '"npm run type-debt:check"');
   expectWorkflowContains('BASELINE_MONOTONICITY_BASE:', 'baseline monotonicity base env');
+  expectWorkflowContains('fetch-depth: 0', 'full history checkout for baseline monotonicity commit text');
+  expectWorkflowContains(
+    'BASELINE_MONOTONICITY_COMMIT_TEXT="$(git log --format=%B',
+    'baseline monotonicity commit-message allow text',
+  );
   expectWorkflowContains('node scripts/check-baseline-monotonicity.mjs', '"node scripts/check-baseline-monotonicity.mjs"');
   expectWorkflowContains('run: npm run lint', '"npm run lint"');
   expectWorkflowContains('run: npm run typecheck:client', '"npm run typecheck:client"');

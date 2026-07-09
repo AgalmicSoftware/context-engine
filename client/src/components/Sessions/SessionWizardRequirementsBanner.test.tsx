@@ -34,10 +34,7 @@ describe('SessionWizardRequirementsBanner', () => {
     );
     expect(screen.getByText('(Optional) A faucet private key for sponsoring user gas')).toBeInTheDocument();
     expect(screen.getByText('A turnkey tool for bundling these resources is in development.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '[redacted-email]' })).toHaveAttribute(
-      'href',
-      'mailto:[redacted-email]',
-    );
+    expect(screen.getByRole('link', { name: '[redacted-email]' })).toHaveAttribute('href', 'mailto:[redacted-email]');
 
     fireEvent.click(screen.getByRole('button', { name: /dismiss session setup requirements/i }));
 

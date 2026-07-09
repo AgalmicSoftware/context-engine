@@ -29,7 +29,7 @@ describe('deriveEoaPrivateKeyFromPrf', () => {
       .spyOn(crypto.subtle, 'importKey')
       .mockImplementation(async (format, keyData, algorithm, extractable, keyUsages) => {
         expect(format).toBe('raw');
-        expect(keyData).toBeInstanceOf(Uint8Array);
+        expect(ArrayBuffer.isView(keyData)).toBe(true);
         expect(algorithm).toBe('HKDF');
         expect(extractable).toBe(false);
         expect(keyUsages).toEqual(['deriveBits']);
@@ -41,5 +41,8 @@ describe('deriveEoaPrivateKeyFromPrf', () => {
 
     expect(importKeySpy).toHaveBeenCalledTimes(1);
     expect(deriveBitsSpy).toHaveBeenCalledTimes(1);
+    const [algorithm] = deriveBitsSpy.mock.calls[0];
+    expect(ArrayBuffer.isView(algorithm.salt)).toBe(true);
+    expect(ArrayBuffer.isView(algorithm.info)).toBe(true);
   });
 });
