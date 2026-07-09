@@ -64,19 +64,25 @@ describe('CommonGround deliberation snapshot export', () => {
       comments: [
         {
           type: 'binary',
-          commentId: '0x1234567890123456789012345678901234567890',
-          commentBody: 'Safe statement text',
+          commentId: 'unsafe-address-id',
+          commentBody: 'Address 0x1234567890123456789012345678901234567890 should not export',
         },
         {
           type: 'binary',
           commentId: 'safe-id',
           commentBody: 'Email test person@example.com should not export',
         },
+        {
+          type: 'binary',
+          commentId: 'safe-statement-id',
+          commentBody: 'Safe statement text',
+        },
       ],
       participantsVotes: Array.from({ length: 8 }, (_, index) => ({
         votes: {
           0: index < 4 ? 1 : -1,
           1: 1,
+          2: 1,
         },
       })),
     };
@@ -89,6 +95,7 @@ describe('CommonGround deliberation snapshot export', () => {
 
     expect(snapshot).not.toBeNull();
     expect(snapshot.statements).toEqual([{ index: 0, text: 'Safe statement text' }]);
+    expect(snapshot.statements.map((statement) => Object.keys(statement).sort())).toEqual([['index', 'text']]);
     expect(snapshot.statements[0]).not.toHaveProperty('id');
     expect(JSON.stringify(snapshot)).not.toMatch(/person@example\.com/);
     expect(JSON.stringify(snapshot)).not.toMatch(/0x1234567890123456789012345678901234567890/);
