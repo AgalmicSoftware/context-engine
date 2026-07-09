@@ -42,10 +42,15 @@ console issues, missing text, or layout issues. The broader default smoke still
 reports pre-existing probe/environment failures for `/session/demo` text and
 external Base RPC CORS on `/admin`.
 
-## Remaining Blocker
+## Documented Exception
 
 `AppShell` is now lazy-loaded but remains above the non-vendor chunk cap because
 the shell/controller layer imports chain, cache, session, and profile runtime
 modules synchronously. A previous broad app-level `manualChunks` split produced
 browser initialization-order failures, so further reduction should be designed as
 a controller/provider boundary refactor instead of another manual chunk pass.
+
+This is an accepted temporary exception for the current release line. The
+follow-up work is a dedicated AppShell chunk diet: map the current chunk
+ownership, move safe route/modal/runtime boundaries one at a time, keep route
+behavior tests green, and only then tighten the budget snapshot.
