@@ -21,7 +21,6 @@ import PolisReport, {
   resolvePrecomputedClusterDifference,
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
-import { getCommentBarData } from '../../utilities/survey/consensusMath';
 import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -41,7 +40,6 @@ jest.mock('../../utilities/survey/consensusMath', () => ({
   ),
   clusterUMAPPointsKmeans: jest.fn((points = []) => new Array(points.length).fill(0)),
   doUMAP: jest.fn((data = []) => data.map((_, index) => [index, index])),
-  getCommentBarData: jest.fn((matrix = []) => matrix.map(() => ({ value: 0 }))),
 }));
 
 jest.mock('../../utilities/survey/consensusReportMath.js', () => ({
@@ -142,7 +140,6 @@ const openSettingsRow = () => {
 describe('PolisReport cache read options', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    getCommentBarData.mockImplementation((matrix = []) => matrix.map(() => ({ value: 0 })));
     computePolisConversationMath.mockReturnValue({
       stats: {
         nParticipants: 0,

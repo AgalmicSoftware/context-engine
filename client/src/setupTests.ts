@@ -206,47 +206,5 @@ jest.mock('d3', () => {
   };
 });
 
-jest.mock('networkanalysis-ts', () => {
-  class Network {
-    constructor({ nNodes = 0 } = {}) {
-      this._nNodes = nNodes;
-    }
-
-    createNormalizedNetworkUsingAssociationStrength() {
-      return this;
-    }
-
-    getNNodes() {
-      return this._nNodes;
-    }
-  }
-
-  class Clustering {
-    constructor({ nNodes = 0 } = {}) {
-      this._nNodes = nNodes;
-    }
-
-    getCluster() {
-      return 0;
-    }
-  }
-
-  class LeidenAlgorithm {
-    setResolution() {}
-    setNIterations() {}
-    improveClustering() {}
-    calcQuality() {
-      return 0;
-    }
-  }
-
-  return {
-    __esModule: true,
-    Network,
-    Clustering,
-    LeidenAlgorithm,
-  };
-});
-
 jest.mock('node:os', () => require('os'), { virtual: true });
 jest.mock('node:events', () => require('events'), { virtual: true });
