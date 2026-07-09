@@ -1,4 +1,5 @@
 import {
+  buildBaseClusters,
   computePolisCommentStats,
   computePolisConversationMath,
   computePolisPcaBundle,
@@ -108,25 +109,25 @@ describe('computePolisConversationMath', () => {
     expect(result.consensus).toBeUndefined();
   });
 
-  it('builds base clusters from participant indexes after filtering out non-conversation participants', () => {
-    const result = computePolisConversationMath(
-      [
-        [1, null, -1],
-        [1, null, -1],
-      ],
-      { q1: 'First question', q2: 'Second question' },
-      ['q1', 'q2'],
-      {
-        randomSeed: 42,
-        baseK: 100,
-        inConversationFloor: 0,
-        inConversationThresholdCap: 2,
-      },
-    );
+  it('builds base clusters by participant index, not participantCoords array position', () => {
+    const participantCoords = [
+      { index: 4, x: 10, y: 20 },
+      { index: 1, x: 1, y: 2 },
+      { index: 7, x: 1, y: 2 },
+      { index: 2, x: -3, y: 5 },
+    ];
+    const participantIndices = [7, 3, 1, 4, 2];
 
-    expect(result.inConversationParticipantIndices).toEqual([0, 2]);
-    expect(result.baseClusters.flatMap((cluster) => cluster.members).sort((left, right) => left - right)).toEqual([
-      0, 2,
+    const clusters = buildBaseClusters(participantCoords, participantIndices, { baseK: 100 });
+
+    expect(clusters).toEqual([
+      // Index 7 is looked up first; index 3 is absent and skipped; index 1
+      // shares the same position as 7, so both stay in the first base cluster.
+      { id: 0, center: [1, 2], members: [7, 1] },
+      // Index 4 appears before index 2 in participantIndices, despite the
+      // participantCoords array being ordered [4, 1, 7, 2].
+      { id: 1, center: [10, 20], members: [4] },
+      { id: 2, center: [-3, 5], members: [2] },
     ]);
   });
 });

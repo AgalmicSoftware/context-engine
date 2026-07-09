@@ -462,7 +462,8 @@ function runWeightedKMeans(
   return clusters;
 }
 
-function buildBaseClusters(
+// Exported for tests to pin participant index lookup semantics.
+export function buildBaseClusters(
   participantCoords: PolisPoint[] = [],
   participantIndices: number[] = [],
   options: PolisReportMathOptions = {},
