@@ -48,6 +48,7 @@ import {
 import { t } from '../../utilities/ui/terminology.js';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import { getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport';
+import { persistCommunitySbtHolderHydrationResults } from './communitySbtHolderHydrationCache.js';
 
 const uiLog = createLogger('ui');
 const COMMUNITY_BEESWARM_DEMO_SLUG = 'demo';
@@ -493,8 +494,7 @@ class CommunityTab extends Component<any, any> {
       });
 
       if (changed) {
-        cacheObj[netKey].sbtList = sbtList;
-        await writeCache('sbtCache', slug, cacheObj);
+        await persistCommunitySbtHolderHydrationResults({ slug, netKey, results });
       }
       if (i + BATCH < entries.length) {
         await new Promise((r: any) => setTimeout(r, 75));

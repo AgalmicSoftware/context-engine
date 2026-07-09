@@ -43,7 +43,7 @@ describe('OnePageSession helpers', () => {
   });
 
   describe('buildAggregatorFromLocalCache', () => {
-    it('filters to binary, non-encrypted responses and drops invalid entries', () => {
+    it('filters to binary, non-encrypted responses and preserves invalid source entries', () => {
       const networkObj = {
         questions: {
           q1: { id: 'q1', type: 'binary' },
@@ -76,14 +76,14 @@ describe('OnePageSession helpers', () => {
 
       const { map, dirty } = buildAggregatorFromLocalCache(networkObj);
 
-      expect(dirty).toBe(true);
+      expect(dirty).toBe(false);
       expect(map.q1).toHaveLength(1);
       expect(map.q1[0]).toMatchObject({
         responder: '0xA',
         questionId: 'q1',
       });
       expect(map.q2).toHaveLength(0);
-      expect(networkObj.questionResponses.q2['0xC']).toBeUndefined();
+      expect(networkObj.questionResponses.q2['0xC']).toBe('{bad json');
     });
 
     it('reuses parse memo across repeated aggregator builds', () => {

@@ -142,6 +142,23 @@ export const createSessionSbtCacheController = (host = {}) => {
   });
   const removeSbtRealtimeListenersForGroup = sbtRealtimeListenerCleanupController.removeSbtRealtimeListenersForGroup;
 
+  const isActiveSbtSlug = (slugIn) => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const activeSlug = normalizeSessionSlug(getActiveSessionSlug() || '');
+    return slug === activeSlug;
+  };
+
+  const setSbtCacheReadyForActiveSlug = (slugIn, cb) => {
+    if (!isActiveSbtSlug(slugIn)) return false;
+    setState((prev) => ({ isSBTCacheReady: true, sbtCacheRevision: prev.sbtCacheRevision + 1 }), cb);
+    return true;
+  };
+
+  const setSbtReadinessForActiveSlug = (slugIn, cb) => {
+    if (!isActiveSbtSlug(slugIn)) return false;
+    return setReadinessStateIfChanged({ isSBTCacheReady: true }, cb);
+  };
+
   const ensureSessionRouteSbtDiscovery = (slugIn) => {
     const pathname = getEffectiveRoutePath(getCurrentPath());
     if (!pathname.startsWith('/session/')) return null;
@@ -787,15 +804,12 @@ export const createSessionSbtCacheController = (host = {}) => {
         await runPriorityFeaturedMetadataPass();
         writeFlag('sbt:partialReady', slug, true);
         writeFlag('sbt:deferredFullScanNeeded', slug, true);
-        setState(
-          (prev) => ({ isSBTCacheReady: true, sbtCacheRevision: prev.sbtCacheRevision + 1 }),
-          checkAllCachesReady,
-        );
+        setSbtCacheReadyForActiveSlug(slug, checkAllCachesReady);
         void ensureSessionRouteSbtDiscovery(slug);
         return;
       } catch (e) {
         mainSiteLog.error('[SBT Partial] Failed (will still unblock UI):', e);
-        setReadinessStateIfChanged({ isSBTCacheReady: true });
+        setSbtReadinessForActiveSlug(slug);
         return;
       }
     }
@@ -849,11 +863,11 @@ export const createSessionSbtCacheController = (host = {}) => {
           `[SBT Full] Cache is fresh (lastBlock=${overallLastBlockProcessedByNetwork}, tip=${baseTo}). Skipping discovery scan.`,
         );
         updateFullScanProgress(fullScanTotalUnits, true);
-        currentNetworkCache.lastBlock = baseTo;
+        currentNetworkCache.lastBlock = overallLastBlockProcessedByNetwork;
         dgWrite('sbtCache', slug, globalCache);
         writeFlag('sbt:deferredFullScanNeeded', slug, false);
         writeFlag('sbt:partialReady', slug, true);
-        setState((prev) => ({ isSBTCacheReady: true, sbtCacheRevision: prev.sbtCacheRevision + 1 }));
+        setSbtCacheReadyForActiveSlug(slug);
         return;
       }
 
@@ -1144,7 +1158,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       writeFlag('sbt:deferredFullScanNeeded', slug, !discoveryScanSucceeded);
       writeFlag('sbt:partialReady', slug, true);
 
-      setState((prev) => ({ isSBTCacheReady: true, sbtCacheRevision: prev.sbtCacheRevision + 1 }));
+      setSbtCacheReadyForActiveSlug(slug);
       if (discoveryScanSucceeded) {
         mainSiteLog.log('initializeSbtCacheForGroup: Full discovery & processing complete.');
       } else {
@@ -1201,7 +1215,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       } catch (e) {
         mainSiteLog.error('[refreshSbtDataForGroup] Full rescan failed:', e);
         // Ensure we unblock UI even on failure
-        setReadinessStateIfChanged({ isSBTCacheReady: true });
+        setSbtReadinessForActiveSlug(slug);
       }
       return;
     }

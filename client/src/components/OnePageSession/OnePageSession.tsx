@@ -964,7 +964,7 @@ class OnePageSession extends Component<any, any> {
           let sawNetworkCache = false;
 
           for (const slug of candidateSlugs) {
-            let qCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
+            let qCache = peekCacheSync('questionsCache', slug) || {};
             if (!qCache || typeof qCache !== 'object') qCache = {};
             if (Object.keys(qCache).length === 0) {
               sourceSigParts.push(`${slug || '__general__'}:empty-cache`);
