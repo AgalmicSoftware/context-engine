@@ -18,11 +18,8 @@ export type SessionWizardStorageProfileFieldProps = {
   value?: unknown;
 };
 
-const toObject = (value: unknown): AnyRecord => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as AnyRecord
-    : {}
-);
+const toObject = (value: unknown): AnyRecord =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as AnyRecord) : {};
 
 const SessionWizardStorageProfileField = ({
   isCollapsed = false,
@@ -35,17 +32,21 @@ const SessionWizardStorageProfileField = ({
   const storageProfile = normalizeSessionStorageProfileConfig(rawValue);
   const storageProfileDisplay = buildSessionStorageProfileDisplayDescriptor(storageProfile);
   const updateStorageBackend = (backend: string) => {
-    onStorageProfileChange(normalizeSessionStorageProfileConfig({
-      ...rawValue,
-      backend,
-    }));
+    onStorageProfileChange(
+      normalizeSessionStorageProfileConfig({
+        ...rawValue,
+        backend,
+      }),
+    );
   };
   const updateCloudflarePayloadAccessMode = (mode: string) => {
-    onStorageProfileChange(normalizeSessionStorageProfileConfig({
-      ...rawValue,
-      backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE,
-      payloadAccessControl: { mode },
-    }));
+    onStorageProfileChange(
+      normalizeSessionStorageProfileConfig({
+        ...rawValue,
+        backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE,
+        payloadAccessControl: { mode },
+      }),
+    );
   };
 
   return (
@@ -57,11 +58,7 @@ const SessionWizardStorageProfileField = ({
     >
       {!isCollapsed && (
         <>
-          <div
-            className={styles.inlineToggleRow}
-            role="radiogroup"
-            aria-label="Session storage profile"
-          >
+          <div className={styles.inlineToggleRow} role="radiogroup" aria-label="Session storage profile">
             {storageProfileDisplay.backendOptions.map((option) => (
               <Button
                 key={option.backend}
@@ -75,22 +72,13 @@ const SessionWizardStorageProfileField = ({
               </Button>
             ))}
           </div>
-          {storageProfileDisplay.backendHelperText &&
-          !storageProfileDisplay.showCloudflarePayloadAccessControls ? (
-            <div className={styles.helperText}>
-              {storageProfileDisplay.backendHelperText}
-            </div>
+          {storageProfileDisplay.backendHelperText && !storageProfileDisplay.showCloudflarePayloadAccessControls ? (
+            <div className={styles.helperText}>{storageProfileDisplay.backendHelperText}</div>
           ) : null}
           {storageProfileDisplay.showCloudflarePayloadAccessControls ? (
             <>
-              <div className={styles.helperText}>
-                {storageProfileDisplay.backendHelperText}
-              </div>
-              <div
-                className={styles.inlineToggleRow}
-                role="radiogroup"
-                aria-label="Cloudflare payload access mode"
-              >
+              <div className={styles.helperText}>{storageProfileDisplay.backendHelperText}</div>
+              <div className={styles.inlineToggleRow} role="radiogroup" aria-label="Cloudflare payload access mode">
                 {storageProfileDisplay.cloudflarePayloadAccessOptions.map((option) => (
                   <Button
                     key={option.mode}
@@ -104,9 +92,7 @@ const SessionWizardStorageProfileField = ({
                   </Button>
                 ))}
               </div>
-              <div className={styles.helperText}>
-                {storageProfileDisplay.cloudflarePayloadAccessHelperText}
-              </div>
+              <div className={styles.helperText}>{storageProfileDisplay.cloudflarePayloadAccessHelperText}</div>
             </>
           ) : null}
         </>

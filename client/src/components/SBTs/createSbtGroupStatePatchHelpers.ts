@@ -1,8 +1,5 @@
 import { toStr } from '../../utilities/shared/primitives.js';
-import {
-  normalizeCreateSbtSelectedGateIds,
-  normalizeMetadataLockGateIds,
-} from './createSbtGroupMetadataLockHelpers';
+import { normalizeCreateSbtSelectedGateIds, normalizeMetadataLockGateIds } from './createSbtGroupMetadataLockHelpers';
 
 type BuildCreateSbtAccountDistributionSyncStatePatchArgs = {
   currentDistribution?: unknown;
@@ -94,9 +91,8 @@ type BuildCreateSbtCountdownTickPatchArgs = {
   state?: unknown;
 };
 
-const isCreateSbtStatePatchPlainObject = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isCreateSbtStatePatchPlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const buildCreateSbtDistributionFieldPatch = ({
   fieldKey = '',
@@ -105,9 +101,10 @@ export const buildCreateSbtDistributionFieldPatch = ({
 }: BuildCreateSbtDistributionFieldPatchArgs = {}): Record<string, unknown> => {
   const stateRecord = isCreateSbtStatePatchPlainObject(state) ? state : {};
   const distributionSource = stateRecord.sbtDistribution;
-  const previousDistribution = distributionSource !== null && typeof distributionSource === 'object'
-    ? distributionSource as Record<string, unknown>
-    : {};
+  const previousDistribution =
+    distributionSource !== null && typeof distributionSource === 'object'
+      ? (distributionSource as Record<string, unknown>)
+      : {};
   return {
     sbtDistribution: {
       ...previousDistribution,
@@ -162,15 +159,17 @@ export const buildCreateSbtCopiedLinkIndexPatch = ({
   copiedLinkIndex: index,
 });
 
-export const buildCreateSbtOpenLockKeyPatch = ({
-  lockKey = '',
-}: BuildCreateSbtOpenLockKeyPatchArgs = {}): Record<string, string> => ({
+export const buildCreateSbtOpenLockKeyPatch = ({ lockKey = '' }: BuildCreateSbtOpenLockKeyPatchArgs = {}): Record<
+  string,
+  string
+> => ({
   openLockKey: String(lockKey ?? ''),
 });
 
-export const buildCreateSbtGroupHashPatch = ({
-  groupHash = '',
-}: BuildCreateSbtGroupHashPatchArgs = {}): Record<string, string> => ({
+export const buildCreateSbtGroupHashPatch = ({ groupHash = '' }: BuildCreateSbtGroupHashPatchArgs = {}): Record<
+  string,
+  string
+> => ({
   groupHash: String(groupHash ?? ''),
 });
 
@@ -183,9 +182,7 @@ export const buildCreateSbtPasswordListPatch = ({
 export const buildCreateSbtBookmarkedSbtsSetPatch = ({
   bookmarkedSbtsSet = new Set<string>(),
 }: BuildCreateSbtBookmarkedSbtsSetPatchArgs = {}): Record<string, Set<string>> => ({
-  bookmarkedSbtsSet: bookmarkedSbtsSet instanceof Set
-    ? bookmarkedSbtsSet as Set<string>
-    : new Set<string>(),
+  bookmarkedSbtsSet: bookmarkedSbtsSet instanceof Set ? (bookmarkedSbtsSet as Set<string>) : new Set<string>(),
 });
 
 export const buildCreateSbtPredictedAddressBusyPatch = (): Record<string, unknown> => ({
@@ -203,9 +200,10 @@ export const buildCreateSbtPredictedAddressPatch = ({
   predictedAddressBusy: predictedAddressBusy === true,
 });
 
-export const buildCreateSbtMintResetFailurePatch = ({
-  error = '',
-}: BuildCreateSbtMintFailurePatchArgs = {}): Record<string, unknown> => ({
+export const buildCreateSbtMintResetFailurePatch = ({ error = '' }: BuildCreateSbtMintFailurePatchArgs = {}): Record<
+  string,
+  unknown
+> => ({
   mintingFailed: true,
   startedMinting: false,
   currentStep: 0,
@@ -253,15 +251,16 @@ export const buildCreateSbtEditResetPatch = ({
   error: '',
   ...(resetUploadState === true
     ? {
-      imageUploaded: false,
-      tokenUriUploaded: false,
-    }
+        imageUploaded: false,
+        tokenUriUploaded: false,
+      }
     : {}),
 });
 
-export const buildCreateSbtErrorPatch = ({
-  error = '',
-}: BuildCreateSbtErrorPatchArgs = {}): Record<string, unknown> => ({
+export const buildCreateSbtErrorPatch = ({ error = '' }: BuildCreateSbtErrorPatchArgs = {}): Record<
+  string,
+  unknown
+> => ({
   error,
 });
 
@@ -312,15 +311,17 @@ export const buildCreateSbtCountdownStartPatch = (): Record<string, unknown> => 
   countdown: 12,
 });
 
-export const buildCreateSbtSymbolPatch = ({
-  sbtSymbol = '',
-}: BuildCreateSbtSymbolPatchArgs = {}): Record<string, unknown> => ({
+export const buildCreateSbtSymbolPatch = ({ sbtSymbol = '' }: BuildCreateSbtSymbolPatchArgs = {}): Record<
+  string,
+  unknown
+> => ({
   sbtSymbol: String(sbtSymbol ?? ''),
 });
 
-export const buildCreateSbtShareableUrlPatch = ({
-  autoJoinUrl = '',
-}: BuildCreateSbtShareableUrlPatchArgs = {}): Record<string, unknown> => {
+export const buildCreateSbtShareableUrlPatch = ({ autoJoinUrl = '' }: BuildCreateSbtShareableUrlPatchArgs = {}): Record<
+  string,
+  unknown
+> => {
   const url = String(autoJoinUrl ?? '');
   return {
     shareableUrl: url,
@@ -354,14 +355,13 @@ export const buildCreateSbtInputChangePatch = ({
 }: BuildCreateSbtInputChangePatchArgs = {}): Record<string, unknown> => ({
   [name]: value,
   ...(name === 'sbtImageUrl' ? { lockedImageAsset: null } : {}),
-  ...(name === 'sbtImageUrl'
-    ? { imageChooserStatusText: '', imageChooserStatusTone: 'default' }
-    : {}),
+  ...(name === 'sbtImageUrl' ? { imageChooserStatusText: '', imageChooserStatusTone: 'default' } : {}),
 });
 
-export const buildCreateSbtCountdownTickPatch = ({
-  state = {},
-}: BuildCreateSbtCountdownTickPatchArgs = {}): Record<string, unknown> => {
+export const buildCreateSbtCountdownTickPatch = ({ state = {} }: BuildCreateSbtCountdownTickPatchArgs = {}): Record<
+  string,
+  unknown
+> => {
   const source = isCreateSbtStatePatchPlainObject(state) ? state : {};
   const nextCountdown = Math.max(0, Number(source.countdown || 0) - 1);
   return {
@@ -370,9 +370,7 @@ export const buildCreateSbtCountdownTickPatch = ({
   };
 };
 
-export const normalizeComparableAddress = (value: unknown): string => (
-  toStr(value).trim().toLowerCase()
-);
+export const normalizeComparableAddress = (value: unknown): string => toStr(value).trim().toLowerCase();
 
 export const buildCreateSbtAccountDistributionSyncPatch = ({
   currentDistribution = {},
@@ -390,14 +388,9 @@ export const buildCreateSbtAccountDistributionSyncPatch = ({
   const source = isCreateSbtStatePatchPlainObject(currentDistribution) ? currentDistribution : {};
   const currentBurnAdmin = toStr(source.burnAdmin).trim();
   const currentAdminAddress = toStr(source.adminAddress).trim();
-  const shouldSyncBurnAdmin = (
-    !currentBurnAdmin ||
-    normalizeComparableAddress(currentBurnAdmin) === prevAccountAddress
-  );
-  const shouldSyncAdminAddress = (
-    !currentAdminAddress ||
-    normalizeComparableAddress(currentAdminAddress) === prevAccountAddress
-  );
+  const shouldSyncBurnAdmin = !currentBurnAdmin || normalizeComparableAddress(currentBurnAdmin) === prevAccountAddress;
+  const shouldSyncAdminAddress =
+    !currentAdminAddress || normalizeComparableAddress(currentAdminAddress) === prevAccountAddress;
   if (!shouldSyncBurnAdmin && !shouldSyncAdminAddress) return null;
 
   const nextAccountText = toStr(nextAccount).trim();

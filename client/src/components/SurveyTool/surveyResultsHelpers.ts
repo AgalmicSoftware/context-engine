@@ -64,14 +64,14 @@ type BuildSurveyResultsRefreshStatusSequencePlanArgs = BuildSurveyResultsRefresh
 };
 export type SurveyResultsRefreshStatusSequenceEffect =
   | {
-    kind: 'state-patch';
-    keys: string[];
-    target: { latestBlock?: unknown };
-  }
+      kind: 'state-patch';
+      keys: string[];
+      target: { latestBlock?: unknown };
+    }
   | {
-    kind: 'follow-up';
-    effect: string;
-  };
+      kind: 'follow-up';
+      effect: string;
+    };
 
 export type SurveyResultsResponseField = UnknownRecord & {
   value?: unknown;
@@ -181,16 +181,12 @@ export const buildSurveyResultsFilterLoadingStatePatch = ({
   prevState = {},
 }: BuildSurveyResultsFilterLoadingStatePatchArgs = {}): { filterLoading: boolean } | null => {
   const normalizedNextLoading = !!nextLoading;
-  const stateRecord = (prevState && typeof prevState === 'object')
-    ? prevState as UnknownRecord
-    : {};
-  return stateRecord.filterLoading === normalizedNextLoading
-    ? null
-    : { filterLoading: normalizedNextLoading };
+  const stateRecord = prevState && typeof prevState === 'object' ? (prevState as UnknownRecord) : {};
+  return stateRecord.filterLoading === normalizedNextLoading ? null : { filterLoading: normalizedNextLoading };
 };
 
 export const stringifySurveyResultsAggregatorResponses = (
-  aggregatorObj: unknown
+  aggregatorObj: unknown,
 ): SurveyResultsStringifiedAggregator => {
   const out: SurveyResultsStringifiedAggregator = {};
   if (!aggregatorObj || typeof aggregatorObj !== 'object') return out;
@@ -228,19 +224,15 @@ export const buildSurveyResultsQuestionFilterCountPatch = ({
   props = {},
   state = {},
 }: BuildSurveyResultsQuestionFilterCountPatchArgs = {}): { filteredQuestionsCount: unknown } | null => {
-  const propsRecord = (props && typeof props === 'object')
-    ? props as UnknownRecord
-    : {};
-  const stateRecord = (state && typeof state === 'object')
-    ? state as UnknownRecord
-    : {};
+  const propsRecord = props && typeof props === 'object' ? (props as UnknownRecord) : {};
+  const stateRecord = state && typeof state === 'object' ? (state as UnknownRecord) : {};
 
   if (!propsRecord.isQuestionCacheReady) return null;
 
   const baseMap =
-    (stateRecord.viewMode === 'survey' && stateRecord.surveyViewMode === 'aggregate')
-      ? (stateRecord.aggregateQuestionResponses || {})
-      : (stateRecord.aggregatorQuestionResponses || {});
+    stateRecord.viewMode === 'survey' && stateRecord.surveyViewMode === 'aggregate'
+      ? stateRecord.aggregateQuestionResponses || {}
+      : stateRecord.aggregatorQuestionResponses || {};
   const baseQuestions = Object.keys(Object(baseMap)).length;
 
   const hasAnyResponses =
@@ -248,10 +240,7 @@ export const buildSurveyResultsQuestionFilterCountPatch = ({
     Object.keys(Object(stateRecord.questionResponses || {})).length > 0 ||
     Object.keys(Object(stateRecord.sbtFilteredAggregatorQuestionResponses || {})).length > 0;
 
-  if (
-    count === 0 &&
-    (!hasAnyResponses || stateRecord.filterLoading || !propsRecord.isResponsesCacheReady)
-  ) {
+  if (count === 0 && (!hasAnyResponses || stateRecord.filterLoading || !propsRecord.isResponsesCacheReady)) {
     return null;
   }
 
@@ -270,11 +259,8 @@ export const buildSurveyResultsQuestionScopeResetPatch = () => ({
   questionResultsHydrated: false,
 });
 
-const toSurveyResultsHelperRecord = (value: unknown): UnknownRecord => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as UnknownRecord
-    : {}
-);
+const toSurveyResultsHelperRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 
 const pruneSurveyResultsResponseAggregator = (value: unknown): UnknownRecord => {
   const pruned: UnknownRecord = {};
@@ -324,9 +310,7 @@ export const buildSurveyResultsQuestionFilterPatch = ({
   const sourceRecord = toSurveyResultsHelperRecord(sourceMap);
   const filteredResponseRecord = toSurveyResultsHelperRecord(filteredResponsesByQuestion);
   const allowedIds = new Set<string>(
-    questionList.map((question) => (
-      String(toSurveyResultsHelperRecord(question).id || '').toLowerCase()
-    ))
+    questionList.map((question) => String(toSurveyResultsHelperRecord(question).id || '').toLowerCase()),
   );
   const nextFilteredAggregator: UnknownRecord = {};
 
@@ -345,15 +329,15 @@ export const buildSurveyResultsQuestionFilterPatch = ({
   if (isSurveyAggregate) {
     statePatch.filteredResponsesCount = Math.min(
       countSurveyResultsDistinctResponders(nextFilteredAggregator),
-      maxResponseCount
+      maxResponseCount,
     );
   } else {
     statePatch.filteredResponsesCount = Math.min(
       countQuestionModeResponses(
         nextFilteredAggregator,
-        toSurveyResultsHelperRecord(networkQuestions) as SurveyResultsQuestionLookup
+        toSurveyResultsHelperRecord(networkQuestions) as SurveyResultsQuestionLookup,
       ),
-      maxResponseCount
+      maxResponseCount,
     );
   }
   return statePatch;
@@ -396,12 +380,12 @@ export const buildSurveyResultsFilteredResponsesPatchPlan = ({
   const filteredResponsesCount = isSurveyMode
     ? Math.min(countSurveyResultsDistinctResponders(pruned), maxResponseCount)
     : Math.min(
-      countQuestionModeResponses(
-        pruned,
-        toSurveyResultsHelperRecord(networkQuestions) as SurveyResultsQuestionLookup
-      ),
-      maxResponseCount
-    );
+        countQuestionModeResponses(
+          pruned,
+          toSurveyResultsHelperRecord(networkQuestions) as SurveyResultsQuestionLookup,
+        ),
+        maxResponseCount,
+      );
 
   return {
     patch: {
@@ -480,8 +464,7 @@ export const buildSurveyResultsFilteredQuestionModeHydratedPatch = ({
   totalResponsesCount: number;
 }) => ({
   aggregatorQuestionResponses,
-  sbtFilteredAggregatorQuestionResponses:
-    sbtFilteredAggregatorQuestionResponses || aggregatorQuestionResponses,
+  sbtFilteredAggregatorQuestionResponses: sbtFilteredAggregatorQuestionResponses || aggregatorQuestionResponses,
   questionResponses,
   totalQuestionsCount,
   totalResponsesCount,
@@ -490,9 +473,7 @@ export const buildSurveyResultsFilteredQuestionModeHydratedPatch = ({
       ? Math.min(currentFilteredQuestionsCount, totalQuestionsCount)
       : totalQuestionsCount,
   filteredResponsesCount:
-    typeof currentFilteredResponsesCount === 'number'
-      ? currentFilteredResponsesCount
-      : initialFilteredCount,
+    typeof currentFilteredResponsesCount === 'number' ? currentFilteredResponsesCount : initialFilteredCount,
   questionResultsHydrated: true,
 });
 
@@ -584,9 +565,7 @@ export const buildSurveyResultsRefreshTargetBlocksPatch = (latestBlock: unknown)
 
 const normalizeRefreshStatusFollowUpEffects = (followUpEffects: readonly unknown[] | unknown = []): string[] => {
   if (!Array.isArray(followUpEffects)) return [];
-  return followUpEffects
-    .map((effect) => String(effect || '').trim())
-    .filter(Boolean);
+  return followUpEffects.map((effect) => String(effect || '').trim()).filter(Boolean);
 };
 
 export const buildSurveyResultsRefreshStatusSequencePlan = ({
@@ -612,12 +591,13 @@ export const buildSurveyResultsRefreshStatusSequencePlan = ({
   }
 
   const refreshTargetPatch = buildSurveyResultsRefreshTargetBlocksPatch(latestBlock);
-  const statePatch = writeNetworkLatestBlock === true
-    ? {
-      ...buildSurveyResultsNetworkLatestBlockPatch(latestBlock),
-      ...refreshTargetPatch,
-    }
-    : refreshTargetPatch;
+  const statePatch =
+    writeNetworkLatestBlock === true
+      ? {
+          ...buildSurveyResultsNetworkLatestBlockPatch(latestBlock),
+          ...refreshTargetPatch,
+        }
+      : refreshTargetPatch;
   const orderedEffects: SurveyResultsRefreshStatusSequenceEffect[] = [
     {
       kind: 'state-patch',
@@ -641,15 +621,8 @@ export const buildSurveyResultsRefreshStatusSequencePlan = ({
   };
 };
 
-export const buildSurveyResultsRefreshStatusWritePlan = (
-  args: BuildSurveyResultsRefreshStatusWritePlanArgs = {}
-) => {
-  const {
-    blockedReason,
-    shouldWrite,
-    statePatch,
-    target,
-  } = buildSurveyResultsRefreshStatusSequencePlan(args);
+export const buildSurveyResultsRefreshStatusWritePlan = (args: BuildSurveyResultsRefreshStatusWritePlanArgs = {}) => {
+  const { blockedReason, shouldWrite, statePatch, target } = buildSurveyResultsRefreshStatusSequencePlan(args);
 
   return {
     blockedReason,
@@ -663,9 +636,7 @@ export const buildSurveyResultsFilteredQuestionsCountPatch = (filteredQuestionsC
   filteredQuestionsCount,
 });
 
-export const buildSurveyResultsLockedResponsesDecryptingPatch = (
-  lockedResponsesDecrypting: unknown
-) => ({
+export const buildSurveyResultsLockedResponsesDecryptingPatch = (lockedResponsesDecrypting: unknown) => ({
   lockedResponsesDecrypting: !!lockedResponsesDecrypting,
   alertMessage: '',
 });
@@ -684,24 +655,22 @@ export const buildSurveyResultsLockedResponsesDecryptCompletePatch = ({
   ...(anyDecrypted
     ? {}
     : {
-      alertMessage: `Unable to decrypt locked responses with the connected ${String(walletLowerLabel || 'wallet')}.`,
-    }),
+        alertMessage: `Unable to decrypt locked responses with the connected ${String(walletLowerLabel || 'wallet')}.`,
+      }),
 });
 
-export const toggleSurveyResultsLockedResponseDetailsPatch = (prevState: {
-  lockedResponseDetailsOpen?: unknown;
-} = {}) => ({
+export const toggleSurveyResultsLockedResponseDetailsPatch = (
+  prevState: {
+    lockedResponseDetailsOpen?: unknown;
+  } = {},
+) => ({
   lockedResponseDetailsOpen: !prevState.lockedResponseDetailsOpen,
 });
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-export const normalizeSignatureValue = (
-  value: unknown,
-  trail: WeakSet<object> = new WeakSet<object>()
-): unknown => {
+export const normalizeSignatureValue = (value: unknown, trail: WeakSet<object> = new WeakSet<object>()): unknown => {
   if (value === null || value === undefined) return value;
   if (typeof value === 'bigint') return `__bigint:${value.toString(10)}`;
   if (typeof value !== 'object') return value;
@@ -714,9 +683,11 @@ export const normalizeSignatureValue = (
   }
   const record = value as UnknownRecord;
   const out: UnknownRecord = {};
-  Object.keys(record).sort().forEach((key) => {
-    out[key] = normalizeSignatureValue(record[key], trail);
-  });
+  Object.keys(record)
+    .sort()
+    .forEach((key) => {
+      out[key] = normalizeSignatureValue(record[key], trail);
+    });
   trail.delete(value);
   return out;
 };
@@ -747,19 +718,13 @@ export const buildSurveyResponderPayloadSignature = (payload: unknown): string =
   return `o:${stableSerializeSignatureValue(payload)}`;
 };
 
-export const buildSurveyRespondersSignature = (
-  surveyResponsesByResponder: UnknownRecord = {}
-): string => {
-  const responders = Object.keys(surveyResponsesByResponder || {})
-    .sort((a, b) => String(a).localeCompare(String(b)));
+export const buildSurveyRespondersSignature = (surveyResponsesByResponder: UnknownRecord = {}): string => {
+  const responders = Object.keys(surveyResponsesByResponder || {}).sort((a, b) => String(a).localeCompare(String(b)));
   let hash = 2166136261;
   responders.forEach((responder) => {
     const responderLower = String(responder || '').toLowerCase();
     hash = mixSurveySignatureHash(hash, responderLower);
-    hash = mixSurveySignatureHash(
-      hash,
-      buildSurveyResponderPayloadSignature(surveyResponsesByResponder?.[responder])
-    );
+    hash = mixSurveySignatureHash(hash, buildSurveyResponderPayloadSignature(surveyResponsesByResponder?.[responder]));
   });
   return `${responders.length}:${hash >>> 0}`;
 };
@@ -781,11 +746,8 @@ export const getSurveyResponderPayloadRefId = (value: unknown): string => {
   return `o:${refId}`;
 };
 
-export const buildSurveyRespondersPayloadRefSignature = (
-  surveyResponsesByResponder: UnknownRecord = {}
-): string => {
-  const responders = Object.keys(surveyResponsesByResponder || {})
-    .sort((a, b) => String(a).localeCompare(String(b)));
+export const buildSurveyRespondersPayloadRefSignature = (surveyResponsesByResponder: UnknownRecord = {}): string => {
+  const responders = Object.keys(surveyResponsesByResponder || {}).sort((a, b) => String(a).localeCompare(String(b)));
   let hash = 2166136261;
   responders.forEach((responder) => {
     const responderLower = String(responder || '').toLowerCase();
@@ -796,9 +758,7 @@ export const buildSurveyRespondersPayloadRefSignature = (
       return;
     }
     hash = mixSurveySignatureHash(hash, getSurveyResponderPayloadRefId(payload));
-    const payloadResponses = isRecord(payload) && Array.isArray(payload.responses)
-      ? payload.responses
-      : [];
+    const payloadResponses = isRecord(payload) && Array.isArray(payload.responses) ? payload.responses : [];
     hash = mixSurveySignatureHash(hash, `r:${payloadResponses.length}`);
     payloadResponses.forEach((entry) => {
       hash = mixSurveySignatureHash(hash, getSurveyResponderPayloadRefId(entry));
@@ -831,7 +791,9 @@ export const normalizeResponseTimestampMs = (value: unknown): number => {
 
 export const getSurveyResponseQuestionId = (row: unknown = {}): string => {
   if (!isRecord(row)) return '';
-  return String(row.questionID || row.questionId || '').trim().toLowerCase();
+  return String(row.questionID || row.questionId || '')
+    .trim()
+    .toLowerCase();
 };
 
 export const getSurveyResponseEntryTimestampMs = (row: unknown = {}): number => {
@@ -844,18 +806,12 @@ export const getSurveyResponsePayloadTimestampMs = (payload: unknown = {}): numb
   return normalizeResponseTimestampMs(payload.timestamp ?? payload.timeStamp);
 };
 
-export const getSurveyResponseAggregateTimestampMs = (
-  row: unknown = {},
-  payload: unknown = {}
-): number => {
+export const getSurveyResponseAggregateTimestampMs = (row: unknown = {}, payload: unknown = {}): number => {
   const entryTimestamp = getSurveyResponseEntryTimestampMs(row);
   const payloadTimestamp = getSurveyResponsePayloadTimestampMs(payload);
   // Current client edits can advance only the top-level payload timestamp.
   // Effective recency must include that value so stale answer rows do not win.
-  if (
-    entryTimestamp === INVALID_RESPONSE_TIMESTAMP &&
-    payloadTimestamp === INVALID_RESPONSE_TIMESTAMP
-  ) {
+  if (entryTimestamp === INVALID_RESPONSE_TIMESTAMP && payloadTimestamp === INVALID_RESPONSE_TIMESTAMP) {
     return 0;
   }
   if (entryTimestamp === INVALID_RESPONSE_TIMESTAMP) return payloadTimestamp;
@@ -865,7 +821,7 @@ export const getSurveyResponseAggregateTimestampMs = (
 
 export const isSurveyQuestionResponseNewer = (
   candidate: SurveyQuestionResponseCandidate,
-  existing: SurveyQuestionResponseCandidate
+  existing: SurveyQuestionResponseCandidate,
 ): boolean => {
   // Compare effective recency first, then payload recency, and finally preserve
   // later array order within the same payload revision.
@@ -925,10 +881,7 @@ export const normalizeSurveyResponsePayloadByQuestionId = (payload: unknown): un
     }
   });
 
-  const normalizedResponses = [
-    ...passthroughRows,
-    ...Array.from(latestByQuestionId.values()),
-  ]
+  const normalizedResponses = [...passthroughRows, ...Array.from(latestByQuestionId.values())]
     .sort((left, right) => left.orderIndex - right.orderIndex)
     .map((entry) => entry.row);
 
@@ -939,18 +892,16 @@ export const normalizeSurveyResponsePayloadByQuestionId = (payload: unknown): un
 };
 
 export const buildSurveyResultsIndividualResponseAggregator = (
-  individualResponses: unknown
+  individualResponses: unknown,
 ): SurveyResultsIndividualAggregator => {
-  const responseRows = Array.isArray(individualResponses)
-    ? individualResponses as SurveyResultsAggregateRow[]
-    : [];
+  const responseRows = Array.isArray(individualResponses) ? (individualResponses as SurveyResultsAggregateRow[]) : [];
   if (responseRows.length === 0) return {};
 
   const aggregator: SurveyResultsIndividualAggregator = {};
 
   responseRows.forEach((response) => {
     const parsedResponse = normalizeSurveyResponsePayloadByQuestionId(
-      response.response
+      response.response,
     ) as SurveyResultsSurveyResponsePayload | null;
     if (!parsedResponse || !Array.isArray(parsedResponse.responses)) return;
 
@@ -988,20 +939,15 @@ const normalizeTsToMs = (val: unknown): number => {
   return NaN;
 };
 
-const readTimestampValue = (value: unknown): unknown => (
-  isRecord(value) ? value.timestamp ?? value.timeStamp : undefined
-);
+const readTimestampValue = (value: unknown): unknown =>
+  isRecord(value) ? (value.timestamp ?? value.timeStamp) : undefined;
 
 const readAnswerTimestampValue = (value: unknown): unknown => {
   if (!isRecord(value)) return undefined;
-  return isRecord(value.answer) ? value.answer.timestamp ?? value.answer.timeStamp : undefined;
+  return isRecord(value.answer) ? (value.answer.timestamp ?? value.answer.timeStamp) : undefined;
 };
 
-export const pickTimestampMs = (
-  primary: unknown,
-  fallback1: unknown,
-  fallback2: unknown
-): number => {
+export const pickTimestampMs = (primary: unknown, fallback1: unknown, fallback2: unknown): number => {
   const candidates = [
     readTimestampValue(primary),
     readAnswerTimestampValue(primary),
@@ -1016,24 +962,19 @@ export const pickTimestampMs = (
   return Number.NEGATIVE_INFINITY;
 };
 
-export const formatTsForCsv = (ms: unknown): string => (
-  typeof ms === 'number' && ms > 0 && Number.isFinite(ms)
-    ? new Date(ms).toISOString()
-    : ''
-);
+export const formatTsForCsv = (ms: unknown): string =>
+  typeof ms === 'number' && ms > 0 && Number.isFinite(ms) ? new Date(ms).toISOString() : '';
 
 export const countQuestionModeResponses = (
   aggregatorByQuestion: SurveyResultsAggregator = {},
-  questionLookup: SurveyResultsQuestionLookup = {}
+  questionLookup: SurveyResultsQuestionLookup = {},
 ): number => {
   let total = 0;
   Object.keys(aggregatorByQuestion || {}).forEach((questionId) => {
     const rows = Array.isArray(aggregatorByQuestion[questionId])
-      ? aggregatorByQuestion[questionId] as SurveyResultsAggregateRow[]
+      ? (aggregatorByQuestion[questionId] as SurveyResultsAggregateRow[])
       : [];
-    const questionType = String(
-      questionLookup?.[String(questionId || '').toLowerCase()]?.type || ''
-    ).toLowerCase();
+    const questionType = String(questionLookup?.[String(questionId || '').toLowerCase()]?.type || '').toLowerCase();
     rows.forEach((row) => {
       const parsedResponse = row?.response;
       if (isFreeformBlankAnswer(questionType, parsedResponse)) return;
@@ -1045,11 +986,12 @@ export const countQuestionModeResponses = (
 
 export const hasAnyCountableSurveyAnswer = (
   parsedSurveyResponse: unknown,
-  questionLookup: SurveyResultsQuestionLookup = {}
+  questionLookup: SurveyResultsQuestionLookup = {},
 ): boolean => {
-  const answers = isRecord(parsedSurveyResponse) && Array.isArray(parsedSurveyResponse.responses)
-    ? parsedSurveyResponse.responses
-    : [];
+  const answers =
+    isRecord(parsedSurveyResponse) && Array.isArray(parsedSurveyResponse.responses)
+      ? parsedSurveyResponse.responses
+      : [];
   if (answers.length === 0) return false;
   for (let i = 0; i < answers.length; i += 1) {
     const answer = answers[i];

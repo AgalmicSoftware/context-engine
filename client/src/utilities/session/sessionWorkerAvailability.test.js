@@ -27,29 +27,37 @@ describe('sessionWorkerAvailability', () => {
   });
 
   it('returns the shared fallback URL for the default/general session when fallback is allowed', () => {
-    expect(getUsableSessionWorkerUrl({
-      slug: '',
-      sessionConfig: { slug: '', corsWorkerUrl: '' },
-      allowSharedFallback: true,
-    })).toBe(expectedSharedFallbackWorkerUrl);
-    expect(getUsableSessionWorkerUrl({
-      slug: 'general',
-      sessionConfig: { slug: 'general', corsWorkerUrl: '' },
-      allowSharedFallback: true,
-    })).toBe(expectedSharedFallbackWorkerUrl);
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: '',
+        sessionConfig: { slug: '', corsWorkerUrl: '' },
+        allowSharedFallback: true,
+      }),
+    ).toBe(expectedSharedFallbackWorkerUrl);
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: 'general',
+        sessionConfig: { slug: 'general', corsWorkerUrl: '' },
+        allowSharedFallback: true,
+      }),
+    ).toBe(expectedSharedFallbackWorkerUrl);
   });
 
   it('still returns no shared fallback URL for the default/general session when fallback is disabled', () => {
-    expect(getUsableSessionWorkerUrl({
-      slug: '',
-      sessionConfig: { slug: '', corsWorkerUrl: '' },
-      allowSharedFallback: false,
-    })).toBe('');
-    expect(getUsableSessionWorkerUrl({
-      slug: 'general',
-      sessionConfig: { slug: 'general', corsWorkerUrl: '' },
-      allowSharedFallback: false,
-    })).toBe('');
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: '',
+        sessionConfig: { slug: '', corsWorkerUrl: '' },
+        allowSharedFallback: false,
+      }),
+    ).toBe('');
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: 'general',
+        sessionConfig: { slug: 'general', corsWorkerUrl: '' },
+        allowSharedFallback: false,
+      }),
+    ).toBe('');
   });
 
   it('treats general-session configs as authoritative when they provide an explicit worker URL', () => {
@@ -58,20 +66,26 @@ describe('sessionWorkerAvailability', () => {
       corsWorkerUrl: 'https://demo-general.example',
     };
 
-    expect(shouldUseSharedFallbackWorkerUrl({
-      slug: '',
-      sessionConfig,
-    })).toBe(false);
-    expect(getUsableSessionWorkerUrl({
-      slug: '',
-      sessionConfig,
-      allowSharedFallback: true,
-    })).toBe(sessionConfig.corsWorkerUrl);
-    expect(getUsableSessionWorkerUrl({
-      slug: '',
-      sessionConfig,
-      allowSharedFallback: false,
-    })).toBe(sessionConfig.corsWorkerUrl);
+    expect(
+      shouldUseSharedFallbackWorkerUrl({
+        slug: '',
+        sessionConfig,
+      }),
+    ).toBe(false);
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: '',
+        sessionConfig,
+        allowSharedFallback: true,
+      }),
+    ).toBe(sessionConfig.corsWorkerUrl);
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: '',
+        sessionConfig,
+        allowSharedFallback: false,
+      }),
+    ).toBe(sessionConfig.corsWorkerUrl);
   });
 
   it('treats cloned general-session configs as authoritative when they provide an explicit worker URL', () => {
@@ -81,14 +95,18 @@ describe('sessionWorkerAvailability', () => {
     };
     const clonedDemoGeneral = { ...demoGeneralWithWorkerUrl };
 
-    expect(shouldUseSharedFallbackWorkerUrl({
-      slug: 'general',
-      sessionConfig: demoGeneralWithWorkerUrl,
-    })).toBe(false);
-    expect(shouldUseSharedFallbackWorkerUrl({
-      slug: 'general',
-      sessionConfig: clonedDemoGeneral,
-    })).toBe(false);
+    expect(
+      shouldUseSharedFallbackWorkerUrl({
+        slug: 'general',
+        sessionConfig: demoGeneralWithWorkerUrl,
+      }),
+    ).toBe(false);
+    expect(
+      shouldUseSharedFallbackWorkerUrl({
+        slug: 'general',
+        sessionConfig: clonedDemoGeneral,
+      }),
+    ).toBe(false);
 
     const usableWorkerUrl = getUsableSessionWorkerUrl({
       slug: 'general',
@@ -105,24 +123,32 @@ describe('sessionWorkerAvailability', () => {
       corsWorkerUrl: 'https://custom.example',
     };
 
-    expect(shouldUseSharedFallbackWorkerUrl({
-      slug: 'general',
-      sessionConfig,
-    })).toBe(false);
-    expect(getUsableSessionWorkerUrl({
-      slug: 'general',
-      sessionConfig,
-      allowSharedFallback: true,
-    })).toBe('https://custom.example');
+    expect(
+      shouldUseSharedFallbackWorkerUrl({
+        slug: 'general',
+        sessionConfig,
+      }),
+    ).toBe(false);
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: 'general',
+        sessionConfig,
+        allowSharedFallback: true,
+      }),
+    ).toBe('https://custom.example');
   });
 
   it('reads compatibility worker URL keys from session config objects', () => {
-    expect(getConfiguredSessionWorkerUrlFromConfig({
-      workerUrl: 'https://compat-worker.example/path/',
-    })).toBe('https://compat-worker.example/path');
-    expect(getConfiguredSessionWorkerUrlFromConfig({
-      sessionWorkerUrl: 'https://session-worker.example',
-    })).toBe('https://session-worker.example');
+    expect(
+      getConfiguredSessionWorkerUrlFromConfig({
+        workerUrl: 'https://compat-worker.example/path/',
+      }),
+    ).toBe('https://compat-worker.example/path');
+    expect(
+      getConfiguredSessionWorkerUrlFromConfig({
+        sessionWorkerUrl: 'https://session-worker.example',
+      }),
+    ).toBe('https://session-worker.example');
   });
 
   it('uses the cached worker-config replica when the session config mirror is stale', () => {
@@ -135,16 +161,18 @@ describe('sessionWorkerAvailability', () => {
     });
     nowSpy.mockRestore();
 
-    expect(hasUsableSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      hasUsableSessionWorkerConfig({
         slug: 'edge',
-        corsWorkerUrl: '',
-        __registry: {
-          updatedAt: 1699999999,
+        sessionConfig: {
+          slug: 'edge',
+          corsWorkerUrl: '',
+          __registry: {
+            updatedAt: 1699999999,
+          },
         },
-      },
-    })).toBe(true);
+      }),
+    ).toBe(true);
   });
 
   it('returns the cached worker-config URL when the session config mirror is stale', () => {
@@ -157,17 +185,19 @@ describe('sessionWorkerAvailability', () => {
     });
     nowSpy.mockRestore();
 
-    expect(getUsableSessionWorkerUrl({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      getUsableSessionWorkerUrl({
         slug: 'edge',
-        corsWorkerUrl: '',
-        __registry: {
-          updatedAt: 1699999999,
+        sessionConfig: {
+          slug: 'edge',
+          corsWorkerUrl: '',
+          __registry: {
+            updatedAt: 1699999999,
+          },
         },
-      },
-      allowSharedFallback: true,
-    })).toBe('https://worker-kv-cache.example');
+        allowSharedFallback: true,
+      }),
+    ).toBe('https://worker-kv-cache.example');
   });
 
   it('prefers the registry mirror when it is newer than the cached worker-config replica', () => {
@@ -180,17 +210,19 @@ describe('sessionWorkerAvailability', () => {
     });
     nowSpy.mockRestore();
 
-    expect(getUsableSessionWorkerUrl({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      getUsableSessionWorkerUrl({
         slug: 'edge',
-        corsWorkerUrl: 'https://registry-mirror.example',
-        __registry: {
-          updatedAt: 1700000001,
+        sessionConfig: {
+          slug: 'edge',
+          corsWorkerUrl: 'https://registry-mirror.example',
+          __registry: {
+            updatedAt: 1700000001,
+          },
         },
-      },
-      allowSharedFallback: true,
-    })).toBe('https://registry-mirror.example');
+        allowSharedFallback: true,
+      }),
+    ).toBe('https://registry-mirror.example');
   });
 
   it('still prefers the cached worker-config replica over the shared fallback for the default session', () => {
@@ -201,20 +233,24 @@ describe('sessionWorkerAvailability', () => {
       },
     });
 
-    expect(getUsableSessionWorkerUrl({
-      slug: '',
-      sessionConfig: demoSessions.general,
-      allowSharedFallback: true,
-    })).toBe('https://worker-kv-cache.example');
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: '',
+        sessionConfig: demoSessions.general,
+        allowSharedFallback: true,
+      }),
+    ).toBe('https://worker-kv-cache.example');
   });
 
   it('fails closed for non-general sessions with no usable worker config', () => {
-    expect(hasUsableSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      hasUsableSessionWorkerConfig({
         slug: 'edge',
-        corsWorkerUrl: '',
-      },
-    })).toBe(false);
+        sessionConfig: {
+          slug: 'edge',
+          corsWorkerUrl: '',
+        },
+      }),
+    ).toBe(false);
   });
 });

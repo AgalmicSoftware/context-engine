@@ -34,11 +34,7 @@ const CollapsibleFieldGroup = ({
         <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
       </button>
     </div>
-    {!isCollapsed && (
-      <div className={styles.objectBody}>
-        {children}
-      </div>
-    )}
+    {!isCollapsed && <div className={styles.objectBody}>{children}</div>}
   </div>
 );
 

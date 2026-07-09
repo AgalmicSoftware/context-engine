@@ -28,7 +28,11 @@ const baseProps = {
     shouldRenderQuestionTable: true,
     showEmptyState: false,
   },
-  renderQuestionTable: jest.fn(() => <table><tbody /></table>),
+  renderQuestionTable: jest.fn(() => (
+    <table>
+      <tbody />
+    </table>
+  )),
   styleMap: { questionListCard: 'questionListCard' },
 };
 
@@ -69,11 +73,7 @@ describe('SurveyResultsQuestionListPanel', () => {
 
   it('does not render outside survey aggregate or questions modes', () => {
     const { container } = render(
-      <SurveyResultsQuestionListPanel
-        {...baseProps}
-        surveyViewMode="individuals"
-        viewMode="survey"
-      />
+      <SurveyResultsQuestionListPanel {...baseProps} surveyViewMode="individuals" viewMode="survey" />,
     );
 
     expect(container).toBeEmptyDOMElement();

@@ -1,7 +1,4 @@
-import {
-  buildRenderedIdsSignature,
-  normalizeQuestionIdKey,
-} from './surveyToolSignatures.js';
+import { buildRenderedIdsSignature, normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import { shouldForceOverwriteDraftValues } from './surveyToolDraftState.js';
 import {
   buildEmptyResponseSlice,
@@ -64,28 +61,22 @@ type BuildCacheHydrationSliceArgs = {
   parseValue?: ((value: unknown) => unknown) | null;
 };
 
-const hasOwn = (value: UnknownRecord, key: string): boolean => (
-  Object.prototype.hasOwnProperty.call(value, key)
-);
+const hasOwn = (value: UnknownRecord, key: string): boolean => Object.prototype.hasOwnProperty.call(value, key);
 
-const hasHydratableCachedField = (field: unknown): boolean => (
+const hasHydratableCachedField = (field: unknown): boolean =>
   isRecord(field) &&
-  (
-    hasOwn(field, 'value') ||
+  (hasOwn(field, 'value') ||
     hasOwn(field, 'encrypted') ||
     hasOwn(field, 'encryptedPortion') ||
     hasOwn(field, 'hash') ||
     hasOwn(field, 'encryptionAudience') ||
-    hasOwn(field, 'audienceMode')
-  )
-);
+    hasOwn(field, 'audienceMode'));
 
-const hasHydratableCachedResponse = (response: ParsedCachedResponse): boolean => (
+const hasHydratableCachedResponse = (response: ParsedCachedResponse): boolean =>
   hasHydratableCachedField(response.answer) ||
   hasHydratableCachedField(response.additional) ||
   response.importance !== undefined ||
-  response.conviction !== undefined
-);
+  response.conviction !== undefined;
 
 type BuildPrefilledSurveyStateArgs = {
   surveyIndex?: unknown;
@@ -321,7 +312,8 @@ type PriorResponseFetchRequest = {
 type ExecutePriorResponseFetchPlanArgs = {
   requestsToFetch?: PriorResponseFetchRequest[] | null;
   responderLower?: string;
-  refreshQuestionResponses?: ((idsToFetch: string[], opts: { slug: string; responder: string }) => Promise<unknown>) | null;
+  refreshQuestionResponses?:
+    ((idsToFetch: string[], opts: { slug: string; responder: string }) => Promise<unknown>) | null;
   readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
 };
 
@@ -339,10 +331,12 @@ type RunPriorResponseBackfillAttemptArgs = {
   responderLower?: string;
   slug?: unknown;
   attemptedSet?: Set<string> | null;
-  loadMissingInfo?: ((args: { responder: string; slug?: unknown }) => Promise<MissingRenderedResponseInfo | null | undefined>) | null;
+  loadMissingInfo?:
+    ((args: { responder: string; slug?: unknown }) => Promise<MissingRenderedResponseInfo | null | undefined>) | null;
   setHydratingState?: ((active: boolean) => void) | null;
   isMounted?: boolean;
-  refreshQuestionResponses?: ((idsToFetch: string[], opts: { slug: string; responder: string }) => Promise<unknown>) | null;
+  refreshQuestionResponses?:
+    ((idsToFetch: string[], opts: { slug: string; responder: string }) => Promise<unknown>) | null;
   readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
   onFailure?: ((error: unknown) => void) | null;
   resetLocalCacheMemo?: (() => void) | null;
@@ -369,7 +363,8 @@ type ApplyLocalCacheRehydrateNoChangeEffectsArgs = {
 
 type ApplyLocalCacheRehydrateSuccessEffectsArgs = {
   updates?: UnknownRecord | ((prev: UnknownRecord) => UnknownRecord) | null;
-  applyStateUpdates?: ((updates: UnknownRecord | ((prev: UnknownRecord) => UnknownRecord), callback?: () => void) => void) | null;
+  applyStateUpdates?:
+    ((updates: UnknownRecord | ((prev: UnknownRecord) => UnknownRecord), callback?: () => void) => void) | null;
   afterStateApplied?: (() => void) | null;
 };
 
@@ -385,8 +380,7 @@ type ApplyLocalCacheRehydrateAppliedEffectsArgs = ApplyPrefillStateEffectsArgs &
   callback?: (() => void) | null;
 };
 
-type ApplyLocalCacheRehydrateUpdatePlanArgs =
-  ApplyLocalCacheRehydrateSuccessEffectsArgs &
+type ApplyLocalCacheRehydrateUpdatePlanArgs = ApplyLocalCacheRehydrateSuccessEffectsArgs &
   ApplyLocalCacheRehydrateAppliedEffectsArgs & {
     changed?: boolean;
     baselineChanged?: boolean;
@@ -473,8 +467,10 @@ type ResolveMissingRenderedResponseLookupArgs = {
   resolveResponseHydrationContext?: ((rawSlug: unknown) => UnknownRecord | null | undefined) | null;
   normalizeSessionSlugValue?: ((value: unknown) => string) | null;
   getExtraScopeSlugs?: ((slug: string) => unknown[] | null | undefined) | null;
-  resolveQuestionSlugMapForIds?: ((questionIds: string[], opts?: UnknownRecord) => Map<string, unknown> | null | undefined) | null;
-  resolveScopeNetId?: ((resolvedSlug: string, entryNetId: string, fallbackNetId: string) => string | null | undefined) | null;
+  resolveQuestionSlugMapForIds?:
+    ((questionIds: string[], opts?: UnknownRecord) => Map<string, unknown> | null | undefined) | null;
+  resolveScopeNetId?:
+    ((resolvedSlug: string, entryNetId: string, fallbackNetId: string) => string | null | undefined) | null;
   readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
   ensureQuestionsNet?: ((cache: unknown, netId: string) => unknown) | null;
 };
@@ -528,10 +524,7 @@ type BuildQuestionSlugMapForIdsArgs = {
   questionIds?: Iterable<unknown> | unknown[];
   poolQuestions?: unknown[] | null;
   normalizeSlug?: ((value: unknown) => string) | null;
-  resolveQuestionSlug?: ((args: {
-    questionId: string;
-    question?: unknown;
-  }) => unknown) | null;
+  resolveQuestionSlug?: ((args: { questionId: string; question?: unknown }) => unknown) | null;
 };
 
 type ResolveQuestionSlugMapLookupArgs = {
@@ -600,7 +593,14 @@ type DraftAwareCacheHydrationStateArgs = {
   currentAdditional?: unknown;
   baselineAnswer?: unknown;
   baselineAdditional?: unknown;
-  areEnvelopesEquivalent?: ((incomingEnvelope: unknown, currentEnvelope: unknown, incomingEncrypted?: unknown, currentEncrypted?: unknown) => boolean) | null;
+  areEnvelopesEquivalent?:
+    | ((
+        incomingEnvelope: unknown,
+        currentEnvelope: unknown,
+        incomingEncrypted?: unknown,
+        currentEncrypted?: unknown,
+      ) => boolean)
+    | null;
 };
 
 type LocalCacheHydrationApplyArgs = {
@@ -622,14 +622,16 @@ type BuildLocalCacheRehydrationStateArgs = {
   cacheSlice?: ResponseSlice | null;
   draftAnswersByQuestionId?: Record<string, unknown> | null;
   cloneBaseline?: ((baseline: ResponseSlice | null | undefined) => ResponseSlice) | null;
-  buildDraftAwareCacheHydrationState?: ((args: DraftAwareCacheHydrationStateArgs) => {
-    effectiveAnswerState?: unknown;
-    effectiveAdditionalState?: unknown;
-    canReplaceMaskedAnswerWithDraftEmpty?: boolean;
-    canReplaceMaskedAdditionalWithDraftEmpty?: boolean;
-    canReplaceMaskedBaselineAnswerWithDraftEmpty?: boolean;
-    canReplaceMaskedBaselineAdditionalWithDraftEmpty?: boolean;
-  }) | null;
+  buildDraftAwareCacheHydrationState?:
+    | ((args: DraftAwareCacheHydrationStateArgs) => {
+        effectiveAnswerState?: unknown;
+        effectiveAdditionalState?: unknown;
+        canReplaceMaskedAnswerWithDraftEmpty?: boolean;
+        canReplaceMaskedAdditionalWithDraftEmpty?: boolean;
+        canReplaceMaskedBaselineAnswerWithDraftEmpty?: boolean;
+        canReplaceMaskedBaselineAdditionalWithDraftEmpty?: boolean;
+      })
+    | null;
   applyLocalCacheHydrationEntryToSlice?: ((args: LocalCacheHydrationApplyArgs) => boolean) | null;
   debugLabel?: string;
 };
@@ -665,7 +667,14 @@ const resolveDraftAwareCachedField = ({
   draftValue?: unknown;
   draftEncrypted?: unknown;
   draftEnvelope?: unknown;
-  areEnvelopesEquivalent?: ((incomingEnvelope: unknown, currentEnvelope: unknown, incomingEncrypted?: unknown, currentEncrypted?: unknown) => boolean) | null;
+  areEnvelopesEquivalent?:
+    | ((
+        incomingEnvelope: unknown,
+        currentEnvelope: unknown,
+        incomingEncrypted?: unknown,
+        currentEncrypted?: unknown,
+      ) => boolean)
+    | null;
 }) => {
   const nextCachedField = isRecord(cachedField) ? cachedField : null;
   if (
@@ -692,7 +701,14 @@ const canReplaceMaskedFieldWithDraftEmpty = ({
 }: {
   currentField?: unknown;
   effectiveCachedField?: unknown;
-  areEnvelopesEquivalent?: ((incomingEnvelope: unknown, currentEnvelope: unknown, incomingEncrypted?: unknown, currentEncrypted?: unknown) => boolean) | null;
+  areEnvelopesEquivalent?:
+    | ((
+        incomingEnvelope: unknown,
+        currentEnvelope: unknown,
+        incomingEncrypted?: unknown,
+        currentEncrypted?: unknown,
+      ) => boolean)
+    | null;
 }) => {
   const nextCurrentField = isRecord(currentField) ? currentField : null;
   const nextEffectiveField = isRecord(effectiveCachedField) ? effectiveCachedField : null;
@@ -726,9 +742,10 @@ export const buildDraftHydrationState = ({
     conviction: { ...((normalizedPrevSlice.conviction as Record<string, unknown>) || {}) },
     additionalComments: { ...((normalizedPrevSlice.additionalComments as Record<string, unknown>) || {}) },
   };
-  const nextBaseline: ResponseSlice = typeof cloneBaseline === 'function'
-    ? cloneBaseline(prevBaseline && typeof prevBaseline === 'object' ? prevBaseline : buildEmptyResponseSlice())
-    : buildEmptyResponseSlice();
+  const nextBaseline: ResponseSlice =
+    typeof cloneBaseline === 'function'
+      ? cloneBaseline(prevBaseline && typeof prevBaseline === 'object' ? prevBaseline : buildEmptyResponseSlice())
+      : buildEmptyResponseSlice();
 
   let changed = false;
   let baselineChanged = false;
@@ -739,23 +756,29 @@ export const buildDraftHydrationState = ({
     const questionId = normalizeQuestionIdKey(rawQuestionId);
     if (!questionId || typeof applyDraftEntryToSlice !== 'function') return;
 
-    const answerEntry = (answers && typeof answers === 'object') ? answers[questionId] : null;
-    if (answerEntry && applyDraftEntryToSlice({
-      targetSlice: nextSlice,
-      questionId,
-      draftEntry: answerEntry,
-      allowOverwrite,
-    })) {
+    const answerEntry = answers && typeof answers === 'object' ? answers[questionId] : null;
+    if (
+      answerEntry &&
+      applyDraftEntryToSlice({
+        targetSlice: nextSlice,
+        questionId,
+        draftEntry: answerEntry,
+        allowOverwrite,
+      })
+    ) {
       changed = true;
     }
 
-    const baselineEntry = (baseline && typeof baseline === 'object') ? baseline[questionId] : null;
-    if (baselineEntry && applyDraftEntryToSlice({
-      targetSlice: nextBaseline,
-      questionId,
-      draftEntry: baselineEntry,
-      allowOverwrite,
-    })) {
+    const baselineEntry = baseline && typeof baseline === 'object' ? baseline[questionId] : null;
+    if (
+      baselineEntry &&
+      applyDraftEntryToSlice({
+        targetSlice: nextBaseline,
+        questionId,
+        draftEntry: baselineEntry,
+        allowOverwrite,
+      })
+    ) {
       baselineChanged = true;
     }
   });
@@ -778,9 +801,10 @@ export const buildCacheHydrationSlice = ({
 }: BuildCacheHydrationSliceArgs = {}) => {
   const slice = buildEmptyResponseSlice();
   const normalizedAccount = String(account || '').toLowerCase();
-  const responses: CachedQuestionResponses = mergedQuestionResponses && typeof mergedQuestionResponses === 'object'
-    ? mergedQuestionResponses as CachedQuestionResponses
-    : {};
+  const responses: CachedQuestionResponses =
+    mergedQuestionResponses && typeof mergedQuestionResponses === 'object'
+      ? (mergedQuestionResponses as CachedQuestionResponses)
+      : {};
   let changed = false;
 
   Array.from(renderedQuestionIds || []).forEach((rawQuestionId) => {
@@ -793,19 +817,19 @@ export const buildCacheHydrationSlice = ({
     const rawResponse = normalizedAccount ? questionMap[normalizedAccount] : null;
     if (!rawResponse) return;
 
-    const parsedResponse = typeof parseResponse === 'function'
-      ? parseResponse(rawResponse)
-      : rawResponse;
+    const parsedResponse = typeof parseResponse === 'function' ? parseResponse(rawResponse) : rawResponse;
     if (!isRecord(parsedResponse)) return;
     const hydratedResponse = parsedResponse as ParsedCachedResponse;
     if (!hasHydratableCachedResponse(hydratedResponse)) return;
 
-    if (applyCachedResponseEntryToSlice({
-      targetSlice: slice,
-      questionId,
-      response: hydratedResponse,
-      parseValue,
-    })) {
+    if (
+      applyCachedResponseEntryToSlice({
+        targetSlice: slice,
+        questionId,
+        response: hydratedResponse,
+        parseValue,
+      })
+    ) {
       changed = true;
     }
   });
@@ -824,9 +848,7 @@ export const buildHydratedResponseSlice = ({
   if (!userAnswers) return slice;
 
   const normalizedAnswers = isRecord(userAnswers) ? userAnswers : null;
-  const responses = Array.isArray(normalizedAnswers?.responses)
-    ? normalizedAnswers.responses
-    : [userAnswers];
+  const responses = Array.isArray(normalizedAnswers?.responses) ? normalizedAnswers.responses : [userAnswers];
 
   if (typeof applyResponseHydrationListToSlice === 'function') {
     const hydrationArgs: ResponseHydrationApplyArgs = {
@@ -853,20 +875,21 @@ export const buildLocalCacheHydrationMemoKey = ({
   questionsCacheNonce = 0,
   questionResponsesNonce = 0,
   normalizeSessionSlugValue = null,
-}: BuildLocalCacheHydrationMemoKeyArgs = {}) => [
-  Array.isArray(scopeSlugs)
-    ? scopeSlugs
-      .map((value) => (typeof normalizeSessionSlugValue === 'function'
-        ? normalizeSessionSlugValue(value)
-        : String(value || '')))
-      .join(',')
-    : '',
-  String(networkIdStr || ''),
-  String(account || ''),
-  String(renderedSignature || ''),
-  Number(questionsCacheNonce || 0),
-  Number(questionResponsesNonce || 0),
-].join('|');
+}: BuildLocalCacheHydrationMemoKeyArgs = {}) =>
+  [
+    Array.isArray(scopeSlugs)
+      ? scopeSlugs
+          .map((value) =>
+            typeof normalizeSessionSlugValue === 'function' ? normalizeSessionSlugValue(value) : String(value || ''),
+          )
+          .join(',')
+      : '',
+    String(networkIdStr || ''),
+    String(account || ''),
+    String(renderedSignature || ''),
+    Number(questionsCacheNonce || 0),
+    Number(questionResponsesNonce || 0),
+  ].join('|');
 
 export const prepareLocalCacheSliceBuild = ({
   scopeSlugs = null,
@@ -879,7 +902,9 @@ export const prepareLocalCacheSliceBuild = ({
   normalizeSessionSlugValue = null,
 }: PrepareLocalCacheSliceBuildArgs = {}) => {
   const nextRenderedIds = Array.from(renderedIds || []);
-  const normalizedAccount = String(account || '').trim().toLowerCase();
+  const normalizedAccount = String(account || '')
+    .trim()
+    .toLowerCase();
   const memoKey = buildLocalCacheHydrationMemoKey({
     scopeSlugs: Array.isArray(scopeSlugs) ? scopeSlugs : [],
     networkIdStr,
@@ -914,17 +939,19 @@ export const resolveLocalCacheSliceLookup = ({
   normalizeSessionSlugValue = null,
   getExtraScopeSlugs = null,
 }: ResolveLocalCacheSliceLookupArgs = {}) => {
-  const hydrationContext = typeof resolveResponseHydrationContext === 'function'
-    ? (resolveResponseHydrationContext(rawSlug) || {})
-    : {};
+  const hydrationContext =
+    typeof resolveResponseHydrationContext === 'function' ? resolveResponseHydrationContext(rawSlug) || {} : {};
   const sessionSlug = (hydrationContext as UnknownRecord).sessionSlug;
-  const slug = typeof normalizeSessionSlugValue === 'function'
-    ? normalizeSessionSlugValue(sessionSlug)
-    : String(sessionSlug || '');
-  const extraSlugs = String(minifiedMode || '').trim().toLowerCase() === 'pile'
-    && typeof getExtraScopeSlugs === 'function'
-    ? (getExtraScopeSlugs(slug) || [])
-    : [];
+  const slug =
+    typeof normalizeSessionSlugValue === 'function'
+      ? normalizeSessionSlugValue(sessionSlug)
+      : String(sessionSlug || '');
+  const extraSlugs =
+    String(minifiedMode || '')
+      .trim()
+      .toLowerCase() === 'pile' && typeof getExtraScopeSlugs === 'function'
+      ? getExtraScopeSlugs(slug) || []
+      : [];
   const scopeSlugs = [slug, ...(Array.isArray(extraSlugs) ? extraSlugs : [])];
   const networkIdStr = (hydrationContext as UnknownRecord).networkIdStr;
 
@@ -952,7 +979,12 @@ export const buildMergedHydrationQuestionResponses = ({
 }: BuildMergedHydrationQuestionResponsesArgs = {}) => {
   const mergedQuestionResponses: CachedQuestionResponses = {};
   const networkId = String(networkIdStr || '');
-  if (!networkId || !Array.isArray(scopeSlugs) || typeof readQuestionsCache !== 'function' || typeof mergeQuestionResponses !== 'function') {
+  if (
+    !networkId ||
+    !Array.isArray(scopeSlugs) ||
+    typeof readQuestionsCache !== 'function' ||
+    typeof mergeQuestionResponses !== 'function'
+  ) {
     return mergedQuestionResponses;
   }
 
@@ -962,9 +994,10 @@ export const buildMergedHydrationQuestionResponses = ({
     let questionsCache = readQuestionsCache(scopeSlug);
     if (!questionsCache || typeof questionsCache !== 'object') questionsCache = {};
     const networkCache = isRecord(questionsCache) ? questionsCache[networkId] : null;
-    const questionResponses = isRecord(networkCache) && isRecord(networkCache.questionResponses)
-      ? networkCache.questionResponses as CachedQuestionResponses
-      : {};
+    const questionResponses =
+      isRecord(networkCache) && isRecord(networkCache.questionResponses)
+        ? (networkCache.questionResponses as CachedQuestionResponses)
+        : {};
     mergeQuestionResponses(mergedQuestionResponses, questionResponses);
   });
 
@@ -982,7 +1015,9 @@ export const loadLocalCacheHydrationSlice = ({
   applyCachedResponseEntryToSlice = null,
 }: LoadLocalCacheHydrationSliceArgs = {}): ResponseSlice | null => {
   const netId = String(networkIdStr || '');
-  const acct = String(account || '').trim().toLowerCase();
+  const acct = String(account || '')
+    .trim()
+    .toLowerCase();
   if (!netId || !acct) return null;
 
   const mergedQuestionResponses = buildMergedHydrationQuestionResponses({
@@ -1008,9 +1043,7 @@ export const buildSurveyResponseStateArray = ({
   nextSlice = null,
 }: BuildSurveyResponseStateArrayArgs = {}) => {
   const normalizedSurveyIndex = Math.max(0, Number(surveyIndex) || 0);
-  const nextSurveysResponseState = Array.isArray(prevSurveysResponseState)
-    ? [...prevSurveysResponseState]
-    : [];
+  const nextSurveysResponseState = Array.isArray(prevSurveysResponseState) ? [...prevSurveysResponseState] : [];
 
   while (nextSurveysResponseState.length <= normalizedSurveyIndex) {
     nextSurveysResponseState.push(buildEmptyResponseSlice());
@@ -1031,21 +1064,30 @@ export const buildMergedSurveyResponseState = ({
   buildEmptyResponseFieldState = null,
 }: BuildMergedSurveyResponseStateArgs = {}) => {
   const normalizedSurveyIndex = Math.max(0, Number(surveyIndex) || 0);
-  const pool = Array.isArray(newQuestionPool) && newQuestionPool.length > 0
-    ? newQuestionPool
-    : (Array.isArray(renderedQuestionIds) ? renderedQuestionIds.map((id) => ({ id })) : []);
+  const pool =
+    Array.isArray(newQuestionPool) && newQuestionPool.length > 0
+      ? newQuestionPool
+      : Array.isArray(renderedQuestionIds)
+        ? renderedQuestionIds.map((id) => ({ id }))
+        : [];
   const nextSurveysResponseState = buildSurveyResponseStateArray({
     prevSurveysResponseState: currentState,
     surveyIndex: normalizedSurveyIndex,
   });
   const prevSlice =
-    nextSurveysResponseState[normalizedSurveyIndex] && typeof nextSurveysResponseState[normalizedSurveyIndex] === 'object'
-      ? nextSurveysResponseState[normalizedSurveyIndex] as ResponseSlice
+    nextSurveysResponseState[normalizedSurveyIndex] &&
+    typeof nextSurveysResponseState[normalizedSurveyIndex] === 'object'
+      ? (nextSurveysResponseState[normalizedSurveyIndex] as ResponseSlice)
       : buildEmptyResponseSlice();
 
   const allowedIds = new Set(
-    pool.map((question) => (question && typeof question === 'object' && 'id' in question ? String((question as UnknownRecord).id || '') : ''))
-      .filter(Boolean)
+    pool
+      .map((question) =>
+        question && typeof question === 'object' && 'id' in question
+          ? String((question as UnknownRecord).id || '')
+          : '',
+      )
+      .filter(Boolean),
   );
 
   const mergedAnswers: Record<string, unknown> = {};
@@ -1061,21 +1103,17 @@ export const buildMergedSurveyResponseState = ({
     }
 
     if (prevSlice.additionalComments && prevSlice.additionalComments[questionId]) {
-      mergedAdditional[questionId] = { ...((prevSlice.additionalComments[questionId] as Record<string, unknown>) || {}) };
+      mergedAdditional[questionId] = {
+        ...((prevSlice.additionalComments[questionId] as Record<string, unknown>) || {}),
+      };
     } else if (typeof buildEmptyResponseFieldState === 'function') {
       mergedAdditional[questionId] = buildEmptyResponseFieldState(questionId, 'additional');
     }
 
-    if (
-      prevSlice.importance &&
-      Object.prototype.hasOwnProperty.call(prevSlice.importance, questionId)
-    ) {
+    if (prevSlice.importance && Object.prototype.hasOwnProperty.call(prevSlice.importance, questionId)) {
       mergedImportance[questionId] = prevSlice.importance[questionId];
     }
-    if (
-      prevSlice.conviction &&
-      Object.prototype.hasOwnProperty.call(prevSlice.conviction, questionId)
-    ) {
+    if (prevSlice.conviction && Object.prototype.hasOwnProperty.call(prevSlice.conviction, questionId)) {
       mergedConviction[questionId] = prevSlice.conviction[questionId];
     }
   });
@@ -1099,9 +1137,12 @@ export const buildInitializedSurveyResponseState = ({
   prevSurveysResponseState = null,
   buildEmptyResponseFieldState = null,
 }: BuildInitializedSurveyResponseStateArgs = {}) => {
-  const preferredIds = Array.isArray(renderedQuestionIds) && renderedQuestionIds.length > 0
-    ? renderedQuestionIds
-    : (Array.isArray(questionPoolIds) ? questionPoolIds : []);
+  const preferredIds =
+    Array.isArray(renderedQuestionIds) && renderedQuestionIds.length > 0
+      ? renderedQuestionIds
+      : Array.isArray(questionPoolIds)
+        ? questionPoolIds
+        : [];
 
   const initialAnswers: Record<string, unknown> = {};
   const initialAdditionalThoughts: Record<string, unknown> = {};
@@ -1127,9 +1168,7 @@ export const buildInitializedSurveyResponseState = ({
   }
 
   const normalizedSurveyIndex = Math.max(0, Number(surveyIndex) || 0);
-  const nextSurveysResponseState = Array.isArray(prevSurveysResponseState)
-    ? [...prevSurveysResponseState]
-    : [];
+  const nextSurveysResponseState = Array.isArray(prevSurveysResponseState) ? [...prevSurveysResponseState] : [];
   while (nextSurveysResponseState.length <= normalizedSurveyIndex) {
     nextSurveysResponseState.push(null);
   }
@@ -1137,10 +1176,7 @@ export const buildInitializedSurveyResponseState = ({
   return nextSurveysResponseState;
 };
 
-const getQuestionFieldValue = (
-  fieldMap: Record<string, unknown> | null | undefined,
-  questionId: string,
-) => {
+const getQuestionFieldValue = (fieldMap: Record<string, unknown> | null | undefined, questionId: string) => {
   if (!fieldMap || typeof fieldMap !== 'object') return undefined;
   const field = fieldMap[questionId];
   if (!field || typeof field !== 'object') return undefined;
@@ -1157,9 +1193,7 @@ export const shouldHandleStartFresh = ({
 }: ShouldHandleStartFreshArgs = {}) => {
   if (viewAddress || userHasResponse || editBaseline || isDirty) return false;
 
-  const slice = currentSlice && typeof currentSlice === 'object'
-    ? currentSlice
-    : buildEmptyResponseSlice();
+  const slice = currentSlice && typeof currentSlice === 'object' ? currentSlice : buildEmptyResponseSlice();
 
   const hasAny = Array.from(renderedQuestionIds || []).some((rawQuestionId) => {
     const questionId = String(rawQuestionId || '');
@@ -1211,13 +1245,10 @@ export const buildResetFormStatePatch = ({
   nextSubmittedSinceLastEdit = false,
   cloneValue = null,
 }: BuildResetFormStatePatchArgs = {}) => {
-  const surveysResponseState = Array.isArray(initialSurveysResponseState)
-    ? initialSurveysResponseState
-    : [];
+  const surveysResponseState = Array.isArray(initialSurveysResponseState) ? initialSurveysResponseState : [];
   const normalizedBaselineIndex = Math.max(0, Number(baselineIndex) || 0);
   const baselineSource =
-    surveysResponseState[normalizedBaselineIndex] &&
-    typeof surveysResponseState[normalizedBaselineIndex] === 'object'
+    surveysResponseState[normalizedBaselineIndex] && typeof surveysResponseState[normalizedBaselineIndex] === 'object'
       ? surveysResponseState[normalizedBaselineIndex]
       : buildEmptyResponseSlice();
 
@@ -1257,9 +1288,10 @@ export const prepareLocalCacheRehydrateRun = ({
 
   const normalizedSurveyIndex = Math.max(0, Number(surveyIndex) || 0);
   const normalizedRenderedIds = Array.from(renderedIds || []);
-  const hydrationSig = typeof buildHydrationSignature === 'function'
-    ? String(buildHydrationSignature(normalizedSurveyIndex, normalizedRenderedIds) || '')
-    : '';
+  const hydrationSig =
+    typeof buildHydrationSignature === 'function'
+      ? String(buildHydrationSignature(normalizedSurveyIndex, normalizedRenderedIds) || '')
+      : '';
 
   if (hydrationSig && String(lastHydrationSig || '') === hydrationSig) {
     return {
@@ -1273,10 +1305,10 @@ export const prepareLocalCacheRehydrateRun = ({
   const surveysResponseState = Array.isArray(currentState.surveysResponseState)
     ? currentState.surveysResponseState
     : [];
-  const baseSlice =
-    (surveysResponseState[normalizedSurveyIndex] && typeof surveysResponseState[normalizedSurveyIndex] === 'object'
-      ? surveysResponseState[normalizedSurveyIndex]
-      : null) || { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
+  const baseSlice = (surveysResponseState[normalizedSurveyIndex] &&
+  typeof surveysResponseState[normalizedSurveyIndex] === 'object'
+    ? surveysResponseState[normalizedSurveyIndex]
+    : null) || { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
 
   return {
     shouldSkip: false,
@@ -1359,12 +1391,9 @@ export const buildExitEditingStatePatch = ({
   cloneValue = null,
   nextSubmittedSinceLastEdit = false,
 }: BuildExitEditingStatePatchArgs = {}) => {
-  const normalizedBaselineSlice = baselineSlice && typeof baselineSlice === 'object'
-    ? baselineSlice
-    : buildEmptyResponseSlice();
-  const clone = typeof cloneValue === 'function'
-    ? cloneValue
-    : ((value: unknown) => value);
+  const normalizedBaselineSlice =
+    baselineSlice && typeof baselineSlice === 'object' ? baselineSlice : buildEmptyResponseSlice();
+  const clone = typeof cloneValue === 'function' ? cloneValue : (value: unknown) => value;
 
   const nextSlice: ResponseSlice = {
     answers: clone(normalizedBaselineSlice.answers || {}) as Record<string, unknown>,
@@ -1408,12 +1437,7 @@ export const buildLocalCacheRehydrationUpdatePlan = ({
   surveyIndex = 0,
   ...rehydrationArgs
 }: BuildLocalCacheRehydrationUpdatePlanArgs = {}) => {
-  const {
-    nextSlice,
-    nextBaseline,
-    changed,
-    baselineChanged,
-  } = buildLocalCacheRehydrationState(rehydrationArgs);
+  const { nextSlice, nextBaseline, changed, baselineChanged } = buildLocalCacheRehydrationState(rehydrationArgs);
 
   const updates: UnknownRecord = {};
   if (changed) {
@@ -1441,12 +1465,7 @@ export const buildDraftHydrationUpdatePlan = ({
   surveyIndex = 0,
   ...draftArgs
 }: BuildDraftHydrationUpdatePlanArgs = {}) => {
-  const {
-    nextSlice,
-    nextBaseline,
-    changed,
-    baselineChanged,
-  } = buildDraftHydrationState(draftArgs);
+  const { nextSlice, nextBaseline, changed, baselineChanged } = buildDraftHydrationState(draftArgs);
 
   const updates: UnknownRecord = {};
   if (changed) {
@@ -1474,14 +1493,14 @@ export const buildDraftHydrationRenderedQuestionIds = ({
   pileQuestions = null,
   forceOverwrite = false,
 }: BuildDraftHydrationRenderedQuestionIdsArgs = {}): string[] => {
-  const rendered = new Set(buildNormalizedRenderedQuestionIds({
-    renderedIds: hydrationQuestionIds,
-  }));
+  const rendered = new Set(
+    buildNormalizedRenderedQuestionIds({
+      renderedIds: hydrationQuestionIds,
+    }),
+  );
   if (forceOverwrite) {
     (Array.isArray(pileQuestions) ? pileQuestions : []).forEach((question) => {
-      const questionId = normalizeQuestionIdKey(
-        isRecord(question) ? question.id : null
-      );
+      const questionId = normalizeQuestionIdKey(isRecord(question) ? question.id : null);
       if (questionId) rendered.add(questionId);
     });
   }
@@ -1496,11 +1515,12 @@ export const buildDraftHydrationOverwriteDecision = ({
   submittedSinceLastEdit = false,
   submissionComplete = false,
 }: BuildDraftHydrationOverwriteDecisionArgs = {}) => {
-  const pendingTotal = Number(
-    isRecord(pendingStats) && Object.prototype.hasOwnProperty.call(pendingStats, 'total')
-      ? pendingStats.total
-      : modifiedCount
-  ) || 0;
+  const pendingTotal =
+    Number(
+      isRecord(pendingStats) && Object.prototype.hasOwnProperty.call(pendingStats, 'total')
+        ? pendingStats.total
+        : modifiedCount,
+    ) || 0;
   const submittedStateActive = !!(submittedSinceLastEdit || submissionComplete);
 
   return {
@@ -1556,12 +1576,11 @@ export const shouldSkipDraftHydrationRun = ({
   suppressPrefill = false,
   submissionError = '',
   draft = null,
-}: ShouldSkipDraftHydrationRunArgs = {}) => (
+}: ShouldSkipDraftHydrationRunArgs = {}) =>
   !!suppressPrefill ||
   !!submissionError ||
   !draft ||
-  (!(draft as DraftPayload).answers && !(draft as DraftPayload).baseline)
-);
+  (!(draft as DraftPayload).answers && !(draft as DraftPayload).baseline);
 
 export const buildDraftHydrationSeedContext = ({
   isStandalone = false,
@@ -1569,13 +1588,12 @@ export const buildDraftHydrationSeedContext = ({
   surveyIndex = 0,
   surveysResponseState = null,
 }: BuildDraftHydrationSeedContextArgs = {}) => {
-  const normalizedSurveyIndex = !!isStandalone || !!singleQuestionMode
-    ? 0
-    : (Number(surveyIndex) || 0);
+  const normalizedSurveyIndex = !!isStandalone || !!singleQuestionMode ? 0 : Number(surveyIndex) || 0;
   const stateArray = Array.isArray(surveysResponseState) ? surveysResponseState : [];
-  const prevSlice = stateArray[normalizedSurveyIndex] && typeof stateArray[normalizedSurveyIndex] === 'object'
-    ? stateArray[normalizedSurveyIndex] as ResponseSlice
-    : buildEmptyResponseSlice();
+  const prevSlice =
+    stateArray[normalizedSurveyIndex] && typeof stateArray[normalizedSurveyIndex] === 'object'
+      ? (stateArray[normalizedSurveyIndex] as ResponseSlice)
+      : buildEmptyResponseSlice();
 
   return {
     surveyIndex: normalizedSurveyIndex,
@@ -1583,14 +1601,8 @@ export const buildDraftHydrationSeedContext = ({
   };
 };
 
-export const buildPrefilledSurveyUpdatePlan = ({
-  ...args
-}: BuildPrefilledSurveyUpdatePlanArgs = {}) => {
-  const {
-    nextSurveysResponseState,
-    nextBaseline,
-    shouldWriteBaseline,
-  } = buildPrefilledSurveyState(args);
+export const buildPrefilledSurveyUpdatePlan = ({ ...args }: BuildPrefilledSurveyUpdatePlanArgs = {}) => {
+  const { nextSurveysResponseState, nextBaseline, shouldWriteBaseline } = buildPrefilledSurveyState(args);
 
   return {
     nextSurveysResponseState,
@@ -1606,11 +1618,7 @@ export const buildPrefilledSurveyUpdatePlan = ({
 export const buildPrefilledSingleQuestionUpdatePlan = ({
   ...args
 }: BuildPrefilledSingleQuestionUpdatePlanArgs = {}) => {
-  const {
-    nextSurveysResponseState,
-    nextBaseline,
-    shouldWriteBaseline,
-  } = buildPrefilledSingleQuestionState(args);
+  const { nextSurveysResponseState, nextBaseline, shouldWriteBaseline } = buildPrefilledSingleQuestionState(args);
 
   return {
     nextSurveysResponseState,
@@ -1634,15 +1642,21 @@ export const shouldBackfillPriorResponses = ({
   submissionComplete = false,
   isSubmitting = false,
 }: ShouldBackfillPriorResponsesArgs = {}): boolean => {
-  const accountLower = String(account || '').trim().toLowerCase();
+  const accountLower = String(account || '')
+    .trim()
+    .toLowerCase();
   const viewingOtherSurveyResponder =
     !!displayAnswerMode &&
     !!viewAddress &&
-    String(viewAddress || '').trim().toLowerCase() !== accountLower;
+    String(viewAddress || '')
+      .trim()
+      .toLowerCase() !== accountLower;
   const viewingOtherQuestionResponder =
     !!singleQuestionMode &&
     !!responderAddress &&
-    String(responderAddress || '').trim().toLowerCase() !== accountLower;
+    String(responderAddress || '')
+      .trim()
+      .toLowerCase() !== accountLower;
 
   return !!(
     loginComplete &&
@@ -1660,15 +1674,20 @@ export const buildPriorResponseFetchPlan = ({
   responderLower = '',
   attemptedKeys = null,
 }: BuildPriorResponseFetchPlanArgs = {}) => {
-  const groupedRequests = Array.isArray(missingInfo?.requests) && missingInfo.requests.length > 0
-    ? missingInfo.requests
-    : [{
-      slug: String(missingInfo?.slug || ''),
-      netId: String(missingInfo?.netId || ''),
-      missingIds: Array.isArray(missingInfo?.missingIds) ? missingInfo.missingIds : [],
-    }];
+  const groupedRequests =
+    Array.isArray(missingInfo?.requests) && missingInfo.requests.length > 0
+      ? missingInfo.requests
+      : [
+          {
+            slug: String(missingInfo?.slug || ''),
+            netId: String(missingInfo?.netId || ''),
+            missingIds: Array.isArray(missingInfo?.missingIds) ? missingInfo.missingIds : [],
+          },
+        ];
 
-  const normalizedResponder = String(responderLower || '').trim().toLowerCase();
+  const normalizedResponder = String(responderLower || '')
+    .trim()
+    .toLowerCase();
   const attempted = attemptedKeys instanceof Set ? attemptedKeys : new Set<string>();
   const requestsToFetch = groupedRequests
     .map((entry) => {
@@ -1686,9 +1705,9 @@ export const buildPriorResponseFetchPlan = ({
 
   return {
     requestsToFetch,
-    attemptedKeysToMark: requestsToFetch.flatMap((entry) => (
-      entry.idsToFetch.map((qid) => `${entry.slug}|${normalizedResponder}|${qid}`)
-    )),
+    attemptedKeysToMark: requestsToFetch.flatMap((entry) =>
+      entry.idsToFetch.map((qid) => `${entry.slug}|${normalizedResponder}|${qid}`),
+    ),
   };
 };
 
@@ -1726,7 +1745,7 @@ export const applyPriorResponseFetchSuccessEffects = ({
   isMounted = false,
   resetLocalCacheMemo = null,
   triggerRehydrate = null,
-} : ApplyPriorResponseFetchSuccessEffectsArgs = {}) => {
+}: ApplyPriorResponseFetchSuccessEffectsArgs = {}) => {
   if (!fetched || !isMounted) return false;
   if (typeof resetLocalCacheMemo === 'function') {
     resetLocalCacheMemo();
@@ -1750,28 +1769,28 @@ export const runPriorResponseBackfillAttempt = async ({
   resetLocalCacheMemo = null,
   triggerRehydrate = null,
 }: RunPriorResponseBackfillAttemptArgs = {}) => {
-  const normalizedResponder = String(responderLower || '').trim().toLowerCase();
+  const normalizedResponder = String(responderLower || '')
+    .trim()
+    .toLowerCase();
   const attemptedKeys: string[] = [];
   let fetched = false;
 
   try {
-    const missingInfo = typeof loadMissingInfo === 'function'
-      ? await loadMissingInfo({ responder: normalizedResponder, slug })
-      : null;
-    const {
-      requestsToFetch,
-      attemptedKeysToMark,
-    } = buildPriorResponseFetchPlan({
+    const missingInfo =
+      typeof loadMissingInfo === 'function' ? await loadMissingInfo({ responder: normalizedResponder, slug }) : null;
+    const { requestsToFetch, attemptedKeysToMark } = buildPriorResponseFetchPlan({
       missingInfo,
       responderLower: normalizedResponder,
       attemptedKeys: attemptedSet,
     });
     if (requestsToFetch.length === 0) return false;
 
-    attemptedKeys.push(...trackPriorResponseAttemptedKeys({
-      attemptedSet,
-      attemptedKeysToMark,
-    }));
+    attemptedKeys.push(
+      ...trackPriorResponseAttemptedKeys({
+        attemptedSet,
+        attemptedKeysToMark,
+      }),
+    );
 
     if (!!isMounted && typeof setHydratingState === 'function') {
       setHydratingState(true);
@@ -1869,14 +1888,16 @@ export const applyPrefillUpdatePlan = ({
   applyStateUpdates = null,
   updateJsonPreview = null,
   recalculateEditStats = null,
-}: ApplyPrefillUpdatePlanArgs = {}) => applyLocalCacheRehydrateSuccessEffects({
-  updates,
-  applyStateUpdates,
-  afterStateApplied: () => applyPrefillStateEffects({
-    updateJsonPreview,
-    recalculateEditStats,
-  }),
-});
+}: ApplyPrefillUpdatePlanArgs = {}) =>
+  applyLocalCacheRehydrateSuccessEffects({
+    updates,
+    applyStateUpdates,
+    afterStateApplied: () =>
+      applyPrefillStateEffects({
+        updateJsonPreview,
+        recalculateEditStats,
+      }),
+  });
 
 export const applyLocalCacheRehydrateUpdatePlan = ({
   changed = false,
@@ -1903,12 +1924,13 @@ export const applyLocalCacheRehydrateUpdatePlan = ({
   return applyLocalCacheRehydrateSuccessEffects({
     updates,
     applyStateUpdates,
-    afterStateApplied: () => applyLocalCacheRehydrateAppliedEffects({
-      updateJsonPreview,
-      recalculateEditStats,
-      ensurePriorResponses,
-      callback,
-    }),
+    afterStateApplied: () =>
+      applyLocalCacheRehydrateAppliedEffects({
+        updateJsonPreview,
+        recalculateEditStats,
+        ensurePriorResponses,
+        callback,
+      }),
   });
 };
 
@@ -1930,9 +1952,7 @@ export const applyLocalCacheRehydrateAppliedEffects = ({
   }
 };
 
-export const applyResetFormStateEffects = ({
-  callback = null,
-}: ApplyResetFormStateEffectsArgs = {}) => {
+export const applyResetFormStateEffects = ({ callback = null }: ApplyResetFormStateEffectsArgs = {}) => {
   if (typeof callback === 'function') {
     callback();
   }
@@ -1973,9 +1993,7 @@ export const applyStartFreshEffects = ({
   }
 };
 
-export const applyDraftHydrationEffects = ({
-  updateJsonPreview = null,
-}: ApplyDraftHydrationEffectsArgs = {}) => {
+export const applyDraftHydrationEffects = ({ updateJsonPreview = null }: ApplyDraftHydrationEffectsArgs = {}) => {
   if (typeof updateJsonPreview === 'function') {
     updateJsonPreview();
   }
@@ -1987,7 +2005,9 @@ export const executePriorResponseFetchPlan = async ({
   refreshQuestionResponses = null,
   readQuestionsCacheAsync = null,
 }: ExecutePriorResponseFetchPlanArgs = {}) => {
-  const normalizedResponder = String(responderLower || '').trim().toLowerCase();
+  const normalizedResponder = String(responderLower || '')
+    .trim()
+    .toLowerCase();
   const requests = Array.isArray(requestsToFetch) ? requestsToFetch : [];
   let fetched = false;
   let slug = '';
@@ -2032,12 +2052,9 @@ export const loadMissingResponseIdsForScope = async ({
   const resolvedNetId = String(netId || '');
   if (!resolvedNetId) return [];
 
-  const rawCache = typeof readQuestionsCacheAsync === 'function'
-    ? await readQuestionsCacheAsync(resolvedSlug)
-    : {};
-  const questionsCache = typeof ensureQuestionsNet === 'function'
-    ? ensureQuestionsNet(rawCache, resolvedNetId)
-    : rawCache;
+  const rawCache = typeof readQuestionsCacheAsync === 'function' ? await readQuestionsCacheAsync(resolvedSlug) : {};
+  const questionsCache =
+    typeof ensureQuestionsNet === 'function' ? ensureQuestionsNet(rawCache, resolvedNetId) : rawCache;
   const questionResponses =
     isRecord(questionsCache) &&
     isRecord(questionsCache[resolvedNetId]) &&
@@ -2063,12 +2080,12 @@ export const loadGroupedMissingResponseRequests = async ({
   const requests = [];
   const cachedMissingIdsByScope = new Map<string, string[]>();
 
-  for (const entry of (Array.isArray(scopePlan) ? scopePlan : [])) {
+  for (const entry of Array.isArray(scopePlan) ? scopePlan : []) {
     const resolvedSlug = String(entry?.slug || '');
     const resolvedNetId = String(
       typeof resolveScopeNetId === 'function'
-        ? (resolveScopeNetId(resolvedSlug, String(entry?.netId || '')) || '')
-        : (entry?.netId || fallbackNetId || '')
+        ? resolveScopeNetId(resolvedSlug, String(entry?.netId || '')) || ''
+        : entry?.netId || fallbackNetId || '',
     );
     if (!resolvedNetId) {
       requests.push({ slug: resolvedSlug, netId: '', missingIds: [] });
@@ -2111,7 +2128,7 @@ export const buildGroupedRenderedResponseScopePlan = ({
     const questionId = normalizeQuestionIdKey(rawQuestionId);
     if (!questionId) return;
     const resolvedSlug = String(
-      (slugByQuestionId instanceof Map ? slugByQuestionId.get(questionId) : null) ?? fallbackSlug ?? ''
+      (slugByQuestionId instanceof Map ? slugByQuestionId.get(questionId) : null) ?? fallbackSlug ?? '',
     );
     const resolvedNetId = String(fallbackNetId || '');
     if (!resolvedNetId) return;
@@ -2134,14 +2151,15 @@ export const buildMissingResponseIdsForRenderedQuestions = ({
   questionResponses = null,
   responderLower = '',
 }: BuildMissingResponseIdsForRenderedQuestionsArgs = {}): string[] => {
-  const normalizedResponder = String(responderLower || '').trim().toLowerCase();
+  const normalizedResponder = String(responderLower || '')
+    .trim()
+    .toLowerCase();
   return Array.from(renderedIds || [])
     .map((qid) => normalizeQuestionIdKey(qid))
     .filter(Boolean)
     .filter((questionId) => {
-      const perQuestion = questionResponses && typeof questionResponses === 'object'
-        ? questionResponses[questionId]
-        : null;
+      const perQuestion =
+        questionResponses && typeof questionResponses === 'object' ? questionResponses[questionId] : null;
       if (!perQuestion || typeof perQuestion !== 'object') return true;
       return !(perQuestion as UnknownRecord)[normalizedResponder];
     });
@@ -2152,14 +2170,13 @@ export const buildMissingRenderedResponseResult = ({
   fallbackSlug = '',
   fallbackNetId = '',
 }: BuildMissingRenderedResponseResultArgs = {}) => {
-  const normalizedRequests = (Array.isArray(requests) ? requests : [])
-    .map((entry) => ({
-      slug: String(entry?.slug || ''),
-      netId: String(entry?.netId || ''),
-      missingIds: buildNormalizedRenderedQuestionIds({
-        renderedIds: Array.isArray(entry?.missingIds) ? entry.missingIds : [],
-      }),
-    }));
+  const normalizedRequests = (Array.isArray(requests) ? requests : []).map((entry) => ({
+    slug: String(entry?.slug || ''),
+    netId: String(entry?.netId || ''),
+    missingIds: buildNormalizedRenderedQuestionIds({
+      renderedIds: Array.isArray(entry?.missingIds) ? entry.missingIds : [],
+    }),
+  }));
   const nonEmptyRequests = normalizedRequests.filter((entry) => entry.missingIds.length > 0);
 
   if (nonEmptyRequests.length === 0) {
@@ -2275,16 +2292,20 @@ export const resolveMissingRenderedResponseLookup = async ({
   readQuestionsCacheAsync = null,
   ensureQuestionsNet = null,
 }: ResolveMissingRenderedResponseLookupArgs = {}) => {
-  const normalizedResponder = String(responderLower || '').trim().toLowerCase();
+  const normalizedResponder = String(responderLower || '')
+    .trim()
+    .toLowerCase();
   if (!normalizedResponder) return { missingIds: [], slug: '', netId: '' };
 
   const effectiveRawSlug = rawSlug || fallbackSlug;
-  const hydrationContext = typeof resolveResponseHydrationContext === 'function'
-    ? (resolveResponseHydrationContext(effectiveRawSlug) || {})
-    : {};
-  const slug = typeof normalizeSessionSlugValue === 'function'
-    ? normalizeSessionSlugValue((hydrationContext as UnknownRecord).sessionSlug)
-    : String((hydrationContext as UnknownRecord).sessionSlug || '');
+  const hydrationContext =
+    typeof resolveResponseHydrationContext === 'function'
+      ? resolveResponseHydrationContext(effectiveRawSlug) || {}
+      : {};
+  const slug =
+    typeof normalizeSessionSlugValue === 'function'
+      ? normalizeSessionSlugValue((hydrationContext as UnknownRecord).sessionSlug)
+      : String((hydrationContext as UnknownRecord).sessionSlug || '');
   const netId = String((hydrationContext as UnknownRecord).networkIdStr || '');
   if (!netId) return { missingIds: [], slug, netId: '' };
 
@@ -2293,15 +2314,17 @@ export const resolveMissingRenderedResponseLookup = async ({
     return { missingIds: [], slug, netId };
   }
 
-  const extraSlugs = typeof getExtraScopeSlugs === 'function'
-    ? (getExtraScopeSlugs(slug) || [])
-    : [];
-  const shouldGroupByScope = String(minifiedMode || '').trim().toLowerCase() === 'pile'
-    && Array.isArray(extraSlugs)
-    && extraSlugs.length > 0;
-  const slugByQuestionId = shouldGroupByScope && typeof resolveQuestionSlugMapForIds === 'function'
-    ? (resolveQuestionSlugMapForIds(normalizedRenderedIds, { surveyId }) || null)
-    : null;
+  const extraSlugs = typeof getExtraScopeSlugs === 'function' ? getExtraScopeSlugs(slug) || [] : [];
+  const shouldGroupByScope =
+    String(minifiedMode || '')
+      .trim()
+      .toLowerCase() === 'pile' &&
+    Array.isArray(extraSlugs) &&
+    extraSlugs.length > 0;
+  const slugByQuestionId =
+    shouldGroupByScope && typeof resolveQuestionSlugMapForIds === 'function'
+      ? resolveQuestionSlugMapForIds(normalizedRenderedIds, { surveyId }) || null
+      : null;
 
   return loadMissingRenderedResponseInfo({
     renderedIds: normalizedRenderedIds,
@@ -2310,11 +2333,10 @@ export const resolveMissingRenderedResponseLookup = async ({
     responderLower: normalizedResponder,
     shouldGroupByScope,
     slugByQuestionId,
-    resolveScopeNetId: (resolvedSlug, entryNetId) => (
+    resolveScopeNetId: (resolvedSlug, entryNetId) =>
       typeof resolveScopeNetId === 'function'
         ? resolveScopeNetId(resolvedSlug, entryNetId, netId)
-        : (entryNetId || netId)
-    ),
+        : entryNetId || netId,
     readQuestionsCacheAsync,
     ensureQuestionsNet,
   });
@@ -2322,13 +2344,14 @@ export const resolveMissingRenderedResponseLookup = async ({
 
 export const buildNormalizedRenderedQuestionIds = ({
   renderedIds = [],
-}: BuildNormalizedRenderedQuestionIdsArgs = {}): string[] => Array.from(
-  new Set(
-    Array.from(renderedIds || [])
-      .map((id) => normalizeQuestionIdKey(id))
-      .filter(Boolean)
-  )
-);
+}: BuildNormalizedRenderedQuestionIdsArgs = {}): string[] =>
+  Array.from(
+    new Set(
+      Array.from(renderedIds || [])
+        .map((id) => normalizeQuestionIdKey(id))
+        .filter(Boolean),
+    ),
+  );
 
 export const buildQuestionSlugMapForIds = ({
   questionIds = [],
@@ -2342,25 +2365,22 @@ export const buildQuestionSlugMapForIds = ({
 
   const poolQuestionById = new Map<string, unknown>();
   (Array.isArray(poolQuestions) ? poolQuestions : []).forEach((question) => {
-    const questionId = normalizeQuestionIdKey(
-      isRecord(question) ? question.id : null
-    );
+    const questionId = normalizeQuestionIdKey(isRecord(question) ? question.id : null);
     if (!questionId || poolQuestionById.has(questionId)) return;
     poolQuestionById.set(questionId, question);
   });
 
   normalizedIds.forEach((questionId) => {
-    const resolvedSlug = typeof resolveQuestionSlug === 'function'
-      ? resolveQuestionSlug({
-        questionId,
-        question: poolQuestionById.get(questionId),
-      })
-      : '';
+    const resolvedSlug =
+      typeof resolveQuestionSlug === 'function'
+        ? resolveQuestionSlug({
+            questionId,
+            question: poolQuestionById.get(questionId),
+          })
+        : '';
     slugByQuestionId.set(
       questionId,
-      typeof normalizeSlug === 'function'
-        ? normalizeSlug(resolvedSlug)
-        : String(resolvedSlug ?? '')
+      typeof normalizeSlug === 'function' ? normalizeSlug(resolvedSlug) : String(resolvedSlug ?? ''),
     );
   });
 
@@ -2385,9 +2405,7 @@ export const resolveQuestionSlugMapLookup = ({
     ...(Array.isArray(pileQuestions) ? pileQuestions : []),
   ];
 
-  const fallbackSurveyId = surveyId !== undefined
-    ? surveyId
-    : (singleQuestionMode ? null : (propsSurveyId || null));
+  const fallbackSurveyId = surveyId !== undefined ? surveyId : singleQuestionMode ? null : propsSurveyId || null;
 
   return buildQuestionSlugMapForIds({
     questionIds,
@@ -2399,14 +2417,15 @@ export const resolveQuestionSlugMapLookup = ({
 
       if (question && Object.prototype.hasOwnProperty.call(question, 'sessionSlug')) {
         resolvedSlug = (question as UnknownRecord).sessionSlug;
-        hasExplicitQuestionSlug = (question as UnknownRecord).sessionSlug !== null
-          && (question as UnknownRecord).sessionSlug !== undefined;
+        hasExplicitQuestionSlug =
+          (question as UnknownRecord).sessionSlug !== null && (question as UnknownRecord).sessionSlug !== undefined;
       }
 
       if (!hasExplicitQuestionSlug && typeof (question as UnknownRecord | null)?.sessionName === 'string') {
-        const mapped = typeof getSessionSlugByName === 'function'
-          ? getSessionSlugByName((question as UnknownRecord).sessionName as string)
-          : null;
+        const mapped =
+          typeof getSessionSlugByName === 'function'
+            ? getSessionSlugByName((question as UnknownRecord).sessionName as string)
+            : null;
         if (mapped !== null && mapped !== undefined) {
           resolvedSlug = mapped;
           hasExplicitQuestionSlug = true;
@@ -2414,15 +2433,16 @@ export const resolveQuestionSlugMapLookup = ({
       }
 
       if (!hasExplicitQuestionSlug) {
-        resolvedSlug = typeof resolveSlugForIds === 'function'
-          ? resolveSlugForIds({
-            sessionName: null,
-            questionId,
-            surveyId: fallbackSurveyId,
-            props,
-            network,
-          })
-          : '';
+        resolvedSlug =
+          typeof resolveSlugForIds === 'function'
+            ? resolveSlugForIds({
+                sessionName: null,
+                questionId,
+                surveyId: fallbackSurveyId,
+                props,
+                network,
+              })
+            : '';
       }
 
       return resolvedSlug;
@@ -2438,11 +2458,8 @@ export const buildSubmissionGroupContext = ({
   multiSessionError = 'Cannot submit responses from multiple sessions at once. Narrow the question view to one session and try again.',
 }: BuildSubmissionGroupContextArgs = {}) => {
   const normalizedIds = buildNormalizedRenderedQuestionIds({ renderedIds: questionIds });
-  const normalizeValue = (value: unknown): string => (
-    typeof normalizeSlug === 'function'
-      ? normalizeSlug(value)
-      : String(value ?? '')
-  );
+  const normalizeValue = (value: unknown): string =>
+    typeof normalizeSlug === 'function' ? normalizeSlug(value) : String(value ?? '');
 
   if (normalizedIds.length === 0) {
     return {
@@ -2458,9 +2475,9 @@ export const buildSubmissionGroupContext = ({
   const seenSlugs = new Set<string>();
 
   normalizedIds.forEach((questionId) => {
-    const resolvedSlug = normalizeValue(
-      slugByQuestionId instanceof Map ? slugByQuestionId.get(questionId) : ''
-    ) || normalizeValue(fallbackSlug);
+    const resolvedSlug =
+      normalizeValue(slugByQuestionId instanceof Map ? slugByQuestionId.get(questionId) : '') ||
+      normalizeValue(fallbackSlug);
     normalizedSlugByQuestionId.set(questionId, resolvedSlug);
     if (seenSlugs.has(resolvedSlug)) return;
     seenSlugs.add(resolvedSlug);
@@ -2496,18 +2513,21 @@ export const buildLocalCacheHydrationSignature = ({
   suppressPrefill = false,
   submissionError = '',
   submissionComplete = false,
-}: BuildLocalCacheHydrationSignatureArgs = {}): string => [
-  String(surveyIndex),
-  Array.isArray(scopeSlugs) ? scopeSlugs.join(',') : '',
-  String(networkIdStr || ''),
-  String(account || '').trim().toLowerCase(),
-  buildRenderedIdsSignature(Array.from(renderedIds || [])),
-  Number(questionsCacheNonce || 0),
-  Number(questionResponsesNonce || 0),
-  suppressPrefill ? 1 : 0,
-  submissionError ? 1 : 0,
-  submissionComplete ? 1 : 0,
-].join('|');
+}: BuildLocalCacheHydrationSignatureArgs = {}): string =>
+  [
+    String(surveyIndex),
+    Array.isArray(scopeSlugs) ? scopeSlugs.join(',') : '',
+    String(networkIdStr || ''),
+    String(account || '')
+      .trim()
+      .toLowerCase(),
+    buildRenderedIdsSignature(Array.from(renderedIds || [])),
+    Number(questionsCacheNonce || 0),
+    Number(questionResponsesNonce || 0),
+    suppressPrefill ? 1 : 0,
+    submissionError ? 1 : 0,
+    submissionComplete ? 1 : 0,
+  ].join('|');
 
 export const resolveLocalCacheHydrationSignatureLookup = ({
   surveyIndex = 0,
@@ -2524,17 +2544,19 @@ export const resolveLocalCacheHydrationSignatureLookup = ({
   normalizeSessionSlugValue = null,
   getExtraScopeSlugs = null,
 }: ResolveLocalCacheHydrationSignatureLookupArgs = {}): string => {
-  const hydrationContext = typeof resolveResponseHydrationContext === 'function'
-    ? (resolveResponseHydrationContext(rawSlug) || {})
-    : {};
+  const hydrationContext =
+    typeof resolveResponseHydrationContext === 'function' ? resolveResponseHydrationContext(rawSlug) || {} : {};
   const sessionSlug = (hydrationContext as UnknownRecord).sessionSlug;
-  const slug = typeof normalizeSessionSlugValue === 'function'
-    ? normalizeSessionSlugValue(sessionSlug)
-    : String(sessionSlug || '');
-  const extraSlugs = String(minifiedMode || '').trim().toLowerCase() === 'pile'
-    && typeof getExtraScopeSlugs === 'function'
-    ? (getExtraScopeSlugs(slug) || [])
-    : [];
+  const slug =
+    typeof normalizeSessionSlugValue === 'function'
+      ? normalizeSessionSlugValue(sessionSlug)
+      : String(sessionSlug || '');
+  const extraSlugs =
+    String(minifiedMode || '')
+      .trim()
+      .toLowerCase() === 'pile' && typeof getExtraScopeSlugs === 'function'
+      ? getExtraScopeSlugs(slug) || []
+      : [];
 
   return buildLocalCacheHydrationSignature({
     surveyIndex,
@@ -2562,18 +2584,21 @@ export const buildPrefilledSurveyState = ({
 }: BuildPrefilledSurveyStateArgs = {}) => {
   const normalizedSurveyIndex = Math.max(0, Number(surveyIndex) || 0);
   const currentStateArr = Array.isArray(prevSurveysResponseState) ? prevSurveysResponseState : [];
-  const currentSlice = currentStateArr[normalizedSurveyIndex] && typeof currentStateArr[normalizedSurveyIndex] === 'object'
-    ? currentStateArr[normalizedSurveyIndex] as ResponseSlice
-    : buildEmptyResponseSlice();
+  const currentSlice =
+    currentStateArr[normalizedSurveyIndex] && typeof currentStateArr[normalizedSurveyIndex] === 'object'
+      ? (currentStateArr[normalizedSurveyIndex] as ResponseSlice)
+      : buildEmptyResponseSlice();
   const allowOverwrite = !isDirty && !submissionComplete;
 
   const nextSurveysResponseState = buildSurveyResponseStateArray({
     prevSurveysResponseState: currentStateArr,
     surveyIndex: normalizedSurveyIndex,
   });
-  const targetSeed = nextSurveysResponseState[normalizedSurveyIndex] && typeof nextSurveysResponseState[normalizedSurveyIndex] === 'object'
-    ? nextSurveysResponseState[normalizedSurveyIndex] as ResponseSlice
-    : buildEmptyResponseSlice();
+  const targetSeed =
+    nextSurveysResponseState[normalizedSurveyIndex] &&
+    typeof nextSurveysResponseState[normalizedSurveyIndex] === 'object'
+      ? (nextSurveysResponseState[normalizedSurveyIndex] as ResponseSlice)
+      : buildEmptyResponseSlice();
   const nextSlice: ResponseSlice = {
     answers: { ...((targetSeed.answers as Record<string, unknown>) || {}) },
     importance: { ...((targetSeed.importance as Record<string, unknown>) || {}) },
@@ -2591,9 +2616,10 @@ export const buildPrefilledSurveyState = ({
   }
 
   nextSurveysResponseState[normalizedSurveyIndex] = nextSlice;
-  const baseline = typeof buildSliceFromUserAnswers === 'function'
-    ? buildSliceFromUserAnswers({ responses }, prevEditBaseline || currentSlice)
-    : null;
+  const baseline =
+    typeof buildSliceFromUserAnswers === 'function'
+      ? buildSliceFromUserAnswers({ responses }, prevEditBaseline || currentSlice)
+      : null;
 
   return {
     nextSurveysResponseState,
@@ -2616,18 +2642,21 @@ export const buildPrefilledSingleQuestionState = ({
   const normalizedQuestionId = normalizeQuestionIdKey(questionId);
   const normalizedSurveyIndex = Math.max(0, Number(surveyIndex) || 0);
   const currentStateArr = Array.isArray(prevSurveysResponseState) ? prevSurveysResponseState : [];
-  const currentSlice = currentStateArr[normalizedSurveyIndex] && typeof currentStateArr[normalizedSurveyIndex] === 'object'
-    ? currentStateArr[normalizedSurveyIndex] as ResponseSlice
-    : buildEmptyResponseSlice();
+  const currentSlice =
+    currentStateArr[normalizedSurveyIndex] && typeof currentStateArr[normalizedSurveyIndex] === 'object'
+      ? (currentStateArr[normalizedSurveyIndex] as ResponseSlice)
+      : buildEmptyResponseSlice();
   const allowOverwrite = !isDirty && !submissionComplete;
 
   const nextSurveysResponseState = buildSurveyResponseStateArray({
     prevSurveysResponseState: currentStateArr,
     surveyIndex: normalizedSurveyIndex,
   });
-  const targetSeed = nextSurveysResponseState[normalizedSurveyIndex] && typeof nextSurveysResponseState[normalizedSurveyIndex] === 'object'
-    ? nextSurveysResponseState[normalizedSurveyIndex] as ResponseSlice
-    : buildEmptyResponseSlice();
+  const targetSeed =
+    nextSurveysResponseState[normalizedSurveyIndex] &&
+    typeof nextSurveysResponseState[normalizedSurveyIndex] === 'object'
+      ? (nextSurveysResponseState[normalizedSurveyIndex] as ResponseSlice)
+      : buildEmptyResponseSlice();
   const nextSlice: ResponseSlice = {
     answers: { ...((targetSeed.answers as Record<string, unknown>) || {}) },
     importance: { ...((targetSeed.importance as Record<string, unknown>) || {}) },
@@ -2646,9 +2675,10 @@ export const buildPrefilledSingleQuestionState = ({
   }
 
   nextSurveysResponseState[normalizedSurveyIndex] = nextSlice;
-  const baseline = typeof buildSliceFromUserAnswers === 'function'
-    ? buildSliceFromUserAnswers(userAnswer, prevEditBaseline || currentSlice)
-    : null;
+  const baseline =
+    typeof buildSliceFromUserAnswers === 'function'
+      ? buildSliceFromUserAnswers(userAnswer, prevEditBaseline || currentSlice)
+      : null;
 
   return {
     nextSurveysResponseState,
@@ -2664,9 +2694,7 @@ export const buildRevertedResponseSlice = ({
   buildEmptyResponseFieldState = null,
 }: BuildRevertedResponseSliceArgs = {}) => {
   const baseline = baselineSlice && typeof baselineSlice === 'object' ? baselineSlice : buildEmptyResponseSlice();
-  const clone = typeof cloneFieldState === 'function'
-    ? cloneFieldState
-    : ((value: unknown) => value);
+  const clone = typeof cloneFieldState === 'function' ? cloneFieldState : (value: unknown) => value;
 
   const nextSlice: ResponseSlice = {
     answers: clone(baseline.answers || {}) as Record<string, unknown>,
@@ -2763,27 +2791,35 @@ export const buildLocalCacheRehydrationState = ({
     conviction: { ...((normalizedBaseSlice.conviction as Record<string, unknown>) || {}) },
     additionalComments: { ...((normalizedBaseSlice.additionalComments as Record<string, unknown>) || {}) },
   };
-  const nextBaseline: ResponseSlice = typeof cloneBaseline === 'function'
-    ? cloneBaseline(prevBaseline && typeof prevBaseline === 'object' ? prevBaseline : buildEmptyResponseSlice())
-    : buildEmptyResponseSlice();
+  const nextBaseline: ResponseSlice =
+    typeof cloneBaseline === 'function'
+      ? cloneBaseline(prevBaseline && typeof prevBaseline === 'object' ? prevBaseline : buildEmptyResponseSlice())
+      : buildEmptyResponseSlice();
   const cache = cacheSlice && typeof cacheSlice === 'object' ? cacheSlice : buildEmptyResponseSlice();
-  const draftMap = draftAnswersByQuestionId && typeof draftAnswersByQuestionId === 'object'
-    ? draftAnswersByQuestionId
-    : {};
+  const draftMap =
+    draftAnswersByQuestionId && typeof draftAnswersByQuestionId === 'object' ? draftAnswersByQuestionId : {};
 
   let changed = false;
   let baselineChanged = false;
 
   Array.from(renderedQuestionIds || []).forEach((rawQuestionId) => {
     const questionId = normalizeQuestionIdKey(rawQuestionId);
-    if (!questionId || typeof buildDraftAwareState !== 'function' || typeof applyLocalCacheHydrationEntryToSlice !== 'function') return;
+    if (
+      !questionId ||
+      typeof buildDraftAwareState !== 'function' ||
+      typeof applyLocalCacheHydrationEntryToSlice !== 'function'
+    )
+      return;
 
-    const cachedAnswer = (cache.answers && typeof cache.answers === 'object') ? cache.answers[questionId] : null;
-    const cachedAdditional = (cache.additionalComments && typeof cache.additionalComments === 'object')
-      ? cache.additionalComments[questionId]
-      : null;
-    const cachedImportance = (cache.importance && typeof cache.importance === 'object') ? cache.importance[questionId] : undefined;
-    const cachedConviction = (cache.conviction && typeof cache.conviction === 'object') ? cache.conviction[questionId] : undefined;
+    const cachedAnswer = cache.answers && typeof cache.answers === 'object' ? cache.answers[questionId] : null;
+    const cachedAdditional =
+      cache.additionalComments && typeof cache.additionalComments === 'object'
+        ? cache.additionalComments[questionId]
+        : null;
+    const cachedImportance =
+      cache.importance && typeof cache.importance === 'object' ? cache.importance[questionId] : undefined;
+    const cachedConviction =
+      cache.conviction && typeof cache.conviction === 'object' ? cache.conviction[questionId] : undefined;
 
     const {
       effectiveAnswerState,
@@ -2802,30 +2838,34 @@ export const buildLocalCacheRehydrationState = ({
       baselineAdditional: nextBaseline.additionalComments?.[questionId],
     });
 
-    if (applyLocalCacheHydrationEntryToSlice({
-      targetSlice: nextSlice,
-      questionId,
-      cachedAnswer: effectiveAnswerState,
-      cachedAdditional: effectiveAdditionalState,
-      cachedImportance,
-      cachedConviction,
-      allowMaskedAnswerDraftEmpty: canReplaceMaskedAnswerWithDraftEmpty,
-      allowMaskedAdditionalDraftEmpty: canReplaceMaskedAdditionalWithDraftEmpty,
-      debugLabel,
-    })) {
+    if (
+      applyLocalCacheHydrationEntryToSlice({
+        targetSlice: nextSlice,
+        questionId,
+        cachedAnswer: effectiveAnswerState,
+        cachedAdditional: effectiveAdditionalState,
+        cachedImportance,
+        cachedConviction,
+        allowMaskedAnswerDraftEmpty: canReplaceMaskedAnswerWithDraftEmpty,
+        allowMaskedAdditionalDraftEmpty: canReplaceMaskedAdditionalWithDraftEmpty,
+        debugLabel,
+      })
+    ) {
       changed = true;
     }
 
-    if (applyLocalCacheHydrationEntryToSlice({
-      targetSlice: nextBaseline,
-      questionId,
-      cachedAnswer: effectiveAnswerState,
-      cachedAdditional: effectiveAdditionalState,
-      cachedImportance,
-      cachedConviction,
-      allowMaskedAnswerDraftEmpty: canReplaceMaskedBaselineAnswerWithDraftEmpty,
-      allowMaskedAdditionalDraftEmpty: canReplaceMaskedBaselineAdditionalWithDraftEmpty,
-    })) {
+    if (
+      applyLocalCacheHydrationEntryToSlice({
+        targetSlice: nextBaseline,
+        questionId,
+        cachedAnswer: effectiveAnswerState,
+        cachedAdditional: effectiveAdditionalState,
+        cachedImportance,
+        cachedConviction,
+        allowMaskedAnswerDraftEmpty: canReplaceMaskedBaselineAnswerWithDraftEmpty,
+        allowMaskedAdditionalDraftEmpty: canReplaceMaskedBaselineAdditionalWithDraftEmpty,
+      })
+    ) {
       baselineChanged = true;
     }
   });

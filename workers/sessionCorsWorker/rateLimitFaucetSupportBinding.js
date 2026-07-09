@@ -2,9 +2,25 @@ import { toTrimmedString } from './stringCoercion.js';
 import {
   createFaucetGateAuthorityWithDeps,
 } from './faucetGateAuthority.js';
+import {
+  ABUSE_COUNTER_TYPES,
+  recordAbuseEvent as recordAbuseEventBoundary,
+} from './abuseObservability.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAY_TTL_SECONDS = 24 * 60 * 60;
+
+const recordRateLimitTrip = async ({ env, deps } = {}) => {
+  try {
+    await (deps?.recordAbuseEvent || recordAbuseEventBoundary)({
+      env,
+      type: ABUSE_COUNTER_TYPES.RATE_LIMIT_TRIP,
+      now: deps?.now,
+    });
+  } catch {
+    // Rate-limit telemetry must not change the allow/deny result.
+  }
+};
 
 export const createRateLimitFaucetSupportWithWorkerDeps = ({
   deps,
@@ -31,7 +47,9 @@ export const createRateLimitFaucetSupportWithWorkerDeps = ({
     }
     record.count += 1;
     await env.GROUP_KV.put(key, JSON.stringify(record), { expirationTtl: DAY_TTL_SECONDS });
-    return record.count <= numeric;
+    const allowed = record.count <= numeric;
+    if (!allowed) await recordRateLimitTrip({ env, deps });
+    return allowed;
   };
 
   const faucetGateAuthority = (

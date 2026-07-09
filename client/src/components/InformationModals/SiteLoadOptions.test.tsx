@@ -5,7 +5,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import SiteLoadOptions from './SiteLoadOptions';
 
-jest.mock('./GreetingModal', () => () => <div data-testid='mock-greeting-modal' />);
+jest.mock('./GreetingModal', () => () => <div data-testid="mock-greeting-modal" />);
 jest.mock('utilities/logging.js', () => ({
   createLogger: () => ({
     log: jest.fn(),
@@ -16,27 +16,33 @@ jest.mock('utilities/logging.js', () => ({
   }),
 }));
 
-const buildStore = () => createStore((state = {
-  profile: {
-    account: null,
-    provider: null,
-  },
-}) => state);
+const buildStore = () =>
+  createStore(
+    (
+      state = {
+        profile: {
+          account: null,
+          provider: null,
+        },
+      },
+    ) => state,
+  );
 
 const noop = () => {};
 
-const renderSiteLoadOptions = (arrowIndex: number, props: Record<string, unknown> = {}) => render(
-  <Provider store={buildStore()}>
-    <SiteLoadOptions
-      arrowIndex={arrowIndex}
-      sidebarOpen
-      closeSidebarFunction={jest.fn()}
-      clickRightArrow={noop}
-      clickLeftArrow={noop}
-      {...props}
-    />
-  </Provider>
-);
+const renderSiteLoadOptions = (arrowIndex: number, props: Record<string, unknown> = {}) =>
+  render(
+    <Provider store={buildStore()}>
+      <SiteLoadOptions
+        arrowIndex={arrowIndex}
+        sidebarOpen
+        closeSidebarFunction={jest.fn()}
+        clickRightArrow={noop}
+        clickLeftArrow={noop}
+        {...props}
+      />
+    </Provider>,
+  );
 
 const SidebarHarness = ({ arrowIndex }: { arrowIndex: number }) => {
   const [sidebarOpen, setSidebarOpen] = React.useState(true);

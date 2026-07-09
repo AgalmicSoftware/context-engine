@@ -7,9 +7,7 @@ import {
 } from '../../utilities/sessionResultsExport';
 import SurveyResultsReportSurface from './SurveyResultsReportSurface';
 
-const mockDemoSurface = jest.fn((props: any) => (
-  <div data-testid="mock-demo-surface">{String(props.viewKey)}</div>
-));
+const mockDemoSurface = jest.fn((props: any) => <div data-testid="mock-demo-surface">{String(props.viewKey)}</div>);
 
 jest.mock('./SurveyResultsDemoSurface', () => ({
   __esModule: true,
@@ -155,7 +153,11 @@ const createProps = (overrides: Record<string, any> = {}) => {
         cacheReadinessDisplay,
         currentSurveyId: 'survey-1',
         effectiveSlug: 'session-one',
-        filterControlsNode: <button type="button" data-testid="filter-display">Filters</button>,
+        filterControlsNode: (
+          <button type="button" data-testid="filter-display">
+            Filters
+          </button>
+        ),
         filterLoading: false,
         getFallbackQuestion: jest.fn((questionId) => ({ id: questionId, prompt: 'Fallback', type: 'freeform' })),
         getLockedResponseKey: jest.fn(() => 'locked-key'),
@@ -174,7 +176,11 @@ const createProps = (overrides: Record<string, any> = {}) => {
         questionResponsesNonce: 1,
         questionsCacheNonce: 2,
         renderQuestionSummary: jest.fn((questionId) => <div>{questionId}</div>),
-        renderQuestionTable: jest.fn(() => <table><tbody /></table>),
+        renderQuestionTable: jest.fn(() => (
+          <table>
+            <tbody />
+          </table>
+        )),
         responses: [],
         sbtCacheRevision: 3,
         styleMap,
@@ -277,11 +283,14 @@ describe('SurveyResultsReportSurface', () => {
     expect(screen.getByTestId('sync-status')).toHaveTextContent('In Sync');
     expect(screen.getByTestId('locked-banner')).toHaveTextContent('Locked banner');
     expect(screen.getByTestId('filter-display')).toHaveTextContent('Filters');
-    expect(screen.getByText((_, element) => (
-      !!element?.classList.contains('filterSummaryText') &&
-      element.textContent?.includes('Questions:') &&
-      element.textContent?.includes('Responses:')
-    ))).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_, element) =>
+          !!element?.classList.contains('filterSummaryText') &&
+          element.textContent?.includes('Questions:') &&
+          element.textContent?.includes('Responses:'),
+      ),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('switch', { name: 'Toggle between individual and aggregate view' }));
     expect(callbacks.onSurveyViewModeToggle).toHaveBeenCalledTimes(1);
@@ -330,9 +339,11 @@ describe('SurveyResultsReportSurface', () => {
     expect(screen.getByTestId('ce-surveyresults-demo-surface-atlas')).toBeInTheDocument();
     expect(screen.getByTestId('mock-demo-surface')).toHaveTextContent('atlas');
     expect(screen.queryByTestId('filter-display')).toBeNull();
-    expect(mockDemoSurface).toHaveBeenCalledWith(expect.objectContaining({
-      activeSlug: 'demo-session',
-      viewKey: 'atlas',
-    }));
+    expect(mockDemoSurface).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeSlug: 'demo-session',
+        viewKey: 'atlas',
+      }),
+    );
   });
 });

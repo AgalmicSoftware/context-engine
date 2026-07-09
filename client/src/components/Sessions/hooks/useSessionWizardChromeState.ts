@@ -22,10 +22,7 @@ export interface UseSessionWizardChromeStateOptions {
 
 const NORMAL_SECTION_ORDER = ['metadata', 'encryption', 'worker', 'publish'];
 
-const useSessionWizardChromeState = ({
-  wizardMode,
-  hasSponsoredBundleLink,
-}: UseSessionWizardChromeStateOptions) => {
+const useSessionWizardChromeState = ({ wizardMode, hasSponsoredBundleLink }: UseSessionWizardChromeStateOptions) => {
   const [wizardDisplaySettingsOpen, setWizardDisplaySettingsOpen] = useState(false);
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
   const [showJsonPreview, setShowJsonPreview] = useState(false);
@@ -47,8 +44,7 @@ const useSessionWizardChromeState = ({
   useEffect(() => {
     if (wizardMode === 'advanced') return;
     setCollapsedSections((prev) => {
-      const firstOpenSection = NORMAL_SECTION_ORDER
-        .find((key) => prev[key] === false) || 'metadata';
+      const firstOpenSection = NORMAL_SECTION_ORDER.find((key) => prev[key] === false) || 'metadata';
       return {
         metadata: firstOpenSection !== 'metadata',
         encryption: firstOpenSection !== 'encryption',

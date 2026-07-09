@@ -1,13 +1,10 @@
-jest.mock('../web3/contractScripts.js', () => ({
+jest.mock('../web3/chainGateway.js', () => ({
   __esModule: true,
   normalizeSessionSlug: jest.fn((s) => String(s || '')),
 }));
 
-const {
-  buildSbtCountsInitialProgress,
-  createSbtLiveProgressController,
-} = require('./sbtLiveProgressController.js');
-const { normalizeSessionSlug } = require('../web3/contractScripts.js');
+const { buildSbtCountsInitialProgress, createSbtLiveProgressController } = require('./sbtLiveProgressController.js');
+const { normalizeSessionSlug } = require('../web3/chainGateway.js');
 
 const createStateHost = () => {
   let state = {
@@ -29,24 +26,15 @@ const createStateHost = () => {
 };
 
 const createProgressDeps = () => ({
-  mergeProgressEntry: jest.fn(({
-    prevEntry = null,
-    nextPatch = null,
-    nowMs = Date.now(),
-  } = {}) => ({
-    ...((prevEntry && typeof prevEntry === 'object') ? prevEntry : {}),
-    ...((nextPatch && typeof nextPatch === 'object') ? nextPatch : {}),
-    updatedAtMs: Math.max(
-      0,
-      Math.floor(Number(nextPatch?.updatedAtMs || nowMs) || 0)
-    ),
+  mergeProgressEntry: jest.fn(({ prevEntry = null, nextPatch = null, nowMs = Date.now() } = {}) => ({
+    ...(prevEntry && typeof prevEntry === 'object' ? prevEntry : {}),
+    ...(nextPatch && typeof nextPatch === 'object' ? nextPatch : {}),
+    updatedAtMs: Math.max(0, Math.floor(Number(nextPatch?.updatedAtMs || nowMs) || 0)),
   })),
   shouldCommitProgress: jest.fn(() => true),
 });
 
-const getOnlyProgressEntry = (host) => (
-  Object.values(host.getState().sbtScanProgressBySlug || {})[0]
-);
+const getOnlyProgressEntry = (host) => Object.values(host.getState().sbtScanProgressBySlug || {})[0];
 
 describe('createSbtLiveProgressController', () => {
   beforeEach(() => {
@@ -73,10 +61,12 @@ describe('createSbtLiveProgressController', () => {
       latestBlock: 20,
     });
 
-    expect(controller.updateSbtLiveProgress('alpha', token, {
-      currentBlock: 15,
-      latestBlock: 20,
-    })).toBe(true);
+    expect(
+      controller.updateSbtLiveProgress('alpha', token, {
+        currentBlock: 15,
+        latestBlock: 20,
+      }),
+    ).toBe(true);
     expect(getOnlyProgressEntry(host)).toMatchObject({
       currentBlock: 15,
       latestBlock: 20,
@@ -100,10 +90,12 @@ describe('createSbtLiveProgressController', () => {
 
     progressDeps.shouldCommitProgress.mockReturnValueOnce(false);
 
-    expect(controller.updateSbtLiveProgress('alpha', token, {
-      currentBlock: 5,
-      latestBlock: 10,
-    })).toBe(false);
+    expect(
+      controller.updateSbtLiveProgress('alpha', token, {
+        currentBlock: 5,
+        latestBlock: 10,
+      }),
+    ).toBe(false);
     expect(getOnlyProgressEntry(host)).toMatchObject({
       currentBlock: 1,
       latestBlock: 10,
@@ -124,10 +116,12 @@ describe('createSbtLiveProgressController', () => {
 
     controller.destroy();
 
-    expect(controller.updateSbtLiveProgress('alpha', token, {
-      currentBlock: 2,
-      latestBlock: 2,
-    })).toBe(false);
+    expect(
+      controller.updateSbtLiveProgress('alpha', token, {
+        currentBlock: 2,
+        latestBlock: 2,
+      }),
+    ).toBe(false);
     expect(getOnlyProgressEntry(host)).toMatchObject({
       currentBlock: 1,
       latestBlock: 2,
@@ -137,19 +131,23 @@ describe('createSbtLiveProgressController', () => {
 
 describe('buildSbtCountsInitialProgress', () => {
   it('returns null when the resumed scan already covers the target block', () => {
-    expect(buildSbtCountsInitialProgress({
-      startBlock: 10,
-      toBlock: 12,
-      seedBlock: 12,
-    })).toBeNull();
+    expect(
+      buildSbtCountsInitialProgress({
+        startBlock: 10,
+        toBlock: 12,
+        seedBlock: 12,
+      }),
+    ).toBeNull();
   });
 
   it('builds a pre-scan progress payload when no blocks have been scanned', () => {
-    expect(buildSbtCountsInitialProgress({
-      startBlock: 10,
-      toBlock: 12,
-      seedBlock: 9,
-    })).toEqual({
+    expect(
+      buildSbtCountsInitialProgress({
+        startBlock: 10,
+        toBlock: 12,
+        seedBlock: 9,
+      }),
+    ).toEqual({
       phase: 'activity',
       fromBlock: 10,
       toBlock: 12,
@@ -164,11 +162,13 @@ describe('buildSbtCountsInitialProgress', () => {
   });
 
   it('builds a partial progress payload from a checkpoint seed block', () => {
-    expect(buildSbtCountsInitialProgress({
-      startBlock: 10,
-      toBlock: 14,
-      seedBlock: 12,
-    })).toEqual({
+    expect(
+      buildSbtCountsInitialProgress({
+        startBlock: 10,
+        toBlock: 14,
+        seedBlock: 12,
+      }),
+    ).toEqual({
       phase: 'activity',
       fromBlock: 10,
       toBlock: 14,
@@ -183,10 +183,12 @@ describe('buildSbtCountsInitialProgress', () => {
   });
 
   it('rejects non-finite block inputs', () => {
-    expect(buildSbtCountsInitialProgress({
-      startBlock: 'bad',
-      toBlock: 14,
-      seedBlock: 12,
-    })).toBeNull();
+    expect(
+      buildSbtCountsInitialProgress({
+        startBlock: 'bad',
+        toBlock: 14,
+        seedBlock: 12,
+      }),
+    ).toBeNull();
   });
 });

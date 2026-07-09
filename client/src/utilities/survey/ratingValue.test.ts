@@ -1,9 +1,4 @@
-import {
-  getRatingFillPercent,
-  normalizeRatingValue,
-  RATING_MAX,
-  RATING_MIN,
-} from './ratingValue.js';
+import { getRatingFillPercent, normalizeRatingValue, RATING_MAX, RATING_MIN } from './ratingValue.js';
 
 describe('ratingValue', () => {
   it('returns the fallback for blank or invalid values', () => {

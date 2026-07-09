@@ -1,8 +1,5 @@
 import { toStr } from '../../utilities/shared/primitives.js';
-import {
-  CLOUDFLARE_MISSING_HANDLER_ERROR,
-  DEPLOY_HELPER_BUNDLE_FETCH_ERROR,
-} from './sessionWizardPublishFlow';
+import { CLOUDFLARE_MISSING_HANDLER_ERROR, DEPLOY_HELPER_BUNDLE_FETCH_ERROR } from './sessionWizardPublishFlow';
 
 type SessionWizardDeployRecord = Record<string, unknown>;
 type ResolveSessionWizardDeployStatusDisplayStateArgs = {
@@ -16,18 +13,13 @@ export type SessionWizardDeployStatusDisplayState = {
   isError: boolean;
 };
 
-const asDeployRecord = (value: unknown): SessionWizardDeployRecord => (
-  value !== null && typeof value === 'object' ? value as SessionWizardDeployRecord : {}
-);
+const asDeployRecord = (value: unknown): SessionWizardDeployRecord =>
+  value !== null && typeof value === 'object' ? (value as SessionWizardDeployRecord) : {};
 
 const resolveCurrentOrigin = (value: unknown = undefined): string => {
   const override = toStr(value).trim();
   if (override) return override;
-  return (
-    typeof window !== 'undefined' && window.location
-      ? toStr(window.location.origin).trim()
-      : ''
-  );
+  return typeof window !== 'undefined' && window.location ? toStr(window.location.origin).trim() : '';
 };
 
 export const buildSessionWizardDeployHelperCorsMessage = ({
@@ -45,35 +37,26 @@ export const buildSessionWizardDeployHelperCorsMessage = ({
   return `Deploy-helper rejected browser origin ${origin}${suffix}. Add this origin to the deploy-helper allowlist at ${helper} and retry.`;
 };
 
-export const buildSessionWizardDeployHelperWorkersDevStatusMessage = (
-  deployResponse: unknown = {}
-): string => {
+export const buildSessionWizardDeployHelperWorkersDevStatusMessage = (deployResponse: unknown = {}): string => {
   const response = asDeployRecord(deployResponse);
   const subdomain = toStr(response?.subdomain).trim();
   const subdomainStatus = toStr(response?.subdomainStatus).trim();
   const subdomainError = toStr(response?.subdomainError).trim();
   const scriptSubdomainError = toStr(response?.scriptSubdomainError).trim();
-  const hasAccountSignal = (
+  const hasAccountSignal =
     subdomain ||
     subdomainStatus ||
     subdomainError ||
-    Object.prototype.hasOwnProperty.call(response, 'subdomainEnabled')
-  );
-  const hasScriptSignal = (
-    scriptSubdomainError ||
-    Object.prototype.hasOwnProperty.call(response, 'scriptSubdomainEnabled')
-  );
+    Object.prototype.hasOwnProperty.call(response, 'subdomainEnabled');
+  const hasScriptSignal =
+    scriptSubdomainError || Object.prototype.hasOwnProperty.call(response, 'scriptSubdomainEnabled');
   if (!hasAccountSignal && !hasScriptSignal) return '';
 
   let accountSummary = '';
   if (subdomainError) {
-    accountSummary = subdomain
-      ? `account issue (${subdomain}): ${subdomainError}`
-      : `account issue: ${subdomainError}`;
+    accountSummary = subdomain ? `account issue (${subdomain}): ${subdomainError}` : `account issue: ${subdomainError}`;
   } else if (subdomainStatus) {
-    accountSummary = subdomain
-      ? `account ${subdomainStatus} (${subdomain})`
-      : `account ${subdomainStatus}`;
+    accountSummary = subdomain ? `account ${subdomainStatus} (${subdomain})` : `account ${subdomainStatus}`;
   } else if (subdomain) {
     accountSummary = `account ready (${subdomain})`;
   }
@@ -94,10 +77,7 @@ export const buildSessionWizardDeployHelperWorkersDevStatusMessage = (
   return summary ? `workers.dev status: ${summary}.` : '';
 };
 
-export const withSessionWizardDeployHelperWorkersDevStatus = (
-  message = '',
-  deployResponse: unknown = {}
-): string => {
+export const withSessionWizardDeployHelperWorkersDevStatus = (message = '', deployResponse: unknown = {}): string => {
   const base = toStr(message).trim();
   const workersDevStatus = buildSessionWizardDeployHelperWorkersDevStatusMessage(deployResponse);
   if (!workersDevStatus) return base;
@@ -114,10 +94,8 @@ export const resolveSessionWizardDeployStatusDisplayState = ({
   return {
     deployButtonDisabled: !!deployInFlight,
     deployStatusText,
-    isError: !!deployStatusText &&
-      !deployInFlight &&
-      !deployVerifiedInUi &&
-      !deployStatusLower.includes('worker deployed'),
+    isError:
+      !!deployStatusText && !deployInFlight && !deployVerifiedInUi && !deployStatusLower.includes('worker deployed'),
   };
 };
 
@@ -147,18 +125,13 @@ export const normalizeSessionWizardDeployErrorMessage = ({
   currentOrigin?: unknown;
 } = {}): string => {
   const error = asDeployRecord(err);
-  const raw = toStr(
-    error?.message ||
-    (typeof err === 'string' || typeof err === 'number' ? err : '')
-  ).trim();
+  const raw = toStr(error?.message || (typeof err === 'string' || typeof err === 'number' ? err : '')).trim();
   const lowered = raw.toLowerCase();
   const statusCode = Number(error?.statusCode || 0);
   const responseError = toStr(error?.responseError).trim();
   const responseLower = responseError.toLowerCase();
   const bundleDiagnostics = error?.responseBundleDiagnostics;
-  const diagnosticsSummary = bundleDiagnostics
-    ? formatSessionWizardDeployBundleDiagnostics(bundleDiagnostics)
-    : '';
+  const diagnosticsSummary = bundleDiagnostics ? formatSessionWizardDeployBundleDiagnostics(bundleDiagnostics) : '';
 
   if ((statusCode === 403 && responseLower.includes('origin')) || responseLower.includes('origin not allowed')) {
     return buildSessionWizardDeployHelperCorsMessage({
@@ -182,7 +155,10 @@ export const normalizeSessionWizardDeployErrorMessage = ({
     const origin = resolveCurrentOrigin(currentOrigin) || '<current-origin>';
     return `Deploy request could not reach ${helper}. This is usually CORS or helper availability; ensure ${origin} is allowed and retry.`;
   }
-  if ((lowered.includes(CLOUDFLARE_MISSING_HANDLER_ERROR) || responseLower.includes(CLOUDFLARE_MISSING_HANDLER_ERROR)) && diagnosticsSummary) {
+  if (
+    (lowered.includes(CLOUDFLARE_MISSING_HANDLER_ERROR) || responseLower.includes(CLOUDFLARE_MISSING_HANDLER_ERROR)) &&
+    diagnosticsSummary
+  ) {
     const base = raw || responseError || 'Worker deploy failed.';
     return `${base} Bundle diagnostics: ${diagnosticsSummary}`;
   }

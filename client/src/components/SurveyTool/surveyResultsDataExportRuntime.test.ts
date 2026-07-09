@@ -4,9 +4,7 @@ import {
   type SurveyResultsDataExportRuntimeArgs,
   type SurveyResultsDataExportState,
 } from './surveyResultsDataExportRuntime';
-import type {
-  SurveyResultsResponseRecord,
-} from './surveyResultsLockedFieldHelpers';
+import type { SurveyResultsResponseRecord } from './surveyResultsLockedFieldHelpers';
 
 const fixedNowIso = (): string => '2026-05-28T10:00:00.000Z';
 
@@ -56,11 +54,8 @@ const createRuntime = ({
     getState: () => mutableState,
     hasEffectiveNetworkId: () => hasEffectiveNetworkId,
     nowIso: fixedNowIso,
-    parseResponse: (response) => (
-      response && typeof response === 'object'
-        ? response as SurveyResultsResponseRecord
-        : null
-    ),
+    parseResponse: (response) =>
+      response && typeof response === 'object' ? (response as SurveyResultsResponseRecord) : null,
     writeCsvFileName: (filename) => {
       writtenCsvFileNames.push(filename);
     },
@@ -104,9 +99,7 @@ describe('surveyResultsDataExportRuntime', () => {
 
     const csv = runtime.generateResponsesCSV();
 
-    expect(writtenCsvFileNames).toEqual([
-      'contextEngine_questionResponses_2026-05-28T10_00_00_000Z_AlphaSession.csv',
-    ]);
+    expect(writtenCsvFileNames).toEqual(['contextEngine_questionResponses_2026-05-28T10_00_00_000Z_AlphaSession.csv']);
     expect(patches).toContainEqual({
       csvFileName: 'contextEngine_questionResponses_2026-05-28T10_00_00_000Z_AlphaSession.csv',
     });
@@ -147,9 +140,7 @@ describe('surveyResultsDataExportRuntime', () => {
         sbtFilteredResponses: [
           {
             response: {
-              responses: [
-                { questionID: 'q2' },
-              ],
+              responses: [{ questionID: 'q2' }],
             },
           },
         ],

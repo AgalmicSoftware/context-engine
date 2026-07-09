@@ -1,46 +1,41 @@
-import {
-  buildSurveyResultsHtmlReportReadinessPlan,
-} from './surveyResultsHtmlReportReadiness';
-import {
-  SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS,
-} from './surveyResultsHtmlReportSelection';
-import {
-  buildRedactedSessionResultsSnapshot,
-} from '../../utilities/sessionResultsExport';
+import { buildSurveyResultsHtmlReportReadinessPlan } from './surveyResultsHtmlReportReadiness';
+import { SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS } from './surveyResultsHtmlReportSelection';
+import { buildRedactedSessionResultsSnapshot } from '../../utilities/sessionResultsExport';
 
 const buildHtmlReportSnapshot = ({
   argumentMapAvailable = false,
   atlasAvailable = false,
   reportAvailable = true,
   riskMatrixAvailable = false,
-} = {}) => buildRedactedSessionResultsSnapshot({
-  exportedAt: '2026-05-25T18:30:00.000Z',
-  session: {
-    chainId: 11155420,
-    name: 'Readiness Session',
-    slug: 'readiness-session',
-  },
-  sections: {
-    argumentMap: {
-      available: argumentMapAvailable,
-      debates: argumentMapAvailable ? [{ id: 'debate-1' }] : [],
+} = {}) =>
+  buildRedactedSessionResultsSnapshot({
+    exportedAt: '2026-05-25T18:30:00.000Z',
+    session: {
+      chainId: 11155420,
+      name: 'Readiness Session',
+      slug: 'readiness-session',
     },
-    atlas: {
-      available: atlasAvailable,
-      nodes: atlasAvailable ? [{ id: 'node-1' }] : [],
+    sections: {
+      argumentMap: {
+        available: argumentMapAvailable,
+        debates: argumentMapAvailable ? [{ id: 'debate-1' }] : [],
+      },
+      atlas: {
+        available: atlasAvailable,
+        nodes: atlasAvailable ? [{ id: 'node-1' }] : [],
+      },
+      report: {
+        available: reportAvailable,
+        questions: reportAvailable
+          ? [{ id: 'q1', options: [], prompt: 'Prompt', responseCount: 1, tags: [], type: 'freeform' }]
+          : [],
+      },
+      riskMatrix: {
+        available: riskMatrixAvailable,
+        comments: riskMatrixAvailable ? [{ id: 'comment-1' }] : [],
+      },
     },
-    report: {
-      available: reportAvailable,
-      questions: reportAvailable
-        ? [{ id: 'q1', options: [], prompt: 'Prompt', responseCount: 1, tags: [], type: 'freeform' }]
-        : [],
-    },
-    riskMatrix: {
-      available: riskMatrixAvailable,
-      comments: riskMatrixAvailable ? [{ id: 'comment-1' }] : [],
-    },
-  },
-});
+  });
 
 describe('surveyResultsHtmlReportReadiness', () => {
   it('builds an HTML report readiness plan from snapshot and selected-section identity', () => {
@@ -114,23 +109,25 @@ describe('surveyResultsHtmlReportReadiness', () => {
   });
 
   it('blocks ready report downloads while analysis generation is pending', () => {
-    expect(buildSurveyResultsHtmlReportReadinessPlan({
-      analysisGenerating: true,
-      isAuthorized: true,
-      selectedSections: {
-        argumentMap: true,
-        atlas: true,
-        report: true,
-        riskMatrix: true,
-        snapshotJson: true,
-      },
-      snapshot: buildHtmlReportSnapshot({
-        argumentMapAvailable: true,
-        atlasAvailable: true,
-        reportAvailable: true,
-        riskMatrixAvailable: true,
+    expect(
+      buildSurveyResultsHtmlReportReadinessPlan({
+        analysisGenerating: true,
+        isAuthorized: true,
+        selectedSections: {
+          argumentMap: true,
+          atlas: true,
+          report: true,
+          riskMatrix: true,
+          snapshotJson: true,
+        },
+        snapshot: buildHtmlReportSnapshot({
+          argumentMapAvailable: true,
+          atlasAvailable: true,
+          reportAvailable: true,
+          riskMatrixAvailable: true,
+        }),
       }),
-    })).toMatchObject({
+    ).toMatchObject({
       canDownload: false,
       hasExportableSections: true,
       hasUnavailableSelectedSections: false,

@@ -25,10 +25,7 @@ const SurveyResultsQuestionListCard = ({
   trailingLabelStyle,
 }: SurveyResultsQuestionListCardProps): React.ReactElement => (
   <Card className={styleMap.questionListCard}>
-    <CardHeader
-      onClick={onToggle}
-      className={styleMap.questionSummaryHeader}
-    >
+    <CardHeader onClick={onToggle} className={styleMap.questionSummaryHeader}>
       <span className={styleMap.questionTitle}>{title}</span>
       <FontAwesomeIcon
         icon={isOpen ? faCaretUp : faCaretDown}
@@ -36,18 +33,9 @@ const SurveyResultsQuestionListCard = ({
         style={trailingLabelStyle}
       />
     </CardHeader>
-    <Collapse
-      isOpen={isOpen}
-      id={styleMap.surveyResultsCollapse}
-    >
+    <Collapse isOpen={isOpen} id={styleMap.surveyResultsCollapse}>
       <CardBody className={styleMap.aggregatorDarkCardBody}>
-        {showEmptyState ? (
-          <p>No questions found.</p>
-        ) : (
-          <div ref={tableWrapperRef}>
-            {questionTableNode}
-          </div>
-        )}
+        {showEmptyState ? <p>No questions found.</p> : <div ref={tableWrapperRef}>{questionTableNode}</div>}
       </CardBody>
     </Collapse>
   </Card>

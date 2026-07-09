@@ -1,8 +1,5 @@
 import reducer from './sessionStateReducer';
-import {
-  FETCH_SESSION_STATE,
-  TOGGLE_TOOLTIPS,
-} from '../actions/types';
+import { FETCH_SESSION_STATE, TOGGLE_TOOLTIPS } from '../actions/types';
 
 describe('sessionStateReducer tooltip preference', () => {
   beforeEach(() => {
@@ -15,10 +12,7 @@ describe('sessionStateReducer tooltip preference', () => {
     const initial = reducer(undefined, { type: '@@INIT' });
     expect(initial.tooltipsEnabled).toBe(false);
 
-    const fetched = reducer(
-      { ...initial, tooltipsEnabled: true },
-      { type: FETCH_SESSION_STATE, payload: {} }
-    );
+    const fetched = reducer({ ...initial, tooltipsEnabled: true }, { type: FETCH_SESSION_STATE, payload: {} });
     expect(fetched.tooltipsEnabled).toBe(false);
   });
 

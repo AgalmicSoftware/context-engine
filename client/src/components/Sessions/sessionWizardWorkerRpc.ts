@@ -1,16 +1,8 @@
 import rpcDefaults from '../../variables/rpcDefaults.js';
-import {
-  DEFAULT_CHAIN_ID,
-} from '../../variables/appConfig.js';
-import {
-  getDefaultHttpRpc,
-  isChainWithFaucetRpcFallback,
-} from '../../variables/chains.js';
+import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
+import { getDefaultHttpRpc, isChainWithFaucetRpcFallback } from '../../variables/chains.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import type {
-  AnyRecord,
-  ChainIdLike,
-} from '../shellTypes';
+import type { AnyRecord, ChainIdLike } from '../shellTypes';
 
 const { getPathRpcUrl } = rpcDefaults;
 
@@ -86,9 +78,7 @@ export const buildSessionWizardWorkerRpcUrlMap = ({
     normalizeRpcUrlList(provider.rpcUrl),
   );
   const defaults = getDefaultWorkerRpcUrlsForChain(resolvedChainId);
-  const merged = configured.length
-    ? mergeRpcUrlLists(configured, defaults)
-    : defaults;
+  const merged = configured.length ? mergeRpcUrlLists(configured, defaults) : defaults;
   if (merged.length) {
     normalized[String(resolvedChainId)] = merged;
   }
@@ -106,7 +96,7 @@ export const resolveSessionWizardWorkerRpcUrl = ({
 } = {}): string => {
   const resolvedChainId = Number(chainId || 0) || null;
   const map = buildSessionWizardWorkerRpcUrlMap({ chainId: resolvedChainId, pathProvider });
-  const byChain = resolvedChainId ? (map[resolvedChainId] || map[String(resolvedChainId)]) : '';
+  const byChain = resolvedChainId ? map[resolvedChainId] || map[String(resolvedChainId)] : '';
   const ordered = mergeRpcUrlLists(
     normalizeRpcUrlList(byChain),
     normalizeRpcUrlList(pathProvider?.rpcUrl),

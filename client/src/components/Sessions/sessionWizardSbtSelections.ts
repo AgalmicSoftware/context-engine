@@ -1,9 +1,6 @@
 import { toStr } from '../../utilities/shared/primitives.js';
 import { normalizePendingSbtDrafts } from './hooks/usePendingSbtDrafts.js';
-import type {
-  AnyRecord,
-  ChainIdLike,
-} from '../shellTypes';
+import type { AnyRecord, ChainIdLike } from '../shellTypes';
 
 export type SbtSelection = AnyRecord & {
   address?: string;
@@ -72,9 +69,7 @@ export const normalizeSbtSelection = (value: unknown): SbtSelection[] => {
   return [];
 };
 
-export const serializeDefaultFeaturedSbtSelections = (
-  value: unknown = []
-): Array<string | AnyRecord> => {
+export const serializeDefaultFeaturedSbtSelections = (value: unknown = []): Array<string | AnyRecord> => {
   const seen = new Set();
   // Keep pending featured selections marked in the cached draft so a refresh can
   // safely re-bind or prune undeployed placeholder addresses without persisting
@@ -110,9 +105,7 @@ export const dedupeSbtSelection = (value: unknown = []): SbtSelection[] => {
   });
 };
 
-export const buildPendingSbtSelection = (
-  draftEntry: PendingSbtDraftLike = {}
-): SbtSelection | null => {
+export const buildPendingSbtSelection = (draftEntry: PendingSbtDraftLike = {}): SbtSelection | null => {
   const address = toStr(draftEntry?.predictedAddress || draftEntry?.address).trim();
   if (!address) return null;
   const displayName = toStr(draftEntry?.displayName || draftEntry?.name || address).trim() || address;
@@ -124,9 +117,7 @@ export const buildPendingSbtSelection = (
   };
 };
 
-const buildDeployedSbtSelection = (
-  draftEntry: PendingSbtDraftLike = {}
-): SbtSelection | null => {
+const buildDeployedSbtSelection = (draftEntry: PendingSbtDraftLike = {}): SbtSelection | null => {
   const address = toStr(draftEntry?.deployedAddress || draftEntry?.predictedAddress || draftEntry?.address).trim();
   if (!address) return null;
   const displayName = toStr(draftEntry?.displayName || draftEntry?.name || address).trim() || address;
@@ -154,9 +145,11 @@ export const promotePendingSbtSelectionsAfterDeploy = ({
   if (!promotedByAddress.size) {
     return dedupeSbtSelection(normalizeSbtSelection(selections));
   }
-  return dedupeSbtSelection(normalizeSbtSelection(selections).map((entry) => {
-    const addressLower = toStr(entry?.address).trim().toLowerCase();
-    if (!addressLower || entry?.pending !== true) return entry;
-    return promotedByAddress.get(addressLower) || entry;
-  }));
+  return dedupeSbtSelection(
+    normalizeSbtSelection(selections).map((entry) => {
+      const addressLower = toStr(entry?.address).trim().toLowerCase();
+      if (!addressLower || entry?.pending !== true) return entry;
+      return promotedByAddress.get(addressLower) || entry;
+    }),
+  );
 };

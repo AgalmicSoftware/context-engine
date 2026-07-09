@@ -1,12 +1,8 @@
-import {
-  runSurveyResultsAnalysisArtifactWriteController,
-} from './surveyResultsAnalysisArtifactWriteController';
-import type {
-  SurveyResultsAnalysisArtifactWritePlan,
-} from './surveyResultsCacheWriteEligibilityPlan';
+import { runSurveyResultsAnalysisArtifactWriteController } from './surveyResultsAnalysisArtifactWriteController';
+import type { SurveyResultsAnalysisArtifactWritePlan } from './surveyResultsCacheWriteEligibilityPlan';
 
 const buildPlan = (
-  overrides: Partial<SurveyResultsAnalysisArtifactWritePlan> = {}
+  overrides: Partial<SurveyResultsAnalysisArtifactWritePlan> = {},
 ): SurveyResultsAnalysisArtifactWritePlan => ({
   blockedReason: '',
   payload: {
@@ -31,21 +27,19 @@ describe('surveyResultsAnalysisArtifactWriteController', () => {
     const writeAnalysisArtifact = jest.fn().mockResolvedValue(undefined);
     const plan = buildPlan();
 
-    await expect(runSurveyResultsAnalysisArtifactWriteController({
-      plan,
-      ports: { writeAnalysisArtifact },
-    })).resolves.toEqual({
+    await expect(
+      runSurveyResultsAnalysisArtifactWriteController({
+        plan,
+        ports: { writeAnalysisArtifact },
+      }),
+    ).resolves.toEqual({
       attempted: true,
       error: null,
       ok: true,
       target: plan.target,
     });
 
-    expect(writeAnalysisArtifact).toHaveBeenCalledWith(
-      'analysisCache',
-      'alpha-session',
-      plan.payload
-    );
+    expect(writeAnalysisArtifact).toHaveBeenCalledWith('analysisCache', 'alpha-session', plan.payload);
   });
 
   it('stays inert when the pure plan is blocked or the write port is missing', async () => {
@@ -61,20 +55,24 @@ describe('surveyResultsAnalysisArtifactWriteController', () => {
       },
     });
 
-    await expect(runSurveyResultsAnalysisArtifactWriteController({
-      plan: blockedPlan,
-      ports: { writeAnalysisArtifact: jest.fn() },
-    })).resolves.toEqual({
+    await expect(
+      runSurveyResultsAnalysisArtifactWriteController({
+        plan: blockedPlan,
+        ports: { writeAnalysisArtifact: jest.fn() },
+      }),
+    ).resolves.toEqual({
       attempted: false,
       error: null,
       ok: false,
       target: blockedPlan.target,
     });
 
-    await expect(runSurveyResultsAnalysisArtifactWriteController({
-      plan: buildPlan(),
-      ports: {},
-    })).resolves.toEqual({
+    await expect(
+      runSurveyResultsAnalysisArtifactWriteController({
+        plan: buildPlan(),
+        ports: {},
+      }),
+    ).resolves.toEqual({
       attempted: false,
       error: null,
       ok: false,
@@ -89,12 +87,14 @@ describe('surveyResultsAnalysisArtifactWriteController', () => {
       shouldWrite: true,
     });
 
-    await expect(runSurveyResultsAnalysisArtifactWriteController({
-      plan,
-      ports: {
-        writeAnalysisArtifact,
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSurveyResultsAnalysisArtifactWriteController({
+        plan,
+        ports: {
+          writeAnalysisArtifact,
+        },
+      }),
+    ).resolves.toEqual({
       attempted: false,
       error: null,
       ok: false,
@@ -114,12 +114,14 @@ describe('surveyResultsAnalysisArtifactWriteController', () => {
       },
     });
 
-    await expect(runSurveyResultsAnalysisArtifactWriteController({
-      plan,
-      ports: {
-        writeAnalysisArtifact: jest.fn().mockRejectedValue(error),
-      },
-    })).resolves.toEqual({
+    await expect(
+      runSurveyResultsAnalysisArtifactWriteController({
+        plan,
+        ports: {
+          writeAnalysisArtifact: jest.fn().mockRejectedValue(error),
+        },
+      }),
+    ).resolves.toEqual({
       attempted: true,
       error,
       ok: false,

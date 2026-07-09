@@ -37,16 +37,18 @@ describe('sessionWizardDraftCache', () => {
       draft: {
         slug: 'large-draft',
         sessionName: 'Large Draft',
-        sessionInfo: 'x'.repeat((256 * 1024) + 1),
+        sessionInfo: 'x'.repeat(256 * 1024 + 1),
       },
     };
 
     const result = writeSessionWizardDraftCache(payload, { storage });
 
-    expect(result).toEqual(expect.objectContaining({
-      ok: true,
-      key: SESSION_WIZARD_CACHE_KEY,
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        ok: true,
+        key: SESSION_WIZARD_CACHE_KEY,
+      }),
+    );
     expect(readSessionWizardDraftCache({ storage })).toEqual(payload);
   });
 
@@ -57,10 +59,12 @@ describe('sessionWizardDraftCache', () => {
       encryptionGates: [{ id: 'gate-1' }],
     };
 
-    expect(writeSessionWizardDraftCache(payload, { storage })).toEqual(expect.objectContaining({
-      ok: true,
-      key: SESSION_WIZARD_CACHE_KEY,
-    }));
+    expect(writeSessionWizardDraftCache(payload, { storage })).toEqual(
+      expect.objectContaining({
+        ok: true,
+        key: SESSION_WIZARD_CACHE_KEY,
+      }),
+    );
     expect(readSessionWizardDraftCache({ storage })).toEqual(payload);
   });
 

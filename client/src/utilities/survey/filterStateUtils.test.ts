@@ -75,29 +75,30 @@ describe('filterStateUtils', () => {
   });
 
   it('preserves aiCombine only when aiFilter is active', () => {
-    const activeCombined = deserializeFilterState(serializeFilterState({
-      ...defaultState,
-      aiFilter: 'energy',
-      aiTopN: 5,
-      aiCombine: true,
-    }));
+    const activeCombined = deserializeFilterState(
+      serializeFilterState({
+        ...defaultState,
+        aiFilter: 'energy',
+        aiTopN: 5,
+        aiCombine: true,
+      }),
+    );
     expect(activeCombined.aiCombine).toBe(true);
 
-    const inactiveCombined = deserializeFilterState(serializeFilterState({
-      ...defaultState,
-      aiFilter: '',
-      aiTopN: 5,
-      aiCombine: true,
-    }));
+    const inactiveCombined = deserializeFilterState(
+      serializeFilterState({
+        ...defaultState,
+        aiFilter: '',
+        aiTopN: 5,
+        aiCombine: true,
+      }),
+    );
     expect(inactiveCombined.aiCombine).toBe(false);
   });
 
   it('round-trips responseStatus with canonical normalization', () => {
     const normalizeResponseStatus = (
-      responseStatus:
-        | { responded?: boolean; notResponded?: boolean }
-        | null
-        | undefined
+      responseStatus: { responded?: boolean; notResponded?: boolean } | null | undefined,
     ): SurveyFilterState['responseStatus'] => {
       const responded = responseStatus?.responded === true;
       const notResponded = responseStatus?.notResponded === true;
@@ -107,10 +108,7 @@ describe('filterStateUtils', () => {
       return { responded, notResponded };
     };
     const roundTripResponseStatus = (
-      responseStatus:
-        | { responded?: boolean; notResponded?: boolean }
-        | null
-        | undefined
+      responseStatus: { responded?: boolean; notResponded?: boolean } | null | undefined,
     ): SurveyFilterState['responseStatus'] => {
       const encoded = serializeFilterState({
         ...defaultState,

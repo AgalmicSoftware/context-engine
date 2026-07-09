@@ -42,13 +42,21 @@ const buildGroupCfg = (overrides = {}) => {
 describe('rpcProviders session-sponsored PATH opt-out', () => {
   beforeEach(() => {
     jest.resetModules();
-    try { globalThis.CE_RPC_PROVIDER_MODE = 'fallback'; } catch (_) {}
-    try { globalThis.CE_PREFER_PATH_RPC = false; } catch (_) {}
+    try {
+      globalThis.CE_RPC_PROVIDER_MODE = 'fallback';
+    } catch (_) {}
+    try {
+      globalThis.CE_PREFER_PATH_RPC = false;
+    } catch (_) {}
   });
 
   afterEach(() => {
-    try { delete globalThis.CE_RPC_PROVIDER_MODE; } catch (_) {}
-    try { delete globalThis.CE_PREFER_PATH_RPC; } catch (_) {}
+    try {
+      delete globalThis.CE_RPC_PROVIDER_MODE;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_PREFER_PATH_RPC;
+    } catch (_) {}
     jest.resetModules();
   });
 
@@ -79,11 +87,13 @@ describe('rpcProviders session-sponsored PATH opt-out', () => {
       const rpcPref = resolveGroupPathRpcPreference(cfg, 84532);
       const diagnostics = getReadProviderDiagnostics(84532, rpcPref || {});
 
-      expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-        providerLabel: 'default',
-        preferPath: false,
-        preferredUrls: [],
-      }));
+      expect(provider?.__CE_RPC_META).toEqual(
+        expect.objectContaining({
+          providerLabel: 'default',
+          preferPath: false,
+          preferredUrls: [],
+        }),
+      );
       expect(diagnostics.urls).not.toContain(ROOT_RPC_URL);
       expect(diagnostics.urls).not.toContain(PATH_DEFAULT_BASE_SEPOLIA);
       expect(diagnostics.publicUrls).not.toContain(PATH_DEFAULT_BASE_SEPOLIA);
@@ -116,11 +126,13 @@ describe('rpcProviders session-sponsored PATH opt-out', () => {
       const diagnostics = getReadProviderDiagnostics(84532, pref || {});
 
       expect(pref).toBeNull();
-      expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-        providerLabel: 'default',
-        preferPath: false,
-        preferredUrls: [],
-      }));
+      expect(provider?.__CE_RPC_META).toEqual(
+        expect.objectContaining({
+          providerLabel: 'default',
+          preferPath: false,
+          preferredUrls: [],
+        }),
+      );
       expect(diagnostics.urls).not.toContain(PATH_DEFAULT_BASE_SEPOLIA);
       expect(diagnostics.publicUrls).not.toContain(PATH_DEFAULT_BASE_SEPOLIA);
       expect(diagnostics.defaultUrls).not.toContain(PATH_DEFAULT_BASE_SEPOLIA);

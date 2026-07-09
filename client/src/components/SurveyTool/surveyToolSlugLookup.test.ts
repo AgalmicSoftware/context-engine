@@ -1,12 +1,8 @@
 import { resolveSlugForIds } from './surveyToolSlugLookup.js';
-import {
-  getAllSessionSlugs,
-  getSessionConfigBySlug,
-  getSessionSlugByName,
-} from '../../utilities/web3/contractScripts.js';
+import { getAllSessionSlugs, getSessionConfigBySlug, getSessionSlugByName } from '../../utilities/web3/chainGateway.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   getAllSessionSlugs: jest.fn(() => []),
   getSessionConfigBySlug: jest.fn(() => null),
   getSessionSlugByName: jest.fn(() => null),
@@ -73,11 +69,12 @@ describe('surveyToolSlugLookup', () => {
   });
 
   it('does not resolve question ids from a borrowed general network cache when a candidate slug is unresolved', () => {
-    const strictLookup = (slug: unknown) => (
-      String(slug || '').trim().toLowerCase() === 'edge'
+    const strictLookup = (slug: unknown) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === 'edge'
         ? { slug: 'edge', networkChainId: 84532 }
-        : null
-    );
+        : null;
 
     mockedGetAllSessionSlugs.mockReturnValue(['ghost', 'edge']);
     mockedGetSessionConfigBySlug.mockImplementation((slug) => strictLookup(slug));

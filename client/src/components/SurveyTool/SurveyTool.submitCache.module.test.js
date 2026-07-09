@@ -1,18 +1,8 @@
-import {
-  writeSubmittedResponsesToLocalCaches,
-} from './surveyToolPostSubmitCacheController';
-import {
-  normalizeSubmitReceipt,
-} from './surveyToolSubmitTransactionController';
-import {
-  buildSubmissionGroupContext,
-} from './surveyToolHydrationFlow';
-import {
-  processRatingEnvelopesForSubmit,
-} from './surveyToolRatingEnvelopeSubmitController';
-import {
-  resolveSurveyToolSubmittedCacheWriteContext,
-} from './surveyToolSessionResolution';
+import { writeSubmittedResponsesToLocalCaches } from './surveyToolPostSubmitCacheController';
+import { normalizeSubmitReceipt } from './surveyToolSubmitTransactionController';
+import { buildSubmissionGroupContext } from './surveyToolHydrationFlow';
+import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmitController';
+import { resolveSurveyToolSubmittedCacheWriteContext } from './surveyToolSessionResolution';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 const TX_HASH = `0x${'6'.repeat(64)}`;
@@ -33,24 +23,36 @@ const makeCacheDeps = ({
   singleQuestionMode,
   isStandalone,
   deepClone,
-  resolveSubmittedCacheWriteContext: (sessionSlug) => resolveSurveyToolSubmittedCacheWriteContext({
-    sessionSlug,
-    network,
-    networkChainId,
-    resolveBySlug,
-  }),
+  resolveSubmittedCacheWriteContext: (sessionSlug) =>
+    resolveSurveyToolSubmittedCacheWriteContext({
+      sessionSlug,
+      network,
+      networkChainId,
+      resolveBySlug,
+    }),
 });
 
-const buildSubmitContextKey = (context = {}) => [
-  String(context.account || '').trim().toLowerCase(),
-  String(context.providerKind || '').trim().toLowerCase(),
-  String(context.effectiveDraftSlug || '').trim().toLowerCase(),
-  String(context.chainId || '').trim(),
-  context.singleQuestionMode ? 'single' : (context.isStandalone ? 'standalone' : 'survey'),
-  String(context.surveyIndex ?? '').trim(),
-  String(context.surveyId || '').trim().toLowerCase(),
-  String(context.questionID || '').trim().toLowerCase(),
-].join('|');
+const buildSubmitContextKey = (context = {}) =>
+  [
+    String(context.account || '')
+      .trim()
+      .toLowerCase(),
+    String(context.providerKind || '')
+      .trim()
+      .toLowerCase(),
+    String(context.effectiveDraftSlug || '')
+      .trim()
+      .toLowerCase(),
+    String(context.chainId || '').trim(),
+    context.singleQuestionMode ? 'single' : context.isStandalone ? 'standalone' : 'survey',
+    String(context.surveyIndex ?? '').trim(),
+    String(context.surveyId || '')
+      .trim()
+      .toLowerCase(),
+    String(context.questionID || '')
+      .trim()
+      .toLowerCase(),
+  ].join('|');
 
 describe('SurveyTool submit cache writes', () => {
   afterEach(() => {
@@ -86,7 +88,7 @@ describe('SurveyTool submit cache writes', () => {
     await cacheScripts.removeCache('questionsCache', slug).catch(() => null);
     await cacheScripts.removeCache('surveysCache', slug).catch(() => null);
     await cacheScripts.writeCache('surveysCache', slug, {
-      '84532': {
+      84532: {
         surveys: {
           [surveyId]: {
             id: surveyId,
@@ -106,31 +108,14 @@ describe('SurveyTool submit cache writes', () => {
     });
 
     try {
-      const result = await writeSubmittedResponsesToLocalCaches({
-        receipt: {
-          blockNumber: 22,
-          transactionIndex: 3,
-          transactionHash: `0x${'2'.repeat(64)}`,
-        },
-        questionResponses: [
-          {
-            questionID: 'q1',
-            responder,
-            type: 'freeform',
-            prompt: 'New prompt',
-            answer: { value: 'fresh', encrypted: false },
-            additional: { value: '', encrypted: false },
-            importance: null,
-            conviction: null,
-            sessionName: 'Edge Session',
+      const result = await writeSubmittedResponsesToLocalCaches(
+        {
+          receipt: {
+            blockNumber: 22,
+            transactionIndex: 3,
+            transactionHash: `0x${'2'.repeat(64)}`,
           },
-        ],
-        surveyResponse: {
-          surveyID: surveyId,
-          responder,
-          surveyTitle: 'Updated Survey',
-          sessionName: 'Edge Session',
-          responses: [
+          questionResponses: [
             {
               questionID: 'q1',
               responder,
@@ -138,56 +123,88 @@ describe('SurveyTool submit cache writes', () => {
               prompt: 'New prompt',
               answer: { value: 'fresh', encrypted: false },
               additional: { value: '', encrypted: false },
+              importance: null,
+              conviction: null,
+              sessionName: 'Edge Session',
             },
           ],
+          surveyResponse: {
+            surveyID: surveyId,
+            responder,
+            surveyTitle: 'Updated Survey',
+            sessionName: 'Edge Session',
+            responses: [
+              {
+                questionID: 'q1',
+                responder,
+                type: 'freeform',
+                prompt: 'New prompt',
+                answer: { value: 'fresh', encrypted: false },
+                additional: { value: '', encrypted: false },
+              },
+            ],
+          },
+          surveyId,
         },
-        surveyId,
-      }, makeCacheDeps({
-        account: responder,
-        effectiveDraftSlug: slug,
-      }));
+        makeCacheDeps({
+          account: responder,
+          effectiveDraftSlug: slug,
+        }),
+      );
 
       expect(result).toEqual({ questionCacheWritten: true, surveyCacheWritten: true });
 
       const questionsCache = await cacheScripts.readCache('questionsCache', slug);
-      expect(questionsCache?.['84532']?.questionResponses?.q1?.[responder]).toEqual(expect.objectContaining({
-        questionID: 'q1',
-        blockNumber: 22,
-        transactionIndex: 3,
-        logIndex: 0,
-        transactionHash: `0x${'2'.repeat(64)}`,
-      }));
-      expect(questionsCache?.['84532']?.questionResponsesMeta?.q1?.[responder]).toEqual(expect.objectContaining({
-        bn: 22,
-        txi: 3,
-        li: 0,
-      }));
+      expect(questionsCache?.['84532']?.questionResponses?.q1?.[responder]).toEqual(
+        expect.objectContaining({
+          questionID: 'q1',
+          blockNumber: 22,
+          transactionIndex: 3,
+          logIndex: 0,
+          transactionHash: `0x${'2'.repeat(64)}`,
+        }),
+      );
+      expect(questionsCache?.['84532']?.questionResponsesMeta?.q1?.[responder]).toEqual(
+        expect.objectContaining({
+          bn: 22,
+          txi: 3,
+          li: 0,
+        }),
+      );
       expect(questionsCache?.['84532']?.questionResponsesLatestBlock).toBe(0);
-      expect(questionsCache?.['84532']?.questions?.q1).toEqual(expect.objectContaining({
-        id: 'q1',
-        prompt: 'New prompt',
-        type: 'freeform',
-        sessionName: 'Edge Session',
-      }));
+      expect(questionsCache?.['84532']?.questions?.q1).toEqual(
+        expect.objectContaining({
+          id: 'q1',
+          prompt: 'New prompt',
+          type: 'freeform',
+          sessionName: 'Edge Session',
+        }),
+      );
 
       const surveysCache = await cacheScripts.readCache('surveysCache', slug);
       const mergedSurveyResponse = surveysCache?.['84532']?.surveyResponses?.[surveyId]?.[responder];
-      expect(mergedSurveyResponse).toEqual(expect.objectContaining({
-        surveyID: surveyId,
-        blockNumber: 22,
-        transactionIndex: 3,
-        logIndex: 0,
-        transactionHash: `0x${'2'.repeat(64)}`,
-      }));
-      expect(mergedSurveyResponse?.responses).toEqual(expect.arrayContaining([
-        expect.objectContaining({ questionID: 'q0' }),
-        expect.objectContaining({ questionID: 'q1' }),
-      ]));
-      expect(surveysCache?.['84532']?.surveys?.[surveyId]).toEqual(expect.objectContaining({
-        title: 'Updated Survey',
-        sessionName: 'Edge Session',
-        questionIDs: expect.arrayContaining(['q0', 'q1']),
-      }));
+      expect(mergedSurveyResponse).toEqual(
+        expect.objectContaining({
+          surveyID: surveyId,
+          blockNumber: 22,
+          transactionIndex: 3,
+          logIndex: 0,
+          transactionHash: `0x${'2'.repeat(64)}`,
+        }),
+      );
+      expect(mergedSurveyResponse?.responses).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ questionID: 'q0' }),
+          expect.objectContaining({ questionID: 'q1' }),
+        ]),
+      );
+      expect(surveysCache?.['84532']?.surveys?.[surveyId]).toEqual(
+        expect.objectContaining({
+          title: 'Updated Survey',
+          sessionName: 'Edge Session',
+          questionIDs: expect.arrayContaining(['q0', 'q1']),
+        }),
+      );
       expect(surveysCache?.['84532']?.surveyResponsesLatestBlock).toEqual({});
     } finally {
       await cacheScripts.removeCache('questionsCache', slug).catch(() => null);
@@ -203,7 +220,7 @@ describe('SurveyTool submit cache writes', () => {
     await cacheScripts.removeCache('questionsCache', routeSlug).catch(() => null);
     await cacheScripts.removeCache('questionsCache', submissionSlug).catch(() => null);
     await cacheScripts.writeCache('questionsCache', routeSlug, {
-      '84532': {
+      84532: {
         questions: {},
         questionResponses: {},
         questionResponsesMeta: {},
@@ -211,37 +228,42 @@ describe('SurveyTool submit cache writes', () => {
     });
 
     try {
-      const result = await writeSubmittedResponsesToLocalCaches({
-        receipt: {
-          blockNumber: 31,
-          transactionIndex: 4,
-          transactionHash: `0x${'8'.repeat(64)}`,
-        },
-        questionResponses: [
-          {
-            questionID: 'q1',
-            responder,
-            type: 'freeform',
-            prompt: 'Alpha prompt',
-            answer: { value: 'fresh', encrypted: false },
-            additional: { value: '', encrypted: false },
+      const result = await writeSubmittedResponsesToLocalCaches(
+        {
+          receipt: {
+            blockNumber: 31,
+            transactionIndex: 4,
+            transactionHash: `0x${'8'.repeat(64)}`,
           },
-        ],
-        submissionSlug,
-      }, makeCacheDeps({
-        account: responder,
-        effectiveDraftSlug: routeSlug,
-      }));
+          questionResponses: [
+            {
+              questionID: 'q1',
+              responder,
+              type: 'freeform',
+              prompt: 'Alpha prompt',
+              answer: { value: 'fresh', encrypted: false },
+              additional: { value: '', encrypted: false },
+            },
+          ],
+          submissionSlug,
+        },
+        makeCacheDeps({
+          account: responder,
+          effectiveDraftSlug: routeSlug,
+        }),
+      );
 
       expect(result).toEqual({ questionCacheWritten: true, surveyCacheWritten: false });
       const routeCache = await cacheScripts.readCache('questionsCache', routeSlug);
       const submissionCache = await cacheScripts.readCache('questionsCache', submissionSlug);
       expect(routeCache?.['84532']?.questionResponses?.q1).toBeUndefined();
-      expect(submissionCache?.['84532']?.questionResponses?.q1?.[responder]).toEqual(expect.objectContaining({
-        questionID: 'q1',
-        blockNumber: 31,
-        transactionIndex: 4,
-      }));
+      expect(submissionCache?.['84532']?.questionResponses?.q1?.[responder]).toEqual(
+        expect.objectContaining({
+          questionID: 'q1',
+          blockNumber: 31,
+          transactionIndex: 4,
+        }),
+      );
     } finally {
       await cacheScripts.removeCache('questionsCache', routeSlug).catch(() => null);
       await cacheScripts.removeCache('questionsCache', submissionSlug).catch(() => null);
@@ -271,10 +293,12 @@ describe('SurveyTool submit cache writes', () => {
       fallbackSlug: 'edge',
     });
 
-    expect(submissionContext).toEqual(expect.objectContaining({
-      ok: true,
-      submissionGroupKey: 'alpha',
-    }));
+    expect(submissionContext).toEqual(
+      expect.objectContaining({
+        ok: true,
+        submissionGroupKey: 'alpha',
+      }),
+    );
 
     const tx = await submitResponses(
       {},
@@ -282,7 +306,7 @@ describe('SurveyTool submit cache writes', () => {
       questionResponses,
       `0x${'0'.repeat(64)}`,
       null,
-      submissionContext.submissionGroupKey
+      submissionContext.submissionGroupKey,
     );
     const receipt = await normalizeSubmitReceipt(tx, {
       questionResponses,
@@ -293,10 +317,12 @@ describe('SurveyTool submit cache writes', () => {
     });
 
     expect(submitResponses.mock.calls[0][5]).toBe('alpha');
-    expect(receipt).toEqual(expect.objectContaining({
-      status: 1,
-      __ceSubmissionGroupKey: 'alpha',
-    }));
+    expect(receipt).toEqual(
+      expect.objectContaining({
+        status: 1,
+        __ceSubmissionGroupKey: 'alpha',
+      }),
+    );
   });
 
   it('blocks pile submissions that span multiple session slugs', async () => {
@@ -310,15 +336,20 @@ describe('SurveyTool submit cache writes', () => {
       fallbackSlug: 'edge',
     });
 
-    expect(submissionContext).toEqual(expect.objectContaining({
-      ok: false,
-      error: 'Cannot submit responses from multiple sessions at once. Narrow the question view to one session and try again.',
-      sessionSlugs: ['alpha', 'beta'],
-    }));
+    expect(submissionContext).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error:
+          'Cannot submit responses from multiple sessions at once. Narrow the question view to one session and try again.',
+        sessionSlugs: ['alpha', 'beta'],
+      }),
+    );
     expect(() => {
       if (!submissionContext.ok) throw new Error(submissionContext.error);
       submitResponses();
-    }).toThrow('Cannot submit responses from multiple sessions at once. Narrow the question view to one session and try again.');
+    }).toThrow(
+      'Cannot submit responses from multiple sessions at once. Narrow the question view to one session and try again.',
+    );
     expect(submitResponses).not.toHaveBeenCalled();
   });
 
@@ -349,40 +380,41 @@ describe('SurveyTool submit cache writes', () => {
       },
     ];
 
-    await processRatingEnvelopesForSubmit({
-      sliceForSubmit: {
-        answers: { q1: { value: '*', encrypted: true, encryptedPortion: '{}' } },
-        additionalComments: { q1: { value: '', encrypted: false } },
+    await processRatingEnvelopesForSubmit(
+      {
+        sliceForSubmit: {
+          answers: { q1: { value: '*', encrypted: true, encryptedPortion: '{}' } },
+          additionalComments: { q1: { value: '', encrypted: false } },
+        },
+        userAnswersSource: null,
+        questionResponses,
+        changedMapForSubmit: { q1: { importance: true } },
+        encryptionBaseOpts: {
+          provider: {},
+          account: snapshot.account,
+          chainId: snapshot.chainId,
+          surveyId: snapshot.surveyId,
+          kind: 'rating',
+          hasher: { hash: jest.fn() },
+        },
       },
-      userAnswersSource: null,
-      questionResponses,
-      changedMapForSubmit: { q1: { importance: true } },
-      encryptionBaseOpts: {
-        provider: {},
-        account: snapshot.account,
-        chainId: snapshot.chainId,
-        surveyId: snapshot.surveyId,
-        kind: 'rating',
-        hasher: { hash: jest.fn() },
+      {
+        isQuestionLockedForResponse: () => false,
+        resolveFieldEncryptionAudience: () => 'self',
+        getEffectiveRecipientsForQid: () => [],
+        getEffectiveRecipientsForField: () => [],
+        getDefaultResponseEncryptionAudienceForQid: () => 'self',
+        buildLitEncryptionOptionsForRecipients: () => null,
+        encryptEnvelopeValue: jest.fn(async () => {
+          currentContext = { ...currentContext, account: '0xdef' };
+          return 'encrypted-rating';
+        }),
+        getImportanceFromResponse: (response) =>
+          typeof response?.importance === 'number' ? response.importance : null,
+        getConvictionFromResponse: (response) =>
+          typeof response?.conviction === 'number' ? response.conviction : null,
       },
-    }, {
-      isQuestionLockedForResponse: () => false,
-      resolveFieldEncryptionAudience: () => 'self',
-      getEffectiveRecipientsForQid: () => [],
-      getEffectiveRecipientsForField: () => [],
-      getDefaultResponseEncryptionAudienceForQid: () => 'self',
-      buildLitEncryptionOptionsForRecipients: () => null,
-      encryptEnvelopeValue: jest.fn(async () => {
-        currentContext = { ...currentContext, account: '0xdef' };
-        return 'encrypted-rating';
-      }),
-      getImportanceFromResponse: (response) => (
-        typeof response?.importance === 'number' ? response.importance : null
-      ),
-      getConvictionFromResponse: (response) => (
-        typeof response?.conviction === 'number' ? response.conviction : null
-      ),
-    });
+    );
 
     expect(() => {
       if (snapshotKey !== buildSubmitContextKey(currentContext)) {
@@ -404,16 +436,17 @@ describe('SurveyTool submit cache writes', () => {
       slug: '',
       networkChainId: 84532,
     };
-    const strictLookup = (inputSlug) => (
-      String(inputSlug || '').trim().toLowerCase() === ''
+    const strictLookup = (inputSlug) =>
+      String(inputSlug || '')
+        .trim()
+        .toLowerCase() === ''
         ? generalCfg
-        : null
-    );
+        : null;
 
     await cacheScripts.removeCache('questionsCache', slug).catch(() => null);
     await cacheScripts.removeCache('surveysCache', slug).catch(() => null);
     await cacheScripts.writeCache('questionsCache', slug, {
-      '84532': {
+      84532: {
         questions: {
           qGeneral: {
             id: 'qGeneral',
@@ -425,7 +458,7 @@ describe('SurveyTool submit cache writes', () => {
       },
     });
     await cacheScripts.writeCache('surveysCache', slug, {
-      '84532': {
+      84532: {
         surveys: {
           [surveyId]: {
             id: surveyId,
@@ -439,27 +472,14 @@ describe('SurveyTool submit cache writes', () => {
     });
 
     try {
-      const result = await writeSubmittedResponsesToLocalCaches({
-        receipt: {
-          blockNumber: 22,
-          transactionIndex: 3,
-          transactionHash: `0x${'2'.repeat(64)}`,
-        },
-        questionResponses: [
-          {
-            questionID: 'q1',
-            responder,
-            type: 'freeform',
-            prompt: 'New prompt',
-            answer: { value: 'fresh', encrypted: false },
-            additional: { value: '', encrypted: false },
+      const result = await writeSubmittedResponsesToLocalCaches(
+        {
+          receipt: {
+            blockNumber: 22,
+            transactionIndex: 3,
+            transactionHash: `0x${'2'.repeat(64)}`,
           },
-        ],
-        surveyResponse: {
-          surveyID: surveyId,
-          responder,
-          surveyTitle: 'Updated Survey',
-          responses: [
+          questionResponses: [
             {
               questionID: 'q1',
               responder,
@@ -469,30 +489,50 @@ describe('SurveyTool submit cache writes', () => {
               additional: { value: '', encrypted: false },
             },
           ],
+          surveyResponse: {
+            surveyID: surveyId,
+            responder,
+            surveyTitle: 'Updated Survey',
+            responses: [
+              {
+                questionID: 'q1',
+                responder,
+                type: 'freeform',
+                prompt: 'New prompt',
+                answer: { value: 'fresh', encrypted: false },
+                additional: { value: '', encrypted: false },
+              },
+            ],
+          },
+          surveyId,
         },
-        surveyId,
-      }, makeCacheDeps({
-        account: responder,
-        effectiveDraftSlug: slug,
-        network: null,
-        resolveBySlug: strictLookup,
-      }));
+        makeCacheDeps({
+          account: responder,
+          effectiveDraftSlug: slug,
+          network: null,
+          resolveBySlug: strictLookup,
+        }),
+      );
 
       expect(result).toEqual({ questionCacheWritten: false, surveyCacheWritten: false });
 
       const questionsCache = await cacheScripts.readCache('questionsCache', slug);
-      expect(questionsCache?.['84532']?.questions?.qGeneral).toEqual(expect.objectContaining({
-        id: 'qGeneral',
-        prompt: 'Borrowed general prompt',
-      }));
+      expect(questionsCache?.['84532']?.questions?.qGeneral).toEqual(
+        expect.objectContaining({
+          id: 'qGeneral',
+          prompt: 'Borrowed general prompt',
+        }),
+      );
       expect(questionsCache?.['84532']?.questions?.q1).toBeUndefined();
       expect(questionsCache?.['84532']?.questionResponses?.q1).toBeUndefined();
 
       const surveysCache = await cacheScripts.readCache('surveysCache', slug);
-      expect(surveysCache?.['84532']?.surveys?.[surveyId]).toEqual(expect.objectContaining({
-        title: 'Borrowed General Survey',
-        questionIDs: ['qGeneral'],
-      }));
+      expect(surveysCache?.['84532']?.surveys?.[surveyId]).toEqual(
+        expect.objectContaining({
+          title: 'Borrowed General Survey',
+          questionIDs: ['qGeneral'],
+        }),
+      );
       expect(surveysCache?.['84532']?.surveyResponses?.[surveyId]?.[responder]).toBeUndefined();
     } finally {
       await cacheScripts.removeCache('questionsCache', slug).catch(() => null);

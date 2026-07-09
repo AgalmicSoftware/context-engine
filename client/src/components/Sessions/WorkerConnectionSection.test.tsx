@@ -13,7 +13,7 @@ describe('WorkerConnectionSection', () => {
         renderInfoTooltip={() => null}
         showSharedWorkerChoice={false}
         onResetToDefault={() => {}}
-      />
+      />,
     );
 
     expect(screen.getByText('Worker URL appears here after a successful custom worker deploy.')).toBeInTheDocument();
@@ -32,7 +32,7 @@ describe('WorkerConnectionSection', () => {
         renderInfoTooltip={({ testId }) => <button type="button" data-testid={testId} />}
         showSharedWorkerChoice
         onResetToDefault={onResetToDefault}
-      />
+      />,
     );
 
     expect(renderField).toHaveBeenCalledWith('corsWorkerUrl', 'https://worker.example', [], { forceShow: true });

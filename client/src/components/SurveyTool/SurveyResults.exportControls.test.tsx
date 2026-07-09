@@ -34,7 +34,7 @@ jest.mock('../../utilities/sessionResultsExport', () => {
     downloadSessionResultsPdfReport: jest.fn(),
   };
 });
-jest.mock('../../utilities/ai/aiScripts.js', () => ({
+jest.mock('../../utilities/ai/aiClient.js', () => ({
   callAI: jest.fn(),
 }));
 const mockPolisReport = jest.fn((..._args: any[]) => null);
@@ -205,8 +205,9 @@ describe('SurveyResults export/view controls', () => {
 
     const menu = document.querySelector('.dropdown-menu');
     expect(menu).not.toBeNull();
-    const optionLabels = Array.from((menu as HTMLElement).querySelectorAll('button.dropdown-item'))
-      .map((item) => item.textContent?.trim());
+    const optionLabels = Array.from((menu as HTMLElement).querySelectorAll('button.dropdown-item')).map((item) =>
+      item.textContent?.trim(),
+    );
 
     expect(optionLabels).toEqual([
       'CSV: Questions',

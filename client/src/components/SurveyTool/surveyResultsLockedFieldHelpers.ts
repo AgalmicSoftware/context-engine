@@ -1,6 +1,4 @@
-import {
-  stableSerializeSignatureValue,
-} from './surveyResultsHelpers.js';
+import { stableSerializeSignatureValue } from './surveyResultsHelpers.js';
 
 type SurveyResultsLockedFieldRecord = Record<string, unknown>;
 
@@ -50,21 +48,15 @@ export type SurveyResultsResponseRecord = SurveyResultsLockedFieldRecord & {
   type?: unknown;
 };
 
-export const hasOwn = (obj: unknown, key: PropertyKey): boolean => (
-  !!obj && Object.prototype.hasOwnProperty.call(obj, key)
-);
+export const hasOwn = (obj: unknown, key: PropertyKey): boolean =>
+  !!obj && Object.prototype.hasOwnProperty.call(obj, key);
 
-export const normalizeGateSbtEntries = (
-  gate: SurveyResultsGateRecord | null = null
-): SurveyResultsGateEntry[] => {
+export const normalizeGateSbtEntries = (gate: SurveyResultsGateRecord | null = null): SurveyResultsGateEntry[] => {
   const out: SurveyResultsGateEntry[] = [];
   const seen: Set<string> = new Set();
   const push = (address: unknown, label: unknown = ''): void => {
-    const normalizedAddress = typeof address === 'string'
-      ? address.trim()
-      : address == null
-        ? ''
-        : String(address).trim();
+    const normalizedAddress =
+      typeof address === 'string' ? address.trim() : address == null ? '' : String(address).trim();
     if (!normalizedAddress) return;
     const key = normalizedAddress.toLowerCase();
     if (seen.has(key)) return;
@@ -84,7 +76,7 @@ export const normalizeGateSbtEntries = (
       const entryRecord = entry as SurveyResultsGateRecord | null | undefined;
       push(
         entryRecord?.address || entryRecord?.sbtAddress || '',
-        entryRecord?.label || entryRecord?.name || entryRecord?.title || ''
+        entryRecord?.label || entryRecord?.name || entryRecord?.title || '',
       );
     });
   }
@@ -112,7 +104,7 @@ export const hasEnvelopeShape = (value: unknown): value is SurveyResultsEncrypte
 };
 
 export const extractEnvelopeCandidate = (
-  field: SurveyResultsEncryptedFieldRecord | null | undefined
+  field: SurveyResultsEncryptedFieldRecord | null | undefined,
 ): unknown | null => {
   if (!field || typeof field !== 'object') return null;
 
@@ -148,19 +140,15 @@ export const isLockedEncryptedField = (field: SurveyResultsEncryptedFieldRecord 
   return !hasVisibleFieldValue(field);
 };
 
-export const getFieldEncryptionAudience = (
-  field: SurveyResultsEncryptedFieldRecord | null | undefined
-): string => (
+export const getFieldEncryptionAudience = (field: SurveyResultsEncryptedFieldRecord | null | undefined): string =>
   typeof field === 'object' && field
-    ? String(field.encryptionAudience || '').trim().toLowerCase()
-    : ''
-);
+    ? String(field.encryptionAudience || '')
+        .trim()
+        .toLowerCase()
+    : '';
 
-export const isBannerEligibleLockedField = (
-  field: SurveyResultsEncryptedFieldRecord | null | undefined
-): boolean => (
-  isLockedEncryptedField(field) && getFieldEncryptionAudience(field) !== 'self'
-);
+export const isBannerEligibleLockedField = (field: SurveyResultsEncryptedFieldRecord | null | undefined): boolean =>
+  isLockedEncryptedField(field) && getFieldEncryptionAudience(field) !== 'self';
 
 export const normalizeGateText = (value: unknown): string => {
   const raw = (typeof value === 'string' ? value : value == null ? '' : String(value)).trim();
@@ -169,19 +157,18 @@ export const normalizeGateText = (value: unknown): string => {
   return raw;
 };
 
-export const buildLockedResponseSignature = (
-  response: SurveyResultsResponseRecord = {}
-): string => stableSerializeSignatureValue({
-  questionId: response?.questionID || response?.questionId || '',
-  timestamp: response?.timeStamp || response?.timestamp || 0,
-  answerHash: response?.answer?.hash || '',
-  additionalHash: response?.additional?.hash || '',
-  answerValue: response?.answer?.value,
-  additionalValue: response?.additional?.value,
-  answerEncrypted: response?.answer?.encrypted,
-  additionalEncrypted: response?.additional?.encrypted,
-  answerEnvelope: extractEnvelopeCandidate(response?.answer),
-  additionalEnvelope: extractEnvelopeCandidate(response?.additional),
-  importanceEncrypted: response?.importanceEncrypted || '',
-  convictionEncrypted: response?.convictionEncrypted || '',
-});
+export const buildLockedResponseSignature = (response: SurveyResultsResponseRecord = {}): string =>
+  stableSerializeSignatureValue({
+    questionId: response?.questionID || response?.questionId || '',
+    timestamp: response?.timeStamp || response?.timestamp || 0,
+    answerHash: response?.answer?.hash || '',
+    additionalHash: response?.additional?.hash || '',
+    answerValue: response?.answer?.value,
+    additionalValue: response?.additional?.value,
+    answerEncrypted: response?.answer?.encrypted,
+    additionalEncrypted: response?.additional?.encrypted,
+    answerEnvelope: extractEnvelopeCandidate(response?.answer),
+    additionalEnvelope: extractEnvelopeCandidate(response?.additional),
+    importanceEncrypted: response?.importanceEncrypted || '',
+    convictionEncrypted: response?.convictionEncrypted || '',
+  });

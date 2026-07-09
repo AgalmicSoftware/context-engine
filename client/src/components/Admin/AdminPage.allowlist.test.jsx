@@ -56,7 +56,7 @@ jest.mock('../../utilities/arweave/arweaveClient.js', () => {
     readArweaveWalletBalance: jest.fn(),
     formatWinstonToAr: jest.fn(),
   };
-  return { arweaveClient, arweaveScripts: arweaveClient };
+  return { arweaveClient };
 });
 
 jest.mock('../../utilities/crypto/encryptedFields.js', () => ({
@@ -94,11 +94,7 @@ jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-se
 
 const AdminPage = require('./AdminPage').default;
 
-const renderAdminPage = async ({
-  account = ADMIN_ADDRESS,
-  initialSessionId,
-  initialRegistryChainId,
-} = {}) => {
+const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, initialRegistryChainId } = {}) => {
   let utils;
   await act(async () => {
     utils = render(
@@ -109,7 +105,7 @@ const renderAdminPage = async ({
         toggleLoginModal={jest.fn()}
         initialSessionId={initialSessionId}
         initialRegistryChainId={initialRegistryChainId}
-      />
+      />,
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -137,11 +133,13 @@ describe('AdminPage allowlist controls', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    );
     sessionEntries = [['edge', buildSessionConfig()]];
     mockLoadSessionRegistryCache.mockResolvedValue(undefined);
     mockGetAllSessionEntries.mockImplementation(() => sessionEntries);
@@ -181,25 +179,30 @@ describe('AdminPage allowlist controls', () => {
   });
 
   it('hydrates the allowlist editor from the cached worker config overlay', async () => {
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
-    localStorage.setItem('ce:sessionWorkerConfigCache:v1', JSON.stringify({
-      v: 2,
-      bySession: {
-        edge: {
-          config: {
-            corsWorkerUrl: 'https://worker.example.test',
-            allowOrigins: ['https://existing.example.test'],
-            limits: { perWalletPerDay: 3 },
-            rpcEndpoint: 'https://rpc.example.test',
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    );
+    localStorage.setItem(
+      'ce:sessionWorkerConfigCache:v1',
+      JSON.stringify({
+        v: 2,
+        bySession: {
+          edge: {
+            config: {
+              corsWorkerUrl: 'https://worker.example.test',
+              allowOrigins: ['https://existing.example.test'],
+              limits: { perWalletPerDay: 3 },
+              rpcEndpoint: 'https://rpc.example.test',
+            },
+            cachedAtMs: 1700000000000,
           },
-          cachedAtMs: 1700000000000,
         },
-      },
-    }));
+      }),
+    );
 
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
@@ -208,20 +211,23 @@ describe('AdminPage allowlist controls', () => {
   });
 
   it('saves the edited allowOrigins list exactly for the selected session', async () => {
-    localStorage.setItem('ce:sessionWorkerConfigCache:v1', JSON.stringify({
-      v: 2,
-      bySession: {
-        edge: {
-          config: {
-            corsWorkerUrl: 'https://worker.example.test',
-            allowOrigins: ['https://existing.example.test', 'https://remove-me.example.test'],
-            limits: { perWalletPerDay: 3 },
-            rpcEndpoint: 'https://rpc.example.test',
+    localStorage.setItem(
+      'ce:sessionWorkerConfigCache:v1',
+      JSON.stringify({
+        v: 2,
+        bySession: {
+          edge: {
+            config: {
+              corsWorkerUrl: 'https://worker.example.test',
+              allowOrigins: ['https://existing.example.test', 'https://remove-me.example.test'],
+              limits: { perWalletPerDay: 3 },
+              rpcEndpoint: 'https://rpc.example.test',
+            },
+            cachedAtMs: 1700000000000,
           },
-          cachedAtMs: 1700000000000,
         },
-      },
-    }));
+      }),
+    );
 
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
@@ -235,18 +241,20 @@ describe('AdminPage allowlist controls', () => {
       expect(screen.getByText(/allowOrigins saved \(1 origins\)/)).toBeInTheDocument();
     });
 
-    expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'set-config',
-      slug: 'edge',
-      workerUrl: 'https://worker.example.test',
-      body: expect.objectContaining({
-        sessionSlug: 'edge',
-        adminAddress: ADMIN_ADDRESS,
-        config: expect.objectContaining({
-          allowOrigins: ['https://existing.example.test'],
+    expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'set-config',
+        slug: 'edge',
+        workerUrl: 'https://worker.example.test',
+        body: expect.objectContaining({
+          sessionSlug: 'edge',
+          adminAddress: ADMIN_ADDRESS,
+          config: expect.objectContaining({
+            allowOrigins: ['https://existing.example.test'],
+          }),
         }),
       }),
-    }));
+    );
     const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
     const payload = JSON.parse(adminCall[1].body);
     expect(payload.sessionSlug).toBe('edge');
@@ -255,12 +263,14 @@ describe('AdminPage allowlist controls', () => {
     expect(payload.slug).toBe('edge');
     expect(Object.prototype.hasOwnProperty.call(payload.config, 'adminAddress')).toBe(false);
     expect(payload.config.allowOrigins).toEqual(['https://existing.example.test']);
-    expect(getCachedSessionWorkerConfig('edge')).toEqual(expect.objectContaining({
-      corsWorkerUrl: 'https://worker.example.test',
-      allowOrigins: ['https://existing.example.test'],
-      limits: { perWalletPerDay: 3 },
-      rpcEndpoint: 'https://rpc.example.test',
-    }));
+    expect(getCachedSessionWorkerConfig('edge')).toEqual(
+      expect.objectContaining({
+        corsWorkerUrl: 'https://worker.example.test',
+        allowOrigins: ['https://existing.example.test'],
+        limits: { perWalletPerDay: 3 },
+        rpcEndpoint: 'https://rpc.example.test',
+      }),
+    );
   });
 
   it('normalizes mixed delimiter allowOrigins input before saving', async () => {
@@ -278,10 +288,7 @@ describe('AdminPage allowlist controls', () => {
 
     const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
     const payload = JSON.parse(adminCall[1].body);
-    expect(payload.config.allowOrigins).toEqual([
-      'https://alpha.example.test',
-      'http://localhost:7391',
-    ]);
+    expect(payload.config.allowOrigins).toEqual(['https://alpha.example.test', 'http://localhost:7391']);
   });
 
   it('retries allowlist saves when the worker reports a nonce mismatch', async () => {
@@ -314,7 +321,11 @@ describe('AdminPage allowlist controls', () => {
       if (String(url).endsWith('/admin/set-config')) {
         setConfigCalls += 1;
         if (setConfigCalls === 1) {
-          return Promise.resolve({ ok: false, status: 400, json: async () => ({ error: 'Nonce mismatch or expired.' }) });
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            json: async () => ({ error: 'Nonce mismatch or expired.' }),
+          });
         }
         return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true }) });
       }
@@ -340,18 +351,21 @@ describe('AdminPage allowlist controls', () => {
   });
 
   it('saving an empty allowlist keeps CORS open and surfaces a warning', async () => {
-    localStorage.setItem('ce:sessionWorkerConfigCache:v1', JSON.stringify({
-      v: 2,
-      bySession: {
-        edge: {
-          config: {
-            corsWorkerUrl: 'https://worker.example.test',
-            allowOrigins: ['https://existing.example.test'],
+    localStorage.setItem(
+      'ce:sessionWorkerConfigCache:v1',
+      JSON.stringify({
+        v: 2,
+        bySession: {
+          edge: {
+            config: {
+              corsWorkerUrl: 'https://worker.example.test',
+              allowOrigins: ['https://existing.example.test'],
+            },
+            cachedAtMs: 1700000000000,
           },
-          cachedAtMs: 1700000000000,
         },
-      },
-    }));
+      }),
+    );
 
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
@@ -359,9 +373,9 @@ describe('AdminPage allowlist controls', () => {
     fireEvent.change(await openAllowlistEditor(), {
       target: { value: '' },
     });
-    expect(screen.getByText(
-      'Empty allowlist: saving this draft keeps CORS open for any browser origin.'
-    )).toBeInTheDocument();
+    expect(
+      screen.getByText('Empty allowlist: saving this draft keeps CORS open for any browser origin.'),
+    ).toBeInTheDocument();
 
     await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
@@ -372,24 +386,29 @@ describe('AdminPage allowlist controls', () => {
     const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
     const payload = JSON.parse(adminCall[1].body);
     expect(payload.config.allowOrigins).toEqual([]);
-    expect(getCachedSessionWorkerConfig('edge')).toEqual(expect.objectContaining({
-      allowOrigins: [],
-    }));
+    expect(getCachedSessionWorkerConfig('edge')).toEqual(
+      expect.objectContaining({
+        allowOrigins: [],
+      }),
+    );
   });
 
   it('adds recommended origins to the allowlist draft without duplicating entries', async () => {
-    localStorage.setItem('ce:sessionWorkerConfigCache:v1', JSON.stringify({
-      v: 2,
-      bySession: {
-        edge: {
-          config: {
-            corsWorkerUrl: 'https://worker.example.test',
-            allowOrigins: ['https://existing.example.test', 'http://localhost:7391'],
+    localStorage.setItem(
+      'ce:sessionWorkerConfigCache:v1',
+      JSON.stringify({
+        v: 2,
+        bySession: {
+          edge: {
+            config: {
+              corsWorkerUrl: 'https://worker.example.test',
+              allowOrigins: ['https://existing.example.test', 'http://localhost:7391'],
+            },
+            cachedAtMs: 1700000000000,
           },
-          cachedAtMs: 1700000000000,
         },
-      },
-    }));
+      }),
+    );
 
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
@@ -402,22 +421,26 @@ describe('AdminPage allowlist controls', () => {
     });
 
     const values = getAllowOriginsInput().value.split('\n').filter(Boolean);
-    expect(values).toEqual(expect.arrayContaining([
-      'https://existing.example.test',
-      'http://localhost:7391',
-      'https://contextengine.xyz', // intentional: production recommended origin assertion
-      window.location.origin,
-    ]));
+    expect(values).toEqual(
+      expect.arrayContaining([
+        'https://existing.example.test',
+        'http://localhost:7391',
+        'https://contextengine.xyz', // intentional: production recommended origin assertion
+        window.location.origin,
+      ]),
+    );
     expect(values.filter((entry) => entry === 'http://localhost:7391')).toHaveLength(1);
     expect(global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'))).toBeUndefined();
   });
 
   it('turns worker allowlist save fetch failures into a stale-worker/CORS hint', async () => {
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : Promise.reject(new TypeError('Failed to fetch'))
-    ));
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : Promise.reject(new TypeError('Failed to fetch')),
+      ),
+    );
 
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
@@ -428,13 +451,13 @@ describe('AdminPage allowlist controls', () => {
     await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
-      expect(screen.getByText(
-        /Worker request could not reach https:\/\/worker\.example\.test\./
-      )).toBeInTheDocument();
+      expect(screen.getByText(/Worker request could not reach https:\/\/worker\.example\.test\./)).toBeInTheDocument();
     });
-    expect(screen.getByText(
-      /If this session still resolves an older worker URL, finish deploy\/config sync or edit the worker URL override first\./
-    )).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /If this session still resolves an older worker URL, finish deploy\/config sync or edit the worker URL override first\./,
+      ),
+    ).toBeInTheDocument();
   });
 
   it('surfaces missing worker URLs before admin patch actions can run', async () => {
@@ -458,18 +481,24 @@ describe('AdminPage allowlist controls', () => {
 
   it('prefills the worker hero card from the cached worker-config replica while async resolution is pending', async () => {
     let resolveWorkerLookup;
-    mockResolveCorsProxyUrl.mockImplementation(() => new Promise((resolve) => {
-      resolveWorkerLookup = resolve;
-    }));
+    mockResolveCorsProxyUrl.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveWorkerLookup = resolve;
+        }),
+    );
     sessionEntries = [['edge', buildSessionConfig({ corsWorkerUrl: '' })]];
-    localStorage.setItem('ce:sessionWorkerConfigCache:v1', JSON.stringify({
-      v: 1,
-      bySession: {
-        edge: {
-          corsWorkerUrl: 'https://worker-kv-cache.example.test',
+    localStorage.setItem(
+      'ce:sessionWorkerConfigCache:v1',
+      JSON.stringify({
+        v: 1,
+        bySession: {
+          edge: {
+            corsWorkerUrl: 'https://worker-kv-cache.example.test',
+          },
         },
-      },
-    }));
+      }),
+    );
 
     await renderAdminPage();
 
@@ -488,14 +517,22 @@ describe('AdminPage allowlist controls', () => {
 
   it('prefills the worker hero card with the shared fallback for the general session', async () => {
     let resolveWorkerLookup;
-    mockResolveCorsProxyUrl.mockImplementation(() => new Promise((resolve) => {
-      resolveWorkerLookup = resolve;
-    }));
-    sessionEntries = [['', buildSessionConfig({
-      slug: '',
-      sessionName: 'Context Engine',
-      corsWorkerUrl: '',
-    })]];
+    mockResolveCorsProxyUrl.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveWorkerLookup = resolve;
+        }),
+    );
+    sessionEntries = [
+      [
+        '',
+        buildSessionConfig({
+          slug: '',
+          sessionName: 'Context Engine',
+          corsWorkerUrl: '',
+        }),
+      ],
+    ];
 
     await renderAdminPage();
 
@@ -505,7 +542,10 @@ describe('AdminPage allowlist controls', () => {
 
     const metadataPanel = screen.getByText('Session metadata').closest('section');
     fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
-    expect(within(metadataPanel).getByRole('link', { name: 'general' })).toHaveAttribute('href', 'http://localhost/session');
+    expect(within(metadataPanel).getByRole('link', { name: 'general' })).toHaveAttribute(
+      'href',
+      'http://localhost/session',
+    );
 
     await act(async () => {
       resolveWorkerLookup({

@@ -1,7 +1,4 @@
-import {
-  bindSessionRegistryReadsPort,
-  type SessionRegistryReadModule,
-} from './sessionRegistryReadPorts';
+import { bindSessionRegistryReadsPort, type SessionRegistryReadModule } from './sessionRegistryReadPorts';
 
 const buildRegistryModule = (overrides: Partial<SessionRegistryReadModule> = {}): SessionRegistryReadModule => ({
   SESSION_REGISTRY_CACHE_UPDATED_EVENT: 'ce:session-registry-cache-updated',
@@ -19,10 +16,18 @@ const buildRegistryModule = (overrides: Partial<SessionRegistryReadModule> = {})
     getRegistryContract: jest.fn(),
     fetchSessionFromRegistry: jest.fn(async () => ({ slug: 'nested' })),
     upsertSessionRegistryCache: jest.fn(() => ({ ts: 2 })),
-    normalizeSlug: jest.fn((value: unknown) => String(value || '').trim().toLowerCase()),
+    normalizeSlug: jest.fn((value: unknown) =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    ),
     formatSessionId: jest.fn((value: unknown) => String(value || '')),
     normalizeSessionIdHex: jest.fn((value: unknown) => String(value || '').toLowerCase()),
-    toRegistrySlug: jest.fn((value: unknown) => String(value || '').trim().toLowerCase()),
+    toRegistrySlug: jest.fn((value: unknown) =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    ),
   },
   ...overrides,
 });
@@ -58,10 +63,8 @@ describe('session registry read ports', () => {
       sessionRegistry: () => registryModule,
     });
 
-    await expect(port.loadSessionRegistryCache({ force: true }))
-      .resolves.toEqual({ sessions: { first: {} } });
-    await expect(port.loadGroupRegistryCache({ bootstrapRpc: true }))
-      .resolves.toEqual({ groups: { first: {} } });
+    await expect(port.loadSessionRegistryCache({ force: true })).resolves.toEqual({ sessions: { first: {} } });
+    await expect(port.loadGroupRegistryCache({ bootstrapRpc: true })).resolves.toEqual({ groups: { first: {} } });
     expect(port.getAllSessionEntries()).toEqual([['first', { slug: 'first' }]]);
     expect(port.getSessionConfig('first')).toEqual({ slug: 'first' });
     expect(port.getSessionConfigById('0xfirst')).toEqual({ slug: 'first-by-id' });
@@ -70,10 +73,8 @@ describe('session registry read ports', () => {
 
     expect(port.getSessionConfig('second')).toEqual({ slug: 'second' });
     expect(port.getSessionConfigById('0xsecond')).toEqual({ slug: 'second-by-id' });
-    await expect(port.fetchSessionFromRegistry({ slug: 'Second' }))
-      .resolves.toEqual({ slug: 'second' });
-    expect(port.upsertSessionRegistryCache({ config: { slug: 'Second' } }))
-      .toEqual({ ts: 99 });
+    await expect(port.fetchSessionFromRegistry({ slug: 'Second' })).resolves.toEqual({ slug: 'second' });
+    expect(port.upsertSessionRegistryCache({ config: { slug: 'Second' } })).toEqual({ ts: 99 });
     expect(port.formatSessionId('session')).toBe('0xsession');
     expect(port.normalizeSessionIdHex('ABC')).toBe('0xabc');
     expect(port.toRegistrySlug(' Second Slug ')).toBe('second-slug');
@@ -121,15 +122,19 @@ describe('session registry read ports', () => {
     const removeEventListener = jest.fn();
     const listener = jest.fn();
     const port = bindSessionRegistryReadsPort({
-      sessionRegistry: () => buildRegistryModule({
-        SESSION_REGISTRY_CACHE_UPDATED_EVENT: 'ce:test-cache-updated',
-      }),
+      sessionRegistry: () =>
+        buildRegistryModule({
+          SESSION_REGISTRY_CACHE_UPDATED_EVENT: 'ce:test-cache-updated',
+        }),
     });
 
-    const unsubscribe = port.subscribeToCacheUpdates({
-      addEventListener,
-      removeEventListener,
-    }, listener);
+    const unsubscribe = port.subscribeToCacheUpdates(
+      {
+        addEventListener,
+        removeEventListener,
+      },
+      listener,
+    );
     unsubscribe();
 
     expect(addEventListener).toHaveBeenCalledWith('ce:test-cache-updated', listener);

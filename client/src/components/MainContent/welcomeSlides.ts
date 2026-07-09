@@ -11,13 +11,7 @@ import {
 } from '../Onboarding/onboardingConfig.js';
 
 export type WelcomeSlideMediaButtonVariant = 'standard' | 'centered';
-export type WelcomeSlideImageVariant =
-  | 'intro'
-  | 'toolkit'
-  | 'goals'
-  | 'audience'
-  | 'motivation'
-  | 'collaborators';
+export type WelcomeSlideImageVariant = 'intro' | 'toolkit' | 'goals' | 'audience' | 'motivation' | 'collaborators';
 
 export type WelcomeSlide = {
   key: string;

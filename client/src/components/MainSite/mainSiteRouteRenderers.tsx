@@ -1,5 +1,8 @@
 import React, { Suspense } from 'react';
 import { ethers } from 'ethers';
+import type { AppShell } from './AppShell';
+import type { SessionConfigLike as ShellSessionConfigLike } from '../shellTypes';
+import type { MainSiteSessionConfigLike } from '../../utilities/session/mainSiteSessionConfig.js';
 import stylesRaw from './AppShell.module.scss';
 import MainAreaTabsRaw from '../MainContent/MainAreaTabs';
 import RightSideRaw from '../RightSidebar/RightSide';
@@ -8,34 +11,98 @@ import RouteErrorBoundaryRaw from '../ErrorBoundary/RouteErrorBoundary';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
-import { buildQuestionRoutePath, isKnownOrGeneralSessionSlug, shouldRetryMaskedQuestionRefresh } from '../../utilities/survey/questionRouting.js';
+import {
+  buildQuestionRoutePath,
+  isKnownOrGeneralSessionSlug,
+  shouldRetryMaskedQuestionRefresh,
+} from '../../utilities/survey/questionRouting.js';
 import { isRouteResponderAddress } from '../../utilities/session/mainSiteUtils.js';
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
-import { getDemoSessionConfigBySlug, getSessionConfigBySlug, normalizeSessionSlug } from '../../domains/sessions/sessionConfig.js';
+import {
+  getDemoSessionConfigBySlug,
+  getSessionConfigBySlug,
+  normalizeSessionSlug,
+} from '../../domains/sessions/sessionConfig.js';
 import { DEFAULT_SESSION_SLUG, DEFAULT_SESSION_SLUG_ALIAS } from '../../variables/appConfig.js';
-import { composeMainSiteAuthViewProps, composeMainSiteLoginViewProps, composeMainSiteQuestionCacheViewProps, composeMainSiteSessionCacheViewProps, composeMainSiteSurveyCacheViewProps, composeMainSiteWalletViewProps } from './mainSiteViewProps.js';
-import { ExperimentalStub as ExperimentalStubRaw, NotFoundRoute as NotFoundRouteRaw, readHashQueryParam, SessionLoadingSkeleton as SessionLoadingSkeletonRaw } from './routeStatusViews';
+import {
+  composeMainSiteAuthViewProps,
+  composeMainSiteLoginViewProps,
+  composeMainSiteQuestionCacheViewProps,
+  composeMainSiteSessionCacheViewProps,
+  composeMainSiteSurveyCacheViewProps,
+  composeMainSiteWalletViewProps,
+} from './mainSiteViewProps.js';
+import {
+  ExperimentalStub as ExperimentalStubRaw,
+  NotFoundRoute as NotFoundRouteRaw,
+  readHashQueryParam,
+  SessionLoadingSkeleton as SessionLoadingSkeletonRaw,
+} from './routeStatusViews';
 import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE } from './routeConfig.js';
 import { resolveMainSiteRouteMatch } from './routeTable.js';
 import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
 import { buildPublicRoute, buildPublicUrl, replaceRouteResponderQueryParam } from './urlUtils.js';
 import { hasAutoFlag as hasAutoFlagFn } from './autoHashPersistence';
-import { resolveMainSiteQuestionRouteSessionContext, resolveMainSiteSessionRouteContext, resolveMainSiteSessionRouteSourceSlug } from './routeSessionResolution.js';
-import { AboutPage as AboutPageRaw, AdminPage as AdminPageRaw, AgentPage as AgentPageRaw, DebateMap as DebateMapRaw, BookmarksPage as BookmarksPageRaw, CompareAddresses as CompareAddressesRaw, ContractPage as ContractPageRaw, DemosIndex as DemosIndexRaw, OnePageSession as OnePageSessionRaw, RiskMatrixDemo as RiskMatrixDemoRaw, SBTPage as SBTPageRaw, SBTsPage as SBTsPageRaw, SessionDocumentsPage as SessionDocumentsPageRaw, SessionWizard as SessionWizardRaw, SimulatedUserPage as SimulatedUserPageRaw, SponsorPage as SponsorPageRaw, SurveyPage as SurveyPageRaw, SurveyTool as SurveyToolRaw, TagPage as TagPageRaw, UserPage as UserPageRaw } from './routeLazyComponents.js';
+import {
+  resolveMainSiteQuestionRouteSessionContext,
+  resolveMainSiteSessionRouteContext,
+  resolveMainSiteSessionRouteSourceSlug,
+} from './routeSessionResolution.js';
+import {
+  AboutPage as AboutPageRaw,
+  AdminPage as AdminPageRaw,
+  AgentPage as AgentPageRaw,
+  DebateMap as DebateMapRaw,
+  BookmarksPage as BookmarksPageRaw,
+  CompareAddresses as CompareAddressesRaw,
+  ContractPage as ContractPageRaw,
+  DemosIndex as DemosIndexRaw,
+  OnePageSession as OnePageSessionRaw,
+  RiskMatrixDemo as RiskMatrixDemoRaw,
+  SBTPage as SBTPageRaw,
+  SBTsPage as SBTsPageRaw,
+  SessionDocumentsPage as SessionDocumentsPageRaw,
+  SessionWizard as SessionWizardRaw,
+  SimulatedUserPage as SimulatedUserPageRaw,
+  SponsorPage as SponsorPageRaw,
+  SurveyPage as SurveyPageRaw,
+  SurveyTool as SurveyToolRaw,
+  TagPage as TagPageRaw,
+  UserPage as UserPageRaw,
+} from './routeLazyComponents.js';
 
-type MainSiteRouteRendererHost = any;
-type MainSiteRouteRendererMap = any;
+type MainSiteRouteRendererHost = AppShell;
 type MainSiteRouteComponent = React.ComponentType<Record<string, unknown>>;
-type RouteRenderCtx = any;
-type RefreshQuestionResponsesOptions = any;
-type MainSiteSurveyMetadataCache = any;
-type SessionConfigLike = any;
+type RouteRenderCtx = {
+  fullPath: string;
+  searchStr: string;
+  hashStr: string;
+  searchParams: URLSearchParams;
+  pathWithoutQuery: string;
+  pathSegments: string[];
+  firstPathSegment: string;
+  routeDemoMode: boolean;
+  requestedSessionId: string;
+  requestedChainId: number | null;
+  requestedSponsoredBundleId: string;
+  requestedSponsoredBundleKey: string | null;
+  defaultSlug: string;
+  defaultSessionCfg: SessionConfigLike | null;
+  defaultSessionChainId: number | null | undefined;
+  defaultSessionNetwork: MainSiteRouteNetwork;
+  cacheInitializationError: boolean;
+  surveyIDFromPath: string | null;
+  autoOpenResults: boolean;
+  parsedFilterStateFromUrl: Record<string, unknown>;
+  isResultsRoute: boolean;
+};
+type RefreshQuestionResponsesOptions = Record<string, unknown>;
+type MainSiteSurveyMetadataCache = Record<string, { surveys?: Record<string, unknown> } | undefined>;
+type SessionConfigLike = MainSiteSessionConfigLike;
 type MainSiteRouteNetwork = Record<string, unknown> | null | undefined;
 
 const styles = stylesRaw as Record<string, string>;
-const asMainSiteRouteComponent = (component: unknown): MainSiteRouteComponent => (
-  component as MainSiteRouteComponent
-);
+const asMainSiteRouteComponent = (component: unknown): MainSiteRouteComponent => component as MainSiteRouteComponent;
 const MainAreaTabs = asMainSiteRouteComponent(MainAreaTabsRaw);
 const RightSide = asMainSiteRouteComponent(RightSideRaw);
 const LazyFallback = asMainSiteRouteComponent(LazyFallbackRaw);
@@ -67,9 +134,8 @@ const UserPage = asMainSiteRouteComponent(UserPageRaw);
 const hasMainSiteRegistryIdentity = (sessionConfig: unknown): boolean => {
   if (!sessionConfig || typeof sessionConfig !== 'object') return false;
   const cfg = sessionConfig as Record<string, unknown>;
-  const registry = cfg.__registry && typeof cfg.__registry === 'object'
-    ? cfg.__registry as Record<string, unknown>
-    : {};
+  const registry =
+    cfg.__registry && typeof cfg.__registry === 'object' ? (cfg.__registry as Record<string, unknown>) : {};
   return !!(
     cfg.sessionId ||
     cfg.sessionIdHex ||
@@ -80,13 +146,8 @@ const hasMainSiteRegistryIdentity = (sessionConfig: unknown): boolean => {
   );
 };
 
-export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): MainSiteRouteRendererMap => ({
-  _renderDebateRoute: (fullPath: string) => (
-    <ExperimentalStub
-      featureName="Debate view"
-      path={fullPath}
-    />
-  ),
+export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) => ({
+  _renderDebateRoute: (fullPath: string) => <ExperimentalStub featureName="Debate view" path={fullPath} />,
 
   _renderBookmarksRoute: () => (
     <Suspense fallback={<LazyFallback label="Loading Bookmarks..." />}>
@@ -198,7 +259,11 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
   _renderCompareRoute: (ctx: RouteRenderCtx) => {
     const { fullPath } = ctx;
     const comparePath = String(fullPath || '').split('?')[0];
-    const firstAddress = comparePath.replace(/^\/compare\/?/, '').split('&').filter(Boolean)[0] || '';
+    const firstAddress =
+      comparePath
+        .replace(/^\/compare\/?/, '')
+        .split('&')
+        .filter(Boolean)[0] || '';
     return (
       <Suspense fallback={<LazyFallback label="Loading..." />}>
         <RouteErrorBoundary resetKey={fullPath}>
@@ -314,7 +379,9 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     const detailRouteHintSlug = host.resolveTrustedSbtRouteSessionSlug(searchStr) || '';
     const initialDetailSlug = detailRouteHintSlug || defaultSlug;
     const resolvedDetailSlug =
-      (host.state.sbtDetailAddress && host.state.sbtDetailAddress.toLowerCase() === sbtLower && host.state.sbtDetailGroupSlug != null)
+      host.state.sbtDetailAddress &&
+      host.state.sbtDetailAddress.toLowerCase() === sbtLower &&
+      host.state.sbtDetailGroupSlug != null
         ? host.state.sbtDetailGroupSlug
         : initialDetailSlug;
     const resolvedDetailNetwork = host.getSessionNetwork(resolvedDetailSlug) || defaultSessionNetwork;
@@ -354,7 +421,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     const profileSearchStr = (typeof window !== 'undefined' ? window.location.search : '') || '';
     const profileSearchParams = new URLSearchParams(profileSearchStr);
 
-    const viewAddress = profilePath.slice(1).replace("u/", "");
+    const viewAddress = profilePath.slice(1).replace('u/', '');
     const defaultTab = profileSearchParams.get('tab');
 
     return (
@@ -434,7 +501,16 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     // This prevents "Survey Not Found" from flashing during initial hydration.
     if (!host.state.cacheHasLoaded && !host.state.isAllCachesReady) {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'white' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '50vh',
+            color: 'white',
+          }}
+        >
           <h3>Loading...</h3>
           <div style={{ marginTop: '1rem' }} className="spinner-border text-light" role="status" />
         </div>
@@ -446,15 +522,14 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
 
     // 2. Check if the data actually exists in this resolved context
     const cfg = host.getSessionCfg(effectiveSlug);
-    const cache = host.readDgRecord(
-      'surveysCache',
-      effectiveSlug,
-      { clone: false }
-    ) as MainSiteSurveyMetadataCache | null;
+    const cache = host.readDgRecord('surveysCache', effectiveSlug, {
+      clone: false,
+    }) as MainSiteSurveyMetadataCache | null;
     const netKey = String(host.getSessionChainId(effectiveSlug));
 
     const inCache = !!cache?.[netKey]?.surveys?.[sidLower];
-    const inConfig = Array.isArray(cfg?.HIGHLIGHTED_SURVEY_IDS) &&
+    const inConfig =
+      Array.isArray(cfg?.HIGHLIGHTED_SURVEY_IDS) &&
       cfg.HIGHLIGHTED_SURVEY_IDS.some((id: string) => id.toLowerCase() === sidLower);
 
     // 3. Check Scan State
@@ -470,30 +545,50 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     // 5. RENDER SPINNER (Block SurveyPage from mounting if scanning or missing)
     if ((!inCache && !inConfig && !hasFailed && !hasError) || isScanning) {
       const routeHintSlug = host.getSurveyRouteSessionSlugHint();
-      const scanTargetLabel = routeHintSlug
-        ? `session "${routeHintSlug}" first, then other sessions`
-        : 'demo sessions';
+      const scanTargetLabel = routeHintSlug ? `session "${routeHintSlug}" first, then other sessions` : 'demo sessions';
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'white' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '50vh',
+            color: 'white',
+          }}
+        >
           <h3>Resolving Survey Context...</h3>
-          <p>Scanning {scanTargetLabel} for ID: {sidLower.substring(0, 6)}...</p>
+          <p>
+            Scanning {scanTargetLabel} for ID: {sidLower.substring(0, 6)}...
+          </p>
           <div style={{ marginTop: '1rem' }} className="spinner-border text-light" role="status" />
         </div>
       );
     }
 
     if (hasError) {
-      const loadErrorMessage = String(host.state.scanErrorMessage || '').trim() || 'Survey metadata was found but could not be loaded.';
+      const loadErrorMessage =
+        String(host.state.scanErrorMessage || '').trim() || 'Survey metadata was found but could not be loaded.';
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'white' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '50vh',
+            color: 'white',
+          }}
+        >
           <h3>Survey Load Error</h3>
           <p>{loadErrorMessage}</p>
           <button
             className="btn btn-outline-light"
-            onClick={() => host.setState(
-              { scanErrorFor: null, scanErrorMessage: '', scanFailedFor: null },
-              () => host.queueSurveyGroupScan(sidLower, { hintedSlug: host.getSurveyRouteSessionSlugHint() })
-            )}
+            onClick={() =>
+              host.setState({ scanErrorFor: null, scanErrorMessage: '', scanFailedFor: null }, () =>
+                host.queueSurveyGroupScan(sidLower, { hintedSlug: host.getSurveyRouteSessionSlugHint() }),
+              )
+            }
           >
             Retry
           </button>
@@ -504,10 +599,21 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     // 6. If Scan Failed (Survey truly doesn't exist in any known group)
     if (hasFailed) {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'white' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '50vh',
+            color: 'white',
+          }}
+        >
           <h3>Survey Not Found</h3>
           <p>This survey ID does not exist in any known session.</p>
-          <button className="btn btn-outline-light" onClick={() => window.history.back()}>Go Back</button>
+          <button className="btn btn-outline-light" onClick={() => window.history.back()}>
+            Go Back
+          </button>
         </div>
       );
     }
@@ -574,46 +680,44 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     const isQuestionsListRoute = fullPath.startsWith('/questions');
     const initialQuestionRouteSession = isQuestionsListRoute
       ? resolveMainSiteQuestionRouteSessionContext({
-        search: searchStr,
-        isCacheManagerReady: host.state.isCacheManagerReady,
-        getSessionConfigBySlug: (slug: string) => host.getDisplaySessionCfg(slug) as SessionConfigLike | null,
-        formatSessionId: sessionRegistryReadsPort.formatSessionId,
-        resolveSessionConfigById: (sessionId: string | number) => sessionRegistryReadsPort.getSessionConfigById(sessionId),
-      })
+          search: searchStr,
+          isCacheManagerReady: host.state.isCacheManagerReady,
+          getSessionConfigBySlug: (slug: string) => host.getDisplaySessionCfg(slug) as ShellSessionConfigLike | null,
+          formatSessionId: sessionRegistryReadsPort.formatSessionId,
+          resolveSessionConfigById: (sessionId: string | number) =>
+            sessionRegistryReadsPort.getSessionConfigById(sessionId),
+        })
       : null;
-    const inheritedNetworkWaitSlug = (
-      isQuestionsListRoute &&
-      initialQuestionRouteSession?.sessionSlugPinned
+    const inheritedNetworkWaitSlug =
+      isQuestionsListRoute && initialQuestionRouteSession?.sessionSlugPinned
         ? initialQuestionRouteSession.sessionSlug
-        : defaultSlug
-    );
-    const inheritedNetworkWaitCfg = inheritedNetworkWaitSlug === defaultSlug
-      ? defaultSessionCfg
-      : host.getDisplaySessionCfg(inheritedNetworkWaitSlug);
-    const inheritedNetworkWaitChainId = inheritedNetworkWaitSlug === defaultSlug
-      ? defaultSessionChainId
-      : host.getDisplaySessionChainId(inheritedNetworkWaitSlug);
+        : defaultSlug;
+    const inheritedNetworkWaitCfg =
+      inheritedNetworkWaitSlug === defaultSlug
+        ? defaultSessionCfg
+        : host.getDisplaySessionCfg(inheritedNetworkWaitSlug);
+    const inheritedNetworkWaitChainId =
+      inheritedNetworkWaitSlug === defaultSlug
+        ? defaultSessionChainId
+        : host.getDisplaySessionChainId(inheritedNetworkWaitSlug);
     const slugStatus = host._sessionPathResolver.getSlugStatus(String(inheritedNetworkWaitSlug || ''));
-    const shouldWaitForInheritedSessionNetwork = (
+    const shouldWaitForInheritedSessionNetwork =
       !!inheritedNetworkWaitSlug &&
       !inheritedNetworkWaitChainId &&
       !inheritedNetworkWaitCfg?.networkChainId &&
-      (!slugStatus.hasAttempted || slugStatus.isPending)
-    );
+      (!slugStatus.hasAttempted || slugStatus.isPending);
     if (shouldWaitForInheritedSessionNetwork) {
       host.resolveSessionPathSlug(inheritedNetworkWaitSlug);
-      return (
-        <LazyFallback label={fullPath.startsWith('/questions') ? 'Loading Questions...' : 'Loading Surveys...'} />
-      );
+      return <LazyFallback label={fullPath.startsWith('/questions') ? 'Loading Questions...' : 'Loading Surveys...'} />;
     }
 
-    const parts = fullPath.split("?")[0].split("/").filter(Boolean);
+    const parts = fullPath.split('?')[0].split('/').filter(Boolean);
     let surveyID = null;
     let displayAnswerMode = false;
     let viewResponseAddress = null;
 
     // Fallback extraction if regex above didn't catch it (unlikely given logic order, but safe)
-    if (parts[0] === "survey" && parts[1] && VALID_SURVEY_ID_RE.test(parts[1])) {
+    if (parts[0] === 'survey' && parts[1] && VALID_SURVEY_ID_RE.test(parts[1])) {
       surveyID = parts[1];
       let responderParam = searchParams.get('responder') || null;
       const legacySurveyResponder = parts[2] || null;
@@ -631,20 +735,17 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
       ? E2E_TESTIDS.PAGE_QUESTIONS_ROOT
       : E2E_TESTIDS.PAGE_SURVEYS_ROOT;
     const questionRouteSession = initialQuestionRouteSession || {
-        sessionSlug: null,
-        sessionId: null,
-        sessionSlugKnown: false,
-        sessionSlugPinned: false,
-        shouldBlockDuringBootstrap: false,
-      };
+      sessionSlug: null,
+      sessionId: null,
+      sessionSlugKnown: false,
+      sessionSlugPinned: false,
+      shouldBlockDuringBootstrap: false,
+    };
     if (questionRouteSession.shouldBlockDuringBootstrap) {
       return <LazyFallback label="Loading Questions..." />;
     }
-    const effectivePageSlug = (
-      isQuestionsListRoute && questionRouteSession.sessionSlugPinned
-        ? questionRouteSession.sessionSlug
-        : defaultSlug
-    );
+    const effectivePageSlug =
+      isQuestionsListRoute && questionRouteSession.sessionSlugPinned ? questionRouteSession.sessionSlug : defaultSlug;
     const effectivePageSessionCfg = isQuestionsListRoute
       ? host.getDisplaySessionCfg(effectivePageSlug)
       : defaultSessionCfg;
@@ -654,16 +755,14 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     const effectivePageNetwork = isQuestionsListRoute
       ? host.getDisplaySessionNetwork(effectivePageSlug)
       : defaultSessionNetwork;
-    const strictQuestionRouteSessionCfg = (
+    const strictQuestionRouteSessionCfg =
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned && effectivePageSlug
         ? host.getSessionCfg(effectivePageSlug)
-        : null
-    );
-    const strictQuestionRouteChainId = (
+        : null;
+    const strictQuestionRouteChainId =
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned && effectivePageSlug
         ? host.getSessionChainId(effectivePageSlug)
-        : null
-    );
+        : null;
     const shouldResolvePinnedQuestionRouteSession = !!(
       isQuestionsListRoute &&
       questionRouteSession.sessionSlugPinned &&
@@ -674,62 +773,57 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     );
     if (shouldResolvePinnedQuestionRouteSession) {
       const slugStatus = host._sessionPathResolver.getSlugStatus(String(effectivePageSlug || ''));
-      const recentError = !!(
-        slugStatus.lastErrorTs &&
-        (Date.now() - slugStatus.lastErrorTs) < 2 * 60 * 1000
-      );
+      const recentError = !!(slugStatus.lastErrorTs && Date.now() - slugStatus.lastErrorTs < 2 * 60 * 1000);
       const keepResolving = recentError && slugStatus.retryCount > 0;
       host.resolveSessionPathSlug(effectivePageSlug!);
       if (!slugStatus.hasAttempted || slugStatus.isPending || keepResolving) {
         return <LazyFallback label="Loading Questions..." />;
       }
     }
-    const shouldRefreshBuiltInDemoQuestionSources = (
+    const shouldRefreshBuiltInDemoQuestionSources =
       isQuestionsListRoute &&
       questionRouteSession.sessionSlugPinned &&
-      normalizeSessionSlug(effectivePageSlug || '') === 'demo'
-    );
-    const pageRefreshSurveyResponsesByID = (
+      normalizeSessionSlug(effectivePageSlug || '') === 'demo';
+    const pageRefreshSurveyResponsesByID =
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned
-        ? ((id: string) => {
-          const primary = host.refreshSurveyResponsesByIDForGroup(effectivePageSlug!, id);
-          if (!shouldRefreshBuiltInDemoQuestionSources) return primary;
-          return Promise.all([
-            Promise.resolve(primary),
-            Promise.resolve(host.refreshSurveyResponsesByIDForGroup('', id)),
-          ]).then(() => undefined);
-        })
-        : host.refreshSurveyResponsesByID
-    );
-    const pageRefreshQuestionMetadata = (
+        ? (id: string) => {
+            const primary = host.refreshSurveyResponsesByIDForGroup(effectivePageSlug!, id);
+            if (!shouldRefreshBuiltInDemoQuestionSources) return primary;
+            return Promise.all([
+              Promise.resolve(primary),
+              Promise.resolve(host.refreshSurveyResponsesByIDForGroup('', id)),
+            ]).then(() => undefined);
+          }
+        : host.refreshSurveyResponsesByID;
+    const pageRefreshQuestionMetadata =
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned
-        ? ((opts = {}) => {
-          const primary = host.refreshQuestionMetadataForGroup(effectivePageSlug!, opts);
-          if (!shouldRefreshBuiltInDemoQuestionSources) return primary;
-          return Promise.all([
-            Promise.resolve(primary),
-            Promise.resolve(host.refreshQuestionMetadataForGroup('', opts)),
-          ]).then(() => undefined);
-        })
-        : host.refreshQuestionMetadata
-    );
-    const pageRefreshQuestionResponses = (
+        ? (opts = {}) => {
+            const primary = host.refreshQuestionMetadataForGroup(effectivePageSlug!, opts);
+            if (!shouldRefreshBuiltInDemoQuestionSources) return primary;
+            return Promise.all([
+              Promise.resolve(primary),
+              Promise.resolve(host.refreshQuestionMetadataForGroup('', opts)),
+            ]).then(() => undefined);
+          }
+        : host.refreshQuestionMetadata;
+    const pageRefreshQuestionResponses =
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned
-        ? ((questionIds?: string[] | null, opts: RefreshQuestionResponsesOptions = {}) => {
-          const primary = host.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: effectivePageSlug ?? undefined });
-          if (!shouldRefreshBuiltInDemoQuestionSources) return primary;
-          return Promise.all([
-            Promise.resolve(primary),
-            Promise.resolve(host.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: '' })),
-          ]).then(() => undefined);
-        })
-        : host.refreshQuestionResponses
-    );
-    const pageRefreshSbtData = (
+        ? (questionIds?: string[] | null, opts: RefreshQuestionResponsesOptions = {}) => {
+            const primary = host.refreshQuestionResponses(questionIds, {
+              ...(opts || {}),
+              slug: effectivePageSlug ?? undefined,
+            });
+            if (!shouldRefreshBuiltInDemoQuestionSources) return primary;
+            return Promise.all([
+              Promise.resolve(primary),
+              Promise.resolve(host.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: '' })),
+            ]).then(() => undefined);
+          }
+        : host.refreshQuestionResponses;
+    const pageRefreshSbtData =
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned
-        ? ((addr: string, slug?: string) => host.refreshSbtData(addr, slug || effectivePageSlug!))
-        : host.refreshSbtData
-    );
+        ? (addr: string, slug?: string) => host.refreshSbtData(addr, slug || effectivePageSlug!)
+        : host.refreshSbtData;
     const authViewProps = composeMainSiteAuthViewProps(host.props);
     const surveyCacheViewProps = composeMainSiteSurveyCacheViewProps(host.state);
 
@@ -782,30 +876,43 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     const legacyResponderAddress = pathParts[questionIndex + 2] || null;
     if (!responderAddress && isRouteResponderAddress(legacyResponderAddress)) {
       responderAddress = legacyResponderAddress;
-      replaceRouteResponderQueryParam(`/question/${String(questionID || '').trim().toLowerCase()}`, responderAddress, searchStr);
+      replaceRouteResponderQueryParam(
+        `/question/${String(questionID || '')
+          .trim()
+          .toLowerCase()}`,
+        responderAddress,
+        searchStr,
+      );
     }
     const questionRouteSession = resolveMainSiteQuestionRouteSessionContext({
       search: searchStr,
       isCacheManagerReady: host.state.isCacheManagerReady,
-      getSessionConfigBySlug: (slug: string) => host.getDisplaySessionCfg(slug) as SessionConfigLike | null,
+      getSessionConfigBySlug: (slug: string) => host.getDisplaySessionCfg(slug) as ShellSessionConfigLike | null,
       formatSessionId: sessionRegistryReadsPort.formatSessionId,
-      resolveSessionConfigById: (sessionId: string | number) => sessionRegistryReadsPort.getSessionConfigById(sessionId),
+      resolveSessionConfigById: (sessionId: string | number) =>
+        sessionRegistryReadsPort.getSessionConfigById(sessionId),
     });
     const queryQuestionSlug = questionRouteSession.sessionSlug;
     const queryQuestionSessionId = questionRouteSession.sessionId;
     const questionSlugPinned = questionRouteSession.sessionSlugPinned;
     if (questionRouteSession.shouldBlockDuringBootstrap) {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'white' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '50vh',
+            color: 'white',
+          }}
+        >
           <h3>Loading Question...</h3>
           <div style={{ marginTop: '1rem' }} className="spinner-border text-light" role="status" />
         </div>
       );
     }
-    const effectiveQuestionSlug =
-      questionSlugPinned
-        ? queryQuestionSlug
-        : host.findGroupSlugForQuestion(questionID);
+    const effectiveQuestionSlug = questionSlugPinned ? queryQuestionSlug : host.findGroupSlugForQuestion(questionID);
     if (effectiveQuestionSlug != null && typeof window !== 'undefined') {
       const canonicalQuestionPath = buildQuestionRoutePath(questionID, {
         responderAddress,
@@ -819,9 +926,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
         window.history.replaceState({}, '', withHash);
       }
     }
-    const walletNetwork = (host.props.network && typeof host.props.network === 'object')
-      ? host.props.network
-      : null;
+    const walletNetwork = host.props.network && typeof host.props.network === 'object' ? host.props.network : null;
     const effectiveQuestionNetwork =
       host.getSessionNetwork(effectiveQuestionSlug) ||
       defaultSessionNetwork ||
@@ -848,7 +953,9 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
             sessionConfig={questionSessionCfg}
             ensureLightSbtUniverse={host.ensureLightSbtUniverse}
             {...questionCacheViewProps}
-            refreshSurveyResponsesByID={(id: string) => host.refreshSurveyResponsesByIDForGroup(effectiveQuestionSlug!, id)}
+            refreshSurveyResponsesByID={(id: string) =>
+              host.refreshSurveyResponsesByIDForGroup(effectiveQuestionSlug!, id)
+            }
             refreshQuestionMetadata={() => host.refreshQuestionMetadataForGroup(effectiveQuestionSlug!)}
             refreshQuestionResponses={(questionIds?: string[] | null, opts: RefreshQuestionResponsesOptions = {}) =>
               host.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: effectiveQuestionSlug ?? undefined })
@@ -876,38 +983,24 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     const nextSubroute = (parts[3] || '').trim().toLowerCase();
     const isQuestionsRoute = subroute === 'questions' && (!nextSubroute || nextSubroute === 'results');
     const isQuestionResultsRoute = isQuestionsRoute && nextSubroute === 'results' && !parts[4];
-    const hasUnsupportedSessionSubroute = (
-      !!parts[2] &&
-      !isDocsRoute &&
-      !isQuestionsRoute
-    ) || (
-      subroute === 'questions' &&
-      !!nextSubroute &&
-      nextSubroute !== 'results'
-    ) || (
-      subroute === 'questions' &&
-      nextSubroute === 'results' &&
-      !!parts[4]
-    );
+    const hasUnsupportedSessionSubroute =
+      (!!parts[2] && !isDocsRoute && !isQuestionsRoute) ||
+      (subroute === 'questions' && !!nextSubroute && nextSubroute !== 'results') ||
+      (subroute === 'questions' && nextSubroute === 'results' && !!parts[4]);
     const sessionRoute = resolveMainSiteSessionRouteContext({
       sessionTokenRaw,
       formatSessionId: sessionRegistryReadsPort.formatSessionId,
-      resolveSessionConfigById: (sessionId: string | number) => sessionRegistryReadsPort.getSessionConfigById(sessionId),
-      resolveSessionConfigBySlug: (slug: string) => (
-        sessionRegistryReadsPort.getSessionConfig(slug) || getSessionConfigBySlug(slug)
-      ),
-      resolveDisplaySessionConfigBySlug: (slug: string) => (
-        getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) || (
-          normalizeSessionSlug(slug) === 'demo'
-            ? getDemoSessionConfigBySlug('', { allowDemoFallback: true })
-            : null
-        )
-      ),
-      resolveSessionSlugFromPathToken: (sessionToken: string) => (
+      resolveSessionConfigById: (sessionId: string | number) =>
+        sessionRegistryReadsPort.getSessionConfigById(sessionId),
+      resolveSessionConfigBySlug: (slug: string) =>
+        sessionRegistryReadsPort.getSessionConfig(slug) || getSessionConfigBySlug(slug),
+      resolveDisplaySessionConfigBySlug: (slug: string) =>
+        getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) ||
+        (normalizeSessionSlug(slug) === 'demo' ? getDemoSessionConfigBySlug('', { allowDemoFallback: true }) : null),
+      resolveSessionSlugFromPathToken: (sessionToken: string) =>
         sessionToken
           ? host.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve: true })
-          : DEFAULT_SESSION_SLUG
-      ),
+          : DEFAULT_SESSION_SLUG,
     });
     const sessionIdFromPath = sessionRoute.sessionIdFromPath;
     const configBySessionId = sessionRoute.configBySessionId;
@@ -918,9 +1011,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
       const canonicalToken = resolvedSlug || DEFAULT_SESSION_SLUG_ALIAS;
       if (sessionTokenRaw.toLowerCase() !== canonicalToken.toLowerCase()) {
         const nextPath = `/session/${canonicalToken}${
-          isQuestionResultsRoute
-            ? '/questions/results'
-            : (isQuestionsRoute ? '/questions' : '')
+          isQuestionResultsRoute ? '/questions/results' : isQuestionsRoute ? '/questions' : ''
         }`;
         const nextUrl = buildPublicUrl(nextPath, window.location.search || '', window.location.hash || '');
         window.history.replaceState({}, '', nextUrl);
@@ -930,18 +1021,11 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     if (sessionRoute.hasUnresolvedSessionId) {
       const unresolvedSessionId = sessionIdFromPath!;
       const idStatus = host._sessionPathResolver.getIdStatus(unresolvedSessionId);
-      const recentError = !!(
-        idStatus.lastErrorTs &&
-        (Date.now() - idStatus.lastErrorTs) < 2 * 60 * 1000
-      );
+      const recentError = !!(idStatus.lastErrorTs && Date.now() - idStatus.lastErrorTs < 2 * 60 * 1000);
       const keepResolving = recentError && idStatus.retryCount > 0;
       host.resolveSessionPathId(unresolvedSessionId);
       if (!idStatus.hasAttempted || idStatus.isPending || keepResolving) {
-        return (
-          <SessionLoadingSkeleton
-            statusTitle={`Resolving ${unresolvedSessionId} Session...`}
-          />
-        );
+        return <SessionLoadingSkeleton statusTitle={`Resolving ${unresolvedSessionId} Session...`} />;
       }
       return (
         <div
@@ -977,18 +1061,11 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     if (!sessionConfig) {
       if (slug) {
         const slugStatus = host._sessionPathResolver.getSlugStatus(slug);
-        const recentError = !!(
-          slugStatus.lastErrorTs &&
-          (Date.now() - slugStatus.lastErrorTs) < 2 * 60 * 1000
-        );
+        const recentError = !!(slugStatus.lastErrorTs && Date.now() - slugStatus.lastErrorTs < 2 * 60 * 1000);
         const keepResolving = recentError && slugStatus.retryCount > 0;
         host.resolveSessionPathSlug(slug);
         if (!slugStatus.hasAttempted || slugStatus.isPending || keepResolving) {
-          return (
-            <SessionLoadingSkeleton
-              statusTitle={`Resolving ${slug} Session...`}
-            />
-          );
+          return <SessionLoadingSkeleton statusTitle={`Resolving ${slug} Session...`} />;
         }
         return (
           <div
@@ -1010,12 +1087,8 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     }
 
     const sessionConfigSlug = normalizeSessionSlug(sessionConfig.slug || '');
-    const sessionRegistryInfo = (
-      sessionConfig.__registry &&
-      typeof sessionConfig.__registry === 'object'
-        ? sessionConfig.__registry
-        : {}
-    );
+    const sessionRegistryInfo =
+      sessionConfig.__registry && typeof sessionConfig.__registry === 'object' ? sessionConfig.__registry : {};
     const sessionConfigHasRegistryIdentity = !!(
       sessionConfig.sessionId ||
       sessionConfig.sessionIdHex ||
@@ -1063,11 +1136,10 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
       sessionConfig,
     });
     const sessionRouteDisplaySlug = normalizeSessionSlug(sessionConfig.slug || slug);
-    const shouldRefreshBuiltInDemoLiveBucket = (
+    const shouldRefreshBuiltInDemoLiveBucket =
       normalizeSessionSlug(sessionTokenRaw) === 'demo' &&
       sessionRouteDisplaySlug === 'demo' &&
-      sessionRouteSourceSlug === ''
-    );
+      sessionRouteSourceSlug === '';
     const refreshSessionRouteSurveyResponsesByID = (id: string) => {
       const primary = host.refreshSurveyResponsesByIDForGroup(sessionRouteSourceSlug, id);
       if (!shouldRefreshBuiltInDemoLiveBucket) return primary;
@@ -1086,7 +1158,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     };
     const refreshSessionRouteQuestionResponses = (
       questionIds?: string[] | null,
-      opts: RefreshQuestionResponsesOptions = {}
+      opts: RefreshQuestionResponsesOptions = {},
     ) => {
       const primary = host.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: sessionRouteSourceSlug });
       if (!shouldRefreshBuiltInDemoLiveBucket) return primary;
@@ -1149,7 +1221,6 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     );
   },
 
-
   getMainView: (relevantMatch: RegExpMatchArray | null | undefined) => {
     // Variable initialization
     let surveyIDFromPath: string | null = null;
@@ -1170,16 +1241,19 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     const requestedSponsoredBundleId = searchParams.get('sponsored') || '';
     const requestedSponsoredBundleKey = readHashQueryParam(hashStr, 'k');
     const requestedChainIdTokens = requestedChainIdRaw ? requestedChainIdRaw.match(/\d+/g) : null;
-    const requestedChainId = requestedChainIdTokens && requestedChainIdTokens.length
-      ? Number(requestedChainIdTokens[requestedChainIdTokens.length - 1])
-      : null;
+    const requestedChainId =
+      requestedChainIdTokens && requestedChainIdTokens.length
+        ? Number(requestedChainIdTokens[requestedChainIdTokens.length - 1])
+        : null;
     const sessionFallbackTarget = host.applySessionFallbackRedirect({ pathIn: fullPath });
     if (sessionFallbackTarget) {
       fullPath = sessionFallbackTarget.path;
     }
     const pathWithoutQuery = String(fullPath || '').split('?')[0] || '';
     const pathSegments = pathWithoutQuery.split('/').filter(Boolean);
-    const firstPathSegment = String(pathSegments[0] || '').trim().toLowerCase();
+    const firstPathSegment = String(pathSegments[0] || '')
+      .trim()
+      .toLowerCase();
 
     // Robust results routing (/survey/:id/results or /questions/results)
     const surveyMatch = fullPath.match(SURVEY_RESULTS_RE);
@@ -1258,8 +1332,8 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     }
 
     // Extract ID if not already extracted (for non-results view)
-    if (!surveyIDFromPath && fullPath.startsWith("/survey/")) {
-      const parts = fullPath.split("?")[0].split("/").filter(Boolean);
+    if (!surveyIDFromPath && fullPath.startsWith('/survey/')) {
+      const parts = fullPath.split('?')[0].split('/').filter(Boolean);
       if (parts[1] && VALID_SURVEY_ID_RE.test(parts[1])) {
         surveyIDFromPath = parts[1];
       }

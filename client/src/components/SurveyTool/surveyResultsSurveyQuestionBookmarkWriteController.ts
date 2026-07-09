@@ -1,13 +1,11 @@
-import type {
-  SurveyResultsSurveyQuestionBookmarkWritePlan,
-} from './surveyResultsCacheWriteEligibilityPlan';
+import type { SurveyResultsSurveyQuestionBookmarkWritePlan } from './surveyResultsCacheWriteEligibilityPlan';
 
 type SurveyResultsRecord = Record<string, unknown>;
 
 export type SurveyResultsBookmarksCacheWritePort = (
   namespace: 'bookmarksCache',
   slug: string,
-  payload: SurveyResultsRecord
+  payload: SurveyResultsRecord,
 ) => Promise<unknown> | unknown;
 
 export type SurveyResultsSurveyQuestionBookmarkWriteControllerPorts = {
@@ -53,11 +51,7 @@ export const runSurveyResultsSurveyQuestionBookmarkWriteController = async ({
   }
 
   try {
-    await ports.writeBookmarksCache(
-      plan.target.namespace,
-      plan.target.slug,
-      plan.payload as SurveyResultsRecord
-    );
+    await ports.writeBookmarksCache(plan.target.namespace, plan.target.slug, plan.payload as SurveyResultsRecord);
     return {
       attempted: true,
       error: null,

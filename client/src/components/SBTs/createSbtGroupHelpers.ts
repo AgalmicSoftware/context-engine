@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { isPublishUploadBootstrapReachabilityError } from '../../utilities/arweave/publishUploadAuth.js';
@@ -9,15 +9,9 @@ import {
   resolveSponsoredGateStateForResource,
   SPONSORED_GATE_STATES,
 } from '../../utilities/web3/sponsoredAccess.js';
-import {
-  normalizePositiveChainId,
-} from './createSbtGroupAuthoringChainHelpers';
-import type {
-  CreateSbtAuthoringChainOption,
-} from './createSbtGroupAuthoringChainHelpers';
-import {
-  resolveCreateSbtEncryptedFieldGateValue,
-} from './createSbtGroupMetadataLockHelpers';
+import { normalizePositiveChainId } from './createSbtGroupAuthoringChainHelpers';
+import type { CreateSbtAuthoringChainOption } from './createSbtGroupAuthoringChainHelpers';
+import { resolveCreateSbtEncryptedFieldGateValue } from './createSbtGroupMetadataLockHelpers';
 export {
   buildCreateSbtAuthoringChainSyncPatch,
   buildCreateSbtAuthoringChainSyncStatePatch,
@@ -51,12 +45,8 @@ export {
   resolveCreateSbtMetadataSessionSlug,
   resolveCreateSbtOpenMintAutoJoinUrl,
 } from './createSbtGroupRouteHelpers';
-export {
-  buildCreateSbtFormCachePayload,
-} from './createSbtGroupFormCachePayloadHelpers';
-export type {
-  CreateSbtFormCachePayload,
-} from './createSbtGroupFormCachePayloadHelpers';
+export { buildCreateSbtFormCachePayload } from './createSbtGroupFormCachePayloadHelpers';
+export type { CreateSbtFormCachePayload } from './createSbtGroupFormCachePayloadHelpers';
 export {
   buildCreateSbtDefaultDistributionState,
   buildCreateSbtGroupPasswordPredictableEntryPatch,
@@ -84,9 +74,7 @@ export {
   resolveCreateSbtPasswordGenerationCount,
   resolveCreateSbtPredictablePasswordListDecision,
 } from './createSbtGroupPasswordHelpers';
-export type {
-  CreateSbtPasswordExportFile,
-} from './createSbtGroupPasswordHelpers';
+export type { CreateSbtPasswordExportFile } from './createSbtGroupPasswordHelpers';
 export {
   areMetadataLockGateMapsEqual,
   areStringArraysEqual,
@@ -248,25 +236,26 @@ export type {
 const ENCRYPTION_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
 
 export type CreateSbtLitGateChainId = number | string | null;
-export type CreateSbtGateBoundary = NonNullable<Parameters<typeof normalizeGateMode>[0]> & Record<string, unknown> & {
-  badgeLabel?: unknown;
-  chain?: unknown;
-  chainId?: unknown;
-  color?: unknown;
-  displayLabel?: unknown;
-  gateId?: unknown;
-  id?: unknown;
-  label?: unknown;
-  litChain?: unknown;
-  name?: unknown;
-  requireAll?: unknown;
-  resourceKey?: unknown;
-  sbtAddress?: unknown;
-  sbtAddresses?: unknown;
-  secondaryLabel?: unknown;
-  title?: unknown;
-  type?: unknown;
-};
+export type CreateSbtGateBoundary = NonNullable<Parameters<typeof normalizeGateMode>[0]> &
+  Record<string, unknown> & {
+    badgeLabel?: unknown;
+    chain?: unknown;
+    chainId?: unknown;
+    color?: unknown;
+    displayLabel?: unknown;
+    gateId?: unknown;
+    id?: unknown;
+    label?: unknown;
+    litChain?: unknown;
+    name?: unknown;
+    requireAll?: unknown;
+    resourceKey?: unknown;
+    sbtAddress?: unknown;
+    sbtAddresses?: unknown;
+    secondaryLabel?: unknown;
+    title?: unknown;
+    type?: unknown;
+  };
 export type CreateSbtMetadataLockGate = CreateSbtGateBoundary & {
   badgeLabel: string;
   chainId: CreateSbtLitGateChainId;
@@ -421,35 +410,26 @@ type BuildCreateSbtGateOptionsFromSessionSourcesArgs = {
   sessionSources?: unknown[];
 };
 
-export const isPlainObject = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+export const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-export const getCreateSbtObjectEntries = (value: unknown): [string, unknown][] => (
-  value !== null && typeof value === 'object'
-    ? Object.entries(value as Record<string, unknown>)
-    : []
-);
+export const getCreateSbtObjectEntries = (value: unknown): [string, unknown][] =>
+  value !== null && typeof value === 'object' ? Object.entries(value as Record<string, unknown>) : [];
 
 export const getCreateSbtRecipientAccessControlConditions = (recipient: unknown): Record<string, unknown>[] => {
   const record = isPlainObject(recipient) ? recipient : {};
   return Array.isArray(record.accessControlConditions)
-    ? record.accessControlConditions as Record<string, unknown>[]
+    ? (record.accessControlConditions as Record<string, unknown>[])
     : [];
 };
 
-export const asCreateSbtGateBoundary = (value: unknown): Record<string, unknown> => (
-  isPlainObject(value) ? value : {}
-);
+export const asCreateSbtGateBoundary = (value: unknown): Record<string, unknown> => (isPlainObject(value) ? value : {});
 
 export const getErrorMessage = (error: unknown, fallback = 'Unknown error'): string => {
-  const message = (
-    error !== null &&
-    (typeof error === 'object' || typeof error === 'function') &&
-    'message' in error
-  )
-    ? error.message
-    : undefined;
+  const message =
+    error !== null && (typeof error === 'object' || typeof error === 'function') && 'message' in error
+      ? error.message
+      : undefined;
   return error instanceof Error && error.message ? error.message : String(message || error || fallback);
 };
 
@@ -473,13 +453,10 @@ export const resolveCreateSbtErrorBannerState = ({
 };
 
 export const shouldFallbackCreateSbtDeferredDraftUpload = (error: unknown): boolean => {
-  const messageValue = (
-    error !== null &&
-    (typeof error === 'object' || typeof error === 'function') &&
-    'message' in error
-  )
-    ? error.message
-    : error;
+  const messageValue =
+    error !== null && (typeof error === 'object' || typeof error === 'function') && 'message' in error
+      ? error.message
+      : error;
   const message = toStr(messageValue).trim().toLowerCase();
   if (!message) return false;
   return (
@@ -515,26 +492,19 @@ export const normalizeGateText = (value: unknown): string => {
   return text;
 };
 
-export const resolveCreateSbtLockAudienceSessionName = (
-  sessionConfig?: Record<string, unknown>
-): string => {
+export const resolveCreateSbtLockAudienceSessionName = (sessionConfig?: Record<string, unknown>): string => {
   const direct = normalizeGateText(sessionConfig?.sessionName || sessionConfig?.slug);
   return direct || 'session';
 };
 
-export const buildCreateSbtScopedLockGateId = (
-  sessionSlug: unknown = '',
-  gateId: unknown = ''
-): string => {
+export const buildCreateSbtScopedLockGateId = (sessionSlug: unknown = '', gateId: unknown = ''): string => {
   const normalizedGateId = normalizeGateText(gateId);
   if (!normalizedGateId) return '';
   const normalizedSessionSlug = normalizeSessionSlug(sessionSlug || '');
   return `session:${normalizedSessionSlug || 'general'}::${normalizedGateId}`;
 };
 
-export const buildCreateSbtResourceKeyByGateId = (
-  sessionConfig?: Record<string, unknown>
-): Record<string, string> => {
+export const buildCreateSbtResourceKeyByGateId = (sessionConfig?: Record<string, unknown>): Record<string, string> => {
   const out: Record<string, string> = {};
   const registerGateId = (gateId: unknown, resourceKey: unknown) => {
     const normalizedGateId = normalizeGateText(gateId);
@@ -543,12 +513,8 @@ export const buildCreateSbtResourceKeyByGateId = (
     if (!out[normalizedGateId]) out[normalizedGateId] = normalizedResourceKey;
   };
 
-  const sponsored = isPlainObject(sessionConfig?.sponsored)
-    ? sessionConfig.sponsored
-    : {};
-  const resources = isPlainObject(sponsored.resources)
-    ? sponsored.resources
-    : {};
+  const sponsored = isPlainObject(sessionConfig?.sponsored) ? sessionConfig.sponsored : {};
+  const resources = isPlainObject(sponsored.resources) ? sponsored.resources : {};
   Object.entries(resources).forEach(([resourceKey, resourceCfg]) => {
     const normalizedResourceCfg = isPlainObject(resourceCfg) ? resourceCfg : {};
     const gateIds = [
@@ -558,14 +524,7 @@ export const buildCreateSbtResourceKeyByGateId = (
     gateIds.forEach((gateId: unknown) => registerGateId(gateId, resourceKey));
   });
 
-  [
-    'default',
-    'ai',
-    'arweave',
-    'docUrls',
-    'questionResponses',
-    'surveyResponses',
-  ].forEach((resourceKey) => {
+  ['default', 'ai', 'arweave', 'docUrls', 'questionResponses', 'surveyResponses'].forEach((resourceKey) => {
     const state = resolveSponsoredGateStateForResource(sessionConfig, resourceKey);
     if (state?.status !== SPONSORED_GATE_STATES.RESTRICTED || !state?.gate) return;
     registerGateId(state.gate?.gateId || state.gate?.id, resourceKey);
@@ -578,7 +537,7 @@ export const stableGateColor = (gateId: unknown): string => {
   const str = String(gateId || '');
   let hash = 0;
   for (let i = 0; i < str.length; i += 1) {
-    hash = ((hash * 31) + str.charCodeAt(i)) >>> 0;
+    hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
   }
   return ENCRYPTION_GATE_COLORS[hash % ENCRYPTION_GATE_COLORS.length];
 };
@@ -599,11 +558,16 @@ export const normalizeAddressList = (values?: unknown[]): string[] => {
 
 export const getCreateSbtBurnAuthEnum = (burnAuth: unknown): number => {
   switch (burnAuth) {
-    case 'AdminOnly': return 0;
-    case 'OwnerOnly': return 1;
-    case 'Both': return 2;
-    case 'Neither': return 3;
-    default: throw new Error(`Unsupported burnAuth value: ${burnAuth}`);
+    case 'AdminOnly':
+      return 0;
+    case 'OwnerOnly':
+      return 1;
+    case 'Both':
+      return 2;
+    case 'Neither':
+      return 3;
+    default:
+      throw new Error(`Unsupported burnAuth value: ${burnAuth}`);
   }
 };
 
@@ -634,16 +598,12 @@ export const normalizeCreateSbtLitGateChainIdFallback = (value: unknown): Create
   return null;
 };
 
-export const resolveCreateSbtLitGateChainId = (
-  value: unknown,
-  fallback: unknown
-): CreateSbtLitGateChainId => (
-  Number(value || fallback || 0) || normalizeCreateSbtLitGateChainIdFallback(fallback)
-);
+export const resolveCreateSbtLitGateChainId = (value: unknown, fallback: unknown): CreateSbtLitGateChainId =>
+  Number(value || fallback || 0) || normalizeCreateSbtLitGateChainIdFallback(fallback);
 
 export const sanitizeCreateSbtGateForMetadata = (
   gateInput: unknown = {},
-  chainIdFallback: unknown = null
+  chainIdFallback: unknown = null,
 ): CreateSbtMetadataLockGate | null => {
   const gate = asCreateSbtGateBoundary(gateInput) as CreateSbtGateBoundary;
   const gateId = normalizeGateText(gate.gateId || gate.id);
@@ -661,20 +621,9 @@ export const sanitizeCreateSbtGateForMetadata = (
     type: gate.type || 'sbt',
     gateId,
     id: gateId,
-    label: normalizeGateText(
-      gate.label ||
-      gate.name ||
-      gate.title ||
-      gate.displayLabel ||
-      gateId
-    ) || gateId,
+    label: normalizeGateText(gate.label || gate.name || gate.title || gate.displayLabel || gateId) || gateId,
     displayLabel: normalizeGateText(gate.displayLabel || gate.label || gateId) || gateId,
-    badgeLabel: normalizeGateText(
-      gate.badgeLabel ||
-      gate.label ||
-      gate.name ||
-      gateId
-    ) || gateId,
+    badgeLabel: normalizeGateText(gate.badgeLabel || gate.label || gate.name || gateId) || gateId,
     secondaryLabel: normalizeGateText(gate.secondaryLabel || ''),
     resourceKey: normalizeGateText(gate.resourceKey || ''),
     color: normalizeGateText(gate.color) || stableGateColor(gateId),
@@ -798,7 +747,7 @@ export const buildCreateSbtEncryptedImageAsset = ({
 };
 
 export const buildCreateSbtPreviewEncryptedImageAsset = (
-  lockedFieldMask: unknown = '[encrypted]'
+  lockedFieldMask: unknown = '[encrypted]',
 ): CreateSbtEncryptedImageAsset => ({
   storage: 'lit-arweave',
   txId: String(lockedFieldMask || ''),
@@ -819,7 +768,7 @@ export const buildCreateSbtFieldAccessDescriptor = ({
   if (!gates.length) return null;
 
   const sbtAddresses = normalizeAddressList(
-    gates.flatMap((gate) => (Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []))
+    gates.flatMap((gate) => (Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : [])),
   );
   const primaryGate = gates[0] || null;
   const resolvedChainId = resolveCreateSbtLitGateChainId(primaryGate?.chainId, chainIdFallback);
@@ -867,20 +816,19 @@ export const buildCreateSbtMetadataEncryption = ({
   const gateIds = gates.map((gate) => gate.gateId).filter(Boolean);
   const resolvedDefaultGateId = normalizeGateText(defaultGateId);
   return {
-    encryptedFieldGates: Object.keys(normalizedFieldGates).length
-      ? normalizedFieldGates
-      : null,
-    encryption: gates.length > 0 && Object.keys(targets).length > 0
-      ? {
-          enabled: true,
-          status: 'lit-v1',
-          defaultGateId: gateIds.includes(resolvedDefaultGateId) ? resolvedDefaultGateId : (gateIds[0] || ''),
-          gateIds,
-          gate: gates[0] || null,
-          gates,
-          targets,
-        }
-      : null,
+    encryptedFieldGates: Object.keys(normalizedFieldGates).length ? normalizedFieldGates : null,
+    encryption:
+      gates.length > 0 && Object.keys(targets).length > 0
+        ? {
+            enabled: true,
+            status: 'lit-v1',
+            defaultGateId: gateIds.includes(resolvedDefaultGateId) ? resolvedDefaultGateId : gateIds[0] || '',
+            gateIds,
+            gate: gates[0] || null,
+            gates,
+            targets,
+          }
+        : null,
   };
 };
 
@@ -919,11 +867,7 @@ export const buildCreateSbtGateOptionsFromConfig = ({
 
     const chainId = resolveCreateSbtLitGateChainId(rawGate.chainId, chainIdFallback);
     const litChain = resolveLitChain({ chainId, litChain: rawGate.litChain || rawGate.chain });
-    const resourceKey = normalizeGateText(
-      rawGate.resourceKey ||
-      rawGate.secondaryLabel ||
-      resourceKeyByGateId[gateId]
-    );
+    const resourceKey = normalizeGateText(rawGate.resourceKey || rawGate.secondaryLabel || resourceKeyByGateId[gateId]);
     const resourceLabel = CREATE_SBT_AUTHORING_GATE_RESOURCE_LABELS[resourceKey] || resourceKey;
 
     gateMap[gateId] = {
@@ -952,63 +896,52 @@ export const buildCreateSbtGateOptionsFromConfig = ({
       registerGate(normalizedGate, normalizedGate.id || normalizedGate.gateId);
     });
   } else {
-    const sponsored = isPlainObject(normalizedSessionConfig.sponsored)
-      ? normalizedSessionConfig.sponsored
-      : {};
-    const sponsoredGates = isPlainObject(sponsored.gates)
-      ? sponsored.gates
-      : {};
+    const sponsored = isPlainObject(normalizedSessionConfig.sponsored) ? normalizedSessionConfig.sponsored : {};
+    const sponsoredGates = isPlainObject(sponsored.gates) ? sponsored.gates : {};
     Object.entries(sponsoredGates).forEach(([gateId, gate]) => registerGate(gate, gateId));
 
     const defaultGateState = resolveSponsoredGateStateForResource(normalizedSessionConfig, 'default');
-    if (
-      defaultGateState?.status === SPONSORED_GATE_STATES.RESTRICTED &&
-      defaultGateState?.gate
-    ) {
-      registerGate(
-        defaultGateState.gate,
-        defaultGateState.gate?.gateId || defaultGateId || 'default'
-      );
+    if (defaultGateState?.status === SPONSORED_GATE_STATES.RESTRICTED && defaultGateState?.gate) {
+      registerGate(defaultGateState.gate, defaultGateState.gate?.gateId || defaultGateId || 'default');
     }
   }
 
-  const gateEntries = Object.values(gateMap)
-    .sort((a, b) => String(a.resourceKey || a.gateId || '').localeCompare(String(b.resourceKey || b.gateId || '')));
+  const gateEntries = Object.values(gateMap).sort((a, b) =>
+    String(a.resourceKey || a.gateId || '').localeCompare(String(b.resourceKey || b.gateId || '')),
+  );
   const gateIds = gateEntries.map((gate) => gate.gateId).filter(Boolean);
   const requestedDefaultGateId = normalizeGateText(defaultGateId);
-  const sponsored = isPlainObject(normalizedSessionConfig.sponsored)
-    ? normalizedSessionConfig.sponsored
-    : {};
-  const lit = isPlainObject(normalizedSessionConfig.lit)
-    ? normalizedSessionConfig.lit
-    : {};
-  const configuredDefaultGateId = normalizeGateText(
-    sponsored.defaultGateId ||
-    lit.defaultGateId
-  );
-  const resolvedDefaultGateId = [
-    requestedDefaultGateId,
-    configuredDefaultGateId,
-    gateEntries[0]?.gateId,
-  ].find((gateId) => gateId && gateIds.includes(gateId)) || (gateEntries[0]?.gateId || '');
+  const sponsored = isPlainObject(normalizedSessionConfig.sponsored) ? normalizedSessionConfig.sponsored : {};
+  const lit = isPlainObject(normalizedSessionConfig.lit) ? normalizedSessionConfig.lit : {};
+  const configuredDefaultGateId = normalizeGateText(sponsored.defaultGateId || lit.defaultGateId);
+  const resolvedDefaultGateId =
+    [requestedDefaultGateId, configuredDefaultGateId, gateEntries[0]?.gateId].find(
+      (gateId) => gateId && gateIds.includes(gateId),
+    ) ||
+    gateEntries[0]?.gateId ||
+    '';
   const selectedGate = gateEntries.find((gate) => gate.gateId === resolvedDefaultGateId) || gateEntries[0] || null;
   // SBT metadata authoring intentionally collapses session-derived resource gates
   // to the canonical default gate instead of exposing per-resource lock picking.
-  const gateOptions = selectedGate ? [{
-    id: selectedGate.gateId,
-    label: sessionLabel,
-    displayLabel: sessionLabel,
-    badgeLabel: sessionLabel,
-    secondaryLabel: '',
-    color: selectedGate.color,
-    mode: selectedGate.mode,
-    requireAll: selectedGate.requireAll === true,
-    sbtAddresses: selectedGate.sbtAddresses,
-    sbtAddress: selectedGate.sbtAddress,
-    chainId: selectedGate.chainId,
-    litChain: selectedGate.litChain,
-    resourceKey: selectedGate.resourceKey || '',
-  }] : [];
+  const gateOptions = selectedGate
+    ? [
+        {
+          id: selectedGate.gateId,
+          label: sessionLabel,
+          displayLabel: sessionLabel,
+          badgeLabel: sessionLabel,
+          secondaryLabel: '',
+          color: selectedGate.color,
+          mode: selectedGate.mode,
+          requireAll: selectedGate.requireAll === true,
+          sbtAddresses: selectedGate.sbtAddresses,
+          sbtAddress: selectedGate.sbtAddress,
+          chainId: selectedGate.chainId,
+          litChain: selectedGate.litChain,
+          resourceKey: selectedGate.resourceKey || '',
+        },
+      ]
+    : [];
 
   return {
     gateMap,
@@ -1032,11 +965,9 @@ export const buildCreateSbtGateOptionsFromSessionSources = ({
     if (!sessionConfig) return;
 
     const sessionSlug = normalizeSessionSlug(source.sessionSlug || sessionConfig.slug || '');
-    const resolvedChainIdFallback = normalizePositiveChainId(
-      source.chainIdFallback ||
-      sessionConfig.networkChainId ||
-      chainIdFallback
-    ) || normalizeCreateSbtLitGateChainIdFallback(chainIdFallback);
+    const resolvedChainIdFallback =
+      normalizePositiveChainId(source.chainIdFallback || sessionConfig.networkChainId || chainIdFallback) ||
+      normalizeCreateSbtLitGateChainIdFallback(chainIdFallback);
     const scopedGateSet = buildCreateSbtGateOptionsFromConfig({
       sessionConfig,
       encryptionGates: Array.isArray(source.encryptionGates) ? source.encryptionGates : [],
@@ -1058,15 +989,12 @@ export const buildCreateSbtGateOptionsFromSessionSources = ({
         option.sbtAddress,
         sourceGate.sbtAddress,
       ]);
-      const chainId = normalizePositiveChainId(
-        option.chainId ||
-        sourceGate.chainId ||
-        resolvedChainIdFallback
-      ) || resolvedChainIdFallback;
-      const litChain = (
-        normalizeGateText(option.litChain || sourceGate.litChain || option.chain || sourceGate.chain)
-        || resolveLitChain({ chainId })
-      );
+      const chainId =
+        normalizePositiveChainId(option.chainId || sourceGate.chainId || resolvedChainIdFallback) ||
+        resolvedChainIdFallback;
+      const litChain =
+        normalizeGateText(option.litChain || sourceGate.litChain || option.chain || sourceGate.chain) ||
+        resolveLitChain({ chainId });
 
       const modeSource = option.mode ? option : sourceGate;
       const scopedGate: CreateSbtMetadataLockGate = {
@@ -1075,15 +1003,20 @@ export const buildCreateSbtGateOptionsFromSessionSources = ({
         id: scopedId,
         sourceGateId: rawGateId,
         sourceSessionSlug: sessionSlug,
-        label: normalizeGateText(option.label || sourceGate.label) || resolveCreateSbtLockAudienceSessionName(sessionConfig),
-        displayLabel: normalizeGateText(option.displayLabel || option.label || sourceGate.displayLabel || sourceGate.label)
-          || resolveCreateSbtLockAudienceSessionName(sessionConfig),
-        badgeLabel: normalizeGateText(option.badgeLabel || option.displayLabel || option.label || sourceGate.badgeLabel || sourceGate.label)
-          || resolveCreateSbtLockAudienceSessionName(sessionConfig),
+        label:
+          normalizeGateText(option.label || sourceGate.label) || resolveCreateSbtLockAudienceSessionName(sessionConfig),
+        displayLabel:
+          normalizeGateText(option.displayLabel || option.label || sourceGate.displayLabel || sourceGate.label) ||
+          resolveCreateSbtLockAudienceSessionName(sessionConfig),
+        badgeLabel:
+          normalizeGateText(
+            option.badgeLabel || option.displayLabel || option.label || sourceGate.badgeLabel || sourceGate.label,
+          ) || resolveCreateSbtLockAudienceSessionName(sessionConfig),
         secondaryLabel: normalizeGateText(option.secondaryLabel || sourceGate.secondaryLabel || ''),
         color: normalizeGateText(option.color || sourceGate.color) || stableGateColor(scopedId),
         mode: normalizeGateMode(modeSource),
-        requireAll: option.requireAll === true || sourceGate.requireAll === true || normalizeGateMode(modeSource) === 'all',
+        requireAll:
+          option.requireAll === true || sourceGate.requireAll === true || normalizeGateMode(modeSource) === 'all',
         sbtAddresses,
         sbtAddress: sbtAddresses[0] || '',
         chainId,
@@ -1096,13 +1029,13 @@ export const buildCreateSbtGateOptionsFromSessionSources = ({
     });
   });
 
-  const preferredGateId = gateOptions.find((gate) => (
-    normalizeSessionSlug(gate.sourceSessionSlug || '') === normalizedPreferredSessionSlug
-  ))?.id || '';
+  const preferredGateId =
+    gateOptions.find((gate) => normalizeSessionSlug(gate.sourceSessionSlug || '') === normalizedPreferredSessionSlug)
+      ?.id || '';
 
   return {
     gateMap,
     gateOptions,
-    defaultGateId: preferredGateId || (gateOptions[0]?.id || ''),
+    defaultGateId: preferredGateId || gateOptions[0]?.id || '',
   };
 };

@@ -32,17 +32,18 @@ describe('questionFilterSignatureHelpers', () => {
 
   it('builds question and response signatures', () => {
     expect(buildQuestionIdListSignature([{ id: 'q1' }])).toBe('[{"id":"q1"}]');
-    expect(buildFilteredResponsesByQuestionSignature({ q1: { responder: '0x1' } }))
-      .toBe('{"q1":{"responder":"0x1"}}');
+    expect(buildFilteredResponsesByQuestionSignature({ q1: { responder: '0x1' } })).toBe('{"q1":{"responder":"0x1"}}');
     expect(buildFilteredResponsesByQuestionSignature(null)).toBe('');
   });
 
   it('builds filter payload signatures by payload shape', () => {
     expect(buildFilterPayloadSignature([{ id: 'q1' }])).toBe('arr:[{"id":"q1"}]');
-    expect(buildFilterPayloadSignature({
-      filteredQuestions: [{ id: 'q1' }],
-      filteredResponsesByQuestion: { q1: { responder: '0x1' } },
-    })).toBe('combo:[{"id":"q1"}]|{"q1":{"responder":"0x1"}}');
+    expect(
+      buildFilterPayloadSignature({
+        filteredQuestions: [{ id: 'q1' }],
+        filteredResponsesByQuestion: { q1: { responder: '0x1' } },
+      }),
+    ).toBe('combo:[{"id":"q1"}]|{"q1":{"responder":"0x1"}}');
     expect(buildFilterPayloadSignature({ b: 2, a: 1 })).toBe('obj:{"a":1,"b":2}');
     expect(buildFilterPayloadSignature('x')).toBe('prim:x');
   });
@@ -50,9 +51,11 @@ describe('questionFilterSignatureHelpers', () => {
   it('normalizes nonce keys and AI candidate signatures', () => {
     expect(normalizeNonceKey('4')).toBe(4);
     expect(normalizeNonceKey('bad')).toBeNull();
-    expect(buildAiCandidateSignature([
-      { id: 'Q1', prompt: 'Prompt one' },
-      { id: 'q2', prompt: null },
-    ])).toBe('[{"id":"q1","prompt":"Prompt one"},{"id":"q2","prompt":""}]');
+    expect(
+      buildAiCandidateSignature([
+        { id: 'Q1', prompt: 'Prompt one' },
+        { id: 'q2', prompt: null },
+      ]),
+    ).toBe('[{"id":"q1","prompt":"Prompt one"},{"id":"q2","prompt":""}]');
   });
 });

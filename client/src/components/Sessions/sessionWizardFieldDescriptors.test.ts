@@ -16,20 +16,18 @@ describe('sessionWizardFieldDescriptors', () => {
       slug: 'demo-session',
     });
 
-    expect(orderedEntries.map(([key]) => key)).toEqual([
-      'slug',
-      'sessionInfo',
-      'defaultTags',
-      'extraField',
-    ]);
+    expect(orderedEntries.map(([key]) => key)).toEqual(['slug', 'sessionInfo', 'defaultTags', 'extraField']);
   });
 
   it('splits primary and more-options entries by mode', () => {
-    const { primaryEntries, moreOptionsEntries } = splitSessionWizardDraftEntries([
-      ['sessionName', 'Demo'],
-      ['blockLimits', { start: 1, end: 2 }],
-      ['defaultTags', 'ai'],
-    ], true);
+    const { primaryEntries, moreOptionsEntries } = splitSessionWizardDraftEntries(
+      [
+        ['sessionName', 'Demo'],
+        ['blockLimits', { start: 1, end: 2 }],
+        ['defaultTags', 'ai'],
+      ],
+      true,
+    );
 
     expect(primaryEntries.map(([key]) => key)).toEqual(['sessionName']);
     expect(moreOptionsEntries.map(([key]) => key)).toEqual(['blockLimits', 'defaultTags']);
@@ -37,38 +35,44 @@ describe('sessionWizardFieldDescriptors', () => {
 
   it('resolves labels and tooltips from field descriptors', () => {
     expect(getSessionWizardFieldLabel('sessionName', 'sessionName')).toBe('Session Name');
-    expect(getSessionWizardFieldTooltip(['faucet', 'privateKey'], '')).toContain(
-      'Lock to store as Lit-encrypted.'
-    );
+    expect(getSessionWizardFieldTooltip(['faucet', 'privateKey'], '')).toContain('Lock to store as Lit-encrypted.');
   });
 
   it('applies shared field visibility rules', () => {
-    expect(shouldHideSessionWizardField({
-      key: 'slug',
-      path: [],
-      currentPath: ['slug'],
-      wizardMode: 'normal',
-    })).toBe(true);
+    expect(
+      shouldHideSessionWizardField({
+        key: 'slug',
+        path: [],
+        currentPath: ['slug'],
+        wizardMode: 'normal',
+      }),
+    ).toBe(true);
 
-    expect(shouldHideSessionWizardField({
-      key: 'apiKey',
-      path: ['ai', 'providers', 'openai'],
-      currentPath: ['ai', 'providers', 'openai', 'apiKey'],
-      wizardMode: 'advanced',
-    })).toBe(true);
+    expect(
+      shouldHideSessionWizardField({
+        key: 'apiKey',
+        path: ['ai', 'providers', 'openai'],
+        currentPath: ['ai', 'providers', 'openai', 'apiKey'],
+        wizardMode: 'advanced',
+      }),
+    ).toBe(true);
 
-    expect(shouldHideSessionWizardField({
-      key: 'chainId',
-      path: ['contracts', 'surveys'],
-      currentPath: ['contracts', 'surveys', 'chainId'],
-      wizardMode: 'advanced',
-    })).toBe(true);
+    expect(
+      shouldHideSessionWizardField({
+        key: 'chainId',
+        path: ['contracts', 'surveys'],
+        currentPath: ['contracts', 'surveys', 'chainId'],
+        wizardMode: 'advanced',
+      }),
+    ).toBe(true);
 
-    expect(shouldHideSessionWizardField({
-      key: 'sessionName',
-      path: [],
-      currentPath: ['sessionName'],
-      wizardMode: 'advanced',
-    })).toBe(false);
+    expect(
+      shouldHideSessionWizardField({
+        key: 'sessionName',
+        path: [],
+        currentPath: ['sessionName'],
+        wizardMode: 'advanced',
+      }),
+    ).toBe(false);
   });
 });

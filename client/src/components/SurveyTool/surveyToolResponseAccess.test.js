@@ -6,24 +6,26 @@ import {
 
 describe('surveyToolResponseAccess', () => {
   it('builds stable keys and signatures for response decrypt checks', () => {
-    expect(buildCanDecryptOtherResponsesSnapshot({
-      account: '0xAbC',
-      loginComplete: true,
-      singleQuestionMode: false,
-      isStandalone: true,
-      policy: {
-        primaryResource: 'surveyResponses',
-        recipients: [{ id: 'gate-1' }],
-      },
-      slug: 'edge',
-      sbtCacheRevision: 7,
-      cfg: {
-        __registry: {
-          updatedAt: '2026-04-25T00:00:00Z',
-          gateAuthority: 'registry',
+    expect(
+      buildCanDecryptOtherResponsesSnapshot({
+        account: '0xAbC',
+        loginComplete: true,
+        singleQuestionMode: false,
+        isStandalone: true,
+        policy: {
+          primaryResource: 'surveyResponses',
+          recipients: [{ id: 'gate-1' }],
         },
-      },
-    })).toEqual({
+        slug: 'edge',
+        sbtCacheRevision: 7,
+        cfg: {
+          __registry: {
+            updatedAt: '2026-04-25T00:00:00Z',
+            gateAuthority: 'registry',
+          },
+        },
+      }),
+    ).toEqual({
       loggedIn: true,
       account: '0xAbC',
       recipients: [{ id: 'gate-1' }],
@@ -34,31 +36,27 @@ describe('surveyToolResponseAccess', () => {
   });
 
   it('uses an anonymous signature when the wallet is not ready', () => {
-    expect(buildCanDecryptOtherResponsesSnapshot({
-      account: '',
-      loginComplete: false,
-      singleQuestionMode: true,
-      isStandalone: false,
-      policy: null,
-      slug: 'edge',
-    }).signature).toBe('<anon>|edge|questionResponses,default|0|||0');
+    expect(
+      buildCanDecryptOtherResponsesSnapshot({
+        account: '',
+        loginComplete: false,
+        singleQuestionMode: true,
+        isStandalone: false,
+        policy: null,
+        slug: 'edge',
+      }).signature,
+    ).toBe('<anon>|edge|questionResponses,default|0|||0');
   });
 
   it('treats mixed error verdicts as unknown instead of denied', () => {
-    expect(resolveCanDecryptOtherResponsesVerdict([
-      { status: 'error' },
-      { status: 'denied' },
-    ])).toEqual({
+    expect(resolveCanDecryptOtherResponsesVerdict([{ status: 'error' }, { status: 'denied' }])).toEqual({
       canDecrypt: false,
       status: 'unknown',
     });
   });
 
   it('grants decrypt access when any checked resource is granted', () => {
-    expect(resolveCanDecryptOtherResponsesVerdict([
-      { status: 'denied' },
-      { status: 'granted' },
-    ])).toEqual({
+    expect(resolveCanDecryptOtherResponsesVerdict([{ status: 'denied' }, { status: 'granted' }])).toEqual({
       canDecrypt: true,
       status: 'granted',
     });

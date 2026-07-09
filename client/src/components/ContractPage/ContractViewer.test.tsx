@@ -12,19 +12,19 @@ describe('ContractViewer compact variant', () => {
     render(
       <ContractViewer
         variant="compact"
-        contracts={[{
-          key: 'surveys',
-          name: 'Questions and Surveys',
-          explainer: 'Keeps track of questions / surveys (+ responses) storage hashes on Arweave.',
-          sourceFile: 'Surveys.sol',
-          source: 'contract Surveys { function ask() external {} }',
-          addresses: [],
-        }]}
+        contracts={[
+          {
+            key: 'surveys',
+            name: 'Questions and Surveys',
+            explainer: 'Keeps track of questions / surveys (+ responses) storage hashes on Arweave.',
+            sourceFile: 'Surveys.sol',
+            source: 'contract Surveys { function ask() external {} }',
+            addresses: [],
+          },
+        ]}
         onClose={jest.fn()}
-        renderSourceHeaderActions={() => (
-          <a href="/contracts?contract=surveys">Open full Contracts page</a>
-        )}
-      />
+        renderSourceHeaderActions={() => <a href="/contracts?contract=surveys">Open full Contracts page</a>}
+      />,
     );
 
     expect(screen.queryByTestId(CONTRACT_VIEWER_TOGGLE_TESTID)).not.toBeInTheDocument();
@@ -32,7 +32,7 @@ describe('ContractViewer compact variant', () => {
     expect(screen.getByTestId(getContractViewerSourceTestId('surveys'))).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open full contracts page/i })).toHaveAttribute(
       'href',
-      '/contracts?contract=surveys'
+      '/contracts?contract=surveys',
     );
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
   });

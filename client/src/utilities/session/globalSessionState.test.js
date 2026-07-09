@@ -13,15 +13,21 @@ const ORIGINAL_RUNTIME_SLUGS = globalThis.CE_SESSION_SCAN_SLUGS;
 describe('globalSessionState helpers', () => {
   beforeEach(() => {
     localStorage.clear();
-    try { delete globalThis.CE_SESSION_SCAN_SCOPE; } catch (_) {}
-    try { delete globalThis.CE_SESSION_SCAN_SLUGS; } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_SCOPE;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_SLUGS;
+    } catch (_) {}
   });
 
   it('derives a concrete primary session from list mode when needed without losing the full list', () => {
-    expect(normalizeGlobalSessionSelection({
-      selectedSessionScope: 'list',
-      selectedSessionSlugs: ['general', 'edge', 'debate'],
-    })).toEqual({
+    expect(
+      normalizeGlobalSessionSelection({
+        selectedSessionScope: 'list',
+        selectedSessionSlugs: ['general', 'edge', 'debate'],
+      }),
+    ).toEqual({
       primarySessionSlug: 'edge',
       primarySessionExplicit: false,
       activeSessionSlug: 'edge',
@@ -31,11 +37,13 @@ describe('globalSessionState helpers', () => {
   });
 
   it('preserves an explicit general primary session instead of re-deriving it from list scope', () => {
-    expect(normalizeGlobalSessionSelection({
-      primarySessionSlug: '',
-      selectedSessionScope: 'list',
-      selectedSessionSlugs: ['general', 'edge'],
-    })).toEqual({
+    expect(
+      normalizeGlobalSessionSelection({
+        primarySessionSlug: '',
+        selectedSessionScope: 'list',
+        selectedSessionSlugs: ['general', 'edge'],
+      }),
+    ).toEqual({
       primarySessionSlug: '',
       primarySessionExplicit: true,
       activeSessionSlug: '',
@@ -45,11 +53,13 @@ describe('globalSessionState helpers', () => {
   });
 
   it('re-derives the primary session when list scope excludes general', () => {
-    expect(normalizeGlobalSessionSelection({
-      primarySessionSlug: '',
-      selectedSessionScope: 'list',
-      selectedSessionSlugs: ['edge', 'debate'],
-    })).toEqual({
+    expect(
+      normalizeGlobalSessionSelection({
+        primarySessionSlug: '',
+        selectedSessionScope: 'list',
+        selectedSessionSlugs: ['edge', 'debate'],
+      }),
+    ).toEqual({
       primarySessionSlug: 'edge',
       primarySessionExplicit: false,
       activeSessionSlug: 'edge',
@@ -156,58 +166,74 @@ describe('globalSessionState helpers', () => {
   });
 
   it('falls back to appConfig scan defaults when nothing is persisted yet', () => {
-    expect(readStoredGlobalSessionSelection()).toEqual(expect.objectContaining({
-      primarySessionExplicit: false,
-      selectedSessionScope: DEFAULT_GLOBAL_SESSION_SCOPE,
-      selectedSessionSlugs: normalizeGlobalSessionSelection({
-        selectedSessionScope: CE_SESSION_SCAN_SCOPE,
-        selectedSessionSlugs: CE_SESSION_SCAN_SLUGS,
-      }).selectedSessionSlugs,
-    }));
+    expect(readStoredGlobalSessionSelection()).toEqual(
+      expect.objectContaining({
+        primarySessionExplicit: false,
+        selectedSessionScope: DEFAULT_GLOBAL_SESSION_SCOPE,
+        selectedSessionSlugs: normalizeGlobalSessionSelection({
+          selectedSessionScope: CE_SESSION_SCAN_SCOPE,
+          selectedSessionSlugs: CE_SESSION_SCAN_SLUGS,
+        }).selectedSessionSlugs,
+      }),
+    );
   });
 
   it('resolves scope slugs without collapsing list mode into a single session', () => {
-    expect(resolveScopedSessionSlugsFromSelection({
-      primarySessionSlug: 'edge',
-      selectedSessionScope: 'all',
-      selectedSessionSlugs: ['general', 'alpha'],
-    })).toEqual([]);
+    expect(
+      resolveScopedSessionSlugsFromSelection({
+        primarySessionSlug: 'edge',
+        selectedSessionScope: 'all',
+        selectedSessionSlugs: ['general', 'alpha'],
+      }),
+    ).toEqual([]);
 
-    expect(resolveScopedSessionSlugsFromSelection({
-      primarySessionSlug: 'edge',
-      selectedSessionScope: 'active',
-      selectedSessionSlugs: ['general', 'alpha'],
-    })).toEqual(['edge']);
+    expect(
+      resolveScopedSessionSlugsFromSelection({
+        primarySessionSlug: 'edge',
+        selectedSessionScope: 'active',
+        selectedSessionSlugs: ['general', 'alpha'],
+      }),
+    ).toEqual(['edge']);
 
-    expect(resolveScopedSessionSlugsFromSelection({
-      primarySessionSlug: 'edge',
-      selectedSessionScope: 'general',
-      selectedSessionSlugs: ['general', 'alpha'],
-    })).toEqual(['']);
+    expect(
+      resolveScopedSessionSlugsFromSelection({
+        primarySessionSlug: 'edge',
+        selectedSessionScope: 'general',
+        selectedSessionSlugs: ['general', 'alpha'],
+      }),
+    ).toEqual(['']);
 
-    expect(resolveScopedSessionSlugsFromSelection({
-      primarySessionSlug: '',
-      selectedSessionScope: 'list',
-      selectedSessionSlugs: ['general', 'alpha'],
-    })).toEqual(['', 'alpha']);
+    expect(
+      resolveScopedSessionSlugsFromSelection({
+        primarySessionSlug: '',
+        selectedSessionScope: 'list',
+        selectedSessionSlugs: ['general', 'alpha'],
+      }),
+    ).toEqual(['', 'alpha']);
   });
 
   it('falls back to the default scope when given an invalid mode', () => {
-    expect(normalizeGlobalSessionSelection({
-      primarySessionSlug: '',
-      selectedSessionScope: 'not-real',
-      selectedSessionSlugs: [],
-    }).selectedSessionScope).toBe(DEFAULT_GLOBAL_SESSION_SCOPE);
+    expect(
+      normalizeGlobalSessionSelection({
+        primarySessionSlug: '',
+        selectedSessionScope: 'not-real',
+        selectedSessionSlugs: [],
+      }).selectedSessionScope,
+    ).toBe(DEFAULT_GLOBAL_SESSION_SCOPE);
   });
 
   afterAll(() => {
     if (typeof ORIGINAL_RUNTIME_SCOPE === 'undefined') {
-      try { delete globalThis.CE_SESSION_SCAN_SCOPE; } catch (_) {}
+      try {
+        delete globalThis.CE_SESSION_SCAN_SCOPE;
+      } catch (_) {}
     } else {
       globalThis.CE_SESSION_SCAN_SCOPE = ORIGINAL_RUNTIME_SCOPE;
     }
     if (typeof ORIGINAL_RUNTIME_SLUGS === 'undefined') {
-      try { delete globalThis.CE_SESSION_SCAN_SLUGS; } catch (_) {}
+      try {
+        delete globalThis.CE_SESSION_SCAN_SLUGS;
+      } catch (_) {}
     } else {
       globalThis.CE_SESSION_SCAN_SLUGS = ORIGINAL_RUNTIME_SLUGS;
     }

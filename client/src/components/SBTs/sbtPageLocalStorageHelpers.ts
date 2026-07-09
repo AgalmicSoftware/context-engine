@@ -52,9 +52,7 @@ export type AppendSbtPageBookmarkResult = {
   shouldWrite: boolean;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
 export const readSbtPageQueuedOrStoredLocalStorageJson = <T extends Record<string, unknown>>({
   fallback,
@@ -70,7 +68,7 @@ export const readSbtPageQueuedOrStoredLocalStorageJson = <T extends Record<strin
     const raw = (typeof pendingRaw === 'string' ? pendingRaw : storageRef.getItem?.(storageKey)) || '';
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
-    return (parsed && typeof parsed === 'object') ? parsed as T : fallback;
+    return parsed && typeof parsed === 'object' ? (parsed as T) : fallback;
   } catch (_) {
     return fallback;
   }

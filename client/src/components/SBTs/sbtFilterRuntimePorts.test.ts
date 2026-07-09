@@ -1,6 +1,4 @@
-import {
-  bindSbtFilterRuntimePorts,
-} from './sbtFilterRuntimePorts';
+import { bindSbtFilterRuntimePorts } from './sbtFilterRuntimePorts';
 
 describe('sbtFilterRuntimePorts', () => {
   it('binds filter runtime ports through call-time getters', async () => {

@@ -1,16 +1,16 @@
-const {
-  updateSbtRealtimeCursorForNetworkCache,
-} = require('./sbtRealtimeCursorCache.js');
+const { updateSbtRealtimeCursorForNetworkCache } = require('./sbtRealtimeCursorCache.js');
 
 describe('updateSbtRealtimeCursorForNetworkCache', () => {
   it('writes the normalized cursor when the cache has no previous cursor', () => {
     const networkCache = {};
 
-    expect(updateSbtRealtimeCursorForNetworkCache(networkCache, {
-      blockNumber: '10',
-      transactionIndex: '2',
-      logIndex: '3',
-    })).toBe(true);
+    expect(
+      updateSbtRealtimeCursorForNetworkCache(networkCache, {
+        blockNumber: '10',
+        transactionIndex: '2',
+        logIndex: '3',
+      }),
+    ).toBe(true);
     expect(networkCache.lastRealtimeEventCursor).toEqual({
       blockNumber: 10,
       transactionIndex: 2,
@@ -27,11 +27,13 @@ describe('updateSbtRealtimeCursorForNetworkCache', () => {
       },
     };
 
-    expect(updateSbtRealtimeCursorForNetworkCache(networkCache, {
-      blockNumber: 10,
-      transactionIndex: 2,
-      logIndex: 4,
-    })).toBe(true);
+    expect(
+      updateSbtRealtimeCursorForNetworkCache(networkCache, {
+        blockNumber: 10,
+        transactionIndex: 2,
+        logIndex: 4,
+      }),
+    ).toBe(true);
     expect(networkCache.lastRealtimeEventCursor).toEqual({
       blockNumber: 10,
       transactionIndex: 2,
@@ -49,20 +51,24 @@ describe('updateSbtRealtimeCursorForNetworkCache', () => {
       lastRealtimeEventCursor: previous,
     };
 
-    expect(updateSbtRealtimeCursorForNetworkCache(networkCache, {
-      blockNumber: 10,
-      transactionIndex: 2,
-      logIndex: 2,
-    })).toBe(false);
+    expect(
+      updateSbtRealtimeCursorForNetworkCache(networkCache, {
+        blockNumber: 10,
+        transactionIndex: 2,
+        logIndex: 2,
+      }),
+    ).toBe(false);
     expect(networkCache.lastRealtimeEventCursor).toBe(previous);
   });
 
   it('ignores invalid cursors', () => {
     const networkCache = {};
 
-    expect(updateSbtRealtimeCursorForNetworkCache(networkCache, {
-      blockNumber: 'not-a-block',
-    })).toBe(false);
+    expect(
+      updateSbtRealtimeCursorForNetworkCache(networkCache, {
+        blockNumber: 'not-a-block',
+      }),
+    ).toBe(false);
     expect(networkCache.lastRealtimeEventCursor).toBeUndefined();
   });
 });

@@ -1,11 +1,6 @@
-import {
-  buildResponsePayload,
-  type BuildResponsePayloadOptions,
-} from './surveyToolResponsePayloadController';
+import { buildResponsePayload, type BuildResponsePayloadOptions } from './surveyToolResponsePayloadController';
 
-const defaultOpts = (
-  overrides: Partial<BuildResponsePayloadOptions> = {},
-): BuildResponsePayloadOptions => ({
+const defaultOpts = (overrides: Partial<BuildResponsePayloadOptions> = {}): BuildResponsePayloadOptions => ({
   isStandalone: false,
   singleQuestionMode: false,
   surveyId: 'survey-1',
@@ -33,199 +28,233 @@ const defaultOpts = (
 
 describe('surveyToolResponsePayloadController', () => {
   it('returns empty object when surveyResponseState is null', () => {
-    expect(buildResponsePayload(defaultOpts({
-      surveyResponseState: null,
-    }))).toEqual({});
+    expect(
+      buildResponsePayload(
+        defaultOpts({
+          surveyResponseState: null,
+        }),
+      ),
+    ).toEqual({});
   });
 
   it('builds survey-mode payload with responses array', () => {
-    const result = buildResponsePayload(defaultOpts({
-      questionPool: [{ id: 'q1', type: 'binary', prompt: 'Yes or no?' }],
-      surveyResponseState: {
-        answers: { q1: { value: 'Yes' } },
-        additionalComments: {},
-        importance: {},
-        conviction: {},
-      },
-    }));
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'binary', prompt: 'Yes or no?' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'Yes' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+      }),
+    );
 
-    expect(result).toEqual(expect.objectContaining({
-      surveyID: 'survey-1',
-      responder: '0xUser',
-      timeStamp: expect.any(Number),
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        surveyID: 'survey-1',
+        responder: '0xUser',
+        timeStamp: expect.any(Number),
+      }),
+    );
     expect(result.responses!).toHaveLength(1);
-    expect(result.responses![0]).toEqual(expect.objectContaining({
-      questionID: 'q1',
-      answer: expect.objectContaining({ value: 'Yes' }),
-    }));
+    expect(result.responses![0]).toEqual(
+      expect.objectContaining({
+        questionID: 'q1',
+        answer: expect.objectContaining({ value: 'Yes' }),
+      }),
+    );
   });
 
   it('importance falls back to conviction when null', () => {
-    const result = buildResponsePayload(defaultOpts({
-      questionPool: [{ id: 'q1', type: 'rating', prompt: 'Rate' }],
-      surveyResponseState: {
-        answers: { q1: { value: 7 } },
-        additionalComments: {},
-        importance: {},
-        conviction: {},
-      },
-      getConvictionFromSlice: () => 8,
-      getImportanceFromSlice: () => null,
-    }));
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'rating', prompt: 'Rate' }],
+        surveyResponseState: {
+          answers: { q1: { value: 7 } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+        getConvictionFromSlice: () => 8,
+        getImportanceFromSlice: () => null,
+      }),
+    );
 
     expect(result.responses![0].importance).toBe(8);
     expect(result.responses![0].conviction).toBe(8);
   });
 
   it('single-question mode returns flat response', () => {
-    const result = buildResponsePayload(defaultOpts({
-      singleQuestionMode: true,
-      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Tell me' }],
-      surveyResponseState: {
-        answers: { q1: { value: 'hello' } },
-        additionalComments: {},
-        importance: {},
-        conviction: {},
-      },
-    }));
+    const result = buildResponsePayload(
+      defaultOpts({
+        singleQuestionMode: true,
+        questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Tell me' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'hello' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+      }),
+    );
 
-    expect(result).toEqual(expect.objectContaining({
-      questionID: 'q1',
-      timeStamp: expect.any(Number),
-      answer: expect.objectContaining({ value: 'hello' }),
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        questionID: 'q1',
+        timeStamp: expect.any(Number),
+        answer: expect.objectContaining({ value: 'hello' }),
+      }),
+    );
     expect(result).not.toHaveProperty('responses');
   });
 
   it('single-question mode returns empty entry when no responses', () => {
-    const result = buildResponsePayload(defaultOpts({
-      singleQuestionMode: true,
-      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Tell me' }],
-      surveyResponseState: {
-        answers: {},
-        additionalComments: {},
-        importance: {},
-        conviction: {},
-      },
-    }));
-
-    expect(result).toEqual(expect.objectContaining({
-      questionID: 'q1',
-      answer: expect.objectContaining({
-        value: '',
-        encrypted: false,
+    const result = buildResponsePayload(
+      defaultOpts({
+        singleQuestionMode: true,
+        questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Tell me' }],
+        surveyResponseState: {
+          answers: {},
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
       }),
-    }));
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        questionID: 'q1',
+        answer: expect.objectContaining({
+          value: '',
+          encrypted: false,
+        }),
+      }),
+    );
   });
 
   it('sets encryptionGateId only when field is encrypted', () => {
-    const result = buildResponsePayload(defaultOpts({
-      questionPool: [{ id: 'q1', type: 'binary', prompt: 'Encrypted?' }],
-      surveyResponseState: {
-        answers: { q1: { value: 'Yes', encrypted: true, hash: 'abc' } },
-        additionalComments: {},
-        importance: {},
-        conviction: {},
-      },
-      resolveFieldEncryptionGateId: () => 'gate-1',
-    }));
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'binary', prompt: 'Encrypted?' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'Yes', encrypted: true, hash: 'abc' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+        resolveFieldEncryptionGateId: () => 'gate-1',
+      }),
+    );
 
     expect(result.responses![0].answer.encryptionGateId).toBe('gate-1');
     expect(result.responses![0].answer.encrypted).toBe(true);
   });
 
   it('does not set encryptionGateId when field is not encrypted', () => {
-    const result = buildResponsePayload(defaultOpts({
-      questionPool: [{ id: 'q1', type: 'binary', prompt: 'Plain?' }],
-      surveyResponseState: {
-        answers: { q1: { value: 'No' } },
-        additionalComments: {},
-        importance: {},
-        conviction: {},
-      },
-      resolveFieldEncryptionGateId: () => 'gate-1',
-    }));
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'binary', prompt: 'Plain?' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'No' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+        resolveFieldEncryptionGateId: () => 'gate-1',
+      }),
+    );
 
     expect(result.responses![0].answer.encryptionGateId).toBeNull();
     expect(result.responses![0].answer.encrypted).toBe(false);
   });
 
   it('does not mark empty additional comments encrypted in submitted payload', () => {
-    const result = buildResponsePayload(defaultOpts({
-      questionPool: [{ id: 'q1', type: 'binary', prompt: 'Encrypted answer' }],
-      surveyResponseState: {
-        answers: {
-          q1: { value: '*', encrypted: true, encryptedPortion: 'answer-envelope', hash: 'answer-hash' },
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'binary', prompt: 'Encrypted answer' }],
+        surveyResponseState: {
+          answers: {
+            q1: { value: '*', encrypted: true, encryptedPortion: 'answer-envelope', hash: 'answer-hash' },
+          },
+          additionalComments: {
+            q1: { value: '', encrypted: true, encryptionAudience: 'gate', encryptedPortion: '', hash: '' },
+          },
+          importance: {},
+          conviction: {},
         },
-        additionalComments: {
-          q1: { value: '', encrypted: true, encryptionAudience: 'gate', encryptedPortion: '', hash: '' },
-        },
-        importance: {},
-        conviction: {},
-      },
-      resolveFieldEncryptionAudience: (_field, _qid, fieldKey) => (
-        fieldKey === 'additional' ? 'gate' : 'self'
-      ),
-      resolveFieldEncryptionGateId: () => 'gate-1',
-    }));
+        resolveFieldEncryptionAudience: (_field, _qid, fieldKey) => (fieldKey === 'additional' ? 'gate' : 'self'),
+        resolveFieldEncryptionGateId: () => 'gate-1',
+      }),
+    );
 
-    expect(result.responses![0].answer).toEqual(expect.objectContaining({
-      encrypted: true,
-      encryptedPortion: 'answer-envelope',
-    }));
-    expect(result.responses![0].additional).toEqual(expect.objectContaining({
-      value: '',
-      encrypted: false,
-      encryptionGateId: null,
-      encryptedPortion: '',
-    }));
+    expect(result.responses![0].answer).toEqual(
+      expect.objectContaining({
+        encrypted: true,
+        encryptedPortion: 'answer-envelope',
+      }),
+    );
+    expect(result.responses![0].additional).toEqual(
+      expect.objectContaining({
+        value: '',
+        encrypted: false,
+        encryptionGateId: null,
+        encryptedPortion: '',
+      }),
+    );
   });
 
   it('filters to answered questions when pool is empty (synthesized candidates)', () => {
-    const result = buildResponsePayload(defaultOpts({
-      questionPool: [],
-      pileQuestions: [],
-      surveyResponseState: {
-        answers: { q1: { value: 'a' }, q2: { value: '' } },
-        additionalComments: { q3: { value: 'note' } },
-        importance: {},
-        conviction: {},
-      },
-    }));
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [],
+        pileQuestions: [],
+        surveyResponseState: {
+          answers: { q1: { value: 'a' }, q2: { value: '' } },
+          additionalComments: { q3: { value: 'note' } },
+          importance: {},
+          conviction: {},
+        },
+      }),
+    );
 
     expect(result.responses!).toHaveLength(2);
     expect(result.responses!.map((response) => response.questionID)).toEqual(['q1', 'q3']);
   });
 
   it('includes surveyTitle from metadata when available', () => {
-    const result = buildResponsePayload(defaultOpts({
-      getSurveyMetadataForJson: () => ({ surveyTitle: 'My Survey', sessionName: 'session-a' }),
-      questionPool: [{ id: 'q1', type: 'binary', prompt: 'Q' }],
-      surveyResponseState: {
-        answers: { q1: { value: 'Yes' } },
-        additionalComments: {},
-        importance: {},
-        conviction: {},
-      },
-    }));
+    const result = buildResponsePayload(
+      defaultOpts({
+        getSurveyMetadataForJson: () => ({ surveyTitle: 'My Survey', sessionName: 'session-a' }),
+        questionPool: [{ id: 'q1', type: 'binary', prompt: 'Q' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'Yes' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+      }),
+    );
 
     expect(result.surveyTitle).toBe('My Survey');
     expect(result.sessionName).toBe('session-a');
   });
 
   it('single-question mode resolves sessionName from question pool first', () => {
-    const result = buildResponsePayload(defaultOpts({
-      singleQuestionMode: true,
-      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Q', sessionName: 'pool-session' }],
-      surveyResponseState: {
-        answers: { q1: { value: 'hi' } },
-        additionalComments: {},
-        importance: {},
-        conviction: {},
-      },
-      resolveSessionContext: () => ({ sessionName: 'context-session' }),
-    }));
+    const result = buildResponsePayload(
+      defaultOpts({
+        singleQuestionMode: true,
+        questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Q', sessionName: 'pool-session' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'hi' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+        resolveSessionContext: () => ({ sessionName: 'context-session' }),
+      }),
+    );
 
     expect(result.sessionName).toBe('pool-session');
   });

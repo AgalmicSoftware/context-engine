@@ -5,23 +5,14 @@ import { toStr } from '../../utilities/shared/primitives.js';
 import type { AnyRecord } from '../shellTypes';
 
 export const LOCAL_WORKER_BUNDLE_BUILD_COMMAND = 'nvm use 20 && npm run worker:bundle';
-export const LOCAL_WORKER_BUNDLE_GENERATE_HELP =
-  `Run ${LOCAL_WORKER_BUNDLE_BUILD_COMMAND} from the repo root, then choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH}.`;
-export const LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP =
-  `Optional fallback: ${LOCAL_WORKER_BUNDLE_GENERATE_HELP}`;
+export const LOCAL_WORKER_BUNDLE_GENERATE_HELP = `Run ${LOCAL_WORKER_BUNDLE_BUILD_COMMAND} from the repo root, then choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH}.`;
+export const LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP = `Optional fallback: ${LOCAL_WORKER_BUNDLE_GENERATE_HELP}`;
 export const MANUAL_BUNDLE_URL_OVERRIDE_HELP =
   'Paste a direct worker bundle URL here if the GitHub-hosted asset is temporarily unavailable.';
-export const LOCAL_WORKER_BUNDLE_FALLBACK_PICKER_HELP =
-  `Automatic hosted bundle fetch failed. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
-export const NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE = (
-  `No default hosted worker bundle URL is configured for normal mode. Provide a manual bundle URL or upload a bundle file below. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`
-);
-export const NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE = (
-  `Normal mode still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`
-);
-export const SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE = (
-  `Sponsored publish still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`
-);
+export const LOCAL_WORKER_BUNDLE_FALLBACK_PICKER_HELP = `Automatic hosted bundle fetch failed. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
+export const NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE = `No default hosted worker bundle URL is configured for normal mode. Provide a manual bundle URL or upload a bundle file below. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
+export const NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE = `Normal mode still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
+export const SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE = `Sponsored publish still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
 
 export const NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED = false;
 
@@ -32,7 +23,7 @@ type SessionWizardProcessLike = {
 };
 
 export const __test__isSessionWizardDevMode = (
-  proc: SessionWizardProcessLike | undefined = (typeof process !== 'undefined' ? process : undefined)
+  proc: SessionWizardProcessLike | undefined = typeof process !== 'undefined' ? process : undefined,
 ): boolean => toStr(proc?.env?.NODE_ENV).trim().toLowerCase() !== 'production';
 
 export const DEV_PERSIST_WORKER_SECRETS = __test__isSessionWizardDevMode();
@@ -77,6 +68,5 @@ export const METADATA_FIELD_ORDER = [
 
 export const SESSION_WIZARD_DEFAULT_TEMPLATE: AnyRecord = buildSessionWizardDefaultTemplate();
 
-export const __test__getSessionWizardDefaultAiSettings = (): AnyRecord => (
-  deepClone(SESSION_WIZARD_DEFAULT_TEMPLATE.ai || {})
-);
+export const __test__getSessionWizardDefaultAiSettings = (): AnyRecord =>
+  deepClone(SESSION_WIZARD_DEFAULT_TEMPLATE.ai || {});

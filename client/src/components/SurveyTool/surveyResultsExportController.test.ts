@@ -5,7 +5,7 @@ import {
 } from './surveyResultsExportController';
 
 const createGenerators = (
-  overrides: Partial<SurveyResultsExportContentGenerators> = {}
+  overrides: Partial<SurveyResultsExportContentGenerators> = {},
 ): SurveyResultsExportContentGenerators => ({
   'questions-csv': jest.fn(() => '"questionID","prompt","type","tags","options"\n"q1","Prompt","binary","",""'),
   'questions-json': jest.fn(() => '{"questions":true}'),
@@ -145,13 +145,15 @@ describe('surveyResultsExportController', () => {
       }),
     });
 
-    expect(() => runSurveyResultsExportController({
-      baseFileName: 'contextEngine_questionResults',
-      downloadFile,
-      exportType: 'csv-questions-and-responses',
-      generators,
-      timestamp: '2026_05_28T10_00_00_000Z',
-    })).toThrow(error);
+    expect(() =>
+      runSurveyResultsExportController({
+        baseFileName: 'contextEngine_questionResults',
+        downloadFile,
+        exportType: 'csv-questions-and-responses',
+        generators,
+        timestamp: '2026_05_28T10_00_00_000Z',
+      }),
+    ).toThrow(error);
     expect(downloadFile).not.toHaveBeenCalled();
   });
 
@@ -162,13 +164,15 @@ describe('surveyResultsExportController', () => {
     });
     const generators = createGenerators();
 
-    expect(() => runSurveyResultsExportController({
-      baseFileName: 'contextEngine_questionResults',
-      downloadFile,
-      exportType: 'json-questions-and-responses',
-      generators,
-      timestamp: '2026_05_28T10_00_00_000Z',
-    })).toThrow(error);
+    expect(() =>
+      runSurveyResultsExportController({
+        baseFileName: 'contextEngine_questionResults',
+        downloadFile,
+        exportType: 'json-questions-and-responses',
+        generators,
+        timestamp: '2026_05_28T10_00_00_000Z',
+      }),
+    ).toThrow(error);
     expect(generators['questions-responses-json']).toHaveBeenCalledTimes(1);
   });
 
@@ -183,11 +187,11 @@ describe('surveyResultsExportController', () => {
       configurable: true,
       value: createObjectURL,
     });
-    const clickSpy = jest
-      .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(function recordClickedAnchor(this: HTMLAnchorElement) {
-        clickedAnchor = this;
-      });
+    const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function recordClickedAnchor(
+      this: HTMLAnchorElement,
+    ) {
+      clickedAnchor = this;
+    });
 
     try {
       runSurveyResultsBrowserDownload({
@@ -200,12 +204,14 @@ describe('surveyResultsExportController', () => {
       const blob = createObjectURL.mock.calls[0][0];
       expect(blob).toBeInstanceOf(Blob);
       expect(blob.type).toBe('application/json;charset=utf-8;');
-      await expect(new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(reader.error || new Error('Unable to read Blob'));
-        reader.readAsText(blob);
-      })).resolves.toBe('downloaded contents');
+      await expect(
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => reject(reader.error || new Error('Unable to read Blob'));
+          reader.readAsText(blob);
+        }),
+      ).resolves.toBe('downloaded contents');
       expect(clickedAnchor).not.toBeNull();
       expect(clickedAnchor?.getAttribute('hidden')).toBe('');
       expect(clickedAnchor?.getAttribute('href')).toBe('blob:survey-results-download');

@@ -1,24 +1,12 @@
 import { SPONSORED_BUNDLE_SUPPORTED_FIELDS } from '../../utilities/arweave/sponsoredBundles.js';
-import {
-  normalizeSponsoredFieldSnapshot,
-} from '../../utilities/session/sponsoredFlags.js';
+import { normalizeSponsoredFieldSnapshot } from '../../utilities/session/sponsoredFlags.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { DEFAULT_GATE_KEYS } from './sessionWizardGateUtils';
-import type {
-  AnyRecord,
-  WorkerSecretsLike,
-} from '../shellTypes';
+import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
 
-export const CHIPOTLE_LIT_CONFIG_FIELDS = Object.freeze([
-  'litApiBase',
-  'litGroupId',
-  'litPkpId',
-  'litActionCid',
-]);
+export const CHIPOTLE_LIT_CONFIG_FIELDS = Object.freeze(['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid']);
 
-export const WORKER_SECRET_CACHE_SAFE_FIELDS = Object.freeze([
-  ...CHIPOTLE_LIT_CONFIG_FIELDS,
-]);
+export const WORKER_SECRET_CACHE_SAFE_FIELDS = Object.freeze([...CHIPOTLE_LIT_CONFIG_FIELDS]);
 
 export const DEFAULT_WORKER_SECRETS: WorkerSecretsLike = {
   openaiKey: '',
@@ -37,7 +25,7 @@ export const DEFAULT_WORKER_SECRETS: WorkerSecretsLike = {
 };
 
 export const WORKER_SECRET_PERSISTED_FIELDS = Object.freeze(
-  Object.keys(DEFAULT_WORKER_SECRETS).filter((key) => !WORKER_SECRET_CACHE_SAFE_FIELDS.includes(key))
+  Object.keys(DEFAULT_WORKER_SECRETS).filter((key) => !WORKER_SECRET_CACHE_SAFE_FIELDS.includes(key)),
 );
 
 export const normalizeWorkerSecrets = (value: WorkerSecretsLike | AnyRecord = {}): WorkerSecretsLike => {
@@ -52,7 +40,7 @@ export const normalizeWorkerSecrets = (value: WorkerSecretsLike | AnyRecord = {}
 
 export const mergeSponsoredBundleWorkerSecrets = (
   currentSecrets: WorkerSecretsLike | AnyRecord = {},
-  bundle: AnyRecord = {}
+  bundle: AnyRecord = {},
 ): WorkerSecretsLike => {
   const next = normalizeWorkerSecrets(currentSecrets);
   SPONSORED_BUNDLE_SUPPORTED_FIELDS.forEach((key) => {
@@ -71,23 +59,23 @@ export const mergeSponsoredBundleWorkerSecrets = (
 
 export const mergeSponsoredBundleDeployForm = (
   currentDeployForm: AnyRecord = {},
-  bundle: AnyRecord = {}
+  bundle: AnyRecord = {},
 ): AnyRecord => {
   void bundle;
-  return currentDeployForm && typeof currentDeployForm === 'object'
-    ? { ...currentDeployForm }
-    : {};
+  return currentDeployForm && typeof currentDeployForm === 'object' ? { ...currentDeployForm } : {};
 };
 
 export const buildWorkerLitCredentialsConfig = (
-  workerSecrets: WorkerSecretsLike | AnyRecord = {}
-): Record<string, string> => (
-  CHIPOTLE_LIT_CONFIG_FIELDS.reduce((acc, key) => {
-    const value = toStr((workerSecrets as AnyRecord)?.[key]).trim();
-    if (value) acc[key] = value;
-    return acc;
-  }, {} as Record<string, string>)
-);
+  workerSecrets: WorkerSecretsLike | AnyRecord = {},
+): Record<string, string> =>
+  CHIPOTLE_LIT_CONFIG_FIELDS.reduce(
+    (acc, key) => {
+      const value = toStr((workerSecrets as AnyRecord)?.[key]).trim();
+      if (value) acc[key] = value;
+      return acc;
+    },
+    {} as Record<string, string>,
+  );
 
 export const sanitizeSessionWizardWorkerSecretsForLitMode = (
   value: WorkerSecretsLike | AnyRecord = {},
@@ -108,15 +96,10 @@ export const resolveSessionWizardEnabledWorkerSecrets = ({
 }: {
   workerSecrets?: WorkerSecretsLike | AnyRecord;
   workerSecretsEnabled?: boolean;
-} = {}): WorkerSecretsLike => (
-  workerSecretsEnabled
-    ? sanitizeSessionWizardWorkerSecretsForLitMode(workerSecrets)
-    : { ...DEFAULT_WORKER_SECRETS }
-);
+} = {}): WorkerSecretsLike =>
+  workerSecretsEnabled ? sanitizeSessionWizardWorkerSecretsForLitMode(workerSecrets) : { ...DEFAULT_WORKER_SECRETS };
 
-export const sanitizeSessionWizardSponsoredFieldSnapshotForLitMode = (
-  value: AnyRecord = {},
-) => {
+export const sanitizeSessionWizardSponsoredFieldSnapshotForLitMode = (value: AnyRecord = {}) => {
   return normalizeSponsoredFieldSnapshot(value);
 };
 

@@ -6,11 +6,7 @@ import {
   DEFAULT_CHIPOTLE_ACTION_NAME,
   DEFAULT_CHIPOTLE_ACTION_PARAMS_EXAMPLE,
 } from '../../utilities/crypto/litChipotleCatalog.js';
-import type {
-  AnyRecord,
-  WorkerSecretSyncResult,
-  WorkerSecretsLike,
-} from '../shellTypes';
+import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../shellTypes';
 
 type AsyncShellResult = AnyRecord | null | undefined;
 type AsyncShellCallback<TResult = AsyncShellResult | void> = (input: AnyRecord) => Promise<TResult>;
@@ -58,7 +54,7 @@ export const buildSessionWizardLitBootstrapRequest = (
     sessionName = '',
   }: {
     sessionName?: unknown;
-  } = {}
+  } = {},
 ): AnyRecord | null => {
   const litApiBase = toTrimmedString((workerSecrets as AnyRecord)?.litApiBase);
   const litGroupId = toTrimmedString((workerSecrets as AnyRecord)?.litGroupId);
@@ -92,7 +88,7 @@ export const buildSessionWizardLitBootstrapRequest = (
 };
 
 export const buildSessionWizardLitProvisionRequest = (
-  workerSecrets: WorkerSecretsLike | AnyRecord = {}
+  workerSecrets: WorkerSecretsLike | AnyRecord = {},
 ): AnyRecord | null => {
   const litApiBase = toTrimmedString((workerSecrets as AnyRecord)?.litApiBase);
   const litGroupId = toTrimmedString((workerSecrets as AnyRecord)?.litGroupId);
@@ -116,10 +112,7 @@ export const buildSessionWizardLitProvisionRequest = (
 const isLitProvisionConfigBootstrapError = (err: unknown): boolean => {
   const message = toErrorMessage(err).toLowerCase();
   if (!message) return false;
-  return (
-    message.includes('admin authorization failed') ||
-    message.includes('session config not found')
-  );
+  return message.includes('admin authorization failed') || message.includes('session config not found');
 };
 
 export const syncWorkerLitActionProvisionAfterDeploy = async ({
@@ -145,9 +138,7 @@ export const syncWorkerLitActionProvisionAfterDeploy = async ({
   retryDelaysMs?: number[];
   wait?: (ms: number) => Promise<void>;
 } = {}): Promise<LitProvisionSyncResult> => {
-  const requestBody = provisionRequest && typeof provisionRequest === 'object'
-    ? { ...provisionRequest }
-    : null;
+  const requestBody = provisionRequest && typeof provisionRequest === 'object' ? { ...provisionRequest } : null;
   if (!requestBody || !toTrimmedString(requestBody.actionCode)) {
     return { warning: '', note: '', synced: false, skipped: true };
   }
@@ -271,9 +262,7 @@ export const syncWorkerLitSessionBootstrapAfterDeploy = async ({
   retryDelaysMs?: number[];
   wait?: (ms: number) => Promise<void>;
 } = {}): Promise<LitBootstrapSyncResult> => {
-  const requestBody = bootstrapRequest && typeof bootstrapRequest === 'object'
-    ? { ...bootstrapRequest }
-    : null;
+  const requestBody = bootstrapRequest && typeof bootstrapRequest === 'object' ? { ...bootstrapRequest } : null;
   if (!requestBody || !toTrimmedString(requestBody.actionCode)) {
     return { warning: '', note: '', synced: false, skipped: true };
   }
@@ -383,7 +372,7 @@ export const syncWorkerLitSessionBootstrapAfterDeploy = async ({
 
 export const withLitBootstrapSyncStatus = (
   baseStatus = '',
-  { warning = '', note = '' }: Partial<LitBootstrapSyncResult> = {}
+  { warning = '', note = '' }: Partial<LitBootstrapSyncResult> = {},
 ): string => {
   const status = toTrimmedString(baseStatus) || 'Worker deployed.';
   const warningText = toTrimmedString(warning);
@@ -395,7 +384,7 @@ export const withLitBootstrapSyncStatus = (
 
 export const withLitProvisionSyncStatus = (
   baseStatus = '',
-  { warning = '', note = '' }: Partial<LitProvisionSyncResult> = {}
+  { warning = '', note = '' }: Partial<LitProvisionSyncResult> = {},
 ): string => {
   const status = toTrimmedString(baseStatus) || 'Worker deployed.';
   const warningText = toTrimmedString(warning);

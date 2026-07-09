@@ -51,10 +51,7 @@ const buildViewportStyle = (position: ToastPosition): React.CSSProperties => ({
   ...(POSITION_STYLES[position] || POSITION_STYLES['bottom-right']),
 });
 
-const buildToastStyle = (
-  kind: string,
-  baseStyle: React.CSSProperties = {}
-): React.CSSProperties => ({
+const buildToastStyle = (kind: string, baseStyle: React.CSSProperties = {}): React.CSSProperties => ({
   pointerEvents: 'auto',
   borderRadius: 12,
   padding: '12px 14px',
@@ -80,10 +77,7 @@ const closeButtonStyle: React.CSSProperties = {
 
 const DEFAULT_TOAST_STYLE: React.CSSProperties = Object.freeze({});
 
-const CEToaster = ({
-  position = 'bottom-right',
-  toastOptions = {},
-}: CEToasterProps) => {
+const CEToaster = ({ position = 'bottom-right', toastOptions = {} }: CEToasterProps) => {
   const [toasts, setToasts] = useState<ToastPayload[]>([]);
   const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const viewportStyle = useMemo(() => buildViewportStyle(position), [position]);

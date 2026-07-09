@@ -1,8 +1,6 @@
 import { canonicalizeSessionSlug } from './canonicalSessionContext.js';
 import { parseWorkerConfig } from './sessionParsers.js';
-import {
-  readConfiguredSessionWorkerUrlCandidate,
-} from './sessionWorkerUrlCompatibility.js';
+import { readConfiguredSessionWorkerUrlCandidate } from './sessionWorkerUrlCompatibility.js';
 import { normalizeSessionIdHex } from '../shared/primitives.js';
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 import type {
@@ -71,13 +69,8 @@ const SLUG_WORKER_CACHE_KEY_PREFIX = 'slug:';
 
 const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
-const toTrimmedString = (value: unknown): string => (
-  typeof value === 'string'
-    ? value.trim()
-    : value == null
-      ? ''
-      : String(value).trim()
-);
+const toTrimmedString = (value: unknown): string =>
+  typeof value === 'string' ? value.trim() : value == null ? '' : String(value).trim();
 const cloneValue = <T>(value: T): T => {
   if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
   if (isObj(value)) {
@@ -92,13 +85,14 @@ const hasWorkerConfigValue = (config: unknown): boolean => {
   const configObj = isObj(config) ? config : {};
   const allowOrigins = configObj.allowOrigins;
   const limits = configObj.limits;
-  return !!config && (
-    !!configObj.corsWorkerUrl ||
-    (Array.isArray(allowOrigins) && allowOrigins.length > 0) ||
-    (isObj(limits) && Object.keys(limits).length > 0) ||
-    !!configObj.rpcEndpoint ||
-    hasOwn(configObj, 'embeddedDeployHelperEnabled') ||
-    hasOwn(configObj, 'litCredentials')
+  return (
+    !!config &&
+    (!!configObj.corsWorkerUrl ||
+      (Array.isArray(allowOrigins) && allowOrigins.length > 0) ||
+      (isObj(limits) && Object.keys(limits).length > 0) ||
+      !!configObj.rpcEndpoint ||
+      hasOwn(configObj, 'embeddedDeployHelperEnabled') ||
+      hasOwn(configObj, 'litCredentials'))
   );
 };
 const normalizeTimestampMs = (value: unknown): number => {
@@ -116,13 +110,9 @@ const normalizeWriteNonce = (value: unknown, fallback = 0): number => {
   if (!Number.isFinite(raw) || raw <= 0) return fallback;
   return Math.trunc(raw);
 };
-const buildSlugCacheKey = (slugIn: unknown = ''): string => (
-  `${SLUG_WORKER_CACHE_KEY_PREFIX}${canonicalizeSessionSlug(slugIn)}`
-);
-const buildAuthoritativeCacheKey = ({
-  sessionIdHex,
-  registryChainId,
-}: Partial<CacheIdentityInput> = {}): string => {
+const buildSlugCacheKey = (slugIn: unknown = ''): string =>
+  `${SLUG_WORKER_CACHE_KEY_PREFIX}${canonicalizeSessionSlug(slugIn)}`;
+const buildAuthoritativeCacheKey = ({ sessionIdHex, registryChainId }: Partial<CacheIdentityInput> = {}): string => {
   const normalizedSessionIdHex = normalizeSessionIdHex(sessionIdHex);
   if (!normalizedSessionIdHex) return '';
   const normalizedRegistryChainId = normalizeChainId(registryChainId);
@@ -130,14 +120,8 @@ const buildAuthoritativeCacheKey = ({
     ? `${SESSION_WORKER_CACHE_KEY_PREFIX}${normalizedRegistryChainId}:${normalizedSessionIdHex}`
     : `${SESSION_WORKER_CACHE_KEY_PREFIX}${normalizedSessionIdHex}`;
 };
-const buildCacheKeyFromIdentity = ({
-  slug,
-  sessionIdHex,
-  registryChainId,
-}: Partial<CacheIdentity> = {}): string => (
-  buildAuthoritativeCacheKey({ sessionIdHex, registryChainId }) ||
-  buildSlugCacheKey(slug)
-);
+const buildCacheKeyFromIdentity = ({ slug, sessionIdHex, registryChainId }: Partial<CacheIdentity> = {}): string =>
+  buildAuthoritativeCacheKey({ sessionIdHex, registryChainId }) || buildSlugCacheKey(slug);
 const parseStoredCacheKey = (keyIn: unknown = ''): CacheIdentity => {
   const key = toTrimmedString(keyIn);
   if (!key) {
@@ -182,17 +166,14 @@ const getSessionIdentityFromConfig = (sessionConfig: unknown = null): CacheIdent
   return {
     slug: canonicalizeSessionSlug(baseConfig.slug ?? ''),
     sessionIdHex: normalizeSessionIdHex(
-      registryMeta.sessionIdHex ??
-      baseConfig.sessionIdHex ??
-      registryMeta.sessionId ??
-      baseConfig.sessionId
+      registryMeta.sessionIdHex ?? baseConfig.sessionIdHex ?? registryMeta.sessionId ?? baseConfig.sessionId,
     ),
     registryChainId: normalizeChainId(
       registryMeta.registryChainId ??
-      registryMeta.chainId ??
-      baseConfig.registryChainId ??
-      baseConfig.chainId ??
-      baseConfig.networkChainId
+        registryMeta.chainId ??
+        baseConfig.registryChainId ??
+        baseConfig.chainId ??
+        baseConfig.networkChainId,
     ),
   };
 };
@@ -201,11 +182,9 @@ const readRegistrySessionConfigBySlug = (slugIn: unknown = ''): SessionConfigLik
   try {
     const parsed = JSON.parse(localStorage.getItem(REGISTRY_CACHE_KEY) || 'null');
     if (!isObj(parsed)) return null;
-    const sessions = isObj(parsed.sessions)
-      ? parsed.sessions
-      : (isObj(parsed.groups) ? parsed.groups : {});
+    const sessions = isObj(parsed.sessions) ? parsed.sessions : isObj(parsed.groups) ? parsed.groups : {};
     const slug = canonicalizeSessionSlug(slugIn);
-    return isObj(sessions[slug]) ? sessions[slug] as SessionConfigLike : null;
+    return isObj(sessions[slug]) ? (sessions[slug] as SessionConfigLike) : null;
   } catch (_) {
     return null;
   }
@@ -236,10 +215,7 @@ const resolveSessionWorkerCacheIdentity = ({
     };
   }
   const workerConfigStore = readSessionWorkerConfigCache();
-  if (
-    hasOwn(workerConfigStore.slugIndex, normalizedSlug) &&
-    workerConfigStore.slugIndex[normalizedSlug] === null
-  ) {
+  if (hasOwn(workerConfigStore.slugIndex, normalizedSlug) && workerConfigStore.slugIndex[normalizedSlug] === null) {
     return {
       slug: normalizedSlug,
       sessionIdHex: '',
@@ -291,53 +267,38 @@ const detectWorkerConfigFieldPresence = (value: unknown): WorkerConfigFieldPrese
   return {
     allowOrigins: hasOwn(rawConfig, 'allowOrigins'),
     limits: hasOwn(rawConfig, 'limits'),
-    rpcEndpoint: (
+    rpcEndpoint:
       hasOwn(rawConfig, 'rpcEndpoint') ||
       hasOwn(rawConfig, 'rpcUrl') ||
       hasOwn(rawRpc, 'endpoint') ||
-      hasOwn(rawRpc, 'url')
-    ),
-    embeddedDeployHelperEnabled: (
-      hasOwn(rawConfig, 'embeddedDeployHelperEnabled') ||
-      hasOwn(rawConfig, 'deployHelperEnabled')
-    ),
+      hasOwn(rawRpc, 'url'),
+    embeddedDeployHelperEnabled:
+      hasOwn(rawConfig, 'embeddedDeployHelperEnabled') || hasOwn(rawConfig, 'deployHelperEnabled'),
   };
 };
-const normalizeWorkerConfigFieldPresence = (
-  value: unknown,
-  rawConfig: unknown
-): WorkerConfigFieldPresence => {
+const normalizeWorkerConfigFieldPresence = (value: unknown, rawConfig: unknown): WorkerConfigFieldPresence => {
   const fallback = detectWorkerConfigFieldPresence(rawConfig);
   if (!isObj(value)) return fallback;
   return {
     allowOrigins: value.allowOrigins === true || (value.allowOrigins !== false && fallback.allowOrigins),
     limits: value.limits === true || (value.limits !== false && fallback.limits),
     rpcEndpoint: value.rpcEndpoint === true || (value.rpcEndpoint !== false && fallback.rpcEndpoint),
-    embeddedDeployHelperEnabled: (
+    embeddedDeployHelperEnabled:
       value.embeddedDeployHelperEnabled === true ||
-      (value.embeddedDeployHelperEnabled !== false && fallback.embeddedDeployHelperEnabled)
-    ),
+      (value.embeddedDeployHelperEnabled !== false && fallback.embeddedDeployHelperEnabled),
   };
 };
-const shouldOverlayAllowOrigins = (record: WorkerConfigRecord | null | undefined): boolean => (
+const shouldOverlayAllowOrigins = (record: WorkerConfigRecord | null | undefined): boolean =>
   record?.fieldPresence?.allowOrigins === true ||
-  (Array.isArray(record?.config?.allowOrigins) && record.config.allowOrigins.length > 0)
-);
-const shouldOverlayLimits = (record: WorkerConfigRecord | null | undefined): boolean => (
+  (Array.isArray(record?.config?.allowOrigins) && record.config.allowOrigins.length > 0);
+const shouldOverlayLimits = (record: WorkerConfigRecord | null | undefined): boolean =>
   record?.fieldPresence?.limits === true ||
-  (isObj(record?.config?.limits) && Object.keys(record.config.limits).length > 0)
-);
-const shouldOverlayRpcEndpoint = (record: WorkerConfigRecord | null | undefined): boolean => (
-  record?.fieldPresence?.rpcEndpoint === true ||
-  !!record?.config?.rpcEndpoint
-);
-const shouldOverlayEmbeddedDeployHelperEnabled = (record: WorkerConfigRecord | null | undefined): boolean => (
-  record?.fieldPresence?.embeddedDeployHelperEnabled === true ||
-  hasOwn(record?.config, 'embeddedDeployHelperEnabled')
-);
-const buildVisibleCachedWorkerConfig = (
-  record: WorkerConfigRecord | null | undefined
-): VisibleCachedWorkerConfig => {
+  (isObj(record?.config?.limits) && Object.keys(record.config.limits).length > 0);
+const shouldOverlayRpcEndpoint = (record: WorkerConfigRecord | null | undefined): boolean =>
+  record?.fieldPresence?.rpcEndpoint === true || !!record?.config?.rpcEndpoint;
+const shouldOverlayEmbeddedDeployHelperEnabled = (record: WorkerConfigRecord | null | undefined): boolean =>
+  record?.fieldPresence?.embeddedDeployHelperEnabled === true || hasOwn(record?.config, 'embeddedDeployHelperEnabled');
+const buildVisibleCachedWorkerConfig = (record: WorkerConfigRecord | null | undefined): VisibleCachedWorkerConfig => {
   if (!record?.config) return null;
   const next: NonNullable<VisibleCachedWorkerConfig> = {
     corsWorkerUrl: record.config.corsWorkerUrl || '',
@@ -367,7 +328,7 @@ const normalizeWorkerConfigEntry = (value: unknown): WorkerConfig | null => {
 };
 const normalizeWorkerConfigRecord = (
   value: unknown,
-  fallbackMeta: Partial<CacheIdentity> = {}
+  fallbackMeta: Partial<CacheIdentity> = {},
 ): WorkerConfigRecord | null => {
   const rawRecord = isObj(value) ? value : null;
   const rawConfig = isObj(rawRecord?.config) ? rawRecord.config : value;
@@ -375,25 +336,14 @@ const normalizeWorkerConfigRecord = (
   if (!normalizedConfig) return null;
   return {
     config: normalizedConfig,
-    cachedAtMs: normalizeTimestampMs(
-      rawRecord?.cachedAtMs ||
-      rawRecord?.cachedAt ||
-      rawRecord?.updatedAt
-    ),
+    cachedAtMs: normalizeTimestampMs(rawRecord?.cachedAtMs || rawRecord?.cachedAt || rawRecord?.updatedAt),
     writeNonce: normalizeWriteNonce(rawRecord?.writeNonce, 1),
     slug: canonicalizeSessionSlug(rawRecord?.slug ?? fallbackMeta.slug ?? ''),
-    sessionIdHex: normalizeSessionIdHex(
-      rawRecord?.sessionIdHex ??
-      fallbackMeta.sessionIdHex
-    ),
-    registryChainId: normalizeChainId(
-      rawRecord?.registryChainId ??
-      fallbackMeta.registryChainId
-    ),
+    sessionIdHex: normalizeSessionIdHex(rawRecord?.sessionIdHex ?? fallbackMeta.sessionIdHex),
+    registryChainId: normalizeChainId(rawRecord?.registryChainId ?? fallbackMeta.registryChainId),
     fieldPresence: normalizeWorkerConfigFieldPresence(
-      rawRecord?.fieldPresence ??
-      rawRecord?.configFieldPresence,
-      rawConfig
+      rawRecord?.fieldPresence ?? rawRecord?.configFieldPresence,
+      rawConfig,
     ),
   };
 };
@@ -429,20 +379,16 @@ export const readSessionWorkerConfigCache = (): WorkerConfigStore => {
   }
 };
 
-const normalizeCacheLookupArgs = (
-  slugOrOptions: unknown = '',
-  sessionConfig: unknown = null
-): CacheLookupArgs => (
+const normalizeCacheLookupArgs = (slugOrOptions: unknown = '', sessionConfig: unknown = null): CacheLookupArgs =>
   isObj(slugOrOptions)
     ? {
-      slug: slugOrOptions.slug,
-      sessionConfig: slugOrOptions.sessionConfig ?? null,
-    }
+        slug: slugOrOptions.slug,
+        sessionConfig: slugOrOptions.sessionConfig ?? null,
+      }
     : {
-      slug: slugOrOptions,
-      sessionConfig,
-    }
-);
+        slug: slugOrOptions,
+        sessionConfig,
+      };
 
 const getCachedSessionWorkerConfigRecord = ({
   slug,
@@ -465,17 +411,15 @@ const getCachedSessionWorkerConfigRecord = ({
 
 export const getCachedSessionWorkerConfig = (
   slugOrOptions: unknown = '',
-  sessionConfig: unknown = null
+  sessionConfig: unknown = null,
 ): VisibleCachedWorkerConfig => {
-  const record = getCachedSessionWorkerConfigRecord(
-    normalizeCacheLookupArgs(slugOrOptions, sessionConfig)
-  );
+  const record = getCachedSessionWorkerConfigRecord(normalizeCacheLookupArgs(slugOrOptions, sessionConfig));
   return buildVisibleCachedWorkerConfig(record);
 };
 
 const buildOverlaySessionWorkerConfig = (
   baseConfig: SessionWorkerConfigReplica,
-  record: WorkerConfigRecord
+  record: WorkerConfigRecord,
 ): SessionWorkerConfigReplica => {
   const cachedConfig: Partial<WorkerConfig> = isObj(record?.config) ? record.config : {};
   const next: SessionWorkerConfigReplica = {
@@ -504,15 +448,18 @@ const buildOverlaySessionWorkerConfig = (
 const getReplicaMeta = (sessionConfig: unknown = null): ReplicaMeta | null => {
   if (!isObj(sessionConfig)) return null;
   return isObj(sessionConfig[WORKER_CONFIG_REPLICA_META])
-    ? sessionConfig[WORKER_CONFIG_REPLICA_META] as ReplicaMeta
+    ? (sessionConfig[WORKER_CONFIG_REPLICA_META] as ReplicaMeta)
     : null;
 };
 
-const getReplicaSourceConfig = (existingMeta: ReplicaMeta | null, fallbackConfig: unknown): SessionWorkerConfigReplica | null => {
+const getReplicaSourceConfig = (
+  existingMeta: ReplicaMeta | null,
+  fallbackConfig: unknown,
+): SessionWorkerConfigReplica | null => {
   if (isObj(existingMeta?.sourceConfig)) {
     return cloneValue(existingMeta.sourceConfig) as SessionWorkerConfigReplica;
   }
-  return isObj(fallbackConfig) ? cloneValue(fallbackConfig) as SessionWorkerConfigReplica : null;
+  return isObj(fallbackConfig) ? (cloneValue(fallbackConfig) as SessionWorkerConfigReplica) : null;
 };
 
 const setReplicaMeta = <T>(sessionConfig: T, meta: ReplicaMeta): T => {
@@ -558,7 +505,7 @@ export const getSessionWorkerConfigReplicaState = ({
   slug,
   sessionConfig,
 }: CacheLookupArgs = {}): SessionWorkerConfigReplicaState => {
-  const inputConfig = isObj(sessionConfig) ? sessionConfig as SessionWorkerConfigReplica : null;
+  const inputConfig = isObj(sessionConfig) ? (sessionConfig as SessionWorkerConfigReplica) : null;
   if (!inputConfig) {
     return {
       sessionConfig: null,
@@ -584,11 +531,7 @@ export const getSessionWorkerConfigReplicaState = ({
     const latestCachedAtMs = normalizeTimestampMs(existingRecord?.cachedAtMs) || null;
     const existingWriteNonce = normalizeWriteNonce(existingMeta.writeNonce, 0);
     const latestWriteNonce = normalizeWriteNonce(existingRecord?.writeNonce, 0);
-    if (
-      existingRecord?.config &&
-      latestCachedAtMs === existingCachedAtMs &&
-      latestWriteNonce === existingWriteNonce
-    ) {
+    if (existingRecord?.config && latestCachedAtMs === existingCachedAtMs && latestWriteNonce === existingWriteNonce) {
       return {
         sessionConfig: inputConfig,
         cachedConfig: existingMeta.cachedConfig || null,
@@ -603,10 +546,12 @@ export const getSessionWorkerConfigReplicaState = ({
     baseConfig = getReplicaSourceConfig(existingMeta, inputConfig) || inputConfig;
   }
 
-  const record = existingRecord || getCachedSessionWorkerConfigRecord({
-    slug: normalizedSlug,
-    sessionConfig: baseConfig,
-  });
+  const record =
+    existingRecord ||
+    getCachedSessionWorkerConfigRecord({
+      slug: normalizedSlug,
+      sessionConfig: baseConfig,
+    });
   const cacheUpdatedAtMs = normalizeTimestampMs(record?.cachedAtMs) || null;
   const registryUpdatedAtMs = normalizeTimestampMs(baseConfig?.__registry?.updatedAt) || null;
   if (!record?.config) {
@@ -660,10 +605,11 @@ export const getSessionWorkerConfigReplicaState = ({
 export const overlayCachedSessionWorkerConfig = ({
   slug,
   sessionConfig,
-}: CacheLookupArgs = {}): SessionWorkerConfigReplica | null => getSessionWorkerConfigReplicaState({
-  slug,
-  sessionConfig,
-}).sessionConfig;
+}: CacheLookupArgs = {}): SessionWorkerConfigReplica | null =>
+  getSessionWorkerConfigReplicaState({
+    slug,
+    sessionConfig,
+  }).sessionConfig;
 
 export const upsertCachedSessionWorkerConfig = ({
   slug,
@@ -703,13 +649,8 @@ export const upsertCachedSessionWorkerConfig = ({
   return normalizedConfig;
 };
 
-export const clearCachedSessionWorkerConfig = (
-  slugOrOptions: unknown = '',
-  sessionConfig: unknown = null
-): void => {
-  const identity = resolveSessionWorkerCacheIdentity(
-    normalizeCacheLookupArgs(slugOrOptions, sessionConfig)
-  );
+export const clearCachedSessionWorkerConfig = (slugOrOptions: unknown = '', sessionConfig: unknown = null): void => {
+  const identity = resolveSessionWorkerCacheIdentity(normalizeCacheLookupArgs(slugOrOptions, sessionConfig));
   const store = readSessionWorkerConfigCache();
   const cacheKey = buildCacheKeyFromIdentity(identity);
   const slugKey = buildSlugCacheKey(identity.slug);

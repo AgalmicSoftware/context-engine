@@ -6,9 +6,7 @@ export interface SbtRealtimeEventCursor {
 
 type UnknownRecord = Record<PropertyKey, unknown>;
 
-const isUnknownRecord = (value: unknown): value is UnknownRecord => (
-  value !== null && typeof value === 'object'
-);
+const isUnknownRecord = (value: unknown): value is UnknownRecord => value !== null && typeof value === 'object';
 
 const normalizeNonNegativeInteger = (value: unknown): number | null => {
   const numericValue = Number(value);

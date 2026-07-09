@@ -33,7 +33,7 @@ export type SessionWizardPublishWorkerSignerArgs = {
 export type SessionWizardPublishControllerPorts = {
   deployWorker: () => Promise<SessionWizardPublishDeployWorkerResult | null | undefined>;
   deployPendingSbts?: (
-    args: SessionWizardPublishWorkerSignerArgs
+    args: SessionWizardPublishWorkerSignerArgs,
   ) => Promise<SessionWizardPendingDraftLike[] | null | undefined>;
 };
 
@@ -101,18 +101,12 @@ export type SessionWizardPublishCompletionRequestInput = {
 };
 
 export type SessionWizardPublishCompletionControllerPorts = {
-  normalizePendingDrafts: (
-    drafts: readonly SessionWizardPendingDraftLike[]
-  ) => SessionWizardPendingDraftLike[];
-  buildPublishedPendingSbtLinks: (
-    args: SessionWizardPublishCompletionLinksInput
-  ) => PublishedPendingSbtLink[];
+  normalizePendingDrafts: (drafts: readonly SessionWizardPendingDraftLike[]) => SessionWizardPendingDraftLike[];
+  buildPublishedPendingSbtLinks: (args: SessionWizardPublishCompletionLinksInput) => PublishedPendingSbtLink[];
 };
 
 export type SessionWizardPublishCompletionControllerCallbacks = {
-  promoteDeployedPendingSbtSelections: (
-    deployedDrafts: SessionWizardPendingDraftLike[]
-  ) => void;
+  promoteDeployedPendingSbtSelections: (deployedDrafts: SessionWizardPendingDraftLike[]) => void;
   setPublishedPendingSbtLinks: (links: PublishedPendingSbtLink[]) => void;
   clearPendingSbtDrafts: () => void;
   setPublishStep: (step: number) => void;
@@ -138,8 +132,7 @@ export type SessionWizardRegisterTxEntry = AnyRecord & {
 };
 
 export type SessionWizardRegisterTxsUpdater =
-  | SessionWizardRegisterTxEntry[]
-  | ((prev: SessionWizardRegisterTxEntry[]) => SessionWizardRegisterTxEntry[]);
+  SessionWizardRegisterTxEntry[] | ((prev: SessionWizardRegisterTxEntry[]) => SessionWizardRegisterTxEntry[]);
 
 export type SessionWizardRegisterStepControllerInput = {
   registerArgs: AnyRecord;
@@ -216,10 +209,9 @@ export type SessionWizardRegisterArgsDescriptor = {
   registerArgs: AnyRecord;
 };
 
-export type SessionWizardRegisterPreflightDescriptorInput =
-  SessionWizardRegisterArgsDescriptorInput & {
-    missingMetadataMessage?: unknown;
-  };
+export type SessionWizardRegisterPreflightDescriptorInput = SessionWizardRegisterArgsDescriptorInput & {
+  missingMetadataMessage?: unknown;
+};
 
 export type SessionWizardRegisterPreflightDescriptor = SessionWizardRegisterArgsDescriptor & {
   canRegister: boolean;
@@ -272,9 +264,7 @@ export type SessionWizardPublishMetadataUploadRequest = {
 };
 
 export type SessionWizardPublishMetadataUploadControllerPorts = {
-  uploadMetadata: (
-    args: SessionWizardPublishWorkerSignerArgs
-  ) => Promise<AnyRecord | null | undefined>;
+  uploadMetadata: (args: SessionWizardPublishWorkerSignerArgs) => Promise<AnyRecord | null | undefined>;
 };
 
 export type SessionWizardPublishMetadataUploadControllerCallbacks = {
@@ -301,16 +291,13 @@ export type SessionWizardRegisterStepRequest = {
   registerGroupArgs: SessionWizardRegisterGroupArgs;
 };
 
-const getPublishStepNumber = (
-  publishExecutionPlan: SessionWizardPublishExecutionPlanLike,
-  stepKey: string
-): number => {
+const getPublishStepNumber = (publishExecutionPlan: SessionWizardPublishExecutionPlanLike, stepKey: string): number => {
   const stepNumber = publishExecutionPlan.stepNumbers?.[stepKey];
   return Number.isFinite(stepNumber) ? Number(stepNumber) : 0;
 };
 
 const assertVerifiedWorkerDeploy = (
-  deployResult: SessionWizardPublishDeployWorkerResult | null | undefined
+  deployResult: SessionWizardPublishDeployWorkerResult | null | undefined,
 ): string => {
   if (!deployResult?.ok) {
     throw new Error(deployResult?.error || 'Worker deploy failed.');
@@ -321,9 +308,10 @@ const assertVerifiedWorkerDeploy = (
   return deployResult.workerUrl;
 };
 
-const getPendingDraftAddressKey = (entry: SessionWizardPendingDraftLike): string => (
-  toStr(entry?.predictedAddress || entry?.deployedAddress).trim().toLowerCase()
-);
+const getPendingDraftAddressKey = (entry: SessionWizardPendingDraftLike): string =>
+  toStr(entry?.predictedAddress || entry?.deployedAddress)
+    .trim()
+    .toLowerCase();
 
 export const runSessionWizardPublishController = async ({
   input,
@@ -357,10 +345,11 @@ export const runSessionWizardPublishController = async ({
       throw new Error('Pending SBT deploy port is required.');
     }
     callbacks.setPublishStep(getPublishStepNumber(publishExecutionPlan, 'deploy-sbts'));
-    deployedPendingDrafts = await ports.deployPendingSbts({
-      workerUrlOverride,
-      signerAccountOverride: input.signerAccountOverride || '',
-    }) || [];
+    deployedPendingDrafts =
+      (await ports.deployPendingSbts({
+        workerUrlOverride,
+        signerAccountOverride: input.signerAccountOverride || '',
+      })) || [];
   }
 
   return {
@@ -470,7 +459,7 @@ export const runSessionWizardPublishMetadataUploadController = async ({
   }
 
   callbacks.setPublishStep(request.publishStep);
-  const uploadResult = await ports.uploadMetadata(request.uploadArgs) || null;
+  const uploadResult = (await ports.uploadMetadata(request.uploadArgs)) || null;
   return {
     status: 'completed',
     uploadResult,
@@ -552,12 +541,17 @@ export const resolveSessionWizardRegisterDuplicateCheckDescriptor = ({
 
 export const isSessionWizardRegisterDuplicatePreflightError = (
   errorMessage: unknown,
-  duplicateCheckDescriptor: Pick<SessionWizardRegisterDuplicateCheckDescriptor, 'slugDuplicateMessage' | 'sessionIdDuplicateMessage'> | null | undefined
+  duplicateCheckDescriptor:
+    | Pick<SessionWizardRegisterDuplicateCheckDescriptor, 'slugDuplicateMessage' | 'sessionIdDuplicateMessage'>
+    | null
+    | undefined,
 ): boolean => {
   const message = toStr(errorMessage);
   if (!message || !duplicateCheckDescriptor) return false;
-  return message === duplicateCheckDescriptor.slugDuplicateMessage ||
-    message === duplicateCheckDescriptor.sessionIdDuplicateMessage;
+  return (
+    message === duplicateCheckDescriptor.slugDuplicateMessage ||
+    message === duplicateCheckDescriptor.sessionIdDuplicateMessage
+  );
 };
 
 export const resolveSessionWizardRegisterArgsDescriptor = ({
@@ -578,12 +572,11 @@ export const resolveSessionWizardRegisterArgsDescriptor = ({
   manualMaxFeePerGasGwei,
   manualMaxPriorityFeePerGasGwei,
 }: SessionWizardRegisterArgsDescriptorInput): SessionWizardRegisterArgsDescriptor => {
-  const metadataURI = normalizeSessionWizardArweaveUri(metadataUriOverride)
-    || normalizeSessionWizardArweaveUri(manualMetadataUrl)
-    || toStr(metadataUrl);
-  const sessionFields = sessionFieldsOverride !== undefined
-    ? (sessionFieldsOverride || {})
-    : pendingOnChainFields;
+  const metadataURI =
+    normalizeSessionWizardArweaveUri(metadataUriOverride) ||
+    normalizeSessionWizardArweaveUri(manualMetadataUrl) ||
+    toStr(metadataUrl);
+  const sessionFields = sessionFieldsOverride !== undefined ? sessionFieldsOverride || {} : pendingOnChainFields;
 
   return {
     metadataUriMissing: !metadataURI,
@@ -636,15 +629,13 @@ export const runSessionWizardRegisterStepController = async ({
   callbacks.setRegisterTxs([]);
   callbacks.setStatus('Registering session on-chain…');
 
-  const registerResult = await ports.registerSessionOnChain({
-    ...input.registerArgs,
-    onTxHash: (entry: SessionWizardRegisterTxEntry) => {
-      callbacks.setRegisterTxs((prev) => [
-        ...(Array.isArray(prev) ? prev : []),
-        entry,
-      ]);
-    },
-  }) || null;
+  const registerResult =
+    (await ports.registerSessionOnChain({
+      ...input.registerArgs,
+      onTxHash: (entry: SessionWizardRegisterTxEntry) => {
+        callbacks.setRegisterTxs((prev) => [...(Array.isArray(prev) ? prev : []), entry]);
+      },
+    })) || null;
 
   if (Array.isArray(registerResult?.txs) && registerResult.txs.length) {
     callbacks.setRegisterTxs(registerResult.txs);
@@ -659,7 +650,7 @@ export const runSessionWizardRegisterStepController = async ({
 
 export const appendSessionWizardRegisterTxEntry = (
   previousEntries: SessionWizardRegisterTxEntry[] | unknown,
-  nextEntry: SessionWizardRegisterTxEntry | null | undefined
+  nextEntry: SessionWizardRegisterTxEntry | null | undefined,
 ): SessionWizardRegisterTxEntry[] => {
   const existingEntries = Array.isArray(previousEntries) ? previousEntries : [];
   const nextHash = nextEntry?.hash;
@@ -667,19 +658,14 @@ export const appendSessionWizardRegisterTxEntry = (
   if (existingEntries.some((entry) => entry?.hash === nextHash)) {
     return existingEntries;
   }
-  return [
-    ...existingEntries,
-    nextEntry,
-  ];
+  return [...existingEntries, nextEntry];
 };
 
 export const resolveSessionWizardRegisterFailureSettlementDescriptor = ({
   error,
 }: SessionWizardRegisterFailureSettlementInput): SessionWizardRegisterFailureSettlementDescriptor => {
-  const err = (error && typeof error === 'object') ? error as AnyRecord : {};
-  const transaction = (err.transaction && typeof err.transaction === 'object')
-    ? err.transaction as AnyRecord
-    : {};
+  const err = error && typeof error === 'object' ? (error as AnyRecord) : {};
+  const transaction = err.transaction && typeof err.transaction === 'object' ? (err.transaction as AnyRecord) : {};
   const txHash = err.transactionHash || transaction.hash || '';
 
   return {
@@ -735,7 +721,7 @@ export const resolveSessionWizardPublishCompletionRequest = ({
 export const resolveSessionWizardPublishFailureSettlementDescriptor = ({
   error,
 }: SessionWizardPublishFailureSettlementInput): SessionWizardPublishFailureSettlementDescriptor => {
-  const err = (error && typeof error === 'object') ? error as AnyRecord : {};
+  const err = error && typeof error === 'object' ? (error as AnyRecord) : {};
   const errorMessage = err.message ? toStr(err.message) : '';
   return {
     errorMessage: errorMessage || 'Publish failed.',
@@ -752,24 +738,19 @@ export const runSessionWizardPublishCompletionController = ({
   ports: SessionWizardPublishCompletionControllerPorts;
   callbacks: SessionWizardPublishCompletionControllerCallbacks;
 }): SessionWizardPublishCompletionControllerResult => {
-  const pendingDraftSnapshot = Array.isArray(input.pendingDraftSnapshot)
-    ? input.pendingDraftSnapshot
-    : [];
+  const pendingDraftSnapshot = Array.isArray(input.pendingDraftSnapshot) ? input.pendingDraftSnapshot : [];
   const normalizedDeployedPendingDrafts = ports.normalizePendingDrafts(
-    Array.isArray(input.deployedPendingDrafts) ? input.deployedPendingDrafts : []
+    Array.isArray(input.deployedPendingDrafts) ? input.deployedPendingDrafts : [],
   );
   const newlyDeployedPendingAddressSet = new Set(
-    normalizedDeployedPendingDrafts
-      .map((entry) => getPendingDraftAddressKey(entry))
-      .filter(Boolean)
+    normalizedDeployedPendingDrafts.map((entry) => getPendingDraftAddressKey(entry)).filter(Boolean),
   );
 
   callbacks.promoteDeployedPendingSbtSelections([
     ...normalizedDeployedPendingDrafts,
-    ...pendingDraftSnapshot.filter((entry) => (
-      entry?.deployed === true &&
-      !newlyDeployedPendingAddressSet.has(getPendingDraftAddressKey(entry))
-    )),
+    ...pendingDraftSnapshot.filter(
+      (entry) => entry?.deployed === true && !newlyDeployedPendingAddressSet.has(getPendingDraftAddressKey(entry)),
+    ),
   ]);
 
   const publishedPendingSbtLinks = ports.buildPublishedPendingSbtLinks({

@@ -1,6 +1,4 @@
-import {
-  runSurveyResultsSurveyQuestionBookmarkWriteController,
-} from './surveyResultsSurveyQuestionBookmarkWriteController';
+import { runSurveyResultsSurveyQuestionBookmarkWriteController } from './surveyResultsSurveyQuestionBookmarkWriteController';
 
 describe('surveyResultsSurveyQuestionBookmarkWriteController', () => {
   it('dispatches one injected bookmarks cache write and returns a plain success result', async () => {
@@ -59,22 +57,24 @@ describe('surveyResultsSurveyQuestionBookmarkWriteController', () => {
   it('does not write when the plan is blocked or missing a payload', async () => {
     const writeBookmarksCache = jest.fn();
 
-    await expect(runSurveyResultsSurveyQuestionBookmarkWriteController({
-      plan: {
-        blockedReason: 'invalid-bookmark-type',
-        payload: null,
-        shouldWrite: false,
-        statePatch: null,
-        target: {
-          namespace: 'bookmarksCache',
-          slug: 'edge',
+    await expect(
+      runSurveyResultsSurveyQuestionBookmarkWriteController({
+        plan: {
+          blockedReason: 'invalid-bookmark-type',
+          payload: null,
+          shouldWrite: false,
+          statePatch: null,
+          target: {
+            namespace: 'bookmarksCache',
+            slug: 'edge',
+          },
+          toggled: null,
         },
-        toggled: null,
-      },
-      ports: {
-        writeBookmarksCache,
-      },
-    })).resolves.toEqual({
+        ports: {
+          writeBookmarksCache,
+        },
+      }),
+    ).resolves.toEqual({
       attempted: false,
       error: null,
       ok: false,

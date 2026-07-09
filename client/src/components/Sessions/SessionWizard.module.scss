@@ -1,6 +1,6 @@
 /* @file SessionWizard.module.scss */
-@use "assets/css/contextEngine.scss" as *;
-@use "scss/variables" as tokens;
+@use 'assets/css/contextEngine.scss' as *;
+@use 'scss/variables' as tokens;
 
 $user-page-text-color: tokens.$ce-panel-text;
 $card-bg: tokens.$ce-card-bg;
@@ -151,7 +151,10 @@ $muted-text: tokens.$ce-muted-text;
   cursor: pointer;
   padding: 6px 12px;
   border-radius: var(--ce-radius-pill);
-  transition: background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .wizardModeBtnActive {
@@ -239,7 +242,10 @@ $muted-text: tokens.$ce-muted-text;
     -3px 3px 6px #171a3d,
     3px -3px 6px rgba(255, 255, 255, 0.04);
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.12s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.12s ease;
 
   &:hover {
     border-color: rgba(255, 255, 255, 0.24);
@@ -418,7 +424,9 @@ $muted-text: tokens.$ce-muted-text;
   border-radius: 14px;
   padding: 14px;
   box-shadow: $card-shadow;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
 
   &:hover {
     border-color: rgba(255, 255, 255, 0.3);
@@ -559,7 +567,10 @@ $muted-text: tokens.$ce-muted-text;
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
 
   &:hover {
     border-color: rgba(255, 255, 255, 0.24);
@@ -575,7 +586,10 @@ $muted-text: tokens.$ce-muted-text;
   padding: 5px 9px;
   font-size: 11px;
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
 
   &:hover {
     border-color: rgba(255, 255, 255, 0.24);
@@ -613,9 +627,7 @@ $muted-text: tokens.$ce-muted-text;
   min-height: 208px;
   border-radius: var(--ce-radius-14);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  background:
-    linear-gradient(180deg, rgba(20, 24, 51, 0.94), rgba(10, 13, 33, 0.92)),
-    rgba(255, 255, 255, 0.03);
+  background: linear-gradient(180deg, rgba(20, 24, 51, 0.94), rgba(10, 13, 33, 0.92)), rgba(255, 255, 255, 0.03);
   overflow: hidden;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
@@ -630,7 +642,10 @@ $muted-text: tokens.$ce-muted-text;
   height: 100%;
   padding: 0;
   cursor: pointer;
-  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
 
   img {
     display: block;
@@ -691,7 +706,10 @@ $muted-text: tokens.$ce-muted-text;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    transform 0.16s ease;
 
   &:hover {
     background: rgba(30, 36, 76, 0.92);
@@ -982,7 +1000,6 @@ $muted-text: tokens.$ce-muted-text;
     line-height: 1;
     transform: translateY(-1px);
   }
-
 }
 
 .createSbtModalBody {
@@ -1144,7 +1161,9 @@ $muted-text: tokens.$ce-muted-text;
   padding: 6px 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
 
   &:hover {
     border-color: rgba(77, 255, 164, 0.55);
@@ -1408,7 +1427,6 @@ $muted-text: tokens.$ce-muted-text;
   margin-top: 8px;
 }
 
-
 .bundleToggleGroup {
   grid-column: 1 / -1;
 }
@@ -1492,7 +1510,10 @@ $muted-text: tokens.$ce-muted-text;
   color: $user-page-text-color;
   font-weight: 600;
   padding: 8px 12px;
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.1s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.1s ease;
 
   &.btn,
   &.btn-secondary,
@@ -1566,7 +1587,9 @@ $muted-text: tokens.$ce-muted-text;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
 
   &:hover {
     border-color: rgba(255, 255, 255, 0.28);
@@ -1623,7 +1646,9 @@ $muted-text: tokens.$ce-muted-text;
   background: rgba(255, 255, 255, 0.06);
   color: $user-page-text-color;
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 .iconButton:hover {
@@ -1672,7 +1697,10 @@ $muted-text: tokens.$ce-muted-text;
   background: rgba(255, 255, 255, 0.04);
   color: $user-page-text-color;
   text-decoration: none;
-  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .workerDeployLink:hover {
@@ -1879,7 +1907,10 @@ $muted-text: tokens.$ce-muted-text;
   font-size: 12px;
   font-family: var(--ce-font-mono);
   text-decoration: none;
-  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .workerDocLink:hover,
@@ -2032,7 +2063,9 @@ $muted-text: tokens.$ce-muted-text;
   justify-content: center;
   cursor: pointer;
   box-shadow: none;
-  transition: color 0.2s ease, transform 0.12s ease;
+  transition:
+    color 0.2s ease,
+    transform 0.12s ease;
 
   svg {
     font-size: 0.82rem;
@@ -2070,7 +2103,10 @@ $muted-text: tokens.$ce-muted-text;
   border: 1px solid $card-border;
   color: $user-page-text-color;
   font-weight: 600;
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.1s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.1s ease;
 
   &.btn,
   &.btn-secondary,
@@ -2113,7 +2149,9 @@ $muted-text: tokens.$ce-muted-text;
   color: var(--ce-color-white);
   font-weight: 600;
   box-shadow: 0 10px 22px rgba(77, 255, 164, 0.25);
-  transition: transform 0.1s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.2s ease;
 
   &:hover {
     transform: translateY(-1px);
@@ -2159,9 +2197,7 @@ $muted-text: tokens.$ce-muted-text;
   padding: 14px 16px;
   border: 1px solid rgba(77, 255, 164, 0.24);
   border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(77, 255, 164, 0.08), rgba(255, 255, 255, 0.04)),
-    rgba(255, 255, 255, 0.03);
+  background: linear-gradient(180deg, rgba(77, 255, 164, 0.08), rgba(255, 255, 255, 0.04)), rgba(255, 255, 255, 0.03);
   color: rgba(244, 247, 255, 0.92);
   box-shadow: $card-shadow;
 }
@@ -2361,7 +2397,10 @@ $muted-text: tokens.$ce-muted-text;
   background: transparent;
   color: rgba(244, 247, 255, 0.76);
   cursor: pointer;
-  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    background 0.2s ease;
   font-size: 1.2rem;
 
   &:hover {
@@ -2411,7 +2450,9 @@ $muted-text: tokens.$ce-muted-text;
   cursor: pointer;
   padding: 2px 6px;
   border-radius: var(--ce-radius-4);
-  transition: color 0.15s ease, background 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
 
   &:hover {
     color: rgba(255, 255, 255, 0.85);
@@ -2476,9 +2517,7 @@ $muted-text: tokens.$ce-muted-text;
   padding: 14px 16px 16px;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
-    rgba(7, 12, 28, 0.42);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)), rgba(7, 12, 28, 0.42);
   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.2);
 }
 
@@ -2533,8 +2572,7 @@ $muted-text: tokens.$ce-muted-text;
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: inherit;
-  background:
-    linear-gradient(90deg, rgba(77, 255, 164, 0.86), rgba(91, 140, 255, 0.9));
+  background: linear-gradient(90deg, rgba(77, 255, 164, 0.86), rgba(91, 140, 255, 0.9));
   box-shadow:
     0 0 18px rgba(77, 255, 164, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.25);

@@ -5,7 +5,7 @@ import ConvictionImportanceLabel from './ConvictionImportanceLabel';
 import ConvictionImportanceSliderControl from './ConvictionImportanceSliderControl';
 import DeferredConvictionImportanceSlider from './DeferredConvictionImportanceSlider';
 import styles from './SurveyTool.module.scss';
-import { shouldExpandSliderToggle } from './surveyToolUtils.js';
+import { shouldExpandSliderToggle } from './surveyToolUtils';
 import type { SliderMode } from './surveyToolSliderState.js';
 
 type SurveyQuestionsFullQuestionSliderSectionProps = {
@@ -79,7 +79,7 @@ const SurveyQuestionsFullQuestionSliderSection = ({
         />
       ) : (
         <ConvictionImportanceSliderControl
-          label={(
+          label={
             <ConvictionImportanceLabel
               importanceToggleEnabled={importanceToggleEnabled}
               sliderMode={sliderMode}
@@ -88,7 +88,7 @@ const SurveyQuestionsFullQuestionSliderSection = ({
               importanceValue={importanceValue}
               onSelectMode={onSelectMode}
             />
-          )}
+          }
           value={activeSliderValue}
           disabled={isSubmitting}
           onChange={onChange}

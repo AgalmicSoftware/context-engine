@@ -1,8 +1,12 @@
 import type { SessionPathResolverController } from './sessionPathResolverController';
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
-  normalizeSessionSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
+  normalizeSessionSlug: jest.fn((value = '') =>
+    String(value || '')
+      .trim()
+      .toLowerCase(),
+  ),
 }));
 
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
@@ -11,7 +15,11 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
     getSessionConfigById: jest.fn(),
   },
   sessionRegistryUtils: {
-    formatSessionId: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
+    formatSessionId: jest.fn((value = '') =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    ),
     fetchSessionFromRegistry: jest.fn(),
     upsertSessionRegistryCache: jest.fn(),
   },
@@ -38,7 +46,7 @@ jest.mock('../../variables/appConfig.js', () => ({
 }));
 
 const { createSessionPathResolverController } = require('./sessionPathResolverController.js');
-const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
+const contractScriptsModule = require('../../utilities/web3/chainGateway.js');
 const sessionRegistryModule = require('../../utilities/web3/sessionRegistry.js');
 const litProtocolModule = require('../../utilities/crypto/litProtocol.js');
 const chainsModule = require('../../variables/chains.js');
@@ -60,7 +68,7 @@ type SessionPathResolverControllerDebug = SessionPathResolverController & {
 
 const useModernFakeTimers = jest.useFakeTimers as unknown as (mode: 'modern') => typeof jest;
 
-const createDeferred = <T,>() => {
+const createDeferred = <T>() => {
   let resolve: (value: T | PromiseLike<T>) => void = () => undefined;
   let reject: (error?: unknown) => void = () => undefined;
   const promise = new Promise<T>((res, rej) => {
@@ -86,7 +94,11 @@ const setWindowPath = (path = '/'): void => {
 };
 
 const getSessionTokenFromPath = (path = ''): string => {
-  const parts = String(path || '').split('?')[0].split('#')[0].split('/').filter(Boolean);
+  const parts = String(path || '')
+    .split('?')[0]
+    .split('#')[0]
+    .split('/')
+    .filter(Boolean);
   if (parts[0] !== 'session') return '';
   return String(parts[1] || '').trim();
 };
@@ -112,31 +124,38 @@ describe('createSessionPathResolverController', () => {
     storedConfigsById = {};
     setWindowPath('/');
 
-    contractScriptsModule.normalizeSessionSlug.mockImplementation(
-      (value = '') => String(value || '').trim().toLowerCase()
+    contractScriptsModule.normalizeSessionSlug.mockImplementation((value = '') =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
     );
     litProtocolModule.getGlobalLitHooks.mockReturnValue({ lit: true });
     chainsModule.getSessionRegistryChainIds.mockReturnValue([84532]);
-    urlUtilsModule.buildPublicUrl.mockImplementation(
-      (path = '', search = '', hash = '') => `${path}${search}${hash}`
-    );
+    urlUtilsModule.buildPublicUrl.mockImplementation((path = '', search = '', hash = '') => `${path}${search}${hash}`);
 
-    sessionRegistryModule.sessionRegistryUtils.formatSessionId.mockImplementation(
-      (value = '') => String(value || '').trim().toLowerCase()
+    sessionRegistryModule.sessionRegistryUtils.formatSessionId.mockImplementation((value = '') =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
     );
     sessionRegistryModule.sessionRegistryUtils.fetchSessionFromRegistry.mockResolvedValue(null);
     sessionRegistryModule.sessionRegistryUtils.upsertSessionRegistryCache.mockImplementation(
       ({ config }: { config?: StoredSessionConfig } = {}) => {
         const sessionId = sessionRegistryModule.sessionRegistryUtils.formatSessionId(
-          config?.sessionId || config?.id || config?.sessionIdHex || ''
+          config?.sessionId || config?.id || config?.sessionIdHex || '',
         );
         if (sessionId) {
           storedConfigsById[sessionId] = config;
         }
-      }
+      },
     );
     sessionRegistryModule.sessionRegistryStore.getSessionConfigById.mockImplementation(
-      (sessionId: string) => storedConfigsById[String(sessionId || '').trim().toLowerCase()] || null
+      (sessionId: string) =>
+        storedConfigsById[
+          String(sessionId || '')
+            .trim()
+            .toLowerCase()
+        ] || null,
     );
   });
 
@@ -187,7 +206,7 @@ describe('createSessionPathResolverController', () => {
         if (sessionId) return idDeferred.promise;
         if (slug) return slugDeferred.promise;
         return Promise.resolve(null);
-      }
+      },
     );
 
     controller.resolveId(' 0xAbC ');
@@ -265,9 +284,11 @@ describe('createSessionPathResolverController', () => {
     await flushMicrotasks();
 
     expect(controller._errorCounts.id[sessionId]).toBe(1);
-    expect(controller._lastErrors.id[sessionId]).toEqual(expect.objectContaining({
-      message: 'boom',
-    }));
+    expect(controller._lastErrors.id[sessionId]).toEqual(
+      expect.objectContaining({
+        message: 'boom',
+      }),
+    );
     expect(controller._retryTimers.id[sessionId]).toBeDefined();
 
     await advanceTimersAndFlush(3200);
@@ -420,7 +441,7 @@ describe('createSessionPathResolverController', () => {
     expect(sessionRegistryModule.sessionRegistryUtils.fetchSessionFromRegistry).toHaveBeenCalledWith(
       expect.objectContaining({
         slug: 'alpha',
-      })
+      }),
     );
     expect(host.bumpResolutionNonce).toHaveBeenCalledTimes(1);
     expect(replaceStateSpy).not.toHaveBeenCalled();

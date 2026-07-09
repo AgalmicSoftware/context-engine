@@ -1,6 +1,4 @@
-import {
-  sanitizeSbtPageMintedTokensOverride,
-} from './sbtPageAutoMintHelpers';
+import { sanitizeSbtPageMintedTokensOverride } from './sbtPageAutoMintHelpers';
 
 export type SbtPageHistorySummary = {
   activeSupply: string;
@@ -32,9 +30,8 @@ type SbtPageHistorySummaryFallbackState = {
   ownerLookupUpperBound: string | null;
 };
 
-const isSbtPageHistoryRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isSbtPageHistoryRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object';
 
 export const normalizeSbtPageHistorySummary = (value: unknown): SbtPageHistorySummary | null => {
   if (!isSbtPageHistoryRecord(value)) return null;
@@ -74,7 +71,7 @@ export const applySbtPageHistorySummaryFallback = ({
   sourceLabel = '',
   summaryValue = null,
 }: ApplySbtPageHistorySummaryFallbackArgs = {}): SbtPageHistorySummaryFallbackState => {
-  const summaryRecord = isSbtPageHistoryRecord(summaryValue) ? summaryValue as SbtPageHistorySummaryInput : {};
+  const summaryRecord = isSbtPageHistoryRecord(summaryValue) ? (summaryValue as SbtPageHistorySummaryInput) : {};
   const holderCount = sanitizeSbtPageMintedTokensOverride(summaryRecord.currentHolderCount);
   const totalMinted = sanitizeSbtPageMintedTokensOverride(summaryRecord.totalMinted);
   return {

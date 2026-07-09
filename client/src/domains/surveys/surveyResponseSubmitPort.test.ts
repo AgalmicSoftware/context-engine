@@ -1,7 +1,4 @@
-import {
-  bindSurveyResponseSubmitPort,
-  type SurveyResponseSubmitGateway,
-} from './surveyResponseSubmitPort';
+import { bindSurveyResponseSubmitPort, type SurveyResponseSubmitGateway } from './surveyResponseSubmitPort';
 
 describe('surveyResponseSubmitPort', () => {
   it('routes submitResponses through call-time chain gateway lookup', async () => {
@@ -16,25 +13,22 @@ describe('surveyResponseSubmitPort', () => {
       chainGateway: () => currentGateway,
     });
 
-    await expect(port.submitResponses(
-      'provider-a',
-      ['q1'],
-      [{ questionID: 'q1' }],
-      'survey-a',
-      { responses: [] },
-      'slug-a'
-    )).resolves.toEqual({ transactionHash: '0xfirst' });
+    await expect(
+      port.submitResponses('provider-a', ['q1'], [{ questionID: 'q1' }], 'survey-a', { responses: [] }, 'slug-a'),
+    ).resolves.toEqual({ transactionHash: '0xfirst' });
 
     currentGateway = secondGateway;
 
-    await expect(port.submitResponses(
-      'provider-b',
-      ['q2'],
-      [{ questionID: 'q2' }],
-      'survey-b',
-      { responses: [{ questionID: 'q2' }] },
-      'slug-b'
-    )).resolves.toEqual({ transactionHash: '0xsecond' });
+    await expect(
+      port.submitResponses(
+        'provider-b',
+        ['q2'],
+        [{ questionID: 'q2' }],
+        'survey-b',
+        { responses: [{ questionID: 'q2' }] },
+        'slug-b',
+      ),
+    ).resolves.toEqual({ transactionHash: '0xsecond' });
 
     expect(firstGateway.submitResponses).toHaveBeenCalledWith(
       'provider-a',
@@ -42,7 +36,7 @@ describe('surveyResponseSubmitPort', () => {
       [{ questionID: 'q1' }],
       'survey-a',
       { responses: [] },
-      'slug-a'
+      'slug-a',
     );
     expect(secondGateway.submitResponses).toHaveBeenCalledWith(
       'provider-b',
@@ -50,7 +44,7 @@ describe('surveyResponseSubmitPort', () => {
       [{ questionID: 'q2' }],
       'survey-b',
       { responses: [{ questionID: 'q2' }] },
-      'slug-b'
+      'slug-b',
     );
   });
 });

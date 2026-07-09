@@ -41,15 +41,16 @@ export const buildSurveyGeneratorAiPromptCopyClassName = (
   copySuccess: unknown,
 ): string => `${styleMap.aiPromptCopyCorner} ${copySuccess ? styleMap.aiPromptCopyCornerSuccess : ''}`;
 
-export const buildSurveyGeneratorPhotoStatusToggleClassName = (
-  styleMap: Record<string, string>,
-): string => `${styleMap.photoStatusChip} ${styleMap.photoStatusToggle}`;
+export const buildSurveyGeneratorPhotoStatusToggleClassName = (styleMap: Record<string, string>): string =>
+  `${styleMap.photoStatusChip} ${styleMap.photoStatusToggle}`;
 
 export const buildSurveyGeneratorPhotoStatusChipClassName = (
   styleMap: Record<string, string>,
   statusKey: unknown,
 ): string => {
-  const raw = toStr(statusKey || 'queued').trim().toLowerCase();
+  const raw = toStr(statusKey || 'queued')
+    .trim()
+    .toLowerCase();
   const statusClassName = styleMap[`photoStatusChip${raw.charAt(0).toUpperCase()}${raw.slice(1)}`] || '';
   return `${styleMap.photoStatusChip} ${statusClassName}`;
 };
@@ -59,20 +60,15 @@ export const buildSurveyGeneratorDocSaveAudienceOptionClassName = (
   active: unknown,
 ): string => `${styleMap.docSaveAudienceOption} ${active ? styleMap.active : ''}`;
 
-export const buildSurveyGeneratorTypeButtonClassName = (
-  styleMap: Record<string, string>,
-  active: unknown,
-): string => `${styleMap.typeButton} ${active ? styleMap.active : ''}`;
+export const buildSurveyGeneratorTypeButtonClassName = (styleMap: Record<string, string>, active: unknown): string =>
+  `${styleMap.typeButton} ${active ? styleMap.active : ''}`;
 
 export const buildSurveyGeneratorTypePillClassName = (
   styleMap: Record<string, string>,
   variant: 'agree' | 'unsure' | 'disagree',
 ): string => {
-  const variantClassName = variant === 'agree'
-    ? styleMap.pillAgree
-    : variant === 'unsure'
-      ? styleMap.pillUnsure
-      : styleMap.pillDisagree;
+  const variantClassName =
+    variant === 'agree' ? styleMap.pillAgree : variant === 'unsure' ? styleMap.pillUnsure : styleMap.pillDisagree;
   return `${styleMap.pill} ${variantClassName}`;
 };
 
@@ -93,10 +89,13 @@ export type SourceFileLike = {
   type?: string;
 };
 
-export type PhotoPreviewUrlApi = {
-  createObjectURL?: (file: Blob | MediaSource) => string;
-  revokeObjectURL?: (url: string) => void;
-} | null | undefined;
+export type PhotoPreviewUrlApi =
+  | {
+      createObjectURL?: (file: Blob | MediaSource) => string;
+      revokeObjectURL?: (url: string) => void;
+    }
+  | null
+  | undefined;
 
 export type QueuedFileSource<TFile extends SourceFileLike = SourceFileLike> = {
   id: string;
@@ -243,31 +242,24 @@ export type BuildSingleGenerationPromptInput = {
   sessionInstructions?: unknown;
 };
 
-export const clampQuestionCount = (value: number) => (
-  Math.min(MAX_QUESTION_COUNT, Math.max(MIN_QUESTION_COUNT, value))
-);
+export const clampQuestionCount = (value: number) => Math.min(MAX_QUESTION_COUNT, Math.max(MIN_QUESTION_COUNT, value));
 
 export const buildAdditionalSourceId = (ref: AdditionalSourceIdRef) => {
   ref.current += 1;
   return `database-source-${ref.current}`;
 };
 
-export const isSupportedPhotoFile = (file: SourceFileLike | null | undefined) => (
+export const isSupportedPhotoFile = (file: SourceFileLike | null | undefined) =>
   Boolean(file) &&
-  (
-    /^image\/(png|jpeg|webp|gif)$/i.test(String(file?.type || '').trim()) ||
-    SUPPORTED_PHOTO_EXTENSIONS.test(String(file?.name || '').trim())
-  )
-);
+  (/^image\/(png|jpeg|webp|gif)$/i.test(String(file?.type || '').trim()) ||
+    SUPPORTED_PHOTO_EXTENSIONS.test(String(file?.name || '').trim()));
 
-export const isSupportedAdditionalFile = (file: SourceFileLike | null | undefined) => (
+export const isSupportedAdditionalFile = (file: SourceFileLike | null | undefined) =>
   Boolean(file) &&
-  (
-    /^(application\/pdf|text\/markdown|text\/plain|text\/csv|application\/json|application\/vnd\.ms-powerpoint|application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation)$/i
-      .test(String(file?.type || '').trim()) ||
-    SUPPORTED_SOURCE_FILE_EXTENSIONS.test(String(file?.name || '').trim())
-  )
-);
+  (/^(application\/pdf|text\/markdown|text\/plain|text\/csv|application\/json|application\/vnd\.ms-powerpoint|application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation)$/i.test(
+    String(file?.type || '').trim(),
+  ) ||
+    SUPPORTED_SOURCE_FILE_EXTENSIONS.test(String(file?.name || '').trim()));
 
 export const buildQueuedFileSource = <TFile extends SourceFileLike>(
   file: TFile,
@@ -364,20 +356,14 @@ export const buildEffectiveAdditionalSourceList = ({
   return { queuedAdditionalSources, effectiveSources };
 };
 
-export const buildPhotoPreviewUrl = (
-  file: unknown,
-  urlApi: PhotoPreviewUrlApi = globalThis.URL,
-): string => {
+export const buildPhotoPreviewUrl = (file: unknown, urlApi: PhotoPreviewUrlApi = globalThis.URL): string => {
   if (!file || !urlApi || typeof urlApi.createObjectURL !== 'function') {
     return '';
   }
   return urlApi.createObjectURL(file as Blob | MediaSource);
 };
 
-export const revokePhotoPreviewUrl = (
-  previewSrc: unknown,
-  urlApi: PhotoPreviewUrlApi = globalThis.URL,
-): boolean => {
+export const revokePhotoPreviewUrl = (previewSrc: unknown, urlApi: PhotoPreviewUrlApi = globalThis.URL): boolean => {
   const src = toStr(previewSrc);
   if (!src || !urlApi || typeof urlApi.revokeObjectURL !== 'function') {
     return false;
@@ -386,26 +372,22 @@ export const revokePhotoPreviewUrl = (
   return true;
 };
 
-export const getSurveyGeneratorErrorMessage = (
-  error: unknown,
-  fallback = 'Unknown error',
-): string => {
-  const message = error && typeof error === 'object' && 'message' in error
-    ? (error as { message?: unknown }).message
-    : '';
+export const getSurveyGeneratorErrorMessage = (error: unknown, fallback = 'Unknown error'): string => {
+  const message =
+    error && typeof error === 'object' && 'message' in error ? (error as { message?: unknown }).message : '';
   return typeof message === 'string' && message.trim() ? message : fallback;
 };
 
-export const buildUnsupportedPhotoMessage = (count = 0) => (
-  `Skipped ${count} unsupported photo${count === 1 ? '' : 's'}. Use png, jpg, jpeg, webp, or gif.`
-);
+export const buildUnsupportedPhotoMessage = (count = 0) =>
+  `Skipped ${count} unsupported photo${count === 1 ? '' : 's'}. Use png, jpg, jpeg, webp, or gif.`;
 
-export const buildUnsupportedSourceMessage = (count = 0) => (
-  `Skipped ${count} unsupported file${count === 1 ? '' : 's'}. Use pdf, md, txt, csv, ppt, pptx, json, png, jpg, jpeg, webp, or gif.`
-);
+export const buildUnsupportedSourceMessage = (count = 0) =>
+  `Skipped ${count} unsupported file${count === 1 ? '' : 's'}. Use pdf, md, txt, csv, ppt, pptx, json, png, jpg, jpeg, webp, or gif.`;
 
 export const getPhotoStatusLabel = (source: PhotoStatusSource = {}) => {
-  const status = toStr(source?.analysisStatus || 'queued').trim().toLowerCase();
+  const status = toStr(source?.analysisStatus || 'queued')
+    .trim()
+    .toLowerCase();
   if (status === 'error') {
     return toStr(source?.analysisError).trim() || PHOTO_ANALYSIS_STATUS_LABELS.error;
   }
@@ -414,19 +396,10 @@ export const getPhotoStatusLabel = (source: PhotoStatusSource = {}) => {
 
 export const isSingleHttpUrlInput = (value: unknown = '') => /^https?:\/\/\S+$/.test(String(value).trim());
 
-export const buildPhotoAnalysisMarkdown = ({
-  photoName,
-  analysisText,
-}: PhotoAnalysisMarkdownInput = {}) => {
+export const buildPhotoAnalysisMarkdown = ({ photoName, analysisText }: PhotoAnalysisMarkdownInput = {}) => {
   const safeName = toStr(photoName).trim() || 'uploaded photo';
   const body = toStr(analysisText).trim();
-  return [
-    '# Photo Analysis',
-    '',
-    `Source photo: ${safeName}`,
-    '',
-    body,
-  ].join('\n');
+  return ['# Photo Analysis', '', `Source photo: ${safeName}`, '', body].join('\n');
 };
 
 export const buildPhotoAnalysisFilename = (photoName: unknown = '') => {
@@ -499,11 +472,10 @@ export const isManualLibraryUploadableContent = ({
   pastedText = '',
   additionalUrlInput = '',
   additionalSources = [],
-}: LibraryContentInput = {}) => (
+}: LibraryContentInput = {}) =>
   Boolean(toStr(pastedText).trim()) ||
   Boolean(toStr(additionalUrlInput).trim()) ||
-  (Array.isArray(additionalSources) && additionalSources.length > 0)
-);
+  (Array.isArray(additionalSources) && additionalSources.length > 0);
 
 export const hasDatabaseToolInputContent = ({
   pastedText = '',
@@ -527,9 +499,7 @@ export const formatAiPromptModelLabel = (config: AiPromptModelConfig = {}) => {
   return model || provider || 'Configured model';
 };
 
-export const normalizeTags = (
-  dTags?: string | Array<string | null | undefined | false | ''> | null,
-) => {
+export const normalizeTags = (dTags?: string | Array<string | null | undefined | false | ''> | null) => {
   if (!dTags) return [];
   if (Array.isArray(dTags)) return (dTags.filter(Boolean) as string[]).map((tag) => tag.trim());
   if (typeof dTags === 'string') {
@@ -541,9 +511,8 @@ export const normalizeTags = (
   return [];
 };
 
-export const getSelectedQuestionTypes = (questionTypes: QuestionTypeSelection = {}) => (
-  Object.keys(questionTypes).filter((type) => questionTypes[type])
-);
+export const getSelectedQuestionTypes = (questionTypes: QuestionTypeSelection = {}) =>
+  Object.keys(questionTypes).filter((type) => questionTypes[type]);
 
 export const buildGeneratedSurveyStatements = ({
   aiData,
@@ -553,11 +522,11 @@ export const buildGeneratedSurveyStatements = ({
   generateQuestionId = generateSharedQuestionId,
 }: GeneratedSurveyStatementsInput): GeneratedSurveyStatementsResult => {
   const wantedTypes = getSelectedQuestionTypes(questionTypes);
-  const questions = aiData.questions
-    .filter((question) => wantedTypes.includes(question.questionType))
-    .slice(0, count);
+  const questions = aiData.questions.filter((question) => wantedTypes.includes(question.questionType)).slice(0, count);
 
-  questions.forEach((question) => { question.tags = question.tags || []; });
+  questions.forEach((question) => {
+    question.tags = question.tags || [];
+  });
 
   const statements = questions.map((question) => ({
     id: generateQuestionId(question.questionType, question.prompt, question.options || []),
@@ -587,12 +556,9 @@ export const buildSingleGenerationPrompt = ({
   const defaultTagsStr = allowed.length > 0 ? allowed.join(', ') : '';
 
   const selectedTypes = getSelectedQuestionTypes(questionTypes);
-  const typesStr =
-    selectedTypes.length > 0 ? selectedTypes.join(',') : 'binary,rating,freeform,multichoice';
+  const typesStr = selectedTypes.length > 0 ? selectedTypes.join(',') : 'binary,rating,freeform,multichoice';
 
-  const sourceType =
-    overrides.sourceTypeOverride ||
-    (transcriptMode ? 'transcript' : 'text');
+  const sourceType = overrides.sourceTypeOverride || (transcriptMode ? 'transcript' : 'text');
 
   const multiSpeakerHint = overrides.multiSpeakerHintOverride || 'unknown';
   const literalReplacement = (value: unknown) => () => toStr(value);

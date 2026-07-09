@@ -1,7 +1,4 @@
-import {
-  getConvictionFromSliceStrict,
-  getImportanceFromSlice,
-} from './surveyToolResponseState.js';
+import { getConvictionFromSliceStrict, getImportanceFromSlice } from './surveyToolResponseState.js';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -35,28 +32,26 @@ type SliderStateContainer = {
   sliderToggleExpandedByQuestion?: SliderToggleExpandedByQuestion;
 };
 
-type SliderEventLike = {
-  type?: unknown;
-} | null | undefined;
+type SliderEventLike =
+  | {
+      type?: unknown;
+    }
+  | null
+  | undefined;
 
 export type SliderMode = 'importance' | 'conviction';
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const asRecord = (value: unknown): UnknownRecord => (
-  isRecord(value) ? value : {}
-);
+const asRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
 
-export const normalizeSliderMode = (mode: unknown): SliderMode => (
-  mode === 'importance' ? 'importance' : 'conviction'
-);
+export const normalizeSliderMode = (mode: unknown): SliderMode => (mode === 'importance' ? 'importance' : 'conviction');
 
 export const buildSliderModeStatePatch = (
   prevState: SliderStateContainer = {},
   questionId: unknown = '',
-  mode: unknown = 'conviction'
+  mode: unknown = 'conviction',
 ): {
   sliderModeByQuestion: Record<string, unknown>;
   sliderToggleExpandedByQuestion: Record<string, unknown>;
@@ -112,7 +107,7 @@ export const shouldExpandSliderToggle = ({
 
 export const getQuestionConvictionSliderValue = (
   slice: SurveyResponseSlice | null | undefined,
-  questionId: unknown = ''
+  questionId: unknown = '',
 ): number => {
   const value = getConvictionFromSliceStrict(slice, String(questionId ?? ''));
   return typeof value === 'number' ? value : 0;
@@ -120,7 +115,7 @@ export const getQuestionConvictionSliderValue = (
 
 export const getQuestionImportanceSliderValue = (
   slice: SurveyResponseSlice | null | undefined,
-  questionId: unknown = ''
+  questionId: unknown = '',
 ): number => {
   const value = getImportanceFromSlice(slice, String(questionId ?? ''));
   return typeof value === 'number' ? value : 0;

@@ -24,9 +24,8 @@ type CustomDemoSessionOptions = {
   baselineDemoUniverseSlugs?: Set<string>;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const BASELINE_DEMO_UNIVERSE_SLUGS = new Set<string>(getBaselineDemoSessionSlugs());
 const BASELINE_DEMO_PLACEHOLDER_SLUGS = new Set<string>(getBaselineDemoPlaceholderSlugs());
@@ -41,10 +40,7 @@ const readUniverseEntryRawSlug = (entry: unknown): string => {
   return typeof cfg?.slug === 'string' ? cfg.slug : String(key || '');
 };
 
-export const resolveSessionUniverseEntrySlug = (
-  entry: unknown,
-  { demoSessionMap }: UniverseOptions = {}
-): string => {
+export const resolveSessionUniverseEntrySlug = (entry: unknown, { demoSessionMap }: UniverseOptions = {}): string => {
   const [key] = readUniverseEntryTuple(entry);
   const resolvedDemoAlias = resolveSessionSlugAliasFromDemoSessions({
     sessionSlug: key,
@@ -57,20 +53,18 @@ export const resolveSessionUniverseEntrySlug = (
 export const filterSessionUniverseEntriesByDemoVisibility = (
   entries: UniverseEntryList | unknown = [],
   showDemoSessions: unknown,
-  { demoSessionMap }: UniverseOptions = {}
+  { demoSessionMap }: UniverseOptions = {},
 ): UniverseEntryList => {
   const normalizedEntries = Array.isArray(entries) ? entries : [];
   if (showDemoSessions === true) return normalizedEntries;
-  return normalizedEntries.filter((entry) => (
-    !BASELINE_DEMO_PLACEHOLDER_SLUGS.has(
-      resolveSessionUniverseEntrySlug(entry, { demoSessionMap })
-    )
-  ));
+  return normalizedEntries.filter(
+    (entry) => !BASELINE_DEMO_PLACEHOLDER_SLUGS.has(resolveSessionUniverseEntrySlug(entry, { demoSessionMap })),
+  );
 };
 
 export const mergeSessionUniverseEntriesBySlug = (
   entrySets: Array<UniverseEntryList | unknown> = [],
-  { demoSessionMap }: UniverseOptions = {}
+  { demoSessionMap }: UniverseOptions = {},
 ): UniverseEntryTuple[] => {
   const out: UniverseEntryTuple[] = [];
   const seen = new Set<string>();
@@ -88,11 +82,9 @@ export const mergeSessionUniverseEntriesBySlug = (
 
 export const getCustomDemoSessionEntries = (
   demoSessionMap: DemoSessionMap = {},
-  { baselineDemoUniverseSlugs = BASELINE_DEMO_UNIVERSE_SLUGS }: CustomDemoSessionOptions = {}
-): Array<[string, DemoSessionConfig]> => (
-  Object.entries(demoSessionMap || {}).filter((entry): entry is [string, DemoSessionConfig] => (
-    !baselineDemoUniverseSlugs.has(
-      resolveSessionUniverseEntrySlug(entry, { demoSessionMap })
-    )
-  ))
-);
+  { baselineDemoUniverseSlugs = BASELINE_DEMO_UNIVERSE_SLUGS }: CustomDemoSessionOptions = {},
+): Array<[string, DemoSessionConfig]> =>
+  Object.entries(demoSessionMap || {}).filter(
+    (entry): entry is [string, DemoSessionConfig] =>
+      !baselineDemoUniverseSlugs.has(resolveSessionUniverseEntrySlug(entry, { demoSessionMap })),
+  );

@@ -1,8 +1,5 @@
 import store from '../../store';
-import {
-  readActiveSessionSlugForScope,
-  shouldBypassSessionScopeWindow,
-} from './sessionScopeWindow.js';
+import { readActiveSessionSlugForScope, shouldBypassSessionScopeWindow } from './sessionScopeWindow.js';
 
 jest.mock('../../store', () => ({
   __esModule: true,

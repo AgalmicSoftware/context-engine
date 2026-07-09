@@ -8,15 +8,10 @@ import {
   type SessionResultsHtmlSnapshot,
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
-import {
-  buildSurveyResultsHtmlReportReadinessPlan,
-} from './surveyResultsHtmlReportReadiness';
-import type {
-  SurveyResultsHtmlReportSectionRow,
-} from './surveyResultsHtmlReportReadiness';
+import { buildSurveyResultsHtmlReportReadinessPlan } from './surveyResultsHtmlReportReadiness';
+import type { SurveyResultsHtmlReportSectionRow } from './surveyResultsHtmlReportReadiness';
 
-export type SurveyResultsHtmlReportAnalysisPayload =
-  Partial<SessionResultsAnalysisPayloadBuildResult> &
+export type SurveyResultsHtmlReportAnalysisPayload = Partial<SessionResultsAnalysisPayloadBuildResult> &
   Record<string, unknown> & {
     eligibility?: Partial<SessionResultsAnalysisEligibility>;
     inputSignature?: unknown;

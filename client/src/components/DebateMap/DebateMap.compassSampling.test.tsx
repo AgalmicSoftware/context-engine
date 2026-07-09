@@ -54,17 +54,15 @@ const parseHistoricalVote = (vote: unknown): number | null => {
   return Number.isNaN(parsedVote) ? null : parsedVote;
 };
 
-const getQuadrantKey = (point: CompassPoint) => (
-  `${point.y > 0.5 ? 'top' : 'bottom'}-${point.x > 0.5 ? 'right' : 'left'}`
-);
+const getQuadrantKey = (point: CompassPoint) =>
+  `${point.y > 0.5 ? 'top' : 'bottom'}-${point.x > 0.5 ? 'right' : 'left'}`;
 
-const getVoteEntriesForNode = (nodeId: string): VoteEntry[] => (
+const getVoteEntriesForNode = (nodeId: string): VoteEntry[] =>
   Object.entries(historicalFigures || {}).reduce<VoteEntry[]>((entries, [username, figure]) => {
     const parsedVote = parseHistoricalVote(figure?.votes?.[nodeId]);
     if (parsedVote == null || !Number.isFinite(parsedVote)) return entries;
     return entries.concat({ username, value: parsedVote });
-  }, [])
-);
+  }, []);
 
 const getCompassNodes = (nodes: DebateTreeNode[], acc: DebateTreeNode[] = []) => {
   (nodes || []).forEach((node) => {
@@ -91,12 +89,7 @@ describe('DebateMap compass sampling', () => {
       const voteEntries = getVoteEntriesForNode(node.id);
       if (voteEntries.length === 0) return;
 
-      const fullPoints = buildHistoricalCompassPoints(
-        voteEntries,
-        [],
-        node.id,
-        Number.MAX_SAFE_INTEGER
-      );
+      const fullPoints = buildHistoricalCompassPoints(voteEntries, [], node.id, Number.MAX_SAFE_INTEGER);
       const sampledPoints = buildHistoricalCompassPoints(voteEntries, [], node.id);
       const fullQuadrants = new Set(fullPoints.map(getQuadrantKey));
       const sampledQuadrants = new Set(sampledPoints.map(getQuadrantKey));
@@ -108,9 +101,10 @@ describe('DebateMap compass sampling', () => {
   it('keeps the most vulnerable atlas leaves meaningfully seeded after persona merges', () => {
     TARGETED_ENRICHMENT_NODE_IDS.forEach((nodeId) => {
       const voteEntries = getVoteEntriesForNode(nodeId);
-      const commentCount = Object.values(historicalFigures || {}).reduce((total, figure) => (
-        total + ((figure?.comments || []).some((comment) => String(comment?.id) === nodeId) ? 1 : 0)
-      ), 0);
+      const commentCount = Object.values(historicalFigures || {}).reduce(
+        (total, figure) => total + ((figure?.comments || []).some((comment) => String(comment?.id) === nodeId) ? 1 : 0),
+        0,
+      );
 
       expect(voteEntries.length).toBeGreaterThanOrEqual(8);
       expect(commentCount).toBe(voteEntries.length);

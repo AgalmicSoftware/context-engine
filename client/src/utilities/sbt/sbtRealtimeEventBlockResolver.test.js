@@ -1,6 +1,4 @@
-const {
-  resolveSbtRealtimeEventBlockNumber,
-} = require('./sbtRealtimeEventBlockResolver.js');
+const { resolveSbtRealtimeEventBlockNumber } = require('./sbtRealtimeEventBlockResolver.js');
 
 const createDeps = (overrides = {}) => ({
   getReadProviderForSession: jest.fn(() => null),
@@ -17,10 +15,12 @@ describe('resolveSbtRealtimeEventBlockNumber', () => {
   it('uses the event block number when present', async () => {
     const deps = createDeps();
 
-    await expect(resolveSbtRealtimeEventBlockNumber({
-      ...deps,
-      event: { blockNumber: 20 },
-    })).resolves.toBe(20);
+    await expect(
+      resolveSbtRealtimeEventBlockNumber({
+        ...deps,
+        event: { blockNumber: 20 },
+      }),
+    ).resolves.toBe(20);
 
     expect(deps.getReadProviderForSession).not.toHaveBeenCalled();
     expect(deps.getRelevantBlockWindowForFilter).not.toHaveBeenCalled();
@@ -34,10 +34,12 @@ describe('resolveSbtRealtimeEventBlockNumber', () => {
       getReadProviderForSession: jest.fn(() => readProvider),
     });
 
-    await expect(resolveSbtRealtimeEventBlockNumber({
-      ...deps,
-      event: { transactionHash: '0xabc' },
-    })).resolves.toBe(30);
+    await expect(
+      resolveSbtRealtimeEventBlockNumber({
+        ...deps,
+        event: { transactionHash: '0xabc' },
+      }),
+    ).resolves.toBe(30);
 
     expect(deps.getReadProviderForSession).toHaveBeenCalledWith('alpha');
     expect(readProvider.getTransactionReceipt).toHaveBeenCalledWith('0xabc');
@@ -47,20 +49,24 @@ describe('resolveSbtRealtimeEventBlockNumber', () => {
   it('falls back to the current block window when receipt lookup fails', async () => {
     const error = new Error('receipt failed');
     const readProvider = {
-      getTransactionReceipt: jest.fn(async () => { throw error; }),
+      getTransactionReceipt: jest.fn(async () => {
+        throw error;
+      }),
     };
     const deps = createDeps({
       getReadProviderForSession: jest.fn(() => readProvider),
     });
 
-    await expect(resolveSbtRealtimeEventBlockNumber({
-      ...deps,
-      event: { transactionHash: '0xabc' },
-    })).resolves.toBe(42);
+    await expect(
+      resolveSbtRealtimeEventBlockNumber({
+        ...deps,
+        event: { transactionHash: '0xabc' },
+      }),
+    ).resolves.toBe(42);
 
     expect(deps.log.error).toHaveBeenCalledWith(
       'Failed to get block number from transaction hash for SBT event',
-      error
+      error,
     );
     expect(deps.getRelevantBlockWindowForFilter).toHaveBeenCalledWith('alpha');
   });
@@ -68,10 +74,12 @@ describe('resolveSbtRealtimeEventBlockNumber', () => {
   it('falls back to the block window when no read provider is available', async () => {
     const deps = createDeps();
 
-    await expect(resolveSbtRealtimeEventBlockNumber({
-      ...deps,
-      event: { transactionHash: '0xabc' },
-    })).resolves.toBe(42);
+    await expect(
+      resolveSbtRealtimeEventBlockNumber({
+        ...deps,
+        event: { transactionHash: '0xabc' },
+      }),
+    ).resolves.toBe(42);
 
     expect(deps.getRelevantBlockWindowForFilter).toHaveBeenCalledWith('alpha');
   });
@@ -79,13 +87,17 @@ describe('resolveSbtRealtimeEventBlockNumber', () => {
   it('logs provider lookup errors and falls back to the block window', async () => {
     const error = new Error('provider failed');
     const deps = createDeps({
-      getReadProviderForSession: jest.fn(() => { throw error; }),
+      getReadProviderForSession: jest.fn(() => {
+        throw error;
+      }),
     });
 
-    await expect(resolveSbtRealtimeEventBlockNumber({
-      ...deps,
-      event: { transactionHash: '0xabc' },
-    })).resolves.toBe(42);
+    await expect(
+      resolveSbtRealtimeEventBlockNumber({
+        ...deps,
+        event: { transactionHash: '0xabc' },
+      }),
+    ).resolves.toBe(42);
 
     expect(deps.log.warn).toHaveBeenCalledWith('MainSite: fallback', error);
     expect(deps.getRelevantBlockWindowForFilter).toHaveBeenCalledWith('alpha');
@@ -94,10 +106,12 @@ describe('resolveSbtRealtimeEventBlockNumber', () => {
   it('falls back to the block window when the event has no block or transaction hash', async () => {
     const deps = createDeps();
 
-    await expect(resolveSbtRealtimeEventBlockNumber({
-      ...deps,
-      event: {},
-    })).resolves.toBe(42);
+    await expect(
+      resolveSbtRealtimeEventBlockNumber({
+        ...deps,
+        event: {},
+      }),
+    ).resolves.toBe(42);
 
     expect(deps.getRelevantBlockWindowForFilter).toHaveBeenCalledWith('alpha');
   });

@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../web3/contractScripts.js';
+import { normalizeSessionSlug } from '../web3/chainGateway.js';
 import {
   mergeSbtLiveProgressEntry,
   SBT_PROGRESS_MIN_INTERVAL_MS,
@@ -37,9 +37,7 @@ type SbtLiveProgressStatePatch = {
   sbtScanProgressBySlug: Record<string, SbtLiveProgressEntry>;
 } | null;
 
-type SbtLiveProgressStateUpdater = (
-  prev: SbtLiveProgressState | null | undefined
-) => SbtLiveProgressStatePatch;
+type SbtLiveProgressStateUpdater = (prev: SbtLiveProgressState | null | undefined) => SbtLiveProgressStatePatch;
 
 interface SbtLiveProgressControllerOptions {
   mergeProgressEntry?: MergeProgressEntry;
@@ -61,11 +59,7 @@ export const buildSbtCountsInitialProgress = ({
   const scanStartBlock = Number(startBlock);
   const scanToBlock = Number(toBlock);
   const progressSeedBlock = Number(seedBlock);
-  if (
-    !Number.isFinite(scanStartBlock) ||
-    !Number.isFinite(scanToBlock) ||
-    !Number.isFinite(progressSeedBlock)
-  ) {
+  if (!Number.isFinite(scanStartBlock) || !Number.isFinite(scanToBlock) || !Number.isFinite(progressSeedBlock)) {
     return null;
   }
 
@@ -73,13 +67,9 @@ export const buildSbtCountsInitialProgress = ({
   if (nextScanFrom > scanToBlock) return null;
 
   const totalBlocks = Math.max(0, scanToBlock - scanStartBlock + 1);
-  const scannedBlocks = Math.max(
-    0,
-    Math.min(totalBlocks, progressSeedBlock - scanStartBlock + 1)
-  );
-  const lastScannedBlock = scannedBlocks > 0
-    ? Math.min(scanToBlock, scanStartBlock + scannedBlocks - 1)
-    : scanStartBlock - 1;
+  const scannedBlocks = Math.max(0, Math.min(totalBlocks, progressSeedBlock - scanStartBlock + 1));
+  const lastScannedBlock =
+    scannedBlocks > 0 ? Math.min(scanToBlock, scanStartBlock + scannedBlocks - 1) : scanStartBlock - 1;
 
   return {
     phase: 'activity',
@@ -88,7 +78,7 @@ export const buildSbtCountsInitialProgress = ({
     totalBlocks,
     scannedBlocks,
     remainingBlocks: Math.max(0, totalBlocks - scannedBlocks),
-    completionRatio: totalBlocks > 0 ? (scannedBlocks / totalBlocks) : 1,
+    completionRatio: totalBlocks > 0 ? scannedBlocks / totalBlocks : 1,
     scanFrom: scanStartBlock,
     scanTo: lastScannedBlock,
     lastScannedBlock,
@@ -140,18 +130,20 @@ export const createSbtLiveProgressController = ({
     slugIn: unknown,
     token: unknown,
     nextPatch: unknown = {},
-    options: unknown = {}
+    options: unknown = {},
   ): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
     const meta = progressMetaBySlug.get(slug);
     if (!meta || Number(meta.token || 0) !== Number(token || 0)) return false;
     const nowMs = Date.now();
-    if (!shouldCommitProgress({
-      force: (options as { force?: unknown } | null | undefined)?.force === true,
-      nowMs,
-      lastCommitMs: Number(meta.lastCommitMs || 0),
-      minIntervalMs,
-    })) {
+    if (
+      !shouldCommitProgress({
+        force: (options as { force?: unknown } | null | undefined)?.force === true,
+        nowMs,
+        lastCommitMs: Number(meta.lastCommitMs || 0),
+        minIntervalMs,
+      })
+    ) {
       return false;
     }
     meta.lastCommitMs = nowMs;

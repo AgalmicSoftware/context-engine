@@ -1,4 +1,4 @@
-@use "scss/finalSubmitCta" as finalSubmitCta;
+@use 'scss/finalSubmitCta' as finalSubmitCta;
 
 /* NEW - Color variables for dropdown items */
 $questions-item-bg: var(--ce-color-success-soft); // Light green
@@ -953,7 +953,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 2px;
-  transition: color 0.18s ease, text-decoration-color 0.18s ease;
+  transition:
+    color 0.18s ease,
+    text-decoration-color 0.18s ease;
 
   &:hover,
   &:focus {
@@ -1059,7 +1061,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   cursor: pointer;
   padding: 6px;
   line-height: 1;
-  transition: color 0.2s ease, transform 0.2s ease;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
   &:hover:not(:disabled) {
     color: #3158b9;
     transform: translateY(-1px);
@@ -2119,7 +2123,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   border: 1px solid rgba(73, 83, 99, 0.3);
   color: #1f2733;
   background: rgba(255, 255, 255, 0.55);
-  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
 
   &:hover,
   &:focus {
@@ -2335,8 +2342,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 //
-
-
 
 .cardLinksContainer {
   display: flex;
@@ -2786,7 +2791,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   border: 2px solid #9a9a9a;
   background: linear-gradient(#dfdfdf, #ffffff);
   color: #000;
-  box-shadow: 1px 1px 0 #fff, -1px -1px 0 #777;
+  box-shadow:
+    1px 1px 0 #fff,
+    -1px -1px 0 #777;
   font-size: 1.3em;
   line-height: 1;
   cursor: pointer;
@@ -2796,7 +2803,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   &:active:not(:disabled) {
     background: #c2c2c2;
-    box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #777;
+    box-shadow:
+      inset 1px 1px 0 #fff,
+      inset -1px -1px 0 #777;
   }
 
   &:focus-visible {
@@ -2947,7 +2956,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   border-top: 1px solid rgba(32, 45, 71, 0.12);
   padding-top: 12px;
 
-  :global([class*="createSurveyContainer"]) {
+  :global([class*='createSurveyContainer']) {
     background: #edf2f7 !important;
     border-color: rgba(32, 45, 71, 0.14) !important;
     color: #18243a !important;
@@ -2961,29 +2970,29 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     color: #18243a !important;
   }
 
-  :global([class*="modeHeader"]) {
+  :global([class*='modeHeader']) {
     border-bottom-color: rgba(32, 45, 71, 0.14) !important;
   }
 
-  :global([class*="toggleLabel"]),
-  :global([class*="inheritToggle"]),
-  :global([class*="optionItem"]),
-  :global([class*="singleSelectLabel"]),
-  :global([class*="questionMetadata"]),
-  :global([class*="tagsManagerContainer"]),
-  :global([class*="questionId"]),
-  :global([class*="surveyIdPreview"]),
-  :global([class*="aiPromptMeta"]) {
+  :global([class*='toggleLabel']),
+  :global([class*='inheritToggle']),
+  :global([class*='optionItem']),
+  :global([class*='singleSelectLabel']),
+  :global([class*='questionMetadata']),
+  :global([class*='tagsManagerContainer']),
+  :global([class*='questionId']),
+  :global([class*='surveyIdPreview']),
+  :global([class*='aiPromptMeta']) {
     color: #18243a !important;
     opacity: 1 !important;
   }
 
-  :global([class*="surveyTitleInput"]),
-  :global([class*="docUrlInput"]),
-  :global([class*="questionPromptInput"]),
-  :global([class*="optionInput"]),
-  :global([class*="questionTypeSelect"]),
-  :global([class*="associatedSurveyInput"]) {
+  :global([class*='surveyTitleInput']),
+  :global([class*='docUrlInput']),
+  :global([class*='questionPromptInput']),
+  :global([class*='optionInput']),
+  :global([class*='questionTypeSelect']),
+  :global([class*='associatedSurveyInput']) {
     background: #fff !important;
     border-color: rgba(32, 45, 71, 0.18) !important;
     color: #18243a !important;
@@ -2994,15 +3003,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
   }
 
-  :global([class*="questionContainer"]),
-  :global([class*="typeSelectorBlock"]) {
+  :global([class*='questionContainer']),
+  :global([class*='typeSelectorBlock']) {
     background: #fff !important;
     border-color: rgba(32, 45, 71, 0.14) !important;
     color: #18243a !important;
     box-shadow: 0 10px 22px rgba(6, 12, 30, 0.12) !important;
   }
 
-  :global([class*="step"]) {
+  :global([class*='step']) {
     color: rgba(24, 36, 58, 0.72) !important;
 
     span,
@@ -3013,18 +3022,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
   }
 
-  :global([class*="stepCompleted"]) {
+  :global([class*='stepCompleted']) {
     color: #167255 !important;
   }
 
-  :global([class*="questionTypeText"]),
-  :global([class*="typeSelectorLabel"]),
-  :global([class*="typeTitle"]) {
+  :global([class*='questionTypeText']),
+  :global([class*='typeSelectorLabel']),
+  :global([class*='typeTitle']) {
     color: #167255 !important;
     opacity: 1 !important;
   }
 
-  :global([class*="typeButton"]) {
+  :global([class*='typeButton']) {
     background: #f8fafc !important;
     border-color: rgba(32, 45, 71, 0.18) !important;
     color: #18243a !important;
@@ -3032,70 +3041,70 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     box-shadow: 0 3px 10px rgba(6, 12, 30, 0.08) !important;
   }
 
-  :global([class*="pill"]) {
+  :global([class*='pill']) {
     background: #e8eef7 !important;
     border-color: rgba(32, 45, 71, 0.18) !important;
     color: #18243a !important;
   }
 
-  :global([class*="pillAgree"]) {
+  :global([class*='pillAgree']) {
     background: #dff7ea !important;
     border-color: rgba(22, 114, 85, 0.35) !important;
     color: #123a2d !important;
   }
 
-  :global([class*="pillDisagree"]) {
+  :global([class*='pillDisagree']) {
     background: #ffe3e3 !important;
     border-color: rgba(191, 64, 64, 0.32) !important;
     color: #7f1d1d !important;
   }
 
-  :global([class*="pillUnsure"]) {
+  :global([class*='pillUnsure']) {
     background: #fff4cc !important;
     border-color: rgba(161, 106, 0, 0.34) !important;
     color: #5f4200 !important;
   }
 
-  :global([class*="freeformPreview"]),
-  :global([class*="ratingPreviewWrap"]) {
+  :global([class*='freeformPreview']),
+  :global([class*='ratingPreviewWrap']) {
     background: #e8eef7 !important;
     border-color: rgba(32, 45, 71, 0.22) !important;
     color: rgba(24, 36, 58, 0.72) !important;
   }
 
-  :global([class*="modeSwitchButton"]),
-  :global([class*="removeQuestionButton"]),
-  :global([class*="removeOptionButton"]),
-  :global([class*="addOptionButton"]),
-  :global([class*="addTagButton"]),
-  :global([class*="magicTagButton"]),
-  :global([class*="clearFormButton"]) {
+  :global([class*='modeSwitchButton']),
+  :global([class*='removeQuestionButton']),
+  :global([class*='removeOptionButton']),
+  :global([class*='addOptionButton']),
+  :global([class*='addTagButton']),
+  :global([class*='magicTagButton']),
+  :global([class*='clearFormButton']) {
     background: #fff !important;
     border: 1px solid rgba(32, 45, 71, 0.2) !important;
     color: #18243a !important;
   }
 
-  :global([class*="removeQuestionButton"]):hover,
-  :global([class*="removeOptionButton"]):hover {
+  :global([class*='removeQuestionButton']):hover,
+  :global([class*='removeOptionButton']):hover {
     background: #ffe3e3 !important;
     border-color: rgba(191, 64, 64, 0.35) !important;
     color: #7f1d1d !important;
   }
 
-  :global([class*="addOptionButton"]):hover,
-  :global([class*="addTagButton"]):hover,
-  :global([class*="magicTagButton"]):hover {
+  :global([class*='addOptionButton']):hover,
+  :global([class*='addTagButton']):hover,
+  :global([class*='magicTagButton']):hover {
     background: #dff7ea !important;
     border-color: rgba(22, 114, 85, 0.35) !important;
     color: #123a2d !important;
   }
 
-  :global([class*="tagInputGroup"]) {
+  :global([class*='tagInputGroup']) {
     background: #fff !important;
     border-color: rgba(32, 45, 71, 0.18) !important;
   }
 
-  :global([class*="tagInputField"]) {
+  :global([class*='tagInputField']) {
     color: #18243a !important;
 
     &::placeholder {
@@ -3103,23 +3112,23 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
   }
 
-  :global([class*="filterBubble"]) {
+  :global([class*='filterBubble']) {
     background: #dff7ea !important;
     border-color: rgba(22, 114, 85, 0.35) !important;
     color: #123a2d !important;
   }
 
-  :global([class*="removeIcon"]) {
+  :global([class*='removeIcon']) {
     color: #123a2d !important;
   }
 
-  :global([class*="jsonDisplay"]) {
+  :global([class*='jsonDisplay']) {
     background: #fff !important;
     border-color: rgba(32, 45, 71, 0.14) !important;
     color: #18243a !important;
   }
 
-  :global([class*="buttonContent"]) {
+  :global([class*='buttonContent']) {
     color: #fff !important;
   }
 }
@@ -3183,8 +3192,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   box-shadow:
     7px 7px 14px #131532,
     -7px -7px 14px #2b2f70;
-  transition:
-    transform 0.3s ease;
+  transition: transform 0.3s ease;
   overflow: visible;
 }
 
@@ -3394,15 +3402,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .miniSpinnerWrapper {
-    opacity: 0.5;
-    position: absolute;
-    top: -30px;
-    right: -75px;
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3em;
+  opacity: 0.5;
+  position: absolute;
+  top: -30px;
+  right: -75px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3em;
 }
 
 .miniLoaderIcon {
@@ -3420,8 +3428,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   border: 1px solid rgba(128, 234, 255, 0.34);
   border-radius: var(--ce-radius-pill);
   background:
-    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.03) 54%),
-    rgba(8, 26, 70, 0.74);
+    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.03) 54%), rgba(8, 26, 70, 0.74);
   color: #e8fbff;
   opacity: 0.5;
   box-shadow:
@@ -3531,8 +3538,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   pointer-events: none;
   width: 396px;
   height: 396px;
-  background:
-    radial-gradient(circle, rgba(166, 245, 255, 0.18) 0%, rgba(85, 216, 255, 0.08) 40%, rgba(34, 105, 255, 0.02) 64%, transparent 78%);
+  background: radial-gradient(
+    circle,
+    rgba(166, 245, 255, 0.18) 0%,
+    rgba(85, 216, 255, 0.08) 40%,
+    rgba(34, 105, 255, 0.02) 64%,
+    transparent 78%
+  );
   filter: blur(16px);
   animation: pileHologramPulse 4.2s ease-in-out infinite;
 }
@@ -3543,9 +3555,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: block;
   width: min(100%, 432px);
   height: auto;
-  filter:
-    drop-shadow(0 0 10px rgba(166, 245, 255, 0.2))
-    drop-shadow(0 0 26px rgba(70, 204, 255, 0.18));
+  filter: drop-shadow(0 0 10px rgba(166, 245, 255, 0.2)) drop-shadow(0 0 26px rgba(70, 204, 255, 0.18));
 }
 
 .pileHologramFloat {
@@ -3751,7 +3761,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileFooter .pileSubmitLink {
     left: calc(100% + 8px);
   }
-
 }
 
 /* ------------------------------------------- */
@@ -4577,8 +4586,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   padding: 6px 10px;
   font-weight: 700;
   cursor: pointer;
-  transition:
-    transform 0.06s ease;
+  transition: transform 0.06s ease;
   &:hover {
     box-shadow: 0 2px 6px rgba(16, 24, 40, 0.12);
     transform: translateY(-1px);
@@ -4689,7 +4697,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 12px;
   width: 100%;
   text-align: left;
-  transition: opacity 0.16s ease, text-shadow 0.16s ease;
+  transition:
+    opacity 0.16s ease,
+    text-shadow 0.16s ease;
 }
 
 .convictionToggleLabel {
@@ -4823,7 +4833,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: inherit;
   text-decoration: none;
   border-bottom: 1px dotted rgba(255, 255, 255, 0.35);
-  transition: color 0.2s ease, border-color 0.2s ease;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease;
 
   &:hover,
   &:focus {

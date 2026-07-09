@@ -87,6 +87,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/check-client-boundaries.test.mjs');
   expectFile('scripts/client-boundaries-baseline.json');
   expectFile('scripts/check-type-debt-ratchet.mjs');
+  expectFile('scripts/check-coverage-floor.mjs');
+  expectFile('scripts/check-coverage-floor.test.mjs');
+  expectFile('scripts/coverage-baseline.json');
+  expectFile('scripts/check-dead-exports-advisory.mjs');
+  expectFile('scripts/check-dead-exports-advisory.test.mjs');
   expectFile('scripts/check-baseline-monotonicity.mjs');
   expectFile('scripts/check-baseline-monotonicity.test.mjs');
   expectFile('scripts/testInventoryConfig.js');
@@ -119,6 +124,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:contracts', 'SessionRegistryFuzzTest');
   expectScriptContains('test:contracts', 'CustomSBTInvariantTest');
   expectScriptContains('test:node', 'scripts/run-node-tests.js');
+  expectScriptContains('test:node:tracked', 'scripts/run-node-tests.js --tracked-only');
   expectScriptContains('client-boundaries:check', 'scripts/check-client-boundaries.mjs');
   expectScriptContains('test:root:jest', '--testMatch');
   expectScriptContains('test:root:jest', '../tests/root/sessionCorsWorker.auth.test.js');
@@ -131,6 +137,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:ci', 'npm run test:wiring');
   expectScriptContains('test:ci', 'npm run type-debt:check');
   expectScriptContains('test:ci', 'npm run verify:release');
+  expectScriptContains('test:ci', 'npm run coverage-floor:check');
   expectScriptContains('test:ci', 'npm run test:root:jest');
   expectScriptContains('test:ci', 'npm run test:worker:session-cors');
   expectScriptContains('test:ci', 'npm run test:node');
@@ -139,6 +146,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('tests', 'npm run test:ci');
   expectScriptContains('tests', 'npm run test:surveys-sbt');
   expectScriptContains('test:client', '--coverage');
+  expectScriptContains('test:client', '--coverageReporters=json-summary');
   expectScriptContains('test:release:client', 'npm test -- --watchAll=false --runInBand');
   expectScriptContains('typecheck:client', 'npm --prefix client run typecheck');
   expectScriptContains('worker:bundle', 'scripts/worker-bundle.mjs');
@@ -146,8 +154,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:worker-bundle', 'scripts/verify-worker-bundle-sync.mjs');
   expectScriptContains('verify:public-release-surface', 'scripts/verify-public-release-surface.js');
   expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
+  expectScriptContains('coverage-floor:check', 'scripts/check-coverage-floor.mjs');
+  expectScriptContains('dead-exports:advisory', 'scripts/check-dead-exports-advisory.mjs');
   expectScriptContains('verify:release', 'npm run lint');
   expectScriptContains('verify:release', 'npm run typecheck:client');
+  expectScriptContains('verify:release', 'npm run -s test:node:tracked');
   expectScriptContains('verify:release', 'npm run test:release:client');
   expectScriptContains('verify:release', 'npm run verify:public-release-surface');
   expectScriptContains('verify:release', 'npm run worker:bundle');
@@ -168,6 +179,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('run: npm run test:wiring', '"npm run test:wiring"');
   expectWorkflowContains('run: npm run type-debt:check', '"npm run type-debt:check"');
   expectWorkflowContains('BASELINE_MONOTONICITY_BASE:', 'baseline monotonicity base env');
+  expectWorkflowContains('fetch-depth: 0', 'full history checkout for baseline monotonicity commit text');
+  expectWorkflowContains(
+    'BASELINE_MONOTONICITY_COMMIT_TEXT="$(git log --format=%B',
+    'baseline monotonicity commit-message allow text',
+  );
   expectWorkflowContains('node scripts/check-baseline-monotonicity.mjs', '"node scripts/check-baseline-monotonicity.mjs"');
   expectWorkflowContains('run: npm run lint', '"npm run lint"');
   expectWorkflowContains('run: npm run typecheck:client', '"npm run typecheck:client"');
@@ -177,11 +193,14 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('run: npm --prefix client run build', '"npm --prefix client run build"');
   expectWorkflowContains('run: npm run test:contracts', '"npm run test:contracts"');
   expectWorkflowContains('run: npm run test:client', '"npm run test:client"');
+  expectWorkflowContains('run: npm run coverage-floor:check', '"npm run coverage-floor:check"');
   expectWorkflowContains('run: npm run test:root:jest', '"npm run test:root:jest"');
   expectWorkflowContains('run: npm run test:worker:session-cors', '"npm run test:worker:session-cors"');
   expectWorkflowContains('run: npm run test:cc', '"npm run test:cc"');
   expectWorkflowContains('run: npm run test:node', '"npm run test:node"');
   expectWorkflowContains('run: npm run test:cache-guard', '"npm run test:cache-guard"');
+  expectWorkflowContains('continue-on-error: true', 'non-blocking advisory step');
+  expectWorkflowContains('run: npm run dead-exports:advisory', '"npm run dead-exports:advisory"');
   expectWorkflowContains('uses: actions/upload-artifact@v4', 'client coverage artifact upload');
   expectWorkflowContains('path: client/coverage/lcov.info', 'client coverage artifact path');
   expectWorkflowContains('needs:', 'aggregate job dependency list');

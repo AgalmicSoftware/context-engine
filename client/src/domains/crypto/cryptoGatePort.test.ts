@@ -1,6 +1,4 @@
-import {
-  bindCryptoGatePort,
-} from './cryptoGatePort';
+import { bindCryptoGatePort } from './cryptoGatePort';
 
 describe('cryptoGatePort', () => {
   it('routes decrypt requests with unchanged envelope and Lit options', async () => {
@@ -10,12 +8,14 @@ describe('cryptoGatePort', () => {
       crypto: () => ({ decryptEnvelopeValue }),
     });
 
-    await expect(port.decryptEnvelopeValue('{"ciphertext":"abc"}', {
-      account: '0xabc',
-      chainId: 11155420,
-      litOpts: { getKey },
-      providerLike: { provider: true },
-    })).resolves.toBe('decrypted value');
+    await expect(
+      port.decryptEnvelopeValue('{"ciphertext":"abc"}', {
+        account: '0xabc',
+        chainId: 11155420,
+        litOpts: { getKey },
+        providerLike: { provider: true },
+      }),
+    ).resolves.toBe('decrypted value');
 
     expect(decryptEnvelopeValue).toHaveBeenCalledWith('{"ciphertext":"abc"}', {
       account: '0xabc',

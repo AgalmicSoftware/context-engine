@@ -25,13 +25,10 @@ const SBT_PAGE_BURN_AUTH_INDEX_BY_NAME: Record<string, number> = {
   Neither: 3,
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
-export const toStringList = (value: unknown): string[] => (
-  Array.isArray(value) ? value.map((entry: unknown) => String(entry ?? '')) : []
-);
+export const toStringList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map((entry: unknown) => String(entry ?? '')) : [];
 
 export const toSbtPageDocumentUrlList = (...values: unknown[]): string[] => {
   const out: string[] = [];
@@ -68,22 +65,24 @@ export const toSbtPageDocumentUrlList = (...values: unknown[]): string[] => {
 };
 
 export const resolveSbtPageBurnAuthLabel = (burnAuth: unknown): string => {
-  const burnIdx = typeof burnAuth === 'string'
-    ? (SBT_PAGE_BURN_AUTH_INDEX_BY_NAME[burnAuth] ?? undefined)
-    : (burnAuth != null ? Number(burnAuth) : undefined);
+  const burnIdx =
+    typeof burnAuth === 'string'
+      ? (SBT_PAGE_BURN_AUTH_INDEX_BY_NAME[burnAuth] ?? undefined)
+      : burnAuth != null
+        ? Number(burnAuth)
+        : undefined;
   const normalizedBurnIdx = Number.isInteger(burnIdx) ? Number(burnIdx) : -1;
-  return (normalizedBurnIdx >= 0 && normalizedBurnIdx < SBT_PAGE_BURN_AUTH_LABELS.length)
+  return normalizedBurnIdx >= 0 && normalizedBurnIdx < SBT_PAGE_BURN_AUTH_LABELS.length
     ? SBT_PAGE_BURN_AUTH_LABELS[normalizedBurnIdx]
     : '?';
 };
 
-export const resolveSbtPageMaxTokensDisplay = (maxTokens: unknown): string => (
-  maxTokens === '0'
-    ? '∞'
-    : (maxTokens != null ? String(maxTokens) : '-')
-);
+export const resolveSbtPageMaxTokensDisplay = (maxTokens: unknown): string =>
+  maxTokens === '0' ? '∞' : maxTokens != null ? String(maxTokens) : '-';
 
-export const resolveSbtPageAdminCreatorAddresses = (sbtInfoInput: unknown): {
+export const resolveSbtPageAdminCreatorAddresses = (
+  sbtInfoInput: unknown,
+): {
   adminAddress: unknown;
   creatorAddress: unknown;
 } => {

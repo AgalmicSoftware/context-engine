@@ -34,9 +34,8 @@ const focusElement = (node: Element | null) => {
   if (node instanceof HTMLElement) node.focus();
 };
 
-const getFallbackLabel = (option: AsyncSearchOption | null | undefined) => (
-  option?.label ?? (option?.value == null ? '' : String(option.value))
-);
+const getFallbackLabel = (option: AsyncSearchOption | null | undefined) =>
+  option?.label ?? (option?.value == null ? '' : String(option.value));
 
 const AsyncSearchSelect = ({
   id,
@@ -68,38 +67,43 @@ const AsyncSearchSelect = ({
   const controlLabelId = resolvedInputId + '-label';
   const normalizedOptions = useMemo(() => (Array.isArray(options) ? options : []), [options]);
   const hasValue = value !== null && value !== undefined;
-  const optionKeyFor = useCallback((option: AsyncSearchOption | null | undefined) => {
-    if (option === null || option === undefined) return '';
-    return String(
-      (typeof getOptionValue === 'function' ? getOptionValue(option) : option?.value) ?? ''
-    );
-  }, [getOptionValue]);
+  const optionKeyFor = useCallback(
+    (option: AsyncSearchOption | null | undefined) => {
+      if (option === null || option === undefined) return '';
+      return String((typeof getOptionValue === 'function' ? getOptionValue(option) : option?.value) ?? '');
+    },
+    [getOptionValue],
+  );
   const renderOptionLabel = useCallback(
-    (option: AsyncSearchOption) => (typeof formatOptionLabel === 'function' ? formatOptionLabel(option) : getFallbackLabel(option)),
-    [formatOptionLabel]
+    (option: AsyncSearchOption) =>
+      typeof formatOptionLabel === 'function' ? formatOptionLabel(option) : getFallbackLabel(option),
+    [formatOptionLabel],
   );
   const renderValueLabel = useCallback(
-    (option: AsyncSearchOption) => (typeof formatValueLabel === 'function' ? formatValueLabel(option) : renderOptionLabel(option)),
-    [formatValueLabel, renderOptionLabel]
+    (option: AsyncSearchOption) =>
+      typeof formatValueLabel === 'function' ? formatValueLabel(option) : renderOptionLabel(option),
+    [formatValueLabel, renderOptionLabel],
   );
   const selectedKey = useMemo(() => optionKeyFor(value), [optionKeyFor, value]);
   const filteredOptions = useMemo(() => {
-    const trimmed = String(query || '').trim().toLowerCase();
+    const trimmed = String(query || '')
+      .trim()
+      .toLowerCase();
     return trimmed
       ? normalizedOptions.filter((option) => {
-        if (typeof filterOption === 'function') {
-          return filterOption(option, trimmed);
-        }
-        const haystack = [
-          option?.label,
-          option?.value,
-          typeof getOptionValue === 'function' ? getOptionValue(option) : null,
-        ]
-          .filter((valuePart) => valuePart !== null && valuePart !== undefined)
-          .join(' ')
-          .toLowerCase();
-        return haystack.includes(trimmed);
-      })
+          if (typeof filterOption === 'function') {
+            return filterOption(option, trimmed);
+          }
+          const haystack = [
+            option?.label,
+            option?.value,
+            typeof getOptionValue === 'function' ? getOptionValue(option) : null,
+          ]
+            .filter((valuePart) => valuePart !== null && valuePart !== undefined)
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(trimmed);
+        })
       : normalizedOptions;
   }, [filterOption, getOptionValue, normalizedOptions, query]);
   const hasVisibleOptions = filteredOptions.length > 0;
@@ -108,16 +112,19 @@ const AsyncSearchSelect = ({
     setQuery('');
     setFocusedIndex(-1);
   }, []);
-  const handleWrapperBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
-    if (!open || !wrapperRef.current) return;
-    const nextFocused = event.relatedTarget;
-    if (nextFocused instanceof Node && wrapperRef.current.contains(nextFocused)) return;
-    requestAnimationFrame(() => {
-      const activeElement = document.activeElement;
-      if (activeElement && wrapperRef.current?.contains(activeElement)) return;
-      closeMenu();
-    });
-  }, [closeMenu, open]);
+  const handleWrapperBlur = useCallback(
+    (event: React.FocusEvent<HTMLDivElement>) => {
+      if (!open || !wrapperRef.current) return;
+      const nextFocused = event.relatedTarget;
+      if (nextFocused instanceof Node && wrapperRef.current.contains(nextFocused)) return;
+      requestAnimationFrame(() => {
+        const activeElement = document.activeElement;
+        if (activeElement && wrapperRef.current?.contains(activeElement)) return;
+        closeMenu();
+      });
+    },
+    [closeMenu, open],
+  );
   const focusOptionAt = useCallback((index: number) => {
     setFocusedIndex(index);
     const row = listRef.current?.querySelector(`[data-ce-async-select-index="${index}"]`);
@@ -128,14 +135,10 @@ const AsyncSearchSelect = ({
   }, [closeMenu, disabled, open]);
   useEffect(() => {
     if (!open) return undefined;
-    const handlePointerDown = (event: PointerEvent) => wrapperRef.current
-      && event.target instanceof Node
-      && !wrapperRef.current.contains(event.target)
-      && closeMenu();
-    const handleFocusIn = (event: FocusEvent) => wrapperRef.current
-      && event.target instanceof Node
-      && !wrapperRef.current.contains(event.target)
-      && closeMenu();
+    const handlePointerDown = (event: PointerEvent) =>
+      wrapperRef.current && event.target instanceof Node && !wrapperRef.current.contains(event.target) && closeMenu();
+    const handleFocusIn = (event: FocusEvent) =>
+      wrapperRef.current && event.target instanceof Node && !wrapperRef.current.contains(event.target) && closeMenu();
     const handleKeyDown = (event: KeyboardEvent) => event.key === 'Escape' && closeMenu();
     document.addEventListener('pointerdown', handlePointerDown);
     document.addEventListener('focusin', handleFocusIn);
@@ -159,42 +162,51 @@ const AsyncSearchSelect = ({
     }
     setOpen(true);
   }, [closeMenu, disabled, open]);
-  const handleSelect = useCallback((option: AsyncSearchOption) => {
-    if (disabled || !onChange) return;
-    onChange(option);
-    closeMenu();
-  }, [closeMenu, disabled, onChange]);
-  const handleSearchKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'ArrowDown' && hasVisibleOptions) {
-      event.preventDefault();
-      focusOptionAt(0);
-      return;
-    }
-    if (event.key === 'Tab') closeMenu();
-  }, [closeMenu, focusOptionAt, hasVisibleOptions]);
-  const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>, option: AsyncSearchOption, index: number) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      handleSelect(option);
-      return;
-    }
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      focusOptionAt(Math.min(filteredOptions.length - 1, index + 1));
-      return;
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      if (index <= 0) {
-        setFocusedIndex(-1);
-        if (searchRef.current && typeof searchRef.current.focus === 'function') searchRef.current.focus();
+  const handleSelect = useCallback(
+    (option: AsyncSearchOption) => {
+      if (disabled || !onChange) return;
+      onChange(option);
+      closeMenu();
+    },
+    [closeMenu, disabled, onChange],
+  );
+  const handleSearchKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'ArrowDown' && hasVisibleOptions) {
+        event.preventDefault();
+        focusOptionAt(0);
         return;
       }
-      focusOptionAt(index - 1);
-      return;
-    }
-    if (event.key === 'Tab') closeMenu();
-  }, [closeMenu, filteredOptions.length, focusOptionAt, handleSelect]);
+      if (event.key === 'Tab') closeMenu();
+    },
+    [closeMenu, focusOptionAt, hasVisibleOptions],
+  );
+  const handleRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>, option: AsyncSearchOption, index: number) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        handleSelect(option);
+        return;
+      }
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        focusOptionAt(Math.min(filteredOptions.length - 1, index + 1));
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (index <= 0) {
+          setFocusedIndex(-1);
+          if (searchRef.current && typeof searchRef.current.focus === 'function') searchRef.current.focus();
+          return;
+        }
+        focusOptionAt(index - 1);
+        return;
+      }
+      if (event.key === 'Tab') closeMenu();
+    },
+    [closeMenu, filteredOptions.length, focusOptionAt, handleSelect],
+  );
   const emptyContent = typeof noOptionsMessage === 'function' ? noOptionsMessage() : 'No options';
   return (
     <div
@@ -234,9 +246,7 @@ const AsyncSearchSelect = ({
         <span className={styles.caret} aria-hidden="true" />
       </button>
       {open && (
-        <div
-          className={cx(styles.menu, classNamePrefix && `${classNamePrefix}__menu`)}
-        >
+        <div className={cx(styles.menu, classNamePrefix && `${classNamePrefix}__menu`)}>
           <div className={styles.searchRow}>
             <input
               ref={searchRef}
@@ -254,54 +264,41 @@ const AsyncSearchSelect = ({
               disabled={disabled}
             />
           </div>
-          {!isLoading &&
-          !hasVisibleOptions &&
-          emptyContent !== null &&
-          emptyContent !== undefined ? (
-            <div
-              className={styles.empty}
-              data-testid="ce-async-select-empty"
-              role="status"
-              aria-live="polite"
-            >
+          {!isLoading && !hasVisibleOptions && emptyContent !== null && emptyContent !== undefined ? (
+            <div className={styles.empty} data-testid="ce-async-select-empty" role="status" aria-live="polite">
               {emptyContent}
             </div>
           ) : null}
-          <div
-            className={styles.list}
-            ref={listRef}
-            role="listbox"
-            aria-label={placeholder || 'Options'}
-          >
-            {hasVisibleOptions ? (
-              filteredOptions.map((option, index) => {
-                const optionKey = optionKeyFor(option);
-                const isSelected = hasValue && optionKey !== '' && optionKey === selectedKey;
-                const isFocused = focusedIndex === index;
-                return (
-                  <div
-                    key={optionKey || index}
-                    role="option"
-                    aria-selected={isSelected}
-                    tabIndex={-1}
-                    data-ce-async-select-index={index}
-                    className={cx(
-                      styles.option,
-                      isFocused && styles.optionFocused,
-                      isSelected && styles.optionSelected,
-                      classNamePrefix && `${classNamePrefix}__option`,
-                      classNamePrefix && isFocused && `${classNamePrefix}__option--is-focused`,
-                      classNamePrefix && isSelected && `${classNamePrefix}__option--is-selected`,
-                    )}
-                    onClick={() => handleSelect(option)}
-                    onKeyDown={(event) => handleRowKeyDown(event, option, index)}
-                    onMouseEnter={() => setFocusedIndex(index)}
-                  >
-                    {renderOptionLabel(option)}
-                  </div>
-                );
-              })
-            ) : null}
+          <div className={styles.list} ref={listRef} role="listbox" aria-label={placeholder || 'Options'}>
+            {hasVisibleOptions
+              ? filteredOptions.map((option, index) => {
+                  const optionKey = optionKeyFor(option);
+                  const isSelected = hasValue && optionKey !== '' && optionKey === selectedKey;
+                  const isFocused = focusedIndex === index;
+                  return (
+                    <div
+                      key={optionKey || index}
+                      role="option"
+                      aria-selected={isSelected}
+                      tabIndex={-1}
+                      data-ce-async-select-index={index}
+                      className={cx(
+                        styles.option,
+                        isFocused && styles.optionFocused,
+                        isSelected && styles.optionSelected,
+                        classNamePrefix && `${classNamePrefix}__option`,
+                        classNamePrefix && isFocused && `${classNamePrefix}__option--is-focused`,
+                        classNamePrefix && isSelected && `${classNamePrefix}__option--is-selected`,
+                      )}
+                      onClick={() => handleSelect(option)}
+                      onKeyDown={(event) => handleRowKeyDown(event, option, index)}
+                      onMouseEnter={() => setFocusedIndex(index)}
+                    >
+                      {renderOptionLabel(option)}
+                    </div>
+                  );
+                })
+              : null}
           </div>
         </div>
       )}

@@ -54,9 +54,8 @@ export type BuildCreateSbtAuthoringContractRefsArgs = {
 
 const CREATE_SBT_AUTHORING_CHAIN_CONTRACT_KEYS = Object.freeze(['surveys', 'sbtFactory']);
 
-const isCreateSbtAuthoringPlainObject = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isCreateSbtAuthoringPlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const normalizeCreateSbtAuthoringText = (value: unknown): string => {
   const text = String(value || '').trim();
@@ -74,11 +73,7 @@ export const resolveCreateSbtCachedDistributionChainId = (distributionPayload: u
   const distribution = isCreateSbtAuthoringPlainObject(distributionPayload) ? distributionPayload : {};
   const cachedNetwork = distribution.network;
   const cachedNetworkRecord = isCreateSbtAuthoringPlainObject(cachedNetwork) ? cachedNetwork : {};
-  return normalizePositiveChainId(
-    cachedNetworkRecord.id ||
-    cachedNetworkRecord.chainId ||
-    cachedNetwork
-  );
+  return normalizePositiveChainId(cachedNetworkRecord.id || cachedNetworkRecord.chainId || cachedNetwork);
 };
 
 export const buildCreateSbtAuthoringChainSyncPatch = ({
@@ -92,9 +87,7 @@ export const buildCreateSbtAuthoringChainSyncPatch = ({
     ? currentDistributionNetwork
     : {};
   const currentDistributionChainId = normalizePositiveChainId(
-    distributionNetwork.id ||
-    distributionNetwork.chainId ||
-    currentDistributionNetwork
+    distributionNetwork.id || distributionNetwork.chainId || currentDistributionNetwork,
   );
   const nextDistributionNetwork = syncedChain.chain;
   const syncedChainName = isCreateSbtAuthoringPlainObject(nextDistributionNetwork)
@@ -127,9 +120,8 @@ export const buildCreateSbtAuthoringChainSyncStatePatch = ({
   };
 };
 
-export const getConfiguredContractAddress = (value: unknown): string => (
-  normalizeCreateSbtAuthoringText(isCreateSbtAuthoringPlainObject(value) ? value.address : value)
-);
+export const getConfiguredContractAddress = (value: unknown): string =>
+  normalizeCreateSbtAuthoringText(isCreateSbtAuthoringPlainObject(value) ? value.address : value);
 
 export const hasUsableCreateSbtFactoryForChain = ({
   chainId = null,
@@ -138,9 +130,8 @@ export const hasUsableCreateSbtFactoryForChain = ({
   chainId?: unknown;
   getSessionContractsForChain?: CreateSbtSessionContractsResolver | null;
 } = {}): boolean => {
-  const chainContracts = typeof getSessionContractsForChain === 'function'
-    ? getSessionContractsForChain(chainId)
-    : null;
+  const chainContracts =
+    typeof getSessionContractsForChain === 'function' ? getSessionContractsForChain(chainId) : null;
   const contracts = isCreateSbtAuthoringPlainObject(chainContracts) ? chainContracts : {};
   return getConfiguredContractAddress(contracts.sbtFactory) !== '';
 };
@@ -151,21 +142,16 @@ export const shouldHideCreateSbtNetworkSelector = ({
 }: {
   deferredDeploy?: unknown;
   hideNetworkSelector?: unknown;
-} = {}): boolean => (
-  !!hideNetworkSelector || !!deferredDeploy
-);
+} = {}): boolean => !!hideNetworkSelector || !!deferredDeploy;
 
-export const selectPreferredChainId = (
-  candidateIds?: unknown[],
-  availableChainIds?: unknown[]
-): number | null => {
+export const selectPreferredChainId = (candidateIds?: unknown[], availableChainIds?: unknown[]): number | null => {
   const normalizedCandidates = (candidateIds === undefined ? [] : candidateIds)
     .map((value: unknown) => normalizePositiveChainId(value))
     .filter((id): id is number => id !== null);
   const allowedIds = new Set<number>(
     (Array.isArray(availableChainIds) ? availableChainIds : [])
       .map((value: unknown) => normalizePositiveChainId(value))
-      .filter((id): id is number => id !== null)
+      .filter((id): id is number => id !== null),
   );
   if (allowedIds.size > 0) {
     const allowedMatch = normalizedCandidates.find((id) => allowedIds.has(id));
@@ -183,19 +169,17 @@ export const resolveCreateSbtAuthoringChainState = ({
   chainOptions?: unknown;
   getChainById?: ((chainId: number) => unknown) | null;
 } = {}): CreateSbtAuthoringChainState => {
-  const selectedChain = (
-    (Array.isArray(chainOptions) ? chainOptions : []).find((option) => (
-      isCreateSbtAuthoringPlainObject(option) && option.id === chainId
-    )) ||
-    (typeof getChainByIdFn === 'function' ? getChainByIdFn(chainId || 0) : null)
-  );
+  const selectedChain =
+    (Array.isArray(chainOptions) ? chainOptions : []).find(
+      (option) => isCreateSbtAuthoringPlainObject(option) && option.id === chainId,
+    ) || (typeof getChainByIdFn === 'function' ? getChainByIdFn(chainId || 0) : null);
   return {
     chainId,
     chain: chainId
-      ? (
-          (isCreateSbtAuthoringPlainObject(selectedChain) ? selectedChain as CreateSbtAuthoringChainOption : null) ||
-          { id: chainId, name: `Chain ${chainId}` }
-        )
+      ? (isCreateSbtAuthoringPlainObject(selectedChain) ? (selectedChain as CreateSbtAuthoringChainOption) : null) || {
+          id: chainId,
+          name: `Chain ${chainId}`,
+        }
       : 'not connected',
   };
 };
@@ -205,12 +189,12 @@ export const resolveCreateSbtAuthoringChainOptions = ({
   hasUsableSbtFactoryForChain = null,
 }: ResolveCreateSbtAuthoringChainOptionsArgs = {}): CreateSbtAuthoringChainOption[] => {
   const chains = typeof getSessionRegistryChains === 'function' ? getSessionRegistryChains() : [];
-  return (Array.isArray(chains) ? chains : [])
-    .filter((chain: unknown): chain is CreateSbtAuthoringChainOption => (
+  return (Array.isArray(chains) ? chains : []).filter(
+    (chain: unknown): chain is CreateSbtAuthoringChainOption =>
       isCreateSbtAuthoringPlainObject(chain) &&
       typeof hasUsableSbtFactoryForChain === 'function' &&
-      hasUsableSbtFactoryForChain(chain.id)
-    ));
+      hasUsableSbtFactoryForChain(chain.id),
+  );
 };
 
 export const resolveCreateSbtPreferredAuthoringChainId = ({
@@ -231,22 +215,18 @@ export const resolveCreateSbtPreferredAuthoringChainId = ({
       networkRecord.id,
       networkRecord.chainId,
     ],
-    availableChainIds
+    availableChainIds,
   );
 };
 
 export const normalizeSessionContractRef = (
   value: unknown,
-  fallbackChainId?: unknown
+  fallbackChainId?: unknown,
 ): NormalizedSessionContractRef | null => {
   const contractRef = isCreateSbtAuthoringPlainObject(value) ? { ...value } : {};
   const address = getConfiguredContractAddress(value);
   const chainId = normalizePositiveChainId(
-    contractRef.chainId ||
-    contractRef.chainID ||
-    contractRef.networkChainId ||
-    contractRef.chain ||
-    fallbackChainId
+    contractRef.chainId || contractRef.chainID || contractRef.networkChainId || contractRef.chain || fallbackChainId,
   );
   if (!address && !chainId) return null;
   return {
@@ -258,7 +238,7 @@ export const normalizeSessionContractRef = (
 export const contractRefMatchesChain = (
   contractRef: Record<string, unknown> | null | undefined,
   targetChainId: number | null,
-  fallbackChainId?: unknown
+  fallbackChainId?: unknown,
 ): boolean => {
   if (!contractRef?.address) return false;
   const effectiveChainId = normalizePositiveChainId(contractRef.chainId || fallbackChainId);
@@ -280,9 +260,8 @@ export const buildCreateSbtAuthoringContractRefs = ({
     ? normalizedSessionConfig.contracts
     : {};
   const sessionChainId = normalizePositiveChainId(normalizedSessionConfig.networkChainId);
-  const rawChainDefaultContracts = typeof getSessionContractsForChain === 'function'
-    ? getSessionContractsForChain(selectedChainId)
-    : null;
+  const rawChainDefaultContracts =
+    typeof getSessionContractsForChain === 'function' ? getSessionContractsForChain(selectedChainId) : null;
   const chainDefaultContracts: Record<string, unknown> = isCreateSbtAuthoringPlainObject(rawChainDefaultContracts)
     ? rawChainDefaultContracts
     : {};
@@ -294,37 +273,31 @@ export const buildCreateSbtAuthoringContractRefs = ({
   const contracts: Record<string, NormalizedSessionContractRef> = {};
 
   contractKeys.forEach((key) => {
-    const sessionResolvedRef = (
-      CREATE_SBT_AUTHORING_CHAIN_CONTRACT_KEYS.includes(key) &&
-      typeof resolveSessionContractRef === 'function'
-    )
-      ? resolveSessionContractRef({ sessionConfig: normalizedSessionConfig, contractKey: key })
-      : null;
+    const sessionResolvedRef =
+      CREATE_SBT_AUTHORING_CHAIN_CONTRACT_KEYS.includes(key) && typeof resolveSessionContractRef === 'function'
+        ? resolveSessionContractRef({ sessionConfig: normalizedSessionConfig, contractKey: key })
+        : null;
     const sessionResolvedRefRecord = isCreateSbtAuthoringPlainObject(sessionResolvedRef) ? sessionResolvedRef : {};
     const explicitSessionContractRef = normalizeSessionContractRef(baseContracts[key], sessionChainId);
     const aliasSessionContractRef = normalizeSessionContractRef(
-      (sessionResolvedRefRecord.address || sessionResolvedRefRecord.chainId) ? sessionResolvedRefRecord : null,
-      sessionChainId
+      sessionResolvedRefRecord.address || sessionResolvedRefRecord.chainId ? sessionResolvedRefRecord : null,
+      sessionChainId,
     );
     const sessionContractRef = explicitSessionContractRef || aliasSessionContractRef;
     const chainDefaultRef = normalizeSessionContractRef(chainDefaultContracts[key], selectedChainId);
 
     // Regression guard: when the authoring chain changes, keep only session-specific
     // contracts that already belong to that chain; otherwise swap to that chain's defaults.
-    const resolvedRef = (
-      chainDefaultRef?.address &&
-      !contractRefMatchesChain(sessionContractRef, selectedChainId, sessionChainId)
-    )
-      ? chainDefaultRef
-      : (sessionContractRef || chainDefaultRef);
+    const resolvedRef =
+      chainDefaultRef?.address && !contractRefMatchesChain(sessionContractRef, selectedChainId, sessionChainId)
+        ? chainDefaultRef
+        : sessionContractRef || chainDefaultRef;
 
     if (!resolvedRef) return;
     const resolvedChainId = normalizePositiveChainId(resolvedRef.chainId || selectedChainId);
     contracts[key] = {
       ...resolvedRef,
-      ...(resolvedChainId
-        ? { chainId: resolvedChainId }
-        : {}),
+      ...(resolvedChainId ? { chainId: resolvedChainId } : {}),
     };
   });
 

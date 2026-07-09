@@ -1,9 +1,4 @@
-import {
-  getRelevantDefaultTags,
-  hasAnyTagOverlap,
-  isDefaultTagRelevant,
-  parseDefaultTags,
-} from './defaultTags';
+import { getRelevantDefaultTags, hasAnyTagOverlap, isDefaultTagRelevant, parseDefaultTags } from './defaultTags';
 
 describe('defaultTags helpers', () => {
   it('parseDefaultTags normalizes, trims, and de-dupes', () => {
@@ -55,8 +50,8 @@ describe('defaultTags helpers', () => {
     expect(
       getRelevantDefaultTags(
         ['Legacy 2025 governance forum', 'Debate about voting systems'],
-        ['rxc', 'legacy2025', 'debate', 'governance']
-      )
+        ['rxc', 'legacy2025', 'debate', 'governance'],
+      ),
     ).toEqual(['legacy2025', 'debate', 'governance']);
   });
 });

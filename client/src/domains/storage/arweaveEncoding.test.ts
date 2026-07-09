@@ -20,7 +20,7 @@ describe('arweave encoding port', () => {
     };
     let scripts = firstScripts;
     const port = bindArweaveEncoding({
-      scripts: () => scripts,
+      client: () => scripts,
     });
 
     expect(port.hexToBase64url('0x11')).toBe('first-base64url');

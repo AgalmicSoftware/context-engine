@@ -18,9 +18,7 @@ type ContractScriptsDefaultWithLegacyBalance = ContractScriptsDefaultExport & {
 const _impl = contractScriptsImpl as ContractScriptsImplModule;
 const defaultExport = _impl.default as ContractScriptsDefaultExport;
 const defaultExportWithLegacyBalance = defaultExport as ContractScriptsDefaultWithLegacyBalance;
-const commonJsExports = typeof exports === 'undefined'
-  ? null
-  : (exports as CommonJsExportRecord);
+const commonJsExports = typeof exports === 'undefined' ? null : (exports as CommonJsExportRecord);
 
 if (commonJsExports) {
   Object.defineProperty(commonJsExports, '__esModule', { value: true });

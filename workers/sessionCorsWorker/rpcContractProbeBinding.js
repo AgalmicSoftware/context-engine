@@ -9,12 +9,24 @@ export const createRpcContractProbeHelpersWithWorkerDeps = ({
   const getRegistryInterface = deps?.getRegistryInterface;
   const now = typeof deps?.now === 'function' ? deps.now : Date.now;
   const log = typeof deps?.log === 'function' ? deps.log : () => {};
+  const isBlockedOutboundUrl = (
+    typeof deps?.isBlockedOutboundUrl === 'function'
+      ? deps.isBlockedOutboundUrl
+      : () => false
+  );
   const warn = (
     (typeof deps?.log?.warn === 'function' ? deps.log.warn : null) ||
     (typeof deps?.warn === 'function' ? deps.warn : null) ||
     (typeof deps?.log === 'function' ? deps.log : null) ||
     console.warn
   );
+
+  const buildBlockedRpcUrlError = () => {
+    const err = new Error('Blocked RPC URL');
+    err.rpcStatus = 403;
+    err.rpcBlocked = true;
+    return err;
+  };
 
   const maskRpcUrl = (raw) => {
     const url = toStr(raw).trim();
@@ -27,9 +39,16 @@ export const createRpcContractProbeHelpersWithWorkerDeps = ({
     }
   };
 
+  const assertRpcUrlAllowed = (target) => {
+    if (isBlockedOutboundUrl(target)) {
+      throw buildBlockedRpcUrlError();
+    }
+  };
+
   const rpcRequest = async ({ rpcUrl, method, params }) => {
     const target = toStr(rpcUrl).trim();
     if (!target) throw new Error('RPC URL missing');
+    assertRpcUrlAllowed(target);
     const res = await fetchImpl(target, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -80,6 +99,7 @@ export const createRpcContractProbeHelpersWithWorkerDeps = ({
     if (!target) return;
     const startedAt = now();
     try {
+      assertRpcUrlAllowed(target);
       const res = await fetchImpl(target, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

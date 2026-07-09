@@ -5,9 +5,11 @@ const { test } = require('node:test');
 
 const {
   TARGET_DEBATE_IDS,
+  buildRecordIndex,
   collectSummary,
   collectValidation,
   extractRecord,
+  loadCorpusFiles,
   normalizeCorpusKey,
 } = require('./ai-discourse-corpus-tools');
 
@@ -28,14 +30,32 @@ test('normalizes common corpus aliases used inside debate references', () => {
   assert.equal(normalizeCorpusKey('dwarkesh_lab_insiders'), 'dwarkesh-lab-insiders');
 });
 
-test('validates target debates and client mirror coverage', () => {
+test('validates all debates and client mirror coverage', () => {
   const validation = collectValidation();
 
   assert.deepEqual(validation.clientDebateMirror.missingFromClient, []);
   assert.deepEqual(validation.clientDebateMirror.extraInClient, []);
+  assert.deepEqual(validation.debateReferences.missing, []);
+  assert.deepEqual(validation.debateReferences.duplicatePositions, []);
+  assert.deepEqual(validation.debateReferences.ambiguousReferences, []);
   assert.deepEqual(validation.targetDebateReferences.missing, []);
   assert.deepEqual(validation.targetDebateReferences.duplicatePositions, []);
+  assert.deepEqual(validation.targetDebateReferences.ambiguousReferences, []);
+  assert.deepEqual(validation.metaCountDrift, []);
   assert.deepEqual(validation.malformedYears, []);
+});
+
+test('taxonomy fields stay within their canonical vocabularies', () => {
+  const validation = collectValidation();
+
+  assert.deepEqual(validation.taxonomyDrift, []);
+  assert.deepEqual(validation.unknownCorpusKeys, []);
+});
+
+test('entry ids are globally unique across corpuses', () => {
+  const validation = collectValidation();
+
+  assert.deepEqual(validation.duplicateIds, []);
 });
 
 test('extracts a compact record by ID for context-safe inspection', () => {
@@ -46,12 +66,36 @@ test('extracts a compact record by ID for context-safe inspection', () => {
   assert.equal(result.record.positions.length, 10);
 });
 
-test('tracks the debate IDs targeted by the corpus quality pass', () => {
-  assert.deepEqual(TARGET_DEBATE_IDS, [
-    'debate_ai_water_usage',
-    'debate_ai_labor_automation',
-    'debate_ai_education_integrity',
-    'debate_ai_copyright_training',
-    'debate_multimodal_deepfake_governance',
+test('indexes records under both id and url so either reference form resolves', () => {
+  const index = buildRecordIndex([
+    {
+      corpusKey: 'synthetic',
+      entries: [
+        { id: 'entry_a', url: 'https://example.com/a' },
+        { id: 'entry_b' },
+        { url: 'https://example.com/c' },
+      ],
+    },
   ]);
+
+  assert.ok(index.byCorpusAndId.has('synthetic:entry_a'));
+  assert.ok(index.byCorpusAndId.has('synthetic:https://example.com/a'));
+  assert.ok(index.byCorpusAndId.has('synthetic:entry_b'));
+  assert.ok(index.byCorpusAndId.has('synthetic:https://example.com/c'));
+  assert.equal(index.duplicateIds.length, 0);
+});
+
+test('extracts records by url as well as by id', () => {
+  const byUrl = extractRecord('https://www.dwarkesh.com/p/dario-amodei-2');
+
+  assert.equal(byUrl.corpus, 'dwarkesh-lab-insiders');
+  assert.equal(byUrl.record.id, 'amodei_dario_dwarkesh_2026_end_of_exponential');
+  assert.deepEqual(extractRecord(byUrl.record.id).record.id, byUrl.record.id);
+});
+
+test('the corpus quality gate covers every debate in the cross-corpus file', () => {
+  const crossCorpus = loadCorpusFiles().find((file) => file.corpusKey === 'cross-corpus');
+  const actualDebateIds = crossCorpus.entries.map((debate) => debate.id);
+
+  assert.deepEqual([...TARGET_DEBATE_IDS].sort(), [...actualDebateIds].sort());
 });

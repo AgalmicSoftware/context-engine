@@ -1,7 +1,4 @@
-import {
-  isSurveyResultsSourceSynced,
-  isSurveyResultsStateSynced,
-} from './surveyResultsSyncHelpers.js';
+import { isSurveyResultsSourceSynced, isSurveyResultsStateSynced } from './surveyResultsSyncHelpers.js';
 
 describe('surveyResultsSyncHelpers', () => {
   it('requires a local block and network block before a source is synced', () => {
@@ -27,32 +24,40 @@ describe('surveyResultsSyncHelpers', () => {
   });
 
   it('requires both question and response sources in question view', () => {
-    expect(isSurveyResultsStateSynced({
-      viewMode: 'questions',
-      networkLatestBlock: 12,
-      questionLocalBlock: 12,
-      responseLocalBlock: 11,
-    })).toBe(false);
+    expect(
+      isSurveyResultsStateSynced({
+        viewMode: 'questions',
+        networkLatestBlock: 12,
+        questionLocalBlock: 12,
+        responseLocalBlock: 11,
+      }),
+    ).toBe(false);
 
-    expect(isSurveyResultsStateSynced({
-      viewMode: 'questions',
-      networkLatestBlock: 12,
-      questionLocalBlock: 12,
-      responseLocalBlock: 12,
-    })).toBe(true);
+    expect(
+      isSurveyResultsStateSynced({
+        viewMode: 'questions',
+        networkLatestBlock: 12,
+        questionLocalBlock: 12,
+        responseLocalBlock: 12,
+      }),
+    ).toBe(true);
   });
 
   it('uses the survey source in survey view', () => {
-    expect(isSurveyResultsStateSynced({
-      viewMode: 'survey',
-      networkLatestBlock: 12,
-      surveyLocalBlock: 11,
-    })).toBe(false);
+    expect(
+      isSurveyResultsStateSynced({
+        viewMode: 'survey',
+        networkLatestBlock: 12,
+        surveyLocalBlock: 11,
+      }),
+    ).toBe(false);
 
-    expect(isSurveyResultsStateSynced({
-      viewMode: 'survey',
-      networkLatestBlock: 12,
-      surveyLocalBlock: 12,
-    })).toBe(true);
+    expect(
+      isSurveyResultsStateSynced({
+        viewMode: 'survey',
+        networkLatestBlock: 12,
+        surveyLocalBlock: 12,
+      }),
+    ).toBe(true);
   });
 });

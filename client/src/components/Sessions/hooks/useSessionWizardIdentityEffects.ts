@@ -1,9 +1,4 @@
-import {
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction,
-  useEffect,
-} from 'react';
+import { type Dispatch, type MutableRefObject, type SetStateAction, useEffect } from 'react';
 import { sessionRegistryUtils } from '../../../utilities/web3/sessionRegistry.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
 import { deepClone } from '../sessionWizardCoreUtils';
@@ -91,7 +86,11 @@ const useSessionWizardIdentityEffects = <TDraft extends DraftWithIdentity>({
     if (privateSlugMode) return;
     const name = toStr(draftSessionName).trim();
     if (!name) return;
-    const autoSlug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 48);
+    const autoSlug = name
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+      .slice(0, 48);
     if (!autoSlug) return;
     const currentSlug = toStr(draftSlug).trim();
     if (currentSlug && currentSlug === lastManualSlugRef.current && currentSlug !== autoSlug) return;

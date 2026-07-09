@@ -5,10 +5,7 @@
  * Key exports: isCallExceptionError, logArweaveMetadataFetchFailure
  */
 import { createLogger } from '../logging.js';
-import {
-  isTerminalArweaveFailureState,
-  normalizeArweaveFailureMeta,
-} from './arweaveFailureClassifiers.js';
+import { isTerminalArweaveFailureState, normalizeArweaveFailureMeta } from './arweaveFailureClassifiers.js';
 
 type ArweaveMetadataFailureLogKeyOptions = {
   scope?: string;
@@ -58,11 +55,7 @@ const isCallExceptionError = (error: unknown): boolean => {
 
     if (typeof current !== 'object') {
       const raw = String(current || '').toLowerCase();
-      if (
-        raw.includes('call exception') ||
-        raw.includes('execution reverted') ||
-        raw.includes('missing revert data')
-      ) {
+      if (raw.includes('call exception') || raw.includes('execution reverted') || raw.includes('missing revert data')) {
         return true;
       }
       continue;
@@ -75,10 +68,10 @@ const isCallExceptionError = (error: unknown): boolean => {
     const code = String(currentError?.code ?? currentError?.error?.code ?? '').toUpperCase();
     const msg = String(
       currentError?.message ||
-      currentError?.reason ||
-      currentError?.error?.message ||
-      currentError?.error?.reason ||
-      ''
+        currentError?.reason ||
+        currentError?.error?.message ||
+        currentError?.error?.reason ||
+        '',
     ).toLowerCase();
     const body = String(currentError?.body || '').toLowerCase();
     const requestBody = String(currentError?.requestBody || '').toLowerCase();
@@ -107,10 +100,19 @@ const buildArweaveMetadataFailureLogKey = ({
   scope = '',
   meta = {},
 }: ArweaveMetadataFailureLogKeyOptions = {}): string => {
-  const label = String(scope || '').trim().toLowerCase() || 'metadata';
+  const label =
+    String(scope || '')
+      .trim()
+      .toLowerCase() || 'metadata';
   const txId = String(meta?.txId || '').trim() || 'no-tx';
-  const state = String(meta?.state || '').trim().toLowerCase() || 'unknown';
-  const kind = String(meta?.kind || '').trim().toLowerCase() || 'unknown';
+  const state =
+    String(meta?.state || '')
+      .trim()
+      .toLowerCase() || 'unknown';
+  const kind =
+    String(meta?.kind || '')
+      .trim()
+      .toLowerCase() || 'unknown';
   const statusNum = Number(meta?.status);
   const status = Number.isFinite(statusNum) ? statusNum : 'na';
   return `${label}|${txId}|${state}|${kind}|${status}`;
@@ -124,7 +126,7 @@ const shouldEmitArweaveMetadataFailureWarn = ({
   if (!key) return true;
   const now = Date.now();
   const prevTs = Number(ARWEAVE_METADATA_FAILURE_LOG_MEMO.get(key) || 0);
-  if (prevTs > 0 && (now - prevTs) < ARWEAVE_METADATA_FAILURE_LOG_DEDUPE_TTL_MS) {
+  if (prevTs > 0 && now - prevTs < ARWEAVE_METADATA_FAILURE_LOG_DEDUPE_TTL_MS) {
     return false;
   }
   ARWEAVE_METADATA_FAILURE_LOG_MEMO.set(key, now);
@@ -136,14 +138,16 @@ const logArweaveMetadataFetchFailure = ({
   scope = 'metadata',
   error = null,
 }: ArweaveMetadataFetchFailureLogOptions = {}): void => {
-  const scopeLabel = String(scope || 'metadata').trim().toLowerCase() || 'metadata';
+  const scopeLabel =
+    String(scope || 'metadata')
+      .trim()
+      .toLowerCase() || 'metadata';
   const failureMeta = normalizeArweaveFailureMeta(error) as ArweaveFailureMeta;
-  const state = String(failureMeta.state || '').trim().toLowerCase();
+  const state = String(failureMeta.state || '')
+    .trim()
+    .toLowerCase();
 
-  if (
-    (scopeLabel === 'question' || scopeLabel === 'survey') &&
-    isCallExceptionError(error)
-  ) {
+  if ((scopeLabel === 'question' || scopeLabel === 'survey') && isCallExceptionError(error)) {
     const errorRecord = error as ErrorChainNode | null | undefined;
     const payload = {
       scope: scopeLabel,
@@ -159,32 +163,29 @@ const logArweaveMetadataFetchFailure = ({
   }
 
   if (isTerminalArweaveFailureState(state)) {
-    const terminalLabel = (
+    const terminalLabel =
       scopeLabel === 'question'
         ? 'Question metadata'
         : scopeLabel === 'survey'
-      ? 'Survey metadata'
+          ? 'Survey metadata'
           : scopeLabel === 'response'
             ? 'Response payload'
-            : 'Metadata'
-    );
+            : 'Metadata';
     const errorRecord = error as ErrorChainNode | null | undefined;
-    contractsLog.warn(
-      `${terminalLabel} unavailable (terminal):`,
-      failureMeta.message || errorRecord?.message || error
-    );
+    contractsLog.warn(`${terminalLabel} unavailable (terminal):`, failureMeta.message || errorRecord?.message || error);
     return;
   }
 
   const nextRetryAtMs = Number(failureMeta.nextRetryAtMs || 0);
-  const kind = String(failureMeta.kind || '').trim().toLowerCase();
-  const cooldownLike = (
+  const kind = String(failureMeta.kind || '')
+    .trim()
+    .toLowerCase();
+  const cooldownLike =
     nextRetryAtMs > Date.now() ||
     state === 'transient' ||
     kind === 'cooldown' ||
     kind === 'not_found' ||
-    kind === 'pending'
-  );
+    kind === 'pending';
 
   if (cooldownLike) {
     const payload = {
@@ -194,15 +195,14 @@ const logArweaveMetadataFetchFailure = ({
       status: Number.isFinite(Number(failureMeta.status)) ? Number(failureMeta.status) : null,
       nextRetryAtMs: nextRetryAtMs > 0 ? nextRetryAtMs : null,
     };
-    const cooldownLabel = (
+    const cooldownLabel =
       scopeLabel === 'question'
         ? 'question metadata'
         : scopeLabel === 'survey'
           ? 'survey metadata'
           : scopeLabel === 'response'
             ? 'response payload'
-            : `${scopeLabel} metadata`
-    );
+            : `${scopeLabel} metadata`;
     if (shouldEmitArweaveMetadataFailureWarn({ scope: scopeLabel, meta: failureMeta })) {
       contractsLog.warn(`[arweave-cache] ${cooldownLabel} fetch cooldown`, payload);
     } else {

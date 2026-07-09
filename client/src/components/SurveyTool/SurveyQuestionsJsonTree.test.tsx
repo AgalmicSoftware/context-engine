@@ -19,11 +19,7 @@ describe('SurveyQuestionsJsonTree', () => {
   });
 
   it('renders object, array, and primitive values', () => {
-    render(
-      <SurveyQuestionsJsonTree
-        jsonInput={{ question: { id: 'q1' }, answers: ['yes'], count: 1 }}
-      />
-    );
+    render(<SurveyQuestionsJsonTree jsonInput={{ question: { id: 'q1' }, answers: ['yes'], count: 1 }} />);
 
     expect(screen.getByText('question:')).toBeInTheDocument();
     expect(screen.getByText('id: q1')).toBeInTheDocument();
@@ -35,12 +31,7 @@ describe('SurveyQuestionsJsonTree', () => {
   it('logs and renders invalid JSON strings with the existing fallback payload', () => {
     const onInvalidInput = jest.fn();
 
-    render(
-      <SurveyQuestionsJsonTree
-        jsonInput="{not json"
-        onInvalidInput={onInvalidInput}
-      />
-    );
+    render(<SurveyQuestionsJsonTree jsonInput="{not json" onInvalidInput={onInvalidInput} />);
 
     expect(onInvalidInput).toHaveBeenCalledWith(
       'Invalid JSON string for display:',
@@ -55,12 +46,7 @@ describe('SurveyQuestionsJsonTree', () => {
   it('logs and renders unsupported input types with the existing fallback payload', () => {
     const onInvalidInput = jest.fn();
 
-    render(
-      <SurveyQuestionsJsonTree
-        jsonInput={42}
-        onInvalidInput={onInvalidInput}
-      />
-    );
+    render(<SurveyQuestionsJsonTree jsonInput={42} onInvalidInput={onInvalidInput} />);
 
     expect(onInvalidInput).toHaveBeenCalledWith(
       'Invalid input for jsonTreeDisplay: Expected string or object, got',

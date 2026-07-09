@@ -45,17 +45,18 @@ const mockNormalizeWorkerUrl = jest.fn((url = '') => {
     const parsed = new URL(ensured);
     const path = parsed.pathname.replace(/\/+$/, '');
     const suffixes = ['/auth/nonce', '/auth/login', '/arweave/upload'];
-    const stripped = suffixes.reduce((current, suffix) => (
-      current.toLowerCase().endsWith(suffix) ? current.slice(0, -suffix.length) : current
-    ), path);
+    const stripped = suffixes.reduce(
+      (current, suffix) => (current.toLowerCase().endsWith(suffix) ? current.slice(0, -suffix.length) : current),
+      path,
+    );
     return stripped && stripped !== '/' ? `${parsed.origin}${stripped}` : parsed.origin;
   } catch {
     return '';
   }
 });
-const mockNormalizeSessionIdHex = jest.fn((value = '') => (
-  String(value || '').trim() === 'edge-session-id' ? '0xedge-session-id' : ''
-));
+const mockNormalizeSessionIdHex = jest.fn((value = '') =>
+  String(value || '').trim() === 'edge-session-id' ? '0xedge-session-id' : '',
+);
 
 jest.mock('../../utilities/worker/corsProxy.js', () => ({
   corsProxyUtils: {
@@ -75,8 +76,8 @@ jest.mock('../../utilities/crypto/cryptography.js', () => ({
   },
 }));
 
-jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../../utilities/arweave/arweaveClient.js', () => ({
+  arweaveClient: {
     uploadDataToArweave: (...args: any[]) => mockUploadDataToArweave(...args),
     downloadDataFromArweave: jest.fn(),
   },
@@ -132,7 +133,7 @@ const renderSponsorPage = async ({
         toggleLoginModal={jest.fn()}
         initialSessionId={initialSessionId}
         initialRegistryChainId={initialRegistryChainId}
-      />
+      />,
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -150,7 +151,7 @@ const getToggleCheckbox = (labelText: string): HTMLInputElement => {
   if (!checkbox) throw new Error(`Missing checkbox for label: ${labelText}`);
   return checkbox as HTMLInputElement;
 };
-const createDeferred = <T = any>(): Deferred<T> => {
+const createDeferred = <T = any,>(): Deferred<T> => {
   let resolve!: Deferred<T>['resolve'];
   let reject!: Deferred<T>['reject'];
   const promise = new Promise<T>((res, rej) => {
@@ -169,21 +170,23 @@ describe('SponsorPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
-    global.fetch = jest.fn((url: any): Promise<any> => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : String(url).endsWith('/admin/issue-sponsored-grants')
-          ? {
-              ok: true,
-              json: async () => ({
+    global.fetch = jest.fn((url: any): Promise<any> =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : String(url).endsWith('/admin/issue-sponsored-grants')
+            ? {
                 ok: true,
-                deployGrantToken: 'deploy-grant-token',
-                faucetGrantToken: '',
-                bootstrapWorkerUrl: 'https://worker.example.test',
-              }),
-            }
-        : { ok: true, json: async () => ({ ok: true }) }
-    )) as any;
+                json: async () => ({
+                  ok: true,
+                  deployGrantToken: 'deploy-grant-token',
+                  faucetGrantToken: '',
+                  bootstrapWorkerUrl: 'https://worker.example.test',
+                }),
+              }
+            : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    ) as any;
     sessionEntries = [['edge', buildSessionConfig()]];
     mockLoadSessionRegistryCache.mockResolvedValue(undefined);
     mockGetAllSessionEntries.mockImplementation(() => sessionEntries);
@@ -260,8 +263,15 @@ describe('SponsorPage', () => {
     expect(getFieldInputByLabel('Lit usage API key')).toBeInTheDocument();
     expect(getFieldInputByLabel('Cloudflare API token')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('No expiry')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-sponsor-expiry-input')).toHaveAttribute('min', expect.stringMatching(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/));
-    expect(screen.getByText('Issue one-time deploy grants through the selected sponsoring session worker instead of writing raw deploy credentials into the bundle.')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-sponsor-expiry-input')).toHaveAttribute(
+      'min',
+      expect.stringMatching(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/),
+    );
+    expect(
+      screen.getByText(
+        'Issue one-time deploy grants through the selected sponsoring session worker instead of writing raw deploy credentials into the bundle.',
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText('Uses sponsoring worker: https://worker.example.test')).toBeInTheDocument();
     expect(getToggleCheckbox('Remember non-secret draft fields')).toBeChecked();
     expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_WORKER_URL_TOGGLE)).toBeInTheDocument();
@@ -278,11 +288,14 @@ describe('SponsorPage', () => {
 
   it('preselects the requested session using sessionId and chainId props', async () => {
     sessionEntries = [
-      ['other', buildSessionConfig({
-        slug: 'other',
-        sessionName: 'Other Session',
-        __registry: { sessionIdHex: '0xother-session-id' },
-      })],
+      [
+        'other',
+        buildSessionConfig({
+          slug: 'other',
+          sessionName: 'Other Session',
+          __registry: { sessionIdHex: '0xother-session-id' },
+        }),
+      ],
       ['edge', buildSessionConfig()],
     ];
 
@@ -320,12 +333,14 @@ describe('SponsorPage', () => {
     });
 
     await waitFor(() => {
-      expect(mockFetchSessionFromRegistry).toHaveBeenCalledWith(expect.objectContaining({
-        chainId: 84532,
-        sessionId: '0xedge-session-id',
-        slug: '',
-        bootstrapRpc: true,
-      }));
+      expect(mockFetchSessionFromRegistry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chainId: 84532,
+          sessionId: '0xedge-session-id',
+          slug: '',
+          bootstrapRpc: true,
+        }),
+      );
     });
     expect(mockUpsertSessionRegistryCache).toHaveBeenCalledWith({ config: fetchedConfig });
     await waitFor(() => {
@@ -347,11 +362,14 @@ describe('SponsorPage', () => {
       view.unmount();
       sessionEntries = [
         ['edge', buildSessionConfig()],
-        ['late', buildSessionConfig({
-          slug: 'late',
-          sessionName: 'Late Session',
-          __registry: { sessionIdHex: '0xlate-session-id' },
-        })],
+        [
+          'late',
+          buildSessionConfig({
+            slug: 'late',
+            sessionName: 'Late Session',
+            __registry: { sessionIdHex: '0xlate-session-id' },
+          }),
+        ],
       ];
 
       await act(async () => {
@@ -360,7 +378,7 @@ describe('SponsorPage', () => {
       });
 
       expect(consoleErrorSpy.mock.calls.flat().join('\n')).not.toContain(
-        "Can't perform a React state update on an unmounted component"
+        "Can't perform a React state update on an unmounted component",
       );
     } finally {
       consoleErrorSpy.mockRestore();
@@ -368,21 +386,23 @@ describe('SponsorPage', () => {
   });
 
   it('uploads an encrypted sponsored bundle and renders a share URL with tx query plus hash key', async () => {
-    getFetchMock().mockImplementation((url: any) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : String(url).endsWith('/admin/issue-sponsored-grants')
-          ? {
-              ok: true,
-              json: async () => ({
+    getFetchMock().mockImplementation((url: any) =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : String(url).endsWith('/admin/issue-sponsored-grants')
+            ? {
                 ok: true,
-                deployGrantToken: 'deploy-grant-token',
-                faucetGrantToken: 'faucet-grant-token',
-                bootstrapWorkerUrl: 'https://worker.example.test',
-              }),
-            }
-          : { ok: true, json: async () => ({ ok: true }) }
-    ));
+                json: async () => ({
+                  ok: true,
+                  deployGrantToken: 'deploy-grant-token',
+                  faucetGrantToken: 'faucet-grant-token',
+                  bootstrapWorkerUrl: 'https://worker.example.test',
+                }),
+              }
+            : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    );
     await renderSponsorPage();
 
     fireEvent.change(getFieldInputByLabel('Label'), {
@@ -430,95 +450,110 @@ describe('SponsorPage', () => {
     });
 
     const [envelope] = mockUploadDataToArweave.mock.calls[0];
-    expect(envelope).toEqual(expect.objectContaining({
-      type: 'contextengine-sponsored-bundle',
-      version: 1,
-      cipher: 'password-aes-gcm',
-      encryptedData: 'encrypted-base64',
-    }));
+    expect(envelope).toEqual(
+      expect.objectContaining({
+        type: 'contextengine-sponsored-bundle',
+        version: 1,
+        cipher: 'password-aes-gcm',
+        encryptedData: 'encrypted-base64',
+      }),
+    );
     expect(JSON.stringify(envelope)).not.toContain('sk-live-openai');
     expect(JSON.stringify(envelope)).not.toContain('https://rpc.example.test');
     expect(JSON.stringify(envelope)).not.toContain('cf-live-token');
     expect(JSON.stringify(envelope)).not.toContain('0xsponsoredfaucet');
-    expect(mockEncryptWithPassword).toHaveBeenCalledWith(expect.objectContaining({
-      openaiKey: 'sk-live-openai',
-      arweaveJwk: '{"kty":"RSA"}',
-      faucetPrivateKey: '0xsponsoredfaucet',
-      customRpcUrl: 'https://rpc.example.test',
-      litApiBase: 'https://api.chipotle.litprotocol.com',
-      litGroupId: 'group_123',
-      litPkpId: 'pkp_123',
-      litActionCid: 'bafy123',
-      litAccountApiKey: 'lit-account-secret',
-      litUsageApiKey: 'lit-secret',
-      bootstrapWorkerUrl: 'https://worker.example.test',
-      deployGrantToken: 'deploy-grant-token',
-      faucetGrantToken: 'faucet-grant-token',
-      meta: expect.objectContaining({
-        sourceSessionSlug: 'edge',
-        sourceWorkerUrl: 'https://worker.example.test',
-      }),
-    }), expect.any(String));
-    expect(mockEncryptWithPassword.mock.calls[0][0]).not.toHaveProperty('cloudflareApiToken');
-    const grantCall = getFetchMock().mock.calls.find(([url]: any[]) => String(url).endsWith('/admin/issue-sponsored-grants'));
-    expect(grantCall).toBeTruthy();
-    expect(JSON.parse(grantCall[1].body)).toEqual(expect.objectContaining({
-      sessionSlug: 'edge',
-      grantRequest: {
+    expect(mockEncryptWithPassword).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openaiKey: 'sk-live-openai',
+        arweaveJwk: '{"kty":"RSA"}',
+        faucetPrivateKey: '0xsponsoredfaucet',
+        customRpcUrl: 'https://rpc.example.test',
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+        litActionCid: 'bafy123',
+        litAccountApiKey: 'lit-account-secret',
+        litUsageApiKey: 'lit-secret',
         bootstrapWorkerUrl: 'https://worker.example.test',
-        deploy: {
-          cloudflareApiToken: 'cf-live-token',
-        },
-        faucet: {
-          faucetPrivateKey: '0xsponsoredfaucet',
-        },
-      },
-      action: 'issue-sponsored-grants',
-      slug: 'edge',
-    }));
-    expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'issue-sponsored-grants',
-      slug: 'edge',
-      workerUrl: 'https://worker.example.test',
-      body: expect.objectContaining({
-        sessionSlug: 'edge',
-        grantRequest: expect.objectContaining({
-          bootstrapWorkerUrl: 'https://worker.example.test',
-          deploy: expect.objectContaining({
-            cloudflareApiToken: 'cf-live-token',
-          }),
-          faucet: expect.objectContaining({
-            faucetPrivateKey: '0xsponsoredfaucet',
-          }),
+        deployGrantToken: 'deploy-grant-token',
+        faucetGrantToken: 'faucet-grant-token',
+        meta: expect.objectContaining({
+          sourceSessionSlug: 'edge',
+          sourceWorkerUrl: 'https://worker.example.test',
         }),
       }),
-      context: expect.objectContaining({
-        account: ADMIN_ADDRESS,
-        chainId: 84532,
-      }),
-    }));
-    expect(mockUploadDataToArweave.mock.calls[0][2]).toEqual(expect.objectContaining({
-      arweaveJwk: '{"kty":"RSA"}',
-      workerUrl: 'https://worker.example.test',
-      skipAuth: true,
-      adminAuth: expect.objectContaining({
-        address: ADMIN_ADDRESS,
-        message: 'bootstrap-siwe-message',
-        signature: '0xbootstrap-admin-auth',
+      expect.any(String),
+    );
+    expect(mockEncryptWithPassword.mock.calls[0][0]).not.toHaveProperty('cloudflareApiToken');
+    const grantCall = getFetchMock().mock.calls.find(([url]: any[]) =>
+      String(url).endsWith('/admin/issue-sponsored-grants'),
+    );
+    expect(grantCall).toBeTruthy();
+    expect(JSON.parse(grantCall[1].body)).toEqual(
+      expect.objectContaining({
         sessionSlug: 'edge',
+        grantRequest: {
+          bootstrapWorkerUrl: 'https://worker.example.test',
+          deploy: {
+            cloudflareApiToken: 'cf-live-token',
+          },
+          faucet: {
+            faucetPrivateKey: '0xsponsoredfaucet',
+          },
+        },
+        action: 'issue-sponsored-grants',
+        slug: 'edge',
       }),
-    }));
-    expect(mockBuildSignedBootstrapAdminAuth).toHaveBeenCalledWith(expect.objectContaining({
-      slug: 'edge',
-      workerUrl: 'https://worker.example.test',
-      statement: 'Admin request: bootstrap arweave upload',
-      context: expect.objectContaining({
-        account: ADMIN_ADDRESS,
-        chainId: 84532,
+    );
+    expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'issue-sponsored-grants',
+        slug: 'edge',
+        workerUrl: 'https://worker.example.test',
+        body: expect.objectContaining({
+          sessionSlug: 'edge',
+          grantRequest: expect.objectContaining({
+            bootstrapWorkerUrl: 'https://worker.example.test',
+            deploy: expect.objectContaining({
+              cloudflareApiToken: 'cf-live-token',
+            }),
+            faucet: expect.objectContaining({
+              faucetPrivateKey: '0xsponsoredfaucet',
+            }),
+          }),
+        }),
+        context: expect.objectContaining({
+          account: ADMIN_ADDRESS,
+          chainId: 84532,
+        }),
       }),
-    }));
+    );
+    expect(mockUploadDataToArweave.mock.calls[0][2]).toEqual(
+      expect.objectContaining({
+        arweaveJwk: '{"kty":"RSA"}',
+        workerUrl: 'https://worker.example.test',
+        skipAuth: true,
+        adminAuth: expect.objectContaining({
+          address: ADMIN_ADDRESS,
+          message: 'bootstrap-siwe-message',
+          signature: '0xbootstrap-admin-auth',
+          sessionSlug: 'edge',
+        }),
+      }),
+    );
+    expect(mockBuildSignedBootstrapAdminAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slug: 'edge',
+        workerUrl: 'https://worker.example.test',
+        statement: 'Admin request: bootstrap arweave upload',
+        context: expect.objectContaining({
+          account: ADMIN_ADDRESS,
+          chainId: 84532,
+        }),
+      }),
+    );
 
-    const shareInput = await screen.findByLabelText('Sponsored share URL') as HTMLInputElement;
+    const shareInput = (await screen.findByLabelText('Sponsored share URL')) as HTMLInputElement;
     expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_SHARE_URL)).toBe(shareInput);
     expect(shareInput.value).toMatch(/^http:\/\/localhost\/new\?sponsored=sponsor_tx_id#k=/);
     expect(shareInput.value).toContain('?sponsored=sponsor_tx_id#k=');
@@ -548,30 +583,37 @@ describe('SponsorPage', () => {
       expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByLabelText('Sponsored share URL')).toBeInTheDocument();
-    const grantCall = getFetchMock().mock.calls.find(([url]: any[]) => String(url).endsWith('/admin/issue-sponsored-grants'));
+    const grantCall = getFetchMock().mock.calls.find(([url]: any[]) =>
+      String(url).endsWith('/admin/issue-sponsored-grants'),
+    );
     expect(grantCall).toBeTruthy();
-    expect(JSON.parse(grantCall[1].body)).toEqual(expect.objectContaining({
-      grantRequest: expect.objectContaining({
-        deploy: {
-          cloudflareApiToken: 'cf-live-token',
-        },
+    expect(JSON.parse(grantCall[1].body)).toEqual(
+      expect.objectContaining({
+        grantRequest: expect.objectContaining({
+          deploy: {
+            cloudflareApiToken: 'cf-live-token',
+          },
+        }),
       }),
-    }));
+    );
   });
 
   it('does not apply stale create completions after the selected session changes', async () => {
     sessionEntries = [
       ['edge', buildSessionConfig()],
-      ['other', buildSessionConfig({
-        slug: 'other',
-        sessionName: 'Other Session',
-        __registry: {
-          sessionIdHex: '0xother-session-id',
-          adminAddress: ADMIN_ADDRESS,
-          registryChainId: 84532,
-          chainId: 84532,
-        },
-      })],
+      [
+        'other',
+        buildSessionConfig({
+          slug: 'other',
+          sessionName: 'Other Session',
+          __registry: {
+            sessionIdHex: '0xother-session-id',
+            adminAddress: ADMIN_ADDRESS,
+            registryChainId: 84532,
+            chainId: 84532,
+          },
+        }),
+      ],
     ];
     const uploadDeferred = createDeferred<string>();
     mockUploadDataToArweave.mockReturnValueOnce(uploadDeferred.promise);
@@ -625,15 +667,17 @@ describe('SponsorPage', () => {
       expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
     });
 
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        sessionName: 'Edge Session Refresh',
-        __registry: {
-          sessionIdHex: '0xedge-session-id-refreshed',
-        },
-      }),
-    ]];
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          sessionName: 'Edge Session Refresh',
+          __registry: {
+            sessionIdHex: '0xedge-session-id-refreshed',
+          },
+        }),
+      ],
+    ];
     await act(async () => {
       window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
       await Promise.resolve();
@@ -668,13 +712,15 @@ describe('SponsorPage', () => {
     });
 
     const cached = JSON.parse(localStorage.getItem('ce:sponsorPageDraft:v1') || '{}');
-    expect(cached).toEqual(expect.objectContaining({
-      persistBundleDraft: true,
-      persistBundleSecrets: false,
-      bundleForm: expect.objectContaining({
-        label: 'Repeatable sponsor bundle',
+    expect(cached).toEqual(
+      expect.objectContaining({
+        persistBundleDraft: true,
+        persistBundleSecrets: false,
+        bundleForm: expect.objectContaining({
+          label: 'Repeatable sponsor bundle',
+        }),
       }),
-    }));
+    );
     expect(JSON.stringify(cached)).not.toContain('sk-repeat-openai');
     expect(JSON.stringify(cached)).not.toContain('cf-repeat-token');
 
@@ -689,14 +735,17 @@ describe('SponsorPage', () => {
   });
 
   it('drops expired sponsor draft expiry values during restore', async () => {
-    localStorage.setItem('ce:sponsorPageDraft:v1', JSON.stringify({
-      v: 1,
-      persistBundleDraft: true,
-      bundleForm: {
-        label: 'Expired sponsor bundle',
-      },
-      expiresAt: '2000-01-01T00:00:00.000Z',
-    }));
+    localStorage.setItem(
+      'ce:sponsorPageDraft:v1',
+      JSON.stringify({
+        v: 1,
+        persistBundleDraft: true,
+        bundleForm: {
+          label: 'Expired sponsor bundle',
+        },
+        expiresAt: '2000-01-01T00:00:00.000Z',
+      }),
+    );
 
     await renderSponsorPage();
 
@@ -706,18 +755,21 @@ describe('SponsorPage', () => {
   });
 
   it('redacts legacy sponsor draft caches that contain raw secrets', async () => {
-    localStorage.setItem('ce:sponsorPageDraft:v1', JSON.stringify({
-      v: 1,
-      persistBundleSecrets: true,
-      bundleForm: {
-        label: 'Legacy cached bundle',
-        openaiKey: 'sk-legacy-openai',
-        cloudflareApiToken: 'cf-legacy-token',
-        customRpcUrl: 'https://rpc.example.test/secret',
-        arweaveJwk: '{"kty":"RSA","d":"secret"}',
-        faucetPrivateKey: '0xlegacyfaucet',
-      },
-    }));
+    localStorage.setItem(
+      'ce:sponsorPageDraft:v1',
+      JSON.stringify({
+        v: 1,
+        persistBundleSecrets: true,
+        bundleForm: {
+          label: 'Legacy cached bundle',
+          openaiKey: 'sk-legacy-openai',
+          cloudflareApiToken: 'cf-legacy-token',
+          customRpcUrl: 'https://rpc.example.test/secret',
+          arweaveJwk: '{"kty":"RSA","d":"secret"}',
+          faucetPrivateKey: '0xlegacyfaucet',
+        },
+      }),
+    );
 
     await renderSponsorPage();
 
@@ -757,32 +809,38 @@ describe('SponsorPage', () => {
   });
 
   it('surfaces when the sponsoring worker cannot issue deploy grants and avoids uploading a bundle', async () => {
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        embeddedDeployHelperEnabled: false,
-      }),
-    ]];
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          embeddedDeployHelperEnabled: false,
+        }),
+      ],
+    ];
     mockFetchSessionFromRegistry.mockResolvedValue(sessionEntries[0][1]);
-    global.fetch = jest.fn((url: any): Promise<any> => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : String(url).endsWith('/admin/issue-sponsored-grants')
-          ? {
-              ok: false,
-              status: 400,
-              json: async () => ({
-                error: 'Deploy grants require embedded deploy-helper to be enabled on the sponsoring worker.',
-              }),
-            }
-          : { ok: true, json: async () => ({ ok: true }) }
-    )) as any;
+    global.fetch = jest.fn((url: any): Promise<any> =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : String(url).endsWith('/admin/issue-sponsored-grants')
+            ? {
+                ok: false,
+                status: 400,
+                json: async () => ({
+                  error: 'Deploy grants require embedded deploy-helper to be enabled on the sponsoring worker.',
+                }),
+              }
+            : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    ) as any;
 
     await renderSponsorPage();
 
-    expect(await screen.findByText(
-      'Deploy grants are unavailable until embedded deploy-helper is enabled on the sponsoring session worker.'
-    )).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Deploy grants are unavailable until embedded deploy-helper is enabled on the sponsoring session worker.',
+      ),
+    ).toBeInTheDocument();
 
     fireEvent.change(getFieldInputByLabel('Label'), {
       target: { value: 'Grant blocked by source worker config' },
@@ -793,9 +851,9 @@ describe('SponsorPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create sponsored URL' }));
 
-    expect(await screen.findByText(
-      'Deploy grants require embedded deploy-helper to be enabled on the sponsoring worker.'
-    )).toBeInTheDocument();
+    expect(
+      await screen.findByText('Deploy grants require embedded deploy-helper to be enabled on the sponsoring worker.'),
+    ).toBeInTheDocument();
     expect(mockUploadDataToArweave).not.toHaveBeenCalled();
   });
 
@@ -823,7 +881,7 @@ describe('SponsorPage', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_STATUS)).toHaveTextContent(
-        "Sponsored grant request could not reach https://worker.example.test. This is usually CORS or worker availability; ensure http://localhost is in that worker session's allowOrigins and retry."
+        "Sponsored grant request could not reach https://worker.example.test. This is usually CORS or worker availability; ensure http://localhost is in that worker session's allowOrigins and retry.",
       );
     });
     expect(mockUploadDataToArweave).not.toHaveBeenCalled();
@@ -891,12 +949,16 @@ describe('SponsorPage', () => {
       expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
     });
 
-    expect(mockBuildSignedBootstrapAdminAuth).toHaveBeenCalledWith(expect.objectContaining({
-      workerUrl: 'https://manual.example.test',
-    }));
-    expect(mockUploadDataToArweave.mock.calls[0][2]).toEqual(expect.objectContaining({
-      workerUrl: 'https://manual.example.test',
-    }));
+    expect(mockBuildSignedBootstrapAdminAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workerUrl: 'https://manual.example.test',
+      }),
+    );
+    expect(mockUploadDataToArweave.mock.calls[0][2]).toEqual(
+      expect.objectContaining({
+        workerUrl: 'https://manual.example.test',
+      }),
+    );
   });
 
   it('normalizes pasted worker endpoint URLs before signing grant and upload requests', async () => {
@@ -927,26 +989,38 @@ describe('SponsorPage', () => {
       expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
     });
 
-    expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
-      workerUrl: 'https://manual.example.test',
-    }));
-    expect(mockBuildSignedBootstrapAdminAuth).toHaveBeenCalledWith(expect.objectContaining({
-      workerUrl: 'https://manual.example.test',
-    }));
+    expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workerUrl: 'https://manual.example.test',
+      }),
+    );
+    expect(mockBuildSignedBootstrapAdminAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workerUrl: 'https://manual.example.test',
+      }),
+    );
     expect(getFetchMock()).toHaveBeenCalledWith(
       'https://manual.example.test/admin/issue-sponsored-grants',
-      expect.anything()
+      expect.anything(),
     );
-    expect(JSON.parse(getFetchMock().mock.calls.find(
-      ([url]: any[]) => String(url) === 'https://manual.example.test/admin/issue-sponsored-grants'
-    )[1].body)).toEqual(expect.objectContaining({
-      grantRequest: expect.objectContaining({
-        bootstrapWorkerUrl: 'https://manual.example.test',
+    expect(
+      JSON.parse(
+        getFetchMock().mock.calls.find(
+          ([url]: any[]) => String(url) === 'https://manual.example.test/admin/issue-sponsored-grants',
+        )[1].body,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        grantRequest: expect.objectContaining({
+          bootstrapWorkerUrl: 'https://manual.example.test',
+        }),
       }),
-    }));
-    expect(mockUploadDataToArweave.mock.calls[0][2]).toEqual(expect.objectContaining({
-      workerUrl: 'https://manual.example.test',
-    }));
+    );
+    expect(mockUploadDataToArweave.mock.calls[0][2]).toEqual(
+      expect.objectContaining({
+        workerUrl: 'https://manual.example.test',
+      }),
+    );
   });
 
   it('keeps a manual worker URL override when async worker resolution finishes later', async () => {
@@ -989,28 +1063,32 @@ describe('SponsorPage', () => {
       expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
     });
 
-    expect(mockUploadDataToArweave.mock.calls[0][2]).toEqual(expect.objectContaining({
-      workerUrl: 'https://manual.example.test',
-    }));
+    expect(mockUploadDataToArweave.mock.calls[0][2]).toEqual(
+      expect.objectContaining({
+        workerUrl: 'https://manual.example.test',
+      }),
+    );
   });
 
   it('makes the current direct-admin-only limitation explicit instead of implying a bad wallet selection', async () => {
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        __registry: {
-          adminAddress: '',
-          hatsAddress: '0x00000000000000000000000000000000000000bb',
-          adminHatId: '7',
-        },
-      }),
-    ]];
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          __registry: {
+            adminAddress: '',
+            hatsAddress: '0x00000000000000000000000000000000000000bb',
+            adminHatId: '7',
+          },
+        }),
+      ],
+    ];
 
     await renderSponsorPage();
 
-    expect(await screen.findByText(
-      'Sponsor uploads currently require a session with a direct `adminAddress`.'
-    )).toBeInTheDocument();
+    expect(
+      await screen.findByText('Sponsor uploads currently require a session with a direct `adminAddress`.'),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/Hats-admin/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Connected wallet is not the admin for the selected session.')).not.toBeInTheDocument();
 
@@ -1022,7 +1100,9 @@ describe('SponsorPage', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Create sponsored URL' }));
 
-    expect(await screen.findByText('Sponsored uploads currently require a session with a direct adminAddress.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Sponsored uploads currently require a session with a direct adminAddress.'),
+    ).toBeInTheDocument();
     expect(getFetchMock()).not.toHaveBeenCalled();
     expect(mockUploadDataToArweave).not.toHaveBeenCalled();
   });

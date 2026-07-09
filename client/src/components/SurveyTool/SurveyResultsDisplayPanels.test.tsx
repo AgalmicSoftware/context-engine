@@ -141,7 +141,11 @@ const baseProps = {
   questionResponsesNonce: 1,
   questionsCacheNonce: 2,
   renderQuestionSummary: jest.fn((questionId) => <div>{questionId}</div>),
-  renderQuestionTable: jest.fn(() => <table><tbody /></table>),
+  renderQuestionTable: jest.fn(() => (
+    <table>
+      <tbody />
+    </table>
+  )),
   responses: [],
   sbtCacheRevision: 3,
   styleMap: defaultStyleMap,
@@ -157,7 +161,11 @@ describe('SurveyResultsDisplayPanels', () => {
 
   it('renders the status, toggle, question-list, filter, and aggregate panels', () => {
     const renderQuestionSummary = jest.fn((questionId) => <div>{questionId}</div>);
-    const renderQuestionTable = jest.fn(() => <table><tbody /></table>);
+    const renderQuestionTable = jest.fn(() => (
+      <table>
+        <tbody />
+      </table>
+    ));
 
     const tree = renderSurveyResultsDisplayPanels({
       ...baseProps,
@@ -190,13 +198,15 @@ describe('SurveyResultsDisplayPanels', () => {
     expect(toggle?.props?.isAggregate).toBe(true);
     expect(questionList?.props?.title).toBe(' View & Sort Questions');
     expect(questionList?.props?.questionTableNode.type).toBe('table');
-    expect(filterSummary?.props).toEqual(expect.objectContaining({
-      displayedTotalQuestionsCount: 2,
-      displayedTotalResponsesCount: 4,
-      normalizedFilteredQuestionsCount: 0,
-      normalizedFilteredResponsesCount: 0,
-      showFilteredCountSpinner: false,
-    }));
+    expect(filterSummary?.props).toEqual(
+      expect.objectContaining({
+        displayedTotalQuestionsCount: 2,
+        displayedTotalResponsesCount: 4,
+        normalizedFilteredQuestionsCount: 0,
+        normalizedFilteredResponsesCount: 0,
+        showFilteredCountSpinner: false,
+      }),
+    );
     expect(summaries?.props?.entries).toEqual([['q1', [{ answer: 'yes' }]]]);
 
     questionList.props.onToggle();
@@ -247,16 +257,20 @@ describe('SurveyResultsDisplayPanels', () => {
           type: 'freeform',
         },
       },
-      responses: [{
-        responder: '0xABC',
-        surveyId: 'survey-1',
-        response: {
-          responses: [{
-            questionID: 'q1',
-            answer: { value: 'Locked answer' },
-          }],
+      responses: [
+        {
+          responder: '0xABC',
+          surveyId: 'survey-1',
+          response: {
+            responses: [
+              {
+                questionID: 'q1',
+                answer: { value: 'Locked answer' },
+              },
+            ],
+          },
         },
-      }],
+      ],
       surveyViewMode: 'individuals',
       viewMode: 'survey',
     });
@@ -310,16 +324,20 @@ describe('SurveyResultsDisplayPanels', () => {
       getResponseCardProps,
       onToggleResponse,
       preNetworkQuestions: {},
-      responses: [{
-        responder: '0xDEF',
-        surveyId: 'survey-1',
-        response: {
-          responses: [{
-            questionID: 'q-missing',
-            answer: { value: 'Cached answer' },
-          }],
+      responses: [
+        {
+          responder: '0xDEF',
+          surveyId: 'survey-1',
+          response: {
+            responses: [
+              {
+                questionID: 'q-missing',
+                answer: { value: 'Cached answer' },
+              },
+            ],
+          },
         },
-      }],
+      ],
       surveyViewMode: 'individuals',
       viewMode: 'survey',
     });
@@ -368,11 +386,13 @@ describe('SurveyResultsDisplayPanels', () => {
       applyDecryptedOverrideToResponse,
       getLockedResponseKey,
       getResponseCardProps,
-      responses: [{
-        responder: '0xEMPTY',
-        surveyId: 'survey-1',
-        response: { notResponses: true },
-      }],
+      responses: [
+        {
+          responder: '0xEMPTY',
+          surveyId: 'survey-1',
+          response: { notResponses: true },
+        },
+      ],
       surveyViewMode: 'individuals',
       viewMode: 'survey',
     });
@@ -416,12 +436,14 @@ describe('SurveyResultsDisplayPanels', () => {
           type: 'freeform',
         },
       },
-      responses: [{
-        responder: '0xOTHER',
-        response: {
-          responses: [lockedAnswer],
+      responses: [
+        {
+          responder: '0xOTHER',
+          response: {
+            responses: [lockedAnswer],
+          },
         },
-      }],
+      ],
       surveyViewMode: 'individuals',
       viewMode: 'survey',
     });

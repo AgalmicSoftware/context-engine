@@ -116,35 +116,44 @@ describe('sessionNaming helpers', () => {
       error: '',
     });
 
-    expect(validateRegistrySessionSlugForWrite('Team A!')).toEqual(expect.objectContaining({
-      ok: false,
-      slug: 'team a!',
-      reason: 'invalid-format',
-    }));
+    expect(validateRegistrySessionSlugForWrite('Team A!')).toEqual(
+      expect.objectContaining({
+        ok: false,
+        slug: 'team a!',
+        reason: 'invalid-format',
+      }),
+    );
 
-    expect(validateRegistrySessionSlugForWrite('__proto__')).toEqual(expect.objectContaining({
-      ok: false,
-      reason: 'reserved',
-    }));
+    expect(validateRegistrySessionSlugForWrite('__proto__')).toEqual(
+      expect.objectContaining({
+        ok: false,
+        reason: 'reserved',
+      }),
+    );
 
-    expect(validateRegistrySessionSlugForWrite('', { allowDefault: false })).toEqual(expect.objectContaining({
-      ok: false,
-      slug: 'general',
-      reason: 'default-disallowed',
-    }));
+    expect(validateRegistrySessionSlugForWrite('', { allowDefault: false })).toEqual(
+      expect.objectContaining({
+        ok: false,
+        slug: 'general',
+        reason: 'default-disallowed',
+      }),
+    );
   });
 
   it('keeps an explicit general slug when active-session defaults are present', () => {
-    const resolved = resolveSessionConfigAliases({
-      sessionSlug: '',
-    }, {
-      defaults: { activeSessionSlug: 'alpha' },
-      resolveBySlug: (slug) => {
-        if (slug === '') return { slug: '', sessionName: 'General' };
-        if (slug === 'alpha') return { slug: 'alpha', sessionName: 'Alpha' };
-        return null;
+    const resolved = resolveSessionConfigAliases(
+      {
+        sessionSlug: '',
       },
-    });
+      {
+        defaults: { activeSessionSlug: 'alpha' },
+        resolveBySlug: (slug) => {
+          if (slug === '') return { slug: '', sessionName: 'General' };
+          if (slug === 'alpha') return { slug: 'alpha', sessionName: 'Alpha' };
+          return null;
+        },
+      },
+    );
 
     expect(resolved.sessionSlug).toBe('');
     expect(resolved.sessionConfig).toEqual({ slug: '', sessionName: 'General' });

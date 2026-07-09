@@ -171,13 +171,21 @@
 }
 
 .demoResultsAtlasSurface {
-  background:
-    linear-gradient(180deg, rgba(21, 31, 74, 0.98) 0%, rgba(14, 21, 50, 0.985) 48%, rgba(8, 12, 28, 0.995) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(21, 31, 74, 0.98) 0%,
+    rgba(14, 21, 50, 0.985) 48%,
+    rgba(8, 12, 28, 0.995) 100%
+  );
 }
 
 .demoResultsRiskMatrixSurface {
-  background:
-    linear-gradient(180deg, rgba(23, 25, 65, 0.98) 0%, rgba(15, 22, 52, 0.985) 46%, rgba(9, 13, 30, 0.995) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(23, 25, 65, 0.98) 0%,
+    rgba(15, 22, 52, 0.985) 46%,
+    rgba(9, 13, 30, 0.995) 100%
+  );
 }
 
 .closeButton {
@@ -634,6 +642,38 @@
 .responseList {
   margin-top: 1rem;
   margin-bottom: 1rem;
+}
+
+.responseListWindowStatus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(31, 39, 51, 0.12);
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.82);
+  color: #334155;
+  font-size: 0.95rem;
+}
+
+.responseListLoadMoreButton {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid rgba(0, 123, 255, 0.35);
+  border-radius: var(--ce-radius-8);
+  background: #007bff;
+  color: var(--ce-color-white);
+  font-weight: 700;
+  line-height: 1.1;
+  cursor: pointer;
+
+  &:hover,
+  &:focus {
+    background: #0056b3;
+    outline: none;
+  }
 }
 
 .lockedSummaryToggle {
@@ -1661,7 +1701,7 @@ grey background, white text, bigger icons, etc.
 #startFreshButton {
   // background-color: #28a745;
   // border-color: #28a745;
-  color: rgba(128, 128, 128, 0.523) ;
+  color: rgba(128, 128, 128, 0.523);
   &:hover {
     background-color: #218838;
     border-color: #1e7e34;

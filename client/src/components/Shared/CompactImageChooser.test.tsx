@@ -24,7 +24,7 @@ describe('CompactImageChooser', () => {
         previewSrc="https://example.test/preview.png"
         statusText="Upload ready"
         helpText="Images can be encrypted."
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'URL' }));

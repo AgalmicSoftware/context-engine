@@ -1,9 +1,5 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
-import {
-  isPlainAnalysisObject,
-  toAnalysisRecord,
-  type UserPageUnknownRecord,
-} from './userPageCoreHelpers';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 
 export type UserPageEffectiveAiConfigRequest = {
   sessionSlug: string;
@@ -17,7 +13,7 @@ export type UserPageEffectiveAiConfigResult = {
 };
 
 export type UserPageEffectiveAiConfigGetter = (
-  request: UserPageEffectiveAiConfigRequest
+  request: UserPageEffectiveAiConfigRequest,
 ) => Promise<UserPageEffectiveAiConfigResult | null | undefined>;
 
 export type UserPageAnalysisAiContextLogger = {
@@ -92,13 +88,12 @@ export const buildUserPageAiSessionScopeContext = ({
   scanScope = '',
   scanSlugs = [],
 }: BuildUserPageAiSessionScopeContextArgs = {}): UserPageAiSessionScopeContext => {
-  const mode = String(scanScope || '').trim().toLowerCase();
+  const mode = String(scanScope || '')
+    .trim()
+    .toLowerCase();
   const activeSlug = normalizeSessionSlug(activeSessionSlug || '');
-  const toList = (raw: unknown): string[] => (
-    Array.isArray(raw)
-      ? Array.from(new Set(raw.map((item: unknown) => normalizeSessionSlug(item || ''))))
-      : []
-  );
+  const toList = (raw: unknown): string[] =>
+    Array.isArray(raw) ? Array.from(new Set(raw.map((item: unknown) => normalizeSessionSlug(item || '')))) : [];
   if (mode === 'general') {
     return { mode, strict: true, allowedSlugs: [''] };
   }
@@ -130,9 +125,7 @@ export const buildUserPageAiSessionSlugCandidates = ({
 
   const activeSlug = normalizeSessionSlug(activeSessionSlug || '');
   const resolvedScopeContext = scopeContext || buildUserPageAiSessionScopeContext({ activeSessionSlug });
-  const allowedSlugs = Array.isArray(resolvedScopeContext.allowedSlugs)
-    ? resolvedScopeContext.allowedSlugs
-    : [];
+  const allowedSlugs = Array.isArray(resolvedScopeContext.allowedSlugs) ? resolvedScopeContext.allowedSlugs : [];
 
   // Keep the actively viewed session eligible even when strict scan scope is narrower.
   push(activeSlug);
@@ -162,11 +155,7 @@ export const resolveUserPageQuestionSourceSessionSlug = ({
 }: ResolveUserPageQuestionSourceSessionSlugArgs = {}): string => {
   const record = toAnalysisRecord(questionData);
   const explicitSlug = normalizeSessionSlug(
-    record.sessionSlug ??
-    record._sessionSlug ??
-    record.groupSlug ??
-    record.session ??
-    ''
+    record.sessionSlug ?? record._sessionSlug ?? record.groupSlug ?? record.session ?? '',
   );
   if (explicitSlug) return explicitSlug;
 
@@ -192,9 +181,7 @@ export const resolveUserPageAnalysisSessionConfigForSlug = ({
 export const buildUserPageAnalysisExcludeSlugSet = ({
   excludeSlugs = [],
 }: BuildUserPageAnalysisExcludeSlugSetArgs = {}): Set<string> => {
-  const list = Array.isArray(excludeSlugs)
-    ? excludeSlugs.filter((slug: unknown) => slug != null)
-    : [];
+  const list = Array.isArray(excludeSlugs) ? excludeSlugs.filter((slug: unknown) => slug != null) : [];
   return new Set<string>(list.map((slug: unknown) => normalizeSessionSlug(slug || '')));
 };
 
@@ -210,50 +197,53 @@ export const resolveUserPageAnalysisSessionFallback = ({
     : [];
   const fallback = active || usable || checkedList[0] || null;
   if (!fallback) return null;
-  const reason = fallback === active
-    ? 'fallback-active-session'
-    : fallback === usable
-      ? 'fallback-first-usable-session'
-      : 'fallback-first-checked-session';
+  const reason =
+    fallback === active
+      ? 'fallback-active-session'
+      : fallback === usable
+        ? 'fallback-first-usable-session'
+        : 'fallback-first-checked-session';
   return { candidate: fallback, reason };
 };
 
-export const buildUserPageAnalysisCandidateLogRows = (
-  checked: unknown = []
-): UserPageAnalysisCandidateLogRow[] => (
-  (Array.isArray(checked) ? checked : [])
-    .map((entry: unknown) => {
-      const record = toAnalysisRecord(entry);
-      return {
-        slug: record.slug || 'general',
-        status: record.status,
-      };
-    })
-);
+export const buildUserPageAnalysisCandidateLogRows = (checked: unknown = []): UserPageAnalysisCandidateLogRow[] =>
+  (Array.isArray(checked) ? checked : []).map((entry: unknown) => {
+    const record = toAnalysisRecord(entry);
+    return {
+      slug: record.slug || 'general',
+      status: record.status,
+    };
+  });
 
 export const deriveAnalysisAiContextFromSessionConfig = (
   sessionSlug: unknown,
-  sessionConfig: UserPageUnknownRecord = {}
+  sessionConfig: UserPageUnknownRecord = {},
 ) => {
   const ai = toAnalysisRecord(sessionConfig.ai);
   const models = toAnalysisRecord(ai.models);
   const modelProviders = toAnalysisRecord(ai.modelProviders);
   const thinkingModel = models.thinking || models.reasoning || models.default;
   const thinkingModelRecord = toAnalysisRecord(thinkingModel);
-  const fallbackProvider = String(ai.mode || ai.provider || 'openai').trim().toLowerCase() || 'openai';
-  const provider = String(
-    (isPlainAnalysisObject(thinkingModel) ? thinkingModelRecord.provider : '') ||
-    modelProviders.thinking ||
-    modelProviders.reasoning ||
-    modelProviders.default ||
-    fallbackProvider
-  ).trim().toLowerCase() || 'openai';
-  const model = String(
-    (isPlainAnalysisObject(thinkingModel)
-      ? (thinkingModelRecord.model || thinkingModelRecord.name || thinkingModelRecord.value)
-      : thinkingModel) ||
-    'gpt-5'
-  ).trim() || 'gpt-5';
+  const fallbackProvider =
+    String(ai.mode || ai.provider || 'openai')
+      .trim()
+      .toLowerCase() || 'openai';
+  const provider =
+    String(
+      (isPlainAnalysisObject(thinkingModel) ? thinkingModelRecord.provider : '') ||
+        modelProviders.thinking ||
+        modelProviders.reasoning ||
+        modelProviders.default ||
+        fallbackProvider,
+    )
+      .trim()
+      .toLowerCase() || 'openai';
+  const model =
+    String(
+      (isPlainAnalysisObject(thinkingModel)
+        ? thinkingModelRecord.model || thinkingModelRecord.name || thinkingModelRecord.value
+        : thinkingModel) || 'gpt-5',
+    ).trim() || 'gpt-5';
   return {
     sessionSlug: String(sessionSlug || ''),
     provider,
@@ -277,7 +267,10 @@ export const resolveUserPageAnalysisAiContext = async ({
     });
     return {
       sessionSlug: String(sessionSlug || ''),
-      provider: String(effective?.provider || fallback.provider || 'openai').trim().toLowerCase() || 'openai',
+      provider:
+        String(effective?.provider || fallback.provider || 'openai')
+          .trim()
+          .toLowerCase() || 'openai',
       model: String(effective?.model || fallback.model || 'gpt-5').trim() || 'gpt-5',
     };
   } catch (error) {

@@ -27,7 +27,7 @@ export type SurveyResultsQuestionMetadataReadControllerResult = {
 };
 
 const normalizeIdentity = (
-  identity: Partial<SurveyResultsQuestionMetadataReadIdentity> = {}
+  identity: Partial<SurveyResultsQuestionMetadataReadIdentity> = {},
 ): SurveyResultsQuestionMetadataReadIdentity => ({
   activeSessionSlug: String(identity.activeSessionSlug || ''),
   currentSurveyId: String(identity.currentSurveyId || ''),
@@ -35,14 +35,11 @@ const normalizeIdentity = (
   viewMode: String(identity.viewMode || ''),
 });
 
-const toQuestionMap = (value: unknown): Record<string, SurveyResultsRecord> => (
-  value && typeof value === 'object'
-    ? value as Record<string, SurveyResultsRecord>
-    : {}
-);
+const toQuestionMap = (value: unknown): Record<string, SurveyResultsRecord> =>
+  value && typeof value === 'object' ? (value as Record<string, SurveyResultsRecord>) : {};
 
 const resolveMetadataStatus = (
-  question: SurveyResultsRecord | null
+  question: SurveyResultsRecord | null,
 ): SurveyResultsQuestionMetadataReadControllerResult['metadataStatus'] => {
   if (!question) return 'missing';
   return question.__ceQuestionMetadataPending === true ? 'loading' : 'ready';
@@ -57,23 +54,16 @@ export const runSurveyResultsQuestionMetadataReadController = ({
   const rawNetworkQuestions =
     preloadedNetworkQuestions != null
       ? preloadedNetworkQuestions
-      : (
-          typeof ports.readNetworkQuestions === 'function'
-            ? ports.readNetworkQuestions(normalizedIdentity)
-            : {}
-        );
+      : typeof ports.readNetworkQuestions === 'function'
+        ? ports.readNetworkQuestions(normalizedIdentity)
+        : {};
   const networkQuestions = toQuestionMap(rawNetworkQuestions);
   const questionKey = normalizedIdentity.questionId.toLowerCase();
-  const question = (
-    questionKey &&
-    networkQuestions[questionKey] &&
-    typeof networkQuestions[questionKey] === 'object'
+  const question =
+    questionKey && networkQuestions[questionKey] && typeof networkQuestions[questionKey] === 'object'
       ? networkQuestions[questionKey]
-      : null
-  );
-  const selectedNetworkQuestions = questionKey && question
-    ? { [questionKey]: question }
-    : {};
+      : null;
+  const selectedNetworkQuestions = questionKey && question ? { [questionKey]: question } : {};
 
   return {
     identity: normalizedIdentity,

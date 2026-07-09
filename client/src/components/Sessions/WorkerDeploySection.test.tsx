@@ -5,9 +5,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 type RenderInfoTooltipProps = Parameters<NonNullable<WorkerDeploySectionProps['renderInfoTooltip']>>[0];
 
-const buildWorkerDeploySectionProps = (
-  props: Partial<WorkerDeploySectionProps> = {}
-): WorkerDeploySectionProps => ({
+const buildWorkerDeploySectionProps = (props: Partial<WorkerDeploySectionProps> = {}): WorkerDeploySectionProps => ({
   isNormalMode: false,
   renderInfoTooltip: ({ testId }: RenderInfoTooltipProps) => <button type="button" data-testid={testId} />,
   workerMode: 'custom',
@@ -46,20 +44,13 @@ const buildWorkerDeploySectionProps = (
   ...props,
 });
 
-const renderWorkerDeploySection = (props: Partial<WorkerDeploySectionProps> = {}) => render(
-  <WorkerDeploySection
-    {...buildWorkerDeploySectionProps(props)}
-  />
-);
+const renderWorkerDeploySection = (props: Partial<WorkerDeploySectionProps> = {}) =>
+  render(<WorkerDeploySection {...buildWorkerDeploySectionProps(props)} />);
 
 const rerenderWorkerDeploySection = (
   rerender: ReturnType<typeof render>['rerender'],
-  props: Partial<WorkerDeploySectionProps> = {}
-) => rerender(
-  <WorkerDeploySection
-    {...buildWorkerDeploySectionProps(props)}
-  />
-);
+  props: Partial<WorkerDeploySectionProps> = {},
+) => rerender(<WorkerDeploySection {...buildWorkerDeploySectionProps(props)} />);
 
 describe('WorkerDeploySection', () => {
   it('shows the sponsored auto-deploy note without manual controls in normal mode', () => {
@@ -131,12 +122,14 @@ describe('WorkerDeploySection', () => {
 
     expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
     const updater = setDeployForm.mock.calls[0][0];
-    expect(updater({
-      workerName: 'demo-worker',
-      apiToken: '',
-      accountId: 'cf-account-1',
-      adminAddress: '',
-    })).toEqual({
+    expect(
+      updater({
+        workerName: 'demo-worker',
+        apiToken: '',
+        accountId: 'cf-account-1',
+        adminAddress: '',
+      }),
+    ).toEqual({
       workerName: 'demo-worker',
       apiToken: 'new-token',
       accountId: 'cf-account-1',
@@ -164,23 +157,27 @@ describe('WorkerDeploySection', () => {
 
     expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
     const updater = setDeployForm.mock.calls[0][0];
-    expect(updater({
-      workerName: 'demo-worker',
-      apiToken: 'old-token',
-      accountId: 'cf-account-1',
-      adminAddress: '',
-    })).toEqual({
+    expect(
+      updater({
+        workerName: 'demo-worker',
+        apiToken: 'old-token',
+        accountId: 'cf-account-1',
+        adminAddress: '',
+      }),
+    ).toEqual({
       workerName: 'demo-worker',
       apiToken: 'new-token',
       accountId: '',
       adminAddress: '',
     });
-    expect(updater({
-      workerName: 'demo-worker',
-      apiToken: 'new-token',
-      accountId: 'cf-account-1',
-      adminAddress: '',
-    })).toEqual({
+    expect(
+      updater({
+        workerName: 'demo-worker',
+        apiToken: 'new-token',
+        accountId: 'cf-account-1',
+        adminAddress: '',
+      }),
+    ).toEqual({
       workerName: 'demo-worker',
       apiToken: 'new-token',
       accountId: 'cf-account-1',
@@ -232,9 +229,9 @@ describe('WorkerDeploySection', () => {
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('https://bundle.example/custom.js');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('secret-token');
     expect(
-      consoleErrorSpy.mock.calls.some(([message]) => (
-        String(message).includes('A component is changing an uncontrolled input to be controlled')
-      )),
+      consoleErrorSpy.mock.calls.some(([message]) =>
+        String(message).includes('A component is changing an uncontrolled input to be controlled'),
+      ),
     ).toBe(false);
 
     consoleErrorSpy.mockRestore();
@@ -258,9 +255,9 @@ describe('WorkerDeploySection', () => {
 
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('https://bundle.example/from-url.js');
     expect(
-      consoleErrorSpy.mock.calls.some(([message]) => (
-        String(message).includes('A component is changing an uncontrolled input to be controlled')
-      )),
+      consoleErrorSpy.mock.calls.some(([message]) =>
+        String(message).includes('A component is changing an uncontrolled input to be controlled'),
+      ),
     ).toBe(false);
 
     consoleErrorSpy.mockRestore();

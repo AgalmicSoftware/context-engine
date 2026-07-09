@@ -177,7 +177,7 @@ import {
   runUserPageCacheRefreshActionController,
 } from './userPageActionController';
 
-import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
+import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -474,7 +474,7 @@ type CryptoUtilsWithSingleField = {
     responseSlice: unknown,
     questionId: string,
     fieldToDecrypt: unknown,
-    options: DecryptSingleFieldOptions
+    options: DecryptSingleFieldOptions,
   ) => Promise<unknown>;
 };
 
@@ -532,15 +532,21 @@ type ResponseRecency = {
   ts: number;
 };
 
-type ManagedCacheUpdateEvent = {
-  namespace?: unknown;
-  slug?: unknown;
-  [key: string]: unknown;
-} | null | undefined;
+type ManagedCacheUpdateEvent =
+  | {
+      namespace?: unknown;
+      slug?: unknown;
+      [key: string]: unknown;
+    }
+  | null
+  | undefined;
 
-type StoppableEvent = {
-  stopPropagation?: () => void;
-} | null | undefined;
+type StoppableEvent =
+  | {
+      stopPropagation?: () => void;
+    }
+  | null
+  | undefined;
 
 type BookmarkToggleMeta = UnknownRecord & {
   nickname?: unknown;
@@ -616,9 +622,13 @@ type ProfileDeepScanReport = UnknownRecord & {
   usedAllSessions?: unknown;
 };
 
-type ProfileScanReportEvent = Event | {
-  detail?: unknown;
-} | null | undefined;
+type ProfileScanReportEvent =
+  | Event
+  | {
+      detail?: unknown;
+    }
+  | null
+  | undefined;
 
 type NicknameKeyEvent = {
   key?: unknown;
@@ -632,17 +642,11 @@ type NicknameChangeEvent = {
 
 const globalState = globalThis as UserPageGlobalState;
 const getEffectiveAiConfigTyped = getEffectiveAiConfig as (
-  request: UserPageEffectiveAiConfigRequest
+  request: UserPageEffectiveAiConfigRequest,
 ) => Promise<UserPageEffectiveAiConfigResult | null | undefined>;
-const writeCacheTyped = writeCache as (
-  namespace: string,
-  slug?: string,
-  value?: unknown
-) => Promise<unknown>;
+const writeCacheTyped = writeCache as (namespace: string, slug?: string, value?: unknown) => Promise<unknown>;
 
-const isGateAccessContext = (value: unknown): value is GateAccessContext => (
-  isUserPageGateAccessContext(value)
-);
+const isGateAccessContext = (value: unknown): value is GateAccessContext => isUserPageGateAccessContext(value);
 
 const createGateAccessContext = (): GateAccessContext => ({
   pendingKeys: new Set(),
@@ -656,7 +660,7 @@ const captureGateContextSnapshot = (gateContext: GateAccessContext | null = null
 
 const mergeGateContextSnapshot = (
   targetContext: GateAccessContext | null,
-  snapshot: GateAccessContextSnapshot | null = null
+  snapshot: GateAccessContextSnapshot | null = null,
 ): void => {
   if (!isGateAccessContext(targetContext) || !snapshot) return;
   (Array.isArray(snapshot.pendingKeys) ? snapshot.pendingKeys : []).forEach((item: string) => {
@@ -667,22 +671,19 @@ const mergeGateContextSnapshot = (
   });
 };
 
-const buildUserAnalysisFingerprint = async (
-  input: Omit<UserPageAnalysisFingerprintInput, 'version'>
-) => buildUserPageAnalysisFingerprint({
-  ...input,
-  version: USER_ANALYSIS_CACHE_VERSION,
-});
+const buildUserAnalysisFingerprint = async (input: Omit<UserPageAnalysisFingerprintInput, 'version'>) =>
+  buildUserPageAnalysisFingerprint({
+    ...input,
+    version: USER_ANALYSIS_CACHE_VERSION,
+  });
 
-const resolveUserAnalysisAiContext = (
-  sessionSlug: unknown,
-  sessionConfig: UnknownRecord = {}
-) => resolveUserPageAnalysisAiContext({
-  getEffectiveAiConfig: getEffectiveAiConfigTyped,
-  logger: accountLog,
-  sessionConfig,
-  sessionSlug,
-});
+const resolveUserAnalysisAiContext = (sessionSlug: unknown, sessionConfig: UnknownRecord = {}) =>
+  resolveUserPageAnalysisAiContext({
+    getEffectiveAiConfig: getEffectiveAiConfigTyped,
+    logger: accountLog,
+    sessionConfig,
+    sessionSlug,
+  });
 
 class UserPage extends Component<any, any> {
   _isMounted: boolean = false;
@@ -720,12 +721,12 @@ class UserPage extends Component<any, any> {
     super(props);
     this.state = {
       viewAddress: '', // Set from props
-      surveyResponseInfo: [],        // Basic info about responded-to surveys
-      surveyCreationInfo: [],        // Basic info about created surveys
-      questionCreationInfo: [],      // Basic info about created questions
-      questionResponseInfo: [],      // Basic info about responded-to questions
+      surveyResponseInfo: [], // Basic info about responded-to surveys
+      surveyCreationInfo: [], // Basic info about created surveys
+      questionCreationInfo: [], // Basic info about created questions
+      questionResponseInfo: [], // Basic info about responded-to questions
 
-      detailedSurveyResponses: {},   // { [surveyId]: [ array of { questionData, responseData } ] }
+      detailedSurveyResponses: {}, // { [surveyId]: [ array of { questionData, responseData } ] }
       detailedQuestionResponses: {}, // { [questionId]: responseObject }
 
       userStats: {
@@ -819,10 +820,11 @@ class UserPage extends Component<any, any> {
     };
   }
 
-  getActiveSessionSlug = (): string => resolveActiveSessionSlug({
-    activeSessionSlug: this.props.activeSessionSlug,
-    sessionSlug: this.props.sessionSlug,
-  }) || '';
+  getActiveSessionSlug = (): string =>
+    resolveActiveSessionSlug({
+      activeSessionSlug: this.props.activeSessionSlug,
+      sessionSlug: this.props.sessionSlug,
+    }) || '';
 
   getBookmarksCache = (): UserPageBookmarksCache => {
     try {
@@ -836,18 +838,18 @@ class UserPage extends Component<any, any> {
 
   persistBookmarksCache = (cacheObj: unknown, source: unknown = ''): void => {
     const slug = this.getActiveSessionSlug();
-    void (writeCache as (
-      namespace: string,
-      slug?: string,
-      value?: unknown
-    ) => Promise<boolean>)('bookmarksCache', slug, cacheObj || {}).catch((error: unknown) => {
+    void (writeCache as (namespace: string, slug?: string, value?: unknown) => Promise<boolean>)(
+      'bookmarksCache',
+      slug,
+      cacheObj || {},
+    ).catch((error: unknown) => {
       accountLog.error('UserPage: Error saving bookmarksCache:', error);
     });
     try {
-      window.dispatchEvent(
-        new CustomEvent('bookmarksCacheUpdated', { detail: { source: source || 'userpage' } })
-      );
-    } catch (e) { accountLog.warn('UserPage: telemetry', e); }
+      window.dispatchEvent(new CustomEvent('bookmarksCacheUpdated', { detail: { source: source || 'userpage' } }));
+    } catch (e) {
+      accountLog.warn('UserPage: telemetry', e);
+    }
   };
 
   stopSpinnerEventPropagation = (event: StoppableEvent): void => {
@@ -924,10 +926,12 @@ class UserPage extends Component<any, any> {
         return;
       }
       this._deepScanTooltipOutputSignature = progressUpdate.nextOutputSignature;
-      this.setState(buildUserPageDeepScanProgressStatePatch({
-        deepScanProgressRows: nextProgressRows,
-        deepScanTooltipLines: nextTooltipLines,
-      }));
+      this.setState(
+        buildUserPageDeepScanProgressStatePatch({
+          deepScanProgressRows: nextProgressRows,
+          deepScanTooltipLines: nextTooltipLines,
+        }),
+      );
     }, 2000);
   };
 
@@ -960,19 +964,10 @@ class UserPage extends Component<any, any> {
     const viewLower = String(this.props.viewAddress || '').toLowerCase();
     if (!viewLower) return null;
     const latestBlockRaw = this.props.latestBlockNumber;
-    const latestBlockNum = Number.isFinite(Number(latestBlockRaw))
-      ? Number(latestBlockRaw)
-      : null;
-    const currentChainId = this.props.network?.id != null
-      ? Number(this.props.network.id)
-      : null;
+    const latestBlockNum = Number.isFinite(Number(latestBlockRaw)) ? Number(latestBlockRaw) : null;
+    const currentChainId = this.props.network?.id != null ? Number(this.props.network.id) : null;
     const userCaches = this._dgReadAll('userCache') as UserCacheSourceEntry[];
-    return this._deriveDeepScanProgressRows(
-      userCaches,
-      viewLower,
-      currentChainId,
-      latestBlockNum
-    );
+    return this._deriveDeepScanProgressRows(userCaches, viewLower, currentChainId, latestBlockNum);
   };
 
   _getDeepScanSessionDisplayConfig = (slugIn: unknown = ''): DeepScanSessionDisplayConfig | null => {
@@ -998,7 +993,7 @@ class UserPage extends Component<any, any> {
     viewLower: string,
     currentChainId: number | null,
     latestBlockNum: number | null,
-  ): DeepScanProgressRow[] | null => (
+  ): DeepScanProgressRow[] | null =>
     measureSync('ce.userPage.deepScanTooltipRows', () => {
       return deriveUserPageDeepScanProgressRows({
         currentChainId,
@@ -1008,25 +1003,18 @@ class UserPage extends Component<any, any> {
         userCaches,
         viewLower,
       }) as DeepScanProgressRow[] | null;
-    }) || null
-  );
+    }) || null;
 
   _deriveDeepScanProgressTooltipFromCaches = (
     userCaches: UserCacheSourceEntry[] | null | undefined,
     viewLower: string,
     currentChainId: number | null,
     latestBlockNum: number | null,
-  ): string[] | null => (
+  ): string[] | null =>
     measureSync('ce.userPage.deepScanTooltip', () => {
-      const rows = this._deriveDeepScanProgressRows(
-        userCaches,
-        viewLower,
-        currentChainId,
-        latestBlockNum
-      );
+      const rows = this._deriveDeepScanProgressRows(userCaches, viewLower, currentChainId, latestBlockNum);
       return formatUserPageDeepScanTooltipLinesFromRows(rows, formatUserPageDeepScanBlockCount);
-    }) || null
-  );
+    }) || null;
 
   renderDeepScanStatusIndicator = (
     targetId: string,
@@ -1047,7 +1035,7 @@ class UserPage extends Component<any, any> {
     return parseUserPageCachedResponsePayload(
       rawValue,
       this._responsePayloadParseMemo,
-      USERPAGE_RESPONSE_PARSE_MEMO_LIMIT
+      USERPAGE_RESPONSE_PARSE_MEMO_LIMIT,
     );
   };
 
@@ -1058,7 +1046,9 @@ class UserPage extends Component<any, any> {
         const enabled = readBoolishUserPageTelemetryFlag(globalState.CE_USER_PROFILE_DEEP_SCAN_LOADING, true);
         if (!enabled) return false;
       }
-    } catch (e) { accountLog.warn('UserPage: telemetry', e); }
+    } catch (e) {
+      accountLog.warn('UserPage: telemetry', e);
+    }
     return true;
   };
 
@@ -1079,9 +1069,7 @@ class UserPage extends Component<any, any> {
     if (!this.isProfileTelemetryEnabled()) return;
     try {
       const safeEvent = String(event || '').trim() || 'unknown';
-      const safePayload: UnknownRecord = isPlainAnalysisObject(payload)
-        ? payload
-        : { value: payload };
+      const safePayload: UnknownRecord = isPlainAnalysisObject(payload) ? payload : { value: payload };
       const seq = Number(this._profileTelemetrySeq || 0) + 1;
       this._profileTelemetrySeq = seq;
       const entry: ProfileTelemetryEntry = {
@@ -1092,14 +1080,14 @@ class UserPage extends Component<any, any> {
         ...safePayload,
       };
       const key = '__CE_PROFILE_SCAN_TELEMETRY__';
-      const bucket = Array.isArray(globalState[key])
-        ? globalState[key] as ProfileTelemetryEntry[]
-        : [];
+      const bucket = Array.isArray(globalState[key]) ? (globalState[key] as ProfileTelemetryEntry[]) : [];
       bucket.push(entry);
       if (bucket.length > 800) bucket.splice(0, bucket.length - 800);
       globalState[key] = bucket;
       console.info(`[CE_PROFILE_SCAN][UserPage] ${safeEvent}`, entry);
-    } catch (e) { accountLog.warn('UserPage: telemetry', e); }
+    } catch (e) {
+      accountLog.warn('UserPage: telemetry', e);
+    }
   };
 
   isProfileColdDiagEnabled = (): boolean => {
@@ -1108,13 +1096,18 @@ class UserPage extends Component<any, any> {
       if (typeof globalState.CE_PROFILE_SCAN_COLD_DIAG !== 'undefined') {
         return readBoolishUserPageTelemetryFlag(globalState.CE_PROFILE_SCAN_COLD_DIAG, false);
       }
-    } catch (e) { accountLog.warn('UserPage: telemetry', e); }
+    } catch (e) {
+      accountLog.warn('UserPage: telemetry', e);
+    }
     return false;
   };
 
   emitProfileColdDiag = (event: unknown, payload: unknown = {}): void => {
     if (!this.isProfileColdDiagEnabled()) return;
-    const name = String(event || '').trim().toLowerCase() || 'unknown';
+    const name =
+      String(event || '')
+        .trim()
+        .toLowerCase() || 'unknown';
     this.emitProfileTelemetry(`cold-diag:${name}`, payload);
   };
 
@@ -1186,7 +1179,7 @@ class UserPage extends Component<any, any> {
       }),
       () => {
         this.loadDataFromCache();
-      }
+      },
     );
   };
 
@@ -1204,30 +1197,35 @@ class UserPage extends Component<any, any> {
     });
     this.setState(buildUserPageDeepScanRequestStatePatch());
 
-    this.props.scanSpecificUserProfile(targetAddress)
+    this.props
+      .scanSpecificUserProfile(targetAddress)
       .then((scanReport: unknown) => {
-        if (!shouldApplyUserPageDeepScanResponse({
-          activeRequestSeq: this._profileScanRequestSeq,
-          currentViewAddress: this.props.viewAddress,
-          isMounted: this._isMounted,
-          requestSeq,
-          targetLower,
-        })) return;
-        const safeReport: ProfileDeepScanReport = isPlainAnalysisObject(scanReport)
-          ? { ...scanReport }
-          : {};
+        if (
+          !shouldApplyUserPageDeepScanResponse({
+            activeRequestSeq: this._profileScanRequestSeq,
+            currentViewAddress: this.props.viewAddress,
+            isMounted: this._isMounted,
+            requestSeq,
+            targetLower,
+          })
+        )
+          return;
+        const safeReport: ProfileDeepScanReport = isPlainAnalysisObject(scanReport) ? { ...scanReport } : {};
         if (!safeReport.targetAddress) safeReport.targetAddress = targetAddress;
         this.applyDeepScanReport(safeReport);
       })
       .catch((err: unknown) => {
         accountLog.error(`[UserPage] Deep search failed${phase === 'update' ? ' on update' : ''}:`, err);
-        if (!shouldApplyUserPageDeepScanResponse({
-          activeRequestSeq: this._profileScanRequestSeq,
-          currentViewAddress: this.props.viewAddress,
-          isMounted: this._isMounted,
-          requestSeq,
-          targetLower,
-        })) return;
+        if (
+          !shouldApplyUserPageDeepScanResponse({
+            activeRequestSeq: this._profileScanRequestSeq,
+            currentViewAddress: this.props.viewAddress,
+            isMounted: this._isMounted,
+            requestSeq,
+            targetLower,
+          })
+        )
+          return;
         this.emitProfileTelemetry('deep-scan-failed', {
           viewAddress: targetLower,
           phase,
@@ -1244,9 +1242,7 @@ class UserPage extends Component<any, any> {
 
   handleBackgroundProfileScanReport = (event: ProfileScanReportEvent): void => {
     if (!this._isMounted) return;
-    const detailSource = event && typeof event === 'object' && 'detail' in event
-      ? event.detail
-      : null;
+    const detailSource = event && typeof event === 'object' && 'detail' in event ? event.detail : null;
     const detail = toAnalysisRecord(detailSource);
     const scanReport = toAnalysisRecord(detail.scanReport) as ProfileDeepScanReport;
     if (!Object.keys(scanReport).length) return;
@@ -1264,17 +1260,20 @@ class UserPage extends Component<any, any> {
     this.applyDeepScanReport(scanReport);
   };
 
-
   componentDidMount() {
     this._isMounted = true;
     try {
       if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
         window.addEventListener(PROFILE_SCAN_REPORT_EVENT, this.handleBackgroundProfileScanReport);
       }
-    } catch (e) { accountLog.warn('UserPage: fallback', e); }
+    } catch (e) {
+      accountLog.warn('UserPage: fallback', e);
+    }
     try {
       this._unsubscribeCacheUpdates = subscribeCacheUpdates(this.handleManagedCacheUpdate);
-    } catch (e) { accountLog.warn('UserPage: fallback', e); }
+    } catch (e) {
+      accountLog.warn('UserPage: fallback', e);
+    }
     this.setState(buildUserPageViewAddressStatePatch({ viewAddress: this.props.viewAddress }), () => {
       // Honor optional defaultTab prop (e.g., 'surveys')
       try {
@@ -1282,7 +1281,9 @@ class UserPage extends Component<any, any> {
         if (dt === 'surveys' || dt === 'questions') {
           this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: dt }));
         }
-      } catch (e) { accountLog.warn('UserPage: fallback', e); }
+      } catch (e) {
+        accountLog.warn('UserPage: fallback', e);
+      }
 
       this.loadPersistedUsername();
       this.loadDataFromCache();
@@ -1293,7 +1294,7 @@ class UserPage extends Component<any, any> {
       // This ensures the "universe" of known SBT addresses is populated, which is
       // a prerequisite for the deep scan to find what the user owns.
       if (this.props.ensureLightSbtUniverse) {
-        accountLog.log("[UserPage] Triggering ensureLightSbtUniverse...");
+        accountLog.log('[UserPage] Triggering ensureLightSbtUniverse...');
         this.props.ensureLightSbtUniverse();
       }
 
@@ -1305,7 +1306,6 @@ class UserPage extends Component<any, any> {
     });
   }
 
-
   componentWillUnmount() {
     this._isMounted = false;
     this._profileScanRequestSeq += 1;
@@ -1313,12 +1313,16 @@ class UserPage extends Component<any, any> {
       if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
         window.removeEventListener(PROFILE_SCAN_REPORT_EVENT, this.handleBackgroundProfileScanReport);
       }
-    } catch (e) { accountLog.warn('UserPage: cleanup', e); }
+    } catch (e) {
+      accountLog.warn('UserPage: cleanup', e);
+    }
     try {
       if (typeof this._unsubscribeCacheUpdates === 'function') {
         this._unsubscribeCacheUpdates();
       }
-    } catch (e) { accountLog.warn('UserPage: cleanup', e); }
+    } catch (e) {
+      accountLog.warn('UserPage: cleanup', e);
+    }
     this._unsubscribeCacheUpdates = null;
     this.clearAnalysisTimer();
     this.stopDeepScanProgressTimer();
@@ -1363,19 +1367,22 @@ class UserPage extends Component<any, any> {
         this._clearSectionDeriveMemo();
         this._deepScanTooltipInputSignature = null;
         this._deepScanTooltipOutputSignature = '';
-        this.setState(buildUserPageAddressContextResetStatePatch({
-          viewAddress: addressContextChange.nextViewAddress,
-        }), () => {
-          this.loadPersistedUsername(); // Load username for the new context
-          this.loadDataFromCache();     // Load all data from cache for the new context
-          this.checkIfBookmarked();     // Check bookmark status for the new context
-          this.loadNicknameFromCache(); // NEW: prefill nickname for the new context
+        this.setState(
+          buildUserPageAddressContextResetStatePatch({
+            viewAddress: addressContextChange.nextViewAddress,
+          }),
+          () => {
+            this.loadPersistedUsername(); // Load username for the new context
+            this.loadDataFromCache(); // Load all data from cache for the new context
+            this.checkIfBookmarked(); // Check bookmark status for the new context
+            this.loadNicknameFromCache(); // NEW: prefill nickname for the new context
 
-          // ---------------------------------------------------------
-          // NEW: Trigger Deep Search if address changed
-          // ---------------------------------------------------------
-          this.startProfileDeepScan('update');
-        });
+            // ---------------------------------------------------------
+            // NEW: Trigger Deep Search if address changed
+            // ---------------------------------------------------------
+            this.startProfileDeepScan('update');
+          },
+        );
       }
     }
 
@@ -1430,14 +1437,13 @@ class UserPage extends Component<any, any> {
     this.emitNoSbtVisibleTelemetry();
   }
 
-
   handleNicknameKeyDown = (event: NicknameKeyEvent): void => {
     if (event.key === 'Enter') {
       this.saveNickname();
     } else if (event.key === 'Escape') {
       this.cancelNicknameEdit();
     }
-  }
+  };
 
   onPenClick = (): void => {
     if (!this._isMounted) return;
@@ -1446,11 +1452,16 @@ class UserPage extends Component<any, any> {
       setTimeout(() => {
         try {
           const el = document.querySelector('input[aria-label="Set nickname"]') as HTMLInputElement | null;
-          if (el) { el.focus(); el.select(); }
-        } catch (e) { accountLog.warn('UserPage: fallback', e); }
+          if (el) {
+            el.focus();
+            el.select();
+          }
+        } catch (e) {
+          accountLog.warn('UserPage: fallback', e);
+        }
       }, 0);
     });
-  }
+  };
 
   cancelNicknameEdit = (): void => {
     if (!this._isMounted) return;
@@ -1463,21 +1474,22 @@ class UserPage extends Component<any, any> {
         trim: true,
         users: parsed?.users,
       });
-    } catch (e) { accountLog.warn('UserPage: fallback', e); }
+    } catch (e) {
+      accountLog.warn('UserPage: fallback', e);
+    }
     this.setState(buildUserPageNicknameEditCancelStatePatch({ nicknameInput: cachedNick }));
-  }
+  };
 
   handleNicknameChange = (event: NicknameChangeEvent): void => {
     if (this._isMounted) {
       this.setState(buildUserPageNicknameInputStatePatch({ nicknameInput: event.target?.value }));
     }
-  }
-
+  };
 
   getOnchainUsername = (_address: unknown, _network: unknown): string | null => {
     return null;
-    // should go in contractScripts.js when enabled
-  }
+    // should go in the chain gateway when enabled
+  };
 
   saveNickname = (): void => {
     const rawAddr = this.props.viewAddress;
@@ -1498,12 +1510,14 @@ class UserPage extends Component<any, any> {
 
     this.persistBookmarksCache(bookmarksCache, 'saveNickname');
     if (this._isMounted) {
-      this.setState(buildUserPageNicknameSaveStatePatch({
-        nickname: saveResult.nickname,
-        bookmarked: saveResult.stillBookmarked,
-      }));
+      this.setState(
+        buildUserPageNicknameSaveStatePatch({
+          nickname: saveResult.nickname,
+          bookmarked: saveResult.stillBookmarked,
+        }),
+      );
     }
-  }
+  };
 
   loadNicknameFromCache = (): void => {
     const rawAddr = this.props.viewAddress;
@@ -1518,35 +1532,35 @@ class UserPage extends Component<any, any> {
     if (this._isMounted) {
       this.setState(buildUserPageNicknameInputStatePatch({ nicknameInput }));
     }
-  }
+  };
 
   loadPersistedUsername = (): void => {
     const { viewAddress, account, network } = this.props;
     if (account && viewAddress && network?.id && account.toLowerCase() === viewAddress.toLowerCase()) {
-        const networkID = network.id.toString();
-        try {
-            const storedUsername = localStorage.getItem(`userPageUsername_${networkID}_${viewAddress.toLowerCase()}`);
-            if (storedUsername && this._isMounted) {
-                this.setState(buildUserPageUsernameLoadedStatePatch({ username: storedUsername }));
-            }
-        } catch (error) {
-            accountLog.error("Error loading username from localStorage:", error);
+      const networkID = network.id.toString();
+      try {
+        const storedUsername = localStorage.getItem(`userPageUsername_${networkID}_${viewAddress.toLowerCase()}`);
+        if (storedUsername && this._isMounted) {
+          this.setState(buildUserPageUsernameLoadedStatePatch({ username: storedUsername }));
         }
+      } catch (error) {
+        accountLog.error('Error loading username from localStorage:', error);
+      }
     }
-  }
+  };
 
   loadDataFromCache = (): void => {
     if (!this._isMounted) return;
     const currentViewAddress = this.props.viewAddress;
     if (!currentViewAddress) {
-      accountLog.warn("UserPage: viewAddress is not set, cannot load data from cache.");
+      accountLog.warn('UserPage: viewAddress is not set, cannot load data from cache.');
       if (this._isMounted) {
         this.setState(buildUserPageMissingAddressCacheStatePatch());
       }
       return;
     }
     this.queueCacheRefresh({ markLoading: true });
-  }
+  };
 
   // --- helpers: group-aware multi-cache reads (union across all groups) ---
   _dgReadAll = (name: unknown): NamespaceCacheSourceEntry[] => {
@@ -1659,11 +1673,7 @@ class UserPage extends Component<any, any> {
     this._refreshAllDataFromCache(refreshOpts);
   };
 
-  _setResponseGateAccessStatus = (
-    cacheKey: unknown,
-    status: unknown,
-    ts: unknown = Date.now()
-  ): void => {
+  _setResponseGateAccessStatus = (cacheKey: unknown, status: unknown, ts: unknown = Date.now()): void => {
     const key = String(cacheKey || '').trim();
     if (!key) return;
     const nextStatus = String(status || 'missing');
@@ -1683,10 +1693,7 @@ class UserPage extends Component<any, any> {
     this.clearResponseGateRetryTimer();
   };
 
-  _getResponseGateAccessStatus = ({
-    slug = '',
-    resourceKey = '',
-  }: GateAccessKeyInput = {}): string => {
+  _getResponseGateAccessStatus = ({ slug = '', resourceKey = '' }: GateAccessKeyInput = {}): string => {
     const account = String(this.props.account || '').trim();
     if (!account) return 'needs-wallet';
     const key = buildUserPageGateAccessCacheKey({
@@ -1781,7 +1788,7 @@ class UserPage extends Component<any, any> {
   handleDecryptQuestionAnswer = async (
     questionId: unknown,
     fieldToDecrypt: unknown = 'both',
-    responseOverride: unknown = null
+    responseOverride: unknown = null,
   ): Promise<boolean> => {
     const decryptRequestPlan = buildUserPageResponseDecryptRequestPlan({
       account: this.props.account,
@@ -1805,11 +1812,11 @@ class UserPage extends Component<any, any> {
 
     let decryptedResult: unknown = null;
     try {
-      decryptedResult = await (cryptoUtils as unknown as CryptoUtilsWithSingleField).decryptSingleField(
+      decryptedResult = await (cryptoUtils as CryptoUtilsWithSingleField).decryptSingleField(
         decryptRequestPlan.responseSlice,
         qid,
         fieldToDecrypt,
-        decryptRequestPlan.cryptoOptions
+        decryptRequestPlan.cryptoOptions,
       );
     } catch (error) {
       accountLog.warn('[UserPage] Failed to decrypt viewed response:', error);
@@ -1852,18 +1859,19 @@ class UserPage extends Component<any, any> {
       viewAddressLower,
       viewerAccount: this.props.account,
     });
-    const displayState = statusRequestPlan.action === 'terminal'
-      ? statusRequestPlan.displayState
-      : buildUserPageEncryptedVisibilityDisplayState({
-          encryptionAudience,
-          resourceKey,
-          statusByResource: statusRequestPlan.resourceKeysToCheck.map((key: string) => ({
-            resourceKey: key,
-            status: this._getResponseGateAccessStatus({ slug, resourceKey: key }),
-          })),
-          viewAddressLower,
-          viewerAccount: this.props.account,
-        });
+    const displayState =
+      statusRequestPlan.action === 'terminal'
+        ? statusRequestPlan.displayState
+        : buildUserPageEncryptedVisibilityDisplayState({
+            encryptionAudience,
+            resourceKey,
+            statusByResource: statusRequestPlan.resourceKeysToCheck.map((key: string) => ({
+              resourceKey: key,
+              status: this._getResponseGateAccessStatus({ slug, resourceKey: key }),
+            })),
+            viewAddressLower,
+            viewerAccount: this.props.account,
+          });
     if (isGateAccessContext(gateContext)) {
       displayState.pendingResourceKeys.forEach((pendingResourceKey) => {
         gateContext.pendingKeys.add(buildUserPageGatePendingKey({ slug, resourceKey: pendingResourceKey }));
@@ -1879,275 +1887,478 @@ class UserPage extends Component<any, any> {
     };
   };
 
-  _collectUnifiedCacheData = ({ networkID, viewAddressLower }: UnifiedCacheAggregateInput): unknown => measureSync('ce.userPage.aggregateCacheData', () => {
-    const surveysCaches = this._dgReadAll('surveysCache');
-    const questionsCaches = this._dgReadAll('questionsCache');
-    const sbtCaches = this._dgReadAll('sbtCache');
-    const userCaches = this._dgReadAll('userCache');
-    const viewAddressKey = String(viewAddressLower || '').toLowerCase();
+  _collectUnifiedCacheData = ({ networkID, viewAddressLower }: UnifiedCacheAggregateInput): unknown =>
+    measureSync('ce.userPage.aggregateCacheData', () => {
+      const surveysCaches = this._dgReadAll('surveysCache');
+      const questionsCaches = this._dgReadAll('questionsCache');
+      const sbtCaches = this._dgReadAll('sbtCache');
+      const userCaches = this._dgReadAll('userCache');
+      const viewAddressKey = String(viewAddressLower || '').toLowerCase();
 
-    const combinedSurveys: EntityCacheMap = {};
-    const combinedSurveyResponses: ResponseBucketMap = {};
-    const combinedSurveyResponsesMeta: ResponseRecencyBucketMap = {};
-    const combinedQuestions: EntityCacheMap = {};
-    const combinedQuestionResponses: ResponseBucketMap = {};
-    const combinedQuestionResponsesMeta: ResponseRecencyBucketMap = {};
-    const sbtAggregate: SbtAggregateMap = {};
-    const surveySourceSlugById: SourceSlugMap = {};
-    const surveyResponseSourceSlugById: SourceSlugMap = {};
-    const surveyResponseSourceSlugByKey: SourceSlugMap = {};
-    const questionSourceSlugById: SourceSlugMap = {};
-    const questionResponseSourceSlugById: SourceSlugMap = {};
-    const questionResponseSourceSlugByKey: SourceSlugMap = {};
+      const combinedSurveys: EntityCacheMap = {};
+      const combinedSurveyResponses: ResponseBucketMap = {};
+      const combinedSurveyResponsesMeta: ResponseRecencyBucketMap = {};
+      const combinedQuestions: EntityCacheMap = {};
+      const combinedQuestionResponses: ResponseBucketMap = {};
+      const combinedQuestionResponsesMeta: ResponseRecencyBucketMap = {};
+      const sbtAggregate: SbtAggregateMap = {};
+      const surveySourceSlugById: SourceSlugMap = {};
+      const surveyResponseSourceSlugById: SourceSlugMap = {};
+      const surveyResponseSourceSlugByKey: SourceSlugMap = {};
+      const questionSourceSlugById: SourceSlugMap = {};
+      const questionResponseSourceSlugById: SourceSlugMap = {};
+      const questionResponseSourceSlugByKey: SourceSlugMap = {};
 
-    const upsertSurveyResponseByRecency = ({
-      sid,
-      responder,
-      responseValue,
-      metaValue = null,
-      slug = '',
-    }: SurveyResponseRecencyUpsertInput): void => {
-      upsertUserPageResponseByRecency({
-        id: sid,
+      const upsertSurveyResponseByRecency = ({
+        sid,
         responder,
-        responseRecencyMeta: combinedSurveyResponsesMeta,
-        responses: combinedSurveyResponses,
-        responseSourceSlugByKey: surveyResponseSourceSlugByKey,
         responseValue,
-        sourceSlugById: surveyResponseSourceSlugById,
-        metaValue,
-        slug,
-      });
-    };
+        metaValue = null,
+        slug = '',
+      }: SurveyResponseRecencyUpsertInput): void => {
+        upsertUserPageResponseByRecency({
+          id: sid,
+          responder,
+          responseRecencyMeta: combinedSurveyResponsesMeta,
+          responses: combinedSurveyResponses,
+          responseSourceSlugByKey: surveyResponseSourceSlugByKey,
+          responseValue,
+          sourceSlugById: surveyResponseSourceSlugById,
+          metaValue,
+          slug,
+        });
+      };
 
-    const upsertQuestionResponseByRecency = ({
-      qid,
-      responder,
-      responseValue,
-      metaValue = null,
-      slug = '',
-    }: QuestionResponseRecencyUpsertInput): void => {
-      upsertUserPageResponseByRecency({
-        id: qid,
+      const upsertQuestionResponseByRecency = ({
+        qid,
         responder,
-        responseRecencyMeta: combinedQuestionResponsesMeta,
-        responses: combinedQuestionResponses,
-        responseSourceSlugByKey: questionResponseSourceSlugByKey,
         responseValue,
-        sourceSlugById: questionResponseSourceSlugById,
-        metaValue,
-        slug,
-      });
-    };
+        metaValue = null,
+        slug = '',
+      }: QuestionResponseRecencyUpsertInput): void => {
+        upsertUserPageResponseByRecency({
+          id: qid,
+          responder,
+          responseRecencyMeta: combinedQuestionResponsesMeta,
+          responses: combinedQuestionResponses,
+          responseSourceSlugByKey: questionResponseSourceSlugByKey,
+          responseValue,
+          sourceSlugById: questionResponseSourceSlugById,
+          metaValue,
+          slug,
+        });
+      };
 
-    surveysCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
-      mergeUserPageSurveyCacheSource({
-        cacheObj,
+      surveysCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
+        mergeUserPageSurveyCacheSource({
+          cacheObj,
+          combinedSurveyResponses,
+          combinedSurveyResponsesMeta,
+          combinedSurveys,
+          networkID,
+          slug,
+          surveyResponseSourceSlugById,
+          surveyResponseSourceSlugByKey,
+          surveySourceSlugById,
+        });
+      });
+
+      questionsCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
+        mergeUserPageQuestionCacheSource({
+          cacheObj,
+          combinedQuestionResponses,
+          combinedQuestionResponsesMeta,
+          combinedQuestions,
+          networkID,
+          questionResponseSourceSlugById,
+          questionResponseSourceSlugByKey,
+          questionSourceSlugById,
+          slug,
+        });
+      });
+
+      sbtCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
+        const netEntries = getPrioritizedUserPageNetworkCacheNodes(cacheObj, networkID) as PrioritizedCacheNode[];
+        netEntries.forEach(({ value: netObj }) => {
+          const sbtList = toAnalysisRecord(netObj.sbtList);
+          Object.keys(sbtList).forEach((addrLowerKey: string) => {
+            mergeUserPageSbtCacheEntryIntoAggregate({
+              sbtAggregate,
+              entry: sbtList[addrLowerKey],
+              key: addrLowerKey,
+              slug,
+              viewAddressKey,
+            });
+          });
+        });
+      });
+
+      userCaches.forEach(({ slug, data: userCacheObj }: NamespaceCacheSourceEntry) => {
+        const userNode = toAnalysisRecord(userCacheObj)[viewAddressKey];
+        if (!isPlainAnalysisObject(userNode)) return;
+        const chainNode = getActiveUserPageChainNode(userNode, networkID) as UserChainNode | null;
+        const payload = isPlainAnalysisObject(chainNode?.data) ? (chainNode.data as UserCachePayload) : null;
+        if (!payload) return;
+
+        (Array.isArray(payload.createdSurveys) ? payload.createdSurveys : []).forEach((item: unknown) => {
+          const itemRecord = toAnalysisRecord(item);
+          if (!itemRecord.id || !itemRecord.data) return;
+          const sid = String(itemRecord.id || '').toLowerCase();
+          if (!sid) return;
+          if (!combinedSurveys[sid]) combinedSurveys[sid] = toAnalysisRecord(itemRecord.data);
+          if (!combinedSurveys[sid].creator) combinedSurveys[sid].creator = viewAddressKey;
+          writeUserPageSourceSlug(surveySourceSlugById, sid, slug);
+        });
+
+        (Array.isArray(payload.surveyResponses) ? payload.surveyResponses : []).forEach((item: unknown) => {
+          const itemRecord = toAnalysisRecord(item);
+          if (!itemRecord.surveyId || !itemRecord.response) return;
+          const sid = String(itemRecord.surveyId || '').toLowerCase();
+          if (!sid) return;
+          upsertSurveyResponseByRecency({
+            sid,
+            responder: String(itemRecord.responder || viewAddressKey).toLowerCase(),
+            responseValue: itemRecord.response,
+            metaValue: {
+              bn: Number(itemRecord.blockNumber ?? itemRecord.bn ?? 0) || 0,
+              txi: Number(itemRecord.transactionIndex ?? itemRecord.txIndex ?? itemRecord.txi ?? 0) || 0,
+              li: Number(itemRecord.logIndex ?? itemRecord.li ?? 0) || 0,
+              ts: Number(itemRecord.timestamp ?? itemRecord.ts ?? 0) || 0,
+            },
+            slug,
+          });
+        });
+
+        (Array.isArray(payload.createdQuestions) ? payload.createdQuestions : []).forEach((item: unknown) => {
+          const itemRecord = toAnalysisRecord(item);
+          if (!itemRecord.id || !itemRecord.data) return;
+          const qid = String(itemRecord.id || '').toLowerCase();
+          if (!qid) return;
+          if (!combinedQuestions[qid]) combinedQuestions[qid] = toAnalysisRecord(itemRecord.data);
+          if (!combinedQuestions[qid].creator) combinedQuestions[qid].creator = viewAddressKey;
+          writeUserPageSourceSlug(questionSourceSlugById, qid, slug);
+        });
+
+        (Array.isArray(payload.questionResponses) ? payload.questionResponses : []).forEach((item: unknown) => {
+          const itemRecord = toAnalysisRecord(item);
+          if (!itemRecord.questionId || !itemRecord.response) return;
+          const qid = String(itemRecord.questionId || '').toLowerCase();
+          if (!qid) return;
+          upsertQuestionResponseByRecency({
+            qid,
+            responder: String(itemRecord.responder || viewAddressKey).toLowerCase(),
+            responseValue: itemRecord.response,
+            metaValue: {
+              bn: Number(itemRecord.blockNumber ?? itemRecord.bn ?? 0) || 0,
+              txi: Number(itemRecord.transactionIndex ?? itemRecord.txIndex ?? itemRecord.txi ?? 0) || 0,
+              li: Number(itemRecord.logIndex ?? itemRecord.li ?? 0) || 0,
+              ts: Number(itemRecord.timestamp ?? itemRecord.ts ?? 0) || 0,
+            },
+            slug,
+          });
+        });
+
+        (getPrioritizedUserPageChainNodes(userNode, networkID) as PrioritizedUserChainNode[]).forEach(({ node }) => {
+          const chainPayload = isPlainAnalysisObject(node.data) ? (node.data as UserCachePayload) : null;
+          if (!chainPayload) return;
+          (Array.isArray(chainPayload.sbts) ? chainPayload.sbts : []).forEach((item: unknown) => {
+            mergeUserPageUserCacheSbtIntoAggregate({
+              sbtAggregate,
+              item,
+              slug,
+              viewAddressKey,
+            });
+          });
+        });
+      });
+
+      return {
+        combinedSurveys,
         combinedSurveyResponses,
         combinedSurveyResponsesMeta,
-        combinedSurveys,
-        networkID,
-        slug,
-        surveyResponseSourceSlugById,
-        surveyResponseSourceSlugByKey,
-        surveySourceSlugById,
-      });
-    });
-
-    questionsCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
-      mergeUserPageQuestionCacheSource({
-        cacheObj,
+        combinedQuestions,
         combinedQuestionResponses,
         combinedQuestionResponsesMeta,
-        combinedQuestions,
-        networkID,
+        surveySourceSlugById,
+        surveyResponseSourceSlugById,
+        surveyResponseSourceSlugByKey,
+        questionSourceSlugById,
         questionResponseSourceSlugById,
         questionResponseSourceSlugByKey,
-        questionSourceSlugById,
-        slug,
-      });
+        sbtAggregate,
+        userCaches,
+      };
     });
-
-    sbtCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
-      const netEntries = getPrioritizedUserPageNetworkCacheNodes(cacheObj, networkID) as PrioritizedCacheNode[];
-      netEntries.forEach(({ value: netObj }) => {
-        const sbtList = toAnalysisRecord(netObj.sbtList);
-        Object.keys(sbtList).forEach((addrLowerKey: string) => {
-          mergeUserPageSbtCacheEntryIntoAggregate({
-            sbtAggregate,
-            entry: sbtList[addrLowerKey],
-            key: addrLowerKey,
-            slug,
-            viewAddressKey,
-          });
-        });
-      });
-    });
-
-    userCaches.forEach(({ slug, data: userCacheObj }: NamespaceCacheSourceEntry) => {
-      const userNode = toAnalysisRecord(userCacheObj)[viewAddressKey];
-      if (!isPlainAnalysisObject(userNode)) return;
-      const chainNode = getActiveUserPageChainNode(userNode, networkID) as UserChainNode | null;
-      const payload = isPlainAnalysisObject(chainNode?.data)
-        ? chainNode.data as UserCachePayload
-        : null;
-      if (!payload) return;
-
-      (Array.isArray(payload.createdSurveys) ? payload.createdSurveys : []).forEach((item: unknown) => {
-        const itemRecord = toAnalysisRecord(item);
-        if (!itemRecord.id || !itemRecord.data) return;
-        const sid = String(itemRecord.id || '').toLowerCase();
-        if (!sid) return;
-        if (!combinedSurveys[sid]) combinedSurveys[sid] = toAnalysisRecord(itemRecord.data);
-        if (!combinedSurveys[sid].creator) combinedSurveys[sid].creator = viewAddressKey;
-        writeUserPageSourceSlug(surveySourceSlugById, sid, slug);
-      });
-
-      (Array.isArray(payload.surveyResponses) ? payload.surveyResponses : []).forEach((item: unknown) => {
-        const itemRecord = toAnalysisRecord(item);
-        if (!itemRecord.surveyId || !itemRecord.response) return;
-        const sid = String(itemRecord.surveyId || '').toLowerCase();
-        if (!sid) return;
-        upsertSurveyResponseByRecency({
-          sid,
-          responder: String(itemRecord.responder || viewAddressKey).toLowerCase(),
-          responseValue: itemRecord.response,
-          metaValue: {
-            bn: Number(itemRecord.blockNumber ?? itemRecord.bn ?? 0) || 0,
-            txi: Number(itemRecord.transactionIndex ?? itemRecord.txIndex ?? itemRecord.txi ?? 0) || 0,
-            li: Number(itemRecord.logIndex ?? itemRecord.li ?? 0) || 0,
-            ts: Number(itemRecord.timestamp ?? itemRecord.ts ?? 0) || 0,
-          },
-          slug,
-        });
-      });
-
-      (Array.isArray(payload.createdQuestions) ? payload.createdQuestions : []).forEach((item: unknown) => {
-        const itemRecord = toAnalysisRecord(item);
-        if (!itemRecord.id || !itemRecord.data) return;
-        const qid = String(itemRecord.id || '').toLowerCase();
-        if (!qid) return;
-        if (!combinedQuestions[qid]) combinedQuestions[qid] = toAnalysisRecord(itemRecord.data);
-        if (!combinedQuestions[qid].creator) combinedQuestions[qid].creator = viewAddressKey;
-        writeUserPageSourceSlug(questionSourceSlugById, qid, slug);
-      });
-
-      (Array.isArray(payload.questionResponses) ? payload.questionResponses : []).forEach((item: unknown) => {
-        const itemRecord = toAnalysisRecord(item);
-        if (!itemRecord.questionId || !itemRecord.response) return;
-        const qid = String(itemRecord.questionId || '').toLowerCase();
-        if (!qid) return;
-        upsertQuestionResponseByRecency({
-          qid,
-          responder: String(itemRecord.responder || viewAddressKey).toLowerCase(),
-          responseValue: itemRecord.response,
-          metaValue: {
-            bn: Number(itemRecord.blockNumber ?? itemRecord.bn ?? 0) || 0,
-            txi: Number(itemRecord.transactionIndex ?? itemRecord.txIndex ?? itemRecord.txi ?? 0) || 0,
-            li: Number(itemRecord.logIndex ?? itemRecord.li ?? 0) || 0,
-            ts: Number(itemRecord.timestamp ?? itemRecord.ts ?? 0) || 0,
-          },
-          slug,
-        });
-      });
-
-      (getPrioritizedUserPageChainNodes(userNode, networkID) as PrioritizedUserChainNode[]).forEach(({ node }) => {
-        const chainPayload = isPlainAnalysisObject(node.data)
-          ? node.data as UserCachePayload
-          : null;
-        if (!chainPayload) return;
-        (Array.isArray(chainPayload.sbts) ? chainPayload.sbts : []).forEach((item: unknown) => {
-          mergeUserPageUserCacheSbtIntoAggregate({
-            sbtAggregate,
-            item,
-            slug,
-            viewAddressKey,
-          });
-        });
-      });
-    });
-
-    return {
-      combinedSurveys,
-      combinedSurveyResponses,
-      combinedSurveyResponsesMeta,
-      combinedQuestions,
-      combinedQuestionResponses,
-      combinedQuestionResponsesMeta,
-      surveySourceSlugById,
-      surveyResponseSourceSlugById,
-      surveyResponseSourceSlugByKey,
-      questionSourceSlugById,
-      questionResponseSourceSlugById,
-      questionResponseSourceSlugByKey,
-      sbtAggregate,
-      userCaches,
-    };
-  })
 
   _deriveSurveySection = (
     aggregate: unknown,
     viewAddressLower: unknown,
-    gateContext: GateAccessContext | null = null
-  ): unknown => measureSync('ce.userPage.deriveSurveySection', () => {
-    const userSurveyResponses: UnknownRecord[] = [];
-    const userCreatedSurveys: UnknownRecord[] = [];
-    const detailedResponses: Record<string, SurveyQuestionResponseDetail[]> = {};
-    const viewAddressKey = String(viewAddressLower || '').toLowerCase();
-    const aggregateRecord = toAnalysisRecord(aggregate);
-    const combinedSurveys = toAnalysisRecord(aggregateRecord.combinedSurveys);
-    const combinedSurveyResponses = toAnalysisRecord(aggregateRecord.combinedSurveyResponses);
-    const combinedQuestions = toAnalysisRecord(aggregateRecord.combinedQuestions);
-    const surveySourceSlugById = toAnalysisRecord(aggregateRecord.surveySourceSlugById);
-    const surveyResponseSourceSlugById = toAnalysisRecord(aggregateRecord.surveyResponseSourceSlugById);
-    const surveyResponseSourceSlugByKey = toAnalysisRecord(aggregateRecord.surveyResponseSourceSlugByKey);
+    gateContext: GateAccessContext | null = null,
+  ): unknown =>
+    measureSync('ce.userPage.deriveSurveySection', () => {
+      const userSurveyResponses: UnknownRecord[] = [];
+      const userCreatedSurveys: UnknownRecord[] = [];
+      const detailedResponses: Record<string, SurveyQuestionResponseDetail[]> = {};
+      const viewAddressKey = String(viewAddressLower || '').toLowerCase();
+      const aggregateRecord = toAnalysisRecord(aggregate);
+      const combinedSurveys = toAnalysisRecord(aggregateRecord.combinedSurveys);
+      const combinedSurveyResponses = toAnalysisRecord(aggregateRecord.combinedSurveyResponses);
+      const combinedQuestions = toAnalysisRecord(aggregateRecord.combinedQuestions);
+      const surveySourceSlugById = toAnalysisRecord(aggregateRecord.surveySourceSlugById);
+      const surveyResponseSourceSlugById = toAnalysisRecord(aggregateRecord.surveyResponseSourceSlugById);
+      const surveyResponseSourceSlugByKey = toAnalysisRecord(aggregateRecord.surveyResponseSourceSlugByKey);
 
-    Object.keys(combinedSurveyResponses).forEach((surveyIdLower: string) => {
-      const surveyResponsesForThisSurvey = toAnalysisRecord(combinedSurveyResponses[surveyIdLower]);
-      const raw = surveyResponsesForThisSurvey[viewAddressKey];
-      if (!raw) return;
+      Object.keys(combinedSurveyResponses).forEach((surveyIdLower: string) => {
+        const surveyResponsesForThisSurvey = toAnalysisRecord(combinedSurveyResponses[surveyIdLower]);
+        const raw = surveyResponsesForThisSurvey[viewAddressKey];
+        if (!raw) return;
 
-      const userFullResponseObject = toAnalysisRecord(this.parseCachedResponsePayload(raw));
-      const surveyResponses = Array.isArray(userFullResponseObject.responses)
-        ? userFullResponseObject.responses
-        : null;
-      if (!surveyResponses) return;
-      const surveyData = toAnalysisRecord(combinedSurveys[surveyIdLower]);
-      const sourceDescriptor = buildUserPageSurveyResponseSourceDescriptor({
-        surveyId: surveyIdLower,
-        surveyResponseSourceSlugById,
-        surveyResponseSourceSlugByKey,
-        surveySourceSlugById,
-        viewAddressLower: viewAddressKey,
-      });
-      const sourceSlug = sourceDescriptor.sourceSlug;
-
-      const detailedQuestionArray: SurveyQuestionResponseDetail[] = [];
-      let hasNonBlank = false;
-      surveyResponses.forEach((resp: unknown) => {
-        const normalizedResponse = normalizeUserPageSingleQuestionResponsePayload(resp);
-        if (!normalizedResponse) return;
-        const questionIDLower = normalizedResponse.questionID
-          ? String(normalizedResponse.questionID).toLowerCase()
-          : 'unknown_question_id';
-        const qData = toAnalysisRecord(combinedQuestions[questionIDLower] || {
-          id: normalizedResponse.questionID || 'unknown_question_id',
-          type: normalizedResponse.type || 'unknown',
-          prompt: normalizedResponse.prompt || 'Unknown Question',
+        const userFullResponseObject = toAnalysisRecord(this.parseCachedResponsePayload(raw));
+        const surveyResponses = Array.isArray(userFullResponseObject.responses)
+          ? userFullResponseObject.responses
+          : null;
+        if (!surveyResponses) return;
+        const surveyData = toAnalysisRecord(combinedSurveys[surveyIdLower]);
+        const sourceDescriptor = buildUserPageSurveyResponseSourceDescriptor({
+          surveyId: surveyIdLower,
+          surveyResponseSourceSlugById,
+          surveyResponseSourceSlugByKey,
+          surveySourceSlugById,
+          viewAddressLower: viewAddressKey,
         });
-        const questionEncrypted = isUserPageQuestionPayloadEncrypted(qData);
-        const answerEncrypted = isUserPageAnswerFieldEncrypted(normalizedResponse);
-        const additionalEncrypted = isUserPageAdditionalFieldEncrypted(normalizedResponse);
-        const responseEncrypted = isUserPageResponsePayloadEncrypted(normalizedResponse);
-        let canDecryptOtherResponses = false;
+        const sourceSlug = sourceDescriptor.sourceSlug;
 
+        const detailedQuestionArray: SurveyQuestionResponseDetail[] = [];
+        let hasNonBlank = false;
+        surveyResponses.forEach((resp: unknown) => {
+          const normalizedResponse = normalizeUserPageSingleQuestionResponsePayload(resp);
+          if (!normalizedResponse) return;
+          const questionIDLower = normalizedResponse.questionID
+            ? String(normalizedResponse.questionID).toLowerCase()
+            : 'unknown_question_id';
+          const qData = toAnalysisRecord(
+            combinedQuestions[questionIDLower] || {
+              id: normalizedResponse.questionID || 'unknown_question_id',
+              type: normalizedResponse.type || 'unknown',
+              prompt: normalizedResponse.prompt || 'Unknown Question',
+            },
+          );
+          const questionEncrypted = isUserPageQuestionPayloadEncrypted(qData);
+          const answerEncrypted = isUserPageAnswerFieldEncrypted(normalizedResponse);
+          const additionalEncrypted = isUserPageAdditionalFieldEncrypted(normalizedResponse);
+          const responseEncrypted = isUserPageResponsePayloadEncrypted(normalizedResponse);
+          let canDecryptOtherResponses = false;
+
+          if (questionEncrypted || answerEncrypted) {
+            const visibility = this._evaluateEncryptedVisibility({
+              resourceKey: 'surveyResponses',
+              slug: sourceSlug,
+              viewAddressLower,
+              encryptionAudience: answerEncrypted
+                ? inferUserPageResponseFieldEncryptionAudience(normalizedResponse, 'answer', 'gate')
+                : 'gate',
+              gateContext,
+            });
+            if (!visibility.visible) return;
+            canDecryptOtherResponses = !!visibility.canDecryptOtherResponses;
+          } else if (additionalEncrypted) {
+            const visibility = this._evaluateEncryptedVisibility({
+              resourceKey: 'surveyResponses',
+              slug: sourceSlug,
+              viewAddressLower,
+              encryptionAudience: inferUserPageResponseFieldEncryptionAudience(
+                normalizedResponse,
+                'additional',
+                'gate',
+              ),
+              gateContext,
+            });
+            canDecryptOtherResponses = !!(visibility.visible && visibility.canDecryptOtherResponses);
+          }
+
+          const nonBlank = hasDisplayableUserPageResponsePayload(normalizedResponse);
+          if (nonBlank || responseEncrypted) hasNonBlank = true;
+
+          detailedQuestionArray.push({
+            questionData: qData,
+            responseData: normalizedResponse,
+            canDecryptOtherResponses,
+            responseEncryption: {
+              answerEncrypted,
+              additionalEncrypted,
+            },
+          });
+        });
+
+        if (!hasNonBlank) return;
+        const fallbackQuestionCount = detailedQuestionArray.length;
+        const surveyQuestionCount = Array.isArray(surveyData?.questionIDs) ? surveyData.questionIDs.length : 0;
+        userSurveyResponses.push({
+          title: surveyData.title || 'Untitled Survey',
+          questionsCount: surveyQuestionCount > 0 ? surveyQuestionCount : fallbackQuestionCount,
+          id: surveyIdLower,
+          tags: Array.isArray(surveyData?.tags) ? surveyData.tags : [],
+          documentURLs: Array.isArray(surveyData?.documentURLs) ? surveyData.documentURLs : [],
+          slug: sourceSlug,
+        });
+        detailedResponses[surveyIdLower] = detailedQuestionArray;
+      });
+
+      Object.keys(combinedSurveys).forEach((surveyIdLower: string) => {
+        const surveyData = toAnalysisRecord(combinedSurveys[surveyIdLower]);
+        if (surveyData.creator && String(surveyData.creator).toLowerCase() === viewAddressKey) {
+          const questionIDs = Array.isArray(surveyData?.questionIDs) ? surveyData.questionIDs : [];
+          const questionPreviews = questionIDs.map((qidRaw: unknown) => {
+            const fullQuestionId = String(qidRaw || '');
+            const qData = toAnalysisRecord(combinedQuestions[fullQuestionId.toLowerCase()]);
+            return {
+              id: fullQuestionId,
+              text: resolveUserPageQuestionPromptText(qData),
+            };
+          });
+          userCreatedSurveys.push({
+            title: surveyData.title || 'Untitled Survey',
+            questionsCount: questionIDs.length,
+            id: surveyIdLower,
+            tags: Array.isArray(surveyData?.tags) ? surveyData.tags : [],
+            documentURLs: Array.isArray(surveyData?.documentURLs) ? surveyData.documentURLs : [],
+            questionIDs,
+            questionPreviews,
+            slug: surveySourceSlugById[surveyIdLower] || '',
+          });
+        }
+      });
+
+      return {
+        surveyResponseInfo: userSurveyResponses,
+        surveyCreationInfo: userCreatedSurveys,
+        detailedSurveyResponses: detailedResponses,
+        surveysResponded: userSurveyResponses.length,
+        surveysCreated: userCreatedSurveys.length,
+      } satisfies SurveySectionResult;
+    });
+
+  _deriveQuestionSection = (
+    aggregate: unknown,
+    viewAddressLower: unknown,
+    gateContext: GateAccessContext | null = null,
+  ): unknown =>
+    measureSync('ce.userPage.deriveQuestionSection', () => {
+      const userCreatedQuestions: UnknownRecord[] = [];
+      const userQuestionResponsesInfo: QuestionResponseInfoEntry[] = [];
+      const detailedSingleQuestionResponses: Record<string, NormalizedQuestionResponsePayload> = {};
+      const viewAddressKey = String(viewAddressLower || '').toLowerCase();
+      const aggregateRecord = toAnalysisRecord(aggregate);
+      const combinedQuestions = toAnalysisRecord(aggregateRecord.combinedQuestions);
+      const combinedQuestionResponses = toAnalysisRecord(aggregateRecord.combinedQuestionResponses);
+      const combinedQuestionResponsesMeta = toAnalysisRecord(aggregateRecord.combinedQuestionResponsesMeta);
+      const questionSourceSlugById = toAnalysisRecord(aggregateRecord.questionSourceSlugById);
+      const questionResponseSourceSlugById = toAnalysisRecord(aggregateRecord.questionResponseSourceSlugById);
+      const questionResponseSourceSlugByKey = toAnalysisRecord(aggregateRecord.questionResponseSourceSlugByKey);
+
+      Object.keys(combinedQuestions).forEach((qid: string) => {
+        const qData = toAnalysisRecord(combinedQuestions[qid]);
+        const sourceSlug = resolveUserPageQuestionSourceSessionSlug({
+          fallbackSlug: questionSourceSlugById[qid] || questionResponseSourceSlugById[qid] || '',
+          getSessionSlugByName,
+          questionData: qData,
+        });
+        if (qData.creator && String(qData.creator).toLowerCase() === viewAddressKey) {
+          if (isUserPageQuestionPayloadEncrypted(qData)) {
+            const visibility = this._evaluateEncryptedVisibility({
+              resourceKey: 'questionResponses',
+              slug: sourceSlug,
+              viewAddressLower: viewAddressKey,
+              encryptionAudience: 'gate',
+              gateContext,
+            });
+            if (!visibility.visible) return;
+          }
+          userCreatedQuestions.push({
+            prompt: qData.prompt || 'Unknown Prompt',
+            type: qData.type || 'unknown',
+            id: qid,
+            slug: sourceSlug,
+            sessionSlug: sourceSlug,
+          });
+        }
+      });
+
+      Object.keys(combinedQuestionResponses).forEach((qid: string) => {
+        const perQ = toAnalysisRecord(combinedQuestionResponses[qid]);
+        const candidate = perQ[viewAddressKey];
+        if (!candidate) return;
+        const responseMeta = toAnalysisRecord(toAnalysisRecord(combinedQuestionResponsesMeta[qid])[viewAddressKey]);
+
+        const parsedResponse = this.parseCachedResponsePayload(candidate);
+        const parsedResponseRecord = toAnalysisRecord(parsedResponse);
+        const responseMetaRecord = toAnalysisRecord(responseMeta);
+        const normalizedInput = isPlainAnalysisObject(parsedResponse)
+          ? {
+              ...parsedResponseRecord,
+              ...(Object.keys(responseMetaRecord).length > 0
+                ? {
+                    blockNumber:
+                      Number(
+                        parsedResponseRecord.blockNumber ??
+                          responseMetaRecord.bn ??
+                          responseMetaRecord.blockNumber ??
+                          0,
+                      ) || 0,
+                    transactionIndex:
+                      Number(
+                        parsedResponseRecord.transactionIndex ??
+                          parsedResponseRecord.txIndex ??
+                          responseMetaRecord.txi ??
+                          responseMetaRecord.transactionIndex ??
+                          responseMetaRecord.txIndex ??
+                          0,
+                      ) || 0,
+                    logIndex:
+                      Number(
+                        parsedResponseRecord.logIndex ?? responseMetaRecord.li ?? responseMetaRecord.logIndex ?? 0,
+                      ) || 0,
+                    timestamp:
+                      Number(
+                        parsedResponseRecord.timestamp ?? responseMetaRecord.ts ?? responseMetaRecord.timestamp ?? 0,
+                      ) || 0,
+                  }
+                : {}),
+            }
+          : parsedResponse;
+        const userResponseObject = normalizeUserPageSingleQuestionResponsePayload(normalizedInput);
+        if (!userResponseObject) return;
+
+        const qData = toAnalysisRecord(
+          combinedQuestions[qid] || {
+            id: qid,
+            type: userResponseObject?.type || 'unknown',
+            prompt: userResponseObject?.prompt || 'Unknown Prompt',
+          },
+        );
+
+        const sourceDescriptor = buildUserPageQuestionResponseSourceDescriptor({
+          getSessionSlugByName,
+          questionData: qData,
+          questionId: qid,
+          questionResponseSourceSlugById,
+          questionResponseSourceSlugByKey,
+          questionSourceSlugById,
+          viewAddressLower: viewAddressKey,
+        });
+        const sourceSlug = sourceDescriptor.sourceSlug;
+        const questionEncrypted = isUserPageQuestionPayloadEncrypted(qData);
+        const answerEncrypted = isUserPageAnswerFieldEncrypted(userResponseObject);
+        const additionalEncrypted = isUserPageAdditionalFieldEncrypted(userResponseObject);
+        const responseEncrypted = isUserPageResponsePayloadEncrypted(userResponseObject);
+        let canDecryptOtherResponses = false;
         if (questionEncrypted || answerEncrypted) {
           const visibility = this._evaluateEncryptedVisibility({
-            resourceKey: 'surveyResponses',
+            resourceKey: 'questionResponses',
             slug: sourceSlug,
-            viewAddressLower,
+            viewAddressLower: viewAddressKey,
             encryptionAudience: answerEncrypted
-              ? inferUserPageResponseFieldEncryptionAudience(normalizedResponse, 'answer', 'gate')
+              ? inferUserPageResponseFieldEncryptionAudience(userResponseObject, 'answer', 'gate')
               : 'gate',
             gateContext,
           });
@@ -2155,275 +2366,71 @@ class UserPage extends Component<any, any> {
           canDecryptOtherResponses = !!visibility.canDecryptOtherResponses;
         } else if (additionalEncrypted) {
           const visibility = this._evaluateEncryptedVisibility({
-            resourceKey: 'surveyResponses',
+            resourceKey: 'questionResponses',
             slug: sourceSlug,
-            viewAddressLower,
-            encryptionAudience: inferUserPageResponseFieldEncryptionAudience(normalizedResponse, 'additional', 'gate'),
+            viewAddressLower: viewAddressKey,
+            encryptionAudience: inferUserPageResponseFieldEncryptionAudience(userResponseObject, 'additional', 'gate'),
             gateContext,
           });
           canDecryptOtherResponses = !!(visibility.visible && visibility.canDecryptOtherResponses);
         }
 
-        const nonBlank = hasDisplayableUserPageResponsePayload(normalizedResponse);
-        if (nonBlank || responseEncrypted) hasNonBlank = true;
+        const nonBlank = hasDisplayableUserPageResponsePayload(userResponseObject);
+        const hasSubmissionHints =
+          hasUserPageResponseSubmissionHints(userResponseObject) ||
+          hasUserPageResponseSubmissionHints(parsedResponse) ||
+          hasUserPageResponseSubmissionHints(candidate);
+        const hasDisplayableResponse = nonBlank || responseEncrypted || hasSubmissionHints;
+        if (!hasDisplayableResponse) return;
+        const responseRecency = extractUserPageResponseRecency(userResponseObject, responseMeta);
 
-        detailedQuestionArray.push({
-          questionData: qData,
-          responseData: normalizedResponse,
-          canDecryptOtherResponses,
-          responseEncryption: {
-            answerEncrypted,
-            additionalEncrypted,
-          },
-        });
-      });
-
-      if (!hasNonBlank) return;
-      const fallbackQuestionCount = detailedQuestionArray.length;
-      const surveyQuestionCount = Array.isArray(surveyData?.questionIDs)
-        ? surveyData.questionIDs.length
-        : 0;
-      userSurveyResponses.push({
-        title: surveyData.title || 'Untitled Survey',
-        questionsCount: surveyQuestionCount > 0 ? surveyQuestionCount : fallbackQuestionCount,
-        id: surveyIdLower,
-        tags: Array.isArray(surveyData?.tags) ? surveyData.tags : [],
-        documentURLs: Array.isArray(surveyData?.documentURLs) ? surveyData.documentURLs : [],
-        slug: sourceSlug,
-      });
-      detailedResponses[surveyIdLower] = detailedQuestionArray;
-    });
-
-    Object.keys(combinedSurveys).forEach((surveyIdLower: string) => {
-      const surveyData = toAnalysisRecord(combinedSurveys[surveyIdLower]);
-      if (surveyData.creator && String(surveyData.creator).toLowerCase() === viewAddressKey) {
-        const questionIDs = Array.isArray(surveyData?.questionIDs) ? surveyData.questionIDs : [];
-        const questionPreviews = questionIDs.map((qidRaw: unknown) => {
-          const fullQuestionId = String(qidRaw || '');
-          const qData = toAnalysisRecord(combinedQuestions[fullQuestionId.toLowerCase()]);
-          return {
-            id: fullQuestionId,
-            text: resolveUserPageQuestionPromptText(qData),
-          };
-        });
-        userCreatedSurveys.push({
-          title: surveyData.title || 'Untitled Survey',
-          questionsCount: questionIDs.length,
-          id: surveyIdLower,
-          tags: Array.isArray(surveyData?.tags) ? surveyData.tags : [],
-          documentURLs: Array.isArray(surveyData?.documentURLs) ? surveyData.documentURLs : [],
-          questionIDs,
-          questionPreviews,
-          slug: surveySourceSlugById[surveyIdLower] || '',
-        });
-      }
-    });
-
-    return {
-      surveyResponseInfo: userSurveyResponses,
-      surveyCreationInfo: userCreatedSurveys,
-      detailedSurveyResponses: detailedResponses,
-      surveysResponded: userSurveyResponses.length,
-      surveysCreated: userCreatedSurveys.length,
-    } satisfies SurveySectionResult;
-  })
-
-  _deriveQuestionSection = (
-    aggregate: unknown,
-    viewAddressLower: unknown,
-    gateContext: GateAccessContext | null = null
-  ): unknown => measureSync('ce.userPage.deriveQuestionSection', () => {
-    const userCreatedQuestions: UnknownRecord[] = [];
-    const userQuestionResponsesInfo: QuestionResponseInfoEntry[] = [];
-    const detailedSingleQuestionResponses: Record<string, NormalizedQuestionResponsePayload> = {};
-    const viewAddressKey = String(viewAddressLower || '').toLowerCase();
-    const aggregateRecord = toAnalysisRecord(aggregate);
-    const combinedQuestions = toAnalysisRecord(aggregateRecord.combinedQuestions);
-    const combinedQuestionResponses = toAnalysisRecord(aggregateRecord.combinedQuestionResponses);
-    const combinedQuestionResponsesMeta = toAnalysisRecord(aggregateRecord.combinedQuestionResponsesMeta);
-    const questionSourceSlugById = toAnalysisRecord(aggregateRecord.questionSourceSlugById);
-    const questionResponseSourceSlugById = toAnalysisRecord(aggregateRecord.questionResponseSourceSlugById);
-    const questionResponseSourceSlugByKey = toAnalysisRecord(aggregateRecord.questionResponseSourceSlugByKey);
-
-    Object.keys(combinedQuestions).forEach((qid: string) => {
-      const qData = toAnalysisRecord(combinedQuestions[qid]);
-      const sourceSlug = resolveUserPageQuestionSourceSessionSlug({
-        fallbackSlug: questionSourceSlugById[qid] || questionResponseSourceSlugById[qid] || '',
-        getSessionSlugByName,
-        questionData: qData,
-      });
-      if (qData.creator && String(qData.creator).toLowerCase() === viewAddressKey) {
-        if (isUserPageQuestionPayloadEncrypted(qData)) {
-          const visibility = this._evaluateEncryptedVisibility({
-            resourceKey: 'questionResponses',
-            slug: sourceSlug,
-            viewAddressLower: viewAddressKey,
-            encryptionAudience: 'gate',
-            gateContext,
-          });
-          if (!visibility.visible) return;
-        }
-        userCreatedQuestions.push({
+        userQuestionResponsesInfo.push({
           prompt: qData.prompt || 'Unknown Prompt',
           type: qData.type || 'unknown',
           id: qid,
           slug: sourceSlug,
           sessionSlug: sourceSlug,
+          canDecryptOtherResponses,
+          responseEncryption: {
+            answerEncrypted,
+            additionalEncrypted,
+          },
+          _responseRecency: responseRecency,
         });
-      }
+        detailedSingleQuestionResponses[qid] = userResponseObject;
+      });
+
+      const normalizedQuestionResponseInfo = normalizeUserPageQuestionResponseInfoOrder(userQuestionResponsesInfo);
+
+      return {
+        questionCreationInfo: userCreatedQuestions,
+        questionResponseInfo: normalizedQuestionResponseInfo,
+        detailedQuestionResponses: detailedSingleQuestionResponses,
+        questionsCreated: userCreatedQuestions.length,
+        questionsResponded: normalizedQuestionResponseInfo.length,
+      } satisfies QuestionSectionResult;
     });
 
-    Object.keys(combinedQuestionResponses).forEach((qid: string) => {
-      const perQ = toAnalysisRecord(combinedQuestionResponses[qid]);
-      const candidate = perQ[viewAddressKey];
-      if (!candidate) return;
-      const responseMeta = toAnalysisRecord(
-        toAnalysisRecord(combinedQuestionResponsesMeta[qid])[viewAddressKey]
-      );
-
-      const parsedResponse = this.parseCachedResponsePayload(candidate);
-      const parsedResponseRecord = toAnalysisRecord(parsedResponse);
-      const responseMetaRecord = toAnalysisRecord(responseMeta);
-      const normalizedInput = (
-        isPlainAnalysisObject(parsedResponse)
-      )
-        ? {
-          ...parsedResponseRecord,
-          ...(Object.keys(responseMetaRecord).length > 0
-            ? {
-              blockNumber: Number(
-                parsedResponseRecord.blockNumber ??
-                responseMetaRecord.bn ??
-                responseMetaRecord.blockNumber ??
-                0
-              ) || 0,
-              transactionIndex: Number(
-                parsedResponseRecord.transactionIndex ??
-                parsedResponseRecord.txIndex ??
-                responseMetaRecord.txi ??
-                responseMetaRecord.transactionIndex ??
-                responseMetaRecord.txIndex ??
-                0
-              ) || 0,
-              logIndex: Number(
-                parsedResponseRecord.logIndex ??
-                responseMetaRecord.li ??
-                responseMetaRecord.logIndex ??
-                0
-              ) || 0,
-              timestamp: Number(
-                parsedResponseRecord.timestamp ??
-                responseMetaRecord.ts ??
-                responseMetaRecord.timestamp ??
-                0
-              ) || 0,
-            }
-            : {}),
+  _deriveSbtSection = (aggregate: unknown, viewAddressLower: unknown): unknown =>
+    measureSync('ce.userPage.deriveSbtSection', () => {
+      const sbtSection = buildUserPageSbtSection({
+        aggregate,
+        viewAddressLower,
+        getSbtDisplayName,
+        getShortenedAddress,
+        translate: t,
+      });
+      if (sbtSection.telemetry) {
+        if (sbtSection.telemetry.signature !== this._lastProfileDeriveTelemetrySignature) {
+          this._lastProfileDeriveTelemetrySignature = sbtSection.telemetry.signature;
+          this.emitProfileTelemetry('derive-sbt-section', sbtSection.telemetry.payload);
         }
-        : parsedResponse;
-      const userResponseObject = normalizeUserPageSingleQuestionResponsePayload(normalizedInput);
-      if (!userResponseObject) return;
-
-      const qData = toAnalysisRecord(combinedQuestions[qid] || {
-        id: qid,
-        type: userResponseObject?.type || 'unknown',
-        prompt: userResponseObject?.prompt || 'Unknown Prompt',
-      });
-
-      const sourceDescriptor = buildUserPageQuestionResponseSourceDescriptor({
-        getSessionSlugByName,
-        questionData: qData,
-        questionId: qid,
-        questionResponseSourceSlugById,
-        questionResponseSourceSlugByKey,
-        questionSourceSlugById,
-        viewAddressLower: viewAddressKey,
-      });
-      const sourceSlug = sourceDescriptor.sourceSlug;
-      const questionEncrypted = isUserPageQuestionPayloadEncrypted(qData);
-      const answerEncrypted = isUserPageAnswerFieldEncrypted(userResponseObject);
-      const additionalEncrypted = isUserPageAdditionalFieldEncrypted(userResponseObject);
-      const responseEncrypted = isUserPageResponsePayloadEncrypted(userResponseObject);
-      let canDecryptOtherResponses = false;
-      if (questionEncrypted || answerEncrypted) {
-        const visibility = this._evaluateEncryptedVisibility({
-          resourceKey: 'questionResponses',
-          slug: sourceSlug,
-          viewAddressLower: viewAddressKey,
-          encryptionAudience: answerEncrypted
-            ? inferUserPageResponseFieldEncryptionAudience(userResponseObject, 'answer', 'gate')
-            : 'gate',
-          gateContext,
-        });
-        if (!visibility.visible) return;
-        canDecryptOtherResponses = !!visibility.canDecryptOtherResponses;
-      } else if (additionalEncrypted) {
-        const visibility = this._evaluateEncryptedVisibility({
-          resourceKey: 'questionResponses',
-          slug: sourceSlug,
-          viewAddressLower: viewAddressKey,
-          encryptionAudience: inferUserPageResponseFieldEncryptionAudience(userResponseObject, 'additional', 'gate'),
-          gateContext,
-        });
-        canDecryptOtherResponses = !!(visibility.visible && visibility.canDecryptOtherResponses);
       }
-
-      const nonBlank = hasDisplayableUserPageResponsePayload(userResponseObject);
-      const hasSubmissionHints = (
-        hasUserPageResponseSubmissionHints(userResponseObject) ||
-        hasUserPageResponseSubmissionHints(parsedResponse) ||
-        hasUserPageResponseSubmissionHints(candidate)
-      );
-      const hasDisplayableResponse = nonBlank || responseEncrypted || hasSubmissionHints;
-      if (!hasDisplayableResponse) return;
-      const responseRecency = extractUserPageResponseRecency(userResponseObject, responseMeta);
-
-      userQuestionResponsesInfo.push({
-        prompt: qData.prompt || 'Unknown Prompt',
-        type: qData.type || 'unknown',
-        id: qid,
-        slug: sourceSlug,
-        sessionSlug: sourceSlug,
-        canDecryptOtherResponses,
-        responseEncryption: {
-          answerEncrypted,
-          additionalEncrypted,
-        },
-        _responseRecency: responseRecency,
-      });
-      detailedSingleQuestionResponses[qid] = userResponseObject;
+      return {
+        sbtList: sbtSection.sbtList,
+        badgesReceived: sbtSection.badgesReceived,
+      } satisfies SbtSectionResult;
     });
-
-    const normalizedQuestionResponseInfo = normalizeUserPageQuestionResponseInfoOrder(userQuestionResponsesInfo);
-
-    return {
-      questionCreationInfo: userCreatedQuestions,
-      questionResponseInfo: normalizedQuestionResponseInfo,
-      detailedQuestionResponses: detailedSingleQuestionResponses,
-      questionsCreated: userCreatedQuestions.length,
-      questionsResponded: normalizedQuestionResponseInfo.length,
-    } satisfies QuestionSectionResult;
-  })
-
-  _deriveSbtSection = (aggregate: unknown, viewAddressLower: unknown): unknown => measureSync('ce.userPage.deriveSbtSection', () => {
-    const sbtSection = buildUserPageSbtSection({
-      aggregate,
-      viewAddressLower,
-      getSbtDisplayName,
-      getShortenedAddress,
-      translate: t,
-    });
-    if (sbtSection.telemetry) {
-      if (sbtSection.telemetry.signature !== this._lastProfileDeriveTelemetrySignature) {
-        this._lastProfileDeriveTelemetrySignature = sbtSection.telemetry.signature;
-        this.emitProfileTelemetry('derive-sbt-section', sbtSection.telemetry.payload);
-      }
-    }
-    return {
-      sbtList: sbtSection.sbtList,
-      badgesReceived: sbtSection.badgesReceived,
-    } satisfies SbtSectionResult;
-  })
 
   _refreshAllDataFromCache = ({
     force = false,
@@ -2432,9 +2439,7 @@ class UserPage extends Component<any, any> {
   }: Partial<CacheRefreshOptions> = {}): void => {
     if (!this._isMounted) return;
     const viewAddress = this.props.viewAddress;
-    const networkID = this.props.network?.id != null
-      ? this.props.network.id.toString()
-      : '';
+    const networkID = this.props.network?.id != null ? this.props.network.id.toString() : '';
 
     if (!viewAddress) {
       this._lastCacheRefreshInputSignature = '';
@@ -2450,9 +2455,8 @@ class UserPage extends Component<any, any> {
     const sbtReady = !!this.props.isSBTCacheReady;
 
     const sourceSnapshot = this._readCacheSourceSnapshot();
-    const gateRecheckEpoch = this._responseGateAccessStatusByKey.size > 0
-      ? Math.floor(Date.now() / USERPAGE_GATE_UNKNOWN_RETRY_MS)
-      : 0;
+    const gateRecheckEpoch =
+      this._responseGateAccessStatusByKey.size > 0 ? Math.floor(Date.now() / USERPAGE_GATE_UNKNOWN_RETRY_MS) : 0;
     const cacheRefreshDescriptor = buildUserPageCacheRefreshRequestDescriptor({
       account: this.props.account,
       bypassSignature,
@@ -2544,11 +2548,11 @@ class UserPage extends Component<any, any> {
         aggregate.userCaches as UserCacheSourceEntry[] | null | undefined,
         viewAddressLower,
         currentChainId,
-        latestBlockNum
+        latestBlockNum,
       );
       deepScanTooltipLines = formatUserPageDeepScanTooltipLinesFromRows(
         deepScanProgressRows,
-        formatUserPageDeepScanBlockCount
+        formatUserPageDeepScanBlockCount,
       );
 
       if (!holdSurveyLoading) {
@@ -2568,7 +2572,11 @@ class UserPage extends Component<any, any> {
           mergeGateContextSnapshot(gateContext, surveyMemoPlan.gateSnapshot as GateAccessContextSnapshot | null);
         } else {
           const surveyGateContext = createGateAccessContext();
-          surveySection = this._deriveSurveySection(aggregate, viewAddressLower, surveyGateContext) as SurveySectionResult;
+          surveySection = this._deriveSurveySection(
+            aggregate,
+            viewAddressLower,
+            surveyGateContext,
+          ) as SurveySectionResult;
           const surveyGateSnapshot = captureGateContextSnapshot(surveyGateContext);
           mergeGateContextSnapshot(gateContext, surveyGateSnapshot);
           this._sectionDeriveMemo.survey = {
@@ -2595,7 +2603,11 @@ class UserPage extends Component<any, any> {
           mergeGateContextSnapshot(gateContext, questionMemoPlan.gateSnapshot as GateAccessContextSnapshot | null);
         } else {
           const questionGateContext = createGateAccessContext();
-          questionSection = this._deriveQuestionSection(aggregate, viewAddressLower, questionGateContext) as QuestionSectionResult;
+          questionSection = this._deriveQuestionSection(
+            aggregate,
+            viewAddressLower,
+            questionGateContext,
+          ) as QuestionSectionResult;
           const questionGateSnapshot = captureGateContextSnapshot(questionGateContext);
           mergeGateContextSnapshot(gateContext, questionGateSnapshot);
           this._sectionDeriveMemo.question = {
@@ -2628,12 +2640,15 @@ class UserPage extends Component<any, any> {
       accountLog.error('Error processing user data from cache:', error);
     }
 
-    this.emitProfileColdDiag('derive', buildUserPageDeriveTelemetrySnapshot({
-      aggregate,
-      questionSection,
-      sbtSection,
-      surveySection,
-    }));
+    this.emitProfileColdDiag(
+      'derive',
+      buildUserPageDeriveTelemetrySnapshot({
+        aggregate,
+        questionSection,
+        sbtSection,
+        surveySection,
+      }),
+    );
 
     const refreshTelemetry = buildUserPageRefreshTelemetrySnapshot({
       aggregate,
@@ -2695,7 +2710,7 @@ class UserPage extends Component<any, any> {
 
       return cacheRefreshStatePatchPlan.statePatch;
     });
-  }
+  };
 
   // -----------------------------------------------------------
   //        COPY / BOOKMARK / COLLAPSE / USERNAME
@@ -2719,26 +2734,28 @@ class UserPage extends Component<any, any> {
       accountLog.warn('UserPage address clipboard write failed:', error);
       notify.error('Could not copy address');
     }
-  }
+  };
 
   toggleCollapse = (): void => {
     if (this._isMounted) {
-        this.setState((prevState: UnknownRecord) => buildUserPageBooleanTogglePatch({
+      this.setState((prevState: UnknownRecord) =>
+        buildUserPageBooleanTogglePatch({
           state: prevState,
           stateKey: 'collapseOpen',
-        }));
+        }),
+      );
     }
-  }
+  };
 
   openFullPage = (): void => {
     window.open(buildPublicRoute(`/u/${this.props.viewAddress}`));
-  }
+  };
 
   handleUsernameChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     if (this._isMounted) {
-        this.setState(buildUserPageUsernameChangeStatePatch({ username: event.target.value }));
+      this.setState(buildUserPageUsernameChangeStatePatch({ username: event.target.value }));
     }
-  }
+  };
 
   onUsernamePenClick = (): void => {
     if (!this._isMounted) return;
@@ -2747,17 +2764,22 @@ class UserPage extends Component<any, any> {
       setTimeout(() => {
         try {
           const el = document.querySelector('input[aria-label="Set username"]') as HTMLInputElement | null;
-          if (el) { el.focus(); el.select(); }
-        } catch (e) { accountLog.warn('UserPage: fallback', e); }
+          if (el) {
+            el.focus();
+            el.select();
+          }
+        } catch (e) {
+          accountLog.warn('UserPage: fallback', e);
+        }
       }, 0);
     });
-  }
+  };
 
   cancelUsernameEdit = (): void => {
     if (!this._isMounted) return;
     this.setState(buildUserPageUsernameEditCancelStatePatch());
     this.loadPersistedUsername(); // Revert to saved value
-  }
+  };
 
   handleUsernameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
@@ -2765,7 +2787,7 @@ class UserPage extends Component<any, any> {
     } else if (e.key === 'Escape') {
       this.cancelUsernameEdit();
     }
-  }
+  };
 
   setUsername = (): void => {
     const newUsernameToSet = this.state.username;
@@ -2775,7 +2797,9 @@ class UserPage extends Component<any, any> {
       if (!this._isMounted) return;
       if (!network?.id) {
         this.setState({
-          ...buildUserPageUsernameErrorStatePatch({ usernameError: "Cannot persist username: network information is missing." }),
+          ...buildUserPageUsernameErrorStatePatch({
+            usernameError: 'Cannot persist username: network information is missing.',
+          }),
           isEditingUsername: true,
         });
         return;
@@ -2784,7 +2808,7 @@ class UserPage extends Component<any, any> {
       try {
         localStorage.setItem(`userPageUsername_${networkID}_${viewAddress.toLowerCase()}`, newUsernameToSet);
       } catch (error) {
-        accountLog.error("Error saving username to localStorage:", error);
+        accountLog.error('Error saving username to localStorage:', error);
         if (this._isMounted) {
           this.setState({
             ...buildUserPageUsernameErrorStatePatch({ usernameError: 'Failed to save username locally.' }),
@@ -2798,10 +2822,12 @@ class UserPage extends Component<any, any> {
       }
     } else {
       if (this._isMounted) {
-        this.setState(buildUserPageUsernameErrorStatePatch({ usernameError: "Can only set username for your own account." }));
+        this.setState(
+          buildUserPageUsernameErrorStatePatch({ usernameError: 'Can only set username for your own account.' }),
+        );
       }
     }
-  }
+  };
 
   toggleBookmark = (optionalMeta: BookmarkToggleMeta | React.MouseEvent<HTMLElement> = {}): void => {
     if (!this.props.viewAddress) return;
@@ -2821,8 +2847,7 @@ class UserPage extends Component<any, any> {
     if (this._isMounted) {
       this.setState(buildUserPageBookmarkToggleStatePatch(toggleResult));
     }
-  }
-
+  };
 
   checkIfBookmarked = (): void => {
     if (!this.props.viewAddress) return;
@@ -2843,8 +2868,7 @@ class UserPage extends Component<any, any> {
         this.setState(nextState);
       }
     }
-  }
-
+  };
 
   // ---- Analyze helpers (timer management) ----
   startAnalysisTimer = (): void => {
@@ -2852,10 +2876,12 @@ class UserPage extends Component<any, any> {
     const startedAt = Date.now();
     this.analysisTimer = setInterval(() => {
       if (!this._isMounted) return;
-      this.setState(buildUserPageAnalysisElapsedStatePatch({
-        nowMs: Date.now(),
-        startedAt,
-      }));
+      this.setState(
+        buildUserPageAnalysisElapsedStatePatch({
+          nowMs: Date.now(),
+          startedAt,
+        }),
+      );
     }, 250);
   };
 
@@ -2914,7 +2940,10 @@ class UserPage extends Component<any, any> {
           account,
           resourceKey: 'ai',
         });
-        status = String(access?.status || 'unknown').trim().toLowerCase() || 'unknown';
+        status =
+          String(access?.status || 'unknown')
+            .trim()
+            .toLowerCase() || 'unknown';
       } catch (_) {
         status = 'unknown';
       }
@@ -2989,10 +3018,7 @@ class UserPage extends Component<any, any> {
     networkId,
   }: UserAnalysisCacheContextArgs): Promise<UserAnalysisCacheContext> => {
     const sessionSlug = String(analysisSession?.slug || '');
-    const aiContext = await resolveUserAnalysisAiContext(
-      sessionSlug,
-      analysisSession?.sessionConfig || {}
-    );
+    const aiContext = await resolveUserAnalysisAiContext(sessionSlug, analysisSession?.sessionConfig || {});
     const fingerprint = await buildUserAnalysisFingerprint({
       userData,
       address: addressLower,
@@ -3023,14 +3049,16 @@ class UserPage extends Component<any, any> {
 
   _hydrateAnalysisFromCache = (entry: UserAnalysisCacheEntry): void => {
     this.clearAnalysisTimer();
-    this.setState(buildUserPageAnalysisResultStatePatch({
-      cachedAt: entry?.cachedAt,
-      includeElapsed: true,
-      includeError: true,
-      includeModal: true,
-      result: entry?.result || {},
-      servedFromCache: true,
-    }));
+    this.setState(
+      buildUserPageAnalysisResultStatePatch({
+        cachedAt: entry?.cachedAt,
+        includeElapsed: true,
+        includeError: true,
+        includeModal: true,
+        result: entry?.result || {},
+        servedFromCache: true,
+      }),
+    );
   };
 
   _writeAnalysisCacheEntry = async ({
@@ -3088,7 +3116,7 @@ class UserPage extends Component<any, any> {
     let surveysCreated: unknown[] = [];
     try {
       const networkID = this.props.network?.id?.toString();
-      const slug = (this.props.activeSessionSlug == null ? '' : this.props.activeSessionSlug);
+      const slug = this.props.activeSessionSlug == null ? '' : this.props.activeSessionSlug;
       const createdSurveyCacheRead = readUserPageAnalysisCreatedSurveyCachesThroughPort({
         networkID,
         peekCache: peekCacheSync,
@@ -3103,11 +3131,13 @@ class UserPage extends Component<any, any> {
         surveyCreationInfo: this.state.surveyCreationInfo,
         surveysCache: createdSurveyCacheRead.surveysCache,
       });
-    } catch (e) { accountLog.warn('UserPage: fallback', e); }
+    } catch (e) {
+      accountLog.warn('UserPage: fallback', e);
+    }
 
     const createdCounts = {
       questionsCreated: questionsCreated.length,
-      surveysCreated: surveysCreated.length
+      surveysCreated: surveysCreated.length,
     };
 
     const userData = {
@@ -3119,14 +3149,12 @@ class UserPage extends Component<any, any> {
       // NEW: created content + explicit counts
       questionsCreated,
       surveysCreated,
-      createdCounts
+      createdCounts,
     };
-    const addressLower = String(this.props.viewAddress || '').trim().toLowerCase();
-    const networkId = String(
-      this.props.network?.id ??
-      this.props.network?.chainId ??
-      ''
-    );
+    const addressLower = String(this.props.viewAddress || '')
+      .trim()
+      .toLowerCase();
+    const networkId = String(this.props.network?.id ?? this.props.network?.chainId ?? '');
     const hydrateAnalysisCacheIfPresent = (cacheContextToRead: UserAnalysisCacheContext): boolean => {
       const cacheReadDescriptor = buildUserPageAnalysisCacheReadDescriptor({
         sessionSlug: cacheContextToRead.sessionSlug,
@@ -3192,10 +3220,12 @@ class UserPage extends Component<any, any> {
 
       // Update UI
       const normalizedResult = normalizeUserAnalysisResult(result);
-      this.setState(buildUserPageAnalysisResultStatePatch({
-        result: normalizedResult,
-        servedFromCache: false,
-      }));
+      this.setState(
+        buildUserPageAnalysisResultStatePatch({
+          result: normalizedResult,
+          servedFromCache: false,
+        }),
+      );
       this.clearAnalysisTimer();
       try {
         await this._writeAnalysisCacheEntry({
@@ -3217,29 +3247,24 @@ class UserPage extends Component<any, any> {
     }
   };
 
-
   getExplorerChainId = (): number | null => {
     const network = this.props.network;
-    const sessionConfigProp = (
+    const sessionConfigProp =
       this.props.sessionConfig &&
       typeof this.props.sessionConfig === 'object' &&
       !Array.isArray(this.props.sessionConfig)
-    )
-      ? this.props.sessionConfig as UnknownRecord
-      : null;
+        ? (this.props.sessionConfig as UnknownRecord)
+        : null;
     const rawSessionSlug = this.props.sessionSlug ?? this.props.activeSessionSlug ?? '';
     const sessionSlug = normalizeSessionSlug(rawSessionSlug || '');
     const hasSessionContext = !!sessionConfigProp || !!sessionSlug;
-    const sessionConfig = sessionConfigProp || (
-      hasSessionContext
-        ? this._getSessionConfigForSlugExact(sessionSlug)
-        : null
-    );
+    const sessionConfig =
+      sessionConfigProp || (hasSessionContext ? this._getSessionConfigForSlugExact(sessionSlug) : null);
     const sessionChainId = hasSessionContext
       ? Number(sessionConfig?.networkChainId ?? this.props.networkChainId ?? 0) || null
       : null;
     return sessionChainId || Number(network?.chainId ?? network?.id ?? 0) || null;
-  }
+  };
 
   getExplorerUrl = (): string | null => {
     const address = String(this.props.viewAddress || '').trim();
@@ -3250,52 +3275,64 @@ class UserPage extends Component<any, any> {
       accountLog.warn(`UserPage: Unknown chain ID (${chainIdForLink}) for explorer link.`);
     }
     return explorerUrl;
-  }
+  };
 
   toggleSurveyResponses = (surveyId: unknown): void => {
     if (this._isMounted) {
-        this.setState((prevState: UnknownRecord) => buildUserPageSurveyExpansionTogglePatch({
+      this.setState((prevState: UnknownRecord) =>
+        buildUserPageSurveyExpansionTogglePatch({
           state: prevState,
           stateKey: 'expandedSurveyResponses',
           surveyId,
-        }));
+        }),
+      );
     }
   };
 
   toggleSurveyCreated = (surveyId: unknown): void => {
-    this.setState((prevState: UnknownRecord) => buildUserPageSurveyExpansionTogglePatch({
-      state: prevState,
-      stateKey: 'expandedSurveysCreated',
-      surveyId,
-    }));
+    this.setState((prevState: UnknownRecord) =>
+      buildUserPageSurveyExpansionTogglePatch({
+        state: prevState,
+        stateKey: 'expandedSurveysCreated',
+        surveyId,
+      }),
+    );
   };
 
   toggleSurveyResponsesSection = (): void => {
-    this.setState((prevState: UnknownRecord) => buildUserPageBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showSectionSurveyResponsesOpen',
-    }));
+    this.setState((prevState: UnknownRecord) =>
+      buildUserPageBooleanTogglePatch({
+        state: prevState,
+        stateKey: 'showSectionSurveyResponsesOpen',
+      }),
+    );
   };
 
   toggleSurveysCreatedSection = (): void => {
-    this.setState((prevState: UnknownRecord) => buildUserPageBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showSectionSurveysCreatedOpen',
-    }));
+    this.setState((prevState: UnknownRecord) =>
+      buildUserPageBooleanTogglePatch({
+        state: prevState,
+        stateKey: 'showSectionSurveysCreatedOpen',
+      }),
+    );
   };
 
   toggleQuestionResponsesSection = (): void => {
-    this.setState((prevState: UnknownRecord) => buildUserPageBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showSectionQuestionResponsesOpen',
-    }));
+    this.setState((prevState: UnknownRecord) =>
+      buildUserPageBooleanTogglePatch({
+        state: prevState,
+        stateKey: 'showSectionQuestionResponsesOpen',
+      }),
+    );
   };
 
   toggleQuestionsCreatedSection = (): void => {
-    this.setState((prevState: UnknownRecord) => buildUserPageBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showSectionQuestionsCreatedOpen',
-    }));
+    this.setState((prevState: UnknownRecord) =>
+      buildUserPageBooleanTogglePatch({
+        state: prevState,
+        stateKey: 'showSectionQuestionsCreatedOpen',
+      }),
+    );
   };
 
   render() {
@@ -3351,8 +3388,14 @@ class UserPage extends Component<any, any> {
     const sbtEntries = sbtList as DerivedSbtListItem[];
     const expandedSurveyResponseMap = expandedSurveyResponses as Record<string, boolean | undefined>;
     const expandedSurveyCreatedMap = expandedSurveysCreated as Record<string, boolean | undefined>;
-    const detailedSurveyResponseMap = detailedSurveyResponses as Record<string, SurveyQuestionResponseDetail[] | undefined>;
-    const detailedQuestionResponseMap = detailedQuestionResponses as Record<string, NormalizedQuestionResponsePayload | null | undefined>;
+    const detailedSurveyResponseMap = detailedSurveyResponses as Record<
+      string,
+      SurveyQuestionResponseDetail[] | undefined
+    >;
+    const detailedQuestionResponseMap = detailedQuestionResponses as Record<
+      string,
+      NormalizedQuestionResponsePayload | null | undefined
+    >;
 
     // === Compute display label with nickname priority (scoped strictly to current viewAddress) ===
     let cachedNicknameForThis = '';
@@ -3363,7 +3406,9 @@ class UserPage extends Component<any, any> {
         trim: true,
         users: parsed?.users,
       });
-    } catch (e) { accountLog.warn('UserPage: fallback', e); }
+    } catch (e) {
+      accountLog.warn('UserPage: fallback', e);
+    }
 
     const explorerUrl = this.getExplorerUrl();
     const {
@@ -3387,20 +3432,22 @@ class UserPage extends Component<any, any> {
     const renderedAddressHref = String(addressHref || '').startsWith('/')
       ? buildPublicRoute(String(addressHref || ''))
       : addressHref;
-    const addressDisplay = shouldLinkAddressLabel
-      ? (
-        <a
-          href={renderedAddressHref}
-          {...(!minimized ? {
-            target: '_blank',
-            rel: 'noopener noreferrer',
-          } : {})}
-          className={styles.addressLink}
-        >
-          {addressLabel}
-        </a>
-      )
-      : addressLabel;
+    const addressDisplay = shouldLinkAddressLabel ? (
+      <a
+        href={renderedAddressHref}
+        {...(!minimized
+          ? {
+              target: '_blank',
+              rel: 'noopener noreferrer',
+            }
+          : {})}
+        className={styles.addressLink}
+      >
+        {addressLabel}
+      </a>
+    ) : (
+      addressLabel
+    );
 
     // === Blockie seed & URL (deterministic across minimized/maximized) ===
     const blockieSeed = resolveUserPageBlockieSeed({ propViewAddress, username });
@@ -3432,11 +3479,7 @@ class UserPage extends Component<any, any> {
       surveyResponseInfo,
       walletLabel: t('walletLower'),
     });
-    const {
-      isQuestionLoadingAny,
-      isSbtLoadingAny,
-      isSurveyLoadingAny,
-    } = cacheRefreshDisplayState.loadingState;
+    const { isQuestionLoadingAny, isSbtLoadingAny, isSurveyLoadingAny } = cacheRefreshDisplayState.loadingState;
     const aiActionPlan = cacheRefreshDisplayState.aiActionPlan;
     const { analyzeButtonDisplayState, compareButtonDisplayState } = aiActionPlan;
     const analyzeActionPlan = {
@@ -3466,10 +3509,7 @@ class UserPage extends Component<any, any> {
       questionResponsesLoadingEmpty,
       questionsCreatedLoadingEmpty,
     } = cacheRefreshDisplayState.sectionLoadingEmptyState;
-    const {
-      questionResponsesEmptyText,
-      sbtEmptyText,
-    } = cacheRefreshDisplayState.uncertainEmptyText;
+    const { questionResponsesEmptyText, sbtEmptyText } = cacheRefreshDisplayState.uncertainEmptyText;
     const questionSectionDisplayState = resolveUserPageQuestionSectionDisplayState({
       questionCreationInfo,
       questionResponseInfo,
@@ -3504,17 +3544,19 @@ class UserPage extends Component<any, any> {
     } = buildUserPageTooltipTargetIds(propViewAddress);
     const deepScanTooltipLines = this.buildDeepScanProgressTooltip();
     const deepScanProgressRows = this.buildDeepScanProgressRows();
-    const {
-      deepScanTooltipContent,
-      deepScanTooltipTitle,
-    } = buildUserPageDeepScanTooltipDisplayState({
+    const { deepScanTooltipContent, deepScanTooltipTitle } = buildUserPageDeepScanTooltipDisplayState({
       deepScanProgressRows,
       deepScanTooltipLines,
       isDeepScanning,
     });
     const renderDeepScanIndicator = (isLoading: boolean, spinnerId: string) =>
       isLoading
-        ? this.renderDeepScanStatusIndicator(spinnerId, deepScanTooltipContent, deepScanProgressRows, deepScanTooltipTitle)
+        ? this.renderDeepScanStatusIndicator(
+            spinnerId,
+            deepScanTooltipContent,
+            deepScanProgressRows,
+            deepScanTooltipTitle,
+          )
         : null;
 
     const headerPassiveDisplayState = resolveUserPageHeaderPassiveDisplayState({
@@ -3529,11 +3571,7 @@ class UserPage extends Component<any, any> {
       propViewAddress,
       viewAddress: propViewAddress,
     });
-    const {
-      isOwner,
-      showPen,
-      showUsernamePen,
-    } = headerPassiveDisplayState.profileEditVisibility;
+    const { isOwner, showPen, showUsernamePen } = headerPassiveDisplayState.profileEditVisibility;
     const headerActionVisibility = headerPassiveDisplayState.headerActionVisibility;
     const bookmarkActionPlan = {
       blockedReason: 'none',
@@ -3611,18 +3649,22 @@ class UserPage extends Component<any, any> {
           minimized={minimized}
           nicknameEnteredIndicatorDisplayState={nicknameEnteredIndicatorDisplayState}
           nicknameInput={this.state.nicknameInput || ''}
-          onAnalyzeUser={(event) => runUserPageAnalyzeActionController({
-            analyzeArgs: [event],
-            event,
-            plan: analyzeActionPlan,
-            ports: { dispatchAnalyze: this.analyzeUser },
-          })}
-          onBookmark={(event) => runUserPageBookmarkActionController({
-            bookmarkArgs: [event],
-            event,
-            plan: bookmarkActionPlan,
-            ports: { dispatchBookmark: this.toggleBookmark },
-          })}
+          onAnalyzeUser={(event) =>
+            runUserPageAnalyzeActionController({
+              analyzeArgs: [event],
+              event,
+              plan: analyzeActionPlan,
+              ports: { dispatchAnalyze: this.analyzeUser },
+            })
+          }
+          onBookmark={(event) =>
+            runUserPageBookmarkActionController({
+              bookmarkArgs: [event],
+              event,
+              plan: bookmarkActionPlan,
+              ports: { dispatchBookmark: this.toggleBookmark },
+            })
+          }
           onCollapseToggle={this.toggleCollapse}
           onCopyAddress={this.copyToClipboard}
           onNicknameBlur={this.saveNickname}
@@ -3640,10 +3682,7 @@ class UserPage extends Component<any, any> {
           usernameErrorDisplayState={usernameErrorDisplayState}
         />
 
-        <UserPageComparePanel
-          collapseOpen={collapseOpen}
-          minimized={minimized}
-        >
+        <UserPageComparePanel collapseOpen={collapseOpen} minimized={minimized}>
           <CompareAddressSection
             firstAddress={propViewAddress}
             account={account}
@@ -3658,7 +3697,11 @@ class UserPage extends Component<any, any> {
                 detailedSurveyResponseMap={detailedSurveyResponseMap}
                 expandedSurveyCreatedMap={expandedSurveyCreatedMap}
                 expandedSurveyResponseMap={expandedSurveyResponseMap}
-                getSurveyCreatedHref={(survey, surveyLinkSlug) => buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyLinkSlug ? `?session=${encodeURIComponent(String(surveyLinkSlug))}` : ''}`)}
+                getSurveyCreatedHref={(survey, surveyLinkSlug) =>
+                  buildPublicRoute(
+                    `/survey/${encodeURIComponent(String(survey.id))}${surveyLinkSlug ? `?session=${encodeURIComponent(String(surveyLinkSlug))}` : ''}`,
+                  )
+                }
                 isSurveyLoadingAny={isSurveyLoadingAny}
                 onDecryptQuestion={this.handleDecryptQuestionAnswer}
                 onOpenSurveyResponse={(survey, e: React.MouseEvent<HTMLElement>) => {
@@ -3669,12 +3712,17 @@ class UserPage extends Component<any, any> {
                   }
                   surveyUrlParams.set('responder', String(propViewAddress));
                   window.open(
-                    buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyUrlParams.toString() ? `?${surveyUrlParams.toString()}` : ''}`),
+                    buildPublicRoute(
+                      `/survey/${encodeURIComponent(String(survey.id))}${surveyUrlParams.toString() ? `?${surveyUrlParams.toString()}` : ''}`,
+                    ),
                     '_blank',
-                    'noopener,noreferrer'
+                    'noopener,noreferrer',
                   );
                 }}
-                onShowQuestionsTab={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' })); }}
+                onShowQuestionsTab={(e: React.MouseEvent<HTMLElement>) => {
+                  e.stopPropagation();
+                  if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' }));
+                }}
                 onSurveyCreatedToggle={this.toggleSurveyCreated}
                 onSurveyResponsesSectionToggle={this.toggleSurveyResponsesSection}
                 onSurveyResponseToggle={this.toggleSurveyResponses}
@@ -3702,7 +3750,10 @@ class UserPage extends Component<any, any> {
                 onDecryptQuestion={this.handleDecryptQuestionAnswer}
                 onQuestionResponsesSectionToggle={this.toggleQuestionResponsesSection}
                 onQuestionsCreatedSectionToggle={this.toggleQuestionsCreatedSection}
-                onShowSurveysTab={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' })); }}
+                onShowSurveysTab={(e: React.MouseEvent<HTMLElement>) => {
+                  e.stopPropagation();
+                  if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' }));
+                }}
                 questionCreationEntries={questionCreationEntries}
                 questionResponsesEmptyText={questionResponsesEmptyText}
                 questionResponsesLoadingIndicator={renderDeepScanIndicator(isQuestionLoadingAny, questionSpinnerId)}
@@ -3710,7 +3761,10 @@ class UserPage extends Component<any, any> {
                 questionResponseEntries={questionResponseEntries}
                 questionResponsesSectionToggleState={questionResponsesSectionToggleState}
                 questionSectionDisplayState={questionSectionDisplayState}
-                questionsCreatedLoadingIndicator={renderDeepScanIndicator(isQuestionLoadingAny, questionsCreatedSpinnerId)}
+                questionsCreatedLoadingIndicator={renderDeepScanIndicator(
+                  isQuestionLoadingAny,
+                  questionsCreatedSpinnerId,
+                )}
                 questionsCreatedSectionToggleState={questionsCreatedSectionToggleState}
                 responderAddress={propViewAddress}
                 sbtCacheRevision={this.props.sbtCacheRevision}
@@ -3736,7 +3790,9 @@ class UserPage extends Component<any, any> {
 
         <UserPageSimulatedActions
           isSimulated={isSimulated}
-          onViewResponses={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch({ open: true })); }}
+          onViewResponses={() => {
+            if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch({ open: true }));
+          }}
         />
 
         <UserPageAnalysisModal
@@ -3752,7 +3808,12 @@ class UserPage extends Component<any, any> {
           analyzing={analyzing}
           isOpen={showAnalysisModal}
           onRefreshAnalysis={() => this.analyzeUser(true)}
-          onToggle={() => { if (this._isMounted) { this.setState(buildUserPageAnalysisModalStatePatch()); this.clearAnalysisTimer(); } }}
+          onToggle={() => {
+            if (this._isMounted) {
+              this.setState(buildUserPageAnalysisModalStatePatch());
+              this.clearAnalysisTimer();
+            }
+          }}
         />
 
         <UserPageFullProfileModal
@@ -3768,7 +3829,9 @@ class UserPage extends Component<any, any> {
           network={network}
           onRefreshSbtData={this.dispatchSbtDataRefresh}
           onStatsCollapseToggle={this.toggleCollapse}
-          onToggle={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch()); }}
+          onToggle={() => {
+            if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch());
+          }}
           provider={provider}
           sbtDisplayState={sbtDisplayState}
           sbtEmptyText={sbtEmptyText}

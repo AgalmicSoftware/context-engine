@@ -13,37 +13,25 @@ type ResolvedSbtSessionSlug = {
 };
 
 export const resolveSessionNameValue = (metadata: unknown = {}): string => {
-  const source = (metadata && typeof metadata === 'object') ? metadata as UnknownRecord : {};
+  const source = metadata && typeof metadata === 'object' ? (metadata as UnknownRecord) : {};
   const fromCanonical = toStr(source.sessionName).trim();
   if (fromCanonical) return fromCanonical;
   return '';
 };
 
-export const resolveSbtSessionSlug = (
-  metadata: unknown = {},
-  fallbackSlug = ''
-): ResolvedSbtSessionSlug => {
-  const source = (metadata && typeof metadata === 'object') ? metadata as UnknownRecord : {};
+export const resolveSbtSessionSlug = (metadata: unknown = {}, fallbackSlug = ''): ResolvedSbtSessionSlug => {
+  const source = metadata && typeof metadata === 'object' ? (metadata as UnknownRecord) : {};
   const hasExplicitSlugField =
     metadata &&
     typeof metadata === 'object' &&
-    (
-      Object.prototype.hasOwnProperty.call(source, 'sessionSlug') ||
-      Object.prototype.hasOwnProperty.call(source, 'slug')
-    );
+    (Object.prototype.hasOwnProperty.call(source, 'sessionSlug') ||
+      Object.prototype.hasOwnProperty.call(source, 'slug'));
 
   if (hasExplicitSlugField) {
-    const explicitRaw = toStr(
-      source.sessionSlug ??
-      source.slug
-    ).trim();
+    const explicitRaw = toStr(source.sessionSlug ?? source.slug).trim();
     const hasExplicitFlag =
-      metadata &&
-      typeof metadata === 'object' &&
-      Object.prototype.hasOwnProperty.call(source, 'sessionSlugExplicit');
-    const explicit = hasExplicitFlag
-      ? (source.sessionSlugExplicit === true)
-      : true;
+      metadata && typeof metadata === 'object' && Object.prototype.hasOwnProperty.call(source, 'sessionSlugExplicit');
+    const explicit = hasExplicitFlag ? source.sessionSlugExplicit === true : true;
     return {
       slug: normalizeSessionSlug(explicitRaw),
       explicit,
@@ -77,15 +65,13 @@ export const normalizeSbtSessionLinkFields = (metadata: unknown, fallbackSlug = 
 export const normalizeSessionNameFields = (
   metadata: unknown,
   fallbackSessionName = '',
-  options: UnknownRecord = {}
+  options: UnknownRecord = {},
 ): unknown => {
   if (!metadata || typeof metadata !== 'object') return metadata;
   const next = metadata as UnknownRecord;
   const fallback = toStr(fallbackSessionName).trim();
   const sessionName = resolveSessionNameValue(next) || fallback;
-  const sessionSlug = normalizeSessionSlug(
-    toStr(options?.sessionSlug ?? next.sessionSlug ?? '').trim()
-  );
+  const sessionSlug = normalizeSessionSlug(toStr(options?.sessionSlug ?? next.sessionSlug ?? '').trim());
   if (sessionName) {
     next.sessionName = sessionName;
   } else {

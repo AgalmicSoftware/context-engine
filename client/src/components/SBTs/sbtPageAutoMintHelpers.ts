@@ -38,9 +38,7 @@ type ResolveSbtPageUrlAutoMintIntentArgs = {
   state?: SbtPageUrlAutoMintState | null;
   windowSearch?: unknown;
 };
-type DecodeSbtPageInviteInput = (
-  normalizedInviteCode: string
-) => Record<string, unknown> | null | undefined;
+type DecodeSbtPageInviteInput = (normalizedInviteCode: string) => Record<string, unknown> | null | undefined;
 
 export type AutoMintPair = {
   auto: boolean;
@@ -66,9 +64,8 @@ export type SbtPageUrlAutoMintIntent = {
   targetPassword: string | null;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const resolveSbtPageAutoMintAddress = (input: unknown): unknown | null => {
   if (Array.isArray(input)) {
@@ -79,9 +76,7 @@ const resolveSbtPageAutoMintAddress = (input: unknown): unknown | null => {
   return input || null;
 };
 
-const getSbtPageAutoMintAddressInfo = (
-  propsIn: SbtPageAutoMintAddressPropsLike = {}
-): SbtPageAutoMintAddressInfo => {
+const getSbtPageAutoMintAddressInfo = (propsIn: SbtPageAutoMintAddressPropsLike = {}): SbtPageAutoMintAddressInfo => {
   const original = resolveSbtPageAutoMintAddress(propsIn.SBTAddress) || '';
   return {
     original,
@@ -90,7 +85,9 @@ const getSbtPageAutoMintAddressInfo = (
 };
 
 const normalizeAutoMintScopePart = (value: unknown, fallback: string): string => {
-  const normalized = String(value ?? '').trim().toLowerCase();
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
   return normalized || fallback;
 };
 
@@ -103,7 +100,9 @@ export const buildSbtPageAutoMintStorageKey = ({
   sbtAddress?: unknown;
   sessionSlug?: unknown;
 } = {}): string | null => {
-  const address = String(sbtAddress || '').trim().toLowerCase();
+  const address = String(sbtAddress || '')
+    .trim()
+    .toLowerCase();
   if (!address) return null;
   return [
     'autoMint',
@@ -132,7 +131,7 @@ export const normalizeSbtInviteCode = (raw: unknown): string => {
 
 export const decodeSbtPageInviteInput = (
   raw: unknown,
-  decodeInvite: DecodeSbtPageInviteInput
+  decodeInvite: DecodeSbtPageInviteInput,
 ): SbtPageDecodedInviteInput | null => {
   const normalized = normalizeSbtInviteCode(raw);
   if (!normalized || typeof decodeInvite !== 'function') return null;
@@ -177,7 +176,7 @@ export const buildSbtPageAutoMintCleanPath = (hrefRaw: unknown = ''): string | n
 };
 
 export const collectAutoMintPairsFromSearchParams = (
-  searchParams: URLSearchParams | string | null = null
+  searchParams: URLSearchParams | string | null = null,
 ): AutoMintPairsResult => {
   const sp = searchParams instanceof URLSearchParams ? searchParams : new URLSearchParams(searchParams || '');
   const globalAuto = sp.get('auto') === '1';
@@ -221,9 +220,8 @@ export const resolveSbtPageUrlAutoMintIntent = ({
   const { original: currentSbtAddress, lower: currentSbtAddrLower } = getSbtPageAutoMintAddressInfo(propsIn || {});
   if (!currentSbtAddress) return null;
 
-  const qs = typeof searchRaw === 'string'
-    ? searchRaw.replace(/^\?/, '')
-    : String(windowSearch || '').replace(/^\?/, '');
+  const qs =
+    typeof searchRaw === 'string' ? searchRaw.replace(/^\?/, '') : String(windowSearch || '').replace(/^\?/, '');
   if (!qs) return null;
 
   const sp = new URLSearchParams(qs);
@@ -260,11 +258,7 @@ export const resolveSbtPageUrlAutoMintIntent = ({
     sessionSlug: resolvedSessionSlug,
     sbtAddress: currentSbtAddrLower,
   });
-  const alreadyTried = !!(
-    autoKey &&
-    sessionStorageRef?.getItem &&
-    sessionStorageRef.getItem(autoKey) === 'done'
-  );
+  const alreadyTried = !!(autoKey && sessionStorageRef?.getItem && sessionStorageRef.getItem(autoKey) === 'done');
 
   return {
     currentSbtAddress,
@@ -276,7 +270,7 @@ export const resolveSbtPageUrlAutoMintIntent = ({
       propsIn?.loginComplete &&
       !state?.userHasSBT &&
       state?.mintingStatus === 'idle' &&
-      !alreadyTried
+      !alreadyTried,
     ),
     autoKey,
   };
@@ -288,22 +282,13 @@ export const shouldRunSbtPagePropPasswordAutoMint = ({
   sbtInfo = null,
   sbtMintPassword = null,
   userHasSBT = false,
-}: ResolveSbtPagePropPasswordAutoMintArgs = {}): boolean => (
-  !!autoMintingMode &&
-  typeof sbtMintPassword === 'string' &&
-  !userHasSBT &&
-  mintingStatus === 'idle' &&
-  !!sbtInfo
-);
+}: ResolveSbtPagePropPasswordAutoMintArgs = {}): boolean =>
+  !!autoMintingMode && typeof sbtMintPassword === 'string' && !userHasSBT && mintingStatus === 'idle' && !!sbtInfo;
 
 export const shouldRunSbtPagePropListAutoMint = ({
   autoMintingMode = false,
   hasAttemptedListMint = false,
   loginComplete = false,
   sbtMintPassword = null,
-}: ResolveSbtPagePropListAutoMintArgs = {}): boolean => (
-  !!loginComplete &&
-  !!autoMintingMode &&
-  Array.isArray(sbtMintPassword) &&
-  !hasAttemptedListMint
-);
+}: ResolveSbtPagePropListAutoMintArgs = {}): boolean =>
+  !!loginComplete && !!autoMintingMode && Array.isArray(sbtMintPassword) && !hasAttemptedListMint;

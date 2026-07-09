@@ -1,6 +1,6 @@
 import { readCache } from '../../utilities/cache/cacheScripts.js';
 import { DG_PRIMARY_ROUTE_CACHE_NAMES } from './sessionCacheConstants.js';
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import { createLogger } from 'utilities/logging.js';
 
 const log = createLogger('sessionCachePersistenceController');
@@ -12,7 +12,7 @@ export interface SessionCachePersistenceHost {
   getActiveSlug?: () => string;
   setState?: (
     updater: (prev: Record<string, unknown>) => Record<string, unknown> | null,
-    callback?: () => void
+    callback?: () => void,
   ) => void;
 }
 
@@ -20,15 +20,12 @@ export interface SessionCachePersistenceController {
   readFlag: (name: string, slug: string) => boolean;
   writeFlag: (name: string, slug: string, val: unknown) => void;
   hasPersistedManagedCacheData: (slugIn: string) => Promise<boolean>;
-  syncCacheHasLoadedFlagFromPersistent: (
-    slugIn: string,
-    opts?: { force?: boolean }
-  ) => Promise<boolean>;
+  syncCacheHasLoadedFlagFromPersistent: (slugIn: string, opts?: { force?: boolean }) => Promise<boolean>;
   destroy: () => void;
 }
 
 export const createSessionCachePersistenceController = (
-  host: SessionCachePersistenceHost = {}
+  host: SessionCachePersistenceHost = {},
 ): SessionCachePersistenceController => {
   const cacheHasLoadedSyncInFlight: Map<string, Promise<boolean>> = new Map();
   const cacheHasLoadedSyncTokenBySlug: Map<string, symbol> = new Map();
@@ -48,9 +45,7 @@ export const createSessionCachePersistenceController = (
   const hasPersistedManagedCacheData = async (slugIn: string): Promise<boolean> => {
     const slug = normalizeSessionSlug(slugIn || '');
     try {
-      const entries = await Promise.all(
-        DG_PRIMARY_ROUTE_CACHE_NAMES.map((namespace) => readCache(namespace, slug))
-      );
+      const entries = await Promise.all(DG_PRIMARY_ROUTE_CACHE_NAMES.map((namespace) => readCache(namespace, slug)));
       return entries.some((entry) => entry != null);
     } catch (error: unknown) {
       log.warn('[MainSite] Failed to verify persisted cache state', {
@@ -61,10 +56,7 @@ export const createSessionCachePersistenceController = (
     }
   };
 
-  const syncCacheHasLoadedFlagFromPersistent = (
-    slugIn: string,
-    opts: { force?: boolean } = {}
-  ): Promise<boolean> => {
+  const syncCacheHasLoadedFlagFromPersistent = (slugIn: string, opts: { force?: boolean } = {}): Promise<boolean> => {
     const slug = normalizeSessionSlug(slugIn || '');
     const force = !!opts.force;
     if (!force && cacheHasLoadedSyncInFlight.has(slug)) {
@@ -80,13 +72,8 @@ export const createSessionCachePersistenceController = (
       }
       writeFlag('cacheHasLoaded', slug, persisted);
 
-      if (
-        host.isMounted?.() &&
-        String(host.getActiveSlug?.() || '') === String(slug || '')
-      ) {
-        host.setState?.((prev) => (
-          prev.cacheHasLoaded === persisted ? null : { cacheHasLoaded: persisted }
-        ));
+      if (host.isMounted?.() && String(host.getActiveSlug?.() || '') === String(slug || '')) {
+        host.setState?.((prev) => (prev.cacheHasLoaded === persisted ? null : { cacheHasLoaded: persisted }));
       }
 
       return persisted;

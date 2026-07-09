@@ -27,7 +27,7 @@ export interface SbtSlugResolveDeps {
   getSbtMetadata: (
     provider: string,
     address: string,
-    slug: string
+    slug: string,
   ) => Promise<GroupSlugLookupRecord | null | undefined>;
   getSbtCreationBlockByAddress: (provider: string, address: string, slug: string) => Promise<number | null>;
   normalizeSessionSlug: (s: string) => string;
@@ -45,17 +45,11 @@ const emitWarn = (deps: WarnableDeps, error: unknown): void => {
   if (typeof deps.warn === 'function') deps.warn(error);
 };
 
-const isLookupRecord = (value: unknown): value is GroupSlugLookupRecord => (
-  value !== null && typeof value === 'object'
-);
+const isLookupRecord = (value: unknown): value is GroupSlugLookupRecord => value !== null && typeof value === 'object';
 
-const asLookupRecord = (value: unknown): GroupSlugLookupRecord | null => (
-  isLookupRecord(value) ? value : null
-);
+const asLookupRecord = (value: unknown): GroupSlugLookupRecord | null => (isLookupRecord(value) ? value : null);
 
-function parseReferrerSlug(
-  deps: Pick<GroupSlugLookupDeps, 'normalizeSessionSlug' | 'warn'>
-): string | null {
+function parseReferrerSlug(deps: Pick<GroupSlugLookupDeps, 'normalizeSessionSlug' | 'warn'>): string | null {
   if (typeof document === 'undefined' || !document.referrer) return null;
   try {
     const match = document.referrer.match(/\/session\/([^/?#]+)/);
@@ -68,9 +62,7 @@ function parseReferrerSlug(
 
 const readReferrerSlugCandidate = (deps: GroupSlugLookupDeps): string | null => {
   try {
-    const getter = typeof deps.getReferrerSlug === 'function'
-      ? deps.getReferrerSlug
-      : () => parseReferrerSlug(deps);
+    const getter = typeof deps.getReferrerSlug === 'function' ? deps.getReferrerSlug : () => parseReferrerSlug(deps);
     return getter();
   } catch (error) {
     emitWarn(deps, error);
@@ -78,11 +70,7 @@ const readReferrerSlugCandidate = (deps: GroupSlugLookupDeps): string | null => 
   }
 };
 
-const getCachedSurveySlug = (
-  surveyIdLower: string,
-  slug: string,
-  deps: GroupSlugLookupDeps
-): string | null => {
+const getCachedSurveySlug = (surveyIdLower: string, slug: string, deps: GroupSlugLookupDeps): string | null => {
   const cfg = asLookupRecord(deps.getSessionCfg(slug));
   const highlightedSurveyIds = cfg?.HIGHLIGHTED_SURVEY_IDS;
   if (
@@ -107,11 +95,7 @@ const getCachedSurveySlug = (
   return null;
 };
 
-const getCachedQuestionSlug = (
-  questionIdLower: string,
-  slug: string,
-  deps: GroupSlugLookupDeps
-): string | null => {
+const getCachedQuestionSlug = (questionIdLower: string, slug: string, deps: GroupSlugLookupDeps): string | null => {
   const questionsCache = asLookupRecord(deps.dgRead('questionsCache', slug));
   if (questionsCache) {
     for (const netKey of Object.keys(questionsCache)) {
@@ -146,10 +130,7 @@ const getCachedQuestionSlug = (
   return null;
 };
 
-export function findGroupSlugForSurvey(
-  surveyID: string | null | undefined,
-  deps: GroupSlugLookupDeps
-): string {
+export function findGroupSlugForSurvey(surveyID: string | null | undefined, deps: GroupSlugLookupDeps): string {
   if (!surveyID) return deps.getCurrentSlug();
   const surveyIdLower = String(surveyID).toLowerCase();
 
@@ -173,9 +154,7 @@ export function findGroupSlugForSurvey(
   let refSlug: string | null = null;
   try {
     refSlugCandidate = readReferrerSlugCandidate(deps);
-    refSlug = refSlugCandidate != null && deps.getSessionCfg(refSlugCandidate)
-      ? refSlugCandidate
-      : null;
+    refSlug = refSlugCandidate != null && deps.getSessionCfg(refSlugCandidate) ? refSlugCandidate : null;
   } catch (error) {
     emitWarn(deps, error);
   }
@@ -195,7 +174,7 @@ export function findGroupSlugForSurvey(
 
 export function findGroupSlugForQuestion(
   questionID: string | null | undefined,
-  deps: QuestionGroupSlugLookupDeps
+  deps: QuestionGroupSlugLookupDeps,
 ): string {
   if (!questionID) return deps.getCurrentSlug();
   const questionIdLower = String(questionID).toLowerCase();
@@ -216,9 +195,7 @@ export function findGroupSlugForQuestion(
   let refSlug: string | null = null;
   try {
     refSlugCandidate = readReferrerSlugCandidate(deps);
-    refSlug = refSlugCandidate != null && deps.getSessionCfg(refSlugCandidate)
-      ? refSlugCandidate
-      : null;
+    refSlug = refSlugCandidate != null && deps.getSessionCfg(refSlugCandidate) ? refSlugCandidate : null;
   } catch (error) {
     emitWarn(deps, error);
   }
@@ -238,7 +215,7 @@ export function findGroupSlugForQuestion(
 
 export async function resolveGroupSlugForSbtAddress(
   sbtAddress: string | null | undefined,
-  deps: SbtSlugResolveDeps
+  deps: SbtSlugResolveDeps,
 ): Promise<string> {
   const fallbackSlug = typeof deps.fallbackSlug === 'string' ? deps.fallbackSlug : '';
   const requestedAddress = String(sbtAddress || '');
@@ -246,9 +223,7 @@ export async function resolveGroupSlugForSbtAddress(
 
   const addrLower = requestedAddress.toLowerCase();
   const scanScope = deps.getSessionScanScope();
-  const scopedSlugs = scanScope === 'all'
-    ? deps.getAllSessionSlugs()
-    : deps.getScopedSessionSlugs(scanScope);
+  const scopedSlugs = scanScope === 'all' ? deps.getAllSessionSlugs() : deps.getScopedSessionSlugs(scanScope);
 
   try {
     for (const slug of scopedSlugs) {
@@ -291,11 +266,7 @@ export async function resolveGroupSlugForSbtAddress(
 
     for (const scopedSlug of scoped) {
       try {
-        const creationBlock = await deps.getSbtCreationBlockByAddress(
-          'none',
-          requestedAddress,
-          scopedSlug
-        );
+        const creationBlock = await deps.getSbtCreationBlockByAddress('none', requestedAddress, scopedSlug);
         if (Number.isFinite(creationBlock)) return scopedSlug;
       } catch (error) {
         emitWarn(deps, error);
@@ -305,7 +276,8 @@ export async function resolveGroupSlugForSbtAddress(
   }
 
   try {
-    const sorted = deps.getAllSessionSlugs()
+    const sorted = deps
+      .getAllSessionSlugs()
       .map((slug) => {
         const cfg = asLookupRecord(deps.getSessionConfigBySlugOrDefault(slug));
         const blockLimits = asLookupRecord(cfg?.blockLimits);
@@ -316,11 +288,7 @@ export async function resolveGroupSlugForSbtAddress(
       .sort((a, b) => (Number(b.start) || 0) - (Number(a.start) || 0));
 
     for (const { slug } of sorted) {
-      const creationBlock = await deps.getSbtCreationBlockByAddress(
-        'none',
-        requestedAddress,
-        slug
-      );
+      const creationBlock = await deps.getSbtCreationBlockByAddress('none', requestedAddress, slug);
       if (Number.isFinite(creationBlock)) return slug;
     }
   } catch (error) {

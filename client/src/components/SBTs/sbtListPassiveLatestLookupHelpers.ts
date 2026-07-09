@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import { isSbtListSyntheticNoSessionSlug } from './sbtListSessionUniverseHelpers';
 
 export type SbtPassiveLatestLookupState = {
@@ -47,9 +47,8 @@ const normalizeResearchStep = (value: unknown): number => {
   return 50;
 };
 
-const asRecord = (value: unknown): Record<string, unknown> => (
-  value && typeof value === 'object' ? value as Record<string, unknown> : {}
-);
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
 export const buildSbtListPassiveLatestLookupPlan = ({
   chipLoadingStatusBySlug = {},
@@ -82,7 +81,7 @@ export const buildSbtListPassiveLatestLookupPlan = ({
       0,
       Number(snapshot.displayCurrentBlock || 0),
       Number(snapshot.liveCurrentBlock || 0),
-      Number(snapshot.lastBlock || 0)
+      Number(snapshot.lastBlock || 0),
     );
   });
 
@@ -96,16 +95,14 @@ export const buildSbtListPassiveLatestLookupPlan = ({
       const existingState = lookupState[slug] as SbtPassiveLatestLookupState | undefined;
       const lastRequestedAtBlock = Number(existingState?.lastRequestedAtBlock || 0);
       const needsInitialLookup = existingState == null;
-      const crossedResearchThreshold = (
-        existingState != null &&
-        Number(currentWatermark || 0) >= (lastRequestedAtBlock + normalizedResearchStep)
-      );
+      const crossedResearchThreshold =
+        existingState != null && Number(currentWatermark || 0) >= lastRequestedAtBlock + normalizedResearchStep;
       if (!needsInitialLookup && !crossedResearchThreshold) return acc;
       if (lookupInFlight[slug]) return acc;
       acc.push({ slug, currentWatermark: Number(currentWatermark || 0) });
       return acc;
     },
-    []
+    [],
   );
 
   return { requests, staleSlugs };

@@ -764,8 +764,7 @@
 .polisReportModern {
   background:
     radial-gradient(900px 600px at 5% 0%, rgba(122, 160, 255, 0.2), transparent 60%),
-    radial-gradient(700px 500px at 95% 8%, rgba(255, 180, 220, 0.18), transparent 55%),
-    #f4f6ff;
+    radial-gradient(700px 500px at 95% 8%, rgba(255, 180, 220, 0.18), transparent 55%), #f4f6ff;
   border: none;
   border-radius: var(--ce-radius-6);
   box-shadow: 0 18px 32px rgba(15, 23, 42, 0.1);
@@ -1014,8 +1013,7 @@
 .polisReportDark {
   background:
     radial-gradient(1000px 700px at 5% 0%, rgba(80, 110, 255, 0.18), transparent 60%),
-    radial-gradient(700px 500px at 95% 10%, rgba(120, 90, 200, 0.18), transparent 55%),
-    #0b1020;
+    radial-gradient(700px 500px at 95% 10%, rgba(120, 90, 200, 0.18), transparent 55%), #0b1020;
   border: 1px solid #1f2937;
   border-radius: var(--ce-radius-6);
   box-shadow: 0 18px 40px rgba(3, 6, 14, 0.6);

@@ -198,16 +198,18 @@ describe('surveyResultsQuestionNetworkReadController', () => {
 
     expect(result.result.questionsLatestBlock).toBe(0);
     expect(result.result.questionResponsesLatestBlock).toBe(0);
-    expect(result.result.questions.q1).toEqual(expect.objectContaining({
-      prompt: 'Malformed metadata question',
-    }));
+    expect(result.result.questions.q1).toEqual(
+      expect.objectContaining({
+        prompt: 'Malformed metadata question',
+      }),
+    );
     expect(result.result.questionResponses.q1).toEqual({
       '0xABC': { answer: { value: 'Cached response' } },
     });
   });
 
   it('keeps empty and missing cached response buckets empty without inventing fallback responses', () => {
-    const readQuestionBucket = jest.fn((slug) => (
+    const readQuestionBucket = jest.fn((slug) =>
       slug === 'edge'
         ? {
             questionsLatestBlock: 9,
@@ -221,8 +223,8 @@ describe('surveyResultsQuestionNetworkReadController', () => {
             },
             questionResponses: {},
           }
-        : null
-    ));
+        : null,
+    );
 
     const result = runSurveyResultsQuestionNetworkReadController({
       netIdStr: '84532',

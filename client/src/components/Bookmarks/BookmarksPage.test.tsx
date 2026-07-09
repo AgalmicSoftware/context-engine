@@ -36,16 +36,8 @@ describe('BookmarksPage cache scan helpers', () => {
 
     const result = readEntries();
 
-    expect(cacheScripts.listNamespaceEntriesSync).toHaveBeenNthCalledWith(
-      1,
-      'bookmarksCache',
-      { cloneValues: false }
-    );
-    expect(cacheScripts.listNamespaceEntriesSync).toHaveBeenNthCalledWith(
-      2,
-      'filters',
-      { cloneValues: false }
-    );
+    expect(cacheScripts.listNamespaceEntriesSync).toHaveBeenNthCalledWith(1, 'bookmarksCache', { cloneValues: false });
+    expect(cacheScripts.listNamespaceEntriesSync).toHaveBeenNthCalledWith(2, 'filters', { cloneValues: false });
     expect(result.bookmarkEntries).toHaveLength(1);
     expect(result.filtersEntries).toHaveLength(1);
   });
@@ -148,18 +140,18 @@ describe('BookmarksPage cache scan helpers', () => {
     render(<BookmarksPage />);
 
     await waitFor(() => {
-      const surveyLinks = screen.getAllByRole('link').filter((link) => (
-        link.getAttribute('href')?.startsWith('/survey/0xsame')
-      ));
+      const surveyLinks = screen
+        .getAllByRole('link')
+        .filter((link) => link.getAttribute('href')?.startsWith('/survey/0xsame'));
       expect(surveyLinks.map((link) => link.getAttribute('href')).sort()).toEqual([
         '/survey/0xsame?session=beta',
         '/survey/0xsame?session=edge',
       ]);
     });
 
-    const questionLinks = screen.getAllByRole('link').filter((link) => (
-      link.getAttribute('href')?.startsWith('/question/0qsame')
-    ));
+    const questionLinks = screen
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('href')?.startsWith('/question/0qsame'));
     expect(questionLinks.map((link) => link.getAttribute('href')).sort()).toEqual([
       '/question/0qsame?session=beta',
       '/question/0qsame?session=edge',

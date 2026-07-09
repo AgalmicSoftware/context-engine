@@ -8,12 +8,16 @@ import {
 describe('sessionWizardUiSupport', () => {
   it('reads tooltip preference from the redux-like store shape', () => {
     expect(readSessionWizardTooltipsEnabled(null)).toBe(true);
-    expect(readSessionWizardTooltipsEnabled({
-      getState: () => ({ sessionState: { tooltipsEnabled: true } }),
-    })).toBe(true);
-    expect(readSessionWizardTooltipsEnabled({
-      getState: () => ({ sessionState: { tooltipsEnabled: false } }),
-    })).toBe(false);
+    expect(
+      readSessionWizardTooltipsEnabled({
+        getState: () => ({ sessionState: { tooltipsEnabled: true } }),
+      }),
+    ).toBe(true);
+    expect(
+      readSessionWizardTooltipsEnabled({
+        getState: () => ({ sessionState: { tooltipsEnabled: false } }),
+      }),
+    ).toBe(false);
   });
 
   it('resolves session header image format from name or mime type', () => {

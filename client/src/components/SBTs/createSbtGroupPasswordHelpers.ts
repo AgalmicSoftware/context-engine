@@ -11,9 +11,8 @@ type CreateSbtGetRandomValues = (array: Uint8Array) => Uint8Array | number[];
 type CreateSbtRandomBytes = (length: number) => Uint8Array | number[];
 type CreateSbtBytesToNonce = (bytes: Uint8Array | number[]) => string;
 
-const isPlainCreateSbtPasswordObject = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isPlainCreateSbtPasswordObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const buildCreateSbtPasswordExportFile = ({
   autoJoinUrl = '',
@@ -37,35 +36,33 @@ export const buildCreateSbtPasswordExportFile = ({
   let content = '';
   let fileName = '';
   const distribution = isPlainCreateSbtPasswordObject(sbtDistribution) ? sbtDistribution : {};
-  const isInvite = !!(
-    distribution.isLimited &&
-    distribution.distributionOption === 'groupPassword'
-  );
+  const isInvite = !!(distribution.isLimited && distribution.distributionOption === 'groupPassword');
   const codeLabel = isInvite ? 'groupPassword' : 'password';
   const fileLabel = isInvite ? 'group-passwords' : 'passwords';
-  const codes = Array.isArray(passwordList)
-    ? passwordList.map((code: unknown) => String(code || ''))
-    : [];
-  const links = Array.isArray(sbtInviteLinks)
-    ? sbtInviteLinks.map((link: unknown) => String(link || ''))
-    : [];
+  const codes = Array.isArray(passwordList) ? passwordList.map((code: unknown) => String(code || '')) : [];
+  const links = Array.isArray(sbtInviteLinks) ? sbtInviteLinks.map((link: unknown) => String(link || '')) : [];
   const fallbackLink = String(autoJoinUrl || '');
   const symbolText = String(sbtSymbol || '');
   const nameText = String(sbtName || '');
   const dateText = String(date || '');
 
   if (exportFormat === 'json') {
-    content = JSON.stringify(codes.map((code, index) => ({
-      index,
-      [codeLabel]: code,
-      inviteLink: links[index] || fallbackLink,
-    })), null, 2);
+    content = JSON.stringify(
+      codes.map((code, index) => ({
+        index,
+        [codeLabel]: code,
+        inviteLink: links[index] || fallbackLink,
+      })),
+      null,
+      2,
+    );
     fileName = `${symbolText}_${nameText}_${fileLabel}_${dateText}.json`;
   } else if (exportFormat === 'csv') {
-    content = `index,${escapeSbtCsvField(codeLabel)},inviteLink\n` +
-      codes.map((code, index) =>
-        `${index},${escapeSbtCsvField(code)},${escapeSbtCsvField(links[index] || fallbackLink)}`
-      ).join('\n');
+    content =
+      `index,${escapeSbtCsvField(codeLabel)},inviteLink\n` +
+      codes
+        .map((code, index) => `${index},${escapeSbtCsvField(code)},${escapeSbtCsvField(links[index] || fallbackLink)}`)
+        .join('\n');
     fileName = `${symbolText}_${nameText}_${fileLabel}_${dateText}.csv`;
   }
 
@@ -93,23 +90,19 @@ export const buildCreateSbtInviteLinks = ({
   passwordList?: unknown;
   sbtAddress?: unknown;
 } = {}): string[] => {
-  const codes = Array.isArray(passwordList)
-    ? passwordList.map((code: unknown) => String(code || ''))
-    : [];
+  const codes = Array.isArray(passwordList) ? passwordList.map((code: unknown) => String(code || '')) : [];
   const origin = String(base || '');
   const routePath = String(demoPath || '');
   const sbtAddressText = String(sbtAddress || '');
   const [detailPathname, detailQuery = ''] = String(detailPath || '').split('?');
   const detailQuerySuffix = detailQuery ? `?${detailQuery}` : '';
-  const encoder = typeof encodeGroupPassword === 'function'
-    ? encodeGroupPassword
-    : (code: unknown) => code;
+  const encoder = typeof encodeGroupPassword === 'function' ? encodeGroupPassword : (code: unknown) => code;
 
-  return codes.map((code) => (
+  return codes.map((code) =>
     isInvite
       ? `${origin}${routePath}?auto=1&sbt=${encodeURIComponent(sbtAddressText)}&gp=${encodeURIComponent(String(encoder(code)))}`
-      : `${origin}${detailPathname}/${encodeURIComponent(code)}${detailQuerySuffix}`
-  ));
+      : `${origin}${detailPathname}/${encodeURIComponent(code)}${detailQuerySuffix}`,
+  );
 };
 
 export const resolveCreateSbtInviteCodeList = ({
@@ -119,9 +112,12 @@ export const resolveCreateSbtInviteCodeList = ({
   listOverride?: unknown;
   passwordList?: unknown;
 } = {}): string[] => {
-  const source = Array.isArray(listOverride) && listOverride.length > 0
-    ? listOverride
-    : (Array.isArray(passwordList) ? passwordList : []);
+  const source =
+    Array.isArray(listOverride) && listOverride.length > 0
+      ? listOverride
+      : Array.isArray(passwordList)
+        ? passwordList
+        : [];
   return source.map((code: unknown) => String(code || ''));
 };
 
@@ -133,9 +129,8 @@ export const resolveCreateSbtPasswordGenerationCount = ({
   sbtDistribution?: unknown;
 } = {}): number => {
   const distribution = isPlainCreateSbtPasswordObject(sbtDistribution) ? sbtDistribution : {};
-  const rawCount = distribution.isLimited && Number(distribution.limitedNumber || 0) > 0
-    ? distribution.limitedNumber
-    : numInviteLinks;
+  const rawCount =
+    distribution.isLimited && Number(distribution.limitedNumber || 0) > 0 ? distribution.limitedNumber : numInviteLinks;
   return Math.max(0, Math.floor(Number(rawCount || 0) || 0));
 };
 
@@ -166,7 +161,7 @@ export const resolveCreateSbtPredictablePasswordListDecision = ({
 
   const desiredCount = Math.max(0, Math.floor(Number(targetCount || 0) || 0));
   const current = Array.isArray(passwordList)
-    ? passwordList.filter((entry: unknown) => String(entry || '').trim()) as string[]
+    ? (passwordList.filter((entry: unknown) => String(entry || '').trim()) as string[])
     : [];
   if (desiredCount > 0 && current.length === desiredCount) {
     return {
@@ -176,9 +171,7 @@ export const resolveCreateSbtPredictablePasswordListDecision = ({
     };
   }
 
-  const generator = typeof generatePassword === 'function'
-    ? generatePassword
-    : () => '';
+  const generator = typeof generatePassword === 'function' ? generatePassword : () => '';
   const next = Array.from({ length: desiredCount }, () => generator(32));
   const shouldUpdatePasswordList = allowStateMutation === true;
   return {
@@ -208,7 +201,9 @@ export const generateCreateSbtRandomHexString = ({
   } else {
     arr = new Uint8Array(byteCount);
   }
-  const hex = Array.from(arr).map((b) => b.toString(16).padStart(2, '0')).join('');
+  const hex = Array.from(arr)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
   return hex.slice(0, targetLength);
 };
 
@@ -218,17 +213,17 @@ export const buildCreateSbtDeferredDraftCreate2Salt = ({
 }: {
   prefix?: unknown;
   randomBytes?: CreateSbtRandomBytes | null;
-} = {}): string => (
+} = {}): string =>
   `${String(prefix || '')}${generateCreateSbtRandomHexString({
     length: 32,
     randomBytes,
-  })}`
-);
+  })}`;
 
 export const generateCreateSbtInviteNonces = ({
-  bytesToNonce = (bytes: Uint8Array | number[]) => (
-    Array.from(bytes).map((byte) => String(byte)).join('')
-  ),
+  bytesToNonce = (bytes: Uint8Array | number[]) =>
+    Array.from(bytes)
+      .map((byte) => String(byte))
+      .join(''),
   count = 0,
   getRandomValues = null,
   randomBytes = null,

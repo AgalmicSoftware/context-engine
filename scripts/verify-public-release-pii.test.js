@@ -31,8 +31,11 @@ function runScanner(targetDir) {
   });
 }
 
-test('verify-public-release-pii passes clean text while warning on public 0x values', () => {
+test('verify-public-release-pii passes clean text while warning on public values', () => {
   withFixture((rootDir) => {
+    const corpusContact = `public-contact${'@'}example.org`;
+    const packageMaintainer = `maintainer${'@'}example.org`;
+
     writeFile(rootDir, 'README.md', [
       '# Fixture',
       'Published contract: 0x1111111111111111111111111111111111111111',
@@ -41,12 +44,30 @@ test('verify-public-release-pii passes clean text while warning on public 0x val
       'const tokenType = "session_jwt";',
       '',
     ].join('\n'));
+    writeFile(rootDir, 'ai-discourse-corpus/corpuses/public-corpus.json', [
+      '{',
+      `  "contact": "${corpusContact}"`,
+      '}',
+      '',
+    ].join('\n'));
+    writeFile(rootDir, 'client/package-lock.json', [
+      '{',
+      '  "packages": {',
+      '    "node_modules/public-package": {',
+      `      "author": "Package Maintainer <${packageMaintainer}>"`,
+      '    }',
+      '  }',
+      '}',
+      '',
+    ].join('\n'));
 
     const result = runScanner(rootDir);
 
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /public release PII scan passed/);
     assert.match(result.stderr, /WARN bare-0x/);
+    assert.match(result.stderr, /WARN public-email: ai-discourse-corpus\/corpuses\/public-corpus\.json:2/);
+    assert.match(result.stderr, /WARN public-email: client\/package-lock\.json:4/);
   });
 });
 

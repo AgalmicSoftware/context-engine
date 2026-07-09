@@ -103,11 +103,11 @@ describe('SurveySelector question toggle', () => {
     const closedTree = subject.render();
     const questionToggle = findElement(
       closedTree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE,
     );
     const closedEncryptedCountBadge = findElement(
       closedTree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT,
     );
 
     expect(questionToggle).toBeTruthy();
@@ -121,7 +121,7 @@ describe('SurveySelector question toggle', () => {
     const openTree = subject.render();
     const openEncryptedCountBadge = findElement(
       openTree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT,
     );
 
     expect(openEncryptedCountBadge).toBeTruthy();
@@ -171,16 +171,12 @@ describe('SurveySelector question toggle', () => {
     const tree = subject.render();
     const questionToggle = findElement(
       tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE,
     );
-    const questionToggleCount = findElement(
-      questionToggle,
-      (element) => nodeHasClassName(element, styles.questionSelectorCount)
+    const questionToggleCount = findElement(questionToggle, (element) =>
+      nodeHasClassName(element, styles.questionSelectorCount),
     );
-    const loadingSpinner = findElement(
-      questionToggle,
-      (element) => element?.props?.icon?.iconName === 'spinner'
-    );
+    const loadingSpinner = findElement(questionToggle, (element) => element?.props?.icon?.iconName === 'spinner');
 
     expect(questionToggle).toBeTruthy();
     expect(questionToggleCount).toBeTruthy();
@@ -215,7 +211,7 @@ describe('SurveySelector question toggle', () => {
     const tree = subject.render();
     const questionToggle = findElement(
       tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE,
     );
 
     expect(questionToggle).toBeTruthy();
@@ -254,11 +250,10 @@ describe('SurveySelector question toggle', () => {
     const tree = subject.render();
     const questionToggle = findElement(
       tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE,
     );
-    const questionToggleCount = findElement(
-      questionToggle,
-      (element) => nodeHasClassName(element, styles.questionSelectorCount)
+    const questionToggleCount = findElement(questionToggle, (element) =>
+      nodeHasClassName(element, styles.questionSelectorCount),
     );
 
     expect(questionToggle).toBeTruthy();
@@ -308,18 +303,13 @@ describe('SurveySelector question toggle', () => {
     const tree = subject.render();
     const encryptedCountBadge = findElement(
       tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT,
     );
-    const loadingSpinnerCount = countElements(
-      tree,
-      (element) => element?.props?.icon?.iconName === 'spinner'
-    );
+    const loadingSpinnerCount = countElements(tree, (element) => element?.props?.icon?.iconName === 'spinner');
     const stickyCountNodeTotal = countElements(
       tree,
-      (element) => (
-        nodeHasClassName(element, styles.questionSelectorCount) &&
-        renderToStaticMarkup(element).includes('(12)')
-      )
+      (element) =>
+        nodeHasClassName(element, styles.questionSelectorCount) && renderToStaticMarkup(element).includes('(12)'),
     );
 
     expect(loadingSpinnerCount).toBeGreaterThanOrEqual(2);
@@ -377,15 +367,14 @@ describe('SurveySelector question toggle', () => {
     const tree = subject.render();
     const questionToggle = findElement(
       tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE,
     );
-    const questionToggleCount = findElement(
-      questionToggle,
-      (element) => nodeHasClassName(element, styles.questionSelectorCount)
+    const questionToggleCount = findElement(questionToggle, (element) =>
+      nodeHasClassName(element, styles.questionSelectorCount),
     );
     const encryptedCountBadge = findElement(
       tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT,
     );
 
     expect(questionToggle).toBeTruthy();

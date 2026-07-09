@@ -21,51 +21,61 @@ describe('SessionWizard pending SBT utilities', () => {
 
   it('promotes pending SBT selections to deployed entries before pending-draft cleanup', () => {
     const promoted = promotePendingSbtSelectionsAfterDeploy({
-      selections: [{
-        address: mockPendingSbtAddress,
-        name: 'Pending SBT (Pending)',
-        pending: true,
-        metadataPreview: { phase: 'pending' },
-      }],
-      deployedDrafts: [{
-        predictedAddress: mockPendingSbtAddress,
-        deployedAddress: mockPendingSbtAddress,
-        displayName: 'Pending SBT',
-        metadataPreview: { phase: 'deployed' },
-        deployed: true,
-      }],
-    });
-
-    expect(promoted).toEqual([{
-      address: mockPendingSbtAddress,
-      name: 'Pending SBT',
-      metadataPreview: { phase: 'deployed' },
-    }]);
-  });
-
-  it('builds published inline SBT links from newly deployed and resumed pending drafts', () => {
-    expect(buildPublishedPendingSbtLinks({
-      deployedDrafts: [{
-        predictedAddress: mockPendingSbtAddress,
-        deployedAddress: mockPendingSbtAddress,
-        displayName: 'Newly Deployed Group',
-        deployed: true,
-      }],
-      pendingDraftSnapshot: [
+      selections: [
+        {
+          address: mockPendingSbtAddress,
+          name: 'Pending SBT (Pending)',
+          pending: true,
+          metadataPreview: { phase: 'pending' },
+        },
+      ],
+      deployedDrafts: [
         {
           predictedAddress: mockPendingSbtAddress,
           deployedAddress: mockPendingSbtAddress,
-          displayName: 'Newly Deployed Group',
-          deployed: true,
-        },
-        {
-          predictedAddress: mockSecondPendingSbtAddress,
-          deployedAddress: mockSecondPendingSbtAddress,
+          displayName: 'Pending SBT',
+          metadataPreview: { phase: 'deployed' },
           deployed: true,
         },
       ],
-      sessionSlug: 'writers-room',
-    })).toEqual([
+    });
+
+    expect(promoted).toEqual([
+      {
+        address: mockPendingSbtAddress,
+        name: 'Pending SBT',
+        metadataPreview: { phase: 'deployed' },
+      },
+    ]);
+  });
+
+  it('builds published inline SBT links from newly deployed and resumed pending drafts', () => {
+    expect(
+      buildPublishedPendingSbtLinks({
+        deployedDrafts: [
+          {
+            predictedAddress: mockPendingSbtAddress,
+            deployedAddress: mockPendingSbtAddress,
+            displayName: 'Newly Deployed Group',
+            deployed: true,
+          },
+        ],
+        pendingDraftSnapshot: [
+          {
+            predictedAddress: mockPendingSbtAddress,
+            deployedAddress: mockPendingSbtAddress,
+            displayName: 'Newly Deployed Group',
+            deployed: true,
+          },
+          {
+            predictedAddress: mockSecondPendingSbtAddress,
+            deployedAddress: mockSecondPendingSbtAddress,
+            deployed: true,
+          },
+        ],
+        sessionSlug: 'writers-room',
+      }),
+    ).toEqual([
       {
         address: mockPendingSbtAddress,
         label: 'Newly Deployed Group',
@@ -169,17 +179,19 @@ describe('SessionWizard pending SBT utilities', () => {
       createSBT: mockCreateSBT,
     });
 
-    expect(finalizeDeferredDraftUpload).toHaveBeenCalledWith(expect.objectContaining({
-      authoringPayload: pendingDraft.authoringPayload,
-      componentProps: expect.objectContaining({
-        account: TEST_ADMIN_ADDRESS,
-        sessionConfigOverride: expect.objectContaining({
-          slug: 'publish-test',
+    expect(finalizeDeferredDraftUpload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authoringPayload: pendingDraft.authoringPayload,
+        componentProps: expect.objectContaining({
+          account: TEST_ADMIN_ADDRESS,
+          sessionConfigOverride: expect.objectContaining({
+            slug: 'publish-test',
+          }),
         }),
       }),
-    }));
+    );
     expect(finalizePendingDraftMock.mock.invocationCallOrder[0]).toBeLessThan(
-      mockCreateSBT.mock.invocationCallOrder[0]
+      mockCreateSBT.mock.invocationCallOrder[0],
     );
     expect(result.finalizedDraft.tokenURI).toBe('ar://finalized-pending-sbt');
     expect(mockCreateSBT).toHaveBeenCalledWith(
@@ -199,12 +211,14 @@ describe('SessionWizard pending SBT utilities', () => {
         contracts: {},
       },
       'draft/test',
-      { useConfiguredDeterministic: true, initializeGroupPasswordHash: false }
+      { useConfiguredDeterministic: true, initializeGroupPasswordHash: false },
     );
-    expect(result.finalizedDraft).toEqual(expect.objectContaining({
-      tokenURI: 'ar://finalized-pending-sbt',
-      metadataUploadStatus: 'ready',
-    }));
+    expect(result.finalizedDraft).toEqual(
+      expect.objectContaining({
+        tokenURI: 'ar://finalized-pending-sbt',
+        metadataUploadStatus: 'ready',
+      }),
+    );
   });
 
   it('resolves demo selector discovery from the source session config instead of the auto-seeded draft block window', () => {
@@ -214,9 +228,14 @@ describe('SessionWizard pending SBT utilities', () => {
       registryChainId: 84532,
       draftNetworkChainId: 84532,
       network: { id: 84532 },
-      normalizeSlug: (value = '') => String(value || '').trim().toLowerCase(),
+      normalizeSlug: (value = '') =>
+        String(value || '')
+          .trim()
+          .toLowerCase(),
       resolveStrictConfig: (slug = '') => {
-        const normalized = String(slug || '').trim().toLowerCase();
+        const normalized = String(slug || '')
+          .trim()
+          .toLowerCase();
         if (normalized && normalized !== 'general') return null;
         return {
           slug: '',
@@ -237,19 +256,21 @@ describe('SessionWizard pending SBT utilities', () => {
       resolveDisplayConfig: () => null,
     });
 
-    expect(selectorConfig).toEqual(expect.objectContaining({
-      slug: 'demo',
-      networkChainId: 84532,
-      contracts: expect.objectContaining({
-        sbtFactory: expect.objectContaining({
-          address: mockSelectorSourceFactory,
-          chainId: 84532,
+    expect(selectorConfig).toEqual(
+      expect.objectContaining({
+        slug: 'demo',
+        networkChainId: 84532,
+        contracts: expect.objectContaining({
+          sbtFactory: expect.objectContaining({
+            address: mockSelectorSourceFactory,
+            chainId: 84532,
+          }),
+        }),
+        blockLimits: expect.objectContaining({
+          start: mockSelectorSourceStartBlock,
         }),
       }),
-      blockLimits: expect.objectContaining({
-        start: mockSelectorSourceStartBlock,
-      }),
-    }));
+    );
     expect(selectorConfig?.blockLimits?.start).not.toBe(latestBlock);
   });
 });

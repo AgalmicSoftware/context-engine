@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { connect } from 'react-redux';
-import {
-  base64urlToBase64,
-  base64urlToHex,
-  hexToBase64url,
-} from '../../domains/storage/arweaveEncoding.js';
+import { base64urlToBase64, base64urlToHex, hexToBase64url } from '../../domains/storage/arweaveEncoding.js';
 import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
@@ -26,14 +22,8 @@ import { faExpand, faCaretDown, faCaretUp, faCopy, faCheck } from '@fortawesome/
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js'; // Added import
 import { notify } from '../../utilities/ui/notify.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import {
-  buildPublicRoute,
-  stripPublicUrlBasePath,
-} from '../../utilities/ui/publicUrl.js';
-import {
-  resolveContractPageActiveSession,
-  resolveContractPageReferrerSlug,
-} from './contractPageSessionResolution.js';
+import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import { resolveContractPageActiveSession, resolveContractPageReferrerSlug } from './contractPageSessionResolution.js';
 import ContractViewer, { type ContractViewerContract } from './ContractViewer';
 import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
@@ -79,7 +69,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
 
   // Fallback: derive slug from referrer (covers full-page reload from /session/:slug)
   const referrerSlug = resolveContractPageReferrerSlug(
-    (typeof document !== 'undefined' ? document.referrer : '') || ''
+    (typeof document !== 'undefined' ? document.referrer : '') || '',
   );
 
   // Resolve session by URL first, then ?session, then routed/Redux context, then referrer, else default "general"
@@ -142,7 +132,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
     {
       clusterCount: '<ClusterCount>',
       sizes: '<ClusterSizes>',
-    }
+    },
   );
 
   const compareToolkitPromptDisplay = buildCompareToolkitPrompt({
@@ -160,26 +150,52 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
   });
   const photoAnalysisPromptDisplay = buildPhotoAnalysisPrompt('<SourceFilename>');
 
-  const promptItems = useMemo<PromptItem[]>(() => ([
-    { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
-    { id: 'questionSelection', title: 'Question Selection', file: 'questionSelectionPrompt.js', content: questionSelectionPrompt },
-    { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
-    { id: 'photoAnalysis', title: 'Photo Analysis', file: 'photoAnalysisPrompt.js', content: photoAnalysisPromptDisplay },
-    { id: 'compareToolkit', title: 'Compare Toolkit', file: 'compareToolkitPrompt.js', content: compareToolkitPromptDisplay },
-    { id: 'clusterAnalysisSystem', title: 'Cluster Analysis (System)', file: 'clusterAnalysisPrompt.js', content: CLUSTER_ANALYSIS_SYSTEM_PROMPT },
-    { id: 'clusterAnalysis', title: 'Cluster Analysis (User)', file: 'clusterAnalysisPrompt.js', content: clusterAnalysisPromptDisplay },
-    { id: 'userAnalysis', title: 'User Analysis', file: 'userAnalysisPrompt.js', content: userAnalysisPromptDisplay },
-    { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.js', content: aiRewritePrompt },
-  ]), [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay]);
+  const promptItems = useMemo<PromptItem[]>(
+    () => [
+      { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
+      {
+        id: 'questionSelection',
+        title: 'Question Selection',
+        file: 'questionSelectionPrompt.js',
+        content: questionSelectionPrompt,
+      },
+      { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
+      {
+        id: 'photoAnalysis',
+        title: 'Photo Analysis',
+        file: 'photoAnalysisPrompt.js',
+        content: photoAnalysisPromptDisplay,
+      },
+      {
+        id: 'compareToolkit',
+        title: 'Compare Toolkit',
+        file: 'compareToolkitPrompt.js',
+        content: compareToolkitPromptDisplay,
+      },
+      {
+        id: 'clusterAnalysisSystem',
+        title: 'Cluster Analysis (System)',
+        file: 'clusterAnalysisPrompt.js',
+        content: CLUSTER_ANALYSIS_SYSTEM_PROMPT,
+      },
+      {
+        id: 'clusterAnalysis',
+        title: 'Cluster Analysis (User)',
+        file: 'clusterAnalysisPrompt.js',
+        content: clusterAnalysisPromptDisplay,
+      },
+      { id: 'userAnalysis', title: 'User Analysis', file: 'userAnalysisPrompt.js', content: userAnalysisPromptDisplay },
+      { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.js', content: aiRewritePrompt },
+    ],
+    [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay],
+  );
 
   const sessionNetworkChainId = activeSession?.networkChainId;
   const contracts = useMemo(() => {
-    const sessionContracts = (
-      activeSession?.contracts &&
-      typeof activeSession.contracts === 'object'
-        ? activeSession.contracts as SessionContractsMap
-        : {}
-    );
+    const sessionContracts =
+      activeSession?.contracts && typeof activeSession.contracts === 'object'
+        ? (activeSession.contracts as SessionContractsMap)
+        : {};
     const firstContract = Object.values(sessionContracts)[0] || null;
     const chainId = Number(sessionNetworkChainId || firstContract?.chainId || 0) || undefined;
     return buildContractsForViewer({
@@ -187,18 +203,21 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
       chainId,
       includeSessionRegistry: true,
       includeCustomSBT: true,
-    }).map((contract) => (
+    }).map((contract) =>
       contract.key === 'sbtFactory'
         ? {
             ...contract,
             extraAction: (
-              <button onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))} className={styles.backButton}>
+              <button
+                onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))}
+                className={styles.backButton}
+              >
                 <FontAwesomeIcon icon={faExpand} /> {`${t('sbts')} list`}
               </button>
             ),
           }
-        : contract
-    ));
+        : contract,
+    );
   }, [activeSession?.contracts, sessionNetworkChainId]);
 
   const [bytes32Input, setBytes32Input] = useState('');
@@ -218,19 +237,25 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
   const [filterUrlInput, setFilterUrlInput] = useState('');
   const [deserializedFilterObjectOutput, setDeserializedFilterObjectOutput] = useState('');
 
-  useEffect(() => () => {
-    copyResetTimersRef.current.forEach((timerId) => clearTimeout(timerId));
-    copyResetTimersRef.current.clear();
-  }, []);
+  useEffect(
+    () => () => {
+      copyResetTimersRef.current.forEach((timerId) => clearTimeout(timerId));
+      copyResetTimersRef.current.clear();
+    },
+    [],
+  );
 
   const scheduleCopyReset = (key: string, resetFn: () => void, delayMs = 1500) => {
     const timers = copyResetTimersRef.current;
     const existing = timers.get(key);
     if (existing) clearTimeout(existing);
-    const timeoutId = setTimeout(() => {
-      timers.delete(key);
-      resetFn();
-    }, Math.max(0, Number(delayMs) || 0));
+    const timeoutId = setTimeout(
+      () => {
+        timers.delete(key);
+        resetFn();
+      },
+      Math.max(0, Number(delayMs) || 0),
+    );
     timers.set(key, timeoutId);
   };
 
@@ -265,13 +290,17 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
 
   const handleCopyPrompt = (promptKey: string, content: string) => {
     if (!content || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
-    navigator.clipboard.writeText(content)
+    navigator.clipboard
+      .writeText(content)
       .then(() => {
         notify.success('Copied to clipboard');
         setCopiedPromptKey(promptKey);
         scheduleCopyReset('copiedPromptKey', () => setCopiedPromptKey(''));
       })
-      .catch((e) => { void e; notify.warn('Copy failed'); });
+      .catch((e) => {
+        void e;
+        notify.warn('Copy failed');
+      });
   };
 
   const handlePromptToggle = (promptId: string) => {
@@ -300,8 +329,10 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
       if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
       parts.push(
         <span key={match.index} className={styles.promptVar}>
-          {'<'}{match[1]}{'>'}
-        </span>
+          {'<'}
+          {match[1]}
+          {'>'}
+        </span>,
       );
       lastIndex = re.lastIndex;
     }
@@ -310,32 +341,44 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
     return parts;
   };
 
-  const jsonBundleText = useMemo(() => JSON.stringify({
-    contracts: contracts
-      .filter((contract) => contract.source)
-      .map((contract) => ({
-        key: contract.key,
-        name: contract.name,
-        file: contract.sourceFile || '',
-        source: contract.source || '',
-      })),
-    prompts: promptItems.map((prompt) => ({
-      id: prompt.id,
-      title: prompt.title,
-      file: prompt.file,
-      content: prompt.content || '',
-    })),
-  }, null, 2), [contracts, promptItems]);
+  const jsonBundleText = useMemo(
+    () =>
+      JSON.stringify(
+        {
+          contracts: contracts
+            .filter((contract) => contract.source)
+            .map((contract) => ({
+              key: contract.key,
+              name: contract.name,
+              file: contract.sourceFile || '',
+              source: contract.source || '',
+            })),
+          prompts: promptItems.map((prompt) => ({
+            id: prompt.id,
+            title: prompt.title,
+            file: prompt.file,
+            content: prompt.content || '',
+          })),
+        },
+        null,
+        2,
+      ),
+    [contracts, promptItems],
+  );
 
   const handleCopyJsonBundle = () => {
     if (!jsonBundleText || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
-    navigator.clipboard.writeText(jsonBundleText)
+    navigator.clipboard
+      .writeText(jsonBundleText)
       .then(() => {
         notify.success('Copied to clipboard');
         setCopiedJson(true);
         scheduleCopyReset('copiedJsonBundle', () => setCopiedJson(false));
       })
-      .catch((e) => { void e; notify.warn('Copy failed'); });
+      .catch((e) => {
+        void e;
+        notify.warn('Copy failed');
+      });
   };
 
   return (
@@ -405,17 +448,11 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
                       >
                         <FontAwesomeIcon icon={copiedPromptKey === prompt.id ? faCheck : faCopy} />
                       </button>
-                      <FontAwesomeIcon
-                        icon={isOpen ? faCaretUp : faCaretDown}
-                        className={styles.promptToggleIcon}
-                      />
+                      <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} className={styles.promptToggleIcon} />
                     </div>
                   </div>
                   {isOpen && (
-                    <pre
-                      id={`prompt-${prompt.id}`}
-                      className={styles.promptBlock}
-                    >
+                    <pre id={`prompt-${prompt.id}`} className={styles.promptBlock}>
                       {highlightPromptVariables(prompt.content || '(Prompt unavailable)')}
                     </pre>
                   )}

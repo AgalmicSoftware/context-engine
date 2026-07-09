@@ -11,7 +11,7 @@ type TooltipPreferenceState = {
 
 const CETooltipEnabled = (props: UncontrolledTooltipProps) => {
   const enabled = useSelector<TooltipPreferenceState, boolean>(
-    (state) => state.sessionState?.tooltipsEnabled !== false
+    (state) => state.sessionState?.tooltipsEnabled !== false,
   );
 
   React.useEffect(() => {

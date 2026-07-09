@@ -169,10 +169,34 @@ const computeStance = (username: string) => {
   if (!data || !data.votes) return [];
 
   const dimensions = [
-    { label: 'Safety vs Speed', positive: ['0x20', '0x21', '0x22', '0x23'], negative: ['0x10', '0x11', '0x12', '0x13'], leftLabel: 'Cautious', rightLabel: 'Accelerate' },
-    { label: 'Control vs Openness', positive: ['0x32'], negative: ['0x31', '0x33'], leftLabel: 'Tight control', rightLabel: 'Open access' },
-    { label: 'Regulation vs Freedom', positive: ['0x32', '0x33'], negative: ['0x30', '0x31'], leftLabel: 'Regulate', rightLabel: 'Self-govern' },
-    { label: 'Protection vs Automation', positive: ['0x20', '0x22'], negative: ['0x41'], leftLabel: 'Protect workers', rightLabel: 'Embrace automation' },
+    {
+      label: 'Safety vs Speed',
+      positive: ['0x20', '0x21', '0x22', '0x23'],
+      negative: ['0x10', '0x11', '0x12', '0x13'],
+      leftLabel: 'Cautious',
+      rightLabel: 'Accelerate',
+    },
+    {
+      label: 'Control vs Openness',
+      positive: ['0x32'],
+      negative: ['0x31', '0x33'],
+      leftLabel: 'Tight control',
+      rightLabel: 'Open access',
+    },
+    {
+      label: 'Regulation vs Freedom',
+      positive: ['0x32', '0x33'],
+      negative: ['0x30', '0x31'],
+      leftLabel: 'Regulate',
+      rightLabel: 'Self-govern',
+    },
+    {
+      label: 'Protection vs Automation',
+      positive: ['0x20', '0x22'],
+      negative: ['0x41'],
+      leftLabel: 'Protect workers',
+      rightLabel: 'Embrace automation',
+    },
   ];
 
   return dimensions.map((dim) => {
@@ -181,8 +205,14 @@ const computeStance = (username: string) => {
     Object.entries(data.votes || {}).forEach(([nodeId, val]) => {
       const prefix = nodeId.substring(0, 4);
       const v = parseInt(String(val), 10);
-      if (dim.positive.includes(prefix)) { score += v; count++; }
-      if (dim.negative.includes(prefix)) { score -= v; count++; }
+      if (dim.positive.includes(prefix)) {
+        score += v;
+        count++;
+      }
+      if (dim.negative.includes(prefix)) {
+        score -= v;
+        count++;
+      }
     });
     const avg = count > 0 ? score / count : 0;
     const normalized = Math.max(-1, Math.min(1, avg / 6)); // -1 to 1
@@ -198,10 +228,12 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
 
   componentDidMount() {
     const { simUsername } = this.props;
-    this.setState(buildSimUserInfoStatePatch({
-      figures: historicalFiguresData,
-      simUsername,
-    }));
+    this.setState(
+      buildSimUserInfoStatePatch({
+        figures: historicalFiguresData,
+        simUsername,
+      }),
+    );
   }
 
   closeFullProfileModal = () => {
@@ -211,7 +243,10 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
   buildQuestionCardData = (question: SimQuestion): SimQuestionCardData => ({
     question: {
       prompt: String(question?.question || '').trim() || 'Untitled question',
-      type: String(question?.questionType || 'freeform').trim().toLowerCase() || 'freeform',
+      type:
+        String(question?.questionType || 'freeform')
+          .trim()
+          .toLowerCase() || 'freeform',
     },
     response: {
       answer: {
@@ -237,7 +272,11 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
     );
   };
 
-  handleHistoricalAvatarError = (event: React.SyntheticEvent<HTMLImageElement>, username: string, fallbackSeed = '') => {
+  handleHistoricalAvatarError = (
+    event: React.SyntheticEvent<HTMLImageElement>,
+    username: string,
+    fallbackSeed = '',
+  ) => {
     const target = event?.currentTarget;
     if (!target) return;
     const fallbackSrc = getHistoricalFigureBlockie(username, { fallbackSeed });
@@ -260,11 +299,14 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
 
     const figureAtlasData = atlasDataByUser[userInfo.username];
     const atlasPositions = figureAtlasData
-      ? Object.entries(figureAtlasData.votes || {}).map(([nodeId, val]) => ({
-          nodeId,
-          nodeName: nodeNames[nodeId] || nodeId.substring(0, 10),
-          vote: parseInt(String(val), 10),
-        })).sort((a, b) => Math.abs(b.vote) - Math.abs(a.vote)).slice(0, 8)
+      ? Object.entries(figureAtlasData.votes || {})
+          .map(([nodeId, val]) => ({
+            nodeId,
+            nodeName: nodeNames[nodeId] || nodeId.substring(0, 10),
+            vote: parseInt(String(val), 10),
+          }))
+          .sort((a, b) => Math.abs(b.vote) - Math.abs(a.vote))
+          .slice(0, 8)
       : [];
 
     const stance = computeStance(userInfo.username);
@@ -280,8 +322,8 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
       >
         {/* === HERO SECTION === */}
         <div className={styles.heroQuoteRow}>
-            <div className={styles.heroSection}>
-              <div className={styles.heroLeft}>
+          <div className={styles.heroSection}>
+            <div className={styles.heroLeft}>
               <img
                 src={resolvedAvatar}
                 alt={userInfo.name}
@@ -307,9 +349,7 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
           {!minimized && userInfo.featuredQuote && (
             <div className={styles.quoteSection}>
               <FontAwesomeIcon icon={faQuoteLeft} className={styles.quoteIcon} />
-              <blockquote className={styles.featuredQuote}>
-                {userInfo.featuredQuote}
-              </blockquote>
+              <blockquote className={styles.featuredQuote}>{userInfo.featuredQuote}</blockquote>
               <cite className={styles.quoteAttribution}>— {userInfo.name}, on AI policy</cite>
             </div>
           )}
@@ -350,8 +390,8 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                     <span className={styles.sectionEyebrow}>Atlas Positions</span>
                     <h2>Where They Stand</h2>
                     <p className={styles.sectionDescription}>
-                      Strongest convictions across AI policy topics. Positive = agrees with the topic&apos;s
-                      framing, negative = challenges it.
+                      Strongest convictions across AI policy topics. Positive = agrees with the topic&apos;s framing,
+                      negative = challenges it.
                     </p>
                     <div className={styles.positionList}>
                       {atlasPositions.map((pos) => {
@@ -360,7 +400,8 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                           returnTo: readWindowLocationPath(),
                         });
                         const voteDisplay = pos.vote > 0 ? `+${pos.vote}` : pos.vote;
-                        const voteMeaning = pos.vote > 0 ? 'Agrees with the topic framing' : 'Challenges the topic framing';
+                        const voteMeaning =
+                          pos.vote > 0 ? 'Agrees with the topic framing' : 'Challenges the topic framing';
 
                         return (
                           <a
@@ -404,7 +445,9 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                 {/* Related Figures */}
                 {(allies.length > 0 || opponents.length > 0) && (
                   <div className={styles.relatedSection}>
-                    <span className={styles.sectionEyebrow}><FontAwesomeIcon icon={faUsers} /> Related Figures</span>
+                    <span className={styles.sectionEyebrow}>
+                      <FontAwesomeIcon icon={faUsers} /> Related Figures
+                    </span>
                     {allies.length > 0 && (
                       <div className={styles.relatedGroup}>
                         <h3 className={styles.relatedLabel}>Most Agreement</h3>
@@ -485,8 +528,15 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
           </>
         )}
 
-        <Modal isOpen={this.state.showFullProfileModal} toggle={this.closeFullProfileModal} size="lg" className={styles.modalContent}>
-          <ModalHeader toggle={this.closeFullProfileModal} className={styles.modalHeader}>Full User Profile</ModalHeader>
+        <Modal
+          isOpen={this.state.showFullProfileModal}
+          toggle={this.closeFullProfileModal}
+          size="lg"
+          className={styles.modalContent}
+        >
+          <ModalHeader toggle={this.closeFullProfileModal} className={styles.modalHeader}>
+            Full User Profile
+          </ModalHeader>
           <ModalBody className={styles.modalBody}>
             <div className={styles.modalSummary}>
               <h3>User Summary</h3>
@@ -495,7 +545,9 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
             <div className={styles.modalQuestions}>
               <h3>Question Responses</h3>
               <div className={styles.modalQuestionDeck}>
-                {userInfo.questions.map((question, index) => this.renderQuestionResponse(question, index, 'fullscreen'))}
+                {userInfo.questions.map((question, index) =>
+                  this.renderQuestionResponse(question, index, 'fullscreen'),
+                )}
               </div>
             </div>
           </ModalBody>

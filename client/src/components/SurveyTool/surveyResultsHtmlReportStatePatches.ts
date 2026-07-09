@@ -23,9 +23,7 @@ export type SurveyResultsHtmlReportDownloadStatePatch = {
   htmlReportSelectedSections?: Required<SessionResultsSectionSelection>;
 };
 
-export const buildSurveyResultsHtmlReportModalOpenPatch = (
-  exportedAt: unknown
-) => ({
+export const buildSurveyResultsHtmlReportModalOpenPatch = (exportedAt: unknown) => ({
   htmlReportModalOpen: true,
   htmlReportExportedAt: String(exportedAt || ''),
   htmlReportAnalysisError: '',
@@ -78,32 +76,28 @@ export const buildSurveyResultsHtmlReportDemoModePatch = ({
     htmlReportAnalysisError: '',
     htmlReportSelectedSections: enabled
       ? {
-        argumentMap: true,
-        atlas: true,
-        report: true,
-        riskMatrix: true,
-        snapshotJson: true,
-      }
+          argumentMap: true,
+          atlas: true,
+          report: true,
+          riskMatrix: true,
+          snapshotJson: true,
+        }
       : { ...SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS },
   };
 };
 
-export const buildSurveyResultsHtmlReportFormatPatch = (
-  format: SessionResultsExportFormat
-) => ({
+export const buildSurveyResultsHtmlReportFormatPatch = (format: SessionResultsExportFormat) => ({
   htmlReportExportFormat: format,
 });
 
 export const buildSurveyResultsHtmlReportAnalysisDemoReadyPatch = (
-  artifact: SessionResultsGeneratedAnalysisArtifact
+  artifact: SessionResultsGeneratedAnalysisArtifact,
 ) => ({
   htmlReportAnalysisArtifact: artifact,
   htmlReportAnalysisError: '',
 });
 
-export const buildSurveyResultsHtmlReportAnalysisErrorPatch = (
-  htmlReportAnalysisError: unknown
-) => ({
+export const buildSurveyResultsHtmlReportAnalysisErrorPatch = (htmlReportAnalysisError: unknown) => ({
   htmlReportAnalysisError: String(htmlReportAnalysisError || ''),
 });
 
@@ -118,8 +112,6 @@ export const buildSurveyResultsHtmlReportAnalysisEligibilityBlockedPatch = ({
   htmlReportAnalysisInputSignature: String(inputSignature || ''),
 });
 
-export const buildSurveyResultsHtmlReportAnalysisProgressPatch = (
-  htmlReportAnalysisProgress: unknown
-) => ({
+export const buildSurveyResultsHtmlReportAnalysisProgressPatch = (htmlReportAnalysisProgress: unknown) => ({
   htmlReportAnalysisProgress: String(htmlReportAnalysisProgress || ''),
 });

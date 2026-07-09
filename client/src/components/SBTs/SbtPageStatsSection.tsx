@@ -1,18 +1,11 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faChevronDown,
-  faChevronUp,
-  faQuestionCircle,
-} from '@fortawesome/free-solid-svg-icons';
+import { faChevronDown, faChevronUp, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
 import CETooltip from '../Shared/CETooltip';
 import styles from './SBTPage.module.scss';
 import SbtPageHolderStatusDisplay from './SbtPageHolderStatusDisplay';
-import type {
-  SbtPageHolderCountStatus,
-  SbtPageHolderScanProgressDisplay,
-} from './SbtPageHolderStatusDisplay';
+import type { SbtPageHolderCountStatus, SbtPageHolderScanProgressDisplay } from './SbtPageHolderStatusDisplay';
 
 type SbtPageStatsSectionProps = {
   adminAddressDisplay: React.ReactNode;
@@ -49,8 +42,7 @@ const SbtPageStatsSection = ({
 }: SbtPageStatsSectionProps): React.ReactElement => (
   <div className={styles.statsSection}>
     <h2 className={sectionHeaderClassName} onClick={onToggle}>
-      STATS{' '}
-      {shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
+      STATS {shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
       {shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
     </h2>
     {isOpen && (
@@ -80,8 +72,7 @@ const SbtPageStatsSection = ({
           </CETooltip>
         </p>
         <p>
-          <span className={styles.label}>Network:</span>{' '}
-          {networkLabel}
+          <span className={styles.label}>Network:</span> {networkLabel}
         </p>
 
         <p>

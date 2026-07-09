@@ -15,25 +15,18 @@ describe('ProfileScanPort', () => {
       chainGateway: () => currentChainGateway,
     });
 
-    await expect(port.getSBTsForUser('0xabc', 'alpha', 10, { returnMeta: true }))
-      .resolves.toEqual([{ id: 'first-sbt' }]);
+    await expect(port.getSBTsForUser('0xabc', 'alpha', 10, { returnMeta: true })).resolves.toEqual([
+      { id: 'first-sbt' },
+    ]);
 
     currentChainGateway = secondChainGateway;
 
-    await expect(port.getUserActivity('0xdef', 'beta', 20, { includeSurveys: true }))
-      .resolves.toEqual({ data: { surveys: ['second-survey'] }, hadError: false });
+    await expect(port.getUserActivity('0xdef', 'beta', 20, { includeSurveys: true })).resolves.toEqual({
+      data: { surveys: ['second-survey'] },
+      hadError: false,
+    });
 
-    expect(firstChainGateway.getSBTsForUser).toHaveBeenCalledWith(
-      '0xabc',
-      'alpha',
-      10,
-      { returnMeta: true }
-    );
-    expect(secondChainGateway.getUserActivity).toHaveBeenCalledWith(
-      '0xdef',
-      'beta',
-      20,
-      { includeSurveys: true }
-    );
+    expect(firstChainGateway.getSBTsForUser).toHaveBeenCalledWith('0xabc', 'alpha', 10, { returnMeta: true });
+    expect(secondChainGateway.getUserActivity).toHaveBeenCalledWith('0xdef', 'beta', 20, { includeSurveys: true });
   });
 });

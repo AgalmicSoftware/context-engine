@@ -93,11 +93,13 @@ import type {
   SbtFilterSelectionState,
   UnknownRecord,
 } from './sbtFilterHelpers';
-import contractScripts, { getSessionChainId, getSessionSlugByName, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import contractScripts, {
+  getSessionChainId,
+  getSessionSlugByName,
+  normalizeSessionSlug,
+} from '../../utilities/web3/chainGateway.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
-import {
-  bindSbtFilterRuntimePorts,
-} from './sbtFilterRuntimePorts';
+import { bindSbtFilterRuntimePorts } from './sbtFilterRuntimePorts';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFilter, faSpinner, faTimes, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
@@ -175,9 +177,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
     this._lastScheduledApplyReason = '';
     this._holderSetMemo = new Map();
     this._holderSetInFlight = new Map();
-    this._lastExternalFilterStateSignature = buildSbtFilterStateSignature(
-      props.externalSBTFilterState || {}
-    );
+    this._lastExternalFilterStateSignature = buildSbtFilterStateSignature(props.externalSBTFilterState || {});
   }
 
   componentDidMount() {
@@ -195,7 +195,6 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
     this._holderSetInFlight.clear();
   }
 
-
   componentDidUpdate(prevProps: Readonly<SbtFilterProps>, prevState: Readonly<SbtFilterState>): void {
     // Determine readiness based on mode.
     const wasDataReady = isSbtFilterDataReady({
@@ -210,11 +209,13 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
     });
 
     // If data just became ready and a filter is active, apply the filter.
-    if (shouldApplySbtFilterOnDataReady({
-      hasActiveFilter: this.hasAnyFilterActive(),
-      isDataReady,
-      wasDataReady,
-    })) {
+    if (
+      shouldApplySbtFilterOnDataReady({
+        hasActiveFilter: this.hasAnyFilterActive(),
+        isDataReady,
+        wasDataReady,
+      })
+    ) {
       this.scheduleApplyFilter('data-ready');
       return; // Filter applied; no further checks this cycle.
     }
@@ -234,9 +235,11 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
       // If local state is already aligned, continue so normal reapply triggers
       // (e.g., changed items/mode/cache revision) still run in this update.
       if (externalStateSync.shouldSyncLocalState) {
-        this.setState(buildSbtFilterExternalStateSyncPatch({
-          incomingStateNormalized: externalStateSync.incomingStateNormalized,
-        }));
+        this.setState(
+          buildSbtFilterExternalStateSyncPatch({
+            incomingStateNormalized: externalStateSync.incomingStateNormalized,
+          }),
+        );
         // Note: Removed direct applyFilter() call here. The state update triggers
         // componentDidUpdate again, which catches the change in step 2 below.
         return;
@@ -257,7 +260,6 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
     }
   }
 
-
   hasAnyFilterActive(): boolean {
     return hasActiveSbtFilterState(this.getLocalFilterState());
   }
@@ -270,12 +272,11 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
     return buildSbtFilterStateSignature(this.getLocalFilterState());
   }
 
-  isLatestApplyRun = (runId: unknown): boolean => (
+  isLatestApplyRun = (runId: unknown): boolean =>
     isLatestSbtFilterApplyRun({
       activeApplyFilterRunId: this._activeApplyFilterRunId,
       runId,
-    })
-  );
+    });
 
   getEffectiveNetwork = (): SbtFilterNetworkLike | null => {
     return resolveEffectiveSbtFilterNetwork({
@@ -328,9 +329,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   };
 
   applyFilter = async (runId: unknown, _reason: unknown = 'manual'): Promise<unknown> => {
-    const effectiveRunId = runId != null
-      ? Number(runId)
-      : (Number(this._applyFilterRunSeq || 0) + 1);
+    const effectiveRunId = runId != null ? Number(runId) : Number(this._applyFilterRunSeq || 0) + 1;
     let newFilterSnapshot = '';
     if (runId == null) {
       this._applyFilterRunSeq = effectiveRunId;
@@ -350,10 +349,10 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
       });
 
       if (!isDataReady) {
-        sbtLog.warn("SBTFilter: Waiting for necessary caches to be ready. Aborting filter.", {
+        sbtLog.warn('SBTFilter: Waiting for necessary caches to be ready. Aborting filter.', {
           mode,
           isSBTCacheReady,
-          isQuestionCacheReady
+          isQuestionCacheReady,
         });
         return;
       }
@@ -365,16 +364,11 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
         excludedSBTGroupsResponder,
         selectedSBTGroups,
         excludedSBTGroups,
-        onlyVerifiedHumans
+        onlyVerifiedHumans,
       } = this.getLocalFilterState();
 
       const effectiveNetwork = this.getEffectiveNetwork();
-      const networkID = String(
-        getSessionChainId(slug) ||
-        effectiveNetwork?.id ||
-        effectiveNetwork?.chainId ||
-        ''
-      );
+      const networkID = String(getSessionChainId(slug) || effectiveNetwork?.id || effectiveNetwork?.chainId || '');
       sbtLog.log('Network ID used in SBTFilter:', networkID);
 
       const itemCount = getSbtFilterItemCount(items);
@@ -443,14 +437,16 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
         slugForCache: unknown,
         netKeyForCache: unknown,
         sbtAddress: string,
-        entryPatch: UnknownRecord = {}
+        entryPatch: UnknownRecord = {},
       ): UnknownRecord | null => {
         const cacheKey = buildSbtFilterSbtCacheMemoKey(slugForCache);
-        const rawCache = asCacheObject(readMemoizedSbtFilterSbtCacheBySlug({
-          cacheBySlug,
-          readSbtCacheBySlug: readSbtFilterSbtCacheBySlug,
-          slugForCache,
-        }));
+        const rawCache = asCacheObject(
+          readMemoizedSbtFilterSbtCacheBySlug({
+            cacheBySlug,
+            readSbtCacheBySlug: readSbtFilterSbtCacheBySlug,
+            slugForCache,
+          }),
+        );
         const nextCache = buildSbtFilterSbtEntryCachePatch({
           entryPatch,
           netKey: netKeyForCache,
@@ -501,10 +497,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
         const rawEntryBurnedCounts = entry?.burnedCountByAddress;
         const entryMintedCountMap = normalizeAddressCountMap(rawEntryMintedCounts);
         const entryBurnedCountMap = normalizeAddressCountMap(rawEntryBurnedCounts);
-        const {
-          checkpointBackedPartialCounts,
-          shouldUseEntryCountMaps,
-        } = resolveSbtFilterEntryCountMapUsage({
+        const { checkpointBackedPartialCounts, shouldUseEntryCountMaps } = resolveSbtFilterEntryCountMapUsage({
           entry,
           entryBurned,
           entryBurnedCountMap,
@@ -544,7 +537,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
 
         if (shouldUseEntryCountMaps) {
           const holdersSet = measureSync('ce.sbtFilter.computeNetHolderSet', () =>
-            buildNetHoldersSetFromCounts(entryMintedCountMap, entryBurnedCountMap)
+            buildNetHoldersSetFromCounts(entryMintedCountMap, entryBurnedCountMap),
           ) as Set<string>;
           this.setHolderSetMemo(holderRevisionKey, holdersSet);
           sbtHoldersMap[sbtAddress] = holdersSet;
@@ -553,7 +546,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
 
         if (!checkpointBackedPartialCounts && entry.countsLoaded === true && entryMinted && entryBurned) {
           const holdersSet = measureSync('ce.sbtFilter.computeNetHolderSet', () =>
-            buildNetHoldersSet(entryMinted, entryBurned)
+            buildNetHoldersSet(entryMinted, entryBurned),
           ) as Set<string>;
           this.setHolderSetMemo(holderRevisionKey, holdersSet);
           sbtHoldersMap[sbtAddress] = holdersSet;
@@ -572,22 +565,26 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
           let inFlight = this._holderSetInFlight.get(requestKey);
           if (!inFlight) {
             inFlight = (async () => {
-              const counts = await contractScriptsBoundary.getSbtMintBurnCountsByAddress('none', sbtAddress, fromBlock, 'latest', sbtSlug);
+              const counts = await contractScriptsBoundary.getSbtMintBurnCountsByAddress(
+                'none',
+                sbtAddress,
+                fromBlock,
+                'latest',
+                sbtSlug,
+              );
               if (counts?.ok === false) {
                 throw new Error('SBT holder count scan failed');
               }
               return buildSbtFilterHolderFetchResult({
                 counts,
-                resolveHoldersSet: (mintedCountByAddress, burnedCountByAddress) => (
+                resolveHoldersSet: (mintedCountByAddress, burnedCountByAddress) =>
                   measureSync('ce.sbtFilter.computeNetHolderSet', () =>
-                    buildNetHoldersSetFromCounts(mintedCountByAddress, burnedCountByAddress)
-                  ) as Set<string>
-                ),
+                    buildNetHoldersSetFromCounts(mintedCountByAddress, burnedCountByAddress),
+                  ) as Set<string>,
               });
-            })()
-              .finally(() => {
-                this._holderSetInFlight.delete(requestKey);
-              });
+            })().finally(() => {
+              this._holderSetInFlight.delete(requestKey);
+            });
             this._holderSetInFlight.set(requestKey, inFlight);
           }
 
@@ -596,12 +593,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
           const holdersSet = fetched?.holdersSet || new Set();
           sbtHoldersMap[sbtAddress] = holdersSet;
 
-          writeSbtEntryForSlug(
-            sbtSlug,
-            netKey,
-            sbtAddress,
-            buildSbtFilterFetchedHolderCacheEntryPatch({ fetched })
-          );
+          writeSbtEntryForSlug(sbtSlug, netKey, sbtAddress, buildSbtFilterFetchedHolderCacheEntryPatch({ fetched }));
           const fetchedRevisionKey = buildSbtFilterFetchedHolderRevisionKey({
             sbtSlug,
             netKey,
@@ -694,13 +686,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
 
           for (const questionObj of items) {
             const questionRecord = asCacheObject(questionObj);
-            if (
-              doesAddressPassFilters(
-                questionRecord.creator,
-                selectedSBTGroupsCreator,
-                excludedSBTGroupsCreator
-              )
-            ) {
+            if (doesAddressPassFilters(questionRecord.creator, selectedSBTGroupsCreator, excludedSBTGroupsCreator)) {
               filteredQuestions.push(questionObj);
             }
           }
@@ -717,24 +703,18 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                 qResponses.push({
                   responder: addr,
                   questionId: qID,
-                  response: responseData
+                  response: responseData,
                 });
               }
             }
 
-          const finalFilteredResponses: SbtFilterResponseEntry[] = [];
-          for (const resp of qResponses) {
-            if (
-              doesAddressPassFilters(
-                resp.responder,
-                selectedSBTGroupsResponder,
-                excludedSBTGroupsResponder
-              )
-            ) {
-              finalFilteredResponses.push(resp);
+            const finalFilteredResponses: SbtFilterResponseEntry[] = [];
+            for (const resp of qResponses) {
+              if (doesAddressPassFilters(resp.responder, selectedSBTGroupsResponder, excludedSBTGroupsResponder)) {
+                finalFilteredResponses.push(resp);
+              }
             }
-          }
-          filteredResponsesByQuestion[qID] = finalFilteredResponses;
+            filteredResponsesByQuestion[qID] = finalFilteredResponses;
           }
 
           if (onlyVerifiedHumans) {
@@ -745,16 +725,13 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
             this.props.onFilterCreators(filteredQuestions, this.getLocalFilterState());
           }
           if (this.props.onFilterResponders) {
-            this.props.onFilterResponders(
-              filteredResponsesByQuestion,
-              this.getLocalFilterState()
-            );
+            this.props.onFilterResponders(filteredResponsesByQuestion, this.getLocalFilterState());
           }
 
           if (this.props.onFilter) {
             const combinedResult = {
               filteredQuestions,
-              filteredResponsesByQuestion
+              filteredResponsesByQuestion,
             };
             this.props.onFilter(combinedResult, this.getLocalFilterState());
           }
@@ -766,7 +743,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
             items,
             networkID,
             'creatorAndResponder',
-            slug
+            slug,
           ) as Record<string, SbtFilterResponseEntry[]>;
 
           const finalAggregator: SbtFilterResponseByQuestion = {};
@@ -783,7 +760,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
               keepThisQuestion = doesAddressPassFilters(
                 questionCreator,
                 selectedSBTGroupsCreator,
-                excludedSBTGroupsCreator
+                excludedSBTGroupsCreator,
               );
             }
             if (!keepThisQuestion) {
@@ -796,11 +773,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
             const keptEntries = normalizeAggregatorResponseEntries(rawArray).filter((entryObj) => {
               if (
                 entryObj.responder &&
-                !doesAddressPassFilters(
-                  entryObj.responder,
-                  selectedSBTGroupsResponder,
-                  excludedSBTGroupsResponder
-                )
+                !doesAddressPassFilters(entryObj.responder, selectedSBTGroupsResponder, excludedSBTGroupsResponder)
               ) {
                 return false;
               }
@@ -832,9 +805,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
 
           return;
         } else {
-          sbtLog.warn(
-            'creatorAndResponder mode: expected array or aggregator object, got something else.'
-          );
+          sbtLog.warn('creatorAndResponder mode: expected array or aggregator object, got something else.');
           if (this.props.onFilter) {
             this.props.onFilter([], this.getLocalFilterState());
           }
@@ -843,20 +814,15 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
       }
       // Single-filter aggregator logic
       else if (
-        (mode === 'creator' ||
-          mode === 'responder' ||
-          mode === 'questions' ||
-          mode === 'questionResponses') &&
+        (mode === 'creator' || mode === 'responder' || mode === 'questions' || mode === 'questionResponses') &&
         typeof items === 'object' &&
         items !== null &&
         !Array.isArray(items)
       ) {
-        const unifiedAgg = unifySbtFilterAggregatorWithAllLocalQuestions(
-          items,
-          networkID,
-          mode,
-          slug
-        ) as Record<string, unknown>;
+        const unifiedAgg = unifySbtFilterAggregatorWithAllLocalQuestions(items, networkID, mode, slug) as Record<
+          string,
+          unknown
+        >;
 
         const finalAggregator: SbtFilterResponseByQuestion = {};
         const questionNetCache = readSbtFilterQuestionsNetBucketBySlug(slug, networkID);
@@ -876,7 +842,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
               keepThisQuestion = doesAddressPassFilters(
                 questionCreator,
                 selectedSBTGroupsCreator,
-                excludedSBTGroupsCreator
+                excludedSBTGroupsCreator,
               );
             }
           }
@@ -884,10 +850,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
             continue;
           }
 
-          if (
-            (mode === 'creator' || mode === 'questions') &&
-            getCachedSbtFilterQuestionEntry(questionNetCache, qId)
-          ) {
+          if ((mode === 'creator' || mode === 'questions') && getCachedSbtFilterQuestionEntry(questionNetCache, qId)) {
             filteredQuestions.push(getCachedSbtFilterQuestionEntry(questionNetCache, qId) as SbtFilterQuestionEntry);
           }
 
@@ -897,11 +860,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
             keptEntries = rawArray.filter((entryObj) => {
               if (
                 entryObj.responder &&
-                !doesAddressPassFilters(
-                  entryObj.responder,
-                  selectedSBTGroupsResponder,
-                  excludedSBTGroupsResponder
-                )
+                !doesAddressPassFilters(entryObj.responder, selectedSBTGroupsResponder, excludedSBTGroupsResponder)
               ) {
                 return false;
               }
@@ -938,9 +897,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
       // Default: array filtering or other object
       else {
         const shouldExpandAddresses =
-          mode === 'addresses' &&
-          this.props.expandToSbtHolders === true &&
-          selectedSBTGroups.length > 0;
+          mode === 'addresses' && this.props.expandToSbtHolders === true && selectedSBTGroups.length > 0;
 
         if (!items && !shouldExpandAddresses) {
           sbtLog.warn(`No items supplied for mode="${mode}".`);
@@ -979,19 +936,13 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
             return true;
           } else {
             // question-based item or aggregator sub-item
-            const {
-              creator: addressToCheckCreator,
-              responder: addressToCheckResponder,
-            } = resolveSbtFilterItemParticipantAddresses(item);
+            const { creator: addressToCheckCreator, responder: addressToCheckResponder } =
+              resolveSbtFilterItemParticipantAddresses(item);
 
             if (mode === 'creator' || mode === 'questions') {
               if (addressToCheckCreator) {
                 if (
-                  !doesAddressPassFilters(
-                    addressToCheckCreator,
-                    selectedSBTGroupsCreator,
-                    excludedSBTGroupsCreator
-                  )
+                  !doesAddressPassFilters(addressToCheckCreator, selectedSBTGroupsCreator, excludedSBTGroupsCreator)
                 ) {
                   return false;
                 }
@@ -1003,7 +954,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                   !doesAddressPassFilters(
                     addressToCheckResponder,
                     selectedSBTGroupsResponder,
-                    excludedSBTGroupsResponder
+                    excludedSBTGroupsResponder,
                   )
                 ) {
                   return false;
@@ -1019,9 +970,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
 
         let filteredResult: unknown;
         if (Array.isArray(itemsToFilter)) {
-          filteredResult = measureSync('ce.sbtFilter.filter.array', () =>
-            itemsToFilter.filter(filterItem)
-          );
+          filteredResult = measureSync('ce.sbtFilter.filter.array', () => itemsToFilter.filter(filterItem));
         } else if (typeof items === 'object') {
           filteredResult = measureSync('ce.sbtFilter.filter.object', () => {
             return filterSbtFilterObjectItems(items, filterItem);
@@ -1049,20 +998,24 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   addSbtSelection = (stateKey: SbtFilterSelectionListKey, sbtObject: SbtFilterSbtOption): void => {
     const address = readSbtOptionAddress(sbtObject);
     if (shouldAppendSbtFilterSelection({ address, state: this.state, stateKey })) {
-      this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterSelectionAddPatch({
-        sbtObject,
-        state: prev,
-        stateKey,
-      }));
+      this.setState((prev: Readonly<SbtFilterState>) =>
+        buildSbtFilterSelectionAddPatch({
+          sbtObject,
+          state: prev,
+          stateKey,
+        }),
+      );
     }
   };
 
   removeSbtSelection = (stateKey: SbtFilterSelectionListKey, address: unknown): void => {
-    this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterSelectionRemovePatch({
-      address,
-      state: prev,
-      stateKey,
-    }));
+    this.setState((prev: Readonly<SbtFilterState>) =>
+      buildSbtFilterSelectionRemovePatch({
+        address,
+        state: prev,
+        stateKey,
+      }),
+    );
   };
 
   handleAddSBTIncludeCreator = (sbtObject: SbtFilterSbtOption): void => {
@@ -1108,31 +1061,37 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   };
 
   toggleVerifiedHumans = (): void => {
-    this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterBooleanTogglePatch({
-      state: prev,
-      stateKey: 'onlyVerifiedHumans',
-    }));
+    this.setState((prev: Readonly<SbtFilterState>) =>
+      buildSbtFilterBooleanTogglePatch({
+        state: prev,
+        stateKey: 'onlyVerifiedHumans',
+      }),
+    );
   };
 
   toggleFilterOptions = (): void => {
-    this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterBooleanTogglePatch({
-      state: prev,
-      stateKey: 'showFilterOptions',
-    }));
+    this.setState((prev: Readonly<SbtFilterState>) =>
+      buildSbtFilterBooleanTogglePatch({
+        state: prev,
+        stateKey: 'showFilterOptions',
+      }),
+    );
   };
 
   toggleShowAllSBTs = (): void => {
-    this.setState((prevState: Readonly<SbtFilterState>) => buildSbtFilterBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showAllSBTs',
-    }));
+    this.setState((prevState: Readonly<SbtFilterState>) =>
+      buildSbtFilterBooleanTogglePatch({
+        state: prevState,
+        stateKey: 'showAllSBTs',
+      }),
+    );
     // No need to call applyFilter here, as this only affects the options in the dropdown
-  }
+  };
 
   renderQuickSelectChips = (
     selectedSBTs: unknown,
     onAddHandler: (sbtObject: SbtFilterQuickSbtOption) => void,
-    filterKey: SbtFilterQuickChipKey
+    filterKey: SbtFilterQuickChipKey,
   ): React.ReactNode => {
     const { defaultFeaturedSBTs, sessionSlug } = this.props;
     if (!hasSbtFilterFeaturedOptions(defaultFeaturedSBTs)) {
@@ -1147,23 +1106,16 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
           const address = String(featuredAddress || '').trim();
           if (!address) return null;
 
-          const {
-            chipLabel,
-            isDisabled,
-            isSelected,
-            key,
-            shouldUseSelectedClass,
-            style,
-            testId,
-          } = buildSbtFilterQuickChipDisplayState({
-            address,
-            filterKey,
-            gateColors: QUICK_CHIP_GATE_COLORS,
-            index,
-            resolveDisplayLabel: resolveSbtDisplayLabel,
-            selectedSet,
-            sessionSlug,
-          });
+          const { chipLabel, isDisabled, isSelected, key, shouldUseSelectedClass, style, testId } =
+            buildSbtFilterQuickChipDisplayState({
+              address,
+              filterKey,
+              gateColors: QUICK_CHIP_GATE_COLORS,
+              index,
+              resolveDisplayLabel: resolveSbtDisplayLabel,
+              selectedSet,
+              sessionSlug,
+            });
 
           return (
             <button
@@ -1202,7 +1154,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
       selectedSBTGroups,
       excludedSBTGroups,
       loading,
-      showAllSBTs
+      showAllSBTs,
     } = this.state;
 
     // Receive defaultFeaturedSBTs prop
@@ -1250,10 +1202,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
         {panelDisplayState.shouldRenderFilterToggleButton && (
           <Button
             onClick={this.toggleFilterOptions}
-            className={[
-              styles.filterButton,
-              surfaceClassNames.filterButtonClassName,
-            ].filter(Boolean).join(' ')}
+            className={[styles.filterButton, surfaceClassNames.filterButtonClassName].filter(Boolean).join(' ')}
           >
             {buttonText} <FontAwesomeIcon icon={faFilter} className={styles.filterButtonIcon} />
           </Button>
@@ -1267,27 +1216,18 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                 <FontAwesomeIcon icon={faSpinner} spin size="2x" color="white" />
               </div>
             )}
-            <div
-              className={surfaceClassNames.filterOptionsClassName}
-            >
-
+            <div className={surfaceClassNames.filterOptionsClassName}>
               {/* Conditionally render the "Show All" checkbox */}
               {panelDisplayState.shouldRenderShowAllCheckbox && (
                 <FormGroup check className={styles.showAllCheckbox}>
                   <Label check>
-                    <Input
-                      type="checkbox"
-                      checked={showAllSBTs}
-                      onChange={this.toggleShowAllSBTs}
-                    />{' '}
-                    Show All SBTs
+                    <Input type="checkbox" checked={showAllSBTs} onChange={this.toggleShowAllSBTs} /> Show All SBTs
                   </Label>
                 </FormGroup>
               )}
 
-
               {/* Mode: 'responder' => filter by SBT group(s) of Survey Responder */}
-      {modeSectionsState.shouldRenderResponderFilter && (
+              {modeSectionsState.shouldRenderResponderFilter && (
                 <>
                   <h5>SBT Group(s) of Survey Responder</h5>
                   <SBTSelector
@@ -1303,11 +1243,8 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                     showAllSBTs={showAllSBTs}
                     sbtCacheRevision={this.props.sbtCacheRevision}
                   />
-                  {hasFeaturedSBTs && this.renderQuickSelectChips(
-                    selectedSBTGroupsResponder,
-                    this.handleAddSBTIncludeResponder,
-                    'ir'
-                  )}
+                  {hasFeaturedSBTs &&
+                    this.renderQuickSelectChips(selectedSBTGroupsResponder, this.handleAddSBTIncludeResponder, 'ir')}
 
                   <SBTSelector
                     id="excludeResponder"
@@ -1322,12 +1259,8 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                     showAllSBTs={showAllSBTs}
                     sbtCacheRevision={this.props.sbtCacheRevision}
                   />
-                  {hasFeaturedSBTs && this.renderQuickSelectChips(
-                    excludedSBTGroupsResponder,
-                    this.handleAddSBTExcludeResponder,
-                    'er'
-                  )}
-
+                  {hasFeaturedSBTs &&
+                    this.renderQuickSelectChips(excludedSBTGroupsResponder, this.handleAddSBTExcludeResponder, 'er')}
                 </>
               )}
 
@@ -1347,11 +1280,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                     showAllSBTs={showAllSBTs}
                     sbtCacheRevision={this.props.sbtCacheRevision}
                   />
-                  {hasFeaturedSBTs && this.renderQuickSelectChips(
-                    selectedSBTGroups,
-                    this.handleAddSBTInclude,
-                    'ia'
-                  )}
+                  {hasFeaturedSBTs && this.renderQuickSelectChips(selectedSBTGroups, this.handleAddSBTInclude, 'ia')}
 
                   <SBTSelector
                     id="excludeAddresses"
@@ -1366,11 +1295,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                     showAllSBTs={showAllSBTs}
                     sbtCacheRevision={this.props.sbtCacheRevision}
                   />
-                  {hasFeaturedSBTs && this.renderQuickSelectChips(
-                    excludedSBTGroups,
-                    this.handleAddSBTExclude,
-                    'ea'
-                  )}
+                  {hasFeaturedSBTs && this.renderQuickSelectChips(excludedSBTGroups, this.handleAddSBTExclude, 'ea')}
                 </>
               )}
 
@@ -1393,11 +1318,8 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                         showAllSBTs={showAllSBTs} // Pass state
                         sbtCacheRevision={this.props.sbtCacheRevision}
                       />
-                      {hasFeaturedSBTs && this.renderQuickSelectChips(
-                        selectedSBTGroupsCreator,
-                        this.handleAddSBTIncludeCreator,
-                        'ic'
-                      )}
+                      {hasFeaturedSBTs &&
+                        this.renderQuickSelectChips(selectedSBTGroupsCreator, this.handleAddSBTIncludeCreator, 'ic')}
 
                       <SBTSelector
                         id="excludeCreator"
@@ -1412,11 +1334,8 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                         showAllSBTs={showAllSBTs} // Pass state
                         sbtCacheRevision={this.props.sbtCacheRevision}
                       />
-                      {hasFeaturedSBTs && this.renderQuickSelectChips(
-                        excludedSBTGroupsCreator,
-                        this.handleAddSBTExcludeCreator,
-                        'ec'
-                      )}
+                      {hasFeaturedSBTs &&
+                        this.renderQuickSelectChips(excludedSBTGroupsCreator, this.handleAddSBTExcludeCreator, 'ec')}
                     </>
                   )}
 
@@ -1437,11 +1356,12 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                         showAllSBTs={showAllSBTs} // Pass state
                         sbtCacheRevision={this.props.sbtCacheRevision}
                       />
-                      {hasFeaturedSBTs && this.renderQuickSelectChips(
-                        selectedSBTGroupsResponder,
-                        this.handleAddSBTIncludeResponder,
-                        'ir2'
-                      )}
+                      {hasFeaturedSBTs &&
+                        this.renderQuickSelectChips(
+                          selectedSBTGroupsResponder,
+                          this.handleAddSBTIncludeResponder,
+                          'ir2',
+                        )}
 
                       <SBTSelector
                         id="excludeResponder2"
@@ -1456,12 +1376,12 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                         showAllSBTs={showAllSBTs} // Pass state
                         sbtCacheRevision={this.props.sbtCacheRevision}
                       />
-                      {hasFeaturedSBTs && this.renderQuickSelectChips(
-                        excludedSBTGroupsResponder,
-                        this.handleAddSBTExcludeResponder,
-                        'er2'
-                      )}
-
+                      {hasFeaturedSBTs &&
+                        this.renderQuickSelectChips(
+                          excludedSBTGroupsResponder,
+                          this.handleAddSBTExcludeResponder,
+                          'er2',
+                        )}
                     </>
                   )}
                 </>

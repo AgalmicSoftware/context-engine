@@ -19,7 +19,7 @@ describe('SurveyQuestionsFullQuestionSliderSection', () => {
         questionId="q1"
         sliderMode="importance"
         sliderOpen={false}
-      />
+      />,
     );
 
     const button = screen.getByRole('button', { name: /conviction \/ importance/i });
@@ -44,7 +44,7 @@ describe('SurveyQuestionsFullQuestionSliderSection', () => {
         questionId="q1"
         sliderMode="importance"
         sliderOpen={false}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /conviction \/ importance/i }));
@@ -72,7 +72,7 @@ describe('SurveyQuestionsFullQuestionSliderSection', () => {
         sliderMode="conviction"
         sliderOpen
         sliderToggleExpandedByQuestion={{ q1: true }}
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: /conviction/i })).toHaveTextContent('3');
@@ -109,7 +109,7 @@ describe('SurveyQuestionsFullQuestionSliderSection', () => {
         sliderMode="conviction"
         sliderOpen
         sliderToggleExpandedByQuestion={{ q1: true }}
-      />
+      />,
     );
 
     const slider = screen.getByRole('slider');

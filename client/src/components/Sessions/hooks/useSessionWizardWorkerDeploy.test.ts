@@ -155,10 +155,12 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(options.setDeployForm).toHaveBeenCalledTimes(1);
     const updater = options.setDeployForm.mock.calls[0][0];
     expect(typeof updater).toBe('function');
-    expect(updater({
-      workerName: 'custom-worker',
-      adminAddress: '',
-    })).toEqual({
+    expect(
+      updater({
+        workerName: 'custom-worker',
+        adminAddress: '',
+      }),
+    ).toEqual({
       workerName: 'custom-worker',
       adminAddress: resolvedAddress,
     });
@@ -192,18 +194,23 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(options.updateDeploymentState).toHaveBeenCalledWith({
       deployStatus: INVALID_SESSION_SLUG_FORMAT_ERROR,
     });
-    expect(options.updateDeploymentState).not.toHaveBeenCalledWith(expect.objectContaining({
-      deployStatus: 'Deploying worker…',
-    }));
+    expect(options.updateDeploymentState).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        deployStatus: 'Deploying worker…',
+      }),
+    );
     expect(options.signTypedAdminAction).not.toHaveBeenCalled();
     expect(cryptoUtils._getProvider).not.toHaveBeenCalled();
   });
 
   it('skips a concurrent worker deploy while the first deploy is still resolving', async () => {
     let resolveAccounts: ((accounts: string[]) => void) | undefined;
-    const providerRequest = jest.fn(() => new Promise<string[]>((resolve) => {
-      resolveAccounts = resolve;
-    }));
+    const providerRequest = jest.fn(
+      () =>
+        new Promise<string[]>((resolve) => {
+          resolveAccounts = resolve;
+        }),
+    );
     (cryptoUtils._getProvider as jest.Mock).mockReturnValue({
       request: providerRequest,
     });
@@ -272,20 +279,22 @@ describe('useSessionWizardWorkerDeploy', () => {
     const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
     expect(deployCall).toBeTruthy();
     const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
-    expect(deployPayload.storageProfile).toEqual(expect.objectContaining({
-      backend: 'cloudflare',
-      sessionOwned: true,
-      telegramOwned: false,
-      payloadAccessControl: expect.objectContaining({
-        gate: 'sbt_gate',
-        encryption: 'worker_envelope',
-        mode: 'worker_sbt_gate',
+    expect(deployPayload.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        sessionOwned: true,
+        telegramOwned: false,
+        payloadAccessControl: expect.objectContaining({
+          gate: 'sbt_gate',
+          encryption: 'worker_envelope',
+          mode: 'worker_sbt_gate',
+        }),
+        cloudflare: expect.objectContaining({
+          payloadAccessMode: 'worker_sbt_gate',
+          r2BucketName: 'ce-session-payloads',
+        }),
       }),
-      cloudflare: expect.objectContaining({
-        payloadAccessMode: 'worker_sbt_gate',
-        r2BucketName: 'ce-session-payloads',
-      }),
-    }));
+    );
     expect(deployPayload.storageProfile.resources.questions).toBe('active');
     expect(deployPayload.storageProfile.resources.responses).toBe('active');
   });

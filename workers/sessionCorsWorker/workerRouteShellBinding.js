@@ -8,6 +8,9 @@ import {
   dispatchAdminRequestWithWorkerDeps as dispatchAdminRequestWithWorkerDepsBoundary,
 } from './adminRequestBinding.js';
 import {
+  dispatchAdminAbuseSummaryRequest as dispatchAdminAbuseSummaryRequestBoundary,
+} from './adminAbuseSummaryDispatch.js';
+import {
   dispatchAuthLoginRequestWithWorkerDeps as dispatchAuthLoginRequestWithWorkerDepsBoundary,
   dispatchAuthNonceRequestWithWorkerDeps as dispatchAuthNonceRequestWithWorkerDepsBoundary,
 } from './authRequestBinding.js';
@@ -52,6 +55,9 @@ export const createWorkerRouteShellWithWorkerDeps = ({
   );
   const dispatchAdminRequestWithWorkerDeps = (
     deps?.dispatchAdminRequestWithWorkerDeps || dispatchAdminRequestWithWorkerDepsBoundary
+  );
+  const dispatchAdminAbuseSummaryRequest = (
+    deps?.dispatchAdminAbuseSummaryRequest || dispatchAdminAbuseSummaryRequestBoundary
   );
   const dispatchAnonymousRouteEntryWithWorkerDeps = (
     deps?.dispatchAnonymousRouteEntryWithWorkerDeps || dispatchAnonymousRouteEntryWithWorkerDepsBoundary
@@ -106,6 +112,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           validateTrustedLoginRequestOrigin: deps?.validateTrustedLoginRequestOrigin,
           resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
           checkNonceRateLimit: deps?.checkNonceRateLimit,
+          ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
           now: deps?.now,
           buildNonce: deps?.buildNonce,
           base64UrlEncode: deps?.base64UrlEncode,
@@ -145,6 +152,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           getAddress: deps?.getAddress,
           buildAuthTokenJti: deps?.buildAuthTokenJti,
           persistAuthTokenRecord: deps?.persistAuthTokenRecord,
+          ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
           now: deps?.now,
         },
         constants: {
@@ -199,6 +207,26 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       });
     }
 
+      if (routeSelection.kind === 'admin-abuse-summary') {
+        return await dispatchAdminAbuseSummaryRequest({
+        request,
+        env,
+        baseHeaders: routeBaseHeaders,
+        slug: envSlug,
+        deps: {
+          json: deps?.json,
+          requireAuth: deps?.requireAuth,
+          getSessionConfig: deps?.getSessionConfig,
+          getCorsContext: deps?.getCorsContext,
+          validateAdmin: deps?.validateAdmin,
+          ...(deps?.readAbuseCounterSummary ? { readAbuseCounterSummary: deps.readAbuseCounterSummary } : {}),
+          ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
+          toStr: deps?.toStr,
+          now: deps?.now,
+        },
+      });
+    }
+
       if (routeSelection.kind === 'admin') {
         return await dispatchAdminRequestWithWorkerDeps({
         request,
@@ -227,6 +255,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           getSessionSecrets: deps?.getSessionSecrets,
           normalizeSecretValue: deps?.normalizeSecretValue,
           putSessionSecrets: deps?.putSessionSecrets,
+          ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
         },
         constants: {
           usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,

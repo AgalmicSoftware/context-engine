@@ -1,9 +1,9 @@
 /** @file AccountDisplay.tsx */
-import React from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCaretDown } from "@fortawesome/free-solid-svg-icons";
+import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCaretDown } from '@fortawesome/free-solid-svg-icons';
 
-import styles from "./Navbar.module.scss";
+import styles from './Navbar.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 export type AccountDisplayTorusProps = {
@@ -21,7 +21,6 @@ export const AccountDisplayTorus = ({
   userImageURL,
   avatarUrl,
 }: AccountDisplayTorusProps) => {
-
   const shortenedAddress = `${account.slice(0, 4)}...${account.slice(-4)}`;
 
   // Primary image preference: use userImageURL if present; otherwise fall back to blockie
@@ -30,26 +29,26 @@ export const AccountDisplayTorus = ({
 
   return (
     <>
-        <button
+      <button
         className={styles.addressButton}
         data-testid={E2E_TESTIDS.WALLET_DISPLAY}
         data-ce-wallet-address={account || undefined}
         style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: '#ffffffbf',
-        borderRadius: '20px',
-        color: 'black',
-        fontSize: '16px',
-        fontWeight: `650`,
-        padding: '6px 20px',
-        width: '250px'
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: '#ffffffbf',
+          borderRadius: '20px',
+          color: 'black',
+          fontSize: '16px',
+          fontWeight: `650`,
+          padding: '6px 20px',
+          width: '250px',
         }}
         onClick={() => {
-        launchAccountSettings();
-        }
-        }>
+          launchAccountSettings();
+        }}
+      >
         {primaryImgSrc && (
           <img
             src={primaryImgSrc}
@@ -58,7 +57,7 @@ export const AccountDisplayTorus = ({
               borderRadius: '50%',
               height: '35px',
               marginRight: '10px',
-              width: '35px'
+              width: '35px',
             }}
           />
         )}
@@ -72,13 +71,13 @@ export const AccountDisplayTorus = ({
               height: '18px',
               width: '18px',
               marginRight: '10px',
-              marginLeft: '-4px'
+              marginLeft: '-4px',
             }}
           />
         )}
         {shortenedAddress}
-        <FontAwesomeIcon icon={faCaretDown} style={{ fontSize: '30px', marginLeft: '10px', marginRight:'10px' }} />
-        </button>
+        <FontAwesomeIcon icon={faCaretDown} style={{ fontSize: '30px', marginLeft: '10px', marginRight: '10px' }} />
+      </button>
     </>
   );
 };

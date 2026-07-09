@@ -1,16 +1,10 @@
-import {
-  compareSbtRealtimeEventCursor,
-  normalizeSbtRealtimeEventCursor,
-} from './sbtRealtimeCursorHelpers.js';
+import { compareSbtRealtimeEventCursor, normalizeSbtRealtimeEventCursor } from './sbtRealtimeCursorHelpers.js';
 
 interface SbtRealtimeNetworkCache extends Record<PropertyKey, unknown> {
   lastRealtimeEventCursor?: unknown;
 }
 
-export const updateSbtRealtimeCursorForNetworkCache = (
-  networkCache: unknown,
-  eventCursor: unknown
-): boolean => {
+export const updateSbtRealtimeCursorForNetworkCache = (networkCache: unknown, eventCursor: unknown): boolean => {
   if (!networkCache || typeof networkCache !== 'object') return false;
   const cache = networkCache as SbtRealtimeNetworkCache;
   const normalizedCursor = normalizeSbtRealtimeEventCursor(eventCursor);

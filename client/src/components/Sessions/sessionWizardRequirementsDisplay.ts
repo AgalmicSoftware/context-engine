@@ -44,36 +44,30 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
   const hasNewSessionAiRequirementCovered = !!toRequirementString(currentWorkerSecrets?.openaiKey).trim();
   const hasNewSessionArweaveRequirementCovered = !!toRequirementString(currentWorkerSecrets?.arweaveJwk).trim();
   const newSessionRequiresLitCredential = !cloudflareWorkerSbtGateMode;
-  const hasNewSessionLitRequirementCovered = (
-    !newSessionRequiresLitCredential ||
-    !!toRequirementString(currentWorkerSecrets?.litAccountApiKey).trim()
-  );
+  const hasNewSessionLitRequirementCovered =
+    !newSessionRequiresLitCredential || !!toRequirementString(currentWorkerSecrets?.litAccountApiKey).trim();
   const hasNewSessionFundingRequirementCovered = !!(
     toRequirementString(currentWorkerSecrets?.faucetPrivateKey).trim() ||
     toRequirementString(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
   );
   const hasNewSessionDeployRequirementCovered = !!toRequirementString(
-    normalizedAppliedSponsoredBundle?.deployGrantToken
+    normalizedAppliedSponsoredBundle?.deployGrantToken,
   ).trim();
-  const sponsoredBundleCoversNewSessionRequirements = (
+  const sponsoredBundleCoversNewSessionRequirements =
     sponsoredBundleStatusTone === 'success' &&
     hasNewSessionAiRequirementCovered &&
     hasNewSessionArweaveRequirementCovered &&
     hasNewSessionLitRequirementCovered &&
     hasNewSessionFundingRequirementCovered &&
-    hasNewSessionDeployRequirementCovered
-  );
-  const sponsoredBundleOwnsNewSessionEntryFlow = !!hasSponsoredBundleLink && (
-    !sponsoredBundleStatus ||
-    sponsoredBundleStatusTone === 'info' ||
-    sponsoredBundleCoversNewSessionRequirements
-  );
-  const isNewSessionBannerDismissedForCurrentContext = (
-    !!newSessionBannerDismissalContextKey &&
-    newSessionBannerDismissedContext === newSessionBannerDismissalContextKey
-  );
+    hasNewSessionDeployRequirementCovered;
+  const sponsoredBundleOwnsNewSessionEntryFlow =
+    !!hasSponsoredBundleLink &&
+    (!sponsoredBundleStatus || sponsoredBundleStatusTone === 'info' || sponsoredBundleCoversNewSessionRequirements);
+  const isNewSessionBannerDismissedForCurrentContext =
+    !!newSessionBannerDismissalContextKey && newSessionBannerDismissedContext === newSessionBannerDismissalContextKey;
   const shouldRespectPersistedNewSessionBannerDismissal = !hasSponsoredBundleLink;
-  const showNewSessionRequirementsBanner = !!isNewSessionWizardRoute &&
+  const showNewSessionRequirementsBanner =
+    !!isNewSessionWizardRoute &&
     !isNewSessionBannerDismissedForCurrentContext &&
     !(shouldRespectPersistedNewSessionBannerDismissal && !!persistedNewSessionBannerDismissed) &&
     !sponsoredBundleOwnsNewSessionEntryFlow;

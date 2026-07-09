@@ -90,7 +90,10 @@
   gap: 10px;
   box-shadow: 4px 4px 0 var(--retro-blue-300);
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .contractCard:focus-visible {
@@ -203,7 +206,9 @@
   font-weight: 700;
   cursor: pointer;
   box-shadow: 2px 2px 0 #9cbfda;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .backButton:hover {
@@ -370,7 +375,9 @@
   gap: 8px;
   text-decoration: none;
   box-shadow: 2px 2px 0 rgba(156, 191, 218, 0.7);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .sourceActionLink:hover {
@@ -534,7 +541,9 @@
   justify-content: center;
   line-height: 1;
   box-shadow: 2px 2px 0 #9cbfda;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .copyButton:hover {
@@ -561,7 +570,9 @@
   font-weight: 700;
   cursor: pointer;
   box-shadow: 2px 2px 0 rgba(156, 191, 218, 0.7);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .collapseButton:hover {
@@ -778,7 +789,9 @@
   cursor: pointer;
   font-weight: 700;
   box-shadow: 2px 2px 0 rgba(43, 110, 168, 0.3);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .converterSectionUtil button:hover {

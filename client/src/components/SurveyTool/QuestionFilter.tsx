@@ -1,47 +1,18 @@
 /** @file QuestionFilter.tsx */
 
-import React, { Component } from 'react';
+import React from 'react';
 import { connect } from 'react-redux';
-import {
-  FormGroup,
-  Label,
-  Input,
-  Button,
-  Modal,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-} from 'reactstrap';
+import { Button, Modal, ModalHeader, ModalBody, ModalFooter } from 'reactstrap';
 import styles from './QuestionFilter.module.scss';
-import SBTFilter from '../SBTs/SBTFilter';
 import GateTooltip from '../Gates/GateTooltip';
-import CETooltip from '../Shared/CETooltip';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faFilter,
-  faChevronDown,
-  faStar,
-  faRobot,
-  faSpinner,
-  faLock,
-  faTimes,
-  faClipboard,
-  faBookmark,
-  faCheck,
-  faQuestionCircle,
-  faPlus
-} from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faLock, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { serializeFilterState, deserializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-
-
-
-import AudioInput from '../Shared/AudioInput/AudioInput';
-import { rankQuestionsAI } from '../../utilities/ai/aiScripts.js';
+import { rankQuestionsAI } from '../../utilities/ai/aiClient.js';
 import { getLocalAiSettings } from '../../utilities/ai/aiSettings.js';
 import { resolveEncryptionGate } from '../../utilities/crypto/encryptionGates.js';
-import { getSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
 import {
   getGateSbtAddresses,
   normalizeGateMode,
@@ -49,40 +20,72 @@ import {
   SPONSORED_GATE_STATES,
 } from '../../utilities/web3/sponsoredAccess.js';
 import { createLogger } from '../../utilities/logging.js';
-import {
-  peekCacheSync,
-  readCache,
-  writeCache,
-} from '../../utilities/cache/cacheScripts.js';
+import { peekCacheSync, readCache, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { notify } from '../../utilities/ui/notify.js';
 import {
-  resolveQuestionFilterEffectiveSlug,
-  resolveQuestionFilterSessionContext,
-} from './questionFilterSessionResolution.js';
-import {
-  QUESTION_FILTER_ACTIONS_STYLE,
-  QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
-  QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE,
   QUESTION_FILTER_ENCRYPTED_COUNT_LOCK_STYLE,
   QUESTION_FILTER_MODAL_HEADER_ROW_STYLE,
   QUESTION_FILTER_MODAL_TITLE_ROW_STYLE,
-  QUESTION_FILTER_SBT_SPINNER_STYLE,
-  buildQuestionFilterAiCombineRowClassName,
   buildQuestionFilterDisabledSectionClassName,
-  buildQuestionFilterSectionIconClassName,
-  buildQuestionFilterTagBubbleClassName,
-  buildQuestionFilterTypeButtonClassName,
-  buildQuestionFilterTypePillClassName,
-  resolveQuestionFilterBookmarkIconStyle,
-  resolveQuestionFilterClearIconStyle,
-  resolveQuestionFilterCopyIconStyle,
   resolveQuestionFilterEncryptedCountBadgeStyle,
   resolveQuestionFilterInlineVisibilityStyle,
-  resolveQuestionFilterSectionBodyStyle,
-  resolveQuestionFilterSectionHeaderStyle,
 } from './questionFilterDisplayHelpers';
+import {
+  QuestionFilterAiSection,
+  QuestionFilterLoadFilterControls,
+  QuestionFilterQuestionTypesSection,
+  QuestionFilterResponseStatusSection,
+  QuestionFilterSbtSection,
+  QuestionFilterSummaryControls,
+  QuestionFilterTagsSection,
+  QuestionFilterTopQuestionsSection,
+} from './QuestionFilterSections';
+import {
+  DEFAULT_AI_TOP_N,
+  DEFAULT_TOP_QUESTIONS_COUNT,
+  EMPTY_FILTER_RESPONSES,
+  QUESTION_FILTER_RESPONSE_PARSE_MEMO_MAX,
+  getEncryptedQuestionCount,
+  getErrorMessage,
+  modalStyles,
+  readQuestionsCacheSync,
+  resolveEffectiveSessionContext,
+  resolveEffectiveSlug,
+  resolveFilterStorageSlug,
+  toUnknownRecord,
+  type QuestionFilterAiAccessState,
+  type QuestionFilterAiApplyOptions,
+  type QuestionFilterAiApplySignatureArgs,
+  type QuestionFilterAiProviderSettings,
+  type QuestionFilterAiRequestOptions,
+  type QuestionFilterBookmarkCache,
+  type QuestionFilterGateTooltipProps,
+  type QuestionFilterInputChangeEvent,
+  type QuestionFilterLoadStateOptions,
+  type QuestionFilterMutableStatePatch,
+  type QuestionFilterPersistenceProps,
+  type QuestionFilterPipelineMemo,
+  type QuestionFilterPipelineResult,
+  type QuestionFilterQuestionRecord,
+  type QuestionFilterQuestionsCacheNet,
+  type QuestionFilterRankedQuestion,
+  type QuestionFilterRequiredValueEvent,
+  type QuestionFilterResponseDrivenStateArgs,
+  type QuestionFilterResponseStats,
+  type QuestionFilterResponseStatsMemo,
+  type QuestionFilterResponsesByQuestion,
+  type QuestionFilterSbtSummaryEntry,
+  type QuestionFilterSbtSummaryState,
+  type QuestionFilterSerializableState,
+  type QuestionFilterSessionProps,
+  type QuestionFilterStateArg,
+  type QuestionFilterStateRecord,
+  type QuestionFilterSummaryItem,
+  type QuestionFilterWriteCache,
+  type UnknownRecord,
+} from './questionFilterRuntimeSupport';
 import {
   buildQuestionFilterAiApplyBasePatch,
   buildQuestionFilterAiApplyFailurePatch,
@@ -153,235 +156,6 @@ export {
 } from './questionFilterDisplayHelpers';
 
 const questionFilterLog = createLogger('questionFilter');
-const FILTER_STORAGE_KEY_PREFIX = 'dg:filters:';
-type UnknownRecord = Record<string, unknown>;
-type QuestionFilterMutableStatePatch = Record<string, unknown>;
-type QuestionFilterBookmarkCache = Record<string, unknown> & {
-  bookmarkedFilters?: unknown[];
-  filters?: unknown[];
-};
-type QuestionFilterResponsesByQuestion = Record<string, unknown>;
-type QuestionFilterWriteCache = (
-  namespace: string,
-  slug: string | undefined,
-  value: unknown
-) => boolean | Promise<boolean>;
-type QuestionFilterSessionProps = UnknownRecord & {
-  account?: string;
-  activeSessionSlug?: unknown;
-  network?: {
-    id?: unknown;
-    [key: string]: unknown;
-  } | null;
-  provider?: unknown;
-  sessionConfig?: unknown;
-  sessionSlug?: unknown;
-  ensureLightSbtUniverse?: unknown;
-  storageKeyPrefix?: unknown;
-};
-type QuestionFilterAiRequestOptions = {
-  sessionSlug: string;
-  sessionConfig: UnknownRecord;
-  context: {
-    account: string;
-    providerLike?: unknown;
-    chainId: unknown;
-  };
-};
-type QuestionFilterAiProviderSettings = {
-  apiKey?: unknown;
-  encryptedApiKey?: unknown;
-};
-type QuestionFilterQuestionRecord = UnknownRecord & {
-  id?: unknown;
-  tags?: unknown;
-  type?: unknown;
-};
-type QuestionFilterResponseStats = {
-  responseCount: number;
-  totalImportance: number;
-};
-type QuestionFilterResponseStatsMemo = {
-  relevantResponsesRef: unknown;
-  mergedQuestionsRef: unknown;
-  questionResponsesNonceKey: unknown;
-  questionsCacheNonceKey: unknown;
-  result: Map<string, QuestionFilterResponseStats>;
-};
-type QuestionFilterPipelineResult = {
-  finalQuestions: QuestionFilterQuestionRecord[];
-  count: number;
-};
-type QuestionFilterPipelineMemo = {
-  usePendingState: boolean;
-  mergedQuestionsRef: unknown;
-  relevantResponsesRef: unknown;
-  selectedTypesRef: unknown;
-  sortByImportance: unknown;
-  sbtFilteredQuestionsRef: unknown;
-  showTopQuestions: unknown;
-  topQuestionsCount: unknown;
-  showTopQuestionsByResponses: unknown;
-  selectedTagsRef: unknown;
-  filterByResponded: unknown;
-  filterByNotResponded: unknown;
-  aiSearchQuery: string;
-  aiFilterApplied: boolean;
-  aiAppliedTopN: number;
-  aiCombineWithOtherFilters: boolean;
-  aiRankedIdsSignature: string;
-  aiLastAppliedSignature: string;
-  questionResponsesNonceKey: unknown;
-  questionsCacheNonceKey: unknown;
-  result: QuestionFilterPipelineResult;
-};
-type QuestionFilterRankedQuestion = [QuestionFilterQuestionRecord, number, number];
-type QuestionFilterSerializableState = Record<string, unknown> & {
-  sbtFilter?: unknown;
-};
-type QuestionFilterQuestionsCacheNet = UnknownRecord & {
-  questions?: Record<string, QuestionFilterQuestionRecord | null | undefined>;
-};
-type QuestionFilterAiApplySignatureArgs = {
-  stateIn?: unknown;
-  propsIn?: QuestionFilterSessionProps;
-  queryOverride?: unknown;
-  candidateQuestions?: unknown;
-};
-type QuestionFilterAiApplyOptions = {
-  auto?: boolean;
-  queryOverride?: unknown;
-  source?: unknown;
-  topNOverride?: unknown;
-};
-type QuestionFilterPersistenceProps = QuestionFilterSessionProps & {
-  defaultFilterState?: unknown;
-  enableLocalStorage?: unknown;
-  filterState?: unknown;
-  filterType?: unknown;
-};
-type QuestionFilterStateArg = {
-  stateIn?: unknown;
-};
-type QuestionFilterResponseDrivenStateArgs = QuestionFilterStateArg & {
-  usePendingState?: boolean;
-};
-type QuestionFilterInputChangeEvent = {
-  target?: {
-    checked?: unknown;
-    value?: unknown;
-  } | null;
-} | null | undefined;
-type QuestionFilterLoadStateOptions = {
-  resetIfMissing?: boolean;
-};
-type QuestionFilterRequiredValueEvent = {
-  target: {
-    value: unknown;
-  };
-};
-type QuestionFilterSbtSummaryEntry = {
-  address?: unknown;
-  name?: unknown;
-};
-type QuestionFilterSbtSummaryState = Record<string, unknown> & {
-  excludedSBTGroups?: unknown[];
-  excludedSBTGroupsCreator?: unknown[];
-  excludedSBTGroupsResponder?: unknown[];
-  selectedSBTGroups?: unknown[];
-  selectedSBTGroupsCreator?: unknown[];
-  selectedSBTGroupsResponder?: unknown[];
-};
-type QuestionFilterSummaryItem = {
-  label: string;
-  onRemove: () => void;
-  type: string;
-};
-type QuestionFilterAiAccessState = {
-  enabled: boolean;
-  sponsoredAvailable: boolean;
-  localKeyAvailable: boolean;
-  sponsoredStatus: string;
-};
-type QuestionFilterGateTooltipProps = {
-  gateId: string | null;
-  gateConfig: React.ComponentProps<typeof GateTooltip>['gateConfig'];
-  mode: string;
-  sbtAddresses: string[];
-} | null;
-type QuestionFilterStateRecord = UnknownRecord & {
-  aiAppliedTopN?: number | null;
-  aiRankingCount?: number;
-  expandedSections: Record<string, boolean>;
-  topQuestionsCount?: number;
-};
-const toUnknownRecord = (value: unknown): UnknownRecord => (
-  value && typeof value === 'object' ? value as UnknownRecord : {}
-);
-const getErrorMessage = (error: unknown, fallback = 'Unknown error') => {
-  const message = error && typeof error === 'object' && 'message' in error
-    ? (error as { message?: unknown }).message
-    : '';
-  return typeof message === 'string' && message.trim() ? message : fallback;
-};
-const getEncryptedQuestionCount = (questions: unknown): number => (
-  (Array.isArray(questions) ? questions : [])
-    .filter((question: { prompt?: unknown }) => String(question?.prompt || '').trim() === '[encrypted]')
-    .length
-);
-
-
-/**
- * This component provides the UI and logic for filtering questions based on type, tags,
- * SBT ownership (creator or responder), popularity, and (when enabled) AI search/ranking.
- *
- * The AI-based filter is currently placed at the top but disabled so it cannot be used.
- * A summary of selected filters is displayed at the top, allowing removal of each filter item by clicking.
- */
-const DEFAULT_TOP_QUESTIONS_COUNT = 10;
-const DEFAULT_AI_TOP_N = 10;
-const QUESTION_FILTER_RESPONSE_PARSE_MEMO_MAX = 500;
-const EMPTY_FILTER_RESPONSES = Object.freeze({});
-
-const modalStyles = {
-  backgroundColor: 'white',
-  fontSize: '16px'
-};
-
-/* ---------------------------------------------------------------------------
- * Group-aware helpers (file-local, minimal surface)
- * -------------------------------------------------------------------------*/
-
-/** Resolve effective session slug:
- * Priority: URL /session/:slug → Redux activeSessionSlug → props.sessionSlug → '' (general)
- */
-function resolveEffectiveSlug(props: QuestionFilterSessionProps = {}) {
-  return resolveQuestionFilterEffectiveSlug({
-    pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
-    activeSessionSlug: props.activeSessionSlug,
-    sessionSlug: props.sessionSlug,
-  });
-}
-
-function resolveEffectiveSessionContext(props: QuestionFilterSessionProps = {}) {
-  return resolveQuestionFilterSessionContext({
-    pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
-    activeSessionSlug: props.activeSessionSlug,
-    sessionSlug: props.sessionSlug,
-    resolveBySlug: getSessionConfigBySlug,
-  });
-}
-
-function resolveFilterStorageSlug(props: QuestionFilterSessionProps = {}) {
-  const prefix = String(props?.storageKeyPrefix || '').trim();
-  if (prefix.startsWith(FILTER_STORAGE_KEY_PREFIX)) {
-    return prefix.slice(FILTER_STORAGE_KEY_PREFIX.length);
-  }
-  return resolveEffectiveSlug(props);
-}
-
-const readQuestionsCacheSync = (slug: string | undefined) => peekCacheSync('questionsCache', slug, { clone: false }) || {};
-
 let QUESTION_FILTER_INSTANCE_SEQ = 0;
 
 class QuestionFilter extends React.Component<any, any> {
@@ -480,7 +254,7 @@ class QuestionFilter extends React.Component<any, any> {
         types: false,
         sbts: false,
         popular: false,
-        tags: true
+        tags: true,
       },
       filterLoading: false,
 
@@ -534,7 +308,9 @@ class QuestionFilter extends React.Component<any, any> {
     this._lastEmittedEncryptedCount = null;
     this._lastEmittedFilterActivity = null;
     this._mergedQuestionsSyncSignature = buildQuestionIdListSignature(mergedQuestions);
-    this._cachedQuestionResponsesSignature = buildFilteredResponsesByQuestionSignature(this.props.questionResponses || {});
+    this._cachedQuestionResponsesSignature = buildFilteredResponsesByQuestionSignature(
+      this.props.questionResponses || {},
+    );
     this._aiAutoApplyInFlightSignature = '';
     this._aiAutoApplyQueuedSignature = '';
     this._aiApplyRequestSeq = 0;
@@ -549,9 +325,7 @@ class QuestionFilter extends React.Component<any, any> {
     return (resolveEffectiveSessionContext(propsIn).sessionConfig || {}) as UnknownRecord;
   };
 
-  buildAiRequestOptions = (
-    propsIn: QuestionFilterSessionProps = this.props
-  ): QuestionFilterAiRequestOptions => {
+  buildAiRequestOptions = (propsIn: QuestionFilterSessionProps = this.props): QuestionFilterAiRequestOptions => {
     const resolvedSession = resolveEffectiveSessionContext(propsIn);
     const slug = resolvedSession.sessionSlug || '';
     const sessionConfig = (resolvedSession.sessionConfig || {}) as UnknownRecord;
@@ -571,9 +345,7 @@ class QuestionFilter extends React.Component<any, any> {
       const local = getLocalAiSettings() as {
         providers?: Record<string, QuestionFilterAiProviderSettings>;
       };
-      const providers = local?.providers && typeof local.providers === 'object'
-        ? local.providers
-        : {};
+      const providers = local?.providers && typeof local.providers === 'object' ? local.providers : {};
       return Object.values(providers).some((entry) => {
         if (!entry || typeof entry !== 'object') return false;
         const plain = String(entry.apiKey || '').trim();
@@ -615,8 +387,7 @@ class QuestionFilter extends React.Component<any, any> {
     const gateState = resolveSponsoredGateStateForResource(cfg, 'ai');
     const sponsoredStatus = String(gateState?.status || SPONSORED_GATE_STATES.UNAVAILABLE);
     const sponsoredAvailable =
-      sponsoredStatus === SPONSORED_GATE_STATES.OPEN ||
-      sponsoredStatus === SPONSORED_GATE_STATES.RESTRICTED;
+      sponsoredStatus === SPONSORED_GATE_STATES.OPEN || sponsoredStatus === SPONSORED_GATE_STATES.RESTRICTED;
     const localKeyAvailable = this.hasConfiguredLocalAiKey();
     const enabled = sponsoredAvailable || localKeyAvailable;
     return {
@@ -628,15 +399,13 @@ class QuestionFilter extends React.Component<any, any> {
   };
 
   getEncryptedQuestionGateTooltipProps = (
-    propsIn: QuestionFilterSessionProps = this.props
+    propsIn: QuestionFilterSessionProps = this.props,
   ): QuestionFilterGateTooltipProps => {
     const sessionConfig = this.getEffectiveSessionConfig(propsIn);
-    const gateConfig = (
-      resolveEncryptionGate(sessionConfig) ||
+    const gateConfig = (resolveEncryptionGate(sessionConfig) ||
       resolveSponsoredGateStateForResource(sessionConfig, 'questionResponses')?.gate ||
       resolveSponsoredGateStateForResource(sessionConfig, 'default')?.gate ||
-      null
-    ) as React.ComponentProps<typeof GateTooltip>['gateConfig'] | null;
+      null) as React.ComponentProps<typeof GateTooltip>['gateConfig'] | null;
     const sponsoredGateConfig = gateConfig as Parameters<typeof getGateSbtAddresses>[0];
     const gateRecord = toUnknownRecord(gateConfig);
     const sbtAddresses = getGateSbtAddresses(sponsoredGateConfig || {});
@@ -653,12 +422,10 @@ class QuestionFilter extends React.Component<any, any> {
 
   getQuestionsSubsetBeforeAi = (usePendingState = true): QuestionFilterQuestionRecord[] => {
     const mergedQuestions = Array.isArray(this.state.mergedQuestions)
-      ? this.state.mergedQuestions as QuestionFilterQuestionRecord[]
+      ? (this.state.mergedQuestions as QuestionFilterQuestionRecord[])
       : [];
     let subset: QuestionFilterQuestionRecord[] = mergedQuestions;
-    const selectedTypes = usePendingState
-      ? this.state.pendingSelectedTypes
-      : this.state.selectedTypes;
+    const selectedTypes = usePendingState ? this.state.pendingSelectedTypes : this.state.selectedTypes;
     const sbtFilteredQuestions = usePendingState
       ? this.state.pendingSbtFilteredQuestions
       : this.state.sbtFilteredQuestions;
@@ -666,8 +433,9 @@ class QuestionFilter extends React.Component<any, any> {
 
     if (sbtFilteredQuestions !== null) {
       const sbtIds = new Set<string>(
-        (Array.isArray(sbtFilteredQuestions) ? sbtFilteredQuestions : [])
-          .map((q: QuestionFilterQuestionRecord) => String(q.id || '').toLowerCase())
+        (Array.isArray(sbtFilteredQuestions) ? sbtFilteredQuestions : []).map((q: QuestionFilterQuestionRecord) =>
+          String(q.id || '').toLowerCase(),
+        ),
       );
       subset = subset.filter((q) => sbtIds.has(String(q.id || '').toLowerCase()));
     }
@@ -690,20 +458,18 @@ class QuestionFilter extends React.Component<any, any> {
     const filterByNotResponded = this.state.filterByNotResponded;
     if ((filterByResponded || filterByNotResponded) && !(filterByResponded && filterByNotResponded)) {
       const userAddress = String(this.props.account || '').toLowerCase();
-      const relevantResponses = (
-        this.props.questionResponses ||
-        this.state.cachedQuestionResponses ||
-        {}
-      ) as Record<string, Record<string, unknown> | undefined>;
+      const relevantResponses = (this.props.questionResponses || this.state.cachedQuestionResponses || {}) as Record<
+        string,
+        Record<string, unknown> | undefined
+      >;
       if (userAddress) {
         subset = subset.filter((q) => {
           const qId = String(q?.id || '');
           const respondersObj = relevantResponses[qId] || relevantResponses[qId.toLowerCase()] || {};
-          const hasResponded = (
+          const hasResponded =
             respondersObj &&
             typeof respondersObj === 'object' &&
-            Object.keys(respondersObj).some((addressKey) => String(addressKey).toLowerCase() === userAddress)
-          );
+            Object.keys(respondersObj).some((addressKey) => String(addressKey).toLowerCase() === userAddress);
           return filterByResponded ? hasResponded : !hasResponded;
         });
       }
@@ -716,7 +482,9 @@ class QuestionFilter extends React.Component<any, any> {
     if (this.state.aiCombineWithOtherFilters) {
       return this.getQuestionsSubsetBeforeAi(true);
     }
-    return Array.isArray(this.state.mergedQuestions) ? this.state.mergedQuestions as QuestionFilterQuestionRecord[] : [];
+    return Array.isArray(this.state.mergedQuestions)
+      ? (this.state.mergedQuestions as QuestionFilterQuestionRecord[])
+      : [];
   };
 
   buildAiApplySignature = ({
@@ -725,15 +493,11 @@ class QuestionFilter extends React.Component<any, any> {
     queryOverride = null,
     candidateQuestions = null,
   }: QuestionFilterAiApplySignatureArgs = {}): string => {
-    const state = stateIn && typeof stateIn === 'object' ? stateIn as UnknownRecord : {};
-    const query = String(
-      queryOverride != null ? queryOverride : state.aiSearchQuery
-    ).trim();
+    const state = stateIn && typeof stateIn === 'object' ? (stateIn as UnknownRecord) : {};
+    const query = String(queryOverride != null ? queryOverride : state.aiSearchQuery).trim();
     if (!query) return '';
     const slug = resolveEffectiveSlug(propsIn);
-    const candidates = Array.isArray(candidateQuestions)
-      ? candidateQuestions
-      : this.getAiRankingCandidates();
+    const candidates = Array.isArray(candidateQuestions) ? candidateQuestions : this.getAiRankingCandidates();
     const candidateSignature = buildAiCandidateSignature(candidates);
     return `${slug}|${query}|${candidateSignature}`;
   };
@@ -784,17 +548,17 @@ class QuestionFilter extends React.Component<any, any> {
     // Handle defaultFilterState prop (string like "tag=AI&sort=recent")
     // This runs if no URL state is provided (this.props.filterState is null/undefined/empty)
     if (shouldApplyDefaultFilterState) {
-		      questionFilterLog.log('Received defaultFilterState:', this.props.defaultFilterState);
-		      // Example: Parse "tag=AI&sort=recent"
-			      const params = new URLSearchParams(this.props.defaultFilterState);
-		      const tagParam = params.get('tag');
-		      const tagsFromDefaultFilterState = tagParam ? tagParam.split(',') : [];
-	      const defaultSort = params.get('sort'); // 'recent', 'importance', etc.
+      questionFilterLog.log('Received defaultFilterState:', this.props.defaultFilterState);
+      // Example: Parse "tag=AI&sort=recent"
+      const params = new URLSearchParams(this.props.defaultFilterState);
+      const tagParam = params.get('tag');
+      const tagsFromDefaultFilterState = tagParam ? tagParam.split(',') : [];
+      const defaultSort = params.get('sort'); // 'recent', 'importance', etc.
 
-		      const newDefaultState: QuestionFilterMutableStatePatch = {};
-	      if (tagsFromDefaultFilterState.length > 0) {
-	        newDefaultState.selectedTags = tagsFromDefaultFilterState;
-	      }
+      const newDefaultState: QuestionFilterMutableStatePatch = {};
+      if (tagsFromDefaultFilterState.length > 0) {
+        newDefaultState.selectedTags = tagsFromDefaultFilterState;
+      }
       if (defaultSort === 'importance') {
         newDefaultState.sortByImportance = true;
         newDefaultState.pendingSortByImportance = true;
@@ -843,9 +607,7 @@ class QuestionFilter extends React.Component<any, any> {
         const aiSearchQuery = typeof urlFilterState.aiFilter === 'string' ? urlFilterState.aiFilter : '';
         newStateFromUrl.aiSearchQuery = aiSearchQuery;
         newStateFromUrl.aiDraftQuery = aiSearchQuery;
-        newStateFromUrl.aiCombineWithOtherFilters = !!(
-          aiSearchQuery.trim() && urlFilterState.aiCombine === true
-        );
+        newStateFromUrl.aiCombineWithOtherFilters = !!(aiSearchQuery.trim() && urlFilterState.aiCombine === true);
       }
       if (urlFilterState.aiTopN !== undefined) {
         const parsedTopN = normalizePositiveInt(urlFilterState.aiTopN, DEFAULT_AI_TOP_N);
@@ -907,10 +669,7 @@ class QuestionFilter extends React.Component<any, any> {
 
       if (Object.keys(newStateFromUrl).length > 0) {
         if (typeof newStateFromUrl.aiSearchQuery === 'string' && newStateFromUrl.aiSearchQuery.trim()) {
-          newStateFromUrl.aiAppliedTopN = normalizePositiveInt(
-            newStateFromUrl.aiAppliedTopN,
-            DEFAULT_AI_TOP_N
-          );
+          newStateFromUrl.aiAppliedTopN = normalizePositiveInt(newStateFromUrl.aiAppliedTopN, DEFAULT_AI_TOP_N);
           newStateFromUrl.aiFilterApplied = false;
           newStateFromUrl.aiRankedQuestionIds = [];
           newStateFromUrl.aiApplyError = '';
@@ -936,7 +695,7 @@ class QuestionFilter extends React.Component<any, any> {
 
   buildAutosaveSignature = (
     propsIn: QuestionFilterPersistenceProps = this.props,
-    stateIn: unknown = this.state
+    stateIn: unknown = this.state,
   ): string => {
     const state = toUnknownRecord(stateIn);
     const props = toUnknownRecord(propsIn) as QuestionFilterPersistenceProps;
@@ -975,48 +734,31 @@ class QuestionFilter extends React.Component<any, any> {
       ? !!(state.pendingSortByImportance || state.sortByImportance)
       : !!state.sortByImportance;
 
-    return !!(
-      hasResponseStatusFilter ||
-      showTopQuestions ||
-      showTopQuestionsByResponses ||
-      sortByImportance
-    );
+    return !!(hasResponseStatusFilter || showTopQuestions || showTopQuestionsByResponses || sortByImportance);
   };
 
   hasActiveResponseStatusFilter = ({ stateIn = this.state }: QuestionFilterStateArg = {}): boolean => {
     const state = toUnknownRecord(stateIn);
     const filterByResponded = !!state.filterByResponded;
     const filterByNotResponded = !!state.filterByNotResponded;
-    return (
-      (filterByResponded || filterByNotResponded) &&
-      !(filterByResponded && filterByNotResponded)
-    );
+    return (filterByResponded || filterByNotResponded) && !(filterByResponded && filterByNotResponded);
   };
 
-  hasExternalFilterState = (propsIn: QuestionFilterPersistenceProps = this.props): boolean => (
-    !!(
-      propsIn?.filterState &&
-      typeof propsIn.filterState === 'object' &&
-      Object.keys(propsIn.filterState).length > 0
-    )
-  );
+  hasExternalFilterState = (propsIn: QuestionFilterPersistenceProps = this.props): boolean =>
+    !!(propsIn?.filterState && typeof propsIn.filterState === 'object' && Object.keys(propsIn.filterState).length > 0);
 
-  shouldApplyDefaultFilterState = (propsIn: QuestionFilterPersistenceProps = this.props): boolean => (
-    !!propsIn?.defaultFilterState && !this.hasExternalFilterState(propsIn)
-  );
+  shouldApplyDefaultFilterState = (propsIn: QuestionFilterPersistenceProps = this.props): boolean =>
+    !!propsIn?.defaultFilterState && !this.hasExternalFilterState(propsIn);
 
-  shouldUseLocalStorageBackedFilterState = (propsIn: QuestionFilterPersistenceProps = this.props): boolean => (
+  shouldUseLocalStorageBackedFilterState = (propsIn: QuestionFilterPersistenceProps = this.props): boolean =>
     !!propsIn?.enableLocalStorage &&
     !this.shouldApplyDefaultFilterState(propsIn) &&
-    !this.hasExternalFilterState(propsIn)
-  );
+    !this.hasExternalFilterState(propsIn);
 
-  getFilterPersistenceScopeSignature = (propsIn: QuestionFilterPersistenceProps = this.props): string => (
-    [
-      propsIn?.filterType === 'results' ? 'results' : 'questions',
-      String(resolveFilterStorageSlug(propsIn) || ''),
-    ].join('|')
-  );
+  getFilterPersistenceScopeSignature = (propsIn: QuestionFilterPersistenceProps = this.props): string =>
+    [propsIn?.filterType === 'results' ? 'results' : 'questions', String(resolveFilterStorageSlug(propsIn) || '')].join(
+      '|',
+    );
 
   getMemoizedStableSerialize = (value: unknown, maxLen: unknown = 4096): string => {
     if (!value || typeof value !== 'object') {
@@ -1035,15 +777,8 @@ class QuestionFilter extends React.Component<any, any> {
     return serialized;
   };
 
-  shouldAutosaveFilterState = (
-    prevProps: QuestionFilterPersistenceProps,
-    prevState: UnknownRecord
-  ): boolean => {
-    if (
-      !this.props.enableLocalStorage ||
-      !this._allowFilterStateAutosave ||
-      this._loadingFilterStateFromCache
-    ) {
+  shouldAutosaveFilterState = (prevProps: QuestionFilterPersistenceProps, prevState: UnknownRecord): boolean => {
+    if (!this.props.enableLocalStorage || !this._allowFilterStateAutosave || this._loadingFilterStateFromCache) {
       return false;
     }
 
@@ -1077,28 +812,23 @@ class QuestionFilter extends React.Component<any, any> {
     measureSync('ce.questionFilter.componentDidUpdate', () => {
       this.syncAiApplyingElapsedTimer();
       const filterPersistenceScopeChanged =
-        this.getFilterPersistenceScopeSignature(prevProps) !==
-        this.getFilterPersistenceScopeSignature(this.props);
+        this.getFilterPersistenceScopeSignature(prevProps) !== this.getFilterPersistenceScopeSignature(this.props);
       const shouldRestoreScopedLocalFilterState =
         filterPersistenceScopeChanged && this.shouldUseLocalStorageBackedFilterState(this.props);
 
       if (shouldRestoreScopedLocalFilterState) {
         this.invalidatePendingAiApply();
-        void this.loadFilterStateFromLocalStorage({ resetIfMissing: true })
-          .then((didRestoreState: unknown) => {
-            if (!didRestoreState || !this._isMounted) return;
-            this.handleApplyFilters(true);
-            this.checkIfCurrentFilterIsBookmarked();
-          });
+        void this.loadFilterStateFromLocalStorage({ resetIfMissing: true }).then((didRestoreState: unknown) => {
+          if (!didRestoreState || !this._isMounted) return;
+          this.handleApplyFilters(true);
+          this.checkIfCurrentFilterIsBookmarked();
+        });
       }
 
       const prevAccount = toStr(prevProps.account).trim();
       const nextAccount = toStr(this.props.account).trim();
       const accountDisconnected = !!prevAccount && !nextAccount;
-      if (
-        accountDisconnected &&
-        (this.state.filterByResponded || this.state.filterByNotResponded)
-      ) {
+      if (accountDisconnected && (this.state.filterByResponded || this.state.filterByNotResponded)) {
         this.setState(
           {
             filterByResponded: false,
@@ -1110,28 +840,24 @@ class QuestionFilter extends React.Component<any, any> {
             }
             this.handleApplyFilters(true);
             this.queueCombinedAiRefreshIfNeeded('update:account-disconnect');
-          }
+          },
         );
         return;
       }
       const prevAccountLower = prevAccount.toLowerCase();
       const nextAccountLower = nextAccount.toLowerCase();
       const connectedAccountChanged = !!nextAccountLower && prevAccountLower !== nextAccountLower;
-      const shouldReapplyForAccountChange = connectedAccountChanged &&
-        this.hasActiveResponseStatusFilter({ stateIn: this.state });
+      const shouldReapplyForAccountChange =
+        connectedAccountChanged && this.hasActiveResponseStatusFilter({ stateIn: this.state });
 
-      const questionNoncePresent =
-        this.props.questionsCacheNonce != null &&
-        prevProps.questionsCacheNonce != null;
+      const questionNoncePresent = this.props.questionsCacheNonce != null && prevProps.questionsCacheNonce != null;
       const responsesNoncePresent =
-        this.props.questionResponsesNonce != null &&
-        prevProps.questionResponsesNonce != null;
+        this.props.questionResponsesNonce != null && prevProps.questionResponsesNonce != null;
 
       const questionsChangedByNonce = questionNoncePresent
         ? prevProps.questionsCacheNonce !== this.props.questionsCacheNonce
         : false;
-      const questionsChanged =
-        questionsChangedByNonce || prevProps.questions !== this.props.questions;
+      const questionsChanged = questionsChangedByNonce || prevProps.questions !== this.props.questions;
       const responsesChangedByNonce = responsesNoncePresent
         ? prevProps.questionResponsesNonce !== this.props.questionResponsesNonce
         : false;
@@ -1178,9 +904,7 @@ class QuestionFilter extends React.Component<any, any> {
             this.queueAutoApplyAiFilter('update:questions-or-responses');
           }
         });
-      } else if (
-        shouldReapplyForAccountChange
-      ) {
+      } else if (shouldReapplyForAccountChange) {
         if (!shouldRestoreScopedLocalFilterState) {
           this.handleApplyFilters(true);
           this.queueAutoApplyAiFilter('update:account-change');
@@ -1199,7 +923,7 @@ class QuestionFilter extends React.Component<any, any> {
       // keep internal state in sync if an external filterState prop changes
       const filterStatePropRefChanged = prevProps.filterState !== this.props.filterState;
       const prevExternalFilterStateSignature =
-        (!filterStatePropRefChanged && typeof this._lastExternalFilterStateSignature === 'string')
+        !filterStatePropRefChanged && typeof this._lastExternalFilterStateSignature === 'string'
           ? this._lastExternalFilterStateSignature
           : this.getMemoizedStableSerialize(prevProps.filterState);
       const nextExternalFilterStateSignature = filterStatePropRefChanged
@@ -1212,14 +936,11 @@ class QuestionFilter extends React.Component<any, any> {
       }
 
       // Save local filter state if enabled
-      if (
-        this.shouldAutosaveFilterState(prevProps, prevState)
-      ) {
+      if (this.shouldAutosaveFilterState(prevProps, prevState)) {
         this.saveFilterStateToLocalStorage();
       }
     });
   }
-
 
   componentWillUnmount() {
     this._isMounted = false;
@@ -1251,17 +972,18 @@ class QuestionFilter extends React.Component<any, any> {
     let bookmarksCache: QuestionFilterBookmarkCache = {};
     try {
       const filtersCache = peekCacheSync('filters', slug, { clone: false }) || {};
-      bookmarksCache = (filtersCache && typeof filtersCache === 'object')
-        ? filtersCache as QuestionFilterBookmarkCache
-        : {};
+      bookmarksCache =
+        filtersCache && typeof filtersCache === 'object' ? (filtersCache as QuestionFilterBookmarkCache) : {};
     } catch (e) {
-      questionFilterLog.error("Error reading bookmarksCache", e);
+      questionFilterLog.error('Error reading bookmarksCache', e);
       bookmarksCache = {};
     }
 
     const bookmarkedFilters = Array.isArray(bookmarksCache.bookmarkedFilters)
       ? bookmarksCache.bookmarkedFilters
-      : (Array.isArray(bookmarksCache.filters) ? bookmarksCache.filters : []);
+      : Array.isArray(bookmarksCache.filters)
+        ? bookmarksCache.filters
+        : [];
     const isMatch = bookmarkedFilters.includes(currentFilterString);
 
     if (this._isMounted && this.state.isCurrentFilterBookmarked !== isMatch) {
@@ -1283,18 +1005,19 @@ class QuestionFilter extends React.Component<any, any> {
 
     try {
       const parsedCache = peekCacheSync('filters', slug, { clone: false });
-      bookmarksCacheObject = (typeof parsedCache === 'object' && parsedCache !== null)
-        ? { ...(parsedCache as QuestionFilterBookmarkCache) }
-        : {};
+      bookmarksCacheObject =
+        typeof parsedCache === 'object' && parsedCache !== null
+          ? { ...(parsedCache as QuestionFilterBookmarkCache) }
+          : {};
     } catch (e) {
-      questionFilterLog.error("Error parsing bookmarksCache from localStorage, resetting.", e);
+      questionFilterLog.error('Error parsing bookmarksCache from localStorage, resetting.', e);
     }
 
     // Canonical field for persisted filter bookmarks.
     if (!Array.isArray(bookmarksCacheObject.bookmarkedFilters)) {
-      bookmarksCacheObject.bookmarkedFilters = (
-        Array.isArray(bookmarksCacheObject.filters) ? [...bookmarksCacheObject.filters] : []
-      );
+      bookmarksCacheObject.bookmarkedFilters = Array.isArray(bookmarksCacheObject.filters)
+        ? [...bookmarksCacheObject.filters]
+        : [];
     } else {
       bookmarksCacheObject.bookmarkedFilters = [...bookmarksCacheObject.bookmarkedFilters];
     }
@@ -1304,32 +1027,30 @@ class QuestionFilter extends React.Component<any, any> {
       bookmarksCacheObject.bookmarkedFilters.push(currentFilterString);
     }
 
-	    const writeResult = (writeCache as QuestionFilterWriteCache)('filters', slug, bookmarksCacheObject);
-	    const handleSuccess = (ok: unknown) => {
-	      if (!ok) {
-	        questionFilterLog.warn('Failed to persist bookmarked filter state');
-	        return;
-	      }
-	      this.setState(buildQuestionFilterBookmarkFeedbackPatch(true), () => {
-	        this.checkIfCurrentFilterIsBookmarked();
-	      });
+    const writeResult = (writeCache as QuestionFilterWriteCache)('filters', slug, bookmarksCacheObject);
+    const handleSuccess = (ok: unknown) => {
+      if (!ok) {
+        questionFilterLog.warn('Failed to persist bookmarked filter state');
+        return;
+      }
+      this.setState(buildQuestionFilterBookmarkFeedbackPatch(true), () => {
+        this.checkIfCurrentFilterIsBookmarked();
+      });
 
-	      if (this.bookmarkFeedbackTimeout) clearTimeout(this.bookmarkFeedbackTimeout);
-	      this.bookmarkFeedbackTimeout = setTimeout(() => {
-	        if (this._isMounted) {
-	          this.setState(buildQuestionFilterBookmarkFeedbackPatch(false));
-	        }
-	      }, 2000);
-	    };
-	    if (writeResult && typeof writeResult !== 'boolean' && typeof writeResult.then === 'function') {
-	      void writeResult
-	        .then(handleSuccess)
-	        .catch((e: unknown) => {
-	          questionFilterLog.error("Error saving bookmarksCache to local cache:", e);
-	        });
-	    } else {
-	      handleSuccess(writeResult);
-	    }
+      if (this.bookmarkFeedbackTimeout) clearTimeout(this.bookmarkFeedbackTimeout);
+      this.bookmarkFeedbackTimeout = setTimeout(() => {
+        if (this._isMounted) {
+          this.setState(buildQuestionFilterBookmarkFeedbackPatch(false));
+        }
+      }, 2000);
+    };
+    if (writeResult && typeof writeResult !== 'boolean' && typeof writeResult.then === 'function') {
+      void writeResult.then(handleSuccess).catch((e: unknown) => {
+        questionFilterLog.error('Error saving bookmarksCache to local cache:', e);
+      });
+    } else {
+      handleSuccess(writeResult);
+    }
   };
 
   // ----------------------------------------------------------------------------------
@@ -1373,9 +1094,7 @@ class QuestionFilter extends React.Component<any, any> {
     try {
       const slug = resolveFilterStorageSlug(this.props);
       const modeKey =
-        this.props.filterType === 'results'
-          ? 'questionFilterState_results'
-          : 'questionFilterState_questions';
+        this.props.filterType === 'results' ? 'questionFilterState_results' : 'questionFilterState_questions';
       let saved: string | null = null;
       const filtersCacheSync = peekCacheSync('filters', slug, { clone: false });
       if (filtersCacheSync && typeof filtersCacheSync === 'object') {
@@ -1391,8 +1110,7 @@ class QuestionFilter extends React.Component<any, any> {
       if (saved) {
         const parsed = toUnknownRecord(JSON.parse(saved));
         const shouldClearPersistedResponseStatus =
-          !toStr(this.props.account).trim() &&
-          (!!parsed?.filterByResponded || !!parsed?.filterByNotResponded);
+          !toStr(this.props.account).trim() && (!!parsed?.filterByResponded || !!parsed?.filterByNotResponded);
         const responseStatusState = normalizeResponseStatusFilterState({
           filterByResponded: parsed.filterByResponded,
           filterByNotResponded: parsed.filterByNotResponded,
@@ -1404,61 +1122,64 @@ class QuestionFilter extends React.Component<any, any> {
             resolve();
             return;
           }
-          this.setState((prevState: QuestionFilterStateRecord) => ({
-            selectedTypes: Array.isArray(parsed.selectedTypes) ? parsed.selectedTypes : prevState.selectedTypes,
-            sortByImportance:
-              typeof parsed.sortByImportance === 'boolean'
-                ? parsed.sortByImportance
-                : prevState.sortByImportance,
-            showTopQuestions:
-              typeof parsed.showTopQuestions === 'boolean'
-                ? parsed.showTopQuestions
-                : prevState.showTopQuestions,
-            topQuestionsCount: parsed.topQuestionsCount || prevState.topQuestionsCount,
-            aiSearchQuery: typeof parsed.aiSearchQuery === 'string' ? parsed.aiSearchQuery : prevState.aiSearchQuery,
-            aiDraftQuery: typeof parsed.aiSearchQuery === 'string' ? parsed.aiSearchQuery : prevState.aiDraftQuery,
-            aiRankingCount: normalizePositiveInt(parsed.aiRankingCount, prevState.aiRankingCount || DEFAULT_AI_TOP_N),
-            aiAppliedTopN: parsed.aiSearchQuery
-              ? normalizePositiveInt(parsed.aiAppliedTopN ?? parsed.aiRankingCount, prevState.aiAppliedTopN || DEFAULT_AI_TOP_N)
-              : null,
-            aiFilterApplied: false,
-            aiRankedQuestionIds: [],
-            aiCombineWithOtherFilters: parsed.aiSearchQuery
-              ? parsed.aiCombineWithOtherFilters === true
-              : false,
-            aiApplyError: '',
-            sbtFilterLocalState: Object.prototype.hasOwnProperty.call(parsed, 'sbtFilterLocalState') ? (parsed.sbtFilterLocalState || null) : prevState.sbtFilterLocalState,
-            selectedTags: Array.isArray(parsed.selectedTags) ? parsed.selectedTags : prevState.selectedTags,
-            filterByResponded: responseStatusState.filterByResponded,
-            filterByNotResponded: responseStatusState.filterByNotResponded,
-            showTopQuestionsByResponses:
-              typeof parsed.showTopQuestionsByResponses === 'boolean'
-                ? parsed.showTopQuestionsByResponses
-                : prevState.showTopQuestionsByResponses,
+          this.setState(
+            (prevState: QuestionFilterStateRecord) => ({
+              selectedTypes: Array.isArray(parsed.selectedTypes) ? parsed.selectedTypes : prevState.selectedTypes,
+              sortByImportance:
+                typeof parsed.sortByImportance === 'boolean' ? parsed.sortByImportance : prevState.sortByImportance,
+              showTopQuestions:
+                typeof parsed.showTopQuestions === 'boolean' ? parsed.showTopQuestions : prevState.showTopQuestions,
+              topQuestionsCount: parsed.topQuestionsCount || prevState.topQuestionsCount,
+              aiSearchQuery: typeof parsed.aiSearchQuery === 'string' ? parsed.aiSearchQuery : prevState.aiSearchQuery,
+              aiDraftQuery: typeof parsed.aiSearchQuery === 'string' ? parsed.aiSearchQuery : prevState.aiDraftQuery,
+              aiRankingCount: normalizePositiveInt(parsed.aiRankingCount, prevState.aiRankingCount || DEFAULT_AI_TOP_N),
+              aiAppliedTopN: parsed.aiSearchQuery
+                ? normalizePositiveInt(
+                    parsed.aiAppliedTopN ?? parsed.aiRankingCount,
+                    prevState.aiAppliedTopN || DEFAULT_AI_TOP_N,
+                  )
+                : null,
+              aiFilterApplied: false,
+              aiRankedQuestionIds: [],
+              aiCombineWithOtherFilters: parsed.aiSearchQuery ? parsed.aiCombineWithOtherFilters === true : false,
+              aiApplyError: '',
+              sbtFilterLocalState: Object.prototype.hasOwnProperty.call(parsed, 'sbtFilterLocalState')
+                ? parsed.sbtFilterLocalState || null
+                : prevState.sbtFilterLocalState,
+              selectedTags: Array.isArray(parsed.selectedTags) ? parsed.selectedTags : prevState.selectedTags,
+              filterByResponded: responseStatusState.filterByResponded,
+              filterByNotResponded: responseStatusState.filterByNotResponded,
+              showTopQuestionsByResponses:
+                typeof parsed.showTopQuestionsByResponses === 'boolean'
+                  ? parsed.showTopQuestionsByResponses
+                  : prevState.showTopQuestionsByResponses,
 
-            // Also update pending states:
-            pendingSelectedTypes: Array.isArray(parsed.selectedTypes) ? parsed.selectedTypes : prevState.pendingSelectedTypes,
-            pendingSortByImportance:
-              typeof parsed.sortByImportance === 'boolean'
-                ? parsed.sortByImportance
-                : prevState.pendingSortByImportance,
-            pendingShowTopQuestions:
-              typeof parsed.showTopQuestions === 'boolean'
-                ? parsed.showTopQuestions
-                : prevState.pendingShowTopQuestions,
-            pendingTopQuestionsCount:
-              parsed.topQuestionsCount || prevState.pendingTopQuestionsCount,
-            pendingShowTopQuestionsByResponses:
-              typeof parsed.showTopQuestionsByResponses === 'boolean'
-                ? parsed.showTopQuestionsByResponses
-                : prevState.pendingShowTopQuestionsByResponses
-          }), () => {
-            if (shouldClearPersistedResponseStatus) {
-              this.saveFilterStateToLocalStorage();
-            }
-            this.queueAutoApplyAiFilter('load-local-state');
-            resolve();
-          });
+              // Also update pending states:
+              pendingSelectedTypes: Array.isArray(parsed.selectedTypes)
+                ? parsed.selectedTypes
+                : prevState.pendingSelectedTypes,
+              pendingSortByImportance:
+                typeof parsed.sortByImportance === 'boolean'
+                  ? parsed.sortByImportance
+                  : prevState.pendingSortByImportance,
+              pendingShowTopQuestions:
+                typeof parsed.showTopQuestions === 'boolean'
+                  ? parsed.showTopQuestions
+                  : prevState.pendingShowTopQuestions,
+              pendingTopQuestionsCount: parsed.topQuestionsCount || prevState.pendingTopQuestionsCount,
+              pendingShowTopQuestionsByResponses:
+                typeof parsed.showTopQuestionsByResponses === 'boolean'
+                  ? parsed.showTopQuestionsByResponses
+                  : prevState.pendingShowTopQuestionsByResponses,
+            }),
+            () => {
+              if (shouldClearPersistedResponseStatus) {
+                this.saveFilterStateToLocalStorage();
+              }
+              this.queueAutoApplyAiFilter('load-local-state');
+              resolve();
+            },
+          );
         });
       } else if (resetIfMissing) {
         didRestoreState = true;
@@ -1493,7 +1214,7 @@ class QuestionFilter extends React.Component<any, any> {
         selectedTags,
         showTopQuestionsByResponses,
         filterByResponded,
-        filterByNotResponded
+        filterByNotResponded,
       } = this.state;
 
       const dataToStore = {
@@ -1509,17 +1230,14 @@ class QuestionFilter extends React.Component<any, any> {
         selectedTags,
         showTopQuestionsByResponses,
         filterByResponded,
-        filterByNotResponded
+        filterByNotResponded,
       };
 
       const modeKey =
-        this.props.filterType === 'results'
-          ? 'questionFilterState_results'
-          : 'questionFilterState_questions';
+        this.props.filterType === 'results' ? 'questionFilterState_results' : 'questionFilterState_questions';
       const slug = resolveFilterStorageSlug(this.props);
       const existing = peekCacheSync('filters', slug, { clone: false });
-      const existingModeState =
-        existing && typeof existing === 'object' ? (existing[modeKey] || null) : null;
+      const existingModeState = existing && typeof existing === 'object' ? existing[modeKey] || null : null;
       const nextModeSignature = this.getMemoizedStableSerialize(dataToStore);
       const existingModeSignature = this.getMemoizedStableSerialize(existingModeState);
       const persistenceSignature = `${slug}|${modeKey}|${nextModeSignature}`;
@@ -1530,9 +1248,8 @@ class QuestionFilter extends React.Component<any, any> {
         this._lastSavedFilterStateSignature = persistenceSignature;
         return;
       }
-      const next = (existing && typeof existing === 'object')
-        ? { ...existing, [modeKey]: dataToStore }
-        : { [modeKey]: dataToStore };
+      const next =
+        existing && typeof existing === 'object' ? { ...existing, [modeKey]: dataToStore } : { [modeKey]: dataToStore };
       const writeResult = (writeCache as QuestionFilterWriteCache)('filters', slug, next);
       const handleSuccess = (ok: unknown) => {
         if (ok !== false) {
@@ -1540,11 +1257,9 @@ class QuestionFilter extends React.Component<any, any> {
         }
       };
       if (writeResult && typeof writeResult !== 'boolean' && typeof writeResult.then === 'function') {
-        void writeResult
-          .then(handleSuccess)
-          .catch((error: unknown) => {
-            questionFilterLog.error('Error saving filter state to cache:', error);
-          });
+        void writeResult.then(handleSuccess).catch((error: unknown) => {
+          questionFilterLog.error('Error saving filter state to cache:', error);
+        });
       } else {
         handleSuccess(writeResult);
       }
@@ -1570,12 +1285,9 @@ class QuestionFilter extends React.Component<any, any> {
     const selectedTypes = normalizeFilterSelectionList(filterState.questionTypes);
     const selectedTags = normalizeFilterSelectionList(filterState.selectedTags);
 
-    const aiSearchQuery =
-      typeof filterState.aiFilter === 'string' ? filterState.aiFilter : '';
+    const aiSearchQuery = typeof filterState.aiFilter === 'string' ? filterState.aiFilter : '';
     const aiTopN = normalizePositiveInt(filterState.aiTopN, DEFAULT_AI_TOP_N);
-    const aiCombineWithOtherFilters = !!(
-      aiSearchQuery.trim() && filterState.aiCombine === true
-    );
+    const aiCombineWithOtherFilters = !!(aiSearchQuery.trim() && filterState.aiCombine === true);
 
     const sbtFilterLocalState = normalizeSbtFilterLocalState(filterState.sbtFilter);
     const responseStatus = toUnknownRecord(filterState.responseStatus);
@@ -1613,11 +1325,8 @@ class QuestionFilter extends React.Component<any, any> {
 
     const nextAiAppliedTopN = aiSearchQuery ? aiTopN : null;
     const currentAiSearchQuery = String(this.state.aiSearchQuery || '');
-    const shouldPreserveAppliedAiState = (
-      aiSearchQuery.trim() &&
-      currentAiSearchQuery === aiSearchQuery &&
-      !!this.state.aiFilterApplied
-    );
+    const shouldPreserveAppliedAiState =
+      aiSearchQuery.trim() && currentAiSearchQuery === aiSearchQuery && !!this.state.aiFilterApplied;
 
     this.setState(
       {
@@ -1656,10 +1365,9 @@ class QuestionFilter extends React.Component<any, any> {
         // and refresh bookmark adornments
         this.checkIfCurrentFilterIsBookmarked();
         this.queueAutoApplyAiFilter('sync-external-state');
-      }
+      },
     );
   }
-
 
   // ----------------------------------------------------------------------------------
   // MERGE QUESTIONS WITH CACHE & LOAD RESPONSES FROM LOCAL
@@ -1682,9 +1390,7 @@ class QuestionFilter extends React.Component<any, any> {
     const cachedQuestions = net.questions;
 
     const allCacheQIDs = Object.keys(cachedQuestions);
-    const existingIDs = new Set<string>(
-      sourceQuestionList.map((q) => String(q.id || '').toLowerCase())
-    );
+    const existingIDs = new Set<string>(sourceQuestionList.map((q) => String(q.id || '').toLowerCase()));
     const merged = [...sourceQuestionList];
 
     allCacheQIDs.forEach((qIdLower) => {
@@ -1713,7 +1419,7 @@ class QuestionFilter extends React.Component<any, any> {
     try {
       const questionsCache = readQuestionsCacheSync(slug);
 
-      const cachedResponses = (questionsCache?.[netIdStr]?.questionResponses) || {};
+      const cachedResponses = questionsCache?.[netIdStr]?.questionResponses || {};
       const cachedResponsesSignature = buildFilteredResponsesByQuestionSignature(cachedResponses);
       if (cachedResponsesSignature === this._cachedQuestionResponsesSignature) return;
       this._cachedQuestionResponsesSignature = cachedResponsesSignature;
@@ -1757,7 +1463,7 @@ class QuestionFilter extends React.Component<any, any> {
     relevantResponses: unknown = {},
     mergedQuestions: unknown = [],
     questionResponsesNonceKey: unknown = null,
-    questionsCacheNonceKey: unknown = null
+    questionsCacheNonceKey: unknown = null,
   ): Map<string, QuestionFilterResponseStats> {
     const memo = this._questionResponseStatsMemo;
     if (
@@ -1770,27 +1476,20 @@ class QuestionFilter extends React.Component<any, any> {
     }
 
     const questionTypeById: Record<string, string> = {};
-    (Array.isArray(mergedQuestions) ? mergedQuestions as QuestionFilterQuestionRecord[] : [])
-      .forEach((question) => {
-        const qLower = toLowerId(question?.id);
-        if (!qLower) return;
-        questionTypeById[qLower] = String(question?.type || '').toLowerCase();
-      });
+    (Array.isArray(mergedQuestions) ? (mergedQuestions as QuestionFilterQuestionRecord[]) : []).forEach((question) => {
+      const qLower = toLowerId(question?.id);
+      if (!qLower) return;
+      questionTypeById[qLower] = String(question?.type || '').toLowerCase();
+    });
 
     const statsByQuestion = new Map<string, QuestionFilterResponseStats>();
-    const responsesByQuestion = (
-      relevantResponses && typeof relevantResponses === 'object'
-        ? relevantResponses as Record<string, unknown>
-        : {}
-    );
+    const responsesByQuestion =
+      relevantResponses && typeof relevantResponses === 'object' ? (relevantResponses as Record<string, unknown>) : {};
     Object.keys(responsesByQuestion).forEach((qId) => {
       const qLower = String(qId || '').toLowerCase();
       const respondersObj = responsesByQuestion[qId];
-      const respondersMap = (
-        respondersObj && typeof respondersObj === 'object'
-          ? respondersObj as Record<string, unknown>
-          : {}
-      );
+      const respondersMap =
+        respondersObj && typeof respondersObj === 'object' ? (respondersObj as Record<string, unknown>) : {};
       const responderKeys = Object.keys(respondersMap);
       let totalImportance = 0;
       let responseCount = 0;
@@ -1832,9 +1531,7 @@ class QuestionFilter extends React.Component<any, any> {
 
   emitCountUpdate = (count: unknown, encryptedCount: unknown): void => {
     if (!this.props.onCountUpdate || !this.props.isQuestionCacheReady) return;
-    const safeEncrypted = typeof encryptedCount === 'number' && Number.isFinite(encryptedCount)
-      ? encryptedCount
-      : 0;
+    const safeEncrypted = typeof encryptedCount === 'number' && Number.isFinite(encryptedCount) ? encryptedCount : 0;
     if (this._lastEmittedCount === count && this._lastEmittedEncryptedCount === safeEncrypted) return;
     this._lastEmittedCount = count;
     this._lastEmittedEncryptedCount = safeEncrypted;
@@ -1850,7 +1547,7 @@ class QuestionFilter extends React.Component<any, any> {
 
   emitFilterCallbacks(
     filteredPayload: unknown,
-    filterStateForCallback: Parameters<typeof serializeFilterState>[0]
+    filterStateForCallback: Parameters<typeof serializeFilterState>[0],
   ): void {
     const payloadSignature = buildFilterPayloadSignature(filteredPayload);
     const filterStateSignature = serializeFilterState(filterStateForCallback) || '';
@@ -1866,33 +1563,22 @@ class QuestionFilter extends React.Component<any, any> {
       this.props.onFilter(filteredPayload, filterStateForCallback);
     }
     // Avoid duplicate parent work when both props point to the same callback.
-    if (
-      this.props.onFilterStateChange &&
-      this.props.onFilterStateChange !== this.props.onFilter
-    ) {
+    if (this.props.onFilterStateChange && this.props.onFilterStateChange !== this.props.onFilter) {
       this.props.onFilterStateChange(filterStateForCallback);
     }
   }
 
   buildFilterPipelineResult(usePendingState = false): QuestionFilterPipelineResult {
     const mergedQuestions: QuestionFilterQuestionRecord[] = Array.isArray(this.state.mergedQuestions)
-      ? this.state.mergedQuestions as QuestionFilterQuestionRecord[]
+      ? (this.state.mergedQuestions as QuestionFilterQuestionRecord[])
       : [];
-    const selectedTypes = usePendingState
-      ? this.state.pendingSelectedTypes
-      : this.state.selectedTypes;
-    const sortByImportance = usePendingState
-      ? this.state.pendingSortByImportance
-      : this.state.sortByImportance;
+    const selectedTypes = usePendingState ? this.state.pendingSelectedTypes : this.state.selectedTypes;
+    const sortByImportance = usePendingState ? this.state.pendingSortByImportance : this.state.sortByImportance;
     const sbtFilteredQuestions = usePendingState
       ? this.state.pendingSbtFilteredQuestions
       : this.state.sbtFilteredQuestions;
-    const showTopQuestions = usePendingState
-      ? this.state.pendingShowTopQuestions
-      : this.state.showTopQuestions;
-    const topQuestionsCount = usePendingState
-      ? this.state.pendingTopQuestionsCount
-      : this.state.topQuestionsCount;
+    const showTopQuestions = usePendingState ? this.state.pendingShowTopQuestions : this.state.showTopQuestions;
+    const topQuestionsCount = usePendingState ? this.state.pendingTopQuestionsCount : this.state.topQuestionsCount;
     const showTopQuestionsByResponses = usePendingState
       ? this.state.pendingShowTopQuestionsByResponses
       : this.state.showTopQuestionsByResponses;
@@ -1910,37 +1596,27 @@ class QuestionFilter extends React.Component<any, any> {
     const hasTypeFilter = (selectedTypes || []).length > 0;
     const hasTagFilter = (selectedTags || []).length > 0;
     const hasTopFilter = Boolean(showTopQuestions || showTopQuestionsByResponses);
-    const hasResponseStatusFilter = (filterByResponded || filterByNotResponded) && !(filterByResponded && filterByNotResponded);
-    const hasAiFilter = (
-      !hasTopFilter &&
-      aiFilterApplied &&
-      String(aiSearchQuery || '').trim().length > 0
-    );
+    const hasResponseStatusFilter =
+      (filterByResponded || filterByNotResponded) && !(filterByResponded && filterByNotResponded);
+    const hasAiFilter = !hasTopFilter && aiFilterApplied && String(aiSearchQuery || '').trim().length > 0;
     const hasImportanceSort = Boolean(sortByImportance);
-    const shouldUseResponseData = (
-      hasResponseStatusFilter ||
-      showTopQuestions ||
-      showTopQuestionsByResponses ||
-      hasImportanceSort
-    );
+    const shouldUseResponseData =
+      hasResponseStatusFilter || showTopQuestions || showTopQuestionsByResponses || hasImportanceSort;
     const relevantResponses = shouldUseResponseData
-      ? (this.props.questionResponses || this.state.cachedQuestionResponses || EMPTY_FILTER_RESPONSES)
+      ? this.props.questionResponses || this.state.cachedQuestionResponses || EMPTY_FILTER_RESPONSES
       : EMPTY_FILTER_RESPONSES;
     const questionResponsesNonceKey = shouldUseResponseData
       ? normalizeNonceKey(this.props.questionResponsesNonce)
       : null;
-    const questionsCacheNonceKey = shouldUseResponseData
-      ? normalizeNonceKey(this.props.questionsCacheNonce)
-      : null;
-    const hasActiveTransforms = (
+    const questionsCacheNonceKey = shouldUseResponseData ? normalizeNonceKey(this.props.questionsCacheNonce) : null;
+    const hasActiveTransforms =
       hasSbtFilter ||
       hasTypeFilter ||
       hasTagFilter ||
       hasResponseStatusFilter ||
       hasAiFilter ||
       hasTopFilter ||
-      hasImportanceSort
-    );
+      hasImportanceSort;
 
     const memo = this._filterPipelineMemo;
     if (
@@ -2000,23 +1676,18 @@ class QuestionFilter extends React.Component<any, any> {
       return result;
     }
 
-    const shouldComputeResponseStats = (
-      showTopQuestions ||
-      showTopQuestionsByResponses ||
-      sortByImportance
-    );
+    const shouldComputeResponseStats = showTopQuestions || showTopQuestionsByResponses || sortByImportance;
     const statsByQuestion = shouldComputeResponseStats
       ? this.getMemoizedQuestionResponseStats(
-        relevantResponses,
-        mergedQuestions,
-        questionResponsesNonceKey,
-        questionsCacheNonceKey
-      )
+          relevantResponses,
+          mergedQuestions,
+          questionResponsesNonceKey,
+          questionsCacheNonceKey,
+        )
       : null;
 
-    const baseQuestions = (hasAiFilter && !aiCombineWithOtherFilters)
-      ? mergedQuestions
-      : this.getQuestionsSubsetBeforeAi(usePendingState);
+    const baseQuestions =
+      hasAiFilter && !aiCombineWithOtherFilters ? mergedQuestions : this.getQuestionsSubsetBeforeAi(usePendingState);
     let finalQuestions: QuestionFilterQuestionRecord[] = baseQuestions;
 
     let shouldApplyAiFilter = hasAiFilter;
@@ -2029,12 +1700,7 @@ class QuestionFilter extends React.Component<any, any> {
     }
 
     if (shouldApplyAiFilter) {
-      finalQuestions = this.applyAISearchFilter(
-        finalQuestions,
-        aiSearchQuery,
-        aiRankedQuestionIds,
-        aiAppliedTopN
-      );
+      finalQuestions = this.applyAISearchFilter(finalQuestions, aiSearchQuery, aiRankedQuestionIds, aiAppliedTopN);
     }
 
     if (showTopQuestions || showTopQuestionsByResponses) {
@@ -2047,11 +1713,9 @@ class QuestionFilter extends React.Component<any, any> {
         });
         rankedByResponses.sort((a, b) => {
           const diff = b[2] - a[2];
-          return diff !== 0 ? diff : (a[1] - b[1]);
+          return diff !== 0 ? diff : a[1] - b[1];
         });
-        finalQuestions = rankedByResponses
-          .slice(0, topLimit)
-          .map(([q, , score]) => ({ ...q, totalResponses: score }));
+        finalQuestions = rankedByResponses.slice(0, topLimit).map(([q, , score]) => ({ ...q, totalResponses: score }));
       } else {
         const rankedByImportance: QuestionFilterRankedQuestion[] = finalQuestions.map((q, idx) => {
           const qLower = String(q.id || '').toLowerCase();
@@ -2060,7 +1724,7 @@ class QuestionFilter extends React.Component<any, any> {
         });
         rankedByImportance.sort((a, b) => {
           const diff = b[2] - a[2];
-          return diff !== 0 ? diff : (a[1] - b[1]);
+          return diff !== 0 ? diff : a[1] - b[1];
         });
         finalQuestions = rankedByImportance
           .slice(0, topLimit)
@@ -2074,7 +1738,7 @@ class QuestionFilter extends React.Component<any, any> {
       });
       rankedByImportance.sort((a, b) => {
         const diff = b[2] - a[2];
-        return diff !== 0 ? diff : (a[1] - b[1]);
+        return diff !== 0 ? diff : a[1] - b[1];
       });
       finalQuestions = rankedByImportance.map(([q, , score]) => ({ ...q, totalImportance: score }));
     }
@@ -2111,10 +1775,7 @@ class QuestionFilter extends React.Component<any, any> {
     return result;
   }
 
-  handleFilteredQuestions = (
-    filtered: unknown,
-    newSbtFilterLocalState: unknown
-  ): void => {
+  handleFilteredQuestions = (filtered: unknown, newSbtFilterLocalState: unknown): void => {
     // "filtered" can be an array or an object { filteredQuestions, filteredResponsesByQuestion }
     let realFilteredQuestions: QuestionFilterQuestionRecord[] = [];
     let filteredResponsesByQuestion: QuestionFilterResponsesByQuestion = {};
@@ -2128,19 +1789,22 @@ class QuestionFilter extends React.Component<any, any> {
       };
       if (Array.isArray(filteredRecord.filteredQuestions)) {
         realFilteredQuestions = filteredRecord.filteredQuestions as QuestionFilterQuestionRecord[];
-        filteredResponsesByQuestion = (
+        filteredResponsesByQuestion =
           filteredRecord.filteredResponsesByQuestion && typeof filteredRecord.filteredResponsesByQuestion === 'object'
-            ? filteredRecord.filteredResponsesByQuestion as QuestionFilterResponsesByQuestion
-            : {}
-        );
+            ? (filteredRecord.filteredResponsesByQuestion as QuestionFilterResponsesByQuestion)
+            : {};
       }
     }
 
     // Infinite loop prevention
     // Strict deep-equality check. If the incoming filtered lists and SBT state are
     // structurally identical to what we already have, return immediately.
-    const sbtStateChanged = stableSerializeSmallObject(newSbtFilterLocalState) !== stableSerializeSmallObject(this.state.sbtFilterLocalState);
-    const questionsChanged = !areQuestionListsEquivalentById(realFilteredQuestions, this.state.pendingSbtFilteredQuestions);
+    const sbtStateChanged =
+      stableSerializeSmallObject(newSbtFilterLocalState) !== stableSerializeSmallObject(this.state.sbtFilterLocalState);
+    const questionsChanged = !areQuestionListsEquivalentById(
+      realFilteredQuestions,
+      this.state.pendingSbtFilteredQuestions,
+    );
 
     if (!sbtStateChanged && !questionsChanged) {
       return;
@@ -2149,12 +1813,12 @@ class QuestionFilter extends React.Component<any, any> {
     this.setState(
       {
         pendingSbtFilteredQuestions: realFilteredQuestions,
-        sbtFilterLocalState: newSbtFilterLocalState
+        sbtFilterLocalState: newSbtFilterLocalState,
       },
       () => {
         this.handleApplyFilters(true);
         this.queueCombinedAiRefreshIfNeeded('sbt-filter-change');
-      }
+      },
     );
 
     const filterStateForCallback = this.buildFilterState();
@@ -2164,9 +1828,9 @@ class QuestionFilter extends React.Component<any, any> {
       this.emitFilterCallbacks(
         {
           filteredQuestions: realFilteredQuestions,
-          filteredResponsesByQuestion
+          filteredResponsesByQuestion,
         },
-        filterStateForCallback
+        filterStateForCallback,
       );
     } else {
       this.emitFilterCallbacks(realFilteredQuestions, filterStateForCallback);
@@ -2189,7 +1853,7 @@ class QuestionFilter extends React.Component<any, any> {
       aiCombineWithOtherFilters: this.state.aiCombineWithOtherFilters,
       sbtFilterLocalState: this.state.sbtFilterLocalState,
       selectedTags: this.state.selectedTags,
-      showTopQuestionsByResponses: this.state.showTopQuestionsByResponses
+      showTopQuestionsByResponses: this.state.showTopQuestionsByResponses,
     };
   }
 
@@ -2197,7 +1861,7 @@ class QuestionFilter extends React.Component<any, any> {
     questions: TQuestions,
     aiSearchQuery: unknown,
     aiRankedQuestionIds: unknown = [],
-    topN: unknown = DEFAULT_AI_TOP_N
+    topN: unknown = DEFAULT_AI_TOP_N,
   ): TQuestions | QuestionFilterQuestionRecord[] {
     const query = typeof aiSearchQuery === 'string' ? aiSearchQuery : String(aiSearchQuery || '');
     if (!query.trim()) {
@@ -2213,7 +1877,7 @@ class QuestionFilter extends React.Component<any, any> {
       if (!orderById.has(key)) orderById.set(key, idx);
     });
 
-    return (Array.isArray(questions) ? questions as QuestionFilterQuestionRecord[] : [])
+    return (Array.isArray(questions) ? (questions as QuestionFilterQuestionRecord[]) : [])
       .filter((q) => orderById.has(String(q?.id || '').toLowerCase()))
       .sort((a, b) => {
         const aIdx = orderById.get(String(a?.id || '').toLowerCase());
@@ -2258,7 +1922,11 @@ class QuestionFilter extends React.Component<any, any> {
     const aiAccess = this.getAiAccessState();
     if (!aiAccess.enabled) {
       if (!auto) {
-        this.setState(buildQuestionFilterAiApplyErrorPatch('AI filter is unavailable. Add a local API key or use a session with sponsored AI access.'));
+        this.setState(
+          buildQuestionFilterAiApplyErrorPatch(
+            'AI filter is unavailable. Add a local API key or use a session with sponsored AI access.',
+          ),
+        );
       }
       return false;
     }
@@ -2270,14 +1938,10 @@ class QuestionFilter extends React.Component<any, any> {
       return false;
     }
 
-    const query = String(
-      queryOverride != null
-        ? queryOverride
-        : this.state.aiDraftQuery
-    ).trim();
+    const query = String(queryOverride != null ? queryOverride : this.state.aiDraftQuery).trim();
     const topN = normalizePositiveInt(
       topNOverride != null ? topNOverride : this.state.aiRankingCount,
-      DEFAULT_AI_TOP_N
+      DEFAULT_AI_TOP_N,
     );
 
     if (!query) {
@@ -2295,25 +1959,28 @@ class QuestionFilter extends React.Component<any, any> {
 
     if (!candidateQuestions.length) {
       this.invalidatePendingAiApply();
-      this.setState(buildQuestionFilterAiApplyNoCandidatesPatch({
-        query,
-        topN,
-      }), () => {
-        this.handleApplyFilters(true);
-      });
+      this.setState(
+        buildQuestionFilterAiApplyNoCandidatesPatch({
+          query,
+          topN,
+        }),
+        () => {
+          this.handleApplyFilters(true);
+        },
+      );
       return true;
     }
 
-    if (
-      this.state.aiFilterApplied &&
-      this.state.aiLastAppliedSignature === applySignature
-    ) {
-      this.setState(buildQuestionFilterAiApplyBasePatch({
-        query,
-        topN,
-      }), () => {
-        this.handleApplyFilters(true);
-      });
+    if (this.state.aiFilterApplied && this.state.aiLastAppliedSignature === applySignature) {
+      this.setState(
+        buildQuestionFilterAiApplyBasePatch({
+          query,
+          topN,
+        }),
+        () => {
+          this.handleApplyFilters(true);
+        },
+      );
       return true;
     }
 
@@ -2327,34 +1994,34 @@ class QuestionFilter extends React.Component<any, any> {
     this.setState(buildQuestionFilterAiApplyingPatch());
 
     try {
-      const rankedIds = await rankQuestionsAI(
-        query,
-        candidateQuestions,
-        Math.max(topN, candidateQuestions.length),
-        {
-          ...this.buildAiRequestOptions(),
-          throwOnError: true,
-        }
-      );
+      const rankedIds = await rankQuestionsAI(query, candidateQuestions, Math.max(topN, candidateQuestions.length), {
+        ...this.buildAiRequestOptions(),
+        throwOnError: true,
+      });
       if (!this._isMounted) return false;
       if (requestSeq !== this._aiLatestRequestSeq) return false;
       const normalizedRankedIds = normalizeAiIdList(rankedIds);
-      this.setState(buildQuestionFilterAiApplySuccessPatch({
-        applySignature,
-        rankedQuestionIds: normalizedRankedIds,
-        query,
-        topN,
-      }), () => {
-        this.handleApplyFilters(true);
-      });
+      this.setState(
+        buildQuestionFilterAiApplySuccessPatch({
+          applySignature,
+          rankedQuestionIds: normalizedRankedIds,
+          query,
+          topN,
+        }),
+        () => {
+          this.handleApplyFilters(true);
+        },
+      );
       return true;
     } catch (error: unknown) {
       questionFilterLog.error('Failed applying AI filter', { source, error });
       if (!this._isMounted) return false;
       if (requestSeq !== this._aiLatestRequestSeq) return false;
-      this.setState(buildQuestionFilterAiApplyFailurePatch(
-        getErrorMessage(error, 'AI filter request failed. Previous AI results were kept.')
-      ));
+      this.setState(
+        buildQuestionFilterAiApplyFailurePatch(
+          getErrorMessage(error, 'AI filter request failed. Previous AI results were kept.'),
+        ),
+      );
       return false;
     } finally {
       if (auto && this._aiAutoApplyInFlightSignature === applySignature) {
@@ -2396,13 +2063,11 @@ class QuestionFilter extends React.Component<any, any> {
       newAiFilterApplied,
       newAiCombineWithOtherFilters,
       newAiRankedSignature: stableSerializeSmallObject(newAiRankedQuestionIds, 8192),
-      newPendingSbtFilteredQuestionsLength: newPendingSbtFilteredQuestions
-        ? newPendingSbtFilteredQuestions.length
-        : -1,
+      newPendingSbtFilteredQuestionsLength: newPendingSbtFilteredQuestions ? newPendingSbtFilteredQuestions.length : -1,
       newShowTopQuestionsByResponses,
       newSelectedTags: [...newSelectedTags].sort(),
       newFilterByResponded,
-      newFilterByNotResponded
+      newFilterByNotResponded,
     };
     const potentialFilterStateSignature = stableSerializeSmallObject(potentialFilterStateObj);
 
@@ -2439,53 +2104,55 @@ class QuestionFilter extends React.Component<any, any> {
         const encCount = getEncryptedQuestionCount(pipelineResult.finalQuestions);
         this.emitCountUpdate(pipelineResult.count, encCount);
         this.checkIfCurrentFilterIsBookmarked();
-      }
+      },
     );
   }
 
-
-
   buildFilterState(): QuestionFilterSerializableState {
-    return buildQuestionFilterStateFromComponentState(
-      this.state,
-      DEFAULT_AI_TOP_N
-    ) as QuestionFilterSerializableState;
+    return buildQuestionFilterStateFromComponentState(this.state, DEFAULT_AI_TOP_N) as QuestionFilterSerializableState;
   }
 
   isFilterStateDefault = (filterStateToTest: unknown): boolean => {
     return isQuestionFilterStateDefault(filterStateToTest);
-  }
+  };
 
   handleCopyFilterUrl = (): void => {
     const { currentViewModeForUrl, currentSurveyIdForUrl } = this.props;
 
     // Validate context props
     if (!currentViewModeForUrl || (currentViewModeForUrl !== 'questions' && currentViewModeForUrl !== 'survey')) {
-      questionFilterLog.error("Cannot construct filter URL: 'currentViewModeForUrl' prop is missing or invalid. Must be 'questions' or 'survey'. Received:", currentViewModeForUrl);
+      questionFilterLog.error(
+        "Cannot construct filter URL: 'currentViewModeForUrl' prop is missing or invalid. Must be 'questions' or 'survey'. Received:",
+        currentViewModeForUrl,
+      );
       return;
     }
     if (currentViewModeForUrl === 'survey' && (!currentSurveyIdForUrl || typeof currentSurveyIdForUrl !== 'string')) {
-      questionFilterLog.error("Cannot construct filter URL: 'currentSurveyIdForUrl' prop is missing or invalid for 'survey' view mode. Received:", currentSurveyIdForUrl);
+      questionFilterLog.error(
+        "Cannot construct filter URL: 'currentSurveyIdForUrl' prop is missing or invalid for 'survey' view mode. Received:",
+        currentSurveyIdForUrl,
+      );
       return;
     }
 
     const currentAppliedFilterState = this.buildFilterState();
 
     if (this.isFilterStateDefault(currentAppliedFilterState)) {
-      questionFilterLog.log("No custom filter applied to copy URL.");
+      questionFilterLog.log('No custom filter applied to copy URL.');
       return;
     }
 
     const serializedState = serializeFilterState(currentAppliedFilterState);
     if (!serializedState) {
-        questionFilterLog.error("Failed to serialize non-default filter state.");
-        return;
+      questionFilterLog.error('Failed to serialize non-default filter state.');
+      return;
     }
 
     const url = new URL(window.location.href);
     url.searchParams.set('filter', serializedState);
 
-    navigator.clipboard.writeText(url.toString())
+    navigator.clipboard
+      .writeText(url.toString())
       .then(() => {
         notify.success('Copied to clipboard');
         if (this.copySuccessTimeout) clearTimeout(this.copySuccessTimeout);
@@ -2499,14 +2166,14 @@ class QuestionFilter extends React.Component<any, any> {
       .catch((err: unknown) => {
         questionFilterLog.error('Failed to copy filter URL to clipboard:', err);
       });
-  }
+  };
 
   toggleSection = (section: string): void => {
     this.setState((prevState: QuestionFilterStateRecord) => ({
       expandedSections: {
         ...prevState.expandedSections,
-        [section]: !prevState.expandedSections[section]
-      }
+        [section]: !prevState.expandedSections[section],
+      },
     }));
   };
 
@@ -2560,15 +2227,14 @@ class QuestionFilter extends React.Component<any, any> {
     });
   };
 
-
   handleSortByImportance = (): void => {
     this.setState(
       (prevState: { pendingSortByImportance?: unknown }) => ({
-        pendingSortByImportance: !prevState.pendingSortByImportance
+        pendingSortByImportance: !prevState.pendingSortByImportance,
       }),
       () => {
         this.handleApplyFilters(true);
-      }
+      },
     );
   };
 
@@ -2592,36 +2258,63 @@ class QuestionFilter extends React.Component<any, any> {
         }
         // After reverting pending states, re-apply filters to reflect the actual current state
         this.handleApplyFilters(true);
-      }
+      },
     );
   };
 
   toggleShowTopQuestions = (byResponses = false): void => {
     if (byResponses) {
       this.setState(
-        (prev: {
-          pendingShowTopQuestionsByResponses?: unknown;
-        }) => ({
+        (prev: { pendingShowTopQuestionsByResponses?: unknown }) => ({
           pendingShowTopQuestionsByResponses: !prev.pendingShowTopQuestionsByResponses,
-          pendingShowTopQuestions: false // Ensure the other top questions mode is off
+          pendingShowTopQuestions: false, // Ensure the other top questions mode is off
         }),
         () => {
           this.handleApplyFilters(true);
-        }
+        },
       );
-    } else { // by importance
+    } else {
+      // by importance
       this.setState(
-        (prev: {
-          pendingShowTopQuestions?: unknown;
-        }) => ({
+        (prev: { pendingShowTopQuestions?: unknown }) => ({
           pendingShowTopQuestions: !prev.pendingShowTopQuestions,
-          pendingShowTopQuestionsByResponses: false // Ensure the other top questions mode is off
+          pendingShowTopQuestionsByResponses: false, // Ensure the other top questions mode is off
         }),
         () => {
           this.handleApplyFilters(true);
-        }
+        },
       );
     }
+  };
+
+  handleTopQuestionsCountChange = (value: unknown): void => {
+    this.setState(buildQuestionFilterTopQuestionsCountPatch(value, DEFAULT_TOP_QUESTIONS_COUNT), () => {
+      if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) {
+        this.handleApplyFilters(true);
+      }
+    });
+  };
+
+  handleRespondedToggle = (): void => {
+    this.setState(
+      (prev: { filterByResponded?: unknown }) => ({ filterByResponded: !prev.filterByResponded }),
+      () => {
+        this.handleApplyFilters(true);
+        this.queueCombinedAiRefreshIfNeeded('response-status-filter-change');
+      },
+    );
+  };
+
+  handleNotRespondedToggle = (): void => {
+    this.setState(
+      (prev: { filterByNotResponded?: unknown }) => ({
+        filterByNotResponded: !prev.filterByNotResponded,
+      }),
+      () => {
+        this.handleApplyFilters(true);
+        this.queueCombinedAiRefreshIfNeeded('response-status-filter-change');
+      },
+    );
   };
 
   handleClearFilters = (): void => {
@@ -2669,7 +2362,7 @@ class QuestionFilter extends React.Component<any, any> {
     try {
       const deserializedState = deserializeFilterStateStrict(filterString) as unknown as UnknownRecord;
       if (!deserializedState) {
-        throw new Error("Invalid filter string.");
+        throw new Error('Invalid filter string.');
       }
 
       const selectedTypes = normalizeFilterSelectionList(deserializedState.questionTypes);
@@ -2721,26 +2414,26 @@ class QuestionFilter extends React.Component<any, any> {
         newState.topQuestionsCount = typeof count === 'number' ? count : DEFAULT_TOP_QUESTIONS_COUNT;
         newState.pendingTopQuestionsCount = typeof count === 'number' ? count : DEFAULT_TOP_QUESTIONS_COUNT;
         if (by === 'importance') {
-            newState.showTopQuestions = true;
-            newState.pendingShowTopQuestions = true;
-            newState.sortByImportance = true;
-            newState.pendingSortByImportance = true;
-            newState.showTopQuestionsByResponses = false;
-            newState.pendingShowTopQuestionsByResponses = false;
+          newState.showTopQuestions = true;
+          newState.pendingShowTopQuestions = true;
+          newState.sortByImportance = true;
+          newState.pendingSortByImportance = true;
+          newState.showTopQuestionsByResponses = false;
+          newState.pendingShowTopQuestionsByResponses = false;
         } else if (by === 'responses') {
-            newState.showTopQuestionsByResponses = true;
-            newState.pendingShowTopQuestionsByResponses = true;
-            newState.showTopQuestions = false;
-            newState.pendingShowTopQuestions = false;
-            newState.sortByImportance = false;
-            newState.pendingSortByImportance = false;
+          newState.showTopQuestionsByResponses = true;
+          newState.pendingShowTopQuestionsByResponses = true;
+          newState.showTopQuestions = false;
+          newState.pendingShowTopQuestions = false;
+          newState.sortByImportance = false;
+          newState.pendingSortByImportance = false;
         } else {
-            newState.showTopQuestions = false;
-            newState.pendingShowTopQuestions = false;
-            newState.showTopQuestionsByResponses = false;
-            newState.pendingShowTopQuestionsByResponses = false;
-            newState.sortByImportance = false;
-            newState.pendingSortByImportance = false;
+          newState.showTopQuestions = false;
+          newState.pendingShowTopQuestions = false;
+          newState.showTopQuestionsByResponses = false;
+          newState.pendingShowTopQuestionsByResponses = false;
+          newState.sortByImportance = false;
+          newState.pendingSortByImportance = false;
         }
       } else {
         newState.topQuestionsCount = DEFAULT_TOP_QUESTIONS_COUNT;
@@ -2757,10 +2450,9 @@ class QuestionFilter extends React.Component<any, any> {
         this.handleApplyFilters(true);
         this.queueAutoApplyAiFilter('load-filter-input');
       });
-
     } catch (error) {
-      questionFilterLog.error("Failed to load filter state:", error);
-      alert("Could not load filter from the provided string. Please check the format.");
+      questionFilterLog.error('Failed to load filter state:', error);
+      alert('Could not load filter from the provided string. Please check the format.');
     }
   };
 
@@ -2796,27 +2488,20 @@ class QuestionFilter extends React.Component<any, any> {
     return tags;
   }
 
-
   removeTypeFilter = (type: unknown): void => {
     const newPending = this.state.pendingSelectedTypes.filter((t: unknown) => t !== type);
-    this.setState(
-      buildQuestionFilterPendingSelectedTypesPatch(newPending),
-      () => {
-        this.handleApplyFilters(true);
-        this.queueCombinedAiRefreshIfNeeded('type-filter-remove');
-      }
-    );
+    this.setState(buildQuestionFilterPendingSelectedTypesPatch(newPending), () => {
+      this.handleApplyFilters(true);
+      this.queueCombinedAiRefreshIfNeeded('type-filter-remove');
+    });
   };
 
   removeTagFilter = (tag: unknown): void => {
     const newTags = this.state.selectedTags.filter((t: unknown) => t !== tag);
-    this.setState(
-      buildQuestionFilterSelectedTagsPatch(newTags),
-      () => {
-        this.handleApplyFilters(true);
-        this.queueCombinedAiRefreshIfNeeded('tag-filter-remove');
-      }
-    );
+    this.setState(buildQuestionFilterSelectedTagsPatch(newTags), () => {
+      this.handleApplyFilters(true);
+      this.queueCombinedAiRefreshIfNeeded('tag-filter-remove');
+    });
   };
 
   removeAiFilter = (): void => {
@@ -2827,47 +2512,41 @@ class QuestionFilter extends React.Component<any, any> {
   };
 
   removeTopQuestionsFilter = (): void => {
-    this.setState(
-      buildQuestionFilterRemoveTopQuestionsPatch(),
-      () => {
-        this.handleApplyFilters(true);
-      }
-    );
+    this.setState(buildQuestionFilterRemoveTopQuestionsPatch(), () => {
+      this.handleApplyFilters(true);
+    });
   };
 
   removeSBTFilterItem = (item: { role?: unknown; sbtAddress?: unknown }): void => {
-    const updatedState = buildQuestionFilterSbtItemRemovalState(
-      this.state.sbtFilterLocalState || {},
-      item
-    );
+    const updatedState = buildQuestionFilterSbtItemRemovalState(this.state.sbtFilterLocalState || {}, item);
     this.setState(buildQuestionFilterSbtLocalStatePatch(updatedState));
   };
 
   getFilterSummaryItems(): QuestionFilterSummaryItem[] {
     const items: QuestionFilterSummaryItem[] = [];
-    const stateToUse = { // Use pending states for UI consistency where they exist
-        showTopQuestions: this.state.pendingShowTopQuestions,
-        topQuestionsCount: this.state.pendingTopQuestionsCount,
-        showTopQuestionsByResponses: this.state.pendingShowTopQuestionsByResponses,
-        selectedTypes: this.state.pendingSelectedTypes,
-        selectedTags: this.state.selectedTags, // No pending version
-        sbtFilterLocalState: this.state.sbtFilterLocalState // No pending version
+    const stateToUse = {
+      // Use pending states for UI consistency where they exist
+      showTopQuestions: this.state.pendingShowTopQuestions,
+      topQuestionsCount: this.state.pendingTopQuestionsCount,
+      showTopQuestionsByResponses: this.state.pendingShowTopQuestionsByResponses,
+      selectedTypes: this.state.pendingSelectedTypes,
+      selectedTags: this.state.selectedTags, // No pending version
+      sbtFilterLocalState: this.state.sbtFilterLocalState, // No pending version
     };
-
 
     // 1) Show "Top X questions" if active
     if (stateToUse.showTopQuestions) {
       items.push({
         type: 'special',
         label: `Top ${stateToUse.topQuestionsCount} by importance`,
-        onRemove: () => this.removeTopQuestionsFilter()
+        onRemove: () => this.removeTopQuestionsFilter(),
       });
     }
     if (stateToUse.showTopQuestionsByResponses) {
       items.push({
         type: 'special',
         label: `Top ${stateToUse.topQuestionsCount} by # responses`,
-        onRemove: () => this.removeTopQuestionsFilter()
+        onRemove: () => this.removeTopQuestionsFilter(),
       });
     }
 
@@ -2876,7 +2555,7 @@ class QuestionFilter extends React.Component<any, any> {
       items.push({
         type: 'questionType',
         label: `${t}`,
-        onRemove: () => this.removeTypeFilter(t)
+        onRemove: () => this.removeTypeFilter(t),
       });
     });
 
@@ -2885,7 +2564,7 @@ class QuestionFilter extends React.Component<any, any> {
       items.push({
         type: 'tag',
         label: `#${tag}`,
-        onRemove: () => this.removeTagFilter(tag)
+        onRemove: () => this.removeTagFilter(tag),
       });
     });
 
@@ -2900,18 +2579,17 @@ class QuestionFilter extends React.Component<any, any> {
 
     const hasConnectedAccount = toStr(this.props.account).trim() !== '';
     const bothResponseChecked = this.state.filterByResponded && this.state.filterByNotResponded;
-    const isAiOverrideModeActive = (
+    const isAiOverrideModeActive =
       !!this.state.aiFilterApplied &&
       toStr(this.state.aiSearchQuery).trim() !== '' &&
-      !this.state.aiCombineWithOtherFilters
-    );
+      !this.state.aiCombineWithOtherFilters;
     if (hasConnectedAccount && !isAiOverrideModeActive && this.state.filterByResponded && !bothResponseChecked) {
       items.push({
         type: 'responseStatus',
         label: 'Responded',
         onRemove: () => {
           this.setState(buildQuestionFilterRespondedStatusPatch(false), () => this.handleApplyFilters(true));
-        }
+        },
       });
     }
     if (hasConnectedAccount && !isAiOverrideModeActive && this.state.filterByNotResponded && !bothResponseChecked) {
@@ -2920,7 +2598,7 @@ class QuestionFilter extends React.Component<any, any> {
         label: 'Not responded',
         onRemove: () => {
           this.setState(buildQuestionFilterNotRespondedStatusPatch(false), () => this.handleApplyFilters(true));
-        }
+        },
       });
     }
 
@@ -2936,8 +2614,8 @@ class QuestionFilter extends React.Component<any, any> {
           onRemove: () =>
             this.removeSBTFilterItem({
               role: 'creatorInclude',
-              sbtAddress: entry.address
-            })
+              sbtAddress: entry.address,
+            }),
         });
       });
     }
@@ -2951,8 +2629,8 @@ class QuestionFilter extends React.Component<any, any> {
           onRemove: () =>
             this.removeSBTFilterItem({
               role: 'creatorExclude',
-              sbtAddress: entry.address
-            })
+              sbtAddress: entry.address,
+            }),
         });
       });
     }
@@ -2966,8 +2644,8 @@ class QuestionFilter extends React.Component<any, any> {
           onRemove: () =>
             this.removeSBTFilterItem({
               role: 'responderInclude',
-              sbtAddress: entry.address
-            })
+              sbtAddress: entry.address,
+            }),
         });
       });
     }
@@ -2981,8 +2659,8 @@ class QuestionFilter extends React.Component<any, any> {
           onRemove: () =>
             this.removeSBTFilterItem({
               role: 'responderExclude',
-              sbtAddress: entry.address
-            })
+              sbtAddress: entry.address,
+            }),
         });
       });
     }
@@ -2996,8 +2674,8 @@ class QuestionFilter extends React.Component<any, any> {
           onRemove: () =>
             this.removeSBTFilterItem({
               role: 'include',
-              sbtAddress: entry.address
-            })
+              sbtAddress: entry.address,
+            }),
         });
       });
     }
@@ -3011,8 +2689,8 @@ class QuestionFilter extends React.Component<any, any> {
           onRemove: () =>
             this.removeSBTFilterItem({
               role: 'exclude',
-              sbtAddress: entry.address
-            })
+              sbtAddress: entry.address,
+            }),
         });
       });
     }
@@ -3023,90 +2701,6 @@ class QuestionFilter extends React.Component<any, any> {
   // ----------------------------------------------------------------------------------
   // RENDER
   // ----------------------------------------------------------------------------------
-  renderCollapsibleSection(
-    title: React.ReactNode,
-    sectionKey: string,
-    icon: React.ComponentProps<typeof FontAwesomeIcon>['icon'],
-    content: React.ReactNode,
-    disabled = false,
-    headerTestId = ''
-  ): JSX.Element {
-    const { expandedSections } = this.state;
-    const isOpen = expandedSections[sectionKey];
-    const clickable = !disabled;
-
-    return (
-      <div className={styles.filterSection}>
-        <div
-          className={styles.sectionHeader}
-          data-testid={headerTestId || undefined}
-          onClick={() => {
-            if (clickable) {
-              this.toggleSection(sectionKey);
-            }
-          }}
-          style={resolveQuestionFilterSectionHeaderStyle({ clickable, disabled })}
-        >
-          <h3>
-            <FontAwesomeIcon icon={icon} className="me-2" />
-            {title}
-          </h3>
-          <FontAwesomeIcon
-            icon={faChevronDown}
-            className={buildQuestionFilterSectionIconClassName(styles, isOpen)}
-          />
-        </div>
-        <div style={resolveQuestionFilterSectionBodyStyle(isOpen, disabled)}>
-          <div className={styles.sectionContent}>{content}</div>
-        </div>
-      </div>
-    );
-  }
-
-  renderFilterActionsIcons = (): JSX.Element => {
-    const currentFilterStateForIcon = this.buildFilterState();
-    const isDefault = this.isFilterStateDefault(currentFilterStateForIcon);
-
-    return (
-      <span style={QUESTION_FILTER_ACTIONS_STYLE}>
-        {/* Clear (X) Icon */}
-        <FontAwesomeIcon
-          icon={faTimes}
-          data-testid={E2E_TESTIDS.QUESTION_FILTER_CLEAR_ALL}
-          onClick={!isDefault ? this.handleClearFilters : undefined}
-          className={styles.clearFilterIcon}
-          title={isDefault ? "No filters to clear" : "Clear current filters"}
-          style={resolveQuestionFilterClearIconStyle(isDefault)}
-        />
-
-        {/* Copy URL Icon */}
-        <FontAwesomeIcon
-          icon={this.state.copiedUrlSuccess ? faCheck : faClipboard}
-          onClick={!isDefault && !this.state.copiedUrlSuccess ? this.handleCopyFilterUrl : undefined}
-          style={resolveQuestionFilterCopyIconStyle(isDefault, this.state.copiedUrlSuccess)}
-          title={isDefault ? "No custom filters to copy" : (this.state.copiedUrlSuccess ? "URL Copied!" : "Copy Filter URL")}
-        />
-        {/* Bookmark Icon */}
-        <FontAwesomeIcon
-          icon={faBookmark}
-          onClick={!isDefault ? this.handleBookmarkCurrentFilter : undefined}
-          style={resolveQuestionFilterBookmarkIconStyle(
-            isDefault,
-            this.state.isCurrentFilterBookmarked,
-            this.state.filterBookmarkedFeedback
-          )}
-          title={isDefault ? "No custom filters to bookmark" : "Bookmark Current Filter"}
-        />
-        {/* Text feedback for bookmarking (if not using icon color change alone) */}
-        {this.state.filterBookmarkedFeedback && !this.state.copiedUrlSuccess && ( // Avoid overlap if both happen
-          <span style={QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE}>
-            Filter Bookmarked!
-          </span>
-        )}
-      </span>
-    );
-  }
-
   render() {
     const isInline = this.props.resultsMode;
     const {
@@ -3132,11 +2726,8 @@ class QuestionFilter extends React.Component<any, any> {
 
     const isTopQuestionsModeActive =
       this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses;
-    const isAiOverrideModeActive = (
-      !!this.state.aiFilterApplied &&
-      String(aiSearchQuery || '').trim() !== '' &&
-      !aiCombineWithOtherFilters
-    );
+    const isAiOverrideModeActive =
+      !!this.state.aiFilterApplied && String(aiSearchQuery || '').trim() !== '' && !aiCombineWithOtherFilters;
     const isOtherFiltersDisabled = isTopQuestionsModeActive || isAiOverrideModeActive;
     const otherFiltersDisabledReason = isTopQuestionsModeActive
       ? 'Disabled by “Top X questions” selection.'
@@ -3147,9 +2738,7 @@ class QuestionFilter extends React.Component<any, any> {
     const sbtFilterSessionConfig = this.props.sessionConfig || sbtSessionContext.sessionConfig || {};
     const aiSectionDisabled = isTopQuestionsModeActive;
     const aiControlsDisabled = isTopQuestionsModeActive || !aiAccessState.enabled || aiApplying;
-    const aiApplyButtonLabel = aiApplying
-      ? `Applying... ${Math.max(0, Number(aiApplyingElapsedSec || 0))}s`
-      : 'Apply';
+    const aiApplyButtonLabel = aiApplying ? `Applying... ${Math.max(0, Number(aiApplyingElapsedSec || 0))}s` : 'Apply';
     const pipelineForRender = this.buildFilterPipelineResult(false);
     const encryptedCount = getEncryptedQuestionCount(pipelineForRender.finalQuestions);
     const encryptedQuestionGateTooltip = this.getEncryptedQuestionGateTooltipProps();
@@ -3177,390 +2766,102 @@ class QuestionFilter extends React.Component<any, any> {
     const allTags = this.getAllTagsWithCounts();
     const tagsToDisplay = showAllTags ? allTags : allTags.slice(0, 10);
 
-    // Main body content
+    const activeAiTopN = normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N);
+    const currentFilterStateForIcon = this.buildFilterState();
+    const isCurrentFilterDefault = this.isFilterStateDefault(currentFilterStateForIcon);
+    const expandedSections = this.state.expandedSections || {};
+
     const bodyContent = (
       <div>
-
-        {/* MOST POPULAR (Top X) */}
-        {this.renderCollapsibleSection(
-          'Most Popular',
-          'popular',
-          faStar,
-          <div>
-            <FormGroup>
-              <Label className={styles.filterOption}>
-                <Input
-                  type="checkbox"
-                  checked={pendingShowTopQuestions}
-                  onChange={() => this.toggleShowTopQuestions(false)}
-                  disabled={false}
-                />
-                Show top
-                <Input
-                  type="number"
-                  min="1"
-                  value={pendingTopQuestionsCount}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    this.setState(buildQuestionFilterTopQuestionsCountPatch(
-                      e.target.value,
-                      DEFAULT_TOP_QUESTIONS_COUNT
-                    ), () => {
-                      if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) { // Use this.state for check
-                        this.handleApplyFilters(true);
-                      }
-                    });
-                  }}
-                  disabled={!pendingShowTopQuestions && !pendingShowTopQuestionsByResponses}
-                  id={styles.topQuestionsCountInput}
-                />
-                {/* questions (by total importance) */}
-                questions (by total conviction)
-
-              </Label>
-            </FormGroup>
-
-            <FormGroup>
-              <Label className={styles.filterOption}>
-                <Input
-                  type="checkbox"
-                  checked={pendingShowTopQuestionsByResponses}
-                  onChange={() => this.toggleShowTopQuestions(true)}
-                />
-                Show top
-                <Input
-                  type="number"
-                  min="1"
-                  value={pendingTopQuestionsCount}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    this.setState(buildQuestionFilterTopQuestionsCountPatch(
-                      e.target.value,
-                      DEFAULT_TOP_QUESTIONS_COUNT
-                    ), () => {
-                      if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) { // Use this.state for check
-                        this.handleApplyFilters(true);
-                      }
-                    });
-                  }}
-                  disabled={!pendingShowTopQuestions && !pendingShowTopQuestionsByResponses}
-                  id={styles.topQuestionsCountInput}
-                />
-                questions (by # of responses)
-              </Label>
-            </FormGroup>
-            {(pendingShowTopQuestions || pendingShowTopQuestionsByResponses) && (
-              <small className="text-muted">
-                This overrides other filters (type, tag, etc.)
-              </small>
-            )}
-          </div>
-        )}
+        <QuestionFilterTopQuestionsSection
+          expandedSections={expandedSections}
+          pendingShowTopQuestions={pendingShowTopQuestions}
+          pendingShowTopQuestionsByResponses={pendingShowTopQuestionsByResponses}
+          pendingTopQuestionsCount={pendingTopQuestionsCount}
+          onToggleSection={this.toggleSection}
+          onToggleShowTopQuestions={this.toggleShowTopQuestions}
+          onTopQuestionsCountChange={this.handleTopQuestionsCountChange}
+        />
 
         <div className={buildQuestionFilterDisabledSectionClassName(styles, isOtherFiltersDisabled)}>
+          <QuestionFilterTagsSection
+            allTagsCount={allTags.length}
+            disabled={isOtherFiltersDisabled}
+            disabledReason={otherFiltersDisabledReason}
+            expandedSections={expandedSections}
+            onTagSelection={this.handleTagSelection}
+            onToggleSection={this.toggleSection}
+            onToggleShowAllTags={this.toggleShowAllTags}
+            selectedTags={selectedTags}
+            showAllTags={showAllTags}
+            tagsToDisplay={tagsToDisplay}
+            tooltipId={this._tagsTooltipId}
+          />
 
-	          {/* TAGS */}
-		          {this.renderCollapsibleSection(
-		            <>
-		              Tags
-		              <FontAwesomeIcon
-		                icon={faQuestionCircle}
-		                className={styles.tooltip}
-		                id={this._tagsTooltipId}
-		                onClick={(e: React.MouseEvent<SVGSVGElement>) => e.stopPropagation()}
-		              />
-		              <CETooltip
-		                placement="right"
-		                trigger="hover focus click"
-		                target={this._tagsTooltipId}
-		                className={styles.tooltipBubble}
-		              >
-		                Tags are for user filtering/search. Session default tag suggestions are fed into the AI tagger and do not hide questions.
-		              </CETooltip>
-	            </>,
-	            'tags',
-	            faFilter,
-		            isOtherFiltersDisabled ? (
-		              <p className={styles.disabledText}>
-		                {otherFiltersDisabledReason}
-	              </p>
-	            ) : (
-              (() => {
-                if (!tagsToDisplay.length) {
-                  return <p>No tags found in current questions.</p>;
-                }
-                return (
-                  <>
-                    <div className={styles.tagsContainer}>
-                      {tagsToDisplay.map((tag: string) => {
-                        const isSelected = selectedTags.includes(tag);
-                        return (
-                          <div
-                            key={tag}
-                            className={buildQuestionFilterTagBubbleClassName(styles, isSelected)}
-                            onClick={() => this.handleTagSelection(tag)}
-                          >
-                            #{tag}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {allTags.length > 10 && (
-                      <Button
-                        color="link"
-                        onClick={this.toggleShowAllTags}
-                        className={styles.showMoreTagsButton}
-                      >
-                        {showAllTags ? 'Show Less' : 'Show More'}
-                      </Button>
-                    )}
-                  </>
-                );
-              })()
-            ),
-            isOtherFiltersDisabled // Pass disabled state to the section itself
-          )}
+          <QuestionFilterQuestionTypesSection
+            disabled={isOtherFiltersDisabled}
+            expandedSections={expandedSections}
+            onToggleSection={this.toggleSection}
+            onTypeSelection={this.handleTypeSelection}
+            pendingSelectedTypes={pendingSelectedTypes}
+          />
 
-          {/* QUESTION TYPES */}
-          {this.renderCollapsibleSection(
-            'Question Types',
-            'types',
-            faFilter,
-            <div className={styles.questionTypeGrid}>
-              <button
-                type="button"
-                className={buildQuestionFilterTypeButtonClassName(styles, pendingSelectedTypes.includes('binary'))}
-                onClick={() => this.handleTypeSelection('binary')}
-                disabled={isOtherFiltersDisabled}
-                aria-pressed={pendingSelectedTypes.includes('binary')}
-              >
-                <div className={styles.typeTitle}>Binary</div>
-                <div className={styles.typePreviewRow}>
-                  <span className={buildQuestionFilterTypePillClassName(styles, 'agree')}>Agree</span>
-                  <span className={buildQuestionFilterTypePillClassName(styles, 'unsure')}>Unsure</span>
-                  <span className={buildQuestionFilterTypePillClassName(styles, 'disagree')}>Disagree</span>
-                </div>
-              </button>
+          <QuestionFilterResponseStatusSection
+            disabled={isOtherFiltersDisabled}
+            expandedSections={expandedSections}
+            hasConnectedAccount={hasConnectedAccount}
+            onRespondedToggle={this.handleRespondedToggle}
+            onNotRespondedToggle={this.handleNotRespondedToggle}
+            onToggleSection={this.toggleSection}
+            filterByResponded={this.state.filterByResponded}
+            filterByNotResponded={this.state.filterByNotResponded}
+          />
 
-              <button
-                type="button"
-                className={buildQuestionFilterTypeButtonClassName(styles, pendingSelectedTypes.includes('multichoice'))}
-                onClick={() => this.handleTypeSelection('multichoice')}
-                disabled={isOtherFiltersDisabled}
-                aria-pressed={pendingSelectedTypes.includes('multichoice')}
-              >
-                <div className={styles.typeTitle}>Multichoice</div>
-                <div className={styles.typePreviewRow}>
-                  <span className={styles.typePill}>Opt 1</span>
-                  <span className={styles.typePill}>Opt 2</span>
-                  <span className={styles.typePill}>Opt 3</span>
-                </div>
-              </button>
+          <QuestionFilterSbtSection
+            creatorAndResponderMode={this.props.creatorAndResponderMode}
+            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+            disabled={isOtherFiltersDisabled}
+            disabledReason={otherFiltersDisabledReason}
+            ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
+            expandedSections={expandedSections}
+            isQuestionCacheReady={this.props.isQuestionCacheReady}
+            isSBTCacheReady={this.props.isSBTCacheReady}
+            isSurveyCacheReady={this.props.isSurveyCacheReady}
+            items={this.state.mergedQuestions}
+            network={this.props.network}
+            onFilter={this.handleFilteredQuestions}
+            onToggleSection={this.toggleSection}
+            provider={this.props.provider}
+            sbtCacheRevision={this.props.sbtCacheRevision}
+            sbtFilterLocalState={sbtFilterLocalState}
+            sessionConfig={sbtFilterSessionConfig}
+            sessionSlug={sbtFilterSessionSlug}
+            setFilterLoading={this.setFilterLoading}
+          />
 
-              <button
-                type="button"
-                className={buildQuestionFilterTypeButtonClassName(styles, pendingSelectedTypes.includes('rating'))}
-                onClick={() => this.handleTypeSelection('rating')}
-                disabled={isOtherFiltersDisabled}
-                aria-pressed={pendingSelectedTypes.includes('rating')}
-              >
-                <div className={styles.typeTitle}>Rating</div>
-                <div className={styles.ratingPreviewWrap}>
-                  <div className={styles.ratingPreviewFill} />
-                  <div className={styles.ratingPreviewHandle} />
-                </div>
-              </button>
-
-              <button
-                type="button"
-                className={buildQuestionFilterTypeButtonClassName(styles, pendingSelectedTypes.includes('freeform'))}
-                onClick={() => this.handleTypeSelection('freeform')}
-                disabled={isOtherFiltersDisabled}
-                aria-pressed={pendingSelectedTypes.includes('freeform')}
-              >
-                <div className={styles.typeTitle}>Freeform</div>
-                <div className={styles.freeformPreview}>...</div>
-              </button>
-            </div>,
-            isOtherFiltersDisabled
-          )}
-
-          {hasConnectedAccount && this.renderCollapsibleSection(
-            'Response Status',
-            'responseStatus',
-            faCheck,
-            <FormGroup>
-              <Label className={styles.filterOption}>
-                <Input
-                  type='checkbox'
-                  checked={this.state.filterByResponded}
-                  onChange={() => this.setState(
-                    (prev: { filterByResponded?: unknown }) => ({ filterByResponded: !prev.filterByResponded }),
-                    () => {
-                      this.handleApplyFilters(true);
-                      this.queueCombinedAiRefreshIfNeeded('response-status-filter-change');
-                    }
-                  )}
-                  disabled={isOtherFiltersDisabled}
-                />
-                Responded
-              </Label>
-              <Label className={styles.filterOption}>
-                <Input
-                  type='checkbox'
-                  checked={this.state.filterByNotResponded}
-                  onChange={() => this.setState(
-                    (prev: { filterByNotResponded?: unknown }) => ({ filterByNotResponded: !prev.filterByNotResponded }),
-                    () => {
-                      this.handleApplyFilters(true);
-                      this.queueCombinedAiRefreshIfNeeded('response-status-filter-change');
-                    }
-                  )}
-                  disabled={isOtherFiltersDisabled}
-                />
-                Not responded
-              </Label>
-            </FormGroup>,
-            isOtherFiltersDisabled
-          )}
-
-          {/* SBT GROUPS */}
-          {this.renderCollapsibleSection(
-            <>
-              {this.props.creatorAndResponderMode
-                ? 'Group(s) of Question Creator / Responder'
-                : 'Group(s) of Question Creator'}
-              {!this.props.isSBTCacheReady && (
-                <span className={styles.sbtSectionLoadingStatus}>
-                  <FontAwesomeIcon icon={faSpinner} spin style={QUESTION_FILTER_SBT_SPINNER_STYLE} />
-                  <span>Loading groups</span>
-                </span>
-              )}
-            </>,
-            'sbts',
-            faStar,
-	            isOtherFiltersDisabled ? (
-	              <p className={styles.disabledText}>
-	                {otherFiltersDisabledReason}
-	              </p>
-	            ) : (
-	              <SBTFilter
-                items={this.state.mergedQuestions}
-                provider={this.props.provider}
-                network={this.props.network}
-                mode={this.props.creatorAndResponderMode ? 'creatorAndResponder' : 'creator'}
-                onFilter={this.handleFilteredQuestions}
-                setFilterLoading={this.setFilterLoading}
-                autoExpand={true}
-                externalSBTFilterState={sbtFilterLocalState}
-                defaultFeaturedSBTs={this.props.defaultFeaturedSBTs} // Pass the prop down
-                //
-                isQuestionCacheReady={this.props.isQuestionCacheReady}
-                isSurveyCacheReady={this.props.isSurveyCacheReady}
-                isSBTCacheReady={this.props.isSBTCacheReady}
-                sbtCacheRevision={this.props.sbtCacheRevision}
-                sessionSlug={sbtFilterSessionSlug}
-                activeSessionSlug={sbtFilterSessionSlug}
-                sessionConfig={sbtFilterSessionConfig}
-                ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
-              />
-	            ),
-	            isOtherFiltersDisabled || !this.props.isSBTCacheReady, // Pass disabled state
-              E2E_TESTIDS.QUESTION_FILTER_SECTION_SBT
-	          )}
-
-	          {/* AI FILTER */}
-	          {this.renderCollapsibleSection(
-	            'AI Filter',
-	            'ai',
-	            faRobot,
-	            <FormGroup>
-                {!aiAccessState.enabled && (
-                  <p className={styles.disabledText} style={QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE}>
-                    AI filter unavailable. Requires an AI sponsored gate in this session or a local API key.
-                  </p>
-                )}
-                {isTopQuestionsModeActive && (
-                  <p className={styles.disabledText} style={QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE}>
-                    Disabled by “Top X questions” selection.
-                  </p>
-                )}
-                <div className={styles.aiFilterInputWrap}>
-                  <AudioInput
-                    hideEncryption={true}
-                    disableEncryption={true}
-                    enableAiRewrite={false}
-                    placeholder="Describe what you want to find..."
-                    value={aiDraftQuery}
-                    updateFunction={this.handleAiDraftQueryChange}
-                    dataTestId={E2E_TESTIDS.QUESTION_FILTER_AI_QUERY}
-                    disabled={aiControlsDisabled}
-                  />
-                  <div className={styles.aiActionCard}>
-                    <div className={styles.aiActionRow}>
-                      <div className={styles.aiCountControl}>
-                        <Label className={styles.aiCountLabel} for={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}>
-                          Questions
-                        </Label>
-                        <Input
-                          id={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}
-                          className={styles.aiCountInput}
-                          type="number"
-                          data-testid={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}
-                          min="1"
-                          value={aiRankingCount}
-                          onChange={this.handleAiTopNChange}
-                          disabled={aiControlsDisabled}
-                        />
-                      </div>
-                      <Button
-                        color="info"
-                        className={styles.aiApplyButton}
-                        data-testid={E2E_TESTIDS.QUESTION_FILTER_AI_APPLY}
-                        disabled={aiControlsDisabled}
-                        onClick={() => this.handleApplyAIFilter({ auto: false, source: 'manual-click' })}
-                      >
-                        {aiApplying && (
-                          <FontAwesomeIcon
-                            icon={faSpinner}
-                            spin
-                            className={styles.aiApplySpinner}
-                          />
-                        )}
-                        <span>{aiApplyButtonLabel}</span>
-                      </Button>
-                      <FormGroup check className={styles.aiCombineGroup}>
-                        <Label check className={buildQuestionFilterAiCombineRowClassName(styles)}>
-                          <Input
-                            type="checkbox"
-                            checked={aiCombineWithOtherFilters}
-                            onChange={this.handleAiCombineWithFiltersChange}
-                            disabled={aiControlsDisabled}
-                          />
-                          Combine with other filters
-                        </Label>
-                      </FormGroup>
-                    </div>
-                    {this.state.aiFilterApplied && aiSearchQuery && !aiApplyError && (
-                      <p className={styles.aiStatusText}>
-                        Active: &quot;{aiSearchQuery}&quot; • Top {normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N)} • {aiCombineWithOtherFilters ? 'Combined' : 'Override'}
-                      </p>
-                    )}
-                    {this.state.aiFilterApplied && aiSearchQuery && !aiCombineWithOtherFilters && !aiApplyError && (
-                      <p className={styles.aiHintText}>
-                        AI Top-N override mode is active. Enable &quot;Combine with other filters&quot; to intersect with type/tag/SBT filters.
-                      </p>
-                    )}
-                    {!!aiApplyError && (
-                      <p className={styles.aiErrorText}>
-                        {aiApplyError}
-                      </p>
-                    )}
-                  </div>
-                </div>
-		            </FormGroup>,
-		            aiSectionDisabled,
-                E2E_TESTIDS.QUESTION_FILTER_SECTION_AI
-		          )}
-
+          <QuestionFilterAiSection
+            activeAiTopN={activeAiTopN}
+            aiAccessEnabled={aiAccessState.enabled}
+            aiApplyButtonLabel={aiApplyButtonLabel}
+            aiApplyError={aiApplyError}
+            aiApplying={aiApplying}
+            aiCombineWithOtherFilters={aiCombineWithOtherFilters}
+            aiControlsDisabled={aiControlsDisabled}
+            aiDraftQuery={aiDraftQuery}
+            aiRankingCount={aiRankingCount}
+            aiSearchQuery={aiSearchQuery}
+            aiSectionDisabled={aiSectionDisabled}
+            expandedSections={expandedSections}
+            isAiFilterApplied={this.state.aiFilterApplied}
+            isTopQuestionsModeActive={isTopQuestionsModeActive}
+            onAiCombineWithFiltersChange={this.handleAiCombineWithFiltersChange}
+            onAiDraftQueryChange={this.handleAiDraftQueryChange}
+            onAiTopNChange={this.handleAiTopNChange}
+            onApplyAiFilter={() => {
+              void this.handleApplyAIFilter({ auto: false, source: 'manual-click' });
+            }}
+            onToggleSection={this.toggleSection}
+          />
         </div>
 
         {filterLoading && (
@@ -3573,59 +2874,29 @@ class QuestionFilter extends React.Component<any, any> {
     );
 
     const filterSummaryAndControlsJsx = (
-      <div className={styles.filterSummaryContainer}>
-        <div className={styles.filterSummaryLabel}>
-          <span>Current Filters:</span>
-          <div className={styles.filterSummaryActions}>
-            {this.renderFilterActionsIcons()}
-          </div>
-        </div>
-
-        <div className={styles.summaryItemsRow}>
-          {summaryItems.map((item, idx) => (
-            <div key={idx} className={styles.filterBubble} onClick={item.onRemove}>
-              <span>{item.label}</span>
-              <FontAwesomeIcon icon={faTimes} className={styles.removeIcon} />
-            </div>
-          ))}
-        </div>
-
-        {/* Load filter row (appears only when + icon is clicked) */}
-        {showLoadInput && (
-          <div className={styles.filterControlsRow}>
-            <div className={styles.loadFilterContainer}>
-              <Input
-                type="text"
-                bsSize="sm"
-                value={filterUrlInput}
-                onChange={this.handleFilterUrlInputChange}
-                placeholder="Load filter from URL/string..."
-                className={styles.loadFilterInput}
-              />
-              <Button
-                size="sm"
-                onClick={this.handleLoadFilter}
-                disabled={!filterUrlInput}
-                className={styles.loadFilterButton}
-              >
-                Load
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+      <QuestionFilterSummaryControls
+        copiedUrlSuccess={this.state.copiedUrlSuccess}
+        filterBookmarkedFeedback={this.state.filterBookmarkedFeedback}
+        filterUrlInput={filterUrlInput}
+        isCurrentFilterBookmarked={this.state.isCurrentFilterBookmarked}
+        isDefault={isCurrentFilterDefault}
+        onBookmarkCurrentFilter={this.handleBookmarkCurrentFilter}
+        onClearFilters={this.handleClearFilters}
+        onCopyFilterUrl={this.handleCopyFilterUrl}
+        onFilterUrlInputChange={this.handleFilterUrlInputChange}
+        onLoadFilter={this.handleLoadFilter}
+        showLoadInput={showLoadInput}
+        summaryItems={summaryItems}
+      />
     );
 
     if (isInline) {
       // "resultsMode" => render inline, but hide if filterModalOpen is false
       return (
         <div style={resolveQuestionFilterInlineVisibilityStyle(this.props.filterModalOpen)}>
-	          <div
-              className={styles.questionFilterInline}
-              data-testid={E2E_TESTIDS.QUESTION_FILTER_MODAL}
-            >
-	            {/* Count row with + icon to open load input */}
-	            <div className={styles.inlineCountRow}>
+          <div className={styles.questionFilterInline} data-testid={E2E_TESTIDS.QUESTION_FILTER_MODAL}>
+            {/* Count row with + icon to open load input */}
+            <div className={styles.inlineCountRow}>
               <div className={styles.inlineCountText}>
                 {!this.props.isQuestionCacheReady ? (
                   <FontAwesomeIcon icon={faSpinner} spin />
@@ -3653,67 +2924,61 @@ class QuestionFilter extends React.Component<any, any> {
     } else {
       // Normal "non-resultsMode," show a Modal
       return (
-	        <Modal
-	          isOpen={this.props.filterModalOpen}
-	          toggle={this.handleCancelFilters} // Use cancel to revert pending changes on close
-	          style={modalStyles}
-	        >
-            <div data-testid={E2E_TESTIDS.QUESTION_FILTER_MODAL}>
-              <ModalHeader toggle={this.handleCancelFilters} className={styles.modalHeader}>
-                <div style={QUESTION_FILTER_MODAL_HEADER_ROW_STYLE}>
-                  <span style={QUESTION_FILTER_MODAL_TITLE_ROW_STYLE}>
-                    <span>Filter Questions ({!this.props.isQuestionCacheReady ? <FontAwesomeIcon icon={faSpinner} spin /> : filteredQuestionsCount}
-                      {renderEncryptedCountBadge('6px')}
-                    )</span>
-                    {/* Place + icon inline with the title to avoid overlaying the close X */}
-                    <FontAwesomeIcon
-                      icon={faPlus}
-                      className={styles.addIcon}
-                      title="Load a saved filter"
-                      onClick={this.toggleLoadInput}
-                    />
+        <Modal
+          isOpen={this.props.filterModalOpen}
+          toggle={this.handleCancelFilters} // Use cancel to revert pending changes on close
+          style={modalStyles}
+        >
+          <div data-testid={E2E_TESTIDS.QUESTION_FILTER_MODAL}>
+            <ModalHeader toggle={this.handleCancelFilters} className={styles.modalHeader}>
+              <div style={QUESTION_FILTER_MODAL_HEADER_ROW_STYLE}>
+                <span style={QUESTION_FILTER_MODAL_TITLE_ROW_STYLE}>
+                  <span>
+                    Filter Questions (
+                    {!this.props.isQuestionCacheReady ? (
+                      <FontAwesomeIcon icon={faSpinner} spin />
+                    ) : (
+                      filteredQuestionsCount
+                    )}
+                    {renderEncryptedCountBadge('6px')})
                   </span>
-                </div>
-              </ModalHeader>
-              <ModalBody className={styles.modalBody}>
-                {summaryItems.length > 0 && filterSummaryAndControlsJsx}
-                {/* In modal mode, also allow loading even if there are no current filters */}
-                {showLoadInput && summaryItems.length === 0 && (
-                  <div className={styles.filterControlsRow}>
-                    <div className={styles.loadFilterContainer}>
-                      <Input
-                        type="text"
-                        bsSize="sm"
-                        value={filterUrlInput}
-                        onChange={this.handleFilterUrlInputChange}
-                        placeholder="Load filter from URL/string..."
-                        className={styles.loadFilterInput}
-                      />
-                      <Button
-                        size="sm"
-                        onClick={this.handleLoadFilter}
-                        disabled={!filterUrlInput}
-                        className={styles.loadFilterButton}
-                      >
-                        Load
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {bodyContent}
-              </ModalBody>
-              <ModalFooter>
-                <Button color="primary" onClick={() => {
-                    // When "See Questions" is clicked, ensure filters are applied from pending state
-                    // and then close the modal.
-                    this.handleApplyFilters(false); // false means apply from pending and then update main state
-                    this.props.toggleFilterModal();
-                }}>
-                  See Questions
-                </Button>
-              </ModalFooter>
-            </div>
-          </Modal>
+                  {/* Place + icon inline with the title to avoid overlaying the close X */}
+                  <FontAwesomeIcon
+                    icon={faPlus}
+                    className={styles.addIcon}
+                    title="Load a saved filter"
+                    onClick={this.toggleLoadInput}
+                  />
+                </span>
+              </div>
+            </ModalHeader>
+            <ModalBody className={styles.modalBody}>
+              {summaryItems.length > 0 && filterSummaryAndControlsJsx}
+              {/* In modal mode, also allow loading even if there are no current filters */}
+              {showLoadInput && summaryItems.length === 0 && (
+                <QuestionFilterLoadFilterControls
+                  filterUrlInput={filterUrlInput}
+                  onFilterUrlInputChange={this.handleFilterUrlInputChange}
+                  onLoadFilter={this.handleLoadFilter}
+                />
+              )}
+              {bodyContent}
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                color="primary"
+                onClick={() => {
+                  // When "See Questions" is clicked, ensure filters are applied from pending state
+                  // and then close the modal.
+                  this.handleApplyFilters(false); // false means apply from pending and then update main state
+                  this.props.toggleFilterModal();
+                }}
+              >
+                See Questions
+              </Button>
+            </ModalFooter>
+          </div>
+        </Modal>
       );
     }
   }

@@ -22,13 +22,15 @@ describe('useSessionWizardCleanupEffect', () => {
     const sessionIdStatusTimerRef = createTimerRef(callbacks[2]);
     const jsonCopiedTimerRef = createTimerRef(callbacks[3]);
 
-    const { unmount } = renderHook(() => useSessionWizardCleanupEffect({
-      isMountedRef,
-      sessionIdRotationTimerRef,
-      adminUrlStatusTimerRef,
-      sessionIdStatusTimerRef,
-      jsonCopiedTimerRef,
-    }));
+    const { unmount } = renderHook(() =>
+      useSessionWizardCleanupEffect({
+        isMountedRef,
+        sessionIdRotationTimerRef,
+        adminUrlStatusTimerRef,
+        sessionIdStatusTimerRef,
+        jsonCopiedTimerRef,
+      }),
+    );
 
     unmount();
     jest.advanceTimersByTime(100);

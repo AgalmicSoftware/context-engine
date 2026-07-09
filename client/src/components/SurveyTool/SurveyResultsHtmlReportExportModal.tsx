@@ -1,13 +1,5 @@
 import React from 'react';
-import {
-  Alert,
-  FormGroup,
-  Input,
-  Label,
-  Modal,
-  ModalBody,
-  ModalHeader,
-} from 'reactstrap';
+import { Alert, FormGroup, Input, Label, Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import {
   SESSION_RESULTS_EXPORT_FORMAT_PDF,
@@ -22,12 +14,8 @@ import SurveyResultsHtmlReportAnalysisControls from './SurveyResultsHtmlReportAn
 import SurveyResultsHtmlReportSectionTable, {
   type SurveyResultsHtmlReportSectionRow,
 } from './SurveyResultsHtmlReportSectionTable';
-import type {
-  SurveyResultsHtmlReportAnalysisPayload,
-} from './surveyResultsHtmlReportModalDescriptor';
-import type {
-  SurveyResultsHtmlReportSectionKey,
-} from './surveyResultsHtmlReportReadiness';
+import type { SurveyResultsHtmlReportAnalysisPayload } from './surveyResultsHtmlReportModalDescriptor';
+import type { SurveyResultsHtmlReportSectionKey } from './surveyResultsHtmlReportReadiness';
 
 export type SurveyResultsHtmlReportExportModalDisplayProps = {
   analysisGenerating?: boolean;
@@ -56,8 +44,7 @@ export type SurveyResultsHtmlReportExecutionProps = {
   onToggleSection: (key: SurveyResultsHtmlReportSectionKey) => void;
 };
 
-export type SurveyResultsHtmlReportExportModalProps =
-  SurveyResultsHtmlReportExportModalDisplayProps &
+export type SurveyResultsHtmlReportExportModalProps = SurveyResultsHtmlReportExportModalDisplayProps &
   SurveyResultsHtmlReportExecutionProps;
 
 export const HTML_REPORT_EXPORT_FORMATS: readonly {
@@ -83,7 +70,7 @@ export const HTML_REPORT_EXPORT_FORMATS: readonly {
 ]);
 
 export const buildSurveyResultsHtmlReportDownloadLabel = (
-  exportFormat: SessionResultsExportFormat = SESSION_RESULTS_EXPORT_FORMAT_VIEWER
+  exportFormat: SessionResultsExportFormat = SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
 ): string => {
   if (exportFormat === SESSION_RESULTS_EXPORT_FORMAT_PDF) return 'Download PDF';
   if (exportFormat === SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML) return 'Download Single HTML';
@@ -122,11 +109,8 @@ export const buildSurveyResultsHtmlReportExportModalDisplayPlan = ({
   const sessionSlug = snapshot?.session?.slug;
 
   return {
-    canGenerateAnalysis: (
-      (isAuthorized || isDemoMode) &&
-      !!analysisPayload?.eligibility?.eligible &&
-      !analysisGenerating
-    ),
+    canGenerateAnalysis:
+      (isAuthorized || isDemoMode) && !!analysisPayload?.eligibility?.eligible && !analysisGenerating,
     downloadBlockedMessage: isAuthorized
       ? 'Select only available sections, or generate selected analysis views before download.'
       : 'Connect a wallet to enable download.',

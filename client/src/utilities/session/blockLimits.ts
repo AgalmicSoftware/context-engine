@@ -21,16 +21,15 @@ const toPositiveBlock = (value: unknown): number | null => {
 
 export const normalizeBlockLimitsForConfig = (
   value: unknown,
-  fallbackStart: unknown = null
+  fallbackStart: unknown = null,
 ): NormalizedBlockLimits | null => {
-  const source: BlockLimitSource = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as BlockLimitSource
-    : {};
+  const source: BlockLimitSource =
+    value && typeof value === 'object' && !Array.isArray(value) ? (value as BlockLimitSource) : {};
   const start = toPositiveBlock(source.start) || toPositiveBlock(fallbackStart);
   if (!start) return null;
 
   const endRaw = source.end;
-  const endCandidate = (endRaw == null || endRaw === '') ? null : toPositiveBlock(endRaw);
+  const endCandidate = endRaw == null || endRaw === '' ? null : toPositiveBlock(endRaw);
   const end = endCandidate && endCandidate >= start ? endCandidate : null;
 
   return { start, end };

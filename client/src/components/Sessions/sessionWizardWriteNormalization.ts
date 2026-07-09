@@ -47,10 +47,7 @@ const WORKER_METADATA_ALIAS_KEYS = Object.freeze([
   'deployHelperEnabled',
 ]);
 
-export {
-  SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
-  buildSessionWizardRegistrySessionFields,
-};
+export { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS, buildSessionWizardRegistrySessionFields };
 
 const orderMetadataFields = (metadata: AnyRecord, fieldOrder: string[] = []): AnyRecord => {
   if (!isObj(metadata)) return metadata;
@@ -82,31 +79,29 @@ const defaultNormalizeAiProvider = (value: unknown, fallback = 'openai'): string
   return lowered || fallback;
 };
 
-const defaultNormalizeAiModels = (raw: AnyRecord = {}): AnyRecord => (
-  isObj(raw) ? cloneValue(raw) : {}
-);
+const defaultNormalizeAiModels = (raw: AnyRecord = {}): AnyRecord => (isObj(raw) ? cloneValue(raw) : {});
 
-const defaultNormalizeAiModelForProvider = (
-  _modelType: string,
-  _providerValue: string,
-  modelValue: unknown
-): string => trimString(modelValue);
+const defaultNormalizeAiModelForProvider = (_modelType: string, _providerValue: string, modelValue: unknown): string =>
+  trimString(modelValue);
 
-export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
-  fieldOrder = [],
-  sanitizeContracts = sanitizeSessionWizardContracts,
-  normalizeAiProvider = defaultNormalizeAiProvider,
-  normalizeAiModels = defaultNormalizeAiModels,
-  normalizeAiModelForProvider = defaultNormalizeAiModelForProvider,
-  defaultAiModels = {},
-}: {
-  fieldOrder?: string[];
-  sanitizeContracts?: (contracts: SessionContractsLike) => SessionContractsLike;
-  normalizeAiProvider?: (value: unknown, fallback?: string) => string;
-  normalizeAiModels?: (raw?: AnyRecord, fallbackProvider?: string, transcription?: unknown) => AnyRecord;
-  normalizeAiModelForProvider?: (modelType: string, providerValue: string, modelValue: unknown) => string;
-  defaultAiModels?: AnyRecord;
-} = {}): AnyRecord => {
+export const sanitizeSessionWizardMetadataPayload = (
+  metadata: AnyRecord,
+  {
+    fieldOrder = [],
+    sanitizeContracts = sanitizeSessionWizardContracts,
+    normalizeAiProvider = defaultNormalizeAiProvider,
+    normalizeAiModels = defaultNormalizeAiModels,
+    normalizeAiModelForProvider = defaultNormalizeAiModelForProvider,
+    defaultAiModels = {},
+  }: {
+    fieldOrder?: string[];
+    sanitizeContracts?: (contracts: SessionContractsLike) => SessionContractsLike;
+    normalizeAiProvider?: (value: unknown, fallback?: string) => string;
+    normalizeAiModels?: (raw?: AnyRecord, fallbackProvider?: string, transcription?: unknown) => AnyRecord;
+    normalizeAiModelForProvider?: (modelType: string, providerValue: string, modelValue: unknown) => string;
+    defaultAiModels?: AnyRecord;
+  } = {},
+): AnyRecord => {
   if (!isObj(metadata)) return metadata;
 
   let next = cloneValue(metadata) as AnyRecord;
@@ -154,7 +149,7 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
       ai.models.fast.model = normalizeAiModelForProvider(
         'fast',
         provider,
-        ai.models.fast.model || defaultAiModels.fast
+        ai.models.fast.model || defaultAiModels.fast,
       );
     }
     if (isObj(ai.models?.thinking)) {
@@ -163,7 +158,7 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
       ai.models.thinking.model = normalizeAiModelForProvider(
         'thinking',
         provider,
-        ai.models.thinking.model || defaultAiModels.thinking
+        ai.models.thinking.model || defaultAiModels.thinking,
       );
     }
     delete ai.mode;
@@ -181,7 +176,7 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   if (isObj(next.sessionModeProfile)) {
     const sessionModeProfile = mergeSessionModeProfileStorageAccess(
       next.sessionModeProfile as SessionModeProfile,
-      next.storageProfile
+      next.storageProfile,
     );
     next.sessionModeProfile = sessionModeProfile;
     const compiled = compileSessionModeProfile(sessionModeProfile);
@@ -204,12 +199,7 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
       throw new Error('Session config requires blockLimits.start (positive block number).');
     }
     next.blockLimits.start = start;
-    next.blockLimits.end = (
-      typeof end === 'number' &&
-      Number.isFinite(end) &&
-      end > 0 &&
-      end >= start
-    ) ? end : null;
+    next.blockLimits.end = typeof end === 'number' && Number.isFinite(end) && end > 0 && end >= start ? end : null;
   } else if (Object.prototype.hasOwnProperty.call(next, 'blockLimits')) {
     throw new Error('Session config requires blockLimits.start (positive block number).');
   }
@@ -235,18 +225,15 @@ export const resolveSessionWizardWorkerStorageProfilePayload = ({
   const resolvedDeployPayload = isObj(deployPayload) ? deployPayload : {};
   const rawStorageProfile = resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile;
   const sessionModeProfile = isObj(resolvedDraft.sessionModeProfile)
-    ? resolvedDraft.sessionModeProfile as SessionModeProfile
-    : (hasLegacyTelegramFirstSessionFlags(resolvedDraft)
+    ? (resolvedDraft.sessionModeProfile as SessionModeProfile)
+    : hasLegacyTelegramFirstSessionFlags(resolvedDraft)
       ? profileFromLegacyConfig(resolvedDraft)
-      : null);
+      : null;
   const effectiveSessionModeProfile = sessionModeProfile
     ? mergeSessionModeProfileStorageAccess(sessionModeProfile, rawStorageProfile)
     : null;
   const compiledProfile = effectiveSessionModeProfile ? compileSessionModeProfile(effectiveSessionModeProfile) : null;
-  const storageProfile = normalizeSessionStorageProfileConfig(
-    compiledProfile?.storageProfile ||
-    rawStorageProfile
-  );
+  const storageProfile = normalizeSessionStorageProfileConfig(compiledProfile?.storageProfile || rawStorageProfile);
   return {
     storageProfile,
     sessionModeProfile: effectiveSessionModeProfile,
@@ -291,9 +278,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
   const chainId = Number(registryChainId || resolvedDraft.networkChainId || networkChainId || 0) || 0;
   const normalizedContracts: SessionContractsLike = {};
   const defaults = (getContractDefaults(chainId) || {}) as Record<string, SessionContractLike>;
-  const draftContracts = isObj(resolvedDraft.contracts)
-    ? (resolvedDraft.contracts as SessionContractsLike)
-    : {};
+  const draftContracts = isObj(resolvedDraft.contracts) ? (resolvedDraft.contracts as SessionContractsLike) : {};
 
   getVisibleContractKeys().forEach((key) => {
     const fromDraft = isObj(draftContracts[key]) ? draftContracts[key] : {};
@@ -306,13 +291,11 @@ export const buildSessionWizardWorkerConfigPayload = ({
     };
   });
 
-  const {
-    storageProfile,
-    sessionModeProfile: effectiveSessionModeProfile,
-  } = resolveSessionWizardWorkerStorageProfilePayload({
-    draft: resolvedDraft,
-    deployPayload: resolvedDeployPayload,
-  });
+  const { storageProfile, sessionModeProfile: effectiveSessionModeProfile } =
+    resolveSessionWizardWorkerStorageProfilePayload({
+      draft: resolvedDraft,
+      deployPayload: resolvedDeployPayload,
+    });
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
@@ -343,10 +326,8 @@ export const buildSessionWizardWorkerConfigPayload = ({
     typeof resolvedDeployPayload.embeddedDeployHelperEnabled === 'boolean' ||
     typeof resolvedDraft.embeddedDeployHelperEnabled === 'boolean'
   ) {
-    next.embeddedDeployHelperEnabled = (
-      resolvedDeployPayload.embeddedDeployHelperEnabled ??
-      resolvedDraft.embeddedDeployHelperEnabled
-    ) !== false;
+    next.embeddedDeployHelperEnabled =
+      (resolvedDeployPayload.embeddedDeployHelperEnabled ?? resolvedDraft.embeddedDeployHelperEnabled) !== false;
   }
 
   const blockLimits = normalizeBlockLimits(resolvedDraft.blockLimits, latestChainBlock);

@@ -1,24 +1,22 @@
 import { ethers } from 'ethers';
 
-import {
-  buildSbtLookupKey,
-} from './sbtSelectorSessionRuntimeHelpers';
+import { buildSbtLookupKey } from './sbtSelectorSessionRuntimeHelpers';
 
 type SbtSelectorSelectableKeySource = Record<string, unknown> & {
   address?: unknown;
   chainId?: unknown;
   sbtAddress?: unknown;
-  sbtInfo?: (Record<string, unknown> & {
-    chainID?: unknown;
-    chainId?: unknown;
-  }) | null;
+  sbtInfo?:
+    | (Record<string, unknown> & {
+        chainID?: unknown;
+        chainId?: unknown;
+      })
+    | null;
   selectionKey?: unknown;
   value?: unknown;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
 export const normalizeSelectableSbtAddress = (value: unknown): string => {
   const rawAddress = String(value || '').trim();
@@ -45,6 +43,5 @@ export const getSelectableSbtKey = (value: unknown): string => {
   return normalizeSelectableSbtAddress(raw);
 };
 
-export const getSelectOptionValue = (option: unknown): string => (
-  getSelectableSbtKey(option) || String(isRecord(option) ? option.value || '' : '')
-);
+export const getSelectOptionValue = (option: unknown): string =>
+  getSelectableSbtKey(option) || String(isRecord(option) ? option.value || '' : '');

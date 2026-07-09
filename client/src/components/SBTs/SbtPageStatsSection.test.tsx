@@ -8,9 +8,7 @@ jest.mock('../Shared/CETooltip', () => ({
   default: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof SbtPageStatsSection>> = {}
-) => ({
+const createProps = (overrides: Partial<React.ComponentProps<typeof SbtPageStatsSection>> = {}) => ({
   adminAddressDisplay: <a href="https://explorer.example.test/admin">0xadmin</a>,
   burnLabel: 'Admin Only',
   creatorAddressDisplay: <a href="https://explorer.example.test/creator">0xcreator</a>,
@@ -55,12 +53,12 @@ describe('SbtPageStatsSection', () => {
     expect(screen.getByText('Admin:')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '0xadmin' })).toHaveAttribute(
       'href',
-      'https://explorer.example.test/admin'
+      'https://explorer.example.test/admin',
     );
     expect(screen.getByText('Creator:')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '0xcreator' })).toHaveAttribute(
       'href',
-      'https://explorer.example.test/creator'
+      'https://explorer.example.test/creator',
     );
     expect(screen.getByText('Minting ends: tomorrow')).toBeInTheDocument();
   });
@@ -74,7 +72,7 @@ describe('SbtPageStatsSection', () => {
           onOpenMintedModal,
           onToggle,
         })}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByText('STATS'));
@@ -101,7 +99,7 @@ describe('SbtPageStatsSection', () => {
             showScanProgress: true,
           },
         })}
-      />
+      />,
     );
 
     expect(screen.queryByTitle('7 holders')).toBeNull();
@@ -119,7 +117,7 @@ describe('SbtPageStatsSection', () => {
           shouldRenderClosedIcon: true,
           shouldRenderOpenIcon: false,
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('STATS')).toBeInTheDocument();

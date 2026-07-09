@@ -25,7 +25,7 @@ export type SessionPublishEffectRunnerArgs<Result> = {
 };
 
 export const buildSessionPublishReducerPlan = (
-  publishExecutionPlan: SessionPublishExecutionPlanInput
+  publishExecutionPlan: SessionPublishExecutionPlanInput,
 ): SessionPublishPlan => ({
   autoDeployWorker: !!publishExecutionPlan.shouldAutoDeployWorker,
   deployPendingSbts: !!publishExecutionPlan.shouldDeployPendingSbts,
@@ -36,7 +36,7 @@ export const buildSessionPublishReducerPlan = (
 export const markSessionPublishEffectSucceeded = (
   dispatch: SessionPublishDispatch,
   effect: SessionPublishEffect,
-  result?: SessionPublishEffectSucceededAction['result']
+  result?: SessionPublishEffectSucceededAction['result'],
 ): void => {
   dispatch({
     type: 'effectSucceeded',
@@ -49,7 +49,7 @@ export const markSessionPublishEffectFailed = (
   dispatch: SessionPublishDispatch,
   effect: SessionPublishEffect,
   message: string,
-  recoverable = true
+  recoverable = true,
 ): void => {
   dispatch({
     type: 'effectFailed',
@@ -61,7 +61,7 @@ export const markSessionPublishEffectFailed = (
 
 export const beginSessionPublishReducerAttempt = (
   dispatch: SessionPublishDispatch,
-  publishExecutionPlan: SessionPublishExecutionPlanInput
+  publishExecutionPlan: SessionPublishExecutionPlanInput,
 ): void => {
   dispatch({
     type: 'beginPublish',

@@ -8,6 +8,13 @@ const CORPUS_DIR = path.join(ROOT_DIR, 'ai-discourse-corpus', 'corpuses');
 const CLIENT_DEBATES_PATH = path.join(ROOT_DIR, 'client', 'src', 'variables', 'demo', 'debates.json');
 
 const CORPUS_FILES = Object.freeze({
+  'ai-forecasting-economics': {
+    corpusKey: 'ai-forecasting-economics',
+    aliases: ['ai-forecasting-economics', 'ai_forecasting_economics', 'forecasting', 'forecasting-economics', 'econ'],
+    relativePath: 'ai-discourse-corpus/corpuses/ai-forecasting-economics-corpus.json',
+    collectionKey: 'entries',
+    metaCountKeys: ['entry_count'],
+  },
   'ai-laws-policy': {
     corpusKey: 'ai-laws-policy',
     aliases: ['ai-laws-policy', 'ai_laws_policy', 'laws', 'ai-laws', 'ai_laws'],
@@ -34,7 +41,7 @@ const CORPUS_FILES = Object.freeze({
     aliases: ['cross-corpus', 'cross_corpus', 'debates'],
     relativePath: 'ai-discourse-corpus/corpuses/cross-corpus-debates.json',
     collectionKey: 'debates',
-    metaCountKeys: ['total_debates'],
+    metaCountKeys: ['debate_count'],
   },
   'dwarkesh-lab-insiders': {
     corpusKey: 'dwarkesh-lab-insiders',
@@ -49,6 +56,13 @@ const CORPUS_FILES = Object.freeze({
     relativePath: 'ai-discourse-corpus/corpuses/enriched-tweets.json',
     collectionKey: null,
     metaCountKeys: [],
+  },
+  'lab-primary-docs': {
+    corpusKey: 'lab-primary-docs',
+    aliases: ['lab-primary-docs', 'lab_primary_docs', 'lab-docs', 'labs'],
+    relativePath: 'ai-discourse-corpus/corpuses/lab-primary-docs-corpus.json',
+    collectionKey: 'entries',
+    metaCountKeys: ['entry_count'],
   },
   'lesswrong-posts': {
     corpusKey: 'lesswrong-posts',
@@ -74,15 +88,124 @@ const CORPUS_FILES = Object.freeze({
 });
 
 const TARGET_DEBATE_IDS = Object.freeze([
+  'debate_exponential_progress',
+  'debate_reward_hacking_misalignment',
+  'debate_predeployment_eval_adequacy',
+  'debate_ai_rd_automation',
+  'debate_open_vs_closed_safety',
+  'debate_benchmark_validity',
+  'debate_regulation_speed',
+  'debate_deceptive_alignment',
   'debate_ai_water_usage',
   'debate_ai_labor_automation',
   'debate_ai_education_integrity',
   'debate_ai_copyright_training',
   'debate_multimodal_deepfake_governance',
+  'debate_government_prerelease_access',
+  'debate_alignment_tractability_2026',
+  'debate_ai_labor_displacement_timeline',
 ]);
 
 const VALID_PRIMARY_URL_RE = /^https?:\/\//i;
 const DATE_RANGE_RE = /^\d{4}-\d{4}$/;
+
+// Canonical vocabularies for taxonomy fields that previously drifted across
+// ingestion batches (mixed casing / snake_case variants). `validate` flags any
+// value outside these sets so new batches cannot re-introduce drift.
+const TAXONOMY_ENUMS = Object.freeze({
+  'ai-forecasting-economics': Object.freeze({
+    category: Object.freeze([
+      'compute_trends',
+      'data_resource',
+      'economic_agenda',
+      'economic_model',
+      'empirical_economics',
+      'forecast_tracking',
+      'forecasting_tournament',
+      'growth_theory',
+      'organization_report',
+      'prediction_market',
+    ]),
+  }),
+  'arxiv-ai-safety': Object.freeze({
+    category: Object.freeze([
+      'Alignment Theory',
+      'Capabilities',
+      'Evaluations',
+      'Fairness',
+      'Forecasting',
+      'Framework',
+      'Governance',
+      'Interpretability',
+      'Policy',
+      'Robustness',
+      'Survey',
+      'Technical Safety',
+    ]),
+  }),
+  'lesswrong-posts': Object.freeze({
+    platform: Object.freeze([
+      'AI Alignment Blog',
+      'AI Impacts',
+      'ARC Evals',
+      'Alignment Forum',
+      'Anthropic',
+      'Astral Codex Ten',
+      'Bounded Regret',
+      'Cold Takes',
+      'EA Forum',
+      'Epoch AI',
+      'Google DeepMind',
+      'Gwern',
+      'LessWrong',
+      'MIRI',
+      'Managing AI Risks',
+      'OpenAI',
+      'Personal Blog',
+      'Sideways View',
+      'Slate Star Codex',
+      'Substack',
+      'TIME Magazine',
+      'arXiv',
+    ]),
+  }),
+  'lab-primary-docs': Object.freeze({
+    lab: Object.freeze([
+      'Amazon',
+      'Anthropic',
+      'Frontier Model Forum',
+      'Google DeepMind',
+      'Meta',
+      'Microsoft',
+      'OpenAI',
+      'xAI',
+    ]),
+    doc_type: Object.freeze([
+      'deployment_update',
+      'framework_report',
+      'model_spec',
+      'policy_statement',
+      'safety_framework',
+      'safety_publication',
+      'system_card',
+      'transparency_report',
+    ]),
+  }),
+  'dwarkesh-lab-insiders': Object.freeze({
+    role_category: Object.freeze([
+      'capabilities_researcher',
+      'former_insider',
+      'governance_expert',
+      'independent_researcher',
+      'investor_strategist',
+      'lab_leader',
+      'lab_researcher',
+      'policy_advisor',
+      'researcher',
+      'safety_researcher',
+    ]),
+  }),
+});
 
 function readJson(absolutePath) {
   return JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
@@ -103,6 +226,19 @@ function getEntryIdentifier(entry) {
     return null;
   }
   return entry.id || entry.url || null;
+}
+
+function getEntryLookupKeys(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return [];
+  }
+  const keys = new Set();
+  [entry.id, entry.url].forEach((value) => {
+    if (typeof value === 'string' && value) {
+      keys.add(value);
+    }
+  });
+  return [...keys];
 }
 
 function createCorpusAliasMap() {
@@ -140,6 +276,7 @@ function loadCorpusFiles(rootDir = ROOT_DIR) {
 function buildRecordIndex(corpusFiles = loadCorpusFiles()) {
   const aliasMap = createCorpusAliasMap();
   const byCorpusAndId = new Map();
+  const lookupKeyEntryCounts = new Map();
   const duplicateIds = [];
   const seenGlobalIds = new Map();
 
@@ -149,8 +286,17 @@ function buildRecordIndex(corpusFiles = loadCorpusFiles()) {
       if (!id) {
         return;
       }
-      const scopedKey = `${file.corpusKey}:${id}`;
-      byCorpusAndId.set(scopedKey, { file, entry });
+      // Index every lookup key (id and url) so debate references can resolve
+      // records by either form. First entry wins, matching extractRecord's
+      // first-match semantics; lookupKeyEntryCounts tracks how many distinct
+      // entries share each key so reference ambiguity can be reported.
+      getEntryLookupKeys(entry).forEach((lookupKey) => {
+        const scopedKey = `${file.corpusKey}:${lookupKey}`;
+        if (!byCorpusAndId.has(scopedKey)) {
+          byCorpusAndId.set(scopedKey, { file, entry });
+        }
+        lookupKeyEntryCounts.set(scopedKey, (lookupKeyEntryCounts.get(scopedKey) || 0) + 1);
+      });
       if (seenGlobalIds.has(id)) {
         duplicateIds.push({
           id,
@@ -166,8 +312,19 @@ function buildRecordIndex(corpusFiles = loadCorpusFiles()) {
   return {
     aliasMap,
     byCorpusAndId,
+    lookupKeyEntryCounts,
     duplicateIds,
   };
+}
+
+function resolveRecord(index, corpusKey, id) {
+  const normalizedCorpusKey = normalizeCorpusKey(corpusKey, index.aliasMap);
+  return index.byCorpusAndId.get(`${normalizedCorpusKey}:${id}`) || null;
+}
+
+function countEntriesForKey(index, corpusKey, id) {
+  const normalizedCorpusKey = normalizeCorpusKey(corpusKey, index.aliasMap);
+  return index.lookupKeyEntryCounts.get(`${normalizedCorpusKey}:${id}`) || 0;
 }
 
 function collectSummary(rootDir = ROOT_DIR) {
@@ -202,23 +359,40 @@ function collectDebateReferenceIssues(crossCorpusFile, index, debateIds = null) 
   const debateIdSet = debateIds ? new Set(debateIds) : null;
   const missing = [];
   const duplicatePositions = [];
+  const ambiguousReferences = [];
 
   crossCorpusFile.entries.forEach((debate) => {
     if (debateIdSet && !debateIdSet.has(debate.id)) {
       return;
     }
 
-    const seenPositionKeys = new Set();
+    const seenResolvedKeys = new Set();
     (debate.positions || []).forEach((position, positionIndex) => {
       const id = position.entry_url_or_id;
       const corpus = position.corpus;
-      const positionKey = `${corpus}:${id}`;
-      if (seenPositionKeys.has(positionKey)) {
+      if (!id || !corpus) {
+        return;
+      }
+      const resolved = resolveRecord(index, corpus, id);
+      if (!resolved) {
+        missing.push({ debateId: debate.id, field: 'positions.entry_url_or_id', corpus, id });
+        return;
+      }
+      // Duplicate detection keys on the resolved record so a url-form and an
+      // id-form reference to the same entry cannot hide a duplicate position.
+      const resolvedKey = `${normalizeCorpusKey(corpus, index.aliasMap)}:${getEntryIdentifier(resolved.entry)}`;
+      if (seenResolvedKeys.has(resolvedKey)) {
         duplicatePositions.push({ debateId: debate.id, positionIndex, corpus, id });
       }
-      seenPositionKeys.add(positionKey);
-      if (id && corpus && !hasRecord(index, corpus, id)) {
-        missing.push({ debateId: debate.id, field: 'positions.entry_url_or_id', corpus, id });
+      seenResolvedKeys.add(resolvedKey);
+      if (countEntriesForKey(index, corpus, id) > 1) {
+        ambiguousReferences.push({
+          debateId: debate.id,
+          field: 'positions.entry_url_or_id',
+          corpus,
+          id,
+          matchingEntries: countEntriesForKey(index, corpus, id),
+        });
       }
     });
 
@@ -227,19 +401,30 @@ function collectDebateReferenceIssues(crossCorpusFile, index, debateIds = null) 
         ['from', reference.from_corpus, reference.from_id],
         ['to', reference.to_corpus, reference.to_id],
       ].forEach(([side, corpus, id]) => {
-        if (id && corpus && !hasRecord(index, corpus, id)) {
+        if (!id || !corpus) {
+          return;
+        }
+        if (!hasRecord(index, corpus, id)) {
           missing.push({
             debateId: debate.id,
             field: `cross_corpus_references[${referenceIndex}].${side}_id`,
             corpus,
             id,
           });
+        } else if (countEntriesForKey(index, corpus, id) > 1) {
+          ambiguousReferences.push({
+            debateId: debate.id,
+            field: `cross_corpus_references[${referenceIndex}].${side}_id`,
+            corpus,
+            id,
+            matchingEntries: countEntriesForKey(index, corpus, id),
+          });
         }
       });
     });
   });
 
-  return { missing, duplicatePositions };
+  return { missing, duplicatePositions, ambiguousReferences };
 }
 
 function collectValidation(rootDir = ROOT_DIR) {
@@ -253,6 +438,24 @@ function collectValidation(rootDir = ROOT_DIR) {
   const malformedYears = [];
   const rangeDateFields = [];
   const invalidPrimaryUrls = [];
+  const taxonomyDrift = [];
+  const unknownCorpusKeys = [];
+
+  const declaredSourceTotal = crossCorpusFile.data?.meta?.total_cross_corpus_sources;
+  if (typeof declaredSourceTotal === 'number') {
+    const actualSourceTotal = crossCorpusFile.entries.reduce(
+      (sum, debate) => sum + (debate.positions || []).length,
+      0
+    );
+    if (declaredSourceTotal !== actualSourceTotal) {
+      metaCountDrift.push({
+        corpus: 'cross-corpus',
+        field: 'total_cross_corpus_sources',
+        expected: declaredSourceTotal,
+        actual: actualSourceTotal,
+      });
+    }
+  }
 
   corpusFiles.forEach((file) => {
     file.metaCountKeys.forEach((key) => {
@@ -289,6 +492,30 @@ function collectValidation(rootDir = ROOT_DIR) {
           invalidPrimaryUrls.push({ corpus: file.corpusKey, id, field, value });
         }
       });
+
+      Object.entries(TAXONOMY_ENUMS[file.corpusKey] || {}).forEach(([field, allowedValues]) => {
+        if (!Object.prototype.hasOwnProperty.call(entry || {}, field)) {
+          return;
+        }
+        if (!allowedValues.includes(entry[field])) {
+          taxonomyDrift.push({ corpus: file.corpusKey, id, field, value: entry[field] });
+        }
+      });
+    });
+  });
+
+  crossCorpusFile.entries.forEach((debate) => {
+    const flagUnknown = (field, value) => {
+      if (value && !index.aliasMap.has(value) && !index.aliasMap.has(String(value).replaceAll('_', '-'))) {
+        unknownCorpusKeys.push({ debateId: debate.id, field, value });
+      }
+    };
+    (debate.positions || []).forEach((position, positionIndex) => {
+      flagUnknown(`positions[${positionIndex}].corpus`, position.corpus);
+    });
+    (debate.cross_corpus_references || []).forEach((reference, referenceIndex) => {
+      flagUnknown(`cross_corpus_references[${referenceIndex}].from_corpus`, reference.from_corpus);
+      flagUnknown(`cross_corpus_references[${referenceIndex}].to_corpus`, reference.to_corpus);
     });
   });
 
@@ -301,6 +528,8 @@ function collectValidation(rootDir = ROOT_DIR) {
     malformedYears,
     rangeDateFields,
     invalidPrimaryUrls,
+    taxonomyDrift,
+    unknownCorpusKeys,
     debateReferences: allReferenceIssues,
     targetDebateReferences: targetReferenceIssues,
     clientDebateMirror: {
@@ -346,7 +575,7 @@ function compactRecord(record) {
 function extractRecord(id, rootDir = ROOT_DIR) {
   const corpusFiles = loadCorpusFiles(rootDir);
   for (const file of corpusFiles) {
-    const entry = file.entries.find((candidate) => getEntryIdentifier(candidate) === id);
+    const entry = file.entries.find((candidate) => getEntryLookupKeys(candidate).includes(id));
     if (entry) {
       return {
         corpus: file.corpusKey,
@@ -398,6 +627,7 @@ module.exports = {
   CLIENT_DEBATES_PATH,
   CORPUS_FILES,
   TARGET_DEBATE_IDS,
+  TAXONOMY_ENUMS,
   buildRecordIndex,
   collectSummary,
   collectValidation,

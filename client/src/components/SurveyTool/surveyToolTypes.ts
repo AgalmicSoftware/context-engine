@@ -19,6 +19,5 @@ export const buildEmptyResponseSlice = (): ResponseSlice => ({
   additionalComments: {},
 });
 
-export const isSurveyToolRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+export const isSurveyToolRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);

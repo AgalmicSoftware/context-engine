@@ -45,31 +45,31 @@ export type SbtMetadataReadsPort = {
   getSbtMetadata: (
     providerName: SbtProviderRef,
     sbtAddress: string,
-    groupKeyOrCfg?: SbtGroupKeyOrConfig
+    groupKeyOrCfg?: SbtGroupKeyOrConfig,
   ) => Promise<SbtMetadataRecord | null | undefined>;
   getMintedTokens: (
     providerName: SbtProviderRef,
     sbtAddress: string,
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
-    options?: SbtReadOptions
+    options?: SbtReadOptions,
   ) => Promise<unknown>;
   getGroupPasswordHash: (
     providerName: SbtProviderRef,
     sbtAddress: string,
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
-    options?: SbtReadOptions
+    options?: SbtReadOptions,
   ) => Promise<string | null>;
   getSbtOnChainConfig: (
     providerName: SbtProviderRef,
     sbtAddress: string,
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
-    fields?: SbtOnChainConfigFields
+    fields?: SbtOnChainConfigFields,
   ) => Promise<SbtOnChainConfig>;
   getSbtCreationBlockByAddress: (
     providerName: SbtProviderRef,
     sbtAddress: string,
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
-    options?: SbtReadOptions
+    options?: SbtReadOptions,
   ) => Promise<number | null>;
 };
 
@@ -77,49 +77,36 @@ export type SbtEventStreamsPort = {
   listenForSBTEvents: (
     providerName: SbtProviderRef,
     handler: (event: unknown) => unknown,
-    sessionSlug: string
+    sessionSlug: string,
   ) => unknown;
-  removeSBTEventListener: (
-    providerName: SbtProviderRef,
-    sessionSlug: string
-  ) => unknown;
+  removeSBTEventListener: (providerName: SbtProviderRef, sessionSlug: string) => unknown;
   listenForSurveyEvents: (
     providerName: SbtProviderRef,
     handler: (event: unknown) => unknown,
-    sessionSlug: string
+    sessionSlug: string,
   ) => unknown;
-  removeSurveyEventsListener: (
-    providerName: SbtProviderRef,
-    sessionSlug: string
-  ) => unknown;
+  removeSurveyEventsListener: (providerName: SbtProviderRef, sessionSlug: string) => unknown;
   listenForSBTInstanceEvents: (
     providerName: SbtProviderRef,
     addresses: unknown[],
     handler: (event: unknown) => unknown,
-    sessionSlug: string
+    sessionSlug: string,
   ) => unknown;
-  removeSBTInstanceEventsListener: (
-    providerName: SbtProviderRef,
-    addresses: unknown[],
-    sessionSlug: string
-  ) => unknown;
+  removeSBTInstanceEventsListener: (providerName: SbtProviderRef, addresses: unknown[], sessionSlug: string) => unknown;
 };
 
 export type SbtMintExecutionPort = {
-  claim: (
-    providerName: SbtProviderRef,
-    sbtAddress: string
-  ) => Promise<SbtTransactionResult>;
+  claim: (providerName: SbtProviderRef, sbtAddress: string) => Promise<SbtTransactionResult>;
   claimWithInvite: (
     providerName: SbtProviderRef,
     sbtAddress: string,
     nonce: string | number,
-    signature: string
+    signature: string,
   ) => Promise<SbtTransactionResult>;
   mintWithGroupSignature: (
     providerName: SbtProviderRef,
     sbtAddress: string,
-    signature: string
+    signature: string,
   ) => Promise<SbtTransactionResult>;
 };
 
@@ -127,29 +114,25 @@ export type SbtAdminOpsPort = {
   addHashedPasswords: (
     providerName: SbtProviderRef,
     sbtAddress: string,
-    hashedPasswords: string[]
+    hashedPasswords: string[],
   ) => Promise<SbtTransactionResult>;
   burnToken: (
     providerName: SbtProviderRef,
     sbtAddress: string,
-    tokenId: SbtTokenIdInput
+    tokenId: SbtTokenIdInput,
   ) => Promise<SbtTransactionResult>;
   claimWithPassword: (
     providerName: SbtProviderRef,
     sbtAddress: string,
-    password: string
+    password: string,
   ) => Promise<SbtTransactionResult>;
   isPasswordValid: (
     providerLike: SbtProviderRef,
     sbtAddress: string,
     hashedPasswordBytes32: string,
-    groupKeyOrCfg?: SbtGroupKeyOrConfig
+    groupKeyOrCfg?: SbtGroupKeyOrConfig,
   ) => Promise<boolean>;
-  startClaim: (
-    providerName: SbtProviderRef,
-    sbtAddress: string,
-    userCommit: string
-  ) => Promise<SbtTransactionResult>;
+  startClaim: (providerName: SbtProviderRef, sbtAddress: string, userCommit: string) => Promise<SbtTransactionResult>;
 };
 
 export type SbtOwnershipReadsPort = {
@@ -157,18 +140,18 @@ export type SbtOwnershipReadsPort = {
     providerName: SbtProviderRef,
     sbtAddress: string,
     tokenId: SbtTokenIdInput,
-    groupKeyOrCfg?: SbtGroupKeyOrConfig
+    groupKeyOrCfg?: SbtGroupKeyOrConfig,
   ) => Promise<string | null>;
   getSBTTokenIdByOwner: (
     providerName: SbtProviderRef,
     sbtAddress: string,
     ownerAddress: string,
-    groupKeyOrCfg?: SbtGroupKeyOrConfig
+    groupKeyOrCfg?: SbtGroupKeyOrConfig,
   ) => Promise<string | null>;
   getSbtHistorySummary: (
     providerName: SbtProviderRef,
     sbtAddress: string,
-    groupKeyOrCfg?: SbtGroupKeyOrConfig
+    groupKeyOrCfg?: SbtGroupKeyOrConfig,
   ) => Promise<SbtHistorySummary | null>;
 };
 
@@ -203,13 +186,7 @@ export type SbtInvitePayloadsInput = {
 };
 
 export type SbtGroupMintAuthorizationPort = {
-  computeGroupPasswordHash: (
-    input: SbtGroupPasswordHashInput
-  ) => string;
-  signGroupMintAuthorization: (
-    input: SbtGroupMintAuthorizationInput
-  ) => Promise<string>;
-  generateInvitePayloads: (
-    input: SbtInvitePayloadsInput
-  ) => Promise<SbtInvitePayload[]>;
+  computeGroupPasswordHash: (input: SbtGroupPasswordHashInput) => string;
+  signGroupMintAuthorization: (input: SbtGroupMintAuthorizationInput) => Promise<string>;
+  generateInvitePayloads: (input: SbtInvitePayloadsInput) => Promise<SbtInvitePayload[]>;
 };

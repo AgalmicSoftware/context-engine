@@ -53,9 +53,7 @@ const SurveyResultsModalHeader = ({
     <div className={styleMap.modalHeaderContent}>
       <div className={styleMap.modalHeaderTitleBlock}>
         <h2 className={styleMap.modalTitle}>
-          {viewMode === 'survey'
-            ? `${surveyTitle ? `${surveyTitle}` : 'Survey Results'}`
-            : 'Question Results'}
+          {viewMode === 'survey' ? `${surveyTitle ? `${surveyTitle}` : 'Survey Results'}` : 'Question Results'}
         </h2>
       </div>
 
@@ -116,10 +114,9 @@ const SurveyResultsModalHeader = ({
               <button
                 key={option.key}
                 type="button"
-                className={[
-                  styleMap.demoResultsViewButton,
-                  isActiveView ? styleMap.demoResultsViewButtonActive : '',
-                ].filter(Boolean).join(' ')}
+                className={[styleMap.demoResultsViewButton, isActiveView ? styleMap.demoResultsViewButtonActive : '']
+                  .filter(Boolean)
+                  .join(' ')}
                 aria-pressed={isActiveView}
                 data-testid={`ce-surveyresults-demo-view-${option.key}`}
                 onClick={() => onDemoResultsViewSelect(option.key)}

@@ -3,21 +3,22 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import BlockLimitsField from './BlockLimitsField';
 import type { BlockLimitsFieldProps } from './BlockLimitsField';
 
-const renderBlockLimitsField = (props: Partial<BlockLimitsFieldProps> = {}) => render(
-  <BlockLimitsField
-    blockLimits={{ start: 123, end: null }}
-    onStartChange={() => {}}
-    blockLimitDuration="30"
-    blockLimitUnit="minutes"
-    onDurationChange={() => {}}
-    onUnitChange={() => {}}
-    latestChainBlock={null}
-    latestBlockStatus=""
-    label="Time Limits"
-    tooltipControl={null}
-    {...props}
-  />
-);
+const renderBlockLimitsField = (props: Partial<BlockLimitsFieldProps> = {}) =>
+  render(
+    <BlockLimitsField
+      blockLimits={{ start: 123, end: null }}
+      onStartChange={() => {}}
+      blockLimitDuration="30"
+      blockLimitUnit="minutes"
+      onDurationChange={() => {}}
+      onUnitChange={() => {}}
+      latestChainBlock={null}
+      latestBlockStatus=""
+      label="Time Limits"
+      tooltipControl={null}
+      {...props}
+    />,
+  );
 
 describe('BlockLimitsField', () => {
   it('renders the start input and end-after duration composer', () => {
@@ -61,7 +62,7 @@ describe('BlockLimitsField', () => {
         latestBlockStatus=""
         label="Time Limits"
         tooltipControl={null}
-      />
+      />,
     );
 
     expect(screen.getByText('No end block set.')).toBeInTheDocument();

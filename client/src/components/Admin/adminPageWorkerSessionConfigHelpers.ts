@@ -33,11 +33,7 @@ export type WorkerUrlResolutionDisplay = {
   url: string;
 };
 
-const asRecord = (value: unknown): AdminRecord => (
-  value && typeof value === 'object'
-    ? value as AdminRecord
-    : {}
-);
+const asRecord = (value: unknown): AdminRecord => (value && typeof value === 'object' ? (value as AdminRecord) : {});
 
 export const normalizeRpcUrlList = (value: unknown): string[] => {
   if (Array.isArray(value)) {
@@ -57,11 +53,12 @@ export const sanitizeRpcUrlMap = (value: unknown): RpcUrlMap => {
   return out;
 };
 
-export const pickFirstNonEmptyRpcUrlMap = (...candidates: unknown[]): RpcUrlMap => candidates.reduce<RpcUrlMap>((found, candidate) => {
-  if (found && Object.keys(found).length > 0) return found;
-  const sanitized = sanitizeRpcUrlMap(candidate);
-  return Object.keys(sanitized).length > 0 ? sanitized : found;
-}, {});
+export const pickFirstNonEmptyRpcUrlMap = (...candidates: unknown[]): RpcUrlMap =>
+  candidates.reduce<RpcUrlMap>((found, candidate) => {
+    if (found && Object.keys(found).length > 0) return found;
+    const sanitized = sanitizeRpcUrlMap(candidate);
+    return Object.keys(sanitized).length > 0 ? sanitized : found;
+  }, {});
 
 export const buildWorkerUrlResolutionDisplay = ({
   resolved,
@@ -78,23 +75,20 @@ export const buildWorkerUrlResolutionDisplay = ({
   return {
     url,
     debug: `source=${resolvedRecord.source || 'unknown'} status=${toStr(status)} url=${resolvedUrl || '(none)'}`,
-    status: url
-      ? `Resolved (${toStr(status)})`
-      : rawStatus
-        ? `Missing (${toStr(rawStatus)})`
-        : 'Missing worker URL',
+    status: url ? `Resolved (${toStr(status)})` : rawStatus ? `Missing (${toStr(rawStatus)})` : 'Missing worker URL',
   };
 };
 
-const mergeRpcUrlMaps = (...candidates: unknown[]): RpcUrlMap => candidates.reduce<RpcUrlMap>((merged, candidate) => {
-  const sanitized = sanitizeRpcUrlMap(candidate);
-  Object.entries(sanitized).forEach(([chainId, urls]) => {
-    if (!normalizeRpcUrlList(merged[chainId]).length && urls.length) {
-      merged[chainId] = urls;
-    }
-  });
-  return merged;
-}, {});
+const mergeRpcUrlMaps = (...candidates: unknown[]): RpcUrlMap =>
+  candidates.reduce<RpcUrlMap>((merged, candidate) => {
+    const sanitized = sanitizeRpcUrlMap(candidate);
+    Object.entries(sanitized).forEach(([chainId, urls]) => {
+      if (!normalizeRpcUrlList(merged[chainId]).length && urls.length) {
+        merged[chainId] = urls;
+      }
+    });
+    return merged;
+  }, {});
 
 const getRpcUrlsForChain = (rpcUrlsByChainId: RpcUrlMap, chainId: unknown): string[] => {
   const numericChainId = Number(chainId || 0) || 0;
@@ -118,28 +112,22 @@ export const getSessionReadRpcConfig = ({
   const rpcProviders = asRecord(rpcRoot.providers);
   const pathProvider = asRecord(rpcProviders.path);
   const faucetCfg = asRecord(cfg.faucet);
-  const chainId = Number(
-    cfg.networkChainId ||
-    registry.chainId ||
-    registry.registryChainId ||
-    fallbackChainId ||
-    0
-  ) || 0;
+  const chainId =
+    Number(cfg.networkChainId || registry.chainId || registry.registryChainId || fallbackChainId || 0) || 0;
   const rpcUrlsByChainId = mergeRpcUrlMaps(
     pathProvider.rpcUrlsByChainId,
     rpcRoot.rpcUrlsByChainId,
-    cfg.rpcUrlsByChainId
+    cfg.rpcUrlsByChainId,
   );
   const chainRpcUrl = getRpcUrlsForChain(rpcUrlsByChainId, chainId)[0] || '';
   const defaultRpcUrl = getDefaultRpcForChain(chainId, { allowPath: false });
-  const rpcUrl = (
+  const rpcUrl =
     normalizeRpcUrlList(faucetCfg.rpcUrl)[0] ||
     chainRpcUrl ||
     normalizeRpcUrlList(pathProvider.rpcUrl)[0] ||
     normalizeRpcUrlList(rpcRoot.rpcUrl)[0] ||
     normalizeRpcUrlList(cfg.rpcUrl)[0] ||
-    defaultRpcUrl
-  );
+    defaultRpcUrl;
   return {
     chainId,
     rpcUrl: toStr(rpcUrl).trim(),
@@ -169,23 +157,17 @@ export const buildWorkerSessionConfigPayload = ({
   const rpcProviders = asRecord(rpcRoot.providers);
   const pathProvider = asRecord(rpcProviders.path);
   const inferredSessionChainId = Number(cfg.networkChainId || fallbackChainId || 0) || 0;
-  const registryChainId = Number(
-    registry.registryChainId ||
-    registry.chainId ||
-    inferredSessionChainId ||
-    0
-  ) || 0;
+  const registryChainId = Number(registry.registryChainId || registry.chainId || inferredSessionChainId || 0) || 0;
   const faucetCfg = asRecord(cfg.faucet);
-  const genericRpcUrlFromConfig = (
+  const genericRpcUrlFromConfig =
     normalizeRpcUrlList(pathProvider.rpcUrl)[0] ||
     normalizeRpcUrlList(rpcRoot.rpcUrl)[0] ||
     normalizeRpcUrlList(cfg.rpcUrl)[0] ||
-    ''
-  );
+    '';
   const rpcUrlsByChainId = mergeRpcUrlMaps(
     pathProvider.rpcUrlsByChainId,
     rpcRoot.rpcUrlsByChainId,
-    cfg.rpcUrlsByChainId
+    cfg.rpcUrlsByChainId,
   );
   const sessionChainRpcUrl = getRpcUrlsForChain(rpcUrlsByChainId, inferredSessionChainId)[0] || '';
   const defaultSessionRpcUrl = getDefaultRpcForChain(inferredSessionChainId);
@@ -212,9 +194,9 @@ export const buildWorkerSessionConfigPayload = ({
   const allowOrigins = Array.isArray(allowOriginsRaw)
     ? allowOriginsRaw.map((entry) => toStr(entry).trim()).filter(Boolean)
     : toStr(allowOriginsRaw)
-      .split(/[\n,]+/)
-      .map((entry) => entry.trim())
-      .filter(Boolean);
+        .split(/[\n,]+/)
+        .map((entry) => entry.trim())
+        .filter(Boolean);
   const limits = asRecord(cfg.limits);
   const scopes = asRecord(cfg.scopes);
 
@@ -223,11 +205,13 @@ export const buildWorkerSessionConfigPayload = ({
   };
   const slug = normalizeSlug(cfg.slug || '');
   const registryAddress = toStr(registry.registryAddress || registry.address || '').trim();
-  const resolvedRegistryAddress = registryAddress || toStr(
-    registryChainId
-      ? (getSessionRegistryAddress(registryChainId) || sessionRegistryUtils.resolveRegistryAddress(registryChainId))
-      : ''
-  ).trim();
+  const resolvedRegistryAddress =
+    registryAddress ||
+    toStr(
+      registryChainId
+        ? getSessionRegistryAddress(registryChainId) || sessionRegistryUtils.resolveRegistryAddress(registryChainId)
+        : '',
+    ).trim();
   const hatsAddress = toStr(registry.hatsAddress || cfg.hatsAddress || '').trim();
   const adminHatId = toStr(registry.adminHatId || cfg.adminHatId || '').trim();
   if (slug || slug === '') out.slug = slug;
@@ -261,13 +245,12 @@ export const buildWorkerSessionConfigPayload = ({
   const faucetChainId = Number(faucetCfg.chainId || faucetCfg.networkChainId || inferredSessionChainId || 0) || 0;
   const faucetChainRpcUrl = getRpcUrlsForChain(resolvedRpcUrlsByChainId, faucetChainId)[0] || '';
   const defaultFaucetRpcUrl = getDefaultRpcForChain(faucetChainId);
-  const faucetRpcUrl = (
+  const faucetRpcUrl =
     normalizeRpcUrlList(faucetCfg.rpcUrl)[0] ||
     faucetChainRpcUrl ||
     (faucetChainId === inferredSessionChainId ? resolvedRpcUrl : '') ||
     defaultFaucetRpcUrl ||
-    resolvedRpcUrl
-  );
+    resolvedRpcUrl;
   const faucetAmountEth = toStr(faucetCfg.amountEth).trim();
   const faucetBalanceThresholdEth = toStr(faucetCfg.balanceThresholdEth).trim();
   if (faucetRpcUrl) faucet.rpcUrl = faucetRpcUrl;

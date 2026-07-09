@@ -14,7 +14,7 @@ export const DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS = Object.freeze([
   'atlasCategory',
 ] as const);
 
-type DemoAnalysisDemographicField = typeof DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS[number];
+type DemoAnalysisDemographicField = (typeof DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS)[number];
 
 export type HistoricalFigureDemographicsEntry = Record<DemoAnalysisDemographicField, string>;
 
@@ -24,15 +24,10 @@ type SourceDemographicsEntry = Omit<HistoricalFigureDemographicsEntry, 'region'>
 
 type UnknownRecord = Record<string, unknown>;
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  typeof value === 'object' && value !== null
-);
+const isRecord = (value: unknown): value is UnknownRecord => typeof value === 'object' && value !== null;
 
-const getRecordEntries = (value: unknown): [string, UnknownRecord][] => (
-  isRecord(value)
-    ? Object.entries(value).filter((entry): entry is [string, UnknownRecord] => isRecord(entry[1]))
-    : []
-);
+const getRecordEntries = (value: unknown): [string, UnknownRecord][] =>
+  isRecord(value) ? Object.entries(value).filter((entry): entry is [string, UnknownRecord] => isRecord(entry[1])) : [];
 
 const COUNTRY_OVERRIDES = Object.freeze({
   USA: 'United States',
@@ -334,7 +329,7 @@ const MANUAL_DEMOGRAPHICS = Object.freeze({
   },
   SusanBAnthony: {
     displayName: 'Susan B. Anthony',
-    bio: 'American suffragist and reformer whose organizing helped build durable movements for women\'s political rights.',
+    bio: "American suffragist and reformer whose organizing helped build durable movements for women's political rights.",
     eraLabel: '19th century reform era',
     eraBucket: 'Industrial',
     country: 'United States',
@@ -464,7 +459,7 @@ const MANUAL_DEMOGRAPHICS = Object.freeze({
   },
   WangariMaathai: {
     displayName: 'Wangari Maathai',
-    bio: 'Kenyan Nobel laureate who founded the Green Belt Movement, linking environmental conservation with women\'s rights and democratic governance.',
+    bio: "Kenyan Nobel laureate who founded the Green Belt Movement, linking environmental conservation with women's rights and democratic governance.",
     eraLabel: 'Late 20th century',
     eraBucket: 'Modern',
     country: 'Kenya',
@@ -484,9 +479,8 @@ const MANUAL_DEMOGRAPHICS = Object.freeze({
   },
 });
 
-const normalizeCountry = (value: unknown = ''): string => (
-  (COUNTRY_OVERRIDES as Record<string, string>)[String(value || '').trim()] || String(value || '').trim()
-);
+const normalizeCountry = (value: unknown = ''): string =>
+  (COUNTRY_OVERRIDES as Record<string, string>)[String(value || '').trim()] || String(value || '').trim();
 
 const normalizeEraBucket = (value: unknown = ''): string => {
   const normalized = String(value || '').trim();
@@ -495,14 +489,12 @@ const normalizeEraBucket = (value: unknown = ''): string => {
 
 const buildMergedFigureLookup = (): Map<string, UnknownRecord> => {
   const mergedData = historicalFiguresMerged as { figures?: unknown };
-  const figures = Array.isArray(mergedData.figures)
-    ? mergedData.figures.filter(isRecord)
-    : [];
+  const figures = Array.isArray(mergedData.figures) ? mergedData.figures.filter(isRecord) : [];
   const lookup = new Map<string, UnknownRecord>();
   figures.forEach((figure) => {
     const keys = [
       String(figure?.username || '').trim(),
-      ...((Array.isArray(figure?.aliases) ? figure.aliases : []).map((alias) => String(alias || '').trim())),
+      ...(Array.isArray(figure?.aliases) ? figure.aliases : []).map((alias) => String(alias || '').trim()),
     ].filter(Boolean);
     keys.forEach((key) => {
       if (!lookup.has(key)) {
@@ -516,18 +508,17 @@ const buildMergedFigureLookup = (): Map<string, UnknownRecord> => {
 const MERGED_FIGURE_LOOKUP = buildMergedFigureLookup();
 
 const ADDITIONAL_FIGURE_LOOKUP = new Map<string, UnknownRecord>(
-  getRecordEntries(additionalHistoricalFigures)
-    .map(([key, value]) => [String(key || '').trim(), value] as [string, UnknownRecord])
+  getRecordEntries(additionalHistoricalFigures).map(
+    ([key, value]) => [String(key || '').trim(), value] as [string, UnknownRecord],
+  ),
 );
 
-const historicalUserRecords = Array.isArray(historicalFigureUsers)
-  ? historicalFigureUsers.filter(isRecord)
-  : [];
+const historicalUserRecords = Array.isArray(historicalFigureUsers) ? historicalFigureUsers.filter(isRecord) : [];
 
 const HISTORICAL_USER_LOOKUP = new Map<string, UnknownRecord>(
   historicalUserRecords
     .map((entry) => [String(entry?.username || '').trim(), entry] as [string, UnknownRecord])
-    .filter(([key]) => key)
+    .filter(([key]) => key),
 );
 
 const buildSourceBackedEntry = (xid = ''): SourceDemographicsEntry | null => {
@@ -542,17 +533,14 @@ const buildSourceBackedEntry = (xid = ''): SourceDemographicsEntry | null => {
   const country = normalizeCountry(mergedFigure?.country);
   const eraBucket = normalizeEraBucket(mergedFigure?.era);
   return {
-    displayName:
-      String(mergedFigure?.displayName || historicalUser?.name || xid).trim(),
+    displayName: String(mergedFigure?.displayName || historicalUser?.name || xid).trim(),
     bio: String(mergedFigure?.bio || '').trim(),
     eraLabel: eraBucket ? `${eraBucket} era` : '',
     eraBucket,
     country,
     gender: String(mergedFigure?.gender || '').trim(),
     affiliation: String(mergedFigure?.affiliation || '').trim(),
-    atlasCategory: String(
-      mergedFigure?.atlasCategory || additionalFigure?.atlasCategory || ''
-    ).trim(),
+    atlasCategory: String(mergedFigure?.atlasCategory || additionalFigure?.atlasCategory || '').trim(),
   };
 };
 
@@ -578,9 +566,7 @@ const buildCanonicalEntry = (xid = ''): HistoricalFigureDemographicsEntry | null
 };
 
 const DEMO_PARTICIPANT_XIDS = Object.freeze(
-  historicalUserRecords
-    .map((figure) => String(figure?.username || '').trim())
-    .filter(Boolean)
+  historicalUserRecords.map((figure) => String(figure?.username || '').trim()).filter(Boolean),
 );
 
 const HISTORICAL_FIGURE_DEMOGRAPHICS = Object.freeze(
@@ -598,7 +584,7 @@ const HISTORICAL_FIGURE_DEMOGRAPHICS = Object.freeze(
     }
     acc[xid] = Object.freeze(entry);
     return acc;
-  }, {})
+  }, {}),
 );
 
 export default HISTORICAL_FIGURE_DEMOGRAPHICS;

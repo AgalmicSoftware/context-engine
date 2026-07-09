@@ -16,20 +16,13 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './SingleQuestionResponse.module.scss';
 import { createLogger } from 'utilities/logging.js';
-import {
-  buildQuestionRoutePath,
-  resolveQuestionPayloadDisplayState,
-} from '../../utilities/survey/questionRouting.js';
+import { buildQuestionRoutePath, resolveQuestionPayloadDisplayState } from '../../utilities/survey/questionRouting.js';
 import { normalizeSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { getLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
 import GateTooltip from '../Gates/GateTooltip';
-import {
-  listNamespaceEntriesSync,
-  peekCacheSync,
-  writeCache,
-} from '../../utilities/cache/cacheScripts.js';
+import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import {
   getRatingFillPercent,
   normalizeRatingValue,
@@ -196,11 +189,7 @@ type SingleQuestionAggregatorClassNames = {
   aggregatorParagraphClassName: string;
   aggregatorFreeformAnswerClassName: string;
 };
-type SingleQuestionWriteCache = (
-  namespace: string,
-  slug: string | undefined,
-  value: unknown
-) => Promise<unknown>;
+type SingleQuestionWriteCache = (namespace: string, slug: string | undefined, value: unknown) => Promise<unknown>;
 type SingleQuestionGlobalCacheWindow = Window & {
   __APP_CACHE__?: Record<string, unknown>;
   __QUESTION_CACHE__?: Record<string, unknown>;
@@ -209,34 +198,38 @@ type SingleQuestionGlobalCacheWindow = Window & {
 
 const joinClassNames = (...parts: unknown[]) => parts.filter(Boolean).join(' ');
 
+const shallowEqualSingleQuestionRecord = (
+  left: Record<string, unknown> | null | undefined,
+  right: Record<string, unknown> | null | undefined,
+): boolean => {
+  if (Object.is(left, right)) return true;
+  if (!left || !right) return false;
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && Object.is(left[key], right[key]));
+};
+
 export const SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE: React.CSSProperties = {
   width: '200px',
 };
 
 export const resolveSingleQuestionBookmarkIconStyle = (
   bookmarkSuccess: unknown,
-  isBookmarked: unknown
+  isBookmarked: unknown,
 ): React.CSSProperties => ({
   color: bookmarkSuccess ? 'lightgreen' : isBookmarked ? '#ffc107' : 'white',
 });
 
-export const buildSingleQuestionMiniPromptButtonClassName = (
-  styleMap: Record<string, string>
-) => `${styleMap.miniPromptAbbrev} ${styleMap.maskedPromptActionButton}`;
+export const buildSingleQuestionMiniPromptButtonClassName = (styleMap: Record<string, string>) =>
+  `${styleMap.miniPromptAbbrev} ${styleMap.maskedPromptActionButton}`;
 
-export const buildSingleQuestionReadOnlyBinaryClassName = (
-  styleMap: Record<string, string>,
-  optionClassName: string
-) => `${styleMap.readOnlyBinary} ${styleMap[optionClassName]}`;
+export const buildSingleQuestionReadOnlyBinaryClassName = (styleMap: Record<string, string>, optionClassName: string) =>
+  `${styleMap.readOnlyBinary} ${styleMap[optionClassName]}`;
 
-export const resolveSingleQuestionRatingBarStyle = (
-  ratingFillPercent: unknown
-): React.CSSProperties => ({
+export const resolveSingleQuestionRatingBarStyle = (ratingFillPercent: unknown): React.CSSProperties => ({
   width: `${ratingFillPercent}%`,
 });
-
-
-
 
 /**
  * SingleQuestionResponse is a component responsible for displaying:
@@ -300,6 +293,13 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     this.clearQuestionLookupMemo();
   }
 
+  shouldComponentUpdate(nextProps: SingleQuestionResponseProps, nextState: SingleQuestionResponseState): boolean {
+    return (
+      !shallowEqualSingleQuestionRecord(this.props, nextProps) ||
+      !shallowEqualSingleQuestionRecord(this.state, nextState)
+    );
+  }
+
   componentDidUpdate(prevProps: SingleQuestionResponseProps) {
     if (this.props.question?.id !== prevProps.question?.id) {
       this.checkBookmarkStatus();
@@ -334,16 +334,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
   getQuestionLookupContextKey = (): string => {
     const slug = this.resolveGroupSlug();
     const netIdStr = String(
-      this.props?.network?.id ??
-      this.props?.network?.chainId ??
-      this.props?.networkChainId ??
-      ''
+      this.props?.network?.id ?? this.props?.network?.chainId ?? this.props?.networkChainId ?? '',
     );
-    const nonceParts = [
-      this.props?.questionsCacheNonce,
-      this.props?.cacheNonce,
-      this.props?.cacheRevision,
-    ]
+    const nonceParts = [this.props?.questionsCacheNonce, this.props?.cacheNonce, this.props?.cacheRevision]
       .map((part: unknown) => (part == null ? '' : String(part)))
       .join(':');
     return `${slug}|${netIdStr}|${nonceParts}`;
@@ -398,9 +391,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
 
     try {
       const existing = peekCacheSync('bookmarksCache', slug, { clone: false }) || {};
-      const base = (typeof existing === 'object' && existing !== null)
-        ? existing as SingleQuestionRecord
-        : {};
+      const base = typeof existing === 'object' && existing !== null ? (existing as SingleQuestionRecord) : {};
       bookmarksCache = {
         ...base,
         surveys: Array.isArray(base.surveys) ? [...base.surveys] : [],
@@ -473,11 +464,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
         return this.renderMultichoiceAggregator(answered, aggregatorQuestion);
 
       default:
-        return (
-          <div className={styles.aggregatorText}>
-            No aggregator available for question type: {questionType}
-          </div>
-        );
+        return <div className={styles.aggregatorText}>No aggregator available for question type: {questionType}</div>;
     }
   };
 
@@ -486,17 +473,14 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       styles.aggregatorContainer,
       this.props.aggregatorContainerClassName,
       styles.aggregatorText,
-      this.props.aggregatorTextClassName
+      this.props.aggregatorTextClassName,
     ),
-    aggregatorParagraphClassName: joinClassNames(
-      styles.aggregatorParagraph,
-      this.props.aggregatorParagraphClassName
-    ),
+    aggregatorParagraphClassName: joinClassNames(styles.aggregatorParagraph, this.props.aggregatorParagraphClassName),
     aggregatorFreeformAnswerClassName: joinClassNames(
       styles.freeformAnswer,
       this.props.aggregatorFreeformAnswerClassName,
       styles.aggregatorText,
-      this.props.aggregatorTextClassName
+      this.props.aggregatorTextClassName,
     ),
   });
 
@@ -507,11 +491,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
    * - Displays non-empty, unencrypted answers in a simple list
    */
   renderFreeformAggregator = (parsedResponses: unknown[]): React.ReactNode => {
-    const {
-      aggregatorContainerClassName,
-      aggregatorParagraphClassName,
-      aggregatorFreeformAnswerClassName,
-    } = this.getAggregatorClassNames();
+    const { aggregatorContainerClassName, aggregatorParagraphClassName, aggregatorFreeformAnswerClassName } =
+      this.getAggregatorClassNames();
     const freeformSummary = buildFreeformAggregatorSummary(parsedResponses);
     if (freeformSummary.total === 0) {
       return (
@@ -556,19 +537,22 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
         <div className={styles.binaryAggregatorItem}>
           {this.renderAnswerByType('binary', 'Agree')}
           <span className={styles.binaryOptionResponse}>
-            {' '}{binarySummary.counts.Agree} ({percent(binarySummary.counts.Agree)}%)
+            {' '}
+            {binarySummary.counts.Agree} ({percent(binarySummary.counts.Agree)}%)
           </span>
         </div>
         <div className={styles.binaryAggregatorItem}>
           {this.renderAnswerByType('binary', 'Unsure')}
           <span className={styles.binaryOptionResponse}>
-            {' '}{binarySummary.counts.Unsure} ({percent(binarySummary.counts.Unsure)}%)
+            {' '}
+            {binarySummary.counts.Unsure} ({percent(binarySummary.counts.Unsure)}%)
           </span>
         </div>
         <div className={styles.binaryAggregatorItem}>
           {this.renderAnswerByType('binary', 'Disagree')}
           <span className={styles.binaryOptionResponse}>
-            {' '}{binarySummary.counts.Disagree} ({percent(binarySummary.counts.Disagree)}%)
+            {' '}
+            {binarySummary.counts.Disagree} ({percent(binarySummary.counts.Disagree)}%)
           </span>
         </div>
       </div>
@@ -589,9 +573,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
 
     return (
       <div className={aggregatorContainerClassName}>
-        <p className={aggregatorParagraphClassName}>
-          {ratingSummary.total} total rating responses.
-        </p>
+        <p className={aggregatorParagraphClassName}>{ratingSummary.total} total rating responses.</p>
         <p className={aggregatorParagraphClassName}>
           Average: {ratingSummary.average.toFixed(2)}, Median: {ratingSummary.median.toFixed(2)}
         </p>
@@ -602,7 +584,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
   // For aggregator multichoice (UPDATED: robust option detection + group-aware cache)
   renderMultichoiceAggregator = (
     parsedResponses: unknown[],
-    aggregatorQuestion: SingleQuestionAggregatorQuestion
+    aggregatorQuestion: SingleQuestionAggregatorQuestion,
   ): React.ReactNode => {
     const { aggregatorContainerClassName, aggregatorParagraphClassName } = this.getAggregatorClassNames();
     // Prefer options on the object; otherwise consult caches
@@ -616,9 +598,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     if (!multichoiceSummary.options.length) {
       return (
         <div className={aggregatorContainerClassName}>
-          <p className={aggregatorParagraphClassName}>
-            No multichoice options are defined for this question.
-          </p>
+          <p className={aggregatorParagraphClassName}>No multichoice options are defined for this question.</p>
         </div>
       );
     }
@@ -668,7 +648,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       canDecryptOtherResponses,
       mode,
       responderAddress,
-      questionOnly
+      questionOnly,
     } = this.props;
 
     // Redirect for mini/profile views
@@ -687,22 +667,18 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     const canDecrypt = !!isOwnResponse || !!canDecryptOtherResponses || responseHasLitSbtRecipient(response);
     if (!onDecryptQuestion || !question?.id || !response || !canDecrypt) return;
 
-    const target =
-      field === 'additional'
-        ? (response.additional || {})
-        : (response.answer || {});
+    const target = field === 'additional' ? response.additional || {} : response.answer || {};
 
     // Only attempt when actually masked/encrypted
-    const isMasked =
-      target &&
-      target.value === '*' &&
-      (Boolean(target.encryptedPortion) || Boolean(target.encrypted));
+    const isMasked = target && target.value === '*' && (Boolean(target.encryptedPortion) || Boolean(target.encrypted));
 
     if (!isMasked) return;
 
     try {
       onDecryptQuestion(question.id, field, response);
-    } catch (e) { questionLog.warn('SingleQuestionResponse: fallback', e); }
+    } catch (e) {
+      questionLog.warn('SingleQuestionResponse: fallback', e);
+    }
   };
 
   handlePromptReloadClick = (): void => {
@@ -710,9 +686,10 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     if (!question?.id || typeof onReloadQuestionPrompt !== 'function') return;
     try {
       onReloadQuestionPrompt(question.id);
-    } catch (e) { questionLog.warn('SingleQuestionResponse: fallback', e); }
+    } catch (e) {
+      questionLog.warn('SingleQuestionResponse: fallback', e);
+    }
   };
-
 
   toggleMiniExpand = (): void => {
     this.setState((prev: SingleQuestionResponseState) => ({ miniExpanded: !prev.miniExpanded }));
@@ -720,25 +697,23 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
 
   /** Pick a stable id for cache lookups */
   getQuestionId = (q: unknown = {}): string => {
-    const question = q && typeof q === 'object' ? q as SingleQuestionRecord : {};
-    return String(question?.id ?? question?._id ?? question?.questionId ?? question?.uuid ?? question?.key ?? question?.slug ?? '');
+    const question = q && typeof q === 'object' ? (q as SingleQuestionRecord) : {};
+    return String(
+      question?.id ?? question?._id ?? question?.questionId ?? question?.uuid ?? question?.key ?? question?.slug ?? '',
+    );
   };
 
   /** Resolve active session slug ('' = general) from canonical session props. */
   resolveGroupSlug = (): string => {
     const fromPath = resolveSessionSlugFromPathname(
-      (typeof window !== 'undefined' && window.location?.pathname) ? window.location.pathname : ''
+      typeof window !== 'undefined' && window.location?.pathname ? window.location.pathname : '',
     );
     if (fromPath != null) return fromPath;
 
-    const fromQuestion =
-      this.props?.question?.sessionSlug ??
-      this.props?.question?.slug;
+    const fromQuestion = this.props?.question?.sessionSlug ?? this.props?.question?.slug;
     if (fromQuestion != null) return normalizeSessionSlug(fromQuestion);
 
-    const fromProp =
-      this.props?.sessionSlug ??
-      this.props?.activeSessionSlug;
+    const fromProp = this.props?.sessionSlug ?? this.props?.activeSessionSlug;
     if (fromProp != null) return normalizeSessionSlug(fromProp);
 
     return '';
@@ -752,17 +727,15 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     }
     const slug = this.resolveGroupSlug();
     const netIdStr = String(
-      this.props?.network?.id ??
-      this.props?.network?.chainId ??
-      this.props?.networkChainId ??
-      ''
+      this.props?.network?.id ?? this.props?.network?.chainId ?? this.props?.networkChainId ?? '',
     );
 
     let parsed = peekCacheSync('questionsCache', slug, { clone: false });
     if (!parsed || typeof parsed !== 'object') {
-      const generalEntry = listNamespaceEntriesSync('questionsCache', { cloneValues: false })
-        .find((entry: SingleQuestionCacheEntry) => String(entry?.slug || '') === '');
-      parsed = (generalEntry && typeof generalEntry.value === 'object') ? generalEntry.value : null;
+      const generalEntry = listNamespaceEntriesSync('questionsCache', { cloneValues: false }).find(
+        (entry: SingleQuestionCacheEntry) => String(entry?.slug || '') === '',
+      );
+      parsed = generalEntry && typeof generalEntry.value === 'object' ? generalEntry.value : null;
       if (!parsed || typeof parsed !== 'object') return {};
     }
 
@@ -785,10 +758,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     }
 
     const netIdStr = String(
-      this.props?.network?.id ??
-      this.props?.network?.chainId ??
-      this.props?.networkChainId ??
-      ''
+      this.props?.network?.id ?? this.props?.network?.chainId ?? this.props?.networkChainId ?? '',
     );
     const remember = (value: unknown): unknown | null => {
       this._crossGroupQuestionMemo.set(memoKey, value || null);
@@ -799,7 +769,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     try {
       const entries = listNamespaceEntriesSync('questionsCache', { cloneValues: false });
       return remember(findSingleQuestionEntryAcrossGroups({ entries, idLower, netIdStr }));
-    } catch (e) { questionLog.warn('SingleQuestionResponse: fallback', e); }
+    } catch (e) {
+      questionLog.warn('SingleQuestionResponse: fallback', e);
+    }
 
     return remember(null);
   };
@@ -817,7 +789,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     const memoHit = this._multichoiceOptionsMemo.get(memoKey);
     if (Array.isArray(memoHit)) return memoHit as string[];
     const remember = (options: unknown): string[] => {
-      const normalized = Array.isArray(options) ? options as string[] : [];
+      const normalized = Array.isArray(options) ? (options as string[]) : [];
       this._multichoiceOptionsMemo.set(memoKey, normalized);
       this.trimMemoMap(this._multichoiceOptionsMemo, 256);
       return normalized;
@@ -835,14 +807,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     }
 
     // 3) Common prop roots (Redux slices, entity maps, etc.)
-    const {
-      questionCache,
-      questionsCache,
-      questionsById,
-      cache,
-      entities,
-      storeCache,
-    } = this.props || {};
+    const { questionCache, questionsCache, questionsById, cache, entities, storeCache } = this.props || {};
 
     const roots = [
       questionsById,
@@ -861,9 +826,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     }
 
     // 4) Global runtime caches that might be hydrated elsewhere
-    const w = typeof window !== 'undefined'
-      ? window as SingleQuestionGlobalCacheWindow
-      : undefined;
+    const w = typeof window !== 'undefined' ? (window as SingleQuestionGlobalCacheWindow) : undefined;
     const globals = [
       w?.__SURVEY_CACHE__?.questionsById,
       w?.__SURVEY_CACHE__,
@@ -884,25 +847,24 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       const hit = qMap?.[id];
       out = this.extractOptionsFromCandidate(hit);
       if (out.length) return remember(out);
-    } catch (e) { questionLog.warn('SingleQuestionResponse: fallback', e); }
+    } catch (e) {
+      questionLog.warn('SingleQuestionResponse: fallback', e);
+    }
 
     // 5a) Cross-group last resort: scan all group caches for this id
     try {
       const cross = this.readQuestionEntryAcrossAllGroups(id);
       out = this.extractOptionsFromCandidate(cross);
       if (out.length) return remember(out);
-    } catch (e) { questionLog.warn('SingleQuestionResponse: fallback', e); }
+    } catch (e) {
+      questionLog.warn('SingleQuestionResponse: fallback', e);
+    }
 
     return remember([]);
   };
 
   renderQuestionOnlyView() {
-    const {
-      question = {},
-      mode = 'mini',
-      questionPromptClassName,
-      questionPromptTestId,
-    } = this.props;
+    const { question = {}, mode = 'mini', questionPromptClassName, questionPromptTestId } = this.props;
     const questionRecord = question || {};
 
     // Stable id + URL
@@ -917,28 +879,30 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     const containerClassName = joinClassNames(
       isFullscreen ? styles.fullscreenQuestionContainer : styles.miniQuestionContainer,
       !isFullscreen && styles.clickThrough,
-      this.props.containerClassName
+      this.props.containerClassName,
     );
     const questionBodyClassName = joinClassNames(
       styles.questionTitleBody,
       !hasCardActions && styles.questionTitleBodyNoLinks,
       isFullscreen && styles.questionOnlyFullscreenBody,
-      this.props.bodyClassName
+      this.props.bodyClassName,
     );
     const questionPromptClassNames = joinClassNames(
       styles.questionPromptText,
       isFullscreen && styles.questionPromptTextFullscreen,
-      questionPromptClassName
+      questionPromptClassName,
     );
     const readOnlyAffordanceClassName = joinClassNames(
       styles.questionOnlyAffordance,
-      isFullscreen && styles.questionOnlyAffordanceFullscreen
+      isFullscreen && styles.questionOnlyAffordanceFullscreen,
     );
 
     const openQuestion = () => {
       try {
         window.open(url, '_blank', 'noopener,noreferrer');
-      } catch (e) { questionLog.warn('SingleQuestionResponse: fallback', e); }
+      } catch (e) {
+        questionLog.warn('SingleQuestionResponse: fallback', e);
+      }
     };
 
     const onKeyDown = (e: React.KeyboardEvent) => {
@@ -967,17 +931,20 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
           <span className={buildSingleQuestionReadOnlyBinaryClassName(styles, 'disagree')}>Disagree</span>
         </div>
       );
-
     } else if (type === 'multichoice') {
       const options = this.getMultichoiceOptions(questionRecord) || [];
       affordance = options.length ? (
         <div className={styles.readOnlyMultichoice} aria-hidden="true">
           {options.map((opt: string, idx: number) => (
-            <span key={`${opt}-${idx}`} className={styles.choiceItem}>{opt}</span>
+            <span key={`${opt}-${idx}`} className={styles.choiceItem}>
+              {opt}
+            </span>
           ))}
         </div>
       ) : (
-        <div className={styles.aggregatorText} aria-hidden="true">No options available.</div>
+        <div className={styles.aggregatorText} aria-hidden="true">
+          No options available.
+        </div>
       );
     } else if (type === 'rating') {
       affordance = (
@@ -1034,24 +1001,16 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
             </div>
           )}
           {/* Prompt */}
-          <div
-            className={questionPromptClassNames}
-            data-testid={questionPromptTestId}
-          >
+          <div className={questionPromptClassNames} data-testid={questionPromptTestId}>
             {questionRecord?.prompt || 'Untitled question'}
           </div>
 
           {/* Read-only affordance */}
-          {affordance && (
-            <div className={readOnlyAffordanceClassName}>
-              {affordance}
-            </div>
-          )}
+          {affordance && <div className={readOnlyAffordanceClassName}>{affordance}</div>}
         </CardBody>
       </Card>
     );
   }
-
 
   renderSinglePersonView = (): React.ReactNode => {
     const {
@@ -1064,8 +1023,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       questionOnly,
       compactEncryptedAnswerCta = false,
       stackCompactDecryptCta = false,
-    } =
-      this.props;
+    } = this.props;
     const { miniExpanded, isBookmarked, bookmarkSuccess } = this.state;
 
     // Non-interactive created-question view
@@ -1094,22 +1052,19 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     const finalArweaveTxId = getLegacyArweaveTxId(response) || getLegacyArweaveTxId(question);
     const answer = response.answer || {};
     const additional = response.additional || {};
-    const conviction =
-      response.conviction !== undefined ? response.conviction : response.importance ?? null;
+    const conviction = response.conviction !== undefined ? response.conviction : (response.importance ?? null);
     const normalizedConviction = normalizeRatingValue(conviction, null);
 
     const isAnswerEncrypted = answer.encrypted && answer.value === '*';
     const isAdditionalEncrypted = additional.encrypted && additional.value === '*';
     const isPromptMasked = String(prompt || '').trim() === '[encrypted]';
     const promptDisplay = resolveQuestionPayloadDisplayState(question, this.props.sessionConfig || null);
-    const promptLabel = isPromptMasked ? (promptDisplay.label || prompt) : prompt;
+    const promptLabel = isPromptMasked ? promptDisplay.label || prompt : prompt;
     const shouldMaskVisibleResponseForMaskedPrompt = isPromptMasked && !isAnswerEncrypted;
     const canReloadPrompt = isPromptMasked && !!id && typeof this.props.onReloadQuestionPrompt === 'function';
     const promptReloading = !!this.props.promptReloading;
     const canDecryptThisResponse =
-      !!isOwnResponse ||
-      !!this.props.canDecryptOtherResponses ||
-      responseHasLitSbtRecipient(response);
+      !!isOwnResponse || !!this.props.canDecryptOtherResponses || responseHasLitSbtRecipient(response);
     const promptGateTooltipProps = resolvePromptGateTooltipProps({
       question,
       gateId: this.props.gateId,
@@ -1130,22 +1085,27 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
 
     const renderEncryptedAnswer = () => {
       if (canDecryptThisResponse) {
-        return wrapCompactDecryptCta((
+        return wrapCompactDecryptCta(
           <Button
             onClick={() => this.handleDecryptClick('answer')}
             className={decryptCtaClassName}
             data-testid={E2E_TESTIDS.DECRYPT_ANSWER}
-            data-ce-question-id={String(id || '').trim().toLowerCase()}
+            data-ce-question-id={String(id || '')
+              .trim()
+              .toLowerCase()}
           >
             Decrypt Answer
-          </Button>
-        ), 'answer');
+          </Button>,
+          'answer',
+        );
       }
       return (
         <p
           className={styles.encryptedResponseText}
           data-testid={E2E_TESTIDS.ENCRYPTED_ANSWER_NOTICE}
-          data-ce-question-id={String(id || '').trim().toLowerCase()}
+          data-ce-question-id={String(id || '')
+            .trim()
+            .toLowerCase()}
         >
           This answer is encrypted.
         </p>
@@ -1156,7 +1116,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       <p
         className={styles.encryptedResponseText}
         data-testid={E2E_TESTIDS.ENCRYPTED_ANSWER_NOTICE}
-        data-ce-question-id={String(id || '').trim().toLowerCase()}
+        data-ce-question-id={String(id || '')
+          .trim()
+          .toLowerCase()}
       >
         This response is gated with the question.
       </p>
@@ -1164,24 +1126,27 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
 
     const renderEncryptedAdditional = () => {
       if (canDecryptThisResponse) {
-        return (
-          wrapCompactDecryptCta((
-            <Button
-              onClick={() => this.handleDecryptClick('additional')}
-              className={decryptCtaClassName}
-              data-testid={E2E_TESTIDS.DECRYPT_ADDITIONAL}
-              data-ce-question-id={String(id || '').trim().toLowerCase()}
-            >
-              Decrypt Additional Comments
-            </Button>
-          ), 'additional')
+        return wrapCompactDecryptCta(
+          <Button
+            onClick={() => this.handleDecryptClick('additional')}
+            className={decryptCtaClassName}
+            data-testid={E2E_TESTIDS.DECRYPT_ADDITIONAL}
+            data-ce-question-id={String(id || '')
+              .trim()
+              .toLowerCase()}
+          >
+            Decrypt Additional Comments
+          </Button>,
+          'additional',
         );
       }
       return (
         <p
           className={styles.encryptedResponseText}
           data-testid={E2E_TESTIDS.ENCRYPTED_ADDITIONAL_NOTICE}
-          data-ce-question-id={String(id || '').trim().toLowerCase()}
+          data-ce-question-id={String(id || '')
+            .trim()
+            .toLowerCase()}
         >
           Additional comments are encrypted.
         </p>
@@ -1211,7 +1176,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     const questionBodyClassName = joinClassNames(
       styles.questionTitleBody,
       !hasCardActions && styles.questionTitleBodyNoLinks,
-      this.props.bodyClassName
+      this.props.bodyClassName,
     );
     const cardLinksClassName = joinClassNames(styles.cardLinksContainer, this.props.linksContainerClassName);
     const cardLinkButtonClassName = joinClassNames(styles.cardLinkButton, this.props.iconButtonClassName);
@@ -1240,7 +1205,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                   className={joinClassNames(
                     cardLinkButtonClassName,
                     styles.bookmarkCardLinkButton,
-                    isBookmarked ? styles.bookmarkCardLinkButtonActive : ''
+                    isBookmarked ? styles.bookmarkCardLinkButtonActive : '',
                   )}
                   title={isBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
                 >
@@ -1265,10 +1230,13 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
               )}
               {showMiniExtras && Boolean(id) && (
                 <a
-                  href={externalLink || buildQuestionRoutePath(id, {
-                    responderAddress: responderAddress || '',
-                    sessionSlug: this.resolveGroupSlug(),
-                  })}
+                  href={
+                    externalLink ||
+                    buildQuestionRoutePath(id, {
+                      responderAddress: responderAddress || '',
+                      sessionSlug: this.resolveGroupSlug(),
+                    })
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cardLinkButtonClassName}
@@ -1300,21 +1268,15 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                         </span>
                       ) : (
                         promptLabel
-                      )
+                      ),
                     )}
                   </button>
                 ) : (
-                  wrapMaskedPromptLabel(
-                    <span className={styles.miniPromptAbbrev}>{promptLabel}</span>
-                  )
+                  wrapMaskedPromptLabel(<span className={styles.miniPromptAbbrev}>{promptLabel}</span>)
                 )}
               </div>
               <Button className={styles.miniExpandButton} onClick={this.toggleMiniExpand}>
-                {miniExpanded ? (
-                  <FontAwesomeIcon icon={faChevronUp} />
-                ) : (
-                  <FontAwesomeIcon icon={faChevronDown} />
-                )}
+                {miniExpanded ? <FontAwesomeIcon icon={faChevronUp} /> : <FontAwesomeIcon icon={faChevronDown} />}
               </Button>
             </div>
           )}
@@ -1352,8 +1314,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                               <span>{promptDisplay.busyLabel || 'Decrypting...'}</span>
                             </span>
                           ) : (
-                            (promptLabel || 'Question')
-                          )
+                            promptLabel || 'Question'
+                          ),
                         )}
                       </button>
                     ) : (
@@ -1363,26 +1325,20 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                 </div>
               )}
 
-              {isAnswerEncrypted ? (
-                renderEncryptedAnswer()
-              ) : shouldMaskVisibleResponseForMaskedPrompt ? (
-                renderMaskedPromptResponse()
-              ) : (
-                this.renderAnswerByType(type, answer.value)
-              )}
+              {isAnswerEncrypted
+                ? renderEncryptedAnswer()
+                : shouldMaskVisibleResponseForMaskedPrompt
+                  ? renderMaskedPromptResponse()
+                  : this.renderAnswerByType(type, answer.value)}
 
               {!shouldMaskVisibleResponseForMaskedPrompt && additional && additional.value ? (
                 isAdditionalEncrypted ? (
                   renderEncryptedAdditional()
                 ) : (
                   <div className={styles.additionalCommentsSection}>
-                    <strong className={styles.additionalCommentsLabel}>
-                      Additional Comments:
-                    </strong>
+                    <strong className={styles.additionalCommentsLabel}>Additional Comments:</strong>
                     <p className={styles.additionalCommentsContent}>
-                      {typeof additional.value === 'string'
-                        ? additional.value
-                        : JSON.stringify(additional.value)}
+                      {typeof additional.value === 'string' ? additional.value : JSON.stringify(additional.value)}
                     </p>
                   </div>
                 )
@@ -1410,9 +1366,6 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     );
   };
 
-
-
-
   // Renders the user interface
   render() {
     const { aggregatorResponseMode, question } = this.props;
@@ -1427,7 +1380,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       const questionBodyClassName = joinClassNames(
         styles.questionTitleBody,
         !hasCardActions && styles.questionTitleBodyNoLinks,
-        this.props.bodyClassName
+        this.props.bodyClassName,
       );
       const cardLinksClassName = joinClassNames(styles.cardLinksContainer, this.props.linksContainerClassName);
       const cardLinkButtonClassName = joinClassNames(styles.cardLinkButton, this.props.iconButtonClassName);
@@ -1443,7 +1396,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                     className={joinClassNames(
                       cardLinkButtonClassName,
                       styles.bookmarkCardLinkButton,
-                      isBookmarked ? styles.bookmarkCardLinkButtonActive : ''
+                      isBookmarked ? styles.bookmarkCardLinkButtonActive : '',
                     )}
                     title={isBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
                   >
@@ -1455,7 +1408,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                 )}
                 {Boolean(aggregatorQuestionArweaveTxId) && (
                   <a
-                    href={normalizeArweaveUrl(aggregatorQuestionArweaveTxId, { contextLabel: 'single_question_response_link' })}
+                    href={normalizeArweaveUrl(aggregatorQuestionArweaveTxId, {
+                      contextLabel: 'single_question_response_link',
+                    })}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={cardLinkButtonClassName}
@@ -1501,8 +1456,11 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
           const option = x as SingleQuestionRecord;
           return option.label ?? option.text ?? option.name ?? option.value ?? '';
         };
-        const raw = Array.isArray(value) ? value : (value != null ? [value] : []);
-        const labels = raw.map(toLabel).map((s: unknown) => String(s).trim()).filter(Boolean);
+        const raw = Array.isArray(value) ? value : value != null ? [value] : [];
+        const labels = raw
+          .map(toLabel)
+          .map((s: unknown) => String(s).trim())
+          .filter(Boolean);
         if (!labels.length) {
           return <div className={styles.freeformAnswer}>No answer provided.</div>;
         }
@@ -1526,14 +1484,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
         return (
           <div className={styles.readOnlyRating}>
             <div className={styles.ratingTrack}>
-              <div
-                className={styles.ratingBar}
-                style={resolveSingleQuestionRatingBarStyle(ratingFillPercent)}
-              />
+              <div className={styles.ratingBar} style={resolveSingleQuestionRatingBarStyle(ratingFillPercent)} />
             </div>
-            <span className={styles.ratingValueLabel}>
-              {`${normalizedRatingValue}/${RATING_MAX}`}
-            </span>
+            <span className={styles.ratingValueLabel}>{`${normalizedRatingValue}/${RATING_MAX}`}</span>
           </div>
         );
       }
@@ -1551,11 +1504,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
 
       case 'freeform':
       default:
-        return (
-          <div className={styles.freeformAnswer}>
-            {typeof value === 'string' ? value : JSON.stringify(value)}
-          </div>
-        );
+        return <div className={styles.freeformAnswer}>{typeof value === 'string' ? value : JSON.stringify(value)}</div>;
     }
   };
 }

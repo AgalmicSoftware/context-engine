@@ -63,7 +63,10 @@ export const buildUniqueTagList = (rawTags: unknown = []): string[] => {
 
 export const parseDefaultSbtTags = (value: unknown): string[] => {
   if (typeof value !== 'string' || value.trim().length === 0) return [];
-  return value.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+  return value
+    .split(',')
+    .map((tag: string) => tag.trim())
+    .filter(Boolean);
 };
 
 export const normalizeCreateSbtRestoredTags = (tags: unknown = []): unknown[] => {
@@ -71,19 +74,14 @@ export const normalizeCreateSbtRestoredTags = (tags: unknown = []): unknown[] =>
   return parseDefaultSbtTags(tags);
 };
 
-export const buildCreateSbtTokenTagList = (tags: string[] = []): string[] => (
-  tags.filter((tag) => tag.trim().length > 0)
-);
+export const buildCreateSbtTokenTagList = (tags: string[] = []): string[] =>
+  tags.filter((tag) => tag.trim().length > 0);
 
-export const buildCreateSbtMetadataPreviewTagList = (tags: unknown = []): unknown[] => (
-  (Array.isArray(tags) ? tags : []).filter((tag: unknown) => String(tag || '').trim().length > 0)
-);
+export const buildCreateSbtMetadataPreviewTagList = (tags: unknown = []): unknown[] =>
+  (Array.isArray(tags) ? tags : []).filter((tag: unknown) => String(tag || '').trim().length > 0);
 
-export const buildCreateSbtDocumentIdHashList = (documentIdHashesDraft = ''): string[] => (
-  documentIdHashesDraft.trim().length > 0
-    ? documentIdHashesDraft.split(',').map((docIdHash) => docIdHash.trim())
-    : []
-);
+export const buildCreateSbtDocumentIdHashList = (documentIdHashesDraft = ''): string[] =>
+  documentIdHashesDraft.trim().length > 0 ? documentIdHashesDraft.split(',').map((docIdHash) => docIdHash.trim()) : [];
 
 export const buildCreateSbtCurrentTagInputPatch = ({
   value = '',
@@ -110,10 +108,16 @@ export const buildCreateSbtTagAdditionState = ({
     tags: [...(Array.isArray(tags) ? tags : []), nextTag],
     currentTagInput: '',
     autoAppliedDefaultTags: (Array.isArray(autoAppliedDefaultTags) ? autoAppliedDefaultTags : []).filter(
-      (tag: unknown) => String(tag || '').trim().toLowerCase() !== nextTagLower
+      (tag: unknown) =>
+        String(tag || '')
+          .trim()
+          .toLowerCase() !== nextTagLower,
     ),
     dismissedDefaultTags: (Array.isArray(dismissedDefaultTags) ? dismissedDefaultTags : []).filter(
-      (tag: unknown) => String(tag || '').trim().toLowerCase() !== nextTagLower
+      (tag: unknown) =>
+        String(tag || '')
+          .trim()
+          .toLowerCase() !== nextTagLower,
     ),
     showTagsInput: true,
   };
@@ -135,13 +139,18 @@ export const buildCreateSbtTagRemovalState = ({
   tags?: unknown;
 } = {}): CreateSbtTagRemovalState => {
   const removeIndex = Number(indexToRemove);
-  const removedTagLower = String(removedTag || '').trim().toLowerCase();
+  const removedTagLower = String(removedTag || '')
+    .trim()
+    .toLowerCase();
   const defaultTagLowerSet = new Set<string>(normalizeTagList(defaultTags));
   const currentDismissed = Array.isArray(dismissedDefaultTags) ? dismissedDefaultTags : [];
   return {
     tags: (Array.isArray(tags) ? tags : []).filter((_: unknown, i: number) => i !== removeIndex),
     autoAppliedDefaultTags: (Array.isArray(autoAppliedDefaultTags) ? autoAppliedDefaultTags : []).filter(
-      (tag: unknown) => String(tag || '').trim().toLowerCase() !== removedTagLower
+      (tag: unknown) =>
+        String(tag || '')
+          .trim()
+          .toLowerCase() !== removedTagLower,
     ),
     dismissedDefaultTags: defaultTagLowerSet.has(removedTagLower)
       ? buildUniqueTagList([...currentDismissed, removedTag])
@@ -180,11 +189,16 @@ export const buildCreateSbtRelevantDefaultTagSyncState = ({
   tags?: unknown;
 } = {}): CreateSbtRelevantDefaultTagSyncState => {
   const prevAutoLower = new Set<string>(normalizeTagList(autoAppliedDefaultTags));
-  const nextDismissed = resetDismissed ? [] : (dismissedDefaultTags || []);
+  const nextDismissed = resetDismissed ? [] : dismissedDefaultTags || [];
   const dismissedLower = new Set<string>(normalizeTagList(nextDismissed));
   const currentTags = Array.isArray(tags) ? tags : [];
   const baseTags = currentTags.filter(
-    (tag: unknown) => !prevAutoLower.has(String(tag || '').trim().toLowerCase())
+    (tag: unknown) =>
+      !prevAutoLower.has(
+        String(tag || '')
+          .trim()
+          .toLowerCase(),
+      ),
   );
   const nextTags = buildUniqueTagList(baseTags);
   const currentTagLower = new Set<string>(normalizeTagList(nextTags));
@@ -236,9 +250,7 @@ export const buildCreateSbtRelevantDefaultTagSyncPatch = ({
   showTagsInput,
 });
 
-export const normalizeCreateSbtDocumentUrlDraft = (value: unknown = ''): string => (
-  String(value || '').trim()
-);
+export const normalizeCreateSbtDocumentUrlDraft = (value: unknown = ''): string => String(value || '').trim();
 
 export const buildEffectiveCreateSbtDocumentUrls = ({
   documentURLs = [],
@@ -271,13 +283,8 @@ export const resolveCreateSbtDocumentUrlInputState = ({
   };
 };
 
-export const removeCreateSbtDocumentUrlAtIndex = (
-  documentURLs: unknown = [],
-  indexToRemove: unknown = 0
-): string[] => {
-  const nextDocumentUrls = Array.isArray(documentURLs)
-    ? [...documentURLs]
-    : [];
+export const removeCreateSbtDocumentUrlAtIndex = (documentURLs: unknown = [], indexToRemove: unknown = 0): string[] => {
+  const nextDocumentUrls = Array.isArray(documentURLs) ? [...documentURLs] : [];
   nextDocumentUrls.splice(Number(indexToRemove), 1);
   return nextDocumentUrls as string[];
 };
@@ -286,10 +293,7 @@ export const buildCreateSbtDocumentUrlAdditionPatch = ({
   documentURLs = [],
   documentUrl = '',
 }: BuildCreateSbtDocumentUrlAdditionPatchArgs = {}): Record<string, unknown> => ({
-  documentURLs: [
-    ...(Array.isArray(documentURLs) ? documentURLs : []),
-    String(documentUrl || ''),
-  ],
+  documentURLs: [...(Array.isArray(documentURLs) ? documentURLs : []), String(documentUrl || '')],
   documentUrl: '',
 });
 

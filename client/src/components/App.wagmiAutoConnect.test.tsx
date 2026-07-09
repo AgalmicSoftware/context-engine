@@ -6,7 +6,8 @@ const buildMockConfigureChainsResult = (_chains: unknown[], _providers: unknown[
   provider: {},
   webSocketProvider: { kind: 'configured-websocket-provider' },
 });
-const buildMockJsonRpcProvider = ({ rpc }: { rpc: (chain: any) => { http: string } | null }) => (
+const buildMockJsonRpcProvider =
+  ({ rpc }: { rpc: (chain: any) => { http: string } | null }) =>
   (chain: any) => {
     const rpcConfig = rpc(chain);
     if (!rpcConfig?.http) return null;
@@ -22,8 +23,7 @@ const buildMockJsonRpcProvider = ({ rpc }: { rpc: (chain: any) => { http: string
       },
       provider,
     };
-  }
-);
+  };
 const mockCreateClient = jest.fn(() => ({}));
 const mockConfigureChains = jest.fn(buildMockConfigureChainsResult);
 const mockConnectorsForWallets = jest.fn(() => []);
@@ -67,6 +67,16 @@ type WalletGroup = {
 const MockRoute = (props: any) => {
   routeProps.push(props);
   return null;
+};
+
+const getLatestAppShellElement = () => {
+  const routeElement = routeProps[routeProps.length - 1]?.element;
+  return routeElement?.props?.children || routeElement;
+};
+
+const getFirstAppShellElement = () => {
+  const routeElement = routeProps[0]?.element;
+  return routeElement?.props?.children || routeElement;
 };
 
 const mockAppDependencies = () => {
@@ -245,17 +255,13 @@ describe('App wagmi auto-connect persistence', () => {
 
     loadAppModule();
 
-    expect(mockCreateClient).toHaveBeenCalledWith(
-      expect.objectContaining({ autoConnect: false })
-    );
+    expect(mockCreateClient).toHaveBeenCalledWith(expect.objectContaining({ autoConnect: false }));
   });
 
   it('keeps wagmi autoConnect enabled when disconnect flag is absent', () => {
     loadAppModule();
 
-    expect(mockCreateClient).toHaveBeenCalledWith(
-      expect.objectContaining({ autoConnect: true })
-    );
+    expect(mockCreateClient).toHaveBeenCalledWith(expect.objectContaining({ autoConnect: true }));
   });
 
   it('passes the configured websocket provider through without enabling WalletConnect by default', () => {
@@ -264,7 +270,7 @@ describe('App wagmi auto-connect persistence', () => {
     expect(mockCreateClient).toHaveBeenCalledWith(
       expect.objectContaining({
         webSocketProvider: { kind: 'configured-websocket-provider' },
-      })
+      }),
     );
     expect(mockMetaMaskWalletCreateConnector).not.toHaveBeenCalled();
   });
@@ -279,18 +285,16 @@ describe('App wagmi auto-connect persistence', () => {
     const connectorConfig = wallet.createConnector();
 
     expect(mockMetaMaskWallet).toHaveBeenCalledWith(
-      expect.objectContaining({ chains: expect.any(Array), shimDisconnect: true })
+      expect.objectContaining({ chains: expect.any(Array), shimDisconnect: true }),
     );
     expect(mockMetaMaskWalletCreateConnector).not.toHaveBeenCalled();
     expect(mockMetaMaskConnector).toHaveBeenCalledWith(
       expect.objectContaining({
         chains: expect.any(Array),
         options: { shimDisconnect: true },
-      })
+      }),
     );
-    expect(connectorConfig.connector).toEqual(
-      expect.objectContaining({ id: 'metaMask-injected' })
-    );
+    expect(connectorConfig.connector).toEqual(expect.objectContaining({ id: 'metaMask-injected' }));
   });
 
   it('preserves RainbowKit MetaMask WalletConnect fallback when explicitly enabled', () => {
@@ -327,7 +331,7 @@ describe('App wagmi auto-connect persistence', () => {
         chainId: 11155420,
         providerKey: 'wagmi-primary',
         url: 'https://primary.example',
-      })
+      }),
     );
     expect(mockWrapEthersJsonRpcSend).toHaveBeenNthCalledWith(
       2,
@@ -336,22 +340,16 @@ describe('App wagmi auto-connect persistence', () => {
         chainId: 11155420,
         providerKey: 'wagmi-fallback',
         url: 'https://fallback.example',
-      })
+      }),
     );
   });
 
   it('passes firstVisit to AppShell during the initial render', () => {
     const { default: App } = loadAppModule();
 
-    render(
-      <App
-        params={{}}
-        location={{ search: '', pathname: '/' }}
-        navigate={jest.fn()}
-      />
-    );
+    render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />);
 
-    const mainSiteElement = routeProps[0].element;
+    const mainSiteElement = getFirstAppShellElement();
     expect(mainSiteElement.props.firstVisit).toBe(true);
   });
 
@@ -359,22 +357,16 @@ describe('App wagmi auto-connect persistence', () => {
     const { toastTheme } = require('../utilities/ui/toastTheme.js');
     const { default: App } = loadAppModule();
 
-    render(
-      <App
-        params={{}}
-        location={{ search: '', pathname: '/' }}
-        navigate={jest.fn()}
-      />
-    );
+    render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />);
 
     expect(mockToaster).toHaveBeenCalled();
-    expect((mockToaster.mock.calls[0]?.[0] as any)).toEqual(
+    expect(mockToaster.mock.calls[0]?.[0] as any).toEqual(
       expect.objectContaining({
         position: 'bottom-right',
         toastOptions: {
           style: toastTheme,
         },
-      })
+      }),
     );
   });
 
@@ -382,13 +374,7 @@ describe('App wagmi auto-connect persistence', () => {
     const { default: App } = loadAppModule();
     window.history.replaceState({}, '', '/session/demo?tab=overview');
 
-    render(
-      <App
-        params={{}}
-        location={{ search: '?tab=overview', pathname: '/session/demo' }}
-        navigate={jest.fn()}
-      />
-    );
+    render(<App params={{}} location={{ search: '?tab=overview', pathname: '/session/demo' }} navigate={jest.fn()} />);
 
     expect(mockSyncPublicPageHead).toHaveBeenCalledTimes(1);
     expect(mockSyncPublicPageHead).toHaveBeenCalledWith();
@@ -397,26 +383,14 @@ describe('App wagmi auto-connect persistence', () => {
   it('re-syncs the public page head when the route changes', () => {
     const { default: App } = loadAppModule();
     const navigate = jest.fn();
-    const { rerender } = render(
-      <App
-        params={{}}
-        location={{ search: '', pathname: '/' }}
-        navigate={navigate}
-      />
-    );
+    const { rerender } = render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={navigate} />);
 
     expect(mockSyncPublicPageHead).toHaveBeenCalledTimes(1);
     act(() => {
       window.history.replaceState({}, '', '/session/demo?view=results');
     });
 
-    rerender(
-      <App
-        params={{}}
-        location={{ search: '?view=results', pathname: '/session/demo' }}
-        navigate={navigate}
-      />
-    );
+    rerender(<App params={{}} location={{ search: '?view=results', pathname: '/session/demo' }} navigate={navigate} />);
 
     expect(mockSyncPublicPageHead).toHaveBeenCalledTimes(2);
     expect(mockSyncPublicPageHead).toHaveBeenLastCalledWith();
@@ -425,13 +399,7 @@ describe('App wagmi auto-connect persistence', () => {
   it('re-syncs the public page head after history.replaceState canonicalizes the URL', () => {
     const { default: App } = loadAppModule();
 
-    render(
-      <App
-        params={{}}
-        location={{ search: '', pathname: '/' }}
-        navigate={jest.fn()}
-      />
-    );
+    render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />);
 
     expect(mockSyncPublicPageHead).toHaveBeenCalledTimes(1);
 
@@ -446,21 +414,15 @@ describe('App wagmi auto-connect persistence', () => {
   it('re-renders AppShell with the browser path after direct history.replaceState updates', () => {
     const { default: App } = loadAppModule();
 
-    render(
-      <App
-        params={{}}
-        location={{ search: '', pathname: '/' }}
-        navigate={jest.fn()}
-      />
-    );
+    render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />);
 
-    expect(routeProps[routeProps.length - 1].element.props.path).toBe('/');
+    expect(getLatestAppShellElement().props.path).toBe('/');
 
     act(() => {
       window.history.replaceState({}, '', '/session/demo?view=results');
     });
 
-    expect(routeProps[routeProps.length - 1].element.props.path).toBe('/session/demo');
+    expect(getLatestAppShellElement().props.path).toBe('/session/demo');
   });
 
   it('reuses the cold-load onboarding snapshot on mount', () => {
@@ -472,13 +434,7 @@ describe('App wagmi auto-connect persistence', () => {
 
     const { default: App } = loadAppModule();
 
-    render(
-      <App
-        params={{}}
-        location={{ search: '', pathname: '/' }}
-        navigate={jest.fn()}
-      />
-    );
+    render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />);
 
     expect(mockReadColdLoadOnboardingState).toHaveBeenCalledTimes(1);
     expect(mockReadColdLoadOnboardingState).toHaveBeenCalledWith(window.localStorage, '/session/demo');
@@ -507,17 +463,11 @@ describe('App wagmi auto-connect persistence', () => {
 
     const { default: App } = loadAppModule();
 
-    render(
-      <App
-        params={{}}
-        location={{ search: '', pathname: '/' }}
-        navigate={jest.fn()}
-      />
-    );
+    render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />);
 
     expect(mockReadColdLoadOnboardingState).toHaveBeenNthCalledWith(1, window.localStorage, '/');
     expect(mockReadColdLoadOnboardingState).toHaveBeenNthCalledWith(2, window.sessionStorage, '/');
-    expect(routeProps[0].element.props.firstVisit).toBe(true);
+    expect(getFirstAppShellElement().props.firstVisit).toBe(true);
   });
 
   it('suppresses first-visit redirects when both storage onboarding reads fail', () => {
@@ -527,39 +477,25 @@ describe('App wagmi auto-connect persistence', () => {
 
     const { default: App } = loadAppModule();
 
-    render(
-      <App
-        params={{}}
-        location={{ search: '', pathname: '/' }}
-        navigate={jest.fn()}
-      />
-    );
+    render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />);
 
     expect(mockReadColdLoadOnboardingState).toHaveBeenCalledTimes(2);
-    expect(routeProps[0].element.props.firstVisit).toBe(false);
+    expect(getFirstAppShellElement().props.firstVisit).toBe(false);
     expect(mockStoreDispatch).not.toHaveBeenCalled();
   });
 
   it('mounts App when localStorage getter throws', () => {
-    const localStorageGetterSpy = jest
-      .spyOn(window, 'localStorage', 'get')
-      .mockImplementation(() => {
-        throw new Error('localStorage unavailable');
-      });
+    const localStorageGetterSpy = jest.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new Error('localStorage unavailable');
+    });
 
     try {
       const { default: App } = loadAppModule();
       expect(() =>
-        render(
-          <App
-            params={{}}
-            location={{ search: '', pathname: '/' }}
-            navigate={jest.fn()}
-          />
-        )
+        render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />),
       ).not.toThrow();
       expect(mockCreateClient).toHaveBeenCalledTimes(1);
-      const mainSiteElement = routeProps[0].element;
+      const mainSiteElement = getFirstAppShellElement();
       expect(mainSiteElement.props.firstVisit).toBe(true);
     } finally {
       localStorageGetterSpy.mockRestore();

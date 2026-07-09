@@ -1,6 +1,4 @@
-import {
-  createSurveyResultsLocalStoragePollingRuntime,
-} from './surveyResultsLocalStoragePollingRuntime';
+import { createSurveyResultsLocalStoragePollingRuntime } from './surveyResultsLocalStoragePollingRuntime';
 
 describe('surveyResultsLocalStoragePollingRuntime', () => {
   beforeEach(() => {
@@ -43,10 +41,7 @@ describe('surveyResultsLocalStoragePollingRuntime', () => {
   });
 
   it('resets to the minimum delay after an observed cache change', () => {
-    const pollLocalStorageForUpdates = jest
-      .fn()
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true);
+    const pollLocalStorageForUpdates = jest.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
     const runtime = createSurveyResultsLocalStoragePollingRuntime({
       minDelayMs: 20,
       midDelayMs: 40,

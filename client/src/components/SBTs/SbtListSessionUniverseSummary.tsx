@@ -2,7 +2,7 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import styles from './SBTsList.module.scss';
 
 type ChipLoadingStatus = {
@@ -33,13 +33,8 @@ const SbtListSessionUniverseSummary = ({
   const overflowCount = Math.max(0, summarySlugs.length - previewSlugs.length);
 
   return (
-    <div
-      className={styles.sessionUniverseCollapsedSummary}
-      data-testid={testId}
-    >
-      <span className={styles.sessionUniverseCollapsedLabel}>
-        Selected ({summarySlugs.length})
-      </span>
+    <div className={styles.sessionUniverseCollapsedSummary} data-testid={testId}>
+      <span className={styles.sessionUniverseCollapsedLabel}>Selected ({summarySlugs.length})</span>
       <div className={styles.sessionUniverseCollapsedChips}>
         {previewSlugs.map((slugRaw: string) => {
           const normalized = normalizeSessionSlug(slugRaw || '');
@@ -51,7 +46,9 @@ const SbtListSessionUniverseSummary = ({
           const collapsedChipClass = [
             styles.sessionUniverseCollapsedChip,
             isLoading ? styles.sessionUniverseCollapsedChipLoading : styles.sessionUniverseCollapsedChipLoaded,
-          ].filter(Boolean).join(' ');
+          ]
+            .filter(Boolean)
+            .join(' ');
 
           return (
             <span
@@ -62,9 +59,7 @@ const SbtListSessionUniverseSummary = ({
               title={showCollapsedProgress ? chipLoadingStatus.progressText : undefined}
             >
               <span className={styles.sessionUniverseCollapsedChipBody}>
-                <span className={styles.sessionUniverseCollapsedChipName}>
-                  {sessionLabel}
-                </span>
+                <span className={styles.sessionUniverseCollapsedChipName}>{sessionLabel}</span>
                 {showCollapsedProgress && (
                   <span
                     className={styles.sessionUniverseCollapsedChipProgress}
@@ -89,16 +84,8 @@ const SbtListSessionUniverseSummary = ({
             </span>
           );
         })}
-        {!previewSlugs.length && (
-          <span className={styles.sessionUniverseCollapsedOverflow}>
-            No sessions selected
-          </span>
-        )}
-        {overflowCount > 0 && (
-          <span className={styles.sessionUniverseCollapsedOverflow}>
-            +{overflowCount} more
-          </span>
-        )}
+        {!previewSlugs.length && <span className={styles.sessionUniverseCollapsedOverflow}>No sessions selected</span>}
+        {overflowCount > 0 && <span className={styles.sessionUniverseCollapsedOverflow}>+{overflowCount} more</span>}
       </div>
     </div>
   );

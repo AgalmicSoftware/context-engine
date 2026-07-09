@@ -16,9 +16,7 @@ const UserPageComparePanel = ({
 
   return (
     <Collapse isOpen={collapseOpen}>
-      <Suspense fallback={null}>
-        {children}
-      </Suspense>
+      <Suspense fallback={null}>{children}</Suspense>
     </Collapse>
   );
 };

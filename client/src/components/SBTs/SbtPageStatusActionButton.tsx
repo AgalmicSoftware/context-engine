@@ -1,10 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCheck,
-  faSpinner,
-  faTimes,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SBTPage.module.scss';
 
@@ -39,19 +35,18 @@ const SbtPageStatusActionButton = ({
 
   return (
     <div>
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={className}
-        {...titleProps}
-      >
+      <button onClick={onClick} disabled={disabled} className={className} {...titleProps}>
         {contentState.shouldRenderIdleLabel && contentState.idleLabel}
         {contentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
         {contentState.shouldRenderSuccess && (
-          <>{contentState.successLabel} <FontAwesomeIcon icon={faCheck} /></>
+          <>
+            {contentState.successLabel} <FontAwesomeIcon icon={faCheck} />
+          </>
         )}
         {contentState.shouldRenderFailure && (
-          <>{contentState.failureLabel} <FontAwesomeIcon icon={faTimes} /></>
+          <>
+            {contentState.failureLabel} <FontAwesomeIcon icon={faTimes} />
+          </>
         )}
       </button>
     </div>

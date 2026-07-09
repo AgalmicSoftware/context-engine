@@ -1,12 +1,7 @@
 import React from 'react';
 import { Card, CardBody, CardHeader, Collapse } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faBookmark,
-  faCaretDown,
-  faCaretUp,
-  faComments,
-} from '@fortawesome/free-solid-svg-icons';
+import { faBookmark, faCaretDown, faCaretUp, faComments } from '@fortawesome/free-solid-svg-icons';
 
 type SurveyResultsQuestionSummaryCardProps = {
   bookmarkIconStyle?: React.CSSProperties;
@@ -46,22 +41,14 @@ const SurveyResultsQuestionSummaryCard = ({
   const isFreeform = resolvedQuestionType === 'freeform' || resolvedQuestionType === 'text';
 
   return (
-    <Card
-      id={domId}
-      className={styleMap.aggregatorSummaryCard}
-    >
-      <CardHeader
-        onClick={onToggleSummary}
-        className={styleMap.questionSummaryHeader}
-      >
+    <Card id={domId} className={styleMap.aggregatorSummaryCard}>
+      <CardHeader onClick={onToggleSummary} className={styleMap.questionSummaryHeader}>
         <div className={styleMap.headerLeft}>
           <div className={styleMap.responseCountContainer}>
             <FontAwesomeIcon icon={faComments} className={styleMap.responseCountIcon} />
             <span className={styleMap.responseCountNumber}>{viewableResponsesCount}</span>
           </div>
-          <span className={styleMap.questionTitle}>
-            {questionPrompt}
-          </span>
+          <span className={styleMap.questionTitle}>{questionPrompt}</span>
         </div>
         <div className={styleMap.questionSummaryHeaderIcons}>
           <button
@@ -81,30 +68,18 @@ const SurveyResultsQuestionSummaryCard = ({
               style={bookmarkIconStyle}
             />
           </button>
-          <FontAwesomeIcon
-            icon={isActive ? faCaretUp : faCaretDown}
-            className={styleMap.questionExpandIcon}
-          />
+          <FontAwesomeIcon icon={isActive ? faCaretUp : faCaretDown} className={styleMap.questionExpandIcon} />
         </div>
       </CardHeader>
-      <Collapse
-        isOpen={isActive}
-        id={styleMap.surveyResultsCollapse}
-      >
+      <Collapse isOpen={isActive} id={styleMap.surveyResultsCollapse}>
         <CardBody className={styleMap.aggregatorDarkCardBody}>
-          {metadataMissing && (
-            <p style={metadataMissingStyle}>
-              No metadata found for this question in local cache.
-            </p>
-          )}
+          {metadataMissing && <p style={metadataMissingStyle}>No metadata found for this question in local cache.</p>}
           <div className={styleMap.surveyResultsOverride}>
-            {isFreeform ? (
-              renderFreeformSummary()
-            ) : resolvedQuestionType === 'multichoice' ? (
-              renderMultichoiceSummary()
-            ) : (
-              renderDefaultSummary()
-            )}
+            {isFreeform
+              ? renderFreeformSummary()
+              : resolvedQuestionType === 'multichoice'
+                ? renderMultichoiceSummary()
+                : renderDefaultSummary()}
           </div>
         </CardBody>
       </Collapse>

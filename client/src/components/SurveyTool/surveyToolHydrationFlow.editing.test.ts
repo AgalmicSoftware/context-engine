@@ -20,44 +20,50 @@ describe('surveyToolHydrationFlow editing state', () => {
       additionalComments: {},
     }));
 
-    expect(resolveRevertPendingBaselineSlice({
-      editBaseline: {
-        answers: { q0: { value: 'edit' } },
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
-      isLoggedIn: true,
-      userAnswers: { answer: { value: 'saved' } },
-      buildSliceFromUserAnswers,
-      buildSliceFromLocalCache,
-    })).toEqual({
+    expect(
+      resolveRevertPendingBaselineSlice({
+        editBaseline: {
+          answers: { q0: { value: 'edit' } },
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+        isLoggedIn: true,
+        userAnswers: { answer: { value: 'saved' } },
+        buildSliceFromUserAnswers,
+        buildSliceFromLocalCache,
+      }),
+    ).toEqual({
       answers: { q0: { value: 'edit' } },
       importance: {},
       conviction: {},
       additionalComments: {},
     });
 
-    expect(resolveRevertPendingBaselineSlice({
-      editBaseline: null,
-      isLoggedIn: true,
-      userAnswers: { answer: { value: 'saved' } },
-      buildSliceFromUserAnswers,
-      buildSliceFromLocalCache,
-    })).toEqual({
+    expect(
+      resolveRevertPendingBaselineSlice({
+        editBaseline: null,
+        isLoggedIn: true,
+        userAnswers: { answer: { value: 'saved' } },
+        buildSliceFromUserAnswers,
+        buildSliceFromLocalCache,
+      }),
+    ).toEqual({
       answers: { q1: { value: 'saved' } },
       importance: {},
       conviction: {},
       additionalComments: {},
     });
 
-    expect(resolveRevertPendingBaselineSlice({
-      editBaseline: null,
-      isLoggedIn: true,
-      userAnswers: null,
-      buildSliceFromUserAnswers,
-      buildSliceFromLocalCache,
-    })).toEqual({
+    expect(
+      resolveRevertPendingBaselineSlice({
+        editBaseline: null,
+        isLoggedIn: true,
+        userAnswers: null,
+        buildSliceFromUserAnswers,
+        buildSliceFromLocalCache,
+      }),
+    ).toEqual({
       answers: { q2: { value: 'cached' } },
       importance: {},
       conviction: {},
@@ -66,17 +72,19 @@ describe('surveyToolHydrationFlow editing state', () => {
   });
 
   it('builds revert-pending state patches for the active survey slice', () => {
-    expect(buildRevertPendingStatePatch({
-      prevSurveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
-      surveyIndex: 2,
-      nextSlice: {
-        answers: { q1: { value: 'saved' } },
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
-      isLoggedIn: false,
-    })).toEqual({
+    expect(
+      buildRevertPendingStatePatch({
+        prevSurveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
+        surveyIndex: 2,
+        nextSlice: {
+          answers: { q1: { value: 'saved' } },
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+        isLoggedIn: false,
+      }),
+    ).toEqual({
       surveysResponseState: [
         { answers: { keep: { value: 'persisted' } } },
         {
@@ -116,39 +124,45 @@ describe('surveyToolHydrationFlow editing state', () => {
       additionalComments: {},
     }));
 
-    expect(resolveExitEditingBaselineSlice({
-      responderAddress: '0xdef',
-      parsedViewAddressAnswers: { answer: { value: 'viewed' } },
-      userAnswers: { answer: { value: 'self' } },
-      buildSliceFromUserAnswers,
-      buildSliceFromLocalCache,
-    })).toEqual({
+    expect(
+      resolveExitEditingBaselineSlice({
+        responderAddress: '0xdef',
+        parsedViewAddressAnswers: { answer: { value: 'viewed' } },
+        userAnswers: { answer: { value: 'self' } },
+        buildSliceFromUserAnswers,
+        buildSliceFromLocalCache,
+      }),
+    ).toEqual({
       answers: { q1: { value: 'viewed' } },
       importance: {},
       conviction: {},
       additionalComments: {},
     });
 
-    expect(resolveExitEditingBaselineSlice({
-      responderAddress: '',
-      parsedViewAddressAnswers: { answer: { value: 'viewed' } },
-      userAnswers: { answer: { value: 'self' } },
-      buildSliceFromUserAnswers,
-      buildSliceFromLocalCache,
-    })).toEqual({
+    expect(
+      resolveExitEditingBaselineSlice({
+        responderAddress: '',
+        parsedViewAddressAnswers: { answer: { value: 'viewed' } },
+        userAnswers: { answer: { value: 'self' } },
+        buildSliceFromUserAnswers,
+        buildSliceFromLocalCache,
+      }),
+    ).toEqual({
       answers: { q1: { value: 'self' } },
       importance: {},
       conviction: {},
       additionalComments: {},
     });
 
-    expect(resolveExitEditingBaselineSlice({
-      responderAddress: '',
-      parsedViewAddressAnswers: null,
-      userAnswers: null,
-      buildSliceFromUserAnswers,
-      buildSliceFromLocalCache,
-    })).toEqual({
+    expect(
+      resolveExitEditingBaselineSlice({
+        responderAddress: '',
+        parsedViewAddressAnswers: null,
+        userAnswers: null,
+        buildSliceFromUserAnswers,
+        buildSliceFromLocalCache,
+      }),
+    ).toEqual({
       answers: { q2: { value: 'cached' } },
       importance: {},
       conviction: {},
@@ -164,20 +178,22 @@ describe('surveyToolHydrationFlow editing state', () => {
       fieldKey,
     }));
 
-    expect(buildExitEditingStatePatch({
-      prevSurveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
-      surveyIndex: 2,
-      baselineSlice: {
-        answers: { q1: { value: 'saved' } },
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
-      renderedQuestionIds: ['q1', 'q2'],
-      buildEmptyResponseFieldState,
-      cloneValue,
-      nextSubmittedSinceLastEdit: false,
-    })).toEqual({
+    expect(
+      buildExitEditingStatePatch({
+        prevSurveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
+        surveyIndex: 2,
+        baselineSlice: {
+          answers: { q1: { value: 'saved' } },
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+        renderedQuestionIds: ['q1', 'q2'],
+        buildEmptyResponseFieldState,
+        cloneValue,
+        nextSubmittedSinceLastEdit: false,
+      }),
+    ).toEqual({
       surveysResponseState: [
         { answers: { keep: { value: 'persisted' } } },
         {

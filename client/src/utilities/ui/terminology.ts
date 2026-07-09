@@ -80,7 +80,9 @@ export const DICTIONARIES = Object.freeze({
 
 const MODE: TerminologyMode = (() => {
   const raw = readPublicEnv('REACT_APP_TERMINOLOGY_MODE', 'plain');
-  const normalized = String(raw || '').trim().toLowerCase();
+  const normalized = String(raw || '')
+    .trim()
+    .toLowerCase();
   return normalized === 'crypto' ? 'crypto' : 'plain';
 })();
 

@@ -2,7 +2,7 @@ import { act } from '@testing-library/react';
 import { ethers } from 'ethers';
 
 import CreateSBTGroup from './CreateSBTGroup';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 
 const SBT_FACTORY_RECEIPT_TEST_IFACE = new ethers.utils.Interface([
   'event SBTCreated(address indexed sbtAddress)',
@@ -12,7 +12,7 @@ const SBT_FACTORY_RECEIPT_TEST_IFACE = new ethers.utils.Interface([
 const makeFactoryReceiptLog = (eventName, args) => {
   const encoded = SBT_FACTORY_RECEIPT_TEST_IFACE.encodeEventLog(
     SBT_FACTORY_RECEIPT_TEST_IFACE.getEvent(eventName),
-    args
+    args,
   );
   return {
     address: '0x00000000000000000000000000000000000000fa',
@@ -63,15 +63,10 @@ describe('CreateSBTGroup deterministic deploy payloads', () => {
     const predictedAddress = '0x00000000000000000000000000000000000000f1';
     const deterministicSymbol = `CE-SBT-${ethers.utils.id('deterministic-salt').slice(2, 8).toUpperCase()}`;
     jest.spyOn(contractScripts, 'predictSBTAddress').mockResolvedValue(predictedAddress);
-    const hashSpy = jest
-      .spyOn(contractScripts, 'computeGroupPasswordHash')
-      .mockReturnValue(`0x${'11'.repeat(32)}`);
+    const hashSpy = jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(`0x${'11'.repeat(32)}`);
     const createSpy = jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
       logs: [
-        makeFactoryReceiptLog('SBTCreatedDeterministic', [
-          predictedAddress,
-          ethers.utils.id('deterministic-salt'),
-        ]),
+        makeFactoryReceiptLog('SBTCreatedDeterministic', [predictedAddress, ethers.utils.id('deterministic-salt')]),
       ],
     });
 
@@ -98,7 +93,7 @@ describe('CreateSBTGroup deterministic deploy payloads', () => {
       {
         useConfiguredDeterministic: true,
         initializeGroupPasswordHash: true,
-      }
+      },
     );
   });
 
@@ -192,7 +187,8 @@ describe('CreateSBTGroup deterministic deploy payloads', () => {
       resolveSecondPrediction = resolve;
     });
 
-    const predictSpy = jest.spyOn(contractScripts, 'predictSBTAddress')
+    const predictSpy = jest
+      .spyOn(contractScripts, 'predictSBTAddress')
       .mockImplementationOnce(() => firstPrediction)
       .mockImplementationOnce(() => secondPrediction);
 
@@ -247,9 +243,7 @@ describe('CreateSBTGroup deterministic deploy payloads', () => {
 
     const freshPredictedAddress = '0x00000000000000000000000000000000000000e5';
     const predictSpy = jest.spyOn(contractScripts, 'predictSBTAddress').mockResolvedValue(freshPredictedAddress);
-    const hashSpy = jest
-      .spyOn(contractScripts, 'computeGroupPasswordHash')
-      .mockReturnValue(`0x${'55'.repeat(32)}`);
+    const hashSpy = jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(`0x${'55'.repeat(32)}`);
 
     const payload = await instance.buildDeferredDraftPayload();
 
@@ -290,7 +284,7 @@ describe('CreateSBTGroup deterministic deploy payloads', () => {
 
     instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'test', networkChainId: 84532 }));
     instance._predictedAddressShapeSignature = instance.buildPredictableDeploySignature(
-      instance.buildPredictableDeployShape()
+      instance.buildPredictableDeployShape(),
     );
     const predictSpy = jest.spyOn(contractScripts, 'predictSBTAddress');
     jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(`0x${'44'.repeat(32)}`);
@@ -298,16 +292,18 @@ describe('CreateSBTGroup deterministic deploy payloads', () => {
     const payload = await instance.buildDeferredDraftPayload();
 
     expect(predictSpy).not.toHaveBeenCalled();
-    expect(payload).toEqual(expect.objectContaining({
-      predictedAddress: '0x00000000000000000000000000000000000000d4',
-      displayName: 'Deferred Group',
-      mintModeOnChain: 2,
-      tokenURI: 'ar://metadata',
-      finalGroupPasswordHash: `0x${'44'.repeat(32)}`,
-      createOptions: {
-        useConfiguredDeterministic: true,
-        initializeGroupPasswordHash: true,
-      },
-    }));
+    expect(payload).toEqual(
+      expect.objectContaining({
+        predictedAddress: '0x00000000000000000000000000000000000000d4',
+        displayName: 'Deferred Group',
+        mintModeOnChain: 2,
+        tokenURI: 'ar://metadata',
+        finalGroupPasswordHash: `0x${'44'.repeat(32)}`,
+        createOptions: {
+          useConfiguredDeterministic: true,
+          initializeGroupPasswordHash: true,
+        },
+      }),
+    );
   });
 });

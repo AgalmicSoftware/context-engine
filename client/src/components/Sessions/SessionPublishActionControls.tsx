@@ -1,11 +1,7 @@
 import React from 'react';
 import { Button } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCog,
-  faSpinner,
-  faUpload,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCog, faSpinner, faUpload } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -20,8 +16,7 @@ export type SessionPublishActionExecutionProps = {
   onTogglePublishAdvanced: () => void;
 };
 
-export type SessionPublishActionControlsProps =
-  SessionPublishActionControlsDisplayProps &
+export type SessionPublishActionControlsProps = SessionPublishActionControlsDisplayProps &
   SessionPublishActionExecutionProps;
 
 const SessionPublishActionControls = ({
@@ -29,13 +24,7 @@ const SessionPublishActionControls = ({
   onPublish,
   onTogglePublishAdvanced,
 }: SessionPublishActionControlsProps): React.ReactElement => {
-  const {
-    displayMode,
-    publishBusy,
-    publishButtonDisabled,
-    publishButtonLabel,
-    settingsButtonActive,
-  } = displayState;
+  const { displayMode, publishBusy, publishButtonDisabled, publishButtonLabel, settingsButtonActive } = displayState;
   const isNormalMode = displayMode === 'normal';
   const containerClassName = isNormalMode ? styles.publishActionCluster : styles.publishRow;
   const primaryButtonClassName = isNormalMode ? styles.publishPrimaryButton : styles.primaryButton;

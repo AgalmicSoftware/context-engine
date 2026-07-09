@@ -40,13 +40,10 @@ export const CREATE_SURVEY_FREEFORM_PREVIEW_STYLE: CSSProperties = {
 
 export const buildCreateSurveyTypePillClassName = (
   styleMap: CreateSurveyStyleMap,
-  variant: 'agree' | 'unsure' | 'disagree'
+  variant: 'agree' | 'unsure' | 'disagree',
 ): string => {
-  const variantClassName = variant === 'agree'
-    ? styleMap.pillAgree
-    : variant === 'unsure'
-      ? styleMap.pillUnsure
-      : styleMap.pillDisagree;
+  const variantClassName =
+    variant === 'agree' ? styleMap.pillAgree : variant === 'unsure' ? styleMap.pillUnsure : styleMap.pillDisagree;
   return `${styleMap.pill} ${variantClassName}`;
 };
 
@@ -72,30 +69,24 @@ export const CREATE_SURVEY_ACTION_ICON_STYLE: CSSProperties = {
 export const buildCreateSurveySubmitButtonClassName = (
   styleMap: CreateSurveyStyleMap,
   isSubmitting: unknown,
-  submissionError: unknown
-): string => `${styleMap.createSurveyButton} ${styleMap.submitSurveyBtn} ${isSubmitting ? styleMap.submittingButton : ''} ${submissionError ? styleMap.errorButton : ''}`;
+  submissionError: unknown,
+): string =>
+  `${styleMap.createSurveyButton} ${styleMap.submitSurveyBtn} ${isSubmitting ? styleMap.submittingButton : ''} ${submissionError ? styleMap.errorButton : ''}`;
 
-export const resolveCreateSurveyProgressFillStyle = (
-  progress: unknown
-): CSSProperties => ({
+export const resolveCreateSurveyProgressFillStyle = (progress: unknown): CSSProperties => ({
   width: `${Math.max(0, Math.min(100, Number(progress) || 0))}%`,
 });
 
-export const resolveCreateSurveyQuestionBookmarkStyle = (
-  bookmarked: unknown
-): CSSProperties => ({
+export const resolveCreateSurveyQuestionBookmarkStyle = (bookmarked: unknown): CSSProperties => ({
   color: bookmarked ? '#ffc107' : undefined,
 });
 
-export const resolveCreateSurveyBookmarkSurveyStyle = (
-  bookmarked: unknown
-): CSSProperties => ({
+export const resolveCreateSurveyBookmarkSurveyStyle = (bookmarked: unknown): CSSProperties => ({
   color: bookmarked ? '#ffe082' : undefined,
 });
 
-export const buildCreateSurveyActionLinkClassName = (
-  styleMap: CreateSurveyStyleMap
-): string => `${styleMap.actionBtn} ${styleMap.actionLink}`;
+export const buildCreateSurveyActionLinkClassName = (styleMap: CreateSurveyStyleMap): string =>
+  `${styleMap.actionBtn} ${styleMap.actionLink}`;
 
 export const CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE: CSSProperties = {
   left: '31px',
@@ -126,23 +117,14 @@ export const CREATE_SURVEY_AUTO_TOOL_PANEL_STYLE: CSSProperties = {
 export const buildCreateSurveyProgressStepClassName = (
   styleMap: CreateSurveyStyleMap,
   submitStep: number,
-  step: number
-): string => submitStep >= step ? styleMap.stepCompleted : styleMap.step;
+  step: number,
+): string => (submitStep >= step ? styleMap.stepCompleted : styleMap.step);
 
-export const buildCreateSurveyAiPromptCopyClassName = (
-  styleMap: CreateSurveyStyleMap,
-  copySuccess: unknown
-): string => `${styleMap.aiPromptCopyCorner} ${copySuccess ? styleMap.aiPromptCopyCornerSuccess : ''}`;
+export const buildCreateSurveyAiPromptCopyClassName = (styleMap: CreateSurveyStyleMap, copySuccess: unknown): string =>
+  `${styleMap.aiPromptCopyCorner} ${copySuccess ? styleMap.aiPromptCopyCornerSuccess : ''}`;
 
-export const buildCreateSurveyContainerClassName = (
-  styleMap: CreateSurveyStyleMap,
-  miniaturized: unknown
-): string => `${styleMap.createSurveyContainer} ${miniaturized ? styleMap.miniaturized : ''}`;
+export const buildCreateSurveyContainerClassName = (styleMap: CreateSurveyStyleMap, miniaturized: unknown): string =>
+  `${styleMap.createSurveyContainer} ${miniaturized ? styleMap.miniaturized : ''}`;
 
-export const resolveCreateSurveyToggleKnobStyle = (
-  isStandaloneQuestion: unknown
-): CSSProperties => (
-  isStandaloneQuestion
-    ? CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE
-    : CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE
-);
+export const resolveCreateSurveyToggleKnobStyle = (isStandaloneQuestion: unknown): CSSProperties =>
+  isStandaloneQuestion ? CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE : CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE;

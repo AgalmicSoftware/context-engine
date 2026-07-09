@@ -16,9 +16,9 @@ describe('LazyFallback', () => {
     expect(screen.getByText('Loading Atlas...')).toBeInTheDocument();
     expect(screen.getByText('Preparing map data')).toBeInTheDocument();
     expect(
-      consoleError.mock.calls.some((args) => (
-        args.some((arg) => String(arg).includes('FontAwesomeIcon: Support for defaultProps will be removed'))
-      ))
+      consoleError.mock.calls.some((args) =>
+        args.some((arg) => String(arg).includes('FontAwesomeIcon: Support for defaultProps will be removed')),
+      ),
     ).toBe(false);
   });
 

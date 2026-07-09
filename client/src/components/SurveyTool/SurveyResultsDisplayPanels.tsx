@@ -15,9 +15,7 @@ import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
 import SurveyResultsQuestionSummariesPanel from './SurveyResultsQuestionSummariesPanel';
 import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
-import type {
-  SurveyResultsCacheReadinessDisplayPlan,
-} from './surveyResultsCacheReadinessDisplayPlan';
+import type { SurveyResultsCacheReadinessDisplayPlan } from './surveyResultsCacheReadinessDisplayPlan';
 
 type SurveyResultsEntry = [string, unknown];
 
@@ -27,7 +25,7 @@ export type SurveyResultsDisplayPanelsArgs = {
   activeToggles?: Record<string, unknown>;
   alertMessage?: React.ReactNode;
   applyDecryptedOverrideToResponse: (
-    args: SurveyResultsIndividualDecryptedOverrideArgs
+    args: SurveyResultsIndividualDecryptedOverrideArgs,
   ) => SurveyResultsIndividualAnswerRecord | null;
   cacheReadinessDisplay: SurveyResultsCacheReadinessDisplayPlan;
   currentSurveyId?: string;
@@ -96,93 +94,86 @@ export const renderSurveyResultsDisplayPanels = ({
   trailingLabelStyle,
   viewMode = '',
 }: SurveyResultsDisplayPanelsArgs): React.ReactElement => {
-  const {
-    filterSummaryDisplay,
-    questionListDisplay,
-  } = cacheReadinessDisplay;
+  const { filterSummaryDisplay, questionListDisplay } = cacheReadinessDisplay;
 
   return (
-  <>
-    <SurveyResultsStatusMessages
-      alertMessage={alertMessage}
-      filterLoading={filterLoading}
-      styleMap={styleMap}
-    />
+    <>
+      <SurveyResultsStatusMessages alertMessage={alertMessage} filterLoading={filterLoading} styleMap={styleMap} />
 
-    {viewMode === 'survey' && (
-      <SurveyResultsSurveyViewModeToggle
-        isAggregate={surveyViewMode === 'aggregate'}
-        knobStyle={toggleKnobStyle}
-        onKeyDown={onSurveyViewModeKeyDown}
-        onToggle={onSurveyViewModeToggle}
+      {viewMode === 'survey' && (
+        <SurveyResultsSurveyViewModeToggle
+          isAggregate={surveyViewMode === 'aggregate'}
+          knobStyle={toggleKnobStyle}
+          onKeyDown={onSurveyViewModeKeyDown}
+          onToggle={onSurveyViewModeToggle}
+          styleMap={styleMap}
+          trailingLabelStyle={trailingLabelStyle}
+        />
+      )}
+
+      {lockedResponsesBannerNode}
+
+      <SurveyResultsQuestionListPanel
+        activeQuestionToggles={activeQuestionToggles}
+        onToggleQuestionList={onToggleQuestionList}
+        questionListDisplay={questionListDisplay}
+        renderQuestionTable={renderQuestionTable}
         styleMap={styleMap}
+        surveyViewMode={surveyViewMode}
+        tableWrapperRef={tableWrapperRef}
         trailingLabelStyle={trailingLabelStyle}
+        viewMode={viewMode}
       />
-    )}
 
-    {lockedResponsesBannerNode}
+      <SurveyResultsFilterSummary
+        displayedTotalQuestionsCount={filterSummaryDisplay.displayedTotalQuestionsCount ?? 0}
+        displayedTotalResponsesCount={filterSummaryDisplay.displayedTotalResponsesCount ?? 0}
+        normalizedFilteredQuestionsCount={filterSummaryDisplay.normalizedFilteredQuestionsCount ?? 0}
+        normalizedFilteredResponsesCount={filterSummaryDisplay.normalizedFilteredResponsesCount ?? 0}
+        showFilteredCountSpinner={!!filterSummaryDisplay.showFilteredCountSpinner}
+      />
 
-    <SurveyResultsQuestionListPanel
-      activeQuestionToggles={activeQuestionToggles}
-      onToggleQuestionList={onToggleQuestionList}
-      questionListDisplay={questionListDisplay}
-      renderQuestionTable={renderQuestionTable}
-      styleMap={styleMap}
-      surveyViewMode={surveyViewMode}
-      tableWrapperRef={tableWrapperRef}
-      trailingLabelStyle={trailingLabelStyle}
-      viewMode={viewMode}
-    />
+      {filterControlsNode}
 
-    <SurveyResultsFilterSummary
-      displayedTotalQuestionsCount={filterSummaryDisplay.displayedTotalQuestionsCount ?? 0}
-      displayedTotalResponsesCount={filterSummaryDisplay.displayedTotalResponsesCount ?? 0}
-      normalizedFilteredQuestionsCount={filterSummaryDisplay.normalizedFilteredQuestionsCount ?? 0}
-      normalizedFilteredResponsesCount={filterSummaryDisplay.normalizedFilteredResponsesCount ?? 0}
-      showFilteredCountSpinner={!!filterSummaryDisplay.showFilteredCountSpinner}
-    />
+      {viewMode === 'survey' && surveyViewMode === 'individuals' && (
+        <SurveyResultsIndividualResponsesList
+          activeToggles={activeToggles}
+          currentSurveyId={currentSurveyId}
+          effectiveSlug={effectiveSlug}
+          filterLoading={filterLoading}
+          onToggleResponse={onToggleResponse}
+          renderResponseBody={(response: SurveyResultsIndividualResponseListEntry) => (
+            <SurveyResultsIndividualResponseBody
+              account={account}
+              applyDecryptedOverrideToResponse={applyDecryptedOverrideToResponse}
+              currentSurveyId={currentSurveyId}
+              effectiveSlug={effectiveSlug}
+              getFallbackQuestion={getFallbackQuestion}
+              getLockedResponseKey={getLockedResponseKey}
+              getResponseCardProps={getResponseCardProps}
+              network={network}
+              preNetworkQuestions={preNetworkQuestions}
+              questionResponsesNonce={questionResponsesNonce}
+              questionsCacheNonce={questionsCacheNonce}
+              response={response}
+              sbtCacheRevision={sbtCacheRevision}
+              styleMap={styleMap}
+            />
+          )}
+          responses={responses}
+          styleMap={styleMap}
+        />
+      )}
 
-    {filterControlsNode}
-
-    {viewMode === 'survey' && surveyViewMode === 'individuals' && (
-      <SurveyResultsIndividualResponsesList
-        activeToggles={activeToggles}
-        currentSurveyId={currentSurveyId}
-        effectiveSlug={effectiveSlug}
+      <SurveyResultsQuestionSummariesPanel
         filterLoading={filterLoading}
-        onToggleResponse={onToggleResponse}
-        renderResponseBody={(response: SurveyResultsIndividualResponseListEntry) => (
-          <SurveyResultsIndividualResponseBody
-            account={account}
-            applyDecryptedOverrideToResponse={applyDecryptedOverrideToResponse}
-            currentSurveyId={currentSurveyId}
-            effectiveSlug={effectiveSlug}
-            getFallbackQuestion={getFallbackQuestion}
-            getLockedResponseKey={getLockedResponseKey}
-            getResponseCardProps={getResponseCardProps}
-            network={network}
-            preNetworkQuestions={preNetworkQuestions}
-            questionResponsesNonce={questionResponsesNonce}
-            questionsCacheNonce={questionsCacheNonce}
-            response={response}
-            sbtCacheRevision={sbtCacheRevision}
-            styleMap={styleMap}
-          />
-        )}
-        responses={responses}
+        questionModeEntries={questionModeEntries}
+        renderQuestionSummary={renderQuestionSummary}
         styleMap={styleMap}
+        surveyAggregateEntries={surveyAggregateEntries}
+        surveyViewMode={surveyViewMode}
+        viewMode={viewMode}
       />
-    )}
-
-    <SurveyResultsQuestionSummariesPanel
-      filterLoading={filterLoading}
-      questionModeEntries={questionModeEntries}
-      renderQuestionSummary={renderQuestionSummary}
-      styleMap={styleMap}
-      surveyAggregateEntries={surveyAggregateEntries}
-      surveyViewMode={surveyViewMode}
-      viewMode={viewMode}
-    />
-  </>
+    </>
   );
 };

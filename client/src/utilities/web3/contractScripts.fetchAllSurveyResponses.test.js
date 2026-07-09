@@ -32,7 +32,7 @@ jest.mock('./rpcProviders.js', () => {
 });
 
 const { ethers } = require('ethers');
-const contractScriptsBarrel = require('./contractScripts.js');
+const contractScriptsBarrel = require('./chainGateway.js');
 
 const contractScripts = contractScriptsBarrel.default;
 const { isRetryableSurveyResponseReadError } = contractScriptsBarrel.__test__contractScriptsErrors;
@@ -59,10 +59,11 @@ const RESPONSES_SUBMITTED_IFACE = new ethers.utils.Interface([
 ]);
 
 const makeResponsesSubmittedLog = (responder, blockNumber, logIndex = 0) => {
-  const encoded = RESPONSES_SUBMITTED_IFACE.encodeEventLog(
-    RESPONSES_SUBMITTED_IFACE.getEvent('ResponsesSubmitted'),
-    [responder, [QUESTION_ID], SURVEY_ID]
-  );
+  const encoded = RESPONSES_SUBMITTED_IFACE.encodeEventLog(RESPONSES_SUBMITTED_IFACE.getEvent('ResponsesSubmitted'), [
+    responder,
+    [QUESTION_ID],
+    SURVEY_ID,
+  ]);
   return {
     address: GROUP_CFG.contracts.surveys.address,
     blockNumber,
@@ -86,25 +87,19 @@ const makeResponseReadError = (message, extra = {}) => {
 };
 
 describe('isRetryableSurveyResponseReadError', () => {
-  it.each([402, 408, 429, 500, 502, 503, 504])(
-    'treats status %s as retryable',
-    (status) => {
-      expect(isRetryableSurveyResponseReadError(makeResponseReadError(`status ${status}`, { status }))).toBe(true);
-    }
-  );
+  it.each([402, 408, 429, 500, 502, 503, 504])('treats status %s as retryable', (status) => {
+    expect(isRetryableSurveyResponseReadError(makeResponseReadError(`status ${status}`, { status }))).toBe(true);
+  });
 
-  it.each([401, 403])(
-    'treats status %s as terminal',
-    (status) => {
-      expect(isRetryableSurveyResponseReadError(makeResponseReadError(`status ${status}`, { status }))).toBe(false);
-    }
-  );
+  it.each([401, 403])('treats status %s as terminal', (status) => {
+    expect(isRetryableSurveyResponseReadError(makeResponseReadError(`status ${status}`, { status }))).toBe(false);
+  });
 
   it.each([402, 'NETWORK_ERROR', 'TIMEOUT', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT'])(
     'treats code %s as retryable',
     (code) => {
       expect(isRetryableSurveyResponseReadError(makeResponseReadError(`code ${code}`, { code }))).toBe(true);
-    }
+    },
   );
 
   it('treats nested error.code 503 as retryable', () => {
@@ -112,8 +107,8 @@ describe('isRetryableSurveyResponseReadError', () => {
       isRetryableSurveyResponseReadError(
         makeResponseReadError('', {
           error: { code: 503 },
-        })
-      )
+        }),
+      ),
     ).toBe(true);
   });
 
@@ -122,21 +117,16 @@ describe('isRetryableSurveyResponseReadError', () => {
       isRetryableSurveyResponseReadError(
         makeResponseReadError('', {
           error: { statusCode: 429 },
-        })
-      )
+        }),
+      ),
     ).toBe(true);
   });
 
-  it.each([
-    'ECONNREFUSED',
-    'connection refused',
-    'connection reset',
-    'socket hang up',
-  ])(
+  it.each(['ECONNREFUSED', 'connection refused', 'connection reset', 'socket hang up'])(
     'treats %s messages as retryable',
     (message) => {
       expect(isRetryableSurveyResponseReadError(makeResponseReadError(message))).toBe(true);
-    }
+    },
   );
 
   it.each([
@@ -145,12 +135,9 @@ describe('isRetryableSurveyResponseReadError', () => {
     ['nested error.message connection reset', { error: { message: 'connection reset' } }, true],
     ['nested error.message quota exceeded', { error: { message: 'quota exceeded' } }, true],
     ['reason invalid response data', { reason: 'invalid response data' }, false],
-  ])(
-    'treats %s according to the nested error shape',
-    (_label, extra, expected) => {
-      expect(isRetryableSurveyResponseReadError(makeResponseReadError('', extra))).toBe(expected);
-    }
-  );
+  ])('treats %s according to the nested error shape', (_label, extra, expected) => {
+    expect(isRetryableSurveyResponseReadError(makeResponseReadError('', extra))).toBe(expected);
+  });
 
   it('treats Arweave cooldown metadata as retryable', () => {
     expect(
@@ -159,8 +146,8 @@ describe('isRetryableSurveyResponseReadError', () => {
           arweaveFailure: {
             kind: 'cooldown',
           },
-        })
-      )
+        }),
+      ),
     ).toBe(true);
   });
 
@@ -169,8 +156,8 @@ describe('isRetryableSurveyResponseReadError', () => {
       isRetryableSurveyResponseReadError(
         makeResponseReadError('request aborted', {
           name: 'AbortError',
-        })
-      )
+        }),
+      ),
     ).toBe(false);
   });
 });
@@ -221,17 +208,11 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       answer: responder.slice(-4),
     }));
 
-    const result = await contractScripts.fetchAllSurveyResponses(
-      'none',
-      SURVEY_ID,
-      1,
-      30,
-      GROUP_CFG
-    );
+    const result = await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 30, GROUP_CFG);
 
     expect(mockGetReadProviderForGroup).toHaveBeenCalledWith(
       expect.objectContaining({ slug: GROUP_CFG.slug }),
-      expect.objectContaining({ contractKey: 'surveys' })
+      expect.objectContaining({ contractKey: 'surveys' }),
     );
     expect(mockGetReadProviderForChain).not.toHaveBeenCalled();
     expect(mockFetchLogsSmartWithProvider).toHaveBeenCalledWith(
@@ -240,7 +221,7 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
         address: GROUP_CFG.contracts.surveys.address,
       }),
       1,
-      30
+      30,
     );
     expect(result.hadPartialFailure).toBe(false);
     expect(result.lowestFailedBlock).toBeNull();
@@ -274,11 +255,12 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       makeResponsesSubmittedLog(responderB, 9, 1),
     ]);
 
-    jest.spyOn(contractScripts, 'getSurveyResponse').mockImplementation((_providerName, responder) => (
-      new Promise((resolve) => {
-        pendingReads.set(String(responder).toLowerCase(), resolve);
-      })
-    ));
+    jest.spyOn(contractScripts, 'getSurveyResponse').mockImplementation(
+      (_providerName, responder) =>
+        new Promise((resolve) => {
+          pendingReads.set(String(responder).toLowerCase(), resolve);
+        }),
+    );
 
     const run = contractScripts.getSurveyResponses('none', 1, 30, GROUP_CFG);
     await Promise.resolve();
@@ -298,24 +280,16 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
 
   it('threads forced Arweave recovery into chunked question response reads', async () => {
     const responder = '0x00000000000000000000000000000000000000aa';
-    mockFetchLogsSmartWithProvider.mockResolvedValue([
-      makeResponsesSubmittedLog(responder, 7, 0),
-    ]);
+    mockFetchLogsSmartWithProvider.mockResolvedValue([makeResponsesSubmittedLog(responder, 7, 0)]);
 
     const getResponseSpy = jest.spyOn(contractScripts, 'getResponse').mockResolvedValue({
       answer: 'recovered',
     });
     const onPartialData = jest.fn();
 
-    await contractScripts.getQuestionResponsesChunkedWithCallback(
-      'none',
-      1,
-      30,
-      null,
-      onPartialData,
-      GROUP_CFG,
-      { forceArweaveFetch: true }
-    );
+    await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 30, null, onPartialData, GROUP_CFG, {
+      forceArweaveFetch: true,
+    });
 
     expect(getResponseSpy).toHaveBeenCalledWith(
       'none',
@@ -325,7 +299,7 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       expect.objectContaining({
         _resolvedCfg: expect.objectContaining({ slug: GROUP_CFG.slug }),
         forceArweaveFetch: true,
-      })
+      }),
     );
     expect(onPartialData).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -337,7 +311,7 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
           }),
         ],
       }),
-      30
+      30,
     );
   });
 
@@ -349,37 +323,27 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       makeResponsesSubmittedLog(responderB, 9, 1),
     ]);
 
-    const getSurveyResponseSpy = jest.spyOn(contractScripts, 'getSurveyResponse').mockImplementation(async (_providerName, responder) => {
-      if (responder === responderB) {
-        throw makeResponseReadError('Invalid response JSON for tx bad-payload', {
-          retryable: false,
-          state: 'terminal_invalid',
-          kind: 'invalid',
-          arweaveFailure: {
+    const getSurveyResponseSpy = jest
+      .spyOn(contractScripts, 'getSurveyResponse')
+      .mockImplementation(async (_providerName, responder) => {
+        if (responder === responderB) {
+          throw makeResponseReadError('Invalid response JSON for tx bad-payload', {
             retryable: false,
             state: 'terminal_invalid',
             kind: 'invalid',
-          },
-        });
-      }
-      return { answer: 'kept' };
-    });
+            arweaveFailure: {
+              retryable: false,
+              state: 'terminal_invalid',
+              kind: 'invalid',
+            },
+          });
+        }
+        return { answer: 'kept' };
+      });
 
-    const result = await contractScripts.fetchAllSurveyResponses(
-      'none',
-      SURVEY_ID,
-      1,
-      30,
-      GROUP_CFG
-    );
+    const result = await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 30, GROUP_CFG);
 
-    expect(getSurveyResponseSpy).toHaveBeenCalledWith(
-      'none',
-      responderB,
-      SURVEY_ID,
-      GROUP_CFG,
-      { throwOnError: true }
-    );
+    expect(getSurveyResponseSpy).toHaveBeenCalledWith('none', responderB, SURVEY_ID, GROUP_CFG, { throwOnError: true });
     expect(result.responses).toEqual([
       expect.objectContaining({
         responder: responderA,
@@ -399,30 +363,20 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       makeResponsesSubmittedLog(responderB, 9, 1),
     ]);
 
-    const getSurveyResponseSpy = jest.spyOn(contractScripts, 'getSurveyResponse').mockImplementation(async (_providerName, responder) => {
-      if (responder === responderB) {
-        throw makeResponseReadError('request aborted', {
-          name: 'AbortError',
-        });
-      }
-      return { answer: 'kept' };
-    });
+    const getSurveyResponseSpy = jest
+      .spyOn(contractScripts, 'getSurveyResponse')
+      .mockImplementation(async (_providerName, responder) => {
+        if (responder === responderB) {
+          throw makeResponseReadError('request aborted', {
+            name: 'AbortError',
+          });
+        }
+        return { answer: 'kept' };
+      });
 
-    const result = await contractScripts.fetchAllSurveyResponses(
-      'none',
-      SURVEY_ID,
-      1,
-      30,
-      GROUP_CFG
-    );
+    const result = await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 30, GROUP_CFG);
 
-    expect(getSurveyResponseSpy).toHaveBeenCalledWith(
-      'none',
-      responderB,
-      SURVEY_ID,
-      GROUP_CFG,
-      { throwOnError: true }
-    );
+    expect(getSurveyResponseSpy).toHaveBeenCalledWith('none', responderB, SURVEY_ID, GROUP_CFG, { throwOnError: true });
     expect(result.responses).toEqual([
       expect.objectContaining({
         responder: responderA,
@@ -451,13 +405,7 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       return { answer: 'kept' };
     });
 
-    const result = await contractScripts.fetchAllSurveyResponses(
-      'none',
-      SURVEY_ID,
-      1,
-      30,
-      GROUP_CFG
-    );
+    const result = await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 30, GROUP_CFG);
 
     expect(result.responses).toEqual([
       expect.objectContaining({
@@ -499,13 +447,7 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       return { answer: 'kept' };
     });
 
-    const result = await contractScripts.fetchAllSurveyResponses(
-      'none',
-      SURVEY_ID,
-      1,
-      30,
-      GROUP_CFG
-    );
+    const result = await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 30, GROUP_CFG);
 
     expect(result.responses).toEqual([
       expect.objectContaining({
@@ -535,13 +477,7 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       return { answer: 'kept' };
     });
 
-    const result = await contractScripts.fetchAllSurveyResponses(
-      'none',
-      SURVEY_ID,
-      1,
-      30,
-      GROUP_CFG
-    );
+    const result = await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 30, GROUP_CFG);
 
     expect(result.responses).toEqual([
       expect.objectContaining({

@@ -21,7 +21,7 @@ import {
   buildLitChipotlePolicy,
   buildLitChipotleWrappedPlaintext,
   fingerprintLitChipotlePolicy,
-} from '../../client/src/utilities/crypto/litChipotlePolicy.js';
+} from './litChipotlePolicyCore.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ethersUtils = ethers?.utils || ethers;

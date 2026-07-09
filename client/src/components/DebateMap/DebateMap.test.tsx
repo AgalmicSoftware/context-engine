@@ -43,8 +43,8 @@ jest.mock('react-router-dom', () => {
 });
 
 jest.mock('../Shared/AudioInput/AudioInput', () => () => <div data-testid="atlas-audio-input" />);
-jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../../utilities/arweave/arweaveClient.js', () => ({
+  arweaveClient: {
     uploadDataToArweave: jest.fn(),
   },
 }));
@@ -163,20 +163,17 @@ const parseHistoricalVote = (vote: any) => {
   const parsedVote = parseInt(vote, 10);
   return Number.isNaN(parsedVote) ? null : parsedVote;
 };
-const getQuadrantKey = (point: any) => (
-  `${point.y > 0.5 ? 'top' : 'bottom'}-${point.x > 0.5 ? 'right' : 'left'}`
-);
-const getVoteEntriesForNode = (nodeId: string) => (
+const getQuadrantKey = (point: any) => `${point.y > 0.5 ? 'top' : 'bottom'}-${point.x > 0.5 ? 'right' : 'left'}`;
+const getVoteEntriesForNode = (nodeId: string) =>
   Object.entries(historicalFigureDataFixture || {}).reduce((entries: any[], [username, figure]: [string, any]) => {
     const parsedVote = parseHistoricalVote(figure?.votes?.[nodeId]);
     if (!Number.isFinite(parsedVote)) return entries;
     return entries.concat({ username, value: parsedVote });
-  }, [] as any[])
-);
+  }, [] as any[]);
 const getAtlasNodeLabel = (label: string): HTMLElement => {
-  const labelElement = screen.getAllByText(label).find((element) => (
-    String(element.className || '').includes('nodeLabel')
-  ));
+  const labelElement = screen
+    .getAllByText(label)
+    .find((element) => String(element.className || '').includes('nodeLabel'));
   if (!labelElement) throw new Error(`Missing atlas node label: ${label}`);
   return labelElement;
 };
@@ -186,24 +183,23 @@ const getAtlasNodeDiameter = (label: string) => {
   if (!dotElement) throw new Error(`Missing atlas node dot: ${label}`);
   return parseFloat((dotElement as HTMLElement).style.width);
 };
-const getAtlasNodeElementById = (nodeId: string, layout = ''): HTMLElement | undefined => (
-  screen.getAllByTestId(E2E_TESTIDS.ATLAS_NODE).find((element) => (
-    element.getAttribute('data-ce-node-id') === nodeId
-      && (!layout || element.getAttribute('data-ce-node-layout') === layout)
-  ))
-);
+const getAtlasNodeElementById = (nodeId: string, layout = ''): HTMLElement | undefined =>
+  screen
+    .getAllByTestId(E2E_TESTIDS.ATLAS_NODE)
+    .find(
+      (element) =>
+        element.getAttribute('data-ce-node-id') === nodeId &&
+        (!layout || element.getAttribute('data-ce-node-layout') === layout),
+    );
 const getDebateViewModeButton = (mode: string): HTMLElement => {
-  const button = screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE).find((element) => (
-    element.getAttribute('data-ce-view-mode') === mode
-  ));
+  const button = screen
+    .getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE)
+    .find((element) => element.getAttribute('data-ce-view-mode') === mode);
   if (!button) throw new Error(`Missing debate view mode button: ${mode}`);
   return button;
 };
-const getPackedNodeLabel = (label: string): HTMLElement | undefined => (
-  screen.getAllByText(label).find((element) => (
-    String(element.className || '').includes('packedNodeLabel')
-  ))
-);
+const getPackedNodeLabel = (label: string): HTMLElement | undefined =>
+  screen.getAllByText(label).find((element) => String(element.className || '').includes('packedNodeLabel'));
 const getAtlasNodeDiameterById = (nodeId: string, layout = '') => {
   const nodeElement = getAtlasNodeElementById(nodeId, layout);
   if (!nodeElement) throw new Error(`Missing atlas node: ${nodeId}`);
@@ -216,10 +212,10 @@ const deceptiveAlignmentNodeId = '0x11100000000000000000000000000000000000000000
 const liabilityFrameworksNodeId = '0x3140000000000000000000000000000000000000000000000000000000000000';
 
 const getHistoricalCaseForNode = (nodeId: string) => {
-  const matchedCase = (Array.isArray(loopholeHistoricalCasesFixture) ? loopholeHistoricalCasesFixture : []).find((historicalCase: any) => (
-    Array.isArray(historicalCase?.debate_map_issues)
-      && historicalCase.debate_map_issues.includes(nodeId)
-  ));
+  const matchedCase = (Array.isArray(loopholeHistoricalCasesFixture) ? loopholeHistoricalCasesFixture : []).find(
+    (historicalCase: any) =>
+      Array.isArray(historicalCase?.debate_map_issues) && historicalCase.debate_map_issues.includes(nodeId),
+  );
 
   if (!matchedCase) {
     throw new Error(`Expected a historical case fixture for node ${nodeId}.`);
@@ -228,25 +224,26 @@ const getHistoricalCaseForNode = (nodeId: string) => {
   return matchedCase;
 };
 
-const renderDemoAtlasNode = (nodeId: string) => render(
-  <MemoryRouter initialEntries={[`/atlas/${nodeId}`]}>
-    <Routes>
-      <Route
-        path="/atlas/:nodeId"
-        element={(
-          <DebateMapComponent
-            account=""
-            provider=""
-            network={{ id: 84532 }}
-            activeSessionSlug=""
-            toggleLoginModal={jest.fn()}
-            demoMode={true}
-          />
-        )}
-      />
-    </Routes>
-  </MemoryRouter>
-);
+const renderDemoAtlasNode = (nodeId: string) =>
+  render(
+    <MemoryRouter initialEntries={[`/atlas/${nodeId}`]}>
+      <Routes>
+        <Route
+          path="/atlas/:nodeId"
+          element={
+            <DebateMapComponent
+              account=""
+              provider=""
+              network={{ id: 84532 }}
+              activeSessionSlug=""
+              toggleLoginModal={jest.fn()}
+              demoMode={true}
+            />
+          }
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
 
 const getAtlasModalContent = (headingName: string | RegExp): HTMLElement => {
   const heading = screen.getByRole('heading', { name: headingName });
@@ -294,7 +291,7 @@ describe('DebateMap', () => {
           activeSessionSlug=""
           toggleLoginModal={jest.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByRole('heading', { name: /^Debate Map$/i })).toBeInTheDocument();
@@ -311,10 +308,12 @@ describe('DebateMap', () => {
           activeSessionSlug=""
           toggleLoginModal={jest.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed')).toBeTruthy();
+    expect(
+      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed'),
+    ).toBeTruthy();
   });
 
   it('ignores wrong-shaped bookmark storage before rendering bookmarkable list nodes', async () => {
@@ -329,7 +328,7 @@ describe('DebateMap', () => {
           activeSessionSlug=""
           toggleLoginModal={jest.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(getDebateViewModeButton('list'));
@@ -342,7 +341,9 @@ describe('DebateMap', () => {
 
   it('builds stable keys for reorderable atlas and list items', () => {
     expect(getDebateNodeStableKeyAny({ id: 'node-id', name: 'Name' }, 'fallback')).toBe('node-id');
-    expect(getDebateNodeStableKeyAny({ name: 'Name', parentPath: [{ name: 'Parent' }] }, 'fallback')).toBe('Parent/Name');
+    expect(getDebateNodeStableKeyAny({ name: 'Name', parentPath: [{ name: 'Parent' }] }, 'fallback')).toBe(
+      'Parent/Name',
+    );
     expect(getDebateNodeStableKeyAny({ name: 'Name' }, 'fallback')).toBe('Name');
     expect(getDebateNodeStableKeyAny({}, 'fallback')).toBe('fallback');
     expect(getDebateNodeListStableKeysAny([{ name: 'Name' }, { name: 'Name' }], 'top-node')).toEqual([
@@ -351,61 +352,63 @@ describe('DebateMap', () => {
     ]);
     expect(getDebateQuestionStableKeyAny({ id: 'q1', prompt: 'Prompt' }, 'fallback')).toBe('q1');
     expect(getDebateQuestionStableKeyAny({ prompt: 'Prompt' }, 'fallback')).toBe('fallback:Prompt');
-    expect(getDebateQuestionListStableKeysAny([
-      { prompt: 'Same prompt' },
-      { prompt: 'Same prompt' },
-      { id: 'q3', prompt: 'Same prompt' },
-    ], 'question-card')).toEqual([
-      'question-card:Same prompt',
-      'question-card:Same prompt:2',
-      'q3',
-    ]);
-    expect(getDebateTagStableKeysAny(['tax', 'Tax', 'energy'])).toEqual([
-      'tag:tax',
-      'tag:Tax:2',
-      'tag:energy',
-    ]);
+    expect(
+      getDebateQuestionListStableKeysAny(
+        [{ prompt: 'Same prompt' }, { prompt: 'Same prompt' }, { id: 'q3', prompt: 'Same prompt' }],
+        'question-card',
+      ),
+    ).toEqual(['question-card:Same prompt', 'question-card:Same prompt:2', 'q3']);
+    expect(getDebateTagStableKeysAny(['tax', 'Tax', 'energy'])).toEqual(['tag:tax', 'tag:Tax:2', 'tag:energy']);
 
-    expect(getAtlasLinkStableKeyAny({
-      sourceId: 'source-id',
-      targetId: 'target-id',
-      source: { x: 1, y: 2 },
-      target: { x: 3, y: 4 },
-    }, 0)).toBe('source-id->target-id');
-    expect(getAtlasLinkStableKeyAny({
-      source: { x: 1, y: 2 },
-      target: { x: 3, y: 4 },
-    }, 7)).toBe('coords:1.000:2.000:3.000:4.000:7');
+    expect(
+      getAtlasLinkStableKeyAny(
+        {
+          sourceId: 'source-id',
+          targetId: 'target-id',
+          source: { x: 1, y: 2 },
+          target: { x: 3, y: 4 },
+        },
+        0,
+      ),
+    ).toBe('source-id->target-id');
+    expect(
+      getAtlasLinkStableKeyAny(
+        {
+          source: { x: 1, y: 2 },
+          target: { x: 3, y: 4 },
+        },
+        7,
+      ),
+    ).toBe('coords:1.000:2.000:3.000:4.000:7');
   });
 
   it('finds top atlas nodes by heat without changing pre-order tie behavior', () => {
-    const topNodes = getTopAtlasNodesByHeatAny([
-      {
-        id: 'early-tie',
-        votes: { up: 5, down: 0 },
-        children: [
-          {
-            id: 'nested-high',
-            votes: { up: 9, down: 0 },
-          },
-        ],
-      },
-      {
-        id: 'comment-heavy',
-        votes: { up: 3, down: 0 },
-        comments: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }],
-      },
-      {
-        id: 'late-tie',
-        votes: { up: 5, down: 0 },
-      },
-    ], 3);
+    const topNodes = getTopAtlasNodesByHeatAny(
+      [
+        {
+          id: 'early-tie',
+          votes: { up: 5, down: 0 },
+          children: [
+            {
+              id: 'nested-high',
+              votes: { up: 9, down: 0 },
+            },
+          ],
+        },
+        {
+          id: 'comment-heavy',
+          votes: { up: 3, down: 0 },
+          comments: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }],
+        },
+        {
+          id: 'late-tie',
+          votes: { up: 5, down: 0 },
+        },
+      ],
+      3,
+    );
 
-    expect(topNodes.map((node: any) => node.id)).toEqual([
-      'comment-heavy',
-      'nested-high',
-      'early-tie',
-    ]);
+    expect(topNodes.map((node: any) => node.id)).toEqual(['comment-heavy', 'nested-high', 'early-tie']);
   });
 
   it('switches between circles and atlas from the main mode controls', () => {
@@ -418,19 +421,27 @@ describe('DebateMap', () => {
           activeSessionSlug=""
           toggleLoginModal={jest.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed')).toBeTruthy();
+    expect(
+      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed'),
+    ).toBeTruthy();
 
     fireEvent.click(getDebateViewModeButton('atlas'));
 
-    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'orbital')).toBeTruthy();
-    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed')).toBeFalsy();
+    expect(
+      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'orbital'),
+    ).toBeTruthy();
+    expect(
+      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed'),
+    ).toBeFalsy();
 
     fireEvent.click(getDebateViewModeButton('circles'));
 
-    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed')).toBeTruthy();
+    expect(
+      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed'),
+    ).toBeTruthy();
   });
 
   it('starts in atlas mode when explicitly configured', () => {
@@ -444,10 +455,12 @@ describe('DebateMap', () => {
           toggleLoginModal={jest.fn()}
           atlasLayoutMode="orbital"
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'orbital')).toBeTruthy();
+    expect(
+      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'orbital'),
+    ).toBeTruthy();
   });
 
   it('builds historical compass points using the current vote for x and other votes for y', () => {
@@ -472,12 +485,7 @@ describe('DebateMap', () => {
     expect(points).toHaveLength(20);
     expect(points.some((point) => point.x < 0.5)).toBe(true);
     expect(points.some((point) => point.x > 0.5)).toBe(true);
-    expect(quadrantKeys).toEqual(new Set([
-      'top-left',
-      'top-right',
-      'bottom-left',
-      'bottom-right',
-    ]));
+    expect(quadrantKeys).toEqual(new Set(['top-left', 'top-right', 'bottom-left', 'bottom-right']));
   });
 
   it('keeps every atlas compass directional label within 35 characters', () => {
@@ -510,9 +518,7 @@ describe('DebateMap', () => {
         authors: ['Figure Alpha', 'Figure Beta'],
         category: 'Loophole Finder',
         draft_legal_code: {
-          articles: [
-            'Art. 7. Emergency powers expire at sunset.',
-          ],
+          articles: ['Art. 7. Emergency powers expire at sunset.'],
         },
         loophole_exploit: {
           institution: 'Transit hub',
@@ -546,7 +552,7 @@ describe('DebateMap', () => {
           xAxis: { label: 'liberty' },
           yAxis: { label: 'order' },
         },
-      }
+      },
     );
 
     expect(enrichedBrief.draftLegalCode).toEqual({
@@ -575,7 +581,7 @@ describe('DebateMap', () => {
           xAxis: { label: 'Liberty' },
           yAxis: { label: 'Order' },
         },
-      }
+      },
     );
 
     expect(typeof fallbackBrief.draftLegalCode).toBe('string');
@@ -587,7 +593,7 @@ describe('DebateMap', () => {
   it('builds historical case briefs only for the expanded case key', () => {
     const brief = buildHistoricalCaseBriefAny(
       { title: 'Expanded case', summary: 'Expanded summary.' },
-      { name: 'Liability Frameworks' }
+      { name: 'Liability Frameworks' },
     );
     const buildBrief = jest.fn(() => brief);
     const historicalCases = [
@@ -599,7 +605,7 @@ describe('DebateMap', () => {
       historicalCases,
       { id: 'node-a', name: 'Liability Frameworks' },
       '',
-      buildBrief
+      buildBrief,
     );
     expect(collapsedBriefs.size).toBe(0);
     expect(buildBrief).not.toHaveBeenCalled();
@@ -608,14 +614,11 @@ describe('DebateMap', () => {
       historicalCases,
       { id: 'node-a', name: 'Liability Frameworks' },
       'expanded-case',
-      buildBrief
+      buildBrief,
     );
 
     expect(buildBrief).toHaveBeenCalledTimes(1);
-    expect(buildBrief).toHaveBeenCalledWith(
-      historicalCases[1],
-      { id: 'node-a', name: 'Liability Frameworks' }
-    );
+    expect(buildBrief).toHaveBeenCalledWith(historicalCases[1], { id: 'node-a', name: 'Liability Frameworks' });
     expect(expandedBriefs.get('expanded-case')).toBe(brief);
   });
 
@@ -625,12 +628,11 @@ describe('DebateMap', () => {
     expect(getCompactTreeNodeLabelAny('Pre-deployment Testing')).toBe('Pre-deploy. Testing');
     expect(getTreeChildColumnCountAny(1, 4)).toBe(2);
     expect(getTreeChildColumnCountAny(0, 2)).toBe(2);
-    expect(getTreeSubtreeSpanAny({
-      children: [
-        { children: [{}, {}] },
-        {},
-      ],
-    })).toBe(3);
+    expect(
+      getTreeSubtreeSpanAny({
+        children: [{ children: [{}, {}] }, {}],
+      }),
+    ).toBe(3);
     expect(getTreeChildStaggerPxAny(2, 1, 2)).toBeGreaterThan(getTreeChildStaggerPxAny(2, 0, 2));
     expect(getTreeChildStaggerPxAny(2, 3, 2)).toBeGreaterThan(getTreeChildStaggerPxAny(2, 1, 2));
     expect(getTreeViewportFitScaleAny(320, 960)).toBeCloseTo(0.3, 1);
@@ -644,26 +646,24 @@ describe('DebateMap', () => {
       {
         id: 'parent-node',
         name: 'Parent Node',
-        children: [
-          { id: 'child-node', name: 'Child A' },
-        ],
+        children: [{ id: 'child-node', name: 'Child A' }],
       },
     ];
     const updatedData = [
       {
         id: 'parent-node',
         name: 'Parent Node',
-        children: [
-          { id: 'child-node', name: 'Child B' },
-        ],
+        children: [{ id: 'child-node', name: 'Child B' }],
       },
     ];
 
     const { rerender } = render(<AtlasViewComponent data={initialData} onNodeClick={onNodeClick} />);
 
-    fireEvent.click(screen.getAllByText('Parent Node').find((element) => (
-      String(element.className || '').includes('nodeLabel')
-    )) as HTMLElement);
+    fireEvent.click(
+      screen
+        .getAllByText('Parent Node')
+        .find((element) => String(element.className || '').includes('nodeLabel')) as HTMLElement,
+    );
 
     expect(screen.getByText(/Up Level/i)).toBeInTheDocument();
     expect(screen.getAllByText('Child A').length).toBeGreaterThan(0);
@@ -690,12 +690,10 @@ describe('DebateMap', () => {
           },
         ]}
         onNodeClick={jest.fn()}
-      />
+      />,
     );
 
-    expect(getAtlasNodeDiameter('High Disagreement')).toBeGreaterThan(
-      getAtlasNodeDiameter('Low Disagreement')
-    );
+    expect(getAtlasNodeDiameter('High Disagreement')).toBeGreaterThan(getAtlasNodeDiameter('Low Disagreement'));
   });
 
   it('renders nested packed atlas nodes in circles mode', () => {
@@ -708,10 +706,12 @@ describe('DebateMap', () => {
           activeSessionSlug=""
           toggleLoginModal={jest.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed')).toBeTruthy();
+    expect(
+      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed'),
+    ).toBeTruthy();
     expect(getAtlasNodeElementById(deceptiveAlignmentNodeId, 'packed')).toBeTruthy();
   });
 
@@ -724,14 +724,12 @@ describe('DebateMap', () => {
           {
             id: 'parent-node',
             name: 'Parent Node',
-            children: [
-              { id: 'child-node', name: 'Child Node' },
-            ],
+            children: [{ id: 'child-node', name: 'Child Node' }],
           },
         ]}
         onNodeClick={onNodeClick}
         atlasLayoutMode="packed"
-      />
+      />,
     );
 
     fireEvent.click(getAtlasNodeElementById('parent-node', 'packed') as HTMLElement);
@@ -758,16 +756,14 @@ describe('DebateMap', () => {
               {
                 id: 'child-node',
                 name: 'Child Node',
-                children: [
-                  { id: 'grandchild-node', name: 'Grandchild Node' },
-                ],
+                children: [{ id: 'grandchild-node', name: 'Grandchild Node' }],
               },
             ],
           },
         ]}
         onNodeClick={onNodeClick}
         atlasLayoutMode="packed"
-      />
+      />,
     );
 
     fireEvent.click(getAtlasNodeElementById('child-node', 'packed') as HTMLElement);
@@ -803,7 +799,7 @@ describe('DebateMap', () => {
         ]}
         onNodeClick={jest.fn()}
         atlasLayoutMode="packed"
-      />
+      />,
     );
 
     expect(String(getPackedNodeLabel('Parent Node')?.className || '')).toContain('alwaysVisible');
@@ -826,7 +822,7 @@ describe('DebateMap', () => {
           activeSessionSlug=""
           toggleLoginModal={jest.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(getAtlasNodeElementById(deceptiveAlignmentNodeId, 'packed') as HTMLElement);
@@ -850,7 +846,7 @@ describe('DebateMap', () => {
           activeSessionSlug=""
           toggleLoginModal={jest.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(getDebateViewModeButton('tree'));
@@ -886,30 +882,18 @@ describe('DebateMap', () => {
         ]}
         onNodeClick={jest.fn()}
         atlasLayoutMode="packed"
-      />
+      />,
     );
 
     expect(getAtlasNodeDiameterById('high-disagreement', 'packed')).toBeGreaterThan(
-      getAtlasNodeDiameterById('low-disagreement', 'packed')
+      getAtlasNodeDiameterById('low-disagreement', 'packed'),
     );
   });
 
   it('applies much larger packed label sizing to large top-level circles', () => {
-    const topLevelSize = getPackedAtlasLabelFontSizePxAny(
-      { hierarchyDepth: 1, isCenter: false },
-      520,
-      true
-    );
-    const childSize = getPackedAtlasLabelFontSizePxAny(
-      { hierarchyDepth: 2, isCenter: false },
-      220,
-      false
-    );
-    const leafSize = getPackedAtlasLabelFontSizePxAny(
-      { hierarchyDepth: 3, isCenter: false },
-      80,
-      false
-    );
+    const topLevelSize = getPackedAtlasLabelFontSizePxAny({ hierarchyDepth: 1, isCenter: false }, 520, true);
+    const childSize = getPackedAtlasLabelFontSizePxAny({ hierarchyDepth: 2, isCenter: false }, 220, false);
+    const leafSize = getPackedAtlasLabelFontSizePxAny({ hierarchyDepth: 3, isCenter: false }, 80, false);
 
     expect(topLevelSize).toBeGreaterThanOrEqual(32);
     expect(topLevelSize).toBeGreaterThan(childSize);
@@ -917,11 +901,14 @@ describe('DebateMap', () => {
   });
 
   it('lifts drilled packed circles upward when invisible root slack leaves too much empty space', () => {
-    const lift = getPackedAtlasVerticalLiftPxAny([
-      { y: 222, r: 120 },
-      { y: 224, r: 118 },
-      { y: 402, r: 96 },
-    ], 8);
+    const lift = getPackedAtlasVerticalLiftPxAny(
+      [
+        { y: 222, r: 120 },
+        { y: 224, r: 118 },
+        { y: 402, r: 96 },
+      ],
+      8,
+    );
 
     expect(lift).toBeGreaterThan(90);
     expect(lift).toBeLessThan(110);
@@ -934,11 +921,11 @@ describe('DebateMap', () => {
     ]);
 
     expect(
-      getPackedAtlasClickTargetAny({ id: 'child-node', hierarchyDepth: 2, groupId: 'parent-node' }, nodesById)
+      getPackedAtlasClickTargetAny({ id: 'child-node', hierarchyDepth: 2, groupId: 'parent-node' }, nodesById),
     ).toEqual(expect.objectContaining({ id: 'parent-node' }));
-    expect(
-      getPackedAtlasClickTargetAny({ id: 'parent-node', hierarchyDepth: 1 }, nodesById)
-    ).toEqual(expect.objectContaining({ id: 'parent-node' }));
+    expect(getPackedAtlasClickTargetAny({ id: 'parent-node', hierarchyDepth: 1 }, nodesById)).toEqual(
+      expect.objectContaining({ id: 'parent-node' }),
+    );
   });
 
   it('removes historical demo questions immediately when demo mode turns off', async () => {
@@ -953,20 +940,18 @@ describe('DebateMap', () => {
     const { rerender } = render(
       <MemoryRouter>
         <DebateMapComponent {...baseProps} demoMode={true} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /List/i }));
     fireEvent.click(screen.getByRole('button', { name: currentDemoLeafFixture.leafName }));
 
-    expect(
-      await screen.findByText(currentDemoLeafFixture.questionText)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(currentDemoLeafFixture.questionText)).toBeInTheDocument();
 
     rerender(
       <MemoryRouter>
         <DebateMapComponent {...baseProps} demoMode={false} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -986,23 +971,21 @@ describe('DebateMap', () => {
     render(
       <MemoryRouter>
         <DebateMapComponent {...baseProps} demoMode={true} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /List/i }));
     fireEvent.click(screen.getByRole('button', { name: currentDemoLeafFixture.leafName }));
     fireEvent.click(await screen.findByRole('button', { name: /Questions/i }));
 
-    expect(
-      await screen.findByText(currentDemoLeafFixture.questionText)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(currentDemoLeafFixture.questionText)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockedGetHistoricalFigureAvatarOrBlockie).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           preferBlockie: false,
-        })
+        }),
       );
     });
   });
@@ -1057,11 +1040,11 @@ describe('DebateMap', () => {
     expect(screen.getByText(privacyCase.summary)).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.ATLAS_HISTORICAL_CASE_EXPAND)).toHaveAttribute(
       'data-ce-case-id',
-      privacyCase.id
+      privacyCase.id,
     );
     expect(screen.getByRole('link', { name: 'Loophole methodology' })).toHaveAttribute(
       'href',
-      'https://github.com/brendanhogan/loophole'
+      'https://github.com/brendanhogan/loophole',
     );
   });
 
@@ -1081,19 +1064,23 @@ describe('DebateMap', () => {
     expect(screen.getByText('Open question')).toBeInTheDocument();
     expect(screen.getByText('Article 1')).toBeInTheDocument();
     expect(
-      screen.getByText(/A metropolitan port authority may activate live facial-recognition surveillance only during a declared transportation security emergency/i)
+      screen.getByText(
+        /A metropolitan port authority may activate live facial-recognition surveillance only during a declared transportation security emergency/i,
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText('Loophole exploit')).toBeInTheDocument();
     expect(screen.getByText('Overreach variant')).toBeInTheDocument();
     expect(screen.getByText(/Bay City Port Authority central rail terminal/i)).toBeInTheDocument();
     expect(screen.getByText(/Harbor Metro Station emergency operations center/i)).toBeInTheDocument();
-    expect(screen.getByText(/Should protest-related unrest ever qualify as a facial-recognition emergency trigger/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Should protest-related unrest ever qualify as a facial-recognition emergency trigger/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/In Re Harbor Terminal Emergency Scan/i)).toBeInTheDocument();
     expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
 
-    const bestPatchCard = screen.getAllByTestId(E2E_TESTIDS.ATLAS_HISTORICAL_CASE_PATCH_CARD).find((element) => (
-      element.getAttribute('data-ce-patch-kind') === 'best'
-    ));
+    const bestPatchCard = screen
+      .getAllByTestId(E2E_TESTIDS.ATLAS_HISTORICAL_CASE_PATCH_CARD)
+      .find((element) => element.getAttribute('data-ce-patch-kind') === 'best');
     expect(bestPatchCard).toBeTruthy();
     expect(within(bestPatchCard as HTMLElement).getByText('Best patch')).toBeInTheDocument();
     expect(within(bestPatchCard as HTMLElement).getByText('James Madison')).toBeInTheDocument();
@@ -1108,21 +1095,21 @@ describe('DebateMap', () => {
     });
   });
 
-  it.each([
-    deceptiveAlignmentNodeId,
-    liabilityFrameworksNodeId,
-  ])('renders enriched historical-case detail for node %s without leaking raw objects', async (nodeId) => {
-    const historicalCase = getHistoricalCaseForNode(nodeId);
+  it.each([deceptiveAlignmentNodeId, liabilityFrameworksNodeId])(
+    'renders enriched historical-case detail for node %s without leaking raw objects',
+    async (nodeId) => {
+      const historicalCase = getHistoricalCaseForNode(nodeId);
 
-    await openHistoricalCaseBrief(nodeId);
+      await openHistoricalCaseBrief(nodeId);
 
-    expect(await screen.findByText(historicalCase.title)).toBeInTheDocument();
-    expect(screen.getByText(historicalCase.open_question.trim())).toBeInTheDocument();
-    expect(screen.getAllByText(historicalCase.best_patch).length).toBeGreaterThan(0);
-    expect(screen.getByText('Loophole exploit')).toBeInTheDocument();
-    expect(screen.getByText('Overreach variant')).toBeInTheDocument();
-    expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
-  });
+      expect(await screen.findByText(historicalCase.title)).toBeInTheDocument();
+      expect(screen.getByText(historicalCase.open_question.trim())).toBeInTheDocument();
+      expect(screen.getAllByText(historicalCase.best_patch).length).toBeGreaterThan(0);
+      expect(screen.getByText('Loophole exploit')).toBeInTheDocument();
+      expect(screen.getByText('Overreach variant')).toBeInTheDocument();
+      expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
+    },
+  );
 
   it('keeps Loophole historical cases out of non-demo atlas nodes', async () => {
     render(
@@ -1130,7 +1117,7 @@ describe('DebateMap', () => {
         <Routes>
           <Route
             path="/atlas/:nodeId"
-            element={(
+            element={
               <DebateMapComponent
                 account=""
                 provider=""
@@ -1139,10 +1126,10 @@ describe('DebateMap', () => {
                 toggleLoginModal={jest.fn()}
                 demoMode={false}
               />
-            )}
+            }
           />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     await screen.findByRole('heading', { name: 'Privacy & Surveillance' });
@@ -1167,7 +1154,7 @@ describe('DebateMap', () => {
           <Routes>
             <Route
               path="/atlas/:nodeId"
-              element={(
+              element={
                 <DebateMapComponent
                   account=""
                   provider=""
@@ -1176,17 +1163,17 @@ describe('DebateMap', () => {
                   toggleLoginModal={jest.fn()}
                   demoMode={true}
                 />
-              )}
+              }
             />
           </Routes>
-        </MemoryRouter>
+        </MemoryRouter>,
       );
 
       fireEvent.click(await screen.findByTitle('Copy Deep Link URL'));
 
       await waitFor(() => {
         expect(writeText).toHaveBeenCalledWith(
-          'http://localhost/ce/atlas/0x1110000000000000000000000000000000000000000000000000000000000000?demo=1'
+          'http://localhost/ce/atlas/0x1110000000000000000000000000000000000000000000000000000000000000?demo=1',
         );
       });
     } finally {
@@ -1205,7 +1192,7 @@ describe('DebateMap', () => {
         <Routes>
           <Route
             path="/atlas/:nodeId"
-            element={(
+            element={
               <DebateMapComponent
                 account=""
                 provider=""
@@ -1213,10 +1200,10 @@ describe('DebateMap', () => {
                 activeSessionSlug="edge"
                 toggleLoginModal={jest.fn()}
               />
-            )}
+            }
           />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(await screen.findByRole('button', { name: 'AI Safety' }));
@@ -1240,7 +1227,7 @@ describe('DebateMap', () => {
           requestedModalNodeId="0x1110000000000000000000000000000000000000000000000000000000000000"
           onModalClose={onModalClose}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(await screen.findByTitle('Copy Deep Link URL')).toBeInTheDocument();
@@ -1258,13 +1245,15 @@ describe('DebateMap', () => {
     mockNavigate.mockClear();
 
     render(
-      <MemoryRouter initialEntries={[
-        '/atlas/0x1110000000000000000000000000000000000000000000000000000000000000?demo=1&returnTo=%2Fsu%2FFranklin%3Ftab%3Datlas%23positions',
-      ]}>
+      <MemoryRouter
+        initialEntries={[
+          '/atlas/0x1110000000000000000000000000000000000000000000000000000000000000?demo=1&returnTo=%2Fsu%2FFranklin%3Ftab%3Datlas%23positions',
+        ]}
+      >
         <Routes>
           <Route
             path="/atlas/:nodeId"
-            element={(
+            element={
               <DebateMapComponent
                 account=""
                 provider=""
@@ -1273,10 +1262,10 @@ describe('DebateMap', () => {
                 toggleLoginModal={jest.fn()}
                 demoMode={true}
               />
-            )}
+            }
           />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(await screen.findByTitle('Copy Deep Link URL')).toBeInTheDocument();
@@ -1301,11 +1290,8 @@ describe('DebateMap', () => {
 
     const { rerender } = render(
       <MemoryRouter>
-        <DebateMapComponent
-          {...baseProps}
-          requestedModalNodeId={privacyAndSurveillanceNodeId}
-        />
-      </MemoryRouter>
+        <DebateMapComponent {...baseProps} requestedModalNodeId={privacyAndSurveillanceNodeId} />
+      </MemoryRouter>,
     );
 
     expect(await screen.findByRole('heading', { name: 'Privacy & Surveillance' })).toBeInTheDocument();
@@ -1316,11 +1302,8 @@ describe('DebateMap', () => {
 
     rerender(
       <MemoryRouter>
-        <DebateMapComponent
-          {...baseProps}
-          requestedModalNodeId={deceptiveAlignmentNodeId}
-        />
-      </MemoryRouter>
+        <DebateMapComponent {...baseProps} requestedModalNodeId={deceptiveAlignmentNodeId} />
+      </MemoryRouter>,
     );
 
     expect(await screen.findByRole('heading', { name: 'Deceptive Alignment' })).toBeInTheDocument();
@@ -1344,7 +1327,7 @@ describe('DebateMap', () => {
     const { container, rerender } = render(
       <MemoryRouter>
         <DebateMapComponent {...baseProps} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(container.firstChild).toHaveClass('debateMapWrapper');
@@ -1354,7 +1337,7 @@ describe('DebateMap', () => {
     rerender(
       <MemoryRouter>
         <DebateMapComponent {...baseProps} embedded={true} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(container.firstChild).toHaveClass('debateMapWrapper');

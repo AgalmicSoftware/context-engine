@@ -1,4 +1,4 @@
-import * as contractScripts from '../../utilities/web3/contractScripts.js';
+import * as contractScripts from '../../utilities/web3/chainGateway.js';
 
 export type SessionConfig = Record<string, unknown> & {
   slug?: string;
@@ -10,35 +10,22 @@ export type SessionConfigLookupOptions = {
   allowDemoFallback?: boolean;
 };
 
-export const normalizeSessionSlug = (slug: unknown): string => (
-  contractScripts.normalizeSessionSlug(slug)
-);
+export const normalizeSessionSlug = (slug: unknown): string => contractScripts.normalizeSessionSlug(slug);
 
-export const getSessionConfigBySlug = (slug: unknown): SessionConfig | null => (
-  contractScripts.getSessionConfigBySlug(slug) as SessionConfig | null
-);
+export const getSessionConfigBySlug = (slug: unknown): SessionConfig | null =>
+  contractScripts.getSessionConfigBySlug(slug) as SessionConfig | null;
 
 export const getDemoSessionConfigBySlug = (
   slug: unknown,
   options: SessionConfigLookupOptions = {},
-): SessionConfig | null => (
-  contractScripts.getDemoSessionConfigBySlug(slug, options) as SessionConfig | null
-);
+): SessionConfig | null => contractScripts.getDemoSessionConfigBySlug(slug, options) as SessionConfig | null;
 
-export const getSessionConfigBySlugOrDefault = (slug: unknown): SessionConfig | null => (
-  contractScripts.getSessionConfigBySlugOrDefault(slug) as SessionConfig | null
-);
+export const getSessionConfigBySlugOrDefault = (slug: unknown): SessionConfig | null =>
+  contractScripts.getSessionConfigBySlugOrDefault(slug) as SessionConfig | null;
 
-export const getSessionSlugByName = (name: unknown): string | null => (
-  contractScripts.getSessionSlugByName(name)
-);
+export const getSessionSlugByName = (name: unknown): string | null => contractScripts.getSessionSlugByName(name);
 
-export const getAllSessionSlugs = (
-  options: { includeEmpty?: boolean } = {},
-): string[] => (
-  contractScripts.getAllSessionSlugs(options) as string[]
-);
+export const getAllSessionSlugs = (options: { includeEmpty?: boolean } = {}): string[] =>
+  contractScripts.getAllSessionSlugs(options) as string[];
 
-export const getSessionChainId = (slug: unknown): number | null => (
-  contractScripts.getSessionChainId(slug)
-);
+export const getSessionChainId = (slug: unknown): number | null => contractScripts.getSessionChainId(slug);

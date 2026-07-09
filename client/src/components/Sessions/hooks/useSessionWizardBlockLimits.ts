@@ -105,9 +105,12 @@ const useSessionWizardBlockLimits = <TDraft extends DraftWithBlockLimits>({
     const unitMs = blockLimitUnit === 'days' ? 86400000 : blockLimitUnit === 'minutes' ? 60000 : 3600000;
     const startFromDraft = Number(draftBlockLimitStart);
     const fallbackStart = Number(latestChainBlock);
-    const startBlock = (Number.isFinite(startFromDraft) && startFromDraft > 0)
-      ? startFromDraft
-      : ((Number.isFinite(fallbackStart) && fallbackStart > 0) ? fallbackStart : 0);
+    const startBlock =
+      Number.isFinite(startFromDraft) && startFromDraft > 0
+        ? startFromDraft
+        : Number.isFinite(fallbackStart) && fallbackStart > 0
+          ? fallbackStart
+          : 0;
     if (!startBlock || !Number.isFinite(duration) || duration <= 0) {
       if (blockEndAutoRef.current) {
         updateDraftValueRef.current?.(['blockLimits', 'end'], null);
@@ -120,7 +123,14 @@ const useSessionWizardBlockLimits = <TDraft extends DraftWithBlockLimits>({
     const endBlock = startBlock + blocks;
     updateDraftValueRef.current?.(['blockLimits', 'end'], endBlock);
     blockEndAutoRef.current = true;
-  }, [blockLimitDuration, blockLimitUnit, latestChainBlock, registryChainId, draftBlockLimitStart, updateDraftValueRef]);
+  }, [
+    blockLimitDuration,
+    blockLimitUnit,
+    latestChainBlock,
+    registryChainId,
+    draftBlockLimitStart,
+    updateDraftValueRef,
+  ]);
 
   const markBlockStartManual = useCallback(() => {
     blockStartManualRef.current = true;

@@ -47,7 +47,7 @@ describe('SBTPage metadata load hydration', () => {
       const sbtAddress = '0x00000000000000000000000000000000000000a1';
       const sbtLower = sbtAddress.toLowerCase();
       const cacheEntry = {
-        '84532': {
+        84532: {
           sbtList: {
             [sbtLower]: {
               sbtAddress,
@@ -71,11 +71,15 @@ describe('SBTPage metadata load hydration', () => {
       };
 
       let resolveFirstRead;
-      const firstRead = new Promise((resolve) => { resolveFirstRead = resolve; });
-      const readSpy = jest.spyOn(cacheScripts, 'readCache')
+      const firstRead = new Promise((resolve) => {
+        resolveFirstRead = resolve;
+      });
+      const readSpy = jest
+        .spyOn(cacheScripts, 'readCache')
         .mockImplementationOnce(() => firstRead)
         .mockResolvedValue(cacheEntry);
-      const groupPasswordSpy = jest.spyOn(contractScripts, 'getGroupPasswordHash')
+      const groupPasswordSpy = jest
+        .spyOn(contractScripts, 'getGroupPasswordHash')
         .mockResolvedValue(ethers.constants.HashZero);
       jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('1');
 
@@ -115,7 +119,7 @@ describe('SBTPage metadata load hydration', () => {
     const adminAddress = '0x00000000000000000000000000000000000000a2';
 
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
-      '84532': {
+      84532: {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -170,15 +174,17 @@ describe('SBTPage metadata load hydration', () => {
       expect.objectContaining({
         slug: 'edge',
         networkChainId: 84532,
-      })
+      }),
     );
-    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
-      name: 'Name Only SBT',
-      symbol: 'CE-SBT-38',
-      tokenURI: 'ar://kcejtnnZ1GhyhjFfPAiLeX3Jaw0dXwhNnkCZ0zB1EuE',
-      admin: adminAddress,
-      chainID: 84532,
-    }));
+    expect(subject.state.sbtInfo).toEqual(
+      expect.objectContaining({
+        name: 'Name Only SBT',
+        symbol: 'CE-SBT-38',
+        tokenURI: 'ar://kcejtnnZ1GhyhjFfPAiLeX3Jaw0dXwhNnkCZ0zB1EuE',
+        admin: adminAddress,
+        chainID: 84532,
+      }),
+    );
     contractCtorSpy.mockRestore();
   });
 
@@ -186,7 +192,7 @@ describe('SBTPage metadata load hydration', () => {
     const sbtAddress = '0x00000000000000000000000000000000000000a1';
     const sbtLower = sbtAddress.toLowerCase();
     const cacheEntry = {
-      '84532': {
+      84532: {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -228,10 +234,12 @@ describe('SBTPage metadata load hydration', () => {
     await flushPromises();
     await Promise.resolve();
 
-    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
-      name: 'Cold Load Badge',
-      tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-    }));
+    expect(subject.state.sbtInfo).toEqual(
+      expect.objectContaining({
+        name: 'Cold Load Badge',
+        tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+      }),
+    );
     expect(subject.state.loadingMintersBurners).toBe(true);
     expect(treeIncludesText(subject.render(), 'Loading SBT Details')).toBe(false);
 
@@ -243,20 +251,22 @@ describe('SBTPage metadata load hydration', () => {
     const sbtAddress = '0x00000000000000000000000000000000000000a1';
     const ownerAddress = '0x00000000000000000000000000000000000000b1';
     const refreshSpy = jest.fn().mockResolvedValue(undefined);
-    const readSpy = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(createReadCachePayload({
-      sbtAddress,
-      mintedAddresses: [ownerAddress],
-      burnedAddresses: [],
-      countsLoaded: true,
-      sbtInfoOverrides: {
-        name: 'Ready Cache Badge',
-        description: 'Complete cached metadata',
-        tokenURI: 'ar://ready-cache-token',
-        image: 'https://example.example.test/ready-cache.png',
-        sessionSlug: 'edge',
-        sessionSlugExplicit: true,
-      },
-    }));
+    const readSpy = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(
+      createReadCachePayload({
+        sbtAddress,
+        mintedAddresses: [ownerAddress],
+        burnedAddresses: [],
+        countsLoaded: true,
+        sbtInfoOverrides: {
+          name: 'Ready Cache Badge',
+          description: 'Complete cached metadata',
+          tokenURI: 'ar://ready-cache-token',
+          image: 'https://example.example.test/ready-cache.png',
+          sessionSlug: 'edge',
+          sessionSlugExplicit: true,
+        },
+      }),
+    );
     const metadataSpy = jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue(null);
     const historySpy = jest.spyOn(contractScripts, 'getSbtHistorySummary').mockResolvedValue(null);
     const mintedTokensSpy = jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue(null);
@@ -291,12 +301,14 @@ describe('SBTPage metadata load hydration', () => {
     expect(contractCtorSpy).not.toHaveBeenCalled();
     expect(subject.fetchHolderAddressesByTokenOwnership).not.toHaveBeenCalled();
     expect(subject.state.resolvedSessionSlug).toBe('edge');
-    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
-      name: 'Ready Cache Badge',
-      description: 'Complete cached metadata',
-      tokenURI: 'ar://ready-cache-token',
-      image: 'https://example.example.test/ready-cache.png',
-    }));
+    expect(subject.state.sbtInfo).toEqual(
+      expect.objectContaining({
+        name: 'Ready Cache Badge',
+        description: 'Complete cached metadata',
+        tokenURI: 'ar://ready-cache-token',
+        image: 'https://example.example.test/ready-cache.png',
+      }),
+    );
     expect(subject.state.countsLoaded).toBe(true);
     expect(subject.state.userHasSBT).toBe(true);
   });
@@ -311,34 +323,39 @@ describe('SBTPage metadata load hydration', () => {
       '0x00000000000000000000000000000000000000b5',
     ];
     const refreshSpy = jest.fn().mockResolvedValue(undefined);
-    const readSpy = jest.spyOn(cacheScripts, 'readCache')
-      .mockResolvedValueOnce(createReadCachePayload({
-        sbtAddress,
-        mintedAddresses: [holderAddresses[0]],
-        burnedAddresses: [],
-        countsLoaded: false,
-        sbtInfoOverrides: {
-          name: 'Approx Count Badge',
-          tokenURI: 'ar://approx-count-token',
-          image: 'https://example.example.test/approx-count.png',
-          sessionSlug: 'edge',
-          sessionSlugExplicit: true,
-        },
-      }))
-      .mockResolvedValueOnce(createReadCachePayload({
-        sbtAddress,
-        mintedAddresses: holderAddresses,
-        burnedAddresses: [],
-        countsLoaded: true,
-        blockNumber: 1250,
-        sbtInfoOverrides: {
-          name: 'Approx Count Badge',
-          tokenURI: 'ar://approx-count-token',
-          image: 'https://example.example.test/approx-count.png',
-          sessionSlug: 'edge',
-          sessionSlugExplicit: true,
-        },
-      }));
+    const readSpy = jest
+      .spyOn(cacheScripts, 'readCache')
+      .mockResolvedValueOnce(
+        createReadCachePayload({
+          sbtAddress,
+          mintedAddresses: [holderAddresses[0]],
+          burnedAddresses: [],
+          countsLoaded: false,
+          sbtInfoOverrides: {
+            name: 'Approx Count Badge',
+            tokenURI: 'ar://approx-count-token',
+            image: 'https://example.example.test/approx-count.png',
+            sessionSlug: 'edge',
+            sessionSlugExplicit: true,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        createReadCachePayload({
+          sbtAddress,
+          mintedAddresses: holderAddresses,
+          burnedAddresses: [],
+          countsLoaded: true,
+          blockNumber: 1250,
+          sbtInfoOverrides: {
+            name: 'Approx Count Badge',
+            tokenURI: 'ar://approx-count-token',
+            image: 'https://example.example.test/approx-count.png',
+            sessionSlug: 'edge',
+            sessionSlugExplicit: true,
+          },
+        }),
+      );
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
     jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('1');
 
@@ -357,16 +374,11 @@ describe('SBTPage metadata load hydration', () => {
     await subject.loadSBTInfo(false);
 
     expect(readSpy).toHaveBeenCalledTimes(2);
-    expect(refreshSpy).toHaveBeenCalledWith(
-      sbtAddress,
-      'edge',
-      expect.objectContaining({ forceCounts: true })
-    );
+    expect(refreshSpy).toHaveBeenCalledWith(sbtAddress, 'edge', expect.objectContaining({ forceCounts: true }));
     expect(subject.state.countsLoaded).toBe(true);
-    expect(subject.getMemoizedNetHoldersList(
-      subject.state.mintedAddresses,
-      subject.state.burnedAddresses
-    )).toHaveLength(5);
+    expect(
+      subject.getMemoizedNetHoldersList(subject.state.mintedAddresses, subject.state.burnedAddresses),
+    ).toHaveLength(5);
   });
 
   it('uses direct metadata reads instead of a duplicate parent-owned refresh during cold hydration', async () => {
@@ -376,7 +388,7 @@ describe('SBTPage metadata load hydration', () => {
     const refreshSpy = jest.fn().mockResolvedValue(undefined);
 
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
-      '84532': {
+      84532: {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -428,10 +440,12 @@ describe('SBTPage metadata load hydration', () => {
 
     expect(refreshSpy).not.toHaveBeenCalled();
     expect(contractScripts.getSbtMetadata).toHaveBeenCalled();
-    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
-      name: 'Hydrated Without Duplicate Refresh',
-      symbol: 'CE-SBT-99',
-    }));
+    expect(subject.state.sbtInfo).toEqual(
+      expect.objectContaining({
+        name: 'Hydrated Without Duplicate Refresh',
+        symbol: 'CE-SBT-99',
+      }),
+    );
     contractCtorSpy.mockRestore();
   });
 
@@ -441,7 +455,7 @@ describe('SBTPage metadata load hydration', () => {
       const sbtAddress = '0x00000000000000000000000000000000000000a1';
       const sbtLower = sbtAddress.toLowerCase();
       const cacheEntry = {
-        '84532': {
+        84532: {
           sbtList: {
             [sbtLower]: {
               sbtAddress,
@@ -465,11 +479,15 @@ describe('SBTPage metadata load hydration', () => {
       };
 
       let resolveFirstRead;
-      const firstRead = new Promise((resolve) => { resolveFirstRead = resolve; });
-      const readSpy = jest.spyOn(cacheScripts, 'readCache')
+      const firstRead = new Promise((resolve) => {
+        resolveFirstRead = resolve;
+      });
+      const readSpy = jest
+        .spyOn(cacheScripts, 'readCache')
         .mockImplementationOnce(() => firstRead)
         .mockResolvedValue(cacheEntry);
-      const groupPasswordSpy = jest.spyOn(contractScripts, 'getGroupPasswordHash')
+      const groupPasswordSpy = jest
+        .spyOn(contractScripts, 'getGroupPasswordHash')
         .mockResolvedValue(ethers.constants.HashZero);
       jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('1');
 
@@ -509,13 +527,13 @@ describe('SBTPage metadata load hydration', () => {
     const sbtLower = sbtAddress.toLowerCase();
     const ownerAddress = '0x00000000000000000000000000000000000000c1';
     const alphaCache = {
-      '84532': {
+      84532: {
         sbtList: {},
         lastBlock: 1200,
       },
     };
     const betaCache = {
-      '84532': {
+      84532: {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -567,10 +585,12 @@ describe('SBTPage metadata load hydration', () => {
     expect(cacheScripts.readCache).toHaveBeenNthCalledWith(1, 'sbtCache', 'alpha');
     expect(cacheScripts.readCache).toHaveBeenCalledTimes(1);
     expect(subject.state.resolvedSessionSlug).toBe('alpha');
-    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
-      image: 'https://example.example.test/beta-badge.png',
-      chainID: 84532,
-    }));
+    expect(subject.state.sbtInfo).toEqual(
+      expect.objectContaining({
+        image: 'https://example.example.test/beta-badge.png',
+        chainID: 84532,
+      }),
+    );
     expect(subject.state.userHasSBT).toBe(false);
   });
 });

@@ -9,16 +9,17 @@ const question = {
   question: 'How are you?',
 };
 
-const renderStandaloneQuestion = () => renderSurveyQuestions({
-  singleQuestionMode: false,
-  isStandalone: true,
-  surveyIndex: 0,
-  account: '0xabc',
-  loginComplete: true,
-  network: { id: 84532 },
-  questionPool: [question],
-  isQuestionCacheReady: true,
-});
+const renderStandaloneQuestion = () =>
+  renderSurveyQuestions({
+    singleQuestionMode: false,
+    isStandalone: true,
+    surveyIndex: 0,
+    account: '0xabc',
+    loginComplete: true,
+    network: { id: 84532 },
+    questionPool: [question],
+    isQuestionCacheReady: true,
+  });
 
 const openAdditionalComments = async () => {
   const commentsToggle = await screen.findByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE);
@@ -26,16 +27,11 @@ const openAdditionalComments = async () => {
   return screen.findByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT);
 };
 
-const getAdditionalCommentsContainer = () => (
-  screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT)
-    .closest(`.${styles.fullQuestionComments}`)
-);
+const getAdditionalCommentsContainer = () =>
+  screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT).closest(`.${styles.fullQuestionComments}`);
 
-const getAdditionalLockIconName = () => (
-  screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK)
-    .querySelector('svg')
-    ?.getAttribute('data-icon')
-);
+const getAdditionalLockIconName = () =>
+  screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK).querySelector('svg')?.getAttribute('data-icon');
 
 describe('SurveyQuestions additional comment locks', () => {
   afterEach(() => {

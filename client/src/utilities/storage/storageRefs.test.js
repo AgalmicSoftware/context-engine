@@ -104,7 +104,11 @@ describe('storageRefs', () => {
       id: TX_ID,
       uri: `ar://${TX_ID}`,
     });
-    expect(resolvePayloadStorageRef({ arweaveTxId: TX_ID })).toEqual(normalizeStorageRefForRecord({ arweaveTxId: TX_ID }));
-    expect(attachStorageRefCompatibilityFields({ arweaveTxId: TX_ID })).toEqual(withStorageRefCompatibility({ arweaveTxId: TX_ID }));
+    expect(resolvePayloadStorageRef({ arweaveTxId: TX_ID })).toEqual(
+      normalizeStorageRefForRecord({ arweaveTxId: TX_ID }),
+    );
+    expect(attachStorageRefCompatibilityFields({ arweaveTxId: TX_ID })).toEqual(
+      withStorageRefCompatibility({ arweaveTxId: TX_ID }),
+    );
   });
 });

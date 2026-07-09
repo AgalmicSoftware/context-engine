@@ -83,31 +83,25 @@ const byteLength = (value: unknown): number => {
   return text.length;
 };
 
-const errorMessage = (error: unknown): string => (
+const errorMessage = (error: unknown): string =>
   error && typeof error === 'object' && 'message' in error && error.message
     ? String(error.message)
-    : String(error || 'Storage operation failed.')
-);
+    : String(error || 'Storage operation failed.');
 
-const normalizeKeyList = (keys: string | string[] | null | undefined): string[] => (
+const normalizeKeyList = (keys: string | string[] | null | undefined): string[] =>
   Array.isArray(keys)
     ? keys.map((key) => String(key || '').trim()).filter(Boolean)
-    : [String(keys || '').trim()].filter(Boolean)
-);
+    : [String(keys || '').trim()].filter(Boolean);
 
-export const boundedStringify = (
-  payload: unknown,
-  options: BoundedStringifyOptions = {}
-): BoundedStringifyResult => {
-  const maxBytes = Number.isFinite(Number(options.maxBytes))
-    ? Number(options.maxBytes)
-    : DEFAULT_MAX_JSON_BYTES;
+export const boundedStringify = (payload: unknown, options: BoundedStringifyOptions = {}): BoundedStringifyResult => {
+  const maxBytes = Number.isFinite(Number(options.maxBytes)) ? Number(options.maxBytes) : DEFAULT_MAX_JSON_BYTES;
   const replacer = options.replacer;
 
   try {
-    const value = typeof replacer === 'function'
-      ? JSON.stringify(payload, replacer, options.space)
-      : JSON.stringify(payload, replacer ?? null, options.space);
+    const value =
+      typeof replacer === 'function'
+        ? JSON.stringify(payload, replacer, options.space)
+        : JSON.stringify(payload, replacer ?? null, options.space);
     if (typeof value !== 'string') {
       return {
         ok: false,
@@ -146,7 +140,7 @@ export const safeJsonRead = <T = unknown>(
   storage: StorageLike | null | undefined,
   key: unknown,
   parser: ((value: unknown) => T) | null = null,
-  options: SafeJsonReadOptions = {}
+  options: SafeJsonReadOptions = {},
 ): SafeJsonReadResult<T> => {
   const normalizedKey = String(key || '').trim();
   if (!storage || !normalizedKey || typeof storage.getItem !== 'function') {
@@ -207,7 +201,7 @@ export const safeJsonWrite = (
   storage: StorageLike | null | undefined,
   key: unknown,
   payload: unknown,
-  options: BoundedStringifyOptions = {}
+  options: BoundedStringifyOptions = {},
 ): SafeJsonWriteResult => {
   const normalizedKey = String(key || '').trim();
   if (!storage || !normalizedKey || typeof storage.setItem !== 'function') {
@@ -240,7 +234,7 @@ export const safeJsonWrite = (
 
 export const removeKeys = (
   storage: StorageLike | null | undefined,
-  keys: string | string[] | null | undefined
+  keys: string | string[] | null | undefined,
 ): RemoveKeysResult => {
   const normalizedKeys = normalizeKeyList(keys);
   const removeItem = storage?.removeItem;
@@ -279,14 +273,20 @@ export const createStorageNamespace = ({
   prefix?: unknown;
   version?: unknown;
 } = {}): StorageNamespace => {
-  const normalizedPrefix = String(prefix || '').trim().replace(/:+$/g, '');
-  const normalizedVersion = String(version || 1).trim().replace(/^v/i, '');
+  const normalizedPrefix = String(prefix || '')
+    .trim()
+    .replace(/:+$/g, '');
+  const normalizedVersion = String(version || 1)
+    .trim()
+    .replace(/^v/i, '');
   const base = `${normalizedPrefix}:v${normalizedVersion}`;
 
   return {
     base,
     key(name = '') {
-      const suffix = String(name || '').trim().replace(/^:+/g, '');
+      const suffix = String(name || '')
+        .trim()
+        .replace(/^:+/g, '');
       return suffix ? `${base}:${suffix}` : base;
     },
   };

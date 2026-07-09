@@ -1,6 +1,4 @@
-import {
-  normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import { ethers } from 'ethers';
 import {
   buildSbtPageHolderListSignature,
@@ -8,10 +6,7 @@ import {
   computeSbtPageNetCounts,
   computeSbtPageNetHoldersList,
 } from './sbtPageHolderHelpers';
-import {
-  buildSessionRoutePath,
-  resolveSbtAddress,
-} from './sbtPageAddressSessionHelpers';
+import { buildSessionRoutePath, resolveSbtAddress } from './sbtPageAddressSessionHelpers';
 export {
   buildSessionRoutePath,
   getCurrentSbtAddressInfo,
@@ -36,17 +31,9 @@ export {
   resolveSbtPageSessionDisplayLabel,
   resolveSbtPageSessionSlugFromInfo,
 } from './sbtPageSessionDisplayHelpers';
-export type {
-  SbtPageSessionDisplayConfig,
-} from './sbtPageSessionDisplayHelpers';
-export {
-  applySbtPageHistorySummaryFallback,
-  normalizeSbtPageHistorySummary,
-} from './sbtPageHistorySummaryHelpers';
-export type {
-  SbtPageHistorySummary,
-  SbtPageHistorySummaryInput,
-} from './sbtPageHistorySummaryHelpers';
+export type { SbtPageSessionDisplayConfig } from './sbtPageSessionDisplayHelpers';
+export { applySbtPageHistorySummaryFallback, normalizeSbtPageHistorySummary } from './sbtPageHistorySummaryHelpers';
+export type { SbtPageHistorySummary, SbtPageHistorySummaryInput } from './sbtPageHistorySummaryHelpers';
 export {
   coerceSbtPageEpochSeconds,
   coerceSbtPageStringArrayValue,
@@ -264,13 +251,8 @@ export {
   resolveSbtPageScanProgressPercent,
   shouldShowSbtPageScanProgress,
 } from './sbtPageScanProgressHelpers';
-export type {
-  SbtPageScanProgressRecord,
-} from './sbtPageScanProgressHelpers';
-export type {
-  SbtPageDisplayImageState,
-  SbtPageInfoImageLike,
-} from './sbtPageMediaHelpers';
+export type { SbtPageScanProgressRecord } from './sbtPageScanProgressHelpers';
+export type { SbtPageDisplayImageState, SbtPageInfoImageLike } from './sbtPageMediaHelpers';
 export {
   resolveSbtPageHolderDisplayModel,
   resolveSbtPageHolderFilterItems,
@@ -479,14 +461,8 @@ type BuildSbtPageDirectMetadataContextArgs = {
   netKeyHint?: unknown;
   slugForRead?: unknown;
 };
-type SbtPageCacheReader = (
-  namespace: string,
-  slug?: string
-) => Promise<unknown> | unknown;
-type SbtPageNamespaceEntriesReader = (
-  namespace: string,
-  options?: Record<string, unknown>
-) => unknown;
+type SbtPageCacheReader = (namespace: string, slug?: string) => Promise<unknown> | unknown;
+type SbtPageNamespaceEntriesReader = (namespace: string, options?: Record<string, unknown>) => unknown;
 type SbtPageCachedSbtEntry = Record<string, unknown> & {
   sbtInfo?: unknown;
   slug?: unknown;
@@ -618,9 +594,7 @@ type SbtPageMetadataCompletenessInfo = Record<string, unknown> & {
   tokenURI?: unknown;
   tokenUri?: unknown;
 };
-export const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+export const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
 export const buildSbtPageEncryptedEnvelopeFingerprint = ({
   descriptionEnvelope = null,
@@ -628,23 +602,21 @@ export const buildSbtPageEncryptedEnvelopeFingerprint = ({
   imageEnvelope = null,
   nameEnvelope = null,
   tagsEnvelope = null,
-}: BuildSbtPageEncryptedEnvelopeFingerprintArgs = {}): string => (
+}: BuildSbtPageEncryptedEnvelopeFingerprintArgs = {}): string =>
   [
     nameEnvelope ? 'n' : '',
     descriptionEnvelope ? 'd' : '',
     tagsEnvelope ? 't' : '',
     documentUrlsEnvelope ? 'u' : '',
     imageEnvelope ? 'i' : '',
-  ].join('')
-);
+  ].join('');
 
 export const buildSbtPageEncryptedEnvelopeDecryptKey = ({
   activeAccount = '',
   envelopeFingerprint = '',
   metaKey = '',
-}: BuildSbtPageEncryptedEnvelopeDecryptKeyArgs = {}): string => (
-  `${metaKey}:${activeAccount || ''}:${envelopeFingerprint || ''}`
-);
+}: BuildSbtPageEncryptedEnvelopeDecryptKeyArgs = {}): string =>
+  `${metaKey}:${activeAccount || ''}:${envelopeFingerprint || ''}`;
 
 export const buildSbtPageEncryptedMetadataDecryptPlan = ({
   activeAccount = '',
@@ -656,9 +628,11 @@ export const buildSbtPageEncryptedMetadataDecryptPlan = ({
   const info = isRecord(sbtInfo) ? sbtInfo : {};
   const encryptedFields = isRecord(info.encryptedFields) ? info.encryptedFields : {};
   const nameEnvelope = encryptedFields.name || info.nameEncrypted || info.encryptedName || null;
-  const descriptionEnvelope = encryptedFields.description || info.descriptionEncrypted || info.encryptedDescription || null;
+  const descriptionEnvelope =
+    encryptedFields.description || info.descriptionEncrypted || info.encryptedDescription || null;
   const tagsEnvelope = encryptedFields.tags || info.tagsEncrypted || info.encryptedTags || null;
-  const documentUrlsEnvelope = encryptedFields.documentURLs || info.documentURLsEncrypted || info.docUrlsEncrypted || null;
+  const documentUrlsEnvelope =
+    encryptedFields.documentURLs || info.documentURLsEncrypted || info.docUrlsEncrypted || null;
   const imageEnvelope = encryptedFields.image || info.imageEncrypted || info.encryptedImage || null;
   const envelopeFingerprint = buildSbtPageEncryptedEnvelopeFingerprint({
     nameEnvelope,
@@ -672,10 +646,7 @@ export const buildSbtPageEncryptedMetadataDecryptPlan = ({
     activeAccount,
     envelopeFingerprint,
   });
-  const alreadyTried = !!(
-    isRecord(decryptTriedByKey) &&
-    decryptTriedByKey[decryptKey]
-  );
+  const alreadyTried = !!(isRecord(decryptTriedByKey) && decryptTriedByKey[decryptKey]);
   const hasEncryptedMetadata = !!(
     nameEnvelope ||
     descriptionEnvelope ||
@@ -704,10 +675,7 @@ export const resolveSbtPageCachedGroupPasswordHash = ({
   groupPasswordHashLoaded = false,
   preferCountsOnly = false,
 }: ResolveSbtPageCachedGroupPasswordHashArgs = {}): SbtPageCachedGroupPasswordHashState => {
-  const shouldReuseCachedGroupPasswordHash = (
-    !!preferCountsOnly &&
-    groupPasswordHashLoaded === true
-  );
+  const shouldReuseCachedGroupPasswordHash = !!preferCountsOnly && groupPasswordHashLoaded === true;
   return {
     groupPasswordHash: shouldReuseCachedGroupPasswordHash ? groupPasswordHash : null,
     shouldReuseCachedGroupPasswordHash,
@@ -731,7 +699,7 @@ export const resolveSbtPageChainMetadataReadNeeds = ({
   info = {},
   zeroAddress = ethers.constants.AddressZero,
 }: ResolveSbtPageChainMetadataReadNeedsArgs = {}): SbtPageChainMetadataReadNeeds => {
-  const metadata = isRecord(info) ? info as SbtPageMetadataCompletenessInfo : {};
+  const metadata = isRecord(info) ? (info as SbtPageMetadataCompletenessInfo) : {};
   const zeroAddressLower = String(zeroAddress || '').toLowerCase();
   const adminRaw = String(metadata.admin || metadata.admin_ || '').trim();
   const needMax = metadata.maxTokens == null;
@@ -751,9 +719,7 @@ export const resolveSbtPageChainMetadataReadNeeds = ({
 
 export const findNestedInteractiveElement = (target: EventTarget | null): unknown => {
   const candidate = target as ClosestCapableTarget | null;
-  return typeof candidate?.closest === 'function'
-    ? candidate.closest('button, a, input, [role="button"]')
-    : null;
+  return typeof candidate?.closest === 'function' ? candidate.closest('button, a, input, [role="button"]') : null;
 };
 
 export const needsSbtPageTokenUriFields = (infoInput: unknown): boolean => {
@@ -770,12 +736,11 @@ export const needsSbtPageTokenUriFields = (infoInput: unknown): boolean => {
     !!(isRecord(info.encryptedFields) && info.encryptedFields.image);
   const endOk = Number.isFinite(Number(info.mintingEndTime));
   const burnOk = Number.isFinite(Number(info.burnAuth));
-  const hasPw = (typeof info.hasPasswordMint === 'boolean');
+  const hasPw = typeof info.hasPasswordMint === 'boolean';
   const maxTok = has(info.maxTokens);
   const adminAddress = String(info.admin || info.admin_ || info.deployer || '').trim();
   const adminOk =
-    !!adminAddress &&
-    adminAddress.toLowerCase() !== String(ethers.constants.AddressZero || '').toLowerCase();
+    !!adminAddress && adminAddress.toLowerCase() !== String(ethers.constants.AddressZero || '').toLowerCase();
   return !(has(tokenUri) && hasImageMetadata && endOk && burnOk && hasPw && maxTok && adminOk);
 };
 
@@ -791,7 +756,9 @@ export const buildSbtPageAdminFallbackPatch = ({
   ownerAddress = '',
   zeroAddress = ethers.constants.AddressZero,
 }: BuildSbtPageAdminFallbackPatchArgs = {}): Record<string, string> => {
-  const zeroAddressLower = String(zeroAddress || '').trim().toLowerCase();
+  const zeroAddressLower = String(zeroAddress || '')
+    .trim()
+    .toLowerCase();
   const nextAdmin = [adminAddress, ownerAddress]
     .map((value: unknown) => String(value || '').trim())
     .find((value: string) => value && value.toLowerCase() !== zeroAddressLower);
@@ -813,10 +780,14 @@ export const buildSbtPageLoadInfoRequestKey = ({
 }: BuildSbtPageLoadInfoRequestKeyArgs = {}): string => {
   const sbtAddress = resolveSbtAddress(sbtAddressInput);
   return [
-    String(sbtAddress || '').trim().toLowerCase(),
+    String(sbtAddress || '')
+      .trim()
+      .toLowerCase(),
     normalizeSessionSlug(activeSlug || ''),
     String(Number(network?.id || 0) || 0),
-    String(account || '').trim().toLowerCase(),
+    String(account || '')
+      .trim()
+      .toLowerCase(),
     String(Number(sbtCacheRevision || 0) || 0),
   ].join('|');
 };
@@ -877,7 +848,11 @@ export const resolveSbtPageLoadInfoPendingQueuePlan = ({
 const buildSbtPageAddressListSignature = (input: unknown): string => {
   if (!Array.isArray(input)) return '';
   return input
-    .map((entry) => String(entry || '').trim().toLowerCase())
+    .map((entry) =>
+      String(entry || '')
+        .trim()
+        .toLowerCase(),
+    )
     .filter(Boolean)
     .join(',');
 };
@@ -899,10 +874,18 @@ export const buildSbtPageSessionSbtAddresses = ({
   stateSbtAddress,
 }: BuildSbtPageSessionSbtAddressesArgs = {}): BuildSbtPageSessionSbtAddressesResult => {
   const cacheKey = [
-    String(stateSbtAddress || '').trim().toLowerCase(),
-    String(routeSbtAddress || '').trim().toLowerCase(),
-    String(resolveSbtAddress(propSBTAddress) || '').trim().toLowerCase(),
-    String(sessionSlug || '').trim().toLowerCase(),
+    String(stateSbtAddress || '')
+      .trim()
+      .toLowerCase(),
+    String(routeSbtAddress || '')
+      .trim()
+      .toLowerCase(),
+    String(resolveSbtAddress(propSBTAddress) || '')
+      .trim()
+      .toLowerCase(),
+    String(sessionSlug || '')
+      .trim()
+      .toLowerCase(),
     buildSbtPageAddressListSignature(sessionConfig?.defaultFeaturedSBTs),
     buildSbtPageAddressListSignature(sessionConfig?.featured_SBTs_LIST),
   ].join('|');
@@ -974,7 +957,9 @@ export const buildSbtPageOpenMintAutoJoinUrl = ({
   if (!sbtAddress || !ethers.utils.isAddress(sbtAddress)) return '';
 
   const info = isRecord(sbtInfo) ? sbtInfo : {};
-  const normalizedHash = String(groupPasswordHash || '').trim().toLowerCase();
+  const normalizedHash = String(groupPasswordHash || '')
+    .trim()
+    .toLowerCase();
   const zeroHash = String(ethers.constants.HashZero || '').toLowerCase();
   const hasGroupHash = !!normalizedHash && normalizedHash !== zeroHash;
   if (info.hasPasswordMint || hasInviteMint || hasGroupPasswordMint || hasGroupHash) {
@@ -995,20 +980,11 @@ export const deriveSbtPageCacheNetKey = ({
   netKeyHint = null,
   slugForCache = '',
 }: DeriveSbtPageCacheNetKeyArgs = {}): string => {
-  const infoRecord = isRecord(infoHint) ? infoHint as SbtPageMetadataInfoLike : {};
-  const networkRecord = isRecord(currentNetwork) ? currentNetwork as SbtPageNetworkLike : {};
-  const chainIdHint =
-    infoRecord.chainID ||
-    infoRecord.chainId ||
-    netKeyHint;
-  const sessionChainId = typeof readSessionChainId === 'function'
-    ? readSessionChainId(slugForCache)
-    : null;
-  const chainId =
-    sessionChainId ||
-    (chainIdHint != null ? Number(chainIdHint) : null) ||
-    networkRecord.id ||
-    null;
+  const infoRecord = isRecord(infoHint) ? (infoHint as SbtPageMetadataInfoLike) : {};
+  const networkRecord = isRecord(currentNetwork) ? (currentNetwork as SbtPageNetworkLike) : {};
+  const chainIdHint = infoRecord.chainID || infoRecord.chainId || netKeyHint;
+  const sessionChainId = typeof readSessionChainId === 'function' ? readSessionChainId(slugForCache) : null;
+  const chainId = sessionChainId || (chainIdHint != null ? Number(chainIdHint) : null) || networkRecord.id || null;
   return chainId != null ? String(chainId) : '';
 };
 
@@ -1020,20 +996,21 @@ export const buildSbtPageDirectMetadataContext = ({
   slugForRead = '',
 }: BuildSbtPageDirectMetadataContextArgs = {}): Record<string, unknown> | string => {
   const normalizedSlug = normalizeSessionSlug(slugForRead || '');
-  const infoRecord = isRecord(infoHint) ? infoHint as SbtPageMetadataInfoLike : {};
-  const networkRecord = isRecord(currentNetwork) ? currentNetwork as SbtPageNetworkLike : {};
-  const chainId = Number(
-    (typeof readSessionChainId === 'function' ? readSessionChainId(normalizedSlug) : null) ||
-    infoRecord.chainID ||
-    infoRecord.chainId ||
-    netKeyHint ||
-    networkRecord.id ||
-    0
-  ) || null;
+  const infoRecord = isRecord(infoHint) ? (infoHint as SbtPageMetadataInfoLike) : {};
+  const networkRecord = isRecord(currentNetwork) ? (currentNetwork as SbtPageNetworkLike) : {};
+  const chainId =
+    Number(
+      (typeof readSessionChainId === 'function' ? readSessionChainId(normalizedSlug) : null) ||
+        infoRecord.chainID ||
+        infoRecord.chainId ||
+        netKeyHint ||
+        networkRecord.id ||
+        0,
+    ) || null;
   const ctx: Record<string, unknown> = {};
   if (normalizedSlug) ctx.slug = normalizedSlug;
   if (chainId) ctx.networkChainId = chainId;
-  return Object.keys(ctx).length ? ctx : (normalizedSlug || '');
+  return Object.keys(ctx).length ? ctx : normalizedSlug || '';
 };
 
 export const readSbtPageCacheBySlug = async ({
@@ -1043,16 +1020,11 @@ export const readSbtPageCacheBySlug = async ({
 }: ReadSbtPageCacheBySlugArgs = {}): Promise<SbtPageCacheByNet> => {
   try {
     if (typeof readCacheFn !== 'function') return {};
-    const parsedRaw = await readCacheFn(
-      'sbtCache',
-      slugForCache == null ? undefined : String(slugForCache)
-    );
-    const parsed = isRecord(parsedRaw) ? parsedRaw as SbtPageCacheByNet : {};
+    const parsedRaw = await readCacheFn('sbtCache', slugForCache == null ? undefined : String(slugForCache));
+    const parsed = isRecord(parsedRaw) ? (parsedRaw as SbtPageCacheByNet) : {};
     const netKey = String(netKeyForCache);
     if (parsed[netKey] == null) {
-      const legacy = Object.keys(parsed || {}).find((key: string) => (
-        key !== netKey && Number(key) === Number(netKey)
-      ));
+      const legacy = Object.keys(parsed || {}).find((key: string) => key !== netKey && Number(key) === Number(netKey));
       if (legacy) {
         parsed[netKey] = {
           ...(isRecord(parsed[netKey]) ? parsed[netKey] : {}),
@@ -1082,13 +1054,13 @@ export const findSbtPageCachedEntryAcrossGroups = ({
       const normalizedSourceSlug = normalizeSessionSlug(sourceSlug);
       if (excludedSlug && normalizedSourceSlug === excludedSlug) continue;
       const parsed = isRecord(namespaceEntry.value)
-        ? namespaceEntry.value as Record<string, SbtPageCacheNetNode | undefined>
+        ? (namespaceEntry.value as Record<string, SbtPageCacheNetNode | undefined>)
         : {};
       for (const netKey of Object.keys(parsed || {})) {
-        const netNode = isRecord(parsed[netKey]) ? parsed[netKey] as SbtPageCacheNetNode : {};
+        const netNode = isRecord(parsed[netKey]) ? (parsed[netKey] as SbtPageCacheNetNode) : {};
         const sbtList = isRecord(netNode.sbtList) ? netNode.sbtList : {};
         const entry = sbtList[normalizedAddress];
-        const entryRecord = isRecord(entry) ? entry as SbtPageCachedSbtEntry : null;
+        const entryRecord = isRecord(entry) ? (entry as SbtPageCachedSbtEntry) : null;
         if (!entryRecord) continue;
         const candidateSlug = normalizeSessionSlug(entryRecord.slug != null ? entryRecord.slug : sourceSlug);
         if (excludedSlug && candidateSlug === excludedSlug) continue;
@@ -1113,11 +1085,7 @@ export const resolveSbtPageMetadataHydrationMode = ({
   const usingCentralHydration = typeof refreshSbtData === 'function';
   return {
     usingCentralHydration,
-    parentOwnsInitialRefresh: (
-      usingCentralHydration &&
-      forceEventFetch !== true &&
-      isSBTCacheReady === false
-    ),
+    parentOwnsInitialRefresh: usingCentralHydration && forceEventFetch !== true && isSBTCacheReady === false,
   };
 };
 
@@ -1127,9 +1095,7 @@ export const buildSbtPageRefreshOptions = ({
   preferCountsOnly = false,
 }: BuildSbtPageRefreshOptionsArgs = {}): SbtPageRefreshOptions | undefined => {
   if (!forceEventFetch) return undefined;
-  const refreshOptions: SbtPageRefreshOptions = onProgress
-    ? { forceCounts: true, onProgress }
-    : { forceCounts: true };
+  const refreshOptions: SbtPageRefreshOptions = onProgress ? { forceCounts: true, onProgress } : { forceCounts: true };
   if (preferCountsOnly) refreshOptions.countsOnly = true;
   return refreshOptions;
 };
@@ -1137,10 +1103,7 @@ export const buildSbtPageRefreshOptions = ({
 export const resolveSbtPageShouldRefreshCounts = ({
   countsLoaded = false,
   forceEventFetch = false,
-}: ResolveSbtPageShouldRefreshCountsArgs = {}): boolean => (
-  forceEventFetch === true ||
-  countsLoaded !== true
-);
+}: ResolveSbtPageShouldRefreshCountsArgs = {}): boolean => forceEventFetch === true || countsLoaded !== true;
 
 export const resolveSbtPageRefreshLifecyclePlan = ({
   eventScanTried = false,
@@ -1149,15 +1112,8 @@ export const resolveSbtPageRefreshLifecyclePlan = ({
   shouldRefreshCounts = false,
   usingCentralHydration = false,
 }: ResolveSbtPageRefreshLifecyclePlanArgs = {}): SbtPageRefreshLifecyclePlan => {
-  const shouldUseCentralRefresh = (
-    !!shouldRefreshCounts &&
-    !!usingCentralHydration &&
-    !parentOwnsInitialRefresh
-  );
-  const hasForcedCountsOptions = (
-    isRecord(refreshOptions) &&
-    !!refreshOptions.forceCounts
-  );
+  const shouldUseCentralRefresh = !!shouldRefreshCounts && !!usingCentralHydration && !parentOwnsInitialRefresh;
+  const hasForcedCountsOptions = isRecord(refreshOptions) && !!refreshOptions.forceCounts;
   return {
     shouldPromoteToForcedCountsRefresh: shouldUseCentralRefresh && !hasForcedCountsOptions,
     shouldRunEventScanRefresh: shouldUseCentralRefresh && !eventScanTried,
@@ -1171,7 +1127,7 @@ export const resolveSbtPageOwnerLookupFallbackDecision = ({
   ownerLookupTokenCount = NaN,
   preferCountsOnly = false,
   requireCountsNotLoaded = false,
-}: ResolveSbtPageOwnerLookupFallbackDecisionArgs = {}): boolean => (
+}: ResolveSbtPageOwnerLookupFallbackDecisionArgs = {}): boolean =>
   !preferCountsOnly &&
   (!requireCountsNotLoaded || countsLoaded !== true) &&
   Array.isArray(mintedAddresses) &&
@@ -1179,8 +1135,7 @@ export const resolveSbtPageOwnerLookupFallbackDecision = ({
   Array.isArray(burnedAddresses) &&
   burnedAddresses.length === 0 &&
   Number.isFinite(Number(ownerLookupTokenCount)) &&
-  Number(ownerLookupTokenCount) > 0
-);
+  Number(ownerLookupTokenCount) > 0;
 
 export const resolveSbtPageOwnerLookupTokenCount = ({
   mintedTokensOverride = null,
@@ -1198,9 +1153,9 @@ export const resolveSbtPageUserAdminStatus = ({
   sbtInfo = null,
 }: ResolveSbtPageUserAdminStatusArgs = {}): unknown => {
   const infoRecord = isRecord(sbtInfo) ? sbtInfo : null;
-  const adminAddr = infoRecord ? (infoRecord.admin || infoRecord.admin_ || '') : '';
+  const adminAddr = infoRecord ? infoRecord.admin || infoRecord.admin_ || '' : '';
   const userLower = String(account || '').toLowerCase();
-  return userLower && adminAddr && (userLower === String(adminAddr).toLowerCase());
+  return userLower && adminAddr && userLower === String(adminAddr).toLowerCase();
 };
 
 export const buildSbtPagePrimaryMetadataStatePatch = ({
@@ -1227,13 +1182,10 @@ export const buildSbtPageAccountDerivedStatePatch = ({
   const minted = Array.isArray(stateRecord.mintedAddresses) ? stateRecord.mintedAddresses : [];
   const burned = Array.isArray(stateRecord.burnedAddresses) ? stateRecord.burnedAddresses : [];
   const net = computeSbtPageNetCounts(minted, burned);
-  const nextUserHasSBT = nextLower ? ((net.get(nextLower) || 0) > 0) : false;
+  const nextUserHasSBT = nextLower ? (net.get(nextLower) || 0) > 0 : false;
   const sbtInfoRecord = isRecord(stateRecord.sbtInfo) ? stateRecord.sbtInfo : null;
   const nextUserIsAdmin = resolveSbtPageUserAdminStatus({ account: nextLower, sbtInfo: sbtInfoRecord });
-  if (
-    nextUserHasSBT === stateRecord.userHasSBT &&
-    nextUserIsAdmin === stateRecord.userIsSbtAdmin
-  ) {
+  if (nextUserHasSBT === stateRecord.userHasSBT && nextUserIsAdmin === stateRecord.userIsSbtAdmin) {
     return null;
   }
   return {
@@ -1279,21 +1231,23 @@ export const buildSbtPageLocalBurnSuccessPatch = ({
     prev.showModal === true ||
     prev.mintingAddressesFilterInitialized === true ||
     (Array.isArray(prev.filteredMintedUsers) && prev.filteredMintedUsers.length > 0);
-  const resolveNextRows = typeof buildNextFilteredHolderRows === 'function'
-    ? buildNextFilteredHolderRows
-    : buildSbtPageNextFilteredHolderRows;
+  const resolveNextRows =
+    typeof buildNextFilteredHolderRows === 'function'
+      ? buildNextFilteredHolderRows
+      : buildSbtPageNextFilteredHolderRows;
   const filteredMintedUsers = shouldManageVisibleRows
     ? resolveNextRows({
-      prevFilteredRows: prev.filteredMintedUsers,
-      prevNetHolders,
-      nextNetHolders,
-      replaceRows: false,
-    })
-    : (Array.isArray(prev.filteredMintedUsers) ? prev.filteredMintedUsers : []);
+        prevFilteredRows: prev.filteredMintedUsers,
+        prevNetHolders,
+        nextNetHolders,
+        replaceRows: false,
+      })
+    : Array.isArray(prev.filteredMintedUsers)
+      ? prev.filteredMintedUsers
+      : [];
   const nextFilteredRows = Array.isArray(filteredMintedUsers) ? filteredMintedUsers : [];
-  const resolveSignature = typeof buildAddressListSignature === 'function'
-    ? buildAddressListSignature
-    : buildSbtPageHolderListSignature;
+  const resolveSignature =
+    typeof buildAddressListSignature === 'function' ? buildAddressListSignature : buildSbtPageHolderListSignature;
   return {
     burnedAddresses: burned,
     userHasSBT: (net.get(addr) || 0) > 0,

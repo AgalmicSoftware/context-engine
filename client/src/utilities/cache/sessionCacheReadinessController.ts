@@ -1,27 +1,19 @@
 import { createLogger } from 'utilities/logging.js';
 import { recordCeRuntimeCacheEvent } from '../../utilities/ui/uiRuntimeStats.js';
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 
 type CacheInitMode = 'auto' | 'partial' | 'full';
 
 export interface SessionCacheReadinessHost {
   getState?: () => Record<string, unknown>;
-  setState?: (
-    updater: (prev: Record<string, unknown>) => Record<string, unknown> | null,
-    cb?: () => void
-  ) => void;
+  setState?: (updater: (prev: Record<string, unknown>) => Record<string, unknown> | null, cb?: () => void) => void;
   isMounted?: () => boolean;
   resolveActiveSlug?: () => string;
   getSessionSlugFromState?: () => string;
   getCurrentPathname?: () => string;
   checkAllCachesReady?: () => void;
-  syncCacheHasLoadedFlagFromPersistent?: (
-    slug: string,
-    opts: { force: boolean }
-  ) => Promise<boolean>;
-  isInitInFlight?: (
-    slug: string
-  ) => { question?: boolean; survey?: boolean; response?: boolean } | null;
+  syncCacheHasLoadedFlagFromPersistent?: (slug: string, opts: { force: boolean }) => Promise<boolean>;
+  isInitInFlight?: (slug: string) => { question?: boolean; survey?: boolean; response?: boolean } | null;
   readFlag?: (name: string, slug: string) => unknown;
   shouldAutoRunFullSbtScan?: (opts: { pathname: string }) => boolean;
   initializeSbtCache?: (opts: { mode: CacheInitMode }) => Promise<unknown>;
@@ -34,40 +26,29 @@ interface CacheUpdateFlags {
 }
 
 export interface SessionCacheReadinessController {
-  setReadinessStateIfChanged: (
-    nextState: Record<string, unknown> | null | undefined,
-    cb?: () => void
-  ) => boolean;
+  setReadinessStateIfChanged: (nextState: Record<string, unknown> | null | undefined, cb?: () => void) => boolean;
   checkAllCachesReady: () => void;
   syncCacheHasLoadedFlagOnTransition: (
     slug: string,
-    opts?: { force?: boolean; isAllReady?: boolean }
+    opts?: { force?: boolean; isAllReady?: boolean },
   ) => Promise<boolean>;
   clearCacheUpdateFlushSchedule: () => void;
   scheduleCacheUpdateFlush: () => void;
-  queueCacheUpdateFlush: (
-    opts?: {
-      slug?: string;
-      needsSbtRevision?: boolean;
-      needsQuestionResponsesNonce?: boolean;
-    }
-  ) => void;
+  queueCacheUpdateFlush: (opts?: {
+    slug?: string;
+    needsSbtRevision?: boolean;
+    needsQuestionResponsesNonce?: boolean;
+  }) => void;
   flushQueuedCacheUpdates: () => void;
   clearLocalRevisionFlushSchedule: () => void;
   scheduleLocalRevisionFlush: () => void;
-  queueLocalRevisionUpdate: (
-    opts?: {
-      needsSbtRevision?: boolean;
-      needsQuestionResponsesNonce?: boolean;
-      checkAllCachesReady?: boolean;
-    }
-  ) => void;
-  flushLocalRevisionUpdate: () => void;
-  handleCrossTabCacheUpdateEvent: (evt: {
-    namespace?: string;
-    slug?: string;
-    source?: string;
+  queueLocalRevisionUpdate: (opts?: {
+    needsSbtRevision?: boolean;
+    needsQuestionResponsesNonce?: boolean;
+    checkAllCachesReady?: boolean;
   }) => void;
+  flushLocalRevisionUpdate: () => void;
+  handleCrossTabCacheUpdateEvent: (evt: { namespace?: string; slug?: string; source?: string }) => void;
   destroy: () => void;
 }
 
@@ -82,7 +63,7 @@ const createDefaultCacheUpdateFlags = (): CacheUpdateFlags => ({
 });
 
 export const createSessionCacheReadinessController = (
-  host: SessionCacheReadinessHost = {}
+  host: SessionCacheReadinessHost = {},
 ): SessionCacheReadinessController => {
   let pendingReadinessValues: Map<string, unknown> = new Map();
   let pendingCacheUpdateSlug: string | null = null;
@@ -96,14 +77,9 @@ export const createSessionCacheReadinessController = (
   let lastCacheHasLoadedSyncSlug: string = '';
   let lastCacheHasLoadedSyncIsAllReady: boolean | null = null;
 
-  const getState = (): StateRecord => (
-    typeof host.getState === 'function' ? host.getState() || {} : {}
-  );
+  const getState = (): StateRecord => (typeof host.getState === 'function' ? host.getState() || {} : {});
 
-  const setState = (
-    updater: (prev: StateRecord) => StateRecord | null,
-    cb?: () => void
-  ): void => {
+  const setState = (updater: (prev: StateRecord) => StateRecord | null, cb?: () => void): void => {
     if (typeof host.setState === 'function') {
       host.setState(updater, cb);
       return;
@@ -111,23 +87,18 @@ export const createSessionCacheReadinessController = (
     if (typeof cb === 'function') cb();
   };
 
-  const isMounted = (): boolean => (
-    typeof host.isMounted === 'function' ? !!host.isMounted() : false
-  );
+  const isMounted = (): boolean => (typeof host.isMounted === 'function' ? !!host.isMounted() : false);
 
-  const resolveActiveSlug = (): string => String(
-    typeof host.resolveActiveSlug === 'function' ? host.resolveActiveSlug() || '' : ''
-  );
+  const resolveActiveSlug = (): string =>
+    String(typeof host.resolveActiveSlug === 'function' ? host.resolveActiveSlug() || '' : '');
 
-  const resolveStateSlug = (): string => String(
-    typeof host.getSessionSlugFromState === 'function'
-      ? host.getSessionSlugFromState() || ''
-      : resolveActiveSlug()
-  );
+  const resolveStateSlug = (): string =>
+    String(
+      typeof host.getSessionSlugFromState === 'function' ? host.getSessionSlugFromState() || '' : resolveActiveSlug(),
+    );
 
-  const getCurrentPathname = (): string => String(
-    typeof host.getCurrentPathname === 'function' ? host.getCurrentPathname() || '' : ''
-  );
+  const getCurrentPathname = (): string =>
+    String(typeof host.getCurrentPathname === 'function' ? host.getCurrentPathname() || '' : '');
 
   const callHostCheckAllCachesReady = (): void => {
     if (typeof host.checkAllCachesReady === 'function') host.checkAllCachesReady();
@@ -200,9 +171,7 @@ export const createSessionCacheReadinessController = (
     needsQuestionResponsesNonce?: boolean;
   } = {}): void => {
     const nextSlug = String(slug || '');
-    const pendingSlug = pendingCacheUpdateSlug == null
-      ? null
-      : String(pendingCacheUpdateSlug || '');
+    const pendingSlug = pendingCacheUpdateSlug == null ? null : String(pendingCacheUpdateSlug || '');
     if (pendingSlug !== null && pendingSlug !== nextSlug) {
       pendingCacheUpdateFlags = createDefaultCacheUpdateFlags();
     }
@@ -244,18 +213,21 @@ export const createSessionCacheReadinessController = (
     pendingLocalRevisionFlags = createDefaultCacheUpdateFlags();
     pendingLocalRevisionCheckAllCachesReady = false;
     if (!isMounted()) return;
-    setState((prev) => {
-      const next: StateRecord = {};
-      if (flags.needsSbtRevision) {
-        next.sbtCacheRevision = Number(prev.sbtCacheRevision ?? 0) + 1;
-      }
-      if (flags.needsQuestionResponsesNonce) {
-        next.questionResponsesNonce = Number(prev.questionResponsesNonce ?? 0) + 1;
-      }
-      return next;
-    }, () => {
-      if (shouldCheckAllCachesReady) callHostCheckAllCachesReady();
-    });
+    setState(
+      (prev) => {
+        const next: StateRecord = {};
+        if (flags.needsSbtRevision) {
+          next.sbtCacheRevision = Number(prev.sbtCacheRevision ?? 0) + 1;
+        }
+        if (flags.needsQuestionResponsesNonce) {
+          next.questionResponsesNonce = Number(prev.questionResponsesNonce ?? 0) + 1;
+        }
+        return next;
+      },
+      () => {
+        if (shouldCheckAllCachesReady) callHostCheckAllCachesReady();
+      },
+    );
   };
 
   const scheduleLocalRevisionFlush = (): void => {
@@ -289,10 +261,7 @@ export const createSessionCacheReadinessController = (
     scheduleLocalRevisionFlush();
   };
 
-  const setReadinessStateIfChanged = (
-    nextState: StateRecord | null | undefined,
-    cb?: () => void
-  ): boolean => {
+  const setReadinessStateIfChanged = (nextState: StateRecord | null | undefined, cb?: () => void): boolean => {
     if (!nextState || typeof nextState !== 'object') {
       if (typeof cb === 'function') cb();
       return false;
@@ -323,15 +292,13 @@ export const createSessionCacheReadinessController = (
     };
     const currentState = getState();
     const hasChange = keys.some((key) => {
-      const baseline = pendingReadinessValues.has(key)
-        ? pendingReadinessValues.get(key)
-        : currentState[key];
+      const baseline = pendingReadinessValues.has(key) ? pendingReadinessValues.get(key) : currentState[key];
       return baseline !== nextState[key];
     });
     if (!hasChange) {
-      const hasPendingCommit = keys.some((key) => (
-        pendingReadinessValues.has(key) && currentState[key] !== pendingReadinessValues.get(key)
-      ));
+      const hasPendingCommit = keys.some(
+        (key) => pendingReadinessValues.has(key) && currentState[key] !== pendingReadinessValues.get(key),
+      );
       if (hasPendingCommit) {
         queueWrite();
         return false;
@@ -345,7 +312,7 @@ export const createSessionCacheReadinessController = (
 
   const syncCacheHasLoadedFlagOnTransition = (
     slugIn: string,
-    opts: { force?: boolean; isAllReady?: boolean } = {}
+    opts: { force?: boolean; isAllReady?: boolean } = {},
   ): Promise<boolean> => {
     const slug = normalizeSessionSlug(slugIn || '');
     const forceRequested = !!opts.force;
@@ -370,10 +337,7 @@ export const createSessionCacheReadinessController = (
   const runDeferredFullSbtScan = (slug: string, pathname: string): void => {
     void (async () => {
       try {
-        if (
-          typeof host.shouldAutoRunFullSbtScan === 'function' &&
-          !host.shouldAutoRunFullSbtScan({ pathname })
-        ) {
+        if (typeof host.shouldAutoRunFullSbtScan === 'function' && !host.shouldAutoRunFullSbtScan({ pathname })) {
           return;
         }
         log.log('[SBT Deferred] Kicking off full scan after questions & surveys are ready...');
@@ -408,7 +372,9 @@ export const createSessionCacheReadinessController = (
     if (!pathname.startsWith('/session/')) return;
 
     const shouldKickOff =
-      isSBTCacheReady && isSurveyCacheReady && isQuestionCacheReady &&
+      isSBTCacheReady &&
+      isSurveyCacheReady &&
+      isQuestionCacheReady &&
       !!(typeof host.readFlag === 'function' && host.readFlag('sbt:deferredFullScanNeeded', slug)) &&
       !(typeof host.readFlag === 'function' && host.readFlag('sbt:fullScanInProgress', slug));
 
@@ -426,17 +392,10 @@ export const createSessionCacheReadinessController = (
     const isLocalEcho = String(evt?.source || '') === 'local';
 
     if (isLocalEcho) {
-      const initInFlight = typeof host.isInitInFlight === 'function'
-        ? host.isInitInFlight(activeSlug) || {}
-        : {};
-      const questionInitBusy = !!(
-        initInFlight?.question ||
-        initInFlight?.survey ||
-        initInFlight?.response
-      );
-      const sbtScanBusy = typeof host.readFlag === 'function'
-        ? !!host.readFlag('sbt:fullScanInProgress', activeSlug)
-        : false;
+      const initInFlight = typeof host.isInitInFlight === 'function' ? host.isInitInFlight(activeSlug) || {} : {};
+      const questionInitBusy = !!(initInFlight?.question || initInFlight?.survey || initInFlight?.response);
+      const sbtScanBusy =
+        typeof host.readFlag === 'function' ? !!host.readFlag('sbt:fullScanInProgress', activeSlug) : false;
       if ((namespace === 'questionsCache' || namespace === 'surveysCache') && questionInitBusy) {
         return;
       }

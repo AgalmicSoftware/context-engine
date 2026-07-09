@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { renderSurveyResults } from './surveyResultsTestHarness';
 
@@ -96,10 +96,11 @@ const mockLatestBlock = (): jest.SpyInstance =>
 type PeekImpl = (namespace: string, slug: string) => any;
 
 const mockPeekCacheSync = (impl: PeekImpl): jest.SpyInstance =>
-  jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(
-    (namespace: any, slug: any = '', _options: any = {}) =>
-      impl(String(namespace || ''), String(slug || ''))
-  );
+  jest
+    .spyOn(cacheScripts, 'peekCacheSync')
+    .mockImplementation((namespace: any, slug: any = '', _options: any = {}) =>
+      impl(String(namespace || ''), String(slug || '')),
+    );
 
 const buildQuestionBucket = ({
   questions = {},
@@ -114,23 +115,20 @@ const buildQuestionBucket = ({
 });
 
 /** Namespace + slug-agnostic peek implementation builder for the common fixtures. */
-const buildPeekImpl = ({
-  questionsBucket = null,
-  surveysBucket = null,
-  bookmarks = undefined,
-  netId = '84532',
-}: any = {}): PeekImpl => (namespace: string, _slug: string) => {
-  if (namespace === 'questionsCache') {
-    return questionsBucket ? { [netId]: questionsBucket } : null;
-  }
-  if (namespace === 'surveysCache') {
-    return surveysBucket ? { [netId]: surveysBucket } : null;
-  }
-  if (namespace === 'bookmarksCache') {
-    return bookmarks === undefined ? null : bookmarks;
-  }
-  return null;
-};
+const buildPeekImpl =
+  ({ questionsBucket = null, surveysBucket = null, bookmarks = undefined, netId = '84532' }: any = {}): PeekImpl =>
+  (namespace: string, _slug: string) => {
+    if (namespace === 'questionsCache') {
+      return questionsBucket ? { [netId]: questionsBucket } : null;
+    }
+    if (namespace === 'surveysCache') {
+      return surveysBucket ? { [netId]: surveysBucket } : null;
+    }
+    if (namespace === 'bookmarksCache') {
+      return bookmarks === undefined ? null : bookmarks;
+    }
+    return null;
+  };
 
 const countNamespaceCalls = (spy: jest.SpyInstance | jest.Mock, namespace: string): number =>
   (spy as jest.Mock).mock.calls.filter((args: any[]) => args[0] === namespace).length;
@@ -339,12 +337,14 @@ describe('SurveyResults bookmark cache writes', () => {
       surveys: ['existing-survey'],
       questions: ['existing-question'],
     };
-    const peekSpy = mockPeekCacheSync(buildPeekImpl({
-      bookmarks: liveBookmarksCache,
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1', type: 'binary', prompt: 'Q1 prompt' } },
+    const peekSpy = mockPeekCacheSync(
+      buildPeekImpl({
+        bookmarks: liveBookmarksCache,
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1', type: 'binary', prompt: 'Q1 prompt' } },
+        }),
       }),
-    }));
+    );
     const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
 
     const surveyView = renderSurveyResults({
@@ -422,12 +422,14 @@ describe('SurveyResults bookmark cache writes', () => {
   it('applies question bookmark removal state even when the async cache write fails', async () => {
     const writeError = new Error('bookmark write failed');
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    mockPeekCacheSync(buildPeekImpl({
-      bookmarks: { surveys: ['s1'], questions: ['q1'] },
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1', type: 'binary', prompt: 'Q1 prompt' } },
+    mockPeekCacheSync(
+      buildPeekImpl({
+        bookmarks: { surveys: ['s1'], questions: ['q1'] },
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1', type: 'binary', prompt: 'Q1 prompt' } },
+        }),
       }),
-    }));
+    );
     const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockRejectedValue(writeError);
 
     try {
@@ -450,7 +452,7 @@ describe('SurveyResults bookmark cache writes', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         '[surveys]',
         '[SurveyResults] Error saving bookmarksCache:',
-        writeError
+        writeError,
       );
     } finally {
       consoleErrorSpy.mockRestore();
@@ -482,12 +484,10 @@ describe('SurveyResults bookmark cache writes', () => {
     });
     // The cache read for the click happened before the write dispatch.
     const clickPeekIndex = peekSpy.mock.calls.findIndex(
-      (args: any[], index: number) => index >= peekCallsBefore && args[0] === 'bookmarksCache'
+      (args: any[], index: number) => index >= peekCallsBefore && args[0] === 'bookmarksCache',
     );
     expect(clickPeekIndex).toBeGreaterThanOrEqual(0);
-    expect(peekSpy.mock.invocationCallOrder[clickPeekIndex]).toBeLessThan(
-      writeSpy.mock.invocationCallOrder[0]
-    );
+    expect(peekSpy.mock.invocationCallOrder[clickPeekIndex]).toBeLessThan(writeSpy.mock.invocationCallOrder[0]);
     // Slug resolution fed the read/write identity ('edge' in both call args above).
     // port note: the slug-resolved-first and setState-applied-last micro-ordering from the legacy
     // instrumented events array has no behavior seam; the icon reflecting the toggle after flush
@@ -501,12 +501,14 @@ describe('SurveyResults bookmark cache writes', () => {
       questions: 'bad-questions',
       otherField: 'kept',
     };
-    mockPeekCacheSync(buildPeekImpl({
-      bookmarks: malformedCache,
-      questionsBucket: buildQuestionBucket({
-        questions: { q2: { id: 'q2', type: 'binary', prompt: 'Q2 prompt' } },
+    mockPeekCacheSync(
+      buildPeekImpl({
+        bookmarks: malformedCache,
+        questionsBucket: buildQuestionBucket({
+          questions: { q2: { id: 'q2', type: 'binary', prompt: 'Q2 prompt' } },
+        }),
       }),
-    }));
+    );
     const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
 
     renderSurveyResults({
@@ -593,7 +595,7 @@ describe('SurveyResults bookmark cache writes', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         '[surveys]',
         '[SurveyResults] Error reading bookmarksCache:',
-        readError
+        readError,
       );
     } finally {
       consoleErrorSpy.mockRestore();
@@ -601,12 +603,14 @@ describe('SurveyResults bookmark cache writes', () => {
   });
 
   it('preserves current empty-slug bookmark write identity when no effective slug is available', async () => {
-    const peekSpy = mockPeekCacheSync(buildPeekImpl({
-      bookmarks: { surveys: [], questions: [] },
-      questionsBucket: buildQuestionBucket({
-        questions: { 'q-empty-slug': { id: 'q-empty-slug', type: 'binary', prompt: 'Empty slug prompt' } },
+    const peekSpy = mockPeekCacheSync(
+      buildPeekImpl({
+        bookmarks: { surveys: [], questions: [] },
+        questionsBucket: buildQuestionBucket({
+          questions: { 'q-empty-slug': { id: 'q-empty-slug', type: 'binary', prompt: 'Empty slug prompt' } },
+        }),
       }),
-    }));
+    );
     const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
 
     renderSurveyResults({
@@ -634,7 +638,8 @@ describe('SurveyResults bookmark cache writes', () => {
     const writeError = new Error('survey bookmark write failed');
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     mockPeekCacheSync(buildPeekImpl({ bookmarks: liveBookmarksCache }));
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache')
+    const writeSpy = jest
+      .spyOn(cacheScripts, 'writeCache')
       .mockRejectedValueOnce(writeError)
       .mockResolvedValueOnce(true);
 
@@ -663,7 +668,7 @@ describe('SurveyResults bookmark cache writes', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         '[surveys]',
         '[SurveyResults] Error saving bookmarksCache:',
-        writeError
+        writeError,
       );
 
       view.rerenderSurveyResults({ surveyId: 's-retry' });
@@ -815,20 +820,27 @@ describe('SurveyResults fallback questions', () => {
         },
       },
     });
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket,
-    }));
-    jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace: string) => (
-      namespace === 'questionsCache' ? { '84532': questionsBucket } : {}
-    ));
-    const view = renderSurveyResults({
-      isOpen: true,
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      preventUrlChange: true,
-      questionsCacheNonce: 40,
-      viewMode: 'questions',
-    }, { route: '/questions/results' });
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket,
+      }),
+    );
+    jest
+      .spyOn(cacheScripts, 'readCache')
+      .mockImplementation(async (namespace: string) =>
+        namespace === 'questionsCache' ? { '84532': questionsBucket } : {},
+      );
+    const view = renderSurveyResults(
+      {
+        isOpen: true,
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: true,
+        preventUrlChange: true,
+        questionsCacheNonce: 40,
+        viewMode: 'questions',
+      },
+      { route: '/questions/results' },
+    );
     await flushAsync(10);
 
     view.rerenderSurveyResults({ questionsCacheNonce: 41 });
@@ -848,12 +860,14 @@ describe('SurveyResults question-mode polling and filter state', () => {
   });
 
   it('invalidates question-filter question memo on nonce ticks with stable refs', async () => {
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1', creator: '0x1', type: 'binary', prompt: 'Q1' } },
-        questionResponses: { q1: { '0x1': { response: true } } },
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1', creator: '0x1', type: 'binary', prompt: 'Q1' } },
+          questionResponses: { q1: { '0x1': { response: true } } },
+        }),
       }),
-    }));
+    );
     const view = renderSurveyResults({
       isOpen: true,
       preventUrlChange: true,
@@ -882,11 +896,13 @@ describe('SurveyResults question-mode polling and filter state', () => {
 
   it('starts and stops local storage polling idempotently', async () => {
     jest.useFakeTimers();
-    const peekSpy = mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1' } },
+    const peekSpy = mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1' } },
+        }),
       }),
-    }));
+    );
     const view = renderSurveyResults({ isOpen: true, preventUrlChange: true });
     await flushAsync(10);
 
@@ -920,22 +936,27 @@ describe('SurveyResults question-mode polling and filter state', () => {
 
   it('skips surveys cache reads during question-mode polling', async () => {
     jest.useFakeTimers();
-    const peekSpy = mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1' } },
+    const peekSpy = mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1' } },
+        }),
+        surveysBucket: {
+          surveyResponses: {},
+          surveyResponsesLatestBlock: {},
+        },
       }),
-      surveysBucket: {
-        surveyResponses: {},
-        surveyResponsesLatestBlock: {},
+    );
+    renderSurveyResults(
+      {
+        isOpen: true,
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: true,
+        preventUrlChange: true,
+        viewMode: 'questions',
       },
-    }));
-    renderSurveyResults({
-      isOpen: true,
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      preventUrlChange: true,
-      viewMode: 'questions',
-    }, { route: '/questions/results' });
+      { route: '/questions/results' },
+    );
     await flushAsync(10);
 
     act(() => {
@@ -955,14 +976,16 @@ describe('SurveyResults question-mode polling and filter state', () => {
   });
 
   it('polls question cache using networkChainId when wallet network is unavailable', async () => {
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: {
-          q1: { id: 'q1', type: 'binary', prompt: 'Q1 prompt' },
-          q2: { id: 'q2', type: 'binary', prompt: 'Q2 prompt' },
-        },
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: {
+            q1: { id: 'q1', type: 'binary', prompt: 'Q1 prompt' },
+            q2: { id: 'q2', type: 'binary', prompt: 'Q2 prompt' },
+          },
+        }),
       }),
-    }));
+    );
     renderSurveyResults({
       isOpen: true,
       preventUrlChange: true,
@@ -980,26 +1003,28 @@ describe('SurveyResults question-mode polling and filter state', () => {
 
   it('falls back to zero for malformed survey latest-block cache entries while polling counts', async () => {
     const surveyId = 'survey-malformed-block';
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1', type: 'binary', prompt: 'Q1 prompt' } },
-      }),
-      surveysBucket: {
-        surveys: { [surveyId]: { questionIDs: ['q1'], title: 'Malformed Block Survey' } },
-        surveyResponses: {
-          [surveyId]: {
-            '0x1111111111111111111111111111111111111111': {
-              responses: [{ questionID: 'q1', answer: { value: true } }],
-            },
-            '0x2222222222222222222222222222222222222222': {
-              responses: [{ questionID: 'q1', answer: { value: false } }],
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1', type: 'binary', prompt: 'Q1 prompt' } },
+        }),
+        surveysBucket: {
+          surveys: { [surveyId]: { questionIDs: ['q1'], title: 'Malformed Block Survey' } },
+          surveyResponses: {
+            [surveyId]: {
+              '0x1111111111111111111111111111111111111111': {
+                responses: [{ questionID: 'q1', answer: { value: true } }],
+              },
+              '0x2222222222222222222222222222222222222222': {
+                responses: [{ questionID: 'q1', answer: { value: false } }],
+              },
             },
           },
+          surveyResponsesLatestBlock: { [surveyId]: 'not-a-block' },
+          surveysLatestBlock: 'also-not-a-block',
         },
-        surveyResponsesLatestBlock: { [surveyId]: 'not-a-block' },
-        surveysLatestBlock: 'also-not-a-block',
-      },
-    }));
+      }),
+    );
     renderSurveyResults({
       isOpen: true,
       preventUrlChange: true,
@@ -1017,20 +1042,22 @@ describe('SurveyResults question-mode polling and filter state', () => {
   });
 
   it('fetches and renders question results using networkChainId without wallet network', async () => {
-    const peekSpy = mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1', type: 'binary', prompt: 'Prompt' } },
-        questionResponses: {
-          q1: {
-            '0xabc': {
-              questionID: 'q1',
-              answer: { value: true },
-              timeStamp: 1,
+    const peekSpy = mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1', type: 'binary', prompt: 'Prompt' } },
+          questionResponses: {
+            q1: {
+              '0xabc': {
+                questionID: 'q1',
+                answer: { value: true },
+                timeStamp: 1,
+              },
             },
           },
-        },
+        }),
       }),
-    }));
+    );
     renderSurveyResults({
       isOpen: true,
       preventUrlChange: true,
@@ -1242,13 +1269,15 @@ describe('SurveyResults question-mode polling and filter state', () => {
   });
 
   it('nonce tick writes refresh status targets before parent polling follow-up', async () => {
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: {},
-        questionsLatestBlock: 234,
-        questionResponsesLatestBlock: 234,
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: {},
+          questionsLatestBlock: 234,
+          questionResponsesLatestBlock: 234,
+        }),
       }),
-    }));
+    );
     const provider = { id: 'provider' };
     const view = renderSurveyResults({
       isOpen: true,
@@ -1276,11 +1305,13 @@ describe('SurveyResults question-mode polling and filter state', () => {
   });
 
   it('skips refresh status writes and polling follow-up when nonce refresh unmounts before write', async () => {
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1' } },
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1' } },
+        }),
       }),
-    }));
+    );
     const view = renderSurveyResults({
       isOpen: true,
       preventUrlChange: true,
@@ -1317,11 +1348,13 @@ describe('SurveyResults question-mode polling and filter state', () => {
 
   it('ignores malformed background latest-block polling values', async () => {
     jest.useFakeTimers();
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1' } },
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1' } },
+        }),
       }),
-    }));
+    );
     const latestSpy = mockLatestBlock();
     latestSpy.mockResolvedValue(Number.POSITIVE_INFINITY);
     const provider = {};
@@ -1350,13 +1383,15 @@ describe('SurveyResults question-mode polling and filter state', () => {
   });
 
   it('recovers refresh status writes after a nonce latest-block failure', async () => {
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: {},
-        questionsLatestBlock: 456,
-        questionResponsesLatestBlock: 456,
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: {},
+          questionsLatestBlock: 456,
+          questionResponsesLatestBlock: 456,
+        }),
       }),
-    }));
+    );
     const view = renderSurveyResults({
       isOpen: true,
       preventUrlChange: true,
@@ -1368,9 +1403,7 @@ describe('SurveyResults question-mode polling and filter state', () => {
 
     const latestSpy = mockLatestBlock();
     latestSpy.mockClear();
-    latestSpy
-      .mockRejectedValueOnce(new Error('latest block failed'))
-      .mockResolvedValueOnce(456);
+    latestSpy.mockRejectedValueOnce(new Error('latest block failed')).mockResolvedValueOnce(456);
 
     view.rerenderSurveyResults({ questionResponsesNonce: 2 });
     await flushAsync(12);
@@ -1390,13 +1423,15 @@ describe('SurveyResults question-mode polling and filter state', () => {
   });
 
   it('preserves a queued nonce retry after latest-block failure and recovers status writes', async () => {
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: {},
-        questionsLatestBlock: 654,
-        questionResponsesLatestBlock: 654,
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: {},
+          questionsLatestBlock: 654,
+          questionResponsesLatestBlock: 654,
+        }),
       }),
-    }));
+    );
     const view = renderSurveyResults({
       isOpen: true,
       preventUrlChange: true,
@@ -1409,9 +1444,7 @@ describe('SurveyResults question-mode polling and filter state', () => {
     const latestSpy = mockLatestBlock();
     latestSpy.mockClear();
     const first = createDeferred<number>();
-    latestSpy
-      .mockImplementationOnce(() => first.promise)
-      .mockResolvedValueOnce(654);
+    latestSpy.mockImplementationOnce(() => first.promise).mockResolvedValueOnce(654);
 
     view.rerenderSurveyResults({ questionResponsesNonce: 2 });
     view.rerenderSurveyResults({ questionResponsesNonce: 3 });
@@ -1431,13 +1464,15 @@ describe('SurveyResults question-mode polling and filter state', () => {
   });
 
   it('manual refresh dispatches question refresh ports before shell polling follow-up', async () => {
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: {},
-        questionsLatestBlock: 123,
-        questionResponsesLatestBlock: 123,
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: {},
+          questionsLatestBlock: 123,
+          questionResponsesLatestBlock: 123,
+        }),
       }),
-    }));
+    );
     const latestSpy = mockLatestBlock();
     latestSpy.mockResolvedValue(123);
     const refreshQuestionMetadata = jest.fn(async () => undefined);
@@ -1471,8 +1506,9 @@ describe('SurveyResults question-mode polling and filter state', () => {
         args,
         order: peekSpy.mock.invocationCallOrder[index],
       }))
-      .filter(({ args, order }: any, index: number) =>
-        index >= peekBase && args[0] === 'questionsCache' && order > respOrder);
+      .filter(
+        ({ args, order }: any, index: number) => index >= peekBase && args[0] === 'questionsCache' && order > respOrder,
+      );
     expect(followUpPolls.length).toBeGreaterThan(0);
     expect(screen.getAllByText('In Sync (Current: 123 / Latest: 123)').length).toBeGreaterThan(0);
     // port note: the reset/queue 'manual-refresh' reason strings are internal-only and dropped.
@@ -1480,19 +1516,21 @@ describe('SurveyResults question-mode polling and filter state', () => {
 
   it('manual survey refresh writes target status before survey dispatch and polling follow-up', async () => {
     const surveyId = '0xABC';
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: {},
-        questionsLatestBlock: 100,
-        questionResponsesLatestBlock: 100,
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: {},
+          questionsLatestBlock: 100,
+          questionResponsesLatestBlock: 100,
+        }),
+        surveysBucket: {
+          surveys: {},
+          surveyResponses: {},
+          surveyResponsesLatestBlock: { '0xabc': 100 },
+          surveysLatestBlock: 100,
+        },
       }),
-      surveysBucket: {
-        surveys: {},
-        surveyResponses: {},
-        surveyResponsesLatestBlock: { '0xabc': 100 },
-        surveysLatestBlock: 100,
-      },
-    }));
+    );
     const latestSpy = mockLatestBlock();
     latestSpy.mockResolvedValue(321);
     const statusAtDispatch: string[] = [];
@@ -1530,11 +1568,13 @@ describe('SurveyResults question-mode polling and filter state', () => {
   });
 
   it('manual refresh keeps missing latest block as a parent-owned status write', async () => {
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1' } },
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1' } },
+        }),
       }),
-    }));
+    );
     const latestSpy = mockLatestBlock();
     latestSpy.mockResolvedValue(undefined);
     const refreshQuestionMetadata = jest.fn(async () => undefined);
@@ -1556,9 +1596,9 @@ describe('SurveyResults question-mode polling and filter state', () => {
     // Dispatch proceeded despite the missing latest block...
     expect(refreshQuestionMetadata.mock.calls.length).toBe(metaBase + 1);
     expect(refreshQuestionResponses.mock.calls.length).toBe(respBase + 1);
-    expect(
-      refreshQuestionMetadata.mock.invocationCallOrder[metaBase]
-    ).toBeLessThan(refreshQuestionResponses.mock.invocationCallOrder[respBase]);
+    expect(refreshQuestionMetadata.mock.invocationCallOrder[metaBase]).toBeLessThan(
+      refreshQuestionResponses.mock.invocationCallOrder[respBase],
+    );
     // ...and the undefined targets never rendered as bogus status values.
     expect(document.body.textContent).not.toContain('undefined');
     expect(document.body.textContent).not.toContain('NaN');
@@ -1567,11 +1607,13 @@ describe('SurveyResults question-mode polling and filter state', () => {
   });
 
   it('manual survey refresh keeps dispatch inert when the survey target is missing', async () => {
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1' } },
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1' } },
+        }),
       }),
-    }));
+    );
     const latestSpy = mockLatestBlock();
     latestSpy.mockResolvedValue(222);
     const refreshSurveyResponsesByID = jest.fn(async () => undefined);
@@ -1600,13 +1642,15 @@ describe('SurveyResults question-mode polling and filter state', () => {
   });
 
   it('manual refresh does not short-circuit already current refresh target blocks', async () => {
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: {},
-        questionsLatestBlock: 777,
-        questionResponsesLatestBlock: 777,
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: {},
+          questionsLatestBlock: 777,
+          questionResponsesLatestBlock: 777,
+        }),
       }),
-    }));
+    );
     const latestSpy = mockLatestBlock();
     latestSpy.mockResolvedValue(777);
     const refreshQuestionMetadata = jest.fn(async () => undefined);
@@ -1644,12 +1688,14 @@ describe('SurveyResults modal and polling behavior', () => {
 
   it('clears response parse memo when the modal closes', async () => {
     const payload = JSON.stringify({ answer: { value: true }, timeStamp: 1 });
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1', type: 'binary', prompt: 'Q1 prompt' } },
-        questionResponses: { q1: { '0xresponder': payload } },
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1', type: 'binary', prompt: 'Q1 prompt' } },
+          questionResponses: { q1: { '0xresponder': payload } },
+        }),
       }),
-    }));
+    );
     const view = renderSurveyResults({
       isOpen: true,
       preventUrlChange: true,
@@ -1681,17 +1727,19 @@ describe('SurveyResults modal and polling behavior', () => {
 
   it('keeps latest-block retries active when coarse polling signature is unchanged', async () => {
     jest.useFakeTimers();
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: { q1: { id: 'q1' } },
-        questionsLatestBlock: 5,
-        questionResponsesLatestBlock: 7,
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: { q1: { id: 'q1' } },
+          questionsLatestBlock: 5,
+          questionResponsesLatestBlock: 7,
+        }),
+        surveysBucket: {
+          surveyResponses: {},
+          surveyResponsesLatestBlock: {},
+        },
       }),
-      surveysBucket: {
-        surveyResponses: {},
-        surveyResponsesLatestBlock: {},
-      },
-    }));
+    );
     const latestSpy = mockLatestBlock();
     renderSurveyResults({
       isOpen: true,
@@ -1735,17 +1783,21 @@ describe('SurveyResults modal and polling behavior', () => {
       questionsLatestBlock: 5,
       questionResponsesLatestBlock: 7,
     });
-    const peekSpy = mockPeekCacheSync(buildPeekImpl({
-      questionsBucket: buildQuestionBucket({
-        questions: questionsMap,
-        questionResponses: questionResponsesMap,
-        questionsLatestBlock: 5,
-        questionResponsesLatestBlock: 7,
+    const peekSpy = mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket: buildQuestionBucket({
+          questions: questionsMap,
+          questionResponses: questionResponsesMap,
+          questionsLatestBlock: 5,
+          questionResponsesLatestBlock: 7,
+        }),
       }),
-    }));
-    jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace: string) => (
-      namespace === 'questionsCache' ? { '84532': questionsBucket } : {}
-    ));
+    );
+    jest
+      .spyOn(cacheScripts, 'readCache')
+      .mockImplementation(async (namespace: string) =>
+        namespace === 'questionsCache' ? { '84532': questionsBucket } : {},
+      );
     renderSurveyResults({ isOpen: true, preventUrlChange: true });
     await flushAsync(10);
     await waitFor(() => expect(screen.getAllByText('Q1 prompt').length).toBeGreaterThan(0));
@@ -1808,12 +1860,16 @@ describe('SurveyResults modal and polling behavior', () => {
         },
       },
     });
-    mockPeekCacheSync(buildPeekImpl({
-      questionsBucket,
-    }));
-    jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace: string) => (
-      namespace === 'questionsCache' ? { '84532': questionsBucket } : {}
-    ));
+    mockPeekCacheSync(
+      buildPeekImpl({
+        questionsBucket,
+      }),
+    );
+    jest
+      .spyOn(cacheScripts, 'readCache')
+      .mockImplementation(async (namespace: string) =>
+        namespace === 'questionsCache' ? { '84532': questionsBucket } : {},
+      );
     renderSurveyResults({
       isOpen: true,
       isQuestionCacheReady: true,
@@ -1831,16 +1887,21 @@ describe('SurveyResults modal and polling behavior', () => {
     });
     await waitFor(() => expect(mockSbtFilter).toHaveBeenCalled());
     await act(async () => {
-      getLastSbtFilterProps().onFilter({
-        q2: [{
-          responder: '0xresponder',
-          response: {
-            questionID: 'q2',
-            answer: { encrypted: true, value: '*', ciphertext: 'cipher-q2' },
-            timeStamp: 1,
-          },
-        }],
-      }, {});
+      getLastSbtFilterProps().onFilter(
+        {
+          q2: [
+            {
+              responder: '0xresponder',
+              response: {
+                questionID: 'q2',
+                answer: { encrypted: true, value: '*', ciphertext: 'cipher-q2' },
+                timeStamp: 1,
+              },
+            },
+          ],
+        },
+        {},
+      );
     });
 
     const toggle = await screen.findByTestId('ce-results-locked-toggle');
@@ -1901,12 +1962,10 @@ describe('SurveyResults modal and polling behavior', () => {
       configurable: true,
     });
     const rafCallbacks: Array<(timestamp: number) => void> = [];
-    const rafSpy = jest
-      .spyOn(window, 'requestAnimationFrame')
-      .mockImplementation((cb: any) => {
-        rafCallbacks.push(cb);
-        return rafCallbacks.length;
-      });
+    const rafSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: any) => {
+      rafCallbacks.push(cb);
+      return rafCallbacks.length;
+    });
 
     try {
       const base = countNamespaceCalls(readSpy, 'questionsCache');
@@ -1958,8 +2017,7 @@ describe('SurveyResults modal and polling behavior', () => {
       questionsLatestBlock: 5,
       questionResponsesLatestBlock: 7,
     });
-    mockPeekCacheSync((namespace: string) =>
-      (namespace === 'questionsCache' ? { '84532': bucketHolder } : null));
+    mockPeekCacheSync((namespace: string) => (namespace === 'questionsCache' ? { '84532': bucketHolder } : null));
     const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
 
     renderSurveyResults({ isOpen: true, preventUrlChange: true });

@@ -20,36 +20,44 @@ describe('sessionWizardDraftState', () => {
       faucet: {},
     });
 
-    expect(normalized).toEqual(expect.objectContaining({
-      sessionName: 'Draft Name',
-      sessionInfo: 'Draft Info',
-      sessionHeader: 'https://example.test/header.png',
-      autoFeatureSBTsBySessionSlug: true,
-      embeddedDeployHelperEnabled: true,
-    }));
-    expect(normalized.ai).toEqual(expect.objectContaining({
-      models: expect.any(Object),
-    }));
+    expect(normalized).toEqual(
+      expect.objectContaining({
+        sessionName: 'Draft Name',
+        sessionInfo: 'Draft Info',
+        sessionHeader: 'https://example.test/header.png',
+        autoFeatureSBTsBySessionSlug: true,
+        embeddedDeployHelperEnabled: true,
+      }),
+    );
+    expect(normalized.ai).toEqual(
+      expect.objectContaining({
+        models: expect.any(Object),
+      }),
+    );
     expect(normalized.rpc.providers.path.rpcUrl).toBeTruthy();
     expect(normalized.faucet.rpcUrl).toBeTruthy();
   });
 
   it('builds the default template with openai defaults and empty authoring fields', () => {
     const template = buildSessionWizardDefaultTemplate();
-    expect(template).toEqual(expect.objectContaining({
-      slug: '',
-      sessionName: '',
-      sessionInfo: '',
-      corsWorkerUrl: '',
-      defaultSbtTags: expect.any(String),
-    }));
-    expect(template.ai).toEqual(expect.objectContaining({
-      reasoningEffort: 'low',
-      models: expect.objectContaining({
-        fast: expect.objectContaining({ provider: 'openai', model: 'gpt-5' }),
-        thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-5' }),
+    expect(template).toEqual(
+      expect.objectContaining({
+        slug: '',
+        sessionName: '',
+        sessionInfo: '',
+        corsWorkerUrl: '',
+        defaultSbtTags: expect.any(String),
       }),
-    }));
+    );
+    expect(template.ai).toEqual(
+      expect.objectContaining({
+        reasoningEffort: 'low',
+        models: expect.objectContaining({
+          fast: expect.objectContaining({ provider: 'openai', model: 'gpt-5' }),
+          thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-5' }),
+        }),
+      }),
+    );
     expect(template.sessionModeProfile).toBeUndefined();
     expect(template.telegramOnly).toBeUndefined();
     expect(template.sessionMode).toBeUndefined();
@@ -66,20 +74,24 @@ describe('sessionWizardDraftState', () => {
       storageProfile: { backend: 'cloudflare' },
     });
 
-    expect(normalized.sessionModeProfile).toEqual(expect.objectContaining({
-      preset: 'custom',
-      authority: { mode: 'worker_canonical' },
-      storage: expect.objectContaining({ backend: 'cloudflare' }),
-      surfaces: expect.objectContaining({
-        telegram: true,
-        miniApp: true,
-        web: true,
+    expect(normalized.sessionModeProfile).toEqual(
+      expect.objectContaining({
+        preset: 'custom',
+        authority: { mode: 'worker_canonical' },
+        storage: expect.objectContaining({ backend: 'cloudflare' }),
+        surfaces: expect.objectContaining({
+          telegram: true,
+          miniApp: true,
+          web: true,
+        }),
       }),
-    }));
-    expect(normalized.storageProfile).toEqual(expect.objectContaining({
-      backend: 'cloudflare',
-      payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
-    }));
+    );
+    expect(normalized.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
+      }),
+    );
     expect(normalized.telegramOnly).toBeUndefined();
     expect(normalized.sessionMode).toBeUndefined();
     expect(normalized.telegramBridgeEnabled).toBeUndefined();
@@ -96,38 +108,46 @@ describe('sessionWizardDraftState', () => {
       faucet: {},
     };
 
-    expect(buildSessionWizardInitialDraftFromCache({
-      cachedWizard: {
-        draft: {
-          sessionName: 'Cached Session',
-          corsWorkerUrl: 'https://cached.example/worker',
+    expect(
+      buildSessionWizardInitialDraftFromCache({
+        cachedWizard: {
+          draft: {
+            sessionName: 'Cached Session',
+            corsWorkerUrl: 'https://cached.example/worker',
+          },
+          deployComplete: false,
         },
-        deployComplete: false,
-      },
-      defaultTemplate,
-      normalModeSharedHostedWorkerEnabled: false,
-      sourceEmbeddedDeployHelperDefault: true,
-    })).toEqual(expect.objectContaining({
-      sessionName: 'Cached Session',
-      corsWorkerUrl: '',
-      embeddedDeployHelperEnabled: true,
-    }));
+        defaultTemplate,
+        normalModeSharedHostedWorkerEnabled: false,
+        sourceEmbeddedDeployHelperDefault: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        sessionName: 'Cached Session',
+        corsWorkerUrl: '',
+        embeddedDeployHelperEnabled: true,
+      }),
+    );
 
-    expect(buildSessionWizardInitialDraftFromCache({
-      cachedWizard: {
-        draft: {
-          embeddedDeployHelperEnabled: false,
-          corsWorkerUrl: 'https://cached.example/worker',
+    expect(
+      buildSessionWizardInitialDraftFromCache({
+        cachedWizard: {
+          draft: {
+            embeddedDeployHelperEnabled: false,
+            corsWorkerUrl: 'https://cached.example/worker',
+          },
+          deployComplete: true,
         },
-        deployComplete: true,
-      },
-      defaultTemplate,
-      normalModeSharedHostedWorkerEnabled: false,
-      sourceEmbeddedDeployHelperDefault: true,
-    })).toEqual(expect.objectContaining({
-      corsWorkerUrl: 'https://cached.example/worker',
-      embeddedDeployHelperEnabled: false,
-    }));
+        defaultTemplate,
+        normalModeSharedHostedWorkerEnabled: false,
+        sourceEmbeddedDeployHelperDefault: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        corsWorkerUrl: 'https://cached.example/worker',
+        embeddedDeployHelperEnabled: false,
+      }),
+    );
   });
 
   it('migrates cached Cloudflare Lit storage drafts into a session mode profile', () => {
@@ -143,19 +163,78 @@ describe('sessionWizardDraftState', () => {
       },
     });
 
-    expect(normalized.sessionModeProfile).toEqual(expect.objectContaining({
-      preset: 'custom',
-      authority: { mode: 'worker_canonical' },
-      storage: expect.objectContaining({ backend: 'cloudflare' }),
-      encryption: { mode: 'lit' },
-    }));
-    expect(normalized.storageProfile).toEqual(expect.objectContaining({
-      backend: 'cloudflare',
-      payloadAccessControl: expect.objectContaining({ mode: 'lit_encrypted' }),
-      sbtGatedAccess: expect.objectContaining({
-        litRequired: 'required_for_cloudflare_payload_encryption',
+    expect(normalized.sessionModeProfile).toEqual(
+      expect.objectContaining({
+        preset: 'custom',
+        authority: { mode: 'worker_canonical' },
+        storage: expect.objectContaining({ backend: 'cloudflare' }),
+        encryption: { mode: 'lit' },
       }),
-    }));
+    );
+    expect(normalized.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        payloadAccessControl: expect.objectContaining({ mode: 'lit_encrypted' }),
+        sbtGatedAccess: expect.objectContaining({
+          litRequired: 'required_for_cloudflare_payload_encryption',
+        }),
+      }),
+    );
+  });
+
+  it('gates cached storage profile migration on cache-owned storage fields', () => {
+    const normalized = buildSessionWizardInitialDraftFromCache({
+      cachedWizard: {
+        draft: {
+          sessionName: 'Cached Legacy Storage Alias',
+          sessionStorageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { mode: 'lit_encrypted' },
+          },
+        },
+      },
+    });
+
+    expect(normalized.sessionModeProfile).toEqual(
+      expect.objectContaining({
+        preset: 'custom',
+        storage: expect.objectContaining({ backend: 'cloudflare' }),
+        encryption: { mode: 'lit' },
+      }),
+    );
+    expect(normalized.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        payloadAccessControl: expect.objectContaining({ mode: 'lit_encrypted' }),
+      }),
+    );
+    expect(normalized.sessionStorageProfile).toBeUndefined();
+  });
+
+  it('does not infer a session mode profile from default storage when cache lacks storage fields', () => {
+    const normalized = buildSessionWizardInitialDraftFromCache({
+      defaultTemplate: {
+        ...buildSessionWizardDefaultTemplate(),
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { mode: 'lit_encrypted' },
+        },
+      },
+      cachedWizard: {
+        draft: {
+          sessionName: 'Cached No Storage',
+        },
+      },
+    });
+
+    expect(normalized.sessionName).toBe('Cached No Storage');
+    expect(normalized.sessionModeProfile).toBeUndefined();
+    expect(normalized.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        payloadAccessControl: expect.objectContaining({ mode: 'lit_encrypted' }),
+      }),
+    );
   });
 
   it('applies registry-chain contract defaults and worker RPC fallbacks without mutating the draft', () => {
@@ -183,21 +262,23 @@ describe('sessionWizardDraftState', () => {
       pathRpc: ' https://rpc.example ',
     });
 
-    expect(next).toEqual(expect.objectContaining({
-      networkChainId: 11155420,
-      contracts: expect.objectContaining({
-        surveys: { address: '0xSurveys', chainId: 11155420 },
-        sessionRegistry: { address: '0xRegistry', chainId: 11155420 },
-        custom: { address: '0xCustom', chainId: 11155420 },
-      }),
-      rpc: {
-        provider: 'path',
-        providers: {
-          path: { rpcUrl: 'https://rpc.example' },
+    expect(next).toEqual(
+      expect.objectContaining({
+        networkChainId: 11155420,
+        contracts: expect.objectContaining({
+          surveys: { address: '0xSurveys', chainId: 11155420 },
+          sessionRegistry: { address: '0xRegistry', chainId: 11155420 },
+          custom: { address: '0xCustom', chainId: 11155420 },
+        }),
+        rpc: {
+          provider: 'path',
+          providers: {
+            path: { rpcUrl: 'https://rpc.example' },
+          },
         },
-      },
-      faucet: { rpcUrl: 'https://rpc.example' },
-    }));
+        faucet: { rpcUrl: 'https://rpc.example' },
+      }),
+    );
     expect(draft).toEqual({
       networkChainId: 84532,
       contracts: {
@@ -257,22 +338,24 @@ describe('sessionWizardDraftState', () => {
       },
     });
 
-    expect(payload).toEqual(expect.objectContaining({
-      sessionId: 'session-1',
-      draft: { sessionName: 'Draft' },
-      pendingSbtDrafts: [],
-      persistWorkerSecrets: false,
-      workerSecrets: {
-        apiToken: '[redacted]',
-        optional: '',
-      },
-      deployForm: {
-        workerName: 'worker',
-        adminAddress: '0xAdmin',
-        accountId: 'account',
-        bundleUrl: 'https://bundle.example/worker.js',
-      },
-    }));
+    expect(payload).toEqual(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        draft: { sessionName: 'Draft' },
+        pendingSbtDrafts: [],
+        persistWorkerSecrets: false,
+        workerSecrets: {
+          apiToken: '[redacted]',
+          optional: '',
+        },
+        deployForm: {
+          workerName: 'worker',
+          adminAddress: '0xAdmin',
+          accountId: 'account',
+          bundleUrl: 'https://bundle.example/worker.js',
+        },
+      }),
+    );
     expect(payload.deployForm.apiToken).toBeUndefined();
   });
 

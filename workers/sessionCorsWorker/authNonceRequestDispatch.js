@@ -86,6 +86,7 @@ export const dispatchAuthNonceRequest = async ({
     now: deps?.now,
     windowMs: deps?.NONCE_RATE_LIMIT_WINDOW_MS,
     ttlSeconds: deps?.NONCE_RATE_LIMIT_TTL_SECONDS,
+    ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
   });
   if (rateLimitResult && !rateLimitResult?.ok) {
     return deps?.json?.({ error: rateLimitResult?.error }, 429, headers);

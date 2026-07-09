@@ -68,18 +68,18 @@ type LockAudienceButtonActionArgs = {
   hasGateOption?: boolean;
 };
 
-const isPlainObject = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isPlainObject = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const normalizeQuestionProgressSlug = (rawSlug = ''): string => {
-  const normalized = String(rawSlug || '').trim().toLowerCase();
+  const normalized = String(rawSlug || '')
+    .trim()
+    .toLowerCase();
   return normalized === 'general' ? '' : normalized;
 };
 
-export const doesQuestionProgressMatchSlug = (progressSlug = '', currentSlug = ''): boolean => (
-  normalizeQuestionProgressSlug(progressSlug) === normalizeQuestionProgressSlug(currentSlug)
-);
+export const doesQuestionProgressMatchSlug = (progressSlug = '', currentSlug = ''): boolean =>
+  normalizeQuestionProgressSlug(progressSlug) === normalizeQuestionProgressSlug(currentSlug);
 
 export const formatQuestionScanBlockCount = (value: unknown): string => {
   const numericValue = Number(value);
@@ -87,45 +87,47 @@ export const formatQuestionScanBlockCount = (value: unknown): string => {
   return Math.max(0, Math.floor(numericValue)).toLocaleString();
 };
 
-export const buildQuestionScanProgressDisplay = (
-  questionScanProgress: QuestionScanProgress | null = null
-) => {
+export const buildQuestionScanProgressDisplay = (questionScanProgress: QuestionScanProgress | null = null) => {
   const totalBlocks = Math.max(0, Number(questionScanProgress?.totalBlocks || 0));
   const requestedTotalBlocks = Math.max(
     totalBlocks,
-    Number(questionScanProgress?.requestedTotalBlocks || totalBlocks || 0)
+    Number(questionScanProgress?.requestedTotalBlocks || totalBlocks || 0),
   );
   const wasCapped = questionScanProgress?.wasCapped === true && requestedTotalBlocks > totalBlocks;
   const progressTotalBlocks = wasCapped ? requestedTotalBlocks : totalBlocks;
   const remainingBlocksRaw = Number(questionScanProgress?.remainingBlocks);
-  const scannedBlocksFallback = progressTotalBlocks > 0
-    ? Math.max(0, progressTotalBlocks - Math.max(0, Number.isFinite(remainingBlocksRaw) ? remainingBlocksRaw : progressTotalBlocks))
-    : 0;
-  const scannedBlocks = progressTotalBlocks > 0
-    ? Math.max(
-      0,
-      Math.min(
-        progressTotalBlocks,
-        Number.isFinite(Number(questionScanProgress?.scannedBlocks))
-          ? Number(questionScanProgress?.scannedBlocks)
-          : scannedBlocksFallback
-      )
-    )
-    : 0;
-  const remainingBlocks = progressTotalBlocks > 0
-    ? Math.max(
-      0,
-      Math.min(
-        progressTotalBlocks,
-        Number.isFinite(remainingBlocksRaw)
-          ? remainingBlocksRaw
-          : (progressTotalBlocks - scannedBlocks)
-      )
-    )
-    : 0;
-  const percentComplete = progressTotalBlocks > 0
-    ? Math.max(0, Math.min(100, Math.round((scannedBlocks / progressTotalBlocks) * 100)))
-    : 0;
+  const scannedBlocksFallback =
+    progressTotalBlocks > 0
+      ? Math.max(
+          0,
+          progressTotalBlocks -
+            Math.max(0, Number.isFinite(remainingBlocksRaw) ? remainingBlocksRaw : progressTotalBlocks),
+        )
+      : 0;
+  const scannedBlocks =
+    progressTotalBlocks > 0
+      ? Math.max(
+          0,
+          Math.min(
+            progressTotalBlocks,
+            Number.isFinite(Number(questionScanProgress?.scannedBlocks))
+              ? Number(questionScanProgress?.scannedBlocks)
+              : scannedBlocksFallback,
+          ),
+        )
+      : 0;
+  const remainingBlocks =
+    progressTotalBlocks > 0
+      ? Math.max(
+          0,
+          Math.min(
+            progressTotalBlocks,
+            Number.isFinite(remainingBlocksRaw) ? remainingBlocksRaw : progressTotalBlocks - scannedBlocks,
+          ),
+        )
+      : 0;
+  const percentComplete =
+    progressTotalBlocks > 0 ? Math.max(0, Math.min(100, Math.round((scannedBlocks / progressTotalBlocks) * 100))) : 0;
 
   return {
     totalBlocks,
@@ -187,47 +189,42 @@ const normalizeSbtFilterState = (rawSbtFilter: unknown): UnknownRecord | null =>
 
 const buildCanonicalSurveyToolFilterState = (rawFilterState: unknown): CanonicalSurveyToolFilterState => {
   const state = isPlainObject(rawFilterState) ? rawFilterState : {};
-  const topQuestions = Object.prototype.hasOwnProperty.call(state, 'topQuestions')
-    ? state.topQuestions
-    : null;
+  const topQuestions = Object.prototype.hasOwnProperty.call(state, 'topQuestions') ? state.topQuestions : null;
   const questionTypes = Array.isArray(state.questionTypes)
     ? [...state.questionTypes]
-    : (Array.isArray(state.types) ? [...state.types] : []);
+    : Array.isArray(state.types)
+      ? [...state.types]
+      : [];
   const selectedTags = Array.isArray(state.selectedTags)
     ? [...state.selectedTags]
-    : (Array.isArray(state.tags) ? [...state.tags] : []);
-  const legacyTopLevelSbt = (
-    Array.isArray(state.includedSBTs) ||
-    Array.isArray(state.excludedSBTs) ||
-    state.onlyVerifiedHumans === true
-  )
-    ? {
-        includedSBTs: Array.isArray(state.includedSBTs) ? [...state.includedSBTs] : [],
-        excludedSBTs: Array.isArray(state.excludedSBTs) ? [...state.excludedSBTs] : [],
-        onlyVerifiedHumans: state.onlyVerifiedHumans === true,
-      }
-    : null;
+    : Array.isArray(state.tags)
+      ? [...state.tags]
+      : [];
+  const legacyTopLevelSbt =
+    Array.isArray(state.includedSBTs) || Array.isArray(state.excludedSBTs) || state.onlyVerifiedHumans === true
+      ? {
+          includedSBTs: Array.isArray(state.includedSBTs) ? [...state.includedSBTs] : [],
+          excludedSBTs: Array.isArray(state.excludedSBTs) ? [...state.excludedSBTs] : [],
+          onlyVerifiedHumans: state.onlyVerifiedHumans === true,
+        }
+      : null;
   const sbtFilter = normalizeSbtFilterState(state.sbtFilter || legacyTopLevelSbt);
-  const aiFilter = (typeof state.aiFilter === 'string')
-    ? (state.aiFilter.trim() || null)
-    : (state.aiFilter ?? null);
+  const aiFilter = typeof state.aiFilter === 'string' ? state.aiFilter.trim() || null : (state.aiFilter ?? null);
   const aiTopNRaw = Object.prototype.hasOwnProperty.call(state, 'aiTopN') ? state.aiTopN : null;
-  const aiTopN = aiFilter == null
-    ? null
-    : (() => {
-      const parsed = Number.parseInt(String(aiTopNRaw ?? ''), 10);
-      return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
-    })();
-  const aiCombine = aiFilter == null
-    ? false
-    : state.aiCombine === true;
+  const aiTopN =
+    aiFilter == null
+      ? null
+      : (() => {
+          const parsed = Number.parseInt(String(aiTopNRaw ?? ''), 10);
+          return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
+        })();
+  const aiCombine = aiFilter == null ? false : state.aiCombine === true;
 
   const rawResponseStatus = isPlainObject(state.responseStatus) ? state.responseStatus : null;
   const responded = rawResponseStatus?.responded === true;
   const notResponded = rawResponseStatus?.notResponded === true;
-  const responseStatus = (responded || notResponded) && !(responded && notResponded)
-    ? { responded, notResponded }
-    : null;
+  const responseStatus =
+    (responded || notResponded) && !(responded && notResponded) ? { responded, notResponded } : null;
 
   return {
     topQuestions,
@@ -246,13 +243,11 @@ export const normalizeSurveyToolFilterState = (rawFilterState: unknown): Unknown
   return serializeFilterState(canonical) ? canonical : {};
 };
 
-export const serializeSurveyToolFilterState = (filterState: unknown): string => (
-  serializeFilterState(buildCanonicalSurveyToolFilterState(filterState))
-);
+export const serializeSurveyToolFilterState = (filterState: unknown): string =>
+  serializeFilterState(buildCanonicalSurveyToolFilterState(filterState));
 
-export const isSurveyToolFilterStateActive = (filterState: unknown): boolean => (
-  !!serializeSurveyToolFilterState(filterState)
-);
+export const isSurveyToolFilterStateActive = (filterState: unknown): boolean =>
+  !!serializeSurveyToolFilterState(filterState);
 
 export const isQuestionPromptMasked = (question: UnknownRecord | null = null): boolean => {
   const prompt = question?.prompt;
@@ -270,9 +265,7 @@ export const buildAnswerLockDisplayState = ({
   isSubmitting?: boolean;
 } = {}) => ({
   lockDisabled: !!isSubmitting || !!masked,
-  lockTitle: masked
-    ? 'Encrypted answer'
-    : (field?.encrypted ? 'Encrypted' : 'Not encrypted'),
+  lockTitle: masked ? 'Encrypted answer' : field?.encrypted ? 'Encrypted' : 'Not encrypted',
 });
 
 export const buildGatedPromptNoticeState = ({
@@ -292,11 +285,11 @@ export const buildGatedPromptNoticeState = ({
   gateLabel?: unknown;
   gatesLabel?: unknown;
 } = {}) => {
-  const tooltipIdBase = String(questionId || fallbackId || 'gated').trim().toLowerCase();
+  const tooltipIdBase = String(questionId || fallbackId || 'gated')
+    .trim()
+    .toLowerCase();
   const normalizedGateNames = Array.isArray(gateNames)
-    ? gateNames
-      .map((name) => String(name || '').trim())
-      .filter(Boolean)
+    ? gateNames.map((name) => String(name || '').trim()).filter(Boolean)
     : [];
   const normalizedSbtLabel = String(sbtLabel || 'SBT').trim() || 'SBT';
   const normalizedGateLabel = String(gateLabel || 'gate').trim() || 'gate';
@@ -329,13 +322,15 @@ export const buildQuestionPromptDecryptDisplayState = ({
   account?: unknown;
   canReloadPrompt?: unknown;
 } = {}) => {
-  const qid = String(questionId || '').trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   const normalizedPromptText = promptText || 'Question';
   const display = payloadDisplay && typeof payloadDisplay === 'object' ? payloadDisplay : {};
   const requiresLogin = !!display.requiresAuth && (!loginComplete || !account);
   const actionTitle = requiresLogin
     ? 'Login required to decrypt gated prompts.'
-    : (display.actionTitle || 'Decrypt gated prompt');
+    : display.actionTitle || 'Decrypt gated prompt';
 
   return {
     qid,
@@ -343,7 +338,7 @@ export const buildQuestionPromptDecryptDisplayState = ({
     promptMasked: !!promptMasked,
     showPromptAction: !!promptMasked && !!qid,
     promptTitle: actionTitle,
-    promptLabel: promptMasked ? (display.label || normalizedPromptText) : normalizedPromptText,
+    promptLabel: promptMasked ? display.label || normalizedPromptText : normalizedPromptText,
     promptBusyLabel: display.busyLabel || 'Decrypting...',
     noticeLeadingText: display.noticeLeadingText,
     noticeStatusText: display.noticeStatusText,
@@ -375,31 +370,36 @@ export const buildLockAudienceDisplayState = ({
   currentGateId = '',
   currentAudienceMode = '',
 }: LockAudienceDisplayStateArgs = {}) => {
-  const qid = String(questionId || '').trim().toLowerCase();
-  const effectiveFieldKey = String(fieldKey || '').trim().toLowerCase() === 'additional'
-    ? 'additional'
-    : 'answer';
-  const isPileVisualContext = String(visualContext || '').trim().toLowerCase() === 'pile';
-  const normalizedFieldState = (fieldState && typeof fieldState === 'object') ? fieldState : {};
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
+  const effectiveFieldKey =
+    String(fieldKey || '')
+      .trim()
+      .toLowerCase() === 'additional'
+      ? 'additional'
+      : 'answer';
+  const isPileVisualContext =
+    String(visualContext || '')
+      .trim()
+      .toLowerCase() === 'pile';
+  const normalizedFieldState = fieldState && typeof fieldState === 'object' ? fieldState : {};
   const normalizedGateOptions = Array.isArray(gateOptions) ? gateOptions : [];
-  const resolvedHasGateOption = forcedGate
-    || normalizedGateOptions.length > 0
-    || hasGateOption === true;
-  const hasAudienceMenu = !forcedGate && (
-    forceAudienceMenu
-    || effectiveFieldKey === 'additional'
-    || resolvedHasGateOption
-  );
+  const resolvedHasGateOption = forcedGate || normalizedGateOptions.length > 0 || hasGateOption === true;
+  const hasAudienceMenu =
+    !forcedGate && (forceAudienceMenu || effectiveFieldKey === 'additional' || resolvedHasGateOption);
   const resolvedMenuOpen = hasAudienceMenu && menuOpen === true;
-  const normalizedCurrentAudience = String(currentAudience || '').trim().toLowerCase();
+  const normalizedCurrentAudience = String(currentAudience || '')
+    .trim()
+    .toLowerCase();
   const normalizedCurrentGateId = String(currentGateId || '').trim();
-  const normalizedAudienceMode = String(currentAudienceMode || '').trim().toLowerCase();
-  const gateActive = (!!normalizedFieldState?.encrypted || forcedGate)
-    && normalizedCurrentAudience === 'gate'
-    && resolvedHasGateOption;
-  const selfActive = !!normalizedFieldState?.encrypted
-    && normalizedCurrentAudience === 'self'
-    && normalizedAudienceMode !== 'inherit';
+  const normalizedAudienceMode = String(currentAudienceMode || '')
+    .trim()
+    .toLowerCase();
+  const gateActive =
+    (!!normalizedFieldState?.encrypted || forcedGate) && normalizedCurrentAudience === 'gate' && resolvedHasGateOption;
+  const selfActive =
+    !!normalizedFieldState?.encrypted && normalizedCurrentAudience === 'self' && normalizedAudienceMode !== 'inherit';
   const plaintextActive = !normalizedFieldState?.encrypted && normalizedAudienceMode !== 'inherit';
   const followActive = effectiveFieldKey === 'additional' && normalizedAudienceMode === 'inherit';
   const lockActive = !!normalizedFieldState?.encrypted || !!forcedGate || !!glowAnswer;
@@ -408,13 +408,13 @@ export const buildLockAudienceDisplayState = ({
   const showBrightLockState = lockActive || (!isPileVisualContext && resolvedMenuOpen);
   const isLockDisabled = !!lockDisabled || !!forcedGate;
   const allowPlaintextOption = !!showPlaintextOption && effectiveFieldKey !== 'additional';
-  const lockButtonStyle = !isLockDisabled
-    ? { opacity: lockVisualActive ? 1 : 0.35 }
-    : undefined;
+  const lockButtonStyle = !isLockDisabled ? { opacity: lockVisualActive ? 1 : 0.35 } : undefined;
   const normalizedSelfAudienceLabel = String(selfAudienceLabel || '').trim() || 'for me';
   const buttonTitle = forcedGate
     ? 'Locked by question gate'
-    : (hasAudienceMenu ? 'Choose encryption audience' : String(lockTitle || ''));
+    : hasAudienceMenu
+      ? 'Choose encryption audience'
+      : String(lockTitle || '');
 
   return {
     qid,
@@ -454,9 +454,12 @@ export const buildLockAudienceButtonAction = ({
   menuOpen = false,
   hasGateOption = false,
 }: LockAudienceButtonActionArgs = {}) => {
-  const normalizedFieldKey = String(effectiveFieldKey || '').trim().toLowerCase() === 'additional'
-    ? 'additional'
-    : 'answer';
+  const normalizedFieldKey =
+    String(effectiveFieldKey || '')
+      .trim()
+      .toLowerCase() === 'additional'
+      ? 'additional'
+      : 'answer';
   const encrypted = !!fieldEncrypted;
 
   if (lockDisabled || forcedGate) {

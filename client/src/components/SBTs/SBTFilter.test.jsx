@@ -1,17 +1,21 @@
 import SBTFilter from './SBTFilter';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('./SBTSelector', () => () => null);
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     getSbtMintBurnCountsByAddress: jest.fn(),
   },
   getSessionChainId: jest.fn(() => null),
   getSessionSlugByName: jest.fn(() => ''),
-  normalizeSessionSlug: jest.fn((value) => String(value || '').trim().toLowerCase()),
+  normalizeSessionSlug: jest.fn((value) =>
+    String(value || '')
+      .trim()
+      .toLowerCase(),
+  ),
 }));
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
@@ -76,7 +80,7 @@ describe('SBTFilter performance guards', () => {
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
-        '84532': {
+        84532: {
           sbtList: {
             '0xsbt': {
               mintedAddresses: ['0xA', '0xB'],
@@ -101,7 +105,7 @@ describe('SBTFilter performance guards', () => {
       },
       {
         selectedSBTGroups: [{ address: '0xSBT', sessionSlug: 'edge', chainId: 84532 }],
-      }
+      },
     );
 
     await subject.runApplyFilter('manual');
@@ -150,7 +154,7 @@ describe('SBTFilter performance guards', () => {
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
-        '84532': {
+        84532: {
           sbtList: {
             '0xsbt': {
               mintedAddresses: ['0xA'],
@@ -174,7 +178,7 @@ describe('SBTFilter performance guards', () => {
       },
       {
         selectedSBTGroups: [{ address: '0xSBT', sessionSlug: 'edge', chainId: 84532 }],
-      }
+      },
     );
 
     await subject.runApplyFilter('chainid-network-shape');
@@ -186,7 +190,7 @@ describe('SBTFilter performance guards', () => {
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
-        '84532': {
+        84532: {
           sbtList: {
             '0xsbt': {
               mintedAddresses: ['0xA'],
@@ -209,7 +213,7 @@ describe('SBTFilter performance guards', () => {
       },
       {
         selectedSBTGroups: [{ address: '0xSBT', sessionSlug: 'edge', chainId: 84532 }],
-      }
+      },
     );
 
     await subject.runApplyFilter('reburn-remint');
@@ -222,7 +226,7 @@ describe('SBTFilter performance guards', () => {
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
-        '84532': {
+        84532: {
           sbtList: {
             '0xsbt': {
               mintedAddresses: ['0xA'],
@@ -258,7 +262,7 @@ describe('SBTFilter performance guards', () => {
       },
       {
         selectedSBTGroups: [{ address: '0xSBT', sessionSlug: 'edge', chainId: 84532 }],
-      }
+      },
     );
 
     await subject.runApplyFilter('checkpoint-backed-partial');
@@ -271,7 +275,7 @@ describe('SBTFilter performance guards', () => {
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
-        '84532': {
+        84532: {
           sbtList: {
             '0xsbt': {
               mintedAddresses: ['0xHolderOnly'],
@@ -294,7 +298,7 @@ describe('SBTFilter performance guards', () => {
       },
       {
         selectedSBTGroups: [{ address: '0xSBT', sessionSlug: 'edge', chainId: 84532 }],
-      }
+      },
     );
 
     await subject.runApplyFilter('expand-missing-items');
@@ -306,7 +310,7 @@ describe('SBTFilter performance guards', () => {
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
-        '84532': {
+        84532: {
           sbtList: {
             '0xsbt': {
               mintedAddresses: [],
@@ -333,7 +337,7 @@ describe('SBTFilter performance guards', () => {
       },
       {
         selectedSBTGroups: [{ address: '0xSBT', sessionSlug: 'edge', chainId: 84532 }],
-      }
+      },
     );
 
     await subject.runApplyFilter('placeholder-arrays');
@@ -346,7 +350,7 @@ describe('SBTFilter performance guards', () => {
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
-        '84532': {
+        84532: {
           sbtList: {
             '0xsbt': {
               creationBlock: 1,
@@ -376,7 +380,7 @@ describe('SBTFilter performance guards', () => {
       },
       {
         selectedSBTGroupsResponder: [{ address: '0xSBT', sessionSlug: 'edge', chainId: 84532 }],
-      }
+      },
     );
 
     const firstRun = subject.runApplyFilter('first');
@@ -390,10 +394,6 @@ describe('SBTFilter performance guards', () => {
 
     expect(contractScripts.getSbtMintBurnCountsByAddress).toHaveBeenCalledTimes(1);
     expect(onFilter).toHaveBeenCalledTimes(1);
-    expect(onFilter).toHaveBeenLastCalledWith(
-      { q1: [{ responder: '0xholder', response: 'yes' }] },
-      expect.any(Object)
-    );
+    expect(onFilter).toHaveBeenLastCalledWith({ q1: [{ responder: '0xholder', response: 'yes' }] }, expect.any(Object));
   });
-
 });

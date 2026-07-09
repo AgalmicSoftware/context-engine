@@ -36,10 +36,7 @@ export type GateMultiSelectLockProps = {
   showDots?: boolean;
 };
 
-const resolveGateSbtDisplayLabel = resolveSbtDisplayLabel as (args: {
-  address: unknown;
-  fallback?: string;
-}) => string;
+const resolveGateSbtDisplayLabel = resolveSbtDisplayLabel as (args: { address: unknown; fallback?: string }) => string;
 
 const normalizeId = (val: unknown) => toStr(val).trim();
 
@@ -62,35 +59,30 @@ const shortAddr = (value: unknown) => {
 
 const normalizeGateMode = (option: GateOption = {}) => {
   const raw = normalizeId(
-    option?.mode ||
-    option?.operator ||
-    option?.gateMode ||
-    (option?.requireAll ? 'all' : '')
+    option?.mode || option?.operator || option?.gateMode || (option?.requireAll ? 'all' : ''),
   ).toLowerCase();
   if (option?.requireAll === true || raw === 'all' || raw === 'and') return 'all';
   return 'any';
 };
 
-const collectSbtAddresses = (option: GateOption = {}) => uniq([
-  ...(Array.isArray(option?.sbtAddresses) ? option.sbtAddresses : []),
-  option?.sbtAddress,
-]);
+const collectSbtAddresses = (option: GateOption = {}) =>
+  uniq([...(Array.isArray(option?.sbtAddresses) ? option.sbtAddresses : []), option?.sbtAddress]);
 
-const resolveSbtItems = (addresses: unknown[] = [], sessionSlug = '') => (
+const resolveSbtItems = (addresses: unknown[] = [], sessionSlug = '') =>
   (Array.isArray(addresses) ? addresses : []).map((address) => {
     const normalizedAddress = normalizeId(address);
     const short = shortAddr(address);
-    const label = resolveGateSbtDisplayLabel({
-      address: normalizedAddress,
-      fallback: 'short',
-    }) || short;
+    const label =
+      resolveGateSbtDisplayLabel({
+        address: normalizedAddress,
+        fallback: 'short',
+      }) || short;
     return {
       address: normalizedAddress,
       label: label === short ? label : `${label} (${short})`,
       href: buildSbtDetailPath(normalizedAddress, sessionSlug),
     };
-  })
-);
+  });
 
 const GateMultiSelectLock = ({
   gateOptions,
@@ -102,12 +94,8 @@ const GateMultiSelectLock = ({
   showDots = true,
 }: GateMultiSelectLockProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const options = useMemo(() => (
-    Array.isArray(gateOptions) ? gateOptions.filter(Boolean) : []
-  ), [gateOptions]);
-  const optionIds = useMemo(() => (
-    options.map((opt) => normalizeId(opt?.id)).filter(Boolean)
-  ), [options]);
+  const options = useMemo(() => (Array.isArray(gateOptions) ? gateOptions.filter(Boolean) : []), [gateOptions]);
+  const optionIds = useMemo(() => options.map((opt) => normalizeId(opt?.id)).filter(Boolean), [options]);
 
   const selected = useMemo(() => {
     const raw = Array.isArray(selectedGateIds) ? selectedGateIds : [];
@@ -158,26 +146,31 @@ const GateMultiSelectLock = ({
     if (typeof onToggleOpen === 'function') onToggleOpen(!open);
   };
 
-  const dots = showDots && selected.length > 1
-    ? selected.slice(0, 4).map((gateId) => {
-        const match = options.find((opt) => normalizeId(opt?.id) === gateId);
-        const color = normalizeId(match?.color) || '#888';
-        return (
-          <span
-            key={gateId}
-            className={styles.dot}
-            style={{ backgroundColor: color, borderColor: color }}
-            aria-hidden="true"
-          />
-        );
-      })
-    : null;
+  const dots =
+    showDots && selected.length > 1
+      ? selected.slice(0, 4).map((gateId) => {
+          const match = options.find((opt) => normalizeId(opt?.id) === gateId);
+          const color = normalizeId(match?.color) || '#888';
+          return (
+            <span
+              key={gateId}
+              className={styles.dot}
+              style={{ backgroundColor: color, borderColor: color }}
+              aria-hidden="true"
+            />
+          );
+        })
+      : null;
 
   const extraDotCount = showDots && selected.length > 4 ? selected.length - 4 : 0;
   const canEditGateLock = options.length > 0 && !disabled;
   const lockButtonLabel = canEditGateLock
-    ? (locked ? `Edit locked ${t('gateLower')}` : `Choose ${t('gateLower')}`)
-    : (locked ? `${t('gate')} unavailable` : `No ${t('gateLower')} available`);
+    ? locked
+      ? `Edit locked ${t('gateLower')}`
+      : `Choose ${t('gateLower')}`
+    : locked
+      ? `${t('gate')} unavailable`
+      : `No ${t('gateLower')} available`;
 
   return (
     <div
@@ -188,9 +181,7 @@ const GateMultiSelectLock = ({
       {dots ? (
         <span className={styles.dots} aria-hidden="true">
           {dots}
-          {extraDotCount > 0 ? (
-            <span className={styles.dotMore}>+{extraDotCount}</span>
-          ) : null}
+          {extraDotCount > 0 ? <span className={styles.dotMore}>+{extraDotCount}</span> : null}
         </span>
       ) : null}
 
@@ -203,15 +194,20 @@ const GateMultiSelectLock = ({
         aria-expanded={canEditGateLock ? open : undefined}
         aria-haspopup={canEditGateLock ? 'dialog' : undefined}
         data-testid={E2E_TESTIDS.GATE_LOCK_BUTTON}
-        >
-          <FontAwesomeIcon
-            icon={locked ? faLock : faLockOpen}
-            style={primaryColor ? { color: primaryColor } : undefined}
-          />
-        </button>
+      >
+        <FontAwesomeIcon
+          icon={locked ? faLock : faLockOpen}
+          style={primaryColor ? { color: primaryColor } : undefined}
+        />
+      </button>
 
       {options.length > 0 && open && !disabled ? (
-        <div className={styles.popover} role="dialog" aria-label={`Select ${t('gatesLower')}`} data-testid={E2E_TESTIDS.GATE_LOCK_POPOVER}>
+        <div
+          className={styles.popover}
+          role="dialog"
+          aria-label={`Select ${t('gatesLower')}`}
+          data-testid={E2E_TESTIDS.GATE_LOCK_POPOVER}
+        >
           {options.map((opt) => {
             const gateId = normalizeId(opt?.id);
             if (!gateId) return null;
@@ -219,13 +215,13 @@ const GateMultiSelectLock = ({
             const color = normalizeId(opt?.color) || '#888';
             const checked = selected.includes(gateId);
             const sbtAddresses = collectSbtAddresses(opt);
-            const sbtItems = resolveSbtItems(
-              sbtAddresses,
-              normalizeId(opt?.sourceSessionSlug || opt?.sessionSlug)
-            );
-            const modeLabel = sbtAddresses.length > 0
-              ? (normalizeGateMode(opt) === 'all' ? `All selected ${t('sbts')} required` : `Any one selected ${t('sbt')} unlocks`)
-              : '';
+            const sbtItems = resolveSbtItems(sbtAddresses, normalizeId(opt?.sourceSessionSlug || opt?.sessionSlug));
+            const modeLabel =
+              sbtAddresses.length > 0
+                ? normalizeGateMode(opt) === 'all'
+                  ? `All selected ${t('sbts')} required`
+                  : `Any one selected ${t('sbt')} unlocks`
+                : '';
             const secondaryLabel = toStr(opt?.secondaryLabel || '');
             return (
               <div
@@ -255,7 +251,7 @@ const GateMultiSelectLock = ({
                   />
                   <span className={styles.rowCopy}>
                     <span className={styles.rowLabel}>{label}</span>
-                    {(secondaryLabel || modeLabel) ? (
+                    {secondaryLabel || modeLabel ? (
                       <span className={styles.rowMeta}>
                         {secondaryLabel}
                         {secondaryLabel && modeLabel ? ' - ' : ''}
@@ -287,9 +283,7 @@ const GateMultiSelectLock = ({
               </div>
             );
           })}
-          {!options.length && (
-            <div className={styles.empty}>{`No ${t('gatesLower')} configured.`}</div>
-          )}
+          {!options.length && <div className={styles.empty}>{`No ${t('gatesLower')} configured.`}</div>}
         </div>
       ) : null}
     </div>

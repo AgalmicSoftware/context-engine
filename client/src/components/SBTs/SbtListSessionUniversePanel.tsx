@@ -1,11 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faChevronDown,
-  faChevronUp,
-  faCog,
-  faSpinner,
-} from '@fortawesome/free-solid-svg-icons';
+import { faChevronDown, faChevronUp, faCog, faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import styles from './SBTsList.module.scss';
@@ -132,16 +127,14 @@ const SbtListSessionUniversePanel = ({
   }
 
   return (
-    <div
-      className={styles.sessionUniversePanel}
-      data-testid="session-selector-panel"
-      id={selectorPanelId}
-    >
+    <div className={styles.sessionUniversePanel} data-testid="session-selector-panel" id={selectorPanelId}>
       <div className={styles.sessionUniverseHeader}>
         <span>Sessions</span>
         {renderHeaderActions()}
       </div>
-      {!hideSessionUniverseSummary && isUniverseCollapsed && renderCollapsedSummary('session-universe-collapsed-summary')}
+      {!hideSessionUniverseSummary &&
+        isUniverseCollapsed &&
+        renderCollapsedSummary('session-universe-collapsed-summary')}
       {!isUniverseCollapsed && (
         <div className={styles.sessionUniverseChips}>
           <SessionChipSelector

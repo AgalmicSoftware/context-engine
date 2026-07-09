@@ -13,10 +13,7 @@ import {
   buildSurveyResultsLocalStoragePollPatchPlan,
 } from './surveyResultsLocalStoragePollDecision';
 import { resolveNetBucketReadOnly } from './surveyResultsRuntimeHelpers';
-import type {
-  SurveyResultsProps,
-  SurveyResultsState,
-} from './SurveyResults';
+import type { SurveyResultsProps, SurveyResultsState } from './SurveyResults';
 import type {
   SurveyResultsQuestionBucketRecord,
   SurveyResultsScopedQuestionNetworkData,
@@ -94,7 +91,7 @@ export const maybeRefreshSurveyResultsNetworkLatestBlockFromPolling = ({
   const now = Date.now();
   if (
     instance._pollLatestBlockLastAttemptAt > 0 &&
-    (now - instance._pollLatestBlockLastAttemptAt) < config.latestBlockPollThrottleMs
+    now - instance._pollLatestBlockLastAttemptAt < config.latestBlockPollThrottleMs
   ) {
     return;
   }
@@ -111,7 +108,9 @@ export const maybeRefreshSurveyResultsNetworkLatestBlockFromPolling = ({
         ports.applyStatePatch(buildSurveyResultsNetworkLatestBlockPatch(parsed));
       }
     })
-    .catch((e: unknown) => { ports.logWarn('SurveyResults: fallback', e); })
+    .catch((e: unknown) => {
+      ports.logWarn('SurveyResults: fallback', e);
+    })
     .finally(() => {
       instance._pollLatestBlockFetchInFlight = false;
     });
@@ -120,19 +119,16 @@ export const maybeRefreshSurveyResultsNetworkLatestBlockFromPolling = ({
 const getMemoizedQuestionsCountForPolling = (
   instance: SurveyResultsLocalStoragePollInstance,
   questionsById: unknown,
-  options: { forceScan?: boolean } = {}
+  options: { forceScan?: boolean } = {},
 ): number => {
-  const ref: SurveyResultsRecord = questionsById && typeof questionsById === 'object'
-    ? questionsById as SurveyResultsRecord
-    : {};
+  const ref: SurveyResultsRecord =
+    questionsById && typeof questionsById === 'object' ? (questionsById as SurveyResultsRecord) : {};
   const forceScan = options && options.forceScan === true;
   const memo = instance._pollQuestionCountMemo;
   if (!forceScan && memo.questionsRef === ref) return memo.count;
   const nextCount = measureSync(
-    forceScan
-      ? 'ce.surveyResults.poll.questionsCountForcedScan'
-      : 'ce.surveyResults.poll.questionsCountScan',
-    () => Object.keys(ref).length
+    forceScan ? 'ce.surveyResults.poll.questionsCountForcedScan' : 'ce.surveyResults.poll.questionsCountScan',
+    () => Object.keys(ref).length,
   ) as number;
   instance._pollQuestionCountMemo = {
     questionsRef: ref,
@@ -145,7 +141,7 @@ const getMemoizedSurveyResponsesCountForPolling = (
   instance: SurveyResultsLocalStoragePollInstance,
   surveyResponsesById: unknown,
   surveyId: unknown,
-  options: { forceScan?: boolean } = {}
+  options: { forceScan?: boolean } = {},
 ): number => {
   const sid = String(surveyId || '').toLowerCase();
   if (!sid) {
@@ -157,12 +153,9 @@ const getMemoizedSurveyResponsesCountForPolling = (
     return 0;
   }
 
-  const byId: SurveyResultsRecord = surveyResponsesById && typeof surveyResponsesById === 'object'
-    ? surveyResponsesById as SurveyResultsRecord
-    : {};
-  const responsesRef = byId[sid] && typeof byId[sid] === 'object'
-    ? byId[sid] as SurveyResultsRecord
-    : null;
+  const byId: SurveyResultsRecord =
+    surveyResponsesById && typeof surveyResponsesById === 'object' ? (surveyResponsesById as SurveyResultsRecord) : {};
+  const responsesRef = byId[sid] && typeof byId[sid] === 'object' ? (byId[sid] as SurveyResultsRecord) : null;
   const memo = instance._pollSurveyResponsesCountMemo;
   const forceScan = options && options.forceScan === true;
   if (!forceScan && memo.surveyId === sid && memo.responsesRef === responsesRef) {
@@ -172,7 +165,7 @@ const getMemoizedSurveyResponsesCountForPolling = (
     forceScan
       ? 'ce.surveyResults.poll.surveyResponsesCountForcedScan'
       : 'ce.surveyResults.poll.surveyResponsesCountScan',
-    () => Object.keys(responsesRef || {}).length
+    () => Object.keys(responsesRef || {}).length,
   ) as number;
   instance._pollSurveyResponsesCountMemo = {
     surveyId: sid,
@@ -186,30 +179,24 @@ export const pollSurveyResultsLocalStorageForUpdates = ({
   config,
   instance,
   ports,
-}: SurveyResultsLocalStoragePollRuntimeArgs): boolean => (
+}: SurveyResultsLocalStoragePollRuntimeArgs): boolean =>
   measureSync('ce.surveyResults.pollLocalStorageForUpdates', () => {
     const props = ports.getProps();
     const state = ports.getState();
     const netIdStr = String(props.network?.id ?? props.networkChainId ?? '');
     if (!netIdStr) return false;
     const slug = ports.getEffectiveSlug();
-    const currentSurveyId = state.viewMode === 'survey'
-      ? String(state.surveyId || '').toLowerCase()
-      : '';
+    const currentSurveyId = state.viewMode === 'survey' ? String(state.surveyId || '').toLowerCase() : '';
 
     const questionNetCache: SurveyResultsQuestionBucketRecord = (
       state.viewMode === 'questions'
         ? ports.getScopedQuestionNetworkDataSync('questions')
-        : resolveNetBucketReadOnly(
-            ports.readQuestionCacheSync(slug) || {},
-            netIdStr,
-            {
-              questionsLatestBlock: 0,
-              questions: {},
-              questionResponses: {},
-              questionResponsesLatestBlock: 0,
-            }
-          )
+        : resolveNetBucketReadOnly(ports.readQuestionCacheSync(slug) || {}, netIdStr, {
+            questionsLatestBlock: 0,
+            questions: {},
+            questionResponses: {},
+            questionResponsesLatestBlock: 0,
+          })
     ) as SurveyResultsQuestionBucketRecord;
 
     const questionsById = questionNetCache.questions || {};
@@ -277,13 +264,11 @@ export const pollSurveyResultsLocalStorageForUpdates = ({
           forceScan: countPlan.shouldForceCountRescan,
         });
     const localSurveyResponsesCount = currentSurveyId
-      ? (
-          countPlan.useCachedCounts
-            ? Number(state.cachedSurveyResponsesCount || 0)
-            : getMemoizedSurveyResponsesCountForPolling(instance, surveyResponsesById, currentSurveyId, {
-                forceScan: countPlan.shouldForceCountRescan,
-              })
-        )
+      ? countPlan.useCachedCounts
+        ? Number(state.cachedSurveyResponsesCount || 0)
+        : getMemoizedSurveyResponsesCountForPolling(instance, surveyResponsesById, currentSurveyId, {
+            forceScan: countPlan.shouldForceCountRescan,
+          })
       : 0;
     const patchPlan = buildSurveyResultsLocalStoragePollPatchPlan({
       blockOrRespChanged: countPlan.blockOrRespChanged,
@@ -305,15 +290,11 @@ export const pollSurveyResultsLocalStorageForUpdates = ({
     instance._lastLocalStoragePollDetailedSignature = patchPlan.detailedSignature;
 
     if (patchPlan.shouldApplyPatch && patchPlan.patch) {
-      ports.applyStatePatch(
-        buildSurveyResultsLocalStoragePollPatch(patchPlan.patch),
-        () => {
-          ports.queueResultsRefresh('poll-local-storage-change');
-        }
-      );
+      ports.applyStatePatch(buildSurveyResultsLocalStoragePollPatch(patchPlan.patch), () => {
+        ports.queueResultsRefresh('poll-local-storage-change');
+      });
       return true;
     }
 
     return false;
-  }) as boolean
-);
+  }) as boolean;

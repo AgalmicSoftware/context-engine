@@ -93,7 +93,6 @@ type EffectiveFaucetConfigResult = {
 
 const log = createLogger('resourceKeys');
 
-
 const STORAGE_KEY = 'ce:resourceKeys:v1';
 const RESERVED_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
 const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -104,13 +103,12 @@ const DEFAULT_SETTINGS = Object.freeze<ResourceKeys>({
   faucet: { useLocal: false, privateKey: '', rpcUrl: '', amountEth: '', balanceThresholdEth: '' },
 });
 
-const buildWorkerKeyMeta = <TKey extends 'apiKey' | 'jwk' | 'privateKey'>(
-  keyName: TKey
-): WorkerKeyMeta<TKey> => ({
-  [keyName]: '',
-  status: 'worker',
-  encryptedAvailable: false,
-} as Record<TKey, string> & { status: string; encryptedAvailable: boolean });
+const buildWorkerKeyMeta = <TKey extends 'apiKey' | 'jwk' | 'privateKey'>(keyName: TKey): WorkerKeyMeta<TKey> =>
+  ({
+    [keyName]: '',
+    status: 'worker',
+    encryptedAvailable: false,
+  }) as Record<TKey, string> & { status: string; encryptedAvailable: boolean };
 
 const normalizeSlug = (raw: unknown): string => canonicalizeSessionSlug(raw);
 
@@ -150,10 +148,7 @@ const normalizeSettings = (raw: unknown = {}): ResourceKeys => {
 
 const normalizeStore = (raw: unknown = null): ResourceKeyStore => {
   const obj = isObj(raw) ? raw : {};
-  const bySessionRaw =
-    isObj(obj.bySession)
-      ? obj.bySession
-      : (isObj(obj.byGroup) ? obj.byGroup : {});
+  const bySessionRaw = isObj(obj.bySession) ? obj.bySession : isObj(obj.byGroup) ? obj.byGroup : {};
   const bySession: Record<string, ResourceKeys> = {};
   Object.entries(bySessionRaw).forEach(([slug, entry]) => {
     const key = normalizeSlug(slug);
@@ -177,7 +172,9 @@ const writeStore = (payload: ResourceKeyStore): void => {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch (e) { log.warn('resourceKeys: fallback', e); }
+  } catch (e) {
+    log.warn('resourceKeys: fallback', e);
+  }
 };
 
 export const getLocalResourceKeys = (slugIn = ''): ResourceKeys => {
@@ -187,10 +184,7 @@ export const getLocalResourceKeys = (slugIn = ''): ResourceKeys => {
   return entry ? normalizeSettings(entry) : normalizeSettings(DEFAULT_SETTINGS);
 };
 
-export const saveLocalResourceKeys = (
-  slugIn = '',
-  updates: Partial<ResourceKeys> = {}
-): ResourceKeys => {
+export const saveLocalResourceKeys = (slugIn = '', updates: Partial<ResourceKeys> = {}): ResourceKeys => {
   const slug = normalizeSlug(slugIn);
   const stored = readStore();
   const current = stored.bySession[slug] || normalizeSettings(DEFAULT_SETTINGS);
@@ -229,13 +223,13 @@ const resolveSessionConfig = (slugIn = ''): SessionConfig | null => {
   });
   if (resolved.sessionConfig || !allowDemoFallback) return resolved.sessionConfig;
   const demoConfig = getDemoSessionConfigForDisplay(resolved.sessionSlug);
-  return isObj(demoConfig) ? demoConfig as SessionConfig : null;
+  return isObj(demoConfig) ? (demoConfig as SessionConfig) : null;
 };
 
 // Legacy alias removed — function is now resolveSessionConfig directly.
 
 const getWalletContext = (
-  override: ResourceKeyResolutionContext = {}
+  override: ResourceKeyResolutionContext = {},
 ): {
   account: string;
   providerLike: ResourceKeyProviderLike;
@@ -243,17 +237,14 @@ const getWalletContext = (
 } => {
   try {
     const state = store?.getState?.();
-    const profile = state?.profile || {};
-    const network = profile.network || {};
-    const chainId =
-      override.chainId ||
-      network.id ||
-      network.chainId ||
-      null;
+    const profile: UnknownRecord = isObj(state?.profile) ? state.profile : {};
+    const network: UnknownRecord = isObj(profile.network) ? profile.network : {};
+    const chainId = override.chainId || network.id || network.chainId || null;
+    const providerLike = typeof profile.provider === 'string' || isObj(profile.provider) ? profile.provider : 'wagmi';
     return {
-      account: override.account || profile.account || '',
-      providerLike: override.providerLike || profile.provider || 'wagmi',
-      chainId,
+      account: override.account || toStr(profile.account),
+      providerLike: override.providerLike || providerLike,
+      chainId: typeof chainId === 'string' || typeof chainId === 'number' ? chainId : null,
     };
   } catch {
     return {
@@ -272,7 +263,7 @@ const getLitHooks = (override: ResourceKeyResolutionContext = {}): UnknownRecord
 
 const resolveEncryptedValue = async (
   encrypted: unknown,
-  context: ResourceKeyResolutionContext = {}
+  context: ResourceKeyResolutionContext = {},
 ): Promise<{ value: unknown; status: string; encryptedAvailable: boolean }> => {
   if (!encrypted) {
     return { value: '', status: 'missing', encryptedAvailable: false };
@@ -311,7 +302,7 @@ const resolveEncryptedValue = async (
 
 const resolveSessionRpcKey = async (
   sessionCfg: SessionConfig | null,
-  context: ResourceKeyResolutionContext = {}
+  context: ResourceKeyResolutionContext = {},
 ): Promise<WorkerKeyMeta<'apiKey'>> => {
   void sessionCfg;
   void context;
@@ -320,7 +311,7 @@ const resolveSessionRpcKey = async (
 
 const resolveSessionArweaveKey = async (
   sessionCfg: SessionConfig | null,
-  context: ResourceKeyResolutionContext = {}
+  context: ResourceKeyResolutionContext = {},
 ): Promise<WorkerKeyMeta<'jwk'>> => {
   void sessionCfg;
   void context;
@@ -329,7 +320,7 @@ const resolveSessionArweaveKey = async (
 
 const resolveSessionFaucetKey = async (
   sessionCfg: SessionConfig | null,
-  context: ResourceKeyResolutionContext = {}
+  context: ResourceKeyResolutionContext = {},
 ): Promise<WorkerKeyMeta<'privateKey'>> => {
   void sessionCfg;
   void context;

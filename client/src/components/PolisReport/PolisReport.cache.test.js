@@ -32,11 +32,13 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 }));
 
 jest.mock('../../utilities/survey/polisMath', () => ({
-  beeswarmByExtremity: jest.fn((points = []) => points.map((point, index) => ({
-    ...point,
-    x: index * 12,
-    y: 24,
-  }))),
+  beeswarmByExtremity: jest.fn((points = []) =>
+    points.map((point, index) => ({
+      ...point,
+      x: index * 12,
+      y: 24,
+    })),
+  ),
   clusterUMAPPointsKmeans: jest.fn((points = []) => new Array(points.length).fill(0)),
   doUMAP: jest.fn((data = []) => data.map((_, index) => [index, index])),
   getCommentBarData: jest.fn((matrix = []) => matrix.map(() => ({ value: 0 }))),
@@ -57,14 +59,16 @@ jest.mock('../../utilities/survey/polisReportMath.js', () => ({
     clusterCount: 0,
     repQuestions: {},
   })),
-  computePolisCommentStats: jest.fn((matrix = []) => matrix.map((_, index) => ({
-    commentIndex: index,
-    extremity: index,
-    agrees: 0,
-    disagrees: 0,
-    unsure: 0,
-    total: 0,
-  }))),
+  computePolisCommentStats: jest.fn((matrix = []) =>
+    matrix.map((_, index) => ({
+      commentIndex: index,
+      extremity: index,
+      agrees: 0,
+      disagrees: 0,
+      unsure: 0,
+      total: 0,
+    })),
+  ),
   findRepresentativeQuestions: jest.fn(() => ({})),
 }));
 
@@ -90,7 +94,7 @@ jest.mock('utilities/ui/historicalFigureAvatars.js', () => ({
   getHistoricalFigureAvatarOrBlockie: jest.fn(() => 'data:image/png;base64,mock-avatar'),
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {},
   getAllSessionSlugs: jest.fn(() => []),
@@ -198,16 +202,18 @@ describe('PolisReport cache read options', () => {
         slug="legacy-live"
         questionResponses={legacyQuestionResponses}
         demoDataFirstLoad={false}
-      />
+      />,
     );
 
     await waitFor(() => {
-      expect(screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.'),
+      ).not.toBeInTheDocument();
       expect(computePolisConversationMath).toHaveBeenCalledWith(
         [[1, -1, 0]],
         expect.objectContaining({ qLegacy: 'Legacy prompt' }),
         ['qLegacy'],
-        expect.objectContaining({ randomSeed: 42 })
+        expect.objectContaining({ randomSeed: 42 }),
       );
     });
   });
@@ -257,7 +263,7 @@ describe('PolisReport cache read options', () => {
         slug="edge-live"
         questionResponses={mixedQuestionResponses}
         demoDataFirstLoad={false}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -265,7 +271,7 @@ describe('PolisReport cache read options', () => {
         [[-1]],
         expect.objectContaining({ qLive: 'Live prompt' }),
         ['qLive'],
-        expect.objectContaining({ randomSeed: 42 })
+        expect.objectContaining({ randomSeed: 42 }),
       );
     });
     expect(JSON.stringify(computePolisConversationMath.mock.calls)).not.toContain('qFixture');
@@ -308,44 +314,33 @@ describe('PolisReport cache read options', () => {
   });
 
   it('reads question and sbt caches with clone disabled during filter application', () => {
-    const out = applyFilterStateToAggregator(
-      { q1: [] },
-      { id: 84532 },
-      {},
-      'edge'
-    );
+    const out = applyFilterStateToAggregator({ q1: [] }, { id: 84532 }, {}, 'edge');
 
-    expect(cacheScripts.peekCacheSync).toHaveBeenNthCalledWith(
-      1,
-      'questionsCache',
-      'edge',
-      { clone: false }
-    );
-    expect(cacheScripts.peekCacheSync).toHaveBeenNthCalledWith(
-      2,
-      'sbtCache',
-      'edge',
-      { clone: false }
-    );
+    expect(cacheScripts.peekCacheSync).toHaveBeenNthCalledWith(1, 'questionsCache', 'edge', { clone: false });
+    expect(cacheScripts.peekCacheSync).toHaveBeenNthCalledWith(2, 'sbtCache', 'edge', { clone: false });
     expect(out).toEqual(expect.any(Object));
   });
 
   it('keeps participant graph tooltip copy aligned with the Polis graph modes', () => {
     expect(REPORT_DEFAULT_EMBEDDING_LABEL).toBe('Polis Auto');
-    expect(PARTICIPANTS_GRAPH_TOOLTIP_TEXT).toBe("This diagram opens in UMAP with 3 groups. Switch to SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic grouping.");
-    expect(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT).toBe("Polis Auto uses Context Engine's Polis-inspired automatic grouping. It keeps the report's PCA-based participant layout and auto-selects opinion groups from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.");
-    expect(OPINION_GROUPS_TOOLTIP_TEXT).toBe("Leave K on auto to use Polis Auto's automatic grouping, or set K manually when exploring UMAP or SVD/PCA layouts.");
+    expect(PARTICIPANTS_GRAPH_TOOLTIP_TEXT).toBe(
+      "This diagram opens in UMAP with 3 groups. Switch to SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic grouping.",
+    );
+    expect(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT).toBe(
+      "Polis Auto uses Context Engine's Polis-inspired automatic grouping. It keeps the report's PCA-based participant layout and auto-selects opinion groups from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.",
+    );
+    expect(OPINION_GROUPS_TOOLTIP_TEXT).toBe(
+      "Leave K on auto to use Polis Auto's automatic grouping, or set K manually when exploring UMAP or SVD/PCA layouts.",
+    );
   });
 
   it('sanitizes session-derived PDF export filenames', () => {
     const timestamp = new Date('2026-01-02T03:04:05.006Z');
 
     expect(buildPolisReportPdfFilename('../Demo <script>alert(1)</script>', timestamp)).toBe(
-      'contextEngine_report_Demo_script_alert_1_script_2026_01_02T03_04_05_006Z.pdf'
+      'contextEngine_report_Demo_script_alert_1_script_2026_01_02T03_04_05_006Z.pdf',
     );
-    expect(buildPolisReportPdfFilename('', timestamp)).toBe(
-      'contextEngine_report_2026_01_02T03_04_05_006Z.pdf'
-    );
+    expect(buildPolisReportPdfFilename('', timestamp)).toBe('contextEngine_report_2026_01_02T03_04_05_006Z.pdf');
   });
 
   it('resolves jsPDF constructors across dynamic import module shapes', () => {
@@ -362,9 +357,7 @@ describe('PolisReport cache read options', () => {
   it('formats the live network label with chain id instead of hardcoding a chain name', () => {
     expect(formatBlockchainNetworkLabel({ id: 11155420, name: 'OP Sepolia' })).toBe('OP Sepolia (11155420)');
     expect(formatBlockchainNetworkLabel({ id: 84532, name: 'Base Sepolia' })).toBe('Base Sepolia (84532)');
-    expect(
-      formatBlockchainNetworkLabel({ id: 84532, name: 'Base Sepolia' }, 11155420)
-    ).toBe('OP Sepolia (11155420)');
+    expect(formatBlockchainNetworkLabel({ id: 84532, name: 'Base Sepolia' }, 11155420)).toBe('OP Sepolia (11155420)');
     expect(formatBlockchainNetworkLabel(null, 11155420)).toBe('OP Sepolia (11155420)');
     expect(formatBlockchainNetworkLabel({ id: 31337 })).toBe('Anvil (31337)');
     expect(formatBlockchainNetworkLabel(null)).toBe('Unknown');
@@ -378,7 +371,7 @@ describe('PolisReport cache read options', () => {
         network={null}
         networkChainId={11155420}
         slug="edge"
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -396,7 +389,7 @@ describe('PolisReport cache read options', () => {
         network={{ id: 84532, name: 'Base Sepolia' }}
         networkChainId={11155420}
         slug="edge"
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -423,7 +416,7 @@ describe('PolisReport cache read options', () => {
         questionResponses={seededQuestionResponses}
         isQuestionCacheReady={false}
         isResponsesCacheReady={false}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -448,16 +441,17 @@ describe('PolisReport cache read options', () => {
           scannedBlocks: 30,
           remainingBlocks: 90,
         }}
-      />
+      />,
     );
 
     expect(screen.getByLabelText('Loading report')).toBeInTheDocument();
     expect(screen.getByText('Scanning session blocks')).toBeInTheDocument();
     expect(screen.getByText('90 blocks left')).toBeInTheDocument();
     expect(screen.getByText('30 / 120')).toBeInTheDocument();
-    expect(
-      screen.getByRole('progressbar', { name: 'Polis report loading progress' })
-    ).toHaveAttribute('aria-valuenow', '25');
+    expect(screen.getByRole('progressbar', { name: 'Polis report loading progress' })).toHaveAttribute(
+      'aria-valuenow',
+      '25',
+    );
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_REPORT_LOADING_PROGRESS)).toBeInTheDocument();
   });
 
@@ -476,7 +470,7 @@ describe('PolisReport cache read options', () => {
           scannedBlocks: 3182031,
           remainingBlocks: 0,
         }}
-      />
+      />,
     );
 
     expect(screen.queryByLabelText('Loading report')).not.toBeInTheDocument();
@@ -498,7 +492,7 @@ describe('PolisReport cache read options', () => {
           discoveredQuestions: 5,
           hydratedQuestions: 2,
         }}
-      />
+      />,
     );
 
     expect(screen.getByLabelText('Loading report')).toBeInTheDocument();
@@ -506,9 +500,10 @@ describe('PolisReport cache read options', () => {
     expect(screen.queryByText('Hydrating question metadata')).not.toBeInTheDocument();
     expect(screen.getByText('3 items left')).toBeInTheDocument();
     expect(screen.getByText('2 / 5')).toBeInTheDocument();
-    expect(
-      screen.getByRole('progressbar', { name: 'Polis report loading progress' })
-    ).toHaveAttribute('aria-valuenow', '40');
+    expect(screen.getByRole('progressbar', { name: 'Polis report loading progress' })).toHaveAttribute(
+      'aria-valuenow',
+      '40',
+    );
   });
 
   it('keeps the hydrate loading label but hides empty zero-count progress details', () => {
@@ -524,16 +519,14 @@ describe('PolisReport cache read options', () => {
           discoveredQuestions: 0,
           hydratedQuestions: 0,
         }}
-      />
+      />,
     );
 
     expect(screen.getByLabelText('Loading report')).toBeInTheDocument();
     expect(screen.getByText('Loading report data')).toBeInTheDocument();
     expect(screen.queryByText('0 items left')).not.toBeInTheDocument();
     expect(screen.queryByText('0 / 0')).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('progressbar', { name: 'Polis report loading progress' })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('progressbar', { name: 'Polis report loading progress' })).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.POLIS_REPORT_LOADING_PROGRESS)).not.toBeInTheDocument();
   });
 
@@ -545,11 +538,11 @@ describe('PolisReport cache read options', () => {
       jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha']);
       cacheScripts.peekCacheSync.mockImplementation((namespace, slug) => {
         if (namespace === 'questionsCache') {
-          return { '84532': { questions: {} } };
+          return { 84532: { questions: {} } };
         }
         if (namespace === 'sbtCache' && slug === 'alpha') {
           return {
-            '84532': {
+            84532: {
               sbtList: {
                 '0x1111111111111111111111111111111111111111': {
                   mintedAddresses: ['0xabc'],
@@ -569,35 +562,17 @@ describe('PolisReport cache read options', () => {
         { id: 84532 },
         {
           sbtFilter: {
-            selectedSBTGroupsResponder: [
-              { address: '0x1111111111111111111111111111111111111111' },
-            ],
+            selectedSBTGroupsResponder: [{ address: '0x1111111111111111111111111111111111111111' }],
           },
         },
-        'edge'
+        'edge',
       );
 
       expect(out).toEqual({});
-      expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith(
-        'questionsCache',
-        'edge',
-        { clone: false }
-      );
-      expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith(
-        'questionsCache',
-        'alpha',
-        { clone: false }
-      );
-      expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith(
-        'sbtCache',
-        'edge',
-        { clone: false }
-      );
-      expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith(
-        'sbtCache',
-        'alpha',
-        { clone: false }
-      );
+      expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+      expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+      expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('sbtCache', 'edge', { clone: false });
+      expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith('sbtCache', 'alpha', { clone: false });
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
@@ -606,11 +581,11 @@ describe('PolisReport cache read options', () => {
   it('uses count maps for SBT responder filters so reminted holders remain included', () => {
     cacheScripts.peekCacheSync.mockImplementation((namespace, slug) => {
       if (namespace === 'questionsCache') {
-        return { '84532': { questions: {} } };
+        return { 84532: { questions: {} } };
       }
       if (namespace === 'sbtCache' && slug === 'alpha') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               '0x1111111111111111111111111111111111111111': {
                 mintedAddresses: ['0xabc'],
@@ -633,12 +608,10 @@ describe('PolisReport cache read options', () => {
       { id: 84532 },
       {
         sbtFilter: {
-          selectedSBTGroupsResponder: [
-            { address: '0x1111111111111111111111111111111111111111' },
-          ],
+          selectedSBTGroupsResponder: [{ address: '0x1111111111111111111111111111111111111111' }],
         },
       },
-      'alpha'
+      'alpha',
     );
 
     expect(out).toEqual({
@@ -649,11 +622,11 @@ describe('PolisReport cache read options', () => {
   it('ignores checkpoint-backed partial count maps for SBT responder filters', () => {
     cacheScripts.peekCacheSync.mockImplementation((namespace, slug) => {
       if (namespace === 'questionsCache') {
-        return { '84532': { questions: {} } };
+        return { 84532: { questions: {} } };
       }
       if (namespace === 'sbtCache' && slug === 'alpha') {
         return {
-          '84532': {
+          84532: {
             sbtList: {
               '0x1111111111111111111111111111111111111111': {
                 mintedAddresses: ['0xabc'],
@@ -682,12 +655,10 @@ describe('PolisReport cache read options', () => {
       { id: 84532 },
       {
         sbtFilter: {
-          selectedSBTGroupsResponder: [
-            { address: '0x1111111111111111111111111111111111111111' },
-          ],
+          selectedSBTGroupsResponder: [{ address: '0x1111111111111111111111111111111111111111' }],
         },
       },
-      'alpha'
+      'alpha',
     );
 
     expect(out).toEqual({});
@@ -702,27 +673,29 @@ describe('PolisReport demo data defaults', () => {
     expect(shouldAutoEnablePolisDemoData({ slug: 'demo-2' })).toBe(true);
     expect(shouldAutoEnablePolisDemoData({ slug: 'edge' })).toBe(false);
     expect(shouldAutoEnablePolisDemoData({ slug: 'edge', demoDataFirstLoad: true })).toBe(false);
-    expect(shouldAutoEnablePolisDemoData({
-      slug: 'edge',
-      demoDataFirstLoad: true,
-      demoDataBySlug: {
-        edge: {
-          comments: [],
-          participantsVotes: [],
+    expect(
+      shouldAutoEnablePolisDemoData({
+        slug: 'edge',
+        demoDataFirstLoad: true,
+        demoDataBySlug: {
+          edge: {
+            comments: [],
+            participantsVotes: [],
+          },
         },
-      },
-    })).toBe(true);
+      }),
+    ).toBe(true);
   });
 
   it('maps demo session slugs to the shared Context demo corpus fixture', () => {
     expect(getPolisDemoDatasetForSlug('demo-1', { allowFallback: false })).toBe(
-      getPolisDemoDatasetForSlug('demo', { allowFallback: false })
+      getPolisDemoDatasetForSlug('demo', { allowFallback: false }),
     );
     expect(getPolisDemoDatasetForSlug('demo-3', { allowFallback: false })).toBe(
-      getPolisDemoDatasetForSlug('demo', { allowFallback: false })
+      getPolisDemoDatasetForSlug('demo', { allowFallback: false }),
     );
     expect(getPolisDemoDatasetForSlug('demo-2', { allowFallback: false })).toBe(
-      getPolisDemoDatasetForSlug('demo', { allowFallback: false })
+      getPolisDemoDatasetForSlug('demo', { allowFallback: false }),
     );
   });
 
@@ -751,7 +724,7 @@ describe('PolisReport demo data defaults', () => {
         demoDataFirstLoad={true}
         isQuestionCacheReady={true}
         isResponsesCacheReady={true}
-      />
+      />,
     );
 
     openSettingsRow();
@@ -765,7 +738,9 @@ describe('PolisReport demo data defaults', () => {
     expect(demoToggle).not.toBeChecked();
     await waitFor(() => {
       expect(screen.queryByText('None (Demo Data Active)')).not.toBeInTheDocument();
-      expect(screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.'),
+      ).not.toBeInTheDocument();
       expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
     });
   });
@@ -792,22 +767,14 @@ describe('PolisReport demo data defaults', () => {
         { x: 0, y: 1, index: 2 },
         { x: 1, y: 1, index: 3 },
       ],
-      statementCoords: [
-        { x: 0, y: 0, index: 0 },
-      ],
+      statementCoords: [{ x: 0, y: 0, index: 0 }],
       commentStats: [],
       clusterAssignments: [0, 0, 1, 1],
       clusterCount: 2,
       repQuestions: {},
     });
 
-    render(
-      <PolisReport
-        {...baseReportProps}
-        slug="demo"
-        questionResponses={seededQuestionResponses}
-      />
-    );
+    render(<PolisReport {...baseReportProps} slug="demo" questionResponses={seededQuestionResponses} />);
 
     await waitFor(() => {
       expect(screen.getByText('List of Participants')).toBeInTheDocument();
@@ -838,22 +805,14 @@ describe('PolisReport demo data defaults', () => {
         { x: 0, y: 1, index: 2 },
         { x: 1, y: 1, index: 3 },
       ],
-      statementCoords: [
-        { x: 0, y: 0, index: 0 },
-      ],
+      statementCoords: [{ x: 0, y: 0, index: 0 }],
       commentStats: [],
       clusterAssignments: [0, 0, 1, 1],
       clusterCount: 2,
       repQuestions: {},
     });
 
-    render(
-      <PolisReport
-        {...baseReportProps}
-        slug="demo"
-        questionResponses={seededQuestionResponses}
-      />
-    );
+    render(<PolisReport {...baseReportProps} slug="demo" questionResponses={seededQuestionResponses} />);
 
     const embeddingSelect = screen.getByDisplayValue('UMAP');
     const clusterInput = screen.getByRole('spinbutton');
@@ -918,9 +877,7 @@ describe('PolisReport demo data defaults', () => {
         { x: 0, y: 1, index: 2 },
         { x: 1, y: 1, index: 3 },
       ],
-      statementCoords: [
-        { x: 0, y: 0, index: 0 },
-      ],
+      statementCoords: [{ x: 0, y: 0, index: 0 }],
       commentStats: [],
       clusterAssignments: [0, 0, 1, 1],
       clusterCount: 2,
@@ -934,7 +891,7 @@ describe('PolisReport demo data defaults', () => {
         questionResponses={seededQuestionResponses}
         demoDataFirstLoad={true}
         demoDataBySlug={{ edge: { ...getPolisDemoDatasetForSlug('demo') } }}
-      />
+      />,
     );
 
     const embeddingSelect = screen.getByDisplayValue('UMAP');
@@ -973,9 +930,7 @@ describe('PolisReport demo data defaults', () => {
         { x: 1, y: 0, index: 1 },
         { x: 0.5, y: 1, index: 2 },
       ],
-      statementCoords: [
-        { x: 10, y: 0, index: 0 },
-      ],
+      statementCoords: [{ x: 10, y: 0, index: 0 }],
       commentStats: [],
       clusterAssignments: [0, 0, 1],
       clusterCount: 2,
@@ -989,7 +944,7 @@ describe('PolisReport demo data defaults', () => {
         questionResponses={seededQuestionResponses}
         demoDataFirstLoad={true}
         demoDataBySlug={{ edge: { ...getPolisDemoDatasetForSlug('demo') } }}
-      />
+      />,
     );
     const statementsToggle = screen.getByLabelText('Statements');
     const embeddingSelect = screen.getByDisplayValue('UMAP');
@@ -1018,9 +973,7 @@ describe('PolisReport demo data defaults', () => {
         { x: 1, y: 0, index: 1 },
         { x: 0.5, y: 1, index: 2 },
       ],
-      statementCoords: [
-        { x: 10, y: 0, index: 0 },
-      ],
+      statementCoords: [{ x: 10, y: 0, index: 0 }],
       commentStats: [],
       clusterAssignments: [0, 0, 1],
       clusterCount: 2,
@@ -1028,11 +981,7 @@ describe('PolisReport demo data defaults', () => {
     });
 
     const { container } = render(
-      <PolisReport
-        {...baseReportProps}
-        slug="demo"
-        questionResponses={seededQuestionResponses}
-      />
+      <PolisReport {...baseReportProps} slug="demo" questionResponses={seededQuestionResponses} />,
     );
     fireEvent.click(screen.getByLabelText('Statements'));
 
@@ -1064,10 +1013,12 @@ describe('PolisReport demo data defaults', () => {
         questionResponses={seededQuestionResponses}
         demoDataFirstLoad={true}
         demoDataBySlug={{ edge: { ...getPolisDemoDatasetForSlug('demo') } }}
-      />
+      />,
     );
 
-    expect(screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.'),
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
   });
 
@@ -1116,16 +1067,14 @@ describe('PolisReport demo data defaults', () => {
         demoDataFirstLoad={true}
         demoDataBySlug={{
           edge: {
-            comments: [
-              { commentId: 'edge-c1', commentBody: 'Edge prompt', type: 'binary' },
-            ],
+            comments: [{ commentId: 'edge-c1', commentBody: 'Edge prompt', type: 'binary' }],
             participantsVotes: [
               { participant: 'edge-user-1', votes: { 0: 1 } },
               { participant: 'edge-user-2', votes: { 0: -1 } },
             ],
           },
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -1163,16 +1112,19 @@ describe('PolisReport demo data defaults', () => {
         questionResponses={seededQuestionResponses}
         demoDataFirstLoad={true}
         demoDataBySlug={{ edge: { ...getPolisDemoDatasetForSlug('demo') } }}
-      />
+      />,
     );
 
     const clusterInput = screen.getByRole('spinbutton');
 
     fireEvent.change(clusterInput, { target: { value: '' } });
 
-    await waitFor(() => {
-      expect(clusterInput).toHaveValue(1);
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(clusterInput).toHaveValue(1);
+      },
+      { timeout: 5000 },
+    );
   });
 
   it('hydrates precomputed cluster analysis when demo data includes a matching versioned fixture', () => {
@@ -1184,9 +1136,11 @@ describe('PolisReport demo data defaults', () => {
     expect(demoDataset?.clusterAnalysis?.length || 0).toBeGreaterThan(0);
     expect(demoMatrix.matrix?.length).toBeGreaterThan(0);
     expect(demoMatrix.responders?.length).toBeGreaterThan(0);
-    expect(precomputedState).toEqual(expect.objectContaining({
-      clusterCount: demoDataset.clusterAnalysis.length,
-    }));
+    expect(precomputedState).toEqual(
+      expect.objectContaining({
+        clusterCount: demoDataset.clusterAnalysis.length,
+      }),
+    );
   });
 
   it('hydrates built-in /session/demo with ready precomputed analysis cache entries', () => {
@@ -1195,14 +1149,18 @@ describe('PolisReport demo data defaults', () => {
 
     expect(precomputedState).not.toBeNull();
     expect(Object.keys(precomputedState.analysisCacheByClusterIndex || {})).toEqual(['0', '1', '2']);
-    expect(precomputedState.analysisCacheByClusterIndex[0]).toEqual(expect.objectContaining({
-      name: 'Technocratic Innovators',
-      short: expect.stringMatching(/Inventors and technical optimists/i),
-    }));
-    expect(precomputedState.analysisCacheByClusterIndex[2]).toEqual(expect.objectContaining({
-      name: 'Governance & Guardrails',
-      short: expect.stringMatching(/Safety-minded institutionalists/i),
-    }));
+    expect(precomputedState.analysisCacheByClusterIndex[0]).toEqual(
+      expect.objectContaining({
+        name: 'Technocratic Innovators',
+        short: expect.stringMatching(/Inventors and technical optimists/i),
+      }),
+    );
+    expect(precomputedState.analysisCacheByClusterIndex[2]).toEqual(
+      expect.objectContaining({
+        name: 'Governance & Guardrails',
+        short: expect.stringMatching(/Safety-minded institutionalists/i),
+      }),
+    );
   });
 
   it('skips precomputed cluster analysis when the fixture version does not match', () => {
@@ -1222,13 +1180,7 @@ describe('PolisReport demo data defaults', () => {
 
     expect(buildPrecomputedDemoClusterState(customDemoDataset)).not.toBeNull();
 
-    render(
-      <PolisReport
-        {...baseReportProps}
-        slug="demo"
-        demoDataBySlug={{ demo: customDemoDataset }}
-      />
-    );
+    render(<PolisReport {...baseReportProps} slug="demo" demoDataBySlug={{ demo: customDemoDataset }} />);
 
     expect(screen.queryByTestId(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)).not.toBeInTheDocument();
   });
@@ -1246,7 +1198,7 @@ describe('PolisReport demo data defaults', () => {
         slug="edge"
         demoDataFirstLoad={true}
         demoDataBySlug={{ edge: customEdgeDataset }}
-      />
+      />,
     );
 
     openSettingsRow();
@@ -1265,7 +1217,7 @@ describe('PolisReport demo data defaults', () => {
       getPolisDemoDatasetForSlug('edge', {
         demoDataBySlug: { edge: customEdgeData },
         allowFallback: false,
-      })
+      }),
     ).toBe(customEdgeData);
   });
 
@@ -1295,7 +1247,7 @@ describe('PolisReport demo data defaults', () => {
         slug="edge"
         demoDataFirstLoad={true}
         demoDataBySlug={{ edge: customEdgeData }}
-      />
+      />,
     );
 
     openSettingsRow();
@@ -1306,15 +1258,11 @@ describe('PolisReport demo data defaults', () => {
   it('keeps invalid responder ids out of the participant list when only some demo users have xids', () => {
     expect(
       getRenderableParticipantList(
-        [
-          '0x0000000000000000000000000000000000000001',
-          'edge-user-1',
-          '0x0000000000000000000000000000000000000001',
-        ],
+        ['0x0000000000000000000000000000000000000001', 'edge-user-1', '0x0000000000000000000000000000000000000001'],
         {
           '0x0000000000000000000000000000000000000001': 'Franklin',
-        }
-      )
+        },
+      ),
     ).toEqual(['0x0000000000000000000000000000000000000001']);
   });
 

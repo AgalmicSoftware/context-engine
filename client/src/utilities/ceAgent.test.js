@@ -8,24 +8,30 @@ describe('ceAgent PolisReport contract', () => {
   });
 
   it('prefers an explicit params.sessionSlug', () => {
-    expect(resolvePolisReportSessionSlug({
-      params: { sessionSlug: 'explicit-session' },
-      state: { activeSessionSlug: 'active-session' },
-    })).toBe('explicit-session');
+    expect(
+      resolvePolisReportSessionSlug({
+        params: { sessionSlug: 'explicit-session' },
+        state: { activeSessionSlug: 'active-session' },
+      }),
+    ).toBe('explicit-session');
   });
 
   it('falls back to the active session slug when params are omitted', () => {
-    expect(resolvePolisReportSessionSlug({
-      params: {},
-      state: { activeSessionSlug: 'active-session' },
-    })).toBe('active-session');
+    expect(
+      resolvePolisReportSessionSlug({
+        params: {},
+        state: { activeSessionSlug: 'active-session' },
+      }),
+    ).toBe('active-session');
   });
 
   it('does not silently fall back to a legacy fixture slug', () => {
-    expect(resolvePolisReportSessionSlug({
-      params: {},
-      state: { activeSessionSlug: '' },
-    })).toBe('');
+    expect(
+      resolvePolisReportSessionSlug({
+        params: {},
+        state: { activeSessionSlug: '' },
+      }),
+    ).toBe('');
   });
 
   it('does not install the dev agent unless the local flag or query flag is enabled', () => {
@@ -35,12 +41,14 @@ describe('ceAgent PolisReport contract', () => {
     window.localStorage.setItem('ce-agent-enabled', '1');
 
     expect(installCeAgent()).toBe(true);
-    expect(window.__ceAgent).toEqual(expect.objectContaining({
-      getState: expect.any(Function),
-      describe: expect.any(Function),
-      perform: expect.any(Function),
-      run: expect.any(Function),
-    }));
+    expect(window.__ceAgent).toEqual(
+      expect.objectContaining({
+        getState: expect.any(Function),
+        describe: expect.any(Function),
+        perform: expect.any(Function),
+        run: expect.any(Function),
+      }),
+    );
     expect(installCeAgent()).toBe(true);
   });
 
@@ -50,14 +58,16 @@ describe('ceAgent PolisReport contract', () => {
     expect(installCeAgent()).toBe(true);
 
     const contract = window.__ceAgent.describe();
-    expect(contract).toEqual(expect.objectContaining({
-      version: 1,
-      activation: expect.objectContaining({
-        route: '/agent',
-        queryParam: 'agent=1',
-        localStorageKey: 'ce-agent-enabled',
+    expect(contract).toEqual(
+      expect.objectContaining({
+        version: 1,
+        activation: expect.objectContaining({
+          route: '/agent',
+          queryParam: 'agent=1',
+          localStorageKey: 'ce-agent-enabled',
+        }),
       }),
-    }));
+    );
     expect(contract.actions.map((action) => action.type)).toEqual([
       'navigate',
       'fill',
@@ -76,9 +86,11 @@ describe('ceAgent PolisReport contract', () => {
         }),
       ],
     });
-    await expect(window.__ceAgent.perform({})).resolves.toEqual(expect.objectContaining({
-      ok: false,
-      error: 'Missing action.type',
-    }));
+    await expect(window.__ceAgent.perform({})).resolves.toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'Missing action.type',
+      }),
+    );
   });
 });

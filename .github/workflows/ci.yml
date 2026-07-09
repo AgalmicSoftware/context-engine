@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -64,10 +66,18 @@ jobs:
           if [ "$BASELINE_MONOTONICITY_BASE" != "origin/main" ]; then
             git fetch --no-tags --depth=1 origin "$BASELINE_MONOTONICITY_BASE" || true
           fi
-          node scripts/check-baseline-monotonicity.mjs --base "$BASELINE_MONOTONICITY_BASE" --allow-text "$BASELINE_MONOTONICITY_ALLOW_TEXT"
+          BASELINE_MONOTONICITY_COMMIT_TEXT="$(git log --format=%B "$BASELINE_MONOTONICITY_BASE"..HEAD || true)"
+          node scripts/check-baseline-monotonicity.mjs --base "$BASELINE_MONOTONICITY_BASE" --allow-text "$BASELINE_MONOTONICITY_ALLOW_TEXT
+          $BASELINE_MONOTONICITY_COMMIT_TEXT"
 
       - name: Lint client
         run: npm run lint
+
+      - name: Check client formatting
+        run: npm --prefix client run format:check
+
+      - name: Lint workers
+        run: npm run lint:workers
 
       - name: Typecheck client
         run: npm run typecheck:client
@@ -130,6 +140,9 @@ jobs:
 
       - name: Run client coverage tests
         run: npm run test:client
+
+      - name: Check client coverage floor
+        run: npm run coverage-floor:check
 
       - name: Upload client coverage
         if: always()
@@ -195,6 +208,55 @@ jobs:
       - name: Run sessionCorsWorker tests
         run: npm run test:worker:session-cors
 
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install client dependencies
+        run: npm --prefix client ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build client
+        run: npm --prefix client run build
+
+      # Quarantine policy: keep this job to stable public smoke routes. If a route
+      # flakes, file the failure with evidence before narrowing the route set.
+      - name: Run tracked E2E smoke
+        env:
+          BASE_URL: http://127.0.0.1:4173
+          SMOKE_ROUTES: /session/pe4,/about,/contracts
+        run: |
+          set -euo pipefail
+          npm --prefix client run preview -- --host 127.0.0.1 --port 4173 > /tmp/context-engine-vite-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 60); do
+            if curl -fsS "$BASE_URL" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS "$BASE_URL" >/dev/null
+          npm run test:e2e:smoke
+
   cecc-and-node:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -227,6 +289,10 @@ jobs:
       - name: Run cache guard
         run: npm run test:cache-guard
 
+      - name: Run dead export advisory
+        continue-on-error: true
+        run: npm run dead-exports:advisory
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -236,6 +302,7 @@ jobs:
       - client
       - root-jest
       - workers
+      - e2e-smoke
       - cecc-and-node
     if: ${{ always() }}
 
@@ -247,6 +314,7 @@ jobs:
           CLIENT_RESULT: ${{ needs.client.result }}
           ROOT_JEST_RESULT: ${{ needs.root-jest.result }}
           WORKERS_RESULT: ${{ needs.workers.result }}
+          E2E_SMOKE_RESULT: ${{ needs.e2e-smoke.result }}
           CECC_AND_NODE_RESULT: ${{ needs.cecc-and-node.result }}
         run: |
           set -euo pipefail
@@ -257,6 +325,7 @@ jobs:
             "client:${CLIENT_RESULT}" \
             "root-jest:${ROOT_JEST_RESULT}" \
             "workers:${WORKERS_RESULT}" \
+            "e2e-smoke:${E2E_SMOKE_RESULT}" \
             "cecc-and-node:${CECC_AND_NODE_RESULT}"
           do
             job="${entry%%:*}"

@@ -38,9 +38,8 @@ type StackLike = {
   split: (separator: string) => string[];
 };
 
-const asRpcErrorNode = (value: unknown): RpcErrorNode => (
-  value && typeof value === 'object' ? value as RpcErrorNode : {}
-);
+const asRpcErrorNode = (value: unknown): RpcErrorNode =>
+  value && typeof value === 'object' ? (value as RpcErrorNode) : {};
 
 const rpcLogger = createLogger('rpc', { prefix: '[RPC_DEBUG]' });
 const RPC_ERROR_TREE_MAX_DEPTH = 5;
@@ -67,7 +66,7 @@ export function truncateRpcString(value: unknown, maxLen = RPC_ERROR_TREE_MAX_ST
 export function summarizeRpcError(
   err: unknown,
   depth = RPC_ERROR_TREE_MAX_DEPTH,
-  seen: Set<unknown> = new Set()
+  seen: Set<unknown> = new Set(),
 ): unknown {
   if (err == null) return err;
   if (typeof err !== 'object') return truncateRpcString(err);
@@ -77,10 +76,7 @@ export function summarizeRpcError(
   const nestedError = asRpcErrorNode(error.error);
   const providerConnection = asRpcErrorNode(error.provider?.connection);
 
-  const url =
-    error.url ||
-    nestedError.url ||
-    providerConnection.url;
+  const url = error.url || nestedError.url || providerConnection.url;
 
   const summary: RpcErrorSummary = {
     name: error.name,
@@ -103,11 +99,13 @@ export function summarizeRpcError(
   if (error.error) summary.error = summarizeRpcError(error.error, depth - 1, seen);
   if (error.cause) summary.cause = summarizeRpcError(error.cause, depth - 1, seen);
   if (Array.isArray(error.errors)) {
-    summary.errors = error.errors.slice(0, RPC_ERROR_TREE_MAX_ARRAY)
+    summary.errors = error.errors
+      .slice(0, RPC_ERROR_TREE_MAX_ARRAY)
       .map((e: unknown) => summarizeRpcError(e, depth - 1, seen));
   }
   if (Array.isArray(error.results)) {
-    summary.results = error.results.slice(0, RPC_ERROR_TREE_MAX_ARRAY)
+    summary.results = error.results
+      .slice(0, RPC_ERROR_TREE_MAX_ARRAY)
       .map((e: unknown) => summarizeRpcError(e, depth - 1, seen));
   }
   if (error.data && typeof error.data === 'object') {

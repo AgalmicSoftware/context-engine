@@ -264,14 +264,18 @@ describe('userPageCacheHelpers', () => {
       },
       viewAddressLower: '0xuser',
     });
-    expect(buildUserPageCacheRefreshRequestDescriptor({
-      ...requestInput,
-      currentInputSignature: descriptor.refreshInputSignature,
-    }).action).toBe('skip-same-signature');
-    expect(buildUserPageCacheRefreshRequestDescriptor({
-      sourceSnapshot,
-      viewAddress: '',
-    })).toMatchObject({
+    expect(
+      buildUserPageCacheRefreshRequestDescriptor({
+        ...requestInput,
+        currentInputSignature: descriptor.refreshInputSignature,
+      }).action,
+    ).toBe('skip-same-signature');
+    expect(
+      buildUserPageCacheRefreshRequestDescriptor({
+        sourceSnapshot,
+        viewAddress: '',
+      }),
+    ).toMatchObject({
       action: 'missing-address',
       refreshInputSignature: '',
       viewAddressLower: '',
@@ -294,10 +298,15 @@ describe('userPageCacheHelpers', () => {
       burnedCountMap: { '0xabc': 1 },
     });
     expect(hasMeaningfulUserPageOwnershipCounts(entry, '0xABC')).toBe(true);
-    expect(hasMeaningfulUserPageOwnershipCounts({
-      countsLoaded: true,
-      mintedCountByAddress: {},
-    }, '')).toBe(true);
+    expect(
+      hasMeaningfulUserPageOwnershipCounts(
+        {
+          countsLoaded: true,
+          mintedCountByAddress: {},
+        },
+        '',
+      ),
+    ).toBe(true);
     expect(hasMeaningfulUserPageOwnershipCounts({}, '0xabc')).toBe(false);
     expect(readUserPageOwnershipCount({ '0xabc': '3' }, '0xABC')).toBe(3);
     expect(readUserPageOwnershipCount({ '0xabc': -2 }, '0xABC')).toBe(0);
@@ -309,11 +318,15 @@ describe('userPageCacheHelpers', () => {
       mintedSet: new Set<string>(),
       burnedSet: new Set<string>(['0xabc']),
     };
-    applyUserPageOwnershipSignal(mintedAggregate, {
-      countsLoaded: false,
-      mintedCountByAddress: { '0xabc': 2 },
-      burnedCountByAddress: { '0xabc': 1 },
-    }, '0xABC');
+    applyUserPageOwnershipSignal(
+      mintedAggregate,
+      {
+        countsLoaded: false,
+        mintedCountByAddress: { '0xabc': 2 },
+        burnedCountByAddress: { '0xabc': 1 },
+      },
+      '0xABC',
+    );
     expect(mintedAggregate.mintedSet.has('0xabc')).toBe(true);
     expect(mintedAggregate.burnedSet.has('0xabc')).toBe(false);
 
@@ -321,11 +334,15 @@ describe('userPageCacheHelpers', () => {
       mintedSet: new Set<string>(),
       burnedSet: new Set<string>(),
     };
-    applyUserPageOwnershipSignal(burnedAggregate, {
-      countsLoaded: false,
-      mintedCountByAddress: { '0xabc': 1 },
-      burnedCountByAddress: { '0xabc': 2 },
-    }, '0xABC');
+    applyUserPageOwnershipSignal(
+      burnedAggregate,
+      {
+        countsLoaded: false,
+        mintedCountByAddress: { '0xabc': 1 },
+        burnedCountByAddress: { '0xabc': 2 },
+      },
+      '0xABC',
+    );
     expect(burnedAggregate.mintedSet.has('0xabc')).toBe(false);
     expect(burnedAggregate.burnedSet.has('0xabc')).toBe(true);
 
@@ -333,9 +350,13 @@ describe('userPageCacheHelpers', () => {
       mintedSet: new Set<string>(['0xabc']),
       burnedSet: new Set<string>(),
     };
-    applyUserPageOwnershipSignal(legacyAggregate, {
-      mintedSet: ['0xabc'],
-    }, '0xABC');
+    applyUserPageOwnershipSignal(
+      legacyAggregate,
+      {
+        mintedSet: ['0xabc'],
+      },
+      '0xABC',
+    );
     expect(legacyAggregate.mintedSet.has('0xabc')).toBe(true);
     expect(legacyAggregate.burnedSet.has('0xabc')).toBe(false);
   });
@@ -356,7 +377,9 @@ describe('userPageCacheHelpers', () => {
     const responseSourceSlugByKey: Record<string, string> = {};
     writeUserPageResponseSourceSlug(responseSourceSlugByKey, ' SurveyA ', ' 0xABC ', ' Session-One ');
     writeUserPageResponseSourceSlug(responseSourceSlugByKey, ' SurveyA ', ' 0xABC ', 'ignored');
-    writeUserPageResponseSourceSlug(responseSourceSlugByKey, ' SurveyA ', ' 0xABC ', ' Session-Two ', { replace: true });
+    writeUserPageResponseSourceSlug(responseSourceSlugByKey, ' SurveyA ', ' 0xABC ', ' Session-Two ', {
+      replace: true,
+    });
     writeUserPageResponseSourceSlug(responseSourceSlugByKey, ' SurveyA ', '', 'missing');
 
     expect(responseSourceSlugByKey).toEqual({
@@ -520,18 +543,23 @@ describe('userPageCacheHelpers', () => {
 
   it('merges user-page network cache buckets with active network taking precedence', () => {
     expect(readUserPageNetworkCache(null, 84532)).toEqual({});
-    expect(readUserPageNetworkCache({
-      '11155420': {
-        surveys: { a: 'global-a' },
-        questionResponses: { q1: 'op' },
-        ignored: { value: true },
-      },
-      '84532': {
-        surveys: { a: 'base-a', b: 'base-b' },
-        questionResponses: { q2: 'base' },
-        questionResponsesMeta: { q2: { blockNumber: 2 } },
-      },
-    }, 84532)).toEqual({
+    expect(
+      readUserPageNetworkCache(
+        {
+          '11155420': {
+            surveys: { a: 'global-a' },
+            questionResponses: { q1: 'op' },
+            ignored: { value: true },
+          },
+          '84532': {
+            surveys: { a: 'base-a', b: 'base-b' },
+            questionResponses: { q2: 'base' },
+            questionResponsesMeta: { q2: { blockNumber: 2 } },
+          },
+        },
+        84532,
+      ),
+    ).toEqual({
       surveys: { a: 'base-a', b: 'base-b' },
       questionResponses: { q1: 'op', q2: 'base' },
       questionResponsesMeta: { q2: { blockNumber: 2 } },
@@ -604,9 +632,14 @@ describe('userPageCacheHelpers', () => {
   });
 
   it('preserves empty arrays for plain active user-page chain data', () => {
-    expect(getActiveUserPageChainNode({
-      '84532': { data: {} },
-    }, 84532)).toEqual({
+    expect(
+      getActiveUserPageChainNode(
+        {
+          '84532': { data: {} },
+        },
+        84532,
+      ),
+    ).toEqual({
       data: {
         sbts: [],
         createdSurveys: [],
@@ -647,16 +680,18 @@ describe('userPageCacheHelpers', () => {
       viewAddressKey,
     });
 
-    expect(sbtAggregate['0xbadge']).toEqual(expect.objectContaining({
-      blockNumber: 44,
-      sbtAddress: '0xBadge',
-      sbtInfo: {
-        name: 'User cache badge',
-        description: 'From sbt cache',
-      },
-      slug: 'alpha',
-      viewerCountsAuthoritative: true,
-    }));
+    expect(sbtAggregate['0xbadge']).toEqual(
+      expect.objectContaining({
+        blockNumber: 44,
+        sbtAddress: '0xBadge',
+        sbtInfo: {
+          name: 'User cache badge',
+          description: 'From sbt cache',
+        },
+        slug: 'alpha',
+        viewerCountsAuthoritative: true,
+      }),
+    );
     expect(Array.from(sbtAggregate['0xbadge'].mintedSet).sort()).toEqual(['0xdef']);
     expect(Array.from(sbtAggregate['0xbadge'].burnedSet)).toEqual([viewAddressKey]);
   });
@@ -676,10 +711,12 @@ describe('userPageCacheHelpers', () => {
 
     expect(Array.from(sbtAggregate['0xbadge'].mintedSet)).toEqual(['0xabc']);
     expect(Array.from(sbtAggregate['0xbadge'].burnedSet)).toEqual([]);
-    expect(sbtAggregate['0xbadge']).toEqual(expect.objectContaining({
-      sbtAddress: '0xBadge',
-      sbtInfo: { name: 'Fallback badge' },
-      slug: 'alpha',
-    }));
+    expect(sbtAggregate['0xbadge']).toEqual(
+      expect.objectContaining({
+        sbtAddress: '0xBadge',
+        sbtInfo: { name: 'Fallback badge' },
+        slug: 'alpha',
+      }),
+    );
   });
 });

@@ -17,10 +17,7 @@ import styles from './AboutPage.module.scss';
 import cipPhoto from '../../assets/img/cip_photo.png';
 import polisLogo from '../../assets/img/polis_logo.png';
 import rxcLogo from '../../assets/img/rxc_logo.png';
-import {
-  PUBLIC_REPO_URL,
-  PUBLIC_WHITEPAPER_URL,
-} from '../../variables/publicRepoMetadata.js';
+import { PUBLIC_REPO_URL, PUBLIC_WHITEPAPER_URL } from '../../variables/publicRepoMetadata.js';
 import {
   derivePrimarySessionSlugFromList,
   GLOBAL_SESSION_SELECTION_UPDATED_EVENT,
@@ -57,14 +54,13 @@ type RoadmapSection = {
   }[];
 };
 
-const HEADER_LINKS = [
-  { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper' },
-];
+const HEADER_LINKS = [{ url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper' }];
 
 const ABOUT_DEMO_VIDEO_VIEW_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/view';
 const ABOUT_DEMO_VIDEO_EMBED_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/preview';
 const ABOUT_DEMO_VIDEO_MEDIA_URL = buildPublicRoute('/about-demo.mp4');
-const ABOUT_DEMO_VIDEO_THUMBNAIL_URL = 'https://drive.google.com/thumbnail?id=1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf&sz=w1000';
+const ABOUT_DEMO_VIDEO_THUMBNAIL_URL =
+  'https://drive.google.com/thumbnail?id=1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf&sz=w1000';
 
 const RECOGNITION_GROUPS: RecognitionGroup[] = [
   {
@@ -98,9 +94,7 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     logoClassName: 'recognitionLogoPolis',
     description:
       'Pol.is showed how large-group discourse software can clarify both consensus and persistent difference, especially in vTaiwan where simple Agree / Unsure / Disagree inputs helped structure public reasoning. Context Engine builds on that approach with more question types, optional privacy, AI-native workflows, and permanent public storage.',
-    links: [
-      { url: 'https://pol.is/', text: 'Official Website' },
-    ],
+    links: [{ url: 'https://pol.is/', text: 'Official Website' }],
   },
   {
     name: 'Collective Intelligence Project',
@@ -110,9 +104,7 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     image: cipPhoto,
     description:
       'Context Engine is social infrastructure for the AI transition: a toolkit for collective intelligence, large-group deliberation, and coordination under information overload. That mission sits directly alongside CIP’s work on scalable collective decision-making for transformative technology.',
-    links: [
-      { url: 'https://cip.org/', text: 'CIP Website' },
-    ],
+    links: [{ url: 'https://cip.org/', text: 'CIP Website' }],
   },
   {
     name: 'Edge City',
@@ -121,9 +113,7 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     logoClassName: 'recognitionLogoEdge',
     description:
       'Residencies like the d/acc residency at Edge Patagonia, sponsored by Protocol Labs, created space to prototype tools for resilient technology, coordination, and governance in live community settings.',
-    links: [
-      { url: 'https://www.edgecity.live/patagonia', text: 'Edge City' },
-    ],
+    links: [{ url: 'https://www.edgecity.live/patagonia', text: 'Edge City' }],
   },
 ];
 
@@ -273,8 +263,7 @@ const USE_CASES = [
     icon: faCity,
     tone: 'orange',
     problemTitle: 'Shallow Civic Input',
-    problem:
-      'Polls and hearings rarely capture the texture of public disagreement on complex civic questions.',
+    problem: 'Polls and hearings rarely capture the texture of public disagreement on complex civic questions.',
     solutionTitle: 'Standing Public Record',
     detail:
       'Gather input that is more nuanced than a poll and more durable than a hearing, with responses that can be filtered across constituencies.',
@@ -285,8 +274,7 @@ const USE_CASES = [
     icon: faChalkboardTeacher,
     tone: 'pink',
     problemTitle: 'Signal That Vanishes',
-    problem:
-      'High-bandwidth event discussion usually disappears once the gathering ends.',
+    problem: 'High-bandwidth event discussion usually disappears once the gathering ends.',
     solutionTitle: 'Persistent Opinion Map',
     detail:
       'Leave with a durable map of consensus, subgroup differences, and unresolved questions that can keep growing between gatherings.',
@@ -307,19 +295,19 @@ const USE_CASES = [
 
 const HERO_TERTIARY_LINKS = HEADER_LINKS.filter(Boolean);
 
-export const getConfiguredRecognitionIndividuals = (
-  individuals: unknown[] = []
-): RecognitionIndividual[] => individuals.filter(
-  (person): person is RecognitionIndividual => (
-    !!person &&
-    typeof person === 'object' &&
-    typeof (person as { name?: unknown }).name === 'string' &&
-    (person as { name: string }).name.trim().length > 0
-  )
-);
+export const getConfiguredRecognitionIndividuals = (individuals: unknown[] = []): RecognitionIndividual[] =>
+  individuals.filter(
+    (person): person is RecognitionIndividual =>
+      !!person &&
+      typeof person === 'object' &&
+      typeof (person as { name?: unknown }).name === 'string' &&
+      (person as { name: string }).name.trim().length > 0,
+  );
 
 export const getAboutDemoSessionPath = (selection = readStoredGlobalSessionSelection()) => {
-  const scopeMode = String(selection?.selectedSessionScope || '').trim().toLowerCase();
+  const scopeMode = String(selection?.selectedSessionScope || '')
+    .trim()
+    .toLowerCase();
   if (scopeMode === 'list') {
     const firstScopedSlug = derivePrimarySessionSlugFromList(selection?.selectedSessionSlugs || []);
     if (firstScopedSlug) return `/session/${encodeURIComponent(firstScopedSlug)}`;
@@ -329,13 +317,14 @@ export const getAboutDemoSessionPath = (selection = readStoredGlobalSessionSelec
 
 const getRecognitionSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-const getRecognitionFallback = (name: string) => name
-  .split(/[^A-Za-z0-9]+/)
-  .filter(Boolean)
-  .map((chunk: string) => chunk[0])
-  .join('')
-  .slice(0, 2)
-  .toUpperCase();
+const getRecognitionFallback = (name: string) =>
+  name
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((chunk: string) => chunk[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
 const AboutPage = () => {
   const [activeUseCase, setActiveUseCase] = useState('');
@@ -358,7 +347,7 @@ const AboutPage = () => {
 
   const handleSectionToggleKeyDown = (
     event: React.KeyboardEvent<HTMLDivElement>,
-    setSectionVisibility: React.Dispatch<React.SetStateAction<boolean>>
+    setSectionVisibility: React.Dispatch<React.SetStateAction<boolean>>,
   ) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -394,16 +383,10 @@ const AboutPage = () => {
       setDemoSessionPath(getAboutDemoSessionPath(detail || readStoredGlobalSessionSelection()));
     };
 
-    window.addEventListener(
-      GLOBAL_SESSION_SELECTION_UPDATED_EVENT,
-      handleGlobalSessionSelectionUpdated
-    );
+    window.addEventListener(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, handleGlobalSessionSelectionUpdated);
 
     return () => {
-      window.removeEventListener(
-        GLOBAL_SESSION_SELECTION_UPDATED_EVENT,
-        handleGlobalSessionSelectionUpdated
-      );
+      window.removeEventListener(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, handleGlobalSessionSelectionUpdated);
     };
   }, []);
 
@@ -413,12 +396,12 @@ const AboutPage = () => {
     }
 
     const detailNode = useCaseDetailRef.current;
-    const prefersReducedMotion = typeof window.matchMedia === 'function'
-      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      : false;
-    const isCompactViewport = typeof window.matchMedia === 'function'
-      ? window.matchMedia('(max-width: 640px)').matches
-      : window.innerWidth <= 640;
+    const prefersReducedMotion =
+      typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+    const isCompactViewport =
+      typeof window.matchMedia === 'function'
+        ? window.matchMedia('(max-width: 640px)').matches
+        : window.innerWidth <= 640;
 
     const scrollUseCaseIntoView = () => {
       const detailRect = detailNode.getBoundingClientRect();
@@ -582,23 +565,14 @@ const AboutPage = () => {
           </div>
 
           {activeUseCaseConfig && (
-            <article
-              ref={useCaseDetailRef}
-              className={styles.useCaseDetail}
-              aria-live="polite"
-              aria-atomic="true"
-            >
+            <article ref={useCaseDetailRef} className={styles.useCaseDetail} aria-live="polite" aria-atomic="true">
               <p className={styles.srOnly}>{activeUseCaseConfig.label}</p>
               <div className={styles.useCaseDetailRow}>
-                <span className={styles.useCaseDetailProblemTag}>
-                  {activeUseCaseConfig.problemTitle}
-                </span>
+                <span className={styles.useCaseDetailProblemTag}>{activeUseCaseConfig.problemTitle}</span>
                 <p className={styles.useCaseDetailRowText}>{activeUseCaseConfig.problem}</p>
               </div>
               <div className={styles.useCaseDetailRow}>
-                <span className={styles.useCaseDetailSolutionTag}>
-                  {activeUseCaseConfig.solutionTitle}
-                </span>
+                <span className={styles.useCaseDetailSolutionTag}>{activeUseCaseConfig.solutionTitle}</span>
                 <p className={styles.useCaseDetailRowText}>{activeUseCaseConfig.detail}</p>
               </div>
             </article>
@@ -615,10 +589,7 @@ const AboutPage = () => {
             aria-expanded={showPresent}
           >
             <h2 className={styles.sectionTitle}>Functionality</h2>
-            <FontAwesomeIcon
-              icon={showPresent ? faCaretUp : faCaretDown}
-              className={styles.toggleIcon}
-            />
+            <FontAwesomeIcon icon={showPresent ? faCaretUp : faCaretDown} className={styles.toggleIcon} />
           </div>
           {showPresent && (
             <div className={styles.collapsibleContent}>
@@ -626,31 +597,36 @@ const AboutPage = () => {
                 <li className={styles.featureItem}>
                   <span className={styles.featureLabel}>Sessions:</span>
                   <span className={styles.featureText}>
-                    Include questions, responses, documents, access gates, and configuration, and new sessions can be created from the web application.
+                    Include questions, responses, documents, access gates, and configuration, and new sessions can be
+                    created from the web application.
                   </span>
                 </li>
                 <li className={styles.featureItem}>
                   <span className={styles.featureLabel}>Questions:</span>
                   <span className={styles.featureText}>
-                    Supports binary, rating, multiple-choice, and freeform questions, with optional conviction weighting and comments.
+                    Supports binary, rating, multiple-choice, and freeform questions, with optional conviction weighting
+                    and comments.
                   </span>
                 </li>
                 <li className={styles.featureItem}>
                   <span className={styles.featureLabel}>Access Control:</span>
                   <span className={styles.featureText}>
-                    Uses soulbound tokens for gated participation, encrypted fields, and sponsored resources like RPC, AI, transaction costs, Arweave storage, and Lit encryption.
+                    Uses soulbound tokens for gated participation, encrypted fields, and sponsored resources like RPC,
+                    AI, transaction costs, Arweave storage, and Lit encryption.
                   </span>
                 </li>
                 <li className={styles.featureItem}>
                   <span className={styles.featureLabel}>Storage:</span>
                   <span className={styles.featureText}>
-                    Lives in durable records, with responses and documents on Arweave plus built-in report views, exports, and address-based comparison tools.
+                    Lives in durable records, with responses and documents on Arweave plus built-in report views,
+                    exports, and address-based comparison tools.
                   </span>
                 </li>
                 <li className={styles.featureItem}>
                   <span className={styles.featureLabel}>AI:</span>
                   <span className={styles.featureText}>
-                    Already supports question generation, transcription, cluster summaries, result analysis, and comparison of user positions across wallets.
+                    Already supports question generation, transcription, cluster summaries, result analysis, and
+                    comparison of user positions across wallets.
                   </span>
                 </li>
               </ul>
@@ -668,10 +644,7 @@ const AboutPage = () => {
             aria-expanded={showRoadmap}
           >
             <h2 className={styles.sectionTitle}>Roadmap</h2>
-            <FontAwesomeIcon
-              icon={showRoadmap ? faCaretUp : faCaretDown}
-              className={styles.toggleIcon}
-            />
+            <FontAwesomeIcon icon={showRoadmap ? faCaretUp : faCaretDown} className={styles.toggleIcon} />
           </div>
           {showRoadmap && (
             <div className={styles.collapsibleContent}>
@@ -706,10 +679,7 @@ const AboutPage = () => {
           )}
         </section>
 
-        <section
-          className={`${styles.section} ${styles.collapsibleSection}`}
-          data-testid="ce-about-recognition-toggle"
-        >
+        <section className={`${styles.section} ${styles.collapsibleSection}`} data-testid="ce-about-recognition-toggle">
           <div
             className={styles.toggleHeader}
             onClick={() => setShowRecognition((currentState) => !currentState)}
@@ -726,7 +696,7 @@ const AboutPage = () => {
                   data-testid="ce-about-recognition-summary"
                   aria-hidden="true"
                 >
-                  {RECOGNITION_GROUPS.map((group) => (
+                  {RECOGNITION_GROUPS.map((group) =>
                     group.logo ? (
                       <img
                         key={group.name}
@@ -735,7 +705,9 @@ const AboutPage = () => {
                         className={[
                           styles.recognitionSummaryLogo,
                           group.logoClassName ? styles[group.logoClassName] : '',
-                        ].filter(Boolean).join(' ')}
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
                       />
                     ) : (
                       <span
@@ -744,14 +716,11 @@ const AboutPage = () => {
                       >
                         {getRecognitionFallback(group.name)}
                       </span>
-                    )
-                  ))}
+                    ),
+                  )}
                 </div>
               )}
-              <FontAwesomeIcon
-                icon={showRecognition ? faCaretUp : faCaretDown}
-                className={styles.toggleIcon}
-              />
+              <FontAwesomeIcon icon={showRecognition ? faCaretUp : faCaretDown} className={styles.toggleIcon} />
             </div>
           </div>
 
@@ -763,10 +732,9 @@ const AboutPage = () => {
                     <button
                       key={group.name}
                       type="button"
-                      className={[
-                        styles.recognitionItem,
-                        group.itemClassName ? styles[group.itemClassName] : '',
-                      ].filter(Boolean).join(' ')}
+                      className={[styles.recognitionItem, group.itemClassName ? styles[group.itemClassName] : '']
+                        .filter(Boolean)
+                        .join(' ')}
                       data-testid={`ce-about-recognition-${getRecognitionSlug(group.name)}`}
                       title={group.description}
                       onClick={() => setActiveRecognition(group)}
@@ -776,15 +744,12 @@ const AboutPage = () => {
                         <img
                           src={group.logo}
                           alt={`${group.name} logo`}
-                          className={[
-                            styles.recognitionLogo,
-                            group.logoClassName ? styles[group.logoClassName] : '',
-                          ].filter(Boolean).join(' ')}
+                          className={[styles.recognitionLogo, group.logoClassName ? styles[group.logoClassName] : '']
+                            .filter(Boolean)
+                            .join(' ')}
                         />
                       ) : (
-                        <span className={styles.recognitionLogoFallback}>
-                          {getRecognitionFallback(group.name)}
-                        </span>
+                        <span className={styles.recognitionLogoFallback}>{getRecognitionFallback(group.name)}</span>
                       )}
                       <span className={styles.recognitionName}>{group.name}</span>
                     </button>
@@ -793,10 +758,7 @@ const AboutPage = () => {
               </div>
 
               {hasRecognizedIndividuals && (
-                <div
-                  className={styles.recognitionIndividuals}
-                  data-testid="ce-about-recognition-individuals"
-                >
+                <div className={styles.recognitionIndividuals} data-testid="ce-about-recognition-individuals">
                   {configuredRecognitionIndividuals.map((person) => (
                     <span key={person.name} className={styles.recognitionIndividual}>
                       {person.url ? (
@@ -824,7 +786,7 @@ const AboutPage = () => {
           <ModalHeader
             toggle={closeRecognitionModal}
             className={styles.recognitionModalHeaderBar}
-            close={(
+            close={
               <button
                 type="button"
                 className={styles.recognitionModalCloseButton}
@@ -833,7 +795,7 @@ const AboutPage = () => {
               >
                 <span aria-hidden="true">×</span>
               </button>
-            )}
+            }
           >
             {activeRecognition && (
               <div className={styles.recognitionModalHeader}>
@@ -844,7 +806,9 @@ const AboutPage = () => {
                     className={[
                       styles.recognitionModalLogo,
                       activeRecognition.logoClassName ? styles[activeRecognition.logoClassName] : '',
-                    ].filter(Boolean).join(' ')}
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
                   />
                 ) : null}
                 <span className={styles.recognitionModalTitle}>{activeRecognition.name}</span>
@@ -855,9 +819,7 @@ const AboutPage = () => {
           <ModalBody className={styles.recognitionModalBody}>
             {activeRecognition && (
               <>
-                <p className={styles.recognitionModalDescription}>
-                  {activeRecognition.description}
-                </p>
+                <p className={styles.recognitionModalDescription}>{activeRecognition.description}</p>
 
                 {activeRecognition?.image && (
                   <img

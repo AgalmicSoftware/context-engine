@@ -1,5 +1,5 @@
 /* client/src/components/SurveyTool/SurveyGenerator/AudioSurveyGenerator.module.scss */
-@use "scss/variables" as tokens;
+@use 'scss/variables' as tokens;
 
 $primary-color: #22180c;
 $secondary-color: #006eff;
@@ -394,7 +394,10 @@ $input-border: tokens.$ce-input-border;
     border-color: rgba(77, 255, 164, 0.4);
     background: rgba(77, 255, 164, 0.12);
     color: #d7ffe9;
-    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease,
+      color 0.18s ease;
 
     &:hover,
     &:focus,
@@ -446,7 +449,10 @@ $input-border: tokens.$ce-input-border;
     cursor: pointer;
     font-size: 1rem;
     line-height: 1;
-    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease,
+      color 0.18s ease;
 
     &:hover,
     &:focus,

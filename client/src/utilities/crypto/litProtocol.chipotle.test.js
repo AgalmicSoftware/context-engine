@@ -3,10 +3,7 @@ const mockUploadDataToArweave = jest.fn();
 const mockDownloadDataFromArweave = jest.fn();
 const { webcrypto } = require('crypto');
 const { ethers } = require('ethers');
-const {
-  buildLitChipotlePolicy,
-  fingerprintLitChipotlePolicy,
-} = require('./litChipotlePolicy.js');
+const { buildLitChipotlePolicy, fingerprintLitChipotlePolicy } = require('./litChipotlePolicy.js');
 
 const TEST_ACTION_CID = 'QmAction123';
 const TEST_PKP_ID = '0xpkp123';
@@ -18,13 +15,14 @@ const makePolicy = ({
   sbtAddresses = [TEST_GATE_ADDRESS],
   litActionCid = TEST_ACTION_CID,
   litPkpId = TEST_PKP_ID,
-} = {}) => buildLitChipotlePolicy({
-  chainId,
-  gateMode,
-  sbtAddresses,
-  litActionCid,
-  litPkpId,
-});
+} = {}) =>
+  buildLitChipotlePolicy({
+    chainId,
+    gateMode,
+    sbtAddresses,
+    litActionCid,
+    litPkpId,
+  });
 
 jest.mock('../worker/workerAuth.js', () => ({
   fetchWorkerWithAuth: (...args) => mockFetchWorkerWithAuth(...args),
@@ -35,8 +33,8 @@ jest.mock('../worker/workerAuth.js', () => ({
   },
 }));
 
-jest.mock('../arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../arweave/arweaveClient.js', () => ({
+  arweaveClient: {
     uploadDataToArweave: (...args) => mockUploadDataToArweave(...args),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
     buildArweaveGatewayUrl: (txId) => `https://arweave.example.test/${txId}`,
@@ -55,9 +53,7 @@ describe('litProtocol Chipotle hooks', () => {
   });
 
   it('extracts SBT gate details from ACCs', () => {
-    const {
-      __test__extractSbtGateFromAccessControlConditions: extractGate,
-    } = require('./litProtocol.js');
+    const { __test__extractSbtGateFromAccessControlConditions: extractGate } = require('./litProtocol.js');
 
     const result = extractGate([
       {
@@ -89,9 +85,7 @@ describe('litProtocol Chipotle hooks', () => {
   });
 
   it('uses worker-mediated Chipotle hooks to wrap and unwrap a CEK', async () => {
-    const {
-      createLitHooks,
-    } = require('./litProtocol.js');
+    const { createLitHooks } = require('./litProtocol.js');
 
     mockFetchWorkerWithAuth.mockImplementation(async (_url, options) => {
       const body = JSON.parse(options.body);
@@ -125,9 +119,7 @@ describe('litProtocol Chipotle hooks', () => {
           response: {
             response: {
               ok: true,
-              plaintext: body.ciphertext === 'wrapped-cek'
-                ? '0x' + '11'.repeat(32)
-                : '',
+              plaintext: body.ciphertext === 'wrapped-cek' ? '0x' + '11'.repeat(32) : '',
             },
           },
         }),
@@ -175,19 +167,23 @@ describe('litProtocol Chipotle hooks', () => {
     const keyBytes = new Uint8Array(32).fill(0x11);
     const wrapped = await hooks.saveKey(keyBytes, { accessControlConditions });
     expect(mockFetchWorkerWithAuth.mock.calls[0][0]).toBe('https://worker.example.test/lit/chipotle-action');
-    expect(wrapped).toEqual(expect.objectContaining({
-      ciphertext: 'wrapped-cek',
-    }));
-    expect(wrapped.chipotle).toEqual(expect.objectContaining({
-      version: 2,
-      chainId: 11155420,
-      gateMode: 'any',
-      litActionCid: TEST_ACTION_CID,
-      litPkpId: TEST_PKP_ID,
-      policyFingerprint: fingerprintLitChipotlePolicy(makePolicy()),
-      policy: makePolicy(),
-      sbtAddresses: [TEST_GATE_ADDRESS.toLowerCase()],
-    }));
+    expect(wrapped).toEqual(
+      expect.objectContaining({
+        ciphertext: 'wrapped-cek',
+      }),
+    );
+    expect(wrapped.chipotle).toEqual(
+      expect.objectContaining({
+        version: 2,
+        chainId: 11155420,
+        gateMode: 'any',
+        litActionCid: TEST_ACTION_CID,
+        litPkpId: TEST_PKP_ID,
+        policyFingerprint: fingerprintLitChipotlePolicy(makePolicy()),
+        policy: makePolicy(),
+        sbtAddresses: [TEST_GATE_ADDRESS.toLowerCase()],
+      }),
+    );
     expect(wrapped.chipotle.rpcUrl).toBeUndefined();
 
     const unwrapped = await hooks.getKey({
@@ -197,20 +193,20 @@ describe('litProtocol Chipotle hooks', () => {
     });
     expect(Array.from(unwrapped)).toEqual(Array.from(keyBytes));
     expect(mockFetchWorkerWithAuth).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(mockFetchWorkerWithAuth.mock.calls[0][1].body)).toEqual(expect.objectContaining({
-      action: 'lit_chipotle_execute',
-      op: 'encrypt',
-      sbtAddresses: [TEST_GATE_ADDRESS],
-      gateMode: 'any',
-      message: '0x' + '11'.repeat(32),
-    }));
+    expect(JSON.parse(mockFetchWorkerWithAuth.mock.calls[0][1].body)).toEqual(
+      expect.objectContaining({
+        action: 'lit_chipotle_execute',
+        op: 'encrypt',
+        sbtAddresses: [TEST_GATE_ADDRESS],
+        gateMode: 'any',
+        message: '0x' + '11'.repeat(32),
+      }),
+    );
     expect(JSON.parse(mockFetchWorkerWithAuth.mock.calls[0][1].body).rpcUrl).toBeUndefined();
   });
 
   it('initializes worker-mediated Chipotle hooks when Lit credentials stay server-side', async () => {
-    const {
-      createLitHooks,
-    } = require('./litProtocol.js');
+    const { createLitHooks } = require('./litProtocol.js');
 
     mockFetchWorkerWithAuth.mockImplementation(async (_url, options) => {
       const body = JSON.parse(options.body);
@@ -263,26 +259,30 @@ describe('litProtocol Chipotle hooks', () => {
       },
     });
 
-    expect(hooks).toEqual(expect.objectContaining({
-      litNetwork: 'chipotle',
-      saveKey: expect.any(Function),
-    }));
+    expect(hooks).toEqual(
+      expect.objectContaining({
+        litNetwork: 'chipotle',
+        saveKey: expect.any(Function),
+      }),
+    );
 
     const wrapped = await hooks.saveKey(new Uint8Array(32).fill(0x22), { accessControlConditions });
     expect(mockFetchWorkerWithAuth.mock.calls[0][0]).toBe('https://worker.example.test/lit/chipotle-action');
-    expect(wrapped).toEqual(expect.objectContaining({
-      ciphertext: 'wrapped-server-side-runtime-cek',
-      dataToEncryptHash: expect.stringContaining('chipotle-v3:QmAction123:11155420:any:'),
-      chipotle: expect.objectContaining({
-        version: 2,
-        litActionCid: TEST_ACTION_CID,
-        litPkpId: TEST_PKP_ID,
-        chainId: 11155420,
-        gateMode: 'any',
-        policyFingerprint: fingerprintLitChipotlePolicy(makePolicy()),
-        policy: makePolicy(),
+    expect(wrapped).toEqual(
+      expect.objectContaining({
+        ciphertext: 'wrapped-server-side-runtime-cek',
+        dataToEncryptHash: expect.stringContaining('chipotle-v3:QmAction123:11155420:any:'),
+        chipotle: expect.objectContaining({
+          version: 2,
+          litActionCid: TEST_ACTION_CID,
+          litPkpId: TEST_PKP_ID,
+          chainId: 11155420,
+          gateMode: 'any',
+          policyFingerprint: fingerprintLitChipotlePolicy(makePolicy()),
+          policy: makePolicy(),
+        }),
       }),
-    }));
+    );
     expect(mockFetchWorkerWithAuth).toHaveBeenCalledTimes(1);
   });
 
@@ -350,15 +350,13 @@ describe('litProtocol Chipotle hooks', () => {
         status: 200,
         json: async () => ({
           ok: true,
+          response: {
             response: {
-              response: {
-                ok: true,
-                plaintext: body.ciphertext === chipotleState.ciphertext
-                  ? chipotleState.plaintext
-                  : '',
-              },
+              ok: true,
+              plaintext: body.ciphertext === chipotleState.ciphertext ? chipotleState.plaintext : '',
             },
-          }),
+          },
+        }),
       };
     });
 
@@ -442,12 +440,14 @@ describe('litProtocol Chipotle hooks', () => {
       lit: uploaderHooks,
     });
 
-    expect(uploadResult).toEqual(expect.objectContaining({
-      txId: 'A'.repeat(43),
-      url: expect.stringContaining('lit://arweave/'),
-      arweaveUrl: 'https://arweave.example.test/' + 'A'.repeat(43),
-      envelope: expect.any(String),
-    }));
+    expect(uploadResult).toEqual(
+      expect.objectContaining({
+        txId: 'A'.repeat(43),
+        url: expect.stringContaining('lit://arweave/'),
+        arweaveUrl: 'https://arweave.example.test/' + 'A'.repeat(43),
+        envelope: expect.any(String),
+      }),
+    );
     expect(stored.envelope).toBeTruthy();
 
     const { payload, txId } = await downloadEncryptedArweaveData({

@@ -1,11 +1,7 @@
 import { toNumberOrNull } from './surveyToolResponseState.js';
 
 export type PileCacheUpdatePlanAction =
-  | 'check-optimistic-baseline'
-  | 'reload'
-  | 'skip-live-edits'
-  | 'show-loading'
-  | 'noop';
+  'check-optimistic-baseline' | 'reload' | 'skip-live-edits' | 'show-loading' | 'noop';
 
 export type PileCacheUpdatePlan = {
   action: PileCacheUpdatePlanAction;
@@ -57,11 +53,7 @@ export const buildPileCacheUpdatePlan = ({
   reloadDelayMs?: number | null;
 } = {}): PileCacheUpdatePlan => {
   const hasCacheSignal =
-    !!cacheReadyTick ||
-    !!nonceTick ||
-    !!responseNonceTick ||
-    !!progressHydrationTick ||
-    !!progressCompletedTick;
+    !!cacheReadyTick || !!nonceTick || !!responseNonceTick || !!progressHydrationTick || !!progressCompletedTick;
   const normalizedReloadDelayMs = Math.max(0, Number(reloadDelayMs || 0));
   const normalizedPileQuestionsLength = Math.max(0, Number(pileQuestionsLength || 0));
 
@@ -75,40 +67,31 @@ export const buildPileCacheUpdatePlan = ({
     return { action: 'skip-live-edits', delayMs: normalizedReloadDelayMs };
   }
 
-  if (
-    normalizedPileQuestionsLength === 0 &&
-    !hasLiveEdits &&
-    !isQuestionCacheReady &&
-    !loading
-  ) {
+  if (normalizedPileQuestionsLength === 0 && !hasLiveEdits && !isQuestionCacheReady && !loading) {
     return { action: 'show-loading', delayMs: normalizedReloadDelayMs };
   }
 
   return { action: 'noop', delayMs: normalizedReloadDelayMs };
 };
 
-const asPileBaselineSlice = (value: unknown): PileBaselineSlice => (
-  value && typeof value === 'object' ? value as PileBaselineSlice : {}
-);
+const asPileBaselineSlice = (value: unknown): PileBaselineSlice =>
+  value && typeof value === 'object' ? (value as PileBaselineSlice) : {};
 
 export const hasAnyPileBaselineInput = (slice: unknown = {}): boolean => {
   const baselineSlice = asPileBaselineSlice(slice);
-  const hasVal = (value: unknown) => (
-    value !== undefined &&
-    value !== null &&
-    (Array.isArray(value) ? value.length > 0 : String(value).length > 0)
-  );
+  const hasVal = (value: unknown) =>
+    value !== undefined && value !== null && (Array.isArray(value) ? value.length > 0 : String(value).length > 0);
 
-  for (const qid in (baselineSlice.answers || {})) {
+  for (const qid in baselineSlice.answers || {}) {
     if (hasVal(baselineSlice.answers?.[qid]?.value)) return true;
   }
-  for (const qid in (baselineSlice.additionalComments || {})) {
+  for (const qid in baselineSlice.additionalComments || {}) {
     if (hasVal(baselineSlice.additionalComments?.[qid]?.value)) return true;
   }
-  for (const qid in (baselineSlice.importance || {})) {
+  for (const qid in baselineSlice.importance || {}) {
     if (Object.prototype.hasOwnProperty.call(baselineSlice.importance || {}, qid)) return true;
   }
-  for (const qid in (baselineSlice.conviction || {})) {
+  for (const qid in baselineSlice.conviction || {}) {
     if (Object.prototype.hasOwnProperty.call(baselineSlice.conviction || {}, qid)) return true;
   }
 
@@ -153,9 +136,7 @@ export const isPileCacheConsistentWithBaseline = ({
   if (!baseline || Object.keys(baselineSlice).length === 0) return false;
 
   const normalizedRenderedIds = Array.isArray(renderedIds) ? renderedIds : [];
-  const normalizedResponses = questionResponses && typeof questionResponses === 'object'
-    ? questionResponses
-    : {};
+  const normalizedResponses = questionResponses && typeof questionResponses === 'object' ? questionResponses : {};
   const accountLower = String(account || '').toLowerCase();
 
   for (const rawQuestionId of normalizedRenderedIds) {
@@ -168,9 +149,7 @@ export const isPileCacheConsistentWithBaseline = ({
     let cacheEntry: PileCacheEntry | null = null;
     try {
       const parsedEntry = typeof rawEntry === 'string' ? JSON.parse(rawEntry) : rawEntry;
-      cacheEntry = parsedEntry && typeof parsedEntry === 'object'
-        ? parsedEntry as PileCacheEntry
-        : null;
+      cacheEntry = parsedEntry && typeof parsedEntry === 'object' ? (parsedEntry as PileCacheEntry) : null;
     } catch {
       cacheEntry = null;
     }
@@ -187,10 +166,9 @@ export const isPileCacheConsistentWithBaseline = ({
     );
     const baselineResponseEncrypted = baselineAnswerEncrypted || baselineAdditionalEncrypted;
     const cacheRatingEncrypted = !!(
-      cacheEntry && (
-        (typeof cacheEntry.importanceEncrypted === 'string' && cacheEntry.importanceEncrypted) ||
-        (typeof cacheEntry.convictionEncrypted === 'string' && cacheEntry.convictionEncrypted)
-      )
+      cacheEntry &&
+      ((typeof cacheEntry.importanceEncrypted === 'string' && cacheEntry.importanceEncrypted) ||
+        (typeof cacheEntry.convictionEncrypted === 'string' && cacheEntry.convictionEncrypted))
     );
 
     if (baselineAnswer && baselineAnswer.value !== undefined) {

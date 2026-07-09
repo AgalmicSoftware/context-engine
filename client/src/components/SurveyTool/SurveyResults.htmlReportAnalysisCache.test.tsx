@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
-import { callAI } from '../../utilities/ai/aiScripts.js';
+import { callAI } from '../../utilities/ai/aiClient.js';
 import {
   downloadSessionResultsHtmlReport,
   downloadSessionResultsPdfReport,
@@ -58,7 +58,7 @@ jest.mock('../../utilities/sessionResultsExport', () => {
     downloadSessionResultsPdfReport: jest.fn(),
   };
 });
-jest.mock('../../utilities/ai/aiScripts.js', () => ({
+jest.mock('../../utilities/ai/aiClient.js', () => ({
   callAI: jest.fn(),
 }));
 const mockPolisReport = jest.fn((..._args: any[]) => null);
@@ -162,7 +162,7 @@ describe('SurveyResults HTML report analysis cache controls', () => {
         network: OP_NETWORK,
         sessionSlug: 'alpha-session',
       },
-      () => seedAnalysisEligibleSession('alpha-session')
+      () => seedAnalysisEligibleSession('alpha-session'),
     );
 
     seedAnalysisEligibleSession('alpha-session');
@@ -227,7 +227,7 @@ describe('SurveyResults HTML report analysis cache controls', () => {
         network: OP_NETWORK,
         sessionSlug: 'alpha-session',
       },
-      () => seedAnalysisEligibleSession('alpha-session')
+      () => seedAnalysisEligibleSession('alpha-session'),
     );
 
     seedAnalysisEligibleSession('alpha-session');
@@ -266,7 +266,7 @@ describe('SurveyResults HTML report analysis cache controls', () => {
         network: OP_NETWORK,
         sessionSlug: 'alpha-session',
       },
-      () => seedAnalysisEligibleSession('alpha-session')
+      () => seedAnalysisEligibleSession('alpha-session'),
     );
 
     const partialArtifact: any = { ...artifact };
@@ -297,13 +297,15 @@ describe('SurveyResults HTML report analysis cache controls', () => {
   });
 
   it('falls back to generation when the analysis cache read port throws', async () => {
-    (callAI as jest.Mock).mockResolvedValue(JSON.stringify({
-      breakdown: {
-        dimensions: [],
-        groups: [{ id: 'read_error_group', label: 'Read error group' }],
-        summary: { overview: 'Generated after cache read failure.' },
-      },
-    }));
+    (callAI as jest.Mock).mockResolvedValue(
+      JSON.stringify({
+        breakdown: {
+          dimensions: [],
+          groups: [{ id: 'read_error_group', label: 'Read error group' }],
+          summary: { overview: 'Generated after cache read failure.' },
+        },
+      }),
+    );
     seedAnalysisEligibleSession('read-error-session');
     mountSurveyResults({
       account: WALLET_ACCOUNT,
@@ -325,7 +327,9 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     expect(callAI).toHaveBeenCalledTimes(1);
     const writtenEntries = analysisArtifactsFromWrite(0);
     expect(writtenEntries[0][1].sections.breakdown.available).toBe(true);
-    expect(screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.')).toBeNull();
+    expect(
+      screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.'),
+    ).toBeNull();
     expect(getSectionRows().find((row) => row.label === 'Report')?.reason).toBe('Ready');
     expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
     expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
@@ -359,8 +363,9 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     expect(writeSlug).toBe('alpha-session');
     expect(payload.existingFlag).toBe(true);
     expect(payload.sessionResultsAnalysis['sessionResultsAnalysis:v1:OP Sepolia:old-input']).toBe(existingArtifact);
-    const newKeys = Object.keys(payload.sessionResultsAnalysis)
-      .filter((key) => key !== 'sessionResultsAnalysis:v1:OP Sepolia:old-input');
+    const newKeys = Object.keys(payload.sessionResultsAnalysis).filter(
+      (key) => key !== 'sessionResultsAnalysis:v1:OP Sepolia:old-input',
+    );
     expect(newKeys).toHaveLength(1);
     expect(newKeys[0]).toMatch(/^sessionResultsAnalysis:v1:OP Sepolia:/);
     expect(payload.sessionResultsAnalysis[newKeys[0]].sections.breakdown.available).toBe(true);
@@ -374,7 +379,7 @@ describe('SurveyResults HTML report analysis cache controls', () => {
         network: OP_NETWORK,
         sessionSlug: 'cached-session',
       },
-      () => seedAnalysisEligibleSession('cached-session')
+      () => seedAnalysisEligibleSession('cached-session'),
     );
 
     seedAnalysisEligibleSession('cached-session');
@@ -404,7 +409,9 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     expect(callAI).not.toHaveBeenCalled();
     expect(analysisCacheWrites()).toHaveLength(0);
     expect(screen.queryByText(/Generating/)).toBeNull();
-    expect(screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.')).toBeNull();
+    expect(
+      screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.'),
+    ).toBeNull();
     expect(getSectionRows().find((row) => row.label === 'Report')?.reason).toBe('Ready');
     expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
     expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
@@ -441,13 +448,15 @@ describe('SurveyResults HTML report analysis cache controls', () => {
   });
 
   it('ignores stale in-memory analysis artifacts and regenerates the current input signature', async () => {
-    (callAI as jest.Mock).mockResolvedValue(JSON.stringify({
-      breakdown: {
-        dimensions: [],
-        groups: [{ id: 'fresh_group', label: 'Fresh group' }],
-        summary: { overview: 'Fresh analysis.' },
-      },
-    }));
+    (callAI as jest.Mock).mockResolvedValue(
+      JSON.stringify({
+        breakdown: {
+          dimensions: [],
+          groups: [{ id: 'fresh_group', label: 'Fresh group' }],
+          summary: { overview: 'Fresh analysis.' },
+        },
+      }),
+    );
     seedAnalysisEligibleSession('stale-artifact-session');
     const harness = mountSurveyResults({
       account: WALLET_ACCOUNT,
@@ -470,12 +479,28 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     seedQuestionsCache({
       questionResponses: {
         q1: {
-          [RESPONDER_ONE]: { answer: { encrypted: false, value: 'Use a viewer.' }, questionId: 'q1', timeStamp: '2026-05-01T00:00:00.000Z' },
-          [RESPONDER_TWO]: { answer: { encrypted: false, value: 'Keep it private.' }, questionId: 'q1', timeStamp: '2026-05-02T00:00:00.000Z' },
+          [RESPONDER_ONE]: {
+            answer: { encrypted: false, value: 'Use a viewer.' },
+            questionId: 'q1',
+            timeStamp: '2026-05-01T00:00:00.000Z',
+          },
+          [RESPONDER_TWO]: {
+            answer: { encrypted: false, value: 'Keep it private.' },
+            questionId: 'q1',
+            timeStamp: '2026-05-02T00:00:00.000Z',
+          },
         },
         q2: {
-          [RESPONDER_ONE]: { answer: { encrypted: false, value: 'Make PDF readable.' }, questionId: 'q2', timeStamp: '2026-05-03T00:00:00.000Z' },
-          [RESPONDER_TWO]: { answer: { encrypted: false, value: 'Add a fresh angle.' }, questionId: 'q2', timeStamp: '2026-05-04T00:00:00.000Z' },
+          [RESPONDER_ONE]: {
+            answer: { encrypted: false, value: 'Make PDF readable.' },
+            questionId: 'q2',
+            timeStamp: '2026-05-03T00:00:00.000Z',
+          },
+          [RESPONDER_TWO]: {
+            answer: { encrypted: false, value: 'Add a fresh angle.' },
+            questionId: 'q2',
+            timeStamp: '2026-05-04T00:00:00.000Z',
+          },
         },
       },
       questions: {
@@ -500,7 +525,9 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     expect(secondArtifact.inputSignature).not.toBe(firstArtifact.inputSignature);
     expect(secondArtifact).not.toBe(firstArtifact);
     expect(secondArtifact.sections.breakdown.available).toBe(true);
-    expect(screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.')).toBeNull();
+    expect(
+      screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.'),
+    ).toBeNull();
     expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
     expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
   });
@@ -513,16 +540,18 @@ describe('SurveyResults HTML report analysis cache controls', () => {
         network: OP_NETWORK,
         sessionSlug: 'stale-cache-session',
       },
-      () => seedAnalysisEligibleSession('stale-cache-session')
+      () => seedAnalysisEligibleSession('stale-cache-session'),
     );
 
-    (callAI as jest.Mock).mockResolvedValue(JSON.stringify({
-      breakdown: {
-        dimensions: [],
-        groups: [{ id: 'fresh_cached_group', label: 'Fresh cached group' }],
-        summary: { overview: 'Fresh cached analysis.' },
-      },
-    }));
+    (callAI as jest.Mock).mockResolvedValue(
+      JSON.stringify({
+        breakdown: {
+          dimensions: [],
+          groups: [{ id: 'fresh_cached_group', label: 'Fresh cached group' }],
+          summary: { overview: 'Fresh cached analysis.' },
+        },
+      }),
+    );
     seedAnalysisEligibleSession('stale-cache-session');
     cacheStore.set(cacheStoreKey('analysisCache', 'stale-cache-session'), {
       sessionResultsAnalysis: {
@@ -547,7 +576,9 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     const writtenEntries = analysisArtifactsFromWrite(0);
     expect(writtenEntries[0][1].inputSignature).not.toBe('stale-cache-input');
     expect(writtenEntries[0][1].sections.breakdown.available).toBe(true);
-    expect(screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.')).toBeNull();
+    expect(
+      screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.'),
+    ).toBeNull();
     // Generation stays inside the analysis path: no report downloads and no extra
     // network refreshes are triggered by the analysis run.
     expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
@@ -566,9 +597,11 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     await openHtmlReportModal();
 
     // The real payload builder reports why generation is ineligible with no data hydrated.
-    expect(screen.getByText(
-      'Needs at least 3 viewable responses; 0 available. Needs at least 2 participants; 0 available. Needs at least 1 hydrated question; 0 available.'
-    )).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Needs at least 3 viewable responses; 0 available. Needs at least 2 participants; 0 available. Needs at least 1 hydrated question; 0 available.',
+      ),
+    ).toBeInTheDocument();
     const generateButton = getGenerateAnalysisButton();
     expect(generateButton).toBeDisabled();
     expect(generateButton).toHaveTextContent('Generate Analysis Views');
@@ -614,18 +647,22 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     expect(keys).toHaveLength(1);
     expect(keys[0]).toMatch(/^sessionResultsAnalysis:v1:Base Sepolia:/);
     expect(payload.sessionResultsAnalysis[keys[0]].sections.breakdown.available).toBe(true);
-    expect(screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.')).toBeNull();
+    expect(
+      screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.'),
+    ).toBeNull();
   });
 
   it('keeps analysis write failures in the generation status path and recovers without starting downloads', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    (callAI as jest.Mock).mockResolvedValue(JSON.stringify({
-      breakdown: {
-        dimensions: [],
-        groups: [],
-        summary: { overview: 'Generated but not cached.' },
-      },
-    }));
+    (callAI as jest.Mock).mockResolvedValue(
+      JSON.stringify({
+        breakdown: {
+          dimensions: [],
+          groups: [],
+          summary: { overview: 'Generated but not cached.' },
+        },
+      }),
+    );
     seedAnalysisEligibleSession('write-failure-session');
     mountSurveyResults({
       account: WALLET_ACCOUNT,
@@ -642,9 +679,13 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     await screen.findByText('Unable to generate analysis views right now. Check AI settings and try again.');
     expect(callAI).toHaveBeenCalledTimes(1);
     expect(analysisCacheWrites()).toHaveLength(1);
-    expect(consoleErrorSpy.mock.calls.some((call) => call.some((arg) => (
-      String(arg).includes('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis')
-    )))).toBe(true);
+    expect(
+      consoleErrorSpy.mock.calls.some((call) =>
+        call.some((arg) =>
+          String(arg).includes('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis'),
+        ),
+      ),
+    ).toBe(true);
     expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
     expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
     // The failed run keeps the artifact out of readiness: analysis sections still need generation.
@@ -655,7 +696,9 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     await waitForAnalysisIdle();
 
     expect(callAI).toHaveBeenCalledTimes(2);
-    expect(screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.')).toBeNull();
+    expect(
+      screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.'),
+    ).toBeNull();
     const recoveredEntries = analysisArtifactsFromWrite(1);
     expect(recoveredEntries[0][1].sections.breakdown.available).toBe(true);
     expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();

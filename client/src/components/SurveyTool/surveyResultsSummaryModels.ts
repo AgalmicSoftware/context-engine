@@ -61,22 +61,24 @@ type BuildSurveyResultsQuestionTableEntriesArgs = {
 
 export const resolveSurveyResultsSummaryQuestionType = (
   question: SurveyResultsRecord | null = null,
-  responses: unknown = []
+  responses: unknown = [],
 ): string => {
-  const resolvedType = String(question?.type || '').trim().toLowerCase();
+  const resolvedType = String(question?.type || '')
+    .trim()
+    .toLowerCase();
   const isFreeform = resolvedType === 'freeform' || resolvedType === 'text';
   if (isFreeform) return 'freeform';
   if (resolvedType) return resolvedType;
-  const responseRows = Array.isArray(responses)
-    ? responses as SurveyResultsSummaryResponseRow[]
-    : [];
+  const responseRows = Array.isArray(responses) ? (responses as SurveyResultsSummaryResponseRow[]) : [];
   for (let index = 0; index < responseRows.length; index += 1) {
     const inferredType = String(
       responseRows[index]?.response?.type ||
-      responseRows[index]?.response?.questionType ||
-      responseRows[index]?.response?.answer?.type ||
-      ''
-    ).trim().toLowerCase();
+        responseRows[index]?.response?.questionType ||
+        responseRows[index]?.response?.answer?.type ||
+        '',
+    )
+      .trim()
+      .toLowerCase();
     const inferredIsFreeform = inferredType === 'freeform' || inferredType === 'text';
     if (inferredIsFreeform) return 'freeform';
     if (inferredType) return inferredType;
@@ -85,14 +87,14 @@ export const resolveSurveyResultsSummaryQuestionType = (
 };
 
 export const getSurveyResultsLatestResponsesByResponder = (
-  responses: unknown = []
+  responses: unknown = [],
 ): SurveyResultsSummaryResponseRow[] => {
-  const responseRows = Array.isArray(responses)
-    ? responses as SurveyResultsSummaryResponseRow[]
-    : [];
+  const responseRows = Array.isArray(responses) ? (responses as SurveyResultsSummaryResponseRow[]) : [];
   const latestByResponder = new Map<string, SurveyResultsSummaryResponseRow>();
   responseRows.forEach((row, index) => {
-    const responderKey = String(row?.responder || `__row_${index}`).trim().toLowerCase();
+    const responderKey = String(row?.responder || `__row_${index}`)
+      .trim()
+      .toLowerCase();
     const timestamp = getSurveyResponseAggregateTimestampMs(row?.response, row);
     const existing = latestByResponder.get(responderKey);
     const existingTimestamp = getSurveyResponseAggregateTimestampMs(existing?.response, existing);
@@ -141,9 +143,7 @@ export const buildSurveyResultsQuestionTableEntries = ({
   return entries;
 };
 
-export const buildSurveyResultsFreeformSummaryModel = (
-  responses: unknown = []
-): SurveyResultsFreeformSummaryModel => {
+export const buildSurveyResultsFreeformSummaryModel = (responses: unknown = []): SurveyResultsFreeformSummaryModel => {
   const latestRows = getSurveyResultsLatestResponsesByResponder(responses);
 
   let encryptedCount = 0;
@@ -162,16 +162,14 @@ export const buildSurveyResultsFreeformSummaryModel = (
       return;
     }
 
-    const isEncryptedPlaceholder =
-      parsedResponse.answer.encrypted === true &&
-      parsedResponse.answer.value === '*';
+    const isEncryptedPlaceholder = parsedResponse.answer.encrypted === true && parsedResponse.answer.value === '*';
     if (isEncryptedPlaceholder) {
       encryptedCount += 1;
       return;
     }
 
     const additionalEncrypted = parsedResponse.additional?.encrypted === true;
-    const rawAdditional = additionalEncrypted ? '' : (parsedResponse.additional?.value || '');
+    const rawAdditional = additionalEncrypted ? '' : parsedResponse.additional?.value || '';
     const safeAdditional = typeof rawAdditional === 'string' ? rawAdditional : JSON.stringify(rawAdditional);
 
     displayedResponses.push({
@@ -192,7 +190,7 @@ export const buildSurveyResultsFreeformSummaryModel = (
 
 export const buildSurveyResultsMultichoiceSummaryModel = (
   responses: unknown = [],
-  question: SurveyResultsRecord | null = null
+  question: SurveyResultsRecord | null = null,
 ): SurveyResultsMultichoiceSummaryModel => {
   const latestRows = getSurveyResultsLatestResponsesByResponder(responses);
   const normalizeChoiceLabel = (choice: unknown) => {
@@ -217,7 +215,7 @@ export const buildSurveyResultsMultichoiceSummaryModel = (
   if (displayByKey.size === 0) {
     latestRows.forEach((row) => {
       const value = row?.response?.answer?.value;
-      const items = Array.isArray(value) ? value : (value == null ? [] : [value]);
+      const items = Array.isArray(value) ? value : value == null ? [] : [value];
       items.forEach(addOption);
     });
   }
@@ -230,7 +228,7 @@ export const buildSurveyResultsMultichoiceSummaryModel = (
     const parsedResponse = row?.response;
     if (!parsedResponse?.answer || parsedResponse.answer.encrypted === true) return;
     const value = parsedResponse.answer.value;
-    const items = Array.isArray(value) ? value : (value == null ? [] : [value]);
+    const items = Array.isArray(value) ? value : value == null ? [] : [value];
     const picks = new Set<string>();
     items.forEach((choice) => {
       const label = String(normalizeChoiceLabel(choice) || '').trim();

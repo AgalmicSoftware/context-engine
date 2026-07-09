@@ -19,18 +19,13 @@ describe('OnePageSession helpers', () => {
         sbtName: 'Alpha',
         sbtDescription: 'Legacy draft details',
       };
-      sessionStorage.setItem(
-        'createSbtFormCache',
-        JSON.stringify(legacyPayload)
-      );
+      sessionStorage.setItem('createSbtFormCache', JSON.stringify(legacyPayload));
 
       const found = hasCachedCreateSbtForm('edge');
 
       expect(found).toBe(true);
       expect(sessionStorage.getItem('createSbtFormCache')).toBeNull();
-      expect(sessionStorage.getItem('dg:createSbtFormCache:edge')).toBe(
-        JSON.stringify(legacyPayload)
-      );
+      expect(sessionStorage.getItem('dg:createSbtFormCache:edge')).toBe(JSON.stringify(legacyPayload));
     });
 
     it('detects cached tags or distribution data', () => {
@@ -40,7 +35,7 @@ describe('OnePageSession helpers', () => {
           sbtName: 'Alpha',
           tags: ['alpha'],
           sbtDistribution: { isLimited: true },
-        })
+        }),
       );
 
       expect(hasCachedCreateSbtForm()).toBe(true);

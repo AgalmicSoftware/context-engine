@@ -1,7 +1,4 @@
-import {
-  buildArweaveGatewayUrlCandidates,
-  normalizeArweaveUrl,
-} from '../../utilities/arweave/arweaveUrls.js';
+import { buildArweaveGatewayUrlCandidates, normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { decodeSbtPageJsonDataUri } from './sbtPagePasswordExportHelpers';
 
 export type SbtPageInfoImageLike = Record<string, unknown> & {
@@ -39,11 +36,7 @@ export const isSbtPageImageLikeUri = (uriRaw: unknown): boolean => {
     const parsed = new URL(raw);
     const path = String(parsed.pathname || '').toLowerCase();
     if (/\.(png|jpe?g|gif|webp|svg|bmp|avif|ico|tiff?)$/i.test(path)) return true;
-    const extHint = String(
-      parsed.searchParams.get('ext') ||
-      parsed.searchParams.get('format') ||
-      ''
-    ).toLowerCase();
+    const extHint = String(parsed.searchParams.get('ext') || parsed.searchParams.get('format') || '').toLowerCase();
     if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif', 'ico', 'tif', 'tiff'].includes(extHint)) {
       return true;
     }
@@ -53,42 +46,38 @@ export const isSbtPageImageLikeUri = (uriRaw: unknown): boolean => {
   return false;
 };
 
-export const getDisplayImageUrlCandidates = (
-  sbtInfo: SbtPageInfoImageLike | null | undefined
-): string[] => {
+export const getDisplayImageUrlCandidates = (sbtInfo: SbtPageInfoImageLike | null | undefined): string[] => {
   const imageValue = sbtInfo?.image;
-  return buildArweaveGatewayUrlCandidates(imageValue, { gateway: 'https://arweave.net' })
-    .filter((candidate) => {
-      try {
-        const host = new URL(candidate).hostname.toLowerCase();
-        const isKnownArweaveGateway = (
-          host === 'ar-io.dev' ||
-          host.endsWith('.ar-io.dev') ||
-          host === 'arweave.net' ||
-          host.endsWith('.arweave.net') ||
-          host === 'gateway.irys.xyz' ||
-          host.endsWith('.gateway.irys.xyz') ||
-          host === 'permagate.io' ||
-          host.endsWith('.permagate.io') ||
-          host === 'g8way.io' ||
-          host.endsWith('.g8way.io')
-        );
-        if (!isKnownArweaveGateway) return true;
-        return (
-          host === 'arweave.net' ||
-          host.endsWith('.arweave.net') ||
-          host === 'gateway.irys.xyz' ||
-          host.endsWith('.gateway.irys.xyz')
-        );
-      } catch (_) {
-        return true;
-      }
-    });
+  return buildArweaveGatewayUrlCandidates(imageValue, { gateway: 'https://arweave.net' }).filter((candidate) => {
+    try {
+      const host = new URL(candidate).hostname.toLowerCase();
+      const isKnownArweaveGateway =
+        host === 'ar-io.dev' ||
+        host.endsWith('.ar-io.dev') ||
+        host === 'arweave.net' ||
+        host.endsWith('.arweave.net') ||
+        host === 'gateway.irys.xyz' ||
+        host.endsWith('.gateway.irys.xyz') ||
+        host === 'permagate.io' ||
+        host.endsWith('.permagate.io') ||
+        host === 'g8way.io' ||
+        host.endsWith('.g8way.io');
+      if (!isKnownArweaveGateway) return true;
+      return (
+        host === 'arweave.net' ||
+        host.endsWith('.arweave.net') ||
+        host === 'gateway.irys.xyz' ||
+        host.endsWith('.gateway.irys.xyz')
+      );
+    } catch (_) {
+      return true;
+    }
+  });
 };
 
 export const resolveDisplayImageHref = (
   sbtInfo: SbtPageInfoImageLike | null | undefined,
-  defaultImage: unknown = ''
+  defaultImage: unknown = '',
 ): string => {
   const candidates = getDisplayImageUrlCandidates(sbtInfo);
   const candidate = candidates[0] || '';
@@ -98,13 +87,14 @@ export const resolveDisplayImageHref = (
 export const getDisplayImageRenderState = (
   sbtInfo: SbtPageInfoImageLike | null | undefined,
   fallbackState: SbtPageDisplayImageFallbackState = {},
-  defaultImage: unknown = ''
+  defaultImage: unknown = '',
 ): SbtPageDisplayImageState => {
   const sourceKey = String(sbtInfo?.image || '').trim();
   const candidates = getDisplayImageUrlCandidates(sbtInfo);
-  const activeIndex = fallbackState.displayImageFallbackKey === sourceKey
-    ? Math.max(0, Number(fallbackState.displayImageFallbackIndex || 0))
-    : 0;
+  const activeIndex =
+    fallbackState.displayImageFallbackKey === sourceKey
+      ? Math.max(0, Number(fallbackState.displayImageFallbackIndex || 0))
+      : 0;
   const fallbackImage = String(defaultImage || '');
   const src = candidates[activeIndex] || fallbackImage;
   return {
@@ -116,21 +106,15 @@ export const getDisplayImageRenderState = (
   };
 };
 
-export const getDisplayImageFallbackCandidateCount = (candidates: unknown): number => (
-  Array.isArray(candidates) ? candidates.length : 0
-);
+export const getDisplayImageFallbackCandidateCount = (candidates: unknown): number =>
+  Array.isArray(candidates) ? candidates.length : 0;
 
 export const getNextDisplayImageFallbackState = (
-  {
-    activeIndex = 0,
-    maxIndex = 0,
-    sourceKey = '',
-  }: SbtPageDisplayImageNextFallbackArgs = {},
-  prevState: SbtPageDisplayImageFallbackState = {}
+  { activeIndex = 0, maxIndex = 0, sourceKey = '' }: SbtPageDisplayImageNextFallbackArgs = {},
+  prevState: SbtPageDisplayImageFallbackState = {},
 ): SbtPageDisplayImageFallbackState | null => {
-  const currentIndex = prevState.displayImageFallbackKey === sourceKey
-    ? Math.max(0, Number(prevState.displayImageFallbackIndex || 0))
-    : 0;
+  const currentIndex =
+    prevState.displayImageFallbackKey === sourceKey ? Math.max(0, Number(prevState.displayImageFallbackIndex || 0)) : 0;
   if (currentIndex !== activeIndex) return null;
   return {
     displayImageFallbackKey: sourceKey,
@@ -170,7 +154,7 @@ export const resolveSbtPageTokenMetadataHref = (tokenUriRaw: unknown): string =>
     decoded.metadata_uri,
     decoded.arweaveUri,
     decoded.arweaveURL,
-    (typeof decoded.arweaveTxId === 'string' ? `ar://${decoded.arweaveTxId}` : null),
+    typeof decoded.arweaveTxId === 'string' ? `ar://${decoded.arweaveTxId}` : null,
   ];
   for (const candidate of candidates) {
     const normalized = normalizeSbtPageCanonicalMetadataHref(candidate);

@@ -1,6 +1,6 @@
 import SBTPage from './SBTPage';
 import { ethers } from 'ethers';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 const mockIsCryptoMode = jest.fn(() => true);
@@ -37,7 +37,7 @@ const createSubject = (props = {}) => {
 const createSparseCacheEntry = (sbtAddress) => {
   const sbtLower = sbtAddress.toLowerCase();
   return {
-    '84532': {
+    84532: {
       sbtList: {
         [sbtLower]: {
           sbtAddress,
@@ -73,15 +73,15 @@ describe('SBTPage ownerOf holder fallback', () => {
   });
 
   it('returns no holder lookups when minted count is zero', async () => {
-    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId').mockResolvedValue(
-      '0x00000000000000000000000000000000000000b1'
-    );
+    const ownerSpy = jest
+      .spyOn(contractScripts, 'getOwnerByTokenId')
+      .mockResolvedValue('0x00000000000000000000000000000000000000b1');
     const subject = createSubject();
 
     const holders = await subject.fetchHolderAddressesByTokenOwnership(
       '0x00000000000000000000000000000000000000a1',
       'edge',
-      0
+      0,
     );
 
     expect(ownerSpy).not.toHaveBeenCalled();
@@ -91,7 +91,8 @@ describe('SBTPage ownerOf holder fallback', () => {
   it('batches ownerOf fallback lookups instead of probing strictly one-by-one', async () => {
     const pending = new Map();
     const ownerAddress = '0x00000000000000000000000000000000000000b1';
-    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId')
+    const ownerSpy = jest
+      .spyOn(contractScripts, 'getOwnerByTokenId')
       .mockImplementation(async (_providerName, _sbtAddress, tokenId) => {
         const id = Number(tokenId);
         if (id >= 1 && id <= 10) {
@@ -106,21 +107,17 @@ describe('SBTPage ownerOf holder fallback', () => {
     const runPromise = subject.fetchHolderAddressesByTokenOwnership(
       '0x00000000000000000000000000000000000000a1',
       'edge',
-      12
+      12,
     );
     await Promise.resolve();
 
     expect(ownerSpy).toHaveBeenCalledTimes(10);
-    expect(ownerSpy.mock.calls.slice(0, 10).map((call) => Number(call[2]))).toEqual(
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    );
+    expect(ownerSpy.mock.calls.slice(0, 10).map((call) => Number(call[2]))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
     pending.forEach((resolve) => resolve(ownerAddress));
     const holders = await runPromise;
 
-    expect(ownerSpy.mock.calls.map((call) => Number(call[2]))).toEqual(
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0]
-    );
+    expect(ownerSpy.mock.calls.map((call) => Number(call[2]))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0]);
     expect(holders).toEqual([ownerAddress.toLowerCase()]);
   });
 
@@ -129,7 +126,8 @@ describe('SBTPage ownerOf holder fallback', () => {
     const ownerA = '0x00000000000000000000000000000000000000b1';
     const ownerB = '0x00000000000000000000000000000000000000b2';
     const ownerC = '0x00000000000000000000000000000000000000b3';
-    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId')
+    const ownerSpy = jest
+      .spyOn(contractScripts, 'getOwnerByTokenId')
       .mockImplementation(async (_providerName, _sbtAddress, tokenId) => {
         const id = Number(tokenId);
         if (id === 0) return null;
@@ -142,7 +140,7 @@ describe('SBTPage ownerOf holder fallback', () => {
     const runPromise = subject.fetchHolderAddressesByTokenOwnership(
       '0x00000000000000000000000000000000000000a1',
       'edge',
-      3
+      3,
     );
     await Promise.resolve();
     expect(ownerSpy).toHaveBeenCalledTimes(3);
@@ -164,7 +162,8 @@ describe('SBTPage ownerOf holder fallback', () => {
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(createSparseCacheEntry(sbtAddress));
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
     jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('2');
-    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId')
+    const ownerSpy = jest
+      .spyOn(contractScripts, 'getOwnerByTokenId')
       .mockImplementation(async (_providerName, _sbtAddress, tokenId) => {
         if (Number(tokenId) === 0) return null;
         if (Number(tokenId) === 1) return ownerA;
@@ -206,7 +205,8 @@ describe('SBTPage ownerOf holder fallback', () => {
     });
     const mintedSpy = jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('1');
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
-    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId')
+    const ownerSpy = jest
+      .spyOn(contractScripts, 'getOwnerByTokenId')
       .mockImplementation(async (_providerName, _sbtAddress, tokenId) => {
         if (Number(tokenId) === 5) return ownerA;
         return null;
@@ -236,7 +236,8 @@ describe('SBTPage ownerOf holder fallback', () => {
   it('probes tokenId 0 after one-based ids for zero-based multi-token contracts', async () => {
     const ownerA = '0x00000000000000000000000000000000000000b1';
     const ownerB = '0x00000000000000000000000000000000000000b2';
-    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId')
+    const ownerSpy = jest
+      .spyOn(contractScripts, 'getOwnerByTokenId')
       .mockImplementation(async (_providerName, _sbtAddress, tokenId) => {
         if (Number(tokenId) === 1) return ownerA;
         if (Number(tokenId) === 2) return ownerA;
@@ -248,7 +249,7 @@ describe('SBTPage ownerOf holder fallback', () => {
     const holders = await subject.fetchHolderAddressesByTokenOwnership(
       '0x00000000000000000000000000000000000000a1',
       'edge',
-      2
+      2,
     );
 
     expect(ownerSpy.mock.calls.map((call) => Number(call[2]))).toEqual([1, 2, 0]);
@@ -262,7 +263,8 @@ describe('SBTPage ownerOf holder fallback', () => {
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(createSparseCacheEntry(sbtAddress));
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
     jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('1');
-    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId')
+    const ownerSpy = jest
+      .spyOn(contractScripts, 'getOwnerByTokenId')
       .mockImplementation(async (_providerName, _sbtAddress, tokenId) => {
         if (Number(tokenId) === 0) return ownerA;
         return null;

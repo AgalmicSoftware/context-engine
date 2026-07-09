@@ -23,19 +23,16 @@ type RouteStatusPageProps = {
   path?: string;
 };
 
-export const RouteStatusPage = ({
-  eyebrow = '',
-  title = '',
-  description = '',
-  path = '',
-}: RouteStatusPageProps) => (
+export const RouteStatusPage = ({ eyebrow = '', title = '', description = '', path = '' }: RouteStatusPageProps) => (
   <div style={ROUTE_STATUS_SHELL_STYLE}>
     <div style={ROUTE_STATUS_CARD_STYLE}>
       {eyebrow ? <div style={ROUTE_STATUS_EYEBROW_STYLE}>{eyebrow}</div> : null}
       <h2 style={ROUTE_STATUS_TITLE_STYLE}>{title}</h2>
       <p style={ROUTE_STATUS_BODY_STYLE}>{description}</p>
       {path ? <p style={ROUTE_STATUS_PATH_STYLE}>Path: {path}</p> : null}
-      <a href={buildPublicRoute('/')} style={ROUTE_STATUS_LINK_STYLE}>Back to home</a>
+      <a href={buildPublicRoute('/')} style={ROUTE_STATUS_LINK_STYLE}>
+        Back to home
+      </a>
     </div>
   </div>
 );
@@ -71,7 +68,9 @@ export const NotFoundRoute = ({ path = '' }: { path?: string }) => (
 export const readHashQueryParam = (hashValue = '', key = ''): string => {
   const normalizedKey = String(key || '').trim();
   if (!normalizedKey) return '';
-  const rawHash = String(hashValue || '').replace(/^#/, '').trim();
+  const rawHash = String(hashValue || '')
+    .replace(/^#/, '')
+    .trim();
   if (!rawHash) return '';
   const params = new URLSearchParams(rawHash);
   return String(params.get(normalizedKey) || '').trim();
@@ -113,9 +112,7 @@ export const SessionLoadingSkeleton = ({
   >
     <div className={styles.sessionLoadingSkeletonStatus}>
       <h3 className={styles.sessionLoadingSkeletonStatusTitle}>{statusTitle}</h3>
-      {statusDetail ? (
-        <p className={styles.sessionLoadingSkeletonStatusText}>{statusDetail}</p>
-      ) : null}
+      {statusDetail ? <p className={styles.sessionLoadingSkeletonStatusText}>{statusDetail}</p> : null}
     </div>
     <div className={styles.sessionLoadingSkeletonSections} aria-hidden="true">
       {SESSION_LOADING_SKELETON_SECTION_LAYOUT.map((sectionLayout, sectionIndex) => (
@@ -137,7 +134,9 @@ export const SessionLoadingSkeleton = ({
                   styles.sessionLoadingSkeletonBar,
                   barIndex === 0 ? styles.sessionLoadingSkeletonTitleBar : null,
                   styles.sessionLoadingSkeletonShimmer,
-                ].filter(Boolean).join(' ')}
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 style={{ width }}
               />
             ))}

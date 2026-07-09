@@ -5,7 +5,7 @@ describe('cacheUpdateCoalescer', () => {
   const originalCancel = window.cancelAnimationFrame;
   const setAnimationFrameGlobals = (
     requestAnimationFrame: Window['requestAnimationFrame'] | undefined,
-    cancelAnimationFrame: Window['cancelAnimationFrame'] | undefined
+    cancelAnimationFrame: Window['cancelAnimationFrame'] | undefined,
   ): void => {
     Object.defineProperty(window, 'requestAnimationFrame', {
       configurable: true,

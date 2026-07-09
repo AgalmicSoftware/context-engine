@@ -16,7 +16,7 @@ jest.mock('../../utilities/web3/sponsoredAccess.js', () => ({
   checkSponsoredAccess: jest.fn(),
 }));
 
-jest.mock('utilities/ai/aiScripts.js', () => ({
+jest.mock('utilities/ai/aiClient.js', () => ({
   analyzeUserOpinions: jest.fn(async () => ({
     summary: 'summary',
     details: 'details',
@@ -40,9 +40,7 @@ const makeInstance = (props = {}) => {
 
   instance._isMounted = true;
   instance.setState = jest.fn((update, cb) => {
-    const patch = typeof update === 'function'
-      ? update(instance.state, instance.props)
-      : update;
+    const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
     if (patch && typeof patch === 'object') {
       instance.state = { ...instance.state, ...patch };
     }
@@ -74,14 +72,30 @@ describe('UserPage deep scan refresh state', () => {
   afterEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
-    try { delete globalThis.CE_USER_PROFILE_DEEP_SCAN_LOADING; } catch (_) {}
-    try { delete globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS; } catch (_) {}
-    try { delete globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS; } catch (_) {}
-    try { delete globalThis.CE_SESSION_SCAN_SCOPE; } catch (_) {}
-    try { delete globalThis.CE_SESSION_SCAN_SLUGS; } catch (_) {}
-    try { localStorage.removeItem('ce:aiSettings:v1'); } catch (_) {}
-    try { localStorage.removeItem('ce:sessionScanScope'); } catch (_) {}
-    try { localStorage.removeItem('ce:sessionScanSlugs'); } catch (_) {}
+    try {
+      delete globalThis.CE_USER_PROFILE_DEEP_SCAN_LOADING;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_SCOPE;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_SESSION_SCAN_SLUGS;
+    } catch (_) {}
+    try {
+      localStorage.removeItem('ce:aiSettings:v1');
+    } catch (_) {}
+    try {
+      localStorage.removeItem('ce:sessionScanScope');
+    } catch (_) {}
+    try {
+      localStorage.removeItem('ce:sessionScanSlugs');
+    } catch (_) {}
   });
 
   it('keeps loading state when data remains uncertain and no cache sources are available', () => {
@@ -366,11 +380,9 @@ describe('UserPage deep scan refresh state', () => {
     const secondAddress = '0x00000000000000000000000000000000000000bb';
     const firstScan = createDeferred();
     const secondScan = createDeferred();
-    const scanSpecificUserProfile = jest.fn((address) => (
-      String(address || '').toLowerCase() === firstAddress.toLowerCase()
-        ? firstScan.promise
-        : secondScan.promise
-    ));
+    const scanSpecificUserProfile = jest.fn((address) =>
+      String(address || '').toLowerCase() === firstAddress.toLowerCase() ? firstScan.promise : secondScan.promise,
+    );
     const instance = makeInstance({ viewAddress: firstAddress, scanSpecificUserProfile });
     instance.loadDataFromCache = jest.fn();
 

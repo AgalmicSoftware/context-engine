@@ -25,12 +25,7 @@ type EncryptionContext = {
   lit?: LitHooks;
 };
 
-type EncryptedValueStatus =
-  | 'missing'
-  | 'wallet-required'
-  | 'lit-unavailable'
-  | 'encrypted'
-  | 'locked';
+type EncryptedValueStatus = 'missing' | 'wallet-required' | 'lit-unavailable' | 'encrypted' | 'locked';
 
 type EncryptedValueResolution = {
   value: unknown;
@@ -38,19 +33,22 @@ type EncryptedValueResolution = {
   encryptedAvailable: boolean;
 };
 
-type GroupCfg = {
-  encryptedFields?: Record<string, EncryptedEnvelope | null | undefined>;
-} | null | undefined;
+type GroupCfg =
+  | {
+      encryptedFields?: Record<string, EncryptedEnvelope | null | undefined>;
+    }
+  | null
+  | undefined;
 
 type EncryptedFieldsApi = {
   resolveEncryptedValue: (
     envelope: EncryptedEnvelope | null | undefined,
-    context?: EncryptionContext
+    context?: EncryptionContext,
   ) => Promise<EncryptedValueResolution>;
   resolveEncryptedFieldValue: (
     groupCfg: GroupCfg,
     fieldPath: string | string[],
-    context?: EncryptionContext
+    context?: EncryptionContext,
   ) => Promise<EncryptedValueResolution>;
 };
 
@@ -60,29 +58,25 @@ type WalletContext = {
   chainId: number | string | null;
 };
 
-const pathKey = (path: string | string[]): string => (
-  Array.isArray(path) ? path.join('.') : toStr(path)
-);
+const pathKey = (path: string | string[]): string => (Array.isArray(path) ? path.join('.') : toStr(path));
 
-const hasOverrideValue = (obj: UnknownRecord | null | undefined, key: string): boolean => (
-  !!obj &&
-  typeof obj === 'object' &&
-  Object.prototype.hasOwnProperty.call(obj, key) &&
-  obj[key] !== undefined
-);
+const hasOverrideValue = (obj: UnknownRecord | null | undefined, key: string): boolean =>
+  !!obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, key) && obj[key] !== undefined;
+const asRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' ? (value as UnknownRecord) : {};
 
 const getWalletContext = (override: EncryptionContext = {}): WalletContext => {
   try {
     const state = store?.getState?.();
-    const profile = state?.profile || {};
-    const network = profile.network || {};
+    const profile = asRecord(state?.profile);
+    const network = asRecord(profile.network);
     const chainId = hasOverrideValue(override, 'chainId')
-      ? override.chainId
-      : (network.id || network.chainId || null);
+      ? (override.chainId ?? null)
+      : network.id || network.chainId || null;
     return {
-      account: hasOverrideValue(override, 'account') ? toStr(override.account) : (profile.account || ''),
-      providerLike: hasOverrideValue(override, 'providerLike') ? override.providerLike : (profile.provider || 'wagmi'),
-      chainId,
+      account: hasOverrideValue(override, 'account') ? toStr(override.account) : toStr(profile.account),
+      providerLike: hasOverrideValue(override, 'providerLike') ? override.providerLike : profile.provider || 'wagmi',
+      chainId: typeof chainId === 'string' || typeof chainId === 'number' ? chainId : null,
     };
   } catch {
     return {
@@ -112,7 +106,7 @@ const getLitHooks = (override: EncryptionContext = {}): LitHooks => {
  */
 export const resolveEncryptedValue = async (
   envelope: EncryptedEnvelope | null | undefined,
-  context: EncryptionContext = {}
+  context: EncryptionContext = {},
 ): Promise<EncryptedValueResolution> => {
   if (!envelope) {
     return { value: '', status: 'missing', encryptedAvailable: false };
@@ -161,15 +155,13 @@ export const resolveEncryptedValue = async (
 export const resolveEncryptedFieldValue = async (
   groupCfg: GroupCfg,
   fieldPath: string | string[],
-  context: EncryptionContext = {}
+  context: EncryptionContext = {},
 ): Promise<EncryptedValueResolution> => {
   const key = pathKey(fieldPath);
   if (!key) return { value: '', status: 'missing', encryptedAvailable: false };
 
   const encryptedFields = groupCfg?.encryptedFields;
-  const envelope = encryptedFields && typeof encryptedFields === 'object'
-    ? encryptedFields[key]
-    : null;
+  const envelope = encryptedFields && typeof encryptedFields === 'object' ? encryptedFields[key] : null;
 
   if (!envelope) {
     return { value: '', status: 'missing', encryptedAvailable: false };

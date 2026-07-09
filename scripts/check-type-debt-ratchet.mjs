@@ -48,6 +48,16 @@ export const TYPE_DEBT_PATTERNS = Object.freeze([
     label: 'Record<...any...>',
     pattern: /\bRecord\s*<(?=[^>\n]*\bany\b)[^>\n]*>/g,
   },
+  {
+    key: 'aliasAny',
+    label: 'type alias = any',
+    pattern: /^\s*(?:export\s+)?type\s+[A-Za-z_$][\w$]*(?:\s*<[^>\n]*>)?\s*=\s*any\s*;?\s*(?=\/\/.*$|$)/gm,
+  },
+  {
+    key: 'mapSetAny',
+    label: 'Map/Set<...any...>',
+    pattern: /\b(?:Map|Set)\s*<(?=[^>\n]*\bany\b)[^>\n]*>/g,
+  },
 ]);
 
 const TEST_DIRECTORY_SEGMENTS = new Set([
@@ -76,6 +86,16 @@ export const countTotal = (counts) => TYPE_DEBT_PATTERNS.reduce(
 );
 
 const normalizePath = (filePath) => filePath.split(path.sep).join('/');
+const normalizeDirectoryPath = (directoryPath) => normalizePath(String(directoryPath || '')).replace(/\/+$/g, '');
+
+export const isPathWithinDirectory = (filePath, directoryPath) => {
+  const normalizedFilePath = normalizePath(filePath);
+  const normalizedDirectoryPath = normalizeDirectoryPath(directoryPath);
+  return (
+    normalizedDirectoryPath.length > 0 &&
+    (normalizedFilePath === normalizedDirectoryPath || normalizedFilePath.startsWith(`${normalizedDirectoryPath}/`))
+  );
+};
 
 export const isProductionTypeScriptFile = (filePath) => {
   const normalizedPath = normalizePath(filePath);
@@ -172,6 +192,35 @@ export const normalizeBaselineCounts = (baseline) => ({
   ...(baseline.counts || baseline),
 });
 
+export const normalizeStrictDebtFreeDirectories = (baseline = {}) => {
+  const rawDirectories = Array.isArray(baseline.strictDebtFreeDirectories)
+    ? baseline.strictDebtFreeDirectories
+    : [];
+
+  return [...new Set(
+    rawDirectories
+      .map(normalizeDirectoryPath)
+      .filter((directoryPath) => (
+        directoryPath === SOURCE_ROOT || directoryPath.startsWith(`${SOURCE_ROOT}/`)
+      )),
+  )].sort();
+};
+
+export const collectStrictDebtFreeDirectoryViolations = (filesWithDebt, strictDebtFreeDirectories) => filesWithDebt
+  .map((file) => {
+    const directory = strictDebtFreeDirectories.find((strictDirectory) => (
+      isPathWithinDirectory(file.path, strictDirectory)
+    ));
+    return directory
+      ? {
+          directory,
+          path: file.path,
+          counts: file.counts,
+        }
+      : null;
+  })
+  .filter(Boolean);
+
 export const compareTypeDebtCounts = (currentCounts, baselineCounts) => TYPE_DEBT_PATTERNS
   .map(({ key, label }) => {
     const current = currentCounts[key] || 0;
@@ -208,6 +257,11 @@ export const readBaseline = (rootDir = DEFAULT_ROOT_DIR) => {
 };
 
 export const writeBaseline = (debt, rootDir = DEFAULT_ROOT_DIR) => {
+  const baselinePath = path.join(rootDir, BASELINE_PATH);
+  const previousBaseline = fs.existsSync(baselinePath)
+    ? JSON.parse(fs.readFileSync(baselinePath, 'utf8'))
+    : {};
+  const strictDebtFreeDirectories = normalizeStrictDebtFreeDirectories(previousBaseline);
   const baseline = {
     sourceRoot: SOURCE_ROOT,
     excluded: [
@@ -219,10 +273,10 @@ export const writeBaseline = (debt, rootDir = DEFAULT_ROOT_DIR) => {
       '__tests__/**',
       'test utility directories/files',
     ],
+    strictDebtFreeDirectories,
     counts: debt.counts,
   };
 
-  const baselinePath = path.join(rootDir, BASELINE_PATH);
   fs.writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
   return baselinePath;
 };
@@ -274,12 +328,23 @@ export const runTypeDebtRatchet = ({
     return 0;
   }
 
+  const baseline = readBaseline(rootDir);
+  const baselineCounts = normalizeBaselineCounts(baseline);
+  const strictDebtFreeDirectories = normalizeStrictDebtFreeDirectories(baseline);
+  const strictDebtFreeDirectoryViolations = collectStrictDebtFreeDirectoryViolations(
+    debt.files,
+    strictDebtFreeDirectories,
+  );
+
   if (args.has('--json')) {
-    stdout(JSON.stringify(debt, null, 2));
+    stdout(JSON.stringify({
+      ...debt,
+      strictDebtFreeDirectories,
+      strictDebtFreeDirectoryViolations,
+    }, null, 2));
     return 0;
   }
 
-  const baselineCounts = normalizeBaselineCounts(readBaseline(rootDir));
   const increases = compareTypeDebtCounts(debt.counts, baselineCounts);
   const reductions = compareTypeDebtReductions(debt.counts, baselineCounts);
 
@@ -292,10 +357,22 @@ export const runTypeDebtRatchet = ({
     debt.files.forEach((file) => stdout(formatFileCounts(file)));
   }
 
+  if (strictDebtFreeDirectories.length > 0) {
+    stdout(`Strict debt-free directories: ${strictDebtFreeDirectories.length}`);
+  }
+
   if (increases.length > 0) {
     stderr('Type debt ratchet failed: count(s) increased above baseline.');
     increases.forEach(({ label, current, baseline, delta }) => {
       stderr(`- ${label}: ${current} exceeds baseline ${baseline} by ${delta}`);
+    });
+    return 1;
+  }
+
+  if (strictDebtFreeDirectoryViolations.length > 0) {
+    stderr('Type debt ratchet failed: strict debt-free directories contain counted debt.');
+    strictDebtFreeDirectoryViolations.forEach((file) => {
+      stderr(`- ${file.directory}: ${formatFileCounts(file)}`);
     });
     return 1;
   }
@@ -311,6 +388,6 @@ export const runTypeDebtRatchet = ({
   return 0;
 };
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   process.exit(runTypeDebtRatchet());
 }

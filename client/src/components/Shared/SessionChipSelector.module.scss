@@ -15,7 +15,10 @@
   color: var(--ce-color-panel-text);
   padding: 12px 14px;
   text-align: left;
-  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
 }
 
 .chip:hover:not(:disabled) {

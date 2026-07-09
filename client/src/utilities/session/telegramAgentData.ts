@@ -13,11 +13,8 @@ export type TelegramPolisDataset = {
   synthesized: boolean;
 };
 
-const toRecord = (value: unknown): UnknownRecord => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as UnknownRecord
-    : {}
-);
+const toRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 
 const toStr = (value: unknown): string => String(value ?? '').trim();
 const toNum = (value: unknown): number => {
@@ -34,10 +31,8 @@ const TELEGRAM_AGENT_AUTH_REASONS = [
   'session_worker_token_expired',
 ];
 
-export const isTelegramAgentAuthFailure = ({ status, reason }: { status?: number; reason?: string } = {}): boolean => (
-  Number(status) === 401 ||
-  TELEGRAM_AGENT_AUTH_REASONS.some((marker) => toStr(reason).includes(marker))
-);
+export const isTelegramAgentAuthFailure = ({ status, reason }: { status?: number; reason?: string } = {}): boolean =>
+  Number(status) === 401 || TELEGRAM_AGENT_AUTH_REASONS.some((marker) => toStr(reason).includes(marker));
 
 export type TelegramAgentQuestion = {
   questionId: string;
@@ -79,9 +74,8 @@ export type TelegramAgentQuestionsResult = {
   answerState?: { answeredCount: number; unansweredCount: number; sort: string };
 };
 
-const resolveAgentBridgeUrl = (envelope: AgentClientLoginEnvelope | null, agentBridgeUrl?: unknown): string => (
-  toStr(agentBridgeUrl || envelope?.agentBridgeUrl).replace(/\/+$/g, '')
-);
+const resolveAgentBridgeUrl = (envelope: AgentClientLoginEnvelope | null, agentBridgeUrl?: unknown): string =>
+  toStr(agentBridgeUrl || envelope?.agentBridgeUrl).replace(/\/+$/g, '');
 
 export const fetchTelegramAgentQuestions = async ({
   envelope,
@@ -243,9 +237,8 @@ const normalizeBinaryValue = (value: unknown): 'Agree' | 'Disagree' | 'Unsure' |
   return POLIS_LABEL_TO_VALUE[raw.toLowerCase()] || '';
 };
 
-const buildPolisResponse = (prompt: string, value: 'Agree' | 'Disagree' | 'Unsure') => (
-  JSON.stringify({ type: 'binary', prompt, answer: { value } })
-);
+const buildPolisResponse = (prompt: string, value: 'Agree' | 'Disagree' | 'Unsure') =>
+  JSON.stringify({ type: 'binary', prompt, answer: { value } });
 
 const appendPolisVote = (
   aggregator: TelegramPolisAggregator,
@@ -365,7 +358,11 @@ const normalizePolisDataset = (body: UnknownRecord): UnknownRecord => {
         const responder = toStr(record.responder);
         const value = toStr(record.value);
         if (!responder || !POLIS_BINARY_VALUES.has(value)) return null;
-        return { responder, questionId, response: buildPolisResponse(prompt, value as 'Agree' | 'Disagree' | 'Unsure') };
+        return {
+          responder,
+          questionId,
+          response: buildPolisResponse(prompt, value as 'Agree' | 'Disagree' | 'Unsure'),
+        };
       })
       .filter(Boolean) as TelegramPolisRow[];
     if (normalizedRows.length > 0) aggregator[questionId] = normalizedRows;
@@ -383,7 +380,11 @@ export const buildTelegramPolisDataset = (viewsInput: unknown): TelegramPolisDat
   const views = toRecord(viewsInput);
   const polisView = toRecord(views.polis);
   const polisData = toRecord(polisView.data);
-  if (polisView.status === 'ready' && polisData.hasData === true && Object.keys(toRecord(polisData.aggregator)).length > 0) {
+  if (
+    polisView.status === 'ready' &&
+    polisData.hasData === true &&
+    Object.keys(toRecord(polisData.aggregator)).length > 0
+  ) {
     return {
       participantCount: toNum(polisData.participantCount),
       questionCount: toNum(polisData.questionCount),
@@ -415,11 +416,13 @@ export const buildTelegramPolisDataset = (viewsInput: unknown): TelegramPolisDat
         if (!questionId || !prompt) return;
         const counts = voteCountsFromCluster(toRecord(statement.cluster), groupSize);
         let cursor = 0;
-        ([
-          ['Agree', counts.Agree],
-          ['Disagree', counts.Disagree],
-          ['Unsure', counts.Unsure],
-        ] as Array<['Agree' | 'Disagree' | 'Unsure', number]>).forEach(([value, count]) => {
+        (
+          [
+            ['Agree', counts.Agree],
+            ['Disagree', counts.Disagree],
+            ['Unsure', counts.Unsure],
+          ] as Array<['Agree' | 'Disagree' | 'Unsure', number]>
+        ).forEach(([value, count]) => {
           const capped = Math.min(count, Math.max(0, groupSize - cursor));
           for (let index = 0; index < capped; index += 1) {
             appendPolisVote(aggregator, questionId, prompt, responders[cursor], value);
@@ -435,9 +438,9 @@ export const buildTelegramPolisDataset = (viewsInput: unknown): TelegramPolisDat
   const binaryRows = rows
     .map((row) => ({ row, counts: binaryCountsFromAggregateRow(row) }))
     .filter((item) => item.counts && toStr(item.row.questionId) && toStr(item.row.prompt)) as Array<{
-      row: UnknownRecord;
-      counts: Record<'Agree' | 'Disagree' | 'Unsure', number>;
-    }>;
+    row: UnknownRecord;
+    counts: Record<'Agree' | 'Disagree' | 'Unsure', number>;
+  }>;
   if (binaryRows.length === 0) return emptyPolisDataset(true);
   const poolSize = Math.max(0, ...binaryRows.map(({ row }) => Math.max(toNum(row.participants), toNum(row.total))));
   if (poolSize <= 0) return emptyPolisDataset(true);
@@ -459,7 +462,10 @@ export const buildTelegramPolisDataset = (viewsInput: unknown): TelegramPolisDat
   return summarizePolisAggregator(aggregator, poolSize, true);
 };
 
-const TELEGRAM_RESULT_VIEW_REQUESTS: Array<{ key: 'consensus' | 'difference' | 'groups' | 'topicMap' | 'polis'; view: string }> = [
+const TELEGRAM_RESULT_VIEW_REQUESTS: Array<{
+  key: 'consensus' | 'difference' | 'groups' | 'topicMap' | 'polis';
+  view: string;
+}> = [
   { key: 'polis', view: 'polis' },
   { key: 'consensus', view: 'consensus' },
   { key: 'difference', view: 'difference' },
@@ -528,7 +534,7 @@ export const normalizeTelegramBucketCards = (buckets: unknown): TelegramBucketCa
       const cat = toRecord(category);
       const categoryId = toStr(cat.categoryId || cat.id);
       const selectedIds = new Set(
-        (Array.isArray(selections[categoryId]) ? selections[categoryId] as unknown[] : []).map(toStr),
+        (Array.isArray(selections[categoryId]) ? (selections[categoryId] as unknown[]) : []).map(toStr),
       );
       return {
         categoryId,

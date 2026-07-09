@@ -7,7 +7,7 @@ import {
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
   normalizeSessionSlug,
-} from './contractScripts.js';
+} from './chainGateway.js';
 import { upsertCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
 
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
@@ -28,14 +28,17 @@ describe('contractScripts session resolution helpers', () => {
   });
 
   it('prefers registry cache for explicit session slugs', () => {
-    localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
-      sessions: {
-        rxc: {
-          slug: 'rxc',
-          sessionName: 'Registry RXC',
+    localStorage.setItem(
+      REGISTRY_CACHE_KEY,
+      JSON.stringify({
+        sessions: {
+          rxc: {
+            slug: 'rxc',
+            sessionName: 'Registry RXC',
+          },
         },
-      },
-    }));
+      }),
+    );
 
     expect(getSessionConfigBySlug('rxc')).toEqual({
       slug: 'rxc',
@@ -50,17 +53,20 @@ describe('contractScripts session resolution helpers', () => {
   });
 
   it('normalizes registry-backed default session naming without mutating legacy fields into authority', () => {
-    localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
-      sessions: {
-        '': {
-          slug: '',
-          sessionName: 'Registry General',
-          sessionInfo: 'Registry Info',
-          orgName: 'Legacy Group Name',
-          orgInfo: 'Legacy Group Info',
+    localStorage.setItem(
+      REGISTRY_CACHE_KEY,
+      JSON.stringify({
+        sessions: {
+          '': {
+            slug: '',
+            sessionName: 'Registry General',
+            sessionInfo: 'Registry Info',
+            orgName: 'Legacy Group Name',
+            orgInfo: 'Legacy Group Info',
+          },
         },
-      },
-    }));
+      }),
+    );
 
     const resolved = getDefaultSessionConfig();
 
@@ -87,13 +93,13 @@ describe('contractScripts session resolution helpers', () => {
       expect.objectContaining({
         slug: '',
         sessionName: 'Context Engine',
-      })
+      }),
     );
     expect(getDemoSessionConfigBySlug('demo', { allowDemoFallback: true })).toEqual(
       expect.objectContaining({
         slug: '',
         sessionName: 'Context Engine',
-      })
+      }),
     );
     expect(getDemoSessionConfigBySlug('DEBATE', { allowDemoFallback: true })).toBeNull();
   });
@@ -116,7 +122,7 @@ describe('contractScripts session resolution helpers', () => {
           '0x5d2f0207B7EB26e807C4a12f2A185928558C00b9',
           '0xeAe3498C31302B421E19Cf30A3e87E814ae5C955',
         ]),
-      })
+      }),
     );
   });
 
@@ -126,15 +132,18 @@ describe('contractScripts session resolution helpers', () => {
   });
 
   it('overlays cached worker config onto shared session-config getters', () => {
-    localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
-      sessions: {
-        edge: {
-          slug: 'edge',
-          sessionName: 'Registry Edge',
-          corsWorkerUrl: 'https://registry-mirror.example',
+    localStorage.setItem(
+      REGISTRY_CACHE_KEY,
+      JSON.stringify({
+        sessions: {
+          edge: {
+            slug: 'edge',
+            sessionName: 'Registry Edge',
+            corsWorkerUrl: 'https://registry-mirror.example',
+          },
         },
-      },
-    }));
+      }),
+    );
     upsertCachedSessionWorkerConfig({
       slug: 'edge',
       config: {
@@ -159,23 +168,29 @@ describe('contractScripts session resolution helpers', () => {
     expect(getAllSessionSlugs()).toEqual([]);
     expect(getAllSessionSlugs({ includeEmpty: false })).toEqual([]);
 
-    localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
-      sessions: {
-        edge: { slug: 'edge', sessionName: 'Edge' },
-      },
-    }));
+    localStorage.setItem(
+      REGISTRY_CACHE_KEY,
+      JSON.stringify({
+        sessions: {
+          edge: { slug: 'edge', sessionName: 'Edge' },
+        },
+      }),
+    );
 
     expect(getAllSessionSlugs()).toEqual(['edge']);
     expect(getAllSessionSlugs({ includeEmpty: false })).toEqual(['edge']);
   });
 
   it('getAllSessionEntries returns registry entries when registry cache is populated', () => {
-    localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
-      sessions: {
-        '': { slug: '', sessionName: 'General' },
-        edge: { slug: 'edge', sessionName: 'Edge' },
-      },
-    }));
+    localStorage.setItem(
+      REGISTRY_CACHE_KEY,
+      JSON.stringify({
+        sessions: {
+          '': { slug: '', sessionName: 'General' },
+          edge: { slug: 'edge', sessionName: 'Edge' },
+        },
+      }),
+    );
 
     const entries = getAllSessionEntries();
     expect(entries.length).toBe(2);
@@ -184,12 +199,15 @@ describe('contractScripts session resolution helpers', () => {
   });
 
   it('getAllSessionSlugs still includes the general session when it exists authoritatively', () => {
-    localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
-      sessions: {
-        '': { slug: '', sessionName: 'General' },
-        edge: { slug: 'edge', sessionName: 'Edge' },
-      },
-    }));
+    localStorage.setItem(
+      REGISTRY_CACHE_KEY,
+      JSON.stringify({
+        sessions: {
+          '': { slug: '', sessionName: 'General' },
+          edge: { slug: 'edge', sessionName: 'Edge' },
+        },
+      }),
+    );
 
     expect(getAllSessionSlugs()).toEqual(['', 'edge']);
     expect(getAllSessionSlugs({ includeEmpty: false })).toEqual(['edge']);

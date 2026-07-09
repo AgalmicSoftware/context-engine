@@ -1,8 +1,4 @@
-import {
-  createStore,
-  entries,
-  get,
-} from './cacheScripts.idb.impl.js';
+import { createStore, entries, get } from './cacheScripts.idb.impl.js';
 
 const originalIndexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB');
 
@@ -29,9 +25,7 @@ describe('cacheScripts.idb.impl', () => {
   it('rejects reads when IndexedDB is unavailable without falling back silently', async () => {
     delete globalThis.indexedDB;
 
-    await expect(get('key', createStore('missing-idb', 'records')))
-      .rejects.toThrow('IndexedDB not available');
-    await expect(entries(createStore('missing-idb-entries', 'records')))
-      .rejects.toThrow('IndexedDB not available');
+    await expect(get('key', createStore('missing-idb', 'records'))).rejects.toThrow('IndexedDB not available');
+    await expect(entries(createStore('missing-idb-entries', 'records'))).rejects.toThrow('IndexedDB not available');
   });
 });

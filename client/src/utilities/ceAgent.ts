@@ -90,7 +90,7 @@ const isVisible = (el: Element | null): boolean => {
 
 const waitFor = async (
   fn: () => unknown | Promise<unknown>,
-  { timeoutMs = 30000, tickMs = 100 }: { timeoutMs?: number; tickMs?: number } = {}
+  { timeoutMs = 30000, tickMs = 100 }: { timeoutMs?: number; tickMs?: number } = {},
 ): Promise<boolean> => {
   const startedAt = Date.now();
   const maxMs = Math.max(100, Number(timeoutMs) || 0);
@@ -98,7 +98,9 @@ const waitFor = async (
   // eslint-disable-next-line no-constant-condition
   while (true) {
     // eslint-disable-next-line no-await-in-loop
-    const ok = await Promise.resolve().then(fn).catch(() => false);
+    const ok = await Promise.resolve()
+      .then(fn)
+      .catch(() => false);
     if (ok) return true;
     if (Date.now() - startedAt > maxMs) return false;
     // eslint-disable-next-line no-await-in-loop
@@ -108,7 +110,7 @@ const waitFor = async (
 
 const waitForTestId = async (
   testId: unknown,
-  { timeoutMs = 20000 }: { timeoutMs?: number } = {}
+  { timeoutMs = 20000 }: { timeoutMs?: number } = {},
 ): Promise<Element | null> => {
   const id = toStr(testId).trim();
   if (!id) return null;
@@ -120,10 +122,7 @@ const setNativeValue = (el: HTMLInputElement | HTMLTextAreaElement | null, value
   const v = toStr(value);
   if (!el) return;
   const tag = String(el.tagName || '').toLowerCase();
-  const proto =
-    tag === 'textarea'
-      ? window.HTMLTextAreaElement?.prototype
-      : window.HTMLInputElement?.prototype;
+  const proto = tag === 'textarea' ? window.HTMLTextAreaElement?.prototype : window.HTMLInputElement?.prototype;
   const desc = proto ? Object.getOwnPropertyDescriptor(proto, 'value') : null;
   const setter = desc && typeof desc.set === 'function' ? desc.set : null;
   if (setter) setter.call(el, v);
@@ -135,7 +134,11 @@ const scrollIntoViewIfNeeded = (el: Element | null): void => {
   try {
     el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
   } catch (_) {
-    try { el.scrollIntoView(); } catch (e) { log.warn('ceAgent: fallback', e); }
+    try {
+      el.scrollIntoView();
+    } catch (e) {
+      log.warn('ceAgent: fallback', e);
+    }
   }
 };
 
@@ -161,14 +164,18 @@ const getState = () => {
     loginComplete = !!s?.sessionState?.loginComplete;
     activeSessionSlug = toStr(s?.sessionState?.activeSessionSlug).trim();
     demoMode = isDemoModeEnabled(s?.sessionState?.demoMode);
-  } catch (e) { log.warn('ceAgent: fallback', e); }
+  } catch (e) {
+    log.warn('ceAgent: fallback', e);
+  }
 
   // Secondary source of truth for wallet (what E2E asserts).
   try {
     const walletEl = elByTestId(E2E_TESTIDS.WALLET_DISPLAY);
     const addr = walletEl ? toStr(walletEl.getAttribute('data-ce-wallet-address')).trim() : '';
     if (addr) account = addr;
-  } catch (e) { log.warn('ceAgent: fallback', e); }
+  } catch (e) {
+    log.warn('ceAgent: fallback', e);
+  }
 
   return {
     route,
@@ -186,9 +193,7 @@ export const resolvePolisReportSessionSlug = ({
 }: {
   params?: CeAgentRecord;
   state?: CeAgentRecord;
-} = {}): string => (
-  toStr(params?.sessionSlug || params?.slug || state?.activeSessionSlug).trim()
-);
+} = {}): string => toStr(params?.sessionSlug || params?.slug || state?.activeSessionSlug).trim();
 
 const perform = async (action: unknown): Promise<CeAgentActionResult> => {
   const a = action && typeof action === 'object' ? action : null;
@@ -231,7 +236,11 @@ const perform = async (action: unknown): Promise<CeAgentActionResult> => {
     }
     scrollIntoViewIfNeeded(el);
     const inputEl = el as HTMLInputElement | HTMLTextAreaElement;
-    try { inputEl.focus(); } catch (e) { log.warn('ceAgent: fallback', e); }
+    try {
+      inputEl.focus();
+    } catch (e) {
+      log.warn('ceAgent: fallback', e);
+    }
     setNativeValue(inputEl, value);
     inputEl.dispatchEvent(new Event('input', { bubbles: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true }));
@@ -247,7 +256,11 @@ const perform = async (action: unknown): Promise<CeAgentActionResult> => {
     if (!el) return err(`click: element not found for testId=${testId}`);
     scrollIntoViewIfNeeded(el);
     // Click even if not strictly "visible"; some toggles are clipped but still clickable.
-    try { (el as HTMLElement).click(); } catch (e) { return err(`click failed: ${(e as Error)?.message || e}`); }
+    try {
+      (el as HTMLElement).click();
+    } catch (e) {
+      return err(`click failed: ${(e as Error)?.message || e}`);
+    }
     return { ok: true, type, at: startedAt, result: { testId } };
   }
 
@@ -266,9 +279,8 @@ const perform = async (action: unknown): Promise<CeAgentActionResult> => {
 
   if (type === 'invokeAi') {
     const tool = toStr(actionRecord?.tool).trim();
-    const params = actionRecord?.params && typeof actionRecord.params === 'object'
-      ? actionRecord.params as CeAgentRecord
-      : {};
+    const params =
+      actionRecord?.params && typeof actionRecord.params === 'object' ? (actionRecord.params as CeAgentRecord) : {};
 
     if (tool === 'CompareAddresses') {
       const addressA = toStr(params.addressA || params.a).trim();
@@ -279,7 +291,11 @@ const perform = async (action: unknown): Promise<CeAgentActionResult> => {
       // Prefer SPA navigation.
       const navRes = await perform({ type: 'navigate', to: '/compare/' });
       if (!navRes.ok) return navRes;
-      const readyRes = await perform({ type: 'assertVisible', testId: E2E_TESTIDS.PAGE_COMPARE_ROOT, timeoutMs: 60000 });
+      const readyRes = await perform({
+        type: 'assertVisible',
+        testId: E2E_TESTIDS.PAGE_COMPARE_ROOT,
+        timeoutMs: 60000,
+      });
       if (!readyRes.ok) return readyRes;
 
       const fillA = await perform({ type: 'fill', testId: E2E_TESTIDS.COMPARE_ADDRESS_A, value: aFilled });
@@ -304,12 +320,20 @@ const perform = async (action: unknown): Promise<CeAgentActionResult> => {
       }
       const navRes = await perform({ type: 'navigate', to: `/session/${encodeURIComponent(sessionSlug)}` });
       if (!navRes.ok) return navRes;
-      const readyRes = await perform({ type: 'assertVisible', testId: E2E_TESTIDS.PAGE_SESSION_ROOT, timeoutMs: 240000 });
+      const readyRes = await perform({
+        type: 'assertVisible',
+        testId: E2E_TESTIDS.PAGE_SESSION_ROOT,
+        timeoutMs: 240000,
+      });
       if (!readyRes.ok) return readyRes;
 
       const resultsToggleRes = await perform({ type: 'click', testId: E2E_TESTIDS.SESSION_RESULTS_TOGGLE });
       if (!resultsToggleRes.ok) return resultsToggleRes;
-      const reportReadyRes = await perform({ type: 'assertVisible', testId: E2E_TESTIDS.POLIS_REPORT_ROOT, timeoutMs: 240000 });
+      const reportReadyRes = await perform({
+        type: 'assertVisible',
+        testId: E2E_TESTIDS.POLIS_REPORT_ROOT,
+        timeoutMs: 240000,
+      });
       if (!reportReadyRes.ok) return reportReadyRes;
 
       const settingsToggleRes = await perform({ type: 'click', testId: E2E_TESTIDS.POLIS_SETTINGS_TOGGLE });
@@ -326,15 +350,18 @@ const perform = async (action: unknown): Promise<CeAgentActionResult> => {
       const analyzeRes = await perform({ type: 'click', testId: E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS });
       if (!analyzeRes.ok) return analyzeRes;
 
-      const ok = await waitFor(() => {
-        const els = document.querySelectorAll(`[data-testid="${cssEscapeAttr(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)}"]`);
-        for (const el of els) {
-          if (isVisible(el) && toStr(el.getAttribute('data-ce-analysis-state')).trim() === 'ready') {
-            return true;
+      const ok = await waitFor(
+        () => {
+          const els = document.querySelectorAll(`[data-testid="${cssEscapeAttr(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)}"]`);
+          for (const el of els) {
+            if (isVisible(el) && toStr(el.getAttribute('data-ce-analysis-state')).trim() === 'ready') {
+              return true;
+            }
           }
-        }
-        return false;
-      }, { timeoutMs: 60000, tickMs: 250 });
+          return false;
+        },
+        { timeoutMs: 60000, tickMs: 250 },
+      );
       if (!ok) return err('PolisReport: timed out waiting for cluster analysis state=ready');
 
       return { ok: true, type, at: startedAt, result: { tool, sessionSlug } };
@@ -348,7 +375,11 @@ const perform = async (action: unknown): Promise<CeAgentActionResult> => {
 
 const run = async (actions: unknown): Promise<CeAgentRunResult> => {
   const arr = Array.isArray(actions) ? actions : null;
-  if (!arr) return { ok: false, results: [{ ok: false, type: 'run', at: new Date().toISOString(), error: 'run(actions) expects an array' }] };
+  if (!arr)
+    return {
+      ok: false,
+      results: [{ ok: false, type: 'run', at: new Date().toISOString(), error: 'run(actions) expects an array' }],
+    };
 
   const results = [];
   for (const action of arr) {

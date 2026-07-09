@@ -1,7 +1,17 @@
 /** @file CommunityTab.tsx */
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUsers, faVoteYea, faSpinner, faScroll, faUsersCog, faChevronDown, faChevronUp, faExclamationTriangle, faCog } from '@fortawesome/free-solid-svg-icons';
+import {
+  faUsers,
+  faVoteYea,
+  faSpinner,
+  faScroll,
+  faUsersCog,
+  faChevronDown,
+  faChevronUp,
+  faExclamationTriangle,
+  faCog,
+} from '@fortawesome/free-solid-svg-icons';
 import styles from './CommunityTab.module.scss';
 import historicalFigures from '../../variables/demo/historical_figure_users.json';
 import { Modal, ModalHeader, ModalBody, Collapse } from 'reactstrap';
@@ -12,7 +22,7 @@ import contractScripts, {
   getSessionChainId,
   getSessionLists,
   normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
 import BeeswarmPlot from '../SurveyTool/BeeswarmPlot';
@@ -50,6 +60,21 @@ type ScopeCacheEntry = {
   questionsCache: Record<string, unknown>;
   sbtCache: Record<string, unknown>;
 };
+type CommunitySbtCacheEntry = Record<string, unknown> & {
+  blockNumber?: unknown;
+  burnedAddresses?: unknown;
+  burnedCountByAddress?: unknown;
+  burnedEventCount?: unknown;
+  countsScanCheckpoint?: unknown;
+  mintedAddresses?: unknown;
+  mintedCountByAddress?: unknown;
+  mintedEventCount?: unknown;
+  sbtAddress?: unknown;
+};
+type CommunitySbtNetworkCache = Record<string, unknown> & {
+  sbtList?: Record<string, CommunitySbtCacheEntry>;
+};
+type CommunitySbtCache = Record<string, CommunitySbtNetworkCache>;
 type ContractScriptsWithBlockWindow = typeof contractScripts & {
   getRelevantBlockWindowForFilter: (slug?: string) => Promise<{ toBlock?: unknown }>;
 };
@@ -85,14 +110,10 @@ const getDisplaySessionChainId = (slugIn = '') => {
 
   const demoCfg = getDemoSessionConfigBySlug(slugIn, { allowDemoFallback: true }) || {};
   const demoChainId = Number(
-    demoCfg?.networkChainId ||
-    demoCfg?.contracts?.surveys?.chainId ||
-    demoCfg?.contracts?.sbtFactory?.chainId ||
-    0
+    demoCfg?.networkChainId || demoCfg?.contracts?.surveys?.chainId || demoCfg?.contracts?.sbtFactory?.chainId || 0,
   );
   return Number.isFinite(demoChainId) && demoChainId > 0 ? demoChainId : null;
 };
-
 
 class CommunityTab extends Component<any, any> {
   [key: string]: any;
@@ -170,20 +191,24 @@ class CommunityTab extends Component<any, any> {
       const p = (typeof window !== 'undefined' ? window.location.pathname : '') || '';
       if (p.startsWith('/session/')) {
         let slug = (p.split('/').filter(Boolean)[1] || '').trim();
-        if (!slug) return '';            // general (empty)
+        if (!slug) return ''; // general (empty)
         return normalizeSessionSlug(slug);
       }
-    } catch (e) { uiLog.warn('CommunityTab: fallback', e); }
-    return '';                            // general (empty)
-  }
+    } catch (e) {
+      uiLog.warn('CommunityTab: fallback', e);
+    }
+    return ''; // general (empty)
+  };
 
   _hasPinnedRouteSession = () => {
     try {
       const p = (typeof window !== 'undefined' ? window.location.pathname : '') || '';
       return p.startsWith('/session/');
-    } catch (e) { uiLog.warn('CommunityTab: fallback', e); }
+    } catch (e) {
+      uiLog.warn('CommunityTab: fallback', e);
+    }
     return false;
-  }
+  };
 
   _currentSlug = () => {
     if (!this._isUniverseEnabled()) {
@@ -193,7 +218,7 @@ class CommunityTab extends Component<any, any> {
       }
     }
     return this._resolveRouteSlug();
-  }
+  };
 
   _dedupeNormalizedSlugs = (slugs: unknown[] = []): string[] => {
     const seen = new Set<string>();
@@ -205,11 +230,9 @@ class CommunityTab extends Component<any, any> {
       out.push(slug);
     });
     return out;
-  }
+  };
 
-  _buildSessionSlugSignature = (slugs: unknown[] = []) => (
-    this._dedupeNormalizedSlugs(slugs).join('|')
-  );
+  _buildSessionSlugSignature = (slugs: unknown[] = []) => this._dedupeNormalizedSlugs(slugs).join('|');
 
   _sortSlugsByKnownOrder = (slugs: unknown[] = [], orderedUniverse: unknown[] = []): string[] => {
     const normalizedUniverse = this._dedupeNormalizedSlugs(orderedUniverse);
@@ -225,12 +248,12 @@ class CommunityTab extends Component<any, any> {
       if (ai !== bi) return ai - bi;
       return String(a).localeCompare(String(b));
     });
-  }
+  };
 
   _labelForSessionSlug = (slugIn: unknown): string => {
     const slug = normalizeSessionSlug(slugIn || '');
     return slug || 'General';
-  }
+  };
 
   _getDefaultSelectedSessionSlugs = () => {
     const availableSlugs = this._getSessionSelectorOptions().map((option: SessionSelectorOption) => option.value);
@@ -241,40 +264,36 @@ class CommunityTab extends Component<any, any> {
     }
     const selection = this._readGlobalSelection();
     const fallbackPrimarySlug = normalizeSessionSlug(
-      typeof this.props.activeSessionSlug === 'string'
-        ? this.props.activeSessionSlug
-        : selection.primarySessionSlug
+      typeof this.props.activeSessionSlug === 'string' ? this.props.activeSessionSlug : selection.primarySessionSlug,
     );
-    const scopedDefaults = selection.selectedSessionScope === 'all'
-      ? availableSlugs
-      : resolveScopedSessionSlugsFromSelection({
-        ...selection,
-        primarySessionSlug: fallbackPrimarySlug,
-      });
-    const filteredDefaults = this._dedupeNormalizedSlugs(scopedDefaults)
-      .filter((slug: string) => availableSet.has(slug));
+    const scopedDefaults =
+      selection.selectedSessionScope === 'all'
+        ? availableSlugs
+        : resolveScopedSessionSlugsFromSelection({
+            ...selection,
+            primarySessionSlug: fallbackPrimarySlug,
+          });
+    const filteredDefaults = this._dedupeNormalizedSlugs(scopedDefaults).filter((slug: string) =>
+      availableSet.has(slug),
+    );
     if (filteredDefaults.length > 0) {
       return this._sortSlugsByKnownOrder(filteredDefaults, availableSlugs);
     }
     if (availableSet.has(routeSlug)) return [routeSlug];
     if (availableSet.has('')) return [''];
     return availableSlugs.length > 0 ? [availableSlugs[0]] : [];
-  }
+  };
 
-  _getSessionSelectorOptions = (): SessionSelectorOption[] => this._dedupeNormalizedSlugs([
-    this._resolveRouteSlug(),
-    '',
-    ...this.listAllSlugs(),
-  ]).map((slug: string) => ({
-    value: slug,
-    label: this._labelForSessionSlug(slug),
-  }));
+  _getSessionSelectorOptions = (): SessionSelectorOption[] =>
+    this._dedupeNormalizedSlugs([this._resolveRouteSlug(), '', ...this.listAllSlugs()]).map((slug: string) => ({
+      value: slug,
+      label: this._labelForSessionSlug(slug),
+    }));
 
   _getSelectedSessionSlugs = () => {
     const availableSlugs = this._getSessionSelectorOptions().map((option: SessionSelectorOption) => option.value);
     const availableSet = new Set<string>(availableSlugs);
-    const defaultSelected = this._getDefaultSelectedSessionSlugs()
-      .filter((slug: string) => availableSet.has(slug));
+    const defaultSelected = this._getDefaultSelectedSessionSlugs().filter((slug: string) => availableSet.has(slug));
     if (defaultSelected.length > 0) {
       return this._sortSlugsByKnownOrder(defaultSelected, availableSlugs);
     }
@@ -283,8 +302,10 @@ class CommunityTab extends Component<any, any> {
   };
 
   toggleLeaderboardControls = () => {
-    this.setState((prevState: Readonly<CommunityTab['state']>) => ({ showLeaderboardControls: !prevState.showLeaderboardControls }));
-  }
+    this.setState((prevState: Readonly<CommunityTab['state']>) => ({
+      showLeaderboardControls: !prevState.showLeaderboardControls,
+    }));
+  };
 
   listAllSlugs = () => {
     if (readSessionScanScope() === 'list') {
@@ -293,12 +314,8 @@ class CommunityTab extends Component<any, any> {
       const routeSlug = normalizeSessionSlug(this._resolveRouteSlug() || '');
       return routeSlug ? [routeSlug] : [''];
     }
-    return this._dedupeNormalizedSlugs([
-      this._resolveRouteSlug(),
-      '',
-      ...getAllSessionSlugs(),
-    ]);
-  }
+    return this._dedupeNormalizedSlugs([this._resolveRouteSlug(), '', ...getAllSessionSlugs()]);
+  };
 
   _resolveNetKeyForSlug = (slug: string) => {
     try {
@@ -307,13 +324,13 @@ class CommunityTab extends Component<any, any> {
     } catch (_) {
       return '';
     }
-  }
+  };
 
   _readCache = (cacheName: string, slug: string, options: CacheReadOptions = {}): Record<string, unknown> => {
     const shouldClone = options?.clone === true;
     const obj = peekCacheSync(cacheName, slug, { clone: shouldClone }) || {};
-    return (obj && typeof obj === 'object') ? obj as Record<string, unknown> : {};
-  }
+    return obj && typeof obj === 'object' ? (obj as Record<string, unknown>) : {};
+  };
 
   _getObjectRefId = (value: unknown) => {
     if (!value || typeof value !== 'object') return 'na';
@@ -324,7 +341,7 @@ class CommunityTab extends Component<any, any> {
       this._cacheRefIds.set(value, id);
     }
     return id;
-  }
+  };
 
   _pickNet = (cacheObj: unknown, netKey: string): Record<string, unknown> => {
     if (!cacheObj || typeof cacheObj !== 'object') return {};
@@ -337,7 +354,7 @@ class CommunityTab extends Component<any, any> {
       return parsedCache[ks[0]] as Record<string, unknown>;
     }
     return {};
-  }
+  };
 
   _buildScopeEntriesFromSlugs = (slugs: unknown[] = [], options: CacheReadOptions = {}): ScopeCacheEntry[] => {
     const out: ScopeCacheEntry[] = [];
@@ -355,11 +372,11 @@ class CommunityTab extends Component<any, any> {
       });
     });
     return out;
-  }
+  };
 
   _iterUniverse = (options: CacheReadOptions = {}) => {
     return this._buildScopeEntriesFromSlugs(this.listAllSlugs(), options);
-  }
+  };
 
   _iterScopeCaches = (options: CacheReadOptions = {}) => {
     if (this._isUniverseEnabled()) return this._iterUniverse(options);
@@ -368,16 +385,14 @@ class CommunityTab extends Component<any, any> {
       return this._buildScopeEntriesFromSlugs(selectedSlugs, options);
     }
     return this._buildScopeEntriesFromSlugs([this._currentSlug()], options);
-  }
+  };
 
   _hydrateSbtHoldersForUsersModal = async () => {
     if (this._holdersHydrationPromise) return this._holdersHydrationPromise;
     this._holdersHydrationInFlight = true;
     this._holdersHydrationAbort = false;
     this._holdersHydrationPromise = (async () => {
-      const slugs = this._isUniverseEnabled()
-        ? this.listAllSlugs()
-        : this._getSelectedSessionSlugs();
+      const slugs = this._isUniverseEnabled() ? this.listAllSlugs() : this._getSelectedSessionSlugs();
       const CONC = 2;
       for (let i = 0; i < slugs.length; i += CONC) {
         const chunk = slugs.slice(i, i + CONC);
@@ -400,7 +415,7 @@ class CommunityTab extends Component<any, any> {
     const netKey = this._resolveNetKeyForSlug(slug);
     if (!netKey) return;
 
-    let cacheObj = await readCache('sbtCache', slug);
+    let cacheObj = await readCache<CommunitySbtCache>('sbtCache', slug);
     if (!cacheObj || typeof cacheObj !== 'object') cacheObj = {};
     if (!cacheObj[netKey]) cacheObj[netKey] = { sbtList: {} };
     const sbtList = cacheObj[netKey].sbtList || {};
@@ -420,36 +435,40 @@ class CommunityTab extends Component<any, any> {
     for (let i = 0; i < entries.length; i += BATCH) {
       if (this._holdersHydrationAbort) break;
       const batch = entries.slice(i, i + BATCH);
-      const results = await Promise.all(batch.map(async (entry: any) => {
-        try {
-          const addr = entry.sbtAddress;
-          const lower = String(addr || '').toLowerCase();
-          const rawCreation = entry.creationBlock ?? entry.sbtInfo?.creationBlock;
-          const creationBlock = Number.isFinite(Number(rawCreation)) ? Math.max(0, Math.floor(Number(rawCreation))) : 0;
-          const counts = await contractScripts.getSbtMintBurnCountsByAddress(
-            'none',
-            addr,
-            creationBlock,
-            'latest',
-            slug
-          );
-          if (counts && counts.ok === false) {
-            return { lower, addr, countsOk: false };
+      const results = await Promise.all(
+        batch.map(async (entry: any) => {
+          try {
+            const addr = entry.sbtAddress;
+            const lower = String(addr || '').toLowerCase();
+            const rawCreation = entry.creationBlock ?? entry.sbtInfo?.creationBlock;
+            const creationBlock = Number.isFinite(Number(rawCreation))
+              ? Math.max(0, Math.floor(Number(rawCreation)))
+              : 0;
+            const counts = await contractScripts.getSbtMintBurnCountsByAddress(
+              'none',
+              addr,
+              creationBlock,
+              'latest',
+              slug,
+            );
+            if (counts && counts.ok === false) {
+              return { lower, addr, countsOk: false };
+            }
+            const mintedAddresses = Object.keys(counts.mintedCountByAddress || {}).map((a: any) => a.toLowerCase());
+            const burnedAddresses = Object.keys(counts.burnedCountByAddress || {}).map((a: any) => a.toLowerCase());
+            return {
+              lower,
+              addr,
+              mintedAddresses,
+              burnedAddresses,
+              counts,
+              countsOk: true,
+            };
+          } catch (e) {
+            return null;
           }
-          const mintedAddresses = Object.keys(counts.mintedCountByAddress || {}).map((a: any) => a.toLowerCase());
-          const burnedAddresses = Object.keys(counts.burnedCountByAddress || {}).map((a: any) => a.toLowerCase());
-          return {
-            lower,
-            addr,
-            mintedAddresses,
-            burnedAddresses,
-            counts,
-            countsOk: true
-          };
-        } catch (e) {
-          return null;
-        }
-      }));
+        }),
+      );
 
       let changed = false;
       results.forEach((res: any) => {
@@ -488,22 +507,23 @@ class CommunityTab extends Component<any, any> {
     const info = entry.sbtInfo || {};
     if (info.hidden === true) return false;
 
-    let ignored: any[] = [], featured: any[] = [];
+    let ignored: any[] = [],
+      featured: any[] = [];
     const lists = getDisplaySessionLists(slug);
-    ignored  = (lists.ignored_SBTs_LIST || []);
-    featured = (lists.featured_SBTs_LIST || []);
+    ignored = lists.ignored_SBTs_LIST || [];
+    featured = lists.featured_SBTs_LIST || [];
     const addrLower = String(entry.sbtAddress || '').toLowerCase();
-    const ignoredSet: any  = new Set(ignored.map((a: any) => (a || '').toLowerCase()));
+    const ignoredSet: any = new Set(ignored.map((a: any) => (a || '').toLowerCase()));
     const featuredSet: any = new Set(featured.map((a: any) => (a || '').toLowerCase()));
     if (ignoredSet.has(addrLower)) return false;
     if (info.unlisted === true && !featuredSet.has(addrLower)) return false;
     return true;
-  }
+  };
 
   _countKeys = (value: any) => {
     if (!value || typeof value !== 'object') return 0;
     return Object.keys(value).length;
-  }
+  };
 
   _summarizeNestedResponseKeys = (value: any) => {
     if (!value || typeof value !== 'object') {
@@ -533,7 +553,7 @@ class CommunityTab extends Component<any, any> {
       });
     });
     return { totalKeys, hash: hash >>> 0 };
-  }
+  };
 
   _summarizeSurveyMetadata = (surveysMap: any) => {
     if (!surveysMap || typeof surveysMap !== 'object') {
@@ -564,7 +584,7 @@ class CommunityTab extends Component<any, any> {
     });
 
     return { totalSurveys, hash: hash >>> 0 };
-  }
+  };
 
   _summarizeQuestionMetadata = (questionsMap: any) => {
     if (!questionsMap || typeof questionsMap !== 'object') {
@@ -589,7 +609,7 @@ class CommunityTab extends Component<any, any> {
     });
 
     return { totalQuestions, hash: hash >>> 0 };
-  }
+  };
 
   _summarizeSbtHolderMembers = (sbtListMap: any) => {
     if (!sbtListMap || typeof sbtListMap !== 'object') {
@@ -636,47 +656,48 @@ class CommunityTab extends Component<any, any> {
     });
 
     return { totalEntries, totalMembers, hash: hash >>> 0 };
-  }
+  };
 
   _buildCoarseCacheSignature = (scopeEntries: any = []) => {
     const parts: any[] = [];
     for (const { slug, netKey, surveysCache, questionsCache, sbtCache } of scopeEntries) {
-      const surveyBlock =
-        Number(surveysCache?.surveysLatestBlock) ||
-        Number(surveysCache?.lastBlock) || 0;
+      const surveyBlock = Number(surveysCache?.surveysLatestBlock) || Number(surveysCache?.lastBlock) || 0;
       const questionBlock =
         Number(questionsCache?.questionsLatestBlock) ||
         Number(questionsCache?.questionResponsesLatestBlock) ||
-        Number(questionsCache?.lastBlock) || 0;
+        Number(questionsCache?.lastBlock) ||
+        0;
       const sbtBlock = Number(sbtCache?.lastBlock) || 0;
       const surveyMetadataSummary = this._summarizeSurveyMetadata(surveysCache?.surveys);
       const questionMetadataSummary = this._summarizeQuestionMetadata(questionsCache?.questions);
       const surveyResponsesSummary = this._summarizeNestedResponseKeys(surveysCache?.surveyResponses);
       const questionResponsesSummary = this._summarizeNestedResponseKeys(questionsCache?.questionResponses);
       const sbtMembersSummary = this._summarizeSbtHolderMembers(sbtCache?.sbtList);
-      parts.push([
-        String(slug || ''),
-        String(netKey || ''),
-        surveyBlock,
-        questionBlock,
-        sbtBlock,
-        this._countKeys(surveysCache?.surveys),
-        surveyMetadataSummary.totalSurveys,
-        surveyMetadataSummary.hash,
-        this._countKeys(surveysCache?.surveyResponses),
-        surveyResponsesSummary.totalKeys,
-        surveyResponsesSummary.hash,
-        this._countKeys(questionsCache?.questions),
-        questionMetadataSummary.totalQuestions,
-        questionMetadataSummary.hash,
-        this._countKeys(questionsCache?.questionResponses),
-        questionResponsesSummary.totalKeys,
-        questionResponsesSummary.hash,
-        this._countKeys(sbtCache?.sbtList),
-        sbtMembersSummary.totalEntries,
-        sbtMembersSummary.totalMembers,
-        sbtMembersSummary.hash,
-      ].join(':'));
+      parts.push(
+        [
+          String(slug || ''),
+          String(netKey || ''),
+          surveyBlock,
+          questionBlock,
+          sbtBlock,
+          this._countKeys(surveysCache?.surveys),
+          surveyMetadataSummary.totalSurveys,
+          surveyMetadataSummary.hash,
+          this._countKeys(surveysCache?.surveyResponses),
+          surveyResponsesSummary.totalKeys,
+          surveyResponsesSummary.hash,
+          this._countKeys(questionsCache?.questions),
+          questionMetadataSummary.totalQuestions,
+          questionMetadataSummary.hash,
+          this._countKeys(questionsCache?.questionResponses),
+          questionResponsesSummary.totalKeys,
+          questionResponsesSummary.hash,
+          this._countKeys(sbtCache?.sbtList),
+          sbtMembersSummary.totalEntries,
+          sbtMembersSummary.totalMembers,
+          sbtMembersSummary.hash,
+        ].join(':'),
+      );
     }
     parts.push(`universe:${this._isUniverseEnabled() ? 1 : 0}`);
     parts.push(`selected:${this._buildSessionSlugSignature(this._getSelectedSessionSlugs())}`);
@@ -686,73 +707,74 @@ class CommunityTab extends Component<any, any> {
     parts.push(`qReady:${this.props.isQuestionCacheReady ? 1 : 0}`);
     parts.push(`sReady:${this.props.isSurveyCacheReady ? 1 : 0}`);
     return parts.join('|');
-  }
+  };
 
-  _buildCacheSignature = (scopeEntries: any = []) => measureSync('ce.communityTab.cacheSignature', () => {
-    const parts: any[] = [];
-    for (const { slug, netKey, surveysCache, questionsCache, sbtCache } of scopeEntries) {
-      const surveyBlock =
-        Number(surveysCache?.surveysLatestBlock) ||
-        Number(surveysCache?.lastBlock) || 0;
-      const questionBlock =
-        Number(questionsCache?.questionsLatestBlock) ||
-        Number(questionsCache?.questionResponsesLatestBlock) ||
-        Number(questionsCache?.lastBlock) || 0;
-      const sbtBlock = Number(sbtCache?.lastBlock) || 0;
-      const surveyRefId = this._countKeys(surveysCache) > 0 ? this._getObjectRefId(surveysCache) : 0;
-      const questionRefId = this._countKeys(questionsCache) > 0 ? this._getObjectRefId(questionsCache) : 0;
-      const sbtRefId = this._countKeys(sbtCache) > 0 ? this._getObjectRefId(sbtCache) : 0;
-      const surveyMetadataSummary = this._summarizeSurveyMetadata(surveysCache?.surveys);
-      const questionMetadataSummary = this._summarizeQuestionMetadata(questionsCache?.questions);
-      const surveyResponsesSummary = this._summarizeNestedResponseKeys(surveysCache?.surveyResponses);
-      const questionResponsesSummary = this._summarizeNestedResponseKeys(questionsCache?.questionResponses);
-      const sbtMembersSummary = this._summarizeSbtHolderMembers(sbtCache?.sbtList);
-      parts.push([
-        String(slug || ''),
-        String(netKey || ''),
-        surveyBlock,
-        questionBlock,
-        sbtBlock,
-        this._countKeys(surveysCache?.surveys),
-        surveyMetadataSummary.totalSurveys,
-        surveyMetadataSummary.hash,
-        this._countKeys(surveysCache?.surveyResponses),
-        surveyResponsesSummary.totalKeys,
-        surveyResponsesSummary.hash,
-        this._countKeys(questionsCache?.questions),
-        questionMetadataSummary.totalQuestions,
-        questionMetadataSummary.hash,
-        this._countKeys(questionsCache?.questionResponses),
-        questionResponsesSummary.totalKeys,
-        questionResponsesSummary.hash,
-        this._countKeys(sbtCache?.sbtList),
-        sbtMembersSummary.totalEntries,
-        sbtMembersSummary.totalMembers,
-        sbtMembersSummary.hash,
-        surveyRefId,
-        questionRefId,
-        sbtRefId,
-      ].join(':'));
-    }
-    parts.push(`universe:${this._isUniverseEnabled() ? 1 : 0}`);
-    parts.push(`selected:${this._buildSessionSlugSignature(this._getSelectedSessionSlugs())}`);
-    parts.push(`active:${String(this._currentSlug() || '')}`);
-    parts.push(`sbtRev:${String(this.props.sbtCacheRevision || '')}`);
-    parts.push(`sbtReady:${this.props.isSBTCacheReady ? 1 : 0}`);
-    parts.push(`qReady:${this.props.isQuestionCacheReady ? 1 : 0}`);
-    parts.push(`sReady:${this.props.isSurveyCacheReady ? 1 : 0}`);
-    return parts.join('|');
-  })
+  _buildCacheSignature = (scopeEntries: any = []) =>
+    measureSync('ce.communityTab.cacheSignature', () => {
+      const parts: any[] = [];
+      for (const { slug, netKey, surveysCache, questionsCache, sbtCache } of scopeEntries) {
+        const surveyBlock = Number(surveysCache?.surveysLatestBlock) || Number(surveysCache?.lastBlock) || 0;
+        const questionBlock =
+          Number(questionsCache?.questionsLatestBlock) ||
+          Number(questionsCache?.questionResponsesLatestBlock) ||
+          Number(questionsCache?.lastBlock) ||
+          0;
+        const sbtBlock = Number(sbtCache?.lastBlock) || 0;
+        const surveyRefId = this._countKeys(surveysCache) > 0 ? this._getObjectRefId(surveysCache) : 0;
+        const questionRefId = this._countKeys(questionsCache) > 0 ? this._getObjectRefId(questionsCache) : 0;
+        const sbtRefId = this._countKeys(sbtCache) > 0 ? this._getObjectRefId(sbtCache) : 0;
+        const surveyMetadataSummary = this._summarizeSurveyMetadata(surveysCache?.surveys);
+        const questionMetadataSummary = this._summarizeQuestionMetadata(questionsCache?.questions);
+        const surveyResponsesSummary = this._summarizeNestedResponseKeys(surveysCache?.surveyResponses);
+        const questionResponsesSummary = this._summarizeNestedResponseKeys(questionsCache?.questionResponses);
+        const sbtMembersSummary = this._summarizeSbtHolderMembers(sbtCache?.sbtList);
+        parts.push(
+          [
+            String(slug || ''),
+            String(netKey || ''),
+            surveyBlock,
+            questionBlock,
+            sbtBlock,
+            this._countKeys(surveysCache?.surveys),
+            surveyMetadataSummary.totalSurveys,
+            surveyMetadataSummary.hash,
+            this._countKeys(surveysCache?.surveyResponses),
+            surveyResponsesSummary.totalKeys,
+            surveyResponsesSummary.hash,
+            this._countKeys(questionsCache?.questions),
+            questionMetadataSummary.totalQuestions,
+            questionMetadataSummary.hash,
+            this._countKeys(questionsCache?.questionResponses),
+            questionResponsesSummary.totalKeys,
+            questionResponsesSummary.hash,
+            this._countKeys(sbtCache?.sbtList),
+            sbtMembersSummary.totalEntries,
+            sbtMembersSummary.totalMembers,
+            sbtMembersSummary.hash,
+            surveyRefId,
+            questionRefId,
+            sbtRefId,
+          ].join(':'),
+        );
+      }
+      parts.push(`universe:${this._isUniverseEnabled() ? 1 : 0}`);
+      parts.push(`selected:${this._buildSessionSlugSignature(this._getSelectedSessionSlugs())}`);
+      parts.push(`active:${String(this._currentSlug() || '')}`);
+      parts.push(`sbtRev:${String(this.props.sbtCacheRevision || '')}`);
+      parts.push(`sbtReady:${this.props.isSBTCacheReady ? 1 : 0}`);
+      parts.push(`qReady:${this.props.isQuestionCacheReady ? 1 : 0}`);
+      parts.push(`sReady:${this.props.isSurveyCacheReady ? 1 : 0}`);
+      return parts.join('|');
+    });
 
-  _buildStatsArray = (prevStats: any, counts: any = {}) => (
+  _buildStatsArray = (prevStats: any, counts: any = {}) =>
     (prevStats || []).map((stat: any) => {
       if (stat.label === 'Users') return { ...stat, count: Number(counts.users || 0) };
       if (stat.label === 'Questions') return { ...stat, count: Number(counts.questions || 0) };
       if (stat.label === 'Surveys') return { ...stat, count: Number(counts.surveys || 0) };
       if (stat.label === 'Groups') return { ...stat, count: Number(counts.groups || 0) };
       return stat;
-    })
-  )
+    });
 
   _areAddressListsEqual = (left: any = [], right: any = []) => {
     if (!Array.isArray(left) || !Array.isArray(right)) return false;
@@ -763,201 +785,203 @@ class CommunityTab extends Component<any, any> {
       }
     }
     return true;
-  }
+  };
 
-  _computeUniverseStatsSnapshot = (scopeEntries: any = []) => measureSync('ce.communityTab.computeUniverseStats', () => {
-    const surveyIdSet: any = new Set();
-    const questionIdSet: any = new Set();
-    const userSet: any = new Set();
-    const sbtAddressSet: any = new Set();
-    const surveyTitleMap: Record<string, any> = {};
-    const surveySlugMap: Record<string, any> = {};
-    const surveyRespondersMap: Record<string, any> = {};
+  _computeUniverseStatsSnapshot = (scopeEntries: any = []) =>
+    measureSync('ce.communityTab.computeUniverseStats', () => {
+      const surveyIdSet: any = new Set();
+      const questionIdSet: any = new Set();
+      const userSet: any = new Set();
+      const sbtAddressSet: any = new Set();
+      const surveyTitleMap: Record<string, any> = {};
+      const surveySlugMap: Record<string, any> = {};
+      const surveyRespondersMap: Record<string, any> = {};
 
-    for (const { slug, surveysCache, questionsCache, sbtCache } of scopeEntries) {
-      const surveysData = surveysCache?.surveys || {};
-      const surveyResponsesData = surveysCache?.surveyResponses || {};
-      const questionsData = questionsCache?.questions || {};
-      const questionResponsesData = questionsCache?.questionResponses || {};
-      const sbtList = sbtCache?.sbtList || {};
+      for (const { slug, surveysCache, questionsCache, sbtCache } of scopeEntries) {
+        const surveysData = surveysCache?.surveys || {};
+        const surveyResponsesData = surveysCache?.surveyResponses || {};
+        const questionsData = questionsCache?.questions || {};
+        const questionResponsesData = questionsCache?.questionResponses || {};
+        const sbtList = sbtCache?.sbtList || {};
 
-      Object.keys(surveysData || {}).forEach((sId: any) => {
-        const sid = String(sId || '').toLowerCase();
-        if (!sid) return;
-        surveyIdSet.add(sid);
-        if (!surveyTitleMap[sid]) {
-          surveyTitleMap[sid] = surveysData[sId]?.title || 'Untitled Survey';
-        }
-        if (!surveySlugMap[sid]) {
-          surveySlugMap[sid] = normalizeSessionSlug(String(slug || ''));
-        }
-        const creator = surveysData[sId]?.creator;
-        if (creator) userSet.add(String(creator).toLowerCase());
+        Object.keys(surveysData || {}).forEach((sId: any) => {
+          const sid = String(sId || '').toLowerCase();
+          if (!sid) return;
+          surveyIdSet.add(sid);
+          if (!surveyTitleMap[sid]) {
+            surveyTitleMap[sid] = surveysData[sId]?.title || 'Untitled Survey';
+          }
+          if (!surveySlugMap[sid]) {
+            surveySlugMap[sid] = normalizeSessionSlug(String(slug || ''));
+          }
+          const creator = surveysData[sId]?.creator;
+          if (creator) userSet.add(String(creator).toLowerCase());
+        });
+
+        Object.keys(surveyResponsesData || {}).forEach((sId: any) => {
+          const sid = String(sId || '').toLowerCase();
+          const responders = Object.keys(surveyResponsesData[sId] || {});
+          if (!surveyRespondersMap[sid]) surveyRespondersMap[sid] = new Set();
+          responders.forEach((r: any) => {
+            const rl = String(r || '').toLowerCase();
+            if (!rl) return;
+            surveyRespondersMap[sid].add(rl);
+            userSet.add(rl);
+          });
+        });
+
+        Object.keys(questionsData || {}).forEach((qId: any) => {
+          const qid = String(qId || '').toLowerCase();
+          if (!qid) return;
+          questionIdSet.add(qid);
+          const creator = questionsData[qId]?.creator;
+          if (creator) userSet.add(String(creator).toLowerCase());
+        });
+
+        Object.keys(questionResponsesData || {}).forEach((qId: any) => {
+          const responders = Object.keys(questionResponsesData[qId] || {});
+          responders.forEach((r: any) => {
+            const rl = String(r || '').toLowerCase();
+            if (rl) userSet.add(rl);
+          });
+        });
+
+        Object.keys(sbtList || {}).forEach((addrLower: any) => {
+          const entry = sbtList[addrLower];
+          if (!entry || !entry.sbtAddress) return;
+
+          if (this._shouldCountSbt(entry, slug)) {
+            sbtAddressSet.add(String(entry.sbtAddress || '').toLowerCase());
+          }
+
+          const info = entry.sbtInfo || {};
+          if (info.creator) userSet.add(String(info.creator).toLowerCase());
+          if (info.admin) userSet.add(String(info.admin).toLowerCase());
+          (entry.mintedAddresses || []).forEach((a: any) => {
+            const al = String(a || '').toLowerCase();
+            if (al) userSet.add(al);
+          });
+          (entry.burnedAddresses || []).forEach((a: any) => {
+            const al = String(a || '').toLowerCase();
+            if (al) userSet.add(al);
+          });
+        });
+      }
+
+      let surveyResponsesCount = 0;
+      Object.values(surveyRespondersMap).forEach((set: any) => {
+        surveyResponsesCount += set ? set.size : 0;
       });
 
-      Object.keys(surveyResponsesData || {}).forEach((sId: any) => {
-        const sid = String(sId || '').toLowerCase();
+      const surveysList = Array.from(surveyIdSet).map((sid: any) => ({
+        id: sid,
+        title: surveyTitleMap[sid] || 'Untitled Survey',
+        responsesCount: (surveyRespondersMap[sid] && surveyRespondersMap[sid].size) || 0,
+        questionsCount: null,
+        slug: surveySlugMap[sid] || '',
+      }));
+
+      return {
+        uniqueUsers: Array.from(userSet),
+        surveysCreatedCount: surveyIdSet.size,
+        surveyResponsesCount,
+        uniqueQuestionsCount: questionIdSet.size,
+        surveysList,
+        sbtsCreatedCount: sbtAddressSet.size,
+      };
+    });
+
+  _computeSingleScopeStatsSnapshot = (scopeEntry: any) =>
+    measureSync('ce.communityTab.computeSingleScopeStats', () => {
+      if (!scopeEntry || !scopeEntry.netKey) {
+        return {
+          uniqueUsers: [],
+          surveysCreatedCount: 0,
+          surveyResponsesCount: 0,
+          uniqueQuestionsCount: 0,
+          surveysList: [],
+          sbtsCreatedCount: 0,
+        };
+      }
+
+      const surveysData = scopeEntry.surveysCache?.surveys || {};
+      const surveyResponsesData = scopeEntry.surveysCache?.surveyResponses || {};
+      const questionsData = scopeEntry.questionsCache?.questions || {};
+      const questionResponsesData = scopeEntry.questionsCache?.questionResponses || {};
+      const sbtList = scopeEntry.sbtCache?.sbtList || {};
+
+      const surveysCreatedCount = Object.keys(surveysData).length;
+      const uniqueQuestionsCount = Object.keys(questionsData).length;
+
+      let surveyResponsesCount = 0;
+      for (const sId in surveyResponsesData) {
+        surveyResponsesCount += Object.keys(surveyResponsesData[sId] || {}).length;
+      }
+
+      const uniqueUsersSet: any = new Set();
+      for (const sId in surveysData) {
+        if (surveysData[sId]?.creator) {
+          uniqueUsersSet.add(String(surveysData[sId].creator).toLowerCase());
+        }
+      }
+      for (const sId in surveyResponsesData) {
         const responders = Object.keys(surveyResponsesData[sId] || {});
-        if (!surveyRespondersMap[sid]) surveyRespondersMap[sid] = new Set();
-        responders.forEach((r: any) => {
-          const rl = String(r || '').toLowerCase();
-          if (!rl) return;
-          surveyRespondersMap[sid].add(rl);
-          userSet.add(rl);
-        });
-      });
-
-      Object.keys(questionsData || {}).forEach((qId: any) => {
-        const qid = String(qId || '').toLowerCase();
-        if (!qid) return;
-        questionIdSet.add(qid);
-        const creator = questionsData[qId]?.creator;
-        if (creator) userSet.add(String(creator).toLowerCase());
-      });
-
-      Object.keys(questionResponsesData || {}).forEach((qId: any) => {
-        const responders = Object.keys(questionResponsesData[qId] || {});
-        responders.forEach((r: any) => {
-          const rl = String(r || '').toLowerCase();
-          if (rl) userSet.add(rl);
-        });
-      });
-
-      Object.keys(sbtList || {}).forEach((addrLower: any) => {
-        const entry = sbtList[addrLower];
-        if (!entry || !entry.sbtAddress) return;
-
-        if (this._shouldCountSbt(entry, slug)) {
-          sbtAddressSet.add(String(entry.sbtAddress || '').toLowerCase());
+        responders.forEach((r: any) => uniqueUsersSet.add(String(r || '').toLowerCase()));
+      }
+      for (const qId in questionsData) {
+        if (questionsData[qId]?.creator) {
+          uniqueUsersSet.add(String(questionsData[qId].creator).toLowerCase());
         }
+      }
+      for (const qId in questionResponsesData) {
+        const responders = Object.keys(questionResponsesData[qId] || {});
+        responders.forEach((r: any) => uniqueUsersSet.add(String(r || '').toLowerCase()));
+      }
 
-        const info = entry.sbtInfo || {};
-        if (info.creator) userSet.add(String(info.creator).toLowerCase());
-        if (info.admin) userSet.add(String(info.admin).toLowerCase());
-        (entry.mintedAddresses || []).forEach((a: any) => {
-          const al = String(a || '').toLowerCase();
-          if (al) userSet.add(al);
-        });
-        (entry.burnedAddresses || []).forEach((a: any) => {
-          const al = String(a || '').toLowerCase();
-          if (al) userSet.add(al);
-        });
+      let sbtsCreatedCount = 0;
+      for (const sbtAddress in sbtList) {
+        const sbtItem = sbtList[sbtAddress];
+        if (!sbtItem) continue;
+        if (this._shouldCountSbt(sbtItem, scopeEntry.slug)) sbtsCreatedCount += 1;
+        if (sbtItem.sbtInfo?.creator) {
+          uniqueUsersSet.add(String(sbtItem.sbtInfo.creator).toLowerCase());
+        }
+        if (sbtItem.sbtInfo?.admin) {
+          uniqueUsersSet.add(String(sbtItem.sbtInfo.admin).toLowerCase());
+        }
+        (sbtItem.mintedAddresses || []).forEach((addr: any) => uniqueUsersSet.add(String(addr || '').toLowerCase()));
+        (sbtItem.burnedAddresses || []).forEach((addr: any) => uniqueUsersSet.add(String(addr || '').toLowerCase()));
+      }
+
+      const surveysList = Object.keys(surveysData).map((sId: any) => {
+        const survey = surveysData[sId] || {};
+        const questionIDs = Array.isArray(survey.questionIDs) ? survey.questionIDs : [];
+        const responsesCount = Object.keys(surveyResponsesData[sId] || {}).length;
+        return {
+          id: sId,
+          title: survey.title || 'Untitled Survey',
+          responsesCount,
+          questionsCount: questionIDs.length,
+          slug: normalizeSessionSlug(String(scopeEntry.slug || '')),
+        };
       });
-    }
 
-    let surveyResponsesCount = 0;
-    Object.values(surveyRespondersMap).forEach((set: any) => {
-      surveyResponsesCount += set ? set.size : 0;
-    });
-
-    const surveysList = Array.from(surveyIdSet).map((sid: any) => ({
-      id: sid,
-      title: surveyTitleMap[sid] || 'Untitled Survey',
-      responsesCount: (surveyRespondersMap[sid] && surveyRespondersMap[sid].size) || 0,
-      questionsCount: null,
-      slug: surveySlugMap[sid] || '',
-    }));
-
-    return {
-      uniqueUsers: Array.from(userSet),
-      surveysCreatedCount: surveyIdSet.size,
-      surveyResponsesCount,
-      uniqueQuestionsCount: questionIdSet.size,
-      surveysList,
-      sbtsCreatedCount: sbtAddressSet.size,
-    };
-  })
-
-  _computeSingleScopeStatsSnapshot = (scopeEntry: any) => measureSync('ce.communityTab.computeSingleScopeStats', () => {
-    if (!scopeEntry || !scopeEntry.netKey) {
       return {
-        uniqueUsers: [],
-        surveysCreatedCount: 0,
-        surveyResponsesCount: 0,
-        uniqueQuestionsCount: 0,
-        surveysList: [],
-        sbtsCreatedCount: 0,
-      };
-    }
-
-    const surveysData = scopeEntry.surveysCache?.surveys || {};
-    const surveyResponsesData = scopeEntry.surveysCache?.surveyResponses || {};
-    const questionsData = scopeEntry.questionsCache?.questions || {};
-    const questionResponsesData = scopeEntry.questionsCache?.questionResponses || {};
-    const sbtList = scopeEntry.sbtCache?.sbtList || {};
-
-    const surveysCreatedCount = Object.keys(surveysData).length;
-    const uniqueQuestionsCount = Object.keys(questionsData).length;
-
-    let surveyResponsesCount = 0;
-    for (const sId in surveyResponsesData) {
-      surveyResponsesCount += Object.keys(surveyResponsesData[sId] || {}).length;
-    }
-
-    const uniqueUsersSet: any = new Set();
-    for (const sId in surveysData) {
-      if (surveysData[sId]?.creator) {
-        uniqueUsersSet.add(String(surveysData[sId].creator).toLowerCase());
-      }
-    }
-    for (const sId in surveyResponsesData) {
-      const responders = Object.keys(surveyResponsesData[sId] || {});
-      responders.forEach((r: any) => uniqueUsersSet.add(String(r || '').toLowerCase()));
-    }
-    for (const qId in questionsData) {
-      if (questionsData[qId]?.creator) {
-        uniqueUsersSet.add(String(questionsData[qId].creator).toLowerCase());
-      }
-    }
-    for (const qId in questionResponsesData) {
-      const responders = Object.keys(questionResponsesData[qId] || {});
-      responders.forEach((r: any) => uniqueUsersSet.add(String(r || '').toLowerCase()));
-    }
-
-    let sbtsCreatedCount = 0;
-    for (const sbtAddress in sbtList) {
-      const sbtItem = sbtList[sbtAddress];
-      if (!sbtItem) continue;
-      if (this._shouldCountSbt(sbtItem, scopeEntry.slug)) sbtsCreatedCount += 1;
-      if (sbtItem.sbtInfo?.creator) {
-        uniqueUsersSet.add(String(sbtItem.sbtInfo.creator).toLowerCase());
-      }
-      if (sbtItem.sbtInfo?.admin) {
-        uniqueUsersSet.add(String(sbtItem.sbtInfo.admin).toLowerCase());
-      }
-      (sbtItem.mintedAddresses || []).forEach((addr: any) => uniqueUsersSet.add(String(addr || '').toLowerCase()));
-      (sbtItem.burnedAddresses || []).forEach((addr: any) => uniqueUsersSet.add(String(addr || '').toLowerCase()));
-    }
-
-    const surveysList = Object.keys(surveysData).map((sId: any) => {
-      const survey = surveysData[sId] || {};
-      const questionIDs = Array.isArray(survey.questionIDs) ? survey.questionIDs : [];
-      const responsesCount = Object.keys(surveyResponsesData[sId] || {}).length;
-      return {
-        id: sId,
-        title: survey.title || 'Untitled Survey',
-        responsesCount,
-        questionsCount: questionIDs.length,
-        slug: normalizeSessionSlug(String(scopeEntry.slug || '')),
+        uniqueUsers: Array.from(uniqueUsersSet),
+        surveysCreatedCount,
+        surveyResponsesCount,
+        uniqueQuestionsCount,
+        surveysList,
+        sbtsCreatedCount,
       };
     });
-
-    return {
-      uniqueUsers: Array.from(uniqueUsersSet),
-      surveysCreatedCount,
-      surveyResponsesCount,
-      uniqueQuestionsCount,
-      surveysList,
-      sbtsCreatedCount,
-    };
-  })
 
   _computeStatsSnapshot = (scopeEntries: any = []) => {
     if (Array.isArray(scopeEntries) && scopeEntries.length === 1) {
       return this._computeSingleScopeStatsSnapshot(scopeEntries[0]);
     }
     return this._computeUniverseStatsSnapshot(scopeEntries);
-  }
+  };
 
   checkIfInitialLoadDone = async () => {
     // This function checks if the initial load is done by comparing the caches' lastBlock to the latest chain block
@@ -978,14 +1002,13 @@ class CommunityTab extends Component<any, any> {
             }
           }
 
-          const surveyLastBlock =
-            Number(surveysCache?.surveysLatestBlock) ||
-            Number(surveysCache?.lastBlock) || 0;
+          const surveyLastBlock = Number(surveysCache?.surveysLatestBlock) || Number(surveysCache?.lastBlock) || 0;
 
           const questionLastBlock =
             Number(questionsCache?.questionsLatestBlock) ||
             Number(questionsCache?.questionResponsesLatestBlock) ||
-            Number(questionsCache?.lastBlock) || 0;
+            Number(questionsCache?.lastBlock) ||
+            0;
 
           const sbtLastBlock = Number(sbtCache?.lastBlock) || 0;
 
@@ -1012,10 +1035,7 @@ class CommunityTab extends Component<any, any> {
       return false;
     }
 
-    const surveyLastBlock =
-      Number(surveysCache.surveysLatestBlock) ||
-      Number(surveysCache.lastBlock) ||
-      0;
+    const surveyLastBlock = Number(surveysCache.surveysLatestBlock) || Number(surveysCache.lastBlock) || 0;
     const questionLastBlock =
       Number(questionsCache.questionsLatestBlock) ||
       Number(questionsCache.questionResponsesLatestBlock) ||
@@ -1039,7 +1059,7 @@ class CommunityTab extends Component<any, any> {
 
     const minLastBlock = Math.min(surveyLastBlock, questionLastBlock, sbtLastBlock);
     return minLastBlock >= latestBlockNumber;
-  }
+  };
 
   _computeNextPollDelayMs = () => {
     const elapsed = Math.max(0, Date.now() - Number(this._statsPollStartedAtMs || 0));
@@ -1053,7 +1073,7 @@ class CommunityTab extends Component<any, any> {
     }
     if (this._statsUnchangedStreak >= 3) return 45000;
     return 30000;
-  }
+  };
 
   _isDocumentHidden = () => {
     if (typeof document === 'undefined') return false;
@@ -1062,27 +1082,27 @@ class CommunityTab extends Component<any, any> {
     } catch (_) {
       return false;
     }
-  }
+  };
 
   _computeFallbackPollDelayMs = () => {
     if (this._isDocumentHidden()) return 120000;
     if (!this.state.initialLoadDone) return 15000;
     return 60000;
-  }
+  };
 
   _clearStatsPollTimer = () => {
     if (this._statsPollTimer) {
       clearTimeout(this._statsPollTimer);
       this._statsPollTimer = null;
     }
-  }
+  };
 
   _flushQueuedCacheUpdateRefresh = () => {
     if (this._isUnmounted || this._isDocumentHidden()) return;
     const force = !!this._cacheUpdateRefreshQueuedForce;
     this._cacheUpdateRefreshQueuedForce = false;
     this._refreshCommunityStats({ force, markLoading: false });
-  }
+  };
 
   _queueCacheDrivenRefresh = ({ force = false }: any = {}) => {
     if (this._isUnmounted || this._isDocumentHidden()) return;
@@ -1092,15 +1112,13 @@ class CommunityTab extends Component<any, any> {
       return;
     }
     this._flushQueuedCacheUpdateRefresh();
-  }
+  };
 
   _scheduleNextStatsPoll = (delayMs: any = null) => {
     if (this._isUnmounted) return;
     this._clearStatsPollTimer();
     const fallbackDelay = this._computeFallbackPollDelayMs();
-    const safeDelay = delayMs == null
-      ? fallbackDelay
-      : Math.max(0, Number(delayMs) || 0);
+    const safeDelay = delayMs == null ? fallbackDelay : Math.max(0, Number(delayMs) || 0);
     this._statsPollTimer = setTimeout(async () => {
       this._statsPollTimer = null;
       if (this._isUnmounted) return;
@@ -1109,7 +1127,7 @@ class CommunityTab extends Component<any, any> {
       }
       this._scheduleNextStatsPoll(this._computeFallbackPollDelayMs());
     }, safeDelay);
-  }
+  };
 
   _runStatsRefreshCycle = async ({ force = false, markLoading = false }: any = {}) => {
     if (this._isUnmounted) return { changed: false };
@@ -1144,8 +1162,8 @@ class CommunityTab extends Component<any, any> {
     let nextInitialLoadDone = this.state.initialLoadDone;
     if (!nextInitialLoadDone) {
       const now = Date.now();
-      const checkIntervalMs = force ? 0 : (this._statsUnchangedStreak >= 3 ? 5000 : 2000);
-      if ((now - this._lastInitialLoadCheckMs) >= checkIntervalMs) {
+      const checkIntervalMs = force ? 0 : this._statsUnchangedStreak >= 3 ? 5000 : 2000;
+      if (now - this._lastInitialLoadCheckMs >= checkIntervalMs) {
         this._lastInitialLoadCheckMs = now;
         const loadDone = await this.checkIfInitialLoadDone();
         if (loadDone) nextInitialLoadDone = true;
@@ -1186,7 +1204,7 @@ class CommunityTab extends Component<any, any> {
     });
 
     return { changed };
-  }
+  };
 
   _refreshCommunityStats = async ({ force = false, markLoading = false }: any = {}) => {
     if (this._isUnmounted) return { changed: false };
@@ -1218,7 +1236,7 @@ class CommunityTab extends Component<any, any> {
       }
     }
     return result;
-  }
+  };
 
   componentDidMount() {
     uiLog.log('CommunityTab mounted. Fetching initial data...');
@@ -1230,14 +1248,25 @@ class CommunityTab extends Component<any, any> {
     this.setState({ initialLoadDone: false, loadingSbtsCreated: true, loadingSurveyData: true });
 
     if (this._universeKickoffDone == null) this._universeKickoffDone = false;
-    if (this._isUniverseEnabled() && typeof this.props.ensureLightSbtUniverse === 'function' && !this._universeKickoffDone) {
+    if (
+      this._isUniverseEnabled() &&
+      typeof this.props.ensureLightSbtUniverse === 'function' &&
+      !this._universeKickoffDone
+    ) {
       this._universeKickoffDone = true;
-      try { this.props.ensureLightSbtUniverse(); } catch (e) { uiLog.warn('CommunityTab: callback', e); }
+      try {
+        this.props.ensureLightSbtUniverse();
+      } catch (e) {
+        uiLog.warn('CommunityTab: callback', e);
+      }
     }
 
-    this._statsCacheRefreshCoalescer = createCacheUpdateCoalescer(() => {
-      this._flushQueuedCacheUpdateRefresh();
-    }, { delayMs: 24 });
+    this._statsCacheRefreshCoalescer = createCacheUpdateCoalescer(
+      () => {
+        this._flushQueuedCacheUpdateRefresh();
+      },
+      { delayMs: 24 },
+    );
     this._cacheUpdateUnsubscribe = subscribeCacheUpdates((evt: any) => {
       const ns = String(evt?.namespace || '');
       if (ns === 'surveysCache' || ns === 'questionsCache' || ns === 'sbtCache') {
@@ -1286,22 +1315,34 @@ class CommunityTab extends Component<any, any> {
       this._statsCacheRefreshCoalescer = null;
     }
     if (typeof this._cacheUpdateUnsubscribe === 'function') {
-      try { this._cacheUpdateUnsubscribe(); } catch (e) { uiLog.warn('CommunityTab: cleanup', e); }
+      try {
+        this._cacheUpdateUnsubscribe();
+      } catch (e) {
+        uiLog.warn('CommunityTab: cleanup', e);
+      }
     }
     this._cacheUpdateUnsubscribe = null;
     if (this._visibilityListenerBound && typeof document !== 'undefined') {
-      try { document.removeEventListener('visibilitychange', this._visibilityListenerBound); } catch (e) { uiLog.warn('CommunityTab: cleanup', e); }
+      try {
+        document.removeEventListener('visibilitychange', this._visibilityListenerBound);
+      } catch (e) {
+        uiLog.warn('CommunityTab: cleanup', e);
+      }
     }
     this._visibilityListenerBound = null;
     if (this._globalSessionSelectionListener && typeof window !== 'undefined') {
-      try { window.removeEventListener(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, this._globalSessionSelectionListener); } catch (e) { uiLog.warn('CommunityTab: cleanup', e); }
+      try {
+        window.removeEventListener(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, this._globalSessionSelectionListener);
+      } catch (e) {
+        uiLog.warn('CommunityTab: cleanup', e);
+      }
     }
     this._globalSessionSelectionListener = null;
   }
 
   updateStatsPeriodically = async () => {
     await this._refreshCommunityStats({ force: false, markLoading: false });
-  }
+  };
 
   componentDidUpdate(prevProps: any, prevState: any) {
     const cacheInputsChanged =
@@ -1334,7 +1375,7 @@ class CommunityTab extends Component<any, any> {
 
   updateSbtGroupsCountFromCache = () => {
     this._queueCacheDrivenRefresh({ force: false });
-  }
+  };
 
   handleUserClick = (user: any) => {
     if (user.username.startsWith('0x')) {
@@ -1342,11 +1383,13 @@ class CommunityTab extends Component<any, any> {
     } else {
       window.open(buildPublicRoute(`/su/${user.username}`), '_blank');
     }
-  }
+  };
 
   // --- Updated handleStatClick to initialize filteredUsers ---
   handleStatClick = (stat: any) => {
-    const labelKey = String(stat.label || '').toLowerCase().replace(/\s+/g, '');
+    const labelKey = String(stat.label || '')
+      .toLowerCase()
+      .replace(/\s+/g, '');
     if (labelKey === 'users') {
       this.setState({
         modalTitle: `${stat.label} Details`,
@@ -1368,7 +1411,7 @@ class CommunityTab extends Component<any, any> {
         showModal: true,
       });
     }
-  }
+  };
 
   // Helper to toggle modal visibility
   toggleModal = () => {
@@ -1377,13 +1420,10 @@ class CommunityTab extends Component<any, any> {
       modalType: !prevState.showModal ? prevState.modalType : null,
       modalTitle: !prevState.showModal ? prevState.modalTitle : '',
     }));
-  }
+  };
 
-  _buildLeaderboardUsersSignature = (users: any = []) => (
-    Array.isArray(users)
-      ? users.map((value: any) => String(value || '')).join('|')
-      : ''
-  );
+  _buildLeaderboardUsersSignature = (users: any = []) =>
+    Array.isArray(users) ? users.map((value: any) => String(value || '')).join('|') : '';
 
   getMemoizedLeaderboardData = () => {
     const { uniqueUsers, hideSimulatedUsers, hideHumanUsers } = this.state;
@@ -1431,7 +1471,7 @@ class CommunityTab extends Component<any, any> {
       result,
     };
     return result;
-  }
+  };
 
   _parseCachedJson = (value: any) => {
     if (!value) return null;
@@ -1443,19 +1483,21 @@ class CommunityTab extends Component<any, any> {
       }
     }
     return typeof value === 'object' ? value : null;
-  }
+  };
 
   _normalizeBinaryVoteValue = (value: any) => {
     if (value === 1 || value === '1' || value === true) return 1;
     if (value === -1 || value === '-1' || value === false) return -1;
     if (value === 0 || value === '0') return 0;
 
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+      .trim()
+      .toLowerCase();
     if (normalized === 'agree' || normalized === 'yes' || normalized === 'true') return 1;
     if (normalized === 'disagree' || normalized === 'no' || normalized === 'false') return -1;
     if (normalized === 'unsure' || normalized === 'neutral' || normalized === 'unknown') return 0;
     return null;
-  }
+  };
 
   _extractBinaryVoteRecord = (rawResponse: any, fallbackQuestion: any = {}) => {
     const response = this._parseCachedJson(rawResponse);
@@ -1469,7 +1511,9 @@ class CommunityTab extends Component<any, any> {
     const vote = this._normalizeBinaryVoteValue(answer.value);
     if (vote == null) return null;
 
-    const responseType = String(response?.type || fallbackQuestion?.type || '').trim().toLowerCase();
+    const responseType = String(response?.type || fallbackQuestion?.type || '')
+      .trim()
+      .toLowerCase();
     if (responseType && responseType !== 'binary') return null;
 
     return {
@@ -1477,7 +1521,7 @@ class CommunityTab extends Component<any, any> {
       type: 'binary',
       prompt: response?.prompt || fallbackQuestion?.prompt || '',
     };
-  }
+  };
 
   _rememberBeeswarmQuestion = (questionMap: any, questionId: any, question: any = {}) => {
     const qid = String(questionId || '').toLowerCase();
@@ -1489,7 +1533,7 @@ class CommunityTab extends Component<any, any> {
       type: existing.type || question?.type || '',
       prompt: existing.prompt || question?.prompt || '',
     });
-  }
+  };
 
   _shouldUseDemoBeeswarmData = () => {
     const scopeEntries = this._iterScopeCaches({ clone: false });
@@ -1498,11 +1542,13 @@ class CommunityTab extends Component<any, any> {
     if (!activeSlug) return false;
     if (activeSlug !== COMMUNITY_BEESWARM_DEMO_SLUG) return false;
     if (readSessionScanScope() !== 'list') return false;
-    return Array.isArray(POLIS_DEMO_DATA_AUTOLOAD_SLUGS)
-      && POLIS_DEMO_DATA_AUTOLOAD_SLUGS
-        .map((slug: any) => normalizeSessionSlug(slug))
-        .includes(COMMUNITY_BEESWARM_DEMO_SLUG);
-  }
+    return (
+      Array.isArray(POLIS_DEMO_DATA_AUTOLOAD_SLUGS) &&
+      POLIS_DEMO_DATA_AUTOLOAD_SLUGS.map((slug: any) => normalizeSessionSlug(slug)).includes(
+        COMMUNITY_BEESWARM_DEMO_SLUG,
+      )
+    );
+  };
 
   _buildDemoBeeswarmPoints = () => {
     const dataset = getPolisDemoDatasetForSlug(COMMUNITY_BEESWARM_DEMO_SLUG, { allowFallback: false }) as {
@@ -1511,12 +1557,16 @@ class CommunityTab extends Component<any, any> {
     } | null;
     const comments = Array.isArray(dataset?.comments) ? dataset.comments : [];
     const binaryComments = comments.filter((c: any) => {
-      const t = String(c?.type || '').trim().toLowerCase();
+      const t = String(c?.type || '')
+        .trim()
+        .toLowerCase();
       return !t || t === 'binary';
     });
     const binaryIndexMap: any[] = [];
     comments.forEach((c: any, i: any) => {
-      const t = String(c?.type || '').trim().toLowerCase();
+      const t = String(c?.type || '')
+        .trim()
+        .toLowerCase();
       if (!t || t === 'binary') binaryIndexMap.push(i);
     });
     const participants = Array.isArray(dataset?.participantsVotes) ? dataset.participantsVotes : [];
@@ -1553,7 +1603,7 @@ class CommunityTab extends Component<any, any> {
         total,
       };
     });
-  }
+  };
 
   _buildCommunityBeeswarmPoints = (scopeEntriesOverride: any = null) => {
     if (this._shouldUseDemoBeeswarmData()) {
@@ -1606,10 +1656,7 @@ class CommunityTab extends Component<any, any> {
 
           parsedSurveyResponse.responses.forEach((responseEntry: any) => {
             const qid = String(
-              responseEntry?.questionID ||
-              responseEntry?.questionId ||
-              responseEntry?.id ||
-              ''
+              responseEntry?.questionID || responseEntry?.questionId || responseEntry?.id || '',
             ).toLowerCase();
             if (!qid) return;
 
@@ -1631,7 +1678,12 @@ class CommunityTab extends Component<any, any> {
     });
 
     const binaryQuestionIds = Array.from(questionMap.entries())
-      .filter(([, question]: any) => String(question?.type || '').trim().toLowerCase() === 'binary')
+      .filter(
+        ([, question]: any) =>
+          String(question?.type || '')
+            .trim()
+            .toLowerCase() === 'binary',
+      )
       .map(([questionId]: any) => questionId)
       .sort((left: any, right: any) => String(left).localeCompare(String(right)));
 
@@ -1641,12 +1693,10 @@ class CommunityTab extends Component<any, any> {
       binaryQuestionIds.reduce((set: any, questionId: any) => {
         Object.keys(combinedResponses.get(questionId) || {}).forEach((responder: any) => set.add(responder));
         return set;
-      }, new Set())
+      }, new Set()),
     ).sort((left: any, right: any) => String(left).localeCompare(String(right)));
 
-    const participantIndexMap: any = new Map(
-      responders.map((responder: any, index: any) => [responder, index])
-    );
+    const participantIndexMap: any = new Map(responders.map((responder: any, index: any) => [responder, index]));
     const ratingMatrix = binaryQuestionIds.map(() => Array(responders.length).fill(null));
 
     binaryQuestionIds.forEach((questionId: any, rowIndex: any) => {
@@ -1675,21 +1725,21 @@ class CommunityTab extends Component<any, any> {
         total,
       };
     });
-  }
+  };
 
   _countPlottableQuestionsFromBeeswarmPoints = (points: unknown[] = []) => {
     if (!Array.isArray(points)) return 0;
     const ids = new Set();
     points.forEach((point: unknown) => {
       const questionId = String(
-        point && typeof point === 'object'
-          ? (point as { questionId?: unknown }).questionId || ''
-          : ''
-      ).trim().toLowerCase();
+        point && typeof point === 'object' ? (point as { questionId?: unknown }).questionId || '' : '',
+      )
+        .trim()
+        .toLowerCase();
       if (questionId) ids.add(questionId);
     });
     return ids.size;
-  }
+  };
 
   renderLeaderboard() {
     const { showMoreLeaderboard } = this.state;
@@ -1736,11 +1786,7 @@ class CommunityTab extends Component<any, any> {
           const imgSrc = resolveLeaderboardAvatar(user);
 
           return (
-            <div
-              key={index}
-              className={styles.leaderboardItem}
-              onClick={() => this.handleUserClick(user)}
-            >
+            <div key={index} className={styles.leaderboardItem} onClick={() => this.handleUserClick(user)}>
               {imgSrc ? (
                 <img
                   src={imgSrc}
@@ -1750,11 +1796,7 @@ class CommunityTab extends Component<any, any> {
                 />
               ) : null}
               <span className={styles.name}>
-                {user.username.startsWith('0x') && (
-                  <>
-                    {getShortenedAddress(user.name, true)}
-                  </>
-                )}
+                {user.username.startsWith('0x') && <>{getShortenedAddress(user.name, true)}</>}
                 {!user.username.startsWith('0x') && (
                   <>
                     {user.name}
@@ -1790,11 +1832,7 @@ class CommunityTab extends Component<any, any> {
                   />
                 ) : null}
                 <span className={styles.name}>
-                  {user.username.startsWith('0x') && (
-                    <>
-                      {getShortenedAddress(user.name, true)}
-                    </>
-                  )}
+                  {user.username.startsWith('0x') && <>{getShortenedAddress(user.name, true)}</>}
                   {!user.username.startsWith('0x') && (
                     <>
                       {user.name}
@@ -1822,7 +1860,7 @@ class CommunityTab extends Component<any, any> {
           <button
             onClick={() =>
               this.setState((prevState: Readonly<CommunityTab['state']>) => ({
-                showMoreLeaderboard: !prevState.showMoreLeaderboard
+                showMoreLeaderboard: !prevState.showMoreLeaderboard,
               }))
             }
             className={styles.showMoreButton}
@@ -1860,17 +1898,14 @@ class CommunityTab extends Component<any, any> {
       return this._beeswarmPoints;
     }
     return this._buildCommunityBeeswarmPoints();
-  }
+  };
 
   renderQuestionsModalContent = () => {
     const points = this._getQuestionSwarmPoints();
     return (
       <div className={styles.questionsModalContent}>
         <div className={styles.questionsModalTopBar}>
-          <a
-            href={buildPublicRoute('/questions')}
-            className={styles.questionsModalLink}
-          >
+          <a href={buildPublicRoute('/questions')} className={styles.questionsModalLink}>
             View Full Questions
           </a>
         </div>
@@ -1879,7 +1914,7 @@ class CommunityTab extends Component<any, any> {
         </div>
       </div>
     );
-  }
+  };
 
   renderLeaderboardControls() {
     const { showLeaderboardControls, hideSimulatedUsers, hideHumanUsers } = this.state;
@@ -1896,17 +1931,18 @@ class CommunityTab extends Component<any, any> {
           <FontAwesomeIcon icon={faCog} />
         </button>
         {showLeaderboardControls ? (
-          <div
-            className={styles.leaderboardControlsPanel}
-            data-testid="ce-community-leaderboard-controls-panel"
-          >
+          <div className={styles.leaderboardControlsPanel} data-testid="ce-community-leaderboard-controls-panel">
             <div className={styles.leaderboardControlsTitle}>Filters</div>
             <div className={styles.leaderboardControlsBody}>
               <label className={styles.leaderboardControlLabel}>
                 <input
                   type="checkbox"
                   checked={hideSimulatedUsers}
-                  onChange={() => this.setState((prevState: Readonly<CommunityTab['state']>) => ({ hideSimulatedUsers: !prevState.hideSimulatedUsers }))}
+                  onChange={() =>
+                    this.setState((prevState: Readonly<CommunityTab['state']>) => ({
+                      hideSimulatedUsers: !prevState.hideSimulatedUsers,
+                    }))
+                  }
                   className={styles.toggleCheckbox}
                   data-testid="ce-community-hide-simulated-users"
                 />
@@ -1916,7 +1952,11 @@ class CommunityTab extends Component<any, any> {
                 <input
                   type="checkbox"
                   checked={hideHumanUsers}
-                  onChange={() => this.setState((prevState: Readonly<CommunityTab['state']>) => ({ hideHumanUsers: !prevState.hideHumanUsers }))}
+                  onChange={() =>
+                    this.setState((prevState: Readonly<CommunityTab['state']>) => ({
+                      hideHumanUsers: !prevState.hideHumanUsers,
+                    }))
+                  }
                   className={styles.toggleCheckbox}
                   data-testid="ce-community-hide-users"
                 />
@@ -1967,8 +2007,8 @@ class CommunityTab extends Component<any, any> {
               network={network}
               sessionSlug={this._currentSlug()}
               onFilter={(newFilteredUsers: any) => {
-                  // This setState call now reliably updates the filtered list
-                  this.setState({ filteredUsers: newFilteredUsers, loadingFilter: false });
+                // This setState call now reliably updates the filtered list
+                this.setState({ filteredUsers: newFilteredUsers, loadingFilter: false });
               }}
               setFilterLoading={(isLoading: any) => this.setState({ loadingFilter: isLoading })} // Pass loading state setter
               autoExpand={false} // Changed this to false to allow internal button toggle
@@ -1977,7 +2017,6 @@ class CommunityTab extends Component<any, any> {
               // this below value is probably not passed-in, but should be
               isSBTCacheReady={this.props.isSBTCacheReady}
               sbtCacheRevision={this.props.sbtCacheRevision}
-
             />
             {loadingFilter ? (
               <div className={styles.loadingContainer}>
@@ -2021,24 +2060,24 @@ class CommunityTab extends Component<any, any> {
               const sessionQuery = slug ? `?session=${encodeURIComponent(slug)}` : '';
               return (
                 <div key={index} className={styles.surveyItem}>
-                <a
-                  href={buildPublicRoute(`/survey/${survey.id}${sessionQuery}`)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.surveyLink}
-                >
-                  {survey.title}
-                </a>
-                <span className={styles.questionsCount}>
-                  Questions: {survey.questionsCount}
-                </span>
-                <span
-                  className={styles.responsesCount}
-                  onClick={() => window.open(buildPublicRoute(`/survey/${survey.id}/results${sessionQuery}`), '_blank')} // Link to results page
-                  style={{ cursor: 'pointer' }} // Add pointer cursor
-                >
-                  Responses: {survey.responsesCount}
-                </span>
+                  <a
+                    href={buildPublicRoute(`/survey/${survey.id}${sessionQuery}`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.surveyLink}
+                  >
+                    {survey.title}
+                  </a>
+                  <span className={styles.questionsCount}>Questions: {survey.questionsCount}</span>
+                  <span
+                    className={styles.responsesCount}
+                    onClick={() =>
+                      window.open(buildPublicRoute(`/survey/${survey.id}/results${sessionQuery}`), '_blank')
+                    } // Link to results page
+                    style={{ cursor: 'pointer' }} // Add pointer cursor
+                  >
+                    Responses: {survey.responsesCount}
+                  </span>
                 </div>
               );
             })}
@@ -2050,8 +2089,7 @@ class CommunityTab extends Component<any, any> {
       default:
         return <p>No content specified.</p>;
     }
-  }
-
+  };
 
   render() {
     const { showModal, modalTitle, loadingSbtsCreated, stats, initialLoadDone } = this.state;
@@ -2060,14 +2098,10 @@ class CommunityTab extends Component<any, any> {
       <div className={styles.communityTab}>
         <div className={styles.leaderboardSection}>
           <div className={styles.leaderboardTopBar}>
-            <div className={styles.headerActionsRight}>
-              {this.renderLeaderboardControls()}
-            </div>
+            <div className={styles.headerActionsRight}>{this.renderLeaderboardControls()}</div>
           </div>
           <div className={styles.content}>
-            <div className={styles.leaderboard}>
-              {this.renderLeaderboard()}
-            </div>
+            <div className={styles.leaderboard}>{this.renderLeaderboard()}</div>
           </div>
         </div>
         <div className={styles.rightSection}>
@@ -2075,12 +2109,12 @@ class CommunityTab extends Component<any, any> {
             <div className={styles.statsHeader}>
               <div className={styles.headerActionsRight}>
                 {!initialLoadDone && (
-                <FontAwesomeIcon
-                  icon={faSpinner}
-                  spin
-                  className={styles.statsHeaderSpinner}
-                  data-testid="ce-community-stats-loading-spinner"
-                />
+                  <FontAwesomeIcon
+                    icon={faSpinner}
+                    spin
+                    className={styles.statsHeaderSpinner}
+                    data-testid="ce-community-stats-loading-spinner"
+                  />
                 )}
               </div>
             </div>
@@ -2103,20 +2137,11 @@ class CommunityTab extends Component<any, any> {
           {this.renderQuestionSwarm()}
         </div>
 
-        <Modal
-          isOpen={showModal}
-          toggle={this.toggleModal}
-          className={styles.modal}
-          size="lg"
-          centered
-          scrollable
-        >
+        <Modal isOpen={showModal} toggle={this.toggleModal} className={styles.modal} size="lg" centered scrollable>
           <ModalHeader toggle={this.toggleModal} className={styles.modalHeader}>
             {modalTitle}
           </ModalHeader>
-          <ModalBody className={styles.modalBody}>
-            {this.renderModalContent()}
-          </ModalBody>
+          <ModalBody className={styles.modalBody}>{this.renderModalContent()}</ModalBody>
         </Modal>
       </div>
     );

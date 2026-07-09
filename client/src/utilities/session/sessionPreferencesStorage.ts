@@ -3,9 +3,9 @@ import { DEFAULT_DEMO_SURFACE_MODE } from '../../variables/appConfig.js';
 const DEMO_SURFACE_MODE_STORAGE_KEY = 'ce:demoSurfaceMode';
 const TOOLTIPS_ENABLED_STORAGE_KEY = 'ce:tooltipsEnabled';
 
-export const normalizeDemoSurfaceMode = (value: unknown): boolean => value === false ? false : true;
+export const normalizeDemoSurfaceMode = (value: unknown): boolean => (value === false ? false : true);
 
-export const normalizeTooltipsEnabled = (value: unknown): boolean => value === false ? false : true;
+export const normalizeTooltipsEnabled = (value: unknown): boolean => (value === false ? false : true);
 
 export const readStoredDemoSurfaceMode = (): boolean => {
   try {

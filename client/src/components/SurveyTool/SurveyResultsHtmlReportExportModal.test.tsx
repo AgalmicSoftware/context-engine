@@ -122,33 +122,35 @@ describe('SurveyResultsHtmlReportExportModal', () => {
   });
 
   it('shows fallback copy and disables unavailable actions', () => {
-    render(renderSurveyResultsHtmlReportExportModal({
-      ...baseProps,
-      analysisGenerating: true,
-      analysisProgress: '',
-      analysisPayload: {
-        eligibility: {
-          counts: {
-            participants: 0,
-            questions: 0,
-            responses: 0,
+    render(
+      renderSurveyResultsHtmlReportExportModal({
+        ...baseProps,
+        analysisGenerating: true,
+        analysisProgress: '',
+        analysisPayload: {
+          eligibility: {
+            counts: {
+              participants: 0,
+              questions: 0,
+              responses: 0,
+            },
+            eligible: false,
+            reasons: ['Need at least one response.'],
           },
-          eligible: false,
-          reasons: ['Need at least one response.'],
         },
-      },
-      canDownload: false,
-      exportFormat: SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
-      htmlReportAnalysisError: 'Analysis failed.',
-      isAuthorized: false,
-      isDemoMode: false,
-      isDemoSession: false,
-      needsAnalysisGeneration: true,
-      snapshot: {
-        exportedAt: '2026-05-25T18:30:00.000Z',
-        session: {},
-      },
-    }));
+        canDownload: false,
+        exportFormat: SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
+        htmlReportAnalysisError: 'Analysis failed.',
+        isAuthorized: false,
+        isDemoMode: false,
+        isDemoSession: false,
+        needsAnalysisGeneration: true,
+        snapshot: {
+          exportedAt: '2026-05-25T18:30:00.000Z',
+          session: {},
+        },
+      }),
+    );
 
     expect(screen.getByText('Session')).toBeInTheDocument();
     expect(screen.getByText('Not connected')).toBeInTheDocument();
@@ -159,7 +161,9 @@ describe('SurveyResultsHtmlReportExportModal', () => {
     expect(screen.getByText('Connect a wallet to enable download.')).toBeInTheDocument();
 
     expect(screen.getByTestId('ce-surveyresults-html-report-generate-analysis')).toBeDisabled();
-    expect(screen.getByTestId('ce-surveyresults-html-report-generate-analysis')).toHaveTextContent('Generating Analysis Views...');
+    expect(screen.getByTestId('ce-surveyresults-html-report-generate-analysis')).toHaveTextContent(
+      'Generating Analysis Views...',
+    );
     expect(screen.getByTestId('ce-surveyresults-html-report-download')).toBeDisabled();
     expect(screen.getByTestId('ce-surveyresults-html-report-download')).toHaveTextContent('Download Single HTML');
     expect(screen.queryByTestId('ce-surveyresults-html-report-demo-mode')).toBeNull();
@@ -172,48 +176,62 @@ describe('SurveyResultsHtmlReportExportModal', () => {
   });
 
   it('builds download labels for every export format', () => {
-    expect(buildSurveyResultsHtmlReportDownloadLabel(SESSION_RESULTS_EXPORT_FORMAT_VIEWER)).toBe('Download HTML Viewer');
-    expect(buildSurveyResultsHtmlReportDownloadLabel(SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML)).toBe('Download Single HTML');
+    expect(buildSurveyResultsHtmlReportDownloadLabel(SESSION_RESULTS_EXPORT_FORMAT_VIEWER)).toBe(
+      'Download HTML Viewer',
+    );
+    expect(buildSurveyResultsHtmlReportDownloadLabel(SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML)).toBe(
+      'Download Single HTML',
+    );
     expect(buildSurveyResultsHtmlReportDownloadLabel(SESSION_RESULTS_EXPORT_FORMAT_PDF)).toBe('Download PDF');
   });
 
   it('builds action labels and inert display decisions without invoking handlers', () => {
-    expect(buildSurveyResultsHtmlReportExportModalDisplayPlan(baseProps)).toEqual(expect.objectContaining({
-      canGenerateAnalysis: true,
-      downloadBlockedMessage: 'Select only available sections, or generate selected analysis views before download.',
-      downloadLabel: 'Download HTML Viewer',
-      exporterLabel: '0xabc...def',
-      generateAnalysisLabel: 'Generate Analysis Views',
-      sessionLabel: 'Demo Session',
-      sessionSlugLabel: ' (demo)',
-    }));
+    expect(buildSurveyResultsHtmlReportExportModalDisplayPlan(baseProps)).toEqual(
+      expect.objectContaining({
+        canGenerateAnalysis: true,
+        downloadBlockedMessage: 'Select only available sections, or generate selected analysis views before download.',
+        downloadLabel: 'Download HTML Viewer',
+        exporterLabel: '0xabc...def',
+        generateAnalysisLabel: 'Generate Analysis Views',
+        sessionLabel: 'Demo Session',
+        sessionSlugLabel: ' (demo)',
+      }),
+    );
 
-    expect(buildSurveyResultsHtmlReportExportModalDisplayPlan({
-      ...baseProps,
-      analysisGenerating: true,
-      analysisProgress: '',
-      exportFormat: SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
-      isAuthorized: false,
-      snapshot: {
-        exportedAt: '2026-05-25T18:30:00.000Z',
-        session: {},
-      },
-    })).toEqual(expect.objectContaining({
-      canGenerateAnalysis: false,
-      downloadBlockedMessage: 'Connect a wallet to enable download.',
-      downloadLabel: 'Download Single HTML',
-      exporterLabel: 'Not connected',
-      generateAnalysisLabel: 'Generating Analysis Views...',
-      sessionLabel: 'Session',
-      sessionSlugLabel: '',
-    }));
+    expect(
+      buildSurveyResultsHtmlReportExportModalDisplayPlan({
+        ...baseProps,
+        analysisGenerating: true,
+        analysisProgress: '',
+        exportFormat: SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
+        isAuthorized: false,
+        snapshot: {
+          exportedAt: '2026-05-25T18:30:00.000Z',
+          session: {},
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canGenerateAnalysis: false,
+        downloadBlockedMessage: 'Connect a wallet to enable download.',
+        downloadLabel: 'Download Single HTML',
+        exporterLabel: 'Not connected',
+        generateAnalysisLabel: 'Generating Analysis Views...',
+        sessionLabel: 'Session',
+        sessionSlugLabel: '',
+      }),
+    );
 
-    expect(buildSurveyResultsHtmlReportExportModalDisplayPlan({
-      ...baseProps,
-      isDemoMode: true,
-    })).toEqual(expect.objectContaining({
-      canGenerateAnalysis: true,
-      generateAnalysisLabel: 'Refresh Demo Analysis',
-    }));
+    expect(
+      buildSurveyResultsHtmlReportExportModalDisplayPlan({
+        ...baseProps,
+        isDemoMode: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canGenerateAnalysis: true,
+        generateAnalysisLabel: 'Refresh Demo Analysis',
+      }),
+    );
   });
 });

@@ -43,9 +43,9 @@ describe('litProtocol getKey memoization', () => {
   it('does not share cache entries across requester addresses', async () => {
     const cekA = new Uint8Array(32).fill(1);
     const cekB = new Uint8Array(32).fill(2);
-    const getKeyUncached = jest.fn(async ({ requesterAddress }) => (
-      String(requesterAddress).toLowerCase() === ADDR_A ? cekA : cekB
-    ));
+    const getKeyUncached = jest.fn(async ({ requesterAddress }) =>
+      String(requesterAddress).toLowerCase() === ADDR_A ? cekA : cekB,
+    );
     const { getKey } = __test__wrapLitGetKeyWithCache(getKeyUncached, {
       litNetwork: BASE_OPTS.litNetwork,
       chain: BASE_OPTS.chain,

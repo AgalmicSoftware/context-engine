@@ -1,8 +1,5 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
-import {
-  CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP,
-  SHOW_DEMO_SESSIONS,
-} from '../../variables/appConfig.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP, SHOW_DEMO_SESSIONS } from '../../variables/appConfig.js';
 
 type SbtListRuntimeRecord = Record<string, unknown>;
 
@@ -50,9 +47,7 @@ const getDefaultSbtListRuntimeGlobal = (): SbtListRuntimeRecord => {
   }
 };
 
-const isSbtListRuntimeRecord = (value: unknown): value is SbtListRuntimeRecord => (
-  !!value && typeof value === 'object'
-);
+const isSbtListRuntimeRecord = (value: unknown): value is SbtListRuntimeRecord => !!value && typeof value === 'object';
 
 const dedupeNormalizedSbtListSlugs = (list: unknown = []): string[] => {
   const out: string[] = [];
@@ -66,13 +61,10 @@ const dedupeNormalizedSbtListSlugs = (list: unknown = []): string[] => {
   return out;
 };
 
-export const isSbtListManagedDgCacheName = (name: unknown): boolean => (
-  SBT_LIST_MANAGED_DG_CACHE_NAMES.has(String(name || ''))
-);
+export const isSbtListManagedDgCacheName = (name: unknown): boolean =>
+  SBT_LIST_MANAGED_DG_CACHE_NAMES.has(String(name || ''));
 
-export const readStoredSbtListModeSelectedSessionSlugs = (
-  storage?: SbtListStorageReader | null
-): string[] => {
+export const readStoredSbtListModeSelectedSessionSlugs = (storage?: SbtListStorageReader | null): string[] => {
   try {
     const resolvedStorage = typeof storage === 'undefined' ? getDefaultSbtListStorage() : storage;
     if (!resolvedStorage?.getItem) return [];
@@ -88,19 +80,16 @@ export const readStoredSbtListModeSelectedSessionSlugs = (
 export const resolveSbtListCreateGroupInitialVisibility = ({
   hasCachedCreateSbtForm = null,
   listSlug = '',
-}: ResolveSbtListCreateGroupInitialVisibilityArgs = {}): boolean => (
+}: ResolveSbtListCreateGroupInitialVisibilityArgs = {}): boolean =>
   typeof hasCachedCreateSbtForm === 'function'
     ? hasCachedCreateSbtForm({
-      sessionSlug: normalizeSessionSlug(listSlug || ''),
-      migrateLegacyToSessionKey: true,
-      clearInvalid: true,
-    })
-    : false
-);
+        sessionSlug: normalizeSessionSlug(listSlug || ''),
+        migrateLegacyToSessionKey: true,
+        clearInvalid: true,
+      })
+    : false;
 
-export const readSbtListUniverseCollapsedState = (
-  storage?: SbtListStorageReader | null
-): boolean => {
+export const readSbtListUniverseCollapsedState = (storage?: SbtListStorageReader | null): boolean => {
   try {
     const resolvedStorage = typeof storage === 'undefined' ? getDefaultSbtListStorage() : storage;
     return resolvedStorage?.getItem?.('dg:sbtUniverseCollapsed') === 'true';
@@ -111,22 +100,21 @@ export const readSbtListUniverseCollapsedState = (
 
 export const readSbtListShowDemoSessions = (
   runtimeGlobal = getDefaultSbtListRuntimeGlobal(),
-  fallback: unknown = SHOW_DEMO_SESSIONS
+  fallback: unknown = SHOW_DEMO_SESSIONS,
 ): boolean => {
   try {
-    if (
-      isSbtListRuntimeRecord(runtimeGlobal) &&
-      typeof runtimeGlobal.SHOW_DEMO_SESSIONS !== 'undefined'
-    ) {
+    if (isSbtListRuntimeRecord(runtimeGlobal) && typeof runtimeGlobal.SHOW_DEMO_SESSIONS !== 'undefined') {
       return !!runtimeGlobal.SHOW_DEMO_SESSIONS;
     }
-  } catch (e) { void e; /* fallback: demo visibility lookup. */ }
+  } catch (e) {
+    void e; /* fallback: demo visibility lookup. */
+  }
   return !!fallback;
 };
 
 export const readSbtListSyncBarResearchBlockStep = (
   runtimeGlobal = getDefaultSbtListRuntimeGlobal(),
-  fallback: unknown = CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP
+  fallback: unknown = CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP,
 ): number => {
   try {
     if (
@@ -138,7 +126,9 @@ export const readSbtListSyncBarResearchBlockStep = (
         return Math.max(1, Math.floor(runtimeValue));
       }
     }
-  } catch (e) { void e; /* fallback: sync-bar research step lookup. */ }
+  } catch (e) {
+    void e; /* fallback: sync-bar research step lookup. */
+  }
 
   const defaultValue = Number(fallback || 0);
   if (Number.isFinite(defaultValue) && defaultValue > 0) {

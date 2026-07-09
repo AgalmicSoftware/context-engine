@@ -5,48 +5,25 @@
 import * as ethersModule from 'ethers';
 
 const resolveEthersCompat = (loadedModule) => {
-  const direct =
-    loadedModule?.ethers ||
-    loadedModule?.default?.ethers ||
-    loadedModule?.default ||
-    loadedModule;
+  const direct = loadedModule?.ethers || loadedModule?.default?.ethers || loadedModule?.default || loadedModule;
   if (direct) return direct;
   try {
     if (typeof require === 'function') {
       const requiredModule = require('ethers');
-      return (
-        requiredModule?.ethers ||
-        requiredModule?.default?.ethers ||
-        requiredModule?.default ||
-        requiredModule
-      );
+      return requiredModule?.ethers || requiredModule?.default?.ethers || requiredModule?.default || requiredModule;
     }
   } catch (_) {}
   return loadedModule;
 };
 
-const ethers =
-  resolveEthersCompat(ethersModule);
+const ethers = resolveEthersCompat(ethersModule);
 const getEthersFn = (...candidates) => candidates.find((fn) => typeof fn === 'function') || null;
-const getEthersUtils = () => (
-  ethers?.utils ||
-  ethersModule?.utils ||
-  ethersModule?.ethers?.utils ||
-  null
-);
+const getEthersUtils = () => ethers?.utils || ethersModule?.utils || ethersModule?.ethers?.utils || null;
 const getAdminHashFns = () => {
   const utils = getEthersUtils();
   return {
-    keccak256: getEthersFn(
-      utils?.keccak256,
-      ethers?.keccak256,
-      ethers?.ethers?.keccak256,
-    ),
-    toUtf8Bytes: getEthersFn(
-      utils?.toUtf8Bytes,
-      ethers?.toUtf8Bytes,
-      ethers?.ethers?.toUtf8Bytes,
-    ),
+    keccak256: getEthersFn(utils?.keccak256, ethers?.keccak256, ethers?.ethers?.keccak256),
+    toUtf8Bytes: getEthersFn(utils?.toUtf8Bytes, ethers?.toUtf8Bytes, ethers?.ethers?.toUtf8Bytes),
   };
 };
 
@@ -84,22 +61,10 @@ export const ADMIN_ACTION_AUTH_FIELDS = Object.freeze([
   'expiration',
 ]);
 
-const toTrimmedString = (value) => (
-  typeof value === 'string'
-    ? value.trim()
-    : value == null
-      ? ''
-      : String(value).trim()
-);
+const toTrimmedString = (value) =>
+  typeof value === 'string' ? value.trim() : value == null ? '' : String(value).trim();
 
-export const buildAdminActionMessage = ({
-  action,
-  slug,
-  bodyHash,
-  nonce,
-  audience,
-  expiration,
-} = {}) => ({
+export const buildAdminActionMessage = ({ action, slug, bodyHash, nonce, audience, expiration } = {}) => ({
   action: toTrimmedString(action),
   slug: toTrimmedString(slug),
   bodyHash: toTrimmedString(bodyHash),
@@ -127,14 +92,11 @@ export const stripAdminActionAuthFields = (body = {}) => {
   }, {});
 };
 
-export const buildAdminActionBodyHash = (body = {}) => (
+export const buildAdminActionBodyHash = (body = {}) =>
   (() => {
     const { keccak256, toUtf8Bytes } = getAdminHashFns();
     if (!keccak256 || !toUtf8Bytes) {
       throw new Error('ethers utils unavailable for admin action hashing.');
     }
-    return keccak256(
-      toUtf8Bytes(JSON.stringify(stripAdminActionAuthFields(body)))
-    );
-  })()
-);
+    return keccak256(toUtf8Bytes(JSON.stringify(stripAdminActionAuthFields(body))));
+  })();

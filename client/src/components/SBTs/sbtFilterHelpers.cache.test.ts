@@ -42,18 +42,12 @@ describe('sbtFilterHelpers cache helpers', () => {
     expect(getCachedSbtFilterQuestionResponseMap(netBucket, 'q1')).toEqual({
       '0xResponder': { answer: 'yes' },
     });
-    expect(unifySbtFilterAggregatorWithAllLocalQuestions(
-      [{ id: 'q1' }],
-      84532,
-      'questions',
-      ' alpha ',
-      readCache
-    )).toEqual([
+    expect(
+      unifySbtFilterAggregatorWithAllLocalQuestions([{ id: 'q1' }], 84532, 'questions', ' alpha ', readCache),
+    ).toEqual([{ id: 'q1' }, { id: 'q2', creator: '0xOther' }]);
+    expect(unifySbtFilterAggregatorWithAllLocalQuestions([{ id: 'q1' }], '', 'questions', 'alpha', readCache)).toEqual([
       { id: 'q1' },
-      { id: 'q2', creator: '0xOther' },
     ]);
-    expect(unifySbtFilterAggregatorWithAllLocalQuestions([{ id: 'q1' }], '', 'questions', 'alpha', readCache))
-      .toEqual([{ id: 'q1' }]);
   });
 
   it('builds SBT entry cache patches without mutating existing cache buckets', () => {
@@ -73,15 +67,17 @@ describe('sbtFilterHelpers cache helpers', () => {
       },
     };
 
-    expect(buildSbtFilterSbtEntryCachePatch({
-      rawCache,
-      netKey: 84532,
-      sbtAddress: '0xabc',
-      entryPatch: {
-        countsLoaded: true,
-        mintedAddresses: ['0x2'],
-      },
-    })).toEqual({
+    expect(
+      buildSbtFilterSbtEntryCachePatch({
+        rawCache,
+        netKey: 84532,
+        sbtAddress: '0xabc',
+        entryPatch: {
+          countsLoaded: true,
+          mintedAddresses: ['0x2'],
+        },
+      }),
+    ).toEqual({
       untouched: true,
       '84532': {
         otherNetValue: 'keep',
@@ -98,12 +94,14 @@ describe('sbtFilterHelpers cache helpers', () => {
       },
     });
     expect(rawCache['84532'].sbtList['0xabc'].mintedAddresses).toEqual(['0x1']);
-    expect(buildSbtFilterSbtEntryCachePatch({
-      rawCache,
-      netKey: '',
-      sbtAddress: '0xabc',
-      entryPatch: { countsLoaded: true },
-    })).toBeNull();
+    expect(
+      buildSbtFilterSbtEntryCachePatch({
+        rawCache,
+        netKey: '',
+        sbtAddress: '0xabc',
+        entryPatch: { countsLoaded: true },
+      }),
+    ).toBeNull();
   });
 
   it('memoizes SBT cache reads by slug and resolves net buckets from the memo', () => {

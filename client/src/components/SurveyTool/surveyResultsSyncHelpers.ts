@@ -14,34 +14,29 @@ export type SurveyResultsSyncStateLike = {
 export const isSurveyResultsSourceSynced = (
   localBlockValue: unknown,
   refreshTargetBlockValue: unknown,
-  networkLatestBlockValue: unknown
+  networkLatestBlockValue: unknown,
 ): boolean => {
   const localBlock = normalizeSurveyResultsBlockNumber(localBlockValue);
   const refreshTargetBlock = normalizeSurveyResultsBlockNumber(refreshTargetBlockValue);
   const networkLatestBlock = normalizeSurveyResultsBlockNumber(networkLatestBlockValue);
   if (localBlock === 0 || networkLatestBlock === 0) return false;
   const clampedLocalBlock = Math.min(localBlock, networkLatestBlock);
-  const clampedTargetBlock =
-    refreshTargetBlock > 0 ? Math.min(refreshTargetBlock, networkLatestBlock) : 0;
-  return clampedTargetBlock > 0
-    ? clampedLocalBlock >= clampedTargetBlock
-    : clampedLocalBlock >= networkLatestBlock;
+  const clampedTargetBlock = refreshTargetBlock > 0 ? Math.min(refreshTargetBlock, networkLatestBlock) : 0;
+  return clampedTargetBlock > 0 ? clampedLocalBlock >= clampedTargetBlock : clampedLocalBlock >= networkLatestBlock;
 };
 
-export const isSurveyResultsStateSynced = (
-  stateSnapshot: SurveyResultsSyncStateLike = {}
-): boolean => {
+export const isSurveyResultsStateSynced = (stateSnapshot: SurveyResultsSyncStateLike = {}): boolean => {
   if (stateSnapshot?.viewMode === 'questions') {
     return (
       isSurveyResultsSourceSynced(
         stateSnapshot.questionLocalBlock,
         stateSnapshot.refreshTargetQuestionBlock,
-        stateSnapshot.networkLatestBlock
+        stateSnapshot.networkLatestBlock,
       ) &&
       isSurveyResultsSourceSynced(
         stateSnapshot.responseLocalBlock,
         stateSnapshot.refreshTargetResponseBlock,
-        stateSnapshot.networkLatestBlock
+        stateSnapshot.networkLatestBlock,
       )
     );
   }
@@ -49,6 +44,6 @@ export const isSurveyResultsStateSynced = (
   return isSurveyResultsSourceSynced(
     stateSnapshot?.surveyLocalBlock,
     stateSnapshot?.refreshTargetSurveyBlock,
-    stateSnapshot?.networkLatestBlock
+    stateSnapshot?.networkLatestBlock,
   );
 };

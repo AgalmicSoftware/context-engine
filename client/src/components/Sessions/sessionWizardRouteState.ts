@@ -9,9 +9,8 @@ export const normalizeSessionWizardPathname = (pathname = ''): string => {
   return normalized || '/';
 };
 
-export const isNewSessionWizardPathname = (pathname = ''): boolean => (
-  SESSION_WIZARD_NEW_SESSION_PATHNAMES.has(normalizeSessionWizardPathname(pathname))
-);
+export const isNewSessionWizardPathname = (pathname = ''): boolean =>
+  SESSION_WIZARD_NEW_SESSION_PATHNAMES.has(normalizeSessionWizardPathname(pathname));
 
 export const readSessionWizardNewSessionBannerDismissed = (): boolean => {
   if (typeof window === 'undefined') return false;

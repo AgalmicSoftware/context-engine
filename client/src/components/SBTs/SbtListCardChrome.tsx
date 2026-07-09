@@ -21,11 +21,7 @@ type SbtListMetaRowProps = {
   styles: SbtListCardChromeStyles;
 };
 
-export const SbtListDetailsPanel = ({
-  details,
-  detailsId,
-  styles,
-}: SbtListDetailsPanelProps): JSX.Element | null => {
+export const SbtListDetailsPanel = ({ details, detailsId, styles }: SbtListDetailsPanelProps): JSX.Element | null => {
   if (!details?.hasDetails) return null;
   return (
     <div id={detailsId} className={styles.sbtDetailsPanel}>
@@ -61,16 +57,10 @@ export const SbtListMetaRow = ({
   styles,
 }: SbtListMetaRowProps): JSX.Element | null => {
   if (!model) return null;
-  const {
-    hasDetailsToggle,
-    hasTags,
-    isExpanded,
-    tags,
-  } = model;
-  const metaRowClassName = [
-    styles.sbtMetaRow,
-    hasTags ? styles.sbtMetaRowWithTags : styles.sbtMetaRowToggleOnly,
-  ].filter(Boolean).join(' ');
+  const { hasDetailsToggle, hasTags, isExpanded, tags } = model;
+  const metaRowClassName = [styles.sbtMetaRow, hasTags ? styles.sbtMetaRowWithTags : styles.sbtMetaRowToggleOnly]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div className={metaRowClassName}>
@@ -98,10 +88,7 @@ export const SbtListMetaRow = ({
           aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${buttonLabel}`}
           onClick={onToggleDetails}
         >
-          <FontAwesomeIcon
-            icon={isExpanded ? faCaretUp : faCaretDown}
-            className={styles.sbtDetailsToggleIcon}
-          />
+          <FontAwesomeIcon icon={isExpanded ? faCaretUp : faCaretDown} className={styles.sbtDetailsToggleIcon} />
         </button>
       )}
     </div>

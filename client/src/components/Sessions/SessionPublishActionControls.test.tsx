@@ -5,7 +5,7 @@ import SessionPublishActionControls from './SessionPublishActionControls';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const buildDisplayState = (
-  overrides: Partial<React.ComponentProps<typeof SessionPublishActionControls>['displayState']> = {}
+  overrides: Partial<React.ComponentProps<typeof SessionPublishActionControls>['displayState']> = {},
 ): React.ComponentProps<typeof SessionPublishActionControls>['displayState'] => ({
   canPublishNow: true,
   displayMode: 'advanced',
@@ -18,7 +18,7 @@ const buildDisplayState = (
 });
 
 const buildProps = (
-  overrides: Partial<React.ComponentProps<typeof SessionPublishActionControls>> = {}
+  overrides: Partial<React.ComponentProps<typeof SessionPublishActionControls>> = {},
 ): React.ComponentProps<typeof SessionPublishActionControls> => ({
   displayState: buildDisplayState(),
   onPublish: jest.fn(),
@@ -40,7 +40,7 @@ describe('SessionPublishActionControls', () => {
           onPublish,
           onTogglePublishAdvanced,
         })}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH));
@@ -63,7 +63,7 @@ describe('SessionPublishActionControls', () => {
           onPublish,
           onTogglePublishAdvanced,
         })}
-      />
+      />,
     );
 
     const busyPublishButton = screen.getByRole('button', { name: /Publishing/i });
@@ -81,7 +81,7 @@ describe('SessionPublishActionControls', () => {
           onPublish,
           onTogglePublishAdvanced,
         })}
-      />
+      />,
     );
 
     const blockedPublishButton = screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
@@ -106,7 +106,7 @@ describe('SessionPublishActionControls', () => {
           onPublish,
           onTogglePublishAdvanced,
         })}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Advanced publish settings' }));

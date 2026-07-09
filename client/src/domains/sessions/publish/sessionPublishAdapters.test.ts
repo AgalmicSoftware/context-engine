@@ -31,41 +31,48 @@ describe('session publish adapters', () => {
       adminAuth: null,
     }));
     const adapter = bindArweavePublishAdapter({
-      arweaveScripts: () => currentScripts,
+      arweaveClient: () => currentScripts,
       resolveUploadOptions,
     });
     const payload = { slug: 'alpha' };
     const options = { requestId: 'arw_meta_test' };
 
-    await expect(adapter.uploadDataToArweave({
-      data: payload,
-      format: 'json',
-      options,
-    })).resolves.toBe('first-tx');
+    await expect(
+      adapter.uploadDataToArweave({
+        data: payload,
+        format: 'json',
+        options,
+      }),
+    ).resolves.toBe('first-tx');
 
     currentScripts = secondScripts;
 
-    await expect(adapter.buildArweaveGatewayUrl({ txId: 'second-tx' }))
-      .toBe('https://gateway.example/second');
-    await expect(adapter.resolveUploadOptions({
-      arweaveJwk: '{"kty":"RSA"}',
-      workerUrl: 'https://worker.example.test',
-      preferDirectArweaveUpload: true,
-    })).resolves.toEqual(expect.objectContaining({
-      forceDirectArweaveUpload: true,
-    }));
+    await expect(adapter.buildArweaveGatewayUrl({ txId: 'second-tx' })).toBe('https://gateway.example/second');
+    await expect(
+      adapter.resolveUploadOptions({
+        arweaveJwk: '{"kty":"RSA"}',
+        workerUrl: 'https://worker.example.test',
+        preferDirectArweaveUpload: true,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        forceDirectArweaveUpload: true,
+      }),
+    );
 
     expect(firstScripts.uploadDataToArweave).toHaveBeenCalledWith(payload, 'json', options);
     expect(secondScripts.buildArweaveGatewayUrl).toHaveBeenCalledWith('second-tx');
-    expect(resolveUploadOptions).toHaveBeenCalledWith(expect.objectContaining({
-      workerUrl: 'https://worker.example.test',
-    }));
+    expect(resolveUploadOptions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workerUrl: 'https://worker.example.test',
+      }),
+    );
   });
 
   it('propagates Arweave upload errors', async () => {
     const failure = new Error('upload failed');
     const adapter = bindArweavePublishAdapter({
-      arweaveScripts: () => ({
+      arweaveClient: () => ({
         uploadDataToArweave: jest.fn(async () => {
           throw failure;
         }),
@@ -73,11 +80,13 @@ describe('session publish adapters', () => {
       }),
     });
 
-    await expect(adapter.uploadDataToArweave({
-      data: { slug: 'broken' },
-      format: 'json',
-      options: {},
-    })).rejects.toBe(failure);
+    await expect(
+      adapter.uploadDataToArweave({
+        data: { slug: 'broken' },
+        format: 'json',
+        options: {},
+      }),
+    ).rejects.toBe(failure);
   });
 
   it('binds registry calls with call-time module lookup', async () => {
@@ -117,21 +126,23 @@ describe('session publish adapters', () => {
 
     currentRegistry = secondRegistry;
 
-    await expect(adapter.getRegistryContract({
-      chainId: 11155420,
-      providerLike: null,
-      options: { bootstrapRpc: true },
-    })).toEqual({ name: 'second-contract' });
-    await expect(adapter.refreshRegistryCache({
-      fetchArgs: { chainId: 11155420, slug: 'second' },
-    })).resolves.toEqual({ slug: 'second' });
+    await expect(
+      adapter.getRegistryContract({
+        chainId: 11155420,
+        providerLike: null,
+        options: { bootstrapRpc: true },
+      }),
+    ).toEqual({ name: 'second-contract' });
+    await expect(
+      adapter.refreshRegistryCache({
+        fetchArgs: { chainId: 11155420, slug: 'second' },
+      }),
+    ).resolves.toEqual({ slug: 'second' });
 
     expect(firstRegistry.registerSessionOnChain).toHaveBeenCalledWith(registerArgs);
-    expect(secondRegistry.sessionRegistryUtils.getRegistryContract).toHaveBeenCalledWith(
-      11155420,
-      null,
-      { bootstrapRpc: true },
-    );
+    expect(secondRegistry.sessionRegistryUtils.getRegistryContract).toHaveBeenCalledWith(11155420, null, {
+      bootstrapRpc: true,
+    });
     expect(secondRegistry.sessionRegistryUtils.upsertSessionRegistryCache).toHaveBeenCalledWith({
       config: { slug: 'second' },
     });
@@ -150,10 +161,8 @@ describe('session publish adapters', () => {
     const actionInput = { action: 'set-config', slug: 'alpha', body: {} };
 
     expect(adapter.normalizeWorkerUrl(' https://worker.example.test ')).toBe('https://worker.example.test');
-    await expect(adapter.buildSignedBootstrapAdminAuth(bootstrapInput))
-      .resolves.toEqual({ signature: '0xbootstrap' });
-    await expect(adapter.buildSignedAdminActionAuth(actionInput))
-      .resolves.toEqual({ signature: '0xaction' });
+    await expect(adapter.buildSignedBootstrapAdminAuth(bootstrapInput)).resolves.toEqual({ signature: '0xbootstrap' });
+    await expect(adapter.buildSignedAdminActionAuth(actionInput)).resolves.toEqual({ signature: '0xaction' });
 
     expect(workerAuth.normalizeWorkerUrl).toHaveBeenCalledWith(' https://worker.example.test ');
     expect(workerAuth.buildSignedBootstrapAdminAuth).toHaveBeenCalledWith(bootstrapInput);
@@ -179,8 +188,9 @@ describe('session publish adapters', () => {
 
     expect(sponsoredAdapter.normalizeSparseSponsoredBundlePayload(rawBundle)).toEqual({ openaiKey: 'key' });
     expect(sponsoredAdapter.hasSponsoredBundleFields({ openaiKey: 'key' })).toBe(true);
-    expect(receiptAdapter.resolveSbtAddressFromFactoryReceipt({ receipt }))
-      .toBe('0x0000000000000000000000000000000000000001');
+    expect(receiptAdapter.resolveSbtAddressFromFactoryReceipt({ receipt })).toBe(
+      '0x0000000000000000000000000000000000000001',
+    );
 
     expect(sponsoredBundles.normalizeSparseSponsoredBundlePayload).toHaveBeenCalledWith(rawBundle);
     expect(sponsoredBundles.hasSponsoredBundleFields).toHaveBeenCalledWith({ openaiKey: 'key' });
@@ -219,19 +229,23 @@ describe('session publish adapters', () => {
       metadataReadsPort: () => currentPort,
     });
 
-    await expect(adapter.getSbtMetadata({
-      providerName: 'none',
-      sbtAddress: '0x0000000000000000000000000000000000000001',
-      groupKeyOrCfg: 'alpha',
-    })).resolves.toEqual({ name: 'first' });
+    await expect(
+      adapter.getSbtMetadata({
+        providerName: 'none',
+        sbtAddress: '0x0000000000000000000000000000000000000001',
+        groupKeyOrCfg: 'alpha',
+      }),
+    ).resolves.toEqual({ name: 'first' });
 
     currentPort = secondPort;
 
-    await expect(adapter.getSbtMetadata({
-      providerName: { selectedAddress: '0x0000000000000000000000000000000000000002' },
-      sbtAddress: '0x0000000000000000000000000000000000000003',
-      groupKeyOrCfg: { slug: 'beta' },
-    })).resolves.toEqual({ name: 'second' });
+    await expect(
+      adapter.getSbtMetadata({
+        providerName: { selectedAddress: '0x0000000000000000000000000000000000000002' },
+        sbtAddress: '0x0000000000000000000000000000000000000003',
+        groupKeyOrCfg: { slug: 'beta' },
+      }),
+    ).resolves.toEqual({ name: 'second' });
 
     expect(firstPort.getSbtMetadata).toHaveBeenCalledWith(
       'none',

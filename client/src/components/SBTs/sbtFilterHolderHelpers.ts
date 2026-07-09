@@ -59,10 +59,8 @@ type SbtFilterHolderRequestKeyArgs = {
 
 type BuildSbtFilterHolderFetchResultArgs = {
   counts?: unknown;
-  resolveHoldersSet?: ((
-    mintedCountByAddress: AddressCountMap,
-    burnedCountByAddress: AddressCountMap
-  ) => Set<string>) | null;
+  resolveHoldersSet?:
+    ((mintedCountByAddress: AddressCountMap, burnedCountByAddress: AddressCountMap) => Set<string>) | null;
 };
 
 type BuildSbtFilterFetchedHolderCacheEntryPatchArgs = {
@@ -110,9 +108,8 @@ export type SbtFilterHolderFetchResult = {
 
 export type SbtHolderSetMap = Record<string, Set<string>>;
 
-const asHolderRecord = (value: unknown): UnknownRecord => (
-  (value && typeof value === 'object') ? value as UnknownRecord : {}
-);
+const asHolderRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' ? (value as UnknownRecord) : {};
 
 export const normalizeAddressCountMap = (value: unknown = null): AddressCountMap => {
   const out: AddressCountMap = {};
@@ -127,16 +124,15 @@ export const normalizeAddressCountMap = (value: unknown = null): AddressCountMap
 };
 
 export const countMapFingerprint = (value: unknown = null): string => {
-  const entries = Object.entries(normalizeAddressCountMap(value))
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const entries = Object.entries(normalizeAddressCountMap(value)).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   if (!entries.length) return 'nil';
   let hash = 0;
   entries.forEach(([addr, count]) => {
     const token = `${addr}:${count}`;
     for (let i = 0; i < token.length; i += 1) {
-      hash = ((hash * 31) + token.charCodeAt(i)) | 0;
+      hash = (hash * 31 + token.charCodeAt(i)) | 0;
     }
-    hash = ((hash * 131) + 1) | 0;
+    hash = (hash * 131 + 1) | 0;
   });
   return `${entries.length}:${hash}`;
 };
@@ -158,21 +154,12 @@ export const resolveSbtFilterEntryCountMapUsage = ({
     !!entryRecord.countsScanCheckpoint &&
     typeof entryRecord.countsScanCheckpoint === 'object';
   const hasStructuredEntryCountMaps =
-    (
-      !!rawEntryMintedCounts &&
-      typeof rawEntryMintedCounts === 'object' &&
-      !Array.isArray(rawEntryMintedCounts)
-    ) || (
-      !!rawEntryBurnedCounts &&
-      typeof rawEntryBurnedCounts === 'object' &&
-      !Array.isArray(rawEntryBurnedCounts)
-    );
+    (!!rawEntryMintedCounts && typeof rawEntryMintedCounts === 'object' && !Array.isArray(rawEntryMintedCounts)) ||
+    (!!rawEntryBurnedCounts && typeof rawEntryBurnedCounts === 'object' && !Array.isArray(rawEntryBurnedCounts));
   const hasAuthoritativeEntryCountMaps =
-    (
-      Object.keys(mintedCountMapRecord).length > 0 ||
-      Object.keys(burnedCountMapRecord).length > 0 ||
-      (entryRecord.countsLoaded === true && hasStructuredEntryCountMaps && !entryMinted && !entryBurned)
-    );
+    Object.keys(mintedCountMapRecord).length > 0 ||
+    Object.keys(burnedCountMapRecord).length > 0 ||
+    (entryRecord.countsLoaded === true && hasStructuredEntryCountMaps && !entryMinted && !entryBurned);
   return {
     checkpointBackedPartialCounts,
     hasAuthoritativeEntryCountMaps,
@@ -187,9 +174,9 @@ export const computeHolderListFingerprint = (addresses: unknown): string => {
   for (let i = 0; i < addresses.length; i += 1) {
     const normalized = String(addresses[i] || '').toLowerCase();
     for (let j = 0; j < normalized.length; j += 1) {
-      hash = ((hash * 31) + normalized.charCodeAt(j)) | 0;
+      hash = (hash * 31 + normalized.charCodeAt(j)) | 0;
     }
-    hash = ((hash * 131) + 1) | 0;
+    hash = (hash * 131 + 1) | 0;
   }
   return `${addresses.length}:${hash}`;
 };
@@ -206,7 +193,7 @@ export const buildSbtFilterHolderRevisionKey = ({
   sbtCacheRevision = 0,
   sbtSlug = '',
   shouldUseEntryCountMaps = false,
-}: SbtFilterHolderRevisionKeyArgs = {}): string => (
+}: SbtFilterHolderRevisionKeyArgs = {}): string =>
   [
     String(sbtSlug || ''),
     String(netKey || ''),
@@ -219,8 +206,7 @@ export const buildSbtFilterHolderRevisionKey = ({
     String(mintedListFingerprint),
     String(burnedListFingerprint),
     String(creationBlock ?? ''),
-  ].join('|')
-);
+  ].join('|');
 
 export const resolveSbtFilterCreationBlock = ({
   entry = null,
@@ -250,20 +236,14 @@ export const buildSbtFilterHolderRequestKey = ({
   netKey = '',
   sbtAddress = '',
   sbtSlug = '',
-}: SbtFilterHolderRequestKeyArgs = {}): string => (
-  [
-    String(sbtSlug || ''),
-    String(netKey || ''),
-    String(sbtAddress || ''),
-    String(fromBlock || 0),
-  ].join('|')
-);
+}: SbtFilterHolderRequestKeyArgs = {}): string =>
+  [String(sbtSlug || ''), String(netKey || ''), String(sbtAddress || ''), String(fromBlock || 0)].join('|');
 
 export const setBoundedSbtHolderMemoEntry = (
   memo: Map<string, Set<string>>,
   key: unknown,
   value: Set<string>,
-  maxEntries: number
+  maxEntries: number,
 ): void => {
   const memoKey = String(key || '');
   if (!memoKey) return;
@@ -286,9 +266,8 @@ export const buildHistorySummaryFromCounts = ({
 }: HistorySummaryCountArgs = {}) => {
   const mintedMap = normalizeAddressCountMap(mintedCountByAddress);
   const burnedMap = normalizeAddressCountMap(burnedCountByAddress);
-  const sumCounts = (value: AddressCountMap = {}) => Object.values(value).reduce((sum, count) => (
-    sum + Math.max(0, Math.floor(Number(count || 0)))
-  ), 0);
+  const sumCounts = (value: AddressCountMap = {}) =>
+    Object.values(value).reduce((sum, count) => sum + Math.max(0, Math.floor(Number(count || 0))), 0);
   let activeSupply = 0;
   let currentHolderCount = 0;
   Object.keys(mintedMap).forEach((addr) => {
@@ -307,12 +286,9 @@ export const buildHistorySummaryFromCounts = ({
   };
 };
 
-export const buildNetHoldersSet = (
-  mintedAddresses: unknown = [],
-  burnedAddresses: unknown = []
-): Set<string> => {
+export const buildNetHoldersSet = (mintedAddresses: unknown = [], burnedAddresses: unknown = []): Set<string> => {
   const burnedSet = new Set<string>(
-    (Array.isArray(burnedAddresses) ? burnedAddresses : []).map((addr) => String(addr || '').toLowerCase())
+    (Array.isArray(burnedAddresses) ? burnedAddresses : []).map((addr) => String(addr || '').toLowerCase()),
   );
   const holders = new Set<string>();
   (Array.isArray(mintedAddresses) ? mintedAddresses : []).forEach((addr) => {
@@ -325,7 +301,7 @@ export const buildNetHoldersSet = (
 
 export const buildNetHoldersSetFromCounts = (
   mintedCountByAddress: unknown = {},
-  burnedCountByAddress: unknown = {}
+  burnedCountByAddress: unknown = {},
 ): Set<string> => {
   const mintedMap = normalizeAddressCountMap(mintedCountByAddress);
   const burnedMap = normalizeAddressCountMap(burnedCountByAddress);
@@ -333,7 +309,7 @@ export const buildNetHoldersSetFromCounts = (
   Object.keys(mintedMap).forEach((addr) => {
     const minted = Math.max(0, Math.floor(Number(mintedMap[addr] || 0)));
     const burned = Math.max(0, Math.floor(Number(burnedMap[addr] || 0)));
-    if ((minted - burned) > 0) {
+    if (minted - burned > 0) {
       holders.add(addr);
     }
   });
@@ -347,9 +323,7 @@ export const buildSbtFilterHolderFetchResult = ({
   const countsRecord = asHolderRecord(counts);
   const mintedCountByAddress = normalizeAddressCountMap(countsRecord.mintedCountByAddress);
   const burnedCountByAddress = normalizeAddressCountMap(countsRecord.burnedCountByAddress);
-  const holdersResolver = typeof resolveHoldersSet === 'function'
-    ? resolveHoldersSet
-    : buildNetHoldersSetFromCounts;
+  const holdersResolver = typeof resolveHoldersSet === 'function' ? resolveHoldersSet : buildNetHoldersSetFromCounts;
 
   return {
     mintedAddresses: Object.keys(mintedCountByAddress),
@@ -424,10 +398,7 @@ export const buildSbtFilterFetchedHolderRevisionKey = ({
   });
 };
 
-export const buildHolderUnionSet = (
-  sbtEntries: unknown = [],
-  sbtHoldersMap: SbtHolderSetMap = {}
-): Set<string> => {
+export const buildHolderUnionSet = (sbtEntries: unknown = [], sbtHoldersMap: SbtHolderSetMap = {}): Set<string> => {
   const union = new Set<string>();
   (Array.isArray(sbtEntries) ? sbtEntries : []).forEach((sbtInput) => {
     const sbt = asSelectedSbtEntry(sbtInput);

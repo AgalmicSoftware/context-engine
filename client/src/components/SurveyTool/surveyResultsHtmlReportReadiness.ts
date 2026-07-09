@@ -1,10 +1,5 @@
-import type {
-  SessionResultsHtmlSnapshot,
-  SessionResultsSectionSelection,
-} from '../../utilities/sessionResultsExport';
-import {
-  normalizeSurveyResultsHtmlReportSelectedSections,
-} from './surveyResultsHtmlReportSelection';
+import type { SessionResultsHtmlSnapshot, SessionResultsSectionSelection } from '../../utilities/sessionResultsExport';
+import { normalizeSurveyResultsHtmlReportSelectedSections } from './surveyResultsHtmlReportSelection';
 
 export type SurveyResultsHtmlReportSectionAvailability = {
   argumentMap: boolean;
@@ -40,11 +35,8 @@ export type SurveyResultsHtmlReportReadinessPlanInput = {
   snapshot: SessionResultsHtmlSnapshot;
 };
 
-export const SURVEY_RESULTS_HTML_REPORT_ANALYSIS_SECTION_KEYS: readonly SurveyResultsHtmlReportSectionKey[] = Object.freeze([
-  'argumentMap',
-  'riskMatrix',
-  'atlas',
-]);
+export const SURVEY_RESULTS_HTML_REPORT_ANALYSIS_SECTION_KEYS: readonly SurveyResultsHtmlReportSectionKey[] =
+  Object.freeze(['argumentMap', 'riskMatrix', 'atlas']);
 
 const HTML_REPORT_SECTION_LABELS: Record<SurveyResultsHtmlReportSectionKey, string> = Object.freeze({
   argumentMap: 'Argument Map',
@@ -55,7 +47,7 @@ const HTML_REPORT_SECTION_LABELS: Record<SurveyResultsHtmlReportSectionKey, stri
 });
 
 const buildSurveyResultsHtmlReportSectionAvailability = (
-  snapshot: SessionResultsHtmlSnapshot
+  snapshot: SessionResultsHtmlSnapshot,
 ): SurveyResultsHtmlReportSectionAvailability => ({
   report: !!snapshot.sections.report.available,
   argumentMap: !!snapshot.sections.argumentMap.available,
@@ -84,41 +76,32 @@ export const buildSurveyResultsHtmlReportReadinessPlan = ({
 }: SurveyResultsHtmlReportReadinessPlanInput): SurveyResultsHtmlReportReadinessPlan => {
   const normalizedSelectedSections = normalizeSurveyResultsHtmlReportSelectedSections(selectedSections);
   const availability = buildSurveyResultsHtmlReportSectionAvailability(snapshot);
-  const sectionRows: SurveyResultsHtmlReportSectionRow[] = ([
-    'report',
-    'argumentMap',
-    'riskMatrix',
-    'atlas',
-    'snapshotJson',
-  ] as SurveyResultsHtmlReportSectionKey[]).map((key) => ({
+  const sectionRows: SurveyResultsHtmlReportSectionRow[] = (
+    ['report', 'argumentMap', 'riskMatrix', 'atlas', 'snapshotJson'] as SurveyResultsHtmlReportSectionKey[]
+  ).map((key) => ({
     available: availability[key],
     key,
     label: HTML_REPORT_SECTION_LABELS[key],
     reason: getSurveyResultsHtmlReportSectionReason({ availability, key }),
   }));
-  const hasExportableSections = (
+  const hasExportableSections =
     (normalizedSelectedSections.report && availability.report) ||
     (normalizedSelectedSections.argumentMap && availability.argumentMap) ||
     (normalizedSelectedSections.riskMatrix && availability.riskMatrix) ||
     (normalizedSelectedSections.atlas && availability.atlas) ||
-    normalizedSelectedSections.snapshotJson
-  );
-  const hasUnavailableSelectedSections = (
+    normalizedSelectedSections.snapshotJson;
+  const hasUnavailableSelectedSections =
     (normalizedSelectedSections.report && !availability.report) ||
     (normalizedSelectedSections.argumentMap && !availability.argumentMap) ||
     (normalizedSelectedSections.riskMatrix && !availability.riskMatrix) ||
-    (normalizedSelectedSections.atlas && !availability.atlas)
-  );
+    (normalizedSelectedSections.atlas && !availability.atlas);
   const needsAnalysisGeneration = SURVEY_RESULTS_HTML_REPORT_ANALYSIS_SECTION_KEYS.some(
-    (key) => normalizedSelectedSections[key] && !availability[key]
+    (key) => normalizedSelectedSections[key] && !availability[key],
   );
 
   return {
     availability,
-    canDownload: !!isAuthorized &&
-      hasExportableSections &&
-      !hasUnavailableSelectedSections &&
-      !analysisGenerating,
+    canDownload: !!isAuthorized && hasExportableSections && !hasUnavailableSelectedSections && !analysisGenerating,
     hasExportableSections,
     hasUnavailableSelectedSections,
     needsAnalysisGeneration,

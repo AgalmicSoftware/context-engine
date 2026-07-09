@@ -1,10 +1,7 @@
 /** @file AudioInput.tsx */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  Input,
-  InputGroupText
-} from 'reactstrap';
+import { Input, InputGroupText } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faMicrophone,
@@ -17,16 +14,17 @@ import {
   faPause,
   faPlay,
   faStop,
-  faDownload
+  faDownload,
 } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './AudioInput.module.scss';
-import { requestAiRewrite, setVadTrimEnabled } from '../../../utilities/ai/aiScripts.js';
+import { requestAiRewrite, setVadTrimEnabled } from '../../../utilities/ai/aiClient.js';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper.js';
 import { createLogger } from '../../../utilities/logging.js';
 
 const surveyLog = createLogger('surveys');
-const LIVE_CONVERSATION_RECORDER_DISABLED_REASON = 'Recording is temporarily disabled while we move long-form conversation capture into a future workflow.';
+const LIVE_CONVERSATION_RECORDER_DISABLED_REASON =
+  'Recording is temporarily disabled while we move long-form conversation capture into a future workflow.';
 
 type SessionConfig = Record<string, unknown>;
 
@@ -147,7 +145,9 @@ const AudioInput = ({
   const waitTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Live mirror to avoid stale closure in waiting timer effect
   const waitingForAIRef = useRef(false);
-  useEffect(() => { waitingForAIRef.current = waitingForAI; }, [waitingForAI]);
+  useEffect(() => {
+    waitingForAIRef.current = waitingForAI;
+  }, [waitingForAI]);
 
   // Elapsed timer for long-form sessions (seconds)
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -250,7 +250,7 @@ const AudioInput = ({
         parentUpdateTimeoutRef.current = setTimeout(flushQueuedParentUpdate, 0);
       }
     },
-    [flushQueuedParentUpdate]
+    [flushQueuedParentUpdate],
   );
 
   // Record-completed flag for strict dock gating (in addition to lastRecordingBlobRef)
@@ -271,7 +271,7 @@ const AudioInput = ({
     audioContextRef,
     mediaStreamRef,
     lastRecordingBlobRef,
-    getLastRecordingBlob
+    getLastRecordingBlob,
   } = useWhisperHook({
     apiKey: '',
     silenceDetection: false,
@@ -286,7 +286,7 @@ const AudioInput = ({
     onTranscriptionComplete: (finalText: string) => {
       const cleaned = (finalText || '').trim();
       if (!cleaned) return;
-      setUserText(prev => {
+      setUserText((prev) => {
         const base = (prev || '').trimEnd();
         const spacer = base.length ? (/\s$/.test(base) ? '' : ' ') : '';
         const next = `${base}${spacer}${cleaned}`;
@@ -297,14 +297,20 @@ const AudioInput = ({
     onError: (err: unknown) => {
       surveyLog.error('[AudioInput] Transcription error:', describeError(err));
     },
-    onRecordingStop: () => { hasRecordedRef.current = true; }
+    onRecordingStop: () => {
+      hasRecordedRef.current = true;
+    },
   }) as UseWhisperResult;
 
   // Live flags for visibility handler to avoid stale closures
   const isRecordingRef = useRef(false);
   const isPausedRef = useRef(false);
-  useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
-  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
 
   // Sync external value
   useEffect(() => {
@@ -359,14 +365,19 @@ const AudioInput = ({
   const longFormEnabled = !!longFormMode;
   const wantsTimer = !!(showRecordingTimerInTextbox || longFormEnabled);
   const wantsInlineControls = !!(showRecorderControlsInTextbox || longFormEnabled);
-  const isTranscriptionRecordingMode = !!(longFormEnabled || showRecorderControlsInTextbox || showRecordingTimerInTextbox);
-  const recordingDurationLimitSeconds = Number.isFinite(Number(recordingDurationSeconds)) && Number(recordingDurationSeconds) > 0
-    ? Math.floor(Number(recordingDurationSeconds))
-    : null;
+  const isTranscriptionRecordingMode = !!(
+    longFormEnabled ||
+    showRecorderControlsInTextbox ||
+    showRecordingTimerInTextbox
+  );
+  const recordingDurationLimitSeconds =
+    Number.isFinite(Number(recordingDurationSeconds)) && Number(recordingDurationSeconds) > 0
+      ? Math.floor(Number(recordingDurationSeconds))
+      : null;
 
   useEffect(() => {
     // Ticks only while actively recording and the overlay is visible
-    const shouldTick = (isRecording && !isPaused) && (wantsTimer || wantsInlineControls);
+    const shouldTick = isRecording && !isPaused && (wantsTimer || wantsInlineControls);
 
     if (shouldTick) {
       if (!recordTimerRef.current) {
@@ -421,10 +432,7 @@ const AudioInput = ({
     }
 
     // ~30 FPS throttle
-    const now =
-      (typeof performance !== 'undefined' && performance.now)
-        ? performance.now()
-        : Date.now();
+    const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
     if (now - lastDrawRef.current < 33) {
       if (animationRef.current !== null) {
         animationRef.current = window.requestAnimationFrame(drawWaveform);
@@ -477,8 +485,7 @@ const AudioInput = ({
   useEffect(() => {
     const onVis = () => {
       const hidden =
-        document.hidden ||
-        (typeof document.visibilityState === 'string' && document.visibilityState !== 'visible');
+        document.hidden || (typeof document.visibilityState === 'string' && document.visibilityState !== 'visible');
       if (hidden) {
         if (animationRef.current) {
           window.cancelAnimationFrame(animationRef.current);
@@ -488,11 +495,7 @@ const AudioInput = ({
       }
       const ctxReady = !!(audioContextRef?.current && mediaStreamRef?.current);
       const shouldAnimate =
-        isRecordingRef.current &&
-        !isPausedRef.current &&
-        ctxReady &&
-        analyserRef.current &&
-        canvasRef.current;
+        isRecordingRef.current && !isPausedRef.current && ctxReady && analyserRef.current && canvasRef.current;
 
       if (shouldAnimate && !animationRef.current) {
         lastDrawRef.current = 0;
@@ -536,7 +539,9 @@ const AudioInput = ({
       sizeCanvasToWrap();
 
       if (ctx.state === 'suspended') {
-        ctx.resume().catch((e) => { surveyLog.warn('AudioInput: fallback', e); });
+        ctx.resume().catch((e) => {
+          surveyLog.warn('AudioInput: fallback', e);
+        });
       }
 
       if (!analyserRef.current) {
@@ -596,7 +601,7 @@ const AudioInput = ({
   // Waveform lifecycle - attach/detach nodes for the entire session (paused or not)
   useEffect(() => {
     let cancelled = false;
-    const sessionActive = (isRecording || isPaused);
+    const sessionActive = isRecording || isPaused;
     if (sessionActive) {
       const trySetup = () => {
         if (cancelled) return;
@@ -634,7 +639,9 @@ const AudioInput = ({
         } else if (analyserRef.current) {
           analyserRef.current.disconnect();
         }
-      } catch (e) { surveyLog.warn('AudioInput: cleanup', e); }
+      } catch (e) {
+        surveyLog.warn('AudioInput: cleanup', e);
+      }
       sourceNodeRef.current = null;
       analyserRef.current = null;
       ctx2dRef.current = null;
@@ -646,8 +653,7 @@ const AudioInput = ({
   // Animation controller - run RAF only while actively recording (not paused)
   useEffect(() => {
     const nodesReady = !!(analyserRef.current && canvasRef.current);
-    const shouldAnimate =
-      isRecording && !isPaused && nodesReady;
+    const shouldAnimate = isRecording && !isPaused && nodesReady;
 
     if (shouldAnimate) {
       if (!animationRef.current) {
@@ -708,12 +714,14 @@ const AudioInput = ({
       setAiRewriteActive(false);
       setWaitingForAI(true);
       setWaitingSeconds(0);
-      const cleaned = String(await requestAiRewrite(currentRewriteText, {
-        sessionSlug: effectiveSessionSlug,
-        sessionConfig: effectiveSessionConfig,
-        context,
-        workerUrl,
-      }));
+      const cleaned = String(
+        await requestAiRewrite(currentRewriteText, {
+          sessionSlug: effectiveSessionSlug,
+          sessionConfig: effectiveSessionConfig,
+          context,
+          workerUrl,
+        }),
+      );
       if (abortedRef.current) return;
       setWaitingForAI(false);
       setWaitingSeconds(0);
@@ -740,7 +748,7 @@ const AudioInput = ({
     callParentUpdate(originalText);
   };
 
-  const getPlaceholder = () => (userText ? '' : (placeholder || ''));
+  const getPlaceholder = () => (userText ? '' : placeholder || '');
 
   // UI state
   const visibleText = userText;
@@ -772,15 +780,16 @@ const AudioInput = ({
       'audio/ogg': 'ogg',
       'audio/opus': 'opus',
       'audio/mp4': 'mp4',
-      'audio/aac': 'aac'
+      'audio/aac': 'aac',
     };
-    return map[mt] || (mt.split('/')[1] || 'mp3');
+    return map[mt] || mt.split('/')[1] || 'mp3';
   };
 
   const downloadAudio = () => {
-    const rec = typeof getLastRecordingBlob === 'function'
-      ? getLastRecordingBlob()
-      : (lastRecordingBlobRef?.current || { blob: null, mimeType: '' });
+    const rec =
+      typeof getLastRecordingBlob === 'function'
+        ? getLastRecordingBlob()
+        : lastRecordingBlobRef?.current || { blob: null, mimeType: '' };
 
     if (!rec?.blob) return;
     const { blob, mimeType } = rec;
@@ -796,7 +805,10 @@ const AudioInput = ({
       a.click();
       a.remove();
     } finally {
-      const revoke = () => { URL.revokeObjectURL(url); window.removeEventListener('pagehide', revoke); };
+      const revoke = () => {
+        URL.revokeObjectURL(url);
+        window.removeEventListener('pagehide', revoke);
+      };
       setTimeout(revoke, 4000);
       window.addEventListener('pagehide', revoke, { once: true });
     }
@@ -816,28 +828,33 @@ const AudioInput = ({
       a.click();
       a.remove();
     } finally {
-      const revoke = () => { URL.revokeObjectURL(url); window.removeEventListener('pagehide', revoke); };
+      const revoke = () => {
+        URL.revokeObjectURL(url);
+        window.removeEventListener('pagehide', revoke);
+      };
       setTimeout(revoke, 4000);
       window.addEventListener('pagehide', revoke, { once: true });
     }
   };
 
-  const hasRecordingBlob =
-    !!((typeof getLastRecordingBlob === 'function' && getLastRecordingBlob()?.blob) ||
-       (lastRecordingBlobRef?.current && lastRecordingBlobRef.current.blob));
+  const hasRecordingBlob = !!(
+    (typeof getLastRecordingBlob === 'function' && getLastRecordingBlob()?.blob) ||
+    (lastRecordingBlobRef?.current && lastRecordingBlobRef.current.blob)
+  );
 
   // Show actual extension for the last recording blob
   const getDownloadExt = useCallback(() => {
-    const rec = typeof getLastRecordingBlob === 'function'
-      ? getLastRecordingBlob()
-      : (lastRecordingBlobRef?.current || { blob: null, mimeType: '' });
+    const rec =
+      typeof getLastRecordingBlob === 'function'
+        ? getLastRecordingBlob()
+        : lastRecordingBlobRef?.current || { blob: null, mimeType: '' };
     const t = rec?.mimeType || (rec?.blob && rec.blob.type) || 'audio/mpeg';
     return extFromMime(t);
   }, [getLastRecordingBlob, lastRecordingBlobRef]);
 
   // Strict gating for download dock
   const hasText = (visibleText || '').trim().length > 0;
-  const hasAudio = !!(lastRecordingBlobRef?.current?.blob) || hasRecordedRef.current === true;
+  const hasAudio = !!lastRecordingBlobRef?.current?.blob || hasRecordedRef.current === true;
   const showDownloadDock = !!enableDownloads && hasText && hasAudio && !isProcessingUI;
   const placeholderStyle: PlaceholderStyle | undefined =
     placeholderOpacity === null || placeholderOpacity === undefined
@@ -848,20 +865,17 @@ const AudioInput = ({
     <div className={styles.audioInputContainer}>
       {/* topControls: AI rewrite + encryption */}
       <div className={styles.topControls}>
-        {enableAiRewrite &&
-          visibleText.trim().length > 0 &&
-          !aiRewriteActive &&
-          !waitingForAI && (
-            <button
-              onClick={handleAiRewrite}
-              title="AI rewrite"
-              aria-label="AI rewrite"
-              className={styles.aiRewriteButton}
-              type="button"
-            >
-              <FontAwesomeIcon icon={faHandSparkles} />
-            </button>
-          )}
+        {enableAiRewrite && visibleText.trim().length > 0 && !aiRewriteActive && !waitingForAI && (
+          <button
+            onClick={handleAiRewrite}
+            title="AI rewrite"
+            aria-label="AI rewrite"
+            className={styles.aiRewriteButton}
+            type="button"
+          >
+            <FontAwesomeIcon icon={faHandSparkles} />
+          </button>
+        )}
 
         {enableAiRewrite && aiRewriteActive && !waitingForAI && (
           <button
@@ -889,7 +903,7 @@ const AudioInput = ({
                 border: 'none',
                 color: 'grey',
                 opacity: 0.7,
-                cursor: 'pointer'
+                cursor: 'pointer',
               }}
             >
               <FontAwesomeIcon
@@ -923,7 +937,7 @@ const AudioInput = ({
                   aria-label="encrypt"
                   checked={encryptBoxChecked}
                   onChange={handleEncryptCheckbox}
-                  onClick={(e) => e.stopPropagation()}  // avoid wrapper double-toggle
+                  onClick={(e) => e.stopPropagation()} // avoid wrapper double-toggle
                   className={styles.encryptCheckbox}
                 />
                 Encrypt
@@ -946,12 +960,15 @@ const AudioInput = ({
 
       {/* Text input + microphone (waveform/spinner overlays live inside the textarea) */}
       <div className={styles.inputRow}>
-        <div className={`${styles.textareaWrap} ${showDownloadDock ? styles.hasDownloadDock : ''}`} ref={textareaWrapRef}>
+        <div
+          className={`${styles.textareaWrap} ${showDownloadDock ? styles.hasDownloadDock : ''}`}
+          ref={textareaWrapRef}
+        >
           <Input
             type="textarea"
             placeholder={getPlaceholder()}
             value={visibleText}
-            className={`${styles.audioTextarea} ${(isActiveRecording || isProcessingUI || isPaused) ? styles.textHidden : ''}`}
+            className={`${styles.audioTextarea} ${isActiveRecording || isProcessingUI || isPaused ? styles.textHidden : ''}`}
             style={placeholderStyle}
             onChange={handleInputChange}
             readOnly={disabled || isRecording || isProcessingUI || isPaused || waitingForAI}
@@ -959,11 +976,7 @@ const AudioInput = ({
             data-ce-question-id={dataCeQuestionId || undefined}
           />
           {(isRecording || isPaused) && (
-            <canvas
-              ref={canvasRef}
-              className={styles.waveformOverlay}
-              aria-hidden="true"
-            />
+            <canvas ref={canvasRef} className={styles.waveformOverlay} aria-hidden="true" />
           )}
 
           {/* Inline overlay for timer and mini controls */}
@@ -983,7 +996,7 @@ const AudioInput = ({
                 borderRadius: 12,
                 fontSize: '0.85rem',
                 zIndex: 2,
-                pointerEvents: 'auto'
+                pointerEvents: 'auto',
               }}
               role="group"
               aria-label="Recording controls"
@@ -1014,7 +1027,7 @@ const AudioInput = ({
                         padding: '2px 6px',
                         borderRadius: 8,
                         lineHeight: 1.2,
-                        cursor: 'pointer'
+                        cursor: 'pointer',
                       }}
                     >
                       <FontAwesomeIcon icon={faPlay} /> <span className="sr-only">Resume</span>
@@ -1032,7 +1045,7 @@ const AudioInput = ({
                         padding: '2px 6px',
                         borderRadius: 8,
                         lineHeight: 1.2,
-                        cursor: 'pointer'
+                        cursor: 'pointer',
                       }}
                     >
                       <FontAwesomeIcon icon={faPause} /> <span className="sr-only">Pause</span>
@@ -1050,7 +1063,7 @@ const AudioInput = ({
                       padding: '2px 6px',
                       borderRadius: 8,
                       lineHeight: 1.2,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
                     }}
                   >
                     <FontAwesomeIcon icon={faStop} /> <span className="sr-only">Stop</span>
@@ -1073,7 +1086,7 @@ const AudioInput = ({
                 alignItems: 'center',
                 gap: 6,
                 zIndex: 3,
-                pointerEvents: 'none'
+                pointerEvents: 'none',
               }}
               aria-label="Download options"
             >
@@ -1092,17 +1105,14 @@ const AudioInput = ({
                   borderRadius: 10,
                   lineHeight: 1,
                   cursor: 'pointer',
-                  pointerEvents: 'auto'
+                  pointerEvents: 'auto',
                 }}
               >
                 <FontAwesomeIcon icon={faDownload} />
               </button>
 
               {downloadsOpen && (
-                <div
-                  className={styles.downloadMenu}
-                  style={{ display: 'inline-flex', gap: 6, pointerEvents: 'auto' }}
-                >
+                <div className={styles.downloadMenu} style={{ display: 'inline-flex', gap: 6, pointerEvents: 'auto' }}>
                   {isTranscriptionRecordingMode && (
                     <button
                       type="button"
@@ -1120,7 +1130,7 @@ const AudioInput = ({
                         borderRadius: 8,
                         lineHeight: 1.2,
                         cursor: hasRecordingBlob ? 'pointer' : 'not-allowed',
-                        opacity: hasRecordingBlob ? 1 : 0.6
+                        opacity: hasRecordingBlob ? 1 : 0.6,
                       }}
                     >
                       .{getDownloadExt()}
@@ -1139,7 +1149,7 @@ const AudioInput = ({
                       padding: '2px 6px',
                       borderRadius: 8,
                       lineHeight: 1.2,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
                     }}
                   >
                     .txt
@@ -1166,25 +1176,24 @@ const AudioInput = ({
           type="button"
           title={
             !isRecorderDisabled
-              ? (isActiveRecording ? 'Stop recording' : 'Start recording')
+              ? isActiveRecording
+                ? 'Stop recording'
+                : 'Start recording'
               : 'Recording temporarily disabled'
           }
           aria-label={
             !isRecorderDisabled
-              ? (isActiveRecording ? 'Stop recording' : 'Start recording')
+              ? isActiveRecording
+                ? 'Stop recording'
+                : 'Start recording'
               : 'Recording temporarily disabled'
           }
           aria-pressed={isActiveRecording}
           disabled={disabled}
         >
-          {isActiveRecording ? (
-            <FontAwesomeIcon icon={faCircle} />
-          ) : (
-            <FontAwesomeIcon icon={faMicrophone} />
-          )}
+          {isActiveRecording ? <FontAwesomeIcon icon={faCircle} /> : <FontAwesomeIcon icon={faMicrophone} />}
         </button>
       </div>
-
     </div>
   );
 };

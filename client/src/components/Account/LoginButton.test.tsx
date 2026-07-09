@@ -20,7 +20,7 @@ describe('LoginButton', () => {
     const { container } = render(
       <Provider store={createStore(false) as any}>
         <LoginButton launchAccountModal={launchAccountModal} />
-      </Provider>
+      </Provider>,
     );
 
     expect(container.querySelector('.navConnectContainer')).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe('LoginButton', () => {
     const { container } = render(
       <Provider store={createStore(true) as any}>
         <LoginButton launchAccountModal={launchAccountModal} />
-      </Provider>
+      </Provider>,
     );
 
     const button = screen.getByRole('button');

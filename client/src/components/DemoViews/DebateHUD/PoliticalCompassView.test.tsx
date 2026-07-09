@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { StandalonePoliticalCompass } from './PoliticalCompassView';
-import { debateData } from '../../../variables/demo/debateData.js';
+import { debateData } from '../../../variables/demo/debateData';
 import historicalFigureUsers from '../../../variables/demo/historical_figure_users.json';
 
 const createCompass = () => ({
@@ -157,19 +157,13 @@ describe('PoliticalCompass tooltip hover behavior', () => {
     const knownUsernames = new Set(
       (historicalFigureUsers as Array<{ username?: string }>)
         .map((figure) => String(figure?.username || '').trim())
-        .filter(Boolean)
+        .filter(Boolean),
     );
-    const compassProfileUsernames = debateData.flatMap((debate: any) => (
-      (debate?.compass?.points || [])
-        .map((point: any) => String(point?.profileUsername || '').trim())
-        .filter(Boolean)
-    ));
+    const compassProfileUsernames = debateData.flatMap((debate: any) =>
+      (debate?.compass?.points || []).map((point: any) => String(point?.profileUsername || '').trim()).filter(Boolean),
+    );
 
-    expect(compassProfileUsernames).toEqual(expect.arrayContaining([
-      'Fuller',
-      'Machiavelli',
-      'Voltaire',
-    ]));
+    expect(compassProfileUsernames).toEqual(expect.arrayContaining(['Fuller', 'Machiavelli', 'Voltaire']));
     expect(compassProfileUsernames.filter((username) => !knownUsernames.has(username))).toEqual([]);
   });
 
@@ -177,10 +171,14 @@ describe('PoliticalCompass tooltip hover behavior', () => {
     const { container } = render(<StandalonePoliticalCompass compass={createCompass()} compact={false} />);
 
     const hypatiaAvatar = screen.getByTestId('ce-political-compass-point-hypatia-avatar');
-    expect(hypatiaAvatar.getAttribute('src')).toMatch(/^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/)/);
+    expect(hypatiaAvatar.getAttribute('src')).toMatch(
+      /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/)/,
+    );
     expect(hypatiaAvatar.style.width).toBe('4%');
 
     expect(screen.queryByTestId('ce-political-compass-point-no-comment-point-avatar')).toBeNull();
-    expect(container.querySelector('[data-testid="ce-political-compass-point-no-comment-point"] circle')).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="ce-political-compass-point-no-comment-point"] circle'),
+    ).not.toBeNull();
   });
 });

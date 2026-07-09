@@ -1,6 +1,4 @@
-import {
-  QuestionFilter as QuestionFilterComponent,
-} from './QuestionFilter';
+import { QuestionFilter as QuestionFilterComponent } from './QuestionFilter';
 import {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
@@ -28,7 +26,7 @@ import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import { serializeFilterState as serializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import styles from './QuestionFilter.module.scss';
 
 jest.mock('../SBTs/SBTFilter', () => () => null);
@@ -39,23 +37,10 @@ type TreePredicate = (node: TreeNode) => boolean;
 type QuestionFilterProps = Record<string, any>;
 const QuestionFilter: any = QuestionFilterComponent;
 const cacheScripts: any = cacheScriptsModule;
-const {
-  initCacheManager,
-  listNamespaceEntriesSync,
-  readCache,
-  removeCache,
-  writeCache,
-} = cacheScripts as any;
+const { initCacheManager, listNamespaceEntriesSync, readCache, removeCache, writeCache } = cacheScripts as any;
 const serializeFilterState: any = serializeFilterStateStrict;
 
-const MANAGED_NAMESPACES = [
-  'questionsCache',
-  'surveysCache',
-  'bookmarksCache',
-  'filters',
-  'sbtCache',
-  'userCache',
-];
+const MANAGED_NAMESPACES = ['questionsCache', 'surveysCache', 'bookmarksCache', 'filters', 'sbtCache', 'userCache'];
 
 const clearManagedCaches = async () => {
   await initCacheManager();
@@ -79,6 +64,14 @@ const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null 
     }
     if (typeof current !== 'object') continue;
     if (predicate(current)) return current;
+    if (
+      typeof current.type === 'function' &&
+      !current.type.prototype?.render &&
+      String(current.type.name || '').startsWith('QuestionFilter')
+    ) {
+      stack.push(current.type(current.props || {}));
+      continue;
+    }
     const children = current?.props?.children;
     if (children !== undefined) stack.push(children);
   }
@@ -98,7 +91,7 @@ describe('isFreeformBlankAnswer', () => {
     expect(
       isFreeformBlankAnswer('freeform', {
         answer: { value: '   ' },
-      })
+      }),
     ).toBe(true);
   });
 
@@ -114,7 +107,7 @@ describe('isFreeformBlankAnswer', () => {
     expect(
       isFreeformBlankAnswer('freeform', {
         answer: { value: 'response' },
-      })
+      }),
     ).toBe(false);
   });
 
@@ -155,17 +148,19 @@ describe('QuestionFilter display helpers', () => {
       display: 'flex',
       alignItems: 'center',
     });
-    expect(resolveQuestionFilterSectionHeaderStyle({
-      clickable: true,
-      disabled: false,
-    })).toEqual({ cursor: 'pointer', opacity: 1 });
-    expect(resolveQuestionFilterSectionHeaderStyle({
-      clickable: false,
-      disabled: true,
-    })).toEqual({ cursor: 'not-allowed', opacity: 0.5 });
-    expect(buildQuestionFilterSectionIconClassName(styles, true)).toBe(
-      `${styles.icon} ${styles.expanded}`
-    );
+    expect(
+      resolveQuestionFilterSectionHeaderStyle({
+        clickable: true,
+        disabled: false,
+      }),
+    ).toEqual({ cursor: 'pointer', opacity: 1 });
+    expect(
+      resolveQuestionFilterSectionHeaderStyle({
+        clickable: false,
+        disabled: true,
+      }),
+    ).toEqual({ cursor: 'not-allowed', opacity: 0.5 });
+    expect(buildQuestionFilterSectionIconClassName(styles, true)).toBe(`${styles.icon} ${styles.expanded}`);
     expect(buildQuestionFilterSectionIconClassName(styles, false)).toBe(`${styles.icon} `);
     expect(resolveQuestionFilterSectionBodyStyle(true, false)).toEqual({ display: 'block' });
     expect(resolveQuestionFilterSectionBodyStyle(true, true)).toEqual({ display: 'none' });
@@ -205,21 +200,15 @@ describe('QuestionFilter display helpers', () => {
       marginLeft: '12px',
       opacity: 0.7,
     });
-    expect(buildQuestionFilterTagBubbleClassName(styles, true)).toBe(
-      `${styles.tagBubble} ${styles.tagBubbleSelected}`
-    );
+    expect(buildQuestionFilterTagBubbleClassName(styles, true)).toBe(`${styles.tagBubble} ${styles.tagBubbleSelected}`);
     expect(buildQuestionFilterTagBubbleClassName(styles, false)).toBe(styles.tagBubble);
     expect(buildQuestionFilterTypeButtonClassName(styles, true)).toBe(
-      `${styles.typeButton} ${styles.typeButtonActive}`
+      `${styles.typeButton} ${styles.typeButtonActive}`,
     );
     expect(buildQuestionFilterTypeButtonClassName(styles, false)).toBe(styles.typeButton);
-    expect(buildQuestionFilterTypePillClassName(styles, 'agree')).toBe(
-      `${styles.typePill} ${styles.typePillAgree}`
-    );
+    expect(buildQuestionFilterTypePillClassName(styles, 'agree')).toBe(`${styles.typePill} ${styles.typePillAgree}`);
     expect(buildQuestionFilterTypePillClassName(styles)).toBe(styles.typePill);
-    expect(buildQuestionFilterAiCombineRowClassName(styles)).toBe(
-      `${styles.filterOption} ${styles.aiCombineRow}`
-    );
+    expect(buildQuestionFilterAiCombineRowClassName(styles)).toBe(`${styles.filterOption} ${styles.aiCombineRow}`);
     expect(buildQuestionFilterDisabledSectionClassName(styles, true)).toBe(styles.disabledSection);
     expect(buildQuestionFilterDisabledSectionClassName(styles, false)).toBe('');
     expect(resolveQuestionFilterInlineVisibilityStyle(true)).toEqual({ display: 'block' });
@@ -239,12 +228,7 @@ describe('QuestionFilter.getMemoizedQuestionResponseStats', () => {
     };
     const mergedQuestions = [{ id: 'q1', type: 'freeform' }];
 
-    const stats = instance.getMemoizedQuestionResponseStats(
-      relevantResponses,
-      mergedQuestions,
-      1,
-      1
-    );
+    const stats = instance.getMemoizedQuestionResponseStats(relevantResponses, mergedQuestions, 1, 1);
     const q1Stats = stats.get('q1');
 
     expect(q1Stats).toEqual({
@@ -263,12 +247,7 @@ describe('QuestionFilter.getMemoizedQuestionResponseStats', () => {
     };
     const mergedQuestions = [{ id: 'q2', type: 'binary' }];
 
-    const stats = instance.getMemoizedQuestionResponseStats(
-      relevantResponses,
-      mergedQuestions,
-      2,
-      2
-    );
+    const stats = instance.getMemoizedQuestionResponseStats(relevantResponses, mergedQuestions, 2, 2);
     const q2Stats = stats.get('q2');
 
     expect(q2Stats).toEqual({
@@ -284,11 +263,10 @@ describe('QuestionFilter session resolution', () => {
   });
 
   it('builds AI request options without inheriting missing explicit session aliases', () => {
-    const configSpy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug')
-      .mockImplementation((slug) => {
-        if (slug === 'rxc') return { slug: 'rxc', networkChainId: 84532 };
-        return null;
-      });
+    const configSpy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation((slug) => {
+      if (slug === 'rxc') return { slug: 'rxc', networkChainId: 84532 };
+      return null;
+    });
 
     const instance = new QuestionFilter({
       sessionSlug: 'DEBATE',
@@ -308,11 +286,10 @@ describe('QuestionFilter session resolution', () => {
   });
 
   it('does not inherit the general session config for unknown non-general slugs', () => {
-    const configSpy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug')
-      .mockImplementation((slug) => {
-        if (slug === '') return { slug: '', networkChainId: 84532 };
-        return null;
-      });
+    const configSpy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation((slug) => {
+      if (slug === '') return { slug: '', networkChainId: 84532 };
+      return null;
+    });
 
     const instance = new QuestionFilter({
       sessionSlug: 'missing-session-slug',
@@ -360,7 +337,7 @@ describe('QuestionFilter session resolution', () => {
     const tree = instance.render();
     const sbtFilterNode = findElement(
       tree,
-      (element) => element?.props?.mode === 'creator' && element?.props?.autoExpand === true
+      (element) => element?.props?.mode === 'creator' && element?.props?.autoExpand === true,
     );
 
     expect(sbtFilterNode).toBeTruthy();
@@ -411,7 +388,7 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     const tree = instance.render();
     const responseStatusHeader = findElement(
       tree,
-      (element) => element?.type === 'h3' && getNodeText(element).includes('Response Status')
+      (element) => element?.type === 'h3' && getNodeText(element).includes('Response Status'),
     );
 
     expect(respondedItem).toBeUndefined();
@@ -457,7 +434,7 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     const tree = instance.render();
     const responseStatusHeader = findElement(
       tree,
-      (element) => element?.type === 'h3' && getNodeText(element).includes('Response Status')
+      (element) => element?.type === 'h3' && getNodeText(element).includes('Response Status'),
     );
 
     expect(respondedItem).toBeTruthy();
@@ -528,7 +505,7 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     const tree = instance.render();
     const sbtHeader = findElement(
       tree,
-      (element) => element?.type === 'h3' && getNodeText(element).includes('Group(s) of Question Creator')
+      (element) => element?.type === 'h3' && getNodeText(element).includes('Group(s) of Question Creator'),
     );
 
     expect(sbtHeader).toBeTruthy();
@@ -577,7 +554,7 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     const tree = instance.render();
     const tooltip = findElement(
       tree,
-      (element) => element?.type === GateTooltip && element?.props?.gateId === 'vip_access'
+      (element) => element?.type === GateTooltip && element?.props?.gateId === 'vip_access',
     );
 
     expect(tooltip).toBeTruthy();
@@ -625,7 +602,7 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     const tree = instance.render();
     const aiApplyButton = findElement(
       tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.QUESTION_FILTER_AI_APPLY
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.QUESTION_FILTER_AI_APPLY,
     );
 
     expect(aiApplyButton).toBeTruthy();

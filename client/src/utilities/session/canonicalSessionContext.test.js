@@ -125,16 +125,20 @@ describe('canonicalSessionContext', () => {
       general: { slug: '', sessionName: 'Context Engine' },
     };
 
-    expect(resolveSessionSlugAliasFromDemoSessions({
-      sessionSlug: 'Context Engine',
-      demoSessions,
-    }).sessionSlug).toBe('Context Engine');
+    expect(
+      resolveSessionSlugAliasFromDemoSessions({
+        sessionSlug: 'Context Engine',
+        demoSessions,
+      }).sessionSlug,
+    ).toBe('Context Engine');
 
-    expect(resolveSessionSlugAliasFromDemoSessions({
-      sessionSlug: 'Context Engine',
-      demoSessions,
-      allowSessionName: true,
-    }).sessionSlug).toBe('');
+    expect(
+      resolveSessionSlugAliasFromDemoSessions({
+        sessionSlug: 'Context Engine',
+        demoSessions,
+        allowSessionName: true,
+      }).sessionSlug,
+    ).toBe('');
   });
 
   it('warns when explicit slug and provided config slug disagree', () => {
@@ -486,7 +490,7 @@ describe('canonicalSessionContext', () => {
     });
 
     expect(resolved.warnings).toContain(
-      'Quarantined corrupt session metadata (not an object); falling back to alternate sources.'
+      'Quarantined corrupt session metadata (not an object); falling back to alternate sources.',
     );
     expect(resolved.provenance.metadata).toBe('demo');
     expect(resolved.context.metadata).toMatchObject({

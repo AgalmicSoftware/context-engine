@@ -102,17 +102,23 @@ const normalizeText = (value: unknown): string => {
 
 const normalizeGateType = (value: unknown): string => toStr(value).trim().toLowerCase();
 
-const buildRecipientDedupeKey = (recipient: LitRecipient): string => JSON.stringify({
-  chain: recipient.chain || null,
-  accessControlConditions: recipient.accessControlConditions || null,
-});
+const buildRecipientDedupeKey = (recipient: LitRecipient): string =>
+  JSON.stringify({
+    chain: recipient.chain || null,
+    accessControlConditions: recipient.accessControlConditions || null,
+  });
 
-const buildGateDedupeKey = (gate: LitGate): string => JSON.stringify({
-  chainId: Number(gate?.chainId || 0) || null,
-  litChain: toStr(gate?.litChain || gate?.chain || '').trim().toLowerCase(),
-  mode: normalizeGateMode(gate as SponsoredGate),
-  sbtAddresses: getGateSbtAddresses(gate as SponsoredGate).map((addr) => addr.toLowerCase()).sort(),
-});
+const buildGateDedupeKey = (gate: LitGate): string =>
+  JSON.stringify({
+    chainId: Number(gate?.chainId || 0) || null,
+    litChain: toStr(gate?.litChain || gate?.chain || '')
+      .trim()
+      .toLowerCase(),
+    mode: normalizeGateMode(gate as SponsoredGate),
+    sbtAddresses: getGateSbtAddresses(gate as SponsoredGate)
+      .map((addr) => addr.toLowerCase())
+      .sort(),
+  });
 
 export const createLitRecipientFromGate = ({
   gate,
@@ -291,9 +297,7 @@ export const buildUploadGatePolicy = ({
     }
   });
 
-  const hasNonOpenResource = states.some(
-    ({ state }) => state?.status !== SPONSORED_GATE_STATES.OPEN
-  );
+  const hasNonOpenResource = states.some(({ state }) => state?.status !== SPONSORED_GATE_STATES.OPEN);
   if (hasNonOpenResource) {
     const defaultState = resolveSponsoredGateStateForResource(cfg, 'default');
     if (defaultState?.status === SPONSORED_GATE_STATES.RESTRICTED && defaultState.gate) {

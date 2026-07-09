@@ -75,37 +75,32 @@ export type BuildSurveyQuestionDecryptExecutionPlanArgs = {
   surveyId?: unknown;
 };
 
-export type BuildSurveyQuestionDecryptRequestPlanArgs =
-  BuildSurveyQuestionDecryptExecutionPlanArgs & {
-    baselineForDecrypt?: ResponseSlice | null;
-    decryptSelection?: SurveyQuestionFieldDecryptSelection | null;
-  };
+export type BuildSurveyQuestionDecryptRequestPlanArgs = BuildSurveyQuestionDecryptExecutionPlanArgs & {
+  baselineForDecrypt?: ResponseSlice | null;
+  decryptSelection?: SurveyQuestionFieldDecryptSelection | null;
+};
 
-const normalizeQuestionId = (questionId: unknown): string => (
-  String(questionId || '').trim().toLowerCase()
-);
+const normalizeQuestionId = (questionId: unknown): string =>
+  String(questionId || '')
+    .trim()
+    .toLowerCase();
 
-const normalizeFieldToDecrypt = (fieldToDecrypt: unknown): string => (
-  String(fieldToDecrypt || 'both').trim().toLowerCase() || 'both'
-);
+const normalizeFieldToDecrypt = (fieldToDecrypt: unknown): string =>
+  String(fieldToDecrypt || 'both')
+    .trim()
+    .toLowerCase() || 'both';
 
 const getLitOption = (litHooks: unknown): { getKey: unknown } | undefined => {
-  const hooks = litHooks && typeof litHooks === 'object'
-    ? litHooks as SurveyQuestionDecryptLitHooks
-    : null;
+  const hooks = litHooks && typeof litHooks === 'object' ? (litHooks as SurveyQuestionDecryptLitHooks) : null;
   return hooks?.getKey ? { getKey: hooks.getKey } : undefined;
 };
 
-const normalizeQuestionPool = (questionPool: unknown): unknown[] => (
-  Array.isArray(questionPool) ? questionPool : []
-);
+const normalizeQuestionPool = (questionPool: unknown): unknown[] => (Array.isArray(questionPool) ? questionPool : []);
 
 const normalizeDecryptSelection = (
-  decryptSelection: SurveyQuestionFieldDecryptSelection | null | undefined
+  decryptSelection: SurveyQuestionFieldDecryptSelection | null | undefined,
 ): SurveyQuestionFieldDecryptSelection => {
-  const selection = decryptSelection && typeof decryptSelection === 'object'
-    ? decryptSelection
-    : {};
+  const selection = decryptSelection && typeof decryptSelection === 'object' ? decryptSelection : {};
   return {
     ...selection,
     hasMaskedField: !!selection.hasMaskedField,
@@ -168,7 +163,7 @@ export const buildSurveyQuestionDecryptRequestPlan = ({
   const executionPlan = buildSurveyQuestionDecryptExecutionPlan(executionArgs);
   const selection = normalizeDecryptSelection(decryptSelection);
   const blocked = (
-    blockedReason: SurveyQuestionDecryptRequestPlan['blockedReason']
+    blockedReason: SurveyQuestionDecryptRequestPlan['blockedReason'],
   ): SurveyQuestionDecryptRequestPlan => ({
     blockedReason,
     chainId: executionPlan.chainId,

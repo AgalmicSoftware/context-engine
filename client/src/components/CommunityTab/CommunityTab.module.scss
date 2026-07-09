@@ -31,8 +31,7 @@
     border-right: 1px solid var(--ce-color-border-light);
     display: flex;
     flex-direction: column;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
   }
 
   .leaderboardTopBar {
@@ -76,8 +75,7 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
   }
 
   .statsSection {
@@ -329,7 +327,6 @@
     :global(.close) span {
       color: var(--ce-color-white);
     }
-
   }
 
   .modalBody {
@@ -554,9 +551,7 @@
     background-color 0.3s ease,
     color 0.3s ease;
   &:hover {
-    color: var(
-      --ce-color-white
-    );
+    color: var(--ce-color-white);
     background-color: #007aff;
     cursor: pointer;
   }
@@ -581,9 +576,7 @@
   border: 1px solid #eaeaea;
   border-radius: var(--ce-radius-8);
   margin-bottom: 10px;
-  background-color: var(
-    --ce-color-white
-  );
+  background-color: var(--ce-color-white);
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   transition: box-shadow 0.3s ease;
   &:hover {

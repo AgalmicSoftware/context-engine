@@ -1,6 +1,4 @@
-import {
-  buildSbtListCacheReadPlan,
-} from './sbtListCacheReadPlanHelpers';
+import { buildSbtListCacheReadPlan } from './sbtListCacheReadPlanHelpers';
 import { SBT_LIST_NO_SESSION_UNIVERSE_SLUG } from './sbtListSessionUniverseHelpers';
 
 const alphaItem = {
@@ -46,23 +44,22 @@ describe('sbtListCacheReadPlanHelpers', () => {
       targetSlug: 'Alpha Session',
     });
     expect(plan.hydrated.map((item) => item.sbtAddress)).toEqual(['0xAlpha', '0xBeta']);
-    expect(plan.passwordFlagItems).toEqual([
-      { ...alphaItem, slug: 'Alpha Session' },
-      betaItem,
-    ]);
+    expect(plan.passwordFlagItems).toEqual([{ ...alphaItem, slug: 'Alpha Session' }, betaItem]);
   });
 
   it('keeps previously loaded cards when a non-forced read returns an empty cache', () => {
     const currentItems = [{ sbtAddress: '0xExisting', sbtInfo: { name: 'Existing' } }];
 
-    expect(buildSbtListCacheReadPlan({
-      currentItems,
-      forceRefresh: false,
-      hasLoadedBefore: true,
-      netKey: '11155420',
-      rawCache: {},
-      targetSlug: 'alpha',
-    })).toMatchObject({
+    expect(
+      buildSbtListCacheReadPlan({
+        currentItems,
+        forceRefresh: false,
+        hasLoadedBefore: true,
+        netKey: '11155420',
+        rawCache: {},
+        targetSlug: 'alpha',
+      }),
+    ).toMatchObject({
       hasCacheRecord: true,
       hasNetworkCacheEntry: false,
       hydrated: [],
@@ -75,37 +72,43 @@ describe('sbtListCacheReadPlanHelpers', () => {
       shouldKeepExistingCards: true,
     });
 
-    expect(buildSbtListCacheReadPlan({
-      currentItems,
-      forceRefresh: false,
-      hasLoadedBefore: false,
-      netKey: '11155420',
-      rawCache: {},
-      targetSlug: 'alpha',
-    })).toMatchObject({
+    expect(
+      buildSbtListCacheReadPlan({
+        currentItems,
+        forceRefresh: false,
+        hasLoadedBefore: false,
+        netKey: '11155420',
+        rawCache: {},
+        targetSlug: 'alpha',
+      }),
+    ).toMatchObject({
       shouldApplyCards: true,
       shouldKeepExistingCards: false,
     });
 
-    expect(buildSbtListCacheReadPlan({
-      currentItems,
-      forceRefresh: true,
-      hasLoadedBefore: true,
-      netKey: '11155420',
-      rawCache: {},
-      targetSlug: 'alpha',
-    })).toMatchObject({
+    expect(
+      buildSbtListCacheReadPlan({
+        currentItems,
+        forceRefresh: true,
+        hasLoadedBefore: true,
+        netKey: '11155420',
+        rawCache: {},
+        targetSlug: 'alpha',
+      }),
+    ).toMatchObject({
       shouldApplyCards: true,
       shouldKeepExistingCards: false,
     });
   });
 
   it('defensively handles missing cache records, non-object network nodes, and synthetic sessions', () => {
-    expect(buildSbtListCacheReadPlan({
-      netKey: '11155420',
-      rawCache: null,
-      targetSlug: 'alpha',
-    })).toMatchObject({
+    expect(
+      buildSbtListCacheReadPlan({
+        netKey: '11155420',
+        rawCache: null,
+        targetSlug: 'alpha',
+      }),
+    ).toMatchObject({
       hasCacheRecord: false,
       hasNetworkCacheEntry: false,
       hydrated: [],
@@ -115,11 +118,13 @@ describe('sbtListCacheReadPlanHelpers', () => {
       },
     });
 
-    expect(buildSbtListCacheReadPlan({
-      netKey: '11155420',
-      rawCache: { 11155420: 'bad' },
-      targetSlug: 'alpha',
-    })).toMatchObject({
+    expect(
+      buildSbtListCacheReadPlan({
+        netKey: '11155420',
+        rawCache: { 11155420: 'bad' },
+        targetSlug: 'alpha',
+      }),
+    ).toMatchObject({
       hasCacheRecord: true,
       hasNetworkCacheEntry: true,
       hydrated: [],
@@ -129,16 +134,18 @@ describe('sbtListCacheReadPlanHelpers', () => {
       },
     });
 
-    expect(buildSbtListCacheReadPlan({
-      netKey: '11155420',
-      rawCache: {
-        11155420: {
-          lastBlock: 10,
-          sbtList: { alpha: alphaItem },
+    expect(
+      buildSbtListCacheReadPlan({
+        netKey: '11155420',
+        rawCache: {
+          11155420: {
+            lastBlock: 10,
+            sbtList: { alpha: alphaItem },
+          },
         },
-      },
-      targetSlug: SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
-    })).toMatchObject({
+        targetSlug: SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
+      }),
+    ).toMatchObject({
       hasNetworkCacheEntry: false,
       hydrated: [],
       netKey: '',

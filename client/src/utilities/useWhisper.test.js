@@ -8,9 +8,7 @@ jest.mock('recordrtc', () => {
     constructor(stream, options = {}) {
       this.options = options;
       this.state = 'recording';
-      this._blob =
-        nextBlob ||
-        new Blob([new Uint8Array(256)], { type: 'audio/wav' });
+      this._blob = nextBlob || new Blob([new Uint8Array(256)], { type: 'audio/wav' });
     }
 
     startRecording() {
@@ -50,7 +48,7 @@ jest.mock('hark', () =>
   jest.fn(() => ({
     on: jest.fn(),
     stop: jest.fn(),
-  }))
+  })),
 );
 
 jest.mock('./ai/aiSettings.js', () => ({
@@ -179,9 +177,7 @@ describe('useWhisper', () => {
       apiKey: '',
     });
 
-    RecordRTC.__setBlob(
-      new Blob([new Uint8Array(256)], { type: 'audio/wav' })
-    );
+    RecordRTC.__setBlob(new Blob([new Uint8Array(256)], { type: 'audio/wav' }));
 
     let now = 1000;
     nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
@@ -238,7 +234,7 @@ describe('useWhisper', () => {
             onTranscriptionComplete: onComplete,
             onRecordingStop: onStop,
           }}
-        />
+        />,
       );
     });
 
@@ -293,7 +289,7 @@ describe('useWhisper', () => {
             silenceDetection: false,
             onTranscriptionComplete: onComplete,
           }}
-        />
+        />,
       );
     });
 
@@ -334,7 +330,7 @@ describe('useWhisper', () => {
             onTranscriptionComplete: onComplete,
             onRecordingStop: onStop,
           }}
-        />
+        />,
       );
     });
 

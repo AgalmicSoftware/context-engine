@@ -21,7 +21,7 @@ describe('SessionPublishProgressPanel', () => {
           ],
           showPublishProgress: true,
         }}
-      />
+      />,
     );
 
     const progressCard = screen.getByTestId('ce-wizard-publish-progress');
@@ -49,7 +49,7 @@ describe('SessionPublishProgressPanel', () => {
           ],
           showPublishProgress: true,
         }}
-      />
+      />,
     );
 
     expect(screen.getByTestId('ce-wizard-publish-progress')).toHaveTextContent('Publish Complete');
@@ -67,7 +67,7 @@ describe('SessionPublishProgressPanel', () => {
           publishProgressSteps: [],
           showPublishProgress: false,
         }}
-      />
+      />,
     );
 
     expect(screen.queryByTestId('ce-wizard-publish-progress')).not.toBeInTheDocument();

@@ -1,18 +1,7 @@
-import type {
-  ChangedFieldsDiffCache,
-  PendingEditStatsCache,
-} from './surveyToolChangedFieldsController';
-import type {
-  ResponseSlice as SurveyToolResponseSlice,
-  UnknownRecord,
-} from './surveyToolTypes';
-import type {
-  SurveyQuestionsProps,
-  SurveyQuestionsState,
-} from './surveyQuestionsTypes';
-import type {
-  SurveyQuestionsStateUpdate,
-} from './surveyQuestionsState';
+import type { ChangedFieldsDiffCache, PendingEditStatsCache } from './surveyToolChangedFieldsController';
+import type { ResponseSlice as SurveyToolResponseSlice, UnknownRecord } from './surveyToolTypes';
+import type { SurveyQuestionsProps, SurveyQuestionsState } from './surveyQuestionsTypes';
+import type { SurveyQuestionsStateUpdate } from './surveyQuestionsState';
 
 declare global {
   interface Window {
@@ -25,7 +14,7 @@ export type SurveyQuestionsCacheQuestion = Record<string, unknown> & { id: strin
 export type SurveyQuestionsSetStateCallback = () => unknown;
 export type SurveyQuestionsSetState = (
   update: SurveyQuestionsStateUpdate,
-  callback?: SurveyQuestionsSetStateCallback
+  callback?: SurveyQuestionsSetStateCallback,
 ) => void;
 export type SurveyQuestionsTimer = ReturnType<typeof setTimeout>;
 export type SurveyQuestionsTimerRef = SurveyQuestionsTimer | null;
@@ -77,7 +66,8 @@ type SurveyQuestionsPendingStatsSnapshot = {
   submittedSinceLastEdit: boolean;
   isSubmitting: boolean;
 };
-export type SurveyQuestionsPendingStatsInput = Partial<Pick<SurveyQuestionsPendingStatsSnapshot, 'total' | 'encrypted'>> | null | undefined;
+export type SurveyQuestionsPendingStatsInput =
+  Partial<Pick<SurveyQuestionsPendingStatsSnapshot, 'total' | 'encrypted'>> | null | undefined;
 type SurveyQuestionsAutoDecryptQueueItem = {
   qid: string;
   field: string;
@@ -179,12 +169,16 @@ export type SurveyQuestionsInstanceFields = {
   _surveyJsonMetaCache: SurveyQuestionsMemoValue;
   _lockedQuestionGateDetailsMemo: SurveyQuestionsLockedGateDetailsMemo;
   _maskedQuestionVisibilityMemoByPool: WeakMap<object, unknown>;
+  // These property names survive minification in the SurveyQuestions chunk.
+  _a: SurveyQuestionsRuntimeRecord | null;
+  _q: Map<string, SurveyQuestionsRuntimeRecord>;
   _canDecryptOtherResponsesKey: string;
   _canDecryptOtherResponsesInFlight: SurveyQuestionsCanDecryptRun;
   _canDecryptOtherResponsesSig: string;
   _canDecryptOtherResponsesRunId: number;
   _fetchSurveyResponseRunId: number;
   _fetchSingleQuestionRunId: number;
+  _questionPoolHydrationRunId: number;
   _localCacheRehydrateRunId: number;
   _responseHydrationStateUpdateDepth: number;
   _surveyDecryptAttemptSeq: number;
@@ -257,12 +251,15 @@ export const createSurveyQuestionsInstanceFields = (): SurveyQuestionsInstanceFi
   _surveyJsonMetaCache: { key: '', source: null, value: null },
   _lockedQuestionGateDetailsMemo: { key: '', poolRef: null, poolVersion: 0, value: [] },
   _maskedQuestionVisibilityMemoByPool: new WeakMap(),
+  _a: null,
+  _q: new Map(),
   _canDecryptOtherResponsesKey: '',
   _canDecryptOtherResponsesInFlight: null,
   _canDecryptOtherResponsesSig: '',
   _canDecryptOtherResponsesRunId: 0,
   _fetchSurveyResponseRunId: 0,
   _fetchSingleQuestionRunId: 0,
+  _questionPoolHydrationRunId: 0,
   _localCacheRehydrateRunId: 0,
   _responseHydrationStateUpdateDepth: 0,
   _surveyDecryptAttemptSeq: 0,

@@ -19,14 +19,8 @@ export type WorkerDeployHelperToggleProps = {
   renderInfoTooltip?: RenderInfoTooltip;
 };
 
-const WorkerDeployHelperToggle = ({
-  checked,
-  onChange,
-  renderInfoTooltip,
-}: WorkerDeployHelperToggleProps) => {
-  const renderTooltip = typeof renderInfoTooltip === 'function'
-    ? renderInfoTooltip
-    : () => null;
+const WorkerDeployHelperToggle = ({ checked, onChange, renderInfoTooltip }: WorkerDeployHelperToggleProps) => {
+  const renderTooltip = typeof renderInfoTooltip === 'function' ? renderInfoTooltip : () => null;
 
   return (
     <FormGroup className={styles.bundleToggleGroup}>
@@ -40,7 +34,8 @@ const WorkerDeployHelperToggle = ({
         <span>Enable embedded deploy-helper on this worker</span>
         {renderTooltip({
           id: 'gw-embedded-deploy-helper-tip',
-          content: 'Lets this session worker handle sponsored bootstrap deploys locally first. Turn it off to reduce surface area and force sponsored deploys to fall back to the standalone helper URL.',
+          content:
+            'Lets this session worker handle sponsored bootstrap deploys locally first. Turn it off to reduce surface area and force sponsored deploys to fall back to the standalone helper URL.',
           placement: 'right',
           testId: 'ce-wizard-worker-tooltip-gw-embedded-deploy-helper-tip',
           ariaLabel: 'Embedded deploy-helper info',

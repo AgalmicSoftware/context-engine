@@ -4,10 +4,10 @@ import {
   normalizeStorageBackend,
 } from '../sessionCorsWorker/storageRefNormalization.js';
 import { buildSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
+import { resolveCloudflareApiBaseUrl } from './deployHelperEndpointConfig.mjs';
 
 const { getPathRpcUrl } = rpcDefaults;
 
-const API_BASE = 'https://api.cloudflare.com/client/v4';
 export const DEFAULT_COMPAT_DATE = '2024-09-02';
 export const DEFAULT_FAUCET_RPC_URL = getPathRpcUrl(11155420) || '';
 export const DEFAULT_FAUCET_AMOUNT_ETH = '0.0002';
@@ -157,10 +157,20 @@ export const readJsonOrText = async (resp) => {
   }
 };
 
-export const cfFetch = async (token, path, options = {}, { fetchImpl = globalThis.fetch } = {}) => {
+export const cfFetch = async (
+  token,
+  path,
+  options = {},
+  {
+    fetchImpl = globalThis.fetch,
+    apiBaseUrl = '',
+    env = null,
+  } = {}
+) => {
+  const cloudflareApiBaseUrl = resolveCloudflareApiBaseUrl({ apiBaseUrl, env });
   let resp;
   try {
-    resp = await fetchImpl(`${API_BASE}${path}`, {
+    resp = await fetchImpl(`${cloudflareApiBaseUrl}${path}`, {
       ...options,
       headers: {
         Authorization: `Bearer ${token}`,
@@ -188,8 +198,14 @@ export const cfFetch = async (token, path, options = {}, { fetchImpl = globalThi
 export const lookupCloudflareAccount = async ({
   apiToken,
   fetchImpl = globalThis.fetch,
+  apiBaseUrl = '',
+  env = null,
 } = {}) => {
-  const accountsResp = await cfFetch(apiToken, '/accounts?per_page=1', {}, { fetchImpl });
+  const accountsResp = await cfFetch(apiToken, '/accounts?per_page=1', {}, {
+    fetchImpl,
+    apiBaseUrl,
+    env,
+  });
   if (!accountsResp.ok) {
     const status = Number(accountsResp.status || 0) || 502;
     return {
@@ -629,6 +645,8 @@ export const ensureWorkersDevSubdomain = async ({
   workerName,
   requestedSubdomain = '',
   fetchImpl = globalThis.fetch,
+  apiBaseUrl = '',
+  env = null,
 } = {}) => {
   let subdomain = null;
   let subdomainStatus = '';
@@ -641,7 +659,9 @@ export const ensureWorkersDevSubdomain = async ({
     ? `ce-${toStr(accountId).replace(/[^a-z0-9-]/gi, '').slice(0, 10)}`
     : '';
 
-  const subdomainResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/subdomain`, {}, { fetchImpl });
+  const cfFetchOptions = { fetchImpl, apiBaseUrl, env };
+
+  const subdomainResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/subdomain`, {}, cfFetchOptions);
   if (subdomainResp.ok) {
     subdomain = subdomainResp.data?.result?.subdomain || null;
     subdomainStatus = subdomainResp.data?.result?.status || '';
@@ -655,7 +675,7 @@ export const ensureWorkersDevSubdomain = async ({
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subdomain: candidate }),
-    }, { fetchImpl });
+    }, cfFetchOptions);
     if (enableResp.ok) {
       subdomain = enableResp.data?.result?.subdomain || candidate;
       subdomainStatus = enableResp.data?.result?.status || subdomainStatus || 'active';
@@ -677,7 +697,7 @@ export const ensureWorkersDevSubdomain = async ({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled: true }),
-    }, { fetchImpl });
+    }, cfFetchOptions);
     if (scriptSubdomainResp.ok) {
       scriptSubdomainEnabled = scriptSubdomainResp.data?.result?.enabled !== false;
     } else {
@@ -700,6 +720,8 @@ export const ensureWorkersDevSubdomain = async ({
 const resolveDeploymentAccountId = async ({
   body,
   fetchImpl,
+  apiBaseUrl = '',
+  env = null,
 } = {}) => {
   const explicitAccountId = toStr(body?.accountId).trim();
   if (explicitAccountId) {
@@ -713,6 +735,8 @@ const resolveDeploymentAccountId = async ({
   const lookup = await lookupCloudflareAccount({
     apiToken: toStr(body?.apiToken || body?.token).trim(),
     fetchImpl,
+    apiBaseUrl,
+    env,
   });
   if (!lookup.ok) {
     return lookup;
@@ -738,6 +762,8 @@ export const executeDeployHelperRequest = async ({
   }
 
   const apiToken = toStr(body?.apiToken || body?.token).trim();
+  const apiBaseUrl = resolveCloudflareApiBaseUrl({ env });
+  const cfFetchOptions = { fetchImpl, apiBaseUrl };
   const workerName = toStr(body?.workerName).trim();
   const defaultSlug = normalizeSlug(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? '');
   const sessionSlug = body?.sessionSlug != null ? sessionSlugCheck.slug : defaultSlug;
@@ -769,6 +795,7 @@ export const executeDeployHelperRequest = async ({
       apiToken,
     },
     fetchImpl,
+    apiBaseUrl,
   });
   if (!accountLookup.ok) {
     return buildFailure(502, {
@@ -846,7 +873,7 @@ export const executeDeployHelperRequest = async ({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title: `ContextEngineSessionCorsWorker:${displaySlug}` }),
-  }, { fetchImpl });
+  }, cfFetchOptions);
   if (!kvCreate.ok) {
     return buildFailure(502, {
       error: kvCreate.error,
@@ -885,7 +912,7 @@ export const executeDeployHelperRequest = async ({
   const scriptUpload = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}`, {
     method: 'PUT',
     body: form,
-  }, { fetchImpl });
+  }, cfFetchOptions);
   if (!scriptUpload.ok) {
     consoleImpl?.error?.('[deploy-helper] script upload failed', JSON.stringify({
       workerName,
@@ -908,7 +935,7 @@ export const executeDeployHelperRequest = async ({
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: 'TOKEN_HMAC_SECRET', type: 'secret_text', text: tokenSecret }),
-  }, { fetchImpl });
+  }, cfFetchOptions);
   if (!secretResp.ok) {
     return buildFailure(502, {
       error: secretResp.error,
@@ -929,7 +956,7 @@ export const executeDeployHelperRequest = async ({
         type: 'secret_text',
         text: randomSecret(),
       }),
-    }, { fetchImpl });
+    }, cfFetchOptions);
     if (!envelopeKekResp.ok) {
       return buildFailure(502, {
         error: envelopeKekResp.error,
@@ -972,7 +999,7 @@ export const executeDeployHelperRequest = async ({
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
-  }, { fetchImpl });
+  }, cfFetchOptions);
   if (!configPut.ok) {
     return buildFailure(502, {
       error: configPut.error,
@@ -986,7 +1013,7 @@ export const executeDeployHelperRequest = async ({
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(secretsEnvelope),
-  }, { fetchImpl });
+  }, cfFetchOptions);
   if (!secretsPut.ok) {
     return buildFailure(502, {
       error: secretsPut.error,
@@ -1010,6 +1037,7 @@ export const executeDeployHelperRequest = async ({
     workerName,
     requestedSubdomain: toStr(body?.subdomain || body?.workersSubdomain).trim(),
     fetchImpl,
+    apiBaseUrl,
   });
   const deploymentPayload = {
     ok: true,
@@ -1039,7 +1067,7 @@ export const executeDeployHelperRequest = async ({
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(configWithWorkerUrl),
-    }, { fetchImpl });
+    }, cfFetchOptions);
     if (!configUpdate.ok) {
       return buildSuccess(207, {
         ...deploymentPayload,

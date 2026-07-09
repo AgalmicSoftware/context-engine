@@ -1,4 +1,3 @@
-
 /**
  * Cluster Analysis Prompt (LLM)
  *
@@ -17,13 +16,11 @@
 
 /** System instruction for the assistant */
 export const CLUSTER_ANALYSIS_SYSTEM_PROMPT =
-  "You are an expert survey analyst. You write neutral, helpful summaries of opinion clusters.";
+  'You are an expert survey analyst. You write neutral, helpful summaries of opinion clusters.';
 
 type UnknownRecord = Record<string, unknown>;
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  typeof value === 'object' && value !== null
-);
+const isRecord = (value: unknown): value is UnknownRecord => typeof value === 'object' && value !== null;
 
 /**
  * Build a user prompt for the model.

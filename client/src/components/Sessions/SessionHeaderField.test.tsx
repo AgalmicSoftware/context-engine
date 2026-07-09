@@ -5,29 +5,30 @@ import SessionHeaderField from './SessionHeaderField';
 import type { SessionHeaderFieldProps } from './SessionHeaderField';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const renderSessionHeaderField = (props: Partial<SessionHeaderFieldProps> = {}) => render(
-  <SessionHeaderField
-    value="https://example.test/header.png"
-    sessionHeaderMode="url"
-    compactSessionHeaderMode="idle"
-    sessionHeaderPreviewSrc="https://example.test/header.png"
-    sessionHeaderUploadStatus=""
-    sessionHeaderUploadStatusTone="default"
-    compactSessionHeaderInputRef={createRef()}
-    onUrlChange={() => {}}
-    onCompactUrlChange={() => {}}
-    onToggleCompactUrlMode={() => {}}
-    onPaste={() => {}}
-    onCompactUploadClick={() => {}}
-    onCompactFileChange={() => {}}
-    onUseUrlMode={() => {}}
-    onUseUploadMode={() => {}}
-    onAdvancedFileChange={() => {}}
-    onClear={() => {}}
-    onExpandPreview={() => {}}
-    {...props}
-  />
-);
+const renderSessionHeaderField = (props: Partial<SessionHeaderFieldProps> = {}) =>
+  render(
+    <SessionHeaderField
+      value="https://example.test/header.png"
+      sessionHeaderMode="url"
+      compactSessionHeaderMode="idle"
+      sessionHeaderPreviewSrc="https://example.test/header.png"
+      sessionHeaderUploadStatus=""
+      sessionHeaderUploadStatusTone="default"
+      compactSessionHeaderInputRef={createRef()}
+      onUrlChange={() => {}}
+      onCompactUrlChange={() => {}}
+      onToggleCompactUrlMode={() => {}}
+      onPaste={() => {}}
+      onCompactUploadClick={() => {}}
+      onCompactFileChange={() => {}}
+      onUseUrlMode={() => {}}
+      onUseUploadMode={() => {}}
+      onAdvancedFileChange={() => {}}
+      onClear={() => {}}
+      onExpandPreview={() => {}}
+      {...props}
+    />,
+  );
 
 describe('SessionHeaderField', () => {
   it('renders the advanced URL mode controls and preview surface', () => {
@@ -35,12 +36,10 @@ describe('SessionHeaderField', () => {
 
     expect(screen.getByLabelText('Use URL')).toBeChecked();
     expect(screen.getByLabelText('Upload file')).not.toBeChecked();
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue(
-      'https://example.test/header.png'
-    );
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue('https://example.test/header.png');
     expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
       'src',
-      'https://example.test/header.png'
+      'https://example.test/header.png',
     );
   });
 
@@ -80,9 +79,7 @@ describe('SessionHeaderField', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_PASTE));
     fireEvent.click(screen.getByRole('button', { name: 'Upload image' }));
 
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue(
-      'https://example.test/header.png'
-    );
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue('https://example.test/header.png');
     expect(onToggleCompactUrlMode).toHaveBeenCalledTimes(1);
     expect(onPaste).toHaveBeenCalledTimes(1);
     expect(onCompactUploadClick).toHaveBeenCalledTimes(1);

@@ -1,6 +1,6 @@
-@use "sass:color";
-@use "scss/finalSubmitCta" as finalSubmitCta;
-@use "scss/variables" as tokens;
+@use 'sass:color';
+@use 'scss/finalSubmitCta' as finalSubmitCta;
+@use 'scss/variables' as tokens;
 
 /* --- Variables (Ported from SBTPage/UserPage) --- */
 $user-page-background: tokens.$ce-panel-bg;
@@ -343,7 +343,10 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
       padding: 5px 9px;
       font-size: 11px;
       cursor: pointer;
-      transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+      transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        color 0.2s ease;
 
       &:hover {
         border-color: rgba(255, 255, 255, 0.24);
@@ -427,9 +430,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
       width: 100%;
       border-radius: var(--ce-radius-12);
       border: 1px solid rgba(255, 255, 255, 0.14);
-      background:
-        linear-gradient(180deg, rgba(20, 24, 51, 0.94), rgba(10, 13, 33, 0.92)),
-        rgba(255, 255, 255, 0.03);
+      background: linear-gradient(180deg, rgba(20, 24, 51, 0.94), rgba(10, 13, 33, 0.92)), rgba(255, 255, 255, 0.03);
       overflow: hidden;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
       min-height: 208px;
@@ -466,7 +467,10 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+      transition:
+        background 0.16s ease,
+        border-color 0.16s ease,
+        transform 0.16s ease;
 
       &:hover {
         background: rgba(30, 36, 76, 0.92);
@@ -545,7 +549,9 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
     font-weight: 700;
     font-size: 1rem;
     padding: 14px 18px;
-    transition: background 0.2s ease, color 0.2s ease;
+    transition:
+      background 0.2s ease,
+      color 0.2s ease;
     font-family: var(--ce-font-body);
 
     svg {
@@ -597,7 +603,9 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    transition: border-color 0.2s ease, background-color 0.2s ease;
+    transition:
+      border-color 0.2s ease,
+      background-color 0.2s ease;
     &:hover {
       border-color: rgba(255, 255, 255, 0.22);
     }
@@ -805,7 +813,9 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.12);
     cursor: pointer;
-    transition: border-color 0.2s ease, background-color 0.2s ease;
+    transition:
+      border-color 0.2s ease,
+      background-color 0.2s ease;
     margin: 0;
 
     &:hover {
@@ -1756,7 +1766,6 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
   @include tokenInfoNarrowLayout;
 
   .createGroupExpanded {
-
     .fieldSectionHeader,
     .settingRow,
     .distributionCheckboxRow,

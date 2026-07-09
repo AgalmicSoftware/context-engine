@@ -18,12 +18,11 @@ type BinaryChoiceInputProps = {
 export const buildBinaryChoiceOptionClassName = (
   styleMap: Record<string, string>,
   option: string,
-  isSelected: unknown
-) => [
-  styleMap.radioOptionText,
-  styleMap[option.toLowerCase()],
-  isSelected ? styleMap.selected : '',
-].filter(Boolean).join(' ');
+  isSelected: unknown,
+) =>
+  [styleMap.radioOptionText, styleMap[option.toLowerCase()], isSelected ? styleMap.selected : '']
+    .filter(Boolean)
+    .join(' ');
 
 const BinaryChoiceInput = ({
   questionId,
@@ -38,11 +37,7 @@ const BinaryChoiceInput = ({
       const isSelected = value === option;
 
       return (
-        <Label
-          key={option}
-          check
-          className={buildBinaryChoiceOptionClassName(styles, option, isSelected)}
-        >
+        <Label key={option} check className={buildBinaryChoiceOptionClassName(styles, option, isSelected)}>
           <Input
             type="radio"
             name={`${inputNamePrefix}-${questionId}`}
@@ -58,12 +53,8 @@ const BinaryChoiceInput = ({
             }}
             disabled={disabled}
           />
-          {showIcons && option === 'Agree' && (
-            <FontAwesomeIcon icon={faCheck} className={styles.optionIcon} />
-          )}
-          {showIcons && option === 'Disagree' && (
-            <FontAwesomeIcon icon={faTimes} className={styles.optionIcon} />
-          )}
+          {showIcons && option === 'Agree' && <FontAwesomeIcon icon={faCheck} className={styles.optionIcon} />}
+          {showIcons && option === 'Disagree' && <FontAwesomeIcon icon={faTimes} className={styles.optionIcon} />}
           {option}
         </Label>
       );

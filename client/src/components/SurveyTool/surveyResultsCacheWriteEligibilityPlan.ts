@@ -81,9 +81,8 @@ export type SurveyResultsSurveyQuestionBookmarkWritePlan = {
   } | null;
 };
 
-const toRecord = (value: unknown): SurveyResultsRecord => (
-  value && typeof value === 'object' ? value as SurveyResultsRecord : {}
-);
+const toRecord = (value: unknown): SurveyResultsRecord =>
+  value && typeof value === 'object' ? (value as SurveyResultsRecord) : {};
 
 export const buildSurveyResultsAnalysisArtifactWriteReadinessPlan = ({
   artifact = null,
@@ -241,12 +240,8 @@ export const buildSurveyResultsSurveyQuestionBookmarkWritePlan = ({
   }
 
   const bookmarksCacheRecord = toRecord(bookmarksCache);
-  const surveys = Array.isArray(bookmarksCacheRecord.surveys)
-    ? [...bookmarksCacheRecord.surveys]
-    : [];
-  const questions = Array.isArray(bookmarksCacheRecord.questions)
-    ? [...bookmarksCacheRecord.questions]
-    : [];
+  const surveys = Array.isArray(bookmarksCacheRecord.surveys) ? [...bookmarksCacheRecord.surveys] : [];
+  const questions = Array.isArray(bookmarksCacheRecord.questions) ? [...bookmarksCacheRecord.questions] : [];
   const targetList = bookmarkType === 'survey' ? surveys : questions;
   const bookmarkIndex = targetList.indexOf(bookmarkId);
   const action = bookmarkIndex > -1 ? 'remove' : 'add';

@@ -107,38 +107,29 @@ const EMPTY_QUESTION_BUCKET: SurveyResultsQuestionBucketRecord = Object.freeze({
   questionResponsesLatestBlock: 0,
 });
 
-const hasOwn = (obj: unknown, key: PropertyKey): boolean => (
-  !!obj && Object.prototype.hasOwnProperty.call(obj, key)
-);
+const hasOwn = (obj: unknown, key: PropertyKey): boolean => !!obj && Object.prototype.hasOwnProperty.call(obj, key);
 
-const toSlugList = (value: unknown[] | null | undefined): string[] => (
-  Array.isArray(value)
-    ? value.map((slug) => String(slug || ''))
-    : []
-);
+const toSlugList = (value: unknown[] | null | undefined): string[] =>
+  Array.isArray(value) ? value.map((slug) => String(slug || '')) : [];
 
-const toQuestionBucket = (value: unknown): SurveyResultsQuestionBucketRecord => (
-  value && typeof value === 'object'
-    ? value as SurveyResultsQuestionBucketRecord
-    : EMPTY_QUESTION_BUCKET
-);
+const toQuestionBucket = (value: unknown): SurveyResultsQuestionBucketRecord =>
+  value && typeof value === 'object' ? (value as SurveyResultsQuestionBucketRecord) : EMPTY_QUESTION_BUCKET;
 
 function mergeQuestionResponsesByQuestion(
   accumulator: SurveyResultsQuestionResponsesByQuestion = {},
   questionResponses: unknown = {},
-  options: SurveyResultsQuestionResponseMergeOptions = {}
+  options: SurveyResultsQuestionResponseMergeOptions = {},
 ): SurveyResultsQuestionResponsesByQuestion {
-  const target = (accumulator && typeof accumulator === 'object') ? accumulator : {};
-  const source = (
+  const target = accumulator && typeof accumulator === 'object' ? accumulator : {};
+  const source =
     questionResponses && typeof questionResponses === 'object'
-      ? questionResponses as SurveyResultsQuestionResponsesByQuestion
-      : {}
-  );
-  const allowedQuestionIds = options.allowedQuestionIds instanceof Set
-    ? options.allowedQuestionIds
-    : null;
+      ? (questionResponses as SurveyResultsQuestionResponsesByQuestion)
+      : {};
+  const allowedQuestionIds = options.allowedQuestionIds instanceof Set ? options.allowedQuestionIds : null;
   Object.keys(source).forEach((questionId) => {
-    const lowerQuestionId = String(questionId || '').trim().toLowerCase();
+    const lowerQuestionId = String(questionId || '')
+      .trim()
+      .toLowerCase();
     if (!lowerQuestionId) return;
     if (allowedQuestionIds && !allowedQuestionIds.has(lowerQuestionId)) return;
     const responderMap = source[questionId];
@@ -154,17 +145,15 @@ function mergeQuestionResponsesByQuestion(
   return target;
 }
 
-const hasAuthoritativeQuestionSessionSlug = (question: SurveyResultsQuestionRecord = {}): boolean => (
-  hasOwn(question, 'sessionSlug') && question?.sessionSlugExplicit === true
-);
+const hasAuthoritativeQuestionSessionSlug = (question: SurveyResultsQuestionRecord = {}): boolean =>
+  hasOwn(question, 'sessionSlug') && question?.sessionSlugExplicit === true;
 
-const isPendingQuestionMetadataPlaceholder = (question: SurveyResultsQuestionRecord = {}): boolean => (
-  !!question && question.__ceQuestionMetadataPending === true
-);
+const isPendingQuestionMetadataPlaceholder = (question: SurveyResultsQuestionRecord = {}): boolean =>
+  !!question && question.__ceQuestionMetadataPending === true;
 
 const resolveScopedQuestionSessionSlug = (
   question: SurveyResultsQuestionRecord = {},
-  bucketSlug: unknown = ''
+  bucketSlug: unknown = '',
 ): string => {
   const normalizedBucketSlug = normalizeSessionSlug(bucketSlug || '');
   const normalizedQuestionSlug = normalizeSessionSlug(question?.sessionSlug || '');
@@ -181,12 +170,12 @@ const shouldKeepScopedQuestion = ({
   allowedScopeSlugs = [],
   requireAuthoritativeBinding = false,
 }: SurveyResultsScopedQuestionOptions = {}): boolean => {
-  const scopeSet = allowedScopeSlugs instanceof Set
-    ? allowedScopeSlugs
-    : new Set(
-      (Array.isArray(allowedScopeSlugs) ? allowedScopeSlugs : [])
-        .map((slug) => normalizeSessionSlug(slug || ''))
-    );
+  const scopeSet =
+    allowedScopeSlugs instanceof Set
+      ? allowedScopeSlugs
+      : new Set(
+          (Array.isArray(allowedScopeSlugs) ? allowedScopeSlugs : []).map((slug) => normalizeSessionSlug(slug || '')),
+        );
   if (!scopeSet.size) return true;
   const normalizedQuestionSlug = normalizeSessionSlug(question?.sessionSlug || '');
   if (isPendingQuestionMetadataPlaceholder(question)) return false;
@@ -198,7 +187,7 @@ const shouldKeepScopedQuestion = ({
 
 export function mergeScopedQuestionNetworkData(
   networkEntries: SurveyResultsScopedQuestionNetworkEntry[] = [],
-  options: SurveyResultsScopedQuestionNetworkOptions = {}
+  options: SurveyResultsScopedQuestionNetworkOptions = {},
 ): SurveyResultsScopedQuestionNetworkData {
   if (!Array.isArray(networkEntries) || networkEntries.length === 0) {
     return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
@@ -206,12 +195,14 @@ export function mergeScopedQuestionNetworkData(
 
   const mergedQuestions: Record<string, SurveyResultsQuestionRecord> = {};
   const mergedQuestionResponses: SurveyResultsQuestionResponsesByQuestion = {};
-  const allowedScopeSlugs = options.allowedScopeSlugs instanceof Set
-    ? options.allowedScopeSlugs
-    : new Set(
-      (Array.isArray(options.allowedScopeSlugs) ? options.allowedScopeSlugs : [])
-        .map((slug) => normalizeSessionSlug(slug || ''))
-    );
+  const allowedScopeSlugs =
+    options.allowedScopeSlugs instanceof Set
+      ? options.allowedScopeSlugs
+      : new Set(
+          (Array.isArray(options.allowedScopeSlugs) ? options.allowedScopeSlugs : []).map((slug) =>
+            normalizeSessionSlug(slug || ''),
+          ),
+        );
   const requireAuthoritativeBinding = options.requireAuthoritativeBinding === true;
   let questionsLatestBlock = 0;
   let questionResponsesLatestBlock = 0;
@@ -219,21 +210,23 @@ export function mergeScopedQuestionNetworkData(
   networkEntries.forEach(({ slug = '', bucket = {} }) => {
     const questionBucket = toQuestionBucket(bucket);
     const allowedQuestionIds: Set<string> = new Set();
-    const questions = (
-      questionBucket.questions && typeof questionBucket.questions === 'object'
-        ? questionBucket.questions
-        : {}
-    );
+    const questions =
+      questionBucket.questions && typeof questionBucket.questions === 'object' ? questionBucket.questions : {};
     Object.keys(questions).forEach((questionId) => {
-      const lowerQuestionId = String(questionId || '').trim().toLowerCase();
+      const lowerQuestionId = String(questionId || '')
+        .trim()
+        .toLowerCase();
       if (!lowerQuestionId) return;
       const question = questions[questionId] || {};
-      if (!shouldKeepScopedQuestion({
-        question,
-        bucketSlug: slug,
-        allowedScopeSlugs,
-        requireAuthoritativeBinding,
-      })) return;
+      if (
+        !shouldKeepScopedQuestion({
+          question,
+          bucketSlug: slug,
+          allowedScopeSlugs,
+          requireAuthoritativeBinding,
+        })
+      )
+        return;
       allowedQuestionIds.add(lowerQuestionId);
       if (Object.prototype.hasOwnProperty.call(mergedQuestions, lowerQuestionId)) return;
       mergedQuestions[lowerQuestionId] = {
@@ -243,18 +236,16 @@ export function mergeScopedQuestionNetworkData(
       };
     });
 
-    mergeQuestionResponsesByQuestion(
-      mergedQuestionResponses,
-      questionBucket.questionResponses || {},
-      { allowedQuestionIds }
-    );
+    mergeQuestionResponsesByQuestion(mergedQuestionResponses, questionBucket.questionResponses || {}, {
+      allowedQuestionIds,
+    });
     questionsLatestBlock = Math.max(
       questionsLatestBlock,
-      normalizeSurveyResultsBlockNumber(questionBucket.questionsLatestBlock)
+      normalizeSurveyResultsBlockNumber(questionBucket.questionsLatestBlock),
     );
     questionResponsesLatestBlock = Math.max(
       questionResponsesLatestBlock,
-      normalizeSurveyResultsBlockNumber(questionBucket.questionResponsesLatestBlock)
+      normalizeSurveyResultsBlockNumber(questionBucket.questionResponsesLatestBlock),
     );
   });
 
@@ -291,20 +282,19 @@ export const runSurveyResultsQuestionNetworkReadController = ({
     bucket: toQuestionBucket(
       typeof ports.readQuestionBucket === 'function'
         ? ports.readQuestionBucket(slug, normalizedNetIdStr)
-        : EMPTY_QUESTION_BUCKET
+        : EMPTY_QUESTION_BUCKET,
     ),
   }));
   const bucketRefs = entries.map((entry) => entry.bucket);
   const memo: SurveyResultsScopedQuestionNetworkMemo = previousMemo || {};
-  const memoMatches = (
+  const memoMatches =
     memo.viewMode === viewMode &&
     memo.netIdStr === normalizedNetIdStr &&
     memo.slugsKey === slugsKey &&
     memo.requireAuthoritativeBinding === authoritativeOnly &&
     Array.isArray(memo.bucketRefs) &&
     memo.bucketRefs.length === bucketRefs.length &&
-    memo.bucketRefs.every((bucket, index) => bucket === bucketRefs[index])
-  );
+    memo.bucketRefs.every((bucket, index) => bucket === bucketRefs[index]);
   if (memoMatches) {
     return {
       memo,
@@ -346,20 +336,22 @@ export const runSurveyResultsQuestionNetworkAsyncReadController = async ({
   }
 
   const slugs = toSlugList(questionReadSlugs);
-  const entries: SurveyResultsScopedQuestionNetworkEntry[] = await Promise.all(slugs.map(async (slug) => {
-    let bucket = typeof ports.peekQuestionBucket === 'function'
-      ? ports.peekQuestionBucket(slug, normalizedNetIdStr)
-      : null;
-    if (!bucket || typeof bucket !== 'object' || Object.keys(bucket).length === 0) {
-      bucket = typeof ports.readQuestionBucket === 'function'
-        ? await ports.readQuestionBucket(slug, normalizedNetIdStr)
-        : EMPTY_QUESTION_BUCKET;
-    }
-    return {
-      slug,
-      bucket: toQuestionBucket(bucket),
-    };
-  }));
+  const entries: SurveyResultsScopedQuestionNetworkEntry[] = await Promise.all(
+    slugs.map(async (slug) => {
+      let bucket =
+        typeof ports.peekQuestionBucket === 'function' ? ports.peekQuestionBucket(slug, normalizedNetIdStr) : null;
+      if (!bucket || typeof bucket !== 'object' || Object.keys(bucket).length === 0) {
+        bucket =
+          typeof ports.readQuestionBucket === 'function'
+            ? await ports.readQuestionBucket(slug, normalizedNetIdStr)
+            : EMPTY_QUESTION_BUCKET;
+      }
+      return {
+        slug,
+        bucket: toQuestionBucket(bucket),
+      };
+    }),
+  );
 
   return {
     result: mergeScopedQuestionNetworkData(entries, {

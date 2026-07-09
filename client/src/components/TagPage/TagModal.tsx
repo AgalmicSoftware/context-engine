@@ -32,10 +32,20 @@ type TagModalProps = {
   toggle: () => void;
   activeTag?: string | null;
   demoCorpusMode?: boolean;
-  demoCorpusRecords?: any[];
+  demoCorpusRecords?: unknown[];
 };
 
-const TagPageComponent = TagPage as React.ComponentType<any>;
+type EmbeddedTagPageProps = {
+  embedded: boolean;
+  demoCorpusMode?: boolean;
+  demoCorpusRecords?: unknown[];
+  selectedTagsOverride?: string[];
+  onSelectedTagsChange?: (tags: unknown[]) => void;
+  emptyQuestionsText?: string;
+  hideEmbeddedSessionSelector?: boolean;
+};
+
+const TagPageComponent = TagPage as React.ComponentType<EmbeddedTagPageProps>;
 
 const dedupeSessionSlugs = (values: unknown[] | unknown = []): string[] => {
   const seen = new Set<string>();
@@ -52,19 +62,18 @@ const dedupeSessionSlugs = (values: unknown[] | unknown = []): string[] => {
 const buildSessionScopeLabel = (slugIn = ''): string => {
   const slug = normalizeSessionSlug(slugIn);
   if (!slug) return 'General';
-  const cfg = (
-    getStrictSessionConfigBySlug(slug) ||
-    getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) ||
-    {}
-  );
+  const cfg = getStrictSessionConfigBySlug(slug) || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) || {};
   const sessionName = String(cfg?.sessionName || '').trim();
   return sessionName && sessionName.toLowerCase() !== slug.toLowerCase()
     ? `${sessionName} (${slug})`
-    : (sessionName || slug);
+    : sessionName || slug;
 };
 
-const buildGlobalTagPageScope = (selection: Record<string, any> = {}): SessionScopeState => {
-  const scopeMode = String(selection?.selectedSessionScope || '').trim().toLowerCase() || 'active';
+const buildGlobalTagPageScope = (selection: Record<string, unknown> = {}): SessionScopeState => {
+  const scopeMode =
+    String(selection?.selectedSessionScope || '')
+      .trim()
+      .toLowerCase() || 'active';
   if (scopeMode === 'all') {
     return { filterMode: 'all', scopeSlugs: [] };
   }
@@ -137,13 +146,7 @@ const buildEmptyQuestionsText = (selectedTags: string[] = []) => {
   return 'No questions found for this tag comparison yet.';
 };
 
-const TagModal = ({
-  isOpen,
-  toggle,
-  activeTag,
-  demoCorpusMode = false,
-  demoCorpusRecords = [],
-}: TagModalProps) => {
+const TagModal = ({ isOpen, toggle, activeTag, demoCorpusMode = false, demoCorpusRecords = [] }: TagModalProps) => {
   const location = useLocation();
   const reduxContext = useContext(ReactReduxContext);
   const sessionState = reduxContext?.store?.getState?.()?.sessionState;
@@ -157,18 +160,9 @@ const TagModal = ({
     setSelectedTags(normalizedActiveTag ? [normalizedActiveTag] : []);
   }, [normalizedActiveTag]);
 
-  const emptyQuestionsText = useMemo(
-    () => buildEmptyQuestionsText(selectedTags),
-    [selectedTags]
-  );
-  const selectedTagsKey = useMemo(
-    () => selectedTags.join('||'),
-    [selectedTags]
-  );
-  const globalSessionSelection = useMemo(
-    () => normalizeGlobalSessionSelection(sessionState || {}),
-    [sessionState]
-  );
+  const emptyQuestionsText = useMemo(() => buildEmptyQuestionsText(selectedTags), [selectedTags]);
+  const selectedTagsKey = useMemo(() => selectedTags.join('||'), [selectedTags]);
+  const globalSessionSelection = useMemo(() => normalizeGlobalSessionSelection(sessionState || {}), [sessionState]);
   const demoScopeSummary = useMemo(() => {
     if (!demoCorpusMode) return null;
 
@@ -177,9 +171,9 @@ const TagModal = ({
     const globalScopeState = buildGlobalTagPageScope(globalSessionSelection);
     const effectiveScopeState: SessionScopeState = routePinned
       ? {
-        filterMode: 'set',
-        scopeSlugs: [normalizeSessionSlug(queryPinnedScopeSlug) || ''],
-      }
+          filterMode: 'set',
+          scopeSlugs: [normalizeSessionSlug(queryPinnedScopeSlug) || ''],
+        }
       : globalScopeState;
 
     return describeScopeSummary({
@@ -231,11 +225,10 @@ const TagModal = ({
 
     resetAllScrollContainers();
 
-    const frameId = (
+    const frameId =
       typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
         ? window.requestAnimationFrame(resetAllScrollContainers)
-        : null
-    );
+        : null;
 
     return () => {
       if (frameId !== null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
@@ -255,10 +248,7 @@ const TagModal = ({
       backdropClassName={styles.tagModalBackdrop}
       wrapClassName={styles.tagModalWrap}
     >
-      <div
-        data-testid="tag-modal-top-bar"
-        className={styles.tagModalHeaderBar}
-      >
+      <div data-testid="tag-modal-top-bar" className={styles.tagModalHeaderBar}>
         <span>Tag explorer</span>
         <div className={styles.tagModalHeaderActions}>
           {demoCorpusMode ? (
@@ -274,12 +264,10 @@ const TagModal = ({
                 <FontAwesomeIcon icon={faCog} />
               </button>
               {demoInfoOpen && demoScopeSummary ? (
-                <div
-                  className={styles.tagModalChromePopover}
-                  data-testid="tag-modal-demo-info-panel"
-                >
+                <div className={styles.tagModalChromePopover} data-testid="tag-modal-demo-info-panel">
                   <div className={styles.sessionSelectorHint}>
-                    Demo corpus mode uses the demo corpus records currently loaded in this view instead of session-scoped questions.
+                    Demo corpus mode uses the demo corpus records currently loaded in this view instead of
+                    session-scoped questions.
                   </div>
                   <div className={styles.sessionSelectorInfoCard}>
                     <div className={styles.sessionSelectorInfoLabel}>Hidden session scope</div>

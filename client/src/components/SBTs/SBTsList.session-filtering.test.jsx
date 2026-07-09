@@ -39,12 +39,14 @@ describe('SBTsList list-mode routing and filtering', () => {
     const alphaAddress = '0x00000000000000000000000000000000000000a1';
     const betaAddress = '0x00000000000000000000000000000000000000b1';
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [alphaAddress.toLowerCase()]: {
               sbtAddress: alphaAddress,
@@ -96,7 +98,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -108,12 +110,14 @@ describe('SBTsList list-mode routing and filtering', () => {
   it('falls back to cached entry slug when sessionSlug is inferred (not explicit)', async () => {
     const alphaAddress = '0x00000000000000000000000000000000000000a1';
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [alphaAddress.toLowerCase()]: {
               sbtAddress: alphaAddress,
@@ -152,7 +156,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -170,12 +174,14 @@ describe('SBTsList list-mode routing and filtering', () => {
     const inferredNameAddress = '0x00000000000000000000000000000000000000a7';
 
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
+        return { 84532: { sbtList: {}, lastBlock: 0 } };
       }
       return {
-        '84532': {
+        84532: {
           sbtList: {
             [explicitAddress.toLowerCase()]: {
               sbtAddress: explicitAddress,
@@ -299,7 +305,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -318,7 +324,7 @@ describe('SBTsList list-mode routing and filtering', () => {
     const otherAddress = '0x00000000000000000000000000000000000000c2';
 
     mockReadCache.mockResolvedValue({
-      '84532': {
+      84532: {
         sbtList: {},
         lastBlock: 1100,
       },
@@ -329,7 +335,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         slug: 'archive',
         key: 'dg:sbtCache:archive',
         value: {
-          '84532': {
+          84532: {
             sbtList: {
               [linkedAddress.toLowerCase()]: {
                 sbtAddress: linkedAddress,
@@ -382,7 +388,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -390,5 +396,4 @@ describe('SBTsList list-mode routing and filtering', () => {
     });
     expect(screen.queryByText('Archive Beta Explicit Badge')).not.toBeInTheDocument();
   });
-
 });

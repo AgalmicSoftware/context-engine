@@ -14,9 +14,7 @@ describe('contractScripts core pure helpers', () => {
   });
 
   it('passes through the original result when timeout is disabled', async () => {
-    await expect(runWithSoftTimeout(Promise.resolve('ready'), { timeoutMs: 0 }))
-      .resolves
-      .toBe('ready');
+    await expect(runWithSoftTimeout(Promise.resolve('ready'), { timeoutMs: 0 })).resolves.toBe('ready');
   });
 
   it('falls back softly on timeout and calls the timeout hook once', async () => {

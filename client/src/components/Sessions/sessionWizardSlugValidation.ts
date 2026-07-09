@@ -8,11 +8,9 @@ const RESERVED_SESSION_SLUG_LIST = Array.from(RESERVED_SESSION_SLUGS)
   .map((slug) => `"${slug}"`)
   .join(', ');
 
-export const RESERVED_SESSION_SLUG_ERROR =
-  `This slug is reserved for the default session or legacy compatibility aliases (${RESERVED_SESSION_SLUG_LIST}). Please choose a different slug.`;
+export const RESERVED_SESSION_SLUG_ERROR = `This slug is reserved for the default session or legacy compatibility aliases (${RESERVED_SESSION_SLUG_LIST}). Please choose a different slug.`;
 
-export const INVALID_SESSION_SLUG_FORMAT_ERROR =
-  'Session slugs must use lowercase letters, numbers, "_" or "-".';
+export const INVALID_SESSION_SLUG_FORMAT_ERROR = 'Session slugs must use lowercase letters, numbers, "_" or "-".';
 
 const VALID_SESSION_SLUG_REGEX = /^[a-z0-9_-]+$/;
 

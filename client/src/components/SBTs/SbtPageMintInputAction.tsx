@@ -41,11 +41,7 @@ const SbtPageMintInputAction = ({
         placeholder={placeholder}
       />
     </div>
-    <button
-      onClick={onAction}
-      disabled={disabled}
-      className={buttonClassName}
-    >
+    <button onClick={onAction} disabled={disabled} className={buttonClassName}>
       {contentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
       {contentState.shouldRenderLabel && contentState.label}
     </button>

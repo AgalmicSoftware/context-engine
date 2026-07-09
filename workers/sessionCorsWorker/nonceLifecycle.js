@@ -1,8 +1,27 @@
+import {
+  ABUSE_COUNTER_TYPES,
+  recordAbuseEvent as recordAbuseEventBoundary,
+} from './abuseObservability.js';
+
 const DEFAULT_USED_NONCE_TTL_SECONDS = 60 * 10;
 const DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS = 60;
 const DEFAULT_NONCE_RATE_LIMIT_MAX = 5;
 const nonceConsumeLocks = new Map();
+
+const recordAbuseEventBestEffort = async ({
+  env,
+  type,
+  deps,
+  now,
+} = {}) => {
+  try {
+    const record = deps?.recordAbuseEvent || recordAbuseEventBoundary;
+    await record({ env, type, now });
+  } catch {
+    // Abuse telemetry is diagnostic only and must not alter auth/rate-limit responses.
+  }
+};
 
 const withNonceConsumeLock = async (key, work) => {
   const previous = nonceConsumeLocks.get(key) || Promise.resolve();
@@ -60,6 +79,11 @@ export const consumeNonce = async (env, slug, address, nonce, deps) => {
     const usedKey = `usedNonce:${slug}:${nonce}`;
     const alreadyUsed = await groupKv?.get?.(usedKey);
     if (alreadyUsed) {
+      await recordAbuseEventBestEffort({
+        env,
+        type: ABUSE_COUNTER_TYPES.NONCE_REPLAY,
+        deps,
+      });
       return { ok: false, error: 'Nonce already used.' };
     }
 
@@ -94,6 +118,7 @@ export const checkNonceRateLimit = async ({
   now,
   windowMs = DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS,
   ttlSeconds = DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS,
+  recordAbuseEvent,
 } = {}) => {
   const numericLimit = Number(limit);
   if (!Number.isFinite(numericLimit) || numericLimit <= 0) return { ok: true };
@@ -118,6 +143,12 @@ export const checkNonceRateLimit = async ({
   await env?.GROUP_KV?.put?.(key, String(next), { expirationTtl });
 
   if (next > numericLimit) {
+    await recordAbuseEventBestEffort({
+      env,
+      type: ABUSE_COUNTER_TYPES.RATE_LIMIT_TRIP,
+      deps: { recordAbuseEvent },
+      now,
+    });
     return {
       ok: false,
       error: 'Too many nonce requests. Try again shortly.',

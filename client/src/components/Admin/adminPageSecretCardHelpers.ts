@@ -56,44 +56,32 @@ export const getAdminSecretFieldInputType = (fieldKey: unknown): 'password' | 't
   return 'password';
 };
 
-export const getAdminSecretFieldRows = (fieldKey: unknown): number | undefined => (
-  getAdminSecretFieldInputType(fieldKey) === 'textarea' ? 3 : undefined
-);
+export const getAdminSecretFieldRows = (fieldKey: unknown): number | undefined =>
+  getAdminSecretFieldInputType(fieldKey) === 'textarea' ? 3 : undefined;
 
-export const buildAdminSecretRemoveTestId = (fieldKey: unknown): string => (
-  `ce-admin-secret-remove-${String(fieldKey).replace(/([A-Z])/g, '-$1').toLowerCase()}`
-);
+export const buildAdminSecretRemoveTestId = (fieldKey: unknown): string =>
+  `ce-admin-secret-remove-${String(fieldKey)
+    .replace(/([A-Z])/g, '-$1')
+    .toLowerCase()}`;
 
-const fieldHasDraftValue = (secrets: AdminSecretDraftMap | undefined, fieldKey: string): boolean => (
-  !!toStr(secrets?.[fieldKey]).trim()
-);
+const fieldHasDraftValue = (secrets: AdminSecretDraftMap | undefined, fieldKey: string): boolean =>
+  !!toStr(secrets?.[fieldKey]).trim();
 
-const fieldIsCleared = (
-  clearedSecretKeys: AdminSecretStatusInput['clearedSecretKeys'],
-  fieldKey: string
-): boolean => (
-  !!clearedSecretKeys?.has?.(fieldKey)
-);
+const fieldIsCleared = (clearedSecretKeys: AdminSecretStatusInput['clearedSecretKeys'], fieldKey: string): boolean =>
+  !!clearedSecretKeys?.has?.(fieldKey);
 
 const fieldHasStoredPresence = (
   storedSecretPresence: AdminSecretPresenceMap | null | undefined,
-  fieldKey: string
-): boolean => (
-  storedSecretPresence?.[fieldKey] === true
-);
+  fieldKey: string,
+): boolean => storedSecretPresence?.[fieldKey] === true;
 
 const fieldHasPresenceEntry = (
   storedSecretPresence: AdminSecretPresenceMap | null | undefined,
-  fieldKey: string
-): boolean => (
-  !!storedSecretPresence &&
-  Object.prototype.hasOwnProperty.call(storedSecretPresence, fieldKey)
-);
+  fieldKey: string,
+): boolean => !!storedSecretPresence && Object.prototype.hasOwnProperty.call(storedSecretPresence, fieldKey);
 
 export const normalizeAdminSecretPresence = (value: unknown): AdminSecretPresenceMap => {
-  const source = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   const out: AdminSecretPresenceMap = {};
   ADMIN_SECRET_CARDS.forEach((card) => {
     card.fields.forEach((fieldKey) => {
@@ -110,9 +98,7 @@ const normalizePresencePatchValue = (value: unknown): boolean => {
 };
 
 export const normalizeAdminSecretPresencePatch = (value: unknown): AdminSecretPresenceMap => {
-  const source = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   const out: AdminSecretPresenceMap = {};
   ADMIN_SECRET_CARDS.forEach((card) => {
     card.fields.forEach((fieldKey) => {
@@ -148,10 +134,11 @@ export const getAdminSecretCardStatus = ({
     if (fields.some((fieldKey) => fieldHasStoredPresence(storedSecretPresence, fieldKey))) {
       return { label: 'Configured', iconLocked: true };
     }
-    return fields.every((fieldKey) => (
-      fieldHasPresenceEntry(storedSecretPresence, fieldKey) &&
-      !fieldHasStoredPresence(storedSecretPresence, fieldKey)
-    ))
+    return fields.every(
+      (fieldKey) =>
+        fieldHasPresenceEntry(storedSecretPresence, fieldKey) &&
+        !fieldHasStoredPresence(storedSecretPresence, fieldKey),
+    )
       ? { label: 'Empty', iconLocked: false }
       : { label: 'Unknown', iconLocked: false };
   }
@@ -170,15 +157,11 @@ export const getAdminSecretFieldStatusLabel = ({
   if (fieldIsCleared(clearedSecretKeys, fieldKey)) return 'Will clear on save';
   if (secretPresenceStatus === 'loading') return 'Checking stored status';
   if (secretPresenceStatus === 'loaded') {
-    return fieldHasStoredPresence(storedSecretPresence, fieldKey)
-      ? 'Stored in worker; hidden'
-      : 'No stored value';
+    return fieldHasStoredPresence(storedSecretPresence, fieldKey) ? 'Stored in worker; hidden' : 'No stored value';
   }
   if (secretPresenceStatus === 'partial') {
     if (!fieldHasPresenceEntry(storedSecretPresence, fieldKey)) return 'Stored status unknown';
-    return fieldHasStoredPresence(storedSecretPresence, fieldKey)
-      ? 'Stored in worker; hidden'
-      : 'No stored value';
+    return fieldHasStoredPresence(storedSecretPresence, fieldKey) ? 'Stored in worker; hidden' : 'No stored value';
   }
   if (secretPresenceStatus === 'error') return 'Unable to verify';
   return 'Stored status unknown';

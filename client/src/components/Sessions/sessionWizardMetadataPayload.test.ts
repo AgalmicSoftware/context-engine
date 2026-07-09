@@ -8,18 +8,17 @@ import {
 
 describe('normalizeSessionWizardDefaultFeaturedSbtMetadata', () => {
   it('normalizes string, address-object, and sbt-address entries without duplicates', () => {
-    expect(normalizeSessionWizardDefaultFeaturedSbtMetadata([
-      '0xAAA',
-      { address: ' 0xbbb ' },
-      { sbtAddress: '0xAAA' },
-      '',
-      {},
-    ])).toEqual(['0xAAA', '0xbbb']);
+    expect(
+      normalizeSessionWizardDefaultFeaturedSbtMetadata([
+        '0xAAA',
+        { address: ' 0xbbb ' },
+        { sbtAddress: '0xAAA' },
+        '',
+        {},
+      ]),
+    ).toEqual(['0xAAA', '0xbbb']);
 
-    expect(normalizeSessionWizardDefaultFeaturedSbtMetadata('0x111, 0x222\n0x111')).toEqual([
-      '0x111',
-      '0x222',
-    ]);
+    expect(normalizeSessionWizardDefaultFeaturedSbtMetadata('0x111, 0x222\n0x111')).toEqual(['0x111', '0x222']);
   });
 });
 
@@ -32,11 +31,7 @@ describe('resolveSessionWizardMetadataPayloadBase', () => {
       sessionIdHex: '0xstale',
       sponsoredSbtAddress: '0xsponsored',
       autoFeatureSBTsWithFeaturedSbtTags: true,
-      defaultFeaturedSBTs: [
-        '0xAAA',
-        { address: '0xbbb' },
-        { sbtAddress: '0xAAA' },
-      ],
+      defaultFeaturedSBTs: ['0xAAA', { address: '0xbbb' }, { sbtAddress: '0xAAA' }],
     };
 
     const metadata = resolveSessionWizardMetadataPayloadBase({
@@ -44,41 +39,51 @@ describe('resolveSessionWizardMetadataPayloadBase', () => {
       sessionId: '00000000-0000-0000-0000-000000000001',
     });
 
-    expect(metadata).toEqual(expect.objectContaining({
-      sessionName: 'Writers Room',
-      slug: 'writers-room',
-      sessionId: '00000000-0000-0000-0000-000000000001',
-      sessionIdHex: '0x00000000000000000000000000000001',
-      autoFeatureSBTsBySessionSlug: true,
-      defaultFeaturedSBTs: ['0xAAA', '0xbbb'],
-    }));
+    expect(metadata).toEqual(
+      expect.objectContaining({
+        sessionName: 'Writers Room',
+        slug: 'writers-room',
+        sessionId: '00000000-0000-0000-0000-000000000001',
+        sessionIdHex: '0x00000000000000000000000000000001',
+        autoFeatureSBTsBySessionSlug: true,
+        defaultFeaturedSBTs: ['0xAAA', '0xbbb'],
+      }),
+    );
     expect(metadata).not.toHaveProperty('sessionInfo');
     expect(metadata).not.toHaveProperty('sponsoredSbtAddress');
     expect(metadata).not.toHaveProperty('autoFeatureSBTsWithFeaturedSbtTags');
-    expect(draft).toEqual(expect.objectContaining({
-      sessionName: ' Writers Room ',
-      sponsoredSbtAddress: '0xsponsored',
-      sessionIdHex: '0xstale',
-    }));
+    expect(draft).toEqual(
+      expect.objectContaining({
+        sessionName: ' Writers Room ',
+        sponsoredSbtAddress: '0xsponsored',
+        sessionIdHex: '0xstale',
+      }),
+    );
   });
 
   it('clears stale session hex when no valid session id is available', () => {
-    expect(resolveSessionWizardMetadataPayloadBase({
-      draft: {
-        slug: 'general',
-        sessionIdHex: '0x00000000000000000000000000000001',
-      },
-      sessionId: '',
-    })).toEqual(expect.objectContaining({
-      sessionId: '',
-    }));
-    expect(resolveSessionWizardMetadataPayloadBase({
-      draft: {
-        slug: 'general',
-        sessionIdHex: '0x00000000000000000000000000000001',
-      },
-      sessionId: '',
-    })).not.toHaveProperty('sessionIdHex');
+    expect(
+      resolveSessionWizardMetadataPayloadBase({
+        draft: {
+          slug: 'general',
+          sessionIdHex: '0x00000000000000000000000000000001',
+        },
+        sessionId: '',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        sessionId: '',
+      }),
+    );
+    expect(
+      resolveSessionWizardMetadataPayloadBase({
+        draft: {
+          slug: 'general',
+          sessionIdHex: '0x00000000000000000000000000000001',
+        },
+        sessionId: '',
+      }),
+    ).not.toHaveProperty('sessionIdHex');
   });
 });
 
@@ -159,10 +164,10 @@ describe('applySessionWizardMetadataUploadGuards', () => {
 
     expect(getSessionWizardMetadataSecretFieldGateKeys(metadata)).toEqual(['arweave.jwk']);
     expect(buildSessionWizardSecretFieldGateErrorMessage(['arweave.jwk'])).toBe(
-      'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.'
+      'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.',
     );
     expect(() => applySessionWizardMetadataUploadGuards({ metadata })).toThrow(
-      'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.'
+      'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.',
     );
     expect(metadata.arweave).toEqual({ jwk: 'secret-jwk' });
   });

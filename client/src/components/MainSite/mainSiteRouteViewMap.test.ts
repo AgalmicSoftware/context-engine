@@ -1,6 +1,4 @@
-import {
-  MAIN_SITE_ROUTE_DEFINITIONS,
-} from './routeTable.js';
+import { MAIN_SITE_ROUTE_DEFINITIONS } from './routeTable.js';
 import {
   MAIN_SITE_ROUTE_VIEW_KEYS,
   renderMainSiteRouteView,
@@ -40,9 +38,7 @@ const buildRenderers = (calls: string[] = []): MainSiteRouteViewRenderers => {
 describe('mainSiteRouteViewMap', () => {
   it('tracks every non-wizard concrete route definition in order', () => {
     expect(MAIN_SITE_ROUTE_VIEW_KEYS).toEqual(
-      MAIN_SITE_ROUTE_DEFINITIONS
-        .map(({ key }) => key)
-        .filter((key) => key !== 'wizard')
+      MAIN_SITE_ROUTE_DEFINITIONS.map(({ key }) => key).filter((key) => key !== 'wizard'),
     );
   });
 
@@ -62,12 +58,14 @@ describe('mainSiteRouteViewMap', () => {
   it('falls back to the not-found renderer for unresolved route keys', () => {
     const calls: string[] = [];
 
-    expect(renderMainSiteRouteView({
-      routeKey: 'notFound',
-      fullPath: '/missing',
-      renderers: buildRenderers(calls),
-      renderNotFound: (path) => `notFound:${path}`,
-    })).toBe('notFound:/missing');
+    expect(
+      renderMainSiteRouteView({
+        routeKey: 'notFound',
+        fullPath: '/missing',
+        renderers: buildRenderers(calls),
+        renderNotFound: (path) => `notFound:${path}`,
+      }),
+    ).toBe('notFound:/missing');
     expect(calls).toEqual([]);
   });
 });

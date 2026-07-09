@@ -28,8 +28,6 @@ describe('sessionWizardStorageProfile', () => {
     expect(profile.cloudflare).toBeNull();
   });
 
-
-
   test('keeps lit-arweave available as a per-session storage backend', () => {
     const profile = normalizeSessionStorageProfileConfig({ backend: 'lit-arweave' });
 
@@ -163,11 +161,8 @@ describe('sessionWizardStorageProfile', () => {
       { mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE, label: 'Worker SBT gate', selected: false },
       { mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED, label: 'Lit encrypted', selected: false },
     ]);
-    expect(publicRead.cloudflarePayloadAccessHelperText)
-      .toBe(SESSION_STORAGE_PROFILE_DISPLAY_COPY.publicRead);
-    expect(litEncrypted.cloudflarePayloadAccessHelperText)
-      .toBe(SESSION_STORAGE_PROFILE_DISPLAY_COPY.litEncrypted);
-    expect(workerSbtGate.cloudflarePayloadAccessHelperText)
-      .toBe(SESSION_STORAGE_PROFILE_DISPLAY_COPY.workerSbtGate);
+    expect(publicRead.cloudflarePayloadAccessHelperText).toBe(SESSION_STORAGE_PROFILE_DISPLAY_COPY.publicRead);
+    expect(litEncrypted.cloudflarePayloadAccessHelperText).toBe(SESSION_STORAGE_PROFILE_DISPLAY_COPY.litEncrypted);
+    expect(workerSbtGate.cloudflarePayloadAccessHelperText).toBe(SESSION_STORAGE_PROFILE_DISPLAY_COPY.workerSbtGate);
   });
 });

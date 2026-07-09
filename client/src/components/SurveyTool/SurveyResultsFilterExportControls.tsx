@@ -14,12 +14,9 @@ import type {
 
 type SurveyResultsQuestionFilterCallback = (
   filteredQuestionsOrCombined: unknown,
-  filterState: SurveyResultsCacheFilterState
+  filterState: SurveyResultsCacheFilterState,
 ) => void;
-type SurveyResultsSbtFilterCallback = (
-  filteredResponses: unknown,
-  sbtFilterState?: unknown
-) => void;
+type SurveyResultsSbtFilterCallback = (filteredResponses: unknown, sbtFilterState?: unknown) => void;
 
 type SurveyResultsFilterExportControlsCacheProps = Pick<
   SurveyResultsCacheFilterInput,
@@ -114,19 +111,13 @@ export const renderSurveyResultsFilterExportControls = ({
     <div className={styleMap.exportAndFilterContainer}>
       <div className={styleMap.filterBox}>
         {viewMode === 'survey' && surveyViewMode === 'individuals' && (
-          <Label className={styleMap.filterBoxLabel}>
-            {/* Filter (Survey Individuals): */}
-          </Label>
+          <Label className={styleMap.filterBoxLabel}>{/* Filter (Survey Individuals): */}</Label>
         )}
         {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-          <Label className={styleMap.filterBoxLabel}>
-            {/* Filter (Survey Aggregate): */}
-          </Label>
+          <Label className={styleMap.filterBoxLabel}>{/* Filter (Survey Aggregate): */}</Label>
         )}
         {viewMode === 'questions' && (
-          <Label className={styleMap.filterBoxLabel}>
-            {/* Filter Questions & Responses: */}
-          </Label>
+          <Label className={styleMap.filterBoxLabel}>{/* Filter Questions & Responses: */}</Label>
         )}
 
         {viewMode === 'survey' && surveyViewMode === 'aggregate' && (

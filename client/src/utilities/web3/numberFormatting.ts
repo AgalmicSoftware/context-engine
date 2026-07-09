@@ -16,12 +16,18 @@ export function decimalEighteen(coinAmount: unknown, callingFunc?: unknown): str
   const coinAmountIsBN = ethers.BigNumber.isBigNumber(coinAmount);
   if (coinAmountIsBN) {
     return ethers.utils.formatEther(coinAmount);
-  }
-  else if (typeof coinAmount === 'string' || coinAmount instanceof String) {
-    try { return ethers.utils.formatEther(String(coinAmount)); } catch { /* ignore */ }
-  }
-  else if (typeof coinAmount === 'number' || coinAmount instanceof Number) {
-    try { return ethers.utils.formatEther(String(coinAmount)); } catch { /* ignore */ }
+  } else if (typeof coinAmount === 'string' || coinAmount instanceof String) {
+    try {
+      return ethers.utils.formatEther(String(coinAmount));
+    } catch {
+      /* ignore */
+    }
+  } else if (typeof coinAmount === 'number' || coinAmount instanceof Number) {
+    try {
+      return ethers.utils.formatEther(String(coinAmount));
+    } catch {
+      /* ignore */
+    }
   }
   contractsLog.log('WRONG TYPE OF BIGNUMBER Passed to decimalEighteen()', coinAmount, 'from:', callingFunc);
   return '0.0';
@@ -33,7 +39,11 @@ export function toEighteenDecimals(coinAmount: unknown): ReturnType<typeof ether
 
 export function getBigNumber(numString: unknown, callingFunc?: unknown): ReturnType<typeof ethers.BigNumber.from> {
   if (numString != null) {
-    try { return ethers.BigNumber.from(String(numString)); } catch { /* ignore */ }
+    try {
+      return ethers.BigNumber.from(String(numString));
+    } catch {
+      /* ignore */
+    }
   }
   contractsLog.log('CHECK – getBigNumber() – undefined or invalid numString passed', numString, 'from:', callingFunc);
   return ethers.BigNumber.from(0);
@@ -46,16 +56,16 @@ export function objectIsBN(object: unknown): boolean {
 export function getJsNumberFromBN(
   this: BigNumberFormattingContext | undefined,
   BNObject: unknown,
-  callingFunc?: unknown
+  callingFunc?: unknown,
 ): number {
-  const objectIsBigNumber = (
-    this &&
-    typeof this.objectIsBN === 'function'
-  )
-    ? this.objectIsBN(BNObject)
-    : objectIsBN(BNObject);
+  const objectIsBigNumber =
+    this && typeof this.objectIsBN === 'function' ? this.objectIsBN(BNObject) : objectIsBN(BNObject);
   if (objectIsBigNumber) {
-    try { return (BNObject as BigNumberLike).toNumber(); } catch { /* ignore */ }
+    try {
+      return (BNObject as BigNumberLike).toNumber();
+    } catch {
+      /* ignore */
+    }
   }
   contractsLog.log('BAD BN VALUE Passed to getJsNumberFromBN()', BNObject, 'from:', callingFunc);
   return 0;

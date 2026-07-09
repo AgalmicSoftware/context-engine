@@ -46,30 +46,25 @@ type SbtListClosestTarget = EventTarget & {
   closest: (selector: string) => Element | null;
 };
 
-const hasSbtListClosestTarget = (value: unknown): value is SbtListClosestTarget => (
-  !!value &&
-  typeof value === 'object' &&
-  typeof (value as { closest?: unknown }).closest === 'function'
-);
+const hasSbtListClosestTarget = (value: unknown): value is SbtListClosestTarget =>
+  !!value && typeof value === 'object' && typeof (value as { closest?: unknown }).closest === 'function';
 
 export const buildSbtListLoadingGroupStatusClassName = ({
   activeClassName = '',
   baseClassName = '',
   pendingClassName = '',
   scanInProgress = false,
-}: BuildSbtListLoadingGroupStatusClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  scanInProgress ? String(activeClassName || '') : String(pendingClassName || ''),
-].filter(Boolean).join(' '));
+}: BuildSbtListLoadingGroupStatusClassNameArgs = {}): string =>
+  [String(baseClassName || ''), scanInProgress ? String(activeClassName || '') : String(pendingClassName || '')]
+    .filter(Boolean)
+    .join(' ');
 
 export const buildSbtListLoadingProgressFillClassName = ({
   baseClassName = '',
   hasLatest = false,
   indeterminateClassName = '',
-}: BuildSbtListLoadingProgressFillClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  hasLatest ? '' : String(indeterminateClassName || ''),
-].filter(Boolean).join(' '));
+}: BuildSbtListLoadingProgressFillClassNameArgs = {}): string =>
+  [String(baseClassName || ''), hasLatest ? '' : String(indeterminateClassName || '')].filter(Boolean).join(' ');
 
 export const resolveSbtListLoadingProgressFillStyle = ({
   hasLatest = false,
@@ -97,61 +92,46 @@ export const buildSbtListExpandedCardShellClassName = ({
   baseClassName = '',
   expandedClassName = '',
   isExpanded = false,
-}: BuildSbtListExpandedCardShellClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  isExpanded ? String(expandedClassName || '') : '',
-].filter(Boolean).join(' '));
+}: BuildSbtListExpandedCardShellClassNameArgs = {}): string =>
+  [String(baseClassName || ''), isExpanded ? String(expandedClassName || '') : ''].filter(Boolean).join(' ');
 
 export const buildSbtListRootClassName = ({
   baseClassName = '',
   rootClassName = '',
-}: BuildSbtListRootClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  String(rootClassName || ''),
-].filter(Boolean).join(' '));
+}: BuildSbtListRootClassNameArgs = {}): string =>
+  [String(baseClassName || ''), String(rootClassName || '')].filter(Boolean).join(' ');
 
 export const buildSbtListSessionUniversePanelClassName = ({
   baseClassName = '',
   closedClassName = '',
   isClosed = false,
-}: BuildSbtListSessionUniversePanelClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  isClosed ? String(closedClassName || '') : '',
-].filter(Boolean).join(' '));
+}: BuildSbtListSessionUniversePanelClassNameArgs = {}): string =>
+  [String(baseClassName || ''), isClosed ? String(closedClassName || '') : ''].filter(Boolean).join(' ');
 
 export const buildSbtListMiniSettingsButtonClassName = ({
   activeClassName = '',
   baseClassName = '',
   isActive = false,
-}: BuildSbtListMiniSettingsButtonClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  isActive ? String(activeClassName || '') : '',
-].filter(Boolean).join(' '));
+}: BuildSbtListMiniSettingsButtonClassNameArgs = {}): string =>
+  [String(baseClassName || ''), isActive ? String(activeClassName || '') : ''].filter(Boolean).join(' ');
 
 export const buildSbtListFilterContainerClassName = ({
   baseClassName = '',
   panelClassName = '',
-}: BuildSbtListFilterContainerClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  String(panelClassName || ''),
-].filter(Boolean).join(' '));
+}: BuildSbtListFilterContainerClassNameArgs = {}): string =>
+  [String(baseClassName || ''), String(panelClassName || '')].filter(Boolean).join(' ');
 
 export const buildSbtListFilterLabelClassName = ({
   activeClassName = '',
   baseClassName = '',
   isActive = false,
   toggleClassName = '',
-}: BuildSbtListFilterLabelClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  String(toggleClassName || ''),
-  isActive ? String(activeClassName || '') : '',
-].filter(Boolean).join(' '));
+}: BuildSbtListFilterLabelClassNameArgs = {}): string =>
+  [String(baseClassName || ''), String(toggleClassName || ''), isActive ? String(activeClassName || '') : '']
+    .filter(Boolean)
+    .join(' ');
 
 export const findSbtListInteractiveAncestor = (
   target: EventTarget | null | undefined,
-  selector: string
-): Element | null => (
-  hasSbtListClosestTarget(target)
-    ? target.closest(selector)
-    : null
-);
+  selector: string,
+): Element | null => (hasSbtListClosestTarget(target) ? target.closest(selector) : null);

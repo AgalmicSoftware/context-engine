@@ -50,7 +50,7 @@ describe('sbtPageMediaHelpers', () => {
     expect(normalizeSbtPageCanonicalMetadataHref('data:application/json,%7B%7D')).toBe('');
     expect(normalizeSbtPageCanonicalMetadataHref('https://cdn.example.test/preview.png')).toBe('');
     expect(normalizeSbtPageCanonicalMetadataHref('https://example.test/metadata.json')).toBe(
-      'https://example.test/metadata.json'
+      'https://example.test/metadata.json',
     );
   });
 
@@ -59,11 +59,14 @@ describe('sbtPageMediaHelpers', () => {
     const sessionTxId = 'ue3Ek_Mh1ypNvvCaGlfrntt_8HxJ9CDiwDlG06uoTpY';
     arweaveGlobals.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     arweaveGlobals.CE_ARWEAVE_AR_IO_URL = 'https://ar-io.dev';
-    const dataUriPayload = Buffer.from(JSON.stringify({
-      tokenURI: `ar://${sbtTxId}`,
-      metadataUri: `ar://${sessionTxId}`,
-      uri: 'https://cdn.example.test/banner.webp',
-    }), 'utf8').toString('base64');
+    const dataUriPayload = Buffer.from(
+      JSON.stringify({
+        tokenURI: `ar://${sbtTxId}`,
+        metadataUri: `ar://${sessionTxId}`,
+        uri: 'https://cdn.example.test/banner.webp',
+      }),
+      'utf8',
+    ).toString('base64');
 
     const href = resolveSbtPageTokenMetadataHref(`data:application/json;base64,${dataUriPayload}`);
 
@@ -73,20 +76,29 @@ describe('sbtPageMediaHelpers', () => {
 
   it('uses later embedded metadata fields when earlier token fields are image-like', () => {
     const txId = '4kpvO6qf-tN4l0R9vQh-Sz6ekU2xq9j5qM4R1X3vZkA';
-    const dataUriPayload = Buffer.from(JSON.stringify({
-      tokenURI: 'https://cdn.example.test/also-image.jpg',
-      uri: 'https://cdn.example.test/banner.webp',
-      metadataUri: `ar://${txId}`,
-    }), 'utf8').toString('base64');
+    const dataUriPayload = Buffer.from(
+      JSON.stringify({
+        tokenURI: 'https://cdn.example.test/also-image.jpg',
+        uri: 'https://cdn.example.test/banner.webp',
+        metadataUri: `ar://${txId}`,
+      }),
+      'utf8',
+    ).toString('base64');
 
     const href = resolveSbtPageTokenMetadataHref(`data:application/json;base64,${dataUriPayload}`);
 
     expect(href).toContain(txId);
     expect(href).not.toContain('also-image.jpg');
-    expect(resolveSbtPageTokenMetadataHref(`data:application/json,${encodeURIComponent(JSON.stringify({
-      tokenURI: 'https://cdn.example.test/also-image.jpg',
-      uri: 'https://cdn.example.test/banner.webp',
-    }))}`)).toBe('');
+    expect(
+      resolveSbtPageTokenMetadataHref(
+        `data:application/json,${encodeURIComponent(
+          JSON.stringify({
+            tokenURI: 'https://cdn.example.test/also-image.jpg',
+            uri: 'https://cdn.example.test/banner.webp',
+          }),
+        )}`,
+      ),
+    ).toBe('');
   });
 
   it('describes token metadata link display state without mutating inputs', () => {
@@ -100,9 +112,11 @@ describe('sbtPageMediaHelpers', () => {
       shouldRenderLink: true,
     });
     expect(args).toEqual({ tokenUriRaw: `ar://${txId}` });
-    expect(resolveSbtPageTokenMetadataLinkDisplayState({
-      tokenUriRaw: 'https://cdn.example.test/preview.png',
-    })).toEqual({
+    expect(
+      resolveSbtPageTokenMetadataLinkDisplayState({
+        tokenUriRaw: 'https://cdn.example.test/preview.png',
+      }),
+    ).toEqual({
       href: '',
       shouldRenderLink: false,
     });
@@ -139,10 +153,7 @@ describe('sbtPageMediaHelpers', () => {
     expect(firstState.activeIndex).toBe(0);
     expect(firstState.src).toBe(`https://arweave.net/${txId}`);
     expect(firstState.canRetry).toBe(true);
-    expect(firstState.candidates).toEqual([
-      `https://arweave.net/${txId}`,
-      `https://gateway.irys.xyz/${txId}`,
-    ]);
+    expect(firstState.candidates).toEqual([`https://arweave.net/${txId}`, `https://gateway.irys.xyz/${txId}`]);
 
     const fallbackState = getDisplayImageRenderState(
       { image },
@@ -150,7 +161,7 @@ describe('sbtPageMediaHelpers', () => {
         displayImageFallbackKey: image,
         displayImageFallbackIndex: 1,
       },
-      '/default.png'
+      '/default.png',
     );
     expect(fallbackState.activeIndex).toBe(1);
     expect(fallbackState.src).toBe(`https://gateway.irys.xyz/${txId}`);
@@ -161,7 +172,7 @@ describe('sbtPageMediaHelpers', () => {
         displayImageFallbackKey: image,
         displayImageFallbackIndex: 2,
       },
-      '/default.png'
+      '/default.png',
     );
     expect(defaultFallbackState.activeIndex).toBe(2);
     expect(defaultFallbackState.src).toBe('/default.png');
@@ -171,23 +182,24 @@ describe('sbtPageMediaHelpers', () => {
   it('builds the next display image fallback state only from the active failed candidate', () => {
     expect(getDisplayImageFallbackCandidateCount(['a', 'b'])).toBe(2);
     expect(getDisplayImageFallbackCandidateCount('bad')).toBe(0);
-    expect(getNextDisplayImageFallbackState(
-      { sourceKey: 'image-a', activeIndex: 0, maxIndex: 2 },
-      {}
-    )).toEqual({
+    expect(getNextDisplayImageFallbackState({ sourceKey: 'image-a', activeIndex: 0, maxIndex: 2 }, {})).toEqual({
       displayImageFallbackKey: 'image-a',
       displayImageFallbackIndex: 1,
     });
-    expect(getNextDisplayImageFallbackState(
-      { sourceKey: 'image-a', activeIndex: 1, maxIndex: 2 },
-      { displayImageFallbackKey: 'image-a', displayImageFallbackIndex: 1 }
-    )).toEqual({
+    expect(
+      getNextDisplayImageFallbackState(
+        { sourceKey: 'image-a', activeIndex: 1, maxIndex: 2 },
+        { displayImageFallbackKey: 'image-a', displayImageFallbackIndex: 1 },
+      ),
+    ).toEqual({
       displayImageFallbackKey: 'image-a',
       displayImageFallbackIndex: 2,
     });
-    expect(getNextDisplayImageFallbackState(
-      { sourceKey: 'image-a', activeIndex: 1, maxIndex: 2 },
-      { displayImageFallbackKey: 'image-a', displayImageFallbackIndex: 0 }
-    )).toBeNull();
+    expect(
+      getNextDisplayImageFallbackState(
+        { sourceKey: 'image-a', activeIndex: 1, maxIndex: 2 },
+        { displayImageFallbackKey: 'image-a', displayImageFallbackIndex: 0 },
+      ),
+    ).toBeNull();
   });
 });

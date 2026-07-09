@@ -43,7 +43,9 @@ const buildClipboardFile = ({
   fileNamePrefix?: unknown;
 }) => {
   if (!(blob instanceof Blob)) return null;
-  const normalizedType = toText(blob.type || imageType).trim().toLowerCase();
+  const normalizedType = toText(blob.type || imageType)
+    .trim()
+    .toLowerCase();
   const extension = SUPPORTED_IMAGE_MIME_TO_EXT[normalizedType];
   if (!extension) return null;
   const fileName = `${toText(fileNamePrefix).trim() || 'clipboard-image'}.${extension}`;
@@ -62,7 +64,9 @@ const buildClipboardFile = ({
   return blob;
 };
 
-export const readCompactImageClipboard = async ({ fileNamePrefix = 'clipboard-image' }: { fileNamePrefix?: unknown } = {}) => {
+export const readCompactImageClipboard = async ({
+  fileNamePrefix = 'clipboard-image',
+}: { fileNamePrefix?: unknown } = {}) => {
   if (typeof navigator === 'undefined' || !navigator.clipboard) {
     return { error: CLIPBOARD_GENERIC_ERROR };
   }

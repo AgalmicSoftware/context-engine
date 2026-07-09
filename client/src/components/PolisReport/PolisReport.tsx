@@ -1,6 +1,5 @@
 /** @file PolisReport.tsx */
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import * as d3 from 'd3';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faQuestionCircle,
@@ -13,17 +12,10 @@ import {
   faCaretDown,
   faCaretUp,
   faChevronLeft,
-  faChevronRight
+  faChevronRight,
 } from '@fortawesome/free-solid-svg-icons';
 
-
-
-import {
-  beeswarmByExtremity,
-  clusterUMAPPointsKmeans,
-  doUMAP,
-  getCommentBarData,
-} from '../../utilities/survey/polisMath';
+import { beeswarmByExtremity, getCommentBarData } from '../../utilities/survey/polisMath';
 import {
   computePolisCommentStats,
   computePolisConversationMath,
@@ -31,1273 +23,94 @@ import {
 } from '../../utilities/survey/polisReportMath.js';
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
-import demoData from '../../variables/demo/demo_polis_data.json';
-import { CE_DEMO_SESSION_SLUGS, POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
-import { getChainById } from '../../variables/chains.js';
 import styles from './PolisReport.module.scss';
 import { QRCodeSVG } from 'qrcode.react';
-import { analyzeClusterOpinions } from '../../utilities/ai/aiScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
-import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
+import { createLogger } from 'utilities/logging.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
-import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
   normalizeQuestionProgressSlug,
-} from '../SurveyTool/surveyToolUtils.js';
-import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
-
-/**************************************************************
- * Helper: tiny identicon ("blockie") generator with no deps
- * Produces a symmetric 8x8 grid identicon as a data URL.
- **************************************************************/
-import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
+} from '../SurveyTool/surveyToolUtils';
+import type {
+  BooleanMap,
+  EmbeddingChoice,
+  NumberMap,
+  PolisAnalysisCacheByKey,
+  PolisAnalysisErrorsByKey,
+  PolisCommentStat,
+  PolisPoint,
+  PolisRepQuestionsMap,
+  PolisReportProps,
+  PolisSbtSelection,
+  PolisStats,
+  PolisVote,
+  PrecomputedDemoClusterState,
+  RatingMatrix,
+  RatingMatrixBuildResult,
+  StringMap,
+  UnknownRecord,
+} from './polisReportRuntime';
 import {
-  getHistoricalFigureAvatarOrBlockie,
-  getHistoricalFigureBlockie,
-} from 'utilities/ui/historicalFigureAvatars.js';
-import { createLogger } from 'utilities/logging.js';
+  DEFAULT_EXPLORATORY_CLUSTER_COUNT,
+  DEFAULT_POLIS_DEMO_DATA,
+  OPINION_GROUPS_TOOLTIP_TEXT,
+  PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
+  PolisBoxPlot,
+  REPORT_DEFAULT_EMBEDDING_LABEL,
+  REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
+  analyzeClusterOpinionsTyped,
+  applyFilterStateToAggregator,
+  buildClusterAnalysisDataKey,
+  buildPolisDemoDatasetsBySlug,
+  buildPolisReportPdfFilename,
+  buildPrecomputedDemoClusterState,
+  buildRatingMatrixFromDemo,
+  buildRatingMatrixFromRealData,
+  clusterUMAPPointsKmeansTyped,
+  d3Report,
+  doUMAPTyped,
+  formatBlockchainNetworkLabel,
+  formatSuperscriptNumber,
+  getErrorMessage,
+  getPolisDemoDatasetForSlug as getPolisDemoDatasetForSlugRuntime,
+  getPolisHistoricalParticipantAvatar,
+  getPolisHistoricalParticipantBlockie,
+  getRenderableParticipantList,
+  getUTCDataTimestamp,
+  resolveExploratoryClusterCount,
+  resolveJsPdfConstructor,
+  shouldAutoEnablePolisDemoData,
+} from './polisReportRuntime';
+export {
+  OPINION_GROUPS_TOOLTIP_TEXT,
+  PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
+  PolisBoxPlot,
+  PolisQuestionHoverCard,
+  REPORT_DEFAULT_EMBEDDING_LABEL,
+  REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
+  applyFilterStateToAggregator,
+  buildClusterAnalysisDataKey,
+  buildPolisReportPdfFilename,
+  buildPrecomputedDemoClusterState,
+  buildRatingMatrixFromDemo,
+  buildRatingMatrixFromRealData,
+  formatBlockchainNetworkLabel,
+  getPolisHistoricalParticipantAvatar,
+  getRenderableParticipantList,
+  normalizePolisBinaryVote,
+  resolveExploratoryClusterCount,
+  resolveJsPdfConstructor,
+  resolvePrecomputedClusterDifference,
+  shouldAutoEnablePolisDemoData,
+} from './polisReportRuntime';
 
 const surveyLog = createLogger('surveys');
-
-type UnknownRecord = Record<string, unknown>;
-type StringMap = Record<string, string>;
-type NumberMap = Record<string, number>;
-type BooleanMap = Record<string, boolean>;
-type ConcretePolisVote = -1 | 0 | 1;
-type PolisVote = ConcretePolisVote | null;
-type RatingMatrix = PolisVote[][];
-type EmbeddingChoice = 'UMAP' | 'SVD' | 'POLIS';
-
-interface PolisResponseRow extends UnknownRecord {
-  responder?: string | null;
-  questionId?: string | null;
-  response?: string | null;
-}
-
-type PolisQuestionResponses = Record<string, PolisResponseRow[]>;
-
-interface PolisQuestionMeta extends UnknownRecord {
-  tags?: unknown[];
-  type?: unknown;
-  creator?: unknown;
-}
-
-interface PolisSbtEntry extends UnknownRecord {
-  name?: string;
-  address?: string;
-  mintedAddresses?: string[];
-  burnedAddresses?: string[];
-  mintedCountByAddress?: unknown;
-  burnedCountByAddress?: unknown;
-  countsLoaded?: boolean;
-  countsScanCheckpoint?: unknown;
-}
-
-interface PolisSbtSelection extends UnknownRecord {
-  name?: string;
-  address: string;
-}
-
-interface PolisSbtFilter extends UnknownRecord {
-  selectedSBTGroupsResponder?: PolisSbtSelection[];
-  excludedSBTGroupsResponder?: PolisSbtSelection[];
-  selectedSBTGroupsCreator?: PolisSbtSelection[];
-  excludedSBTGroupsCreator?: PolisSbtSelection[];
-  selectedSBTGroups?: PolisSbtSelection[];
-  excludedSBTGroups?: PolisSbtSelection[];
-}
-
-interface PolisFilterState extends UnknownRecord {
-  selectedTags?: unknown[];
-  tag?: string;
-  tags?: string | unknown[];
-  includeTags?: string | unknown[];
-  questionTypes?: unknown[];
-  sbtFilter?: PolisSbtFilter | null;
-  topQuestions?: {
-    count?: unknown;
-    by?: unknown;
-  };
-  onlyVerifiedHumans?: boolean;
-}
-
-interface PolisStats {
-  nParticipants: number;
-  nComments: number;
-  totalVotes: number;
-  votesPerVoterAvg: number;
-}
-
-interface PolisPoint extends UnknownRecord {
-  x: number;
-  y: number;
-  index: number;
-}
-
-interface PolisRepresentativeQuestion extends UnknownRecord {
-  label: string;
-  questionIndex: number;
-  prompt: string;
-  difference: number;
-  repfulFor?: string;
-}
-
-type PolisRepQuestionsMap = Record<string, PolisRepresentativeQuestion[]>;
-
-interface PolisClusterAnalysisResult {
-  short: string;
-  long: string;
-  name?: string;
-}
-
-type PolisAnalysisCacheByCluster = Record<string, PolisClusterAnalysisResult>;
-type PolisAnalysisCacheByKey = Record<string, PolisAnalysisCacheByCluster>;
-type PolisAnalysisErrorsByKey = Record<string, StringMap>;
-
-interface PrecomputedDemoClusterState {
-  clusterCount: number;
-  clusterAssignments: number[];
-  repQuestions: PolisRepQuestionsMap;
-  clusterCollapseState: BooleanMap;
-  analysisCacheByClusterIndex: PolisAnalysisCacheByCluster;
-  commentStats?: PolisCommentStat[];
-}
-
-interface PolisCommentStat extends UnknownRecord {
-  commentIndex: number;
-  extremity: number;
-  agrees: number;
-  disagrees: number;
-  unsure?: number;
-  total: number;
-}
-
-interface RatingMatrixBuildResult {
-  matrix: RatingMatrix | null;
-  responders: string[];
-  questions: string[];
-  promptsMap: StringMap;
-  displayNamesMap?: StringMap;
-}
-
-interface PolisReportProps {
-  [key: string]: unknown;
-  questionResponses?: PolisQuestionResponses | UnknownRecord | null;
-  network?: UnknownRecord | null;
-  disclaimersActive?: boolean;
-  sbtFilterString?: string;
-  filterState?: PolisFilterState | null;
-  sessionName?: unknown;
-  sessionHeader?: unknown;
-  sessionInfo?: unknown;
-  onePageDemo?: boolean;
-  demoMode?: boolean;
-  demoDataFirstLoad?: boolean;
-  demoDataBySlug?: unknown;
-  miniMode?: boolean;
-  isQuestionCacheReady?: boolean;
-  isResponsesCacheReady?: boolean;
-  questionScanProgress?: UnknownRecord | null;
-  questionResponsesNonce?: number;
-  networkChainId?: number | string | null;
-  slug?: string;
-  sessionSlug?: string;
-}
-
-type DoUMAPFn = (data: number[][], nNeighbors: number, randomSeed: number) => [number, number][];
-type ClusterPointsFn = (points: PolisPoint[], clusterCount: number, randomSeed: number) => number[];
-type AnalyzeClusterOpinionsFn = (
-  payload: UnknownRecord,
-  allClustersData: UnknownRecord,
-  options: { sessionSlug: string }
-) => Promise<Partial<PolisClusterAnalysisResult>>;
-
-type D3LinearScale = {
-  domain(values: [number, number]): {
-    range(values: [number, number]): (value: number) => number;
-  };
-};
-
-type D3ReportApi = {
-  scaleOrdinal(range: readonly string[]): (value: string | number) => string;
-  schemeCategory10: readonly string[];
-  polygonHull(points: [number, number][]): [number, number][] | null;
-  min(values: number[]): number | undefined;
-  max(values: number[]): number | undefined;
-  scaleLinear(): D3LinearScale;
-  line(): (points: [number, number][]) => string | null;
-};
-
-type JsPdfDocument = {
-  internal: {
-    pageSize: {
-      getWidth(): number;
-      getHeight(): number;
-    };
-  };
-  addImage(...args: unknown[]): void;
-  addPage(): void;
-  save(filename: string): void;
-};
-
-type JsPdfConstructor = new (...args: unknown[]) => JsPdfDocument;
-
-const d3Report = d3 as unknown as D3ReportApi;
-const doUMAPTyped = doUMAP as unknown as DoUMAPFn;
-const clusterUMAPPointsKmeansTyped = clusterUMAPPointsKmeans as unknown as ClusterPointsFn;
-const analyzeClusterOpinionsTyped = analyzeClusterOpinions as unknown as AnalyzeClusterOpinionsFn;
-const asRecord = (value: unknown): UnknownRecord => (
-  value && typeof value === 'object' ? value as UnknownRecord : {}
-);
-const getErrorMessage = (error: unknown, fallback = 'Unknown error') => {
-  if (
-    error &&
-    typeof error === 'object' &&
-    'message' in error &&
-    typeof error.message === 'string' &&
-    error.message.trim()
-  ) {
-    return error.message;
-  }
-  return fallback;
-};
-
-export const sanitizePolisReportPdfNamePart = (value: unknown): string => (
-  String(value ?? '')
-    .trim()
-    .replace(/\s+/g, '_')
-    .replace(/[^a-zA-Z0-9._-]+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^[_.,-]+|[_.,-]+$/g, '')
-    .slice(0, 80)
-);
-
-export const buildPolisReportPdfFilename = (
-  sessionName: unknown,
-  now: Date = new Date()
-): string => {
-  const sessionPart = sanitizePolisReportPdfNamePart(sessionName);
-  const timestamp = now.toISOString().replace(/[:.-]/g, '_');
-  return `contextEngine_report${sessionPart ? `_${sessionPart}` : ''}_${timestamp}.pdf`;
-};
-
-export const resolveJsPdfConstructor = (module: unknown): JsPdfConstructor => {
-  const record = module && typeof module === 'object' ? module as UnknownRecord : {};
-  const defaultExport = record.default;
-  if (typeof defaultExport === 'function') return defaultExport as JsPdfConstructor;
-  if (typeof record.jsPDF === 'function') return record.jsPDF as JsPdfConstructor;
-  if (defaultExport && typeof defaultExport === 'object') {
-    const defaultRecord = defaultExport as UnknownRecord;
-    if (typeof defaultRecord.jsPDF === 'function') return defaultRecord.jsPDF as JsPdfConstructor;
-  }
-  throw new Error('jsPDF constructor is unavailable');
-};
-
-
-
-
-/**************************************************************
- * Helper: parse JSON safely
- **************************************************************/
-function safeJsonParse(str: unknown): UnknownRecord | null {
-  if (!str) return null;
-  try {
-    const parsed = JSON.parse(String(str));
-    return parsed && typeof parsed === 'object' ? parsed as UnknownRecord : null;
-  } catch (e) {
-    return null;
-  }
-}
-
-const isPolisDemoFixturePayload = (value: UnknownRecord | null | undefined): boolean => (
-  !!value && value.source === 'demo-polis-data'
-);
-
-export function normalizePolisBinaryVote(value: unknown): ConcretePolisVote | null {
-  if (value === 1) return 1;
-  if (value === -1) return -1;
-  if (value === 0) return 0;
-  if (value === true) return 1;
-  if (value === false) return -1;
-
-  const normalized = String(value ?? '').trim().toLowerCase();
-  if (!normalized) return null;
-  if (normalized === 'agree' || normalized === 'yes' || normalized === 'y' || normalized === 'true' || normalized === '1') {
-    return 1;
-  }
-  if (normalized === 'disagree' || normalized === 'no' || normalized === 'n' || normalized === 'false' || normalized === '-1') {
-    return -1;
-  }
-  if (normalized === 'unsure' || normalized === 'unknown' || normalized === 'maybe' || normalized === 'neutral' || normalized === '0') {
-    return 0;
-  }
-  return null;
-}
-
-const DEFAULT_POLIS_DEMO_DATA = demoData;
-const DEFAULT_EXPLORATORY_CLUSTER_COUNT = 3;
-const POLIS_DEMO_CLUSTER_ANALYSIS_VERSION = 2;
-// Registry-backed demo pages can reuse the shared Context corpus fixture while
-// their question/response storage migrates independently.
-const BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG = Object.freeze(
-  (Array.isArray(CE_DEMO_SESSION_SLUGS) ? CE_DEMO_SESSION_SLUGS : ['demo']).reduce<Record<string, unknown>>(
-    (acc, rawSlug) => {
-      const slug = normalizeSessionSlug(rawSlug);
-      if (slug) acc[slug] = DEFAULT_POLIS_DEMO_DATA;
-      return acc;
-    },
-    { demo: DEFAULT_POLIS_DEMO_DATA }
-  )
-);
-
-function buildPolisDemoDatasetsBySlug(demoDataBySlug: unknown = null) {
-  const out: Record<string, unknown> = { ...BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG };
-  if (!demoDataBySlug || typeof demoDataBySlug !== 'object' || Array.isArray(demoDataBySlug)) {
-    return out;
-  }
-  Object.entries(demoDataBySlug).forEach(([rawSlug, value]) => {
-    const slug = normalizeSessionSlug(rawSlug);
-    if (!slug || !value || typeof value !== 'object') return;
-    out[slug] = value;
-  });
-  return out;
-}
-
-function resolvePolisDemoDatasetsBySlug(options: { datasetsBySlug?: unknown; demoDataBySlug?: unknown } = {}) {
-  if (options?.datasetsBySlug && typeof options.datasetsBySlug === 'object' && !Array.isArray(options.datasetsBySlug)) {
-    return options.datasetsBySlug as Record<string, unknown>;
-  }
-  return buildPolisDemoDatasetsBySlug(options?.demoDataBySlug);
-}
-
-const resolvePolisReadSlugs = (baseSlug: unknown = '') => {
-  const normalizedBaseSlug = normalizeSessionSlug(baseSlug);
-  return [normalizedBaseSlug];
-};
-
-const POLIS_DEMO_AUTOLOAD_SLUG_SET = new Set<string>(
-  Array.isArray(POLIS_DEMO_DATA_AUTOLOAD_SLUGS)
-    ? POLIS_DEMO_DATA_AUTOLOAD_SLUGS.map((slug: unknown) => normalizeSessionSlug(slug))
-    : []
-);
-
-export function getPolisHistoricalParticipantAvatar(displayName: unknown = '', fallbackSeed: unknown = '') {
-  const normalizedDisplayName = String(displayName || '').trim();
-  if (!normalizedDisplayName) return '';
-  return getHistoricalFigureAvatarOrBlockie(normalizedDisplayName, {
-    preferBlockie: false,
-    fallbackSeed: normalizedDisplayName || String(fallbackSeed || ''),
-  });
-}
-
-export function getPolisHistoricalParticipantBlockie(displayName: unknown = '', fallbackSeed: unknown = '') {
-  const normalizedDisplayName = String(displayName || '').trim();
-  if (!normalizedDisplayName) return generateBlockieDataUrl(String(fallbackSeed || '').toLowerCase(), 8, 4);
-  return getHistoricalFigureBlockie(normalizedDisplayName, {
-    fallbackSeed: normalizedDisplayName || String(fallbackSeed || ''),
-  });
-}
-
-const SUPERSCRIPT_DIGITS: Record<string, string> = Object.freeze({
-  0: '⁰',
-  1: '¹',
-  2: '²',
-  3: '³',
-  4: '⁴',
-  5: '⁵',
-  6: '⁶',
-  7: '⁷',
-  8: '⁸',
-  9: '⁹',
-});
-
-function formatSuperscriptNumber(value: unknown) {
-  return String(value ?? '')
-    .split('')
-    .map((char) => SUPERSCRIPT_DIGITS[char] || char)
-    .join('');
-}
-
-export function hasPolisDemoDatasetForSlug(slugIn: unknown = '', options: { datasetsBySlug?: unknown; demoDataBySlug?: unknown } = {}) {
-  const datasetsBySlug = resolvePolisDemoDatasetsBySlug(options);
-  const slug = normalizeSessionSlug(slugIn);
-  if (!slug) return false;
-  return Object.prototype.hasOwnProperty.call(datasetsBySlug, slug);
-}
-
-export function getPolisDemoDatasetForSlug(
-  slugIn: unknown = '',
-  options: { datasetsBySlug?: unknown; demoDataBySlug?: unknown; allowFallback?: boolean } = {}
-) {
-  const datasetsBySlug = resolvePolisDemoDatasetsBySlug(options);
-  const allowFallback = options?.allowFallback !== false;
-  const slug = normalizeSessionSlug(slugIn);
-  if (slug && Object.prototype.hasOwnProperty.call(datasetsBySlug, slug)) return datasetsBySlug[slug];
-  return allowFallback ? DEFAULT_POLIS_DEMO_DATA : null;
-}
-
-export function shouldAutoEnablePolisDemoData(input: {
-  slug?: unknown;
-  sessionSlug?: unknown;
-  demoDataFirstLoad?: boolean;
-  datasetsBySlug?: unknown;
-  demoDataBySlug?: unknown;
-} = {}) {
-  const slug = normalizeSessionSlug(input?.slug ?? input?.sessionSlug ?? '');
-  if (input?.demoDataFirstLoad) {
-    return slug === 'demo' || hasPolisDemoDatasetForSlug(slug, input);
-  }
-  return POLIS_DEMO_AUTOLOAD_SLUG_SET.has(slug) && hasPolisDemoDatasetForSlug(slug, input);
-}
-
-export function buildClusterAnalysisDataKey({
-  activeClusterAssignments = [],
-  activeClusterCount = 0,
-  activeRepQuestions = {},
-  embeddingChoice = '',
-  useDemoData = false,
-  questionResponsesNonce = 0,
-  questionPrompts = {},
-  allQuestions = [],
-}: {
-  activeClusterAssignments?: number[];
-  activeClusterCount?: number;
-  activeRepQuestions?: PolisRepQuestionsMap;
-  embeddingChoice?: string;
-  useDemoData?: boolean;
-  questionResponsesNonce?: number;
-  questionPrompts?: StringMap;
-  allQuestions?: string[];
-} = {}) {
-  const assignmentHash = (Array.isArray(activeClusterAssignments) ? activeClusterAssignments : []).reduce((acc, val) => {
-    return (acc * 31 + (val + 1)) % 1000000007;
-  }, 7);
-  const promptEntries = Object.entries(questionPrompts || {});
-  let promptsHash = 0;
-  promptEntries.forEach(([key, value]) => {
-    const text = `${key}:${value || ''}`;
-    for (let i = 0; i < text.length; i += 31) {
-      promptsHash = (promptsHash * 33 + text.charCodeAt(i)) % 1000000007;
-    }
-  });
-  const questionCount = allQuestions?.length || 0;
-  const repCount = Object.keys(activeRepQuestions || {}).length;
-  // Demo-mode analysis derives from the fixed fixture, so upstream response
-  // nonce churn should not invalidate the visible cluster-analysis cache.
-  const nonce = useDemoData ? 0 : (questionResponsesNonce ?? 0);
-
-  return `${embeddingChoice}-${activeClusterCount}-${nonce}-${questionCount}-${promptEntries.length}-${repCount}-${assignmentHash}-${promptsHash}`;
-}
-
-/**************************************************************
- * Helper: applyFilterStateToAggregator
- * Filters the aggregator BEFORE building the rating matrix.
- * - questionResponses: { [qId]: Array<{ responder, questionId, response }> }
- * - network: chain object (uses network.id to read caches)
- * - filterState: QuestionFilter state from parent (see types in prompt)
- *
- * Returns a pruned aggregator with only filtered question IDs and
- * per-question filtered response arrays.
- *
- * Notes:
- *  - If caches are missing/partial, we skip that filter step gracefully.
- *  - We DO NOT read demo mode here; caller bypasses filtering when demo is on.
- **************************************************************/
-export function applyFilterStateToAggregator(
-  questionResponses: PolisQuestionResponses | UnknownRecord | null | undefined,
-  network: UnknownRecord | null | undefined,
-  filterState: PolisFilterState | null | undefined,
-  sessionSlug: unknown
-): PolisQuestionResponses {
-  if (!questionResponses || typeof questionResponses !== 'object') return {};
-
-  const netId = network?.id != null ? String(network.id) : null;
-
-  // Resolve group slug (optional param -> URL path fallback)
-  const resolveSlug = () => {
-    if (typeof sessionSlug === 'string') {
-      return canonicalizeLegacySessionAlias(sessionSlug);
-    }
-    try {
-      const p =
-        (typeof window !== 'undefined' && window.location && window.location.pathname) ?
-          window.location.pathname : '';
-      if (p.startsWith('/session/')) {
-        const s = (p.split('/').filter(Boolean)[1] || '').trim();
-        if (!s) return '';
-        return canonicalizeLegacySessionAlias(s);
-      }
-    } catch (e) { surveyLog.warn('PolisReport: fallback', e); }
-    return ''; // default to general
-  };
-  const slug = resolveSlug();
-  const readSlugs = resolvePolisReadSlugs(slug);
-
-  // Safe cache reads (group-aware dg:* keys)
-  const qMap: Record<string, PolisQuestionMeta> = {};
-  const sbtList: Record<string, PolisSbtEntry> = {};
-  readSlugs.forEach((readSlug) => {
-    const qParsed = peekCacheSync('questionsCache', readSlug, { clone: false });
-    const sParsed = peekCacheSync('sbtCache', readSlug, { clone: false });
-    const qCache = (qParsed || null) as Record<string, { questions?: Record<string, PolisQuestionMeta> }> | null;
-    const sCache = (sParsed || null) as Record<string, { sbtList?: Record<string, PolisSbtEntry> }> | null;
-    const scopedQuestions = (
-      netId && qCache && qCache[netId] && qCache[netId].questions
-    ) ? qCache[netId].questions : {};
-    const scopedSbtList = (
-      netId && sCache && sCache[netId] && sCache[netId].sbtList
-    ) ? sCache[netId].sbtList : {};
-
-    Object.keys(scopedQuestions).forEach((questionId) => {
-      const lowerQuestionId = String(questionId || '').toLowerCase();
-      if (!lowerQuestionId || Object.prototype.hasOwnProperty.call(qMap, lowerQuestionId)) return;
-      qMap[lowerQuestionId] = scopedQuestions[questionId];
-    });
-    Object.assign(sbtList, scopedSbtList);
-  });
-
-  // ---- Build combined tag set (lowercased) ----
-  const combinedTagSet = new Set<string>();
-  if (Array.isArray(filterState?.selectedTags)) {
-    filterState.selectedTags
-      .map((t) => String(t).trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((t) => combinedTagSet.add(t));
-  }
-  // ---- NEW: accept additional tag filter shapes (comma-strings or arrays) ----
-  if (typeof filterState?.tag === 'string' && filterState.tag.trim() !== '') {
-    filterState.tag
-      .split(',')
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((t) => combinedTagSet.add(t));
-  }
-  if (Array.isArray(filterState?.tags)) {
-    filterState.tags
-      .map((t) => String(t).trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((t) => combinedTagSet.add(t));
-  }
-  if (typeof filterState?.tags === 'string' && filterState.tags.trim() !== '') {
-    filterState.tags
-      .split(',')
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((t) => combinedTagSet.add(t));
-  }
-  if (Array.isArray(filterState?.includeTags)) {
-    filterState.includeTags
-      .map((t) => String(t).trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((t) => combinedTagSet.add(t));
-  }
-  if (typeof filterState?.includeTags === 'string' && filterState.includeTags.trim() !== '') {
-    filterState.includeTags
-      .split(',')
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((t) => combinedTagSet.add(t));
-  }
-
-  // ---- Question types set (lowercased) ----
-  const typesSet = new Set<string>(
-    Array.isArray(filterState?.questionTypes)
-      ? filterState.questionTypes.map((s) => String(s).toLowerCase())
-      : []
-  );
-
-  // ---- SBT helpers ----
-  const sbtFilter = filterState?.sbtFilter || null;
-  const toLowerAddr = (x: unknown) => (
-    x && typeof x === 'object' && 'address' in x ? String(x.address).toLowerCase() : ''
-  ).trim();
-  const normalizeAddressCountMap = (value: unknown = null): NumberMap => {
-    const out: NumberMap = {};
-    Object.entries((value && typeof value === 'object') ? value : {}).forEach(([addrRaw, countRaw]) => {
-      const addr = String(addrRaw || '').toLowerCase().trim();
-      if (!addr) return;
-      const count = Math.max(0, Math.floor(Number(countRaw || 0)));
-      if (count <= 0) return;
-      out[addr] = count;
-    });
-    return out;
-  };
-
-  function isAddrInSbt(sbtAddrLower: string, personLower: string) {
-    if (!sbtAddrLower || !personLower) return false;
-    const entry = sbtList[sbtAddrLower];
-    if (!entry) return false;
-    const checkpointBackedPartialCounts =
-      entry?.countsLoaded !== true &&
-      !!entry?.countsScanCheckpoint &&
-      typeof entry.countsScanCheckpoint === 'object';
-    const mintedCountMap = normalizeAddressCountMap(entry.mintedCountByAddress);
-    const burnedCountMap = normalizeAddressCountMap(entry.burnedCountByAddress);
-    if (!checkpointBackedPartialCounts && (Object.keys(mintedCountMap).length > 0 || Object.keys(burnedCountMap).length > 0)) {
-      return Number(mintedCountMap[personLower] || 0) > Number(burnedCountMap[personLower] || 0);
-    }
-    if (checkpointBackedPartialCounts) return false;
-    const minted = Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [];
-    const burned = Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : [];
-    const inMinted = minted.includes(personLower);
-    const inBurned = burned.includes(personLower);
-    return inMinted && !inBurned;
-  }
-
-  function isMemberOfAny(personLower: string, groupListLower: string[]) {
-    if (!personLower || !Array.isArray(groupListLower) || groupListLower.length === 0) return false;
-    for (const g of groupListLower) {
-      if (!g) continue;
-      if (isAddrInSbt(g, personLower)) return true;
-    }
-    return false;
-  }
-
-  // Responder SBT lists (new + legacy)
-  const incResponderGroupsLower = [
-    ...(Array.isArray(sbtFilter?.selectedSBTGroupsResponder) ? sbtFilter.selectedSBTGroupsResponder : []),
-    ...(Array.isArray(sbtFilter?.selectedSBTGroups) ? sbtFilter.selectedSBTGroups : []),
-  ]
-    .map(toLowerAddr)
-    .filter(Boolean);
-
-  const excResponderGroupsLower = [
-    ...(Array.isArray(sbtFilter?.excludedSBTGroupsResponder) ? sbtFilter.excludedSBTGroupsResponder : []),
-    ...(Array.isArray(sbtFilter?.excludedSBTGroups) ? sbtFilter.excludedSBTGroups : []),
-  ]
-    .map(toLowerAddr)
-    .filter(Boolean);
-
-  // Creator SBT lists (new only)
-  const incCreatorGroupsLower = Array.isArray(sbtFilter?.selectedSBTGroupsCreator)
-    ? sbtFilter.selectedSBTGroupsCreator.map(toLowerAddr).filter(Boolean)
-    : [];
-  const excCreatorGroupsLower = Array.isArray(sbtFilter?.excludedSBTGroupsCreator)
-    ? sbtFilter.excludedSBTGroupsCreator.map(toLowerAddr).filter(Boolean)
-    : [];
-
-  // --- Build filtered aggregator ---
-  let filteredAgg: PolisQuestionResponses = {};
-
-  Object.entries(questionResponses).forEach(([qId, arr]) => {
-    const qIdLower = String(qId || '').toLowerCase();
-
-    // Question metadata (may be missing)
-    const qMeta = qMap[qIdLower] || null;
-    const qTagsLower = Array.isArray(qMeta?.tags) ? qMeta.tags.map((t) => String(t).toLowerCase()) : null;
-    const qTypeLower = qMeta?.type ? String(qMeta.type).toLowerCase() : null;
-    const creatorLower = qMeta?.creator ? String(qMeta.creator).toLowerCase() : null;
-
-    // 1) Tags: if we have tags in cache AND combined set is non-empty, require intersection.
-    if (combinedTagSet.size > 0 && Array.isArray(qTagsLower) && qTagsLower.length > 0) {
-      const hasAny = qTagsLower.some((t) => combinedTagSet.has(t));
-      if (!hasAny) return; // skip this question
-    }
-    // If tags missing from cache, skip gating (graceful).
-
-    // 2) Types: if provided AND we know the type, require it to match; if unknown type, skip gating.
-    if (typesSet.size > 0 && qTypeLower && !typesSet.has(qTypeLower)) {
-      return;
-    }
-
-    // 3) Creator SBT rules: gate entire question
-    if (incCreatorGroupsLower.length > 0) {
-      // If creator unknown, skip gating (do NOT drop due to cache miss).
-      if (creatorLower) {
-        const ok = isMemberOfAny(creatorLower, incCreatorGroupsLower);
-        if (!ok) return;
-      }
-    }
-    if (excCreatorGroupsLower.length > 0) {
-      if (creatorLower) {
-        const bad = isMemberOfAny(creatorLower, excCreatorGroupsLower);
-        if (bad) return;
-      }
-    }
-
-    // 4) Responder SBT rules: filter per-response
-    const nextArr: PolisResponseRow[] = [];
-    const originalArr = Array.isArray(arr) ? arr as PolisResponseRow[] : [];
-    for (const respObj of originalArr) {
-      const responderLower = respObj?.responder ? String(respObj.responder).toLowerCase() : '';
-      if (!responderLower) continue;
-
-      // Inclusion lists (union): if present, responder must be in at least one
-      if (incResponderGroupsLower.length > 0) {
-        if (!isMemberOfAny(responderLower, incResponderGroupsLower)) {
-          continue;
-        }
-      }
-      // Exclusion lists (union): drop if responder is in any excluded group
-      if (excResponderGroupsLower.length > 0) {
-        if (isMemberOfAny(responderLower, excResponderGroupsLower)) {
-          continue;
-        }
-      }
-      nextArr.push(respObj);
-    }
-
-    if (nextArr.length > 0) {
-      filteredAgg[qId] = nextArr;
-    }
-  });
-
-  // 5) Top questions (after the above)
-  const top = filterState?.topQuestions;
-  const topCount = Number(top?.count || 0);
-  const topBy =
-    top?.by === 'responses'
-      ? 'responses'
-      : (top?.by === 'conviction' || top?.by === 'importance' ? 'importance' : null);
-
-  if (topBy && topCount > 0) {
-    const scored = Object.entries(filteredAgg).map(([qId, arr]) => {
-      let score = 0;
-      for (const r of arr) {
-        const parsed = safeJsonParse(r?.response);
-        if (!parsed) continue;
-        if (isPolisDemoFixturePayload(parsed)) continue;
-        // We only consider binary answers here to align with rating-matrix & spec
-        if (parsed.type !== 'binary') continue;
-        const answer = asRecord(parsed.answer);
-        if (answer.encrypted) continue;
-
-        if (topBy === 'responses') {
-          if (normalizePolisBinaryVote(answer.value) !== null) {
-            score += 1;
-          }
-        } else {
-          const imp = Number(parsed?.conviction ?? parsed?.importance ?? 0);
-          if (!Number.isNaN(imp)) score += imp;
-        }
-      }
-      return { qId, score };
-    });
-
-    // Sort descending by score
-    scored.sort((a, b) => b.score - a.score);
-
-    const keep = scored.slice(0, Math.min(topCount, scored.length)).map((s) => s.qId);
-    const keepSet = new Set(keep);
-
-    const limited: PolisQuestionResponses = {};
-    Object.keys(filteredAgg).forEach((qid) => {
-      if (keepSet.has(qid)) limited[qid] = filteredAgg[qid];
-    });
-    filteredAgg = limited;
-  }
-
-  // onlyVerifiedHumans: If true but no SBT constraints exist, no-op per spec.
-  // (If there is already an SBT include list for humans, it's already applied above.)
-
-  return filteredAgg;
-}
-
-
-/***************************************************************
- * PolisBoxPlot
- * Distinguishes:
- *   - green (Agree => 1)
- *   - yellow (Unsure => 0)
- *   - red (Disagree => -1)
- *
- * NOTE: Non-answers (null/undefined) are ignored in both counts
- * and width calculations; no "white" segment is rendered.
- ***************************************************************/
-function PolisBoxPlot({ votes }: { votes: Array<number | null | undefined> }) {
-  // Keep only concrete answers
-  const concreteVotes = Array.isArray(votes)
-    ? votes.filter((v): v is ConcretePolisVote => v === 1 || v === 0 || v === -1)
-    : [];
-
-  const totalConcrete = concreteVotes.length;
-
-  const agrees = concreteVotes.filter((v) => v === 1).length;
-  const disagrees = concreteVotes.filter((v) => v === -1).length;
-  const unsures = concreteVotes.filter((v) => v === 0).length;
-
-  // Dimensions for the mini bar
-  const svgWidth = 200;
-  const svgHeight = 30;
-
-  // Avoid division by zero; if no concrete votes, render only the frame
-  const denom = totalConcrete > 0 ? totalConcrete : 1;
-
-  // Convert counts to pixel widths using only concrete answers
-  const fractionAgree = (agrees / denom) * svgWidth;
-  const fractionUnsure = (unsures / denom) * svgWidth;
-  const fractionDisagree = (disagrees / denom) * svgWidth;
-
-  let currentX = 0;
-
-  return (
-    <div className={styles.polisBoxPlotContainer}>
-      <svg width={svgWidth} height={svgHeight} className={styles.polisBoxPlotSvg}>
-        <rect
-          x={0}
-          y={0}
-          width={svgWidth}
-          height={svgHeight}
-          fill="none"
-          stroke="#000"
-          strokeWidth={1}
-        />
-
-        {/* Only draw segments if there's at least one concrete answer */}
-        {totalConcrete > 0 && (
-          <>
-            <rect
-              x={currentX}
-              y={0}
-              width={fractionAgree}
-              height={svgHeight}
-              fill="green"
-            />
-            {fractionAgree > 0 && (currentX += fractionAgree)}
-
-            <rect
-              x={currentX}
-              y={0}
-              width={fractionUnsure}
-              height={svgHeight}
-              fill="yellow"
-            />
-            {fractionUnsure > 0 && (currentX += fractionUnsure)}
-
-            <rect
-              x={currentX}
-              y={0}
-              width={fractionDisagree}
-              height={svgHeight}
-              fill="red"
-            />
-          </>
-        )}
-      </svg>
-    </div>
-  );
-}
-
-function PolisQuestionHoverCard({
-  label,
-  prompt,
-  votes = [],
-  metaLabel = '',
-}: {
-  label?: string;
-  prompt?: string;
-  votes?: Array<number | null | undefined>;
-  metaLabel?: string;
-}) {
-  const concreteVotes = Array.isArray(votes)
-    ? votes.filter((v): v is ConcretePolisVote => v === 1 || v === 0 || v === -1)
-    : [];
-
-  const agrees = concreteVotes.filter((v) => v === 1).length;
-  const disagrees = concreteVotes.filter((v) => v === -1).length;
-  const unsures = concreteVotes.filter((v) => v === 0).length;
-
-  return (
-    <div>
-      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-        {label ? `${label}: ` : ''}{prompt || '(No prompt)'}
-      </div>
-      {metaLabel ? (
-        <div style={{ fontSize: '0.78rem', marginBottom: '6px', opacity: 0.85 }}>
-          {metaLabel}
-        </div>
-      ) : null}
-      {concreteVotes.length === 0 ? (
-        <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>
-          No responses in this comparison.
-        </div>
-      ) : (
-        <div className={styles.questionVoteRow}>
-          <span style={{ fontSize: '0.85rem', marginRight: '8px' }}>
-            <strong>Agree:</strong> {agrees} /{' '}
-            <strong>Disagree:</strong> {disagrees} /{' '}
-            <strong>Unsure:</strong> {unsures}
-          </span>
-          <PolisBoxPlot votes={concreteVotes} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-/***************************************************************
- * Build rating matrix from real or from the included demo
- *
- * We only consider question responses of type 'binary'.
- *   That means we only parse if r.response has { type: 'binary' } and
- *   answer { value: 'Agree' | 'Disagree' | 'Unsure' }, including
- *   legacy yes/no/0/1 encodings from older response payloads.
- ***************************************************************/
-function isPolisRealRowAllowedForSession(
-  row: PolisResponseRow,
-  parsedResponse: UnknownRecord | null,
-  sessionSlug: unknown = ''
-): boolean {
-  return (
-    isResponseAllowedForSessionSlug(row, sessionSlug) &&
-    isResponseAllowedForSessionSlug(parsedResponse, sessionSlug)
-  );
-}
-
-export function buildRatingMatrixFromRealData(
-  realQR: PolisQuestionResponses | UnknownRecord,
-  options: { sessionSlug?: unknown } = {}
-): RatingMatrixBuildResult {
-  if (!realQR || typeof realQR !== 'object') {
-    return { matrix: null, responders: [], questions: [], promptsMap: {} };
-  }
-  const sessionSlug = options.sessionSlug || '';
-
-  // Collect binary questions deterministically and gather prompts
-  const participantsSet = new Set<string>();
-  const binaryQuestions: Array<{ qId: string; prompt: string }> = [];
-  const promptsMap: StringMap = {};
-
-  Object.entries(realQR).forEach(([qId, arr]) => {
-    if (!Array.isArray(arr) || arr.length === 0) return;
-
-    // Find the first parsed response with a declared type to decide if it's binary
-    let firstType: unknown = null;
-    let firstPrompt: unknown = null;
-    for (const r of arr) {
-      const parsed = safeJsonParse(r?.response);
-      if (isPolisDemoFixturePayload(parsed)) continue;
-      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
-      if (parsed && typeof parsed === 'object' && parsed.type) {
-        firstType = parsed.type;
-        firstPrompt = parsed.prompt || '(No prompt)';
-        break;
-      }
-    }
-    if (firstType !== 'binary') return; // we only include binary questions
-
-    binaryQuestions.push({ qId, prompt: String(firstPrompt || '(No prompt)') });
-    promptsMap[qId] = String(firstPrompt || '(No prompt)');
-
-    // Gather participants who answered this (binary) question
-    for (const r of arr) {
-      const parsed = safeJsonParse(r?.response);
-      if (isPolisDemoFixturePayload(parsed)) continue;
-      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
-      if (r?.responder) {
-        participantsSet.add(String(r.responder).toLowerCase());
-      }
-    }
-  });
-
-  // No usable questions or participants => bail out
-  if (binaryQuestions.length === 0 || participantsSet.size === 0) {
-    return { matrix: null, responders: [], questions: [], promptsMap: {} };
-  }
-
-  // Deterministic ordering
-  const questionsSorted = binaryQuestions
-    .map(({ qId }) => qId)
-    .sort((a, b) => String(a).localeCompare(String(b)));
-
-  const respondersSorted = Array.from(participantsSet).sort((a, b) =>
-    String(a).localeCompare(String(b))
-  );
-
-  // Build index maps
-  const questionIndexMap: NumberMap = {};
-  questionsSorted.forEach((qId, idx) => {
-    questionIndexMap[qId] = idx;
-  });
-
-  const participantIndexMap: NumberMap = {};
-  respondersSorted.forEach((addr, idx) => {
-    participantIndexMap[addr] = idx;
-  });
-
-  // Initialize matrix [nQuestions x nParticipants] with nulls
-  const numQ = questionsSorted.length;
-  const numP = respondersSorted.length;
-  const matrix: RatingMatrix = Array.from({ length: numQ }, () => Array(numP).fill(null));
-
-  // Fill matrix with -1 / 0 / 1 for Disagree / Unsure / Agree
-  questionsSorted.forEach((qId) => {
-    const rowIndex = questionIndexMap[qId];
-    const arr = Array.isArray(realQR[qId]) ? realQR[qId] as PolisResponseRow[] : [];
-    for (const r of arr) {
-      const parsed = safeJsonParse(r?.response);
-      if (!parsed || parsed.type !== 'binary') continue;
-      if (isPolisDemoFixturePayload(parsed)) continue;
-      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
-      const answer = asRecord(parsed.answer);
-      if (answer.encrypted) continue;
-
-      const val: PolisVote = normalizePolisBinaryVote(answer.value);
-
-      const pIdx = participantIndexMap[String(r?.responder || '').toLowerCase()];
-      if (pIdx !== undefined) {
-        matrix[rowIndex][pIdx] = val;
-      }
-    }
-  });
-
-  return {
-    matrix,
-    responders: respondersSorted,
-    questions: questionsSorted,
-    promptsMap
-  };
-}
-
-export function buildRatingMatrixFromDemo(demoDataSource: unknown = DEFAULT_POLIS_DEMO_DATA): RatingMatrixBuildResult {
-  const demoRecord = demoDataSource && typeof demoDataSource === 'object' ? demoDataSource as UnknownRecord : {};
-  const commentsArr = Array.isArray(demoRecord.comments) ? demoRecord.comments as UnknownRecord[] : [];
-  const participantsArr = Array.isArray(demoRecord.participantsVotes)
-    ? demoRecord.participantsVotes as UnknownRecord[]
-    : [];
-
-  if (!commentsArr.length || !participantsArr.length) {
-    return { matrix: null, responders: [], questions: [], promptsMap: {}, displayNamesMap: {} };
-  }
-
-  const binaryComments = commentsArr.filter((c) => {
-    const t = String(c?.type || '').trim().toLowerCase();
-    return !t || t === 'binary';
-  });
-  const binaryOriginalIndices: number[] = [];
-  commentsArr.forEach((c, i) => {
-    const t = String(c?.type || '').trim().toLowerCase();
-    if (!t || t === 'binary') binaryOriginalIndices.push(i);
-  });
-
-  const promptsMap: StringMap = {};
-  const questionList: string[] = [];
-  binaryComments.forEach((comment) => {
-    const commentId = String(comment.commentId || '');
-    questionList.push(commentId);
-    promptsMap[commentId] = String(comment.commentBody || '(No prompt)');
-  });
-
-  const participantsSet = new Set<string>();
-  participantsArr.forEach((p) => {
-    participantsSet.add(String(p.participant || ''));
-  });
-
-  const participantArray = Array.from(participantsSet);
-  const participantIndexMap: NumberMap = {};
-  participantArray.forEach((addr, i) => {
-    participantIndexMap[addr] = i;
-  });
-
-  // Build display names map from xid field (e.g. historical figure usernames)
-  const displayNamesMap: StringMap = {};
-  participantsArr.forEach((p) => {
-    if (p.xid && p.participant) {
-      displayNamesMap[String(p.participant)] = String(p.xid);
-    }
-  });
-
-  const numC = binaryComments.length;
-  const numP = participantArray.length;
-  const matrix: RatingMatrix = [];
-  for (let i = 0; i < numC; i++) {
-    matrix.push(new Array(numP).fill(null));
-  }
-
-  participantsArr.forEach((p) => {
-    const pIdx = participantIndexMap[String(p.participant || '')];
-    if (pIdx === undefined) return;
-    const vs = p.votes && typeof p.votes === 'object' ? p.votes as UnknownRecord : {};
-    binaryOriginalIndices.forEach((origIdx, filteredIdx) => {
-      const val = vs[String(origIdx)];
-      if ((val === 1 || val === 0 || val === -1 || val === null) && filteredIdx < numC) {
-        matrix[filteredIdx][pIdx] = val;
-      }
-    });
-  });
-
-  return {
-    matrix,
-    responders: participantArray,
-    questions: questionList,
-    promptsMap,
-    displayNamesMap
-  };
-}
-
-export const resolvePrecomputedClusterDifference = (
-  differenceFromData: unknown,
-  clusterAgreeRate: unknown,
-  overallAgreeRate: unknown
-): number => {
-  const difference = Number(differenceFromData);
-  if (Number.isFinite(difference)) return difference;
-  const clusterRate = Number(clusterAgreeRate);
-  const overallRate = Number(overallAgreeRate);
-  if (!Number.isFinite(clusterRate) || !Number.isFinite(overallRate)) return 0;
-  return +(Math.abs(clusterRate - overallRate).toFixed(1));
-};
-
-export const resolveExploratoryClusterCount = ({
-  activeClusterCount = 0,
-  manualClusterCountValue = null,
-}: {
-  activeClusterCount?: unknown;
-  manualClusterCountValue?: unknown;
-} = {}): number => {
-  const count = Number(activeClusterCount || 0);
-  const safeCount = Number.isFinite(count) ? count : 0;
-  return manualClusterCountValue !== null
-    ? Math.max(safeCount, 2)
-    : safeCount;
-};
-
-export function buildPrecomputedDemoClusterState(demoDataSource: unknown = DEFAULT_POLIS_DEMO_DATA): PrecomputedDemoClusterState | null {
-  const demoRecord = demoDataSource && typeof demoDataSource === 'object' ? demoDataSource as UnknownRecord : {};
-  if (Number(demoRecord.clusterAnalysisVersion) !== POLIS_DEMO_CLUSTER_ANALYSIS_VERSION) {
-    return null;
-  }
-  const clusterAnalysis = Array.isArray(demoRecord.clusterAnalysis)
-    ? demoRecord.clusterAnalysis as UnknownRecord[]
-    : [];
-  const participantsArr = Array.isArray(demoRecord.participantsVotes)
-    ? demoRecord.participantsVotes as UnknownRecord[]
-    : [];
-
-  if (!clusterAnalysis.length || !participantsArr.length) return null;
-
-  const participantOrder: string[] = [];
-  const participantGroupIdByAddress: NumberMap = {};
-  participantsArr.forEach((participant) => {
-    const address = String(participant?.participant || '').trim();
-    const groupId = Number(participant?.groupId);
-    if (!address || !Number.isInteger(groupId)) return;
-    if (Object.prototype.hasOwnProperty.call(participantGroupIdByAddress, address)) return;
-    participantGroupIdByAddress[address] = groupId;
-    participantOrder.push(address);
-  });
-
-  const uniqueGroupIds = Array.from(
-    new Set(
-      participantOrder
-        .map((address) => participantGroupIdByAddress[address])
-        .filter((groupId) => Number.isInteger(groupId))
-    )
-  ).sort((a, b) => a - b);
-
-  if (!uniqueGroupIds.length || uniqueGroupIds.length !== clusterAnalysis.length) return null;
-
-  const clusterIndexByGroupId = new Map(uniqueGroupIds.map((groupId, index) => [groupId, index]));
-  const clusterAssignmentsMaybe = participantOrder.map((address) => clusterIndexByGroupId.get(participantGroupIdByAddress[address]));
-  if (clusterAssignmentsMaybe.some((clusterIndex) => !Number.isInteger(clusterIndex))) return null;
-  const clusterAssignments = clusterAssignmentsMaybe as number[];
-
-  const repQuestions: PolisRepQuestionsMap = {};
-  const clusterCollapseState: BooleanMap = {};
-  const analysisCacheByClusterIndex: PolisAnalysisCacheByCluster = {};
-
-  clusterAnalysis.forEach((cluster, clusterIndex) => {
-    const topStatements = Array.isArray(cluster?.topStatements) ? cluster.topStatements as UnknownRecord[] : [];
-    repQuestions[clusterIndex] = topStatements
-      .map((statement): PolisRepresentativeQuestion | null => {
-        const questionIndex = Number(statement?.questionIndex);
-        if (!Number.isInteger(questionIndex) || questionIndex < 0) return null;
-        const difference = resolvePrecomputedClusterDifference(
-          statement?.differenceScore,
-          asRecord(statement?.cluster).agreeRate,
-          asRecord(statement?.overall).agreeRate
-        );
-
-        return {
-          label: String(statement?.label || `#${questionIndex + 1}`),
-          questionIndex,
-          prompt: String(statement?.prompt || ''),
-          difference,
-        };
-      })
-      .filter((statement): statement is PolisRepresentativeQuestion => !!statement);
-
-    clusterCollapseState[clusterIndex] = true;
-
-    const participantCount = Number(cluster?.participantCount);
-    const topLabels = repQuestions[clusterIndex].map((statement) => statement.label);
-    const details: string[] = [];
-    if (Number.isFinite(participantCount) && participantCount > 0) {
-      details.push(`${participantCount} demo participants.`);
-    }
-    if (topLabels.length) {
-      details.push(`Most distinctive questions: ${topLabels.join(', ')}.`);
-    }
-
-    analysisCacheByClusterIndex[clusterIndex] = {
-      name: String(cluster?.clusterLabel || `Cluster ${clusterIndex}`),
-      short: String(cluster?.characteristics || '').trim(),
-      long: details.join(' ').trim(),
-    };
-  });
-
-  return {
-    clusterCount: uniqueGroupIds.length,
-    clusterAssignments,
-    repQuestions,
-    clusterCollapseState,
-    analysisCacheByClusterIndex,
-  };
-}
-
-export function getRenderableParticipantList(responders: unknown[] = [], displayNames: StringMap = {}) {
-  const isEth = (value: unknown) => typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value);
-  const hasDisplayNames = !!(displayNames && Object.keys(displayNames).length > 0);
-  const unique = Array.from(new Set(Array.isArray(responders) ? responders : [])).filter((addr) => {
-    const displayName = displayNames?.[String(addr)];
-    return !!displayName || isEth(addr);
-  }).map((addr) => String(addr));
-
-  if (!hasDisplayNames) {
-    unique.sort();
-  }
-
-  return unique;
-}
-
-export function formatBlockchainNetworkLabel(network: UnknownRecord | null = null, fallbackChainId: unknown = null) {
-  const networkChainId = Number(
-    network?.id ??
-    network?.chainId ??
-    network?.networkChainId ??
-    0
-  ) || 0;
-  const chainId = Number(fallbackChainId ?? networkChainId ?? 0) || 0;
-  const chain = chainId ? getChainById(chainId) : null;
-  const shouldUseWalletName = !!networkChainId && networkChainId === chainId;
-  const name = shouldUseWalletName
-    ? String(network?.name || '').trim() || String(chain?.name || '').trim()
-    : String(chain?.name || '').trim() || String(network?.name || '').trim();
-  if (name && chainId) return `${name} (${chainId})`;
-  if (name) return name;
-  if (chainId) return `Chain ${chainId}`;
-  return 'Unknown';
-}
-
-function getLastBlock() {
-
-  return "20608649";
-}
-
-function getUTCDataTimestamp() {
-
-  const now = new Date();
-  return now.toISOString().replace('T', ' ').split('.')[0] + ' UTC';
-}
-
-export const REPORT_DEFAULT_EMBEDDING_LABEL = 'Polis Auto';
-export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with 3 groups. Switch to SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic grouping.`;
-export const REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT = "Polis Auto uses Context Engine's Polis-inspired automatic grouping. It keeps the report's PCA-based participant layout and auto-selects opinion groups from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.";
-export const OPINION_GROUPS_TOOLTIP_TEXT = "Leave K on auto to use Polis Auto's automatic grouping, or set K manually when exploring UMAP or SVD/PCA layouts.";
+export const getPolisDemoDatasetForSlug = (...args: Parameters<typeof getPolisDemoDatasetForSlugRuntime>) =>
+  getPolisDemoDatasetForSlugRuntime(...args);
 
 /***************************************************************
  * The main PolisReport component
@@ -1343,42 +156,32 @@ export default function PolisReport({
   const resolvedSessionInfo = sessionInfo;
   const activeReportSlug = normalizeSessionSlug(slug || sessionSlug || '');
   const resolvedSessionSlug = activeReportSlug;
-  const reportProgressSlug = useMemo(
-    () => normalizeQuestionProgressSlug(resolvedSessionSlug),
-    [resolvedSessionSlug]
-  );
-  const resolvedDemoDataBySlug = useMemo(
-    () => buildPolisDemoDatasetsBySlug(demoDataBySlug),
-    [demoDataBySlug]
-  );
+  const reportProgressSlug = useMemo(() => normalizeQuestionProgressSlug(resolvedSessionSlug), [resolvedSessionSlug]);
+  const resolvedDemoDataBySlug = useMemo(() => buildPolisDemoDatasetsBySlug(demoDataBySlug), [demoDataBySlug]);
   const autoUseDemoData = useMemo(
-    () => shouldAutoEnablePolisDemoData({
-      slug: activeReportSlug,
-      demoDataFirstLoad,
-      datasetsBySlug: resolvedDemoDataBySlug,
-    }),
-    [activeReportSlug, demoDataFirstLoad, resolvedDemoDataBySlug]
+    () =>
+      shouldAutoEnablePolisDemoData({
+        slug: activeReportSlug,
+        demoDataFirstLoad,
+        datasetsBySlug: resolvedDemoDataBySlug,
+      }),
+    [activeReportSlug, demoDataFirstLoad, resolvedDemoDataBySlug],
   );
   const activeDemoData = useMemo(
     () => getPolisDemoDatasetForSlug(activeReportSlug, { datasetsBySlug: resolvedDemoDataBySlug }),
-    [activeReportSlug, resolvedDemoDataBySlug]
+    [activeReportSlug, resolvedDemoDataBySlug],
   );
   // Keep the canonical built-in demo aligned with other demo datasets by
   // starting in the shared exploratory UMAP view instead of special-casing
   // a first-load Polis Auto mode.
   const defaultEmbeddingChoice = 'UMAP' as EmbeddingChoice;
   const defaultManualClusterCount = String(DEFAULT_EXPLORATORY_CLUSTER_COUNT);
-  const currentPathname = typeof window !== 'undefined' && window.location?.pathname
-    ? window.location.pathname
-    : '';
-  const currentSearch = typeof window !== 'undefined' && typeof window.location?.search === 'string'
-    ? window.location.search
-    : '';
+  const currentPathname = typeof window !== 'undefined' && window.location?.pathname ? window.location.pathname : '';
+  const currentSearch =
+    typeof window !== 'undefined' && typeof window.location?.search === 'string' ? window.location.search : '';
   const liveReportUrl = useMemo(() => {
     if (!resolvedSessionSlug || !currentPathname) return '';
-    const origin = typeof window !== 'undefined' && window.location?.origin
-      ? window.location.origin
-      : '';
+    const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '';
     // Strip auth/claim params that should never appear in exported PDFs
     const SENSITIVE_PARAMS = new Set(['gp', 'password', 'inv', 'sbt', 'auto']);
     const params = new URLSearchParams(currentSearch);
@@ -1408,7 +211,7 @@ export default function PolisReport({
   }, [questionScanProgress, reportProgressSlug]);
   const loadingScanProgress = useMemo(
     () => buildQuestionScanProgressDisplay(scopedQuestionScanProgress),
-    [scopedQuestionScanProgress]
+    [scopedQuestionScanProgress],
   );
   const autoUseDemoDataSignatureRef = useRef<string>(`${activeReportSlug}|${autoUseDemoData ? '1' : '0'}`);
   const precomputedDemoClusterState = useMemo<PrecomputedDemoClusterState | null>(() => {
@@ -1419,7 +222,9 @@ export default function PolisReport({
   // For cluster assignments
   const [clusterCount, setClusterCount] = useState<number>(0);
   const [clusterAssignments, setClusterAssignments] = useState<number[]>([]);
-  const [embeddingChoice, setEmbeddingChoice] = useState<EmbeddingChoice>(() => defaultEmbeddingChoice as EmbeddingChoice);
+  const [embeddingChoice, setEmbeddingChoice] = useState<EmbeddingChoice>(
+    () => defaultEmbeddingChoice as EmbeddingChoice,
+  );
   const embeddingChoiceRef = useRef<EmbeddingChoice>(defaultEmbeddingChoice as EmbeddingChoice);
   const [manualClusterCount, setManualClusterCount] = useState<string>(() => defaultManualClusterCount);
   const [exploratoryClusterAssignments, setExploratoryClusterAssignments] = useState<number[]>([]);
@@ -1460,10 +265,13 @@ export default function PolisReport({
       checkScrollableTimeoutRef.current = null;
     }
   }, []);
-  const scheduleTooltipHide = useCallback((delay: number = 400) => {
-    cancelTooltipHide();
-    hideTimerRef.current = setTimeout(() => setHoveredContent(null), delay);
-  }, [cancelTooltipHide]);
+  const scheduleTooltipHide = useCallback(
+    (delay: number = 400) => {
+      cancelTooltipHide();
+      hideTimerRef.current = setTimeout(() => setHoveredContent(null), delay);
+    },
+    [cancelTooltipHide],
+  );
 
   useEffect(() => {
     return () => {
@@ -1489,15 +297,10 @@ export default function PolisReport({
       className?: string;
       style?: React.CSSProperties;
       title?: string;
-    } = {}
+    } = {},
   ) => {
     const footnoteNumber = registerFootnote(text);
-    const {
-      ariaLabel,
-      className = styles.tooltipIcon,
-      style,
-      title,
-    } = options;
+    const { ariaLabel, className = styles.tooltipIcon, style, title } = options;
 
     return (
       <>
@@ -1518,9 +321,7 @@ export default function PolisReport({
           </span>
         )}
         {footnoteNumber ? (
-          <sup className={`${styles.showWhenPdf} ${styles.footnoteRef}`}>
-            {formatSuperscriptNumber(footnoteNumber)}
-          </sup>
+          <sup className={`${styles.showWhenPdf} ${styles.footnoteRef}`}>{formatSuperscriptNumber(footnoteNumber)}</sup>
         ) : null}
       </>
     );
@@ -1530,7 +331,7 @@ export default function PolisReport({
   const [showSettingsRow, setShowSettingsRow] = useState<boolean>(() => isDemoSessionSlug(activeReportSlug));
   const [reportStyle, setReportStyle] = useState<string>('original');
   const embeddingDefaultSignatureRef = useRef<string>(
-    `${activeReportSlug}|${defaultEmbeddingChoice}|${defaultManualClusterCount}`
+    `${activeReportSlug}|${defaultEmbeddingChoice}|${defaultManualClusterCount}`,
   );
 
   // Toggles for participant graph
@@ -1542,10 +343,19 @@ export default function PolisReport({
 
   // NEW: toggle for showing Ethereum addresses in participant graph (non-demo only)
   const [showAddresses, setShowAddresses] = useState<boolean>(() => {
-    try { localStorage.setItem('ceReport_showAddresses', localStorage.getItem('ceReport_showAddresses') || 'false'); return localStorage.getItem('ceReport_showAddresses') === 'true'; } catch { return false; }
+    try {
+      localStorage.setItem('ceReport_showAddresses', localStorage.getItem('ceReport_showAddresses') || 'false');
+      return localStorage.getItem('ceReport_showAddresses') === 'true';
+    } catch {
+      return false;
+    }
   });
   useEffect(() => {
-    try { localStorage.setItem('ceReport_showAddresses', showAddresses ? 'true' : 'false'); } catch (e) { surveyLog.warn('PolisReport: fallback', e); }
+    try {
+      localStorage.setItem('ceReport_showAddresses', showAddresses ? 'true' : 'false');
+    } catch (e) {
+      surveyLog.warn('PolisReport: fallback', e);
+    }
   }, [showAddresses]);
 
   // PDF capture ref
@@ -1584,20 +394,19 @@ export default function PolisReport({
     }
 
     try {
-      setPolisMathResult(computePolisConversationMath(
-        ratingMatrix,
-        questionPrompts,
-        allQuestions,
-        { randomSeed: DETERMINISTIC_SEED }
-      ) as {
-        stats: PolisStats;
-        participantCoords: PolisPoint[];
-        statementCoords: PolisPoint[];
-        commentStats?: PolisCommentStat[];
-        clusterAssignments: number[];
-        clusterCount: number;
-        repQuestions: PolisRepQuestionsMap;
-      });
+      setPolisMathResult(
+        computePolisConversationMath(ratingMatrix, questionPrompts, allQuestions, {
+          randomSeed: DETERMINISTIC_SEED,
+        }) as {
+          stats: PolisStats;
+          participantCoords: PolisPoint[];
+          statementCoords: PolisPoint[];
+          commentStats?: PolisCommentStat[];
+          clusterAssignments: number[];
+          clusterCount: number;
+          repQuestions: PolisRepQuestionsMap;
+        },
+      );
       setPolisMathError(null);
     } catch (error) {
       setPolisMathResult(null);
@@ -1633,12 +442,12 @@ export default function PolisReport({
   // auto-hydrate precomputed cluster summaries. Custom per-slug fixtures still
   // stay on the normal computed/AI path.
   const shouldUsePrecomputedDemoClusters = !!(
-    precomputedDemoClusterState
-    && isDemoSessionSlug(activeReportSlug)
-    && effectiveUseDemoData
-    && activeDemoData === DEFAULT_POLIS_DEMO_DATA
-    && embeddingChoice === 'POLIS'
-    && manualClusterCountValue === null
+    precomputedDemoClusterState &&
+    isDemoSessionSlug(activeReportSlug) &&
+    effectiveUseDemoData &&
+    activeDemoData === DEFAULT_POLIS_DEMO_DATA &&
+    embeddingChoice === 'POLIS' &&
+    manualClusterCountValue === null
   );
   const isExploratoryMode = embeddingChoice !== 'POLIS' || manualClusterCountValue !== null;
   const activeParticipantCoords = embeddingChoice === 'UMAP' ? umapParticipantCoords : participantCoords;
@@ -1646,21 +455,27 @@ export default function PolisReport({
   const activeClusterCount = useMemo(() => {
     if (manualClusterCountValue !== null) return manualClusterCountValue;
     if (
-      !isExploratoryMode
-      && shouldUsePrecomputedDemoClusters
-      && Number.isInteger(precomputedDemoClusterState?.clusterCount)
+      !isExploratoryMode &&
+      shouldUsePrecomputedDemoClusters &&
+      Number.isInteger(precomputedDemoClusterState?.clusterCount)
     ) {
       return precomputedDemoClusterState.clusterCount;
     }
     return clusterCount || 0;
-  }, [clusterCount, isExploratoryMode, manualClusterCountValue, precomputedDemoClusterState, shouldUsePrecomputedDemoClusters]);
+  }, [
+    clusterCount,
+    isExploratoryMode,
+    manualClusterCountValue,
+    precomputedDemoClusterState,
+    shouldUsePrecomputedDemoClusters,
+  ]);
   const activeClusterAssignments = useMemo(() => {
     const source = isExploratoryMode ? exploratoryClusterAssignments : clusterAssignments;
     if (Array.isArray(source) && source.length) return source;
     if (
-      !isExploratoryMode
-      && shouldUsePrecomputedDemoClusters
-      && Array.isArray(precomputedDemoClusterState?.clusterAssignments)
+      !isExploratoryMode &&
+      shouldUsePrecomputedDemoClusters &&
+      Array.isArray(precomputedDemoClusterState?.clusterAssignments)
     ) {
       return precomputedDemoClusterState.clusterAssignments;
     }
@@ -1676,10 +491,10 @@ export default function PolisReport({
     const source = isExploratoryMode ? exploratoryRepQuestions : repQuestions;
     if (source && typeof source === 'object' && Object.keys(source).length) return source;
     if (
-      !isExploratoryMode
-      && shouldUsePrecomputedDemoClusters
-      && precomputedDemoClusterState?.repQuestions
-      && typeof precomputedDemoClusterState.repQuestions === 'object'
+      !isExploratoryMode &&
+      shouldUsePrecomputedDemoClusters &&
+      precomputedDemoClusterState?.repQuestions &&
+      typeof precomputedDemoClusterState.repQuestions === 'object'
     ) {
       return precomputedDemoClusterState.repQuestions;
     }
@@ -1730,25 +545,29 @@ export default function PolisReport({
       return false;
     }
   });
-  const analysisDataKey = useMemo(() => buildClusterAnalysisDataKey({
-    activeClusterAssignments,
-    activeClusterCount,
-    activeRepQuestions,
-    embeddingChoice,
-    useDemoData: effectiveUseDemoData,
-    questionResponsesNonce,
-    questionPrompts,
-    allQuestions,
-  }), [
-    activeClusterAssignments,
-    activeClusterCount,
-    activeRepQuestions,
-    embeddingChoice,
-    effectiveUseDemoData,
-    questionResponsesNonce,
-    questionPrompts,
-    allQuestions,
-  ]);
+  const analysisDataKey = useMemo(
+    () =>
+      buildClusterAnalysisDataKey({
+        activeClusterAssignments,
+        activeClusterCount,
+        activeRepQuestions,
+        embeddingChoice,
+        useDemoData: effectiveUseDemoData,
+        questionResponsesNonce,
+        questionPrompts,
+        allQuestions,
+      }),
+    [
+      activeClusterAssignments,
+      activeClusterCount,
+      activeRepQuestions,
+      embeddingChoice,
+      effectiveUseDemoData,
+      questionResponsesNonce,
+      questionPrompts,
+      allQuestions,
+    ],
+  );
   const currentAnalysisKey = analysisDataKey;
 
   useEffect(() => {
@@ -1791,7 +610,9 @@ export default function PolisReport({
     setParticipantsListOpen(false);
 
     const newObj: BooleanMap = {};
-    Object.keys(activeRepQuestions || {}).forEach((c) => { newObj[c] = false; });
+    Object.keys(activeRepQuestions || {}).forEach((c) => {
+      newObj[c] = false;
+    });
     setClusterCollapseState(newObj);
   }
 
@@ -1803,19 +624,25 @@ export default function PolisReport({
     setParticipantsListOpen(true);
 
     const newObj: BooleanMap = {};
-    Object.keys(activeRepQuestions || {}).forEach((c) => { newObj[c] = true; });
+    Object.keys(activeRepQuestions || {}).forEach((c) => {
+      newObj[c] = true;
+    });
     setClusterCollapseState(newObj);
   }
 
   function handleCollapseAllClusters() {
     const newObj: BooleanMap = {};
-    Object.keys(activeRepQuestions || {}).forEach((c) => { newObj[c] = false; });
+    Object.keys(activeRepQuestions || {}).forEach((c) => {
+      newObj[c] = false;
+    });
     setClusterCollapseState(newObj);
   }
 
   function handleExpandAllClusters() {
     const newObj: BooleanMap = {};
-    Object.keys(activeRepQuestions || {}).forEach((c) => { newObj[c] = true; });
+    Object.keys(activeRepQuestions || {}).forEach((c) => {
+      newObj[c] = true;
+    });
     setClusterCollapseState(newObj);
   }
 
@@ -1841,10 +668,7 @@ export default function PolisReport({
   };
 
   const stepManualClusterCount = (delta: number) => {
-    const base = Math.max(
-      activeClusterCount || clusterCount || 0,
-      DEFAULT_EXPLORATORY_CLUSTER_COUNT
-    );
+    const base = Math.max(activeClusterCount || clusterCount || 0, DEFAULT_EXPLORATORY_CLUSTER_COUNT);
     setManualClusterCount(String(Math.max(2, base + delta)));
   };
 
@@ -1869,12 +693,7 @@ export default function PolisReport({
     try {
       if (!effectiveUseDemoData) {
         // Apply the upstream filterState BEFORE building the matrix
-        const filteredAgg = applyFilterStateToAggregator(
-          questionResponses,
-          network,
-          filterState,
-          activeReportSlug
-        );
+        const filteredAgg = applyFilterStateToAggregator(questionResponses, network, filterState, activeReportSlug);
         buildResult = buildRatingMatrixFromRealData(filteredAgg, { sessionSlug: activeReportSlug });
       } else {
         // Demo mode: bypass all filters entirely
@@ -1906,7 +725,15 @@ export default function PolisReport({
     } catch (e: unknown) {
       setErrorMessage(`Error building rating matrix: ${getErrorMessage(e)}`);
     }
-  }, [questionResponses, effectiveUseDemoData, filterState, network, questionResponsesNonce, activeReportSlug, activeDemoData]);
+  }, [
+    questionResponses,
+    effectiveUseDemoData,
+    filterState,
+    network,
+    questionResponsesNonce,
+    activeReportSlug,
+    activeDemoData,
+  ]);
 
   useEffect(() => {
     if (!shouldUsePrecomputedDemoClusters) return;
@@ -1986,7 +813,7 @@ export default function PolisReport({
           x: point[0],
           y: point[1],
           index,
-        }))
+        })),
       );
     } catch (e: unknown) {
       surveyLog.error('UMAP error caught:', e);
@@ -2029,7 +856,12 @@ export default function PolisReport({
       const fallbackAssignments = new Array(pointsToUse.length).fill(0);
       setExploratoryClusterAssignments(fallbackAssignments);
       setExploratoryRepQuestions(
-        findRepresentativeQuestions(ratingMatrix, fallbackAssignments, questionPrompts, allQuestions) as PolisRepQuestionsMap
+        findRepresentativeQuestions(
+          ratingMatrix,
+          fallbackAssignments,
+          questionPrompts,
+          allQuestions,
+        ) as PolisRepQuestionsMap,
       );
       return;
     }
@@ -2040,7 +872,7 @@ export default function PolisReport({
         ratingMatrix,
         assigned,
         questionPrompts,
-        allQuestions
+        allQuestions,
       ) as PolisRepQuestionsMap;
       setExploratoryClusterAssignments(assigned);
       setExploratoryRepQuestions(nextRepQuestions);
@@ -2072,16 +904,16 @@ export default function PolisReport({
   useEffect(() => {
     if (!shouldUsePrecomputedDemoClusters) return;
     setAnalysisLoadingKey(null);
-      setAnalysisErrorsByKey((prev) => ({
+    setAnalysisErrorsByKey((prev) => ({
       ...prev,
-      [currentAnalysisKey]: {}
+      [currentAnalysisKey]: {},
     }));
     setAnalysisCacheByKey((prev) => ({
       ...prev,
       [currentAnalysisKey]: {
         ...(prev[currentAnalysisKey] || {}),
-        ...precomputedDemoClusterState.analysisCacheByClusterIndex
-      }
+        ...precomputedDemoClusterState.analysisCacheByClusterIndex,
+      },
     }));
   }, [currentAnalysisKey, precomputedDemoClusterState, shouldUsePrecomputedDemoClusters]);
 
@@ -2125,12 +957,12 @@ export default function PolisReport({
       if (direction === 'left') {
         container.scrollTo({
           left: 0,
-          behavior: 'smooth'
+          behavior: 'smooth',
         });
       } else if (direction === 'right') {
         container.scrollTo({
           left: container.scrollWidth,
-          behavior: 'smooth'
+          behavior: 'smooth',
         });
       }
     }
@@ -2152,7 +984,9 @@ export default function PolisReport({
     // === NEW: ensure clusters expanded for PDF capture ===
     const prevClusterState = { ...clusterCollapseState };
     const expandAllForPdf: BooleanMap = {};
-    Object.keys(activeRepQuestions || {}).forEach((c) => { expandAllForPdf[c] = true; });
+    Object.keys(activeRepQuestions || {}).forEach((c) => {
+      expandAllForPdf[c] = true;
+    });
     setClusterCollapseState(expandAllForPdf);
 
     // === NEW: ensure "All Questions" is open during PDF capture ===
@@ -2174,7 +1008,9 @@ export default function PolisReport({
       // Lazy-load heavy PDF deps with retry for chunk loading failures
       const loadWithRetry = async <T,>(importFn: () => Promise<T>, retries: number = 2): Promise<T> => {
         for (let i = 0; i <= retries; i++) {
-          try { return await importFn(); } catch (e) {
+          try {
+            return await importFn();
+          } catch (e) {
             if (i === retries) throw e;
             await new Promise((resolve) => setTimeout(resolve, 500));
           }
@@ -2244,7 +1080,6 @@ export default function PolisReport({
     }
   };
 
-
   /***************************************************************
    * Mouse move for tooltips
    ***************************************************************/
@@ -2253,7 +1088,7 @@ export default function PolisReport({
       const rect = containerRef.current.getBoundingClientRect();
       setTooltipPos({
         x: e.clientX - rect.left + 10,
-        y: e.clientY - rect.top + 10
+        y: e.clientY - rect.top + 10,
       });
     }
   }
@@ -2264,10 +1099,7 @@ export default function PolisReport({
   function buildQuestionList() {
     if (!ratingMatrix || !ratingMatrix.length) {
       return (
-        <p
-          className={styles.hiddenInPdf}
-          style={{ fontStyle: 'italic', marginLeft: '10px' }}
-        >
+        <p className={styles.hiddenInPdf} style={{ fontStyle: 'italic', marginLeft: '10px' }}>
           (No questions or rating matrix)
         </p>
       );
@@ -2291,7 +1123,7 @@ export default function PolisReport({
           style={{
             marginBottom: '6px',
             borderBottom: '1px solid #ddd',
-            paddingBottom: '6px'
+            paddingBottom: '6px',
           }}
         >
           <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
@@ -2300,10 +1132,8 @@ export default function PolisReport({
           {/* UPDATED: Added className for mobile styling */}
           <div className={styles.questionVoteRow}>
             <span style={{ fontSize: '0.8rem', marginRight: '8px' }}>
-              <strong>Agree:</strong> {agrees} /{' '}
-              <strong>Disagree:</strong> {disagrees} /{' '}
-              <strong>Unsure:</strong> {unsures} /{' '}
-              (Total: {total})
+              <strong>Agree:</strong> {agrees} / <strong>Disagree:</strong> {disagrees} / <strong>Unsure:</strong>{' '}
+              {unsures} / (Total: {total})
             </span>
             <PolisBoxPlot votes={votes} />
           </div>
@@ -2311,11 +1141,7 @@ export default function PolisReport({
       );
     });
 
-    return (
-      <div style={{ marginTop: 10 }}>
-        {lines}
-      </div>
-    );
+    return <div style={{ marginTop: 10 }}>{lines}</div>;
   }
 
   /***************************************************************
@@ -2332,26 +1158,14 @@ export default function PolisReport({
 
   function renderParticipantsList() {
     if (!Array.isArray(allResponders) || allResponders.length === 0) {
-      return (
-        <p
-          style={{ fontStyle: 'italic', marginLeft: '10px' }}
-        >
-          (No participants found.)
-        </p>
-      );
+      return <p style={{ fontStyle: 'italic', marginLeft: '10px' }}>(No participants found.)</p>;
     }
 
     const hasDisplayNames = demoDisplayNames && Object.keys(demoDisplayNames).length > 0;
     const unique = getRenderableParticipantList(allResponders, demoDisplayNames);
 
     if (unique.length === 0) {
-      return (
-        <p
-          style={{ fontStyle: 'italic', marginLeft: '10px' }}
-        >
-          (No valid participant addresses.)
-        </p>
-      );
+      return <p style={{ fontStyle: 'italic', marginLeft: '10px' }}>(No valid participant addresses.)</p>;
     }
 
     return (
@@ -2359,22 +1173,14 @@ export default function PolisReport({
         {unique.map((addr, idx) => {
           const displayName = demoDisplayNames[addr];
           const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
-          const imgSrc = displayName
-            ? getPolisHistoricalParticipantAvatar(displayName, addr)
-            : getBlockieFor(addr);
+          const imgSrc = displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : getBlockieFor(addr);
           const shortAddr = getShortenedAddress(addr, false) || addr;
-          const linkHref = displayName ? `/su/${displayName}` : (isEth ? `/u/${addr}` : '');
+          const linkHref = displayName ? `/su/${displayName}` : isEth ? `/u/${addr}` : '';
           const label = displayName || addr;
           const shortLabel = displayName || shortAddr;
           return (
-            <div
-              key={addr}
-              className={styles.participantListItem}
-              title={displayName || addr}
-            >
-              <span className={`${styles.showWhenPdf} ${styles.participantIndex}`}>
-                {idx + 1}.
-              </span>
+            <div key={addr} className={styles.participantListItem} title={displayName || addr}>
+              <span className={`${styles.showWhenPdf} ${styles.participantIndex}`}>{idx + 1}.</span>
               {imgSrc ? (
                 <img
                   src={imgSrc}
@@ -2394,27 +1200,14 @@ export default function PolisReport({
                 />
               ) : null}
               {linkHref ? (
-                <a
-                  href={linkHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.participantAddressLink}
-                >
-                  <span className={styles.participantAddressFull}>
-                    {label}
-                  </span>
-                  <span className={styles.participantAddressShort}>
-                    {shortLabel}
-                  </span>
+                <a href={linkHref} target="_blank" rel="noopener noreferrer" className={styles.participantAddressLink}>
+                  <span className={styles.participantAddressFull}>{label}</span>
+                  <span className={styles.participantAddressShort}>{shortLabel}</span>
                 </a>
               ) : (
                 <span className={styles.participantAddressLink}>
-                  <span className={styles.participantAddressFull}>
-                    {label}
-                  </span>
-                  <span className={styles.participantAddressShort}>
-                    {shortLabel}
-                  </span>
+                  <span className={styles.participantAddressFull}>{label}</span>
+                  <span className={styles.participantAddressShort}>{shortLabel}</span>
                 </span>
               )}
             </div>
@@ -2424,7 +1217,6 @@ export default function PolisReport({
     );
   }
 
-
   /***************************************************************
    * getVotesForQuestionInCluster
    ***************************************************************/
@@ -2432,7 +1224,7 @@ export default function PolisReport({
     questionIndex: number,
     clusterIndex: number,
     rMatrix: RatingMatrix | null,
-    assignments: number[]
+    assignments: number[],
   ): PolisVote[] {
     // Safely handle edge cases
     if (!rMatrix || !rMatrix.length) return [];
@@ -2444,9 +1236,10 @@ export default function PolisReport({
     const votes: PolisVote[] = [];
     for (let p = 0; p < nParticipants; p++) {
       if (assignments[p] === clusterIndex) {
-        const val = (rMatrix[questionIndex][p] !== undefined && rMatrix[questionIndex][p] !== null)
-          ? rMatrix[questionIndex][p]
-          : null;
+        const val =
+          rMatrix[questionIndex][p] !== undefined && rMatrix[questionIndex][p] !== null
+            ? rMatrix[questionIndex][p]
+            : null;
         votes.push(val);
       }
     }
@@ -2459,15 +1252,22 @@ export default function PolisReport({
   const countVotes = (votesArr: PolisVote[]) => {
     const res = { agree: 0, disagree: 0, unsure: 0, responded: 0 };
     (votesArr || []).forEach((v) => {
-      if (v === 1) { res.agree += 1; res.responded += 1; }
-      else if (v === -1) { res.disagree += 1; res.responded += 1; }
-      else if (v === 0) { res.unsure += 1; res.responded += 1; }
+      if (v === 1) {
+        res.agree += 1;
+        res.responded += 1;
+      } else if (v === -1) {
+        res.disagree += 1;
+        res.responded += 1;
+      } else if (v === 0) {
+        res.unsure += 1;
+        res.responded += 1;
+      }
     });
     return {
       ...res,
-      agreeRate: res.responded ? +(res.agree * 100 / res.responded).toFixed(1) : 0,
-      disagreeRate: res.responded ? +(res.disagree * 100 / res.responded).toFixed(1) : 0,
-      unsureRate: res.responded ? +(res.unsure * 100 / res.responded).toFixed(1) : 0
+      agreeRate: res.responded ? +((res.agree * 100) / res.responded).toFixed(1) : 0,
+      disagreeRate: res.responded ? +((res.disagree * 100) / res.responded).toFixed(1) : 0,
+      unsureRate: res.responded ? +((res.unsure * 100) / res.responded).toFixed(1) : 0,
     };
   };
 
@@ -2482,14 +1282,14 @@ export default function PolisReport({
       const promptKey = allQuestions[qIdx];
       const prompt = (questionPrompts[promptKey] || rq.prompt || '').trim();
       const clusterVotes = getVotesForQuestionInCluster(qIdx, clusterIndex, matrix, activeClusterAssignments);
-      const overallVotes = (matrix[qIdx] || []);
+      const overallVotes = matrix[qIdx] || [];
       return {
         label: rq.label,
         questionIndex: qIdx,
         prompt,
         cluster: countVotes(clusterVotes),
         overall: countVotes(overallVotes),
-        differenceScore: rq.difference
+        differenceScore: rq.difference,
       };
     });
 
@@ -2543,28 +1343,29 @@ export default function PolisReport({
         }
       });
 
-	      // Sequentially analyze each missing/failed cluster
-	      for (const c of clustersToAnalyze) {
-	        const clusterKey = String(c);
-	        // Set this cluster's timer start at call time
-	        analysisStartTimesRef.current[clusterKey] = Date.now();
+      // Sequentially analyze each missing/failed cluster
+      for (const c of clustersToAnalyze) {
+        const clusterKey = String(c);
+        // Set this cluster's timer start at call time
+        analysisStartTimesRef.current[clusterKey] = Date.now();
 
-	        const payload = buildClusterPayload(c, uniqueClusters);
+        const payload = buildClusterPayload(c, uniqueClusters);
 
         try {
           // Pass prior names to instruct the AI to choose a distinct title
           const allClustersDataWithNames = {
             ...baseAllClustersData,
             previousNames: usedNames.slice(),
-            nameUniqueness: true
+            nameUniqueness: true,
           };
 
-          const aiRes = await analyzeClusterOpinionsTyped(payload, allClustersDataWithNames, { sessionSlug: activeReportSlug });
+          const aiRes = await analyzeClusterOpinionsTyped(payload, allClustersDataWithNames, {
+            sessionSlug: activeReportSlug,
+          });
 
           // Enforce uniqueness in UI even if AI repeats a name
-          const baseNameCandidate = (aiRes && (aiRes.name || aiRes.short))
-            ? String(aiRes.name || aiRes.short).trim()
-            : '';
+          const baseNameCandidate =
+            aiRes && (aiRes.name || aiRes.short) ? String(aiRes.name || aiRes.short).trim() : '';
 
           let proposed = baseNameCandidate || `Group ${usedNames.length + 1}`;
           const seenLower = new Set(usedNames.map((n) => n.toLowerCase()));
@@ -2579,26 +1380,26 @@ export default function PolisReport({
           }
           usedNames.push(proposed);
 
-	          setAnalysisCacheByKey((prev) => ({
-	            ...prev,
-	            [key]: {
-	              ...(prev[key] || {}),
-	              [clusterKey]: {
-                  short: String(aiRes.short || ''),
-                  long: String(aiRes.long || ''),
-                  name: proposed,
-                }
-	            }
-	          }));
-	        } catch (err: unknown) {
-	          setAnalysisErrorsByKey((prev) => ({
-	            ...prev,
-	            [key]: {
-	              ...(prev[key] || {}),
-	              [clusterKey]: getErrorMessage(err, 'AI request failed')
-	            }
-	          }));
-	        }
+          setAnalysisCacheByKey((prev) => ({
+            ...prev,
+            [key]: {
+              ...(prev[key] || {}),
+              [clusterKey]: {
+                short: String(aiRes.short || ''),
+                long: String(aiRes.long || ''),
+                name: proposed,
+              },
+            },
+          }));
+        } catch (err: unknown) {
+          setAnalysisErrorsByKey((prev) => ({
+            ...prev,
+            [key]: {
+              ...(prev[key] || {}),
+              [clusterKey]: getErrorMessage(err, 'AI request failed'),
+            },
+          }));
+        }
       }
     } catch (e) {
       surveyLog.error('Analyze clusters failed:', e);
@@ -2620,7 +1421,7 @@ export default function PolisReport({
       );
     }
     const arr = activeRepQuestions[clusterIndex].slice(0, 3);
-    const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a,b)=>a-b);
+    const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a, b) => a - b);
     const colorScale = d3Report.scaleOrdinal(d3Report.schemeCategory10);
 
     return (
@@ -2632,7 +1433,7 @@ export default function PolisReport({
             qIndex,
             clusterIndex,
             ratingMatrix,
-            activeClusterAssignments
+            activeClusterAssignments,
           );
 
           return (
@@ -2642,17 +1443,17 @@ export default function PolisReport({
                 marginLeft: '20px',
                 marginBottom: '8px',
                 borderLeft: '2px solid #ccc',
-                paddingLeft: '8px'
+                paddingLeft: '8px',
               }}
             >
               <strong>{rq.label}</strong>: {questionPrompt} <br />
               <small style={{ color: '#666' }}>
-                ({rq.repfulFor === 'disagree' ? 'disagreement' : 'agreement'} rate differs from the overall conversation by {(rq.difference * 100).toFixed(1)} percentage points)
+                ({rq.repfulFor === 'disagree' ? 'disagreement' : 'agreement'} rate differs from the overall conversation
+                by {(rq.difference * 100).toFixed(1)} percentage points)
               </small>
               <div style={{ marginTop: '4px' }}>
                 <PolisBoxPlot votes={clusterVotes} />
               </div>
-
               {/* Compare all other clusters */}
               <div style={{ marginTop: '6px', marginBottom: '6px' }}>
                 <div
@@ -2660,7 +1461,7 @@ export default function PolisReport({
                     display: 'flex',
                     flexWrap: 'wrap',
                     alignItems: 'center',
-                    gap: '8px'
+                    gap: '8px',
                   }}
                 >
                   {uniqueClusters.map((cl) => {
@@ -2669,7 +1470,7 @@ export default function PolisReport({
                       qIndex,
                       cl,
                       ratingMatrix,
-                      activeClusterAssignments
+                      activeClusterAssignments,
                     );
                     const clusterColor = colorScale(cl);
                     return (
@@ -2677,14 +1478,14 @@ export default function PolisReport({
                         key={cl}
                         style={{
                           border: `1px solid ${clusterColor}`,
-                          padding: '4px'
+                          padding: '4px',
                         }}
                       >
                         <div
                           style={{
                             color: clusterColor,
                             fontWeight: 'bold',
-                            marginBottom: '4px'
+                            marginBottom: '4px',
                           }}
                         >
                           Cluster {cl}
@@ -2731,7 +1532,7 @@ export default function PolisReport({
    ***************************************************************/
   function renderClusterLegend() {
     if (!activeClusterAssignments || !activeClusterAssignments.length) return null;
-    const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a,b)=>a-b);
+    const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a, b) => a - b);
     const colorScale = d3Report.scaleOrdinal(d3Report.schemeCategory10);
 
     const cacheForKey = analysisCacheByKey[currentAnalysisKey] || {};
@@ -2751,7 +1552,7 @@ export default function PolisReport({
           style={{
             display: 'flex',
             flexDirection: 'column',
-            marginTop: '6px'
+            marginTop: '6px',
           }}
         >
           {uniqueClusters.map((c) => {
@@ -2760,20 +1561,14 @@ export default function PolisReport({
             const handleToggleCluster = () => {
               setClusterCollapseState((prev) => ({
                 ...prev,
-                [c]: !prev[c]
+                [c]: !prev[c],
               }));
             };
 
             const analysis = cacheForKey[c];
             const errText = errorsForKey[c];
             const isLoadingThis = analysisLoadingKey === currentAnalysisKey && !analysis && !errText;
-            const analysisState = analysis
-              ? 'ready'
-              : errText
-                ? 'error'
-                : isLoadingThis
-                  ? 'loading'
-                  : 'idle';
+            const analysisState = analysis ? 'ready' : errText ? 'error' : isLoadingThis ? 'loading' : 'idle';
             const startedAt = analysisStartTimesRef.current?.[c];
             const elapsed = formatElapsed(startedAt); // analysisTicker used to re-render
             const shouldRenderAnalysisState = isLoadingThis || !!analysis || !!errText;
@@ -2786,7 +1581,7 @@ export default function PolisReport({
                 style={{
                   marginBottom: '8px',
                   border: '1px dashed #ccc',
-                  padding: '6px'
+                  padding: '6px',
                 }}
               >
                 <div
@@ -2795,7 +1590,7 @@ export default function PolisReport({
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between'
+                    justifyContent: 'space-between',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -2803,13 +1598,11 @@ export default function PolisReport({
                       <circle cx={8} cy={8} r={6} fill={cColor} />
                     </svg>
                     <span style={{ marginLeft: '4px', fontWeight: 'bold' }}>
-                      Cluster {c}{nameSuffix}
+                      Cluster {c}
+                      {nameSuffix}
                     </span>
                   </div>
-                  <FontAwesomeIcon
-                    icon={clusterIsOpen ? faMinusSquare : faPlusSquare}
-                    style={{ marginRight: '8px' }}
-                  />
+                  <FontAwesomeIcon icon={clusterIsOpen ? faMinusSquare : faPlusSquare} style={{ marginRight: '8px' }} />
                 </div>
 
                 {/* NEW: AI Analysis Summary / Spinner / Error */}
@@ -2823,7 +1616,9 @@ export default function PolisReport({
                     {isLoadingThis && (
                       <div className={styles.clusterAnalysisRow}>
                         <FontAwesomeIcon icon={faSpinner} spin className={styles.analysisSpinner} />
-                        <span className={styles.elapsedTimer} aria-live="polite">{elapsed}</span>
+                        <span className={styles.elapsedTimer} aria-live="polite">
+                          {elapsed}
+                        </span>
                         <span className={styles.analysisNote}>Analyzing group...</span>
                       </div>
                     )}
@@ -2834,18 +1629,16 @@ export default function PolisReport({
                       </div>
                     )}
                     {errText && !analysis && (
-                      <div className={styles.clusterAnalysisError}>
-                        Couldn’t analyze this cluster: {errText}
-                      </div>
+                      <div className={styles.clusterAnalysisError}>Couldn’t analyze this cluster: {errText}</div>
                     )}
                   </div>
                 )}
 
-                {clusterIsOpen ? renderClusterRepresentativesFor(c) : (
+                {clusterIsOpen ? (
+                  renderClusterRepresentativesFor(c)
+                ) : (
                   <div style={{ marginLeft: '20px', marginTop: '6px' }}>
-                    <em className={styles.showWhenPdf}>
-                      Omitted
-                    </em>
+                    <em className={styles.showWhenPdf}>Omitted</em>
                   </div>
                 )}
               </div>
@@ -2866,10 +1659,7 @@ export default function PolisReport({
 
       if (!pointsToUse || !pointsToUse.length) {
         return (
-          <p
-            className={styles.hiddenInPdf}
-            style={{ fontStyle: 'italic', marginLeft: '10px', color: 'red' }}
-          >
+          <p className={styles.hiddenInPdf} style={{ fontStyle: 'italic', marginLeft: '10px', color: 'red' }}>
             (Not enough participant data to plot.)
           </p>
         );
@@ -2887,8 +1677,14 @@ export default function PolisReport({
       const w = 500;
       const h = 400;
       const pad = 40;
-      const xScale = d3Report.scaleLinear().domain([minx, maxx]).range([-(w / 2 - pad), (w / 2 - pad)]);
-      const yScale = d3Report.scaleLinear().domain([miny, maxy]).range([(h / 2 - pad), -(h / 2 - pad)]);
+      const xScale = d3Report
+        .scaleLinear()
+        .domain([minx, maxx])
+        .range([-(w / 2 - pad), w / 2 - pad]);
+      const yScale = d3Report
+        .scaleLinear()
+        .domain([miny, maxy])
+        .range([h / 2 - pad, -(h / 2 - pad)]);
 
       const hulls = buildClusterHulls(pointsToUse, activeClusterAssignments);
       const colorScale = d3Report.scaleOrdinal(d3Report.schemeCategory10);
@@ -2909,225 +1705,178 @@ export default function PolisReport({
             <g transform={`translate(${centerX}, ${centerY})`}>
               {showRadialAxes && (
                 <g>
-                  <circle
-                    strokeWidth={1}
-                    stroke="rgb(230,230,230)"
-                    fill="rgb(248,248,248)"
-                    r={Math.min(w, h) / 2.3}
-                  />
-                  <circle
-                    strokeWidth={1}
-                    stroke="rgb(230,230,230)"
-                    fill="rgb(245,245,245)"
-                    r={Math.min(w, h) / 4}
-                  />
-                  <circle
-                    strokeWidth={1}
-                    stroke="rgb(230,230,230)"
-                    fill="rgb(248,248,248)"
-                    r={Math.min(w, h) / 8}
-                  />
+                  <circle strokeWidth={1} stroke="rgb(230,230,230)" fill="rgb(248,248,248)" r={Math.min(w, h) / 2.3} />
+                  <circle strokeWidth={1} stroke="rgb(230,230,230)" fill="rgb(245,245,245)" r={Math.min(w, h) / 4} />
+                  <circle strokeWidth={1} stroke="rgb(230,230,230)" fill="rgb(248,248,248)" r={Math.min(w, h) / 8} />
                 </g>
               )}
 
               {showAxes && (
                 <g>
-                  <line
-                    x1={-(w / 2) + pad}
-                    y1={0}
-                    x2={(w / 2) - pad}
-                    y2={0}
-                    stroke="black"
-                    strokeWidth={1}
-                  />
-                  <line
-                    x1={0}
-                    y1={-(h / 2) + pad}
-                    x2={0}
-                    y2={(h / 2) - pad}
-                    stroke="black"
-                    strokeWidth={1}
-                  />
+                  <line x1={-(w / 2) + pad} y1={0} x2={w / 2 - pad} y2={0} stroke="black" strokeWidth={1} />
+                  <line x1={0} y1={-(h / 2) + pad} x2={0} y2={h / 2 - pad} stroke="black" strokeWidth={1} />
                 </g>
               )}
 
-              {showGroupOutline && hulls.map((hullObj, i) => {
-                if (!hullObj.path) return null;
-                const cColor = colorScale(hullObj.cluster); // BUGFIX: reuse existing colorScale; do not re-instantiate
-                const lineGenerator = d3Report.line();
-                const pathStr = lineGenerator(
-                    hullObj.path.map((pt) => [xScale(pt[0]), yScale(pt[1])])
-                  ) + "Z";
-                return (
-                  <path
-                    key={i}
-                    d={pathStr}
-                    fill={cColor}
-                    fillOpacity={0.1}
-                    stroke={cColor}
-                    strokeOpacity={0.7}
-                    strokeWidth={1}
-                  />
-                );
-              })}
+              {showGroupOutline &&
+                hulls.map((hullObj, i) => {
+                  if (!hullObj.path) return null;
+                  const cColor = colorScale(hullObj.cluster); // BUGFIX: reuse existing colorScale; do not re-instantiate
+                  const lineGenerator = d3Report.line();
+                  const pathStr = lineGenerator(hullObj.path.map((pt) => [xScale(pt[0]), yScale(pt[1])])) + 'Z';
+                  return (
+                    <path
+                      key={i}
+                      d={pathStr}
+                      fill={cColor}
+                      fillOpacity={0.1}
+                      stroke={cColor}
+                      strokeOpacity={0.7}
+                      strokeWidth={1}
+                    />
+                  );
+                })}
 
-              {showParticipants && pointsToUse.map((d, i) => {
-                const c = activeClusterAssignments[d.index] ?? 0;
-                const col = colorScale(c);
-                const px = xScale(d.x);
-                const py = yScale(d.y);
-                const addr = allResponders?.[d.index];
-                const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
-                const displayName = demoDisplayNames?.[addr];
-                const hasLink = isEth || !!displayName;
-                const linkHref = displayName ? `/su/${displayName}` : `/u/${addr}`;
-                const linkLabel = displayName || getShortenedAddress(addr, false);
-                const historicalAvatar = displayName
-                  ? getPolisHistoricalParticipantAvatar(displayName, addr)
-                  : '';
+              {showParticipants &&
+                pointsToUse.map((d, i) => {
+                  const c = activeClusterAssignments[d.index] ?? 0;
+                  const col = colorScale(c);
+                  const px = xScale(d.x);
+                  const py = yScale(d.y);
+                  const addr = allResponders?.[d.index];
+                  const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
+                  const displayName = demoDisplayNames?.[addr];
+                  const hasLink = isEth || !!displayName;
+                  const linkHref = displayName ? `/su/${displayName}` : `/u/${addr}`;
+                  const linkLabel = displayName || getShortenedAddress(addr, false);
+                  const historicalAvatar = displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : '';
 
-                const textShort =
-                  displayName
-                    ? (showAddresses ? displayName : null)
-                    : ((isEth && showAddresses)
+                  const textShort = displayName
+                    ? showAddresses
+                      ? displayName
+                      : null
+                    : isEth && showAddresses
                       ? getShortenedAddress(addr, false)
-                      : null);
+                      : null;
 
-                return (
-                  <g key={i}>
+                  return (
+                    <g key={i}>
+                      <circle
+                        cx={px}
+                        cy={py}
+                        r={5}
+                        fill={col}
+                        style={{ cursor: hasLink ? 'pointer' : 'default' }}
+                        onMouseEnter={() => {
+                          if (!enableTooltips) return;
+                          cancelTooltipHide();
+
+                          if (hasLink) {
+                            setHoveredContent(
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                {historicalAvatar ? (
+                                  <img
+                                    src={historicalAvatar}
+                                    alt=""
+                                    width={26}
+                                    height={26}
+                                    style={{ borderRadius: '8px', flexShrink: 0 }}
+                                  />
+                                ) : null}
+                                <div>
+                                  <a
+                                    href={linkHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ textDecoration: 'none', fontWeight: 600 }}
+                                  >
+                                    {linkLabel}
+                                  </a>
+                                  <div>Cluster {c}</div>
+                                </div>
+                              </div>,
+                            );
+                          } else {
+                            setHoveredContent(`Cluster ${c}`);
+                          }
+                        }}
+                        onMouseLeave={() => scheduleTooltipHide(450)}
+                        onClick={() => {
+                          if (hasLink) {
+                            window.open(linkHref, '_blank', 'noopener');
+                          }
+                        }}
+                      />
+                      {/* Participant index label for PDF export only */}
+                      {isPdfModeActive && (
+                        <text x={px} y={py + 3} textAnchor="middle" fontSize="8" fill="#fff" fontWeight="600">
+                          {d.index + 1}
+                        </text>
+                      )}
+                      {/* Optional text labels below points when not miniMode */}
+                      {!miniMode && textShort && (
+                        <text x={px} y={py + 14} textAnchor="middle" fontSize="9" fill="#333">
+                          {textShort}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+
+              {showComments &&
+                activeStatementCoords.map((d, i) => {
+                  const label = questionLabels[d.index] || `#${d.index + 1}`;
+                  const promptKey = allQuestions[d.index];
+                  const prompt = questionPrompts[promptKey] || '(No prompt)';
+                  const px = xScale(d.x);
+                  const py = yScale(d.y);
+                  const votesForThis = matrix[d.index] || [];
+                  const agrees = votesForThis.filter((v) => v === 1).length;
+                  const disagrees = votesForThis.filter((v) => v === -1).length;
+                  const unsures = votesForThis.filter((v) => v === 0).length;
+                  const noresps = votesForThis.filter((v) => v === null || v === undefined).length;
+
+                  const rowVotes = matrix[d.index] || [];
+                  const statementHoverContent = (
+                    <div>
+                      <div style={{ marginBottom: '6px' }}>
+                        <strong>{label}:</strong> {prompt}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', marginBottom: '6px' }}>
+                        <strong>Agree:</strong> {agrees}, <strong>Disagree:</strong> {disagrees},{' '}
+                        <strong>Unsure:</strong> {unsures}, <strong>No Resp:</strong> {noresps}
+                      </div>
+                      <PolisBoxPlot votes={rowVotes} />
+                    </div>
+                  );
+
+                  return (
                     <circle
+                      key={i}
                       cx={px}
                       cy={py}
-                      r={5}
-                      fill={col}
-                      style={{ cursor: hasLink ? 'pointer' : 'default' }}
+                      r={3}
+                      fill="#000"
                       onMouseEnter={() => {
-                        if (!enableTooltips) return;
-                        cancelTooltipHide();
-
-                        if (hasLink) {
-                          setHoveredContent(
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              {historicalAvatar ? (
-                                <img
-                                  src={historicalAvatar}
-                                  alt=""
-                                  width={26}
-                                  height={26}
-                                  style={{ borderRadius: '8px', flexShrink: 0 }}
-                                />
-                              ) : null}
-                              <div>
-                                <a
-                                  href={linkHref}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{ textDecoration: 'none', fontWeight: 600 }}
-                                >
-                                  {linkLabel}
-                                </a>
-                                <div>Cluster {c}</div>
-                              </div>
-                            </div>
-                          );
-                        } else {
-                          setHoveredContent(`Cluster ${c}`);
+                        if (enableTooltips) {
+                          cancelTooltipHide();
+                          setHoveredContent(statementHoverContent);
                         }
                       }}
                       onMouseLeave={() => scheduleTooltipHide(450)}
-                      onClick={() => {
-                        if (hasLink) {
-                          window.open(linkHref, '_blank', 'noopener');
-                        }
-                      }}
                     />
-                    {/* Participant index label for PDF export only */}
-                    {isPdfModeActive && (
-                      <text
-                        x={px}
-                        y={py + 3}
-                        textAnchor="middle"
-                        fontSize="8"
-                        fill="#fff"
-                        fontWeight="600"
-                      >
-                        {d.index + 1}
-                      </text>
-                    )}
-                    {/* Optional text labels below points when not miniMode */}
-                    {!miniMode && textShort && (
-                      <text
-                        x={px}
-                        y={py + 14}
-                        textAnchor="middle"
-                        fontSize="9"
-                        fill="#333"
-                      >
-                        {textShort}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-
-              {showComments && activeStatementCoords.map((d, i) => {
-                const label = questionLabels[d.index] || `#${d.index + 1}`;
-                const promptKey = allQuestions[d.index];
-                const prompt = questionPrompts[promptKey] || '(No prompt)';
-                const px = xScale(d.x);
-                const py = yScale(d.y);
-                const votesForThis = matrix[d.index] || [];
-                const agrees = votesForThis.filter((v) => v === 1).length;
-                const disagrees = votesForThis.filter((v) => v === -1).length;
-                const unsures = votesForThis.filter((v) => v === 0).length;
-                const noresps = votesForThis.filter((v) => v === null || v === undefined).length;
-
-                const rowVotes = matrix[d.index] || [];
-                const statementHoverContent = (
-                  <div>
-                    <div style={{ marginBottom: '6px' }}>
-                      <strong>{label}:</strong> {prompt}
-                    </div>
-                    <div style={{ fontSize: '0.85rem', marginBottom: '6px' }}>
-                      <strong>Agree:</strong> {agrees},{' '}
-                      <strong>Disagree:</strong> {disagrees},{' '}
-                      <strong>Unsure:</strong> {unsures},{' '}
-                      <strong>No Resp:</strong> {noresps}
-                    </div>
-                    <PolisBoxPlot votes={rowVotes} />
-                  </div>
-                );
-
-                return (
-                  <circle
-                    key={i}
-                    cx={px}
-                    cy={py}
-                    r={3}
-                    fill="#000"
-                    onMouseEnter={() => {
-                      if (enableTooltips) {
-                        cancelTooltipHide();
-                        setHoveredContent(statementHoverContent);
-                      }
-                    }}
-                    onMouseLeave={() => scheduleTooltipHide(450)}
-                  />
-                );
-              })}
+                  );
+                })}
             </g>
           </svg>
         </div>
       );
     } catch (err: unknown) {
       return (
-        <p style={{ color: 'red', marginLeft: '10px' }}>
-          Error rendering participant graph: {getErrorMessage(err)}
-        </p>
+        <p style={{ color: 'red', marginLeft: '10px' }}>Error rendering participant graph: {getErrorMessage(err)}</p>
       );
     }
   }
-
 
   /***************************************************************
    * renderCommentSwarm (UPDATED to show numbers in PDF mode)
@@ -3137,10 +1886,7 @@ export default function PolisReport({
       const matrix = ratingMatrix;
       if (!matrix || !matrix.length) {
         return (
-          <p
-            className={styles.hiddenInPdf}
-            style={{ fontStyle: 'italic', marginLeft: '10px' }}
-          >
+          <p className={styles.hiddenInPdf} style={{ fontStyle: 'italic', marginLeft: '10px' }}>
             (No question data for beeswarm)
           </p>
         );
@@ -3156,16 +1902,13 @@ export default function PolisReport({
           extremity: item.extremity,
           agrees: item.agrees,
           disagrees: item.disagrees,
-          total: item.total
+          total: item.total,
         };
       });
 
       if (!points.length) {
         return (
-          <p
-            className={styles.hiddenInPdf}
-            style={{ fontStyle: 'italic', marginLeft: '10px' }}
-          >
+          <p className={styles.hiddenInPdf} style={{ fontStyle: 'italic', marginLeft: '10px' }}>
             (No valid report comment data)
           </p>
         );
@@ -3179,11 +1922,7 @@ export default function PolisReport({
         // UPDATED: Added outer layout container for scroll buttons
         <div className={styles.swarmLayoutContainer}>
           <div className={styles.swarmContainer} ref={swarmContainerRef}>
-            <svg
-              width={w}
-              height={h}
-              className={styles.beeswarmSvg}
-            >
+            <svg width={w} height={h} className={styles.beeswarmSvg}>
               <line x1={0} y1={h - 10} x2={w} y2={h - 10} stroke="black" />
               <text x={0} y={h - 15} fontSize="14" fill="black">
                 Consensus
@@ -3208,18 +1947,14 @@ export default function PolisReport({
                       {label}: {prompt}
                     </div>
                     <div style={{ fontSize: '0.85rem', marginBottom: '6px' }}>
-                      <strong>Agree:</strong> {agrees},{' '}
-                      <strong>Disagree:</strong> {disagrees},{' '}
-                      <strong>Unsure:</strong> {unsures}
+                      <strong>Agree:</strong> {agrees}, <strong>Disagree:</strong> {disagrees}, <strong>Unsure:</strong>{' '}
+                      {unsures}
                     </div>
                     <PolisBoxPlot votes={rowVotes} />
                   </div>
                 );
 
-                const circleClass =
-                  hoveredCircleIndex === i
-                    ? styles.beeswarmCircleHover
-                    : styles.beeswarmCircle;
+                const circleClass = hoveredCircleIndex === i ? styles.beeswarmCircleHover : styles.beeswarmCircle;
 
                 return (
                   <g key={i}>
@@ -3243,14 +1978,7 @@ export default function PolisReport({
                       }}
                     />
                     {isPdfModeActive && (
-                      <text
-                        x={d.x}
-                        y={d.y + 3}
-                        textAnchor="middle"
-                        fontSize="8"
-                        fill="#fff"
-                        fontWeight="600"
-                      >
+                      <text x={d.x} y={d.y + 3} textAnchor="middle" fontSize="8" fill="#fff" fontWeight="600">
                         {i + 1}
                       </text>
                     )}
@@ -3261,18 +1989,10 @@ export default function PolisReport({
           </div>
           {isSwarmScrollable && (
             <div className={styles.swarmScrollControls}>
-              <button
-                className={styles.scrollButton}
-                onClick={() => handleSwarmScroll('left')}
-                title="Scroll to Start"
-              >
+              <button className={styles.scrollButton} onClick={() => handleSwarmScroll('left')} title="Scroll to Start">
                 <FontAwesomeIcon icon={faChevronLeft} />
               </button>
-              <button
-                className={styles.scrollButton}
-                onClick={() => handleSwarmScroll('right')}
-                title="Scroll to End"
-              >
+              <button className={styles.scrollButton} onClick={() => handleSwarmScroll('right')} title="Scroll to End">
                 <FontAwesomeIcon icon={faChevronRight} />
               </button>
             </div>
@@ -3280,11 +2000,7 @@ export default function PolisReport({
         </div>
       );
     } catch (err: unknown) {
-      return (
-        <p style={{ color: 'red', marginLeft: '10px' }}>
-          Error rendering Bee Swarm: {getErrorMessage(err)}
-        </p>
-      );
+      return <p style={{ color: 'red', marginLeft: '10px' }}>Error rendering Bee Swarm: {getErrorMessage(err)}</p>;
     }
   }
 
@@ -3297,90 +2013,113 @@ export default function PolisReport({
     }
 
     if (!filterState || typeof filterState !== 'object') {
-        return <span>None</span>;
+      return <span>None</span>;
     }
 
-    const {
-        sbtFilter,
-        onlyVerifiedHumans,
-        questionTypes,
-        selectedTags,
-        topQuestions
-    } = filterState;
+    const { sbtFilter, onlyVerifiedHumans, questionTypes, selectedTags, topQuestions } = filterState;
 
     const activeFilterElements: React.ReactNode[] = [];
 
     // 1. Verified Humans
     if (onlyVerifiedHumans) {
-        activeFilterElements.push(
-            <div key="verified"><strong>Only Verified Humans</strong></div>
-        );
+      activeFilterElements.push(
+        <div key="verified">
+          <strong>Only Verified Humans</strong>
+        </div>,
+      );
     }
 
     // 2. Top Questions
     if (topQuestions && topQuestions.count) {
-        const topQuestionCount = String(topQuestions.count);
-        const byText =
-          topQuestions.by === 'responses'
-            ? '# of responses'
-            : (topQuestions.by === 'conviction' ? 'conviction' : 'importance');
-        activeFilterElements.push(
-            <div key="top-questions">
-                <strong>Showing:</strong> Top {topQuestionCount} by {byText}
-            </div>
-        );
+      const topQuestionCount = String(topQuestions.count);
+      const byText =
+        topQuestions.by === 'responses'
+          ? '# of responses'
+          : topQuestions.by === 'conviction'
+            ? 'conviction'
+            : 'importance';
+      activeFilterElements.push(
+        <div key="top-questions">
+          <strong>Showing:</strong> Top {topQuestionCount} by {byText}
+        </div>,
+      );
     }
 
     // 3. Question Types
     if (questionTypes && questionTypes.length > 0) {
-        activeFilterElements.push(
-            <div key="q-types">
-                <strong>Types:</strong> {questionTypes.join(', ')}
-            </div>
-        );
+      activeFilterElements.push(
+        <div key="q-types">
+          <strong>Types:</strong> {questionTypes.join(', ')}
+        </div>,
+      );
     }
 
     // 4. Selected Tags
     if (selectedTags && selectedTags.length > 0) {
-        activeFilterElements.push(
-            <div key="tags">
-                <strong>Tags:</strong> {selectedTags.map((t) => `#${t}`).join(', ')}
-            </div>
-        );
+      activeFilterElements.push(
+        <div key="tags">
+          <strong>Tags:</strong> {selectedTags.map((t) => `#${t}`).join(', ')}
+        </div>,
+      );
     }
 
     // 5. SBT Filters
-    const renderSBTList = (sbtArr: PolisSbtSelection[]) => sbtArr.map((sbt) => sbt.name || `${sbt.address.slice(0, 6)}...`).join(', ');
+    const renderSBTList = (sbtArr: PolisSbtSelection[]) =>
+      sbtArr.map((sbt) => sbt.name || `${sbt.address.slice(0, 6)}...`).join(', ');
 
     if (sbtFilter) {
-        if (sbtFilter.selectedSBTGroupsCreator?.length) {
-            activeFilterElements.push(<div key="sbt-c-in"><strong>Creator Include:</strong> {renderSBTList(sbtFilter.selectedSBTGroupsCreator)}</div>);
-        }
-        if (sbtFilter.excludedSBTGroupsCreator?.length) {
-            activeFilterElements.push(<div key="sbt-c-ex"><strong>Creator Exclude:</strong> {renderSBTList(sbtFilter.excludedSBTGroupsCreator)}</div>);
-        }
-        if (sbtFilter.selectedSBTGroupsResponder?.length) {
-            activeFilterElements.push(<div key="sbt-r-in"><strong>Responder Include:</strong> {renderSBTList(sbtFilter.selectedSBTGroupsResponder)}</div>);
-        }
-        if (sbtFilter.excludedSBTGroupsResponder?.length) {
-            activeFilterElements.push(<div key="sbt-r-ex"><strong>Responder Exclude:</strong> {renderSBTList(sbtFilter.excludedSBTGroupsResponder)}</div>);
-        }
-        // Handle single-role 'addresses' mode from older filter structures for compatibility
-        if (sbtFilter.selectedSBTGroups?.length) {
-            activeFilterElements.push(<div key="sbt-a-in"><strong>Include:</strong> {renderSBTList(sbtFilter.selectedSBTGroups)}</div>);
-        }
-        if (sbtFilter.excludedSBTGroups?.length) {
-            activeFilterElements.push(<div key="sbt-a-ex"><strong>Exclude:</strong> {renderSBTList(sbtFilter.excludedSBTGroups)}</div>);
-        }
+      if (sbtFilter.selectedSBTGroupsCreator?.length) {
+        activeFilterElements.push(
+          <div key="sbt-c-in">
+            <strong>Creator Include:</strong> {renderSBTList(sbtFilter.selectedSBTGroupsCreator)}
+          </div>,
+        );
+      }
+      if (sbtFilter.excludedSBTGroupsCreator?.length) {
+        activeFilterElements.push(
+          <div key="sbt-c-ex">
+            <strong>Creator Exclude:</strong> {renderSBTList(sbtFilter.excludedSBTGroupsCreator)}
+          </div>,
+        );
+      }
+      if (sbtFilter.selectedSBTGroupsResponder?.length) {
+        activeFilterElements.push(
+          <div key="sbt-r-in">
+            <strong>Responder Include:</strong> {renderSBTList(sbtFilter.selectedSBTGroupsResponder)}
+          </div>,
+        );
+      }
+      if (sbtFilter.excludedSBTGroupsResponder?.length) {
+        activeFilterElements.push(
+          <div key="sbt-r-ex">
+            <strong>Responder Exclude:</strong> {renderSBTList(sbtFilter.excludedSBTGroupsResponder)}
+          </div>,
+        );
+      }
+      // Handle single-role 'addresses' mode from older filter structures for compatibility
+      if (sbtFilter.selectedSBTGroups?.length) {
+        activeFilterElements.push(
+          <div key="sbt-a-in">
+            <strong>Include:</strong> {renderSBTList(sbtFilter.selectedSBTGroups)}
+          </div>,
+        );
+      }
+      if (sbtFilter.excludedSBTGroups?.length) {
+        activeFilterElements.push(
+          <div key="sbt-a-ex">
+            <strong>Exclude:</strong> {renderSBTList(sbtFilter.excludedSBTGroups)}
+          </div>,
+        );
+      }
     }
 
     // Handle the old `sbtFilterString` for basic backward compatibility if `filterState` is simple
     if (activeFilterElements.length === 0 && sbtFilterString) {
-        return <span>{sbtFilterString}</span>;
+      return <span>{sbtFilterString}</span>;
     }
 
     if (activeFilterElements.length === 0) {
-        return <span>None</span>;
+      return <span>None</span>;
     }
 
     return <div className={styles.filterList}>{activeFilterElements}</div>;
@@ -3393,34 +2132,28 @@ export default function PolisReport({
   const hasRenderableReport = !!stats;
   const isModernStyle = reportStyle === 'modern';
   const isDarkStyle = reportStyle === 'dark';
-  const sessionInfoText = typeof resolvedSessionInfo === 'string'
-    ? resolvedSessionInfo
-    : JSON.stringify(resolvedSessionInfo) || '';
+  const sessionInfoText =
+    typeof resolvedSessionInfo === 'string' ? resolvedSessionInfo : JSON.stringify(resolvedSessionInfo) || '';
   const hydrateDiscovered = Math.max(0, Number(scopedQuestionScanProgress?.discoveredQuestions || 0));
   const hydrateDone = Math.max(0, Number(scopedQuestionScanProgress?.hydratedQuestions || 0));
   const isHydratingLoading = scopedQuestionScanProgress?.phase === 'hydrate';
   const hasHydrateProgressDetails = isHydratingLoading && hydrateDiscovered > 0;
-  const hasCompletedScopedBlockScan = scopedQuestionScanProgress?.phase === 'scan'
-    && loadingScanProgress.requestedTotalBlocks > 0
-    && loadingScanProgress.remainingBlocks === 0
-    && loadingScanProgress.percentComplete >= 100;
-  const isRefreshing = !effectiveUseDemoData
-    && !hasCompletedScopedBlockScan
-    && (!isQuestionCacheReady || !isResponsesCacheReady);
+  const hasCompletedScopedBlockScan =
+    scopedQuestionScanProgress?.phase === 'scan' &&
+    loadingScanProgress.requestedTotalBlocks > 0 &&
+    loadingScanProgress.remainingBlocks === 0 &&
+    loadingScanProgress.percentComplete >= 100;
+  const isRefreshing =
+    !effectiveUseDemoData && !hasCompletedScopedBlockScan && (!isQuestionCacheReady || !isResponsesCacheReady);
   const isLoading = isRefreshing && !hasRenderableReport;
-  const showLoadingProgress = isLoading && (
-    loadingScanProgress.requestedTotalBlocks > 0 ||
-    isHydratingLoading
-  );
+  const showLoadingProgress = isLoading && (loadingScanProgress.requestedTotalBlocks > 0 || isHydratingLoading);
   const showLoadingProgressDetails = !isHydratingLoading || hasHydrateProgressDetails;
   const loadingProgressPercent = isHydratingLoading
-    ? (hydrateDiscovered > 0
+    ? hydrateDiscovered > 0
       ? Math.round((Math.min(hydrateDone, hydrateDiscovered) / hydrateDiscovered) * 100)
-      : 0)
+      : 0
     : loadingScanProgress.percentComplete;
-  const loadingProgressStatusText = isHydratingLoading
-    ? 'Loading report data'
-    : 'Scanning session blocks';
+  const loadingProgressStatusText = isHydratingLoading ? 'Loading report data' : 'Scanning session blocks';
   const loadingProgressLeftText = isHydratingLoading
     ? `${Math.max(0, hydrateDiscovered - Math.min(hydrateDone, hydrateDiscovered))} items left`
     : loadingScanProgress.metaLeftText;
@@ -3439,7 +2172,9 @@ export default function PolisReport({
       onMouseMove={handleContainerMouseMove}
     >
       {/* The gear icon to toggle top settings row */}
-      <div style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px' }}>
+      <div
+        style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px' }}
+      >
         {isRefreshing && hasRenderableReport && (
           <div
             aria-label="Refreshing report"
@@ -3483,7 +2218,7 @@ export default function PolisReport({
               style={{
                 padding: '6px 12px',
                 cursor: 'pointer',
-                marginRight: '4px'
+                marginRight: '4px',
               }}
               onMouseEnter={() => {
                 if (enableTooltips) {
@@ -3526,11 +2261,7 @@ export default function PolisReport({
           </div>
 
           <div style={{ marginRight: '12px' }}>
-            <label
-              className={styles.demoToggleLabel}
-              htmlFor="report-style-select"
-              style={{ marginRight: '6px' }}
-            >
+            <label className={styles.demoToggleLabel} htmlFor="report-style-select" style={{ marginRight: '6px' }}>
               Report style:
             </label>
             <select
@@ -3552,8 +2283,6 @@ export default function PolisReport({
             <button onClick={handleExpandAll} style={{ marginRight: '8px' }}>
               Expand All
             </button>
-
-
           </div>
         </div>
       )}
@@ -3563,7 +2292,6 @@ export default function PolisReport({
         ref={reportRef}
         className={`${styles.reportInner} ${isModernStyle ? styles.reportInnerModern : ''} ${isDarkStyle ? styles.reportInnerDark : ''}`}
       >
-
         {/* --- ORGANIZATION BRANDING SECTION --- */}
         <div className={styles.brandingHeader}>
           {/* {sessionHeader && (
@@ -3578,11 +2306,7 @@ export default function PolisReport({
               {resolvedSessionName} - Context Engine Report
             </h3>
           )} */}
-          {!!resolvedSessionInfo && (
-             <p className={styles.sessionInfo}>
-               {sessionInfoText}
-             </p>
-           )}
+          {!!resolvedSessionInfo && <p className={styles.sessionInfo}>{sessionInfoText}</p>}
         </div>
         {/* --- END ORGANIZATION BRANDING SECTION --- */}
 
@@ -3603,16 +2327,13 @@ export default function PolisReport({
 
         {disclaimersActive && (
           <div className={styles.disclaimerBox}>
-            <strong>Note:</strong> Only non-encrypted, binary
-            (Agree/Disagree/Unsure) responses have been considered in
+            <strong>Note:</strong> Only non-encrypted, binary (Agree/Disagree/Unsure) responses have been considered in
             this Polis-inspired report.
           </div>
         )}
 
         {errorMessage && (
-          <div style={{ color: 'red', marginBottom: '10px', fontWeight: 'bold' }}>
-            Error: {errorMessage}
-          </div>
+          <div style={{ color: 'red', marginBottom: '10px', fontWeight: 'bold' }}>Error: {errorMessage}</div>
         )}
 
         {isLoading ? (
@@ -3642,10 +2363,7 @@ export default function PolisReport({
                       aria-valuenow={loadingProgressPercent}
                       data-testid={E2E_TESTIDS.POLIS_REPORT_LOADING_PROGRESS}
                     >
-                      <div
-                        className={styles.loadingProgressFill}
-                        style={{ width: `${loadingProgressPercent}%` }}
-                      />
+                      <div className={styles.loadingProgressFill} style={{ width: `${loadingProgressPercent}%` }} />
                     </div>
                   </>
                 )}
@@ -3653,9 +2371,7 @@ export default function PolisReport({
             )}
           </div>
         ) : !stats ? (
-          <p className={styles.noData}>
-            No non-encrypted binary responses found, or no Demo data loaded.
-          </p>
+          <p className={styles.noData}>No non-encrypted binary responses found, or no Demo data loaded.</p>
         ) : (
           <>
             <div className={styles.sectionCollapse}>
@@ -3684,15 +2400,16 @@ export default function PolisReport({
                       <div className={styles.statsItem}>
                         <span className={styles.statLabel}>
                           Participants
-                          {renderTooltipReference('Participants who voted or wrote statements in the conversation.')}
-                          :
+                          {renderTooltipReference('Participants who voted or wrote statements in the conversation.')}:
                         </span>
                         <span className={styles.statValue}>{stats.nParticipants}</span>
                       </div>
                       <div className={styles.statsItem}>
                         <span className={styles.statLabel}>
                           Statements
-                          {renderTooltipReference('Number of statements (questions) with a binary vote option available.')}
+                          {renderTooltipReference(
+                            'Number of statements (questions) with a binary vote option available.',
+                          )}
                           :
                         </span>
                         <span className={styles.statValue}>{stats.nComments}</span>
@@ -3700,7 +2417,9 @@ export default function PolisReport({
                       <div className={styles.statsItem}>
                         <span className={styles.statLabel}>
                           Votes
-                          {renderTooltipReference('Total agree or disagree clicks recorded across all statements by participants.')}
+                          {renderTooltipReference(
+                            'Total agree or disagree clicks recorded across all statements by participants.',
+                          )}
                           :
                         </span>
                         <span className={styles.statValue}>{stats.totalVotes}</span>
@@ -3708,24 +2427,18 @@ export default function PolisReport({
                       <div className={styles.statsItem}>
                         <span className={styles.statLabel}>
                           Votes/Voter Avg
-                          {renderTooltipReference('The average number of vote actions each participant made.')}
-                          :
+                          {renderTooltipReference('The average number of vote actions each participant made.')}:
                         </span>
-                        <span className={styles.statValue}>
-                          {stats.votesPerVoterAvg.toFixed(2)}
-                        </span>
+                        <span className={styles.statValue}>{stats.votesPerVoterAvg.toFixed(2)}</span>
                       </div>
                     </div>
                     <div className={styles.statsRow}>
                       <div className={styles.statsItem}>
                         <span className={styles.statLabel}>
                           Active Filters
-                          {renderTooltipReference('Summary of all active filters applied to this data.')}
-                          :
+                          {renderTooltipReference('Summary of all active filters applied to this data.')}:
                         </span>
-                        <div className={styles.statValue}>
-                          {renderActiveFilters()}
-                        </div>
+                        <div className={styles.statValue}>{renderActiveFilters()}</div>
                       </div>
                     </div>
 
@@ -3733,7 +2446,9 @@ export default function PolisReport({
                     <div className={styles.statsRow}>
                       <div className={styles.statsItem}>
                         <span className={styles.statLabel}>Blockchain:</span>
-                        <span className={styles.statValue}>{formatBlockchainNetworkLabel(network, networkChainId)}</span>
+                        <span className={styles.statValue}>
+                          {formatBlockchainNetworkLabel(network, networkChainId)}
+                        </span>
                       </div>
                       {/* <div className={styles.statsItem}>
                         <span className={styles.statLabel}>Last Block:</span>
@@ -3769,11 +2484,7 @@ export default function PolisReport({
                   )}
                 </div>
               </div>
-              {beeswarmOpen ? (
-                <div className={styles.graphSection}>
-                  {renderCommentSwarm()}
-                </div>
-              ) : null}
+              {beeswarmOpen ? <div className={styles.graphSection}>{renderCommentSwarm()}</div> : null}
             </div>
 
             {/* PARTICIPANTS + STATEMENTS GRAPH */}
@@ -3784,7 +2495,10 @@ export default function PolisReport({
                 onClick={() => setParticipantsGraphOpen(!participantsGraphOpen)}
               >
                 <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
-                  <FontAwesomeIcon icon={participantsGraphOpen ? faCaretUp : faCaretDown} style={{ marginRight: '6px' }} />
+                  <FontAwesomeIcon
+                    icon={participantsGraphOpen ? faCaretUp : faCaretDown}
+                    style={{ marginRight: '6px' }}
+                  />
                   Participants Graph
                   {renderTooltipReference(PARTICIPANTS_GRAPH_TOOLTIP_TEXT, {
                     ariaLabel: 'Participants graph view details',
@@ -3810,7 +2524,9 @@ export default function PolisReport({
                       <select
                         id="embedding-choice-select"
                         value={embeddingChoice}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleEmbeddingChoiceChange(e.target.value as EmbeddingChoice)}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                          handleEmbeddingChoiceChange(e.target.value as EmbeddingChoice)
+                        }
                         style={{ padding: '4px' }}
                       >
                         <option value="UMAP">UMAP</option>
@@ -3836,7 +2552,9 @@ export default function PolisReport({
                           id="cluster-count-input"
                           type="number"
                           value={manualClusterCount === '' ? String(activeClusterCount || 0) : manualClusterCount}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleManualClusterCountChange(e.target.value)}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            handleManualClusterCountChange(e.target.value)
+                          }
                           onBlur={handleManualClusterCountBlur}
                           className={styles.clusterNumberInput}
                           min="2"
@@ -3848,11 +2566,7 @@ export default function PolisReport({
                         >
                           +
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setManualClusterCount('')}
-                          style={{ marginLeft: '6px' }}
-                        >
+                        <button type="button" onClick={() => setManualClusterCount('')} style={{ marginLeft: '6px' }}>
                           Auto
                         </button>
                       </div>
@@ -3932,42 +2646,37 @@ export default function PolisReport({
                     </div>
                   </div>
 
-                  <div className={styles.graphSection}>
-                    {renderParticipantGraph()}
-                  </div>
+                  <div className={styles.graphSection}>{renderParticipantGraph()}</div>
 
                   <div className={styles.pdfIgnore}>
                     <button onClick={handleCollapseAllClusters} style={{ marginRight: '10px' }}>
                       Collapse Clusters
                     </button>
-                    <button onClick={handleExpandAllClusters}>
-                      Expand Clusters
+                    <button onClick={handleExpandAllClusters}>Expand Clusters</button>
+                    {/* NEW: Analyze clusters button */}
+                    <button
+                      className={styles.analyzeClustersBtn}
+                      onClick={handleAnalyzeClustersClick}
+                      disabled={!!analysisLoadingKey}
+                      data-testid={E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS}
+                      title="Use AI to summarize each cluster’s unique viewpoint"
+                      style={{ marginLeft: '10px' }}
+                    >
+                      {analysisLoadingKey ? (
+                        <>
+                          <FontAwesomeIcon icon={faSpinner} spin className={styles.analysisSpinner} />
+                          <span>Analyzing…</span>
+                        </>
+                      ) : (
+                        <>
+                          <FontAwesomeIcon icon={faWand} />
+                          <span>Analyze clusters</span>
+                        </>
+                      )}
                     </button>
-                                {/* NEW: Analyze clusters button */}
-            <button
-              className={styles.analyzeClustersBtn}
-              onClick={handleAnalyzeClustersClick}
-              disabled={!!analysisLoadingKey}
-              data-testid={E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS}
-              title="Use AI to summarize each cluster’s unique viewpoint"
-              style={{ marginLeft: '10px' }}
-            >
-              {analysisLoadingKey ? (
-                <>
-                  <FontAwesomeIcon icon={faSpinner} spin className={styles.analysisSpinner} />
-                  <span>Analyzing…</span>
-                </>
-              ) : (
-                <>
-                  <FontAwesomeIcon icon={faWand} />
-                  <span>Analyze clusters</span>
-                </>
-              )}
-            </button>
                   </div>
 
                   {renderClusterLegend()}
-
                 </>
               ) : (
                 <div style={{ width: '900px', height: '1px', opacity: 0, pointerEvents: 'none' }} />
@@ -3994,11 +2703,7 @@ export default function PolisReport({
                   )}
                 </div>
               </div>
-              {allQuestionsOpen ? (
-                <>
-                  {buildQuestionList()}
-                </>
-              ) : null}
+              {allQuestionsOpen ? <>{buildQuestionList()}</> : null}
             </div>
 
             {/* LIST OF PARTICIPANTS (NEW) – Appears directly BELOW "All Questions" */}
@@ -4009,7 +2714,10 @@ export default function PolisReport({
                 onClick={() => setParticipantsListOpen(!participantsListOpen)}
               >
                 <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
-                  <FontAwesomeIcon icon={participantsListOpen ? faCaretUp : faCaretDown} style={{ marginRight: '6px' }} />
+                  <FontAwesomeIcon
+                    icon={participantsListOpen ? faCaretUp : faCaretDown}
+                    style={{ marginRight: '6px' }}
+                  />
                   List of Participants
                 </h5>
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
@@ -4029,9 +2737,7 @@ export default function PolisReport({
                 <h5 className={styles.footnotesHeading}>Footnotes</h5>
                 <ol className={styles.footnotesList}>
                   {footnoteTexts.map((text, index) => (
-                    <li key={`polis-footnote-${index + 1}`}>
-                      {text}
-                    </li>
+                    <li key={`polis-footnote-${index + 1}`}>{text}</li>
                   ))}
                 </ol>
               </div>
@@ -4067,7 +2773,7 @@ export default function PolisReport({
           role="tooltip"
           style={{
             left: tooltipPos.x,
-            top: tooltipPos.y
+            top: tooltipPos.y,
           }}
           onMouseEnter={cancelTooltipHide}
           onMouseLeave={() => scheduleTooltipHide(450)}
@@ -4078,5 +2784,3 @@ export default function PolisReport({
     </div>
   );
 }
-
-export { PolisBoxPlot, PolisQuestionHoverCard };

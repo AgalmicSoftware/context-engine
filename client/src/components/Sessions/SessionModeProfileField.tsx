@@ -23,6 +23,8 @@ type SessionModeProfileFieldProps = {
   value?: unknown;
   onChange: (profile: SessionModeProfile, compiled: { storageProfile: AnyRecord }) => void;
   onContinue?: () => void;
+  entryOnly?: boolean;
+  showContinue?: boolean;
 };
 
 const PRESET_CARDS = [
@@ -31,25 +33,14 @@ const PRESET_CARDS = [
     title: 'Fast & Cheap (Cloudflare)',
     badge: 'Recommended',
     copy: 'Hosted on Cloudflare. Session-scoped by default. Not permanent. Can be publicly anchored later.',
-    keys: [
-      'Cloudflare API token',
-      'AI provider key',
-      'Arweave JWK',
-      'RPC URL/key',
-      'Lit key only for Lit encryption',
-    ],
+    keys: ['Cloudflare API token', 'AI provider key', 'Arweave JWK', 'RPC URL/key', 'Lit key only for Lit encryption'],
   },
   {
     id: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
     title: 'Trustless & Public (Decentralized)',
     badge: '',
     copy: 'Published publicly and permanently unless you enable encryption. Slower and more expensive to set up.',
-    keys: [
-      'Arweave wallet/JWK',
-      'RPC URL/key',
-      'AI provider key',
-      'Lit API key if encryption is enabled',
-    ],
+    keys: ['Arweave wallet/JWK', 'RPC URL/key', 'AI provider key', 'Lit API key if encryption is enabled'],
   },
 ] as const;
 
@@ -77,19 +68,16 @@ const SURFACE_LABELS: Array<{ value: SessionModeSurface; label: string; rendered
   { value: 'ceCc', label: 'CE-CC', rendered: false },
 ];
 
-const isProfile = (value: unknown): value is SessionModeProfile => (
+const isProfile = (value: unknown): value is SessionModeProfile =>
   !!value &&
   typeof value === 'object' &&
   !Array.isArray(value) &&
-  (value as { profileVersion?: unknown }).profileVersion === 1
-);
+  (value as { profileVersion?: unknown }).profileVersion === 1;
 
-const cloneProfile = (profile: SessionModeProfile): SessionModeProfile => (
-  JSON.parse(JSON.stringify(profile))
-);
+const cloneProfile = (profile: SessionModeProfile): SessionModeProfile => JSON.parse(JSON.stringify(profile));
 
 const presetForChain = (
-  presetId: Exclude<typeof SESSION_MODE_PRESET_IDS[keyof typeof SESSION_MODE_PRESET_IDS], 'custom'>,
+  presetId: Exclude<(typeof SESSION_MODE_PRESET_IDS)[keyof typeof SESSION_MODE_PRESET_IDS], 'custom'>,
   registryChainId: number | null,
 ): SessionModeProfile => {
   const profile = cloneSessionModePreset(presetId);
@@ -99,29 +87,16 @@ const presetForChain = (
   return profile;
 };
 
-const profilesDiffer = (left: SessionModeProfile, right: SessionModeProfile): boolean => (
-  JSON.stringify(left) !== JSON.stringify(right)
-);
+const profilesDiffer = (left: SessionModeProfile, right: SessionModeProfile): boolean =>
+  JSON.stringify(left) !== JSON.stringify(right);
 
-const cloneAccessConditions = (
-  value?: SessionModeAccessConditionDocument
-): SessionModeAccessConditionDocument => (
-  value
-    ? JSON.parse(JSON.stringify(value))
-    : { match: 'any', conditions: [] }
-);
+const cloneAccessConditions = (value?: SessionModeAccessConditionDocument): SessionModeAccessConditionDocument =>
+  value ? JSON.parse(JSON.stringify(value)) : { match: 'any', conditions: [] };
 
-const defaultSbtChainId = (
-  profile: SessionModeProfile,
-  registryChainId: number | null
-): number => (
-  Number(profile.evm.registryChainId || registryChainId || 11155420) || 11155420
-);
+const defaultSbtChainId = (profile: SessionModeProfile, registryChainId: number | null): number =>
+  Number(profile.evm.registryChainId || registryChainId || 11155420) || 11155420;
 
-const setWorkerEnvelopeCondition = (
-  profile: SessionModeProfile,
-  conditions: SessionModeAccessConditionDocument
-) => {
+const setWorkerEnvelopeCondition = (profile: SessionModeProfile, conditions: SessionModeAccessConditionDocument) => {
   profile.encryption = {
     ...profile.encryption,
     accessConditions: conditions.conditions.length ? conditions : undefined,
@@ -133,15 +108,15 @@ const SessionModeProfileField = ({
   value = null,
   onChange,
   onContinue,
+  entryOnly = false,
+  showContinue = true,
 }: SessionModeProfileFieldProps): React.ReactElement => {
   const profile = isProfile(value) ? value : null;
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const selectedPreset = profile?.preset && profile.preset !== SESSION_MODE_PRESET_IDS.CUSTOM
-    ? profile.preset
-    : '';
+  const selectedPreset = profile?.preset && profile.preset !== SESSION_MODE_PRESET_IDS.CUSTOM ? profile.preset : '';
   const validation = useMemo(
     () => (profile ? validateSessionModeProfile(profile) : { valid: false, issues: [] }),
-    [profile]
+    [profile],
   );
 
   const commitProfile = (nextProfile: SessionModeProfile) => {
@@ -149,7 +124,9 @@ const SessionModeProfileField = ({
     onChange(nextProfile, { storageProfile: compiled.storageProfile });
   };
 
-  const selectPreset = (presetId: Exclude<typeof SESSION_MODE_PRESET_IDS[keyof typeof SESSION_MODE_PRESET_IDS], 'custom'>) => {
+  const selectPreset = (
+    presetId: Exclude<(typeof SESSION_MODE_PRESET_IDS)[keyof typeof SESSION_MODE_PRESET_IDS], 'custom'>,
+  ) => {
     const nextProfile = presetForChain(presetId, registryChainId || null);
     if (
       profile &&
@@ -164,7 +141,9 @@ const SessionModeProfileField = ({
   };
 
   const updateProfile = (mutate: (draft: SessionModeProfile) => void) => {
-    const base = profile ? cloneProfile(profile) : presetForChain(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE, registryChainId || null);
+    const base = profile
+      ? cloneProfile(profile)
+      : presetForChain(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE, registryChainId || null);
     base.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     mutate(base);
     base.surfaces.web = true;
@@ -174,9 +153,10 @@ const SessionModeProfileField = ({
   const selectedSurfaceFilter = new Set(profile?.export.surfaceFilter || []);
   const hasRegistryChain = !!(profile?.evm.registryChainId || registryChainId);
   const litDisabledReason = hasRegistryChain ? '' : 'Choose a registry chain before enabling Lit.';
-  const workerEnvelopeDisabledReason = profile?.storage.backend === 'cloudflare'
-    ? ''
-    : 'Worker envelope encryption is available only with Cloudflare storage. Use Lit for encrypted Arweave artifacts.';
+  const workerEnvelopeDisabledReason =
+    profile?.storage.backend === 'cloudflare'
+      ? ''
+      : 'Worker envelope encryption is available only with Cloudflare storage. Use Lit for encrypted Arweave artifacts.';
 
   return (
     <section className={styles.modeProfilePanel} aria-label="Session mode">
@@ -187,15 +167,17 @@ const SessionModeProfileField = ({
             <span className={styles.modeProfileChip}>Custom</span>
           ) : null}
         </div>
-        <Button
-          type="button"
-          color="primary"
-          disabled={!profile}
-          data-testid="ce-new-preset-continue"
-          onClick={onContinue}
-        >
-          Continue
-        </Button>
+        {showContinue ? (
+          <Button
+            type="button"
+            color="primary"
+            disabled={!profile}
+            data-testid="ce-new-preset-continue"
+            onClick={onContinue}
+          >
+            Continue
+          </Button>
+        ) : null}
       </div>
 
       <div className={styles.modePresetGrid} role="radiogroup" aria-label="Session mode presets">
@@ -232,17 +214,18 @@ const SessionModeProfileField = ({
         })}
       </div>
 
-      <button
-        type="button"
-        className={styles.moreOptionsToggle}
-        onClick={() => setAdvancedOpen((prev) => !prev)}
-        aria-expanded={advancedOpen}
-      >
-        Advanced options{' '}
-        <FontAwesomeIcon icon={advancedOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 6 }} />
-      </button>
+      {!entryOnly ? (
+        <button
+          type="button"
+          className={styles.moreOptionsToggle}
+          onClick={() => setAdvancedOpen((prev) => !prev)}
+          aria-expanded={advancedOpen}
+        >
+          Advanced options <FontAwesomeIcon icon={advancedOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 6 }} />
+        </button>
+      ) : null}
 
-      {advancedOpen ? (
+      {!entryOnly && advancedOpen ? (
         <div className={styles.modeAdvancedGrid}>
           {!profile ? (
             <div className={styles.helperText}>Choose a preset before editing per-axis options.</div>
@@ -256,24 +239,26 @@ const SessionModeProfileField = ({
                     { value: 'arweave', label: 'Arweave' },
                   ]}
                   value={profile.storage.backend}
-                  onChange={(backend) => updateProfile((draft) => {
-                    draft.storage.backend = backend as SessionModeProfile['storage']['backend'];
-                    if (backend === 'cloudflare') {
-                      draft.authority.mode = 'worker_canonical';
-                      if (draft.results.visibility === 'public_full_if_storage_public') {
-                        draft.results.visibility = 'participant_aggregate';
+                  onChange={(backend) =>
+                    updateProfile((draft) => {
+                      draft.storage.backend = backend as SessionModeProfile['storage']['backend'];
+                      if (backend === 'cloudflare') {
+                        draft.authority.mode = 'worker_canonical';
+                        if (draft.results.visibility === 'public_full_if_storage_public') {
+                          draft.results.visibility = 'participant_aggregate';
+                        }
+                      } else {
+                        draft.authority.mode = 'evm_registry_canonical';
+                        draft.evm.registryChainId = draft.evm.registryChainId || registryChainId || 11155420;
+                        if (draft.encryption.mode === 'worker_envelope') {
+                          draft.encryption = { mode: 'none' };
+                        }
+                        if (draft.export.scope === 'encrypted_envelopes_only' && draft.encryption.mode === 'none') {
+                          draft.export.scope = 'admin_raw';
+                        }
                       }
-                    } else {
-                      draft.authority.mode = 'evm_registry_canonical';
-                      draft.evm.registryChainId = draft.evm.registryChainId || registryChainId || 11155420;
-                      if (draft.encryption.mode === 'worker_envelope') {
-                        draft.encryption = { mode: 'none' };
-                      }
-                      if (draft.export.scope === 'encrypted_envelopes_only' && draft.encryption.mode === 'none') {
-                        draft.export.scope = 'admin_raw';
-                      }
-                    }
-                  })}
+                    })
+                  }
                 />
               </FormRow>
 
@@ -291,22 +276,26 @@ const SessionModeProfileField = ({
                     },
                   ]}
                   value={profile.encryption.mode}
-                  onChange={(mode) => updateProfile((draft) => {
-                    draft.encryption = { mode: mode as SessionModeEncryptionMode };
-                    if (mode === 'lit') {
-                      draft.evm.registryChainId = draft.evm.registryChainId || registryChainId || 11155420;
-                    }
-                    if (mode === 'worker_envelope') {
-                      draft.encryption.keyProvider = 'worker_secret';
-                    }
-                    if (mode === 'none' && draft.export.scope === 'encrypted_envelopes_only') {
-                      draft.export.scope = 'admin_raw';
-                    }
-                  })}
+                  onChange={(mode) =>
+                    updateProfile((draft) => {
+                      draft.encryption = { mode: mode as SessionModeEncryptionMode };
+                      if (mode === 'lit') {
+                        draft.evm.registryChainId = draft.evm.registryChainId || registryChainId || 11155420;
+                      }
+                      if (mode === 'worker_envelope') {
+                        draft.encryption.keyProvider = 'worker_secret';
+                      }
+                      if (mode === 'none' && draft.export.scope === 'encrypted_envelopes_only') {
+                        draft.export.scope = 'admin_raw';
+                      }
+                    })
+                  }
                   dataTestIdPrefix="ce-new-encryption"
                 />
                 {litDisabledReason ? <div className={styles.helperText}>{litDisabledReason}</div> : null}
-                {workerEnvelopeDisabledReason ? <div className={styles.helperText}>{workerEnvelopeDisabledReason}</div> : null}
+                {workerEnvelopeDisabledReason ? (
+                  <div className={styles.helperText}>{workerEnvelopeDisabledReason}</div>
+                ) : null}
                 {profile.encryption.mode === 'worker_envelope' ? (
                   <WorkerEnvelopeOptions
                     profile={profile}
@@ -324,12 +313,14 @@ const SessionModeProfileField = ({
                         type="checkbox"
                         checked={profile.surfaces[surface.value]}
                         disabled={surface.fixed}
-                        onChange={(event) => updateProfile((draft) => {
-                          draft.surfaces[surface.value] = surface.fixed ? true : event.target.checked;
-                          if (surface.value === 'telegram' && event.target.checked) {
-                            draft.surfaces.miniApp = true;
-                          }
-                        })}
+                        onChange={(event) =>
+                          updateProfile((draft) => {
+                            draft.surfaces[surface.value] = surface.fixed ? true : event.target.checked;
+                            if (surface.value === 'telegram' && event.target.checked) {
+                              draft.surfaces.miniApp = true;
+                            }
+                          })
+                        }
                       />{' '}
                       {surface.label}
                     </Label>
@@ -341,15 +332,19 @@ const SessionModeProfileField = ({
                 <Input
                   type="select"
                   value={profile.results.visibility}
-                  onChange={(event) => updateProfile((draft) => {
-                    draft.results.visibility = event.target.value as SessionModeResultsVisibility;
-                  })}
+                  onChange={(event) =>
+                    updateProfile((draft) => {
+                      draft.results.visibility = event.target.value as SessionModeResultsVisibility;
+                    })
+                  }
                 >
                   {RESULT_VISIBILITY_OPTIONS.map((option) => (
                     <option
                       key={option.value}
                       value={option.value}
-                      disabled={option.value === 'public_full_if_storage_public' && profile.storage.backend === 'cloudflare'}
+                      disabled={
+                        option.value === 'public_full_if_storage_public' && profile.storage.backend === 'cloudflare'
+                      }
                     >
                       {option.label}
                     </option>
@@ -360,13 +355,15 @@ const SessionModeProfileField = ({
                     <Input
                       type="checkbox"
                       checked={profile.results.exposure?.anonymizedGroupsEnabled === true}
-                      onChange={(event) => updateProfile((draft) => {
-                        draft.results.exposure = {
-                          aggregateResultsEnabled: draft.results.exposure?.aggregateResultsEnabled !== false,
-                          anonymizedGroupsEnabled: event.target.checked,
-                          minGroupSize: Math.max(2, Number(draft.results.exposure?.minGroupSize || 2) || 2),
-                        };
-                      })}
+                      onChange={(event) =>
+                        updateProfile((draft) => {
+                          draft.results.exposure = {
+                            aggregateResultsEnabled: draft.results.exposure?.aggregateResultsEnabled !== false,
+                            anonymizedGroupsEnabled: event.target.checked,
+                            minGroupSize: Math.max(2, Number(draft.results.exposure?.minGroupSize || 2) || 2),
+                          };
+                        })
+                      }
                     />{' '}
                     Anonymized groups
                   </Label>
@@ -376,13 +373,15 @@ const SessionModeProfileField = ({
                       type="number"
                       min={2}
                       value={profile.results.exposure?.minGroupSize || 2}
-                      onChange={(event) => updateProfile((draft) => {
-                        draft.results.exposure = {
-                          aggregateResultsEnabled: draft.results.exposure?.aggregateResultsEnabled !== false,
-                          anonymizedGroupsEnabled: draft.results.exposure?.anonymizedGroupsEnabled === true,
-                          minGroupSize: Math.max(2, Number(event.target.value || 2) || 2),
-                        };
-                      })}
+                      onChange={(event) =>
+                        updateProfile((draft) => {
+                          draft.results.exposure = {
+                            aggregateResultsEnabled: draft.results.exposure?.aggregateResultsEnabled !== false,
+                            anonymizedGroupsEnabled: draft.results.exposure?.anonymizedGroupsEnabled === true,
+                            minGroupSize: Math.max(2, Number(event.target.value || 2) || 2),
+                          };
+                        })
+                      }
                     />
                   </Label>
                 </div>
@@ -392,14 +391,16 @@ const SessionModeProfileField = ({
                 <Input
                   type="select"
                   value={profile.export.scope}
-                  onChange={(event) => updateProfile((draft) => {
-                    draft.export.scope = event.target.value as SessionModeExportScope;
-                    if (draft.export.scope !== 'selected_surfaces') {
-                      delete draft.export.surfaceFilter;
-                    } else if (!draft.export.surfaceFilter?.length) {
-                      draft.export.surfaceFilter = ['web'];
-                    }
-                  })}
+                  onChange={(event) =>
+                    updateProfile((draft) => {
+                      draft.export.scope = event.target.value as SessionModeExportScope;
+                      if (draft.export.scope !== 'selected_surfaces') {
+                        delete draft.export.surfaceFilter;
+                      } else if (!draft.export.surfaceFilter?.length) {
+                        draft.export.surfaceFilter = ['web'];
+                      }
+                    })
+                  }
                 >
                   {EXPORT_SCOPE_OPTIONS.map((option) => (
                     <option
@@ -418,12 +419,14 @@ const SessionModeProfileField = ({
                         <Input
                           type="checkbox"
                           checked={selectedSurfaceFilter.has(surface.value)}
-                          onChange={(event) => updateProfile((draft) => {
-                            const next = new Set(draft.export.surfaceFilter || []);
-                            if (event.target.checked) next.add(surface.value);
-                            else next.delete(surface.value);
-                            draft.export.surfaceFilter = Array.from(next);
-                          })}
+                          onChange={(event) =>
+                            updateProfile((draft) => {
+                              const next = new Set(draft.export.surfaceFilter || []);
+                              if (event.target.checked) next.add(surface.value);
+                              else next.delete(surface.value);
+                              draft.export.surfaceFilter = Array.from(next);
+                            })
+                          }
                         />{' '}
                         {surface.label}
                       </Label>
@@ -535,7 +538,9 @@ const WorkerEnvelopeOptions = ({
 
   const updateCondition = (
     index: number,
-    mutate: (condition: SessionModeAccessConditionDocument['conditions'][number]) => SessionModeAccessConditionDocument['conditions'][number]
+    mutate: (
+      condition: SessionModeAccessConditionDocument['conditions'][number],
+    ) => SessionModeAccessConditionDocument['conditions'][number],
   ) => {
     const next = cloneAccessConditions(profile.encryption.accessConditions);
     const current = next.conditions[index];
@@ -547,7 +552,8 @@ const WorkerEnvelopeOptions = ({
   return (
     <div className={styles.modeAdvancedNested}>
       <div className={styles.helperText}>
-        Encrypted at rest. Keys are held by the session worker; decryption is gated by session conditions. Key provider: <strong>worker_secret</strong>{' '}
+        Encrypted at rest. Keys are held by the session worker; decryption is gated by session conditions. Key provider:{' '}
+        <strong>worker_secret</strong>{' '}
         <span id="ce-worker-envelope-copy-tooltip" tabIndex={0}>
           <FontAwesomeIcon icon={faQuestionCircle} />
         </span>
@@ -572,13 +578,28 @@ const WorkerEnvelopeOptions = ({
         </Input>
       </Label>
       <div className={styles.inlineToggleRow}>
-        <Button type="button" size="sm" onClick={() => addCondition('worker_role')} data-testid="ce-new-envelope-add-worker-role">
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => addCondition('worker_role')}
+          data-testid="ce-new-envelope-add-worker-role"
+        >
           Add worker role
         </Button>
-        <Button type="button" size="sm" onClick={() => addCondition('sbt_onchain')} data-testid="ce-new-envelope-add-sbt-onchain">
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => addCondition('sbt_onchain')}
+          data-testid="ce-new-envelope-add-sbt-onchain"
+        >
           Add SBT
         </Button>
-        <Button type="button" size="sm" onClick={() => addCondition('agent_grant_scope')} data-testid="ce-new-envelope-add-agent-scope">
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => addCondition('agent_grant_scope')}
+          data-testid="ce-new-envelope-add-agent-scope"
+        >
           Add agent scope
         </Button>
       </div>
@@ -600,7 +621,9 @@ const WorkerEnvelopeOptions = ({
               <Input
                 value={condition.scope}
                 data-testid={`ce-new-envelope-agent-scope-${index}`}
-                onChange={(event) => updateCondition(index, () => ({ kind: 'agent_grant_scope', scope: event.target.value }))}
+                onChange={(event) =>
+                  updateCondition(index, () => ({ kind: 'agent_grant_scope', scope: event.target.value }))
+                }
               />
             ) : null}
             {condition.kind === 'sbt_onchain' ? (
@@ -609,28 +632,34 @@ const WorkerEnvelopeOptions = ({
                   type="number"
                   value={condition.chainId || ''}
                   data-testid={`ce-new-envelope-sbt-chain-${index}`}
-                  onChange={(event) => updateCondition(index, () => ({
-                    ...condition,
-                    chainId: Number(event.target.value || 0) || 0,
-                  }))}
+                  onChange={(event) =>
+                    updateCondition(index, () => ({
+                      ...condition,
+                      chainId: Number(event.target.value || 0) || 0,
+                    }))
+                  }
                 />
                 <Input
                   value={condition.contract}
                   placeholder="0x..."
                   data-testid={`ce-new-envelope-sbt-contract-${index}`}
-                  onChange={(event) => updateCondition(index, () => ({
-                    ...condition,
-                    contract: event.target.value,
-                  }))}
+                  onChange={(event) =>
+                    updateCondition(index, () => ({
+                      ...condition,
+                      contract: event.target.value,
+                    }))
+                  }
                 />
                 <Input
                   type="select"
                   value={condition.anyOrAll}
                   data-testid={`ce-new-envelope-sbt-match-${index}`}
-                  onChange={(event) => updateCondition(index, () => ({
-                    ...condition,
-                    anyOrAll: event.target.value === 'all' ? 'all' : 'any',
-                  }))}
+                  onChange={(event) =>
+                    updateCondition(index, () => ({
+                      ...condition,
+                      anyOrAll: event.target.value === 'all' ? 'all' : 'any',
+                    }))
+                  }
                 >
                   <option value="any">Any token</option>
                   <option value="all">All tokens</option>

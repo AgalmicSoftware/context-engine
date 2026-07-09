@@ -1,9 +1,6 @@
 import { getSessionSlugByName } from '../web3/sessionConfigResolvers.js';
 import { normalizeSessionSlug } from '../session/sessionNaming.js';
-import {
-  prepareQuestionMetadataCacheEntry,
-  prepareSurveyMetadataCacheEntry,
-} from './metadataCacheEntryBuilders.js';
+import { prepareQuestionMetadataCacheEntry, prepareSurveyMetadataCacheEntry } from './metadataCacheEntryBuilders.js';
 
 jest.mock('../web3/sessionConfigResolvers.js', () => {
   const actual = jest.requireActual('../web3/sessionConfigResolvers.js');
@@ -83,19 +80,16 @@ describe('metadataCacheEntryBuilders', () => {
       expect(result.creationBlock).toBe(42);
     });
 
-    it.each([null, ''])(
-      'coerces creationBlock to 0 for legacy-compatible inputs: %p',
-      (creationBlock) => {
-        const result = prepareSurveyMetadataCacheEntry({
-          surveyId: 'survey-abc',
-          surveyData: {},
-          slug: 'fallback-session',
-          creationBlock,
-        });
+    it.each([null, ''])('coerces creationBlock to 0 for legacy-compatible inputs: %p', (creationBlock) => {
+      const result = prepareSurveyMetadataCacheEntry({
+        surveyId: 'survey-abc',
+        surveyData: {},
+        slug: 'fallback-session',
+        creationBlock,
+      });
 
-        expect(result.creationBlock).toBe(0);
-      }
-    );
+      expect(result.creationBlock).toBe(0);
+    });
 
     it.each([undefined, Number.NaN, Number.POSITIVE_INFINITY])(
       'skips creationBlock when it is not finite: %p',
@@ -108,7 +102,7 @@ describe('metadataCacheEntryBuilders', () => {
         });
 
         expect(Object.prototype.hasOwnProperty.call(result, 'creationBlock')).toBe(false);
-      }
+      },
     );
 
     it('sets a survey slug fallback when the envelope leaves slug unset for non-scoped writes', () => {

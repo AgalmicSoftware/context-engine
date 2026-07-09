@@ -1,6 +1,22 @@
 import {
   validateAuthTokenRecord,
 } from './authTokenClaims.js';
+import {
+  ABUSE_COUNTER_TYPES,
+  recordAbuseEvent as recordAbuseEventBoundary,
+} from './abuseObservability.js';
+
+const recordAuthFailure = async ({ env, deps } = {}) => {
+  try {
+    await (deps?.recordAbuseEvent || recordAbuseEventBoundary)({
+      env,
+      type: ABUSE_COUNTER_TYPES.AUTH_FAILURE,
+      now: deps?.now,
+    });
+  } catch {
+    // Auth telemetry must never mask or alter the original auth failure.
+  }
+};
 
 export const resolveAuthenticatedRequest = async ({
   request,
@@ -12,6 +28,7 @@ export const resolveAuthenticatedRequest = async ({
   const authHeader = request?.headers?.get('authorization') || '';
   const match = authHeader.match(/bearer\s+(.+)/i);
   if (!match) {
+    await recordAuthFailure({ env, deps });
     return {
       ok: false,
       response: deps?.json?.({ error: 'Missing Authorization header.' }, 401, baseHeaders),
@@ -21,6 +38,7 @@ export const resolveAuthenticatedRequest = async ({
   const token = match[1];
   const verification = await deps?.verifyToken?.(token, env?.TOKEN_HMAC_SECRET);
   if (!verification?.ok) {
+    await recordAuthFailure({ env, deps });
     return {
       ok: false,
       response: deps?.json?.({ error: verification?.error || 'Invalid token.' }, 401, baseHeaders),
@@ -40,6 +58,7 @@ export const resolveAuthenticatedRequest = async ({
   }) || { ok: false, error: 'Invalid session slug.' };
 
   if (!slugContext.ok) {
+    await recordAuthFailure({ env, deps });
     return {
       ok: false,
       response: deps?.json?.({ error: slugContext.error }, 400, baseHeaders),
@@ -48,6 +67,7 @@ export const resolveAuthenticatedRequest = async ({
 
   const { explicitSlugProvided, slug, tokenSlug } = slugContext;
   if (!explicitSlugProvided) {
+    await recordAuthFailure({ env, deps });
     return {
       ok: false,
       response: deps?.json?.({ error: deps?.MISSING_SLUG_ERROR }, 400, baseHeaders),
@@ -55,6 +75,7 @@ export const resolveAuthenticatedRequest = async ({
   }
 
   if (tokenHasSlug && slug !== tokenSlug) {
+    await recordAuthFailure({ env, deps });
     return {
       ok: false,
       response: deps?.json?.({ error: 'Token does not match requested session slug.' }, 403, baseHeaders),
@@ -67,6 +88,7 @@ export const resolveAuthenticatedRequest = async ({
       : validateAuthTokenRecord;
     const tokenRecord = await validateRecord({ env, payload, slug });
     if (!tokenRecord?.ok) {
+      await recordAuthFailure({ env, deps });
       return {
         ok: false,
         response: deps?.json?.({ error: tokenRecord?.error || 'Invalid token.' }, 401, baseHeaders),

@@ -27,13 +27,9 @@ type AggregatorBuildResult = {
   signature?: string;
 };
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object';
 
-const asRecord = (value: unknown): UnknownRecord => (
-  isRecord(value) ? value : {}
-);
+const asRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
 
 const hashMix = (seed: unknown, text: unknown) => {
   let h = Number(seed) >>> 0;
@@ -69,7 +65,7 @@ export const computeAggregatorDataSignature = (map: unknown = {}) => {
 
 const computeAggregatorDataSignatureFromRows = (
   qids: unknown[] = [],
-  rowSignaturesByQuestion: RowSignaturesByQuestion = {}
+  rowSignaturesByQuestion: RowSignaturesByQuestion = {},
 ) => {
   const normalizedQids = Array.isArray(qids) ? qids.filter(Boolean).sort() : [];
   if (normalizedQids.length === 0) return '0:0:0';
@@ -125,17 +121,16 @@ export const computeAggregatorSourceSnapshotSignature = (questionResponses: unkn
 };
 
 const normalizeAggregatorSessionSlug = (value: unknown = '') => {
-  const normalized = String(value || '').trim().toLowerCase();
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
   return normalized === 'general' ? '' : normalized;
 };
 
-const isPendingQuestionMetadataPlaceholder = (question: unknown = null) => (
-  isRecord(question) && question.__ceQuestionMetadataPending === true
-);
+const isPendingQuestionMetadataPlaceholder = (question: unknown = null) =>
+  isRecord(question) && question.__ceQuestionMetadataPending === true;
 
-const hasOwn = (obj: unknown, key: PropertyKey) => (
-  isRecord(obj) && Object.prototype.hasOwnProperty.call(obj, key)
-);
+const hasOwn = (obj: unknown, key: PropertyKey) => isRecord(obj) && Object.prototype.hasOwnProperty.call(obj, key);
 
 const getQuestionSessionSlugExplicitSignature = (question: unknown = {}) => {
   const questionRecord = asRecord(question);
@@ -147,9 +142,11 @@ const getQuestionSessionSlugExplicitSignature = (question: unknown = {}) => {
 const hasVisibleQuestionMetadataForAggregator = (
   questions: UnknownRecord = {},
   qId: unknown = '',
-  sessionSlug: unknown = ''
+  sessionSlug: unknown = '',
 ) => {
-  const lowerQid = String(qId || '').trim().toLowerCase();
+  const lowerQid = String(qId || '')
+    .trim()
+    .toLowerCase();
   if (!lowerQid) return false;
   const question = questions[lowerQid] || questions[String(qId)];
   if (!isRecord(question) || isPendingQuestionMetadataPlaceholder(question)) return false;
@@ -160,9 +157,8 @@ const hasVisibleQuestionMetadataForAggregator = (
   return true;
 };
 
-const isDemoPolisFixtureResponse = (response: unknown = null) => (
-  isRecord(response) && response.source === 'demo-polis-data'
-);
+const isDemoPolisFixtureResponse = (response: unknown = null) =>
+  isRecord(response) && response.source === 'demo-polis-data';
 
 export const computeAggregatorQuestionMetadataSignature = (questions: unknown = {}) => {
   if (!isRecord(questions)) return '0:0';
@@ -181,15 +177,13 @@ export const computeAggregatorQuestionMetadataSignature = (questions: unknown = 
 
 export function buildAggregatorFromLocalCache(
   networkObj: AggregatorNetworkNode | null | undefined,
-  opts: AggregatorBuildOptions = {}
+  opts: AggregatorBuildOptions = {},
 ): AggregatorBuildResult {
   if (!networkObj) return { map: {}, dirty: false };
   const parseMemo = opts?.parseMemo instanceof Map ? opts.parseMemo : null;
   const sessionSlug = opts?.sessionSlug || '';
   const questions = asRecord(networkObj.questions);
-  const questionResponses = isRecord(networkObj.questionResponses)
-    ? networkObj.questionResponses
-    : {};
+  const questionResponses = isRecord(networkObj.questionResponses) ? networkObj.questionResponses : {};
   const aggregatorMap: AggregatorMap = {};
   const rowSignaturesByQuestion: RowSignaturesByQuestion = {};
   let dirty = false;
@@ -225,7 +219,12 @@ export function buildAggregatorFromLocalCache(
           parsed = rawResponse;
         }
       } catch {
-        try { delete responderMap[resAddr]; dirty = true; } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
+        try {
+          delete responderMap[resAddr];
+          dirty = true;
+        } catch (e) {
+          demoLog.warn('OnePageSession: fallback', e);
+        }
         parsed = null;
       }
       if (!parsed) return;
@@ -254,9 +253,6 @@ export function buildAggregatorFromLocalCache(
   return {
     map: aggregatorMap,
     dirty,
-    signature: computeAggregatorDataSignatureFromRows(
-      Object.keys(aggregatorMap),
-      rowSignaturesByQuestion,
-    ),
+    signature: computeAggregatorDataSignatureFromRows(Object.keys(aggregatorMap), rowSignaturesByQuestion),
   };
 }

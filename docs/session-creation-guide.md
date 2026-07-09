@@ -173,6 +173,7 @@ chosen mode:
   URL/key, AI provider key, and optional Lit key needed when encryption is
   enabled.
 
+After Continue, the selected profile remains visible above the setup stages so
 Advanced per-axis changes, such as enabling the Telegram surface or changing
 storage/authority/encryption independently, flip the profile to `custom`. New
 session publishes write the `sessionModeProfile` profile as the source of truth

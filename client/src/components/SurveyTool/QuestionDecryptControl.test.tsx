@@ -5,12 +5,7 @@ import QuestionDecryptControl from './QuestionDecryptControl';
 describe('QuestionDecryptControl', () => {
   it('renders the manual decrypt action when auto-decrypt is off', () => {
     const onClick = jest.fn();
-    render(
-      <QuestionDecryptControl
-        actionLabel="Decrypt Answer"
-        onClick={onClick}
-      />
-    );
+    render(<QuestionDecryptControl actionLabel="Decrypt Answer" onClick={onClick} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Decrypt Answer' }));
     expect(onClick).toHaveBeenCalledTimes(1);
@@ -24,7 +19,7 @@ describe('QuestionDecryptControl', () => {
         disabled
         onClick={onClick}
         title="Connect wallet to decrypt"
-      />
+      />,
     );
 
     const button = screen.getByRole('button', { name: 'Decrypt Prompt' });
@@ -43,7 +38,7 @@ describe('QuestionDecryptControl', () => {
         showBusySpinnerWhenAutoDecryptEnabled
         busy
         actionLabel="Decrypt Comments"
-      />
+      />,
     );
 
     expect(screen.getByText('Decrypting...')).toBeInTheDocument();
@@ -51,23 +46,14 @@ describe('QuestionDecryptControl', () => {
   });
 
   it('renders nothing for auto-decrypt-only full-mode fields when no spinner should be shown', () => {
-    const { container } = render(
-      <QuestionDecryptControl
-        autoDecryptEnabled
-        actionLabel="Decrypt Answer"
-      />
-    );
+    const { container } = render(<QuestionDecryptControl autoDecryptEnabled actionLabel="Decrypt Answer" />);
 
     expect(container).toBeEmptyDOMElement();
   });
 
   it('renders nothing for idle auto-decrypt spinner ownership', () => {
     const { container } = render(
-      <QuestionDecryptControl
-        autoDecryptEnabled
-        showBusySpinnerWhenAutoDecryptEnabled
-        actionLabel="Decrypt Answer"
-      />
+      <QuestionDecryptControl autoDecryptEnabled showBusySpinnerWhenAutoDecryptEnabled actionLabel="Decrypt Answer" />,
     );
 
     expect(container).toBeEmptyDOMElement();

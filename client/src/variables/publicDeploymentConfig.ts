@@ -11,27 +11,18 @@ const EMPTY_PUBLIC_DEPLOYMENT_ENDPOINT = '';
 const DEFAULT_PROJECT_DEPLOY_HELPER_URL = 'https://ce-deploy-helper.agalmic.workers.dev/';
 const DEFAULT_DEMO_WORKER_URL = 'https://demo-worker-030226.agalmic.workers.dev';
 
-export const DEFAULT_SHARED_WORKER_URL = readPublicEnv(
-  'REACT_APP_CE_SHARED_WORKER_URL',
-  DEFAULT_DEMO_WORKER_URL
-);
+export const DEFAULT_SHARED_WORKER_URL = readPublicEnv('REACT_APP_CE_SHARED_WORKER_URL', DEFAULT_DEMO_WORKER_URL);
 
-export const DEPLOY_HELPER_URL = readPublicEnv(
-  'REACT_APP_CE_DEPLOY_HELPER_URL',
-  DEFAULT_PROJECT_DEPLOY_HELPER_URL
-);
+export const DEPLOY_HELPER_URL = readPublicEnv('REACT_APP_CE_DEPLOY_HELPER_URL', DEFAULT_PROJECT_DEPLOY_HELPER_URL);
 
-export const HEALTHCHECK_WORKER_URL = readPublicEnv(
-  'REACT_APP_CE_HEALTHCHECK_WORKER_URL',
-  DEFAULT_DEMO_WORKER_URL
-);
+export const HEALTHCHECK_WORKER_URL = readPublicEnv('REACT_APP_CE_HEALTHCHECK_WORKER_URL', DEFAULT_DEMO_WORKER_URL);
 
 export const WORKER_BUNDLE_URL = readPublicEnv(
   'REACT_APP_CE_WORKER_BUNDLE_URL',
-  buildPublicRepoLatestReleaseAssetUrl('sessionCorsWorker.bundle.js')
+  buildPublicRepoLatestReleaseAssetUrl('sessionCorsWorker.bundle.js'),
 );
 
 export const DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED',
-  true
+  true,
 );

@@ -28,9 +28,13 @@ jest.mock('../../utilities/session/registryBootstrapChainIds.js', () => ({
   resolveSessionRegistryBootstrapChainIds: jest.fn(() => undefined),
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
-  normalizeSessionSlug: jest.fn((s) => String(s || '').trim().toLowerCase()),
+  normalizeSessionSlug: jest.fn((s) =>
+    String(s || '')
+      .trim()
+      .toLowerCase(),
+  ),
 }));
 
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
@@ -79,7 +83,7 @@ const { createSessionProfileScanController } = require('./sessionProfileScanCont
 const litProtocolModule = require('../../utilities/crypto/litProtocol.js');
 const sessionScanScopeModule = require('../../utilities/session/sessionScanScope.js');
 const registryBootstrapModule = require('../../utilities/session/registryBootstrapChainIds.js');
-const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
+const contractScriptsModule = require('../../utilities/web3/chainGateway.js');
 const sessionRegistryModule = require('../../utilities/web3/sessionRegistry.js');
 const chainsModule = require('../../variables/chains.js');
 const debugTelemetryModule = require('./profileScanTelemetry.js');
@@ -140,9 +144,10 @@ const flushMicrotasks = async (times = 6) => {
   }
 };
 
-const flushEventLoop = () => new Promise((resolve) => {
-  setTimeout(resolve, 0);
-});
+const flushEventLoop = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
 
 const waitForProfileScanCalls = async (host, expectedCalls) => {
   for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -188,8 +193,10 @@ describe('createSessionProfileScanController', () => {
     litProtocolModule.getGlobalLitHooks.mockReturnValue({});
     sessionScanScopeModule.getAllowedSessionSlugs.mockReturnValue([]);
     registryBootstrapModule.resolveSessionRegistryBootstrapChainIds.mockReturnValue(undefined);
-    contractScriptsModule.normalizeSessionSlug.mockImplementation(
-      (slug) => String(slug || '').trim().toLowerCase()
+    contractScriptsModule.normalizeSessionSlug.mockImplementation((slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase(),
     );
     sessionRegistryModule.fetchSessionFromRegistry.mockResolvedValue(null);
     sessionRegistryModule.loadGroupRegistryCache.mockResolvedValue({
@@ -501,7 +508,7 @@ describe('createSessionProfileScanController', () => {
           useAllSessionsQuestionActivityScan: false,
           useAllSessionsActivityScan: false,
           useAllSessionsScan: true,
-        })
+        }),
       );
     });
 
@@ -517,7 +524,7 @@ describe('createSessionProfileScanController', () => {
           useAllSessionsQuestionActivityScan: false,
           useAllSessionsActivityScan: true,
           useAllSessionsScan: true,
-        })
+        }),
       );
     });
 
@@ -533,7 +540,7 @@ describe('createSessionProfileScanController', () => {
           useAllSessionsQuestionActivityScan: true,
           useAllSessionsActivityScan: true,
           useAllSessionsScan: true,
-        })
+        }),
       );
     });
 
@@ -550,7 +557,7 @@ describe('createSessionProfileScanController', () => {
           useAllSessionsQuestionActivityScan: true,
           useAllSessionsActivityScan: true,
           useAllSessionsScan: true,
-        })
+        }),
       );
     });
   });
@@ -574,9 +581,7 @@ describe('createSessionProfileScanController', () => {
   describe('getActiveProfileScanChainId', () => {
     it('returns the session chain ID when available', () => {
       const host = makeHost({
-        getSessionChainId: jest.fn().mockImplementation((slug) => (
-          slug === 'test-session' ? 11155420 : 0
-        )),
+        getSessionChainId: jest.fn().mockImplementation((slug) => (slug === 'test-session' ? 11155420 : 0)),
         getNetworkId: jest.fn().mockReturnValue(84532),
       });
       const controller = createSessionProfileScanController(host);
@@ -658,9 +663,9 @@ describe('createSessionProfileScanController', () => {
     it('getRegistryBootstrapScopeKey sorts and dedupes chain IDs', () => {
       const controller = createSessionProfileScanController(makeHost());
 
-      expect(
-        controller.getRegistryBootstrapScopeKey([11155420, 84532, 11155420, '84532', 0, null])
-      ).toBe('84532,11155420');
+      expect(controller.getRegistryBootstrapScopeKey([11155420, 84532, 11155420, '84532', 0, null])).toBe(
+        '84532,11155420',
+      );
     });
   });
 
@@ -687,7 +692,7 @@ describe('createSessionProfileScanController', () => {
           providerLike: {},
           force: true,
           bootstrapRpc: true,
-        })
+        }),
       );
       expect(result).toEqual(
         expect.objectContaining({
@@ -696,7 +701,7 @@ describe('createSessionProfileScanController', () => {
           beforeCount: 0,
           afterCount: 1,
           hadLoadErrors: false,
-        })
+        }),
       );
     });
 
@@ -781,7 +786,7 @@ describe('createSessionProfileScanController', () => {
               afterCount: 1,
             }),
           }),
-        })
+        }),
       );
     });
 
@@ -793,9 +798,7 @@ describe('createSessionProfileScanController', () => {
       globalThis.CE_PROFILE_SCAN_REGISTRY_TIMEOUT_MS = 5000;
       registryBootstrapModule.resolveSessionRegistryBootstrapChainIds.mockReturnValue([84532]);
       sessionRegistryModule.sessionRegistryStore.getAllSessionEntries.mockReturnValue([]);
-      sessionRegistryModule.loadGroupRegistryCache.mockImplementation(
-        () => new Promise(() => {})
-      );
+      sessionRegistryModule.loadGroupRegistryCache.mockImplementation(() => new Promise(() => {}));
 
       const run = controller.ensureRegistryHydratedForProfileScan();
 
@@ -809,7 +812,7 @@ describe('createSessionProfileScanController', () => {
           hasEntries: false,
           timedOut: true,
           afterCount: 0,
-        })
+        }),
       );
     });
 
@@ -855,7 +858,7 @@ describe('createSessionProfileScanController', () => {
           coverageReason: 'scoped',
           prioritizedGeneralFirst: false,
           scanOrdering: 'active-first-general-early-scoped',
-        })
+        }),
       );
     });
 
@@ -889,7 +892,7 @@ describe('createSessionProfileScanController', () => {
           rawAllSlugCount: 4,
           activeChainSlugCount: 3,
           scanOrdering: 'active-first-general-early-all',
-        })
+        }),
       );
     });
 
@@ -922,12 +925,12 @@ describe('createSessionProfileScanController', () => {
         controller.resolveProfileDeepScanPlan({
           useAllSessionsScan: true,
           registryStatus: { afterCount: 0, hasEntries: false },
-        })
+        }),
       ).toEqual(
         expect.objectContaining({
           coverageComplete: false,
           coverageReason: 'registry-empty',
-        })
+        }),
       );
     });
 
@@ -940,12 +943,12 @@ describe('createSessionProfileScanController', () => {
         controller.resolveProfileDeepScanPlan({
           useAllSessionsScan: true,
           registryStatus: { afterCount: 1, hasEntries: true, timedOut: true },
-        })
+        }),
       ).toEqual(
         expect.objectContaining({
           coverageComplete: false,
           coverageReason: 'registry-timeout',
-        })
+        }),
       );
     });
 
@@ -958,12 +961,12 @@ describe('createSessionProfileScanController', () => {
         controller.resolveProfileDeepScanPlan({
           useAllSessionsScan: true,
           registryStatus: { afterCount: 1, hasEntries: true, hadLoadErrors: true },
-        })
+        }),
       ).toEqual(
         expect.objectContaining({
           coverageComplete: false,
           coverageReason: 'registry-partial-errors',
-        })
+        }),
       );
     });
   });
@@ -1110,7 +1113,8 @@ describe('createSessionProfileScanController', () => {
       it('deduplicates concurrent runs per operation key', async () => {
         const controller = createSessionProfileScanController(makeHost());
         const firstRun = createDeferred();
-        const runGeneral = jest.fn()
+        const runGeneral = jest
+          .fn()
           .mockImplementationOnce(() => firstRun.promise)
           .mockResolvedValue(undefined);
 
@@ -1249,7 +1253,8 @@ describe('createSessionProfileScanController', () => {
     it('stops pending backfill operations', async () => {
       const controller = createSessionProfileScanController(makeHost());
       const firstRun = createDeferred();
-      const runGeneral = jest.fn()
+      const runGeneral = jest
+        .fn()
         .mockImplementationOnce(() => firstRun.promise)
         .mockResolvedValue(undefined);
 

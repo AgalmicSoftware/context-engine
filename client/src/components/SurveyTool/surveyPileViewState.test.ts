@@ -32,39 +32,44 @@ describe('surveyPileViewState', () => {
   it('uses questionPool as the early visible pile source until the sorted pile catches up', () => {
     const earlyQuestion = { id: 'q1', prompt: 'Early question' };
 
-    expect(resolveEarlyVisiblePileQuestions({
-      pileQuestions: [],
-      questionPool: [
-        earlyQuestion,
-        { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
-      ],
-      isFilterActive: false,
-    })).toEqual([earlyQuestion]);
+    expect(
+      resolveEarlyVisiblePileQuestions({
+        pileQuestions: [],
+        questionPool: [earlyQuestion, { id: 'q2', prompt: '[encrypted]', promptDecrypted: false }],
+        isFilterActive: false,
+      }),
+    ).toEqual([earlyQuestion]);
 
-    expect(resolveEarlyVisiblePileQuestions({
-      pileQuestions: [{ id: 'pile-q', prompt: 'Sorted pile question' }],
-      questionPool: [earlyQuestion],
-      isFilterActive: false,
-    })).toEqual([{ id: 'pile-q', prompt: 'Sorted pile question' }]);
+    expect(
+      resolveEarlyVisiblePileQuestions({
+        pileQuestions: [{ id: 'pile-q', prompt: 'Sorted pile question' }],
+        questionPool: [earlyQuestion],
+        isFilterActive: false,
+      }),
+    ).toEqual([{ id: 'pile-q', prompt: 'Sorted pile question' }]);
 
-    expect(resolveEarlyVisiblePileQuestions({
-      pileQuestions: [],
-      questionPool: [earlyQuestion],
-      isFilterActive: true,
-    })).toEqual([]);
+    expect(
+      resolveEarlyVisiblePileQuestions({
+        pileQuestions: [],
+        questionPool: [earlyQuestion],
+        isFilterActive: true,
+      }),
+    ).toEqual([]);
   });
 
   it('builds the pile submit success-badge presentation state', () => {
-    expect(buildPileSubmitViewState({
-      pendingStats: { total: 0 },
-      isSubmitting: false,
-      submittedSinceLastEdit: true,
-      submissionComplete: false,
-      pileSubmitTempText: '',
-      pileSubmitLabel: 'Submit 0',
-      account: ' 0xABCD ',
-      isAddress: (value) => value === '0xABCD',
-    })).toEqual({
+    expect(
+      buildPileSubmitViewState({
+        pendingStats: { total: 0 },
+        isSubmitting: false,
+        submittedSinceLastEdit: true,
+        submissionComplete: false,
+        pileSubmitTempText: '',
+        pileSubmitLabel: 'Submit 0',
+        account: ' 0xABCD ',
+        isAddress: (value) => value === '0xABCD',
+      }),
+    ).toEqual({
       hasPendingPileChanges: false,
       pileSubmittedStateActive: true,
       showPileSubmitSuccessBadge: true,
@@ -75,14 +80,16 @@ describe('surveyPileViewState', () => {
   });
 
   it('builds the hidden-idle submit presentation state when nothing is pending', () => {
-    expect(buildPileSubmitViewState({
-      pendingStats: { total: 0 },
-      isSubmitting: false,
-      submittedSinceLastEdit: false,
-      submissionComplete: false,
-      pileSubmitTempText: 'No new or changed responses',
-      pileSubmitLabel: 'Submit 0',
-    })).toEqual({
+    expect(
+      buildPileSubmitViewState({
+        pendingStats: { total: 0 },
+        isSubmitting: false,
+        submittedSinceLastEdit: false,
+        submissionComplete: false,
+        pileSubmitTempText: 'No new or changed responses',
+        pileSubmitLabel: 'Submit 0',
+      }),
+    ).toEqual({
       hasPendingPileChanges: false,
       pileSubmittedStateActive: false,
       showPileSubmitSuccessBadge: false,
@@ -93,9 +100,11 @@ describe('surveyPileViewState', () => {
   });
 
   it('builds the staged no-pending pile submit feedback plan', () => {
-    expect(buildNoPendingPileSubmitFeedbackPlan({
-      submitLabel: 'Submit 0',
-    })).toEqual({
+    expect(
+      buildNoPendingPileSubmitFeedbackPlan({
+        submitLabel: 'Submit 0',
+      }),
+    ).toEqual({
       initialText: NO_PENDING_PILE_SUBMIT_TEXT,
       restoreText: 'Submit 0',
       clearText: null,
@@ -105,15 +114,17 @@ describe('surveyPileViewState', () => {
   });
 
   it('builds the pile submit rail state for pending and submitted branches', () => {
-    expect(buildPileSubmitRailViewState({
-      pendingStats: { total: 2 },
-      isSubmitting: false,
-      submittedSinceLastEdit: false,
-      submissionComplete: false,
-      pileSubmitTempText: '',
-      pileSubmitLabel: 'Submit 2',
-      account: '',
-    })).toEqual({
+    expect(
+      buildPileSubmitRailViewState({
+        pendingStats: { total: 2 },
+        isSubmitting: false,
+        submittedSinceLastEdit: false,
+        submissionComplete: false,
+        pileSubmitTempText: '',
+        pileSubmitLabel: 'Submit 2',
+        account: '',
+      }),
+    ).toEqual({
       hasPendingPileChanges: true,
       pileSubmittedStateActive: false,
       showPileSubmitSuccessBadge: false,
@@ -127,16 +138,18 @@ describe('surveyPileViewState', () => {
       showClearPendingButton: true,
     });
 
-    expect(buildPileSubmitRailViewState({
-      pendingStats: { total: 0 },
-      isSubmitting: false,
-      submittedSinceLastEdit: true,
-      submissionComplete: false,
-      pileSubmitTempText: '',
-      pileSubmitLabel: 'Submit 0',
-      account: '0xABCD',
-      isAddress: (value) => value === '0xABCD',
-    })).toEqual({
+    expect(
+      buildPileSubmitRailViewState({
+        pendingStats: { total: 0 },
+        isSubmitting: false,
+        submittedSinceLastEdit: true,
+        submissionComplete: false,
+        pileSubmitTempText: '',
+        pileSubmitLabel: 'Submit 0',
+        account: '0xABCD',
+        isAddress: (value) => value === '0xABCD',
+      }),
+    ).toEqual({
       hasPendingPileChanges: false,
       pileSubmittedStateActive: true,
       showPileSubmitSuccessBadge: true,
@@ -152,135 +165,155 @@ describe('surveyPileViewState', () => {
   });
 
   it('prefers gated pile empty state only after load settles and hidden questions remain', () => {
-    expect(shouldPreferPileGatedEmptyState({
-      hasConcreteHiddenQuestions: true,
-      hasVisibleQuestions: false,
-      firstBoot: false,
-      cacheHasLoaded: true,
-      recentRateLimit: false,
-      hasPendingMetadataRetries: false,
-    })).toBe(true);
+    expect(
+      shouldPreferPileGatedEmptyState({
+        hasConcreteHiddenQuestions: true,
+        hasVisibleQuestions: false,
+        firstBoot: false,
+        cacheHasLoaded: true,
+        recentRateLimit: false,
+        hasPendingMetadataRetries: false,
+      }),
+    ).toBe(true);
 
-    expect(shouldPreferPileGatedEmptyState({
-      hasConcreteHiddenQuestions: true,
-      hasVisibleQuestions: false,
-      firstBoot: false,
-      cacheHasLoaded: false,
-      recentRateLimit: false,
-      hasPendingMetadataRetries: false,
-    })).toBe(false);
+    expect(
+      shouldPreferPileGatedEmptyState({
+        hasConcreteHiddenQuestions: true,
+        hasVisibleQuestions: false,
+        firstBoot: false,
+        cacheHasLoaded: false,
+        recentRateLimit: false,
+        hasPendingMetadataRetries: false,
+      }),
+    ).toBe(false);
   });
 
   it('builds filtered-empty pile workspace state once filters settle the empty result', () => {
-    expect(buildPileWorkspaceViewState({
-      pileQuestions: [],
-      activePileIndex: 0,
-      loading: true,
-      hiddenMaskedQuestionIds: [],
-      hasHiddenGatedQuestions: false,
-      firstBoot: false,
-      cacheHasLoaded: true,
-      isQuestionCacheReady: true,
-      recentRateLimit: false,
-      scanRemainingBlocks: 37500,
-      hydrateDiscovered: 0,
-      hydrateDone: 0,
-      pendingMetadataCount: 0,
-      questionScanPhase: 'scan',
-      isHydratingPriorResponses: false,
-      isFilterActive: true,
-      hasFilterBaseQuestions: true,
-    })).toEqual(expect.objectContaining({
-      activeQuestion: null,
-      activePromptMasked: false,
-      hasVisibleQuestions: false,
-      showFilteredEmptyState: true,
-      showGatedEmptyState: false,
-      isStillLoading: false,
-      showMiniBackgroundSpinner: false,
-    }));
+    expect(
+      buildPileWorkspaceViewState({
+        pileQuestions: [],
+        activePileIndex: 0,
+        loading: true,
+        hiddenMaskedQuestionIds: [],
+        hasHiddenGatedQuestions: false,
+        firstBoot: false,
+        cacheHasLoaded: true,
+        isQuestionCacheReady: true,
+        recentRateLimit: false,
+        scanRemainingBlocks: 37500,
+        hydrateDiscovered: 0,
+        hydrateDone: 0,
+        pendingMetadataCount: 0,
+        questionScanPhase: 'scan',
+        isHydratingPriorResponses: false,
+        isFilterActive: true,
+        hasFilterBaseQuestions: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        activeQuestion: null,
+        activePromptMasked: false,
+        hasVisibleQuestions: false,
+        showFilteredEmptyState: true,
+        showGatedEmptyState: false,
+        isStillLoading: false,
+        showMiniBackgroundSpinner: false,
+      }),
+    );
   });
 
   it('builds active-question pile workspace state for masked prompts during background refresh', () => {
-    expect(buildPileWorkspaceViewState({
-      pileQuestions: [
-        { id: 'q1', prompt: 'First question', promptDecrypted: true },
-        { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
-      ],
-      activePileIndex: 1,
-      loading: false,
-      hiddenMaskedQuestionIds: [],
-      hasHiddenGatedQuestions: false,
-      firstBoot: false,
-      cacheHasLoaded: true,
-      isQuestionCacheReady: true,
-      recentRateLimit: false,
-      scanRemainingBlocks: 12,
-      hydrateDiscovered: 0,
-      hydrateDone: 0,
-      pendingMetadataCount: 0,
-      questionScanPhase: 'scan',
-      isHydratingPriorResponses: false,
-      isFilterActive: false,
-      hasFilterBaseQuestions: true,
-    })).toEqual(expect.objectContaining({
-      activeQuestion: { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
-      activePromptMasked: true,
-      hasVisibleQuestions: true,
-      hasScanOrHydrationWork: true,
-      isStillLoading: false,
-      showMiniBackgroundSpinner: true,
-    }));
+    expect(
+      buildPileWorkspaceViewState({
+        pileQuestions: [
+          { id: 'q1', prompt: 'First question', promptDecrypted: true },
+          { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
+        ],
+        activePileIndex: 1,
+        loading: false,
+        hiddenMaskedQuestionIds: [],
+        hasHiddenGatedQuestions: false,
+        firstBoot: false,
+        cacheHasLoaded: true,
+        isQuestionCacheReady: true,
+        recentRateLimit: false,
+        scanRemainingBlocks: 12,
+        hydrateDiscovered: 0,
+        hydrateDone: 0,
+        pendingMetadataCount: 0,
+        questionScanPhase: 'scan',
+        isHydratingPriorResponses: false,
+        isFilterActive: false,
+        hasFilterBaseQuestions: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        activeQuestion: { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
+        activePromptMasked: true,
+        hasVisibleQuestions: true,
+        hasScanOrHydrationWork: true,
+        isStillLoading: false,
+        showMiniBackgroundSpinner: true,
+      }),
+    );
   });
 
   it('fails closed to gated empty state when a gated session has unresolved question metadata', () => {
-    expect(buildPileWorkspaceViewState({
-      pileQuestions: [],
-      activePileIndex: 0,
-      loading: true,
-      hiddenMaskedQuestionIds: [],
-      hasHiddenGatedQuestions: false,
-      firstBoot: false,
-      cacheHasLoaded: true,
-      isQuestionCacheReady: false,
-      recentRateLimit: false,
-      scanRemainingBlocks: 0,
-      hydrateDiscovered: 1,
-      hydrateDone: 0,
-      pendingMetadataCount: 0,
-      questionScanPhase: 'hydrate',
-      hasSessionQuestionGate: true,
-    })).toEqual(expect.objectContaining({
-      hasVisibleQuestions: false,
-      hasConcreteHiddenQuestions: false,
-      hasUnhydratedGatedQuestions: true,
-      showGatedEmptyState: true,
-      allowUnreadyEmptySettlement: true,
-      isStillLoading: false,
-    }));
+    expect(
+      buildPileWorkspaceViewState({
+        pileQuestions: [],
+        activePileIndex: 0,
+        loading: true,
+        hiddenMaskedQuestionIds: [],
+        hasHiddenGatedQuestions: false,
+        firstBoot: false,
+        cacheHasLoaded: true,
+        isQuestionCacheReady: false,
+        recentRateLimit: false,
+        scanRemainingBlocks: 0,
+        hydrateDiscovered: 1,
+        hydrateDone: 0,
+        pendingMetadataCount: 0,
+        questionScanPhase: 'hydrate',
+        hasSessionQuestionGate: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        hasVisibleQuestions: false,
+        hasConcreteHiddenQuestions: false,
+        hasUnhydratedGatedQuestions: true,
+        showGatedEmptyState: true,
+        allowUnreadyEmptySettlement: true,
+        isStillLoading: false,
+      }),
+    );
   });
 
   it('keeps gated empty state after an empty gated cache reports ready', () => {
-    expect(buildPileWorkspaceViewState({
-      pileQuestions: [],
-      activePileIndex: 0,
-      loading: false,
-      hiddenMaskedQuestionIds: [],
-      hasHiddenGatedQuestions: false,
-      firstBoot: false,
-      cacheHasLoaded: true,
-      isQuestionCacheReady: true,
-      recentRateLimit: false,
-      scanRemainingBlocks: 0,
-      hydrateDiscovered: 0,
-      hydrateDone: 0,
-      pendingMetadataCount: 0,
-      questionScanPhase: '',
-      hasSessionQuestionGate: true,
-    })).toEqual(expect.objectContaining({
-      hasUnhydratedGatedQuestions: true,
-      showGatedEmptyState: true,
-      isStillLoading: false,
-    }));
+    expect(
+      buildPileWorkspaceViewState({
+        pileQuestions: [],
+        activePileIndex: 0,
+        loading: false,
+        hiddenMaskedQuestionIds: [],
+        hasHiddenGatedQuestions: false,
+        firstBoot: false,
+        cacheHasLoaded: true,
+        isQuestionCacheReady: true,
+        recentRateLimit: false,
+        scanRemainingBlocks: 0,
+        hydrateDiscovered: 0,
+        hydrateDone: 0,
+        pendingMetadataCount: 0,
+        questionScanPhase: '',
+        hasSessionQuestionGate: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        hasUnhydratedGatedQuestions: true,
+        showGatedEmptyState: true,
+        isStillLoading: false,
+      }),
+    );
   });
 });

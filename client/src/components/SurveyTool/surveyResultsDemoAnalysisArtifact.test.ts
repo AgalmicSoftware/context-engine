@@ -1,9 +1,5 @@
-import {
-  buildSurveyResultsDemoAnalysisArtifact,
-} from './surveyResultsDemoAnalysisArtifact';
-import type {
-  SessionResultsAnalysisPayloadBuildResult,
-} from '../../utilities/sessionResultsExport';
+import { buildSurveyResultsDemoAnalysisArtifact } from './surveyResultsDemoAnalysisArtifact';
+import type { SessionResultsAnalysisPayloadBuildResult } from '../../utilities/sessionResultsExport';
 
 const buildAnalysisPayload = ({
   questions = [

@@ -7,7 +7,7 @@
  */
 
 import { ethers } from 'ethers';
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { buildSiweMessage } from '../worker/workerAuth.js';
 import { normalizeSessionSlug } from './sessionConfigResolvers.js';
@@ -44,22 +44,19 @@ type RetryOptions = {
   baseDelayMs?: number;
 };
 
-const asSignerLike = (value: unknown): SignerLike | null => (
+const asSignerLike = (value: unknown): SignerLike | null =>
   value &&
   typeof value === 'object' &&
   typeof (value as Partial<SignerLike>).signMessage === 'function' &&
   typeof (value as Partial<SignerLike>).getAddress === 'function'
-    ? value as SignerLike
-    : null
-);
+    ? (value as SignerLike)
+    : null;
 
-const asSessionConfigFields = (value: unknown): SessionConfigFields => (
-  value && typeof value === 'object' ? value as SessionConfigFields : {}
-);
+const asSessionConfigFields = (value: unknown): SessionConfigFields =>
+  value && typeof value === 'object' ? (value as SessionConfigFields) : {};
 
-const asErrorMessageSource = (value: unknown): ErrorMessageSource => (
-  value && typeof value === 'object' ? value as ErrorMessageSource : {}
-);
+const asErrorMessageSource = (value: unknown): ErrorMessageSource =>
+  value && typeof value === 'object' ? (value as ErrorMessageSource) : {};
 
 export const buildArweaveUploadBootstrapAuth = async ({
   signer = null,
@@ -98,7 +95,7 @@ export const buildArweaveUploadBootstrapAuth = async ({
       sessionSlug: slug,
     }),
   });
-  const nonceData = await nonceResp.json().catch(() => ({})) as NonceResponseBody;
+  const nonceData = (await nonceResp.json().catch(() => ({}))) as NonceResponseBody;
   if (!nonceResp.ok) {
     throw new Error(String(nonceData?.error || 'Failed to request Arweave bootstrap nonce.'));
   }
@@ -151,12 +148,12 @@ export const uploadDataToArweaveWithRetry = async (
   data: unknown,
   format: unknown,
   opts: unknown,
-  { attempts = 3, baseDelayMs = 350 }: RetryOptions = {}
+  { attempts = 3, baseDelayMs = 350 }: RetryOptions = {},
 ): Promise<unknown> => {
   let lastErr: unknown = null;
   for (let i = 0; i < attempts; i += 1) {
     try {
-      return await arweaveScripts.uploadDataToArweave(data, format, opts as Record<string, unknown> | undefined);
+      return await arweaveClient.uploadDataToArweave(data, format, opts as Record<string, unknown> | undefined);
     } catch (err) {
       lastErr = err;
       if (i >= attempts - 1 || !isRetryableArweaveUploadError(err)) {

@@ -1,4 +1,5 @@
 import { readArweaveUploadRequestPayload } from './arweaveUploadRequestNormalization.js';
+import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import { workerGroupsRoute as workerGroupsRouteBoundary } from './workerGroups.js';
 
 export const dispatchAuthenticatedSecretPathRoute = async ({
@@ -114,9 +115,16 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
   if (!secretContext?.ok) {
     let canUseProvidedJwk = false;
     if (isArweaveUploadRoute && secretContext?.reason === 'missing_secrets') {
+      const maxUploadBytes = resolveMaxUploadBytes({ env, deps });
       const uploadPayload = await (
         deps?.readArweaveUploadRequestPayload || readArweaveUploadRequestPayload
-      )(request);
+      )(request, { maxUploadBytes });
+      if (uploadPayload?.status === 413) {
+        return {
+          handled: true,
+          response: deps?.json?.({ error: uploadPayload.error }, 413, headers),
+        };
+      }
       canUseProvidedJwk = !!uploadPayload?.ok && !!uploadPayload?.payload?.providedJwk;
     }
     if (canUseProvidedJwk) {
@@ -153,6 +161,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     handled: true,
     response: await deps?.arweaveUpload?.({
       request,
+      env,
       secrets,
       baseHeaders: headers,
       config,

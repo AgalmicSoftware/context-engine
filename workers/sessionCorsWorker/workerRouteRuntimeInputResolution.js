@@ -40,6 +40,8 @@ export const resolveWorkerRouteRuntimeInput = ({
     resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
     validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
     consumeNonce: deps?.consumeNonce,
+    ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
+    ...(deps?.readAbuseCounterSummary ? { readAbuseCounterSummary: deps.readAbuseCounterSummary } : {}),
     buildNonce: deps?.buildNonce,
     checkNonceRateLimit: deps?.checkNonceRateLimit,
     base64UrlEncode: deps?.base64UrlEncode,

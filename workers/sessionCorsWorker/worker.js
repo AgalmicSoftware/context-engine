@@ -26,7 +26,7 @@ const log = (...args) => {
 log.warn = (...args) => console.warn(...args);
 log.error = (...args) => console.error(...args);
 
-const workerRuntime = createWorkerTopLevelRuntimeWithWorkerDepsBoundary({
+const workerDeps = {
   deps: {
     ethers,
     URL,
@@ -36,13 +36,21 @@ const workerRuntime = createWorkerTopLevelRuntimeWithWorkerDepsBoundary({
     rpcFetch: (...args) => globalThis.fetch(...args),
     now: Date.now,
   },
+};
+
+const createWorkerRuntime = (env) => createWorkerTopLevelRuntimeWithWorkerDepsBoundary({
+  ...workerDeps,
+  env,
 });
 
-export const workerAuthGateUtils = workerRuntime.workerAuthGateUtils;
+const defaultWorkerRuntime = createWorkerRuntime();
+
+export const workerAuthGateUtils = defaultWorkerRuntime.workerAuthGateUtils;
 
 export default {
   fetch(request, env, ctx) {
     initializeWorkerDebugLogs(env);
+    const workerRuntime = createWorkerRuntime(env);
     return workerRuntime.fetch(request, env, ctx);
   },
 };

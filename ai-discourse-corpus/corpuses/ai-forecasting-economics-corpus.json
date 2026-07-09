@@ -1,0 +1,757 @@
+{
+  "meta": {
+    "description": "Corpus of AI forecasting and economics source material: compute and capability trend data (Epoch AI, Our World in Data), crowd and tournament forecasts (Metaculus, XPT), and the formal economics of transformative AI (growth theory, automation models, empirical macro estimates). Provides the quantitative-trajectory and economic-impact evidence base that AI governance and timeline debates draw on.",
+    "version": "1.0",
+    "date_generated": "2026-07-08",
+    "entry_count": 17,
+    "curation_notes": "All URLs verified via web search/fetch on 2026-07-08. date_precision marks year- or month-granular dates; prediction-market entries are dated by question opening with current standings (as of 2026-07) described in summaries. Overlapping documents already in other sub-corpuses are excluded: AI 2027 and Machines of Loving Grace (dwarkesh-lab-insiders), the 2023 AI Impacts expert survey (lesswrong-posts), Bio Anchors and Compute Trends Across Three Eras (arxiv-ai-safety), the AI Impacts discontinuous-progress investigation (lesswrong-posts), and METR time-horizon work (metr-evals-metrics).",
+    "coverage": {
+      "categories": [
+        "compute_trends",
+        "data_resource",
+        "economic_agenda",
+        "economic_model",
+        "empirical_economics",
+        "forecast_tracking",
+        "forecasting_tournament",
+        "growth_theory",
+        "organization_report",
+        "prediction_market"
+      ],
+      "date_range": "2020 to 2026-01-16"
+    }
+  },
+  "entries": [
+    {
+      "id": "epoch_data_hub_trajectory_of_ai",
+      "title": "Epoch AI Data Hub: Data on the Trajectory of AI",
+      "authors": [
+        "Epoch AI"
+      ],
+      "date": "2023",
+      "date_precision": "year",
+      "source_type": "dataset",
+      "source_platform": "Epoch AI",
+      "url": "https://epoch.ai/data",
+      "category": "data_resource",
+      "summary": "Epoch AI’s continuously updated public databases tracking the empirical trajectory of AI: notable and frontier model training runs (parameters, compute, data), hardware price-performance, data centers (including a satellite-imagery explorer), AI chip production and sales, benchmark results, and company-level indicators. The de facto reference dataset behind most quantitative claims in AI forecasting and governance debates — training-compute doubling times, threshold-crossing model counts, and capacity growth figures typically trace here.",
+      "key_findings": [
+        "Frontier training compute grew ~4-5x/year through the early 2020s (dashboard-maintained estimate)",
+        "Total AI-chip computing capacity has grown ~3.3x per year since 2022",
+        "Databases: notable models, frontier data centers, chips, benchmarks, companies"
+      ],
+      "novel_arguments_and_concepts": [
+        "open longitudinal measurement as forecasting infrastructure"
+      ],
+      "implications_for_governance": "Compute-threshold regulation (e.g. 1e26 FLOP triggers) is only administrable because public trackers like this exist to estimate which and how many models cross thresholds.",
+      "themes": [
+        "compute_trends",
+        "measurement",
+        "forecasting_infrastructure"
+      ],
+      "tags": [
+        "epoch_ai",
+        "compute",
+        "datasets",
+        "trends"
+      ],
+      "influence_score": 9,
+      "source_links": [
+        {
+          "title": "Data center satellite explorer",
+          "url": "https://epoch.ai/data/data-centers/satellite-explorer"
+        }
+      ]
+    },
+    {
+      "id": "epoch_can_scaling_continue_2030_2024",
+      "title": "Can AI Scaling Continue Through 2030?",
+      "authors": [
+        "Jaime Sevilla",
+        "Epoch AI"
+      ],
+      "date": "2024-08",
+      "date_precision": "month",
+      "source_type": "research_report",
+      "source_platform": "Epoch AI",
+      "url": "https://epoch.ai/blog/can-ai-scaling-continue-through-2030",
+      "category": "compute_trends",
+      "summary": "Epoch’s systematic feasibility study of continued frontier scaling to 2030 across four candidate constraints: power availability, chip manufacturing capacity, data scarcity, and the latency wall. Concludes training runs of roughly 2e29 FLOP (≈10,000x GPT-4) are plausibly feasible by 2030, with power and chip packaging the binding constraints and data the most uncertain. The reference analysis cited on both sides of the will-scaling-hit-a-wall debate.",
+      "key_findings": [
+        "~2e29 FLOP training runs plausibly feasible by 2030",
+        "Power and advanced packaging (CoWoS) identified as binding constraints before data",
+        "Multi-datacenter distributed training treated as a viable path around single-site power limits"
+      ],
+      "quantitative_data": {
+        "metric_name": "largest feasible training run by 2030",
+        "current_value": "~2e29 FLOP (central estimate)",
+        "trend": "~4x/year frontier compute growth assumed sustainable this decade"
+      },
+      "novel_arguments_and_concepts": [
+        "constraint-by-constraint feasibility decomposition of scaling"
+      ],
+      "implications_for_governance": "If scaling stays feasible to 2030, capability forecasts anchored to compute keep their predictive relevance — directly feeding timeline and threshold-policy debates.",
+      "themes": [
+        "compute_trends",
+        "scaling",
+        "forecasting"
+      ],
+      "tags": [
+        "epoch_ai",
+        "scaling",
+        "compute",
+        "power",
+        "2030"
+      ],
+      "influence_score": 8,
+      "source_links": []
+    },
+    {
+      "id": "epoch_gate_model_2025",
+      "title": "GATE: An Integrated Assessment Model for AI Automation",
+      "authors": [
+        "Ege Erdil",
+        "Andrei Potlogea",
+        "Tamay Besiroglu",
+        "et al. (Epoch AI)"
+      ],
+      "date": "2025-03",
+      "date_precision": "month",
+      "source_type": "research_paper",
+      "source_platform": "Epoch AI / arXiv",
+      "url": "https://epoch.ai/blog/announcing-gate",
+      "category": "economic_model",
+      "summary": "GATE (Growth and AI Transition Endogenous model) is a compute-centric integrated assessment model linking AI hardware investment, R&D, and automation to macroeconomic outcomes: investment buys compute, compute drives automation of a task continuum, automation raises output, and output finances further investment. Under central parameters the model produces growth accelerated 2-20x over the ~3% historical average during the automation transition, with over a fifth of yearly output reinvested into AI at peak, while exposing which parameter uncertainties (automatability distribution, compute-capability mapping) drive the spread. Released with an interactive sandbox for exploring scenarios.",
+      "key_findings": [
+        "Growth rates elevated 2-20x over historical ~3% during the automation period under central parameters",
+        ">20% of annual output reinvested into AI in boom scenarios",
+        "Outcome spread dominated by automatability and compute-to-capability assumptions"
+      ],
+      "quantitative_data": {
+        "metric_name": "modeled GDP growth during AI automation transition",
+        "current_value": "2-20x historical average (scenario-dependent)",
+        "trend": "super-exponential in high-automation scenarios"
+      },
+      "novel_arguments_and_concepts": [
+        "integrated assessment modeling ported from climate economics to AI",
+        "compute-anchored automation modeling"
+      ],
+      "implications_for_governance": "Gives explosive-growth claims a formal, criticizable model with explicit parameters — moving the takeoff debate from intuition to sensitivity analysis.",
+      "themes": [
+        "economic_growth",
+        "automation",
+        "modeling",
+        "takeoff"
+      ],
+      "tags": [
+        "epoch_ai",
+        "gate",
+        "economic_model",
+        "automation",
+        "explosive_growth"
+      ],
+      "influence_score": 8,
+      "source_links": [
+        {
+          "title": "arXiv paper",
+          "url": "https://arxiv.org/abs/2503.04941"
+        }
+      ]
+    },
+    {
+      "id": "epoch_frontier_model_counts_2025",
+      "title": "Trends in Frontier AI Model Count: A Forecast to 2028",
+      "authors": [
+        "Epoch AI"
+      ],
+      "date": "2025-04",
+      "date_precision": "month",
+      "source_type": "research_paper",
+      "source_platform": "Epoch AI / arXiv",
+      "url": "https://epoch.ai/publications/model-counts-compute-thresholds",
+      "category": "compute_trends",
+      "summary": "Forecasts how many models will cross absolute compute thresholds (the numbers regulation is written around): roughly ten models above 1e26 FLOP by 2026, growing to hundreds above that line by 2030 as frontier compute diffuses. Quantifies the administrative reality that threshold-based regules shift from covering a handful of labs to covering a broad industry within a few years unless thresholds are indexed.",
+      "key_findings": [
+        "~10 models above 1e26 FLOP expected by 2026",
+        "200+ models above 1e26 FLOP projected by 2030",
+        "Fixed compute thresholds capture rapidly growing model populations over time"
+      ],
+      "quantitative_data": {
+        "metric_name": "models exceeding 1e26 FLOP",
+        "current_value": "~10 by 2026 (forecast)",
+        "trend": "200+ by 2030"
+      },
+      "novel_arguments_and_concepts": [
+        "regulatory-threshold population forecasting"
+      ],
+      "implications_for_governance": "Directly undermines or supports compute-threshold policy designs (EU AI Act GPAI systemic-risk line, US reporting triggers) depending on whether thresholds index to the frontier.",
+      "themes": [
+        "compute_thresholds",
+        "regulation",
+        "forecasting"
+      ],
+      "tags": [
+        "epoch_ai",
+        "compute_thresholds",
+        "forecast",
+        "regulation"
+      ],
+      "influence_score": 7,
+      "source_links": [
+        {
+          "title": "arXiv version",
+          "url": "https://arxiv.org/abs/2504.16138"
+        }
+      ]
+    },
+    {
+      "id": "epoch_impact_report_2026",
+      "title": "Epoch AI 2025 Impact Report",
+      "authors": [
+        "Epoch AI"
+      ],
+      "date": "2026-01-16",
+      "source_type": "organization_report",
+      "source_platform": "Epoch AI",
+      "url": "https://epoch.ai/blog/epoch-impact-report-2025",
+      "category": "organization_report",
+      "summary": "Epoch AI’s annual report (2026-01-16): 100+ research outputs in 2025, audience more than doubled, $10M+ raised, and a 2026 roadmap centered on expanding Data Explorers (frontier data centers, AI companies, benchmarking) and cross-actor compute tracking beginning with AI chip sales data. Documents the institutionalization of independent AI measurement as a field — useful as a primary record of what forecasting infrastructure exists and where it is heading.",
+      "key_findings": [
+        "100+ outputs and >2x audience growth in 2025",
+        "2026 roadmap: chip-sales tracking, expanded data-center and company explorers"
+      ],
+      "novel_arguments_and_concepts": [],
+      "implications_for_governance": "Independent measurement organizations are load-bearing for evidence-based AI policy; this report is the capacity statement for the largest one.",
+      "themes": [
+        "forecasting_infrastructure",
+        "measurement"
+      ],
+      "tags": [
+        "epoch_ai",
+        "impact_report",
+        "organization"
+      ],
+      "influence_score": 5,
+      "source_links": []
+    },
+    {
+      "id": "metaculus_weak_agi_question",
+      "title": "Metaculus: When Will the First Weakly General AI Be Publicly Known?",
+      "authors": [
+        "Metaculus community"
+      ],
+      "date": "2020",
+      "date_precision": "year",
+      "source_type": "prediction_market_question",
+      "source_platform": "Metaculus",
+      "url": "https://www.metaculus.com/questions/3479/date-weakly-general-ai-is-publicly-known/",
+      "category": "prediction_market",
+      "summary": "The most-watched aggregate AGI timeline signal: a long-running Metaculus question (opened 2020) with ~1,700 forecasters predicting when a weakly general AI — passing defined benchmarks including a Turing-test variant, SAT performance, and general game-playing — will publicly exist. The community median moved from the 2040s pre-2022 to the late 2020s after ChatGPT and the reasoning-model era; as of mid-2026 the median sits at June 2028 (central range roughly November 2026 to 2032). The question’s trajectory is itself a primary dataset on how the forecasting community updated through the LLM era.",
+      "key_findings": [
+        "Community median: June 2028 as of mid-2026 (~1.7k forecasters)",
+        "Median compressed by roughly 15 years between 2020 and 2026",
+        "Resolution criteria fixed in 2020, making the update series comparable over time"
+      ],
+      "quantitative_data": {
+        "metric_name": "community median date for weak AGI",
+        "current_value": "2028-06 (as of 2026-07)",
+        "trend": "monotonic compression since 2020"
+      },
+      "novel_arguments_and_concepts": [
+        "fixed-criteria long-horizon crowd forecasting for AGI"
+      ],
+      "implications_for_governance": "Widely quoted in policy debate as the crowd timeline; its criteria-vs-vibes gap is also the standard cautionary example about operationalizing AGI.",
+      "themes": [
+        "timelines",
+        "crowd_forecasting",
+        "agi"
+      ],
+      "tags": [
+        "metaculus",
+        "agi_timelines",
+        "forecasting",
+        "prediction_markets"
+      ],
+      "influence_score": 8,
+      "source_links": [
+        {
+          "title": "Metaculus AI hub",
+          "url": "https://www.metaculus.com/ai/"
+        }
+      ]
+    },
+    {
+      "id": "metaculus_full_agi_question",
+      "title": "Metaculus: When Will the First General AI System Be Devised, Tested, and Publicly Announced?",
+      "authors": [
+        "Metaculus community"
+      ],
+      "date": "2020",
+      "date_precision": "year",
+      "source_type": "prediction_market_question",
+      "source_platform": "Metaculus",
+      "url": "https://www.metaculus.com/questions/5121/when-will-the-first-general-ai-system-be-devised-tested-and-publicly-announced/",
+      "category": "prediction_market",
+      "summary": "Metaculus’s stronger AGI criterion question — requiring robust general capability across adversarial Turing testing, robotic manipulation, expert-level QA, and cross-domain skill in a unified system. As of mid-2026 the community median is January 2033, with ~25% probability by 2029 and ~50% by 2033 (central range 2029 to 2040). Paired with the weak-AGI question, it brackets the crowd’s distinction between benchmark-passing generality and genuinely strong general systems.",
+      "key_findings": [
+        "Community median: January 2033 as of mid-2026",
+        "~25% by 2029, ~50% by 2033",
+        "Weak-vs-strong question gap (~4-5 years) has stayed roughly stable through updates"
+      ],
+      "quantitative_data": {
+        "metric_name": "community median date for strong AGI",
+        "current_value": "2033-01 (as of 2026-07)",
+        "trend": "compressed from ~2060 pre-2022"
+      },
+      "novel_arguments_and_concepts": [],
+      "implications_for_governance": "The weak/strong bracket is the closest thing policy has to an aggregate probability distribution over transformative timelines.",
+      "themes": [
+        "timelines",
+        "crowd_forecasting",
+        "agi"
+      ],
+      "tags": [
+        "metaculus",
+        "agi_timelines",
+        "forecasting"
+      ],
+      "influence_score": 7,
+      "source_links": []
+    },
+    {
+      "id": "fri_xpt_2023",
+      "title": "Forecasting Existential Risks: Evidence from a Long-Run Forecasting Tournament (XPT)",
+      "authors": [
+        "Ezra Karger",
+        "Philip Tetlock",
+        "Josh Rosenberg",
+        "et al. (Forecasting Research Institute)"
+      ],
+      "date": "2023-07",
+      "date_precision": "month",
+      "source_type": "research_report",
+      "source_platform": "Forecasting Research Institute",
+      "url": "https://forecastingresearch.org/research/existential-risk-persuasion-tournament",
+      "category": "forecasting_tournament",
+      "summary": "The landmark adversarial-collaboration tournament on existential risk: 169 participants — superforecasters with verified accuracy records and domain experts — spent months forecasting, debating, and attempting to persuade each other on extinction and catastrophe probabilities. Headline result: a persistent, unresolved gap on AI risk, with superforecasters at ~0.4% AI-caused extinction by 2100 versus ~3% for AI domain experts, barely moving under incentivized persuasion. The reference dataset on expert disagreement about AI existential risk and on the limits of persuasion between calibrated forecasters and domain specialists.",
+      "key_findings": [
+        "AI extinction by 2100: superforecaster median ~0.38% vs AI-expert median ~3%",
+        "Persuasion phase produced minimal convergence despite incentives",
+        "Both groups put AI risk above most other examined existential risks"
+      ],
+      "quantitative_data": {
+        "metric_name": "AI-caused human extinction probability by 2100",
+        "current_value": "0.38% (superforecasters) vs 3% (AI experts)",
+        "trend": "gap stable under adversarial collaboration"
+      },
+      "novel_arguments_and_concepts": [
+        "persuasion tournaments",
+        "calibration-vs-domain-knowledge tension in x-risk estimation"
+      ],
+      "implications_for_governance": "Policymakers citing expert risk estimates must choose whose priors to trust; XPT quantified how wide and sticky that choice is.",
+      "themes": [
+        "existential_risk",
+        "expert_disagreement",
+        "forecasting_methodology"
+      ],
+      "tags": [
+        "forecasting_research_institute",
+        "xpt",
+        "tetlock",
+        "existential_risk",
+        "superforecasters"
+      ],
+      "influence_score": 8,
+      "source_links": [
+        {
+          "title": "Full report PDF",
+          "url": "https://static1.squarespace.com/static/635693acf15a3e2a14a56a4a/t/64f0a7838ccbf43b6b5ee40c/1693493128111/XPT.pdf"
+        },
+        {
+          "title": "Near-term accuracy follow-up",
+          "url": "https://forecastingresearch.org/research/near-term-xpt-accuracy"
+        }
+      ]
+    },
+    {
+      "id": "nber_acemoglu_simple_macro_ai_2024",
+      "title": "The Simple Macroeconomics of AI",
+      "authors": [
+        "Daron Acemoglu"
+      ],
+      "date": "2024-05",
+      "date_precision": "month",
+      "source_type": "working_paper",
+      "source_platform": "NBER",
+      "url": "https://www.nber.org/papers/w32487",
+      "category": "empirical_economics",
+      "summary": "The canonical skeptical estimate of near-term AI macro impact. Using task-based growth accounting with exposure estimates from prior studies, Acemoglu projects total factor productivity gains of only ~0.66% cumulatively over ten years from generative AI (GDP ~1.1%), arguing exposed tasks are a modest share of the economy, average cost savings are moderate, and hard-to-learn tasks will resist automation. Directly targets the multi-percent-per-year forecasts from industry and some economists, and anchors the low end of the AI-growth debate.",
+      "key_findings": [
+        "~0.66% total TFP uplift over 10 years (central estimate)",
+        "Modest GDP effects (~1.1% cumulative) absent new task creation",
+        "Distinguishes easy-to-learn from hard-to-learn tasks as the binding margin"
+      ],
+      "quantitative_data": {
+        "metric_name": "10-year TFP gain from generative AI",
+        "current_value": "~0.66% cumulative",
+        "trend": "flat absent qualitatively new capabilities"
+      },
+      "novel_arguments_and_concepts": [
+        "task-exposure-based macro accounting applied to genAI"
+      ],
+      "implications_for_governance": "The standard citation against AI-driven fiscal windfall assumptions and for skepticism about transformative near-term growth.",
+      "themes": [
+        "economic_growth",
+        "productivity",
+        "automation_skepticism"
+      ],
+      "tags": [
+        "acemoglu",
+        "nber",
+        "macroeconomics",
+        "productivity"
+      ],
+      "influence_score": 8,
+      "source_links": [
+        {
+          "title": "PDF",
+          "url": "https://www.nber.org/system/files/working_papers/w32487/w32487.pdf"
+        }
+      ]
+    },
+    {
+      "id": "nber_growth_under_transformative_ai_2023",
+      "title": "Economic Growth under Transformative AI",
+      "authors": [
+        "Philip Trammell",
+        "Anton Korinek"
+      ],
+      "date": "2023-10",
+      "date_precision": "month",
+      "source_type": "working_paper",
+      "source_platform": "NBER",
+      "url": "https://www.nber.org/papers/w31815",
+      "category": "growth_theory",
+      "summary": "The systematic survey of what growth theory actually implies about transformative AI: works through production-function assumptions (substitution vs complementarity between AI and labor, Baumol bottlenecks, AI in idea production) and maps which assumptions deliver which regimes — from stagnant wages with explosive output to broad-based growth to full decoupling of growth from labor. The paper that made \"it depends on elasticities and bottlenecks\" the disciplined center of the explosive-growth debate.",
+      "key_findings": [
+        "Explosive growth follows from full substitutability in goods or idea production; bottlenecked complements deliver Baumol-limited growth",
+        "Wage trajectories can decouple sharply from output trajectories depending on factor substitution",
+        "Identifies the small set of empirical parameters the debate reduces to"
+      ],
+      "novel_arguments_and_concepts": [
+        "taxonomy of growth regimes under AI by production assumptions"
+      ],
+      "implications_for_governance": "Labor policy and fiscal planning under AI hinge on which regime obtains; this is the map of the regimes.",
+      "themes": [
+        "economic_growth",
+        "growth_theory",
+        "labor"
+      ],
+      "tags": [
+        "trammell",
+        "korinek",
+        "nber",
+        "growth_theory",
+        "transformative_ai"
+      ],
+      "influence_score": 8,
+      "source_links": [
+        {
+          "title": "PDF",
+          "url": "https://www.nber.org/system/files/working_papers/w31815/w31815.pdf"
+        }
+      ]
+    },
+    {
+      "id": "nber_korinek_suh_agi_scenarios_2024",
+      "title": "Scenarios for the Transition to AGI",
+      "authors": [
+        "Anton Korinek",
+        "Donghyun Suh"
+      ],
+      "date": "2024-03",
+      "date_precision": "month",
+      "source_type": "working_paper",
+      "source_platform": "NBER",
+      "url": "https://www.nber.org/papers/w32255",
+      "category": "growth_theory",
+      "summary": "Models the AGI transition as progressive automation of a task distribution parameterized by computational complexity, deriving wage and output paths under different shapes of the human-task frontier. Central results: output accelerates in all automation scenarios, but wages can collapse before full automation if the remaining human tasks are a bounded set — the timing of wage collapse versus wage boom depends on whether automatable task complexity is bounded or unbounded. The cleanest formal statement of when AGI is good or catastrophic for labor.",
+      "key_findings": [
+        "Wage dynamics bifurcate: boom then collapse (bounded human tasks) vs sustained gains (unbounded)",
+        "Output growth accelerates across all modeled scenarios",
+        "Baseline scenario projects on the order of a doubling of GDP within a decade of advanced AGI deployment"
+      ],
+      "novel_arguments_and_concepts": [
+        "compute-complexity parameterization of task automation",
+        "wage-collapse timing results"
+      ],
+      "implications_for_governance": "Formalizes the case that labor-income erosion can precede full automation — the analytic basis for pre-AGI redistribution planning.",
+      "themes": [
+        "agi_transition",
+        "labor",
+        "wages",
+        "growth_theory"
+      ],
+      "tags": [
+        "korinek",
+        "suh",
+        "nber",
+        "agi",
+        "wages"
+      ],
+      "influence_score": 7,
+      "source_links": [
+        {
+          "title": "PDF",
+          "url": "https://www.nber.org/system/files/working_papers/w32255/w32255.pdf"
+        },
+        {
+          "title": "SSRN version",
+          "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4762962"
+        }
+      ]
+    },
+    {
+      "id": "nber_karger_forecasting_economic_effects_2025",
+      "title": "Forecasting the Economic Effects of AI",
+      "authors": [
+        "Ezra Karger",
+        "et al."
+      ],
+      "date": "2025",
+      "date_precision": "year",
+      "source_type": "working_paper",
+      "source_platform": "NBER",
+      "url": "https://www.nber.org/system/files/working_papers/w35046/w35046.pdf",
+      "category": "empirical_economics",
+      "summary": "Applies structured forecasting methodology (in the XPT tradition) to AI’s economic effects: eliciting calibrated probabilistic forecasts from economists and forecasters over GDP, productivity, and labor-market outcomes under AI scenarios, quantifying the disagreement between forecasting-track-record holders and domain economists on how large and how fast AI’s macro effects will be. Bridges the forecasting-tournament literature and the AI-macro debate that Acemoglu and the explosive-growth camp anchor.",
+      "key_findings": [
+        "Structured elicitation of AI macro forecasts across expert populations",
+        "Documents systematic gaps between forecaster and economist expectations"
+      ],
+      "novel_arguments_and_concepts": [
+        "tournament-style elicitation for macro AI effects"
+      ],
+      "implications_for_governance": "Gives fiscal and labor planners distributional forecasts rather than point estimates from single models.",
+      "themes": [
+        "forecasting_methodology",
+        "economic_growth",
+        "expert_disagreement"
+      ],
+      "tags": [
+        "karger",
+        "nber",
+        "forecasting",
+        "macroeconomics"
+      ],
+      "influence_score": 6,
+      "source_links": []
+    },
+    {
+      "id": "nber_research_agenda_transformative_ai_2025",
+      "title": "A Research Agenda for the Economics of Transformative AI",
+      "authors": [
+        "Ajay Agrawal",
+        "Erik Brynjolfsson",
+        "Anton Korinek"
+      ],
+      "date": "2025",
+      "date_precision": "year",
+      "source_type": "working_paper",
+      "source_platform": "NBER",
+      "url": "https://www.nber.org/papers/w34256",
+      "category": "economic_agenda",
+      "summary": "The field-defining agenda paper accompanying the NBER Economics of Transformative AI project: organizes the open questions — growth regimes, labor and wages, market structure and concentration, public finance when labor-income tax bases erode, alignment of AI with economic institutions, and transition dynamics — into a research program, and argues economists have systematically under-invested in scenarios where AI substitutes broadly for human labor. The coordination point for the emerging TAI-economics subfield.",
+      "key_findings": [
+        "Canonical open-question map for transformative-AI economics",
+        "Argues mainstream economics under-weights broad-substitution scenarios"
+      ],
+      "novel_arguments_and_concepts": [
+        "transformative AI as a distinct economic research program"
+      ],
+      "implications_for_governance": "Signals to policy institutions which economic unknowns are live; the syllabus for TAI-aware economic policy staff.",
+      "themes": [
+        "economic_agenda",
+        "transformative_ai",
+        "labor",
+        "public_finance"
+      ],
+      "tags": [
+        "agrawal",
+        "brynjolfsson",
+        "korinek",
+        "nber",
+        "research_agenda"
+      ],
+      "influence_score": 7,
+      "source_links": [
+        {
+          "title": "NBER Economics of Transformative AI project",
+          "url": "https://www.nber.org/books-and-chapters/economics-transformative-ai"
+        }
+      ]
+    },
+    {
+      "id": "econtai_automating_ai_research_explosive_growth_2026",
+      "title": "When Does Automating AI Research Produce Explosive Growth? Feedback Loops in Innovation Networks",
+      "authors": [
+        "Tom Davidson",
+        "Basil Halperin",
+        "Thomas Houlden",
+        "Anton Korinek"
+      ],
+      "date": "2026-01",
+      "date_precision": "month",
+      "source_type": "working_paper",
+      "source_platform": "NBER / econtai.org",
+      "url": "https://www.nber.org/system/files/working_papers/w35155/w35155.pdf",
+      "category": "growth_theory",
+      "summary": "The sharpest formal treatment yet of the intelligence-explosion-to-growth-explosion link. Builds a semi-endogenous growth model with an innovation network — research and automation in one sector raise research productivity in others — and derives a clean analytical condition for when automating AI R&D produces super-exponential (\"explosive\") growth. Two reinforcing channels can offset diminishing returns to ideas: a technological feedback loop across research sectors and an economic feedback loop where higher output finances more research. Headline finding: the take-off threshold is within reach of plausible parameter values, with growth effects slow initially but compounding rapidly.",
+      "key_findings": [
+        "Closed-form threshold condition for explosive growth from R&D automation",
+        "Take-off threshold assessed as within reach under plausible parameters",
+        "Predicts slow-then-compounding growth dynamics rather than immediate discontinuity"
+      ],
+      "novel_arguments_and_concepts": [
+        "innovation-network feedback formalization of the intelligence explosion",
+        "analytical take-off threshold"
+      ],
+      "implications_for_governance": "Turns takeoff debates into a measurable-parameters question; directly relevant to DeepMind FSF-style ML R&D destabilization protocols and compute governance.",
+      "themes": [
+        "explosive_growth",
+        "ai_rd_automation",
+        "takeoff",
+        "growth_theory"
+      ],
+      "tags": [
+        "davidson",
+        "halperin",
+        "houlden",
+        "korinek",
+        "explosive_growth",
+        "rsi"
+      ],
+      "influence_score": 8,
+      "source_links": [
+        {
+          "title": "econtai.org version (2026-01-02)",
+          "url": "https://www.econtai.org/research/AutomatingResearch-2026-01-02.pdf"
+        },
+        {
+          "title": "SSRN",
+          "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6705512"
+        }
+      ]
+    },
+    {
+      "id": "nber_economics_transformative_ai_volume_2025",
+      "title": "The Economics of Transformative AI (NBER Volume)",
+      "authors": [
+        "Ajay Agrawal",
+        "Erik Brynjolfsson",
+        "Anton Korinek (eds.)"
+      ],
+      "date": "2025",
+      "date_precision": "year",
+      "source_type": "book",
+      "source_platform": "NBER / University of Chicago Press",
+      "url": "https://www.nber.org/books-and-chapters/economics-transformative-ai",
+      "category": "economic_agenda",
+      "summary": "The first NBER volume dedicated to transformative-AI economics, collecting chapters across growth, labor, market structure, public finance (including what to tax when AGI erodes labor-income and consumption bases), and institution design under advanced AI. Marks the mainstreaming of questions that lived in the futurist literature five years earlier, with an associated recurring NBER workshop series from fall 2025.",
+      "key_findings": [
+        "Institutional consolidation of TAI economics into the NBER canon",
+        "Public-finance-under-AGI chapters directly address tax-base erosion"
+      ],
+      "novel_arguments_and_concepts": [],
+      "implications_for_governance": "The volume policy economists will actually cite; its framings will propagate into treasury and central-bank analysis.",
+      "themes": [
+        "economic_agenda",
+        "transformative_ai",
+        "public_finance"
+      ],
+      "tags": [
+        "nber",
+        "transformative_ai",
+        "economics",
+        "volume"
+      ],
+      "influence_score": 6,
+      "source_links": [
+        {
+          "title": "Fall 2025 workshop",
+          "url": "https://www.nber.org/conferences/economics-transformative-ai-workshop-fall-2025"
+        }
+      ]
+    },
+    {
+      "id": "futuresearch_agi_timeline_tracker_2026",
+      "title": "AGI Timeline Predictions: How Top Forecasters Updated, 2023 to 2026",
+      "authors": [
+        "FutureSearch"
+      ],
+      "date": "2026",
+      "date_precision": "year",
+      "source_type": "analysis",
+      "source_platform": "FutureSearch",
+      "url": "https://futuresearch.ai/blog/agi-timeline-tracker/",
+      "category": "forecast_tracking",
+      "summary": "Longitudinal tracking of how named top forecasters and forecasting platforms revised AGI timeline predictions from 2023 through 2026 — who updated toward shorter timelines, who held, and how stated reasons map to capability events (reasoning models, agentic coding, time-horizon results). Useful as a meta-forecasting record: it measures the update behavior of the forecasting community itself rather than adding another timeline estimate.",
+      "key_findings": [
+        "Documents systematic timeline compression across tracked forecasters 2023→2026",
+        "Ties individual updates to specific capability milestones"
+      ],
+      "novel_arguments_and_concepts": [
+        "forecaster-update audit trail for AGI timelines"
+      ],
+      "implications_for_governance": "Update velocity of calibrated forecasters is itself evidence for how fast the policy window may be moving.",
+      "themes": [
+        "timelines",
+        "forecasting_methodology",
+        "meta_forecasting"
+      ],
+      "tags": [
+        "futuresearch",
+        "agi_timelines",
+        "forecaster_tracking"
+      ],
+      "influence_score": 5,
+      "source_links": []
+    },
+    {
+      "id": "owid_artificial_intelligence_data",
+      "title": "Our World in Data: Artificial Intelligence",
+      "authors": [
+        "Charlie Giattino",
+        "Edouard Mathieu",
+        "Veronika Samborska",
+        "Max Roser (Our World in Data)"
+      ],
+      "date": "2023",
+      "date_precision": "year",
+      "source_type": "dataset",
+      "source_platform": "Our World in Data",
+      "url": "https://ourworldindata.org/artificial-intelligence",
+      "category": "data_resource",
+      "summary": "Our World in Data’s continuously updated AI topic hub: long-run charts on training compute, model capabilities versus human benchmarks, AI investment flows, adoption, and public attitudes, largely built on Epoch AI’s databases with OWID’s accessibility and licensing. The standard public-communication layer for AI trend data — the charts most likely to appear in journalism, teaching, and policy briefings.",
+      "key_findings": [
+        "Public-facing longitudinal charts of compute, capabilities, investment, adoption",
+        "CC-licensed, citable, continuously refreshed visualizations over Epoch data"
+      ],
+      "novel_arguments_and_concepts": [],
+      "implications_for_governance": "Public and legislative understanding of AI trajectories largely flows through this layer; its framing choices matter for discourse quality.",
+      "themes": [
+        "data_resource",
+        "public_communication",
+        "compute_trends"
+      ],
+      "tags": [
+        "our_world_in_data",
+        "datasets",
+        "charts",
+        "trends"
+      ],
+      "influence_score": 6,
+      "source_links": []
+    }
+  ]
+}

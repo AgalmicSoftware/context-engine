@@ -5,7 +5,7 @@ import SessionPublishBundleFallbackPanel from './SessionPublishBundleFallbackPan
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const buildProps = (
-  overrides: Partial<React.ComponentProps<typeof SessionPublishBundleFallbackPanel>> = {}
+  overrides: Partial<React.ComponentProps<typeof SessionPublishBundleFallbackPanel>> = {},
 ): React.ComponentProps<typeof SessionPublishBundleFallbackPanel> => ({
   bundleFile: null,
   bundleFileInputRef: createRef<HTMLInputElement>(),
@@ -29,20 +29,20 @@ describe('SessionPublishBundleFallbackPanel', () => {
           normalModeBundleUrlOverride: 'https://assets.example.test/sessionCorsWorker.bundle.js',
           onNormalModeBundleUrlOverrideChange,
         })}
-      />
+      />,
     );
 
     const overrideInput = screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE);
     expect(overrideInput).toHaveValue('https://assets.example.test/sessionCorsWorker.bundle.js');
-    expect(screen.getByText('Use an https:// bundle URL when the hosted asset is unavailable.'))
-      .toBeInTheDocument();
+    expect(screen.getByText('Use an https:// bundle URL when the hosted asset is unavailable.')).toBeInTheDocument();
 
     fireEvent.change(overrideInput, {
       target: { value: 'https://cdn.example.test/sessionCorsWorker.bundle.js' },
     });
 
-    expect(onNormalModeBundleUrlOverrideChange)
-      .toHaveBeenCalledWith('https://cdn.example.test/sessionCorsWorker.bundle.js');
+    expect(onNormalModeBundleUrlOverrideChange).toHaveBeenCalledWith(
+      'https://cdn.example.test/sessionCorsWorker.bundle.js',
+    );
   });
 
   it('renders validation errors and keeps the file clear action disabled without a file', () => {
@@ -53,7 +53,7 @@ describe('SessionPublishBundleFallbackPanel', () => {
           normalModeBundleUrlOverrideValidationError: 'Manual bundle URL override must use an https:// URL.',
           onClearBundleFile,
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Manual bundle URL override must use an https:// URL.')).toBeInTheDocument();
@@ -77,7 +77,7 @@ describe('SessionPublishBundleFallbackPanel', () => {
           onBundleFileChange,
           onClearBundleFile,
         })}
-      />
+      />,
     );
 
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT), {

@@ -93,12 +93,10 @@ const EncryptionPanel = ({
   const translate = typeof t === 'function' ? t : (key: string) => key;
   const gates = Array.isArray(encryptionGates) ? encryptionGates : [];
   const pendingDrafts = Array.isArray(pendingSbtDrafts) ? pendingSbtDrafts : [];
-  const renderInfoTooltip = typeof renderSessionWizardInfoTooltip === 'function'
-    ? renderSessionWizardInfoTooltip
-    : () => null;
-  const normalizeSelection: (value: unknown[]) => unknown[] = typeof normalizeSbtSelection === 'function'
-    ? normalizeSbtSelection
-    : (value: unknown[]) => value;
+  const renderInfoTooltip =
+    typeof renderSessionWizardInfoTooltip === 'function' ? renderSessionWizardInfoTooltip : () => null;
+  const normalizeSelection: (value: unknown[]) => unknown[] =
+    typeof normalizeSbtSelection === 'function' ? normalizeSbtSelection : (value: unknown[]) => value;
 
   return (
     <section id="session-wizard-section-encryption" className={`${styles.panel} ${styles.encryptionPanel}`}>

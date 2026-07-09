@@ -1,4 +1,4 @@
-import chainGateway from '../../utilities/web3/contractScripts.js';
+import chainGateway from '../../utilities/web3/chainGateway.js';
 import type {
   SbtGroupKeyOrConfig,
   SbtHistorySummary,
@@ -12,18 +12,18 @@ type SbtOwnershipReadsChainGateway = {
     providerName: SbtProviderRef,
     sbtAddress: string,
     tokenId: SbtTokenIdInput,
-    groupKeyOrCfg?: SbtGroupKeyOrConfig
+    groupKeyOrCfg?: SbtGroupKeyOrConfig,
   ) => Promise<string | null>;
   getSBTTokenIdByOwner: (
     providerName: SbtProviderRef,
     sbtAddress: string,
     ownerAddress: string,
-    groupKeyOrCfg?: SbtGroupKeyOrConfig
+    groupKeyOrCfg?: SbtGroupKeyOrConfig,
   ) => Promise<string | null>;
   getSbtHistorySummary: (
     providerName: SbtProviderRef,
     sbtAddress: string,
-    groupKeyOrCfg?: SbtGroupKeyOrConfig
+    groupKeyOrCfg?: SbtGroupKeyOrConfig,
   ) => Promise<SbtHistorySummary | null>;
 };
 
@@ -34,15 +34,12 @@ type BindSbtOwnershipReadsPortArgs = {
 export const bindSbtOwnershipReadsPort = ({
   chainGateway: readChainGateway,
 }: BindSbtOwnershipReadsPortArgs): SbtOwnershipReadsPort => ({
-  getOwnerByTokenId: (providerName, sbtAddress, tokenId, groupKeyOrCfg) => (
-    readChainGateway().getOwnerByTokenId(providerName, sbtAddress, tokenId, groupKeyOrCfg)
-  ),
-  getSBTTokenIdByOwner: (providerName, sbtAddress, ownerAddress, groupKeyOrCfg) => (
-    readChainGateway().getSBTTokenIdByOwner(providerName, sbtAddress, ownerAddress, groupKeyOrCfg)
-  ),
-  getSbtHistorySummary: (providerName, sbtAddress, groupKeyOrCfg) => (
-    readChainGateway().getSbtHistorySummary(providerName, sbtAddress, groupKeyOrCfg)
-  ),
+  getOwnerByTokenId: (providerName, sbtAddress, tokenId, groupKeyOrCfg) =>
+    readChainGateway().getOwnerByTokenId(providerName, sbtAddress, tokenId, groupKeyOrCfg),
+  getSBTTokenIdByOwner: (providerName, sbtAddress, ownerAddress, groupKeyOrCfg) =>
+    readChainGateway().getSBTTokenIdByOwner(providerName, sbtAddress, ownerAddress, groupKeyOrCfg),
+  getSbtHistorySummary: (providerName, sbtAddress, groupKeyOrCfg) =>
+    readChainGateway().getSbtHistorySummary(providerName, sbtAddress, groupKeyOrCfg),
 });
 
 export const sbtOwnershipReadsPort = bindSbtOwnershipReadsPort({

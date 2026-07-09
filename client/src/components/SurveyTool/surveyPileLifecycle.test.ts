@@ -9,49 +9,59 @@ import {
 
 describe('surveyPileLifecycle', () => {
   it('scopes pile question progress by slug and derives hydration/completion ticks', () => {
-    expect(pickScopedPileQuestionProgress({
-      progress: { slug: 'edge', phase: 'hydrate' },
-      progressSlug: 'edge',
-      doesQuestionProgressMatchSlug: (value, slug) => value === slug,
-    })).toEqual({ slug: 'edge', phase: 'hydrate' });
+    expect(
+      pickScopedPileQuestionProgress({
+        progress: { slug: 'edge', phase: 'hydrate' },
+        progressSlug: 'edge',
+        doesQuestionProgressMatchSlug: (value, slug) => value === slug,
+      }),
+    ).toEqual({ slug: 'edge', phase: 'hydrate' });
 
-    expect(pickScopedPileQuestionProgress({
-      progress: { slug: 'other', phase: 'hydrate' },
-      progressSlug: 'edge',
-      doesQuestionProgressMatchSlug: (value, slug) => value === slug,
-    })).toBeNull();
+    expect(
+      pickScopedPileQuestionProgress({
+        progress: { slug: 'other', phase: 'hydrate' },
+        progressSlug: 'edge',
+        doesQuestionProgressMatchSlug: (value, slug) => value === slug,
+      }),
+    ).toBeNull();
 
-    expect(buildPileQuestionProgressSignals({
-      previousProgress: {
-        slug: 'edge',
-        phase: 'hydrate',
-        discoveredQuestions: 4,
-        hydratedQuestions: 2,
-        pendingMetadataCount: 1,
-      },
-      nextProgress: {
-        slug: 'edge',
-        phase: 'complete',
-        discoveredQuestions: 4,
-        hydratedQuestions: 4,
-        pendingMetadataCount: 0,
-      },
-    })).toEqual(expect.objectContaining({
-      prevDiscoveredQuestions: 4,
-      nextDiscoveredQuestions: 4,
-      prevHydratedQuestions: 2,
-      nextHydratedQuestions: 4,
-      prevPendingMetadataCount: 1,
-      nextPendingMetadataCount: 0,
-      progressHydrationTick: true,
-      progressCompletedTick: true,
-    }));
+    expect(
+      buildPileQuestionProgressSignals({
+        previousProgress: {
+          slug: 'edge',
+          phase: 'hydrate',
+          discoveredQuestions: 4,
+          hydratedQuestions: 2,
+          pendingMetadataCount: 1,
+        },
+        nextProgress: {
+          slug: 'edge',
+          phase: 'complete',
+          discoveredQuestions: 4,
+          hydratedQuestions: 4,
+          pendingMetadataCount: 0,
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        prevDiscoveredQuestions: 4,
+        nextDiscoveredQuestions: 4,
+        prevHydratedQuestions: 2,
+        nextHydratedQuestions: 4,
+        prevPendingMetadataCount: 1,
+        nextPendingMetadataCount: 0,
+        progressHydrationTick: true,
+        progressCompletedTick: true,
+      }),
+    );
   });
 
   it('builds pile context reset state with cleared runtime slices', () => {
-    expect(buildPileContextResetState({
-      submittedSinceLastEdit: true,
-    })).toEqual({
+    expect(
+      buildPileContextResetState({
+        submittedSinceLastEdit: true,
+      }),
+    ).toEqual({
       loading: true,
       pileQuestions: [],
       activePileIndex: 0,
@@ -63,37 +73,39 @@ describe('surveyPileLifecycle', () => {
   });
 
   it('builds auto-decrypt lifecycle plans for blocked resets and refresh sweeps', () => {
-    expect(buildPileAutoDecryptUpdatePlan({
-      providerChanged: true,
-      autoDecryptBlocked: true,
-      autoDecryptEnabled: true,
-    })).toEqual({
+    expect(
+      buildPileAutoDecryptUpdatePlan({
+        providerChanged: true,
+        autoDecryptBlocked: true,
+        autoDecryptEnabled: true,
+      }),
+    ).toEqual({
       shouldDisableBlockedAutoDecrypt: true,
       queueAutoDecryptReasons: [],
     });
 
-    expect(buildPileAutoDecryptUpdatePlan({
-      autoDecryptBlocked: false,
-      autoDecryptEnabled: true,
-      responseNonceTick: true,
-      autoDecryptJustEnabled: true,
-      commentsChanged: true,
-    })).toEqual({
+    expect(
+      buildPileAutoDecryptUpdatePlan({
+        autoDecryptBlocked: false,
+        autoDecryptEnabled: true,
+        responseNonceTick: true,
+        autoDecryptJustEnabled: true,
+        commentsChanged: true,
+      }),
+    ).toEqual({
       shouldDisableBlockedAutoDecrypt: false,
-      queueAutoDecryptReasons: [
-        'pile-state-change',
-        'pile-enabled',
-        'pile-comments-toggle',
-      ],
+      queueAutoDecryptReasons: ['pile-state-change', 'pile-enabled', 'pile-comments-toggle'],
     });
   });
 
   it('builds component update plans for context resets, reloads, and background cleanup', () => {
-    expect(buildPileComponentUpdatePlan({
-      accountChanged: true,
-      loading: false,
-      showLongLoading: true,
-    })).toEqual({
+    expect(
+      buildPileComponentUpdatePlan({
+        accountChanged: true,
+        loading: false,
+        showLongLoading: true,
+      }),
+    ).toEqual({
       shouldResetContext: true,
       cacheUpdatePlan: { action: 'noop', delayMs: 80 },
       shouldClearLongLoading: false,
@@ -101,18 +113,20 @@ describe('surveyPileLifecycle', () => {
       queueAutoDecryptReasons: [],
     });
 
-    expect(buildPileComponentUpdatePlan({
-      responseNonceTick: true,
-      isOptimistic: false,
-      hasLiveEdits: false,
-      pileQuestionsLength: 1,
-      isQuestionCacheReady: true,
-      loading: false,
-      showLongLoading: true,
-      autoDecryptEnabled: true,
-      cacheJustBecameReady: true,
-      surveysResponseStateChanged: true,
-    })).toEqual({
+    expect(
+      buildPileComponentUpdatePlan({
+        responseNonceTick: true,
+        isOptimistic: false,
+        hasLiveEdits: false,
+        pileQuestionsLength: 1,
+        isQuestionCacheReady: true,
+        loading: false,
+        showLongLoading: true,
+        autoDecryptEnabled: true,
+        cacheJustBecameReady: true,
+        surveysResponseStateChanged: true,
+      }),
+    ).toEqual({
       shouldResetContext: false,
       cacheUpdatePlan: { action: 'reload', delayMs: 80 },
       shouldClearLongLoading: true,

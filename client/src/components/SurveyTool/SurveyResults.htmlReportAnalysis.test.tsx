@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
-import { callAI } from '../../utilities/ai/aiScripts.js';
+import { callAI } from '../../utilities/ai/aiClient.js';
 import {
   downloadSessionResultsHtmlReport,
   downloadSessionResultsPdfReport,
@@ -58,7 +58,7 @@ jest.mock('../../utilities/sessionResultsExport', () => {
     downloadSessionResultsPdfReport: jest.fn(),
   };
 });
-jest.mock('../../utilities/ai/aiScripts.js', () => ({
+jest.mock('../../utilities/ai/aiClient.js', () => ({
   callAI: jest.fn(),
 }));
 const mockPolisReport = jest.fn((..._args: any[]) => null);
@@ -257,9 +257,11 @@ describe('SurveyResults HTML report analysis controls', () => {
     await screen.findByText('Unable to export the HTML report.');
     expect(downloadSessionResultsHtmlReport).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('ce-surveyresults-html-report-modal')).toBeInTheDocument();
-    expect(consoleErrorSpy.mock.calls.some((call) => call.some((arg) => (
-      String(arg).includes('[SurveyResults.downloadHtmlReport] Failed to export HTML report')
-    )))).toBe(true);
+    expect(
+      consoleErrorSpy.mock.calls.some((call) =>
+        call.some((arg) => String(arg).includes('[SurveyResults.downloadHtmlReport] Failed to export HTML report')),
+      ),
+    ).toBe(true);
 
     fireEvent.click(getDownloadReportButton());
 
@@ -276,36 +278,56 @@ describe('SurveyResults HTML report analysis controls', () => {
   it('generates AI analysis with synthetic participant IDs and stores the local artifact', async () => {
     (callAI as jest.Mock).mockImplementation((prompt: string) => {
       if (prompt.includes('Generate only this result view: Breakdown')) {
-        return Promise.resolve(JSON.stringify({
-          breakdown: {
-            dimensions: [{ id: 'question_tags', label: 'Question Tags', values: [{ id: 'exports', label: 'exports', count: 3 }] }],
-            summary: { overview: 'Participants broadly prioritize clear export controls.' },
-            groups: [{ id: 'group_1', label: 'Export controls', participantIds: ['participant_001'] }],
-          },
-        }));
+        return Promise.resolve(
+          JSON.stringify({
+            breakdown: {
+              dimensions: [
+                {
+                  id: 'question_tags',
+                  label: 'Question Tags',
+                  values: [{ id: 'exports', label: 'exports', count: 3 }],
+                },
+              ],
+              summary: { overview: 'Participants broadly prioritize clear export controls.' },
+              groups: [{ id: 'group_1', label: 'Export controls', participantIds: ['participant_001'] }],
+            },
+          }),
+        );
       }
       if (prompt.includes('Generate only this result view: Argument Map')) {
-        return Promise.resolve(JSON.stringify({
-          argumentMap: {
-            debates: [{ id: 'debate_1', title: 'Export scope', claims: [{ id: 'claim_1', participantIds: ['participant_001'] }] }],
-          },
-        }));
+        return Promise.resolve(
+          JSON.stringify({
+            argumentMap: {
+              debates: [
+                {
+                  id: 'debate_1',
+                  title: 'Export scope',
+                  claims: [{ id: 'claim_1', participantIds: ['participant_001'] }],
+                },
+              ],
+            },
+          }),
+        );
       }
       if (prompt.includes('Generate only this result view: Risk Matrix')) {
-        return Promise.resolve(JSON.stringify({
-          riskMatrix: {
-            categories: [{ id: 'risk_1', label: 'Privacy leakage' }],
-            comments: [{ id: 'risk_comment_1', participantIds: ['participant_002'] }],
-            heatmap: { risk_1: { likelihood: 'medium', impact: 'high' } },
-          },
-        }));
+        return Promise.resolve(
+          JSON.stringify({
+            riskMatrix: {
+              categories: [{ id: 'risk_1', label: 'Privacy leakage' }],
+              comments: [{ id: 'risk_comment_1', participantIds: ['participant_002'] }],
+              heatmap: { risk_1: { likelihood: 'medium', impact: 'high' } },
+            },
+          }),
+        );
       }
-      return Promise.resolve(JSON.stringify({
-        atlas: {
-          nodes: [{ id: 'atlas_1', label: 'Privacy-preserving exports', participantIds: ['participant_001'] }],
-          edges: [],
-        },
-      }));
+      return Promise.resolve(
+        JSON.stringify({
+          atlas: {
+            nodes: [{ id: 'atlas_1', label: 'Privacy-preserving exports', participantIds: ['participant_001'] }],
+            edges: [],
+          },
+        }),
+      );
     });
     seedAnalysisEligibleSession('demo');
     mountSurveyResults({
@@ -387,9 +409,7 @@ describe('SurveyResults HTML report analysis controls', () => {
     // surveyResultsAnalysisLifecyclePlan module tests. Ordering is observed here through
     // DOM status text and cross-mock invocation order on the module seams.
     await screen.findByText('Generating Breakdown (1/2)');
-    expect(callAIPrompts()).toEqual([
-      expect.stringContaining('Generate only this result view: Breakdown'),
-    ]);
+    expect(callAIPrompts()).toEqual([expect.stringContaining('Generate only this result view: Breakdown')]);
     expect(analysisCacheWrites()).toHaveLength(0);
 
     await act(async () => {
@@ -407,8 +427,9 @@ describe('SurveyResults HTML report analysis controls', () => {
       expect.stringContaining('Generate only this result view: Risk Matrix'),
     ]);
     // The first cache write committed before the second section generation started.
-    expect(writeSpy.mock.invocationCallOrder[writeSpy.mock.invocationCallOrder.length - 1])
-      .toBeLessThan((callAI as jest.Mock).mock.invocationCallOrder[1]);
+    expect(writeSpy.mock.invocationCallOrder[writeSpy.mock.invocationCallOrder.length - 1]).toBeLessThan(
+      (callAI as jest.Mock).mock.invocationCallOrder[1],
+    );
 
     await act(async () => {
       secondAnalysis.resolve(RISK_MATRIX_ANALYSIS_JSON);
@@ -427,7 +448,9 @@ describe('SurveyResults HTML report analysis controls', () => {
     expect(secondWriteEntries[0][1].sections.riskMatrix.available).toBe(true);
 
     expect(screen.queryByText(/Generating/)).toBeNull();
-    expect(screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.')).toBeNull();
+    expect(
+      screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.'),
+    ).toBeNull();
     const rows = getSectionRows();
     expect(rows.find((row) => row.label === 'Risk Matrix')?.availability).toBe('Available');
     expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
@@ -463,22 +486,26 @@ describe('SurveyResults HTML report analysis controls', () => {
   it('keeps section generation failures inside the analysis lifecycle without fetch, decrypt, or download side effects', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     (callAI as jest.Mock)
-      .mockResolvedValueOnce(JSON.stringify({
-        breakdown: {
-          dimensions: [],
-          groups: [{ id: 'group_1', label: 'Partial group' }],
-          summary: { overview: 'First section ready.' },
-        },
-      }))
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          breakdown: {
+            dimensions: [],
+            groups: [{ id: 'group_1', label: 'Partial group' }],
+            summary: { overview: 'First section ready.' },
+          },
+        }),
+      )
       .mockRejectedValueOnce(new Error('risk matrix unavailable'))
-      .mockResolvedValueOnce(JSON.stringify({
-        riskMatrix: {
-          categories: [{ id: 'risk_1', label: 'Recovered risk' }],
-          comments: [],
-          heatmap: {},
-          scenarioLinks: [],
-        },
-      }));
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          riskMatrix: {
+            categories: [{ id: 'risk_1', label: 'Recovered risk' }],
+            comments: [],
+            heatmap: {},
+            scenarioLinks: [],
+          },
+        }),
+      );
     seedAnalysisEligibleSession('partial-failure-session');
     mountSurveyResults({
       account: WALLET_ACCOUNT,
@@ -495,26 +522,34 @@ describe('SurveyResults HTML report analysis controls', () => {
 
     await screen.findByText('Unable to generate analysis views right now. Check AI settings and try again.');
     expect(callAI).toHaveBeenCalledTimes(2);
-    expect((callAI as jest.Mock).mock.calls[0][1]).toEqual(expect.objectContaining({
-      sessionSlug: 'partial-failure-session',
-      taskType: 'analysis',
-    }));
+    expect((callAI as jest.Mock).mock.calls[0][1]).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'partial-failure-session',
+        taskType: 'analysis',
+      }),
+    );
     expect(analysisCacheWrites()).toHaveLength(1);
     const partialEntries = analysisArtifactsFromWrite(0);
-    expect(partialEntries[0][1]).toEqual(expect.objectContaining({
-      kind: 'ce_session_results_analysis_artifact',
-      source: 'ai-generated',
-      version: 1,
-    }));
+    expect(partialEntries[0][1]).toEqual(
+      expect.objectContaining({
+        kind: 'ce_session_results_analysis_artifact',
+        source: 'ai-generated',
+        version: 1,
+      }),
+    );
     expect(partialEntries[0][1].sections.breakdown.available).toBe(true);
     expect(partialEntries[0][1].sections.riskMatrix.available).toBe(false);
     // port note: the lifecycle failure-recovery setState patch equality is covered by the
     // buildSurveyResultsAnalysisLifecyclePlan module tests; here the recovery is observed
     // through the rendered error state and section rows.
     expect(getSectionRows().find((row) => row.label === 'Risk Matrix')?.reason).toBe('Needs analysis');
-    expect(consoleErrorSpy.mock.calls.some((call) => call.some((arg) => (
-      String(arg).includes('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis')
-    )))).toBe(true);
+    expect(
+      consoleErrorSpy.mock.calls.some((call) =>
+        call.some((arg) =>
+          String(arg).includes('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis'),
+        ),
+      ),
+    ).toBe(true);
     expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
     expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
     expect(latestBlockSpy.mock.calls.length).toBe(latestBlockCallsBeforeGenerate);
@@ -525,12 +560,14 @@ describe('SurveyResults HTML report analysis controls', () => {
 
     expect(callAI).toHaveBeenCalledTimes(3);
     expect((callAI as jest.Mock).mock.calls[2][0]).toEqual(
-      expect.stringContaining('Generate only this result view: Risk Matrix')
+      expect.stringContaining('Generate only this result view: Risk Matrix'),
     );
     const recoveredEntries = analysisArtifactsFromWrite(1);
     expect(recoveredEntries[0][1].sections.breakdown.available).toBe(true);
     expect(recoveredEntries[0][1].sections.riskMatrix.available).toBe(true);
-    expect(screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.')).toBeNull();
+    expect(
+      screen.queryByText('Unable to generate analysis views right now. Check AI settings and try again.'),
+    ).toBeNull();
     expect(getSectionRows().find((row) => row.label === 'Risk Matrix')?.availability).toBe('Available');
     expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
     expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();

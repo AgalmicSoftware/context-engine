@@ -1,7 +1,4 @@
-import {
-  hasMeaningfulFieldValue,
-  shouldEncryptResponseFieldForSubmit,
-} from './surveyToolDraftState';
+import { hasMeaningfulFieldValue, shouldEncryptResponseFieldForSubmit } from './surveyToolDraftState';
 import { normalizeQuestionIdKey } from './surveyToolSignatures';
 import type { ResponseFieldState } from './surveyToolAudienceDerivationController';
 
@@ -63,9 +60,7 @@ export const buildFieldEncryptionWorkGroups = (
 
   const ensureGroup = (recipients: string[] = []): MutableEncryptionWorkGroup => {
     const normalizedRecipients = Array.isArray(recipients) ? recipients.filter(Boolean) : [];
-    const groupKey = normalizedRecipients.length > 0
-      ? `gate:${JSON.stringify(normalizedRecipients)}`
-      : 'self';
+    const groupKey = normalizedRecipients.length > 0 ? `gate:${JSON.stringify(normalizedRecipients)}` : 'self';
     if (!groups.has(groupKey)) {
       groups.set(groupKey, {
         recipients: normalizedRecipients,
@@ -104,15 +99,18 @@ export const buildFieldEncryptionWorkGroups = (
       value: SubmitResponseFieldState | undefined;
     }> = [
       { fieldKey: 'answer', bucketKey: 'answers', value: applyLock(sourceSlice.answers?.[qid], 'answer') },
-      { fieldKey: 'additional', bucketKey: 'additionalComments', value: applyLock(sourceSlice.additionalComments?.[qid], 'additional') },
+      {
+        fieldKey: 'additional',
+        bucketKey: 'additionalComments',
+        value: applyLock(sourceSlice.additionalComments?.[qid], 'additional'),
+      },
     ];
 
     fieldSpecs.forEach(({ fieldKey, bucketKey, value }) => {
       if (!value || !shouldEncryptResponseFieldForSubmit(value)) return;
       const audience = deps.resolveFieldEncryptionAudience(value, qid, fieldKey);
-      const recipients = audience === 'gate'
-        ? deps.getEffectiveRecipientsForField({ questionId: qid, fieldKey, field: value })
-        : [];
+      const recipients =
+        audience === 'gate' ? deps.getEffectiveRecipientsForField({ questionId: qid, fieldKey, field: value }) : [];
       if (audience === 'gate' && (!Array.isArray(recipients) || recipients.length === 0)) {
         missingRecipients.push(`${fieldKey}:${qid}`);
         return;

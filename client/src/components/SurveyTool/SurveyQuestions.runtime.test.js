@@ -2,12 +2,9 @@ import React from 'react';
 import { act, screen, waitFor } from '@testing-library/react';
 
 import { renderSurveyQuestions } from './surveyQuestionsTestHarness';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import {
-  executeSurveyDraftHydration,
-  executeSurveySingleQuestionPrefill,
-} from './surveyToolHydrationController';
+import { executeSurveyDraftHydration, executeSurveySingleQuestionPrefill } from './surveyToolHydrationController';
 import {
   applyQuestionDecryptCompletionStatus,
   applyQuestionDecryptFailureStatus,
@@ -55,9 +52,7 @@ import {
   buildPrefilledSingleQuestionUpdatePlan,
   resolveExitEditingBaselineSlice,
 } from './surveyToolHydrationFlow.js';
-import {
-  buildSurveyQuestionDecryptExecutionPlan,
-} from './surveyQuestionDecryptRequestPlan';
+import { buildSurveyQuestionDecryptExecutionPlan } from './surveyQuestionDecryptRequestPlan';
 
 const createDeferred = () => {
   let resolve;
@@ -89,7 +84,9 @@ const mergeSurveyResponseState = (currentState = [], questionPool = [], surveyIn
     conviction: { ...((next[surveyIndex] || {}).conviction || {}) },
   };
   questionPool.forEach((question) => {
-    const questionId = String(question?.id || question?.questionID || '').trim().toLowerCase();
+    const questionId = String(question?.id || question?.questionID || '')
+      .trim()
+      .toLowerCase();
     if (!questionId) return;
     target.answers[questionId] = target.answers[questionId] || { value: '' };
     target.additionalComments[questionId] = target.additionalComments[questionId] || { value: '' };
@@ -271,8 +268,7 @@ describe('SurveyQuestions runtime helpers', () => {
       jest.runOnlyPendingTimers();
       await Promise.resolve();
     });
-    expect(JSON.parse(sessionStorage.getItem(firstDraftKey)).answers.q1.value)
-      .toBe('account scoped draft');
+    expect(JSON.parse(sessionStorage.getItem(firstDraftKey)).answers.q1.value).toBe('account scoped draft');
     firstView.unmount();
 
     let secondRuntime = null;
@@ -316,29 +312,35 @@ describe('SurveyQuestions runtime helpers', () => {
     });
 
     await waitFor(() => expect(runtimeEngine?._isMounted).toBe(true));
-    expect(runtimeEngine.scheduleSingleQuestionBootstrapRetry({
-      questionId: 'q1',
-      attempt: 0,
-      reason: 'metadata-empty',
-    })).toBe(true);
+    expect(
+      runtimeEngine.scheduleSingleQuestionBootstrapRetry({
+        questionId: 'q1',
+        attempt: 0,
+        reason: 'metadata-empty',
+      }),
+    ).toBe(true);
     const firstTimer = runtimeEngine._singleQuestionBootstrapRetryTimer;
     expect(firstTimer).toBeTruthy();
     expect(runtimeEngine._singleQuestionBootstrapRetrySig).toBe('q1:1');
     expect(runtimeEngine.getPendingSingleQuestionBootstrapRetryAttempt('q1')).toBe(1);
 
-    expect(runtimeEngine.scheduleSingleQuestionBootstrapRetry({
-      questionId: 'q1',
-      attempt: 0,
-      reason: 'duplicate',
-    })).toBe(true);
+    expect(
+      runtimeEngine.scheduleSingleQuestionBootstrapRetry({
+        questionId: 'q1',
+        attempt: 0,
+        reason: 'duplicate',
+      }),
+    ).toBe(true);
     expect(runtimeEngine._singleQuestionBootstrapRetryTimer).toBe(firstTimer);
     expect(runtimeEngine._singleQuestionBootstrapRetrySig).toBe('q1:1');
 
-    expect(runtimeEngine.scheduleSingleQuestionBootstrapRetry({
-      questionId: 'q1',
-      attempt: 1,
-      reason: 'newer-attempt',
-    })).toBe(true);
+    expect(
+      runtimeEngine.scheduleSingleQuestionBootstrapRetry({
+        questionId: 'q1',
+        attempt: 1,
+        reason: 'newer-attempt',
+      }),
+    ).toBe(true);
     expect(runtimeEngine._singleQuestionBootstrapRetryTimer).not.toBe(firstTimer);
     expect(runtimeEngine._singleQuestionBootstrapRetrySig).toBe('q1:2');
 
@@ -352,12 +354,10 @@ describe('SurveyQuestions runtime helpers', () => {
   it('runs primary submit through start state, contract write, receipt, and submitted state', async () => {
     const txDeferred = createDeferred();
     const events = [];
-    const submitResponsesSpy = jest
-      .spyOn(contractScripts, 'submitResponses')
-      .mockImplementation(async (...args) => {
-        events.push({ type: 'contract', args });
-        return txDeferred.promise;
-      });
+    const submitResponsesSpy = jest.spyOn(contractScripts, 'submitResponses').mockImplementation(async (...args) => {
+      events.push({ type: 'contract', args });
+      return txDeferred.promise;
+    });
     jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
     jest.spyOn(cryptoUtils, 'hashIdentifier').mockImplementation((value) => `hashed:${String(value)}`);
 
@@ -420,27 +420,27 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(events.map((event) => event.type)).toEqual(['contract', 'receipt']);
     expect(runtimeEngine._submitGuard).toBe(false);
     expect(runtimeEngine.state.responseUrl).toBe('/');
-    expect(runtimeEngine.state.userAnswers.responses[0]).toEqual(expect.objectContaining({
-      questionID: 'q1',
-      responder: '0xabc',
-      answer: expect.objectContaining({ value: 'submitted answer' }),
-    }));
+    expect(runtimeEngine.state.userAnswers.responses[0]).toEqual(
+      expect.objectContaining({
+        questionID: 'q1',
+        responder: '0xabc',
+        answer: expect.objectContaining({ value: 'submitted answer' }),
+      }),
+    );
   });
 
   it('keeps primary submit pending until the transaction receipt resolves', async () => {
     const receiptDeferred = createDeferred();
     const events = [];
-    const submitResponsesSpy = jest
-      .spyOn(contractScripts, 'submitResponses')
-      .mockImplementation(async () => {
-        events.push({ type: 'contract' });
-        return {
-          wait: async () => {
-            events.push({ type: 'wait-start' });
-            return receiptDeferred.promise;
-          },
-        };
-      });
+    const submitResponsesSpy = jest.spyOn(contractScripts, 'submitResponses').mockImplementation(async () => {
+      events.push({ type: 'contract' });
+      return {
+        wait: async () => {
+          events.push({ type: 'wait-start' });
+          return receiptDeferred.promise;
+        },
+      };
+    });
     jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
     jest.spyOn(cryptoUtils, 'hashIdentifier').mockImplementation((value) => `hashed:${String(value)}`);
 
@@ -500,13 +500,14 @@ describe('SurveyQuestions runtime helpers', () => {
 
   it('runs mount-time survey draft hydration under the response hydration guard', () => {
     const setState = jest.fn((update, callback) => {
-      const patch = typeof update === 'function'
-        ? update({
-          surveysResponseState: [emptySlice()],
-          editBaseline: emptySlice(),
-          modifiedCount: 0,
-        })
-        : update;
+      const patch =
+        typeof update === 'function'
+          ? update({
+              surveysResponseState: [emptySlice()],
+              editBaseline: emptySlice(),
+              modifiedCount: 0,
+            })
+          : update;
       if (callback) callback();
       return patch;
     });
@@ -529,14 +530,19 @@ describe('SurveyQuestions runtime helpers', () => {
     });
 
     expect(result).toEqual({ reason: 'applied', applied: true, renderedQuestionIds: ['q1'] });
-    expect(setState).toHaveBeenCalledWith(expect.objectContaining({
-      surveysResponseState: [expect.objectContaining({
-        answers: { q1: { value: 'drafted' } },
-      })],
-      editBaseline: expect.objectContaining({
-        answers: { q1: { value: 'drafted' } },
+    expect(setState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surveysResponseState: [
+          expect.objectContaining({
+            answers: { q1: { value: 'drafted' } },
+          }),
+        ],
+        editBaseline: expect.objectContaining({
+          answers: { q1: { value: 'drafted' } },
+        }),
       }),
-    }), expect.any(Function));
+      expect.any(Function),
+    );
     expect(updateJsonPreview).toHaveBeenCalledTimes(1);
     // port note: the private responseHydrationOwned depth counter is covered here by
     // the extracted draft hydration controller receiving and applying the owned update.
@@ -592,14 +598,15 @@ describe('SurveyQuestions runtime helpers', () => {
     const buildUpdatePlan = jest.fn(buildPrefilledSingleQuestionUpdatePlan);
     const invalidateResponseHydrationRuns = jest.fn();
     const setState = jest.fn((update, callback) => {
-      const patch = typeof update === 'function'
-        ? update({
-          surveysResponseState: [emptySlice()],
-          editBaseline: emptySlice(),
-          isDirty: false,
-          submissionComplete: false,
-        })
-        : update;
+      const patch =
+        typeof update === 'function'
+          ? update({
+              surveysResponseState: [emptySlice()],
+              editBaseline: emptySlice(),
+              isDirty: false,
+              submissionComplete: false,
+            })
+          : update;
       if (callback) callback();
       return patch;
     });
@@ -623,13 +630,14 @@ describe('SurveyQuestions runtime helpers', () => {
 
     expect(result).toEqual({ applied: true, reason: 'applied' });
     expect(invalidateResponseHydrationRuns).not.toHaveBeenCalled();
-    expect(buildUpdatePlan).toHaveBeenCalledWith(expect.objectContaining({
-      questionId: 'q1',
-      userAnswer: { questionID: 'q1', answer: { value: 'prefilled' } },
-    }));
+    expect(buildUpdatePlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: 'q1',
+        userAnswer: { questionID: 'q1', answer: { value: 'prefilled' } },
+      }),
+    );
     expect(setState).toHaveBeenCalled();
-    expect(setState.mock.results[0].value.surveysResponseState[0].answers.q1)
-      .toEqual({ value: 'prefilled' });
+    expect(setState.mock.results[0].value.surveysResponseState[0].answers.q1).toEqual({ value: 'prefilled' });
   });
 
   it('restores recent decrypted single-question payload before response bootstrap', async () => {
@@ -650,25 +658,29 @@ describe('SurveyQuestions runtime helpers', () => {
     });
     const flowPlan = resolveSingleQuestionCacheBootstrapFlowPlan({ cacheBootstrapResult: bootstrapResult });
 
-    expect(bootstrapResult).toEqual(expect.objectContaining({
-      status: 'seeded-from-recent',
-      shouldBootstrapViewedResponse: true,
-      questionData: expect.objectContaining({
-        id: 'q1',
-        prompt: 'Restored gated prompt',
-        promptDecrypted: true,
+    expect(bootstrapResult).toEqual(
+      expect.objectContaining({
+        status: 'seeded-from-recent',
+        shouldBootstrapViewedResponse: true,
+        questionData: expect.objectContaining({
+          id: 'q1',
+          prompt: 'Restored gated prompt',
+          promptDecrypted: true,
+        }),
       }),
-    }));
-    expect(flowPlan).toEqual(expect.objectContaining({
-      action: 'stop',
-      retryPlan: expect.objectContaining({
-        reason: 'recent-payload-waiting-for-response-bootstrap',
+    );
+    expect(flowPlan).toEqual(
+      expect.objectContaining({
+        action: 'stop',
+        retryPlan: expect.objectContaining({
+          reason: 'recent-payload-waiting-for-response-bootstrap',
+        }),
+        seededHydration: {
+          questionData: expect.objectContaining({ id: 'q1', prompt: 'Restored gated prompt' }),
+          isLoadingResponse: true,
+        },
       }),
-      seededHydration: {
-        questionData: expect.objectContaining({ id: 'q1', prompt: 'Restored gated prompt' }),
-        isLoadingResponse: true,
-      },
-    }));
+    );
   });
 
   it('seeds recent viewed-question metadata and waits for responder restore without fetching execution paths', () => {
@@ -697,22 +709,26 @@ describe('SurveyQuestions runtime helpers', () => {
       runId: 8,
     });
 
-    expect(seededState).toEqual(expect.objectContaining({
-      questionPool: [expect.objectContaining({ id: 'q1', prompt: 'Viewed prompt' })],
-      isLoadingResponse: true,
-      viewAddressAnswers: '',
-      parsedViewAddressAnswers: null,
-    }));
-    expect(stopPlan).toEqual(expect.objectContaining({
-      action: 'retry',
-      retryOutcome: expect.objectContaining({
-        shouldClearRetry: false,
-        debugPayload: expect.objectContaining({
-          phase: 'recent-payload-response-bootstrap-retrying',
-          responderAddress: '0xdef',
+    expect(seededState).toEqual(
+      expect.objectContaining({
+        questionPool: [expect.objectContaining({ id: 'q1', prompt: 'Viewed prompt' })],
+        isLoadingResponse: true,
+        viewAddressAnswers: '',
+        parsedViewAddressAnswers: null,
+      }),
+    );
+    expect(stopPlan).toEqual(
+      expect.objectContaining({
+        action: 'retry',
+        retryOutcome: expect.objectContaining({
+          shouldClearRetry: false,
+          debugPayload: expect.objectContaining({
+            phase: 'recent-payload-response-bootstrap-retrying',
+            responderAddress: '0xdef',
+          }),
         }),
       }),
-    }));
+    );
   });
 
   it('preserves the current single-question shell when cache bootstrap cannot bind a network', () => {
@@ -732,11 +748,13 @@ describe('SurveyQuestions runtime helpers', () => {
       extraState: flowPlan.fallbackStatePatch,
     });
 
-    expect(flowPlan).toEqual(expect.objectContaining({
-      action: 'stop',
-      debugPhase: 'recent-payload-missing-network',
-      fallbackStatePatch: { isLoadingResponse: false },
-    }));
+    expect(flowPlan).toEqual(
+      expect.objectContaining({
+        action: 'stop',
+        debugPhase: 'recent-payload-missing-network',
+        fallbackStatePatch: { isLoadingResponse: false },
+      }),
+    );
     expect(preserved).toEqual({
       action: 'preserve',
       statePatch: {
@@ -767,18 +785,21 @@ describe('SurveyQuestions runtime helpers', () => {
       canUseRecentPayload: () => false,
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      status: 'ready',
-      cacheState,
-      recentPayloadForAccount: null,
-      questionData: { id: 'q1', prompt: 'Cached prompt', questionType: 'text' },
-    }));
-    expect(resolveSingleQuestionCacheBootstrapFlowPlan({ cacheBootstrapResult: result }))
-      .toEqual(expect.objectContaining({
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'ready',
+        cacheState,
+        recentPayloadForAccount: null,
+        questionData: { id: 'q1', prompt: 'Cached prompt', questionType: 'text' },
+      }),
+    );
+    expect(resolveSingleQuestionCacheBootstrapFlowPlan({ cacheBootstrapResult: result })).toEqual(
+      expect.objectContaining({
         action: 'continue',
         recentPayloadForAccount: null,
         seededHydration: null,
-      }));
+      }),
+    );
   });
 
   it('persists SurveyQuestions bookmarks with optimistic cache writes', () => {
@@ -822,8 +843,7 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(sweep).not.toHaveBeenCalled();
     jest.advanceTimersByTime(1);
     expect(sweep).toHaveBeenCalledTimes(1);
-    expect(buildAutoDecryptAttemptedState({}, 'q1:answer').autoDecryptAttempted)
-      .toEqual({ 'q1:answer': true });
+    expect(buildAutoDecryptAttemptedState({}, 'q1:answer').autoDecryptAttempted).toEqual({ 'q1:answer': true });
     // port note: the actual debounce timer is a class instance field; the durable seam is
     // the single scheduled pass plus attempted-key state builder.
   });
@@ -851,8 +871,7 @@ describe('SurveyQuestions runtime helpers', () => {
     runtimeEngine.queueAutoDecryptVisibleSweep('comments-toggle');
     runtimeEngine.queueAutoDecryptVisibleSweep('cache-ready');
     expect(runtimeEngine._autoDecryptSweepMicrotaskScheduled).toBe(true);
-    expect(Array.from(runtimeEngine._queuedAutoDecryptSweepReasons).sort())
-      .toEqual(['cache-ready', 'comments-toggle']);
+    expect(Array.from(runtimeEngine._queuedAutoDecryptSweepReasons).sort()).toEqual(['cache-ready', 'comments-toggle']);
 
     await act(async () => {
       await Promise.resolve();
@@ -894,17 +913,10 @@ describe('SurveyQuestions runtime helpers', () => {
       hash: 'answer-hash',
       encryptionAudience: 'gate',
     };
-    const key = buildDecryptTaskKey(
-      'viewed',
-      'Q1',
-      'answer',
-      { responder: '0xResponder', answer },
-      '0xViewer',
-    );
+    const key = buildDecryptTaskKey('viewed', 'Q1', 'answer', { responder: '0xResponder', answer }, '0xViewer');
 
     expect(key).toBe('viewed|q1|answer|0xresponder|*|1|answer-ciphertext|answer-hash|gate|');
-    expect(buildDecryptTaskKey('self', 'Q1', 'answer', { answer }, '0xViewer'))
-      .toContain('|0xviewer|');
+    expect(buildDecryptTaskKey('self', 'Q1', 'answer', { answer }, '0xViewer')).toContain('|0xviewer|');
     // port note: account/provider/session/network are captured by the async context
     // snapshot; field payload/responder scope is asserted through the extracted task key.
   });
@@ -962,11 +974,13 @@ describe('SurveyQuestions runtime helpers', () => {
       busyTokens,
       statePatch: null,
     });
-    expect(buildClearedQuestionDecryptBusyTokens({
-      busyTokens,
-      keysToClear: ['q1:answer'],
-      token: 1,
-    })).toEqual(busyTokens);
+    expect(
+      buildClearedQuestionDecryptBusyTokens({
+        busyTokens,
+        keysToClear: ['q1:answer'],
+        token: 1,
+      }),
+    ).toEqual(busyTokens);
   });
 
   it('does not apply an older same-context decrypt result after a newer decrypt owns the field', () => {
@@ -1000,18 +1014,22 @@ describe('SurveyQuestions runtime helpers', () => {
       token: 7,
       busyTokens: { 'q1:answer': 7 },
     });
-    expect(ownsQuestionDecryptBusyTokens({
-      busyTokens: registration.busyTokens,
-      keysToCheck: ['q1:answer'],
-      token: 7,
-    })).toBe(true);
-    expect(buildQuestionDecryptOwnedClearState({
-      prevState: { decryptingByKey: { 'q1:answer': true } },
-      questionId: 'q1',
-      fieldToDecrypt: 'answer',
-      token: 7,
-      busyTokens: registration.busyTokens,
-    })).toEqual({
+    expect(
+      ownsQuestionDecryptBusyTokens({
+        busyTokens: registration.busyTokens,
+        keysToCheck: ['q1:answer'],
+        token: 7,
+      }),
+    ).toBe(true);
+    expect(
+      buildQuestionDecryptOwnedClearState({
+        prevState: { decryptingByKey: { 'q1:answer': true } },
+        questionId: 'q1',
+        fieldToDecrypt: 'answer',
+        token: 7,
+        busyTokens: registration.busyTokens,
+      }),
+    ).toEqual({
       busyTokens: {},
       statePatch: {
         decryptingByKey: { 'q1:answer': false },
@@ -1115,10 +1133,12 @@ describe('SurveyQuestions runtime helpers', () => {
 
   it('builds Lit encryption options from recipients and wallet provider hooks', () => {
     const provider = { request: jest.fn() };
-    const recipients = [{
-      accessControlConditions: [{ contractAddress: '0x1' }],
-      chain: 'baseSepolia',
-    }];
+    const recipients = [
+      {
+        accessControlConditions: [{ contractAddress: '0x1' }],
+        chain: 'baseSepolia',
+      },
+    ];
     const plan = buildSurveyQuestionDecryptExecutionPlan({
       account: '0xabc',
       chainId: 84532,
@@ -1139,24 +1159,28 @@ describe('SurveyQuestions runtime helpers', () => {
       chainId: plan.chainId,
     };
 
-    expect(plan).toEqual(expect.objectContaining({
-      chainId: 84532,
-      providerKind: 'wallet',
-      lit: { getKey: expect.any(Function) },
-      opts: expect.objectContaining({
-        account: '0xabc',
-        provider,
-        throwOnError: true,
+    expect(plan).toEqual(
+      expect.objectContaining({
+        chainId: 84532,
+        providerKind: 'wallet',
+        lit: { getKey: expect.any(Function) },
+        opts: expect.objectContaining({
+          account: '0xabc',
+          provider,
+          throwOnError: true,
+        }),
       }),
-    }));
-    expect(litOptions).toEqual(expect.objectContaining({
-      accessControlConditions: recipients[0].accessControlConditions,
-      chain: 'baseSepolia',
-      recipients,
-      provider,
-      account: '0xabc',
-      chainId: 84532,
-    }));
+    );
+    expect(litOptions).toEqual(
+      expect.objectContaining({
+        accessControlConditions: recipients[0].accessControlConditions,
+        chain: 'baseSepolia',
+        recipients,
+        provider,
+        account: '0xabc',
+        chainId: 84532,
+      }),
+    );
     // port note: buildLitEncryptionOptionsForRecipients is still a private parent
     // method; this keeps the wallet/Lit option contract pinned at the extracted plan seam.
   });
@@ -1188,12 +1212,14 @@ describe('SurveyQuestions runtime helpers', () => {
     });
 
     expect(events).toEqual(['clear-guard', 'finish-attempt', 'set-success', 'after-state']);
-    expect(result.statePatch).toEqual(expect.objectContaining({
-      responseUrl: '/survey/0xsurvey/0xabc?session=submitted-edge',
-      submissionComplete: true,
-      userHasResponse: true,
-      userResponseEncrypted: true,
-    }));
+    expect(result.statePatch).toEqual(
+      expect.objectContaining({
+        responseUrl: '/survey/0xsurvey/0xabc?session=submitted-edge',
+        submissionComplete: true,
+        userHasResponse: true,
+        userResponseEncrypted: true,
+      }),
+    );
   });
 
   it('runs submit failure status cleanup through the parent wiring', () => {
@@ -1210,16 +1236,18 @@ describe('SurveyQuestions runtime helpers', () => {
     });
 
     expect(events).toEqual(['clear-guard', 'finish-attempt', 'set-failure']);
-    expect(result).toEqual(expect.objectContaining({
-      outcome: 'failure',
-      status: 'completed',
-      submitAttemptId: 6,
-      statePatch: expect.objectContaining({
-        isSubmitting: false,
-        submissionComplete: false,
-        submissionError: 'submit rejected',
+    expect(result).toEqual(
+      expect.objectContaining({
+        outcome: 'failure',
+        status: 'completed',
+        submitAttemptId: 6,
+        statePatch: expect.objectContaining({
+          isSubmitting: false,
+          submissionComplete: false,
+          submissionError: 'submit rejected',
+        }),
       }),
-    }));
+    );
   });
 
   it('skips auto-decrypt requeue for unchanged masked payloads after a failed attempt', () => {
@@ -1248,19 +1276,23 @@ describe('SurveyQuestions runtime helpers', () => {
       editBaseline: maskedSlice(),
       decryptingByKey: { 'q1:answer': true, 'q1:additional': true },
     };
-    const nextState = buildSelfQuestionDecryptSuccessState(prevState, {
-      surveyIndex: 0,
-      questionId: 'q1',
-      clearMode: 'both',
-      didUpdate: true,
-      baselineSlice: prevState.surveysResponseState[0],
-      decryptedStateSlice: {
-        answers: { q1: { value: 'decrypted answer' } },
-        additionalComments: { q1: { value: 'decrypted note' } },
+    const nextState = buildSelfQuestionDecryptSuccessState(
+      prevState,
+      {
+        surveyIndex: 0,
+        questionId: 'q1',
+        clearMode: 'both',
+        didUpdate: true,
+        baselineSlice: prevState.surveysResponseState[0],
+        decryptedStateSlice: {
+          answers: { q1: { value: 'decrypted answer' } },
+          additionalComments: { q1: { value: 'decrypted note' } },
+        },
+        decryptedImportance: 8,
+        decryptedConviction: 3,
       },
-      decryptedImportance: 8,
-      decryptedConviction: 3,
-    }, deepClone);
+      deepClone,
+    );
 
     expect(nextState.surveysResponseState[0]).toMatchObject({
       answers: { q1: { value: 'decrypted answer', encrypted: true } },
@@ -1268,23 +1300,20 @@ describe('SurveyQuestions runtime helpers', () => {
       importance: { q1: 8 },
       conviction: { q1: 3 },
     });
-    expect(nextState).toEqual(expect.objectContaining({
-      isEditing: true,
-      displayAnswerMode: false,
-      isDecrypting: false,
-      suppressPrefill: true,
-      decryptingByKey: { 'q1:answer': false, 'q1:additional': false },
-    }));
+    expect(nextState).toEqual(
+      expect.objectContaining({
+        isEditing: true,
+        displayAnswerMode: false,
+        isDecrypting: false,
+        suppressPrefill: true,
+        decryptingByKey: { 'q1:answer': false, 'q1:additional': false },
+      }),
+    );
   });
 
   it('routes self decrypt failures through the owned busy-token fallback state', () => {
     const prevState = { decryptingByKey: { 'q1:answer': true } };
-    expect(buildQuestionDecryptFailureState(
-      prevState,
-      'q1',
-      'answer',
-      'decrypt rejected',
-    )).toEqual({
+    expect(buildQuestionDecryptFailureState(prevState, 'q1', 'answer', 'decrypt rejected')).toEqual({
       isDecrypting: false,
       submissionError: 'decrypt rejected',
       decryptingByKey: { 'q1:answer': false },
@@ -1299,45 +1328,59 @@ describe('SurveyQuestions runtime helpers', () => {
 
   it('keeps viewed decrypt inert when login or response override is unavailable', () => {
     const selection = getQuestionFieldDecryptSelection('q1', 'answer', emptySlice());
-    const prepared = prepareQuestionDecryptAttempt({
-      questionId: 'q1',
-      fieldToDecrypt: 'answer',
-      baselineForDecrypt: emptySlice(),
-    }, {
-      getQuestionFieldDecryptSelection,
-      buildQuestionDecryptExecutionContext: () => ({}),
-    });
-    const mode = resolveQuestionDecryptHandlingMode({
-      questionId: 'q1',
-      responseOverride: null,
-      viewerAccount: '',
-      viewedResponder: '0xdef',
-    }, {
-      getViewedResponseOverrideForQuestion: () => null,
-    });
+    const prepared = prepareQuestionDecryptAttempt(
+      {
+        questionId: 'q1',
+        fieldToDecrypt: 'answer',
+        baselineForDecrypt: emptySlice(),
+      },
+      {
+        getQuestionFieldDecryptSelection,
+        buildQuestionDecryptExecutionContext: () => ({}),
+      },
+    );
+    const mode = resolveQuestionDecryptHandlingMode(
+      {
+        questionId: 'q1',
+        responseOverride: null,
+        viewerAccount: '',
+        viewedResponder: '0xdef',
+      },
+      {
+        getViewedResponseOverrideForQuestion: () => null,
+      },
+    );
 
-    expect(selection).toEqual(expect.objectContaining({
-      hasMaskedField: false,
-      keysToMark: [],
-    }));
-    expect(prepared).toEqual(expect.objectContaining({
-      blockedReason: 'no-masked-field',
-      shouldDecrypt: false,
-    }));
-    expect(mode).toEqual(expect.objectContaining({
-      hasResponseOverride: false,
-      isViewedResponseMode: true,
-    }));
+    expect(selection).toEqual(
+      expect.objectContaining({
+        hasMaskedField: false,
+        keysToMark: [],
+      }),
+    );
+    expect(prepared).toEqual(
+      expect.objectContaining({
+        blockedReason: 'no-masked-field',
+        shouldDecrypt: false,
+      }),
+    );
+    expect(mode).toEqual(
+      expect.objectContaining({
+        hasResponseOverride: false,
+        isViewedResponseMode: true,
+      }),
+    );
   });
 
   it('applies viewed decrypt results without switching into self-edit state', () => {
     const prevState = {
       parsedViewAddressAnswers: {
-        responses: [{
-          questionID: 'q1',
-          answer: { value: '*' },
-          additional: { value: '*' },
-        }],
+        responses: [
+          {
+            questionID: 'q1',
+            answer: { value: '*' },
+            additional: { value: '*' },
+          },
+        ],
       },
       viewAddressAnswers: '',
       decryptingByKey: { 'q1:answer': true, 'q1:additional': true },
@@ -1360,8 +1403,7 @@ describe('SurveyQuestions runtime helpers', () => {
       importance: 6,
       conviction: 4,
     });
-    expect(JSON.parse(nextState.viewAddressAnswers).responses[0].answer.value)
-      .toBe('viewed answer');
+    expect(JSON.parse(nextState.viewAddressAnswers).responses[0].answer.value).toBe('viewed answer');
     expect(nextState).not.toHaveProperty('isEditing');
   });
 
@@ -1378,22 +1420,27 @@ describe('SurveyQuestions runtime helpers', () => {
       questionPool: [{ id: 'q1', prompt: '[encrypted]' }],
       runId: 10,
     });
-    const ready = buildSingleQuestionReadyHydrationState({
-      surveysResponseState: [emptySlice()],
-    }, {
-      mergeSurveyResponseState,
-      questionData: { id: 'q1', prompt: 'Restored prompt', promptDecrypted: true },
-    });
+    const ready = buildSingleQuestionReadyHydrationState(
+      {
+        surveysResponseState: [emptySlice()],
+      },
+      {
+        mergeSurveyResponseState,
+        questionData: { id: 'q1', prompt: 'Restored prompt', promptDecrypted: true },
+      },
+    );
 
     expect(plan.fetchCandidateSlugs).toEqual(['primary', 'fallback', '']);
     expect(getQuestionFetchCandidateSlugs).toHaveBeenCalledWith('q1', 'primary', {
       allowPinnedFallback: true,
     });
-    expect(ready.questionPool).toEqual([{
-      id: 'q1',
-      prompt: 'Restored prompt',
-      promptDecrypted: true,
-    }]);
+    expect(ready.questionPool).toEqual([
+      {
+        id: 'q1',
+        prompt: 'Restored prompt',
+        promptDecrypted: true,
+      },
+    ]);
   });
 
   it('clears prompt reload busy state when source restoration fails', () => {
@@ -1406,25 +1453,32 @@ describe('SurveyQuestions runtime helpers', () => {
       },
       runId: 11,
     });
-    const fallback = buildSingleQuestionPlaceholderHydrationState({
-      surveysResponseState: [emptySlice()],
-    }, {
-      mergeSurveyResponseState,
-      placeholderQuestion: { id: 'q1', prompt: '[encrypted]' },
-    });
+    const fallback = buildSingleQuestionPlaceholderHydrationState(
+      {
+        surveysResponseState: [emptySlice()],
+      },
+      {
+        mergeSurveyResponseState,
+        placeholderQuestion: { id: 'q1', prompt: '[encrypted]' },
+      },
+    );
 
-    expect(blocked).toEqual(expect.objectContaining({
-      status: 'blocked-question',
-      statePatch: expect.objectContaining({
-        isLoadingResponse: false,
-        noResponse: true,
+    expect(blocked).toEqual(
+      expect.objectContaining({
+        status: 'blocked-question',
+        statePatch: expect.objectContaining({
+          isLoadingResponse: false,
+          noResponse: true,
+        }),
       }),
-    }));
-    expect(fallback).toEqual(expect.objectContaining({
-      isLoadingResponse: false,
-      noResponse: false,
-      questionPool: [{ id: 'q1', prompt: '[encrypted]' }],
-    }));
+    );
+    expect(fallback).toEqual(
+      expect.objectContaining({
+        isLoadingResponse: false,
+        noResponse: false,
+        questionPool: [{ id: 'q1', prompt: '[encrypted]' }],
+      }),
+    );
   });
 
   it('restores exit-editing state from the viewed response source before self or cache fallbacks', () => {
@@ -1446,9 +1500,7 @@ describe('SurveyQuestions runtime helpers', () => {
       importance: {},
       conviction: {},
     };
-    const buildSliceFromUserAnswers = jest.fn((source) => (
-      source?.kind === 'viewed' ? viewedSlice : selfSlice
-    ));
+    const buildSliceFromUserAnswers = jest.fn((source) => (source?.kind === 'viewed' ? viewedSlice : selfSlice));
     const buildSliceFromLocalCache = jest.fn(() => cacheSlice);
 
     const baselineSlice = resolveExitEditingBaselineSlice({
@@ -1472,10 +1524,12 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(buildSliceFromLocalCache).not.toHaveBeenCalled();
     expect(statePatch.surveysResponseState[0].answers.q1.value).toBe('viewed');
     expect(statePatch.editBaseline.answers.q1.value).toBe('viewed');
-    expect(statePatch).toEqual(expect.objectContaining({
-      isEditing: false,
-      displayAnswerMode: true,
-      isDirty: false,
-    }));
+    expect(statePatch).toEqual(
+      expect.objectContaining({
+        isEditing: false,
+        displayAnswerMode: true,
+        isDirty: false,
+      }),
+    );
   });
 });

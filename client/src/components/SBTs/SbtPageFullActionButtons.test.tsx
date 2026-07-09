@@ -23,7 +23,7 @@ const activeSbtInfo = {
 
 const createMintProps = (
   displayState: SbtPageMintButtonDisplayState,
-  overrides: Partial<React.ComponentProps<typeof SbtPageMintActionSurface>> = {}
+  overrides: Partial<React.ComponentProps<typeof SbtPageMintActionSurface>> = {},
 ): React.ComponentProps<typeof SbtPageMintActionSurface> => ({
   buttonClassName: 'mint-button',
   displayState,
@@ -37,17 +37,16 @@ const createMintProps = (
   ...overrides,
 });
 
-const createMintDisplayState = (
-  overrides: Parameters<typeof resolveSbtPageMintButtonDisplayState>[0] = {}
-) => resolveSbtPageMintButtonDisplayState({
-  burningStatus: 'idle',
-  groupPasswordInput: 'join-code',
-  mintingStatus: 'idle',
-  nowSeconds: 100,
-  sbtInfo: activeSbtInfo,
-  userHasSBT: false,
-  ...overrides,
-});
+const createMintDisplayState = (overrides: Parameters<typeof resolveSbtPageMintButtonDisplayState>[0] = {}) =>
+  resolveSbtPageMintButtonDisplayState({
+    burningStatus: 'idle',
+    groupPasswordInput: 'join-code',
+    mintingStatus: 'idle',
+    nowSeconds: 100,
+    sbtInfo: activeSbtInfo,
+    userHasSBT: false,
+    ...overrides,
+  });
 
 describe('SbtPageMintActionSurface', () => {
   it('routes group-password mint through the named parent dispatch', () => {
@@ -55,13 +54,16 @@ describe('SbtPageMintActionSurface', () => {
     const onMintUnlimitedWithGroupPassword = jest.fn();
     render(
       <SbtPageMintActionSurface
-        {...createMintProps(createMintDisplayState({
-          hasGroupPasswordMint: true,
-        }), {
-          onGroupPasswordInputChange,
-          onMintUnlimitedWithGroupPassword,
-        })}
-      />
+        {...createMintProps(
+          createMintDisplayState({
+            hasGroupPasswordMint: true,
+          }),
+          {
+            onGroupPasswordInputChange,
+            onMintUnlimitedWithGroupPassword,
+          },
+        )}
+      />,
     );
 
     fireEvent.change(screen.getByPlaceholderText('Group Password'), { target: { value: 'next-code' } });
@@ -77,12 +79,15 @@ describe('SbtPageMintActionSurface', () => {
     const onClaimWithInviteCode = jest.fn();
     render(
       <SbtPageMintActionSurface
-        {...createMintProps(createMintDisplayState({
-          hasInviteMint: true,
-        }), {
-          onClaimWithInviteCode,
-        })}
-      />
+        {...createMintProps(
+          createMintDisplayState({
+            hasInviteMint: true,
+          }),
+          {
+            onClaimWithInviteCode,
+          },
+        )}
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
@@ -96,15 +101,18 @@ describe('SbtPageMintActionSurface', () => {
     const onOpenMintTransaction = jest.fn();
     render(
       <SbtPageMintActionSurface
-        {...createMintProps(createMintDisplayState({
-          lastMintTxHash: '0xmint',
-          mintedLabel: 'Minted',
-          mintingStatus: 'success',
-        }), {
-          onMint,
-          onOpenMintTransaction,
-        })}
-      />
+        {...createMintProps(
+          createMintDisplayState({
+            lastMintTxHash: '0xmint',
+            mintedLabel: 'Minted',
+            mintingStatus: 'success',
+          }),
+          {
+            onMint,
+            onOpenMintTransaction,
+          },
+        )}
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Minted' }));
@@ -120,7 +128,7 @@ describe('SbtPageMintActionSurface', () => {
         {...createMintProps(createMintDisplayState(), {
           onMint,
         })}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
@@ -132,10 +140,12 @@ describe('SbtPageMintActionSurface', () => {
   it('renders no mint controls when the descriptor is hidden', () => {
     const { container } = render(
       <SbtPageMintActionSurface
-        {...createMintProps(createMintDisplayState({
-          userHasSBT: true,
-        }))}
-      />
+        {...createMintProps(
+          createMintDisplayState({
+            userHasSBT: true,
+          }),
+        )}
+      />,
     );
 
     expect(container).toBeEmptyDOMElement();
@@ -144,7 +154,7 @@ describe('SbtPageMintActionSurface', () => {
 
 const createBurnProps = (
   plan: SbtPageBurnActionPlan,
-  overrides: Partial<React.ComponentProps<typeof SbtPageBurnActionSurface>> = {}
+  overrides: Partial<React.ComponentProps<typeof SbtPageBurnActionSurface>> = {},
 ): React.ComponentProps<typeof SbtPageBurnActionSurface> => {
   const displayState = resolveSbtPageBurnStatusButtonState({
     burningStatus: 'idle',
@@ -171,14 +181,17 @@ describe('SbtPageBurnActionSurface', () => {
     const onBurn = jest.fn();
     render(
       <SbtPageBurnActionSurface
-        {...createBurnProps(resolveSbtPageBurnActionPlan({
-          account: '0xholder',
-          sbtInfo: activeSbtInfo,
-          userHasSBT: true,
-        }), {
-          onBurn,
-        })}
-      />
+        {...createBurnProps(
+          resolveSbtPageBurnActionPlan({
+            account: '0xholder',
+            sbtInfo: activeSbtInfo,
+            userHasSBT: true,
+          }),
+          {
+            onBurn,
+          },
+        )}
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Burn' }));
@@ -189,12 +202,14 @@ describe('SbtPageBurnActionSurface', () => {
   it('renders no burn button when the parent descriptor is hidden', () => {
     const { container } = render(
       <SbtPageBurnActionSurface
-        {...createBurnProps(resolveSbtPageBurnActionPlan({
-          account: '0xholder',
-          sbtInfo: activeSbtInfo,
-          userHasSBT: false,
-        }))}
-      />
+        {...createBurnProps(
+          resolveSbtPageBurnActionPlan({
+            account: '0xholder',
+            sbtInfo: activeSbtInfo,
+            userHasSBT: false,
+          }),
+        )}
+      />,
     );
 
     expect(container).toBeEmptyDOMElement();
@@ -229,7 +244,12 @@ describe('renderSbtPageFullActionSurfaces', () => {
       },
     });
 
-    render(<>{surfaces.mintButton}{surfaces.burnButton}</>);
+    render(
+      <>
+        {surfaces.mintButton}
+        {surfaces.burnButton}
+      </>,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
 
     expect(onMint).toHaveBeenCalledTimes(1);
@@ -265,7 +285,12 @@ describe('renderSbtPageFullActionSurfaces', () => {
       },
     });
 
-    render(<>{surfaces.mintButton}{surfaces.burnButton}</>);
+    render(
+      <>
+        {surfaces.mintButton}
+        {surfaces.burnButton}
+      </>,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Burn' }));
 
     expect(onBurn).toHaveBeenCalledTimes(1);

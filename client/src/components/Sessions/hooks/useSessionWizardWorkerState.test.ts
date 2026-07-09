@@ -8,9 +8,7 @@ type ProvisionedSponsoredContext = {
 };
 
 const buildProvisionedSponsoredContextState = jest.fn((value: unknown): ProvisionedSponsoredContext => {
-  const context = value && typeof value === 'object'
-    ? value as Partial<ProvisionedSponsoredContext>
-    : {};
+  const context = value && typeof value === 'object' ? (value as Partial<ProvisionedSponsoredContext>) : {};
 
   return {
     sessionSlug: context.sessionSlug || '',
@@ -19,15 +17,18 @@ const buildProvisionedSponsoredContextState = jest.fn((value: unknown): Provisio
   };
 });
 
-const renderWorkerState = (overrides = {}) => renderHook(() => useSessionWizardWorkerState<ProvisionedSponsoredContext>({
-  cachedWizard: null,
-  deployHelperUrlDefault: 'https://deploy-helper.example',
-  workerBundleUrlDefault: 'https://bundle.example/session-worker.js',
-  devPersistWorkerSecrets: true,
-  defaultAllowedOrigins: 'http://localhost:3010\nhttp://127.0.0.1:3010',
-  buildProvisionedSponsoredContextState,
-  ...overrides,
-}));
+const renderWorkerState = (overrides = {}) =>
+  renderHook(() =>
+    useSessionWizardWorkerState<ProvisionedSponsoredContext>({
+      cachedWizard: null,
+      deployHelperUrlDefault: 'https://deploy-helper.example',
+      workerBundleUrlDefault: 'https://bundle.example/session-worker.js',
+      devPersistWorkerSecrets: true,
+      defaultAllowedOrigins: 'http://localhost:3010\nhttp://127.0.0.1:3010',
+      buildProvisionedSponsoredContextState,
+      ...overrides,
+    }),
+  );
 
 describe('useSessionWizardWorkerState', () => {
   beforeEach(() => {

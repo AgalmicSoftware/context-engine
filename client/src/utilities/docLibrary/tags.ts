@@ -57,11 +57,12 @@ export const normalizeSbtAddress = (raw: unknown): string => {
   return addr;
 };
 
-export const buildDocLibraryCommonTags = ({ kind, storage }: CommonTagsInput = {}): ArweaveTag[] => ([
-  { name: 'CE-DocLibrary', value: '1' },
-  { name: 'CE-DocKind', value: toStr(kind || '').trim() },
-  { name: 'CE-DocStorage', value: toStr(storage || '').trim() },
-].filter((t) => t && t.name && t.value));
+export const buildDocLibraryCommonTags = ({ kind, storage }: CommonTagsInput = {}): ArweaveTag[] =>
+  [
+    { name: 'CE-DocLibrary', value: '1' },
+    { name: 'CE-DocKind', value: toStr(kind || '').trim() },
+    { name: 'CE-DocStorage', value: toStr(storage || '').trim() },
+  ].filter((t) => t && t.name && t.value);
 
 export const buildDocLibrarySessionTags = ({ sessionIdHex }: SessionTagsInput = {}): ArweaveTag[] => {
   const normalized = normalizeSessionIdHex(sessionIdHex);
@@ -85,7 +86,11 @@ const truncateTagValue = (value: unknown, maxLen: number): string => {
   return v.slice(0, Math.max(0, maxLen - 1)).trim();
 };
 
-export const buildDocLibraryPlaintextFileMetaTags = ({ name, mime, size }: PlaintextFileMetaTagsInput = {}): ArweaveTag[] => {
+export const buildDocLibraryPlaintextFileMetaTags = ({
+  name,
+  mime,
+  size,
+}: PlaintextFileMetaTagsInput = {}): ArweaveTag[] => {
   const out: ArweaveTag[] = [];
   const safeName = truncateTagValue(name, 180);
   const safeMime = truncateTagValue(mime, 120);
@@ -105,10 +110,9 @@ export const buildDocLibraryRoleTags = ({ role, derivedFromTxId }: RoleTagsInput
   return out;
 };
 
-export const mergeTags = (...lists: unknown[]): ArweaveTag[] => (
+export const mergeTags = (...lists: unknown[]): ArweaveTag[] =>
   lists
     .flatMap((list) => (Array.isArray(list) ? list : []))
     .filter((t) => t && typeof t === 'object' && typeof t.name === 'string' && typeof t.value === 'string')
     .map((t) => ({ name: t.name.trim(), value: t.value.trim() }))
-    .filter((t) => t.name && t.value !== '')
-);
+    .filter((t) => t.name && t.value !== '');

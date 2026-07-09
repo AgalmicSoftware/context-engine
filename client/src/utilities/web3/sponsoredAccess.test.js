@@ -6,9 +6,9 @@ import {
   resolveSponsoredGateForResource,
   resolveSponsoredGateStateForResource,
 } from './sponsoredAccess.js';
-import contractScripts from './contractScripts.js';
+import contractScripts from './chainGateway.js';
 
-jest.mock('./contractScripts.js', () => ({
+jest.mock('./chainGateway.js', () => ({
   __esModule: true,
   default: {
     userHasSBT: jest.fn(),
@@ -204,9 +204,7 @@ describe('sponsoredAccess cache behavior', () => {
   });
 
   it('rechecks access after hit TTL expires', async () => {
-    contractScripts.userHasSBT
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+    contractScripts.userHasSBT.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     const nowSpy = jest.spyOn(Date, 'now');
     try {
       nowSpy.mockReturnValue(100_000);
@@ -296,9 +294,7 @@ describe('sponsoredAccess cache behavior', () => {
     let now = 0;
     const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
     const neverResolvingLookup = new Promise(() => {});
-    contractScripts.userHasSBT
-      .mockImplementationOnce(() => neverResolvingLookup)
-      .mockResolvedValueOnce(true);
+    contractScripts.userHasSBT.mockImplementationOnce(() => neverResolvingLookup).mockResolvedValueOnce(true);
 
     const args = {
       sessionConfig: cfg,
@@ -314,14 +310,18 @@ describe('sponsoredAccess cache behavior', () => {
 
       now = 30_000;
       jest.advanceTimersByTime(30_000);
-      await expect(first).resolves.toEqual(expect.objectContaining({
-        status: 'unresolved',
-        resourceKey: 'default',
-      }));
-      expect(readCachedSponsoredAccess(args)).toEqual(expect.objectContaining({
-        status: 'unresolved',
-        resourceKey: 'default',
-      }));
+      await expect(first).resolves.toEqual(
+        expect.objectContaining({
+          status: 'unresolved',
+          resourceKey: 'default',
+        }),
+      );
+      expect(readCachedSponsoredAccess(args)).toEqual(
+        expect.objectContaining({
+          status: 'unresolved',
+          resourceKey: 'default',
+        }),
+      );
 
       const second = await checkSponsoredAccess(args);
 
@@ -330,10 +330,12 @@ describe('sponsoredAccess cache behavior', () => {
 
       now = 60_001;
       jest.advanceTimersByTime(30_001);
-      await expect(checkSponsoredAccess(args)).resolves.toEqual(expect.objectContaining({
-        status: 'granted',
-        resourceKey: 'default',
-      }));
+      await expect(checkSponsoredAccess(args)).resolves.toEqual(
+        expect.objectContaining({
+          status: 'granted',
+          resourceKey: 'default',
+        }),
+      );
       expect(contractScripts.userHasSBT).toHaveBeenCalledTimes(2);
     } finally {
       nowSpy.mockRestore();
@@ -365,14 +367,18 @@ describe('sponsoredAccess cache behavior', () => {
 
       now = 30_000;
       jest.advanceTimersByTime(30_000);
-      await expect(first).resolves.toEqual(expect.objectContaining({
-        status: 'unresolved',
-        resourceKey: 'default',
-      }));
-      expect(readCachedSponsoredAccess(args)).toEqual(expect.objectContaining({
-        status: 'unresolved',
-        resourceKey: 'default',
-      }));
+      await expect(first).resolves.toEqual(
+        expect.objectContaining({
+          status: 'unresolved',
+          resourceKey: 'default',
+        }),
+      );
+      expect(readCachedSponsoredAccess(args)).toEqual(
+        expect.objectContaining({
+          status: 'unresolved',
+          resourceKey: 'default',
+        }),
+      );
 
       now = 60_001;
       jest.advanceTimersByTime(30_001);
@@ -381,23 +387,29 @@ describe('sponsoredAccess cache behavior', () => {
       expect(contractScripts.userHasSBT).toHaveBeenCalledTimes(2);
 
       secondLookup.resolve(false);
-      await expect(second).resolves.toEqual(expect.objectContaining({
-        status: 'denied',
-        resourceKey: 'default',
-      }));
-      expect(readCachedSponsoredAccess(args)).toEqual(expect.objectContaining({
-        status: 'denied',
-        resourceKey: 'default',
-      }));
+      await expect(second).resolves.toEqual(
+        expect.objectContaining({
+          status: 'denied',
+          resourceKey: 'default',
+        }),
+      );
+      expect(readCachedSponsoredAccess(args)).toEqual(
+        expect.objectContaining({
+          status: 'denied',
+          resourceKey: 'default',
+        }),
+      );
 
       firstLookup.resolve(true);
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(readCachedSponsoredAccess(args)).toEqual(expect.objectContaining({
-        status: 'denied',
-        resourceKey: 'default',
-      }));
+      expect(readCachedSponsoredAccess(args)).toEqual(
+        expect.objectContaining({
+          status: 'denied',
+          resourceKey: 'default',
+        }),
+      );
     } finally {
       nowSpy.mockRestore();
       jest.useRealTimers();
@@ -509,11 +521,13 @@ describe('sponsoredAccess unavailable gate handling', () => {
       resourceKey: 'default',
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      status: 'error',
-      error: 'rpc down',
-      resourceKey: 'default',
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'error',
+        error: 'rpc down',
+        resourceKey: 'default',
+      }),
+    );
     expect(debugSpy).not.toHaveBeenCalled();
   });
 });

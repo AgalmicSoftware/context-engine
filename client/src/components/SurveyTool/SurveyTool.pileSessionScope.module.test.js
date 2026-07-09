@@ -2,9 +2,9 @@ import { screen, waitFor } from '@testing-library/react';
 
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
-import { buildQuestionFilterStorageKeyPrefix } from './surveyToolUtils.js';
+import { buildQuestionFilterStorageKeyPrefix } from './surveyToolUtils';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 
 const defaultCacheNode = {
@@ -40,25 +40,29 @@ const mockQuestionCaches = (questionCachesBySlug = {}) => {
   return { readSpy, peekSpy };
 };
 
-const renderPile = (props = {}) => renderSurveyPileViewMode({
-  minifiedMode: 'pile',
-  network: { id: 84532 },
-  networkChainId: 84532,
-  account: '',
-  sessionSlug: 'edge',
-  activeSessionSlug: 'edge',
-  cacheHasLoaded: true,
-  isQuestionCacheReady: true,
-  questionResponsesNonce: 1,
-  questionsCacheNonce: 1,
-  onFilterChange: jest.fn(),
-  runtimeStrategy: createPileViewRuntimeStrategy(),
-  ...props,
-}, { route: '/session/edge' });
+const renderPile = (props = {}) =>
+  renderSurveyPileViewMode(
+    {
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      cacheHasLoaded: true,
+      isQuestionCacheReady: true,
+      questionResponsesNonce: 1,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+      runtimeStrategy: createPileViewRuntimeStrategy(),
+      ...props,
+    },
+    { route: '/session/edge' },
+  );
 
 const createScopedQuestionCaches = () => ({
   edge: {
-    '84532': {
+    84532: {
       ...defaultCacheNode,
       questions: {
         q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' },
@@ -66,7 +70,7 @@ const createScopedQuestionCaches = () => ({
     },
   },
   alpha: {
-    '84532': {
+    84532: {
       ...defaultCacheNode,
       questions: {
         q2: { id: 'q2', prompt: 'Alpha 2', type: 'freeform' },
@@ -80,7 +84,7 @@ const createScopedQuestionCaches = () => ({
     },
   },
   beta: {
-    '84532': {
+    84532: {
       ...defaultCacheNode,
       questions: {
         q3: { id: 'q3', prompt: 'Beta 3', type: 'freeform' },
@@ -147,16 +151,21 @@ describe('SurveyTool pile session scope and progress', () => {
     // port note: dropped direct QuestionFilter prop inspection; the scoped prefix is
     // asserted through the same helper used to render that prop, while QuestionFilter
     // storage behavior is covered in QuestionFilter.pipelineAutosave.test.ts.
-    expect(buildQuestionFilterStorageKeyPrefix({
-      activeSessionSlug: 'edge',
-      sessionSlug: 'edge',
-      network: { id: 84532 },
-      networkChainId: 84532,
-    }, 'edge')).toBe('dg:filters:edge');
+    expect(
+      buildQuestionFilterStorageKeyPrefix(
+        {
+          activeSessionSlug: 'edge',
+          sessionSlug: 'edge',
+          network: { id: 84532 },
+          networkChainId: 84532,
+        },
+        'edge',
+      ),
+    ).toBe('dg:filters:edge');
   });
 
   it('renders capped pile loading progress with the requested total block count', async () => {
-    mockQuestionCaches({ edge: { '84532': defaultCacheNode } });
+    mockQuestionCaches({ edge: { 84532: defaultCacheNode } });
 
     renderPile({
       isQuestionCacheReady: false,
@@ -168,7 +177,7 @@ describe('SurveyTool pile session scope and progress', () => {
   });
 
   it('tracks pile loading progress relative to the current refresh window', async () => {
-    mockQuestionCaches({ edge: { '84532': defaultCacheNode } });
+    mockQuestionCaches({ edge: { 84532: defaultCacheNode } });
     const { rerenderSurveyQuestions } = renderPile({
       isQuestionCacheReady: false,
       questionScanProgress: cappedScanProgress(),

@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import contractScripts from './contractScripts.js';
+import contractScripts from './chainGateway.js';
 
 describe('contractScripts.userCanBurnSBTs', () => {
   const sbtAddress = '0x1111111111111111111111111111111111111111';
@@ -88,16 +88,11 @@ describe('contractScripts.userCanBurnSBTs', () => {
     installContractStub(burnAuth);
     userHasSbtSpy = jest.spyOn(contractScripts, 'userHasSBT').mockResolvedValue(hasSBT);
 
-    const result = await contractScripts.userCanBurnSBTs(
-      'none',
-      sbtAddress,
-      userAddress,
-      {
-        slug: 'edge',
-        networkChainId: 84532,
-        contracts: {},
-      }
-    );
+    const result = await contractScripts.userCanBurnSBTs('none', sbtAddress, userAddress, {
+      slug: 'edge',
+      networkChainId: 84532,
+      contracts: {},
+    });
 
     expect(result).toBe(expected);
     expect(userHasSbtSpy).toHaveBeenCalledWith(
@@ -106,7 +101,7 @@ describe('contractScripts.userCanBurnSBTs', () => {
       userAddress,
       0,
       'latest',
-      expect.objectContaining({ slug: 'edge' })
+      expect.objectContaining({ slug: 'edge' }),
     );
   });
 });

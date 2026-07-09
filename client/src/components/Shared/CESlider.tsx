@@ -65,54 +65,57 @@ function CESlider({
   const resolvedMax = toFiniteNumber(max, 10);
   const resolvedStep = toFiniteNumber(step, 1);
   const tooltipEnabled = Boolean(tooltip);
-  const resolvedValue = clampValue(
-    toFiniteNumber(value, resolvedMin),
-    resolvedMin,
-    resolvedMax
-  );
+  const resolvedValue = clampValue(toFiniteNumber(value, resolvedMin), resolvedMin, resolvedMax);
   const rangeSpan = resolvedMax - resolvedMin;
-  const percentage = rangeSpan <= 0
-    ? 0
-    : ((resolvedValue - resolvedMin) / rangeSpan) * 100;
+  const percentage = rangeSpan <= 0 ? 0 : ((resolvedValue - resolvedMin) / rangeSpan) * 100;
 
   const handleInteractionStart = React.useCallback(() => {
     if (disabled || typeof onChangeStart !== 'function') return;
     onChangeStart();
   }, [disabled, onChangeStart]);
 
-  const handleChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    if (disabled || typeof onChange !== 'function') return;
-    onChange(Number(event.target.value), event.nativeEvent);
-  }, [disabled, onChange]);
+  const handleChange = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      if (disabled || typeof onChange !== 'function') return;
+      onChange(Number(event.target.value), event.nativeEvent);
+    },
+    [disabled, onChange],
+  );
 
-  const handleInteractionEnd = React.useCallback((event: React.MouseEvent<HTMLInputElement> | React.TouchEvent<HTMLInputElement>) => {
-    if (disabled || typeof onChangeComplete !== 'function') return;
-    onChangeComplete(Number(event.currentTarget.value));
-  }, [disabled, onChangeComplete]);
+  const handleInteractionEnd = React.useCallback(
+    (event: React.MouseEvent<HTMLInputElement> | React.TouchEvent<HTMLInputElement>) => {
+      if (disabled || typeof onChangeComplete !== 'function') return;
+      onChangeComplete(Number(event.currentTarget.value));
+    },
+    [disabled, onChangeComplete],
+  );
 
-  const handleKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (disabled) return;
-    const isArrowKey = ARROW_KEYS.includes(event.key);
-    if (!isArrowKey) return;
+  const handleKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (disabled) return;
+      const isArrowKey = ARROW_KEYS.includes(event.key);
+      if (!isArrowKey) return;
 
-    const nextValue = getKeyboardValue({
-      key: event.key,
-      value: resolvedValue,
-      min: resolvedMin,
-      max: resolvedMax,
-      step: resolvedStep,
-    });
+      const nextValue = getKeyboardValue({
+        key: event.key,
+        value: resolvedValue,
+        min: resolvedMin,
+        max: resolvedMax,
+        step: resolvedStep,
+      });
 
-    event.preventDefault();
-    if (nextValue === resolvedValue) return;
+      event.preventDefault();
+      if (nextValue === resolvedValue) return;
 
-    if (typeof onChange === 'function') {
-      onChange(nextValue, event.nativeEvent);
-    }
-    if (typeof onChangeComplete === 'function') {
-      onChangeComplete(nextValue);
-    }
-  }, [disabled, onChange, onChangeComplete, resolvedMax, resolvedMin, resolvedStep, resolvedValue]);
+      if (typeof onChange === 'function') {
+        onChange(nextValue, event.nativeEvent);
+      }
+      if (typeof onChangeComplete === 'function') {
+        onChangeComplete(nextValue);
+      }
+    },
+    [disabled, onChange, onChangeComplete, resolvedMax, resolvedMin, resolvedStep, resolvedValue],
+  );
 
   return (
     <div

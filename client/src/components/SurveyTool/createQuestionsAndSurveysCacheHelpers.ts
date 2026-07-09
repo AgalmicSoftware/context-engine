@@ -13,9 +13,7 @@ type SubmittedResourcesCacheOptions = {
   questionIds?: unknown;
 };
 
-const isObjectLikeRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object'
-);
+const isObjectLikeRecord = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object';
 
 const getManagedResourceMap = (bucket: unknown, mapKey: 'questions' | 'surveys'): ManagedResourceMap => {
   if (!isObjectLikeRecord(bucket)) return {};
@@ -31,7 +29,7 @@ export const readManagedCacheSnapshot = (namespace: string, slug = ''): ManagedC
 export const selectManagedNetBucketSnapshot = (
   namespace: string,
   slug: string,
-  netKey: string
+  netKey: string,
 ): ManagedCacheSnapshot => {
   const obj = readManagedCacheSnapshot(namespace, slug);
   if (!obj || !netKey) return null;

@@ -20,22 +20,23 @@ export type SurveyQuestionsHarnessStoreState = {
   sessionState?: Record<string, unknown>;
 };
 
-export const createSurveyQuestionsTestStore = (
-  overrides: SurveyQuestionsHarnessStoreState = {}
-) => createStore(
-  (state = {
-    profile: {
-      account: '',
-      network: { id: 84532 },
-      ...(overrides.profile || {}),
-    },
-    sessionState: {
-      activeSessionSlug: '',
-      loginComplete: false,
-      ...(overrides.sessionState || {}),
-    },
-  }) => state
-);
+export const createSurveyQuestionsTestStore = (overrides: SurveyQuestionsHarnessStoreState = {}) =>
+  createStore(
+    (
+      state = {
+        profile: {
+          account: '',
+          network: { id: 84532 },
+          ...(overrides.profile || {}),
+        },
+        sessionState: {
+          activeSessionSlug: '',
+          loginComplete: false,
+          ...(overrides.sessionState || {}),
+        },
+      },
+    ) => state,
+  );
 
 export type RenderSurveyQuestionsOptions = {
   route?: string;
@@ -60,9 +61,7 @@ if (typeof afterEach === 'function') {
   });
 }
 
-const createDefaultSurveyQuestionsProps = (
-  props: SurveyQuestionsProps = {}
-): SurveyQuestionsProps => ({
+const createDefaultSurveyQuestionsProps = (props: SurveyQuestionsProps = {}): SurveyQuestionsProps => ({
   account: '',
   displayAnswerMode: false,
   isStandalone: false,
@@ -78,8 +77,7 @@ const createDefaultSurveyQuestionsProps = (
 const syncRoute = (route?: string): void => {
   if (!route) return;
   if (harnessUrlToRestore === null) {
-    harnessUrlToRestore =
-      `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    harnessUrlToRestore = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   }
   window.history.replaceState({}, '', route);
 };
@@ -87,37 +85,31 @@ const syncRoute = (route?: string): void => {
 const renderWithSurveyQuestionsWrappers = (
   element: React.ReactElement,
   options: RenderSurveyQuestionsOptions = {},
-  store = options.store ?? createSurveyQuestionsTestStore(options.storeState)
+  store = options.store ?? createSurveyQuestionsTestStore(options.storeState),
 ): RenderResult => {
   return render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={[options.route ?? '/']}>
-        {element}
-      </MemoryRouter>
-    </Provider>
+      <MemoryRouter initialEntries={[options.route ?? '/']}>{element}</MemoryRouter>
+    </Provider>,
   );
 };
 
 const createHarness = (
   Component: React.ComponentType<SurveyQuestionsProps>,
   props: SurveyQuestionsProps = {},
-  options: RenderSurveyQuestionsOptions = {}
+  options: RenderSurveyQuestionsOptions = {},
 ): SurveyQuestionsHarness => {
   syncRoute(options.route);
   const store = options.store ?? createSurveyQuestionsTestStore(options.storeState);
   let currentProps = createDefaultSurveyQuestionsProps(props);
-  const wrap = (nextProps: SurveyQuestionsProps) => (
-    <Component {...nextProps} />
-  );
+  const wrap = (nextProps: SurveyQuestionsProps) => <Component {...nextProps} />;
   const result = renderWithSurveyQuestionsWrappers(wrap(currentProps), options, store);
   const rerenderSurveyQuestions = (nextProps: SurveyQuestionsProps): void => {
     currentProps = { ...currentProps, ...nextProps };
     result.rerender(
       <Provider store={store}>
-        <MemoryRouter initialEntries={[options.route ?? '/']}>
-          {wrap(currentProps)}
-        </MemoryRouter>
-      </Provider>
+        <MemoryRouter initialEntries={[options.route ?? '/']}>{wrap(currentProps)}</MemoryRouter>
+      </Provider>,
     );
   };
   const harness = Object.assign(result, { rerenderSurveyQuestions }) as SurveyQuestionsHarness;
@@ -129,10 +121,10 @@ const createHarness = (
 
 export const renderSurveyQuestions = (
   props: SurveyQuestionsProps = {},
-  options: RenderSurveyQuestionsOptions = {}
+  options: RenderSurveyQuestionsOptions = {},
 ): SurveyQuestionsHarness => createHarness(SurveyQuestions, props, options);
 
 export const renderSurveyPileViewMode = (
   props: SurveyQuestionsProps = {},
-  options: RenderSurveyQuestionsOptions = {}
+  options: RenderSurveyQuestionsOptions = {},
 ): SurveyQuestionsHarness => createHarness(PileViewMode, props, options);

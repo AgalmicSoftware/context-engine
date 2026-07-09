@@ -1,10 +1,4 @@
-import {
-  boundedStringify,
-  createStorageNamespace,
-  removeKeys,
-  safeJsonRead,
-  safeJsonWrite,
-} from './storageJson.js';
+import { boundedStringify, createStorageNamespace, removeKeys, safeJsonRead, safeJsonWrite } from './storageJson.js';
 
 type MemoryStorage = {
   getItem: jest.Mock<string | null, [string]>;
@@ -30,11 +24,13 @@ describe('storageJson primitives', () => {
     const storage = createMemoryStorage();
     storage.setItem('draft', JSON.stringify({ count: 2 }));
 
-    expect(safeJsonRead(storage, 'draft', (value) => (value as { count: number }).count)).toEqual(expect.objectContaining({
-      ok: true,
-      value: 2,
-      status: 'ok',
-    }));
+    expect(safeJsonRead(storage, 'draft', (value) => (value as { count: number }).count)).toEqual(
+      expect.objectContaining({
+        ok: true,
+        value: 2,
+        status: 'ok',
+      }),
+    );
   });
 
   it('returns parse-failed and clears malformed values only when requested', () => {
@@ -42,37 +38,43 @@ describe('storageJson primitives', () => {
     storage.setItem('draft', '{bad json');
 
     const first = safeJsonRead(storage, 'draft');
-    expect(first).toEqual(expect.objectContaining({
-      ok: false,
-      status: 'parse-failed',
-    }));
+    expect(first).toEqual(
+      expect.objectContaining({
+        ok: false,
+        status: 'parse-failed',
+      }),
+    );
     expect(storage.removeItem).not.toHaveBeenCalled();
 
     const second = safeJsonRead(storage, 'draft', null, { clearInvalid: true });
-    expect(second).toEqual(expect.objectContaining({
-      ok: false,
-      status: 'parse-failed',
-    }));
+    expect(second).toEqual(
+      expect.objectContaining({
+        ok: false,
+        status: 'parse-failed',
+      }),
+    );
     expect(storage.removeItem).toHaveBeenCalledWith('draft');
   });
 
   it('writes JSON only when the bounded serialized payload fits', () => {
     const storage = createMemoryStorage();
 
-    expect(safeJsonWrite(storage, 'draft', { title: 'Short' }, { maxBytes: 64 }))
-      .toEqual(expect.objectContaining({
+    expect(safeJsonWrite(storage, 'draft', { title: 'Short' }, { maxBytes: 64 })).toEqual(
+      expect.objectContaining({
         ok: true,
         status: 'ok',
         key: 'draft',
-      }));
+      }),
+    );
 
     expect(JSON.parse(storage.getItem('draft') as string)).toEqual({ title: 'Short' });
 
-    expect(safeJsonWrite(storage, 'oversized', { body: 'x'.repeat(80) }, { maxBytes: 32 }))
-      .toEqual(expect.objectContaining({
+    expect(safeJsonWrite(storage, 'oversized', { body: 'x'.repeat(80) }, { maxBytes: 32 })).toEqual(
+      expect.objectContaining({
         ok: false,
         status: 'too-large',
-      }));
+      }),
+    );
     expect(storage.getItem('oversized')).toBeNull();
   });
 
@@ -80,10 +82,12 @@ describe('storageJson primitives', () => {
     const circular: Record<string, unknown> = {};
     circular.self = circular;
 
-    expect(boundedStringify(circular)).toEqual(expect.objectContaining({
-      ok: false,
-      status: 'stringify-failed',
-    }));
+    expect(boundedStringify(circular)).toEqual(
+      expect.objectContaining({
+        ok: false,
+        status: 'stringify-failed',
+      }),
+    );
   });
 
   it('removes key lists while reporting partial failures', () => {

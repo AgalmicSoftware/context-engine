@@ -63,11 +63,24 @@ describe('surveyPileQuestionSections', () => {
       lockControl: <div data-testid="additional-lock">Lock</div>,
     });
 
-    const inlineRow = findElement(tree, (node) => isElementNode(node) && node.type === AdditionalCommentsInlineRow) as InlineRowElementNode | null;
+    const inlineRow = findElement(
+      tree,
+      (node) => isElementNode(node) && node.type === AdditionalCommentsInlineRow,
+    ) as InlineRowElementNode | null;
 
     expect(inlineRow).not.toBeNull();
-    expect(findElement(inlineRow?.props.input, (node) => isElementNode(node) && node.props['data-testid'] === 'additional-input')).not.toBeNull();
-    expect(findElement(inlineRow?.props.lockControl, (node) => isElementNode(node) && node.props['data-testid'] === 'additional-lock')).not.toBeNull();
+    expect(
+      findElement(
+        inlineRow?.props.input,
+        (node) => isElementNode(node) && node.props['data-testid'] === 'additional-input',
+      ),
+    ).not.toBeNull();
+    expect(
+      findElement(
+        inlineRow?.props.lockControl,
+        (node) => isElementNode(node) && node.props['data-testid'] === 'additional-lock',
+      ),
+    ).not.toBeNull();
   });
 
   it('renders masked or unmasked pile comments based on the masked flag and visibility', () => {
@@ -84,15 +97,23 @@ describe('surveyPileQuestionSections', () => {
       additionalEditorRow: <div data-testid="editor-row">Editor</div>,
     });
 
-    expect(findElement(maskedTree, (node) => isElementNode(node) && node.props['data-testid'] === 'decrypt-comments')).not.toBeNull();
-    expect(findElement(maskedTree, (node) => isElementNode(node) && node.props['data-testid'] === 'editor-row')).toBeNull();
-    expect(findElement(unmaskedTree, (node) => isElementNode(node) && node.props['data-testid'] === 'editor-row')).not.toBeNull();
-    expect(renderPileCommentsSection({
-      showComments: false,
-      maskedAdditional: false,
-      decryptAdditionalControl: <div />,
-      additionalEditorRow: <div />,
-    })).toBeNull();
+    expect(
+      findElement(maskedTree, (node) => isElementNode(node) && node.props['data-testid'] === 'decrypt-comments'),
+    ).not.toBeNull();
+    expect(
+      findElement(maskedTree, (node) => isElementNode(node) && node.props['data-testid'] === 'editor-row'),
+    ).toBeNull();
+    expect(
+      findElement(unmaskedTree, (node) => isElementNode(node) && node.props['data-testid'] === 'editor-row'),
+    ).not.toBeNull();
+    expect(
+      renderPileCommentsSection({
+        showComments: false,
+        maskedAdditional: false,
+        decryptAdditionalControl: <div />,
+        additionalEditorRow: <div />,
+      }),
+    ).toBeNull();
   });
 
   it('renders pile question icons with active comment state and forwards the toggle callback', () => {
@@ -105,7 +126,7 @@ describe('surveyPileQuestionSections', () => {
     });
     const commentsButton = findElement(
       tree,
-      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE
+      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE,
     ) as CommentsButtonElementNode | null;
 
     expect(commentsButton).not.toBeNull();
@@ -113,7 +134,9 @@ describe('surveyPileQuestionSections', () => {
     expect(commentsButton?.props['data-ce-question-id']).toBe('q1');
     commentsButton?.props.onClick();
     expect(onToggleComments).toHaveBeenCalledTimes(1);
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'answer-lock')).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'answer-lock'),
+    ).not.toBeNull();
   });
 
   it('renders the pile footer with control row and optional comments section', () => {
@@ -124,31 +147,45 @@ describe('surveyPileQuestionSections', () => {
     });
 
     expect(findElement(tree, (node) => nodeHasClassName(node, 'pileControlsRow'))).not.toBeNull();
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'slider-section')).not.toBeNull();
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'question-icons')).not.toBeNull();
-    expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'comments-section')).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'slider-section'),
+    ).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'question-icons'),
+    ).not.toBeNull();
+    expect(
+      findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'comments-section'),
+    ).not.toBeNull();
   });
 
   it('builds pile question comment display helpers', () => {
-    expect(buildPileQuestionCommentButtonClassName({
-      activeClassName: 'active',
-      baseClassName: 'base',
-      commentClassName: 'comment',
-      hasAdditionalContent: true,
-    })).toBe('base comment active');
-    expect(buildPileQuestionCommentButtonClassName({
-      activeClassName: 'active',
-      baseClassName: 'base',
-      commentClassName: 'comment',
-      hasAdditionalContent: false,
-    })).toBe('base comment');
-    expect(resolvePileQuestionCommentIconClassName({
-      glowClassName: 'glow',
-      hasAdditionalContent: true,
-    })).toBe('glow');
-    expect(resolvePileQuestionCommentIconClassName({
-      glowClassName: 'glow',
-      hasAdditionalContent: false,
-    })).toBeUndefined();
+    expect(
+      buildPileQuestionCommentButtonClassName({
+        activeClassName: 'active',
+        baseClassName: 'base',
+        commentClassName: 'comment',
+        hasAdditionalContent: true,
+      }),
+    ).toBe('base comment active');
+    expect(
+      buildPileQuestionCommentButtonClassName({
+        activeClassName: 'active',
+        baseClassName: 'base',
+        commentClassName: 'comment',
+        hasAdditionalContent: false,
+      }),
+    ).toBe('base comment');
+    expect(
+      resolvePileQuestionCommentIconClassName({
+        glowClassName: 'glow',
+        hasAdditionalContent: true,
+      }),
+    ).toBe('glow');
+    expect(
+      resolvePileQuestionCommentIconClassName({
+        glowClassName: 'glow',
+        hasAdditionalContent: false,
+      }),
+    ).toBeUndefined();
   });
 });

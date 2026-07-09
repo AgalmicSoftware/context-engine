@@ -24,7 +24,7 @@ export type SurveyResultsDemoSurfaceState = {
 
 export type SurveyResultsDemoSurfaceQuestionResponsePort = (
   selected: true,
-  sourceAggregator: unknown
+  sourceAggregator: unknown,
 ) => SurveyResultsDemoSurfaceProps['questionResponses'];
 
 export type SurveyResultsDemoSurfacePropsInput = {
@@ -91,14 +91,16 @@ export const buildSurveyResultsDemoSurfaceProps = ({
 };
 
 export const createSurveyResultsDemoSurfaceParentProps = (
-  parentProps: SurveyResultsDemoSurfaceRecord
+  parentProps: SurveyResultsDemoSurfaceRecord,
 ): SurveyResultsDemoSurfaceParentProps => ({
   defaultTags: parentProps.defaultTags as SurveyResultsDemoSurfaceParentProps['defaultTags'],
   filterState: parentProps.filterState as SurveyResultsDemoSurfaceParentProps['filterState'],
   isQuestionCacheReady: parentProps.isQuestionCacheReady as SurveyResultsDemoSurfaceParentProps['isQuestionCacheReady'],
-  isResponsesCacheReady: parentProps.isResponsesCacheReady as SurveyResultsDemoSurfaceParentProps['isResponsesCacheReady'],
+  isResponsesCacheReady:
+    parentProps.isResponsesCacheReady as SurveyResultsDemoSurfaceParentProps['isResponsesCacheReady'],
   network: parentProps.network as SurveyResultsDemoSurfaceParentProps['network'],
   networkChainId: parentProps.networkChainId as SurveyResultsDemoSurfaceParentProps['networkChainId'],
-  questionResponsesNonce: parentProps.questionResponsesNonce as SurveyResultsDemoSurfaceParentProps['questionResponsesNonce'],
+  questionResponsesNonce:
+    parentProps.questionResponsesNonce as SurveyResultsDemoSurfaceParentProps['questionResponsesNonce'],
   questionScanProgress: parentProps.questionScanProgress as SurveyResultsDemoSurfaceParentProps['questionScanProgress'],
 });

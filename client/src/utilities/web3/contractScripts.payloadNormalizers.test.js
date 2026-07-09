@@ -15,21 +15,25 @@ describe('contractScripts payload normalizers', () => {
   });
 
   it('coerces question option aliases into display labels', () => {
-    expect(coerceQuestionOptionLabels([
-      ' Alpha ',
-      { label: 'Beta' },
-      { text: 'Gamma' },
-      { name: 'Delta' },
-      { value: 'Epsilon' },
-      { id: 'zeta' },
-      '',
-      'Alpha',
-    ])).toEqual(['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'zeta']);
+    expect(
+      coerceQuestionOptionLabels([
+        ' Alpha ',
+        { label: 'Beta' },
+        { text: 'Gamma' },
+        { name: 'Delta' },
+        { value: 'Epsilon' },
+        { id: 'zeta' },
+        '',
+        'Alpha',
+      ]),
+    ).toEqual(['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'zeta']);
 
-    expect(coerceQuestionOptionLabels({
-      one: { label: 'One' },
-      two: { id: 'two' },
-    })).toEqual(['One', 'two']);
+    expect(
+      coerceQuestionOptionLabels({
+        one: { label: 'One' },
+        two: { id: 'two' },
+      }),
+    ).toEqual(['One', 'two']);
 
     expect(coerceQuestionOptionLabels('["A","B"]')).toEqual(['A', 'B']);
   });
@@ -37,11 +41,7 @@ describe('contractScripts payload normalizers', () => {
   it('mirrors conviction and importance fields without overwriting existing values', () => {
     const payload = {
       conviction: 4,
-      responses: [
-        { importance: 7 },
-        { conviction: 2, importance: 9 },
-        { conviction: 5 },
-      ],
+      responses: [{ importance: 7 }, { conviction: 2, importance: 9 }, { conviction: 5 }],
     };
 
     const normalized = normalizeConvictionImportance(payload);

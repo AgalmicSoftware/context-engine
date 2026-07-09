@@ -1,8 +1,4 @@
-import {
-  UserPage,
-  makeInstance,
-  setupUserPageCacheRefreshTestLifecycle,
-} from './UserPage.cacheRefresh.testUtils';
+import { UserPage, makeInstance, setupUserPageCacheRefreshTestLifecycle } from './UserPage.cacheRefresh.testUtils';
 
 describe('UserPage cache refresh aggregation and scheduling', () => {
   setupUserPageCacheRefreshTestLifecycle();
@@ -26,74 +22,82 @@ describe('UserPage cache refresh aggregation and scheduling', () => {
     });
 
     const dataByNamespace = {
-      surveysCache: [{
-        slug: 'edge',
-        data: {
-          [networkID]: {
-            surveys: {
-              s1: {
-                id: 's1',
-                title: 'Survey 1',
-                creator: viewAddress,
-                questionIDs: ['q1'],
-                tags: ['governance', 'ai'],
-                documentURLs: ['https://example.com/survey-1-doc'],
-              },
-            },
-            surveyResponses: {
-              s1: {
-                [viewAddress]: surveyResponsePayload,
-              },
-            },
-          },
-        },
-      }],
-      questionsCache: [{
-        slug: 'edge',
-        data: {
-          [networkID]: {
-            questions: {
-              q1: {
-                id: 'q1',
-                prompt: 'Question 1',
-                type: 'freeform',
-                creator: viewAddress,
-              },
-            },
-            questionResponses: {
-              q1: {
-                [viewAddress]: questionResponsePayload,
-              },
-            },
-          },
-        },
-      }],
-      sbtCache: [{
-        slug: 'edge',
-        data: {
-          [networkID]: {
-            sbtList: {
-              '0x100': {
-                sbtAddress: '0x100',
-                sbtInfo: { name: 'Badge 100', unlisted: false },
-                mintedAddresses: [viewAddress],
-                burnedAddresses: [],
-              },
-            },
-          },
-        },
-      }],
-      userCache: [{
-        slug: 'edge',
-        data: {
-          [viewLower]: {
+      surveysCache: [
+        {
+          slug: 'edge',
+          data: {
             [networkID]: {
-              lastBlockScanned: 120,
-              data: {},
+              surveys: {
+                s1: {
+                  id: 's1',
+                  title: 'Survey 1',
+                  creator: viewAddress,
+                  questionIDs: ['q1'],
+                  tags: ['governance', 'ai'],
+                  documentURLs: ['https://example.com/survey-1-doc'],
+                },
+              },
+              surveyResponses: {
+                s1: {
+                  [viewAddress]: surveyResponsePayload,
+                },
+              },
             },
           },
         },
-      }],
+      ],
+      questionsCache: [
+        {
+          slug: 'edge',
+          data: {
+            [networkID]: {
+              questions: {
+                q1: {
+                  id: 'q1',
+                  prompt: 'Question 1',
+                  type: 'freeform',
+                  creator: viewAddress,
+                },
+              },
+              questionResponses: {
+                q1: {
+                  [viewAddress]: questionResponsePayload,
+                },
+              },
+            },
+          },
+        },
+      ],
+      sbtCache: [
+        {
+          slug: 'edge',
+          data: {
+            [networkID]: {
+              sbtList: {
+                '0x100': {
+                  sbtAddress: '0x100',
+                  sbtInfo: { name: 'Badge 100', unlisted: false },
+                  mintedAddresses: [viewAddress],
+                  burnedAddresses: [],
+                },
+              },
+            },
+          },
+        },
+      ],
+      userCache: [
+        {
+          slug: 'edge',
+          data: {
+            [viewLower]: {
+              [networkID]: {
+                lastBlockScanned: 120,
+                data: {},
+              },
+            },
+          },
+        },
+      ],
     };
 
     instance._dgHasAny = jest.fn(() => true);
@@ -166,9 +170,7 @@ describe('UserPage cache refresh aggregation and scheduling', () => {
       account: '0x00000000000000000000000000000000000000bb',
       latestBlockNumber: 100,
     });
-    instance._dgHasAny = jest.fn((namespace) => (
-      namespace === 'questionsCache' || namespace === 'userCache'
-    ));
+    instance._dgHasAny = jest.fn((namespace) => namespace === 'questionsCache' || namespace === 'userCache');
     const aggregate = {
       userCaches: [],
       surveysById: {},
@@ -215,9 +217,7 @@ describe('UserPage cache refresh aggregation and scheduling', () => {
       account: '0x00000000000000000000000000000000000000bb',
       latestBlockNumber: 100,
     });
-    instance._dgHasAny = jest.fn((namespace) => (
-      namespace === 'questionsCache' || namespace === 'userCache'
-    ));
+    instance._dgHasAny = jest.fn((namespace) => namespace === 'questionsCache' || namespace === 'userCache');
     const aggregate = {
       userCaches: [],
       surveysById: {},
@@ -263,9 +263,7 @@ describe('UserPage cache refresh aggregation and scheduling', () => {
       account: '0x00000000000000000000000000000000000000bb',
       latestBlockNumber: 100,
     });
-    instance._dgHasAny = jest.fn((namespace) => (
-      namespace === 'questionsCache' || namespace === 'userCache'
-    ));
+    instance._dgHasAny = jest.fn((namespace) => namespace === 'questionsCache' || namespace === 'userCache');
     const aggregate = {
       userCaches: [],
       surveysById: {},
@@ -314,9 +312,7 @@ describe('UserPage cache refresh aggregation and scheduling', () => {
       account: '0x00000000000000000000000000000000000000bb',
       latestBlockNumber: 100,
     });
-    instance._dgHasAny = jest.fn((namespace) => (
-      namespace === 'questionsCache' || namespace === 'userCache'
-    ));
+    instance._dgHasAny = jest.fn((namespace) => namespace === 'questionsCache' || namespace === 'userCache');
     const aggregate = {
       userCaches: [],
       surveysById: {},
@@ -365,9 +361,7 @@ describe('UserPage cache refresh aggregation and scheduling', () => {
       latestBlockNumber: 100,
       questionResponsesNonce: 0,
     });
-    instance._dgHasAny = jest.fn((namespace) => (
-      namespace === 'questionsCache' || namespace === 'userCache'
-    ));
+    instance._dgHasAny = jest.fn((namespace) => namespace === 'questionsCache' || namespace === 'userCache');
     const aggregate = {
       userCaches: [],
       surveysById: {},

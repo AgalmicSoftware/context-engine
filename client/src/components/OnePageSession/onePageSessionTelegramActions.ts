@@ -11,10 +11,7 @@ import type {
   TelegramAnswerInput,
   TelegramResultsDataset,
 } from '../../utilities/session/telegramSessionBackend';
-import type {
-  isTelegramAgentAuthFailure,
-  TelegramAgentQuestion,
-} from '../../utilities/session/telegramAgentData';
+import type { isTelegramAgentAuthFailure, TelegramAgentQuestion } from '../../utilities/session/telegramAgentData';
 import type { TelegramSessionMeta } from '../../utilities/session/sessionBackendKind';
 import {
   buildTelegramAuthFailureState,
@@ -133,7 +130,7 @@ export const createOnePageSessionTelegramActions = ({
       const url = new URL(`${agentBridgeUrl}/api/agent/session-meta`);
       url.searchParams.set('sessionSlug', sessionSlug);
       const response = await ports.fetchImpl(url.toString(), { method: 'GET', cache: 'no-store' });
-      const body = await response.json().catch(() => null) as TelegramSessionMeta | null;
+      const body = (await response.json().catch(() => null)) as TelegramSessionMeta | null;
       if (!response.ok || !body || body.ok === false) {
         setState({ telegramSessionMetaStatus: 'error' });
         return null;
@@ -159,7 +156,9 @@ export const createOnePageSessionTelegramActions = ({
   const handleAgentClientLoginEvent = (event: CustomEvent<unknown>): void => {
     const envelope = resolveAgentClientLoginEnvelopeFromEvent(event, resolveCurrentSessionSlug());
     if (!envelope) return;
-    setState({ telegramClientEnvelope: envelope }, () => { void loadTelegramAgentData(true); });
+    setState({ telegramClientEnvelope: envelope }, () => {
+      void loadTelegramAgentData(true);
+    });
   };
 
   const loadTelegramAgentQuestions = async (force = false): Promise<unknown> => {
@@ -221,10 +220,7 @@ export const createOnePageSessionTelegramActions = ({
 
   const loadTelegramAgentData = (force = false): Promise<unknown[]> => {
     void loadTelegramSessionMeta();
-    return Promise.all([
-      loadTelegramAgentQuestions(force),
-      loadTelegramAgentResults(force),
-    ]);
+    return Promise.all([loadTelegramAgentQuestions(force), loadTelegramAgentResults(force)]);
   };
 
   const handleTelegramQuestionSubmit = async (
@@ -257,10 +253,9 @@ export const createOnePageSessionTelegramActions = ({
     }
     setState((prev: Readonly<OnePageSessionTelegramState>) => ({
       telegramSubmittingQuestionId: '',
-      telegramSubmittedQuestionIds: Array.from(new Set([
-        ...(prev.telegramSubmittedQuestionIds || []),
-        question.questionId,
-      ])),
+      telegramSubmittedQuestionIds: Array.from(
+        new Set([...(prev.telegramSubmittedQuestionIds || []), question.questionId]),
+      ),
     }));
     void loadTelegramAgentData(true);
   };

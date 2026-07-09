@@ -89,7 +89,7 @@ describe('MainAreaTabs', () => {
           focusedTab: 2,
           changeFocusedTab,
         })}
-      />
+      />,
     );
 
     expect(changeFocusedTab).not.toHaveBeenCalled();

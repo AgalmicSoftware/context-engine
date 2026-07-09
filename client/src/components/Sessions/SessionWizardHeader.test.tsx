@@ -36,13 +36,7 @@ describe('SessionWizardHeader', () => {
   });
 
   it('renders sponsored display settings without changing the mode test ids', () => {
-    render(
-      <SessionWizardHeader
-        {...baseProps}
-        hasSponsoredBundleLink
-        wizardDisplaySettingsOpen
-      />
-    );
+    render(<SessionWizardHeader {...baseProps} hasSponsoredBundleLink wizardDisplaySettingsOpen />);
 
     const settingsButton = screen.getByRole('button', { name: 'Session wizard display settings' });
     expect(settingsButton).toHaveAttribute('aria-expanded', 'true');
@@ -69,7 +63,7 @@ describe('SessionWizardHeader', () => {
           { id: 11155420, name: 'OP Sepolia' },
         ]}
         wizardMode="advanced"
-      />
+      />,
     );
 
     expect(screen.getByText('Advanced mode shows the full session configuration.')).toBeInTheDocument();
@@ -95,7 +89,7 @@ describe('SessionWizardHeader', () => {
         registryChainName="Anvil"
         registryChainOptions={[]}
         wizardMode="advanced"
-      />
+      />,
     );
 
     expect(screen.getByDisplayValue('Anvil')).toBeInTheDocument();

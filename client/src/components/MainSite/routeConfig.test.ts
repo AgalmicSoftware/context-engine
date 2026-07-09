@@ -29,21 +29,19 @@ describe('routeConfig', () => {
     expect(VALID_SURVEY_ID_RE.test(surveyId)).toBe(true);
     expect(VALID_SURVEY_ID_RE.test('0xabc')).toBe(false);
 
-    expect(`/survey/${surveyId}/results`.match(SURVEY_RESULTS_RE)).toEqual(
-      expect.arrayContaining([surveyId])
-    );
+    expect(`/survey/${surveyId}/results`.match(SURVEY_RESULTS_RE)).toEqual(expect.arrayContaining([surveyId]));
     expect(`/survey/${surveyId}/results/filtered`.match(SURVEY_RESULTS_RE)).toEqual(
-      expect.arrayContaining([surveyId, 'filtered'])
+      expect.arrayContaining([surveyId, 'filtered']),
     );
     expect('/survey/not-a-survey/results'.match(SURVEY_RESULTS_RE)).toBeNull();
   });
 
   it('matches question results routes with optional filter segments', () => {
     expect('/questions/results'.match(QUESTION_RESULTS_RE)).toEqual(
-      expect.arrayContaining(['/questions/results', undefined])
+      expect.arrayContaining(['/questions/results', undefined]),
     );
     expect('/questions/results/responded'.match(QUESTION_RESULTS_RE)).toEqual(
-      expect.arrayContaining(['/questions/results/responded', 'responded'])
+      expect.arrayContaining(['/questions/results/responded', 'responded']),
     );
     expect('/questions'.match(QUESTION_RESULTS_RE)).toBeNull();
   });

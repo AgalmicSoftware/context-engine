@@ -1,8 +1,4 @@
-import {
-  isPlainAnalysisObject,
-  toAnalysisRecord,
-  type UserPageUnknownRecord,
-} from './userPageCoreHelpers';
+import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 import {
   compareUserPageResponseRecency,
   extractUserPageResponseRecencyWithHints,
@@ -18,13 +14,8 @@ export type UserPageCacheNetworkBucket = UserPageUnknownRecord & {
   questionResponsesMeta?: unknown;
   sbtList?: unknown;
 };
-type UserPageCacheNetworkMergeKey = (
-  'surveys' |
-  'surveyResponses' |
-  'questions' |
-  'questionResponses' |
-  'questionResponsesMeta'
-);
+type UserPageCacheNetworkMergeKey =
+  'surveys' | 'surveyResponses' | 'questions' | 'questionResponses' | 'questionResponsesMeta';
 
 const USER_PAGE_CACHE_NETWORK_MERGE_KEYS: UserPageCacheNetworkMergeKey[] = [
   'surveys',
@@ -52,13 +43,14 @@ export type UserPageOwnershipSignalAggregate = {
   mintedSet: Set<string>;
   burnedSet: Set<string>;
 };
-export type UserPageSbtAggregateEntry = UserPageUnknownRecord & UserPageOwnershipSignalAggregate & {
-  blockNumber?: number;
-  sbtAddress?: unknown;
-  sbtInfo?: unknown;
-  slug?: unknown;
-  viewerCountsAuthoritative?: boolean;
-};
+export type UserPageSbtAggregateEntry = UserPageUnknownRecord &
+  UserPageOwnershipSignalAggregate & {
+    blockNumber?: number;
+    sbtAddress?: unknown;
+    sbtInfo?: unknown;
+    slug?: unknown;
+    viewerCountsAuthoritative?: boolean;
+  };
 export type UserPageSbtAggregateMap = Record<string, UserPageSbtAggregateEntry | undefined>;
 export type UserPageSourceSlugMap = Record<string, string>;
 export type UserPageSourceSlugWriteOptions = {
@@ -119,13 +111,13 @@ type MergeUserPageUserCacheSbtIntoAggregateArgs = {
 };
 
 const normalizeUserPageCacheSourceSlug = (slug: unknown): string => {
-  const raw = String(slug || '').trim().toLowerCase();
+  const raw = String(slug || '')
+    .trim()
+    .toLowerCase();
   return raw === 'general' ? '' : raw;
 };
 
-export const getUserPageOwnershipCountMaps = (
-  entry: unknown = {}
-): UserPageOwnershipCountMaps => {
+export const getUserPageOwnershipCountMaps = (entry: unknown = {}): UserPageOwnershipCountMaps => {
   const entryRecord = toAnalysisRecord(entry);
   const mintedCountMap = isPlainAnalysisObject(entryRecord.mintedCountByAddress)
     ? entryRecord.mintedCountByAddress
@@ -136,10 +128,7 @@ export const getUserPageOwnershipCountMaps = (
   return { mintedCountMap, burnedCountMap };
 };
 
-export const hasMeaningfulUserPageOwnershipCounts = (
-  entry: unknown = {},
-  addressLower: unknown = ''
-): boolean => {
+export const hasMeaningfulUserPageOwnershipCounts = (entry: unknown = {}, addressLower: unknown = ''): boolean => {
   const entryRecord = toAnalysisRecord(entry);
   const { mintedCountMap, burnedCountMap } = getUserPageOwnershipCountMaps(entry);
   if (!mintedCountMap && !burnedCountMap) return false;
@@ -152,19 +141,13 @@ export const hasMeaningfulUserPageOwnershipCounts = (
   );
 };
 
-export const readUserPageOwnershipCount = (
-  countMap: UserPageUnknownRecord | null,
-  addressLower: unknown
-): number => (
-  countMap
-    ? Math.max(0, Number(countMap[String(addressLower || '').toLowerCase()] || 0) || 0)
-    : 0
-);
+export const readUserPageOwnershipCount = (countMap: UserPageUnknownRecord | null, addressLower: unknown): number =>
+  countMap ? Math.max(0, Number(countMap[String(addressLower || '').toLowerCase()] || 0) || 0) : 0;
 
 export const applyUserPageOwnershipSignal = (
   aggEntry: UserPageOwnershipSignalAggregate,
   entry: unknown,
-  addressLower: unknown
+  addressLower: unknown,
 ): void => {
   const addressKey = String(addressLower || '').toLowerCase();
   if (!addressKey) return;
@@ -187,7 +170,7 @@ export const applyUserPageOwnershipSignal = (
 const buildDefaultUserPageSbtAggregateEntry = (
   entry: UserPageUnknownRecord,
   key: string,
-  slug: unknown
+  slug: unknown,
 ): UserPageSbtAggregateEntry => ({
   sbtAddress: entry.sbtAddress || key,
   sbtInfo: null,
@@ -201,7 +184,7 @@ const buildDefaultUserPageSbtAggregateEntry = (
 const applyUserPageSbtAggregateMetadata = (
   aggEntry: UserPageSbtAggregateEntry,
   entry: UserPageUnknownRecord,
-  slug: unknown
+  slug: unknown,
 ): void => {
   if (slug && !aggEntry.slug) aggEntry.slug = slug;
   if (!aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = entry.sbtInfo;
@@ -233,20 +216,18 @@ export const mergeUserPageSbtCacheEntryIntoAggregate = ({
     aggEntry.burnedSet.delete(addressKey);
     aggEntry.viewerCountsAuthoritative = true;
   }
-  (Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [])
-    .forEach((address: unknown) => {
-      const addressLower = String(address || '').toLowerCase();
-      if (!addressLower) return;
-      if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === addressKey) return;
-      aggEntry.mintedSet.add(addressLower);
-    });
-  (Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : [])
-    .forEach((address: unknown) => {
-      const addressLower = String(address || '').toLowerCase();
-      if (!addressLower) return;
-      if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === addressKey) return;
-      aggEntry.burnedSet.add(addressLower);
-    });
+  (Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : []).forEach((address: unknown) => {
+    const addressLower = String(address || '').toLowerCase();
+    if (!addressLower) return;
+    if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === addressKey) return;
+    aggEntry.mintedSet.add(addressLower);
+  });
+  (Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : []).forEach((address: unknown) => {
+    const addressLower = String(address || '').toLowerCase();
+    if (!addressLower) return;
+    if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === addressKey) return;
+    aggEntry.burnedSet.add(addressLower);
+  });
   applyUserPageOwnershipSignal(aggEntry, entry, addressKey);
   aggEntry.blockNumber = Math.max(aggEntry.blockNumber || 0, Number(entry.blockNumber || 0));
   if (entry.sbtAddress) aggEntry.sbtAddress = entry.sbtAddress;
@@ -267,10 +248,7 @@ export const mergeUserPageUserCacheSbtIntoAggregate = ({
   const aggEntry = sbtAggregate[key] || buildDefaultUserPageSbtAggregateEntry(itemRecord, key, slug);
 
   applyUserPageSbtAggregateMetadata(aggEntry, itemRecord, slug);
-  const hasAggregateOwnershipSignal = (
-    aggEntry.mintedSet.has(addressKey) ||
-    aggEntry.burnedSet.has(addressKey)
-  );
+  const hasAggregateOwnershipSignal = aggEntry.mintedSet.has(addressKey) || aggEntry.burnedSet.has(addressKey);
   const hasExplicitCounts = hasMeaningfulUserPageOwnershipCounts(itemRecord, addressKey);
   if (hasExplicitCounts) {
     applyUserPageOwnershipSignal(aggEntry, itemRecord, addressKey);
@@ -287,7 +265,7 @@ export const writeUserPageSourceSlug = (
   target: UserPageSourceSlugMap,
   id: unknown,
   slug: unknown,
-  opts: UserPageSourceSlugWriteOptions = {}
+  opts: UserPageSourceSlugWriteOptions = {},
 ): void => {
   const key = String(id || '').toLowerCase();
   if (!key) return;
@@ -301,10 +279,14 @@ export const writeUserPageResponseSourceSlug = (
   id: unknown,
   responder: unknown,
   slug: unknown,
-  opts: UserPageSourceSlugWriteOptions = {}
+  opts: UserPageSourceSlugWriteOptions = {},
 ): void => {
-  const idKey = String(id || '').trim().toLowerCase();
-  const responderKey = String(responder || '').trim().toLowerCase();
+  const idKey = String(id || '')
+    .trim()
+    .toLowerCase();
+  const responderKey = String(responder || '')
+    .trim()
+    .toLowerCase();
   if (!idKey || !responderKey) return;
   const responseKey = `${idKey}|${responderKey}`;
   const replace = !!(opts && opts.replace);
@@ -323,15 +305,19 @@ export const upsertUserPageResponseByRecency = ({
   metaValue = null,
   slug = '',
 }: UpsertUserPageResponseByRecencyArgs): void => {
-  const idLower = String(id || '').trim().toLowerCase();
-  const responderLower = String(responder || '').trim().toLowerCase();
+  const idLower = String(id || '')
+    .trim()
+    .toLowerCase();
+  const responderLower = String(responder || '')
+    .trim()
+    .toLowerCase();
   if (!idLower || !responderLower || responseValue == null) return;
   if (!responses[idLower]) responses[idLower] = {};
   if (!responseRecencyMeta[idLower]) responseRecencyMeta[idLower] = {};
   const existingResponse = responses[idLower][responderLower];
   const existingRecency = extractUserPageResponseRecencyWithHints(
     existingResponse,
-    responseRecencyMeta[idLower][responderLower]
+    responseRecencyMeta[idLower][responderLower],
   );
   const incomingRecency = extractUserPageResponseRecencyWithHints(responseValue, metaValue);
   const hasExisting = Object.prototype.hasOwnProperty.call(responses[idLower], responderLower);
@@ -377,14 +363,10 @@ export const mergeUserPageSurveyCacheSource = ({
     Object.keys(perSurvey).forEach((resAddrRaw: string) => {
       const responder = String(resAddrRaw || '').toLowerCase();
       if (!responder) return;
-      const responseValue = (
-        Object.prototype.hasOwnProperty.call(perSurvey, resAddrRaw)
-          ? perSurvey[resAddrRaw]
-          : perSurvey[responder]
-      );
-      const responseMeta = (responseValue && typeof responseValue === 'object')
-        ? responseValue
-        : null;
+      const responseValue = Object.prototype.hasOwnProperty.call(perSurvey, resAddrRaw)
+        ? perSurvey[resAddrRaw]
+        : perSurvey[responder];
+      const responseMeta = responseValue && typeof responseValue === 'object' ? responseValue : null;
       upsertUserPageResponseByRecency({
         id: sid,
         responder,
@@ -428,26 +410,18 @@ export const mergeUserPageQuestionCacheSource = ({
     const qid = String(qidRaw || '').toLowerCase();
     if (!qid) return;
     const perQuestion = toAnalysisRecord(responseMap[qidRaw] || responseMap[qid]);
-    const perQuestionMeta = (
-      isPlainAnalysisObject(responseMetaMap[qidRaw])
-        ? responseMetaMap[qidRaw]
-        : isPlainAnalysisObject(responseMetaMap[qid])
-          ? responseMetaMap[qid]
-          : {}
-    );
+    const perQuestionMeta = isPlainAnalysisObject(responseMetaMap[qidRaw])
+      ? responseMetaMap[qidRaw]
+      : isPlainAnalysisObject(responseMetaMap[qid])
+        ? responseMetaMap[qid]
+        : {};
     Object.keys(perQuestion).forEach((resAddrRaw: string) => {
       const responder = String(resAddrRaw || '').toLowerCase();
       if (!responder) return;
-      const responseValue = (
-        Object.prototype.hasOwnProperty.call(perQuestion, resAddrRaw)
-          ? perQuestion[resAddrRaw]
-          : perQuestion[responder]
-      );
-      const responseMeta = (
-        perQuestionMeta[resAddrRaw] ??
-        perQuestionMeta[responder] ??
-        null
-      );
+      const responseValue = Object.prototype.hasOwnProperty.call(perQuestion, resAddrRaw)
+        ? perQuestion[resAddrRaw]
+        : perQuestion[responder];
+      const responseMeta = perQuestionMeta[resAddrRaw] ?? perQuestionMeta[responder] ?? null;
       upsertUserPageResponseByRecency({
         id: qid,
         responder,
@@ -463,10 +437,7 @@ export const mergeUserPageQuestionCacheSource = ({
   });
 };
 
-export const readUserPageNetworkCache = (
-  cacheObj: unknown,
-  networkID: unknown
-): UserPageCacheNetworkBucket => {
+export const readUserPageNetworkCache = (cacheObj: unknown, networkID: unknown): UserPageCacheNetworkBucket => {
   if (!isPlainAnalysisObject(cacheObj)) return {};
   const mergeBucket = (target: UserPageCacheNetworkBucket, bucket: unknown): void => {
     if (!isPlainAnalysisObject(bucket)) return;
@@ -492,7 +463,7 @@ export const readUserPageNetworkCache = (
 
 export const getPrioritizedUserPageNetworkCacheNodes = (
   cacheObj: unknown,
-  networkID: unknown
+  networkID: unknown,
 ): UserPagePrioritizedCacheNode[] => {
   if (!isPlainAnalysisObject(cacheObj)) return [];
   const out: UserPagePrioritizedCacheNode[] = [];
@@ -515,7 +486,7 @@ export const getPrioritizedUserPageNetworkCacheNodes = (
 
 export const getPrioritizedUserPageChainNodes = (
   userNode: unknown,
-  networkID: unknown
+  networkID: unknown,
 ): UserPagePrioritizedUserChainNode[] => {
   if (!isPlainAnalysisObject(userNode)) return [];
   const out: UserPagePrioritizedUserChainNode[] = [];
@@ -536,10 +507,7 @@ export const getPrioritizedUserPageChainNodes = (
   return out;
 };
 
-export const getActiveUserPageChainNode = (
-  userNode: unknown,
-  networkID: unknown
-): UserPageUserChainNode | null => {
+export const getActiveUserPageChainNode = (userNode: unknown, networkID: unknown): UserPageUserChainNode | null => {
   if (!isPlainAnalysisObject(userNode)) return null;
   const mergedData = getPrioritizedUserPageChainNodes(userNode, networkID).reduce<UserPageUserCachePayload>(
     (acc, { node }) => {
@@ -565,7 +533,7 @@ export const getActiveUserPageChainNode = (
         ],
       };
     },
-    {}
+    {},
   );
   if (Object.keys(mergedData).length === 0) return null;
   return { data: mergedData };

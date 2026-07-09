@@ -2,19 +2,17 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import SessionChipSelector from './SessionChipSelector';
 
-const buildOptions = (labels: string[] = []) => labels.map((label) => ({
-  key: label,
-  slug: label.toLowerCase(),
-  label,
-}));
+const buildOptions = (labels: string[] = []) =>
+  labels.map((label) => ({
+    key: label,
+    slug: label.toLowerCase(),
+    label,
+  }));
 
 describe('SessionChipSelector', () => {
   it('collapses long lists behind a see-more toggle and expands on demand', () => {
     render(
-      <SessionChipSelector
-        options={buildOptions(['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'])}
-        collapsedLimit={3}
-      />
+      <SessionChipSelector options={buildOptions(['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'])} collapsedLimit={3} />,
     );
 
     expect(screen.getByText('Alpha')).toBeInTheDocument();
@@ -31,12 +29,7 @@ describe('SessionChipSelector', () => {
   });
 
   it('does not render the see-more toggle when the list fits within the limit', () => {
-    render(
-      <SessionChipSelector
-        options={buildOptions(['Alpha', 'Beta', 'Gamma'])}
-        collapsedLimit={3}
-      />
-    );
+    render(<SessionChipSelector options={buildOptions(['Alpha', 'Beta', 'Gamma'])} collapsedLimit={3} />);
 
     expect(screen.queryByRole('button', { name: /See more/i })).not.toBeInTheDocument();
   });

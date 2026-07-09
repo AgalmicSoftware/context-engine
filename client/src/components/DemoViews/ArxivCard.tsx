@@ -44,22 +44,21 @@ const extractArxivId = (url = '') => {
 };
 
 const formatAuthorSurname = (author = '') => {
-  const parts = String(author || '').trim().split(/\s+/).filter(Boolean);
+  const parts = String(author || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   return parts[parts.length - 1] || '';
 };
 
 const formatCompactAuthors = (entry: ArxivEntry = {}) => {
-  const listedAuthors = Array.isArray(entry.authors)
-    ? entry.authors.filter(Boolean)
-    : [];
+  const listedAuthors = Array.isArray(entry.authors) ? entry.authors.filter(Boolean) : [];
 
   if (listedAuthors.length === 0) {
     return entry.author ? String(entry.author).trim() : null;
   }
 
-  const surnames = listedAuthors
-    .map((author) => formatAuthorSurname(author))
-    .filter(Boolean);
+  const surnames = listedAuthors.map((author) => formatAuthorSurname(author)).filter(Boolean);
 
   if (surnames.length === 0) return null;
   if (surnames.length === 1) return surnames[0];
@@ -101,9 +100,10 @@ const formatEntryDate = (entry: ArxivEntry = {}) => {
 
 const ArxivCard = ({ entry = null, onTagClick, onAtlasIssueOpen }: ArxivCardProps) => {
   const arxivId = extractArxivId(entry?.url);
-  const authorLabel = Array.isArray(entry?.authors) && entry.authors.length > 0
-    ? entry.authors.join(', ')
-    : formatCompactAuthors(entry || {});
+  const authorLabel =
+    Array.isArray(entry?.authors) && entry.authors.length > 0
+      ? entry.authors.join(', ')
+      : formatCompactAuthors(entry || {});
   const dateLabel = formatEntryDate(entry || {});
   const summaryText = entry?.summary || entry?.abstract || '';
   const tags = Array.isArray(entry?.tags) ? entry.tags : [];
@@ -112,29 +112,20 @@ const ArxivCard = ({ entry = null, onTagClick, onAtlasIssueOpen }: ArxivCardProp
     <article className={`${styles.card} ${styles.arxivCard}`}>
       <div className={styles.entryHeader}>
         <div className={styles.entryHeaderContent}>
-          {(arxivId || entry?.category) ? (
+          {arxivId || entry?.category ? (
             <div className={styles.arxivMetaTop}>
-              {arxivId ? (
-                <span className={styles.arxivId}>
-                  arXiv:{arxivId}
-                </span>
-              ) : null}
+              {arxivId ? <span className={styles.arxivId}>arXiv:{arxivId}</span> : null}
               {entry?.category ? (
-                <span
-                  className={styles.arxivCategory}
-                  data-category={entry.category}
-                >
+                <span className={styles.arxivCategory} data-category={entry.category}>
                   {entry.category}
                 </span>
               ) : null}
             </div>
           ) : null}
 
-          <div className={styles.arxivTitle}>
-            {entry?.title || entry?.id || 'Untitled entry'}
-          </div>
+          <div className={styles.arxivTitle}>{entry?.title || entry?.id || 'Untitled entry'}</div>
 
-          {(authorLabel || dateLabel) ? (
+          {authorLabel || dateLabel ? (
             <div className={styles.arxivMetaRow}>
               {authorLabel ? (
                 <>
@@ -144,21 +135,13 @@ const ArxivCard = ({ entry = null, onTagClick, onAtlasIssueOpen }: ArxivCardProp
                   </span>
                 </>
               ) : null}
-              {dateLabel ? (
-                <span className={styles.arxivDate}>
-                  Submitted {dateLabel}
-                </span>
-              ) : null}
+              {dateLabel ? <span className={styles.arxivDate}>Submitted {dateLabel}</span> : null}
             </div>
           ) : null}
         </div>
       </div>
 
-      {summaryText ? (
-        <div className={`${styles.entrySummary} ${styles.clamp3}`}>
-          {summaryText}
-        </div>
-      ) : null}
+      {summaryText ? <div className={`${styles.entrySummary} ${styles.clamp3}`}>{summaryText}</div> : null}
 
       {tags.length > 0 ? (
         <div className={styles.pillRow}>

@@ -13,9 +13,8 @@ export type BuildCreateSbtResetFormStateArgs = BuildCreateSbtDefaultDistribution
 
 export type BuildCreateSbtInitialStateArgs = BuildCreateSbtResetFormStateArgs;
 
-const isCreateSbtFormStatePlainObject = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isCreateSbtFormStatePlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const buildCreateSbtRestoredDistributionState = ({
   currentDistribution = {},
@@ -34,28 +33,20 @@ export const buildCreateSbtRestoredDistributionState = ({
     ...payload,
   };
   const rawMintingEndTime = payload.mintingEndTime;
-  nextDistribution.mintingEndTime = rawMintingEndTime
-    ? new Date(rawMintingEndTime as string | number | Date)
-    : null;
+  nextDistribution.mintingEndTime = rawMintingEndTime ? new Date(rawMintingEndTime as string | number | Date) : null;
   nextDistribution.network = chainState.chain;
   return nextDistribution;
 };
 
 export const resolveCreateSbtRestoredDeferredCreate2Salt = (
   value: unknown = '',
-  fallbackValue: unknown = ''
-): unknown => (
-  typeof value === 'string' && value.trim()
-    ? value
-    : fallbackValue
-);
+  fallbackValue: unknown = '',
+): unknown => (typeof value === 'string' && value.trim() ? value : fallbackValue);
 
 export const resolveCreateSbtRestoredPredictableAddressEnabled = (
   value: unknown = null,
-  fallbackValue: unknown = false
-): boolean => (
-  typeof value === 'boolean' ? value : !!fallbackValue
-);
+  fallbackValue: unknown = false,
+): boolean => (typeof value === 'boolean' ? value : !!fallbackValue);
 
 export const buildCreateSbtGroupPasswordPredictableExitPatch = ({
   autoCreate2SaltForGroupPassword = false,
@@ -190,9 +181,8 @@ export const buildCreateSbtResetFormState = ({
   metadataLockGateIds: createEmptyMetadataLockGateIds(),
   lockedImageAsset: null,
   create2Salt: '',
-  deferredCreate2Salt: deferredDeploy && typeof deferredCreate2SaltBuilder === 'function'
-    ? deferredCreate2SaltBuilder()
-    : '',
+  deferredCreate2Salt:
+    deferredDeploy && typeof deferredCreate2SaltBuilder === 'function' ? deferredCreate2SaltBuilder() : '',
   predictableAddressEnabled: !!deferredDeploy,
   predictedAddress: '',
   predictedAddressStatus: '',

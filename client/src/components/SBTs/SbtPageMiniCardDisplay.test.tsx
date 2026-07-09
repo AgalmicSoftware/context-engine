@@ -25,7 +25,7 @@ describe('SbtPageMiniCardDisplay', () => {
         shouldRenderLiveIndicator={true}
         showLockIcon={true}
         showMiniSbtAddress={true}
-      />
+      />,
     );
 
     const image = screen.getByTestId(E2E_TESTIDS.SBT_PAGE_IMAGE);
@@ -50,7 +50,7 @@ describe('SbtPageMiniCardDisplay', () => {
         sbtAddress="0x00000000000000000000000000000000000000f1"
         sbtName="Ended Badge"
         shouldRenderEndedIndicator={true}
-      />
+      />,
     );
 
     expect(screen.getByText('Ended Badge')).toBeInTheDocument();

@@ -4,7 +4,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import SbtListSessionUniversePanel from './SbtListSessionUniversePanel';
 import type { SbtListSessionSelectorOption } from './sbtListSessionSelectorDisplayHelpers';
 
-const createOption = (slug: string, overrides: Partial<SbtListSessionSelectorOption> = {}): SbtListSessionSelectorOption => ({
+const createOption = (
+  slug: string,
+  overrides: Partial<SbtListSessionSelectorOption> = {},
+): SbtListSessionSelectorOption => ({
   active: false,
   checkTestId: `session-chip-check-${slug || 'general'}`,
   chipTestId: `session-chip-${slug || 'general'}`,
@@ -30,7 +33,7 @@ const createOption = (slug: string, overrides: Partial<SbtListSessionSelectorOpt
 });
 
 const createProps = (
-  overrides: Partial<React.ComponentProps<typeof SbtListSessionUniversePanel>> = {}
+  overrides: Partial<React.ComponentProps<typeof SbtListSessionUniversePanel>> = {},
 ): React.ComponentProps<typeof SbtListSessionUniversePanel> => ({
   buildSessionRouteHref: (slug) => (slug ? `/session/${slug}` : '/session'),
   canShowMoreSessions: false,
@@ -48,10 +51,7 @@ const createProps = (
   remainingHiddenSessionCount: 0,
   selectedSummarySlugs: ['alpha'],
   selectorPanelId: 'session-selector-panel',
-  sessionSelectorOptions: [
-    createOption('alpha', { selected: true }),
-    createOption('beta'),
-  ],
+  sessionSelectorOptions: [createOption('alpha', { selected: true }), createOption('beta')],
   showMoreSessionsLoading: false,
   showUniverseSpinner: false,
   usesFallbackSessionSettingsToggle: true,
@@ -68,7 +68,7 @@ describe('SbtListSessionUniversePanel', () => {
           onToggleSessionSettings,
           showUniverseSpinner: true,
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Sessions')).toBeInTheDocument();
@@ -89,7 +89,7 @@ describe('SbtListSessionUniversePanel', () => {
           onOpenSessionChip,
           onToggleSessionChip,
         })}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByTestId('session-chip-beta'));
@@ -99,7 +99,7 @@ describe('SbtListSessionUniversePanel', () => {
     expect(onOpenSessionChip).toHaveBeenCalledWith(
       'alpha',
       expect.objectContaining({ slug: 'alpha' }),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -113,7 +113,7 @@ describe('SbtListSessionUniversePanel', () => {
           onToggleUniverseCollapsed,
           selectedSummarySlugs: ['alpha', 'beta'],
         })}
-      />
+      />,
     );
 
     expect(screen.getByTestId('session-universe-collapsed-summary')).toHaveTextContent('Selected (2)');
@@ -128,7 +128,7 @@ describe('SbtListSessionUniversePanel', () => {
           remainingHiddenSessionCount: 3,
           showMoreSessionsLoading: true,
         })}
-      />
+      />,
     );
 
     const showMoreButton = screen.getByRole('button', { name: /Show More Sessions \(3\)/ });

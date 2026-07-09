@@ -29,18 +29,24 @@ describe('sessionWizardRouteState', () => {
   });
 
   it('builds context keys for plain and sponsored new-session routes', () => {
-    expect(buildSessionWizardNewSessionBannerDismissalContextKey({
-      pathname: '/new',
-    })).toBe('/new::plain');
-    expect(buildSessionWizardNewSessionBannerDismissalContextKey({
-      pathname: '/session/new',
-      sponsoredBundleId: 'bundle-123',
-      sponsoredBundleKey: 'secret',
-    })).toBe('/session/new::sponsored::bundle-123::with-key');
-    expect(buildSessionWizardNewSessionBannerDismissalContextKey({
-      pathname: '/session/demo',
-      sponsoredBundleId: 'bundle-123',
-    })).toBe('');
+    expect(
+      buildSessionWizardNewSessionBannerDismissalContextKey({
+        pathname: '/new',
+      }),
+    ).toBe('/new::plain');
+    expect(
+      buildSessionWizardNewSessionBannerDismissalContextKey({
+        pathname: '/session/new',
+        sponsoredBundleId: 'bundle-123',
+        sponsoredBundleKey: 'secret',
+      }),
+    ).toBe('/session/new::sponsored::bundle-123::with-key');
+    expect(
+      buildSessionWizardNewSessionBannerDismissalContextKey({
+        pathname: '/session/demo',
+        sponsoredBundleId: 'bundle-123',
+      }),
+    ).toBe('');
   });
 
   it('removes the sponsored bundle key from hash URLs', () => {

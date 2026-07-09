@@ -1,6 +1,10 @@
-jest.mock('../web3/contractScripts.js', () => ({
+jest.mock('../web3/chainGateway.js', () => ({
   __esModule: true,
-  normalizeSessionSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
+  normalizeSessionSlug: jest.fn((value = '') =>
+    String(value || '')
+      .trim()
+      .toLowerCase(),
+  ),
 }));
 
 const {
@@ -11,16 +15,18 @@ const {
 
 describe('profileScanReportHelpers', () => {
   it('enables list-scope fanout only for explicit non-legacy profile scan modes', () => {
-    expect(createProfileScanFanoutPlan({
-      scopeContext: { scope: 'list' },
-      allSessionsMode: {
-        legacyAllSessions: false,
-        useAllSessionsSbtScan: true,
-        useAllSessionsSurveyActivityScan: false,
-        useAllSessionsQuestionActivityScan: true,
-        useAllSessionsScan: false,
-      },
-    })).toMatchObject({
+    expect(
+      createProfileScanFanoutPlan({
+        scopeContext: { scope: 'list' },
+        allSessionsMode: {
+          legacyAllSessions: false,
+          useAllSessionsSbtScan: true,
+          useAllSessionsSurveyActivityScan: false,
+          useAllSessionsQuestionActivityScan: true,
+          useAllSessionsScan: false,
+        },
+      }),
+    ).toMatchObject({
       isListScope: true,
       allowListScopeSbtFanout: true,
       allowListScopeSurveyActivityFanout: false,
@@ -30,16 +36,18 @@ describe('profileScanReportHelpers', () => {
       shouldHydrateRegistry: true,
     });
 
-    expect(createProfileScanFanoutPlan({
-      scopeContext: { scope: 'list' },
-      allSessionsMode: {
-        legacyAllSessions: true,
-        useAllSessionsSbtScan: true,
-        useAllSessionsSurveyActivityScan: true,
-        useAllSessionsQuestionActivityScan: true,
-        useAllSessionsScan: true,
-      },
-    })).toMatchObject({
+    expect(
+      createProfileScanFanoutPlan({
+        scopeContext: { scope: 'list' },
+        allSessionsMode: {
+          legacyAllSessions: true,
+          useAllSessionsSbtScan: true,
+          useAllSessionsSurveyActivityScan: true,
+          useAllSessionsQuestionActivityScan: true,
+          useAllSessionsScan: true,
+        },
+      }),
+    ).toMatchObject({
       allowListScopeSbtFanout: false,
       allowListScopeSurveyActivityFanout: false,
       allowListScopeQuestionActivityFanout: false,
@@ -50,10 +58,12 @@ describe('profileScanReportHelpers', () => {
   });
 
   it('uses the global all-session setting outside list scope', () => {
-    expect(createProfileScanFanoutPlan({
-      scopeContext: { scope: 'active' },
-      allSessionsMode: { useAllSessionsScan: true },
-    })).toMatchObject({
+    expect(
+      createProfileScanFanoutPlan({
+        scopeContext: { scope: 'active' },
+        allSessionsMode: { useAllSessionsScan: true },
+      }),
+    ).toMatchObject({
       isListScope: false,
       allowListScopeAnyFanout: false,
       useAllSessionsScan: true,

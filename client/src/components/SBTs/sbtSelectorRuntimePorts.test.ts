@@ -1,7 +1,4 @@
-import {
-  bindSbtSelectorRuntimePorts,
-  isEnsureLightSbtUniverse,
-} from './sbtSelectorRuntimePorts';
+import { bindSbtSelectorRuntimePorts, isEnsureLightSbtUniverse } from './sbtSelectorRuntimePorts';
 
 describe('sbtSelectorRuntimePorts', () => {
   it('binds selector runtime ports through call-time getters', async () => {

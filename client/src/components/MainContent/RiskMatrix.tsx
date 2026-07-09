@@ -9,7 +9,7 @@ import styles from './RiskMatrix.module.scss';
 import {
   getRiskMatrixAtlasScenarioCountForCell,
   getRiskMatrixAtlasScenariosForCell,
-} from '../../variables/demo/riskMatrixAtlasScenarioData.js';
+} from '../../variables/demo/riskMatrixAtlasScenarioData';
 import seedComments from '../../variables/demo/riskMatrixSeedComments.json';
 import {
   enrichRiskMatrixCommentRecord,
@@ -17,11 +17,7 @@ import {
   type RiskMatrixCorpusRef,
   type RiskMatrixHistoricalFigure,
 } from '../../variables/demo/riskMatrixCommentContext';
-import {
-  buildAtlasNodeRoute,
-  buildPublicUrlPath,
-  readWindowLocationPath,
-} from '../../utilities/ui/publicUrl.js';
+import { buildAtlasNodeRoute, buildPublicUrlPath, readWindowLocationPath } from '../../utilities/ui/publicUrl.js';
 import { getHistoricalFigureAvatarByName } from '../../utilities/ui/historicalFigureAvatars.js';
 
 export type RiskValence = 'opportunity' | 'risk';
@@ -124,10 +120,11 @@ const VALID_VALENCES = new Set(['opportunity', 'risk']);
 
 const clsx = (...args: Array<string | false | null | undefined>) => args.filter(Boolean).join(' ');
 
-const toTestIdFragment = (value = '') => String(value)
-  .toLowerCase()
-  .replace(/[^a-z0-9]+/g, '-')
-  .replace(/^-+|-+$/g, '');
+const toTestIdFragment = (value = '') =>
+  String(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
 const isAggregateCellId = (cellId = '') => cellId.includes('_vs_');
 
@@ -220,10 +217,7 @@ const parseSelectionStateFromCell = (cellId = '') => {
   };
 };
 
-const getCommentsForCellRecords = (
-  cellId: string,
-  comments: RiskCommentRecord[] = []
-): RiskCommentRecord[] => {
+const getCommentsForCellRecords = (cellId: string, comments: RiskCommentRecord[] = []): RiskCommentRecord[] => {
   if (typeof cellId !== 'string' || !cellId) return [];
 
   if (isAggregateCellId(cellId)) {
@@ -231,37 +225,29 @@ const getCommentsForCellRecords = (
     if (!catX || !catY) return [];
 
     return comments.filter(
-      (entry) => isCanonicalCellId(entry.cell)
-        && entry.cell.startsWith(`${catX}.`)
-        && entry.cell.includes(`.${catY}.`)
+      (entry) => isCanonicalCellId(entry.cell) && entry.cell.startsWith(`${catX}.`) && entry.cell.includes(`.${catY}.`),
     );
   }
 
   return comments.filter((entry) => entry.cell === cellId);
 };
 
-const hasRestoreState = (restoreState: RiskMatrixRestoreState | null | undefined) => (
-  Boolean(restoreState && typeof restoreState === 'object' && Object.keys(restoreState).length > 0)
-);
+const hasRestoreState = (restoreState: RiskMatrixRestoreState | null | undefined) =>
+  Boolean(restoreState && typeof restoreState === 'object' && Object.keys(restoreState).length > 0);
 
-const buildInitialRiskMatrixState = (
-  restoreState: RiskMatrixRestoreState | null | undefined
-): RiskMatrixState => {
+const buildInitialRiskMatrixState = (restoreState: RiskMatrixRestoreState | null | undefined): RiskMatrixState => {
   const nextComments = Array.isArray(restoreState?.comments)
     ? restoreState.comments.filter(isValidCommentRecord).map(normalizeCommentRecord).map(enrichRiskMatrixCommentRecord)
     : INITIAL_COMMENTS;
   const rawSelectedCellId = String(restoreState?.selectedCellId || '').trim();
-  const selectedCellId = (isAggregateCellId(rawSelectedCellId) || isCanonicalCellId(rawSelectedCellId))
-    ? rawSelectedCellId
-    : '';
+  const selectedCellId =
+    isAggregateCellId(rawSelectedCellId) || isCanonicalCellId(rawSelectedCellId) ? rawSelectedCellId : '';
   const derivedSelectionState = parseSelectionStateFromCell(selectedCellId);
   const nextValence = VALID_VALENCES.has(String(restoreState?.valence || ''))
     ? (restoreState?.valence as RiskValence)
     : DEFAULT_VALENCE;
   const parsedIntensity = Number(restoreState?.intensity);
-  const nextIntensity = Number.isFinite(parsedIntensity) && parsedIntensity > 0
-    ? parsedIntensity
-    : DEFAULT_INTENSITY;
+  const nextIntensity = Number.isFinite(parsedIntensity) && parsedIntensity > 0 ? parsedIntensity : DEFAULT_INTENSITY;
   const modal = Boolean(restoreState?.modal && selectedCellId);
 
   return {
@@ -330,10 +316,8 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
 
   getCellValue = (catY: string, catX: string) => this.state.heatmap[`${catY}_${catX}`] || 0;
 
-  getCommentsForCell = (
-    cellId: string,
-    comments: RiskCommentRecord[] = this.state.comments
-  ): RiskCommentRecord[] => getCommentsForCellRecords(cellId, comments);
+  getCommentsForCell = (cellId: string, comments: RiskCommentRecord[] = this.state.comments): RiskCommentRecord[] =>
+    getCommentsForCellRecords(cellId, comments);
 
   getRestoreState = (): RiskMatrixRestoreState => ({
     comments: this.state.comments,
@@ -348,10 +332,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     activeSubcategoryY: this.state.activeSubcategoryY,
   });
 
-  getHeatmapMaxMagnitude = () => Math.max(
-    6,
-    ...Object.values(this.state.heatmap).map((value) => Math.abs(value))
-  );
+  getHeatmapMaxMagnitude = () => Math.max(6, ...Object.values(this.state.heatmap).map((value) => Math.abs(value)));
 
   getCellAriaLabel = (catX: string, catY: string, value: number) => {
     if (value === 0) {
@@ -362,13 +343,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     return `${catX} versus ${catY}, ${leaning} balance ${formatRiskMatrixValue(value)}. Open aggregated notes.`;
   };
 
-  getSubCellAriaLabel = (
-    catX: string,
-    subX: string,
-    catY: string,
-    subY: string,
-    value: number
-  ) => {
+  getSubCellAriaLabel = (catX: string, subX: string, catY: string, subY: string, value: number) => {
     if (value === 0) {
       return `${catX} ${subX} versus ${catY} ${subY}, no seeded signal yet. Open detailed notes.`;
     }
@@ -448,12 +423,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
   };
 
   handleSaveComment = () => {
-    const {
-      comment,
-      intensity,
-      selectedCellId,
-      valence,
-    } = this.state;
+    const { comment, intensity, selectedCellId, valence } = this.state;
 
     if (isAggregateCellId(selectedCellId)) return;
 
@@ -485,28 +455,34 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     const nextValence = event.target.value === 'risk' ? 'risk' : 'opportunity';
     this.setState({ valence: nextValence });
   };
-  handleCommentChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => this.setState({ comment: event.target.value });
-  handleIntensityChange = (event: React.ChangeEvent<HTMLInputElement>) => this.setState({ intensity: Number(event.target.value) });
+  handleCommentChange = (event: React.ChangeEvent<HTMLTextAreaElement>) =>
+    this.setState({ comment: event.target.value });
+  handleIntensityChange = (event: React.ChangeEvent<HTMLInputElement>) =>
+    this.setState({ intensity: Number(event.target.value) });
 
-  handleCellMouseEnter = (rowIndex: number, colIndex: number) => this.setState({
-    hoveredRowIndex: rowIndex,
-    hoveredColIndex: colIndex,
-  });
+  handleCellMouseEnter = (rowIndex: number, colIndex: number) =>
+    this.setState({
+      hoveredRowIndex: rowIndex,
+      hoveredColIndex: colIndex,
+    });
 
-  handleCellMouseLeave = () => this.setState({
-    hoveredRowIndex: null,
-    hoveredColIndex: null,
-  });
+  handleCellMouseLeave = () =>
+    this.setState({
+      hoveredRowIndex: null,
+      hoveredColIndex: null,
+    });
 
-  handleSubCellMouseEnter = (rowIndex: number, colIndex: number) => this.setState({
-    hoveredSubRowIndex: rowIndex,
-    hoveredSubColIndex: colIndex,
-  });
+  handleSubCellMouseEnter = (rowIndex: number, colIndex: number) =>
+    this.setState({
+      hoveredSubRowIndex: rowIndex,
+      hoveredSubColIndex: colIndex,
+    });
 
-  handleSubCellMouseLeave = () => this.setState({
-    hoveredSubRowIndex: null,
-    hoveredSubColIndex: null,
-  });
+  handleSubCellMouseLeave = () =>
+    this.setState({
+      hoveredSubRowIndex: null,
+      hoveredSubColIndex: null,
+    });
 
   getColorByValue = (value: number) => {
     if (value === 0) return undefined;
@@ -523,12 +499,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
   };
 
   renderMainGrid = () => {
-    const {
-      activeCategoryX,
-      activeCategoryY,
-      hoveredColIndex,
-      hoveredRowIndex,
-    } = this.state;
+    const { activeCategoryX, activeCategoryY, hoveredColIndex, hoveredRowIndex } = this.state;
     const numCategories = RISK_MATRIX_CATEGORIES.length;
 
     return (
@@ -552,7 +523,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                 className={clsx(
                   styles.cell,
                   styles.headerCell,
-                  activeCategoryX === catX.name && styles.activeHeaderCell
+                  activeCategoryX === catX.name && styles.activeHeaderCell,
                 )}
                 style={{ gridColumn: index + 2, gridRow: 1 }}
                 data-testid={`ce-risk-matrix-header-x-${toTestIdFragment(catX.name)}`}
@@ -571,7 +542,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                   className={clsx(
                     styles.cell,
                     styles.headerCell,
-                    activeCategoryY === catY.name && styles.activeHeaderCell
+                    activeCategoryY === catY.name && styles.activeHeaderCell,
                   )}
                   style={{ gridColumn: 1, gridRow: rowIndex + 2 }}
                   data-testid={`ce-risk-matrix-header-y-${toTestIdFragment(catY.name)}`}
@@ -589,9 +560,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                   const hasValue = cellValue !== 0;
                   const atlasScenarioCount = isDiagonal ? 0 : getRiskMatrixAtlasScenarioCountForCell(selectedCellId);
                   const isHovered = rowIndex === hoveredRowIndex && colIndex === hoveredColIndex;
-                  const isHighlighted = !isDiagonal && (
-                    catY.name === activeCategoryY || catX.name === activeCategoryX
-                  );
+                  const isHighlighted = !isDiagonal && (catY.name === activeCategoryY || catX.name === activeCategoryX);
 
                   if (isDiagonal) {
                     return (
@@ -615,7 +584,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                         !hasValue && styles.emptyCell,
                         atlasScenarioCount > 0 && styles.gridCellLinked,
                         isHighlighted && styles.highlighted,
-                        isHovered && hasValue && styles.popOutEffect
+                        isHovered && hasValue && styles.popOutEffect,
                       )}
                       style={{
                         gridColumn: colIndex + 2,
@@ -630,9 +599,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                       onBlur={this.handleCellMouseLeave}
                       onClick={() => this.handleCellClick(catY.name, catX.name)}
                     >
-                      {hasValue && (
-                        <span className={styles.cellValue}>{formatRiskMatrixValue(cellValue)}</span>
-                      )}
+                      {hasValue && <span className={styles.cellValue}>{formatRiskMatrixValue(cellValue)}</span>}
                     </button>
                   );
                 })}
@@ -645,12 +612,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
   };
 
   renderSubcategorySelectors = () => {
-    const {
-      activeCategoryX,
-      activeCategoryY,
-      activeSubcategoryX,
-      activeSubcategoryY,
-    } = this.state;
+    const { activeCategoryX, activeCategoryY, activeSubcategoryX, activeSubcategoryY } = this.state;
 
     const categoryX = RISK_MATRIX_CATEGORIES.find((cat) => cat.name === activeCategoryX);
     const categoryY = RISK_MATRIX_CATEGORIES.find((cat) => cat.name === activeCategoryY);
@@ -667,10 +629,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
               <button
                 key={`selector-x-${sub}`}
                 type="button"
-                className={clsx(
-                  styles.selectorButton,
-                  activeSubcategoryX === sub && styles.selectorButtonActive
-                )}
+                className={clsx(styles.selectorButton, activeSubcategoryX === sub && styles.selectorButtonActive)}
                 data-testid={`ce-risk-matrix-selector-x-${toTestIdFragment(sub)}`}
                 aria-pressed={activeSubcategoryX === sub}
                 onClick={() => this.handleSubcategoryXClick(sub)}
@@ -699,10 +658,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
               <button
                 key={`selector-y-${sub}`}
                 type="button"
-                className={clsx(
-                  styles.selectorButton,
-                  activeSubcategoryY === sub && styles.selectorButtonActive
-                )}
+                className={clsx(styles.selectorButton, activeSubcategoryY === sub && styles.selectorButtonActive)}
                 data-testid={`ce-risk-matrix-selector-y-${toTestIdFragment(sub)}`}
                 aria-pressed={activeSubcategoryY === sub}
                 onClick={() => this.handleSubcategoryYClick(sub)}
@@ -751,9 +707,12 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     return (
       <section className={styles.sectionCard} data-testid="ce-risk-matrix-subgrid">
         <div className={styles.subgridHeader}>
-          <h3 className={styles.sectionTitle}>{activeCategoryY} x {activeCategoryX}</h3>
+          <h3 className={styles.sectionTitle}>
+            {activeCategoryY} x {activeCategoryX}
+          </h3>
           <p className={styles.subgridSummary}>
-            Refine to sub-overlaps, compare seeded notes, and open the atlas-linked scenarios attached to each detail cell.
+            Refine to sub-overlaps, compare seeded notes, and open the atlas-linked scenarios attached to each detail
+            cell.
           </p>
         </div>
 
@@ -775,11 +734,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
               <button
                 key={`subhead-x-${subX}`}
                 type="button"
-                className={clsx(
-                  styles.cell,
-                  styles.headerCell,
-                  activeSubcategoryX === subX && styles.activeHeaderCell
-                )}
+                className={clsx(styles.cell, styles.headerCell, activeSubcategoryX === subX && styles.activeHeaderCell)}
                 style={{ gridColumn: index + 2, gridRow: 1 }}
                 data-testid={`ce-risk-matrix-subheader-x-${toTestIdFragment(subX)}`}
                 aria-pressed={activeSubcategoryX === subX}
@@ -796,7 +751,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                   className={clsx(
                     styles.cell,
                     styles.headerCell,
-                    activeSubcategoryY === subY && styles.activeHeaderCell
+                    activeSubcategoryY === subY && styles.activeHeaderCell,
                   )}
                   style={{ gridColumn: 1, gridRow: rowIndex + 2 }}
                   data-testid={`ce-risk-matrix-subheader-y-${toTestIdFragment(subY)}`}
@@ -828,7 +783,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                         !hasValue && styles.emptyCell,
                         atlasScenarioCount > 0 && styles.gridCellLinked,
                         isHighlighted && styles.highlighted,
-                        isHovered && hasValue && styles.popOutEffect
+                        isHovered && hasValue && styles.popOutEffect,
                       )}
                       style={{
                         gridColumn: colIndex + 2,
@@ -836,16 +791,20 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                         backgroundColor: this.getColorByValue(cellValue),
                       }}
                       data-testid={`ce-risk-matrix-subcell-${toTestIdFragment(activeCategoryXKey)}-${toTestIdFragment(subX)}-vs-${toTestIdFragment(activeCategoryYKey)}-${toTestIdFragment(subY)}`}
-                      aria-label={this.getSubCellAriaLabel(activeCategoryXKey, subX, activeCategoryYKey, subY, cellValue)}
+                      aria-label={this.getSubCellAriaLabel(
+                        activeCategoryXKey,
+                        subX,
+                        activeCategoryYKey,
+                        subY,
+                        cellValue,
+                      )}
                       onMouseEnter={() => this.handleSubCellMouseEnter(rowIndex, colIndex)}
                       onMouseLeave={this.handleSubCellMouseLeave}
                       onFocus={() => this.handleSubCellMouseEnter(rowIndex, colIndex)}
                       onBlur={this.handleSubCellMouseLeave}
                       onClick={() => this.handleSubCellClick(subY, subX)}
                     >
-                      {hasValue && (
-                        <span className={styles.cellValue}>{formatRiskMatrixValue(cellValue)}</span>
-                      )}
+                      {hasValue && <span className={styles.cellValue}>{formatRiskMatrixValue(cellValue)}</span>}
                     </button>
                   );
                 })}
@@ -858,12 +817,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
   };
 
   renderCommentComposer = () => {
-    const {
-      comment,
-      intensity,
-      selectedCellId,
-      valence,
-    } = this.state;
+    const { comment, intensity, selectedCellId, valence } = this.state;
 
     if (isAggregateCellId(selectedCellId)) return null;
 
@@ -972,22 +926,23 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                         <span className={styles.atlasScenarioNodeLabel}>{scenario.atlasNodeLabel}</span>
                         <h4 className={styles.atlasScenarioTitle}>{scenario.title}</h4>
                         <p className={styles.atlasScenarioSummary}>{scenario.summary}</p>
-                        <div className={styles.atlasScenarioMetaLine} aria-label={`${scenario.confidence} confidence, ${scenario.timeHorizon}`}>
-                          <span className={styles.atlasScenarioMetaPill}>
-                            {scenario.confidence} confidence
-                          </span>
-                          <span className={styles.atlasScenarioMetaPill}>
-                            {scenario.timeHorizon}
-                          </span>
+                        <div
+                          className={styles.atlasScenarioMetaLine}
+                          aria-label={`${scenario.confidence} confidence, ${scenario.timeHorizon}`}
+                        >
+                          <span className={styles.atlasScenarioMetaPill}>{scenario.confidence} confidence</span>
+                          <span className={styles.atlasScenarioMetaPill}>{scenario.timeHorizon}</span>
                         </div>
                       </div>
                     </div>
-                    <span className={clsx(
-                      styles.atlasScenarioValence,
-                      scenario.valence === 'risk' && styles.atlasScenarioValenceRisk,
-                      scenario.valence === 'opportunity' && styles.atlasScenarioValenceOpportunity,
-                      scenario.valence === 'mixed' && styles.atlasScenarioValenceMixed
-                    )}>
+                    <span
+                      className={clsx(
+                        styles.atlasScenarioValence,
+                        scenario.valence === 'risk' && styles.atlasScenarioValenceRisk,
+                        scenario.valence === 'opportunity' && styles.atlasScenarioValenceOpportunity,
+                        scenario.valence === 'mixed' && styles.atlasScenarioValenceMixed,
+                      )}
+                    >
                       {scenario.valence}
                     </span>
                   </div>
@@ -1006,9 +961,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                           />
                           <div className={styles.atlasScenarioAnchorCopy}>
                             <span className={styles.atlasScenarioAnchorName}>{anchor.name}</span>
-                            {anchor.role && (
-                              <span className={styles.atlasScenarioAnchorRole}>{anchor.role}</span>
-                            )}
+                            {anchor.role && <span className={styles.atlasScenarioAnchorRole}>{anchor.role}</span>}
                           </div>
                         </div>
                       ))}
@@ -1051,7 +1004,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     title: string,
     entries: RiskCommentRecord[],
     isAggregateSelection: boolean,
-    valence: RiskValence
+    valence: RiskValence,
   ) => {
     if (!Array.isArray(entries) || entries.length === 0) return null;
 
@@ -1063,7 +1016,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
         className={clsx(
           styles.commentSection,
           valence === 'opportunity' && styles.commentSectionOpportunity,
-          valence === 'risk' && styles.commentSectionRisk
+          valence === 'risk' && styles.commentSectionRisk,
         )}
       >
         <button
@@ -1083,90 +1036,88 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
         </button>
         {isOpen && (
           <ul id={listId} className={styles.commentList} data-testid={listId}>
-          {entries.map((entry, index) => (
-            (() => {
-              const figureName = String(entry.historicalFigure?.name || '').trim();
-              const figureAvatar = figureName ? getHistoricalFigureAvatarByName(figureName) : '';
-              const corpusRefs = Array.isArray(entry.corpusRefs) ? entry.corpusRefs.filter(Boolean) : [];
-              const sourceCitations = getRiskMatrixCorpusSourceCitationItems(corpusRefs).slice(0, 2);
+            {entries.map((entry, index) =>
+              (() => {
+                const figureName = String(entry.historicalFigure?.name || '').trim();
+                const figureAvatar = figureName ? getHistoricalFigureAvatarByName(figureName) : '';
+                const corpusRefs = Array.isArray(entry.corpusRefs) ? entry.corpusRefs.filter(Boolean) : [];
+                const sourceCitations = getRiskMatrixCorpusSourceCitationItems(corpusRefs).slice(0, 2);
 
-              return (
-                <li
-                  key={`${title}-${entry.cell}-${index}`}
-                  className={clsx(
-                    styles.commentItem,
-                    entry.valence === 'opportunity' && styles.commentItemOpportunity,
-                    entry.valence === 'risk' && styles.commentItemRisk
-                  )}
-                >
-                  <div className={styles.commentHeader}>
-                    <div className={styles.commentHeaderMain}>
-                      <span className={styles.commentEyebrow}>
-                        {isAggregateSelection ? 'Sub-overlap' : 'Seeded note'}
-                      </span>
-                      <h5 className={styles.commentCardTitle}>
-                        {isAggregateSelection
-                          ? formatCellPath(entry.cell)
-                          : (entry.valence === 'opportunity' ? 'Opportunity signal' : 'Risk signal')}
-                      </h5>
-                    </div>
-                    <div className={styles.commentHeaderMeta}>
-                      <span className={styles.commentIntensity}>Intensity {entry.intensity}</span>
-                      <span className={styles.commentBadge}>
-                        {entry.valence === 'opportunity' ? 'Opportunity' : 'Risk'}
-                      </span>
-                    </div>
-                  </div>
-                  <p className={styles.commentText}>{entry.comment}</p>
-
-                  {figureName && (
-                    <div className={styles.commentFigureRow}>
-                      {figureAvatar ? (
-                        <img
-                          className={styles.commentFigureAvatar}
-                          src={figureAvatar}
-                          alt={figureName}
-                        />
-                      ) : (
-                        <div className={styles.commentFigureAvatarFallback} aria-hidden="true">
-                          {figureName.charAt(0)}
-                        </div>
-                      )}
-                      <div className={styles.commentFigureCopy}>
-                        <span className={styles.commentFigureName}>{figureName}</span>
-                        {entry.historicalFigure?.role && (
-                          <span className={styles.commentFigureRole}>{entry.historicalFigure.role}</span>
-                        )}
+                return (
+                  <li
+                    key={`${title}-${entry.cell}-${index}`}
+                    className={clsx(
+                      styles.commentItem,
+                      entry.valence === 'opportunity' && styles.commentItemOpportunity,
+                      entry.valence === 'risk' && styles.commentItemRisk,
+                    )}
+                  >
+                    <div className={styles.commentHeader}>
+                      <div className={styles.commentHeaderMain}>
+                        <span className={styles.commentEyebrow}>
+                          {isAggregateSelection ? 'Sub-overlap' : 'Seeded note'}
+                        </span>
+                        <h5 className={styles.commentCardTitle}>
+                          {isAggregateSelection
+                            ? formatCellPath(entry.cell)
+                            : entry.valence === 'opportunity'
+                              ? 'Opportunity signal'
+                              : 'Risk signal'}
+                        </h5>
+                      </div>
+                      <div className={styles.commentHeaderMeta}>
+                        <span className={styles.commentIntensity}>Intensity {entry.intensity}</span>
+                        <span className={styles.commentBadge}>
+                          {entry.valence === 'opportunity' ? 'Opportunity' : 'Risk'}
+                        </span>
                       </div>
                     </div>
-                  )}
+                    <p className={styles.commentText}>{entry.comment}</p>
 
-                  {sourceCitations.length > 0 && (
-                    <div className={styles.commentReferenceLine}>
-                      {sourceCitations.length > 1 ? 'Sources: ' : 'Source: '}
-                      {sourceCitations.map((citation, citationIndex) => (
-                        <React.Fragment key={`${citation.label}-${citation.url || citationIndex}`}>
-                          {citationIndex > 0 && <span aria-hidden="true"> • </span>}
-                          {citation.url ? (
-                            <a
-                              className={styles.commentReferenceLink}
-                              href={citation.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {citation.label}
-                            </a>
-                          ) : (
-                            <span>{citation.label}</span>
+                    {figureName && (
+                      <div className={styles.commentFigureRow}>
+                        {figureAvatar ? (
+                          <img className={styles.commentFigureAvatar} src={figureAvatar} alt={figureName} />
+                        ) : (
+                          <div className={styles.commentFigureAvatarFallback} aria-hidden="true">
+                            {figureName.charAt(0)}
+                          </div>
+                        )}
+                        <div className={styles.commentFigureCopy}>
+                          <span className={styles.commentFigureName}>{figureName}</span>
+                          {entry.historicalFigure?.role && (
+                            <span className={styles.commentFigureRole}>{entry.historicalFigure.role}</span>
                           )}
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  )}
-                </li>
-              );
-            })()
-          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {sourceCitations.length > 0 && (
+                      <div className={styles.commentReferenceLine}>
+                        {sourceCitations.length > 1 ? 'Sources: ' : 'Source: '}
+                        {sourceCitations.map((citation, citationIndex) => (
+                          <React.Fragment key={`${citation.label}-${citation.url || citationIndex}`}>
+                            {citationIndex > 0 && <span aria-hidden="true"> • </span>}
+                            {citation.url ? (
+                              <a
+                                className={styles.commentReferenceLink}
+                                href={citation.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                {citation.label}
+                              </a>
+                            ) : (
+                              <span>{citation.label}</span>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                );
+              })(),
+            )}
           </ul>
         )}
       </section>
@@ -1174,21 +1125,17 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
   };
 
   renderModal = () => {
-    const {
-      comment,
-      existingComments,
-      modal,
-      selectedCellId,
-    } = this.state;
+    const { comment, existingComments, modal, selectedCellId } = this.state;
 
     const isAggregateSelection = isAggregateCellId(selectedCellId);
     const canSaveComment = !isAggregateSelection && comment.trim().length > 0;
     const modalTitle = formatSelectionTitle(selectedCellId);
     const atlasScenarios = getRiskMatrixAtlasScenariosForCell(selectedCellId) as RiskMatrixAtlasScenario[];
     const commentsLabel = existingComments.length === 1 ? '1 note' : `${existingComments.length} notes`;
-    const modalMeta = atlasScenarios.length > 0
-      ? `${commentsLabel} • ${atlasScenarios.length} linked atlas overlap${atlasScenarios.length === 1 ? '' : 's'}`
-      : commentsLabel;
+    const modalMeta =
+      atlasScenarios.length > 0
+        ? `${commentsLabel} • ${atlasScenarios.length} linked atlas overlap${atlasScenarios.length === 1 ? '' : 's'}`
+        : commentsLabel;
     const opportunityComments = existingComments.filter((entry) => entry.valence === 'opportunity');
     const riskComments = existingComments.filter((entry) => entry.valence === 'risk');
 
@@ -1209,12 +1156,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
               <h3 className={styles.modalTitle}>{modalTitle}</h3>
               <span className={styles.modalMeta}>{modalMeta}</span>
             </div>
-            <button
-              type="button"
-              className={styles.modalCloseButton}
-              aria-label="Close"
-              onClick={this.closeModal}
-            >
+            <button type="button" className={styles.modalCloseButton} aria-label="Close" onClick={this.closeModal}>
               ×
             </button>
           </div>
@@ -1262,10 +1204,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     const { embedded = false } = this.props;
 
     return (
-      <div
-        className={clsx(styles.container, embedded && styles.embedded)}
-        data-testid="ce-risk-matrix"
-      >
+      <div className={clsx(styles.container, embedded && styles.embedded)} data-testid="ce-risk-matrix">
         <div className={styles.shell}>
           {this.renderMainGrid()}
           {activeCategoryX && activeCategoryY && this.renderSubGrid()}

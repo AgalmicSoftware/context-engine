@@ -3,18 +3,19 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import CollapsibleFieldGroup from './CollapsibleFieldGroup';
 import type { CollapsibleFieldGroupProps } from './CollapsibleFieldGroup';
 
-const renderCollapsibleFieldGroup = (props: Partial<CollapsibleFieldGroupProps> = {}) => render(
-  <CollapsibleFieldGroup
-    title="AI settings"
-    isCollapsed={false}
-    onToggleCollapsed={() => {}}
-    className="objectGroup"
-    toggleAriaLabel="AI settings expand"
-    {...props}
-  >
-    <div>Child field</div>
-  </CollapsibleFieldGroup>
-);
+const renderCollapsibleFieldGroup = (props: Partial<CollapsibleFieldGroupProps> = {}) =>
+  render(
+    <CollapsibleFieldGroup
+      title="AI settings"
+      isCollapsed={false}
+      onToggleCollapsed={() => {}}
+      className="objectGroup"
+      toggleAriaLabel="AI settings expand"
+      {...props}
+    >
+      <div>Child field</div>
+    </CollapsibleFieldGroup>,
+  );
 
 describe('CollapsibleFieldGroup', () => {
   it('renders title and children when not collapsed', () => {
@@ -55,7 +56,7 @@ describe('CollapsibleFieldGroup', () => {
         toggleAriaLabel="AI settings collapse"
       >
         <div>Child field</div>
-      </CollapsibleFieldGroup>
+      </CollapsibleFieldGroup>,
     );
 
     button = screen.getByRole('button', { name: 'AI settings collapse' });

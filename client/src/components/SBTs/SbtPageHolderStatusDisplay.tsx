@@ -1,9 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faSpinner,
-  faUser,
-} from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faUser } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SBTPage.module.scss';
 import SbtPageStatsScanProgressDisplay from './SbtPageStatsScanProgressDisplay';
@@ -61,9 +58,7 @@ const SbtPageHolderStatusDisplay = ({
         {isInitialLoading ? (
           <FontAwesomeIcon icon={faSpinner} spin />
         ) : (
-          <span title={mintedCountTitle}>
-            {`${netMinted} / ${maxTokensDisplay}`}
-          </span>
+          <span title={mintedCountTitle}>{`${netMinted} / ${maxTokensDisplay}`}</span>
         )}
         {isRefreshing && (
           <span style={refreshIndicatorStyle} title="Refreshing...">

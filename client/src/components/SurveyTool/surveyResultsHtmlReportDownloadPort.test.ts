@@ -1,6 +1,4 @@
-import {
-  bindSurveyResultsHtmlReportDownloadPort,
-} from './surveyResultsHtmlReportDownloadPort';
+import { bindSurveyResultsHtmlReportDownloadPort } from './surveyResultsHtmlReportDownloadPort';
 
 describe('surveyResultsHtmlReportDownloadPort', () => {
   it('routes HTML and PDF report downloads with unchanged arguments', async () => {

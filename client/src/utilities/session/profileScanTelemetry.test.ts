@@ -5,12 +5,16 @@ import {
   isProfileScanTelemetryEnabled,
 } from './profileScanTelemetry';
 
-jest.mock('utilities/logging.js', () => ({
-  __esModule: true,
-  createLogger: jest.fn(() => ({
-    warn: jest.fn(),
-  })),
-}), { virtual: true });
+jest.mock(
+  'utilities/logging.js',
+  () => ({
+    __esModule: true,
+    createLogger: jest.fn(() => ({
+      warn: jest.fn(),
+    })),
+  }),
+  { virtual: true },
+);
 
 type TelemetryTestContext = {
   readBoolishRuntimeFlag: jest.Mock<boolean, [unknown, boolean?]>;
@@ -37,15 +41,11 @@ const createContext = (): TelemetryTestContext => {
     emitProfileScanTelemetry: jest.fn(),
   };
 
-  context.isProfileScanTelemetryEnabled.mockImplementation(() => (
-    isProfileScanTelemetryEnabled.call(context)
-  ));
-  context.isProfileScanColdDiagEnabled.mockImplementation(() => (
-    isProfileScanColdDiagEnabled.call(context)
-  ));
-  context.emitProfileScanTelemetry.mockImplementation((event: string, payload?: unknown) => (
-    emitProfileScanTelemetry.call(context, event, payload)
-  ));
+  context.isProfileScanTelemetryEnabled.mockImplementation(() => isProfileScanTelemetryEnabled.call(context));
+  context.isProfileScanColdDiagEnabled.mockImplementation(() => isProfileScanColdDiagEnabled.call(context));
+  context.emitProfileScanTelemetry.mockImplementation((event: string, payload?: unknown) =>
+    emitProfileScanTelemetry.call(context, event, payload),
+  );
 
   return context;
 };
@@ -92,7 +92,7 @@ describe('profileScanTelemetry', () => {
     ]);
     expect(infoSpy).toHaveBeenCalledWith(
       '[CE_PROFILE_SCAN][MainSite] scan-start',
-      expect.objectContaining({ event: 'scan-start' })
+      expect.objectContaining({ event: 'scan-start' }),
     );
   });
 
@@ -102,9 +102,6 @@ describe('profileScanTelemetry', () => {
 
     emitProfileScanColdDiag.call(context, 'RPC', { attempts: 2 });
 
-    expect(context.emitProfileScanTelemetry).toHaveBeenCalledWith(
-      'cold-diag:rpc',
-      { attempts: 2 }
-    );
+    expect(context.emitProfileScanTelemetry).toHaveBeenCalledWith('cold-diag:rpc', { attempts: 2 });
   });
 });

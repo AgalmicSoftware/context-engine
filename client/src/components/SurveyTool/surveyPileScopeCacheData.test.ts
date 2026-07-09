@@ -1,9 +1,6 @@
 import { ensureQuestionsNet, mergeQuestionResponses } from './surveyToolCacheState.js';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
-import {
-  buildPileResponseCounts,
-  loadPileScopeCacheSnapshot,
-} from './surveyPileScopeCacheData';
+import { buildPileResponseCounts, loadPileScopeCacheSnapshot } from './surveyPileScopeCacheData';
 
 describe('surveyPileScopeCacheData', () => {
   it('loads and merges pile scope caches while honoring blocked ids and question dedupe', async () => {
@@ -54,27 +51,25 @@ describe('surveyPileScopeCacheData', () => {
         },
       };
     });
-    const getHighlightedQuestionIdsSet = jest.fn<Set<string>, [string]>((scopeSlug) => (
-      scopeSlug === 'edge'
-        ? new Set(['Q1'])
-        : new Set(['q2'])
-    ));
-    const getBlockedQuestionIdsSet = jest.fn<Set<string>, [string]>((scopeSlug) => (
-      scopeSlug === 'edge'
-        ? new Set(['qblocked'])
-        : new Set()
-    ));
+    const getHighlightedQuestionIdsSet = jest.fn<Set<string>, [string]>((scopeSlug) =>
+      scopeSlug === 'edge' ? new Set(['Q1']) : new Set(['q2']),
+    );
+    const getBlockedQuestionIdsSet = jest.fn<Set<string>, [string]>((scopeSlug) =>
+      scopeSlug === 'edge' ? new Set(['qblocked']) : new Set(),
+    );
 
-    await expect(loadPileScopeCacheSnapshot({
-      scopeSlugs: ['edge', 'other'],
-      networkIdStr: '84532',
-      readQuestionsCacheAsync,
-      ensureQuestionsNet,
-      getHighlightedQuestionIdsSet,
-      mergeQuestionResponses,
-      getBlockedQuestionIdsSet,
-      normalizeQuestionIdKey,
-    })).resolves.toEqual({
+    await expect(
+      loadPileScopeCacheSnapshot({
+        scopeSlugs: ['edge', 'other'],
+        networkIdStr: '84532',
+        readQuestionsCacheAsync,
+        ensureQuestionsNet,
+        getHighlightedQuestionIdsSet,
+        mergeQuestionResponses,
+        getBlockedQuestionIdsSet,
+        normalizeQuestionIdKey,
+      }),
+    ).resolves.toEqual({
       allResponses: {
         q1: {
           '0xabc': { answer: { value: 'edge-response' } },
@@ -116,15 +111,17 @@ describe('surveyPileScopeCacheData', () => {
   });
 
   it('builds pile response counts from merged responder maps', () => {
-    expect(buildPileResponseCounts({
-      questionResponses: {
-        q1: {
-          '0xabc': { answer: { value: 'one' } },
-          '0xdef': { answer: { value: 'two' } },
+    expect(
+      buildPileResponseCounts({
+        questionResponses: {
+          q1: {
+            '0xabc': { answer: { value: 'one' } },
+            '0xdef': { answer: { value: 'two' } },
+          },
+          q2: {},
         },
-        q2: {},
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       q1: 2,
       q2: 0,
     });

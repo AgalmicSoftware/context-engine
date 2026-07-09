@@ -1,4 +1,3 @@
-
 /**
  * Build a strict prompt for analyzing a single user's profile data.
  * Expected output (JSON only):

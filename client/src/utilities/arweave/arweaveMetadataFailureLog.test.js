@@ -47,38 +47,41 @@ describe('arweaveMetadataFailureLog', () => {
   it('detects nested call-exception errors across chained payloads', () => {
     const { isCallExceptionError } = loadSubject();
 
-    expect(isCallExceptionError({
-      cause: {
-        errors: [
-          {
-            error: {
-              code: 'CALL_EXCEPTION',
-              message: 'execution reverted: denied',
+    expect(
+      isCallExceptionError({
+        cause: {
+          errors: [
+            {
+              error: {
+                code: 'CALL_EXCEPTION',
+                message: 'execution reverted: denied',
+              },
             },
+          ],
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      isCallExceptionError({
+        results: [
+          {
+            requestBody: '{"error":"execution reverted"}',
           },
         ],
-      },
-    })).toBe(true);
+      }),
+    ).toBe(true);
 
-    expect(isCallExceptionError({
-      results: [
-        {
-          requestBody: '{"error":"execution reverted"}',
-        },
-      ],
-    })).toBe(true);
-
-    expect(isCallExceptionError({
-      cause: { errors: [{ message: 'ordinary network timeout' }] },
-    })).toBe(false);
+    expect(
+      isCallExceptionError({
+        cause: { errors: [{ message: 'ordinary network timeout' }] },
+      }),
+    ).toBe(false);
   });
 
   it('dedupes repeated question call-exception warnings within the TTL and re-emits after expiry', () => {
     const nowSpy = jest.spyOn(Date, 'now');
-    nowSpy
-      .mockReturnValueOnce(1_000)
-      .mockReturnValueOnce(10_000)
-      .mockReturnValueOnce(41_500);
+    nowSpy.mockReturnValueOnce(1_000).mockReturnValueOnce(10_000).mockReturnValueOnce(41_500);
 
     const {
       logArweaveMetadataFetchFailure,
@@ -116,20 +119,9 @@ describe('arweaveMetadataFailureLog', () => {
       message: 'execution reverted: denied',
     };
 
-    expect(mockWarn).toHaveBeenNthCalledWith(
-      1,
-      '[arweave-cache] question metadata hash lookup reverted',
-      payload
-    );
-    expect(mockDebug).toHaveBeenCalledWith(
-      '[arweave-cache] question metadata hash lookup reverted (deduped)',
-      payload
-    );
-    expect(mockWarn).toHaveBeenNthCalledWith(
-      2,
-      '[arweave-cache] question metadata hash lookup reverted',
-      payload
-    );
+    expect(mockWarn).toHaveBeenNthCalledWith(1, '[arweave-cache] question metadata hash lookup reverted', payload);
+    expect(mockDebug).toHaveBeenCalledWith('[arweave-cache] question metadata hash lookup reverted (deduped)', payload);
+    expect(mockWarn).toHaveBeenNthCalledWith(2, '[arweave-cache] question metadata hash lookup reverted', payload);
     expect(mockWarn).toHaveBeenCalledTimes(2);
     expect(mockDebug).toHaveBeenCalledTimes(1);
     expect(mockError).not.toHaveBeenCalled();
@@ -160,10 +152,7 @@ describe('arweaveMetadataFailureLog', () => {
       error: { message: 'fallback message' },
     });
 
-    expect(mockWarn).toHaveBeenCalledWith(
-      'Response payload unavailable (terminal):',
-      'bad payload'
-    );
+    expect(mockWarn).toHaveBeenCalledWith('Response payload unavailable (terminal):', 'bad payload');
     expect(mockDebug).not.toHaveBeenCalled();
     expect(mockError).not.toHaveBeenCalled();
   });
@@ -203,14 +192,8 @@ describe('arweaveMetadataFailureLog', () => {
       nextRetryAtMs: 50_000,
     };
 
-    expect(mockWarn).toHaveBeenCalledWith(
-      '[arweave-cache] survey metadata fetch cooldown',
-      payload
-    );
-    expect(mockDebug).toHaveBeenCalledWith(
-      '[arweave-cache] survey metadata fetch cooldown (deduped)',
-      payload
-    );
+    expect(mockWarn).toHaveBeenCalledWith('[arweave-cache] survey metadata fetch cooldown', payload);
+    expect(mockDebug).toHaveBeenCalledWith('[arweave-cache] survey metadata fetch cooldown (deduped)', payload);
     expect(mockWarn).toHaveBeenCalledTimes(1);
     expect(mockDebug).toHaveBeenCalledTimes(1);
     expect(mockError).not.toHaveBeenCalled();

@@ -14,11 +14,7 @@ jest.mock('../Shared/CETooltip', () => ({
 describe('GatedPromptNotice', () => {
   it('renders the gated notice and tooltip text for the current question', () => {
     render(
-      <GatedPromptNotice
-        questionId="Q1"
-        tooltipId="ce-gated-tip-q1"
-        tooltipText="Required SBT gate: Governance"
-      />
+      <GatedPromptNotice questionId="Q1" tooltipId="ce-gated-tip-q1" tooltipText="Required SBT gate: Governance" />,
     );
 
     expect(screen.getByTestId('ce-survey-gated-prompt-notice')).toHaveAttribute('data-ce-question-id', 'q1');
@@ -35,7 +31,7 @@ describe('GatedPromptNotice', () => {
         tooltipId="ce-gated-tip-q1"
         tooltipText="Required SBT gate: Governance"
         onAction={onAction}
-      />
+      />,
     );
 
     const button = screen.getByTestId(E2E_TESTIDS.SURVEY_DECRYPT_PROMPT_NOTICE);
@@ -57,7 +53,7 @@ describe('GatedPromptNotice', () => {
         actionDisabled
         actionTitle="Decrypt already in progress"
         onAction={onAction}
-      />
+      />,
     );
 
     const button = screen.getByTestId(E2E_TESTIDS.SURVEY_DECRYPT_PROMPT_NOTICE);
@@ -74,9 +70,11 @@ describe('GatedPromptNotice', () => {
 
   it('builds gated prompt notice display helpers', () => {
     expect(resolveGatedPromptLockIconStyle()).toEqual({ marginRight: 8 });
-    expect(buildGatedPromptTooltipIconClassName({
-      baseClassName: 'tooltip',
-      tooltipClassName: 'gated',
-    })).toBe('tooltip gated');
+    expect(
+      buildGatedPromptTooltipIconClassName({
+        baseClassName: 'tooltip',
+        tooltipClassName: 'gated',
+      }),
+    ).toBe('tooltip gated');
   });
 });

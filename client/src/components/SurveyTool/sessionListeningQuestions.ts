@@ -1,4 +1,4 @@
-import { callAI } from '../../utilities/ai/aiScripts.js';
+import { callAI } from '../../utilities/ai/aiClient.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { generateQuestionId as generateSharedQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import {
@@ -54,10 +54,9 @@ export const buildListeningQuestionPrompt = (
     multiSpeakerHintOverride = 'likely_multiple_speakers',
   }: ListeningQuestionGenerationOptions = {},
 ) => {
-  const listeningInstructions = [
-    LISTENING_TRANSCRIPT_FOCUS_INSTRUCTIONS,
-    String(sessionInstructions || '').trim(),
-  ].filter(Boolean).join('\n\n');
+  const listeningInstructions = [LISTENING_TRANSCRIPT_FOCUS_INSTRUCTIONS, String(sessionInstructions || '').trim()]
+    .filter(Boolean)
+    .join('\n\n');
 
   return buildSingleGenerationPrompt({
     promptTemplate: seedGenPrompt,
@@ -85,11 +84,8 @@ export const parseListeningQuestionResponse = (raw: unknown): GeneratedAiQuestio
   return parsed;
 };
 
-export const generateListeningQuestionId = (
-  type: string,
-  prompt: string,
-  options: string[] = [],
-) => generateSharedQuestionId(type, prompt, options);
+export const generateListeningQuestionId = (type: string, prompt: string, options: string[] = []) =>
+  generateSharedQuestionId(type, prompt, options);
 
 export const buildListeningQuestionStatements = (
   payload: GeneratedAiQuestionPayload,
@@ -97,13 +93,14 @@ export const buildListeningQuestionStatements = (
     count = LISTENING_QUESTION_COUNT,
     questionTypes = LISTENING_QUESTION_TYPES,
   }: ListeningQuestionGenerationOptions = {},
-) => buildGeneratedSurveyStatements({
-  aiData: payload,
-  questionTypes,
-  count,
-  fallbackTitle: 'Listening Session Questions',
-  generateQuestionId: generateListeningQuestionId,
-});
+) =>
+  buildGeneratedSurveyStatements({
+    aiData: payload,
+    questionTypes,
+    count,
+    fallbackTitle: 'Listening Session Questions',
+    generateQuestionId: generateListeningQuestionId,
+  });
 
 export const generateQuestionsFromListeningTranscript = async (
   transcript: unknown,

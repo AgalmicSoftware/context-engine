@@ -7,32 +7,34 @@ import {
 
 describe('sessionWizardResourceConfig', () => {
   it('resolves normalized ai model providers', () => {
-    expect(resolveSessionWizardAiModelProviders({
-      models: {
-        fast: { provider: 'Anthropic' },
-        thinking: { provider: 'openrouter' },
-      },
-    })).toEqual({
+    expect(
+      resolveSessionWizardAiModelProviders({
+        models: {
+          fast: { provider: 'Anthropic' },
+          thinking: { provider: 'openrouter' },
+        },
+      }),
+    ).toEqual({
       fastProvider: 'anthropic',
       thinkingProvider: 'openrouter',
     });
   });
 
   it('returns only the OpenAI secret field for ai resources', () => {
-    expect(resolveSessionWizardResourceSecretFields('ai', {
-      models: {
-        fast: { provider: 'anthropic' },
-        thinking: { provider: 'openrouter' },
-      },
-    }).map((field) => field.key)).toEqual(['openaiKey']);
+    expect(
+      resolveSessionWizardResourceSecretFields('ai', {
+        models: {
+          fast: { provider: 'anthropic' },
+          thinking: { provider: 'openrouter' },
+        },
+      }).map((field) => field.key),
+    ).toEqual(['openaiKey']);
   });
 
   it('returns non-ai secret fields without mutation', () => {
     const first = resolveSessionWizardResourceSecretFields('rpc', null);
     const second = resolveSessionWizardResourceSecretFields('rpc', null);
-    expect(first).toEqual([
-      { key: 'customRpcUrl', label: 'Custom RPC URL', type: 'text', placeholder: 'https://...' },
-    ]);
+    expect(first).toEqual([{ key: 'customRpcUrl', label: 'Custom RPC URL', type: 'text', placeholder: 'https://...' }]);
     expect(first).not.toBe(second);
   });
 

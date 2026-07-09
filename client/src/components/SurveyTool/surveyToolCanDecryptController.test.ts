@@ -1,18 +1,11 @@
-
 import {
   buildCanDecryptContext,
   evaluateCanDecryptPreCheck,
   resolveCanDecryptGateAccess,
 } from './surveyToolCanDecryptController';
-import type {
-  CanDecryptContextInputs,
-  CanDecryptSnapshot,
-  CheckAccessFn,
-} from './surveyToolCanDecryptController';
+import type { CanDecryptContextInputs, CanDecryptSnapshot, CheckAccessFn } from './surveyToolCanDecryptController';
 
-const makeInputs = (
-  overrides: Partial<CanDecryptContextInputs> = {},
-): CanDecryptContextInputs => ({
+const makeInputs = (overrides: Partial<CanDecryptContextInputs> = {}): CanDecryptContextInputs => ({
   getEffectiveDraftSlug: () => 'test-slug',
   resolveEffectiveSlugFromProps: () => 'fallback-slug',
   resolveEffectiveResponseGateConfig: jest.fn().mockReturnValue({ networkChainId: 84532 }),
@@ -28,9 +21,7 @@ const makeInputs = (
   ...overrides,
 });
 
-const makeSnapshot = (
-  overrides: Partial<CanDecryptSnapshot> = {},
-): CanDecryptSnapshot => ({
+const makeSnapshot = (overrides: Partial<CanDecryptSnapshot> = {}): CanDecryptSnapshot => ({
   loggedIn: true,
   account: '0x1234',
   recipients: ['0xabc'],
@@ -122,16 +113,18 @@ describe('surveyToolCanDecryptController', () => {
   });
 
   describe('evaluateCanDecryptPreCheck', () => {
-    it("returns earlyExit true with needs-wallet when logged out", () => {
-      expect(evaluateCanDecryptPreCheck(
-        makeSnapshot({ loggedIn: false }),
-      )).toEqual({ earlyExit: true, status: 'needs-wallet' });
+    it('returns earlyExit true with needs-wallet when logged out', () => {
+      expect(evaluateCanDecryptPreCheck(makeSnapshot({ loggedIn: false }))).toEqual({
+        earlyExit: true,
+        status: 'needs-wallet',
+      });
     });
 
-    it("returns earlyExit true with no-gate when recipients are empty and wallet is ready", () => {
-      expect(evaluateCanDecryptPreCheck(
-        makeSnapshot({ recipients: [] }),
-      )).toEqual({ earlyExit: true, status: 'no-gate' });
+    it('returns earlyExit true with no-gate when recipients are empty and wallet is ready', () => {
+      expect(evaluateCanDecryptPreCheck(makeSnapshot({ recipients: [] }))).toEqual({
+        earlyExit: true,
+        status: 'no-gate',
+      });
     });
 
     it('returns earlyExit false when logged in and recipients are present', () => {
@@ -146,12 +139,15 @@ describe('surveyToolCanDecryptController', () => {
         .mockResolvedValueOnce({ status: 'denied' })
         .mockResolvedValueOnce({ status: 'granted' });
 
-      await resolveCanDecryptGateAccess({
-        cfg: { networkChainId: 84532 },
-        slug: 'session-slug',
-        account: '0x1234',
-        resourceKeysToCheck: ['questionResponses', 'default'],
-      }, checkAccess);
+      await resolveCanDecryptGateAccess(
+        {
+          cfg: { networkChainId: 84532 },
+          slug: 'session-slug',
+          account: '0x1234',
+          resourceKeysToCheck: ['questionResponses', 'default'],
+        },
+        checkAccess,
+      );
 
       expect(checkAccess).toHaveBeenCalledTimes(2);
       expect(checkAccess).toHaveBeenNthCalledWith(1, {
@@ -168,18 +164,23 @@ describe('surveyToolCanDecryptController', () => {
       });
     });
 
-    it("returns granted when any checked resource is granted, including after an earlier denial", async () => {
+    it('returns granted when any checked resource is granted, including after an earlier denial', async () => {
       const checkAccess: CheckAccessFn = jest
         .fn()
         .mockResolvedValueOnce({ status: 'denied' })
         .mockResolvedValueOnce({ status: 'granted' });
 
-      await expect(resolveCanDecryptGateAccess({
-        cfg: {},
-        slug: 'slug',
-        account: '0x1234',
-        resourceKeysToCheck: ['questionResponses', 'default'],
-      }, checkAccess)).resolves.toEqual({
+      await expect(
+        resolveCanDecryptGateAccess(
+          {
+            cfg: {},
+            slug: 'slug',
+            account: '0x1234',
+            resourceKeysToCheck: ['questionResponses', 'default'],
+          },
+          checkAccess,
+        ),
+      ).resolves.toEqual({
         canDecrypt: true,
         status: 'granted',
       });
@@ -191,12 +192,17 @@ describe('surveyToolCanDecryptController', () => {
         .mockResolvedValueOnce({ status: 'denied' })
         .mockResolvedValueOnce({ status: 'denied' });
 
-      await expect(resolveCanDecryptGateAccess({
-        cfg: {},
-        slug: 'slug',
-        account: '0x1234',
-        resourceKeysToCheck: ['questionResponses', 'default'],
-      }, checkAccess)).resolves.toEqual({
+      await expect(
+        resolveCanDecryptGateAccess(
+          {
+            cfg: {},
+            slug: 'slug',
+            account: '0x1234',
+            resourceKeysToCheck: ['questionResponses', 'default'],
+          },
+          checkAccess,
+        ),
+      ).resolves.toEqual({
         canDecrypt: false,
         status: 'denied',
       });
@@ -210,12 +216,17 @@ describe('surveyToolCanDecryptController', () => {
           .mockResolvedValueOnce({ status: 'denied' })
           .mockResolvedValueOnce({ status });
 
-        await expect(resolveCanDecryptGateAccess({
-          cfg: {},
-          slug: 'slug',
-          account: '0x1234',
-          resourceKeysToCheck: ['questionResponses', 'default'],
-        }, checkAccess)).resolves.toEqual({
+        await expect(
+          resolveCanDecryptGateAccess(
+            {
+              cfg: {},
+              slug: 'slug',
+              account: '0x1234',
+              resourceKeysToCheck: ['questionResponses', 'default'],
+            },
+            checkAccess,
+          ),
+        ).resolves.toEqual({
           canDecrypt: false,
           status: 'unknown',
         });
@@ -225,12 +236,17 @@ describe('surveyToolCanDecryptController', () => {
     it('handles a single-resource check correctly', async () => {
       const checkAccess: CheckAccessFn = jest.fn().mockResolvedValue({ status: 'granted' });
 
-      await expect(resolveCanDecryptGateAccess({
-        cfg: {},
-        slug: 'slug',
-        account: '0x1234',
-        resourceKeysToCheck: ['questionResponses'],
-      }, checkAccess)).resolves.toEqual({
+      await expect(
+        resolveCanDecryptGateAccess(
+          {
+            cfg: {},
+            slug: 'slug',
+            account: '0x1234',
+            resourceKeysToCheck: ['questionResponses'],
+          },
+          checkAccess,
+        ),
+      ).resolves.toEqual({
         canDecrypt: true,
         status: 'granted',
       });

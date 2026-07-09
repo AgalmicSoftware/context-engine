@@ -2,16 +2,19 @@
 import { toStr } from '../shared/primitives.js';
 import { STORAGE_BACKENDS, normalizeStorageBackend } from '../storage/storageRefs.js';
 
-type SessionConfigLike = {
-  storageProfile?: { backend?: unknown } | null;
-  storageBackend?: unknown;
-  docLibrary?: {
-    provider?: unknown;
-    arweave?: {
-      graphqlUrl?: unknown;
-    } | null;
-  } | null;
-} | null | undefined;
+type SessionConfigLike =
+  | {
+      storageProfile?: { backend?: unknown } | null;
+      storageBackend?: unknown;
+      docLibrary?: {
+        provider?: unknown;
+        arweave?: {
+          graphqlUrl?: unknown;
+        } | null;
+      } | null;
+    }
+  | null
+  | undefined;
 
 export const DEFAULT_ARWEAVE_GRAPHQL_URLS = Object.freeze([
   'https://permagate.io/graphql',
@@ -38,7 +41,9 @@ export const resolveDocLibraryProvider = (sessionConfig: SessionConfigLike): str
   const storageBackend = normalizeStorageBackend(cfg?.storageProfile?.backend || cfg?.storageBackend || '');
   if (storageBackend === STORAGE_BACKENDS.CLOUDFLARE) return STORAGE_BACKENDS.CLOUDFLARE;
   if (storageBackend === STORAGE_BACKENDS.LIT_ARWEAVE) return STORAGE_BACKENDS.LIT_ARWEAVE;
-  const provider = toStr(cfg?.docLibrary?.provider || '').trim().toLowerCase();
+  const provider = toStr(cfg?.docLibrary?.provider || '')
+    .trim()
+    .toLowerCase();
   return provider || STORAGE_BACKENDS.ARWEAVE;
 };
 
@@ -58,6 +63,5 @@ export const resolveArweaveGraphqlUrls = (sessionConfig: SessionConfigLike): str
   return urls.length ? urls : [...DEFAULT_ARWEAVE_GRAPHQL_URLS];
 };
 
-export const resolveArweaveGraphqlUrl = (sessionConfig: SessionConfigLike): string => (
-  resolveArweaveGraphqlUrls(sessionConfig)[0] || DEFAULT_ARWEAVE_GRAPHQL_URL
-);
+export const resolveArweaveGraphqlUrl = (sessionConfig: SessionConfigLike): string =>
+  resolveArweaveGraphqlUrls(sessionConfig)[0] || DEFAULT_ARWEAVE_GRAPHQL_URL;

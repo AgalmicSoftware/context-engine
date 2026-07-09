@@ -1,9 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import SessionWizardNormalModeRail, {
-  getNormalModeCardToneClassName,
-} from './SessionWizardNormalModeRail';
+import SessionWizardNormalModeRail, { getNormalModeCardToneClassName } from './SessionWizardNormalModeRail';
 import type { NormalModeCard } from './sessionWizardNormalModeCards';
 
 const cards: NormalModeCard[] = [
@@ -40,7 +38,7 @@ describe('SessionWizardNormalModeRail', () => {
         collapsedSections={{ metadata: true, encryption: false, publish: true }}
         normalModeCards={cards}
         onFocusSection={onFocusSection}
-      />
+      />,
     );
 
     expect(screen.getByRole('region', { name: 'Normal mode sections' })).toHaveStyle({

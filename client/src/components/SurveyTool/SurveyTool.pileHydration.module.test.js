@@ -5,10 +5,7 @@ import {
   buildPileLoadFailureState,
   buildPileLoadProgressState,
 } from './surveyPileLoadPlanner';
-import {
-  buildPileEmptyProbeStatePlan,
-  buildPileResponseCountsCachePlan,
-} from './surveyPileLoadController';
+import { buildPileEmptyProbeStatePlan, buildPileResponseCountsCachePlan } from './surveyPileLoadController';
 import { buildPileQuestionSetHydrationPlan } from './surveyPileHydrationPlan';
 import {
   buildPileFilterResultPlan,
@@ -16,39 +13,34 @@ import {
   buildPileQuestionPipelineState,
   splitPileMaskedQuestions,
 } from './surveyPileQuestionFlow';
-import {
-  executePileQuestionSetHydration,
-} from './surveyPileResponseController';
+import { executePileQuestionSetHydration } from './surveyPileResponseController';
 import { buildPileWorkspaceViewState } from './surveyPileViewState';
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 const ACCOUNT = '0xabc';
 
-const sameQuestionIds = (left, right) => (
+const sameQuestionIds = (left, right) =>
   JSON.stringify((left || []).map((question) => String(question.id))) ===
-  JSON.stringify((right || []).map((question) => String(question.id)))
-);
+  JSON.stringify((right || []).map((question) => String(question.id)));
 
-const buildQuestionListSignature = (questions = []) => (
+const buildQuestionListSignature = (questions = []) =>
   Array.isArray(questions) && questions.length > 0
     ? questions.map((question) => String(question.id || '').toLowerCase()).join('|')
-    : 'empty'
-);
+    : 'empty';
 
-const getPileVisibleQuestionIds = (questions = []) => (
-  Array.isArray(questions)
-    ? questions.map((question) => String(question.id || '').toLowerCase()).filter(Boolean)
-    : []
-);
+const getPileVisibleQuestionIds = (questions = []) =>
+  Array.isArray(questions) ? questions.map((question) => String(question.id || '').toLowerCase()).filter(Boolean) : [];
 
 const buildVisibleResponseSignature = (questionResponses = {}, visibleIds = [], account = '') => {
   const accountLower = String(account || '').toLowerCase();
-  return visibleIds.map((questionId) => {
-    const raw = questionResponses?.[questionId]?.[accountLower];
-    if (!raw) return `${questionId}:none`;
-    return `${questionId}:${JSON.stringify(raw)}`;
-  }).join('|');
+  return visibleIds
+    .map((questionId) => {
+      const raw = questionResponses?.[questionId]?.[accountLower];
+      if (!raw) return `${questionId}:none`;
+      return `${questionId}:${JSON.stringify(raw)}`;
+    })
+    .join('|');
 };
 
 const buildLoadResult = ({
@@ -60,28 +52,29 @@ const buildLoadResult = ({
   account = ACCOUNT,
   isFilterActive = false,
   filterSig = '',
-} = {}) => buildPileLoadResultPlan({
-  previousAllQuestionsForFilter,
-  previousPileQuestions,
-  previousActivePileIndex: 0,
-  previousHasHiddenGatedQuestions: false,
-  previousLoading: false,
-  sortedQuestions,
-  sortedVisibleQuestions,
-  hiddenQuestions: [],
-  hasHiddenGatedQuestions: false,
-  isFilterActive,
-  filterSig,
-  questionResponses,
-  account,
-  settleUnreadyEmpty: false,
-  isQuestionCacheReady: true,
-  recentRateLimit: false,
-  areQuestionListsEquivalent: sameQuestionIds,
-  buildQuestionListSignature,
-  getPileVisibleQuestionIds,
-  buildPileVisibleResponseSignature: buildVisibleResponseSignature,
-});
+} = {}) =>
+  buildPileLoadResultPlan({
+    previousAllQuestionsForFilter,
+    previousPileQuestions,
+    previousActivePileIndex: 0,
+    previousHasHiddenGatedQuestions: false,
+    previousLoading: false,
+    sortedQuestions,
+    sortedVisibleQuestions,
+    hiddenQuestions: [],
+    hasHiddenGatedQuestions: false,
+    isFilterActive,
+    filterSig,
+    questionResponses,
+    account,
+    settleUnreadyEmpty: false,
+    isQuestionCacheReady: true,
+    recentRateLimit: false,
+    areQuestionListsEquivalent: sameQuestionIds,
+    buildQuestionListSignature,
+    getPileVisibleQuestionIds,
+    buildPileVisibleResponseSignature: buildVisibleResponseSignature,
+  });
 
 describe('SurveyTool pile hydration and loading', () => {
   afterEach(() => {
@@ -92,7 +85,7 @@ describe('SurveyTool pile hydration and loading', () => {
 
   it('uses clone-free questions cache reads in SurveyQuestions.handleFilter', () => {
     const cacheValue = {
-      '84532': {
+      84532: {
         questionResponses: {
           q1: {
             '0xaa': '{"type":"binary","answer":{"value":"yes"}}',
@@ -210,11 +203,7 @@ describe('SurveyTool pile hydration and loading', () => {
       serializeFilterState: (filterState) => JSON.stringify(filterState || {}),
     });
 
-    expect(plan.nextState.pileQuestions.map((question) => question.id)).toEqual([
-      'q2',
-      'q1',
-      'q_blocked',
-    ]);
+    expect(plan.nextState.pileQuestions.map((question) => question.id)).toEqual(['q2', 'q1', 'q_blocked']);
     expect(plan.shouldSkipStateUpdate).toBe(true);
     // port note: unresolved session slug cache reads are covered in
     // `SurveyTool.pileSessionScope.module.test.js`; this keeps the pile filter
@@ -329,11 +318,13 @@ describe('SurveyTool pile hydration and loading', () => {
       areQuestionListsEquivalent: sameQuestionIds,
     });
 
-    expect(probe).toEqual(expect.objectContaining({
-      action: 'continue-loading-immediately',
-      nextProbeStartedAtMs: 0,
-      nextProbeDelayMs: 0,
-    }));
+    expect(probe).toEqual(
+      expect.objectContaining({
+        action: 'continue-loading-immediately',
+        nextProbeStartedAtMs: 0,
+        nextProbeDelayMs: 0,
+      }),
+    );
     expect(statePlan.nextState).toEqual({
       pileQuestions: [],
       allQuestionsForFilter: [],
@@ -342,10 +333,12 @@ describe('SurveyTool pile hydration and loading', () => {
   });
 
   it('keeps pile loading active after load failures while recent rate-limit warming is active', () => {
-    expect(buildPileLoadFailureState({
-      isQuestionCacheReady: true,
-      recentRateLimit: true,
-    })).toEqual({ loading: true });
+    expect(
+      buildPileLoadFailureState({
+        isQuestionCacheReady: true,
+        recentRateLimit: true,
+      }),
+    ).toEqual({ loading: true });
   });
 
   it('keeps unanswered questions visible in pile mode when response map is empty', () => {
@@ -366,11 +359,13 @@ describe('SurveyTool pile hydration and loading', () => {
     });
 
     expect(pipeline.visibleQuestions.map((question) => question.id)).toEqual(['q1']);
-    expect(loadResult.nextState).toEqual(expect.objectContaining({
-      allQuestionsForFilter: [expect.objectContaining({ id: 'q1' })],
-      pileQuestions: [expect.objectContaining({ id: 'q1' })],
-      loading: false,
-    }));
+    expect(loadResult.nextState).toEqual(
+      expect.objectContaining({
+        allQuestionsForFilter: [expect.objectContaining({ id: 'q1' })],
+        pileQuestions: [expect.objectContaining({ id: 'q1' })],
+        loading: false,
+      }),
+    );
   });
 
   it('settles stuck hydrate 0/0 empty piles into deterministic no-questions state', () => {
@@ -560,12 +555,14 @@ describe('SurveyTool pile hydration and loading', () => {
     });
 
     expect(secondLoad.resultSignature).toBe(firstLoad.resultSignature);
-    expect(buildPileQuestionSetHydrationPlan({
-      requestEpoch: 5,
-      resultSignature: secondLoad.resultSignature,
-      lastResultSignature: firstLoad.resultSignature,
-      initializeResponses: true,
-    }).shouldSkipDuplicateSignature).toBe(true);
+    expect(
+      buildPileQuestionSetHydrationPlan({
+        requestEpoch: 5,
+        resultSignature: secondLoad.resultSignature,
+        lastResultSignature: firstLoad.resultSignature,
+        initializeResponses: true,
+      }).shouldSkipDuplicateSignature,
+    ).toBe(true);
     expect(countsPlan.responseCounts).toEqual({ q1: 0, q2: 1 });
   });
 });

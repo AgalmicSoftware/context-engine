@@ -27,23 +27,23 @@ describe('sessionWizardContracts', () => {
   });
 
   test('visible contract keys include session registry row', () => {
-    expect(getVisibleSessionWizardContractKeys()).toEqual([
-      'surveys',
-      'sbtFactory',
-      'sessionRegistry',
-    ]);
+    expect(getVisibleSessionWizardContractKeys()).toEqual(['surveys', 'sbtFactory', 'sessionRegistry']);
   });
 
   test('registry resolver prefers manual contract address over chain default', () => {
-    expect(resolveSessionWizardRegistryAddress(DEFAULT_CONFIG_CHAIN_ID, {
-      sessionRegistry: { address: '0xabc' },
-    })).toBe('0xabc');
+    expect(
+      resolveSessionWizardRegistryAddress(DEFAULT_CONFIG_CHAIN_ID, {
+        sessionRegistry: { address: '0xabc' },
+      }),
+    ).toBe('0xabc');
   });
 
   test('registry resolver falls back to chain default when manual value is empty', () => {
-    expect(resolveSessionWizardRegistryAddress(DEFAULT_CONFIG_CHAIN_ID, {
-      sessionRegistry: { address: '' },
-    })).toBe(getSessionRegistryAddress(DEFAULT_CONFIG_CHAIN_ID));
+    expect(
+      resolveSessionWizardRegistryAddress(DEFAULT_CONFIG_CHAIN_ID, {
+        sessionRegistry: { address: '' },
+      }),
+    ).toBe(getSessionRegistryAddress(DEFAULT_CONFIG_CHAIN_ID));
   });
 
   test('sanitize keeps visible contracts and drops hidden entries', () => {
@@ -79,11 +79,7 @@ describe('sessionWizardContracts', () => {
     expect(plan.selectedContract?.key).toBe('surveys');
     expect(plan.selectedContractHref).toBe('/contracts?contract=surveys&session=source-session');
     expect(plan.selectedContractSessionSlug).toBe('source-session');
-    expect(plan.contracts.map((contract) => contract.key)).toEqual([
-      'surveys',
-      'sbtFactory',
-      'sessionRegistry',
-    ]);
+    expect(plan.contracts.map((contract) => contract.key)).toEqual(['surveys', 'sbtFactory', 'sessionRegistry']);
   });
 
   test('contract viewer plan fills visible defaults without adding the custom SBT template', () => {

@@ -1,6 +1,6 @@
 /** @file App.tsx */
-import React from "react";
-import { Routes, Route } from 'react-router-dom'
+import React, { Suspense } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import store from '../store.js';
 import { SERVER } from '../variables/appConfig.js';
@@ -9,21 +9,20 @@ import { createLogger } from '../utilities/logging';
 import { syncPublicPageHead } from '../utilities/ui/publicPageHead.js';
 import CEToaster from './Shared/CEToaster';
 
-import "assets/css/contextEngine.scss";
+import 'assets/css/contextEngine.scss';
 
-import withRouter from "./HooksHOC/withRouterBridge";
-import AppShell from "./MainSite/AppShell";
+import withRouter from './HooksHOC/withRouterBridge';
 import AppErrorBoundary from './ErrorBoundary/AppErrorBoundary';
 import { readColdLoadOnboardingState } from './Onboarding/onboardingConfig.js';
 import { toastTheme } from '../utilities/ui/toastTheme.js';
 
 import '@rainbow-me/rainbowkit/styles.css';
 
-import {
-  RainbowKitProvider,
-} from '@rainbow-me/rainbowkit';
+import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { WagmiConfig } from 'wagmi';
 import { chains, wagmiClient } from '../app/runtime/appWagmiRuntime';
+
+const AppShell = React.lazy(() => import('./MainSite/AppShell'));
 
 const log = createLogger('general');
 
@@ -69,10 +68,7 @@ const ensureHistorySyncBridge = () => {
   const originalPushState = window.history.pushState;
   const originalReplaceState = window.history.replaceState;
 
-  patchedPushState = function patchedPushStateWrapper(
-    this: History,
-    ...args: Parameters<History['pushState']>
-  ) {
+  patchedPushState = function patchedPushStateWrapper(this: History, ...args: Parameters<History['pushState']>) {
     const result = originalPushState.apply(this, args);
     dispatchAppHistorySync();
     return result;
@@ -159,7 +155,7 @@ try {
 class App extends React.Component<AppProps, AppState> {
   state: AppState = {
     serverEndpoint: SERVER,
-    matchesAddress: "",
+    matchesAddress: '',
   };
 
   _lastSyncedRouteHeadKey: string | null = null;
@@ -191,14 +187,18 @@ class App extends React.Component<AppProps, AppState> {
   };
 
   componentDidMount() {
-    document.body.classList.add("index-page");
+    document.body.classList.add('index-page');
 
     if (_coldLoadSnapshot?.shouldStartOnboarding) {
       store.dispatch({ type: 'SET_ONBOARDING_STEP', payload: 1 });
     }
 
     // Dev/E2E-only agent interface (gated; no-op unless enabled).
-    try { installCeAgent(); } catch (e) { log.warn('App: fallback', e); }
+    try {
+      installCeAgent();
+    } catch (e) {
+      log.warn('App: fallback', e);
+    }
     // React Router updates do not cover direct history.replaceState/pushState calls,
     // so bridge the History API back into the same head-sync path.
     this.unsubscribeHistorySync = subscribeToHistorySync(() => {
@@ -209,7 +209,6 @@ class App extends React.Component<AppProps, AppState> {
       this.forceUpdate();
     }
     this.syncRouteHead();
-
   }
 
   componentDidUpdate(prevProps: AppProps) {
@@ -227,22 +226,21 @@ class App extends React.Component<AppProps, AppState> {
     } catch (e) {
       log.warn('App: cleanup', e);
     }
-    document.body.classList.remove("index-page");
+    document.body.classList.remove('index-page');
   }
 
   render() {
-    const location = (
+    const location =
       typeof window !== 'undefined' && window.location
         ? {
-          pathname: window.location.pathname || this.props.location?.pathname || '',
-          search: window.location.search || this.props.location?.search || '',
-        }
-        : (this.props.location || { pathname: '', search: '' })
-    );
+            pathname: window.location.pathname || this.props.location?.pathname || '',
+            search: window.location.search || this.props.location?.search || '',
+          }
+        : this.props.location || { pathname: '', search: '' };
 
-    const search = location.search || ''
-    const nftCode = search.substring(search.indexOf("=") + 1);
-    const urlPath = (location.pathname || '').toString()
+    const search = location.search || '';
+    const nftCode = search.substring(search.indexOf('=') + 1);
+    const urlPath = (location.pathname || '').toString();
     const viewAddress = urlPath.split('/u/')[1];
     const siteProps = {
       nftCode,
@@ -255,21 +253,25 @@ class App extends React.Component<AppProps, AppState> {
     };
 
     return (
-        <WagmiConfig client={wagmiClient}>
-          <RainbowKitProvider chains={chains}>
-            <Provider store={store}>
+      <WagmiConfig client={wagmiClient}>
+        <RainbowKitProvider chains={chains}>
+          <Provider store={store}>
             <AppErrorBoundary>
-            <CEToaster
-              position='bottom-right'
-              toastOptions={{ style: toastTheme }}
-            />
-            <Routes>
-              <Route path="*" element={<AppShell path={urlPath} {...siteProps} />} />
-            </Routes>
+              <CEToaster position="bottom-right" toastOptions={{ style: toastTheme }} />
+              <Routes>
+                <Route
+                  path="*"
+                  element={
+                    <Suspense fallback={null}>
+                      <AppShell path={urlPath} {...siteProps} />
+                    </Suspense>
+                  }
+                />
+              </Routes>
             </AppErrorBoundary>
-            </Provider>
-          </RainbowKitProvider>
-        </WagmiConfig>
+          </Provider>
+        </RainbowKitProvider>
+      </WagmiConfig>
     );
   }
 }

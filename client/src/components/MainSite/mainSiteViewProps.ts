@@ -2,10 +2,7 @@ import type { MainSiteProps, MainSiteState } from './MainSiteTypes';
 
 export type MainSiteWalletViewProps = Pick<MainSiteProps, 'account' | 'provider'>;
 
-export type MainSiteLoginViewProps = Pick<
-  MainSiteProps,
-  'toggleLoginModal' | 'loginComplete'
->;
+export type MainSiteLoginViewProps = Pick<MainSiteProps, 'toggleLoginModal' | 'loginComplete'>;
 
 export type MainSiteAuthViewProps = MainSiteWalletViewProps &
   MainSiteLoginViewProps &
@@ -45,31 +42,23 @@ export type MainSiteSessionCacheViewProps = Pick<
   | 'questionScanProgress'
 >;
 
-export const composeMainSiteWalletViewProps = (
-  props: MainSiteProps,
-): MainSiteWalletViewProps => ({
+export const composeMainSiteWalletViewProps = (props: MainSiteProps): MainSiteWalletViewProps => ({
   account: props.account,
   provider: props.provider,
 });
 
-export const composeMainSiteLoginViewProps = (
-  props: MainSiteProps,
-): MainSiteLoginViewProps => ({
+export const composeMainSiteLoginViewProps = (props: MainSiteProps): MainSiteLoginViewProps => ({
   toggleLoginModal: props.toggleLoginModal,
   loginComplete: props.loginComplete,
 });
 
-export const composeMainSiteAuthViewProps = (
-  props: MainSiteProps,
-): MainSiteAuthViewProps => ({
+export const composeMainSiteAuthViewProps = (props: MainSiteProps): MainSiteAuthViewProps => ({
   ...composeMainSiteWalletViewProps(props),
   ...composeMainSiteLoginViewProps(props),
   loginInProgress: props.loginInProgress,
 });
 
-export const composeMainSiteSurveyCacheViewProps = (
-  state: MainSiteState,
-): MainSiteSurveyCacheViewProps => ({
+export const composeMainSiteSurveyCacheViewProps = (state: MainSiteState): MainSiteSurveyCacheViewProps => ({
   isSurveyCacheReady: state.isSurveyCacheReady,
   isQuestionCacheReady: state.isQuestionCacheReady,
   isResponsesCacheReady: state.isResponsesCacheReady,
@@ -80,9 +69,7 @@ export const composeMainSiteSurveyCacheViewProps = (
   questionScanProgress: state.questionScanProgress,
 });
 
-export const composeMainSiteQuestionCacheViewProps = (
-  state: MainSiteState,
-): MainSiteQuestionCacheViewProps => ({
+export const composeMainSiteQuestionCacheViewProps = (state: MainSiteState): MainSiteQuestionCacheViewProps => ({
   isQuestionCacheReady: state.isQuestionCacheReady,
   isResponsesCacheReady: state.isResponsesCacheReady,
   isSBTCacheReady: state.isSBTCacheReady,
@@ -91,9 +78,7 @@ export const composeMainSiteQuestionCacheViewProps = (
   questionScanProgress: state.questionScanProgress,
 });
 
-export const composeMainSiteSessionCacheViewProps = (
-  state: MainSiteState,
-): MainSiteSessionCacheViewProps => ({
+export const composeMainSiteSessionCacheViewProps = (state: MainSiteState): MainSiteSessionCacheViewProps => ({
   isSBTCacheReady: state.isSBTCacheReady,
   isSurveyCacheReady: state.isSurveyCacheReady,
   isQuestionCacheReady: state.isQuestionCacheReady,

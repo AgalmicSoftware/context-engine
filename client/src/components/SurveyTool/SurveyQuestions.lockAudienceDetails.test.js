@@ -1,10 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
-import {
-  buildGateAudienceSbtItems,
-  resolveLockAudienceSessionName,
-} from './surveyToolResponseGateController';
+import { buildGateAudienceSbtItems, resolveLockAudienceSessionName } from './surveyToolResponseGateController';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
@@ -17,27 +14,32 @@ const normalizeText = (value) => {
   return raw;
 };
 
-const renderAudienceControl = (overrides = {}) => render(
-  <SurveyQuestionsLockAudienceControl
-    qid="q1"
-    effectiveFieldKey="answer"
-    buttonTitle="Choose encryption audience"
-    hasAudienceMenu
-    menuOpen
-    normalizedSelfAudienceLabel="only me"
-    gateOptions={[{
-      gateId: 'default_gate',
-      label: 'test-12',
-      sbtItems: [{
-        address,
-        label: 'AI Gate Test SBT',
-        meta: '0x1111...1111',
-        href: buildSbtDetailPath(address, 'edge'),
-      }],
-    }]}
-    {...overrides}
-  />
-);
+const renderAudienceControl = (overrides = {}) =>
+  render(
+    <SurveyQuestionsLockAudienceControl
+      qid="q1"
+      effectiveFieldKey="answer"
+      buttonTitle="Choose encryption audience"
+      hasAudienceMenu
+      menuOpen
+      normalizedSelfAudienceLabel="only me"
+      gateOptions={[
+        {
+          gateId: 'default_gate',
+          label: 'test-12',
+          sbtItems: [
+            {
+              address,
+              label: 'AI Gate Test SBT',
+              meta: '0x1111...1111',
+              href: buildSbtDetailPath(address, 'edge'),
+            },
+          ],
+        },
+      ]}
+      {...overrides}
+    />,
+  );
 
 describe('SurveyQuestions lock audience details', () => {
   afterEach(() => {
@@ -60,11 +62,9 @@ describe('SurveyQuestions lock audience details', () => {
 
   it('does not inherit the general session name in lock audience labels when the slug is unresolved', () => {
     const resolveSlugForIds = jest.fn(() => 'missing-session-slug');
-    const resolveLockAudienceSessionNameContext = jest.fn((slug) => (
-      slug === ''
-        ? { sessionName: 'General Session' }
-        : null
-    ));
+    const resolveLockAudienceSessionNameContext = jest.fn((slug) =>
+      slug === '' ? { sessionName: 'General Session' } : null,
+    );
 
     const label = resolveLockAudienceSessionName({
       normalizeGateLabelText: normalizeText,
@@ -82,9 +82,11 @@ describe('SurveyQuestions lock audience details', () => {
 
     expect(label).toBe('session');
     expect(label).not.toBe('General Session');
-    expect(resolveSlugForIds).toHaveBeenCalledWith(expect.objectContaining({
-      questionId: '',
-    }));
+    expect(resolveSlugForIds).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: '',
+      }),
+    );
     expect(resolveLockAudienceSessionNameContext).toHaveBeenCalledWith('missing-session-slug');
     expect(resolveLockAudienceSessionNameContext).not.toHaveBeenCalledWith('');
   });
@@ -131,17 +133,21 @@ describe('SurveyQuestions lock audience details', () => {
         menuOpen
         normalizedSelfAudienceLabel="only me"
         expandedGateId="default_gate"
-        gateOptions={[{
-          gateId: 'default_gate',
-          label: 'test-12',
-          sbtItems: [{
-            address,
-            label: 'AI Gate Test SBT',
-            meta: '0x1111...1111',
-            href: buildSbtDetailPath(address, 'edge'),
-          }],
-        }]}
-      />
+        gateOptions={[
+          {
+            gateId: 'default_gate',
+            label: 'test-12',
+            sbtItems: [
+              {
+                address,
+                label: 'AI Gate Test SBT',
+                meta: '0x1111...1111',
+                href: buildSbtDetailPath(address, 'edge'),
+              },
+            ],
+          },
+        ]}
+      />,
     );
 
     expect(screen.getByText('AI Gate Test SBT')).toBeInTheDocument();
@@ -153,16 +159,20 @@ describe('SurveyQuestions lock audience details', () => {
     const onToggleGateDetails = jest.fn();
 
     renderAudienceControl({
-      gateOptions: [{
-        gateId: 'vip_gate',
-        label: 'VIP gate',
-        sbtItems: [{
-          address,
-          label: 'AI Gate Test SBT',
-          meta: '0x1111...1111',
-          href: buildSbtDetailPath(address, 'edge'),
-        }],
-      }],
+      gateOptions: [
+        {
+          gateId: 'vip_gate',
+          label: 'VIP gate',
+          sbtItems: [
+            {
+              address,
+              label: 'AI Gate Test SBT',
+              meta: '0x1111...1111',
+              href: buildSbtDetailPath(address, 'edge'),
+            },
+          ],
+        },
+      ],
       onSelectAudience,
       onToggleGateDetails,
     });

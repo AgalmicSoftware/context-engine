@@ -1,9 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import {
-  FORCE_COLD_LOAD_WELCOME_SLIDES_BOOKMARKLET,
-  WELCOME_SLIDES,
-} from './welcomeSlides.js';
+import { FORCE_COLD_LOAD_WELCOME_SLIDES_BOOKMARKLET, WELCOME_SLIDES } from './welcomeSlides.js';
 
 describe('welcome slide assets', () => {
   it('uses a transparent goals image so minimized slides do not show a source rectangle', () => {
@@ -17,8 +14,7 @@ describe('welcome slide assets', () => {
 
   it('keeps the cold-load welcome slide test bookmarklet next to the slide definitions', () => {
     expect(FORCE_COLD_LOAD_WELCOME_SLIDES_BOOKMARKLET).toBe(
-      "javascript:localStorage.setItem('ce:forceColdLoadWelcomeSlides','true');localStorage.removeItem('ce_onboarding_complete');localStorage.removeItem('firstVisit');location.href='/'"
+      "javascript:localStorage.setItem('ce:forceColdLoadWelcomeSlides','true');localStorage.removeItem('ce_onboarding_complete');localStorage.removeItem('firstVisit');location.href='/'",
     );
   });
-
 });

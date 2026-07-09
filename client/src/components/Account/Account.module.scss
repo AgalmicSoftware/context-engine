@@ -1,5 +1,5 @@
 /* @file Account.module.scss */
-@use "sass:color";
+@use 'sass:color';
 
 /* --- LoginAndSettingsModal.tsx --- */
 
@@ -1239,7 +1239,8 @@ h1 {
   color: var(--ce-color-white);
 }
 
-#loginModal { }
+#loginModal {
+}
 
 #closeModalIcon {
   font-size: 2em;
@@ -1537,7 +1538,8 @@ h1 {
   color: var(--ce-color-orange);
 }
 
-#testETHFaucetLink { }
+#testETHFaucetLink {
+}
 
 #web3ModalLoginText {
   font-weight: 600;
@@ -2506,7 +2508,9 @@ h1 {
   font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
-  transition: color 0.2s ease, opacity 0.2s ease;
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease;
 
   &:hover,
   &:focus-visible {
@@ -2687,7 +2691,10 @@ h1 {
   padding: 9px 11px;
   font-size: 0.86rem;
   font-family: var(--ce-font-mono);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .aiSettingsInput:focus,
@@ -2757,7 +2764,11 @@ h1 {
   padding: 8px 14px;
   font-size: 0.82rem;
   font-weight: 700;
-  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .aiReasoningBtn:hover:not(:disabled),
@@ -3075,8 +3086,8 @@ h1 {
   // On larger screens, display side-by-side
   @media (min-width: 769px) {
     flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }
 
@@ -3426,7 +3437,7 @@ h1 {
 }
 
 #loginModalCard::before {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -3434,7 +3445,7 @@ h1 {
 }
 
 #loginModalCard::after {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   background: radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.08), transparent 55%);

@@ -21,7 +21,7 @@ describe('SurveyQuestionsTopRouteSection', () => {
           onToggleDisplayAnswerMode,
           userHasResponse: true,
         }}
-      />
+      />,
     );
 
     const button = screen.getByRole('button', { name: /Back to survey/i });
@@ -50,7 +50,7 @@ describe('SurveyQuestionsTopRouteSection', () => {
           userHasResponse: true,
           userResponseEncrypted: true,
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Decrypt \/ Edit All/i }));

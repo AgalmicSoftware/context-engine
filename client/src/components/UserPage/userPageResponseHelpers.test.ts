@@ -244,7 +244,7 @@ describe('userPageResponseHelpers', () => {
     const parsed = parseUserPageCachedResponsePayload(
       '{"__proto__":{"polluted":"yes"},"answer":{"value":"safe"}}',
       new Map(),
-      10
+      10,
     );
 
     expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype);
@@ -271,24 +271,30 @@ describe('userPageResponseHelpers', () => {
       answer: { value: 'plain answer' },
       additional: { value: '' },
     });
-    expect(normalizeUserPageSingleQuestionResponsePayload({
-      response: {
+    expect(
+      normalizeUserPageSingleQuestionResponsePayload({
+        response: {
+          value: 'nested answer',
+          additionalComment: 'nested note',
+        },
+        blockNumber: 50,
+      }),
+    ).toEqual(
+      expect.objectContaining({
         value: 'nested answer',
-        additionalComment: 'nested note',
-      },
-      blockNumber: 50,
-    })).toEqual(expect.objectContaining({
-      value: 'nested answer',
-      blockNumber: 50,
-      answer: { value: 'nested answer' },
-      additional: { value: 'nested note' },
-    }));
-    expect(normalizeUserPageSingleQuestionResponsePayload({ arbitrary: 'legacy' })).toEqual(expect.objectContaining({
-      arbitrary: 'legacy',
-      answer: {},
-      additional: {},
-      __ceMalformedPayload: true,
-    }));
+        blockNumber: 50,
+        answer: { value: 'nested answer' },
+        additional: { value: 'nested note' },
+      }),
+    );
+    expect(normalizeUserPageSingleQuestionResponsePayload({ arbitrary: 'legacy' })).toEqual(
+      expect.objectContaining({
+        arbitrary: 'legacy',
+        answer: {},
+        additional: {},
+        __ceMalformedPayload: true,
+      }),
+    );
   });
 
   it('detects displayable response values and submission hints', () => {
@@ -297,14 +303,18 @@ describe('userPageResponseHelpers', () => {
     expect(isDisplayableUserPageResponseValue(['*', { value: 'yes' }])).toBe(true);
     expect(isDisplayableUserPageResponseValue({ nested: true })).toBe(true);
 
-    expect(hasDisplayableUserPageResponsePayload({
-      answer: { value: '*' },
-      additional: { value: 'comment' },
-    })).toBe(true);
-    expect(hasDisplayableUserPageResponsePayload({
-      answer: { value: '*' },
-      additional: { value: '' },
-    })).toBe(false);
+    expect(
+      hasDisplayableUserPageResponsePayload({
+        answer: { value: '*' },
+        additional: { value: 'comment' },
+      }),
+    ).toBe(true);
+    expect(
+      hasDisplayableUserPageResponsePayload({
+        answer: { value: '*' },
+        additional: { value: '' },
+      }),
+    ).toBe(false);
 
     expect(hasUserPageResponseSubmissionHints('answer')).toBe(true);
     expect(hasUserPageResponseSubmissionHints('  ')).toBe(false);
@@ -314,36 +324,48 @@ describe('userPageResponseHelpers', () => {
   });
 
   it('extracts and compares response recency fields with metadata precedence', () => {
-    expect(extractUserPageResponseRecency({
-      blockNumber: 10,
-      transactionIndex: 2,
-      logIndex: 4,
-      timestamp: 100,
-    }, {
-      bn: 11,
-      txi: 1,
-      li: 3,
-      ts: 200,
-    })).toEqual({
+    expect(
+      extractUserPageResponseRecency(
+        {
+          blockNumber: 10,
+          transactionIndex: 2,
+          logIndex: 4,
+          timestamp: 100,
+        },
+        {
+          bn: 11,
+          txi: 1,
+          li: 3,
+          ts: 200,
+        },
+      ),
+    ).toEqual({
       bn: 11,
       txi: 1,
       li: 3,
       ts: 200,
     });
-    expect(extractUserPageResponseRecency({
-      bn: 'bad',
-      txIndex: 5,
-    })).toEqual({
+    expect(
+      extractUserPageResponseRecency({
+        bn: 'bad',
+        txIndex: 5,
+      }),
+    ).toEqual({
       bn: 0,
       txi: 5,
       li: 0,
       ts: 0,
     });
-    expect(extractUserPageResponseRecencyWithHints({
-      timestamp: 0,
-    }, {
-      bn: 12,
-    })).toEqual({
+    expect(
+      extractUserPageResponseRecencyWithHints(
+        {
+          timestamp: 0,
+        },
+        {
+          bn: 12,
+        },
+      ),
+    ).toEqual({
       bn: 12,
       txi: 0,
       li: 0,
@@ -358,7 +380,12 @@ describe('userPageResponseHelpers', () => {
       hasHints: false,
     });
     expect(compareUserPageResponseRecency({ blockNumber: 10 }, { blockNumber: 9 })).toBe(1);
-    expect(compareUserPageResponseRecency({ blockNumber: 10, transactionIndex: 1 }, { blockNumber: 10, transactionIndex: 3 })).toBe(-2);
+    expect(
+      compareUserPageResponseRecency(
+        { blockNumber: 10, transactionIndex: 1 },
+        { blockNumber: 10, transactionIndex: 3 },
+      ),
+    ).toBe(-2);
     expect(compareUserPageResponseRecency({ blockNumber: 10, logIndex: 3 }, { blockNumber: 10, logIndex: 3 })).toBe(0);
   });
 

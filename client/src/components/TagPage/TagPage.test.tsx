@@ -24,7 +24,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   subscribeCacheUpdates: (...args: any[]) => (mockSubscribeCacheUpdates as any)(...args),
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {},
   getAllSessionSlugs: (...args: any[]) => mockGetAllSessionSlugs(...args),
@@ -37,7 +37,7 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   SESSION_REGISTRY_CACHE_UPDATED_EVENT: 'ce:session-registry-cache-updated',
 }));
 
-jest.mock('../../utilities/ai/aiScripts.js', () => ({
+jest.mock('../../utilities/ai/aiClient.js', () => ({
   __esModule: true,
   callAI: (...args: any[]) => mockCallAI(...args),
 }));
@@ -80,11 +80,12 @@ jest.mock('reactstrap', () => {
     ModalHeader: ({ children, className, close, toggle }: any) => (
       <div data-testid="tag-modal-header" data-class={className}>
         <span>{children}</span>
-        {close || (toggle ? (
-          <button type="button" onClick={toggle} aria-label="Close">
-            ×
-          </button>
-        ) : null)}
+        {close ||
+          (toggle ? (
+            <button type="button" onClick={toggle} aria-label="Close">
+              ×
+            </button>
+          ) : null)}
       </div>
     ),
     ModalBody: ({ children, className }: any) => (
@@ -135,27 +136,26 @@ describe('tag AI cache helpers', () => {
   });
 });
 
-const createTagPageStore = (sessionStateOverrides: Record<string, any> = {}) => createStore(
-  (state = {
-    profile: {
-      network: { id: 84532 },
-    },
-    sessionState: {
-      activeSessionSlug: 'edge',
-      primarySessionSlug: 'edge',
-      primarySessionExplicit: false,
-      selectedSessionScope: 'active',
-      selectedSessionSlugs: [],
-      ...sessionStateOverrides,
-    },
-  }) => state
-);
+const createTagPageStore = (sessionStateOverrides: Record<string, any> = {}) =>
+  createStore(
+    (
+      state = {
+        profile: {
+          network: { id: 84532 },
+        },
+        sessionState: {
+          activeSessionSlug: 'edge',
+          primarySessionSlug: 'edge',
+          primarySessionExplicit: false,
+          selectedSessionScope: 'active',
+          selectedSessionSlugs: [],
+          ...sessionStateOverrides,
+        },
+      },
+    ) => state,
+  );
 
-const buildQuestionsEntry = ({
-  slug = 'edge',
-  questions = {},
-  questionResponses = {},
-}: Record<string, any> = {}) => ({
+const buildQuestionsEntry = ({ slug = 'edge', questions = {}, questionResponses = {} }: Record<string, any> = {}) => ({
   namespace: 'questionsCache',
   slug,
   key: `dg:questionsCache:${slug || 'general'}`,
@@ -242,17 +242,14 @@ const renderTagPage = ({
   isQuestionCacheReady = true,
   sessionState = {},
   tagPageProps = {},
-}: Record<string, any> = {}) => render(
-  <Provider store={createTagPageStore(sessionState)}>
-    <MemoryRouter initialEntries={[entry]}>
-      <TagPageComponent
-        questionResponsesNonce={0}
-        isQuestionCacheReady={isQuestionCacheReady}
-        {...tagPageProps}
-      />
-    </MemoryRouter>
-  </Provider>
-);
+}: Record<string, any> = {}) =>
+  render(
+    <Provider store={createTagPageStore(sessionState)}>
+      <MemoryRouter initialEntries={[entry]}>
+        <TagPageComponent questionResponsesNonce={0} isQuestionCacheReady={isQuestionCacheReady} {...tagPageProps} />
+      </MemoryRouter>
+    </Provider>,
+  );
 
 const renderTagModal = ({
   activeTag = 'Google',
@@ -262,19 +259,20 @@ const renderTagModal = ({
   demoCorpusMode = false,
   demoCorpusRecordsOverride = [],
   toggle = jest.fn(),
-}: Record<string, any> = {}) => render(
-  <Provider store={createTagPageStore(sessionState)}>
-    <MemoryRouter initialEntries={[entry]}>
-      <TagModalComponent
-        isOpen={isOpen}
-        toggle={toggle}
-        activeTag={activeTag}
-        demoCorpusMode={demoCorpusMode}
-        demoCorpusRecords={demoCorpusRecordsOverride}
-      />
-    </MemoryRouter>
-  </Provider>
-);
+}: Record<string, any> = {}) =>
+  render(
+    <Provider store={createTagPageStore(sessionState)}>
+      <MemoryRouter initialEntries={[entry]}>
+        <TagModalComponent
+          isOpen={isOpen}
+          toggle={toggle}
+          activeTag={activeTag}
+          demoCorpusMode={demoCorpusMode}
+          demoCorpusRecords={demoCorpusRecordsOverride}
+        />
+      </MemoryRouter>
+    </Provider>,
+  );
 
 describe('TagPage', () => {
   beforeEach(() => {
@@ -350,16 +348,34 @@ describe('TagPage', () => {
     expect(scss).toMatch(/\.pageEmbedded\s*{[\s\S]*?overflow-x:\s*hidden;/);
     expect(scss).toMatch(/\.headerControls\s*{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;/);
     expect(scss).toMatch(/\.tagPickerEmbedded\s*{[\s\S]*?margin-left:\s*auto;/);
-    expect(scss).toMatch(/\.tagPickerPopover\s*{[\s\S]*?right:\s*0;[\s\S]*?max-height:\s*min\(420px,\s*calc\(100vh - 220px\)\);[\s\S]*?overflow-y:\s*auto;/);
+    expect(scss).toMatch(
+      /\.tagPickerPopover\s*{[\s\S]*?right:\s*0;[\s\S]*?max-height:\s*min\(420px,\s*calc\(100vh - 220px\)\);[\s\S]*?overflow-y:\s*auto;/,
+    );
     expect(scss).toMatch(/\.demoCorpusFooter\s*{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;/);
-    expect(scss).toMatch(/\.demoCorpusTagList\s*{[\s\S]*?flex:\s*1 1 420px;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/);
-    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.headerTopRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?flex-wrap:\s*wrap;/);
-    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.headerLead\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*auto;/);
-    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.headerMeta\s*{[\s\S]*?width:\s*auto;[\s\S]*?flex:\s*0 0 auto;/);
-    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.headerControls\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?flex-wrap:\s*wrap;/);
-    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.tagPickerPopover\s*{[\s\S]*?right:\s*0;[\s\S]*?left:\s*auto;[\s\S]*?max-height:\s*min\(360px,\s*calc\(100vh - 190px\)\);/);
-    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.demoCorpusTagList\s*{[\s\S]*?flex:\s*0 1 auto;[\s\S]*?width:\s*100%;[\s\S]*?align-items:\s*flex-start;/);
-    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.demoCorpusTag\s*{[\s\S]*?align-self:\s*flex-start;/);
+    expect(scss).toMatch(
+      /\.demoCorpusTagList\s*{[\s\S]*?flex:\s*1 1 420px;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*720px\)\s*{[\s\S]*?\.headerTopRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?flex-wrap:\s*wrap;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*720px\)\s*{[\s\S]*?\.headerLead\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*auto;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*720px\)\s*{[\s\S]*?\.headerMeta\s*{[\s\S]*?width:\s*auto;[\s\S]*?flex:\s*0 0 auto;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*720px\)\s*{[\s\S]*?\.headerControls\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?flex-wrap:\s*wrap;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*720px\)\s*{[\s\S]*?\.tagPickerPopover\s*{[\s\S]*?right:\s*0;[\s\S]*?left:\s*auto;[\s\S]*?max-height:\s*min\(360px,\s*calc\(100vh - 190px\)\);/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*720px\)\s*{[\s\S]*?\.demoCorpusTagList\s*{[\s\S]*?flex:\s*0 1 auto;[\s\S]*?width:\s*100%;[\s\S]*?align-items:\s*flex-start;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*720px\)\s*{[\s\S]*?\.demoCorpusTag\s*{[\s\S]*?align-self:\s*flex-start;/,
+    );
   });
 
   it('displays tag pills from the URL', () => {
@@ -414,7 +430,9 @@ describe('TagPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /tag page session selector/i }));
 
-    expect(screen.getByText(/demo corpus mode uses the demo corpus records currently loaded in this view/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/demo corpus mode uses the demo corpus records currently loaded in this view/i),
+    ).toBeInTheDocument();
     expect(screen.getByTestId('ce-tag-page-demo-session-info')).toHaveTextContent('Session scope: edge');
     expect(screen.queryByRole('button', { name: /use global default/i })).not.toBeInTheDocument();
   });
@@ -451,14 +469,22 @@ describe('TagPage', () => {
     const cardTitle = screen.getByRole('heading', { name: 'Google on contrails' });
     const card = cardTitle.closest('article') as HTMLElement;
     expect(card).not.toBeNull();
-    expect(within(card).queryByText('Google partnered with American Airlines to reduce contrails.')).not.toBeInTheDocument();
+    expect(
+      within(card).queryByText('Google partnered with American Airlines to reduce contrails.'),
+    ).not.toBeInTheDocument();
     expect(within(card).queryByText('View source')).not.toBeInTheDocument();
-    expect(within(card).getByRole('link', { name: /view source/i })).toHaveAttribute('href', 'https://example.com/google-contrails');
+    expect(within(card).getByRole('link', { name: /view source/i })).toHaveAttribute(
+      'href',
+      'https://example.com/google-contrails',
+    );
 
     fireEvent.click(within(card).getByRole('button', { name: /expand google on contrails/i }));
 
     expect(within(card).getByText('Google partnered with American Airlines to reduce contrails.')).toBeInTheDocument();
-    expect(within(card).getByRole('button', { name: /collapse google on contrails/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(within(card).getByRole('button', { name: /collapse google on contrails/i })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
   });
 
   it('keeps related tags first while still including the broader scoped tag universe in the picker', () => {
@@ -468,7 +494,9 @@ describe('TagPage', () => {
 
     const dialog = screen.getByRole('dialog', { name: /add tag to comparison/i });
     expect(dialog).toBeInTheDocument();
-    const dialogButtons = within(dialog).getAllByRole('button').map((button) => button.textContent);
+    const dialogButtons = within(dialog)
+      .getAllByRole('button')
+      .map((button) => button.textContent);
     expect(dialogButtons).toEqual(['#ai', '#culture']);
     expect(within(dialog).getByRole('button', { name: /add ai tag to comparison/i })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: /add culture tag to comparison/i })).toBeInTheDocument();
@@ -529,11 +557,12 @@ describe('TagPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /add tag to comparison/i }));
 
     const dialog = screen.getByRole('dialog', { name: /add tag to comparison/i });
-    expect(within(dialog).getAllByRole('button').slice(0, 3).map((button) => button.textContent)).toEqual([
-      '#Anthropic',
-      '#DeepMind',
-      '#Microsoft',
-    ]);
+    expect(
+      within(dialog)
+        .getAllByRole('button')
+        .slice(0, 3)
+        .map((button) => button.textContent),
+    ).toEqual(['#Anthropic', '#DeepMind', '#Microsoft']);
     expect(within(dialog).getByRole('button', { name: /add AI Governance tag to comparison/i })).toBeInTheDocument();
     expect(within(dialog).queryByText(/no additional tags available/i)).not.toBeInTheDocument();
   });
@@ -758,13 +787,13 @@ describe('TagPage', () => {
   });
 
   it('treats the general session as a valid single-session scope for AI interpretation without a documents panel', async () => {
-    mockGetDemoSessionConfigBySlug.mockImplementation((slug) => (
+    mockGetDemoSessionConfigBySlug.mockImplementation((slug) =>
       slug === ''
         ? {
-          sessionName: 'General',
-        }
-        : null
-    ));
+            sessionName: 'General',
+          }
+        : null,
+    );
     mockListNamespaceEntriesSync.mockImplementation((namespace) => {
       if (namespace !== 'questionsCache') return [];
       return [
@@ -807,10 +836,7 @@ describe('TagPage', () => {
         },
       ],
     });
-    expect(mockCallAI).toHaveBeenCalledWith(
-      expectedPrompt,
-      expect.objectContaining({ sessionSlug: '' })
-    );
+    expect(mockCallAI).toHaveBeenCalledWith(expectedPrompt, expect.objectContaining({ sessionSlug: '' }));
     expect(await screen.findByText('Mocked interpretation')).toBeInTheDocument();
   });
 
@@ -819,9 +845,12 @@ describe('TagPage', () => {
     let nowMs = 1000;
     jest.spyOn(Date, 'now').mockImplementation(() => nowMs);
     let resolveAi!: (value: string) => void;
-    mockCallAI.mockImplementationOnce(() => new Promise<string>((resolve) => {
-      resolveAi = resolve;
-    }));
+    mockCallAI.mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveAi = resolve;
+        }),
+    );
 
     renderTagPage({ entry: '/tag/governance' });
 
@@ -902,7 +931,9 @@ describe('TagModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /tag explorer info/i }));
 
     expect(screen.getByTestId('tag-modal-demo-info-panel')).toBeInTheDocument();
-    expect(screen.getByText(/demo corpus mode uses the demo corpus records currently loaded in this view/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/demo corpus mode uses the demo corpus records currently loaded in this view/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/session scope: edge/i)).toBeInTheDocument();
     expect(screen.queryByTestId('ce-tag-page-session-selector-toggle')).not.toBeInTheDocument();
   });
@@ -947,7 +978,7 @@ describe('TagModal', () => {
             demoCorpusRecords={[]}
           />
         </MemoryRouter>
-      </Provider>
+      </Provider>,
     );
 
     expect(screen.getByRole('heading', { name: '#Open Source' })).toBeInTheDocument();
@@ -990,20 +1021,38 @@ describe('TagModal', () => {
     const jsx = fs.readFileSync(jsxPath, 'utf8');
 
     expect(scss).toMatch(/\.tagModal\s*{[\s\S]*padding:\s*16px 0 !important;[\s\S]*overflow:\s*hidden !important;/);
-    expect(scss).toMatch(/:global\(\.modal-dialog\)\s*{[\s\S]*width:\s*min\(1440px,\s*calc\(100vw - 32px\)\);[\s\S]*height:\s*calc\(100vh - 32px\);/);
-    expect(scss).toMatch(/\.tagModalContent\s*{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*height:\s*100%;[\s\S]*position:\s*relative;/);
+    expect(scss).toMatch(
+      /:global\(\.modal-dialog\)\s*{[\s\S]*width:\s*min\(1440px,\s*calc\(100vw - 32px\)\);[\s\S]*height:\s*calc\(100vh - 32px\);/,
+    );
+    expect(scss).toMatch(
+      /\.tagModalContent\s*{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*height:\s*100%;[\s\S]*position:\s*relative;/,
+    );
     expect(scss).toMatch(/\.tagModalBackdrop\s*{[\s\S]*background:\s*rgba\(3,\s*5,\s*18,\s*0\.08\) !important;/);
-    expect(scss).toMatch(/\.tagModalHeaderBar\s*{[\s\S]*display:\s*flex;[\s\S]*width:\s*100%;[\s\S]*justify-content:\s*space-between;[\s\S]*position:\s*relative;/);
-    expect(scss).toMatch(/\.tagModalHeaderActions\s*{[\s\S]*display:\s*inline-flex;[\s\S]*align-items:\s*center;[\s\S]*gap:\s*10px;/);
-    expect(scss).toMatch(/\.tagModalChromeButton\s*{[\s\S]*border-radius:\s*999px;[\s\S]*width:\s*2\.4rem;[\s\S]*height:\s*2\.4rem;/);
-    expect(scss).toMatch(/\.tagModalChromePopover\s*{[\s\S]*position:\s*absolute;[\s\S]*top:\s*calc\(100% \+ 10px\);[\s\S]*right:\s*0;/);
+    expect(scss).toMatch(
+      /\.tagModalHeaderBar\s*{[\s\S]*display:\s*flex;[\s\S]*width:\s*100%;[\s\S]*justify-content:\s*space-between;[\s\S]*position:\s*relative;/,
+    );
+    expect(scss).toMatch(
+      /\.tagModalHeaderActions\s*{[\s\S]*display:\s*inline-flex;[\s\S]*align-items:\s*center;[\s\S]*gap:\s*10px;/,
+    );
+    expect(scss).toMatch(
+      /\.tagModalChromeButton\s*{[\s\S]*border-radius:\s*999px;[\s\S]*width:\s*2\.4rem;[\s\S]*height:\s*2\.4rem;/,
+    );
+    expect(scss).toMatch(
+      /\.tagModalChromePopover\s*{[\s\S]*position:\s*absolute;[\s\S]*top:\s*calc\(100% \+ 10px\);[\s\S]*right:\s*0;/,
+    );
     expect(scss).toMatch(/\.tagModalBody\s*{[\s\S]*overflow:\s*hidden;[\s\S]*padding:\s*0;/);
-    expect(scss).toMatch(/\.tagModalScrollArea\s*{[\s\S]*overflow-x:\s*hidden;[\s\S]*overflow-y:\s*auto;[\s\S]*height:\s*100%;[\s\S]*width:\s*100%;/);
+    expect(scss).toMatch(
+      /\.tagModalScrollArea\s*{[\s\S]*overflow-x:\s*hidden;[\s\S]*overflow-y:\s*auto;[\s\S]*height:\s*100%;[\s\S]*width:\s*100%;/,
+    );
     expect(scss).toMatch(/\.titleEmbedded\s*{[\s\S]*font-size:\s*clamp\(2rem,\s*5\.35vw,\s*3\.95rem\);/);
     expect(scss).toMatch(/\.titlePillHeading\s*{[\s\S]*font-size:\s*1rem;[\s\S]*line-height:\s*1;/);
     expect(scss).toMatch(/\.tagPillHero\s*{[\s\S]*font-size:\s*clamp\(1\.25rem,\s*3\.6vw,\s*2\.7rem\);/);
-    expect(scss).toMatch(/\.tagPillRemove\s*{[\s\S]*min-width:\s*1\.5rem;[\s\S]*min-height:\s*1\.5rem;[\s\S]*border:\s*0;[\s\S]*background:\s*transparent;[\s\S]*font-size:\s*1\.18rem;/);
-    expect(scss).toMatch(/\.tagPillRemoveHero\s*{[\s\S]*min-width:\s*1\.8rem;[\s\S]*min-height:\s*1\.8rem;[\s\S]*font-size:\s*1\.38rem;/);
+    expect(scss).toMatch(
+      /\.tagPillRemove\s*{[\s\S]*min-width:\s*1\.5rem;[\s\S]*min-height:\s*1\.5rem;[\s\S]*border:\s*0;[\s\S]*background:\s*transparent;[\s\S]*font-size:\s*1\.18rem;/,
+    );
+    expect(scss).toMatch(
+      /\.tagPillRemoveHero\s*{[\s\S]*min-width:\s*1\.8rem;[\s\S]*min-height:\s*1\.8rem;[\s\S]*font-size:\s*1\.38rem;/,
+    );
     expect(jsx).toContain('contentClassName={styles.tagModalContent}');
     expect(jsx).toContain('backdropClassName={styles.tagModalBackdrop}');
     expect(jsx).toContain('innerRef={modalRef}');
@@ -1020,8 +1069,14 @@ describe('TagModal', () => {
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/\$tag-route-bg:\s*#20204e;/);
-    expect(scss).toMatch(/\.tagModalContent\s*{[\s\S]*radial-gradient\(circle at top right,\s*rgba\(\$tag-route-accent,\s*0\.18\),\s*transparent 34%\),[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-bg,\s*0\.985\),\s*rgba\(\$tag-route-bg-deep,\s*0\.985\)\);[\s\S]*background-color:\s*\$tag-route-bg;/);
-    expect(scss).toMatch(/\.tagModalHeaderBar\s*{[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-accent-alt,\s*0\.16\),\s*rgba\(\$tag-route-bg,\s*0\.1\)\),/);
-    expect(scss).toMatch(/\.tagModalChromePopover\s*{[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-accent-alt,\s*0\.14\),\s*rgba\(\$tag-route-bg-deep,\s*0\.14\)\),[\s\S]*rgba\(\$tag-route-bg,\s*0\.98\);/);
+    expect(scss).toMatch(
+      /\.tagModalContent\s*{[\s\S]*radial-gradient\(circle at top right,\s*rgba\(\$tag-route-accent,\s*0\.18\),\s*transparent 34%\),[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-bg,\s*0\.985\),\s*rgba\(\$tag-route-bg-deep,\s*0\.985\)\);[\s\S]*background-color:\s*\$tag-route-bg;/,
+    );
+    expect(scss).toMatch(
+      /\.tagModalHeaderBar\s*{[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-accent-alt,\s*0\.16\),\s*rgba\(\$tag-route-bg,\s*0\.1\)\),/,
+    );
+    expect(scss).toMatch(
+      /\.tagModalChromePopover\s*{[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-accent-alt,\s*0\.14\),\s*rgba\(\$tag-route-bg-deep,\s*0\.14\)\),[\s\S]*rgba\(\$tag-route-bg,\s*0\.98\);/,
+    );
   });
 });

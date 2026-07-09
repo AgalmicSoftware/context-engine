@@ -1,4 +1,7 @@
-export const toLowerId = (value: unknown): string => String(value || '').trim().toLowerCase();
+export const toLowerId = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
 export const areQuestionListsEquivalentById = (a: unknown, b: unknown): boolean => {
   const aa = Array.isArray(a) ? a : [];
@@ -34,9 +37,11 @@ export const stableSerializeSmallObject = (value: unknown, maxLen: unknown = 409
       return input.map((item) => normalize(item, seen));
     }
     const out: Record<string, unknown> = {};
-    Object.keys(input).sort().forEach((key) => {
-      out[key] = normalize((input as Record<string, unknown>)[key], seen);
-    });
+    Object.keys(input)
+      .sort()
+      .forEach((key) => {
+        out[key] = normalize((input as Record<string, unknown>)[key], seen);
+      });
     return out;
   };
   try {
@@ -52,16 +57,10 @@ export const stableSerializeSmallObject = (value: unknown, maxLen: unknown = 409
   }
 };
 
-export const buildQuestionIdListSignature = (questions: unknown = []): string => (
-  stableSerializeSmallObject(
-    Array.isArray(questions) ? questions : [],
-    65536
-  )
-);
+export const buildQuestionIdListSignature = (questions: unknown = []): string =>
+  stableSerializeSmallObject(Array.isArray(questions) ? questions : [], 65536);
 
-export const buildFilteredResponsesByQuestionSignature = (
-  responsesByQuestion: unknown = {}
-): string => {
+export const buildFilteredResponsesByQuestionSignature = (responsesByQuestion: unknown = {}): string => {
   if (!responsesByQuestion || typeof responsesByQuestion !== 'object') return '';
   return stableSerializeSmallObject(responsesByQuestion, 65536);
 };
@@ -100,6 +99,6 @@ export const buildAiCandidateSignature = (questions: unknown = []): string => {
         prompt: String(q?.prompt || ''),
       };
     }),
-    65536
+    65536,
   );
 };

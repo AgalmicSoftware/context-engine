@@ -28,15 +28,19 @@ describe('sessionWizardUrlSupport', () => {
   });
 
   it('builds session and admin urls from explicit origins', () => {
-    expect(buildSessionWizardSessionUrl({
-      slug: ' Demo Space ',
-      origin: 'https://app.example',
-    })).toBe('https://app.example/session/Demo%20Space');
-    expect(buildSessionWizardAdminUrl({
-      sessionId: 'abc-123',
-      chainId: 84532,
-      origin: 'https://app.example',
-    })).toBe('https://app.example/admin?sessionId=abc-123&chainId=84532');
+    expect(
+      buildSessionWizardSessionUrl({
+        slug: ' Demo Space ',
+        origin: 'https://app.example',
+      }),
+    ).toBe('https://app.example/session/Demo%20Space');
+    expect(
+      buildSessionWizardAdminUrl({
+        sessionId: 'abc-123',
+        chainId: 84532,
+        origin: 'https://app.example',
+      }),
+    ).toBe('https://app.example/admin?sessionId=abc-123&chainId=84532');
   });
 
   it('normalizes worker urls and resolves explorer bases', () => {

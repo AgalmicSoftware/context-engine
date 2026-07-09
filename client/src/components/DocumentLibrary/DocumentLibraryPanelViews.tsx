@@ -14,13 +14,10 @@ import { Button, Input } from 'reactstrap';
 
 import styles from './DocumentLibraryPanel.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { arweaveClient as arweaveScripts } from '../../utilities/arweave/arweaveClient.js';
+import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient.js';
 import { DOC_LIBRARY_DOC_ROLES } from '../../utilities/docLibrary/tags.js';
 import { getGlobalLitHooks, litStorage } from '../../utilities/crypto/litProtocol.js';
-import {
-  STORAGE_BACKENDS,
-  normalizeStorageRef,
-} from '../../utilities/storage/storageRefs.js';
+import { STORAGE_BACKENDS, normalizeStorageRef } from '../../utilities/storage/storageRefs.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { createLogger } from '../../utilities/logging.js';
@@ -100,7 +97,7 @@ type LitHooks = {
 
 const normalizeDocStorageRef = normalizeStorageRef as (
   input: unknown,
-  opts?: NormalizeStorageRefOptions
+  opts?: NormalizeStorageRefOptions,
 ) => StorageRef | null;
 
 const copyToClipboard = async (text: unknown): Promise<boolean> => {
@@ -166,10 +163,8 @@ const DocRowImagePreview = ({
       return undefined;
     }
 
-    const litHooks = (
-      (scopedLitHooks && typeof scopedLitHooks === 'object' ? scopedLitHooks : null) ||
-      getGlobalLitHooks()
-    ) as LitHooks;
+    const litHooks = ((scopedLitHooks && typeof scopedLitHooks === 'object' ? scopedLitHooks : null) ||
+      getGlobalLitHooks()) as LitHooks;
     if (!provider || !toStr(account).trim()) {
       setEncryptedPreviewUrl('');
       return undefined;
@@ -185,9 +180,7 @@ const DocRowImagePreview = ({
           providerLike: provider,
           account,
           chainId: chainId || null,
-          ...(litHooks && typeof litHooks.getKey === 'function'
-            ? { lit: { getKey: litHooks.getKey } }
-            : {}),
+          ...(litHooks && typeof litHooks.getKey === 'function' ? { lit: { getKey: litHooks.getKey } } : {}),
           arweave: {
             debugContext: {
               category: 'doc_lit_preview',
@@ -236,11 +229,7 @@ const DocRowImagePreview = ({
 
   return (
     <div className={styles.docPreview} data-testid={E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW}>
-      <img
-        src={previewSrc}
-        alt={`${name || 'Document'} preview`}
-        className={styles.docPreviewImage}
-      />
+      <img src={previewSrc} alt={`${name || 'Document'} preview`} className={styles.docPreviewImage} />
     </div>
   );
 };
@@ -263,7 +252,11 @@ export const DocumentLibraryViewerBody = ({
   viewerTitle,
 }: DocumentLibraryViewerBodyProps) => {
   if (viewerError) {
-    return <div className={styles.viewerError} data-testid={E2E_TESTIDS.DOC_VIEWER_ERROR}>{viewerError}</div>;
+    return (
+      <div className={styles.viewerError} data-testid={E2E_TESTIDS.DOC_VIEWER_ERROR}>
+        {viewerError}
+      </div>
+    );
   }
   if (viewerLoading) {
     return (
@@ -292,13 +285,21 @@ export const DocumentLibraryViewerBody = ({
                   Unsafe or invalid URL (not rendered as a link): <code>{toStr(parsed.url).trim()}</code>
                 </div>
               )}
-              <pre className={styles.viewerPre} data-testid={E2E_TESTIDS.DOC_VIEWER_TEXT}>{viewerText}</pre>
+              <pre className={styles.viewerPre} data-testid={E2E_TESTIDS.DOC_VIEWER_TEXT}>
+                {viewerText}
+              </pre>
             </div>
           );
         }
-      } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
+      } catch (e) {
+        log.warn('DocumentLibraryPanel: fallback', e);
+      }
     }
-    return <pre className={styles.viewerPre} data-testid={E2E_TESTIDS.DOC_VIEWER_TEXT}>{viewerText}</pre>;
+    return (
+      <pre className={styles.viewerPre} data-testid={E2E_TESTIDS.DOC_VIEWER_TEXT}>
+        {viewerText}
+      </pre>
+    );
   }
 
   if (viewerBlobUrl) {
@@ -308,8 +309,18 @@ export const DocumentLibraryViewerBody = ({
     if (mime.startsWith('image/')) {
       return (
         <div className={styles.viewerMedia}>
-          <img src={viewerBlobUrl} alt={filename} className={styles.viewerImage} data-testid={E2E_TESTIDS.DOC_VIEWER_IMAGE} />
-          <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
+          <img
+            src={viewerBlobUrl}
+            alt={filename}
+            className={styles.viewerImage}
+            data-testid={E2E_TESTIDS.DOC_VIEWER_IMAGE}
+          />
+          <a
+            href={viewerBlobUrl}
+            download={filename}
+            className={styles.viewerDownload}
+            data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}
+          >
             Download file
           </a>
         </div>
@@ -318,8 +329,18 @@ export const DocumentLibraryViewerBody = ({
     if (mime === 'application/pdf') {
       return (
         <div className={styles.viewerMedia}>
-          <iframe title="PDF" src={viewerBlobUrl} className={styles.viewerPdf} data-testid={E2E_TESTIDS.DOC_VIEWER_PDF} />
-          <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
+          <iframe
+            title="PDF"
+            src={viewerBlobUrl}
+            className={styles.viewerPdf}
+            data-testid={E2E_TESTIDS.DOC_VIEWER_PDF}
+          />
+          <a
+            href={viewerBlobUrl}
+            download={filename}
+            className={styles.viewerDownload}
+            data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}
+          >
             Download file
           </a>
         </div>
@@ -329,7 +350,12 @@ export const DocumentLibraryViewerBody = ({
       return (
         <div className={styles.viewerMedia}>
           <audio controls src={viewerBlobUrl} className={styles.viewerAudio} />
-          <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
+          <a
+            href={viewerBlobUrl}
+            download={filename}
+            className={styles.viewerDownload}
+            data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}
+          >
             Download file
           </a>
         </div>
@@ -339,7 +365,12 @@ export const DocumentLibraryViewerBody = ({
       return (
         <div className={styles.viewerMedia}>
           <video controls src={viewerBlobUrl} className={styles.viewerVideo} />
-          <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
+          <a
+            href={viewerBlobUrl}
+            download={filename}
+            className={styles.viewerDownload}
+            data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}
+          >
             Download file
           </a>
         </div>
@@ -347,7 +378,12 @@ export const DocumentLibraryViewerBody = ({
     }
     return (
       <div className={styles.viewerMedia}>
-        <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
+        <a
+          href={viewerBlobUrl}
+          download={filename}
+          className={styles.viewerDownload}
+          data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}
+        >
           Download file
         </a>
       </div>
@@ -453,14 +489,13 @@ export const DocumentLibraryUploadControls = ({
         aria-busy={fileUploadPending || undefined}
         data-testid={E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON}
       >
-        <FontAwesomeIcon icon={fileUploadPending ? faSpinner : faUpload} spin={fileUploadPending} /> {fileUploadPending ? 'Uploading' : 'Upload'}
+        <FontAwesomeIcon icon={fileUploadPending ? faSpinner : faUpload} spin={fileUploadPending} />{' '}
+        {fileUploadPending ? 'Uploading' : 'Upload'}
       </Button>
     </div>
 
     <div className={styles.uploadRow}>
-      <div className={styles.uploadLabel}>
-        URL
-      </div>
+      <div className={styles.uploadLabel}>URL</div>
       <Input
         type="url"
         value={urlInput}
@@ -480,7 +515,8 @@ export const DocumentLibraryUploadControls = ({
         title="Upload link record"
         data-testid={E2E_TESTIDS.DOC_URL_ADD_BUTTON}
       >
-        <FontAwesomeIcon icon={urlUploadPending ? faSpinner : faLink} spin={urlUploadPending} /> {urlUploadPending ? 'Adding' : 'Add'}
+        <FontAwesomeIcon icon={urlUploadPending ? faSpinner : faLink} spin={urlUploadPending} />{' '}
+        {urlUploadPending ? 'Adding' : 'Add'}
       </Button>
     </div>
 
@@ -503,7 +539,13 @@ export const DocumentLibraryUploadControls = ({
           className={styles.lockToggle}
           onClick={onToggleLocked}
           disabled={requiresLitDocumentStorage}
-          title={requiresLitDocumentStorage ? 'Lit-Arweave session storage requires encrypted uploads' : (locked ? 'Upload plaintext' : 'Encrypt with Lit')}
+          title={
+            requiresLitDocumentStorage
+              ? 'Lit-Arweave session storage requires encrypted uploads'
+              : locked
+                ? 'Upload plaintext'
+                : 'Encrypt with Lit'
+          }
           data-testid={E2E_TESTIDS.DOC_LOCK_TOGGLE}
           data-ce-locked={locked ? 'true' : 'false'}
         >
@@ -513,9 +555,7 @@ export const DocumentLibraryUploadControls = ({
       </div>
 
       {sessionGateUnsupportedMessage ? (
-        <div className={styles.noticeInline}>
-          {sessionGateUnsupportedMessage}
-        </div>
+        <div className={styles.noticeInline}>{sessionGateUnsupportedMessage}</div>
       ) : null}
 
       {locked && (
@@ -548,12 +588,17 @@ export const DocumentLibraryUploadControls = ({
             <div className={styles.gateSummary}>
               {docUploadsGate.hasRecipients ? (
                 <div>
-                  <div><strong>Mode:</strong> {docUploadsGate.mode}</div>
-                  <div><strong>SBTs:</strong> {docUploadsGate.sbtAddresses.length}</div>
+                  <div>
+                    <strong>Mode:</strong> {docUploadsGate.mode}
+                  </div>
+                  <div>
+                    <strong>SBTs:</strong> {docUploadsGate.sbtAddresses.length}
+                  </div>
                 </div>
               ) : (
                 <div className={styles.noticeInline}>
-                  Session <code>docUploads</code> gate is unavailable or empty. Uploads will default to plaintext unless you pick Custom SBT(s).
+                  Session <code>docUploads</code> gate is unavailable or empty. Uploads will default to plaintext unless
+                  you pick Custom SBT(s).
                 </div>
               )}
             </div>
@@ -561,10 +606,7 @@ export const DocumentLibraryUploadControls = ({
 
           {audienceMode === 'custom' && (
             <div className={styles.customAudience}>
-              <div
-                className={styles.customSelectorWrap}
-                data-testid={E2E_TESTIDS.DOC_CUSTOM_SBT_SELECTOR}
-              >
+              <div className={styles.customSelectorWrap} data-testid={E2E_TESTIDS.DOC_CUSTOM_SBT_SELECTOR}>
                 <SBTSelector
                   id={`doc-library-custom-${mode || 'session'}`}
                   label="Select SBT access"
@@ -609,7 +651,11 @@ export const DocumentLibraryUploadControls = ({
     {secondaryAssociationType === 'sbt' && mode !== 'session' && (
       <div className={styles.secondaryAssoc}>
         <label className={styles.checkboxLabel}>
-          <input type="checkbox" checked={alsoAssociateSbt} onChange={(e) => onAlsoAssociateSbtChange(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={alsoAssociateSbt}
+            onChange={(e) => onAlsoAssociateSbtChange(e.target.checked)}
+          />
           Also associate with SBT group
         </label>
         {alsoAssociateSbt && (
@@ -678,27 +724,31 @@ export const DocumentLibraryList = ({
   litHooks,
 }: DocumentLibraryListProps) => (
   <div className={styles.list}>
-    {!docs.length && !loading && canList && (
-      <div className={styles.empty}>No documents found yet.</div>
-    )}
+    {!docs.length && !loading && canList && <div className={styles.empty}>No documents found yet.</div>}
     {docs.map((doc) => {
       const tagMap = doc?.tagMap || {};
       const storage = toStr(tagMap['CE-DocStorage']).trim().toLowerCase();
       const kind = toStr(tagMap['CE-DocKind']).trim().toLowerCase();
       const docRole = toStr(tagMap['CE-DocRole']).trim().toLowerCase();
-      const mimeType = toStr(tagMap['CE-DocMime'] || doc?.data?.type).trim().toLowerCase();
+      const mimeType = toStr(tagMap['CE-DocMime'] || doc?.data?.type)
+        .trim()
+        .toLowerCase();
       const isImageDoc = mimeType.startsWith('image/') || docRole === DOC_LIBRARY_DOC_ROLES.PHOTO;
-      const name = toStr(tagMap['CE-DocName']).trim() || (kind === 'link' ? 'Link record' : (storage === 'lit-arweave' ? 'Encrypted document' : 'Document'));
+      const name =
+        toStr(tagMap['CE-DocName']).trim() ||
+        (kind === 'link' ? 'Link record' : storage === 'lit-arweave' ? 'Encrypted document' : 'Document');
       const txId = toStr(doc?.txId).trim();
       const isEncryptedStorage = storage === 'lit-arweave' || storage === 'lit';
-      const storageRef = normalizeDocStorageRef(doc?.storageRef || { backend: storage, id: txId }, { fallbackBackend: storage || STORAGE_BACKENDS.ARWEAVE });
+      const storageRef = normalizeDocStorageRef(doc?.storageRef || { backend: storage, id: txId }, {
+        fallbackBackend: storage || STORAGE_BACKENDS.ARWEAVE,
+      });
       const isCloudflareStorage = storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE;
-      const arweaveUrl = txId && !isCloudflareStorage ? arweaveScripts.buildArweaveGatewayUrl(txId) : '';
+      const arweaveUrl = txId && !isCloudflareStorage ? arweaveClient.buildArweaveGatewayUrl(txId) : '';
       const litUrl = txId && !isCloudflareStorage ? litStorage.buildLitArweaveUrl(txId) : '';
-      const storageUrl = isCloudflareStorage ? toStr(storageRef?.uri).trim() : (isEncryptedStorage ? litUrl : arweaveUrl);
+      const storageUrl = isCloudflareStorage ? toStr(storageRef?.uri).trim() : isEncryptedStorage ? litUrl : arweaveUrl;
       const ts = doc?.block?.timestamp ? Number(doc.block.timestamp) * 1000 : null;
-      const indexStatus = !doc?.block ? 'pending' : (ts ? 'indexed' : 'unconfirmed');
-      const timeLabel = ts ? new Date(ts).toLocaleString() : (doc?.block ? 'Unconfirmed' : 'Pending indexing');
+      const indexStatus = !doc?.block ? 'pending' : ts ? 'indexed' : 'unconfirmed';
+      const timeLabel = ts ? new Date(ts).toLocaleString() : doc?.block ? 'Unconfirmed' : 'Pending indexing';
       const showPhotoRoleBadge = docRole === DOC_LIBRARY_DOC_ROLES.PHOTO;
       const showPhotoAnalysisRoleBadge = docRole === DOC_LIBRARY_DOC_ROLES.PHOTO_ANALYSIS;
 
@@ -748,7 +798,12 @@ export const DocumentLibraryList = ({
             >
               <FontAwesomeIcon icon={faEye} />
             </button>
-            <button type="button" className={styles.iconBtn} onClick={() => copyToClipboard(storageUrl)} title="Copy link">
+            <button
+              type="button"
+              className={styles.iconBtn}
+              onClick={() => copyToClipboard(storageUrl)}
+              title="Copy link"
+            >
               <FontAwesomeIcon icon={faCopy} />
             </button>
             {arweaveUrl ? (
@@ -776,14 +831,7 @@ export const DocumentLibraryList = ({
 
     {canList && docs.length > 0 && (
       <div className={styles.pagination}>
-        <Button
-          type="button"
-          color="secondary"
-          outline
-          size="sm"
-          onClick={onLoadMore}
-          disabled={loading || !cursor}
-        >
+        <Button type="button" color="secondary" outline size="sm" onClick={onLoadMore} disabled={loading || !cursor}>
           Load more
         </Button>
       </div>

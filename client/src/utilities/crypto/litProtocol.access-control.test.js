@@ -24,10 +24,12 @@ describe('litProtocol access control helpers', () => {
   it('builds a specific-wallet access control condition', () => {
     const litProtocol = loadLitProtocol();
 
-    expect(litProtocol.buildWalletAddressAccessControlConditions({
-      walletAddress: '0x00000000000000000000000000000000000000Aa',
-      chainId: 84532,
-    })).toEqual([
+    expect(
+      litProtocol.buildWalletAddressAccessControlConditions({
+        walletAddress: '0x00000000000000000000000000000000000000Aa',
+        chainId: 84532,
+      }),
+    ).toEqual([
       {
         contractAddress: '',
         standardContractType: '',
@@ -45,10 +47,12 @@ describe('litProtocol access control helpers', () => {
   it('keeps OP Sepolia for wallet-only access control', () => {
     const litProtocol = loadLitProtocol();
 
-    expect(litProtocol.buildWalletAddressAccessControlConditions({
-      walletAddress: '0x00000000000000000000000000000000000000Aa',
-      chainId: 11155420,
-    })).toEqual([
+    expect(
+      litProtocol.buildWalletAddressAccessControlConditions({
+        walletAddress: '0x00000000000000000000000000000000000000Aa',
+        chainId: 11155420,
+      }),
+    ).toEqual([
       {
         contractAddress: '',
         standardContractType: '',
@@ -66,9 +70,11 @@ describe('litProtocol access control helpers', () => {
   it('returns null for an invalid wallet address', () => {
     const litProtocol = loadLitProtocol();
 
-    expect(litProtocol.buildWalletAddressAccessControlConditions({
-      walletAddress: 'not-an-address',
-      chainId: 84532,
-    })).toBeNull();
+    expect(
+      litProtocol.buildWalletAddressAccessControlConditions({
+        walletAddress: 'not-an-address',
+        chainId: 84532,
+      }),
+    ).toBeNull();
   });
 });

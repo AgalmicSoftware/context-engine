@@ -24,11 +24,7 @@ type SurveyQuestionsFullQuestionContentSections = {
 
 const renderFullQuestionCommentsSection = (content: React.ReactNode): React.ReactNode => {
   if (!content) return null;
-  return (
-    <div className={styles.fullQuestionComments}>
-      {content}
-    </div>
-  );
+  return <div className={styles.fullQuestionComments}>{content}</div>;
 };
 
 export const buildSurveyQuestionsFullQuestionContentSections = ({
@@ -41,10 +37,10 @@ export const buildSurveyQuestionsFullQuestionContentSections = ({
   renderAnswerDecryptControl,
   renderResponseInput,
 }: SurveyQuestionsFullQuestionContentSectionsArgs): SurveyQuestionsFullQuestionContentSections => {
-  const mainContent = maskedAnswer ? renderAnswerDecryptControl() : (
-    <InputGroup id={styles.responseInputSection}>
-      {renderResponseInput()}
-    </InputGroup>
+  const mainContent = maskedAnswer ? (
+    renderAnswerDecryptControl()
+  ) : (
+    <InputGroup id={styles.responseInputSection}>{renderResponseInput()}</InputGroup>
   );
 
   if (!commentsOpen) {
@@ -71,10 +67,7 @@ export const buildSurveyQuestionsFullQuestionContentSections = ({
   return {
     mainContent,
     commentsSection: renderFullQuestionCommentsSection(
-      <AdditionalCommentsInlineRow
-        input={renderAdditionalInput()}
-        lockControl={renderAdditionalLockControl()}
-      />
+      <AdditionalCommentsInlineRow input={renderAdditionalInput()} lockControl={renderAdditionalLockControl()} />,
     ),
   };
 };

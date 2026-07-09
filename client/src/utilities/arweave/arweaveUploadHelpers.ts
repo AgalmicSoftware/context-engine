@@ -8,10 +8,7 @@
 
 import { getChainById } from '../../variables/chains.js';
 import { getEffectiveArweaveKey } from '../session/resourceKeys.js';
-import {
-  getSessionConfigBySlugOrDefault,
-  normalizeSessionSlug,
-} from '../web3/sessionConfigResolvers.js';
+import { getSessionConfigBySlugOrDefault, normalizeSessionSlug } from '../web3/sessionConfigResolvers.js';
 import { buildArweaveUploadBootstrapAuth } from '../web3/contractArweaveUploadRuntime.js';
 
 type LooseRecord = Record<string, any>;
@@ -33,11 +30,13 @@ export interface ArweaveUploadOpts {
 
 export const buildArweaveUploadTags = (
   cfg: Record<string, unknown> | null | undefined,
-  slugOrEmpty = ''
+  slugOrEmpty = '',
 ): ArweaveUploadTag[] => {
   const cfgAny = cfg as LooseRecord | null | undefined;
   const slug = normalizeSessionSlug(slugOrEmpty);
-  const rawChainId = Number(cfgAny?.networkChainId || cfgAny?.network?.chainId || cfgAny?.chainID || cfgAny?.chainId || 0);
+  const rawChainId = Number(
+    cfgAny?.networkChainId || cfgAny?.network?.chainId || cfgAny?.chainID || cfgAny?.chainId || 0,
+  );
   const chainId = Number.isFinite(rawChainId) && rawChainId > 0 ? rawChainId : 0;
   const surveysRef = cfgAny?.contracts?.surveys || {};
   const rawAddress = String(surveysRef?.address || cfgAny?.contractAddress || cfgAny?.address || '').trim();
@@ -56,17 +55,15 @@ export const buildArweaveUploadTags = (
 
 export const resolveArweaveUploadOpts = async (
   groupKeyOrCfg?: string | Record<string, unknown> | null,
-  { providerLike = null, signer = null }: { providerLike?: unknown; signer?: unknown } = {}
+  { providerLike = null, signer = null }: { providerLike?: unknown; signer?: unknown } = {},
 ): Promise<ArweaveUploadOpts> => {
-  const cfg = ((groupKeyOrCfg && typeof groupKeyOrCfg === 'object')
-    ? groupKeyOrCfg
-    : getSessionConfigBySlugOrDefault(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg)) as Record<string, unknown> | null;
-  const cfgAny = cfg as LooseRecord | null;
-  const slug = normalizeSessionSlug(
-    typeof groupKeyOrCfg === 'string'
+  const cfg = (
+    groupKeyOrCfg && typeof groupKeyOrCfg === 'object'
       ? groupKeyOrCfg
-      : (cfgAny?.slug || '')
-  );
+      : getSessionConfigBySlugOrDefault(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg)
+  ) as Record<string, unknown> | null;
+  const cfgAny = cfg as LooseRecord | null;
+  const slug = normalizeSessionSlug(typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfgAny?.slug || '');
   const tags = buildArweaveUploadTags(cfg, slug);
 
   let arweaveJwk = '';
@@ -74,21 +71,24 @@ export const resolveArweaveUploadOpts = async (
   try {
     const result = await getEffectiveArweaveKey({ sessionSlug: slug, sessionConfig: cfg });
     arweaveJwk = result?.arweaveJwk || '';
-    arweaveJwkSource = String(result?.source || '').trim().toLowerCase();
+    arweaveJwkSource = String(result?.source || '')
+      .trim()
+      .toLowerCase();
   } catch (_) {
     arweaveJwk = '';
     arweaveJwkSource = '';
   }
   const forceDirectArweaveUpload = !!arweaveJwk && arweaveJwkSource === 'local';
 
-  const bootstrapAuth = arweaveJwk && !forceDirectArweaveUpload
-    ? await buildArweaveUploadBootstrapAuth({
-        signer: signer as LooseRecord | null,
-        providerLike,
-        sessionSlug: slug,
-        sessionConfig: cfg,
-      })
-    : null;
+  const bootstrapAuth =
+    arweaveJwk && !forceDirectArweaveUpload
+      ? await buildArweaveUploadBootstrapAuth({
+          signer: signer as LooseRecord | null,
+          providerLike,
+          sessionSlug: slug,
+          sessionConfig: cfg,
+        })
+      : null;
 
   return {
     arweaveJwk,

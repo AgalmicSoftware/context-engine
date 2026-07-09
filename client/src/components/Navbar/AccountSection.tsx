@@ -4,10 +4,10 @@ import { connect } from 'react-redux';
 import { toggleLoginModal } from '../../actions/sessionStateActions.js';
 import type { RootState } from '../../reducers/index.js';
 
-import styles from "./Navbar.module.scss";
+import styles from './Navbar.module.scss';
 
 import LoginButtonRaw from 'components/Account/LoginButton';
-import LoginAndSettingsModalRaw from '../Account/LoginAndSettingsModal'
+import LoginAndSettingsModalRaw from '../Account/LoginAndSettingsModal';
 import { AccountDisplayTorus } from './AccountDisplay';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -41,17 +41,17 @@ class AccountSection extends Component<AccountSectionProps> {
   launchAccountSettings = () => {
     const open = true;
     this.props.toggleLoginModal(open);
-  }
+  };
 
   render() {
     const loggedIn = this.props.loginComplete;
-    accountLog.log("AccountSection.tsx - loggedIn: ", loggedIn)
+    accountLog.log('AccountSection.tsx - loggedIn: ', loggedIn);
 
     // Pre-compute blockie for all providers (fallback for wagmi/passkey which lack social image)
     const blockieUrl = this.props.account ? generateBlockieDataUrl(this.props.account, 8, 4) : '';
 
     // Standardized display: use AccountDisplayTorus for all logged-in states (passkey wallet, Wagmi)
-    const relevantAccountDisplay =
+    const relevantAccountDisplay = (
       <AccountDisplayTorus
         account={this.props.account || ''}
         loginComplete={this.props.loginComplete}
@@ -59,15 +59,14 @@ class AccountSection extends Component<AccountSectionProps> {
         userImageURL={this.props.userImageURL}
         provider={this.props.provider}
         avatarUrl={blockieUrl}
-      />;
+      />
+    );
 
     const topRight = loggedIn ? (
       <>
         <div id={styles.AccountSectionLoggedIn}>
-          <div id={styles.addressDisplay}>
-            { relevantAccountDisplay }
-          </div>
-        </div >
+          <div id={styles.addressDisplay}>{relevantAccountDisplay}</div>
+        </div>
       </>
     ) : (
       <>
@@ -78,11 +77,11 @@ class AccountSection extends Component<AccountSectionProps> {
     return (
       <>
         <LoginAndSettingsModal
-        sendTestETH={(amountToSend: unknown) => this.props.sendTestETH?.(amountToSend)}
-        demoMode={this.props.demoMode}
-        toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
+          sendTestETH={(amountToSend: unknown) => this.props.sendTestETH?.(amountToSend)}
+          demoMode={this.props.demoMode}
+          toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
         />
-        { topRight }
+        {topRight}
       </>
     );
   }

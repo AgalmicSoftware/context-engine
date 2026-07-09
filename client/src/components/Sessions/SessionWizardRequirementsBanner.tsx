@@ -49,8 +49,8 @@ const SessionWizardRequirementsBanner = ({
             className={styles.newSessionBannerLink}
           >
             OpenAI API key
-          </a>
-          {' '}for text and transcription
+          </a>{' '}
+          for text and transcription
         </li>
         <li>
           {newSessionRequiresLitCredential ? (
@@ -62,10 +62,12 @@ const SessionWizardRequirementsBanner = ({
                 className={styles.newSessionBannerLink}
               >
                 Lit API key
-              </a>
-              {' '}for encrypted access automation
+              </a>{' '}
+              for encrypted access automation
             </>
-          ) : 'No Lit key is required for Cloudflare worker-enforced SBT access control'}
+          ) : (
+            'No Lit key is required for Cloudflare worker-enforced SBT access control'
+          )}
         </li>
         <li>
           <a
@@ -75,8 +77,8 @@ const SessionWizardRequirementsBanner = ({
             className={styles.newSessionBannerLink}
           >
             Arweave wallet (JWK)
-          </a>
-          {' '}for permanent storage
+          </a>{' '}
+          for permanent storage
         </li>
         <li>
           {fundingRequirementHref ? (
@@ -88,19 +90,16 @@ const SessionWizardRequirementsBanner = ({
             >
               {fundingRequirementLabel}
             </a>
-          ) : fundingRequirementLabel}
+          ) : (
+            fundingRequirementLabel
+          )}
         </li>
         <li>(Optional) A faucet private key for sponsoring user gas</li>
       </ul>
-      <p className={styles.newSessionBannerCopy}>
-        A turnkey tool for bundling these resources is in development.
-      </p>
+      <p className={styles.newSessionBannerCopy}>A turnkey tool for bundling these resources is in development.</p>
       <p className={styles.newSessionBannerCopy}>
         In the meantime, you can get a sponsored session URL by contacting{' '}
-        <a
-          href="mailto:[redacted-email]"
-          className={styles.newSessionBannerLink}
-        >
+        <a href="mailto:[redacted-email]" className={styles.newSessionBannerLink}>
           [redacted-email]
         </a>
         .

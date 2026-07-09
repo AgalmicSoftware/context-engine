@@ -14,28 +14,23 @@ jest.mock('../TagPage/TagPage', () => ({
   default: (props: any) => {
     mockTagPage(props);
     const selectedTags = Array.isArray(props?.selectedTagsOverride) ? props.selectedTagsOverride : [];
-    return (
-      <div data-testid="tag-page-mock">
-        {selectedTags.join(' + ')}
-      </div>
-    );
+    return <div data-testid="tag-page-mock">{selectedTags.join(' + ')}</div>;
   },
 }));
 
 jest.mock('react-simple-maps', () => ({
   ComposableMap: ({ children }: any) => <div data-testid="mock-composable-map">{children}</div>,
-  Geographies: ({ children }: any) => children({
-    geographies: [
-      { rsmKey: 'usa', properties: { name: 'United States of America' } },
-      { rsmKey: 'gbr', properties: { name: 'United Kingdom' } },
-      { rsmKey: 'ind', properties: { name: 'India' } },
-      { rsmKey: 'chn', properties: { name: 'China' } },
-    ],
-  }),
+  Geographies: ({ children }: any) =>
+    children({
+      geographies: [
+        { rsmKey: 'usa', properties: { name: 'United States of America' } },
+        { rsmKey: 'gbr', properties: { name: 'United Kingdom' } },
+        { rsmKey: 'ind', properties: { name: 'India' } },
+        { rsmKey: 'chn', properties: { name: 'China' } },
+      ],
+    }),
   Geography: ({ children, geography }: any) => (
-    <div data-testid={`mock-geo-${geography.properties.name}`}>
-      {children}
-    </div>
+    <div data-testid={`mock-geo-${geography.properties.name}`}>{children}</div>
   ),
   Sphere: () => null,
   Graticule: () => null,
@@ -44,10 +39,7 @@ jest.mock('react-simple-maps', () => ({
 const originalMatchMedia = window.matchMedia;
 const originalFetch = global.fetch;
 const fullCrossCorpusPayload = JSON.parse(
-  fs.readFileSync(
-    path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'),
-    'utf8'
-  )
+  fs.readFileSync(path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'), 'utf8'),
 );
 
 const setMobileViewport = (matches: boolean) => {
@@ -110,20 +102,21 @@ const extractMediaBlock = (scss: string, query: string, requiredSnippet = '') =>
   return null;
 };
 
-const renderPolicyGlobeHarness = (entries: any[]) => render(
-  <PolicyGlobe entries={entries}>
-    {({ filteredEntries, GlobeElement }) => (
-      <div>
-        {GlobeElement}
-        <ol>
-          {filteredEntries.map((entry) => (
-            <li key={entry.id}>{entry.title}</li>
-          ))}
-        </ol>
-      </div>
-    )}
-  </PolicyGlobe>
-);
+const renderPolicyGlobeHarness = (entries: any[]) =>
+  render(
+    <PolicyGlobe entries={entries}>
+      {({ filteredEntries, GlobeElement }) => (
+        <div>
+          {GlobeElement}
+          <ol>
+            {filteredEntries.map((entry) => (
+              <li key={entry.id}>{entry.title}</li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </PolicyGlobe>,
+  );
 
 const getTabButton = (name: string) => screen.getAllByRole('button', { name })[0];
 
@@ -149,19 +142,9 @@ describe('CorpusViewer', () => {
     const phoneBlock = extractMediaBlock(corpusScss, '@media (max-width: 480px)', '.container {');
     const policyScss = fs.readFileSync(path.join(__dirname, 'PolicyGlobe.module.scss'), 'utf8');
     const policyMobileBlock = extractMediaBlock(policyScss, '@media (max-width: 640px)', '.filterButton {');
-    const mapScss = fs.readFileSync(
-      path.join(__dirname, 'DemoAnalysis', 'DemoAnalysisWorkspace.module.scss'),
-      'utf8'
-    );
-    const mapJsx = fs.readFileSync(
-      path.join(__dirname, 'DemoAnalysis', 'WorldResultsMap.tsx'),
-      'utf8'
-    );
-    const compactMapMobileBlock = extractMediaBlock(
-      mapScss,
-      '@media (max-width: 640px)',
-      '.mapFrameCompact {'
-    );
+    const mapScss = fs.readFileSync(path.join(__dirname, 'DemoAnalysis', 'DemoAnalysisWorkspace.module.scss'), 'utf8');
+    const mapJsx = fs.readFileSync(path.join(__dirname, 'DemoAnalysis', 'WorldResultsMap.tsx'), 'utf8');
+    const compactMapMobileBlock = extractMediaBlock(mapScss, '@media (max-width: 640px)', '.mapFrameCompact {');
 
     expect(mobileBlock).toContain('.tabButton {');
     expect(mobileBlock).toContain('.tabBar {');
@@ -221,8 +204,12 @@ describe('CorpusViewer', () => {
     expect(policyMobileBlock).toContain('font-size: 11px;');
     expect(policyMobileBlock).toContain('white-space: normal;');
     expect(corpusScss).toMatch(/\.tabIcon\s*{[\s\S]*?font-size:\s*24px;/);
-    expect(corpusScss).toMatch(/\.container\s*{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?max-width:\s*100%;[\s\S]*?width:\s*100%;/);
-    expect(corpusScss).toMatch(/\.metrCard\s*{[\s\S]*?background:\s*linear-gradient\(180deg,\s*#ffffff 0%,\s*#fbfdff 100%\);/);
+    expect(corpusScss).toMatch(
+      /\.container\s*{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?max-width:\s*100%;[\s\S]*?width:\s*100%;/,
+    );
+    expect(corpusScss).toMatch(
+      /\.metrCard\s*{[\s\S]*?background:\s*linear-gradient\(180deg,\s*#ffffff 0%,\s*#fbfdff 100%\);/,
+    );
     expect(corpusScss).toMatch(/\.metrCard \.entrySummary\s*{[\s\S]*?color:\s*#4b5563;/);
     expect(corpusScss).toMatch(/\.policyMapLens\s*{[\s\S]*?padding:\s*4px 4px 0;/);
     expect(corpusScss).toMatch(/\.policyMapPanel\s*{[\s\S]*?padding:\s*10px 10px 12px;/);
@@ -232,12 +219,16 @@ describe('CorpusViewer', () => {
     expect(corpusScss).toMatch(/\.cardFooterLinks\s*{[\s\S]*?width:\s*100%;/);
     expect(corpusScss).toMatch(/\.tweetActionRow\s*{[\s\S]*?justify-content:\s*flex-start;/);
     expect(mapScss).toMatch(/\.mapFrameCompact\s*{[\s\S]*?width:\s*100%;[\s\S]*?padding:\s*0;/);
-    expect(mapScss).toMatch(/\.mapFrameCompact\s*{[\s\S]*?:global\(svg\)\s*{[\s\S]*?display:\s*block;[\s\S]*?max-width:\s*none;[\s\S]*?width:\s*100%;/);
+    expect(mapScss).toMatch(
+      /\.mapFrameCompact\s*{[\s\S]*?:global\(svg\)\s*{[\s\S]*?display:\s*block;[\s\S]*?max-width:\s*none;[\s\S]*?width:\s*100%;/,
+    );
     expect(compactMapMobileBlock).toContain('.mapFrameCompact {');
     expect(compactMapMobileBlock).toContain('padding-top: 0;');
     expect(compactMapMobileBlock).toContain('.mapFrameCompact :global(svg) {');
     expect(compactMapMobileBlock).toContain('max-width: none;');
-    expect(mapJsx).toMatch(/projectionConfig=\{\{\s*rotate:\s*\[-10,\s*0,\s*0\],\s*scale:\s*compact \? 147 : 147\s*\}\}/);
+    expect(mapJsx).toMatch(
+      /projectionConfig=\{\{\s*rotate:\s*\[-10,\s*0,\s*0\],\s*scale:\s*compact \? 147 : 147\s*\}\}/,
+    );
   });
 
   it('defaults to Cross-Corpus and loads the richer active corpus from GitHub on demand', async () => {
@@ -253,7 +244,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(getTabButton('Cross-Corpus')).toHaveAttribute('aria-pressed', 'true');
@@ -268,10 +259,10 @@ describe('CorpusViewer', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json',
-      { cache: 'no-store' }
+      { cache: 'no-store' },
     );
     expect(screen.getByTestId('ce-context-corpus-status')).toHaveTextContent(
-      'Loaded full Cross-Corpus corpus • 16 entries'
+      'Loaded full Cross-Corpus corpus • 16 entries',
     );
     expect(screen.getByTestId('ce-context-load-full-corpus')).toBeDisabled();
   });
@@ -282,7 +273,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
@@ -317,7 +308,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
@@ -334,7 +325,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
@@ -356,7 +347,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter initialEntries={['/session/demo']}>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
@@ -368,7 +359,7 @@ describe('CorpusViewer', () => {
     expect(within(tweetCard).getByRole('link', { name: 'Exponential Progress Debate' })).toBeInTheDocument();
     expect(issueLink).toHaveAttribute(
       'href',
-      '/atlas/0x2110000000000000000000000000000000000000000000000000000000000000?demo=1&returnTo=%2Fsession%2Fdemo'
+      '/atlas/0x2110000000000000000000000000000000000000000000000000000000000000?demo=1&returnTo=%2Fsession%2Fdemo',
     );
   });
 
@@ -376,7 +367,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
@@ -395,15 +386,13 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer onAtlasIssueOpen={onAtlasIssueOpen} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Exponential Progress Debate' })[0]);
 
-    expect(onAtlasIssueOpen).toHaveBeenCalledWith(
-      '0x2110000000000000000000000000000000000000000000000000000000000000'
-    );
+    expect(onAtlasIssueOpen).toHaveBeenCalledWith('0x2110000000000000000000000000000000000000000000000000000000000000');
     expect(screen.queryByRole('link', { name: 'Exponential Progress Debate' })).not.toBeInTheDocument();
   });
 
@@ -411,7 +400,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer showGithubLink={false} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.queryByRole('link', { name: /Full corpus on GitHub/i })).not.toBeInTheDocument();
@@ -435,17 +424,19 @@ describe('CorpusViewer', () => {
           externalLoadRequestNonce={0}
           onExternalLoadStateChange={onExternalLoadStateChange}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
-      expect(onExternalLoadStateChange).toHaveBeenCalledWith(expect.objectContaining({
-        activeCorpusKey: 'cross_corpus',
-        activeCorpusLabel: 'Cross-Corpus',
-        loadStatus: 'idle',
-        loadButtonLabel: 'Load full corpus',
-        disableLoadButton: false,
-      }));
+      expect(onExternalLoadStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          activeCorpusKey: 'cross_corpus',
+          activeCorpusLabel: 'Cross-Corpus',
+          loadStatus: 'idle',
+          loadButtonLabel: 'Load full corpus',
+          disableLoadButton: false,
+        }),
+      );
     });
 
     rerender(
@@ -455,23 +446,25 @@ describe('CorpusViewer', () => {
           externalLoadRequestNonce={1}
           onExternalLoadStateChange={onExternalLoadStateChange}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json',
-        { cache: 'no-store' }
+        { cache: 'no-store' },
       );
     });
 
     await waitFor(() => {
-      expect(onExternalLoadStateChange).toHaveBeenCalledWith(expect.objectContaining({
-        activeCorpusKey: 'cross_corpus',
-        loadStatus: 'loaded',
-        loadButtonLabel: 'Full corpus loaded',
-        disableLoadButton: true,
-      }));
+      expect(onExternalLoadStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          activeCorpusKey: 'cross_corpus',
+          loadStatus: 'loaded',
+          loadButtonLabel: 'Full corpus loaded',
+          disableLoadButton: true,
+        }),
+      );
     });
   });
 
@@ -479,12 +472,12 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByRole('link', { name: /Full corpus on GitHub/i })).toHaveAttribute(
       'href',
-      'https://github.com/AgalmicSoftware/context-engine/tree/main/ai-discourse-corpus'
+      'https://github.com/AgalmicSoftware/context-engine/tree/main/ai-discourse-corpus',
     );
   });
 
@@ -492,7 +485,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Papers' }));
@@ -504,7 +497,7 @@ describe('CorpusViewer', () => {
     expect(arxivCard).toBeTruthy();
     expect(within(arxivCard).getByRole('link', { name: 'View paper' })).toHaveAttribute(
       'href',
-      'https://arxiv.org/abs/2005.14165'
+      'https://arxiv.org/abs/2005.14165',
     );
   });
 
@@ -512,7 +505,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(getTabButton('LessWrong'));
@@ -524,7 +517,7 @@ describe('CorpusViewer', () => {
     expect(within(lessWrongCard).getByText('Novel argument')).toBeInTheDocument();
     expect(within(lessWrongCard).getByRole('link', { name: 'View source' })).toHaveAttribute(
       'href',
-      'https://www.yudkowsky.net/singularity/aibox'
+      'https://www.yudkowsky.net/singularity/aibox',
     );
   });
 
@@ -532,7 +525,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(getTabButton('Cross-Corpus'));
@@ -545,7 +538,7 @@ describe('CorpusViewer', () => {
     expect(within(crossCorpusCard).getByText(/Synthesizes: METR • Dwarkesh • LessWrong/i)).toBeInTheDocument();
     expect(within(crossCorpusCard).getByRole('link', { name: 'Open dataset' })).toHaveAttribute(
       'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json'
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json',
     );
   });
 
@@ -553,7 +546,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Papers' }));
@@ -563,10 +556,10 @@ describe('CorpusViewer', () => {
     const thirdFeaturedTitle = screen.getByText('Attention Is All You Need');
 
     expect(
-      firstFeaturedTitle.compareDocumentPosition(secondFeaturedTitle) & window.Node.DOCUMENT_POSITION_FOLLOWING
+      firstFeaturedTitle.compareDocumentPosition(secondFeaturedTitle) & window.Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      secondFeaturedTitle.compareDocumentPosition(thirdFeaturedTitle) & window.Node.DOCUMENT_POSITION_FOLLOWING
+      secondFeaturedTitle.compareDocumentPosition(thirdFeaturedTitle) & window.Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
@@ -636,16 +629,14 @@ describe('CorpusViewer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Inactive' }));
 
-    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'California SB 1047',
-    ]);
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['California SB 1047']);
   });
 
   it('renders the policy filter row and lightweight world map on the Laws & Policy tab', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByRole('button', { name: 'Insider Interviews' })).toBeInTheDocument();
@@ -655,9 +646,10 @@ describe('CorpusViewer', () => {
     expect(screen.getByTestId('ce-policy-split-layout')).toBeInTheDocument();
     expect(screen.getByTestId('demo-analysis-world-map')).toBeInTheDocument();
     expect(screen.getAllByText(/ASEAN Guide on AI Governance and Ethics/i).length).toBeGreaterThan(0);
-    expect(
-      within(screen.getByTestId('ce-policy-filter-row')).getByRole('button', { name: 'All' })
-    ).toHaveAttribute('aria-pressed', 'true');
+    expect(within(screen.getByTestId('ce-policy-filter-row')).getByRole('button', { name: 'All' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
 
     fireEvent.click(within(screen.getByTestId('ce-policy-filter-row')).getByRole('button', { name: 'Proposed' }));
 
@@ -675,7 +667,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Insider Interviews' }));
@@ -688,7 +680,7 @@ describe('CorpusViewer', () => {
     const { container } = render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Insider Interviews' }));
@@ -704,7 +696,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Insider Interviews' }));
@@ -715,13 +707,10 @@ describe('CorpusViewer', () => {
     expect(ai2027Card).toBeTruthy();
     expect(within(ai2027Card).getByRole('link', { name: 'View interview' })).toHaveAttribute(
       'href',
-      'https://www.dwarkesh.com/p/scott-daniel'
+      'https://www.dwarkesh.com/p/scott-daniel',
     );
     expect(interviewLinks.map((link) => link.getAttribute('href'))).toEqual(
-      expect.arrayContaining([
-        'https://www.dwarkesh.com/p/scott-daniel',
-        'https://www.dwarkesh.com/p/satya-nadella-2',
-      ])
+      expect.arrayContaining(['https://www.dwarkesh.com/p/scott-daniel', 'https://www.dwarkesh.com/p/satya-nadella-2']),
     );
   });
 
@@ -729,7 +718,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Metrics' }));
@@ -739,11 +728,11 @@ describe('CorpusViewer', () => {
 
     expect(previewImage).toHaveAttribute(
       'src',
-      'https://metr.org/assets/images/measuring-ai-ability-to-complete-long-tasks/models-are-succeeding-at-increasingly-long-tasks.png'
+      'https://metr.org/assets/images/measuring-ai-ability-to-complete-long-tasks/models-are-succeeding-at-increasingly-long-tasks.png',
     );
     expect(within(metrCard).getByRole('link', { name: 'Open full report' })).toHaveAttribute(
       'href',
-      'https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/'
+      'https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/',
     );
   });
 
@@ -751,7 +740,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter initialEntries={['/session/demo']}>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
@@ -777,7 +766,7 @@ describe('CorpusViewer', () => {
     render(
       <MemoryRouter initialEntries={['/session/demo']}>
         <CorpusViewer />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Laws & Policy' }));

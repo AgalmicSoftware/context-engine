@@ -1,20 +1,14 @@
-import {
-  buildSurveyResultsLockedRows,
-} from './surveyResultsLockedResponsesModel';
+import { buildSurveyResultsLockedRows } from './surveyResultsLockedResponsesModel';
 
 describe('surveyResultsLockedResponsesModel', () => {
-  const isLockedField = (field: unknown): boolean => (
-    !!field && typeof field === 'object' && (field as { locked?: boolean }).locked === true
-  );
+  const isLockedField = (field: unknown): boolean =>
+    !!field && typeof field === 'object' && (field as { locked?: boolean }).locked === true;
 
   it('builds survey-individual locked rows with normalized identity and overrides', () => {
     const keyArgs: unknown[] = [];
     const rows = buildSurveyResultsLockedRows({
-      applyDecryptedOverrideToResponse: ({ key, response }) => (
-        key.includes('q1')
-          ? { ...response, answer: { locked: true, value: 'override' } }
-          : response
-      ),
+      applyDecryptedOverrideToResponse: ({ key, response }) =>
+        key.includes('q1') ? { ...response, answer: { locked: true, value: 'override' } } : response,
       getLockedResponseKey: (args) => {
         keyArgs.push(args);
         return `${args.surveyId}:${args.questionId}:${args.responder}`;

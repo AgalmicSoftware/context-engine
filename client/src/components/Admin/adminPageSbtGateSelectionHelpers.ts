@@ -13,11 +13,8 @@ export type AdminDefaultGate = {
   chainId: number | null;
 };
 
-const asRecord = (value: unknown): Record<string, unknown> => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {}
-);
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
 export const normalizeSbtSelection = (value: unknown): AdminSbtSelection[] => {
   if (Array.isArray(value)) {
@@ -86,13 +83,7 @@ export const resolveDefaultGateFromConfig = (cfg: unknown = {}): AdminDefaultGat
   if (!rawAddresses.length && Array.isArray(sponsored.sbtAddresses)) rawAddresses.push(...sponsored.sbtAddresses);
   if (!rawAddresses.length && sponsored.sbtAddress) rawAddresses.push(sponsored.sbtAddress);
   const sbtAddresses = dedupeSbtSelections(rawAddresses).map((entry) => entry.address);
-  const chainId = Number(
-    gate.chainId ||
-    sponsored.chainId ||
-    config.networkChainId ||
-    registry.chainId ||
-    0
-  ) || null;
+  const chainId = Number(gate.chainId || sponsored.chainId || config.networkChainId || registry.chainId || 0) || null;
   return {
     gateId: defaultGateId || '',
     sbtAddresses,

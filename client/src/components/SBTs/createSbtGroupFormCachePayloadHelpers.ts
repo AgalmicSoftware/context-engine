@@ -1,9 +1,5 @@
-import {
-  normalizeCreateSbtDocumentUrlDraft,
-} from './createSbtGroupContentAuthoringHelpers';
-import {
-  normalizeMetadataLockGateIds,
-} from './createSbtGroupMetadataLockHelpers';
+import { normalizeCreateSbtDocumentUrlDraft } from './createSbtGroupContentAuthoringHelpers';
+import { normalizeMetadataLockGateIds } from './createSbtGroupMetadataLockHelpers';
 
 export type CreateSbtFormCachePayload = Record<string, unknown> & {
   _imageDataUrl?: string;
@@ -20,10 +16,24 @@ export const buildCreateSbtFormCachePayload = ({
   effectiveSessionSlug?: unknown;
 } = {}): CreateSbtFormCachePayload => {
   const {
-    sbtName, sbtDescription, sbtImageUrl, useImageUrl, sbtDistribution,
-    tags, documentIDHashes, documentURLs, documentUrl, groupPassword, numInviteLinks,
-    exportFormat, metadataLockGateIds, create2Salt, predictableAddressEnabled,
-    deferredCreate2Salt, autoAppliedDefaultTags, dismissedDefaultTags,
+    sbtName,
+    sbtDescription,
+    sbtImageUrl,
+    useImageUrl,
+    sbtDistribution,
+    tags,
+    documentIDHashes,
+    documentURLs,
+    documentUrl,
+    groupPassword,
+    numInviteLinks,
+    exportFormat,
+    metadataLockGateIds,
+    create2Salt,
+    predictableAddressEnabled,
+    deferredCreate2Salt,
+    autoAppliedDefaultTags,
+    dismissedDefaultTags,
   } = state;
 
   const safeDist: Record<string, unknown> = { ...Object(sbtDistribution || {}) };

@@ -24,12 +24,14 @@ describe('surveyToolHydration shared contracts', () => {
   it('hydrates baseline-only draft entries without mutating the live slice', () => {
     const stateRef: any = {
       current: {
-        surveysResponseState: [{
-          answers: { q1: { value: 'live-answer' } },
-          importance: {},
-          conviction: {},
-          additionalComments: {},
-        }],
+        surveysResponseState: [
+          {
+            answers: { q1: { value: 'live-answer' } },
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+        ],
         editBaseline: buildEmptySlice(),
       },
     };
@@ -207,18 +209,20 @@ describe('surveyToolHydration shared contracts', () => {
   it('preserves decrypted-empty draft intent when masked cache envelopes match', async () => {
     const stateRef: any = {
       current: {
-        surveysResponseState: [{
-          answers: {
-            q1: {
-              value: '*',
-              encrypted: true,
-              encryptedPortion: 'ans-env-1',
+        surveysResponseState: [
+          {
+            answers: {
+              q1: {
+                value: '*',
+                encrypted: true,
+                encryptedPortion: 'ans-env-1',
+              },
             },
+            importance: {},
+            conviction: {},
+            additionalComments: {},
           },
-          importance: {},
-          conviction: {},
-          additionalComments: {},
-        }],
+        ],
         editBaseline: {
           answers: {
             q1: {
@@ -285,18 +289,13 @@ describe('surveyToolHydration shared contracts', () => {
         },
       }),
       cloneBaseline: (value) => JSON.parse(JSON.stringify(value)),
-      buildDraftAwareCacheHydrationState: (args: any) => buildDraftAwareCacheHydrationState({
-        ...args,
-        areEnvelopesEquivalent: (
-          incomingEnvelope,
-          currentEnvelope,
-          incomingEncrypted,
-          currentEncrypted,
-        ) => (
-          String(incomingEnvelope || '') === String(currentEnvelope || '')
-          && !!incomingEncrypted === !!currentEncrypted
-        ),
-      }),
+      buildDraftAwareCacheHydrationState: (args: any) =>
+        buildDraftAwareCacheHydrationState({
+          ...args,
+          areEnvelopesEquivalent: (incomingEnvelope, currentEnvelope, incomingEncrypted, currentEncrypted) =>
+            String(incomingEnvelope || '') === String(currentEnvelope || '') &&
+            !!incomingEncrypted === !!currentEncrypted,
+        }),
       applyLocalCacheHydrationEntryToSlice: ({
         targetSlice,
         questionId,

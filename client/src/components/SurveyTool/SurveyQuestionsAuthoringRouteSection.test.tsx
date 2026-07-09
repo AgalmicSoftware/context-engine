@@ -24,7 +24,7 @@ describe('SurveyQuestionsAuthoringRouteSection', () => {
           pendingEditCount: 1,
           submitButtonText: 'Submit Response',
         }}
-      />
+      />,
     );
 
     expect(screen.getByTestId('editable-question')).toBeInTheDocument();
@@ -36,9 +36,7 @@ describe('SurveyQuestionsAuthoringRouteSection', () => {
   });
 
   it('renders the submitted response slot from parent-provided answer renderers', () => {
-    const renderSurveyAnswers = jest.fn(() => (
-      <div data-testid="submitted-answers">Submitted answers</div>
-    ));
+    const renderSurveyAnswers = jest.fn(() => <div data-testid="submitted-answers">Submitted answers</div>);
 
     render(
       <SurveyQuestionsAuthoringRouteSection
@@ -49,13 +47,10 @@ describe('SurveyQuestionsAuthoringRouteSection', () => {
           renderSurveyAnswers,
           userAnswers: { responses: [{ questionID: 'q1', answer: 'Yes' }] },
         }}
-      />
+      />,
     );
 
     expect(screen.getByTestId('submitted-answers')).toBeInTheDocument();
-    expect(renderSurveyAnswers).toHaveBeenCalledWith(
-      [{ questionID: 'q1', answer: 'Yes' }],
-      true
-    );
+    expect(renderSurveyAnswers).toHaveBeenCalledWith([{ questionID: 'q1', answer: 'Yes' }], true);
   });
 });

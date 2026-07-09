@@ -1,7 +1,7 @@
 import {
   E2E_TESTIDS,
   REGISTRY_CACHE_KEY,
-  arweaveScripts,
+  arweaveClient,
   cacheScripts,
   collectTreeNodes,
   contractScripts,
@@ -29,13 +29,21 @@ import {
 describe('CreateQuestionsAndSurveys managed cache reads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    try { localStorage.clear(); } catch (_) {}
+    try {
+      localStorage.clear();
+    } catch (_) {}
   });
 
   afterEach(() => {
-    try { delete (globalThis as any).CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete (globalThis as any).CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try {
+      delete (globalThis as any).CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete (globalThis as any).CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
   });
 
   it('reads managed cache snapshots with clone disabled', () => {
@@ -43,11 +51,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
 
     const snapshot = readManagedCacheSnapshot('bookmarksCache', 'edge');
 
-    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith(
-      'bookmarksCache',
-      'edge',
-      { clone: false }
-    );
+    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
     expect(snapshot).toEqual({ surveys: ['a'] });
   });
 
@@ -77,19 +81,23 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       },
     });
 
-    expect(hasSubmittedResourcesInManagedCache({
-      slug: 'edge',
-      netId: '84532',
-      surveyAddedSuccessfully: true,
-      surveyId: '0xSurvey',
-    })).toBe(true);
+    expect(
+      hasSubmittedResourcesInManagedCache({
+        slug: 'edge',
+        netId: '84532',
+        surveyAddedSuccessfully: true,
+        surveyId: '0xSurvey',
+      }),
+    ).toBe(true);
 
-    expect(hasSubmittedResourcesInManagedCache({
-      slug: 'edge',
-      netId: '84532',
-      questionsAddedSuccessfully: true,
-      questionIds: ['q1', 'q2'],
-    })).toBe(true);
+    expect(
+      hasSubmittedResourcesInManagedCache({
+        slug: 'edge',
+        netId: '84532',
+        questionsAddedSuccessfully: true,
+        questionIds: ['q1', 'q2'],
+      }),
+    ).toBe(true);
   });
 
   it('rejects incomplete submitted resource cache hits', () => {
@@ -99,25 +107,31 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       },
     });
 
-    expect(hasSubmittedResourcesInManagedCache({
-      slug: 'edge',
-      questionsAddedSuccessfully: true,
-      questionIds: ['q1'],
-    })).toBe(false);
+    expect(
+      hasSubmittedResourcesInManagedCache({
+        slug: 'edge',
+        questionsAddedSuccessfully: true,
+        questionIds: ['q1'],
+      }),
+    ).toBe(false);
 
-    expect(hasSubmittedResourcesInManagedCache({
-      slug: 'edge',
-      netId: '84532',
-      questionsAddedSuccessfully: true,
-      questionIds: ['q1', 'q2'],
-    })).toBe(false);
+    expect(
+      hasSubmittedResourcesInManagedCache({
+        slug: 'edge',
+        netId: '84532',
+        questionsAddedSuccessfully: true,
+        questionIds: ['q1', 'q2'],
+      }),
+    ).toBe(false);
 
-    expect(hasSubmittedResourcesInManagedCache({
-      slug: 'edge',
-      netId: '84532',
-      questionsAddedSuccessfully: true,
-      questionIds: 'q1' as unknown as string[],
-    })).toBe(false);
+    expect(
+      hasSubmittedResourcesInManagedCache({
+        slug: 'edge',
+        netId: '84532',
+        questionsAddedSuccessfully: true,
+        questionIds: 'q1' as unknown as string[],
+      }),
+    ).toBe(false);
   });
 
   it('copies survey links with session query params when an active session slug exists', () => {
@@ -175,12 +189,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       ...instance.state,
       title: 'Alpha draft',
       documentURLs: ['https://example.com/alpha-doc'],
-      questions: [{
-        id: 'q-alpha',
-        type: 'freeform',
-        prompt: 'Alpha prompt?',
-        tags: ['alpha'],
-      }],
+      questions: [
+        {
+          id: 'q-alpha',
+          type: 'freeform',
+          prompt: 'Alpha prompt?',
+          tags: ['alpha'],
+        },
+      ],
     };
 
     instance.saveToLocalStorage({ immediate: true });
@@ -188,35 +204,47 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const rawScopedDraft = localStorage.getItem(buildCreateSurveyDraftStorageKey('alpha'));
     expect(localStorage.getItem('unfinishedSurvey')).toBeNull();
     expect(rawScopedDraft).not.toBeNull();
-    expect(JSON.parse(rawScopedDraft || '{}')).toEqual(expect.objectContaining({
-      _sessionSlug: 'alpha',
-      title: 'Alpha draft',
-      documentURLs: ['https://example.com/alpha-doc'],
-    }));
+    expect(JSON.parse(rawScopedDraft || '{}')).toEqual(
+      expect.objectContaining({
+        _sessionSlug: 'alpha',
+        title: 'Alpha draft',
+        documentURLs: ['https://example.com/alpha-doc'],
+      }),
+    );
   });
 
   it('restores unfinished survey drafts only for the matching active session', () => {
-    localStorage.setItem(buildCreateSurveyDraftStorageKey('alpha'), JSON.stringify({
-      _sessionSlug: 'alpha',
-      title: 'Alpha draft',
-      isStandaloneQuestion: true,
-      questions: [{
-        id: 'q-alpha',
-        type: 'freeform',
-        prompt: 'Alpha prompt?',
-        tags: ['alpha'],
-      }],
-    }));
-    localStorage.setItem(buildCreateSurveyDraftStorageKey('beta'), JSON.stringify({
-      _sessionSlug: 'alpha',
-      title: 'Mismatched draft',
-      questions: [{
-        id: 'q-mismatch',
-        type: 'freeform',
-        prompt: 'Wrong prompt?',
-        tags: ['wrong'],
-      }],
-    }));
+    localStorage.setItem(
+      buildCreateSurveyDraftStorageKey('alpha'),
+      JSON.stringify({
+        _sessionSlug: 'alpha',
+        title: 'Alpha draft',
+        isStandaloneQuestion: true,
+        questions: [
+          {
+            id: 'q-alpha',
+            type: 'freeform',
+            prompt: 'Alpha prompt?',
+            tags: ['alpha'],
+          },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      buildCreateSurveyDraftStorageKey('beta'),
+      JSON.stringify({
+        _sessionSlug: 'alpha',
+        title: 'Mismatched draft',
+        questions: [
+          {
+            id: 'q-mismatch',
+            type: 'freeform',
+            prompt: 'Wrong prompt?',
+            tags: ['wrong'],
+          },
+        ],
+      }),
+    );
 
     const betaInstance = makeInstance({ activeSessionSlug: 'beta' });
     betaInstance.updateSurveyHash = jest.fn();
@@ -239,16 +267,21 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   it('loads legacy unscoped drafts only outside an active session', () => {
-    localStorage.setItem('unfinishedSurvey', JSON.stringify({
-      title: 'Legacy draft',
-      isStandaloneQuestion: true,
-      questions: [{
-        id: 'q-legacy',
-        type: 'freeform',
-        prompt: 'Legacy prompt?',
-        tags: ['legacy'],
-      }],
-    }));
+    localStorage.setItem(
+      'unfinishedSurvey',
+      JSON.stringify({
+        title: 'Legacy draft',
+        isStandaloneQuestion: true,
+        questions: [
+          {
+            id: 'q-legacy',
+            type: 'freeform',
+            prompt: 'Legacy prompt?',
+            tags: ['legacy'],
+          },
+        ],
+      }),
+    );
 
     const scopedInstance = makeInstance({ activeSessionSlug: 'beta' });
     scopedInstance.updateSurveyHash = jest.fn();
@@ -285,12 +318,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     writeInstance.state = {
       ...writeInstance.state,
       title: 'No-op draft',
-      questions: [{
-        id: 'q-no-op',
-        type: 'freeform',
-        prompt: 'No-op prompt?',
-        tags: [],
-      }],
+      questions: [
+        {
+          id: 'q-no-op',
+          type: 'freeform',
+          prompt: 'No-op prompt?',
+          tags: [],
+        },
+      ],
     };
 
     expect(() => writeInstance.saveToLocalStorage({ immediate: true })).not.toThrow();
@@ -316,12 +351,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       instance.state = {
         ...instance.state,
         isStandaloneQuestion: true,
-        questions: [{
-          id: 'q1',
-          type: 'freeform',
-          prompt: '   ',
-          tags: [],
-        }],
+        questions: [
+          {
+            id: 'q1',
+            type: 'freeform',
+            prompt: '   ',
+            tags: [],
+          },
+        ],
       };
 
       await instance.createSurvey();
@@ -343,23 +380,18 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const unsafeJavascriptUrl = ['java', 'script:alert(1)'].join('');
     const unsafeDataUrl = 'data:text/html,<script>alert(1)</script>';
 
-    expect(sanitizeDocumentUrls([
-      'https://example.com/doc',
-      'http://example.com/alt',
-      relativeViewerUrl,
-      arUrl,
-      litUrl,
-      legacyLitUrl,
-      unsafeJavascriptUrl,
-      unsafeDataUrl,
-    ])).toEqual([
-      'https://example.com/doc',
-      'http://example.com/alt',
-      relativeViewerUrl,
-      arUrl,
-      litUrl,
-      legacyLitUrl,
-    ]);
+    expect(
+      sanitizeDocumentUrls([
+        'https://example.com/doc',
+        'http://example.com/alt',
+        relativeViewerUrl,
+        arUrl,
+        litUrl,
+        legacyLitUrl,
+        unsafeJavascriptUrl,
+        unsafeDataUrl,
+      ]),
+    ).toEqual(['https://example.com/doc', 'http://example.com/alt', relativeViewerUrl, arUrl, litUrl, legacyLitUrl]);
 
     const allowedInstance = makeInstance();
     allowedInstance.state = {
@@ -375,10 +407,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     allowedInstance.addDocumentURL();
 
     expect(allowedInstance.state.docURLError).toBe('');
-    expect(allowedInstance.state.documentURLs).toEqual([
-      'https://safe.example/doc',
-      relativeViewerUrl,
-    ]);
+    expect(allowedInstance.state.documentURLs).toEqual(['https://safe.example/doc', relativeViewerUrl]);
     const allowedAnchorHrefs = collectTreeNodes(allowedInstance.render(), (node) => node?.type === 'a')
       .map((node) => node?.props?.href)
       .filter(Boolean);
@@ -391,21 +420,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       isStandaloneQuestion: false,
       title: 'Survey Title',
       questions: [],
-      documentURLs: [
-        'https://safe.example/doc',
-        arUrl,
-        litUrl,
-        legacyLitUrl,
-        unsafeJavascriptUrl,
-        unsafeDataUrl,
-      ],
+      documentURLs: ['https://safe.example/doc', arUrl, litUrl, legacyLitUrl, unsafeJavascriptUrl, unsafeDataUrl],
       docURLInput: unsafeJavascriptUrl,
     };
 
     instance.addDocumentURL();
 
     expect(instance.state.docURLError).toBe(
-      'Document URLs must use http://, https://, a root-relative path (/...), ar://, or a supported Lit encrypted-doc URL.'
+      'Document URLs must use http://, https://, a root-relative path (/...), ar://, or a supported Lit encrypted-doc URL.',
     );
     expect(instance.state.documentURLs).toEqual([
       'https://safe.example/doc',
@@ -418,9 +440,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
 
     const markup = renderToStaticMarkup(instance.render());
     expect(markup).toContain('href="https://safe.example/doc"');
-    expect(markup).toContain(
-      `href="${normalizeArweaveUrl(arUrl, { contextLabel: 'create_survey_document_url' })}"`
-    );
+    expect(markup).toContain(`href="${normalizeArweaveUrl(arUrl, { contextLabel: 'create_survey_document_url' })}"`);
     expect(markup).toContain(`Encrypted doc (${litUrl})`);
     expect(markup).toContain(`Encrypted doc (${legacyLitUrl})`);
     expect(markup).not.toContain(`href="${litUrl}"`);
@@ -530,5 +550,4 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(instance.state.submitStep).toBe(3);
     jest.useRealTimers();
   });
-
 });

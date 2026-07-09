@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Keep this prebuild cleanup while older local checkouts may still have stale
+// Vite output in build-vite/ or vite-build/; current builds write to build/.
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const clientDir = path.resolve(scriptDir, '..');
 const legacyOutputDirs = ['build-vite', 'vite-build'];

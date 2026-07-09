@@ -8,24 +8,53 @@
 
 /** Set of first-segment prefixes that getMainView recognizes (prevents cache wait for unknown paths) */
 export const KNOWN_ROUTE_PREFIXES = new Set([
-  'debate', 'atlas', 'tag', 'bookmarks', 'compare',
-  'surveys', 'survey', 'questions', 'question', 'sbts', 'sbt',
-  'groups', 'group', 'su', 'u', 'new', 'demo', 'about', 'demos',
-  'matrix', 'contracts', 'admin', 'sponsor', 'agent', 'session', 'docs',
+  'debate',
+  'atlas',
+  'tag',
+  'bookmarks',
+  'compare',
+  'surveys',
+  'survey',
+  'questions',
+  'question',
+  'sbts',
+  'sbt',
+  'groups',
+  'group',
+  'su',
+  'u',
+  'new',
+  'demo',
+  'about',
+  'demos',
+  'matrix',
+  'contracts',
+  'admin',
+  'sponsor',
+  'agent',
+  'session',
+  'docs',
 ]);
 
 /** Routes that render without waiting for cache hydration */
 export function isStaticNonCacheRoute(path: string) {
   return (
-    path === '/debate' || path === '/debate/' ||
+    path === '/debate' ||
+    path === '/debate/' ||
     path.startsWith('/tag/') ||
     path === '/about' ||
-    path === '/demos' || path === '/demos/' ||
+    path === '/demos' ||
+    path === '/demos/' ||
     path === '/matrix' ||
-    path === '/contracts' || path === '/contracts/' || path.startsWith('/contracts/') ||
-    path === '/admin' || path === '/admin/' ||
-    path === '/sponsor' || path === '/sponsor/' ||
-    path === '/agent' || path === '/agent/' ||
+    path === '/contracts' ||
+    path === '/contracts/' ||
+    path.startsWith('/contracts/') ||
+    path === '/admin' ||
+    path === '/admin/' ||
+    path === '/sponsor' ||
+    path === '/sponsor/' ||
+    path === '/agent' ||
+    path === '/agent/' ||
     path.startsWith('/docs')
   );
 }

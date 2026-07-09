@@ -41,8 +41,6 @@ export const normalizeOrigin = (raw: unknown): string => {
 
 export const normalizeOriginList = (rawList: unknown): string[] => {
   const list: unknown[] = Array.isArray(rawList) ? rawList : [rawList];
-  const cleaned = list
-    .map((entry) => normalizeOrigin(entry))
-    .filter(Boolean);
+  const cleaned = list.map((entry) => normalizeOrigin(entry)).filter(Boolean);
   return Array.from(new Set(cleaned));
 };

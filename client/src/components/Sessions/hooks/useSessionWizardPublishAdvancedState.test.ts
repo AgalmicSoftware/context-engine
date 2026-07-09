@@ -16,14 +16,16 @@ describe('useSessionWizardPublishAdvancedState', () => {
   });
 
   it('hydrates manual gas values from cached wizard state', () => {
-    const { result } = renderHook(() => useSessionWizardPublishAdvancedState({
-      cachedWizard: {
-        manualGasLimit: ' 900000 ',
-        manualGasPriceGwei: ' 1.5 ',
-        manualMaxFeePerGasGwei: ' 2.25 ',
-        manualMaxPriorityFeePerGasGwei: ' 0.25 ',
-      },
-    }));
+    const { result } = renderHook(() =>
+      useSessionWizardPublishAdvancedState({
+        cachedWizard: {
+          manualGasLimit: ' 900000 ',
+          manualGasPriceGwei: ' 1.5 ',
+          manualMaxFeePerGasGwei: ' 2.25 ',
+          manualMaxPriorityFeePerGasGwei: ' 0.25 ',
+        },
+      }),
+    );
 
     expect(result.current.manualGasLimit).toBe('900000');
     expect(result.current.manualGasPriceGwei).toBe('1.5');
@@ -32,11 +34,13 @@ describe('useSessionWizardPublishAdvancedState', () => {
   });
 
   it('falls back to the default gas limit when cached value trims empty', () => {
-    const { result } = renderHook(() => useSessionWizardPublishAdvancedState({
-      cachedWizard: {
-        manualGasLimit: '   ',
-      },
-    }));
+    const { result } = renderHook(() =>
+      useSessionWizardPublishAdvancedState({
+        cachedWizard: {
+          manualGasLimit: '   ',
+        },
+      }),
+    );
 
     expect(result.current.manualGasLimit).toBe('1200000');
   });

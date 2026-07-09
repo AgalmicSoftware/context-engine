@@ -2,9 +2,8 @@ import { toStr } from '../../../utilities/shared/primitives.js';
 
 export type RegistryWriteRecord = Record<string, unknown>;
 
-export const isObj = (value: unknown): value is RegistryWriteRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+export const isObj = (value: unknown): value is RegistryWriteRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const trimString = (value: unknown): string => toStr(value).trim();
 

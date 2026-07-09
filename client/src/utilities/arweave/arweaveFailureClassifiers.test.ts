@@ -9,15 +9,17 @@ import {
 
 describe('arweaveFailureClassifiers', () => {
   it('normalizes persisted failure entries for shared cache and classifier use', () => {
-    expect(normalizeArweaveFailureEntry({
-      attempts: '2',
-      firstFailedAtMs: '101',
-      lastFailedAtMs: '202',
-      nextRetryAtMs: '303',
-      lastStatus: '404',
-      state: ' Terminal_Not_Found ',
-      message: 42,
-    })).toEqual({
+    expect(
+      normalizeArweaveFailureEntry({
+        attempts: '2',
+        firstFailedAtMs: '101',
+        lastFailedAtMs: '202',
+        nextRetryAtMs: '303',
+        lastStatus: '404',
+        state: ' Terminal_Not_Found ',
+        message: 42,
+      }),
+    ).toEqual({
       attempts: 2,
       firstFailedAtMs: 101,
       lastFailedAtMs: 202,
@@ -60,6 +62,6 @@ describe('arweaveFailureClassifiers', () => {
 
   it('keeps the classifier module decoupled from the cache module import path', () => {
     const source = fs.readFileSync(require.resolve('./arweaveFailureClassifiers.js'), 'utf8');
-    expect(source).not.toContain("../cache/contractScriptsCache.js");
+    expect(source).not.toContain('../cache/contractScriptsCache.js');
   });
 });

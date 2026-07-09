@@ -38,11 +38,7 @@ export const buildWorkerAllowOrigins = ({
   // `allowOrigins` is sometimes stored as a newline/comma-delimited string (legacy configs),
   // so treat strings as lists instead of one opaque entry to keep patches additive.
   const extras = coerceOriginListInput(extraOrigins);
-  return normalizeOriginList([
-    currentOrigin,
-    ...SHARED_DEFAULT_WORKER_ALLOWED_ORIGINS,
-    ...extras,
-  ]);
+  return normalizeOriginList([currentOrigin, ...SHARED_DEFAULT_WORKER_ALLOWED_ORIGINS, ...extras]);
 };
 
 export const workerCorsOrigins = {

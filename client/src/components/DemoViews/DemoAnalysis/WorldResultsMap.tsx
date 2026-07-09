@@ -1,11 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import {
-  ComposableMap,
-  Geographies,
-  Geography,
-  Graticule,
-  Sphere,
-} from 'react-simple-maps';
+import { ComposableMap, Geographies, Geography, Graticule, Sphere } from 'react-simple-maps';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
@@ -114,11 +108,10 @@ const buildFocusedCountriesSummary = (focusedCountries: string[] = []) => {
   return `Country focus: ${focusedCountries.slice(0, 5).join(', ')} +${focusedCountries.length - 5} more`;
 };
 
-export const mapCountryNamesToIsoCodes = (countryNames: string[] = []) => (
+export const mapCountryNamesToIsoCodes = (countryNames: string[] = []) =>
   (Array.isArray(countryNames) ? countryNames : [])
     .map((countryName) => COUNTRY_NAME_TO_ISO_A3[String(countryName || '').trim()])
-    .filter(Boolean)
-);
+    .filter(Boolean);
 
 const WorldResultsMap = ({
   question,
@@ -155,10 +148,7 @@ const WorldResultsMap = ({
     };
   }, [question, responses]);
 
-  const focusedIsoCodes = useMemo(
-    () => new Set(mapCountryNamesToIsoCodes(focusedCountries)),
-    [focusedCountries]
-  );
+  const focusedIsoCodes = useMemo(() => new Set(mapCountryNamesToIsoCodes(focusedCountries)), [focusedCountries]);
 
   const renderMap = () => (
     <ComposableMap
@@ -168,48 +158,51 @@ const WorldResultsMap = ({
       {compact ? null : <Sphere stroke="#E4E5E6" strokeWidth={0.5} />}
       {compact ? null : <Graticule stroke="#E4E5E6" strokeWidth={0.5} />}
       <Geographies geography={GEO_URL}>
-        {({ geographies }: { geographies: GeographyDatum[] }) => geographies.map((geo) => {
-          const isoCode = GEOJSON_NAME_TO_ISO_A3[geo.properties.name];
-          const countryData = isoCode ? processedData.mapData[isoCode] : null;
-          const isFocusMode = focusedIsoCodes.size > 0;
-          const isInFocus = !isFocusMode || focusedIsoCodes.has(isoCode);
-          const lightweightFill = colorScale?.(
-            (data && isoCode && data[isoCode]) || (data && data[geo.properties.name]) || null,
-            isoCode,
-            geo
-          ) || 'rgba(77,255,164,0.35)';
-          const fill = isLightweightMode
-            ? lightweightFill
-            : !isInFocus
-              ? DEFAULT_COUNTRY_FILL
-              : (countryData
-                ? TOP_ANSWER_COLORS[countryData.topAnswer] || DEFAULT_COUNTRY_FILL
-                : DEFAULT_COUNTRY_FILL);
-          const hoverFill = compact ? fill : '#F53';
-          const pressedFill = compact ? fill : '#E42';
+        {({ geographies }: { geographies: GeographyDatum[] }) =>
+          geographies.map((geo) => {
+            const isoCode = GEOJSON_NAME_TO_ISO_A3[geo.properties.name];
+            const countryData = isoCode ? processedData.mapData[isoCode] : null;
+            const isFocusMode = focusedIsoCodes.size > 0;
+            const isInFocus = !isFocusMode || focusedIsoCodes.has(isoCode);
+            const lightweightFill =
+              colorScale?.(
+                (data && isoCode && data[isoCode]) || (data && data[geo.properties.name]) || null,
+                isoCode,
+                geo,
+              ) || 'rgba(77,255,164,0.35)';
+            const fill = isLightweightMode
+              ? lightweightFill
+              : !isInFocus
+                ? DEFAULT_COUNTRY_FILL
+                : countryData
+                  ? TOP_ANSWER_COLORS[countryData.topAnswer] || DEFAULT_COUNTRY_FILL
+                  : DEFAULT_COUNTRY_FILL;
+            const hoverFill = compact ? fill : '#F53';
+            const pressedFill = compact ? fill : '#E42';
 
-          const title = isLightweightMode
-            ? geo.properties.name
-            : !countryData
-              ? `${geo.properties.name}: No data`
-              : `${countryData.countryName}: ${countryData.topAnswer} (${(Number(countryData.topRate || 0) * 100).toFixed(0)}%)`;
+            const title = isLightweightMode
+              ? geo.properties.name
+              : !countryData
+                ? `${geo.properties.name}: No data`
+                : `${countryData.countryName}: ${countryData.topAnswer} (${(Number(countryData.topRate || 0) * 100).toFixed(0)}%)`;
 
-          return (
-            <Geography
-              key={geo.rsmKey}
-              geography={geo}
-              stroke={compact ? 'rgba(226, 232, 255, 0.32)' : '#FFF'}
-              strokeWidth={compact ? 0.45 : 0.7}
-              style={{
-                default: { fill, outline: 'none' },
-                hover: { fill: hoverFill, outline: 'none' },
-                pressed: { fill: pressedFill, outline: 'none' },
-              }}
-            >
-              <title>{title}</title>
-            </Geography>
-          );
-        })}
+            return (
+              <Geography
+                key={geo.rsmKey}
+                geography={geo}
+                stroke={compact ? 'rgba(226, 232, 255, 0.32)' : '#FFF'}
+                strokeWidth={compact ? 0.45 : 0.7}
+                style={{
+                  default: { fill, outline: 'none' },
+                  hover: { fill: hoverFill, outline: 'none' },
+                  pressed: { fill: pressedFill, outline: 'none' },
+                }}
+              >
+                <title>{title}</title>
+              </Geography>
+            );
+          })
+        }
       </Geographies>
     </ComposableMap>
   );
@@ -228,10 +221,7 @@ const WorldResultsMap = ({
 
   if (!question) {
     return (
-      <section
-        className={`${styles.panel} ${styles.mapPanel}`}
-        data-testid="demo-analysis-world-map"
-      >
+      <section className={`${styles.panel} ${styles.mapPanel}`} data-testid="demo-analysis-world-map">
         <div className={styles.panelHeader}>
           <h3 className={styles.panelTitle}>World Results Map</h3>
         </div>
@@ -248,10 +238,7 @@ const WorldResultsMap = ({
 
   if (!processedData.hasAnyData) {
     return (
-      <section
-        className={`${styles.panel} ${styles.mapPanel}`}
-        data-testid="demo-analysis-world-map"
-      >
+      <section className={`${styles.panel} ${styles.mapPanel}`} data-testid="demo-analysis-world-map">
         <div className={styles.panelHeader}>
           <div>
             <h3 className={styles.panelTitle}>World Results Map</h3>
@@ -287,9 +274,7 @@ const WorldResultsMap = ({
 
       <div className={styles.mapFrameShell}>
         <div className={styles.mapFrameViewport}>
-          <div className={styles.mapFrame}>
-            {renderMap()}
-          </div>
+          <div className={styles.mapFrame}>{renderMap()}</div>
         </div>
       </div>
     </section>

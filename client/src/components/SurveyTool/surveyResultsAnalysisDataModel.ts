@@ -1,6 +1,4 @@
-import type {
-  SessionResultsAnalysisResponseInput,
-} from '../../utilities/sessionResultsExport';
+import type { SessionResultsAnalysisResponseInput } from '../../utilities/sessionResultsExport';
 
 type SurveyResultsAnalysisRecord = Record<string, unknown>;
 
@@ -8,7 +6,7 @@ export type SurveyResultsAnalysisParsePort = (response: unknown) => unknown;
 export type SurveyResultsAnalysisQuestionIdPort = (response: unknown) => string;
 export type SurveyResultsAnalysisQuestionMetadataPort = (
   response: unknown,
-  questionData?: SurveyResultsAnalysisRecord | null
+  questionData?: SurveyResultsAnalysisRecord | null,
 ) => unknown;
 
 export type BuildSurveyResultsAnalysisResponsesArgs = {
@@ -50,13 +48,10 @@ export type BuildSurveyResultsAnalysisSegmentDimensionsArgs = {
   questions?: unknown;
 };
 
-const isRecord = (value: unknown): value is SurveyResultsAnalysisRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is SurveyResultsAnalysisRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const toRecord = (value: unknown): SurveyResultsAnalysisRecord => (
-  isRecord(value) ? value : {}
-);
+const toRecord = (value: unknown): SurveyResultsAnalysisRecord => (isRecord(value) ? value : {});
 
 const defaultParseResponse = (response: unknown): unknown => {
   if (isRecord(response)) return response;
@@ -76,21 +71,26 @@ const defaultGetQuestionId = (response: unknown): string => {
   return String(record.questionID || record.questionId || '').trim();
 };
 
-const defaultGetQuestionPrompt = (response: unknown, questionData: SurveyResultsAnalysisRecord | null = null): unknown => {
+const defaultGetQuestionPrompt = (
+  response: unknown,
+  questionData: SurveyResultsAnalysisRecord | null = null,
+): unknown => {
   const responseRecord = toRecord(response);
   const questionRecord = toRecord(questionData);
   return responseRecord.prompt || questionRecord.prompt || '';
 };
 
-const defaultGetQuestionType = (response: unknown, questionData: SurveyResultsAnalysisRecord | null = null): unknown => {
+const defaultGetQuestionType = (
+  response: unknown,
+  questionData: SurveyResultsAnalysisRecord | null = null,
+): unknown => {
   const responseRecord = toRecord(response);
   const questionRecord = toRecord(questionData);
   return responseRecord.type || questionRecord.type || questionRecord.questionType || '';
 };
 
-const isSurveyIndividualsMode = (viewMode: unknown, surveyViewMode: unknown): boolean => (
-  viewMode === 'survey' && surveyViewMode === 'individuals'
-);
+const isSurveyIndividualsMode = (viewMode: unknown, surveyViewMode: unknown): boolean =>
+  viewMode === 'survey' && surveyViewMode === 'individuals';
 
 export const readSurveyResultsAnalysisTextField = (field: unknown): string => {
   if (field === null || field === undefined) return '';
@@ -107,7 +107,9 @@ export const readSurveyResultsAnalysisTextField = (field: unknown): string => {
 };
 
 export const readSurveyResultsAnalysisSafeLabel = (value: unknown): string => {
-  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  const text = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!text) return '';
   if (/^0x/i.test(text) || /0x[a-fA-F0-9]{6,}/.test(text)) return '';
   return text;
@@ -127,20 +129,12 @@ export const buildSurveyResultsAnalysisResponsesForExport = ({
   const rows: SessionResultsAnalysisResponseInput[] = [];
   const questions = toRecord(networkQuestions);
   const parsePort = typeof parseResponse === 'function' ? parseResponse : defaultParseResponse;
-  const questionIdPort = typeof getResponseQuestionId === 'function'
-    ? getResponseQuestionId
-    : defaultGetQuestionId;
-  const questionPromptPort = typeof getResponseQuestionPrompt === 'function'
-    ? getResponseQuestionPrompt
-    : defaultGetQuestionPrompt;
-  const questionTypePort = typeof getResponseQuestionType === 'function'
-    ? getResponseQuestionType
-    : defaultGetQuestionType;
-  const pushRow = (
-    response: unknown,
-    responder: unknown,
-    questionIdFallback: unknown = ''
-  ): void => {
+  const questionIdPort = typeof getResponseQuestionId === 'function' ? getResponseQuestionId : defaultGetQuestionId;
+  const questionPromptPort =
+    typeof getResponseQuestionPrompt === 'function' ? getResponseQuestionPrompt : defaultGetQuestionPrompt;
+  const questionTypePort =
+    typeof getResponseQuestionType === 'function' ? getResponseQuestionType : defaultGetQuestionType;
+  const pushRow = (response: unknown, responder: unknown, questionIdFallback: unknown = ''): void => {
     if (!isRecord(response)) return;
     const questionId = questionIdPort(response) || String(questionIdFallback || '').trim();
     if (!questionId) return;
@@ -163,9 +157,8 @@ export const buildSurveyResultsAnalysisResponsesForExport = ({
     responseRows.forEach((responseRow) => {
       const row = toRecord(responseRow);
       const parsedResponse = parsePort(row.response);
-      const answers = isRecord(parsedResponse) && Array.isArray(parsedResponse.responses)
-        ? parsedResponse.responses
-        : [];
+      const answers =
+        isRecord(parsedResponse) && Array.isArray(parsedResponse.responses) ? parsedResponse.responses : [];
       answers.forEach((answer) => pushRow(answer, row.responder));
     });
     return rows;
@@ -188,16 +181,17 @@ type SurveyResultsAnalysisCountBucket = {
 };
 
 const buildSegmentValues = (
-  counts: Map<string, SurveyResultsAnalysisCountBucket>
-): SurveyResultsAnalysisSegmentDimension['values'] => Array.from(counts.values())
-  .filter((value) => value.label)
-  .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
-  .map((value) => ({
-    count: value.count,
-    id: value.label,
-    label: value.label,
-    ...(value.source ? { source: value.source } : {}),
-  }));
+  counts: Map<string, SurveyResultsAnalysisCountBucket>,
+): SurveyResultsAnalysisSegmentDimension['values'] =>
+  Array.from(counts.values())
+    .filter((value) => value.label)
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
+    .map((value) => ({
+      count: value.count,
+      id: value.label,
+      label: value.label,
+      ...(value.source ? { source: value.source } : {}),
+    }));
 
 const addSbtFilterEntries = ({
   counts,
@@ -233,15 +227,9 @@ export const buildSurveyResultsAnalysisSegmentDimensionsForExport = ({
 }: BuildSurveyResultsAnalysisSegmentDimensionsArgs = {}): SurveyResultsAnalysisSegmentDimension[] => {
   const dimensions: SurveyResultsAnalysisSegmentDimension[] = [];
   const reportQuestions = Array.isArray(questions) ? questions.map(toRecord) : [];
-  const sbtLabelPort = typeof getSbtEntryLabel === 'function'
-    ? getSbtEntryLabel
-    : readSurveyResultsAnalysisSafeLabel;
-  const gatePort = typeof getQuestionEncryptionGates === 'function'
-    ? getQuestionEncryptionGates
-    : () => [];
-  const normalizeGatePort = typeof normalizeGateSbtEntries === 'function'
-    ? normalizeGateSbtEntries
-    : () => [];
+  const sbtLabelPort = typeof getSbtEntryLabel === 'function' ? getSbtEntryLabel : readSurveyResultsAnalysisSafeLabel;
+  const gatePort = typeof getQuestionEncryptionGates === 'function' ? getQuestionEncryptionGates : () => [];
+  const normalizeGatePort = typeof normalizeGateSbtEntries === 'function' ? normalizeGateSbtEntries : () => [];
 
   const tagCounts = new Map<string, SurveyResultsAnalysisCountBucket>();
   reportQuestions.forEach((question) => {
@@ -267,12 +255,42 @@ export const buildSurveyResultsAnalysisSegmentDimensionsForExport = ({
 
   const sbtFilter = toRecord(toRecord(filterState).sbtFilter);
   const sbtCounts = new Map<string, SurveyResultsAnalysisCountBucket>();
-  addSbtFilterEntries({ counts: sbtCounts, entries: sbtFilter.selectedSBTGroups, getSbtEntryLabel: sbtLabelPort, prefix: 'Include' });
-  addSbtFilterEntries({ counts: sbtCounts, entries: sbtFilter.selectedSBTGroupsResponder, getSbtEntryLabel: sbtLabelPort, prefix: 'Responder include' });
-  addSbtFilterEntries({ counts: sbtCounts, entries: sbtFilter.selectedSBTGroupsCreator, getSbtEntryLabel: sbtLabelPort, prefix: 'Creator include' });
-  addSbtFilterEntries({ counts: sbtCounts, entries: sbtFilter.excludedSBTGroups, getSbtEntryLabel: sbtLabelPort, prefix: 'Exclude' });
-  addSbtFilterEntries({ counts: sbtCounts, entries: sbtFilter.excludedSBTGroupsResponder, getSbtEntryLabel: sbtLabelPort, prefix: 'Responder exclude' });
-  addSbtFilterEntries({ counts: sbtCounts, entries: sbtFilter.excludedSBTGroupsCreator, getSbtEntryLabel: sbtLabelPort, prefix: 'Creator exclude' });
+  addSbtFilterEntries({
+    counts: sbtCounts,
+    entries: sbtFilter.selectedSBTGroups,
+    getSbtEntryLabel: sbtLabelPort,
+    prefix: 'Include',
+  });
+  addSbtFilterEntries({
+    counts: sbtCounts,
+    entries: sbtFilter.selectedSBTGroupsResponder,
+    getSbtEntryLabel: sbtLabelPort,
+    prefix: 'Responder include',
+  });
+  addSbtFilterEntries({
+    counts: sbtCounts,
+    entries: sbtFilter.selectedSBTGroupsCreator,
+    getSbtEntryLabel: sbtLabelPort,
+    prefix: 'Creator include',
+  });
+  addSbtFilterEntries({
+    counts: sbtCounts,
+    entries: sbtFilter.excludedSBTGroups,
+    getSbtEntryLabel: sbtLabelPort,
+    prefix: 'Exclude',
+  });
+  addSbtFilterEntries({
+    counts: sbtCounts,
+    entries: sbtFilter.excludedSBTGroupsResponder,
+    getSbtEntryLabel: sbtLabelPort,
+    prefix: 'Responder exclude',
+  });
+  addSbtFilterEntries({
+    counts: sbtCounts,
+    entries: sbtFilter.excludedSBTGroupsCreator,
+    getSbtEntryLabel: sbtLabelPort,
+    prefix: 'Creator exclude',
+  });
   if (sbtFilter.onlyVerifiedHumans) {
     sbtCounts.set('verified_humans', {
       count: Number(participantCount) || 1,
@@ -298,8 +316,7 @@ export const buildSurveyResultsAnalysisSegmentDimensionsForExport = ({
     const responseCount = Math.max(1, Number(question.responseCount || 0));
     gatePort(questionRecord).forEach((gate) => {
       normalizeGatePort(gate).forEach((entry) => {
-        const label = readSurveyResultsAnalysisSafeLabel(entry.label)
-          || sbtLabelPort({ address: entry.address });
+        const label = readSurveyResultsAnalysisSafeLabel(entry.label) || sbtLabelPort({ address: entry.address });
         if (!label) return;
         const key = label.toLowerCase();
         const prev = gateCounts.get(key) || { count: 0, label, source: 'responseGates' };

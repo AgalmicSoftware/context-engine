@@ -27,17 +27,11 @@ export const getSessionWizardNormalModeBundleUrlOverrideValidationError = (value
   return '';
 };
 
-const getValidSessionWizardNormalModeBundleUrlOverride = (value: unknown = ''): string => (
-  getSessionWizardNormalModeBundleUrlOverrideValidationError(value)
-    ? ''
-    : toStr(value).trim()
-);
+const getValidSessionWizardNormalModeBundleUrlOverride = (value: unknown = ''): string =>
+  getSessionWizardNormalModeBundleUrlOverrideValidationError(value) ? '' : toStr(value).trim();
 
-const resolveSponsoredBundleBootstrapWorkerUrl = (bundle: AnyRecord = {}): string => normalizeWorkerAuthUrl(toStr(
-  bundle?.bootstrapWorkerUrl ||
-  bundle?.meta?.sourceWorkerUrl ||
-  ''
-).trim());
+const resolveSponsoredBundleBootstrapWorkerUrl = (bundle: AnyRecord = {}): string =>
+  normalizeWorkerAuthUrl(toStr(bundle?.bootstrapWorkerUrl || bundle?.meta?.sourceWorkerUrl || '').trim());
 
 export const resolveSessionWizardShouldAutoDeployWorker = ({
   workerMode = 'default',
@@ -47,11 +41,7 @@ export const resolveSessionWizardShouldAutoDeployWorker = ({
   workerMode?: unknown;
   sponsoredAutoDeployReady?: boolean;
   deployComplete?: boolean;
-} = {}) => (
-  toStr(workerMode).trim() !== 'default' &&
-  sponsoredAutoDeployReady &&
-  !deployComplete
-);
+} = {}) => toStr(workerMode).trim() !== 'default' && sponsoredAutoDeployReady && !deployComplete;
 
 export const buildSessionWizardPublishPlan = ({
   shouldAutoDeployWorker = false,
@@ -84,11 +74,9 @@ export const resolveSessionWizardBundleUrlForMode = ({
 } = {}) => {
   const normalizedBundleUrl = toStr(bundleUrl).trim();
   if (wizardMode !== 'normal') return normalizedBundleUrl;
-  const normalizedNormalModeBundleUrlOverride = getValidSessionWizardNormalModeBundleUrlOverride(
-    normalModeBundleUrlOverride
-  );
-  return normalizedNormalModeBundleUrlOverride ||
-    toStr(normalModeDefaultBundleUrl).trim();
+  const normalizedNormalModeBundleUrlOverride =
+    getValidSessionWizardNormalModeBundleUrlOverride(normalModeBundleUrlOverride);
+  return normalizedNormalModeBundleUrlOverride || toStr(normalModeDefaultBundleUrl).trim();
 };
 
 export const resolveSponsoredBundleDeployReadiness = ({
@@ -140,12 +128,11 @@ export const resolveSponsoredBundleDeployReadiness = ({
   };
 };
 
-export const buildSessionWizardPublishStepNumbers = (options: AnyRecord = {}): Record<string, number> => (
+export const buildSessionWizardPublishStepNumbers = (options: AnyRecord = {}): Record<string, number> =>
   buildSessionWizardPublishPlan(options).reduce<Record<string, number>>((acc, stepKey, index) => {
     acc[stepKey] = index + 1;
     return acc;
-  }, {})
-);
+  }, {});
 
 export const buildSessionWizardPublishExecutionPlan = ({
   workerMode = 'default',
@@ -209,19 +196,14 @@ export const resolveSessionWizardSponsoredAutoDeployReadiness = ({
   normalModeBundleUrlOverride?: unknown;
   normalModeDefaultBundleUrl?: unknown;
 } = {}) => {
-  const resolveMissingWorkerSecrets = (
-    typeof getMissingWorkerSecretsForDeploy === 'function'
-      ? getMissingWorkerSecretsForDeploy
-      : () => []
-  );
+  const resolveMissingWorkerSecrets =
+    typeof getMissingWorkerSecretsForDeploy === 'function' ? getMissingWorkerSecretsForDeploy : () => [];
   return resolveSponsoredBundleDeployReadiness({
     wizardMode,
     sponsoredBundle,
     deployForm,
     workerSecretsEnabled,
-    missingWorkerSecrets: workerSecretsEnabled
-      ? resolveMissingWorkerSecrets(currentWorkerSecrets)
-      : [],
+    missingWorkerSecrets: workerSecretsEnabled ? resolveMissingWorkerSecrets(currentWorkerSecrets) : [],
     hasBundleFile,
     normalModeBundleUrlOverride,
     normalModeDefaultBundleUrl,
@@ -242,26 +224,20 @@ const looksLikeWorkerBundleText = (value: unknown = ''): boolean => {
   const normalized = toStr(value).trim();
   if (!normalized) return false;
   return (
-    normalized.includes('fetch(') && (
-      normalized.includes('export default') ||
-      normalized.includes('export {') ||
-      normalized.includes(' as default')
-    )
+    normalized.includes('fetch(') &&
+    (normalized.includes('export default') || normalized.includes('export {') || normalized.includes(' as default'))
   );
 };
 
 const looksLikeWrappedWorkerBundleStringModule = (value: unknown = ''): boolean => {
   const normalized = toStr(value).trim();
   if (!normalized) return false;
-  return (
-    /^export\s+default\s+["'`]/.test(normalized) ||
-    /^module\.exports\s*=\s*["'`]/.test(normalized)
-  );
+  return /^export\s+default\s+["'`]/.test(normalized) || /^module\.exports\s*=\s*["'`]/.test(normalized);
 };
 
 export const readSessionWizardBundleFileText = async (
   bundleFile: File | null | undefined,
-  emptyError = `Selected worker bundle file was empty. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
+  emptyError = `Selected worker bundle file was empty. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`,
 ): Promise<string> => {
   const rawBundleText = toStr(bundleFile ? await bundleFile.text() : '');
   const normalizedBundleText = rawBundleText.trim();
@@ -270,17 +246,17 @@ export const readSessionWizardBundleFileText = async (
   }
   if (looksLikeHtmlDocument(normalizedBundleText)) {
     throw new Error(
-      `Selected worker bundle file resolved to HTML instead of a worker script. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
+      `Selected worker bundle file resolved to HTML instead of a worker script. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`,
     );
   }
   if (looksLikeWrappedWorkerBundleStringModule(normalizedBundleText)) {
     throw new Error(
-      `Selected worker bundle file resolved to a JavaScript string wrapper instead of raw worker bytes. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
+      `Selected worker bundle file resolved to a JavaScript string wrapper instead of raw worker bytes. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`,
     );
   }
   if (!looksLikeWorkerBundleText(normalizedBundleText)) {
     throw new Error(
-      `Selected worker bundle file is missing the expected worker module export. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
+      `Selected worker bundle file is missing the expected worker module export. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`,
     );
   }
   return rawBundleText;
@@ -314,17 +290,17 @@ export const resolveSessionWizardDeployBundleMode = ({
     normalModeBundleUrlOverride,
     normalModeDefaultBundleUrl,
   });
-  return (
-    (wizardMode === 'normal' && hasBundleFile && (forceManualBundleFile || !hasHostedNormalModeBundleUrl))
-      ? 'upload'
-      : (wizardMode === 'normal' && forceSponsoredAutoDeploy)
+  return wizardMode === 'normal' && hasBundleFile && (forceManualBundleFile || !hasHostedNormalModeBundleUrl)
+    ? 'upload'
+    : wizardMode === 'normal' && forceSponsoredAutoDeploy
+      ? 'url'
+      : wizardMode === 'normal' && sponsoredAutoDeployReady
         ? 'url'
-        : (wizardMode === 'normal' && sponsoredAutoDeployReady)
-          ? 'url'
-          : (wizardMode === 'normal')
-            ? (hasResolvedNormalModeBundleUrl ? 'url' : 'upload')
-            : bundleMode
-  );
+        : wizardMode === 'normal'
+          ? hasResolvedNormalModeBundleUrl
+            ? 'url'
+            : 'upload'
+          : bundleMode;
 };
 
 export type SessionWizardSponsoredAutoDeployStateLike = {
@@ -378,10 +354,7 @@ export const resolveSessionWizardSponsoredPublishSurfaceState = ({
   missingHostedBundleMessage?: string;
 } = {}): SessionWizardSponsoredPublishSurfaceState => {
   const normalizedWorkerMode = toStr(workerMode).trim();
-  const shouldUseSponsoredAutoDeployFlow = (
-    normalizedWorkerMode !== 'default' &&
-    !!sponsoredAutoDeployState.ready
-  );
+  const shouldUseSponsoredAutoDeployFlow = normalizedWorkerMode !== 'default' && !!sponsoredAutoDeployState.ready;
   const hasManualBundleFallbackFile = !!hasBundleFile;
   const sponsoredAutoDeployBundleMode = resolveSessionWizardDeployBundleMode({
     wizardMode,
@@ -393,38 +366,25 @@ export const resolveSessionWizardSponsoredPublishSurfaceState = ({
     normalModeBundleUrlOverride,
     normalModeDefaultBundleUrl,
   });
-  const showNormalModeWorkerStep = !(
-    !!sponsoredAutoDeployState.active &&
-    normalizedWorkerMode !== 'default'
-  );
-  const sponsoredLocalBundledAssetAvailable = (
-    sponsoredAutoDeployBundleMode !== 'upload' ||
-    hasManualBundleFallbackFile
-  );
+  const showNormalModeWorkerStep = !(!!sponsoredAutoDeployState.active && normalizedWorkerMode !== 'default');
+  const sponsoredLocalBundledAssetAvailable = sponsoredAutoDeployBundleMode !== 'upload' || hasManualBundleFallbackFile;
   const canUseSponsoredAutoDeployNow = shouldUseSponsoredAutoDeployFlow && sponsoredLocalBundledAssetAvailable;
   const hasNormalModeBundleUrlOverride = !!toStr(normalModeBundleUrlOverride).trim();
   const missing = Array.isArray(sponsoredAutoDeployState.missing)
     ? sponsoredAutoDeployState.missing.map((entry) => toStr(entry).trim()).filter(Boolean)
     : [];
-  const sponsoredAutoDeployMissingBundleUrl = (
-    !!sponsoredAutoDeployState.active &&
-    missing.includes('Worker bundle URL')
-  );
-  const showSponsoredBundleFallbackInput = (
+  const sponsoredAutoDeployMissingBundleUrl =
+    !!sponsoredAutoDeployState.active && missing.includes('Worker bundle URL');
+  const showSponsoredBundleFallbackInput =
     !!isNormalMode &&
     !showNormalModeWorkerStep &&
-    (
-      !!forceManualBundleFile ||
+    (!!forceManualBundleFile ||
       hasManualBundleFallbackFile ||
       hasNormalModeBundleUrlOverride ||
-      sponsoredAutoDeployMissingBundleUrl
-    )
-  );
+      sponsoredAutoDeployMissingBundleUrl);
   const normalModeHostedBundleConfigured = !!toStr(normalModeDefaultBundleUrl).trim();
-  const showNormalModeManualBundleControls = (
-    !!isNormalMode &&
-    (!!forceManualBundleFile || !normalModeHostedBundleConfigured)
-  );
+  const showNormalModeManualBundleControls =
+    !!isNormalMode && (!!forceManualBundleFile || !normalModeHostedBundleConfigured);
   const normalModeBundleHelpText = normalModeHostedBundleConfigured
     ? hostedBundleHelpMessage
     : missingHostedBundleMessage;
@@ -476,11 +436,8 @@ export const resolveSessionWizardDeployBundlePayload = async ({
   };
 };
 
-const hasSessionWizardBundleDiagnostics = (bundleDiagnostics: unknown = null): boolean => (
-  !!bundleDiagnostics &&
-  typeof bundleDiagnostics === 'object' &&
-  Object.keys(bundleDiagnostics).length > 0
-);
+const hasSessionWizardBundleDiagnostics = (bundleDiagnostics: unknown = null): boolean =>
+  !!bundleDiagnostics && typeof bundleDiagnostics === 'object' && Object.keys(bundleDiagnostics).length > 0;
 
 const isSessionWizardRemoteBundleUrlFetchFailure = ({
   err,
@@ -492,10 +449,9 @@ const isSessionWizardRemoteBundleUrlFetchFailure = ({
   if (effectiveBundleMode !== 'url') {
     return false;
   }
-  const error = (err && typeof err === 'object') ? err as AnyRecord : {};
+  const error = err && typeof err === 'object' ? (err as AnyRecord) : {};
   const combined = `${toStr(
-    error?.message ||
-    (typeof err === 'string' || typeof err === 'number' ? err : '')
+    error?.message || (typeof err === 'string' || typeof err === 'number' ? err : ''),
   ).trim()} ${toStr(error?.responseError).trim()}`.toLowerCase();
   return combined.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR);
 };
@@ -510,13 +466,14 @@ const isSessionWizardRemoteBundleUrlMissingHandlerFailure = ({
   if (effectiveBundleMode !== 'url') {
     return false;
   }
-  const error = (err && typeof err === 'object') ? err as AnyRecord : {};
+  const error = err && typeof err === 'object' ? (err as AnyRecord) : {};
   const combined = `${toStr(
-    error?.message ||
-    (typeof err === 'string' || typeof err === 'number' ? err : '')
+    error?.message || (typeof err === 'string' || typeof err === 'number' ? err : ''),
   ).trim()} ${toStr(error?.responseError).trim()}`.toLowerCase();
-  return combined.includes(CLOUDFLARE_MISSING_HANDLER_ERROR) &&
-    hasSessionWizardBundleDiagnostics(error?.responseBundleDiagnostics);
+  return (
+    combined.includes(CLOUDFLARE_MISSING_HANDLER_ERROR) &&
+    hasSessionWizardBundleDiagnostics(error?.responseBundleDiagnostics)
+  );
 };
 
 export const shouldForceSessionWizardNormalModeManualBundleRetry = ({
@@ -529,20 +486,17 @@ export const shouldForceSessionWizardNormalModeManualBundleRetry = ({
   wizardMode?: string;
   effectiveBundleMode?: string;
   hasBundleFile?: boolean;
-} = {}) => (
+} = {}) =>
   wizardMode === 'normal' &&
   !hasBundleFile &&
-  (
-    isSessionWizardRemoteBundleUrlFetchFailure({
-      err,
-      effectiveBundleMode,
-    }) ||
+  (isSessionWizardRemoteBundleUrlFetchFailure({
+    err,
+    effectiveBundleMode,
+  }) ||
     isSessionWizardRemoteBundleUrlMissingHandlerFailure({
       err,
       effectiveBundleMode,
-    })
-  )
-);
+    }));
 
 export const getSessionWizardPublishProgressPercent = ({
   publishStep = 0,
@@ -564,11 +518,11 @@ export const getSessionWizardPublishProgressPercent = ({
     return Math.min(100, Math.max(0, clampedStep * stepSize));
   }
   const base = Math.max(0, (clampedStep - 1) * stepSize);
-  const cap = clampedStep >= steps ? 100 : base + (stepSize * 0.82);
+  const cap = clampedStep >= steps ? 100 : base + stepSize * 0.82;
   const durationMs = 2600;
   const ratio = Math.max(0, Math.min(1, Number(elapsedMs || 0) / durationMs));
   const eased = 1 - Math.pow(1 - ratio, 2);
-  return Math.min(99, Math.max(base + (stepSize * 0.18), base + ((cap - base) * eased)));
+  return Math.min(99, Math.max(base + stepSize * 0.18, base + (cap - base) * eased));
 };
 
 export type SessionWizardPublishProgressStep = {
@@ -608,15 +562,16 @@ export const buildSessionWizardPublishProgressSteps = ({
     const isComplete = currentPublishStep > stepNumber || (key === 'done' && currentPublishStep >= stepNumber);
     return {
       key,
-      label: key === 'deploy-worker'
-        ? 'Deploy Worker'
-        : key === 'deploy-sbts'
-          ? `Deploy ${normalizedSbtLabel}`
-          : key === 'upload-metadata'
-            ? 'Upload Arweave'
-            : key === 'register-session'
-              ? 'Register On-chain'
-              : 'Done',
+      label:
+        key === 'deploy-worker'
+          ? 'Deploy Worker'
+          : key === 'deploy-sbts'
+            ? `Deploy ${normalizedSbtLabel}`
+            : key === 'upload-metadata'
+              ? 'Upload Arweave'
+              : key === 'register-session'
+                ? 'Register On-chain'
+                : 'Done',
       state: isActive ? 'active' : isComplete ? 'complete' : 'pending',
     };
   });
@@ -642,9 +597,12 @@ export const resolveSessionWizardPublishProgressDisplayState = ({
     publishSteps,
     sbtsLabel,
   });
-  const activePublishProgressStep = publishProgressSteps[
-    Math.max(0, Math.min((currentPublishStep || 1) - 1, Math.max(0, publishProgressSteps.length - 1)))
-  ] || publishProgressSteps[0] || null;
+  const activePublishProgressStep =
+    publishProgressSteps[
+      Math.max(0, Math.min((currentPublishStep || 1) - 1, Math.max(0, publishProgressSteps.length - 1)))
+    ] ||
+    publishProgressSteps[0] ||
+    null;
   const publishProgressPercent = getSessionWizardPublishProgressPercent({
     publishStep: currentPublishStep,
     publishBusy,

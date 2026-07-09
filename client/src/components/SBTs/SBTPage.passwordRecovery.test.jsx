@@ -1,5 +1,5 @@
 import SBTPage from './SBTPage';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import {
   SBT_PASSWORD_RECOVERY_KIND,
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,
@@ -54,21 +54,24 @@ describe('SBTPage scoped password recovery store', () => {
       network: { id: 84532, name: 'Base Sepolia' },
     });
     const now = Date.now();
-    localStorage.setItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY, JSON.stringify({
-      v: 1,
-      kind: SBT_PASSWORD_RECOVERY_KIND,
-      updatedAt: now,
-      entries: {
-        [`84532:${sbtLower}`]: {
-          chainId: 84532,
-          sbtAddress: sbtLower,
-          passwords: ['scoped-code'],
-          createdAt: now,
-          updatedAt: now,
-          expiresAt: now + 60_000,
+    localStorage.setItem(
+      SBT_PASSWORD_RECOVERY_STORAGE_KEY,
+      JSON.stringify({
+        v: 1,
+        kind: SBT_PASSWORD_RECOVERY_KIND,
+        updatedAt: now,
+        entries: {
+          [`84532:${sbtLower}`]: {
+            chainId: 84532,
+            sbtAddress: sbtLower,
+            passwords: ['scoped-code'],
+            createdAt: now,
+            updatedAt: now,
+            expiresAt: now + 60_000,
+          },
         },
-      },
-    }));
+      }),
+    );
 
     subject.loadCachedPasswords();
 
@@ -89,21 +92,24 @@ describe('SBTPage scoped password recovery store', () => {
         chainID: 84532,
       },
     };
-    localStorage.setItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY, JSON.stringify({
-      v: 1,
-      kind: SBT_PASSWORD_RECOVERY_KIND,
-      updatedAt: now,
-      entries: {
-        [`84532:${sbtLower}`]: {
-          chainId: 84532,
-          sbtAddress: sbtLower,
-          passwords: ['base-only-code'],
-          createdAt: now,
-          updatedAt: now,
-          expiresAt: now + 60_000,
+    localStorage.setItem(
+      SBT_PASSWORD_RECOVERY_STORAGE_KEY,
+      JSON.stringify({
+        v: 1,
+        kind: SBT_PASSWORD_RECOVERY_KIND,
+        updatedAt: now,
+        entries: {
+          [`84532:${sbtLower}`]: {
+            chainId: 84532,
+            sbtAddress: sbtLower,
+            passwords: ['base-only-code'],
+            createdAt: now,
+            updatedAt: now,
+            expiresAt: now + 60_000,
+          },
         },
-      },
-    }));
+      }),
+    );
 
     subject.loadCachedPasswords();
 
@@ -130,11 +136,13 @@ describe('SBTPage scoped password recovery store', () => {
     await subject.handleGenerateAdminInvites();
 
     const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
-    expect(recoveryStore.entries[`84532:${sbtLower}`]).toEqual(expect.objectContaining({
-      chainId: 84532,
-      sbtAddress: sbtLower,
-      passwords: ['admin-one', 'admin-two'],
-    }));
+    expect(recoveryStore.entries[`84532:${sbtLower}`]).toEqual(
+      expect.objectContaining({
+        chainId: 84532,
+        sbtAddress: sbtLower,
+        passwords: ['admin-one', 'admin-two'],
+      }),
+    );
     expect(subject.state.adminGeneratedPasswords).toEqual(['admin-one', 'admin-two']);
     expect(subject.state.cachedPasswords).toEqual(['admin-one', 'admin-two']);
   });

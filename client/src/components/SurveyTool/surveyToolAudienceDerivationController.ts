@@ -16,24 +16,18 @@ type EncryptionConfig = UnknownRecord & {
   gates?: unknown;
 };
 
-const isObjectRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isObjectRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const asResponseFieldState = (value: unknown): ResponseFieldState => (
-  isObjectRecord(value) ? value as ResponseFieldState : {}
-);
+const asResponseFieldState = (value: unknown): ResponseFieldState =>
+  isObjectRecord(value) ? (value as ResponseFieldState) : {};
 
 export const getQuestionEncryptionGates = (question: unknown): UnknownRecord[] => {
   const questionRecord = isObjectRecord(question) ? question : {};
-  const enc = isObjectRecord(questionRecord.encryption)
-    ? questionRecord.encryption as EncryptionConfig
-    : null;
+  const enc = isObjectRecord(questionRecord.encryption) ? (questionRecord.encryption as EncryptionConfig) : null;
   if (!enc) return [];
   if (enc.enabled === false) return [];
-  const gates = Array.isArray(enc.gates)
-    ? enc.gates
-    : (isObjectRecord(enc.gate) ? [enc.gate] : []);
+  const gates = Array.isArray(enc.gates) ? enc.gates : isObjectRecord(enc.gate) ? [enc.gate] : [];
   return gates.filter(isObjectRecord);
 };
 
@@ -43,21 +37,23 @@ export const normalizeFieldAudienceMode = (
   field: unknown,
   hasMeaningfulFieldValue: (v: unknown) => boolean,
 ): string => {
-  const normalizedFieldKey = String(fieldKey || '').trim().toLowerCase() === 'additional'
-    ? 'additional'
-    : 'answer';
+  const normalizedFieldKey =
+    String(fieldKey || '')
+      .trim()
+      .toLowerCase() === 'additional'
+      ? 'additional'
+      : 'answer';
   if (normalizedFieldKey !== 'additional') return 'explicit';
 
-  const raw = String(value || '').trim().toLowerCase();
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
   if (raw === 'inherit' || raw === 'follow' || raw === 'follow-answer') return 'inherit';
   if (raw === 'explicit') return 'explicit';
   const fieldState = asResponseFieldState(field);
 
   const hasPersistedState =
-    hasMeaningfulFieldValue(field) ||
-    !!fieldState.encrypted ||
-    !!fieldState.encryptedPortion ||
-    !!fieldState.hash;
+    hasMeaningfulFieldValue(field) || !!fieldState.encrypted || !!fieldState.encryptedPortion || !!fieldState.hash;
   return hasPersistedState ? 'explicit' : 'inherit';
 };
 
@@ -92,7 +88,9 @@ export const normalizeResponseEncryptionAudience = (
   const qid = questionId ? String(questionId).toLowerCase() : '';
   if (qid && deps.isQuestionLocked(qid)) return 'gate';
 
-  const raw = String(value || '').trim().toLowerCase();
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
   if (raw === 'gate') {
     if (qid) {
       return deps.getEffectiveRecipientsForQid(qid).length ? 'gate' : 'self';
@@ -113,12 +111,11 @@ export const buildEmptyResponseFieldState = (
   },
 ): ResponseFieldState => {
   const qid = questionId ? String(questionId).toLowerCase() : '';
-  const audience = qid
-    ? deps.getDefaultAudienceForQid(qid)
-    : deps.getDefaultAudience();
-  const gateId = audience === 'gate'
-    ? deps.resolveFieldEncryptionGateId({ encryptionAudience: audience }, qid || null, fieldKey)
-    : null;
+  const audience = qid ? deps.getDefaultAudienceForQid(qid) : deps.getDefaultAudience();
+  const gateId =
+    audience === 'gate'
+      ? deps.resolveFieldEncryptionGateId({ encryptionAudience: audience }, qid || null, fieldKey)
+      : null;
   return {
     value: '',
     encrypted: audience === 'gate',
@@ -144,16 +141,16 @@ export const resolveFieldEncryptionAudience = (
   const fieldState = asResponseFieldState(field);
   if (fieldState.encryptionAudience) {
     if (
-      String(fieldState.encryptionAudience || '').trim().toLowerCase() === 'gate' &&
+      String(fieldState.encryptionAudience || '')
+        .trim()
+        .toLowerCase() === 'gate' &&
       String(fieldState.encryptionGateId || '').trim()
     ) {
       return 'gate';
     }
     return deps.normalizeAudience(fieldState.encryptionAudience, qid || null);
   }
-  return qid
-    ? deps.getDefaultAudienceForQid(qid)
-    : deps.getDefaultAudience();
+  return qid ? deps.getDefaultAudienceForQid(qid) : deps.getDefaultAudience();
 };
 
 export const normalizeGateLabelText = (value: unknown): string => {

@@ -5,10 +5,7 @@
  *
  * Key exports: getPrimaryRpcUrlForChain, getFallbackRpcUrlForChain, normalizeRpcCandidateList
  */
-import {
-  getDefaultHttpRpc,
-  getPreferredPathRpcUrl,
-} from '../../variables/chains.js';
+import { getDefaultHttpRpc, getPreferredPathRpcUrl } from '../../variables/chains.js';
 
 type RpcChainLike = {
   id?: number;
@@ -18,9 +15,7 @@ type RpcChainLike = {
   };
 };
 
-export const normalizeRpcCandidateList = (
-  urls: ReadonlyArray<string | null | undefined> = []
-): string[] => {
+export const normalizeRpcCandidateList = (urls: ReadonlyArray<string | null | undefined> = []): string[] => {
   const out: string[] = [];
   const seen = new Set<string>();
   urls.forEach((raw) => {

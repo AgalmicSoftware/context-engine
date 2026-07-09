@@ -62,12 +62,10 @@ describe('displayHelpers', () => {
       <>
         {getShortenedQuestionID(QUESTION_ID, true, '/custom-question')}
         {getShortenedTransactionHash(TX_HASH, true, '/custom-tx')}
-      </>
+      </>,
     );
 
-    expect(screen.getByRole('link', { name: 'qwe...rst' }))
-      .toHaveAttribute('href', '/custom-question');
-    expect(screen.getByRole('link', { name: '0x1234...fedcba' }))
-      .toHaveAttribute('href', '/custom-tx');
+    expect(screen.getByRole('link', { name: 'qwe...rst' })).toHaveAttribute('href', '/custom-question');
+    expect(screen.getByRole('link', { name: '0x1234...fedcba' })).toHaveAttribute('href', '/custom-tx');
   });
 });

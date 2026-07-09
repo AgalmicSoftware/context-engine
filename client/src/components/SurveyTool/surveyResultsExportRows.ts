@@ -45,7 +45,9 @@ export const buildSurveyResultsFilteredQuestionIdsForExport = ({
   const questionIds = new Set<string>();
 
   Object.keys(aggregatorQuestionResponses || {}).forEach((qId) => {
-    const normalized = String(qId || '').trim().toLowerCase();
+    const normalized = String(qId || '')
+      .trim()
+      .toLowerCase();
     if (normalized) questionIds.add(normalized);
   });
 

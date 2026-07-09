@@ -15,12 +15,7 @@ describe('SurveyQuestionsLockedQuestionsPanel', () => {
 
   it('renders the decrypt action and forwards hidden question ids', () => {
     const onDecrypt = jest.fn();
-    render(
-      <SurveyQuestionsLockedQuestionsPanel
-        hiddenMaskedQuestionIds={['q1', 'q2']}
-        onDecrypt={onDecrypt}
-      />
-    );
+    render(<SurveyQuestionsLockedQuestionsPanel hiddenMaskedQuestionIds={['q1', 'q2']} onDecrypt={onDecrypt} />);
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_LOCKED_DECRYPT));
 
@@ -33,19 +28,23 @@ describe('SurveyQuestionsLockedQuestionsPanel', () => {
     render(
       <SurveyQuestionsLockedQuestionsPanel
         hiddenMaskedQuestionIds={['q1']}
-        lockedGateDetails={[{
-          id: 'gate-1',
-          label: 'Session Access',
-          questionCount: 1,
-          sbts: [{
-            address: '0x1111111111111111111111111111111111111111',
-            href: '/sbt/0x1111111111111111111111111111111111111111',
-            label: 'Participant Pass',
-          }],
-        }]}
+        lockedGateDetails={[
+          {
+            id: 'gate-1',
+            label: 'Session Access',
+            questionCount: 1,
+            sbts: [
+              {
+                address: '0x1111111111111111111111111111111111111111',
+                href: '/sbt/0x1111111111111111111111111111111111111111',
+                label: 'Participant Pass',
+              },
+            ],
+          },
+        ]}
         lockedGateDetailsExpanded
         onToggleDetails={onToggleDetails}
-      />
+      />,
     );
 
     expect(screen.getByText('Session Access')).toBeInTheDocument();
@@ -62,18 +61,22 @@ describe('SurveyQuestionsLockedQuestionsPanel', () => {
     render(
       <SurveyQuestionsLockedQuestionsPanel
         hiddenMaskedQuestionIds={['q1']}
-        lockedGateDetails={[{
-          id: 'gate-1',
-          label: 'Session Access',
-          questionCount: 1,
-          sbts: [{
-            address: '0x1111111111111111111111111111111111111111',
-            href,
-            label: 'Participant Pass',
-          }],
-        }]}
+        lockedGateDetails={[
+          {
+            id: 'gate-1',
+            label: 'Session Access',
+            questionCount: 1,
+            sbts: [
+              {
+                address: '0x1111111111111111111111111111111111111111',
+                href,
+                label: 'Participant Pass',
+              },
+            ],
+          },
+        ]}
         subtitle={`${t('sbt')} required: Participant Pass. Connect an eligible ${t('walletLower')} to decrypt.`}
-      />
+      />,
     );
 
     const link = screen.getByRole('link', { name: `Open ${t('sbt')} Participant Pass` });

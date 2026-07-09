@@ -1,0 +1,38 @@
+name: Bug Report
+description: Report a reproducible problem in Context Engine.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include secrets, private keys, real API keys, or private user data.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the behavior and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include route, browser, chain/network, worker mode, or command details when relevant.
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. Run ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Browser, OS, Node/npm version, chain, wallet, worker/storage profile
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or screenshots
+      description: Redact addresses only if needed for privacy; always redact secrets and private keys.

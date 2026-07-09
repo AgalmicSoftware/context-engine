@@ -1,27 +1,19 @@
 /** @file withRouterBridge.tsx */
-import type { ComponentType } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import type { ComponentType } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 type RouterBridgeOuterProps = Record<string, unknown>;
 
-  function withRouter(Component: ComponentType<any>) {
-    function ComponentWithRouterProp(props: RouterBridgeOuterProps) {
+function withRouter(Component: ComponentType<any>) {
+  function ComponentWithRouterProp(props: RouterBridgeOuterProps) {
+    const params = useParams();
+    const navigate = useNavigate();
+    const location = useLocation();
 
-      const params = useParams()
-      const navigate = useNavigate()
-      const location = useLocation()
-
-      return (
-          <Component
-            {...props}
-            params={params}
-            location={location}
-            navigate={navigate}
-          />
-      );
-    }
-
-    return ComponentWithRouterProp;
+    return <Component {...props} params={params} location={location} navigate={navigate} />;
   }
 
-  export default withRouter;
+  return ComponentWithRouterProp;
+}
+
+export default withRouter;

@@ -1,21 +1,13 @@
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
-import {
-  getDemoSessionConfigBySlug,
-  getSessionConfigBySlugOrDefault,
-} from '../../utilities/web3/contractScripts.js';
+import { getDemoSessionConfigBySlug, getSessionConfigBySlugOrDefault } from '../../utilities/web3/chainGateway.js';
 import { normalizeSessionNaming } from '../../utilities/session/sessionMetadata.js';
 import { normalizeSponsoredFieldSnapshot } from '../../utilities/session/sponsoredFlags.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS } from './sessionWizardOnChainCompat.js';
 import { normalizeSbtSelection } from './sessionWizardSbtSelections';
-import type {
-  AnyRecord,
-  ChainIdLike,
-  NetworkLike,
-  SessionConfigLike,
-} from '../shellTypes';
+import type { AnyRecord, ChainIdLike, NetworkLike, SessionConfigLike } from '../shellTypes';
 
 export const DEFAULT_GATE_KEYS = [
   'default',
@@ -124,12 +116,8 @@ export const isSecretFieldPath = (pathArr: string[]): boolean => {
   return false;
 };
 
-export const isPrimitive = (val: unknown): boolean => (
-  val === null ||
-  typeof val === 'string' ||
-  typeof val === 'number' ||
-  typeof val === 'boolean'
-);
+export const isPrimitive = (val: unknown): boolean =>
+  val === null || typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean';
 
 export const isStringArray = (arr: unknown): boolean => Array.isArray(arr) && arr.every((v) => isPrimitive(v));
 
@@ -192,17 +180,12 @@ export const resolveSessionWizardSelectorSourceConfig = ({
   resolveDisplayConfig?: ((slug: string) => SessionConfigLike | null | undefined) | null;
   defaultChainId?: ChainIdLike;
 } = {}): SessionConfigLike => {
-  const activeSlug = typeof normalizeSlug === 'function'
-    ? normalizeSlug(activeSessionSlug || '')
-    : toStr(activeSessionSlug).trim().toLowerCase();
-  const fallbackChainId = Number(
-    registryChainId ||
-    draftNetworkChainId ||
-    network?.id ||
-    network?.chainId ||
-    defaultChainId ||
-    0
-  ) || null;
+  const activeSlug =
+    typeof normalizeSlug === 'function'
+      ? normalizeSlug(activeSessionSlug || '')
+      : toStr(activeSessionSlug).trim().toLowerCase();
+  const fallbackChainId =
+    Number(registryChainId || draftNetworkChainId || network?.id || network?.chainId || defaultChainId || 0) || null;
   const normalizeSourceConfig = (cfg: SessionConfigLike | null | undefined): SessionConfigLike | null => {
     if (!cfg || typeof cfg !== 'object') return null;
     const normalizedCfg = normalizeSessionNaming(cfg) as AnyRecord;
@@ -210,23 +193,17 @@ export const resolveSessionWizardSelectorSourceConfig = ({
       ...normalizedCfg,
       slug: activeSlug || normalizedCfg?.slug || '',
       networkChainId: Number(normalizedCfg?.networkChainId || fallbackChainId || 0) || fallbackChainId,
-      contracts: (normalizedCfg?.contracts && typeof normalizedCfg.contracts === 'object')
-        ? normalizedCfg.contracts
-        : {},
+      contracts: normalizedCfg?.contracts && typeof normalizedCfg.contracts === 'object' ? normalizedCfg.contracts : {},
     } as SessionConfigLike;
   };
 
-  const strictConfig = typeof resolveStrictConfig === 'function'
-    ? resolveStrictConfig(activeSlug)
-    : null;
+  const strictConfig = typeof resolveStrictConfig === 'function' ? resolveStrictConfig(activeSlug) : null;
   if (strictConfig && !strictConfig.__unresolved) {
     const normalizedStrictConfig = normalizeSourceConfig(strictConfig);
     if (normalizedStrictConfig) return normalizedStrictConfig;
   }
 
-  const displayConfig = typeof resolveDisplayConfig === 'function'
-    ? resolveDisplayConfig(activeSlug)
-    : null;
+  const displayConfig = typeof resolveDisplayConfig === 'function' ? resolveDisplayConfig(activeSlug) : null;
   if (displayConfig && !displayConfig.__unresolved) {
     const normalizedDisplayConfig = normalizeSourceConfig(displayConfig);
     if (normalizedDisplayConfig) return normalizedDisplayConfig;
@@ -235,10 +212,9 @@ export const resolveSessionWizardSelectorSourceConfig = ({
   // `/session/demo` is a read-only source-session alias in the wizard, so when no
   // explicit session config exists we still source discovery from the default bucket.
   if (activeSlug === 'demo') {
-    const defaultConfig = (
+    const defaultConfig =
       (typeof resolveStrictConfig === 'function' ? resolveStrictConfig('') : null) ||
-      (typeof resolveDisplayConfig === 'function' ? resolveDisplayConfig('') : null)
-    );
+      (typeof resolveDisplayConfig === 'function' ? resolveDisplayConfig('') : null);
     const normalizedDefaultConfig = normalizeSourceConfig(defaultConfig);
     if (normalizedDefaultConfig) return normalizedDefaultConfig;
   }

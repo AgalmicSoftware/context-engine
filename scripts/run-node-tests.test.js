@@ -5,8 +5,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
-const { collectNodeTestFiles } = require('./run-node-tests');
+const { collectNodeTestFiles, parseRunNodeTestsArgs } = require('./run-node-tests');
 
 function writeFile(rootDir, relativePath) {
   const absolutePath = path.join(rootDir, relativePath);
@@ -75,5 +76,38 @@ test('collectNodeTestFiles tolerates stripped public copies without optional hel
     ]);
     assert.equal(files.some((entry) => entry.includes('*')), false);
     assert.equal(files.some((entry) => entry.includes(path.join('scripts', 'lib', 'e2e'))), false);
+  });
+});
+
+test('collectNodeTestFiles can filter to git-tracked node tests', () => {
+  withTempRepo((rootDir) => {
+    execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
+    writeFile(rootDir, 'tests/root/arweave-metadata-uri.test.js');
+    writeFile(rootDir, 'scripts/verify-worker-bundle-sync.test.js');
+    writeFile(rootDir, 'scripts/untracked-local.test.js');
+    execFileSync('git', ['add', 'tests/root/arweave-metadata-uri.test.js', 'scripts/verify-worker-bundle-sync.test.js'], {
+      cwd: rootDir,
+      stdio: 'ignore',
+    });
+
+    assert.deepEqual(collectNodeTestFiles(rootDir, { trackedOnly: true }), [
+      'tests/root/arweave-metadata-uri.test.js',
+      path.join('scripts', 'verify-worker-bundle-sync.test.js'),
+    ]);
+  });
+});
+
+test('parseRunNodeTestsArgs accepts tracked-only flag or env opt-in', () => {
+  assert.deepEqual(parseRunNodeTestsArgs(['--tracked-only'], {}), {
+    trackedOnly: true,
+    unknownArgs: [],
+  });
+  assert.deepEqual(parseRunNodeTestsArgs([], { CE_NODE_TESTS_TRACKED_ONLY: '1' }), {
+    trackedOnly: true,
+    unknownArgs: [],
+  });
+  assert.deepEqual(parseRunNodeTestsArgs(['--unknown'], {}), {
+    trackedOnly: false,
+    unknownArgs: ['--unknown'],
   });
 });

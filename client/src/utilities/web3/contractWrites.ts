@@ -53,7 +53,7 @@ const rpcLog = (...args: unknown[]): void => {
 const logBroadcastCallbackFailure = (method: unknown, error: unknown): void => {
   contractsLog.warn(
     `[${method}] onBroadcastTxHash callback failed; continuing transaction wait`,
-    extractEstimateErrorMessage(error)
+    extractEstimateErrorMessage(error),
   );
 };
 
@@ -119,9 +119,7 @@ const resolveTxGasOverrides = async ({
   const methodName = String(method || '');
   const fallback = ethers.BigNumber.from(String(fallbackGasLimit));
   const min = ethers.BigNumber.from(String(minEstimate));
-  const safeOverrides = existingOverrides && typeof existingOverrides === 'object'
-    ? existingOverrides
-    : {};
+  const safeOverrides = existingOverrides && typeof existingOverrides === 'object' ? existingOverrides : {};
   let gasLimit = fallback;
 
   if (preferFallbackGasLimit) {
@@ -138,7 +136,7 @@ const resolveTxGasOverrides = async ({
       contractsLog.warn(
         `[${logLabel}] estimateGas too low; using fallback gasLimit`,
         estimate?.toString?.() || String(estimate),
-        fallback.toString()
+        fallback.toString(),
       );
     } else {
       gasLimit = estimate.mul(120).div(100);
@@ -150,7 +148,7 @@ const resolveTxGasOverrides = async ({
     contractsLog.warn(
       `[${logLabel}] estimateGas failed; using fallback gasLimit`,
       fallback.toString(),
-      extractEstimateErrorMessage(err)
+      extractEstimateErrorMessage(err),
     );
   }
 
@@ -245,7 +243,7 @@ const sendContractWriteViaProvider = async ({
   if (!ethersProvider || typeof ethersProvider.waitForTransaction !== 'function') {
     throw new Error('Connected wallet provider does not support waiting for transaction receipts.');
   }
-  const receipt = await ethersProvider.waitForTransaction(txHash) as AnyRecord;
+  const receipt = (await ethersProvider.waitForTransaction(txHash)) as AnyRecord;
   if (!receipt || (receipt.status !== undefined && receipt.status !== 1)) {
     const resolvedRevertMessage = await resolveReceiptRevertMessage({
       contract,

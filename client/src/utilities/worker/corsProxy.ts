@@ -17,22 +17,14 @@ import {
 } from '../session/sessionWorkerAvailability.js';
 import { toStr } from '../shared/primitives.js';
 import { createLogger } from '../logging.js';
-import {
-  defaultCorsProxyAllowDemoFallback,
-  resolveWorkerSessionContext,
-} from './workerSessionResolution.js';
+import { defaultCorsProxyAllowDemoFallback, resolveWorkerSessionContext } from './workerSessionResolution.js';
 
 const rpcLog = createLogger('rpc');
 
 const looksLikeEnvelope = (value: any): boolean => {
   if (!value) return false;
-  const isEnvelopeShape = (obj: any): boolean => (
-    !!obj &&
-    typeof obj === 'object' &&
-    typeof obj.ciphertext === 'string' &&
-    typeof obj.iv === 'string' &&
-    obj.aad
-  );
+  const isEnvelopeShape = (obj: any): boolean =>
+    !!obj && typeof obj === 'object' && typeof obj.ciphertext === 'string' && typeof obj.iv === 'string' && obj.aad;
   if (typeof value === 'object') return isEnvelopeShape(value);
   if (typeof value === 'string') {
     try {
@@ -99,7 +91,7 @@ export const resolveCorsProxyUrl = async ({
       status: 'plain',
       source: 'session',
       session: effectiveCfg,
-      group: effectiveCfg
+      group: effectiveCfg,
     };
   }
 

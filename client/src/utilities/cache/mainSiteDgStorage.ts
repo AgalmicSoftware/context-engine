@@ -1,9 +1,5 @@
 import { createLogger } from 'utilities/logging.js';
-import {
-  peekCacheSync,
-  removeCache,
-  writeCacheOptimistic,
-} from '../../utilities/cache/cacheScripts.js';
+import { peekCacheSync, removeCache, writeCacheOptimistic } from '../../utilities/cache/cacheScripts.js';
 import { DG_MANAGED_CACHE_NAMES } from './sessionCacheConstants.js';
 import {
   evictOldDgEntries,
@@ -27,19 +23,14 @@ export interface MainSiteDgStorage {
 
 const log = createLogger('mainSiteDgStorage');
 
-const isManagedDgCacheName = (name: unknown): boolean =>
-  DG_MANAGED_CACHE_NAMES.has(String(name || ''));
+const isManagedDgCacheName = (name: unknown): boolean => DG_MANAGED_CACHE_NAMES.has(String(name || ''));
 
 export const createMainSiteDgStorage = (): MainSiteDgStorage => {
   const lastWrittenJsonByKey: Map<string, string> = new Map();
 
   const key = (name: string, slug: string): string => `dg:${name}:${slug}`;
 
-  const read = (
-    name: string,
-    slug: string,
-    options: Record<string, unknown> = {},
-  ): unknown => {
+  const read = (name: string, slug: string, options: Record<string, unknown> = {}): unknown => {
     if (isManagedDgCacheName(name)) {
       return peekCacheSync(name, slug, options);
     }
@@ -53,11 +44,7 @@ export const createMainSiteDgStorage = (): MainSiteDgStorage => {
   const write = (name: string, slug: string, obj: unknown): Promise<boolean> => {
     const storageKey = `dg:${name}:${slug}`;
     if (isManagedDgCacheName(name)) {
-      return writeCacheOptimistic(
-        name,
-        slug,
-        obj as Parameters<typeof writeCacheOptimistic>[2],
-      )
+      return writeCacheOptimistic(name, slug, obj as Parameters<typeof writeCacheOptimistic>[2])
         .then((ok: boolean) => {
           if (!ok) {
             log.warn('[MainSite] DG.write managed cache persist failed', {
@@ -137,9 +124,7 @@ export const createMainSiteDgStorage = (): MainSiteDgStorage => {
     } catch (e: unknown) {
       const errorLike = e as { name?: string; code?: number };
       const isQuotaExceeded =
-        errorLike?.name === 'QuotaExceededError' ||
-        errorLike?.code === 22 ||
-        errorLike?.code === 1014;
+        errorLike?.name === 'QuotaExceededError' || errorLike?.code === 22 || errorLike?.code === 1014;
 
       if (isQuotaExceeded) {
         if (perfEnabled) bumpMainSitePerfCounter('dgWriteNonManagedQuotaRetryCount');
@@ -183,12 +168,14 @@ export const createMainSiteDgStorage = (): MainSiteDgStorage => {
   const remove = (name: string, slug: string): Promise<void> => {
     const storageKey = `dg:${name}:${slug}`;
     if (isManagedDgCacheName(name)) {
-      return removeCache(name, slug).catch((e: unknown) => {
-        log.warn('[MainSite] DG.remove managed cache persist failed', {
-          storageKey,
-          error: (e as { message?: string })?.message || e,
+      return removeCache(name, slug)
+        .then(() => undefined)
+        .catch((e: unknown) => {
+          log.warn('[MainSite] DG.remove managed cache persist failed', {
+            storageKey,
+            error: (e as { message?: string })?.message || e,
+          });
         });
-      });
     }
     try {
       localStorage.removeItem(storageKey);

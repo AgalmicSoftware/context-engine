@@ -1,9 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faSpinner,
-  faSync,
-} from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faSync } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import styles from './UserPage.module.scss';
@@ -54,15 +51,8 @@ const UserPageAnalysisModal = ({
   onRefreshAnalysis,
   onToggle,
 }: UserPageAnalysisModalProps): React.ReactElement => (
-  <Modal
-    isOpen={isOpen}
-    toggle={onToggle}
-    className={styles.modalContent}
-  >
-    <ModalHeader
-      toggle={onToggle}
-      className={styles.modalHeader}
-    >
+  <Modal isOpen={isOpen} toggle={onToggle} className={styles.modalContent}>
+    <ModalHeader toggle={onToggle} className={styles.modalHeader}>
       {/* Close "X" is intentionally hidden via CSS; do not delete this feature. */}
       <div className={styles.modalTitleRow}>
         {analysisName || 'User Analysis'}
@@ -87,14 +77,10 @@ const UserPageAnalysisModal = ({
       {analysisModalDisplayState.shouldRenderAnalyzing && (
         <div className={styles.analyzingContainer}>
           <FontAwesomeIcon icon={faSpinner} spin />
-          <span>
-            Generating insights… {(analysisElapsedMs / 1000).toFixed(1)}s
-          </span>
+          <span>Generating insights… {(analysisElapsedMs / 1000).toFixed(1)}s</span>
         </div>
       )}
-      {analysisModalDisplayState.shouldRenderError && (
-        <p className={styles.placeholderNote}>{analysisError}</p>
-      )}
+      {analysisModalDisplayState.shouldRenderError && <p className={styles.placeholderNote}>{analysisError}</p>}
       {analysisModalDisplayState.shouldRenderAnalysisBody && (
         <>
           <p className={styles.placeholderNote}>{aiAnalysis}</p>
@@ -102,9 +88,7 @@ const UserPageAnalysisModal = ({
           {analysisModalDisplayState.shouldRenderHistoricalAlignment && (
             <div className={styles.historicalAlignment}>
               <h4>Historical Alignment</h4>
-              {analysisModalDisplayState.shouldRenderHistoricalFigure && (
-                <p>{analysisHistoricalFigure}</p>
-              )}
+              {analysisModalDisplayState.shouldRenderHistoricalFigure && <p>{analysisHistoricalFigure}</p>}
               {analysisModalDisplayState.shouldRenderHistoricalReasoning && (
                 <p className={styles.placeholderNote}>{analysisHistoricalReasoning}</p>
               )}

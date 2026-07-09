@@ -38,22 +38,28 @@ describe('sbtOverviewPageHelpers', () => {
   it('builds SBTsPage initial state and boolean toggle patches', () => {
     const hasCachedCreateSbtForm = jest.fn(() => true);
 
-    expect(resolveSBTsPageInitialCreateGroupSessionSlug({
-      activeSessionSlug: 'active',
-      sessionConfig: { slug: 'config' },
-      sessionSlug: ' direct ',
-    })).toBe('direct');
-    expect(resolveSBTsPageInitialCreateGroupSessionSlug({
-      activeSessionSlug: ' active ',
-      sessionConfig: { slug: ' config ' },
-      sessionSlug: '',
-    })).toBe('config');
-    expect(buildSBTsPageInitialState({
-      activeSessionSlug: ' active ',
-      hasCachedCreateSbtForm,
-      sessionConfig: null,
-      sessionSlug: '',
-    })).toEqual({
+    expect(
+      resolveSBTsPageInitialCreateGroupSessionSlug({
+        activeSessionSlug: 'active',
+        sessionConfig: { slug: 'config' },
+        sessionSlug: ' direct ',
+      }),
+    ).toBe('direct');
+    expect(
+      resolveSBTsPageInitialCreateGroupSessionSlug({
+        activeSessionSlug: ' active ',
+        sessionConfig: { slug: ' config ' },
+        sessionSlug: '',
+      }),
+    ).toBe('config');
+    expect(
+      buildSBTsPageInitialState({
+        activeSessionSlug: ' active ',
+        hasCachedCreateSbtForm,
+        sessionConfig: null,
+        sessionSlug: '',
+      }),
+    ).toEqual({
       showSBTsList: false,
       showCreateGroup: true,
     });
@@ -66,14 +72,18 @@ describe('sbtOverviewPageHelpers', () => {
       showSBTsList: false,
       showCreateGroup: false,
     });
-    expect(buildSBTsPageBooleanTogglePatch({
-      state: { showSBTsList: false },
-      stateKey: 'showSBTsList',
-    })).toEqual({ showSBTsList: true });
-    expect(buildSBTsPageBooleanTogglePatch({
-      state: { showCreateGroup: 'open' },
-      stateKey: 'showCreateGroup',
-    })).toEqual({ showCreateGroup: false });
+    expect(
+      buildSBTsPageBooleanTogglePatch({
+        state: { showSBTsList: false },
+        stateKey: 'showSBTsList',
+      }),
+    ).toEqual({ showSBTsList: true });
+    expect(
+      buildSBTsPageBooleanTogglePatch({
+        state: { showCreateGroup: 'open' },
+        stateKey: 'showCreateGroup',
+      }),
+    ).toEqual({ showCreateGroup: false });
     expect(resolveSBTsPageCacheFeaturedCardLinkStyle()).toEqual({
       minWidth: '240px',
       maxWidth: '240px',
@@ -91,27 +101,29 @@ describe('sbtOverviewPageHelpers', () => {
   });
 
   it('builds cache-backed featured card models', () => {
-    expect(buildSBTsPageCacheFeaturedCardModel({
-      defaultImage: '/default.png',
-      effectiveSessionSlug: 'fallback',
-      entry: {
-        address: ' 0xABC ',
-        sessionSlug: 'Edge',
-        sbt: {
-          sbtInfo: {
-            hasPasswordMint: true,
-            image: 'ipfs://asset/path',
-            mintingEndTime: 200,
-            name: 'Named Badge',
+    expect(
+      buildSBTsPageCacheFeaturedCardModel({
+        defaultImage: '/default.png',
+        effectiveSessionSlug: 'fallback',
+        entry: {
+          address: ' 0xABC ',
+          sessionSlug: 'Edge',
+          sbt: {
+            sbtInfo: {
+              hasPasswordMint: true,
+              image: 'ipfs://asset/path',
+              mintingEndTime: 200,
+              name: 'Named Badge',
+            },
           },
         },
-      },
-      getDisplayName: (info) => (isSBTsPageRecord(info) ? info.name : ''),
-      getShortAddress: (address) => `short:${address}`,
-      index: 3,
-      nowSeconds: 100,
-      sbtLabel: 'Group',
-    })).toMatchObject({
+        getDisplayName: (info) => (isSBTsPageRecord(info) ? info.name : ''),
+        getShortAddress: (address) => `short:${address}`,
+        index: 3,
+        nowSeconds: 100,
+        sbtLabel: 'Group',
+      }),
+    ).toMatchObject({
       imageUrl: 'https://ipfs.io/ipfs/asset/path',
       isMintingActive: true,
       isPasswordLocked: true,
@@ -121,20 +133,22 @@ describe('sbtOverviewPageHelpers', () => {
       sbtName: 'Named Badge',
       shortenedAddress: 'short:0xABC',
     });
-    expect(buildSBTsPageCacheFeaturedCardModel({
-      defaultImage: '/default.png',
-      entry: {
-        address: '',
-        sbt: {
-          sbtInfo: {
-            mintingEndTime: 50,
+    expect(
+      buildSBTsPageCacheFeaturedCardModel({
+        defaultImage: '/default.png',
+        entry: {
+          address: '',
+          sbt: {
+            sbtInfo: {
+              mintingEndTime: 50,
+            },
           },
         },
-      },
-      index: 7,
-      nowSeconds: 100,
-      sbtLabel: 'Group',
-    })).toMatchObject({
+        index: 7,
+        nowSeconds: 100,
+        sbtLabel: 'Group',
+      }),
+    ).toMatchObject({
       imageUrl: '/default.png',
       isMintingActive: false,
       isPasswordLocked: false,
@@ -146,23 +160,27 @@ describe('sbtOverviewPageHelpers', () => {
   });
 
   it('builds featured entry models for embedded SBT cards', () => {
-    expect(buildSBTsPageFeaturedEntryModel({
-      effectiveSessionSlug: 'fallback',
-      entry: {
-        address: '0xABC',
-        sessionSlug: 'Edge',
-      },
-      index: 5,
-    })).toEqual({
+    expect(
+      buildSBTsPageFeaturedEntryModel({
+        effectiveSessionSlug: 'fallback',
+        entry: {
+          address: '0xABC',
+          sessionSlug: 'Edge',
+        },
+        index: 5,
+      }),
+    ).toEqual({
       resolvedSessionSlug: 'Edge',
       sbtAddress: '0xABC',
       sbtKey: 'Edge:0xabc',
     });
-    expect(buildSBTsPageFeaturedEntryModel({
-      effectiveSessionSlug: 'fallback',
-      entry: {},
-      index: 5,
-    })).toEqual({
+    expect(
+      buildSBTsPageFeaturedEntryModel({
+        effectiveSessionSlug: 'fallback',
+        entry: {},
+        index: 5,
+      }),
+    ).toEqual({
       resolvedSessionSlug: 'fallback',
       sbtAddress: undefined,
       sbtKey: 'fallback:5',
@@ -170,53 +188,59 @@ describe('sbtOverviewPageHelpers', () => {
   });
 
   it('resolves display session configs and list fields through injected readers', () => {
-    const getSessionConfigBySlug = jest.fn((slug: string) => (
-      slug === 'Edge'
-        ? { featured_SBTs_LIST: ['0xA'], ignored_SBTs_LIST: 'bad', slug }
-        : null
-    ));
+    const getSessionConfigBySlug = jest.fn((slug: string) =>
+      slug === 'Edge' ? { featured_SBTs_LIST: ['0xA'], ignored_SBTs_LIST: 'bad', slug } : null,
+    );
     const getSessionConfigBySlugOrDefault = jest.fn(() => null);
-    const getDemoSessionConfigBySlug = jest.fn((slug: string) => (
+    const getDemoSessionConfigBySlug = jest.fn((slug: string) =>
       slug === ''
         ? { featured_SBTs_LIST: ['0xDefault'], ignored_SBTs_LIST: ['0xIgnoreDefault'] }
-        : { featured_SBTs_LIST: ['0xDemo'], ignored_SBTs_LIST: ['0xIgnoreDemo'], slug }
-    ));
+        : { featured_SBTs_LIST: ['0xDemo'], ignored_SBTs_LIST: ['0xIgnoreDemo'], slug },
+    );
 
-    expect(resolveSBTsPageDisplaySessionConfig({
-      getDemoSessionConfigBySlug,
-      getSessionConfigBySlug,
-      getSessionConfigBySlugOrDefault,
-      slugIn: ' Edge ',
-    })).toEqual({
+    expect(
+      resolveSBTsPageDisplaySessionConfig({
+        getDemoSessionConfigBySlug,
+        getSessionConfigBySlug,
+        getSessionConfigBySlugOrDefault,
+        slugIn: ' Edge ',
+      }),
+    ).toEqual({
       featured_SBTs_LIST: ['0xA'],
       ignored_SBTs_LIST: 'bad',
       slug: 'Edge',
     });
-    expect(resolveSBTsPageDisplaySessionConfig({
-      getDemoSessionConfigBySlug,
-      getSessionConfigBySlug,
-      getSessionConfigBySlugOrDefault,
-      slugIn: '',
-    })).toEqual({
+    expect(
+      resolveSBTsPageDisplaySessionConfig({
+        getDemoSessionConfigBySlug,
+        getSessionConfigBySlug,
+        getSessionConfigBySlugOrDefault,
+        slugIn: '',
+      }),
+    ).toEqual({
       featured_SBTs_LIST: ['0xDefault'],
       ignored_SBTs_LIST: ['0xIgnoreDefault'],
     });
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('', { allowDemoFallback: true });
 
-    expect(resolveSBTsPageDisplaySessionLists({
-      getDemoSessionConfigBySlug,
-      getSessionConfigBySlug,
-      slugIn: 'missing',
-    })).toEqual({
+    expect(
+      resolveSBTsPageDisplaySessionLists({
+        getDemoSessionConfigBySlug,
+        getSessionConfigBySlug,
+        slugIn: 'missing',
+      }),
+    ).toEqual({
       featured_SBTs_LIST: ['0xDemo'],
       ignored_SBTs_LIST: ['0xIgnoreDemo'],
     });
-    expect(resolveSBTsPageDisplaySessionLists({
-      sessionConfig: {
-        featured_SBTs_LIST: 'bad',
-        ignored_SBTs_LIST: ['0xB'],
-      },
-    })).toEqual({
+    expect(
+      resolveSBTsPageDisplaySessionLists({
+        sessionConfig: {
+          featured_SBTs_LIST: 'bad',
+          ignored_SBTs_LIST: ['0xB'],
+        },
+      }),
+    ).toEqual({
       featured_SBTs_LIST: [],
       ignored_SBTs_LIST: ['0xB'],
     });
@@ -228,35 +252,48 @@ describe('sbtOverviewPageHelpers', () => {
   });
 
   it('builds progress signatures for deduped slugs', () => {
-    expect(buildSBTsPageFeaturedProgressSignature({
-      edge: {
-        currentBlock: 10,
-        latestBlock: 20,
-        displayCurrentBlock: 11,
-        liveCurrentBlock: 12,
-        lastBlock: 9,
-        scanInProgress: true,
-        deferred: false,
-      },
-    }, ['edge', 'edge', 'missing'])).toBe('edge:10:20:11:12:9:1:0|missing:idle');
+    expect(
+      buildSBTsPageFeaturedProgressSignature(
+        {
+          edge: {
+            currentBlock: 10,
+            latestBlock: 20,
+            displayCurrentBlock: 11,
+            liveCurrentBlock: 12,
+            lastBlock: 9,
+            scanInProgress: true,
+            deferred: false,
+          },
+        },
+        ['edge', 'edge', 'missing'],
+      ),
+    ).toBe('edge:10:20:11:12:9:1:0|missing:idle');
   });
 
   it('resolves auto-feature precedence from session metadata', () => {
-    expect(resolveSBTsPageAutoFeatureBySessionSlug({
-      autoFeatureSBTsBySessionSlug: false,
-      autoFeatureSBTsWithFeaturedSbtTags: true,
-    })).toBe(false);
-    expect(resolveSBTsPageAutoFeatureBySessionSlug({
-      autoFeatureSBTsWithFeaturedSbtTags: false,
-    })).toBe(false);
+    expect(
+      resolveSBTsPageAutoFeatureBySessionSlug({
+        autoFeatureSBTsBySessionSlug: false,
+        autoFeatureSBTsWithFeaturedSbtTags: true,
+      }),
+    ).toBe(false);
+    expect(
+      resolveSBTsPageAutoFeatureBySessionSlug({
+        autoFeatureSBTsWithFeaturedSbtTags: false,
+      }),
+    ).toBe(false);
     expect(resolveSBTsPageAutoFeatureBySessionSlug(null)).toBeUndefined();
-    expect(isSBTsPageSessionAutoFeatureEnabled({
-      autoFeatureSBTsBySessionSlug: true,
-      autoFeatureSBTsWithFeaturedSbtTags: false,
-    })).toBe(true);
-    expect(isSBTsPageSessionAutoFeatureEnabled({
-      autoFeatureSBTsBySessionSlug: false,
-    })).toBe(false);
+    expect(
+      isSBTsPageSessionAutoFeatureEnabled({
+        autoFeatureSBTsBySessionSlug: true,
+        autoFeatureSBTsWithFeaturedSbtTags: false,
+      }),
+    ).toBe(true);
+    expect(
+      isSBTsPageSessionAutoFeatureEnabled({
+        autoFeatureSBTsBySessionSlug: false,
+      }),
+    ).toBe(false);
   });
 
   it('resolves featured SBT session slugs by metadata authority', () => {
@@ -265,42 +302,67 @@ describe('sbtOverviewPageHelpers', () => {
     expect(hasSBTsPageAuthoritativeSessionSlug({ sessionSlug: 'edge', sessionSlugExplicit: false })).toBe(false);
     expect(hasSBTsPageExplicitSessionSlug({ sessionSlug: 'edge' })).toBe(false);
     expect(hasSBTsPageExplicitSessionSlug({ sessionSlug: 'edge', sessionSlugExplicit: true })).toBe(true);
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sessionSlug: 'top',
-      sbtInfo: { sessionSlug: 'info', sessionSlugExplicit: true },
-    })).toBe('info');
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sessionSlug: 'top',
-      sessionSlugExplicit: true,
-      sbtInfo: { slug: 'legacy' },
-    })).toBe('top');
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sbtInfo: { slug: 'legacy' },
-    })).toBe('legacy');
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sessionSlug: 'alpha',
-      sessionSlugExplicit: false,
-      sbtInfo: { sessionSlug: 'alpha', sessionSlugExplicit: false },
-    })).toBeNull();
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sbtInfo: { sessionSlug: 'legacy-compatible' },
-    }, { requireExplicitSessionSlug: true })).toBeNull();
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sbtInfo: { slug: 'legacy' },
-    }, { requireExplicitSessionSlug: true })).toBeNull();
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sbtInfo: { sessionSlug: 'explicit', sessionSlugExplicit: true },
-    }, { requireExplicitSessionSlug: true })).toBe('explicit');
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug({
+        sessionSlug: 'top',
+        sbtInfo: { sessionSlug: 'info', sessionSlugExplicit: true },
+      }),
+    ).toBe('info');
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug({
+        sessionSlug: 'top',
+        sessionSlugExplicit: true,
+        sbtInfo: { slug: 'legacy' },
+      }),
+    ).toBe('top');
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug({
+        sbtInfo: { slug: 'legacy' },
+      }),
+    ).toBe('legacy');
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug({
+        sessionSlug: 'alpha',
+        sessionSlugExplicit: false,
+        sbtInfo: { sessionSlug: 'alpha', sessionSlugExplicit: false },
+      }),
+    ).toBeNull();
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug(
+        {
+          sbtInfo: { sessionSlug: 'legacy-compatible' },
+        },
+        { requireExplicitSessionSlug: true },
+      ),
+    ).toBeNull();
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug(
+        {
+          sbtInfo: { slug: 'legacy' },
+        },
+        { requireExplicitSessionSlug: true },
+      ),
+    ).toBeNull();
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug(
+        {
+          sbtInfo: { sessionSlug: 'explicit', sessionSlugExplicit: true },
+        },
+        { requireExplicitSessionSlug: true },
+      ),
+    ).toBe('explicit');
     expect(resolveSBTsPageFeaturedSbtSessionSlug(null)).toBeNull();
   });
 
   it('normalizes featured entries for cache-backed card lookups', () => {
-    expect(normalizeSBTsPageFeaturedEntries([
-      { address: ' 0xABC ', sessionSlug: ' Edge ' },
-      { address: '', sessionSlug: 'missing' },
-      null,
-      { address: '0xDEF' },
-    ])).toEqual([
+    expect(
+      normalizeSBTsPageFeaturedEntries([
+        { address: ' 0xABC ', sessionSlug: ' Edge ' },
+        { address: '', sessionSlug: 'missing' },
+        null,
+        { address: '0xDEF' },
+      ]),
+    ).toEqual([
       { address: '0xABC', lowerAddress: '0xabc', sessionSlug: 'Edge' },
       { address: '0xDEF', lowerAddress: '0xdef', sessionSlug: '' },
     ]);

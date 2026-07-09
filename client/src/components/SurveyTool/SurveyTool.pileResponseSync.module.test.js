@@ -61,9 +61,7 @@ const applyDraftEntryToSlice = ({ targetSlice, questionId, draftEntry }) => {
   return true;
 };
 
-const mergeScopedQuestionResponses = (target = {}, source = {}) => (
-  mergeQuestionResponses(target, source)
-);
+const mergeScopedQuestionResponses = (target = {}, source = {}) => mergeQuestionResponses(target, source);
 
 describe('SurveyTool pile response sync and JSON controls', () => {
   afterEach(() => {
@@ -300,7 +298,7 @@ describe('SurveyTool pile response sync and JSON controls', () => {
       pileQuestions: [createQuestion('q1')],
     });
     const readQuestionsCache = jest.fn(() => ({
-      '84532': {
+      84532: {
         questionResponses: {
           q1: {
             '0xabc': {

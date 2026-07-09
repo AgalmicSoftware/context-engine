@@ -27,22 +27,14 @@ export const UserPageDeepScanProgressPanel = ({
 
   return (
     <div className={styles.deepScanProgressPanel}>
-      {headerText ? (
-        <div className={styles.deepScanProgressHeader}>{headerText}</div>
-      ) : null}
+      {headerText ? <div className={styles.deepScanProgressHeader}>{headerText}</div> : null}
       {progressRows.map((row, index) => {
-        const {
-          indeterminateText,
-          progressFillStyle,
-          remainingText,
-          rowKey,
-          scannedText,
-          shouldRenderScannedText,
-        } = buildUserPageDeepScanProgressRowDisplayState({
-          index,
-          row,
-          showScannedText,
-        });
+        const { indeterminateText, progressFillStyle, remainingText, rowKey, scannedText, shouldRenderScannedText } =
+          buildUserPageDeepScanProgressRowDisplayState({
+            index,
+            row,
+            showScannedText,
+          });
 
         return (
           <div key={rowKey} className={styles.deepScanProgressRow}>
@@ -50,15 +42,10 @@ export const UserPageDeepScanProgressPanel = ({
             {row.isDeterminate ? (
               <>
                 <div className={styles.deepScanProgressBar}>
-                  <div
-                    className={styles.deepScanProgressFill}
-                    style={progressFillStyle}
-                  />
+                  <div className={styles.deepScanProgressFill} style={progressFillStyle} />
                 </div>
                 <div className={styles.deepScanProgressStats}>{remainingText}</div>
-                {shouldRenderScannedText ? (
-                  <div className={styles.deepScanProgressStats}>{scannedText}</div>
-                ) : null}
+                {shouldRenderScannedText ? <div className={styles.deepScanProgressStats}>{scannedText}</div> : null}
               </>
             ) : (
               <div className={styles.deepScanIndeterminate}>{indeterminateText}</div>

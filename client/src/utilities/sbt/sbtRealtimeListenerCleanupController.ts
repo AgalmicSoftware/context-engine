@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../web3/contractScripts.js';
+import { normalizeSessionSlug } from '../web3/chainGateway.js';
 
 interface SbtRealtimeListenerContractScripts {
   removeSBTEventListener?: (provider: string, sessionSlug: string) => unknown;
@@ -19,10 +19,10 @@ export const createSbtRealtimeListenerCleanupController = ({
   clearCoverage = null,
   contractScripts = null,
 }: SbtRealtimeListenerCleanupOptions = {}) => {
-  const removeSbtRealtimeListenersForGroup = (slugIn: unknown, {
-    removeFactory = true,
-    removeInstance = true,
-  }: SbtRealtimeListenerRemovalOptions = {}) => {
+  const removeSbtRealtimeListenersForGroup = (
+    slugIn: unknown,
+    { removeFactory = true, removeInstance = true }: SbtRealtimeListenerRemovalOptions = {},
+  ) => {
     const slug = normalizeSessionSlug(slugIn || '');
     if (typeof clearCoverage === 'function') {
       clearCoverage(slug);

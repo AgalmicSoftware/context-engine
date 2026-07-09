@@ -61,9 +61,12 @@ Local development:
 
 Release:
 - `docs/dependency-audit-hotspots.md`: dependency audit remediations, accepted residuals, and package-specific audit commands.
+- `docs/dependency-audit.md`: current client npm audit disposition ledger and blocked/deferred package-family decisions.
 - `docs/release-runbook.md`: operator release checklist, gates, public strip policy, worker bundle publishing, and rollback notes.
 - `docs/releasing.md`: Public-history replay, stripped artifact export, and release hygiene checks.
+- `docs/security/at-rest-hardening-decision-note.md`: current passkey at-rest evidence and required decisions before worker KV secret encryption.
 - `docs/security/audit-prep-2026-07-06.md`: built-in audit-prep snapshot covering npm audit disposition, secrets/config sweeps, and contracts/worker inventory.
+- `docs/security-sweeps.md`: full-history secret-sweep commands, raw match counts, and dispositions.
 - `docs/testing-budget.md`: full client/test:node runtime budget, coverage snapshot, and slowest-suite report.
 - `docs/typescript-strictness-plan.md`: plan for moving from count ratchets toward directory-level compiler strictness.
 

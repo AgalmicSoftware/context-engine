@@ -38,30 +38,30 @@ export type SbtSelectorLoadOptionsRequestDecision = {
   shouldSkipUnchanged: boolean;
 };
 
-const isSbtSelectorHydrationRecord = (value: unknown): value is Record<string, unknown> => (
-  value != null && typeof value === 'object' && !Array.isArray(value)
-);
+const isSbtSelectorHydrationRecord = (value: unknown): value is Record<string, unknown> =>
+  value != null && typeof value === 'object' && !Array.isArray(value);
 
 export const buildSelectedSbtHydrationAddresses = (selectedSBTs: unknown): string[] => {
   const selected = Array.isArray(selectedSBTs) ? selectedSBTs : [];
-  return Array.from(new Set(
-    selected
-      .map((entry: unknown) => {
-        const record = isSbtSelectorHydrationRecord(entry) ? entry as SbtSelectorHydrationAddressEntry : {};
-        return String(record.address || '').trim();
-      })
-      .filter((value: string) => ethers.utils.isAddress(value))
-      .map((value: string) => ethers.utils.getAddress(value))
-  ));
+  return Array.from(
+    new Set(
+      selected
+        .map((entry: unknown) => {
+          const record = isSbtSelectorHydrationRecord(entry) ? (entry as SbtSelectorHydrationAddressEntry) : {};
+          return String(record.address || '').trim();
+        })
+        .filter((value: string) => ethers.utils.isAddress(value))
+        .map((value: string) => ethers.utils.getAddress(value)),
+    ),
+  );
 };
 
 export const buildSelectedSbtHydrationSignature = ({
   addresses = [],
   networkID = null,
   slug = '',
-}: BuildSelectedSbtHydrationSignatureArgs = {}): string => (
-  `${String(slug || '')}|${Number(networkID || 0)}|${(Array.isArray(addresses) ? addresses : []).join(',')}`
-);
+}: BuildSelectedSbtHydrationSignatureArgs = {}): string =>
+  `${String(slug || '')}|${Number(networkID || 0)}|${(Array.isArray(addresses) ? addresses : []).join(',')}`;
 
 export const resolveSbtSelectorTargetedHydrationDecision = ({
   addresses = [],
@@ -75,12 +75,19 @@ export const resolveSbtSelectorTargetedHydrationDecision = ({
     hitList
       .map((entry: unknown) => {
         const record = isSbtSelectorHydrationRecord(entry) ? entry : {};
-        return String(record.address || '').trim().toLowerCase();
+        return String(record.address || '')
+          .trim()
+          .toLowerCase();
       })
-      .filter(Boolean)
+      .filter(Boolean),
   );
   const hasUnresolvedAddresses = addressList.some(
-    (address: unknown) => !resolvedAddresses.has(String(address || '').trim().toLowerCase())
+    (address: unknown) =>
+      !resolvedAddresses.has(
+        String(address || '')
+          .trim()
+          .toLowerCase(),
+      ),
   );
   if (!hasHits) {
     return {

@@ -7,9 +7,7 @@ import type {
   SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
 import type { SurveyResultsHtmlReportExportModalProps } from './SurveyResultsHtmlReportExportModal';
-import {
-  buildSurveyResultsHtmlReportExportModalDescriptor,
-} from './surveyResultsHtmlReportModalDescriptor';
+import { buildSurveyResultsHtmlReportExportModalDescriptor } from './surveyResultsHtmlReportModalDescriptor';
 
 export type SurveyResultsHtmlReportModalPropsInput = Pick<
   SurveyResultsHtmlReportExportModalProps,

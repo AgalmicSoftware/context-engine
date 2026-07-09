@@ -26,7 +26,7 @@ describe('AgentPage', () => {
     expect(screen.getByText('no')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.AGENT_LOG)).toHaveTextContent('Log is empty.');
     expect(screen.getByTestId(E2E_TESTIDS.AGENT_ACTIONS)).not.toHaveValue(
-      expect.stringContaining('ai-browseruse-75209033')
+      expect.stringContaining('ai-browseruse-75209033'),
     );
   });
 
@@ -79,9 +79,9 @@ describe('AgentPage', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.AGENT_RUN));
 
     await waitFor(() => {
-      expect(run).toHaveBeenCalledWith(expect.arrayContaining([
-        expect.objectContaining({ type: 'navigate', to: '/compare/' }),
-      ]));
+      expect(run).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ type: 'navigate', to: '/compare/' })]),
+      );
     });
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.AGENT_LOG)).toHaveTextContent('run:start');

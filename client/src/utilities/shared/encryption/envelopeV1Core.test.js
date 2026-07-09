@@ -82,7 +82,7 @@ const deriveKekFromSigIndependent = async (signatureHex, contextBytes, keyUsages
     hkdfKey,
     { name: 'AES-GCM', length: 256 },
     false,
-    keyUsages
+    keyUsages,
   );
 };
 
@@ -143,10 +143,7 @@ describe('envelopeV1Core', () => {
   });
 
   it('concatenates bytes while ignoring empty and null arrays', () => {
-    expectBytes(
-      concatBytes(null, new Uint8Array([1]), new Uint8Array(), undefined, new Uint8Array([2, 3])),
-      [1, 2, 3]
-    );
+    expectBytes(concatBytes(null, new Uint8Array([1]), new Uint8Array(), undefined, new Uint8Array([2, 3])), [1, 2, 3]);
   });
 
   it('normalizes lowercase strings and strictly detects objects', () => {
@@ -176,7 +173,7 @@ describe('envelopeV1Core', () => {
     expect(bytesToHex(encodeRating(12))).toBe('0x0a');
     expect(bytesToHex(encodeRating(-1))).toBe('0x00');
     expect(bytesToHex(encodeMultichoiceBitset(['a', 'i'], ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']))).toBe(
-      '0x0101'
+      '0x0101',
     );
     expect(bytesToHex(encodeFreeform('hi\u2713'))).toBe('0x6869e29c93');
   });
@@ -208,11 +205,9 @@ describe('envelopeV1Core', () => {
     const fakeHasher = ([a, b, c]) => a + b + c;
 
     await expect(
-      poseidonHashBytes([new Uint8Array([1]), new Uint8Array([2]), new Uint8Array([3])], fakeHasher)
+      poseidonHashBytes([new Uint8Array([1]), new Uint8Array([2]), new Uint8Array([3])], fakeHasher),
     ).resolves.toBe(bigIntToHex32(6n));
-    await expect(poseidonHashBytes([new Uint8Array([1])], null)).rejects.toThrow(
-      /Poseidon hasher required/
-    );
+    await expect(poseidonHashBytes([new Uint8Array([1])], null)).rejects.toThrow(/Poseidon hasher required/);
   });
 
   it('supports async Poseidon hashers and normalizes their output', async () => {
@@ -220,20 +215,16 @@ describe('envelopeV1Core', () => {
     const independentlyComputedSum = 1n + 2n;
     const expected = bigIntToHex32((independentlyComputedSum + 7n) % BN254_P);
 
-    await expect(
-      poseidonHashBytes([new Uint8Array([1]), new Uint8Array([2])], asyncHasher)
-    ).resolves.toBe(expected);
+    await expect(poseidonHashBytes([new Uint8Array([1]), new Uint8Array([2])], asyncHasher)).resolves.toBe(expected);
   });
 
   it('builds deterministic commitment domain bytes', () => {
     const expected = `rxc|commit|v1|chain:${CHAIN_ID}|survey:${SURVEY_ID}|qid:${Q_ID.toLowerCase()}`;
     const expectedBytes = new TextEncoder().encode(expected);
 
-    expect(utf8d(buildCommitDomainBytes({ chainId: CHAIN_ID, surveyId: SURVEY_ID, qId: Q_ID }))).toBe(
-      expected
-    );
+    expect(utf8d(buildCommitDomainBytes({ chainId: CHAIN_ID, surveyId: SURVEY_ID, qId: Q_ID }))).toBe(expected);
     expect(bytesToHex(buildCommitDomainBytes({ chainId: CHAIN_ID, surveyId: SURVEY_ID, qId: Q_ID }))).toBe(
-      ethers.utils.hexlify(expectedBytes)
+      ethers.utils.hexlify(expectedBytes),
     );
   });
 
@@ -241,7 +232,7 @@ describe('envelopeV1Core', () => {
     const fixedSaltBytes = Uint8Array.from({ length: 16 }, (_, i) => i);
     const canonicalBytes = new Uint8Array([2]);
     const domainBytes = new TextEncoder().encode(
-      `rxc|commit|v1|chain:${CHAIN_ID}|survey:${SURVEY_ID}|qid:${Q_ID.toLowerCase()}`
+      `rxc|commit|v1|chain:${CHAIN_ID}|survey:${SURVEY_ID}|qid:${Q_ID.toLowerCase()}`,
     );
     const combinedBytes = new Uint8Array(fixedSaltBytes.length + canonicalBytes.length + domainBytes.length);
     combinedBytes.set(fixedSaltBytes, 0);
@@ -257,11 +248,7 @@ describe('envelopeV1Core', () => {
       return out;
     };
     const expectedPoseidonValue =
-      ([fixedSaltBytes, canonicalBytes, domainBytes].reduce(
-        (acc, bytes) => acc + toFieldIndependent(bytes),
-        0n
-      ) +
-        1n) %
+      ([fixedSaltBytes, canonicalBytes, domainBytes].reduce((acc, bytes) => acc + toFieldIndependent(bytes), 0n) + 1n) %
       bn254P;
     const expected = {
       salt: '0x000102030405060708090a0b0c0d0e0f',
@@ -334,16 +321,12 @@ describe('envelopeV1Core', () => {
   it('computes stable context hashes for fixed inputs', () => {
     const expected = ethers.utils.keccak256(
       new TextEncoder().encode(
-        `rxc|v1|chain:${CHAIN_ID}|acct:${ACCOUNT}|survey:${SURVEY_ID}|qid:${Q_ID.toLowerCase()}`
-      )
+        `rxc|v1|chain:${CHAIN_ID}|acct:${ACCOUNT}|survey:${SURVEY_ID}|qid:${Q_ID.toLowerCase()}`,
+      ),
     );
 
-    expect(computeContext({ chainId: CHAIN_ID, account: ACCOUNT, surveyId: SURVEY_ID, qId: Q_ID })).toBe(
-      expected
-    );
-    expect(computeContext({ chainId: CHAIN_ID, account: ACCOUNT, surveyId: SURVEY_ID, qId: Q_ID })).toBe(
-      expected
-    );
+    expect(computeContext({ chainId: CHAIN_ID, account: ACCOUNT, surveyId: SURVEY_ID, qId: Q_ID })).toBe(expected);
+    expect(computeContext({ chainId: CHAIN_ID, account: ACCOUNT, surveyId: SURVEY_ID, qId: Q_ID })).toBe(expected);
   });
 
   it('builds AAD and hashes identifiers deterministically', () => {
@@ -365,7 +348,7 @@ describe('envelopeV1Core', () => {
         SURVEY_ID +
         '","qId":"' +
         Q_ID +
-        '"}'
+        '"}',
     );
     expect(hashIdentifier(upperHexDigits)).toBe(upperHexDigits.toLowerCase());
     expect(hashIdentifier('')).toBe(ethers.utils.hexZeroPad('0x0', 32));
@@ -425,14 +408,12 @@ describe('envelopeV1Core', () => {
     expect(() => parseEnvelope(makeEnvelopeJson({ recipients: [{ type: '' }] }))).toThrow(/recipient type/);
     expect(() => parseEnvelope(makeEnvelopeJson({ recipients: [{ type: 'lit-sbt-v1' }] }))).not.toThrow();
     expect(() => parseEnvelope(makeEnvelopeJson({ commitments: {} }))).toThrow(/keccak256/);
-    expect(() => parseEnvelope(makeEnvelopeJson({ commitments: { keccak256: '0x1234' } }))).toThrow(
-      /keccak256/
-    );
+    expect(() => parseEnvelope(makeEnvelopeJson({ commitments: { keccak256: '0x1234' } }))).toThrow(/keccak256/);
     expect(() =>
-      parseEnvelope(makeEnvelopeJson({ commitments: { keccak256: KECCAK_HEX, poseidon: null } }))
+      parseEnvelope(makeEnvelopeJson({ commitments: { keccak256: KECCAK_HEX, poseidon: null } })),
     ).not.toThrow();
     expect(() =>
-      parseEnvelope(makeEnvelopeJson({ commitments: { keccak256: KECCAK_HEX, poseidon: '0x1234' } }))
+      parseEnvelope(makeEnvelopeJson({ commitments: { keccak256: KECCAK_HEX, poseidon: '0x1234' } })),
     ).toThrow(/poseidon/);
   });
 
@@ -442,7 +423,7 @@ describe('envelopeV1Core', () => {
     ['missing context and nonce', { context: undefined, nonce: undefined }],
   ])('accepts self-eip712-v1 recipients with optional %s', (_, recipientOverrides) => {
     expect(() =>
-      parseEnvelope(makeEnvelopeJson({ recipients: [makeSelfRecipient(recipientOverrides)] }))
+      parseEnvelope(makeEnvelopeJson({ recipients: [makeSelfRecipient(recipientOverrides)] })),
     ).not.toThrow();
   });
 
@@ -455,30 +436,22 @@ describe('envelopeV1Core', () => {
       /recipient\[0\].*wrap_iv must decode to exactly 12 bytes/,
     ],
     ['missing wrapped_cek', { wrapped_cek: undefined }, /recipient\[0\].*missing wrapped_cek/],
-    [
-      'empty wrapped_cek',
-      { wrapped_cek: b64encode(new Uint8Array()) },
-      /recipient\[0\].*wrapped_cek/,
-    ],
+    ['empty wrapped_cek', { wrapped_cek: b64encode(new Uint8Array()) }, /recipient\[0\].*wrapped_cek/],
     ['non-string nonce', { nonce: 1 }, /recipient\[0\].*nonce must be a non-empty string/],
     ['empty nonce', { nonce: '' }, /recipient\[0\].*nonce must be a non-empty string/],
   ])('rejects self-eip712-v1 recipients with %s', (_, recipientOverrides, expectedError) => {
-    expect(() =>
-      parseEnvelope(makeEnvelopeJson({ recipients: [makeSelfRecipient(recipientOverrides)] }))
-    ).toThrow(expectedError);
+    expect(() => parseEnvelope(makeEnvelopeJson({ recipients: [makeSelfRecipient(recipientOverrides)] }))).toThrow(
+      expectedError,
+    );
   });
 
   it('validates envelope bindings case-insensitively', () => {
     const env = parseEnvelope(makeEnvelopeJson({ aad: { surveyId: SURVEY_ID.toUpperCase(), qId: 'Case-Q' } }));
 
-    expect(() =>
-      validateEnvelopeBinding(env, { expectedSurveyId: SURVEY_ID, expectedQId: 'case-q' })
-    ).not.toThrow();
+    expect(() => validateEnvelopeBinding(env, { expectedSurveyId: SURVEY_ID, expectedQId: 'case-q' })).not.toThrow();
     expect(() => validateEnvelopeBinding({}, { expectedSurveyId: SURVEY_ID, expectedQId: Q_ID })).not.toThrow();
     expect(() => validateEnvelopeBinding({ aad: null }, { expectedSurveyId: SURVEY_ID })).not.toThrow();
-    expect(() => validateEnvelopeBinding(env, { expectedSurveyId: `0x${'55'.repeat(32)}` })).toThrow(
-      /surveyId/
-    );
+    expect(() => validateEnvelopeBinding(env, { expectedSurveyId: `0x${'55'.repeat(32)}` })).toThrow(/surveyId/);
     expect(() => validateEnvelopeBinding(env, { expectedQId: 'other-q' })).toThrow(/qId/);
   });
 
@@ -490,7 +463,7 @@ describe('envelopeV1Core', () => {
     const raw = await globalThis.crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: encrypted.iv, additionalData: aadBytes },
       key,
-      encrypted.ciphertext
+      encrypted.ciphertext,
     );
     const tamperedAadBytes = new Uint8Array(aadBytes);
     tamperedAadBytes[0] ^= 0xff;
@@ -500,8 +473,8 @@ describe('envelopeV1Core', () => {
       globalThis.crypto.subtle.decrypt(
         { name: 'AES-GCM', iv: encrypted.iv, additionalData: tamperedAadBytes },
         key,
-        encrypted.ciphertext
-      )
+        encrypted.ciphertext,
+      ),
     ).rejects.toThrow();
   });
 
@@ -518,11 +491,9 @@ describe('envelopeV1Core', () => {
 
     expectBytes(decrypted, Array.from(plaintext));
     await expect(
-      aesGcmDecrypt(key, encrypted.iv, encrypted.ciphertext, { aadBytes: tamperedAadBytes })
+      aesGcmDecrypt(key, encrypted.iv, encrypted.ciphertext, { aadBytes: tamperedAadBytes }),
     ).rejects.toThrow();
-    await expect(
-      aesGcmDecrypt(key, encrypted.iv, tamperedCiphertext, { aadBytes })
-    ).rejects.toThrow();
+    await expect(aesGcmDecrypt(key, encrypted.iv, tamperedCiphertext, { aadBytes })).rejects.toThrow();
   });
 
   it('derives KEKs from signatures that match an independent WebCrypto derivation', async () => {
@@ -533,13 +504,13 @@ describe('envelopeV1Core', () => {
     const ciphertext = await globalThis.crypto.subtle.encrypt(
       { name: 'AES-GCM', iv, additionalData: contextBytes },
       kek,
-      cekRaw
+      cekRaw,
     );
     const independentKek = await deriveKekFromSigIndependent(SIG_HEX, contextBytes);
     const decrypted = await globalThis.crypto.subtle.decrypt(
       { name: 'AES-GCM', iv, additionalData: contextBytes },
       independentKek,
-      ciphertext
+      ciphertext,
     );
 
     expectBytes(new Uint8Array(decrypted), Array.from(cekRaw));
@@ -564,7 +535,7 @@ describe('envelopeV1Core', () => {
         additionalData: contextBytes,
       },
       independentKek,
-      b64decodeIndependent(recipient.wrapped_cek)
+      b64decodeIndependent(recipient.wrapped_cek),
     );
 
     expect(recipient.type).toBe('self-eip712-v1');

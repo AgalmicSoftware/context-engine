@@ -15,12 +15,11 @@ const stepNumbers = {
   done: 5,
 };
 
-const state = (overrides: Partial<SessionPublishState>): SessionPublishState => (
+const state = (overrides: Partial<SessionPublishState>): SessionPublishState =>
   createInitialSessionPublishState({
     status: 'editing',
     ...overrides,
-  })
-);
+  });
 
 describe('resolveSessionWizardPublishReducerUiState', () => {
   it.each([
@@ -59,26 +58,36 @@ describe('resolveSessionWizardPublishReducerUiState', () => {
     ['published', state({ status: 'published' }), { publishBusy: false, publishStep: 5 }],
     [
       'failedRecoverable',
-      state({ status: 'failedRecoverable', error: { effect: 'uploadMetadata', message: 'Upload failed.', recoverable: true } }),
+      state({
+        status: 'failedRecoverable',
+        error: { effect: 'uploadMetadata', message: 'Upload failed.', recoverable: true },
+      }),
       { publishBusy: false, publishStep: 0 },
     ],
     [
       'failedTerminal',
-      state({ status: 'failedTerminal', error: { effect: 'registerSession', message: 'Registration failed.', recoverable: false } }),
+      state({
+        status: 'failedTerminal',
+        error: { effect: 'registerSession', message: 'Registration failed.', recoverable: false },
+      }),
       { publishBusy: false, publishStep: 0 },
     ],
   ])('maps %s to the legacy publish progress inputs', (_label, inputState, expected) => {
-    expect(resolveSessionWizardPublishReducerUiState({
-      state: inputState,
-      stepNumbers,
-    })).toEqual(expected);
+    expect(
+      resolveSessionWizardPublishReducerUiState({
+        state: inputState,
+        stepNumbers,
+      }),
+    ).toEqual(expected);
   });
 
   it('keeps unknown or missing step numbers at the legacy preparing state', () => {
-    expect(resolveSessionWizardPublishReducerUiState({
-      state: state({ status: 'uploadingMetadata', currentEffect: 'uploadMetadata' }),
-      stepNumbers: {},
-    })).toEqual({
+    expect(
+      resolveSessionWizardPublishReducerUiState({
+        state: state({ status: 'uploadingMetadata', currentEffect: 'uploadMetadata' }),
+        stepNumbers: {},
+      }),
+    ).toEqual({
       publishBusy: true,
       publishStep: 0,
     });
@@ -107,17 +116,21 @@ describe('resolveSessionWizardPublishReducerUiState', () => {
       sbtsLabel: 'Groups',
     });
 
-    expect(plan.publishActionDisplayState).toEqual(expect.objectContaining({
-      publishBusy: true,
-      publishButtonDisabled: true,
-      publishButtonLabel: 'Deploy Session',
-    }));
-    expect(plan.publishProgressDisplayState).toEqual(expect.objectContaining({
-      activePublishProgressStepLabel: 'Upload Arweave',
-      publishProgressEyebrow: 'Publishing Session',
-      publishStep: 2,
-      showPublishProgress: true,
-    }));
+    expect(plan.publishActionDisplayState).toEqual(
+      expect.objectContaining({
+        publishBusy: true,
+        publishButtonDisabled: true,
+        publishButtonLabel: 'Deploy Session',
+      }),
+    );
+    expect(plan.publishProgressDisplayState).toEqual(
+      expect.objectContaining({
+        activePublishProgressStepLabel: 'Upload Arweave',
+        publishProgressEyebrow: 'Publishing Session',
+        publishStep: 2,
+        showPublishProgress: true,
+      }),
+    );
     expect(plan.publishProgressDisplayState.publishProgressSteps).toEqual([
       { key: 'deploy-sbts', label: 'Deploy Groups', state: 'complete' },
       { key: 'upload-metadata', label: 'Upload Arweave', state: 'active' },

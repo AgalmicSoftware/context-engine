@@ -1,10 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import {
-  SESSION_STORAGE_BACKENDS,
-  SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
-} from './sessionWizardStorageProfile';
+import { SESSION_STORAGE_BACKENDS, SESSION_STORAGE_PAYLOAD_ACCESS_MODES } from './sessionWizardStorageProfile';
 import SessionWizardStorageProfileField from './SessionWizardStorageProfileField';
 
 describe('SessionWizardStorageProfileField', () => {
@@ -19,7 +16,7 @@ describe('SessionWizardStorageProfileField', () => {
         onStorageProfileChange={onStorageProfileChange}
         onToggleCollapsed={onToggleCollapsed}
         {...props}
-      />
+      />,
     );
     return { onStorageProfileChange, onToggleCollapsed };
   };

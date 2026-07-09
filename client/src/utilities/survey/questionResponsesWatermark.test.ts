@@ -30,4 +30,3 @@ describe('questionResponsesWatermark', () => {
     expect(watermark).toBe(lastPersistedBlock);
   });
 });
-

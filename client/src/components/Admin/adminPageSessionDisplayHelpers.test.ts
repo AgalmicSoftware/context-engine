@@ -19,15 +19,19 @@ describe('adminPageSessionDisplayHelpers', () => {
 
   it('resolves admin session display URLs by config, metadata, then selected slug', () => {
     expect(getAdminSessionDisplayUrl()).toBe('');
-    expect(getAdminSessionDisplayUrl({
-      selectedSlug: 'selected',
-      selectedConfig: { slug: 'config-slug' },
-      groupMetadata: { slug: 'metadata-slug' },
-    })).toBe(`${window.location.origin}/session/config-slug`);
-    expect(getAdminSessionDisplayUrl({
-      selectedSlug: 'selected',
-      groupMetadata: { slug: 'metadata-slug' },
-    })).toBe(`${window.location.origin}/session/metadata-slug`);
+    expect(
+      getAdminSessionDisplayUrl({
+        selectedSlug: 'selected',
+        selectedConfig: { slug: 'config-slug' },
+        groupMetadata: { slug: 'metadata-slug' },
+      }),
+    ).toBe(`${window.location.origin}/session/config-slug`);
+    expect(
+      getAdminSessionDisplayUrl({
+        selectedSlug: 'selected',
+        groupMetadata: { slug: 'metadata-slug' },
+      }),
+    ).toBe(`${window.location.origin}/session/metadata-slug`);
   });
 
   it('formats short addresses consistently', () => {
@@ -41,34 +45,36 @@ describe('adminPageSessionDisplayHelpers', () => {
 
     expect(buildAdminChainRegistryDisplay({ chainId: 84532 })).toBe(`${baseSepoliaName} (84532)`);
     expect(buildAdminChainRegistryDisplay({ chainId: 84532, registryChainId: '84532' })).toBe(
-      `${baseSepoliaName} (84532)`
+      `${baseSepoliaName} (84532)`,
     );
     expect(buildAdminChainRegistryDisplay({ chainId: 11155420, registryChainId: 84532 })).toBe(
-      `${opSepoliaName} (11155420) / ${baseSepoliaName} (84532)`
+      `${opSepoliaName} (11155420) / ${baseSepoliaName} (84532)`,
     );
     expect(buildAdminChainRegistryDisplay()).toBe('\u2014');
   });
 
   it('collects encrypted metadata entries from legacy and provider locations', () => {
-    expect(collectEncryptedEntries({
-      encryptedFields: {
-        prompt: 'cipher-a',
-        empty: '',
-      },
-      sessionInfoEncrypted: 'cipher-session',
-      ai: {
-        providers: {
-          openai: { encryptedApiKey: 'cipher-openai' },
+    expect(
+      collectEncryptedEntries({
+        encryptedFields: {
+          prompt: 'cipher-a',
+          empty: '',
         },
-      },
-      rpc: {
-        providers: {
-          '84532': { encryptedApiKey: 'cipher-rpc' },
+        sessionInfoEncrypted: 'cipher-session',
+        ai: {
+          providers: {
+            openai: { encryptedApiKey: 'cipher-openai' },
+          },
         },
-      },
-      arweave: { encryptedJwk: 'cipher-arweave' },
-      faucet: { encryptedPrivateKey: 'cipher-faucet' },
-    })).toEqual({
+        rpc: {
+          providers: {
+            '84532': { encryptedApiKey: 'cipher-rpc' },
+          },
+        },
+        arweave: { encryptedJwk: 'cipher-arweave' },
+        faucet: { encryptedPrivateKey: 'cipher-faucet' },
+      }),
+    ).toEqual({
       prompt: 'cipher-a',
       sessionInfo: 'cipher-session',
       'ai.providers.openai.apiKey': 'cipher-openai',

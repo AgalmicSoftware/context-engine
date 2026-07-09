@@ -1,7 +1,4 @@
-import {
-  getSessionSlugByName,
-  normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+import { getSessionSlugByName, normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 
 type ScopedSbtIgnoreKeyArgs = {
   address?: unknown;
@@ -24,9 +21,7 @@ type SbtSessionSlugRecord = Record<string, unknown> & {
   };
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
 export const pickNormalizedSessionSlug = (...values: unknown[]): string => {
   for (const value of values) {
@@ -46,13 +41,13 @@ export const pickOptionalNormalizedSessionSlug = (...values: unknown[]): string 
   return null;
 };
 
-export const hasOwn = (value: unknown, key: PropertyKey): boolean => (
-  isRecord(value) &&
-  Object.prototype.hasOwnProperty.call(value, key)
-);
+export const hasOwn = (value: unknown, key: PropertyKey): boolean =>
+  isRecord(value) && Object.prototype.hasOwnProperty.call(value, key);
 
 export const buildScopedSbtIgnoreKey = ({ slug, address }: ScopedSbtIgnoreKeyArgs = {}): string => {
-  const lowerAddress = String(address || '').trim().toLowerCase();
+  const lowerAddress = String(address || '')
+    .trim()
+    .toLowerCase();
   if (!lowerAddress) return '';
   return `${pickNormalizedSessionSlug(slug)}|${lowerAddress}`;
 };
@@ -65,7 +60,7 @@ export const hasAuthoritativeSessionSlug = (value: unknown): boolean => {
 };
 
 export const resolveAuthoritativeSbtSessionBindingSlug = (sbt: unknown): string | null => {
-  const record = isRecord(sbt) ? sbt as SbtSessionSlugRecord : {};
+  const record = isRecord(sbt) ? (sbt as SbtSessionSlugRecord) : {};
   const sbtInfo = isRecord(record.sbtInfo) ? record.sbtInfo : {};
 
   if (hasAuthoritativeSessionSlug(sbtInfo)) {
@@ -83,7 +78,7 @@ export const resolveAuthoritativeSbtSessionBindingSlug = (sbt: unknown): string 
 };
 
 export const resolveDeclaredSbtSessionSlug = (sbt: unknown): string | null => {
-  const record = isRecord(sbt) ? sbt as SbtSessionSlugRecord : {};
+  const record = isRecord(sbt) ? (sbt as SbtSessionSlugRecord) : {};
   const sbtInfo = isRecord(record.sbtInfo) ? record.sbtInfo : {};
   if (hasOwn(sbtInfo, 'sessionSlug')) {
     return normalizeSessionSlug(sbtInfo.sessionSlug || '');
@@ -95,23 +90,18 @@ export const resolveDeclaredSbtSessionSlug = (sbt: unknown): string | null => {
 };
 
 export const resolveConcreteSbtSessionBindingSlug = (sbt: unknown): string | null => {
-  const record = isRecord(sbt) ? sbt as SbtSessionSlugRecord : {};
+  const record = isRecord(sbt) ? (sbt as SbtSessionSlugRecord) : {};
   const authoritativeSlug = resolveAuthoritativeSbtSessionBindingSlug(sbt);
   if (authoritativeSlug != null) return authoritativeSlug;
 
   const sbtInfo = isRecord(record.sbtInfo) ? record.sbtInfo : {};
 
-  const hasInferredSessionSlug = (
+  const hasInferredSessionSlug =
     (hasOwn(sbtInfo, 'sessionSlug') && sbtInfo.sessionSlugExplicit === false) ||
-    (hasOwn(record, 'sessionSlug') && record.sessionSlugExplicit === false)
-  );
+    (hasOwn(record, 'sessionSlug') && record.sessionSlugExplicit === false);
   if (hasInferredSessionSlug) return null;
 
-  const legacySessionName = String(
-    sbtInfo.sessionName ??
-    record.sessionName ??
-    ''
-  ).trim();
+  const legacySessionName = String(sbtInfo.sessionName ?? record.sessionName ?? '').trim();
   if (!legacySessionName) return null;
 
   const mappedSlug = getSessionSlugByName(legacySessionName);
@@ -127,20 +117,14 @@ export const resolveSbtDetailLinkSessionSlug = ({
   const sbtInfo = isRecord(record.sbtInfo) ? record.sbtInfo : {};
   const explicitBindingSlug = pickOptionalNormalizedSessionSlug(
     hasOwn(record, 'sessionBindingSlug') ? record.sessionBindingSlug : undefined,
-    hasAuthoritativeSessionSlug(sbtInfo)
-      ? normalizeSessionSlug(sbtInfo.sessionSlug || '')
-      : undefined,
-    (hasOwn(record, 'sessionSlug') && record.sessionSlugExplicit === true)
+    hasAuthoritativeSessionSlug(sbtInfo) ? normalizeSessionSlug(sbtInfo.sessionSlug || '') : undefined,
+    hasOwn(record, 'sessionSlug') && record.sessionSlugExplicit === true
       ? normalizeSessionSlug(record.sessionSlug || '')
-      : undefined
+      : undefined,
   );
   if (explicitBindingSlug != null) return explicitBindingSlug;
 
-  const metadataSessionName = String(
-    sbtInfo.sessionName ??
-    record.sessionName ??
-    ''
-  ).trim();
+  const metadataSessionName = String(sbtInfo.sessionName ?? record.sessionName ?? '').trim();
   if (metadataSessionName) {
     const byName = getSessionSlugByName(metadataSessionName);
     if (byName != null) return normalizeSessionSlug(byName);

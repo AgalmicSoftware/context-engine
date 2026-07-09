@@ -67,23 +67,25 @@ describe('SurveyResultsDemoSurface', () => {
         questionResponsesNonce={3}
         questionScanProgress={{ done: 2 }}
         viewKey="report"
-      />
+      />,
     );
 
     expect(screen.getByTestId('polis-report')).toHaveAttribute('data-slug', 'demo');
     expect(screen.getByTestId('polis-report')).toHaveAttribute('data-question-count', '2');
     expect(screen.getByTestId('polis-report')).toHaveAttribute('data-disclaimers-active', 'true');
-    expect(mockPolisReport).toHaveBeenCalledWith(expect.objectContaining({
-      defaultTags: ['tag'],
-      filterState: { active: true },
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: false,
-      network: { id: 84532 },
-      questionResponses,
-      questionResponsesNonce: 3,
-      questionScanProgress: { done: 2 },
-      slug: 'demo',
-    }));
+    expect(mockPolisReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultTags: ['tag'],
+        filterState: { active: true },
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: false,
+        network: { id: 84532 },
+        questionResponses,
+        questionResponsesNonce: 3,
+        questionScanProgress: { done: 2 },
+        slug: 'demo',
+      }),
+    );
   });
 
   it('preserves opaque cache progress inputs at the report handoff', () => {
@@ -98,13 +100,15 @@ describe('SurveyResultsDemoSurface', () => {
         questionResponsesNonce="opaque-nonce"
         questionScanProgress={progress}
         viewKey="report"
-      />
+      />,
     );
 
-    expect(mockPolisReport).toHaveBeenCalledWith(expect.objectContaining({
-      questionResponsesNonce: 'opaque-nonce',
-      questionScanProgress: progress,
-    }));
+    expect(mockPolisReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionResponsesNonce: 'opaque-nonce',
+        questionScanProgress: progress,
+      }),
+    );
   });
 
   it('renders atlas and keeps modal close state owned by the parent callback', async () => {
@@ -118,7 +122,7 @@ describe('SurveyResultsDemoSurface', () => {
         onAtlasNodeOpen={jest.fn()}
         questionResponses={[]}
         viewKey="atlas"
-      />
+      />,
     );
 
     const atlas = await screen.findByTestId('demo-atlas');
@@ -139,7 +143,7 @@ describe('SurveyResultsDemoSurface', () => {
         onAtlasNodeOpen={onAtlasNodeOpen}
         questionResponses={[]}
         viewKey="riskMatrix"
-      />
+      />,
     );
 
     fireEvent.click(await screen.findByTestId('risk-matrix'));

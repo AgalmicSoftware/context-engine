@@ -1,10 +1,6 @@
 import { getChainById, getSessionRegistryAddress, isTestnetChain } from '../../variables/chains.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import {
-  getContractDisplayName,
-  getContractExplainer,
-  getContractSourceFileName,
-} from './contractMetadata.js';
+import { getContractDisplayName, getContractExplainer, getContractSourceFileName } from './contractMetadata.js';
 import { getContractSourceDefinitions } from './contractSourceLoader.js';
 import type {
   AnyRecord,
@@ -54,14 +50,14 @@ const buildContractAddresses = ({
   if (!normalizedAddress) return [];
 
   const chain = normalizedChainId ? getChainById(normalizedChainId) : null;
-  return [{
-    address: normalizedAddress,
-    ...(normalizedChainId ? { id: normalizedChainId } : {}),
-    testnet: chain ? isTestnetChain(chain) : false,
-    explorerUrl: normalizedChainId
-      ? getExplorerAddressUrl(normalizedAddress, normalizedChainId)
-      : '',
-  }];
+  return [
+    {
+      address: normalizedAddress,
+      ...(normalizedChainId ? { id: normalizedChainId } : {}),
+      testnet: chain ? isTestnetChain(chain) : false,
+      explorerUrl: normalizedChainId ? getExplorerAddressUrl(normalizedAddress, normalizedChainId) : '',
+    },
+  ];
 };
 
 export const buildContractViewerContracts = ({
@@ -76,33 +72,29 @@ export const buildContractViewerContracts = ({
   includeCustomSBT?: boolean;
 } = {}): ContractViewerContractLike[] => {
   const sourceDefinitions = getContractSourceDefinitions() as Record<string, AnyRecord>;
-  const normalizedContracts = sessionContracts && typeof sessionContracts === 'object'
-    ? sessionContracts
-    : {};
-  const entries: ContractViewerContractLike[] = Object.entries(normalizedContracts).map(([contractKey, contractInfo]) => {
-    const info = (contractInfo && typeof contractInfo === 'object' ? contractInfo : {}) as SessionContractLike;
-    const contractChainId = Number(info.chainId || chainId || 0) || null;
-    const sourceDefinition = sourceDefinitions[contractKey] || {};
+  const normalizedContracts = sessionContracts && typeof sessionContracts === 'object' ? sessionContracts : {};
+  const entries: ContractViewerContractLike[] = Object.entries(normalizedContracts).map(
+    ([contractKey, contractInfo]) => {
+      const info = (contractInfo && typeof contractInfo === 'object' ? contractInfo : {}) as SessionContractLike;
+      const contractChainId = Number(info.chainId || chainId || 0) || null;
+      const sourceDefinition = sourceDefinitions[contractKey] || {};
 
-    return {
-      key: contractKey,
-      name: getContractDisplayName(contractKey),
-      addresses: buildContractAddresses({
-        address: info.address || info.contractAddress || '',
-        chainId: contractChainId,
-      }),
-      explainer: getContractExplainer(contractKey),
-      sourceFile: sourceDefinition.file || getContractSourceFileName(contractKey),
-      source: sourceDefinition.source || '',
-    };
-  });
+      return {
+        key: contractKey,
+        name: getContractDisplayName(contractKey),
+        addresses: buildContractAddresses({
+          address: info.address || info.contractAddress || '',
+          chainId: contractChainId,
+        }),
+        explainer: getContractExplainer(contractKey),
+        sourceFile: sourceDefinition.file || getContractSourceFileName(contractKey),
+        source: sourceDefinition.source || '',
+      };
+    },
+  );
 
   const firstContract = Object.values(normalizedContracts)[0] as SessionContractLike | undefined;
-  const resolvedChainId = Number(
-    chainId ||
-    firstContract?.chainId ||
-    0
-  ) || null;
+  const resolvedChainId = Number(chainId || firstContract?.chainId || 0) || null;
 
   if (includeSessionRegistry && resolvedChainId && !entries.some((entry) => entry.key === 'sessionRegistry')) {
     const registryAddress = toStr(getSessionRegistryAddress(resolvedChainId)).trim();

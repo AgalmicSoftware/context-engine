@@ -13,12 +13,14 @@ describe('sponsoredBootstrapFunding helpers', () => {
   });
 
   it('normalizes compatibility fields into the persisted funding context shape', () => {
-    expect(normalizeSponsoredBootstrapFundingContext({
-      sourceSessionSlug: ' General ',
-      bootstrapWorkerUrl: 'https://worker.example/path///',
-      requestedSessionSlug: ' Edge Session ',
-      faucetGrantToken: ' grant-token ',
-    })).toEqual({
+    expect(
+      normalizeSponsoredBootstrapFundingContext({
+        sourceSessionSlug: ' General ',
+        bootstrapWorkerUrl: 'https://worker.example/path///',
+        requestedSessionSlug: ' Edge Session ',
+        faucetGrantToken: ' grant-token ',
+      }),
+    ).toEqual({
       sessionSlug: '',
       workerUrl: 'https://worker.example/path',
       targetSessionSlug: 'Edge Session',
@@ -27,11 +29,13 @@ describe('sponsoredBootstrapFunding helpers', () => {
   });
 
   it('persists, reads, clears tokens, and removes the session storage context', () => {
-    expect(writeSponsoredBootstrapFundingContext({
-      sessionSlug: 'source',
-      workerUrl: 'https://worker.example',
-      faucetGrantToken: 'grant-token',
-    })).toEqual({
+    expect(
+      writeSponsoredBootstrapFundingContext({
+        sessionSlug: 'source',
+        workerUrl: 'https://worker.example',
+        faucetGrantToken: 'grant-token',
+      }),
+    ).toEqual({
       sessionSlug: 'source',
       workerUrl: 'https://worker.example',
       targetSessionSlug: '',

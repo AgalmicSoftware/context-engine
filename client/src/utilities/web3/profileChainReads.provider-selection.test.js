@@ -23,10 +23,7 @@ const GROUP_CFG = {
 const SBT_CREATED_IFACE = new ethers.utils.Interface(['event SBTCreated(address indexed sbtAddress)']);
 
 const makeCreatedLog = (address, blockNumber = 0) => {
-  const encoded = SBT_CREATED_IFACE.encodeEventLog(
-    SBT_CREATED_IFACE.getEvent('SBTCreated'),
-    [address]
-  );
+  const encoded = SBT_CREATED_IFACE.encodeEventLog(SBT_CREATED_IFACE.getEvent('SBTCreated'), [address]);
   return {
     address: GROUP_CFG.contracts.sbtFactory.address,
     blockNumber,
@@ -65,7 +62,11 @@ const makeDeps = () => {
     shouldLog: jest.fn(() => false),
     fetchLogsSmartWithProvider: jest.fn(async () => []),
     resolveSessionNameValue: jest.fn(() => ''),
-    normalizeSessionSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
+    normalizeSessionSlug: jest.fn((value = '') =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    ),
     normalizeSbtSessionLinkFields: jest.fn((value) => value),
     normalizeSessionNameFields: jest.fn((value) => value),
     latestBlockCache: { _map: {} },
@@ -102,21 +103,15 @@ describe('profileChainReads session-aware provider selection', () => {
     const firstLog = makeCreatedLog(firstAddress, 12);
     const secondLog = makeCreatedLog(secondAddress, 15);
     const discovered = [];
-    deps.fetchLogsSmartWithProvider.mockImplementation(async (
-      _provider,
-      _filter,
-      _fromBlock,
-      _toBlock,
-      _depth,
-      _chunk,
-      progressState
-    ) => {
-      if (typeof progressState?.onLogs === 'function') {
-        await progressState.onLogs({ logs: [firstLog], scanTo: 12 });
-        await progressState.onLogs({ logs: [firstLog, secondLog], scanTo: 15 });
-      }
-      return [firstLog, secondLog];
-    });
+    deps.fetchLogsSmartWithProvider.mockImplementation(
+      async (_provider, _filter, _fromBlock, _toBlock, _depth, _chunk, progressState) => {
+        if (typeof progressState?.onLogs === 'function') {
+          await progressState.onLogs({ logs: [firstLog], scanTo: 12 });
+          await progressState.onLogs({ logs: [firstLog, secondLog], scanTo: 15 });
+        }
+        return [firstLog, secondLog];
+      },
+    );
     const parseLogSpy = jest.spyOn(ethers.utils.Interface.prototype, 'parseLog');
 
     const methods = createProfileChainReadMethods(deps);

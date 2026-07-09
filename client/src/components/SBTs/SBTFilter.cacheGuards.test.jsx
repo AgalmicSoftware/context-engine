@@ -3,19 +3,23 @@ import contractScripts, {
   getSessionChainId,
   getSessionSlugByName,
   normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('./SBTSelector', () => () => null);
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     getSbtMintBurnCountsByAddress: jest.fn(),
   },
   getSessionChainId: jest.fn(() => null),
   getSessionSlugByName: jest.fn(() => ''),
-  normalizeSessionSlug: jest.fn((value) => String(value || '').trim().toLowerCase()),
+  normalizeSessionSlug: jest.fn((value) =>
+    String(value || '')
+      .trim()
+      .toLowerCase(),
+  ),
 }));
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
@@ -70,7 +74,7 @@ describe('SBTFilter holder cache guards', () => {
 
   it('invalidates holder memo when sbtCacheRevision changes', async () => {
     const sbtCache = {
-      '84532': {
+      84532: {
         sbtList: {
           '0xsbt': {
             mintedAddresses: ['0xAA'],
@@ -95,7 +99,7 @@ describe('SBTFilter holder cache guards', () => {
       },
       {
         selectedSBTGroups: [{ address: '0xSBT', sessionSlug: 'edge', chainId: 84532 }],
-      }
+      },
     );
 
     await subject.runApplyFilter('rev1');
@@ -160,7 +164,7 @@ describe('SBTFilter holder cache guards', () => {
       },
       {
         selectedSBTGroupsCreator: [{ address: '0xSBT', sessionSlug: 'edge', chainId: 84532 }],
-      }
+      },
     );
 
     await subject.runApplyFilter('legacy-cache');
@@ -172,14 +176,18 @@ describe('SBTFilter holder cache guards', () => {
     expect(contractScripts.getSbtMintBurnCountsByAddress).toHaveBeenCalledTimes(1);
     expect(onFilter).toHaveBeenCalledWith(
       { filteredQuestions: [], filteredResponsesByQuestion: {} },
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
   it('keeps unresolved non-general selected SBT slugs scoped to their explicit cache bucket and fetch slug', async () => {
     getSessionChainId.mockImplementation((slug) => (slug === '' ? 84532 : null));
     getSessionSlugByName.mockReturnValue('');
-    normalizeSessionSlug.mockImplementation((value) => String(value || '').trim().toLowerCase());
+    normalizeSessionSlug.mockImplementation((value) =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    );
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {};
@@ -200,35 +208,29 @@ describe('SBTFilter holder cache guards', () => {
         onFilter,
       },
       {
-        selectedSBTGroups: [{
-          address: '0xSBT',
-          sessionSlug: 'edge',
-          sessionName: 'Context Engine',
-        }],
-      }
+        selectedSBTGroups: [
+          {
+            address: '0xSBT',
+            sessionSlug: 'edge',
+            sessionName: 'Context Engine',
+          },
+        ],
+      },
     );
 
     await subject.runApplyFilter('strict-unresolved-sbt-slug');
 
     expect(getSessionSlugByName).not.toHaveBeenCalled();
-    expect(contractScripts.getSbtMintBurnCountsByAddress).toHaveBeenCalledWith(
-      'none',
-      '0xsbt',
-      0,
-      'latest',
-      'edge'
-    );
+    expect(contractScripts.getSbtMintBurnCountsByAddress).toHaveBeenCalledWith('none', '0xsbt', 0, 'latest', 'edge');
     expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('sbtCache', 'edge', { clone: false });
     expect(
-      cacheScripts.peekCacheSync.mock.calls.some(
-        ([namespace, slug]) => namespace === 'sbtCache' && slug === ''
-      )
+      cacheScripts.peekCacheSync.mock.calls.some(([namespace, slug]) => namespace === 'sbtCache' && slug === ''),
     ).toBe(false);
     expect(cacheScripts.writeCache).toHaveBeenCalledWith(
       'sbtCache',
       'edge',
       expect.objectContaining({
-        '84532': expect.objectContaining({
+        84532: expect.objectContaining({
           sbtList: expect.objectContaining({
             '0xsbt': expect.objectContaining({
               mintedAddresses: ['0xa'],
@@ -249,7 +251,7 @@ describe('SBTFilter holder cache guards', () => {
             }),
           }),
         }),
-      })
+      }),
     );
     expect(onFilter).toHaveBeenCalledWith(['0xa'], expect.any(Object));
   });
@@ -259,7 +261,7 @@ describe('SBTFilter holder cache guards', () => {
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
-        '84532': {
+        84532: {
           sbtList: {
             '0xsbt': {
               creationBlock: 1,
@@ -282,7 +284,7 @@ describe('SBTFilter holder cache guards', () => {
       },
       {
         selectedSBTGroups: [{ address: '0xSBT', sessionSlug: 'edge', chainId: 84532 }],
-      }
+      },
     );
 
     try {
@@ -295,7 +297,7 @@ describe('SBTFilter holder cache guards', () => {
         'Error fetching SBT holders:',
         expect.objectContaining({
           message: 'SBT holder count scan failed',
-        })
+        }),
       );
     } finally {
       consoleErrorSpy.mockRestore();

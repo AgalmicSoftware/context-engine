@@ -1,10 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCheck,
-  faCopy,
-  faExclamationTriangle,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faCopy, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 
 import styles from './SBTPage.module.scss';
@@ -41,15 +37,8 @@ type SbtPageActionFeedbackDisplayProps = {
   transactionError: SbtPageActionErrorFeedbackDisplay;
 };
 
-const SbtPageActionTransactionLink = ({
-  href,
-  text,
-}: SbtPageActionTransactionLinkDisplay): React.ReactElement => (
-  <a
-    href={href}
-    target="_blank"
-    rel="noopener noreferrer"
-  >
+const SbtPageActionTransactionLink = ({ href, text }: SbtPageActionTransactionLinkDisplay): React.ReactElement => (
+  <a href={href} target="_blank" rel="noopener noreferrer">
     {text}
   </a>
 );
@@ -66,8 +55,7 @@ const SbtPageActionSuccessFeedback = ({
       <p className={styles.mintSuccess}>
         {message}
         <br />
-        {txLabel}{' '}
-        <SbtPageActionTransactionLink {...txLink} />
+        {txLabel} <SbtPageActionTransactionLink {...txLink} />
       </p>
     </div>
   );
@@ -99,8 +87,7 @@ const SbtPageActionFeedbackDisplay = ({
         {transactionError.txLink && (
           <>
             <br />
-            Tx Hash:{' '}
-            <SbtPageActionTransactionLink {...transactionError.txLink} />
+            Tx Hash: <SbtPageActionTransactionLink {...transactionError.txLink} />
           </>
         )}
       </Alert>

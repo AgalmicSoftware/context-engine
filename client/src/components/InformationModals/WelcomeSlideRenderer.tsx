@@ -25,10 +25,7 @@ const buildClassName = (classes: Array<string | false | null | undefined>) => cl
 
 const MEDIA_BUTTON_CLASS_BY_VARIANT: Record<WelcomeSlideMediaButtonVariant, string> = {
   standard: styles.welcomeSlideMediaButton,
-  centered: buildClassName([
-    styles.welcomeSlideMediaButton,
-    styles.welcomeSlideMediaButtonCentered,
-  ]),
+  centered: buildClassName([styles.welcomeSlideMediaButton, styles.welcomeSlideMediaButtonCentered]),
 };
 
 const IMAGE_CLASS_BY_VARIANT: Record<WelcomeSlideImageVariant, string> = {
@@ -52,19 +49,14 @@ const WelcomeSlideRenderer = ({
     return null;
   }
 
-  const bulletPoints = Array.isArray(currentSlide?.bulletPoints)
-    ? currentSlide.bulletPoints
-    : [];
+  const bulletPoints = Array.isArray(currentSlide?.bulletPoints) ? currentSlide.bulletPoints : [];
   const isTitlelessSlide = !String(currentSlide?.title || '').trim();
-  const hasVisibleBulletPoints = bulletPoints.some((point) => (
-    Boolean(point?.bold || point?.text)
-  ));
+  const hasVisibleBulletPoints = bulletPoints.some((point) => Boolean(point?.bold || point?.text));
   const slideLayout = currentSlide?.mediaLayout || 'default';
   const containerClassName = buildClassName([styles.welcomeSlideLayout, className]);
-  const mediaButtonClassName = MEDIA_BUTTON_CLASS_BY_VARIANT[currentSlide.mediaButtonVariant]
-    || MEDIA_BUTTON_CLASS_BY_VARIANT.standard;
-  const imageClassName = IMAGE_CLASS_BY_VARIANT[currentSlide.imageVariant]
-    || IMAGE_CLASS_BY_VARIANT.intro;
+  const mediaButtonClassName =
+    MEDIA_BUTTON_CLASS_BY_VARIANT[currentSlide.mediaButtonVariant] || MEDIA_BUTTON_CLASS_BY_VARIANT.standard;
+  const imageClassName = IMAGE_CLASS_BY_VARIANT[currentSlide.imageVariant] || IMAGE_CLASS_BY_VARIANT.intro;
   const bulletListClassName = buildClassName([
     styles.welcomeSlideBulletList,
     isTitlelessSlide ? styles.isTitlelessBulletList : null,
@@ -75,10 +67,10 @@ const WelcomeSlideRenderer = ({
       {leadingContent}
 
       <button
-        type='button'
+        type="button"
         className={mediaButtonClassName}
         style={EXPLAINER_BUTTON_STYLE}
-        data-testid='ce-welcome-slide-media'
+        data-testid="ce-welcome-slide-media"
         data-slide-key={currentSlide.key}
         data-slide-layout={slideLayout}
         onClick={onSlideClick || undefined}
@@ -87,17 +79,17 @@ const WelcomeSlideRenderer = ({
           src={currentSlide.image}
           alt={currentSlide.imageAlt || currentSlide.overlayTitle || currentSlide.title || 'Welcome slide'}
           className={imageClassName}
-          data-testid='ce-welcome-slide-image'
+          data-testid="ce-welcome-slide-image"
           data-slide-layout={slideLayout}
         />
       </button>
 
       <div
         className={bulletListClassName}
-        data-testid='ce-welcome-slide-bullet-list'
+        data-testid="ce-welcome-slide-bullet-list"
         style={{ display: hasVisibleBulletPoints ? 'flex' : 'none' }}
       >
-        <ul className={styles.welcomeSlideBulletItems} data-testid='ce-welcome-slide-bullet-items'>
+        <ul className={styles.welcomeSlideBulletItems} data-testid="ce-welcome-slide-bullet-items">
           {bulletPoints.map((point, index: number) => {
             const bold = String(point?.bold || '');
             const text = String(point?.text || '');
@@ -107,11 +99,7 @@ const WelcomeSlideRenderer = ({
                 <h4 className={styles.welcomeSlideBulletText}>
                   {bold ? <strong>{bold}</strong> : null}
                   {bold && text ? ' ' : null}
-                  {text ? (
-                    <span className={styles.welcomeSlideBulletTrailingText}>
-                      {text}
-                    </span>
-                  ) : null}
+                  {text ? <span className={styles.welcomeSlideBulletTrailingText}>{text}</span> : null}
                 </h4>
               </li>
             );

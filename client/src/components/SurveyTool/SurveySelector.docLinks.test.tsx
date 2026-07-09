@@ -51,10 +51,7 @@ describe('SurveySelector document links', () => {
         {
           id: 'survey-with-docs',
           title: 'Survey with docs',
-          documentURLs: [
-            'https://example.com/docs/one',
-            'https://example.com/docs/two',
-          ],
+          documentURLs: ['https://example.com/docs/one', 'https://example.com/docs/two'],
         },
       ],
       selectedSurveyIndex: 0,
@@ -65,7 +62,7 @@ describe('SurveySelector document links', () => {
     const tree = subject.render();
     const docLink = findElement(
       tree,
-      (element) => element?.type === 'a' && element?.props?.href === 'https://example.com/docs/one'
+      (element) => element?.type === 'a' && element?.props?.href === 'https://example.com/docs/one',
     );
 
     expect(docLink).toBeTruthy();
@@ -91,10 +88,7 @@ describe('SurveySelector document links', () => {
         {
           id: 'survey-with-docs',
           title: 'Survey with docs',
-          documentURLs: [
-            'https://example.com/docs/one',
-            'https://example.com/docs/two',
-          ],
+          documentURLs: ['https://example.com/docs/one', 'https://example.com/docs/two'],
         },
       ],
       selectedSurveyIndex: null,
@@ -105,11 +99,10 @@ describe('SurveySelector document links', () => {
     const tree = subject.render();
     const docLink = findElement(
       tree,
-      (element) => (
+      (element) =>
         element?.type === 'a' &&
         element?.props?.href === 'https://example.com/docs/one' &&
-        nodeHasClassName(element, 'surveyItemDocLink')
-      )
+        nodeHasClassName(element, 'surveyItemDocLink'),
     );
 
     expect(docLink).toBeTruthy();

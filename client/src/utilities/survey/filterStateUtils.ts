@@ -7,16 +7,10 @@
  * Key exports: serializeFilterState, deserializeFilterState
  */
 
-
-
-
 /**
  * Default structure for an empty filter state.
  * Used for deserialization fallbacks and for checking if a state is "effectively empty".
  */
-
-
-
 
 import { createLogger } from '../logging.js';
 
@@ -40,13 +34,11 @@ export type SurveyFilterState = {
 
 type FilterStateRecord = Record<string, unknown>;
 
-const hasOwn = (value: FilterStateRecord, key: keyof SurveyFilterState | string): boolean => (
-  Object.prototype.hasOwnProperty.call(value, key)
-);
+const hasOwn = (value: FilterStateRecord, key: keyof SurveyFilterState | string): boolean =>
+  Object.prototype.hasOwnProperty.call(value, key);
 
-const isRecord = (value: unknown): value is FilterStateRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is FilterStateRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const defaultEmptyFilterState: SurveyFilterState = {
   topQuestions: null,
@@ -133,9 +125,9 @@ export function serializeFilterState(filterStateObj: FilterStateRecord | null | 
 
     // Convert to Base64URL format
     const base64UrlString = base64String
-      .replace(/\+/g, '-')  // Replace '+' with '-'
-      .replace(/\//g, '_')  // Replace '/' with '_'
-      .replace(/=+$/, '');   // Remove trailing '=' padding
+      .replace(/\+/g, '-') // Replace '+' with '-'
+      .replace(/\//g, '_') // Replace '/' with '_'
+      .replace(/=+$/, ''); // Remove trailing '=' padding
 
     return base64UrlString;
   } catch (error) {
@@ -166,8 +158,8 @@ export function deserializeFilterState(base64UrlString: string | null | undefine
   try {
     // Convert Base64URL back to standard Base64
     let base64String = base64UrlString
-      .replace(/-/g, '+')  // Replace '-' with '+'
-      .replace(/_/g, '/');  // Replace '_' with '/'
+      .replace(/-/g, '+') // Replace '-' with '+'
+      .replace(/_/g, '/'); // Replace '_' with '/'
 
     // Add Base64 padding if necessary. Standard Base64 decoders might require it.
     // The length of a Base64 string (sans padding) must be a multiple of 4 when padded.
@@ -190,24 +182,14 @@ export function deserializeFilterState(base64UrlString: string | null | undefine
     }
     const parsedObj = parsedValue;
 
-    const aiFilter = (
+    const aiFilter =
       hasOwn(parsedObj, 'aiFilter') && typeof parsedObj.aiFilter === 'string'
-    )
-      ? parsedObj.aiFilter
-      : defaultEmptyFilterState.aiFilter;
-    const parsedAiTopN = Number.parseInt(
-      String(hasOwn(parsedObj, 'aiTopN') ? parsedObj.aiTopN : ''),
-      10
-    );
-    const normalizedAiTopN = Number.isFinite(parsedAiTopN) && parsedAiTopN > 0
-      ? parsedAiTopN
-      : null;
-    const aiTopN = (typeof aiFilter === 'string' && aiFilter.trim() !== '')
-      ? normalizedAiTopN
-      : null;
-    const aiCombine = (typeof aiFilter === 'string' && aiFilter.trim() !== '')
-      ? parsedObj.aiCombine === true
-      : false;
+        ? parsedObj.aiFilter
+        : defaultEmptyFilterState.aiFilter;
+    const parsedAiTopN = Number.parseInt(String(hasOwn(parsedObj, 'aiTopN') ? parsedObj.aiTopN : ''), 10);
+    const normalizedAiTopN = Number.isFinite(parsedAiTopN) && parsedAiTopN > 0 ? parsedAiTopN : null;
+    const aiTopN = typeof aiFilter === 'string' && aiFilter.trim() !== '' ? normalizedAiTopN : null;
+    const aiCombine = typeof aiFilter === 'string' && aiFilter.trim() !== '' ? parsedObj.aiCombine === true : false;
 
     // Ensure the parsed object conforms to the filterState structure by merging with defaults.
     // This provides defaults for any missing keys and ensures correct types (e.g., arrays).
@@ -215,25 +197,24 @@ export function deserializeFilterState(base64UrlString: string | null | undefine
       topQuestions: hasOwn(parsedObj, 'topQuestions')
         ? (parsedObj.topQuestions as number | null)
         : defaultEmptyFilterState.topQuestions,
-      questionTypes: hasOwn(parsedObj, 'questionTypes') && Array.isArray(parsedObj.questionTypes)
-        ? (parsedObj.questionTypes as string[])
-        : [...defaultEmptyFilterState.questionTypes],
-      sbtFilter: hasOwn(parsedObj, 'sbtFilter')
-        ? parsedObj.sbtFilter
-        : defaultEmptyFilterState.sbtFilter,
+      questionTypes:
+        hasOwn(parsedObj, 'questionTypes') && Array.isArray(parsedObj.questionTypes)
+          ? (parsedObj.questionTypes as string[])
+          : [...defaultEmptyFilterState.questionTypes],
+      sbtFilter: hasOwn(parsedObj, 'sbtFilter') ? parsedObj.sbtFilter : defaultEmptyFilterState.sbtFilter,
       aiFilter,
       aiTopN,
       aiCombine,
-      selectedTags: hasOwn(parsedObj, 'selectedTags') && Array.isArray(parsedObj.selectedTags)
-        ? (parsedObj.selectedTags as string[])
-        : [...defaultEmptyFilterState.selectedTags],
+      selectedTags:
+        hasOwn(parsedObj, 'selectedTags') && Array.isArray(parsedObj.selectedTags)
+          ? (parsedObj.selectedTags as string[])
+          : [...defaultEmptyFilterState.selectedTags],
       responseStatus:
-        hasOwn(parsedObj, 'responseStatus') &&
-        isRecord(parsedObj.responseStatus)
+        hasOwn(parsedObj, 'responseStatus') && isRecord(parsedObj.responseStatus)
           ? {
-            responded: !!parsedObj.responseStatus.responded,
-            notResponded: !!parsedObj.responseStatus.notResponded,
-          }
+              responded: !!parsedObj.responseStatus.responded,
+              notResponded: !!parsedObj.responseStatus.notResponded,
+            }
           : defaultEmptyFilterState.responseStatus,
     };
 
@@ -256,9 +237,7 @@ export function deserializeFilterStateStrict(base64UrlString: string | null | un
     throw new Error('Filter state string is empty.');
   }
 
-  let base64String = base64UrlString
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
+  let base64String = base64UrlString.replace(/-/g, '+').replace(/_/g, '/');
   const paddingLength = base64String.length % 4;
   if (paddingLength === 1) {
     throw new Error('Filter state string is malformed.');

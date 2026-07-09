@@ -14,7 +14,9 @@ describe('rpcDebugStats filtering', () => {
   });
 
   afterEach(() => {
-    try { delete globalThis.ENABLE_RPC_DEBUG_STATS; } catch (_) {
+    try {
+      delete globalThis.ENABLE_RPC_DEBUG_STATS;
+    } catch (_) {
       globalThis.ENABLE_RPC_DEBUG_STATS = undefined;
     }
   });

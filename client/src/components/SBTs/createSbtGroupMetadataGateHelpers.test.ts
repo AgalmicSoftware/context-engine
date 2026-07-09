@@ -130,48 +130,54 @@ describe('createSbtGroupMetadataGateHelpers', () => {
   });
 
   it('requires Lit recipients when metadata lock gates are selected', () => {
-    expect(() => requireCreateSbtRecipientsForGateSelection({
-      gateIds: ['gate-1'],
-      recipients: [],
-      scopeLabel: 'content',
-      gateLowerLabel: 'access rule',
-      gatesLowerLabel: 'access rules',
-    })).toThrow('Selected lock access rule (gate-1) for content do not resolve to valid Lit recipients.');
+    expect(() =>
+      requireCreateSbtRecipientsForGateSelection({
+        gateIds: ['gate-1'],
+        recipients: [],
+        scopeLabel: 'content',
+        gateLowerLabel: 'access rule',
+        gatesLowerLabel: 'access rules',
+      }),
+    ).toThrow('Selected lock access rule (gate-1) for content do not resolve to valid Lit recipients.');
 
-    expect(() => requireCreateSbtRecipientsForGateSelection({
-      gateIds: ['gate-1', 'gate-2'],
-      recipients: [],
-      scopeLabel: 'image',
-      gateLowerLabel: 'access rule',
-      gatesLowerLabel: 'access rules',
-    })).toThrow('Selected lock access rules (gate-1, gate-2) for image do not resolve to valid Lit recipients.');
+    expect(() =>
+      requireCreateSbtRecipientsForGateSelection({
+        gateIds: ['gate-1', 'gate-2'],
+        recipients: [],
+        scopeLabel: 'image',
+        gateLowerLabel: 'access rule',
+        gatesLowerLabel: 'access rules',
+      }),
+    ).toThrow('Selected lock access rules (gate-1, gate-2) for image do not resolve to valid Lit recipients.');
 
-    expect(() => requireCreateSbtRecipientsForGateSelection({
-      gateIds: [],
-      recipients: [],
-    })).not.toThrow();
-    expect(() => requireCreateSbtRecipientsForGateSelection({
-      gateIds: ['gate-1'],
-      recipients: [{ accessControlConditions: [] }],
-    })).not.toThrow();
+    expect(() =>
+      requireCreateSbtRecipientsForGateSelection({
+        gateIds: [],
+        recipients: [],
+      }),
+    ).not.toThrow();
+    expect(() =>
+      requireCreateSbtRecipientsForGateSelection({
+        gateIds: ['gate-1'],
+        recipients: [{ accessControlConditions: [] }],
+      }),
+    ).not.toThrow();
   });
 
   it('merges recipient access control conditions while preserving primary fallback fields', () => {
     const conditionA = { contractAddress: '0x00000000000000000000000000000000000000aa' };
     const conditionB = { contractAddress: '0x00000000000000000000000000000000000000bb' };
 
-    expect(buildCreateSbtRecipientAccessControlState({
-      recipients: [
-        { accessControlConditions: [conditionA], chain: 'baseSepolia' },
-        { accessControlConditions: 'bad', chain: 'ignored' },
-        { accessControlConditions: [conditionB], chain: 'optimismSepolia' },
-      ],
-    })).toEqual({
-      combinedAccessControlConditions: [
-        conditionA,
-        { operator: 'or' },
-        conditionB,
-      ],
+    expect(
+      buildCreateSbtRecipientAccessControlState({
+        recipients: [
+          { accessControlConditions: [conditionA], chain: 'baseSepolia' },
+          { accessControlConditions: 'bad', chain: 'ignored' },
+          { accessControlConditions: [conditionB], chain: 'optimismSepolia' },
+        ],
+      }),
+    ).toEqual({
+      combinedAccessControlConditions: [conditionA, { operator: 'or' }, conditionB],
       primaryAccessControlConditions: [conditionA],
       primaryChain: 'baseSepolia',
       primaryRecipient: {
@@ -180,12 +186,11 @@ describe('createSbtGroupMetadataGateHelpers', () => {
       },
     });
 
-    expect(buildCreateSbtRecipientAccessControlState({
-      recipients: [
-        'bad',
-        { accessControlConditions: [conditionB], chain: 'optimismSepolia' },
-      ],
-    })).toEqual({
+    expect(
+      buildCreateSbtRecipientAccessControlState({
+        recipients: ['bad', { accessControlConditions: [conditionB], chain: 'optimismSepolia' }],
+      }),
+    ).toEqual({
       combinedAccessControlConditions: [conditionB],
       primaryAccessControlConditions: undefined,
       primaryChain: null,
@@ -194,15 +199,19 @@ describe('createSbtGroupMetadataGateHelpers', () => {
   });
 
   it('builds encrypted image asset metadata from upload results and preview masks', () => {
-    expect(buildCreateSbtEncryptedImageAsset({
-      uploadResult: { txId: '  arweaveTx123  ' },
-    })).toEqual({
+    expect(
+      buildCreateSbtEncryptedImageAsset({
+        uploadResult: { txId: '  arweaveTx123  ' },
+      }),
+    ).toEqual({
       storage: 'lit-arweave',
       txId: 'arweaveTx123',
     });
-    expect(buildCreateSbtEncryptedImageAsset({
-      uploadResult: { txId: '   ' },
-    })).toBeNull();
+    expect(
+      buildCreateSbtEncryptedImageAsset({
+        uploadResult: { txId: '   ' },
+      }),
+    ).toBeNull();
     expect(buildCreateSbtEncryptedImageAsset()).toBeNull();
     expect(buildCreateSbtPreviewEncryptedImageAsset('[encrypted]')).toEqual({
       storage: 'lit-arweave',
@@ -218,10 +227,7 @@ describe('createSbtGroupMetadataGateHelpers', () => {
         'gate-a': {
           gateId: 'gate-a',
           label: 'Alpha',
-          sbtAddresses: [
-            '0x00000000000000000000000000000000000000aa',
-            '0x00000000000000000000000000000000000000aa',
-          ],
+          sbtAddresses: ['0x00000000000000000000000000000000000000aa', '0x00000000000000000000000000000000000000aa'],
         },
         'gate-b': {
           gateId: 'gate-b',
@@ -235,23 +241,24 @@ describe('createSbtGroupMetadataGateHelpers', () => {
     expect(descriptor).toMatchObject({
       type: 'sbt',
       gateIds: ['gate-a', 'gate-b'],
-      sbtAddresses: [
-        '0x00000000000000000000000000000000000000aa',
-        '0x00000000000000000000000000000000000000bb',
-      ],
+      sbtAddresses: ['0x00000000000000000000000000000000000000aa', '0x00000000000000000000000000000000000000bb'],
       sbtAddress: '0x00000000000000000000000000000000000000aa',
       chainId: 84532,
       litChain: 'baseSepolia',
     });
     expect(descriptor?.gates.map((gate) => gate.gateId)).toEqual(['gate-a', 'gate-b']);
-    expect(buildCreateSbtFieldAccessDescriptor({
-      gateIds: ['missing'],
-      gateMap: { 'gate-a': { gateId: 'gate-a', sbtAddress: '0xA' } },
-    })).toBeNull();
-    expect(buildCreateSbtFieldAccessDescriptor({
-      gateIds: ['gate-a'],
-      gateMap: { 'gate-a': { gateId: 'gate-a' } },
-    })).toBeNull();
+    expect(
+      buildCreateSbtFieldAccessDescriptor({
+        gateIds: ['missing'],
+        gateMap: { 'gate-a': { gateId: 'gate-a', sbtAddress: '0xA' } },
+      }),
+    ).toBeNull();
+    expect(
+      buildCreateSbtFieldAccessDescriptor({
+        gateIds: ['gate-a'],
+        gateMap: { 'gate-a': { gateId: 'gate-a' } },
+      }),
+    ).toBeNull();
   });
 
   it('builds metadata encryption envelopes from selected field gates', () => {
@@ -294,10 +301,12 @@ describe('createSbtGroupMetadataGateHelpers', () => {
       },
     });
     expect(payload.encryption?.gates.map((gate) => gate.gateId)).toEqual(['gate-a', 'gate-b']);
-    expect(buildCreateSbtMetadataEncryption({
-      encryptedFieldGates: { name: ['missing'] },
-      gateMap,
-    })).toEqual({
+    expect(
+      buildCreateSbtMetadataEncryption({
+        encryptedFieldGates: { name: ['missing'] },
+        gateMap,
+      }),
+    ).toEqual({
       encryptedFieldGates: null,
       encryption: null,
     });
@@ -379,36 +388,33 @@ describe('createSbtGroupMetadataGateHelpers', () => {
         {
           sessionSlug: 'alpha',
           sessionConfig: { slug: 'alpha', sessionName: 'Alpha Session', networkChainId: 84532 },
-          encryptionGates: [
-            { gateId: 'gate-a', sbtAddress: '0xA', resourceKey: 'default' },
-          ],
+          encryptionGates: [{ gateId: 'gate-a', sbtAddress: '0xA', resourceKey: 'default' }],
         },
         {
           sessionSlug: 'beta',
           sessionConfig: { slug: 'beta', sessionName: 'Beta Session', networkChainId: 11155420 },
-          encryptionGates: [
-            { gateId: 'gate-b', sbtAddresses: ['0xB', '0xC'], mode: 'all' },
-          ],
+          encryptionGates: [{ gateId: 'gate-b', sbtAddresses: ['0xB', '0xC'], mode: 'all' }],
         },
       ],
     });
 
     expect(scoped.defaultGateId).toBe('session:beta::gate-b');
-    expect(scoped.gateOptions.map((gate) => gate.id)).toEqual([
-      'session:alpha::gate-a',
-      'session:beta::gate-b',
-    ]);
-    expect(scoped.gateMap['session:beta::gate-b']).toEqual(expect.objectContaining({
-      sourceGateId: 'gate-b',
-      sourceSessionSlug: 'beta',
-      label: 'Beta Session',
-      requireAll: true,
-      sbtAddresses: ['0xB', '0xC'],
-      chainId: 11155420,
-    }));
-    expect(buildCreateSbtGateOptionsFromSessionSources({
-      sessionSources: [null, { sessionConfig: null }],
-    })).toEqual({
+    expect(scoped.gateOptions.map((gate) => gate.id)).toEqual(['session:alpha::gate-a', 'session:beta::gate-b']);
+    expect(scoped.gateMap['session:beta::gate-b']).toEqual(
+      expect.objectContaining({
+        sourceGateId: 'gate-b',
+        sourceSessionSlug: 'beta',
+        label: 'Beta Session',
+        requireAll: true,
+        sbtAddresses: ['0xB', '0xC'],
+        chainId: 11155420,
+      }),
+    );
+    expect(
+      buildCreateSbtGateOptionsFromSessionSources({
+        sessionSources: [null, { sessionConfig: null }],
+      }),
+    ).toEqual({
       gateMap: {},
       gateOptions: [],
       defaultGateId: '',

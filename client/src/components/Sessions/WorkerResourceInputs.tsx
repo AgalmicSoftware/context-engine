@@ -39,21 +39,16 @@ const WorkerResourceInputs = ({
   getSecretFieldTestId,
   onUpdateSecret,
 }: WorkerResourceInputsProps) => {
-  const buildSecretFieldTestId = typeof getSecretFieldTestId === 'function'
-    ? getSecretFieldTestId
-    : () => undefined;
+  const buildSecretFieldTestId = typeof getSecretFieldTestId === 'function' ? getSecretFieldTestId : () => undefined;
 
   const renderGenericField = (field: ResourceSecretField) => {
     const value = toStr(workerSecrets[field.key]);
     const label = `${field.label}${field.required ? ' *' : ''}`;
     const isTextarea = field.type === 'textarea';
-    const placeholder = (
-      resourceKey === 'rpc' &&
-      field.key === 'customRpcUrl' &&
-      !toStr(value).trim()
-    )
-      ? (effectiveDefaultWorkerRpcUrl || field.placeholder || '')
-      : (field.placeholder || '');
+    const placeholder =
+      resourceKey === 'rpc' && field.key === 'customRpcUrl' && !toStr(value).trim()
+        ? effectiveDefaultWorkerRpcUrl || field.placeholder || ''
+        : field.placeholder || '';
 
     return (
       <FormGroup key={field.key} className={`${styles.resourceInput} ${!isTextarea ? styles.inlineLabelInput : ''}`}>
@@ -92,9 +87,7 @@ const WorkerResourceInputs = ({
 
     return (
       <div className={styles.resourceFields}>
-        <div className={styles.resourceInputGrid}>
-          {renderGenericField(litAccountField)}
-        </div>
+        <div className={styles.resourceInputGrid}>{renderGenericField(litAccountField)}</div>
         <div className={styles.helperText}>
           {/* Worker deploy derives the Lit group, PKP, and CE action from this key when needed. */}
         </div>
@@ -102,11 +95,7 @@ const WorkerResourceInputs = ({
     );
   }
 
-  return (
-    <div className={styles.resourceInputGrid}>
-      {fields.map(renderGenericField)}
-    </div>
-  );
+  return <div className={styles.resourceInputGrid}>{fields.map(renderGenericField)}</div>;
 };
 
 export default WorkerResourceInputs;

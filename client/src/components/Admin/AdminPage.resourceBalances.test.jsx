@@ -63,7 +63,7 @@ jest.mock('../../utilities/arweave/arweaveClient.js', () => {
     readArweaveWalletBalance: (...args) => mockReadArweaveWalletBalance(...args),
     formatWinstonToAr: (...args) => mockFormatWinstonToAr(...args),
   };
-  return { arweaveClient, arweaveScripts: arweaveClient };
+  return { arweaveClient };
 });
 
 jest.mock('../../utilities/crypto/encryptedFields.js', () => ({
@@ -105,11 +105,7 @@ jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-se
 
 const AdminPage = require('./AdminPage').default;
 
-const renderAdminPage = async ({
-  account = ADMIN_ADDRESS,
-  initialSessionId,
-  initialRegistryChainId,
-} = {}) => {
+const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, initialRegistryChainId } = {}) => {
   let utils;
   await act(async () => {
     utils = render(
@@ -120,7 +116,7 @@ const renderAdminPage = async ({
         toggleLoginModal={jest.fn()}
         initialSessionId={initialSessionId}
         initialRegistryChainId={initialRegistryChainId}
-      />
+      />,
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -129,9 +125,7 @@ const renderAdminPage = async ({
 };
 
 const getWorkerSecretsPanel = () => screen.getByText('Worker secrets').closest('section');
-const getSecretInputByLabel = (labelText) => (
-  screen.getByText(labelText).parentElement.querySelector('input,textarea')
-);
+const getSecretInputByLabel = (labelText) => screen.getByText(labelText).parentElement.querySelector('input,textarea');
 const clickAndSettle = async (element) => {
   await act(async () => {
     fireEvent.click(element);
@@ -155,11 +149,13 @@ describe('AdminPage resource balance previews', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    );
     mockFormatWinstonToAr.mockImplementation((winston) => {
       if (String(winston) === '12345678000000') return '12.345678';
       if (String(winston) === '5') return '0.000000';

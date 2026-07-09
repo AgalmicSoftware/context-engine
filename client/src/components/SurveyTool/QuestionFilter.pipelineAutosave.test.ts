@@ -1,6 +1,4 @@
-import {
-  QuestionFilter as QuestionFilterComponent,
-} from './QuestionFilter';
+import { QuestionFilter as QuestionFilterComponent } from './QuestionFilter';
 import {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
@@ -28,7 +26,7 @@ import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import { serializeFilterState as serializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import styles from './QuestionFilter.module.scss';
 
 jest.mock('../SBTs/SBTFilter', () => () => null);
@@ -39,23 +37,10 @@ type TreePredicate = (node: TreeNode) => boolean;
 type QuestionFilterProps = Record<string, any>;
 const QuestionFilter: any = QuestionFilterComponent;
 const cacheScripts: any = cacheScriptsModule;
-const {
-  initCacheManager,
-  listNamespaceEntriesSync,
-  readCache,
-  removeCache,
-  writeCache,
-} = cacheScripts as any;
+const { initCacheManager, listNamespaceEntriesSync, readCache, removeCache, writeCache } = cacheScripts as any;
 const serializeFilterState: any = serializeFilterStateStrict;
 
-const MANAGED_NAMESPACES = [
-  'questionsCache',
-  'surveysCache',
-  'bookmarksCache',
-  'filters',
-  'sbtCache',
-  'userCache',
-];
+const MANAGED_NAMESPACES = ['questionsCache', 'surveysCache', 'bookmarksCache', 'filters', 'sbtCache', 'userCache'];
 
 const clearManagedCaches = async () => {
   await initCacheManager();
@@ -880,7 +865,7 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
         questionFilterState_questions: expect.objectContaining({
           selectedTags: ['beta'],
         }),
-      })
+      }),
     );
 
     peekSpy.mockRestore();

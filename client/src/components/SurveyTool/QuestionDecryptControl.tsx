@@ -27,13 +27,7 @@ const QuestionDecryptControl = ({
 
   if (autoDecryptEnabled) {
     if (!showBusySpinnerWhenAutoDecryptEnabled) return null;
-    content = (
-      <DecryptActionChip
-        spinnerOnly
-        busy={busy}
-        actionLabel={actionLabel}
-      />
-    );
+    content = <DecryptActionChip spinnerOnly busy={busy} actionLabel={actionLabel} />;
   } else {
     content = (
       <DecryptActionChip

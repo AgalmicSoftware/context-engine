@@ -18,10 +18,12 @@ export type SurveyResultsLockedResponseRow = SurveyResultsLockedResponsesRecord 
 
 export type BuildSurveyResultsLockedRowsArgs = {
   aggregatorQuestionResponses?: unknown;
-  applyDecryptedOverrideToResponse?: ((args: {
-    key: string;
-    response?: SurveyResultsLockedResponsesRecord | null;
-  }) => SurveyResultsLockedResponsesRecord | null | undefined) | null;
+  applyDecryptedOverrideToResponse?:
+    | ((args: {
+        key: string;
+        response?: SurveyResultsLockedResponsesRecord | null;
+      }) => SurveyResultsLockedResponsesRecord | null | undefined)
+    | null;
   getLockedResponseKey?: ((args: SurveyResultsLockedResponsesKeyArgs) => string) | null;
   isBannerEligibleLockedField?: ((field: unknown) => boolean) | null;
   sbtFilteredResponses?: unknown;
@@ -30,19 +32,21 @@ export type BuildSurveyResultsLockedRowsArgs = {
   viewMode?: unknown;
 };
 
-const toRecord = (value: unknown): SurveyResultsLockedResponsesRecord => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as SurveyResultsLockedResponsesRecord
-    : {}
-);
+const toRecord = (value: unknown): SurveyResultsLockedResponsesRecord =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as SurveyResultsLockedResponsesRecord) : {};
 
 const defaultGetLockedResponseKey = ({
   questionId = '',
   responder = '',
   surveyId = '',
-}: SurveyResultsLockedResponsesKeyArgs): string => (
-  [surveyId, questionId, responder].map((part) => String(part || '').trim().toLowerCase()).join(':')
-);
+}: SurveyResultsLockedResponsesKeyArgs): string =>
+  [surveyId, questionId, responder]
+    .map((part) =>
+      String(part || '')
+        .trim()
+        .toLowerCase(),
+    )
+    .join(':');
 
 const defaultApplyOverride = ({
   response = null,
@@ -53,11 +57,10 @@ const defaultApplyOverride = ({
 
 const defaultIsBannerEligible = (): boolean => false;
 
-const readResponseRecord = (response: unknown): SurveyResultsLockedResponsesRecord | null => (
+const readResponseRecord = (response: unknown): SurveyResultsLockedResponsesRecord | null =>
   response && typeof response === 'object' && !Array.isArray(response)
-    ? response as SurveyResultsLockedResponsesRecord
-    : null
-);
+    ? (response as SurveyResultsLockedResponsesRecord)
+    : null;
 
 export const buildSurveyResultsLockedRows = ({
   aggregatorQuestionResponses = {},
@@ -70,15 +73,11 @@ export const buildSurveyResultsLockedRows = ({
   viewMode = '',
 }: BuildSurveyResultsLockedRowsArgs = {}): SurveyResultsLockedResponseRow[] => {
   const rows: SurveyResultsLockedResponseRow[] = [];
-  const keyPort = typeof getLockedResponseKey === 'function'
-    ? getLockedResponseKey
-    : defaultGetLockedResponseKey;
-  const overridePort = typeof applyDecryptedOverrideToResponse === 'function'
-    ? applyDecryptedOverrideToResponse
-    : defaultApplyOverride;
-  const eligiblePort = typeof isBannerEligibleLockedField === 'function'
-    ? isBannerEligibleLockedField
-    : defaultIsBannerEligible;
+  const keyPort = typeof getLockedResponseKey === 'function' ? getLockedResponseKey : defaultGetLockedResponseKey;
+  const overridePort =
+    typeof applyDecryptedOverrideToResponse === 'function' ? applyDecryptedOverrideToResponse : defaultApplyOverride;
+  const eligiblePort =
+    typeof isBannerEligibleLockedField === 'function' ? isBannerEligibleLockedField : defaultIsBannerEligible;
 
   const pushRow = ({
     questionId,
@@ -91,9 +90,13 @@ export const buildSurveyResultsLockedRows = ({
     response?: SurveyResultsLockedResponsesRecord | null;
     rowSurveyId?: unknown;
   }): void => {
-    const normalizedQuestionId = String(questionId || '').trim().toLowerCase();
+    const normalizedQuestionId = String(questionId || '')
+      .trim()
+      .toLowerCase();
     if (!normalizedQuestionId) return;
-    const normalizedResponder = String(responder || '').trim().toLowerCase();
+    const normalizedResponder = String(responder || '')
+      .trim()
+      .toLowerCase();
     const effectiveSurveyId = rowSurveyId ?? surveyId;
     const key = keyPort({
       responder: normalizedResponder,
@@ -101,14 +104,14 @@ export const buildSurveyResultsLockedRows = ({
       surveyId: effectiveSurveyId,
       response,
     });
-    const mergedResponse = overridePort({
-      response,
-      key,
-    }) || response || null;
-    if (
-      !eligiblePort(mergedResponse?.answer) &&
-      !eligiblePort(mergedResponse?.additional)
-    ) {
+    const mergedResponse =
+      overridePort({
+        response,
+        key,
+      }) ||
+      response ||
+      null;
+    if (!eligiblePort(mergedResponse?.answer) && !eligiblePort(mergedResponse?.additional)) {
       return;
     }
     rows.push({
@@ -125,8 +128,12 @@ export const buildSurveyResultsLockedRows = ({
     const surveyResponses = Array.isArray(sbtFilteredResponses) ? sbtFilteredResponses : [];
     surveyResponses.forEach((surveyResponse) => {
       const row = toRecord(surveyResponse);
-      const responder = String(row.responder || '').trim().toLowerCase();
-      const rowSurveyId = String(row.surveyId || surveyId || '').trim().toLowerCase();
+      const responder = String(row.responder || '')
+        .trim()
+        .toLowerCase();
+      const rowSurveyId = String(row.surveyId || surveyId || '')
+        .trim()
+        .toLowerCase();
       const responseRecord = toRecord(row.response);
       const answers = Array.isArray(responseRecord.responses) ? responseRecord.responses : [];
       answers.forEach((answerItem) => {

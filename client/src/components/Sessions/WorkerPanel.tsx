@@ -8,9 +8,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import WorkerConnectionSection from './WorkerConnectionSection';
 import WorkerDeploySection from './WorkerDeploySection';
 import WorkerSecretsSection from './WorkerSecretsSection';
-import {
-  normalizeWorkerUrl as normalizeWorkerAuthUrl,
-} from '../../utilities/worker/workerAuth.js';
+import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
@@ -161,12 +159,9 @@ const WorkerPanel = ({
   workerUrlAutoFilled,
 }: WorkerPanelProps) => {
   const translate = typeof t === 'function' ? t : (key: string) => key;
-  const renderInfoTooltip = typeof renderSessionWizardInfoTooltip === 'function'
-    ? renderSessionWizardInfoTooltip
-    : () => null;
-  const renderResource = typeof renderResourceCard === 'function'
-    ? renderResourceCard
-    : () => null;
+  const renderInfoTooltip =
+    typeof renderSessionWizardInfoTooltip === 'function' ? renderSessionWizardInfoTooltip : () => null;
+  const renderResource = typeof renderResourceCard === 'function' ? renderResourceCard : () => null;
 
   const handleDefaultWorkerModeClick = () => {
     onWorkerModeChange('default');
@@ -207,17 +202,19 @@ const WorkerPanel = ({
               <div className={styles.workerModeCopy}>
                 <div className={styles.workerModeTitle}>Bring your own worker</div>
                 <div className={styles.workerModeSummary}>
-                  Deploy your own worker or paste a worker URL you control. Shared hosted worker
-                  support is planned separately.
+                  Deploy your own worker or paste a worker URL you control. Shared hosted worker support is planned
+                  separately.
                 </div>
               </div>
-            ) : !isNormalMode && (
-              <div className={styles.workerModeCopy}>
-                <div className={styles.workerModeTitle}>How should this session run?</div>
-                <div className={styles.workerModeSummary}>
-                  {workerMode === 'default' ? 'Shared hosted worker' : 'Custom worker deployment'}
+            ) : (
+              !isNormalMode && (
+                <div className={styles.workerModeCopy}>
+                  <div className={styles.workerModeTitle}>How should this session run?</div>
+                  <div className={styles.workerModeSummary}>
+                    {workerMode === 'default' ? 'Shared hosted worker' : 'Custom worker deployment'}
+                  </div>
                 </div>
-              </div>
+              )
             )}
             {showSharedWorkerChoice && (
               <>
@@ -243,7 +240,8 @@ const WorkerPanel = ({
                 </div>
                 {renderInfoTooltip({
                   id: 'gw-worker-mode-tip',
-                  content: 'Toggle between the shared hosted worker and deploying your own. Using your own requires a free Cloudflare account (or Vercel Edge, AWS Lambda@Edge, Fly.io, Render, Deno Deploy). Deploy as a module worker with Node.js + npm deps.',
+                  content:
+                    'Toggle between the shared hosted worker and deploying your own. Using your own requires a free Cloudflare account (or Vercel Edge, AWS Lambda@Edge, Fly.io, Render, Deno Deploy). Deploy as a module worker with Node.js + npm deps.',
                   placement: 'right',
                   testId: 'ce-wizard-worker-tooltip-gw-worker-mode-tip',
                   ariaLabel: 'Worker mode info',

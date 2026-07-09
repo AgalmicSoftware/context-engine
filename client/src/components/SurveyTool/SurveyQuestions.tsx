@@ -14,11 +14,25 @@ import {
 } from 'reactstrap';
 import { Link } from 'react-router-dom';
 // Styles
-import "../../assets/css/contextEngine.scss";
+import '../../assets/css/contextEngine.scss';
 import styles from './SurveyTool.module.scss';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCheck, faSpinner, faFilter, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
+import {
+  faLock,
+  faUnlock,
+  faPlus,
+  faMinus,
+  faCaretDown,
+  faCheck,
+  faSpinner,
+  faFilter,
+  faMicrophone,
+  faChevronLeft,
+  faChevronRight,
+  faComment,
+  faRobot,
+} from '@fortawesome/free-solid-svg-icons';
 
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
@@ -45,9 +59,7 @@ import {
   type RatingEnvelopeDeps,
   type RatingEnvelopeContext,
 } from './surveyToolRatingEnvelopeSubmitController';
-import {
-  writeSubmittedResponsesToLocalCaches as writeSubmittedResponsesToLocalCachesHelper,
-} from './surveyToolPostSubmitCacheController';
+import { writeSubmittedResponsesToLocalCaches as writeSubmittedResponsesToLocalCachesHelper } from './surveyToolPostSubmitCacheController';
 import {
   ensureIdentifierHash,
   filterChangedResponsesForSubmit,
@@ -178,21 +190,13 @@ import {
   buildQuestionPromptDecryptDisplayState,
   isQuestionPromptMasked as isQuestionPromptMaskedHelper,
 } from './surveyToolViewState.js';
-import {
-  buildResponseGateConfigSignature,
-} from './surveyToolResponseAccess';
-import {
-  decideAutoDecryptBlocked,
-  decideAutomaticPromptDecryptByKind,
-} from './surveyQuestionsDecryptEligibility.js';
+import { buildResponseGateConfigSignature } from './surveyToolResponseAccess';
+import { decideAutoDecryptBlocked, decideAutomaticPromptDecryptByKind } from './surveyQuestionsDecryptEligibility.js';
 import {
   buildDecryptContextKeyFromContext,
   buildResponseGatePolicyCacheKeyFromInputs,
 } from './surveyQuestionsCacheKeys.js';
-import {
-  readSessionScanScope,
-  readSessionScanSlugs,
-} from '../../utilities/session/sessionScanScope.js';
+import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import {
   listNamespaceEntriesSync,
   peekCacheSync,
@@ -348,7 +352,7 @@ import {
   writeQuestionsCache,
   writeSurveysCache,
   bumpSurveyPerfCounter,
-} from './surveyToolUtils.js';
+} from './surveyToolUtils';
 import {
   buildSurveyLocalCacheSlice,
   executeSurveyResponsePrefill,
@@ -386,18 +390,13 @@ import {
   normalizeSingleQuestionMetadataForCache,
   resolveSingleQuestionCacheState,
 } from './surveyToolSingleQuestionMetadataController';
-import {
-  resolveSingleQuestionMetadataBootstrap,
-} from './surveyToolSingleQuestionMetadataBootstrapController';
+import { resolveSingleQuestionMetadataBootstrap } from './surveyToolSingleQuestionMetadataBootstrapController';
 import {
   areSurveyResponsesConsistent,
   resolveSurveyBaselineSourceSlice,
   resolveSurveyUserAnswersSlice,
 } from './surveyToolResponseSourceController';
-import {
-  buildAnswerUpdatePlan,
-  buildAdditionalUpdatePlan,
-} from './surveyToolResponseMutationController';
+import { buildAnswerUpdatePlan, buildAdditionalUpdatePlan } from './surveyToolResponseMutationController';
 import { buildResponsePayload } from './surveyToolResponsePayloadController';
 import {
   buildIndexedQuestionEntryKeys,
@@ -458,9 +457,7 @@ import {
   buildSurveyQuestionsJson,
   shouldUseSubmittedResponseJson,
 } from './surveyQuestionsJsonDerivation.js';
-import {
-  buildSurveyQuestionsRouteJsonControlsProps,
-} from './surveyQuestionsRouteJsonControlsProps.js';
+import { buildSurveyQuestionsRouteJsonControlsProps } from './surveyQuestionsRouteJsonControlsProps.js';
 import {
   buildClearedTransientSubmitFeedbackState,
   buildQuestionPoolPendingSubmitFeedbackMessage,
@@ -585,6 +582,7 @@ import {
   buildUserSurveyResponseFoundState,
   buildUserSurveyResponseMissingState,
   isSurveyQuestionsMaskedPromptText,
+  publishSurveyQuestionPoolIfCurrent,
   type SurveyQuestionsAuthoringPanelDisplayState,
   type SurveyQuestionsAuthoringRouteReadinessDescriptor,
   type SurveyQuestionsFullLoadingProgressState,
@@ -642,43 +640,45 @@ export const SurveyQuestions = (props: SurveyQuestionsProps): React.ReactElement
   engine.bottomRef = bottomRef;
   engine.topRef = topRef;
 
-const getRuntimeStrategy = (): SurveyQuestionsRuntimeStrategy | null => (
+  const getRuntimeStrategy = (): SurveyQuestionsRuntimeStrategy | null =>
     propsRef.current.runtimeStrategy && typeof propsRef.current.runtimeStrategy === 'object'
       ? propsRef.current.runtimeStrategy
-      : null
-  );
+      : null;
 
-const isPasskeyWalletAutoSignReady = () => {
+  const isPasskeyWalletAutoSignReady = () => {
     try {
       return !!(
-        typeof passkeyWallet.isPasskeyWalletAutoSignReady === 'function' &&
-        passkeyWallet.isPasskeyWalletAutoSignReady()
+        typeof passkeyWallet.isPasskeyWalletAutoSignReady === 'function' && passkeyWallet.isPasskeyWalletAutoSignReady()
       );
     } catch (_: any) {
       return false;
     }
   };
 
-const isAutoDecryptBlocked = () => {
+  const isAutoDecryptBlocked = () => {
     try {
-      const kind: SurveyQuestionsLegacyValue = (cryptoUtils as SurveyQuestionsLegacyValue).getProviderKind(propsRef.current.provider);
+      const kind: SurveyQuestionsLegacyValue = (cryptoUtils as SurveyQuestionsLegacyValue).getProviderKind(
+        propsRef.current.provider,
+      );
       return decideAutoDecryptBlocked(kind, () => isPasskeyWalletAutoSignReady());
     } catch (_: any) {
       return false;
     }
   };
 
-const shouldAttemptAutomaticPromptDecrypt = () => {
+  const shouldAttemptAutomaticPromptDecrypt = () => {
     if (!propsRef.current.loginComplete || !propsRef.current.account || !propsRef.current.provider) return false;
     try {
-      const kind: SurveyQuestionsLegacyValue = (cryptoUtils as SurveyQuestionsLegacyValue).getProviderKind(propsRef.current.provider);
+      const kind: SurveyQuestionsLegacyValue = (cryptoUtils as SurveyQuestionsLegacyValue).getProviderKind(
+        propsRef.current.provider,
+      );
       return decideAutomaticPromptDecryptByKind(kind, () => isPasskeyWalletAutoSignReady());
     } catch (_: any) {
       return false;
     }
   };
 
-const _applyDraftTrackingState = (tracking: SurveyQuestionsDraftTrackingState = {}) => {
+  const _applyDraftTrackingState = (tracking: SurveyQuestionsDraftTrackingState = {}) => {
     if (!tracking || typeof tracking !== 'object') return;
     if (Object.prototype.hasOwnProperty.call(tracking, 'draftParseCache')) {
       inst._draftParseCache = tracking.draftParseCache ?? null;
@@ -694,22 +694,20 @@ const _applyDraftTrackingState = (tracking: SurveyQuestionsDraftTrackingState = 
     }
   };
 
-const invalidateResponseHydrationRuns = () => {
+  const invalidateResponseHydrationRuns = () => {
     inst._fetchSurveyResponseRunId = (Number(inst._fetchSurveyResponseRunId) || 0) + 1;
     inst._fetchSingleQuestionRunId = (Number(inst._fetchSingleQuestionRunId) || 0) + 1;
+    inst._questionPoolHydrationRunId = (Number(inst._questionPoolHydrationRunId) || 0) + 1;
     inst._localCacheRehydrateRunId = (Number(inst._localCacheRehydrateRunId) || 0) + 1;
     if (inst._isMounted && stateRef.current.isLoadingResponse) {
       setState(buildResponseHydrationInvalidatedState());
     }
   };
 
-const setResponseHydrationState = (next: SurveyQuestionsStateUpdate, callback?: SurveyQuestionsSetStateCallback) => {
+  const setResponseHydrationState = (next: SurveyQuestionsStateUpdate, callback?: SurveyQuestionsSetStateCallback) => {
     inst._responseHydrationStateUpdateDepth += 1;
     const release = () => {
-      inst._responseHydrationStateUpdateDepth = Math.max(
-        0,
-        (Number(inst._responseHydrationStateUpdateDepth) || 0) - 1,
-      );
+      inst._responseHydrationStateUpdateDepth = Math.max(0, (Number(inst._responseHydrationStateUpdateDepth) || 0) - 1);
     };
 
     try {
@@ -726,7 +724,7 @@ const setResponseHydrationState = (next: SurveyQuestionsStateUpdate, callback?: 
     }
   };
 
-const _applyDraftHydrationEntryToSlice = ({
+  const _applyDraftHydrationEntryToSlice = ({
     targetSlice = null,
     questionId = '',
     draftEntry = null,
@@ -759,7 +757,7 @@ const _applyDraftHydrationEntryToSlice = ({
     return !!patch.changed;
   };
 
-const _applyResponseHydrationEntryToSlice = ({
+  const _applyResponseHydrationEntryToSlice = ({
     targetSlice = null,
     currentSlice = null,
     questionId = '',
@@ -803,16 +801,14 @@ const _applyResponseHydrationEntryToSlice = ({
     return !!patch.changed;
   };
 
-const _applyResponseHydrationListToSlice = ({
+  const _applyResponseHydrationListToSlice = ({
     targetSlice = null,
     currentSlice = null,
     responses = [],
     allowOverwrite = false,
     parseValue = parseAnswerValue,
     questionIdResolver = (response: unknown) => {
-      const responseRecord = response && typeof response === 'object'
-        ? response as Record<string, unknown>
-        : {};
+      const responseRecord = response && typeof response === 'object' ? (response as Record<string, unknown>) : {};
       return normalizeQuestionIdKey(responseRecord.questionID || responseRecord.questionId);
     },
   }: SurveyQuestionsResponseHydrationListArgs = {}) => {
@@ -822,21 +818,23 @@ const _applyResponseHydrationListToSlice = ({
     list.forEach((response: unknown) => {
       const qid = (questionIdResolver as SurveyQuestionsQuestionIdResolver)(response);
       if (!qid) return;
-      if (inst._applyResponseHydrationEntryToSlice({
-        targetSlice,
-        currentSlice,
-        questionId: qid,
-        response,
-        allowOverwrite,
-        parseValue,
-      })) {
+      if (
+        inst._applyResponseHydrationEntryToSlice({
+          targetSlice,
+          currentSlice,
+          questionId: qid,
+          response,
+          allowOverwrite,
+          parseValue,
+        })
+      ) {
         changed = true;
       }
     });
     return changed;
   };
 
-const _applyCachedResponseEntryToSlice = ({
+  const _applyCachedResponseEntryToSlice = ({
     targetSlice = null,
     questionId = '',
     response = null,
@@ -867,7 +865,7 @@ const _applyCachedResponseEntryToSlice = ({
     return !!patch.changed;
   };
 
-const _applyLocalCacheHydrationEntryToSlice = ({
+  const _applyLocalCacheHydrationEntryToSlice = ({
     targetSlice = null,
     questionId = '',
     cachedAnswer = null,
@@ -887,14 +885,9 @@ const _applyLocalCacheHydrationEntryToSlice = ({
 
     if (
       cachedAnswer &&
-      (
-        allowMaskedAnswerDraftEmpty ||
+      (allowMaskedAnswerDraftEmpty ||
         targetAnswers?.[questionId]?.value === undefined ||
-        (
-          targetAnswers?.[questionId]?.value === '' &&
-          !targetAnswers?.[questionId]?.encryptedPortion
-        )
-      )
+        (targetAnswers?.[questionId]?.value === '' && !targetAnswers?.[questionId]?.encryptedPortion))
     ) {
       targetAnswers[questionId] = {
         ...(targetAnswers[questionId] || {}),
@@ -902,22 +895,18 @@ const _applyLocalCacheHydrationEntryToSlice = ({
       };
       changed = true;
       if (debugLabel) {
-        DEBUG_PREFILL && surveyLog.log(`${debugLabel} Hydrated answer for qid=${questionId}`, {
-          fromCache: cachedAnswer,
-        });
+        DEBUG_PREFILL &&
+          surveyLog.log(`${debugLabel} Hydrated answer for qid=${questionId}`, {
+            fromCache: cachedAnswer,
+          });
       }
     }
 
     if (
       cachedAdditional &&
-      (
-        allowMaskedAdditionalDraftEmpty ||
+      (allowMaskedAdditionalDraftEmpty ||
         targetAdditional?.[questionId]?.value === undefined ||
-        (
-          targetAdditional?.[questionId]?.value === '' &&
-          !targetAdditional?.[questionId]?.encryptedPortion
-        )
-      )
+        (targetAdditional?.[questionId]?.value === '' && !targetAdditional?.[questionId]?.encryptedPortion))
     ) {
       targetAdditional[questionId] = {
         ...(targetAdditional[questionId] || {}),
@@ -925,9 +914,10 @@ const _applyLocalCacheHydrationEntryToSlice = ({
       };
       changed = true;
       if (debugLabel) {
-        DEBUG_PREFILL && surveyLog.log(`${debugLabel} Hydrated additional for qid=${questionId}`, {
-          fromCache: cachedAdditional,
-        });
+        DEBUG_PREFILL &&
+          surveyLog.log(`${debugLabel} Hydrated additional for qid=${questionId}`, {
+            fromCache: cachedAdditional,
+          });
       }
     }
 
@@ -939,9 +929,10 @@ const _applyLocalCacheHydrationEntryToSlice = ({
       targetImportance[questionId] = Number(cachedImportance);
       changed = true;
       if (debugLabel) {
-        DEBUG_PREFILL && surveyLog.log(`${debugLabel} Hydrated importance for qid=${questionId}`, {
-          fromCache: cachedImportance,
-        });
+        DEBUG_PREFILL &&
+          surveyLog.log(`${debugLabel} Hydrated importance for qid=${questionId}`, {
+            fromCache: cachedImportance,
+          });
       }
     }
 
@@ -953,26 +944,34 @@ const _applyLocalCacheHydrationEntryToSlice = ({
       targetConviction[questionId] = Number(cachedConviction);
       changed = true;
       if (debugLabel) {
-        DEBUG_PREFILL && surveyLog.log(`${debugLabel} Hydrated conviction for qid=${questionId}`, {
-          fromCache: cachedConviction,
-        });
+        DEBUG_PREFILL &&
+          surveyLog.log(`${debugLabel} Hydrated conviction for qid=${questionId}`, {
+            fromCache: cachedConviction,
+          });
       }
     }
 
     return changed;
   };
 
-const setManagedTimeout = (fn: SurveyQuestionsTimeoutCallback, delayMs: unknown = 0) => {
-    const timeoutId = setTimeout(() => {
-      inst._transientTimeouts.delete(timeoutId);
-      if (!inst._isMounted) return;
-      try { fn(); } catch (e: unknown) { surveyLog.warn('SurveyTool: callback', e); }
-    }, Math.max(0, Number(delayMs) || 0));
+  const setManagedTimeout = (fn: SurveyQuestionsTimeoutCallback, delayMs: unknown = 0) => {
+    const timeoutId = setTimeout(
+      () => {
+        inst._transientTimeouts.delete(timeoutId);
+        if (!inst._isMounted) return;
+        try {
+          fn();
+        } catch (e: unknown) {
+          surveyLog.warn('SurveyTool: callback', e);
+        }
+      },
+      Math.max(0, Number(delayMs) || 0),
+    );
     inst._transientTimeouts.add(timeoutId);
     return timeoutId;
   };
 
-const clearManagedTimeouts = () => {
+  const clearManagedTimeouts = () => {
     if (!inst._transientTimeouts || inst._transientTimeouts.size === 0) return;
     inst._transientTimeouts.forEach((timeoutId) => {
       clearTimeout(timeoutId);
@@ -980,7 +979,7 @@ const clearManagedTimeouts = () => {
     inst._transientTimeouts.clear();
   };
 
-const clearSingleQuestionBootstrapRetry = () => {
+  const clearSingleQuestionBootstrapRetry = () => {
     if (inst._singleQuestionBootstrapRetryTimer) {
       clearTimeout(inst._singleQuestionBootstrapRetryTimer);
       inst._singleQuestionBootstrapRetryTimer = null;
@@ -988,10 +987,14 @@ const clearSingleQuestionBootstrapRetry = () => {
     inst._singleQuestionBootstrapRetrySig = '';
   };
 
-const getPendingSingleQuestionBootstrapRetryAttempt = (questionId: unknown = '') => {
-    const qid = String(questionId || propsRef.current.questionID || '').trim().toLowerCase();
+  const getPendingSingleQuestionBootstrapRetryAttempt = (questionId: unknown = '') => {
+    const qid = String(questionId || propsRef.current.questionID || '')
+      .trim()
+      .toLowerCase();
     if (!qid) return 0;
-    const currentRetrySig = String(inst._singleQuestionBootstrapRetrySig || '').trim().toLowerCase();
+    const currentRetrySig = String(inst._singleQuestionBootstrapRetrySig || '')
+      .trim()
+      .toLowerCase();
     if (!currentRetrySig) return 0;
     const [currentQid = '', currentAttemptToken = '0'] = currentRetrySig.split(':');
     if (currentQid !== qid) return 0;
@@ -999,11 +1002,11 @@ const getPendingSingleQuestionBootstrapRetryAttempt = (questionId: unknown = '')
     return Number.isFinite(currentAttempt) && currentAttempt > 0 ? currentAttempt : 0;
   };
 
-const updateSingleQuestionDebug = (patch: Record<string, unknown> = {}) => {
+  const updateSingleQuestionDebug = (patch: Record<string, unknown> = {}) => {
     if (typeof window === 'undefined') return;
     try {
       const prev =
-        (window.__CE_SINGLE_Q_DEBUG__ && typeof window.__CE_SINGLE_Q_DEBUG__ === 'object')
+        window.__CE_SINGLE_Q_DEBUG__ && typeof window.__CE_SINGLE_Q_DEBUG__ === 'object'
           ? window.__CE_SINGLE_Q_DEBUG__
           : {};
       window.__CE_SINGLE_Q_DEBUG__ = {
@@ -1011,18 +1014,28 @@ const updateSingleQuestionDebug = (patch: Record<string, unknown> = {}) => {
         ...patch,
         updatedAt: Date.now(),
       };
-    } catch (e: unknown) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: unknown) {
+      surveyLog.warn('SurveyTool: fallback', e);
+    }
   };
 
-const scheduleSingleQuestionBootstrapRetry = ({ questionId = '', attempt = 0, reason = '' }: SurveyQuestionsBootstrapRetryArgs = {}) => {
-    const qid = String(questionId || propsRef.current.questionID || '').trim().toLowerCase();
+  const scheduleSingleQuestionBootstrapRetry = ({
+    questionId = '',
+    attempt = 0,
+    reason = '',
+  }: SurveyQuestionsBootstrapRetryArgs = {}) => {
+    const qid = String(questionId || propsRef.current.questionID || '')
+      .trim()
+      .toLowerCase();
     if (!qid || !inst._isMounted) return false;
 
     const maxAttempts = 6;
     const nextAttempt = Math.max(1, Number(attempt || 0) + 1);
     if (nextAttempt > maxAttempts) return false;
 
-    const currentRetrySig = String(inst._singleQuestionBootstrapRetrySig || '').trim().toLowerCase();
+    const currentRetrySig = String(inst._singleQuestionBootstrapRetrySig || '')
+      .trim()
+      .toLowerCase();
     if (currentRetrySig) {
       const [currentQid = '', currentAttemptToken = '0'] = currentRetrySig.split(':');
       const currentAttempt = Number(currentAttemptToken || 0);
@@ -1046,9 +1059,7 @@ const scheduleSingleQuestionBootstrapRetry = ({ questionId = '', attempt = 0, re
         forceQuestionMetadataRefetch: true,
         bootstrapRetryAttempt: nextAttempt,
       }).catch((error: unknown) => {
-        const errorRecord = error && typeof error === 'object'
-          ? error as { message?: unknown }
-          : null;
+        const errorRecord = error && typeof error === 'object' ? (error as { message?: unknown }) : null;
         surveyLog.error('SurveyQuestions: bootstrap retry failed', {
           questionId: qid,
           attempt: nextAttempt,
@@ -1061,7 +1072,7 @@ const scheduleSingleQuestionBootstrapRetry = ({ questionId = '', attempt = 0, re
     return true;
   };
 
-const surveyQuestionsRuntimeMethods = createSurveyQuestionsRuntimeMethods({
+  const surveyQuestionsRuntimeMethods = createSurveyQuestionsRuntimeMethods({
     DEBUG_PREFILL,
     Dropdown,
     DropdownMenu,
@@ -1160,6 +1171,7 @@ const surveyQuestionsRuntimeMethods = createSurveyQuestionsRuntimeMethods({
     buildEmptyResponseFieldStateCore,
     buildEncryptionTogglePlan,
     buildFetchedQuestionPoolState,
+    publishSurveyQuestionPoolIfCurrent,
     buildFieldDecryptStateHelper,
     buildFieldEncryptionWorkGroupsCore,
     buildGateAudienceSbtItemsController,
@@ -1867,7 +1879,10 @@ const surveyQuestionsRuntimeMethods = createSurveyQuestionsRuntimeMethods({
     handleDecryptEdit,
   } = surveyQuestionsRuntimeMethods;
 
-async function runComponentDidUpdate(prevProps: SurveyQuestionsProps, prevState: SurveyQuestionsState): Promise<unknown> {
+  async function runComponentDidUpdate(
+    prevProps: SurveyQuestionsProps,
+    prevState: SurveyQuestionsState,
+  ): Promise<unknown> {
     const runtimeStrategy = getRuntimeStrategy();
     if (typeof runtimeStrategy?.componentDidUpdate === 'function') {
       return runtimeStrategy.componentDidUpdate(engine, prevProps, prevState);
@@ -1875,7 +1890,7 @@ async function runComponentDidUpdate(prevProps: SurveyQuestionsProps, prevState:
     return runDefaultComponentDidUpdate(prevProps, prevState);
   }
 
-function runComponentDidMount(): unknown {
+  function runComponentDidMount(): unknown {
     const runtimeStrategy = getRuntimeStrategy();
     if (typeof runtimeStrategy?.componentDidMount === 'function') {
       return runtimeStrategy.componentDidMount(engine);
@@ -1883,7 +1898,7 @@ function runComponentDidMount(): unknown {
     return runDefaultComponentDidMount();
   }
 
-function runComponentWillUnmount(): unknown {
+  function runComponentWillUnmount(): unknown {
     const runtimeStrategy = getRuntimeStrategy();
     if (typeof runtimeStrategy?.componentWillUnmount === 'function') {
       return runtimeStrategy.componentWillUnmount(engine);
@@ -2208,18 +2223,15 @@ function runComponentWillUnmount(): unknown {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
-    const runtimeStrategy: SurveyQuestionsLegacyValue = getRuntimeStrategy();
-    if (typeof runtimeStrategy?.render === 'function') {
-      return runtimeStrategy.render(engine);
-    }
-    return renderDefaultSurveyQuestionsRoute();
-
+  const runtimeStrategy: SurveyQuestionsLegacyValue = getRuntimeStrategy();
+  if (typeof runtimeStrategy?.render === 'function') {
+    return runtimeStrategy.render(engine);
+  }
+  return renderDefaultSurveyQuestionsRoute();
 };
 
 // Preserve direct QuestionsDashboard/SurveySelector consumers without reviving the import cycle.
 (SurveySelector as SurveyQuestionsLegacyValue).SurveyQuestionsComponent = SurveyQuestions;
 (QuestionsDashboard as SurveyQuestionsLegacyValue).SurveyQuestionsComponent = SurveyQuestions;
-
 
 export default SurveyQuestions;

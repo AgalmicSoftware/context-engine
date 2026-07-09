@@ -5,34 +5,21 @@ import {
   SurveyResultsLockedResponsesBanner,
   SurveyResultsLockedResponsesToggle,
 } from './SurveyResultsLockedResponsesPanel';
-import {
-  buildSurveyResultsCacheControllerSnapshot,
-} from './surveyResultsCacheControllerSnapshot';
-import {
-  buildSurveyResultsCacheReadinessDisplayPlan,
-} from './surveyResultsCacheReadinessDisplayPlan';
+import { buildSurveyResultsCacheControllerSnapshot } from './surveyResultsCacheControllerSnapshot';
+import { buildSurveyResultsCacheReadinessDisplayPlan } from './surveyResultsCacheReadinessDisplayPlan';
 import {
   buildSurveyResultsDemoSurfaceProps,
   createSurveyResultsDemoSurfaceParentProps,
   type SurveyResultsDemoSurfaceQuestionResponsePort,
 } from './surveyResultsDemoSurfaceProps';
-import {
-  buildSurveyResultsExportControlsDisplayDescriptor,
-} from './surveyResultsExportPlans.js';
+import { buildSurveyResultsExportControlsDisplayDescriptor } from './surveyResultsExportPlans.js';
 import type { SurveyResultsDisplayPanelsArgs } from './SurveyResultsDisplayPanels';
 import { renderSurveyResultsFilterExportControls } from './SurveyResultsFilterExportControls';
-import type {
-  SurveyResultsHtmlReportExportModalProps,
-} from './SurveyResultsHtmlReportExportModal';
-import {
-  renderSurveyResultsSyncStatusPanel,
-} from './SurveyResultsPanels';
+import type { SurveyResultsHtmlReportExportModalProps } from './SurveyResultsHtmlReportExportModal';
+import { renderSurveyResultsSyncStatusPanel } from './SurveyResultsPanels';
 import SurveyResultsReportSurface from './SurveyResultsReportSurface';
 import type { QuestionFilterHandle } from './QuestionFilter';
-import type {
-  SurveyResultsProps,
-  SurveyResultsState,
-} from './SurveyResults';
+import type { SurveyResultsProps, SurveyResultsState } from './SurveyResults';
 
 type SurveyResultsRecord = Record<string, unknown>;
 type SurveyResultsAggregatorEntry = [string, unknown];
@@ -70,12 +57,10 @@ export type SurveyResultsRenderSurfaceArgs = {
   getMemoizedAggregatorEntries: (aggregator: unknown) => SurveyResultsAggregatorEntry[];
   getMemoizedIndividualsAggregator: (individualResponses: unknown) => unknown;
   getMemoizedLockedResponsesModel: (
-    questions: Record<string, SurveyResultsRecord>
+    questions: Record<string, SurveyResultsRecord>,
   ) => SurveyResultsLockedResponsesModel;
   getMemoizedPolisQuestionResponses: SurveyResultsDemoSurfaceQuestionResponsePort;
-  getMemoizedQuestionFilterQuestions: (
-    networkQuestionsById: Record<string, SurveyResultsRecord>
-  ) => unknown;
+  getMemoizedQuestionFilterQuestions: (networkQuestionsById: Record<string, SurveyResultsRecord>) => unknown;
   getQuestionFilterStorageKeyPrefix: (viewMode?: unknown) => string;
   getResponseCardProps: SurveyResultsDisplayPanelsArgs['getResponseCardProps'];
   getScopedQuestionNetworkDataSync: (viewMode?: unknown) => SurveyResultsScopedQuestionNetworkData;
@@ -101,11 +86,11 @@ export type SurveyResultsRenderSurfaceArgs = {
   renderQuestionSummary: (
     qId: string,
     responses: unknown,
-    preNetworkQuestions: Record<string, SurveyResultsRecord>
+    preNetworkQuestions: Record<string, SurveyResultsRecord>,
   ) => React.ReactNode;
   renderQuestionTable: (
     questionMap: unknown,
-    preNetworkQuestions: Record<string, SurveyResultsRecord>
+    preNetworkQuestions: Record<string, SurveyResultsRecord>,
   ) => React.ReactNode;
   stableSetFilterLoading: (loading: unknown) => void;
   state: SurveyResultsState;
@@ -201,16 +186,11 @@ export const renderSurveyResultsRenderSurface = ({
   const aggregatorEntries = getMemoizedAggregatorEntries(sbtFilteredAggregatorQuestionResponses);
   const aggregatorEntriesCount = aggregatorEntries.length;
   const lockedResponsesModel = getMemoizedLockedResponsesModel(preNetworkQuestions);
-  const surveyAggregateEntries =
-    (viewMode === 'survey' && surveyViewMode === 'aggregate') ? aggregatorEntries : [];
+  const surveyAggregateEntries = viewMode === 'survey' && surveyViewMode === 'aggregate' ? aggregatorEntries : [];
   const questionModeEntries = viewMode === 'questions' ? aggregatorEntries : [];
-  const surveyIdAbbreviation = currentSurveyId
-    ? getShortenedSurveyID(currentSurveyId, false, null, false)
-    : null;
+  const surveyIdAbbreviation = currentSurveyId ? getShortenedSurveyID(currentSurveyId, false, null, false) : null;
   const isDemoQuestionResults = getIsDemoQuestionResultsContext();
-  const demoResultsViewMode = isDemoQuestionResults
-    ? state.demoResultsViewMode || 'raw'
-    : 'raw';
+  const demoResultsViewMode = isDemoQuestionResults ? state.demoResultsViewMode || 'raw' : 'raw';
   const isDemoAlternateResultsView = isDemoQuestionResults && demoResultsViewMode !== 'raw';
   const demoResultsViewOptions: SurveyResultsDemoViewOption[] = isDemoQuestionResults
     ? [
@@ -257,7 +237,7 @@ export const renderSurveyResultsRenderSurface = ({
     viewMode,
   });
   const cacheReadinessDisplay = buildSurveyResultsCacheReadinessDisplayPlan(
-    cacheControllerSnapshot.cacheReadinessInput
+    cacheControllerSnapshot.cacheReadinessInput,
   );
   const filterInput = cacheControllerSnapshot.filterInput;
   const syncStatusNode = renderSurveyResultsSyncStatusPanel({
@@ -340,10 +320,7 @@ export const renderSurveyResultsRenderSurface = ({
     questionResponsesNonce: props.questionResponsesNonce,
     questionsCacheNonce: props.questionsCacheNonce,
     renderQuestionSummary: (qId, arr) => renderQuestionSummary(qId, arr, preNetworkQuestions),
-    renderQuestionTable: () => renderQuestionTable(
-      sbtFilteredAggregatorQuestionResponses,
-      preNetworkQuestions
-    ),
+    renderQuestionTable: () => renderQuestionTable(sbtFilteredAggregatorQuestionResponses, preNetworkQuestions),
     responses: sbtFilteredResponses,
     sbtCacheRevision: props.sbtCacheRevision,
     styleMap,

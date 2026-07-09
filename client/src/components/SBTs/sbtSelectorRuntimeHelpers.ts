@@ -75,9 +75,7 @@ export type SbtSelectorUpdateSignals = {
   universeScopeChanged: boolean;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
 const getDefaultSbtSelectorRuntimeGlobal = (): Record<string, unknown> => {
   try {
@@ -129,9 +127,7 @@ export const isSbtSelectorForcedDebugEnabled = ({
   windowRef,
 }: SbtSelectorDebugRuntimeArgs = {}): boolean => {
   try {
-    const resolvedRuntime = typeof runtimeGlobal === 'undefined'
-      ? getDefaultSbtSelectorRuntimeGlobal()
-      : runtimeGlobal;
+    const resolvedRuntime = typeof runtimeGlobal === 'undefined' ? getDefaultSbtSelectorRuntimeGlobal() : runtimeGlobal;
     if (resolvedRuntime && readBoolishDebugFlag(resolvedRuntime.CE_SBT_SELECTOR_DEBUG)) {
       return true;
     }
@@ -139,15 +135,10 @@ export const isSbtSelectorForcedDebugEnabled = ({
     return false;
   }
   try {
-    const resolvedWindow = typeof windowRef === 'undefined'
-      ? getDefaultSbtSelectorWindow()
-      : windowRef;
+    const resolvedWindow = typeof windowRef === 'undefined' ? getDefaultSbtSelectorWindow() : windowRef;
     if (resolvedWindow) {
       const params = new URLSearchParams(resolvedWindow.location?.search || '');
-      if (
-        params.has(SBT_SELECTOR_DEBUG_QUERY_KEY) &&
-        readBoolishDebugFlag(params.get(SBT_SELECTOR_DEBUG_QUERY_KEY))
-      ) {
+      if (params.has(SBT_SELECTOR_DEBUG_QUERY_KEY) && readBoolishDebugFlag(params.get(SBT_SELECTOR_DEBUG_QUERY_KEY))) {
         return true;
       }
     }
@@ -155,9 +146,8 @@ export const isSbtSelectorForcedDebugEnabled = ({
     return false;
   }
   try {
-    const resolvedLocalStorage = typeof localStorageRef === 'undefined'
-      ? getDefaultSbtSelectorLocalStorage()
-      : localStorageRef;
+    const resolvedLocalStorage =
+      typeof localStorageRef === 'undefined' ? getDefaultSbtSelectorLocalStorage() : localStorageRef;
     if (
       resolvedLocalStorage?.getItem &&
       readBoolishDebugFlag(resolvedLocalStorage.getItem(SBT_SELECTOR_DEBUG_STORAGE_KEY))
@@ -168,9 +158,8 @@ export const isSbtSelectorForcedDebugEnabled = ({
     return false;
   }
   try {
-    const resolvedSessionStorage = typeof sessionStorageRef === 'undefined'
-      ? getDefaultSbtSelectorSessionStorage()
-      : sessionStorageRef;
+    const resolvedSessionStorage =
+      typeof sessionStorageRef === 'undefined' ? getDefaultSbtSelectorSessionStorage() : sessionStorageRef;
     if (
       resolvedSessionStorage?.getItem &&
       readBoolishDebugFlag(resolvedSessionStorage.getItem(SBT_SELECTOR_DEBUG_STORAGE_KEY))
@@ -185,13 +174,10 @@ export const isSbtSelectorForcedDebugEnabled = ({
 
 export const shouldAutoSearchOtherSbtSelectorSessions = (
   runtimeGlobal: Record<string, unknown> | null = getDefaultSbtSelectorRuntimeGlobal(),
-  fallback: unknown = CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS
+  fallback: unknown = CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS,
 ): boolean => {
   try {
-    if (
-      isRecord(runtimeGlobal) &&
-      typeof runtimeGlobal.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS !== 'undefined'
-    ) {
+    if (isRecord(runtimeGlobal) && typeof runtimeGlobal.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS !== 'undefined') {
       return readBoolishDebugFlag(runtimeGlobal.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS);
     }
   } catch (_) {

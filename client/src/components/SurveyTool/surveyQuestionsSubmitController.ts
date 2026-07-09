@@ -4,24 +4,13 @@ import type {
   SurveySubmitSuccessStatePatch,
   SurveyQuestionsPrimarySubmitPlan,
 } from './surveyQuestionsTypes.js';
-import {
-  buildSubmitFailureState,
-  buildSubmitStartState,
-  buildSubmitSuccessState,
-} from './surveyQuestionsTypes.js';
-import {
-  updateSubmittedSinceLastEdit,
-} from './surveyToolUtils.js';
+import { buildSubmitFailureState, buildSubmitStartState, buildSubmitSuccessState } from './surveyQuestionsTypes.js';
+import { updateSubmittedSinceLastEdit } from './surveyToolUtils';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 
-export type SurveyQuestionsSubmitNavigationPort = (
-  path: string,
-  plan: SurveyQuestionsPrimarySubmitPlan
-) => void;
+export type SurveyQuestionsSubmitNavigationPort = (path: string, plan: SurveyQuestionsPrimarySubmitPlan) => void;
 
-export type SurveyQuestionsSubmitDispatchPort = (
-  plan: SurveyQuestionsPrimarySubmitPlan
-) => void;
+export type SurveyQuestionsSubmitDispatchPort = (plan: SurveyQuestionsPrimarySubmitPlan) => void;
 
 export type SurveyQuestionsSubmitControllerPorts = {
   activateSubmitGuard?: () => void;
@@ -43,10 +32,7 @@ export type SurveyQuestionsSubmitCompletionPorts = {
   clearSubmitGuard?: () => void;
   finishSubmitAttempt?: (submitAttemptId: number) => void;
   setSubmitFailureState?: (statePatch: SurveySubmitFailureStatePatch) => void;
-  setSubmitSuccessState?: (
-    statePatch: SurveySubmitSuccessStatePatch,
-    afterStateApplied?: () => void
-  ) => void;
+  setSubmitSuccessState?: (statePatch: SurveySubmitSuccessStatePatch, afterStateApplied?: () => void) => void;
 };
 
 export type SurveyQuestionsSubmitStaleStatePatch = {
@@ -80,9 +66,8 @@ export const resolveSubmitEffectiveDraftSlug = ({
   routeSlug?: unknown;
   normalizeSlug?: ((value: unknown) => string) | null;
 } = {}): string => {
-  const normalizeValue = typeof normalizeSlug === 'function'
-    ? normalizeSlug
-    : (value: unknown) => String(value ?? '').trim();
+  const normalizeValue =
+    typeof normalizeSlug === 'function' ? normalizeSlug : (value: unknown) => String(value ?? '').trim();
   return normalizeValue(draftSlug) || normalizeValue(routeSlug);
 };
 
@@ -165,9 +150,7 @@ export type SurveyQuestionsStaleSubmitControllerResult = {
   statePatch: SurveyQuestionsSubmitStaleStatePatch | null;
 };
 
-const buildUnhandledResult = (
-  plan: SurveyQuestionsPrimarySubmitPlan
-): SurveyQuestionsSubmitControllerResult => ({
+const buildUnhandledResult = (plan: SurveyQuestionsPrimarySubmitPlan): SurveyQuestionsSubmitControllerResult => ({
   action: plan.action,
   path: plan.path || '',
   plan,
@@ -180,40 +163,25 @@ const normalizeSubmitAttemptId = (submitAttemptId: unknown): number => {
   return Number.isFinite(value) && value > 0 ? value : 0;
 };
 
-const normalizePendingStatCount = (
-  value: unknown,
-  fallback: unknown = 0
-): number => {
+const normalizePendingStatCount = (value: unknown, fallback: unknown = 0): number => {
   const fallbackValue = Number(fallback || 0);
   const normalizedFallback = Number.isFinite(fallbackValue) ? fallbackValue : 0;
   const numericValue = Number(value ?? normalizedFallback);
   return Number.isFinite(numericValue) ? numericValue : normalizedFallback;
 };
 
-const readPendingStatCount = (
-  pendingStats: unknown,
-  key: 'total' | 'encrypted',
-  fallback: unknown
-): number => {
-  if (
-    pendingStats &&
-    typeof pendingStats === 'object' &&
-    Object.prototype.hasOwnProperty.call(pendingStats, key)
-  ) {
-    return normalizePendingStatCount(
-      (pendingStats as Partial<Record<'total' | 'encrypted', unknown>>)[key]
-    );
+const readPendingStatCount = (pendingStats: unknown, key: 'total' | 'encrypted', fallback: unknown): number => {
+  if (pendingStats && typeof pendingStats === 'object' && Object.prototype.hasOwnProperty.call(pendingStats, key)) {
+    return normalizePendingStatCount((pendingStats as Partial<Record<'total' | 'encrypted', unknown>>)[key]);
   }
   return normalizePendingStatCount(fallback);
 };
 
-const resolveSubmitFailureMessage = (error: unknown): string => (
-  ((error as { message?: string } | null | undefined)?.message) || 'Submission failed.'
-);
+const resolveSubmitFailureMessage = (error: unknown): string =>
+  (error as { message?: string } | null | undefined)?.message || 'Submission failed.';
 
-const lowerSubmitRouteValue = (value: unknown): string => (
-  ((value || '') as { toLowerCase: () => string }).toLowerCase()
-);
+const lowerSubmitRouteValue = (value: unknown): string =>
+  ((value || '') as { toLowerCase: () => string }).toLowerCase();
 
 const buildSubmitStaleState = (): SurveyQuestionsSubmitStaleStatePatch => ({
   isSubmitting: false,
@@ -221,10 +189,7 @@ const buildSubmitStaleState = (): SurveyQuestionsSubmitStaleStatePatch => ({
   currentStep: 0,
 });
 
-const runSubmitCompletionPrelude = (
-  submitAttemptId: number,
-  ports: SurveyQuestionsSubmitCompletionPorts
-): void => {
+const runSubmitCompletionPrelude = (submitAttemptId: number, ports: SurveyQuestionsSubmitCompletionPorts): void => {
   ports.clearSubmitGuard?.();
   if (submitAttemptId > 0) {
     ports.finishSubmitAttempt?.(submitAttemptId);
@@ -236,9 +201,7 @@ export const resolveSurveyQuestionsSubmitPendingStats = ({
   fallbackTotal = 0,
   getPendingEditStats,
 }: ResolveSurveyQuestionsSubmitPendingStatsArgs = {}): SurveyQuestionsSubmitPendingStats => {
-  const pendingStats = typeof getPendingEditStats === 'function'
-    ? getPendingEditStats()
-    : null;
+  const pendingStats = typeof getPendingEditStats === 'function' ? getPendingEditStats() : null;
 
   return {
     total: readPendingStatCount(pendingStats, 'total', fallbackTotal),
@@ -350,11 +313,10 @@ export const runSurveyQuestionsStaleSubmitController = ({
   ports.clearSubmitGuard?.();
 
   const submitAttemptId = normalizeSubmitAttemptId(
-    (snapshot as { submitAttemptId?: unknown } | null | undefined)?.submitAttemptId
+    (snapshot as { submitAttemptId?: unknown } | null | undefined)?.submitAttemptId,
   );
-  const canUpdateSubmitState = typeof ports.canUpdateSubmitState === 'function'
-    ? !!ports.canUpdateSubmitState(snapshot)
-    : false;
+  const canUpdateSubmitState =
+    typeof ports.canUpdateSubmitState === 'function' ? !!ports.canUpdateSubmitState(snapshot) : false;
 
   if (!canUpdateSubmitState) {
     return {
@@ -376,9 +338,10 @@ export const runSurveyQuestionsStaleSubmitController = ({
     };
   }
 
-  const isSubmitAttemptActive = typeof ports.isSubmitAttemptActive === 'function'
-    ? !!ports.isSubmitAttemptActive(submitAttemptId, snapshot)
-    : false;
+  const isSubmitAttemptActive =
+    typeof ports.isSubmitAttemptActive === 'function'
+      ? !!ports.isSubmitAttemptActive(submitAttemptId, snapshot)
+      : false;
   if (!isSubmitAttemptActive) {
     return {
       outcome: 'stale',
@@ -418,10 +381,7 @@ export const runSurveyQuestionsSubmitSuccessController = ({
     editBaseline,
     hasEncrypted,
     responseUrl,
-    submittedSinceLastEdit: updateSubmittedSinceLastEdit(
-      submittedSinceLastEdit,
-      'submit_success'
-    ),
+    submittedSinceLastEdit: updateSubmittedSinceLastEdit(submittedSinceLastEdit, 'submit_success'),
     surveysResponseState,
     userAnswers,
   });
@@ -445,10 +405,7 @@ export const runSurveyQuestionsSubmitFailureController = ({
 }: RunSurveyQuestionsSubmitFailureControllerArgs): SurveyQuestionsSubmitFailureControllerResult => {
   const normalizedSubmitAttemptId = normalizeSubmitAttemptId(submitAttemptId);
   const statePatch = buildSubmitFailureState({
-    submittedSinceLastEdit: updateSubmittedSinceLastEdit(
-      submittedSinceLastEdit,
-      'submit_error'
-    ),
+    submittedSinceLastEdit: updateSubmittedSinceLastEdit(submittedSinceLastEdit, 'submit_error'),
     submissionError: resolveSubmitFailureMessage(error),
   });
 

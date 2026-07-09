@@ -1,7 +1,4 @@
-import {
-  bindSponsoredBundlePort,
-  type SponsoredBundleModule,
-} from './sponsoredBundlePorts';
+import { bindSponsoredBundlePort, type SponsoredBundleModule } from './sponsoredBundlePorts';
 
 describe('sponsored bundle port', () => {
   it('routes bundle helpers and upload through call-time module lookup', async () => {
@@ -22,18 +19,19 @@ describe('sponsored bundle port', () => {
       sponsoredBundles: () => currentModule,
     });
 
-    expect(port.buildSponsoredBundlePlaintext({ openaiKey: 'alpha' }))
-      .toEqual({ openaiKey: 'first' });
+    expect(port.buildSponsoredBundlePlaintext({ openaiKey: 'alpha' })).toEqual({ openaiKey: 'first' });
     expect(port.generateSponsoredBundleSecret()).toBe('first-secret');
 
     currentModule = secondModule;
 
     expect(port.hasSponsoredBundleFields({ openaiKey: '' })).toBe(false);
-    await expect(port.uploadSponsoredBundle({
-      secret: 'secret',
-      bundle: { openaiKey: 'beta' },
-      sessionSlug: 'edge',
-    })).resolves.toEqual({ txId: 'second-tx' });
+    await expect(
+      port.uploadSponsoredBundle({
+        secret: 'secret',
+        bundle: { openaiKey: 'beta' },
+        sessionSlug: 'edge',
+      }),
+    ).resolves.toEqual({ txId: 'second-tx' });
 
     expect(firstModule.buildSponsoredBundlePlaintext).toHaveBeenCalledWith({ openaiKey: 'alpha' });
     expect(firstModule.generateSponsoredBundleSecret).toHaveBeenCalledWith();

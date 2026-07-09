@@ -47,7 +47,7 @@ describe('rollingTranscription helpers', () => {
     ];
 
     expect(stitchRollingTranscriptSegments(segments)).toBe(
-      'We talked about budget timing and risk thresholds that the group should review before voting.'
+      'We talked about budget timing and risk thresholds that the group should review before voting.',
     );
     expect(mergeRollingTranscriptText('alpha beta gamma', 'beta gamma delta')).toBe('alpha beta gamma delta');
   });
@@ -69,17 +69,21 @@ describe('rollingTranscription helpers', () => {
       completedAt: 20,
     };
 
-    expect(writeListeningDraft('demo', {
-      transcript: 'Recovered transcript',
-      segments: [segment],
-    })).toBe(true);
+    expect(
+      writeListeningDraft('demo', {
+        transcript: 'Recovered transcript',
+        segments: [segment],
+      }),
+    ).toBe(true);
 
     expect(window.localStorage.getItem(buildListeningDraftStorageKey('demo'))).not.toContain('Blob');
-    expect(readListeningDraft('demo')).toEqual(expect.objectContaining({
-      sessionSlug: 'demo',
-      transcript: 'Recovered transcript',
-      segments: [segment],
-    }));
+    expect(readListeningDraft('demo')).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'demo',
+        transcript: 'Recovered transcript',
+        segments: [segment],
+      }),
+    );
     expect(clearListeningDraft('demo')).toBe(true);
     expect(readListeningDraft('demo')).toBeNull();
   });
@@ -93,16 +97,20 @@ describe('rollingTranscription helpers', () => {
       startedAt: 30,
     };
 
-    expect(writeListeningDraft('demo', {
-      transcript: '',
-      segments: [segment],
-    })).toBe(true);
+    expect(
+      writeListeningDraft('demo', {
+        transcript: '',
+        segments: [segment],
+      }),
+    ).toBe(true);
 
-    expect(readListeningDraft('demo')?.segments[0]).toEqual(expect.objectContaining({
-      id: 'segment-queued',
-      index: 1,
-      status: 'error',
-      error: 'Recording interrupted before transcription completed.',
-    }));
+    expect(readListeningDraft('demo')?.segments[0]).toEqual(
+      expect.objectContaining({
+        id: 'segment-queued',
+        index: 1,
+        status: 'error',
+        error: 'Recording interrupted before transcription completed.',
+      }),
+    );
   });
 });

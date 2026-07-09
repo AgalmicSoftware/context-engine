@@ -15,21 +15,15 @@ export const coerceSbtPageStringArrayValue = (value: unknown): string[] => {
 };
 
 export const getErrorMessage = (error: unknown, fallback = 'Unknown error'): string => {
-  const message = (
-    error !== null &&
-    (typeof error === 'object' || typeof error === 'function') &&
-    'message' in error
-  )
-    ? error.message
-    : undefined;
+  const message =
+    error !== null && (typeof error === 'object' || typeof error === 'function') && 'message' in error
+      ? error.message
+      : undefined;
   return error instanceof Error && error.message ? error.message : String(message || error || fallback);
 };
 
-export const resolveSbtPageCopyableErrorText = (error: unknown): string => (
-  (typeof error === 'string' && error)
-    ? error
-    : getErrorMessage(error, '')
-);
+export const resolveSbtPageCopyableErrorText = (error: unknown): string =>
+  typeof error === 'string' && error ? error : getErrorMessage(error, '');
 
 export const coerceSbtPageEpochSeconds = (value: unknown): number => {
   const n = Number(value || 0);

@@ -44,7 +44,9 @@
   cursor: pointer;
   text-align: left;
   line-height: 1.4;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 
   &:hover {
     border-color: var(--ce-async-select-border-hover);

@@ -20,7 +20,11 @@ type Normalizer = (value: unknown) => string;
 type UnknownRecord = Record<string, unknown>;
 
 type ProviderDebugContext = {
-  fnTag?: string; scopeTag?: string; method?: string; fromBlock?: number | string | null; toBlock?: number | string | null;
+  fnTag?: string;
+  scopeTag?: string;
+  method?: string;
+  fromBlock?: number | string | null;
+  toBlock?: number | string | null;
 };
 type ProviderContextEntry = { token: number; context: ProviderDebugContext };
 
@@ -30,13 +34,25 @@ interface DebugRecordEntry {
   chainId: string | null;
   outcome: string;
   ms: number | null;
-  providerKey: string | null; url: string | null; keyHash: string | null;
-  fnTag?: string; scopeTag?: string; rpc?: RpcMethodDetails | null; paramsSummary?: string; stack?: string;
+  providerKey: string | null;
+  url: string | null;
+  keyHash: string | null;
+  fnTag?: string;
+  scopeTag?: string;
+  rpc?: RpcMethodDetails | null;
+  paramsSummary?: string;
+  stack?: string;
 }
 
 type KeyEntry = {
-  keyHash: string; count: number; method: string; chainId: string | null; providerKey: string | null; url: string | null;
-  paramsSummary: string; stackSnippet: string;
+  keyHash: string;
+  count: number;
+  method: string;
+  chainId: string | null;
+  providerKey: string | null;
+  url: string | null;
+  paramsSummary: string;
+  stackSnippet: string;
 };
 
 interface PerfBlock {
@@ -45,7 +61,9 @@ interface PerfBlock {
 }
 
 type TaggedOutcomeCounts = OutcomeCounts & {
-  method: string; fnTag: string | null; scopeTag: string | null;
+  method: string;
+  fnTag: string | null;
+  scopeTag: string | null;
 };
 type ChainTaggedOutcomeCounts = TaggedOutcomeCounts & { chainId: string };
 
@@ -67,14 +85,33 @@ interface DebugState {
   perf: PerfBlock;
 }
 
-type SummaryFilter = { methods?: string[]; outcomes?: string[]; fnTags?: string[]; scopeTags?: string[]; chainIds?: string[] };
-interface RpcMethodDetails extends UnknownRecord { type: string }
+type SummaryFilter = {
+  methods?: string[];
+  outcomes?: string[];
+  fnTags?: string[];
+  scopeTags?: string[];
+  chainIds?: string[];
+};
+interface RpcMethodDetails extends UnknownRecord {
+  type: string;
+}
 
 interface GetLogsRangeReport {
-  chainId: string | null; fromBlock: unknown; toBlock: unknown; fromBlockRaw: string | null; toBlockRaw: string | null;
-  address: unknown; blockHash: unknown; topics0: unknown;
-  totalCalls: number; networkCalls: number; cacheHits: number; inflightHits: number; errorCalls: number;
-  firstTs: number | null; lastTs: number | null;
+  chainId: string | null;
+  fromBlock: unknown;
+  toBlock: unknown;
+  fromBlockRaw: string | null;
+  toBlockRaw: string | null;
+  address: unknown;
+  blockHash: unknown;
+  topics0: unknown;
+  totalCalls: number;
+  networkCalls: number;
+  cacheHits: number;
+  inflightHits: number;
+  errorCalls: number;
+  firstTs: number | null;
+  lastTs: number | null;
 }
 
 type LegacyRpcStats = { counts?: UnknownRecord; inflight?: UnknownRecord; recent?: unknown[] };
@@ -148,25 +185,19 @@ const normalizeTopicsField = (raw: unknown): Array<string | string[]> => {
   });
 };
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const isOutcome = (value: string): value is Outcome => (
-  value === 'network' ||
-  value === 'cache_hit' ||
-  value === 'inflight_hit' ||
-  value === 'error'
-);
+const isOutcome = (value: string): value is Outcome =>
+  value === 'network' || value === 'cache_hit' || value === 'inflight_hit' || value === 'error';
 
 const incrementOutcome = (counts: OutcomeCounts, outcome: string): void => {
   if (!isOutcome(outcome)) return;
   counts[outcome] += 1;
 };
 
-const getOutcomeCount = (counts: OutcomeCounts, outcome: string): number => (
-  isOutcome(outcome) ? Number(counts[outcome] || 0) : 0
-);
+const getOutcomeCount = (counts: OutcomeCounts, outcome: string): number =>
+  isOutcome(outcome) ? Number(counts[outcome] || 0) : 0;
 
 const extractMethodDetails = (methodIn: unknown, paramsIn: unknown): RpcMethodDetails | null => {
   const method = toStr(methodIn).trim();
@@ -229,7 +260,7 @@ const truncate = (str: unknown, max = 800): string => {
 };
 
 const getGlobalState = (): DebugState => {
-  const g = typeof globalThis !== 'undefined' ? globalThis as RpcDebugGlobal : {} as RpcDebugGlobal;
+  const g = typeof globalThis !== 'undefined' ? (globalThis as RpcDebugGlobal) : ({} as RpcDebugGlobal);
   if (!g.__CE_RPC_DEBUG_STATE__ || typeof g.__CE_RPC_DEBUG_STATE__ !== 'object') {
     g.__CE_RPC_DEBUG_STATE__ = {
       v: 1,
@@ -256,7 +287,7 @@ const getGlobalState = (): DebugState => {
 };
 
 const getProviderContextStore = (): WeakMap<object, ProviderContextEntry[]> => {
-  const g = typeof globalThis !== 'undefined' ? globalThis as RpcDebugGlobal : {} as RpcDebugGlobal;
+  const g = typeof globalThis !== 'undefined' ? (globalThis as RpcDebugGlobal) : ({} as RpcDebugGlobal);
   if (!g.__CE_RPC_DEBUG_PROVIDER_CONTEXT_STACKS__ || typeof g.__CE_RPC_DEBUG_PROVIDER_CONTEXT_STACKS__ !== 'object') {
     g.__CE_RPC_DEBUG_PROVIDER_CONTEXT_STACKS__ = new WeakMap();
   }
@@ -264,9 +295,9 @@ const getProviderContextStore = (): WeakMap<object, ProviderContextEntry[]> => {
 };
 
 const nextProviderContextToken = (): number => {
-  const g = typeof globalThis !== 'undefined' ? globalThis as RpcDebugGlobal : {} as RpcDebugGlobal;
+  const g = typeof globalThis !== 'undefined' ? (globalThis as RpcDebugGlobal) : ({} as RpcDebugGlobal);
   const current = Number(g.__CE_RPC_DEBUG_PROVIDER_CONTEXT_TOKEN_SEQ__ || 0);
-  const next = Number.isFinite(current) ? (current + 1) : 1;
+  const next = Number.isFinite(current) ? current + 1 : 1;
   g.__CE_RPC_DEBUG_PROVIDER_CONTEXT_TOKEN_SEQ__ = next;
   return next;
 };
@@ -299,7 +330,10 @@ const readProviderContextFromEntry = (entry: unknown): ProviderDebugContext | nu
   return entry as ProviderDebugContext;
 };
 
-export const rpcDebugPushProviderContextWithToken = (provider: object | null | undefined, contextIn: unknown): number | null => {
+export const rpcDebugPushProviderContextWithToken = (
+  provider: object | null | undefined,
+  contextIn: unknown,
+): number | null => {
   if (!provider || (typeof provider !== 'object' && typeof provider !== 'function')) return null;
   const context = normalizeProviderDebugContext(contextIn);
   if (!context) return null;
@@ -342,7 +376,9 @@ export const rpcDebugPopProviderContext = (provider: object | null | undefined, 
     }
     if (current.length > 0) store.set(provider, current);
     else store.delete(provider);
-  } catch (e) { log.warn('rpcDebugStats: fallback', e); }
+  } catch (e) {
+    log.warn('rpcDebugStats: fallback', e);
+  }
 };
 
 export const rpcDebugReadProviderContext = (provider: object | null | undefined): ProviderDebugContext | null => {
@@ -365,7 +401,9 @@ const touchLru = <K, V>(map: Map<K, V>, key: K, value: V): void => {
   try {
     map.delete(key);
     map.set(key, value);
-  } catch (e) { log.warn('rpcDebugStats: fallback', e); }
+  } catch (e) {
+    log.warn('rpcDebugStats: fallback', e);
+  }
 };
 
 interface RpcDebugResetOpts {
@@ -398,7 +436,9 @@ export const rpcDebugReset = (opts: RpcDebugResetOpts = {}): void => {
       g.__CE_RPC_DEBUG_PROVIDER_CONTEXT_STACKS__ = new WeakMap();
       g.__CE_RPC_DEBUG_PROVIDER_CONTEXT_TOKEN_SEQ__ = 0;
     }
-  } catch (e) { log.warn('rpcDebugStats: fallback', e); }
+  } catch (e) {
+    log.warn('rpcDebugStats: fallback', e);
+  }
 };
 
 interface RpcDebugRecordArgs {
@@ -559,20 +599,20 @@ const normalizeFilterValues = (raw: unknown, normalizer: Normalizer = normalizeT
 const normalizeSummaryFilter = (filterIn: unknown): SummaryFilter | null => {
   if (!isRecord(filterIn)) return null;
   const methods = normalizeFilterValues(
-    Object.prototype.hasOwnProperty.call(filterIn, 'methods') ? filterIn.methods : filterIn.method
+    Object.prototype.hasOwnProperty.call(filterIn, 'methods') ? filterIn.methods : filterIn.method,
   );
   const outcomes = normalizeFilterValues(
-    Object.prototype.hasOwnProperty.call(filterIn, 'outcomes') ? filterIn.outcomes : filterIn.outcome
+    Object.prototype.hasOwnProperty.call(filterIn, 'outcomes') ? filterIn.outcomes : filterIn.outcome,
   );
   const fnTags = normalizeFilterValues(
-    Object.prototype.hasOwnProperty.call(filterIn, 'fnTags') ? filterIn.fnTags : filterIn.fnTag
+    Object.prototype.hasOwnProperty.call(filterIn, 'fnTags') ? filterIn.fnTags : filterIn.fnTag,
   );
   const scopeTags = normalizeFilterValues(
-    Object.prototype.hasOwnProperty.call(filterIn, 'scopeTags') ? filterIn.scopeTags : filterIn.scopeTag
+    Object.prototype.hasOwnProperty.call(filterIn, 'scopeTags') ? filterIn.scopeTags : filterIn.scopeTag,
   );
   const chainIds = normalizeFilterValues(
     Object.prototype.hasOwnProperty.call(filterIn, 'chainIds') ? filterIn.chainIds : filterIn.chainId,
-    (value) => toStr(value).trim()
+    (value) => toStr(value).trim(),
   );
   const out: SummaryFilter = {};
   if (methods.length) out.methods = methods;
@@ -619,7 +659,10 @@ const createOutcomeCounter = (): OutcomeCounter => ({
   error: 0,
 });
 
-const addOutcomeCounts = (target: OutcomeCounter, source: Partial<OutcomeCounts> | null | undefined): OutcomeCounter => {
+const addOutcomeCounts = (
+  target: OutcomeCounter,
+  source: Partial<OutcomeCounts> | null | undefined,
+): OutcomeCounter => {
   const out = target;
   out.network += Number(source?.network || 0);
   out.cache_hit += Number(source?.cache_hit || 0);
@@ -629,7 +672,10 @@ const addOutcomeCounts = (target: OutcomeCounter, source: Partial<OutcomeCounts>
   return out;
 };
 
-const buildFilteredMethodOutcomes = (st: DebugState, filterIn: unknown): { totals: OutcomeCounter; byMethod: Record<string, OutcomeCounter> } => {
+const buildFilteredMethodOutcomes = (
+  st: DebugState,
+  filterIn: unknown,
+): { totals: OutcomeCounter; byMethod: Record<string, OutcomeCounter> } => {
   const filter = normalizeSummaryFilter(filterIn);
   const totals = createOutcomeCounter();
   const byMethod: Record<string, OutcomeCounter> = {};
@@ -699,17 +745,8 @@ const buildGetLogsRangeReport = (recentEntries: DebugRecordEntry[] = [], maxRows
     const toBlock = rpc.toBlock;
     const fromLabel = rpc.fromBlockRaw != null ? toStr(rpc.fromBlockRaw) : String(fromBlock);
     const toLabel = rpc.toBlockRaw != null ? toStr(rpc.toBlockRaw) : String(toBlock);
-    const addressPart = Array.isArray(rpc.address)
-      ? rpc.address.join(',')
-      : (rpc.address || '');
-    const key = [
-      chainId,
-      fromLabel,
-      toLabel,
-      addressPart,
-      rpc.blockHash || '',
-      toStr(rpc.topics0 || ''),
-    ].join('|');
+    const addressPart = Array.isArray(rpc.address) ? rpc.address.join(',') : rpc.address || '';
+    const key = [chainId, fromLabel, toLabel, addressPart, rpc.blockHash || '', toStr(rpc.topics0 || '')].join('|');
     const slot = rangeMap.get(key) || {
       chainId: chainId || null,
       fromBlock,
@@ -785,7 +822,9 @@ export const perfDebugLitGetKey = (event: string): void => {
   else if (e === 'error') st.perf.litGetKey.errors += 1;
 };
 
-interface RpcDebugSnapshotOpts { topN?: number }
+interface RpcDebugSnapshotOpts {
+  topN?: number;
+}
 
 export const rpcDebugSnapshot = ({ topN = 20 }: RpcDebugSnapshotOpts = {}): UnknownRecord => {
   const st = getGlobalState();
@@ -811,7 +850,9 @@ export const rpcDebugSnapshot = ({ topN = 20 }: RpcDebugSnapshotOpts = {}): Unkn
   const keysArr: KeyEntry[] = [];
   try {
     for (const [, v] of st.keys.entries()) keysArr.push(v);
-  } catch (e) { log.warn('rpcDebugStats: fallback', e); }
+  } catch (e) {
+    log.warn('rpcDebugStats: fallback', e);
+  }
   const topKeys = keysArr
     .sort((a, b) => (b.count || 0) - (a.count || 0))
     .slice(0, n)
@@ -853,7 +894,11 @@ interface RpcDebugScanSummaryOpts {
   filter?: unknown;
 }
 
-export const rpcDebugScanSummary = ({ topN = 20, maxRanges = 200, filter = null }: RpcDebugScanSummaryOpts = {}): UnknownRecord => {
+export const rpcDebugScanSummary = ({
+  topN = 20,
+  maxRanges = 200,
+  filter = null,
+}: RpcDebugScanSummaryOpts = {}): UnknownRecord => {
   const st = getGlobalState();
   const snapshot = rpcDebugSnapshot({ topN });
   const normalizedFilter = normalizeSummaryFilter(filter);
@@ -897,9 +942,7 @@ export const rpcDebugScanSummary = ({ topN = 20, maxRanges = 200, filter = null 
   }
 
   const pickMethod = (name: string): OutcomeCounter => {
-    const methodSlot = methodOutcomes && typeof methodOutcomes === 'object'
-      ? methodOutcomes[name]
-      : null;
+    const methodSlot = methodOutcomes && typeof methodOutcomes === 'object' ? methodOutcomes[name] : null;
     if (!methodSlot || typeof methodSlot !== 'object') return createOutcomeCounter();
     return {
       total: Number(methodSlot.total || 0),
@@ -943,7 +986,9 @@ export const rpcDebugStartRun = ({ recentMax = 1000, keysMax = 1500 }: RpcDebugS
       g.ENABLE_RPC_DEBUG_STATS = true;
       g.__RPC_STATS__ = { counts: {}, recent: [], inflight: {} };
     }
-  } catch (e) { log.warn('rpcDebugStats: fallback', e); }
+  } catch (e) {
+    log.warn('rpcDebugStats: fallback', e);
+  }
 
   rpcDebugReset({ recentMax, keysMax });
   return rpcDebugScanSummary({ topN: 20, maxRanges: 200 });
@@ -953,9 +998,7 @@ const installWindowTools = (): void => {
   try {
     if (typeof window === 'undefined') return;
     const w = window as WindowWithRpcDebug;
-    const existing = w.__CE_RPC_DEBUG__ && typeof w.__CE_RPC_DEBUG__ === 'object'
-      ? w.__CE_RPC_DEBUG__
-      : {};
+    const existing = w.__CE_RPC_DEBUG__ && typeof w.__CE_RPC_DEBUG__ === 'object' ? w.__CE_RPC_DEBUG__ : {};
     w.__CE_RPC_DEBUG__ = {
       ...existing,
       startRun: rpcDebugStartRun,
@@ -963,7 +1006,9 @@ const installWindowTools = (): void => {
       snapshot: rpcDebugSnapshot,
       scanSummary: rpcDebugScanSummary,
     };
-  } catch (e) { log.warn('rpcDebugStats: fallback', e); }
+  } catch (e) {
+    log.warn('rpcDebugStats: fallback', e);
+  }
 };
 
 installWindowTools();

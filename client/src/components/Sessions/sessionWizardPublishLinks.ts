@@ -1,9 +1,6 @@
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import {
-  normalizePendingSbtDrafts,
-  type PendingSbtDraft,
-} from './hooks/usePendingSbtDrafts.js';
+import { normalizePendingSbtDrafts, type PendingSbtDraft } from './hooks/usePendingSbtDrafts.js';
 
 export type PublishedPendingSbtLink = {
   address: string;
@@ -23,17 +20,24 @@ export const buildPublishedPendingSbtLinks = ({
   const normalizedDeployedDrafts = normalizePendingSbtDrafts(deployedDrafts);
   const newlyDeployedAddressSet = new Set(
     normalizedDeployedDrafts
-      .map((entry) => toStr(entry?.predictedAddress || entry?.deployedAddress || entry?.address).trim().toLowerCase())
-      .filter(Boolean)
+      .map((entry) =>
+        toStr(entry?.predictedAddress || entry?.deployedAddress || entry?.address)
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean),
   );
   const finalizedDrafts = normalizePendingSbtDrafts([
     ...normalizedDeployedDrafts,
-    ...normalizePendingSbtDrafts(pendingDraftSnapshot).filter((entry) => (
-      entry?.deployed === true &&
-      !newlyDeployedAddressSet.has(
-        toStr(entry?.predictedAddress || entry?.deployedAddress || entry?.address).trim().toLowerCase()
-      )
-    )),
+    ...normalizePendingSbtDrafts(pendingDraftSnapshot).filter(
+      (entry) =>
+        entry?.deployed === true &&
+        !newlyDeployedAddressSet.has(
+          toStr(entry?.predictedAddress || entry?.deployedAddress || entry?.address)
+            .trim()
+            .toLowerCase(),
+        ),
+    ),
   ]);
 
   return finalizedDrafts

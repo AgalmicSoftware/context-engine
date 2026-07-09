@@ -1,7 +1,4 @@
-import {
-  STORAGE_BACKENDS,
-  normalizeStorageBackend,
-} from '../../utilities/storage/storageRefs.js';
+import { STORAGE_BACKENDS, normalizeStorageBackend } from '../../utilities/storage/storageRefs.js';
 import {
   SESSION_STORAGE_PAYLOAD_ACCESS_GATES,
   SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
@@ -80,8 +77,7 @@ const SESSION_STORAGE_PAYLOAD_ACCESS_DISPLAY_OPTIONS = Object.freeze([
 ]);
 
 export const SESSION_STORAGE_PROFILE_DISPLAY_COPY = Object.freeze({
-  litArweave:
-    'Lit-Arweave stores encrypted Arweave payloads for session documents and context.',
+  litArweave: 'Lit-Arweave stores encrypted Arweave payloads for session documents and context.',
   cloudflare:
     'Cloudflare stores canonical CE payloads through the session worker: R2 for blobs, D1 or KV for metadata/indexes, and Durable Objects only for signer/runtime coordination.',
   publicRead:
@@ -93,7 +89,8 @@ export const SESSION_STORAGE_PROFILE_DISPLAY_COPY = Object.freeze({
 });
 
 const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
-const trim = (value: unknown): string => (typeof value === 'string' ? value : value == null ? '' : String(value)).trim();
+const trim = (value: unknown): string =>
+  (typeof value === 'string' ? value : value == null ? '' : String(value)).trim();
 
 const normalizeBackend = (value: unknown): string => normalizeStorageBackend(value);
 
@@ -111,15 +108,19 @@ export const buildSessionStoragePayloadAccessControl = (
     mode: normalizedMode,
     enforcement: litEncrypted
       ? 'lit_access_control_conditions'
-      : (workerEnvelope
+      : workerEnvelope
         ? 'session_worker_envelope_conditions'
-        : (publicRead ? 'session_worker_public_read' : 'session_worker_sbt_gate')),
+        : publicRead
+          ? 'session_worker_public_read'
+          : 'session_worker_sbt_gate',
     litRequired: litEncrypted,
     label: litEncrypted
       ? 'Lit-encrypted Cloudflare payloads'
-      : (workerEnvelope
+      : workerEnvelope
         ? 'Worker-envelope encrypted Cloudflare payloads'
-        : (publicRead ? 'Public-read Cloudflare payloads' : 'Worker-enforced SBT access control')),
+        : publicRead
+          ? 'Public-read Cloudflare payloads'
+          : 'Worker-enforced SBT access control',
     resources: { ...SESSION_STORAGE_PAYLOAD_ACCESS_RESOURCE_GATES },
     ...(accessControl.accessConditions ? { accessConditions: accessControl.accessConditions } : {}),
   };
@@ -128,7 +129,9 @@ export const buildSessionStoragePayloadAccessControl = (
 export const sessionStoragePayloadAccessRequiresLit = (profile: unknown): boolean => {
   if (!isObj(profile)) return false;
   if (normalizeBackend(profile.backend) !== SESSION_STORAGE_BACKENDS.CLOUDFLARE) return false;
-  return normalizeSessionStoragePayloadAccessControl(profile).encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT;
+  return (
+    normalizeSessionStoragePayloadAccessControl(profile).encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT
+  );
 };
 
 export const isWorkerSbtGateCloudflareStorageProfile = (profile: unknown): boolean => {
@@ -167,9 +170,10 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
   const backend = normalizeBackend(raw.backend || raw.profile || raw.storageProfile);
   const base = buildDefaultSessionStorageProfile();
   const rawResources = isObj(raw.resources) ? raw.resources : {};
-  const defaultCanonicalStage = backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE
-    ? SESSION_STORAGE_RESOURCE_STAGES.ACTIVE
-    : SESSION_STORAGE_RESOURCE_STAGES.STAGED;
+  const defaultCanonicalStage =
+    backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE
+      ? SESSION_STORAGE_RESOURCE_STAGES.ACTIVE
+      : SESSION_STORAGE_RESOURCE_STAGES.STAGED;
   const docsContext = trim(rawResources.docsContext || raw.docsContext || '').toLowerCase();
   const normalizeResourceStage = (value: unknown, fallback: string): string => {
     const normalized = trim(value).toLowerCase();
@@ -184,15 +188,16 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
     telegramOwned: false,
     resources: {
       ...base.resources,
-      docsContext: docsContext === SESSION_STORAGE_RESOURCE_STAGES.STAGED
-        ? SESSION_STORAGE_RESOURCE_STAGES.STAGED
-        : SESSION_STORAGE_RESOURCE_STAGES.ACTIVE,
+      docsContext:
+        docsContext === SESSION_STORAGE_RESOURCE_STAGES.STAGED
+          ? SESSION_STORAGE_RESOURCE_STAGES.STAGED
+          : SESSION_STORAGE_RESOURCE_STAGES.ACTIVE,
       questions: normalizeResourceStage(rawResources.questions || raw.questions, defaultCanonicalStage),
       surveys: normalizeResourceStage(rawResources.surveys || raw.surveys, defaultCanonicalStage),
       responses: normalizeResourceStage(rawResources.responses || raw.responses, defaultCanonicalStage),
       generatedArtifacts: normalizeResourceStage(
         rawResources.generatedArtifacts || raw.generatedArtifacts,
-        defaultCanonicalStage
+        defaultCanonicalStage,
       ),
       media: normalizeResourceStage(rawResources.media || raw.media, defaultCanonicalStage),
       images: normalizeResourceStage(rawResources.images || raw.images, defaultCanonicalStage),
@@ -211,9 +216,9 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
       ...normalized.sbtGatedAccess,
       litRequired: payloadAccessControl.litRequired
         ? 'required_for_cloudflare_payload_encryption'
-        : (payloadAccessControl.gate === SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE
+        : payloadAccessControl.gate === SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE
           ? 'not_required_public_read'
-          : 'not_required_worker_enforced'),
+          : 'not_required_worker_enforced',
     };
     normalized.cloudflare = {
       primitives: SESSION_STORAGE_CLOUDFLARE_PRIMITIVES,
@@ -234,19 +239,22 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
 };
 
 export const buildSessionStorageProfileDisplayDescriptor = (
-  input: unknown = {}
+  input: unknown = {},
 ): SessionStorageProfileDisplayDescriptor => {
   const profile = normalizeSessionStorageProfileConfig(input);
   const backend = trim(profile.backend);
   const showCloudflarePayloadAccessControls = backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE;
   const cloudflarePayloadAccessMode = showCloudflarePayloadAccessControls
     ? normalizeSessionStoragePayloadAccessMode(
-      isObj(profile.payloadAccessControl) ? profile.payloadAccessControl.mode : ''
-    )
+        isObj(profile.payloadAccessControl) ? profile.payloadAccessControl.mode : '',
+      )
     : '';
-  const backendHelperText = backend === SESSION_STORAGE_BACKENDS.LIT_ARWEAVE
-    ? SESSION_STORAGE_PROFILE_DISPLAY_COPY.litArweave
-    : (showCloudflarePayloadAccessControls ? SESSION_STORAGE_PROFILE_DISPLAY_COPY.cloudflare : '');
+  const backendHelperText =
+    backend === SESSION_STORAGE_BACKENDS.LIT_ARWEAVE
+      ? SESSION_STORAGE_PROFILE_DISPLAY_COPY.litArweave
+      : showCloudflarePayloadAccessControls
+        ? SESSION_STORAGE_PROFILE_DISPLAY_COPY.cloudflare
+        : '';
   const cloudflarePayloadAccessHelperText = !showCloudflarePayloadAccessControls
     ? ''
     : cloudflarePayloadAccessMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ
@@ -266,9 +274,9 @@ export const buildSessionStorageProfileDisplayDescriptor = (
     cloudflarePayloadAccessMode,
     cloudflarePayloadAccessOptions: showCloudflarePayloadAccessControls
       ? SESSION_STORAGE_PAYLOAD_ACCESS_DISPLAY_OPTIONS.map((option) => ({
-        ...option,
-        selected: cloudflarePayloadAccessMode === option.mode,
-      }))
+          ...option,
+          selected: cloudflarePayloadAccessMode === option.mode,
+        }))
       : [],
     cloudflarePayloadAccessHelperText,
   };

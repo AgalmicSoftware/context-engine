@@ -45,11 +45,7 @@ export const runSurveyResultsManualRefreshDispatchController = async ({
     };
   }
 
-  if (
-    normalizedViewMode === 'survey' &&
-    normalizedSurveyId &&
-    typeof ports.refreshSurveyResponsesByID === 'function'
-  ) {
+  if (normalizedViewMode === 'survey' && normalizedSurveyId && typeof ports.refreshSurveyResponsesByID === 'function') {
     await ports.refreshSurveyResponsesByID(normalizedSurveyId);
     dispatched.push('surveyResponses');
     return {

@@ -208,15 +208,17 @@ const makeRow = (overrides: Partial<UserPageDeepScanProgressRow> = {}): UserPage
 // User page helper coverage for analysis result state, cache refresh telemetry, AI availability, and address reset helpers.
 describe('userPage analysis refresh helpers', () => {
   it('normalizes user analysis results and fallback fields', () => {
-    expect(normalizeUserAnalysisResult({
-      name: 'Analysis',
-      summary: 'Summary',
-      details: 'Details',
-      historicalAlignment: {
-        figure: 'Ada',
-        reasoning: 'Pattern match',
-      },
-    })).toEqual({
+    expect(
+      normalizeUserAnalysisResult({
+        name: 'Analysis',
+        summary: 'Summary',
+        details: 'Details',
+        historicalAlignment: {
+          figure: 'Ada',
+          reasoning: 'Pattern match',
+        },
+      }),
+    ).toEqual({
       name: 'Analysis',
       summary: 'Summary',
       details: 'Details',
@@ -235,22 +237,24 @@ describe('userPage analysis refresh helpers', () => {
         reasoning: '',
       },
     });
-    expect(buildUserPageAnalysisResultStatePatch({
-      cachedAt: '1710000000000',
-      includeElapsed: true,
-      includeError: true,
-      includeModal: true,
-      result: {
-        name: 'Cached',
-        summary: 'Summary',
-        details: 'Details',
-        historicalAlignment: {
-          figure: 'Ada',
-          reasoning: 'Reason',
+    expect(
+      buildUserPageAnalysisResultStatePatch({
+        cachedAt: '1710000000000',
+        includeElapsed: true,
+        includeError: true,
+        includeModal: true,
+        result: {
+          name: 'Cached',
+          summary: 'Summary',
+          details: 'Details',
+          historicalAlignment: {
+            figure: 'Ada',
+            reasoning: 'Reason',
+          },
         },
-      },
-      servedFromCache: true,
-    })).toEqual({
+        servedFromCache: true,
+      }),
+    ).toEqual({
       showAnalysisModal: true,
       aiAnalysis: 'Summary',
       analysisDetails: 'Details',
@@ -263,9 +267,11 @@ describe('userPage analysis refresh helpers', () => {
       analysisServedFromCache: true,
       analysisCachedAt: 1710000000000,
     });
-    expect(buildUserPageAnalysisResultStatePatch({
-      result: null,
-    })).toEqual({
+    expect(
+      buildUserPageAnalysisResultStatePatch({
+        result: null,
+      }),
+    ).toEqual({
       aiAnalysis: '',
       analysisDetails: '',
       analysisName: 'User Analysis',
@@ -325,24 +331,32 @@ describe('userPage analysis refresh helpers', () => {
       iconStyle: { color: undefined },
       title: 'Bookmark user',
     });
-    expect(buildUserPageRootClassName({
-      baseClassName: 'user-page',
-      minimized: false,
-      minimizedClassName: 'minimized',
-    })).toBe('user-page');
-    expect(buildUserPageRootClassName({
-      baseClassName: 'user-page',
-      minimized: true,
-      minimizedClassName: 'minimized',
-    })).toBe('user-page minimized');
-    expect(buildUserPageHeaderBookmarkClassName({
-      baseClassName: 'bookmark-button',
-      headerClassName: 'header-bookmark',
-    })).toBe('bookmark-button header-bookmark');
-    expect(buildUserPageCreatedQuestionWrapperClassName({
-      baseClassName: 'created-question',
-      bolderClassName: 'created-question-bolder',
-    })).toBe('created-question created-question-bolder');
+    expect(
+      buildUserPageRootClassName({
+        baseClassName: 'user-page',
+        minimized: false,
+        minimizedClassName: 'minimized',
+      }),
+    ).toBe('user-page');
+    expect(
+      buildUserPageRootClassName({
+        baseClassName: 'user-page',
+        minimized: true,
+        minimizedClassName: 'minimized',
+      }),
+    ).toBe('user-page minimized');
+    expect(
+      buildUserPageHeaderBookmarkClassName({
+        baseClassName: 'bookmark-button',
+        headerClassName: 'header-bookmark',
+      }),
+    ).toBe('bookmark-button header-bookmark');
+    expect(
+      buildUserPageCreatedQuestionWrapperClassName({
+        baseClassName: 'created-question',
+        bolderClassName: 'created-question-bolder',
+      }),
+    ).toBe('created-question created-question-bolder');
     expect(resolveUserPageAvatarDisplayState({ blockieUrl: 'data:image/png;base64,abc' })).toEqual({
       avatarStyle: {
         backgroundImage: 'url(data:image/png;base64,abc)',
@@ -350,10 +364,12 @@ describe('userPage analysis refresh helpers', () => {
         backgroundSize: 'cover',
       },
     });
-    expect(resolveUserPageBookmarksLinkDisplayState({
-      baseClassName: 'bookmarks-link',
-      inlineClassName: 'bookmarks-link-inline',
-    })).toEqual({
+    expect(
+      resolveUserPageBookmarksLinkDisplayState({
+        baseClassName: 'bookmarks-link',
+        inlineClassName: 'bookmarks-link-inline',
+      }),
+    ).toEqual({
       className: 'bookmarks-link bookmarks-link-inline',
       style: { marginLeft: '12px' },
     });
@@ -416,21 +432,25 @@ describe('userPage analysis refresh helpers', () => {
     expect(buildUserPageViewAddressStatePatch({ viewAddress: undefined })).toEqual({
       viewAddress: undefined,
     });
-    expect(buildUserPageAnalysisElapsedStatePatch({
-      nowMs: 1250,
-      startedAt: 1000,
-    })).toEqual({
+    expect(
+      buildUserPageAnalysisElapsedStatePatch({
+        nowMs: 1250,
+        startedAt: 1000,
+      }),
+    ).toEqual({
       analysisElapsedMs: 250,
     });
     const sessionConfig = { ai: { provider: 'openai' } };
-    expect(buildUserPageAnalysisAiOptions({
-      analysisSession: {
-        slug: 'analysis-session',
-        sessionConfig,
-        status: 'allowed',
-        reason: 'selected',
-      },
-    })).toEqual({
+    expect(
+      buildUserPageAnalysisAiOptions({
+        analysisSession: {
+          slug: 'analysis-session',
+          sessionConfig,
+          status: 'allowed',
+          reason: 'selected',
+        },
+      }),
+    ).toEqual({
       sessionSlug: 'analysis-session',
       sessionConfig,
       sessionSelection: {
@@ -438,12 +458,14 @@ describe('userPage analysis refresh helpers', () => {
         reason: 'selected',
       },
     });
-    expect(buildUserPageAnalysisAiOptions({
-      analysisSession: {
-        sessionConfig,
-      },
-      defaultReason: 'fallback-gate-unavailable',
-    })).toEqual({
+    expect(
+      buildUserPageAnalysisAiOptions({
+        analysisSession: {
+          sessionConfig,
+        },
+        defaultReason: 'fallback-gate-unavailable',
+      }),
+    ).toEqual({
       sessionSlug: '',
       sessionConfig,
       sessionSelection: {
@@ -458,106 +480,136 @@ describe('userPage analysis refresh helpers', () => {
       analysisServedFromCache: false,
       analysisCachedAt: null,
     });
-    expect(buildUserPageAnalysisErrorStatePatch({
-      message: 'Try again',
-    }).analysisError).toBe('Try again');
-    expect(resolveUserPageResponseNonceRefresh({
-      account: '0x00000000000000000000000000000000000000aa',
-      connectedAddress: '',
-      nextNonce: 2,
-      prevNonce: 1,
-      viewAddress: '0x00000000000000000000000000000000000000AA',
-    })).toEqual({
+    expect(
+      buildUserPageAnalysisErrorStatePatch({
+        message: 'Try again',
+      }).analysisError,
+    ).toBe('Try again');
+    expect(
+      resolveUserPageResponseNonceRefresh({
+        account: '0x00000000000000000000000000000000000000aa',
+        connectedAddress: '',
+        nextNonce: 2,
+        prevNonce: 1,
+        viewAddress: '0x00000000000000000000000000000000000000AA',
+      }),
+    ).toEqual({
       isOwnProfile: true,
       options: { force: true, markLoading: false, bypassSignature: true },
     });
-    expect(resolveUserPageResponseNonceRefresh({
-      connectedAddress: '0x00000000000000000000000000000000000000bb',
-      nextNonce: 2,
-      prevNonce: 1,
-      viewAddress: '0x00000000000000000000000000000000000000aa',
-    })).toEqual({
+    expect(
+      resolveUserPageResponseNonceRefresh({
+        connectedAddress: '0x00000000000000000000000000000000000000bb',
+        nextNonce: 2,
+        prevNonce: 1,
+        viewAddress: '0x00000000000000000000000000000000000000aa',
+      }),
+    ).toEqual({
       isOwnProfile: false,
       options: { markLoading: false },
     });
-    expect(resolveUserPageResponseNonceRefresh({
-      nextNonce: 1,
-      prevNonce: 1,
-      viewAddress: '0x00000000000000000000000000000000000000aa',
-    })).toBeNull();
-    expect(resolveUserPageManagedCacheUpdate({
-      bookmarksSlug: 'alpha',
-      namespace: 'bookmarksCache',
-      slug: 'alpha',
-    })).toEqual({ action: 'bookmarks' });
-    expect(resolveUserPageManagedCacheUpdate({
-      bookmarksSlug: 'alpha',
-      namespace: 'bookmarksCache',
-      slug: 'beta',
-    })).toEqual({ action: 'ignore' });
-    expect(resolveUserPageManagedCacheUpdate({
-      namespace: 'sbtCache',
-      slug: 'beta',
-    })).toEqual({ action: 'refresh' });
-    expect(resolveUserPageManagedCacheUpdate({
-      namespace: 'unknownCache',
-    })).toEqual({ action: 'ignore' });
-    expect(resolveUserPageAddressContextChange({
-      prevViewAddress: '0x1',
-      nextViewAddress: '0x2',
-      prevNetwork: { id: 84532 },
-      nextNetwork: { id: 84532 },
-    })).toEqual({
+    expect(
+      resolveUserPageResponseNonceRefresh({
+        nextNonce: 1,
+        prevNonce: 1,
+        viewAddress: '0x00000000000000000000000000000000000000aa',
+      }),
+    ).toBeNull();
+    expect(
+      resolveUserPageManagedCacheUpdate({
+        bookmarksSlug: 'alpha',
+        namespace: 'bookmarksCache',
+        slug: 'alpha',
+      }),
+    ).toEqual({ action: 'bookmarks' });
+    expect(
+      resolveUserPageManagedCacheUpdate({
+        bookmarksSlug: 'alpha',
+        namespace: 'bookmarksCache',
+        slug: 'beta',
+      }),
+    ).toEqual({ action: 'ignore' });
+    expect(
+      resolveUserPageManagedCacheUpdate({
+        namespace: 'sbtCache',
+        slug: 'beta',
+      }),
+    ).toEqual({ action: 'refresh' });
+    expect(
+      resolveUserPageManagedCacheUpdate({
+        namespace: 'unknownCache',
+      }),
+    ).toEqual({ action: 'ignore' });
+    expect(
+      resolveUserPageAddressContextChange({
+        prevViewAddress: '0x1',
+        nextViewAddress: '0x2',
+        prevNetwork: { id: 84532 },
+        nextNetwork: { id: 84532 },
+      }),
+    ).toEqual({
       nextViewAddress: '0x2',
       shouldReset: true,
     });
-    expect(resolveUserPageAddressContextChange({
-      prevViewAddress: '0x1',
-      nextViewAddress: '0x1',
-      prevNetwork: { id: 84532 },
-      nextNetwork: { id: 11155420 },
-    }).shouldReset).toBe(true);
-    expect(resolveUserPageAddressContextChange({
-      prevViewAddress: '0x1',
-      nextViewAddress: '0x1',
-      prevNetwork: null,
-      nextNetwork: {},
-    }).shouldReset).toBe(false);
-    expect(resolveUserPageCacheUpdateRefresh({
-      prevSbtCacheRevision: 1,
-      nextSbtCacheRevision: 2,
-      prevAccount: '0xA',
-      nextAccount: '0xA',
-    })).toEqual({
+    expect(
+      resolveUserPageAddressContextChange({
+        prevViewAddress: '0x1',
+        nextViewAddress: '0x1',
+        prevNetwork: { id: 84532 },
+        nextNetwork: { id: 11155420 },
+      }).shouldReset,
+    ).toBe(true);
+    expect(
+      resolveUserPageAddressContextChange({
+        prevViewAddress: '0x1',
+        nextViewAddress: '0x1',
+        prevNetwork: null,
+        nextNetwork: {},
+      }).shouldReset,
+    ).toBe(false);
+    expect(
+      resolveUserPageCacheUpdateRefresh({
+        prevSbtCacheRevision: 1,
+        nextSbtCacheRevision: 2,
+        prevAccount: '0xA',
+        nextAccount: '0xA',
+      }),
+    ).toEqual({
       accountChanged: false,
       sbtRevisionChanged: true,
       shouldQueueCacheRefresh: true,
       shouldResetGateAccess: true,
     });
-    expect(resolveUserPageCacheUpdateRefresh({
-      prevSbtCacheRevision: 2,
-      nextSbtCacheRevision: 2,
-      prevAccount: '0xA',
-      nextAccount: '0xB',
-    })).toMatchObject({
+    expect(
+      resolveUserPageCacheUpdateRefresh({
+        prevSbtCacheRevision: 2,
+        nextSbtCacheRevision: 2,
+        prevAccount: '0xA',
+        nextAccount: '0xB',
+      }),
+    ).toMatchObject({
       accountChanged: true,
       sbtRevisionChanged: false,
       shouldQueueCacheRefresh: true,
     });
-    expect(resolveUserPageCacheUpdateRefresh({
-      prevSbtCacheRevision: 2,
-      nextSbtCacheRevision: 2,
-      prevAccount: '0xA',
-      nextAccount: '0xA',
-    }).shouldQueueCacheRefresh).toBe(false);
-    expect(mergeUserPageQueuedCacheRefreshFlags({
-      bypassSignature: true,
-      currentBypassSignature: false,
-      currentForce: true,
-      currentMarkLoading: false,
-      force: false,
-      markLoading: true,
-    })).toEqual({
+    expect(
+      resolveUserPageCacheUpdateRefresh({
+        prevSbtCacheRevision: 2,
+        nextSbtCacheRevision: 2,
+        prevAccount: '0xA',
+        nextAccount: '0xA',
+      }).shouldQueueCacheRefresh,
+    ).toBe(false);
+    expect(
+      mergeUserPageQueuedCacheRefreshFlags({
+        bypassSignature: true,
+        currentBypassSignature: false,
+        currentForce: true,
+        currentMarkLoading: false,
+        force: false,
+        markLoading: true,
+      }),
+    ).toEqual({
       bypassSignature: true,
       force: true,
       markLoading: true,
@@ -567,100 +619,114 @@ describe('userPage analysis refresh helpers', () => {
       force: false,
       markLoading: false,
     });
-    expect(buildUserPageCacheRefreshOptions({
-      bypassSignature: true,
-      force: true,
-      markLoading: false,
-    })).toEqual({
+    expect(
+      buildUserPageCacheRefreshOptions({
+        bypassSignature: true,
+        force: true,
+        markLoading: false,
+      }),
+    ).toEqual({
       bypassSignature: true,
       force: true,
       markLoading: false,
     });
-    expect(buildUserPageCacheRefreshOptions({
-      bypassSignature: false,
-      force: false,
-      markLoading: true,
-    })).toEqual({
+    expect(
+      buildUserPageCacheRefreshOptions({
+        bypassSignature: false,
+        force: false,
+        markLoading: true,
+      }),
+    ).toEqual({
       force: false,
       markLoading: true,
     });
-    expect(buildUserPageCacheRefreshInputSignature({
-      account: ' 0xABC ',
-      gateRecheckEpoch: 4,
-      hasQuestionSources: false,
-      hasSbtSources: true,
-      hasSurveySources: true,
-      hasUncertainGateAccess: true,
-      hasUncertainUserData: false,
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: false,
-      isSBTCacheReady: true,
-      isSurveyCacheReady: true,
-      networkID: 84532,
-      questionResponsesNonce: 7,
-      responseGateAccessGeneration: 2,
-      responseGateAccessStatusVersion: 3,
-      sbtCacheRevision: 11,
-      sourceMembershipSignature: 'survey|question|sbt',
-      viewAddressLower: '0xuser',
-    })).toBe('0xuser|84532|0xabc|1101|101|survey|question|sbt|7|11|0|1|2|3|4');
-    expect(buildUserPageCacheLoadingHoldFlags({
-      force: false,
-      hasQuestionSources: false,
-      hasSbtSources: false,
-      hasSurveySources: false,
-      questionsReady: true,
-      responsesReady: false,
-      sbtReady: false,
-      surveysReady: false,
-    })).toEqual({
+    expect(
+      buildUserPageCacheRefreshInputSignature({
+        account: ' 0xABC ',
+        gateRecheckEpoch: 4,
+        hasQuestionSources: false,
+        hasSbtSources: true,
+        hasSurveySources: true,
+        hasUncertainGateAccess: true,
+        hasUncertainUserData: false,
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: false,
+        isSBTCacheReady: true,
+        isSurveyCacheReady: true,
+        networkID: 84532,
+        questionResponsesNonce: 7,
+        responseGateAccessGeneration: 2,
+        responseGateAccessStatusVersion: 3,
+        sbtCacheRevision: 11,
+        sourceMembershipSignature: 'survey|question|sbt',
+        viewAddressLower: '0xuser',
+      }),
+    ).toBe('0xuser|84532|0xabc|1101|101|survey|question|sbt|7|11|0|1|2|3|4');
+    expect(
+      buildUserPageCacheLoadingHoldFlags({
+        force: false,
+        hasQuestionSources: false,
+        hasSbtSources: false,
+        hasSurveySources: false,
+        questionsReady: true,
+        responsesReady: false,
+        sbtReady: false,
+        surveysReady: false,
+      }),
+    ).toEqual({
       holdQuestionLoading: true,
       holdSbtLoading: true,
       holdSurveyLoading: true,
     });
-    expect(buildUserPageCacheLoadingHoldFlags({
-      force: false,
-      hasQuestionSources: true,
-      hasSbtSources: true,
-      hasSurveySources: true,
-      questionsReady: false,
-      responsesReady: false,
-      sbtReady: false,
-      surveysReady: false,
-    })).toEqual({
+    expect(
+      buildUserPageCacheLoadingHoldFlags({
+        force: false,
+        hasQuestionSources: true,
+        hasSbtSources: true,
+        hasSurveySources: true,
+        questionsReady: false,
+        responsesReady: false,
+        sbtReady: false,
+        surveysReady: false,
+      }),
+    ).toEqual({
       holdQuestionLoading: false,
       holdSbtLoading: false,
       holdSurveyLoading: false,
     });
-    expect(buildUserPageCacheLoadingHoldFlags({
-      force: true,
-      questionsReady: false,
-      responsesReady: false,
-      sbtReady: false,
-      surveysReady: false,
-    })).toEqual({
+    expect(
+      buildUserPageCacheLoadingHoldFlags({
+        force: true,
+        questionsReady: false,
+        responsesReady: false,
+        sbtReady: false,
+        surveysReady: false,
+      }),
+    ).toEqual({
       holdQuestionLoading: false,
       holdSbtLoading: false,
       holdSurveyLoading: false,
     });
-    expect(buildUserPageDeriveTelemetrySnapshot({
-      aggregate: {
-        combinedQuestions: { q1: {} },
-        combinedQuestionResponses: { q1: {}, q2: {} },
-        combinedSurveys: { s1: {}, s2: {} },
-        combinedSurveyResponses: { s1: {} },
-        sbtAggregate: { badge1: {}, badge2: {}, badge3: {} },
-      },
-      questionSection: {
-        questionCreationInfo: [{ id: 'q1' }, { id: 'q2' }],
-        questionResponseInfo: [{ id: 'q1' }],
-      },
-      sbtSection: { sbtList: [{}, {}] },
-      surveySection: {
-        surveyCreationInfo: [{ id: 's1' }],
-        surveyResponseInfo: [{ id: 's1' }, { id: 's2' }],
-      },
-    })).toEqual({
+    expect(
+      buildUserPageDeriveTelemetrySnapshot({
+        aggregate: {
+          combinedQuestions: { q1: {} },
+          combinedQuestionResponses: { q1: {}, q2: {} },
+          combinedSurveys: { s1: {}, s2: {} },
+          combinedSurveyResponses: { s1: {} },
+          sbtAggregate: { badge1: {}, badge2: {}, badge3: {} },
+        },
+        questionSection: {
+          questionCreationInfo: [{ id: 'q1' }, { id: 'q2' }],
+          questionResponseInfo: [{ id: 'q1' }],
+        },
+        sbtSection: { sbtList: [{}, {}] },
+        surveySection: {
+          surveyCreationInfo: [{ id: 's1' }],
+          surveyResponseInfo: [{ id: 's1' }, { id: 's2' }],
+        },
+      }),
+    ).toEqual({
       aggregateBuilt: true,
       combinedSurveys: 2,
       combinedQuestions: 1,
@@ -682,18 +748,22 @@ describe('userPage analysis refresh helpers', () => {
       questionSection: null,
       sbtSection: null,
     });
-    expect(buildUserPageNoSbtVisibleTelemetryState({
-      isSBTReady: false,
-      sbtList: [],
-    })).toEqual({
+    expect(
+      buildUserPageNoSbtVisibleTelemetryState({
+        isSBTReady: false,
+        sbtList: [],
+      }),
+    ).toEqual({
       payload: null,
       shouldEmit: false,
       signature: '',
     });
-    expect(buildUserPageNoSbtVisibleTelemetryState({
-      isSBTReady: true,
-      sbtList: [{ sbtAddress: '0x1' }],
-    }).shouldEmit).toBe(false);
+    expect(
+      buildUserPageNoSbtVisibleTelemetryState({
+        isSBTReady: true,
+        sbtList: [{ sbtAddress: '0x1' }],
+      }).shouldEmit,
+    ).toBe(false);
     const noSbtTelemetry = buildUserPageNoSbtVisibleTelemetryState({
       hasUncertainGateAccess: true,
       hasUncertainSbtData: true,
@@ -796,87 +866,95 @@ describe('userPage analysis refresh helpers', () => {
       deepScanTooltipLines: ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'],
     });
     expect(buildUserPageRefreshTelemetrySignature(refreshTelemetry)).toBe(
-      `${telemetryAddress}|84532|1|1|1|0|1|3|1|2|1|1|2|2|one|two|three|four|five|six|seven|eight`
+      `${telemetryAddress}|84532|1|1|1|0|1|3|1|2|1|1|2|2|one|two|three|four|five|six|seven|eight`,
     );
-    expect(resolveUserPageAiAvailabilityRefresh({
-      nextAccount: '0xB',
-      nextIsQuestionCacheReady: true,
-      nextIsResponsesCacheReady: true,
-      nextIsSBTCacheReady: true,
-      nextIsSurveyCacheReady: true,
-      nextNetworkId: 84532,
-      nextViewAddress: '0xVIEW',
-      prevAccount: '0xA',
-      prevIsQuestionCacheReady: true,
-      prevIsResponsesCacheReady: true,
-      prevIsSBTCacheReady: true,
-      prevIsSurveyCacheReady: true,
-      prevNetworkId: 84532,
-      prevViewAddress: '0xVIEW',
-    })).toEqual({
+    expect(
+      resolveUserPageAiAvailabilityRefresh({
+        nextAccount: '0xB',
+        nextIsQuestionCacheReady: true,
+        nextIsResponsesCacheReady: true,
+        nextIsSBTCacheReady: true,
+        nextIsSurveyCacheReady: true,
+        nextNetworkId: 84532,
+        nextViewAddress: '0xVIEW',
+        prevAccount: '0xA',
+        prevIsQuestionCacheReady: true,
+        prevIsResponsesCacheReady: true,
+        prevIsSBTCacheReady: true,
+        prevIsSurveyCacheReady: true,
+        prevNetworkId: 84532,
+        prevViewAddress: '0xVIEW',
+      }),
+    ).toEqual({
       allCachesReady: true,
       contextChanged: true,
       shouldCheckAfterReset: true,
       shouldCheckNow: false,
     });
-    expect(resolveUserPageAiAvailabilityRefresh({
-      nextAccount: '0xA',
-      nextIsQuestionCacheReady: true,
-      nextIsResponsesCacheReady: false,
-      nextIsSBTCacheReady: true,
-      nextIsSurveyCacheReady: true,
-      nextNetworkId: 84532,
-      nextViewAddress: '0xVIEW2',
-      prevAccount: '0xA',
-      prevIsQuestionCacheReady: true,
-      prevIsResponsesCacheReady: true,
-      prevIsSBTCacheReady: true,
-      prevIsSurveyCacheReady: true,
-      prevNetworkId: 84532,
-      prevViewAddress: '0xVIEW',
-    })).toMatchObject({
+    expect(
+      resolveUserPageAiAvailabilityRefresh({
+        nextAccount: '0xA',
+        nextIsQuestionCacheReady: true,
+        nextIsResponsesCacheReady: false,
+        nextIsSBTCacheReady: true,
+        nextIsSurveyCacheReady: true,
+        nextNetworkId: 84532,
+        nextViewAddress: '0xVIEW2',
+        prevAccount: '0xA',
+        prevIsQuestionCacheReady: true,
+        prevIsResponsesCacheReady: true,
+        prevIsSBTCacheReady: true,
+        prevIsSurveyCacheReady: true,
+        prevNetworkId: 84532,
+        prevViewAddress: '0xVIEW',
+      }),
+    ).toMatchObject({
       allCachesReady: false,
       contextChanged: true,
       shouldCheckAfterReset: false,
       shouldCheckNow: false,
     });
-    expect(resolveUserPageAiAvailabilityRefresh({
-      nextAccount: '0xA',
-      nextIsQuestionCacheReady: true,
-      nextIsResponsesCacheReady: true,
-      nextIsSBTCacheReady: true,
-      nextIsSurveyCacheReady: true,
-      nextNetworkId: 84532,
-      nextViewAddress: '0xVIEW',
-      prevAccount: '0xA',
-      prevIsQuestionCacheReady: true,
-      prevIsResponsesCacheReady: false,
-      prevIsSBTCacheReady: true,
-      prevIsSurveyCacheReady: true,
-      prevNetworkId: 84532,
-      prevViewAddress: '0xVIEW',
-    })).toEqual({
+    expect(
+      resolveUserPageAiAvailabilityRefresh({
+        nextAccount: '0xA',
+        nextIsQuestionCacheReady: true,
+        nextIsResponsesCacheReady: true,
+        nextIsSBTCacheReady: true,
+        nextIsSurveyCacheReady: true,
+        nextNetworkId: 84532,
+        nextViewAddress: '0xVIEW',
+        prevAccount: '0xA',
+        prevIsQuestionCacheReady: true,
+        prevIsResponsesCacheReady: false,
+        prevIsSBTCacheReady: true,
+        prevIsSurveyCacheReady: true,
+        prevNetworkId: 84532,
+        prevViewAddress: '0xVIEW',
+      }),
+    ).toEqual({
       allCachesReady: true,
       contextChanged: false,
       shouldCheckAfterReset: false,
       shouldCheckNow: true,
     });
-    expect(resolveUserPageAiAvailabilityRefresh({
-      nextAccount: '0xA',
-      nextIsQuestionCacheReady: true,
-      nextIsResponsesCacheReady: true,
-      nextIsSBTCacheReady: true,
-      nextIsSurveyCacheReady: true,
-      nextNetworkId: '84532',
-      nextViewAddress: '0xVIEW',
-      prevAccount: '0xA',
-      prevIsQuestionCacheReady: true,
-      prevIsResponsesCacheReady: true,
-      prevIsSBTCacheReady: true,
-      prevIsSurveyCacheReady: true,
-      prevNetworkId: 84532,
-      prevViewAddress: '0xVIEW',
-    })).toEqual({
+    expect(
+      resolveUserPageAiAvailabilityRefresh({
+        nextAccount: '0xA',
+        nextIsQuestionCacheReady: true,
+        nextIsResponsesCacheReady: true,
+        nextIsSBTCacheReady: true,
+        nextIsSurveyCacheReady: true,
+        nextNetworkId: '84532',
+        nextViewAddress: '0xVIEW',
+        prevAccount: '0xA',
+        prevIsQuestionCacheReady: true,
+        prevIsResponsesCacheReady: true,
+        prevIsSBTCacheReady: true,
+        prevIsSurveyCacheReady: true,
+        prevNetworkId: 84532,
+        prevViewAddress: '0xVIEW',
+      }),
+    ).toEqual({
       allCachesReady: true,
       contextChanged: true,
       shouldCheckAfterReset: true,
@@ -899,18 +977,22 @@ describe('userPage analysis refresh helpers', () => {
       deepScanTooltipLines: null,
       deepScanProgressRows: null,
     });
-    expect(buildUserPageMissingAddressCacheStateUpdate({
-      loadingSurveys: false,
-      loadingQuestions: false,
-      loadingSBTs: false,
-      hasUncertainGateAccess: false,
-      deepScanTooltipLines: null,
-      deepScanProgressRows: null,
-    })).toBeNull();
-    expect(buildUserPageMissingAddressCacheStateUpdate({
-      loadingSurveys: true,
-      deepScanTooltipLines: ['pending'],
-    })).toEqual({
+    expect(
+      buildUserPageMissingAddressCacheStateUpdate({
+        loadingSurveys: false,
+        loadingQuestions: false,
+        loadingSBTs: false,
+        hasUncertainGateAccess: false,
+        deepScanTooltipLines: null,
+        deepScanProgressRows: null,
+      }),
+    ).toBeNull();
+    expect(
+      buildUserPageMissingAddressCacheStateUpdate({
+        loadingSurveys: true,
+        deepScanTooltipLines: ['pending'],
+      }),
+    ).toEqual({
       loadingSurveys: false,
       loadingQuestions: false,
       loadingSBTs: false,
@@ -918,9 +1000,11 @@ describe('userPage analysis refresh helpers', () => {
       deepScanTooltipLines: null,
       deepScanProgressRows: null,
     });
-    expect(buildUserPageAddressContextResetStatePatch({
-      viewAddress: '0x00000000000000000000000000000000000000aa',
-    })).toMatchObject({
+    expect(
+      buildUserPageAddressContextResetStatePatch({
+        viewAddress: '0x00000000000000000000000000000000000000aa',
+      }),
+    ).toMatchObject({
       surveyResponseInfo: [],
       surveyCreationInfo: [],
       questionCreationInfo: [],
@@ -961,14 +1045,18 @@ describe('userPage analysis refresh helpers', () => {
   });
 
   it('extracts analysis additional comments and importance from visible response fields', () => {
-    expect(extractUserPageAnalysisAdditionalComment({
-      additionalComment: { value: '*' },
-      additionalComments: { value: 'extra context' },
-    })).toBe('extra context');
-    expect(extractUserPageAnalysisAdditionalComment({
-      comment: { text: 'hidden', encrypted: true },
-      comments: ' fallback note ',
-    })).toBe(' fallback note ');
+    expect(
+      extractUserPageAnalysisAdditionalComment({
+        additionalComment: { value: '*' },
+        additionalComments: { value: 'extra context' },
+      }),
+    ).toBe('extra context');
+    expect(
+      extractUserPageAnalysisAdditionalComment({
+        comment: { text: 'hidden', encrypted: true },
+        comments: ' fallback note ',
+      }),
+    ).toBe(' fallback note ');
     expect(extractUserPageAnalysisAdditionalComment({ additionalComment: '*' })).toBeNull();
     expect(extractUserPageAnalysisImportance({ conviction: 4 })).toBe(4);
     expect(extractUserPageAnalysisImportance({ meta: { importance: 2 } })).toBe(2);

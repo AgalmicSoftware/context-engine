@@ -18,7 +18,7 @@ jest.mock('../arweave/arweaveClient.js', () => {
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
     buildArweaveGatewayUrl: (txId, gateway = 'https://arweave.example.test') => `${gateway}/${txId}`,
   };
-  return { arweaveClient, arweaveScripts: arweaveClient };
+  return { arweaveClient };
 });
 
 const ACCOUNT = '0x00000000000000000000000000000000000000aa';
@@ -45,21 +45,29 @@ describe('docLibrary uploads self-recipient encryption', () => {
   });
 
   it('builds doc viewer URLs with legacy tx query compatibility and encoded metadata', () => {
-    expect(buildSessionDocLibraryViewerUrl({
-      sessionToken: 'Edge Session',
-      storageRef: 'indexeddb://doc 1',
-      storage: 'indexeddb',
-      kind: 'note',
-      name: 'Private note.md',
-    })).toBe('/session/Edge%20Session/docs?__ceDocTx=indexeddb%3A%2F%2Fdoc+1&__ceDocStorage=indexeddb&__ceDocKind=note&__ceDocName=Private+note.md');
-    expect(buildSessionDocLibraryViewerUrl({
-      sessionToken: '',
-      txId: 'tx-1',
-    })).toBe('');
-    expect(buildSessionDocLibraryViewerUrl({
-      sessionToken: 'edge',
-      txId: '',
-    })).toBe('');
+    expect(
+      buildSessionDocLibraryViewerUrl({
+        sessionToken: 'Edge Session',
+        storageRef: 'indexeddb://doc 1',
+        storage: 'indexeddb',
+        kind: 'note',
+        name: 'Private note.md',
+      }),
+    ).toBe(
+      '/session/Edge%20Session/docs?__ceDocTx=indexeddb%3A%2F%2Fdoc+1&__ceDocStorage=indexeddb&__ceDocKind=note&__ceDocName=Private+note.md',
+    );
+    expect(
+      buildSessionDocLibraryViewerUrl({
+        sessionToken: '',
+        txId: 'tx-1',
+      }),
+    ).toBe('');
+    expect(
+      buildSessionDocLibraryViewerUrl({
+        sessionToken: 'edge',
+        txId: '',
+      }),
+    ).toBe('');
   });
 
   it('normalizes public link records without mutating caller input', () => {
@@ -70,18 +78,18 @@ describe('docLibrary uploads self-recipient encryption', () => {
     const before = JSON.stringify(input);
     const record = createDocLibraryLinkRecord(input);
 
-    expect(record).toEqual(expect.objectContaining({
-      v: 1,
-      kind: 'link',
-      url: 'https://example.test/path?q=1',
-      title: 'Reference',
-    }));
+    expect(record).toEqual(
+      expect.objectContaining({
+        v: 1,
+        kind: 'link',
+        url: 'https://example.test/path?q=1',
+        title: 'Reference',
+      }),
+    );
     expect(typeof record.createdAt).toBe('string');
     expect(JSON.stringify(input)).toBe(before);
-    expect(() => createDocLibraryLinkRecord({ url: 'ftp://example.test/file' }))
-      .toThrow('URL must be http(s).');
-    expect(() => createDocLibraryLinkRecord({ url: 'not a url' }))
-      .toThrow('Invalid URL.');
+    expect(() => createDocLibraryLinkRecord({ url: 'ftp://example.test/file' })).toThrow('URL must be http(s).');
+    expect(() => createDocLibraryLinkRecord({ url: 'not a url' })).toThrow('Invalid URL.');
   });
 
   it('resolves doc upload gates and self-recipient modes from legacy aliases', () => {
@@ -106,22 +114,26 @@ describe('docLibrary uploads self-recipient encryption', () => {
       mode: 'all',
       hasRecipients: true,
     });
-    expect(resolveDocUploadsGate({
-      __registry: {
-        gatesByResource: {
-          docUploads: {
-            lookupStatus: 'missing',
-            mode: 'any',
-            chainId: 0,
-            sbtAddresses: ['0xabc'],
+    expect(
+      resolveDocUploadsGate({
+        __registry: {
+          gatesByResource: {
+            docUploads: {
+              lookupStatus: 'missing',
+              mode: 'any',
+              chainId: 0,
+              sbtAddresses: ['0xabc'],
+            },
           },
         },
-      },
-    })).toEqual(expect.objectContaining({
-      chainId: null,
-      mode: 'any',
-      hasRecipients: false,
-    }));
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        chainId: null,
+        mode: 'any',
+        hasRecipients: false,
+      }),
+    );
     expect(isSelfRecipientDocEncryption({ recipientType: 'Only Me' })).toBe(true);
     expect(isSelfRecipientDocEncryption({ mode: 'only_me' })).toBe(true);
     expect(isSelfRecipientDocEncryption({ audience: 'session' })).toBe(false);
@@ -158,12 +170,14 @@ describe('docLibrary uploads self-recipient encryption', () => {
     });
 
     const envelope = JSON.parse(storedEnvelope);
-    expect(result).toEqual(expect.objectContaining({
-      txId: 'A'.repeat(43),
-      storage: 'lit-arweave',
-      kind: 'file',
-      data: { size: null, type: 'application/json' },
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        txId: 'A'.repeat(43),
+        storage: 'lit-arweave',
+        kind: 'file',
+        data: { size: null, type: 'application/json' },
+      }),
+    );
     expect(mockUploadDataToArweave).toHaveBeenCalledWith(
       expect.any(String),
       'json',
@@ -199,14 +213,16 @@ describe('docLibrary uploads self-recipient encryption', () => {
         chainId: CHAIN_ID,
       },
     }));
-    const accessControlConditions = [{
-      contractAddress: '0x00000000000000000000000000000000000000bb',
-      standardContractType: 'ERC721',
-      chain: 'ethereum',
-      method: 'balanceOf',
-      parameters: [':userAddress'],
-      returnValueTest: { comparator: '>', value: '0' },
-    }];
+    const accessControlConditions = [
+      {
+        contractAddress: '0x00000000000000000000000000000000000000bb',
+        standardContractType: 'ERC721',
+        chain: 'ethereum',
+        method: 'balanceOf',
+        parameters: [':userAddress'],
+        returnValueTest: { comparator: '>', value: '0' },
+      },
+    ];
     mockUploadDataToArweave.mockImplementation(async (data) => {
       storedEnvelope = data;
       return 'B'.repeat(43);
@@ -231,19 +247,21 @@ describe('docLibrary uploads self-recipient encryption', () => {
     });
 
     const envelope = JSON.parse(storedEnvelope);
-    expect(saveKey).toHaveBeenCalledWith(expect.any(Uint8Array), expect.objectContaining({
-      accessControlConditions,
-      chain: 'ethereum',
-    }));
-    expect(envelope.recipients.map((recipient) => recipient.type)).toEqual([
-      'self-eip712-v1',
-      'lit-sbt-v1',
-    ]);
-    expect(envelope.recipients[1].lit).toEqual(expect.objectContaining({
-      accessControlConditions,
-      ciphertext: 'chipotle-ciphertext',
-      dataToEncryptHash: 'chipotle-hash',
-      chipotle: expect.objectContaining({ gateMode: 'any' }),
-    }));
+    expect(saveKey).toHaveBeenCalledWith(
+      expect.any(Uint8Array),
+      expect.objectContaining({
+        accessControlConditions,
+        chain: 'ethereum',
+      }),
+    );
+    expect(envelope.recipients.map((recipient) => recipient.type)).toEqual(['self-eip712-v1', 'lit-sbt-v1']);
+    expect(envelope.recipients[1].lit).toEqual(
+      expect.objectContaining({
+        accessControlConditions,
+        ciphertext: 'chipotle-ciphertext',
+        dataToEncryptHash: 'chipotle-hash',
+        chipotle: expect.objectContaining({ gateMode: 'any' }),
+      }),
+    );
   });
 });

@@ -36,7 +36,11 @@ describe('SessionWizard worker panel rendering', () => {
     expect(screen.queryByText('Upload bundle file')).not.toBeInTheDocument();
     expect(screen.queryByText('Using Default Worker')).not.toBeInTheDocument();
     expect(screen.queryByText('Use My Own')).not.toBeInTheDocument();
-    expect(screen.queryByText('Most sessions can stay on the shared default worker. Only switch to your own worker if you want to manage the infrastructure yourself.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Most sessions can stay on the shared default worker. Only switch to your own worker if you want to manage the infrastructure yourself.',
+      ),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('How should this session run?')).not.toBeInTheDocument();
     expect(screen.queryByText('Shared hosted worker')).not.toBeInTheDocument();
     expect(screen.queryByText('Worker secrets')).not.toBeInTheDocument();
@@ -54,11 +58,13 @@ describe('SessionWizard worker panel rendering', () => {
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveAttribute('readonly');
     expect(
       screen.getByText(
-        'Normal mode deploys use the GitHub-hosted worker bundle automatically. If a retry needs a different source, keep this Git URL as the default and add a manual bundle URL or upload below after a fetch failure.'
-      )
+        'Normal mode deploys use the GitHub-hosted worker bundle automatically. If a retry needs a different source, keep this Git URL as the default and add a manual bundle URL or upload below after a fetch failure.',
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByText('Worker name')).not.toBeInTheDocument();
-    expect(screen.queryByText('Passing a Cloudflare API token to a deploy-helper requires trust.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Passing a Cloudflare API token to a deploy-helper requires trust.'),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Worker code (unbundled, copy + paste)')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reset to default' })).not.toBeInTheDocument();
   });
@@ -81,53 +87,63 @@ describe('SessionWizard worker panel rendering', () => {
   it('builds Chipotle worker config for global Lit hooks when Lit v3 worker secrets are present', () => {
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
-    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim().replace(/\/+$/, ''));
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') =>
+      String(value || '')
+        .trim()
+        .replace(/\/+$/, ''),
+    );
     try {
-      expect(resolveSessionWizardChipotleHookConfig({
-        workerSecretsEnabled: true,
-        resolvedWorkerUrl: 'https://chipotle-worker.example.test/',
-        draft: {
-          slug: 'chipotle-hook-session',
-          sessionName: 'Chipotle Hook Session',
-        },
-        workerSecrets: {
-          litApiBase: 'https://api.chipotle.litprotocol.com',
-          litGroupId: '21',
-          litPkpId: '0xaeb338631a7cb716c7ac2effd22b7b69ebcd137b',
-          litActionCid: 'QmYyLDMz1AQYo3mPeHbBLTyfae8fhK5muXyqPhnAedJbr4',
-        },
-      })).toEqual(expect.objectContaining({
-        enabled: true,
-        workerUrl: 'https://chipotle-worker.example.test',
-        litCredentials: {
-          litApiBase: 'https://api.chipotle.litprotocol.com',
-          litActionCid: 'QmYyLDMz1AQYo3mPeHbBLTyfae8fhK5muXyqPhnAedJbr4',
-          litGroupId: '21',
-          litPkpId: '0xaeb338631a7cb716c7ac2effd22b7b69ebcd137b',
-        },
-        sessionConfig: {
-          slug: 'chipotle-hook-session',
-          sessionName: 'Chipotle Hook Session',
-          corsWorkerUrl: 'https://chipotle-worker.example.test',
+      expect(
+        resolveSessionWizardChipotleHookConfig({
+          workerSecretsEnabled: true,
+          resolvedWorkerUrl: 'https://chipotle-worker.example.test/',
+          draft: {
+            slug: 'chipotle-hook-session',
+            sessionName: 'Chipotle Hook Session',
+          },
+          workerSecrets: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+            litGroupId: '21',
+            litPkpId: '0xaeb338631a7cb716c7ac2effd22b7b69ebcd137b',
+            litActionCid: 'QmYyLDMz1AQYo3mPeHbBLTyfae8fhK5muXyqPhnAedJbr4',
+          },
+        }),
+      ).toEqual(
+        expect.objectContaining({
+          enabled: true,
+          workerUrl: 'https://chipotle-worker.example.test',
           litCredentials: {
             litApiBase: 'https://api.chipotle.litprotocol.com',
             litActionCid: 'QmYyLDMz1AQYo3mPeHbBLTyfae8fhK5muXyqPhnAedJbr4',
             litGroupId: '21',
             litPkpId: '0xaeb338631a7cb716c7ac2effd22b7b69ebcd137b',
           },
-        },
-      }));
+          sessionConfig: {
+            slug: 'chipotle-hook-session',
+            sessionName: 'Chipotle Hook Session',
+            corsWorkerUrl: 'https://chipotle-worker.example.test',
+            litCredentials: {
+              litApiBase: 'https://api.chipotle.litprotocol.com',
+              litActionCid: 'QmYyLDMz1AQYo3mPeHbBLTyfae8fhK5muXyqPhnAedJbr4',
+              litGroupId: '21',
+              litPkpId: '0xaeb338631a7cb716c7ac2effd22b7b69ebcd137b',
+            },
+          },
+        }),
+      );
 
-      expect(resolveSessionWizardChipotleHookConfig({
-        workerSecretsEnabled: true,
-        resolvedWorkerUrl: 'https://chipotle-worker.example.test',
-        workerSecrets: {
-          litApiBase: 'https://api.chipotle.litprotocol.com',
-        },
-        draft: {
-          slug: 'chipotle-hook-session',
-        },
-      })).toBeNull();
+      expect(
+        resolveSessionWizardChipotleHookConfig({
+          workerSecretsEnabled: true,
+          resolvedWorkerUrl: 'https://chipotle-worker.example.test',
+          workerSecrets: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+          },
+          draft: {
+            slug: 'chipotle-hook-session',
+          },
+        }),
+      ).toBeNull();
     } finally {
       workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
     }
@@ -231,5 +247,4 @@ describe('SessionWizard worker panel rendering', () => {
     fireEvent.click(embeddedToggle);
     expect(embeddedToggle).not.toBeChecked();
   });
-
 });

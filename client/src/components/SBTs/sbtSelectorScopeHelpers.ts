@@ -1,6 +1,4 @@
-import {
-  normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 
 export type SbtSelectorDiscoverySlugOptions = {
   allowEmpty?: boolean;
@@ -73,13 +71,10 @@ export type BuildSbtSelectorAutoSearchSessionOptionsArgs = {
   sourceSessionSlug?: unknown;
 };
 
-const isSbtSelectorScopeRecord = (value: unknown): value is Record<string, unknown> => (
-  value != null && typeof value === 'object' && !Array.isArray(value)
-);
+const isSbtSelectorScopeRecord = (value: unknown): value is Record<string, unknown> =>
+  value != null && typeof value === 'object' && !Array.isArray(value);
 
-const hasOwn = (value: unknown, key: PropertyKey): boolean => (
-  Object.prototype.hasOwnProperty.call(Object(value), key)
-);
+const hasOwn = (value: unknown, key: PropertyKey): boolean => Object.prototype.hasOwnProperty.call(Object(value), key);
 
 const pickNormalizedSessionSlug = (...values: unknown[]): string => {
   for (const value of values) {
@@ -90,33 +85,25 @@ const pickNormalizedSessionSlug = (...values: unknown[]): string => {
   return '';
 };
 
-const isUnresolvedSessionConfig = (config: unknown): boolean => (
-  isSbtSelectorScopeRecord(config) &&
-  config.__unresolved === true
-);
+const isUnresolvedSessionConfig = (config: unknown): boolean =>
+  isSbtSelectorScopeRecord(config) && config.__unresolved === true;
 
 export const resolvePropSessionSlug = (props: unknown = {}): string => {
   const record = isSbtSelectorScopeRecord(props) ? props : {};
   const hasExplicitSessionSlug = hasOwn(record, 'sessionSlug');
-  return pickNormalizedSessionSlug(
-    hasExplicitSessionSlug ? record.sessionSlug : undefined,
-    record.activeSessionSlug
-  );
+  return pickNormalizedSessionSlug(hasExplicitSessionSlug ? record.sessionSlug : undefined, record.activeSessionSlug);
 };
 
 export const resolveSbtSelectorEffectiveSessionSlug = ({
   groupOverride = false,
   props = {},
   sourceSessionSlug = '',
-}: ResolveSbtSelectorEffectiveSessionSlugArgs = {}): string => (
-  groupOverride
-    ? String(sourceSessionSlug ?? '')
-    : resolvePropSessionSlug(props)
-);
+}: ResolveSbtSelectorEffectiveSessionSlugArgs = {}): string =>
+  groupOverride ? String(sourceSessionSlug ?? '') : resolvePropSessionSlug(props);
 
 export const normalizeDiscoverySlugs = (
   slugs: unknown,
-  { allowEmpty = true }: SbtSelectorDiscoverySlugOptions = {}
+  { allowEmpty = true }: SbtSelectorDiscoverySlugOptions = {},
 ): string[] => {
   const values = Array.isArray(slugs) ? slugs : [slugs];
   const seen = new Set<string>();
@@ -141,9 +128,7 @@ export const buildSbtSelectorListScopeTargetSlugSet = ({
   targetSlugs?: unknown;
 } = {}): Set<string> | null => {
   if (scopeMode !== 'list') return null;
-  const sourceSlugs = Array.isArray(targetSlugs) && targetSlugs.length > 0
-    ? targetSlugs
-    : [fallbackSlug];
+  const sourceSlugs = Array.isArray(targetSlugs) && targetSlugs.length > 0 ? targetSlugs : [fallbackSlug];
   return new Set<string>(normalizeDiscoverySlugs(sourceSlugs, { allowEmpty: true }));
 };
 
@@ -155,38 +140,28 @@ export const resolveDirectSbtSelectorTargetSlugs = ({
   readSessionScanScope: readSessionScanScopeFn = null,
   readSessionScanSlugs: readSessionScanSlugsFn = null,
 }: ResolveDirectSbtSelectorTargetSlugsArgs = {}): string[] => {
-  const normalizeSlugs = typeof normalizeDiscoverySlugsFn === 'function'
-    ? normalizeDiscoverySlugsFn
-    : normalizeDiscoverySlugs;
+  const normalizeSlugs =
+    typeof normalizeDiscoverySlugsFn === 'function' ? normalizeDiscoverySlugsFn : normalizeDiscoverySlugs;
   const explicitSlugs = normalizeSlugs(explicitOverride, { allowEmpty: true });
   if (explicitSlugs.length > 0) return explicitSlugs;
 
   const effectiveSlug = normalizeSessionSlug(propSessionSlug || '');
-  const scopeMode = typeof readSessionScanScopeFn === 'function'
-    ? readSessionScanScopeFn()
-    : '';
+  const scopeMode = typeof readSessionScanScopeFn === 'function' ? readSessionScanScopeFn() : '';
   if (scopeMode === 'general') return [''];
   if (scopeMode === 'list') {
-    const scanSlugs = typeof readSessionScanSlugsFn === 'function'
-      ? readSessionScanSlugsFn()
-      : [];
+    const scanSlugs = typeof readSessionScanSlugsFn === 'function' ? readSessionScanSlugsFn() : [];
     return normalizeSlugs(scanSlugs, { allowEmpty: true });
   }
   if (scopeMode === 'all') {
-    const allSlugs = typeof getAllSessionSlugsFn === 'function'
-      ? getAllSessionSlugsFn({ includeEmpty: true })
-      : [];
+    const allSlugs = typeof getAllSessionSlugsFn === 'function' ? getAllSessionSlugsFn({ includeEmpty: true }) : [];
     return normalizeSlugs(allSlugs, { allowEmpty: true });
   }
   return normalizeSlugs([effectiveSlug], { allowEmpty: true });
 };
 
-export const resolveSbtSelectorTargetSlugs = (
-  args: ResolveSbtSelectorTargetSlugsArgs = {}
-): string[] => {
-  const normalizeSlugs = typeof args.normalizeDiscoverySlugs === 'function'
-    ? args.normalizeDiscoverySlugs
-    : normalizeDiscoverySlugs;
+export const resolveSbtSelectorTargetSlugs = (args: ResolveSbtSelectorTargetSlugsArgs = {}): string[] => {
+  const normalizeSlugs =
+    typeof args.normalizeDiscoverySlugs === 'function' ? args.normalizeDiscoverySlugs : normalizeDiscoverySlugs;
   if (hasOwn(args, 'slugOverride')) {
     return normalizeSlugs([args.slugOverride], { allowEmpty: true });
   }
@@ -204,11 +179,12 @@ export const shouldWarmSbtSelectorRegistryCacheForTargets = ({
 }: ShouldWarmSbtSelectorRegistryCacheArgs = {}): boolean => {
   const targets = Array.isArray(targetSlugs) ? targetSlugs : [];
   if (!targets.length) return true;
-  return targets.some((targetSlug: string) => (
-    !(typeof shouldUsePropsSessionConfigForSlug === 'function'
-      ? shouldUsePropsSessionConfigForSlug(targetSlug)
-      : false)
-  ));
+  return targets.some(
+    (targetSlug: string) =>
+      !(typeof shouldUsePropsSessionConfigForSlug === 'function'
+        ? shouldUsePropsSessionConfigForSlug(targetSlug)
+        : false),
+  );
 };
 
 export const shouldUsePropsSbtSelectorSessionConfigForSlug = ({
@@ -231,21 +207,20 @@ export const resolveSbtSelectorDisplayLookupSessionConfig = ({
   isUnresolvedSessionConfig: isUnresolvedSessionConfigFn = isUnresolvedSessionConfig,
   sessionSlug = '',
 }: ResolveSbtSelectorDisplayLookupSessionConfigArgs = {}): unknown | null => {
-  const strictLookupConfig = typeof getSessionConfigBySlugOrDefaultFn === 'function'
-    ? getSessionConfigBySlugOrDefaultFn(sessionSlug)
-    : null;
-  const isUnresolved = typeof isUnresolvedSessionConfigFn === 'function'
-    ? isUnresolvedSessionConfigFn
-    : isUnresolvedSessionConfig;
+  const strictLookupConfig =
+    typeof getSessionConfigBySlugOrDefaultFn === 'function' ? getSessionConfigBySlugOrDefaultFn(sessionSlug) : null;
+  const isUnresolved =
+    typeof isUnresolvedSessionConfigFn === 'function' ? isUnresolvedSessionConfigFn : isUnresolvedSessionConfig;
   if (strictLookupConfig && !isUnresolved(strictLookupConfig)) {
     return strictLookupConfig;
   }
   if (!allowDemoSessionFallback) {
     return strictLookupConfig || null;
   }
-  const demoLookupConfig = typeof getDemoSessionConfigBySlugFn === 'function'
-    ? getDemoSessionConfigBySlugFn(sessionSlug, { allowDemoFallback: true })
-    : null;
+  const demoLookupConfig =
+    typeof getDemoSessionConfigBySlugFn === 'function'
+      ? getDemoSessionConfigBySlugFn(sessionSlug, { allowDemoFallback: true })
+      : null;
   return demoLookupConfig || strictLookupConfig || null;
 };
 
@@ -270,15 +245,11 @@ export const resolveSbtSelectorScopeMode = ({
 export const buildSbtSelectorGroupOptions = ({
   getSessionLabel = null,
   slugs = [],
-}: BuildSbtSelectorGroupOptionsArgs = {}): SbtSelectorGroupOption[] => (
-  (Array.isArray(slugs) ? slugs : [])
-    .map((slug: unknown) => ({
-      value: String(slug || ''),
-      label: typeof getSessionLabel === 'function'
-        ? getSessionLabel(slug)
-        : String(slug || ''),
-    }))
-);
+}: BuildSbtSelectorGroupOptionsArgs = {}): SbtSelectorGroupOption[] =>
+  (Array.isArray(slugs) ? slugs : []).map((slug: unknown) => ({
+    value: String(slug || ''),
+    label: typeof getSessionLabel === 'function' ? getSessionLabel(slug) : String(slug || ''),
+  }));
 
 export const buildSbtSelectorAutoSearchSessionOptions = ({
   autoSearchOtherSessions = false,
@@ -296,7 +267,7 @@ export const buildSbtSelectorAutoSearchSessionOptions = ({
   }
   return (Array.isArray(groupOptions) ? groupOptions : [])
     .map((option: unknown) => {
-      const record = isSbtSelectorScopeRecord(option) ? option as SbtSelectorGroupOption : { value: '', label: '' };
+      const record = isSbtSelectorScopeRecord(option) ? (option as SbtSelectorGroupOption) : { value: '', label: '' };
       return {
         ...record,
         label: String(record.label || ''),

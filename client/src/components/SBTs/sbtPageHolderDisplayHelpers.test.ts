@@ -15,17 +15,19 @@ import {
 
 describe('sbtPageHelpers holder display helpers', () => {
   it('resolves holder loading display state without changing fallback rules', () => {
-    expect(resolveSbtPageHolderLoadingState({
-      countsLoaded: false,
-      hasComputedHolders: false,
-      hasFilteredHolders: false,
-      isScanActive: false,
-      loadingMintersBurners: false,
-      loadingMintedFilter: false,
-      mintedTokensOverride: null,
-      netHoldersCount: 0,
-      sbtScanPending: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageHolderLoadingState({
+        countsLoaded: false,
+        hasComputedHolders: false,
+        hasFilteredHolders: false,
+        isScanActive: false,
+        loadingMintersBurners: false,
+        loadingMintedFilter: false,
+        mintedTokensOverride: null,
+        netHoldersCount: 0,
+        sbtScanPending: true,
+      }),
+    ).toEqual({
       countsReady: true,
       effectiveLoading: false,
       holdersReady: true,
@@ -35,13 +37,15 @@ describe('sbtPageHelpers holder display helpers', () => {
       shouldOverrideMinted: false,
       terminalEmptyHoldersState: true,
     });
-    expect(resolveSbtPageHolderLoadingState({
-      countsLoaded: false,
-      loadingMintersBurners: true,
-      mintedTokensOverride: '5',
-      netHoldersCount: 0,
-      sbtScanInProgress: true,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageHolderLoadingState({
+        countsLoaded: false,
+        loadingMintersBurners: true,
+        mintedTokensOverride: '5',
+        netHoldersCount: 0,
+        sbtScanInProgress: true,
+      }),
+    ).toMatchObject({
       countsReady: true,
       effectiveLoading: true,
       isGlobalLoading: true,
@@ -50,168 +54,212 @@ describe('sbtPageHelpers holder display helpers', () => {
       shouldOverrideMinted: true,
       terminalEmptyHoldersState: false,
     });
-    expect(resolveSbtPageHolderLoadingState({
-      countsLoaded: true,
-      mintedTokensOverride: '5',
-      netHoldersCount: 2,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageHolderLoadingState({
+        countsLoaded: true,
+        mintedTokensOverride: '5',
+        netHoldersCount: 2,
+      }),
+    ).toMatchObject({
       netMinted: '2',
       shouldOverrideMinted: false,
       holdersReady: true,
     });
-    expect(resolveSbtPageHolderResolutionState({
-      loadingMintersBurners: true,
-      mintedAddresses: [],
-      mintedTokensOverride: '3',
-    })).toEqual({
+    expect(
+      resolveSbtPageHolderResolutionState({
+        loadingMintersBurners: true,
+        mintedAddresses: [],
+        mintedTokensOverride: '3',
+      }),
+    ).toEqual({
       addressesAreResolving: true,
       addressesNeedResolutionHint: true,
     });
-    expect(resolveSbtPageHolderResolutionState({
-      isRefreshing: true,
-      mintedAddresses: ['0xHolder'],
-      mintedTokensOverride: '3',
-      showScanProgress: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageHolderResolutionState({
+        isRefreshing: true,
+        mintedAddresses: ['0xHolder'],
+        mintedTokensOverride: '3',
+        showScanProgress: true,
+      }),
+    ).toEqual({
       addressesAreResolving: false,
       addressesNeedResolutionHint: false,
     });
-    expect(resolveSbtPageHolderResolutionState({
-      loadingMintersBurners: false,
-      loadingMintedFilter: false,
-      mintedAddresses: [],
-      mintedTokensOverride: '3',
-      showScanProgress: false,
-    })).toEqual({
+    expect(
+      resolveSbtPageHolderResolutionState({
+        loadingMintersBurners: false,
+        loadingMintedFilter: false,
+        mintedAddresses: [],
+        mintedTokensOverride: '3',
+        showScanProgress: false,
+      }),
+    ).toEqual({
       addressesAreResolving: false,
       addressesNeedResolutionHint: true,
     });
-    expect(resolveSbtPageHoldersDisplayCount({
-      netHoldersCount: 4,
-      shouldOverrideMinted: false,
-    })).toBe('4');
-    expect(resolveSbtPageHoldersDisplayCount({
-      mintedTokensOverride: '7',
-      netHoldersCount: 4,
-      shouldOverrideMinted: true,
-    })).toBe('~7');
-    expect(shouldShowSbtPageScanProgress({
-      effectiveLoading: true,
-      hasActiveScanProgress: true,
-      rawRemainingBlocksCount: 0,
-    })).toBe(true);
-    expect(shouldShowSbtPageScanProgress({
-      effectiveLoading: false,
-      hasActiveScanProgress: true,
-      rawRemainingBlocksCount: 3,
-    })).toBe(true);
-    expect(shouldShowSbtPageScanProgress({
-      effectiveLoading: false,
-      hasActiveScanProgress: true,
-      rawRemainingBlocksCount: 0,
-    })).toBe(false);
-    expect(shouldShowSbtPageScanProgress({
-      effectiveLoading: true,
-      hasActiveScanProgress: false,
-      rawRemainingBlocksCount: 3,
-    })).toBe(false);
-    expect(resolveSbtPageScanProgressPercent({
-      progress: { scannedBlocks: 5, totalBlocks: 20 },
-      showScanProgress: true,
-    })).toBe(25);
-    expect(resolveSbtPageScanProgressPercent({
-      progress: { scannedBlocks: 50, totalBlocks: 20 },
-      showScanProgress: true,
-    })).toBe(100);
-    expect(resolveSbtPageScanProgressPercent({
-      progress: { scannedBlocks: 'bad', totalBlocks: 20 },
-      showScanProgress: true,
-    })).toBe(0);
-    expect(resolveSbtPageScanProgressPercent({
-      progress: { scannedBlocks: 5, totalBlocks: 20 },
-      showScanProgress: false,
-    })).toBe(0);
+    expect(
+      resolveSbtPageHoldersDisplayCount({
+        netHoldersCount: 4,
+        shouldOverrideMinted: false,
+      }),
+    ).toBe('4');
+    expect(
+      resolveSbtPageHoldersDisplayCount({
+        mintedTokensOverride: '7',
+        netHoldersCount: 4,
+        shouldOverrideMinted: true,
+      }),
+    ).toBe('~7');
+    expect(
+      shouldShowSbtPageScanProgress({
+        effectiveLoading: true,
+        hasActiveScanProgress: true,
+        rawRemainingBlocksCount: 0,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowSbtPageScanProgress({
+        effectiveLoading: false,
+        hasActiveScanProgress: true,
+        rawRemainingBlocksCount: 3,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowSbtPageScanProgress({
+        effectiveLoading: false,
+        hasActiveScanProgress: true,
+        rawRemainingBlocksCount: 0,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowSbtPageScanProgress({
+        effectiveLoading: true,
+        hasActiveScanProgress: false,
+        rawRemainingBlocksCount: 3,
+      }),
+    ).toBe(false);
+    expect(
+      resolveSbtPageScanProgressPercent({
+        progress: { scannedBlocks: 5, totalBlocks: 20 },
+        showScanProgress: true,
+      }),
+    ).toBe(25);
+    expect(
+      resolveSbtPageScanProgressPercent({
+        progress: { scannedBlocks: 50, totalBlocks: 20 },
+        showScanProgress: true,
+      }),
+    ).toBe(100);
+    expect(
+      resolveSbtPageScanProgressPercent({
+        progress: { scannedBlocks: 'bad', totalBlocks: 20 },
+        showScanProgress: true,
+      }),
+    ).toBe(0);
+    expect(
+      resolveSbtPageScanProgressPercent({
+        progress: { scannedBlocks: 5, totalBlocks: 20 },
+        showScanProgress: false,
+      }),
+    ).toBe(0);
     expect(resolveSbtPageScanProgressFillStyle({ percent: 25 })).toEqual({
       width: '25%',
     });
     expect(resolveSbtPageScanProgressFillStyle({ percent: undefined })).toEqual({
       width: '0%',
     });
-    expect(resolveSbtPageScanProgressDisplay({
-      rawRemainingBlocksCount: 12345.6,
-      sessionLabel: ' Example Session ',
-      showScanProgress: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageScanProgressDisplay({
+        rawRemainingBlocksCount: 12345.6,
+        sessionLabel: ' Example Session ',
+        showScanProgress: true,
+      }),
+    ).toEqual({
       remainingBlocksCount: 12345.6,
       scanProgressSessionText: 'Session: Example Session',
       scanProgressText: 'Scanning mint/burn history: 12,345.6 blocks remaining',
     });
-    expect(resolveSbtPageScanProgressDisplay({
-      rawRemainingBlocksCount: Number.NaN,
-      sessionLabel: '',
-      showScanProgress: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageScanProgressDisplay({
+        rawRemainingBlocksCount: Number.NaN,
+        sessionLabel: '',
+        showScanProgress: true,
+      }),
+    ).toEqual({
       remainingBlocksCount: Number.NaN,
       scanProgressSessionText: 'Session: ',
       scanProgressText: 'Scanning mint/burn history: - blocks remaining',
     });
-    expect(resolveSbtPageScanProgressDisplay({
-      rawRemainingBlocksCount: 7,
-      sessionLabel: 'Hidden',
-      showScanProgress: false,
-    })).toEqual({
+    expect(
+      resolveSbtPageScanProgressDisplay({
+        rawRemainingBlocksCount: 7,
+        sessionLabel: 'Hidden',
+        showScanProgress: false,
+      }),
+    ).toEqual({
       remainingBlocksCount: 0,
       scanProgressSessionText: null,
       scanProgressText: null,
     });
-    expect(resolveSbtPageHolderFilterItems({
-      filteredMintedUsers: ['0xFiltered'],
-      hasComputedHolders: true,
-      hasFilteredHolders: true,
-      isScanActive: true,
-      netHolders: ['0xNet'],
-    })).toEqual({
+    expect(
+      resolveSbtPageHolderFilterItems({
+        filteredMintedUsers: ['0xFiltered'],
+        hasComputedHolders: true,
+        hasFilteredHolders: true,
+        isScanActive: true,
+        netHolders: ['0xNet'],
+      }),
+    ).toEqual({
       filteredMintedUsers: ['0xFiltered'],
       holderItemsForFilter: ['0xNet'],
       keepStaleFilterRowsWhileRefreshing: false,
     });
-    expect(resolveSbtPageHolderFilterItems({
-      filteredMintedUsers: ['0xFiltered'],
-      hasComputedHolders: false,
-      hasFilteredHolders: true,
-      isScanActive: true,
-      netHolders: ['0xNet'],
-    })).toEqual({
+    expect(
+      resolveSbtPageHolderFilterItems({
+        filteredMintedUsers: ['0xFiltered'],
+        hasComputedHolders: false,
+        hasFilteredHolders: true,
+        isScanActive: true,
+        netHolders: ['0xNet'],
+      }),
+    ).toEqual({
       filteredMintedUsers: ['0xFiltered'],
       holderItemsForFilter: ['0xFiltered'],
       keepStaleFilterRowsWhileRefreshing: true,
     });
-    expect(resolveSbtPageHolderFilterItems({
-      filteredMintedUsers: 'bad',
-      hasComputedHolders: false,
-      hasFilteredHolders: false,
-      isScanActive: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageHolderFilterItems({
+        filteredMintedUsers: 'bad',
+        hasComputedHolders: false,
+        hasFilteredHolders: false,
+        isScanActive: true,
+      }),
+    ).toEqual({
       filteredMintedUsers: [],
       holderItemsForFilter: [],
       keepStaleFilterRowsWhileRefreshing: false,
     });
-    expect(resolveSbtPageHolderModalDisplayState({
-      holdersReady: true,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageHolderModalDisplayState({
+        holdersReady: true,
+      }),
+    ).toMatchObject({
       showEmptyStateInModal: true,
       showHeaderCount: true,
       showSpinnerInModalBody: false,
       waitingForHolderDetails: false,
     });
-    expect(resolveSbtPageHolderModalDisplayState({
-      hasActiveScanProgress: true,
-      isRefreshing: true,
-      loadingMintersBurners: true,
-      shouldOverrideMinted: true,
-      showModal: true,
-      showScanProgress: true,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageHolderModalDisplayState({
+        hasActiveScanProgress: true,
+        isRefreshing: true,
+        loadingMintersBurners: true,
+        shouldOverrideMinted: true,
+        showModal: true,
+        showScanProgress: true,
+      }),
+    ).toMatchObject({
       mintedCountTitle: 'Holder list not loaded yet; showing an on-chain holder count estimate.',
       showApproximateCountHint: true,
       showCornerSpinner: false,
@@ -221,11 +269,13 @@ describe('sbtPageHelpers holder display helpers', () => {
       showSpinnerInModalBody: true,
       waitingForHolderDetails: true,
     });
-    expect(resolveSbtPageHolderModalDisplayState({
-      hasFilteredHolders: true,
-      holdersReady: true,
-      loadingMintersBurners: true,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageHolderModalDisplayState({
+        hasFilteredHolders: true,
+        holdersReady: true,
+        loadingMintersBurners: true,
+      }),
+    ).toMatchObject({
       showCornerSpinner: true,
       showEmptyStateInModal: false,
       showHeaderCount: true,

@@ -9,9 +9,7 @@ type SurveyQuestionsLoadingStateProps = {
   progressState: SurveyQuestionsFullLoadingProgressState;
 };
 
-const SurveyQuestionsLoadingState = ({
-  progressState,
-}: SurveyQuestionsLoadingStateProps): React.ReactElement => (
+const SurveyQuestionsLoadingState = ({ progressState }: SurveyQuestionsLoadingStateProps): React.ReactElement => (
   <div className={styles.loadingContainer}>
     <FontAwesomeIcon icon={faSpinner} spin />
     <div className={styles.fullLoadingHeadline}>Loading questions...</div>
@@ -22,10 +20,7 @@ const SurveyQuestionsLoadingState = ({
           <span>{progressState.metaRightText}</span>
         </div>
         <div className={styles.fullLoadingProgressBar}>
-          <div
-            className={styles.fullLoadingProgressFill}
-            style={progressState.fillStyle}
-          />
+          <div className={styles.fullLoadingProgressFill} style={progressState.fillStyle} />
         </div>
       </div>
     )}

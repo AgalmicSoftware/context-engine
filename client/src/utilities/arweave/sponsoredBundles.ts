@@ -2,7 +2,7 @@ import bufferModule from 'buffer/';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { toStr } from '../shared/primitives.js';
 import { buildPublicRoute } from '../ui/publicUrl.js';
-import { arweaveScripts } from './arweaveScripts.js';
+import { arweaveClient } from './arweaveClient.js';
 
 type LooseRecord = Record<string, any>;
 
@@ -29,16 +29,9 @@ export const SPONSORED_BUNDLE_SUPPORTED_FIELDS = Object.freeze([
 ]);
 
 const isObj = (value: unknown): value is LooseRecord => !!value && typeof value === 'object' && !Array.isArray(value);
-const Buffer =
-  bufferModule?.Buffer ||
-  bufferModule;
-const base64UrlEncode = (bytes: Uint8Array): string => (
-  Buffer.from(bytes)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '')
-);
+const Buffer = bufferModule?.Buffer || bufferModule;
+const base64UrlEncode = (bytes: Uint8Array): string =>
+  Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 const getDefaultSponsoredSessionPath = () => buildPublicRoute('/new');
 
 const createSponsoredBundleError = (code: string, message: string) => {
@@ -51,10 +44,9 @@ export const generateSponsoredBundleSecret = (byteLength = SPONSORED_BUNDLE_SECR
   const resolvedByteLength = Number(byteLength || 0) || SPONSORED_BUNDLE_SECRET_BYTES;
   const runtimeGlobal = globalThis as any;
   const runtimeWindow = typeof window !== 'undefined' ? (window as any) : null;
-  const cryptoApi = (
+  const cryptoApi =
     (typeof globalThis !== 'undefined' && runtimeGlobal?.crypto?.getRandomValues ? runtimeGlobal.crypto : null) ||
-    (runtimeWindow?.crypto?.getRandomValues ? runtimeWindow.crypto : null)
-  );
+    (runtimeWindow?.crypto?.getRandomValues ? runtimeWindow.crypto : null);
   if (!cryptoApi?.getRandomValues) {
     throw new Error('Secure random generator unavailable.');
   }
@@ -100,14 +92,13 @@ export const normalizeSparseSponsoredBundlePayload = (raw: unknown) => {
   return next;
 };
 
-export const hasSponsoredBundleFields = (bundle: LooseRecord = {}): boolean => (
+export const hasSponsoredBundleFields = (bundle: LooseRecord = {}): boolean =>
   SPONSORED_BUNDLE_SUPPORTED_FIELDS.some((key) => {
     if (key === 'bootstrapWorkerUrl') {
       return false;
     }
     return !!toStr(bundle?.[key] || '').trim();
-  })
-);
+  });
 
 export const buildSponsoredBundlePlaintext = ({
   openaiKey = '',
@@ -246,7 +237,7 @@ export const readSponsoredBundleFromArweave = async ({
   if (!resolvedTxId) {
     throw createSponsoredBundleError('malformed_link', 'Sponsored link is missing a bundle id.');
   }
-  const raw = await arweaveScripts.downloadDataFromArweave(resolvedTxId, arweaveOpts);
+  const raw = await arweaveClient.downloadDataFromArweave(resolvedTxId, arweaveOpts);
   const envelope = parseSponsoredBundleEnvelope(raw);
   const bundle = await decryptSponsoredBundleEnvelope({ envelope, secret });
   if (!hasSponsoredBundleFields(bundle)) {
@@ -282,7 +273,7 @@ export const buildSponsoredSessionUrl = ({
     throw new Error('Sponsored bundle secret is required.');
   }
   const baseOrigin = toStr(
-    origin || (typeof window !== 'undefined' && window.location ? window.location.origin : '')
+    origin || (typeof window !== 'undefined' && window.location ? window.location.origin : ''),
   ).trim();
   const normalizedPath = toStr(path || getDefaultSponsoredSessionPath()).trim() || getDefaultSponsoredSessionPath();
   const search = `?sponsored=${encodeURIComponent(resolvedTxId)}`;
@@ -326,7 +317,7 @@ export const uploadSponsoredBundle = async ({
   const plaintext = buildSponsoredBundlePlaintext({
     ...bundle,
     meta: {
-      ...((bundle?.meta && typeof bundle.meta === 'object') ? bundle.meta : {}),
+      ...(bundle?.meta && typeof bundle.meta === 'object' ? bundle.meta : {}),
       label,
       createdAt,
       createdBy,
@@ -338,7 +329,7 @@ export const uploadSponsoredBundle = async ({
   }
   const encryptedData = await cryptoUtils.encryptWithPassword(plaintext, password);
   const envelope = buildSponsoredBundleEnvelope({ encryptedData });
-  const txId = await arweaveScripts.uploadDataToArweave(envelope, 'json', {
+  const txId = await arweaveClient.uploadDataToArweave(envelope, 'json', {
     arweaveJwk,
     workerUrl,
     sessionSlug,

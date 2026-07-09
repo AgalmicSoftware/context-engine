@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import SBTSelector from './SBTSelector';
-import * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsUtils from '../../utilities/web3/chainGateway.js';
 import * as sessionRegistryUtils from '../../utilities/web3/sessionRegistry.js';
 
 const GENERAL_FACTORY_ADDRESS = '0x2222222222222222222222222222222222222222';
@@ -48,9 +48,11 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   loadSessionRegistryCache: jest.fn(async () => null),
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => {
+jest.mock('../../utilities/web3/chainGateway.js', () => {
   const normalizeSessionSlug = (raw: unknown = '') => {
-    const normalized = String(raw ?? '').trim().toLowerCase();
+    const normalized = String(raw ?? '')
+      .trim()
+      .toLowerCase();
     if (!normalized || normalized === 'general') return '';
     return normalized;
   };
@@ -126,7 +128,7 @@ describe('SBTSelector AsyncSearchSelect integration', () => {
           variant="admin"
         />
         <button type="button">outside</button>
-      </div>
+      </div>,
     );
 
     await waitFor(() => {
@@ -143,10 +145,12 @@ describe('SBTSelector AsyncSearchSelect integration', () => {
     fireEvent.click(screen.getByRole('option', { name: 'Beta Badge' }));
 
     await waitFor(() => {
-      expect(onAddSBT).toHaveBeenCalledWith(expect.objectContaining({
-        address: betaAddress.toLowerCase(),
-        name: 'Beta Badge',
-      }));
+      expect(onAddSBT).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address: betaAddress.toLowerCase(),
+          name: 'Beta Badge',
+        }),
+      );
     });
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
 

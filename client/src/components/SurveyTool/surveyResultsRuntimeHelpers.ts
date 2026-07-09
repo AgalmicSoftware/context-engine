@@ -5,12 +5,8 @@ import {
   parseQuestionSessionSlugFromSearch,
 } from '../../utilities/survey/questionRouting.js';
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
-import {
-  stableSerializeSignatureValue,
-} from './surveyResultsHelpers.js';
-import type {
-  SurveyResultsResponseRecord,
-} from './surveyResultsLockedFieldHelpers';
+import { stableSerializeSignatureValue } from './surveyResultsHelpers.js';
+import type { SurveyResultsResponseRecord } from './surveyResultsLockedFieldHelpers';
 
 type SurveyResultsRuntimeRecord = Record<string, unknown>;
 
@@ -18,7 +14,7 @@ const surveyLog = createLogger('surveys');
 
 export function unifyAggregatorWithAllQuestionIDs(
   baseAggregator: Record<string, unknown[]> = {},
-  allKnownQuestionIds: string[] = []
+  allKnownQuestionIds: string[] = [],
 ): Record<string, unknown[]> {
   const loweredMap: Record<string, unknown[]> = {};
   for (const key of Object.keys(baseAggregator)) {
@@ -46,10 +42,7 @@ export const readPathSearch = (path: unknown = ''): string => {
 
 export const hasExplicitSessionQueryPinInPath = (path: unknown = ''): boolean => {
   const search = readPathSearch(path);
-  return (
-    parseQuestionSessionSlugFromSearch(search) !== null ||
-    parseQuestionSessionIdFromSearch(search) !== null
-  );
+  return parseQuestionSessionSlugFromSearch(search) !== null || parseQuestionSessionIdFromSearch(search) !== null;
 };
 
 export function applyExistingGroupPrefix(newPath: string): string {
@@ -58,26 +51,24 @@ export function applyExistingGroupPrefix(newPath: string): string {
     const p = (typeof window !== 'undefined' && window.location && window.location.pathname) || '';
     const pathOnly = p.split('?')[0].split('#')[0];
     const segs = pathOnly.split('/').filter(Boolean);
-    const RESERVED: Set<string> = new Set(['questions','question','survey','surveys']);
+    const RESERVED: Set<string> = new Set(['questions', 'question', 'survey', 'surveys']);
     if (segs.length >= 2 && !RESERVED.has(segs[0])) {
       const base = `/${segs[0]}/${segs[1]}`;
       if (!newPath.startsWith(base)) {
         return `${base}${newPath.startsWith('/') ? '' : '/'}${newPath}`;
       }
     }
-  } catch (e) { surveyLog.warn('SurveyResults: fallback', e); }
+  } catch (e) {
+    surveyLog.warn('SurveyResults: fallback', e);
+  }
   return newPath;
 }
 
-export function resolveNetBucketReadOnly(
-  cacheObj: unknown,
-  netIdStr: unknown,
-  fallbackValue: unknown
-): unknown {
+export function resolveNetBucketReadOnly(cacheObj: unknown, netIdStr: unknown, fallbackValue: unknown): unknown {
   const fallback = fallbackValue === undefined ? {} : fallbackValue;
   if (!cacheObj || typeof cacheObj !== 'object' || !netIdStr) return fallback;
   const bucket = (cacheObj as SurveyResultsRuntimeRecord)[String(netIdStr)];
-  return (bucket && typeof bucket === 'object') ? bucket : fallback;
+  return bucket && typeof bucket === 'object' ? bucket : fallback;
 }
 
 export const normalizeNonceKey = (value: unknown): number | null => {
@@ -85,9 +76,8 @@ export const normalizeNonceKey = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-export const getFilterStateSignature = (
-  filterState: unknown
-): string => serializeFilterState(filterState as SurveyResultsRuntimeRecord | null | undefined) || '';
+export const getFilterStateSignature = (filterState: unknown): string =>
+  serializeFilterState(filterState as SurveyResultsRuntimeRecord | null | undefined) || '';
 
 export const areValuesEquivalentBySignature = (currentValue: unknown, nextValue: unknown): boolean => {
   if (currentValue === nextValue) return true;
@@ -98,20 +88,15 @@ export const areValuesEquivalentBySignature = (currentValue: unknown, nextValue:
   return stableSerializeSignatureValue(currentValue) === stableSerializeSignatureValue(nextValue);
 };
 
-export const getResponseQuestionId = (obj: SurveyResultsResponseRecord | null | undefined): string => (
-  String(obj?.questionID || obj?.questionId || '').trim()
-);
+export const getResponseQuestionId = (obj: SurveyResultsResponseRecord | null | undefined): string =>
+  String(obj?.questionID || obj?.questionId || '').trim();
 
 export const getResponseQuestionPrompt = (
   obj: SurveyResultsResponseRecord | null | undefined,
-  questionData: SurveyResultsRuntimeRecord | null = null
-): unknown => (
-  obj?.prompt || questionData?.prompt || ''
-);
+  questionData: SurveyResultsRuntimeRecord | null = null,
+): unknown => obj?.prompt || questionData?.prompt || '';
 
 export const getResponseQuestionType = (
   obj: SurveyResultsResponseRecord | null | undefined,
-  questionData: SurveyResultsRuntimeRecord | null = null
-): unknown => (
-  obj?.type || questionData?.type || ''
-);
+  questionData: SurveyResultsRuntimeRecord | null = null,
+): unknown => obj?.type || questionData?.type || '';

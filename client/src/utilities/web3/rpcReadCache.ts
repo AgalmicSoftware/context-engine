@@ -121,9 +121,8 @@ const createGlobalCacheState = (): RpcReadCacheState => ({
   rateLimitProbes: new Map<string, RpcRateLimitProbe>(),
 });
 
-const getGlobalObject = (): RpcCacheGlobals => (
-  typeof globalThis !== 'undefined' ? (globalThis as RpcCacheGlobals) : ({} as RpcCacheGlobals)
-);
+const getGlobalObject = (): RpcCacheGlobals =>
+  typeof globalThis !== 'undefined' ? (globalThis as RpcCacheGlobals) : ({} as RpcCacheGlobals);
 
 const isObj = (val: unknown): val is LooseObject => !!val && typeof val === 'object' && !Array.isArray(val);
 const normalizeDebugTag = (value: unknown): string | null => {
@@ -175,9 +174,7 @@ const safeStackSnippet = (): string => {
       .filter(Boolean);
 
     // Drop the leading "Error" line (browser/Node differ slightly).
-    const frames = lines[0] && lines[0].toLowerCase().startsWith('error')
-      ? lines.slice(1)
-      : lines;
+    const frames = lines[0] && lines[0].toLowerCase().startsWith('error') ? lines.slice(1) : lines;
 
     // Heuristic: remove wrapper + ethers internals, then take the next few frames which are
     // more likely to include app callsites (when sourcemaps are available).
@@ -226,10 +223,7 @@ const normalizeHex = (value: unknown): string => {
 
 const normalizeLogsAddress = (value: unknown): string | string[] => {
   if (!Array.isArray(value)) return normalizeHexAddress(value);
-  const normalized = value
-    .map(normalizeHexAddress)
-    .filter(Boolean)
-    .sort();
+  const normalized = value.map(normalizeHexAddress).filter(Boolean).sort();
   if (normalized.length === 0) return '';
   if (normalized.length === 1) return normalized[0];
   return normalized;
@@ -289,9 +283,11 @@ const stableKeyStringify = (value: unknown): string => {
       seen.add(v);
       const record = v as LooseObject;
       const out: LooseObject = {};
-      Object.keys(record).sort().forEach((k) => {
-        out[k] = walk(record[k]);
-      });
+      Object.keys(record)
+        .sort()
+        .forEach((k) => {
+          out[k] = walk(record[k]);
+        });
       return out;
     }
     return toStr(v);
@@ -337,7 +333,7 @@ const buildMethodKeyPart = (methodIn: unknown, paramsIn: unknown): string => {
     const addressNorm = normalizeLogsAddress(filter.address);
     const topics = Array.isArray(filter.topics) ? filter.topics : [];
     const topicsNorm = stableKeyStringify(
-      topics.map((t) => (Array.isArray(t) ? t.map(normalizeHex) : normalizeHex(t)))
+      topics.map((t) => (Array.isArray(t) ? t.map(normalizeHex) : normalizeHex(t))),
     );
     const fromBlock = normalizeBlockTag(filter.fromBlock);
     const toBlock = normalizeBlockTag(filter.toBlock);
@@ -378,11 +374,7 @@ const resolveTtlMs = (methodIn: unknown, paramsIn: unknown): number => {
     const filter: LooseObject = isObj(params[0]) ? params[0] : {};
     const fromBlock = normalizeBlockTag(filter.fromBlock);
     const toBlock = normalizeBlockTag(filter.toBlock);
-    const isLatest =
-      fromBlock === 'latest' ||
-      fromBlock === 'pending' ||
-      toBlock === 'latest' ||
-      toBlock === 'pending';
+    const isLatest = fromBlock === 'latest' || fromBlock === 'pending' || toBlock === 'latest' || toBlock === 'pending';
     if (isLatest) return 2000;
     // Treat numeric ranges as immutable (hash includes range).
     if ((isNumericHex(fromBlock) || fromBlock === 'earliest') && isNumericHex(toBlock)) return 10 * 60 * 1000;
@@ -403,12 +395,7 @@ const DEDUPE_METHODS: ReadonlySet<string> = new Set([
   'eth_chainId',
 ]);
 
-const TTL_METHODS: ReadonlySet<string> = new Set([
-  'eth_call',
-  'eth_getLogs',
-  'eth_blockNumber',
-  'eth_chainId',
-]);
+const TTL_METHODS: ReadonlySet<string> = new Set(['eth_call', 'eth_getLogs', 'eth_blockNumber', 'eth_chainId']);
 
 const METHOD_CACHE_LIMITS: Readonly<Record<RpcCacheMethod, number>> = Object.freeze({
   eth_call: 800,
@@ -527,13 +514,12 @@ const getRpcRateLimitKey = (meta: ProviderSendMeta): string => {
   return `${Number(meta.chainId || 0) || 'unknown'}|${providerPart}`;
 };
 
-const buildRpcRateLimitBackoffError = (
-  meta: ProviderSendMeta,
-  state: RpcRateLimitState,
-): Error & LooseObject => {
+const buildRpcRateLimitBackoffError = (meta: ProviderSendMeta, state: RpcRateLimitState): Error & LooseObject => {
   const retryAfterMs = Math.max(0, Math.ceil(Number(state.nextRetryAt || 0) - nowMs()));
   const label = toStr(meta.providerLabel || meta.providerKey || meta.url || 'RPC endpoint').trim();
-  const err = new Error(`RPC endpoint is backing off after rate limiting (${label}); retry in ${Math.ceil(retryAfterMs / 1000)}s`) as Error & LooseObject;
+  const err = new Error(
+    `RPC endpoint is backing off after rate limiting (${label}); retry in ${Math.ceil(retryAfterMs / 1000)}s`,
+  ) as Error & LooseObject;
   err.name = 'RpcRateLimitBackoffError';
   err.code = 'CE_RPC_RATE_LIMIT_BACKOFF';
   err.status = 429;
@@ -561,7 +547,9 @@ const waitForActiveRateLimitProbe = async (key: string): Promise<void> => {
   if (remaining <= 0) return;
   await Promise.race([
     probe.promise,
-    new Promise<void>((resolve) => { setTimeout(resolve, remaining); }),
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, remaining);
+    }),
   ]);
 };
 
@@ -569,7 +557,10 @@ const trackRateLimitProbe = (key: string, run: Promise<unknown>): void => {
   if (!key) return;
   const cache = getGlobalCache();
   const probe: RpcRateLimitProbe = {
-    promise: run.then(() => undefined, () => undefined),
+    promise: run.then(
+      () => undefined,
+      () => undefined,
+    ),
     startedAt: nowMs(),
   };
   cache.rateLimitProbes.set(key, probe);
@@ -594,10 +585,7 @@ const recordRpcRateLimitError = (key: string, err: unknown): void => {
     RPC_RATE_LIMIT_MAX_BACKOFF_MS,
     RPC_RATE_LIMIT_BASE_BACKOFF_MS * Math.pow(2, Math.min(10, failures - 1)),
   );
-  const retryAfterMs = Math.min(
-    RPC_RATE_LIMIT_MAX_BACKOFF_MS,
-    Math.max(exponentialMs, getRetryAfterMsFromError(err)),
-  );
+  const retryAfterMs = Math.min(RPC_RATE_LIMIT_MAX_BACKOFF_MS, Math.max(exponentialMs, getRetryAfterMsFromError(err)));
   const now = nowMs();
   cache.rateLimits.set(key, {
     failures,
@@ -763,8 +751,8 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
     }
 
     const cacheOff = isCacheDisabled();
-    const ttlMs = (!cacheOff && wantsTtl) ? resolveTtlMs(method, params) : 0;
-    const shouldDedupe = (!cacheOff && wantsDedupe);
+    const ttlMs = !cacheOff && wantsTtl ? resolveTtlMs(method, params) : 0;
+    const shouldDedupe = !cacheOff && wantsDedupe;
     const isDebug = isRpcDebugEnabled();
 
     const keyPart = buildMethodKeyPart(method, params);
@@ -778,9 +766,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
     })();
 
     const stackSnippet = isDebug ? safeStackSnippet() : '';
-    const debugContext = isDebug
-      ? readProviderRpcDebugContext(method, params)
-      : { fnTag: null, scopeTag: null };
+    const debugContext = isDebug ? readProviderRpcDebugContext(method, params) : { fnTag: null, scopeTag: null };
     const t0 = nowMs();
 
     if (ttlMs > 0) {
@@ -934,7 +920,9 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
       value: sendMeta,
       enumerable: false,
     });
-  } catch (e) { log.warn('rpcReadCache: fallback', e); }
+  } catch (e) {
+    log.warn('rpcReadCache: fallback', e);
+  }
 
   return provider;
 };
@@ -947,7 +935,9 @@ export const __test__resetRpcReadCache = (): void => {
       g.__CE_RPC_READ_CACHE__.cacheByMethod = createCacheByMethod();
       g.__CE_RPC_READ_CACHE__.rateLimits = new Map<string, RpcRateLimitState>();
       g.__CE_RPC_READ_CACHE__.rateLimitProbes = new Map<string, RpcRateLimitProbe>();
-    } catch (e) { log.warn('rpcReadCache: fallback', e); }
+    } catch (e) {
+      log.warn('rpcReadCache: fallback', e);
+    }
   }
   if (evictionIntervalId != null) {
     clearInterval(evictionIntervalId);

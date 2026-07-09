@@ -75,9 +75,7 @@ describe('publicDeploymentConfig', () => {
       const { buildPublicRepoLatestReleaseAssetUrl } = require('./publicRepoMetadata.js');
 
       expect(config.WORKER_BUNDLE_URL).toContain('.js');
-      expect(config.WORKER_BUNDLE_URL).toBe(
-        buildPublicRepoLatestReleaseAssetUrl('sessionCorsWorker.bundle.js')
-      );
+      expect(config.WORKER_BUNDLE_URL).toBe(buildPublicRepoLatestReleaseAssetUrl('sessionCorsWorker.bundle.js'));
     });
   });
 

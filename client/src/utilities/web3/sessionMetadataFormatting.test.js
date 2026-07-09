@@ -4,26 +4,30 @@ import {
   resolveSbtSessionSlug,
   resolveSessionNameValue,
 } from './sessionMetadataFormatting.js';
-import {
-  normalizeSessionSlug,
-  resolveSessionByName,
-} from './sessionConfigResolvers.js';
+import { normalizeSessionSlug, resolveSessionByName } from './sessionConfigResolvers.js';
 
 jest.mock('./sessionConfigResolvers.js', () => ({
-  normalizeSessionSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
+  normalizeSessionSlug: jest.fn((value = '') =>
+    String(value || '')
+      .trim()
+      .toLowerCase(),
+  ),
   resolveSessionByName: jest.fn(() => null),
 }));
 
 describe('sessionMetadataFormatting helpers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    normalizeSessionSlug.mockImplementation((value = '') => String(value || '').trim().toLowerCase());
+    normalizeSessionSlug.mockImplementation((value = '') =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    );
     resolveSessionByName.mockReturnValue(null);
   });
 
   it('reads only the canonical sessionName field', () => {
-    expect(resolveSessionNameValue({ sessionName: '  Direct Name  ', groupName: 'Legacy Name' }))
-      .toBe('Direct Name');
+    expect(resolveSessionNameValue({ sessionName: '  Direct Name  ', groupName: 'Legacy Name' })).toBe('Direct Name');
     expect(resolveSessionNameValue({ groupName: 'Legacy Name' })).toBe('');
     expect(resolveSessionNameValue(null)).toBe('');
   });
@@ -39,11 +43,13 @@ describe('sessionMetadataFormatting helpers', () => {
   });
 
   it('respects an explicit false sessionSlugExplicit flag', () => {
-    expect(resolveSbtSessionSlug({
-      sessionSlug: '  Beta  ',
-      sessionSlugExplicit: false,
-      sessionName: 'Ignored Name',
-    })).toEqual({
+    expect(
+      resolveSbtSessionSlug({
+        sessionSlug: '  Beta  ',
+        sessionSlugExplicit: false,
+        sessionName: 'Ignored Name',
+      }),
+    ).toEqual({
       slug: 'beta',
       explicit: false,
     });

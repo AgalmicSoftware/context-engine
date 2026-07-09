@@ -45,13 +45,11 @@ export const LEGACY_SBT_ENCRYPTED_FIELD_KEYS = Object.freeze({
 
 export type SbtEncryptedFieldKey = keyof typeof LEGACY_SBT_ENCRYPTED_FIELD_KEYS;
 
-export const isSbtDisplayMetadataRecord = (value: unknown): value is SbtDisplayMetadataRecord => (
-  !!value && typeof value === 'object'
-);
+export const isSbtDisplayMetadataRecord = (value: unknown): value is SbtDisplayMetadataRecord =>
+  !!value && typeof value === 'object';
 
-const readSbtRecordValue = (value: unknown, key: string): unknown => (
-  isSbtDisplayMetadataRecord(value) ? value[key] : undefined
-);
+const readSbtRecordValue = (value: unknown, key: string): unknown =>
+  isSbtDisplayMetadataRecord(value) ? value[key] : undefined;
 
 export const getSbtDisplayAddressLower = (value: unknown): string => toStr(value).trim().toLowerCase();
 
@@ -70,9 +68,8 @@ export const buildSbtDisplayLabelMemoKey = ({
   addressLower?: unknown;
   preferredSlug?: unknown;
   chainId?: unknown;
-} = {}): string => (
-  `${toStr(addressLower).trim().toLowerCase()}|${normalizeSbtDisplaySlug(preferredSlug)}|${normalizeSbtDisplayChainId(chainId)}`
-);
+} = {}): string =>
+  `${toStr(addressLower).trim().toLowerCase()}|${normalizeSbtDisplaySlug(preferredSlug)}|${normalizeSbtDisplayChainId(chainId)}`;
 
 export const buildSbtDisplayRetryStateKey = ({
   addressLower = '',
@@ -82,13 +79,11 @@ export const buildSbtDisplayRetryStateKey = ({
   addressLower?: unknown;
   slug?: unknown;
   chainId?: unknown;
-} = {}): string => (
-  `${addressLower === undefined ? '' : String(addressLower)}|${normalizeSbtDisplaySlug(slug)}|${Number(chainId || 0) || 0}`
-);
+} = {}): string =>
+  `${addressLower === undefined ? '' : String(addressLower)}|${normalizeSbtDisplaySlug(slug)}|${Number(chainId || 0) || 0}`;
 
-export const buildSbtDisplayInflightLookupKey = (retryKey: unknown): string => (
-  `${retryKey === undefined ? '' : String(retryKey)}|lookup`
-);
+export const buildSbtDisplayInflightLookupKey = (retryKey: unknown): string =>
+  `${retryKey === undefined ? '' : String(retryKey)}|lookup`;
 
 export const resolveSbtDisplayRetryAllowed = (retryStateEntry: unknown, now: unknown): boolean => {
   const retryAt = Number(readSbtRecordValue(retryStateEntry, 'nextRetryAt') || 0);
@@ -103,17 +98,10 @@ export const shouldWriteSbtDisplayLabelMemoEntry = ({
   value?: unknown;
 } = {}): boolean => {
   const key = toStr(memoKey).trim();
-  return !!(
-    key &&
-    value &&
-    typeof value === 'object' &&
-    readSbtRecordValue(value, 'name')
-  );
+  return !!(key && value && typeof value === 'object' && readSbtRecordValue(value, 'name'));
 };
 
-export const shouldPersistSbtDisplayMetadata = (metadata: unknown): boolean => (
-  isSbtDisplayMetadataRecord(metadata)
-);
+export const shouldPersistSbtDisplayMetadata = (metadata: unknown): boolean => isSbtDisplayMetadataRecord(metadata);
 
 export const getLegacySbtEncryptedFieldKeys = (fieldKey: unknown): readonly string[] => {
   const key = toStr(fieldKey) as SbtEncryptedFieldKey;
@@ -126,14 +114,8 @@ export const isSbtMetadataFieldLocked = (info: unknown, fieldKey: unknown): bool
   const key = toStr(fieldKey);
   if (!key) return false;
   if (info[`${key}Locked`] === true) return true;
-  const encryptedFields = isSbtDisplayMetadataRecord(info.encryptedFields)
-    ? info.encryptedFields
-    : null;
-  if (
-    encryptedFields &&
-    Object.prototype.hasOwnProperty.call(encryptedFields, key) &&
-    encryptedFields[key]
-  ) {
+  const encryptedFields = isSbtDisplayMetadataRecord(info.encryptedFields) ? info.encryptedFields : null;
+  if (encryptedFields && Object.prototype.hasOwnProperty.call(encryptedFields, key) && encryptedFields[key]) {
     return true;
   }
   return getLegacySbtEncryptedFieldKeys(key).some((legacyKey) => !!info[legacyKey]);
@@ -149,12 +131,7 @@ export const getSbtMetadataDescriptionText = (info: unknown): string => {
 export const getSbtMetadataDisplayNameValue = (info: unknown): string => {
   if (!isSbtDisplayMetadataRecord(info)) return '';
   const nameLocked = isSbtMetadataFieldLocked(info, 'name');
-  const candidates = nameLocked
-    ? [info.name]
-    : [
-        info.name,
-        info.title,
-      ];
+  const candidates = nameLocked ? [info.name] : [info.name, info.title];
   if (!nameLocked) {
     candidates.push(info.symbol);
     candidates.push(info.contractName);
@@ -201,10 +178,7 @@ export const resolveSbtMetadataLookupDecision = (metadata: unknown): SbtMetadata
   };
 };
 
-export const resolveSbtCacheEntryFromBucket = (
-  bucket: unknown,
-  addressLower: unknown
-): unknown | null => {
+export const resolveSbtCacheEntryFromBucket = (bucket: unknown, addressLower: unknown): unknown | null => {
   if (!isSbtDisplayMetadataRecord(bucket)) return null;
   const sbtList = isSbtDisplayMetadataRecord(bucket.sbtList) ? bucket.sbtList : null;
   if (!sbtList) return null;
@@ -220,20 +194,19 @@ export const resolveSbtCacheEntryFromBucket = (
   return null;
 };
 
-export const resolveSbtCacheEntryChainId = (entry: unknown, netKey: unknown = ''): number => (
+export const resolveSbtCacheEntryChainId = (entry: unknown, netKey: unknown = ''): number =>
   normalizeSbtDisplayChainId(
     readSbtRecordValue(readSbtRecordValue(entry, 'sbtInfo'), 'chainID') ||
-    readSbtRecordValue(readSbtRecordValue(entry, 'sbtInfo'), 'chainId') ||
-    readSbtRecordValue(entry, 'chainID') ||
-    readSbtRecordValue(entry, 'chainId') ||
-    netKey
-  )
-);
+      readSbtRecordValue(readSbtRecordValue(entry, 'sbtInfo'), 'chainId') ||
+      readSbtRecordValue(entry, 'chainID') ||
+      readSbtRecordValue(entry, 'chainId') ||
+      netKey,
+  );
 
 export const resolveSbtDisplayNameFromCacheValue = (
   cacheValue: unknown,
   addressLower: unknown,
-  { expectedChainId = 0 }: { expectedChainId?: unknown } = {}
+  { expectedChainId = 0 }: { expectedChainId?: unknown } = {},
 ): SbtCacheNameHit | null => {
   if (!isSbtDisplayMetadataRecord(cacheValue)) return null;
   const expected = normalizeSbtDisplayChainId(expectedChainId);
@@ -273,9 +246,7 @@ export const resolveSbtDisplayCacheWriteNetKey = ({
 } = {}): string => {
   const cache = isSbtDisplayMetadataRecord(cacheObj) ? cacheObj : {};
   const infoChainId = normalizeSbtDisplayChainId(
-    readSbtRecordValue(info, 'chainID') ||
-    readSbtRecordValue(info, 'chainId') ||
-    0
+    readSbtRecordValue(info, 'chainID') || readSbtRecordValue(info, 'chainId') || 0,
   );
   const preferredChainId = normalizeSbtDisplayChainId(chainId);
   const preferredNetKey = preferredChainId > 0 ? String(preferredChainId) : '';
@@ -323,9 +294,7 @@ export const buildSbtDisplayCacheEntry = ({
 } = {}): Record<string, unknown> => {
   const existing = isSbtDisplayMetadataRecord(existingEntry) ? existingEntry : {};
   const existingInfoValue = readSbtRecordValue(existing, 'sbtInfo');
-  const existingInfo = isSbtDisplayMetadataRecord(existingInfoValue)
-    ? existingInfoValue
-    : {};
+  const existingInfo = isSbtDisplayMetadataRecord(existingInfoValue) ? existingInfoValue : {};
   const metadataRecord = isSbtDisplayMetadataRecord(metadata) ? metadata : {};
   return {
     ...existing,

@@ -61,9 +61,8 @@ export type OnePageSessionTelegramShellProps = {
   onSubmitAnswer: (question: TelegramAgentQuestion, answer: TelegramAnswerInput) => void | Promise<void>;
 };
 
-const normalizeResultsMode = (resultsViewMode: string): TelegramResultsMode => (
-  resultsViewMode === 'debateAtlas' ? 'debateAtlas' : 'polis'
-);
+const normalizeResultsMode = (resultsViewMode: string): TelegramResultsMode =>
+  resultsViewMode === 'debateAtlas' ? 'debateAtlas' : 'polis';
 
 const OnePageSessionTelegramShell = ({
   account,
@@ -118,7 +117,8 @@ const OnePageSessionTelegramShell = ({
           >
             <strong>Telegram-first session</strong>
             <span>
-              Sign in with a Context Engine agent token to view questions, groups, and participant-visible results in the web client.
+              Sign in with a Context Engine agent token to view questions, groups, and participant-visible results in
+              the web client.
             </span>
             <button
               type="button"
@@ -182,10 +182,7 @@ const OnePageSessionTelegramShell = ({
             />
           </Suspense>
           <Suspense fallback={<LazyFallback label="Loading Telegram groups..." minHeight="20vh" />}>
-            <TelegramBucketCards
-              cards={loadTelegramGroups(telegramClientEnvelope)}
-              onReconnect={onOpenLoginModal}
-            />
+            <TelegramBucketCards cards={loadTelegramGroups(telegramClientEnvelope)} onReconnect={onOpenLoginModal} />
           </Suspense>
           <section className={styles.telegramListPanel} data-testid="ce-session-telegram-results">
             <div className={styles.telegramListHeader}>
@@ -216,7 +213,8 @@ const OnePageSessionTelegramShell = ({
               <>
                 {telegramPolisDataset.synthesized ? (
                   <p className={styles.telegramReportApprox} data-testid="ce-session-telegram-report-approx">
-                    Approximate report: raw participant vectors are not available yet, so this view synthesizes a deterministic aggregate dataset.
+                    Approximate report: raw participant vectors are not available yet, so this view synthesizes a
+                    deterministic aggregate dataset.
                   </p>
                 ) : null}
                 <Suspense fallback={<LazyFallback label="Loading Polis report..." minHeight="20vh" />}>
@@ -252,10 +250,7 @@ const OnePageSessionTelegramShell = ({
             ) : null}
             {mode === 'debateAtlas' ? (
               <Suspense fallback={<LazyFallback label="Loading debate map prompt..." minHeight="20vh" />}>
-                <TelegramDebateMapPanel
-                  questions={telegramAgentQuestions}
-                  results={telegramAgentResults}
-                />
+                <TelegramDebateMapPanel questions={telegramAgentQuestions} results={telegramAgentResults} />
               </Suspense>
             ) : null}
           </section>

@@ -1,4 +1,4 @@
-import chainGateway from '../../utilities/web3/contractScripts.js';
+import chainGateway from '../../utilities/web3/chainGateway.js';
 
 export type SurveyResponseSubmitGateway = {
   submitResponses: (
@@ -7,7 +7,7 @@ export type SurveyResponseSubmitGateway = {
     questionResponses: unknown,
     surveyId: unknown,
     surveyResponse: unknown,
-    submissionGroupKey: unknown
+    submissionGroupKey: unknown,
   ) => Promise<unknown>;
 };
 
@@ -20,23 +20,15 @@ export type BindSurveyResponseSubmitPortArgs = {
 export const bindSurveyResponseSubmitPort = ({
   chainGateway: readChainGateway,
 }: BindSurveyResponseSubmitPortArgs): SurveyResponseSubmitPort => ({
-  submitResponses: (
-    provider,
-    questionIds,
-    questionResponses,
-    surveyId,
-    surveyResponse,
-    submissionGroupKey
-  ) => (
+  submitResponses: (provider, questionIds, questionResponses, surveyId, surveyResponse, submissionGroupKey) =>
     readChainGateway().submitResponses(
       provider,
       questionIds,
       questionResponses,
       surveyId,
       surveyResponse,
-      submissionGroupKey
-    )
-  ),
+      submissionGroupKey,
+    ),
 });
 
 export const surveyResponseSubmitPort = bindSurveyResponseSubmitPort({

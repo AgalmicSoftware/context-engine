@@ -1,6 +1,4 @@
-import {
-  resolveSbtPageActionFeedbackDisplayDescriptor,
-} from './sbtPageActionFeedbackDisplayState';
+import { resolveSbtPageActionFeedbackDisplayDescriptor } from './sbtPageActionFeedbackDisplayState';
 
 const mintTxHash = '0x1111111111111111111111111111111111111111111111111111111111111111';
 const burnTxHash = '0x2222222222222222222222222222222222222222222222222222222222222222';
@@ -115,18 +113,20 @@ describe('resolveSbtPageActionFeedbackDisplayDescriptor', () => {
   it('preserves an error transaction link descriptor independently from error visibility', () => {
     const getExplorerLink = jest.fn((hash: unknown) => `https://explorer.example.test/tx/${String(hash || '')}`);
 
-    expect(resolveSbtPageActionFeedbackDisplayDescriptor({
-      actionFeedbackState: {
-        showErrorTransactionHash: true,
-        showTransactionError: false,
-      },
-      errorMessage: 'wallet rejected transaction',
-      getExplorerLink,
-      labels,
-      transactionState: {
-        transactionHash: errorTxHash,
-      },
-    }).transactionError).toEqual({
+    expect(
+      resolveSbtPageActionFeedbackDisplayDescriptor({
+        actionFeedbackState: {
+          showErrorTransactionHash: true,
+          showTransactionError: false,
+        },
+        errorMessage: 'wallet rejected transaction',
+        getExplorerLink,
+        labels,
+        transactionState: {
+          transactionHash: errorTxHash,
+        },
+      }).transactionError,
+    ).toEqual({
       errorMessage: 'wallet rejected transaction',
       show: false,
       txLink: {

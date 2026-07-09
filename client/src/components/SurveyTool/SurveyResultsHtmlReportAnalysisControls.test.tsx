@@ -33,7 +33,7 @@ describe('SurveyResultsHtmlReportAnalysisControls', () => {
         htmlReportAnalysisError="Previous attempt failed."
         onGenerateAnalysis={onGenerateAnalysis}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByText(/4\s+responses,\s+2\s+participants,\s+3\s+questions\./)).toBeInTheDocument();
@@ -55,7 +55,7 @@ describe('SurveyResultsHtmlReportAnalysisControls', () => {
         generateAnalysisLabel="Generating Analysis Views..."
         onGenerateAnalysis={onGenerateAnalysis}
         styleMap={styleMap}
-      />
+      />,
     );
 
     const generateButton = screen.getByTestId('ce-surveyresults-html-report-generate-analysis');
@@ -74,7 +74,7 @@ describe('SurveyResultsHtmlReportAnalysisControls', () => {
         generateAnalysisLabel="Generate Analysis Views"
         onGenerateAnalysis={jest.fn()}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByText(/0\s+responses,\s+0\s+participants,\s+0\s+questions\./)).toBeInTheDocument();

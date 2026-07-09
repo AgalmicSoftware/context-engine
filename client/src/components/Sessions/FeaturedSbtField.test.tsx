@@ -28,18 +28,11 @@ jest.mock('../SBTs/SBTSelector', () => (props: MockSbtSelectorProps) => {
       data-default-featured={(props.defaultFeaturedSBTs || []).join(',')}
       data-selected={selectedSBTs.map((entry) => entry.address).join(',')}
     >
-      <button
-        type="button"
-        onClick={() => props.onAddSBT?.({ address: '0x222', name: 'Second SBT' })}
-      >
+      <button type="button" onClick={() => props.onAddSBT?.({ address: '0x222', name: 'Second SBT' })}>
         Add featured SBT
       </button>
       {selectedSBTs.map((entry) => (
-        <button
-          key={entry.address}
-          type="button"
-          onClick={() => props.onRemoveSBT?.(entry.address)}
-        >
+        <button key={entry.address} type="button" onClick={() => props.onRemoveSBT?.(entry.address)}>
           {`Remove ${entry.address}`}
         </button>
       ))}
@@ -47,26 +40,27 @@ jest.mock('../SBTs/SBTSelector', () => (props: MockSbtSelectorProps) => {
   );
 });
 
-const renderFeaturedSbtField = (props: Partial<FeaturedSbtFieldProps> = {}) => render(
-  <FeaturedSbtField
-    label="Default Groups"
-    tooltipControl={<span data-testid="featured-tooltip">?</span>}
-    createButtonLabel="Create Group"
-    onCreateSbt={() => {}}
-    selectedSBTs={[{ address: '0x111', name: 'First SBT' }]}
-    onSelectionsChange={() => {}}
-    onRemove={() => {}}
-    selectorLabel="Choose groups"
-    network={{ id: 11155420 }}
-    additionalSBTOptions={[]}
-    chainId={11155420}
-    sessionSlug="session-alpha"
-    sessionConfig={{ slug: 'session-alpha' }}
-    sbtCacheRevision={1}
-    ensureLightSbtUniverse={() => {}}
-    {...props}
-  />
-);
+const renderFeaturedSbtField = (props: Partial<FeaturedSbtFieldProps> = {}) =>
+  render(
+    <FeaturedSbtField
+      label="Default Groups"
+      tooltipControl={<span data-testid="featured-tooltip">?</span>}
+      createButtonLabel="Create Group"
+      onCreateSbt={() => {}}
+      selectedSBTs={[{ address: '0x111', name: 'First SBT' }]}
+      onSelectionsChange={() => {}}
+      onRemove={() => {}}
+      selectorLabel="Choose groups"
+      network={{ id: 11155420 }}
+      additionalSBTOptions={[]}
+      chainId={11155420}
+      sessionSlug="session-alpha"
+      sessionConfig={{ slug: 'session-alpha' }}
+      sbtCacheRevision={1}
+      ensureLightSbtUniverse={() => {}}
+      {...props}
+    />,
+  );
 
 describe('FeaturedSbtField', () => {
   it('renders the field header, create action, and selector surface', () => {
@@ -76,7 +70,7 @@ describe('FeaturedSbtField', () => {
     expect(screen.getByTestId('featured-tooltip')).toBeInTheDocument();
     expect(screen.getByTestId('mock-featured-sbt-selector')).toHaveAttribute(
       'data-selector-id',
-      'default-featured-sbts'
+      'default-featured-sbts',
     );
   });
 

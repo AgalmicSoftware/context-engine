@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import type { SbtListHelperItem } from './sbtListCardDetailsHelpers';
 import {
   buildSbtListRenderItemKey,
@@ -34,12 +34,11 @@ export type BuildSbtRenderBucketsOptions<T extends SbtListHelperItem = SbtListHe
 
 const readSbtSessionGroupLists = (
   slug: string,
-  getSessionListsForSlug: BuildSbtRenderBucketsOptions['getSessionListsForSlug']
-): SbtSessionGroupLists => (
+  getSessionListsForSlug: BuildSbtRenderBucketsOptions['getSessionListsForSlug'],
+): SbtSessionGroupLists =>
   isSbtListSyntheticNoSessionSlug(slug)
     ? { featured_SBTs_LIST: [], ignored_SBTs_LIST: [] }
-    : getSessionListsForSlug(slug)
-);
+    : getSessionListsForSlug(slug);
 
 export const buildSbtListRenderBuckets = <T extends SbtListHelperItem>({
   allSessionsMode,
@@ -65,14 +64,18 @@ export const buildSbtListRenderBuckets = <T extends SbtListHelperItem>({
   const featuredAllGroups: T[] = [];
   const activeSessionSlug = normalizeSessionSlug(listSlug || '');
   const selectedSessionSet = new Set<string>(
-    (Array.isArray(sectionSessionSlugs) ? sectionSessionSlugs : [])
-      .map((slug: unknown) => normalizeSessionSlug(slug || ''))
+    (Array.isArray(sectionSessionSlugs) ? sectionSessionSlugs : []).map((slug: unknown) =>
+      normalizeSessionSlug(slug || ''),
+    ),
   );
   const keyOptions = { allSessionsMode, listSlug, resolveSbtSessionSlug };
-  const sessionGroupListsBySlug = new Map<string, {
-    featuredSet: Set<string>;
-    ignoredSet: Set<string>;
-  }>();
+  const sessionGroupListsBySlug = new Map<
+    string,
+    {
+      featuredSet: Set<string>;
+      ignoredSet: Set<string>;
+    }
+  >();
   const getSessionGroupListSets = (slug: string) => {
     const cacheKey = String(slug || '');
     const cached = sessionGroupListsBySlug.get(cacheKey);
@@ -87,7 +90,7 @@ export const buildSbtListRenderBuckets = <T extends SbtListHelperItem>({
   };
 
   (Array.isArray(sbtList) ? sbtList : []).forEach((candidate: unknown) => {
-    const sbt = isSbtListHelperRecord(candidate) ? candidate as T : null;
+    const sbt = isSbtListHelperRecord(candidate) ? (candidate as T) : null;
     if (!sbt?.sbtInfo || !sbt?.sbtAddress) return;
     const addrLower = normalizeSbtListAddressLower(sbt.sbtAddress);
     if (!addrLower) return;

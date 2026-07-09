@@ -7,12 +7,15 @@ import type { SessionHeaderFieldProps } from '../SessionHeaderField';
 export type SessionHeaderUploadStatusTone = NonNullable<SessionHeaderFieldProps['sessionHeaderUploadStatusTone']>;
 export type SessionHeaderFileState = File | Blob;
 
-type SessionHeaderClipboardResult = {
-  kind?: string;
-  file?: SessionHeaderFileState | null;
-  text?: string;
-  error?: string;
-} | null | undefined;
+type SessionHeaderClipboardResult =
+  | {
+      kind?: string;
+      file?: SessionHeaderFileState | null;
+      text?: string;
+      error?: string;
+    }
+  | null
+  | undefined;
 
 type ReadSessionHeaderClipboard = (options: { fileNamePrefix: string }) => Promise<SessionHeaderClipboardResult>;
 
@@ -38,10 +41,7 @@ const useSessionHeaderPreview = ({
   const [sessionHeaderUploadStatusTone, setSessionHeaderUploadStatusTone] =
     useState<SessionHeaderUploadStatusTone>('default');
 
-  const setSessionHeaderStatus = useCallback((
-    text = '',
-    tone: SessionHeaderUploadStatusTone = 'default',
-  ) => {
+  const setSessionHeaderStatus = useCallback((text = '', tone: SessionHeaderUploadStatusTone = 'default') => {
     setSessionHeaderUploadStatus(text);
     setSessionHeaderUploadStatusTone(text ? tone : 'default');
   }, []);
@@ -50,11 +50,7 @@ const useSessionHeaderPreview = ({
     const canCreateObjectUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
     if (!sessionHeaderFile) {
       const currentPreviewUrl = sessionHeaderPreviewUrlRef.current;
-      if (
-        currentPreviewUrl &&
-        typeof URL !== 'undefined' &&
-        typeof URL.revokeObjectURL === 'function'
-      ) {
+      if (currentPreviewUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
         URL.revokeObjectURL(currentPreviewUrl);
       }
       setSessionHeaderPreviewUrl('');
@@ -106,10 +102,7 @@ const useSessionHeaderPreview = ({
       return;
     }
 
-    setSessionHeaderStatus(
-      clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
-      'error',
-    );
+    setSessionHeaderStatus(clipboardResult?.error || 'Clipboard does not contain a supported image or URL.', 'error');
   }, [readClipboard, setSessionHeaderStatus, updateDraftSessionHeader]);
 
   const handleClearSessionHeaderPreview = useCallback(() => {

@@ -15,14 +15,18 @@ import {
 
 describe('sbtFilterDisplayHelpers', () => {
   it('builds generic display and toggle state', () => {
-    expect(buildSbtFilterBooleanTogglePatch({
-      state: { showFilterOptions: true },
-      stateKey: 'showFilterOptions',
-    })).toEqual({ showFilterOptions: false });
-    expect(buildSbtFilterBooleanTogglePatch({
-      state: null,
-      stateKey: 'showAllSBTs',
-    })).toEqual({ showAllSBTs: true });
+    expect(
+      buildSbtFilterBooleanTogglePatch({
+        state: { showFilterOptions: true },
+        stateKey: 'showFilterOptions',
+      }),
+    ).toEqual({ showFilterOptions: false });
+    expect(
+      buildSbtFilterBooleanTogglePatch({
+        state: null,
+        stateKey: 'showAllSBTs',
+      }),
+    ).toEqual({ showAllSBTs: true });
     expect(hasSbtFilterFeaturedOptions(['0xA'])).toBe(true);
     expect(hasSbtFilterFeaturedOptions([])).toBe(false);
     expect(resolveSbtFilterButtonText({ mode: 'questions' })).toBe('Response Filter');
@@ -31,21 +35,25 @@ describe('sbtFilterDisplayHelpers', () => {
   });
 
   it('resolves filter panel and surface display state', () => {
-    expect(resolveSbtFilterOptionsVisibilityState({
-      autoExpand: true,
-      hideLoadingOverlay: false,
-      loading: true,
-      showFilterOptions: false,
-    })).toEqual({
+    expect(
+      resolveSbtFilterOptionsVisibilityState({
+        autoExpand: true,
+        hideLoadingOverlay: false,
+        loading: true,
+        showFilterOptions: false,
+      }),
+    ).toEqual({
       shouldRenderFilterOptions: true,
       shouldRenderLoadingOverlay: true,
     });
-    expect(resolveSbtFilterOptionsVisibilityState({
-      autoExpand: false,
-      hideLoadingOverlay: true,
-      loading: true,
-      showFilterOptions: true,
-    })).toEqual({
+    expect(
+      resolveSbtFilterOptionsVisibilityState({
+        autoExpand: false,
+        hideLoadingOverlay: true,
+        loading: true,
+        showFilterOptions: true,
+      }),
+    ).toEqual({
       shouldRenderFilterOptions: true,
       shouldRenderLoadingOverlay: false,
     });
@@ -66,11 +74,13 @@ describe('sbtFilterDisplayHelpers', () => {
         borderRadius: 'inherit',
       },
     });
-    expect(resolveSbtFilterPanelDisplayState({
-      autoExpand: false,
-      hasFeaturedSBTs: true,
-      hideUI: false,
-    })).toEqual({
+    expect(
+      resolveSbtFilterPanelDisplayState({
+        autoExpand: false,
+        hasFeaturedSBTs: true,
+        hideUI: false,
+      }),
+    ).toEqual({
       shouldRenderFilterToggleButton: true,
       shouldRenderHiddenRoot: false,
       shouldRenderShowAllCheckbox: true,
@@ -78,12 +88,14 @@ describe('sbtFilterDisplayHelpers', () => {
     expect(resolveSbtFilterSurfaceDisplayState({ buttonSurface: 'light' })).toEqual({
       shouldUseLightSurface: true,
     });
-    expect(buildSbtFilterSurfaceClassNames({
-      filterButtonLightClassName: 'filter-button-light',
-      filterOptionsBaseClassName: 'filter-options',
-      filterOptionsLightClassName: 'filter-options-light',
-      shouldUseLightSurface: true,
-    })).toEqual({
+    expect(
+      buildSbtFilterSurfaceClassNames({
+        filterButtonLightClassName: 'filter-button-light',
+        filterOptionsBaseClassName: 'filter-options',
+        filterOptionsLightClassName: 'filter-options-light',
+        shouldUseLightSurface: true,
+      }),
+    ).toEqual({
       filterButtonClassName: 'filter-button-light',
       filterOptionsClassName: 'filter-options filter-options-light',
     });
@@ -126,15 +138,17 @@ describe('sbtFilterDisplayHelpers', () => {
     expect(formatSbtFilterQuickChipAddress('')).toBe('');
     expect(formatSbtFilterQuickChipAddress('0x1234567890')).toBe('0x1234567890');
     expect(formatSbtFilterQuickChipAddress('0xABCDEF0000000000000000000000000000001234')).toBe('0xABCD...01234');
-    expect(buildSbtFilterQuickChipDisplayState({
-      address: ' 0xABCDEF0000000000000000000000000000001234 ',
-      filterKey: 'creator',
-      gateColors: ['#111111', '#222222'],
-      index: 2,
-      resolveDisplayLabel: () => 'Builder Badge',
-      selectedSet,
-      sessionSlug: 'edge',
-    })).toEqual({
+    expect(
+      buildSbtFilterQuickChipDisplayState({
+        address: ' 0xABCDEF0000000000000000000000000000001234 ',
+        filterKey: 'creator',
+        gateColors: ['#111111', '#222222'],
+        index: 2,
+        resolveDisplayLabel: () => 'Builder Badge',
+        selectedSet,
+        sessionSlug: 'edge',
+      }),
+    ).toEqual({
       address: '0xABCDEF0000000000000000000000000000001234',
       addressLower: '0xabcdef0000000000000000000000000000001234',
       chipLabel: 'Builder Badge',
@@ -145,16 +159,20 @@ describe('sbtFilterDisplayHelpers', () => {
       style: { backgroundColor: '#111111' },
       testId: 'ce-sbt-quick-chip-creator-0xABCDEF0000000000000000000000000000001234',
     });
-    expect(buildSbtFilterQuickChipDisplayState({
-      address: '0xABCDEF0000000000000000000000000000001234',
-      resolveDisplayLabel: () => {
-        throw new Error('lookup failed');
-      },
-    }).chipLabel).toBe('0xABCD...01234');
-    expect(buildSbtFilterQuickChipClassName({
-      baseClassName: 'quick-chip',
-      selectedClassName: 'quick-chip-selected',
-      shouldUseSelectedClass: true,
-    })).toBe('quick-chip quick-chip-selected');
+    expect(
+      buildSbtFilterQuickChipDisplayState({
+        address: '0xABCDEF0000000000000000000000000000001234',
+        resolveDisplayLabel: () => {
+          throw new Error('lookup failed');
+        },
+      }).chipLabel,
+    ).toBe('0xABCD...01234');
+    expect(
+      buildSbtFilterQuickChipClassName({
+        baseClassName: 'quick-chip',
+        selectedClassName: 'quick-chip-selected',
+        shouldUseSelectedClass: true,
+      }),
+    ).toBe('quick-chip quick-chip-selected');
   });
 });

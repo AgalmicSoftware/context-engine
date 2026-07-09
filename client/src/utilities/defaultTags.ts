@@ -6,7 +6,10 @@
  *
  * Key exports: normalizeTagList, parseDefaultTags, hasAnyTagOverlap, isDefaultTagRelevant, getRelevantDefaultTags
  */
-const normalizeTag = (raw: unknown): string => String(raw ?? '').trim().toLowerCase();
+const normalizeTag = (raw: unknown): string =>
+  String(raw ?? '')
+    .trim()
+    .toLowerCase();
 const normalizeCompact = (raw: unknown): string => normalizeTag(raw).replace(/[^a-z0-9]+/g, '');
 
 const toIterableArray = (value: unknown): unknown[] => {
@@ -16,7 +19,9 @@ const toIterableArray = (value: unknown): unknown[] => {
   try {
     const iterable = value as Iterable<unknown> & { [Symbol.iterator]?: unknown };
     if (typeof iterable[Symbol.iterator] === 'function') return Array.from(iterable);
-  } catch (e) { void e; /* fallback: non-iterable input. */ }
+  } catch (e) {
+    void e; /* fallback: non-iterable input. */
+  }
   return [];
 };
 
@@ -42,12 +47,18 @@ export const parseDefaultTags = (rawCsv: unknown): string[] => {
 
 const normalizeTagMatchSource = (value: unknown): string => {
   if (Array.isArray(value)) {
-    return value.map((entry) => String(entry ?? '').trim()).filter(Boolean).join(' ');
+    return value
+      .map((entry) => String(entry ?? '').trim())
+      .filter(Boolean)
+      .join(' ');
   }
   return String(value ?? '').trim();
 };
 
-const tokenizeText = (raw: unknown): string[] => normalizeTag(raw).split(/[^a-z0-9]+/).filter(Boolean);
+const tokenizeText = (raw: unknown): string[] =>
+  normalizeTag(raw)
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
 
 const hasCompactedTokenSequenceMatch = (compactTag: string, sourceTokens: string[] = []): boolean => {
   if (!compactTag || !Array.isArray(sourceTokens) || sourceTokens.length < 2) return false;
@@ -95,7 +106,9 @@ export const isDefaultTagRelevant = (textSource: unknown, tag: unknown): boolean
 export const getRelevantDefaultTags = (textSource: unknown, defaultTags: unknown): string[] => {
   const tags: string[] = Array.isArray(defaultTags)
     ? defaultTags
-    : (typeof defaultTags === 'string' ? defaultTags.split(',') : []);
+    : typeof defaultTags === 'string'
+      ? defaultTags.split(',')
+      : [];
   const seen = new Set<string>();
   const out: string[] = [];
 

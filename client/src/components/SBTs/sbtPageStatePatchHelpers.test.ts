@@ -44,21 +44,25 @@ import {
 
 describe('sbtPageStatePatchHelpers', () => {
   it('builds initial state and generic state patches', () => {
-    expect(buildSbtPageInitialState({ network: { id: 84532 } })).toEqual(expect.objectContaining({
-      sbtInfo: null,
-      userHasSBT: false,
-      network: { id: 84532 },
-      mintedAddresses: [],
-      burnedAddresses: [],
-      showStats: true,
-      loadingMintersBurners: true,
-      displayImageFallbackKey: '',
-      displayImageFallbackIndex: 0,
-    }));
-    expect(buildSbtPageBooleanTogglePatch({
-      state: { showStats: true },
-      stateKey: 'showStats',
-    })).toEqual({ showStats: false });
+    expect(buildSbtPageInitialState({ network: { id: 84532 } })).toEqual(
+      expect.objectContaining({
+        sbtInfo: null,
+        userHasSBT: false,
+        network: { id: 84532 },
+        mintedAddresses: [],
+        burnedAddresses: [],
+        showStats: true,
+        loadingMintersBurners: true,
+        displayImageFallbackKey: '',
+        displayImageFallbackIndex: 0,
+      }),
+    );
+    expect(
+      buildSbtPageBooleanTogglePatch({
+        state: { showStats: true },
+        stateKey: 'showStats',
+      }),
+    ).toEqual({ showStats: false });
     expect(buildSbtPageAddressChangeResetMintUiPatch({ sbtAddressChanged: false })).toBeNull();
     expect(buildSbtPageAddressChangeResetMintUiPatch({ sbtAddressChanged: true })).toEqual({
       showMiniPasswordInput: false,
@@ -82,10 +86,12 @@ describe('sbtPageStatePatchHelpers', () => {
       showPasswordAlert: false,
       error: null,
     });
-    expect(buildSbtPageNetworkUpdatePatch({
-      network: { id: 10 },
-      resetMintUiState: { mintStep: 0 },
-    })).toEqual({ mintStep: 0, network: { id: 10 } });
+    expect(
+      buildSbtPageNetworkUpdatePatch({
+        network: { id: 10 },
+        resetMintUiState: { mintStep: 0 },
+      }),
+    ).toEqual({ mintStep: 0, network: { id: 10 } });
     expect(buildSbtPageErrorPatch({ error: 'boom' })).toEqual({ error: 'boom' });
     expect(buildSbtPageCachedPasswordsPatch({ cachedPasswords: ['a'] })).toEqual({ cachedPasswords: ['a'] });
     expect(buildSbtPageBookmarkedPatch({ bookmarked: 'yes' })).toEqual({ bookmarked: false });
@@ -101,11 +107,13 @@ describe('sbtPageStatePatchHelpers', () => {
       lastTransactionType: 'mint',
       error: null,
     });
-    expect(buildSbtPageMintSuccessPatch({
-      clearManualPassword: true,
-      mintStep: 2,
-      txHash: '0xmint',
-    })).toEqual({
+    expect(
+      buildSbtPageMintSuccessPatch({
+        clearManualPassword: true,
+        mintStep: 2,
+        txHash: '0xmint',
+      }),
+    ).toEqual({
       mintingStatus: 'success',
       transactionHash: '0xmint',
       lastTransactionType: 'mint',
@@ -113,10 +121,12 @@ describe('sbtPageStatePatchHelpers', () => {
       mintStep: 2,
       manualPasswordInput: '',
     });
-    expect(buildSbtPageBurnFailurePatch({
-      error: 'burn failed',
-      resetBurnSearch: true,
-    })).toEqual({
+    expect(
+      buildSbtPageBurnFailurePatch({
+        error: 'burn failed',
+        resetBurnSearch: true,
+      }),
+    ).toEqual({
       error: 'burn failed',
       burningStatus: 'failure',
       burnSearchInput: '',
@@ -141,11 +151,13 @@ describe('sbtPageStatePatchHelpers', () => {
       burnSearchResult: null,
       burnSearchType: null,
     });
-    expect(buildSbtPageBurnSearchResultPatch({
-      address: '0xA',
-      resultType: 'holder',
-      tokenId: 1,
-    })).toEqual({
+    expect(
+      buildSbtPageBurnSearchResultPatch({
+        address: '0xA',
+        resultType: 'holder',
+        tokenId: 1,
+      }),
+    ).toEqual({
       burnSearchResult: {
         address: '0xA',
         tokenId: 1,
@@ -156,10 +168,12 @@ describe('sbtPageStatePatchHelpers', () => {
 
   it('builds loading, modal, and display data patches', () => {
     expect(buildSbtPageMintedModalVisibilityPatch({ visible: true })).toEqual({ showModal: true });
-    expect(buildSbtPageMintedModalInitialFilterPatch({
-      buildAddressListSignature: () => 'sig',
-      netHolders: ['0xA'],
-    })).toEqual({
+    expect(
+      buildSbtPageMintedModalInitialFilterPatch({
+        buildAddressListSignature: () => 'sig',
+        netHolders: ['0xA'],
+      }),
+    ).toEqual({
       filteredMintedUsers: ['0xA'],
       filteredMintedUsersSignature: 'sig',
       mintingAddressesFilterInitialized: true,
@@ -168,10 +182,12 @@ describe('sbtPageStatePatchHelpers', () => {
     expect(buildSbtPageLoadingMintersBurnersPatch({ loading: true })).toEqual({
       loadingMintersBurners: true,
     });
-    expect(buildSbtPageLoadInfoLoadingStartPatch({
-      hasExplicitSlug: true,
-      normalizedExplicitSlug: 'alpha',
-    })).toEqual({
+    expect(
+      buildSbtPageLoadInfoLoadingStartPatch({
+        hasExplicitSlug: true,
+        normalizedExplicitSlug: 'alpha',
+      }),
+    ).toEqual({
       loadingMintersBurners: true,
       logScanProgress: null,
       resolvedSessionSlug: 'alpha',
@@ -188,31 +204,39 @@ describe('sbtPageStatePatchHelpers', () => {
       relevantQuestions: ['What is the purpose of this Badge?', 'How can I use this Badge?'],
       relevantDocuments: ['Badge Whitepaper', 'Community Guidelines'],
     });
-    expect(buildSbtPageLogScanProgressPatch({
-      progress: { phase: 'scan' },
-      slug: 'alpha',
-    })).toEqual({ logScanProgress: { phase: 'scan', slug: 'alpha' } });
+    expect(
+      buildSbtPageLogScanProgressPatch({
+        progress: { phase: 'scan' },
+        slug: 'alpha',
+      }),
+    ).toEqual({ logScanProgress: { phase: 'scan', slug: 'alpha' } });
   });
 
   it('builds password and admin patches', () => {
-    expect(buildSbtPagePasswordMintInputPatch({
-      inputField: 'manualPasswordInput',
-      inputValue: 'claim-code',
-    })).toEqual({
+    expect(
+      buildSbtPagePasswordMintInputPatch({
+        inputField: 'manualPasswordInput',
+        inputValue: 'claim-code',
+      }),
+    ).toEqual({
       manualPasswordInput: 'claim-code',
       mintingStatus: 'idle',
       mintStep: 0,
       error: null,
     });
-    expect(buildSbtPagePasswordInputValuePatch({
-      inputField: 'unknown',
-      inputValue: null,
-    })).toEqual({ groupPasswordInput: '' });
-    expect(buildSbtPageMintPasswordPrefillPatch({
-      currentGroupPasswordInput: 'existing-group',
-      finalPasswordToUse: 'invite:raw',
-      invitePayload: { inviteCode: 'code-1' },
-    })).toEqual({
+    expect(
+      buildSbtPagePasswordInputValuePatch({
+        inputField: 'unknown',
+        inputValue: null,
+      }),
+    ).toEqual({ groupPasswordInput: '' });
+    expect(
+      buildSbtPageMintPasswordPrefillPatch({
+        currentGroupPasswordInput: 'existing-group',
+        finalPasswordToUse: 'invite:raw',
+        invitePayload: { inviteCode: 'code-1' },
+      }),
+    ).toEqual({
       mintPassword: '',
       manualPasswordInput: '',
       groupPasswordInput: 'code-1',
@@ -256,10 +280,12 @@ describe('sbtPageStatePatchHelpers', () => {
       docModalName: '',
       docModalBlobUrl: '',
     });
-    expect(buildSbtPageDocModalOpenPatch({
-      loading: true,
-      name: 'Decrypting',
-    })).toEqual({
+    expect(
+      buildSbtPageDocModalOpenPatch({
+        loading: true,
+        name: 'Decrypting',
+      }),
+    ).toEqual({
       docModalOpen: true,
       docModalLoading: true,
       docModalError: '',
@@ -267,12 +293,14 @@ describe('sbtPageStatePatchHelpers', () => {
       docModalName: 'Decrypting',
       docModalBlobUrl: '',
     });
-    expect(buildSbtPageDocModalContentPatch({
-      blobUrl: 'blob:doc',
-      content: null,
-      error: undefined,
-      name: 'Payload',
-    })).toEqual({
+    expect(
+      buildSbtPageDocModalContentPatch({
+        blobUrl: 'blob:doc',
+        content: null,
+        error: undefined,
+        name: 'Payload',
+      }),
+    ).toEqual({
       docModalLoading: false,
       docModalError: '',
       docModalContent: '',

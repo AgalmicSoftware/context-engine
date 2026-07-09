@@ -181,18 +181,18 @@ Decrypt:  Client ──▸ Lit SDK decrypt(payload) ──▸ Lit nodes verify S
 | SBT management | `components/SBTs/SBTsList.tsx`, `SBTPage.tsx`, `CreateSBTGroup.tsx` |
 | Gate components | `components/Gates/` |
 | **Utilities** | |
-| Web3 / contracts | `utilities/web3/contractScripts.js` (compat barrel), `contractScripts.impl.ts`, `contractHelpers.ts`, `contractEventListeners.ts`, `contractProfile.ts`, `sessionRegistry.ts` |
+| Web3 / contracts | `utilities/web3/chainGateway.ts`, `contractScripts.impl.ts`, `contractHelpers.ts`, `chainEventStreams.ts`, `profileChainReads.ts`, `sessionRegistry.ts` |
 | Wallet | `client/src/wallet/` passkey EOA wallet config, encrypted keystore, EIP-1193 provider, and soft-session worker |
-| Crypto / Lit | `utilities/crypto/litProtocol.js`, `cryptography.js`, `encryptedFields.js` |
-| Arweave | `utilities/arweave/arweaveScripts.js`, `arweaveUrls.js` |
-| Session helpers | `utilities/session/sessionNaming.js`, `sessionMetadata.js`, `resourceKeys.js`, `sessionModeProfile.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, `telegramSessionBackend.ts` |
-| Worker auth | `utilities/worker/workerAuth.js`, `corsProxy.js` |
-| Cache | `utilities/cache/cacheScripts.js`, `storageManager.js` |
-| AI | `utilities/ai/aiScripts.js`, `aiSettings.js` |
-| Survey logic | `utilities/survey/questionRouting.js`, `filterStateUtils.js`, `compareUsers.js` |
+| Crypto / Lit | `utilities/crypto/litProtocol.ts`, `cryptography.ts`, `encryptedFields.ts` |
+| Arweave | `utilities/arweave/arweaveClient.js`, `arweaveUrls.ts` |
+| Session helpers | `utilities/session/sessionNaming.ts`, `sessionMetadata.ts`, `resourceKeys.ts`, `sessionModeProfile.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, `telegramSessionBackend.ts` |
+| Worker auth | `utilities/worker/workerAuth.ts`, `corsProxy.ts` |
+| Cache | `utilities/cache/cacheScripts.ts`, `storageManager.ts` |
+| AI | `utilities/ai/aiClient.js`, `aiSettings.ts` |
+| Survey logic | `utilities/survey/questionRouting.ts`, `filterStateUtils.ts`, `compareUsers.ts` |
 | **Config / variables** | |
-| Feature flags | `variables/appConfig.js` |
-| Chain config | `variables/chains.js` |
+| Feature flags | `variables/appConfig.ts` (`appConfig.js` remains as a compatibility entry) |
+| Chain config | `variables/chains.ts` |
 | Session fallback | `variables/demo/demo_sessions.json` |
 
 ### Contracts (`contracts/`)
@@ -271,13 +271,14 @@ That ENS lookup is not implemented yet.
 │           │    { token, exp }              │                   │
 │           │                               │   Mint token:     │
 │           │    4. Authenticated requests   │   { sub, slug,    │
-│           │    Authorization: Bearer <tok> │     scopes, exp } │
-│           │──────────────────────────────▸│   HMAC-signed     │
+│           │    Authorization: Bearer <tok> │     scopes, exp,  │
+│           │──────────────────────────────▸│     jti }         │
+│           │                               │   HMAC + KV jti   │
 └──────────┘                               └───────────────────┘
 
 Token format: base64url(payload) + "." + base64url(hmac(payload))
 Scopes: ai, arweave, transcribe, faucet, fetch
-TTL: 24 hours
+TTL: 4 hours; the `authToken:{slug}:{sub}:{jti}` KV marker uses the same TTL
 ```
 
 ## Session Config Data Shape
@@ -332,4 +333,3 @@ SBTFactory                      ────────────────
 - [`docs/forking-wallet.md`](docs/forking-wallet.md) — fork-owned RP ID setup
 - [`docs/security-model.md`](docs/security-model.md) — embedded wallet security model
 - [`docs/local-chain.md`](docs/local-chain.md) — Local Anvil development
-- [`CLAUDE.md`](CLAUDE.md) — AI agent workflow and conventions

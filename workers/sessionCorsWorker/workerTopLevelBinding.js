@@ -2,9 +2,9 @@ import rpcDefaults from '../../client/src/variables/rpcDefaults.js';
 import {
   createWorkerRuntimeDepsWithWorkerDeps as createWorkerRuntimeDepsWithWorkerDepsBoundary,
 } from './workerRuntimeDepsBinding.js';
+import { resolveOpenAiTranscribeUrl } from './endpointConfig.js';
 
 const { getPathRpcUrl } = rpcDefaults;
-const OPENAI_TRANSCRIBE_URL = 'https://api.openai.com/v1/audio/transcriptions';
 
 const SESSION_REGISTRY_ABI = [
   'function getResourceGate(string,string) view returns (address[] sbtAddresses, uint256 chainId, uint8 mode, uint256 perMemberLimit)',
@@ -45,6 +45,7 @@ const ANONYMOUS_SCOPE_DISABLED_ERROR = 'Anonymous access denied: route scope dis
 
 export const createWorkerTopLevelRuntimeWithWorkerDeps = ({
   deps,
+  env,
 } = {}) => {
   const createWorkerRuntimeDepsWithWorkerDeps = (
     deps?.createWorkerRuntimeDepsWithWorkerDeps ||
@@ -62,7 +63,7 @@ export const createWorkerTopLevelRuntimeWithWorkerDeps = ({
       now: deps?.now,
     },
     constants: {
-      OPENAI_TRANSCRIBE_URL,
+      OPENAI_TRANSCRIBE_URL: resolveOpenAiTranscribeUrl({ env }),
       SESSION_REGISTRY_ABI,
       ERC721_ABI,
       SBT_ADMIN_ABI,

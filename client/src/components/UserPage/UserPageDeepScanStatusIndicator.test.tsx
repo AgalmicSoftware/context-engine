@@ -16,12 +16,7 @@ jest.mock('../Shared/CETooltip', () => ({
     target: string;
     trigger?: string;
   }) => (
-    <div
-      data-testid="deep-scan-tooltip"
-      data-autohide={String(autohide)}
-      data-target={target}
-      data-trigger={trigger}
-    >
+    <div data-testid="deep-scan-tooltip" data-autohide={String(autohide)} data-target={target} data-trigger={trigger}>
       {children}
     </div>
   ),
@@ -50,7 +45,7 @@ describe('UserPageDeepScanStatusIndicator', () => {
         targetId="deepScanTarget"
         titleText="Scanning profile"
         tooltipLines={['Fallback line']}
-      />
+      />,
     );
 
     const spinner = container.querySelector('#deepScanTarget') as SVGElement;
@@ -74,7 +69,7 @@ describe('UserPageDeepScanStatusIndicator', () => {
         targetId="deepScanTextTarget"
         titleText=""
         tooltipLines={['Checking cache', 'Scanning chain']}
-      />
+      />,
     );
 
     expect(screen.getByTestId('deep-scan-tooltip')).toHaveAttribute('data-target', 'deepScanTextTarget');
@@ -89,7 +84,7 @@ describe('UserPageDeepScanStatusIndicator', () => {
         targetId="deepScanEmptyTarget"
         titleText=""
         tooltipLines={[]}
-      />
+      />,
     );
 
     expect(screen.queryByTestId('deep-scan-tooltip')).toBeNull();

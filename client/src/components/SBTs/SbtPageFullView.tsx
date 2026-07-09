@@ -1,32 +1,21 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faArrowLeft,
-  faInfinity,
-  faQuestionCircle,
-} from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faInfinity, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 
 import contextEngineLoadingGif from '../../assets/img/context_engine_logo_animation.gif';
-import { getChainLabelById } from '../../utilities/web3/contractScripts.js';
+import { getChainLabelById } from '../../utilities/web3/chainGateway.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import CETooltip from '../Shared/CETooltip';
 import styles from './SBTPage.module.scss';
-import {
-  renderSbtPageDocModal,
-  renderSbtPageFullImageModal,
-  renderSbtPageHolderModal,
-} from './SBTPageModals';
+import { renderSbtPageDocModal, renderSbtPageFullImageModal, renderSbtPageHolderModal } from './SBTPageModals';
 import SbtPageActionsSection from './SbtPageActionsSection';
 import SbtPageAdminSection from './SbtPageAdminSection';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
 import SbtPageMoreDetailsSection from './SbtPageMoreDetailsSection';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import type { SbtPageFullActionSurfaces } from './SbtPageFullActionButtons';
-import type {
-  SbtPageHolderCountStatus,
-  SbtPageHolderScanProgressDisplay,
-} from './SbtPageHolderStatusDisplay';
+import type { SbtPageHolderCountStatus, SbtPageHolderScanProgressDisplay } from './SbtPageHolderStatusDisplay';
 import {
   buildSbtPageSectionHeaderClassName,
   resolveSbtPageActionFeedbackState,
@@ -133,9 +122,7 @@ type RenderSbtPageFullViewArgs = {
   networkId?: unknown;
   provider?: unknown;
   relevantInfo: React.ReactNode;
-  resolveScanProgressSessionLabel?: (
-    progress: { sessionLabel?: string; sessionSlug?: string } | null
-  ) => unknown;
+  resolveScanProgressSessionLabel?: (progress: { sessionLabel?: string; sessionSlug?: string } | null) => unknown;
   sbtAddressForDisplay: string;
   sbtCacheRevision?: unknown;
   sbtInfo: SbtPageInfoForFullView | null;
@@ -148,17 +135,9 @@ type RenderSbtPageFullViewArgs = {
   workerScanPending?: unknown;
 };
 
-export const renderSbtPageFullViewLoading = ({
-  sbtLabel,
-}: {
-  sbtLabel: string;
-}): React.ReactElement => (
+export const renderSbtPageFullViewLoading = ({ sbtLabel }: { sbtLabel: string }): React.ReactElement => (
   <div className={styles.loadingPage}>
-    <img
-      src={contextEngineLoadingGif}
-      alt="Context Engine loading"
-      className={styles.loadingLogo}
-    />
+    <img src={contextEngineLoadingGif} alt="Context Engine loading" className={styles.loadingLogo} />
     <div className={styles.loadingTitle}>{`Loading ${sbtLabel} Details`}</div>
   </div>
 );
@@ -216,7 +195,9 @@ const renderSbtPageMintEndDisplay = ({
     return (
       <p>
         <span className={styles.label}>{`${mintingLabel} ends:`}</span>
-        <span><FontAwesomeIcon icon={faInfinity} /> Never</span>
+        <span>
+          <FontAwesomeIcon icon={faInfinity} /> Never
+        </span>
       </p>
     );
   }

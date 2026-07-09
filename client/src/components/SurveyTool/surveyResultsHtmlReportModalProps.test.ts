@@ -8,41 +8,42 @@ const styleMap = {
   htmlReportModal: 'htmlReportModal',
 };
 
-const buildSnapshot = () => buildRedactedSessionResultsSnapshot({
-  exportedAt: '2026-06-08T12:00:00.000Z',
-  session: {
-    chainId: 11155420,
-    name: 'Report Session',
-    slug: 'report-session',
-  },
-  sections: {
-    argumentMap: {
-      available: false,
-      debates: [],
+const buildSnapshot = () =>
+  buildRedactedSessionResultsSnapshot({
+    exportedAt: '2026-06-08T12:00:00.000Z',
+    session: {
+      chainId: 11155420,
+      name: 'Report Session',
+      slug: 'report-session',
     },
-    atlas: {
-      available: true,
-      nodes: [{ id: 'node-1' }],
+    sections: {
+      argumentMap: {
+        available: false,
+        debates: [],
+      },
+      atlas: {
+        available: true,
+        nodes: [{ id: 'node-1' }],
+      },
+      report: {
+        available: true,
+        questions: [
+          {
+            id: 'q1',
+            options: [],
+            prompt: 'Question one',
+            responseCount: 2,
+            tags: [],
+            type: 'freeform',
+          },
+        ],
+      },
+      riskMatrix: {
+        available: false,
+        comments: [],
+      },
     },
-    report: {
-      available: true,
-      questions: [
-        {
-          id: 'q1',
-          options: [],
-          prompt: 'Question one',
-          responseCount: 2,
-          tags: [],
-          type: 'freeform',
-        },
-      ],
-    },
-    riskMatrix: {
-      available: false,
-      comments: [],
-    },
-  },
-});
+  });
 
 describe('buildSurveyResultsHtmlReportModalProps', () => {
   it('combines modal display descriptors with named execution props without invoking them', () => {
@@ -89,19 +90,21 @@ describe('buildSurveyResultsHtmlReportModalProps', () => {
       styleMap,
     });
 
-    expect(props).toEqual(expect.objectContaining({
-      analysisGenerating: false,
-      analysisProgress: '42',
-      canDownload: false,
-      exportFormat: SESSION_RESULTS_EXPORT_FORMAT_PDF,
-      htmlReportAnalysisError: 'Needs generated analysis.',
-      isAuthorized: true,
-      isDemoMode: true,
-      isDemoSession: true,
-      isOpen: true,
-      needsAnalysisGeneration: true,
-      styleMap,
-    }));
+    expect(props).toEqual(
+      expect.objectContaining({
+        analysisGenerating: false,
+        analysisProgress: '42',
+        canDownload: false,
+        exportFormat: SESSION_RESULTS_EXPORT_FORMAT_PDF,
+        htmlReportAnalysisError: 'Needs generated analysis.',
+        isAuthorized: true,
+        isDemoMode: true,
+        isDemoSession: true,
+        isOpen: true,
+        needsAnalysisGeneration: true,
+        styleMap,
+      }),
+    );
     expect(props.sectionRows).toEqual([
       { available: true, key: 'report', label: 'Report', reason: 'Ready' },
       { available: false, key: 'argumentMap', label: 'Argument Map', reason: 'Needs analysis' },

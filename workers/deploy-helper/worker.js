@@ -96,7 +96,7 @@ export default {
       }
       const apiToken = toStr(body?.apiToken || body?.token).trim();
       if (!apiToken) return json({ error: 'Missing apiToken.' }, 400, headers);
-      const accountLookup = await lookupCloudflareAccount({ apiToken });
+      const accountLookup = await lookupCloudflareAccount({ apiToken, env });
       if (!accountLookup.ok) {
         return json({
           error: accountLookup.error,

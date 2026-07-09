@@ -17,17 +17,9 @@ import {
   type SurveyResultsAggregateRow,
   type SurveyResultsSurveyResponsePayload,
 } from './surveyResultsHelpers.js';
-import {
-  normalizeSurveyResultsQuestionModeCache,
-} from './surveyResultsQuestionModeCacheNormalizationController';
-import {
-  resolveNetBucketReadOnly,
-  unifyAggregatorWithAllQuestionIDs,
-} from './surveyResultsRuntimeHelpers';
-import type {
-  SurveyResultsProps,
-  SurveyResultsState,
-} from './SurveyResults';
+import { normalizeSurveyResultsQuestionModeCache } from './surveyResultsQuestionModeCacheNormalizationController';
+import { resolveNetBucketReadOnly, unifyAggregatorWithAllQuestionIDs } from './surveyResultsRuntimeHelpers';
+import type { SurveyResultsProps, SurveyResultsState } from './SurveyResults';
 import type {
   SurveyResultsQuestionResponsesByQuestion,
   SurveyResultsQuestionResponsesByResponder,
@@ -39,11 +31,14 @@ type SurveyResultsRecord = Record<string, unknown>;
 type SurveyResultsSurveyBucketRecord = SurveyResultsRecord & {
   surveyResponses?: Record<string, SurveyResultsRecord>;
   surveyResponsesLatestBlock?: unknown;
-  surveys?: Record<string, SurveyResultsRecord & {
-    documentURLs?: unknown;
-    questionIDs?: unknown;
-    title?: string;
-  }>;
+  surveys?: Record<
+    string,
+    SurveyResultsRecord & {
+      documentURLs?: unknown;
+      questionIDs?: unknown;
+      title?: string;
+    }
+  >;
   surveysLatestBlock?: unknown;
 };
 
@@ -94,15 +89,11 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   if (!surveysCache || Object.keys(surveysCache).length === 0) {
     surveysCache = ((await ports.readSurveyCache(slug)) || {}) as SurveyResultsRecord;
   }
-  const hasSurveyNetCache = !!(
-    surveysCache &&
-    typeof surveysCache === 'object' &&
-    surveysCache[netIdStr] != null
-  );
+  const hasSurveyNetCache = !!(surveysCache && typeof surveysCache === 'object' && surveysCache[netIdStr] != null);
   const surveyNetCache = resolveNetBucketReadOnly(
     surveysCache,
     netIdStr,
-    null
+    null,
   ) as SurveyResultsSurveyBucketRecord | null;
 
   if (!hasSurveyNetCache || !surveyNetCache) {
@@ -126,14 +117,12 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   const allResponders = Object.keys(srMap);
   const networkQuestions = ports.getNetworkQuestionsForCurrentContext();
   const questionIDsInSurvey: string[] = Array.isArray(surveyNetCache?.surveys?.[currentSurveyID]?.questionIDs)
-    ? surveyNetCache.surveys[currentSurveyID].questionIDs as string[]
+    ? (surveyNetCache.surveys[currentSurveyID].questionIDs as string[])
     : [];
-  const questionIdsSignature = questionIDsInSurvey
-    .map((qid) => String(qid || '').toLowerCase())
-    .join('|');
+  const questionIdsSignature = questionIDsInSurvey.map((qid) => String(qid || '').toLowerCase()).join('|');
   const surveyResponsesLatestBlock = readSurveyResultsLatestBlock(
     surveyNetCache?.surveyResponsesLatestBlock,
-    currentSurveyID
+    currentSurveyID,
   );
   const surveyDefinitionLatestBlock = normalizeSurveyResultsBlockNumber(surveyNetCache?.surveysLatestBlock);
   const surveyCacheChangeNonce = Number(instance._surveysCacheChangeNonce || 0);
@@ -151,10 +140,7 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
     questionIdsSignature,
   ].join('::');
   const respondersSignature = buildSurveyRespondersSignature(srMap);
-  const sourceSignature = [
-    coarseSourceSignature,
-    respondersSignature,
-  ].join('::');
+  const sourceSignature = [coarseSourceSignature, respondersSignature].join('::');
   if (instance._surveyModeSourceSignature === sourceSignature) {
     instance._surveyModeSourceCoarseSignature = coarseSourceSignature;
     instance._surveyModeSourcePayloadRefSignature = payloadRefSignature;
@@ -171,7 +157,7 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   allResponders.forEach((responder) => {
     const responderLower = String(responder || '').toLowerCase();
     const rawResp = normalizeSurveyResponsePayloadByQuestionId(
-      ports.parseResponse(srMap[responder])
+      ports.parseResponse(srMap[responder]),
     ) as SurveyResultsSurveyResponsePayload | null;
     if (!hasAnyCountableSurveyAnswer(rawResp, networkQuestions)) return;
     rawResponses.push({
@@ -193,10 +179,7 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
     });
   });
   const totalRespondersCount = rawResponses.length;
-  const finalAggregator = unifyAggregatorWithAllQuestionIDs(
-    aggregatorMap,
-    questionIDsInSurvey
-  );
+  const finalAggregator = unifyAggregatorWithAllQuestionIDs(aggregatorMap, questionIDsInSurvey);
   const totalQCount = Object.keys(finalAggregator).length;
 
   let foundTitle = '';
@@ -204,21 +187,23 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   if (surveyNetCache?.surveys?.[currentSurveyID]) {
     foundTitle = surveyNetCache.surveys[currentSurveyID].title || '';
     foundDocURLs = Array.isArray(surveyNetCache.surveys[currentSurveyID].documentURLs)
-      ? surveyNetCache.surveys[currentSurveyID].documentURLs as string[]
+      ? (surveyNetCache.surveys[currentSurveyID].documentURLs as string[])
       : [];
   }
 
-  ports.applyStatePatch(buildSurveyResultsSurveyModeHydratedPatch({
-    aggregateQuestionResponses: finalAggregator,
-    filteredResponsesCount: rawResponses.length,
-    responses: rawResponses,
-    sbtFilteredAggregatorQuestionResponses: finalAggregator,
-    sbtFilteredResponses: rawResponses,
-    surveyDocumentURLs: foundDocURLs,
-    surveyTitle: foundTitle,
-    totalQuestionsCount: totalQCount,
-    totalResponsesCount: totalRespondersCount,
-  }));
+  ports.applyStatePatch(
+    buildSurveyResultsSurveyModeHydratedPatch({
+      aggregateQuestionResponses: finalAggregator,
+      filteredResponsesCount: rawResponses.length,
+      responses: rawResponses,
+      sbtFilteredAggregatorQuestionResponses: finalAggregator,
+      sbtFilteredResponses: rawResponses,
+      surveyDocumentURLs: foundDocURLs,
+      surveyTitle: foundTitle,
+      totalQuestionsCount: totalQCount,
+      totalResponsesCount: totalRespondersCount,
+    }),
+  );
 };
 
 export const fetchSurveyResultsQuestionModeResponses = async ({
@@ -232,11 +217,10 @@ export const fetchSurveyResultsQuestionModeResponses = async ({
   const strictQuestionResponseSlug = isDemoSessionSlug(effectiveSlug) ? effectiveSlug : '';
   const normalizedQuestionModeCache = normalizeSurveyResultsQuestionModeCache({
     ports: {
-      isDemoPolisFixtureResponse: (responseData) => (
+      isDemoPolisFixtureResponse: (responseData) =>
         !!responseData &&
         typeof responseData === 'object' &&
-        (responseData as SurveyResultsRecord).source === 'demo-polis-data'
-      ),
+        (responseData as SurveyResultsRecord).source === 'demo-polis-data',
       isResponseAllowedForSessionSlug,
       parseResponse: ports.parseResponse,
     },
@@ -272,10 +256,7 @@ export const fetchSurveyResultsQuestionModeResponses = async ({
   });
 
   const knownQIDs = Object.keys(allQuestions);
-  const finalAggregator = unifyAggregatorWithAllQuestionIDs(
-    aggregatorMap as Record<string, unknown[]>,
-    knownQIDs
-  );
+  const finalAggregator = unifyAggregatorWithAllQuestionIDs(aggregatorMap as Record<string, unknown[]>, knownQIDs);
   const totalQ = Object.keys(finalAggregator).length;
   const totalResponseCount = countQuestionModeResponses(finalAggregator, allQuestions);
   const initialFilteredCount = totalResponseCount;
@@ -299,15 +280,17 @@ export const fetchSurveyResultsQuestionModeResponses = async ({
         } catch (e) {
           ports.logWarn('SurveyResults: fallback', e);
         }
-      }
+      },
     );
   } else {
-    ports.applyStatePatch(buildSurveyResultsUnfilteredQuestionModeHydratedPatch({
-      aggregatorQuestionResponses: finalAggregator,
-      filteredResponsesCount: initialFilteredCount,
-      questionResponses: partialQR,
-      totalQuestionsCount: totalQ,
-      totalResponsesCount: totalResponseCount,
-    }));
+    ports.applyStatePatch(
+      buildSurveyResultsUnfilteredQuestionModeHydratedPatch({
+        aggregatorQuestionResponses: finalAggregator,
+        filteredResponsesCount: initialFilteredCount,
+        questionResponses: partialQR,
+        totalQuestionsCount: totalQ,
+        totalResponsesCount: totalResponseCount,
+      }),
+    );
   }
 };

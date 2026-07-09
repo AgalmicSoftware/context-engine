@@ -1,6 +1,4 @@
-import {
-  createSurveyResultsQueuedRefreshRuntime,
-} from './surveyResultsQueuedRefreshRuntime';
+import { createSurveyResultsQueuedRefreshRuntime } from './surveyResultsQueuedRefreshRuntime';
 
 describe('surveyResultsQueuedRefreshRuntime', () => {
   it('coalesces queued reasons into one measured refresh after the microtask', () => {
@@ -25,10 +23,7 @@ describe('surveyResultsQueuedRefreshRuntime', () => {
 
     microtasks.shift()?.();
 
-    expect(measureFlush).toHaveBeenCalledWith(
-      'ce.surveyResults.flushQueuedResultsRefresh',
-      expect.any(Function)
-    );
+    expect(measureFlush).toHaveBeenCalledWith('ce.surveyResults.flushQueuedResultsRefresh', expect.any(Function));
     expect(requestFetchResponses).toHaveBeenCalledTimes(1);
     expect(runtime.getQueuedReasons()).toEqual([]);
     expect(runtime.isMicrotaskScheduled()).toBe(false);

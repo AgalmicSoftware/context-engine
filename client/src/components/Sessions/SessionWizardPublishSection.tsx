@@ -1,13 +1,8 @@
 import React from 'react';
 
-import SessionPublishSummary, {
-  type SessionPublishSummaryProps,
-} from './SessionPublishSummary';
+import SessionPublishSummary, { type SessionPublishSummaryProps } from './SessionPublishSummary';
 
-export type SessionWizardPublishSectionProps = Omit<
-  SessionPublishSummaryProps,
-  'isCollapsed' | 'onToggleCollapsed'
-> & {
+export type SessionWizardPublishSectionProps = Omit<SessionPublishSummaryProps, 'isCollapsed' | 'onToggleCollapsed'> & {
   isCollapsed: boolean;
   isNormalMode: boolean;
   onToggleCollapsed: () => void;
@@ -21,13 +16,7 @@ const SessionWizardPublishSection = ({
 }: SessionWizardPublishSectionProps): React.ReactElement | null => {
   if (isNormalMode && isCollapsed) return null;
 
-  return (
-    <SessionPublishSummary
-      {...summaryProps}
-      isCollapsed={isCollapsed}
-      onToggleCollapsed={onToggleCollapsed}
-    />
-  );
+  return <SessionPublishSummary {...summaryProps} isCollapsed={isCollapsed} onToggleCollapsed={onToggleCollapsed} />;
 };
 
 export default SessionWizardPublishSection;

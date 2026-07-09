@@ -24,15 +24,11 @@ export type SbtPageActionEventLike = {
   preventDefault?: () => void;
 };
 
-export type SbtPageActionDispatch<Args extends readonly unknown[] = readonly unknown[]> = (
-  ...args: Args
-) => unknown;
+export type SbtPageActionDispatch<Args extends readonly unknown[] = readonly unknown[]> = (...args: Args) => unknown;
 
 export type SbtPageNoArgActionDispatch = () => unknown;
 
-export type SbtPageMintActionControllerPorts<
-  MintArgs extends readonly unknown[] = readonly unknown[]
-> = {
+export type SbtPageMintActionControllerPorts<MintArgs extends readonly unknown[] = readonly unknown[]> = {
   dispatchMint?: SbtPageActionDispatch<MintArgs>;
   openMintTransaction?: () => unknown;
 };
@@ -49,7 +45,7 @@ export type SbtPageMiniMintActionControllerPorts<
   MiniMintArgs extends readonly unknown[] = readonly unknown[],
   GroupPasswordMintArgs extends readonly unknown[] = readonly unknown[],
   InviteCodeMintArgs extends readonly unknown[] = readonly unknown[],
-  ShowPasswordInputArgs extends readonly unknown[] = readonly unknown[]
+  ShowPasswordInputArgs extends readonly unknown[] = readonly unknown[],
 > = {
   dispatchGroupPasswordMint?: SbtPageActionDispatch<GroupPasswordMintArgs>;
   dispatchInviteCodeMint?: SbtPageActionDispatch<InviteCodeMintArgs>;
@@ -58,16 +54,9 @@ export type SbtPageMiniMintActionControllerPorts<
 };
 
 export type SbtPageMiniCardActionControllerPorts = SbtPageMiniBurnActionControllerPorts &
-  SbtPageMiniMintActionControllerPorts<
-    [],
-    [],
-    [unknown],
-    []
-  >;
+  SbtPageMiniMintActionControllerPorts<[], [], [unknown], []>;
 
-export type RunSbtPageMintActionControllerArgs<
-  MintArgs extends readonly unknown[] = readonly unknown[]
-> = {
+export type RunSbtPageMintActionControllerArgs<MintArgs extends readonly unknown[] = readonly unknown[]> = {
   canOpenMintTx?: boolean;
   disabled?: boolean;
   event?: SbtPageActionEventLike | null;
@@ -95,7 +84,7 @@ export type RunSbtPageMiniMintActionControllerArgs<
   MiniMintArgs extends readonly unknown[] = readonly unknown[],
   GroupPasswordMintArgs extends readonly unknown[] = readonly unknown[],
   InviteCodeMintArgs extends readonly unknown[] = readonly unknown[],
-  ShowPasswordInputArgs extends readonly unknown[] = readonly unknown[]
+  ShowPasswordInputArgs extends readonly unknown[] = readonly unknown[],
 > = {
   disabled?: boolean;
   event?: SbtPageActionEventLike | null;
@@ -133,9 +122,7 @@ export type SbtPageMiniCardActionHandlers = {
   onShowMiniPasswordInput: (event?: SbtPageActionEventLike | null) => SbtPageActionControllerResult;
 };
 
-const isBlocked = (blockedReason: unknown): boolean => (
-  !!blockedReason && blockedReason !== 'none'
-);
+const isBlocked = (blockedReason: unknown): boolean => !!blockedReason && blockedReason !== 'none';
 
 const preventDefault = (event?: SbtPageActionEventLike | null): void => {
   if (typeof event?.preventDefault === 'function') {
@@ -143,9 +130,7 @@ const preventDefault = (event?: SbtPageActionEventLike | null): void => {
   }
 };
 
-export const runSbtPageMintActionController = <
-  MintArgs extends readonly unknown[] = readonly unknown[]
->({
+export const runSbtPageMintActionController = <MintArgs extends readonly unknown[] = readonly unknown[]>({
   canOpenMintTx = false,
   disabled = false,
   event = null,
@@ -251,7 +236,7 @@ export const runSbtPageMiniMintActionController = <
   MiniMintArgs extends readonly unknown[] = readonly unknown[],
   GroupPasswordMintArgs extends readonly unknown[] = readonly unknown[],
   InviteCodeMintArgs extends readonly unknown[] = readonly unknown[],
-  ShowPasswordInputArgs extends readonly unknown[] = readonly unknown[]
+  ShowPasswordInputArgs extends readonly unknown[] = readonly unknown[],
 >({
   disabled = false,
   event = null,
@@ -403,31 +388,36 @@ export const buildSbtPageMiniCardActionHandlers = ({
   miniMintActionPlan = null,
   ports = {},
 }: BuildSbtPageMiniCardActionHandlersArgs = {}): SbtPageMiniCardActionHandlers => ({
-  onClaimWithInviteCode: (event = null) => runSbtPageMiniMintActionController({
-    event,
-    inviteCodeMintArgs: [groupPasswordInput],
-    plan: miniMintActionPlan,
-    ports,
-  }),
-  onMiniBurn: (event = null) => runSbtPageMiniBurnActionController({
-    disabled: miniBurnDisabled,
-    event,
-    plan: miniBurnActionPlan,
-    ports,
-  }),
-  onMiniMint: (event = null) => runSbtPageMiniMintActionController({
-    event,
-    plan: miniMintActionPlan,
-    ports,
-  }),
-  onMintUnlimitedWithGroupPassword: (event = null) => runSbtPageMiniMintActionController({
-    event,
-    plan: miniMintActionPlan,
-    ports,
-  }),
-  onShowMiniPasswordInput: (event = null) => runSbtPageMiniMintActionController({
-    event,
-    plan: miniMintActionPlan,
-    ports,
-  }),
+  onClaimWithInviteCode: (event = null) =>
+    runSbtPageMiniMintActionController({
+      event,
+      inviteCodeMintArgs: [groupPasswordInput],
+      plan: miniMintActionPlan,
+      ports,
+    }),
+  onMiniBurn: (event = null) =>
+    runSbtPageMiniBurnActionController({
+      disabled: miniBurnDisabled,
+      event,
+      plan: miniBurnActionPlan,
+      ports,
+    }),
+  onMiniMint: (event = null) =>
+    runSbtPageMiniMintActionController({
+      event,
+      plan: miniMintActionPlan,
+      ports,
+    }),
+  onMintUnlimitedWithGroupPassword: (event = null) =>
+    runSbtPageMiniMintActionController({
+      event,
+      plan: miniMintActionPlan,
+      ports,
+    }),
+  onShowMiniPasswordInput: (event = null) =>
+    runSbtPageMiniMintActionController({
+      event,
+      plan: miniMintActionPlan,
+      ports,
+    }),
 });

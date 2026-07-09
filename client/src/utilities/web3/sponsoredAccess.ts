@@ -6,7 +6,7 @@
  *
  * Key exports: checkSponsoredAccess, getDefaultSponsoredGate, getGateSbtAddresses, SPONSORED_GATE_STATES, normalizeGateMode
  */
-import contractScripts from './contractScripts.js';
+import contractScripts from './chainGateway.js';
 import {
   SPONSORED_GATE_STATES,
   getDefaultSponsoredGate as getDefaultSponsoredGateImpl,
@@ -45,84 +45,81 @@ const checkSbtAccess = ({
   account?: string | null;
   sessionConfig?: SessionConfigLike | null;
   sessionSlug?: string | null;
-} = {}) => (
-  contractScripts.userHasSBT as UserHasSBTFn
-)(
-  'none',
-  sbtAddress,
-  account,
-  0,
-  'latest',
-  sessionConfig || sessionSlug || ''
-);
+} = {}) =>
+  (contractScripts.userHasSBT as UserHasSBTFn)(
+    'none',
+    sbtAddress,
+    account,
+    0,
+    'latest',
+    sessionConfig || sessionSlug || '',
+  );
 
 /**
  * Check sponsored access by resolving SBT ownership through contractScripts.
  */
-export const checkSponsoredAccess = (args: {
-  sessionConfig?: SessionConfigLike | null;
-  sessionSlug?: string;
-  account?: string;
-  resourceKey?: SponsoredResource;
-} = {}): Promise<SponsoredAccessResult> => checkSponsoredAccessWithChecker({
-  ...args,
-  checkSbtAccess,
-});
+export const checkSponsoredAccess = (
+  args: {
+    sessionConfig?: SessionConfigLike | null;
+    sessionSlug?: string;
+    account?: string;
+    resourceKey?: SponsoredResource;
+  } = {},
+): Promise<SponsoredAccessResult> =>
+  checkSponsoredAccessWithChecker({
+    ...args,
+    checkSbtAccess,
+  });
 
 /**
  * Resolve the default sponsored gate from a session config.
  */
-export const getDefaultSponsoredGate: typeof getDefaultSponsoredGateImpl = (...args) => (
-  getDefaultSponsoredGateImpl(...args)
-);
+export const getDefaultSponsoredGate: typeof getDefaultSponsoredGateImpl = (...args) =>
+  getDefaultSponsoredGateImpl(...args);
 
 /**
  * Resolve the sponsored gate state for a resource key.
  */
-export const resolveSponsoredGateStateForResource: typeof resolveSponsoredGateStateForResourceImpl = (...args) => (
-  resolveSponsoredGateStateForResourceImpl(...args)
-);
+export const resolveSponsoredGateStateForResource: typeof resolveSponsoredGateStateForResourceImpl = (...args) =>
+  resolveSponsoredGateStateForResourceImpl(...args);
 
 /**
  * Resolve the sponsored gate payload for a resource key.
  */
-export const resolveSponsoredGateForResource: typeof resolveSponsoredGateForResourceImpl = (...args) => (
-  resolveSponsoredGateForResourceImpl(...args)
-);
+export const resolveSponsoredGateForResource: typeof resolveSponsoredGateForResourceImpl = (...args) =>
+  resolveSponsoredGateForResourceImpl(...args);
 
 /**
  * Read a recent sponsored access result from cache.
  */
-export const readCachedSponsoredAccess: typeof readCachedSponsoredAccessImpl = (...args) => (
-  readCachedSponsoredAccessImpl(...args)
-);
+export const readCachedSponsoredAccess: typeof readCachedSponsoredAccessImpl = (...args) =>
+  readCachedSponsoredAccessImpl(...args);
 
 /**
  * Warm the sponsored access cache for a gated resource.
  */
-export const primeSponsoredAccessCheck = (args: {
-  sessionConfig?: SessionConfigLike | null;
-  sessionSlug?: string;
-  account?: string;
-  resourceKey?: SponsoredResource;
-} = {}): Promise<SponsoredAccessResult | null> => primeSponsoredAccessCheckWithChecker({
-  ...args,
-  checkSbtAccess,
-});
+export const primeSponsoredAccessCheck = (
+  args: {
+    sessionConfig?: SessionConfigLike | null;
+    sessionSlug?: string;
+    account?: string;
+    resourceKey?: SponsoredResource;
+  } = {},
+): Promise<SponsoredAccessResult | null> =>
+  primeSponsoredAccessCheckWithChecker({
+    ...args,
+    checkSbtAccess,
+  });
 
 /**
  * Collect unique SBT addresses from a sponsored gate payload.
  */
-export const getGateSbtAddresses: typeof getGateSbtAddressesImpl = (...args) => (
-  getGateSbtAddressesImpl(...args)
-);
+export const getGateSbtAddresses: typeof getGateSbtAddressesImpl = (...args) => getGateSbtAddressesImpl(...args);
 
 /**
  * Normalize a sponsored gate mode to `any` or `all`.
  */
-export const normalizeGateMode: typeof normalizeGateModeImpl = (...args) => (
-  normalizeGateModeImpl(...args)
-);
+export const normalizeGateMode: typeof normalizeGateModeImpl = (...args) => normalizeGateModeImpl(...args);
 
 /**
  * Convenience bundle of the sponsored access public helpers.

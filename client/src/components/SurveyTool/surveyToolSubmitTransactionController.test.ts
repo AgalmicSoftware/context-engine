@@ -1,4 +1,3 @@
-
 import {
   ensureIdentifierHash,
   filterChangedResponsesForSubmit,
@@ -9,11 +8,9 @@ const HASH_ZERO = `0x${'0'.repeat(64)}`;
 const TX_HASH = `0x${'a'.repeat(64)}`;
 type NormalizeSubmitOptions = Parameters<typeof normalizeSubmitReceipt>[1];
 
-const deepCloneJson = <T,>(obj: T): T => JSON.parse(JSON.stringify(obj)) as T;
+const deepCloneJson = <T>(obj: T): T => JSON.parse(JSON.stringify(obj)) as T;
 
-const makeSubmitOpts = (
-  overrides: Partial<NormalizeSubmitOptions> = {},
-): NormalizeSubmitOptions => ({
+const makeSubmitOpts = (overrides: Partial<NormalizeSubmitOptions> = {}): NormalizeSubmitOptions => ({
   questionResponses: [
     {
       questionID: 'q1',
@@ -43,14 +40,16 @@ describe('surveyToolSubmitTransactionController', () => {
         answer: { value: 'yes' },
       };
 
-      expect(filterChangedResponsesForSubmit({
-        data,
-        changedSet: new Set(['q1']),
-        singleQuestionMode: true,
-        isStandalone: false,
-        surveyId: 'survey-1',
-        HashZero: HASH_ZERO,
-      })).toEqual({
+      expect(
+        filterChangedResponsesForSubmit({
+          data,
+          changedSet: new Set(['q1']),
+          singleQuestionMode: true,
+          isStandalone: false,
+          surveyId: 'survey-1',
+          HashZero: HASH_ZERO,
+        }),
+      ).toEqual({
         questionIds: ['q1'],
         questionResponses: [data],
         surveyId: HASH_ZERO,
@@ -59,25 +58,29 @@ describe('surveyToolSubmitTransactionController', () => {
     });
 
     it('single question mode throws when qid is not in the changed set', () => {
-      expect(() => filterChangedResponsesForSubmit({
-        data: { questionID: 'q1' },
-        changedSet: new Set(['q2']),
-        singleQuestionMode: true,
-        isStandalone: false,
-        surveyId: 'survey-1',
-        HashZero: HASH_ZERO,
-      })).toThrow('No new or changed responses to submit.');
+      expect(() =>
+        filterChangedResponsesForSubmit({
+          data: { questionID: 'q1' },
+          changedSet: new Set(['q2']),
+          singleQuestionMode: true,
+          isStandalone: false,
+          surveyId: 'survey-1',
+          HashZero: HASH_ZERO,
+        }),
+      ).toThrow('No new or changed responses to submit.');
     });
 
     it('single question mode throws when data has no questionID', () => {
-      expect(() => filterChangedResponsesForSubmit({
-        data: { answer: { value: 'yes' } },
-        changedSet: new Set(['q1']),
-        singleQuestionMode: true,
-        isStandalone: false,
-        surveyId: 'survey-1',
-        HashZero: HASH_ZERO,
-      })).toThrow('No new or changed responses to submit.');
+      expect(() =>
+        filterChangedResponsesForSubmit({
+          data: { answer: { value: 'yes' } },
+          changedSet: new Set(['q1']),
+          singleQuestionMode: true,
+          isStandalone: false,
+          surveyId: 'survey-1',
+          HashZero: HASH_ZERO,
+        }),
+      ).toThrow('No new or changed responses to submit.');
     });
 
     it('survey mode filters responses to only changed qids', () => {
@@ -99,19 +102,18 @@ describe('surveyToolSubmitTransactionController', () => {
     });
 
     it('survey mode throws when no responses match the changed set', () => {
-      expect(() => filterChangedResponsesForSubmit({
-        data: {
-          responses: [
-            { questionID: 'q1' },
-            { questionID: 'q2' },
-          ],
-        },
-        changedSet: new Set(['q9']),
-        singleQuestionMode: false,
-        isStandalone: false,
-        surveyId: 'survey-1',
-        HashZero: HASH_ZERO,
-      })).toThrow('No new or changed responses to submit.');
+      expect(() =>
+        filterChangedResponsesForSubmit({
+          data: {
+            responses: [{ questionID: 'q1' }, { questionID: 'q2' }],
+          },
+          changedSet: new Set(['q9']),
+          singleQuestionMode: false,
+          isStandalone: false,
+          surveyId: 'survey-1',
+          HashZero: HASH_ZERO,
+        }),
+      ).toThrow('No new or changed responses to submit.');
     });
 
     it('survey mode sets surveyId from props when not standalone', () => {
@@ -308,49 +310,41 @@ describe('surveyToolSubmitTransactionController', () => {
         })),
       };
 
-      await expect(normalizeSubmitReceipt(tx, makeSubmitOpts())).rejects.toThrow(
-        'Submission failed on-chain.',
-      );
+      await expect(normalizeSubmitReceipt(tx, makeSubmitOpts())).rejects.toThrow('Submission failed on-chain.');
     });
 
     it('accepts string transaction hash (0x + 64 chars)', async () => {
-      const result = await normalizeSubmitReceipt(
-        TX_HASH,
-        makeSubmitOpts(),
-      );
+      const result = await normalizeSubmitReceipt(TX_HASH, makeSubmitOpts());
 
       expect(result.transactionHash).toBe(TX_HASH);
     });
 
     it('accepts object with transactionHash property', async () => {
-      const result = await normalizeSubmitReceipt(
-        { transactionHash: TX_HASH, nonce: 7 },
-        makeSubmitOpts(),
-      );
+      const result = await normalizeSubmitReceipt({ transactionHash: TX_HASH, nonce: 7 }, makeSubmitOpts());
 
-      expect(result).toEqual(expect.objectContaining({
-        transactionHash: TX_HASH,
-        nonce: 7,
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          transactionHash: TX_HASH,
+          nonce: 7,
+        }),
+      );
     });
 
     it('accepts object with hash property', async () => {
-      const result = await normalizeSubmitReceipt(
-        { hash: TX_HASH, from: '0x123' },
-        makeSubmitOpts(),
-      );
+      const result = await normalizeSubmitReceipt({ hash: TX_HASH, from: '0x123' }, makeSubmitOpts());
 
-      expect(result).toEqual(expect.objectContaining({
-        hash: TX_HASH,
-        from: '0x123',
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          hash: TX_HASH,
+          from: '0x123',
+        }),
+      );
     });
 
     it('throws "No transaction was sent." for invalid tx', async () => {
-      await expect(normalizeSubmitReceipt(
-        { receipt: null },
-        makeSubmitOpts(),
-      )).rejects.toThrow('No transaction was sent.');
+      await expect(normalizeSubmitReceipt({ receipt: null }, makeSubmitOpts())).rejects.toThrow(
+        'No transaction was sent.',
+      );
     });
 
     it('attaches __ceQuestionResponses, __ceSurveyResponse, __ceSurveyId, and __ceSubmissionGroupKey', async () => {
@@ -364,13 +358,15 @@ describe('surveyToolSubmitTransactionController', () => {
         }),
       );
 
-      expect(result).toEqual(expect.objectContaining({
-        transactionHash: TX_HASH,
-        __ceQuestionResponses: [{ questionID: 'q2', answer: { value: 'two' } }],
-        __ceSurveyResponse: { surveyID: 'survey-2', responses: [{ questionID: 'q2' }] },
-        __ceSurveyId: 'survey-2',
-        __ceSubmissionGroupKey: 'group-2',
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          transactionHash: TX_HASH,
+          __ceQuestionResponses: [{ questionID: 'q2', answer: { value: 'two' } }],
+          __ceSurveyResponse: { surveyID: 'survey-2', responses: [{ questionID: 'q2' }] },
+          __ceSurveyId: 'survey-2',
+          __ceSubmissionGroupKey: 'group-2',
+        }),
+      );
     });
 
     it('uses deepClone for metadata', async () => {
@@ -386,11 +382,14 @@ describe('surveyToolSubmitTransactionController', () => {
       };
       const deepClone = jest.fn(deepCloneJson);
 
-      const result = await normalizeSubmitReceipt(TX_HASH, makeSubmitOpts({
-        questionResponses,
-        surveyResponse,
-        deepClone,
-      }));
+      const result = await normalizeSubmitReceipt(
+        TX_HASH,
+        makeSubmitOpts({
+          questionResponses,
+          surveyResponse,
+          deepClone,
+        }),
+      );
 
       expect(deepClone).toHaveBeenCalledTimes(2);
       expect(deepClone).toHaveBeenNthCalledWith(1, questionResponses);

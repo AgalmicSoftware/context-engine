@@ -50,7 +50,7 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
         sessionConfig={TEST_SESSION_CONFIG}
         mode="session"
         sessionIdHex={`0x${'4'.repeat(32)}`}
-      />
+      />,
     );
 
     const preview = await screen.findByTestId(E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW);
@@ -65,11 +65,9 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     const pendingUnscopedPreview = createDeferred<{
       payload: { ciphertext: string; dataToEncryptHash: string };
     }>();
-    litStorage.downloadEncryptedArweaveData
-      .mockReturnValueOnce(pendingUnscopedPreview.promise)
-      .mockResolvedValueOnce({
-        payload: { ciphertext: 'ciphertext', dataToEncryptHash: 'hash' },
-      });
+    litStorage.downloadEncryptedArweaveData.mockReturnValueOnce(pendingUnscopedPreview.promise).mockResolvedValueOnce({
+      payload: { ciphertext: 'ciphertext', dataToEncryptHash: 'hash' },
+    });
     litStorage.decodeLitPayloadToBlob.mockReturnValue(
       new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }),
     );
@@ -110,9 +108,11 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
 
     const preview = await screen.findByTestId(E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW);
     const image = preview.querySelector('img');
-    expect(litStorage.downloadEncryptedArweaveData).toHaveBeenCalledWith(expect.objectContaining({
-      lit: { getKey },
-    }));
+    expect(litStorage.downloadEncryptedArweaveData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lit: { getKey },
+      }),
+    );
     expect(image?.getAttribute('src')).toBe('blob:doc-library-image-preview');
     await act(async () => {
       pendingUnscopedPreview.resolve({ payload: { ciphertext: 'ciphertext', dataToEncryptHash: 'hash' } });
@@ -156,24 +156,30 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
         sessionConfig={{ storageProfile: { backend: 'cloudflare' } }}
         mode="session"
         sessionIdHex={`0x${'7'.repeat(32)}`}
-      />
+      />,
     );
 
     expect(await screen.findByText('Cloud policy note')).toBeInTheDocument();
-    expect(mockListSessionStorageRefs).toHaveBeenCalledWith(expect.objectContaining({
-      sessionSlug: 'edge',
-      resource: 'docsContext',
-    }));
+    expect(mockListSessionStorageRefs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'edge',
+        resource: 'docsContext',
+      }),
+    );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
 
     await waitFor(() => {
-      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(expect.objectContaining({
-        storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_docopaque1' }),
-      }));
+      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_docopaque1' }),
+        }),
+      );
     });
     expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('cloud text');
-    expect(JSON.stringify(mockReadSessionStorageBlob.mock.calls[0][0].storageRef)).not.toMatch(/bucket|account|token|secret|r2:\/\//i);
+    expect(JSON.stringify(mockReadSessionStorageBlob.mock.calls[0][0].storageRef)).not.toMatch(
+      /bucket|account|token|secret|r2:\/\//i,
+    );
   });
 
   it('auto-opens Cloudflare viewer links through session storage refs', async () => {
@@ -184,7 +190,7 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     window.history.replaceState(
       {},
       '',
-      '/session/edge/docs?keep=1&__ceDocRef=cf_docopaque1&__ceDocStorage=cloudflare&__ceDocKind=file&__ceDocName=Cloud%20auto'
+      '/session/edge/docs?keep=1&__ceDocRef=cf_docopaque1&__ceDocStorage=cloudflare&__ceDocKind=file&__ceDocName=Cloud%20auto',
     );
 
     render(
@@ -198,13 +204,15 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
         sessionConfig={{ storageProfile: { backend: 'cloudflare' } }}
         mode="session"
         sessionIdHex={`0x${'7'.repeat(32)}`}
-      />
+      />,
     );
 
     await waitFor(() => {
-      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(expect.objectContaining({
-        storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_docopaque1' }),
-      }));
+      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_docopaque1' }),
+        }),
+      );
     });
     expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('cloud auto text');
     expect(window.location.search).toBe('?keep=1');
@@ -220,7 +228,7 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     window.history.replaceState(
       {},
       '',
-      `/session/edge/docs?__ceDocTx=${txId}&__ceDocStorage=lit-arweave&__ceDocKind=file&__ceDocName=Encrypted%20auto`
+      `/session/edge/docs?__ceDocTx=${txId}&__ceDocStorage=lit-arweave&__ceDocKind=file&__ceDocName=Encrypted%20auto`,
     );
 
     const panelProps = {
@@ -242,11 +250,13 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     });
 
     await waitFor(() => {
-      expect(litStorage.downloadEncryptedArweaveData).toHaveBeenCalledWith(expect.objectContaining({
-        url: `https://lit.example.test/${txId}`,
-        providerLike: {},
-        account: '0x123',
-      }));
+      expect(litStorage.downloadEncryptedArweaveData).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: `https://lit.example.test/${txId}`,
+          providerLike: {},
+          account: '0x123',
+        }),
+      );
     });
     expect(litStorage.downloadEncryptedArweaveData.mock.calls[0][0]).not.toHaveProperty('lit');
     expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('lit auto text');
@@ -279,7 +289,7 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
         sessionSlug="edge"
         sessionConfig={{ storageProfile: { backend: 'cloudflare' } }}
         mode="session"
-      />
+      />,
     );
 
     const file = new File(['cloud'], 'cloudflare-upload.txt', { type: 'text/plain' });
@@ -294,14 +304,14 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     });
 
     await waitFor(() => {
-      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
-        file,
-        sessionSlug: 'edge',
-        sessionConfig: { storageProfile: { backend: 'cloudflare' } },
-        tags: expect.arrayContaining([
-          expect.objectContaining({ name: 'CE-DocStorage', value: 'cloudflare' }),
-        ]),
-      }));
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file,
+          sessionSlug: 'edge',
+          sessionConfig: { storageProfile: { backend: 'cloudflare' } },
+          tags: expect.arrayContaining([expect.objectContaining({ name: 'CE-DocStorage', value: 'cloudflare' })]),
+        }),
+      );
     });
     expect(screen.queryByText('Session ID is unavailable; cannot upload session docs.')).not.toBeInTheDocument();
   });
@@ -325,7 +335,7 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
         }}
         mode="session"
         sessionIdHex={`0x${'8'.repeat(32)}`}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -345,17 +355,17 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     });
 
     await waitFor(() => {
-      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
-        file,
-        encryption: expect.objectContaining({
-          enabled: true,
-          saveKey,
-          accessControlConditions: [{ contractAddress: '0xgate' }],
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file,
+          encryption: expect.objectContaining({
+            enabled: true,
+            saveKey,
+            accessControlConditions: [{ contractAddress: '0xgate' }],
+          }),
+          tags: expect.arrayContaining([expect.objectContaining({ name: 'CE-DocStorage', value: 'lit-arweave' })]),
         }),
-        tags: expect.arrayContaining([
-          expect.objectContaining({ name: 'CE-DocStorage', value: 'lit-arweave' }),
-        ]),
-      }));
+      );
     });
   });
 
@@ -373,7 +383,7 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
           mode="session"
           sessionIdHex={`0x${'5'.repeat(32)}`}
           showUploadControls={false}
-        />
+        />,
       );
       await Promise.resolve();
       await Promise.resolve();

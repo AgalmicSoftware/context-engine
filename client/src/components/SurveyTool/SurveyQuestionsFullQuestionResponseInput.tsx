@@ -9,6 +9,7 @@ import {
   buildSurveyQuestionsFullQuestionResponseInputActionDescriptor,
   buildSurveyQuestionsFullQuestionResponseInputDescriptor,
   shouldDispatchSurveyQuestionsFullQuestionResponseInputAction,
+  type SurveyQuestionsFullQuestionResponseInputActionDescriptor,
 } from './surveyQuestionsFullQuestionResponseInputState';
 
 type SurveyQuestionRecord = {
@@ -24,7 +25,7 @@ type SurveyAnswerRecord = {
 
 type SurveyQuestionsFullQuestionResponseInputProps = {
   question: SurveyQuestionRecord;
-  qIndex: number;
+  qIndex?: number;
   answer: SurveyAnswerRecord;
   glowAnswer?: boolean;
   isSubmitting?: boolean;
@@ -37,9 +38,8 @@ type SurveyQuestionsFullQuestionResponseInputProps = {
   onToggleAnswerEncryption?: (nextEncryptedState: boolean) => void;
 };
 
-const SurveyQuestionsFullQuestionResponseInput = ({
+export const SurveyQuestionsFullQuestionResponseInput = ({
   question,
-  qIndex,
   answer,
   glowAnswer = false,
   isSubmitting = false,
@@ -53,7 +53,6 @@ const SurveyQuestionsFullQuestionResponseInput = ({
 }: SurveyQuestionsFullQuestionResponseInputProps): React.ReactNode => {
   const inputDescriptor = buildSurveyQuestionsFullQuestionResponseInputDescriptor({
     question,
-    qIndex,
     answer,
     glowAnswer,
     isSubmitting,
@@ -66,9 +65,8 @@ const SurveyQuestionsFullQuestionResponseInput = ({
       kind: 'answer-change',
       nextValue,
       event,
-    });
+    }) as Extract<SurveyQuestionsFullQuestionResponseInputActionDescriptor, { kind: 'answer-change' }>;
     if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
-    if (action.kind !== 'answer-change') return;
     if (action.event === undefined) {
       onAnswerChange?.(action.nextValue);
     } else {
@@ -82,9 +80,8 @@ const SurveyQuestionsFullQuestionResponseInput = ({
       kind: 'rating-change',
       nextValue,
       event,
-    });
+    }) as Extract<SurveyQuestionsFullQuestionResponseInputActionDescriptor, { kind: 'rating-change' }>;
     if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
-    if (action.kind !== 'rating-change') return;
     onRatingChange?.(action.nextValue, action.event);
   };
 
@@ -93,9 +90,8 @@ const SurveyQuestionsFullQuestionResponseInput = ({
       inputDescriptor,
       kind: 'rating-commit',
       nextValue,
-    });
+    }) as Extract<SurveyQuestionsFullQuestionResponseInputActionDescriptor, { kind: 'rating-commit' }>;
     if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
-    if (action.kind !== 'rating-commit') return;
     onDeferredRatingCommit?.(action.nextValue);
   };
 
@@ -104,9 +100,8 @@ const SurveyQuestionsFullQuestionResponseInput = ({
       inputDescriptor,
       kind: 'rating-change-complete',
       event,
-    });
+    }) as Extract<SurveyQuestionsFullQuestionResponseInputActionDescriptor, { kind: 'rating-change-complete' }>;
     if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
-    if (action.kind !== 'rating-change-complete') return;
     if (action.event === undefined) {
       onRatingChangeComplete?.();
     } else {
@@ -119,9 +114,8 @@ const SurveyQuestionsFullQuestionResponseInput = ({
       inputDescriptor,
       kind: 'answer-encryption-toggle',
       nextEncryptedState,
-    });
+    }) as Extract<SurveyQuestionsFullQuestionResponseInputActionDescriptor, { kind: 'answer-encryption-toggle' }>;
     if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
-    if (action.kind !== 'answer-encryption-toggle') return;
     onToggleAnswerEncryption?.(action.nextEncryptedState);
   };
 
@@ -167,7 +161,6 @@ const SurveyQuestionsFullQuestionResponseInput = ({
     default:
       return (
         <SurveyAudioFieldInput
-          qIndex={inputDescriptor.qIndex}
           {...audioInputWorkerProps}
           placeholder={inputDescriptor.placeholder}
           updateFunction={emitAnswerChange}
@@ -178,10 +171,10 @@ const SurveyQuestionsFullQuestionResponseInput = ({
           dataCeQuestionId={inputDescriptor.dataCeQuestionId}
           disabled={inputDescriptor.disabled}
           forceGlow={inputDescriptor.forceGlow}
-          disableEncryption={inputDescriptor.disableEncryption}
+          disableEncryption
         />
       );
   }
 };
 
-export default SurveyQuestionsFullQuestionResponseInput;
+export default React.memo(SurveyQuestionsFullQuestionResponseInput);

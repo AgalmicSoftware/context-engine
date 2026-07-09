@@ -1,13 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faAtlas,
-  faEye,
-  faHeart,
-  faLink,
-  faRetweet,
-} from '@fortawesome/free-solid-svg-icons';
+import { faAtlas, faEye, faHeart, faLink, faRetweet } from '@fortawesome/free-solid-svg-icons';
 
 import corpusDebateMapLinks from '../../variables/demo/corpus_debate_map_links.json';
 import debateMapData from '../../variables/demo/debate_map_demo_data.json';
@@ -34,13 +28,15 @@ type LegacyIssueLink = {
   label?: string;
 };
 
-type DebateIssueRef = string | {
-  atlasNodeId?: string;
-  nodeId?: string;
-  id?: string;
-  label?: string;
-  name?: string;
-};
+type DebateIssueRef =
+  | string
+  | {
+      atlasNodeId?: string;
+      nodeId?: string;
+      id?: string;
+      label?: string;
+      name?: string;
+    };
 
 export type CorpusEntry = {
   id?: string;
@@ -91,7 +87,7 @@ const legacyDebateMapLinks = corpusDebateMapLinks as Record<string, LegacyIssueL
 const buildAtlasIssueIndex = (
   nodes: AtlasNode[] | null | undefined,
   parentPath: string[] = [],
-  acc: Record<string, Omit<AtlasIssue, 'href'>> = {}
+  acc: Record<string, Omit<AtlasIssue, 'href'>> = {},
 ) => {
   (Array.isArray(nodes) ? nodes : []).forEach((node) => {
     const nextPath = [...parentPath, node.name];
@@ -109,9 +105,7 @@ const ATLAS_ISSUE_INDEX = buildAtlasIssueIndex(debateMapNodes);
 
 const formatDate = (value: unknown) => {
   if (!value) return null;
-  const date = value instanceof Date
-    ? value
-    : new Date(typeof value === 'number' ? value : String(value));
+  const date = value instanceof Date ? value : new Date(typeof value === 'number' ? value : String(value));
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleDateString(undefined, {
     day: 'numeric',
@@ -120,15 +114,14 @@ const formatDate = (value: unknown) => {
   });
 };
 
-const resolveDebateMapIssues = (
-  entry: CorpusEntry | null | undefined = {},
-  atlasReturnTo = ''
-) => {
+const resolveDebateMapIssues = (entry: CorpusEntry | null | undefined = {}, atlasReturnTo = '') => {
   const rawIssues = Array.isArray(entry?.debate_map_issues)
     ? entry.debate_map_issues
-    : (Array.isArray(entry?.debateMapIssues)
+    : Array.isArray(entry?.debateMapIssues)
       ? entry.debateMapIssues
-      : (Array.isArray(entry?.debate_nodes) ? entry.debate_nodes : []));
+      : Array.isArray(entry?.debate_nodes)
+        ? entry.debate_nodes
+        : [];
 
   const normalizedIssues: AtlasIssue[] = [];
   const seenIssueIds = new Set();
@@ -158,9 +151,7 @@ const resolveDebateMapIssues = (
         return;
       }
 
-      const mappedLegacyIssues = Array.isArray(legacyDebateMapLinks?.[issueRef])
-        ? legacyDebateMapLinks[issueRef]
-        : [];
+      const mappedLegacyIssues = Array.isArray(legacyDebateMapLinks?.[issueRef]) ? legacyDebateMapLinks[issueRef] : [];
 
       mappedLegacyIssues.forEach((mappedIssue) => {
         pushIssue(mappedIssue?.atlasNodeId || mappedIssue?.nodeId || mappedIssue?.id, mappedIssue?.label || '');
@@ -173,7 +164,7 @@ const resolveDebateMapIssues = (
 
     pushIssue(
       issueObject.atlasNodeId || issueObject.nodeId || issueObject.id,
-      String(issueObject.label || issueObject.name || '')
+      String(issueObject.label || issueObject.name || ''),
     );
   });
 
@@ -215,7 +206,7 @@ export const DebateMapSection = ({
 
   if (linkedIssues.length === 0) return null;
 
-  const issueLinks = linkedIssues.map((issue) => (
+  const issueLinks = linkedIssues.map((issue) =>
     onAtlasIssueOpen ? (
       <button
         key={issue.id}
@@ -224,33 +215,16 @@ export const DebateMapSection = ({
         title={issue.pathLabel}
         onClick={() => onAtlasIssueOpen(issue.id)}
       >
-        {showAtlasIcon ? (
-          <FontAwesomeIcon
-            icon={faAtlas}
-            className={styles.debateMapIcon}
-            aria-hidden="true"
-          />
-        ) : null}
+        {showAtlasIcon ? <FontAwesomeIcon icon={faAtlas} className={styles.debateMapIcon} aria-hidden="true" /> : null}
         <span>{issue.label}</span>
       </button>
     ) : (
-      <Link
-        key={issue.id}
-        to={issue.href}
-        className={styles.debateMapLink}
-        title={issue.pathLabel}
-      >
-        {showAtlasIcon ? (
-          <FontAwesomeIcon
-            icon={faAtlas}
-            className={styles.debateMapIcon}
-            aria-hidden="true"
-          />
-        ) : null}
+      <Link key={issue.id} to={issue.href} className={styles.debateMapLink} title={issue.pathLabel}>
+        {showAtlasIcon ? <FontAwesomeIcon icon={faAtlas} className={styles.debateMapIcon} aria-hidden="true" /> : null}
         <span>{issue.label}</span>
       </Link>
-    )
-  ));
+    ),
+  );
 
   if (inline) {
     return issueLinks;
@@ -258,9 +232,7 @@ export const DebateMapSection = ({
 
   return (
     <div className={styles.debateMapFooter}>
-      <div className={styles.debateMapFooterLinks}>
-        {issueLinks}
-      </div>
+      <div className={styles.debateMapFooterLinks}>{issueLinks}</div>
     </div>
   );
 };
@@ -269,12 +241,7 @@ export const ExternalSourceLink = ({ entry, fallbackLabel = 'View source' }: Ext
   if (!entry?.url) return null;
 
   return (
-    <a
-      href={entry.url}
-      rel="noopener noreferrer"
-      className={styles.externalLink}
-      target="_blank"
-    >
+    <a href={entry.url} rel="noopener noreferrer" className={styles.externalLink} target="_blank">
       <FontAwesomeIcon icon={faLink} />
       <span>{entry.source_label || fallbackLabel}</span>
     </a>
@@ -291,11 +258,11 @@ const TweetCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: TweetCardProps)
   const normalizedSentiment = String(resolvedEntry.sentiment || '').toLowerCase();
   const sentimentClassName = normalizedSentiment.includes('optim')
     ? styles.sentimentOptimistic
-    : (normalizedSentiment.includes('skept') || normalizedSentiment.includes('caut'))
+    : normalizedSentiment.includes('skept') || normalizedSentiment.includes('caut')
       ? styles.sentimentSkeptical
-      : (normalizedSentiment.includes('alarm')
-        || normalizedSentiment.includes('concern')
-        || normalizedSentiment.includes('doom'))
+      : normalizedSentiment.includes('alarm') ||
+          normalizedSentiment.includes('concern') ||
+          normalizedSentiment.includes('doom')
         ? styles.sentimentAlarmist
         : styles.sentimentNeutral;
   const tags = Array.isArray(resolvedEntry.tags) ? resolvedEntry.tags : [];
@@ -311,30 +278,16 @@ const TweetCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: TweetCardProps)
         </div>
         <div className={styles.tweetAuthorMeta}>
           <div className={styles.tweetAuthorNames}>
-            <span className={styles.tweetName}>
-              {authorName}
-            </span>
-            {handle ? (
-              <span className={styles.tweetHandle}>
-                {handle}
-              </span>
-            ) : null}
+            <span className={styles.tweetName}>{authorName}</span>
+            {handle ? <span className={styles.tweetHandle}>{handle}</span> : null}
           </div>
         </div>
-        <div className={styles.tweetDate}>
-          {createdAt || 'Undated post'}
-        </div>
+        <div className={styles.tweetDate}>{createdAt || 'Undated post'}</div>
       </div>
 
-      <div className={`${styles.tweetBody} ${shouldTruncate ? styles.tweetBodyClamped : ''}`.trim()}>
-        {displayText}
-      </div>
+      <div className={`${styles.tweetBody} ${shouldTruncate ? styles.tweetBodyClamped : ''}`.trim()}>{displayText}</div>
       {summaryText.length > 280 ? (
-        <button
-          type="button"
-          className={styles.tweetReadMore}
-          onClick={() => setExpanded((value) => !value)}
-        >
+        <button type="button" className={styles.tweetReadMore} onClick={() => setExpanded((value) => !value)}>
           {expanded ? 'Show less' : 'Show more'}
         </button>
       ) : null}
@@ -352,9 +305,7 @@ const TweetCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: TweetCardProps)
             </button>
           ))}
           {resolvedEntry.sentiment ? (
-            <span className={`${styles.sentimentBadge} ${sentimentClassName}`}>
-              {resolvedEntry.sentiment}
-            </span>
+            <span className={`${styles.sentimentBadge} ${sentimentClassName}`}>{resolvedEntry.sentiment}</span>
           ) : null}
         </div>
       ) : null}

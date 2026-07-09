@@ -3,14 +3,18 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('./SBTSelector', () => () => null);
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     getSbtMintBurnCountsByAddress: jest.fn(),
   },
   getSessionChainId: jest.fn(() => null),
   getSessionSlugByName: jest.fn(() => ''),
-  normalizeSessionSlug: jest.fn((value) => String(value || '').trim().toLowerCase()),
+  normalizeSessionSlug: jest.fn((value) =>
+    String(value || '')
+      .trim()
+      .toLowerCase(),
+  ),
 }));
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
@@ -52,13 +56,16 @@ describe('SBTFilter signature guards', () => {
   });
   it('reapplies when array item identities change at equal item counts', async () => {
     const onFilter = jest.fn();
-    const subject = createSubject({
-      mode: 'addresses',
-      items: ['0x1', '0x2'],
-      onFilter,
-    }, {
-      onlyVerifiedHumans: true,
-    });
+    const subject = createSubject(
+      {
+        mode: 'addresses',
+        items: ['0x1', '0x2'],
+        onFilter,
+      },
+      {
+        onlyVerifiedHumans: true,
+      },
+    );
 
     await subject.runApplyFilter('first');
     onFilter.mockClear();
@@ -77,13 +84,16 @@ describe('SBTFilter signature guards', () => {
   it('reapplies when large arrays mutate in unsampled middle indexes', async () => {
     const onFilter = jest.fn();
     const items = Array.from({ length: 300 }, (_, index) => `0x${String(index).padStart(3, '0')}`);
-    const subject = createSubject({
-      mode: 'addresses',
-      items,
-      onFilter,
-    }, {
-      onlyVerifiedHumans: true,
-    });
+    const subject = createSubject(
+      {
+        mode: 'addresses',
+        items,
+        onFilter,
+      },
+      {
+        onlyVerifiedHumans: true,
+      },
+    );
 
     await subject.runApplyFilter('first');
     onFilter.mockClear();
@@ -102,16 +112,19 @@ describe('SBTFilter signature guards', () => {
 
   it('treats aggregator objects with identical content but reordered keys as unchanged', async () => {
     const onFilter = jest.fn();
-    const subject = createSubject({
-      mode: 'responder',
-      items: {
-        q1: [{ responder: '0xA', response: 'yes' }],
-        q2: [{ responder: '0xB', response: 'no' }],
+    const subject = createSubject(
+      {
+        mode: 'responder',
+        items: {
+          q1: [{ responder: '0xA', response: 'yes' }],
+          q2: [{ responder: '0xB', response: 'no' }],
+        },
+        onFilter,
       },
-      onFilter,
-    }, {
-      onlyVerifiedHumans: true,
-    });
+      {
+        onlyVerifiedHumans: true,
+      },
+    );
 
     await subject.runApplyFilter('first');
     onFilter.mockClear();
@@ -131,15 +144,18 @@ describe('SBTFilter signature guards', () => {
 
   it('reapplies in aggregator mode when question keys change at equal item counts', async () => {
     const onFilter = jest.fn();
-    const subject = createSubject({
-      mode: 'responder',
-      items: {
-        q1: [{ responder: '0xA', response: 'yes' }],
+    const subject = createSubject(
+      {
+        mode: 'responder',
+        items: {
+          q1: [{ responder: '0xA', response: 'yes' }],
+        },
+        onFilter,
       },
-      onFilter,
-    }, {
-      onlyVerifiedHumans: true,
-    });
+      {
+        onlyVerifiedHumans: true,
+      },
+    );
 
     await subject.runApplyFilter('first');
     onFilter.mockClear();
@@ -154,10 +170,7 @@ describe('SBTFilter signature guards', () => {
     await subject.runApplyFilter('second');
 
     expect(onFilter).toHaveBeenCalledTimes(1);
-    expect(onFilter).toHaveBeenCalledWith(
-      { q3: [{ responder: '0xA', response: 'yes' }] },
-      expect.any(Object)
-    );
+    expect(onFilter).toHaveBeenCalledWith({ q3: [{ responder: '0xA', response: 'yes' }] }, expect.any(Object));
   });
 
   it('reapplies in large aggregator objects when middle-key values change', async () => {
@@ -166,13 +179,16 @@ describe('SBTFilter signature guards', () => {
     for (let i = 0; i < 300; i += 1) {
       items[`q${i}`] = [{ responder: '0xA', response: `r-${i}` }];
     }
-    const subject = createSubject({
-      mode: 'responder',
-      items,
-      onFilter,
-    }, {
-      onlyVerifiedHumans: true,
-    });
+    const subject = createSubject(
+      {
+        mode: 'responder',
+        items,
+        onFilter,
+      },
+      {
+        onlyVerifiedHumans: true,
+      },
+    );
 
     await subject.runApplyFilter('first');
     onFilter.mockClear();
@@ -192,15 +208,18 @@ describe('SBTFilter signature guards', () => {
 
   it('reapplies when nested response object content changes with same shape', async () => {
     const onFilter = jest.fn();
-    const subject = createSubject({
-      mode: 'responder',
-      items: {
-        q1: [{ responder: '0xA', response: { answer: { value: 'yes', type: 'freeform' } } }],
+    const subject = createSubject(
+      {
+        mode: 'responder',
+        items: {
+          q1: [{ responder: '0xA', response: { answer: { value: 'yes', type: 'freeform' } } }],
+        },
+        onFilter,
       },
-      onFilter,
-    }, {
-      onlyVerifiedHumans: true,
-    });
+      {
+        onlyVerifiedHumans: true,
+      },
+    );
 
     await subject.runApplyFilter('first');
     onFilter.mockClear();
@@ -221,43 +240,54 @@ describe('SBTFilter signature guards', () => {
 
   it('reapplies when deep multi-select payload values change with same shape', async () => {
     const onFilter = jest.fn();
-    const subject = createSubject({
-      mode: 'responder',
-      items: {
-        q1: [{
-          responder: '0xA',
-          response: {
-            responses: [{
-              questionID: 'q1',
-              answer: {
-                type: 'multi-select',
-                value: ['yes', 'maybe'],
+    const subject = createSubject(
+      {
+        mode: 'responder',
+        items: {
+          q1: [
+            {
+              responder: '0xA',
+              response: {
+                responses: [
+                  {
+                    questionID: 'q1',
+                    answer: {
+                      type: 'multi-select',
+                      value: ['yes', 'maybe'],
+                    },
+                  },
+                ],
               },
-            }],
-          },
-        }],
+            },
+          ],
+        },
+        onFilter,
       },
-      onFilter,
-    }, {
-      onlyVerifiedHumans: true,
-    });
+      {
+        onlyVerifiedHumans: true,
+      },
+    );
 
     await subject.runApplyFilter('first');
     onFilter.mockClear();
 
     const nextItems = {
-      q1: [{
-        responder: '0xA',
-        response: {
-          responses: [{
-            questionID: 'q1',
-            answer: {
-              type: 'multi-select',
-              value: ['yes', 'no'],
-            },
-          }],
+      q1: [
+        {
+          responder: '0xA',
+          response: {
+            responses: [
+              {
+                questionID: 'q1',
+                answer: {
+                  type: 'multi-select',
+                  value: ['yes', 'no'],
+                },
+              },
+            ],
+          },
         },
-      }],
+      ],
     };
     subject.props = {
       ...subject.props,
@@ -272,20 +302,23 @@ describe('SBTFilter signature guards', () => {
 
   it('reapplies when map-style responder payload changes with same key shape', async () => {
     const onFilter = jest.fn();
-    const subject = createSubject({
-      mode: 'responder',
-      items: {
-        q1: {
-          '0xA': {
-            answer: { value: 'yes', type: 'freeform' },
-            timeStamp: 1,
+    const subject = createSubject(
+      {
+        mode: 'responder',
+        items: {
+          q1: {
+            '0xA': {
+              answer: { value: 'yes', type: 'freeform' },
+              timeStamp: 1,
+            },
           },
         },
+        onFilter,
       },
-      onFilter,
-    }, {
-      onlyVerifiedHumans: true,
-    });
+      {
+        onlyVerifiedHumans: true,
+      },
+    );
 
     await subject.runApplyFilter('first');
     onFilter.mockClear();
@@ -314,21 +347,24 @@ describe('SBTFilter signature guards', () => {
 
   it('reapplies when map-style additional payload changes with stable answer and keys', async () => {
     const onFilter = jest.fn();
-    const subject = createSubject({
-      mode: 'responder',
-      items: {
-        q1: {
-          '0xA': {
-            answer: { value: 'yes', type: 'freeform' },
-            additional: { value: 'hello' },
-            timeStamp: 1,
+    const subject = createSubject(
+      {
+        mode: 'responder',
+        items: {
+          q1: {
+            '0xA': {
+              answer: { value: 'yes', type: 'freeform' },
+              additional: { value: 'hello' },
+              timeStamp: 1,
+            },
           },
         },
+        onFilter,
       },
-      onFilter,
-    }, {
-      onlyVerifiedHumans: true,
-    });
+      {
+        onlyVerifiedHumans: true,
+      },
+    );
 
     await subject.runApplyFilter('first');
     onFilter.mockClear();
@@ -357,31 +393,38 @@ describe('SBTFilter signature guards', () => {
 
   it('reapplies when top-level timestamp metadata changes with same response payload', async () => {
     const onFilter = jest.fn();
-    const subject = createSubject({
-      mode: 'responder',
-      items: {
-        q1: [{
-          responder: '0xA',
-          questionId: 'q1',
-          response: { answer: { value: 'yes', type: 'freeform' } },
-          timeStamp: 1,
-        }],
+    const subject = createSubject(
+      {
+        mode: 'responder',
+        items: {
+          q1: [
+            {
+              responder: '0xA',
+              questionId: 'q1',
+              response: { answer: { value: 'yes', type: 'freeform' } },
+              timeStamp: 1,
+            },
+          ],
+        },
+        onFilter,
       },
-      onFilter,
-    }, {
-      onlyVerifiedHumans: true,
-    });
+      {
+        onlyVerifiedHumans: true,
+      },
+    );
 
     await subject.runApplyFilter('first');
     onFilter.mockClear();
 
     const nextItems = {
-      q1: [{
-        responder: '0xA',
-        questionId: 'q1',
-        response: { answer: { value: 'yes', type: 'freeform' } },
-        timeStamp: 2,
-      }],
+      q1: [
+        {
+          responder: '0xA',
+          questionId: 'q1',
+          response: { answer: { value: 'yes', type: 'freeform' } },
+          timeStamp: 2,
+        },
+      ],
     };
     subject.props = {
       ...subject.props,
@@ -423,13 +466,16 @@ describe('SBTFilter signature guards', () => {
 
   it('reapplies when item text changes by case only under active filters', async () => {
     const onFilter = jest.fn();
-    const subject = createSubject({
-      mode: 'addresses',
-      items: ['CaseSensitiveValue'],
-      onFilter,
-    }, {
-      onlyVerifiedHumans: true,
-    });
+    const subject = createSubject(
+      {
+        mode: 'addresses',
+        items: ['CaseSensitiveValue'],
+        onFilter,
+      },
+      {
+        onlyVerifiedHumans: true,
+      },
+    );
 
     await subject.runApplyFilter('first');
     onFilter.mockClear();
@@ -450,7 +496,7 @@ describe('SBTFilter signature guards', () => {
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
-        '84532': {
+        84532: {
           sbtList: {
             '0xsbt': {
               mintedAddresses: ['0xA'],
@@ -473,16 +519,13 @@ describe('SBTFilter signature guards', () => {
       },
       {
         selectedSBTGroups: [{ address: '0xSBT', sessionSlug: 'edge', chainId: 84532 }],
-      }
+      },
     );
 
     try {
       await subject.runApplyFilter('no-network');
       expect(onFilter).toHaveBeenCalledWith(['0xa', '0xb'], expect.any(Object));
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[sbt]',
-        'Network ID is undefined in SBTFilter. Cannot proceed.'
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[sbt]', 'Network ID is undefined in SBTFilter. Cannot proceed.');
 
       onFilter.mockClear();
       subject.props = {
@@ -519,9 +562,7 @@ describe('SBTFilter signature guards', () => {
     };
     const prevState = { ...subject.state };
 
-    sharedExternalFilterState.selectedSBTGroups = [
-      { address: '0xbbb', sessionSlug: 'edge', chainId: 84532 },
-    ];
+    sharedExternalFilterState.selectedSBTGroups = [{ address: '0xbbb', sessionSlug: 'edge', chainId: 84532 }];
 
     subject.componentDidUpdate(prevProps, prevState);
 
@@ -574,5 +615,4 @@ describe('SBTFilter signature guards', () => {
     expect(subject.scheduleApplyFilter).toHaveBeenCalledTimes(1);
     expect(subject.scheduleApplyFilter).toHaveBeenCalledWith('state-change');
   });
-
 });

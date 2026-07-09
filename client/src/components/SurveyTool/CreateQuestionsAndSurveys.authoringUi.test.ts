@@ -1,7 +1,7 @@
 import {
   E2E_TESTIDS,
   REGISTRY_CACHE_KEY,
-  arweaveScripts,
+  arweaveClient,
   cacheScripts,
   collectTreeNodes,
   contractScripts,
@@ -31,9 +31,15 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   afterEach(() => {
-    try { delete (globalThis as any).CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete (globalThis as any).CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try {
+      delete (globalThis as any).CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete (globalThis as any).CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
   });
 
   it('renders the survey/questions toggle immediately on initial load', () => {
@@ -50,10 +56,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
 
     const tree = instance.render();
     const modeToggles = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'modeToggle'));
-    const modeSwitches = collectTreeNodes(
-      tree,
-      (node) => node?.props?.['data-testid'] === 'ce-create-mode-switch'
-    );
+    const modeSwitches = collectTreeNodes(tree, (node) => node?.props?.['data-testid'] === 'ce-create-mode-switch');
 
     expect(modeToggles).toHaveLength(0);
     expect(modeSwitches).toHaveLength(1);
@@ -78,11 +81,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     instance.updateSurveyHash = jest.fn();
     instance.saveToLocalStorage = jest.fn();
 
-    instance.handleAutoQuestionsGenerated(
-      [{ type: 'freeform', prompt: 'What should happen next?', tags: [] }],
-      [],
-      ''
-    );
+    instance.handleAutoQuestionsGenerated([{ type: 'freeform', prompt: 'What should happen next?', tags: [] }], [], '');
 
     const tree = instance.render();
     const modeToggles = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'modeToggle'));
@@ -98,19 +97,13 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const instance = makeInstance();
 
     let tree = instance.render();
-    let modeSwitches = collectTreeNodes(
-      tree,
-      (node) => node?.props?.['data-testid'] === 'ce-create-mode-switch'
-    );
+    let modeSwitches = collectTreeNodes(tree, (node) => node?.props?.['data-testid'] === 'ce-create-mode-switch');
     expect(modeSwitches).toHaveLength(1);
     expect(treeHasText(modeSwitches[0], 'Manual')).toBe(true);
 
     instance.state = { ...instance.state, showAutoTool: false };
     tree = instance.render();
-    modeSwitches = collectTreeNodes(
-      tree,
-      (node) => node?.props?.['data-testid'] === 'ce-create-mode-switch'
-    );
+    modeSwitches = collectTreeNodes(tree, (node) => node?.props?.['data-testid'] === 'ce-create-mode-switch');
     expect(modeSwitches).toHaveLength(1);
     expect(treeHasText(modeSwitches[0], 'from URL / Content')).toBe(true);
   });
@@ -127,16 +120,18 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       showAutoTool: false,
       isStandaloneQuestion: false,
       title: 'Survey Title',
-      questions: [{
-        uiKey: 'q1',
-        id: 'q1',
-        type: 'freeform',
-        prompt: 'Question 1',
-        tags: [],
-        currentTagInputValue: '',
-        aiGeneratedTagsFromSource: [],
-        isGeneratingTags: false,
-      }],
+      questions: [
+        {
+          uiKey: 'q1',
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        },
+      ],
     };
 
     const tree = instance.render();
@@ -156,12 +151,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       gateMap: {
         gate_1: { id: 'gate_1' },
       },
-      gateOptions: [{
-        id: 'gate_1',
-        label: 'Edge Session',
-        badgeLabel: 'Edge Session',
-        color: '#5affc2',
-      }],
+      gateOptions: [
+        {
+          id: 'gate_1',
+          label: 'Edge Session',
+          badgeLabel: 'Edge Session',
+          color: '#5affc2',
+        },
+      ],
       defaultGateId: 'gate_1',
     }));
     instance.state = {
@@ -169,16 +166,18 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       showAutoTool: false,
       isStandaloneQuestion: false,
       title: 'Survey Title',
-      questions: [{
-        uiKey: 'q1',
-        id: 'q1',
-        type: 'freeform',
-        prompt: 'Question 1',
-        tags: [],
-        currentTagInputValue: '',
-        aiGeneratedTagsFromSource: [],
-        isGeneratingTags: false,
-      }],
+      questions: [
+        {
+          uiKey: 'q1',
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        },
+      ],
     };
 
     const tree = instance.render();
@@ -202,19 +201,19 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       ...instance.state,
       showAutoTool: false,
       questionsAddedSuccessfully: true,
-      questions: [{
-        uiKey: 'q1',
-        id: 'question-id-1234567890',
-        type: 'freeform',
-        prompt: 'Question 1',
-        tags: [],
-        currentTagInputValue: '',
-        aiGeneratedTagsFromSource: [],
-        isGeneratingTags: false,
-      }],
-      uploadedQuestions: [
-        { questionId: 'question-id-1234567890', arweaveTxId: txId },
+      questions: [
+        {
+          uiKey: 'q1',
+          id: 'question-id-1234567890',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        },
       ],
+      uploadedQuestions: [{ questionId: 'question-id-1234567890', arweaveTxId: txId }],
     };
 
     const markup = renderToStaticMarkup(instance.render());
@@ -234,16 +233,18 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       surveyAddedSuccessfully: true,
       isStandaloneQuestion: false,
       title: 'Survey Title',
-      questions: [{
-        uiKey: 'q1',
-        id: 'question-id-1234567890',
-        type: 'freeform',
-        prompt: 'Question 1',
-        tags: [],
-        currentTagInputValue: '',
-        aiGeneratedTagsFromSource: [],
-        isGeneratingTags: false,
-      }],
+      questions: [
+        {
+          uiKey: 'q1',
+          id: 'question-id-1234567890',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        },
+      ],
       lastSubmittedSurveyId: '0xSurvey',
       lastSubmittedSurveyArweaveTxId: txId,
     };
@@ -262,22 +263,24 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         surveyAddedSuccessfully: true,
         isStandaloneQuestion: false,
         title: 'Survey Title',
-        questions: [{
-          uiKey: 'q1',
-          id: 'question-id-1234567890',
-          type: 'freeform',
-          prompt: 'Question 1',
-          tags: [],
-          currentTagInputValue: '',
-          aiGeneratedTagsFromSource: [],
-          isGeneratingTags: false,
-        }],
+        questions: [
+          {
+            uiKey: 'q1',
+            id: 'question-id-1234567890',
+            type: 'freeform',
+            prompt: 'Question 1',
+            tags: [],
+            currentTagInputValue: '',
+            aiGeneratedTagsFromSource: [],
+            isGeneratingTags: false,
+          },
+        ],
         lastSubmittedSurveyId: '0xSurvey',
       };
 
       return collectTreeNodes(
         instance.render(),
-        (node) => node?.type === 'a' && typeof node?.props?.href === 'string' && node.props.href.startsWith('/survey/')
+        (node) => node?.type === 'a' && typeof node?.props?.href === 'string' && node.props.href.startsWith('/survey/'),
       ).map((node) => node.props.href);
     };
 
@@ -297,50 +300,51 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       isStandaloneQuestion: false,
     };
 
-    const { gateOptions, defaultGateId } = instance.resolveGateOptions({
-      sessionName: 'FOR TEST 12',
-      __registry: {
-        gateAuthority: 'onchain',
-        gatesByResource: {
-          surveyResponses: {
-            gateId: 'survey_gate',
-            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
-            lookupStatus: 'ok',
+    const { gateOptions, defaultGateId } = instance.resolveGateOptions(
+      {
+        sessionName: 'FOR TEST 12',
+        __registry: {
+          gateAuthority: 'onchain',
+          gatesByResource: {
+            surveyResponses: {
+              gateId: 'survey_gate',
+              sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+              lookupStatus: 'ok',
+            },
+            default: {
+              gateId: 'default_gate',
+              sbtAddresses: ['0x2222222222222222222222222222222222222222'],
+              lookupStatus: 'ok',
+            },
+            docUrls: {
+              gateId: 'doc_urls_gate',
+              sbtAddresses: ['0x3333333333333333333333333333333333333333'],
+              lookupStatus: 'ok',
+            },
           },
-          default: {
-            gateId: 'default_gate',
-            sbtAddresses: ['0x2222222222222222222222222222222222222222'],
-            lookupStatus: 'ok',
-          },
-          docUrls: {
-            gateId: 'doc_urls_gate',
-            sbtAddresses: ['0x3333333333333333333333333333333333333333'],
-            lookupStatus: 'ok',
+        },
+        sponsored: {
+          gates: {
+            survey_gate: {
+              label: 'Registry surveyResponses gate',
+              mode: 'all',
+              sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+            },
+            default_gate: {
+              label: 'Registry default gate',
+              mode: 'any',
+              sbtAddresses: ['0x2222222222222222222222222222222222222222'],
+            },
+            doc_urls_gate: {
+              label: 'Registry docUrls gate',
+              mode: 'any',
+              sbtAddresses: ['0x3333333333333333333333333333333333333333'],
+            },
           },
         },
       },
-      sponsored: {
-        gates: {
-          survey_gate: {
-            label: 'Registry surveyResponses gate',
-            mode: 'all',
-            sbtAddresses: [
-              '0x1111111111111111111111111111111111111111',
-            ],
-          },
-          default_gate: {
-            label: 'Registry default gate',
-            mode: 'any',
-            sbtAddresses: ['0x2222222222222222222222222222222222222222'],
-          },
-          doc_urls_gate: {
-            label: 'Registry docUrls gate',
-            mode: 'any',
-            sbtAddresses: ['0x3333333333333333333333333333333333333333'],
-          },
-        },
-      },
-    }, { isStandaloneQuestion: false });
+      { isStandaloneQuestion: false },
+    );
 
     expect(defaultGateId).toBe('survey_gate');
     expect(gateOptions).toEqual([

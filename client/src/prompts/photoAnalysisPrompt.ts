@@ -17,5 +17,7 @@ export default function buildPhotoAnalysisPrompt(fileName = '') {
     '3. Key claims, facts, figures, names, and decisions visible in the image.',
     '4. Any low-confidence or unreadable regions called out explicitly.',
     'Do not invent hidden or unreadable details.',
-  ].filter(Boolean).join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }

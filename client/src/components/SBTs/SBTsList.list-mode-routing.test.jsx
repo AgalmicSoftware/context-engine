@@ -60,7 +60,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -95,7 +95,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -131,7 +131,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
         ensureLightSbtUniverse={ensureLightSbtUniverse}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -140,7 +140,7 @@ describe('SBTsList list-mode routing and filtering', () => {
     await waitFor(() => {
       expect(ensureLightSbtUniverse).toHaveBeenCalledWith(
         expect.arrayContaining(['beta']),
-        expect.objectContaining({ force: true })
+        expect.objectContaining({ force: true }),
       );
     });
 
@@ -175,13 +175,13 @@ describe('SBTsList list-mode routing and filtering', () => {
         embeddedMode
         ensureLightSbtDiscovery={ensureLightSbtDiscovery}
         ensureLightSbtUniverse={ensureLightSbtUniverse}
-      />
+      />,
     );
 
     await waitFor(() => {
       expect(ensureLightSbtDiscovery).toHaveBeenCalledWith(
         'alpha',
-        expect.objectContaining({ forceScopeSlug: 'alpha' })
+        expect.objectContaining({ forceScopeSlug: 'alpha' }),
       );
     });
 
@@ -191,7 +191,7 @@ describe('SBTsList list-mode routing and filtering', () => {
     await waitFor(() => {
       expect(ensureLightSbtUniverse).toHaveBeenCalledWith(
         expect.arrayContaining(['beta']),
-        expect.objectContaining({ force: true })
+        expect.objectContaining({ force: true }),
       );
     });
 
@@ -228,7 +228,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -266,7 +266,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -299,7 +299,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -350,7 +350,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -365,14 +365,12 @@ describe('SBTsList list-mode routing and filtering', () => {
 
   it('uses demo-only session labels and route tokens for session chips when strict config is missing', async () => {
     mockReadSessionScanScope.mockReturnValue('all');
-    mockGetAllSessionEntries.mockReturnValue([
-      ['edge', { slug: 'edge' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['edge', { slug: 'edge' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['edge', { slug: 'edge' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['edge', { slug: 'edge' }]]);
     mockGetSessionConfigBySlug.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'edge') return null;
       return {
         sessionName: normalized || 'General',
@@ -380,7 +378,9 @@ describe('SBTsList list-mode routing and filtering', () => {
       };
     });
     mockGetDemoSessionConfigBySlug.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'edge') return null;
       return {
         slug: 'edge',
@@ -407,7 +407,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -432,7 +432,7 @@ describe('SBTsList list-mode routing and filtering', () => {
     const alphaAddress = '0x00000000000000000000000000000000000000a1';
     const betaAddress = '0x00000000000000000000000000000000000000b1';
     const alphaCache = {
-      '84532': {
+      84532: {
         sbtList: {
           [alphaAddress.toLowerCase()]: {
             sbtAddress: alphaAddress,
@@ -453,7 +453,7 @@ describe('SBTsList list-mode routing and filtering', () => {
       },
     };
     const betaCache = {
-      '84532': {
+      84532: {
         sbtList: {
           [betaAddress.toLowerCase()]: {
             sbtAddress: betaAddress,
@@ -475,10 +475,12 @@ describe('SBTsList list-mode routing and filtering', () => {
     };
 
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') return alphaCache;
       if (normalized === 'beta') return betaCache;
-      return { '84532': { sbtList: {}, lastBlock: 0 } };
+      return { 84532: { sbtList: {}, lastBlock: 0 } };
     });
 
     const ensureLightSbtDiscovery = jest.fn().mockResolvedValue(undefined);
@@ -500,7 +502,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -524,14 +526,10 @@ describe('SBTsList list-mode routing and filtering', () => {
       expect(screen.getByTestId('session-chip-check-beta')).toBeInTheDocument();
     });
     await waitFor(() => {
-      expect(ensureLightSbtDiscovery).toHaveBeenCalledWith(
-        'beta',
-        expect.objectContaining({ forceScopeSlug: 'beta' })
-      );
+      expect(ensureLightSbtDiscovery).toHaveBeenCalledWith('beta', expect.objectContaining({ forceScopeSlug: 'beta' }));
     });
     await waitFor(() => {
       expect(screen.getByText('Beta Selected Badge')).toBeInTheDocument();
     });
   });
-
 });

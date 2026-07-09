@@ -3,37 +3,19 @@ import {
   buildSurveyResultsFilterBookmarkWritePlan,
   buildSurveyResultsSurveyQuestionBookmarkWritePlan,
 } from './surveyResultsCacheWriteEligibilityPlan';
-import {
-  buildSurveyResultsAnalysisLifecyclePlan,
-} from './surveyResultsAnalysisLifecyclePlan';
-import {
-  runSurveyResultsAnalysisLifecycleController,
-} from './surveyResultsAnalysisLifecycleController';
-import {
-  buildSurveyResultsCacheControllerSnapshot,
-} from './surveyResultsCacheControllerSnapshot';
-import {
-  buildSurveyResultsCacheReadinessDisplayPlan,
-} from './surveyResultsCacheReadinessDisplayPlan';
-import {
-  buildSurveyResultsFallbackQuestionWritePlan,
-} from './surveyResultsFallbackQuestionHelpers';
+import { buildSurveyResultsAnalysisLifecyclePlan } from './surveyResultsAnalysisLifecyclePlan';
+import { runSurveyResultsAnalysisLifecycleController } from './surveyResultsAnalysisLifecycleController';
+import { buildSurveyResultsCacheControllerSnapshot } from './surveyResultsCacheControllerSnapshot';
+import { buildSurveyResultsCacheReadinessDisplayPlan } from './surveyResultsCacheReadinessDisplayPlan';
+import { buildSurveyResultsFallbackQuestionWritePlan } from './surveyResultsFallbackQuestionHelpers';
 import {
   buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsRefreshStatusWritePlan,
 } from './surveyResultsHelpers';
-import {
-  runSurveyResultsFilterBookmarkWriteController,
-} from './surveyResultsFilterBookmarkWriteController';
-import {
-  runSurveyResultsFallbackQuestionWriteController,
-} from './surveyResultsFallbackQuestionWriteController';
-import {
-  runSurveyResultsAnalysisArtifactWriteController,
-} from './surveyResultsAnalysisArtifactWriteController';
-import {
-  runSurveyResultsSurveyQuestionBookmarkWriteController,
-} from './surveyResultsSurveyQuestionBookmarkWriteController';
+import { runSurveyResultsFilterBookmarkWriteController } from './surveyResultsFilterBookmarkWriteController';
+import { runSurveyResultsFallbackQuestionWriteController } from './surveyResultsFallbackQuestionWriteController';
+import { runSurveyResultsAnalysisArtifactWriteController } from './surveyResultsAnalysisArtifactWriteController';
+import { runSurveyResultsSurveyQuestionBookmarkWriteController } from './surveyResultsSurveyQuestionBookmarkWriteController';
 
 describe('surveyResultsCacheWriteReadiness', () => {
   const writePathReadiness = [
@@ -78,11 +60,7 @@ describe('surveyResultsCacheWriteReadiness', () => {
       status: 'pure-sequence-plan-only',
     },
     {
-      blockers: [
-        'AI generation flow',
-        'report export/download execution',
-        'parent-owned cache reads',
-      ],
+      blockers: ['AI generation flow', 'report export/download execution', 'parent-owned cache reads'],
       controllerReady: true,
       hasInjectedController: typeof runSurveyResultsAnalysisArtifactWriteController === 'function',
       hasMethodBoundaryCoverage: true,
@@ -137,73 +115,64 @@ describe('surveyResultsCacheWriteReadiness', () => {
     },
   ];
 
-  it.each(writePathReadiness)('pins $path controller readiness', ({
-    blockers = [],
-    controllerReady,
-    hasInjectedController,
-    hasMethodBoundaryCoverage,
-    hasPurePlan,
-    status,
-  }) => {
-    expect(controllerReady).toBe(hasPurePlan && hasInjectedController);
-    expect(hasMethodBoundaryCoverage).toBe(true);
-    expect([
-      'controller-routed',
-      'pure-plan-only',
-      'pure-sequence-plan-only',
-      'method-covered-deferred',
-      'test-pinned-only',
-      'blocked',
-    ]).toContain(status);
-    if (status === 'controller-routed') {
-      expect(controllerReady).toBe(true);
-      expect(hasPurePlan).toBe(true);
-      expect(hasInjectedController).toBe(true);
-    }
-    if (status === 'pure-sequence-plan-only') {
-      expect(controllerReady).toBe(false);
-      expect(hasPurePlan).toBe(true);
-      expect(hasInjectedController).toBe(false);
-      expect(blockers).toEqual(expect.arrayContaining([
-        'parent-owned setState application',
-        'polling/backoff lifecycle',
-      ]));
-    }
-    if (status === 'pure-plan-only') {
-      expect(controllerReady).toBe(false);
-      expect(hasPurePlan).toBe(true);
-      expect(hasInjectedController).toBe(false);
-      expect(blockers).toEqual(expect.arrayContaining([
-        'AI generation flow',
-        'cache read/write execution',
-      ]));
-    }
-    if (status === 'test-pinned-only') {
-      expect(controllerReady).toBe(false);
+  it.each(writePathReadiness)(
+    'pins $path controller readiness',
+    ({ blockers = [], controllerReady, hasInjectedController, hasMethodBoundaryCoverage, hasPurePlan, status }) => {
+      expect(controllerReady).toBe(hasPurePlan && hasInjectedController);
       expect(hasMethodBoundaryCoverage).toBe(true);
-      expect(hasInjectedController).toBe(false);
-      expect(blockers).toEqual(expect.arrayContaining([
-        'normalization shape',
-        'stale/latest-block precedence',
-        'missing key behavior',
-        'partial payloads',
-        'failure/recovery',
-      ]));
-    }
-    if (status === 'blocked') {
-      expect(controllerReady).toBe(false);
-      expect(hasPurePlan).toBe(false);
-      expect(hasInjectedController).toBe(false);
-      expect(blockers.length).toBeGreaterThan(0);
-    }
-    if (status === 'method-covered-deferred') {
-      expect(controllerReady).toBe(false);
-      expect(hasPurePlan).toBe(false);
-      expect(hasInjectedController).toBe(false);
-      expect(blockers).toEqual(expect.arrayContaining([
-        'AI generation flow',
-        'broad analysis cache persistence',
-      ]));
-    }
-  });
+      expect([
+        'controller-routed',
+        'pure-plan-only',
+        'pure-sequence-plan-only',
+        'method-covered-deferred',
+        'test-pinned-only',
+        'blocked',
+      ]).toContain(status);
+      if (status === 'controller-routed') {
+        expect(controllerReady).toBe(true);
+        expect(hasPurePlan).toBe(true);
+        expect(hasInjectedController).toBe(true);
+      }
+      if (status === 'pure-sequence-plan-only') {
+        expect(controllerReady).toBe(false);
+        expect(hasPurePlan).toBe(true);
+        expect(hasInjectedController).toBe(false);
+        expect(blockers).toEqual(
+          expect.arrayContaining(['parent-owned setState application', 'polling/backoff lifecycle']),
+        );
+      }
+      if (status === 'pure-plan-only') {
+        expect(controllerReady).toBe(false);
+        expect(hasPurePlan).toBe(true);
+        expect(hasInjectedController).toBe(false);
+        expect(blockers).toEqual(expect.arrayContaining(['AI generation flow', 'cache read/write execution']));
+      }
+      if (status === 'test-pinned-only') {
+        expect(controllerReady).toBe(false);
+        expect(hasMethodBoundaryCoverage).toBe(true);
+        expect(hasInjectedController).toBe(false);
+        expect(blockers).toEqual(
+          expect.arrayContaining([
+            'normalization shape',
+            'stale/latest-block precedence',
+            'missing key behavior',
+            'partial payloads',
+            'failure/recovery',
+          ]),
+        );
+      }
+      if (status === 'blocked') {
+        expect(controllerReady).toBe(false);
+        expect(hasPurePlan).toBe(false);
+        expect(hasInjectedController).toBe(false);
+        expect(blockers.length).toBeGreaterThan(0);
+      }
+      if (status === 'method-covered-deferred') {
+        expect(controllerReady).toBe(false);
+        expect(hasPurePlan).toBe(false);
+        expect(hasInjectedController).toBe(false);
+        expect(blockers).toEqual(expect.arrayContaining(['AI generation flow', 'broad analysis cache persistence']));
+      }
+    },
+  );
 });

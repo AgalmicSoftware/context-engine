@@ -41,11 +41,14 @@ export const buildPileQuestionCommentButtonClassName = ({
   baseClassName?: unknown;
   commentClassName?: unknown;
   hasAdditionalContent?: unknown;
-} = {}): string => ([
-  String(baseClassName || ''),
-  String(commentClassName || ''),
-  hasAdditionalContent ? String(activeClassName || '') : '',
-].filter(Boolean).join(' '));
+} = {}): string =>
+  [
+    String(baseClassName || ''),
+    String(commentClassName || ''),
+    hasAdditionalContent ? String(activeClassName || '') : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
 export const resolvePileQuestionCommentIconClassName = ({
   glowClassName = '',
@@ -53,19 +56,14 @@ export const resolvePileQuestionCommentIconClassName = ({
 }: {
   glowClassName?: unknown;
   hasAdditionalContent?: unknown;
-} = {}): string | undefined => (
-  hasAdditionalContent ? String(glowClassName || '') || undefined : undefined
-);
+} = {}): string | undefined => (hasAdditionalContent ? String(glowClassName || '') || undefined : undefined);
 
 export const renderPileAdditionalEditorRow = ({
   input,
   lockControl,
 }: PileAdditionalEditorRowProps): React.ReactElement => (
   <div className={styles.pileAdditionalEditor}>
-    <AdditionalCommentsInlineRow
-      input={input}
-      lockControl={lockControl}
-    />
+    <AdditionalCommentsInlineRow input={input} lockControl={lockControl} />
   </div>
 );
 
@@ -78,9 +76,7 @@ export const renderPileCommentsSection = ({
   if (!showComments) return null;
 
   return (
-    <div className={styles.pileCommentsRow}>
-      {maskedAdditional ? decryptAdditionalControl : additionalEditorRow}
-    </div>
+    <div className={styles.pileCommentsRow}>{maskedAdditional ? decryptAdditionalControl : additionalEditorRow}</div>
   );
 };
 
@@ -100,7 +96,9 @@ export const renderPileQuestionIcons = ({
       })}
       onClick={onToggleComments}
       data-testid={E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE}
-      data-ce-question-id={String(questionId || '').trim().toLowerCase()}
+      data-ce-question-id={String(questionId || '')
+        .trim()
+        .toLowerCase()}
     >
       <FontAwesomeIcon
         icon={faComment}

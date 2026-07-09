@@ -23,9 +23,8 @@ export const dedupeTrimmedList = (values: unknown = []): string[] => {
   return out;
 };
 
-export const formatDelimitedDraftList = (value: unknown): string => (
-  Array.isArray(value) ? dedupeTrimmedList(value).join('\n') : ''
-);
+export const formatDelimitedDraftList = (value: unknown): string =>
+  Array.isArray(value) ? dedupeTrimmedList(value).join('\n') : '';
 
 export const parseDelimitedDraftList = (raw: unknown): string[] => {
   if (Array.isArray(raw)) return dedupeTrimmedList(raw);

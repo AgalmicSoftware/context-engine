@@ -1,14 +1,16 @@
-import {
-  normalizeSbtFullScanPolicy,
-  readSbtFullScanPolicy,
-  writeSbtFullScanPolicy,
-} from './sbtFullScanPolicy.js';
+import { normalizeSbtFullScanPolicy, readSbtFullScanPolicy, writeSbtFullScanPolicy } from './sbtFullScanPolicy.js';
 
 describe('sbtFullScanPolicy helpers', () => {
   beforeEach(() => {
-    try { window.history.replaceState({}, '', '/'); } catch (_) {}
-    try { localStorage.removeItem('ce:sbtFullScanPolicy'); } catch (_) {}
-    try { delete (globalThis as Record<string, unknown>).CE_SBT_FULL_SCAN_POLICY; } catch (_) {}
+    try {
+      window.history.replaceState({}, '', '/');
+    } catch (_) {}
+    try {
+      localStorage.removeItem('ce:sbtFullScanPolicy');
+    } catch (_) {}
+    try {
+      delete (globalThis as Record<string, unknown>).CE_SBT_FULL_SCAN_POLICY;
+    } catch (_) {}
   });
 
   it('normalizes bad inputs to "auto"', () => {

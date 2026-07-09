@@ -4,6 +4,7 @@ import {
   buildFetchedQuestionPoolState,
   buildRenderedQuestionPayloadPoolsState,
   buildSurveyQuestionPoolLoadState,
+  publishSurveyQuestionPoolIfCurrent,
 } from './surveyQuestionsTypes.js';
 import {
   executeSurveyFormStateReset,
@@ -11,10 +12,7 @@ import {
   shouldSurveyAutoStartFresh,
 } from './surveyToolResponseResetController';
 import { buildInitializedSurveyResponseState } from './surveyToolHydrationFlow.js';
-import {
-  buildQuestionIdScopeSignature,
-  normalizeQuestionIdKey,
-} from './surveyToolSignatures.js';
+import { buildQuestionIdScopeSignature, normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import {
   getSessionSlugHintFromProps,
   getSessionSlugPinnedFromProps,
@@ -63,19 +61,17 @@ const poolDeps = (overrides = {}) => ({
   ...overrides,
 });
 
-const didEditDiffInputsChange = ({
-  prevProps = {},
-  nextProps = {},
-  prevState = {},
-  nextState = {},
-} = {}) => {
+const didEditDiffInputsChange = ({ prevProps = {}, nextProps = {}, prevState = {}, nextState = {} } = {}) => {
   if (!prevProps || !prevState) return true;
   if (prevState.surveysResponseState !== nextState.surveysResponseState) return true;
   if (prevState.editBaseline !== nextState.editBaseline) return true;
   if (prevState.userAnswers !== nextState.userAnswers) return true;
-  if (buildQuestionIdScopeSignature(prevState.questionPool) !== buildQuestionIdScopeSignature(nextState.questionPool)) return true;
-  if (buildQuestionIdScopeSignature(prevState.pileQuestions) !== buildQuestionIdScopeSignature(nextState.pileQuestions)) return true;
-  if (buildQuestionIdScopeSignature(prevProps.questionPool) !== buildQuestionIdScopeSignature(nextProps.questionPool)) return true;
+  if (buildQuestionIdScopeSignature(prevState.questionPool) !== buildQuestionIdScopeSignature(nextState.questionPool))
+    return true;
+  if (buildQuestionIdScopeSignature(prevState.pileQuestions) !== buildQuestionIdScopeSignature(nextState.pileQuestions))
+    return true;
+  if (buildQuestionIdScopeSignature(prevProps.questionPool) !== buildQuestionIdScopeSignature(nextProps.questionPool))
+    return true;
   if (prevProps.isStandalone !== nextProps.isStandalone) return true;
   if (prevProps.minifiedMode !== nextProps.minifiedMode) return true;
   if (prevProps.surveyIndex !== nextProps.surveyIndex) return true;
@@ -93,12 +89,7 @@ const didEditDiffInputsChange = ({
   return false;
 };
 
-const applyDiffInputStats = ({
-  diffInputsChanged,
-  getPendingEditStats,
-  emitPendingStats,
-  recalculateEditStats,
-}) => {
+const applyDiffInputStats = ({ diffInputsChanged, getPendingEditStats, emitPendingStats, recalculateEditStats }) => {
   if (!diffInputsChanged) return null;
   const pendingStats = getPendingEditStats();
   emitPendingStats(pendingStats);
@@ -141,12 +132,14 @@ describe('SurveyTool question pool lifecycle', () => {
       { sessionSlug: 'edge-b' },
       { sessionSlugPinned: false },
     ].forEach((patch) => {
-      expect(didEditDiffInputsChange({
-        prevProps: baseProps,
-        nextProps: { ...baseProps, ...patch },
-        prevState: sharedState,
-        nextState: sharedState,
-      })).toBe(true);
+      expect(
+        didEditDiffInputsChange({
+          prevProps: baseProps,
+          nextProps: { ...baseProps, ...patch },
+          prevState: sharedState,
+          nextState: sharedState,
+        }),
+      ).toBe(true);
     });
     // port note: the old test called the class wrapper directly; the portable
     // contract is the identity/signature/session scope comparison it delegates.
@@ -173,12 +166,14 @@ describe('SurveyTool question pool lifecycle', () => {
     };
     const props = { questionPool: [{ id: 'prop-q1' }] };
 
-    expect(didEditDiffInputsChange({
-      prevProps: props,
-      nextProps: { questionPool: [{ id: 'prop-q1' }] },
-      prevState,
-      nextState,
-    })).toBe(false);
+    expect(
+      didEditDiffInputsChange({
+        prevProps: props,
+        nextProps: { questionPool: [{ id: 'prop-q1' }] },
+        prevState,
+        nextState,
+      }),
+    ).toBe(false);
   });
 
   it('does not invalidate hydration runs for response loading state changes only', () => {
@@ -193,26 +188,28 @@ describe('SurveyTool question pool lifecycle', () => {
       questionPool: [{ id: 'q1' }],
     };
 
-    expect(didEditDiffInputsChange({
-      prevProps: props,
-      nextProps: props,
-      prevState: {
-        surveysResponseState: sharedResponsesState,
-        editBaseline: sharedBaseline,
-        userAnswers: null,
-        questionPool: [{ id: 'q1' }],
-        pileQuestions: [],
-        isLoadingResponse: false,
-      },
-      nextState: {
-        surveysResponseState: sharedResponsesState,
-        editBaseline: sharedBaseline,
-        userAnswers: null,
-        questionPool: [{ id: 'q1' }],
-        pileQuestions: [],
-        isLoadingResponse: true,
-      },
-    })).toBe(false);
+    expect(
+      didEditDiffInputsChange({
+        prevProps: props,
+        nextProps: props,
+        prevState: {
+          surveysResponseState: sharedResponsesState,
+          editBaseline: sharedBaseline,
+          userAnswers: null,
+          questionPool: [{ id: 'q1' }],
+          pileQuestions: [],
+          isLoadingResponse: false,
+        },
+        nextState: {
+          surveysResponseState: sharedResponsesState,
+          editBaseline: sharedBaseline,
+          userAnswers: null,
+          questionPool: [{ id: 'q1' }],
+          pileQuestions: [],
+          isLoadingResponse: true,
+        },
+      }),
+    ).toBe(false);
   });
 
   it('skips no-op SurveyQuestions questionPool state writes when fetched payloads are semantically unchanged', async () => {
@@ -258,6 +255,19 @@ describe('SurveyTool question pool lifecycle', () => {
       questionPoolExpectedIds: ['q1'],
       questionPoolPendingIds: [],
     });
+  });
+
+  it('does not publish a stale survey question-pool hydration result after start fresh', () => {
+    const publishQuestionPool = jest.fn();
+
+    const published = publishSurveyQuestionPoolIfCurrent({
+      isStaleRun: () => true,
+      publishQuestionPool,
+      warnMissing: true,
+    });
+
+    expect(published).toBe(false);
+    expect(publishQuestionPool).not.toHaveBeenCalled();
   });
 
   it('hydrates all survey question ids into the direct-route question pool', async () => {
@@ -308,12 +318,15 @@ describe('SurveyTool question pool lifecycle', () => {
 
   it('does not read survey/question caches from a borrowed general network when the slug is unresolved', async () => {
     const missingSlug = 'missing-session-slug';
-    const cacheWriteContext = resolveQuestionPayloadCacheWriteContext({
-      activeSessionSlug: '',
-      sessionSlug: missingSlug,
-      network: null,
-      networkChainId: null,
-    }, missingSlug);
+    const cacheWriteContext = resolveQuestionPayloadCacheWriteContext(
+      {
+        activeSessionSlug: '',
+        sessionSlug: missingSlug,
+        network: null,
+        networkChainId: null,
+      },
+      missingSlug,
+    );
 
     expect(cacheWriteContext).toMatchObject({
       sessionSlug: missingSlug,
@@ -334,24 +347,28 @@ describe('SurveyTool question pool lifecycle', () => {
   });
 
   it('reports pending survey question-pool hydration from SurveyQuestions state', () => {
-    expect(buildSurveyQuestionPoolLoadState({
-      singleQuestionMode: false,
-      isStandalone: false,
-      questionPoolExpectedIds: ['q1', 'q2'],
-      questionPoolPendingIds: ['q2'],
-    })).toEqual({
+    expect(
+      buildSurveyQuestionPoolLoadState({
+        singleQuestionMode: false,
+        isStandalone: false,
+        questionPoolExpectedIds: ['q1', 'q2'],
+        questionPoolPendingIds: ['q2'],
+      }),
+    ).toEqual({
       expectedIds: ['q1', 'q2'],
       pendingIds: ['q2'],
       pendingCount: 1,
       isIncomplete: true,
     });
 
-    expect(buildSurveyQuestionPoolLoadState({
-      singleQuestionMode: false,
-      isStandalone: true,
-      questionPoolExpectedIds: ['q1', 'q2'],
-      questionPoolPendingIds: ['q2'],
-    })).toEqual({
+    expect(
+      buildSurveyQuestionPoolLoadState({
+        singleQuestionMode: false,
+        isStandalone: true,
+        questionPoolExpectedIds: ['q1', 'q2'],
+        questionPoolPendingIds: ['q2'],
+      }),
+    ).toEqual({
       expectedIds: [],
       pendingIds: [],
       pendingCount: 0,
@@ -375,9 +392,11 @@ describe('SurveyTool question pool lifecycle', () => {
 
     expect(fetchQuestionPool).toHaveBeenCalledTimes(1);
     expect(getProviderKind).not.toHaveBeenCalled();
-    expect(buildQuestionPoolPendingSubmitFeedbackMessage({
-      pendingCount: loadState.pendingCount,
-    })).toBe('Loading 1 more question...');
+    expect(
+      buildQuestionPoolPendingSubmitFeedbackMessage({
+        pendingCount: loadState.pendingCount,
+      }),
+    ).toBe('Loading 1 more question...');
     // port note: the old test inspected `_submitGuard` and transient timers
     // inside `encryptAndUpload`; the portable contract is the incomplete-pool
     // preflight that refreshes questions and blocks provider/encryption work.
@@ -485,10 +504,7 @@ describe('SurveyTool question pool lifecycle', () => {
 
   it('auto-starts fresh only when the active slice is effectively empty', () => {
     const baseState = {
-      surveysResponseState: [
-        null,
-        createSlice(),
-      ],
+      surveysResponseState: [null, createSlice()],
       userHasResponse: false,
       editBaseline: null,
       isDirty: false,
@@ -498,25 +514,29 @@ describe('SurveyTool question pool lifecycle', () => {
       viewAddress: '',
     };
 
-    expect(shouldSurveyAutoStartFresh({
-      props,
-      state: baseState,
-      getRenderedQuestionIds: () => ['q1'],
-    })).toBe(true);
+    expect(
+      shouldSurveyAutoStartFresh({
+        props,
+        state: baseState,
+        getRenderedQuestionIds: () => ['q1'],
+      }),
+    ).toBe(true);
 
-    expect(shouldSurveyAutoStartFresh({
-      props,
-      state: {
-        ...baseState,
-        surveysResponseState: [
-          null,
-          createSlice({
-            additionalComments: { q1: { value: 'notes' } },
-          }),
-        ],
-      },
-      getRenderedQuestionIds: () => ['q1'],
-    })).toBe(false);
+    expect(
+      shouldSurveyAutoStartFresh({
+        props,
+        state: {
+          ...baseState,
+          surveysResponseState: [
+            null,
+            createSlice({
+              additionalComments: { q1: { value: 'notes' } },
+            }),
+          ],
+        },
+        getRenderedQuestionIds: () => ['q1'],
+      }),
+    ).toBe(false);
   });
 
   it('builds and applies start-fresh survey state before clearing drafts', () => {

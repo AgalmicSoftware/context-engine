@@ -1,46 +1,41 @@
-import {
-  SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS,
-} from './surveyResultsHtmlReportSelection.js';
-import {
-  buildSurveyResultsHtmlReportExportModalDescriptor,
-} from './surveyResultsHtmlReportModalDescriptor.js';
-import {
-  buildRedactedSessionResultsSnapshot,
-} from '../../utilities/sessionResultsExport';
+import { SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS } from './surveyResultsHtmlReportSelection.js';
+import { buildSurveyResultsHtmlReportExportModalDescriptor } from './surveyResultsHtmlReportModalDescriptor.js';
+import { buildRedactedSessionResultsSnapshot } from '../../utilities/sessionResultsExport';
 
 const buildHtmlReportSnapshot = ({
   argumentMapAvailable = false,
   atlasAvailable = false,
   reportAvailable = true,
   riskMatrixAvailable = false,
-} = {}) => buildRedactedSessionResultsSnapshot({
-  exportedAt: '2026-05-25T18:30:00.000Z',
-  session: {
-    chainId: 11155420,
-    name: 'Readiness Session',
-    slug: 'readiness-session',
-  },
-  sections: {
-    argumentMap: {
-      available: argumentMapAvailable,
-      debates: argumentMapAvailable ? [{ id: 'debate-1' }] : [],
+} = {}) =>
+  buildRedactedSessionResultsSnapshot({
+    exportedAt: '2026-05-25T18:30:00.000Z',
+    session: {
+      chainId: 11155420,
+      name: 'Readiness Session',
+      slug: 'readiness-session',
     },
-    atlas: {
-      available: atlasAvailable,
-      nodes: atlasAvailable ? [{ id: 'node-1' }] : [],
+    sections: {
+      argumentMap: {
+        available: argumentMapAvailable,
+        debates: argumentMapAvailable ? [{ id: 'debate-1' }] : [],
+      },
+      atlas: {
+        available: atlasAvailable,
+        nodes: atlasAvailable ? [{ id: 'node-1' }] : [],
+      },
+      report: {
+        available: reportAvailable,
+        questions: reportAvailable
+          ? [{ id: 'q1', options: [], prompt: 'Prompt', responseCount: 1, tags: [], type: 'freeform' }]
+          : [],
+      },
+      riskMatrix: {
+        available: riskMatrixAvailable,
+        comments: riskMatrixAvailable ? [{ id: 'comment-1' }] : [],
+      },
     },
-    report: {
-      available: reportAvailable,
-      questions: reportAvailable
-        ? [{ id: 'q1', options: [], prompt: 'Prompt', responseCount: 1, tags: [], type: 'freeform' }]
-        : [],
-    },
-    riskMatrix: {
-      available: riskMatrixAvailable,
-      comments: riskMatrixAvailable ? [{ id: 'comment-1' }] : [],
-    },
-  },
-});
+  });
 
 const buildAnalysisPayload = () => ({
   inputSignature: 'analysis-input',
@@ -73,19 +68,21 @@ describe('surveyResultsHtmlReportModalDescriptor', () => {
       snapshot,
     });
 
-    expect(descriptor).toEqual(expect.objectContaining({
-      analysisGenerating: false,
-      analysisProgress: '42',
-      canDownload: false,
-      exportFormat: 'viewer',
-      htmlReportAnalysisError: 'Needs generated analysis.',
-      isAuthorized: true,
-      isDemoMode: true,
-      isDemoSession: true,
-      isOpen: true,
-      needsAnalysisGeneration: true,
-      snapshot,
-    }));
+    expect(descriptor).toEqual(
+      expect.objectContaining({
+        analysisGenerating: false,
+        analysisProgress: '42',
+        canDownload: false,
+        exportFormat: 'viewer',
+        htmlReportAnalysisError: 'Needs generated analysis.',
+        isAuthorized: true,
+        isDemoMode: true,
+        isDemoSession: true,
+        isOpen: true,
+        needsAnalysisGeneration: true,
+        snapshot,
+      }),
+    );
     expect(descriptor.selectedSections).toEqual({
       ...SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS,
       argumentMap: true,

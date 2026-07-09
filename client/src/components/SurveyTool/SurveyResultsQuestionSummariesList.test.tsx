@@ -22,7 +22,7 @@ describe('SurveyResultsQuestionSummariesList', () => {
         filterLoading={false}
         renderQuestionSummary={renderQuestionSummary}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByTestId('summary-q1')).toHaveTextContent('q1');
@@ -38,7 +38,7 @@ describe('SurveyResultsQuestionSummariesList', () => {
         filterLoading={false}
         renderQuestionSummary={jest.fn()}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByText('No results yet.')).toBeInTheDocument();
@@ -49,7 +49,7 @@ describe('SurveyResultsQuestionSummariesList', () => {
         filterLoading={true}
         renderQuestionSummary={jest.fn()}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.queryByText('No results yet.')).not.toBeInTheDocument();
@@ -63,7 +63,7 @@ describe('SurveyResultsQuestionSummariesList', () => {
         filterLoading={false}
         renderQuestionSummary={jest.fn()}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByText('Results could not be displayed.')).toBeInTheDocument();

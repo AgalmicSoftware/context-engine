@@ -31,9 +31,7 @@ const renderDeepScanTooltipContent = (
   }
 
   if (!Array.isArray(tooltipLines) || tooltipLines.length === 0) return null;
-  return tooltipLines.map((line, index) => (
-    <div key={`deepScanTextLine_${index}`}>{line}</div>
-  ));
+  return tooltipLines.map((line, index) => <div key={`deepScanTextLine_${index}`}>{line}</div>);
 };
 
 const renderDeepScanTooltip = (
@@ -41,8 +39,11 @@ const renderDeepScanTooltip = (
   tooltipLines: string[] | null | undefined,
   progressRows: UserPageDeepScanProgressRow[] | null | undefined,
 ): React.ReactNode => {
-  if ((!Array.isArray(tooltipLines) || tooltipLines.length === 0) &&
-      (!Array.isArray(progressRows) || progressRows.length === 0)) return null;
+  if (
+    (!Array.isArray(tooltipLines) || tooltipLines.length === 0) &&
+    (!Array.isArray(progressRows) || progressRows.length === 0)
+  )
+    return null;
   return (
     <CETooltip
       placement="right"
@@ -70,11 +71,7 @@ const UserPageDeepScanStatusIndicator = ({
 
   return (
     <>
-      <span
-        className={styles.cornerLoadingStatus}
-        onClick={handleSpinnerEvent}
-        onMouseDown={handleSpinnerEvent}
-      >
+      <span className={styles.cornerLoadingStatus} onClick={handleSpinnerEvent} onMouseDown={handleSpinnerEvent}>
         <FontAwesomeIcon
           icon={faSpinner}
           spin

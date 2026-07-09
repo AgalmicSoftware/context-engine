@@ -166,17 +166,13 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
       return key;
     });
 
-    const decrypted = await cryptoUtils.decryptMultipleAnswers(
-      encrypted,
-      questionPool,
-      {
-        provider: providerDecrypt,
-        account: ACCOUNT,
-        chainId: CHAIN_ID,
-        surveyId: SURVEY_ID,
-        lit: { getKey },
-      }
-    );
+    const decrypted = await cryptoUtils.decryptMultipleAnswers(encrypted, questionPool, {
+      provider: providerDecrypt,
+      account: ACCOUNT,
+      chainId: CHAIN_ID,
+      surveyId: SURVEY_ID,
+      lit: { getKey },
+    });
 
     expect(decrypted.answers.q1.value).toBe('Agree');
     expect(decrypted.additionalComments.q1.value).toBe('because reasons');
@@ -236,17 +232,13 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
       return key;
     });
 
-    const decrypted = await cryptoUtils.decryptMultipleAnswers(
-      encrypted,
-      questionPool,
-      {
-        provider: providerDecrypt,
-        account: ACCOUNT,
-        chainId: CHAIN_ID,
-        surveyId: SURVEY_ID,
-        lit: { getKey },
-      }
-    );
+    const decrypted = await cryptoUtils.decryptMultipleAnswers(encrypted, questionPool, {
+      provider: providerDecrypt,
+      account: ACCOUNT,
+      chainId: CHAIN_ID,
+      surveyId: SURVEY_ID,
+      lit: { getKey },
+    });
 
     expect(litEntry?.lit?.ciphertext).toBeTruthy();
     expect(decrypted.answers.q1.value).toBe('Lit fallback secret');
@@ -273,15 +265,17 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
       qId: 'q-lit-first',
       lit: {
         saveKey,
-        recipients: [{
-          accessControlConditions: buildSbtAccessControlConditions({
-            sbtAddresses: [GATE_A],
-            chainId: CHAIN_ID,
-            litChain: 'baseSepolia',
-            mode: 'any',
-          }),
-          chain: 'baseSepolia',
-        }],
+        recipients: [
+          {
+            accessControlConditions: buildSbtAccessControlConditions({
+              sbtAddresses: [GATE_A],
+              chainId: CHAIN_ID,
+              litChain: 'baseSepolia',
+              mode: 'any',
+            }),
+            chain: 'baseSepolia',
+          },
+        ],
       },
     });
     const getKey = jest.fn(async ({ ciphertext }) => {
@@ -300,16 +294,14 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
 
     expect(value).toBe('Lit-first secret');
     expect(getKey).toHaveBeenCalledTimes(1);
-    expect(
-      providerDecrypt.request.mock.calls.some(([req]) => req?.method === 'eth_signTypedData_v4')
-    ).toBe(false);
+    expect(providerDecrypt.request.mock.calls.some(([req]) => req?.method === 'eth_signTypedData_v4')).toBe(false);
   });
 
   it('rejects envelopes with a non-12-byte IV', async () => {
     const envelopeJson = await makeEnvelopeJson({ iv: 'AQIDBAUGBwg=' });
 
     await expect(cryptoUtils.decryptEnvelopeValue(envelopeJson)).rejects.toThrow(
-      'Envelope IV must be exactly 12 bytes (got 8).'
+      'Envelope IV must be exactly 12 bytes (got 8).',
     );
   });
 
@@ -317,7 +309,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     const envelopeJson = await makeEnvelopeJson({ ciphertext: '====' });
 
     await expect(cryptoUtils.decryptEnvelopeValue(envelopeJson)).rejects.toThrow(
-      'Envelope ciphertext is empty after decode.'
+      'Envelope ciphertext is empty after decode.',
     );
   });
 
@@ -329,7 +321,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     };
 
     await expect(cryptoUtils.decryptEnvelopeValue(JSON.stringify(litEnvelope))).rejects.toThrow(
-      'Lit recipient missing ciphertext or encryptedSymmetricKey.'
+      'Lit recipient missing ciphertext or encryptedSymmetricKey.',
     );
 
     const selfEnvelope = {
@@ -338,7 +330,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     };
 
     await expect(cryptoUtils.decryptEnvelopeValue(JSON.stringify(selfEnvelope))).rejects.toThrow(
-      'Self-EIP712 recipient missing wrap_iv or wrapped_cek.'
+      'Self-EIP712 recipient missing wrap_iv or wrapped_cek.',
     );
   });
 
@@ -379,7 +371,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     });
 
     await expect(cryptoUtils.decryptEnvelopeValue(envelopeJson)).rejects.toThrow(
-      'Envelope keccak256 commitment has invalid format.'
+      'Envelope keccak256 commitment has invalid format.',
     );
   });
 });

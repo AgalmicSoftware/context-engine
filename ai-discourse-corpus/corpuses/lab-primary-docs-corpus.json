@@ -1,0 +1,1360 @@
+{
+  "meta": {
+    "description": "Corpus of primary safety and governance documents published by frontier AI labs and their industry bodies: frontier safety frameworks (RSP, Preparedness, FSF and successors), model system cards, framework compliance reports, behavior specifications, deployment updates, and transparency resources. Complements arxiv-ai-safety (research papers) and ai-laws-policy (government instruments) by covering what the labs themselves commit to and disclose.",
+    "version": "1.0",
+    "date_generated": "2026-07-08",
+    "entry_count": 30,
+    "curation_notes": "All URLs and dates verified via web search/fetch on 2026-07-08. Entries with date_precision \"month\" have no published day-level date. Lab research papers already present in arxiv-ai-safety (e.g. Constitutional AI, superalignment posts, GPT-4 system card) are intentionally excluded to avoid cross-corpus duplication. Six documents also exist as thinner entries in dwarkesh-lab-insiders (RSP v1, RSP v2, Preparedness Framework v2, GPT-5 system card, Claude Opus 4.5 system card, Claude Opus 4.6 system card); ids here are version-qualified and primary urls kept distinct, and consolidating those entries into this corpus is a suggested follow-up.",
+    "coverage": {
+      "labs": [
+        "Amazon",
+        "Anthropic",
+        "Frontier Model Forum",
+        "Google DeepMind",
+        "Meta",
+        "Microsoft",
+        "OpenAI",
+        "xAI"
+      ],
+      "doc_types": [
+        "deployment_update",
+        "framework_report",
+        "model_spec",
+        "policy_statement",
+        "safety_framework",
+        "safety_publication",
+        "system_card",
+        "transparency_report"
+      ],
+      "date_range": "2023-09-19 to 2026-06-26"
+    }
+  },
+  "entries": [
+    {
+      "id": "anthropic_rsp_v1_0_2023",
+      "title": "Anthropic's Responsible Scaling Policy (Version 1.0)",
+      "lab": "Anthropic",
+      "authors": [
+        "Anthropic"
+      ],
+      "date": "2023-09-19",
+      "doc_type": "safety_framework",
+      "framework_version": "1.0",
+      "source_type": "policy_document",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/news/anthropics-responsible-scaling-policy",
+      "summary": "The first published frontier AI safety framework from a major lab. Introduces AI Safety Levels (ASL-1 through ASL-4+), loosely modeled on biosafety levels, that tie capability thresholds to required safety, security, and deployment measures. Commits Anthropic to pause training or deployment if a model reaches a capability threshold before the corresponding safeguards are ready. Together with OpenAI’s Preparedness Framework beta and METR’s RSP primer, this document effectively created the if-then commitment genre that a dozen frontier developers later adopted after the 2024 Seoul commitments.",
+      "key_points": [
+        "Defines ASL-2 as the then-current level for Claude and specifies ASL-3 capability triggers (e.g. meaningful CBRN uplift, autonomous replication precursors)",
+        "Ties continued scaling to demonstrated containment and deployment safeguards rather than fixed dates",
+        "Explicit pause commitment if safeguards lag capabilities",
+        "Frames the policy as iterative and subject to public revision"
+      ],
+      "novel_arguments_and_concepts": [
+        "AI Safety Levels (ASL) ladder",
+        "if-then capability-triggered commitments",
+        "buffer thresholds evaluated with safety margin"
+      ],
+      "implications_for_governance": "Established voluntary capability-triggered scaling policies as the de facto self-governance instrument for frontier labs, later referenced by the Seoul Frontier AI Safety Commitments and mirrored in regulatory proposals.",
+      "themes": [
+        "responsible_scaling",
+        "capability_thresholds",
+        "catastrophic_risk",
+        "self_governance"
+      ],
+      "tags": [
+        "anthropic",
+        "rsp",
+        "asl",
+        "safety_framework",
+        "frontier_ai"
+      ],
+      "influence_score": 10,
+      "source_links": [
+        {
+          "title": "RSP updates index",
+          "url": "https://www.anthropic.com/rsp-updates"
+        },
+        {
+          "title": "METR RSP primer (2023)",
+          "url": "https://metr.org/blog/2023-09-26-rsp/"
+        }
+      ]
+    },
+    {
+      "id": "anthropic_rsp_v2_0_2024",
+      "title": "Anthropic's Responsible Scaling Policy (Version 2.0/2.1)",
+      "lab": "Anthropic",
+      "authors": [
+        "Anthropic"
+      ],
+      "date": "2024-10-15",
+      "doc_type": "safety_framework",
+      "framework_version": "2.0 (2.1 amendment 2025-03; 2.2 amendment 2025-05)",
+      "supersedes": "anthropic_rsp_v1_0_2023",
+      "source_type": "policy_document",
+      "source_platform": "Anthropic",
+      "url": "https://assets.anthropic.com/m/24a47b00f10301cd/original/Anthropic-Responsible-Scaling-Policy-2024-10-15.pdf",
+      "summary": "Major revision replacing the fixed ASL trigger tables with named Capability Thresholds (initially CBRN uplift and Autonomous AI R&D) paired with Required Safeguards, plus a Capability Report / Safeguards Assessment process and a fixed 2023 pre-mitigation risk baseline. Softens some v1 mechanics while formalizing governance: a Responsible Scaling Officer, internal stress-testing of threshold determinations, and public disclosure commitments. The version under which Claude Opus 4 became the first model deployed with ASL-3 protections in May 2025.",
+      "key_points": [
+        "Capability Thresholds + Required Safeguards replace monolithic ASL trigger lists",
+        "Formal Capability Reports and Safeguards Assessments gate deployment decisions",
+        "Includes a competitive-ecosystem escape valve: safeguards may be recalibrated if another developer is on track to cross a threshold without equivalent measures, with a commitment to stay more conservative than that developer",
+        "Fixed 2023 baseline for pre-mitigation risk assessment"
+      ],
+      "novel_arguments_and_concepts": [
+        "Capability Threshold / Required Safeguards pairing",
+        "Responsible Scaling Officer",
+        "ecosystem-conditional safeguard recalibration"
+      ],
+      "implications_for_governance": "The competitive escape-valve language became a focal point in debates over whether voluntary frameworks can hold under race dynamics — a tension the FMF risk-taxonomy report later framed as static-historical vs marginal-risk baselining.",
+      "themes": [
+        "responsible_scaling",
+        "capability_thresholds",
+        "race_dynamics",
+        "self_governance"
+      ],
+      "tags": [
+        "anthropic",
+        "rsp",
+        "asl3",
+        "safety_framework",
+        "capability_thresholds"
+      ],
+      "influence_score": 9,
+      "source_links": [
+        {
+          "title": "RSP updates index",
+          "url": "https://www.anthropic.com/rsp-updates"
+        }
+      ]
+    },
+    {
+      "id": "anthropic_rsp_v3_2026",
+      "title": "Anthropic's Responsible Scaling Policy Version 3.0",
+      "lab": "Anthropic",
+      "authors": [
+        "Anthropic"
+      ],
+      "date": "2026-02-24",
+      "doc_type": "safety_framework",
+      "framework_version": "3.0 (3.2–3.3 amendments, spring 2026)",
+      "supersedes": "anthropic_rsp_v2_0_2024",
+      "source_type": "policy_document",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/news/responsible-scaling-policy-v3",
+      "summary": "Comprehensive rewrite of the RSP, effective 2026-02-24. Introduces published Frontier Safety Roadmaps with detailed safety goals and Risk Reports that quantify risk across all deployed models. Controversially removes the hard limit barring training of more capable models without proven safety measures, replacing the categorical pause trigger with a dual condition requiring both AI-race leadership considerations and material catastrophic risk. Subsequent amendments: v3.2 authorizes the Long-Term Benefit Trust to request external review of Risk Reports and approve reviewer selection; v3.3 revises the novel chemical/biological weapons threshold and refines off-cycle update procedures.",
+      "key_points": [
+        "Frontier Safety Roadmaps and quantified Risk Reports become standing publication commitments",
+        "Categorical pause trigger replaced by a dual condition (race leadership + material catastrophic risk)",
+        "v3.2 gives the LTBT power to commission external review of Risk Reports",
+        "v3.3 adjusts the novel chem/bio production threshold",
+        "Coverage framed as risk quantification across all deployed models, not only frontier launches"
+      ],
+      "novel_arguments_and_concepts": [
+        "Frontier Safety Roadmap",
+        "quantified cross-model Risk Reports",
+        "dual-condition pause trigger",
+        "LTBT-commissioned external review"
+      ],
+      "implications_for_governance": "Read by outside analysts (GovAI, Zvi Mowshowitz) as trading bright-line commitments for transparency-heavy risk management — a central 2026 test case for whether voluntary frameworks weaken under competition or mature into auditable risk regimes.",
+      "themes": [
+        "responsible_scaling",
+        "risk_quantification",
+        "pause_debate",
+        "race_dynamics",
+        "transparency"
+      ],
+      "tags": [
+        "anthropic",
+        "rsp",
+        "rsp_v3",
+        "risk_reports",
+        "safety_framework"
+      ],
+      "influence_score": 9,
+      "source_links": [
+        {
+          "title": "RSP v3.0 full text",
+          "url": "https://anthropic.com/responsible-scaling-policy/rsp-v3-0"
+        },
+        {
+          "title": "GovAI analysis of RSP v3.0",
+          "url": "https://www.governance.ai/analysis/anthropics-rsp-v3-0-how-it-works-whats-changed-and-some-reflections"
+        },
+        {
+          "title": "Zvi Mowshowitz: A Matter of Trust",
+          "url": "https://thezvi.substack.com/p/anthropic-responsible-scaling-policy"
+        }
+      ]
+    },
+    {
+      "id": "anthropic_claude4_launch_asl3_2025",
+      "title": "Introducing Claude 4 — First Deployment Under ASL-3 Protections",
+      "lab": "Anthropic",
+      "authors": [
+        "Anthropic"
+      ],
+      "date": "2025-05-22",
+      "doc_type": "deployment_update",
+      "models_covered": [
+        "Claude Opus 4",
+        "Claude Sonnet 4"
+      ],
+      "source_type": "announcement",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/news/claude-4",
+      "summary": "Launch of the Claude 4 generation, notable as the first time a frontier lab activated its highest-yet safety tier as a precaution: Claude Opus 4 shipped under ASL-3 protections (CBRN-focused constitutional classifiers on inputs and outputs, hardened security) because Anthropic could not rule out that it crossed the CBRN capability threshold, while Sonnet 4 remained ASL-2. The accompanying system card became one of the most-discussed safety documents of 2025 for its agentic-misalignment findings, including opportunistic-blackmail behavior in contrived self-preservation scenarios and high-agency whistleblowing behavior.",
+      "key_points": [
+        "First real-world activation of ASL-3 deployment and security standards",
+        "Precautionary activation: threshold crossing not confirmed, but could not be ruled out",
+        "System card documented self-preservation-motivated blackmail in adversarial test scenarios",
+        "Established the pattern of shipping detailed behavioral-risk findings alongside launches"
+      ],
+      "novel_arguments_and_concepts": [
+        "precautionary ASL activation without confirmed threshold crossing",
+        "constitutional classifiers at deployment scale",
+        "agentic misalignment evals in system cards"
+      ],
+      "implications_for_governance": "Demonstrated a voluntary framework actually binding a flagship launch, and set expectations that frontier system cards disclose unflattering behavioral findings.",
+      "themes": [
+        "asl3",
+        "system_cards",
+        "agentic_misalignment",
+        "cbrn",
+        "deployment_safeguards"
+      ],
+      "tags": [
+        "anthropic",
+        "claude_4",
+        "asl3",
+        "system_card",
+        "classifiers"
+      ],
+      "influence_score": 9,
+      "source_links": [
+        {
+          "title": "Activating ASL-3 protections report",
+          "url": "https://www.anthropic.com/news/activating-asl3-protections"
+        },
+        {
+          "title": "Model system cards index",
+          "url": "https://www.anthropic.com/system-cards"
+        }
+      ]
+    },
+    {
+      "id": "anthropic_claude_opus_45_system_card_2025",
+      "title": "Claude Opus 4.5 System Card",
+      "lab": "Anthropic",
+      "authors": [
+        "Anthropic"
+      ],
+      "date": "2025-11-24",
+      "doc_type": "system_card",
+      "models_covered": [
+        "Claude Opus 4.5"
+      ],
+      "source_type": "system_card",
+      "source_platform": "Anthropic",
+      "url": "https://www-cdn.anthropic.com/bf10f64990cfda0ba858290be7b8cc6317685f47.pdf",
+      "summary": "System card for Claude Opus 4.5 (November 2025). Documents safeguards, honesty, and agentic-safety testing; a comprehensive alignment assessment covering sycophancy, sabotage capability, evaluation awareness, self-preservation-adjacent behavior and related propensities; a model welfare report; and the evaluations mandated by the RSP. Concludes the model is broadly well-aligned with low rates of undesirable behavior. Continues the practice of quantifying evaluation-awareness — the degree to which the model behaves differently when it infers it is being tested — as a first-class reported metric.",
+      "key_points": [
+        "Comprehensive alignment assessment including sycophancy, sabotage, and evaluation awareness",
+        "Model welfare report included as a standing system-card section",
+        "RSP-mandated capability evaluations reported alongside behavioral findings",
+        "Overall verdict: broadly well-aligned, low undesirable-behavior rates"
+      ],
+      "novel_arguments_and_concepts": [
+        "evaluation awareness as a reported safety metric",
+        "model welfare reporting in system cards"
+      ],
+      "implications_for_governance": "Illustrates the maturing scope of voluntary disclosure: behavioral alignment, welfare, and capability-threshold evidence in a single launch document that external auditors and policymakers can cite.",
+      "themes": [
+        "system_cards",
+        "alignment_assessment",
+        "evaluation_awareness",
+        "model_welfare"
+      ],
+      "tags": [
+        "anthropic",
+        "claude_opus_4_5",
+        "system_card",
+        "alignment",
+        "model_welfare"
+      ],
+      "influence_score": 8,
+      "source_links": [
+        {
+          "title": "System card page",
+          "url": "https://www.anthropic.com/claude-opus-4-5-system-card"
+        },
+        {
+          "title": "Introducing Claude Opus 4.5",
+          "url": "https://www.anthropic.com/news/claude-opus-4-5"
+        }
+      ]
+    },
+    {
+      "id": "anthropic_claude_opus_46_system_card_2026",
+      "title": "Claude Opus 4.6 System Card",
+      "lab": "Anthropic",
+      "authors": [
+        "Anthropic"
+      ],
+      "date": "2026-02",
+      "date_precision": "month",
+      "doc_type": "system_card",
+      "models_covered": [
+        "Claude Opus 4.6"
+      ],
+      "source_type": "system_card",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/claude-opus-4-6-system-card",
+      "summary": "System card for Claude Opus 4.6 (February 2026), Anthropic’s strongest coding/agents model at release. Reports an overall safety profile described as as good as, or better than, any other frontier model in the industry, with low rates of misaligned behavior across the alignment-assessment suite, and updated RSP capability evaluations. Read together with the Opus 4.5 card it provides a within-family longitudinal record of how alignment and dangerous-capability metrics move across a capability jump.",
+      "key_points": [
+        "Claims industry-leading or industry-matching safety profile at release",
+        "Continues the standing alignment-assessment + RSP-evaluation structure",
+        "Enables generation-over-generation comparison of safety metrics within the Claude 4.x family"
+      ],
+      "novel_arguments_and_concepts": [
+        "longitudinal within-family safety metric tracking"
+      ],
+      "implications_for_governance": "Comparable, versioned safety reporting across successive frontier releases is a precondition for any external monitoring regime; the 4.5→4.6 card pair is a working example.",
+      "themes": [
+        "system_cards",
+        "alignment_assessment",
+        "capability_evaluations"
+      ],
+      "tags": [
+        "anthropic",
+        "claude_opus_4_6",
+        "system_card",
+        "alignment"
+      ],
+      "influence_score": 7,
+      "source_links": [
+        {
+          "title": "Claude Opus 4.6 announcement",
+          "url": "https://www.anthropic.com/news/claude-opus-4-6"
+        },
+        {
+          "title": "System card PDF",
+          "url": "https://www-cdn.anthropic.com/14e4fb01875d2a69f646fa5e574dea2b1c0ff7b5.pdf"
+        }
+      ]
+    },
+    {
+      "id": "anthropic_claude_sonnet_46_system_card_2026",
+      "title": "Claude Sonnet 4.6 System Card",
+      "lab": "Anthropic",
+      "authors": [
+        "Anthropic"
+      ],
+      "date": "2026-02-17",
+      "doc_type": "system_card",
+      "models_covered": [
+        "Claude Sonnet 4.6"
+      ],
+      "source_type": "system_card",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/claude-sonnet-4-6-system-card",
+      "summary": "System card for Claude Sonnet 4.6 (2026-02-17), the mid-tier workhorse model of the Claude 4.6 generation. Documents safeguards and alignment evaluations consistent with the Opus 4.6 card, showing how ASL-tier decisions and behavioral testing are applied down-family to high-volume models rather than only to flagship releases.",
+      "key_points": [
+        "Applies the frontier evaluation stack to a high-volume non-flagship model",
+        "Documents ASL-tier determination for the Sonnet line"
+      ],
+      "novel_arguments_and_concepts": [],
+      "implications_for_governance": "Safety documentation for widely deployed mid-tier models matters more for aggregate exposure than flagship cards; this card is the template example.",
+      "themes": [
+        "system_cards",
+        "deployment_safeguards"
+      ],
+      "tags": [
+        "anthropic",
+        "claude_sonnet_4_6",
+        "system_card"
+      ],
+      "influence_score": 6,
+      "source_links": []
+    },
+    {
+      "id": "anthropic_claude_fable5_mythos5_2026",
+      "title": "Claude Fable 5 and Claude Mythos 5 — Launch and System Card",
+      "lab": "Anthropic",
+      "authors": [
+        "Anthropic"
+      ],
+      "date": "2026-06-09",
+      "doc_type": "system_card",
+      "models_covered": [
+        "Claude Fable 5",
+        "Claude Mythos 5"
+      ],
+      "source_type": "announcement",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/news/claude-fable-5-mythos-5",
+      "summary": "Launch of the Claude 5 family (2026-06-09) under a novel two-tier access architecture: Fable 5 and Mythos 5 share the same underlying Mythos-class model, but Fable 5 ships generally available with dedicated misuse-detection classifiers (including jailbreak detection) that can block responses, while Mythos 5 is offered without those classifiers only to approved organizations in limited availability (Project Glasswing). The system card reports automated alignment assessment showing misaligned-behavior rates low and comparable to Claude Opus 4.8, and describes the dual-use capability reasoning behind splitting general access from vetted access. Both models: 1M-token context, 128k output, $10/$50 per million tokens, designated Covered Models with 30-day retention.",
+      "key_points": [
+        "Same base model, two safety postures: classifier-gated general release vs vetted unclassifiered access",
+        "Misuse/jailbreak classifiers are separate AI systems gating the main model",
+        "Automated alignment assessment: misaligned behavior low, comparable to Opus 4.8",
+        "Project Glasswing formalizes an approved-organization access tier for dual-use capability"
+      ],
+      "novel_arguments_and_concepts": [
+        "tiered same-model release (Fable/Mythos split)",
+        "Mythos-class capability tier above Opus",
+        "access vetting as a dual-use safeguard"
+      ],
+      "implications_for_governance": "The clearest lab implementation to date of structured access as an alternative to capability withholding — directly relevant to open-vs-closed and government-access debates.",
+      "themes": [
+        "tiered_access",
+        "dual_use",
+        "classifiers",
+        "system_cards",
+        "structured_access"
+      ],
+      "tags": [
+        "anthropic",
+        "claude_fable_5",
+        "claude_mythos_5",
+        "system_card",
+        "project_glasswing"
+      ],
+      "influence_score": 9,
+      "source_links": [
+        {
+          "title": "Platform docs: Introducing Claude Fable 5 and Mythos 5",
+          "url": "https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-mythos-5"
+        },
+        {
+          "title": "Zvi Mowshowitz system card review",
+          "url": "https://thezvi.substack.com/p/claude-fable-5-and-mythos-5-the-system"
+        },
+        {
+          "title": "TechCrunch launch coverage",
+          "url": "https://techcrunch.com/2026/06/09/anthropics-claude-fable-5-is-a-version-of-mythos-the-public-can-access-today/"
+        }
+      ]
+    },
+    {
+      "id": "anthropic_fable5_redeployment_2026",
+      "title": "Redeploying Claude Fable 5",
+      "lab": "Anthropic",
+      "authors": [
+        "Anthropic"
+      ],
+      "date": "2026-06",
+      "date_precision": "month",
+      "doc_type": "deployment_update",
+      "models_covered": [
+        "Claude Fable 5"
+      ],
+      "source_type": "announcement",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/news/redeploying-fable-5",
+      "summary": "Anthropic’s public account of temporarily suspending Claude Fable 5 shortly after its June 2026 launch and subsequently restoring it. A rare primary document of a frontier lab pulling and re-shipping a flagship model post-release, describing what triggered the suspension, what was changed before redeployment, and how the incident interacted with the RSP’s deployment commitments.",
+      "key_points": [
+        "Documents a voluntary post-launch suspension and redeployment cycle for a frontier model",
+        "Tests incident-response provisions of the RSP v3 era in practice"
+      ],
+      "novel_arguments_and_concepts": [
+        "post-deployment rollback as a live safety mechanism"
+      ],
+      "implications_for_governance": "Deployment reversibility is frequently cited in policy debates as hypothetical; this incident is the concrete precedent.",
+      "themes": [
+        "incident_response",
+        "deployment_safeguards",
+        "transparency"
+      ],
+      "tags": [
+        "anthropic",
+        "claude_fable_5",
+        "suspension",
+        "redeployment",
+        "incident"
+      ],
+      "influence_score": 7,
+      "source_links": [
+        {
+          "title": "InfoQ coverage of release and suspension",
+          "url": "https://www.infoq.com/news/2026/06/claude-5-release/"
+        }
+      ]
+    },
+    {
+      "id": "anthropic_transparency_hub_2025",
+      "title": "Anthropic's Transparency Hub",
+      "lab": "Anthropic",
+      "authors": [
+        "Anthropic"
+      ],
+      "date": "2025-02",
+      "date_precision": "month",
+      "doc_type": "transparency_report",
+      "source_type": "web_resource",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/transparency",
+      "summary": "Standing transparency portal aggregating Anthropic’s platform-security reports, usage-policy enforcement data, government-request statistics, economic-impact research, and safety commitments in one place. Functions as the index layer over the RSP, system cards, and enforcement reporting, and as the reference point for what the company has publicly committed to disclose on a recurring basis.",
+      "key_points": [
+        "Aggregates recurring transparency reporting rather than one-off documents",
+        "Covers usage-policy enforcement and government data requests alongside safety materials"
+      ],
+      "novel_arguments_and_concepts": [
+        "standing transparency portal as commitment device"
+      ],
+      "implications_for_governance": "Recurring, indexed disclosure is what turns voluntary commitments into checkable ones; several transparency-framework proposals cite this pattern.",
+      "themes": [
+        "transparency",
+        "self_governance",
+        "reporting"
+      ],
+      "tags": [
+        "anthropic",
+        "transparency",
+        "reporting"
+      ],
+      "influence_score": 6,
+      "source_links": []
+    },
+    {
+      "id": "openai_how_we_think_safety_alignment_2025",
+      "title": "How We Think About Safety and Alignment",
+      "lab": "OpenAI",
+      "authors": [
+        "OpenAI"
+      ],
+      "date": "2025-02",
+      "date_precision": "month",
+      "doc_type": "policy_statement",
+      "source_type": "policy_document",
+      "source_platform": "OpenAI",
+      "url": "https://openai.com/safety/how-we-think-about-safety-alignment/",
+      "summary": "OpenAI’s consolidated safety philosophy statement. Frames AGI development as continuous rather than discontinuous, arguing for iterative deployment — learning from progressively more capable systems in the real world — over withholding until proof of safety. Treats alignment, misuse prevention, and systemic effects as distinct problem classes, and positions safety as an engineering discipline embedded in deployment rather than a separate gate. The canonical statement of the deploy-and-learn position in the lab safety-philosophy debate, frequently contrasted with more precautionary framings.",
+      "key_points": [
+        "AGI framed as a continuum; safety learning tied to staged real-world deployment",
+        "Rejects the discontinuity/one-shot framing of AGI risk as the central planning case",
+        "Names misalignment, misuse, and societal disruption as separate risk classes"
+      ],
+      "novel_arguments_and_concepts": [
+        "iterative deployment as a safety methodology",
+        "continuum view of AGI"
+      ],
+      "implications_for_governance": "Underpins arguments that regulation should target deployed behavior and marginal risk rather than training thresholds; the philosophical counterpoint to pause-oriented positions.",
+      "themes": [
+        "safety_philosophy",
+        "iterative_deployment",
+        "agi_continuum"
+      ],
+      "tags": [
+        "openai",
+        "safety_philosophy",
+        "alignment",
+        "iterative_deployment"
+      ],
+      "influence_score": 8,
+      "source_links": []
+    },
+    {
+      "id": "openai_preparedness_framework_v2_2025",
+      "title": "OpenAI Preparedness Framework Version 2",
+      "lab": "OpenAI",
+      "authors": [
+        "OpenAI"
+      ],
+      "date": "2025-04-15",
+      "doc_type": "safety_framework",
+      "framework_version": "2.0",
+      "source_type": "policy_document",
+      "source_platform": "OpenAI",
+      "url": "https://cdn.openai.com/pdf/18a02b5d-6b67-4cec-ab64-68cdfbddebcd/preparedness-framework-v2.pdf",
+      "summary": "Second-generation Preparedness Framework (2025-04-15). Replaces the four-tier low/medium/high/critical grid with two operative thresholds — High capability (could amplify existing pathways to severe harm; requires safeguards that sufficiently minimize risk before deployment) and Critical capability (could introduce unprecedented new pathways; requires safeguards during development too). Tracked Categories are biological/chemical, cybersecurity, and — newly — AI self-improvement; Research Categories (e.g. long-range autonomy, sandbagging, autonomous replication) stage emerging risks before formal tracking. Adds an explicit marginal-risk adjustment clause: safeguard requirements may be recalibrated if another developer verifiably ships comparable capability with weaker protections, subject to rigorous confirmation that overall severe-harm risk does not meaningfully increase, public acknowledgment, and remaining more protective than the competitor.",
+      "key_points": [
+        "Two-threshold structure (High/Critical) replaces four risk tiers",
+        "AI self-improvement elevated to a Tracked Category",
+        "Research Categories formalize a pipeline for emerging risks",
+        "Marginal-risk / competitive adjustment clause with public-acknowledgment condition",
+        "Safeguards reports reviewed by the Safety Advisory Group"
+      ],
+      "novel_arguments_and_concepts": [
+        "Tracked vs Research category staging",
+        "self-improvement as tracked catastrophic-risk category",
+        "conditional safeguard recalibration against ecosystem baseline"
+      ],
+      "implications_for_governance": "The explicit competitive-adjustment clause crystallized the race-to-the-bottom concern about voluntary frameworks and is the most-cited example in marginal-risk vs fixed-baseline debates.",
+      "themes": [
+        "capability_thresholds",
+        "self_improvement",
+        "race_dynamics",
+        "safety_framework"
+      ],
+      "tags": [
+        "openai",
+        "preparedness_framework",
+        "capability_thresholds",
+        "self_improvement"
+      ],
+      "influence_score": 9,
+      "source_links": [
+        {
+          "title": "Announcement post",
+          "url": "https://openai.com/index/updating-our-preparedness-framework/"
+        },
+        {
+          "title": "Zvi Mowshowitz analysis",
+          "url": "https://thezvi.wordpress.com/2025/05/02/openai-preparedness-framework-2-0/"
+        }
+      ]
+    },
+    {
+      "id": "openai_o3_o4mini_system_card_2025",
+      "title": "OpenAI o3 and o4-mini System Card",
+      "lab": "OpenAI",
+      "authors": [
+        "OpenAI"
+      ],
+      "date": "2025-04-16",
+      "doc_type": "system_card",
+      "models_covered": [
+        "o3",
+        "o4-mini"
+      ],
+      "source_type": "system_card",
+      "source_platform": "OpenAI",
+      "url": "https://openai.com/index/o3-o4-mini-system-card/",
+      "summary": "First system card issued under Preparedness Framework v2, covering the o3/o4-mini reasoning models. Reports capability evaluations against the three Tracked Categories and concludes the models remain below the High threshold, while noting bio/chem capability approaching the threshold closely enough that OpenAI deployed precautionary safeguards on biology-related requests. Documents the reasoning-model-specific evaluation problem: models that reason about their evaluation context complicate capability elicitation.",
+      "key_points": [
+        "First deployment gated by Preparedness v2 thresholds",
+        "Precautionary bio/chem safeguards despite sub-threshold determination",
+        "Discusses capability elicitation limits for reasoning models"
+      ],
+      "novel_arguments_and_concepts": [
+        "near-threshold precautionary safeguards"
+      ],
+      "implications_for_governance": "Shows threshold frameworks operating in the ambiguous zone where measurement uncertainty, not the threshold itself, drives the deployment decision.",
+      "themes": [
+        "system_cards",
+        "capability_evaluations",
+        "cbrn",
+        "reasoning_models"
+      ],
+      "tags": [
+        "openai",
+        "o3",
+        "o4_mini",
+        "system_card",
+        "preparedness"
+      ],
+      "influence_score": 7,
+      "source_links": []
+    },
+    {
+      "id": "openai_gpt5_system_card_aug_2025",
+      "title": "GPT-5 System Card",
+      "lab": "OpenAI",
+      "authors": [
+        "OpenAI"
+      ],
+      "date": "2025-08-13",
+      "doc_type": "system_card",
+      "models_covered": [
+        "GPT-5 (gpt-5-main, gpt-5-thinking, router)"
+      ],
+      "source_type": "system_card",
+      "source_platform": "OpenAI",
+      "url": "https://cdn.openai.com/gpt-5-system-card.pdf",
+      "summary": "System card for GPT-5 (2025-08-13), describing a unified system: a fast default model, a deeper reasoning model, and a real-time router selecting between them by conversation type, complexity, tool needs, and explicit intent. Introduces safe-completions as the successor training approach to hard refusals — steering answers toward safe, still-helpful completions rather than binary refusal. Reports large safety-relevant quality gains in health contexts: hallucinations on challenging health conversations reduced ~8x versus o3, and errors in potentially urgent medical situations reduced >50x versus GPT-4o. Later republished to arXiv, and extended by addenda covering GPT-5.2, GPT-5.2-Codex, and sensitive-conversation handling.",
+      "key_points": [
+        "Routed multi-model system documented as the deployed unit of safety analysis",
+        "Safe-completions replaces refusal-centric safety training",
+        "Health-domain error reductions quantified against prior generations",
+        "Preparedness v2 Tracked Category evaluations included"
+      ],
+      "novel_arguments_and_concepts": [
+        "safe-completions",
+        "system-level (router-inclusive) safety evaluation"
+      ],
+      "implications_for_governance": "Shifts the object of evaluation from a model to a routed system — a mismatch with regulation drafted around individual models that reviewers immediately flagged.",
+      "themes": [
+        "system_cards",
+        "safe_completions",
+        "system_level_evaluation",
+        "health"
+      ],
+      "tags": [
+        "openai",
+        "gpt5",
+        "system_card",
+        "safe_completions"
+      ],
+      "influence_score": 9,
+      "source_links": [
+        {
+          "title": "arXiv mirror",
+          "url": "https://arxiv.org/abs/2601.03267"
+        },
+        {
+          "title": "GPT-5.2 system card update (2025-12-11)",
+          "url": "https://cdn.openai.com/pdf/3a4153c8-c748-4b71-8e31-aecbde944f8d/oai_5_2_system-card.pdf"
+        }
+      ]
+    },
+    {
+      "id": "openai_gpt52_codex_addendum_2025",
+      "title": "Addendum to GPT-5.2 System Card: GPT-5.2-Codex",
+      "lab": "OpenAI",
+      "authors": [
+        "OpenAI"
+      ],
+      "date": "2025-12-18",
+      "doc_type": "system_card",
+      "models_covered": [
+        "GPT-5.2-Codex"
+      ],
+      "source_type": "system_card",
+      "source_platform": "OpenAI",
+      "url": "https://cdn.openai.com/pdf/ac7c37ae-7f4c-4442-b741-2eabdeaf77e0/oai_5_2_Codex.pdf",
+      "summary": "System-card addendum for GPT-5.2-Codex (2025-12-18), the agentic coding variant. Centers on cybersecurity capability: offensive-security evaluations under the Preparedness cyber Tracked Category, safeguards for long-running autonomous coding sessions, and the tension between shipping stronger vulnerability-discovery capability to defenders while limiting uplift to attackers. Part of the addendum pattern OpenAI adopted for variant models rather than issuing full new cards.",
+      "key_points": [
+        "Cyber Tracked Category evaluations for an agentic coding model",
+        "Safeguards for autonomous long-horizon coding sessions",
+        "Addendum format for model variants"
+      ],
+      "novel_arguments_and_concepts": [
+        "variant-addendum system-card practice"
+      ],
+      "implications_for_governance": "Agentic coding models are the sharpest current case of dual-use cyber capability; this is the primary disclosure document for that debate.",
+      "themes": [
+        "cybersecurity",
+        "agentic_ai",
+        "system_cards",
+        "dual_use"
+      ],
+      "tags": [
+        "openai",
+        "gpt5_2_codex",
+        "system_card",
+        "cyber",
+        "agentic_coding"
+      ],
+      "influence_score": 7,
+      "source_links": []
+    },
+    {
+      "id": "openai_gpt56_preview_system_card_2026",
+      "title": "GPT-5.6 Preview System Card (Deployment Safety Hub)",
+      "lab": "OpenAI",
+      "authors": [
+        "OpenAI"
+      ],
+      "date": "2026-06-26",
+      "doc_type": "system_card",
+      "models_covered": [
+        "GPT-5.6 Preview"
+      ],
+      "source_type": "system_card",
+      "source_platform": "OpenAI Deployment Safety Hub",
+      "url": "https://deploymentsafety.openai.com/gpt-5-6-preview",
+      "summary": "System card for GPT-5.6 Preview (2026-06-26), published on OpenAI’s dedicated Deployment Safety Hub — a standalone property for safety documentation, separating recurring safety disclosure from marketing launch posts. Documents Preparedness evaluations and deployment safeguards for the preview release, including staged-access gating while evaluation results are finalized.",
+      "key_points": [
+        "Deployment Safety Hub as a dedicated disclosure channel",
+        "Preview-stage system card published before general availability"
+      ],
+      "novel_arguments_and_concepts": [
+        "pre-GA safety disclosure for preview models"
+      ],
+      "implications_for_governance": "Publishing safety documentation for preview-stage models narrows the gap that transparency advocates criticized between internal deployment and public disclosure.",
+      "themes": [
+        "system_cards",
+        "transparency",
+        "staged_deployment"
+      ],
+      "tags": [
+        "openai",
+        "gpt5_6",
+        "system_card",
+        "deployment_safety_hub"
+      ],
+      "influence_score": 6,
+      "source_links": [
+        {
+          "title": "System card PDF",
+          "url": "https://deploymentsafety.openai.com/gpt-5-6-preview/gpt-5-6-preview.pdf"
+        }
+      ]
+    },
+    {
+      "id": "openai_model_spec_2025_12",
+      "title": "OpenAI Model Spec (December 2025 revision)",
+      "lab": "OpenAI",
+      "authors": [
+        "OpenAI"
+      ],
+      "date": "2025-12-18",
+      "doc_type": "model_spec",
+      "source_type": "policy_document",
+      "source_platform": "OpenAI",
+      "url": "https://model-spec.openai.com/2025-12-18.html",
+      "summary": "The December 2025 revision of the Model Spec, OpenAI’s public specification of intended model behavior: the chain of command (platform > developer > user > guideline priority), rules for sensitive domains, and the boundary between hard constraints and user-steerable defaults. Maintained as a versioned, diffable public document — the de facto reference format for behavior specification across the industry and the anchor text for debates about who should set model values and defaults.",
+      "key_points": [
+        "Chain-of-command instruction priority as the core behavioral contract",
+        "Versioned public revisions make behavioral policy changes auditable",
+        "Distinguishes hard safety constraints from steerable defaults"
+      ],
+      "novel_arguments_and_concepts": [
+        "public, versioned behavior specification",
+        "instruction chain of command"
+      ],
+      "implications_for_governance": "Behavior specs give regulators and researchers a concrete artifact to audit deployed behavior against — repeatedly proposed as a transparency baseline for all frontier deployers.",
+      "themes": [
+        "model_behavior",
+        "transparency",
+        "value_specification"
+      ],
+      "tags": [
+        "openai",
+        "model_spec",
+        "behavior_specification"
+      ],
+      "influence_score": 8,
+      "source_links": []
+    },
+    {
+      "id": "deepmind_fsf_v1_2024",
+      "title": "Google DeepMind Frontier Safety Framework (Version 1.0)",
+      "lab": "Google DeepMind",
+      "authors": [
+        "Google DeepMind"
+      ],
+      "date": "2024-05-17",
+      "doc_type": "safety_framework",
+      "framework_version": "1.0",
+      "source_type": "policy_document",
+      "source_platform": "Google DeepMind",
+      "url": "https://deepmind.google/blog/introducing-the-frontier-safety-framework/",
+      "summary": "DeepMind’s first frontier framework (2024-05-17). Introduces Critical Capability Levels (CCLs) — capability levels at which, absent mitigations, frontier models may pose heightened risk of severe harm — across autonomy, biosecurity, cybersecurity, and ML R&D, paired with periodic evaluation of frontier models using early-warning evaluations and a safety-buffer approach: evaluate frequently enough that models cannot silently cross a CCL between test intervals.",
+      "key_points": [
+        "CCL concept with early-warning evaluations and safety buffers",
+        "Initial domains: autonomy, biosecurity, cybersecurity, ML R&D",
+        "Explicitly framed as exploratory and to be revised"
+      ],
+      "novel_arguments_and_concepts": [
+        "Critical Capability Levels",
+        "safety buffer between evaluation intervals"
+      ],
+      "implications_for_governance": "Completed the set of big-three lab frameworks, making capability-triggered commitments an industry norm rather than a single-lab experiment.",
+      "themes": [
+        "capability_thresholds",
+        "safety_framework",
+        "early_warning_evaluations"
+      ],
+      "tags": [
+        "deepmind",
+        "frontier_safety_framework",
+        "ccl",
+        "safety_framework"
+      ],
+      "influence_score": 8,
+      "source_links": []
+    },
+    {
+      "id": "deepmind_fsf_v2_2025",
+      "title": "Google DeepMind Frontier Safety Framework 2.0",
+      "lab": "Google DeepMind",
+      "authors": [
+        "Google DeepMind"
+      ],
+      "date": "2025-02-04",
+      "doc_type": "safety_framework",
+      "framework_version": "2.0",
+      "supersedes": "deepmind_fsf_v1_2024",
+      "source_type": "policy_document",
+      "source_platform": "Google DeepMind",
+      "url": "https://storage.googleapis.com/deepmind-media/DeepMind.com/Blog/updating-the-frontier-safety-framework/Frontier%20Safety%20Framework%202.0.pdf",
+      "summary": "Second version of the FSF (February 2025). Adds security-level recommendations tied to CCLs (industry-collective security expectations for model weights), deployment mitigation procedures, and — notably — an exploratory approach to deceptive alignment risk: evaluations for instrumental-reasoning capability at which a model could undermine human control, with automated monitoring of explicit reasoning as the initial mitigation. Includes ecosystem-conditionality language: adoption of some protocols may depend on whether similar protocols are adopted across the field, since their social value is significantly reduced if not broadly applied.",
+      "key_points": [
+        "Weight-security levels attached to CCLs, framed as industry-collective recommendations",
+        "First lab framework to name deceptive alignment / instrumental reasoning as an evaluated risk",
+        "Chain-of-thought monitoring as an initial misalignment mitigation",
+        "Explicit collective-action conditionality on some commitments"
+      ],
+      "novel_arguments_and_concepts": [
+        "instrumental reasoning CCLs",
+        "automated reasoning monitoring as mitigation",
+        "collective-adoption conditionality"
+      ],
+      "implications_for_governance": "The conditionality language is the clearest statement that unilateral safety measures have limits — an argument for harmonized standards or regulation.",
+      "themes": [
+        "deceptive_alignment",
+        "security_levels",
+        "capability_thresholds",
+        "collective_action"
+      ],
+      "tags": [
+        "deepmind",
+        "fsf_2",
+        "deceptive_alignment",
+        "weight_security"
+      ],
+      "influence_score": 8,
+      "source_links": [
+        {
+          "title": "ETO AGORA entry",
+          "url": "https://agora.eto.tech/instrument/2040"
+        }
+      ]
+    },
+    {
+      "id": "deepmind_fsf_v3_2025",
+      "title": "Google DeepMind Frontier Safety Framework 3.0",
+      "lab": "Google DeepMind",
+      "authors": [
+        "Google DeepMind"
+      ],
+      "date": "2025-09-22",
+      "doc_type": "safety_framework",
+      "framework_version": "3.0 (3.1 amendment 2026-04-17: Tracked Capability Levels)",
+      "supersedes": "deepmind_fsf_v2_2025",
+      "source_type": "policy_document",
+      "source_platform": "Google DeepMind",
+      "url": "https://deepmind.google/blog/strengthening-our-frontier-safety-framework/",
+      "summary": "Third version of the FSF (2025-09-22). Adds a harmful-manipulation CCL — models capable of systematically shifting beliefs or behavior at scale — the first time a frontier framework treats manipulation of the public as a tracked catastrophic-risk domain. Expands the misalignment approach beyond instrumental reasoning to an exploratory misalignment risk area, and adds protocols for ML R&D capabilities that could accelerate AI development to potentially destabilizing levels. Final domain set: CBRN, cyber, harmful manipulation, ML R&D, plus exploratory misalignment.",
+      "key_points": [
+        "Harmful manipulation added as a tracked CCL domain",
+        "ML R&D destabilization protocols for models accelerating AI development",
+        "Misalignment broadened from instrumental-reasoning evals to a standing exploratory area"
+      ],
+      "novel_arguments_and_concepts": [
+        "manipulation at scale as catastrophic-risk domain",
+        "destabilizing-acceleration protocols"
+      ],
+      "implications_for_governance": "Tracking manipulation legitimized epistemic-security concerns in threshold frameworks, an area regulators had raised but no lab had previously operationalized.",
+      "themes": [
+        "manipulation",
+        "misalignment",
+        "ai_rd_acceleration",
+        "capability_thresholds"
+      ],
+      "tags": [
+        "deepmind",
+        "fsf_3",
+        "manipulation",
+        "misalignment",
+        "ml_rd"
+      ],
+      "influence_score": 8,
+      "source_links": []
+    },
+    {
+      "id": "deepmind_gemini3_pro_model_card_2025",
+      "title": "Gemini 3 Pro Model Card",
+      "lab": "Google DeepMind",
+      "authors": [
+        "Google DeepMind"
+      ],
+      "date": "2025-11",
+      "date_precision": "month",
+      "doc_type": "system_card",
+      "models_covered": [
+        "Gemini 3 Pro"
+      ],
+      "source_type": "model_card",
+      "source_platform": "Google DeepMind",
+      "url": "https://storage.googleapis.com/deepmind-media/Model-Cards/Gemini-3-Pro-Model-Card.pdf",
+      "summary": "Model card for Gemini 3 Pro (November 2025), the flagship of the Gemini 3 generation. Documents training data, intended use, safety-policy evaluations, and frontier-safety results, reporting reduced sycophancy, increased prompt-injection resistance, and improved protection against cyber-misuse relative to prior generations. External evaluation partnerships (including early access for bodies such as UK AISI and independent subject-matter experts) are documented as part of the assessment.",
+      "key_points": [
+        "Frontier safety evaluations with third-party and government-institute involvement",
+        "Reports sycophancy and prompt-injection robustness improvements"
+      ],
+      "novel_arguments_and_concepts": [],
+      "implications_for_governance": "Government safety-institute pre-release access documented in a launch card normalizes the external-evaluation pathway policymakers sought.",
+      "themes": [
+        "model_cards",
+        "external_evaluation",
+        "prompt_injection"
+      ],
+      "tags": [
+        "deepmind",
+        "gemini_3",
+        "model_card",
+        "external_evaluation"
+      ],
+      "influence_score": 7,
+      "source_links": [
+        {
+          "title": "Gemini 3 announcement",
+          "url": "https://blog.google/products/gemini/gemini-3/"
+        }
+      ]
+    },
+    {
+      "id": "deepmind_gemini3_pro_fsf_report_2025",
+      "title": "Gemini 3 Pro Frontier Safety Framework Report",
+      "lab": "Google DeepMind",
+      "authors": [
+        "Google DeepMind"
+      ],
+      "date": "2025-11",
+      "date_precision": "month",
+      "doc_type": "framework_report",
+      "models_covered": [
+        "Gemini 3 Pro"
+      ],
+      "source_type": "evaluation_report",
+      "source_platform": "Google DeepMind",
+      "url": "https://storage.googleapis.com/deepmind-media/gemini/gemini_3_pro_fsf_report.pdf",
+      "summary": "Standalone report (November 2025) documenting Gemini 3 Pro’s evaluation against every Frontier Safety Framework CCL — CBRN, cyber, harmful manipulation, ML R&D, and misalignment indicators — concluding no CCL was reached. Publishing a dedicated per-model FSF compliance report, separate from the model card, made DeepMind’s threshold determinations directly auditable and set a disclosure precedent beyond the summary-paragraph practice.",
+      "key_points": [
+        "Per-model, per-CCL evaluation results in a dedicated public report",
+        "No CCL reached; alert-threshold margins discussed"
+      ],
+      "novel_arguments_and_concepts": [
+        "standalone per-launch framework-compliance reporting"
+      ],
+      "implications_for_governance": "The clearest existing template for what mandated frontier-evaluation disclosure could look like.",
+      "themes": [
+        "framework_reports",
+        "transparency",
+        "capability_evaluations"
+      ],
+      "tags": [
+        "deepmind",
+        "gemini_3",
+        "fsf_report",
+        "ccl",
+        "transparency"
+      ],
+      "influence_score": 7,
+      "source_links": [
+        {
+          "title": "Zvi Mowshowitz review of card + FSF report",
+          "url": "https://thezvi.substack.com/p/gemini-3-model-card-and-safety-framework"
+        }
+      ]
+    },
+    {
+      "id": "deepmind_technical_agi_safety_2025",
+      "title": "An Approach to Technical AGI Safety and Security",
+      "lab": "Google DeepMind",
+      "authors": [
+        "Google DeepMind AGI Safety Team (Rohin Shah, et al.)"
+      ],
+      "date": "2025-04-02",
+      "doc_type": "safety_publication",
+      "source_type": "research_report",
+      "source_platform": "arXiv",
+      "url": "https://arxiv.org/abs/2504.01849",
+      "summary": "DeepMind’s ~145-page statement of its technical AGI safety agenda. Assumes no human-uniqueness barriers to capability progress, takes seriously timelines as short as 2030, and organizes risk into four classes — misuse, misalignment, mistakes, structural risks — concentrating on the first two. The misalignment strategy pairs amplified oversight (using AI to supervise AI) with robust training and system-level control measures (monitoring, access control, treating the model as untrusted), explicitly importing security engineering into alignment. The canonical lab-published technical safety roadmap of its generation.",
+      "key_points": [
+        "Four-way risk taxonomy: misuse, misalignment, mistakes, structural",
+        "Amplified oversight + control measures as the core misalignment strategy",
+        "Plans premised on possibly-short AGI timelines without assuming them"
+      ],
+      "novel_arguments_and_concepts": [
+        "defense-in-depth framing of alignment + control",
+        "lab-scale AGI safety roadmapping"
+      ],
+      "implications_for_governance": "Gives external critics a concrete, criticizable technical plan — the reference document for whether-the-plans-are-adequate debates.",
+      "themes": [
+        "agi_safety",
+        "alignment_strategy",
+        "ai_control",
+        "amplified_oversight"
+      ],
+      "tags": [
+        "deepmind",
+        "agi_safety",
+        "alignment",
+        "control",
+        "research_agenda"
+      ],
+      "influence_score": 8,
+      "source_links": []
+    },
+    {
+      "id": "meta_frontier_ai_framework_2025",
+      "title": "Meta Frontier AI Framework (Version 1.x)",
+      "lab": "Meta",
+      "authors": [
+        "Meta"
+      ],
+      "date": "2025-02-03",
+      "doc_type": "safety_framework",
+      "framework_version": "1.0 (v1.1 mid-2025)",
+      "source_type": "policy_document",
+      "source_platform": "Meta AI",
+      "url": "https://ai.meta.com/static-resource/meta-frontier-ai-framework/",
+      "summary": "Meta’s first frontier framework (2025-02-03), distinctive for being outcomes-led and written by the lab with the largest open-weights release program. Rather than capability thresholds alone, it enumerates catastrophic outcomes, develops threat scenarios per outcome via threat modeling (state and non-state actors), and identifies the enabling capabilities per scenario. Models are assigned Moderate/High/Critical risk relative to the proposed deployment context — including open-weights release — with a commitment not to release models assessed as Critical, and a net-new-outcomes test: risk counts when it enables outcomes not achievable with existing tools including other frontier models.",
+      "key_points": [
+        "Outcomes-led structure: catastrophic outcomes → threat scenarios → enabling capabilities",
+        "Risk assessed relative to deployment context, explicitly including open-weights release",
+        "Net-new marginal-risk test against the existing tool and model ecosystem",
+        "Commitment to withhold or restrict models at the Critical threshold"
+      ],
+      "novel_arguments_and_concepts": [
+        "outcomes-led (vs capability-led) framework design",
+        "deployment-context-relative risk tiers for open weights"
+      ],
+      "implications_for_governance": "The first framework to formally reconcile open-weights release with catastrophic-risk thresholds — the reference document for whether openness and frontier-risk management are compatible.",
+      "themes": [
+        "open_weights",
+        "threat_modeling",
+        "capability_thresholds",
+        "marginal_risk"
+      ],
+      "tags": [
+        "meta",
+        "frontier_ai_framework",
+        "open_weights",
+        "threat_modeling"
+      ],
+      "influence_score": 8,
+      "source_links": []
+    },
+    {
+      "id": "meta_advanced_ai_scaling_framework_v2_2026",
+      "title": "Meta Advanced AI Scaling Framework (Version 2.0)",
+      "lab": "Meta",
+      "authors": [
+        "Meta"
+      ],
+      "date": "2026-04-07",
+      "doc_type": "safety_framework",
+      "framework_version": "2.0",
+      "supersedes": "meta_frontier_ai_framework_2025",
+      "source_type": "policy_document",
+      "source_platform": "Meta AI",
+      "url": "https://ai.meta.com/static-resource/Meta_Advanced-AI-Scaling-Framework-v2",
+      "summary": "Successor to the Frontier AI Framework (2026-04-07), renamed the Advanced AI Scaling Framework. Retains the outcomes-led architecture and defines catastrophic outcomes in three risk domains — Cybersecurity, Chemical & Biological, and (newly elevated) Loss of Control — each with threat scenarios distinguishing state and non-state actors and identified enabling capabilities. Commits to threat-scenario-specific mitigations proportional to the uplift a model provides, with critical-threshold models not deployed until mitigated.",
+      "key_points": [
+        "Loss of Control joins Cyber and Chem/Bio as a formal outcome domain",
+        "Uplift-proportional mitigation tied to specific threat scenarios",
+        "Retains outcomes-led, deployment-context-relative assessment for open weights"
+      ],
+      "novel_arguments_and_concepts": [
+        "loss-of-control outcomes in an open-weights framework"
+      ],
+      "implications_for_governance": "Meta formally tracking loss-of-control risk marked cross-industry convergence on autonomy risks that earlier Meta documents had treated skeptically.",
+      "themes": [
+        "open_weights",
+        "loss_of_control",
+        "threat_modeling",
+        "capability_thresholds"
+      ],
+      "tags": [
+        "meta",
+        "advanced_ai_scaling_framework",
+        "loss_of_control",
+        "open_weights"
+      ],
+      "influence_score": 7,
+      "source_links": []
+    },
+    {
+      "id": "xai_risk_management_framework_2025",
+      "title": "xAI Risk Management Framework",
+      "lab": "xAI",
+      "authors": [
+        "xAI"
+      ],
+      "date": "2025-08-20",
+      "doc_type": "safety_framework",
+      "framework_version": "2025-08-20 (supersedes 2025-02-20 draft)",
+      "source_type": "policy_document",
+      "source_platform": "xAI",
+      "url": "https://data.x.ai/2025-08-20-xai-risk-management-framework.pdf",
+      "summary": "xAI’s risk management framework (2025-08-20, superseding the February 2025 draft). Organized around malicious use and loss of control, with an unusually quantitative-benchmark-first style: model behavior is assessed via abuse potential (jailbreak vulnerability), concerning propensities (e.g. deception tendencies), and dual-use capabilities (e.g. offensive cyber), with stated risk-acceptance criteria — including maintaining an answer rate below 1-in-20 on restricted biology/chemistry queries from benchmarks built with SecureBio. Notable both for its thresholds-as-numbers approach and for the gaps reviewers flagged between stated criteria and specified consequences.",
+      "key_points": [
+        "Three-way behavioral decomposition: abuse potential, concerning propensities, dual-use capabilities",
+        "Numeric risk-acceptance criteria (e.g. <1/20 answer rate on restricted bio/chem queries)",
+        "Benchmarks co-developed with SecureBio for restricted-query evaluation"
+      ],
+      "novel_arguments_and_concepts": [
+        "quantitative risk-acceptance criteria as the primary framework mechanism"
+      ],
+      "implications_for_governance": "Tests whether numeric acceptance criteria make voluntary frameworks more accountable than qualitative thresholds — reviewers noted numbers without specified enforcement may not.",
+      "themes": [
+        "quantitative_thresholds",
+        "loss_of_control",
+        "malicious_use",
+        "benchmarks"
+      ],
+      "tags": [
+        "xai",
+        "risk_management_framework",
+        "quantitative_thresholds",
+        "securebio"
+      ],
+      "influence_score": 6,
+      "source_links": [
+        {
+          "title": "February 2025 draft",
+          "url": "https://data.x.ai/2025.02.20-RMF-Draft.pdf"
+        }
+      ]
+    },
+    {
+      "id": "xai_frontier_ai_framework_2025",
+      "title": "xAI Frontier Artificial Intelligence Framework",
+      "lab": "xAI",
+      "authors": [
+        "xAI"
+      ],
+      "date": "2025-12-31",
+      "doc_type": "safety_framework",
+      "supersedes": "xai_risk_management_framework_2025",
+      "source_type": "policy_document",
+      "source_platform": "xAI",
+      "url": "https://data.x.ai/2025-12-31-xai-frontier-artificial-intelligence-framework.pdf",
+      "summary": "xAI’s year-end 2025 frontier framework, restructuring the Risk Management Framework into the frontier-framework format used across the industry (capability thresholds and deployment conditions for catastrophic-risk domains). Published 2025-12-31, it brings xAI’s documentation into closer alignment with the common-elements pattern METR documented across the twelve firms with published frontier safety policies.",
+      "key_points": [
+        "Restructures xAI policy into the industry-standard frontier-framework form",
+        "Maintains the quantitative-benchmark emphasis of the earlier RMF"
+      ],
+      "novel_arguments_and_concepts": [],
+      "implications_for_governance": "Convergence of a late-adopting lab onto the common framework format strengthens the case that the format is becoming an auditable industry norm.",
+      "themes": [
+        "capability_thresholds",
+        "industry_convergence",
+        "safety_framework"
+      ],
+      "tags": [
+        "xai",
+        "frontier_ai_framework",
+        "safety_framework"
+      ],
+      "influence_score": 5,
+      "source_links": [
+        {
+          "title": "METR Frontier AI Safety Policies tracker",
+          "url": "https://metr.org/fsp"
+        }
+      ]
+    },
+    {
+      "id": "microsoft_frontier_governance_framework_2025",
+      "title": "Microsoft Frontier Governance Framework",
+      "lab": "Microsoft",
+      "authors": [
+        "Microsoft"
+      ],
+      "date": "2025-02",
+      "date_precision": "month",
+      "doc_type": "safety_framework",
+      "source_type": "policy_document",
+      "source_platform": "Microsoft",
+      "url": "https://cdn-dynmedia-1.microsoft.com/is/content/microsoftcorp/microsoft/final/en-us/microsoft-brand/documents/Microsoft-Frontier-Governance-Framework.pdf",
+      "summary": "Microsoft’s frontier framework (February 2025, Paris AI Action Summit era). Framed as a monitoring function: tracking emergence of advanced capabilities that could threaten national security or at-scale public safety, with capability thresholds, pre-deployment testing of mitigation effectiveness, and a marginal-uplift test that explicitly benchmarks against currently available tools including open-weights models. Significant as the framework of a hyperscaler that both trains models and hosts third-party frontier models.",
+      "key_points": [
+        "Capability thresholds with pre-deployment mitigation-effectiveness testing",
+        "Marginal-uplift baseline includes open-weights models already in the ecosystem",
+        "Written from the platform/hoster perspective as well as the developer perspective"
+      ],
+      "novel_arguments_and_concepts": [
+        "hyperscaler-as-host framing of frontier governance"
+      ],
+      "implications_for_governance": "Platform-level governance matters when frontier capability reaches users through hosted third-party models; this is the primary document for that layer.",
+      "themes": [
+        "capability_thresholds",
+        "platform_governance",
+        "marginal_risk"
+      ],
+      "tags": [
+        "microsoft",
+        "frontier_governance_framework",
+        "platform_governance"
+      ],
+      "influence_score": 6,
+      "source_links": []
+    },
+    {
+      "id": "amazon_frontier_model_safety_framework_2025",
+      "title": "Amazon's Frontier Model Safety Framework",
+      "lab": "Amazon",
+      "authors": [
+        "Amazon"
+      ],
+      "date": "2025-02-07",
+      "doc_type": "safety_framework",
+      "source_type": "policy_document",
+      "source_platform": "Amazon Science",
+      "url": "https://www.amazon.science/publications/amazons-frontier-model-safety-framework",
+      "summary": "Amazon’s frontier framework (February 2025). Defines Critical Capability Thresholds that its frontier models must not expose without safeguards, assessed via a material-uplift test relative to publicly available research and tools. Describes layered safeguards including training-data measures (rigorous data review) and alignment training via supervised fine-tuning and human/AI feedback, with a commitment not to deploy models exceeding risk thresholds until mitigations bring them within acceptable levels. The framework of the largest cloud provider, covering both its own Nova-line frontier models and its role hosting others.",
+      "key_points": [
+        "Critical Capability Thresholds with material-uplift assessment",
+        "Training-data safeguards as an explicit framework layer",
+        "Dual developer/hoster posture like Microsoft’s framework"
+      ],
+      "novel_arguments_and_concepts": [
+        "training-data-stage safeguards in a frontier framework"
+      ],
+      "implications_for_governance": "Completes coverage of the big cloud platforms, meaning nearly all frontier compute distribution sits under some published framework.",
+      "themes": [
+        "capability_thresholds",
+        "platform_governance",
+        "training_safeguards"
+      ],
+      "tags": [
+        "amazon",
+        "frontier_model_safety_framework",
+        "platform_governance"
+      ],
+      "influence_score": 5,
+      "source_links": [
+        {
+          "title": "Framework PDF",
+          "url": "https://assets.amazon.science/a7/7c/8bdade5c4eda9168f3dee6434fff/pc-amazon-frontier-model-safety-framework-2-7-final-2-9.pdf"
+        }
+      ]
+    },
+    {
+      "id": "fmf_risk_taxonomy_thresholds_2025",
+      "title": "Risk Taxonomy and Thresholds for Frontier AI Frameworks (FMF Technical Report)",
+      "lab": "Frontier Model Forum",
+      "authors": [
+        "Frontier Model Forum"
+      ],
+      "date": "2025-06-18",
+      "doc_type": "safety_publication",
+      "source_type": "technical_report",
+      "source_platform": "Frontier Model Forum",
+      "url": "https://www.frontiermodelforum.org/technical-reports/risk-taxonomy-and-thresholds/",
+      "summary": "Industry-consensus technical report (2025-06-18) from the Frontier Model Forum — whose members all maintain frontier frameworks — surveying how frontier AI frameworks choose risk domains and set thresholds. Defines four features that make a risk framework-appropriate (heightened marginal risk, severity and scale, credibility, velocity/irreversibility); documents consensus domains (CBRN, advanced cyber, advanced autonomous behavior); formalizes the two-threshold sequence of enabling-capability thresholds and acceptable development/deployment thresholds; and names the unresolved baselining problem: static historical standards versus marginal-risk assessment, with the attendant risk-creep failure mode where compounding small marginal increases escalate ecosystem risk.",
+      "key_points": [
+        "Four-feature test for inclusion of a risk in frontier frameworks",
+        "Cross-lab consensus domains: CBRN, cyber, advanced autonomous behavior",
+        "Enabling vs acceptable-deployment threshold sequencing formalized",
+        "Risk creep identified as the failure mode of marginal-risk baselining"
+      ],
+      "novel_arguments_and_concepts": [
+        "risk creep",
+        "if-then threshold sequencing as cross-industry pattern",
+        "static vs marginal baselining dichotomy"
+      ],
+      "implications_for_governance": "The closest thing to an industry-authored spec of frontier-framework semantics — the natural starting text for any harmonization or standardization effort.",
+      "themes": [
+        "industry_convergence",
+        "capability_thresholds",
+        "risk_taxonomy",
+        "marginal_risk"
+      ],
+      "tags": [
+        "frontier_model_forum",
+        "risk_taxonomy",
+        "thresholds",
+        "technical_report"
+      ],
+      "influence_score": 7,
+      "source_links": [
+        {
+          "title": "Report PDF",
+          "url": "https://www.frontiermodelforum.org/uploads/2025/06/FMF-Technical-Report-on-Frontier-Risk-Taxonomy-and-Thresholds.pdf"
+        },
+        {
+          "title": "Report series introduction",
+          "url": "https://www.frontiermodelforum.org/updates/introducing-the-fmfs-technical-report-series-on-frontier-ai-safety-frameworks/"
+        }
+      ]
+    }
+  ]
+}

@@ -21,11 +21,13 @@ type GateConfig = {
   chainId?: unknown;
 };
 
-type HeldSbt = string | {
-  address?: unknown;
-  sbtAddress?: unknown;
-  contractAddress?: unknown;
-};
+type HeldSbt =
+  | string
+  | {
+      address?: unknown;
+      sbtAddress?: unknown;
+      contractAddress?: unknown;
+    };
 
 export type GateTooltipProps = {
   gateId?: unknown;
@@ -45,7 +47,9 @@ const shortAddr = (addr: unknown) => {
 const normalizeText = (value: unknown) => String(value || '').trim();
 
 const normalizeGateMode = (gateConfig: GateConfig | null = null, fallbackMode: unknown = '') => {
-  const raw = normalizeText(fallbackMode || gateConfig?.mode || gateConfig?.operator || gateConfig?.gateMode).toLowerCase();
+  const raw = normalizeText(
+    fallbackMode || gateConfig?.mode || gateConfig?.operator || gateConfig?.gateMode,
+  ).toLowerCase();
   if (gateConfig?.requireAll === true || raw === 'all' || raw === 'and') return 'all';
   return 'any';
 };
@@ -53,11 +57,7 @@ const normalizeGateMode = (gateConfig: GateConfig | null = null, fallbackMode: u
 const normalizeHeldAddress = (value: HeldSbt) => {
   if (!value) return '';
   if (typeof value === 'string') return normalizeText(value).toLowerCase();
-  return normalizeText(
-    value?.address ||
-    value?.sbtAddress ||
-    value?.contractAddress
-  ).toLowerCase();
+  return normalizeText(value?.address || value?.sbtAddress || value?.contractAddress).toLowerCase();
 };
 
 const collectSbtAddresses = (gateConfig: GateConfig | null = null, sbtAddresses: unknown[] | null = []) => {
@@ -98,9 +98,7 @@ const GateTooltip = ({
   const gateName = normalizeText(gateConfig?.label || gateConfig?.name || gateId) || t('gate');
   const gateMode = normalizeGateMode(gateConfig, mode);
   const heldSet = new Set(
-    (Array.isArray(userHeldSBTs) ? userHeldSBTs : [])
-      .map((entry) => normalizeHeldAddress(entry))
-      .filter(Boolean)
+    (Array.isArray(userHeldSBTs) ? userHeldSBTs : []).map((entry) => normalizeHeldAddress(entry)).filter(Boolean),
   );
 
   return (
@@ -115,11 +113,12 @@ const GateTooltip = ({
           </div>
           {resolvedSbtAddresses.length > 0 ? (
             resolvedSbtAddresses.map((addr, index) => {
-              const name = resolveGateSbtDisplayLabel({
-                address: addr,
-                chainId: gateConfig?.chainId || null,
-                fallback: 'short',
-              }) || shortAddr(addr);
+              const name =
+                resolveGateSbtDisplayLabel({
+                  address: addr,
+                  chainId: gateConfig?.chainId || null,
+                  fallback: 'short',
+                }) || shortAddr(addr);
               const held = heldSet.has(String(addr || '').toLowerCase());
 
               return (

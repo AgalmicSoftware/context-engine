@@ -67,6 +67,10 @@ import {
   consumeNonce as consumeNonceBoundary,
 } from './nonceLifecycle.js';
 import {
+  readAbuseCounterSummary as readAbuseCounterSummaryBoundary,
+  recordAbuseEvent as recordAbuseEventBoundary,
+} from './abuseObservability.js';
+import {
   corsHeaders as corsHeadersBoundary,
   originAllowed as originAllowedBoundary,
   parseAllowOrigins as parseAllowOriginsBoundary,
@@ -165,6 +169,8 @@ export const resolveWorkerRuntimeDeps = ({
       buildNonce: resolveDep('buildNonce', buildNonceBoundary),
       checkNonceRateLimit: resolveDep('checkNonceRateLimit', checkNonceRateLimitBoundary),
       consumeNonce: resolveDep('consumeNonce', consumeNonceBoundary),
+      recordAbuseEvent: resolveDep('recordAbuseEvent', recordAbuseEventBoundary),
+      readAbuseCounterSummary: resolveDep('readAbuseCounterSummary', readAbuseCounterSummaryBoundary),
       base64UrlEncode: resolveDep('base64UrlEncode', base64UrlEncodeBoundary),
       signToken: resolveDep('signToken', signTokenBoundary),
       buildAuthTokenJti: resolveDep('buildAuthTokenJti', buildAuthTokenJtiBoundary),

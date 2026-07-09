@@ -12,18 +12,15 @@ type TagInterpretationPromptOptions = {
   maxQuestions?: number;
 };
 
-const isQuestionRecord = (question: unknown): question is TagInterpretationQuestion => (
-  typeof question === 'object' && question !== null
-);
+const isQuestionRecord = (question: unknown): question is TagInterpretationQuestion =>
+  typeof question === 'object' && question !== null;
 
 export default function buildTagInterpretationPrompt({
   selectedTags = [],
   questions = [],
   maxQuestions = 20,
 }: TagInterpretationPromptOptions = {}): string {
-  const tags = (Array.isArray(selectedTags) ? selectedTags : [])
-    .map((tag) => String(tag || '').trim())
-    .filter(Boolean);
+  const tags = (Array.isArray(selectedTags) ? selectedTags : []).map((tag) => String(tag || '').trim()).filter(Boolean);
   const visibleQuestions = (Array.isArray(questions) ? questions : []).slice(0, maxQuestions);
 
   return [

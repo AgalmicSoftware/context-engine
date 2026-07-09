@@ -5,9 +5,9 @@ import {
   writeSingleQuestionResponseToCache,
 } from './surveyToolSingleQuestionController';
 
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
-const createDeferred = <T,>() => {
+const createDeferred = <T>() => {
   let resolve!: (value: T | PromiseLike<T>) => void;
   let reject!: (reason?: unknown) => void;
   const promise = new Promise<T>((res, rej) => {
@@ -18,9 +18,10 @@ const createDeferred = <T,>() => {
 };
 
 const applyStateUpdate = (stateRef: { current: Record<string, unknown> }, update: unknown) => {
-  const patch = typeof update === 'function'
-    ? (update as (state: Record<string, unknown>) => Record<string, unknown> | null)(stateRef.current)
-    : update;
+  const patch =
+    typeof update === 'function'
+      ? (update as (state: Record<string, unknown>) => Record<string, unknown> | null)(stateRef.current)
+      : update;
   stateRef.current = { ...stateRef.current, ...(patch || {}) };
   return patch;
 };
@@ -47,31 +48,35 @@ describe('surveyToolSingleQuestionController', () => {
     const getResponseHash = jest.fn();
     const scheduleRetry = jest.fn();
 
-    await expect(executeViewedSingleQuestionResponseBootstrap({
-      props: {
-        provider: {},
-        account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      },
-      state: stateRef.current,
-      questionId: 'q1',
-      responderAddress,
-      effectiveSingleSlug: 'edge',
-      safeSetState,
-      getResponse: jest.fn().mockResolvedValue(null),
-      getResponseHash,
-      readCachedResponderResponse: jest.fn().mockReturnValue(null),
-      readFreshCachedResponderResponse: jest.fn().mockResolvedValue(latest),
-      normalizeViewedResponse: jest.fn((value) => value),
-      mergeViewedResponse: jest.fn((_prev, next) => next),
-      scheduleRetry,
-      clearRetry: jest.fn(),
-      writeResponseToCache: jest.fn(),
-      prefillSingleQuestionResponse: jest.fn(),
-    })).resolves.toEqual(expect.objectContaining({
-      applied: true,
-      reason: 'loaded',
-      latest,
-    }));
+    await expect(
+      executeViewedSingleQuestionResponseBootstrap({
+        props: {
+          provider: {},
+          account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+        state: stateRef.current,
+        questionId: 'q1',
+        responderAddress,
+        effectiveSingleSlug: 'edge',
+        safeSetState,
+        getResponse: jest.fn().mockResolvedValue(null),
+        getResponseHash,
+        readCachedResponderResponse: jest.fn().mockReturnValue(null),
+        readFreshCachedResponderResponse: jest.fn().mockResolvedValue(latest),
+        normalizeViewedResponse: jest.fn((value) => value),
+        mergeViewedResponse: jest.fn((_prev, next) => next),
+        scheduleRetry,
+        clearRetry: jest.fn(),
+        writeResponseToCache: jest.fn(),
+        prefillSingleQuestionResponse: jest.fn(),
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        applied: true,
+        reason: 'loaded',
+        latest,
+      }),
+    );
 
     expect(getResponseHash).not.toHaveBeenCalled();
     expect(scheduleRetry).not.toHaveBeenCalled();
@@ -96,30 +101,34 @@ describe('surveyToolSingleQuestionController', () => {
     const safeSetState = jest.fn((update) => applyStateUpdate(stateRef, update));
     const clearRetry = jest.fn();
 
-    await expect(executeViewedSingleQuestionResponseBootstrap({
-      props: {
-        provider: {},
-        account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      },
-      state: stateRef.current,
-      questionId: 'q1',
-      responderAddress,
-      effectiveSingleSlug: 'edge',
-      safeSetState,
-      getResponse: jest.fn().mockResolvedValue({ answer: { value: 'bad' } }),
-      getResponseHash: jest.fn(),
-      readCachedResponderResponse: jest.fn().mockReturnValue(null),
-      readFreshCachedResponderResponse: jest.fn().mockResolvedValue(null),
-      normalizeViewedResponse: jest.fn().mockReturnValue(null),
-      mergeViewedResponse: jest.fn((_prev, next) => next),
-      scheduleRetry: jest.fn(),
-      clearRetry,
-      writeResponseToCache: jest.fn(),
-      prefillSingleQuestionResponse: jest.fn(),
-    })).resolves.toEqual(expect.objectContaining({
-      applied: false,
-      reason: 'malformed',
-    }));
+    await expect(
+      executeViewedSingleQuestionResponseBootstrap({
+        props: {
+          provider: {},
+          account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+        state: stateRef.current,
+        questionId: 'q1',
+        responderAddress,
+        effectiveSingleSlug: 'edge',
+        safeSetState,
+        getResponse: jest.fn().mockResolvedValue({ answer: { value: 'bad' } }),
+        getResponseHash: jest.fn(),
+        readCachedResponderResponse: jest.fn().mockReturnValue(null),
+        readFreshCachedResponderResponse: jest.fn().mockResolvedValue(null),
+        normalizeViewedResponse: jest.fn().mockReturnValue(null),
+        mergeViewedResponse: jest.fn((_prev, next) => next),
+        scheduleRetry: jest.fn(),
+        clearRetry,
+        writeResponseToCache: jest.fn(),
+        prefillSingleQuestionResponse: jest.fn(),
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        applied: false,
+        reason: 'malformed',
+      }),
+    );
 
     expect(clearRetry).toHaveBeenCalledTimes(1);
     expect(stateRef.current.noResponse).toBe(true);
@@ -148,29 +157,30 @@ describe('surveyToolSingleQuestionController', () => {
     const writeResponseToCache = jest.fn();
     const prefillSingleQuestionResponse = jest.fn();
 
-    await expect(executeOwnSingleQuestionResponseBootstrap({
-      props: {
-        provider: {},
-        account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      },
-      state: stateRef.current,
-      questionId: 'q1',
-      effectiveSingleSlug: 'edge',
-      safeSetState,
-      getResponse: jest.fn().mockResolvedValue(latest),
-      writeResponseToCache,
-      areResponsesConsistent: jest.fn().mockReturnValue(true),
-      prefillSingleQuestionResponse,
-    })).resolves.toEqual(expect.objectContaining({
-      applied: true,
-      reason: 'loaded',
-      latest,
-    }));
-
-    expect(writeResponseToCache).toHaveBeenCalledWith(
-      '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      latest
+    await expect(
+      executeOwnSingleQuestionResponseBootstrap({
+        props: {
+          provider: {},
+          account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+        state: stateRef.current,
+        questionId: 'q1',
+        effectiveSingleSlug: 'edge',
+        safeSetState,
+        getResponse: jest.fn().mockResolvedValue(latest),
+        writeResponseToCache,
+        areResponsesConsistent: jest.fn().mockReturnValue(true),
+        prefillSingleQuestionResponse,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        applied: true,
+        reason: 'loaded',
+        latest,
+      }),
     );
+
+    expect(writeResponseToCache).toHaveBeenCalledWith('0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', latest);
     expect(prefillSingleQuestionResponse).not.toHaveBeenCalled();
     expect(stateRef.current.userHasResponse).toBe(true);
     expect(stateRef.current.userAnswers).toEqual(latest);
@@ -200,29 +210,30 @@ describe('surveyToolSingleQuestionController', () => {
     const writeResponseToCache = jest.fn();
     const prefillSingleQuestionResponse = jest.fn();
 
-    await expect(executeOwnSingleQuestionResponseBootstrap({
-      props: {
-        provider: {},
-        account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      },
-      state: stateRef.current,
-      questionId: 'q1',
-      effectiveSingleSlug: 'edge',
-      safeSetState,
-      getResponse: jest.fn().mockResolvedValue(latest),
-      writeResponseToCache,
-      areResponsesConsistent: jest.fn(),
-      prefillSingleQuestionResponse,
-    })).resolves.toEqual(expect.objectContaining({
-      applied: true,
-      reason: 'loaded',
-      latest,
-    }));
-
-    expect(writeResponseToCache).toHaveBeenCalledWith(
-      '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      latest
+    await expect(
+      executeOwnSingleQuestionResponseBootstrap({
+        props: {
+          provider: {},
+          account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+        state: stateRef.current,
+        questionId: 'q1',
+        effectiveSingleSlug: 'edge',
+        safeSetState,
+        getResponse: jest.fn().mockResolvedValue(latest),
+        writeResponseToCache,
+        areResponsesConsistent: jest.fn(),
+        prefillSingleQuestionResponse,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        applied: true,
+        reason: 'loaded',
+        latest,
+      }),
     );
+
+    expect(writeResponseToCache).toHaveBeenCalledWith('0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', latest);
     expect(prefillSingleQuestionResponse).toHaveBeenCalledWith(latest);
     expect(stateRef.current.userHasResponse).toBe(true);
     expect(stateRef.current.userResponseEncrypted).toBe(true);
@@ -302,16 +313,18 @@ describe('surveyToolSingleQuestionController', () => {
     };
     const updateQuestionsCache = jest.fn();
 
-    await expect(readFreshSingleQuestionCachedResponderResponse({
-      responder: responderAddress,
-      questionId: 'q1',
-      netIdStr: '',
-      effectiveSingleSlug: 'edge',
-      readQuestionsCacheAsync: jest.fn().mockResolvedValue(freshCache),
-      ensureQuestionsNet: jest.fn((cache) => cache as typeof freshCache),
-      cloneValue: clone,
-      updateQuestionsCache,
-    })).resolves.toEqual({
+    await expect(
+      readFreshSingleQuestionCachedResponderResponse({
+        responder: responderAddress,
+        questionId: 'q1',
+        netIdStr: '',
+        effectiveSingleSlug: 'edge',
+        readQuestionsCacheAsync: jest.fn().mockResolvedValue(freshCache),
+        ensureQuestionsNet: jest.fn((cache) => cache as typeof freshCache),
+        cloneValue: clone,
+        updateQuestionsCache,
+      }),
+    ).resolves.toEqual({
       answer: { value: 'cached', encrypted: false },
     });
 

@@ -23,6 +23,11 @@ import {
 import {
   isWorkerGroupMember,
 } from './workerGroups.js';
+import {
+  rejectBytesOverLimit,
+  rejectContentLengthOverLimit,
+  resolveMaxUploadBytes,
+} from './uploadSizeLimits.js';
 
 const encoder = new TextEncoder();
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
@@ -155,7 +160,7 @@ const normalizeUploadPolicy = (policyInput) => {
   };
 };
 
-const readJsonPayload = async (request) => {
+const readJsonPayload = async (request, { maxUploadBytes } = {}) => {
   let raw = null;
   try {
     raw = await (typeof request?.clone === 'function' ? request.clone() : request).json();
@@ -168,10 +173,13 @@ const readJsonPayload = async (request) => {
   const serialized = isJsonContentType(contentType) && typeof data !== 'string'
     ? JSON.stringify(data)
     : toStr(data);
+  const bytes = encoder.encode(serialized);
+  const tooLarge = rejectBytesOverLimit({ bytes, maxUploadBytes });
+  if (tooLarge) return tooLarge;
   return {
     ok: true,
     payload: {
-      bytes: encoder.encode(serialized),
+      bytes,
       contentType,
       backend: raw.backend || raw.storageBackend || raw.storage,
       resource: trim(raw.resource) || 'docsContext',
@@ -186,7 +194,7 @@ const readJsonPayload = async (request) => {
   };
 };
 
-const readMultipartPayload = async (request) => {
+const readMultipartPayload = async (request, { maxUploadBytes } = {}) => {
   let form;
   try {
     form = await (typeof request?.clone === 'function' ? request.clone() : request).formData();
@@ -198,10 +206,13 @@ const readMultipartPayload = async (request) => {
     return { ok: false, error: 'Missing "file" or "data" field.' };
   }
   const buf = await fileOrBlob.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  const tooLarge = rejectBytesOverLimit({ bytes, maxUploadBytes });
+  if (tooLarge) return tooLarge;
   return {
     ok: true,
     payload: {
-      bytes: new Uint8Array(buf),
+      bytes,
       contentType: trim(form.get('contentType')) || fileOrBlob.type || 'application/octet-stream',
       backend: form.get('backend') || form.get('storageBackend') || form.get('storage'),
       resource: trim(form.get('resource')) || 'docsContext',
@@ -216,10 +227,13 @@ const readMultipartPayload = async (request) => {
   };
 };
 
-export const readStorageUploadRequestPayload = async (request) => {
+export const readStorageUploadRequestPayload = async (request, options = {}) => {
   const contentType = request?.headers?.get?.('content-type') || '';
-  if (contentType.includes('multipart/form-data')) return readMultipartPayload(request);
-  if (contentType.includes('application/json')) return readJsonPayload(request);
+  const maxUploadBytes = resolveMaxUploadBytes(options);
+  const contentLengthRejection = rejectContentLengthOverLimit({ request, maxUploadBytes });
+  if (contentLengthRejection) return contentLengthRejection;
+  if (contentType.includes('multipart/form-data')) return readMultipartPayload(request, { maxUploadBytes });
+  if (contentType.includes('application/json')) return readJsonPayload(request, { maxUploadBytes });
   return { ok: false, error: 'Unsupported Content-Type.' };
 };
 
@@ -796,10 +810,11 @@ const parseArweaveUploadResponse = async (response) => {
   return { body, id };
 };
 
-const handleArweaveStorageUpload = async ({ request, config, slug, uploaderAddress, backend, payload, baseHeaders, deps }) => {
+const handleArweaveStorageUpload = async ({ request, env, config, slug, uploaderAddress, backend, payload, baseHeaders, deps }) => {
   const secrets = (await deps?.getSessionSecrets?.(slug)) || {};
   const response = await deps?.arweaveUpload?.({
     request,
+    env,
     secrets,
     baseHeaders,
     config,
@@ -1357,8 +1372,9 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
 
 export const storageRoute = async ({ path, method, request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps } = {}) => {
   if (path === '/storage/upload' && method === 'POST') {
-    const uploadPayload = await (deps?.readStorageUploadRequestPayload || readStorageUploadRequestPayload)(request);
-    if (!uploadPayload?.ok) return responseJson(deps, { error: uploadPayload?.error || 'Invalid storage upload payload.' }, 400, baseHeaders);
+    const maxUploadBytes = resolveMaxUploadBytes({ env, deps });
+    const uploadPayload = await (deps?.readStorageUploadRequestPayload || readStorageUploadRequestPayload)(request, { maxUploadBytes });
+    if (!uploadPayload?.ok) return responseJson(deps, { error: uploadPayload?.error || 'Invalid storage upload payload.' }, uploadPayload?.status || 400, baseHeaders);
     const payload = uploadPayload.payload || {};
     const backend = resolveConfiguredStorageBackend({
       config,
@@ -1366,7 +1382,7 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
       payloadEncrypted: payload.payloadEncrypted,
     });
     if (isArweaveStorageBackend(backend)) {
-      return handleArweaveStorageUpload({ request, config, slug, uploaderAddress, backend, payload, baseHeaders, deps });
+      return handleArweaveStorageUpload({ request, env, config, slug, uploaderAddress, backend, payload, baseHeaders, deps });
     }
     return handleCloudflareUpload({ env, config, slug, uploaderAddress, authScopes, payload, baseHeaders, deps });
   }

@@ -1,7 +1,4 @@
-import {
-  readInjectedProviderChainId,
-  shouldUseInjectedReadProviderForChain,
-} from './readProviderSelection.js';
+import { readInjectedProviderChainId, shouldUseInjectedReadProviderForChain } from './readProviderSelection.js';
 
 describe('readInjectedProviderChainId', () => {
   it('parses hex and decimal injected chain id fields', () => {
@@ -19,31 +16,41 @@ describe('readInjectedProviderChainId', () => {
 
 describe('shouldUseInjectedReadProviderForChain', () => {
   it('allows the injected provider only when both target and wallet are on 31337', () => {
-    expect(shouldUseInjectedReadProviderForChain({
-      targetChainId: 31337,
-      injectedProvider: { chainId: '0x7a69' },
-    })).toBe(true);
+    expect(
+      shouldUseInjectedReadProviderForChain({
+        targetChainId: 31337,
+        injectedProvider: { chainId: '0x7a69' },
+      }),
+    ).toBe(true);
 
-    expect(shouldUseInjectedReadProviderForChain({
-      targetChainId: 31337,
-      injectedProvider: { networkVersion: '31337' },
-    })).toBe(true);
+    expect(
+      shouldUseInjectedReadProviderForChain({
+        targetChainId: 31337,
+        injectedProvider: { networkVersion: '31337' },
+      }),
+    ).toBe(true);
   });
 
   it('falls back to the configured RPC when the wallet is on a different chain', () => {
-    expect(shouldUseInjectedReadProviderForChain({
-      targetChainId: 31337,
-      injectedProvider: { chainId: '0x14a34' },
-    })).toBe(false);
+    expect(
+      shouldUseInjectedReadProviderForChain({
+        targetChainId: 31337,
+        injectedProvider: { chainId: '0x14a34' },
+      }),
+    ).toBe(false);
 
-    expect(shouldUseInjectedReadProviderForChain({
-      targetChainId: 31337,
-      injectedProvider: {},
-    })).toBe(false);
+    expect(
+      shouldUseInjectedReadProviderForChain({
+        targetChainId: 31337,
+        injectedProvider: {},
+      }),
+    ).toBe(false);
 
-    expect(shouldUseInjectedReadProviderForChain({
-      targetChainId: 84532,
-      injectedProvider: { chainId: '0x7a69' },
-    })).toBe(false);
+    expect(
+      shouldUseInjectedReadProviderForChain({
+        targetChainId: 84532,
+        injectedProvider: { chainId: '0x7a69' },
+      }),
+    ).toBe(false);
   });
 });

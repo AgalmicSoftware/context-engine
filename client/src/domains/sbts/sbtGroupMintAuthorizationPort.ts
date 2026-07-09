@@ -1,4 +1,4 @@
-import chainGateway from '../../utilities/web3/contractScripts.js';
+import chainGateway from '../../utilities/web3/chainGateway.js';
 import type {
   SbtGroupMintAuthorizationInput,
   SbtGroupMintAuthorizationPort,
@@ -8,15 +8,9 @@ import type {
 } from './sbtPorts.js';
 
 type SbtGroupMintAuthorizationChainGateway = {
-  computeGroupPasswordHash: (
-    input: SbtGroupPasswordHashInput
-  ) => string;
-  signGroupMintAuthorization: (
-    input: SbtGroupMintAuthorizationInput
-  ) => Promise<string>;
-  generateInvitePayloads: (
-    input: SbtInvitePayloadsInput
-  ) => Promise<SbtInvitePayload[]>;
+  computeGroupPasswordHash: (input: SbtGroupPasswordHashInput) => string;
+  signGroupMintAuthorization: (input: SbtGroupMintAuthorizationInput) => Promise<string>;
+  generateInvitePayloads: (input: SbtInvitePayloadsInput) => Promise<SbtInvitePayload[]>;
 };
 
 type BindSbtGroupMintAuthorizationPortArgs = {
@@ -26,15 +20,9 @@ type BindSbtGroupMintAuthorizationPortArgs = {
 export const bindSbtGroupMintAuthorizationPort = ({
   chainGateway: readChainGateway,
 }: BindSbtGroupMintAuthorizationPortArgs): SbtGroupMintAuthorizationPort => ({
-  computeGroupPasswordHash: (input) => (
-    readChainGateway().computeGroupPasswordHash(input)
-  ),
-  signGroupMintAuthorization: (input) => (
-    readChainGateway().signGroupMintAuthorization(input)
-  ),
-  generateInvitePayloads: (input) => (
-    readChainGateway().generateInvitePayloads(input)
-  ),
+  computeGroupPasswordHash: (input) => readChainGateway().computeGroupPasswordHash(input),
+  signGroupMintAuthorization: (input) => readChainGateway().signGroupMintAuthorization(input),
+  generateInvitePayloads: (input) => readChainGateway().generateInvitePayloads(input),
 });
 
 export const sbtGroupMintAuthorizationPort = bindSbtGroupMintAuthorizationPort({

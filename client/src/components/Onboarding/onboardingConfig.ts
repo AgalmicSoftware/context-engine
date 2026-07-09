@@ -19,7 +19,10 @@ const parseStorageBoolean = (value: unknown): boolean | null => {
 };
 
 export const isSessionColdLoadOnboardingRoute = (pathname: unknown): boolean => {
-  const normalizedPathname = String(pathname || '').trim().replace(/\/+$/, '') || '/';
+  const normalizedPathname =
+    String(pathname || '')
+      .trim()
+      .replace(/\/+$/, '') || '/';
   if (normalizedPathname === '/session') return true;
   if (!normalizedPathname.startsWith('/session/')) return false;
 
@@ -29,7 +32,7 @@ export const isSessionColdLoadOnboardingRoute = (pathname: unknown): boolean => 
 
 export const shouldAutoOpenColdLoadOnboarding = (
   storage: Pick<OnboardingStorage, 'getItem'>,
-  pathname: unknown = ''
+  pathname: unknown = '',
 ): boolean => {
   const forcedValue = parseStorageBoolean(storage?.getItem?.(COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY));
   if (forcedValue != null) return forcedValue;
@@ -43,7 +46,6 @@ export const readColdLoadOnboardingState = (storage: OnboardingStorage, pathname
   return {
     firstVisit,
     shouldStartOnboarding:
-      storage.getItem(ONBOARDING_COMPLETE_STORAGE_KEY) == null &&
-      shouldAutoOpenColdLoadOnboarding(storage, pathname),
+      storage.getItem(ONBOARDING_COMPLETE_STORAGE_KEY) == null && shouldAutoOpenColdLoadOnboarding(storage, pathname),
   };
 };

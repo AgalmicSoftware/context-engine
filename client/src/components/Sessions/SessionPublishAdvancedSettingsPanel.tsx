@@ -89,7 +89,8 @@ const SessionPublishAdvancedSettingsPanel = ({
         <span>Max fee per gas (gwei)</span>
         {renderInfoTooltip({
           id: 'gw-tip-max-fee',
-          content: 'Optional. EIP-1559 maxFeePerGas override. Use this (and priority fee) to bump a stuck/pending tx when you hit "replacement fee too low". Leave blank to use wallet defaults.',
+          content:
+            'Optional. EIP-1559 maxFeePerGas override. Use this (and priority fee) to bump a stuck/pending tx when you hit "replacement fee too low". Leave blank to use wallet defaults.',
           placement: 'right',
           testId: 'ce-wizard-worker-tooltip-gw-tip-max-fee',
           ariaLabel: 'Max fee per gas info',

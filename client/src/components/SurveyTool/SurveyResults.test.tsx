@@ -23,7 +23,7 @@ import {
 } from './SurveyResults';
 import { renderSurveyResults } from './surveyResultsTestHarness';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 
 type SurveyResultsProps = Record<string, any>;
@@ -101,11 +101,7 @@ jest.mock('./SurveyResultsModalHeader', () => ({
     mockModalHeader(props);
     return (
       <div data-testid="surveyresults-modal-header">
-        <h2>
-          {props?.viewMode === 'survey'
-            ? (props?.surveyTitle || 'Survey Results')
-            : 'Question Results'}
-        </h2>
+        <h2>{props?.viewMode === 'survey' ? props?.surveyTitle || 'Survey Results' : 'Question Results'}</h2>
         {props?.syncStatusNode}
       </div>
     );
@@ -158,17 +154,15 @@ const lastRecordedProps = (recordingMock: jest.Mock): any => {
   return calls.length > 0 ? calls[calls.length - 1][0] : undefined;
 };
 
-const recordedAggregateSummaryProps = (): any[] => (
+const recordedAggregateSummaryProps = (): any[] =>
   mockSingleQuestionResponse.mock.calls
     .map((call) => call[0])
-    .filter((props) => props && props.aggregatorResponseMode === true)
-);
+    .filter((props) => props && props.aggregatorResponseMode === true);
 
-const recordedIndividualResponseProps = (): any[] => (
+const recordedIndividualResponseProps = (): any[] =>
   mockSingleQuestionResponse.mock.calls
     .map((call) => call[0])
-    .filter((props) => props && props.aggregatorResponseMode === false)
-);
+    .filter((props) => props && props.aggregatorResponseMode === false);
 
 type QuestionsBucketOverrides = Record<string, any>;
 const buildQuestionsBucket = (overrides: QuestionsBucketOverrides = {}) => ({
@@ -211,51 +205,42 @@ type SurveyResultsCacheFixtures = {
  * namespace+slug, records writes, and feeds the surveysCache slug scan.
  */
 const installCacheFixtures = (fixtures: SurveyResultsCacheFixtures = {}) => {
-  const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(
-    (...args: any[]) => {
-      const [namespace, slug] = args as [string, string];
-      if (namespace === 'bookmarksCache') {
-        if (fixtures.bookmarksError) throw fixtures.bookmarksError;
-        return fixtures.bookmarks ?? null;
-      }
-      if (namespace === 'questionsCache') {
-        return (fixtures.questionsBySlug || {})[slug] ?? null;
-      }
-      if (namespace === 'surveysCache') {
-        return (fixtures.surveysBySlug || {})[slug] ?? null;
-      }
-      return null;
+  const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((...args: any[]) => {
+    const [namespace, slug] = args as [string, string];
+    if (namespace === 'bookmarksCache') {
+      if (fixtures.bookmarksError) throw fixtures.bookmarksError;
+      return fixtures.bookmarks ?? null;
     }
-  );
-  const readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(
-    async (...args: any[]) => {
-      const [namespace, slug] = args as [string, string];
-      if (namespace === 'questionsCache') {
-        return (fixtures.readQuestionsBySlug || {})[slug]
-          ?? (fixtures.questionsBySlug || {})[slug]
-          ?? {};
-      }
-      if (namespace === 'surveysCache') {
-        return (fixtures.surveysBySlug || {})[slug] ?? {};
-      }
-      return {};
+    if (namespace === 'questionsCache') {
+      return (fixtures.questionsBySlug || {})[slug] ?? null;
     }
-  );
+    if (namespace === 'surveysCache') {
+      return (fixtures.surveysBySlug || {})[slug] ?? null;
+    }
+    return null;
+  });
+  const readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (...args: any[]) => {
+    const [namespace, slug] = args as [string, string];
+    if (namespace === 'questionsCache') {
+      return (fixtures.readQuestionsBySlug || {})[slug] ?? (fixtures.questionsBySlug || {})[slug] ?? {};
+    }
+    if (namespace === 'surveysCache') {
+      return (fixtures.surveysBySlug || {})[slug] ?? {};
+    }
+    return {};
+  });
   const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(undefined as never);
-  const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockImplementation(
-    (...args: any[]) => {
-      const [namespace] = args as [string];
-      if (namespace !== 'surveysCache') return [];
-      return Object.entries(fixtures.surveysBySlug || {}).map(([slug, value]) => ({ slug, value }));
-    }
-  );
+  const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockImplementation((...args: any[]) => {
+    const [namespace] = args as [string];
+    if (namespace !== 'surveysCache') return [];
+    return Object.entries(fixtures.surveysBySlug || {}).map(([slug, value]) => ({ slug, value }));
+  });
   return { listSpy, peekSpy, readSpy, writeSpy };
 };
 
 /** Local contractScripts seam (harness gap): mount-time refresh needs a block number. */
-const mockLatestBlock = (value: number) => (
-  jest.spyOn(contractScripts, 'getLatestBlockNumber').mockImplementation(async () => value)
-);
+const mockLatestBlock = (value: number) =>
+  jest.spyOn(contractScripts, 'getLatestBlockNumber').mockImplementation(async () => value);
 
 /** Local read-scope seam (harness gap): keeps question fan-out deterministic per test. */
 const mockQuestionReadScope = ({
@@ -284,7 +269,7 @@ const mountSurveyResults = async (props: SurveyResultsProps = {}) => {
 
 const rerenderAndSettle = async (
   harness: ReturnType<typeof renderSurveyResults>,
-  nextProps: SurveyResultsProps
+  nextProps: SurveyResultsProps,
 ): Promise<void> => {
   harness.rerenderSurveyResults(nextProps);
   await settle();
@@ -297,10 +282,7 @@ const openSyncDetails = (): void => {
 describe('countQuestionModeResponses', () => {
   it('excludes blank freeform responses from question-mode totals', () => {
     const aggregatorByQuestion = {
-      Q1: [
-        { response: { answer: { value: '   ' } } },
-        { response: { answer: { value: 'Visible freeform answer' } } },
-      ],
+      Q1: [{ response: { answer: { value: '   ' } } }, { response: { answer: { value: 'Visible freeform answer' } } }],
     };
     const questionLookup = {
       q1: { type: 'freeform' },
@@ -311,10 +293,7 @@ describe('countQuestionModeResponses', () => {
 
   it('keeps blank responses for non-freeform question types', () => {
     const aggregatorByQuestion = {
-      q2: [
-        { response: { answer: { value: '   ' } } },
-        { response: { answer: { value: 'Agree' } } },
-      ],
+      q2: [{ response: { answer: { value: '   ' } } }, { response: { answer: { value: 'Agree' } } }],
     };
     const questionLookup = {
       q2: { type: 'binary' },
@@ -327,9 +306,7 @@ describe('countQuestionModeResponses', () => {
 describe('hasAnyCountableSurveyAnswer', () => {
   it('returns false for freeform responses that are only blank answers', () => {
     const parsedSurveyResponse = {
-      responses: [
-        { questionID: 'q1', answer: { value: '   ' } },
-      ],
+      responses: [{ questionID: 'q1', answer: { value: '   ' } }],
     };
     const questionLookup = {
       q1: { type: 'freeform' },
@@ -340,9 +317,7 @@ describe('hasAnyCountableSurveyAnswer', () => {
 
   it('keeps encrypted placeholders countable for freeform answers', () => {
     const parsedSurveyResponse = {
-      responses: [
-        { questionID: 'q1', answer: { value: '*', encrypted: true } },
-      ],
+      responses: [{ questionID: 'q1', answer: { value: '*', encrypted: true } }],
     };
     const questionLookup = {
       q1: { type: 'freeform' },
@@ -353,9 +328,7 @@ describe('hasAnyCountableSurveyAnswer', () => {
 
   it('treats answers as countable when question metadata is unavailable', () => {
     const parsedSurveyResponse = {
-      responses: [
-        { questionID: 'q1', answer: { value: '   ' } },
-      ],
+      responses: [{ questionID: 'q1', answer: { value: '   ' } }],
     };
 
     expect(hasAnyCountableSurveyAnswer(parsedSurveyResponse, {})).toBe(true);
@@ -452,7 +425,7 @@ describe('SurveyResults constructor bookmark bootstrap', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       '[surveys]',
       '[SurveyResults] Error reading bookmarksCache:',
-      readError
+      readError,
     );
     expect(screen.queryAllByTitle('Remove bookmark')).toHaveLength(0);
     expect(lastRecordedProps(mockModalHeader).bookmarkedSurveyIDs).toEqual([]);
@@ -572,26 +545,28 @@ describe('SurveyResults cache/readiness shell wiring', () => {
       expect(lastRecordedProps(mockIndividualResponsesList)?.responses).toHaveLength(1);
     });
 
-    expect(lastRecordedProps(mockModalHeader)).toEqual(expect.objectContaining({
-      currentSurveyId: SURVEY_ID,
-      effectiveSlug: 'controller-session',
-      surveyTitle: 'Controller Input Survey',
-      viewMode: 'survey',
-    }));
+    expect(lastRecordedProps(mockModalHeader)).toEqual(
+      expect.objectContaining({
+        currentSurveyId: SURVEY_ID,
+        effectiveSlug: 'controller-session',
+        surveyTitle: 'Controller Input Survey',
+        viewMode: 'survey',
+      }),
+    );
     const listProps = lastRecordedProps(mockIndividualResponsesList);
-    expect(listProps).toEqual(expect.objectContaining({
-      currentSurveyId: SURVEY_ID,
-      effectiveSlug: 'controller-session',
-      filterLoading: false,
-    }));
+    expect(listProps).toEqual(
+      expect.objectContaining({
+        currentSurveyId: SURVEY_ID,
+        effectiveSlug: 'controller-session',
+        filterLoading: false,
+      }),
+    );
     expect(listProps.responses).toEqual([
       expect.objectContaining({
         responder,
         surveyId: SURVEY_ID,
         response: expect.objectContaining({
-          responses: [
-            expect.objectContaining({ questionID: 'q1', answer: { value: 'Visible answer' } }),
-          ],
+          responses: [expect.objectContaining({ questionID: 'q1', answer: { value: 'Visible answer' } })],
         }),
       }),
     ]);
@@ -728,21 +703,17 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     });
     await settle();
     expect(onFilterChange).toHaveBeenLastCalledWith(currentFilterState);
-    expect(onFilterChange.mock.calls[onFilterChange.mock.calls.length - 1][0])
-      .toBe(currentFilterState);
-    expect(onFilterStateChangeForUrlUpdate.mock.calls[
-      onFilterStateChangeForUrlUpdate.mock.calls.length - 1
-    ][0]).toBe(currentFilterState);
+    expect(onFilterChange.mock.calls[onFilterChange.mock.calls.length - 1][0]).toBe(currentFilterState);
+    expect(onFilterStateChangeForUrlUpdate.mock.calls[onFilterStateChangeForUrlUpdate.mock.calls.length - 1][0]).toBe(
+      currentFilterState,
+    );
 
     onFilterChange.mockClear();
     onFilterStateChangeForUrlUpdate.mockClear();
 
     // Then deliver a filtered commit whose filter-state payload is a non-object.
     act(() => {
-      lastRecordedProps(mockQuestionFilter).onFilter(
-        [{ id: 'q-a' }, { id: 'q-b' }],
-        'stale-filter-payload'
-      );
+      lastRecordedProps(mockQuestionFilter).onFilter([{ id: 'q-a' }, { id: 'q-b' }], 'stale-filter-payload');
     });
     await settle();
 
@@ -811,11 +782,8 @@ describe('SurveyResults cache/readiness shell wiring', () => {
       selectedTags: ['alpha'],
       sbtFilter: sbtFilterState,
     });
-    expect(
-      onFilterChange.mock.calls[onFilterChange.mock.calls.length - 1][0].sbtFilter
-    ).toBe(sbtFilterState);
-    const filterSummaryText = (document.querySelector('.filterSummaryText')?.textContent || '')
-      .replace(/‎/g, '');
+    expect(onFilterChange.mock.calls[onFilterChange.mock.calls.length - 1][0].sbtFilter).toBe(sbtFilterState);
+    const filterSummaryText = (document.querySelector('.filterSummaryText')?.textContent || '').replace(/‎/g, '');
     expect(filterSummaryText).toMatch(/Responses:\s*2\s*Filtered:\s*1/);
   });
 
@@ -1043,8 +1011,7 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     // question id gains a summary card (display metadata comes from the sync peek path,
     // so the card uses the unknown-question fallback) carrying the read-bucket response.
     await screen.findByText('Unknown question: qread');
-    const readBackedSummary = recordedAggregateSummaryProps()
-      .find((props) => props?.question?.id === 'qread');
+    const readBackedSummary = recordedAggregateSummaryProps().find((props) => props?.question?.id === 'qread');
     expect(readBackedSummary).toBeTruthy();
     expect(readBackedSummary.allResponses).toEqual([
       expect.objectContaining({
@@ -1102,11 +1069,8 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     await settle();
 
     await screen.findByText('Unknown question: q-missing');
-    expect(
-      screen.getByText('No metadata found for this question in local cache.')
-    ).toBeInTheDocument();
-    const summaryProps = recordedAggregateSummaryProps()
-      .find((props) => props?.question?.id === 'q-missing');
+    expect(screen.getByText('No metadata found for this question in local cache.')).toBeInTheDocument();
+    const summaryProps = recordedAggregateSummaryProps().find((props) => props?.question?.id === 'q-missing');
     expect(summaryProps).toBeTruthy();
     expect(summaryProps.question).toEqual({
       id: 'q-missing',
@@ -1155,8 +1119,7 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     });
 
     await screen.findAllByText('Ready cached prompt');
-    const readyProps = recordedAggregateSummaryProps()
-      .find((props) => props?.question?.id === 'q-ready');
+    const readyProps = recordedAggregateSummaryProps().find((props) => props?.question?.id === 'q-ready');
     expect(readyProps).toBeTruthy();
     // port note: the legacy toBe identity on the cached question degraded to a structural
     // match — the scoped network merge clones question records before they reach summaries.
@@ -1167,9 +1130,7 @@ describe('SurveyResults cache/readiness shell wiring', () => {
       type: 'binary',
     });
     expect(screen.queryByText(/Unknown question:/)).toBeNull();
-    expect(
-      screen.queryByText('No metadata found for this question in local cache.')
-    ).toBeNull();
+    expect(screen.queryByText('No metadata found for this question in local cache.')).toBeNull();
     expect(writeSpy).not.toHaveBeenCalled();
     // port note: the reader-call-args facet ({activeSessionSlug, currentSurveyId,
     // questionId, viewMode}) is internal wiring with no seam here; covered by
@@ -1323,8 +1284,7 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     await settle();
 
     await screen.findByText('Unknown question: q-empty');
-    const fallbackProps = recordedAggregateSummaryProps()
-      .find((props) => props?.question?.id === 'q-empty');
+    const fallbackProps = recordedAggregateSummaryProps().find((props) => props?.question?.id === 'q-empty');
     expect(fallbackProps).toBeTruthy();
     expect(fallbackProps.question).toEqual({
       id: 'q-empty',
@@ -1362,8 +1322,9 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     await settle();
     await screen.findByText('Unknown question: q-empty');
 
-    const firstFallbackQuestion = recordedAggregateSummaryProps()
-      .find((props) => props?.question?.id === 'q-empty')?.question;
+    const firstFallbackQuestion = recordedAggregateSummaryProps().find(
+      (props) => props?.question?.id === 'q-empty',
+    )?.question;
     expect(firstFallbackQuestion).toEqual({
       id: 'q-empty',
       prompt: 'Unknown question',
@@ -1372,8 +1333,9 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     mockSingleQuestionResponse.mockClear();
     await rerenderAndSettle(harness, { sbtCacheRevision: 'fallback-reuse-nudge' });
 
-    const secondFallbackQuestion = recordedAggregateSummaryProps()
-      .find((props) => props?.question?.id === 'q-empty')?.question;
+    const secondFallbackQuestion = recordedAggregateSummaryProps().find(
+      (props) => props?.question?.id === 'q-empty',
+    )?.question;
     expect(secondFallbackQuestion).toBe(firstFallbackQuestion);
     expect(writeSpy).not.toHaveBeenCalled();
     // port note: the previous direct setState/queue/fetch/decrypt/export not-called guards
@@ -1415,8 +1377,9 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     // bare instance) moved to surveyResultsFallbackQuestionHelpers unit coverage; here the
     // component-owned guard is exercised end-to-end: fallback identity is stable per mode
     // across view toggles and differs between summary and individual modes.
-    const individualFirst = recordedIndividualResponseProps()
-      .find((props) => props?.question?.id === 'q-plan')?.question;
+    const individualFirst = recordedIndividualResponseProps().find(
+      (props) => props?.question?.id === 'q-plan',
+    )?.question;
     expect(individualFirst).toEqual({
       id: 'q-plan',
       creator: '',
@@ -1427,8 +1390,7 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     mockSingleQuestionResponse.mockClear();
     fireEvent.click(screen.getByRole('switch'));
     await settle();
-    const summaryFirst = recordedAggregateSummaryProps()
-      .find((props) => props?.question?.id === 'q-plan')?.question;
+    const summaryFirst = recordedAggregateSummaryProps().find((props) => props?.question?.id === 'q-plan')?.question;
     expect(summaryFirst).toEqual({
       id: 'q-plan',
       prompt: 'Unknown question',
@@ -1437,15 +1399,15 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     mockSingleQuestionResponse.mockClear();
     fireEvent.click(screen.getByRole('switch'));
     await settle();
-    const individualSecond = recordedIndividualResponseProps()
-      .find((props) => props?.question?.id === 'q-plan')?.question;
+    const individualSecond = recordedIndividualResponseProps().find(
+      (props) => props?.question?.id === 'q-plan',
+    )?.question;
     expect(individualSecond).toBe(individualFirst);
 
     mockSingleQuestionResponse.mockClear();
     fireEvent.click(screen.getByRole('switch'));
     await settle();
-    const summarySecond = recordedAggregateSummaryProps()
-      .find((props) => props?.question?.id === 'q-plan')?.question;
+    const summarySecond = recordedAggregateSummaryProps().find((props) => props?.question?.id === 'q-plan')?.question;
     expect(summarySecond).toBe(summaryFirst);
 
     expect(summaryFirst).not.toBe(individualFirst);

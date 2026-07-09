@@ -17,13 +17,14 @@ type TreePredicate = (node: TreeNode) => boolean;
 type SingleQuestionResponseProps = Record<string, any>;
 const asCacheEntries = (entries: any[]): any => entries;
 
-const createSubject = (props: SingleQuestionResponseProps = {}) => new SingleQuestionResponse({
-  network: { id: 84532 },
-  questionsCacheNonce: 1,
-  questionResponsesNonce: 1,
-  sessionSlug: 'edge',
-  ...props,
-});
+const createSubject = (props: SingleQuestionResponseProps = {}) =>
+  new SingleQuestionResponse({
+    network: { id: 84532 },
+    questionsCacheNonce: 1,
+    questionResponsesNonce: 1,
+    sessionSlug: 'edge',
+    ...props,
+  });
 
 const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null => {
   const stack: TreeNode[] = [node];
@@ -56,10 +57,10 @@ describe('SingleQuestionResponse style contracts', () => {
     expect(resolveSingleQuestionBookmarkIconStyle(false, true)).toEqual({ color: '#ffc107' });
     expect(resolveSingleQuestionBookmarkIconStyle(false, false)).toEqual({ color: 'white' });
     expect(buildSingleQuestionMiniPromptButtonClassName(styles)).toBe(
-      `${styles.miniPromptAbbrev} ${styles.maskedPromptActionButton}`
+      `${styles.miniPromptAbbrev} ${styles.maskedPromptActionButton}`,
     );
     expect(buildSingleQuestionReadOnlyBinaryClassName(styles, 'agree')).toBe(
-      `${styles.readOnlyBinary} ${styles.agree}`
+      `${styles.readOnlyBinary} ${styles.agree}`,
     );
     expect(SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE).toEqual({ width: '200px' });
     expect(resolveSingleQuestionRatingBarStyle(60)).toEqual({ width: '60%' });
@@ -72,7 +73,9 @@ describe('SingleQuestionResponse style contracts', () => {
     expect(scss).toMatch(/\.fullscreenQuestionContainer\s*{[\s\S]*?font-family:\s*inherit;/);
     expect(scss).toMatch(/\.fullscreenQuestionContainer\s*{[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.06\);/);
     expect(scss).toMatch(/\.questionTitle\s*{[\s\S]*?font-family:\s*inherit;/);
-    expect(scss).toMatch(/\.encryptedResponseText\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?border-radius:\s*(?:999px|var\(--ce-radius-pill\));[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.08\);/);
+    expect(scss).toMatch(
+      /\.encryptedResponseText\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?border-radius:\s*(?:999px|var\(--ce-radius-pill\));[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.08\);/,
+    );
     expect(scss).not.toMatch(/\.freeformAnswer\s*{[\s\S]*?font-family:\s*var\(--ce-font-mono\);/);
     expect(scss).not.toMatch(/\.encryptedResponseText\s*{[\s\S]*?font-family:\s*var\(--ce-font-mono\);/);
   });
@@ -81,9 +84,13 @@ describe('SingleQuestionResponse style contracts', () => {
     const scssPath = path.join(__dirname, 'SingleQuestionResponse.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
-    expect(scss).toMatch(/\.miniQuestionContainer \.questionTitleBody\s*{[\s\S]*?padding:\s*15px;[\s\S]*?padding-right:\s*88px;/);
+    expect(scss).toMatch(
+      /\.miniQuestionContainer \.questionTitleBody\s*{[\s\S]*?padding:\s*15px;[\s\S]*?padding-right:\s*88px;/,
+    );
     expect(scss).toMatch(/\.miniQuestionContainer \.cardLinksContainer\s*{[\s\S]*?top:\s*10px;[\s\S]*?right:\s*10px;/);
-    expect(scss).toMatch(/\.miniQuestionContainer \.cardLinkButton\s*{[\s\S]*?width:\s*auto;[\s\S]*?height:\s*auto;[\s\S]*?font-size:\s*0\.9em;/);
+    expect(scss).toMatch(
+      /\.miniQuestionContainer \.cardLinkButton\s*{[\s\S]*?width:\s*auto;[\s\S]*?height:\s*auto;[\s\S]*?font-size:\s*0\.9em;/,
+    );
   });
 
   it('restores prompt width when a response card has no top-right actions to show', () => {
@@ -93,7 +100,27 @@ describe('SingleQuestionResponse style contracts', () => {
     expect(scss).toMatch(/\.questionTitleBodyNoLinks\s*{[\s\S]*?padding-right:\s*28px;/);
     expect(scss).toMatch(/\.miniQuestionContainer \.questionTitleBodyNoLinks\s*{[\s\S]*?padding-right:\s*15px;/);
   });
+});
 
+describe('SingleQuestionResponse render guard', () => {
+  it('skips updates when top-level props and state values are unchanged', () => {
+    const question = { id: 'q1', prompt: 'Question?', type: 'freeform' };
+    const response = { answer: { value: 'Answer' } };
+    const subject = createSubject({ question, response });
+
+    expect(subject.shouldComponentUpdate({ ...subject.props }, { ...subject.state })).toBe(false);
+  });
+
+  it('updates when render-relevant prop or state references change', () => {
+    const question = { id: 'q1', prompt: 'Question?', type: 'freeform' };
+    const response = { answer: { value: 'Answer' } };
+    const subject = createSubject({ question, response });
+
+    expect(
+      subject.shouldComponentUpdate({ ...subject.props, response: { answer: { value: 'Updated' } } }, subject.state),
+    ).toBe(true);
+    expect(subject.shouldComponentUpdate(subject.props, { ...subject.state, miniExpanded: true })).toBe(true);
+  });
 });
 
 describe('SingleQuestionResponse card actions', () => {
@@ -155,8 +182,7 @@ describe('SingleQuestionResponse card actions', () => {
 
     const tree = subject.render();
 
-    expect(findElement(tree, (node) => node?.props?.title === 'View on Arweave')?.props?.href)
-      .toContain(preferredTxId);
+    expect(findElement(tree, (node) => node?.props?.title === 'View on Arweave')?.props?.href).toContain(preferredTxId);
   });
 
   it('does not render an Arweave link for Cloudflare-only question storage refs', () => {
@@ -217,9 +243,9 @@ describe('SingleQuestionResponse card actions', () => {
     });
 
     const debateTree = debateSubject.render();
-    expect(
-      findElement(debateTree, (node) => node?.props?.title === 'View question page')?.props?.href
-    ).toBe('/question/q-created?session=DEBATE');
+    expect(findElement(debateTree, (node) => node?.props?.title === 'View question page')?.props?.href).toBe(
+      '/question/q-created?session=DEBATE',
+    );
 
     const generalSubject = createSubject({
       mode: 'mini',
@@ -234,9 +260,9 @@ describe('SingleQuestionResponse card actions', () => {
     });
 
     const generalTree = generalSubject.render();
-    expect(
-      findElement(generalTree, (node) => node?.props?.title === 'View question page')?.props?.href
-    ).toBe('/question/q-general');
+    expect(findElement(generalTree, (node) => node?.props?.title === 'View question page')?.props?.href).toBe(
+      '/question/q-general',
+    );
   });
 });
 
@@ -279,18 +305,9 @@ describe('SingleQuestionResponse masked prompt copy', () => {
     });
 
     const tree = subject.renderSinglePersonView();
-    const notice = findElement(
-      tree,
-      (node) => node?.props?.['data-testid'] === 'ce-encrypted-answer-notice'
-    );
-    const visibleAgree = findElement(
-      tree,
-      (node) => node?.props?.children === 'Agree'
-    );
-    const visibleNote = findElement(
-      tree,
-      (node) => node?.props?.children === 'private note'
-    );
+    const notice = findElement(tree, (node) => node?.props?.['data-testid'] === 'ce-encrypted-answer-notice');
+    const visibleAgree = findElement(tree, (node) => node?.props?.children === 'Agree');
+    const visibleNote = findElement(tree, (node) => node?.props?.children === 'private note');
 
     expect(notice).toBeTruthy();
     expect(notice?.props?.children).toBe('This response is gated with the question.');
@@ -305,10 +322,12 @@ describe('SingleQuestionResponse option lookup memoization', () => {
   });
 
   it('memoizes multichoice fallback resolution for the same cache context', () => {
-    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(asCacheEntries([
-      { slug: '', value: { '84532': { questions: {} } } },
-      { slug: 'alpha', value: { '84532': { questions: { q1: { options: ['Yes', 'No'] } } } } },
-    ]));
+    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(
+      asCacheEntries([
+        { slug: '', value: { '84532': { questions: {} } } },
+        { slug: 'alpha', value: { '84532': { questions: { q1: { options: ['Yes', 'No'] } } } } },
+      ]),
+    );
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(null);
 
     const subject = createSubject();
@@ -322,10 +341,12 @@ describe('SingleQuestionResponse option lookup memoization', () => {
   });
 
   it('invalidates option memo when cache nonce props change', () => {
-    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(asCacheEntries([
-      { slug: '', value: { '84532': { questions: {} } } },
-      { slug: 'alpha', value: { '84532': { questions: { q1: { options: ['A', 'B'] } } } } },
-    ]));
+    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(
+      asCacheEntries([
+        { slug: '', value: { '84532': { questions: {} } } },
+        { slug: 'alpha', value: { '84532': { questions: { q1: { options: ['A', 'B'] } } } } },
+      ]),
+    );
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(null);
 
     const subject = createSubject({ questionsCacheNonce: 2 });
@@ -340,10 +361,12 @@ describe('SingleQuestionResponse option lookup memoization', () => {
   });
 
   it('keeps option memo warm when only response nonce changes', () => {
-    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(asCacheEntries([
-      { slug: '', value: { '84532': { questions: {} } } },
-      { slug: 'alpha', value: { '84532': { questions: { q1: { options: ['A', 'B'] } } } } },
-    ]));
+    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(
+      asCacheEntries([
+        { slug: '', value: { '84532': { questions: {} } } },
+        { slug: 'alpha', value: { '84532': { questions: { q1: { options: ['A', 'B'] } } } } },
+      ]),
+    );
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(null);
 
     const subject = createSubject({ questionResponsesNonce: 7 });
@@ -359,9 +382,9 @@ describe('SingleQuestionResponse option lookup memoization', () => {
   });
 
   it('memoizes group-cache map discovery within the same lookup context', () => {
-    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(asCacheEntries([
-      { slug: '', value: { '84532': { questions: { q1: { id: 'q1' } } } } },
-    ]));
+    const listSpy = jest
+      .spyOn(cacheScripts, 'listNamespaceEntriesSync')
+      .mockReturnValue(asCacheEntries([{ slug: '', value: { '84532': { questions: { q1: { id: 'q1' } } } } }]));
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(null);
 
     const subject = createSubject();
@@ -375,10 +398,12 @@ describe('SingleQuestionResponse option lookup memoization', () => {
   });
 
   it('does not rerun cross-group scan after memo warmup in the same context', () => {
-    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(asCacheEntries([
-      { slug: '', value: { '84532': { questions: {} } } },
-      { slug: 'alpha', value: { '84532': { questions: { q1: { options: ['Yes', 'No'] } } } } },
-    ]));
+    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(
+      asCacheEntries([
+        { slug: '', value: { '84532': { questions: {} } } },
+        { slug: 'alpha', value: { '84532': { questions: { q1: { options: ['Yes', 'No'] } } } } },
+      ]),
+    );
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(null);
 
     const subject = createSubject();
@@ -508,10 +533,7 @@ describe('SingleQuestionResponse encrypted answer CTA variants', () => {
   const litEncryptedPortion = JSON.stringify({
     v: 1,
     cipher: 'aes-gcm-256',
-    recipients: [
-      { type: 'self-eip712-v1' },
-      { type: 'lit-sbt-v1', lit: { chain: 'optimismSepolia' } },
-    ],
+    recipients: [{ type: 'self-eip712-v1' }, { type: 'lit-sbt-v1', lit: { chain: 'optimismSepolia' } }],
   });
 
   it('renders only the decrypt button for compact encrypted-answer CTA mode', () => {
@@ -597,9 +619,13 @@ describe('SingleQuestionResponse encrypted answer CTA variants', () => {
     expect(decryptButton).not.toBeNull();
     decryptButton.props.onClick();
 
-    expect(onDecryptQuestion).toHaveBeenCalledWith('q1', 'answer', expect.objectContaining({
-      answer: expect.objectContaining({ encryptedPortion: litEncryptedPortion }),
-    }));
+    expect(onDecryptQuestion).toHaveBeenCalledWith(
+      'q1',
+      'answer',
+      expect.objectContaining({
+        answer: expect.objectContaining({ encryptedPortion: litEncryptedPortion }),
+      }),
+    );
   });
 });
 
@@ -706,12 +732,14 @@ describe('SingleQuestionResponse gate tooltip integration', () => {
         type: 'freeform',
         prompt: '[encrypted]',
         encryption: {
-          gates: [{
-            gateId: 'vip_access',
-            label: 'VIP Gate',
-            mode: 'all',
-            sbtAddresses: [gateSbt],
-          }],
+          gates: [
+            {
+              gateId: 'vip_access',
+              label: 'VIP Gate',
+              mode: 'all',
+              sbtAddresses: [gateSbt],
+            },
+          ],
         },
       },
       response: {
@@ -726,7 +754,7 @@ describe('SingleQuestionResponse gate tooltip integration', () => {
     const tree = subject.renderSinglePersonView();
     const tooltip = findElement(
       tree,
-      (element) => element?.type === GateTooltip && element?.props?.gateId === 'vip_access'
+      (element) => element?.type === GateTooltip && element?.props?.gateId === 'vip_access',
     );
 
     expect(tooltip).toBeTruthy();

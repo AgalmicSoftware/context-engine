@@ -15,10 +15,7 @@ type SurveyQuestionsJsonTreeProps = {
   onInvalidInput?: (...args: unknown[]) => void;
 };
 
-export const processSurveyQuestionsJsonToTree = (
-  json: unknown,
-  level = 0,
-): SurveyQuestionsJsonTreeNode[] => {
+export const processSurveyQuestionsJsonToTree = (json: unknown, level = 0): SurveyQuestionsJsonTreeNode[] => {
   let output: SurveyQuestionsJsonTreeNode[] = [];
   if (json === null || json === undefined) {
     return output;
@@ -47,10 +44,7 @@ export const processSurveyQuestionsJsonToTree = (
   return output;
 };
 
-const normalizeJsonInputForDisplay = (
-  jsonInput: unknown,
-  onInvalidInput: (...args: unknown[]) => void,
-): unknown => {
+const normalizeJsonInputForDisplay = (jsonInput: unknown, onInvalidInput: (...args: unknown[]) => void): unknown => {
   let jsonObject: unknown;
   if (jsonInput === null || jsonInput === undefined) {
     jsonObject = {};
@@ -64,10 +58,7 @@ const normalizeJsonInputForDisplay = (
   } else if (typeof jsonInput === 'object') {
     jsonObject = jsonInput;
   } else {
-    onInvalidInput(
-      'Invalid input for jsonTreeDisplay: Expected string or object, got',
-      typeof jsonInput,
-    );
+    onInvalidInput('Invalid input for jsonTreeDisplay: Expected string or object, got', typeof jsonInput);
     jsonObject = { error: 'Invalid input type', original: String(jsonInput) };
   }
 
@@ -96,17 +87,17 @@ const SurveyQuestionsJsonTree = ({
   return (
     <ul className={styles.tree}>
       {treeData.map((node, index) => (
-        <li
-          key={index}
-          className={styles.treeItem}
-          style={buildSurveyQuestionsJsonTreeItemStyle(node.level)}
-        >
+        <li key={index} className={styles.treeItem} style={buildSurveyQuestionsJsonTreeItemStyle(node.level)}>
           <span className={styles.keyValueContainer}>
             {node.type === 'arrayItemValue' && (
-              <span>[{node.key}]: {String(node.value)}</span>
+              <span>
+                [{node.key}]: {String(node.value)}
+              </span>
             )}
             {node.type === 'objectKeyValue' && (
-              <span>{node.key}: {String(node.value)}</span>
+              <span>
+                {node.key}: {String(node.value)}
+              </span>
             )}
             {node.type === 'arrayItem' && <span>[{node.key}]</span>}
             {node.type === 'objectKey' && <span>{node.key}:</span>}

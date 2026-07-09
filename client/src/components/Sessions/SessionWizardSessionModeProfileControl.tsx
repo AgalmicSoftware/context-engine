@@ -7,6 +7,8 @@ export type SessionWizardSessionModeProfileControlProps = {
   value?: unknown;
   onChange: (profile: SessionModeProfile, compiled: { storageProfile: UnknownRecord }) => void;
   onContinue?: () => void;
+  entryOnly?: boolean;
+  showContinue?: boolean;
 };
 
 const SessionWizardSessionModeProfileControl = ({
@@ -14,12 +16,16 @@ const SessionWizardSessionModeProfileControl = ({
   value,
   onChange,
   onContinue,
+  entryOnly,
+  showContinue,
 }: SessionWizardSessionModeProfileControlProps) => (
   <SessionModeProfileField
     registryChainId={registryChainId}
     value={value}
     onChange={onChange}
     onContinue={onContinue}
+    entryOnly={entryOnly}
+    showContinue={showContinue}
   />
 );
 

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 
 import AudioInput from './AudioInput';
-import { requestAiRewrite } from '../../../utilities/ai/aiScripts';
+import { requestAiRewrite } from '../../../utilities/ai/aiClient';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper';
 
 type LastRecording = {
@@ -77,8 +77,8 @@ const actGlobal = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean;
 };
 
-jest.mock('../../../utilities/ai/aiScripts', () => {
-  const actual = jest.requireActual('../../../utilities/ai/aiScripts');
+jest.mock('../../../utilities/ai/aiClient', () => {
+  const actual = jest.requireActual('../../../utilities/ai/aiClient');
   return {
     ...actual,
     requestAiRewrite: jest.fn(),
@@ -204,20 +204,15 @@ describe('AudioInput', () => {
 
   it('shows a long-form timer while recording', () => {
     jest.useFakeTimers();
-    mockUseWhisper.mockReturnValue(buildWhisperState({
-      status: RECORDING_STATUS.RECORDING,
-      isRecording: true,
-    }));
+    mockUseWhisper.mockReturnValue(
+      buildWhisperState({
+        status: RECORDING_STATUS.RECORDING,
+        isRecording: true,
+      }),
+    );
 
     act(() => {
-      root.render(
-        <AudioInput
-          longFormMode
-          updateFunction={jest.fn()}
-          value=""
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput longFormMode updateFunction={jest.fn()} value="" placeholder="Speak" />);
     });
 
     expect(container.textContent).toContain('Recording');
@@ -232,11 +227,13 @@ describe('AudioInput', () => {
   it('auto-stops recording when a duration limit is reached', () => {
     jest.useFakeTimers();
     const stopRecording = jest.fn();
-    mockUseWhisper.mockReturnValue(buildWhisperState({
-      status: RECORDING_STATUS.RECORDING,
-      isRecording: true,
-      stopRecording,
-    }));
+    mockUseWhisper.mockReturnValue(
+      buildWhisperState({
+        status: RECORDING_STATUS.RECORDING,
+        isRecording: true,
+        stopRecording,
+      }),
+    );
 
     act(() => {
       root.render(
@@ -246,7 +243,7 @@ describe('AudioInput', () => {
           updateFunction={jest.fn()}
           value=""
           placeholder="Speak"
-        />
+        />,
       );
     });
 
@@ -262,14 +259,7 @@ describe('AudioInput', () => {
     mockUseWhisper.mockReturnValue(buildWhisperState({ startRecording }));
 
     act(() => {
-      root.render(
-        <AudioInput
-          recordingDisabled
-          updateFunction={jest.fn()}
-          value=""
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput recordingDisabled updateFunction={jest.fn()} value="" placeholder="Speak" />);
     });
 
     const micButton = requireElement(container.querySelector('button[aria-label="Recording temporarily disabled"]'));
@@ -287,13 +277,7 @@ describe('AudioInput', () => {
     mockUseWhisper.mockReturnValue(buildWhisperState({ startRecording }));
 
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={jest.fn()}
-          value=""
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={jest.fn()} value="" placeholder="Speak" />);
     });
 
     const micButton = requireElement(container.querySelector('button[aria-label="Start recording"]'));
@@ -308,19 +292,15 @@ describe('AudioInput', () => {
 
   it('hides the download dock by default even when text and audio exist', () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' });
-    mockUseWhisper.mockReturnValue(buildWhisperState({
-      lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
-      getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
-    }));
+    mockUseWhisper.mockReturnValue(
+      buildWhisperState({
+        lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
+        getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
+      }),
+    );
 
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={jest.fn()}
-          value="Hello world"
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={jest.fn()} value="Hello world" placeholder="Speak" />);
     });
 
     const downloadToggle = container.querySelector('button[title="Downloads"]');
@@ -329,19 +309,16 @@ describe('AudioInput', () => {
 
   it('shows the download dock when downloads are enabled and text/audio exist', () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' });
-    mockUseWhisper.mockReturnValue(buildWhisperState({
-      lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
-      getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
-    }));
+    mockUseWhisper.mockReturnValue(
+      buildWhisperState({
+        lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
+        getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
+      }),
+    );
 
     act(() => {
       root.render(
-        <AudioInput
-          enableDownloads={true}
-          updateFunction={jest.fn()}
-          value="Hello world"
-          placeholder="Speak"
-        />
+        <AudioInput enableDownloads={true} updateFunction={jest.fn()} value="Hello world" placeholder="Speak" />,
       );
     });
 
@@ -350,19 +327,16 @@ describe('AudioInput', () => {
 
   it('hides the download dock when downloads are disabled', () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' });
-    mockUseWhisper.mockReturnValue(buildWhisperState({
-      lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
-      getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
-    }));
+    mockUseWhisper.mockReturnValue(
+      buildWhisperState({
+        lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
+        getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
+      }),
+    );
 
     act(() => {
       root.render(
-        <AudioInput
-          enableDownloads={false}
-          updateFunction={jest.fn()}
-          value="Hello world"
-          placeholder="Speak"
-        />
+        <AudioInput enableDownloads={false} updateFunction={jest.fn()} value="Hello world" placeholder="Speak" />,
       );
     });
 
@@ -372,19 +346,16 @@ describe('AudioInput', () => {
 
   it('hides audio download choice outside transcription recording mode', () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' });
-    mockUseWhisper.mockReturnValue(buildWhisperState({
-      lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
-      getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
-    }));
+    mockUseWhisper.mockReturnValue(
+      buildWhisperState({
+        lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
+        getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
+      }),
+    );
 
     act(() => {
       root.render(
-        <AudioInput
-          enableDownloads={true}
-          updateFunction={jest.fn()}
-          value="Hello world"
-          placeholder="Speak"
-        />
+        <AudioInput enableDownloads={true} updateFunction={jest.fn()} value="Hello world" placeholder="Speak" />,
       );
     });
 
@@ -399,10 +370,12 @@ describe('AudioInput', () => {
 
   it('shows audio and transcript download choices in transcription recording mode', () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' });
-    mockUseWhisper.mockReturnValue(buildWhisperState({
-      lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
-      getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
-    }));
+    mockUseWhisper.mockReturnValue(
+      buildWhisperState({
+        lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
+        getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
+      }),
+    );
 
     act(() => {
       root.render(
@@ -412,7 +385,7 @@ describe('AudioInput', () => {
           updateFunction={jest.fn()}
           value="Hello world"
           placeholder="Speak"
-        />
+        />,
       );
     });
 
@@ -447,27 +420,26 @@ describe('AudioInput', () => {
       resume: jest.fn(() => Promise.resolve()),
     };
 
-    jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({
-      clearRect: jest.fn(),
-      fillRect: jest.fn(),
-      fillStyle: '#000',
-    } as unknown as CanvasRenderingContext2D));
+    jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+      () =>
+        ({
+          clearRect: jest.fn(),
+          fillRect: jest.fn(),
+          fillStyle: '#000',
+        }) as unknown as CanvasRenderingContext2D,
+    );
 
-    mockUseWhisper.mockReturnValue(buildWhisperState({
-      status: RECORDING_STATUS.RECORDING,
-      isRecording: true,
-      audioContextRef,
-      mediaStreamRef,
-    }));
+    mockUseWhisper.mockReturnValue(
+      buildWhisperState({
+        status: RECORDING_STATUS.RECORDING,
+        isRecording: true,
+        audioContextRef,
+        mediaStreamRef,
+      }),
+    );
 
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={jest.fn()}
-          value=""
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={jest.fn()} value="" placeholder="Speak" />);
     });
 
     const rafCallsBeforeRefs = requestAnimationFrameSpy.mock.calls.length;
@@ -489,13 +461,7 @@ describe('AudioInput', () => {
   it('skips duplicate same-text parent updates', () => {
     const updateSpy = jest.fn();
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={updateSpy}
-          value=""
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={updateSpy} value="" placeholder="Speak" />);
     });
 
     const textarea = requireElement(container.querySelector('textarea'));
@@ -521,13 +487,7 @@ describe('AudioInput', () => {
   it('emits same text again after parent-controlled reset', () => {
     const updateSpy = jest.fn();
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={updateSpy}
-          value=""
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={updateSpy} value="" placeholder="Speak" />);
     });
 
     let textarea = requireElement(container.querySelector('textarea'));
@@ -543,22 +503,10 @@ describe('AudioInput', () => {
 
     // Simulate controlled parent sync then external reset (e.g. Start Fresh).
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={updateSpy}
-          value="hello"
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={updateSpy} value="hello" placeholder="Speak" />);
     });
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={updateSpy}
-          value=""
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={updateSpy} value="" placeholder="Speak" />);
     });
 
     textarea = requireElement(container.querySelector('textarea'));
@@ -575,13 +523,7 @@ describe('AudioInput', () => {
   it('coalesces burst typing into a single parent update per frame', () => {
     const updateSpy = jest.fn();
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={updateSpy}
-          value=""
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={updateSpy} value="" placeholder="Speak" />);
     });
 
     const textarea = requireElement(container.querySelector('textarea'));
@@ -615,13 +557,7 @@ describe('AudioInput', () => {
     const updateFns = [jest.fn(), jest.fn(), jest.fn(), jest.fn()];
 
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={updateFns[0]}
-          value="Initial text"
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={updateFns[0]} value="Initial text" placeholder="Speak" />);
     });
 
     const textarea = requireElement(container.querySelector('textarea'));
@@ -646,27 +582,9 @@ describe('AudioInput', () => {
     expect(updateFns[0]).not.toHaveBeenCalled();
 
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={updateFns[1]}
-          value="parent-live-1"
-          placeholder="Speak"
-        />
-      );
-      root.render(
-        <AudioInput
-          updateFunction={updateFns[2]}
-          value="parent-live-2"
-          placeholder="Speak"
-        />
-      );
-      root.render(
-        <AudioInput
-          updateFunction={updateFns[3]}
-          value="parent-live-3"
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={updateFns[1]} value="parent-live-1" placeholder="Speak" />);
+      root.render(<AudioInput updateFunction={updateFns[2]} value="parent-live-2" placeholder="Speak" />);
+      root.render(<AudioInput updateFunction={updateFns[3]} value="parent-live-3" placeholder="Speak" />);
     });
     act(() => {
       flushRafQueue();
@@ -681,13 +599,7 @@ describe('AudioInput', () => {
   it('cancels queued parent updates on unmount', () => {
     const updateSpy = jest.fn();
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={updateSpy}
-          value=""
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={updateSpy} value="" placeholder="Speak" />);
     });
 
     const textarea = requireElement(container.querySelector('textarea'));
@@ -712,13 +624,7 @@ describe('AudioInput', () => {
     const updateSpy = jest.fn();
 
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={updateSpy}
-          value="Original version"
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={updateSpy} value="Original version" placeholder="Speak" />);
     });
 
     const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
@@ -748,13 +654,7 @@ describe('AudioInput', () => {
     const updateSpy = jest.fn();
 
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={updateSpy}
-          value=""
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={updateSpy} value="" placeholder="Speak" />);
     });
 
     const textarea = requireElement(container.querySelector('textarea'));
@@ -773,11 +673,7 @@ describe('AudioInput', () => {
     });
 
     expect(mockRequestAiRewrite).toHaveBeenCalledWith('Current draft', expect.any(Object));
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[surveys]',
-      '[AudioInput] AI rewrite error:',
-      expect.any(Error)
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith('[surveys]', '[AudioInput] AI rewrite error:', expect.any(Error));
     expect((textarea as HTMLTextAreaElement).value).toBe('Current draft');
     expect(updateSpy).toHaveBeenLastCalledWith('Current draft');
   });
@@ -789,13 +685,7 @@ describe('AudioInput', () => {
     const updateSpy = jest.fn();
 
     act(() => {
-      root.render(
-        <AudioInput
-          updateFunction={updateSpy}
-          value="First original"
-          placeholder="Speak"
-        />
-      );
+      root.render(<AudioInput updateFunction={updateSpy} value="First original" placeholder="Speak" />);
     });
 
     const textarea = requireElement(container.querySelector('textarea'));
@@ -833,11 +723,7 @@ describe('AudioInput', () => {
     });
 
     expect(mockRequestAiRewrite).toHaveBeenLastCalledWith('Second current draft', expect.any(Object));
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[surveys]',
-      '[AudioInput] AI rewrite error:',
-      expect.any(Error)
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith('[surveys]', '[AudioInput] AI rewrite error:', expect.any(Error));
     expect((textarea as HTMLTextAreaElement).value).toBe('Second current draft');
     expect(updateSpy).toHaveBeenLastCalledWith('Second current draft');
     expect(updateSpy).not.toHaveBeenLastCalledWith('First original');

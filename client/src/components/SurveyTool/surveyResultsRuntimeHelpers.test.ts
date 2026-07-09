@@ -20,11 +20,16 @@ describe('surveyResultsRuntimeHelpers', () => {
   });
 
   it('lowercases aggregator keys and includes known empty question IDs', () => {
-    expect(unifyAggregatorWithAllQuestionIDs({
-      Q1: ['a'],
-      q1: ['b'],
-      Q2: ['c'],
-    }, ['Q3'])).toEqual({
+    expect(
+      unifyAggregatorWithAllQuestionIDs(
+        {
+          Q1: ['a'],
+          q1: ['b'],
+          Q2: ['c'],
+        },
+        ['Q3'],
+      ),
+    ).toEqual({
       q1: ['a', 'b'],
       q2: ['c'],
       q3: [],
@@ -59,10 +64,12 @@ describe('surveyResultsRuntimeHelpers', () => {
   it('normalizes nonce keys and filter signatures', () => {
     expect(normalizeNonceKey('4')).toBe(4);
     expect(normalizeNonceKey('bad')).toBeNull();
-    expect(getFilterStateSignature({ selectedTags: ['b', 'a'] }))
-      .toBe(getFilterStateSignature({ selectedTags: ['b', 'a'] }));
-    expect(getFilterStateSignature({ selectedTags: ['b', 'a'] }))
-      .not.toBe(getFilterStateSignature({ selectedTags: ['a', 'b'] }));
+    expect(getFilterStateSignature({ selectedTags: ['b', 'a'] })).toBe(
+      getFilterStateSignature({ selectedTags: ['b', 'a'] }),
+    );
+    expect(getFilterStateSignature({ selectedTags: ['b', 'a'] })).not.toBe(
+      getFilterStateSignature({ selectedTags: ['a', 'b'] }),
+    );
   });
 
   it('compares values by stable signatures only for object-like values', () => {
@@ -75,8 +82,9 @@ describe('surveyResultsRuntimeHelpers', () => {
   it('reads response question identity with metadata fallback fields', () => {
     expect(getResponseQuestionId({ questionID: ' q1 ' })).toBe('q1');
     expect(getResponseQuestionId({ questionId: ' q2 ' })).toBe('q2');
-    expect(getResponseQuestionPrompt({ prompt: 'Response prompt' }, { prompt: 'Question prompt' }))
-      .toBe('Response prompt');
+    expect(getResponseQuestionPrompt({ prompt: 'Response prompt' }, { prompt: 'Question prompt' })).toBe(
+      'Response prompt',
+    );
     expect(getResponseQuestionPrompt({}, { prompt: 'Question prompt' })).toBe('Question prompt');
     expect(getResponseQuestionType({ type: 'binary' }, { type: 'freeform' })).toBe('binary');
     expect(getResponseQuestionType({}, { type: 'freeform' })).toBe('freeform');

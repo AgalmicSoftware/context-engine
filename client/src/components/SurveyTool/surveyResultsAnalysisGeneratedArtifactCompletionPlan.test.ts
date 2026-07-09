@@ -11,7 +11,7 @@ const requestedSections: SessionResultsAnalysisSectionKey[] = ['breakdown', 'ris
 
 const createArtifact = (
   inputSignature = 'ready-input',
-  riskMatrixAvailable = true
+  riskMatrixAvailable = true,
 ): SessionResultsGeneratedAnalysisArtifact => ({
   generatedAt: '2026-06-01T00:00:00.000Z',
   inputSignature,
@@ -42,13 +42,15 @@ describe('surveyResultsAnalysisGeneratedArtifactCompletionPlan', () => {
   it('builds cache write and lifecycle descriptors for a generated artifact matching the current input', () => {
     const artifact = createArtifact('ready-input');
 
-    expect(buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan({
-      artifact,
-      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
-      inputSignature: 'ready-input',
-      requestedSections,
-      slug: 'alpha-session',
-    })).toEqual({
+    expect(
+      buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan({
+        artifact,
+        cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
+        inputSignature: 'ready-input',
+        requestedSections,
+        slug: 'alpha-session',
+      }),
+    ).toEqual({
       blockedReason: '',
       cacheWriteBlockedReason: '',
       cacheWriteDescriptor: {
@@ -114,21 +116,25 @@ describe('surveyResultsAnalysisGeneratedArtifactCompletionPlan', () => {
       htmlReportAnalysisProgress: '',
     };
 
-    expect(buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan({
-      artifact: null,
-      failureStatePatch,
-      inputSignature: 'missing-input',
-      requestedSections,
-      slug: 'missing-session',
-    })).toEqual(expect.objectContaining({
-      blockedReason: 'missing-artifact',
-      cacheWriteDescriptor: null,
-      failurePatchDescriptor: failureStatePatch,
-      lifecyclePatchDescriptor: null,
-      shouldWriteCache: false,
-      status: 'skipped',
-      usable: false,
-    }));
+    expect(
+      buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan({
+        artifact: null,
+        failureStatePatch,
+        inputSignature: 'missing-input',
+        requestedSections,
+        slug: 'missing-session',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        blockedReason: 'missing-artifact',
+        cacheWriteDescriptor: null,
+        failurePatchDescriptor: failureStatePatch,
+        lifecyclePatchDescriptor: null,
+        shouldWriteCache: false,
+        status: 'skipped',
+        usable: false,
+      }),
+    );
   });
 
   it('rejects stale generated artifacts before they become cache-write payloads or lifecycle patches', () => {
@@ -195,13 +201,15 @@ describe('surveyResultsAnalysisGeneratedArtifactCompletionPlan', () => {
     });
 
     expect(events).toEqual(['write:runner-input']);
-    expect(result).toEqual(expect.objectContaining({
-      cacheWriteAttempted: true,
-      cacheWriteSucceeded: true,
-      error: null,
-      errorMessage: '',
-      ok: true,
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        cacheWriteAttempted: true,
+        cacheWriteSucceeded: true,
+        error: null,
+        errorMessage: '',
+        ok: true,
+      }),
+    );
     expect(result.lifecyclePatchDescriptor?.htmlReportAnalysisArtifact).toBe(artifact);
   });
 
@@ -274,13 +282,15 @@ describe('surveyResultsAnalysisGeneratedArtifactCompletionPlan', () => {
       },
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      cacheWriteAttempted: true,
-      cacheWriteSucceeded: false,
-      error,
-      errorMessage: 'Generated analysis artifact completion cache write failed.',
-      lifecyclePatchDescriptor: null,
-      ok: false,
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        cacheWriteAttempted: true,
+        cacheWriteSucceeded: false,
+        error,
+        errorMessage: 'Generated analysis artifact completion cache write failed.',
+        lifecyclePatchDescriptor: null,
+        ok: false,
+      }),
+    );
   });
 });

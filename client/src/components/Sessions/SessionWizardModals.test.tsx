@@ -39,12 +39,8 @@ jest.mock('../SBTs/CreateSBTGroup', () => ({
       data-network-chain-id={String(props.sessionConfigOverride?.networkChainId || '')}
       data-arweave-jwk={props.arweaveJwkOverride || ''}
       data-gate-ids={(props.encryptionGates || []).map((gate) => gate.id).join(',')}
-      data-gate-require-all={(props.encryptionGates || [])
-        .map((gate) => String(gate.requireAll))
-        .join(',')}
-      data-sbt-addresses={(props.encryptionGates || [])
-        .flatMap((gate) => gate.sbtAddresses || [])
-        .join(',')}
+      data-gate-require-all={(props.encryptionGates || []).map((gate) => String(gate.requireAll)).join(',')}
+      data-sbt-addresses={(props.encryptionGates || []).flatMap((gate) => gate.sbtAddresses || []).join(',')}
       data-default-gate-id={props.defaultGateId || ''}
       data-default-sbt-tags={props.defaultSbtTags || ''}
       data-deferred-deploy={String(props.deferredDeploy)}
@@ -63,9 +59,7 @@ jest.mock('../ContractPage/ContractViewer', () => ({
   )),
 }));
 
-const buildProps = (
-  overrides: Partial<SessionWizardModalsProps> = {}
-): SessionWizardModalsProps => ({
+const buildProps = (overrides: Partial<SessionWizardModalsProps> = {}): SessionWizardModalsProps => ({
   account: '0x00000000000000000000000000000000000000aa',
   provider: { kind: 'mock-provider' },
   createSbtModalState: { open: false },
@@ -117,50 +111,23 @@ describe('SessionWizardModals', () => {
     render(<SessionWizardModals {...buildProps({ createSbtModalState: { open: true } })} />);
 
     expect(screen.getByText('Add sbt to Session')).toBeInTheDocument();
-    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute(
-      'data-session-slug',
-      'edge-session'
-    );
-    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute(
-      'data-session-config-slug',
-      'edge-session'
-    );
-    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute(
-      'data-network-chain-id',
-      '84532'
-    );
-    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute(
-      'data-arweave-jwk',
-      '{"kty":"RSA"}'
-    );
+    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute('data-session-slug', 'edge-session');
+    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute('data-session-config-slug', 'edge-session');
+    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute('data-network-chain-id', '84532');
+    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute('data-arweave-jwk', '{"kty":"RSA"}');
     expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute(
       'data-sbt-addresses',
-      '0x00000000000000000000000000000000000000ab'
+      '0x00000000000000000000000000000000000000ab',
     );
-    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute(
-      'data-gate-require-all',
-      'true'
-    );
-    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute(
-      'data-default-gate-id',
-      'gate-a'
-    );
-    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute(
-      'data-default-sbt-tags',
-      'writers,reviewers'
-    );
-    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute(
-      'data-deferred-deploy',
-      'true'
-    );
+    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute('data-gate-require-all', 'true');
+    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute('data-default-gate-id', 'gate-a');
+    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute('data-default-sbt-tags', 'writers,reviewers');
+    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute('data-deferred-deploy', 'true');
     expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute(
       'data-attempt-immediate-deferred-upload',
-      'false'
+      'false',
     );
-    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute(
-      'data-hide-network-selector',
-      'true'
-    );
+    expect(screen.getByTestId('mock-create-sbt-group')).toHaveAttribute('data-hide-network-selector', 'true');
   });
 
   it('keeps the contract viewer modal test id and full-page link stable', () => {
@@ -174,18 +141,18 @@ describe('SessionWizardModals', () => {
             address: '0x0000000000000000000000000000000000000001',
           },
         })}
-      />
+      />,
     );
 
     expect(screen.getByTestId(WIZARD_CONTRACT_MODAL_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId('mock-contract-viewer')).toBeInTheDocument();
     expect(screen.getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute(
       'href',
-      '/contracts?contract=surveys'
+      '/contracts?contract=surveys',
     );
     expect(screen.getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute(
       'aria-label',
-      'Open full Contracts page for Surveys'
+      'Open full Contracts page for Surveys',
     );
   });
 
@@ -198,7 +165,7 @@ describe('SessionWizardModals', () => {
           sessionHeaderPreviewSrc: 'https://example.test/header.png',
           onCloseSessionHeaderPreviewModal,
         })}
-      />
+      />,
     );
 
     const preview = screen.getByAltText('Expanded session header preview');

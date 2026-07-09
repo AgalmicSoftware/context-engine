@@ -21,14 +21,10 @@ export type SurveyResultsAnalysisGeneratedArtifactCompletionPlanArgs = {
 };
 
 export type SurveyResultsAnalysisGeneratedArtifactCompletionBlockedReason =
-  | ''
-  | 'missing-artifact'
-  | 'stale-input-signature';
+  '' | 'missing-artifact' | 'stale-input-signature';
 
 export type SurveyResultsAnalysisGeneratedArtifactCompletionCacheBlockedReason =
-  | ''
-  | 'missing-cache-key'
-  | 'missing-slug';
+  '' | 'missing-cache-key' | 'missing-slug';
 
 export type SurveyResultsAnalysisGeneratedArtifactCompletionCacheWriteDescriptor = {
   payload: SessionResultsGeneratedAnalysisArtifact;
@@ -64,7 +60,7 @@ export type SurveyResultsAnalysisGeneratedArtifactCompletionPlan = {
 };
 
 export type SurveyResultsAnalysisGeneratedArtifactCompletionWritePort = (
-  artifact: SessionResultsGeneratedAnalysisArtifact
+  artifact: SessionResultsGeneratedAnalysisArtifact,
 ) => Promise<unknown> | unknown;
 
 export type SurveyResultsAnalysisGeneratedArtifactCompletionRunnerPorts = {
@@ -87,29 +83,23 @@ export type SurveyResultsAnalysisGeneratedArtifactCompletionRunnerResult = {
 };
 
 const buildFailurePatchDescriptor = (
-  override: SurveyResultsAnalysisLifecycleStatePatch | null | undefined
-): SurveyResultsAnalysisLifecycleStatePatch => (
+  override: SurveyResultsAnalysisLifecycleStatePatch | null | undefined,
+): SurveyResultsAnalysisLifecycleStatePatch =>
   override || {
     htmlReportAnalysisGenerating: false,
     htmlReportAnalysisError: SURVEY_RESULTS_ANALYSIS_FAILURE_MESSAGE,
     htmlReportAnalysisProgress: '',
-  }
-);
+  };
 
 const normalizeSections = (
-  sections: readonly SessionResultsAnalysisSectionKey[] | undefined
-): SessionResultsAnalysisSectionKey[] => (
-  Array.isArray(sections) ? sections.filter(Boolean) : []
-);
+  sections: readonly SessionResultsAnalysisSectionKey[] | undefined,
+): SessionResultsAnalysisSectionKey[] => (Array.isArray(sections) ? sections.filter(Boolean) : []);
 
 const getAvailableSections = (
   artifact: SessionResultsGeneratedAnalysisArtifact | null,
-  requestedSections: readonly SessionResultsAnalysisSectionKey[]
-): SessionResultsAnalysisSectionKey[] => (
-  artifact
-    ? requestedSections.filter((section) => !!artifact.sections?.[section]?.available)
-    : []
-);
+  requestedSections: readonly SessionResultsAnalysisSectionKey[],
+): SessionResultsAnalysisSectionKey[] =>
+  artifact ? requestedSections.filter((section) => !!artifact.sections?.[section]?.available) : [];
 
 export const buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan = ({
   artifact = null,
@@ -120,9 +110,7 @@ export const buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan = ({
   slug = '',
 }: SurveyResultsAnalysisGeneratedArtifactCompletionPlanArgs = {}): SurveyResultsAnalysisGeneratedArtifactCompletionPlan => {
   const normalizedInputSignature = String(inputSignature || '');
-  const normalizedArtifact = artifact && artifact.kind === 'ce_session_results_analysis_artifact'
-    ? artifact
-    : null;
+  const normalizedArtifact = artifact && artifact.kind === 'ce_session_results_analysis_artifact' ? artifact : null;
   const artifactInputSignature = String(normalizedArtifact?.inputSignature || '');
   const cacheTarget = buildSurveyResultsAnalysisArtifactCacheTarget({
     cacheKey,
@@ -179,14 +167,14 @@ export const buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan = ({
     cacheWriteDescriptor: cacheWriteBlockedReason
       ? null
       : {
-        payload: completedArtifact,
-        target: {
-          namespace: target.namespace,
-          slug: target.slug,
-          cacheKey: target.cacheKey,
-          inputSignature: target.inputSignature,
+          payload: completedArtifact,
+          target: {
+            namespace: target.namespace,
+            slug: target.slug,
+            cacheKey: target.cacheKey,
+            inputSignature: target.inputSignature,
+          },
         },
-      },
     failurePatchDescriptor: null,
     lifecyclePatchDescriptor: {
       htmlReportAnalysisArtifact: completedArtifact,

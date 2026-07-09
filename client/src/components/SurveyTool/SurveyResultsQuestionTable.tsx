@@ -24,14 +24,10 @@ export const SURVEY_RESULTS_SORTABLE_HEADER_STYLE: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-export {
-  SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
-  SURVEY_RESULTS_TABLE_CELL_STYLE,
-};
+export { SURVEY_RESULTS_TABLE_BOOKMARK_STYLE, SURVEY_RESULTS_TABLE_CELL_STYLE };
 
-const getSortIndicator = (column: string, sortBy = '', sortAsc = true): string => (
-  sortBy === column ? (sortAsc ? '▲' : '▼') : '▲▼'
-);
+const getSortIndicator = (column: string, sortBy = '', sortAsc = true): string =>
+  sortBy === column ? (sortAsc ? '▲' : '▼') : '▲▼';
 
 const SurveyResultsQuestionTable = ({
   bookmarkedQuestionIDs = [],
@@ -49,22 +45,13 @@ const SurveyResultsQuestionTable = ({
       <thead>
         <tr>
           <th style={SURVEY_RESULTS_TABLE_CELL_STYLE}>Question ID</th>
-          <th
-            style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE}
-            onClick={() => onSort('prompt')}
-          >
+          <th style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE} onClick={() => onSort('prompt')}>
             Prompt {getSortIndicator('prompt', sortBy, sortAsc)}
           </th>
-          <th
-            style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE}
-            onClick={() => onSort('type')}
-          >
+          <th style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE} onClick={() => onSort('type')}>
             Type {getSortIndicator('type', sortBy, sortAsc)}
           </th>
-          <th
-            style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE}
-            onClick={() => onSort('responses')}
-          >
+          <th style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE} onClick={() => onSort('responses')}>
             Responses {getSortIndicator('responses', sortBy, sortAsc)}
           </th>
           <th style={SURVEY_RESULTS_TABLE_CELL_STYLE}>Actions</th>

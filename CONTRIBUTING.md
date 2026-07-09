@@ -29,22 +29,27 @@ Worker, Arweave, and on-chain E2E flows may also require a funded test wallet, a
 
 ## Running Tests
 
+- Fast repository wiring gate: `npm run test:wiring`
+- Type-debt ratchet: `npm run type-debt:check`
+- Client typecheck: `npm run typecheck:client`
 - Root CI-equivalent test flow: `npm test`
 - Client-only tests (no Foundry required): `cd client && npm test -- --watchAll=false` (Jest 30)
 - Client lint: `cd client && npm run lint` (ESLint 9 flat config)
+- Client format check: `cd client && npm run format:check`
 - Contract tests: `forge test`
 - Gate E2E smoke: `npm run ai:test-gates:any-all`
 - Gated decrypt E2E: `npm run ai:test-gated-decrypt:all-types`
 - Survey response encryption matrix: `npm run ai:test-survey-response:encryption-matrix`
 - Seed question-type survey fixtures: `npm run ai:seed-survey:question-types`
 
-Before opening a PR, run the smallest relevant test set for your change. `npm test` is the full root gate and requires Foundry; for client-only work, the client test command above is the lighter prerequisite path. UI, worker, gating, encryption, or Arweave changes should also update or extend automation when practical.
+Before opening a PR, run the smallest relevant test set for your change plus `npm run test:wiring`, `npm run type-debt:check`, and `npm run typecheck:client`. `npm run verify:release` is the release-quality local gate for client lint, typecheck, full client Jest, public release surface verification, worker bundle sync, and production build. `npm test` is the full root CI-equivalent gate and requires Foundry; for client-only work, the client test command above is the lighter prerequisite path. UI, worker, gating, encryption, or Arweave changes should also update or extend automation when practical.
 
 ## Pull Requests
 
 - Branch from the current default branch.
 - Keep PRs scoped to one change or closely related set of changes.
 - Describe user-visible behavior changes clearly.
+- Keep public PR text free of internal planning IDs, private paths, and private operational notes.
 - Keep changelog entries public-facing. Do not include internal planning identifiers in any `CHANGELOG.md`; rewrite entries as release notes that describe the shipped behavior or technical change directly.
 - Include screenshots, logs, or repro notes for UI, web3, worker, or encryption-flow changes when they help review.
 - Update docs and tests when behavior, config, or workflows change.

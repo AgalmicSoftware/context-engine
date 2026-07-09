@@ -8,10 +8,7 @@
 import { CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES } from '../../variables/appConfig.js';
 import { toStr } from '../shared/primitives.js';
 import { createLogger } from '../logging.js';
-import {
-  canonicalizeSessionSlug,
-  resolveSessionSlugAliasFromDemoSessions,
-} from './canonicalSessionContext.js';
+import { canonicalizeSessionSlug, resolveSessionSlugAliasFromDemoSessions } from './canonicalSessionContext.js';
 import {
   dispatchGlobalSessionSelectionUpdatedEvent,
   normalizeGlobalSessionSelection,
@@ -61,9 +58,7 @@ type ValidatedSessionScanWindowSuccess = {
   wasCapped: boolean;
   maxBlockRange: number;
 };
-type ValidatedSessionScanWindowResult =
-  | ValidatedSessionScanWindowFailure
-  | ValidatedSessionScanWindowSuccess;
+type ValidatedSessionScanWindowResult = ValidatedSessionScanWindowFailure | ValidatedSessionScanWindowSuccess;
 type GlobalSessionSelection = Record<string, unknown> & {
   selectedSessionScope?: unknown;
   selectedSessionSlugs?: unknown;
@@ -71,7 +66,6 @@ type GlobalSessionSelection = Record<string, unknown> & {
 
 const log = createLogger('sessionScanScope');
 const DEMO_SESSION_MAP = getDemoSessionMap() as DemoSessionMap;
-
 
 const URL_PARAM_KEY = 'ceSessionScanScope';
 const URL_PARAM_SLUGS_KEY = 'ceSessionScanSlugs';
@@ -92,16 +86,16 @@ const normalizeMaxBlockRange = (value: unknown): number | null => {
   return Math.max(1, Math.floor(n));
 };
 
-export const readSessionScanMaxBlockRange = (
-  fallback: unknown = DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE
-): number => {
+export const readSessionScanMaxBlockRange = (fallback: unknown = DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE): number => {
   const fallbackValue = normalizeMaxBlockRange(fallback) || DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE;
   try {
     if (typeof process !== 'undefined' && process?.env) {
       const envValue = normalizeMaxBlockRange(process.env.REACT_APP_SESSION_SCAN_MAX_BLOCK_RANGE);
       if (envValue != null) return envValue;
     }
-  } catch (e) { void e; /* fallback: env override lookup. */ }
+  } catch (e) {
+    void e; /* fallback: env override lookup. */
+  }
   return fallbackValue;
 };
 
@@ -113,7 +107,9 @@ const readResolveDemoAliasToggle = (): boolean => {
         return runtimeGlobals[GLOBAL_DEMO_ALIAS_KEY] === true;
       }
     }
-  } catch (e) { void e; /* fallback: demo alias toggle lookup. */ }
+  } catch (e) {
+    void e; /* fallback: demo alias toggle lookup. */
+  }
   return CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES === true;
 };
 
@@ -134,7 +130,9 @@ const extractSlugFromWorkerHost = (raw: unknown = ''): string => {
     const parsed = new URL(value);
     const fromUrl = readHostSlug(parsed.hostname);
     if (fromUrl) return fromUrl;
-  } catch (e) { void e; /* fallback: worker host parsing. */ }
+  } catch (e) {
+    void e; /* fallback: worker host parsing. */
+  }
 
   const hostCandidate = value.split(/[/?#]/)[0] || '';
   return readHostSlug(hostCandidate);
@@ -153,7 +151,7 @@ export const normalizeSessionScanScope = (raw: unknown): SessionScanScope => {
 
 export const normalizeSessionScanSlug = (
   raw: unknown,
-  { allowEmpty = true }: SessionScanSlugOptions = {}
+  { allowEmpty = true }: SessionScanSlugOptions = {},
 ): string | null => {
   if (raw == null) return allowEmpty ? '' : null;
   const value = toStr(raw);
@@ -208,11 +206,7 @@ export const resolveValidatedSessionScanWindow = ({
   }
 
   const fromBlock = resolvedFromRaw == null ? start : Math.max(start, resolvedFromRaw);
-  const requestedToBlock = (
-    end == null
-      ? resolvedToRaw
-      : (resolvedToRaw == null ? end : Math.min(end, resolvedToRaw))
-  );
+  const requestedToBlock = end == null ? resolvedToRaw : resolvedToRaw == null ? end : Math.min(end, resolvedToRaw);
   if (requestedToBlock == null) {
     return {
       ok: false,
@@ -232,10 +226,9 @@ export const resolveValidatedSessionScanWindow = ({
     1,
     Math.floor(
       Number(
-        normalizeMaxBlockRange(maxBlockRange) ||
-        readSessionScanMaxBlockRange(DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE)
-      )
-    )
+        normalizeMaxBlockRange(maxBlockRange) || readSessionScanMaxBlockRange(DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE),
+      ),
+    ),
   );
   let toBlock = requestedToBlock;
   let wasCapped = false;
@@ -260,7 +253,7 @@ export const resolveValidatedSessionScanWindow = ({
 
 const normalizeSessionScanListSlug = (
   raw: unknown,
-  { allowEmpty = true }: SessionScanSlugOptions = {}
+  { allowEmpty = true }: SessionScanSlugOptions = {},
 ): string | null => {
   const slug = normalizeSessionScanSlug(raw, { allowEmpty });
   if (slug == null) return null;
@@ -275,11 +268,7 @@ const normalizeSessionScanListSlug = (
 export const normalizeSessionScanSlugs = (raw: unknown): string[] => {
   const isArray = Array.isArray(raw);
   const list: unknown[] = Array.isArray(raw)
-    ? raw.flatMap((item) => (
-      typeof item === 'string'
-        ? item.split(',')
-        : [item]
-    ))
+    ? raw.flatMap((item) => (typeof item === 'string' ? item.split(',') : [item]))
     : toStr(raw).split(',');
   const seen = new Set<string>();
   const out: string[] = [];
@@ -300,7 +289,9 @@ const parseStoredSlugs = (raw: unknown): string[] => {
     try {
       const arr = JSON.parse(str);
       return normalizeSessionScanSlugs(arr);
-    } catch (e) { void e; /* fallback: stored slug parsing. */ }
+    } catch (e) {
+      void e; /* fallback: stored slug parsing. */
+    }
   }
   return normalizeSessionScanSlugs(str);
 };
@@ -319,17 +310,9 @@ const dedupeSlugs = (slugs: ReadonlyArray<unknown> = []): string[] => {
   return out;
 };
 
-export const getAllowedSessionSlugs = (
-  scopeIn: unknown,
-  listIn: unknown,
-  activeSlugIn: unknown
-): string[] => {
-  const scope = normalizeSessionScanScope(
-    typeof scopeIn === 'undefined' ? readSessionScanScope() : scopeIn
-  );
-  const list = normalizeSessionScanSlugs(
-    typeof listIn === 'undefined' ? readSessionScanSlugs() : listIn
-  );
+export const getAllowedSessionSlugs = (scopeIn: unknown, listIn: unknown, activeSlugIn: unknown): string[] => {
+  const scope = normalizeSessionScanScope(typeof scopeIn === 'undefined' ? readSessionScanScope() : scopeIn);
+  const list = normalizeSessionScanSlugs(typeof listIn === 'undefined' ? readSessionScanSlugs() : listIn);
   const activeSlug = normalizeSessionScanSlug(activeSlugIn, { allowEmpty: true });
 
   if (scope === 'general') return [''];
@@ -338,16 +321,13 @@ export const getAllowedSessionSlugs = (
   return [];
 };
 
-export const isSessionSlugAllowedByScope = (
-  slugIn: unknown,
-  opts: SessionScanScopeOptions = {}
-): boolean => {
+export const isSessionSlugAllowedByScope = (slugIn: unknown, opts: SessionScanScopeOptions = {}): boolean => {
   const hasActiveSlug = !!(opts && Object.prototype.hasOwnProperty.call(opts, 'activeSlug'));
   const hasActiveSlugFromRoute = !!(opts && Object.prototype.hasOwnProperty.call(opts, 'activeSlugFromRoute'));
   const activeSlugRaw = hasActiveSlug ? opts.activeSlug : undefined;
   const activeSlugFromRoute = hasActiveSlugFromRoute ? opts.activeSlugFromRoute === true : false;
   const normalizedScope = normalizeSessionScanScope(
-    typeof opts.scope === 'undefined' ? readSessionScanScope() : opts.scope
+    typeof opts.scope === 'undefined' ? readSessionScanScope() : opts.scope,
   );
   if (normalizedScope === 'all') return true;
   const slug = normalizeSessionScanSlug(slugIn, { allowEmpty: true });
@@ -356,10 +336,7 @@ export const isSessionSlugAllowedByScope = (
   // In restricted modes, explicitly loaded session pages should still be allowed.
   // For "general", only allow this override when the active slug came from an
   // explicit /session/<slug> route (not stale store state).
-  if (
-    (normalizedScope === 'list' || (normalizedScope === 'general' && activeSlugFromRoute)) &&
-    hasActiveSlug
-  ) {
+  if ((normalizedScope === 'list' || (normalizedScope === 'general' && activeSlugFromRoute)) && hasActiveSlug) {
     const activeSlug = normalizeSessionScanSlug(activeSlugRaw, { allowEmpty: true });
     if (activeSlug != null && activeSlug !== '' && slug === activeSlug) return true;
   }
@@ -383,14 +360,18 @@ export const readSessionScanScope = (): SessionScanScope => {
         return normalizeSessionScanScope(params.get(URL_PARAM_KEY));
       }
     }
-  } catch (e) { void e; /* fallback: scope lookup. */ }
+  } catch (e) {
+    void e; /* fallback: scope lookup. */
+  }
 
   try {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (stored != null) return normalizeSessionScanScope(stored);
     }
-  } catch (e) { void e; /* fallback: scope lookup. */ }
+  } catch (e) {
+    void e; /* fallback: scope lookup. */
+  }
 
   try {
     if (typeof globalThis !== 'undefined') {
@@ -399,14 +380,18 @@ export const readSessionScanScope = (): SessionScanScope => {
         return normalizeSessionScanScope(runtimeGlobals[GLOBAL_KEY]);
       }
     }
-  } catch (e) { void e; /* fallback: scope lookup. */ }
+  } catch (e) {
+    void e; /* fallback: scope lookup. */
+  }
 
   try {
     const selection = readStoredGlobalSessionSelection() as GlobalSessionSelection | null;
     if (selection?.selectedSessionScope) {
       return normalizeSessionScanScope(selection.selectedSessionScope);
     }
-  } catch (e) { void e; /* fallback: scope lookup. */ }
+  } catch (e) {
+    void e; /* fallback: scope lookup. */
+  }
 
   return FAIL_CLOSED_SESSION_SCAN_SCOPE;
 };
@@ -426,14 +411,18 @@ export const readSessionScanSlugs = (): string[] => {
         return normalizeSessionScanSlugs(params.get(URL_PARAM_SLUGS_KEY));
       }
     }
-  } catch (e) { void e; /* fallback: slug scope lookup. */ }
+  } catch (e) {
+    void e; /* fallback: slug scope lookup. */
+  }
 
   try {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem(LOCAL_STORAGE_SLUGS_KEY);
       if (stored != null) return parseStoredSlugs(stored);
     }
-  } catch (e) { void e; /* fallback: slug scope lookup. */ }
+  } catch (e) {
+    void e; /* fallback: slug scope lookup. */
+  }
 
   try {
     if (typeof globalThis !== 'undefined') {
@@ -442,14 +431,18 @@ export const readSessionScanSlugs = (): string[] => {
         return normalizeSessionScanSlugs(runtimeGlobals[GLOBAL_SLUGS_KEY]);
       }
     }
-  } catch (e) { void e; /* fallback: slug scope lookup. */ }
+  } catch (e) {
+    void e; /* fallback: slug scope lookup. */
+  }
 
   try {
     const selection = readStoredGlobalSessionSelection() as GlobalSessionSelection | null;
     if (Array.isArray(selection?.selectedSessionSlugs)) {
       return normalizeSessionScanSlugs(selection.selectedSessionSlugs);
     }
-  } catch (e) { void e; /* fallback: slug scope lookup. */ }
+  } catch (e) {
+    void e; /* fallback: slug scope lookup. */
+  }
 
   return [];
 };
@@ -461,11 +454,15 @@ export const writeSessionScanScope = (scopeIn: unknown): SessionScanScope => {
     if (typeof globalThis !== 'undefined') {
       (globalThis as Record<string, unknown>)[GLOBAL_KEY] = scope;
     }
-  } catch (e) { log.warn('sessionScanScope: fallback', e); }
+  } catch (e) {
+    log.warn('sessionScanScope: fallback', e);
+  }
 
   try {
     if (typeof localStorage !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEY, scope);
-  } catch (e) { log.warn('sessionScanScope: fallback', e); }
+  } catch (e) {
+    log.warn('sessionScanScope: fallback', e);
+  }
 
   try {
     const selection = normalizeGlobalSessionSelection({
@@ -474,7 +471,9 @@ export const writeSessionScanScope = (scopeIn: unknown): SessionScanScope => {
     });
     persistGlobalSessionSelection(selection);
     dispatchGlobalSessionSelectionUpdatedEvent(selection);
-  } catch (e) { log.warn('sessionScanScope: fallback', e); }
+  } catch (e) {
+    log.warn('sessionScanScope: fallback', e);
+  }
 
   return scope;
 };
@@ -486,11 +485,15 @@ export const writeSessionScanSlugs = (slugsIn: unknown): string[] => {
     if (typeof globalThis !== 'undefined') {
       (globalThis as Record<string, unknown>)[GLOBAL_SLUGS_KEY] = slugs;
     }
-  } catch (e) { log.warn('sessionScanScope: fallback', e); }
+  } catch (e) {
+    log.warn('sessionScanScope: fallback', e);
+  }
 
   try {
     if (typeof localStorage !== 'undefined') localStorage.setItem(LOCAL_STORAGE_SLUGS_KEY, JSON.stringify(slugs));
-  } catch (e) { log.warn('sessionScanScope: fallback', e); }
+  } catch (e) {
+    log.warn('sessionScanScope: fallback', e);
+  }
 
   try {
     const selection = normalizeGlobalSessionSelection({
@@ -499,7 +502,9 @@ export const writeSessionScanSlugs = (slugsIn: unknown): string[] => {
     });
     persistGlobalSessionSelection(selection);
     dispatchGlobalSessionSelectionUpdatedEvent(selection);
-  } catch (e) { log.warn('sessionScanScope: fallback', e); }
+  } catch (e) {
+    log.warn('sessionScanScope: fallback', e);
+  }
 
   return slugs;
 };

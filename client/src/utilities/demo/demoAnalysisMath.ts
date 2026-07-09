@@ -110,9 +110,7 @@ type IndicatorHeatmapData = {
   pivotData: Array<Array<number | null>>;
 };
 
-const isFiniteNumber = (value: unknown): value is number => (
-  typeof value === 'number' && Number.isFinite(value)
-);
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
 export const parseSegmentKey = (segmentKey: unknown = ''): SegmentDescriptor => {
   const normalized = String(segmentKey || '').trim();
@@ -147,7 +145,7 @@ export const buildComparisonGroup = (segmentKey: unknown = ''): ComparisonGroup 
 
 export const calculateConsensus = (
   ratesBySegment: Map<string, number> = new Map(),
-  selectedSegmentKeys: string[] = []
+  selectedSegmentKeys: string[] = [],
 ): number | null => {
   const availableRates = selectedSegmentKeys
     .map((segmentKey) => ratesBySegment.get(segmentKey))
@@ -158,27 +156,29 @@ export const calculateConsensus = (
 
 export const calculateDivergence = (
   ratesBySegment: Map<string, number> = new Map(),
-  selectedSegmentKeys: string[] = []
+  selectedSegmentKeys: string[] = [],
 ): number | null => {
   const availableRates = selectedSegmentKeys
     .map((segmentKey) => ratesBySegment.get(segmentKey))
     .filter((rate): rate is number => Number.isFinite(rate));
   if (availableRates.length < 2) return null;
   const mean = availableRates.reduce((sum, rate) => sum + rate, 0) / availableRates.length;
-  const variance = availableRates.reduce((sum, rate) => sum + ((rate - mean) ** 2), 0) / availableRates.length;
+  const variance = availableRates.reduce((sum, rate) => sum + (rate - mean) ** 2, 0) / availableRates.length;
   return Math.sqrt(variance);
 };
 
 export const calculateDivisiveness = (
   ratesBySegment: Map<string, number> = new Map(),
-  selectedSegmentKeys: string[] = []
+  selectedSegmentKeys: string[] = [],
 ): number | null => {
   const divergence = calculateDivergence(ratesBySegment, selectedSegmentKeys);
   if (divergence == null || !Number.isFinite(divergence)) return null;
   return Math.max(0, Math.min(divergence / 0.5, 1));
 };
 
-export const getMinMaxAgreement = (groupRates: AgreementRate[] = []): {
+export const getMinMaxAgreement = (
+  groupRates: AgreementRate[] = [],
+): {
   min: ResolvedAgreementRate;
   max: ResolvedAgreementRate;
 } => {
@@ -217,7 +217,7 @@ export const beeswarmByExtremity = (
   points: BeeswarmPoint[] = [],
   innerWidth = 0,
   innerHeight = 0,
-  padding: BeeswarmPadding = {}
+  padding: BeeswarmPadding = {},
 ): BeeswarmPoint[] => {
   if (!Array.isArray(points) || points.length === 0) return [];
 
@@ -238,9 +238,8 @@ export const beeswarmByExtremity = (
       let candidateY = baseY;
       let layer = 0;
 
-      const collides = (x: number, y: number) => placed.some((existing) => (
-        Math.hypot(Number(existing.x || 0) - x, Number(existing.y || 0) - y) < radius * 2
-      ));
+      const collides = (x: number, y: number) =>
+        placed.some((existing) => Math.hypot(Number(existing.x || 0) - x, Number(existing.y || 0) - y) < radius * 2);
 
       while (collides(point.x, candidateY)) {
         layer += 1;
@@ -259,11 +258,12 @@ export const beeswarmByExtremity = (
     });
 };
 
-export const buildQuestionMap = (questions: DemoAnalysisQuestion[] = []): Map<string, DemoAnalysisQuestion> => new Map(
-  (Array.isArray(questions) ? questions : []).map((question) => [String(question?.id || ''), question])
-);
+export const buildQuestionMap = (questions: DemoAnalysisQuestion[] = []): Map<string, DemoAnalysisQuestion> =>
+  new Map((Array.isArray(questions) ? questions : []).map((question) => [String(question?.id || ''), question]));
 
-export const buildResponsesByQuestionResponse = (flatResponses: DemoFlatResponse[] = []): Map<string, ResponseAggregate> => {
+export const buildResponsesByQuestionResponse = (
+  flatResponses: DemoFlatResponse[] = [],
+): Map<string, ResponseAggregate> => {
   const responseMap = new Map<string, ResponseAggregate>();
   (Array.isArray(flatResponses) ? flatResponses : []).forEach((row) => {
     const questionId = String(row?.questionId || '').trim();
@@ -405,9 +405,7 @@ export const findMostDivergentPairs = ({
     }
   }
 
-  return pairResults
-    .sort((left, right) => right.score - left.score)
-    .slice(0, topN);
+  return pairResults.sort((left, right) => right.score - left.score).slice(0, topN);
 };
 
 export const buildIndicatorHeatmapData = ({
@@ -430,11 +428,12 @@ export const buildIndicatorHeatmapData = ({
   const pivotData = rowLabels.map((category) => {
     const questionIds = categoryQuestionIds.get(category) || [];
     return columnLabels.map((responseText) => {
-      const rows = (Array.isArray(flatResponses) ? flatResponses : []).filter((row) => (
-        row?.segmentKey === selectedSegmentKey &&
-        row?.responseText === responseText &&
-        questionIds.includes(String(row?.questionId || ''))
-      ));
+      const rows = (Array.isArray(flatResponses) ? flatResponses : []).filter(
+        (row) =>
+          row?.segmentKey === selectedSegmentKey &&
+          row?.responseText === responseText &&
+          questionIds.includes(String(row?.questionId || '')),
+      );
       if (rows.length === 0) return null;
       const averageRate = rows.reduce((sum, row) => sum + Number(row?.rate || 0), 0) / rows.length;
       return averageRate;

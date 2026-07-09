@@ -29,13 +29,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
   it('shows transcript mode only when text input exists and toggles placeholder text', () => {
     act(() => {
       root.render(
-        <AudioSurveyGenerator
-          provider={{}}
-          network={{}}
-          account="0x123"
-          loginComplete
-          toggleLoginModal={jest.fn()}
-        />
+        <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
       );
     });
 
@@ -66,13 +60,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
   it('shows transcript mode when a URL source is typed', () => {
     act(() => {
       root.render(
-        <AudioSurveyGenerator
-          provider={{}}
-          network={{}}
-          account="0x123"
-          loginComplete
-          toggleLoginModal={jest.fn()}
-        />
+        <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
       );
     });
 
@@ -86,13 +74,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
   it('hides the generate questions button until the full-size database tool has content', () => {
     act(() => {
       root.render(
-        <AudioSurveyGenerator
-          provider={{}}
-          network={{}}
-          account="0x123"
-          loginComplete
-          toggleLoginModal={jest.fn()}
-        />
+        <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
       );
     });
 
@@ -115,7 +97,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
           loginComplete
           toggleLoginModal={jest.fn()}
           minified
-        />
+        />,
       );
     });
 
@@ -130,13 +112,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
     const secondPhoto = new File(['photo-two'], 'diagram.webp', { type: 'image/webp' });
 
     await renderSubject(
-      <AudioSurveyGenerator
-        provider={{}}
-        network={{}}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-      />
+      <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
     );
 
     expect(findGenerateQuestionsButton()).toBeUndefined();
@@ -160,19 +136,15 @@ describe('AudioSurveyGenerator input and question generation', () => {
     const invalidSvg = new File(['not-supported'], 'vector.svg', { type: 'image/svg+xml' });
 
     await renderSubject(
-      <AudioSurveyGenerator
-        provider={{}}
-        network={{}}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-      />
+      <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
     );
 
     addAdditionalPhoto([validPng, validPdf, validGif, invalidSvg]);
 
     expect(getPhotoCards()).toHaveLength(2);
-    expect(container.textContent).toContain('Skipped 1 unsupported file. Use pdf, md, txt, csv, ppt, pptx, json, png, jpg, jpeg, webp, or gif.');
+    expect(container.textContent).toContain(
+      'Skipped 1 unsupported file. Use pdf, md, txt, csv, ppt, pptx, json, png, jpg, jpeg, webp, or gif.',
+    );
     expect(container.textContent).toContain('memo.png');
     expect(container.textContent).toContain('diagram.gif');
     expect(container.textContent).toContain('notes.pdf');
@@ -180,13 +152,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
 
   it('does not expose inline photo analysis while a queued photo is not ready', async () => {
     await renderSubject(
-      <AudioSurveyGenerator
-        provider={{}}
-        network={{}}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-      />
+      <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
     );
 
     addAdditionalPhoto();
@@ -203,13 +169,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
   it('uses simplified section headings in the generator surface', async () => {
     act(() => {
       root.render(
-        <AudioSurveyGenerator
-          provider={{}}
-          network={{}}
-          account="0x123"
-          loginComplete
-          toggleLoginModal={jest.fn()}
-        />
+        <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
       );
     });
 
@@ -217,7 +177,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
       const urlInput = container.querySelector('input[type="url"][placeholder="Add URL"]');
       Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(
         urlInput,
-        'https://example.com/seed-source'
+        'https://example.com/seed-source',
       );
       urlInput.dispatchEvent(new Event('input', { bubbles: true }));
     });
@@ -232,7 +192,9 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(sectionHeadings).not.toContain('Content');
     expect(sectionHeadings).not.toContain('Question Types');
 
-    const anyHeading = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6')).map((node) => node.textContent.trim());
+    const anyHeading = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6')).map((node) =>
+      node.textContent.trim(),
+    );
     expect(anyHeading).not.toContain('Content');
     expect(anyHeading).not.toContain('Question Types');
     expect(anyHeading).not.toContain('Additional Context (URL / File)');
@@ -248,19 +210,13 @@ describe('AudioSurveyGenerator input and question generation', () => {
   it('shows the question count readout with the default value', () => {
     act(() => {
       root.render(
-        <AudioSurveyGenerator
-          provider={{}}
-          network={{}}
-          account="0x123"
-          loginComplete
-          toggleLoginModal={jest.fn()}
-        />
+        <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
       );
     });
 
-    expect(
-      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`).textContent
-    ).toBe('10');
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`).textContent).toBe(
+      '10',
+    );
     expect(container.textContent).toContain('# Questions');
     expect(container.textContent).not.toContain('Number of Questions');
   });
@@ -268,20 +224,12 @@ describe('AudioSurveyGenerator input and question generation', () => {
   it('decrements the question count by five and clamps at five', () => {
     act(() => {
       root.render(
-        <AudioSurveyGenerator
-          provider={{}}
-          network={{}}
-          account="0x123"
-          loginComplete
-          toggleLoginModal={jest.fn()}
-        />
+        <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
       );
     });
 
     const countValue = () => container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`);
-    const decrementButton = container.querySelector(
-      `[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_DECREMENT}"]`
-    );
+    const decrementButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_DECREMENT}"]`);
 
     expect(countValue().textContent).toBe('10');
     expect(decrementButton.disabled).toBe(false);
@@ -297,20 +245,12 @@ describe('AudioSurveyGenerator input and question generation', () => {
   it('increments the question count by five and clamps at fifty', () => {
     act(() => {
       root.render(
-        <AudioSurveyGenerator
-          provider={{}}
-          network={{}}
-          account="0x123"
-          loginComplete
-          toggleLoginModal={jest.fn()}
-        />
+        <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
       );
     });
 
     const countValue = () => container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`);
-    const incrementButton = container.querySelector(
-      `[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}"]`
-    );
+    const incrementButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}"]`);
 
     for (let index = 0; index < 8; index += 1) {
       toggleCheckbox(incrementButton);
@@ -324,19 +264,15 @@ describe('AudioSurveyGenerator input and question generation', () => {
   });
 
   it('passes the adjusted question count through to the AI prompt on submit', async () => {
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Adjusted Count Survey',
-      questions: buildAiQuestions(15),
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Adjusted Count Survey',
+        questions: buildAiQuestions(15),
+      }),
+    );
 
     await renderSubject(
-      <AudioSurveyGenerator
-        provider={{}}
-        network={{}}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-      />
+      <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
     );
 
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}"]`));
@@ -348,15 +284,15 @@ describe('AudioSurveyGenerator input and question generation', () => {
     });
 
     expect(mockCallAI).toHaveBeenCalledTimes(1);
-    expect(
-      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`).textContent
-    ).toBe('15');
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`).textContent).toBe(
+      '15',
+    );
     expect(mockCallAI.mock.calls[0][0]).toMatch(/numberOfSeedStatementsOrPrompts:\s*15\b/);
   });
 
   it('uses webpage source type when only additional URL sources are provided', async () => {
     mockProcessAdditionalSources.mockResolvedValue(
-      'This is extracted webpage content from additional sources only, and it is long enough to pass validation.'
+      'This is extracted webpage content from additional sources only, and it is long enough to pass validation.',
     );
     mockCallAI.mockResolvedValue(
       JSON.stringify({
@@ -368,18 +304,12 @@ describe('AudioSurveyGenerator input and question generation', () => {
             tags: ['webpage'],
           },
         ],
-      })
+      }),
     );
 
     await act(async () => {
       root.render(
-        <AudioSurveyGenerator
-          provider={{}}
-          network={{}}
-          account="0x123"
-          loginComplete
-          toggleLoginModal={jest.fn()}
-        />
+        <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
       );
     });
 

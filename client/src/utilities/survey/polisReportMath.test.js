@@ -33,12 +33,14 @@ describe('computePolisCommentStats', () => {
 
     const stats = computePolisCommentStats(ratingMatrix, { randomSeed: 42 });
 
-    expect(stats[0]).toEqual(expect.objectContaining({
-      agrees: 1,
-      disagrees: 1,
-      unsure: 2,
-      total: 4,
-    }));
+    expect(stats[0]).toEqual(
+      expect.objectContaining({
+        agrees: 1,
+        disagrees: 1,
+        unsure: 2,
+        total: 4,
+      }),
+    );
     expect(stats[0].extremity).toBeCloseTo(stats[0].divisiveness);
     expect(Number.isFinite(stats[0].extremity)).toBe(true);
   });
@@ -76,16 +78,11 @@ describe('computePolisConversationMath', () => {
 
   const allQuestions = Array.from({ length: ratingMatrix.length }, (_, index) => `q${index}`);
   const questionPromptsMap = Object.fromEntries(
-    allQuestions.map((questionId, index) => [questionId, `Question ${index + 1}`])
+    allQuestions.map((questionId, index) => [questionId, `Question ${index + 1}`]),
   );
 
   it('auto-selects Polis-style groups and still assigns low-participation outliers', () => {
-    const result = computePolisConversationMath(
-      ratingMatrix,
-      questionPromptsMap,
-      allQuestions,
-      { randomSeed: 42 }
-    );
+    const result = computePolisConversationMath(ratingMatrix, questionPromptsMap, allQuestions, { randomSeed: 42 });
 
     expect(result.clusterCount).toBe(2);
     expect(result.clusterAssignments).toHaveLength(6);
@@ -117,22 +114,19 @@ describe('findRepresentativeQuestions', () => {
       q4: 'Disagree question 2',
     };
 
-    const repQuestions = findRepresentativeQuestions(
-      ratingMatrix,
-      assignments,
-      questionPromptsMap,
-      allQuestions
-    );
+    const repQuestions = findRepresentativeQuestions(ratingMatrix, assignments, questionPromptsMap, allQuestions);
 
     expect(repQuestions[0].some((item) => item.repfulFor === 'agree')).toBe(true);
     expect(repQuestions[0].some((item) => item.repfulFor === 'disagree')).toBe(true);
-    expect(repQuestions[0][0]).toEqual(expect.objectContaining({
-      questionIndex: expect.any(Number),
-      prompt: expect.any(String),
-      repfulFor: expect.stringMatching(/agree|disagree/),
-      repness: expect.any(Number),
-      repnessTest: expect.any(Number),
-    }));
+    expect(repQuestions[0][0]).toEqual(
+      expect.objectContaining({
+        questionIndex: expect.any(Number),
+        prompt: expect.any(String),
+        repfulFor: expect.stringMatching(/agree|disagree/),
+        repness: expect.any(Number),
+        repnessTest: expect.any(Number),
+      }),
+    );
   });
 });
 

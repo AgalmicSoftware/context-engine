@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCircle,
@@ -22,10 +16,7 @@ import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS } from '../../utilities/audio/rollingTranscription';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import {
-  generateQuestionsFromListeningTranscript,
-  LISTENING_QUESTION_COUNT,
-} from './sessionListeningQuestions';
+import { generateQuestionsFromListeningTranscript, LISTENING_QUESTION_COUNT } from './sessionListeningQuestions';
 
 type SessionListeningPanelProps = Record<string, unknown> & {
   sessionSlug?: string;
@@ -36,9 +27,10 @@ type SessionListeningPanelProps = Record<string, unknown> & {
   onClose?: () => void;
 };
 type CreateQuestionsAndSurveysPanelProps = React.ComponentProps<typeof CreateQuestionsAndSurveys>;
-type BrowserAudioWindow = Window & typeof globalThis & {
-  webkitAudioContext?: typeof AudioContext;
-};
+type BrowserAudioWindow = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
 
 const formatElapsed = (secondsRaw: unknown) => {
   const seconds = Math.max(0, Math.floor(Number(secondsRaw || 0)));
@@ -47,11 +39,10 @@ const formatElapsed = (secondsRaw: unknown) => {
   return `${minutes}:${String(rest).padStart(2, '0')}`;
 };
 
-const getSessionInstructions = (sessionConfig: unknown) => (
+const getSessionInstructions = (sessionConfig: unknown) =>
   sessionConfig && typeof sessionConfig === 'object'
     ? (sessionConfig as Record<string, unknown>).questionsGenPrompt || ''
-    : ''
-);
+    : '';
 
 type SessionListeningWaveformProps = {
   streamRef?: React.MutableRefObject<MediaStream | null>;
@@ -74,11 +65,7 @@ const cancelWaveformFrame = (handle: number) => {
   clearTimeout(handle as unknown as ReturnType<typeof setTimeout>);
 };
 
-function SessionListeningWaveform({
-  streamRef,
-  isActive,
-  isPaused,
-}: SessionListeningWaveformProps) {
+function SessionListeningWaveform({ streamRef, isActive, isPaused }: SessionListeningWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -107,11 +94,8 @@ function SessionListeningWaveform({
       return;
     }
 
-    const now = (
-      typeof performance !== 'undefined' && typeof performance.now === 'function'
-        ? performance.now()
-        : Date.now()
-    );
+    const now =
+      typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
     if (now - lastDrawRef.current < 33) {
       if (animationRef.current !== null) {
         animationRef.current = requestWaveformFrame(drawWaveform);
@@ -150,9 +134,7 @@ function SessionListeningWaveform({
     let x = 0;
     ctx.fillStyle = '#000080';
     for (let i = 0; i < bufferLength; i += 1) {
-      const barHeight = peak > 0
-        ? Math.max(2, Math.min(dataArray[i] * scale, visualHeight))
-        : 0;
+      const barHeight = peak > 0 ? Math.max(2, Math.min(dataArray[i] * scale, visualHeight)) : 0;
       ctx.fillRect(x, canvasHeight - 2 - barHeight, barWidth, barHeight);
       x += barWidth + 1;
     }
@@ -286,24 +268,11 @@ function SessionListeningWaveform({
     }
   }, [drawWaveform, isActive, isPaused]);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className={styles.sessionListeningWaveformCanvas}
-      aria-hidden="true"
-    />
-  );
+  return <canvas ref={canvasRef} className={styles.sessionListeningWaveformCanvas} aria-hidden="true" />;
 }
 
 export default function SessionListeningPanel(props: SessionListeningPanelProps) {
-  const {
-    sessionSlug = '',
-    sessionConfig = null,
-    context,
-    workerUrl,
-    defaultTags = null,
-    onClose,
-  } = props;
+  const { sessionSlug = '', sessionConfig = null, context, workerUrl, defaultTags = null, onClose } = props;
   const recorder = useRollingTranscriptionRecorder({
     sessionSlug,
     sessionConfig,
@@ -328,17 +297,19 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const hasTranscript = trimmedTranscript.length > 0;
   const hasGeneratedDraft = generatedQuestions.length > 0;
   const latestSuccessfulTranscriptAt = useMemo(
-    () => recorder.segments.reduce((latest, segment) => {
-      if (segment.status !== 'complete' || !String(segment.text || '').trim()) return latest;
-      return Math.max(latest, Number(segment.completedAt || segment.startedAt || 0));
-    }, 0),
+    () =>
+      recorder.segments.reduce((latest, segment) => {
+        if (segment.status !== 'complete' || !String(segment.text || '').trim()) return latest;
+        return Math.max(latest, Number(segment.completedAt || segment.startedAt || 0));
+      }, 0),
     [recorder.segments],
   );
   const latestFailedTranscriptAt = useMemo(
-    () => recorder.segments.reduce((latest, segment) => {
-      if (segment.status !== 'error') return latest;
-      return Math.max(latest, Number(segment.completedAt || segment.startedAt || 0));
-    }, 0),
+    () =>
+      recorder.segments.reduce((latest, segment) => {
+        if (segment.status !== 'error') return latest;
+        return Math.max(latest, Number(segment.completedAt || segment.startedAt || 0));
+      }, 0),
     [recorder.segments],
   );
   const hasActionableFailedSegment = latestFailedTranscriptAt > latestSuccessfulTranscriptAt;
@@ -357,30 +328,45 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const recorderError = recorder.errorMessage && !hasTranscript ? recorder.errorMessage : '';
   const shouldShowGenericRecorderError = Boolean(
     hasTranscript &&
-    (
-      hasActionableFailedSegment ||
-      (recorder.errorMessage && latestFailedTranscriptAt > 0 && latestFailedTranscriptAt >= latestSuccessfulTranscriptAt)
-    ),
+    (hasActionableFailedSegment ||
+      (recorder.errorMessage &&
+        latestFailedTranscriptAt > 0 &&
+        latestFailedTranscriptAt >= latestSuccessfulTranscriptAt)),
   );
-  const visibleError = generationError || recorderError || (
-    hasActionableFailedSegment || shouldShowGenericRecorderError
+  const visibleError =
+    generationError ||
+    recorderError ||
+    (hasActionableFailedSegment || shouldShowGenericRecorderError
       ? 'Some audio could not be transcribed. You can keep recording or generate questions from the transcript already captured.'
-      : ''
-  );
+      : '');
   const recordButtonLabel = isRecorderSessionActive
-    ? (recorder.isStopping ? 'Stopping' : 'Stop')
-    : (isStarting ? 'Starting' : (hasTranscript ? 'Record more' : 'Record'));
+    ? recorder.isStopping
+      ? 'Stopping'
+      : 'Stop'
+    : isStarting
+      ? 'Starting'
+      : hasTranscript
+        ? 'Record more'
+        : 'Record';
   const recordButtonIcon = isRecorderSessionActive
-    ? (recorder.isStopping ? faSpinner : faStop)
-    : (isStarting ? faSpinner : faMicrophone);
+    ? recorder.isStopping
+      ? faSpinner
+      : faStop
+    : isStarting
+      ? faSpinner
+      : faMicrophone;
   const isRecordButtonSpinning = recorder.isStopping || isStarting;
   const statusLabel = recorder.isStopping
     ? 'Stopping recorder'
     : recorder.isPaused
-    ? 'Paused'
-    : recorder.isRecording
-    ? 'Recording'
-    : (isStarting ? 'Starting recorder' : (hasTranscript ? 'Transcript ready' : ''));
+      ? 'Paused'
+      : recorder.isRecording
+        ? 'Recording'
+        : isStarting
+          ? 'Starting recorder'
+          : hasTranscript
+            ? 'Transcript ready'
+            : '';
 
   useEffect(() => {
     if (!isGenerating) {
@@ -459,10 +445,9 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
 
   return (
     <aside
-      className={[
-        styles.sessionListeningPanel,
-        hasGeneratedDraft ? styles.sessionListeningPanelWithDraft : '',
-      ].filter(Boolean).join(' ')}
+      className={[styles.sessionListeningPanel, hasGeneratedDraft ? styles.sessionListeningPanelWithDraft : '']
+        .filter(Boolean)
+        .join(' ')}
       data-testid={E2E_TESTIDS.SESSION_LISTENING_PANEL}
     >
       <div className={styles.sessionListeningHeader}>
@@ -477,7 +462,9 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         <button
           type="button"
           className={styles.sessionListeningClose}
-          onClick={() => { void handleClose(); }}
+          onClick={() => {
+            void handleClose();
+          }}
           disabled={isClosing}
           aria-label={isClosing ? 'Finalizing recording before closing' : 'Close listening panel'}
           title={isClosing ? 'Finalizing recording' : 'Close'}
@@ -506,11 +493,10 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           <div className={styles.sessionListeningButtonColumn} role="group" aria-label="Recording controls">
             <button
               type="button"
-              className={[
-                styles.sessionListeningAudioButton,
-                styles.sessionListeningStopButton,
-              ].join(' ')}
-              onClick={() => { void recorder.stopRecording(); }}
+              className={[styles.sessionListeningAudioButton, styles.sessionListeningStopButton].join(' ')}
+              onClick={() => {
+                void recorder.stopRecording();
+              }}
               disabled={recorder.isStopping}
               aria-label="Stop recording"
               title="Stop recording"
@@ -528,9 +514,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
               title={recorder.isPaused ? 'Resume recording' : 'Pause recording'}
             >
               <FontAwesomeIcon icon={recorder.isPaused ? faPlay : faPause} />
-              <span className={styles.sessionListeningSrOnly}>
-                {recorder.isPaused ? 'Resume' : 'Pause'}
-              </span>
+              <span className={styles.sessionListeningSrOnly}>{recorder.isPaused ? 'Resume' : 'Pause'}</span>
             </button>
           </div>
         </div>

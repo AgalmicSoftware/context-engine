@@ -1,7 +1,4 @@
-import {
-  executeSurveyLocalCacheRehydrate,
-  executeSurveyPriorResponseBackfill,
-} from './surveyToolHydrationController';
+import { executeSurveyLocalCacheRehydrate, executeSurveyPriorResponseBackfill } from './surveyToolHydrationController';
 import {
   areEnvelopesEquivalent,
   buildDraftAnswersByQuestionId,
@@ -9,7 +6,7 @@ import {
   buildLocalCacheRehydrationUpdatePlan,
   loadLocalCacheHydrationSlice,
   mergeQuestionResponses,
-} from './surveyToolUtils.js';
+} from './surveyToolUtils';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -37,14 +34,9 @@ const applyLocalCacheHydrationEntryToSlice = ({
 
   if (
     cachedAnswer &&
-    (
-      allowMaskedAnswerDraftEmpty ||
+    (allowMaskedAnswerDraftEmpty ||
       targetSlice.answers?.[questionId]?.value === undefined ||
-      (
-        targetSlice.answers?.[questionId]?.value === '' &&
-        !targetSlice.answers?.[questionId]?.encryptedPortion
-      )
-    )
+      (targetSlice.answers?.[questionId]?.value === '' && !targetSlice.answers?.[questionId]?.encryptedPortion))
   ) {
     targetSlice.answers[questionId] = {
       ...(targetSlice.answers[questionId] || {}),
@@ -55,14 +47,10 @@ const applyLocalCacheHydrationEntryToSlice = ({
 
   if (
     cachedAdditional &&
-    (
-      allowMaskedAdditionalDraftEmpty ||
+    (allowMaskedAdditionalDraftEmpty ||
       targetSlice.additionalComments?.[questionId]?.value === undefined ||
-      (
-        targetSlice.additionalComments?.[questionId]?.value === '' &&
-        !targetSlice.additionalComments?.[questionId]?.encryptedPortion
-      )
-    )
+      (targetSlice.additionalComments?.[questionId]?.value === '' &&
+        !targetSlice.additionalComments?.[questionId]?.encryptedPortion))
   ) {
     targetSlice.additionalComments[questionId] = {
       ...(targetSlice.additionalComments[questionId] || {}),
@@ -125,10 +113,11 @@ const runLocalCacheRehydrate = async ({
     loadDraft,
     buildDraftAnswersByQuestionId,
     cloneBaseline: clone,
-    buildDraftAwareCacheHydrationState: (args) => buildDraftAwareCacheHydrationState({
-      ...args,
-      areEnvelopesEquivalent,
-    }),
+    buildDraftAwareCacheHydrationState: (args) =>
+      buildDraftAwareCacheHydrationState({
+        ...args,
+        areEnvelopesEquivalent,
+      }),
     applyLocalCacheHydrationEntryToSlice,
     setState,
     updateJsonPreview,
@@ -150,12 +139,14 @@ const runLocalCacheRehydrate = async ({
   };
 };
 
-const createBaseStateRef = (slice = {
-  answers: {},
-  importance: {},
-  conviction: {},
-  additionalComments: {},
-}) => ({
+const createBaseStateRef = (
+  slice = {
+    answers: {},
+    importance: {},
+    conviction: {},
+    additionalComments: {},
+  },
+) => ({
   current: {
     suppressPrefill: false,
     submissionError: '',
@@ -181,35 +172,37 @@ describe('SurveyTool local-cache response rehydrate', () => {
       rehydrateLocalCacheLastSig: 'stale|sig',
     };
 
-    await expect(executeSurveyPriorResponseBackfill({
-      props: {
-        account: '0xabc',
-        loginComplete: true,
-        displayAnswerMode: false,
-        viewAddress: '',
-        singleQuestionMode: false,
-        responderAddress: '',
-        refreshQuestionResponses,
-      },
-      state: {
-        submissionComplete: false,
-        isSubmitting: false,
-      },
-      attemptedSet: new Set(),
-      getMissingRenderedResponseIdsForAccount: jest.fn().mockResolvedValue({
-        missingIds: ['q1'],
-        slug: 'edge',
-        netId: '84532',
+    await expect(
+      executeSurveyPriorResponseBackfill({
+        props: {
+          account: '0xabc',
+          loginComplete: true,
+          displayAnswerMode: false,
+          viewAddress: '',
+          singleQuestionMode: false,
+          responderAddress: '',
+          refreshQuestionResponses,
+        },
+        state: {
+          submissionComplete: false,
+          isSubmitting: false,
+        },
+        attemptedSet: new Set(),
+        getMissingRenderedResponseIdsForAccount: jest.fn().mockResolvedValue({
+          missingIds: ['q1'],
+          slug: 'edge',
+          netId: '84532',
+        }),
+        setHydratingState: jest.fn(),
+        isMounted: true,
+        readQuestionsCacheAsync: jest.fn().mockResolvedValue(undefined),
+        resetLocalCacheMemo: () => {
+          cacheRefs.localCacheSliceMemo = { key: '', value: null, hasValue: false };
+          cacheRefs.rehydrateLocalCacheLastSig = '';
+        },
+        triggerRehydrate: rehydrateLocalCacheAnswersForRenderedIds,
       }),
-      setHydratingState: jest.fn(),
-      isMounted: true,
-      readQuestionsCacheAsync: jest.fn().mockResolvedValue(undefined),
-      resetLocalCacheMemo: () => {
-        cacheRefs.localCacheSliceMemo = { key: '', value: null, hasValue: false };
-        cacheRefs.rehydrateLocalCacheLastSig = '';
-      },
-      triggerRehydrate: rehydrateLocalCacheAnswersForRenderedIds,
-    })).resolves.toBe(true);
+    ).resolves.toBe(true);
 
     expect(refreshQuestionResponses).toHaveBeenCalledWith(['q1'], {
       slug: 'edge',
@@ -306,23 +299,25 @@ describe('SurveyTool local-cache response rehydrate', () => {
   it('does not hydrate local-cache responses for unresolved draft slugs without a resolved network id', () => {
     const readQuestionsCache = jest.fn();
 
-    expect(loadLocalCacheHydrationSlice({
-      scopeSlugs: ['missing-session-slug'],
-      networkIdStr: '',
-      account: '0xabc',
-      renderedQuestionIds: ['q1'],
-      readQuestionsCache,
-      mergeQuestionResponses,
-      parseResponse: (raw) => raw,
-      applyCachedResponseEntryToSlice: jest.fn(),
-    })).toBeNull();
+    expect(
+      loadLocalCacheHydrationSlice({
+        scopeSlugs: ['missing-session-slug'],
+        networkIdStr: '',
+        account: '0xabc',
+        renderedQuestionIds: ['q1'],
+        readQuestionsCache,
+        mergeQuestionResponses,
+        parseResponse: (raw) => raw,
+        applyCachedResponseEntryToSlice: jest.fn(),
+      }),
+    ).toBeNull();
 
     expect(readQuestionsCache).not.toHaveBeenCalled();
   });
 
   it('builds local-cache slices through the shared cache hydration helper', () => {
     const readQuestionsCache = jest.fn(() => ({
-      '84532': {
+      84532: {
         questionResponses: {
           q1: {
             '0xabc': {
@@ -672,34 +667,38 @@ describe('SurveyTool local-cache response rehydrate', () => {
       stateRef.current._rehydrateLocalCacheLastSig = value;
     });
 
-    await expect(executeSurveyLocalCacheRehydrate({
-      props: {
-        isStandalone: false,
-        singleQuestionMode: false,
-        surveyIndex: 0,
-      },
-      state: stateRef.current,
-      lastHydrationSig: '',
-      getHydrationQuestionIds: () => ['q1'],
-      buildHydrationSignature: () => 'rehydrate|q1|unchanged',
-      buildSliceFromLocalCache: () => clone(matchingSlice),
-      setLastHydrationSig,
-      loadDraft: () => null,
-      buildDraftAnswersByQuestionId,
-      cloneBaseline: clone,
-      buildDraftAwareCacheHydrationState: (args) => buildDraftAwareCacheHydrationState({
-        ...args,
-        areEnvelopesEquivalent,
+    await expect(
+      executeSurveyLocalCacheRehydrate({
+        props: {
+          isStandalone: false,
+          singleQuestionMode: false,
+          surveyIndex: 0,
+        },
+        state: stateRef.current,
+        lastHydrationSig: '',
+        getHydrationQuestionIds: () => ['q1'],
+        buildHydrationSignature: () => 'rehydrate|q1|unchanged',
+        buildSliceFromLocalCache: () => clone(matchingSlice),
+        setLastHydrationSig,
+        loadDraft: () => null,
+        buildDraftAnswersByQuestionId,
+        cloneBaseline: clone,
+        buildDraftAwareCacheHydrationState: (args) =>
+          buildDraftAwareCacheHydrationState({
+            ...args,
+            areEnvelopesEquivalent,
+          }),
+        applyLocalCacheHydrationEntryToSlice,
+        setState,
+        ensurePriorResponses,
+        callback,
+        buildRehydrationUpdatePlan: (args) =>
+          buildLocalCacheRehydrationUpdatePlan({
+            ...args,
+            debugLabel: '[Survey][rehydrateLocal]',
+          }),
       }),
-      applyLocalCacheHydrationEntryToSlice,
-      setState,
-      ensurePriorResponses,
-      callback,
-      buildRehydrationUpdatePlan: (args) => buildLocalCacheRehydrationUpdatePlan({
-        ...args,
-        debugLabel: '[Survey][rehydrateLocal]',
-      }),
-    })).resolves.toEqual({
+    ).resolves.toEqual({
       reason: 'no-change',
       applied: false,
       renderedQuestionIds: ['q1'],

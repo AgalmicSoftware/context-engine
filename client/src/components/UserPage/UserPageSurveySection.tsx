@@ -1,10 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faChevronDown,
-  faChevronUp,
-  faExpand,
-} from '@fortawesome/free-solid-svg-icons';
+import { faChevronDown, faChevronUp, faExpand } from '@fortawesome/free-solid-svg-icons';
 import { Collapse } from 'reactstrap';
 
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
@@ -61,10 +57,7 @@ type UserPageSurveySectionProps = {
   getSurveyCreatedHref: (survey: UserPageSurveyEntry, surveyLinkSlug?: unknown) => string;
   isSurveyLoadingAny?: boolean;
   onDecryptQuestion: NonNullable<SingleQuestionResponseProps['onDecryptQuestion']>;
-  onOpenSurveyResponse: (
-    survey: UserPageSurveyEntry,
-    event: React.MouseEvent<HTMLElement>
-  ) => unknown;
+  onOpenSurveyResponse: (survey: UserPageSurveyEntry, event: React.MouseEvent<HTMLElement>) => unknown;
   onShowQuestionsTab: (event: React.MouseEvent<HTMLElement>) => unknown;
   onSurveyCreatedToggle: (surveyId: string) => unknown;
   onSurveyResponsesSectionToggle: (event?: React.MouseEvent<HTMLElement>) => unknown;
@@ -108,10 +101,7 @@ const UserPageSurveySection = ({
 }: UserPageSurveySectionProps): React.ReactElement => (
   <div className={styles.leftColumn}>
     <div className={styles.surveySection}>
-      <h2
-        onClick={onSurveyResponsesSectionToggle}
-        className={styles.sectionHeader}
-      >
+      <h2 onClick={onSurveyResponsesSectionToggle} className={styles.sectionHeader}>
         {surveyResponsesSectionToggleState.shouldRenderOpenIcon && (
           <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
         )}
@@ -158,9 +148,7 @@ const UserPageSurveySection = ({
                   style={surveyResponsePreviewDisplayState.style}
                 >
                   <div className={styles.surveyTitle}>{survey.title}</div>
-                  <div className={styles.surveyInfo}>
-                    Questions: {survey.questionsCount}
-                  </div>
+                  <div className={styles.surveyInfo}>Questions: {survey.questionsCount}</div>
                   {responderAddress && (
                     <button
                       type="button"
@@ -188,7 +176,9 @@ const UserPageSurveySection = ({
                       <div className={styles.surveyDetailRow}>
                         <span className={styles.surveyDetailLabel}>Tags:</span>{' '}
                         {survey.tags.map((tag: React.ReactNode, tagIndex: number) => (
-                          <span key={tagIndex} className={styles.surveyTag}>{tag}</span>
+                          <span key={tagIndex} className={styles.surveyTag}>
+                            {tag}
+                          </span>
                         ))}
                       </div>
                     )}
@@ -196,7 +186,13 @@ const UserPageSurveySection = ({
                       <div className={styles.surveyDetailRow}>
                         <span className={styles.surveyDetailLabel}>Documents:</span>
                         {survey.documentURLs.map((url: string, urlIndex: number) => (
-                          <a key={urlIndex} href={url} target="_blank" rel="noopener noreferrer" className={styles.surveyDocLink}>
+                          <a
+                            key={urlIndex}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.surveyDocLink}
+                          >
                             {url.length > 60 ? url.slice(0, 57) + '...' : url}
                           </a>
                         ))}
@@ -224,9 +220,7 @@ const UserPageSurveySection = ({
                   </div>
                 )}
                 {surveyResponseCardToggleState.isOpen && !surveyResponseCardState.hasResponses && (
-                  <div className={styles.noResponsesMsg}>
-                    No non-empty responses recorded for this survey.
-                  </div>
+                  <div className={styles.noResponsesMsg}>No non-empty responses recorded for this survey.</div>
                 )}
               </div>
             );
@@ -236,10 +230,7 @@ const UserPageSurveySection = ({
         ) : null}
       </Collapse>
 
-      <h2
-        onClick={onSurveysCreatedSectionToggle}
-        className={styles.sectionHeaderWithMargin}
-      >
+      <h2 onClick={onSurveysCreatedSectionToggle} className={styles.sectionHeaderWithMargin}>
         {surveysCreatedSectionToggleState.shouldRenderOpenIcon && (
           <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
         )}
@@ -267,14 +258,8 @@ const UserPageSurveySection = ({
             const surveyCreatedCardToggleState = resolveUserPageSectionToggleDisplayState({
               open: isCreatedExpanded,
             });
-            const {
-              hasDocURLs,
-              hasExpandContent,
-              hasQuestionIDs,
-              hasTags,
-              questionPreviewEntries,
-              surveyLinkSlug,
-            } = resolveUserPageSurveyCreatedCardState({ survey });
+            const { hasDocURLs, hasExpandContent, hasQuestionIDs, hasTags, questionPreviewEntries, surveyLinkSlug } =
+              resolveUserPageSurveyCreatedCardState({ survey });
             const surveyCreatedPreviewDisplayState = resolveUserPageSurveyPreviewDisplayState({
               actionsClassName: styles.surveyPreviewWithActions,
               baseClassName: styles.surveyPreview,
@@ -326,7 +311,9 @@ const UserPageSurveySection = ({
                       <div className={styles.surveyDetailRow}>
                         <span className={styles.surveyDetailLabel}>Tags:</span>{' '}
                         {survey.tags.map((tag: React.ReactNode, tagIndex: number) => (
-                          <span key={tagIndex} className={styles.surveyTag}>{tag}</span>
+                          <span key={tagIndex} className={styles.surveyTag}>
+                            {tag}
+                          </span>
                         ))}
                       </div>
                     )}
@@ -334,7 +321,13 @@ const UserPageSurveySection = ({
                       <div className={styles.surveyDetailRow}>
                         <span className={styles.surveyDetailLabel}>Documents:</span>
                         {survey.documentURLs.map((url: string, urlIndex: number) => (
-                          <a key={urlIndex} href={url} target="_blank" rel="noopener noreferrer" className={styles.surveyDocLink}>
+                          <a
+                            key={urlIndex}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.surveyDocLink}
+                          >
                             {url.length > 60 ? url.slice(0, 57) + '...' : url}
                           </a>
                         ))}
@@ -344,22 +337,23 @@ const UserPageSurveySection = ({
                       <div className={styles.surveyDetailRow}>
                         <span className={styles.surveyDetailLabel}>Questions:</span>
                         <ul className={styles.surveyQuestionList}>
-                          {(questionPreviewEntries as UserPageSurveyPreviewEntry[]).map((entry, questionIndex: number) => {
-                            const fullQuestionId = String(entry?.id || '');
-                            const resolvedText = String(entry?.text || '').trim();
-                            return (
-                              <li key={`${fullQuestionId}_${questionIndex}`} className={styles.surveyQuestionItem}>
-                                {resolvedText ? resolvedText : (
-                                  <span
-                                    className={styles.surveyQuestionFallbackId}
-                                    title={fullQuestionId}
-                                  >
-                                    {shortenUserPageQuestionId(fullQuestionId)}
-                                  </span>
-                                )}
-                              </li>
-                            );
-                          })}
+                          {(questionPreviewEntries as UserPageSurveyPreviewEntry[]).map(
+                            (entry, questionIndex: number) => {
+                              const fullQuestionId = String(entry?.id || '');
+                              const resolvedText = String(entry?.text || '').trim();
+                              return (
+                                <li key={`${fullQuestionId}_${questionIndex}`} className={styles.surveyQuestionItem}>
+                                  {resolvedText ? (
+                                    resolvedText
+                                  ) : (
+                                    <span className={styles.surveyQuestionFallbackId} title={fullQuestionId}>
+                                      {shortenUserPageQuestionId(fullQuestionId)}
+                                    </span>
+                                  )}
+                                </li>
+                              );
+                            },
+                          )}
                         </ul>
                       </div>
                     )}

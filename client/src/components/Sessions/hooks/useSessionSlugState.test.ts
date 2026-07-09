@@ -9,12 +9,14 @@ describe('useSessionSlugState', () => {
 
   it('starts with idle slug availability', () => {
     const sessionExists = jest.fn();
-    const { result } = renderHook(() => useSessionSlugState({
-      slug: '',
-      privateSlugMode: false,
-      registryChainId: 11155420,
-      sessionExists,
-    }));
+    const { result } = renderHook(() =>
+      useSessionSlugState({
+        slug: '',
+        privateSlugMode: false,
+        registryChainId: 11155420,
+        sessionExists,
+      }),
+    );
 
     expect(result.current.slugAvailability).toEqual({ status: 'idle' });
   });
@@ -23,12 +25,14 @@ describe('useSessionSlugState', () => {
     jest.useFakeTimers();
     const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
     const sessionExists = jest.fn();
-    const { unmount } = renderHook(() => useSessionSlugState({
-      slug: 'available-session',
-      privateSlugMode: false,
-      registryChainId: 11155420,
-      sessionExists,
-    }));
+    const { unmount } = renderHook(() =>
+      useSessionSlugState({
+        slug: 'available-session',
+        privateSlugMode: false,
+        registryChainId: 11155420,
+        sessionExists,
+      }),
+    );
 
     expect(jest.getTimerCount()).toBe(1);
 
@@ -41,12 +45,14 @@ describe('useSessionSlugState', () => {
   it('resets checking slug availability back to idle', () => {
     jest.useFakeTimers();
     const sessionExists = jest.fn(() => new Promise<boolean>(() => {}));
-    const { result } = renderHook(() => useSessionSlugState({
-      slug: 'available-session',
-      privateSlugMode: false,
-      registryChainId: 11155420,
-      sessionExists,
-    }));
+    const { result } = renderHook(() =>
+      useSessionSlugState({
+        slug: 'available-session',
+        privateSlugMode: false,
+        registryChainId: 11155420,
+        sessionExists,
+      }),
+    );
 
     act(() => {
       jest.advanceTimersByTime(300);
@@ -67,17 +73,16 @@ describe('useSessionSlugState', () => {
 
   it('reflects injected registry check results for public slugs', async () => {
     jest.useFakeTimers();
-    const sessionExists = jest.fn()
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+    const sessionExists = jest.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     const { result, rerender } = renderHook(
-      ({ slug }) => useSessionSlugState({
-        slug,
-        privateSlugMode: false,
-        registryChainId: 11155420,
-        sessionExists,
-      }),
-      { initialProps: { slug: 'taken-session' } }
+      ({ slug }) =>
+        useSessionSlugState({
+          slug,
+          privateSlugMode: false,
+          registryChainId: 11155420,
+          sessionExists,
+        }),
+      { initialProps: { slug: 'taken-session' } },
     );
 
     await act(async () => {
@@ -109,12 +114,14 @@ describe('useSessionSlugState', () => {
   it('marks public slug availability as error when the registry check rejects', async () => {
     jest.useFakeTimers();
     const sessionExists = jest.fn().mockRejectedValueOnce(new Error('registry unavailable'));
-    const { result } = renderHook(() => useSessionSlugState({
-      slug: 'error-session',
-      privateSlugMode: false,
-      registryChainId: 11155420,
-      sessionExists,
-    }));
+    const { result } = renderHook(() =>
+      useSessionSlugState({
+        slug: 'error-session',
+        privateSlugMode: false,
+        registryChainId: 11155420,
+        sessionExists,
+      }),
+    );
 
     await act(async () => {
       jest.advanceTimersByTime(300);

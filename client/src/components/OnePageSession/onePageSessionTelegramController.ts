@@ -1,7 +1,4 @@
-import {
-  resolveSessionBackendKind,
-  type TelegramSessionMeta,
-} from '../../utilities/session/sessionBackendKind';
+import { resolveSessionBackendKind, type TelegramSessionMeta } from '../../utilities/session/sessionBackendKind';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import type { TelegramResultsDataset } from '../../utilities/session/telegramSessionBackend';
 
@@ -57,17 +54,16 @@ export type AgentClientLoginEnvelopeMemoryGlobal = {
 };
 
 export const normalizeOnePageSessionSlug = (value: unknown = ''): string => {
-  const normalized = String(value || '').trim().toLowerCase();
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
   return normalized === 'general' ? '' : normalized;
 };
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const toRecord = (value: unknown): UnknownRecord => (
-  isRecord(value) ? value : {}
-);
+const toRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
 
 const toTrimmedString = (value: unknown): string => String(value ?? '').trim();
 
@@ -77,9 +73,7 @@ export const resolveCurrentSessionSlugForProps = (
 ): string => {
   const propsRecord = toRecord(propsIn);
   const sessionConfig = toRecord(propsRecord.sessionConfig);
-  return normalizeOnePageSessionSlug(
-    resolveEffectiveSlug(propsIn) || sessionConfig.slug || propsRecord.slug || '',
-  );
+  return normalizeOnePageSessionSlug(resolveEffectiveSlug(propsIn) || sessionConfig.slug || propsRecord.slug || '');
 };
 
 export const buildCurrentSessionConfigRequest = (
@@ -100,11 +94,11 @@ export const resolveTelegramAgentBridgeUrl = (sessionConfig: unknown = null): st
   const telegram = toRecord(cfg.telegram);
   return toTrimmedString(
     cfg.agentBridgeUrl ||
-    cfg.agentBridgeWorkerUrl ||
-    cfg.telegramAgentBridgeUrl ||
-    telegram.agentBridgeUrl ||
-    telegram.workerUrl ||
-    DEFAULT_AGENT_BRIDGE_URL,
+      cfg.agentBridgeWorkerUrl ||
+      cfg.telegramAgentBridgeUrl ||
+      telegram.agentBridgeUrl ||
+      telegram.workerUrl ||
+      DEFAULT_AGENT_BRIDGE_URL,
   ).replace(/\/+$/g, '');
 };
 
@@ -116,17 +110,14 @@ export const isOnePageTelegramBackendMode = ({
   sessionConfig: unknown;
   sessionSlug: unknown;
   telegramSessionMeta: TelegramSessionMeta | null;
-}): boolean => (
+}): boolean =>
   resolveSessionBackendKind({
     sessionConfig,
     probeResult: telegramSessionMeta,
     sessionSlug: normalizeOnePageSessionSlug(sessionSlug),
-  }) === 'telegram'
-);
+  }) === 'telegram';
 
-export const buildTelegramAuthFailureState = (
-  reason: unknown = '',
-): OnePageSessionTelegramAuthFailureState => ({
+export const buildTelegramAuthFailureState = (reason: unknown = ''): OnePageSessionTelegramAuthFailureState => ({
   telegramClientEnvelope: null,
   telegramAgentQuestionsStatus: 'idle',
   telegramAgentQuestions: [],
@@ -149,9 +140,8 @@ export const buildTelegramDataResetState = (): OnePageSessionTelegramDataResetSt
   telegramPolisDataset: null,
 });
 
-export const getAgentClientLoginEnvelopeMemoryKey = (sessionSlug: unknown): string => (
-  normalizeOnePageSessionSlug(sessionSlug) || 'general'
-);
+export const getAgentClientLoginEnvelopeMemoryKey = (sessionSlug: unknown): string =>
+  normalizeOnePageSessionSlug(sessionSlug) || 'general';
 
 export const clearTelegramEnvelopeMemoryCache = (
   sessionSlug: unknown,
@@ -170,16 +160,17 @@ export const cacheAgentClientLoginEnvelope = (
   globalTarget: AgentClientLoginEnvelopeMemoryGlobal = globalThis as AgentClientLoginEnvelopeMemoryGlobal,
 ): string => {
   const key = getAgentClientLoginEnvelopeMemoryKey(envelope.sessionSlug);
-  if (!globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ || typeof globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ !== 'object') {
+  if (
+    !globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ ||
+    typeof globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ !== 'object'
+  ) {
     globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ = {};
   }
   globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__[key] = envelope;
   return key;
 };
 
-export const resolveTelegramResultsAuthFailureReason = (
-  result: TelegramResultsDataset,
-): unknown | null => {
+export const resolveTelegramResultsAuthFailureReason = (result: TelegramResultsDataset): unknown | null => {
   const views = toRecord(result.views);
   for (const view of Object.values(views)) {
     const viewRecord = toRecord(view);
@@ -201,6 +192,7 @@ export const resolveAgentClientLoginEnvelopeFromEvent = (
   const detail = toRecord(event?.detail);
   const envelope = detail.envelope;
   if (!isAgentClientLoginEnvelope(envelope)) return null;
-  if (normalizeOnePageSessionSlug(envelope.sessionSlug) !== normalizeOnePageSessionSlug(currentSessionSlug)) return null;
+  if (normalizeOnePageSessionSlug(envelope.sessionSlug) !== normalizeOnePageSessionSlug(currentSessionSlug))
+    return null;
   return envelope;
 };

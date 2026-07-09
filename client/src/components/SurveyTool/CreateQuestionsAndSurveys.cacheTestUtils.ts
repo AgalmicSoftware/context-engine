@@ -8,10 +8,10 @@ import CreateQuestionsAndSurveys, {
 import type { ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
+import { arweaveClient } from '../../utilities/arweave/arweaveClient';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import * as resourceKeys from '../../utilities/session/resourceKeys.js';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import { sessionRegistryStore, sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { getChainById, getDefaultHttpRpc } from '../../variables/chains.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -46,9 +46,8 @@ const peekCacheSyncMock = cacheScripts.peekCacheSync as jest.Mock;
 const subscribeCacheUpdatesMock = cacheScripts.subscribeCacheUpdates as jest.Mock;
 const writeCacheOptimisticMock = cacheScripts.writeCacheOptimistic as jest.Mock;
 
-const asTreeElement = (node: unknown): TreeElement | null => (
-  node !== null && typeof node === 'object' ? node as TreeElement : null
-);
+const asTreeElement = (node: unknown): TreeElement | null =>
+  node !== null && typeof node === 'object' ? (node as TreeElement) : null;
 
 const makeInstance = (props: Partial<CreateQuestionsAndSurveysProps> = {}): CreateQuestionsAndSurveysHarness => {
   const instance = new CreateQuestionsAndSurveys({
@@ -58,9 +57,13 @@ const makeInstance = (props: Partial<CreateQuestionsAndSurveysProps> = {}): Crea
   } as CreateQuestionsAndSurveysProps) as CreateQuestionsAndSurveysHarness;
   instance._isMounted = true;
   instance.setState = jest.fn((update: unknown, cb?: () => void) => {
-    const patch = typeof update === 'function'
-      ? (update as (state: Record<string, unknown>, props: CreateQuestionsAndSurveysProps) => unknown)(instance.state, instance.props)
-      : update;
+    const patch =
+      typeof update === 'function'
+        ? (update as (state: Record<string, unknown>, props: CreateQuestionsAndSurveysProps) => unknown)(
+            instance.state,
+            instance.props,
+          )
+        : update;
     if (patch && typeof patch === 'object') {
       instance.state = { ...instance.state, ...(patch as Record<string, unknown>) };
     }
@@ -107,7 +110,7 @@ export {
   selectManagedNetBucketSnapshot,
   renderToStaticMarkup,
   cacheScripts,
-  arweaveScripts,
+  arweaveClient,
   normalizeArweaveUrl,
   resourceKeys,
   contractScripts,

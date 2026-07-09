@@ -34,7 +34,9 @@ test('dispatchBootstrapArweaveUploadWithWorkerDeps preserves bootstrap request l
           'Session config not found. Provide arweaveJwk for bootstrap uploads or register session config first.',
         );
         assert.equal(value.deps.getCorsContext, 'getCorsContext');
-        assert.equal(value.deps.arweaveUpload, 'arweaveUpload');
+        assert.equal(typeof value.deps.arweaveUpload, 'function');
+        const uploadResult = await value.deps.arweaveUpload({ requestId: 'upload-1' });
+        assert.equal(uploadResult, 'arweaveUploadResult');
 
         const slugContext = value.deps.resolveWorkerBodySlugContext({
           body: { sessionSlug: 'session-a' },
@@ -105,7 +107,10 @@ test('dispatchBootstrapArweaveUploadWithWorkerDeps preserves bootstrap request l
         assert.equal(slug, 'session-a');
         return 'secretsResult';
       },
-      arweaveUpload: 'arweaveUpload',
+      arweaveUpload: async (value) => {
+        assert.deepEqual(value, { requestId: 'upload-1', env });
+        return 'arweaveUploadResult';
+      },
     },
     constants: {
       missingSlugError: 'Missing sessionSlug.',

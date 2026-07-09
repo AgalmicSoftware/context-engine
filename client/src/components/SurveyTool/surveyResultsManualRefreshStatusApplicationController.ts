@@ -1,13 +1,11 @@
-import {
-  buildSurveyResultsRefreshStatusSequencePlan,
-} from './surveyResultsHelpers.js';
+import { buildSurveyResultsRefreshStatusSequencePlan } from './surveyResultsHelpers.js';
 
 type SurveyResultsStatePatch = Record<string, unknown>;
 
 export type SurveyResultsManualRefreshStatusApplicationPorts = {
   applyRefreshState: (
     statePatch: SurveyResultsStatePatch,
-    afterApply: () => Promise<void>
+    afterApply: () => Promise<void>,
   ) => Promise<unknown> | unknown;
   dispatchManualRefresh: () => Promise<unknown> | unknown;
   pollLocalStorageForUpdates: () => unknown;
@@ -42,9 +40,7 @@ const MANUAL_REFRESH_FOLLOW_UP_EFFECTS = [
   'queueResultsRefresh:manual-refresh',
 ] as const;
 
-const runManualRefreshFollowUps = async (
-  ports: SurveyResultsManualRefreshStatusApplicationPorts
-): Promise<void> => {
+const runManualRefreshFollowUps = async (ports: SurveyResultsManualRefreshStatusApplicationPorts): Promise<void> => {
   await ports.dispatchManualRefresh();
   ports.resetLocalStoragePollingBackoff('manual-refresh');
   ports.pollLocalStorageForUpdates();
@@ -61,9 +57,9 @@ export const runSurveyResultsManualRefreshStatusApplicationController = async ({
     latestBlock,
     followUpEffects: MANUAL_REFRESH_FOLLOW_UP_EFFECTS,
   });
-  const orderedEffects = refreshStatusSequencePlan.orderedEffects.map((effect) => (
-    effect.kind === 'state-patch' ? 'state-patch' : effect.effect
-  ));
+  const orderedEffects = refreshStatusSequencePlan.orderedEffects.map((effect) =>
+    effect.kind === 'state-patch' ? 'state-patch' : effect.effect,
+  );
 
   if (!refreshStatusSequencePlan.shouldWrite || !refreshStatusSequencePlan.statePatch) {
     return {

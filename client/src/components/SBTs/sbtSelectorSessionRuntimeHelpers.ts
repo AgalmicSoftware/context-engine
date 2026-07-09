@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import { normalizeDiscoverySlugs } from './sbtSelectorScopeHelpers';
 
 export type SbtLookupKeyArgs = {
@@ -69,29 +69,32 @@ type SbtSelectorFeaturedSignatureEntry = Record<string, unknown> & {
   slug?: unknown;
 };
 
-const isSbtSelectorRuntimeRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isSbtSelectorRuntimeRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object';
 
-export const normalizeAddressListForSig = (addresses: unknown): string[] => (
-  Array.from(new Set(
-    (Array.isArray(addresses) ? addresses : [])
-      .map((value) => String(value || '').trim().toLowerCase())
-      .filter(Boolean)
-  )).sort()
-);
+export const normalizeAddressListForSig = (addresses: unknown): string[] =>
+  Array.from(
+    new Set(
+      (Array.isArray(addresses) ? addresses : [])
+        .map((value) =>
+          String(value || '')
+            .trim()
+            .toLowerCase(),
+        )
+        .filter(Boolean),
+    ),
+  ).sort();
 
-export const normalizeSessionSlugListForSig = (slugs: unknown): string[] => (
-  Array.from(new Set(
-    (Array.isArray(slugs) ? slugs : [])
-      .map((value) => normalizeSessionSlug(value || ''))
-      .filter((value): value is string => value != null)
-  ))
-);
+export const normalizeSessionSlugListForSig = (slugs: unknown): string[] =>
+  Array.from(
+    new Set(
+      (Array.isArray(slugs) ? slugs : [])
+        .map((value) => normalizeSessionSlug(value || ''))
+        .filter((value): value is string => value != null),
+    ),
+  );
 
-export const buildSessionSlugSignature = (slugs: unknown): string => (
-  normalizeSessionSlugListForSig(slugs).join(',')
-);
+export const buildSessionSlugSignature = (slugs: unknown): string => normalizeSessionSlugListForSig(slugs).join(',');
 
 export const buildSharedLightUniverseKickoffSignature = (slugs: unknown = []): string => {
   const normalized = normalizeDiscoverySlugs(slugs, { allowEmpty: true })
@@ -113,12 +116,11 @@ export const buildSbtSelectorLogContext = ({
 
 export const buildTargetSlugChainSignature = (
   targetSlugs: unknown = [],
-  resolveSessionChainId: ResolveSbtSelectorSessionChainId = () => 0
-): string => (
+  resolveSessionChainId: ResolveSbtSelectorSessionChainId = () => 0,
+): string =>
   normalizeDiscoverySlugs(targetSlugs, { allowEmpty: true })
     .map((targetSlug: string) => `${targetSlug}:${Number(resolveSessionChainId(targetSlug) || 0)}`)
-    .join('|')
-);
+    .join('|');
 
 export const normalizeChainValue = (value: unknown): number | null => {
   const parsed = Number(value || 0);
@@ -126,14 +128,16 @@ export const normalizeChainValue = (value: unknown): number | null => {
 };
 
 export const buildSbtLookupKey = ({ address, chainId }: SbtLookupKeyArgs = {}): string => {
-  const lowerAddress = String(address || '').trim().toLowerCase();
+  const lowerAddress = String(address || '')
+    .trim()
+    .toLowerCase();
   if (!lowerAddress) return '';
   const normalizedChainId = normalizeChainValue(chainId);
   return normalizedChainId ? `${normalizedChainId}:${lowerAddress}` : lowerAddress;
 };
 
 export const getNormalizedNetworkChainValue = (network: unknown): number | null => {
-  const record = network && typeof network === 'object' ? network as Record<string, unknown> : {};
+  const record = network && typeof network === 'object' ? (network as Record<string, unknown>) : {};
   return normalizeChainValue(record.id || record.chainId || 0);
 };
 
@@ -148,38 +152,36 @@ export const resolveSbtSelectorSessionNetworkId = ({
   shouldUsePropsSessionConfig = false,
   slug = '',
 }: ResolveSbtSelectorSessionNetworkIdArgs = {}): number | null => {
-  const sessionConfig = shouldUsePropsSessionConfig && isSbtSelectorRuntimeRecord(propsSessionConfig)
-    ? propsSessionConfig
-    : null;
+  const sessionConfig =
+    shouldUsePropsSessionConfig && isSbtSelectorRuntimeRecord(propsSessionConfig) ? propsSessionConfig : null;
   const sessionConfigChainId = normalizeChainValue(sessionConfig?.networkChainId);
   if (sessionConfigChainId) return sessionConfigChainId;
 
   const registryChainId = normalizeChainValue(
-    typeof getSessionChainIdFn === 'function' ? getSessionChainIdFn(slug) : null
+    typeof getSessionChainIdFn === 'function' ? getSessionChainIdFn(slug) : null,
   );
   if (registryChainId) return registryChainId;
 
   const displayLookupCfg = isSbtSelectorRuntimeRecord(displayLookupSessionConfig) ? displayLookupSessionConfig : {};
   const displayContracts = isSbtSelectorRuntimeRecord(displayLookupCfg.contracts) ? displayLookupCfg.contracts : {};
-  const displaySbtFactory = isSbtSelectorRuntimeRecord(displayContracts.sbtFactory)
-    ? displayContracts.sbtFactory
-    : {};
+  const displaySbtFactory = isSbtSelectorRuntimeRecord(displayContracts.sbtFactory) ? displayContracts.sbtFactory : {};
   const displaySurveys = isSbtSelectorRuntimeRecord(displayContracts.surveys) ? displayContracts.surveys : {};
   const displayRegistry = isSbtSelectorRuntimeRecord(displayLookupCfg.__registry) ? displayLookupCfg.__registry : {};
   const displayLookupChainId = normalizeChainValue(
     displayLookupCfg.networkChainId ||
-    displayRegistry.chainId ||
-    displaySbtFactory.chainId ||
-    displaySurveys.chainId ||
-    0
+      displayRegistry.chainId ||
+      displaySbtFactory.chainId ||
+      displaySurveys.chainId ||
+      0,
   );
   if (displayLookupChainId) return displayLookupChainId;
 
   const directOverride = normalizeChainValue(directChainId);
   if (directOverride) return directOverride;
-  const walletChainId = typeof getNormalizedNetworkChainValueFn === 'function'
-    ? getNormalizedNetworkChainValueFn(network)
-    : getNormalizedNetworkChainValue(network);
+  const walletChainId =
+    typeof getNormalizedNetworkChainValueFn === 'function'
+      ? getNormalizedNetworkChainValueFn(network)
+      : getNormalizedNetworkChainValue(network);
   if (walletChainId) return walletChainId;
   return normalizeChainValue(defaultFallbackChainId);
 };
@@ -235,30 +237,28 @@ export const resolveSbtSelectorSessionLabel = ({
   return sessionName || slugText;
 };
 
-export const buildFeaturedEntrySignature = (entries: unknown): string => (
+export const buildFeaturedEntrySignature = (entries: unknown): string =>
   (Array.isArray(entries) ? entries : [])
     .map((entry) => {
-      const record = isSbtSelectorRuntimeRecord(entry) ? entry as SbtSelectorFeaturedSignatureEntry : {};
+      const record = isSbtSelectorRuntimeRecord(entry) ? (entry as SbtSelectorFeaturedSignatureEntry) : {};
       const slug = normalizeSessionSlug(record.slug || '');
-      const address = String(record.address || '').trim().toLowerCase();
+      const address = String(record.address || '')
+        .trim()
+        .toLowerCase();
       return `${slug}:${address}`;
     })
     .filter((value) => value !== ':')
-    .join(',')
-);
+    .join(',');
 
 export const buildSessionConfigSig = (sessionConfig: unknown): string => {
-  const config = isSbtSelectorRuntimeRecord(sessionConfig)
-    ? sessionConfig as SbtSelectorSessionConfigSigLike
-    : null;
+  const config = isSbtSelectorRuntimeRecord(sessionConfig) ? (sessionConfig as SbtSelectorSessionConfigSigLike) : null;
   if (!config) return '';
   const slug = String(config.slug || '');
-  const factoryAddress = String(config.contracts?.sbtFactory?.address || '').trim().toLowerCase();
+  const factoryAddress = String(config.contracts?.sbtFactory?.address || '')
+    .trim()
+    .toLowerCase();
   const networkChainId = normalizeChainValue(
-    config.networkChainId ||
-    config.__registry?.chainId ||
-    config.contracts?.sbtFactory?.chainId ||
-    0
+    config.networkChainId || config.__registry?.chainId || config.contracts?.sbtFactory?.chainId || 0,
   );
   const blockStart = String(Number(config.blockLimits?.start || 0) || '');
   const blockEnd = String(Number(config.blockLimits?.end || 0) || '');
@@ -283,7 +283,5 @@ export const buildSbtOptionsRequestSignature = ({
   ].join('|');
 };
 
-export const isUnresolvedSessionConfig = (config: unknown): boolean => (
-  isSbtSelectorRuntimeRecord(config) &&
-  config.__unresolved === true
-);
+export const isUnresolvedSessionConfig = (config: unknown): boolean =>
+  isSbtSelectorRuntimeRecord(config) && config.__unresolved === true;

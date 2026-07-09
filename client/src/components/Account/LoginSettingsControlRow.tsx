@@ -27,10 +27,7 @@ export const LoginSettingsConfigToggleControl = ({
     data-testid={testId || undefined}
   >
     Config
-    <FontAwesomeIcon
-      icon={expanded ? faCaretUp : faCaretDown}
-      className={styles.aiSettingsToggleIcon}
-    />
+    <FontAwesomeIcon icon={expanded ? faCaretUp : faCaretDown} className={styles.aiSettingsToggleIcon} />
   </Button>
 );
 
@@ -45,10 +42,7 @@ export const LoginSettingsSessionSummary = ({
 
   return (
     <div className={styles.settingsSessionSummary}>
-      <div
-        className={styles.settingsSessionRoute}
-        aria-label={`Active session: ${label}`}
-      >
+      <div className={styles.settingsSessionRoute} aria-label={`Active session: ${label}`}>
         <span className={styles.settingsSessionLabel}>SESSION</span>
         <span className={styles.settingsSessionName}>{label}</span>
         <a
@@ -94,15 +88,8 @@ export const LoginSettingsControlRow = ({
   <div className={[styles.settingsContainer, containerClassName].filter(Boolean).join(' ')}>
     <div className={[styles.settingsRow, rowClassName].filter(Boolean).join(' ')}>
       {beforeConfig}
-      <LoginSettingsConfigToggleControl
-        expanded={configOpen}
-        onToggle={onToggleConfig}
-        testId={configTestId}
-      />
-      <LoginSettingsSessionSummary
-        activeSession={activeSession}
-        sessionHref={sessionHref}
-      />
+      <LoginSettingsConfigToggleControl expanded={configOpen} onToggle={onToggleConfig} testId={configTestId} />
+      <LoginSettingsSessionSummary activeSession={activeSession} sessionHref={sessionHref} />
       {betweenSessionAndTooltips}
       {tooltipsControl}
       {demoControl}

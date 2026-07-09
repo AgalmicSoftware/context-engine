@@ -9,9 +9,9 @@ import {
 describe('surveyResultsSummaryModels', () => {
   it('resolves question type from metadata and response fallbacks', () => {
     expect(resolveSurveyResultsSummaryQuestionType({ type: 'Text' }, [])).toBe('freeform');
-    expect(resolveSurveyResultsSummaryQuestionType(null, [
-      { response: { questionType: 'Multichoice' } },
-    ])).toBe('multichoice');
+    expect(resolveSurveyResultsSummaryQuestionType(null, [{ response: { questionType: 'Multichoice' } }])).toBe(
+      'multichoice',
+    );
     expect(resolveSurveyResultsSummaryQuestionType(null, [])).toBe('');
   });
 
@@ -34,10 +34,7 @@ describe('surveyResultsSummaryModels', () => {
       },
     ];
 
-    expect(getSurveyResultsLatestResponsesByResponder(rows)).toEqual([
-      rows[1],
-      rows[2],
-    ]);
+    expect(getSurveyResultsLatestResponsesByResponder(rows)).toEqual([rows[1], rows[2]]);
   });
 
   it('builds sorted question-table entries from network metadata and latest responders', () => {
@@ -173,7 +170,7 @@ describe('surveyResultsSummaryModels', () => {
       ],
       {
         options: ['Alpha', { label: 'Beta' }, { value: 'Gamma' }],
-      }
+      },
     );
 
     expect(summary.totalResponders).toBe(2);

@@ -27,7 +27,7 @@ describe('AudioSurveyGenerator explorer view and session selector', () => {
         account="0x123"
         loginComplete
         toggleLoginModal={jest.fn()}
-      />
+      />,
     );
 
     expect(getMockCorpusViewerModuleLoadCount()).toBe(0);
@@ -49,7 +49,7 @@ describe('AudioSurveyGenerator explorer view and session selector', () => {
           },
         }}
         explorerMode="view"
-      />
+      />,
     );
 
     expect(getMockCorpusViewerModuleLoadCount()).toBe(1);
@@ -72,14 +72,16 @@ describe('AudioSurveyGenerator explorer view and session selector', () => {
           sessionIdHex: `0x${'1'.repeat(32)}`,
         })}
         explorerMode="view"
-      />
+      />,
     );
 
     const demoToggle = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_VIEW_DEMO_TOGGLE}"]`);
     toggleCheckbox(demoToggle);
 
     expect(container.textContent).not.toContain('Open full page');
-    expect(Array.from(container.querySelectorAll('a')).some((node) => node.textContent === 'Open full page')).toBe(false);
+    expect(Array.from(container.querySelectorAll('a')).some((node) => node.textContent === 'Open full page')).toBe(
+      false,
+    );
   });
 
   it('defaults explorer view mode to the demo corpus and can switch to the session doc library', async () => {
@@ -99,7 +101,7 @@ describe('AudioSurveyGenerator explorer view and session selector', () => {
           },
         }}
         explorerMode="view"
-      />
+      />,
     );
 
     const demoToggle = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_VIEW_DEMO_TOGGLE}"]`);
@@ -113,13 +115,15 @@ describe('AudioSurveyGenerator explorer view and session selector', () => {
 
     expect(container.querySelector('[data-testid="mock-corpus-viewer"]')).toBeNull();
     expect(container.querySelector('[data-testid="mock-document-library-panel"]')).toBeTruthy();
-    expect(mockDocumentLibraryPanel).toHaveBeenLastCalledWith(expect.objectContaining({
-      sessionSlug: 'edge',
-      mode: 'session',
-      compact: false,
-      pageSize: 10,
-      showUploadControls: false,
-    }));
+    expect(mockDocumentLibraryPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'edge',
+        mode: 'session',
+        compact: false,
+        pageSize: 10,
+        showUploadControls: false,
+      }),
+    );
   });
 
   it('defaults explorer view mode to session docs when demo surfaces are disabled', async () => {
@@ -140,19 +144,21 @@ describe('AudioSurveyGenerator explorer view and session selector', () => {
         }}
         explorerMode="view"
         demoSurfaceMode={false}
-      />
+      />,
     );
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_VIEW_DEMO_TOGGLE}"]`)).toBeNull();
     expect(container.querySelector('[data-testid="mock-corpus-viewer"]')).toBeNull();
     expect(container.querySelector('[data-testid="mock-document-library-panel"]')).toBeTruthy();
-    expect(mockDocumentLibraryPanel).toHaveBeenLastCalledWith(expect.objectContaining({
-      sessionSlug: 'edge',
-      mode: 'session',
-      compact: false,
-      pageSize: 10,
-      showUploadControls: false,
-    }));
+    expect(mockDocumentLibraryPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'edge',
+        mode: 'session',
+        compact: false,
+        pageSize: 10,
+        showUploadControls: false,
+      }),
+    );
   });
 
   it('shows an empty state instead of the doc library when explorer view mode has no resolved session docs context', async () => {
@@ -164,7 +170,7 @@ describe('AudioSurveyGenerator explorer view and session selector', () => {
         loginComplete
         toggleLoginModal={jest.fn()}
         explorerMode="view"
-      />
+      />,
     );
 
     const demoToggle = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_VIEW_DEMO_TOGGLE}"]`);
@@ -186,7 +192,7 @@ describe('AudioSurveyGenerator explorer view and session selector', () => {
           toggleLoginModal={jest.fn()}
           minified
           explorerMode="view"
-        />
+        />,
       );
     });
 
@@ -207,7 +213,7 @@ describe('AudioSurveyGenerator explorer view and session selector', () => {
           toggleLoginModal={jest.fn()}
           activeSessionSlug="edge"
           sessionConfig={{ slug: 'edge', sessionName: 'Edge Session' }}
-        />
+        />,
       );
     });
 
@@ -216,25 +222,40 @@ describe('AudioSurveyGenerator explorer view and session selector', () => {
     expect(container.querySelector('[data-testid="ce-database-session-selector-panel"]')).toBeNull();
 
     act(() => {
-      container.querySelector('[data-testid="ce-database-session-selector-toggle"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      container
+        .querySelector('[data-testid="ce-database-session-selector-toggle"]')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(container.querySelector('[data-testid="ce-database-session-selector-panel"]')).toBeTruthy();
-    expect(container.querySelector('[data-testid="ce-database-session-chip-edge"]')).toHaveAttribute('data-session-selected', 'true');
+    expect(container.querySelector('[data-testid="ce-database-session-chip-edge"]')).toHaveAttribute(
+      'data-session-selected',
+      'true',
+    );
 
     act(() => {
-      container.querySelector('[data-testid="ce-database-session-chip-rxc"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      container
+        .querySelector('[data-testid="ce-database-session-chip-rxc"]')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(container.querySelector('[data-testid="ce-database-session-chip-rxc"]')).toHaveAttribute('data-session-selected', 'true');
+    expect(container.querySelector('[data-testid="ce-database-session-chip-rxc"]')).toHaveAttribute(
+      'data-session-selected',
+      'true',
+    );
     expect(container.textContent).toContain('Using a local AudioSurveyGenerator override.');
 
     act(() => {
-      const resetButton = Array.from(container.querySelectorAll('button')).find((node) => node.textContent.includes('Use global default'));
+      const resetButton = Array.from(container.querySelectorAll('button')).find((node) =>
+        node.textContent.includes('Use global default'),
+      );
       resetButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(container.querySelector('[data-testid="ce-database-session-chip-edge"]')).toHaveAttribute('data-session-selected', 'true');
+    expect(container.querySelector('[data-testid="ce-database-session-chip-edge"]')).toHaveAttribute(
+      'data-session-selected',
+      'true',
+    );
     expect(container.textContent).toContain('Using the global primary session by default.');
   });
 
@@ -257,16 +278,18 @@ describe('AudioSurveyGenerator explorer view and session selector', () => {
         sessionOverrideSlug="rxc"
         sessionOverrideTouched={true}
         hideInternalSessionSelector
-      />
+      />,
     );
 
     expect(container.querySelector('[data-testid="ce-database-session-selector"]')).toBeNull();
     expect(container.querySelector('[data-testid="mock-document-library-panel"]')).toBeTruthy();
-    expect(mockDocumentLibraryPanel).toHaveBeenLastCalledWith(expect.objectContaining({
-      sessionSlug: 'rxc',
-      mode: 'session',
-      sessionIdHex: `0x${'3'.repeat(32)}`,
-      showUploadControls: false,
-    }));
+    expect(mockDocumentLibraryPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'rxc',
+        mode: 'session',
+        sessionIdHex: `0x${'3'.repeat(32)}`,
+        showUploadControls: false,
+      }),
+    );
   });
 });

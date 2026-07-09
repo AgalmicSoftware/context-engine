@@ -51,10 +51,7 @@ describe('SBTsList create group and session universe loading status', () => {
   });
 
   it('does not auto-expand create group from a name-only cached draft', async () => {
-    sessionStorage.setItem(
-      'createSbtFormCache',
-      JSON.stringify({ sbtName: 'Alpha' })
-    );
+    sessionStorage.setItem('createSbtFormCache', JSON.stringify({ sbtName: 'Alpha' }));
 
     renderSBTsList({
       isSBTCacheReady: false,
@@ -73,7 +70,7 @@ describe('SBTsList create group and session universe loading status', () => {
       JSON.stringify({
         sbtName: 'Alpha',
         sbtDescription: 'Cached draft details',
-      })
+      }),
     );
 
     renderSBTsList({
@@ -99,10 +96,12 @@ describe('SBTsList create group and session universe loading status', () => {
 
     await waitFor(() => {
       const latestProps = mockCreateGroup.mock.calls[mockCreateGroup.mock.calls.length - 1]?.[0];
-      expect(latestProps).toEqual(expect.objectContaining({
-        sessionSlug: 'alpha',
-        lockGatePreferredSessionSlug: 'alpha',
-      }));
+      expect(latestProps).toEqual(
+        expect.objectContaining({
+          sessionSlug: 'alpha',
+          lockGatePreferredSessionSlug: 'alpha',
+        }),
+      );
       expect(latestProps.lockGateSessionSources).toEqual([
         expect.objectContaining({
           sessionSlug: 'alpha',
@@ -191,7 +190,7 @@ describe('SBTsList create group and session universe loading status', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -229,7 +228,7 @@ describe('SBTsList create group and session universe loading status', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -259,7 +258,7 @@ describe('SBTsList create group and session universe loading status', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -293,7 +292,7 @@ describe('SBTsList create group and session universe loading status', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -308,7 +307,7 @@ describe('SBTsList create group and session universe loading status', () => {
 
     await act(async () => {
       resolveReadCache({
-        '84532': {
+        84532: {
           sbtList: {},
           lastBlock: 0,
         },

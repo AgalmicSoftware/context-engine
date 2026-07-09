@@ -1,11 +1,7 @@
 import React from 'react';
 import { Card, CardBody, CardHeader, Collapse } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretDown,
-  faCaretUp,
-  faExternalLinkAlt,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 
@@ -38,10 +34,7 @@ const SurveyResultsIndividualResponseCard = ({
   styleMap,
 }: SurveyResultsIndividualResponseCardProps): React.ReactElement => (
   <Card className={styleMap.singleResponseCard}>
-    <CardHeader
-      onClick={() => onToggleResponse(responseId)}
-      className={styleMap.responseHeader}
-    >
+    <CardHeader onClick={() => onToggleResponse(responseId)} className={styleMap.responseHeader}>
       <span className={styleMap.responderAddress}>
         <a
           href={`/u/${encodeURIComponent(response.responder)}`}
@@ -59,17 +52,10 @@ const SurveyResultsIndividualResponseCard = ({
           <FontAwesomeIcon icon={faExternalLinkAlt} />
         </a>
       </span>
-      <FontAwesomeIcon
-        icon={isOpen ? faCaretUp : faCaretDown}
-        className={styleMap.biggerIcon}
-      />
+      <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} className={styleMap.biggerIcon} />
     </CardHeader>
     <Collapse isOpen={isOpen} id={styleMap.surveyResultsCollapse}>
-      {isOpen && (
-        <CardBody className={styleMap.responseCard}>
-          {renderResponseBody(response, index)}
-        </CardBody>
-      )}
+      {isOpen && <CardBody className={styleMap.responseCard}>{renderResponseBody(response, index)}</CardBody>}
     </Collapse>
   </Card>
 );

@@ -1,5 +1,5 @@
 import { buildPileCacheUpdatePlan, type PileCacheUpdatePlan } from './surveyPileCacheSync.js';
-import { updateSubmittedSinceLastEdit } from './surveyToolUtils.js';
+import { updateSubmittedSinceLastEdit } from './surveyToolUtils';
 
 export type PileQuestionProgressLike = {
   slug?: unknown;
@@ -57,16 +57,14 @@ export const buildPileQuestionProgressSignals = ({
   const prevPendingMetadataCount = Math.max(0, Number(previousProgress?.pendingMetadataCount || 0));
   const nextPendingMetadataCount = Math.max(0, Number(nextProgress?.pendingMetadataCount || 0));
 
-  const progressHydrationTick = (
+  const progressHydrationTick =
     (nextDiscoveredQuestions !== prevDiscoveredQuestions ||
       nextHydratedQuestions !== prevHydratedQuestions ||
       nextPendingMetadataCount !== prevPendingMetadataCount) &&
-    (nextDiscoveredQuestions > 0 || nextHydratedQuestions > 0 || nextPendingMetadataCount > 0)
-  );
-  const progressCompletedTick = (
+    (nextDiscoveredQuestions > 0 || nextHydratedQuestions > 0 || nextPendingMetadataCount > 0);
+  const progressCompletedTick =
     String(previousProgress?.phase || '').toLowerCase() === 'hydrate' &&
-    String(nextProgress?.phase || '').toLowerCase() !== 'hydrate'
-  );
+    String(nextProgress?.phase || '').toLowerCase() !== 'hydrate';
 
   return {
     prevDiscoveredQuestions,
@@ -120,16 +118,11 @@ export const buildPileAutoDecryptUpdatePlan = ({
   commentsChanged?: boolean;
 } = {}): PileAutoDecryptUpdatePlan => {
   const queueAutoDecryptReasons: string[] = [];
-  const shouldDisableBlockedAutoDecrypt =
-    !!autoDecryptBlocked && (!!providerChanged || !!accountChanged);
+  const shouldDisableBlockedAutoDecrypt = !!autoDecryptBlocked && (!!providerChanged || !!accountChanged);
 
   if (
     autoDecryptEnabled &&
-    (nonceTick ||
-      responseNonceTick ||
-      pileQuestionsChanged ||
-      surveysResponseStateChanged ||
-      cacheJustBecameReady) &&
+    (nonceTick || responseNonceTick || pileQuestionsChanged || surveysResponseStateChanged || cacheJustBecameReady) &&
     !autoDecryptBlocked
   ) {
     queueAutoDecryptReasons.push('pile-state-change');

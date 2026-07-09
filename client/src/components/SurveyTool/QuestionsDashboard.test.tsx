@@ -1,6 +1,6 @@
 import { QuestionsDashboard } from './SurveySelector';
 import { SurveyQuestions } from './SurveyQuestions';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 
@@ -14,18 +14,14 @@ const syncClassSetState = (subject: any) => {
   return subject.setState;
 };
 
-const mockPeekQuestionsCache = (questionCachesBySlug: Record<string, any>) => (
+const mockPeekQuestionsCache = (questionCachesBySlug: Record<string, any>) =>
   jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace?: string, slug?: string) => {
     if (namespace !== 'questionsCache') return {};
     return questionCachesBySlug[String(slug || '')] || {};
-  })
-);
+  });
 
-const buildQuestionMapByIdLower = (questions: any[]) => (
-  new Map<string, any>(
-    questions.map((q: any) => [String(q.id).toLowerCase(), q] as [string, any])
-  )
-);
+const buildQuestionMapByIdLower = (questions: any[]) =>
+  new Map<string, any>(questions.map((q: any) => [String(q.id).toLowerCase(), q] as [string, any]));
 
 const findFirstNodeByType = (node: any, targetType: any): any => {
   if (node == null) return null;
@@ -207,7 +203,9 @@ describe('QuestionsDashboard', () => {
   it('aggregates QuestionsDashboard questions across all scope using getAllSessionSlugs', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('all');
     const readScopeSlugsSpy = jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['ignored']);
-    const allSlugsSpy = jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue(['edge', 'gamma', 'delta']);
+    const allSlugsSpy = jest
+      .spyOn(contractScriptsModule, 'getAllSessionSlugs')
+      .mockReturnValue(['edge', 'gamma', 'delta']);
     const strictLookup = (slug: unknown) => {
       if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
       if (slug === 'gamma') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
@@ -276,7 +274,9 @@ describe('QuestionsDashboard', () => {
     window.history.replaceState({}, '', '/session/edge');
     try {
       jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
-      const readScopeSlugsSpy = jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+      const readScopeSlugsSpy = jest
+        .spyOn(sessionScanScope, 'readSessionScanSlugs')
+        .mockReturnValue(['edge', 'alpha', 'beta']);
       const strictLookup = (slug: unknown) => {
         if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
         if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
@@ -456,7 +456,9 @@ describe('QuestionsDashboard', () => {
     window.history.replaceState({}, '', '/survey/0xsurvey?session=edge');
     try {
       jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
-      const readScopeSlugsSpy = jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+      const readScopeSlugsSpy = jest
+        .spyOn(sessionScanScope, 'readSessionScanSlugs')
+        .mockReturnValue(['edge', 'alpha', 'beta']);
       jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug: any) => {
         if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
         if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
@@ -519,15 +521,16 @@ describe('QuestionsDashboard', () => {
       networkChainId: 84532,
       BLOCKED_QUESTION_IDS: ['qgeneral'],
     };
-    const strictLookup = (slug: unknown) => (
-      String(slug || '').trim().toLowerCase() === ''
+    const strictLookup = (slug: unknown) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === ''
         ? generalCfg
-        : null
-    );
+        : null;
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug: any) => (
-      strictLookup(slug) || generalCfg
-    ));
+    jest
+      .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
+      .mockImplementation((slug: any) => strictLookup(slug) || generalCfg);
     jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({

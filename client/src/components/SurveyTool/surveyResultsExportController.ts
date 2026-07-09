@@ -12,14 +12,9 @@ import {
 
 export type SurveyResultsExportDownloadRequest = SurveyResultsBrowserDownloadRequest;
 
-export type SurveyResultsExportDownloadPort = (
-  request: SurveyResultsExportDownloadRequest
-) => void;
+export type SurveyResultsExportDownloadPort = (request: SurveyResultsExportDownloadRequest) => void;
 
-export type SurveyResultsExportContentGenerators = Record<
-  SurveyResultsExportGeneratorKey,
-  () => string
->;
+export type SurveyResultsExportContentGenerators = Record<SurveyResultsExportGeneratorKey, () => string>;
 
 export type SurveyResultsExportControllerResult =
   | {

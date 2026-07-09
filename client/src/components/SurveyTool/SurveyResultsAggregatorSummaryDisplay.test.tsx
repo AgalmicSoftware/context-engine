@@ -10,11 +10,13 @@ import {
 
 describe('SurveyResultsAggregatorSummaryDisplay', () => {
   it('builds freeform summary labels without requiring card renderers', () => {
-    expect(buildSurveyResultsFreeformSummaryLabel({
-      blankCount: 2,
-      encryptedCount: 1,
-      totalResponses: 5,
-    })).toBe('5 total responses. 1 encrypted responses not shown. 2 blank not shown.');
+    expect(
+      buildSurveyResultsFreeformSummaryLabel({
+        blankCount: 2,
+        encryptedCount: 1,
+        totalResponses: 5,
+      }),
+    ).toBe('5 total responses. 1 encrypted responses not shown. 2 blank not shown.');
   });
 
   it('renders freeform answer rows and additional comments', () => {
@@ -32,7 +34,7 @@ describe('SurveyResultsAggregatorSummaryDisplay', () => {
             },
           ],
         }}
-      />
+      />,
     );
 
     expect(screen.getByText('1 total responses.')).toBeInTheDocument();
@@ -50,7 +52,7 @@ describe('SurveyResultsAggregatorSummaryDisplay', () => {
             { count: 1, key: 'no', label: 'No' },
           ],
         }}
-      />
+      />,
     );
 
     expect(screen.getByText('4 total responders to this multichoice question.')).toBeInTheDocument();
@@ -61,11 +63,7 @@ describe('SurveyResultsAggregatorSummaryDisplay', () => {
   });
 
   it('renders summary empty-state copy as passive display', () => {
-    render(
-      <SurveyResultsAggregatorEmptyState>
-        No display rows.
-      </SurveyResultsAggregatorEmptyState>
-    );
+    render(<SurveyResultsAggregatorEmptyState>No display rows.</SurveyResultsAggregatorEmptyState>);
 
     expect(screen.getByText('No display rows.')).toBeInTheDocument();
   });

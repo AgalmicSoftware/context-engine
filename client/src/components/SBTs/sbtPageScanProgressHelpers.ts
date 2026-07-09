@@ -50,9 +50,8 @@ type SbtPageScanProgressDisplay = {
   scanProgressText: string | null;
 };
 
-const isSbtPageScanRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isSbtPageScanRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const hasUsableSbtPageScanProgress = (progress: unknown): boolean => {
   const record = isSbtPageScanRecord(progress) ? progress : null;
@@ -63,13 +62,11 @@ export const hasUsableSbtPageScanProgress = (progress: unknown): boolean => {
   const remainingBlocks = Number(record.remainingBlocks);
   return (
     (Number.isFinite(totalBlocks) && totalBlocks > 0) ||
-    (
-      Number.isFinite(currentBlock) &&
+    (Number.isFinite(currentBlock) &&
       currentBlock >= 0 &&
       Number.isFinite(latestBlock) &&
       latestBlock > 0 &&
-      latestBlock >= currentBlock
-    ) ||
+      latestBlock >= currentBlock) ||
     (Number.isFinite(remainingBlocks) && remainingBlocks >= 0)
   );
 };
@@ -82,21 +79,14 @@ export const isActiveSbtPageScanProgress = (progress: unknown): boolean => {
 
   const totalBlocks = Number(record.totalBlocks || 0);
   const scannedBlocks = Number(record.scannedBlocks);
-  if (
-    Number.isFinite(totalBlocks) &&
-    totalBlocks > 0 &&
-    Number.isFinite(scannedBlocks)
-  ) {
+  if (Number.isFinite(totalBlocks) && totalBlocks > 0 && Number.isFinite(scannedBlocks)) {
     return scannedBlocks < totalBlocks;
   }
 
   const currentBlock = Number(record.currentBlock || 0);
   const latestBlock = Number(record.latestBlock || 0);
   return (
-    Number.isFinite(currentBlock) &&
-    currentBlock >= 0 &&
-    Number.isFinite(latestBlock) &&
-    latestBlock > currentBlock
+    Number.isFinite(currentBlock) && currentBlock >= 0 && Number.isFinite(latestBlock) && latestBlock > currentBlock
   );
 };
 
@@ -106,17 +96,11 @@ export const resolveSbtPageHolderScanActive = ({
   loadingMintedFilter = false,
   sbtScanInProgress = false,
   sbtScanPending = false,
-}: ResolveSbtPageHolderScanActiveArgs = {}): boolean => Boolean(
-  hasActiveScanProgress ||
-  loadingMintersBurners ||
-  loadingMintedFilter ||
-  sbtScanInProgress ||
-  sbtScanPending
-);
+}: ResolveSbtPageHolderScanActiveArgs = {}): boolean =>
+  Boolean(hasActiveScanProgress || loadingMintersBurners || loadingMintedFilter || sbtScanInProgress || sbtScanPending);
 
-export const formatSbtPageBlockCount = (value: unknown): string => (
-  Number.isFinite(Number(value)) ? Number(value).toLocaleString() : '-'
-);
+export const formatSbtPageBlockCount = (value: unknown): string =>
+  Number.isFinite(Number(value)) ? Number(value).toLocaleString() : '-';
 
 export const resolveSbtPageRemainingBlocksCount = (progress: unknown): number => {
   const record = isSbtPageScanRecord(progress) ? progress : {};
@@ -125,7 +109,7 @@ export const resolveSbtPageRemainingBlocksCount = (progress: unknown): number =>
     0,
     Number.isFinite(remainingBlocks)
       ? remainingBlocks
-      : (Number(record.totalBlocks || 0) - Number(record.scannedBlocks || 0))
+      : Number(record.totalBlocks || 0) - Number(record.scannedBlocks || 0),
   );
 };
 
@@ -133,9 +117,8 @@ export const shouldShowSbtPageScanProgress = ({
   effectiveLoading = false,
   hasActiveScanProgress = false,
   rawRemainingBlocksCount = 0,
-}: ShouldShowSbtPageScanProgressArgs = {}): boolean => (
-  !!hasActiveScanProgress && (!!effectiveLoading || Number(rawRemainingBlocksCount) > 0)
-);
+}: ShouldShowSbtPageScanProgressArgs = {}): boolean =>
+  !!hasActiveScanProgress && (!!effectiveLoading || Number(rawRemainingBlocksCount) > 0);
 
 export const resolveSbtPageScanProgressPercent = ({
   progress = null,
@@ -143,21 +126,14 @@ export const resolveSbtPageScanProgressPercent = ({
 }: ResolveSbtPageScanProgressPercentArgs = {}): number => {
   if (!showScanProgress) return 0;
   const record = isSbtPageScanRecord(progress) ? progress : {};
-  return (
-    Number.isFinite(Number(record.totalBlocks)) &&
+  return Number.isFinite(Number(record.totalBlocks)) &&
     Number(record.totalBlocks) > 0 &&
     Number.isFinite(Number(record.scannedBlocks))
-      ? Math.max(
+    ? Math.max(
         0,
-        Math.min(
-          100,
-          Math.round(
-            (Number(record.scannedBlocks || 0) / Number(record.totalBlocks || 1)) * 100
-          )
-        )
+        Math.min(100, Math.round((Number(record.scannedBlocks || 0) / Number(record.totalBlocks || 1)) * 100)),
       )
-      : 0
-  );
+    : 0;
 };
 
 export const resolveSbtPageScanProgressFillStyle = ({
@@ -179,9 +155,7 @@ export const resolveSbtPageScanProgressDisplay = ({
       scanProgressText: null,
     };
   }
-  const remainingBlocksCount = rawRemainingBlocksCount == null
-    ? 0
-    : Number(rawRemainingBlocksCount);
+  const remainingBlocksCount = rawRemainingBlocksCount == null ? 0 : Number(rawRemainingBlocksCount);
   return {
     remainingBlocksCount,
     scanProgressSessionText: `Session: ${String(sessionLabel || '').trim()}`,
@@ -208,12 +182,8 @@ export const buildSbtPageParentSessionScanProgress = ({
   const startCandidate = Math.floor(Number(blockLimits.start || 0));
   const hasStartBlock = Number.isFinite(startCandidate) && startCandidate > 0;
   const startBlock = hasStartBlock ? Math.min(startCandidate, latestBlock) : 0;
-  const totalBlocks = hasStartBlock
-    ? Math.max(1, latestBlock - startBlock + 1)
-    : null;
-  const scannedBlocks = totalBlocks != null
-    ? Math.max(0, Math.min(totalBlocks, currentBlock - startBlock + 1))
-    : null;
+  const totalBlocks = hasStartBlock ? Math.max(1, latestBlock - startBlock + 1) : null;
+  const scannedBlocks = totalBlocks != null ? Math.max(0, Math.min(totalBlocks, currentBlock - startBlock + 1)) : null;
 
   return {
     ...progress,

@@ -42,11 +42,7 @@ export const AUTHORITY_MATRIX = deepFreeze<AuthorityMatrix>({
     fields: ['slug', 'sessionId', 'metadataURI', 'chainId'],
     authoritativeSource: AUTHORITY_SOURCES.REGISTRY,
     allowedFallbacks: [AUTHORITY_SOURCES.DEMO],
-    mustNotOverride: [
-      AUTHORITY_SOURCES.ARWEAVE,
-      AUTHORITY_SOURCES.BROWSER,
-      AUTHORITY_SOURCES.CACHE,
-    ],
+    mustNotOverride: [AUTHORITY_SOURCES.ARWEAVE, AUTHORITY_SOURCES.BROWSER, AUTHORITY_SOURCES.CACHE],
   },
   gates: {
     fields: ['sponsored', 'gates'],
@@ -63,11 +59,7 @@ export const AUTHORITY_MATRIX = deepFreeze<AuthorityMatrix>({
     fields: ['slug', 'registrySlug', 'legacyExactSlug'],
     authoritativeSource: AUTHORITY_SOURCES.REGISTRY,
     allowedFallbacks: [AUTHORITY_SOURCES.DEMO],
-    mustNotOverride: [
-      AUTHORITY_SOURCES.ARWEAVE,
-      AUTHORITY_SOURCES.BROWSER,
-      AUTHORITY_SOURCES.CACHE,
-    ],
+    mustNotOverride: [AUTHORITY_SOURCES.ARWEAVE, AUTHORITY_SOURCES.BROWSER, AUTHORITY_SOURCES.CACHE],
   },
   faucetEligibility: {
     fields: ['txGas', 'faucetFallbackResources'],
@@ -83,15 +75,8 @@ export const AUTHORITY_MATRIX = deepFreeze<AuthorityMatrix>({
   registryDiscovery: {
     fields: ['sessionRegistryAddress', 'sessionContractsByChain'],
     authoritativeSource: AUTHORITY_SOURCES.DISCOVERY,
-    allowedFallbacks: [
-      AUTHORITY_SOURCES.BROWSER,
-      AUTHORITY_SOURCES.BUNDLED,
-    ],
-    mustNotOverride: [
-      AUTHORITY_SOURCES.ARWEAVE,
-      AUTHORITY_SOURCES.DEMO,
-      AUTHORITY_SOURCES.CACHE,
-    ],
+    allowedFallbacks: [AUTHORITY_SOURCES.BROWSER, AUTHORITY_SOURCES.BUNDLED],
+    mustNotOverride: [AUTHORITY_SOURCES.ARWEAVE, AUTHORITY_SOURCES.DEMO, AUTHORITY_SOURCES.CACHE],
   },
   textMetadata: {
     fields: ['sessionName', 'sessionInfo', 'tags', 'ai', 'lit', 'encryption'],
@@ -111,30 +96,13 @@ export const AUTHORITY_MATRIX = deepFreeze<AuthorityMatrix>({
     ],
   },
   secrets: {
-    fields: [
-      'arweaveJwk',
-      'apiKey',
-      'privateKey',
-      'litAccountApiKey',
-      'litUsageApiKey',
-    ],
+    fields: ['arweaveJwk', 'apiKey', 'privateKey', 'litAccountApiKey', 'litUsageApiKey'],
     authoritativeSource: AUTHORITY_SOURCES.WORKER_SECRETS,
     allowedFallbacks: [AUTHORITY_SOURCES.BROWSER],
-    mustNotOverride: [
-      AUTHORITY_SOURCES.ARWEAVE,
-      AUTHORITY_SOURCES.DEMO,
-      AUTHORITY_SOURCES.CACHE,
-    ],
+    mustNotOverride: [AUTHORITY_SOURCES.ARWEAVE, AUTHORITY_SOURCES.DEMO, AUTHORITY_SOURCES.CACHE],
   },
   localPreferences: {
-    fields: [
-      'rpc.useLocal',
-      'rpc.apiKey',
-      'arweave.useLocal',
-      'arweave.jwk',
-      'faucet.useLocal',
-      'faucet.privateKey',
-    ],
+    fields: ['rpc.useLocal', 'rpc.apiKey', 'arweave.useLocal', 'arweave.jwk', 'faucet.useLocal', 'faucet.privateKey'],
     authoritativeSource: AUTHORITY_SOURCES.BROWSER,
     allowedFallbacks: [],
     mustNotOverride: [

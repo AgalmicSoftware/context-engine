@@ -71,11 +71,7 @@ describe('chains paid RPC env wiring', () => {
     process.env.REACT_APP_CE_OP_SEPOLIA_PAID_RPC_URL_HTTP = 'https://op-paid.example/rpc';
 
     jest.isolateModules(() => {
-      const {
-        baseSepolia,
-        optimismSepolia,
-        getConfiguredPaidRpcHttpUrl,
-      } = require('./chains.js');
+      const { baseSepolia, optimismSepolia, getConfiguredPaidRpcHttpUrl } = require('./chains.js');
 
       expect(getConfiguredPaidRpcHttpUrl(84532)).toBe('https://base-paid.example/rpc');
       expect(getConfiguredPaidRpcHttpUrl(11155420)).toBe('https://op-paid.example/rpc');
@@ -91,11 +87,7 @@ describe('chains paid RPC env wiring', () => {
     process.env.REACT_APP_CE_OP_SEPOLIA_PAID_RPC_URL_HTTP = 'https://op-only.example/rpc';
 
     jest.isolateModules(() => {
-      const {
-        baseSepolia,
-        optimismSepolia,
-        getPreferredPathRpcUrl,
-      } = require('./chains.js');
+      const { baseSepolia, optimismSepolia, getPreferredPathRpcUrl } = require('./chains.js');
 
       expect(getPreferredPathRpcUrl(84532)).toBe('https://base-sepolia-testnet.api.pocket.network');
       expect(baseSepolia.rpcUrls?.public?.http?.[0]).toBe('https://base-sepolia-testnet.api.pocket.network');

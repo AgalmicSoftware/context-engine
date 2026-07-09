@@ -24,8 +24,10 @@ describe('ChainScanReadsPort', () => {
 
     currentChainGateway = secondChainGateway;
 
-    await expect(port.getRelevantBlockWindowForFilter('beta', { strict: true }))
-      .resolves.toEqual({ fromBlock: 11, toBlock: 20 });
+    await expect(port.getRelevantBlockWindowForFilter('beta', { strict: true })).resolves.toEqual({
+      fromBlock: 11,
+      toBlock: 20,
+    });
     expect(port.getReadProviderForSession('beta')).toBe(secondProvider);
 
     expect(firstChainGateway.getLatestBlockNumber).toHaveBeenCalledWith('none', 'alpha');

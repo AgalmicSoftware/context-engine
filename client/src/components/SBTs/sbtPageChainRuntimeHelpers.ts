@@ -32,9 +32,8 @@ type BuildSbtPageClaimCountdownCompletePatchArgs = {
   waitMs?: unknown;
 };
 
-const isSbtPageChainRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isSbtPageChainRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const readSbtPagePositiveNumber = (value: unknown): number | null => {
   const n = Number(value || 0);
@@ -42,7 +41,7 @@ const readSbtPagePositiveNumber = (value: unknown): number | null => {
 };
 
 export const getBlockExplorerBaseUrl = (network: unknown): string => {
-  const networkRecord = isSbtPageChainRecord(network) ? network as BlockExplorerNetworkLike : null;
+  const networkRecord = isSbtPageChainRecord(network) ? (network as BlockExplorerNetworkLike) : null;
   return String(networkRecord?.blockExplorers?.default?.url || '').replace(/\/+$/, '');
 };
 
@@ -107,9 +106,7 @@ export const resolveSbtPageActiveChainId = ({
   if (sbtChainId) return sbtChainId;
 
   const sessionChainId = readSbtPagePositiveNumber(
-    typeof getSessionChainId === 'function'
-      ? getSessionChainId(String(sessionSlug || ''))
-      : null
+    typeof getSessionChainId === 'function' ? getSessionChainId(String(sessionSlug || '')) : null,
   );
   return sessionChainId || null;
 };
@@ -130,9 +127,7 @@ export const resolveSbtPageRecoveryCacheChainId = ({
   if ((propChainId ?? 0) > 0) return propChainId;
 
   const sessionChainId = readSbtPagePositiveNumber(
-    typeof getSessionChainId === 'function'
-      ? getSessionChainId(String(sessionSlug || ''))
-      : null
+    typeof getSessionChainId === 'function' ? getSessionChainId(String(sessionSlug || '')) : null,
   );
   if (sessionChainId) return sessionChainId;
 
@@ -147,15 +142,12 @@ export const resolveSbtPageActiveBlockTimeMs = ({
 }: ResolveSbtPageActiveBlockTimeMsArgs = {}): number => {
   const factor = Number(multiplier || 1);
   const safeFactor = Number.isFinite(factor) && factor > 0 ? factor : 1;
-  const blockTimeMs = typeof getChainBlockTimeMs === 'function'
-    ? getChainBlockTimeMs(activeChainId)
-    : 0;
+  const blockTimeMs = typeof getChainBlockTimeMs === 'function' ? getChainBlockTimeMs(activeChainId) : 0;
   return Math.round(blockTimeMs * safeFactor);
 };
 
-export const resolveSbtPageCountdownDisplaySeconds = (remainingMs: unknown): number => (
-  Math.max(0, Math.ceil(Number(remainingMs || 0) / 1000))
-);
+export const resolveSbtPageCountdownDisplaySeconds = (remainingMs: unknown): number =>
+  Math.max(0, Math.ceil(Number(remainingMs || 0) / 1000));
 
 export const buildSbtPageClaimCountdownTickPatch = ({
   remainingMs = 0,

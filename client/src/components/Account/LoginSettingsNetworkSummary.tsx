@@ -17,9 +17,8 @@ type NetworkSummaryProps = {
   walletNetworkName?: string;
 };
 
-const buildNetworkDetail = (targetNetworkName: string): string => (
-  `The active session targets ${targetNetworkName}. If your wallet shows a different chain, switch before submitting.`
-);
+const buildNetworkDetail = (targetNetworkName: string): string =>
+  `The active session targets ${targetNetworkName}. If your wallet shows a different chain, switch before submitting.`;
 
 export const LoginSettingsInlineNetworkSummary = ({
   targetNetworkName = 'not configured',
@@ -48,9 +47,7 @@ export const LoginSettingsInlineNetworkSummary = ({
         autohide={false}
         className={styles.networkTooltip}
       >
-        <div style={{ padding: '10px' }}>
-          {detail}
-        </div>
+        <div style={{ padding: '10px' }}>{detail}</div>
       </CETooltip>
     </div>
   );
@@ -84,9 +81,7 @@ export const LoginSettingsPanelNetworkSummary = ({
             />
           </div>
           <div className={styles.aiSettingsSummaryValue}>{targetNetworkName}</div>
-          <div className={styles.aiSettingsSummaryDetail}>
-            {detail}
-          </div>
+          <div className={styles.aiSettingsSummaryDetail}>{detail}</div>
           <CETooltip
             placement="right"
             target={tooltipId}
@@ -95,18 +90,14 @@ export const LoginSettingsPanelNetworkSummary = ({
             autohide={false}
             className={styles.networkTooltip}
           >
-            <div style={{ padding: '10px' }}>
-              {detail}
-            </div>
+            <div style={{ padding: '10px' }}>{detail}</div>
           </CETooltip>
         </div>
         {showWalletNetwork && (
           <div className={styles.aiSettingsSummaryCard}>
             <div className={styles.aiSettingsSummaryLabel}>Wallet</div>
             <div className={styles.aiSettingsSummaryValue}>{walletNetworkName}</div>
-            <div className={styles.aiSettingsSummaryDetail}>
-              Switch before submitting to match the session network.
-            </div>
+            <div className={styles.aiSettingsSummaryDetail}>Switch before submitting to match the session network.</div>
           </div>
         )}
       </div>

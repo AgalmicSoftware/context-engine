@@ -2,12 +2,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Label, FormGroup, FormText } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faClipboard, faExternalLinkAlt, faLock, faLockOpen, faPen, faQuestionCircle, faSync, faTimes } from '@fortawesome/free-solid-svg-icons';
+import {
+  faCaretDown,
+  faCaretUp,
+  faClipboard,
+  faExternalLinkAlt,
+  faPen,
+  faQuestionCircle,
+  faSync,
+} from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import styles from './AdminPage.module.scss';
-import {
-  USE_ONCHAIN_SESSION_REGISTRY,
-} from '../../variables/appConfig.js';
+import { USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { encryptedFieldsUtils } from '../../utilities/crypto/encryptedFields.js';
 import { normalizeOriginList } from '../../utilities/urlUtils.js';
@@ -35,10 +41,12 @@ import {
 } from '../../utilities/session/sessionWorkerAvailability.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../utilities/session/sponsoredFlags.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import AudioInput from '../Shared/AudioInput/AudioInput';
 import SBTSelector from '../SBTs/SBTSelector';
 import { JsonPanel } from '../Shared/Json/JsonControls';
 import CETooltip from '../Shared/CETooltip';
+import AdminPageMetadataEditor from './AdminPageMetadataEditor';
+import AdminPageTestsPanel from './AdminPageTestsPanel';
+import AdminPageWorkerSecretsPanel from './AdminPageWorkerSecretsPanel';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
 import {
@@ -74,17 +82,7 @@ import {
   getAdminSessionDisplayUrl,
   shortAddress,
 } from './adminPageSessionDisplayHelpers';
-import {
-  ADMIN_SECRET_CARDS,
-  buildAdminSecretRemoveTestId,
-  getAdminSecretCardStatus,
-  getAdminSecretFieldInputType,
-  getAdminSecretFieldLabel,
-  getAdminSecretFieldRows,
-  getAdminSecretFieldStatusLabel,
-  normalizeAdminSecretPresence,
-  normalizeAdminSecretPresencePatch,
-} from './adminPageSecretCardHelpers';
+import { normalizeAdminSecretPresence, normalizeAdminSecretPresencePatch } from './adminPageSecretCardHelpers';
 import type { AdminTestResults } from './adminPageTestResultHelpers';
 import { renderAdminTestResult } from './adminPageTestResultHelpers';
 import {
@@ -125,7 +123,6 @@ import {
   buildEditableSessionMetadataPayload,
   parseChainIdInput,
   resolveAutoFeatureBySessionSlug,
-  shouldShowInlineResourceSummary,
 } from './adminPageMetadataDraftHelpers';
 
 const log = createLogger('general');
@@ -182,11 +179,8 @@ const buildSecretPresenceTargetKey = ({ slug, workerUrl }: { slug?: unknown; wor
   return normalizedWorkerUrl ? `${normalizedSlug}\n${normalizedWorkerUrl}` : '';
 };
 
-const asAdminSessionConfig = (value: unknown): AdminSessionConfigLike => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as AdminSessionConfigLike
-    : {}
-);
+const asAdminSessionConfig = (value: unknown): AdminSessionConfigLike =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as AdminSessionConfigLike) : {};
 
 const AdminPage = ({
   account,
@@ -245,7 +239,10 @@ const AdminPage = ({
   const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState(false);
   const [defaultGateTouched, setDefaultGateTouched] = useState(false);
   const [gateConfigDirty, setGateConfigDirty] = useState(false);
-  const [metadataBlockLimitsDraft, setMetadataBlockLimitsDraft] = useState<AdminMetadataBlockLimitsDraft>({ start: '', end: '' });
+  const [metadataBlockLimitsDraft, setMetadataBlockLimitsDraft] = useState<AdminMetadataBlockLimitsDraft>({
+    start: '',
+    end: '',
+  });
   const [metadataDraftTouched, setMetadataDraftTouched] = useState(false);
   const [metadataAutoFeatureDraft, setMetadataAutoFeatureDraft] = useState(true);
   const [metadataAutoFeatureTouched, setMetadataAutoFeatureTouched] = useState(false);
@@ -280,9 +277,17 @@ const AdminPage = ({
   const [workerSecretsDirty, setWorkerSecretsDirty] = useState(false);
   const [clearedSecretKeys, setClearedSecretKeys] = useState<AdminSecretKeySet>(() => new Set());
   const [storedSecretPresence, setStoredSecretPresence] = useState<Record<string, boolean>>({});
-  const [secretPresenceStatus, setSecretPresenceStatus] = useState<'idle' | 'loading' | 'partial' | 'loaded' | 'error'>('idle');
+  const [secretPresenceStatus, setSecretPresenceStatus] = useState<'idle' | 'loading' | 'partial' | 'loaded' | 'error'>(
+    'idle',
+  );
   const [secretPresenceMessage, setSecretPresenceMessage] = useState('');
-  const [openSecretCards, setOpenSecretCards] = useState<AdminOpenSecretCards>({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
+  const [openSecretCards, setOpenSecretCards] = useState<AdminOpenSecretCards>({
+    ai: false,
+    rpc: false,
+    arweave: false,
+    faucet: false,
+    lit: false,
+  });
   const [arweaveResource, setArweaveResource] = useState<any>(() => buildAdminArweaveEmptyResource());
   const [faucetResource, setFaucetResource] = useState<any>(() => buildAdminFaucetEmptyResource());
   const [litResource, setLitResource] = useState<any>(() => buildAdminLitNotConfiguredResource());
@@ -321,7 +326,11 @@ const AdminPage = ({
 
   const updateMetadataConfigDraft = useCallback((key: string, value: unknown) => {
     setMetadataDraftTouched(true);
-    if (key === 'contractSurveysAddress' || key === 'contractSbtFactoryAddress' || key === 'contractSessionRegistryAddress') {
+    if (
+      key === 'contractSurveysAddress' ||
+      key === 'contractSbtFactoryAddress' ||
+      key === 'contractSessionRegistryAddress'
+    ) {
       setMetadataContractDraftTouched(true);
       setMetadataContractsVerified(false);
     }
@@ -336,7 +345,7 @@ const AdminPage = ({
   const requestedAutoRefreshKeyRef = useRef('');
   // Avoid any automatic wallet RPC calls in /admin (some wallets show connect popups even for
   // "read-only" methods). Treat wallet as "ready" only if the app believes login is complete.
-  const walletReady = !!account && (loginComplete !== false);
+  const walletReady = !!account && loginComplete !== false;
 
   useEffect(() => {
     setIgnoreRequestedSession(false);
@@ -349,43 +358,43 @@ const AdminPage = ({
     return nextSessions;
   }, []);
 
-  const loadSessions = useCallback(async ({ forceOnChain }: any = {}) => {
-    const cached = syncSessionsFromRegistryCache();
+  const loadSessions = useCallback(
+    async ({ forceOnChain }: any = {}) => {
+      const cached = syncSessionsFromRegistryCache();
 
-    const chainIds = requestedChainId ? [requestedChainId] : undefined;
-    const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
-    const runRegistryLoad = async (bootstrapRpc: any) => {
-      try {
-        return await adminSessionRegistryPorts.reads.loadSessionRegistryCache({
-          ...(chainIds ? { chainIds } : {}),
-          force: shouldForceRegistryRead,
-          // In /admin, never auto-decrypt registry metadata; keep wallet prompts behind user actions.
-          providerLike: null,
-          account: '',
-          lit: null,
-          bootstrapRpc,
-        });
-      } catch (error) {
-        return { __error: error };
+      const chainIds = requestedChainId ? [requestedChainId] : undefined;
+      const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
+      const runRegistryLoad = async (bootstrapRpc: any) => {
+        try {
+          return await adminSessionRegistryPorts.reads.loadSessionRegistryCache({
+            ...(chainIds ? { chainIds } : {}),
+            force: shouldForceRegistryRead,
+            // In /admin, never auto-decrypt registry metadata; keep wallet prompts behind user actions.
+            providerLike: null,
+            account: '',
+            lit: null,
+            bootstrapRpc,
+          });
+        } catch (error) {
+          return { __error: error };
+        }
+      };
+
+      const primaryResult: any = await runRegistryLoad(true);
+      let refreshed = syncSessionsFromRegistryCache();
+      const primaryCount = countSessionsForChain(refreshed, requestedChainId);
+      const primaryLoadHadErrors = !!primaryResult?.__error || primaryResult?.__loadMeta?.hadLoadErrors === true;
+      const shouldRetryWithDefaultRpc = primaryCount <= 0 || primaryLoadHadErrors;
+
+      if (shouldRetryWithDefaultRpc) {
+        await runRegistryLoad(false);
+        refreshed = syncSessionsFromRegistryCache();
       }
-    };
 
-    const primaryResult: any = await runRegistryLoad(true);
-    let refreshed = syncSessionsFromRegistryCache();
-    const primaryCount = countSessionsForChain(refreshed, requestedChainId);
-    const primaryLoadHadErrors = (
-      !!primaryResult?.__error ||
-      primaryResult?.__loadMeta?.hadLoadErrors === true
-    );
-    const shouldRetryWithDefaultRpc = primaryCount <= 0 || primaryLoadHadErrors;
-
-    if (shouldRetryWithDefaultRpc) {
-      await runRegistryLoad(false);
-      refreshed = syncSessionsFromRegistryCache();
-    }
-
-    return refreshed;
-  }, [requestedChainId, syncSessionsFromRegistryCache]);
+      return refreshed;
+    },
+    [requestedChainId, syncSessionsFromRegistryCache],
+  );
 
   const handleRefreshSessions = useCallback(async () => {
     setSessionsRefreshBusy(true);
@@ -452,12 +461,14 @@ const AdminPage = ({
   const requestedSessionMatch = useMemo(() => {
     if (!requestedSessionRaw) return null;
     if (requestedSessionIdHex) {
-      return availableSessions.find(([, rawCfg]) => {
-        const cfg = asAdminSessionConfig(rawCfg);
-        const registry = asAdminSessionConfig(cfg.__registry);
-        const cfgId = adminSessionRegistryPorts.reads.normalizeSessionIdHex(registry.sessionIdHex || cfg.sessionId);
-        return cfgId && cfgId === requestedSessionIdHex;
-      }) || null;
+      return (
+        availableSessions.find(([, rawCfg]) => {
+          const cfg = asAdminSessionConfig(rawCfg);
+          const registry = asAdminSessionConfig(cfg.__registry);
+          const cfgId = adminSessionRegistryPorts.reads.normalizeSessionIdHex(registry.sessionIdHex || cfg.sessionId);
+          return cfgId && cfgId === requestedSessionIdHex;
+        }) || null
+      );
     }
     return availableSessions.find(([slug]) => slug === requestedSessionSlug) || null;
   }, [availableSessions, requestedSessionRaw, requestedSessionIdHex, requestedSessionSlug]);
@@ -471,12 +482,7 @@ const AdminPage = ({
       handleRefreshSessions();
     }, 1000);
     return () => clearTimeout(timeoutId);
-  }, [
-    requestedSessionRaw,
-    requestedChainId,
-    ignoreRequestedSession,
-    handleRefreshSessions,
-  ]);
+  }, [requestedSessionRaw, requestedChainId, ignoreRequestedSession, handleRefreshSessions]);
 
   useEffect(() => {
     if (!availableSessions.length) {
@@ -546,7 +552,10 @@ const AdminPage = ({
         setSessionLookupStatus('');
       } catch (err: any) {
         if (!cancelled) {
-          const message = getErrorMessage(err, `Session not found on chain ${requestedChainId}: ${requestedSessionRaw}`);
+          const message = getErrorMessage(
+            err,
+            `Session not found on chain ${requestedChainId}: ${requestedSessionRaw}`,
+          );
           setSessionLookupStatus(message);
           notify.error(message);
         }
@@ -571,53 +580,61 @@ const AdminPage = ({
   }, [availableSessions, selectedSlug]);
   const effectiveWorkerAllowOrigins = useMemo(() => {
     if (!selectedConfig) return [];
-    const cachedWorkerConfig: any = getCachedSessionWorkerConfig({
-      slug: selectedSlug,
-      sessionConfig: selectedConfig,
-    }) || {};
+    const cachedWorkerConfig: any =
+      getCachedSessionWorkerConfig({
+        slug: selectedSlug,
+        sessionConfig: selectedConfig,
+      }) || {};
     if (Object.prototype.hasOwnProperty.call(cachedWorkerConfig, 'allowOrigins')) {
       return parseAllowOriginsDraft(cachedWorkerConfig.allowOrigins);
     }
     return parseAllowOriginsDraft(selectedConfig?.allowOrigins);
   }, [selectedConfig, selectedSlug]);
-  const effectiveAllowOriginsDraft = useMemo(() => (
-    formatAllowOriginsDraft(effectiveWorkerAllowOrigins)
-  ), [effectiveWorkerAllowOrigins]);
-  const normalizedAllowOriginsDraft = useMemo(() => (
-    parseAllowOriginsDraft(allowOriginsDraft)
-  ), [allowOriginsDraft]);
-  const normalizedAllowOriginsDraftText = useMemo(() => (
-    formatAllowOriginsDraft(normalizedAllowOriginsDraft)
-  ), [normalizedAllowOriginsDraft]);
+  const effectiveAllowOriginsDraft = useMemo(
+    () => formatAllowOriginsDraft(effectiveWorkerAllowOrigins),
+    [effectiveWorkerAllowOrigins],
+  );
+  const normalizedAllowOriginsDraft = useMemo(() => parseAllowOriginsDraft(allowOriginsDraft), [allowOriginsDraft]);
+  const normalizedAllowOriginsDraftText = useMemo(
+    () => formatAllowOriginsDraft(normalizedAllowOriginsDraft),
+    [normalizedAllowOriginsDraft],
+  );
   const allowOriginsHasChanges = normalizedAllowOriginsDraftText !== effectiveAllowOriginsDraft;
 
   const groupMetadata = useMemo(() => selectedConfig, [selectedConfig]);
-  const relevantSessionChainId = useMemo(() => (
-    Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0) || 0
-  ), [selectedConfig, network?.id]);
-  const relevantRegistryChainId = useMemo(() => (
-    Number(
-      selectedConfig?.__registry?.registryChainId ||
-      selectedConfig?.__registry?.chainId ||
-      selectedConfig?.networkChainId ||
-      network?.id ||
-      0
-    ) || 0
-  ), [selectedConfig, network?.id]);
-  const encryptedFieldsSessionKey = useMemo(() => ([
-    normalizeSlug(groupMetadata?.slug || selectedSlug),
-    toStr(groupMetadata?.sessionId || groupMetadata?.__registry?.sessionIdHex).trim(),
-    toStr(groupMetadata?.__registry?.registryChainId || groupMetadata?.__registry?.chainId || relevantRegistryChainId).trim(),
-  ].join('|')), [groupMetadata, selectedSlug, relevantRegistryChainId]);
+  const relevantSessionChainId = useMemo(
+    () => Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0) || 0,
+    [selectedConfig, network?.id],
+  );
+  const relevantRegistryChainId = useMemo(
+    () =>
+      Number(
+        selectedConfig?.__registry?.registryChainId ||
+          selectedConfig?.__registry?.chainId ||
+          selectedConfig?.networkChainId ||
+          network?.id ||
+          0,
+      ) || 0,
+    [selectedConfig, network?.id],
+  );
+  const encryptedFieldsSessionKey = useMemo(
+    () =>
+      [
+        normalizeSlug(groupMetadata?.slug || selectedSlug),
+        toStr(groupMetadata?.sessionId || groupMetadata?.__registry?.sessionIdHex).trim(),
+        toStr(
+          groupMetadata?.__registry?.registryChainId || groupMetadata?.__registry?.chainId || relevantRegistryChainId,
+        ).trim(),
+      ].join('|'),
+    [groupMetadata, selectedSlug, relevantRegistryChainId],
+  );
   const relevantSessionChainLabel = useMemo(() => {
     if (!relevantSessionChainId) return '';
     const name = getChainName(relevantSessionChainId);
     return name ? `${name} (${relevantSessionChainId})` : String(relevantSessionChainId);
   }, [relevantSessionChainId]);
 
-  const defaultGate = useMemo(() => (
-    resolveDefaultGateFromConfig(groupMetadata || {})
-  ), [groupMetadata]);
+  const defaultGate = useMemo(() => resolveDefaultGateFromConfig(groupMetadata || {}), [groupMetadata]);
 
   // If the default gate is empty, treat /health as public. Otherwise, require an authenticated wallet.
   const defaultGateIsEmpty = !defaultGate?.sbtAddresses?.length;
@@ -684,9 +701,12 @@ const AdminPage = ({
     setAllowOriginsDraftDirty(false);
   }, [selectedSlug, effectiveAllowOriginsDraft, allowOriginsDraftDirty]);
 
-  useEffect(() => () => {
-    if (rawMetadataCopyResetRef.current) clearTimeout(rawMetadataCopyResetRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (rawMetadataCopyResetRef.current) clearTimeout(rawMetadataCopyResetRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!relevantSessionChainId) {
@@ -696,7 +716,8 @@ const AdminPage = ({
     }
     let cancelled = false;
     setMetadataLatestBlockStatus('Loading current block…');
-    rpcProvidersChainReadsPort.getLatestBlockNumberForChain(relevantSessionChainId)
+    rpcProvidersChainReadsPort
+      .getLatestBlockNumberForChain(relevantSessionChainId)
       .then((blockNumber: number) => {
         if (cancelled) return;
         setMetadataLatestBlock(blockNumber);
@@ -760,7 +781,7 @@ const AdminPage = ({
         ) {
           next[key] = {
             ...previousEntry,
-            status: previousEntry.status === 'wallet-required' ? 'locked' : (previousEntry.status || 'locked'),
+            status: previousEntry.status === 'wallet-required' ? 'locked' : previousEntry.status || 'locked',
             encryptedAvailable: true,
             envelope,
           };
@@ -786,12 +807,8 @@ const AdminPage = ({
     }
     const entries = collectEncryptedEntries(groupMetadata);
     if (!Object.keys(entries).length) return;
-    const chainId = Number(
-      groupMetadata?.networkChainId ||
-      groupMetadata?.__registry?.chainId ||
-      network?.id ||
-      0
-    ) || 0;
+    const chainId =
+      Number(groupMetadata?.networkChainId || groupMetadata?.__registry?.chainId || network?.id || 0) || 0;
     setDecryptFieldsBusy(true);
     try {
       const next: Record<string, any> = {};
@@ -811,37 +828,44 @@ const AdminPage = ({
   }, [groupMetadata, walletReady, toggleLoginModal, account, provider, network?.id]);
 
   const currentSponsored = selectedConfig?.sponsoredKeys || {};
-  const currentSponsoredLit = (
-    currentSponsored?.lit === true ||
-    toStr(currentSponsored?.lit).trim() === '1'
-  );
+  const currentSponsoredLit = currentSponsored?.lit === true || toStr(currentSponsored?.lit).trim() === '1';
   const resourceSessionConfig = groupMetadata || selectedConfig;
-  const selectedConfigWorkerUrl = useMemo(() => (
-    normalizeWorkerUrl(getUsableSessionWorkerUrl({
-      slug: selectedSlug,
-      sessionConfig: selectedConfig,
-      allowSharedFallback: true,
-    }))
-  ), [selectedConfig, selectedSlug]);
-  const selectedSessionHasUsableWorker = useMemo(() => (
-    hasUsableSessionWorkerConfig({
-      slug: selectedSlug,
-      sessionConfig: selectedConfig,
-      allowSharedFallback: true,
-    })
-  ), [selectedConfig, selectedSlug]);
-  const secretPresenceTargetKey = useMemo(() => (
-    buildSecretPresenceTargetKey({
-      slug: selectedSlug,
-      workerUrl: workerUrl || selectedConfigWorkerUrl,
-    })
-  ), [selectedConfigWorkerUrl, selectedSlug, workerUrl]);
-  const sessionReadRpc = useMemo(() => (
-    getSessionReadRpcConfig({
-      sessionConfig: resourceSessionConfig,
-      fallbackChainId: relevantSessionChainId || network?.id || 0,
-    })
-  ), [resourceSessionConfig, relevantSessionChainId, network?.id]);
+  const selectedConfigWorkerUrl = useMemo(
+    () =>
+      normalizeWorkerUrl(
+        getUsableSessionWorkerUrl({
+          slug: selectedSlug,
+          sessionConfig: selectedConfig,
+          allowSharedFallback: true,
+        }),
+      ),
+    [selectedConfig, selectedSlug],
+  );
+  const selectedSessionHasUsableWorker = useMemo(
+    () =>
+      hasUsableSessionWorkerConfig({
+        slug: selectedSlug,
+        sessionConfig: selectedConfig,
+        allowSharedFallback: true,
+      }),
+    [selectedConfig, selectedSlug],
+  );
+  const secretPresenceTargetKey = useMemo(
+    () =>
+      buildSecretPresenceTargetKey({
+        slug: selectedSlug,
+        workerUrl: workerUrl || selectedConfigWorkerUrl,
+      }),
+    [selectedConfigWorkerUrl, selectedSlug, workerUrl],
+  );
+  const sessionReadRpc = useMemo(
+    () =>
+      getSessionReadRpcConfig({
+        sessionConfig: resourceSessionConfig,
+        fallbackChainId: relevantSessionChainId || network?.id || 0,
+      }),
+    [resourceSessionConfig, relevantSessionChainId, network?.id],
+  );
 
   useEffect(() => {
     secretPresenceTargetKeyRef.current = secretPresenceTargetKey;
@@ -926,18 +950,22 @@ const AdminPage = ({
       const arweaveBalance = await adminArweavePort.readArweaveWalletBalance(parsedJwk);
       address = arweaveBalance.address;
       if (requestId !== arweaveResourceRequestRef.current) return;
-      setArweaveResource(buildAdminArweaveBalanceResource({
-        address,
-        winston: arweaveBalance.winston,
-        formatWinstonToAr: adminArweavePort.formatWinstonToAr,
-        shortAddress,
-      }));
+      setArweaveResource(
+        buildAdminArweaveBalanceResource({
+          address,
+          winston: arweaveBalance.winston,
+          formatWinstonToAr: adminArweavePort.formatWinstonToAr,
+          shortAddress,
+        }),
+      );
     } catch (err) {
       if (requestId !== arweaveResourceRequestRef.current) return;
-      setArweaveResource(buildAdminArweaveErrorResource({
-        address,
-        shortAddress,
-      }));
+      setArweaveResource(
+        buildAdminArweaveErrorResource({
+          address,
+          shortAddress,
+        }),
+      );
     }
   }, [secrets.arweaveJwk]);
 
@@ -959,41 +987,47 @@ const AdminPage = ({
       return;
     }
 
-    const sessionChainLabel = relevantSessionChainLabel || (sessionReadRpc.chainId ? String(sessionReadRpc.chainId) : '');
+    const sessionChainLabel =
+      relevantSessionChainLabel || (sessionReadRpc.chainId ? String(sessionReadRpc.chainId) : '');
     if (!sessionReadRpc.chainId) {
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource(buildAdminFaucetRpcUnavailableResource({
-        address,
-        shortAddress,
-      }));
+      setFaucetResource(
+        buildAdminFaucetRpcUnavailableResource({
+          address,
+          shortAddress,
+        }),
+      );
       return;
     }
 
-    setFaucetResource(buildAdminFaucetLoadingResource({
-      address,
-      sessionChainLabel,
-      shortAddress,
-    }));
+    setFaucetResource(
+      buildAdminFaucetLoadingResource({
+        address,
+        sessionChainLabel,
+        shortAddress,
+      }),
+    );
 
     try {
-      const balanceWei = await rpcProvidersChainReadsPort.getNativeBalanceWeiForChain(
-        sessionReadRpc.chainId,
-        address
-      );
+      const balanceWei = await rpcProvidersChainReadsPort.getNativeBalanceWeiForChain(sessionReadRpc.chainId, address);
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource(buildAdminFaucetBalanceResource({
-        address,
-        balanceWei,
-        sessionChainLabel,
-        formatEther: ethers.utils.formatEther,
-        shortAddress,
-      }));
+      setFaucetResource(
+        buildAdminFaucetBalanceResource({
+          address,
+          balanceWei,
+          sessionChainLabel,
+          formatEther: ethers.utils.formatEther,
+          shortAddress,
+        }),
+      );
     } catch (_) {
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource(buildAdminFaucetErrorResource({
-        address,
-        shortAddress,
-      }));
+      setFaucetResource(
+        buildAdminFaucetErrorResource({
+          address,
+          shortAddress,
+        }),
+      );
     }
   }, [relevantSessionChainLabel, secrets.faucetPrivateKey, sessionReadRpc.chainId]);
 
@@ -1011,128 +1045,135 @@ const AdminPage = ({
     };
   }, [refreshFaucetResource]);
 
-  const signAdminAction = useCallback(async ({
-    action = 'set-config',
-    body = {},
-    chainId: chainIdOverride = null,
-    workerUrl: overrideWorkerUrl,
-  }: any = {}) => {
-    if (!account) {
-      if (toggleLoginModal) toggleLoginModal(true);
-      throw new Error('Connect a wallet to sign admin requests.');
-    }
-    const slug = normalizeSlug(selectedSlug);
-    const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
-    if (!baseUrl) throw new Error('Worker URL is missing.');
+  const signAdminAction = useCallback(
+    async ({
+      action = 'set-config',
+      body = {},
+      chainId: chainIdOverride = null,
+      workerUrl: overrideWorkerUrl,
+    }: any = {}) => {
+      if (!account) {
+        if (toggleLoginModal) toggleLoginModal(true);
+        throw new Error('Connect a wallet to sign admin requests.');
+      }
+      const slug = normalizeSlug(selectedSlug);
+      const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
+      if (!baseUrl) throw new Error('Worker URL is missing.');
 
-    const chainId = Number(
-      chainIdOverride ||
-      selectedConfig?.__registry?.chainId ||
-      selectedConfig?.networkChainId ||
-      network?.id ||
-      1
-    ) || 1;
+      const chainId =
+        Number(
+          chainIdOverride || selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1,
+        ) || 1;
 
-    return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
-      action,
-      slug,
-      body,
-      workerUrl: baseUrl,
-      context: {
-        account,
-        chainId,
-        providerLike: typeof provider === 'string' ? provider : undefined,
-      },
-    });
-  }, [
-    account,
-    network?.id,
-    provider,
-    selectedConfig,
-    selectedConfigWorkerUrl,
-    selectedSlug,
-    toggleLoginModal,
-    workerUrl,
-  ]);
-
-  const postSignedAdminRequest = useCallback(async ({
-    action = 'set-config',
-    body = {},
-    path,
-    chainId: chainIdOverride = null,
-    workerUrl: overrideWorkerUrl,
-    retryAttempts = ADMIN_ACTION_NONCE_RETRY_ATTEMPTS,
-  }: any = {}) => {
-    const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
-    if (!baseUrl) throw new Error('Worker URL is missing.');
-
-    let lastError: any = null;
-    for (let attempt = 1; attempt <= retryAttempts; attempt += 1) {
-      const auth = await signAdminAction({
+      return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
         action,
+        slug,
         body,
-        chainId: chainIdOverride,
         workerUrl: baseUrl,
+        context: {
+          account,
+          chainId,
+          providerLike: typeof provider === 'string' ? provider : undefined,
+        },
       });
-      let res;
-      try {
-        res = await fetch(`${baseUrl}${path}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...body, ...auth }),
+    },
+    [
+      account,
+      network?.id,
+      provider,
+      selectedConfig,
+      selectedConfigWorkerUrl,
+      selectedSlug,
+      toggleLoginModal,
+      workerUrl,
+    ],
+  );
+
+  const postSignedAdminRequest = useCallback(
+    async ({
+      action = 'set-config',
+      body = {},
+      path,
+      chainId: chainIdOverride = null,
+      workerUrl: overrideWorkerUrl,
+      retryAttempts = ADMIN_ACTION_NONCE_RETRY_ATTEMPTS,
+    }: any = {}) => {
+      const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
+      if (!baseUrl) throw new Error('Worker URL is missing.');
+
+      let lastError: any = null;
+      for (let attempt = 1; attempt <= retryAttempts; attempt += 1) {
+        const auth = await signAdminAction({
+          action,
+          body,
+          chainId: chainIdOverride,
+          workerUrl: baseUrl,
         });
-      } catch (error) {
-        throw new Error(normalizeAdminWorkerFetchError({
-          error,
-          workerBase: baseUrl,
-        }));
+        let res;
+        try {
+          res = await fetch(`${baseUrl}${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...body, ...auth }),
+          });
+        } catch (error) {
+          throw new Error(
+            normalizeAdminWorkerFetchError({
+              error,
+              workerBase: baseUrl,
+            }),
+          );
+        }
+
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          return { baseUrl, response: res, data };
+        }
+
+        const responseError = data?.error || '';
+        if (
+          attempt < retryAttempts &&
+          isRetryableAdminNonceFailure({
+            responseStatus: res.status,
+            responseError,
+          })
+        ) {
+          // A concurrent admin action may have consumed the previous nonce.
+          // Re-sign with a fresh nonce instead of surfacing a transient failure.
+          // eslint-disable-next-line no-await-in-loop
+          await sleep(250 * attempt);
+          continue;
+        }
+
+        lastError = new Error(
+          normalizeAdminWorkerFetchError({
+            error: responseError || `Request failed (${res.status}).`,
+            workerBase: baseUrl,
+            responseStatus: res.status,
+            responseError,
+          }),
+        );
+        throw lastError;
       }
 
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        return { baseUrl, response: res, data };
+      throw lastError || new Error(`Failed admin action: ${action}`);
+    },
+    [selectedConfigWorkerUrl, signAdminAction, workerUrl],
+  );
+
+  const mergeStoredSecretPresenceFromPayload = useCallback(
+    (payload: Record<string, unknown> = {}) => {
+      const patch = normalizeAdminSecretPresencePatch(payload);
+      setStoredSecretPresence((prev) => {
+        const next = { ...prev, ...patch };
+        return secretPresenceStatus === 'loaded' ? normalizeAdminSecretPresence(next) : next;
+      });
+      if (secretPresenceStatus !== 'loaded') {
+        setSecretPresenceStatus('partial');
       }
-
-      const responseError = data?.error || '';
-      if (attempt < retryAttempts && isRetryableAdminNonceFailure({
-        responseStatus: res.status,
-        responseError,
-      })) {
-        // A concurrent admin action may have consumed the previous nonce.
-        // Re-sign with a fresh nonce instead of surfacing a transient failure.
-        // eslint-disable-next-line no-await-in-loop
-        await sleep(250 * attempt);
-        continue;
-      }
-
-      lastError = new Error(normalizeAdminWorkerFetchError({
-        error: responseError || `Request failed (${res.status}).`,
-        workerBase: baseUrl,
-        responseStatus: res.status,
-        responseError,
-      }));
-      throw lastError;
-    }
-
-    throw lastError || new Error(`Failed admin action: ${action}`);
-  }, [
-    selectedConfigWorkerUrl,
-    signAdminAction,
-    workerUrl,
-  ]);
-
-  const mergeStoredSecretPresenceFromPayload = useCallback((payload: Record<string, unknown> = {}) => {
-    const patch = normalizeAdminSecretPresencePatch(payload);
-    setStoredSecretPresence((prev) => {
-      const next = { ...prev, ...patch };
-      return secretPresenceStatus === 'loaded'
-        ? normalizeAdminSecretPresence(next)
-        : next;
-    });
-    if (secretPresenceStatus !== 'loaded') {
-      setSecretPresenceStatus('partial');
-    }
-  }, [secretPresenceStatus]);
+    },
+    [secretPresenceStatus],
+  );
 
   const refreshSecretPresence = useCallback(async () => {
     let baseUrl = '';
@@ -1154,10 +1195,7 @@ const AdminPage = ({
         path: '/admin/secret-presence',
         workerUrl: baseUrl,
       });
-      if (
-        requestId !== secretPresenceRequestRef.current ||
-        targetKey !== secretPresenceTargetKeyRef.current
-      ) {
+      if (requestId !== secretPresenceRequestRef.current || targetKey !== secretPresenceTargetKeyRef.current) {
         return;
       }
       setStoredSecretPresence(normalizeAdminSecretPresence(data?.secrets));
@@ -1166,126 +1204,125 @@ const AdminPage = ({
     } catch (err) {
       if (
         requestId &&
-        (
-          requestId !== secretPresenceRequestRef.current ||
-          targetKey !== secretPresenceTargetKeyRef.current
-        )
+        (requestId !== secretPresenceRequestRef.current || targetKey !== secretPresenceTargetKeyRef.current)
       ) {
         return;
       }
       setSecretPresenceStatus('error');
-      setSecretPresenceMessage(normalizeAdminWorkerFetchError({
-        error: err,
-        workerBase: baseUrl || normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl),
-      }));
+      setSecretPresenceMessage(
+        normalizeAdminWorkerFetchError({
+          error: err,
+          workerBase: baseUrl || normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl),
+        }),
+      );
     }
-  }, [
-    postSignedAdminRequest,
-    selectedConfig,
-    selectedConfigWorkerUrl,
-    selectedSlug,
-    workerUrl,
-  ]);
+  }, [postSignedAdminRequest, selectedConfig, selectedConfigWorkerUrl, selectedSlug, workerUrl]);
 
-  const refreshLitResource = useCallback(async ({ includeSignedStatus = true }: any = {}) => {
-    const requestId = litResourceRequestRef.current + 1;
-    litResourceRequestRef.current = requestId;
-    const baseUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
-    const litCredentials = selectedConfig?.litCredentials
-      && typeof selectedConfig.litCredentials === 'object'
-      && !Array.isArray(selectedConfig.litCredentials)
-      ? selectedConfig.litCredentials
-      : {};
-    const accountApiKey = toStr(secrets.litAccountApiKey).trim();
-    const usageApiKey = toStr(secrets.litUsageApiKey).trim();
-    const configuredLitApiBase = toStr(litCredentials?.litApiBase).trim();
-    const configuredLitGroupId = toStr(litCredentials?.litGroupId).trim();
-    const configuredLitPkpId = toStr(litCredentials?.litPkpId).trim();
-    const configuredLitActionCid = toStr(litCredentials?.litActionCid).trim();
-    const hasChipotleConfig = !!(
-      configuredLitApiBase ||
-      configuredLitGroupId ||
-      configuredLitPkpId ||
-      configuredLitActionCid
-    );
-    const useChipotlePath = !!(accountApiKey || usageApiKey || hasChipotleConfig);
+  const refreshLitResource = useCallback(
+    async ({ includeSignedStatus = true }: any = {}) => {
+      const requestId = litResourceRequestRef.current + 1;
+      litResourceRequestRef.current = requestId;
+      const baseUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
+      const litCredentials =
+        selectedConfig?.litCredentials &&
+        typeof selectedConfig.litCredentials === 'object' &&
+        !Array.isArray(selectedConfig.litCredentials)
+          ? selectedConfig.litCredentials
+          : {};
+      const accountApiKey = toStr(secrets.litAccountApiKey).trim();
+      const usageApiKey = toStr(secrets.litUsageApiKey).trim();
+      const configuredLitApiBase = toStr(litCredentials?.litApiBase).trim();
+      const configuredLitGroupId = toStr(litCredentials?.litGroupId).trim();
+      const configuredLitPkpId = toStr(litCredentials?.litPkpId).trim();
+      const configuredLitActionCid = toStr(litCredentials?.litActionCid).trim();
+      const hasChipotleConfig = !!(
+        configuredLitApiBase ||
+        configuredLitGroupId ||
+        configuredLitPkpId ||
+        configuredLitActionCid
+      );
+      const useChipotlePath = !!(accountApiKey || usageApiKey || hasChipotleConfig);
 
-    if (!useChipotlePath && !baseUrl) {
-      setLitResource(buildAdminLitNotConfiguredResource());
-      return;
-    }
+      if (!useChipotlePath && !baseUrl) {
+        setLitResource(buildAdminLitNotConfiguredResource());
+        return;
+      }
 
-    if (!baseUrl || !selectedConfig) {
-      if (requestId !== litResourceRequestRef.current) return;
-      setLitResource(buildAdminLitUnavailableResource({ useChipotlePath }));
-      return;
-    }
+      if (!baseUrl || !selectedConfig) {
+        if (requestId !== litResourceRequestRef.current) return;
+        setLitResource(buildAdminLitUnavailableResource({ useChipotlePath }));
+        return;
+      }
 
-    if (!includeSignedStatus) {
-      if (requestId !== litResourceRequestRef.current) return;
-      setLitResource(buildAdminLitStatusNotLoadedResource({
-        hasAccountApiKey: !!accountApiKey,
-        hasUsageApiKey: !!usageApiKey,
-        configuredLitApiBase,
-        configuredLitGroupId,
-        configuredLitPkpId,
-        configuredLitActionCid,
-        formatPreviewValue,
-      }));
-      return;
-    }
+      if (!includeSignedStatus) {
+        if (requestId !== litResourceRequestRef.current) return;
+        setLitResource(
+          buildAdminLitStatusNotLoadedResource({
+            hasAccountApiKey: !!accountApiKey,
+            hasUsageApiKey: !!usageApiKey,
+            configuredLitApiBase,
+            configuredLitGroupId,
+            configuredLitPkpId,
+            configuredLitActionCid,
+            formatPreviewValue,
+          }),
+        );
+        return;
+      }
 
-    setLitResource(buildAdminLitLoadingResource({
-      configuredLitGroupId,
-      formatPreviewValue,
-    }));
+      setLitResource(
+        buildAdminLitLoadingResource({
+          configuredLitGroupId,
+          formatPreviewValue,
+        }),
+      );
 
-    try {
-      const slug = normalizeSlug(selectedSlug);
-      const requestBody = {
-        sessionSlug: slug,
-        ...(usageApiKey ? { litUsageApiKey: usageApiKey } : {}),
-        ...(accountApiKey ? { apiKey: accountApiKey } : {}),
-      };
-      const { data } = await postSignedAdminRequest({
-        action: 'lit-chipotle-status',
-        body: requestBody,
-        path: '/admin/lit-chipotle-status',
-        workerUrl: baseUrl,
-      });
-      if (requestId !== litResourceRequestRef.current) return;
+      try {
+        const slug = normalizeSlug(selectedSlug);
+        const requestBody = {
+          sessionSlug: slug,
+          ...(usageApiKey ? { litUsageApiKey: usageApiKey } : {}),
+          ...(accountApiKey ? { apiKey: accountApiKey } : {}),
+        };
+        const { data } = await postSignedAdminRequest({
+          action: 'lit-chipotle-status',
+          body: requestBody,
+          path: '/admin/lit-chipotle-status',
+          workerUrl: baseUrl,
+        });
+        if (requestId !== litResourceRequestRef.current) return;
 
-      const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
-      const groupSummary = data?.groupSummary && typeof data.groupSummary === 'object'
-        ? data.groupSummary
-        : {};
-      const balanceDisplay = toStr(data?.balance?.balance_display || '').trim();
-      setLitResource(buildAdminLitStatusResource({
-        ready: data?.ready === true,
-        warnings,
-        groupSummary,
-        balanceDisplay,
-        configuredLitApiBase,
-        configuredLitGroupId,
-        configuredLitPkpId,
-        configuredLitActionCid,
-        formatPreviewValue,
-      }));
-    } catch (error: any) {
-      if (requestId !== litResourceRequestRef.current) return;
-      setLitResource(buildAdminLitErrorResource(
-        getErrorMessage(error, 'Failed to load Lit Chipotle status.')
-      ));
-    }
-  }, [
-    secrets.litAccountApiKey,
-    secrets.litUsageApiKey,
-    selectedConfig,
-    selectedConfigWorkerUrl,
-    selectedSlug,
-    postSignedAdminRequest,
-    workerUrl,
-  ]);
+        const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
+        const groupSummary = data?.groupSummary && typeof data.groupSummary === 'object' ? data.groupSummary : {};
+        const balanceDisplay = toStr(data?.balance?.balance_display || '').trim();
+        setLitResource(
+          buildAdminLitStatusResource({
+            ready: data?.ready === true,
+            warnings,
+            groupSummary,
+            balanceDisplay,
+            configuredLitApiBase,
+            configuredLitGroupId,
+            configuredLitPkpId,
+            configuredLitActionCid,
+            formatPreviewValue,
+          }),
+        );
+      } catch (error: any) {
+        if (requestId !== litResourceRequestRef.current) return;
+        setLitResource(buildAdminLitErrorResource(getErrorMessage(error, 'Failed to load Lit Chipotle status.')));
+      }
+    },
+    [
+      secrets.litAccountApiKey,
+      secrets.litUsageApiKey,
+      selectedConfig,
+      selectedConfigWorkerUrl,
+      selectedSlug,
+      postSignedAdminRequest,
+      workerUrl,
+    ],
+  );
 
   useEffect(() => {
     refreshLitResource({ includeSignedStatus: false });
@@ -1295,21 +1332,20 @@ const AdminPage = ({
   }, [refreshLitResource]);
 
   const litResourceLabel = useMemo(() => {
-    const litCredentials = selectedConfig?.litCredentials
-      && typeof selectedConfig.litCredentials === 'object'
-      && !Array.isArray(selectedConfig.litCredentials)
-      ? selectedConfig.litCredentials
-      : {};
-    return (
-      getAdminLitResourceLabel({
-        hasAccountApiKey: !!toStr(secrets.litAccountApiKey).trim(),
-        hasUsageApiKey: !!toStr(secrets.litUsageApiKey).trim(),
-        configuredLitApiBase: litCredentials?.litApiBase,
-        configuredLitGroupId: litCredentials?.litGroupId,
-        configuredLitPkpId: litCredentials?.litPkpId,
-        configuredLitActionCid: litCredentials?.litActionCid,
-      })
-    );
+    const litCredentials =
+      selectedConfig?.litCredentials &&
+      typeof selectedConfig.litCredentials === 'object' &&
+      !Array.isArray(selectedConfig.litCredentials)
+        ? selectedConfig.litCredentials
+        : {};
+    return getAdminLitResourceLabel({
+      hasAccountApiKey: !!toStr(secrets.litAccountApiKey).trim(),
+      hasUsageApiKey: !!toStr(secrets.litUsageApiKey).trim(),
+      configuredLitApiBase: litCredentials?.litApiBase,
+      configuredLitGroupId: litCredentials?.litGroupId,
+      configuredLitPkpId: litCredentials?.litPkpId,
+      configuredLitActionCid: litCredentials?.litActionCid,
+    });
   }, [selectedConfig, secrets.litAccountApiKey, secrets.litUsageApiKey]);
 
   const resolveSuggestedAllowOrigins = (extraOrigins: any = normalizedAllowOriginsDraft) => {
@@ -1344,7 +1380,7 @@ const AdminPage = ({
     setCorsPatchStatus(
       addedCount > 0
         ? `Added ${addedCount} recommended origin${addedCount === 1 ? '' : 's'} to the draft. Save allowlist to apply.`
-        : 'Recommended origins are already in the draft.'
+        : 'Recommended origins are already in the draft.',
     );
   };
 
@@ -1387,14 +1423,14 @@ const AdminPage = ({
       setCorsPatchStatus(
         allowOrigins.length
           ? `allowOrigins saved (${allowOrigins.length} origins). Re-run the Worker Tests.`
-          : 'allowOrigins saved with open CORS (no allowlist). Re-run the Worker Tests.'
+          : 'allowOrigins saved with open CORS (no allowlist). Re-run the Worker Tests.',
       );
     } catch (err) {
       setCorsPatchStatus(
         normalizeAdminWorkerFetchError({
           error: err,
           workerBase: baseUrl || normalizeWorkerUrl(workerUrl),
-        })
+        }),
       );
     } finally {
       setCorsPatchBusy(false);
@@ -1405,7 +1441,7 @@ const AdminPage = ({
     try {
       const sessionLabel = selectedConfig?.sessionName
         ? `${selectedSlug || 'general'} — ${selectedConfig.sessionName}`
-        : (selectedSlug || 'general');
+        : selectedSlug || 'general';
       setSaveStatus(`Saving worker secrets for ${sessionLabel}…`);
       setChainStatus('');
       const slug = normalizeSlug(selectedSlug);
@@ -1435,20 +1471,20 @@ const AdminPage = ({
       });
       setSaveStatus(`Worker secrets saved for ${sessionLabel}.`);
 
-      const registryChainId = Number(
-        selectedConfig?.__registry?.registryChainId ||
-        selectedConfig?.__registry?.chainId ||
-        selectedConfig?.networkChainId ||
-        network?.id ||
-        0
-      ) || 0;
-      const shouldPreserveSponsoredLit = (
+      const registryChainId =
+        Number(
+          selectedConfig?.__registry?.registryChainId ||
+            selectedConfig?.__registry?.chainId ||
+            selectedConfig?.networkChainId ||
+            network?.id ||
+            0,
+        ) || 0;
+      const shouldPreserveSponsoredLit =
         currentSponsoredLit &&
         !clearedSecretKeys.has('litAccountApiKey') &&
         !clearedSecretKeys.has('litUsageApiKey') &&
         !Object.prototype.hasOwnProperty.call(secretsPayload, 'litAccountApiKey') &&
-        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey')
-      );
+        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey');
       const sponsoredFields = adminSessionRegistryPorts.writes.buildRegistrySessionFields({
         sponsoredFields: buildSponsoredSessionFlagFields({
           secrets: secretsPayload,
@@ -1491,7 +1527,8 @@ const AdminPage = ({
     const baseUrl = normalizeWorkerUrl(workerUrl);
     if (!baseUrl) throw new Error('Worker URL is missing.');
 
-    const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
+    const chainId =
+      Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
     const { message } = await adminWorkerPorts.siweLogin.prepareSiweLogin({
       workerUrl: baseUrl,
       address: account,
@@ -1547,34 +1584,35 @@ const AdminPage = ({
     try {
       if (!selectedConfig) throw new Error('Select a session first.');
       if (!canAdmin) throw new Error('Connect the admin wallet to update gates.');
-      const registryChainId = Number(
-        selectedConfig?.__registry?.registryChainId ||
-        selectedConfig?.__registry?.chainId ||
-        selectedConfig?.networkChainId ||
-        0
-      ) || 0;
+      const registryChainId =
+        Number(
+          selectedConfig?.__registry?.registryChainId ||
+            selectedConfig?.__registry?.chainId ||
+            selectedConfig?.networkChainId ||
+            0,
+        ) || 0;
       if (!registryChainId) throw new Error('Registry chain id is missing.');
       const registrySlug = adminSessionRegistryPorts.reads.toRegistrySlug(selectedSlug);
       const sbtAddresses = dedupeSbtSelections(defaultGateDraft.sbts || []).map((entry: any) => entry.address);
       if (!sbtAddresses.length) throw new Error('Provide at least one SBT address.');
-      const gateChainId = parseChainIdInput(defaultGateDraft.chainId) ||
-        Number(
-          selectedConfig?.networkChainId ||
-          selectedConfig?.__registry?.chainId ||
-          0
-        ) || 0;
+      const gateChainId =
+        parseChainIdInput(defaultGateDraft.chainId) ||
+        Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || 0) ||
+        0;
       const mode = normalizeGateMode(defaultGateDraft.mode) === 'all' ? 1 : 0;
       const result = await adminSessionRegistryPorts.writes.setResourceGatesOnChain({
         providerLike: provider,
         chainId: registryChainId,
         slug: registrySlug,
-        gates: [{
-          resourceKey: 'default',
-          sbtAddresses,
-          chainId: gateChainId,
-          mode,
-          perMemberLimit: 0,
-        }],
+        gates: [
+          {
+            resourceKey: 'default',
+            sbtAddresses,
+            chainId: gateChainId,
+            mode,
+            perMemberLimit: 0,
+          },
+        ],
       });
       const txHash = toStr(result?.txs?.[0]?.hash).trim();
       if (txHash) {
@@ -1603,78 +1641,76 @@ const AdminPage = ({
   const canRunTests = !!baseWorkerUrl && !!account;
   const canRunHealthTest = !!baseWorkerUrl && (defaultGateIsEmpty || walletReady);
   // NOTE: For now we assume registry chain === session chain; split these if they diverge later.
-  const testChainId = Number(
-    selectedConfig?.__registry?.chainId ||
-    selectedConfig?.networkChainId ||
-    network?.id ||
-    0
-  ) || 0;
+  const testChainId =
+    Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 0) || 0;
   const testContext = { account, providerLike: provider, chainId: testChainId };
   const testSessionConfig = selectedConfig
     ? { ...selectedConfig, corsWorkerUrl: baseWorkerUrl || selectedConfigWorkerUrl || '' }
     : null;
-  const ensureWorkerSessionConfig = useCallback(async ({
-    sessionConfigOverride,
-    action = 'set-config',
-    workerUrl: workerUrlOverride,
-  }: any = {}) => {
-    const sessionConfigForSync = sessionConfigOverride || selectedConfig;
-    if (!sessionConfigForSync) throw new Error('Select a session first.');
-    if (!account) {
-      if (toggleLoginModal) toggleLoginModal(true);
-      throw new Error('Connect the admin wallet to seed worker config.');
-    }
-    const slug = normalizeSlug(selectedSlug);
-    const baseUrl = normalizeWorkerUrl(workerUrlOverride || baseWorkerUrl || selectedConfigWorkerUrl);
-    if (!baseUrl) throw new Error('Worker URL is missing.');
+  const ensureWorkerSessionConfig = useCallback(
+    async ({ sessionConfigOverride, action = 'set-config', workerUrl: workerUrlOverride }: any = {}) => {
+      const sessionConfigForSync = sessionConfigOverride || selectedConfig;
+      if (!sessionConfigForSync) throw new Error('Select a session first.');
+      if (!account) {
+        if (toggleLoginModal) toggleLoginModal(true);
+        throw new Error('Connect the admin wallet to seed worker config.');
+      }
+      const slug = normalizeSlug(selectedSlug);
+      const baseUrl = normalizeWorkerUrl(workerUrlOverride || baseWorkerUrl || selectedConfigWorkerUrl);
+      if (!baseUrl) throw new Error('Worker URL is missing.');
 
-    const configPayload = buildWorkerSessionConfigPayload({
-      sessionConfig: sessionConfigForSync,
+      const configPayload = buildWorkerSessionConfigPayload({
+        sessionConfig: sessionConfigForSync,
+        account,
+        fallbackChainId: testChainId,
+      });
+      const requestBody = {
+        sessionSlug: slug,
+        adminAddress: configPayload.adminAddress || account,
+        config: configPayload,
+      };
+      const { data } = await postSignedAdminRequest({
+        action,
+        body: requestBody,
+        path: '/admin/set-config',
+        chainId: testChainId,
+        workerUrl: baseUrl,
+      });
+      upsertCachedSessionWorkerConfig({
+        slug,
+        sessionConfig: selectedConfig,
+        config: {
+          ...configPayload,
+          corsWorkerUrl: baseUrl,
+        },
+      });
+      return { data, configPayload };
+    },
+    [
       account,
-      fallbackChainId: testChainId,
-    });
-    const requestBody = {
-      sessionSlug: slug,
-      adminAddress: configPayload.adminAddress || account,
-      config: configPayload,
-    };
-    const { data } = await postSignedAdminRequest({
-      action,
-      body: requestBody,
-      path: '/admin/set-config',
-      chainId: testChainId,
-      workerUrl: baseUrl,
-    });
-    upsertCachedSessionWorkerConfig({
-      slug,
-      sessionConfig: selectedConfig,
-      config: {
-        ...configPayload,
-        corsWorkerUrl: baseUrl,
-      },
-    });
-    return { data, configPayload };
-  }, [
-    account,
-    baseWorkerUrl,
-    postSignedAdminRequest,
-    selectedConfigWorkerUrl,
-    selectedConfig,
-    selectedSlug,
-    testChainId,
-    toggleLoginModal,
-  ]);
-  const withSessionConfigRetry = useCallback(async (run: any) => {
-    try {
-      return await run();
-    } catch (err: any) {
-      const message = toStr(getErrorMessage(err, '')).toLowerCase();
-      if (!shouldSeedWorkerConfigFromError(message)) throw err;
-      setTestStatus('Worker config missing; seeding from selected session…');
-      await ensureWorkerSessionConfig();
-      return run();
-    }
-  }, [ensureWorkerSessionConfig]);
+      baseWorkerUrl,
+      postSignedAdminRequest,
+      selectedConfigWorkerUrl,
+      selectedConfig,
+      selectedSlug,
+      testChainId,
+      toggleLoginModal,
+    ],
+  );
+  const withSessionConfigRetry = useCallback(
+    async (run: any) => {
+      try {
+        return await run();
+      } catch (err: any) {
+        const message = toStr(getErrorMessage(err, '')).toLowerCase();
+        if (!shouldSeedWorkerConfigFromError(message)) throw err;
+        setTestStatus('Worker config missing; seeding from selected session…');
+        await ensureWorkerSessionConfig();
+        return run();
+      }
+    },
+    [ensureWorkerSessionConfig],
+  );
 
   const runWorkerHealthTest = async () => {
     const healthBase = normalizeWorkerUrl(baseWorkerUrl);
@@ -1692,7 +1728,10 @@ const AdminPage = ({
       unauthStatus = Number(unauthResp.status || 0) || 0;
       unauthError = toStr(unauthData?.error).trim();
       if (unauthResp.ok) {
-        setTestResults((prev) => ({ ...prev, health: `OK (${unauthData?.ts ? new Date(unauthData.ts).toISOString() : 'healthy'})` }));
+        setTestResults((prev) => ({
+          ...prev,
+          health: `OK (${unauthData?.ts ? new Date(unauthData.ts).toISOString() : 'healthy'})`,
+        }));
         setTestStatus('Health check succeeded.');
         return;
       }
@@ -1722,13 +1761,17 @@ const AdminPage = ({
         }
       }
       const data = await withSessionConfigRetry(async () => {
-        const resp = await adminWorkerPorts.adminAuth.fetchWorkerWithAuth(`${healthBase}/health`, {
-          method: 'GET',
-        }, {
-          sessionSlug: selectedSlug,
-          context: testContext,
-          workerUrl: baseWorkerUrl,
-        });
+        const resp = await adminWorkerPorts.adminAuth.fetchWorkerWithAuth(
+          `${healthBase}/health`,
+          {
+            method: 'GET',
+          },
+          {
+            sessionSlug: selectedSlug,
+            context: testContext,
+            workerUrl: baseWorkerUrl,
+          },
+        );
         const payload: Record<string, unknown> = await resp.json().catch(() => ({}));
         if (!resp.ok) throw new Error(String(payload?.error || `Health check failed (${resp.status})`));
         return payload;
@@ -1774,25 +1817,21 @@ const AdminPage = ({
         }
       }
       const aiCfg = selectedConfig?.ai && typeof selectedConfig.ai === 'object' ? selectedConfig.ai : {};
-      const fastModelEntry = aiCfg?.models?.fast && typeof aiCfg.models.fast === 'object'
-        ? aiCfg.models.fast
-        : {};
+      const fastModelEntry = aiCfg?.models?.fast && typeof aiCfg.models.fast === 'object' ? aiCfg.models.fast : {};
       const fastModelCandidate = toStr(fastModelEntry.model).trim();
       const legacyModelCandidate = toStr(aiCfg?.model).trim();
       const inferredProvider = inferAiProviderFromModel(fastModelCandidate || legacyModelCandidate);
       const providerMode = normalizeAiProvider(
-        fastModelEntry.provider || aiCfg?.mode || aiCfg?.provider || inferredProvider || 'openai'
+        fastModelEntry.provider || aiCfg?.mode || aiCfg?.provider || inferredProvider || 'openai',
       );
       const providerCfg = aiCfg?.providers?.[providerMode] || {};
       const providerModelCandidate = toStr(providerCfg.model).trim();
       const inferredFastProvider = inferAiProviderFromModel(fastModelCandidate);
       const inferredLegacyProvider = inferAiProviderFromModel(legacyModelCandidate);
       const fastModelMatchesProvider =
-        !!fastModelCandidate &&
-        (!inferredFastProvider || inferredFastProvider === providerMode);
+        !!fastModelCandidate && (!inferredFastProvider || inferredFastProvider === providerMode);
       const legacyModelMatchesProvider =
-        !!legacyModelCandidate &&
-        (!inferredLegacyProvider || inferredLegacyProvider === providerMode);
+        !!legacyModelCandidate && (!inferredLegacyProvider || inferredLegacyProvider === providerMode);
       const model =
         (fastModelMatchesProvider ? fastModelCandidate : '') ||
         providerModelCandidate ||
@@ -1815,15 +1854,19 @@ const AdminPage = ({
       };
 
       const data = await withSessionConfigRetry(async () => {
-        const resp = await adminWorkerPorts.adminAuth.fetchWorkerWithAuth(`${baseWorkerUrl}/ai`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }, {
-          sessionSlug: selectedSlug,
-          context: testContext,
-          workerUrl: baseWorkerUrl,
-        });
+        const resp = await adminWorkerPorts.adminAuth.fetchWorkerWithAuth(
+          `${baseWorkerUrl}/ai`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          },
+          {
+            sessionSlug: selectedSlug,
+            context: testContext,
+            workerUrl: baseWorkerUrl,
+          },
+        );
         const parsed: Record<string, unknown> = await resp.json().catch(() => ({}));
         if (!resp.ok) throw new Error(String(parsed?.error || `AI test failed (${resp.status})`));
         return parsed;
@@ -1857,13 +1900,15 @@ const AdminPage = ({
         ts: new Date().toISOString(),
         slug: selectedSlug || 'general',
       };
-      const txId = await withSessionConfigRetry(() => adminArweavePort.uploadDataToArweave(payload, 'json', {
-        sessionConfig: testSessionConfig,
-        sessionSlug: selectedSlug,
-        context: testContext,
-        workerUrl: baseWorkerUrl,
-        arweaveJwk: toStr(secrets.arweaveJwk).trim() || undefined,
-      }));
+      const txId = await withSessionConfigRetry(() =>
+        adminArweavePort.uploadDataToArweave(payload, 'json', {
+          sessionConfig: testSessionConfig,
+          sessionSlug: selectedSlug,
+          context: testContext,
+          workerUrl: baseWorkerUrl,
+          arweaveJwk: toStr(secrets.arweaveJwk).trim() || undefined,
+        }),
+      );
       const tx = String(txId || '').trim();
       const txLabel = tx ? `OK (tx ${tx.slice(0, 12)}…)` : 'OK';
       const txUrl = tx ? adminArweavePort.buildArweaveGatewayUrl(tx) : '';
@@ -1892,19 +1937,23 @@ const AdminPage = ({
     setTestStatus(`Testing faucet transfer (${shortAddress(burnAddress)})…`);
     try {
       const data = await withSessionConfigRetry(async () => {
-        const resp = await adminWorkerPorts.adminAuth.fetchWorkerWithAuth(`${baseWorkerUrl}/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'request_test_eth',
-            address: burnAddress,
-            amountEth: '0.0000001',
-          }),
-        }, {
-          sessionSlug: selectedSlug,
-          context: testContext,
-          workerUrl: baseWorkerUrl,
-        });
+        const resp = await adminWorkerPorts.adminAuth.fetchWorkerWithAuth(
+          `${baseWorkerUrl}/`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'request_test_eth',
+              address: burnAddress,
+              amountEth: '0.0000001',
+            }),
+          },
+          {
+            sessionSlug: selectedSlug,
+            context: testContext,
+            workerUrl: baseWorkerUrl,
+          },
+        );
         const parsed: Record<string, unknown> = await resp.json().catch(() => ({}));
         if (!resp.ok) {
           const details = [
@@ -1914,15 +1963,15 @@ const AdminPage = ({
             parsed?.registryChainId ? `registryChainId=${parsed.registryChainId}` : '',
             parsed?.networkChainId ? `networkChainId=${parsed.networkChainId}` : '',
             parsed?.faucetChainId ? `faucetChainId=${parsed.faucetChainId}` : '',
-          ].filter(Boolean).join(' | ');
+          ]
+            .filter(Boolean)
+            .join(' | ');
           throw new Error(details || `Faucet test failed (${resp.status})`);
         }
         return parsed;
       });
       const hash = toStr(data?.txHash).trim();
-      const label = hash
-        ? `OK (tx ${hash.slice(0, 12)}…)`
-        : `OK (sent to ${shortAddress(burnAddress)})`;
+      const label = hash ? `OK (tx ${hash.slice(0, 12)}…)` : `OK (sent to ${shortAddress(burnAddress)})`;
       const txUrl = hash ? buildTxExplorerUrl(hash, testChainId) : '';
       setTestResults((prev) => ({ ...prev, faucet: { label, href: txUrl } }));
       setTestStatus('Faucet test succeeded.');
@@ -1954,7 +2003,8 @@ const AdminPage = ({
       if (!gate.sbtAddresses.length) {
         throw new Error('Default gate has no SBT addresses.');
       }
-      const chainId = gate.chainId ||
+      const chainId =
+        gate.chainId ||
         Number(groupMetadata?.networkChainId || groupMetadata?.__registry?.chainId || network?.id || 0) ||
         null;
       const litChain = resolveLitChain({ chainId });
@@ -2001,9 +2051,8 @@ const AdminPage = ({
         throw new Error('Lit hooks not initialized.');
       }
       const litNetwork = toStr(hooks?.litNetwork).trim() || 'chipotle';
-      const chainId = Number(
-        groupMetadata?.networkChainId || groupMetadata?.__registry?.chainId || network?.id || 0
-      ) || null;
+      const chainId =
+        Number(groupMetadata?.networkChainId || groupMetadata?.__registry?.chainId || network?.id || 0) || null;
       const decrypted = await cryptoUtils.decryptEnvelopeValue(litTestEnvelope, {
         account,
         chainId,
@@ -2020,9 +2069,10 @@ const AdminPage = ({
     }
   };
 
-  const currentBlockSummary = Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
-    ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
-    : metadataLatestBlockStatus;
+  const currentBlockSummary =
+    Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
+      ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
+      : metadataLatestBlockStatus;
 
   const handleUseCurrentBlockForMetadata = () => {
     const nextStart = Number(metadataLatestBlock || 0);
@@ -2042,7 +2092,9 @@ const AdminPage = ({
       if (!canAdmin) throw new Error('Connect the admin wallet to update session metadata.');
       if (!relevantRegistryChainId) throw new Error('Registry chain id is missing.');
       if (!metadataContractsReadyForSave) {
-        throw new Error('Session metadata contracts are currently synthesized defaults. Verify or edit the contract addresses before saving.');
+        throw new Error(
+          'Session metadata contracts are currently synthesized defaults. Verify or edit the contract addresses before saving.',
+        );
       }
 
       const metadata = buildEditableSessionMetadataPayload({
@@ -2080,30 +2132,30 @@ const AdminPage = ({
       adminSessionRegistryPorts.reads.upsertSessionRegistryCache({ config: nextConfig });
       setSessions(adminSessionRegistryPorts.reads.getAllSessionEntries() || []);
       setMetadataDraftTouched(false);
-	      const txUrl = buildTxExplorerUrl(registryResult?.txHash, relevantRegistryChainId);
-	      const baseSuccessStatus = txUrl ? `Session metadata updated. ${txUrl}` : 'Session metadata updated.';
-	      let workerSyncSuffix = '';
-	      try {
-	        const metadataSyncWorkerUrl = normalizeWorkerUrl(
-	          getUsableSessionWorkerUrl({
-	            slug: selectedSlug,
-	            sessionConfig: nextConfig,
-	            allowSharedFallback: true,
-	          }) ||
-	          baseWorkerUrl ||
-	          selectedConfigWorkerUrl
-	        );
-	        if (typeof fetch === 'function' && metadataSyncWorkerUrl) {
-	          setMetadataUpdateStatus('Syncing worker config…');
-	          await ensureWorkerSessionConfig({
-	            sessionConfigOverride: nextConfig,
-	            action: 'set-config',
-	            workerUrl: metadataSyncWorkerUrl,
-	          });
-	          workerSyncSuffix = ' Worker config synced.';
-	        } else {
-	          workerSyncSuffix = ' Worker config sync skipped (worker URL missing).';
-	        }
+      const txUrl = buildTxExplorerUrl(registryResult?.txHash, relevantRegistryChainId);
+      const baseSuccessStatus = txUrl ? `Session metadata updated. ${txUrl}` : 'Session metadata updated.';
+      let workerSyncSuffix = '';
+      try {
+        const metadataSyncWorkerUrl = normalizeWorkerUrl(
+          getUsableSessionWorkerUrl({
+            slug: selectedSlug,
+            sessionConfig: nextConfig,
+            allowSharedFallback: true,
+          }) ||
+            baseWorkerUrl ||
+            selectedConfigWorkerUrl,
+        );
+        if (typeof fetch === 'function' && metadataSyncWorkerUrl) {
+          setMetadataUpdateStatus('Syncing worker config…');
+          await ensureWorkerSessionConfig({
+            sessionConfigOverride: nextConfig,
+            action: 'set-config',
+            workerUrl: metadataSyncWorkerUrl,
+          });
+          workerSyncSuffix = ' Worker config synced.';
+        } else {
+          workerSyncSuffix = ' Worker config sync skipped (worker URL missing).';
+        }
       } catch (syncError: any) {
         workerSyncSuffix = ` Worker config sync failed: ${getErrorMessage(syncError, 'unknown error')}`;
       }
@@ -2117,7 +2169,7 @@ const AdminPage = ({
 
   const resolvedSessionHeader = normalizeSessionMediaUrl(
     groupMetadata?.sessionHeaderImg || groupMetadata?.sessionHeader || '',
-    { contextLabel: 'session_header_image' }
+    { contextLabel: 'session_header_image' },
   );
   useEffect(() => {
     if (!resolvedSessionHeader) {
@@ -2143,8 +2195,9 @@ const AdminPage = ({
     };
   }, [resolvedSessionHeader]);
   const selectedSlugLabel = normalizeSlug(selectedSlug) || 'general';
-  const selectedSessionName = toStr(groupMetadata?.sessionName || selectedConfig?.sessionName).trim()
-    || (selectedConfig ? selectedSlugLabel : 'No session selected');
+  const selectedSessionName =
+    toStr(groupMetadata?.sessionName || selectedConfig?.sessionName).trim() ||
+    (selectedConfig ? selectedSlugLabel : 'No session selected');
   const relevantRegistryChainLabel = relevantRegistryChainId
     ? `${getChainName(relevantRegistryChainId) || 'Chain'} (${relevantRegistryChainId})`
     : '';
@@ -2155,94 +2208,77 @@ const AdminPage = ({
   });
   const metadataSlugValue = normalizeSlug(groupMetadata?.slug) || '';
   const metadataSlugDisplay = metadataSlugValue || 'general';
-  const metadataSessionUrl = groupMetadata
-    ? buildSessionUrl(metadataSlugValue, { allowGeneral: true })
-    : '';
-  const metadataAdminAddress = toStr(groupMetadata?.__registry?.adminAddress || groupMetadata?.adminAddress || '').trim();
+  const metadataSessionUrl = groupMetadata ? buildSessionUrl(metadataSlugValue, { allowGeneral: true }) : '';
+  const metadataAdminAddress = toStr(
+    groupMetadata?.__registry?.adminAddress || groupMetadata?.adminAddress || '',
+  ).trim();
   const metadataAdminUrl = buildUserPageUrl(metadataAdminAddress);
   const metadataUriValue = toStr(groupMetadata?.__registry?.metadataURI || '').trim();
   const metadataUriUrl = metadataUriValue
     ? adminArweavePort.normalizeArweaveUrl(metadataUriValue, { contextLabel: 'admin_metadata_uri' }) || metadataUriValue
     : '';
-  const metadataLoadState = toStr(groupMetadata?.__registry?.metadataLoadState).trim() || (metadataUriValue ? 'loaded' : 'none');
+  const metadataLoadState =
+    toStr(groupMetadata?.__registry?.metadataLoadState).trim() || (metadataUriValue ? 'loaded' : 'none');
   const metadataDefaultedContractKeys = Array.isArray(groupMetadata?.__registry?.metadataDefaultedContractKeys)
-    ? groupMetadata.__registry.metadataDefaultedContractKeys
-        .map((key: any) => toStr(key).trim())
-        .filter(Boolean)
+    ? groupMetadata.__registry.metadataDefaultedContractKeys.map((key: any) => toStr(key).trim()).filter(Boolean)
     : [];
-  const metadataContractsNeedVerification = (
-    metadataLoadState === 'unavailable' &&
-    metadataDefaultedContractKeys.length > 0
+  const metadataContractsNeedVerification =
+    metadataLoadState === 'unavailable' && metadataDefaultedContractKeys.length > 0;
+  const metadataDefaultedEditableContractKeys = metadataDefaultedContractKeys.filter((key: any) =>
+    ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key),
   );
-  const metadataDefaultedEditableContractKeys = metadataDefaultedContractKeys
-    .filter((key: any) => ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key));
-  const metadataContractsReadyForSave = (
+  const metadataContractsReadyForSave =
     !metadataContractsNeedVerification ||
     metadataDefaultedEditableContractKeys.length === 0 ||
     metadataContractsVerified ||
-    metadataContractDraftTouched
-  );
+    metadataContractDraftTouched;
   const metadataLoadStateLabel = (() => {
     if (metadataLoadState === 'loaded') return 'Loaded from session metadata';
     if (metadataLoadState === 'unavailable') return 'Metadata unavailable; contracts below may be chain defaults';
     return 'No registry metadata URI configured';
   })();
-  const metadataContracts = groupMetadata?.contracts && typeof groupMetadata.contracts === 'object'
-    ? groupMetadata.contracts
-    : {};
-  const visibleMetadataContracts = Object.entries(metadataContracts).filter(([, value]: any) => value && typeof value === 'object');
-  const readonlyMetadataContracts = visibleMetadataContracts.filter(
-    ([key]: any) => !ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key)
+  const metadataContracts = asAdminSessionConfig(groupMetadata?.contracts);
+  const visibleMetadataContracts = Object.entries(metadataContracts).filter(
+    (entry): entry is [string, Record<string, unknown>] => {
+      const value = entry[1];
+      return !!value && typeof value === 'object' && !Array.isArray(value);
+    },
   );
-  const sessionCardTone = selectedConfig ? 'ready' : (availableSessions.length ? 'idle' : 'warning');
+  const readonlyMetadataContracts = visibleMetadataContracts.filter(
+    ([key]) => !ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key),
+  );
+  const sessionCardTone = selectedConfig ? 'ready' : availableSessions.length ? 'idle' : 'warning';
   const showHeroMedia = !!resolvedSessionHeader && heroHeaderImageReady;
   const metadataOpen = openSection === 'metadata';
   const defaultGateOpen = openSection === 'defaultGate';
   const workerSecretsOpen = openSection === 'workerSecrets';
   const testsOpen = openSection === 'tests';
-  const toggleSection = (key: any) => {
-    setOpenSection((prev: any) => (prev === key ? '' : key));
+  const toggleSection = (key: string) => {
+    setOpenSection((prev) => (prev === key ? '' : key));
   };
-  const renderInfoTooltip = (id: any, content: any) => {
+  const renderInfoTooltip = (id: string, content: React.ReactNode) => {
     if (!content) return null;
     return (
       <>
         <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id={id} />
-        <CETooltip
-          placement="right"
-          trigger="hover focus click"
-          target={id}
-          className={styles.tooltipBubble}
-        >
+        <CETooltip placement="right" trigger="hover focus click" target={id} className={styles.tooltipBubble}>
           {content}
         </CETooltip>
       </>
     );
   };
-  const renderInlineResourceSummary = ({ key, label, resource, onRefresh, refreshLabel }: any) => {
-    if (!shouldShowInlineResourceSummary(resource)) return null;
-    return (
-      <div key={key} className={styles.inlineResourceCard}>
-        <div className={styles.inlineResourceHeader}>
-          <div className={styles.resourceLabel}>{label}</div>
-          <button
-            type="button"
-            className={styles.resourceRefreshButton}
-            onClick={onRefresh}
-            aria-label={refreshLabel}
-            title={refreshLabel}
-          >
-            <FontAwesomeIcon icon={faSync} spin={resource.loading} />
-          </button>
-        </div>
-        <div className={styles.inlineResourceBalance}>{resource.display}</div>
-        <div className={styles.inlineResourceStatus}>{resource.meta}</div>
-      </div>
-    );
-  };
+  const handleTranscribeTestTextChange = useCallback((next: string) => {
+    setTranscribeText(next);
+    const trimmed = toStr(next).trim();
+    setTestResults((prev) => ({
+      ...prev,
+      transcribe: trimmed ? `OK (${trimmed.slice(0, 80)})` : '',
+    }));
+  }, []);
   const handleCopyRawMetadata = useCallback(() => {
     if (!groupMetadata || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
-    navigator.clipboard.writeText(JSON.stringify(groupMetadata, null, 2))
+    navigator.clipboard
+      .writeText(JSON.stringify(groupMetadata, null, 2))
       .then(() => {
         setCopiedRawMetadataJson(true);
         if (rawMetadataCopyResetRef.current) clearTimeout(rawMetadataCopyResetRef.current);
@@ -2264,7 +2300,7 @@ const AdminPage = ({
                 <h1>Session Admin</h1>
                 {renderInfoTooltip(
                   'admin-session-title-tip',
-                  'Keep worker access, metadata, and operator checks tidy in one place.'
+                  'Keep worker access, metadata, and operator checks tidy in one place.',
                 )}
               </div>
             </div>
@@ -2275,14 +2311,13 @@ const AdminPage = ({
             )}
           </div>
           <div className={styles.heroStats}>
-            <div className={`${styles.heroStat} ${styles[`heroStat${sessionCardTone[0].toUpperCase()}${sessionCardTone.slice(1)}`]}`}>
+            <div
+              className={`${styles.heroStat} ${styles[`heroStat${sessionCardTone[0].toUpperCase()}${sessionCardTone.slice(1)}`]}`}
+            >
               <div className={styles.heroSessionPrimaryRow}>
                 <div className={styles.heroCardHeaderWithTooltip}>
                   <span className={styles.heroSessionDetailLabel}>Session</span>
-                  {renderInfoTooltip(
-                    'admin-sessions-tip',
-                    'Pick the live session and confirm its worker endpoint.'
-                  )}
+                  {renderInfoTooltip('admin-sessions-tip', 'Pick the live session and confirm its worker endpoint.')}
                 </div>
                 <div className={styles.heroSessionPrimaryBody}>
                   {availableSessions.length > 0 ? (
@@ -2305,7 +2340,8 @@ const AdminPage = ({
                         const cfg = asAdminSessionConfig(rawCfg);
                         return (
                           <option key={slug} value={slug}>
-                            {slug || 'general'}{cfg.sessionName ? ` — ${cfg.sessionName}` : ''}
+                            {slug || 'general'}
+                            {cfg.sessionName ? ` — ${cfg.sessionName}` : ''}
                           </option>
                         );
                       })}
@@ -2343,13 +2379,14 @@ const AdminPage = ({
                 <div className={`${styles.heroSessionDetailRow} ${styles.heroSessionDetailRowAlignStart}`}>
                   <div className={styles.heroCardHeaderWithTooltip}>
                     <span className={styles.heroSessionDetailLabel}>Worker URL</span>
-                    {(workerStatus || workerDebug) && renderInfoTooltip(
-                      'admin-worker-url-tip',
-                      <div className={styles.tooltipTextStack}>
-                        {workerStatus && <div>{workerStatus}</div>}
-                        {workerDebug && <div>{workerDebug}</div>}
-                      </div>
-                    )}
+                    {(workerStatus || workerDebug) &&
+                      renderInfoTooltip(
+                        'admin-worker-url-tip',
+                        <div className={styles.tooltipTextStack}>
+                          {workerStatus && <div>{workerStatus}</div>}
+                          {workerDebug && <div>{workerDebug}</div>}
+                        </div>,
+                      )}
                   </div>
                   {selectedConfig ? (
                     <div className={styles.heroSessionDetailBody}>
@@ -2367,13 +2404,18 @@ const AdminPage = ({
                               <button
                                 type="button"
                                 className={`${styles.heroCardInputActionButton} ${styles.heroCardInputIconButton}`}
-                                onClick={() => navigator.clipboard.writeText(workerUrl).then(() => notify.success('Copied to clipboard')).catch(() => {})}
+                                onClick={() =>
+                                  navigator.clipboard
+                                    .writeText(workerUrl)
+                                    .then(() => notify.success('Copied to clipboard'))
+                                    .catch(() => {})
+                                }
                                 title="Copy worker URL"
                                 aria-label="Copy worker URL"
-                            >
-                              <FontAwesomeIcon icon={faClipboard} />
-                            </button>
-                          )}
+                              >
+                                <FontAwesomeIcon icon={faClipboard} />
+                              </button>
+                            )}
                             <Button
                               type="button"
                               size="sm"
@@ -2410,7 +2452,9 @@ const AdminPage = ({
                           outline
                           className={`${styles.actionButton} ${styles.subtleActionButton}`}
                           onClick={() => setShowAllowlistEditor((prev: any) => !prev)}
-                          title={showAllowlistEditor ? 'Hide the CORS allowlist editor' : 'Show the CORS allowlist editor'}
+                          title={
+                            showAllowlistEditor ? 'Hide the CORS allowlist editor' : 'Show the CORS allowlist editor'
+                          }
                         >
                           Allowlist <FontAwesomeIcon icon={showAllowlistEditor ? faCaretUp : faCaretDown} />
                         </Button>
@@ -2512,1047 +2556,356 @@ const AdminPage = ({
       </header>
 
       <div className={styles.sectionStack}>
-      <section className={`${styles.panel} ${styles.metadataPanel}`}>
-        <div className={styles.panelHeader}>
-          <div className={styles.panelTitleGroup}>
-            <div className={styles.panelTitleRow}>
-              <div className={styles.panelTitle}>Session metadata</div>
-              {renderInfoTooltip(
-                'admin-metadata-tip',
-                'Review the canonical config and make careful live edits when needed.'
-              )}
-            </div>
-          </div>
-          <Button
-            size="sm"
-            color="secondary"
-            outline
-            className={styles.collapseToggle}
-            onClick={() => toggleSection('metadata')}
-            aria-label="Toggle Session metadata section"
-          >
-            <FontAwesomeIcon icon={metadataOpen ? faCaretUp : faCaretDown} />
-          </Button>
-        </div>
-        {!groupMetadata && (
-          <div className={styles.warningNote}>
-            No metadata found for this session yet. Register the session on-chain or select a legacy demo session.
-          </div>
-        )}
-        {metadataOpen && groupMetadata && (
-          <>
-            <div className={styles.metadataGrid}>
-              <div className={styles.metadataItem}>
-                <span>Slug</span>
-                <span>
-                  {metadataSessionUrl ? (
-                    <a href={metadataSessionUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                      {metadataSlugDisplay}
-                    </a>
-                  ) : metadataSlugDisplay}
-                </span>
-              </div>
-              <div className={styles.metadataItem}>
-                <span>Session name</span>
-                <span>{toStr(groupMetadata.sessionName || '').trim() || '—'}</span>
-              </div>
-              <div className={styles.metadataItem}>
-                <span>Chain / Registry</span>
-                <span>{buildAdminChainRegistryDisplay({
-                  chainId: groupMetadata.networkChainId || groupMetadata.__registry?.chainId || '',
-                  registryChainId: groupMetadata.__registry?.registryChainId || groupMetadata.registryChainId || '',
-                })}</span>
-              </div>
-              <div className={styles.metadataItem}>
-                <span>Admin</span>
-                <span>
-                  {metadataAdminUrl ? (
-                    <a href={metadataAdminUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                      {shortAddress(metadataAdminAddress) || metadataAdminAddress}
-                    </a>
-                  ) : '—'}
-                </span>
-              </div>
-              <div className={styles.metadataItem}>
-                <span>Metadata URI</span>
-                <span>
-                  {metadataUriUrl ? (
-                    <a href={metadataUriUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                      {metadataUriValue}
-                    </a>
-                  ) : '—'}
-                </span>
-              </div>
-              <div className={styles.metadataItem}>
-                <span>Metadata source</span>
-                <span>{metadataLoadStateLabel}</span>
-              </div>
-            </div>
-            {metadataContractsNeedVerification && (
-              <div className={styles.warningNote}>
-                Session metadata could not be loaded, so the contract addresses below are currently synthesized from chain defaults.
-                Verify them before publishing any metadata update.
-              </div>
-            )}
-            {canAdmin && (
-              <div className={styles.metadataEditorCard}>
-                <div className={styles.metadataEditorIntro}>
-                  Publish session defaults and curation metadata here. Block limits, faucet settings,
-                  contracts, and registry/RPC context are also synced to worker config when a worker URL is available.
-                </div>
-                <div className={styles.metadataSectionGrid}>
-                  <div className={styles.metadataSectionCard}>
-                    <div className={styles.panelSubtitle}>Session defaults</div>
-                    <div className={styles.metadataEditorGrid}>
-                      <FormGroup>
-                        <Label>Default tags</Label>
-                        <Input
-                          value={metadataConfigDraft.defaultTags}
-                          placeholder="ai, governance, survey"
-                          onChange={(e: any) => updateMetadataConfigDraft('defaultTags', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Default SBT tags</Label>
-                        <Input
-                          value={metadataConfigDraft.defaultSbtTags}
-                          placeholder="member, contributor"
-                          onChange={(e: any) => updateMetadataConfigDraft('defaultSbtTags', e.target.value)}
-                        />
-                      </FormGroup>
-                    </div>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Question generation prompt</Label>
-                      <Input
-                        type="textarea"
-                        rows={4}
-                        value={metadataConfigDraft.questionsGenPrompt}
-                        placeholder="Optional prompt used when auto-generating questions"
-                        onChange={(e: any) => updateMetadataConfigDraft('questionsGenPrompt', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Default filter state</Label>
-                      <Input
-                        type="textarea"
-                        rows={4}
-                        value={metadataConfigDraft.defaultFilterState}
-                        placeholder='{"sort":"recent"} or tag=ai&sort=recent'
-                        onChange={(e: any) => updateMetadataConfigDraft('defaultFilterState', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup check className={styles.metadataToggle}>
-                      <Label check className={styles.metadataToggleLabel}>
-                        <Input
-                          type="checkbox"
-                          checked={metadataAutoFeatureDraft}
-                          onChange={(e: any) => {
-                            setMetadataDraftTouched(true);
-                            setMetadataAutoFeatureTouched(true);
-                            setMetadataAutoFeatureDraft(!!e.target.checked);
-                          }}
-                        />
-                        Auto-feature by session slug
-                      </Label>
-                    </FormGroup>
-                    <FormGroup className={styles.metadataSelectorGroup}>
-                      <Label>Default featured SBTs</Label>
-                      <SBTSelector
-                        id="admin-default-featured-sbts"
-                        label=""
-                        selectedSBTs={metadataConfigDraft.defaultFeaturedSBTs}
-                        onAddSBT={(sbt: any) => {
-                          updateMetadataConfigDraft(
-                            'defaultFeaturedSBTs',
-                            dedupeSbtSelections([...(metadataConfigDraft.defaultFeaturedSBTs || []), sbt])
-                          );
-                        }}
-                        onRemoveSBT={(address: any) => {
-                          updateMetadataConfigDraft(
-                            'defaultFeaturedSBTs',
-                            dedupeSbtSelections(metadataConfigDraft.defaultFeaturedSBTs || []).filter(
-                              (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase()
-                            )
-                          );
-                        }}
-                        network={network}
-                        chainId={relevantSessionChainId || network?.id || null}
-                        sessionSlug={normalizeSlug(selectedSlug)}
-                        variant="admin"
-                        ensureLightSbtUniverse={ensureLightSbtUniverse}
-                        defaultFeaturedSBTs={(metadataConfigDraft.defaultFeaturedSBTs || []).map((entry: any) => entry.address)}
-                      />
-                    </FormGroup>
-                  </div>
-
-                  <div className={styles.metadataSectionCard}>
-                    <div className={styles.panelSubtitle}>AI defaults</div>
-                    <div className={styles.metadataEditorGrid}>
-                      <FormGroup>
-                        <Label>Fast provider</Label>
-                        <Input
-                          type="select"
-                          value={metadataConfigDraft.aiFastProvider}
-                          onChange={(e: any) => updateMetadataConfigDraft('aiFastProvider', e.target.value)}
-                        >
-                          {ADMIN_AI_PROVIDER_OPTIONS.map((option: any) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </Input>
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Fast model</Label>
-                        <Input
-                          value={metadataConfigDraft.aiFastModel}
-                          onChange={(e: any) => updateMetadataConfigDraft('aiFastModel', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Thinking provider</Label>
-                        <Input
-                          type="select"
-                          value={metadataConfigDraft.aiThinkingProvider}
-                          onChange={(e: any) => updateMetadataConfigDraft('aiThinkingProvider', e.target.value)}
-                        >
-                          {ADMIN_AI_PROVIDER_OPTIONS.map((option: any) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </Input>
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Thinking model</Label>
-                        <Input
-                          value={metadataConfigDraft.aiThinkingModel}
-                          onChange={(e: any) => updateMetadataConfigDraft('aiThinkingModel', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Transcription provider</Label>
-                        <Input
-                          type="select"
-                          value={metadataConfigDraft.aiTranscriptionProvider}
-                          onChange={(e: any) => updateMetadataConfigDraft('aiTranscriptionProvider', e.target.value)}
-                        >
-                          <option value="openai">OpenAI</option>
-                        </Input>
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Transcription model</Label>
-                        <Input
-                          value={metadataConfigDraft.aiTranscriptionModel}
-                          onChange={(e: any) => updateMetadataConfigDraft('aiTranscriptionModel', e.target.value)}
-                        />
-                      </FormGroup>
-                    </div>
-                  </div>
-
-                  <div className={styles.metadataSectionCard}>
-                    <div className={styles.panelSubtitle}>Runtime sync</div>
-                    <div className={styles.metadataEditorGrid}>
-                      <FormGroup>
-                        <Label>Start block</Label>
-                        <Input
-                          type="number"
-                          value={metadataBlockLimitsDraft.start}
-                          onChange={(e: any) => {
-                            setMetadataDraftTouched(true);
-                            setMetadataBlockLimitsDraft((prev) => ({
-                              ...(prev || {}),
-                              start: e.target.value,
-                            }));
-                          }}
-                        />
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>End block</Label>
-                        <Input
-                          type="number"
-                          value={metadataBlockLimitsDraft.end}
-                          placeholder="Optional"
-                          onChange={(e: any) => {
-                            setMetadataDraftTouched(true);
-                            setMetadataBlockLimitsDraft((prev) => ({
-                              ...(prev || {}),
-                              end: e.target.value,
-                            }));
-                          }}
-                        />
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Faucet amount (ETH)</Label>
-                        <Input
-                          value={metadataConfigDraft.faucetAmountEth}
-                          placeholder="0.0002"
-                          onChange={(e: any) => updateMetadataConfigDraft('faucetAmountEth', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Faucet threshold (ETH)</Label>
-                        <Input
-                          value={metadataConfigDraft.faucetBalanceThresholdEth}
-                          placeholder="0.001"
-                          onChange={(e: any) => updateMetadataConfigDraft('faucetBalanceThresholdEth', e.target.value)}
-                        />
-                      </FormGroup>
-                    </div>
-                    {currentBlockSummary && (
-                      <div className={styles.statusNote}>{currentBlockSummary}</div>
-                    )}
-                    <Button
-                      size="sm"
-                      color="secondary"
-                      outline
-                      className={styles.actionButton}
-                      onClick={handleUseCurrentBlockForMetadata}
-                      disabled={metadataUpdateBusy || !metadataLatestBlock}
-                    >
-                      Use current block
-                    </Button>
-                  </div>
-
-                  <div className={styles.metadataSectionCard}>
-                    <div className={styles.panelSubtitle}>Contracts</div>
-                    <div className={styles.metadataEditorGrid}>
-                      <FormGroup>
-                        <Label>Surveys contract</Label>
-                        <Input
-                          value={metadataConfigDraft.contractSurveysAddress}
-                          placeholder="0x..."
-                          onChange={(e: any) => updateMetadataConfigDraft('contractSurveysAddress', e.target.value)}
-                        />
-                        <FormText color="muted">
-                          Chain: {relevantSessionChainLabel || 'Uses session chain'}
-                        </FormText>
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>SBT factory contract</Label>
-                        <Input
-                          value={metadataConfigDraft.contractSbtFactoryAddress}
-                          placeholder="0x..."
-                          onChange={(e: any) => updateMetadataConfigDraft('contractSbtFactoryAddress', e.target.value)}
-                        />
-                        <FormText color="muted">
-                          Chain: {relevantSessionChainLabel || 'Uses session chain'}
-                        </FormText>
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>SessionRegistry contract</Label>
-                        <Input
-                          value={metadataConfigDraft.contractSessionRegistryAddress}
-                          placeholder="0x..."
-                          onChange={(e: any) => updateMetadataConfigDraft('contractSessionRegistryAddress', e.target.value)}
-                        />
-                        <FormText color="muted">
-                          Chain: {relevantRegistryChainLabel || relevantSessionChainLabel || 'Uses registry chain'}
-                        </FormText>
-                      </FormGroup>
-                    </div>
-                    {metadataContractsNeedVerification && metadataDefaultedEditableContractKeys.length > 0 && (
-                      <FormGroup check className={styles.metadataToggle}>
-                        <Label check className={styles.metadataToggleLabel}>
-                          <Input
-                            type="checkbox"
-                            checked={metadataContractsVerified}
-                            onChange={(e: any) => setMetadataContractsVerified(!!e.target.checked)}
-                          />
-                          I verified these fallback defaults and want to publish them if I save metadata
-                        </Label>
-                      </FormGroup>
-                    )}
-                    {metadataContractsNeedVerification && !metadataContractsReadyForSave && (
-                      <div className={styles.warningNote}>
-                        Saving is blocked until you verify or edit the synthesized contract addresses above.
-                      </div>
-                    )}
-                    {readonlyMetadataContracts.length ? (
-                      <div className={styles.metadataReadonlyGrid}>
-                        {readonlyMetadataContracts.map(([key, value]: any) => (
-                          <div key={key} className={styles.metadataReadonlyItem}>
-                            <span>{key}</span>
-                            <strong>{toStr(value?.address).trim() || '—'}</strong>
-                            <span>{toStr(value?.chainId).trim() || '—'}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                    {!visibleMetadataContracts.length && (
-                      <div className={styles.statusNote}>No contract metadata found for this session.</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className={styles.metadataSectionCard}>
-                  <div className={styles.panelSubtitle}>Curated lists</div>
-                  <div className={styles.metadataSectionGrid}>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Highlighted question IDs</Label>
-                      <Input
-                        type="textarea"
-                        rows={3}
-                        value={metadataConfigDraft.highlightedQuestionIds}
-                        placeholder="One question id per line"
-                        onChange={(e: any) => updateMetadataConfigDraft('highlightedQuestionIds', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Blocked question IDs</Label>
-                      <Input
-                        type="textarea"
-                        rows={3}
-                        value={metadataConfigDraft.blockedQuestionIds}
-                        placeholder="One question id per line"
-                        onChange={(e: any) => updateMetadataConfigDraft('blockedQuestionIds', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Highlighted survey IDs</Label>
-                      <Input
-                        type="textarea"
-                        rows={3}
-                        value={metadataConfigDraft.highlightedSurveyIds}
-                        placeholder="One survey id per line"
-                        onChange={(e: any) => updateMetadataConfigDraft('highlightedSurveyIds', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Blocked survey IDs</Label>
-                      <Input
-                        type="textarea"
-                        rows={3}
-                        value={metadataConfigDraft.blockedSurveyIds}
-                        placeholder="One survey id per line"
-                        onChange={(e: any) => updateMetadataConfigDraft('blockedSurveyIds', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Ignored SBT list</Label>
-                      <Input
-                        type="textarea"
-                        rows={3}
-                        value={metadataConfigDraft.ignoredSbtsList}
-                        placeholder="One SBT address per line"
-                        onChange={(e: any) => updateMetadataConfigDraft('ignoredSbtsList', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Featured SBT list</Label>
-                      <Input
-                        type="textarea"
-                        rows={3}
-                        value={metadataConfigDraft.featuredSbtsList}
-                        placeholder="One SBT address per line"
-                        onChange={(e: any) => updateMetadataConfigDraft('featuredSbtsList', e.target.value)}
-                      />
-                    </FormGroup>
-                  </div>
-                </div>
-
-                <div className={styles.metadataEditorActions}>
-                  <Button
-                    color="primary"
-                    className={styles.actionButton}
-                    onClick={handleSaveSessionMetadata}
-                    disabled={metadataUpdateBusy}
-                  >
-                    {metadataUpdateBusy ? 'Updating metadata…' : 'Update metadata'}
-                  </Button>
-                </div>
-                {metadataUpdateStatus && <div className={styles.statusNote}>{metadataUpdateStatus}</div>}
-              </div>
-            )}
-            <div className={styles.metadataJsonSection}>
-              <div className={styles.resultBoxLabel}>Raw metadata</div>
-              <JsonPanel
-                onCopy={handleCopyRawMetadata}
-                copied={copiedRawMetadataJson}
-                copyTitle="Copy raw metadata JSON"
-                as="pre"
-                contentProps={{ className: styles.metadataJsonContent }}
-                className={styles.metadataJsonPanel}
-              >
-                {JSON.stringify(groupMetadata, null, 2)}
-              </JsonPanel>
-            </div>
-          </>
-        )}
-      {!!Object.keys(encryptedFields || {}).length && (
-        <>
+        <section className={`${styles.panel} ${styles.metadataPanel}`}>
           <div className={styles.panelHeader}>
-            <div className={styles.panelSubtitle} style={{ margin: 0 }}>
-              Encrypted fields
+            <div className={styles.panelTitleGroup}>
+              <div className={styles.panelTitleRow}>
+                <div className={styles.panelTitle}>Session metadata</div>
+                {renderInfoTooltip(
+                  'admin-metadata-tip',
+                  'Review the canonical config and make careful live edits when needed.',
+                )}
+              </div>
             </div>
             <Button
               size="sm"
               color="secondary"
               outline
-              onClick={handleDecryptEncryptedFields}
-              disabled={decryptFieldsBusy || !walletReady}
-              title={!walletReady ? 'Connect a wallet to decrypt fields' : 'Decrypt fields (wallet signature prompts)'}
+              className={styles.collapseToggle}
+              onClick={() => toggleSection('metadata')}
+              aria-label="Toggle Session metadata section"
             >
-              {decryptFieldsBusy ? 'Decrypting…' : 'Decrypt'}
+              <FontAwesomeIcon icon={metadataOpen ? faCaretUp : faCaretDown} />
             </Button>
           </div>
-          {!walletReady && (
-            <div className={styles.statusNote}>
-              Connect a wallet to decrypt these fields.
+          {!groupMetadata && (
+            <div className={styles.warningNote}>
+              No metadata found for this session yet. Register the session on-chain or select a legacy demo session.
             </div>
           )}
-          <div className={styles.grid}>
-            {Object.entries(encryptedFields).map(([key, envelope]: any) => {
-                const resolved = decryptedFields[key] || {};
-                const status = resolved.status || 'locked';
-                const decrypted = toStr(resolved.value);
-                const decryptedPreview = decrypted ? formatPreviewValue(decrypted) : null;
-                return (
-                  <div
-                    key={key}
-                    className={`${styles.statusItem} ${!decryptedPreview ? styles.statusItemClickable : ''}`}
-                    onClick={() => { if (!decryptedPreview && !decryptFieldsBusy) handleDecryptEncryptedFields(); }}
-                    role={!decryptedPreview ? 'button' : undefined}
-                    title={!decryptedPreview ? (walletReady ? 'Click to decrypt' : 'Connect wallet to decrypt') : undefined}
-                  >
-                    <span>{key}</span>
-                    <span>{decryptedPreview || '[encrypted]'}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </section>
-
-      <section className={`${styles.panel} ${styles.gatePanel}`}>
-        <div className={styles.panelHeader}>
-          <div className={styles.panelTitleGroup}>
-            <div className={styles.panelTitleRow}>
-              <div className={styles.panelTitle}>On-chain default gate</div>
-              {renderInfoTooltip(
-                'admin-default-gate-tip',
-                'Match the default worker-auth gate to the session’s intended access model.'
+          {metadataOpen && groupMetadata && (
+            <>
+              <div className={styles.metadataGrid}>
+                <div className={styles.metadataItem}>
+                  <span>Slug</span>
+                  <span>
+                    {metadataSessionUrl ? (
+                      <a href={metadataSessionUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
+                        {metadataSlugDisplay}
+                      </a>
+                    ) : (
+                      metadataSlugDisplay
+                    )}
+                  </span>
+                </div>
+                <div className={styles.metadataItem}>
+                  <span>Session name</span>
+                  <span>{toStr(groupMetadata.sessionName || '').trim() || '—'}</span>
+                </div>
+                <div className={styles.metadataItem}>
+                  <span>Chain / Registry</span>
+                  <span>
+                    {buildAdminChainRegistryDisplay({
+                      chainId: groupMetadata.networkChainId || groupMetadata.__registry?.chainId || '',
+                      registryChainId: groupMetadata.__registry?.registryChainId || groupMetadata.registryChainId || '',
+                    })}
+                  </span>
+                </div>
+                <div className={styles.metadataItem}>
+                  <span>Admin</span>
+                  <span>
+                    {metadataAdminUrl ? (
+                      <a href={metadataAdminUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
+                        {shortAddress(metadataAdminAddress) || metadataAdminAddress}
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </span>
+                </div>
+                <div className={styles.metadataItem}>
+                  <span>Metadata URI</span>
+                  <span>
+                    {metadataUriUrl ? (
+                      <a href={metadataUriUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
+                        {metadataUriValue}
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </span>
+                </div>
+                <div className={styles.metadataItem}>
+                  <span>Metadata source</span>
+                  <span>{metadataLoadStateLabel}</span>
+                </div>
+              </div>
+              {metadataContractsNeedVerification && (
+                <div className={styles.warningNote}>
+                  Session metadata could not be loaded, so the contract addresses below are currently synthesized from
+                  chain defaults. Verify them before publishing any metadata update.
+                </div>
               )}
-            </div>
-          </div>
-          <Button
-            size="sm"
-            color="secondary"
-            outline
-            className={styles.collapseToggle}
-            onClick={() => toggleSection('defaultGate')}
-            aria-label="Toggle On-chain default gate section"
-          >
-            <FontAwesomeIcon icon={defaultGateOpen ? faCaretUp : faCaretDown} />
-          </Button>
-        </div>
-        {defaultGateOpen && (
-          <>
-            <div className={styles.formRow}>
-              <FormGroup>
-                <Label className={styles.gateLabelRow}>
-                  <span>Default gate SBTs</span>
-                  <Input
-                    type="select"
-                    value={defaultGateDraft.mode}
-                    data-testid={E2E_TESTIDS.ADMIN_GATE_MODE_SELECT}
-                    onChange={(e: any) => {
-                      setDefaultGateTouched(true);
-                      setGateConfigDirty(true);
-                      setDefaultGateDraft((prev: any) => ({ ...prev, mode: e.target.value }));
-                    }}
-                    className={styles.gateModeSelect}
-                  >
-                    <option value="any">ANY</option>
-                    <option value="all">ALL</option>
-                  </Input>
-                </Label>
-                <SBTSelector
-                  id="admin-default-gate-sbts"
-                  label=""
-                  selectedSBTs={dedupeSbtSelections(defaultGateDraft.sbts || [])}
-                  onAddSBT={(sbt: any) => {
-                    setDefaultGateTouched(true);
-                    setGateConfigDirty(true);
-                    setDefaultGateDraft((prev: any) => ({
-                      ...prev,
-                      sbts: dedupeSbtSelections([...(prev.sbts || []), sbt]),
-                    }));
-                  }}
-                  onRemoveSBT={(address: any) => {
-                    setDefaultGateTouched(true);
-                    setGateConfigDirty(true);
-                    setDefaultGateDraft((prev: any) => ({
-                      ...prev,
-                      sbts: dedupeSbtSelections(prev.sbts || []).filter(
-                        (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase()
-                      ),
-                    }));
-                  }}
+              {canAdmin && (
+                <AdminPageMetadataEditor
+                  metadataConfigDraft={metadataConfigDraft}
+                  updateMetadataConfigDraft={updateMetadataConfigDraft}
+                  metadataAutoFeatureDraft={metadataAutoFeatureDraft}
+                  setMetadataDraftTouched={setMetadataDraftTouched}
+                  setMetadataAutoFeatureTouched={setMetadataAutoFeatureTouched}
+                  setMetadataAutoFeatureDraft={setMetadataAutoFeatureDraft}
                   network={network}
-                  chainId={
-                    Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0) ||
-                    null
-                  }
-                  sessionSlug={normalizeSlug(selectedSlug)}
-                  variant="admin"
+                  relevantSessionChainId={relevantSessionChainId}
+                  relevantSessionChainLabel={relevantSessionChainLabel}
+                  relevantRegistryChainLabel={relevantRegistryChainLabel}
+                  selectedSlug={selectedSlug}
                   ensureLightSbtUniverse={ensureLightSbtUniverse}
+                  metadataBlockLimitsDraft={metadataBlockLimitsDraft}
+                  setMetadataBlockLimitsDraft={setMetadataBlockLimitsDraft}
+                  currentBlockSummary={currentBlockSummary}
+                  handleUseCurrentBlockForMetadata={handleUseCurrentBlockForMetadata}
+                  metadataUpdateBusy={metadataUpdateBusy}
+                  metadataLatestBlock={metadataLatestBlock}
+                  metadataContractsNeedVerification={metadataContractsNeedVerification}
+                  metadataDefaultedEditableContractKeys={metadataDefaultedEditableContractKeys}
+                  metadataContractsVerified={metadataContractsVerified}
+                  setMetadataContractsVerified={setMetadataContractsVerified}
+                  metadataContractsReadyForSave={metadataContractsReadyForSave}
+                  readonlyMetadataContracts={readonlyMetadataContracts}
+                  visibleMetadataContracts={visibleMetadataContracts}
+                  handleSaveSessionMetadata={handleSaveSessionMetadata}
+                  metadataUpdateStatus={metadataUpdateStatus}
                 />
-              </FormGroup>
+              )}
+              <div className={styles.metadataJsonSection}>
+                <div className={styles.resultBoxLabel}>Raw metadata</div>
+                <JsonPanel
+                  onCopy={handleCopyRawMetadata}
+                  copied={copiedRawMetadataJson}
+                  copyTitle="Copy raw metadata JSON"
+                  as="pre"
+                  contentProps={{ className: styles.metadataJsonContent }}
+                  className={styles.metadataJsonPanel}
+                >
+                  {JSON.stringify(groupMetadata, null, 2)}
+                </JsonPanel>
+              </div>
+            </>
+          )}
+          {!!Object.keys(encryptedFields || {}).length && (
+            <>
+              <div className={styles.panelHeader}>
+                <div className={styles.panelSubtitle} style={{ margin: 0 }}>
+                  Encrypted fields
+                </div>
+                <Button
+                  size="sm"
+                  color="secondary"
+                  outline
+                  onClick={handleDecryptEncryptedFields}
+                  disabled={decryptFieldsBusy || !walletReady}
+                  title={
+                    !walletReady ? 'Connect a wallet to decrypt fields' : 'Decrypt fields (wallet signature prompts)'
+                  }
+                >
+                  {decryptFieldsBusy ? 'Decrypting…' : 'Decrypt'}
+                </Button>
+              </div>
+              {!walletReady && <div className={styles.statusNote}>Connect a wallet to decrypt these fields.</div>}
+              <div className={styles.grid}>
+                {Object.entries(encryptedFields).map(([key, envelope]: any) => {
+                  const resolved = decryptedFields[key] || {};
+                  const status = resolved.status || 'locked';
+                  const decrypted = toStr(resolved.value);
+                  const decryptedPreview = decrypted ? formatPreviewValue(decrypted) : null;
+                  return (
+                    <div
+                      key={key}
+                      className={`${styles.statusItem} ${!decryptedPreview ? styles.statusItemClickable : ''}`}
+                      onClick={() => {
+                        if (!decryptedPreview && !decryptFieldsBusy) handleDecryptEncryptedFields();
+                      }}
+                      role={!decryptedPreview ? 'button' : undefined}
+                      title={
+                        !decryptedPreview ? (walletReady ? 'Click to decrypt' : 'Connect wallet to decrypt') : undefined
+                      }
+                    >
+                      <span>{key}</span>
+                      <span>{decryptedPreview || '[encrypted]'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </section>
+
+        <section className={`${styles.panel} ${styles.gatePanel}`}>
+          <div className={styles.panelHeader}>
+            <div className={styles.panelTitleGroup}>
+              <div className={styles.panelTitleRow}>
+                <div className={styles.panelTitle}>On-chain default gate</div>
+                {renderInfoTooltip(
+                  'admin-default-gate-tip',
+                  'Match the default worker-auth gate to the session’s intended access model.',
+                )}
+              </div>
             </div>
             <Button
-              color="primary"
-              className={styles.actionButton}
-              onClick={handleSyncDefaultGate}
-              data-testid={E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON}
-              disabled={!canAdmin || gateSyncBusy}
-              style={{ opacity: gateConfigDirty ? 1 : 0.5 }}
+              size="sm"
+              color="secondary"
+              outline
+              className={styles.collapseToggle}
+              onClick={() => toggleSection('defaultGate')}
+              aria-label="Toggle On-chain default gate section"
             >
-              Update default gate on-chain
+              <FontAwesomeIcon icon={defaultGateOpen ? faCaretUp : faCaretDown} />
             </Button>
-            {gateSyncStatus && (
-              <div className={styles.statusNote} data-testid={E2E_TESTIDS.ADMIN_GATE_STATUS}>
-                {gateSyncStatus}
-              </div>
-            )}
-            {gateSyncResult && <div className={styles.statusNote}>{renderAdminTestResult(gateSyncResult)}</div>}
-          </>
-        )}
-      </section>
-
-      <section className={`${styles.panel} ${styles.secretsPanel}`}>
-        <div className={styles.panelHeader}>
-          <div className={styles.panelTitleGroup}>
-            <div className={styles.panelTitleRow}>
-              <div className={styles.panelTitle}>Worker secrets</div>
-              {renderInfoTooltip(
-                'admin-worker-secrets-tip',
-                'Edit operator credentials without revealing what is already stored in the worker.'
-              )}
-            </div>
           </div>
-          <Button
-            size="sm"
-            color="secondary"
-            outline
-            className={styles.collapseToggle}
-            onClick={() => toggleSection('workerSecrets')}
-            aria-label="Toggle Worker secrets section"
-          >
-            <FontAwesomeIcon icon={workerSecretsOpen ? faCaretUp : faCaretDown} />
-          </Button>
-        </div>
-        {workerSecretsOpen && (
-          <>
-            <div className={styles.secretStatusBar}>
-              <div className={styles.statusNote}>
-                {secretPresenceMessage || 'Stored secret status not checked. Refresh to verify worker-managed secrets without revealing values.'}
-              </div>
-              <Button
-                size="sm"
-                color="secondary"
-                outline
-                className={styles.subtleActionButton}
-                onClick={refreshSecretPresence}
-                disabled={secretPresenceStatus === 'loading' || !selectedConfig || !normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl)}
-              >
-                <FontAwesomeIcon icon={faSync} style={{ marginRight: 6 }} />
-                {secretPresenceStatus === 'loading' ? 'Checking...' : 'Refresh secret status'}
-              </Button>
-            </div>
-            <div className={styles.secretOptionsGrid}>
-              {ADMIN_SECRET_CARDS.map((card: any) => {
-                const isOpen = openSecretCards[card.key];
-                const cardStatus = getAdminSecretCardStatus({
-                  fields: card.fields,
-                  secrets,
-                  clearedSecretKeys,
-                  storedSecretPresence,
-                  secretPresenceStatus,
-                  workerSecretsDirty,
-                });
-                return (
-                  <div key={card.key} className={`${styles.secretOptionCard}${isOpen ? ` ${styles.activeOption}` : ''}`}>
-                    <button
-                      type="button"
-                      className={styles.secretOptionHeader}
-                      aria-label={card.label}
-                      onClick={() => setOpenSecretCards((p) => ({ ...p, [card.key]: !p[card.key] }))}
-                      aria-expanded={isOpen}
+          {defaultGateOpen && (
+            <>
+              <div className={styles.formRow}>
+                <FormGroup>
+                  <Label className={styles.gateLabelRow}>
+                    <span>Default gate SBTs</span>
+                    <Input
+                      type="select"
+                      value={defaultGateDraft.mode}
+                      data-testid={E2E_TESTIDS.ADMIN_GATE_MODE_SELECT}
+                      onChange={(e: any) => {
+                        setDefaultGateTouched(true);
+                        setGateConfigDirty(true);
+                        setDefaultGateDraft((prev: any) => ({ ...prev, mode: e.target.value }));
+                      }}
+                      className={styles.gateModeSelect}
                     >
-                      <FontAwesomeIcon icon={cardStatus.iconLocked ? faLock : faLockOpen} style={{ opacity: cardStatus.iconLocked ? 0.9 : 0.4, marginRight: 8 }} />
-                      <span className={styles.secretOptionText}>
-                        <span>{card.label}</span>
-                        <span className={styles.secretOptionMeta}>{cardStatus.label}</span>
-                      </span>
-                      <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 'auto' }} />
-                    </button>
-                    {isOpen && (
-                      <div className={styles.secretOptionBody}>
-                        {card.fields.map((fieldKey: any) => {
-                          const secretFieldKey = String(fieldKey);
-                          const inputType = getAdminSecretFieldInputType(secretFieldKey);
-                          const isTextarea = inputType === 'textarea';
-                          const label = getAdminSecretFieldLabel(secretFieldKey);
-                          return (
-                            <FormGroup key={secretFieldKey}>
-                              <Label>{label}</Label>
-                              <div className={`${styles.secretInputRow}${isTextarea ? ` ${styles.secretInputRowMultiline}` : ''}`}>
-                                <Input
-                                  type={inputType}
-                                  rows={getAdminSecretFieldRows(secretFieldKey)}
-                                  value={secrets[secretFieldKey]}
-                                  onChange={(e: any) => handleSecretChange(secretFieldKey, e.target.value)}
-                                  className={styles.secretInput}
-                                />
-                                <button
-                                  type="button"
-                                  className={`${styles.secretRemoveButton}${clearedSecretKeys.has(secretFieldKey) ? ` ${styles.secretRemoveButtonActive}` : ''}`}
-                                  onClick={() => handleClearSecret(secretFieldKey)}
-                                  title={`Clear ${label} on next save`}
-                                  aria-label={`Clear ${label}`}
-                                  data-testid={buildAdminSecretRemoveTestId(secretFieldKey)}
-                                >
-                                  <FontAwesomeIcon icon={faTimes} />
-                                </button>
-                              </div>
-                              <div className={styles.secretFieldStatus}>
-                                {getAdminSecretFieldStatusLabel({
-                                  fieldKey: secretFieldKey,
-                                  secrets,
-                                  clearedSecretKeys,
-                                  storedSecretPresence,
-                                  secretPresenceStatus,
-                                  workerSecretsDirty,
-                                })}
-                              </div>
-                              {secretFieldKey === 'litAccountApiKey' ? (
-                                <div className={styles.warningNote}>
-                                  Anyone with this key can create new Lit groups, PKPs, usage keys, and actions inside that bundle-owned Lit account. Use disposable per-bundle accounts instead of a shared deployment account.
-                                </div>
-                              ) : null}
-                            </FormGroup>
-                          );
-                        })}
-                        {card.key === 'arweave' && renderInlineResourceSummary({
-                          key: 'arweave-resource',
-                          label: 'Arweave balance',
-                          resource: arweaveResource,
-                          onRefresh: refreshArweaveResource,
-                          refreshLabel: 'Refresh Arweave balance',
-                        })}
-                        {card.key === 'faucet' && renderInlineResourceSummary({
-                          key: 'faucet-resource',
-                          label: 'Faucet balance',
-                          resource: faucetResource,
-                          onRefresh: refreshFaucetResource,
-                          refreshLabel: 'Refresh faucet balance',
-                        })}
-                        {card.key === 'lit' && renderInlineResourceSummary({
-                          key: 'lit-resource',
-                          label: litResourceLabel,
-                          resource: litResource,
-                          onRefresh: () => refreshLitResource({ includeSignedStatus: true }),
-                          refreshLabel: 'Refresh Lit status',
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            {canAdmin && workerSecretsDirty && (
+                      <option value="any">ANY</option>
+                      <option value="all">ALL</option>
+                    </Input>
+                  </Label>
+                  <SBTSelector
+                    id="admin-default-gate-sbts"
+                    label=""
+                    selectedSBTs={dedupeSbtSelections(defaultGateDraft.sbts || [])}
+                    onAddSBT={(sbt: any) => {
+                      setDefaultGateTouched(true);
+                      setGateConfigDirty(true);
+                      setDefaultGateDraft((prev: any) => ({
+                        ...prev,
+                        sbts: dedupeSbtSelections([...(prev.sbts || []), sbt]),
+                      }));
+                    }}
+                    onRemoveSBT={(address: any) => {
+                      setDefaultGateTouched(true);
+                      setGateConfigDirty(true);
+                      setDefaultGateDraft((prev: any) => ({
+                        ...prev,
+                        sbts: dedupeSbtSelections(prev.sbts || []).filter(
+                          (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase(),
+                        ),
+                      }));
+                    }}
+                    network={network}
+                    chainId={
+                      Number(
+                        selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0,
+                      ) || null
+                    }
+                    sessionSlug={normalizeSlug(selectedSlug)}
+                    variant="admin"
+                    ensureLightSbtUniverse={ensureLightSbtUniverse}
+                  />
+                </FormGroup>
+              </div>
               <Button
                 color="primary"
                 className={styles.actionButton}
-                onClick={handleSaveWorkerSecrets}
-                disabled={!canAdmin}
+                onClick={handleSyncDefaultGate}
+                data-testid={E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON}
+                disabled={!canAdmin || gateSyncBusy}
+                style={{ opacity: gateConfigDirty ? 1 : 0.5 }}
               >
-                Save worker secrets
+                Update default gate on-chain
               </Button>
-            )}
-            {saveStatus && <div className={styles.statusNote}>{saveStatus}</div>}
-            {chainStatus && <div className={styles.statusNote}>{chainStatus}</div>}
-          </>
-        )}
-      </section>
-
-      {showTestsPanel && (
-      <section className={`${styles.panel} ${styles.testsPanel}`}>
-        <div className={styles.panelHeader}>
-          <div className={styles.panelTitleGroup}>
-            <div className={styles.panelTitleRow}>
-              <div className={styles.panelTitle}>Tests</div>
-              {renderInfoTooltip(
-                'admin-tests-tip',
-                <div className={styles.tooltipTextStack}>
-                  <div>Run quick checks against the selected worker and the session&apos;s gate rules.</div>
-                  <div>Run these as a user who holds the sponsored SBT. Tests use the configured worker URL and auth flow.</div>
+              {gateSyncStatus && (
+                <div className={styles.statusNote} data-testid={E2E_TESTIDS.ADMIN_GATE_STATUS}>
+                  {gateSyncStatus}
                 </div>
               )}
-            </div>
-          </div>
-          <Button
-            size="sm"
-            color="secondary"
-            outline
-            className={styles.collapseToggle}
-            onClick={() => {
+              {gateSyncResult && <div className={styles.statusNote}>{renderAdminTestResult(gateSyncResult)}</div>}
+            </>
+          )}
+        </section>
+
+        <AdminPageWorkerSecretsPanel
+          workerSecretsOpen={workerSecretsOpen}
+          onToggle={() => toggleSection('workerSecrets')}
+          canAdmin={canAdmin}
+          selectedConfig={selectedConfig}
+          workerUrl={workerUrl}
+          selectedConfigWorkerUrl={selectedConfigWorkerUrl}
+          secretPresenceMessage={secretPresenceMessage}
+          secretPresenceStatus={secretPresenceStatus}
+          refreshSecretPresence={refreshSecretPresence}
+          openSecretCards={openSecretCards}
+          setOpenSecretCards={setOpenSecretCards}
+          secrets={secrets}
+          clearedSecretKeys={clearedSecretKeys}
+          storedSecretPresence={storedSecretPresence}
+          workerSecretsDirty={workerSecretsDirty}
+          handleSecretChange={handleSecretChange}
+          handleClearSecret={handleClearSecret}
+          arweaveResource={arweaveResource}
+          faucetResource={faucetResource}
+          litResource={litResource}
+          litResourceLabel={litResourceLabel}
+          refreshArweaveResource={refreshArweaveResource}
+          refreshFaucetResource={refreshFaucetResource}
+          refreshLitResource={refreshLitResource}
+          handleSaveWorkerSecrets={handleSaveWorkerSecrets}
+          saveStatus={saveStatus}
+          chainStatus={chainStatus}
+        />
+
+        {showTestsPanel && (
+          <AdminPageTestsPanel
+            testsOpen={testsOpen}
+            onCollapse={() => {
               setShowTestsPanel(false);
-              setOpenSection((prev: any) => (prev === 'tests' ? '' : prev));
+              setOpenSection((prev) => (prev === 'tests' ? '' : prev));
             }}
-            aria-label="Toggle Tests section"
-          >
-            <FontAwesomeIcon icon={testsOpen ? faCaretUp : faCaretDown} />
-          </Button>
-        </div>
-        {testsOpen && (
-          <>
-        <div className={styles.panelTitleRow}>
-          <div className={styles.panelSubtitle}>Lit quick test (no worker)</div>
-          {renderInfoTooltip(
-            'admin-lit-test-tip',
-            'Uses the selected session’s default gate + Lit hooks. Does not call the worker.'
-          )}
-        </div>
-        <FormGroup>
-          <Label>Lit test value</Label>
-          <Input
-            type="textarea"
-            rows="2"
-            value={litTestValue}
-            onChange={(e: any) => setLitTestValue(e.target.value)}
-            placeholder="Type a short test string"
+            litTestValue={litTestValue}
+            setLitTestValue={setLitTestValue}
+            litTestBusy={litTestBusy}
+            litTestEnvelope={litTestEnvelope}
+            litTestStatus={litTestStatus}
+            litTestDecrypted={litTestDecrypted}
+            runLitEncryptTest={runLitEncryptTest}
+            runLitDecryptTest={runLitDecryptTest}
+            canRunTests={canRunTests}
+            canRunHealthTest={canRunHealthTest}
+            defaultGateIsEmpty={defaultGateIsEmpty}
+            walletReady={walletReady}
+            account={account}
+            testBusy={testBusy}
+            testResults={testResults}
+            testStatus={testStatus}
+            runWorkerHealthTest={runWorkerHealthTest}
+            runWorkerAiTest={runWorkerAiTest}
+            runWorkerArweaveTest={runWorkerArweaveTest}
+            runWorkerFaucetTest={runWorkerFaucetTest}
+            transcribeText={transcribeText}
+            handleTranscribeTestTextChange={handleTranscribeTestTextChange}
+            selectedSlug={selectedSlug}
+            testSessionConfig={testSessionConfig}
+            testContext={testContext}
+            baseWorkerUrl={baseWorkerUrl}
+            deniedBusy={deniedBusy}
+            deniedStatus={deniedStatus}
+            deniedResults={deniedResults}
+            runDeniedAccessTest={runDeniedAccessTest}
           />
-        </FormGroup>
-        <div className={`${styles.formRow} ${styles.litActionRow}`}>
-          <Button
-            color="primary"
-            outline
-            className={styles.actionButton}
-            onClick={runLitEncryptTest}
-            disabled={litTestBusy}
-          >
-            Encrypt
-          </Button>
-          <Button
-            color="primary"
-            outline
-            className={styles.actionButton}
-            onClick={runLitDecryptTest}
-            disabled={litTestBusy || !litTestEnvelope}
-          >
-            Decrypt
-          </Button>
-        </div>
-        {litTestStatus && <div className={styles.statusNote}>{litTestStatus}</div>}
-        {litTestEnvelope && (
-          <div className={styles.resultBox}>
-            <div>Envelope</div>
-            <pre>{litTestEnvelope}</pre>
-          </div>
         )}
-        {litTestDecrypted && (
-          <div className={styles.statusNote}>
-            Decrypted: {litTestDecrypted}
-          </div>
-        )}
-        <div className={styles.inlineRow}>
-          <Label>
-            Transcription test (AudioInput)
-            {!canRunTests && renderInfoTooltip(
-              'admin-transcription-tip',
-              'Connect a wallet and set a worker URL to test transcription.'
-            )}
-          </Label>
-          {canRunTests ? (
-            <AudioInput
-              placeholder="Record a short clip to test /transcribe…"
-              updateFunction={(next: any) => {
-                setTranscribeText(next);
-                const trimmed = toStr(next).trim();
-                setTestResults((prev) => ({ ...prev, transcribe: trimmed ? `OK (${trimmed.slice(0, 80)})` : '' }));
-              }}
-              toggleEncryption={() => {}}
-              value={transcribeText}
-              encrypted={false}
-              hideEncryption
-              disableEncryption
-              enableAiRewrite={false}
-              sessionSlug={normalizeSlug(selectedSlug)}
-              sessionConfig={testSessionConfig}
-              context={testContext}
-              workerUrl={baseWorkerUrl}
-            />
-          ) : null}
-        </div>
-        {testStatus && <div className={styles.statusNote}>{testStatus}</div>}
-        <div className={styles.grid}>
-            <div
-              className={`${styles.statusItem} ${canRunHealthTest ? styles.statusItemClickable : ''}`}
-              onClick={() => {
-                if (!testBusy && canRunHealthTest) runWorkerHealthTest();
-              }}
-              role={canRunHealthTest ? 'button' : undefined}
-              tabIndex={canRunHealthTest ? 0 : -1}
-              onKeyDown={(e: any) => {
-                if (e.key === 'Enter' && !testBusy && canRunHealthTest) runWorkerHealthTest();
-              }}
-              title={(() => {
-                if (!baseWorkerUrl) return 'Set a worker URL to test /health';
-                if (!defaultGateIsEmpty && !walletReady) return 'Connect a wallet to run the gated access test.';
-                return 'Click to test /health';
-              })()}
-              id={!defaultGateIsEmpty && !walletReady ? 'admin-health-test-chip' : undefined}
-            >
-            <span>Health</span>
-            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.health)}</span>
-          </div>
-          {!defaultGateIsEmpty && !walletReady && (
-            <CETooltip
-              placement="top"
-              trigger="hover focus click"
-              target="admin-health-test-chip"
-              className={styles.tooltipBubble}
-            >
-              Connect a wallet to run the gated access test.
-            </CETooltip>
-          )}
-          <div
-            className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!testBusy && account) runWorkerAiTest();
-            }}
-            role={account ? 'button' : undefined}
-            tabIndex={account ? 0 : -1}
-            onKeyDown={(e: any) => { if (e.key === 'Enter' && !testBusy && account) runWorkerAiTest(); }}
-            title="Click to test AI"
-          >
-            <span>AI</span>
-            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.ai)}</span>
-          </div>
-          <div
-            className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!testBusy && account) runWorkerArweaveTest();
-            }}
-            role={account ? 'button' : undefined}
-            tabIndex={account ? 0 : -1}
-            onKeyDown={(e: any) => { if (e.key === 'Enter' && !testBusy && account) runWorkerArweaveTest(); }}
-            title="Click to test Arweave upload"
-          >
-            <span>Arweave</span>
-            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.arweave)}</span>
-          </div>
-          <div
-            className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!testBusy && account) runWorkerFaucetTest();
-            }}
-            role={account ? 'button' : undefined}
-            tabIndex={account ? 0 : -1}
-            onKeyDown={(e: any) => { if (e.key === 'Enter' && !testBusy && account) runWorkerFaucetTest(); }}
-            title="Click to test faucet (0.0000001)"
-          >
-            <span>Faucet</span>
-            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.faucet)}</span>
-          </div>
-          <div className={styles.statusItem}>
-            <span>Transcribe</span>
-            <span>{renderAdminTestResult(testResults.transcribe)}</span>
-          </div>
-        </div>
-        <div className={styles.panelTitleRow} style={{ marginTop: 16 }}>
-          <div className={styles.panelTitle}>Negative tests (denied access)</div>
-          {renderInfoTooltip(
-            'admin-negative-tests-tip',
-            'Connect a wallet that does NOT hold the sponsored SBT. Each test expects a 403 during login.'
-          )}
-        </div>
-        {deniedStatus && <div className={styles.statusNote}>{deniedStatus}</div>}
-        <div className={styles.grid}>
-          <div
-            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!deniedBusy) runDeniedAccessTest('login');
-            }}
-            role={!deniedBusy ? 'button' : undefined}
-            tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e: any) => {
-              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('login');
-            }}
-            title="Click to test login denied"
-            data-testid="ce-admin-denied-chip-login"
-          >
-            <span>Login</span>
-            <span>{renderAdminTestResult(deniedResults.login)}</span>
-          </div>
-          <div
-            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!deniedBusy) runDeniedAccessTest('ai');
-            }}
-            role={!deniedBusy ? 'button' : undefined}
-            tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e: any) => {
-              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('ai');
-            }}
-            title="Click to test AI denied"
-            data-testid="ce-admin-denied-chip-ai"
-          >
-            <span>AI</span>
-            <span>{renderAdminTestResult(deniedResults.ai)}</span>
-          </div>
-          <div
-            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!deniedBusy) runDeniedAccessTest('arweave');
-            }}
-            role={!deniedBusy ? 'button' : undefined}
-            tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e: any) => {
-              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('arweave');
-            }}
-            title="Click to test Arweave denied"
-            data-testid="ce-admin-denied-chip-arweave"
-          >
-            <span>Arweave</span>
-            <span>{renderAdminTestResult(deniedResults.arweave)}</span>
-          </div>
-          <div
-            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!deniedBusy) runDeniedAccessTest('transcribe');
-            }}
-            role={!deniedBusy ? 'button' : undefined}
-            tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e: any) => {
-              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('transcribe');
-            }}
-            title="Click to test transcription denied"
-            data-testid="ce-admin-denied-chip-transcribe"
-          >
-            <span>Transcribe</span>
-            <span>{renderAdminTestResult(deniedResults.transcribe)}</span>
-          </div>
-          <div
-            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!deniedBusy) runDeniedAccessTest('faucet');
-            }}
-            role={!deniedBusy ? 'button' : undefined}
-            tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e: any) => {
-              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('faucet');
-            }}
-            title="Click to test faucet denied"
-            data-testid="ce-admin-denied-chip-faucet"
-          >
-            <span>Faucet</span>
-            <span>{renderAdminTestResult(deniedResults.faucet)}</span>
-          </div>
-        </div>
-          </>
-        )}
-      </section>
-      )}
       </div>
     </div>
   );

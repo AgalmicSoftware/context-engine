@@ -11,9 +11,7 @@ import {
 } from '../../../utilities/session/sponsoredBootstrapFunding.js';
 import { normalizeBaseUrl } from '../../../utilities/urlUtils.js';
 import { buildEmptyProvisionedSponsoredContext } from '../sessionWizardGateUtils';
-import {
-  readSessionWizardSponsoredBundleCache,
-} from '../sessionWizardSponsoredBundleCache';
+import { readSessionWizardSponsoredBundleCache } from '../sessionWizardSponsoredBundleCache';
 import { buildSponsoredBundleAppliedStatusMessage } from '../sessionWizardSponsoredBundleSupport';
 import {
   mergeSponsoredBundleDeployForm,
@@ -147,9 +145,8 @@ const renderAppliedBundleLifecycle = async () => {
     customValue: 'baseline-worker-secret',
   };
   const applyWorkerSecretsUpdate = jest.fn((nextValueOrUpdater) => {
-    currentWorkerSecrets = typeof nextValueOrUpdater === 'function'
-      ? nextValueOrUpdater(currentWorkerSecrets)
-      : nextValueOrUpdater;
+    currentWorkerSecrets =
+      typeof nextValueOrUpdater === 'function' ? nextValueOrUpdater(currentWorkerSecrets) : nextValueOrUpdater;
   });
   const getCurrentWorkerSecrets = jest.fn(() => currentWorkerSecrets);
   const onUpdateDeploymentState = jest.fn((nextState = {}) => {
@@ -183,16 +180,18 @@ const renderAppliedBundleLifecycle = async () => {
 
   mockReadSessionWizardSponsoredBundleCache.mockResolvedValue(sponsoredBundle);
 
-  const hook = renderHook(() => useSponsoredBundleLifecycle({
-    initialSponsoredBundleId: sponsoredBundle.id,
-    draftSlug: refs.draftRef.current.slug,
-    refs,
-    getCurrentWorkerSecrets,
-    applyWorkerSecretsUpdate,
-    updateDraftCorsWorkerUrl,
-    updateDeploymentState: onUpdateDeploymentState,
-    updateWorkerSecretState,
-  }));
+  const hook = renderHook(() =>
+    useSponsoredBundleLifecycle({
+      initialSponsoredBundleId: sponsoredBundle.id,
+      draftSlug: refs.draftRef.current.slug,
+      refs,
+      getCurrentWorkerSecrets,
+      applyWorkerSecretsUpdate,
+      updateDraftCorsWorkerUrl,
+      updateDeploymentState: onUpdateDeploymentState,
+      updateWorkerSecretState,
+    }),
+  );
 
   await waitFor(() => {
     expect(hook.result.current.sponsoredBundleAppliedBundleRef.current).toEqual(sponsoredBundle);
@@ -252,18 +251,17 @@ describe('useSponsoredBundleLifecycle', () => {
   it('hasSponsoredBundleLink is true when initialSponsoredBundleId is provided', () => {
     mockReadSessionWizardSponsoredBundleCache.mockImplementation(() => new Promise(() => {}));
 
-    const { result } = renderHook(() => useSponsoredBundleLifecycle({
-      initialSponsoredBundleId: 'bundle-123',
-    }));
+    const { result } = renderHook(() =>
+      useSponsoredBundleLifecycle({
+        initialSponsoredBundleId: 'bundle-123',
+      }),
+    );
 
     expect(result.current.hasSponsoredBundleLink).toBe(true);
   });
 
   it('clearSponsoredBundleTracking resets internal refs', async () => {
-    const {
-      result,
-      onUpdateDeploymentState,
-    } = await renderAppliedBundleLifecycle();
+    const { result, onUpdateDeploymentState } = await renderAppliedBundleLifecycle();
 
     onUpdateDeploymentState.mockClear();
 
@@ -282,10 +280,7 @@ describe('useSponsoredBundleLifecycle', () => {
   });
 
   it('restoreSponsoredBundleOverrides calls onUpdateDeploymentState', async () => {
-    const {
-      result,
-      onUpdateDeploymentState,
-    } = await renderAppliedBundleLifecycle();
+    const { result, onUpdateDeploymentState } = await renderAppliedBundleLifecycle();
 
     onUpdateDeploymentState.mockClear();
 
@@ -328,10 +323,12 @@ describe('useSponsoredBundleLifecycle', () => {
   it('handles non-object sponsored bundle load failures without crashing and keeps the status retryable', async () => {
     mockReadSponsoredBundleFromArweave.mockRejectedValueOnce('bundle gateway timeout');
 
-    const { result } = renderHook(() => useSponsoredBundleLifecycle({
-      initialSponsoredBundleId: 'bundle-123',
-      initialSponsoredBundleKey: 'bundle-secret',
-    }));
+    const { result } = renderHook(() =>
+      useSponsoredBundleLifecycle({
+        initialSponsoredBundleId: 'bundle-123',
+        initialSponsoredBundleKey: 'bundle-secret',
+      }),
+    );
 
     await waitFor(() => {
       expect(result.current.sponsoredBundleStatus).toEqual({

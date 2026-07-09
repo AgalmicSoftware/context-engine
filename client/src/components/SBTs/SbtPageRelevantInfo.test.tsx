@@ -3,9 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof SbtPageRelevantInfo>> = {}
-) => ({
+const createProps = (overrides: Partial<React.ComponentProps<typeof SbtPageRelevantInfo>> = {}) => ({
   documentIDHashes: ['doc hash'],
   documentURLs: ['https://doc.example.test/public'],
   onOpenEncryptedDoc: jest.fn(),
@@ -24,7 +22,7 @@ describe('SbtPageRelevantInfo', () => {
     expect(screen.getByText('Document URLs:')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'https://doc.example.test/public' })).toHaveAttribute(
       'href',
-      'https://doc.example.test/public'
+      'https://doc.example.test/public',
     );
     expect(screen.getByText('Document ID Hashes:')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'doc hash' })).toHaveAttribute('href', '/doc/doc%20hash');
@@ -45,7 +43,7 @@ describe('SbtPageRelevantInfo', () => {
           shouldRenderTags: false,
           tags: [],
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Encrypted Doc')).toBeInTheDocument();
@@ -64,7 +62,7 @@ describe('SbtPageRelevantInfo', () => {
             documentURLs: [],
             shouldRenderDocumentUrls: false,
           })}
-        />
+        />,
       );
 
       expect(screen.getByRole('link', { name: 'doc hash' })).toHaveAttribute('href', '/ce/doc/doc%20hash');
@@ -83,7 +81,7 @@ describe('SbtPageRelevantInfo', () => {
           shouldRenderDocumentUrls: false,
           shouldRenderTags: false,
         })}
-      />
+      />,
     );
 
     expect(screen.queryByText('Document URLs:')).toBeNull();

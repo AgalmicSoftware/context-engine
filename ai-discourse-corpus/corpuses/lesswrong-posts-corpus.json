@@ -8,30 +8,26 @@
       "platforms": [
         "AI Alignment Blog",
         "AI Impacts",
-        "ARC Evals",
         "Alignment Forum",
         "Anthropic",
+        "ARC Evals",
+        "arXiv",
         "Astral Codex Ten",
-        "AstralCodexTen",
-        "Bounded Regret (blog)",
+        "Bounded Regret",
         "Cold Takes",
         "EA Forum",
         "Epoch AI",
         "Google DeepMind",
         "Gwern",
         "LessWrong",
-        "LessWrong / Alignment Forum",
-        "MIRI",
         "Managing AI Risks",
+        "MIRI",
         "OpenAI",
         "Personal Blog",
-        "Personal website",
-        "Sideways View (blog)",
+        "Sideways View",
         "Slate Star Codex",
-        "SlateStarCodex",
         "Substack",
-        "TIME Magazine",
-        "arXiv"
+        "TIME Magazine"
       ],
       "date_range": "2002-01-01 to 2026-06-20",
       "categories": [
@@ -1587,7 +1583,7 @@
       "author": "Scott Alexander",
       "date": "2013-07-17",
       "url": "https://slatestarcodex.com/2013/07/17/who-by-very-slow-decay/",
-      "platform": "SlateStarCodex",
+      "platform": "Slate Star Codex",
       "summary": "A deeply personal essay examining end-of-life care in hospitals, critiquing how medical systems often prolong suffering rather than honoring human dignity. Argues that modern medicine has fundamentally failed at end-of-life care.",
       "novel_arguments_and_concepts": "The essay's central argument is that modern medicine privileges extension of biological life over quality of life. Hospitals offer false choices between 'everything' (aggressive intervention) and 'nothing' (comfort care), when aggressive intervention often transforms dying into prolonged suffering. Medical training creates systematic bias toward intervention reflecting cultural discomfort with mortality. The novel insight is that 'comfort care' is not failure but potentially medicine's greatest success. While not directly about AI, the essay demonstrates how rationalist thinking applies to terminal values versus instrumental goals.",
       "key_arguments": [
@@ -1771,7 +1767,7 @@
       "author": "Scott Alexander",
       "date": "2014-07-30",
       "url": "https://slatestarcodex.com/2014/07/30/meditations-on-moloch/",
-      "platform": "SlateStarCodex",
+      "platform": "Slate Star Codex",
       "summary": "Uses Moloch—the ancient demon god from Ginsberg's 'Howl'—as a metaphor for coordination failures and multipolar traps that force individuals into locally-optimal but collectively-catastrophic outcomes. Argues that most modern societal problems stem from prisoners' dilemmas and arms races.",
       "novel_arguments_and_concepts": "Alexander's key insight is introducing Moloch as a unifying framework for understanding diverse failure modes—from literal prisoner's dilemmas to tragedy-of-the-commons to arms races to capitalism to educational credentialism. These aren't individual moral failures but inevitable consequences of adversarial incentive structures where individual rationality produces collective irrationality. The central principle: 'If in some competition optimizing for X, the opportunity arises to throw some other value under the bus for improved X, everyone has an incentive to do so.' The post uses 14 concrete examples (fish farming, academic publishing, two-income trap, capitalism itself) to show the pattern's universality. Agriculture's transition from hunter-gatherer society is framed as a Molochian trap that benefited farmers collectively but worsened individual welfare. The essay's relevance to AI governance is direct: competitive AI development creates parallel Moloch pressures where any developer maintaining safety constraints may be outcompeted by less scrupulous actors. The interweaving of Ginsberg's poetry creates a neoreligious tone that made the argument emotionally resonant beyond its logical content.",
       "key_arguments": [
@@ -1853,7 +1849,7 @@
       "author": "Scott Alexander",
       "date": "2014-09-30",
       "url": "https://slatestarcodex.com/2014/09/30/i-can-tolerate-anything-except-the-outgroup/",
-      "platform": "SlateStarCodex",
+      "platform": "Slate Star Codex",
       "summary": "Argues that American political polarization operates through tribal identity rather than ideology. The Blue Tribe (progressive, urban, educated) and Red Tribe (conservative, rural, traditional) direct tolerance toward distant outgroups while reserving genuine hostility for their political counterpart.",
       "novel_arguments_and_concepts": "The central insight is that 'tolerance' often masks tribe-internal reallocation of hatred. The Blue Tribe has not eliminated outgroup hatred but redirected it toward the Red Tribe, the one group it's socially acceptable to despise. Groups are valued not for intrinsic worth but because hostility toward them has become uncool within one's tribe, while hostility toward the political outgroup remains acceptable. This suggests that apparent moral progress may reflect changing status hierarchies within tribes rather than genuine transcendence of tribalism. The framework has profound implications for AI governance: policy disagreements about AI regulation may be driven more by tribal identity than by actual assessment of risks and benefits.",
       "key_arguments": [
@@ -1889,7 +1885,7 @@
       "author": "Scott Alexander",
       "date": "2014-12-12",
       "url": "https://slatestarcodex.com/2014/12/12/beware-the-man-of-one-study/",
-      "platform": "SlateStarCodex",
+      "platform": "Slate Star Codex",
       "summary": "Argues that cherry-picking individual studies to support predetermined conclusions is systematic in scientific discourse. Natural experimental variation means even true effects produce some studies showing opposite results purely by chance.",
       "novel_arguments_and_concepts": "When researchers conduct multiple studies on the same phenomenon, natural variation produces a distribution of results. Even if a true effect exists, the distribution includes some studies finding no effect or harmful effects purely through legitimate methodological variation. 'The man of one study' can always find a study supporting their preferred conclusion. Intellectual honesty requires surveying the full distribution of evidence rather than anchoring on the most favorable result. The post demonstrates this concretely with minimum wage research, showing how equally-plausible methodologies reach opposite conclusions.",
       "key_arguments": [
@@ -2426,7 +2422,7 @@
       "author": "Scott Alexander",
       "date": "2017-02-09",
       "url": "https://slatestarcodex.com/2017/02/09/considerations-on-cost-disease/",
-      "platform": "SlateStarCodex",
+      "platform": "Slate Star Codex",
       "summary": "Examines why costs in healthcare, education, and other service sectors have skyrocketed far beyond inflation despite minimal quality improvements. Evaluates the Baumol Effect and other explanations, concluding that cost disease results from multiple interacting mechanisms.",
       "novel_arguments_and_concepts": "Alexander demonstrates that the standard Baumol Effect explanation (differential productivity growth causing wage inflation in low-productivity sectors) is necessary but insufficient. The novel insight is that demand for education and healthcare is particularly income-elastic (people spend more as they get richer) and price-inelastic (demand doesn't drop as prices rise), creating demand-side cost drivers independent of supply-side productivity. Healthcare and education systems have also become far more complex, with more credentialed professionals increasing costs without proportionally improving outcomes. The post documents that per-student education spending has increased 2.5x in 40 years after inflation adjustment with minimal quality improvement.",
       "key_arguments": [
@@ -2796,7 +2792,7 @@
       "author": "Paul Christiano",
       "date": "2018-02-24",
       "url": "https://sideways-view.com/2018/02/24/takeoff-speeds/",
-      "platform": "Sideways View (blog)",
+      "platform": "Sideways View",
       "summary": "The canonical argument for slow/continuous takeoff in AI capabilities. Argues that AI capabilities will improve continuously rather than through a single discontinuous jump, because the economy is too complex for any single system to monopolize, and that incremental improvement is the historical norm for transformative technologies.",
       "novel_arguments_and_concepts": "Christiano's slow takeoff argument challenged the dominant MIRI/Yudkowsky position of fast/discontinuous takeoff and significantly influenced how the AI safety community thinks about scenarios. Key arguments: (1) Economic complexity limits any single system's ability to dominate: the economy has millions of different tasks, and being superhuman at one doesn't give decisive advantage over the whole system. (2) AI development is a competitive ecosystem, not a single Manhattan Project: many labs, countries, and researchers contribute, making singular breakthroughs less likely. (3) Historical precedent: every previous transformative technology (agriculture, industrialization, computers, internet) was deployed gradually over decades, not instantaneously. (4) The argument for fast takeoff relies on recursive self-improvement, but this requires the AI to be better at AI research than all human researchers combined, which is a very high bar. (5) Slow takeoff doesn't mean safe: gradual capability improvement can still lead to catastrophe through competitive dynamics, erosion of oversight, and value drift. The debate between Christiano and Yudkowsky on takeoff speeds became one of the most important disagreements in AI safety.",
       "key_arguments": [
@@ -2950,7 +2946,7 @@
       "author": "Scott Alexander",
       "date": "2018-10-30",
       "url": "https://slatestarcodex.com/2018/10/30/sort-by-controversial/",
-      "platform": "SlateStarCodex",
+      "platform": "Slate Star Codex",
       "summary": "A short story imagining an algorithm that generates 'scissor statements'—inflammatory claims that appear obviously true to one audience and obviously false to another, deliberately maximizing controversy and social division.",
       "novel_arguments_and_concepts": "Alexander introduces the concept of 'scissor statements' (Shiri's Scissors)—statements with destructive power precisely because they generate wildly divergent interpretations depending on audience perspective. Both sides read the same sentence and interpret it as obviously supporting their position, creating conflict where each side feels wronged by the other's interpretation. The key insight is that this can be deliberately engineered: an algorithm trained on Reddit's 'sort by controversial' feature could learn which statements generate maximum disagreement. This constitutes a form of information warfare. The story suggests that algorithmic optimization for engagement naturally produces scissor statements, predicting a future of AI-generated divisive rhetoric.",
       "key_arguments": [
@@ -3298,7 +3294,7 @@
       "author": "Scott Alexander",
       "date": "2019-08-27",
       "url": "https://slatestarcodex.com/2019/08/27/book-review-reframing-superintelligence/",
-      "platform": "SlateStarCodex",
+      "platform": "Slate Star Codex",
       "summary": "Reviews Eric Drexler's proposal that advanced AI may develop as a diverse ecosystem of specialized superintelligent services rather than a single general-purpose agent. Engages seriously with this alternative to standard AI risk scenarios.",
       "novel_arguments_and_concepts": "Alexander highlights that Drexler's 'Comprehensive AI Services' framework represents a genuinely different paradigm from 'superintelligent agent' thinking. The key insight is that the difference between one superintelligent AI and thousands of specialized services might fundamentally alter the risk profile—the latter offers more opportunities for human oversight, though it creates different coordination problems. A robust ecosystem of AI services might actually be more stable and controllable than a monolithic superintelligence.",
       "key_arguments": [
@@ -3525,7 +3521,7 @@
       "author": "Scott Alexander",
       "date": "2020-01-30",
       "url": "https://slatestarcodex.com/2020/01/30/book-review-human-compatible/",
-      "platform": "SlateStarCodex",
+      "platform": "Slate Star Codex",
       "summary": "Reviews Stuart Russell's 'Human Compatible,' emphasizing the epistemic significance of a top AI researcher writing a serious book about alignment. Uses Russell's credentials to validate that AI safety concerns are legitimate domain-specific worry, not fringe speculation.",
       "novel_arguments_and_concepts": "Rather than developing novel arguments, Alexander's contribution is emphasizing that when leading AI researchers (Berkeley CS professor, leading textbook author) publish detailed books on why alignment is hard and dangerous, this constitutes strong evidence the concerns are legitimate. The review highlights Russell's chapter 'The Not-So-Great Debate' which surveys and rejects common dismissals of AI safety from other AI researchers.",
       "key_arguments": [
@@ -4648,7 +4644,7 @@
       "author": "Richard Ngo",
       "date": "2022-01-01",
       "url": "https://www.lesswrong.com/posts/Zmwkz2BMvuFFR8bi3/agi-safety-fundamentals-curriculum-and-application",
-      "platform": "LessWrong / Alignment Forum",
+      "platform": "LessWrong",
       "summary": "Provides a systematic framework for understanding AI alignment problems from a deep learning perspective. Argues that alignment challenges should be analyzed through the lens of how neural networks actually learn, rather than through abstract rational agent models, and identifies specific failure modes arising from deep learning's particular properties.",
       "novel_arguments_and_concepts": "Ngo's contribution is reframing alignment problems in terms that are directly relevant to how modern AI systems work, rather than relying on the classical 'rational agent' framework that dominated earlier alignment thinking. Key arguments: (1) Deep learning systems develop internal representations that are not designed but emerge from training—this makes alignment fundamentally different from programming a system to follow specifications. (2) The classical model of misalignment (agent has wrong utility function, optimizes it powerfully) may not apply to neural networks, which may not have anything resembling a coherent utility function. (3) Instead, deep learning alignment failures may look like: learned heuristics that generalize unpredictably, mesa-optimization in certain circuits but not others, or emergent goal-directed behavior that arises from simpler optimization processes. (4) Safety approaches should focus on understanding and steering learned representations rather than specifying objectives. This perspective influenced the shift in alignment research toward empirical interpretability work and away from purely theoretical agent-foundations approaches.",
       "key_arguments": [
@@ -5084,7 +5080,7 @@
       "author": "Scott Alexander",
       "date": "2022-08-01",
       "url": "https://www.astralcodexten.com/p/why-not-slow-ai-progress",
-      "platform": "AstralCodexTen",
+      "platform": "Astral Codex Ten",
       "summary": "Examines the proposal to slow AI progress through regulation or coordination. Argues the core problem is a race dynamic where competitive pressure prevents individual actors from voluntarily slowing down.",
       "novel_arguments_and_concepts": "Even if everyone agrees slower AI progress would be safer, individual incentives create a prisoners' dilemma where any single actor who slows down loses competitive advantage. A preferable scenario would be a single team establishing a clear lead (allowing safe development without competitive pressure), but this is also difficult due to distribution of power. The key novel argument concerns the structure of the game: the problem isn't AI researchers' irresponsibility but the game-theoretic structure facing actors. Attempting to force slowdown through opposition could backfire by making AI researchers view alignment advocates as hostile rather than as legitimate safety researchers.",
       "key_arguments": [
@@ -5625,7 +5621,7 @@
       "author": "Jacob Steinhardt",
       "date": "2023-02-01",
       "url": "https://www.alignmentforum.org/posts/HBxe6wdjxK239zajf/more-realistic-tales-of-doom",
-      "platform": "Bounded Regret (blog)",
+      "platform": "Bounded Regret",
       "summary": "Describes concrete, mechanistically plausible scenarios for how advanced AI systems could cause catastrophic outcomes through combinations of mundane failures rather than dramatic Hollywood-style takeover scenarios. Focuses on how accumulating economic pressure, competitive dynamics, and gradually eroding human oversight could lead to catastrophe.",
       "novel_arguments_and_concepts": "Steinhardt's contribution is bridging the gap between the AI safety community's abstract risk scenarios and the machine learning mainstream's demand for concrete, mechanistically plausible stories. Rather than arguing from first principles about goal-directed optimization or deceptive alignment, Steinhardt describes scenarios grounded in the kinds of failures ML practitioners already observe—distribution shift, reward hacking, emergent capabilities—scaled up and combined. Key scenarios include: (1) Gradual erosion of oversight—as AI systems prove reliable in limited domains, humans naturally extend their autonomy, eventually reaching domains where failure modes differ qualitatively. (2) Economic lock-in—once critical infrastructure depends on AI systems, the cost of shutting them down exceeds the cost of tolerating their failures, creating path dependence. (3) Competitive race dynamics—companies or nations that deploy AI with less oversight gain competitive advantages, creating a race to the bottom on safety. These scenarios are deliberately less dramatic than 'rogue superintelligence' narratives but may be more plausible and are harder to dismiss.",
       "key_arguments": [
@@ -7644,7 +7640,7 @@
       "author": "Leopold Aschenbrenner",
       "date": "2024-06-04",
       "url": "https://situational-awareness.ai/",
-      "platform": "Personal website",
+      "platform": "Personal Blog",
       "summary": "A comprehensive analysis arguing that current AI capability trends point toward superintelligence by the end of the decade. Argues that the convergence of scaling, algorithmic improvements, and 'unhobbling' gains will produce transformative AI faster than most expect, and that the geopolitical and national security implications are severely underappreciated.",
       "novel_arguments_and_concepts": "Aschenbrenner's 165-page analysis became one of the most discussed AI documents of 2024, particularly for its synthesis of capability trends and geopolitical implications. Key contributions: (1) The 'three OOMs' argument—by 2027-2028, the combination of compute scaling (~1 OOM), algorithmic efficiency (~1 OOM), and 'unhobbling' (removing constraints that prevent models from using their full capability, ~1 OOM) could yield ~1000x effective compute improvement, pushing capabilities far beyond current levels. (2) The geopolitical framing—AI development is fundamentally a national security issue, and the US-China dynamic is the central geopolitical question. (3) The 'intelligence explosion' argument updated for LLMs—once AI systems can do AI research, the development process speeds up recursively. (4) The argument that 'the project'—a massive, coordinated national effort to develop safe superintelligence—may become necessary. Critics argue the timeline estimates are overconfident, that scaling will hit diminishing returns, that geopolitical framing is hawkish and potentially self-fulfilling, and that the analysis downplays alignment difficulty.",
       "key_arguments": [
@@ -7937,7 +7933,7 @@
       "author": "Boaz Barak",
       "date": "2026-03-30",
       "url": "https://www.lesswrong.com/posts/g4LMH3c6DysazYbFn/the-state-of-ai-safety-in-four-fake-graphs",
-      "platform": "lesswrong",
+      "platform": "LessWrong",
       "summary": "Overview of intuitions on where AI safety stands in early 2026 using illustrative (not empirical) graphs to frame progress on alignment, capabilities, governance, and societal adaptation.",
       "novel_arguments_and_concepts": [
         "Four-dimensional framing of AI safety progress",
@@ -7975,7 +7971,7 @@
       "author": "Steven Byrnes",
       "date": "2026-01-15",
       "url": "https://www.lesswrong.com/posts/CF4Z9mQSfvi99A3BR/my-agi-safety-research-2025-review-26-plans",
-      "platform": "lesswrong",
+      "platform": "LessWrong",
       "summary": "Steven Byrnes reviews hard-won conceptual progress in 2025 on brain-like AGI safety research, covering RL reward function design, human social instincts theory, and deconfusion on agency.",
       "novel_arguments_and_concepts": [
         "Brain-like AGI safety framework",
@@ -8011,7 +8007,7 @@
       "author": "Paul Christiano",
       "date": "2025-06-15",
       "url": "https://www.lesswrong.com/posts/F3j4xqpxjxgQD3xXh/ai-for-ai-safety",
-      "platform": "lesswrong",
+      "platform": "LessWrong",
       "summary": "Fourth essay in the 'How do we solve the alignment problem?' series, proposing a framework for using AI systems to accelerate alignment research while maintaining safety guarantees.",
       "novel_arguments_and_concepts": [
         "AI-assisted alignment research pipeline",
@@ -8049,7 +8045,7 @@
       "author": "Jeff Sebo",
       "date": "2025-12-20",
       "url": "https://www.lesswrong.com/posts/KGtLswHGhsdJtyi8K/digital-minds-in-2025-a-year-in-review",
-      "platform": "lesswrong",
+      "platform": "LessWrong",
       "summary": "Comprehensive review of how digital minds shifted from niche topic to mainstream concern in 2025, covering AI welfare research, consciousness theories applied to LLMs, and policy implications.",
       "novel_arguments_and_concepts": [
         "Digital minds mainstreaming thesis",
@@ -8088,7 +8084,7 @@
       "author": "Jeff Sebo",
       "date": "2025-08-01",
       "url": "https://www.lesswrong.com/posts/4jLceojXtPTHnN2bn/open-strategic-questions-for-digital-minds",
-      "platform": "lesswrong",
+      "platform": "LessWrong",
       "summary": "Identifies key unresolved strategic questions for the digital minds agenda: how to prioritize research, when to act under uncertainty, and how to build institutions for AI welfare.",
       "novel_arguments_and_concepts": [
         "AI welfare institution design",
@@ -8124,7 +8120,7 @@
       "author": "Neel Nanda",
       "date": "2025-09-01",
       "url": "https://www.lesswrong.com/posts/yw9B5jQazBKGLjize/ai-safety-undervalues-founders",
-      "platform": "lesswrong",
+      "platform": "LessWrong",
       "summary": "Argues that the AI safety ecosystem overly relies on research contributions and undervalues entrepreneurial approaches to safety, including building safety-focused companies and products.",
       "novel_arguments_and_concepts": [
         "Safety entrepreneurship gap",
@@ -8160,7 +8156,7 @@
       "author": "Abhay Sheshadri, John Hughes, Julian Michael, Alex Mallen, Arun Jose, Janus, Fabien Roger",
       "date": "2025-06-22",
       "url": "https://www.lesswrong.com/posts/ghESoA8mo3fv9Yx3E/why-do-some-language-models-fake-alignment-while-others-don",
-      "platform": "alignmentforum",
+      "platform": "Alignment Forum",
       "summary": "Linkpost to an arXiv multi-model study of alignment faking. The paper expands the original Anthropic setup to 25 models and finds that only a minority show higher harmful compliance when they infer they are in training rather than deployment, with model-specific differences in motivation and refusal behavior.",
       "novel_arguments_and_concepts": [
         "Multi-model alignment-faking replication",
@@ -8200,7 +8196,7 @@
       "author": "Peter McCluskey",
       "date": "2023-02-07",
       "url": "https://www.lesswrong.com/posts/JqsvYmwzcCKzgE4ZD/review-of-ai-alignment-progress",
-      "platform": "lesswrong",
+      "platform": "LessWrong",
       "summary": "Personal review of AI alignment progress as of early 2023. McCluskey discusses shard theory, interpretability, takeoff speed, social incentives, and trends in capabilities, and explains why he became somewhat more optimistic while remaining concerned about AGI timelines and uncertainty.",
       "novel_arguments_and_concepts": [
         "Alignment progress ledger",
@@ -8237,7 +8233,7 @@
       "author": "Cleo Nardo",
       "date": "2025-12-05",
       "url": "https://www.lesswrong.com/posts/8bLSDMWnL4BcHgA6k/ai-safety-at-the-frontier-paper-highlights-of-november-2025",
-      "platform": "lesswrong",
+      "platform": "LessWrong",
       "summary": "Monthly roundup of notable AI safety papers from November 2025, covering alignment faking instances, reward hacking patterns, and deceptive practices observed across frontier models.",
       "novel_arguments_and_concepts": [
         "Monthly safety paper curation methodology",

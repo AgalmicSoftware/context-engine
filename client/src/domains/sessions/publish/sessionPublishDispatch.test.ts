@@ -18,11 +18,13 @@ describe('sessionPublishDispatch', () => {
   };
 
   it('builds the reducer plan from the controller execution plan', () => {
-    expect(buildSessionPublishReducerPlan({
-      shouldAutoDeployWorker: true,
-      shouldDeployPendingSbts: true,
-      shouldUploadMetadata: false,
-    })).toEqual({
+    expect(
+      buildSessionPublishReducerPlan({
+        shouldAutoDeployWorker: true,
+        shouldDeployPendingSbts: true,
+        shouldUploadMetadata: false,
+      }),
+    ).toEqual({
       autoDeployWorker: true,
       deployPendingSbts: true,
       uploadMetadata: false,
@@ -77,14 +79,16 @@ describe('sessionPublishDispatch', () => {
     const { actions, dispatch } = collectActions();
     const error = new Error('boom');
 
-    await expect(runSessionPublishEffect({
-      dispatch,
-      effect: 'deployWorker',
-      getErrorMessage: (err) => err instanceof Error ? err.message : String(err),
-      run: async () => {
-        throw error;
-      },
-    })).rejects.toBe(error);
+    await expect(
+      runSessionPublishEffect({
+        dispatch,
+        effect: 'deployWorker',
+        getErrorMessage: (err) => (err instanceof Error ? err.message : String(err)),
+        run: async () => {
+          throw error;
+        },
+      }),
+    ).rejects.toBe(error);
 
     expect(actions).toEqual([
       {

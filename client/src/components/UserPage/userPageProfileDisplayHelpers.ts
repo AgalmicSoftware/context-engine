@@ -165,19 +165,16 @@ export const resolveUserPageAddressDisplayState = ({
   const currentLower = String(propViewAddress || '').toLowerCase();
   const pendingNick = String(nicknameInput || '').trim();
   const stateViewLower = String(stateViewAddress || '').toLowerCase();
-  const pendingNicknameForThis = (
-    stateViewLower === currentLower &&
-    (isEditingNickname || bookmarked)
-  ) ? pendingNick : '';
+  const pendingNicknameForThis =
+    stateViewLower === currentLower && (isEditingNickname || bookmarked) ? pendingNick : '';
   const nicknameToUse = String(cachedNickname || '') || pendingNicknameForThis;
   const profileUrl = propViewAddress ? `/u/${propViewAddress}` : '';
   const usernameText = String(username || '');
   const shortAddress = propViewAddress
-    ? String(typeof getShortenedAddress === 'function'
-      ? getShortenedAddress(propViewAddress, false)
-      : propViewAddress)
+    ? String(typeof getShortenedAddress === 'function' ? getShortenedAddress(propViewAddress, false) : propViewAddress)
     : '';
-  const addressLabel = nicknameToUse ||
+  const addressLabel =
+    nicknameToUse ||
     (isSimulated && usernameText ? usernameText : '') ||
     (usernameText && !isSimulated ? usernameText : '') ||
     shortAddress;
@@ -195,6 +192,5 @@ export const resolveUserPageAddressDisplayState = ({
 export const resolveUserPageBlockieSeed = ({
   propViewAddress = '',
   username = '',
-}: ResolveUserPageBlockieSeedArgs = {}): string => (
-  String(propViewAddress || '') || (username ? String(username) : 'contextengine-default-seed')
-);
+}: ResolveUserPageBlockieSeedArgs = {}): string =>
+  String(propViewAddress || '') || (username ? String(username) : 'contextengine-default-seed');

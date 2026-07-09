@@ -67,7 +67,7 @@ const buildPublishUiPlan = (overrides: Record<string, any> = {}) => {
 };
 
 const buildProps = (
-  overrides: Partial<React.ComponentProps<typeof SessionPublishSummary>> = {}
+  overrides: Partial<React.ComponentProps<typeof SessionPublishSummary>> = {},
 ): React.ComponentProps<typeof SessionPublishSummary> => ({
   isCollapsed: false,
   onToggleCollapsed: jest.fn(),
@@ -125,7 +125,7 @@ describe('SessionPublishSummary', () => {
             },
           }),
         })}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Deploy Session/i }));
@@ -145,7 +145,7 @@ describe('SessionPublishSummary', () => {
             },
           }),
         })}
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: /Publishing/i })).toBeDisabled();
@@ -164,7 +164,7 @@ describe('SessionPublishSummary', () => {
             },
           }),
         })}
-      />
+      />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).toBeDisabled();
@@ -182,7 +182,7 @@ describe('SessionPublishSummary', () => {
             },
           }),
         })}
-      />
+      />,
     );
 
     expect(screen.queryByText('Set a worker URL before uploading metadata.')).not.toBeInTheDocument();
@@ -209,7 +209,7 @@ describe('SessionPublishSummary', () => {
             },
           }),
         })}
-      />
+      />,
     );
 
     const progressCard = screen.getByTestId('ce-wizard-publish-progress');
@@ -267,7 +267,7 @@ describe('SessionPublishSummary', () => {
           sessionUrl: 'https://context.example.test/session/readiness-session',
           status: 'Published session readiness-session.',
         })}
-      />
+      />,
     );
 
     const progressCard = screen.getByTestId('ce-wizard-publish-progress');
@@ -278,23 +278,33 @@ describe('SessionPublishSummary', () => {
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_URI)).toHaveTextContent('ar://metadata-tx');
     expect(screen.queryByText('Uploaded metadata URI:')).not.toBeInTheDocument();
     expect(screen.getByText('Arweave tx:')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'https://arweave.example.test/metadata-tx' }))
-      .toHaveAttribute('href', 'https://arweave.example.test/metadata-tx');
+    expect(screen.getByRole('link', { name: 'https://arweave.example.test/metadata-tx' })).toHaveAttribute(
+      'href',
+      'https://arweave.example.test/metadata-tx',
+    );
     expect(screen.getByText('Register txs:')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('createSession:')).toBeInTheDocument();
-    expect(screen.getByRole('link', {
-      name: 'https://optimism-sepolia.blockscout.com/tx/0xregister1',
-    })).toHaveAttribute('href', 'https://optimism-sepolia.blockscout.com/tx/0xregister1');
+    expect(
+      screen.getByRole('link', {
+        name: 'https://optimism-sepolia.blockscout.com/tx/0xregister1',
+      }),
+    ).toHaveAttribute('href', 'https://optimism-sepolia.blockscout.com/tx/0xregister1');
     expect(screen.getByText('setSessionFields:')).toBeInTheDocument();
-    expect(screen.getByRole('link', {
-      name: 'https://optimism-sepolia.blockscout.com/tx/0xregister2',
-    })).toHaveAttribute('href', 'https://optimism-sepolia.blockscout.com/tx/0xregister2');
-    expect(screen.getByRole('link', {
-      name: 'https://context.example.test/session/readiness-session',
-    })).toHaveAttribute('href', 'https://context.example.test/session/readiness-session');
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_URL))
-      .toHaveAttribute('href', 'https://context.example.test/admin/readiness-session');
+    expect(
+      screen.getByRole('link', {
+        name: 'https://optimism-sepolia.blockscout.com/tx/0xregister2',
+      }),
+    ).toHaveAttribute('href', 'https://optimism-sepolia.blockscout.com/tx/0xregister2');
+    expect(
+      screen.getByRole('link', {
+        name: 'https://context.example.test/session/readiness-session',
+      }),
+    ).toHaveAttribute('href', 'https://context.example.test/session/readiness-session');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_URL)).toHaveAttribute(
+      'href',
+      'https://context.example.test/admin/readiness-session',
+    );
     expect(screen.getByText('Admin URL copied.')).toBeInTheDocument();
     expect(screen.getByText('Published session readiness-session.')).toBeInTheDocument();
 
@@ -313,7 +323,7 @@ describe('SessionPublishSummary', () => {
           onPublish,
           onTogglePublishAdvanced,
         })}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Advanced publish settings' }));
@@ -340,11 +350,11 @@ describe('SessionPublishSummary', () => {
           }),
           workerUrlSource: 'custom worker URL',
         })}
-      />
+      />,
     );
 
     expect(
-      screen.getByText('Arweave upload worker: https://worker.example.test (custom worker URL)')
+      screen.getByText('Arweave upload worker: https://worker.example.test (custom worker URL)'),
     ).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText('ar://<txId> or https://arweave.net/<txId>'), {
@@ -392,7 +402,7 @@ describe('SessionPublishSummary', () => {
             },
           }),
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Uploaded metadata URI:')).toBeInTheDocument();
@@ -416,14 +426,8 @@ describe('SessionPublishSummary', () => {
   });
 
   it('renders published inline SBT links with human-readable labels', () => {
-    const firstHref = buildSbtDetailPath(
-      '0x00000000000000000000000000000000000000a1',
-      'writers'
-    );
-    const secondHref = buildSbtDetailPath(
-      '0x00000000000000000000000000000000000000a2',
-      'writers'
-    );
+    const firstHref = buildSbtDetailPath('0x00000000000000000000000000000000000000a1', 'writers');
+    const secondHref = buildSbtDetailPath('0x00000000000000000000000000000000000000a2', 'writers');
     render(
       <SessionPublishSummary
         {...buildProps({
@@ -440,14 +444,15 @@ describe('SessionPublishSummary', () => {
             },
           ],
         })}
-      />
+      />,
     );
 
     expect(screen.getAllByTestId('ce-wizard-published-sbt-link')).toHaveLength(2);
     expect(screen.getByRole('link', { name: 'Writers Group' })).toHaveAttribute('href', firstHref);
-    expect(
-      screen.getByRole('link', { name: '0x00000000000000000000000000000000000000a2' })
-    ).toHaveAttribute('href', secondHref);
+    expect(screen.getByRole('link', { name: '0x00000000000000000000000000000000000000a2' })).toHaveAttribute(
+      'href',
+      secondHref,
+    );
   });
 
   it('omits published inline SBT rows when no SBTs were created during publish', () => {

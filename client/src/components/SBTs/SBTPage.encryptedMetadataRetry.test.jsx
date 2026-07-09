@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 
 import SBTPage from './SBTPage';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 import { litStorage } from 'utilities/crypto/litProtocol.js';
@@ -63,10 +63,18 @@ describe('SBTPage encrypted metadata retry behavior', () => {
   });
 
   afterEach(() => {
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
-    try { delete window.__litHooks; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
+    try {
+      delete window.__litHooks;
+    } catch (_) {}
     jest.restoreAllMocks();
   });
 
@@ -75,7 +83,7 @@ describe('SBTPage encrypted metadata retry behavior', () => {
     const sbtLower = sbtAddress.toLowerCase();
     const account = '0x00000000000000000000000000000000000000ba';
     const cacheEntry = {
-      '84532': {
+      84532: {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -147,12 +155,14 @@ describe('SBTPage encrypted metadata retry behavior', () => {
     expect(decryptSpy).toHaveBeenCalledTimes(1);
     expect(downloadSpy).toHaveBeenCalledTimes(1);
     expect(objectUrlMock.createObjectURL).toHaveBeenCalledTimes(1);
-    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
-      name: 'Private Badge',
-      nameDecrypted: true,
-      image: 'blob:locked-image-after-connect',
-      imageDecrypted: true,
-    }));
+    expect(subject.state.sbtInfo).toEqual(
+      expect.objectContaining({
+        name: 'Private Badge',
+        nameDecrypted: true,
+        image: 'blob:locked-image-after-connect',
+        imageDecrypted: true,
+      }),
+    );
     objectUrlMock.restore();
   });
 
@@ -161,7 +171,7 @@ describe('SBTPage encrypted metadata retry behavior', () => {
     const sbtLower = sbtAddress.toLowerCase();
     const account = '0x00000000000000000000000000000000000000b1';
     const cacheEntry = {
-      '84532': {
+      84532: {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -215,10 +225,12 @@ describe('SBTPage encrypted metadata retry behavior', () => {
     await subject.loadSBTInfo(true);
 
     expect(decryptSpy).toHaveBeenCalledTimes(1);
-    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
-      description: 'Private description',
-      descriptionDecrypted: true,
-    }));
+    expect(subject.state.sbtInfo).toEqual(
+      expect.objectContaining({
+        description: 'Private description',
+        descriptionDecrypted: true,
+      }),
+    );
   });
 
   it('retries encrypted metadata decrypt when the active account changes', async () => {
@@ -227,7 +239,7 @@ describe('SBTPage encrypted metadata retry behavior', () => {
     const accountA = '0x00000000000000000000000000000000000000b1';
     const accountB = '0x00000000000000000000000000000000000000b2';
     const cacheEntry = {
-      '84532': {
+      84532: {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -257,10 +269,11 @@ describe('SBTPage encrypted metadata retry behavior', () => {
 
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
-    const decryptSpy = jest.spyOn(cryptoUtils, 'decryptEnvelopeValue')
-      .mockImplementation(async (_envelope, options = {}) => (
-        options.account === accountB ? 'Private description' : null
-      ));
+    const decryptSpy = jest
+      .spyOn(cryptoUtils, 'decryptEnvelopeValue')
+      .mockImplementation(async (_envelope, options = {}) =>
+        options.account === accountB ? 'Private description' : null,
+      );
     window.__litHooks = { getKey: jest.fn() };
 
     const subject = createSubject({
@@ -288,10 +301,12 @@ describe('SBTPage encrypted metadata retry behavior', () => {
 
     expect(decryptSpy).toHaveBeenCalledTimes(2);
     expect(decryptSpy.mock.calls.map((call) => call[1]?.account)).toEqual([accountA, accountB]);
-    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
-      description: 'Private description',
-      descriptionDecrypted: true,
-    }));
+    expect(subject.state.sbtInfo).toEqual(
+      expect.objectContaining({
+        description: 'Private description',
+        descriptionDecrypted: true,
+      }),
+    );
   });
 
   it('retries encrypted name and uploaded image decrypt when the active account changes', async () => {
@@ -300,7 +315,7 @@ describe('SBTPage encrypted metadata retry behavior', () => {
     const accountA = '0x00000000000000000000000000000000000000bb';
     const accountB = '0x00000000000000000000000000000000000000bc';
     const cacheEntry = {
-      '84532': {
+      84532: {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -338,11 +353,11 @@ describe('SBTPage encrypted metadata retry behavior', () => {
 
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
-    const decryptSpy = jest.spyOn(cryptoUtils, 'decryptEnvelopeValue')
-      .mockImplementation(async (_envelope, options = {}) => (
-        options.account === accountB ? 'Private Badge' : null
-      ));
-    const downloadSpy = jest.spyOn(litStorage, 'downloadEncryptedArweaveData')
+    const decryptSpy = jest
+      .spyOn(cryptoUtils, 'decryptEnvelopeValue')
+      .mockImplementation(async (_envelope, options = {}) => (options.account === accountB ? 'Private Badge' : null));
+    const downloadSpy = jest
+      .spyOn(litStorage, 'downloadEncryptedArweaveData')
       .mockImplementation(async (_opts = {}) => {
         if (_opts.account !== accountB) throw new Error('not authorized');
         return {
@@ -381,12 +396,14 @@ describe('SBTPage encrypted metadata retry behavior', () => {
     expect(decryptSpy).toHaveBeenCalledTimes(2);
     expect(downloadSpy).toHaveBeenCalledTimes(2);
     expect(objectUrlMock.createObjectURL).toHaveBeenCalledTimes(1);
-    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
-      name: 'Private Badge',
-      nameDecrypted: true,
-      image: 'blob:locked-image-after-account-switch',
-      imageDecrypted: true,
-    }));
+    expect(subject.state.sbtInfo).toEqual(
+      expect.objectContaining({
+        name: 'Private Badge',
+        nameDecrypted: true,
+        image: 'blob:locked-image-after-account-switch',
+        imageDecrypted: true,
+      }),
+    );
     objectUrlMock.restore();
   });
 });

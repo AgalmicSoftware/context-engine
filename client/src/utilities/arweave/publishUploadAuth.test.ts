@@ -1,7 +1,4 @@
-import {
-  isPublishUploadBootstrapReachabilityError,
-  resolvePublishArweaveUploadOptions,
-} from './publishUploadAuth.js';
+import { isPublishUploadBootstrapReachabilityError, resolvePublishArweaveUploadOptions } from './publishUploadAuth.js';
 
 describe('publishUploadAuth helpers', () => {
   it('goes direct first when a sponsored JWK is already available for wizard publish uploads', async () => {
@@ -10,13 +7,15 @@ describe('publishUploadAuth helpers', () => {
       signature: '0xsigned',
     }));
 
-    await expect(resolvePublishArweaveUploadOptions({
-      arweaveJwk: '{"kty":"RSA"}',
-      workerUrl: 'https://worker.example/auth/nonce',
-      preferDirectArweaveUpload: true,
-      requireAdminAuthWithoutJwk: true,
-      buildAdminAuth,
-    })).resolves.toEqual({
+    await expect(
+      resolvePublishArweaveUploadOptions({
+        arweaveJwk: '{"kty":"RSA"}',
+        workerUrl: 'https://worker.example/auth/nonce',
+        preferDirectArweaveUpload: true,
+        requireAdminAuthWithoutJwk: true,
+        buildAdminAuth,
+      }),
+    ).resolves.toEqual({
       forceDirectArweaveUpload: true,
       arweaveJwk: '{"kty":"RSA"}',
       workerUrl: 'https://worker.example',
@@ -32,12 +31,14 @@ describe('publishUploadAuth helpers', () => {
       throw new TypeError('Failed to fetch');
     });
 
-    await expect(resolvePublishArweaveUploadOptions({
-      arweaveJwk: '{"kty":"RSA"}',
-      workerUrl: 'https://worker.example',
-      allowDirectFallbackOnBootstrapFailure: true,
-      buildAdminAuth,
-    })).resolves.toEqual({
+    await expect(
+      resolvePublishArweaveUploadOptions({
+        arweaveJwk: '{"kty":"RSA"}',
+        workerUrl: 'https://worker.example',
+        allowDirectFallbackOnBootstrapFailure: true,
+        buildAdminAuth,
+      }),
+    ).resolves.toEqual({
       forceDirectArweaveUpload: true,
       arweaveJwk: '{"kty":"RSA"}',
       workerUrl: 'https://worker.example',
@@ -51,12 +52,14 @@ describe('publishUploadAuth helpers', () => {
       throw new Error('Failed to reach worker auth endpoint (https://worker.example/auth/nonce).');
     });
 
-    await expect(resolvePublishArweaveUploadOptions({
-      arweaveJwk: '',
-      workerUrl: 'https://worker.example',
-      requireAdminAuthWithoutJwk: true,
-      buildAdminAuth,
-    })).rejects.toThrow('Failed to reach worker auth endpoint');
+    await expect(
+      resolvePublishArweaveUploadOptions({
+        arweaveJwk: '',
+        workerUrl: 'https://worker.example',
+        requireAdminAuthWithoutJwk: true,
+        buildAdminAuth,
+      }),
+    ).rejects.toThrow('Failed to reach worker auth endpoint');
   });
 
   it('uses worker admin auth when no direct JWK is available for hosted uploads', async () => {
@@ -68,12 +71,14 @@ describe('publishUploadAuth helpers', () => {
     };
     const buildAdminAuth = jest.fn(async () => adminAuth);
 
-    await expect(resolvePublishArweaveUploadOptions({
-      arweaveJwk: '',
-      workerUrl: 'https://worker.example/auth/login',
-      requireAdminAuthWithoutJwk: true,
-      buildAdminAuth,
-    })).resolves.toEqual({
+    await expect(
+      resolvePublishArweaveUploadOptions({
+        arweaveJwk: '',
+        workerUrl: 'https://worker.example/auth/login',
+        requireAdminAuthWithoutJwk: true,
+        buildAdminAuth,
+      }),
+    ).resolves.toEqual({
       forceDirectArweaveUpload: false,
       arweaveJwk: '',
       workerUrl: 'https://worker.example',
@@ -85,12 +90,14 @@ describe('publishUploadAuth helpers', () => {
   });
 
   it('fails closed for hosted uploads when no worker URL or JWK is available', async () => {
-    await expect(resolvePublishArweaveUploadOptions({
-      arweaveJwk: '',
-      workerUrl: '',
-      requireAdminAuthWithoutJwk: true,
-      buildAdminAuth: jest.fn(),
-    })).rejects.toThrow('Worker URL is missing.');
+    await expect(
+      resolvePublishArweaveUploadOptions({
+        arweaveJwk: '',
+        workerUrl: '',
+        requireAdminAuthWithoutJwk: true,
+        buildAdminAuth: jest.fn(),
+      }),
+    ).rejects.toThrow('Worker URL is missing.');
   });
 
   it('does not fall back on logical auth errors even when a JWK is present', async () => {
@@ -98,20 +105,26 @@ describe('publishUploadAuth helpers', () => {
       throw new Error('Typed data signature does not match signer address.');
     });
 
-    await expect(resolvePublishArweaveUploadOptions({
-      arweaveJwk: '{"kty":"RSA"}',
-      workerUrl: 'https://worker.example',
-      allowDirectFallbackOnBootstrapFailure: true,
-      buildAdminAuth,
-    })).rejects.toThrow('Typed data signature does not match signer address.');
+    await expect(
+      resolvePublishArweaveUploadOptions({
+        arweaveJwk: '{"kty":"RSA"}',
+        workerUrl: 'https://worker.example',
+        allowDirectFallbackOnBootstrapFailure: true,
+        buildAdminAuth,
+      }),
+    ).rejects.toThrow('Typed data signature does not match signer address.');
   });
 
   it('classifies normalized reachability messages for deferred fallback decisions', () => {
-    expect(isPublishUploadBootstrapReachabilityError(
-      new Error('Failed to reach worker auth endpoint (https://worker.example/auth/nonce). Check worker URL and allowOrigins includes http://localhost:3000.')
-    )).toBe(true);
-    expect(isPublishUploadBootstrapReachabilityError(
-      new Error('Connect a wallet to sign admin requests.')
-    )).toBe(false);
+    expect(
+      isPublishUploadBootstrapReachabilityError(
+        new Error(
+          'Failed to reach worker auth endpoint (https://worker.example/auth/nonce). Check worker URL and allowOrigins includes http://localhost:3000.',
+        ),
+      ),
+    ).toBe(true);
+    expect(isPublishUploadBootstrapReachabilityError(new Error('Connect a wallet to sign admin requests.'))).toBe(
+      false,
+    );
   });
 });

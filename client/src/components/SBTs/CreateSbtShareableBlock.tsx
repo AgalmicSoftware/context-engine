@@ -1,12 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCheck,
-  faClipboard,
-  faCopy,
-  faDownload,
-  faQuestionCircle,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faClipboard, faCopy, faDownload, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { QRCodeSVG } from 'qrcode.react';
 
 import CETooltip from '../Shared/CETooltip';
@@ -79,12 +73,10 @@ export const CreateSbtShareableBlock = ({
         </h3>
 
         <div className={styles.urlContainer}>
-          <span className={styles.urlText} title={url}>{url}</span>
-          <button
-            onClick={() => onCopyUrl(url, copyKeyUrl)}
-            className={styles.copyButton}
-            title="Copy URL"
-          >
+          <span className={styles.urlText} title={url}>
+            {url}
+          </span>
+          <button onClick={() => onCopyUrl(url, copyKeyUrl)} className={styles.copyButton} title="Copy URL">
             {copyUrlActionState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
             {copyUrlActionState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
           </button>

@@ -11,9 +11,7 @@ export const isSessionWizardArweaveTxId = (value: unknown): boolean => /^[a-z0-9
 
 export const isSessionWizardArweaveGatewayHost = (host: unknown): boolean => {
   const normalized = toStr(host).trim().toLowerCase();
-  return normalized.endsWith('arweave.net')
-    || normalized.endsWith('arweave.dev')
-    || normalized.endsWith('arweave.app');
+  return normalized.endsWith('arweave.net') || normalized.endsWith('arweave.dev') || normalized.endsWith('arweave.app');
 };
 
 export const extractSessionWizardArweaveTxId = (raw: unknown): string => {
@@ -37,9 +35,7 @@ export const extractSessionWizardArweaveTxId = (raw: unknown): string => {
   return isSessionWizardArweaveTxId(value) ? value : '';
 };
 
-export const parseSessionWizardArweaveTxId = (raw: unknown): string => (
-  extractSessionWizardArweaveTxId(raw)
-);
+export const parseSessionWizardArweaveTxId = (raw: unknown): string => extractSessionWizardArweaveTxId(raw);
 
 export const normalizeSessionWizardArweaveUri = (raw: unknown): string => {
   const value = toStr(raw).trim();
@@ -55,25 +51,14 @@ export const getSessionWizardExplorerBaseUrl = (chainId: ChainIdLike): string =>
   return toStr(chain?.blockExplorers?.default?.url).trim();
 };
 
-export const normalizeSessionWizardSlug = (slug: unknown): string => (
-  sessionRegistryUtils.normalizeSlug(slug)
-);
+export const normalizeSessionWizardSlug = (slug: unknown): string => sessionRegistryUtils.normalizeSlug(slug);
 
-export const normalizeSessionWizardWorkerUrl = (url: unknown): string => (
-  normalizeWorkerAuthUrl(toStr(url).trim())
-);
+export const normalizeSessionWizardWorkerUrl = (url: unknown): string => normalizeWorkerAuthUrl(toStr(url).trim());
 
-const resolveBrowserOrigin = (): string => (
-  typeof window !== 'undefined' && window.location ? toStr(window.location.origin).trim() : ''
-);
+const resolveBrowserOrigin = (): string =>
+  typeof window !== 'undefined' && window.location ? toStr(window.location.origin).trim() : '';
 
-export const buildSessionWizardSessionUrl = ({
-  slug,
-  origin,
-}: {
-  slug?: unknown;
-  origin?: string;
-}): string => {
+export const buildSessionWizardSessionUrl = ({ slug, origin }: { slug?: unknown; origin?: string }): string => {
   const normalizedSlug = normalizeSessionWizardSlug(slug);
   if (!normalizedSlug) return '';
   const base = toStr(origin).trim() || resolveBrowserOrigin();

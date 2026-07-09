@@ -53,8 +53,8 @@ test('extractImportSpecifiers finds static, dynamic, and require imports', () =>
 
 test('resolveClientImport resolves local client imports and ignores packages', () => {
   assert.equal(
-    resolveClientImport('client/src/components/Admin/AdminPage.tsx', '../../utilities/web3/contractScripts.js'),
-    'client/src/utilities/web3/contractScripts'
+    resolveClientImport('client/src/components/Admin/AdminPage.tsx', '../../utilities/web3/chainGateway.js'),
+    'client/src/utilities/web3/chainGateway'
   );
   assert.equal(
     resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'src/utilities/worker/corsProxy'),
@@ -65,8 +65,8 @@ test('resolveClientImport resolves local client imports and ignores packages', (
     'client/src/utilities/web3/sessionRegistry'
   );
   assert.equal(
-    resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'utilities/web3/contractScripts.js'),
-    'client/src/utilities/web3/contractScripts'
+    resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'utilities/web3/chainGateway.js'),
+    'client/src/utilities/web3/chainGateway'
   );
   assert.equal(
     resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'components/Shared/CETooltip'),
@@ -213,7 +213,7 @@ test('route/page low-level imports through Vite bare aliases are violations', ()
     writeFile(
       rootDir,
       'client/src/components/UserPage/UserPage.tsx',
-      "import contractScripts from 'utilities/web3/contractScripts.js';\n"
+      "import contractScripts from 'utilities/web3/chainGateway.js';\n"
     );
 
     const violations = collectClientBoundaryViolations({ rootDir });
@@ -221,8 +221,8 @@ test('route/page low-level imports through Vite bare aliases are violations', ()
       {
         rule: 'route-page-no-low-level',
         source: 'client/src/components/UserPage/UserPage.tsx',
-        import: 'utilities/web3/contractScripts.js',
-        resolved: 'client/src/utilities/web3/contractScripts',
+        import: 'utilities/web3/chainGateway.js',
+        resolved: 'client/src/utilities/web3/chainGateway',
       },
     ]);
   });
@@ -233,7 +233,7 @@ test('shared runtime components cannot add low-level imports', () => {
     writeFile(
       rootDir,
       'client/src/components/SurveyTool/SurveyQuestions.tsx',
-      "import contractScripts from '../../utilities/web3/contractScripts.js';\n"
+      "import contractScripts from '../../utilities/web3/chainGateway.js';\n"
     );
 
     const largeRuntimeSource = [
@@ -262,8 +262,8 @@ test('shared runtime components cannot add low-level imports', () => {
       {
         rule: 'shared-runtime-no-new-low-level',
         source: 'client/src/components/SurveyTool/SurveyQuestions.tsx',
-        import: '../../utilities/web3/contractScripts.js',
-        resolved: 'client/src/utilities/web3/contractScripts',
+        import: '../../utilities/web3/chainGateway.js',
+        resolved: 'client/src/utilities/web3/chainGateway',
       },
     ]);
   });
@@ -279,7 +279,7 @@ test('pure low-level re-export barrels are pass-through facade violations', () =
           getDemoSessionConfigBySlug,
           getSessionConfigBySlug,
           normalizeSessionSlug,
-        } from '../web3/contractScripts.js';
+        } from '../web3/chainGateway.js';
         export {
           checkSponsoredAccess,
         } from '../web3/sponsoredAccess.js';
@@ -349,7 +349,7 @@ test('app runtime modules may delegate to low-level modules', () => {
       rootDir,
       'client/src/app/runtime/appWagmiRuntime.ts',
       `
-        import contractScripts from '../../utilities/web3/contractScripts.js';
+        import contractScripts from '../../utilities/web3/chainGateway.js';
 
         export const first = () => (
           contractScripts.first()

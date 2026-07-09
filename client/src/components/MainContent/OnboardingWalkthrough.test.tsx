@@ -14,8 +14,12 @@ jest.mock('../InformationModals/SiteLoadOptions', () => ({
     clickLeftArrow?: () => void;
   }) => (
     <div data-testid="mock-site-load-options" data-arrow-index={arrowIndex}>
-      <button type="button" onClick={clickRightArrow}>Advance slide</button>
-      <button type="button" onClick={clickLeftArrow}>Previous slide</button>
+      <button type="button" onClick={clickRightArrow}>
+        Advance slide
+      </button>
+      <button type="button" onClick={clickLeftArrow}>
+        Previous slide
+      </button>
     </div>
   ),
 }));

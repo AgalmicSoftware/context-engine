@@ -80,12 +80,8 @@ const SessionChipSelector = ({
     return <div className={styles.emptyState}>{emptyText}</div>;
   }
 
-  const visibleList = canCollapse && !expanded
-    ? list.slice(0, normalizedCollapsedLimit)
-    : list;
-  const hiddenCount = canCollapse
-    ? Math.max(0, list.length - normalizedCollapsedLimit)
-    : 0;
+  const visibleList = canCollapse && !expanded ? list.slice(0, normalizedCollapsedLimit) : list;
+  const hiddenCount = canCollapse ? Math.max(0, list.length - normalizedCollapsedLimit) : 0;
 
   return (
     <div className={[styles.selector, className].filter(Boolean).join(' ')}>
@@ -99,7 +95,9 @@ const SessionChipSelector = ({
           option.loaded === false ? styles.chipUnloaded : '',
           option.general ? styles.chipGeneral : '',
           option.disabled ? styles.chipDisabled : '',
-        ].filter(Boolean).join(' ');
+        ]
+          .filter(Boolean)
+          .join(' ');
 
         const handleChipClick = () => {
           if (option.disabled) return;
@@ -121,11 +119,7 @@ const SessionChipSelector = ({
         };
 
         return (
-          <div
-            key={option.key || slug || option.label}
-            className={styles.chipRow}
-            data-testid={option.rowTestId}
-          >
+          <div key={option.key || slug || option.label} className={styles.chipRow} data-testid={option.rowTestId}>
             <button
               type="button"
               className={chipClasses}
@@ -141,22 +135,14 @@ const SessionChipSelector = ({
               <span className={styles.chipTopRow}>
                 <span className={styles.chipContent}>
                   {option.selected && (
-                    <span
-                      aria-hidden="true"
-                      className={styles.chipCheck}
-                      data-testid={option.checkTestId}
-                    >
+                    <span aria-hidden="true" className={styles.chipCheck} data-testid={option.checkTestId}>
                       ✓
                     </span>
                   )}
                   <span>{option.label}</span>
                 </span>
 
-                {option.primary ? (
-                  <span className={styles.primaryBadge}>
-                    Primary
-                  </span>
-                ) : null}
+                {option.primary ? <span className={styles.primaryBadge}>Primary</span> : null}
 
                 {(option.href || option.showOpen) && (
                   <span
@@ -172,32 +158,19 @@ const SessionChipSelector = ({
                 )}
               </span>
 
-              {option.metaText ? (
-                <span className={styles.metaText}>{option.metaText}</span>
-              ) : null}
+              {option.metaText ? <span className={styles.metaText}>{option.metaText}</span> : null}
 
               {option.showProgress && (
-                <span
-                  className={styles.progressWrap}
-                  aria-hidden="true"
-                  data-testid={option.progressWrapTestId}
-                >
-                  <span
-                    className={styles.progressTrack}
-                    data-testid={option.progressTrackTestId}
-                  >
+                <span className={styles.progressWrap} aria-hidden="true" data-testid={option.progressWrapTestId}>
+                  <span className={styles.progressTrack} data-testid={option.progressTrackTestId}>
                     <span
-                      className={[
-                        styles.progressFill,
-                        option.indeterminate ? styles.progressFillIndeterminate : '',
-                      ].filter(Boolean).join(' ')}
+                      className={[styles.progressFill, option.indeterminate ? styles.progressFillIndeterminate : '']
+                        .filter(Boolean)
+                        .join(' ')}
                       data-testid={option.progressFillTestId}
                     />
                   </span>
-                  <span
-                    className={styles.progressText}
-                    data-testid={option.progressTextTestId}
-                  >
+                  <span className={styles.progressText} data-testid={option.progressTextTestId}>
                     {option.progressText}
                   </span>
                 </span>
@@ -214,9 +187,7 @@ const SessionChipSelector = ({
           aria-expanded={expanded}
           data-testid={expandToggleTestId || undefined}
         >
-          {expanded
-            ? collapseLabel
-            : `${expandLabel}${hiddenCount > 0 ? ` (${hiddenCount} more)` : ''}`}
+          {expanded ? collapseLabel : `${expandLabel}${hiddenCount > 0 ? ` (${hiddenCount} more)` : ''}`}
         </button>
       ) : null}
     </div>

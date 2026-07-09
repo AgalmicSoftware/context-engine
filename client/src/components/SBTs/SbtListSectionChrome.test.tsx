@@ -33,7 +33,7 @@ describe('SbtListSectionChrome', () => {
             statusLabel: 'Pending',
           },
         ]}
-      />
+      />,
     );
 
     expect(screen.getByText('Loading groups')).toBeInTheDocument();
@@ -49,9 +49,7 @@ describe('SbtListSectionChrome', () => {
   });
 
   it('renders section titles with optional corner spinners', () => {
-    const { rerender } = render(
-      <SbtListSectionTitle label="Live" showSpinner={false} spinnerId="spinner-live" />
-    );
+    const { rerender } = render(<SbtListSectionTitle label="Live" showSpinner={false} spinnerId="spinner-live" />);
 
     expect(screen.getByRole('heading', { name: 'Live' })).toBeInTheDocument();
     expect(screen.queryByTestId('spinner-live')).not.toBeInTheDocument();
@@ -70,7 +68,7 @@ describe('SbtListSectionChrome', () => {
         wrapClassName="grid"
       >
         <article>Live group</article>
-      </SbtListSectionBody>
+      </SbtListSectionBody>,
     );
 
     expect(screen.getByText('Live group')).toBeInTheDocument();
@@ -79,13 +77,9 @@ describe('SbtListSectionChrome', () => {
     expect(screen.queryByText('No live groups.')).not.toBeInTheDocument();
 
     rerender(
-      <SbtListSectionBody
-        emptyLabel="No live groups."
-        hasItems={false}
-        loadingHint={<span>Loading live groups</span>}
-      >
+      <SbtListSectionBody emptyLabel="No live groups." hasItems={false} loadingHint={<span>Loading live groups</span>}>
         <article>Live group</article>
-      </SbtListSectionBody>
+      </SbtListSectionBody>,
     );
 
     expect(screen.getByText('Loading live groups')).toBeInTheDocument();
@@ -95,7 +89,7 @@ describe('SbtListSectionChrome', () => {
     rerender(
       <SbtListSectionBody emptyLabel="No live groups." hasItems={false}>
         <article>Live group</article>
-      </SbtListSectionBody>
+      </SbtListSectionBody>,
     );
 
     expect(screen.getByText('No live groups.')).toBeInTheDocument();
@@ -104,9 +98,7 @@ describe('SbtListSectionChrome', () => {
   });
 
   it('renders block progress only outside all-sessions mode', () => {
-    const { rerender } = render(
-      <SbtListSectionLoadingHint allSessionsMode={false} blocksLeft={42} />
-    );
+    const { rerender } = render(<SbtListSectionLoadingHint allSessionsMode={false} blocksLeft={42} />);
 
     expect(screen.getByText('Loading…')).toBeInTheDocument();
     expect(screen.getByText('Blocks left: 42')).toBeInTheDocument();

@@ -39,7 +39,7 @@ describe('resolveLitChain', () => {
         chainId: null,
         litChain: null,
         chain: null,
-      })
+      }),
     );
   });
 

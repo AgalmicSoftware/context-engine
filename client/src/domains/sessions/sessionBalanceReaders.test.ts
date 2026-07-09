@@ -4,9 +4,9 @@ import {
   hasLegacyEthBalanceReader,
   hasNativeBalanceReader,
 } from './sessionBalanceReaders';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {},
 }));

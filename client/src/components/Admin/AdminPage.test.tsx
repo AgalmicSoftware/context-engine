@@ -12,22 +12,28 @@ describe('AdminPage', () => {
     expect(typeof AdminPage).toBe('function');
   });
   it('keeps the open-session display URL when group metadata is available without a selected config', () => {
-    expect(adminPageTestUtils.getAdminSessionDisplayUrl({
-      selectedSlug: 'debate',
-      selectedConfig: null,
-      groupMetadata: { slug: 'rxc', sessionName: 'Debate Session' },
-    })).toBe('http://localhost/session/rxc');
-    expect(adminPageTestUtils.getAdminSessionDisplayUrl({
-      selectedSlug: '',
-      selectedConfig: null,
-      groupMetadata: { slug: '', sessionName: 'Context Engine' },
-    })).toBe('http://localhost/session');
+    expect(
+      adminPageTestUtils.getAdminSessionDisplayUrl({
+        selectedSlug: 'debate',
+        selectedConfig: null,
+        groupMetadata: { slug: 'rxc', sessionName: 'Debate Session' },
+      }),
+    ).toBe('http://localhost/session/rxc');
+    expect(
+      adminPageTestUtils.getAdminSessionDisplayUrl({
+        selectedSlug: '',
+        selectedConfig: null,
+        groupMetadata: { slug: '', sessionName: 'Context Engine' },
+      }),
+    ).toBe('http://localhost/session');
 
-    expect(adminPageTestUtils.getAdminSessionDisplayUrl({
-      selectedSlug: 'missing-session-slug',
-      selectedConfig: null,
-      groupMetadata: null,
-    })).toBe('');
+    expect(
+      adminPageTestUtils.getAdminSessionDisplayUrl({
+        selectedSlug: 'missing-session-slug',
+        selectedConfig: null,
+        groupMetadata: null,
+      }),
+    ).toBe('');
   });
 
   it('builds worker config payload with registry/rpc fallbacks from chain defaults', () => {
@@ -49,7 +55,7 @@ describe('AdminPage', () => {
     expect(payload.rpcUrlsByChainId).toEqual(
       expect.objectContaining({
         [String(DEFAULT_CONFIG_CHAIN_ID)]: [getDefaultHttpRpc(DEFAULT_CONFIG_CHAIN_ID)],
-      })
+      }),
     );
   });
 
@@ -140,14 +146,16 @@ describe('AdminPage', () => {
       fallbackStart: 7654321,
     });
 
-    expect(payload).toEqual(expect.objectContaining({
-      slug: 'test-9',
-      sessionName: 'Test 9',
-      blockLimits: {
-        start: 7654321,
-        end: null,
-      },
-    }));
+    expect(payload).toEqual(
+      expect.objectContaining({
+        slug: 'test-9',
+        sessionName: 'Test 9',
+        blockLimits: {
+          start: 7654321,
+          end: null,
+        },
+      }),
+    );
     expect(payload.__registry).toBeUndefined();
     expect(payload.sponsoredKeys).toBeUndefined();
     expect(payload.sponsored).toBeUndefined();
@@ -213,22 +221,22 @@ describe('AdminPage', () => {
       },
     });
 
-    expect(draft).toEqual(expect.objectContaining({
-      defaultTags: 'alpha, beta',
-      defaultFilterState: '{\n  "sort": "recent"\n}',
-      highlightedQuestionIds: 'q1\nq2',
-      faucetAmountEth: '0.0002',
-      aiFastProvider: 'openai',
-      aiFastModel: 'gpt-4o-mini',
-      aiThinkingProvider: 'anthropic',
-      aiThinkingModel: 'claude-3-7-sonnet',
-      aiTranscriptionProvider: 'openai',
-      aiTranscriptionModel: 'whisper-1',
-    }));
+    expect(draft).toEqual(
+      expect.objectContaining({
+        defaultTags: 'alpha, beta',
+        defaultFilterState: '{\n  "sort": "recent"\n}',
+        highlightedQuestionIds: 'q1\nq2',
+        faucetAmountEth: '0.0002',
+        aiFastProvider: 'openai',
+        aiFastModel: 'gpt-4o-mini',
+        aiThinkingProvider: 'anthropic',
+        aiThinkingModel: 'claude-3-7-sonnet',
+        aiTranscriptionProvider: 'openai',
+        aiTranscriptionModel: 'whisper-1',
+      }),
+    );
     const expectedFeatured = ethers.utils.getAddress('0x00000000000000000000000000000000000000aa');
-    expect(draft.defaultFeaturedSBTs).toEqual([
-      expect.objectContaining({ address: expectedFeatured }),
-    ]);
+    expect(draft.defaultFeaturedSBTs).toEqual([expect.objectContaining({ address: expectedFeatured })]);
   });
 
   it('defaults admin AI metadata drafts to GPT-5 when metadata is missing AI settings', () => {
@@ -254,18 +262,23 @@ describe('AdminPage', () => {
     expect(draft.aiFastProvider).toBe('openai');
     expect(draft.aiFastModel).toBe('gpt-4');
 
-    const applied = adminPageTestUtils.applyAdminMetadataDraft({
-      ai: {
-        mode: 'openai',
-        model: 'gpt-4',
-        provider: 'openai',
+    const applied = adminPageTestUtils.applyAdminMetadataDraft(
+      {
+        ai: {
+          mode: 'openai',
+          model: 'gpt-4',
+          provider: 'openai',
+        },
       },
-    }, draft);
+      draft,
+    );
 
-    expect(applied.ai.models.fast).toEqual(expect.objectContaining({
-      provider: 'openai',
-      model: 'gpt-4',
-    }));
+    expect(applied.ai.models.fast).toEqual(
+      expect.objectContaining({
+        provider: 'openai',
+        model: 'gpt-4',
+      }),
+    );
   });
 
   it('applies advanced admin metadata edits and strips worker-only fields from the published payload', () => {
@@ -309,30 +322,32 @@ describe('AdminPage', () => {
       },
     });
 
-    expect(payload).toEqual(expect.objectContaining({
-      defaultTags: 'governance',
-      questionsGenPrompt: 'Ask governance questions',
-      defaultSbtTags: 'member',
-      defaultFilterState: { sort: 'recent' },
-      defaultFeaturedSBTs: [ethers.utils.getAddress('0x00000000000000000000000000000000000000bb')],
-      HIGHLIGHTED_QUESTION_IDS: ['q1', 'q2'],
-      BLOCKED_QUESTION_IDS: ['q3'],
-      HIGHLIGHTED_SURVEY_IDS: ['s1'],
-      BLOCKED_SURVEY_IDS: ['s2'],
-      ignored_SBTs_LIST: ['0x00000000000000000000000000000000000000cc'],
-      featured_SBTs_LIST: ['0x00000000000000000000000000000000000000dd'],
-      faucet: {
-        amountEth: '0.0002',
-        balanceThresholdEth: '0.001',
-      },
-      ai: {
-        models: {
-          fast: { provider: 'openai', model: 'gpt-4o' },
-          thinking: { provider: 'anthropic', model: 'claude-3-7-sonnet' },
-          transcription: { provider: 'openai', model: 'whisper-1' },
+    expect(payload).toEqual(
+      expect.objectContaining({
+        defaultTags: 'governance',
+        questionsGenPrompt: 'Ask governance questions',
+        defaultSbtTags: 'member',
+        defaultFilterState: { sort: 'recent' },
+        defaultFeaturedSBTs: [ethers.utils.getAddress('0x00000000000000000000000000000000000000bb')],
+        HIGHLIGHTED_QUESTION_IDS: ['q1', 'q2'],
+        BLOCKED_QUESTION_IDS: ['q3'],
+        HIGHLIGHTED_SURVEY_IDS: ['s1'],
+        BLOCKED_SURVEY_IDS: ['s2'],
+        ignored_SBTs_LIST: ['0x00000000000000000000000000000000000000cc'],
+        featured_SBTs_LIST: ['0x00000000000000000000000000000000000000dd'],
+        faucet: {
+          amountEth: '0.0002',
+          balanceThresholdEth: '0.001',
         },
-      },
-    }));
+        ai: {
+          models: {
+            fast: { provider: 'openai', model: 'gpt-4o' },
+            thinking: { provider: 'anthropic', model: 'claude-3-7-sonnet' },
+            transcription: { provider: 'openai', model: 'whisper-1' },
+          },
+        },
+      }),
+    );
     expect(payload).not.toHaveProperty('allowOrigins');
     expect(payload).not.toHaveProperty('rpcUrlsByChainId');
     expect(payload.ai.providers).toBeUndefined();

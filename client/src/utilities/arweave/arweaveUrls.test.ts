@@ -7,8 +7,8 @@ import {
   parseArweaveTxId,
 } from './arweaveUrls';
 
-jest.mock('./arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('./arweaveClient.js', () => ({
+  arweaveClient: {
     registerTxContext: jest.fn(),
   },
 }));
@@ -26,10 +26,18 @@ describe('arweaveUrls helpers', () => {
   const gatewayFanoutSecondary = 'https://g8way.io'; // intentional: real URL - verifies production gateway fanout
 
   afterEach(() => {
-    try { delete (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete (globalThis as Record<string, unknown>).CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
-    try { delete (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAYS; } catch (_) {}
+    try {
+      delete (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete (globalThis as Record<string, unknown>).CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
+    try {
+      delete (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAYS;
+    } catch (_) {}
   });
 
   it('detects base64url txIds', () => {
@@ -60,9 +68,7 @@ describe('arweaveUrls helpers', () => {
   });
 
   it('defaults to direct AR.IO-only gateway routing', () => {
-    expect(getDefaultArweaveGateways()).toEqual([
-      defaultArIoGateway,
-    ]);
+    expect(getDefaultArweaveGateways()).toEqual([defaultArIoGateway]);
   });
 
   it('keeps legacy gateway fanout available when direct-to-AR.IO mode is disabled', () => {
@@ -94,11 +100,12 @@ describe('arweaveUrls helpers', () => {
   it('builds gateway fallback candidates for tx ids and known gateway URLs', () => {
     (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     (globalThis as Record<string, unknown>).CE_ARWEAVE_AR_IO_URL = testArIoGateway;
-    (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAYS = ['https://backup.example.test', canonicalArweaveGateway];
+    (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAYS = [
+      'https://backup.example.test',
+      canonicalArweaveGateway,
+    ];
 
-    const candidates = buildArweaveGatewayUrlCandidates(
-      `${arIoSubdomainGateway}/${txId}?`
-    );
+    const candidates = buildArweaveGatewayUrlCandidates(`${arIoSubdomainGateway}/${txId}?`);
 
     expect(candidates).toEqual([
       `${testArIoGateway}/${txId}`,

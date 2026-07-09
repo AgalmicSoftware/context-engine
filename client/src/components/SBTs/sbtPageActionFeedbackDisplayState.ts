@@ -59,11 +59,7 @@ export const resolveSbtPageActionFeedbackDisplayDescriptor = ({
   labels: SbtPageActionFeedbackLabels;
   transactionState?: SbtPageActionsTransactionState;
 }): SbtPageActionFeedbackDisplayDescriptor => {
-  const {
-    lastBurnTxHash = '',
-    lastMintTxHash = '',
-    transactionHash = '',
-  } = transactionState;
+  const { lastBurnTxHash = '', lastMintTxHash = '', transactionHash = '' } = transactionState;
   const mintSuccess = {
     message: `${labels.sbtLabel} successfully ${labels.mintedLowerLabel}!`,
     show: actionFeedbackState.showMintSuccess,

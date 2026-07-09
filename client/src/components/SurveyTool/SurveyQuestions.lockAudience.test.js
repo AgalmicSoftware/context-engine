@@ -1,9 +1,6 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { renderSurveyQuestions } from './surveyQuestionsTestHarness';
-import {
-  buildLockAudienceButtonAction,
-  buildLockAudienceDisplayState,
-} from './surveyToolViewState';
+import { buildLockAudienceButtonAction, buildLockAudienceDisplayState } from './surveyToolViewState';
 import { getResponseGateOptions } from './surveyToolResponseGateController';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
@@ -15,36 +12,39 @@ const question = {
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 const responseGateAddress = '0x00000000000000000000000000000000000000aa';
 
-const renderStandaloneQuestion = () => renderSurveyQuestions({
-  singleQuestionMode: false,
-  isStandalone: true,
-  surveyIndex: 0,
-  account: '0xabc',
-  loginComplete: true,
-  network: { id: 84532 },
-  networkChainId: 84532,
-  questionPool: [question],
-  isQuestionCacheReady: true,
-});
+const renderStandaloneQuestion = () =>
+  renderSurveyQuestions({
+    singleQuestionMode: false,
+    isStandalone: true,
+    surveyIndex: 0,
+    account: '0xabc',
+    loginComplete: true,
+    network: { id: 84532 },
+    networkChainId: 84532,
+    questionPool: [question],
+    isQuestionCacheReady: true,
+  });
 
-const getAnswerLockIconName = () => (
-  screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK)
-    .querySelector('svg')
-    ?.getAttribute('data-icon')
-);
+const getAnswerLockIconName = () =>
+  screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK).querySelector('svg')?.getAttribute('data-icon');
 
-const normalizeQuestionIdKey = (value) => String(value || '').trim().toLowerCase();
+const normalizeQuestionIdKey = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
 const createResponseGateOptionDeps = () => ({
   normalizeQuestionIdKey,
   isQuestionLockedForResponse: () => false,
   getQuestionGateOptions: () => [],
   getResponseGatePolicy: () => ({
-    gates: [{
-      gateId: 'default_gate',
-      label: 'Registry default gate',
-      sbtAddresses: ['0x1111111111111111111111111111111111111111'],
-    }],
+    gates: [
+      {
+        gateId: 'default_gate',
+        label: 'Registry default gate',
+        sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+      },
+    ],
     recipients: [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'baseSepolia' }],
   }),
   buildRecipientsFromGates: () => [],
@@ -68,13 +68,15 @@ describe('SurveyQuestions lock audience controls', () => {
   });
 
   it('locks and opens the pile lock audience menu on first click when no default gate is configured', async () => {
-    expect(buildLockAudienceButtonAction({
-      effectiveFieldKey: 'answer',
-      fieldEncrypted: false,
-      hasAudienceMenu: true,
-      menuOpen: false,
-      hasGateOption: false,
-    })).toEqual({
+    expect(
+      buildLockAudienceButtonAction({
+        effectiveFieldKey: 'answer',
+        fieldEncrypted: false,
+        hasAudienceMenu: true,
+        menuOpen: false,
+        hasGateOption: false,
+      }),
+    ).toEqual({
       kind: 'enable-answer-and-open-menu',
     });
 
@@ -89,13 +91,15 @@ describe('SurveyQuestions lock audience controls', () => {
   });
 
   it('opens the pile lock audience menu without locking on first click when a gate option is available', () => {
-    expect(buildLockAudienceButtonAction({
-      effectiveFieldKey: 'answer',
-      fieldEncrypted: false,
-      hasAudienceMenu: true,
-      menuOpen: false,
-      hasGateOption: true,
-    })).toEqual({
+    expect(
+      buildLockAudienceButtonAction({
+        effectiveFieldKey: 'answer',
+        fieldEncrypted: false,
+        hasAudienceMenu: true,
+        menuOpen: false,
+        hasGateOption: true,
+      }),
+    ).toEqual({
       kind: 'set-menu-open',
       nextOpen: true,
     });
@@ -172,68 +176,77 @@ describe('SurveyQuestions lock audience controls', () => {
     const gateOptions = getResponseGateOptions('q1', createResponseGateOptionDeps());
 
     expect(gateOptions).toHaveLength(1);
-    expect(gateOptions[0]).toEqual(expect.objectContaining({
-      gateId: 'default_gate',
-      label: 'test-12',
-    }));
+    expect(gateOptions[0]).toEqual(
+      expect.objectContaining({
+        gateId: 'default_gate',
+        label: 'test-12',
+      }),
+    );
   });
 
   it('resolves direct-question response gates from the session registry cache', async () => {
-    window.localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
-      sessions: {
-        edge: {
-          slug: 'edge',
-          sessionName: 'Edge Session',
-          networkChainId: 11155420,
-          __registry: {
-            gateAuthority: 'onchain',
-            gatesByResource: {
-              questionResponses: {
-                lookupStatus: 'ok',
-                sbtAddresses: [responseGateAddress],
-                sbtAddress: responseGateAddress,
-                chainId: 11155420,
-                mode: 0,
+    window.localStorage.setItem(
+      REGISTRY_CACHE_KEY,
+      JSON.stringify({
+        sessions: {
+          edge: {
+            slug: 'edge',
+            sessionName: 'Edge Session',
+            networkChainId: 11155420,
+            __registry: {
+              gateAuthority: 'onchain',
+              gatesByResource: {
+                questionResponses: {
+                  lookupStatus: 'ok',
+                  sbtAddresses: [responseGateAddress],
+                  sbtAddress: responseGateAddress,
+                  chainId: 11155420,
+                  mode: 0,
+                },
               },
             },
-          },
-          encryption: {
-            defaultGateId: 'questionResponses',
-            primaryGateId: 'questionResponses',
-            gates: {
-              questionResponses: {
-                gateId: 'questionResponses',
-                resourceKey: 'questionResponses',
-                type: 'sbt',
-                label: 'questionResponses',
-                sbtAddresses: [responseGateAddress],
-                sbtAddress: responseGateAddress,
-                chainId: 11155420,
-                mode: 0,
+            encryption: {
+              defaultGateId: 'questionResponses',
+              primaryGateId: 'questionResponses',
+              gates: {
+                questionResponses: {
+                  gateId: 'questionResponses',
+                  resourceKey: 'questionResponses',
+                  type: 'sbt',
+                  label: 'questionResponses',
+                  sbtAddresses: [responseGateAddress],
+                  sbtAddress: responseGateAddress,
+                  chainId: 11155420,
+                  mode: 0,
+                },
               },
             },
           },
         },
-      },
-    }));
+      }),
+    );
 
-    renderSurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: true,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 11155420 },
-      networkChainId: 11155420,
-      questionPool: [question],
-      isQuestionCacheReady: true,
-    }, {
-      route: '/question/q1?session=edge',
-    });
+    renderSurveyQuestions(
+      {
+        singleQuestionMode: false,
+        isStandalone: true,
+        account: '0xabc',
+        loginComplete: true,
+        network: { id: 11155420 },
+        networkChainId: 11155420,
+        questionPool: [question],
+        isQuestionCacheReady: true,
+      },
+      {
+        route: '/question/q1?session=edge',
+      },
+    );
     await screen.findByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK);
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK));
 
-    expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE))
-      .toHaveTextContent('Registry questionResponses gate');
+    expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE)).toHaveTextContent(
+      'Registry questionResponses gate',
+    );
   });
 });

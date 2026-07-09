@@ -5,9 +5,7 @@ import SurveyQuestionsResponseRouteSection from './SurveyQuestionsResponseRouteS
 
 describe('SurveyQuestionsResponseRouteSection', () => {
   it('renders survey answers through parent-provided answer renderers', () => {
-    const renderSurveyAnswers = jest.fn(() => (
-      <div data-testid="survey-answers">Survey answers</div>
-    ));
+    const renderSurveyAnswers = jest.fn(() => <div data-testid="survey-answers">Survey answers</div>);
 
     render(
       <SurveyQuestionsResponseRouteSection
@@ -18,15 +16,12 @@ describe('SurveyQuestionsResponseRouteSection', () => {
           userAnswers: { responses: [{ questionID: 'q1', answer: 'Yes' }] },
         }}
         routeViewDisplayState={{ isOwnResponse: true }}
-      />
+      />,
     );
 
     expect(screen.getByTestId('survey-answers')).toBeInTheDocument();
     expect(screen.getByTestId('survey-answers').parentElement).toHaveClass('response-view');
-    expect(renderSurveyAnswers).toHaveBeenCalledWith(
-      [{ questionID: 'q1', answer: 'Yes' }],
-      true
-    );
+    expect(renderSurveyAnswers).toHaveBeenCalledWith([{ questionID: 'q1', answer: 'Yes' }], true);
   });
 
   it('renders viewed-address response metadata from route display state', () => {
@@ -43,12 +38,9 @@ describe('SurveyQuestionsResponseRouteSection', () => {
           viewedAddressLower: '0xabcdef',
           viewedAddressRaw: '0xABCDEF',
         }}
-      />
+      />,
     );
 
-    expect(screen.getByRole('link', { name: '0xabc...def' })).toHaveAttribute(
-      'href',
-      '/u/0xabcdef'
-    );
+    expect(screen.getByRole('link', { name: '0xabc...def' })).toHaveAttribute('href', '/u/0xabcdef');
   });
 });

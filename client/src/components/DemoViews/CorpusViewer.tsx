@@ -75,14 +75,16 @@ type CorpusViewerProps = {
   onAtlasIssueOpen?: AtlasIssueOpenHandler | null;
   showGithubLink?: boolean;
   externalLoadRequestNonce?: number;
-  onExternalLoadStateChange?: ((state: {
-    activeCorpusKey: string;
-    activeCorpusLabel: string;
-    loadStatus: CorpusLoadStatus;
-    loadButtonLabel: string;
-    disableLoadButton: boolean;
-    error: string;
-  }) => void) | null;
+  onExternalLoadStateChange?:
+    | ((state: {
+        activeCorpusKey: string;
+        activeCorpusLabel: string;
+        loadStatus: CorpusLoadStatus;
+        loadButtonLabel: string;
+        disableLoadButton: boolean;
+        error: string;
+      }) => void)
+    | null;
 };
 
 type EntryCardProps = {
@@ -162,7 +164,25 @@ const POLICY_ANCHOR_TO_ISO_A3 = Object.freeze<Record<string, string[]>>({
   brazil: ['BRA'],
   canada: ['CAN'],
   china: ['CHN'],
-  eu: ['FRA', 'DEU', 'ITA', 'POL', 'ESP', 'NLD', 'BEL', 'IRL', 'AUT', 'SWE', 'DNK', 'FIN', 'GRC', 'PRT', 'ROU', 'CZE', 'HUN'],
+  eu: [
+    'FRA',
+    'DEU',
+    'ITA',
+    'POL',
+    'ESP',
+    'NLD',
+    'BEL',
+    'IRL',
+    'AUT',
+    'SWE',
+    'DNK',
+    'FIN',
+    'GRC',
+    'PRT',
+    'ROU',
+    'CZE',
+    'HUN',
+  ],
   india: ['IND'],
   japan: ['JPN'],
   southKorea: ['KOR'],
@@ -175,11 +195,10 @@ const MOBILE_TWEET_PREVIEW_QUERY = '(max-width: 720px)';
 const demoCorpusesByKey = (corpusSample as { corpuses?: Record<string, any> }).corpuses || {};
 const getDemoCorpusRecords = buildDemoCorpusRecords as (demoCorpuses?: CorpusDefinition[]) => any[];
 
-const readIsMobileTweetPreview = () => (
-  typeof window !== 'undefined'
-  && typeof window.matchMedia === 'function'
-  && window.matchMedia(MOBILE_TWEET_PREVIEW_QUERY).matches
-);
+const readIsMobileTweetPreview = () =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia(MOBILE_TWEET_PREVIEW_QUERY).matches;
 
 const useIsMobileTweetPreview = () => {
   const [isMobileTweetPreview, setIsMobileTweetPreview] = useState(readIsMobileTweetPreview);
@@ -252,18 +271,21 @@ const getPolicyMapFill = (status = '', isFallback = false) => {
   }
 };
 
-const shouldUseHalfWidthGrid = (corpusKey = '') => (
-  corpusKey === 'tweets' || corpusKey === 'arxiv_ai_safety' || corpusKey === 'cross_corpus'
-);
+const shouldUseHalfWidthGrid = (corpusKey = '') =>
+  corpusKey === 'tweets' || corpusKey === 'arxiv_ai_safety' || corpusKey === 'cross_corpus';
 
-const normalizeEntryText = (value: unknown = '') => String(value || '').replace(/\s+/g, ' ').trim();
+const normalizeEntryText = (value: unknown = '') =>
+  String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-const toTitleCase = (value: unknown = '') => normalizeEntryText(value)
-  .toLowerCase()
-  .split(/\s+/)
-  .filter(Boolean)
-  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-  .join(' ');
+const toTitleCase = (value: unknown = '') =>
+  normalizeEntryText(value)
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 
 const normalizeSourceUrl = (value: unknown = '') => {
   if (typeof value === 'string') return normalizeEntryText(value);
@@ -304,9 +326,12 @@ const buildLoadedEntry = (entry: CorpusEntry = {}) => {
   const questionSummary = normalizeEntryText(entry?.question);
   const relevanceSummary = normalizeEntryText(entry?.relevance_to_ai_discourse);
   const summary = normalizeEntryText(entry?.summary) || questionSummary || relevanceSummary;
-  const tags = Array.isArray(entry?.tags) && entry.tags.length > 0
-    ? entry.tags
-    : (Array.isArray(entry?.themes) ? entry.themes.slice(0, 6) : []);
+  const tags =
+    Array.isArray(entry?.tags) && entry.tags.length > 0
+      ? entry.tags
+      : Array.isArray(entry?.themes)
+        ? entry.themes.slice(0, 6)
+        : [];
 
   return {
     ...entry,
@@ -327,16 +352,19 @@ const buildCrossCorpusDebateEntries = (payload: Record<string, any> = {}) => {
     const contestedPremises = Array.isArray(debate?.premise_extraction?.contested_premises)
       ? debate.premise_extraction.contested_premises
       : [];
-    const leadPremise = contestedPremises.find((premise: Record<string, any>) => normalizeEntryText(premise?.premise)) || null;
+    const leadPremise =
+      contestedPremises.find((premise: Record<string, any>) => normalizeEntryText(premise?.premise)) || null;
     const argumentNodes = flattenArgumentTreeNodes(debate?.argument_tree?.root);
-    const supportingNodes = argumentNodes.filter((node: Record<string, any>) => normalizeEntryText(node?.source?.title));
+    const supportingNodes = argumentNodes.filter((node: Record<string, any>) =>
+      normalizeEntryText(node?.source?.title),
+    );
     const featuredSource = supportingNodes[0]?.source || {};
     const corporaSynthesized = Array.from(
       new Set(
         supportingNodes
           .map((node: Record<string, any>) => formatCorpusDisplayName(node?.source?.corpus))
-          .filter(Boolean)
-      )
+          .filter(Boolean),
+      ),
     );
     const confirmedAgreements = Array.isArray(debate?.agreement_map?.confirmed_agreements)
       ? debate.agreement_map.confirmed_agreements
@@ -358,11 +386,7 @@ const buildCrossCorpusDebateEntries = (payload: Record<string, any> = {}) => {
       featured_source_corpus: formatCorpusDisplayName(featuredSource?.corpus),
       corpora_synthesized: corporaSynthesized.length > 0 ? corporaSynthesized : fallbackCorpora,
       confirmed_agreement_count: confirmedAgreements.length,
-      tags: [
-        'Cross-Corpus',
-        normalizedCategory,
-        ...corporaSynthesized.slice(0, 3),
-      ].filter(Boolean),
+      tags: ['Cross-Corpus', normalizedCategory, ...corporaSynthesized.slice(0, 3)].filter(Boolean),
     });
   });
 };
@@ -375,7 +399,7 @@ const truncateEntryText = (value: unknown = '', maxLength = 240) => {
 
 const buildEntryInsight = (entry: CorpusEntry = {}) => {
   const novelArguments = normalizeEntryText(
-    entry.novel_arguments_and_concepts || entry.novel_arguments_and_perspectives
+    entry.novel_arguments_and_concepts || entry.novel_arguments_and_perspectives,
   );
   if (novelArguments) {
     return {
@@ -410,11 +434,13 @@ const buildEntrySupportMeta = (entry: CorpusEntry = {}) => {
     const featuredSourceMeta = [
       normalizeEntryText(entry.featured_source_corpus),
       normalizeEntryText(entry.featured_source_author),
-    ].filter(Boolean).join(' • ');
+    ]
+      .filter(Boolean)
+      .join(' • ');
     lines.push(
       featuredSourceMeta
         ? `Featured source: ${featuredSourceTitle} (${featuredSourceMeta})`
-        : `Featured source: ${featuredSourceTitle}`
+        : `Featured source: ${featuredSourceTitle}`,
     );
   }
 
@@ -434,9 +460,10 @@ const formatAuthors = (entry: CorpusEntry = {}) => {
   return `${entry.authors[0]} +${entry.authors.length - 1}`;
 };
 
-const buildInsiderAuthorKey = (entry: CorpusEntry = {}) => (
-  String(entry.author || entry.title || entry.id || '').trim().toLowerCase()
-);
+const buildInsiderAuthorKey = (entry: CorpusEntry = {}) =>
+  String(entry.author || entry.title || entry.id || '')
+    .trim()
+    .toLowerCase();
 
 const diversifyInsiderEntries = (entries: CorpusEntry[] = []) => {
   const remainingEntries = Array.isArray(entries) ? [...entries] : [];
@@ -460,48 +487,40 @@ const diversifyInsiderEntries = (entries: CorpusEntry[] = []) => {
   return orderedEntries;
 };
 
-const buildCorpusDefinitions = (): CorpusDefinition[] => (
-  CORPUS_ORDER
-    .map((key) => {
-      const corpus = demoCorpusesByKey[key];
-      if (!corpus) return null;
-      const entries = Array.isArray(corpus.entries) ? corpus.entries as CorpusEntry[] : [];
-      const orderedEntries = key === 'dwarkesh_lab_insiders'
-        ? diversifyInsiderEntries(entries)
-        : entries;
+const buildCorpusDefinitions = (): CorpusDefinition[] =>
+  CORPUS_ORDER.map((key) => {
+    const corpus = demoCorpusesByKey[key];
+    if (!corpus) return null;
+    const entries = Array.isArray(corpus.entries) ? (corpus.entries as CorpusEntry[]) : [];
+    const orderedEntries = key === 'dwarkesh_lab_insiders' ? diversifyInsiderEntries(entries) : entries;
 
-      return {
-        ...corpus,
-        count_full: corpus.count_full,
-        entries: orderedEntries,
-        key,
-        tabLabel: TAB_LABELS[key] || corpus.label || key,
-      };
-    })
-    .filter((corpus): corpus is CorpusDefinition => Boolean(corpus))
-);
+    return {
+      ...corpus,
+      count_full: corpus.count_full,
+      entries: orderedEntries,
+      key,
+      tabLabel: TAB_LABELS[key] || corpus.label || key,
+    };
+  }).filter((corpus): corpus is CorpusDefinition => Boolean(corpus));
 
 const buildLoadedCorpusDefinition = (
   key = '',
   payload: any = {},
-  fallbackCorpus: CorpusDefinition
+  fallbackCorpus: CorpusDefinition,
 ): CorpusDefinition => {
-  const rawEntries = Array.isArray(payload)
-    ? payload
-    : (Array.isArray(payload?.entries) ? payload.entries : []);
-  const loadedEntries = key === 'cross_corpus' && Array.isArray(payload?.debates)
-    ? buildCrossCorpusDebateEntries(payload)
-    : rawEntries.map((entry: CorpusEntry) => buildLoadedEntry(entry));
-  const orderedEntries = key === 'dwarkesh_lab_insiders'
-    ? diversifyInsiderEntries(loadedEntries)
-    : loadedEntries;
+  const rawEntries = Array.isArray(payload) ? payload : Array.isArray(payload?.entries) ? payload.entries : [];
+  const loadedEntries =
+    key === 'cross_corpus' && Array.isArray(payload?.debates)
+      ? buildCrossCorpusDebateEntries(payload)
+      : rawEntries.map((entry: CorpusEntry) => buildLoadedEntry(entry));
+  const orderedEntries = key === 'dwarkesh_lab_insiders' ? diversifyInsiderEntries(loadedEntries) : loadedEntries;
   const countFull = getCorpusCount(
-    payload?.meta?.total_entries
-      || payload?.meta?.entry_count
-      || payload?.meta?.debate_count
-      || payload?.meta?.count_full
-      || loadedEntries.length
-      || fallbackCorpus?.count_full
+    payload?.meta?.total_entries ||
+      payload?.meta?.entry_count ||
+      payload?.meta?.debate_count ||
+      payload?.meta?.count_full ||
+      loadedEntries.length ||
+      fallbackCorpus?.count_full,
   );
 
   return {
@@ -554,11 +573,12 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }: EntryCard
   const policyStatusGroup = isPolicyCorpus ? getPolicyStatusGroup(entry) : null;
   const policyFlag = isPolicyCorpus ? getJurisdictionFlag(entry.jurisdiction) : null;
   const policyStatusLabel = isPolicyCorpus ? getPolicyStatusLabel(entry) : null;
-  const policyStatusBadgeClassName = policyStatusGroup === POLICY_FILTERS.proposed
-    ? policyStyles.statusProposed
-    : policyStatusGroup === POLICY_FILTERS.inactive
-      ? policyStyles.statusInactive
-      : policyStyles.statusLive;
+  const policyStatusBadgeClassName =
+    policyStatusGroup === POLICY_FILTERS.proposed
+      ? policyStyles.statusProposed
+      : policyStatusGroup === POLICY_FILTERS.inactive
+        ? policyStyles.statusInactive
+        : policyStyles.statusLive;
   const sourceLabel = isMetrCorpus ? 'Open full report' : 'View source';
   const cardClassName = `${styles.card} ${
     isPolicyCorpus ? policyStyles.policyCard : isMetrCorpus ? styles.metrCard : ''
@@ -573,32 +593,20 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }: EntryCard
               <span className={policyStyles.jurisdictionFlag} aria-hidden="true">
                 {policyFlag}
               </span>
-              <div className={styles.entryTitle}>
-                {entry.title || entry.id || 'Untitled entry'}
-              </div>
+              <div className={styles.entryTitle}>{entry.title || entry.id || 'Untitled entry'}</div>
             </div>
           ) : (
-            <div className={styles.entryTitle}>
-              {entry.title || entry.id || 'Untitled entry'}
-            </div>
+            <div className={styles.entryTitle}>{entry.title || entry.id || 'Untitled entry'}</div>
           )}
-          {meta.length > 0 && (
-            <div className={styles.entryMeta}>
-              {meta.join(' • ')}
-            </div>
-          )}
+          {meta.length > 0 && <div className={styles.entryMeta}>{meta.join(' • ')}</div>}
         </div>
         {isPolicyCorpus ? (
           <div className={policyStyles.policyBadgeRow}>
-            <span
-              className={`${policyStyles.statusBadge} ${policyStatusBadgeClassName}`.trim()}
-            >
+            <span className={`${policyStyles.statusBadge} ${policyStatusBadgeClassName}`.trim()}>
               {policyStatusLabel}
             </span>
             {entry.jurisdiction ? (
-              <span className={`${styles.pill} ${styles.jurisdictionBadge}`}>
-                {entry.jurisdiction}
-              </span>
+              <span className={`${styles.pill} ${styles.jurisdictionBadge}`}>{entry.jurisdiction}</span>
             ) : null}
           </div>
         ) : null}
@@ -607,12 +615,7 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }: EntryCard
       {entry?.image_url ? (
         <div className={styles.entryMediaBlock}>
           {entry?.url ? (
-            <a
-              href={entry.url}
-              rel="noopener noreferrer"
-              target="_blank"
-              className={styles.entryMediaLink}
-            >
+            <a href={entry.url} rel="noopener noreferrer" target="_blank" className={styles.entryMediaLink}>
               <img
                 src={entry.image_url}
                 alt={entry.title || 'Explorer preview'}
@@ -633,11 +636,7 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }: EntryCard
         </div>
       ) : null}
 
-      <div
-        className={`${styles.entrySummary} ${styles.clamp3}`}
-      >
-        {summaryText}
-      </div>
+      <div className={`${styles.entrySummary} ${styles.clamp3}`}>{summaryText}</div>
 
       {entryInsight ? (
         <div className={styles.entryInsightBlock}>
@@ -694,14 +693,11 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }: EntryCard
 
 const EmptyCorpusState = ({ corpus, title, text }: EmptyCorpusStateProps) => (
   <div className={styles.emptyState}>
-    <div className={styles.emptyStateIcon}>
-      {renderCorpusIcon(corpus.icon)}
-    </div>
-    <div className={styles.emptyStateTitle}>
-      {title || corpus.label}
-    </div>
+    <div className={styles.emptyStateIcon}>{renderCorpusIcon(corpus.icon)}</div>
+    <div className={styles.emptyStateTitle}>{title || corpus.label}</div>
     <div className={styles.emptyStateText}>
-      {text || 'No demo entries are loaded for this tab yet. The tab is wired and ready for cross-corpus debate material.'}
+      {text ||
+        'No demo entries are loaded for this tab yet. The tab is wired and ready for cross-corpus debate material.'}
     </div>
   </div>
 );
@@ -716,10 +712,7 @@ const CorpusViewer = ({
   const [corpusLoadStatusByKey, setCorpusLoadStatusByKey] = useState<Record<string, CorpusLoadStatus>>({});
   const [corpusLoadErrorByKey, setCorpusLoadErrorByKey] = useState<Record<string, string>>({});
   // Intentionally cross-corpus: tag explorer shows every record with the clicked tag across all demo corpuses, ignoring any per-tab (e.g. PolicyGlobe) filter.
-  const demoCorpusRecords = useMemo(
-    () => getDemoCorpusRecords(corpusDefinitions),
-    [corpusDefinitions]
-  );
+  const demoCorpusRecords = useMemo(() => getDemoCorpusRecords(corpusDefinitions), [corpusDefinitions]);
 
   const [activeCorpusKey, setActiveCorpusKey] = useState(corpusDefinitions[0]?.key || 'cross_corpus');
   const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -728,22 +721,21 @@ const CorpusViewer = ({
   const handledExternalLoadRequestNonceRef = React.useRef(externalLoadRequestNonce);
 
   const activeCorpus = corpusDefinitions.find((corpus) => corpus.key === activeCorpusKey) || corpusDefinitions[0];
-  const activeCorpusLoadStatus = activeCorpus ? (corpusLoadStatusByKey[activeCorpus.key] || 'idle') : 'idle';
+  const activeCorpusLoadStatus = activeCorpus ? corpusLoadStatusByKey[activeCorpus.key] || 'idle' : 'idle';
   const activeCorpusLoadError = activeCorpus ? corpusLoadErrorByKey[activeCorpus.key] || '' : '';
   const activeCorpusTotalCount = getCorpusCount(activeCorpus?.count_full) || activeCorpus?.entries.length || 0;
   const activeCorpusCountLabel = activeCorpus
     ? `${activeCorpus.entries.length.toLocaleString()} of ${activeCorpusTotalCount.toLocaleString()} entries`
     : '';
-  const loadFullCorpusLabel = activeCorpusLoadStatus === 'loading'
-    ? 'Loading full corpus…'
-    : activeCorpusLoadStatus === 'loaded'
-      ? 'Full corpus loaded'
-      : activeCorpusLoadStatus === 'error'
-        ? 'Retry full corpus'
-        : 'Load full corpus';
-  const disableLoadFullCorpusButton = (
-    activeCorpusLoadStatus === 'loading' || activeCorpusLoadStatus === 'loaded'
-  );
+  const loadFullCorpusLabel =
+    activeCorpusLoadStatus === 'loading'
+      ? 'Loading full corpus…'
+      : activeCorpusLoadStatus === 'loaded'
+        ? 'Full corpus loaded'
+        : activeCorpusLoadStatus === 'error'
+          ? 'Retry full corpus'
+          : 'Load full corpus';
+  const disableLoadFullCorpusButton = activeCorpusLoadStatus === 'loading' || activeCorpusLoadStatus === 'loaded';
 
   useEffect(() => {
     setMobileTweetsExpanded(false);
@@ -770,11 +762,11 @@ const CorpusViewer = ({
       }
 
       const payload = await response.json();
-      setCorpusDefinitions((previous) => previous.map((corpus) => (
-        corpus.key === activeCorpus.key
-          ? buildLoadedCorpusDefinition(activeCorpus.key, payload, corpus)
-          : corpus
-      )));
+      setCorpusDefinitions((previous) =>
+        previous.map((corpus) =>
+          corpus.key === activeCorpus.key ? buildLoadedCorpusDefinition(activeCorpus.key, payload, corpus) : corpus,
+        ),
+      );
       setCorpusLoadStatusByKey((previous) => ({
         ...previous,
         [activeCorpus.key]: 'loaded',
@@ -821,15 +813,30 @@ const CorpusViewer = ({
 
   if (!activeCorpus) return null;
 
-  const renderEntries = (entries: CorpusEntry[]) => (
+  const renderEntries = (entries: CorpusEntry[]) =>
     entries.filter(Boolean).map((entry, index) => {
       const key = entry.id || entry.url || `${activeCorpus.key}-${index}`;
       return activeCorpus.key === 'tweets' ? (
-        <TweetCard key={key} entry={entry as any} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen || undefined} />
+        <TweetCard
+          key={key}
+          entry={entry as any}
+          onTagClick={setActiveTag}
+          onAtlasIssueOpen={onAtlasIssueOpen || undefined}
+        />
       ) : activeCorpus.key === 'arxiv_ai_safety' ? (
-        <ArxivCard key={key} entry={entry as any} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen || undefined} />
+        <ArxivCard
+          key={key}
+          entry={entry as any}
+          onTagClick={setActiveTag}
+          onAtlasIssueOpen={onAtlasIssueOpen || undefined}
+        />
       ) : activeCorpus.key === 'dwarkesh_lab_insiders' ? (
-        <InsiderCard key={key} entry={entry as any} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen || undefined} />
+        <InsiderCard
+          key={key}
+          entry={entry as any}
+          onTagClick={setActiveTag}
+          onAtlasIssueOpen={onAtlasIssueOpen || undefined}
+        />
       ) : (
         <EntryCard
           key={key}
@@ -839,13 +846,9 @@ const CorpusViewer = ({
           onAtlasIssueOpen={onAtlasIssueOpen}
         />
       );
-    })
-  );
+    });
 
-  const renderEntriesCollection = (
-    entries: CorpusEntry[],
-    { id, testId }: { id?: string; testId?: string } = {}
-  ) => (
+  const renderEntriesCollection = (entries: CorpusEntry[], { id, testId }: { id?: string; testId?: string } = {}) => (
     <div
       id={id}
       data-testid={testId}
@@ -857,13 +860,11 @@ const CorpusViewer = ({
 
   const renderTweetEntriesCollection = () => {
     const tweetEntries = activeCorpus.entries.filter(Boolean);
-    const shouldShowMobilePreview = (
-      isMobileTweetPreview
-      && tweetEntries.length > MOBILE_TWEET_PREVIEW_LIMIT
-    );
-    const visibleEntries = shouldShowMobilePreview && !mobileTweetsExpanded
-      ? tweetEntries.slice(0, MOBILE_TWEET_PREVIEW_LIMIT)
-      : tweetEntries;
+    const shouldShowMobilePreview = isMobileTweetPreview && tweetEntries.length > MOBILE_TWEET_PREVIEW_LIMIT;
+    const visibleEntries =
+      shouldShowMobilePreview && !mobileTweetsExpanded
+        ? tweetEntries.slice(0, MOBILE_TWEET_PREVIEW_LIMIT)
+        : tweetEntries;
     const tweetCountLabel = mobileTweetsExpanded
       ? `Showing all ${tweetEntries.length} tweets`
       : `${Math.min(MOBILE_TWEET_PREVIEW_LIMIT, tweetEntries.length)} of ${tweetEntries.length} tweets shown`;
@@ -912,9 +913,7 @@ const CorpusViewer = ({
               <span className={`${styles.tabIcon} ${isActive ? styles.tabIconActive : ''}`.trim()}>
                 {renderCorpusIcon(corpus.icon)}
               </span>
-              <span className={styles.tabLabel}>
-                {corpus.tabLabel}
-              </span>
+              <span className={styles.tabLabel}>{corpus.tabLabel}</span>
             </button>
           );
         })}
@@ -995,7 +994,9 @@ const CorpusViewer = ({
                         <div className={styles.policyMapLens}>
                           <WorldResultsMap
                             data={mapData}
-                            colorScale={(regionStatus) => getPolicyMapFill(String(regionStatus || globalStatus), !regionStatus)}
+                            colorScale={(regionStatus) =>
+                              getPolicyMapFill(String(regionStatus || globalStatus), !regionStatus)
+                            }
                             compact
                           />
                         </div>

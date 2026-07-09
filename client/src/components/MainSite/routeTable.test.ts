@@ -1,7 +1,4 @@
-import {
-  MAIN_SITE_ROUTE_DEFINITIONS,
-  resolveMainSiteRouteMatch,
-} from './routeTable.js';
+import { MAIN_SITE_ROUTE_DEFINITIONS, resolveMainSiteRouteMatch } from './routeTable.js';
 
 const ADDRESS = '0x00000000000000000000000000000000000000f1';
 const SURVEY_ID = `0x${'a'.repeat(64)}`;
@@ -52,7 +49,7 @@ describe('MainSite route table', () => {
       expect.objectContaining({
         key,
         ...expected,
-      })
+      }),
     );
   });
 
@@ -61,25 +58,25 @@ describe('MainSite route table', () => {
       expect.objectContaining({
         key: 'wizard',
         canonicalPath: '/session/new',
-      })
+      }),
     );
     expect(resolveMainSiteRouteMatch({ fullPath: '/session/new', isAddress })).toEqual(
       expect.objectContaining({
         key: 'wizard',
         canonicalPath: undefined,
-      })
+      }),
     );
     expect(resolveMainSiteRouteMatch({ fullPath: '/groups/edge', isAddress })).toEqual(
       expect.objectContaining({
         key: 'sbtsList',
         sbtAddress: null,
-      })
+      }),
     );
     expect(resolveMainSiteRouteMatch({ fullPath: `/group/${ADDRESS}`, isAddress })).toEqual(
       expect.objectContaining({
         key: 'sbtDetail',
         sbtAddress: ADDRESS,
-      })
+      }),
     );
   });
 
@@ -89,13 +86,13 @@ describe('MainSite route table', () => {
       expect.objectContaining({
         key: 'sbtDetail',
         sbtAddress: ADDRESS,
-      })
+      }),
     );
     expect(resolveMainSiteRouteMatch({ fullPath: `//group/${ADDRESS}`, isAddress })).toEqual(
       expect.objectContaining({
         key: 'sbtDetail',
         sbtAddress: ADDRESS,
-      })
+      }),
     );
   });
 
@@ -104,14 +101,14 @@ describe('MainSite route table', () => {
       expect.objectContaining({
         isKnownRoutePrefix: true,
         shouldBypassCacheHydrationWait: true,
-      })
+      }),
     );
     expect(resolveMainSiteRouteMatch({ fullPath: '/not-a-route', isAddress })).toEqual(
       expect.objectContaining({
         key: 'notFound',
         isKnownRoutePrefix: false,
         shouldBypassCacheHydrationWait: false,
-      })
+      }),
     );
   });
 });

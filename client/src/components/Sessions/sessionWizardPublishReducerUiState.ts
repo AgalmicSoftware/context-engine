@@ -5,10 +5,9 @@ import {
   type SessionWizardPublishUiPlanInput,
 } from './sessionWizardPublishReadiness';
 
-export type SessionWizardPublishStepNumbers = Partial<Record<
-  'deploy-worker' | 'deploy-sbts' | 'upload-metadata' | 'register-session' | 'done',
-  number
->>;
+export type SessionWizardPublishStepNumbers = Partial<
+  Record<'deploy-worker' | 'deploy-sbts' | 'upload-metadata' | 'register-session' | 'done', number>
+>;
 
 export type SessionWizardPublishReducerUiState = {
   publishBusy: boolean;
@@ -32,7 +31,7 @@ const BUSY_STATUSES = new Set<SessionPublishState['status']>([
 
 const getStepNumber = (
   stepNumbers: SessionWizardPublishStepNumbers,
-  stepKey: keyof SessionWizardPublishStepNumbers
+  stepKey: keyof SessionWizardPublishStepNumbers,
 ): number => Math.max(0, Number(stepNumbers[stepKey] || 0));
 
 export const resolveSessionWizardPublishReducerUiState = ({

@@ -1,5 +1,5 @@
 /* @file AdminPage.module.scss */
-@use "scss/variables" as tokens;
+@use 'scss/variables' as tokens;
 
 $admin-bg: tokens.$ce-panel-bg;
 $admin-text: tokens.$ce-panel-text;
@@ -250,7 +250,10 @@ $card-shadow: tokens.$ce-card-shadow;
   color: $admin-text;
   text-decoration: none;
   flex: 0 0 auto;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .heroStatExternalLink:hover,
@@ -271,7 +274,10 @@ $card-shadow: tokens.$ce-card-shadow;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
   color: $admin-text;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .heroCardIconButton:hover:not(:disabled),
@@ -364,7 +370,9 @@ $card-shadow: tokens.$ce-card-shadow;
   border-radius: 16px;
   border: 1px solid rgba(77, 255, 164, 0.26);
   // background: rgba(13, 16, 40, 0.72);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .heroCardInputShell:focus-within {
@@ -410,7 +418,10 @@ $card-shadow: tokens.$ce-card-shadow;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .heroCardInputActionButton:hover,
@@ -576,20 +587,20 @@ $card-shadow: tokens.$ce-card-shadow;
 }
 
 .collapseToggle:global(.btn) {
-    opacity: 0.5;
-    display: inline-flex;
-    font-size: 3em;
-    align-items: center;
-    justify-content: center;
-    width: 38px;
-    min-width: 38px;
-    height: 38px;
-    padding: 0;
-    border: 0px solid rgba(255, 255, 255, 0.14);
-    /* border-radius: 12px; */
-    /* background: rgba(255, 255, 255, 0.04); */
-    color: rgba(255, 255, 255, 0.76);
-    box-shadow: none;
+  opacity: 0.5;
+  display: inline-flex;
+  font-size: 3em;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0px solid rgba(255, 255, 255, 0.14);
+  /* border-radius: 12px; */
+  /* background: rgba(255, 255, 255, 0.04); */
+  color: rgba(255, 255, 255, 0.76);
+  box-shadow: none;
 }
 
 .collapseToggle:global(.btn:hover:not(:disabled)),
@@ -700,7 +711,10 @@ $card-shadow: tokens.$ce-card-shadow;
   text-transform: uppercase;
   cursor: pointer;
   white-space: nowrap;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .copyButton:hover {
@@ -996,7 +1010,10 @@ $card-shadow: tokens.$ce-card-shadow;
 
 .statusItemClickable {
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.15s ease;
 }
 
 .statusItemClickable:hover,
@@ -1052,7 +1069,10 @@ $card-shadow: tokens.$ce-card-shadow;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: $admin-deep;
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.15s ease;
 }
 
 .activeOption {
@@ -1128,7 +1148,10 @@ $card-shadow: tokens.$ce-card-shadow;
   background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.78);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .secretRemoveButton:hover,

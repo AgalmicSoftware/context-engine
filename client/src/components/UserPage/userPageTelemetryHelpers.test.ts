@@ -20,24 +20,26 @@ describe('userPageTelemetryHelpers', () => {
   });
 
   it('builds derive telemetry snapshots without changing missing-section defaults', () => {
-    expect(buildUserPageDeriveTelemetrySnapshot({
-      aggregate: {
-        combinedQuestions: { q1: {} },
-        combinedQuestionResponses: { q1: {}, q2: {} },
-        combinedSurveys: { s1: {}, s2: {} },
-        combinedSurveyResponses: { s1: {} },
-        sbtAggregate: { badge1: {}, badge2: {}, badge3: {} },
-      },
-      questionSection: {
-        questionCreationInfo: [{ id: 'q1' }, { id: 'q2' }],
-        questionResponseInfo: [{ id: 'q1' }],
-      },
-      sbtSection: { sbtList: [{}, {}] },
-      surveySection: {
-        surveyCreationInfo: [{ id: 's1' }],
-        surveyResponseInfo: [{ id: 's1' }, { id: 's2' }],
-      },
-    })).toEqual({
+    expect(
+      buildUserPageDeriveTelemetrySnapshot({
+        aggregate: {
+          combinedQuestions: { q1: {} },
+          combinedQuestionResponses: { q1: {}, q2: {} },
+          combinedSurveys: { s1: {}, s2: {} },
+          combinedSurveyResponses: { s1: {} },
+          sbtAggregate: { badge1: {}, badge2: {}, badge3: {} },
+        },
+        questionSection: {
+          questionCreationInfo: [{ id: 'q1' }, { id: 'q2' }],
+          questionResponseInfo: [{ id: 'q1' }],
+        },
+        sbtSection: { sbtList: [{}, {}] },
+        surveySection: {
+          surveyCreationInfo: [{ id: 's1' }],
+          surveyResponseInfo: [{ id: 's1' }, { id: 's2' }],
+        },
+      }),
+    ).toEqual({
       aggregateBuilt: true,
       combinedSurveys: 2,
       combinedQuestions: 1,
@@ -62,35 +64,41 @@ describe('userPageTelemetryHelpers', () => {
   });
 
   it('builds no-SBT visible telemetry only after SBT loading completes', () => {
-    expect(buildUserPageNoSbtVisibleTelemetryState({
-      isSBTReady: false,
-      sbtList: [],
-    })).toEqual({
+    expect(
+      buildUserPageNoSbtVisibleTelemetryState({
+        isSBTReady: false,
+        sbtList: [],
+      }),
+    ).toEqual({
       payload: null,
       shouldEmit: false,
       signature: '',
     });
-    expect(buildUserPageNoSbtVisibleTelemetryState({
-      isSBTReady: true,
-      sbtList: [{ sbtAddress: '0x1' }],
-    }).shouldEmit).toBe(false);
+    expect(
+      buildUserPageNoSbtVisibleTelemetryState({
+        isSBTReady: true,
+        sbtList: [{ sbtAddress: '0x1' }],
+      }).shouldEmit,
+    ).toBe(false);
 
-    expect(buildUserPageNoSbtVisibleTelemetryState({
-      hasUncertainGateAccess: true,
-      hasUncertainSbtData: true,
-      hasUncertainUserData: true,
-      isDeepScanning: false,
-      isSBTReady: true,
-      latestRefreshTelemetry: {
-        aggregateSbtAddresses: 2,
-        derivedSbtCount: null,
-        heldAggregateSbtCount: 0,
-      },
-      loadingSBTs: false,
-      networkID: 84532,
-      sbtList: [],
-      viewAddress: '0x00000000000000000000000000000000000000AA',
-    })).toEqual({
+    expect(
+      buildUserPageNoSbtVisibleTelemetryState({
+        hasUncertainGateAccess: true,
+        hasUncertainSbtData: true,
+        hasUncertainUserData: true,
+        isDeepScanning: false,
+        isSBTReady: true,
+        latestRefreshTelemetry: {
+          aggregateSbtAddresses: 2,
+          derivedSbtCount: null,
+          heldAggregateSbtCount: 0,
+        },
+        loadingSBTs: false,
+        networkID: 84532,
+        sbtList: [],
+        viewAddress: '0x00000000000000000000000000000000000000AA',
+      }),
+    ).toEqual({
       payload: {
         viewAddress: '0x00000000000000000000000000000000000000aa',
         networkID: '84532',
@@ -180,7 +188,7 @@ describe('userPageTelemetryHelpers', () => {
       deepScanTooltipLines: ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'],
     });
     expect(buildUserPageRefreshTelemetrySignature(refreshTelemetry)).toBe(
-      `${telemetryAddress}|84532|1|1|1|0|1|3|1|2|1|1|2|2|one|two|three|four|five|six|seven|eight`
+      `${telemetryAddress}|84532|1|1|1|0|1|3|1|2|1|1|2|2|one|two|three|four|five|six|seven|eight`,
     );
   });
 });

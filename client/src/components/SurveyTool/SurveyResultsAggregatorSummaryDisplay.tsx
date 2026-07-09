@@ -25,10 +25,7 @@ export const buildSurveyResultsFreeformSummaryLabel = ({
   blankCount = 0,
   encryptedCount = 0,
   totalResponses = 0,
-}: Pick<
-  FreeformAggregatorSummaryModel,
-  'blankCount' | 'encryptedCount' | 'totalResponses'
->): string => {
+}: Pick<FreeformAggregatorSummaryModel, 'blankCount' | 'encryptedCount' | 'totalResponses'>): string => {
   const parts = [`${Number(totalResponses || 0)} total responses.`];
   if (Number(encryptedCount || 0) > 0) {
     parts.push(`${Number(encryptedCount || 0)} encrypted responses not shown.`);
@@ -46,20 +43,13 @@ type SurveyResultsFreeformSummaryDisplayProps = {
 export const SurveyResultsFreeformSummaryDisplay = ({
   summary,
 }: SurveyResultsFreeformSummaryDisplayProps): React.ReactElement => {
-  const displayedResponses = Array.isArray(summary.displayedResponses)
-    ? summary.displayedResponses
-    : [];
+  const displayedResponses = Array.isArray(summary.displayedResponses) ? summary.displayedResponses : [];
 
   return (
     <div className={aggregatorPanelClassName}>
-      <p className={styles.surveyResultsAggregatorParagraph}>
-        {buildSurveyResultsFreeformSummaryLabel(summary)}
-      </p>
+      <p className={styles.surveyResultsAggregatorParagraph}>{buildSurveyResultsFreeformSummaryLabel(summary)}</p>
       {displayedResponses.map((item, index) => (
-        <div
-          key={`freeform-${item.responder || ''}-${index}`}
-          className={styles.surveyResultsFreeformAnswer}
-        >
+        <div key={`freeform-${item.responder || ''}-${index}`} className={styles.surveyResultsFreeformAnswer}>
           {typeof item.value === 'string' ? item.value : JSON.stringify(item.value)}
           {item.additional && (
             <div className={styles.surveyResultsFreeformAdditionalComment}>
@@ -90,10 +80,7 @@ export const SurveyResultsMultichoiceDistributionDisplay = ({
       {options.map((option) => {
         const percent = ((option.count / totalResponders) * 100).toFixed(2);
         return (
-          <div
-            key={option.key}
-            className={multichoiceOptionClassName}
-          >
+          <div key={option.key} className={multichoiceOptionClassName}>
             <span className={styles.surveyResultsMultichoiceOptionLabel}>{option.label}</span>
             <span className={styles.surveyResultsMultichoiceOptionStats}>
               {option.count} ({percent}%)

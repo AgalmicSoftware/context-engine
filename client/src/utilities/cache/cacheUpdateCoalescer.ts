@@ -5,10 +5,7 @@
  *
  * Key exports: createCacheUpdateCoalescer
  */
-export const createCacheUpdateCoalescer = (
-  flush?: (() => void) | null,
-  options: { delayMs?: number } = {}
-) => {
+export const createCacheUpdateCoalescer = (flush?: (() => void) | null, options: { delayMs?: number } = {}) => {
   const delayMs = Number(options.delayMs);
   const fallbackDelayMs = Number.isFinite(delayMs) && delayMs > 0 ? delayMs : 16;
 

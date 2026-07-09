@@ -92,12 +92,7 @@ const SessionHeaderField = ({
     <>
       <div className={styles.inlineToggleRow}>
         <Label className={styles.workerRadio}>
-          <Input
-            type="radio"
-            name="sessionHeaderMode"
-            checked={sessionHeaderMode === 'url'}
-            onChange={onUseUrlMode}
-          />
+          <Input type="radio" name="sessionHeaderMode" checked={sessionHeaderMode === 'url'} onChange={onUseUrlMode} />
           Use URL
         </Label>
         <Label className={styles.workerRadio}>
@@ -118,11 +113,7 @@ const SessionHeaderField = ({
           data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
         />
       ) : (
-        <Input
-          type="file"
-          accept="image/*"
-          onChange={onAdvancedFileChange}
-        />
+        <Input type="file" accept="image/*" onChange={onAdvancedFileChange} />
       )}
       {previewSrc ? (
         <div className={styles.sessionHeaderPreviewSurface}>

@@ -1,7 +1,4 @@
-import {
-  resolveSponsoredGateStateForResource,
-  SPONSORED_GATE_STATES,
-} from '../../utilities/web3/sponsoredAccess.js';
+import { resolveSponsoredGateStateForResource, SPONSORED_GATE_STATES } from '../../utilities/web3/sponsoredAccess.js';
 
 type UnknownRecord = Record<string, unknown>;
 type QuestionSelectionInput = {
@@ -21,7 +18,7 @@ type CreateSurveyQuestionIdGenerator = (
   type: unknown,
   prompt: unknown,
   options: unknown,
-  singleSelect: unknown
+  singleSelect: unknown,
 ) => unknown;
 type BuildCreateSurveyQuestionOptionListArgs = {
   generateQuestionId?: CreateSurveyQuestionIdGenerator;
@@ -153,9 +150,10 @@ type CreateSurveySurveySubmitSuccessBasePatch = {
 };
 type CreateSurveySurveySubmitSuccessPatch =
   | CreateSurveySurveySubmitSuccessBasePatch
-  | (CreateSurveySurveySubmitSuccessBasePatch & CreateSurveySubmitSuccessResetPatch & {
-    uploadedQuestions: CreateSurveyUploadedQuestionPatchEntry[];
-  });
+  | (CreateSurveySurveySubmitSuccessBasePatch &
+      CreateSurveySubmitSuccessResetPatch & {
+        uploadedQuestions: CreateSurveyUploadedQuestionPatchEntry[];
+      });
 
 type LitRecipientInput = {
   accessControlConditions?: unknown;
@@ -201,17 +199,13 @@ const AUTHORING_GATE_RESOURCE_LABELS: Record<string, string> = Object.freeze({
   surveyResponses: 'survey',
 });
 
-const isPlainRecord = (value: unknown): value is UnknownRecord => (
-  !!value &&
-  typeof value === 'object' &&
-  !Array.isArray(value)
-);
+const isPlainRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const normalizeCreateSurveyUploadedQuestions = (
-  uploadedQuestions: unknown
-): CreateSurveyUploadedQuestionPatchEntry[] => (
-  Array.isArray(uploadedQuestions) ? uploadedQuestions as CreateSurveyUploadedQuestionPatchEntry[] : []
-);
+  uploadedQuestions: unknown,
+): CreateSurveyUploadedQuestionPatchEntry[] =>
+  Array.isArray(uploadedQuestions) ? (uploadedQuestions as CreateSurveyUploadedQuestionPatchEntry[]) : [];
 
 const toOptionText = (value: unknown): string => {
   if (typeof value === 'string') return value;
@@ -219,27 +213,19 @@ const toOptionText = (value: unknown): string => {
   return String(value);
 };
 
-export const isMultichoiceQuestionType = (questionType: unknown): boolean => (
-  String(questionType || '') === 'multichoice'
-);
+export const isMultichoiceQuestionType = (questionType: unknown): boolean =>
+  String(questionType || '') === 'multichoice';
 
-export const resolveQuestionSingleSelect = (question: QuestionSelectionInput = {}): boolean => (
-  !!(question.singleSelect || question.oneSelectionOnly)
-);
+export const resolveQuestionSingleSelect = (question: QuestionSelectionInput = {}): boolean =>
+  !!(question.singleSelect || question.oneSelectionOnly);
 
-export const normalizeAuthoringQuestionOptions = (
-  questionType: unknown,
-  options: unknown
-): string[] | undefined => {
+export const normalizeAuthoringQuestionOptions = (questionType: unknown, options: unknown): string[] | undefined => {
   if (!isMultichoiceQuestionType(questionType)) return undefined;
   if (!Array.isArray(options)) return [];
   return options.map(toOptionText);
 };
 
-export const normalizePayloadQuestionOptions = (
-  questionType: unknown,
-  options: unknown
-): string[] | undefined => {
+export const normalizePayloadQuestionOptions = (questionType: unknown, options: unknown): string[] | undefined => {
   if (!isMultichoiceQuestionType(questionType)) return undefined;
   if (!Array.isArray(options)) return undefined;
   const normalizedOptions: string[] = [];
@@ -264,12 +250,8 @@ export const findDuplicateQuestionOptionLabel = (options: unknown = []): string 
   return '';
 };
 
-export const resolvePayloadSingleSelect = (
-  questionType: unknown,
-  singleSelect: unknown
-): boolean | undefined => (
-  isMultichoiceQuestionType(questionType) ? !!singleSelect : undefined
-);
+export const resolvePayloadSingleSelect = (questionType: unknown, singleSelect: unknown): boolean | undefined =>
+  isMultichoiceQuestionType(questionType) ? !!singleSelect : undefined;
 
 export const buildCreateSurveyQuestionOptionList = ({
   generateQuestionId = () => '',
@@ -303,7 +285,7 @@ export const buildCreateSurveyQuestionOptionList = ({
     questionToUpdate.type,
     questionToUpdate.prompt,
     questionToUpdate.options,
-    questionToUpdate.singleSelect
+    questionToUpdate.singleSelect,
   );
   updatedQuestions[qIndex] = questionToUpdate;
   return updatedQuestions;
@@ -328,7 +310,7 @@ export const buildCreateSurveyQuestionFieldUpdateList = ({
       questionToUpdate.type,
       questionToUpdate.prompt,
       questionToUpdate.options || [],
-      questionToUpdate.singleSelect
+      questionToUpdate.singleSelect,
     );
   }
   updatedQuestions[qIndex] = questionToUpdate;
@@ -405,9 +387,7 @@ export const buildCreateSurveyStandaloneToggleState = (prevState: unknown = {}) 
   };
 };
 
-export const removeDuplicateCreateSurveyQuestions = (
-  questions: Iterable<unknown> = [],
-) => {
+export const removeDuplicateCreateSurveyQuestions = (questions: Iterable<unknown> = []) => {
   const unique: unknown[] = [];
   const setIds = new Set<unknown>();
   for (const question of questions) {
@@ -434,24 +414,17 @@ export const buildAuthoringEncryptionPayload = ({
   targets: targets || {},
 });
 
-export const isEncryptableFieldValueEmpty = (value: unknown): boolean => (
+export const isEncryptableFieldValueEmpty = (value: unknown): boolean =>
   value === undefined ||
   value === null ||
   (typeof value === 'string' && value.trim() === '') ||
-  (Array.isArray(value) && value.length === 0)
-);
+  (Array.isArray(value) && value.length === 0);
 
-export const combineLitRecipientAccessControlConditions = (
-  recipients: unknown
-): unknown[] => {
+export const combineLitRecipientAccessControlConditions = (recipients: unknown): unknown[] => {
   if (!Array.isArray(recipients)) return [];
   const combinedAccessControlConditions: unknown[] = [];
   recipients.forEach((recipient) => {
-    const recipientRecord = (
-      recipient && typeof recipient === 'object'
-        ? recipient as LitRecipientInput
-        : null
-    );
+    const recipientRecord = recipient && typeof recipient === 'object' ? (recipient as LitRecipientInput) : null;
     const conditions = recipientRecord?.accessControlConditions;
     if (!Array.isArray(conditions) || conditions.length === 0) return;
     if (combinedAccessControlConditions.length > 0) {
@@ -470,7 +443,7 @@ export const buildCreateSurveyGateObjectsAndRecipients = ({
   normalizeKnownGateIds = normalizeGateIds,
   resolveLitChain = ({ litChain }) => litChain || null,
 }: BuildCreateSurveyGateObjectsAndRecipientsArgs = {}) => {
-  const safeGateMap = (gateMap && typeof gateMap === 'object') ? gateMap : {};
+  const safeGateMap = gateMap && typeof gateMap === 'object' ? gateMap : {};
   const gateIds = normalizeKnownGateIds(gateIdsIn);
   const gates: UnknownRecord[] = [];
   const recipients: CreateSurveyGateRecipient[] = [];
@@ -484,12 +457,9 @@ export const buildCreateSurveyGateObjectsAndRecipients = ({
     const fallbackChainId = Number(chainIdFallback || 0) || null;
     const chainId = Number(gate.chainId || fallbackChainId || 0) || fallbackChainId;
     const litChain = resolveLitChain({ chainId, litChain: gate.litChain });
-    const sbtAddresses = Array.from(new Set(
-      [
-        ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
-        gate.sbtAddress,
-      ].filter(Boolean)
-    )) as string[];
+    const sbtAddresses = Array.from(
+      new Set([...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []), gate.sbtAddress].filter(Boolean)),
+    ) as string[];
     if (!sbtAddresses.length) return;
 
     const mode = gate.mode || 'any';
@@ -527,18 +497,15 @@ export const buildCreateSurveyGateObjectsAndRecipients = ({
   return { gates, recipients };
 };
 
-export const findFirstBlankQuestionPromptIndex = (questions: unknown = []): number => (
+export const findFirstBlankQuestionPromptIndex = (questions: unknown = []): number =>
   (Array.isArray(questions) ? questions : []).findIndex((question) => {
-    const questionRecord = (
-      question && typeof question === 'object'
-        ? question as QuestionPromptInput
-        : null
-    );
+    const questionRecord = question && typeof question === 'object' ? (question as QuestionPromptInput) : null;
     return String(questionRecord?.prompt || '').trim() === '';
-  })
-);
+  });
 
-export const findFirstDuplicateMultichoiceOptionQuestion = (questions: unknown = []): {
+export const findFirstDuplicateMultichoiceOptionQuestion = (
+  questions: unknown = [],
+): {
   index: number;
   label: string;
 } => {
@@ -571,17 +538,12 @@ export const getCreateSurveyValidationError = ({
   return '';
 };
 
-export const buildCreateSurveyCopySuccessPatch = (
-  stateKey: unknown,
-  copied: unknown
-) => ({
+export const buildCreateSurveyCopySuccessPatch = (stateKey: unknown, copied: unknown) => ({
   [String(stateKey || '')]: !!copied,
 });
 
 export const buildCreateSurveyFocusTargetPatch = (focusTargetUiKey: unknown = null) => ({
-  focusTargetUiKey: typeof focusTargetUiKey === 'string' && focusTargetUiKey
-    ? focusTargetUiKey
-    : null,
+  focusTargetUiKey: typeof focusTargetUiKey === 'string' && focusTargetUiKey ? focusTargetUiKey : null,
 });
 
 export const buildCreateSurveyTitleChangePatch = (title: unknown) => ({
@@ -614,10 +576,8 @@ export const buildCreateSurveyValidationErrorPatch = (formValidationError: unkno
   formValidationError: String(formValidationError || ''),
 });
 
-export const buildCreateSurveyAutoToolTogglePatch = (
-  state: { showAutoTool?: unknown } | null | undefined = {}
-) => ({
-  showAutoTool: !(state?.showAutoTool),
+export const buildCreateSurveyAutoToolTogglePatch = (state: { showAutoTool?: unknown } | null | undefined = {}) => ({
+  showAutoTool: !state?.showAutoTool,
 });
 
 export const buildCreateSurveyCacheLoadedPatch = () => ({
@@ -702,9 +662,10 @@ export function buildCreateSurveySurveySubmitSuccessPatch(args: {
   resetDraft: true;
   surveyArweaveTxId?: unknown;
   surveyId?: unknown;
-}): CreateSurveySurveySubmitSuccessBasePatch & CreateSurveySubmitSuccessResetPatch & {
-  uploadedQuestions: CreateSurveyUploadedQuestionPatchEntry[];
-};
+}): CreateSurveySurveySubmitSuccessBasePatch &
+  CreateSurveySubmitSuccessResetPatch & {
+    uploadedQuestions: CreateSurveyUploadedQuestionPatchEntry[];
+  };
 export function buildCreateSurveySurveySubmitSuccessPatch(args?: {
   resetDraft?: false | undefined;
   surveyArweaveTxId?: unknown;
@@ -761,7 +722,7 @@ export const buildCreateSurveySubmitCatchPatch = ({
     progress: 0,
     submissionError: String(errorMessage || 'An error occurred during submission.'),
     showSubmitSteps: reset ? false : !!showSubmitSteps,
-    submitStep: reset ? 0 : (currentStep === 0 ? 1 : currentStep),
+    submitStep: reset ? 0 : currentStep === 0 ? 1 : currentStep,
   };
 };
 
@@ -789,9 +750,7 @@ export const buildCreateSurveyAutoGeneratedDraftPatch = ({
   submissionError: '',
   lastSubmittedSurveyId: '',
   lastSubmittedSurveyArweaveTxId: '',
-  focusTargetUiKey: typeof focusTargetUiKey === 'string' && focusTargetUiKey
-    ? focusTargetUiKey
-    : null,
+  focusTargetUiKey: typeof focusTargetUiKey === 'string' && focusTargetUiKey ? focusTargetUiKey : null,
 });
 
 export const buildCreateSurveyClearFormStatePatch = () => ({
@@ -835,9 +794,8 @@ export const buildCreateSurveyHashPatch = (surveyHash: unknown = '') => ({
   surveyHash: String(surveyHash || ''),
 });
 
-const buildLowercaseBookmarkSet = (values: unknown = []) => new Set(
-  (Array.isArray(values) ? values : []).map((value) => String(value).toLowerCase())
-);
+const buildLowercaseBookmarkSet = (values: unknown = []) =>
+  new Set((Array.isArray(values) ? values : []).map((value) => String(value).toLowerCase()));
 
 export const buildCreateSurveyBookmarkSetsPatch = ({
   surveys = [],
@@ -851,22 +809,24 @@ export const buildCreateSurveyBookmarkSetsPatch = ({
 });
 
 export const buildCreateSurveyBookmarkedQuestionsSetPatch = (bookmarkedQuestionsSet: unknown) => ({
-  bookmarkedQuestionsSet: bookmarkedQuestionsSet instanceof Set
-    ? new Set(bookmarkedQuestionsSet)
-    : buildLowercaseBookmarkSet(bookmarkedQuestionsSet),
+  bookmarkedQuestionsSet:
+    bookmarkedQuestionsSet instanceof Set
+      ? new Set(bookmarkedQuestionsSet)
+      : buildLowercaseBookmarkSet(bookmarkedQuestionsSet),
 });
 
 export const buildCreateSurveyBookmarkedSurveysSetPatch = (bookmarkedSurveysSet: unknown) => ({
-  bookmarkedSurveysSet: bookmarkedSurveysSet instanceof Set
-    ? new Set(bookmarkedSurveysSet)
-    : buildLowercaseBookmarkSet(bookmarkedSurveysSet),
+  bookmarkedSurveysSet:
+    bookmarkedSurveysSet instanceof Set
+      ? new Set(bookmarkedSurveysSet)
+      : buildLowercaseBookmarkSet(bookmarkedSurveysSet),
 });
 
 export const stableGateColor = (gateId: unknown) => {
   const str = String(gateId || '');
   let hash = 0;
   for (let i = 0; i < str.length; i += 1) {
-    hash = ((hash * 31) + str.charCodeAt(i)) >>> 0;
+    hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
   }
   return ENCRYPTION_GATE_COLORS[hash % ENCRYPTION_GATE_COLORS.length];
 };
@@ -886,13 +846,12 @@ export const buildCreateSurveySubmitGatePlan = ({
   questions = [],
   surveyLockGateIds = [],
 }: CreateSurveySubmitGatePlanArgs = {}) => {
-  const safeGateMap = (gateMap && typeof gateMap === 'object') ? gateMap : {};
+  const safeGateMap = gateMap && typeof gateMap === 'object' ? gateMap : {};
   const knownGateIds = new Set(Object.keys(safeGateMap));
-  const normalizeKnownGateIds = (value: unknown): string[] => (
-    normalizeGateIds(value).filter((gateId): gateId is string => (
-      typeof gateId === 'string' && knownGateIds.has(gateId)
-    ))
-  );
+  const normalizeKnownGateIds = (value: unknown): string[] =>
+    normalizeGateIds(value).filter(
+      (gateId): gateId is string => typeof gateId === 'string' && knownGateIds.has(gateId),
+    );
 
   const defaultSubmitGateIds = defaultGateId ? normalizeKnownGateIds([defaultGateId]) : [];
   const applyDefaultSubmitGateIds = (value: unknown): string[] => {
@@ -906,31 +865,21 @@ export const buildCreateSurveySubmitGatePlan = ({
     return defaultSubmitGateIds;
   };
 
-  const resolvedSurveyLockGateIds = !isStandaloneQuestion
-    ? applyDefaultSubmitGateIds(surveyLockGateIds)
-    : [];
+  const resolvedSurveyLockGateIds = !isStandaloneQuestion ? applyDefaultSubmitGateIds(surveyLockGateIds) : [];
 
-  const resolveQuestionSubmitGateIds = (
-    question?: CreateSurveySubmitGatePlanQuestion | null
-  ): string[] => {
+  const resolveQuestionSubmitGateIds = (question?: CreateSurveySubmitGatePlanQuestion | null): string[] => {
     if (!question) return [];
-    if (isStandaloneQuestion) return applyStandaloneQuestionGateIds(
-      question.lockGateIds,
-      question.lockGateIdsTouched
-    );
+    if (isStandaloneQuestion) return applyStandaloneQuestionGateIds(question.lockGateIds, question.lockGateIdsTouched);
     const hasOwnLock = Object.prototype.hasOwnProperty.call(question || {}, 'lockGateIds');
     if (!hasOwnLock || question.lockGateIds === null) return resolvedSurveyLockGateIds;
     return applyDefaultSubmitGateIds(question.lockGateIds);
   };
 
-  const questionNeedsEncryption = (
-    question?: CreateSurveySubmitGatePlanQuestion | null
-  ): boolean => resolveQuestionSubmitGateIds(question).length > 0;
+  const questionNeedsEncryption = (question?: CreateSurveySubmitGatePlanQuestion | null): boolean =>
+    resolveQuestionSubmitGateIds(question).length > 0;
 
-  const needsLit = (
-    resolvedSurveyLockGateIds.length > 0 ||
-    (Array.isArray(questions) ? questions : []).some(questionNeedsEncryption)
-  );
+  const needsLit =
+    resolvedSurveyLockGateIds.length > 0 || (Array.isArray(questions) ? questions : []).some(questionNeedsEncryption);
 
   return {
     knownGateIds,
@@ -954,37 +903,36 @@ export const buildCreateSurveyGateOptions = ({
   const sponsored = isPlainRecord(cfg.sponsored) ? cfg.sponsored : {};
   const fullEncryptionGateMap = isPlainRecord(encryption.gates) ? encryption.gates : null;
   const fullSponsoredGateMap = isPlainRecord(sponsored.gates) ? sponsored.gates : null;
-  const fullGateMap: CreateSurveyGateMap = ((fullEncryptionGateMap && Object.keys(fullEncryptionGateMap).length)
-    ? fullEncryptionGateMap
-    : (fullSponsoredGateMap && Object.keys(fullSponsoredGateMap).length ? fullSponsoredGateMap : {})) as CreateSurveyGateMap;
+  const fullGateMap: CreateSurveyGateMap = (
+    fullEncryptionGateMap && Object.keys(fullEncryptionGateMap).length
+      ? fullEncryptionGateMap
+      : fullSponsoredGateMap && Object.keys(fullSponsoredGateMap).length
+        ? fullSponsoredGateMap
+        : {}
+  ) as CreateSurveyGateMap;
   const primaryResource = isStandaloneQuestion ? 'questionResponses' : 'surveyResponses';
   const sessionLabel = normalizeGateText(sessionLabelIn) || 'session';
   const relevantGates: CreateSurveyGateDefinition[] = [];
   const seenGateIds = new Set<string>();
   const seenGateKeys = new Set<string>();
 
-  const pushRelevantGate = (
-    seedGate: CreateSurveyGateDefinition | null = null,
-    resourceKey: unknown = ''
-  ) => {
+  const pushRelevantGate = (seedGate: CreateSurveyGateDefinition | null = null, resourceKey: unknown = '') => {
     if (!seedGate || typeof seedGate !== 'object') return;
 
-    const candidateIds = [
-      seedGate.gateId,
-      seedGate.id,
-    ]
+    const candidateIds = [seedGate.gateId, seedGate.id]
       .map((value: unknown) => normalizeGateText(value))
       .filter((gateId): gateId is string => Boolean(gateId));
     const seedAddresses = normalizeAddressList([
       ...(Array.isArray(seedGate.sbtAddresses) ? seedGate.sbtAddresses : []),
       seedGate.sbtAddress,
     ]);
-    const seedAddressKey = seedAddresses.map((address: string) => address.toLowerCase()).sort().join('|');
+    const seedAddressKey = seedAddresses
+      .map((address: string) => address.toLowerCase())
+      .sort()
+      .join('|');
 
     let resolvedGateId = candidateIds[0] || '';
-    let resolvedGate: CreateSurveyGateDefinition | null = resolvedGateId
-      ? fullGateMap?.[resolvedGateId] || null
-      : null;
+    let resolvedGate: CreateSurveyGateDefinition | null = resolvedGateId ? fullGateMap?.[resolvedGateId] || null : null;
 
     if (!resolvedGate && seedAddressKey) {
       Object.entries(fullGateMap || {}).some(([gateId, gate]) => {
@@ -992,7 +940,10 @@ export const buildCreateSurveyGateOptions = ({
           ...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []),
           gate?.sbtAddress,
         ]);
-        const gateAddressKey = gateAddresses.map((address: string) => address.toLowerCase()).sort().join('|');
+        const gateAddressKey = gateAddresses
+          .map((address: string) => address.toLowerCase())
+          .sort()
+          .join('|');
         if (!gateAddressKey || gateAddressKey !== seedAddressKey) return false;
         resolvedGateId = normalizeGateText(gateId);
         resolvedGate = gate;
@@ -1041,22 +992,18 @@ export const buildCreateSurveyGateOptions = ({
 
   if (!relevantGates.length) {
     const resources = isPlainRecord(sponsored.resources)
-      ? sponsored.resources as Record<string, UnknownRecord | undefined>
+      ? (sponsored.resources as Record<string, UnknownRecord | undefined>)
       : {};
-    const primaryResourceCfg = (
+    const primaryResourceCfg =
       resources?.[primaryResource] &&
       typeof resources[primaryResource] === 'object' &&
       !Array.isArray(resources[primaryResource])
-    )
-      ? resources[primaryResource]
-      : {};
-    const defaultResourceCfg = (
-      resources?.default &&
-      typeof resources.default === 'object' &&
-      !Array.isArray(resources.default)
-    )
-      ? resources.default
-      : {};
+        ? resources[primaryResource]
+        : {};
+    const defaultResourceCfg =
+      resources?.default && typeof resources.default === 'object' && !Array.isArray(resources.default)
+        ? resources.default
+        : {};
     const fallbackIds = [
       ...(Array.isArray(primaryResourceCfg?.gateIds) ? primaryResourceCfg.gateIds : []),
       primaryResourceCfg?.gateId,
@@ -1078,7 +1025,9 @@ export const buildCreateSurveyGateOptions = ({
     if (!gateId) return;
     gateMap[gateId] = gate;
   });
-  const gateIds = Object.keys(gateMap || {}).filter(Boolean).sort();
+  const gateIds = Object.keys(gateMap || {})
+    .filter(Boolean)
+    .sort();
   const multipleGateOptions = gateIds.length > 1;
   const gateOptions = gateIds.map((gateId: string): CreateSurveyGateOption => {
     const gate: CreateSurveyGateDefinition = gateMap[gateId] || {};
@@ -1087,17 +1036,10 @@ export const buildCreateSurveyGateOptions = ({
       ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
       gate.sbtAddress,
     ]);
-    const mode = String(
-      gate.mode ||
-      gate.operator ||
-      gate.gateMode ||
-      (gate.requireAll === true ? 'all' : '')
-    ).trim();
+    const mode = String(gate.mode || gate.operator || gate.gateMode || (gate.requireAll === true ? 'all' : '')).trim();
     const resourceKey = normalizeGateText(gate.resourceKey) || primaryResource;
     const resourceLabel = AUTHORING_GATE_RESOURCE_LABELS[resourceKey] || resourceKey;
-    const displayLabel = multipleGateOptions
-      ? `${sessionLabel} (${resourceLabel})`
-      : sessionLabel;
+    const displayLabel = multipleGateOptions ? `${sessionLabel} (${resourceLabel})` : sessionLabel;
     return {
       id: gateId,
       label: displayLabel,
@@ -1118,15 +1060,16 @@ export const buildCreateSurveyGateOptions = ({
       : '',
     !primaryExplicitOpen
       ? normalizeGateText(
-        resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.gateId ||
-        resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.id
-      )
+          resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.gateId ||
+            resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.id,
+        )
       : '',
     gateOptions[0]?.id,
   ]
     .map((val: unknown) => normalizeGateText(val))
     .filter((gateId): gateId is string => Boolean(gateId));
-  const defaultGateId = candidateDefaults.find((gateId: string) => gateIds.includes(gateId)) || (gateOptions[0]?.id || '');
+  const defaultGateId =
+    candidateDefaults.find((gateId: string) => gateIds.includes(gateId)) || gateOptions[0]?.id || '';
 
   return { gateMap, gateOptions, defaultGateId };
 };
@@ -1155,55 +1098,46 @@ export const normalizeAddressList = (values: unknown[] = []) => {
 const getCreateSurveySbtAddressKey = (value: unknown): string => {
   if (!value || typeof value !== 'object') return '';
   const record = value as UnknownRecord;
-  return String(record.address || record.sbtAddress || '').trim().toLowerCase();
+  return String(record.address || record.sbtAddress || '')
+    .trim()
+    .toLowerCase();
 };
 
-export const addCreateSurveyEncryptionGateSbt = <
-  TSbt extends UnknownRecord = UnknownRecord
->(
+export const addCreateSurveyEncryptionGateSbt = <TSbt extends UnknownRecord = UnknownRecord>(
   selectedSbts: unknown = [],
-  sbt: unknown = null
+  sbt: unknown = null,
 ): TSbt[] => {
-  const current = Array.isArray(selectedSbts) ? selectedSbts as TSbt[] : [];
+  const current = Array.isArray(selectedSbts) ? (selectedSbts as TSbt[]) : [];
   if (!sbt || typeof sbt !== 'object' || Array.isArray(sbt)) return [...current];
   const nextSbt = sbt as TSbt;
   const nextAddress = getCreateSurveySbtAddressKey(nextSbt);
-  if (
-    nextAddress &&
-    current.some((entry) => getCreateSurveySbtAddressKey(entry) === nextAddress)
-  ) {
+  if (nextAddress && current.some((entry) => getCreateSurveySbtAddressKey(entry) === nextAddress)) {
     return [...current];
   }
   return [...current, nextSbt];
 };
 
-export const removeCreateSurveyEncryptionGateSbt = <
-  TSbt extends UnknownRecord = UnknownRecord
->(
+export const removeCreateSurveyEncryptionGateSbt = <TSbt extends UnknownRecord = UnknownRecord>(
   selectedSbts: unknown = [],
-  address: unknown = ''
+  address: unknown = '',
 ): TSbt[] => {
-  const current = Array.isArray(selectedSbts) ? selectedSbts as TSbt[] : [];
-  const addressKey = String(address || '').trim().toLowerCase();
+  const current = Array.isArray(selectedSbts) ? (selectedSbts as TSbt[]) : [];
+  const addressKey = String(address || '')
+    .trim()
+    .toLowerCase();
   if (!addressKey) return [...current];
   return current.filter((entry) => getCreateSurveySbtAddressKey(entry) !== addressKey);
 };
 
-export const normalizeTagList = (values: unknown = []) => (
+export const normalizeTagList = (values: unknown = []) =>
   (Array.isArray(values) ? values : [])
-    .filter((tag) => (
-      tag != null &&
-      (
-        typeof tag === 'string' ||
-        typeof tag === 'number' ||
-        typeof tag === 'boolean'
-      )
-    ))
+    .filter((tag) => tag != null && (typeof tag === 'string' || typeof tag === 'number' || typeof tag === 'boolean'))
     .map((tag) => String(tag).trim())
-    .filter((tag) => tag && tag !== '[object Object]')
-);
+    .filter((tag) => tag && tag !== '[object Object]');
 
-export const buildCreateSurveyQuestionTagRemovalList = <TQuestion extends CreateSurveyQuestionTagEntry = CreateSurveyQuestionTagEntry>({
+export const buildCreateSurveyQuestionTagRemovalList = <
+  TQuestion extends CreateSurveyQuestionTagEntry = CreateSurveyQuestionTagEntry,
+>({
   questions,
   questionIndex,
   tagIndexToRemove,
@@ -1212,9 +1146,7 @@ export const buildCreateSurveyQuestionTagRemovalList = <TQuestion extends Create
   questionIndex?: unknown;
   tagIndexToRemove?: unknown;
 } = {}): TQuestion[] => {
-  const updatedQuestions: TQuestion[] = [
-    ...((questions || []) as Iterable<TQuestion>)
-  ];
+  const updatedQuestions: TQuestion[] = [...((questions || []) as Iterable<TQuestion>)];
   const qIndex = questionIndex as number;
   const questionToUpdate: TQuestion & CreateSurveyQuestionTagEntry = { ...updatedQuestions[qIndex] };
   const currentTags = normalizeTagList(questionToUpdate.tags);
@@ -1223,7 +1155,9 @@ export const buildCreateSurveyQuestionTagRemovalList = <TQuestion extends Create
   return updatedQuestions;
 };
 
-export const buildCreateSurveyQuestionTagInputValueList = <TQuestion extends CreateSurveyQuestionTagEntry = CreateSurveyQuestionTagEntry>({
+export const buildCreateSurveyQuestionTagInputValueList = <
+  TQuestion extends CreateSurveyQuestionTagEntry = CreateSurveyQuestionTagEntry,
+>({
   questions,
   questionIndex,
   value,
@@ -1232,9 +1166,7 @@ export const buildCreateSurveyQuestionTagInputValueList = <TQuestion extends Cre
   questionIndex?: unknown;
   value?: unknown;
 } = {}): TQuestion[] => {
-  const updatedQuestions: TQuestion[] = [
-    ...((questions || []) as Iterable<TQuestion>)
-  ];
+  const updatedQuestions: TQuestion[] = [...((questions || []) as Iterable<TQuestion>)];
   const qIndex = questionIndex as number;
   updatedQuestions[qIndex] = {
     ...updatedQuestions[qIndex],
@@ -1243,16 +1175,16 @@ export const buildCreateSurveyQuestionTagInputValueList = <TQuestion extends Cre
   return updatedQuestions;
 };
 
-export const buildCreateSurveyQuestionTagCommitList = <TQuestion extends CreateSurveyQuestionTagEntry = CreateSurveyQuestionTagEntry>({
+export const buildCreateSurveyQuestionTagCommitList = <
+  TQuestion extends CreateSurveyQuestionTagEntry = CreateSurveyQuestionTagEntry,
+>({
   questions,
   questionIndex,
 }: {
   questions?: Iterable<TQuestion> | null;
   questionIndex?: unknown;
 } = {}): TQuestion[] => {
-  const updatedQuestions: TQuestion[] = [
-    ...((questions || []) as Iterable<TQuestion>)
-  ];
+  const updatedQuestions: TQuestion[] = [...((questions || []) as Iterable<TQuestion>)];
   const qIndex = questionIndex as number;
   const questionToUpdate: TQuestion & CreateSurveyQuestionTagEntry = { ...updatedQuestions[qIndex] };
   const currentTags = normalizeTagList(questionToUpdate.tags);
@@ -1301,8 +1233,5 @@ export const getErrorMessage = (error: unknown, fallback = 'Unknown error') => {
   return fallback;
 };
 
-export const getErrorCode = (error: unknown) => (
-  error && typeof error === 'object' && 'code' in error
-    ? (error as { code?: unknown }).code
-    : undefined
-);
+export const getErrorCode = (error: unknown) =>
+  error && typeof error === 'object' && 'code' in error ? (error as { code?: unknown }).code : undefined;

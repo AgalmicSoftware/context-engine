@@ -42,7 +42,7 @@ export const dispatchBootstrapArweaveUploadWithWorkerDeps = async ({
       getCorsContext: deps?.getCorsContext,
       verifyAdminSignature: (value) => deps?.verifyAdminSignature?.({ ...value, env }),
       getSessionSecrets: (slug) => deps?.getSessionSecrets?.(env, slug),
-      arweaveUpload: deps?.arweaveUpload,
+      arweaveUpload: (value) => deps?.arweaveUpload?.({ ...value, env }),
       logBootstrapPayload: ({ requestId, body }) => log('[arweave] bootstrap payload', {
         requestId: requestId || null,
         hasAddress: !!body?.address,

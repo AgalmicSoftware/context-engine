@@ -3,7 +3,7 @@ jest.mock('utilities/logging.js', () => ({
   createLogger: jest.fn(),
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   getAllSessionSlugs: jest.fn(),
   normalizeSessionSlug: jest.fn(),
@@ -64,7 +64,7 @@ describe('createSessionScanPolicy', () => {
   beforeEach(() => {
     jest.resetModules();
 
-    contractScriptsModule = jest.requireMock('../../utilities/web3/contractScripts.js');
+    contractScriptsModule = jest.requireMock('../../utilities/web3/chainGateway.js');
     scanScopeModule = jest.requireMock('../../utilities/session/sessionScanScope.js');
     listenersModule = jest.requireMock('../../utilities/sbt/sbtInstanceListenersMode.js');
     fullScanModule = jest.requireMock('../../utilities/sbt/sbtFullScanPolicy.js');
@@ -83,8 +83,10 @@ describe('createSessionScanPolicy', () => {
     };
     loggingModule.createLogger.mockReturnValue(mockLogger);
 
-    contractScriptsModule.normalizeSessionSlug.mockImplementation(
-      (slug) => String(slug || '').trim().toLowerCase()
+    contractScriptsModule.normalizeSessionSlug.mockImplementation((slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase(),
     );
     contractScriptsModule.getAllSessionSlugs.mockReturnValue(['alpha', 'beta']);
     scanScopeModule.readSessionScanScope.mockReturnValue('all');
@@ -165,14 +167,10 @@ describe('createSessionScanPolicy', () => {
       'Set CE_SBT_INSTANCE_LISTENERS_MODE=on to override.';
 
     expect(policy.isSbtInstanceListenerEnabledForGroup('general')).toBe(false);
-    expect(
-      consoleInfoSpy.mock.calls.filter(([message]) => message === suppressionMessage)
-    ).toHaveLength(1);
+    expect(consoleInfoSpy.mock.calls.filter(([message]) => message === suppressionMessage)).toHaveLength(1);
 
     expect(policy.isSbtInstanceListenerEnabledForGroup('general')).toBe(false);
-    expect(
-      consoleInfoSpy.mock.calls.filter(([message]) => message === suppressionMessage)
-    ).toHaveLength(1);
+    expect(consoleInfoSpy.mock.calls.filter(([message]) => message === suppressionMessage)).toHaveLength(1);
 
     scanScopeModule.readSessionScanScope.mockReturnValue('all');
     policy = createSessionScanPolicy(makeHost());
@@ -189,7 +187,7 @@ describe('createSessionScanPolicy', () => {
     expect(policy.getSessionScanScope()).toBe('active');
     expect(consoleInfoSpy).toHaveBeenCalledTimes(1);
     expect(consoleInfoSpy).toHaveBeenCalledWith(
-      '[Context Engine] CE_SESSION_SCAN_SCOPE=active (cross-session RPC scans clamped)'
+      '[Context Engine] CE_SESSION_SCAN_SCOPE=active (cross-session RPC scans clamped)',
     );
   });
 
@@ -290,9 +288,11 @@ describe('createSessionScanPolicy', () => {
     scanScopeModule.readSessionScanScope.mockReturnValue('list');
     scanScopeModule.readSessionScanSlugs.mockReturnValue(['alpha']);
     scanScopeModule.getAllowedSessionSlugs.mockReturnValue(['alpha']);
-    policy = createSessionScanPolicy(makeHost({
-      getActiveSessionSlug: jest.fn().mockReturnValue('Alpha'),
-    }));
+    policy = createSessionScanPolicy(
+      makeHost({
+        getActiveSessionSlug: jest.fn().mockReturnValue('Alpha'),
+      }),
+    );
 
     expect(policy.getScopedSessionSlugs()).toEqual(['alpha']);
     expect(scanScopeModule.getAllowedSessionSlugs).toHaveBeenCalledWith('list', ['alpha'], 'alpha');
@@ -308,9 +308,11 @@ describe('createSessionScanPolicy', () => {
     scanScopeModule.readSessionScanScope.mockReturnValue('active');
     scanScopeModule.isSessionSlugAllowedByScope.mockReturnValue(false);
     scanScopeModule.getAllowedSessionSlugs.mockReturnValue(['alpha']);
-    policy = createSessionScanPolicy(makeHost({
-      getActiveSessionSlug: jest.fn().mockReturnValue('alpha'),
-    }));
+    policy = createSessionScanPolicy(
+      makeHost({
+        getActiveSessionSlug: jest.fn().mockReturnValue('alpha'),
+      }),
+    );
 
     expect(policy.shouldSkipSessionScanForSlug('beta', 'scan')).toBe(true);
     expect(mockLogger.info).toHaveBeenCalledTimes(1);
@@ -318,9 +320,11 @@ describe('createSessionScanPolicy', () => {
 
   it('runs the onSkipped callback when a slug is out of scope', () => {
     const onSkipped = jest.fn();
-    const policy = createSessionScanPolicy(makeHost({
-      getActiveSessionSlug: jest.fn().mockReturnValue('alpha'),
-    }));
+    const policy = createSessionScanPolicy(
+      makeHost({
+        getActiveSessionSlug: jest.fn().mockReturnValue('alpha'),
+      }),
+    );
 
     scanScopeModule.readSessionScanScope.mockReturnValue('active');
     scanScopeModule.isSessionSlugAllowedByScope.mockReturnValue(false);
@@ -376,16 +380,13 @@ describe('createSessionScanPolicy', () => {
     policy.logScopeSkipOnce('scan', 'beta', scopeContext);
 
     expect(mockLogger.info).toHaveBeenCalledTimes(1);
-    expect(mockLogger.info).toHaveBeenCalledWith(
-      '[SessionScanScope] skipped out-of-scope scan/listener',
-      {
-        operation: 'scan',
-        slug: 'beta',
-        scope: 'active',
-        allowedSlugs: ['general', 'alpha'],
-        activeSlug: 'alpha',
-      }
-    );
+    expect(mockLogger.info).toHaveBeenCalledWith('[SessionScanScope] skipped out-of-scope scan/listener', {
+      operation: 'scan',
+      slug: 'beta',
+      scope: 'active',
+      allowedSlugs: ['general', 'alpha'],
+      activeSlug: 'alpha',
+    });
   });
 
   it('clears skip-log dedupe state on destroy', () => {

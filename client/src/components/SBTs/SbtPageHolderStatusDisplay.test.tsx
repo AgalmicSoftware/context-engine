@@ -3,9 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import SbtPageHolderStatusDisplay from './SbtPageHolderStatusDisplay';
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof SbtPageHolderStatusDisplay>> = {}
-) => ({
+const createProps = (overrides: Partial<React.ComponentProps<typeof SbtPageHolderStatusDisplay>> = {}) => ({
   countStatus: {
     isInitialLoading: false,
     isRefreshing: false,
@@ -62,7 +60,7 @@ describe('SbtPageHolderStatusDisplay', () => {
             showScanProgress: true,
           },
         })}
-      />
+      />,
     );
 
     expect(screen.queryByTitle('7 holders')).toBeNull();

@@ -1,8 +1,7 @@
-# chainGateway / contractScripts Map
+# chainGateway Map
 
 ## Quick Reference
 - Canonical barrel file: `client/src/utilities/web3/chainGateway.ts`
-- Legacy compatibility shim: `client/src/utilities/web3/contractScripts.js`
 - Primary implementation: `client/src/utilities/web3/contractScripts.impl.ts`
 - Session registry helper: `client/src/utilities/web3/sessionRegistry.ts`
 - Split helper modules:
@@ -17,25 +16,19 @@
   - `client/src/utilities/web3/contractScripts.sbtRegistryMethods.ts`
   - `client/src/utilities/web3/contractScripts.sbtMintMethods.ts`
 - Current lengths:
-  - `chainGateway.ts`: **86 lines**
-  - `contractScripts.js`: **13 lines**
-  - `contractScripts.ts`: **70-line compatibility alias**
-  - `contractScripts.impl.ts`: **1,166 lines**
-  - `contractScripts.surveyEventReadMethods.ts`: **756 lines**
-  - `contractScripts.surveyPayloadReadMethods.ts`: **822 lines**
-  - `contractScripts.surveyWriteMethods.ts`: **665 lines**
-  - `contractScripts.sbtRegistryMethods.ts`: **1,224 lines**
-  - `contractScripts.sbtMintMethods.ts`: **859 lines**
-  - `sessionRegistry.ts`: **2,571 lines**
-  - `contractHelpers.ts`: **1,040 lines**
+  - `chainGateway.ts`: **84 lines**
+  - `contractScripts.impl.ts`: **1,146 lines**
+  - `contractScripts.surveyEventReadMethods.ts`: **890 lines**
+  - `contractScripts.surveyPayloadReadMethods.ts`: **843 lines**
+  - `contractScripts.surveyWriteMethods.ts`: **710 lines**
+  - `contractScripts.sbtRegistryMethods.ts`: **1,276 lines**
+  - `contractScripts.sbtMintMethods.ts`: **915 lines**
+  - `sessionRegistry.ts`: **2,539 lines**
+  - `contractHelpers.ts`: **999 lines**
   - `chainEventStreams.ts`: **554 lines**
-  - `contractEventListeners.ts`: **2-line compatibility alias**
-  - `profileChainReads.ts`: **1,151 lines**
-  - `contractProfile.ts`: **5-line compatibility alias**
-  - `chainEventScans.ts`: **511 lines**
-  - `contractScriptsEventScans.ts`: **5-line compatibility alias**
-  - `chainMetadataResolution.ts`: **797 lines**
-  - `contractScriptsMetadataResolution.ts`: **9-line compatibility alias**
+  - `profileChainReads.ts`: **1,114 lines**
+  - `chainEventScans.ts`: **485 lines**
+  - `chainMetadataResolution.ts`: **784 lines**
 - This map intentionally avoids exact line numbers. Phase 4 TypeScript extraction and helper splits move code frequently, so name-based navigation stays more accurate than stale ranges.
 - `sessionRegistry.ts` and `contractScripts.impl.ts` typecheck without `@ts-nocheck`. The typed web3-core milestone was verified on OP Sepolia with the gate and gated-decrypt E2E suites; Lit v3 remains chain-configured and is not tied to a single testnet.
 
@@ -52,14 +45,13 @@ chainGateway.ts  [canonical CJS-compatible barrel for jest.spyOn]
      -> contractScripts.sbt*Methods.ts         [SBT registry/mint method maps]
 ```
 
-`chainGateway` is the main web3 integration layer between React and chain, Arweave, Lit, and registry state. The legacy `contractScripts.js` and `contractScripts.ts` names remain as compatibility aliases while callers migrate. The TypeScript split moved reusable helper families plus stateless event-scan and metadata-resolution helpers out of the monolith; `contractScripts.impl.ts` still owns session resolution, provider selection, decrypt policy, survey/question writes, SBT flows, and the final default export wiring.
+`chainGateway` is the main web3 integration layer between React and chain, Arweave, Lit, and registry state. The TypeScript split moved reusable helper families plus stateless event-scan and metadata-resolution helpers out of the monolith; `contractScripts.impl.ts` still owns session resolution, provider selection, decrypt policy, survey/question writes, SBT flows, and the final default export wiring.
 The remaining stateful survey/SBT methods live in factory modules that receive the same runtime dependency bundle and are spread back onto the default export, preserving call-time `this` lookup and `jest.spyOn()` seams.
 
-Route/page code now reaches selected chain gateway operations through purpose ports under `client/src/domains/**` when that boundary has been modernized. Those adapters deliberately use call-time property lookup against the shared barrel object so `jest.spyOn(contractScripts, ...)` and `jest.spyOn(chainGateway, ...)` remain supported test seams.
+Route/page code now reaches selected chain gateway operations through purpose ports under `client/src/domains/**` when that boundary has been modernized. Those adapters deliberately use call-time property lookup against the shared barrel object so `jest.spyOn(chainGateway, ...)` remains a supported test seam.
 
 ## Navigation Rules
 - Start in `chainGateway.ts` when adding or auditing barrel-export behavior.
-- Start in `contractScripts.js` or `contractScripts.ts` only when maintaining legacy import-path compatibility.
 - Start in `sessionRegistry.ts` for session registry lookups, registry cache behavior, session config normalization, or chain-aware session metadata.
 - Start in `contractHelpers.ts` for block windows, latest block/gas, read-provider behavior, or faucet helpers.
 - Start in `chainEventStreams.ts` for long-lived listener registration and cleanup.
@@ -75,10 +67,6 @@ Route/page code now reaches selected chain gateway operations through purpose po
 - Canonical barrel.
 - Keeps CommonJS property assignment so `jest.spyOn()` can patch named exports.
 - Re-exports the default object plus high-value named helpers and `__test__` seams from `contractScripts.impl.ts`.
-
-### `contractScripts.js` / `contractScripts.ts`
-- Naming-migration aliases for legacy callers.
-- Preserve the same spyable default and named export surface while callers move to `chainGateway`.
 
 ### `contractScripts.impl.ts`
 - Declares shared constants, gas fallbacks, listener registries, and internal cache maps.
@@ -115,19 +103,15 @@ Route/page code now reaches selected chain gateway operations through purpose po
 ### `chainEventStreams.ts`
 - Owns SBT factory listeners, per-SBT activity listeners, and survey listeners.
 - Central place for attach/remove logic and listener dedupe behavior.
-- `contractEventListeners.ts` remains as a naming-migration alias for existing imports while callers move to the canonical stream name.
 
 ### `profileChainReads.ts`
 - Owns token-owner lookups, SBT universe discovery, per-user holdings memoization, minimal SBT summaries, and cross-domain activity aggregation.
-- `contractProfile.ts` remains as a naming-migration alias for existing imports while callers move to the canonical profile-read name.
 
 ### `chainEventScans.ts`
 - Owns stateless historical event-scan helpers split from the main implementation while preserving call-time delegation through the `contractScripts` object.
-- `contractScriptsEventScans.ts` remains as a naming-migration alias for existing imports while callers move to the canonical scan name.
 
 ### `chainMetadataResolution.ts`
 - Owns stateless metadata URI resolution, fetch, and normalization helpers split from the main implementation while preserving call-time delegation through the `contractScripts` object.
-- `contractScriptsMetadataResolution.ts` remains as a naming-migration alias for existing imports while callers move to the canonical metadata name.
 
 ## Method Guide
 
@@ -252,4 +236,4 @@ getAllSbtAddressesCached
 - If a bug is about masked metadata not decrypting, inspect `shouldAttemptGateDecrypt`, `maybeDecryptQuestionPayload`, `maybeDecryptSurveyPayload`, and the `get*Data` methods in `contractScripts.impl.ts`.
 - If a bug is about listeners double-firing or leaking, inspect `chainEventStreams.ts` before touching `MainSite`.
 - If a bug is about profile or SBT universe scans, inspect `profileChainReads.ts` before expanding `contractScripts.impl.ts`.
-- If a test needs to spy on named exports, use `chainGateway.ts` for new tests and keep `contractScripts.js` coverage for legacy import-path compatibility.
+- If a test needs to spy on named exports, use `chainGateway.ts` and the canonical `chainGateway` module surface.

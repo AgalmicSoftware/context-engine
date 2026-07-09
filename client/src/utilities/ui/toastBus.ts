@@ -19,21 +19,18 @@ export type ToastListener = (payload: ToastPayload) => void;
 let toastSequence = 0;
 const listeners = new Set<ToastListener>();
 
-const isToastOptions = (value: unknown): value is ToastOptions => (
-  !!value && typeof value === 'object'
-);
+const isToastOptions = (value: unknown): value is ToastOptions => !!value && typeof value === 'object';
 
 const normalizeToastPayload = (message: unknown, options: unknown = {}): ToastPayload => {
   const normalizedOptions = isToastOptions(options) ? options : {};
   return {
-    id: `ce-toast-${Date.now()}-${toastSequence += 1}`,
+    id: `ce-toast-${Date.now()}-${(toastSequence += 1)}`,
     message: String(message == null ? '' : message).trim(),
     kind: String(normalizedOptions.kind || 'info'),
-    duration: (
+    duration:
       typeof normalizedOptions.duration === 'number' && Number.isFinite(normalizedOptions.duration)
-    )
-      ? normalizedOptions.duration
-      : 4000,
+        ? normalizedOptions.duration
+        : 4000,
     icon: normalizedOptions.icon || '',
   };
 };

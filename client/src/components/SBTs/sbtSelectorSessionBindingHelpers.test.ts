@@ -31,59 +31,79 @@ describe('sbtSelectorSessionBindingHelpers', () => {
     expect(hasAuthoritativeSessionSlug({ sessionSlug: 'Alpha', sessionSlugExplicit: false })).toBe(false);
     expect(hasAuthoritativeSessionSlug({ slug: 'Alpha' })).toBe(false);
 
-    expect(resolveAuthoritativeSbtSessionBindingSlug({
-      sbtInfo: { sessionSlug: 'Alpha', sessionSlugExplicit: true },
-    })).toBe('Alpha');
+    expect(
+      resolveAuthoritativeSbtSessionBindingSlug({
+        sbtInfo: { sessionSlug: 'Alpha', sessionSlugExplicit: true },
+      }),
+    ).toBe('Alpha');
     expect(resolveAuthoritativeSbtSessionBindingSlug({ sessionSlug: 'Beta' })).toBe('Beta');
     expect(resolveAuthoritativeSbtSessionBindingSlug({ sbtInfo: { slug: 'Legacy' } })).toBe('Legacy');
-    expect(resolveAuthoritativeSbtSessionBindingSlug({
-      sessionSlug: 'Inferred',
-      sessionSlugExplicit: false,
-    })).toBeNull();
+    expect(
+      resolveAuthoritativeSbtSessionBindingSlug({
+        sessionSlug: 'Inferred',
+        sessionSlugExplicit: false,
+      }),
+    ).toBeNull();
 
-    expect(resolveDeclaredSbtSessionSlug({
-      sbtInfo: { sessionSlug: 'Declared' },
-      sessionSlug: 'Fallback',
-    })).toBe('Declared');
+    expect(
+      resolveDeclaredSbtSessionSlug({
+        sbtInfo: { sessionSlug: 'Declared' },
+        sessionSlug: 'Fallback',
+      }),
+    ).toBe('Declared');
     expect(resolveDeclaredSbtSessionSlug({ sessionSlug: 'Fallback' })).toBe('Fallback');
     expect(resolveDeclaredSbtSessionSlug({})).toBeNull();
-    expect(resolveConcreteSbtSessionBindingSlug({
-      sessionSlug: 'Concrete',
-      sessionSlugExplicit: true,
-    })).toBe('Concrete');
-    expect(resolveConcreteSbtSessionBindingSlug({
-      sessionSlug: 'Inferred',
-      sessionSlugExplicit: false,
-    })).toBeNull();
+    expect(
+      resolveConcreteSbtSessionBindingSlug({
+        sessionSlug: 'Concrete',
+        sessionSlugExplicit: true,
+      }),
+    ).toBe('Concrete');
+    expect(
+      resolveConcreteSbtSessionBindingSlug({
+        sessionSlug: 'Inferred',
+        sessionSlugExplicit: false,
+      }),
+    ).toBeNull();
   });
 
   it('resolves SBT detail link session slug precedence', () => {
-    expect(resolveSbtDetailLinkSessionSlug({
-      sbt: {
-        sessionBindingSlug: 'Binding',
-        sbtInfo: { sessionSlug: 'Info', sessionSlugExplicit: true },
-        sessionSlug: 'Selected',
-      },
-      fallbackSlug: 'Fallback',
-    })).toBe('Binding');
-    expect(resolveSbtDetailLinkSessionSlug({
-      sbt: {
-        sbtInfo: { sessionSlug: 'Info', sessionSlugExplicit: true },
-        sessionSlug: 'Selected',
-      },
-      fallbackSlug: 'Fallback',
-    })).toBe('Info');
-    expect(resolveSbtDetailLinkSessionSlug({
-      sbt: { sessionSlug: 'Selected', sessionSlugExplicit: true },
-      fallbackSlug: 'Fallback',
-    })).toBe('Selected');
-    expect(resolveSbtDetailLinkSessionSlug({
-      sbt: { sessionSlug: 'Selected', sessionSlugExplicit: false },
-      fallbackSlug: 'Fallback',
-    })).toBe('Selected');
-    expect(resolveSbtDetailLinkSessionSlug({
-      sbt: {},
-      fallbackSlug: 'Fallback',
-    })).toBe('Fallback');
+    expect(
+      resolveSbtDetailLinkSessionSlug({
+        sbt: {
+          sessionBindingSlug: 'Binding',
+          sbtInfo: { sessionSlug: 'Info', sessionSlugExplicit: true },
+          sessionSlug: 'Selected',
+        },
+        fallbackSlug: 'Fallback',
+      }),
+    ).toBe('Binding');
+    expect(
+      resolveSbtDetailLinkSessionSlug({
+        sbt: {
+          sbtInfo: { sessionSlug: 'Info', sessionSlugExplicit: true },
+          sessionSlug: 'Selected',
+        },
+        fallbackSlug: 'Fallback',
+      }),
+    ).toBe('Info');
+    expect(
+      resolveSbtDetailLinkSessionSlug({
+        sbt: { sessionSlug: 'Selected', sessionSlugExplicit: true },
+        fallbackSlug: 'Fallback',
+      }),
+    ).toBe('Selected');
+    expect(
+      resolveSbtDetailLinkSessionSlug({
+        sbt: { sessionSlug: 'Selected', sessionSlugExplicit: false },
+        fallbackSlug: 'Fallback',
+      }),
+    ).toBe('Selected');
+    expect(
+      resolveSbtDetailLinkSessionSlug({
+        sbt: {},
+        fallbackSlug: 'Fallback',
+      }),
+    ).toBe('Fallback');
   });
 });

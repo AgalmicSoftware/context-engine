@@ -1,10 +1,7 @@
 import { createLogger } from 'utilities/logging.js';
 import { getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
 
-import {
-  buildSurveyResultsAlertMessagePatch,
-  buildSurveyResultsCsvFileNamePatch,
-} from './surveyResultsHelpers.js';
+import { buildSurveyResultsAlertMessagePatch, buildSurveyResultsCsvFileNamePatch } from './surveyResultsHelpers.js';
 import {
   runSurveyResultsBrowserDownload,
   runSurveyResultsExportController,
@@ -22,9 +19,7 @@ import {
   buildSurveyResultsFilteredQuestionsForExport,
   type SurveyResultsQuestionExportRecord,
 } from './surveyResultsExportRows.js';
-import type {
-  SurveyResultsResponseRecord,
-} from './surveyResultsLockedFieldHelpers';
+import type { SurveyResultsResponseRecord } from './surveyResultsLockedFieldHelpers';
 
 type SurveyResultsDataExportRecord = Record<string, unknown>;
 
@@ -90,31 +85,20 @@ const surveyLog = createLogger('surveys');
 const NETWORK_UNAVAILABLE_EXPORT_MESSAGE = 'Network not available for fetching question data.';
 const NO_FILTERED_QUESTIONS_EXPORT_MESSAGE = 'No filtered questions to export.';
 
-const toRecord = (value: unknown): SurveyResultsDataExportRecord => (
-  value && typeof value === 'object' ? value as SurveyResultsDataExportRecord : {}
-);
+const toRecord = (value: unknown): SurveyResultsDataExportRecord =>
+  value && typeof value === 'object' ? (value as SurveyResultsDataExportRecord) : {};
 
-const toQuestionRecordMap = (
-  value: unknown
-): Record<string, SurveyResultsDataExportQuestionRecord | undefined> => (
-  toRecord(value) as Record<string, SurveyResultsDataExportQuestionRecord | undefined>
-);
+const toQuestionRecordMap = (value: unknown): Record<string, SurveyResultsDataExportQuestionRecord | undefined> =>
+  toRecord(value) as Record<string, SurveyResultsDataExportQuestionRecord | undefined>;
 
-const toFilteredResponseRows = (value: unknown): SurveyResultsFilteredResponseRow[] => (
-  Array.isArray(value) ? value as SurveyResultsFilteredResponseRow[] : []
-);
+const toFilteredResponseRows = (value: unknown): SurveyResultsFilteredResponseRow[] =>
+  Array.isArray(value) ? (value as SurveyResultsFilteredResponseRow[]) : [];
 
-const toAggregatorRecord = (value: unknown): Record<string, unknown> => (
-  toRecord(value)
-);
+const toAggregatorRecord = (value: unknown): Record<string, unknown> => toRecord(value);
 
-const buildCsvTimestamp = (nowIso: () => string): string => (
-  nowIso().replace(/[:.]/g, '_')
-);
+const buildCsvTimestamp = (nowIso: () => string): string => nowIso().replace(/[:.]/g, '_');
 
-const buildDownloadTimestamp = (nowIso: () => string): string => (
-  nowIso().replace(/[:.-]/g, '_')
-);
+const buildDownloadTimestamp = (nowIso: () => string): string => nowIso().replace(/[:.-]/g, '_');
 
 export const createSurveyResultsDataExportRuntime = ({
   applyStatePatch,
@@ -148,12 +132,11 @@ export const createSurveyResultsDataExportRuntime = ({
     });
   };
 
-  const getFilteredQuestionsForExport = (): SurveyResultsQuestionExportRecord[] => (
+  const getFilteredQuestionsForExport = (): SurveyResultsQuestionExportRecord[] =>
     buildSurveyResultsFilteredQuestionsForExport({
       networkQuestions: toQuestionRecordMap(getNetworkQuestionsForCurrentContext()),
       questionIds: getFilteredQuestionIdsForExport(),
-    })
-  );
+    });
 
   const generateResponsesCSV = (): string => {
     const state = getState();
@@ -166,13 +149,8 @@ export const createSurveyResultsDataExportRuntime = ({
 
     const tsName = buildCsvTimestamp(nowIso);
     try {
-      const isSurveyIndividuals = (
-        state.viewMode === 'survey' &&
-        state.surveyViewMode === 'individuals'
-      );
-      const prefix = isSurveyIndividuals
-        ? 'contextEngine_surveyResponses'
-        : 'contextEngine_questionResponses';
+      const isSurveyIndividuals = state.viewMode === 'survey' && state.surveyViewMode === 'individuals';
+      const prefix = isSurveyIndividuals ? 'contextEngine_surveyResponses' : 'contextEngine_questionResponses';
 
       let cleanSession = '';
       const sessionName = props.sessionName;
@@ -180,7 +158,10 @@ export const createSurveyResultsDataExportRuntime = ({
         if (typeof sessionName === 'string' && sessionName.trim().length > 0) {
           cleanSession = sessionName.replace(/[^A-Za-z0-9_-]+/g, '');
         } else if (sessionName !== undefined) {
-          surveyLog.error('[SurveyResults.generateResponsesCSV] sessionName provided but not a non-empty string:', sessionName);
+          surveyLog.error(
+            '[SurveyResults.generateResponsesCSV] sessionName provided but not a non-empty string:',
+            sessionName,
+          );
         }
       } catch (orgErr) {
         surveyLog.error('[SurveyResults.generateResponsesCSV] Failed to sanitize sessionName:', orgErr);
@@ -268,9 +249,7 @@ export const createSurveyResultsDataExportRuntime = ({
   const getExportBaseFileName = (exportType: unknown = getState().exportType): string => {
     const state = getState();
     const surveyId = String(state.surveyId || '');
-    const surveyIdShort = surveyId
-      ? getShortenedSurveyID(surveyId, false, null, true)
-      : 'all';
+    const surveyIdShort = surveyId ? getShortenedSurveyID(surveyId, false, null, true) : 'all';
     return buildSurveyResultsExportBaseFileName({
       exportType,
       surveyIdShort,

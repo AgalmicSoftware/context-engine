@@ -27,12 +27,14 @@ describe('SBTsList cache hydration loading status', () => {
 
     const alphaAddress = '0x00000000000000000000000000000000000000aa';
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { lastBlock: 0, sbtList: {} } };
+        return { 84532: { lastBlock: 0, sbtList: {} } };
       }
       return {
-        '84532': {
+        84532: {
           lastBlock: 1100,
           sbtList: {
             [alphaAddress.toLowerCase()]: {
@@ -69,7 +71,7 @@ describe('SBTsList cache hydration loading status', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -79,7 +81,7 @@ describe('SBTsList cache hydration loading status', () => {
 
     await act(async () => {
       resolveReadCache({
-        '84532': {
+        84532: {
           sbtList: {},
           lastBlock: 0,
         },
@@ -96,15 +98,17 @@ describe('SBTsList cache hydration loading status', () => {
     const ensureLightSbtDiscovery = jest.fn(() => pendingDiscovery);
 
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { lastBlock: 0, sbtList: {} } };
+        return { 84532: { lastBlock: 0, sbtList: {} } };
       }
       if (!exposePrimedCard) {
-        return { '84532': { lastBlock: 0, sbtList: {} } };
+        return { 84532: { lastBlock: 0, sbtList: {} } };
       }
       return {
-        '84532': {
+        84532: {
           lastBlock: 1050,
           sbtList: {
             [alphaLower]: {
@@ -143,7 +147,7 @@ describe('SBTsList cache hydration loading status', () => {
         latestBlockNumber={0}
         ensureLightSbtDiscovery={ensureLightSbtDiscovery}
         sbtScanProgressBySlug={{}}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -169,7 +173,7 @@ describe('SBTsList cache hydration loading status', () => {
         sbtScanProgressBySlug={{
           alpha: { currentBlock: 1050, latestBlock: 1100 },
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -187,15 +191,17 @@ describe('SBTsList cache hydration loading status', () => {
     const ensureLightSbtDiscovery = jest.fn(() => pendingDiscovery);
 
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'alpha') {
-        return { '84532': { lastBlock: 0, sbtList: {} } };
+        return { 84532: { lastBlock: 0, sbtList: {} } };
       }
       if (cacheState !== 'primed') {
-        return { '84532': { lastBlock: 0, sbtList: {} } };
+        return { 84532: { lastBlock: 0, sbtList: {} } };
       }
       return {
-        '84532': {
+        84532: {
           lastBlock: 1060,
           sbtList: {
             [alphaLower]: {
@@ -234,7 +240,7 @@ describe('SBTsList cache hydration loading status', () => {
         latestBlockNumber={0}
         ensureLightSbtDiscovery={ensureLightSbtDiscovery}
         sbtScanProgressBySlug={{}}
-      />
+      />,
     );
 
     cacheState = 'primed';
@@ -256,7 +262,7 @@ describe('SBTsList cache hydration loading status', () => {
         sbtScanProgressBySlug={{
           alpha: { currentBlock: 1060, latestBlock: 1100 },
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -283,7 +289,7 @@ describe('SBTsList cache hydration loading status', () => {
         sbtScanProgressBySlug={{
           alpha: { currentBlock: 1070, latestBlock: 1100 },
         }}
-      />
+      />,
     );
 
     await waitFor(() => {

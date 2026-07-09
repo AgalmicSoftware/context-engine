@@ -20,32 +20,34 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
       return true;
     });
 
-    expect(buildDraftHydrationState({
-      renderedQuestionIds: ['Q1', 'q2'],
-      draft: {
-        answers: {
-          q1: { value: 'answer-1', importance: 4, conviction: 7 },
+    expect(
+      buildDraftHydrationState({
+        renderedQuestionIds: ['Q1', 'q2'],
+        draft: {
+          answers: {
+            q1: { value: 'answer-1', importance: 4, conviction: 7 },
+          },
+          baseline: {
+            q2: { value: 'baseline-2', importance: 2, conviction: 3 },
+          },
         },
-        baseline: {
-          q2: { value: 'baseline-2', importance: 2, conviction: 3 },
+        prevSlice: {
+          answers: { q0: { value: 'keep' } },
+          importance: {},
+          conviction: {},
+          additionalComments: {},
         },
-      },
-      prevSlice: {
-        answers: { q0: { value: 'keep' } },
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
-      prevBaseline: {
-        answers: { q9: { value: 'baseline-keep' } },
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
-      allowOverwrite: true,
-      cloneBaseline,
-      applyDraftEntryToSlice,
-    })).toEqual({
+        prevBaseline: {
+          answers: { q9: { value: 'baseline-keep' } },
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+        allowOverwrite: true,
+        cloneBaseline,
+        applyDraftEntryToSlice,
+      }),
+    ).toEqual({
       nextSlice: {
         answers: {
           q0: { value: 'keep' },
@@ -75,15 +77,17 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
   it('returns unchanged slices when no rendered ids or draft entries apply', () => {
     const applyDraftEntryToSlice = jest.fn();
 
-    expect(buildDraftHydrationState({
-      renderedQuestionIds: [],
-      draft: null,
-      prevSlice: null,
-      prevBaseline: null,
-      allowOverwrite: false,
-      cloneBaseline: null,
-      applyDraftEntryToSlice,
-    })).toEqual({
+    expect(
+      buildDraftHydrationState({
+        renderedQuestionIds: [],
+        draft: null,
+        prevSlice: null,
+        prevBaseline: null,
+        allowOverwrite: false,
+        cloneBaseline: null,
+        applyDraftEntryToSlice,
+      }),
+    ).toEqual({
       nextSlice: {
         answers: {},
         importance: {},
@@ -109,79 +113,87 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
     }));
     const onError = jest.fn();
 
-    expect(loadDraftAnswersByQuestionIdSafely({
-      loadDraft: () => ({ answers: { q1: { value: 'raw-draft' } } }),
-      buildDraftAnswersByQuestionId,
-      onError,
-    })).toEqual({
+    expect(
+      loadDraftAnswersByQuestionIdSafely({
+        loadDraft: () => ({ answers: { q1: { value: 'raw-draft' } } }),
+        buildDraftAnswersByQuestionId,
+        onError,
+      }),
+    ).toEqual({
       q1: { value: 'draft-answer' },
     });
     expect(onError).not.toHaveBeenCalled();
 
     const draftError = new Error('draft-load-failed');
-    expect(loadDraftAnswersByQuestionIdSafely({
-      loadDraft: () => {
-        throw draftError;
-      },
-      buildDraftAnswersByQuestionId,
-      onError,
-    })).toEqual({});
+    expect(
+      loadDraftAnswersByQuestionIdSafely({
+        loadDraft: () => {
+          throw draftError;
+        },
+        buildDraftAnswersByQuestionId,
+        onError,
+      }),
+    ).toEqual({});
     expect(onError).toHaveBeenCalledWith(draftError);
 
     onError.mockClear();
     const buildError = new Error('draft-map-failed');
-    expect(loadDraftAnswersByQuestionIdSafely({
-      loadDraft: () => ({ answers: { q1: { value: 'raw-draft' } } }),
-      buildDraftAnswersByQuestionId: () => {
-        throw buildError;
-      },
-      onError,
-    })).toEqual({});
+    expect(
+      loadDraftAnswersByQuestionIdSafely({
+        loadDraft: () => ({ answers: { q1: { value: 'raw-draft' } } }),
+        buildDraftAnswersByQuestionId: () => {
+          throw buildError;
+        },
+        onError,
+      }),
+    ).toEqual({});
     expect(onError).toHaveBeenCalledWith(buildError);
   });
 
   it('builds draft hydration rendered ids with optional pile expansion', () => {
-    expect(buildDraftHydrationRenderedQuestionIds({
-      hydrationQuestionIds: ['q1', 'Q2'],
-      pileQuestions: [
-        { id: 'q2' },
-        { id: 'q3' },
-      ],
-      forceOverwrite: false,
-    })).toEqual(['q1', 'q2']);
+    expect(
+      buildDraftHydrationRenderedQuestionIds({
+        hydrationQuestionIds: ['q1', 'Q2'],
+        pileQuestions: [{ id: 'q2' }, { id: 'q3' }],
+        forceOverwrite: false,
+      }),
+    ).toEqual(['q1', 'q2']);
 
-    expect(buildDraftHydrationRenderedQuestionIds({
-      hydrationQuestionIds: ['q1', 'Q2'],
-      pileQuestions: [
-        { id: 'q2' },
-        { id: 'q3' },
-      ],
-      forceOverwrite: true,
-    })).toEqual(['q1', 'q2', 'q3']);
+    expect(
+      buildDraftHydrationRenderedQuestionIds({
+        hydrationQuestionIds: ['q1', 'Q2'],
+        pileQuestions: [{ id: 'q2' }, { id: 'q3' }],
+        forceOverwrite: true,
+      }),
+    ).toEqual(['q1', 'q2', 'q3']);
   });
 
   it('builds draft hydration overwrite decisions from pending edit state', () => {
-    expect(buildDraftHydrationOverwriteDecision({
-      forceOverwrite: true,
-      isDirty: false,
-      modifiedCount: 0,
-      pendingStats: { total: 0 },
-      submittedSinceLastEdit: false,
-      submissionComplete: false,
-    })).toEqual({
+    expect(
+      buildDraftHydrationOverwriteDecision({
+        forceOverwrite: true,
+        isDirty: false,
+        modifiedCount: 0,
+        pendingStats: { total: 0 },
+        submittedSinceLastEdit: false,
+        submissionComplete: false,
+      }),
+    ).toEqual({
       pendingTotal: 0,
       submittedStateActive: false,
       allowOverwrite: true,
     });
 
-    expect(buildDraftHydrationOverwriteDecision({
-      forceOverwrite: false,
-      isDirty: true,
-      modifiedCount: 2,
-      pendingStats: { total: 2 },
-      submittedSinceLastEdit: true,
-      submissionComplete: true,
-    })).toEqual({
+    expect(
+      buildDraftHydrationOverwriteDecision({
+        forceOverwrite: false,
+        isDirty: true,
+        modifiedCount: 2,
+        pendingStats: { total: 2 },
+        submittedSinceLastEdit: true,
+        submissionComplete: true,
+      }),
+    ).toEqual({
       pendingTotal: 2,
       submittedStateActive: true,
       allowOverwrite: false,
@@ -189,32 +201,40 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
   });
 
   it('decides when draft hydration should skip and resolves its seed context', () => {
-    expect(shouldSkipDraftHydrationRun({
-      suppressPrefill: true,
-      submissionError: '',
-      draft: { answers: { q1: { value: 'x' } } },
-    })).toBe(true);
+    expect(
+      shouldSkipDraftHydrationRun({
+        suppressPrefill: true,
+        submissionError: '',
+        draft: { answers: { q1: { value: 'x' } } },
+      }),
+    ).toBe(true);
 
-    expect(shouldSkipDraftHydrationRun({
-      suppressPrefill: false,
-      submissionError: 'failed',
-      draft: { answers: { q1: { value: 'x' } } },
-    })).toBe(true);
+    expect(
+      shouldSkipDraftHydrationRun({
+        suppressPrefill: false,
+        submissionError: 'failed',
+        draft: { answers: { q1: { value: 'x' } } },
+      }),
+    ).toBe(true);
 
-    expect(shouldSkipDraftHydrationRun({
-      suppressPrefill: false,
-      submissionError: '',
-      draft: { answers: {}, baseline: {} },
-    })).toBe(false);
+    expect(
+      shouldSkipDraftHydrationRun({
+        suppressPrefill: false,
+        submissionError: '',
+        draft: { answers: {}, baseline: {} },
+      }),
+    ).toBe(false);
 
-    expect(buildDraftHydrationSeedContext({
-      isStandalone: false,
-      singleQuestionMode: false,
-      surveyIndex: 2,
-      surveysResponseState: [
-        { answers: { q0: { value: 'keep-0' } }, importance: {}, conviction: {}, additionalComments: {} },
-      ],
-    })).toEqual({
+    expect(
+      buildDraftHydrationSeedContext({
+        isStandalone: false,
+        singleQuestionMode: false,
+        surveyIndex: 2,
+        surveysResponseState: [
+          { answers: { q0: { value: 'keep-0' } }, importance: {}, conviction: {}, additionalComments: {} },
+        ],
+      }),
+    ).toEqual({
       surveyIndex: 2,
       prevSlice: {
         answers: {},
@@ -224,14 +244,16 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
       },
     });
 
-    expect(buildDraftHydrationSeedContext({
-      isStandalone: true,
-      singleQuestionMode: false,
-      surveyIndex: 3,
-      surveysResponseState: [
-        { answers: { q1: { value: 'keep-1' } }, importance: {}, conviction: {}, additionalComments: {} },
-      ],
-    })).toEqual({
+    expect(
+      buildDraftHydrationSeedContext({
+        isStandalone: true,
+        singleQuestionMode: false,
+        surveyIndex: 3,
+        surveysResponseState: [
+          { answers: { q1: { value: 'keep-1' } }, importance: {}, conviction: {}, additionalComments: {} },
+        ],
+      }),
+    ).toEqual({
       surveyIndex: 0,
       prevSlice: {
         answers: { q1: { value: 'keep-1' } },
@@ -249,39 +271,39 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
       return true;
     });
 
-    expect(buildDraftHydrationRunPlan({
-      hydrationQuestionIds: ['q1'],
-      pileQuestions: [{ id: 'q2' }],
-      forceOverwrite: true,
-      isDirty: false,
-      modifiedCount: 0,
-      pendingStats: { total: 0 },
-      submittedSinceLastEdit: false,
-      submissionComplete: false,
-      prevSurveysResponseState: [
-        { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      ],
-      surveyIndex: 0,
-      draft: {
-        answers: {
-          q2: { value: 'off-screen' },
+    expect(
+      buildDraftHydrationRunPlan({
+        hydrationQuestionIds: ['q1'],
+        pileQuestions: [{ id: 'q2' }],
+        forceOverwrite: true,
+        isDirty: false,
+        modifiedCount: 0,
+        pendingStats: { total: 0 },
+        submittedSinceLastEdit: false,
+        submissionComplete: false,
+        prevSurveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+        surveyIndex: 0,
+        draft: {
+          answers: {
+            q2: { value: 'off-screen' },
+          },
         },
-      },
-      prevSlice: {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
-      prevBaseline: {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
-      cloneBaseline,
-      applyDraftEntryToSlice,
-    })).toEqual({
+        prevSlice: {
+          answers: {},
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+        prevBaseline: {
+          answers: {},
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+        cloneBaseline,
+        applyDraftEntryToSlice,
+      }),
+    ).toEqual({
       renderedQuestionIds: ['q1', 'q2'],
       allowOverwrite: true,
       nextSlice: {
@@ -321,34 +343,36 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
       return true;
     });
 
-    expect(buildDraftHydrationUpdatePlan({
-      prevSurveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
-      surveyIndex: 2,
-      renderedQuestionIds: ['q1'],
-      draft: {
-        answers: {
-          q1: { value: 'answer-1', importance: 4, conviction: 7 },
+    expect(
+      buildDraftHydrationUpdatePlan({
+        prevSurveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
+        surveyIndex: 2,
+        renderedQuestionIds: ['q1'],
+        draft: {
+          answers: {
+            q1: { value: 'answer-1', importance: 4, conviction: 7 },
+          },
+          baseline: {
+            q1: { value: 'baseline-1', importance: 2, conviction: 3 },
+          },
         },
-        baseline: {
-          q1: { value: 'baseline-1', importance: 2, conviction: 3 },
+        prevSlice: {
+          answers: {},
+          importance: {},
+          conviction: {},
+          additionalComments: {},
         },
-      },
-      prevSlice: {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
-      prevBaseline: {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
-      allowOverwrite: true,
-      cloneBaseline,
-      applyDraftEntryToSlice,
-    })).toEqual({
+        prevBaseline: {
+          answers: {},
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+        allowOverwrite: true,
+        cloneBaseline,
+        applyDraftEntryToSlice,
+      }),
+    ).toEqual({
       nextSlice: {
         answers: { q1: { value: 'answer-1' } },
         importance: { q1: 4 },
@@ -388,5 +412,4 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
       },
     });
   });
-
 });

@@ -28,7 +28,7 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
         toggleLoginModal={jest.fn()}
         activeSessionSlug="edge"
         sessionConfig={makeSessionConfig()}
-      />
+      />,
     );
 
     await addAdditionalUrl('https://example.com/source');
@@ -57,7 +57,7 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
         toggleLoginModal={jest.fn()}
         activeSessionSlug="edge"
         sessionConfig={makeSessionConfig({ docUploadsGate: null })}
-      />
+      />,
     );
 
     await addAdditionalUrl('https://example.com/private');
@@ -90,14 +90,16 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
           sessionIdHex: `0x${'3'.repeat(32)}`,
           docUploadsGate: null,
         })}
-      />
+      />,
     );
 
     await addAdditionalUrl('https://example.com/delayed-gate');
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     expect(
-      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`).getAttribute('aria-label')
+      container
+        .querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`)
+        .getAttribute('aria-label'),
     ).toContain('only me');
 
     await renderSubject(
@@ -117,29 +119,33 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
             mode: 0,
           },
         })}
-      />
+      />,
     );
 
     expect(
-      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`).getAttribute('aria-label')
+      container
+        .querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`)
+        .getAttribute('aria-label'),
     ).toContain('Edge Session');
   });
 
   it('saves queued extra sources into the session doc library before generating questions', async () => {
     const onQuestionsGenerated = jest.fn();
     mockProcessAdditionalSources.mockResolvedValue(
-      'This additional source content is long enough to drive question generation on its own.'
+      'This additional source content is long enough to drive question generation on its own.',
     );
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Saved Sources Survey',
-      questions: [
-        {
-          prompt: 'Should saved sources use doc-library refs?',
-          questionType: 'binary',
-          tags: ['docs'],
-        },
-      ],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Saved Sources Survey',
+        questions: [
+          {
+            prompt: 'Should saved sources use doc-library refs?',
+            questionType: 'binary',
+            tags: ['docs'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -154,7 +160,7 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
           sessionIdHex: `0x${'4'.repeat(32)}`,
         })}
         onQuestionsGenerated={onQuestionsGenerated}
-      />
+      />,
     );
 
     await addAdditionalUrl('https://example.com/to-save');
@@ -167,11 +173,11 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
 
     expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledTimes(1);
     expect(mockCallAI).toHaveBeenCalledTimes(1);
-    expect(mockUploadDocLibraryUrlRecord.mock.invocationCallOrder[0]).toBeLessThan(mockCallAI.mock.invocationCallOrder[0]);
+    expect(mockUploadDocLibraryUrlRecord.mock.invocationCallOrder[0]).toBeLessThan(
+      mockCallAI.mock.invocationCallOrder[0],
+    );
     expect(onQuestionsGenerated).toHaveBeenCalledTimes(1);
-    expect(onQuestionsGenerated.mock.calls[0][1]).toEqual([
-      expect.stringContaining('/session/0xSessionToken/docs?'),
-    ]);
+    expect(onQuestionsGenerated.mock.calls[0][1]).toEqual([expect.stringContaining('/session/0xSessionToken/docs?')]);
     expect(onQuestionsGenerated.mock.calls[0][1][0].startsWith('/session/0xSessionToken/docs?')).toBe(true);
     expect(onQuestionsGenerated.mock.calls[0][1][0]).toContain(`__ceDocTx=${'A'.repeat(43)}`);
     expect(onQuestionsGenerated.mock.calls[0][1][0]).not.toBe('https://example.com/to-save');
@@ -180,18 +186,20 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
   it('saves a typed URL source into session context during generation without requiring the add-url click', async () => {
     const onQuestionsGenerated = jest.fn();
     mockProcessAdditionalSources.mockResolvedValue(
-      'This typed URL source content is long enough to drive question generation on its own.'
+      'This typed URL source content is long enough to drive question generation on its own.',
     );
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Typed URL Saved Sources Survey',
-      questions: [
-        {
-          prompt: 'Should typed URLs be saved as context before generation?',
-          questionType: 'binary',
-          tags: ['docs'],
-        },
-      ],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Typed URL Saved Sources Survey',
+        questions: [
+          {
+            prompt: 'Should typed URLs be saved as context before generation?',
+            questionType: 'binary',
+            tags: ['docs'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -206,7 +214,7 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
           sessionIdHex: `0x${'4'.repeat(32)}`,
         })}
         onQuestionsGenerated={onQuestionsGenerated}
-      />
+      />,
     );
 
     setInputValue('input[placeholder="Add URL"]', 'https://example.com/typed-to-save');
@@ -218,14 +226,14 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
     });
 
     expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledTimes(1);
-    expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(expect.objectContaining({
-      url: 'https://example.com/typed-to-save',
-    }));
+    expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://example.com/typed-to-save',
+      }),
+    );
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     expect(onQuestionsGenerated).toHaveBeenCalledTimes(1);
-    expect(onQuestionsGenerated.mock.calls[0][1]).toEqual([
-      expect.stringContaining('/session/0xSessionToken/docs?'),
-    ]);
+    expect(onQuestionsGenerated.mock.calls[0][1]).toEqual([expect.stringContaining('/session/0xSessionToken/docs?')]);
     expect(onQuestionsGenerated.mock.calls[0][1][0]).toContain(`__ceDocTx=${'A'.repeat(43)}`);
     expect(onQuestionsGenerated.mock.calls[0][1][0]).not.toBe('https://example.com/typed-to-save');
     expect(container.querySelector('input[placeholder="Add URL"]').value).toBe('');
@@ -236,18 +244,20 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
     const scopedSaveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
     const onQuestionsGenerated = jest.fn();
     mockProcessAdditionalSources.mockResolvedValue(
-      'This additional source content is long enough to drive question generation on its own.'
+      'This additional source content is long enough to drive question generation on its own.',
     );
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Worker Runtime Survey',
-      questions: [
-        {
-          prompt: 'Can server-side Lit runtime save session-gated context?',
-          questionType: 'binary',
-          tags: ['docs'],
-        },
-      ],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Worker Runtime Survey',
+        questions: [
+          {
+            prompt: 'Can server-side Lit runtime save session-gated context?',
+            questionType: 'binary',
+            tags: ['docs'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -270,14 +280,16 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
           },
         })}
         onQuestionsGenerated={onQuestionsGenerated}
-      />
+      />,
     );
 
     await addAdditionalUrl('https://example.com/to-save-with-worker-runtime');
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     expect(
-      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`).getAttribute('aria-label')
+      container
+        .querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`)
+        .getAttribute('aria-label'),
     ).toContain('Edge Session');
 
     const form = container.querySelector('form');
@@ -285,31 +297,35 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
       form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
 
-    expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(expect.objectContaining({
-      encryption: expect.objectContaining({
-        enabled: true,
-        saveKey: scopedSaveKey,
-        chainId: 11155420,
+    expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        encryption: expect.objectContaining({
+          enabled: true,
+          saveKey: scopedSaveKey,
+          chainId: 11155420,
+        }),
       }),
-    }));
+    );
     expect(onQuestionsGenerated).toHaveBeenCalledTimes(1);
   });
 
   it('keeps raw extra-source URLs when doc-library saving is not enabled', async () => {
     const onQuestionsGenerated = jest.fn();
     mockProcessAdditionalSources.mockResolvedValue(
-      'This additional source content is long enough to drive question generation on its own.'
+      'This additional source content is long enough to drive question generation on its own.',
     );
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Raw URL Survey',
-      questions: [
-        {
-          prompt: 'Should unsaved sources stay raw?',
-          questionType: 'binary',
-          tags: ['docs'],
-        },
-      ],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Raw URL Survey',
+        questions: [
+          {
+            prompt: 'Should unsaved sources stay raw?',
+            questionType: 'binary',
+            tags: ['docs'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -321,7 +337,7 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
         activeSessionSlug="edge"
         sessionConfig={makeSessionConfig()}
         onQuestionsGenerated={onQuestionsGenerated}
-      />
+      />,
     );
 
     await addAdditionalUrl('https://example.com/raw-source');
@@ -335,7 +351,7 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
     expect(onQuestionsGenerated).toHaveBeenCalledWith(
       expect.any(Array),
       ['https://example.com/raw-source'],
-      'Raw URL Survey'
+      'Raw URL Survey',
     );
   });
 
@@ -350,7 +366,7 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
         toggleLoginModal={toggleLoginModal}
         activeSessionSlug="edge"
         sessionConfig={makeSessionConfig()}
-      />
+      />,
     );
 
     setInputValue('input[placeholder="Add URL"]', 'https://example.com/auth-required');
@@ -371,12 +387,14 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
   it('blocks question generation when saving queued doc sources fails', async () => {
     mockUploadDocLibraryUrlRecord.mockRejectedValueOnce(new Error('Save failed.'));
     mockProcessAdditionalSources.mockResolvedValue(
-      'This additional source content is long enough to drive question generation on its own.'
+      'This additional source content is long enough to drive question generation on its own.',
     );
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Should not render',
-      questions: [],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Should not render',
+        questions: [],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -387,7 +405,7 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
         toggleLoginModal={jest.fn()}
         activeSessionSlug="edge"
         sessionConfig={makeSessionConfig()}
-      />
+      />,
     );
 
     await addAdditionalUrl('https://example.com/fails');

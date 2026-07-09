@@ -1,15 +1,6 @@
-import {
-  getAllSessionSlugs,
-  getSessionSlugByName,
-} from '../../utilities/web3/contractScripts.js';
-import {
-  readQuestionsCacheRef,
-  readSurveysCacheRef,
-} from './surveyToolCacheState.js';
-import {
-  resolveEffectiveSlug,
-  resolveIdLookupContext,
-} from './surveyToolScope.js';
+import { getAllSessionSlugs, getSessionSlugByName } from '../../utilities/web3/chainGateway.js';
+import { readQuestionsCacheRef, readSurveysCacheRef } from './surveyToolCacheState.js';
+import { resolveEffectiveSlug, resolveIdLookupContext } from './surveyToolScope.js';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -54,13 +45,13 @@ export function resolveSlugForIds({
     const netIdStr = idLookupContext.networkIdStr || '';
 
     const questionCache = readQuestionsCacheRef(slug) || {};
-    const networkQuestions = netIdStr ? (questionCache?.[netIdStr] || null) : null;
+    const networkQuestions = netIdStr ? questionCache?.[netIdStr] || null : null;
     if (qLower && networkQuestions && networkQuestions.questions && networkQuestions.questions[qLower]) {
       return slug;
     }
 
     const surveyCache = readSurveysCacheRef(slug) || {};
-    const networkSurveys = netIdStr ? (surveyCache?.[netIdStr] || null) : null;
+    const networkSurveys = netIdStr ? surveyCache?.[netIdStr] || null : null;
     if (networkSurveys && networkSurveys.surveys) {
       if (sLower && networkSurveys.surveys[sLower]) {
         const mapped = getSessionSlugByName(networkSurveys.surveys[sLower]?.sessionName);

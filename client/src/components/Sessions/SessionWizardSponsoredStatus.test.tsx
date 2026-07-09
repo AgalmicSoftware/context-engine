@@ -2,15 +2,11 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import SessionWizardSponsoredStatus, {
-  getSponsoredBundleStatusToneClassName,
-} from './SessionWizardSponsoredStatus';
+import SessionWizardSponsoredStatus, { getSponsoredBundleStatusToneClassName } from './SessionWizardSponsoredStatus';
 
 describe('SessionWizardSponsoredStatus', () => {
   it('renders nothing without a status', () => {
-    const { container } = render(
-      <SessionWizardSponsoredStatus onRetry={jest.fn()} status={null} />
-    );
+    const { container } = render(<SessionWizardSponsoredStatus onRetry={jest.fn()} status={null} />);
 
     expect(container).toBeEmptyDOMElement();
   });
@@ -26,7 +22,7 @@ describe('SessionWizardSponsoredStatus', () => {
           retryable: true,
           tone: 'error',
         }}
-      />
+      />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent('Malformed sponsored link.');

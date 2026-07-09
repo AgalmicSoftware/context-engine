@@ -45,9 +45,7 @@ export const buildTagHref = (tag: unknown, baseUrl = '', sessionSlug = '') => {
     ? joinTagRoute(baseUrl, '/tag/')
     : joinTagRoute(baseUrl, `/tag/${encodeURIComponent(trimmedTag)}`);
 
-  return normalizedSessionSlug
-    ? `${path}?session=${encodeURIComponent(normalizedSessionSlug)}`
-    : path;
+  return normalizedSessionSlug ? `${path}?session=${encodeURIComponent(normalizedSessionSlug)}` : path;
 };
 
 const QuestionTagDropdown = ({

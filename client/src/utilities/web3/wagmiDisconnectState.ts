@@ -1,6 +1,5 @@
 /** @file wagmiDisconnectState.js */
 
-
 import { createLogger } from '../logging.js';
 
 const log = createLogger('wagmiDisconnectState');
@@ -26,11 +25,15 @@ export const wasUserExplicitlyDisconnected = (storage: Storage | null = getStora
 export const markUserExplicitlyDisconnected = (storage: Storage | null = getStorage()): void => {
   try {
     storage?.setItem(USER_DISCONNECTED_STORAGE_KEY, 'true');
-  } catch (e) { log.warn('wagmiDisconnectState: fallback', e); }
+  } catch (e) {
+    log.warn('wagmiDisconnectState: fallback', e);
+  }
 };
 
 export const clearUserExplicitlyDisconnected = (storage: Storage | null = getStorage()): void => {
   try {
     storage?.removeItem(USER_DISCONNECTED_STORAGE_KEY);
-  } catch (e) { log.warn('wagmiDisconnectState: fallback', e); }
+  } catch (e) {
+    log.warn('wagmiDisconnectState: fallback', e);
+  }
 };

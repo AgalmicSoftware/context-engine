@@ -8,15 +8,11 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
-import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
+import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
-import {
-  Container,
-  Row,
-  Col,
-} from 'reactstrap';
+import { Container, Row, Col } from 'reactstrap';
 
 import ToolExplorerPluginExplainer from './ToolExplorerPluginExplainer';
 import LazyFallback from '../Shared/LazyFallback';
@@ -32,12 +28,12 @@ import styles from './ToolExplorer.module.scss';
 import plusSignImage from '../../assets/img/plus_sign.png';
 
 // Tools/plugins are lazy-loaded so chunks are fetched only on click.
-const RiskMatrix = React.lazy(() => import("../MainContent/RiskMatrix"));
-const SurveyTool = React.lazy(() => import("../SurveyTool/SurveyTool"));
-const AudioInput = React.lazy(() => import("../Shared/AudioInput/AudioInput"));
-const SBTsPage = React.lazy(() => import("../SBTs/SBTsPage"));
-const DebateMap = React.lazy(() => import("../DebateMap/DebateMap"));
-const AudioSurveyGenerator = React.lazy(() => import("../SurveyTool/SurveyGenerator/SurveyGenerator"));
+const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
+const SurveyTool = React.lazy(() => import('../SurveyTool/SurveyTool'));
+const AudioInput = React.lazy(() => import('../Shared/AudioInput/AudioInput'));
+const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
+const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
+const AudioSurveyGenerator = React.lazy(() => import('../SurveyTool/SurveyGenerator/SurveyGenerator'));
 
 const log = createLogger('ui');
 
@@ -57,10 +53,14 @@ type ToolData = {
 type ExpandedComponentState = {
   component: ToolComponent;
   data: ToolData;
-  props?: Record<string, any>;
+  props?: Record<string, unknown>;
 } | null;
 
-type ToolExplorerProps = Record<string, any>;
+type ToolExplorerProps = {
+  activeSessionSlug?: unknown;
+  demoSurfaceMode?: unknown;
+  [key: string]: unknown;
+};
 
 const ToolExplorer = (props: ToolExplorerProps) => {
   const [expandedComponent, setExpandedComponent] = useState<ExpandedComponentState>(null);
@@ -76,7 +76,8 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     {
       name: 'Questions',
       subtext: 'Opinions and Priorities',
-      explainText: 'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering. Responses can be encrypted for privacy and retroactive evaluation by ZK systems (opt-in). Audio input processed by OpenAI – not stored by this app. Responses stored permanently on Arweave',
+      explainText:
+        'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering. Responses can be encrypted for privacy and retroactive evaluation by ZK systems (opt-in). Audio input processed by OpenAI – not stored by this app. Responses stored permanently on Arweave',
       image: worldVoteImage,
       headerImage: artHeader,
       content: SurveyTool,
@@ -86,7 +87,8 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     {
       name: 'Groups',
       subtext: 'Create and Use',
-      explainText: 'Soulbound tokens (non-transferrable NFTs) enable digital groups to organize and coordinate by representing membership, roles, and permissions on-chain. SBTs can create private spaces for collective action, decision-making, and training custom AI models together, unlocking new possibilities for decentralized governance.',
+      explainText:
+        'Soulbound tokens (non-transferrable NFTs) enable digital groups to organize and coordinate by representing membership, roles, and permissions on-chain. SBTs can create private spaces for collective action, decision-making, and training custom AI models together, unlocking new possibilities for decentralized governance.',
       image: modelDirectoryImage,
       content: SBTsPage,
       disabled: false,
@@ -95,7 +97,8 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     {
       name: 'Context',
       subtext: 'AI Opinion Database',
-      explainText: 'AI Database Tool ingests URLs or PDFs, generates debate-worthy questions using AI, and allows users to select and add these questions to a debate tree and/or question bank.',
+      explainText:
+        'AI Database Tool ingests URLs or PDFs, generates debate-worthy questions using AI, and allows users to select and add these questions to a debate tree and/or question bank.',
       image: magnifyingGlassImage,
       headerImage: null,
       content: AudioSurveyGenerator,
@@ -105,7 +108,8 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     {
       name: 'Debate Tree',
       subtext: 'For efficient discourse',
-      explainText: 'Demo of an interactive version of Deepmind\'s "AI Policy Atlas". Intended to help users structure and navigate complex arguments, and to help AI researchers and policymakers understand and communicate about AI policy issues. Work in progress.',
+      explainText:
+        'Demo of an interactive version of Deepmind\'s "AI Policy Atlas". Intended to help users structure and navigate complex arguments, and to help AI researchers and policymakers understand and communicate about AI policy issues. Work in progress.',
       image: debateTreeImage,
       headerImage: null,
       content: DebateMap,
@@ -115,7 +119,8 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     {
       name: 'Risks',
       subtext: 'Track opps and risks',
-      explainText: 'A tool for collective "heatmap" tracking of opportunities and risks related to disruptive technologies. Input from other areas of the site could be used to populate and improve this display. Axes could be different, and a 3D version (with subcategories) can be previewed by clicking a row and column',
+      explainText:
+        'A tool for collective "heatmap" tracking of opportunities and risks related to disruptive technologies. Input from other areas of the site could be used to populate and improve this display. Axes could be different, and a 3D version (with subcategories) can be previewed by clicking a row and column',
       image: riskMatrixImage,
       headerImage: null,
       content: RiskMatrix,
@@ -154,11 +159,13 @@ const ToolExplorer = (props: ToolExplorerProps) => {
   const showGroupsHeaderActions = expandedToolName === 'Groups';
   const showDataHeaderActions = expandedToolName === 'Context';
   const expandedDemoCard = expandedComponent?.data?.status === 'future';
-  const selectedDataSessionSlug = useMemo(() => (
-    dataSessionOverrideTouched
-      ? normalizeSessionSlug(dataSessionOverrideSlug || '')
-      : normalizeSessionSlug(props.activeSessionSlug || '')
-  ), [dataSessionOverrideSlug, dataSessionOverrideTouched, props.activeSessionSlug]);
+  const selectedDataSessionSlug = useMemo(
+    () =>
+      dataSessionOverrideTouched
+        ? normalizeSessionSlug(dataSessionOverrideSlug || '')
+        : normalizeSessionSlug(props.activeSessionSlug || ''),
+    [dataSessionOverrideSlug, dataSessionOverrideTouched, props.activeSessionSlug],
+  );
   const dataSessionSelectorOptions = useMemo(() => {
     const options = new Map();
     const pushOption = (slugIn = '') => {
@@ -167,9 +174,10 @@ const ToolExplorer = (props: ToolExplorerProps) => {
       const cfg = getSessionConfigBySlug(slug) || {};
       const sessionName = toStr(cfg?.sessionName || '').trim();
       const slugLabel = slug || 'General';
-      const label = sessionName && sessionName.toLowerCase() !== slugLabel.toLowerCase()
-        ? `${sessionName} (${slugLabel})`
-        : (sessionName || slugLabel);
+      const label =
+        sessionName && sessionName.toLowerCase() !== slugLabel.toLowerCase()
+          ? `${sessionName} (${slugLabel})`
+          : sessionName || slugLabel;
       options.set(slug, {
         key: `database-session-${slug || 'general'}`,
         slug,
@@ -182,19 +190,18 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     };
 
     pushOption(selectedDataSessionSlug);
-    pushOption(props.activeSessionSlug);
+    pushOption(toStr(props.activeSessionSlug));
     pushOption('');
     (getAllSessionSlugs({ includeEmpty: true }) || []).forEach(pushOption);
     return Array.from(options.values());
   }, [props.activeSessionSlug, selectedDataSessionSlug]);
 
-  const readInitialGroupsCreateState = () => (
+  const readInitialGroupsCreateState = () =>
     hasCachedCreateSbtForm({
-      sessionSlug: props.activeSessionSlug || '',
+      sessionSlug: toStr(props.activeSessionSlug),
       migrateLegacyToSessionKey: true,
       clearInvalid: true,
-    } as any)
-  );
+    });
 
   const handleClick = (Component: ToolComponent, data: ToolData) => {
     if (!data.disabled) {
@@ -207,7 +214,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
       }
       setExpandedComponent(() => ({
         component: Component,
-        data: data
+        data: data,
       }));
     }
   };
@@ -242,42 +249,46 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     }
   }, [expandedDemoCard, props.demoSurfaceMode]);
 
-  const expandedChildProps = expandedComponent ? {
-    ...expandedComponent.data,
-    account: props.account,
-    provider: props.provider,
-    litHooks: props.litHooks,
-    activeSessionSlug: props.activeSessionSlug,
-    sessionConfig: getSessionConfigBySlug(props.activeSessionSlug || '') || null,
-    ensureLightSbtUniverse: props.ensureLightSbtUniverse,
-    loginComplete: props.loginComplete,
-    toggleLoginModal: props.toggleLoginModal,
-    network: props.network,
-    isSBTCacheReady: props.isSBTCacheReady,
-    isSurveyCacheReady: props.isSurveyCacheReady,
-    isQuestionCacheReady: props.isQuestionCacheReady,
-    ...(expandedToolName === 'Questions'
-      ? {
-        preventUrlChange: true,
+  const expandedChildProps = expandedComponent
+    ? {
+        ...expandedComponent.data,
+        account: props.account,
+        provider: props.provider,
+        litHooks: props.litHooks,
+        activeSessionSlug: props.activeSessionSlug,
+        sessionConfig: getSessionConfigBySlug(props.activeSessionSlug || '') || null,
+        ensureLightSbtUniverse: props.ensureLightSbtUniverse,
+        loginComplete: props.loginComplete,
+        toggleLoginModal: props.toggleLoginModal,
+        network: props.network,
+        isSBTCacheReady: props.isSBTCacheReady,
+        isSurveyCacheReady: props.isSurveyCacheReady,
+        isQuestionCacheReady: props.isQuestionCacheReady,
+        ...(expandedToolName === 'Questions'
+          ? {
+              preventUrlChange: true,
+            }
+          : {}),
+        ...(expandedToolName === 'Debate Tree' ? { demoMode: demoSurfaceEnabled } : {}),
+        ...(showGroupsHeaderActions
+          ? {
+              hideMiniActionRow: true,
+              showCreateGroupAboveFeatured: true,
+              showCreateGroupExternal: showEmbeddedCreateGroup,
+              onCreateGroupToggleExternal: toggleEmbeddedCreateGroup,
+            }
+          : {}),
+        ...(showDataHeaderActions
+          ? {
+              explorerMode: dataToolMode,
+              demoSurfaceMode: props.demoSurfaceMode,
+              sessionOverrideSlug: dataSessionOverrideSlug,
+              sessionOverrideTouched: dataSessionOverrideTouched,
+              hideInternalSessionSelector: true,
+            }
+          : {}),
       }
-      : {}),
-    ...(expandedToolName === 'Debate Tree'
-      ? { demoMode: demoSurfaceEnabled }
-      : {}),
-    ...(showGroupsHeaderActions ? {
-      hideMiniActionRow: true,
-      showCreateGroupAboveFeatured: true,
-      showCreateGroupExternal: showEmbeddedCreateGroup,
-      onCreateGroupToggleExternal: toggleEmbeddedCreateGroup,
-    } : {}),
-    ...(showDataHeaderActions ? {
-      explorerMode: dataToolMode,
-      demoSurfaceMode: props.demoSurfaceMode,
-      sessionOverrideSlug: dataSessionOverrideSlug,
-      sessionOverrideTouched: dataSessionOverrideTouched,
-      hideInternalSessionSelector: true,
-    } : {}),
-  } : null;
+    : null;
 
   return (
     <>
@@ -294,8 +305,8 @@ const ToolExplorer = (props: ToolExplorerProps) => {
         </Container>
       ) : null}
       <Container className={`${styles.explorerContainer} ${useSparseGrid ? styles.explorerContainerSparse : ''}`}>
-      {expandedComponent ? (
-        <div className={styles.breadcrumbContainer}>
+        {expandedComponent ? (
+          <div className={styles.breadcrumbContainer}>
             <div className={styles.expandedHeaderRow}>
               <div className={styles.expandedHeaderLead}>
                 <button
@@ -367,7 +378,10 @@ const ToolExplorer = (props: ToolExplorerProps) => {
                         <FontAwesomeIcon icon={faCog} />
                       </button>
                       {showDataSessionSelector && (
-                        <div className={styles.headerSessionSelectorPanel} data-testid="ce-database-session-selector-panel">
+                        <div
+                          className={styles.headerSessionSelectorPanel}
+                          data-testid="ce-database-session-selector-panel"
+                        >
                           <div className={styles.headerSessionSelectorHeader}>
                             <div className={styles.headerSessionSelectorHint}>
                               {dataSessionOverrideTouched
@@ -408,36 +422,33 @@ const ToolExplorer = (props: ToolExplorerProps) => {
             </div>
 
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="30vh" />}>
-              {React.createElement(
-                expandedComponent.component,
-                expandedChildProps,
-              )}
+              {React.createElement(expandedComponent.component, expandedChildProps)}
             </Suspense>
-        </div>
-      ) : (
-        <Row className={`${styles.explorerRow} ${useSparseGrid ? styles.explorerRowSparse : ''}`}>
-          {visibleExampleComponents.map(({ Component, props, data }, index) => (
-            <Col
-              key={index}
-              xs="12"
-              sm="6"
-              md="4"
-              className={`${styles.explorerCol} ${useSparseGrid ? styles.explorerColSparse : ''} ${props.disabled ? styles.disabled : ''} ${styles[props.status]}`}
-              onClick={() => handleClick(Component, data)}
-            >
-              <div className={styles.square}>
-                <div
-                  className={styles.backgroundImage}
-                  style={{
-                    backgroundImage: `url(${props.image})`,
-                  }}
-                ></div>
-                <div className={styles.squareText}>{props.name}</div>
-                <div className={styles.squareSubtext}>{props.subtext}</div>
-              </div>
-            </Col>
-          ))}
-        </Row>
+          </div>
+        ) : (
+          <Row className={`${styles.explorerRow} ${useSparseGrid ? styles.explorerRowSparse : ''}`}>
+            {visibleExampleComponents.map(({ Component, props, data }, index) => (
+              <Col
+                key={index}
+                xs="12"
+                sm="6"
+                md="4"
+                className={`${styles.explorerCol} ${useSparseGrid ? styles.explorerColSparse : ''} ${props.disabled ? styles.disabled : ''} ${styles[props.status]}`}
+                onClick={() => handleClick(Component, data)}
+              >
+                <div className={styles.square}>
+                  <div
+                    className={styles.backgroundImage}
+                    style={{
+                      backgroundImage: `url(${props.image})`,
+                    }}
+                  ></div>
+                  <div className={styles.squareText}>{props.name}</div>
+                  <div className={styles.squareSubtext}>{props.subtext}</div>
+                </div>
+              </Col>
+            ))}
+          </Row>
         )}
       </Container>
     </>

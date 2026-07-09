@@ -1,16 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretDown,
-  faCaretUp,
-  faInfoCircle,
-  faTags,
-} from '@fortawesome/free-solid-svg-icons';
-import {
-  beeswarmByExtremity,
-  buildComparisonReportRows,
-} from '../../../utilities/demo/demoAnalysisMath.js';
+import { faCaretDown, faCaretUp, faInfoCircle, faTags } from '@fortawesome/free-solid-svg-icons';
+import { beeswarmByExtremity, buildComparisonReportRows } from '../../../utilities/demo/demoAnalysisMath.js';
 import styles from './ComparisonReport.module.scss';
 
 type ComparisonGroup = {
@@ -114,7 +106,9 @@ const BINARY_RESPONSE_TONE_BY_LABEL: Record<string, BinaryResponseTone> = {
 const RESPONSE_ORDER = ['Agree', 'Unsure', 'Disagree'];
 
 const getBinaryResponseTone = (responseText = ''): BinaryResponseTone | null => {
-  const normalized = String(responseText || '').trim().toLowerCase();
+  const normalized = String(responseText || '')
+    .trim()
+    .toLowerCase();
   return BINARY_RESPONSE_TONE_BY_LABEL[normalized] || null;
 };
 
@@ -133,11 +127,7 @@ const getCandlestickSegmentClassName = (responseText = '') => {
 };
 
 const getOrderedResponseTexts = (rows: FlatResponse[] = [], preferredResponseText = '') => {
-  const responseSet = new Set(
-    rows
-      .map((row) => String(row?.responseText || '').trim())
-      .filter(Boolean)
-  );
+  const responseSet = new Set(rows.map((row) => String(row?.responseText || '').trim()).filter(Boolean));
   const preferred = String(preferredResponseText || '').trim();
   if (preferred) responseSet.add(preferred);
 
@@ -150,13 +140,10 @@ const getOrderedResponseTexts = (rows: FlatResponse[] = [], preferredResponseTex
 };
 
 const formatDistributionMeta = (rows: FlatResponse[] = []) => {
-  const modeledResponseCount = rows.reduce(
-    (max, row) => Math.max(max, Number(row?.totalVotes || 0)),
-    0
-  );
+  const modeledResponseCount = rows.reduce((max, row) => Math.max(max, Number(row?.totalVotes || 0)), 0);
   const participantCount = rows.reduce(
     (max, row) => Math.max(max, Number(row?.participantCount || 0)),
-    modeledResponseCount
+    modeledResponseCount,
   );
 
   if (modeledResponseCount > 0 && participantCount > 0) {
@@ -235,11 +222,7 @@ const TagLegend = ({ selectedTags, colorScale }: TagLegendProps) => {
       <span className={styles.legendTitle}>Filtering by Tags:</span>
       <div className={styles.legendPills}>
         {selectedTags.map((tag) => (
-          <span
-            key={tag.tagID}
-            className={styles.legendPill}
-            style={{ backgroundColor: colorScale(tag.tagID) }}
-          >
+          <span key={tag.tagID} className={styles.legendPill} style={{ backgroundColor: colorScale(tag.tagID) }}>
             {tag.tagName}
           </span>
         ))}
@@ -254,9 +237,7 @@ const DistributionCandlesticks = ({ datasets }: { datasets: DistributionDataset[
       <div key={dataset.segmentKey || dataset.groupName} className={styles.analysisDistributionDataset}>
         <div className={styles.analysisDistributionHeader}>
           <span className={styles.analysisDistributionTitle}>{dataset.groupName}</span>
-          {dataset.meta ? (
-            <span className={styles.analysisDistributionMeta}>{dataset.meta}</span>
-          ) : null}
+          {dataset.meta ? <span className={styles.analysisDistributionMeta}>{dataset.meta}</span> : null}
         </div>
         <div
           className={styles.analysisCandlestick}
@@ -274,8 +255,13 @@ const DistributionCandlesticks = ({ datasets }: { datasets: DistributionDataset[
         </div>
         <div className={styles.analysisDistributionLegend}>
           {dataset.rows.map((row) => (
-            <span key={`${dataset.segmentKey || dataset.groupName}:${row.responseText}:legend`} className={styles.analysisDistributionLegendItem}>
-              <span className={`${styles.analysisDistributionDot} ${getCandlestickSegmentClassName(row.responseText)}`} />
+            <span
+              key={`${dataset.segmentKey || dataset.groupName}:${row.responseText}:legend`}
+              className={styles.analysisDistributionLegendItem}
+            >
+              <span
+                className={`${styles.analysisDistributionDot} ${getCandlestickSegmentClassName(row.responseText)}`}
+              />
               {row.responseText} {(row.rate * 100).toFixed(0)}%
             </span>
           ))}
@@ -316,18 +302,21 @@ const ComparisonReport = ({
   };
 
   const analysisRows = useMemo<AnalysisRow[]>(
-    () => (buildComparisonReportRows as (input: {
-      flatResponses: FlatResponse[];
-      questions: Question[];
-      comparisonGroups: ComparisonGroup[];
-      questionTagsData: QuestionTagsById;
-    }) => AnalysisRow[])({
-      flatResponses,
-      questions,
-      comparisonGroups,
-      questionTagsData,
-    }),
-    [comparisonGroups, flatResponses, questionTagsData, questions]
+    () =>
+      (
+        buildComparisonReportRows as (input: {
+          flatResponses: FlatResponse[];
+          questions: Question[];
+          comparisonGroups: ComparisonGroup[];
+          questionTagsData: QuestionTagsById;
+        }) => AnalysisRow[]
+      )({
+        flatResponses,
+        questions,
+        comparisonGroups,
+        questionTagsData,
+      }),
+    [comparisonGroups, flatResponses, questionTagsData, questions],
   );
 
   const tagInfo = useMemo(() => {
@@ -358,7 +347,7 @@ const ComparisonReport = ({
 
   const selectedTagIDs = useMemo(
     () => new Set(Array.isArray(selectedTagIDsProp) ? selectedTagIDsProp : Array.from(internalSelectedTagIDs)),
-    [internalSelectedTagIDs, selectedTagIDsProp]
+    [internalSelectedTagIDs, selectedTagIDsProp],
   );
 
   const filteredRows = useMemo(() => {
@@ -366,24 +355,27 @@ const ComparisonReport = ({
     return analysisRows.filter((row) => row.tags.some((tag) => selectedTagIDs.has(tag.tagID)));
   }, [analysisRows, selectedTagIDs]);
 
-  const analysisResults = useMemo(() => ({
-    topConsensus: filteredRows
-      .filter((row) => row.consensus !== null)
-      .sort((left, right) => Number(right.consensus || 0) - Number(left.consensus || 0))
-      .slice(0, 20),
-    topDivergence: filteredRows
-      .filter((row) => row.divergence !== null)
-      .sort((left, right) => Number(right.divergence || 0) - Number(left.divergence || 0))
-      .slice(0, 20),
-    beeswarmData: filteredRows
-      .filter((row) => row.divisiveness !== null)
-      .map((row, index) => ({
-        ...row,
-        index,
-        extremity: row.divisiveness,
-        primaryTag: row.tags.length > 0 ? row.tags[0] : null,
-      })),
-  }), [filteredRows]);
+  const analysisResults = useMemo(
+    () => ({
+      topConsensus: filteredRows
+        .filter((row) => row.consensus !== null)
+        .sort((left, right) => Number(right.consensus || 0) - Number(left.consensus || 0))
+        .slice(0, 20),
+      topDivergence: filteredRows
+        .filter((row) => row.divergence !== null)
+        .sort((left, right) => Number(right.divergence || 0) - Number(left.divergence || 0))
+        .slice(0, 20),
+      beeswarmData: filteredRows
+        .filter((row) => row.divisiveness !== null)
+        .map((row, index) => ({
+          ...row,
+          index,
+          extremity: row.divisiveness,
+          primaryTag: row.tags.length > 0 ? row.tags[0] : null,
+        })),
+    }),
+    [filteredRows],
+  );
 
   const swarmedData = useMemo(() => {
     if (!analysisResults.beeswarmData || analysisResults.beeswarmData.length === 0 || swarmWidth <= 0) {
@@ -394,7 +386,7 @@ const ComparisonReport = ({
       analysisResults.beeswarmData,
       Math.max(0, swarmWidth - plotPadding.left - plotPadding.right),
       160,
-      plotPadding
+      plotPadding,
     ) as BeeswarmPoint[];
   }, [analysisResults.beeswarmData, swarmWidth]);
 
@@ -414,7 +406,7 @@ const ComparisonReport = ({
 
   const selectedTagsForLegend = useMemo(
     () => tagInfo.displayTags.filter((tag) => selectedTagIDs.has(tag.tagID)),
-    [selectedTagIDs, tagInfo.displayTags]
+    [selectedTagIDs, tagInfo.displayTags],
   );
 
   const handleTagChange = (tagID: string) => {
@@ -485,8 +477,12 @@ const ComparisonReport = ({
       <div className={styles.swarmLayoutContainer} ref={swarmContainerRef}>
         <svg width={swarmWidth} height={220} className={styles.beeswarmSvg}>
           <line x1={20} y1={176} x2={Math.max(20, swarmWidth - 20)} y2={176} stroke="#aaa" />
-          <text x={20} y={206} fontSize="12" fill="#555" textAnchor="start">More Similarity</text>
-          <text x={Math.max(20, swarmWidth - 20)} y={206} fontSize="12" fill="#555" textAnchor="end">More Difference</text>
+          <text x={20} y={206} fontSize="12" fill="#555" textAnchor="start">
+            More Similarity
+          </text>
+          <text x={Math.max(20, swarmWidth - 20)} y={206} fontSize="12" fill="#555" textAnchor="end">
+            More Difference
+          </text>
           {swarmedData.map((point) => {
             const isFiltered = selectedTagIDs.size > 0;
             const circleFill = isFiltered && point.primaryTag ? tagColorScale(point.primaryTag.tagID) : null;
@@ -536,7 +532,9 @@ const ComparisonReport = ({
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           <FontAwesomeIcon icon={faInfoCircle} size="2x" style={{ color: '#6c757d', marginBottom: '1rem' }} />
           <h4 style={{ color: '#343a40' }}>Comparison Report</h4>
-          <p className={styles.noData}>Select two or more demographic groups from the filters above to see a detailed comparison report.</p>
+          <p className={styles.noData}>
+            Select two or more demographic groups from the filters above to see a detailed comparison report.
+          </p>
         </div>
       </div>
     );
@@ -570,8 +568,11 @@ const ComparisonReport = ({
       </button>
 
       <Collapse isOpen={reportOpen}>
-        <div id="demo-analysis-comparison-report-body" className={styles.reportCollapseBody} data-testid="demo-analysis-comparison-report-body">
-
+        <div
+          id="demo-analysis-comparison-report-body"
+          className={styles.reportCollapseBody}
+          data-testid="demo-analysis-comparison-report-body"
+        >
           <ComparisonLegend groups={comparisonGroups} colorScale={groupColorScale} />
           <TagLegend selectedTags={selectedTagsForLegend} colorScale={tagColorScale} />
 
@@ -603,7 +604,11 @@ const ComparisonReport = ({
                   </div>
                   {tagInfo.displayTags.length > 10 && (
                     <div className={styles.viewMoreContainer}>
-                      <button type="button" onClick={() => setShowAllTags((value) => !value)} className={styles.viewMoreButton}>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllTags((value) => !value)}
+                        className={styles.viewMoreButton}
+                      >
                         {showAllTags ? 'Show Less' : `Show ${tagInfo.displayTags.length - 10} More Tags`}
                       </button>
                     </div>
@@ -647,7 +652,6 @@ const ComparisonReport = ({
               {hoveredContent}
             </div>
           )}
-
         </div>
       </Collapse>
     </div>

@@ -1,6 +1,4 @@
-import {
-  buildSurveyResultsCacheControllerSnapshot,
-} from './surveyResultsCacheControllerSnapshot';
+import { buildSurveyResultsCacheControllerSnapshot } from './surveyResultsCacheControllerSnapshot';
 
 describe('surveyResultsCacheControllerSnapshot', () => {
   it('packages question-mode cache, filter, polling, refresh, and selected result inputs without mutating them', () => {
@@ -116,11 +114,13 @@ describe('surveyResultsCacheControllerSnapshot', () => {
   });
 
   it('keeps survey manual refresh inert until the survey id and refresh port are available', () => {
-    expect(buildSurveyResultsCacheControllerSnapshot({
-      currentSurveyId: '0xabc',
-      hasRefreshSurveyResponsesByID: true,
-      viewMode: 'survey',
-    }).manualRefreshInput).toEqual({
+    expect(
+      buildSurveyResultsCacheControllerSnapshot({
+        currentSurveyId: '0xabc',
+        hasRefreshSurveyResponsesByID: true,
+        viewMode: 'survey',
+      }).manualRefreshInput,
+    ).toEqual({
       canDispatch: true,
       canRefreshQuestions: false,
       canRefreshSurvey: true,
@@ -129,11 +129,13 @@ describe('surveyResultsCacheControllerSnapshot', () => {
       viewMode: 'survey',
     });
 
-    expect(buildSurveyResultsCacheControllerSnapshot({
-      currentSurveyId: '',
-      hasRefreshSurveyResponsesByID: true,
-      viewMode: 'survey',
-    }).manualRefreshInput).toEqual({
+    expect(
+      buildSurveyResultsCacheControllerSnapshot({
+        currentSurveyId: '',
+        hasRefreshSurveyResponsesByID: true,
+        viewMode: 'survey',
+      }).manualRefreshInput,
+    ).toEqual({
       canDispatch: false,
       canRefreshQuestions: false,
       canRefreshSurvey: false,

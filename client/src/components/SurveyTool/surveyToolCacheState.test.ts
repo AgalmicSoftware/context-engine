@@ -20,11 +20,7 @@ import {
   writeQuestionsCache,
   writeSurveysCache,
 } from './surveyToolCacheState.js';
-import {
-  peekCacheSync,
-  readCache,
-  writeCacheOptimistic,
-} from '../../utilities/cache/cacheScripts.js';
+import { peekCacheSync, readCache, writeCacheOptimistic } from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   peekCacheSync: jest.fn(() => null),
@@ -84,12 +80,17 @@ describe('surveyToolCacheState', () => {
   });
 
   it('merges question responses by normalized question and responder ids', () => {
-    expect(mergeQuestionResponses({
-      q1: { '0xabc': { answer: 'old' } },
-    }, {
-      Q1: { '0xDEF': { answer: 'new' } },
-      q2: { '0xABC': { answer: 'two' } },
-    })).toEqual({
+    expect(
+      mergeQuestionResponses(
+        {
+          q1: { '0xabc': { answer: 'old' } },
+        },
+        {
+          Q1: { '0xDEF': { answer: 'new' } },
+          q2: { '0xABC': { answer: 'two' } },
+        },
+      ),
+    ).toEqual({
       q1: {
         '0xabc': { answer: 'old' },
         '0xdef': { answer: 'new' },
@@ -105,17 +106,20 @@ describe('surveyToolCacheState', () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
 
     try {
-      window.sessionStorage.setItem('dg:recentQuestionPayloads', JSON.stringify({
-        q1: {
-          savedAtMs: now - 1_000,
-          creator: '0xAbC',
-          responseJSON: { questionID: 'q1' },
-        },
-        stale: {
-          savedAtMs: now - (13 * 60 * 60 * 1000),
-          creator: '0xabc',
-        },
-      }));
+      window.sessionStorage.setItem(
+        'dg:recentQuestionPayloads',
+        JSON.stringify({
+          q1: {
+            savedAtMs: now - 1_000,
+            creator: '0xAbC',
+            responseJSON: { questionID: 'q1' },
+          },
+          stale: {
+            savedAtMs: now - 13 * 60 * 60 * 1000,
+            creator: '0xabc',
+          },
+        }),
+      );
 
       expect(readRecentQuestionPayload('Q1')).toEqual({
         creator: '0xAbC',
@@ -133,7 +137,9 @@ describe('surveyToolCacheState', () => {
   it('tracks cache hydration and payload equivalence without mutating content', () => {
     expect(hasCacheHydratedFlag({ cacheHasLoaded: true })).toBe(true);
     expect(hasCacheHydratedFlag({ cacheHasLoaded: false })).toBe(false);
-    expect(areQuestionPayloadsEquivalent({ id: 'q1', responseJSON: { ok: true } }, { id: 'q1', responseJSON: { ok: true } })).toBe(true);
+    expect(
+      areQuestionPayloadsEquivalent({ id: 'q1', responseJSON: { ok: true } }, { id: 'q1', responseJSON: { ok: true } }),
+    ).toBe(true);
     expect(areQuestionPayloadsEquivalent({ id: 'q1' }, { id: 'q2' })).toBe(false);
   });
 
@@ -204,22 +210,26 @@ describe('surveyToolCacheState', () => {
         s1: 12,
       },
     });
-    expect(mergeSurveyToolCachePatchIntoSurveysCache({}, '', {
-      surveys: { s1: { id: 's1' } },
-    })).toEqual({});
+    expect(
+      mergeSurveyToolCachePatchIntoSurveysCache({}, '', {
+        surveys: { s1: { id: 's1' } },
+      }),
+    ).toEqual({});
   });
 
   it('compares and stamps response recency metadata in block/log order', () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
 
     try {
-      expect(toResponseRecencyMeta({
-        blockNumber: 10,
-        transactionIndex: 2,
-        logIndex: 1,
-        timestamp: 1234,
-        transactionHash: '0xhash',
-      })).toEqual({
+      expect(
+        toResponseRecencyMeta({
+          blockNumber: 10,
+          transactionIndex: 2,
+          logIndex: 1,
+          timestamp: 1234,
+          transactionHash: '0xhash',
+        }),
+      ).toEqual({
         bn: 10,
         txi: 2,
         li: 1,
@@ -227,15 +237,19 @@ describe('surveyToolCacheState', () => {
         transactionHash: '0xhash',
       });
 
-      expect(isIncomingResponseMetaNewer(
-        { blockNumber: 11, transactionIndex: 0, logIndex: 0, timestamp: 1200 },
-        { blockNumber: 10, transactionIndex: 9, logIndex: 9, timestamp: 1300 }
-      )).toBe(true);
+      expect(
+        isIncomingResponseMetaNewer(
+          { blockNumber: 11, transactionIndex: 0, logIndex: 0, timestamp: 1200 },
+          { blockNumber: 10, transactionIndex: 9, logIndex: 9, timestamp: 1300 },
+        ),
+      ).toBe(true);
 
-      expect(stampResponsePayloadWithMeta(
-        { responseJSON: { ok: true } },
-        { blockNumber: 12, transactionIndex: 3, logIndex: 4, timestamp: 5678, transactionHash: '0xabc' }
-      )).toEqual({
+      expect(
+        stampResponsePayloadWithMeta(
+          { responseJSON: { ok: true } },
+          { blockNumber: 12, transactionIndex: 3, logIndex: 4, timestamp: 5678, transactionHash: '0xabc' },
+        ),
+      ).toEqual({
         responseJSON: { ok: true },
         blockNumber: 12,
         transactionIndex: 3,
@@ -249,19 +263,24 @@ describe('surveyToolCacheState', () => {
   });
 
   it('merges survey response payload rows by normalized question id', () => {
-    expect(mergeSurveyResponsePayloads({
-      responses: [
-        { questionID: 'Q1', answer: 'old' },
-        { questionID: 'Q2', answer: 'keep' },
-      ],
-      preserved: true,
-    }, {
-      responses: [
-        { questionID: 'q1', answer: 'new' },
-        { questionID: 'q3', answer: 'add' },
-      ],
-      incoming: true,
-    })).toEqual({
+    expect(
+      mergeSurveyResponsePayloads(
+        {
+          responses: [
+            { questionID: 'Q1', answer: 'old' },
+            { questionID: 'Q2', answer: 'keep' },
+          ],
+          preserved: true,
+        },
+        {
+          responses: [
+            { questionID: 'q1', answer: 'new' },
+            { questionID: 'q3', answer: 'add' },
+          ],
+          incoming: true,
+        },
+      ),
+    ).toEqual({
       preserved: true,
       incoming: true,
       responses: [

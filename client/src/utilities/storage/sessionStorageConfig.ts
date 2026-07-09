@@ -1,9 +1,6 @@
 /** @file sessionStorageConfig.ts */
 
-import {
-  STORAGE_BACKENDS,
-  normalizeStorageBackend,
-} from './storageRefs.js';
+import { STORAGE_BACKENDS, normalizeStorageBackend } from './storageRefs.js';
 import type { StorageBackend } from './storageRefs.js';
 import { toStr } from '../shared/primitives.js';
 
@@ -35,10 +32,14 @@ export const SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES = Object.freeze({
   LIT: 'lit',
 } as const);
 
-type SessionStorageResourceStage = typeof SESSION_STORAGE_RESOURCE_STAGES[keyof typeof SESSION_STORAGE_RESOURCE_STAGES];
-export type SessionStoragePayloadAccessMode = typeof SESSION_STORAGE_PAYLOAD_ACCESS_MODES[keyof typeof SESSION_STORAGE_PAYLOAD_ACCESS_MODES];
-export type SessionStoragePayloadAccessGate = typeof SESSION_STORAGE_PAYLOAD_ACCESS_GATES[keyof typeof SESSION_STORAGE_PAYLOAD_ACCESS_GATES];
-export type SessionStoragePayloadEncryptionMode = typeof SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES[keyof typeof SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES];
+type SessionStorageResourceStage =
+  (typeof SESSION_STORAGE_RESOURCE_STAGES)[keyof typeof SESSION_STORAGE_RESOURCE_STAGES];
+export type SessionStoragePayloadAccessMode =
+  (typeof SESSION_STORAGE_PAYLOAD_ACCESS_MODES)[keyof typeof SESSION_STORAGE_PAYLOAD_ACCESS_MODES];
+export type SessionStoragePayloadAccessGate =
+  (typeof SESSION_STORAGE_PAYLOAD_ACCESS_GATES)[keyof typeof SESSION_STORAGE_PAYLOAD_ACCESS_GATES];
+export type SessionStoragePayloadEncryptionMode =
+  (typeof SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES)[keyof typeof SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES];
 
 export interface SessionStoragePayloadAccessControl {
   gate: SessionStoragePayloadAccessGate;
@@ -67,10 +68,17 @@ interface ResolveSessionStorageBackendOptions {
   encrypted?: unknown;
 }
 
-const normalizePayloadAccessGate = (value: unknown, fallback: SessionStoragePayloadAccessGate = SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE): SessionStoragePayloadAccessGate => {
+const normalizePayloadAccessGate = (
+  value: unknown,
+  fallback: SessionStoragePayloadAccessGate = SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE,
+): SessionStoragePayloadAccessGate => {
   const normalized = toStr(value).trim().toLowerCase().replace(/-/g, '_');
   if (!normalized) return fallback;
-  if (normalized === 'none' || normalized === 'public' || normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ) {
+  if (
+    normalized === 'none' ||
+    normalized === 'public' ||
+    normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ
+  ) {
     return SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE;
   }
   if (
@@ -92,7 +100,7 @@ const normalizePayloadAccessGate = (value: unknown, fallback: SessionStoragePayl
 
 const normalizePayloadEncryptionMode = (
   value: unknown,
-  fallback: SessionStoragePayloadEncryptionMode = SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.NONE
+  fallback: SessionStoragePayloadEncryptionMode = SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.NONE,
 ): SessionStoragePayloadEncryptionMode => {
   const raw = isObj(value) ? value.mode : value;
   const normalized = toStr(raw).trim().toLowerCase().replace(/-/g, '_');
@@ -111,10 +119,7 @@ const normalizePayloadEncryptionMode = (
 
 export const normalizeSessionStoragePayloadAccessMode = (value: unknown): SessionStoragePayloadAccessMode => {
   const normalized = toStr(value).trim().toLowerCase().replace(/-/g, '_');
-  if (
-    normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ ||
-    normalized === 'public'
-  ) {
+  if (normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ || normalized === 'public') {
     return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
   }
   if (
@@ -128,7 +133,7 @@ export const normalizeSessionStoragePayloadAccessMode = (value: unknown): Sessio
 };
 
 export const deriveLegacyPayloadAccessMode = (
-  accessControl: Pick<SessionStoragePayloadAccessControl, 'gate' | 'encryption'>
+  accessControl: Pick<SessionStoragePayloadAccessControl, 'gate' | 'encryption'>,
 ): SessionStoragePayloadAccessMode => {
   if (accessControl.encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT) {
     return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
@@ -145,42 +150,35 @@ export const normalizeSessionStoragePayloadAccessControl = (raw: unknown): Sessi
   const cloudflare = rawRecord.cloudflare as { payloadAccessMode?: unknown } | null | undefined;
   const legacyMode = normalizeSessionStoragePayloadAccessMode(
     isObj(raw)
-      ? (
-        payloadAccessControl?.mode ||
-        cloudflare?.payloadAccessMode ||
-        rawRecord.payloadAccessMode ||
-        rawRecord.accessControlMode
-      )
-      : raw
+      ? payloadAccessControl?.mode ||
+          cloudflare?.payloadAccessMode ||
+          rawRecord.payloadAccessMode ||
+          rawRecord.accessControlMode
+      : raw,
   );
-  const fallbackGate = (
+  const fallbackGate =
     legacyMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ ||
     legacyMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED
-  )
-    ? SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE
-    : SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE;
-  const fallbackEncryption = legacyMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED
-    ? SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT
-    : SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.NONE;
-  const source = (
+      ? SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE
+      : SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE;
+  const fallbackEncryption =
+    legacyMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED
+      ? SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT
+      : SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.NONE;
+  const source =
     isObj(raw) &&
     !Object.prototype.hasOwnProperty.call(rawRecord, 'payloadAccessControl') &&
-    (
-      Object.prototype.hasOwnProperty.call(rawRecord, 'gate') ||
-      Object.prototype.hasOwnProperty.call(rawRecord, 'encryption')
-    )
-  ) ? rawRecord : payloadAccessControl;
-  const gate = normalizePayloadAccessGate(
-    isObj(source) ? source.gate : undefined,
-    fallbackGate
-  );
-  const encryption = normalizePayloadEncryptionMode(
-    isObj(source) ? source.encryption : undefined,
-    fallbackEncryption
-  );
+    (Object.prototype.hasOwnProperty.call(rawRecord, 'gate') ||
+      Object.prototype.hasOwnProperty.call(rawRecord, 'encryption'))
+      ? rawRecord
+      : payloadAccessControl;
+  const gate = normalizePayloadAccessGate(isObj(source) ? source.gate : undefined, fallbackGate);
+  const encryption = normalizePayloadEncryptionMode(isObj(source) ? source.encryption : undefined, fallbackEncryption);
   const accessConditions = isObj(source?.accessConditions)
     ? JSON.parse(JSON.stringify(source.accessConditions))
-    : (isObj(source?.conditions) ? JSON.parse(JSON.stringify(source.conditions)) : null);
+    : isObj(source?.conditions)
+      ? JSON.parse(JSON.stringify(source.conditions))
+      : null;
   return {
     gate,
     encryption,
@@ -193,36 +191,56 @@ export const normalizeSessionStorageConfig = (sessionConfig: unknown = null): No
   const cfg = isObj(sessionConfig) ? sessionConfig : {};
   const raw = isObj(cfg.storageProfile)
     ? cfg.storageProfile
-    : (isObj(cfg.sessionStorageConfig) ? cfg.sessionStorageConfig : {});
+    : isObj(cfg.sessionStorageConfig)
+      ? cfg.sessionStorageConfig
+      : {};
   const backend = normalizeStorageBackend(
-    raw.backend ||
-    cfg.storageBackend ||
-    (cfg.docLibrary as { provider?: unknown } | null | undefined)?.provider
+    raw.backend || cfg.storageBackend || (cfg.docLibrary as { provider?: unknown } | null | undefined)?.provider,
   );
   const resources = isObj(raw.resources) ? raw.resources : {};
-  const defaultCanonicalStage: SessionStorageResourceStage = backend === STORAGE_BACKENDS.CLOUDFLARE
-    ? SESSION_STORAGE_RESOURCE_STAGES.ACTIVE
-    : SESSION_STORAGE_RESOURCE_STAGES.STAGED;
+  const defaultCanonicalStage: SessionStorageResourceStage =
+    backend === STORAGE_BACKENDS.CLOUDFLARE
+      ? SESSION_STORAGE_RESOURCE_STAGES.ACTIVE
+      : SESSION_STORAGE_RESOURCE_STAGES.STAGED;
   return {
     backend,
     resources: {
-      docsContext: toStr(resources.docsContext || '').trim().toLowerCase() || SESSION_STORAGE_RESOURCE_STAGES.ACTIVE,
-      questions: toStr(resources.questions || '').trim().toLowerCase() || defaultCanonicalStage,
-      surveys: toStr(resources.surveys || '').trim().toLowerCase() || defaultCanonicalStage,
-      responses: toStr(resources.responses || '').trim().toLowerCase() || defaultCanonicalStage,
-      generatedArtifacts: toStr(resources.generatedArtifacts || '').trim().toLowerCase() || defaultCanonicalStage,
-      media: toStr(resources.media || '').trim().toLowerCase() || defaultCanonicalStage,
+      docsContext:
+        toStr(resources.docsContext || '')
+          .trim()
+          .toLowerCase() || SESSION_STORAGE_RESOURCE_STAGES.ACTIVE,
+      questions:
+        toStr(resources.questions || '')
+          .trim()
+          .toLowerCase() || defaultCanonicalStage,
+      surveys:
+        toStr(resources.surveys || '')
+          .trim()
+          .toLowerCase() || defaultCanonicalStage,
+      responses:
+        toStr(resources.responses || '')
+          .trim()
+          .toLowerCase() || defaultCanonicalStage,
+      generatedArtifacts:
+        toStr(resources.generatedArtifacts || '')
+          .trim()
+          .toLowerCase() || defaultCanonicalStage,
+      media:
+        toStr(resources.media || '')
+          .trim()
+          .toLowerCase() || defaultCanonicalStage,
     },
-    payloadAccessControl: backend === STORAGE_BACKENDS.CLOUDFLARE
-      ? normalizeSessionStoragePayloadAccessControl(raw)
-      : normalizeSessionStoragePayloadAccessControl(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED),
+    payloadAccessControl:
+      backend === STORAGE_BACKENDS.CLOUDFLARE
+        ? normalizeSessionStoragePayloadAccessControl(raw)
+        : normalizeSessionStoragePayloadAccessControl(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED),
   };
 };
 
-export const resolveSessionStorageBackend = (sessionConfig: unknown = null, {
-  resource = 'docsContext',
-  encrypted = false,
-}: ResolveSessionStorageBackendOptions = {}): StorageBackend => {
+export const resolveSessionStorageBackend = (
+  sessionConfig: unknown = null,
+  { resource = 'docsContext', encrypted = false }: ResolveSessionStorageBackendOptions = {},
+): StorageBackend => {
   const storageConfig = normalizeSessionStorageConfig(sessionConfig);
   const resourceKey = toStr(resource).trim() || 'docsContext';
   const resourceStage = storageConfig.resources[resourceKey] || SESSION_STORAGE_RESOURCE_STAGES.ACTIVE;
@@ -233,26 +251,36 @@ export const resolveSessionStorageBackend = (sessionConfig: unknown = null, {
   return STORAGE_BACKENDS.ARWEAVE;
 };
 
-export const requiresLitForSessionStorage = (sessionConfig: unknown = null, opts: ResolveSessionStorageBackendOptions = {}): boolean => (
+export const requiresLitForSessionStorage = (
+  sessionConfig: unknown = null,
+  opts: ResolveSessionStorageBackendOptions = {},
+): boolean =>
   resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.LIT_ARWEAVE ||
-  (
-    resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.CLOUDFLARE &&
-    normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT
-  )
-);
+  (resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.CLOUDFLARE &&
+    normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.encryption ===
+      SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT);
 
-export const usesCloudflareSessionStorage = (sessionConfig: unknown = null, opts: ResolveSessionStorageBackendOptions = {}): boolean => (
-  resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.CLOUDFLARE
-);
+export const usesCloudflareSessionStorage = (
+  sessionConfig: unknown = null,
+  opts: ResolveSessionStorageBackendOptions = {},
+): boolean => resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.CLOUDFLARE;
 
-export const usesWorkerSbtGateCloudflareStorage = (sessionConfig: unknown = null, opts: ResolveSessionStorageBackendOptions = {}): boolean => (
+export const usesWorkerSbtGateCloudflareStorage = (
+  sessionConfig: unknown = null,
+  opts: ResolveSessionStorageBackendOptions = {},
+): boolean =>
   usesCloudflareSessionStorage(sessionConfig, opts) &&
-  normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.gate === SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE &&
-  normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.encryption !== SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT
-);
+  normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.gate ===
+    SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE &&
+  normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.encryption !==
+    SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT;
 
-export const usesPublicReadCloudflareStorage = (sessionConfig: unknown = null, opts: ResolveSessionStorageBackendOptions = {}): boolean => (
+export const usesPublicReadCloudflareStorage = (
+  sessionConfig: unknown = null,
+  opts: ResolveSessionStorageBackendOptions = {},
+): boolean =>
   usesCloudflareSessionStorage(sessionConfig, opts) &&
-  normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.gate === SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE &&
-  normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.encryption !== SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT
-);
+  normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.gate ===
+    SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE &&
+  normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.encryption !==
+    SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT;

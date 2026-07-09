@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import demoAnalysisData from '../../../variables/demo/demo_analysis_data.json';
 import historicalFigureDemographics from '../../../variables/demo/historical_figure_demographics.js';
 import buildDemoAnalysisData from '../../../utilities/demo/demoAnalysisAdapter.js';
+import type { DemoAnalysisMetadataByXid, DemoAnalysisSource } from '../../../utilities/demo/demoAnalysisAdapter';
 import {
   buildComparisonGroup,
   findMostDivergentPairs,
@@ -76,14 +77,17 @@ type DemoAnalysisWorkspaceProps = {
   sessionSlug?: string;
 };
 
-const getDemoAnalysisData = buildDemoAnalysisData as unknown as (demoData?: unknown, metadataByXid?: unknown) => AnalysisData;
+const getDemoAnalysisData = (demoData?: unknown, metadataByXid?: unknown): AnalysisData =>
+  buildDemoAnalysisData(
+    demoData as DemoAnalysisSource | undefined,
+    metadataByXid as DemoAnalysisMetadataByXid | undefined,
+  );
 const getComparisonGroup = buildComparisonGroup as (segmentKey: string) => ComparisonGroup;
 const getDivergentPairs = findMostDivergentPairs as (input: Record<string, unknown>) => Suggestion[];
 const getParsedSegment = parseSegmentKey as (segmentKey: string) => { category: string; value: string };
 
-const buildSuggestionSelectionKey = (questionId = '', segmentKeys: string[] = []) => (
-  `${String(questionId || '').trim()}::${[...(Array.isArray(segmentKeys) ? segmentKeys : [])].sort().join('::')}`
-);
+const buildSuggestionSelectionKey = (questionId = '', segmentKeys: string[] = []) =>
+  `${String(questionId || '').trim()}::${[...(Array.isArray(segmentKeys) ? segmentKeys : [])].sort().join('::')}`;
 
 const DemoAnalysisWorkspace = ({
   demoData = demoAnalysisData,
@@ -92,12 +96,12 @@ const DemoAnalysisWorkspace = ({
 }: DemoAnalysisWorkspaceProps) => {
   const analysisData = useMemo<AnalysisData>(
     () => getDemoAnalysisData(demoData, metadataByXid),
-    [demoData, metadataByXid]
+    [demoData, metadataByXid],
   );
 
   const questionMap = useMemo(
     () => new Map(analysisData.questions.map((question) => [question.id, question])),
-    [analysisData.questions]
+    [analysisData.questions],
   );
 
   const [selectedSegmentKeys, setSelectedSegmentKeys] = useState<string[]>([]);
@@ -112,13 +116,11 @@ const DemoAnalysisWorkspace = ({
 
   const comparisonGroups = useMemo(
     () => selectedSegmentKeys.map((segmentKey) => getComparisonGroup(segmentKey)),
-    [selectedSegmentKeys]
+    [selectedSegmentKeys],
   );
 
   const selectedQuestion = questionMap.get(selectedQuestionId) || null;
-  const selectedQuestionTags = selectedQuestionId
-    ? (analysisData.questionTagsData[selectedQuestionId] || [])
-    : [];
+  const selectedQuestionTags = selectedQuestionId ? analysisData.questionTagsData[selectedQuestionId] || [] : [];
   const activeSuggestionKey = useMemo(() => {
     if (!selectedQuestionId || selectedSegmentKeys.length < 2) return '';
     return buildSuggestionSelectionKey(selectedQuestionId, selectedSegmentKeys);
@@ -160,11 +162,9 @@ const DemoAnalysisWorkspace = ({
   }, [selectedSegmentKeys]);
 
   const toggleSegment = (segmentKey: string) => {
-    setSelectedSegmentKeys((previous) => (
-      previous.includes(segmentKey)
-        ? previous.filter((value) => value !== segmentKey)
-        : [...previous, segmentKey]
-    ));
+    setSelectedSegmentKeys((previous) =>
+      previous.includes(segmentKey) ? previous.filter((value) => value !== segmentKey) : [...previous, segmentKey],
+    );
   };
 
   const handleCategoryChange = (category: string, nextSegmentKeysForCategory: string[]) => {
@@ -183,13 +183,13 @@ const DemoAnalysisWorkspace = ({
   const handleAutoSelectCorrelation = (sourceSegmentKey: string | null = null) => {
     const candidateSuggestions = sourceSegmentKey
       ? getDivergentPairs({
-        demographics: analysisData.demographics,
-        flatResponses: analysisData.flatResponses,
-        segmentCounts: analysisData.segmentCounts,
-        questions: analysisData.questions,
-        topN: 1,
-        allowedSegmentKeys: [sourceSegmentKey],
-      })
+          demographics: analysisData.demographics,
+          flatResponses: analysisData.flatResponses,
+          segmentCounts: analysisData.segmentCounts,
+          questions: analysisData.questions,
+          topN: 1,
+          allowedSegmentKeys: [sourceSegmentKey],
+        })
       : suggestions;
 
     if (candidateSuggestions.length === 0) return;
@@ -224,7 +224,7 @@ const DemoAnalysisWorkspace = ({
               questionPromptClassName={styles.selectedQuestionCardPrompt}
               questionPromptTestId="demo-analysis-selected-question"
             />
-            {(selectedQuestionTags.length > 0 || selectedQuestion.keyTension) ? (
+            {selectedQuestionTags.length > 0 || selectedQuestion.keyTension ? (
               <div className={styles.selectedQuestionGrounding}>
                 {selectedQuestion.keyTension ? (
                   <p className={styles.selectedQuestionTension} data-testid="demo-analysis-selected-question-tension">
@@ -232,7 +232,10 @@ const DemoAnalysisWorkspace = ({
                   </p>
                 ) : null}
                 {selectedQuestionTags.length > 0 ? (
-                  <div className={styles.selectedQuestionGroundingPills} data-testid="demo-analysis-selected-question-tags">
+                  <div
+                    className={styles.selectedQuestionGroundingPills}
+                    data-testid="demo-analysis-selected-question-tags"
+                  >
                     {selectedQuestionTags.map((tag) => (
                       <a
                         key={tag.tagID}

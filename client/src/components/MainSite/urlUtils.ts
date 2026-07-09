@@ -16,19 +16,15 @@ export const buildPublicRoute = (pathname = ''): string => buildSharedPublicRout
 export const stripConfiguredPublicBasePath = (pathname = ''): string => stripPublicUrlBasePath(pathname);
 
 export const buildPublicUrl = (pathname = '', search = '', hash = ''): string => {
-  const normalizedSearch = search
-    ? (String(search).startsWith('?') ? String(search) : `?${search}`)
-    : '';
-  const normalizedHash = hash
-    ? (String(hash).startsWith('#') ? String(hash) : `#${hash}`)
-    : '';
+  const normalizedSearch = search ? (String(search).startsWith('?') ? String(search) : `?${search}`) : '';
+  const normalizedHash = hash ? (String(hash).startsWith('#') ? String(hash) : `#${hash}`) : '';
   return `${buildPublicRoute(pathname)}${normalizedSearch}${normalizedHash}`;
 };
 
 export const replaceRouteResponderQueryParam = (
   pathname: string | null | undefined,
   responder: unknown,
-  search = ''
+  search = '',
 ): void => {
   if (typeof window === 'undefined' || !pathname || !isRouteResponderAddress(responder)) return;
   const params = new URLSearchParams(String(search || ''));

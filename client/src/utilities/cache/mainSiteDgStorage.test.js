@@ -11,12 +11,12 @@ jest.mock('utilities/logging', () => ({
   createLogger: jest.fn(() => mockLogger),
 }));
 
-jest.mock('../../utilities/cache/cacheScripts.js', () => ({
+jest.mock('../../utilities/cache/cacheScripts', () => ({
   __esModule: true,
   peekCacheSync: jest.fn(),
   removeCache: jest.fn(),
   writeCacheOptimistic: jest.fn(),
-}), { virtual: true });
+}));
 
 jest.mock('./sessionCacheConstants', () => ({
   __esModule: true,
@@ -46,7 +46,7 @@ jest.mock('../session/mainSiteUtils', () => ({
 }));
 
 const { createMainSiteDgStorage } = require('./mainSiteDgStorage.js');
-const cacheScripts = require('../../utilities/cache/cacheScripts.js');
+const cacheScripts = require('../../utilities/cache/cacheScripts');
 const storageEviction = require('./sessionCacheEviction');
 const mainSiteUtils = require('../session/mainSiteUtils');
 
@@ -125,9 +125,7 @@ describe('createMainSiteDgStorage', () => {
     let attempts = 0;
 
     mainSiteUtils.isMainSitePerfCountersEnabled.mockReturnValue(true);
-    mainSiteUtils.getMainSitePerfNow
-      .mockReturnValueOnce(10)
-      .mockReturnValue(16);
+    mainSiteUtils.getMainSitePerfNow.mockReturnValueOnce(10).mockReturnValue(16);
     storageEviction.trimLargeArrays.mockImplementation((obj) => {
       if (Array.isArray(obj?.items)) {
         obj.items = obj.items.slice(-2);
@@ -152,7 +150,10 @@ describe('createMainSiteDgStorage', () => {
     expect(storageEviction.trimLargeArrays).toHaveBeenCalledTimes(1);
     expect(JSON.parse(localStorage.getItem(storageKey))).toEqual({ items: [3, 4] });
     expect(mainSiteUtils.bumpMainSitePerfCounter).toHaveBeenCalledWith('dgWriteNonManagedCalls');
-    expect(mainSiteUtils.bumpMainSitePerfCounter).toHaveBeenCalledWith('dgWriteNonManagedSerializedBytes', expect.any(Number));
+    expect(mainSiteUtils.bumpMainSitePerfCounter).toHaveBeenCalledWith(
+      'dgWriteNonManagedSerializedBytes',
+      expect.any(Number),
+    );
     expect(mainSiteUtils.bumpMainSitePerfCounter).toHaveBeenCalledWith('dgWriteNonManagedQuotaRetryCount');
     expect(mainSiteUtils.bumpMainSitePerfCounter).toHaveBeenCalledWith('dgWriteNonManagedQuotaRetrySuccess');
     expect(mainSiteUtils.bumpMainSitePerfCounter).toHaveBeenCalledWith('dgWriteNonManagedDurationSamples', 1);

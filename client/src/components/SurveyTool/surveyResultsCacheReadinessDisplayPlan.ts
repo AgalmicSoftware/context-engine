@@ -79,21 +79,13 @@ export const buildSurveyResultsCacheReadinessDisplayPlan = ({
 }: SurveyResultsCacheReadinessDisplayPlanArgs = {}): SurveyResultsCacheReadinessDisplayPlan => {
   const normalizedViewMode = String(viewMode || '');
   const mode: SurveyResultsCacheReadinessMode =
-    normalizedViewMode === 'questions' || normalizedViewMode === 'survey'
-      ? normalizedViewMode
-      : 'unknown';
-  const summaryCountsSource = mode === 'survey'
-    ? 'survey-results'
-    : 'question-results';
-  const areSummaryCountsHydrated = normalizedViewMode === 'survey'
-    ? !!surveyResultsHydrated
-    : !!questionResultsHydrated;
+    normalizedViewMode === 'questions' || normalizedViewMode === 'survey' ? normalizedViewMode : 'unknown';
+  const summaryCountsSource = mode === 'survey' ? 'survey-results' : 'question-results';
+  const areSummaryCountsHydrated =
+    normalizedViewMode === 'survey' ? !!surveyResultsHydrated : !!questionResultsHydrated;
   const startedAt = toFiniteNumberOrNull(syncLoadingStartedAt);
   const currentTime = toFiniteNumberOrNull(nowMs);
-  const showLongSyncNotice =
-    startedAt !== null &&
-    currentTime !== null &&
-    currentTime - startedAt >= 15000;
+  const showLongSyncNotice = startedAt !== null && currentTime !== null && currentTime - startedAt >= 15000;
 
   const questionListDisplay = buildSurveyResultsQuestionListDisplayPlan({
     aggregatorEntriesCount,

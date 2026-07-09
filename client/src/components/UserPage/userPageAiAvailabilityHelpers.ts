@@ -64,11 +64,8 @@ export const resolveUserPageAiAvailabilityRefresh = ({
     prevIsQuestionCacheReady &&
     prevIsResponsesCacheReady
   );
-  const contextChanged = (
-    prevAccount !== nextAccount ||
-    prevViewAddress !== nextViewAddress ||
-    prevNetworkId !== nextNetworkId
-  );
+  const contextChanged =
+    prevAccount !== nextAccount || prevViewAddress !== nextViewAddress || prevNetworkId !== nextNetworkId;
   return {
     allCachesReady,
     contextChanged,

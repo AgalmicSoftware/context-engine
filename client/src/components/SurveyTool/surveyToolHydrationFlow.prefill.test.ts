@@ -21,23 +21,25 @@ describe('surveyToolHydrationFlow prefill helpers', () => {
       conviction: {},
     }));
 
-    expect(buildPrefilledSingleQuestionState({
-      surveyIndex: 2,
-      questionId: 'Q1',
-      prevSurveysResponseState: [
-        { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
-      ],
-      prevEditBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      isDirty: false,
-      submissionComplete: false,
-      userAnswer: {
-        questionID: 'q1',
-        answer: { value: 'hydrated answer' },
-        additional: { value: 'hydrated notes' },
-      },
-      applyResponseHydrationListToSlice,
-      buildSliceFromUserAnswers,
-    })).toEqual({
+    expect(
+      buildPrefilledSingleQuestionState({
+        surveyIndex: 2,
+        questionId: 'Q1',
+        prevSurveysResponseState: [
+          { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
+        ],
+        prevEditBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+        isDirty: false,
+        submissionComplete: false,
+        userAnswer: {
+          questionID: 'q1',
+          answer: { value: 'hydrated answer' },
+          additional: { value: 'hydrated notes' },
+        },
+        applyResponseHydrationListToSlice,
+        buildSliceFromUserAnswers,
+      }),
+    ).toEqual({
       nextSurveysResponseState: [
         { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
         { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
@@ -57,17 +59,19 @@ describe('surveyToolHydrationFlow prefill helpers', () => {
       shouldWriteBaseline: true,
     });
 
-    expect(buildPrefilledSingleQuestionState({
-      surveyIndex: 0,
-      questionId: '',
-      prevSurveysResponseState: [],
-      prevEditBaseline: null,
-      isDirty: true,
-      submissionComplete: true,
-      userAnswer: null,
-      applyResponseHydrationListToSlice,
-      buildSliceFromUserAnswers,
-    }).shouldWriteBaseline).toBe(false);
+    expect(
+      buildPrefilledSingleQuestionState({
+        surveyIndex: 0,
+        questionId: '',
+        prevSurveysResponseState: [],
+        prevEditBaseline: null,
+        isDirty: true,
+        submissionComplete: true,
+        userAnswer: null,
+        applyResponseHydrationListToSlice,
+        buildSliceFromUserAnswers,
+      }).shouldWriteBaseline,
+    ).toBe(false);
   });
 
   it('builds single-question prefill update plans with optional baseline writes', () => {
@@ -83,19 +87,21 @@ describe('surveyToolHydrationFlow prefill helpers', () => {
       additionalComments: {},
     }));
 
-    expect(buildPrefilledSingleQuestionUpdatePlan({
-      surveyIndex: 1,
-      questionId: 'q1',
-      prevSurveysResponseState: [
-        { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
-      ],
-      prevEditBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      isDirty: false,
-      submissionComplete: false,
-      userAnswer: { answer: { value: 'answer-1' } },
-      applyResponseHydrationListToSlice,
-      buildSliceFromUserAnswers,
-    })).toEqual({
+    expect(
+      buildPrefilledSingleQuestionUpdatePlan({
+        surveyIndex: 1,
+        questionId: 'q1',
+        prevSurveysResponseState: [
+          { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
+        ],
+        prevEditBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+        isDirty: false,
+        submissionComplete: false,
+        userAnswer: { answer: { value: 'answer-1' } },
+        applyResponseHydrationListToSlice,
+        buildSliceFromUserAnswers,
+      }),
+    ).toEqual({
       nextSurveysResponseState: [
         { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
         {
@@ -156,25 +162,27 @@ describe('surveyToolHydrationFlow prefill helpers', () => {
       conviction: { q1: 7 },
     }));
 
-    expect(buildPrefilledSurveyState({
-      surveyIndex: 1,
-      prevSurveysResponseState: [
-        { answers: { q0: { value: 'keep' } }, importance: {}, conviction: {}, additionalComments: {} },
-      ],
-      prevEditBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      isDirty: false,
-      submissionComplete: false,
-      responses: [
-        {
-          answer: { value: 'hydrated answer' },
-          additional: { value: 'hydrated notes' },
-          importance: 4,
-          conviction: 7,
-        },
-      ],
-      applyResponseHydrationListToSlice,
-      buildSliceFromUserAnswers,
-    })).toEqual({
+    expect(
+      buildPrefilledSurveyState({
+        surveyIndex: 1,
+        prevSurveysResponseState: [
+          { answers: { q0: { value: 'keep' } }, importance: {}, conviction: {}, additionalComments: {} },
+        ],
+        prevEditBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+        isDirty: false,
+        submissionComplete: false,
+        responses: [
+          {
+            answer: { value: 'hydrated answer' },
+            additional: { value: 'hydrated notes' },
+            importance: 4,
+            conviction: 7,
+          },
+        ],
+        applyResponseHydrationListToSlice,
+        buildSliceFromUserAnswers,
+      }),
+    ).toEqual({
       nextSurveysResponseState: [
         { answers: { q0: { value: 'keep' } }, importance: {}, conviction: {}, additionalComments: {} },
         {
@@ -193,20 +201,24 @@ describe('surveyToolHydrationFlow prefill helpers', () => {
       shouldWriteBaseline: true,
     });
 
-    expect(buildPrefilledSurveyState({
-      surveyIndex: 0,
-      prevSurveysResponseState: [],
-      prevEditBaseline: null,
-      isDirty: true,
-      submissionComplete: true,
-      responses: [],
-      applyResponseHydrationListToSlice,
-      buildSliceFromUserAnswers,
-    }).shouldWriteBaseline).toBe(false);
+    expect(
+      buildPrefilledSurveyState({
+        surveyIndex: 0,
+        prevSurveysResponseState: [],
+        prevEditBaseline: null,
+        isDirty: true,
+        submissionComplete: true,
+        responses: [],
+        applyResponseHydrationListToSlice,
+        buildSliceFromUserAnswers,
+      }).shouldWriteBaseline,
+    ).toBe(false);
   });
 
   it('builds survey prefill update plans with optional baseline writes', () => {
-    const responses = [{ answer: { value: 'answer-1' }, additional: { value: 'notes-1' }, importance: 4, conviction: 7 }];
+    const responses = [
+      { answer: { value: 'answer-1' }, additional: { value: 'notes-1' }, importance: 4, conviction: 7 },
+    ];
     const applyResponseHydrationListToSlice = jest.fn(({ targetSlice, responses: nextResponses }) => {
       const first = nextResponses[0];
       targetSlice.answers.q1 = { value: first.answer.value };
@@ -222,18 +234,20 @@ describe('surveyToolHydrationFlow prefill helpers', () => {
       additionalComments: { q1: { value: 'baseline notes' } },
     }));
 
-    expect(buildPrefilledSurveyUpdatePlan({
-      surveyIndex: 1,
-      prevSurveysResponseState: [
-        { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
-      ],
-      prevEditBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      isDirty: false,
-      submissionComplete: false,
-      responses,
-      applyResponseHydrationListToSlice,
-      buildSliceFromUserAnswers,
-    })).toEqual({
+    expect(
+      buildPrefilledSurveyUpdatePlan({
+        surveyIndex: 1,
+        prevSurveysResponseState: [
+          { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
+        ],
+        prevEditBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+        isDirty: false,
+        submissionComplete: false,
+        responses,
+        applyResponseHydrationListToSlice,
+        buildSliceFromUserAnswers,
+      }),
+    ).toEqual({
       nextSurveysResponseState: [
         { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
         {

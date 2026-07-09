@@ -28,23 +28,29 @@ describe('userPageHelpers response decrypt helpers', () => {
     expect(normalizeUserPageGateResourceKey('  field-1  ')).toBe('field-1');
     expect(normalizeUserPageGateResourceKey('')).toBe('default');
 
-    expect(buildUserPageGateAccessCacheKey({
-      account: ' 0xABC ',
-      networkID: 84532,
-      resourceKey: ' field-1 ',
-      sbtCacheRevision: 7,
-      slug: ' General ',
-    })).toBe('0xabc|84532|7||field-1');
+    expect(
+      buildUserPageGateAccessCacheKey({
+        account: ' 0xABC ',
+        networkID: 84532,
+        resourceKey: ' field-1 ',
+        sbtCacheRevision: 7,
+        slug: ' General ',
+      }),
+    ).toBe('0xabc|84532|7||field-1');
 
-    expect(buildUserPageGateAccessCacheKey({
-      resourceKey: '',
-      slug: 'alpha',
-    })).toBe('anon||0|alpha|default');
+    expect(
+      buildUserPageGateAccessCacheKey({
+        resourceKey: '',
+        slug: 'alpha',
+      }),
+    ).toBe('anon||0|alpha|default');
 
-    expect(buildUserPageGatePendingKey({
-      resourceKey: ' response ',
-      slug: 'Beta',
-    })).toBe('beta::response');
+    expect(
+      buildUserPageGatePendingKey({
+        resourceKey: ' response ',
+        slug: 'Beta',
+      }),
+    ).toBe('beta::response');
     expect(buildUserPageGatePendingKey({ slug: 'general' })).toBe('::default');
   });
 
@@ -71,32 +77,50 @@ describe('userPageHelpers response decrypt helpers', () => {
   });
 
   it('infers response encryption audiences with field precedence', () => {
-    expect(inferUserPageResponseFieldEncryptionAudience({
-      answer: { encryptionAudience: ' Self ' },
-    }, 'answer', 'gate')).toBe('self');
+    expect(
+      inferUserPageResponseFieldEncryptionAudience(
+        {
+          answer: { encryptionAudience: ' Self ' },
+        },
+        'answer',
+        'gate',
+      ),
+    ).toBe('self');
 
-    expect(inferUserPageResponseFieldEncryptionAudience({
-      answer: { encryptionAudience: 'public' },
-    }, 'answer', ' Self ')).toBe('self');
+    expect(
+      inferUserPageResponseFieldEncryptionAudience(
+        {
+          answer: { encryptionAudience: 'public' },
+        },
+        'answer',
+        ' Self ',
+      ),
+    ).toBe('self');
 
-    expect(inferUserPageResponseEncryptionAudience({
-      answer: { encryptionAudience: 'self' },
-      additional: { encryptionAudience: 'self' },
-    })).toBe('self');
-    expect(inferUserPageResponseEncryptionAudience({
-      answer: { encryptionAudience: 'self' },
-      additional: { encryptionAudience: 'gate' },
-    })).toBe('gate');
+    expect(
+      inferUserPageResponseEncryptionAudience({
+        answer: { encryptionAudience: 'self' },
+        additional: { encryptionAudience: 'self' },
+      }),
+    ).toBe('self');
+    expect(
+      inferUserPageResponseEncryptionAudience({
+        answer: { encryptionAudience: 'self' },
+        additional: { encryptionAudience: 'gate' },
+      }),
+    ).toBe('gate');
     expect(inferUserPageResponseEncryptionAudience({}, 'custom')).toBe('custom');
     expect(inferUserPageResponseEncryptionAudience({}, '')).toBe('gate');
   });
 
   it('builds decryptable response fields and decrypted patches', () => {
-    expect(buildUserPageDecryptableResponseField({
-      value: 'ciphertext',
-      encryptedPortion: 'payload',
-      keep: 'yes',
-    })).toEqual({
+    expect(
+      buildUserPageDecryptableResponseField({
+        value: 'ciphertext',
+        encryptedPortion: 'payload',
+        keep: 'yes',
+      }),
+    ).toEqual({
       value: 'ciphertext',
       encryptedPortion: 'payload',
       keep: 'yes',
@@ -110,79 +134,87 @@ describe('userPageHelpers response decrypt helpers', () => {
 
     const originalField = { value: '*', encrypted: true, encryptedPortion: 'payload', keep: 'yes' };
     expect(applyUserPageDecryptedPatchToResponseField(originalField, {})).toBe(originalField);
-    expect(applyUserPageDecryptedPatchToResponseField(originalField, {
-      value: 'clear',
-      zkSalt: 'salt-1',
-    })).toEqual({
+    expect(
+      applyUserPageDecryptedPatchToResponseField(originalField, {
+        value: 'clear',
+        zkSalt: 'salt-1',
+      }),
+    ).toEqual({
       value: 'clear',
       encrypted: false,
       keep: 'yes',
       zkSalt: 'salt-1',
     });
 
-    expect(buildUserPageDecryptedResponsePatch({
-      responseObj: {
-        answer: { value: '*', encrypted: true, encryptedPortion: 'answer-cipher' },
-        additional: { value: '*', encrypted: true, encryptedPortion: 'additional-cipher' },
-        untouched: true,
-      },
-      questionId: ' Q1 ',
-      fieldToDecrypt: 'both',
-      decryptedResult: {
-        answers: {
-          q1: { value: 'answer clear' },
+    expect(
+      buildUserPageDecryptedResponsePatch({
+        responseObj: {
+          answer: { value: '*', encrypted: true, encryptedPortion: 'answer-cipher' },
+          additional: { value: '*', encrypted: true, encryptedPortion: 'additional-cipher' },
+          untouched: true,
         },
-        additionalComments: {
-          q1: { value: 'additional clear' },
+        questionId: ' Q1 ',
+        fieldToDecrypt: 'both',
+        decryptedResult: {
+          answers: {
+            q1: { value: 'answer clear' },
+          },
+          additionalComments: {
+            q1: { value: 'additional clear' },
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       answer: { value: 'answer clear', encrypted: false },
       additional: { value: 'additional clear', encrypted: false },
       untouched: true,
     });
 
-    expect(buildUserPageDecryptedResponsePatch({
-      responseObj: { answer: { value: '*' } },
-      questionId: 'q1',
-      fieldToDecrypt: 'additional',
-      decryptedResult: { answers: { q1: { value: 'ignored' } } },
-    })).toBeNull();
+    expect(
+      buildUserPageDecryptedResponsePatch({
+        responseObj: { answer: { value: '*' } },
+        questionId: 'q1',
+        fieldToDecrypt: 'additional',
+        decryptedResult: { answers: { q1: { value: 'ignored' } } },
+      }),
+    ).toBeNull();
   });
 
   it('builds response decrypt survey bindings from response and survey details', () => {
     const hashZero = '0x0000000000000000000000000000000000000000000000000000000000000000';
     const responseOverride = { surveyID: 'OverrideSurvey' };
 
-    expect(buildUserPageResponseDecryptSurveyBindings({
-      hashZero,
-      questionId: ' Q1 ',
-      responseOverride,
-      questionResponseInfo: [
-        { id: 'q1', associatedSurveyId: 'InfoAssoc', surveyId: 'InfoSurvey' },
-        { id: 'other', surveyId: 'IgnoredInfo' },
-      ],
-      detailedSurveyResponses: {
-        'Survey-Key': [
-          {
-            questionData: { id: 'Q1', surveyID: 'QuestionSurvey' },
-            responseData: { surveyId: 'ResponseSurvey' },
-          },
+    expect(
+      buildUserPageResponseDecryptSurveyBindings({
+        hashZero,
+        questionId: ' Q1 ',
+        responseOverride,
+        questionResponseInfo: [
+          { id: 'q1', associatedSurveyId: 'InfoAssoc', surveyId: 'InfoSurvey' },
+          { id: 'other', surveyId: 'IgnoredInfo' },
         ],
-        ReferenceSurvey: [
-          {
-            questionData: { id: 'Other' },
-            responseData: responseOverride,
-          },
-        ],
-        IgnoredSurvey: [
-          {
-            questionData: { id: 'Other', surveyID: 'IgnoredQuestion' },
-            responseData: { surveyId: 'IgnoredResponse' },
-          },
-        ],
-      },
-    })).toEqual({
+        detailedSurveyResponses: {
+          'Survey-Key': [
+            {
+              questionData: { id: 'Q1', surveyID: 'QuestionSurvey' },
+              responseData: { surveyId: 'ResponseSurvey' },
+            },
+          ],
+          ReferenceSurvey: [
+            {
+              questionData: { id: 'Other' },
+              responseData: responseOverride,
+            },
+          ],
+          IgnoredSurvey: [
+            {
+              questionData: { id: 'Other', surveyID: 'IgnoredQuestion' },
+              responseData: { surveyId: 'IgnoredResponse' },
+            },
+          ],
+        },
+      }),
+    ).toEqual({
       surveyId: 'overridesurvey',
       acceptedSurveyIds: [
         'overridesurvey',
@@ -196,10 +228,12 @@ describe('userPageHelpers response decrypt helpers', () => {
       ],
     });
 
-    expect(buildUserPageResponseDecryptSurveyBindings({
-      hashZero,
-      questionId: 'missing',
-    })).toEqual({
+    expect(
+      buildUserPageResponseDecryptSurveyBindings({
+        hashZero,
+        questionId: 'missing',
+      }),
+    ).toEqual({
       surveyId: hashZero,
       acceptedSurveyIds: [hashZero],
     });
@@ -214,21 +248,25 @@ describe('userPageHelpers response decrypt helpers', () => {
       additional: { value: '', encrypted: false },
     };
 
-    expect(buildUserPageResponseDecryptRequestPlan({
-      account: ' 0xABC ',
-      detailedSurveyResponses: {
-        SurveyA: [{
-          questionData: { id: 'Q1' },
-          responseData: responseOverride,
-        }],
-      },
-      hashZero,
-      litHooks: { getKey },
-      networkId: '84532',
-      provider: 'provider-ref',
-      questionId: ' Q1 ',
-      responseOverride,
-    })).toEqual({
+    expect(
+      buildUserPageResponseDecryptRequestPlan({
+        account: ' 0xABC ',
+        detailedSurveyResponses: {
+          SurveyA: [
+            {
+              questionData: { id: 'Q1' },
+              responseData: responseOverride,
+            },
+          ],
+        },
+        hashZero,
+        litHooks: { getKey },
+        networkId: '84532',
+        provider: 'provider-ref',
+        questionId: ' Q1 ',
+        responseOverride,
+      }),
+    ).toEqual({
       account: '0xABC',
       blockedReason: '',
       cryptoOptions: {
@@ -262,16 +300,20 @@ describe('userPageHelpers response decrypt helpers', () => {
       status: 'ready',
     });
 
-    expect(buildUserPageResponseDecryptRequestPlan({
-      account: '',
-      questionId: 'q1',
-      responseOverride,
-    })).toEqual(expect.objectContaining({
-      blockedReason: 'missing-account',
-      cryptoOptions: null,
-      responseSlice: null,
-      status: 'blocked',
-    }));
+    expect(
+      buildUserPageResponseDecryptRequestPlan({
+        account: '',
+        questionId: 'q1',
+        responseOverride,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        blockedReason: 'missing-account',
+        cryptoOptions: null,
+        responseSlice: null,
+        status: 'blocked',
+      }),
+    );
   });
 
   it('builds decrypted response state patches without mutating previous buckets', () => {
@@ -326,15 +368,17 @@ describe('userPageHelpers response decrypt helpers', () => {
     expect(previousState.detailedQuestionResponses.q1).toBe(encryptedResponse);
     expect(previousState.detailedSurveyResponses.s1[0].responseData).toBe(encryptedResponse);
 
-    expect(buildUserPageDecryptedResponseStatePatch({
-      patchedResponse,
-      previousState: {
-        detailedQuestionResponses: {},
-        detailedSurveyResponses: {},
-      },
-      questionId: 'q1',
-      responseOverride: encryptedResponse,
-    })).toEqual({
+    expect(
+      buildUserPageDecryptedResponseStatePatch({
+        patchedResponse,
+        previousState: {
+          detailedQuestionResponses: {},
+          detailedSurveyResponses: {},
+        },
+        questionId: 'q1',
+        responseOverride: encryptedResponse,
+      }),
+    ).toEqual({
       didUpdate: false,
       statePatch: null,
     });

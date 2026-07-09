@@ -1,8 +1,4 @@
-import {
-  bumpSurveyPerfCounter,
-  isSurveyPerfCountersEnabled,
-  scheduleMicrotask,
-} from './surveyToolRuntimeSupport.js';
+import { bumpSurveyPerfCounter, isSurveyPerfCountersEnabled, scheduleMicrotask } from './surveyToolRuntimeSupport.js';
 
 describe('surveyToolRuntimeSupport', () => {
   const originalEnableUiPerfStats = (globalThis as any).ENABLE_CE_UI_PERF_STATS;

@@ -1,17 +1,8 @@
-import {
-  isPlainAnalysisObject,
-  toAnalysisRecord,
-  type UserPageUnknownRecord,
-} from './userPageCoreHelpers';
-import {
-  normalizeUserAnalysisResult,
-} from './userPageAnalysisStateHelpers';
+import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
+import { normalizeUserAnalysisResult } from './userPageAnalysisStateHelpers';
 import { normalizeUserPageSourceSlugForSignature } from './userPageGateHelpers';
 
-export {
-  isPlainAnalysisObject,
-  toAnalysisRecord,
-} from './userPageCoreHelpers';
+export { isPlainAnalysisObject, toAnalysisRecord } from './userPageCoreHelpers';
 export type { UserPageUnknownRecord } from './userPageCoreHelpers';
 export {
   applyUserPageBookmarkNicknameSave,
@@ -142,9 +133,7 @@ export {
   shouldApplyUserPageDeepScanResponse,
   sortUserPageDeepScanProgressRows,
 } from './userPageDeepScanHelpers';
-export type {
-  UserPageDeepScanProgressRow,
-} from './userPageDeepScanHelpers';
+export type { UserPageDeepScanProgressRow } from './userPageDeepScanHelpers';
 export {
   applyUserPageDecryptedPatchToResponseField,
   buildUserPageDecryptableResponseField,
@@ -379,11 +368,7 @@ export type {
 } from './userPageAiAvailabilityHelpers';
 type UserPageNamespaceSlugReader = (namespace: unknown) => unknown;
 type UserPageNamespacePresenceReader = (namespace: unknown) => boolean;
-type UserPageDeepScanCacheReader = (
-  namespace: string,
-  slug: string,
-  options?: { clone?: boolean }
-) => unknown;
+type UserPageDeepScanCacheReader = (namespace: string, slug: string, options?: { clone?: boolean }) => unknown;
 export type UserPageNamespaceSourceEntry = {
   slug: string;
   data: UserPageUnknownRecord;
@@ -555,10 +540,10 @@ export type UserPageCacheRefreshRequestDescriptor = {
   sourcePresence: UserPageCacheSourcePresence;
   viewAddressLower: string;
 } & UserPageCacheLoadingHoldFlags & {
-  hasQuestionSources: boolean;
-  hasSbtSources: boolean;
-  hasSurveySources: boolean;
-};
+    hasQuestionSources: boolean;
+    hasSbtSources: boolean;
+    hasSurveySources: boolean;
+  };
 export type UserPageUnifiedCacheAggregateMemoPlan = {
   aggregateMemoKey: string;
   aggregate: unknown;
@@ -608,11 +593,10 @@ type BuildUserPageUnifiedCacheAggregateMemoKeyArgs = {
   sourceMembershipSignature?: unknown;
   viewAddressLower?: unknown;
 };
-type BuildUserPageUnifiedCacheAggregateMemoPlanArgs =
-  BuildUserPageUnifiedCacheAggregateMemoKeyArgs & {
-    currentAggregateMemo?: unknown;
-    currentAggregateMemoKey?: unknown;
-  };
+type BuildUserPageUnifiedCacheAggregateMemoPlanArgs = BuildUserPageUnifiedCacheAggregateMemoKeyArgs & {
+  currentAggregateMemo?: unknown;
+  currentAggregateMemoKey?: unknown;
+};
 type BuildUserPageResponseSectionDeriveSignatureArgs = {
   account?: unknown;
   networkID?: unknown;
@@ -622,22 +606,20 @@ type BuildUserPageResponseSectionDeriveSignatureArgs = {
   sourceSignature?: unknown;
   viewAddressLower?: unknown;
 };
-type BuildUserPageResponseSectionDeriveMemoPlanArgs =
-  BuildUserPageResponseSectionDeriveSignatureArgs & {
-    currentMemo?: unknown;
-    force?: unknown;
-  };
+type BuildUserPageResponseSectionDeriveMemoPlanArgs = BuildUserPageResponseSectionDeriveSignatureArgs & {
+  currentMemo?: unknown;
+  force?: unknown;
+};
 type BuildUserPageSbtSectionDeriveSignatureArgs = {
   networkID?: unknown;
   sbtCacheRevision?: unknown;
   sourceSignature?: unknown;
   viewAddressLower?: unknown;
 };
-type BuildUserPageSbtSectionDeriveMemoPlanArgs =
-  BuildUserPageSbtSectionDeriveSignatureArgs & {
-    currentMemo?: unknown;
-    force?: unknown;
-  };
+type BuildUserPageSbtSectionDeriveMemoPlanArgs = BuildUserPageSbtSectionDeriveSignatureArgs & {
+  currentMemo?: unknown;
+  force?: unknown;
+};
 export type UserPageAnalysisCacheEntry = UserPageUnknownRecord & {
   version?: unknown;
   fingerprint?: unknown;
@@ -657,13 +639,9 @@ export type UserPageAnalysisCacheReadDescriptor = {
 export type UserPageAnalysisCacheReadPort = (
   namespace: string,
   slug?: string,
-  options?: { clone?: boolean }
+  options?: { clone?: boolean },
 ) => unknown;
-export type UserPageAnalysisCacheWritePort = (
-  namespace: string,
-  slug?: string,
-  value?: unknown
-) => Promise<unknown>;
+export type UserPageAnalysisCacheWritePort = (namespace: string, slug?: string, value?: unknown) => Promise<unknown>;
 export type UserPageAnalysisCacheReadPortResult = {
   descriptor: UserPageAnalysisCacheReadDescriptor;
   entry: UserPageAnalysisCacheEntry | null;
@@ -685,9 +663,8 @@ export type UserPageAnalysisCreatedSurveyCacheReadResult = {
   surveysCache: unknown;
 };
 
-export const toAnalysisCacheBucket = (value: unknown): UserPageUnknownRecord => (
-  value != null && typeof value === 'object' ? value as UserPageUnknownRecord : {}
-);
+export const toAnalysisCacheBucket = (value: unknown): UserPageUnknownRecord =>
+  value != null && typeof value === 'object' ? (value as UserPageUnknownRecord) : {};
 
 export const isUserPageGateAccessContext = (value: unknown): boolean => {
   const record = toAnalysisRecord(value);
@@ -726,7 +703,9 @@ export const buildUserPageAnalysisCacheReadDescriptor = ({
   sessionSlug = '',
 }: BuildUserPageAnalysisCacheReadDescriptorArgs = {}): UserPageAnalysisCacheReadDescriptor => ({
   action: forceRefresh ? 'skip-force-refresh' : 'read',
-  addressLower: String(addressLower || '').trim().toLowerCase(),
+  addressLower: String(addressLower || '')
+    .trim()
+    .toLowerCase(),
   fingerprint: String(fingerprint || ''),
   networkId: String(networkId || ''),
   sessionSlug: String(sessionSlug || ''),
@@ -757,9 +736,7 @@ export const readUserPageAnalysisCacheThroughPort = ({
     };
   }
   try {
-    const cacheObj = toAnalysisCacheBucket(
-      peekCache('analysisCache', readDescriptor.sessionSlug, { clone: false })
-    );
+    const cacheObj = toAnalysisCacheBucket(peekCache('analysisCache', readDescriptor.sessionSlug, { clone: false }));
     const entry = readUserPageAnalysisCacheEntry({
       addressLower: readDescriptor.addressLower,
       cacheObj,
@@ -824,19 +801,13 @@ export const buildUserPageAnalysisCacheWritePayload = ({
   const networkKey = String(networkId || '');
   const addressKey = String(addressLower || '');
   const networkBucketSource = next[networkKey];
-  const networkBucket: UserPageUnknownRecord = (
-    networkBucketSource &&
-    typeof networkBucketSource === 'object'
-  )
-    ? { ...(networkBucketSource as UserPageUnknownRecord) }
-    : {};
+  const networkBucket: UserPageUnknownRecord =
+    networkBucketSource && typeof networkBucketSource === 'object'
+      ? { ...(networkBucketSource as UserPageUnknownRecord) }
+      : {};
   const addressBucketRaw = networkBucket[addressKey];
-  const addressBucketSource: UserPageUnknownRecord = (
-    addressBucketRaw &&
-    typeof addressBucketRaw === 'object'
-  )
-    ? addressBucketRaw as UserPageUnknownRecord
-    : {};
+  const addressBucketSource: UserPageUnknownRecord =
+    addressBucketRaw && typeof addressBucketRaw === 'object' ? (addressBucketRaw as UserPageUnknownRecord) : {};
   const addressBucket: Record<string, UserPageAnalysisCacheEntry> = {};
   Object.entries(addressBucketSource).forEach(([key, sibling]) => {
     const siblingRecord = sibling as UserPageAnalysisCacheEntry;
@@ -1002,14 +973,13 @@ export const readUserPageCacheSourcePresence = ({
   hasNamespaceEntries = () => false,
 }: {
   hasNamespaceEntries?: UserPageNamespacePresenceReader;
-} = {}): UserPageCacheSourcePresence => (
+} = {}): UserPageCacheSourcePresence =>
   buildUserPageCacheSourcePresence({
     hasSurveysCache: hasNamespaceEntries('surveysCache'),
     hasQuestionsCache: hasNamespaceEntries('questionsCache'),
     hasSbtCache: hasNamespaceEntries('sbtCache'),
     hasUserCache: hasNamespaceEntries('userCache'),
-  })
-);
+  });
 
 export const readUserPageCacheSourceSnapshot = ({
   hasNamespaceEntries = () => false,
@@ -1065,19 +1035,9 @@ export const buildUserPageCacheSourceSnapshot = ({
     hasSurveySources,
     hasQuestionSources,
     hasSbtSources,
-    surveySourcesSignature: [
-      surveysNamespaceSignature,
-      questionsNamespaceSignature,
-      userNamespaceSignature,
-    ].join('|'),
-    questionSourcesSignature: [
-      questionsNamespaceSignature,
-      userNamespaceSignature,
-    ].join('|'),
-    sbtSourcesSignature: [
-      sbtNamespaceSignature,
-      userNamespaceSignature,
-    ].join('|'),
+    surveySourcesSignature: [surveysNamespaceSignature, questionsNamespaceSignature, userNamespaceSignature].join('|'),
+    questionSourcesSignature: [questionsNamespaceSignature, userNamespaceSignature].join('|'),
+    sbtSourcesSignature: [sbtNamespaceSignature, userNamespaceSignature].join('|'),
     membershipSignature: [
       surveysNamespaceSignature,
       questionsNamespaceSignature,
@@ -1093,15 +1053,14 @@ export const buildUserPageUnifiedCacheAggregateMemoKey = ({
   questionResponsesNonce = 0,
   sbtCacheRevision = 0,
   sourceMembershipSignature = '',
-}: BuildUserPageUnifiedCacheAggregateMemoKeyArgs = {}): string => (
+}: BuildUserPageUnifiedCacheAggregateMemoKeyArgs = {}): string =>
   [
     String(viewAddressLower || ''),
     String(networkID || ''),
     String(questionResponsesNonce || 0),
     String(sbtCacheRevision || 0),
     String(sourceMembershipSignature || ''),
-  ].join('|')
-);
+  ].join('|');
 
 export const buildUserPageUnifiedCacheAggregateMemoPlan = ({
   currentAggregateMemo = null,
@@ -1119,10 +1078,7 @@ export const buildUserPageUnifiedCacheAggregateMemoPlan = ({
     sourceMembershipSignature,
     viewAddressLower,
   });
-  const canReuseAggregate = !!(
-    currentAggregateMemo &&
-    String(currentAggregateMemoKey || '') === aggregateMemoKey
-  );
+  const canReuseAggregate = !!(currentAggregateMemo && String(currentAggregateMemoKey || '') === aggregateMemoKey);
   return {
     aggregate: canReuseAggregate ? currentAggregateMemo : null,
     aggregateMemoKey,
@@ -1138,17 +1094,18 @@ export const buildUserPageResponseSectionDeriveSignature = ({
   account = '',
   responseGateAccessGeneration = 0,
   responseGateAccessStatusVersion = 0,
-}: BuildUserPageResponseSectionDeriveSignatureArgs = {}): string => (
+}: BuildUserPageResponseSectionDeriveSignatureArgs = {}): string =>
   [
     String(viewAddressLower || ''),
     String(networkID || ''),
     String(sourceSignature || ''),
     String(questionResponsesNonce || 0),
-    String(account || '').trim().toLowerCase(),
+    String(account || '')
+      .trim()
+      .toLowerCase(),
     String(responseGateAccessGeneration || 0),
     String(responseGateAccessStatusVersion || 0),
-  ].join('|')
-);
+  ].join('|');
 
 export const buildUserPageResponseSectionDeriveMemoPlan = ({
   account = '',
@@ -1185,14 +1142,13 @@ export const buildUserPageSbtSectionDeriveSignature = ({
   networkID = '',
   sourceSignature = '',
   sbtCacheRevision = 0,
-}: BuildUserPageSbtSectionDeriveSignatureArgs = {}): string => (
+}: BuildUserPageSbtSectionDeriveSignatureArgs = {}): string =>
   [
     String(viewAddressLower || ''),
     String(networkID || ''),
     String(sourceSignature || ''),
     String(sbtCacheRevision || 0),
-  ].join('|')
-);
+  ].join('|');
 
 export const buildUserPageSbtSectionDeriveMemoPlan = ({
   currentMemo = null,
@@ -1228,16 +1184,10 @@ export const resolveUserPageResponseNonceRefresh = ({
   if (prevNonce === nextNonce) return null;
   const viewAddressLower = String(viewAddress || '').toLowerCase();
   const connectedAddressLower = String(connectedAddress || account || '').toLowerCase();
-  const isOwnProfile = !!(
-    viewAddressLower &&
-    connectedAddressLower &&
-    viewAddressLower === connectedAddressLower
-  );
+  const isOwnProfile = !!(viewAddressLower && connectedAddressLower && viewAddressLower === connectedAddressLower);
   return {
     isOwnProfile,
-    options: isOwnProfile
-      ? { force: true, markLoading: false, bypassSignature: true }
-      : { markLoading: false },
+    options: isOwnProfile ? { force: true, markLoading: false, bypassSignature: true } : { markLoading: false },
   };
 };
 
@@ -1249,20 +1199,17 @@ export const resolveUserPageManagedCacheUpdate = ({
   const resolvedNamespace = String(namespace || '').trim();
   if (!resolvedNamespace) return { action: 'ignore' };
   if (resolvedNamespace === 'bookmarksCache') {
-    return String(slug || '') === String(bookmarksSlug || '')
-      ? { action: 'bookmarks' }
-      : { action: 'ignore' };
+    return String(slug || '') === String(bookmarksSlug || '') ? { action: 'bookmarks' } : { action: 'ignore' };
   }
   return ['surveysCache', 'questionsCache', 'sbtCache', 'userCache'].includes(resolvedNamespace)
     ? { action: 'refresh' }
     : { action: 'ignore' };
 };
 
-const readOptionalUserPageNetworkId = (network: unknown): unknown => (
+const readOptionalUserPageNetworkId = (network: unknown): unknown =>
   network != null && (typeof network === 'object' || typeof network === 'function')
     ? (network as { id?: unknown }).id
-    : undefined
-);
+    : undefined;
 
 export const resolveUserPageAddressContextChange = ({
   nextNetwork = null,
@@ -1271,10 +1218,9 @@ export const resolveUserPageAddressContextChange = ({
   prevViewAddress = undefined,
 }: ResolveUserPageAddressContextChangeArgs = {}): UserPageAddressContextChangeDecision => ({
   nextViewAddress,
-  shouldReset: (
+  shouldReset:
     prevViewAddress !== nextViewAddress ||
-    readOptionalUserPageNetworkId(prevNetwork) !== readOptionalUserPageNetworkId(nextNetwork)
-  ),
+    readOptionalUserPageNetworkId(prevNetwork) !== readOptionalUserPageNetworkId(nextNetwork),
 });
 
 export const resolveUserPageCacheUpdateRefresh = ({
@@ -1354,7 +1300,9 @@ export const buildUserPageCacheRefreshInputSignature = ({
   return [
     String(viewAddressLower || ''),
     String(networkID || ''),
-    String(account || '').trim().toLowerCase(),
+    String(account || '')
+      .trim()
+      .toLowerCase(),
     readinessSignature,
     sourceSignature,
     String(sourceMembershipSignature || ''),
@@ -1400,25 +1348,25 @@ export const buildUserPageCacheRefreshRequestDescriptor = ({
   const hasSbtSources = !!snapshot.hasSbtSources;
   const refreshInputSignature = viewAddressLower
     ? buildUserPageCacheRefreshInputSignature({
-      account,
-      gateRecheckEpoch,
-      hasQuestionSources,
-      hasSbtSources,
-      hasSurveySources,
-      hasUncertainGateAccess,
-      hasUncertainUserData,
-      isQuestionCacheReady,
-      isResponsesCacheReady,
-      isSBTCacheReady,
-      isSurveyCacheReady,
-      networkID,
-      questionResponsesNonce,
-      responseGateAccessGeneration,
-      responseGateAccessStatusVersion,
-      sbtCacheRevision,
-      sourceMembershipSignature: snapshot.membershipSignature,
-      viewAddressLower,
-    })
+        account,
+        gateRecheckEpoch,
+        hasQuestionSources,
+        hasSbtSources,
+        hasSurveySources,
+        hasUncertainGateAccess,
+        hasUncertainUserData,
+        isQuestionCacheReady,
+        isResponsesCacheReady,
+        isSBTCacheReady,
+        isSurveyCacheReady,
+        networkID,
+        questionResponsesNonce,
+        responseGateAccessGeneration,
+        responseGateAccessStatusVersion,
+        sbtCacheRevision,
+        sourceMembershipSignature: snapshot.membershipSignature,
+        viewAddressLower,
+      })
     : '';
   const holdFlags = buildUserPageCacheLoadingHoldFlags({
     force: resolvedForce,
@@ -1430,18 +1378,13 @@ export const buildUserPageCacheRefreshRequestDescriptor = ({
     sbtReady: isSBTCacheReady,
     surveysReady: isSurveyCacheReady,
   });
-  const shouldSkipSameSignature = (
+  const shouldSkipSameSignature =
     !resolvedForce &&
     !resolvedMarkLoading &&
     !resolvedBypassSignature &&
-    refreshInputSignature === String(currentInputSignature || '')
-  );
+    refreshInputSignature === String(currentInputSignature || '');
   return {
-    action: !viewAddressLower
-      ? 'missing-address'
-      : shouldSkipSameSignature
-        ? 'skip-same-signature'
-        : 'refresh',
+    action: !viewAddressLower ? 'missing-address' : shouldSkipSameSignature ? 'skip-same-signature' : 'refresh',
     bypassSignature: resolvedBypassSignature,
     force: resolvedForce,
     hasQuestionSources,
@@ -1466,9 +1409,9 @@ export const buildUserPageCacheLoadingHoldFlags = ({
   sbtReady = false,
   surveysReady = false,
 }: BuildUserPageCacheLoadingHoldFlagsArgs = {}): UserPageCacheLoadingHoldFlags => ({
-  holdSurveyLoading: !force && ((!surveysReady || !responsesReady) && !hasSurveySources),
-  holdQuestionLoading: !force && ((!questionsReady || !responsesReady) && !hasQuestionSources),
-  holdSbtLoading: !force && (!sbtReady && !hasSbtSources),
+  holdSurveyLoading: !force && (!surveysReady || !responsesReady) && !hasSurveySources,
+  holdQuestionLoading: !force && (!questionsReady || !responsesReady) && !hasQuestionSources,
+  holdSbtLoading: !force && !sbtReady && !hasSbtSources,
 });
 
 export const buildUserPageMissingAddressCacheStatePatch = (): UserPageUnknownRecord => ({
@@ -1480,9 +1423,7 @@ export const buildUserPageMissingAddressCacheStatePatch = (): UserPageUnknownRec
   deepScanProgressRows: null,
 });
 
-export const buildUserPageMissingAddressCacheStateUpdate = (
-  prevState: unknown = {}
-): UserPageUnknownRecord | null => {
+export const buildUserPageMissingAddressCacheStateUpdate = (prevState: unknown = {}): UserPageUnknownRecord | null => {
   const prev = toAnalysisRecord(prevState);
   if (
     prev.loadingSurveys === false &&

@@ -6,9 +6,7 @@ import type {
 
 export type SurveyResultsAnalysisLifecycleControllerPhase = 'before-generation' | 'failure-recovery';
 
-export type SurveyResultsAnalysisLifecycleStatePatchPort = (
-  patch: SurveyResultsAnalysisLifecycleStatePatch
-) => unknown;
+export type SurveyResultsAnalysisLifecycleStatePatchPort = (patch: SurveyResultsAnalysisLifecycleStatePatch) => unknown;
 
 export type SurveyResultsAnalysisLifecycleControllerPorts = {
   applyBlockedState?: SurveyResultsAnalysisLifecycleStatePatchPort;
@@ -24,11 +22,7 @@ export type SurveyResultsAnalysisLifecycleControllerArgs = {
 };
 
 export type SurveyResultsAnalysisLifecycleAppliedPort =
-  | ''
-  | 'blocked-state'
-  | 'failure-recovery-state'
-  | 'generate-start-state'
-  | 'ready-state';
+  '' | 'blocked-state' | 'failure-recovery-state' | 'generate-start-state' | 'ready-state';
 
 export type SurveyResultsAnalysisLifecycleControllerResult = {
   appliedPort: SurveyResultsAnalysisLifecycleAppliedPort;
@@ -51,7 +45,7 @@ const missingPlanResult: SurveyResultsAnalysisLifecycleControllerResult = {
 const applyPort = (
   appliedPort: SurveyResultsAnalysisLifecycleAppliedPort,
   patch: SurveyResultsAnalysisLifecycleStatePatch,
-  port?: SurveyResultsAnalysisLifecycleStatePatchPort
+  port?: SurveyResultsAnalysisLifecycleStatePatchPort,
 ): SurveyResultsAnalysisLifecycleAppliedPort => {
   if (typeof port !== 'function') return '';
   port(patch);

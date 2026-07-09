@@ -52,11 +52,7 @@ type SbtPageBurnButtonState = {
   canOwnerBurn: boolean;
   shouldRenderBurnButton: boolean;
 };
-type SbtPageBurnActionBlockedReason =
-  | 'none'
-  | 'missing-sbt'
-  | 'missing-token'
-  | 'owner-burn-disabled';
+type SbtPageBurnActionBlockedReason = 'none' | 'missing-sbt' | 'missing-token' | 'owner-burn-disabled';
 export type SbtPageBurnActionPlan = SbtPageBurnButtonState & {
   blockedReason: SbtPageBurnActionBlockedReason;
 };
@@ -253,29 +249,11 @@ type SbtPageMiniMintFlowDisplayState = {
   shouldRenderOpenMintButton: boolean;
 };
 export type SbtPageMiniMintActionBlockedReason =
-  | 'none'
-  | 'already-has-token'
-  | 'mini-mint-unavailable'
-  | 'mint-ended'
-  | 'no-visible-action';
+  'none' | 'already-has-token' | 'mini-mint-unavailable' | 'mint-ended' | 'no-visible-action';
 export type SbtPageMiniMintActionHandlerKind =
-  | 'none'
-  | 'claim-with-invite-code'
-  | 'mini-mint'
-  | 'mint-unlimited-with-group-password'
-  | 'show-password-input';
-export type SbtPageMiniMintActionInertReason =
-  | 'none'
-  | 'disabled'
-  | 'hidden'
-  | 'status-only';
-export type SbtPageMiniMintActionLabelKind =
-  | 'none'
-  | 'countdown'
-  | 'finish'
-  | 'join'
-  | 'minted'
-  | 'status';
+  'none' | 'claim-with-invite-code' | 'mini-mint' | 'mint-unlimited-with-group-password' | 'show-password-input';
+export type SbtPageMiniMintActionInertReason = 'none' | 'disabled' | 'hidden' | 'status-only';
+export type SbtPageMiniMintActionLabelKind = 'none' | 'countdown' | 'finish' | 'join' | 'minted' | 'status';
 export type SbtPageMiniMintActionViewKind =
   | 'hidden'
   | 'group-password-disclosure'
@@ -448,11 +426,7 @@ type ShouldRenderSbtPageMintButtonArgs = {
   sbtInfo?: unknown;
   userHasSBT?: unknown;
 };
-type SbtPageMintActionBlockedReason =
-  | 'none'
-  | 'already-has-token'
-  | 'mint-ended'
-  | 'missing-sbt';
+type SbtPageMintActionBlockedReason = 'none' | 'already-has-token' | 'mint-ended' | 'missing-sbt';
 type SbtPageMintActionPlan = {
   blockedReason: SbtPageMintActionBlockedReason;
   shouldRenderMintButton: boolean;
@@ -503,9 +477,8 @@ type SbtPageMiniBurnPermission = {
   canOwnerBurn: boolean;
 };
 
-const isSbtPageActionRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isSbtPageActionRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const coerceSbtPageBurnAuth = (burnAuth: unknown): number => {
   const burnAuthNumber = Number(burnAuth);
@@ -604,7 +577,7 @@ export const resolveSbtPageMiniMintFlowDisplayState = ({
 };
 
 const buildHiddenMiniMintActionPlan = (
-  blockedReason: SbtPageMiniMintActionBlockedReason
+  blockedReason: SbtPageMiniMintActionBlockedReason,
 ): SbtPageMiniMintActionPlan => ({
   blockedReason,
   disabled: true,
@@ -775,11 +748,8 @@ export const resolveSbtPageMiniBurnPermission = ({
   const adminAddr = info.admin || info.admin_;
   const adminAddrLower = adminAddr ? String(adminAddr).toLowerCase() : '';
   const burnAuth = coerceSbtPageBurnAuth(info.burnAuth);
-  const canOwnerBurn = (
-    burnAuth === 1 ||
-    burnAuth === 2 ||
-    (burnAuth === 0 && !!adminAddr && adminAddrLower === userAddressLower)
-  );
+  const canOwnerBurn =
+    burnAuth === 1 || burnAuth === 2 || (burnAuth === 0 && !!adminAddr && adminAddrLower === userAddressLower);
   const canAdminBurn = !!userIsSbtAdmin && (burnAuth === 0 || burnAuth === 2);
   return {
     canAdminBurn,
@@ -797,11 +767,11 @@ export const resolveSbtPageBurnButtonState = ({
   const userAddressLower = account ? String(account).toLowerCase() : null;
   const adminAddr = String(info.admin || info.admin_ || '');
   const burnAuth = coerceSbtPageBurnAuth(info.burnAuth);
-  const canOwnerBurn = !!userHasSBT && (
-    burnAuth === 1 ||
-    burnAuth === 2 ||
-    (burnAuth === 0 && !!adminAddr && adminAddr.toLowerCase() === userAddressLower)
-  );
+  const canOwnerBurn =
+    !!userHasSBT &&
+    (burnAuth === 1 ||
+      burnAuth === 2 ||
+      (burnAuth === 0 && !!adminAddr && adminAddr.toLowerCase() === userAddressLower));
   return {
     canOwnerBurn,
     shouldRenderBurnButton: !!userHasSBT && canOwnerBurn,
@@ -984,7 +954,7 @@ export const resolveSbtPageManualClaimActionRequest = ({
   });
   const buildInputAction = (
     label: unknown,
-    viewKind: 'manual-password-finish-input' | 'manual-password-start-input'
+    viewKind: 'manual-password-finish-input' | 'manual-password-start-input',
   ): SbtPageManualClaimActionRequest => ({
     buttonState,
     contentState: resolveSbtPagePendingButtonContentState({
@@ -1219,7 +1189,7 @@ export const resolveSbtPageMiniManualClaimActionRequest = ({
   };
   const buildInputAction = (
     label: unknown,
-    viewKind: 'manual-password-finish-input' | 'manual-password-start-input'
+    viewKind: 'manual-password-finish-input' | 'manual-password-start-input',
   ): SbtPageMiniManualClaimActionRequest => ({
     ...hiddenRequest,
     contentState: resolveSbtPagePendingButtonContentState({
@@ -1286,11 +1256,10 @@ export const buildSbtPageActionButtonClassName = ({
   includeMiniClass = false,
   miniClassName = '',
   variantClassName = '',
-}: BuildSbtPageActionButtonClassNameArgs = {}): string => ([
-  String(actionClassName || ''),
-  String(variantClassName || ''),
-  includeMiniClass ? String(miniClassName || '') : '',
-].filter(Boolean).join(' '));
+}: BuildSbtPageActionButtonClassNameArgs = {}): string =>
+  [String(actionClassName || ''), String(variantClassName || ''), includeMiniClass ? String(miniClassName || '') : '']
+    .filter(Boolean)
+    .join(' ');
 
 export const resolveSbtPageMiniControlDisplayState = ({
   inputMaxWidth = '',
@@ -1521,10 +1490,7 @@ export const resolveSbtPageAdminActionState = ({
   const showPasswordGen = hasPasswordMint && info.maxTokens === '0';
   const showNoMoreInvites = hasPasswordMint && info.maxTokens !== '0';
   return {
-    canAdminBurn: (
-      (burnAuth === 0 || burnAuth === 2) &&
-      adminAddr.toLowerCase() === String(account || '').toLowerCase()
-    ),
+    canAdminBurn: (burnAuth === 0 || burnAuth === 2) && adminAddr.toLowerCase() === String(account || '').toLowerCase(),
     hasPasswordMint,
     isInvite: !!hasInviteMint,
     showNoMoreInvites,

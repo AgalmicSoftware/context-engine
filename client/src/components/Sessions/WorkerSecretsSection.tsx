@@ -49,12 +49,8 @@ const WorkerSecretsSection = ({
   defaultAllowedOrigins,
 }: WorkerSecretsSectionProps) => {
   const t = typeof translate === 'function' ? translate : (key: string) => key;
-  const renderTooltip = typeof renderInfoTooltip === 'function'
-    ? renderInfoTooltip
-    : () => null;
-  const renderResourceCard = typeof renderResource === 'function'
-    ? renderResource
-    : () => null;
+  const renderTooltip = typeof renderInfoTooltip === 'function' ? renderInfoTooltip : () => null;
+  const renderResourceCard = typeof renderResource === 'function' ? renderResource : () => null;
 
   return (
     <div className={styles.workerSecretsPanel}>
@@ -72,7 +68,8 @@ const WorkerSecretsSection = ({
                 <span>Dev: keep secrets on refresh</span>
                 {renderTooltip({
                   id: 'gw-worker-persist-secrets-tip',
-                  content: 'Stores worker secrets in localStorage so they survive refresh. Do not enable on shared machines.',
+                  content:
+                    'Stores worker secrets in localStorage so they survive refresh. Do not enable on shared machines.',
                   placement: 'right',
                   testId: 'ce-wizard-worker-tooltip-gw-worker-persist-secrets-tip',
                   ariaLabel: 'Persist worker secrets info',
@@ -93,7 +90,8 @@ const WorkerSecretsSection = ({
               <span>Require users to pay for usage</span>
               {renderTooltip({
                 id: 'gw-worker-kv-tip',
-                content: 'When enabled, users must provide their own API keys and fund minimal transaction and storage fees. When off (default), the session admin provides keys via worker secrets.',
+                content:
+                  'When enabled, users must provide their own API keys and fund minimal transaction and storage fees. When off (default), the session admin provides keys via worker secrets.',
                 placement: 'right',
                 testId: 'ce-wizard-worker-tooltip-gw-worker-kv-tip',
                 ariaLabel: 'Worker secrets mode info',
@@ -122,9 +120,7 @@ const WorkerSecretsSection = ({
             </div>
           </>
         )}
-        <div className={styles.gateGrid}>
-          {workerResourceKeys.map(renderResourceCard)}
-        </div>
+        <div className={styles.gateGrid}>{workerResourceKeys.map(renderResourceCard)}</div>
       </div>
       <div className={styles.workerConfigGrid}>
         <FormGroup>
@@ -132,7 +128,8 @@ const WorkerSecretsSection = ({
             <span>Allowed origins (comma or newline)</span>
             {renderTooltip({
               id: 'gw-allowed-origins',
-              content: 'The URL(s) where your site will be accessible — e.g. a subdomain of contextengine.eth or a custom domain. Include localhost for development.',
+              content:
+                'The URL(s) where your site will be accessible — e.g. a subdomain of contextengine.eth or a custom domain. Include localhost for development.',
               placement: 'right',
               testId: 'ce-wizard-worker-tooltip-gw-allowed-origins',
               ariaLabel: 'Allowed origins info',

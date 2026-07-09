@@ -6,11 +6,9 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 
 jest.mock('../../utilities/sbt/sbtDisplayNames.js', () => ({
-  resolveSbtDisplayLabel: jest.fn(({ address }: { address?: string }) => (
-    String(address || '').toLowerCase() === '0x1111111111111111111111111111111111111111'
-      ? 'VIP Pass'
-      : ''
-  )),
+  resolveSbtDisplayLabel: jest.fn(({ address }: { address?: string }) =>
+    String(address || '').toLowerCase() === '0x1111111111111111111111111111111111111111' ? 'VIP Pass' : '',
+  ),
 }));
 
 const gateOptions = [
@@ -29,24 +27,14 @@ describe('GateMultiSelectLock', () => {
       showDots: false,
     };
 
-    const { rerender } = render(
-      <GateMultiSelectLock
-        {...props}
-        open={false}
-      />
-    );
+    const { rerender } = render(<GateMultiSelectLock {...props} open={false} />);
 
     expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).not.toHaveClass(styles.open);
     expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.queryByRole('button', { name: /gate details/i })).not.toBeInTheDocument();
 
-    rerender(
-      <GateMultiSelectLock
-        {...props}
-        open={true}
-      />
-    );
+    rerender(<GateMultiSelectLock {...props} open={true} />);
 
     expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toHaveClass(styles.open);
     expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toHaveAttribute('aria-expanded', 'true');
@@ -65,7 +53,7 @@ describe('GateMultiSelectLock', () => {
         onToggleOpen={onToggleOpen}
         disabled={false}
         showDots={false}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON));
@@ -83,7 +71,7 @@ describe('GateMultiSelectLock', () => {
         onToggleOpen={jest.fn()}
         disabled={false}
         showDots={false}
-      />
+      />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toHaveAttribute('aria-label', 'Choose access rule');
@@ -97,7 +85,7 @@ describe('GateMultiSelectLock', () => {
         onToggleOpen={jest.fn()}
         disabled={false}
         showDots={false}
-      />
+      />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toHaveAttribute('aria-label', 'Edit locked access rule');
@@ -113,7 +101,7 @@ describe('GateMultiSelectLock', () => {
         onToggleOpen={jest.fn()}
         disabled={false}
         showDots={false}
-      />
+      />,
     );
 
     const rows = screen.getAllByTestId(E2E_TESTIDS.GATE_LOCK_ROW);
@@ -154,7 +142,7 @@ describe('GateMultiSelectLock', () => {
         onToggleOpen={onToggleOpen}
         disabled={false}
         showDots={false}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON));
@@ -169,7 +157,7 @@ describe('GateMultiSelectLock', () => {
         onToggleOpen={onToggleOpen}
         disabled={false}
         showDots={false}
-      />
+      />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_POPOVER)).toBeInTheDocument();
@@ -179,7 +167,7 @@ describe('GateMultiSelectLock', () => {
     expect(screen.getByText(/0x1111\.\.\.1111/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Open Group/ })).toHaveAttribute(
       'href',
-      buildSbtDetailPath('0x1111111111111111111111111111111111111111', 'edge')
+      buildSbtDetailPath('0x1111111111111111111111111111111111111111', 'edge'),
     );
 
     fireEvent.click(screen.getByRole('checkbox'));
@@ -194,7 +182,7 @@ describe('GateMultiSelectLock', () => {
         onToggleOpen={onToggleOpen}
         disabled={false}
         showDots={false}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('checkbox', { checked: true }));

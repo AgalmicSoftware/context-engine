@@ -48,12 +48,8 @@ const LOCAL_OVERRIDE_SECTIONS = [
   { sectionKey: 'arweave', secretKey: 'jwk' },
   { sectionKey: 'faucet', secretKey: 'privateKey' },
 ] as const;
-const WORKER_LIT_CREDENTIAL_FIELDS = [
-  'litApiBase',
-  'litGroupId',
-  'litPkpId',
-  'litActionCid',
-] as const;
+type MutableLocalOverrideSection = UnknownRecord & { useLocal: boolean };
+const WORKER_LIT_CREDENTIAL_FIELDS = ['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid'] as const;
 
 const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
@@ -82,14 +78,26 @@ const defaultLocalOverrides = (): LocalResourceOverrides => ({
   arweave: { useLocal: false, jwk: '' },
   faucet: { useLocal: false, privateKey: '' },
 });
+const getMutableLocalOverrideSection = (
+  overrides: LocalResourceOverrides,
+  sectionKey: (typeof LOCAL_OVERRIDE_SECTIONS)[number]['sectionKey'],
+): MutableLocalOverrideSection => {
+  switch (sectionKey) {
+    case 'rpc':
+      return overrides.rpc;
+    case 'arweave':
+      return overrides.arweave;
+    case 'faucet':
+      return overrides.faucet;
+    default:
+      return sectionKey satisfies never;
+  }
+};
 const normalizeOptionalStringField = (
   target: UnknownRecord,
   key: string,
   errors: string[],
-  {
-    label = key,
-    transform,
-  }: { label?: string; transform?: ((value: string) => string) | undefined } = {}
+  { label = key, transform }: { label?: string; transform?: ((value: string) => string) | undefined } = {},
 ): string => {
   if (!hasOwn(target, key)) return '';
   const raw = target[key];
@@ -115,7 +123,7 @@ const normalizeOptionalBooleanField = (
   target: UnknownRecord,
   key: string,
   errors: string[],
-  { label = key }: { label?: string } = {}
+  { label = key }: { label?: string } = {},
 ): boolean => {
   if (!hasOwn(target, key)) return false;
   const raw = target[key];
@@ -162,10 +170,7 @@ const normalizeTags = (metadata: UnknownRecord, errors: string[]): void => {
     delete metadata.tags;
   }
 };
-const normalizeWorkerLitCredentials = (
-  raw: unknown,
-  errors: string[]
-): UnknownRecord | null => {
+const normalizeWorkerLitCredentials = (raw: unknown, errors: string[]): UnknownRecord | null => {
   if (raw == null) return {};
   if (!isObj(raw)) {
     pushTypeError(errors, 'litCredentials', 'an object');
@@ -245,9 +250,7 @@ export const parseSessionIdentity = (raw: unknown = {}): ParsedSessionIdentity =
     }
   }
 
-  const chainId = hasOwn(input, 'chainId')
-    ? parsePositiveInteger(input.chainId, 'chainId', errors)
-    : null;
+  const chainId = hasOwn(input, 'chainId') ? parsePositiveInteger(input.chainId, 'chainId', errors) : null;
 
   return {
     ok: errors.length === 0,
@@ -376,15 +379,13 @@ export const parseWorkerConfig = (raw: unknown): ParsedWorkerConfig => {
 
   const rpcEndpointRaw = hasOwn(raw, 'rpcEndpoint')
     ? raw.rpcEndpoint
-    : (
-      hasOwn(raw, 'rpcUrl')
-        ? raw.rpcUrl
-        : (
-          isObj(raw.rpc) && hasOwn(raw.rpc, 'endpoint')
-            ? raw.rpc.endpoint
-            : (isObj(raw.rpc) && hasOwn(raw.rpc, 'url') ? raw.rpc.url : undefined)
-        )
-    );
+    : hasOwn(raw, 'rpcUrl')
+      ? raw.rpcUrl
+      : isObj(raw.rpc) && hasOwn(raw.rpc, 'endpoint')
+        ? raw.rpc.endpoint
+        : isObj(raw.rpc) && hasOwn(raw.rpc, 'url')
+          ? raw.rpc.url
+          : undefined;
   if (rpcEndpointRaw !== undefined) {
     if (rpcEndpointRaw == null) {
       config.rpcEndpoint = '';
@@ -397,7 +398,9 @@ export const parseWorkerConfig = (raw: unknown): ParsedWorkerConfig => {
 
   const embeddedDeployHelperEnabledRaw = hasOwn(raw, 'embeddedDeployHelperEnabled')
     ? raw.embeddedDeployHelperEnabled
-    : (hasOwn(raw, 'deployHelperEnabled') ? raw.deployHelperEnabled : undefined);
+    : hasOwn(raw, 'deployHelperEnabled')
+      ? raw.deployHelperEnabled
+      : undefined;
   if (embeddedDeployHelperEnabledRaw !== undefined) {
     if (embeddedDeployHelperEnabledRaw == null) {
       config.embeddedDeployHelperEnabled = true;
@@ -420,9 +423,7 @@ export const parseWorkerConfig = (raw: unknown): ParsedWorkerConfig => {
   };
 };
 
-export const parseLocalResourceOverrides = (
-  raw: unknown
-): ParsedLocalResourceOverrides => {
+export const parseLocalResourceOverrides = (raw: unknown): ParsedLocalResourceOverrides => {
   if (!isObj(raw)) {
     return {
       ok: false,
@@ -441,7 +442,7 @@ export const parseLocalResourceOverrides = (
       pushTypeError(errors, sectionKey, 'an object');
       return;
     }
-    const section = overrides[sectionKey] as unknown as UnknownRecord;
+    const section = getMutableLocalOverrideSection(overrides, sectionKey);
     section.useLocal = normalizeOptionalBooleanField(sectionRaw, 'useLocal', errors, {
       label: `${sectionKey}.useLocal`,
     });

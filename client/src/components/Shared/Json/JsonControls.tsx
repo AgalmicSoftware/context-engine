@@ -14,14 +14,7 @@ type JsonButtonProps = {
   disabled?: boolean;
 };
 
-export const JsonIconButton = ({
-  label,
-  icon,
-  onClick,
-  title,
-  className = '',
-  disabled = false,
-}: JsonButtonProps) => (
+export const JsonIconButton = ({ label, icon, onClick, title, className = '', disabled = false }: JsonButtonProps) => (
   <button
     type="button"
     className={`${styles.jsonIconButton} ${className}`.trim()}
@@ -56,13 +49,9 @@ export const JsonToggleButton = ({
     aria-label={label}
     disabled={disabled}
   >
-    {icon && iconPosition === 'left' && (
-      <FontAwesomeIcon icon={icon} className={styles.jsonToggleIcon} />
-    )}
+    {icon && iconPosition === 'left' && <FontAwesomeIcon icon={icon} className={styles.jsonToggleIcon} />}
     <span className={styles.jsonToggleLabel}>{label}</span>
-    {icon && iconPosition === 'right' && (
-      <FontAwesomeIcon icon={icon} className={styles.jsonToggleIcon} />
-    )}
+    {icon && iconPosition === 'right' && <FontAwesomeIcon icon={icon} className={styles.jsonToggleIcon} />}
   </button>
 );
 
@@ -117,15 +106,7 @@ export const JsonButtonRow = ({
   className?: string;
 }) => {
   const alignmentClass =
-    align === 'center'
-      ? styles.jsonButtonRowCenter
-      : align === 'end'
-        ? styles.jsonButtonRowEnd
-        : '';
+    align === 'center' ? styles.jsonButtonRowCenter : align === 'end' ? styles.jsonButtonRowEnd : '';
 
-  return (
-    <div className={`${styles.jsonButtonRow} ${alignmentClass} ${className}`.trim()}>
-      {children}
-    </div>
-  );
+  return <div className={`${styles.jsonButtonRow} ${alignmentClass} ${className}`.trim()}>{children}</div>;
 };

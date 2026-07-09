@@ -1,8 +1,5 @@
 import React from 'react';
-import {
-  Input,
-  Table,
-} from 'reactstrap';
+import { Input, Table } from 'reactstrap';
 
 import type {
   SurveyResultsHtmlReportSectionKey,
@@ -11,8 +8,7 @@ import type {
 
 export type { SurveyResultsHtmlReportSectionRow };
 
-export type SurveyResultsHtmlReportSelectedSections =
-  Partial<Record<SurveyResultsHtmlReportSectionKey, unknown>>;
+export type SurveyResultsHtmlReportSelectedSections = Partial<Record<SurveyResultsHtmlReportSectionKey, unknown>>;
 
 export type SurveyResultsHtmlReportSectionTableProps = {
   onToggleSection: (key: SurveyResultsHtmlReportSectionKey) => void;

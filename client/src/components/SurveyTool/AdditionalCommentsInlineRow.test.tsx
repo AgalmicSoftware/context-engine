@@ -8,7 +8,7 @@ describe('AdditionalCommentsInlineRow', () => {
       <AdditionalCommentsInlineRow
         input={<div data-testid="additional-input" />}
         lockControl={<div data-testid="additional-lock" />}
-      />
+      />,
     );
 
     expect(screen.getByTestId('additional-input')).toBeInTheDocument();

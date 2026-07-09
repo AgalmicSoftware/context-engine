@@ -56,22 +56,26 @@ describe('questionFilterHelpers.normalizeAiIdList', () => {
 
 describe('questionFilterHelpers.normalizeResponseStatusFilterState', () => {
   it('drops response-status filters when no wallet account is connected', () => {
-    expect(normalizeResponseStatusFilterState({
-      account: '',
-      filterByResponded: true,
-      filterByNotResponded: true,
-    })).toEqual({
+    expect(
+      normalizeResponseStatusFilterState({
+        account: '',
+        filterByResponded: true,
+        filterByNotResponded: true,
+      }),
+    ).toEqual({
       filterByResponded: false,
       filterByNotResponded: false,
     });
   });
 
   it('keeps response-status filters when an account is available', () => {
-    expect(normalizeResponseStatusFilterState({
-      account: '0xabc',
-      filterByResponded: true,
-      filterByNotResponded: false,
-    })).toEqual({
+    expect(
+      normalizeResponseStatusFilterState({
+        account: '0xabc',
+        filterByResponded: true,
+        filterByNotResponded: false,
+      }),
+    ).toEqual({
       filterByResponded: true,
       filterByNotResponded: false,
     });
@@ -116,68 +120,90 @@ describe('questionFilterHelpers.isQuestionFilterStateDefault', () => {
   it('treats the component default filter shape and empty SBT lists as default', () => {
     expect(isQuestionFilterStateDefault(null)).toBe(true);
     expect(isQuestionFilterStateDefault(defaultFilterState)).toBe(true);
-    expect(isQuestionFilterStateDefault({
-      ...defaultFilterState,
-      sbtFilter: {
-        selectedSBTGroupsCreator: [],
-        excludedSBTGroupsCreator: [],
-        selectedSBTGroupsResponder: [],
-        excludedSBTGroupsResponder: [],
-        selectedSBTGroups: [],
-        excludedSBTGroups: [],
-      },
-      responseStatus: {
-        responded: true,
-        notResponded: true,
-      },
-    })).toBe(true);
+    expect(
+      isQuestionFilterStateDefault({
+        ...defaultFilterState,
+        sbtFilter: {
+          selectedSBTGroupsCreator: [],
+          excludedSBTGroupsCreator: [],
+          selectedSBTGroupsResponder: [],
+          excludedSBTGroupsResponder: [],
+          selectedSBTGroups: [],
+          excludedSBTGroups: [],
+        },
+        responseStatus: {
+          responded: true,
+          notResponded: true,
+        },
+      }),
+    ).toBe(true);
   });
 
   it('detects active filter state across each supported filter family', () => {
-    expect(isQuestionFilterStateDefault({
-      ...defaultFilterState,
-      topQuestions: { count: 10, by: 'responses' },
-    })).toBe(false);
-    expect(isQuestionFilterStateDefault({
-      ...defaultFilterState,
-      questionTypes: ['freeform'],
-    })).toBe(false);
-    expect(isQuestionFilterStateDefault({
-      ...defaultFilterState,
-      selectedTags: ['alpha'],
-    })).toBe(false);
-    expect(isQuestionFilterStateDefault({
-      ...defaultFilterState,
-      sbtFilter: { selectedSBTGroups: [{ address: '0x1' }] },
-    })).toBe(false);
-    expect(isQuestionFilterStateDefault({
-      ...defaultFilterState,
-      aiFilter: 'rank this',
-    })).toBe(false);
-    expect(isQuestionFilterStateDefault({
-      ...defaultFilterState,
-      aiTopN: 5,
-    })).toBe(false);
-    expect(isQuestionFilterStateDefault({
-      ...defaultFilterState,
-      aiCombine: true,
-    })).toBe(false);
-    expect(isQuestionFilterStateDefault({
-      ...defaultFilterState,
-      responseStatus: { responded: true, notResponded: false },
-    })).toBe(false);
+    expect(
+      isQuestionFilterStateDefault({
+        ...defaultFilterState,
+        topQuestions: { count: 10, by: 'responses' },
+      }),
+    ).toBe(false);
+    expect(
+      isQuestionFilterStateDefault({
+        ...defaultFilterState,
+        questionTypes: ['freeform'],
+      }),
+    ).toBe(false);
+    expect(
+      isQuestionFilterStateDefault({
+        ...defaultFilterState,
+        selectedTags: ['alpha'],
+      }),
+    ).toBe(false);
+    expect(
+      isQuestionFilterStateDefault({
+        ...defaultFilterState,
+        sbtFilter: { selectedSBTGroups: [{ address: '0x1' }] },
+      }),
+    ).toBe(false);
+    expect(
+      isQuestionFilterStateDefault({
+        ...defaultFilterState,
+        aiFilter: 'rank this',
+      }),
+    ).toBe(false);
+    expect(
+      isQuestionFilterStateDefault({
+        ...defaultFilterState,
+        aiTopN: 5,
+      }),
+    ).toBe(false);
+    expect(
+      isQuestionFilterStateDefault({
+        ...defaultFilterState,
+        aiCombine: true,
+      }),
+    ).toBe(false);
+    expect(
+      isQuestionFilterStateDefault({
+        ...defaultFilterState,
+        responseStatus: { responded: true, notResponded: false },
+      }),
+    ).toBe(false);
   });
 
   it('preserves legacy non-default handling for partial empty objects', () => {
     expect(isQuestionFilterStateDefault({})).toBe(false);
-    expect(isQuestionFilterStateDefault({
-      ...defaultFilterState,
-      questionTypes: undefined,
-    })).toBe(false);
-    expect(isQuestionFilterStateDefault({
-      ...defaultFilterState,
-      selectedTags: undefined,
-    })).toBe(false);
+    expect(
+      isQuestionFilterStateDefault({
+        ...defaultFilterState,
+        questionTypes: undefined,
+      }),
+    ).toBe(false);
+    expect(
+      isQuestionFilterStateDefault({
+        ...defaultFilterState,
+        selectedTags: undefined,
+      }),
+    ).toBe(false);
   });
 });
 
@@ -198,14 +224,16 @@ describe('questionFilterHelpers.buildQuestionFilterStateFromComponentState', () 
   };
 
   it('projects component state to the serializable filter state shape', () => {
-    expect(buildQuestionFilterStateFromComponentState({
-      ...baseState,
-      selectedTypes: ['freeform'],
-      selectedTags: ['alpha'],
-      sbtFilterLocalState: { selectedSBTGroups: [{ address: '0x1' }] },
-      showTopQuestionsByResponses: true,
-      topQuestionsCount: 5,
-    })).toEqual({
+    expect(
+      buildQuestionFilterStateFromComponentState({
+        ...baseState,
+        selectedTypes: ['freeform'],
+        selectedTags: ['alpha'],
+        sbtFilterLocalState: { selectedSBTGroups: [{ address: '0x1' }] },
+        showTopQuestionsByResponses: true,
+        topQuestionsCount: 5,
+      }),
+    ).toEqual({
       topQuestions: { count: 5, by: 'responses' },
       questionTypes: ['freeform'],
       sbtFilter: { selectedSBTGroups: [{ address: '0x1' }] },
@@ -218,17 +246,22 @@ describe('questionFilterHelpers.buildQuestionFilterStateFromComponentState', () 
   });
 
   it('prefers importance top questions over response top questions and normalizes active AI filters', () => {
-    expect(buildQuestionFilterStateFromComponentState({
-      ...baseState,
-      showTopQuestions: true,
-      showTopQuestionsByResponses: true,
-      topQuestionsCount: 3,
-      aiFilterApplied: true,
-      aiSearchQuery: ' rank this ',
-      aiAppliedTopN: 'bad',
-      aiCombineWithOtherFilters: true,
-      filterByResponded: true,
-    }, 12)).toEqual({
+    expect(
+      buildQuestionFilterStateFromComponentState(
+        {
+          ...baseState,
+          showTopQuestions: true,
+          showTopQuestionsByResponses: true,
+          topQuestionsCount: 3,
+          aiFilterApplied: true,
+          aiSearchQuery: ' rank this ',
+          aiAppliedTopN: 'bad',
+          aiCombineWithOtherFilters: true,
+          filterByResponded: true,
+        },
+        12,
+      ),
+    ).toEqual({
       topQuestions: { count: 3, by: 'importance' },
       questionTypes: [],
       sbtFilter: null,
@@ -241,15 +274,17 @@ describe('questionFilterHelpers.buildQuestionFilterStateFromComponentState', () 
   });
 
   it('suppresses AI and response-status filters when their active-state rules are not met', () => {
-    expect(buildQuestionFilterStateFromComponentState({
-      ...baseState,
-      aiFilterApplied: true,
-      aiSearchQuery: '   ',
-      aiAppliedTopN: 4,
-      aiCombineWithOtherFilters: true,
-      filterByResponded: true,
-      filterByNotResponded: true,
-    })).toMatchObject({
+    expect(
+      buildQuestionFilterStateFromComponentState({
+        ...baseState,
+        aiFilterApplied: true,
+        aiSearchQuery: '   ',
+        aiAppliedTopN: 4,
+        aiCombineWithOtherFilters: true,
+        filterByResponded: true,
+        filterByNotResponded: true,
+      }),
+    ).toMatchObject({
       aiFilter: null,
       aiTopN: null,
       aiCombine: false,
@@ -269,30 +304,42 @@ describe('questionFilterHelpers.buildQuestionFilterSbtItemRemovalState', () => {
   });
 
   it('removes SBT filter entries by role and address case-insensitively', () => {
-    expect(buildQuestionFilterSbtItemRemovalState(makeState(), {
-      role: 'creatorInclude',
-      sbtAddress: '0xaa',
-    }).selectedSBTGroupsCreator).toEqual([{ address: '0xBb' }]);
-    expect(buildQuestionFilterSbtItemRemovalState(makeState(), {
-      role: 'creatorExclude',
-      sbtAddress: '0xcc',
-    }).excludedSBTGroupsCreator).toEqual([]);
-    expect(buildQuestionFilterSbtItemRemovalState(makeState(), {
-      role: 'responderInclude',
-      sbtAddress: '0xdd',
-    }).selectedSBTGroupsResponder).toEqual([]);
-    expect(buildQuestionFilterSbtItemRemovalState(makeState(), {
-      role: 'responderExclude',
-      sbtAddress: '0xee',
-    }).excludedSBTGroupsResponder).toEqual([]);
-    expect(buildQuestionFilterSbtItemRemovalState(makeState(), {
-      role: 'include',
-      sbtAddress: '0xff',
-    }).selectedSBTGroups).toEqual([]);
-    expect(buildQuestionFilterSbtItemRemovalState(makeState(), {
-      role: 'exclude',
-      sbtAddress: '0x11',
-    }).excludedSBTGroups).toEqual([]);
+    expect(
+      buildQuestionFilterSbtItemRemovalState(makeState(), {
+        role: 'creatorInclude',
+        sbtAddress: '0xaa',
+      }).selectedSBTGroupsCreator,
+    ).toEqual([{ address: '0xBb' }]);
+    expect(
+      buildQuestionFilterSbtItemRemovalState(makeState(), {
+        role: 'creatorExclude',
+        sbtAddress: '0xcc',
+      }).excludedSBTGroupsCreator,
+    ).toEqual([]);
+    expect(
+      buildQuestionFilterSbtItemRemovalState(makeState(), {
+        role: 'responderInclude',
+        sbtAddress: '0xdd',
+      }).selectedSBTGroupsResponder,
+    ).toEqual([]);
+    expect(
+      buildQuestionFilterSbtItemRemovalState(makeState(), {
+        role: 'responderExclude',
+        sbtAddress: '0xee',
+      }).excludedSBTGroupsResponder,
+    ).toEqual([]);
+    expect(
+      buildQuestionFilterSbtItemRemovalState(makeState(), {
+        role: 'include',
+        sbtAddress: '0xff',
+      }).selectedSBTGroups,
+    ).toEqual([]);
+    expect(
+      buildQuestionFilterSbtItemRemovalState(makeState(), {
+        role: 'exclude',
+        sbtAddress: '0x11',
+      }).excludedSBTGroups,
+    ).toEqual([]);
   });
 
   it('copies the local state and leaves unknown roles untouched', () => {
@@ -304,10 +351,12 @@ describe('questionFilterHelpers.buildQuestionFilterSbtItemRemovalState', () => {
 
     expect(next).toEqual(state);
     expect(next).not.toBe(state);
-    expect(buildQuestionFilterSbtItemRemovalState(null, {
-      role: 'include',
-      sbtAddress: '0xaa',
-    })).toEqual({});
+    expect(
+      buildQuestionFilterSbtItemRemovalState(null, {
+        role: 'include',
+        sbtAddress: '0xaa',
+      }),
+    ).toEqual({});
   });
 });
 
@@ -389,12 +438,14 @@ describe('questionFilterHelpers status state patches', () => {
       aiRankedQuestionIds: [],
       aiLastAppliedSignature: '',
     });
-    expect(buildQuestionFilterAiApplySuccessPatch({
-      applySignature: 'sig',
-      rankedQuestionIds: ['Q1', 'q1', 'Q2'],
-      query: 'alpha',
-      topN: 3,
-    })).toEqual({
+    expect(
+      buildQuestionFilterAiApplySuccessPatch({
+        applySignature: 'sig',
+        rankedQuestionIds: ['Q1', 'q1', 'Q2'],
+        query: 'alpha',
+        topN: 3,
+      }),
+    ).toEqual({
       aiApplying: false,
       aiSearchQuery: 'alpha',
       aiDraftQuery: 'alpha',
@@ -477,8 +528,9 @@ describe('questionFilterHelpers status state patches', () => {
     expect(buildQuestionFilterCachedResponsesPatch(cachedQuestionResponses)).toEqual({
       cachedQuestionResponses,
     });
-    expect(buildQuestionFilterCachedResponsesPatch(cachedQuestionResponses).cachedQuestionResponses)
-      .toBe(cachedQuestionResponses);
+    expect(buildQuestionFilterCachedResponsesPatch(cachedQuestionResponses).cachedQuestionResponses).toBe(
+      cachedQuestionResponses,
+    );
     expect(buildQuestionFilterSbtLocalStatePatch(sbtFilterLocalState)).toEqual({
       sbtFilterLocalState,
     });

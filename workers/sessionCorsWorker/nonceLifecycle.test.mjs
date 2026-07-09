@@ -47,6 +47,27 @@ test('consumeNonce rejects already-used nonces before writing a claim', async ()
   assert.deepEqual(calls, [['get', 'usedNonce:session-a:nonce-1']]);
 });
 
+test('consumeNonce records nonce replays without blocking the failure response', async () => {
+  const events = [];
+  const env = {
+    GROUP_KV: {
+      get: async (key) => (key === 'usedNonce:session-a:nonce-1' ? '1' : null),
+    },
+  };
+
+  assert.deepEqual(
+    await consumeNonce(env, 'session-a', '0xabc', 'nonce-1', {
+      recordAbuseEvent: async (event) => {
+        events.push(event);
+        throw new Error('counter unavailable');
+      },
+    }),
+    { ok: false, error: 'Nonce already used.' }
+  );
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, 'nonce_replays');
+});
+
 test('consumeNonce writes a claim before checking the active nonce and rolls claim back on mismatch', async () => {
   const store = new Map();
   const calls = [];
@@ -212,6 +233,35 @@ test('checkNonceRateLimit enforces a per-address fixed window limit', async () =
     ['get', 'rate:authNonce:session-a:0xabc:120000'],
     ['put', 'rate:authNonce:session-a:0xabc:120000', '3', { expirationTtl: 61 }],
   ]);
+});
+
+test('checkNonceRateLimit records rate-limit trips', async () => {
+  const store = new Map();
+  const events = [];
+  const env = {
+    GROUP_KV: {
+      get: async (key) => store.get(key) || null,
+      put: async (key, value) => {
+        store.set(key, value);
+      },
+    },
+  };
+
+  const result = await checkNonceRateLimit({
+    env,
+    slug: 'session-a',
+    identity: 'anon:client',
+    limit: 0.5,
+    now: () => 123_456,
+    recordAbuseEvent: async (event) => {
+      events.push(event);
+      return { ok: true };
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, 'rate_limit_trips');
 });
 
 test('checkNonceRateLimit preserves burst behavior inside one fixed window', async () => {

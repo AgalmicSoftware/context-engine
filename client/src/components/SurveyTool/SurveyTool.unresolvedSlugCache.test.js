@@ -2,14 +2,14 @@ import { screen } from '@testing-library/react';
 
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
-import { resolveQuestionPayloadCacheWriteContext } from './surveyToolUtils.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import { resolveQuestionPayloadCacheWriteContext } from './surveyToolUtils';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 const MISSING_SLUG = 'missing-session-slug';
 
 const borrowedGeneralQuestionsCache = {
-  '84532': {
+  84532: {
     questions: {
       q1: { id: 'q1', type: 'freeform', prompt: 'Borrowed general prompt' },
       qGeneral: { id: 'qGeneral', type: 'freeform', prompt: 'Borrowed general prompt' },
@@ -23,32 +23,35 @@ const setupUnresolvedSessionLookup = () => {
     slug: '',
     networkChainId: 84532,
   };
-  const strictLookup = jest.fn((slug) => (
-    String(slug || '').trim().toLowerCase() === ''
+  const strictLookup = jest.fn((slug) =>
+    String(slug || '')
+      .trim()
+      .toLowerCase() === ''
       ? generalCfg
-      : null
-  ));
+      : null,
+  );
   jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
-  jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
-    strictLookup(slug) || generalCfg
-  ));
+  jest
+    .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
+    .mockImplementation((slug) => strictLookup(slug) || generalCfg);
   return strictLookup;
 };
 
-const renderUnresolvedPile = (props = {}) => renderSurveyPileViewMode({
-  minifiedMode: 'pile',
-  account: '',
-  sessionSlug: MISSING_SLUG,
-  activeSessionSlug: '',
-  isQuestionCacheReady: true,
-  questionResponsesNonce: 1,
-  questionsCacheNonce: 1,
-  onFilterChange: jest.fn(),
-  network: null,
-  networkChainId: null,
-  runtimeStrategy: createPileViewRuntimeStrategy(),
-  ...props,
-});
+const renderUnresolvedPile = (props = {}) =>
+  renderSurveyPileViewMode({
+    minifiedMode: 'pile',
+    account: '',
+    sessionSlug: MISSING_SLUG,
+    activeSessionSlug: '',
+    isQuestionCacheReady: true,
+    questionResponsesNonce: 1,
+    questionsCacheNonce: 1,
+    onFilterChange: jest.fn(),
+    network: null,
+    networkChainId: null,
+    runtimeStrategy: createPileViewRuntimeStrategy(),
+    ...props,
+  });
 
 describe('SurveyTool unresolved slug cache guards', () => {
   afterEach(() => {
@@ -60,12 +63,15 @@ describe('SurveyTool unresolved slug cache guards', () => {
   it('does not write fetched question payloads into a borrowed general network cache when the slug is unresolved', () => {
     const strictLookup = setupUnresolvedSessionLookup();
 
-    const cacheWriteContext = resolveQuestionPayloadCacheWriteContext({
-      activeSessionSlug: '',
-      sessionSlug: MISSING_SLUG,
-      network: null,
-      networkChainId: null,
-    }, MISSING_SLUG);
+    const cacheWriteContext = resolveQuestionPayloadCacheWriteContext(
+      {
+        activeSessionSlug: '',
+        sessionSlug: MISSING_SLUG,
+        network: null,
+        networkChainId: null,
+      },
+      MISSING_SLUG,
+    );
 
     // port note: dropped direct cacheQuestionPayloadForSlug invocation; the
     // no-write guard is the unresolved cache-write context returning no network
@@ -97,9 +103,11 @@ describe('SurveyTool unresolved slug cache guards', () => {
 
   it('does not load/sort pile questions from a borrowed general network cache when the slug is unresolved', () => {
     setupUnresolvedSessionLookup();
-    const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation((namespace) => (
-      Promise.resolve(namespace === 'questionsCache' ? borrowedGeneralQuestionsCache : {})
-    ));
+    const readCacheSpy = jest
+      .spyOn(cacheScripts, 'readCache')
+      .mockImplementation((namespace) =>
+        Promise.resolve(namespace === 'questionsCache' ? borrowedGeneralQuestionsCache : {}),
+      );
 
     renderUnresolvedPile();
 

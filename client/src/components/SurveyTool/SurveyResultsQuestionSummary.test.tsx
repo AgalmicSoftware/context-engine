@@ -7,18 +7,12 @@ import SurveyResultsQuestionSummary, {
 } from './SurveyResultsQuestionSummary';
 
 const mockSingleQuestionResponse = jest.fn((props: any) => (
-  <div data-testid="single-question-response">
-    {props.allResponses?.[0]?.response?.answer?.value || ''}
-  </div>
+  <div data-testid="single-question-response">{props.allResponses?.[0]?.response?.answer?.value || ''}</div>
 ));
 
 jest.mock('./SingleQuestionResponse', () => (props: any) => {
   mockSingleQuestionResponse(props);
-  return (
-    <div data-testid="single-question-response">
-      {props.allResponses?.[0]?.response?.answer?.value || ''}
-    </div>
-  );
+  return <div data-testid="single-question-response">{props.allResponses?.[0]?.response?.answer?.value || ''}</div>;
 });
 
 const styleMap = {
@@ -56,28 +50,33 @@ describe('SurveyResultsQuestionSummary', () => {
   });
 
   it('counts only latest visible selected-question responses', () => {
-    expect(countSurveyResultsViewableResponses([
-      {
-        responder: '0xaaa',
-        timestamp: 1,
-        response: { answer: { value: 'Older visible answer' } },
-      },
-      {
-        responder: '0xaaa',
-        timestamp: 2,
-        response: { answer: { value: '   ' } },
-      },
-      {
-        responder: '0xbbb',
-        timestamp: 1,
-        response: { answer: { encrypted: true, value: '*' } },
-      },
-      {
-        responder: '0xccc',
-        timestamp: 1,
-        response: { answer: { value: 'Visible answer' } },
-      },
-    ], 'freeform')).toBe(1);
+    expect(
+      countSurveyResultsViewableResponses(
+        [
+          {
+            responder: '0xaaa',
+            timestamp: 1,
+            response: { answer: { value: 'Older visible answer' } },
+          },
+          {
+            responder: '0xaaa',
+            timestamp: 2,
+            response: { answer: { value: '   ' } },
+          },
+          {
+            responder: '0xbbb',
+            timestamp: 1,
+            response: { answer: { encrypted: true, value: '*' } },
+          },
+          {
+            responder: '0xccc',
+            timestamp: 1,
+            response: { answer: { value: 'Visible answer' } },
+          },
+        ],
+        'freeform',
+      ),
+    ).toBe(1);
   });
 
   it('assembles selected-question display data with decrypted overrides', () => {
@@ -100,30 +99,36 @@ describe('SurveyResultsQuestionSummary', () => {
         },
       },
       questionId: 'q1',
-      responses: [{
-        responder: '0xaaa',
-        response: { answer: { encrypted: true, value: '*' } },
-      }],
+      responses: [
+        {
+          responder: '0xaaa',
+          response: { answer: { encrypted: true, value: '*' } },
+        },
+      ],
       surveyId: 'survey-1',
     });
 
-    expect(model).toEqual(expect.objectContaining({
-      bookmarked: true,
-      domId: 'questionCard-q1',
-      isActive: true,
-      metadataMissing: false,
-      questionPrompt: 'Explain the selected result',
-      resolvedQuestionType: 'binary',
-      viewableResponsesCount: 1,
-    }));
+    expect(model).toEqual(
+      expect.objectContaining({
+        bookmarked: true,
+        domId: 'questionCard-q1',
+        isActive: true,
+        metadataMissing: false,
+        questionPrompt: 'Explain the selected result',
+        resolvedQuestionType: 'binary',
+        viewableResponsesCount: 1,
+      }),
+    );
     expect(model.displayResponses[0].response).toEqual({
       answer: { value: 'Decrypted answer' },
     });
-    expect(getLockedResponseKey).toHaveBeenCalledWith(expect.objectContaining({
-      questionId: 'q1',
-      responder: '0xaaa',
-      surveyId: 'survey-1',
-    }));
+    expect(getLockedResponseKey).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: 'q1',
+        responder: '0xaaa',
+        surveyId: 'survey-1',
+      }),
+    );
   });
 
   it('renders the selected result card and preserves handler wiring', () => {
@@ -156,22 +161,26 @@ describe('SurveyResultsQuestionSummary', () => {
         onToggleBookmark={onToggleBookmark}
         onToggleSummary={onToggleSummary}
         questionId="q1"
-        responses={[{
-          responder: '0xaaa',
-          response: { answer: { encrypted: true, value: '*' } },
-        }]}
+        responses={[
+          {
+            responder: '0xaaa',
+            response: { answer: { encrypted: true, value: '*' } },
+          },
+        ]}
         styleMap={styleMap}
         surveyId="survey-1"
-      />
+      />,
     );
 
     expect(screen.getByText('Explain the selected result')).toBeInTheDocument();
     expect(screen.getByTestId('single-question-response')).toHaveTextContent('Decrypted answer');
-    expect(mockSingleQuestionResponse).toHaveBeenCalledWith(expect.objectContaining({
-      activeSessionSlug: 'session-one',
-      aggregatorResponseMode: true,
-      network: { id: 84532 },
-    }));
+    expect(mockSingleQuestionResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeSessionSlug: 'session-one',
+        aggregatorResponseMode: true,
+        network: { id: 84532 },
+      }),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove bookmark' }));
     expect(onToggleBookmark).toHaveBeenCalledWith('q1');

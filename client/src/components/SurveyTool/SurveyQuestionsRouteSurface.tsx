@@ -25,9 +25,7 @@ const SurveyQuestionsRouteSurface = ({
   viewingAnswers = false,
 }: SurveyQuestionsRouteSurfaceProps): React.ReactElement => {
   if (renderReadiness.shouldShowLoadingState) {
-    return (
-      <SurveyQuestionsLoadingState progressState={loadingProgressState} />
-    );
+    return <SurveyQuestionsLoadingState progressState={loadingProgressState} />;
   }
 
   return (
@@ -68,10 +66,7 @@ const SurveyQuestionsRouteSurface = ({
         responseJson={jsonControlsProps.responseJson}
         surveyJson={jsonControlsProps.surveyJson}
       />
-      <SurveyQuestionsTagModalSlot
-        layoutDisplayState={layoutDisplayState}
-        tagModalProps={tagModalProps}
-      />
+      <SurveyQuestionsTagModalSlot layoutDisplayState={layoutDisplayState} tagModalProps={tagModalProps} />
     </div>
   );
 };

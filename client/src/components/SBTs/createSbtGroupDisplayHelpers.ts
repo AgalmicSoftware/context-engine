@@ -48,9 +48,8 @@ export type CreateSbtCollapseHeaderDisplayState = {
   shouldUseOpenClass: boolean;
 };
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const buildCreateSbtCollapseTogglePatch = ({
   section = '',
@@ -83,10 +82,8 @@ export const buildCreateSbtCollapseHeaderClassName = ({
   baseClassName = '',
   openClassName = '',
   shouldUseOpenClass = false,
-}: BuildCreateSbtCollapseHeaderClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  shouldUseOpenClass ? String(openClassName || '') : '',
-].filter(Boolean).join(' '));
+}: BuildCreateSbtCollapseHeaderClassNameArgs = {}): string =>
+  [String(baseClassName || ''), shouldUseOpenClass ? String(openClassName || '') : ''].filter(Boolean).join(' ');
 
 export const buildCreateSbtActiveClassName = ({
   activeClassName = '',
@@ -97,7 +94,9 @@ export const buildCreateSbtActiveClassName = ({
   return [
     ...baseNames.map((className) => String(className || '')),
     shouldUseActiveClass ? String(activeClassName || '') : '',
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 };
 
 export const resolveCreateSbtTooltipIconStyle = (): Record<string, number> => ({
@@ -121,26 +120,20 @@ export const resolveCreateSbtShareableTooltipIconStyle = (): Record<string, stri
 export const buildCreateSbtActionLinkClassName = ({
   actionClassName = '',
   linkClassName = '',
-}: BuildCreateSbtActionLinkClassNameArgs = {}): string => ([
-  String(actionClassName || ''),
-  String(linkClassName || ''),
-].filter(Boolean).join(' '));
+}: BuildCreateSbtActionLinkClassNameArgs = {}): string =>
+  [String(actionClassName || ''), String(linkClassName || '')].filter(Boolean).join(' ');
 
 export const buildCreateSbtInlineFieldLockClassName = ({
   baseClassName = '',
   inlineClassName = '',
-}: BuildCreateSbtInlineFieldLockClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  String(inlineClassName || ''),
-].filter(Boolean).join(' '));
+}: BuildCreateSbtInlineFieldLockClassNameArgs = {}): string =>
+  [String(baseClassName || ''), String(inlineClassName || '')].filter(Boolean).join(' ');
 
 export const buildCreateSbtTokenInfoMetaCardClassName = ({
   fieldSectionClassName = '',
   metaCardClassName = '',
-}: BuildCreateSbtTokenInfoMetaCardClassNameArgs = {}): string => ([
-  String(fieldSectionClassName || ''),
-  String(metaCardClassName || ''),
-].filter(Boolean).join(' '));
+}: BuildCreateSbtTokenInfoMetaCardClassNameArgs = {}): string =>
+  [String(fieldSectionClassName || ''), String(metaCardClassName || '')].filter(Boolean).join(' ');
 
 export const resolveCreateSbtHiddenQrDisplayState = (): CreateSbtHiddenQrDisplayState => ({
   hiddenStyle: {

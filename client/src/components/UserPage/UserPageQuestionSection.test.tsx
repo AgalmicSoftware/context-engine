@@ -4,9 +4,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import UserPageQuestionSection from './UserPageQuestionSection';
 
 jest.mock('reactstrap', () => ({
-  Collapse: ({ children, isOpen }: { children: React.ReactNode; isOpen?: boolean }) => (
-    isOpen ? <div data-testid="collapse">{children}</div> : null
-  ),
+  Collapse: ({ children, isOpen }: { children: React.ReactNode; isOpen?: boolean }) =>
+    isOpen ? <div data-testid="collapse">{children}</div> : null,
 }));
 
 jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
@@ -36,12 +35,13 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
     sessionSlug?: unknown;
     showImportance?: unknown;
   }) => {
-    const responseRecord = (response && typeof response === 'object')
-      ? response as {
-        additional?: { encrypted?: unknown; value?: unknown };
-        answer?: { encrypted?: unknown; value?: unknown };
-      }
-      : {};
+    const responseRecord =
+      response && typeof response === 'object'
+        ? (response as {
+            additional?: { encrypted?: unknown; value?: unknown };
+            answer?: { encrypted?: unknown; value?: unknown };
+          })
+        : {};
 
     return (
       <div
@@ -61,16 +61,16 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
       >
         {question?.prompt || question?.id}
         {(questionOnly || canDecryptOtherResponses) && (
-          <button type="button" onClick={() => onDecryptQuestion?.(question?.id)}>decrypt</button>
+          <button type="button" onClick={() => onDecryptQuestion?.(question?.id)}>
+            decrypt
+          </button>
         )}
       </div>
     );
   },
 }));
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof UserPageQuestionSection>> = {}
-) => ({
+const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageQuestionSection>> = {}) => ({
   activeSessionSlug: 'fallback-session',
   createdQuestionWrapperClassName: 'created-question-wrapper',
   detailedQuestionResponseMap: {
@@ -82,19 +82,23 @@ const createProps = (
   onQuestionResponsesSectionToggle: jest.fn(),
   onQuestionsCreatedSectionToggle: jest.fn(),
   onShowSurveysTab: jest.fn((event: React.MouseEvent<HTMLElement>) => event.stopPropagation()),
-  questionCreationEntries: [{
-    id: 'q-created',
-    prompt: 'Created question',
-  }],
+  questionCreationEntries: [
+    {
+      id: 'q-created',
+      prompt: 'Created question',
+    },
+  ],
   questionResponsesEmptyText: 'No question responses yet.',
   questionResponsesLoadingIndicator: <span data-testid="responses-loading">responses loading</span>,
   questionResponsesNonce: 'nonce-1',
-  questionResponseEntries: [{
-    canDecryptOtherResponses: true,
-    id: 'q-response',
-    prompt: 'Answered question',
-    sessionSlug: 'response-session',
-  }],
+  questionResponseEntries: [
+    {
+      canDecryptOtherResponses: true,
+      id: 'q-response',
+      prompt: 'Answered question',
+      sessionSlug: 'response-session',
+    },
+  ],
   questionResponsesSectionToggleState: {
     isOpen: true,
     shouldRenderClosedIcon: false,
@@ -132,7 +136,7 @@ describe('UserPageQuestionSection', () => {
           onQuestionsCreatedSectionToggle,
           onShowSurveysTab,
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Question Responses')).toBeInTheDocument();
@@ -174,7 +178,7 @@ describe('UserPageQuestionSection', () => {
             shouldRenderQuestionsCreatedEmptyText: true,
           },
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('No question responses yet.')).toBeInTheDocument();
@@ -200,19 +204,22 @@ describe('UserPageQuestionSection', () => {
             },
           },
           onDecryptQuestion,
-          questionResponseEntries: [{
-            canDecryptOtherResponses: false,
-            id: 'q-gated',
-            prompt: 'Gated cached response',
-            slug: 'gated-session',
-          }, {
-            id: 'q-open',
-            prompt: 'Open cached response',
-          }],
+          questionResponseEntries: [
+            {
+              canDecryptOtherResponses: false,
+              id: 'q-gated',
+              prompt: 'Gated cached response',
+              slug: 'gated-session',
+            },
+            {
+              id: 'q-open',
+              prompt: 'Open cached response',
+            },
+          ],
           questionResponsesNonce: 'cache-nonce',
           sbtCacheRevision: 'gate-revision',
         })}
-      />
+      />,
     );
 
     const responseCards = screen.getAllByTestId('question-response-card');
@@ -251,16 +258,18 @@ describe('UserPageQuestionSection', () => {
             },
           },
           onDecryptQuestion,
-          questionResponseEntries: [{
-            canDecryptOtherResponses: true,
-            id: 'q-gated-visible',
-            prompt: 'Visible gated response',
-            sessionSlug: 'gated-cache-session',
-          }],
+          questionResponseEntries: [
+            {
+              canDecryptOtherResponses: true,
+              id: 'q-gated-visible',
+              prompt: 'Visible gated response',
+              sessionSlug: 'gated-cache-session',
+            },
+          ],
           questionResponsesNonce: 'gate-cache-nonce',
           sbtCacheRevision: 'gate-cache-revision',
         })}
-      />
+      />,
     );
 
     const responseCard = screen.getByTestId('question-response-card');
@@ -297,15 +306,17 @@ describe('UserPageQuestionSection', () => {
             },
           },
           onDecryptQuestion,
-          questionResponseEntries: [{
-            canDecryptOtherResponses: true,
-            id: 'q-gated-fallback-session',
-            prompt: 'Fallback session gated response',
-          }],
+          questionResponseEntries: [
+            {
+              canDecryptOtherResponses: true,
+              id: 'q-gated-fallback-session',
+              prompt: 'Fallback session gated response',
+            },
+          ],
           questionResponsesNonce: 'fallback-cache-nonce',
           sbtCacheRevision: 'fallback-cache-revision',
         })}
-      />
+      />,
     );
 
     const responseCard = screen.getByTestId('question-response-card');

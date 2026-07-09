@@ -33,13 +33,10 @@ const contextSectionKeys = ['SUBCATEGORY_CONTEXT', 'CATEGORY_CONTEXT'] as const;
 const contextFixture = riskMatrixCommentContextData as RiskMatrixCommentContextFixture;
 const corpusFixture = corpusSample as CorpusSampleFixture;
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  typeof value === 'object' && value !== null
-);
+const isRecord = (value: unknown): value is UnknownRecord => typeof value === 'object' && value !== null;
 
-const getContextSectionEntries = (
-  sectionKey: typeof contextSectionKeys[number]
-): ContextEntryFixture[] => Object.values(contextFixture[sectionKey] || {});
+const getContextSectionEntries = (sectionKey: (typeof contextSectionKeys)[number]): ContextEntryFixture[] =>
+  Object.values(contextFixture[sectionKey] || {});
 
 describe('riskMatrixCommentContext', () => {
   it('enriches seeded overlap comments from demo context data', () => {
@@ -54,13 +51,15 @@ describe('riskMatrixCommentContext', () => {
       name: 'Franklin D. Roosevelt',
       role: 'Shared-gains politics',
     });
-    expect(entry.corpusRefs).toEqual(expect.arrayContaining<RiskMatrixCorpusRef>([
-      expect.objectContaining({
-        corpusId: 'tweets',
-        label: 'AI Discourse Tweets',
-        note: 'William Bryk on knowledge-work compression',
-      }),
-    ]));
+    expect(entry.corpusRefs).toEqual(
+      expect.arrayContaining<RiskMatrixCorpusRef>([
+        expect.objectContaining({
+          corpusId: 'tweets',
+          label: 'AI Discourse Tweets',
+          note: 'William Bryk on knowledge-work compression',
+        }),
+      ]),
+    );
   });
 
   it('preserves explicit comment metadata already carried by the record', () => {
@@ -73,28 +72,34 @@ describe('riskMatrixCommentContext', () => {
         name: 'Custom Figure',
         role: 'Custom role',
       },
-      corpusRefs: [{
-        label: 'Custom corpus',
-        note: 'Custom note',
-        url: 'https://example.com/custom',
-      }],
+      corpusRefs: [
+        {
+          label: 'Custom corpus',
+          note: 'Custom note',
+          url: 'https://example.com/custom',
+        },
+      ],
     });
 
     expect(entry.historicalFigure).toEqual<RiskMatrixHistoricalFigure>({
       name: 'Custom Figure',
       role: 'Custom role',
     });
-    expect(entry.corpusRefs).toEqual<RiskMatrixCorpusRef[]>([{
-      label: 'Custom corpus',
-      note: 'Custom note',
-      url: 'https://example.com/custom',
-    }]);
+    expect(entry.corpusRefs).toEqual<RiskMatrixCorpusRef[]>([
+      {
+        label: 'Custom corpus',
+        note: 'Custom note',
+        url: 'https://example.com/custom',
+      },
+    ]);
   });
 
   it('keeps seeded historical figures inside the existing historical figure demo set', () => {
-    const validFigureNames = new Set((historicalFigureUsers as Array<{ name?: string }>)
-      .map((entry) => String(entry?.name || '').trim())
-      .filter(Boolean));
+    const validFigureNames = new Set(
+      (historicalFigureUsers as Array<{ name?: string }>)
+        .map((entry) => String(entry?.name || '').trim())
+        .filter(Boolean),
+    );
 
     const usedFigureNames = new Set<string>();
     contextSectionKeys.forEach((sectionKey) => {
@@ -112,7 +117,7 @@ describe('riskMatrixCommentContext', () => {
       Object.entries(corpusFixture.meta?.corpuses || {}).map(([corpusId, corpusEntry]) => [
         corpusId,
         String(corpusEntry?.label || '').trim(),
-      ])
+      ]),
     );
 
     contextSectionKeys.forEach((sectionKey) => {
@@ -146,9 +151,11 @@ describe('riskMatrixCommentContext', () => {
 
     expect(citations).toHaveLength(1);
     expect(citations[0]).toMatch(/^@PalisadeAI — .*o3 model sabotaged a shutdown mechanism/i);
-    expect(citationItems).toEqual([{
-      label: expect.stringMatching(/^@PalisadeAI — .*o3 model sabotaged a shutdown mechanism/i),
-      url: 'https://x.com/PalisadeAI/status/1926084635903025621',
-    }]);
+    expect(citationItems).toEqual([
+      {
+        label: expect.stringMatching(/^@PalisadeAI — .*o3 model sabotaged a shutdown mechanism/i),
+        url: 'https://x.com/PalisadeAI/status/1926084635903025621',
+      },
+    ]);
   });
 });

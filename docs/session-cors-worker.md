@@ -111,6 +111,7 @@ If you deploy via the Group Wizard and a deploy-helper:
 - Deploy-helper origin configuration:
   - CE-hosted mode should set `ALLOWED_ORIGINS` explicitly to the public app origins it serves. Current hosted example: `https://contextengine.xyz,https://www.contextengine.xyz,http://localhost:3000`.
   - Self-hosted mode should replace that list with the origins for your own app/admin hosts. Leaving `ALLOWED_ORIGINS` unset is intentionally restrictive and only allows `http://localhost:3000` until you configure it.
+  - `CE_CLOUDFLARE_API_BASE_URL` is optional and defaults to `https://api.cloudflare.com/client/v4`. Override it only for Cloudflare-compatible test or proxy endpoints.
   - This is where self-hosting can still trip over the CLI default: `npm run deploy-helper:deploy` can seed the stable CE/local defaults, but unlike the `/new` browser flow it cannot discover your current custom app origin. If your UI runs on `https://your-app.example`, pass that origin explicitly with `--allowed-origins`.
   - Worker URLs returned from deploy flows are normalized to absolute `http(s)` base URLs before auth/admin calls run. Protocol-less hosts are prefixed (`https://` except local dev hosts), while relative paths are rejected.
 - Admin origin management:
@@ -203,15 +204,15 @@ Default worker URL:
 - Legacy untimestamped browser replicas remain a migration bridge only when the registry mirror is blank; once the mirror has a worker URL again, those old cache entries no longer outrank it.
 - `client/src/utilities/session/sessionWorkerAvailability.ts` now gives UI a sync worker-config overlay surface for both "is a usable worker-backed config available?" and "what configured worker URL is currently usable?"; when callers opt in, it also returns the shared default/general fallback worker URL synchronously. `SBTsList.tsx`, `LiveDebateMode.tsx`, and `AdminPage.tsx` use it instead of component-local raw `corsWorkerUrl` truthiness.
 - `client/src/utilities/session/sessionParsers.ts` now accepts compatibility worker URL aliases like `workerUrl` and `sessionWorkerUrl` too, so the lower-level parser, cache bridge, worker availability helper, and `corsProxy` share the same worker URL normalization rules.
-- `client/src/utilities/session/sessionWorkerUrlCompatibility.ts` now owns that remaining worker URL compatibility alias list/read surface plus the shared metadata-strip alias keys reused by `sessionParsers.ts`, `sessionWorkerConfigCache.js`, `sessionWorkerAvailability.ts`, `canonicalSessionContext.ts`, and `sessionWizardWriteNormalization.ts`, so worker URL compatibility reads and Arweave metadata stripping no longer drift apart.
-- `client/src/utilities/worker/corsProxy.js` now uses that same configured-worker-URL parser for plain session-config reads, so compatibility keys like `workerUrl` and `sessionWorkerUrl` stay aligned with the shared worker availability helper.
-- `client/src/utilities/worker/workerSessionResolution.js` now owns the shared active-session slug, alias-resolution, and registry/demo session-config lookup scaffold used by both `workerAuth.js` and `corsProxy.js`, while each caller still keeps its own default `allowDemoFallback` policy.
-- `client/src/utilities/worker/workerSessionResolution.js` now also exports the distinct default demo-fallback policy helpers used by `workerAuth.js` and `corsProxy.js`, so the policy-normalization logic is shared while auth still defaults fail-closed and `corsProxy` still allows non-general demo fallback in on-chain mode.
-- `client/src/utilities/worker/corsProxy.js` now trusts that shared scaffold directly instead of performing a second-pass session-config lookup after alias resolution, so the async worker URL path no longer keeps an extra copy of the same session-resolution step.
+- `client/src/utilities/session/sessionWorkerUrlCompatibility.ts` now owns that remaining worker URL compatibility alias list/read surface plus the shared metadata-strip alias keys reused by `sessionParsers.ts`, `sessionWorkerConfigCache.ts`, `sessionWorkerAvailability.ts`, `canonicalSessionContext.ts`, and `sessionWizardWriteNormalization.ts`, so worker URL compatibility reads and Arweave metadata stripping no longer drift apart.
+- `client/src/utilities/worker/corsProxy.ts` now uses that same configured-worker-URL parser for plain session-config reads, so compatibility keys like `workerUrl` and `sessionWorkerUrl` stay aligned with the shared worker availability helper.
+- `client/src/utilities/worker/workerSessionResolution.ts` now owns the shared active-session slug, alias-resolution, and registry/demo session-config lookup scaffold used by both `workerAuth.ts` and `corsProxy.ts`, while each caller still keeps its own default `allowDemoFallback` policy.
+- `client/src/utilities/worker/workerSessionResolution.ts` now also exports the distinct default demo-fallback policy helpers used by `workerAuth.ts` and `corsProxy.ts`, so the policy-normalization logic is shared while auth still defaults fail-closed and `corsProxy` still allows non-general demo fallback in on-chain mode.
+- `client/src/utilities/worker/corsProxy.ts` now trusts that shared scaffold directly instead of performing a second-pass session-config lookup after alias resolution, so the async worker URL path no longer keeps an extra copy of the same session-resolution step.
 - `client/src/utilities/session/sessionWorkerAvailability.ts` now also owns the shared "default session must ignore `demoSessions.general` as worker authority in on-chain mode" rule, so sync UI reads and async `corsProxy` resolution both fall back to `CLOUDFLARE_CORS_WORKER_URL` on the same contract.
-- `client/src/utilities/worker/corsProxy.js` also now reuses the shared default/general fallback worker URL selector from `sessionWorkerAvailability.ts`, so the sync and async default-session worker URL paths stay on the same fallback contract.
+- `client/src/utilities/worker/corsProxy.ts` also now reuses the shared default/general fallback worker URL selector from `sessionWorkerAvailability.ts`, so the sync and async default-session worker URL paths stay on the same fallback contract.
 - Worker auth now defaults to no silent demo-session fallback in on-chain mode; explicit demo/off-chain callers must opt in when resolving worker URLs for login.
-- **Stage-B fail-closed strictness (2026-03-12):** All security-sensitive callers — Arweave uploads (`arweaveClient.js`, with `arweaveScripts.js` as a compatibility alias), AI requests (`aiClient.js`, with `aiScripts.js` as a compatibility alias), transcription (`useWhisper.js`), faucet (`contractHelpers.ts`), image fetch (`imageFetchClient.ts`, with `imageScripts.ts` as a compatibility alias), session-config resolution (`contractScripts.impl.ts`, `resourceKeys.js`, `aiSettings.js`), and the canonical resolver (`canonicalSessionContext.js`) — now require explicit `allowDemoFallback: true` opt-in to use demo session fixtures when the on-chain registry is active. The CORS proxy demo-fallback policy (`defaultCorsProxyAllowDemoFallback`) is also tightened to match auth defaults. `getSessionConfigBySlugOrDefault` returns `null` for unknown non-general slugs instead of silently mapping them to the general default config.
+- **Stage-B fail-closed strictness (2026-03-12):** All security-sensitive callers — Arweave uploads (`arweaveClient.js`), AI requests (`aiClient.js`), transcription (`useWhisper.ts`), faucet (`contractHelpers.ts`), image fetch (`imageFetchClient.ts`), session-config resolution (`contractScripts.impl.ts`, `resourceKeys.ts`, `aiSettings.ts`), and the canonical resolver (`canonicalSessionContext.ts`) — now require explicit `allowDemoFallback: true` opt-in to use demo session fixtures when the on-chain registry is active. The CORS proxy demo-fallback policy (`defaultCorsProxyAllowDemoFallback`) is also tightened to match auth defaults. `getSessionConfigBySlugOrDefault` returns `null` for unknown non-general slugs instead of silently mapping them to the general default config.
 - In on-chain registry mode, worker auth/cors proxy no longer treat `demoSessions.general`
   as an implicit worker authority for the default session; the shared fallback is used instead.
 - The shared fallback is only used for the general/default session; non-general slugs do not fall back to it.
@@ -257,6 +258,7 @@ Admin test panel:
 Authenticated clients can use the worker as the session storage boundary:
 
 - `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings when R2 is available. For small JSON/demo deployments where R2 is not enabled, the worker can store opaque payload envelopes in KV-only Cloudflare storage. Both modes return an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
+  - Upload bodies are capped at 25 MB by default before Arweave or Cloudflare storage handoff. Set `CE_MAX_UPLOAD_BYTES` on the Worker to lower or raise that limit for `/storage/upload` and `/arweave/upload`.
 - `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the configured Cloudflare payload access check. Public-read sessions may be served anonymously; gated sessions require authenticated route preflight. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
 - `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects, tag metadata, and the configured payload access mode. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
 - `GET|POST /storage/export-envelopes`: returns ciphertext plus envelope metadata for encrypted Cloudflare payloads in the requested resource. It does not decrypt payload bytes and does not include session KEK material.
@@ -365,6 +367,7 @@ Vars:
 - `DEFAULT_SESSION_SLUG` (optional; canonical)
 - `DEFAULT_GROUP_SLUG` (optional; legacy alias still read for compatibility)
 - `DEPLOY_HELPER_ENABLED` (optional; only if you embed deploy endpoints in the same worker)
+- `CE_OPENAI_TRANSCRIBE_URL` (optional; defaults to `https://api.openai.com/v1/audio/transcriptions`)
 - `LIT_ACCOUNT_API_KEY` or `LIT_USAGE_API_KEY` (optional; used for worker-mediated Lit Chipotle execution when no per-session Lit account or usage key has been stored yet, or when a sponsor intentionally runs a shared-account model)
 - `LIT_API_BASE` (optional; defaults to `https://api.chipotle.litprotocol.com`; production requests are restricted to the approved Chipotle API host)
 - `LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE` (optional; dev/test only, allows `LIT_API_BASE` to target localhost/loopback Chipotle stubs over `http` or `https`)
@@ -484,11 +487,11 @@ enforcement is deferred to stage-B strictness work.
 ### Client-side helpers
 
 - `routeSessionResolution.ts` — route/session precedence for MainSite
-- `litSessionConfig.js` — Lit protocol chain/network/gate resolution
+- `litSessionConfig.ts` — Lit protocol chain/network/gate resolution
 - `surveyToolSessionResolution.ts` — SurveyTool session context resolution
-- `canonicalSessionContext.js` — canonical session config assembly with provenance
-- `sessionWorkerConfigCache.js` — browser-side replica cache for Worker KV session config, used as the preferred bridge over the registry worker URL mirror
-- `sessionWorkerAvailability.js` — sync "usable worker-backed config" helper for UI loading-state reads; overlays the cached worker-config replica and preserves the default/general shared worker fallback
+- `canonicalSessionContext.ts` — canonical session config assembly with provenance
+- `sessionWorkerConfigCache.ts` — browser-side replica cache for Worker KV session config, used as the preferred bridge over the registry worker URL mirror
+- `sessionWorkerAvailability.ts` — sync "usable worker-backed config" helper for UI loading-state reads; overlays the cached worker-config replica and preserves the default/general shared worker fallback
 - `sessionWizardWriteNormalization.ts` — SessionWizard Stage-A producer write-target normalization for Arweave metadata, registry compatibility fields, and Worker KV config payloads
 
 ### Worker-side boundaries
@@ -1166,6 +1169,7 @@ Signed login/bootstrap requests:
     `safeFetch` / blocked-url / default-URL deps bundle before the execution helper runs.
 - `POST /arweave/upload` (multipart or JSON)
   - Optional override: `arweaveJwk` (JSON string or object).
+  - Upload bodies are capped at 25 MB by default. The Worker rejects oversized `Content-Length`, JSON `data`, or multipart file bytes with `413`; set `CE_MAX_UPLOAD_BYTES` to configure the limit.
   - Bootstrap parsing for unauthenticated uploads is normalized across JSON and multipart before slug validation/admin checks.
   - Unauthenticated bootstrap upload dispatch now also routes through a shared helper:
     it preserves the no-auth-only bootstrap handoff, the missing-config + request-`arweaveJwk` bootstrap rule,

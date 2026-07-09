@@ -39,9 +39,7 @@ export const LoginSettingsSessionPills = ({
           className={`${styles.sessionPill} ${sessionEntry.isActive ? styles.sessionPillActive : ''}`}
         >
           {sessionEntry.label}
-          <span className={styles.sessionPillMeta}>
-            {sessionEntry.isActive ? 'active' : sessionEntry.slugLabel}
-          </span>
+          <span className={styles.sessionPillMeta}>{sessionEntry.isActive ? 'active' : sessionEntry.slugLabel}</span>
         </span>
       ))}
     </div>
@@ -80,9 +78,7 @@ export const LoginSettingsSupportedResourceCard = ({
           <LoginSettingsSessionPills sessions={[activeSession]} />
           <span
             className={`${styles.supportedResourceActiveState} ${
-              activeSponsorSession
-                ? styles.supportedResourceActiveStateOn
-                : styles.supportedResourceActiveStateOff
+              activeSponsorSession ? styles.supportedResourceActiveStateOn : styles.supportedResourceActiveStateOff
             }`}
           >
             {activeSponsorSession ? 'configured here' : 'not configured here'}
@@ -98,7 +94,9 @@ export const LoginSettingsSupportedResourceCard = ({
               aria-expanded={extrasExpanded}
               aria-label={`${extrasExpanded ? 'Hide' : 'Show'} other ${card.title} sponsor sessions`}
             >
-              {extrasExpanded ? 'Hide other sessions' : `${extraCount} other ${extraCount === 1 ? 'session' : 'sessions'}`}
+              {extrasExpanded
+                ? 'Hide other sessions'
+                : `${extraCount} other ${extraCount === 1 ? 'session' : 'sessions'}`}
               <FontAwesomeIcon
                 icon={extrasExpanded ? faCaretUp : faCaretDown}
                 className={styles.supportedResourceMoreChevron}

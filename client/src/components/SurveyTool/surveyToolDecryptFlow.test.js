@@ -65,13 +65,17 @@ const deepClone = (value) => JSON.parse(JSON.stringify(value));
 
 describe('surveyToolDecryptFlow', () => {
   it('parses encrypted envelopes and builds shared field/render display state', () => {
-    expect(parseEncryptedEnvelope({
-      encryptedPortion: '{"cipher":"abc"}',
-    })).toEqual({ cipher: 'abc' });
+    expect(
+      parseEncryptedEnvelope({
+        encryptedPortion: '{"cipher":"abc"}',
+      }),
+    ).toEqual({ cipher: 'abc' });
 
-    expect(parseEncryptedEnvelope({
-      encryptedPortion: '{not-json',
-    })).toBeNull();
+    expect(
+      parseEncryptedEnvelope({
+        encryptedPortion: '{not-json',
+      }),
+    ).toBeNull();
 
     const answerDecryptState = buildFieldDecryptState(
       { value: '*', encrypted: true, encryptedPortion: '' },
@@ -131,10 +135,12 @@ describe('surveyToolDecryptFlow', () => {
       activeSliderValue: 8,
     });
 
-    expect(buildQuestionRenderDisplayState({
-      responseDisplayState,
-      fieldDisplayState,
-    })).toEqual({
+    expect(
+      buildQuestionRenderDisplayState({
+        responseDisplayState,
+        fieldDisplayState,
+      }),
+    ).toEqual({
       answer: { value: '*' },
       additional: { value: 'notes' },
       convictionValue: 3,
@@ -178,21 +184,25 @@ describe('surveyToolDecryptFlow', () => {
       title: 'Connect wallet to decrypt',
       wrapperStyle: { marginTop: '4px' },
     });
-    expect(buildQuestionFieldDecryptControlDisplayState({
-      ...input,
-      allowDecrypt: true,
-      isDecrypting: true,
-    })).toMatchObject({
+    expect(
+      buildQuestionFieldDecryptControlDisplayState({
+        ...input,
+        allowDecrypt: true,
+        isDecrypting: true,
+      }),
+    ).toMatchObject({
       disabled: true,
       title: undefined,
     });
-    expect(buildQuestionFieldDecryptControlDisplayState({
-      ...input,
-      allowDecrypt: true,
-      autoDecryptEnabled: true,
-      busy: false,
-      isDecrypting: false,
-    })).toMatchObject({
+    expect(
+      buildQuestionFieldDecryptControlDisplayState({
+        ...input,
+        allowDecrypt: true,
+        autoDecryptEnabled: true,
+        busy: false,
+        isDecrypting: false,
+      }),
+    ).toMatchObject({
       autoDecryptEnabled: true,
       busy: false,
       disabled: false,
@@ -211,62 +221,79 @@ describe('surveyToolDecryptFlow', () => {
   });
 
   it('derives question field task keys, busy maps, selection, and state transitions', () => {
-    expect(buildAutoDecryptMaskedFieldSignature({
-      value: '*',
-      encrypted: true,
-      encryptedPortion: 'enc-1',
-      hash: 'hash-1',
-      encryptionAudience: 'gate',
-    })).toBe('*|1|enc-1|hash-1|gate');
+    expect(
+      buildAutoDecryptMaskedFieldSignature({
+        value: '*',
+        encrypted: true,
+        encryptedPortion: 'enc-1',
+        hash: 'hash-1',
+        encryptionAudience: 'gate',
+      }),
+    ).toBe('*|1|enc-1|hash-1|gate');
 
-    expect(buildDecryptTaskKey(
-      'viewed',
-      'Q1',
-      'additional',
-      {
-        responderAddress: '0xDEF',
-        answer: { value: '*', encrypted: true, encryptedPortion: 'ans-env' },
-        additional: { value: '*', encrypted: true, encryptedPortion: 'add-env' },
-      },
-      '0xabc',
-    )).toBe(
-      'viewed|q1|additional|0xdef|*|1|ans-env|||*|1|add-env||'
-    );
+    expect(
+      buildDecryptTaskKey(
+        'viewed',
+        'Q1',
+        'additional',
+        {
+          responderAddress: '0xDEF',
+          answer: { value: '*', encrypted: true, encryptedPortion: 'ans-env' },
+          additional: { value: '*', encrypted: true, encryptedPortion: 'add-env' },
+        },
+        '0xabc',
+      ),
+    ).toBe('viewed|q1|additional|0xdef|*|1|ans-env|||*|1|add-env||');
 
     expect(getQuestionFieldTaskKey(' Q1 ', ' Prompt ')).toBe('q1:prompt');
     expect(getQuestionFieldTaskKey('', 'answer')).toBe('');
 
-    expect(getQuestionFieldTaskKeys(' Q1 ', {
-      includeAnswer: true,
-      includeAdditional: true,
-    })).toEqual(['q1:answer', 'q1:additional']);
+    expect(
+      getQuestionFieldTaskKeys(' Q1 ', {
+        includeAnswer: true,
+        includeAdditional: true,
+      }),
+    ).toEqual(['q1:answer', 'q1:additional']);
 
-    expect(markQuestionFieldBusyMap({
-      'q1:prompt': true,
-    }, ['q1:answer', '', 'q1:additional'])).toEqual({
+    expect(
+      markQuestionFieldBusyMap(
+        {
+          'q1:prompt': true,
+        },
+        ['q1:answer', '', 'q1:additional'],
+      ),
+    ).toEqual({
       'q1:prompt': true,
       'q1:answer': true,
       'q1:additional': true,
     });
 
-    expect(clearQuestionFieldBusyMap({
-      'q1:answer': true,
-      'q1:additional': true,
-      'q1:prompt': true,
-    }, ' Q1 ', 'additional')).toEqual({
+    expect(
+      clearQuestionFieldBusyMap(
+        {
+          'q1:answer': true,
+          'q1:additional': true,
+          'q1:prompt': true,
+        },
+        ' Q1 ',
+        'additional',
+      ),
+    ).toEqual({
       'q1:answer': true,
       'q1:additional': false,
       'q1:prompt': true,
     });
 
-    expect(getQuestionFieldDecryptSelection('q1', 'both', {
-      answers: {
-        q1: { value: '*', encrypted: true },
-      },
-      additionalComments: {
-        q1: { value: '*', encryptedPortion: 'sealed' },
-      },
-    })).toEqual({
+    expect(
+      getQuestionFieldDecryptSelection('q1', 'both', {
+        answers: {
+          q1: { value: '*', encrypted: true },
+        },
+        additionalComments: {
+          q1: { value: '*', encryptedPortion: 'sealed' },
+        },
+      }),
+    ).toEqual({
       maskedAnswer: true,
       maskedAdditional: true,
       hasMaskedField: true,
@@ -274,10 +301,9 @@ describe('surveyToolDecryptFlow', () => {
       keysToMark: ['q1:answer', 'q1:additional'],
     });
 
-    expect(buildQuestionDecryptStartState(
-      { decryptingByKey: { 'q1:prompt': true } },
-      ['q1:answer', 'q1:additional'],
-    )).toEqual({
+    expect(
+      buildQuestionDecryptStartState({ decryptingByKey: { 'q1:prompt': true } }, ['q1:answer', 'q1:additional']),
+    ).toEqual({
       isDecrypting: true,
       submissionError: '',
       suppressPrefill: true,
@@ -288,12 +314,14 @@ describe('surveyToolDecryptFlow', () => {
       },
     });
 
-    expect(buildQuestionDecryptFailureState(
-      { decryptingByKey: { 'q1:answer': true, 'q1:additional': true, 'q1:prompt': true } },
-      'Q1',
-      'additional',
-      'boom',
-    )).toEqual({
+    expect(
+      buildQuestionDecryptFailureState(
+        { decryptingByKey: { 'q1:answer': true, 'q1:additional': true, 'q1:prompt': true } },
+        'Q1',
+        'additional',
+        'boom',
+      ),
+    ).toEqual({
       isDecrypting: false,
       submissionError: 'boom',
       decryptingByKey: {
@@ -321,16 +349,20 @@ describe('surveyToolDecryptFlow', () => {
     });
     expect(hasQuestionDecryptBusy({ 'q1:answer': false, 'q1:additional': true })).toBe(true);
     expect(hasQuestionDecryptBusy({ 'q1:answer': false })).toBe(false);
-    expect(ownsQuestionDecryptBusyTokens({
-      busyTokens: registration.busyTokens,
-      keysToCheck: ['q1:answer', 'q1:additional'],
-      token: 3,
-    })).toBe(true);
-    expect(ownsQuestionDecryptBusyTokens({
-      busyTokens: { ...registration.busyTokens, 'q1:answer': 4 },
-      keysToCheck: ['q1:answer', 'q1:additional'],
-      token: 3,
-    })).toBe(false);
+    expect(
+      ownsQuestionDecryptBusyTokens({
+        busyTokens: registration.busyTokens,
+        keysToCheck: ['q1:answer', 'q1:additional'],
+        token: 3,
+      }),
+    ).toBe(true);
+    expect(
+      ownsQuestionDecryptBusyTokens({
+        busyTokens: { ...registration.busyTokens, 'q1:answer': 4 },
+        keysToCheck: ['q1:answer', 'q1:additional'],
+        token: 3,
+      }),
+    ).toBe(false);
 
     const staleCleanup = buildQuestionDecryptOwnedClearState({
       prevState: {
@@ -363,27 +395,31 @@ describe('surveyToolDecryptFlow', () => {
       },
     });
 
-    expect(buildQuestionDecryptOwnedClearState({
-      prevState: { decryptingByKey: { 'q1:answer': true } },
-      questionId: 'Q1',
-      fieldToDecrypt: 'answer',
-      token: 3,
-      busyTokens: { 'q1:answer': 4 },
-      extraPatch: { submissionError: 'old failure' },
-    })).toEqual({
+    expect(
+      buildQuestionDecryptOwnedClearState({
+        prevState: { decryptingByKey: { 'q1:answer': true } },
+        questionId: 'Q1',
+        fieldToDecrypt: 'answer',
+        token: 3,
+        busyTokens: { 'q1:answer': 4 },
+        extraPatch: { submissionError: 'old failure' },
+      }),
+    ).toEqual({
       busyTokens: { 'q1:answer': 4 },
       statePatch: null,
     });
 
-    expect(buildQuestionDecryptOwnedClearState({
-      prevState: { decryptingByKey: { 'q1:answer': true } },
-      questionId: 'Q1',
-      fieldToDecrypt: 'answer',
-      token: null,
-      busyTokens: { 'q1:answer': 4 },
-      activeSurveyDecryptAttemptSeq: 9,
-      extraPatch: { submissionError: 'fallback failure' },
-    })).toEqual({
+    expect(
+      buildQuestionDecryptOwnedClearState({
+        prevState: { decryptingByKey: { 'q1:answer': true } },
+        questionId: 'Q1',
+        fieldToDecrypt: 'answer',
+        token: null,
+        busyTokens: { 'q1:answer': 4 },
+        activeSurveyDecryptAttemptSeq: 9,
+        extraPatch: { submissionError: 'fallback failure' },
+      }),
+    ).toEqual({
       busyTokens: { 'q1:answer': 4 },
       statePatch: {
         submissionError: 'fallback failure',
@@ -392,55 +428,56 @@ describe('surveyToolDecryptFlow', () => {
       },
     });
 
-    expect(buildClearedQuestionDecryptBusyTokens({
-      busyTokens: { 'q1:answer': 4, 'q1:additional': 3 },
-      keysToClear: ['q1:answer', 'q1:additional'],
-      token: 3,
-    })).toEqual({ 'q1:answer': 4 });
+    expect(
+      buildClearedQuestionDecryptBusyTokens({
+        busyTokens: { 'q1:answer': 4, 'q1:additional': 3 },
+        keysToClear: ['q1:answer', 'q1:additional'],
+        token: 3,
+      }),
+    ).toEqual({ 'q1:answer': 4 });
   });
 
   it('applies question decrypt completion status for stale, newer-token, and success paths', () => {
     const staleSetState = jest.fn((updater) => updater({ decryptingByKey: { 'q1:answer': true } }));
     const buildStaleState = jest.fn(() => ({ decryptingByKey: { 'q1:answer': false } }));
 
-    expect(applyQuestionDecryptCompletionStatus({
-      context: { account: '0xold' },
-      questionId: 'q1',
-      fieldToDecrypt: 'answer',
-      decryptAttemptToken: 2,
-      keysToMark: ['q1:answer'],
-      setState: staleSetState,
-      isDecryptContextCurrent: () => false,
-      canUpdateStateForAsyncSnapshot: () => true,
-      buildQuestionDecryptStaleState: buildStaleState,
-    })).toEqual({
+    expect(
+      applyQuestionDecryptCompletionStatus({
+        context: { account: '0xold' },
+        questionId: 'q1',
+        fieldToDecrypt: 'answer',
+        decryptAttemptToken: 2,
+        keysToMark: ['q1:answer'],
+        setState: staleSetState,
+        isDecryptContextCurrent: () => false,
+        canUpdateStateForAsyncSnapshot: () => true,
+        buildQuestionDecryptStaleState: buildStaleState,
+      }),
+    ).toEqual({
       shouldReturn: true,
       result: false,
       reason: 'stale-context',
     });
-    expect(buildStaleState).toHaveBeenCalledWith(
-      { decryptingByKey: { 'q1:answer': true } },
-      'q1',
-      'answer',
-      2,
-    );
+    expect(buildStaleState).toHaveBeenCalledWith({ decryptingByKey: { 'q1:answer': true } }, 'q1', 'answer', 2);
 
     const newerTokenEvents = [];
-    expect(applyQuestionDecryptCompletionStatus({
-      context: { account: '0xabc' },
-      questionId: 'q1',
-      fieldToDecrypt: 'answer',
-      decryptAttemptToken: 2,
-      keysToMark: ['q1:answer'],
-      setState: (updater) => {
-        newerTokenEvents.push(updater({ decryptingByKey: { 'q1:answer': true } }));
-      },
-      clearQuestionDecryptBusyTokens: () => newerTokenEvents.push('clear'),
-      isDecryptContextCurrent: () => true,
-      ownsQuestionDecryptBusyTokens: () => false,
-      buildQuestionDecryptStaleState: () => ({ decryptingByKey: { 'q1:answer': true } }),
-      buildSuccessState: () => ({ success: true }),
-    })).toEqual({
+    expect(
+      applyQuestionDecryptCompletionStatus({
+        context: { account: '0xabc' },
+        questionId: 'q1',
+        fieldToDecrypt: 'answer',
+        decryptAttemptToken: 2,
+        keysToMark: ['q1:answer'],
+        setState: (updater) => {
+          newerTokenEvents.push(updater({ decryptingByKey: { 'q1:answer': true } }));
+        },
+        clearQuestionDecryptBusyTokens: () => newerTokenEvents.push('clear'),
+        isDecryptContextCurrent: () => true,
+        ownsQuestionDecryptBusyTokens: () => false,
+        buildQuestionDecryptStaleState: () => ({ decryptingByKey: { 'q1:answer': true } }),
+        buildSuccessState: () => ({ success: true }),
+      }),
+    ).toEqual({
       shouldReturn: true,
       result: false,
       reason: 'stale-busy-token',
@@ -449,22 +486,24 @@ describe('surveyToolDecryptFlow', () => {
 
     const successEvents = [];
     const successCallback = jest.fn(() => successEvents.push('callback'));
-    expect(applyQuestionDecryptCompletionStatus({
-      context: { account: '0xabc' },
-      questionId: 'q1',
-      fieldToDecrypt: 'answer',
-      decryptAttemptToken: 3,
-      keysToMark: ['q1:answer'],
-      setState: (updater, callback) => {
-        successEvents.push(updater({ decryptingByKey: { 'q1:answer': true } }));
-        callback();
-      },
-      clearQuestionDecryptBusyTokens: (keys, token) => successEvents.push({ clear: keys, token }),
-      isDecryptContextCurrent: () => true,
-      ownsQuestionDecryptBusyTokens: () => true,
-      buildSuccessState: () => ({ decryptingByKey: { 'q1:answer': false } }),
-      onSuccessStateApplied: successCallback,
-    })).toEqual({
+    expect(
+      applyQuestionDecryptCompletionStatus({
+        context: { account: '0xabc' },
+        questionId: 'q1',
+        fieldToDecrypt: 'answer',
+        decryptAttemptToken: 3,
+        keysToMark: ['q1:answer'],
+        setState: (updater, callback) => {
+          successEvents.push(updater({ decryptingByKey: { 'q1:answer': true } }));
+          callback();
+        },
+        clearQuestionDecryptBusyTokens: (keys, token) => successEvents.push({ clear: keys, token }),
+        isDecryptContextCurrent: () => true,
+        ownsQuestionDecryptBusyTokens: () => true,
+        buildSuccessState: () => ({ decryptingByKey: { 'q1:answer': false } }),
+        onSuccessStateApplied: successCallback,
+      }),
+    ).toEqual({
       shouldReturn: false,
       result: null,
       reason: 'applied',
@@ -486,39 +525,37 @@ describe('surveyToolDecryptFlow', () => {
       buildViewedResponseDecryptSuccessState: jest.fn(() => ({ viewedSuccess: true })),
     };
 
-    expect(applyQuestionDecryptCompletionStatus({
-      host,
-      context: { account: '0xabc' },
-      questionId: 'q1',
-      fieldToDecrypt: 'answer',
-      decryptAttemptToken: 4,
-      keysToMark: ['q1:answer'],
-      successStateKind: 'viewed',
-      successStateOptions,
-    })).toEqual({
+    expect(
+      applyQuestionDecryptCompletionStatus({
+        host,
+        context: { account: '0xabc' },
+        questionId: 'q1',
+        fieldToDecrypt: 'answer',
+        decryptAttemptToken: 4,
+        keysToMark: ['q1:answer'],
+        successStateKind: 'viewed',
+        successStateOptions,
+      }),
+    ).toEqual({
       shouldReturn: false,
       result: null,
       reason: 'applied',
     });
-    expect(host.buildViewedResponseDecryptSuccessState).toHaveBeenCalledWith(
-      { viewed: true },
-      successStateOptions,
-    );
-    expect(hostSuccessEvents).toEqual([
-      { clear: ['q1:answer'], token: 4 },
-      { viewedSuccess: true },
-    ]);
+    expect(host.buildViewedResponseDecryptSuccessState).toHaveBeenCalledWith({ viewed: true }, successStateOptions);
+    expect(hostSuccessEvents).toEqual([{ clear: ['q1:answer'], token: 4 }, { viewedSuccess: true }]);
   });
 
   it('starts question decrypt attempt status only when a masked field is planned', () => {
     const prepareQuestionDecryptAttempt = jest.fn(() => ({ shouldDecrypt: false }));
 
-    expect(startQuestionDecryptAttemptStatus({
-      questionId: 'q1',
-      fieldToDecrypt: 'answer',
-      baselineForDecrypt: { answers: {} },
-      prepareQuestionDecryptAttempt,
-    })).toEqual({
+    expect(
+      startQuestionDecryptAttemptStatus({
+        questionId: 'q1',
+        fieldToDecrypt: 'answer',
+        baselineForDecrypt: { answers: {} },
+        prepareQuestionDecryptAttempt,
+      }),
+    ).toEqual({
       shouldReturn: true,
       result: false,
       reason: 'no-masked-field',
@@ -557,12 +594,14 @@ describe('surveyToolDecryptFlow', () => {
       })),
     };
 
-    expect(startQuestionDecryptAttemptStatus({
-      host,
-      questionId: 'q1',
-      fieldToDecrypt: 'both',
-      baselineForDecrypt: { answers: { q1: { value: '*' } } },
-    })).toEqual({
+    expect(
+      startQuestionDecryptAttemptStatus({
+        host,
+        questionId: 'q1',
+        fieldToDecrypt: 'both',
+        baselineForDecrypt: { answers: { q1: { value: '*' } } },
+      }),
+    ).toEqual({
       shouldReturn: false,
       result: null,
       reason: 'started',
@@ -589,27 +628,68 @@ describe('surveyToolDecryptFlow', () => {
     ]);
   });
 
+  it('preserves decrypt keys fallback shape for busy-token registration', () => {
+    const nonArrayKeysToMark = { answer: 'q1:answer' };
+    const registerBusyTokens = jest.fn(() => 13);
+    const buildStartState = jest.fn(() => ({ started: true }));
+    const setState = jest.fn((updater) => updater({ decryptingByKey: {} }));
+
+    const started = startQuestionDecryptAttemptStatus({
+      prepareQuestionDecryptAttempt: jest.fn(() => ({
+        shouldDecrypt: true,
+        decryptSelection: {
+          keysToMark: nonArrayKeysToMark,
+          clearMode: 'answer',
+        },
+      })),
+      registerQuestionDecryptBusyTokens: registerBusyTokens,
+      buildQuestionDecryptStartState: buildStartState,
+      setState,
+    });
+
+    expect(started.keysToMark).toBe(nonArrayKeysToMark);
+    expect(registerBusyTokens).toHaveBeenCalledWith(nonArrayKeysToMark);
+    expect(buildStartState).toHaveBeenCalledWith({ decryptingByKey: {} }, nonArrayKeysToMark);
+
+    const registerEmptyKeys = jest.fn(() => 14);
+    const buildEmptyStartState = jest.fn(() => ({ started: true }));
+
+    const startedWithEmptyKeys = startQuestionDecryptAttemptStatus({
+      prepareQuestionDecryptAttempt: jest.fn(() => ({
+        shouldDecrypt: true,
+        decryptSelection: {
+          keysToMark: '',
+          clearMode: 'answer',
+        },
+      })),
+      registerQuestionDecryptBusyTokens: registerEmptyKeys,
+      buildQuestionDecryptStartState: buildEmptyStartState,
+      setState: (updater) => updater({ decryptingByKey: { stale: 1 } }),
+    });
+
+    expect(startedWithEmptyKeys.keysToMark).toEqual([]);
+    expect(registerEmptyKeys).toHaveBeenCalledWith([]);
+    expect(buildEmptyStartState).toHaveBeenCalledWith({ decryptingByKey: { stale: 1 } }, []);
+  });
+
   it('applies question decrypt failure status through stale or owned failure patches', () => {
     const staleSetState = jest.fn((updater) => updater({ decryptingByKey: { 'q1:answer': true } }));
     const buildStaleState = jest.fn(() => ({ decryptingByKey: { 'q1:answer': false } }));
 
-    expect(applyQuestionDecryptFailureStatus({
-      context: { account: '0xold' },
-      questionId: 'q1',
-      fieldToDecrypt: 'answer',
-      decryptAttemptToken: 2,
-      error: new Error('old failure'),
-      setState: staleSetState,
-      isDecryptContextCurrent: () => false,
-      canUpdateStateForAsyncSnapshot: () => true,
-      buildQuestionDecryptStaleState: buildStaleState,
-    })).toBe(false);
-    expect(buildStaleState).toHaveBeenCalledWith(
-      { decryptingByKey: { 'q1:answer': true } },
-      'q1',
-      'answer',
-      2,
-    );
+    expect(
+      applyQuestionDecryptFailureStatus({
+        context: { account: '0xold' },
+        questionId: 'q1',
+        fieldToDecrypt: 'answer',
+        decryptAttemptToken: 2,
+        error: new Error('old failure'),
+        setState: staleSetState,
+        isDecryptContextCurrent: () => false,
+        canUpdateStateForAsyncSnapshot: () => true,
+        buildQuestionDecryptStaleState: buildStaleState,
+      }),
+    ).toBe(false);
+    expect(buildStaleState).toHaveBeenCalledWith({ decryptingByKey: { 'q1:answer': true } }, 'q1', 'answer', 2);
 
     const failureSetState = jest.fn((updater) => updater({ decryptingByKey: { 'q1:answer': true } }));
     const buildFailureState = jest.fn(() => ({
@@ -617,16 +697,18 @@ describe('surveyToolDecryptFlow', () => {
       submissionError: 'current failure',
     }));
 
-    expect(applyQuestionDecryptFailureStatus({
-      context: { account: '0xabc' },
-      questionId: 'q1',
-      fieldToDecrypt: 'answer',
-      decryptAttemptToken: 3,
-      error: new Error('current failure'),
-      setState: failureSetState,
-      isDecryptContextCurrent: () => true,
-      buildQuestionDecryptFailureStateForAttempt: buildFailureState,
-    })).toBe(false);
+    expect(
+      applyQuestionDecryptFailureStatus({
+        context: { account: '0xabc' },
+        questionId: 'q1',
+        fieldToDecrypt: 'answer',
+        decryptAttemptToken: 3,
+        error: new Error('current failure'),
+        setState: failureSetState,
+        isDecryptContextCurrent: () => true,
+        buildQuestionDecryptFailureStateForAttempt: buildFailureState,
+      }),
+    ).toBe(false);
     expect(buildFailureState).toHaveBeenCalledWith(
       { decryptingByKey: { 'q1:answer': true } },
       'q1',
@@ -648,22 +730,24 @@ describe('surveyToolDecryptFlow', () => {
     const resolveDecryptSurveyId = jest.fn(() => 'survey-1');
     const getProviderKind = jest.fn(() => 'browser');
 
-    await expect(decryptQuestionRatingEnvelopes(
-      {
-        importanceEncrypted: 'importance-env',
-        convictionEncrypted: 'conviction-env',
-      },
-      {
-        account: '0xabc',
-        chainId: 84532,
-        lit: { getKey: jest.fn() },
-        providerLike: provider,
-      },
-      {
-        decryptEnvelopeValue,
-        logWarn,
-      },
-    )).resolves.toEqual({
+    await expect(
+      decryptQuestionRatingEnvelopes(
+        {
+          importanceEncrypted: 'importance-env',
+          convictionEncrypted: 'conviction-env',
+        },
+        {
+          account: '0xabc',
+          chainId: 84532,
+          lit: { getKey: jest.fn() },
+          providerLike: provider,
+        },
+        {
+          decryptEnvelopeValue,
+          logWarn,
+        },
+      ),
+    ).resolves.toEqual({
       decryptedImportance: 7,
       decryptedConviction: null,
     });
@@ -671,19 +755,21 @@ describe('surveyToolDecryptFlow', () => {
     expect(decryptEnvelopeValue).toHaveBeenCalledTimes(2);
     expect(logWarn).not.toHaveBeenCalled();
 
-    expect(buildQuestionDecryptExecutionContext({
-      baselineForDecrypt: { answers: {} },
-      questionId: 'Q1',
-      provider,
-      account: '0xabc',
-      network: { id: 84532 },
-      questionPool: [{ id: 'pool-q' }],
-      pileQuestions: [{ id: 'pile-q' }],
-      litHooks,
-      hasher: 'hash-worker',
-      resolveDecryptSurveyId,
-      getProviderKind,
-    })).toEqual({
+    expect(
+      buildQuestionDecryptExecutionContext({
+        baselineForDecrypt: { answers: {} },
+        questionId: 'Q1',
+        provider,
+        account: '0xabc',
+        network: { id: 84532 },
+        questionPool: [{ id: 'pool-q' }],
+        pileQuestions: [{ id: 'pile-q' }],
+        litHooks,
+        hasher: 'hash-worker',
+        resolveDecryptSurveyId,
+        getProviderKind,
+      }),
+    ).toEqual({
       providerKind: 'browser',
       chainId: 84532,
       surveyId: 'survey-1',
@@ -722,28 +808,32 @@ describe('surveyToolDecryptFlow', () => {
     const resolveDecryptSurveyId = jest.fn(() => 'survey-bulk');
     const getProviderKind = jest.fn(() => 'browser');
 
-    expect(collectQuestionRatingEnvelopesByQid({
-      responses: [
-        { questionID: 'q1', importanceEncrypted: 'imp-1' },
-        { questionID: 'q2', convictionEncrypted: 'conv-2' },
-      ],
-    })).toEqual({
+    expect(
+      collectQuestionRatingEnvelopesByQid({
+        responses: [
+          { questionID: 'q1', importanceEncrypted: 'imp-1' },
+          { questionID: 'q2', convictionEncrypted: 'conv-2' },
+        ],
+      }),
+    ).toEqual({
       q1: { importanceEncrypted: 'imp-1', convictionEncrypted: '' },
       q2: { importanceEncrypted: '', convictionEncrypted: 'conv-2' },
     });
 
-    expect(carryForwardSurveyQuestionRatings(
-      {
-        answers: {},
-        importance: { q1: null },
-        conviction: {},
-        additionalComments: {},
-      },
-      {
-        importance: { q1: 5 },
-        conviction: { q1: 9 },
-      },
-    )).toEqual({
+    expect(
+      carryForwardSurveyQuestionRatings(
+        {
+          answers: {},
+          importance: { q1: null },
+          conviction: {},
+          additionalComments: {},
+        },
+        {
+          importance: { q1: 5 },
+          conviction: { q1: 9 },
+        },
+      ),
+    ).toEqual({
       answers: {},
       importance: { q1: 5 },
       conviction: { q1: 9 },
@@ -781,19 +871,21 @@ describe('surveyToolDecryptFlow', () => {
       q2: { importanceEncrypted: '', convictionEncrypted: 'conv-2' },
     });
 
-    expect(buildSurveyDecryptExecutionContext({
-      sourceSlice,
-      questionId: 'Q1',
-      provider,
-      account: '0xabc',
-      network: { id: 84532 },
-      questionPool: [{ id: 'pool-q' }],
-      pileQuestions: [{ id: 'pile-q' }],
-      litHooks,
-      hasher: 'hash-worker',
-      resolveDecryptSurveyId,
-      getProviderKind,
-    })).toEqual({
+    expect(
+      buildSurveyDecryptExecutionContext({
+        sourceSlice,
+        questionId: 'Q1',
+        provider,
+        account: '0xabc',
+        network: { id: 84532 },
+        questionPool: [{ id: 'pool-q' }],
+        pileQuestions: [{ id: 'pile-q' }],
+        litHooks,
+        hasher: 'hash-worker',
+        resolveDecryptSurveyId,
+        getProviderKind,
+      }),
+    ).toEqual({
       providerKind: 'browser',
       chainId: 84532,
       surveyId: 'survey-bulk',
@@ -826,14 +918,16 @@ describe('surveyToolDecryptFlow', () => {
       ],
     };
 
-    expect(buildSurveyDecryptAttemptSourceInputs({
-      decryptContext: {
-        surveyIndex: 1,
-        sessionSlug: '',
-      },
-      state,
-      getEffectiveDraftSlug: () => 'fallback-slug',
-    })).toEqual({
+    expect(
+      buildSurveyDecryptAttemptSourceInputs({
+        decryptContext: {
+          surveyIndex: 1,
+          sessionSlug: '',
+        },
+        state,
+        getEffectiveDraftSlug: () => 'fallback-slug',
+      }),
+    ).toEqual({
       surveyIndex: 1,
       slug: 'fallback-slug',
       fallbackUserAnswers: state.userAnswers,
@@ -841,14 +935,16 @@ describe('surveyToolDecryptFlow', () => {
       previousStateSlice: state.surveysResponseState[1],
     });
 
-    expect(buildSurveyDecryptAttemptSourceInputs({
-      decryptContext: {
-        surveyIndex: 3,
-        sessionSlug: 'session-slug',
-      },
-      state,
-      getEffectiveDraftSlug: () => 'fallback-slug',
-    })).toEqual({
+    expect(
+      buildSurveyDecryptAttemptSourceInputs({
+        decryptContext: {
+          surveyIndex: 3,
+          sessionSlug: 'session-slug',
+        },
+        state,
+        getEffectiveDraftSlug: () => 'fallback-slug',
+      }),
+    ).toEqual({
       surveyIndex: 3,
       slug: 'session-slug',
       fallbackUserAnswers: state.userAnswers,
@@ -862,18 +958,20 @@ describe('surveyToolDecryptFlow', () => {
     });
 
     const staleEvents = [];
-    expect(applySurveyDecryptStaleStatus({
-      context: { account: '0xabc' },
-      attemptId: 4,
-      isDecryptContextCurrent: () => false,
-      canUpdateSurveyDecryptAttempt: (context, attemptId) => {
-        staleEvents.push({ canUpdate: context, attemptId });
-        return true;
-      },
-      finishSurveyDecryptAttempt: (attemptId) => staleEvents.push({ finish: attemptId }),
-      buildSurveyDecryptStaleState: () => ({ isDecrypting: false }),
-      setSurveyDecryptStaleState: (patch) => staleEvents.push({ patch }),
-    })).toEqual({
+    expect(
+      applySurveyDecryptStaleStatus({
+        context: { account: '0xabc' },
+        attemptId: 4,
+        isDecryptContextCurrent: () => false,
+        canUpdateSurveyDecryptAttempt: (context, attemptId) => {
+          staleEvents.push({ canUpdate: context, attemptId });
+          return true;
+        },
+        finishSurveyDecryptAttempt: (attemptId) => staleEvents.push({ finish: attemptId }),
+        buildSurveyDecryptStaleState: () => ({ isDecrypting: false }),
+        setSurveyDecryptStaleState: (patch) => staleEvents.push({ patch }),
+      }),
+    ).toEqual({
       shouldReturn: true,
       reason: 'stale-context-applied',
     });
@@ -884,24 +982,28 @@ describe('surveyToolDecryptFlow', () => {
     ]);
 
     const skippedEvents = [];
-    expect(applySurveyDecryptStaleStatus({
-      context: { account: '0xabc' },
-      attemptId: 5,
-      isDecryptContextCurrent: () => false,
-      canUpdateSurveyDecryptAttempt: () => false,
-      finishSurveyDecryptAttempt: (attemptId) => skippedEvents.push({ finish: attemptId }),
-      setSurveyDecryptStaleState: (patch) => skippedEvents.push({ patch }),
-    })).toEqual({
+    expect(
+      applySurveyDecryptStaleStatus({
+        context: { account: '0xabc' },
+        attemptId: 5,
+        isDecryptContextCurrent: () => false,
+        canUpdateSurveyDecryptAttempt: () => false,
+        finishSurveyDecryptAttempt: (attemptId) => skippedEvents.push({ finish: attemptId }),
+        setSurveyDecryptStaleState: (patch) => skippedEvents.push({ patch }),
+      }),
+    ).toEqual({
       shouldReturn: true,
       reason: 'stale-context-skipped',
     });
     expect(skippedEvents).toEqual([]);
 
-    expect(applySurveyDecryptStaleStatus({
-      context: { account: '0xabc' },
-      attemptId: 6,
-      isDecryptContextCurrent: () => true,
-    })).toEqual({
+    expect(
+      applySurveyDecryptStaleStatus({
+        context: { account: '0xabc' },
+        attemptId: 6,
+        isDecryptContextCurrent: () => true,
+      }),
+    ).toEqual({
       shouldReturn: false,
       reason: 'current-context',
     });
@@ -916,29 +1018,31 @@ describe('surveyToolDecryptFlow', () => {
       convictionEncrypted: 'conv-latest',
     });
 
-    await expect(hydrateLatestQuestionDecryptState(
-      {
-        questionId: 'q1',
-        fieldToDecrypt: 'both',
-        baselineForDecrypt: {
-          answers: { q1: { value: '*', encrypted: true } },
-          additionalComments: { q1: { value: '*', encrypted: true } },
+    await expect(
+      hydrateLatestQuestionDecryptState(
+        {
+          questionId: 'q1',
+          fieldToDecrypt: 'both',
+          baselineForDecrypt: {
+            answers: { q1: { value: '*', encrypted: true } },
+            additionalComments: { q1: { value: '*', encrypted: true } },
+          },
+          initialRatingEnvelopes: { importanceEncrypted: '', convictionEncrypted: '' },
+          account: '0xabc',
+          responderForLatest: '0xdef',
+          sessionSlug: 'demo-slug',
+          networkID: '84532',
         },
-        initialRatingEnvelopes: { importanceEncrypted: '', convictionEncrypted: '' },
-        account: '0xabc',
-        responderForLatest: '0xdef',
-        sessionSlug: 'demo-slug',
-        networkID: '84532',
-      },
-      {
-        getQuestionFieldDecryptSelection,
-        readQuestionsCache: jest.fn(() => ({ cached: true })),
-        getLatestQuestionResponse,
-        mergeLatestEncryptedQuestionFields,
-        mergeQuestionRatingEnvelopeState,
-        logWarn: jest.fn(),
-      },
-    )).resolves.toEqual({
+        {
+          getQuestionFieldDecryptSelection,
+          readQuestionsCache: jest.fn(() => ({ cached: true })),
+          getLatestQuestionResponse,
+          mergeLatestEncryptedQuestionFields,
+          mergeQuestionRatingEnvelopeState,
+          logWarn: jest.fn(),
+        },
+      ),
+    ).resolves.toEqual({
       baselineForDecrypt: {
         answers: {
           q1: {
@@ -963,12 +1067,7 @@ describe('surveyToolDecryptFlow', () => {
       },
     });
 
-    expect(getLatestQuestionResponse).toHaveBeenCalledWith(
-      '0xdef',
-      'q1',
-      '84532',
-      { cached: true },
-    );
+    expect(getLatestQuestionResponse).toHaveBeenCalledWith('0xdef', 'q1', '84532', { cached: true });
   });
 
   it('prepares viewed decrypt state from the route payload and latest envelope hydration', async () => {
@@ -987,24 +1086,26 @@ describe('surveyToolDecryptFlow', () => {
       },
     });
 
-    await expect(prepareViewedQuestionDecryptState(
-      {
-        questionId: 'Q1',
-        fieldToDecrypt: 'answer',
-        responseOverride: {
-          questionID: 'q1',
-          importanceEncrypted: 'imp-stale',
+    await expect(
+      prepareViewedQuestionDecryptState(
+        {
+          questionId: 'Q1',
+          fieldToDecrypt: 'answer',
+          responseOverride: {
+            questionID: 'q1',
+            importanceEncrypted: 'imp-stale',
+          },
+          account: '0xabc',
+          responderForLatest: '0xdef',
+          sessionSlug: 'demo-slug',
+          networkID: '84532',
         },
-        account: '0xabc',
-        responderForLatest: '0xdef',
-        sessionSlug: 'demo-slug',
-        networkID: '84532',
-      },
-      {
-        buildViewedResponseDecryptBaseline,
-        hydrateLatestQuestionDecryptState,
-      },
-    )).resolves.toEqual({
+        {
+          buildViewedResponseDecryptBaseline,
+          hydrateLatestQuestionDecryptState,
+        },
+      ),
+    ).resolves.toEqual({
       questionId: 'q1',
       baselineForDecrypt: {
         answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'fresh-answer' } },
@@ -1045,25 +1146,27 @@ describe('surveyToolDecryptFlow', () => {
       },
     });
 
-    await expect(prepareSelfQuestionDecryptState(
-      {
-        surveyIndex: 0,
-        questionId: 'Q1',
-        fieldToDecrypt: 'answer',
-        responseOverride: { questionID: 'q1' },
-        userAnswers: { responses: [] },
-        account: '0xabc',
-        sessionSlug: 'demo-slug',
-        networkID: '84532',
-      },
-      {
-        buildSelfQuestionDecryptBaseline,
-        mergeQuestionResponseOverrideIntoDecryptSlice,
-        mergeQuestionRatingEnvelopeState,
-        hydrateLatestQuestionDecryptState,
-        logWarn: jest.fn(),
-      },
-    )).resolves.toEqual({
+    await expect(
+      prepareSelfQuestionDecryptState(
+        {
+          surveyIndex: 0,
+          questionId: 'Q1',
+          fieldToDecrypt: 'answer',
+          responseOverride: { questionID: 'q1' },
+          userAnswers: { responses: [] },
+          account: '0xabc',
+          sessionSlug: 'demo-slug',
+          networkID: '84532',
+        },
+        {
+          buildSelfQuestionDecryptBaseline,
+          mergeQuestionResponseOverrideIntoDecryptSlice,
+          mergeQuestionRatingEnvelopeState,
+          hydrateLatestQuestionDecryptState,
+          logWarn: jest.fn(),
+        },
+      ),
+    ).resolves.toEqual({
       questionId: 'q1',
       baselineSlice: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
       baselineForDecrypt: {
@@ -1100,17 +1203,19 @@ describe('surveyToolDecryptFlow', () => {
       opts: { providerKind: 'browser' },
     }));
 
-    expect(prepareQuestionDecryptAttempt(
-      {
-        questionId: 'q1',
-        fieldToDecrypt: 'answer',
-        baselineForDecrypt: { answers: { q1: { value: 'clear' } } },
-      },
-      {
-        getQuestionFieldDecryptSelection,
-        buildQuestionDecryptExecutionContext,
-      },
-    )).toEqual({
+    expect(
+      prepareQuestionDecryptAttempt(
+        {
+          questionId: 'q1',
+          fieldToDecrypt: 'answer',
+          baselineForDecrypt: { answers: { q1: { value: 'clear' } } },
+        },
+        {
+          getQuestionFieldDecryptSelection,
+          buildQuestionDecryptExecutionContext,
+        },
+      ),
+    ).toEqual({
       blockedReason: 'no-masked-field',
       shouldDecrypt: false,
       decryptSelection: {
@@ -1120,17 +1225,19 @@ describe('surveyToolDecryptFlow', () => {
       },
     });
 
-    expect(prepareQuestionDecryptAttempt(
-      {
-        questionId: 'q1',
-        fieldToDecrypt: 'answer',
-        baselineForDecrypt: { answers: { q1: { value: '*', encrypted: true } } },
-      },
-      {
-        getQuestionFieldDecryptSelection,
-        buildQuestionDecryptExecutionContext,
-      },
-    )).toEqual({
+    expect(
+      prepareQuestionDecryptAttempt(
+        {
+          questionId: 'q1',
+          fieldToDecrypt: 'answer',
+          baselineForDecrypt: { answers: { q1: { value: '*', encrypted: true } } },
+        },
+        {
+          getQuestionFieldDecryptSelection,
+          buildQuestionDecryptExecutionContext,
+        },
+      ),
+    ).toEqual({
       blockedReason: '',
       shouldDecrypt: true,
       decryptSelection: {
@@ -1182,23 +1289,25 @@ describe('surveyToolDecryptFlow', () => {
       decryptedConviction: 9,
     });
 
-    await expect(finalizeQuestionDecryptAttempt(
-      {
-        questionId: 'Q1',
-        fieldToDecrypt: 'both',
-        baselineForDecrypt: { answers: { q1: { value: '*', encrypted: true } } },
-        ratingEnvelopes: { importanceEncrypted: 'imp-env' },
-        account: '0xabc',
-        providerLike: { provider: true },
-        chainId: 84532,
-        lit: { getKey: jest.fn() },
-        opts: { providerKind: 'browser' },
-      },
-      {
-        decryptSingleField,
-        decryptQuestionRatingEnvelopes,
-      },
-    )).resolves.toEqual({
+    await expect(
+      finalizeQuestionDecryptAttempt(
+        {
+          questionId: 'Q1',
+          fieldToDecrypt: 'both',
+          baselineForDecrypt: { answers: { q1: { value: '*', encrypted: true } } },
+          ratingEnvelopes: { importanceEncrypted: 'imp-env' },
+          account: '0xabc',
+          providerLike: { provider: true },
+          chainId: 84532,
+          lit: { getKey: jest.fn() },
+          opts: { providerKind: 'browser' },
+        },
+        {
+          decryptSingleField,
+          decryptQuestionRatingEnvelopes,
+        },
+      ),
+    ).resolves.toEqual({
       decryptedStateSlice: {
         answers: { q1: { value: 'clear answer' } },
         additionalComments: { q1: { value: 'clear notes' } },
@@ -1232,22 +1341,24 @@ describe('surveyToolDecryptFlow', () => {
       return null;
     });
 
-    await expect(decryptQuestionRatingEnvelopeMap(
-      {
-        q1: { importanceEncrypted: 'importance-q1' },
-        q2: { convictionEncrypted: 'conviction-q2' },
-      },
-      {
-        account: '0xabc',
-        chainId: 84532,
-        lit: { getKey: jest.fn() },
-        providerLike: { provider: true },
-      },
-      {
-        decryptEnvelopeValue,
-        logWarn: jest.fn(),
-      },
-    )).resolves.toEqual({
+    await expect(
+      decryptQuestionRatingEnvelopeMap(
+        {
+          q1: { importanceEncrypted: 'importance-q1' },
+          q2: { convictionEncrypted: 'conviction-q2' },
+        },
+        {
+          account: '0xabc',
+          chainId: 84532,
+          lit: { getKey: jest.fn() },
+          providerLike: { provider: true },
+        },
+        {
+          decryptEnvelopeValue,
+          logWarn: jest.fn(),
+        },
+      ),
+    ).resolves.toEqual({
       decryptedImportanceFromEnv: { q1: 7 },
       decryptedConvictionFromEnv: { q2: 9 },
     });
@@ -1267,24 +1378,26 @@ describe('surveyToolDecryptFlow', () => {
       additionalComments: { q1: { value: 'clear notes', encrypted: true } },
     }));
 
-    await expect(finalizeSurveyDecryptAttempt(
-      {
-        sourceSlice: { answers: { q1: { value: '*', encrypted: true } } },
-        ratingEnvelopesByQid: { q1: { importanceEncrypted: 'imp-env' } },
-        account: '0xabc',
-        providerLike: { provider: true },
-        chainId: 84532,
-        lit: { getKey: jest.fn() },
-        poolForDecrypt: [{ id: 'q1' }],
-        opts: { providerKind: 'browser' },
-        previousStateSlice: { answers: { q1: { encrypted: true } } },
-      },
-      {
-        decryptMultipleAnswers,
-        decryptQuestionRatingEnvelopeMap,
-        normalizeBulkDecryptedSliceForSurveyState,
-      },
-    )).resolves.toEqual({
+    await expect(
+      finalizeSurveyDecryptAttempt(
+        {
+          sourceSlice: { answers: { q1: { value: '*', encrypted: true } } },
+          ratingEnvelopesByQid: { q1: { importanceEncrypted: 'imp-env' } },
+          account: '0xabc',
+          providerLike: { provider: true },
+          chainId: 84532,
+          lit: { getKey: jest.fn() },
+          poolForDecrypt: [{ id: 'q1' }],
+          opts: { providerKind: 'browser' },
+          previousStateSlice: { answers: { q1: { encrypted: true } } },
+        },
+        {
+          decryptMultipleAnswers,
+          decryptQuestionRatingEnvelopeMap,
+          normalizeBulkDecryptedSliceForSurveyState,
+        },
+      ),
+    ).resolves.toEqual({
       normalizedDecryptedSlice: {
         answers: { q1: { value: 'clear answer', encrypted: true } },
         additionalComments: { q1: { value: 'clear notes', encrypted: true } },
@@ -1323,59 +1436,60 @@ describe('surveyToolDecryptFlow', () => {
     const getLatestQuestionResponse = jest.fn().mockResolvedValue({ answer: { value: '*' } });
     const getLatestSurveyResponse = jest.fn().mockResolvedValue({ responses: [{ questionID: 'q1' }] });
 
-    await expect(resolveLatestSurveyDecryptResponse(
-      {
-        singleQuestionMode: true,
-        questionId: ' Q1 ',
-        account: '0xabc',
-        providerLike: { provider: true },
-        slug: 'demo-slug',
-        fallbackUserAnswers: { fallback: true },
-      },
-      {
-        getLatestQuestionResponse,
-        getLatestSurveyResponse,
-      },
-    )).resolves.toEqual({ answer: { value: '*' } });
+    await expect(
+      resolveLatestSurveyDecryptResponse(
+        {
+          singleQuestionMode: true,
+          questionId: ' Q1 ',
+          account: '0xabc',
+          providerLike: { provider: true },
+          slug: 'demo-slug',
+          fallbackUserAnswers: { fallback: true },
+        },
+        {
+          getLatestQuestionResponse,
+          getLatestSurveyResponse,
+        },
+      ),
+    ).resolves.toEqual({ answer: { value: '*' } });
 
-    expect(getLatestQuestionResponse).toHaveBeenCalledWith(
-      { provider: true },
-      '0xabc',
-      'q1',
-      'demo-slug',
-    );
+    expect(getLatestQuestionResponse).toHaveBeenCalledWith({ provider: true }, '0xabc', 'q1', 'demo-slug');
 
-    await expect(resolveLatestSurveyDecryptResponse(
-      {
-        singleQuestionMode: false,
-        account: '0xabc',
-        surveyId: 'survey-1',
-        fallbackUserAnswers: { fallback: true },
-      },
-      {
-        getLatestQuestionResponse,
-        getLatestSurveyResponse,
-      },
-    )).resolves.toEqual({ responses: [{ questionID: 'q1' }] });
+    await expect(
+      resolveLatestSurveyDecryptResponse(
+        {
+          singleQuestionMode: false,
+          account: '0xabc',
+          surveyId: 'survey-1',
+          fallbackUserAnswers: { fallback: true },
+        },
+        {
+          getLatestQuestionResponse,
+          getLatestSurveyResponse,
+        },
+      ),
+    ).resolves.toEqual({ responses: [{ questionID: 'q1' }] });
 
     expect(getLatestSurveyResponse).toHaveBeenCalledWith('0xabc', 'survey-1');
 
     getLatestQuestionResponse.mockResolvedValueOnce(null);
 
-    await expect(resolveLatestSurveyDecryptResponse(
-      {
-        singleQuestionMode: true,
-        questionId: 'q2',
-        account: '0xabc',
-        providerLike: { provider: true },
-        slug: 'demo-slug',
-        fallbackUserAnswers: { fallback: true },
-      },
-      {
-        getLatestQuestionResponse,
-        getLatestSurveyResponse,
-      },
-    )).resolves.toEqual({ fallback: true });
+    await expect(
+      resolveLatestSurveyDecryptResponse(
+        {
+          singleQuestionMode: true,
+          questionId: 'q2',
+          account: '0xabc',
+          providerLike: { provider: true },
+          slug: 'demo-slug',
+          fallbackUserAnswers: { fallback: true },
+        },
+        {
+          getLatestQuestionResponse,
+          getLatestSurveyResponse,
+        },
+      ),
+    ).resolves.toEqual({ fallback: true });
   });
 
   it('prepares bulk survey decrypt attempts from latest source, source slice, and execution context', async () => {
@@ -1393,24 +1507,26 @@ describe('surveyToolDecryptFlow', () => {
       poolForDecrypt: [{ id: 'q1' }],
     }));
 
-    await expect(prepareSurveyDecryptAttempt(
-      {
-        singleQuestionMode: true,
-        questionId: 'Q1',
-        account: '0xabc',
-        providerLike: { provider: true },
-        slug: 'demo-slug',
-        surveyId: 'survey-1',
-        fallbackUserAnswers: { fallback: true },
-        fallbackSourceSlice: { answers: {} },
-        previousStateSlice: { answers: { q1: { encrypted: true } } },
-      },
-      {
-        resolveLatestSurveyDecryptResponse,
-        buildSurveyDecryptSourceState,
-        buildSurveyDecryptExecutionContext,
-      },
-    )).resolves.toEqual({
+    await expect(
+      prepareSurveyDecryptAttempt(
+        {
+          singleQuestionMode: true,
+          questionId: 'Q1',
+          account: '0xabc',
+          providerLike: { provider: true },
+          slug: 'demo-slug',
+          surveyId: 'survey-1',
+          fallbackUserAnswers: { fallback: true },
+          fallbackSourceSlice: { answers: {} },
+          previousStateSlice: { answers: { q1: { encrypted: true } } },
+        },
+        {
+          resolveLatestSurveyDecryptResponse,
+          buildSurveyDecryptSourceState,
+          buildSurveyDecryptExecutionContext,
+        },
+      ),
+    ).resolves.toEqual({
       latest: { responses: [{ questionID: 'q1' }] },
       sourceSlice: { answers: { q1: { value: '*' } } },
       ratingEnvelopesByQid: { q1: { importanceEncrypted: 'imp-env' } },
@@ -1434,10 +1550,7 @@ describe('surveyToolDecryptFlow', () => {
       { answers: {} },
       { answers: { q1: { encrypted: true } } },
     );
-    expect(buildSurveyDecryptExecutionContext).toHaveBeenCalledWith(
-      { answers: { q1: { value: '*' } } },
-      'Q1',
-    );
+    expect(buildSurveyDecryptExecutionContext).toHaveBeenCalledWith({ answers: { q1: { value: '*' } } }, 'Q1');
   });
 
   it('normalizes decrypt slice shape and builds viewed-response baselines', () => {
@@ -1446,21 +1559,21 @@ describe('surveyToolDecryptFlow', () => {
       additionalComments: null,
     }));
 
-    expect(ensureQuestionDecryptSliceShape({
-      answers: { q1: { value: '*' } },
-      additionalComments: null,
-    })).toEqual({
+    expect(
+      ensureQuestionDecryptSliceShape({
+        answers: { q1: { value: '*' } },
+        additionalComments: null,
+      }),
+    ).toEqual({
       answers: { q1: { value: '*' } },
       additionalComments: {},
       importance: {},
       conviction: {},
     });
 
-    expect(buildViewedResponseDecryptBaseline(
-      { questionId: 'Q1', answer: { value: '*' } },
-      'q1',
-      buildSliceFromUserAnswers,
-    )).toEqual({
+    expect(
+      buildViewedResponseDecryptBaseline({ questionId: 'Q1', answer: { value: '*' } }, 'q1', buildSliceFromUserAnswers),
+    ).toEqual({
       answers: { q1: { value: '*' } },
       additionalComments: {},
       importance: {},
@@ -1474,14 +1587,16 @@ describe('surveyToolDecryptFlow', () => {
       additional: { value: '' },
     });
 
-    expect(normalizeSingleQuestionViewedResponse({
-      questionID: 'Q1',
-      response: {
-        answerText: 'answer text',
-        additionalComment: 'notes',
-      },
-      importance: 3,
-    })).toEqual({
+    expect(
+      normalizeSingleQuestionViewedResponse({
+        questionID: 'Q1',
+        response: {
+          answerText: 'answer text',
+          additionalComment: 'notes',
+        },
+        importance: 3,
+      }),
+    ).toEqual({
       questionID: 'Q1',
       response: {
         answerText: 'answer text',
@@ -1496,16 +1611,15 @@ describe('surveyToolDecryptFlow', () => {
 
     expect(normalizeSingleQuestionViewedResponse({ random: 'shape' })).toBeNull();
 
-    expect(getViewedResponseOverrideForQuestion(
-      'q1',
-      {
-        responses: [
-          { questionID: 'q2', answer: { value: 'skip' } },
-          { answer: { value: 'keep' } },
-        ],
-      },
-      '0xABC',
-    )).toEqual({
+    expect(
+      getViewedResponseOverrideForQuestion(
+        'q1',
+        {
+          responses: [{ questionID: 'q2', answer: { value: 'skip' } }, { answer: { value: 'keep' } }],
+        },
+        '0xABC',
+      ),
+    ).toEqual({
       questionID: 'q1',
       answer: { value: 'keep' },
       responder: '0xabc',
@@ -1519,17 +1633,19 @@ describe('surveyToolDecryptFlow', () => {
       answer: { value: '*' },
     }));
 
-    expect(resolveQuestionDecryptHandlingMode(
-      {
-        questionId: 'q1',
-        responseOverride: null,
-        viewerAccount: '0xabc',
-        viewedResponder: '0xdef',
-      },
-      {
-        getViewedResponseOverrideForQuestion,
-      },
-    )).toEqual({
+    expect(
+      resolveQuestionDecryptHandlingMode(
+        {
+          questionId: 'q1',
+          responseOverride: null,
+          viewerAccount: '0xabc',
+          viewedResponder: '0xdef',
+        },
+        {
+          getViewedResponseOverrideForQuestion,
+        },
+      ),
+    ).toEqual({
       viewerLower: '0xabc',
       viewedResponderLower: '0xdef',
       effectiveResponseOverride: {
@@ -1540,17 +1656,19 @@ describe('surveyToolDecryptFlow', () => {
       isViewedResponseMode: true,
     });
 
-    expect(resolveQuestionDecryptHandlingMode(
-      {
-        questionId: 'q1',
-        responseOverride: { questionID: 'q1', answer: { value: '*' } },
-        viewerAccount: '0xabc',
-        viewedResponder: '0xabc',
-      },
-      {
-        getViewedResponseOverrideForQuestion,
-      },
-    )).toEqual({
+    expect(
+      resolveQuestionDecryptHandlingMode(
+        {
+          questionId: 'q1',
+          responseOverride: { questionID: 'q1', answer: { value: '*' } },
+          viewerAccount: '0xabc',
+          viewedResponder: '0xabc',
+        },
+        {
+          getViewedResponseOverrideForQuestion,
+        },
+      ),
+    ).toEqual({
       viewerLower: '0xabc',
       viewedResponderLower: '0xabc',
       effectiveResponseOverride: {
@@ -1565,9 +1683,12 @@ describe('surveyToolDecryptFlow', () => {
   it('deduplicates in-flight decrypt tasks by key on the provided map', async () => {
     const inFlightMap = new Map();
     let resolveTask;
-    const runner = jest.fn(() => new Promise((resolve) => {
-      resolveTask = resolve;
-    }));
+    const runner = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveTask = resolve;
+        }),
+    );
 
     const first = runDedupedDecryptTask(inFlightMap, 'task-key', runner);
     const second = runDedupedDecryptTask(inFlightMap, 'task-key', runner);
@@ -1586,50 +1707,58 @@ describe('surveyToolDecryptFlow', () => {
     const scopedEnvelope = JSON.stringify({ aad: { surveyId: '0xscoped' } });
     const fallbackEnvelope = JSON.stringify({ aad: { surveyId: '0xfallback' } });
 
-    expect(resolveDecryptSurveyId(
-      {
-        answers: {
-          q1: { encryptedPortion: scopedEnvelope },
+    expect(
+      resolveDecryptSurveyId(
+        {
+          answers: {
+            q1: { encryptedPortion: scopedEnvelope },
+          },
         },
-      },
-      {
-        propSurveyId: '0xprop',
-        questionId: 'q1',
-        defaultSurveyId: '0x0000',
-      },
-    )).toBe('0xprop');
-
-    expect(resolveDecryptSurveyId(
-      {
-        answers: {
-          q1: { encryptedPortion: scopedEnvelope },
+        {
+          propSurveyId: '0xprop',
+          questionId: 'q1',
+          defaultSurveyId: '0x0000',
         },
-      },
-      {
-        questionId: 'q1',
-        defaultSurveyId: '0x0000',
-      },
-    )).toBe('0xscoped');
+      ),
+    ).toBe('0xprop');
 
-    expect(resolveDecryptSurveyId(
-      {
-        answers: {
-          q2: { encryptedPortion: fallbackEnvelope },
+    expect(
+      resolveDecryptSurveyId(
+        {
+          answers: {
+            q1: { encryptedPortion: scopedEnvelope },
+          },
         },
-      },
-      {
-        questionId: 'q1',
-        defaultSurveyId: '0x0000',
-      },
-    )).toBe('0xfallback');
+        {
+          questionId: 'q1',
+          defaultSurveyId: '0x0000',
+        },
+      ),
+    ).toBe('0xscoped');
 
-    expect(resolveDecryptSurveyId(
-      { answers: {} },
-      {
-        questionId: 'q1',
-        defaultSurveyId: '0x0000',
-      },
-    )).toBe('0x0000');
+    expect(
+      resolveDecryptSurveyId(
+        {
+          answers: {
+            q2: { encryptedPortion: fallbackEnvelope },
+          },
+        },
+        {
+          questionId: 'q1',
+          defaultSurveyId: '0x0000',
+        },
+      ),
+    ).toBe('0xfallback');
+
+    expect(
+      resolveDecryptSurveyId(
+        { answers: {} },
+        {
+          questionId: 'q1',
+          defaultSurveyId: '0x0000',
+        },
+      ),
+    ).toBe('0x0000');
   });
 
   it('builds viewed-response decrypt success state without mutating unrelated records', () => {
@@ -1664,27 +1793,29 @@ describe('surveyToolDecryptFlow', () => {
       ],
     });
 
-    expect(buildViewedResponseDecryptSuccessState(
-      {
-        parsedViewAddressAnswers: {
-          answer: { value: '*' },
-          additional: { value: '*' },
+    expect(
+      buildViewedResponseDecryptSuccessState(
+        {
+          parsedViewAddressAnswers: {
+            answer: { value: '*' },
+            additional: { value: '*' },
+          },
+          viewAddressAnswers: '{"stale":true}',
+          decryptingByKey: { 'q1:answer': true, 'q1:additional': true },
         },
-        viewAddressAnswers: '{"stale":true}',
-        decryptingByKey: { 'q1:answer': true, 'q1:additional': true },
-      },
-      {
-        questionId: 'q1',
-        clearMode: 'both',
-        didUpdate: true,
-        decryptedStateSlice: {
-          answers: { q1: { value: 'clear answer' } },
-          additionalComments: { q1: { value: 'clear notes' } },
+        {
+          questionId: 'q1',
+          clearMode: 'both',
+          didUpdate: true,
+          decryptedStateSlice: {
+            answers: { q1: { value: 'clear answer' } },
+            additionalComments: { q1: { value: 'clear notes' } },
+          },
+          decryptedImportance: 7,
+          decryptedConviction: 9,
         },
-        decryptedImportance: 7,
-        decryptedConviction: 9,
-      },
-    )).toEqual({
+      ),
+    ).toEqual({
       parsedViewAddressAnswers: {
         answer: { value: 'clear answer' },
         additional: { value: 'clear notes' },
@@ -1704,36 +1835,35 @@ describe('surveyToolDecryptFlow', () => {
 
   it('preserves viewed-response state identity and serialized text when decrypted values do not change', () => {
     const parsedViewAddressAnswers = {
-      responses: [
-        { questionID: 'q1', answer: { value: 'clear answer' } },
-      ],
+      responses: [{ questionID: 'q1', answer: { value: 'clear answer' } }],
     };
 
-    expect(applyDecryptedQuestionResponseValuesToContainer(
-      parsedViewAddressAnswers,
-      {
+    expect(
+      applyDecryptedQuestionResponseValuesToContainer(parsedViewAddressAnswers, {
         questionId: 'q1',
         decryptedStateSlice: {
           answers: { q1: { value: 'clear answer' } },
         },
-      },
-    )).toBe(parsedViewAddressAnswers);
+      }),
+    ).toBe(parsedViewAddressAnswers);
 
-    expect(buildViewedResponseDecryptSuccessState(
-      {
-        parsedViewAddressAnswers,
-        viewAddressAnswers: '{"already":"serialized"}',
-        decryptingByKey: { 'q1:answer': true },
-      },
-      {
-        questionId: 'q1',
-        clearMode: 'answer',
-        didUpdate: true,
-        decryptedStateSlice: {
-          answers: { q1: { value: 'clear answer' } },
+    expect(
+      buildViewedResponseDecryptSuccessState(
+        {
+          parsedViewAddressAnswers,
+          viewAddressAnswers: '{"already":"serialized"}',
+          decryptingByKey: { 'q1:answer': true },
         },
-      },
-    )).toEqual({
+        {
+          questionId: 'q1',
+          clearMode: 'answer',
+          didUpdate: true,
+          decryptedStateSlice: {
+            answers: { q1: { value: 'clear answer' } },
+          },
+        },
+      ),
+    ).toEqual({
       parsedViewAddressAnswers,
       viewAddressAnswers: '{"already":"serialized"}',
       isDecrypting: false,
@@ -1742,41 +1872,47 @@ describe('surveyToolDecryptFlow', () => {
   });
 
   it('builds self-response decrypt success state and syncs the edit baseline', () => {
-    expect(buildSelfQuestionDecryptSuccessState(
-      {
-        surveysResponseState: [{
-          answers: { q1: { value: '*', encrypted: true } },
-          importance: { q1: 1 },
-          conviction: { q1: 2 },
-          additionalComments: { q1: { value: '*', encrypted: true } },
-        }],
-        decryptingByKey: { 'q1:answer': true, 'q1:additional': true },
-        editBaseline: null,
-      },
-      {
-        surveyIndex: 0,
-        questionId: 'q1',
-        clearMode: 'both',
-        didUpdate: true,
-        baselineSlice: {
-          answers: { q1: { value: '*', encryptedPortion: 'ans-env' } },
-          additionalComments: { q1: { value: '*', encrypted: true } },
+    expect(
+      buildSelfQuestionDecryptSuccessState(
+        {
+          surveysResponseState: [
+            {
+              answers: { q1: { value: '*', encrypted: true } },
+              importance: { q1: 1 },
+              conviction: { q1: 2 },
+              additionalComments: { q1: { value: '*', encrypted: true } },
+            },
+          ],
+          decryptingByKey: { 'q1:answer': true, 'q1:additional': true },
+          editBaseline: null,
         },
-        decryptedStateSlice: {
-          answers: { q1: { value: 'clear answer', zkSalt: 'salt-a' } },
-          additionalComments: { q1: { value: 'clear notes', zkSalt: 'salt-b' } },
+        {
+          surveyIndex: 0,
+          questionId: 'q1',
+          clearMode: 'both',
+          didUpdate: true,
+          baselineSlice: {
+            answers: { q1: { value: '*', encryptedPortion: 'ans-env' } },
+            additionalComments: { q1: { value: '*', encrypted: true } },
+          },
+          decryptedStateSlice: {
+            answers: { q1: { value: 'clear answer', zkSalt: 'salt-a' } },
+            additionalComments: { q1: { value: 'clear notes', zkSalt: 'salt-b' } },
+          },
+          decryptedImportance: 7,
+          decryptedConviction: 9,
         },
-        decryptedImportance: 7,
-        decryptedConviction: 9,
-      },
-      deepClone,
-    )).toEqual({
-      surveysResponseState: [{
-        answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
-        importance: { q1: 7 },
-        conviction: { q1: 9 },
-        additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
-      }],
+        deepClone,
+      ),
+    ).toEqual({
+      surveysResponseState: [
+        {
+          answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
+          importance: { q1: 7 },
+          conviction: { q1: 9 },
+          additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
+        },
+      ],
       isEditing: true,
       displayAnswerMode: false,
       isDecrypting: false,
@@ -1792,33 +1928,39 @@ describe('surveyToolDecryptFlow', () => {
   });
 
   it('builds bulk survey decrypt success state and resets edit diffs', () => {
-    expect(buildSurveyDecryptSuccessState(
-      {
-        surveysResponseState: [{
-          answers: { q1: { value: '*', encrypted: true } },
-          importance: { q1: 1 },
-          conviction: { q1: 2 },
-          additionalComments: { q1: { value: '*', encrypted: true } },
-        }],
-      },
-      {
-        surveyIndex: 0,
-        decryptedSlice: {
+    expect(
+      buildSurveyDecryptSuccessState(
+        {
+          surveysResponseState: [
+            {
+              answers: { q1: { value: '*', encrypted: true } },
+              importance: { q1: 1 },
+              conviction: { q1: 2 },
+              additionalComments: { q1: { value: '*', encrypted: true } },
+            },
+          ],
+        },
+        {
+          surveyIndex: 0,
+          decryptedSlice: {
+            answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
+            importance: { q1: 4 },
+            additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
+          },
+          decryptedImportanceFromEnv: { q1: 7 },
+          decryptedConvictionFromEnv: { q1: 9 },
+        },
+        deepClone,
+      ),
+    ).toEqual({
+      surveysResponseState: [
+        {
           answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
-          importance: { q1: 4 },
+          importance: { q1: 7 },
+          conviction: { q1: 9 },
           additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
         },
-        decryptedImportanceFromEnv: { q1: 7 },
-        decryptedConvictionFromEnv: { q1: 9 },
-      },
-      deepClone,
-    )).toEqual({
-      surveysResponseState: [{
-        answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
-        importance: { q1: 7 },
-        conviction: { q1: 9 },
-        additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
-      }],
+      ],
       startFresh: false,
       displayAnswerMode: false,
       isEditing: true,
@@ -1836,32 +1978,34 @@ describe('surveyToolDecryptFlow', () => {
   });
 
   it('normalizes bulk decrypted slices to preserve encrypted intent before merge', () => {
-    expect(normalizeBulkDecryptedSliceForSurveyState(
-      {
-        answers: {
-          q1: { value: 'clear answer', zkSalt: 'salt-a' },
-          q2: { value: 'plain answer' },
-        },
-        additionalComments: {
-          q1: { value: 'clear notes', zkSalt: 'salt-b' },
-        },
-      },
-      {
-        previousStateSlice: {
-          answers: { q1: { encrypted: true } },
-          additionalComments: {},
-        },
-        baselineSlice: {
+    expect(
+      normalizeBulkDecryptedSliceForSurveyState(
+        {
           answers: {
-            q1: { value: '*', encryptedPortion: 'ans-env' },
-            q2: { value: 'plain answer', encrypted: false },
+            q1: { value: 'clear answer', zkSalt: 'salt-a' },
+            q2: { value: 'plain answer' },
           },
           additionalComments: {
-            q1: { value: '*', encrypted: true },
+            q1: { value: 'clear notes', zkSalt: 'salt-b' },
           },
         },
-      },
-    )).toEqual({
+        {
+          previousStateSlice: {
+            answers: { q1: { encrypted: true } },
+            additionalComments: {},
+          },
+          baselineSlice: {
+            answers: {
+              q1: { value: '*', encryptedPortion: 'ans-env' },
+              q2: { value: 'plain answer', encrypted: false },
+            },
+            additionalComments: {
+              q1: { value: '*', encrypted: true },
+            },
+          },
+        },
+      ),
+    ).toEqual({
       answers: {
         q1: { value: 'clear answer', zkSalt: 'salt-a', encrypted: true },
         q2: { value: 'plain answer', encrypted: false },
@@ -1873,60 +2017,68 @@ describe('surveyToolDecryptFlow', () => {
   });
 
   it('merges response overrides and latest encrypted question fields', () => {
-    expect(mergeQuestionResponseOverrideIntoDecryptSlice(
-      {
-        answers: { q1: { value: '*', encrypted: false } },
-        additionalComments: { q1: { value: '', encrypted: false } },
-      },
-      'Q1',
-      {
-        answer: { value: '*', encryptedPortion: 'ans-env', hash: 'ans-hash' },
-        additional: { value: 'notes', encrypted: true, hash: 'add-hash' },
-      },
-    )).toEqual({
+    expect(
+      mergeQuestionResponseOverrideIntoDecryptSlice(
+        {
+          answers: { q1: { value: '*', encrypted: false } },
+          additionalComments: { q1: { value: '', encrypted: false } },
+        },
+        'Q1',
+        {
+          answer: { value: '*', encryptedPortion: 'ans-env', hash: 'ans-hash' },
+          additional: { value: 'notes', encrypted: true, hash: 'add-hash' },
+        },
+      ),
+    ).toEqual({
       answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'ans-env', hash: 'ans-hash' } },
       additionalComments: { q1: { value: 'notes', encrypted: true, hash: 'add-hash' } },
     });
 
-    expect(mergeLatestEncryptedQuestionFields(
-      {
-        answers: { q1: { value: '*', encrypted: false, hash: 'old-a' } },
-        additionalComments: { q1: { value: '*', encrypted: true, hash: 'old-b' } },
-      },
-      'Q1',
-      {
-        answer: { encrypted: true, hash: 'new-a', encryptedPortion: 'ans-env' },
-        additional: { encrypted: false, hash: 'new-b', encryptedPortion: 'add-env' },
-      },
-      {
-        includeAnswer: true,
-        includeAdditional: true,
-      },
-    )).toEqual({
+    expect(
+      mergeLatestEncryptedQuestionFields(
+        {
+          answers: { q1: { value: '*', encrypted: false, hash: 'old-a' } },
+          additionalComments: { q1: { value: '*', encrypted: true, hash: 'old-b' } },
+        },
+        'Q1',
+        {
+          answer: { encrypted: true, hash: 'new-a', encryptedPortion: 'ans-env' },
+          additional: { encrypted: false, hash: 'new-b', encryptedPortion: 'add-env' },
+        },
+        {
+          includeAnswer: true,
+          includeAdditional: true,
+        },
+      ),
+    ).toEqual({
       answers: { q1: { value: '*', encrypted: true, hash: 'new-a', encryptedPortion: 'ans-env' } },
       additionalComments: { q1: { value: '*', encrypted: true, hash: 'new-b', encryptedPortion: 'add-env' } },
     });
   });
 
   it('extracts and merges rating envelope state across sources', () => {
-    expect(getQuestionRatingEnvelopes(
-      {
-        responses: [
-          { questionID: 'q2', importanceEncrypted: 'skip-me' },
-          { questionID: 'Q1', convictionEncrypted: 'conv-1' },
-        ],
-      },
-      'q1',
-    )).toEqual({
+    expect(
+      getQuestionRatingEnvelopes(
+        {
+          responses: [
+            { questionID: 'q2', importanceEncrypted: 'skip-me' },
+            { questionID: 'Q1', convictionEncrypted: 'conv-1' },
+          ],
+        },
+        'q1',
+      ),
+    ).toEqual({
       importanceEncrypted: '',
       convictionEncrypted: 'conv-1',
     });
 
-    expect(mergeQuestionRatingEnvelopeState(
-      { importanceEncrypted: 'imp-1', convictionEncrypted: '' },
-      { importanceEncrypted: '', convictionEncrypted: 'conv-2' },
-      'q1',
-    )).toEqual({
+    expect(
+      mergeQuestionRatingEnvelopeState(
+        { importanceEncrypted: 'imp-1', convictionEncrypted: '' },
+        { importanceEncrypted: '', convictionEncrypted: 'conv-2' },
+        'q1',
+      ),
+    ).toEqual({
       importanceEncrypted: 'imp-1',
       convictionEncrypted: 'conv-2',
     });
@@ -1938,20 +2090,22 @@ describe('surveyToolDecryptFlow', () => {
       additionalComments: { q1: { value: 'clear notes', zkSalt: 'salt-b' } },
     };
 
-    expect(applyDecryptedQuestionResponseValues(
-      {
-        answer: { value: '*' },
-        additional: { value: '*' },
-        importance: 1,
-        conviction: 2,
-      },
-      {
-        questionId: 'Q1',
-        decryptedStateSlice,
-        decryptedImportance: 7,
-        decryptedConviction: 9,
-      },
-    )).toEqual({
+    expect(
+      applyDecryptedQuestionResponseValues(
+        {
+          answer: { value: '*' },
+          additional: { value: '*' },
+          importance: 1,
+          conviction: 2,
+        },
+        {
+          questionId: 'Q1',
+          decryptedStateSlice,
+          decryptedImportance: 7,
+          decryptedConviction: 9,
+        },
+      ),
+    ).toEqual({
       answer: { value: 'clear answer' },
       additional: { value: 'clear notes' },
       importance: 7,
@@ -1984,18 +2138,20 @@ describe('surveyToolDecryptFlow', () => {
       conviction: { q1: 9 },
     });
 
-    expect(syncDecryptedQuestionIntoBaseline(
-      null,
-      { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      nextTargetStateSlice,
-      {
-        questionId: 'Q1',
-        decryptedStateSlice,
-        decryptedImportance: 7,
-        decryptedConviction: 9,
-      },
-      deepClone,
-    )).toEqual({
+    expect(
+      syncDecryptedQuestionIntoBaseline(
+        null,
+        { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+        nextTargetStateSlice,
+        {
+          questionId: 'Q1',
+          decryptedStateSlice,
+          decryptedImportance: 7,
+          decryptedConviction: 9,
+        },
+        deepClone,
+      ),
+    ).toEqual({
       answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
       additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
       importance: { q1: 7 },
@@ -2009,13 +2165,9 @@ describe('surveyToolDecryptFlow', () => {
       additionalComments: { q1: { value: '' } },
     }));
 
-    expect(buildSelfQuestionDecryptBaseline(
-      0,
-      [null],
-      { responses: [] },
-      buildSliceFromUserAnswers,
-      deepClone,
-    )).toEqual({
+    expect(
+      buildSelfQuestionDecryptBaseline(0, [null], { responses: [] }, buildSliceFromUserAnswers, deepClone),
+    ).toEqual({
       baselineSlice: {
         answers: { q1: { value: '*' } },
         additionalComments: { q1: { value: '' } },

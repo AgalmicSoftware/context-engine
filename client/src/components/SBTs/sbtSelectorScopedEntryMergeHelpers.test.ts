@@ -14,11 +14,16 @@ describe('sbtSelectorScopedEntryMergeHelpers', () => {
   });
 
   it('decorates entries with source slug, binding slug, and normalized chain', () => {
-    expect(decorateScopedSbtEntry({
-      chainId: '84532',
-      sessionBindingSlug: 'Binding',
-      slug: 'Alpha',
-    }, 'Fallback')).toMatchObject({
+    expect(
+      decorateScopedSbtEntry(
+        {
+          chainId: '84532',
+          sessionBindingSlug: 'Binding',
+          slug: 'Alpha',
+        },
+        'Fallback',
+      ),
+    ).toMatchObject({
       chainId: 84532,
       slug: 'Alpha',
       __sourceSessionSlug: 'Alpha',
@@ -44,7 +49,7 @@ describe('sbtSelectorScopedEntryMergeHelpers', () => {
         sessionBindingSlug: 'IncomingBinding',
         slug: 'Incoming',
       },
-      'Fallback'
+      'Fallback',
     );
 
     expect(merged).toMatchObject({
@@ -52,13 +57,11 @@ describe('sbtSelectorScopedEntryMergeHelpers', () => {
       sessionBindingSlug: 'ExistingBinding',
       slug: 'Existing',
     });
-    expect(shouldPreferIncomingScopedSbtEntry(
-      { sbtInfo: { image: 'old.png' } },
-      { sbtInfo: { name: 'Named Badge' } }
-    )).toBe(true);
-    expect(shouldPreferIncomingScopedSbtEntry(
-      { sbtInfo: { image: 'old.png' } },
-      { sbtInfo: { image: 'new.png' } }
-    )).toBe(false);
+    expect(
+      shouldPreferIncomingScopedSbtEntry({ sbtInfo: { image: 'old.png' } }, { sbtInfo: { name: 'Named Badge' } }),
+    ).toBe(true);
+    expect(
+      shouldPreferIncomingScopedSbtEntry({ sbtInfo: { image: 'old.png' } }, { sbtInfo: { image: 'new.png' } }),
+    ).toBe(false);
   });
 });

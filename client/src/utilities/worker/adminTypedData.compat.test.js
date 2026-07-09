@@ -29,12 +29,14 @@ describe('adminTypedData compat import shapes', () => {
 
     expect(buildAdminActionBodyHash(unsignedBody)).toBe(
       compat.utils.keccak256(
-        compat.utils.toUtf8Bytes(JSON.stringify({
-          config: {
-            allowOrigins: ['https://contextengine.xyz'],
-          },
-        }))
-      )
+        compat.utils.toUtf8Bytes(
+          JSON.stringify({
+            config: {
+              allowOrigins: ['https://contextengine.xyz'],
+            },
+          }),
+        ),
+      ),
     );
   });
 
@@ -66,12 +68,14 @@ describe('adminTypedData compat import shapes', () => {
 
     expect(buildAdminActionBodyHash(unsignedBody)).toBe(
       compat.utils.keccak256(
-        compat.utils.toUtf8Bytes(JSON.stringify({
-          config: {
-            allowOrigins: ['https://contextengine.xyz'],
-          },
-        }))
-      )
+        compat.utils.toUtf8Bytes(
+          JSON.stringify({
+            config: {
+              allowOrigins: ['https://contextengine.xyz'],
+            },
+          }),
+        ),
+      ),
     );
   });
 });

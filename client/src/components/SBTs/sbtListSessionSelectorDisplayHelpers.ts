@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import {
   buildSbtListChipProgressDisplayPlan,
   type SbtListChipProgressDisplayPlan,
@@ -53,10 +53,9 @@ type BuildSbtListSessionRouteHrefArgs = {
 
 type BuildSbtListSessionSelectorOptionsArgs = {
   activeSessionSlug?: unknown;
-  buildChipProgressDisplayPlan?: ((args: {
-    isLoading?: unknown;
-    status?: SbtListChipProgressStatus | null;
-  }) => SbtListChipProgressDisplayPlan) | null;
+  buildChipProgressDisplayPlan?:
+    | ((args: { isLoading?: unknown; status?: SbtListChipProgressStatus | null }) => SbtListChipProgressDisplayPlan)
+    | null;
   buildSessionRouteHref?: ((slug: string) => string) | null;
   chipLoadingStatusBySlug?: Record<string, SbtListChipProgressStatus | null | undefined> | null;
   chipProgressVisibilityBySlug?: Record<string, unknown> | null;
@@ -73,11 +72,8 @@ type ResolveSbtListSessionSelectorSummarySlugsArgs = {
   selectedSessionUniverseSlugs?: unknown;
 };
 
-const asRecord = <TValue = unknown>(value: unknown): Record<string, TValue> => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, TValue>
-    : {}
-);
+const asRecord = <TValue = unknown>(value: unknown): Record<string, TValue> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, TValue>) : {};
 
 const normalizeSlugSet = (value: Set<unknown> | unknown[] | undefined): Set<string> => {
   if (value instanceof Set) {
@@ -89,10 +85,7 @@ const normalizeSlugSet = (value: Set<unknown> | unknown[] | undefined): Set<stri
   return new Set();
 };
 
-const appendPublicBasePath = (
-  publicBasePath: unknown,
-  pathIn: unknown
-): string => {
+const appendPublicBasePath = (publicBasePath: unknown, pathIn: unknown): string => {
   const basePath = String(publicBasePath || '');
   const normalizedPath = String(pathIn || '').trim();
   if (!normalizedPath) return basePath || '/';
@@ -106,15 +99,9 @@ export const buildSbtListSessionRouteHref = ({
 }: BuildSbtListSessionRouteHrefArgs = {}): string => {
   const normalized = normalizeSessionSlug(slug || '');
   if (isSbtListSyntheticNoSessionSlug(normalized)) return '';
-  const cfg = typeof getSessionConfig === 'function'
-    ? getSessionConfig(normalized)
-    : null;
+  const cfg = typeof getSessionConfig === 'function' ? getSessionConfig(normalized) : null;
   const routeToken = String(
-    cfg?.__registry?.sessionId ||
-    cfg?.__registry?.sessionIdHex ||
-    cfg?.sessionId ||
-    cfg?.sessionIdHex ||
-    ''
+    cfg?.__registry?.sessionId || cfg?.__registry?.sessionIdHex || cfg?.sessionId || cfg?.sessionIdHex || '',
   ).trim();
 
   if (routeToken) {
@@ -128,13 +115,12 @@ export const resolveSbtListSessionSelectorSummarySlugs = ({
   isListModeScopeEnabled = false,
   listSlug = '',
   selectedSessionUniverseSlugs = [],
-}: ResolveSbtListSessionSelectorSummarySlugsArgs = {}): string[] => (
+}: ResolveSbtListSessionSelectorSummarySlugsArgs = {}): string[] =>
   isListModeScopeEnabled
-    ? (Array.isArray(selectedSessionUniverseSlugs)
+    ? Array.isArray(selectedSessionUniverseSlugs)
       ? selectedSessionUniverseSlugs.map((slug) => normalizeSessionSlug(slug || ''))
-      : Array.from(normalizeSlugSet(selectedSessionUniverseSlugs as Set<unknown>)))
-    : [normalizeSessionSlug(listSlug || '')]
-);
+      : Array.from(normalizeSlugSet(selectedSessionUniverseSlugs as Set<unknown>))
+    : [normalizeSessionSlug(listSlug || '')];
 
 export const buildSbtListSessionSelectorOptions = ({
   activeSessionSlug = '',
@@ -157,9 +143,7 @@ export const buildSbtListSessionSelectorOptions = ({
 
   return slugs.map((slugRaw) => {
     const normalized = normalizeSessionSlug(slugRaw || '');
-    const isSelected = isListModeScopeEnabled
-      ? selectedSet.has(normalized)
-      : normalized === activeSlug;
+    const isSelected = isListModeScopeEnabled ? selectedSet.has(normalized) : normalized === activeSlug;
     const chipState = chipStates[normalized];
     const isLoading = !!progressVisibility[normalized];
     const chipLoadingStatus = loadingStatuses[normalized] || null;
@@ -167,10 +151,8 @@ export const buildSbtListSessionSelectorOptions = ({
       isLoading,
       status: chipLoadingStatus,
     });
-    const sessionRouteHref = typeof buildSessionRouteHref === 'function'
-      ? buildSessionRouteHref(normalized)
-      : '';
-    const label = String(labelForSessionSlug ? labelForSessionSlug(normalized) : (normalized || 'General'));
+    const sessionRouteHref = typeof buildSessionRouteHref === 'function' ? buildSessionRouteHref(normalized) : '';
+    const label = String(labelForSessionSlug ? labelForSessionSlug(normalized) : normalized || 'General');
     const testSlug = normalized || 'general';
 
     return {

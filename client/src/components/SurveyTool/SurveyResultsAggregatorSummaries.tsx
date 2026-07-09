@@ -38,16 +38,10 @@ export const SurveyResultsFreeformAggregatorSummary = ({
   const totalResponses = Number(summary.totalResponses || 0);
   const encryptedCount = Number(summary.encryptedCount || 0);
   const blankCount = Number(summary.blankCount || 0);
-  const displayedResponses = Array.isArray(summary.displayedResponses)
-    ? summary.displayedResponses
-    : [];
+  const displayedResponses = Array.isArray(summary.displayedResponses) ? summary.displayedResponses : [];
 
   if (totalResponses === 0 && encryptedCount === 0 && blankCount === 0) {
-    return (
-      <SurveyResultsAggregatorEmptyState>
-        No freeform responses available.
-      </SurveyResultsAggregatorEmptyState>
-    );
+    return <SurveyResultsAggregatorEmptyState>No freeform responses available.</SurveyResultsAggregatorEmptyState>;
   }
 
   return (
@@ -79,11 +73,7 @@ export const SurveyResultsMultichoiceAggregatorSummary = ({
   }
 
   if (totalResponders === 0) {
-    return (
-      <SurveyResultsAggregatorEmptyState>
-        No multichoice responses available.
-      </SurveyResultsAggregatorEmptyState>
-    );
+    return <SurveyResultsAggregatorEmptyState>No multichoice responses available.</SurveyResultsAggregatorEmptyState>;
   }
 
   return (

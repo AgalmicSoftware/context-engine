@@ -3,12 +3,8 @@ import {
   SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
   type SessionResultsHtmlSnapshot,
 } from '../../utilities/sessionResultsExport';
-import {
-  bindSurveyResultsHtmlReportExporterPort,
-} from './surveyResultsHtmlReportExporterPort';
-import type {
-  SurveyResultsHtmlReportDownloadRequest,
-} from './surveyResultsHtmlReportDownloadRequest';
+import { bindSurveyResultsHtmlReportExporterPort } from './surveyResultsHtmlReportExporterPort';
+import type { SurveyResultsHtmlReportDownloadRequest } from './surveyResultsHtmlReportDownloadRequest';
 
 const buildSnapshot = (): SessionResultsHtmlSnapshot => ({
   counts: {
@@ -53,7 +49,7 @@ const buildSnapshot = (): SessionResultsHtmlSnapshot => ({
 });
 
 const buildDownloadRequest = (
-  overrides: Partial<SurveyResultsHtmlReportDownloadRequest> = {}
+  overrides: Partial<SurveyResultsHtmlReportDownloadRequest> = {},
 ): SurveyResultsHtmlReportDownloadRequest => ({
   filename: 'contextEngine_sessionReport_demo-session_2026-05-25T18_30_00_000Z.html',
   filenameIdentity: {
@@ -90,20 +86,19 @@ describe('surveyResultsHtmlReportExporterPort', () => {
       renderHtmlReport: () => renderHtmlReport,
     });
 
-    await expect(exporter.exportReport({
-      downloadRequest,
-      snapshot,
-    })).resolves.toEqual({
+    await expect(
+      exporter.exportReport({
+        downloadRequest,
+        snapshot,
+      }),
+    ).resolves.toEqual({
       filename: downloadRequest.filename,
       html: '<html>Rendered report</html>',
       kind: 'html',
     });
 
     expect(renderHtmlReport).toHaveBeenCalledWith(snapshot, downloadRequest.renderOptions);
-    expect(downloadHtmlReport).toHaveBeenCalledWith(
-      '<html>Rendered report</html>',
-      downloadRequest.filename
-    );
+    expect(downloadHtmlReport).toHaveBeenCalledWith('<html>Rendered report</html>', downloadRequest.filename);
     expect(downloadPdfReport).not.toHaveBeenCalled();
   });
 

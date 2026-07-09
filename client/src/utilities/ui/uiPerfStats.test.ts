@@ -1,9 +1,4 @@
-import {
-  ceUiPerfSnapshot,
-  isCeUiPerfEnabled,
-  measureSync,
-  resetCeUiPerfStats,
-} from './uiPerfStats.js';
+import { ceUiPerfSnapshot, isCeUiPerfEnabled, measureSync, resetCeUiPerfStats } from './uiPerfStats.js';
 
 type UiPerfTestGlobal = typeof globalThis & {
   ENABLE_CE_UI_PERF_STATS?: boolean;
@@ -48,17 +43,21 @@ describe('uiPerfStats', () => {
   });
 
   it('installs the global snapshot/reset API and reflects the enabled flag', () => {
-    expect(runtimeGlobal.__CE_UI_PERF__?.snapshot()).toEqual(expect.objectContaining({
-      enabled: false,
-      byLabel: {},
-    }));
+    expect(runtimeGlobal.__CE_UI_PERF__?.snapshot()).toEqual(
+      expect.objectContaining({
+        enabled: false,
+        byLabel: {},
+      }),
+    );
 
     setGlobalValue('ENABLE_CE_UI_PERF_STATS', true);
 
     expect(isCeUiPerfEnabled()).toBe(true);
-    expect(runtimeGlobal.__CE_UI_PERF__?.snapshot()).toEqual(expect.objectContaining({
-      enabled: true,
-    }));
+    expect(runtimeGlobal.__CE_UI_PERF__?.snapshot()).toEqual(
+      expect.objectContaining({
+        enabled: true,
+      }),
+    );
   });
 
   it('returns the callback value without sampling when disabled', () => {
@@ -71,7 +70,8 @@ describe('uiPerfStats', () => {
     Object.defineProperty(performance, 'now', {
       configurable: true,
       writable: true,
-      value: jest.fn()
+      value: jest
+        .fn()
         .mockReturnValueOnce(10)
         .mockReturnValueOnce(18.4321)
         .mockReturnValueOnce(20)

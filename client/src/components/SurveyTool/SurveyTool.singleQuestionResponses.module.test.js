@@ -13,16 +13,14 @@ import {
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
 const applyStateUpdate = (stateRef, update) => {
-  const patch = typeof update === 'function'
-    ? update(stateRef.current)
-    : update;
+  const patch = typeof update === 'function' ? update(stateRef.current) : update;
   stateRef.current = { ...stateRef.current, ...(patch || {}) };
   return patch;
 };
 
 const ensureQuestionsNet = (cache, netId) => {
   const nextCache = {
-    ...((cache && typeof cache === 'object') ? cache : {}),
+    ...(cache && typeof cache === 'object' ? cache : {}),
   };
   nextCache[netId] = nextCache[netId] || {};
   nextCache[netId].questions = nextCache[netId].questions || {};
@@ -54,13 +52,15 @@ describe('SurveyTool single-question response bootstrap', () => {
       runId: 1,
     });
 
-    expect(plan).toEqual(expect.objectContaining({
-      status: 'missing-question-id',
-      debugPayload: expect.objectContaining({
-        phase: 'missing-question-id',
+    expect(plan).toEqual(
+      expect.objectContaining({
+        status: 'missing-question-id',
+        debugPayload: expect.objectContaining({
+          phase: 'missing-question-id',
+        }),
+        statePatch: { isLoadingResponse: false },
       }),
-      statePatch: { isLoadingResponse: false },
-    }));
+    );
     expect(getQuestionFetchCandidateSlugs).not.toHaveBeenCalled();
   });
 
@@ -88,44 +88,50 @@ describe('SurveyTool single-question response bootstrap', () => {
     const getResponseHash = jest.fn().mockResolvedValue('tx-response-hash');
     const scheduleRetry = jest.fn();
 
-    await expect(executeViewedSingleQuestionResponseBootstrap({
-      props: {
-        provider: {},
-        account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    await expect(
+      executeViewedSingleQuestionResponseBootstrap({
+        props: {
+          provider: {},
+          account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          responderAddress,
+        },
+        state: stateRef.current,
+        questionId: 'q1',
         responderAddress,
-      },
-      state: stateRef.current,
-      questionId: 'q1',
-      responderAddress,
-      effectiveSingleSlug: 'edge',
-      safeSetState,
-      getResponse,
-      getResponseHash,
-      readCachedResponderResponse: jest.fn().mockReturnValue(null),
-      readFreshCachedResponderResponse: jest.fn().mockResolvedValue(freshCachedResponse),
-      normalizeViewedResponse: jest.fn((value) => value),
-      mergeViewedResponse: jest.fn((_prev, latest) => latest),
-      scheduleRetry,
-      clearRetry: jest.fn(),
-      writeResponseToCache: jest.fn(),
-      prefillSingleQuestionResponse: jest.fn(),
-    })).resolves.toEqual(expect.objectContaining({
-      applied: true,
-      reason: 'loaded',
-      latest: freshCachedResponse,
-    }));
+        effectiveSingleSlug: 'edge',
+        safeSetState,
+        getResponse,
+        getResponseHash,
+        readCachedResponderResponse: jest.fn().mockReturnValue(null),
+        readFreshCachedResponderResponse: jest.fn().mockResolvedValue(freshCachedResponse),
+        normalizeViewedResponse: jest.fn((value) => value),
+        mergeViewedResponse: jest.fn((_prev, latest) => latest),
+        scheduleRetry,
+        clearRetry: jest.fn(),
+        writeResponseToCache: jest.fn(),
+        prefillSingleQuestionResponse: jest.fn(),
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        applied: true,
+        reason: 'loaded',
+        latest: freshCachedResponse,
+      }),
+    );
 
     expect(getResponse).toHaveBeenCalled();
     expect(getResponseHash).not.toHaveBeenCalled();
     expect(scheduleRetry).not.toHaveBeenCalled();
     expect(stateRef.current.noResponse).toBe(false);
     expect(stateRef.current.isLoadingResponse).toBe(false);
-    expect(stateRef.current.parsedViewAddressAnswers).toEqual(expect.objectContaining({
-      responder: responderAddress,
-      answer: expect.objectContaining({
-        encryptedPortion: 'cipher-answer',
+    expect(stateRef.current.parsedViewAddressAnswers).toEqual(
+      expect.objectContaining({
+        responder: responderAddress,
+        answer: expect.objectContaining({
+          encryptedPortion: 'cipher-answer',
+        }),
       }),
-    }));
+    );
   });
 
   it('marks viewed response as no-response when recent payload bootstrap retries are exhausted', async () => {
@@ -166,13 +172,15 @@ describe('SurveyTool single-question response bootstrap', () => {
 
     expect(seededState.questionPool[0]).toEqual(expect.objectContaining({ id: 'q1' }));
     expect(retryPlan.action).toBe('retry');
-    expect(retryPlan.retryOutcome).toEqual(expect.objectContaining({
-      shouldClearRetry: true,
-      exhaustedStatePatch: expect.objectContaining({
-        noResponse: true,
-        isLoadingResponse: false,
+    expect(retryPlan.retryOutcome).toEqual(
+      expect.objectContaining({
+        shouldClearRetry: true,
+        exhaustedStatePatch: expect.objectContaining({
+          noResponse: true,
+          isLoadingResponse: false,
+        }),
       }),
-    }));
+    );
   });
 
   it('writes recent payload into the slugged questions cache before viewed-response bootstrap retries', async () => {
@@ -210,28 +218,30 @@ describe('SurveyTool single-question response bootstrap', () => {
       runId: 1,
     });
 
-    expect(updateCacheAtomic).toHaveBeenCalledWith(
-      'questionsCache',
-      'edge',
-      expect.any(Function)
-    );
+    expect(updateCacheAtomic).toHaveBeenCalledWith('questionsCache', 'edge', expect.any(Function));
     expect(bootstrapResult.status).toBe('seeded-from-recent');
-    expect(bootstrapResult.cacheState?.questionsCache?.['84532']?.questions?.q1).toEqual(expect.objectContaining({
-      id: 'q1',
-      prompt: 'Prompt from recent payload',
-    }));
-    expect(flowPlan.seededHydration).toEqual(expect.objectContaining({
-      isLoadingResponse: true,
-      questionData: expect.objectContaining({ id: 'q1' }),
-    }));
-    expect(retryPlan).toEqual(expect.objectContaining({
-      action: 'retry',
-      retryOutcome: expect.objectContaining({
-        debugPayload: expect.objectContaining({
-          phase: 'recent-payload-response-bootstrap-retrying',
+    expect(bootstrapResult.cacheState?.questionsCache?.['84532']?.questions?.q1).toEqual(
+      expect.objectContaining({
+        id: 'q1',
+        prompt: 'Prompt from recent payload',
+      }),
+    );
+    expect(flowPlan.seededHydration).toEqual(
+      expect.objectContaining({
+        isLoadingResponse: true,
+        questionData: expect.objectContaining({ id: 'q1' }),
+      }),
+    );
+    expect(retryPlan).toEqual(
+      expect.objectContaining({
+        action: 'retry',
+        retryOutcome: expect.objectContaining({
+          debugPayload: expect.objectContaining({
+            phase: 'recent-payload-response-bootstrap-retrying',
+          }),
         }),
       }),
-    }));
+    );
   });
 
   it('does not bootstrap own single-question response from a borrowed general network when the slug is unresolved', async () => {
@@ -280,13 +290,15 @@ describe('SurveyTool single-question response bootstrap', () => {
     expect(bootstrapResult.status).toBe('seeded-from-recent');
     expect(bootstrapResult.cacheState).toBeNull();
     expect(seededState.questionPool[0]).toEqual(expect.objectContaining({ id: 'q1' }));
-    expect(fallbackPlan).toEqual(expect.objectContaining({
-      action: 'fallback',
-      debugPayload: expect.objectContaining({
-        phase: 'recent-payload-missing-network',
+    expect(fallbackPlan).toEqual(
+      expect.objectContaining({
+        action: 'fallback',
+        debugPayload: expect.objectContaining({
+          phase: 'recent-payload-missing-network',
+        }),
+        fallbackStatePatch: { isLoadingResponse: false },
       }),
-      fallbackStatePatch: { isLoadingResponse: false },
-    }));
+    );
     expect(getResponse).not.toHaveBeenCalled();
     expect(writeQuestionsCache).not.toHaveBeenCalled();
     expect(prefillSingleQuestionResponse).not.toHaveBeenCalled();
@@ -340,24 +352,28 @@ describe('SurveyTool single-question response bootstrap', () => {
     const prefillSingleQuestionResponse = jest.fn();
 
     expect(flowPlan.action).toBe('continue');
-    await expect(executeOwnSingleQuestionResponseBootstrap({
-      props: {
-        provider: {},
-        account,
-      },
-      state: stateRef.current,
-      questionId: 'q1',
-      effectiveSingleSlug: 'unknown-slug',
-      safeSetState,
-      getResponse,
-      writeResponseToCache: jest.fn(),
-      areResponsesConsistent: jest.fn(),
-      prefillSingleQuestionResponse,
-    })).resolves.toEqual(expect.objectContaining({
-      applied: true,
-      reason: 'loaded',
-      latest: latestResponse,
-    }));
+    await expect(
+      executeOwnSingleQuestionResponseBootstrap({
+        props: {
+          provider: {},
+          account,
+        },
+        state: stateRef.current,
+        questionId: 'q1',
+        effectiveSingleSlug: 'unknown-slug',
+        safeSetState,
+        getResponse,
+        writeResponseToCache: jest.fn(),
+        areResponsesConsistent: jest.fn(),
+        prefillSingleQuestionResponse,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        applied: true,
+        reason: 'loaded',
+        latest: latestResponse,
+      }),
+    );
 
     expect(getResponse).toHaveBeenCalledWith({
       provider: {},

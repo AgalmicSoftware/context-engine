@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import {
+  DEFAULT_OPENAI_TRANSCRIBE_URL,
+  OPENAI_TRANSCRIBE_URL_ENV,
+} from './endpointConfig.js';
 import { createWorkerTopLevelRuntimeWithWorkerDeps } from './workerTopLevelBinding.js';
 
 test('createWorkerTopLevelRuntimeWithWorkerDeps returns the runtime contract from the runtime-deps binding', () => {
@@ -45,7 +49,7 @@ test('createWorkerTopLevelRuntimeWithWorkerDeps preserves worker globals and sta
             now: 'now',
           },
           constants: {
-            OPENAI_TRANSCRIBE_URL: 'https://api.openai.com/v1/audio/transcriptions',
+            OPENAI_TRANSCRIBE_URL: DEFAULT_OPENAI_TRANSCRIBE_URL,
             SESSION_REGISTRY_ABI: [
               'function getResourceGate(string,string) view returns (address[] sbtAddresses, uint256 chainId, uint8 mode, uint256 perMemberLimit)',
               'function sessionExists(string) view returns (bool)',
@@ -89,4 +93,30 @@ test('createWorkerTopLevelRuntimeWithWorkerDeps preserves worker globals and sta
   });
 
   assert.equal(result, runtime);
+});
+
+test('createWorkerTopLevelRuntimeWithWorkerDeps honors env transcription endpoint overrides', () => {
+  const runtime = {
+    workerAuthGateUtils: { id: 'workerAuthGateUtils' },
+    fetch: 'fetch',
+  };
+  let constants = null;
+
+  const result = createWorkerTopLevelRuntimeWithWorkerDeps({
+    env: {
+      [OPENAI_TRANSCRIBE_URL_ENV]: 'https://transcribe.example.test/v1/audio/transcriptions',
+    },
+    deps: {
+      createWorkerRuntimeDepsWithWorkerDeps: (value) => {
+        constants = value.constants;
+        return runtime;
+      },
+    },
+  });
+
+  assert.equal(result, runtime);
+  assert.equal(
+    constants.OPENAI_TRANSCRIBE_URL,
+    'https://transcribe.example.test/v1/audio/transcriptions'
+  );
 });

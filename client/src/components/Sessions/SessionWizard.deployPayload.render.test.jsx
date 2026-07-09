@@ -24,14 +24,15 @@ describe('SessionWizard deploy payload rendering', () => {
         signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
       }),
     }));
-    const verifyMessageSpy = jest
-      .spyOn(ethers.utils, 'verifyMessage')
-      .mockReturnValue(TEST_ADMIN_ADDRESS);
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      deployForm: {
-        accountId: 'cf-account-1',
-      },
-    }));
+    const verifyMessageSpy = jest.spyOn(ethers.utils, 'verifyMessage').mockReturnValue(TEST_ADMIN_ADDRESS);
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        deployForm: {
+          accountId: 'cf-account-1',
+        },
+      }),
+    );
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
       const trimmed = String(value || '').trim();
       return trimmed || 'https://deploy-helper.example.test';
@@ -61,9 +62,7 @@ describe('SessionWizard deploy payload rendering', () => {
     try {
       renderLoggedInSessionWizard({
         provider: {
-          request: jest.fn(async ({ method }) => (
-            method === 'eth_accounts' ? [TEST_ADMIN_ADDRESS] : []
-          )),
+          request: jest.fn(async ({ method }) => (method === 'eth_accounts' ? [TEST_ADMIN_ADDRESS] : [])),
         },
         toggleLoginModal: jest.fn(),
       });

@@ -70,9 +70,11 @@ describe('sessionWorkerConfigCache', () => {
         corsWorkerUrl: 'https://worker.example',
       },
     });
-    expect(getCachedSessionWorkerConfig('edge')).toEqual(expect.objectContaining({
-      corsWorkerUrl: 'https://worker.example',
-    }));
+    expect(getCachedSessionWorkerConfig('edge')).toEqual(
+      expect.objectContaining({
+        corsWorkerUrl: 'https://worker.example',
+      }),
+    );
 
     upsertCachedSessionWorkerConfig({
       slug: 'edge',
@@ -104,16 +106,18 @@ describe('sessionWorkerConfigCache', () => {
       },
     });
 
-    expect(getCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      getCachedSessionWorkerConfig({
         slug: 'edge',
-        __registry: {
-          sessionIdHex: '0xabc',
-          registryChainId: 84532,
+        sessionConfig: {
+          slug: 'edge',
+          __registry: {
+            sessionIdHex: '0xabc',
+            registryChainId: 84532,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       corsWorkerUrl: 'https://worker.example',
       allowOrigins: ['https://existing.example'],
       limits: { perWalletPerDay: 3 },
@@ -132,17 +136,19 @@ describe('sessionWorkerConfigCache', () => {
     });
     nowSpy.mockRestore();
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        sessionName: 'Edge Session',
-        corsWorkerUrl: 'https://registry-mirror.example',
-        __registry: {
-          updatedAt: 1699999999,
+        sessionConfig: {
+          slug: 'edge',
+          sessionName: 'Edge Session',
+          corsWorkerUrl: 'https://registry-mirror.example',
+          __registry: {
+            updatedAt: 1699999999,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       sessionName: 'Edge Session',
       corsWorkerUrl: 'https://worker.example',
@@ -179,16 +185,18 @@ describe('sessionWorkerConfigCache', () => {
         litActionCid: 'QmAction123',
       },
     });
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        sessionName: 'Edge Session',
-        __registry: {
-          updatedAt: 1699999999,
+        sessionConfig: {
+          slug: 'edge',
+          sessionName: 'Edge Session',
+          __registry: {
+            updatedAt: 1699999999,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       sessionName: 'Edge Session',
       corsWorkerUrl: 'https://worker.example',
@@ -259,18 +267,20 @@ describe('sessionWorkerConfigCache', () => {
     });
     nowSpy.mockRestore();
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        sessionName: 'Edge Session',
-        corsWorkerUrl: 'https://registry-mirror.example',
-        embeddedDeployHelperEnabled: true,
-        __registry: {
-          updatedAt: 1699999999,
+        sessionConfig: {
+          slug: 'edge',
+          sessionName: 'Edge Session',
+          corsWorkerUrl: 'https://registry-mirror.example',
+          embeddedDeployHelperEnabled: true,
+          __registry: {
+            updatedAt: 1699999999,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       sessionName: 'Edge Session',
       corsWorkerUrl: 'https://worker.example',
@@ -314,10 +324,12 @@ describe('sessionWorkerConfigCache', () => {
     });
     nowSpy.mockRestore();
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: appliedReplica,
-    })).toEqual({
+    expect(
+      overlayCachedSessionWorkerConfig({
+        slug: 'edge',
+        sessionConfig: appliedReplica,
+      }),
+    ).toEqual({
       slug: 'edge',
       sessionName: 'Edge Session',
       corsWorkerUrl: 'https://worker-b.example',
@@ -358,10 +370,12 @@ describe('sessionWorkerConfigCache', () => {
     });
     nowSpy.mockRestore();
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: appliedReplica,
-    })).toEqual({
+    expect(
+      overlayCachedSessionWorkerConfig({
+        slug: 'edge',
+        sessionConfig: appliedReplica,
+      }),
+    ).toEqual({
       slug: 'edge',
       sessionName: 'Edge Session',
       corsWorkerUrl: 'https://worker-b.example',
@@ -398,33 +412,40 @@ describe('sessionWorkerConfigCache', () => {
 
     clearCachedSessionWorkerConfig('edge');
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: appliedReplica,
-    })).toEqual(baseConfig);
+    expect(
+      overlayCachedSessionWorkerConfig({
+        slug: 'edge',
+        sessionConfig: appliedReplica,
+      }),
+    ).toEqual(baseConfig);
   });
 
   it('does not let legacy untimestamped cache entries override a populated registry mirror', () => {
-    localStorage.setItem('ce:sessionWorkerConfigCache:v1', JSON.stringify({
-      v: 1,
-      bySession: {
-        edge: {
-          corsWorkerUrl: 'https://worker-kv-cache.example',
+    localStorage.setItem(
+      'ce:sessionWorkerConfigCache:v1',
+      JSON.stringify({
+        v: 1,
+        bySession: {
+          edge: {
+            corsWorkerUrl: 'https://worker-kv-cache.example',
+          },
         },
-      },
-    }));
+      }),
+    );
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        sessionName: 'Edge Session',
-        corsWorkerUrl: 'https://registry-mirror.example',
-        __registry: {
-          updatedAt: 1700000001,
+        sessionConfig: {
+          slug: 'edge',
+          sessionName: 'Edge Session',
+          corsWorkerUrl: 'https://registry-mirror.example',
+          __registry: {
+            updatedAt: 1700000001,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       sessionName: 'Edge Session',
       corsWorkerUrl: 'https://registry-mirror.example',
@@ -444,17 +465,19 @@ describe('sessionWorkerConfigCache', () => {
     });
     nowSpy.mockRestore();
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        sessionName: 'Edge Session',
-        workerUrl: 'https://registry-compat.example',
-        __registry: {
-          updatedAt: 1700000001,
+        sessionConfig: {
+          slug: 'edge',
+          sessionName: 'Edge Session',
+          workerUrl: 'https://registry-compat.example',
+          __registry: {
+            updatedAt: 1700000001,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       sessionName: 'Edge Session',
       workerUrl: 'https://registry-compat.example',
@@ -465,26 +488,31 @@ describe('sessionWorkerConfigCache', () => {
   });
 
   it('still uses legacy cache entries when the registry mirror is missing', () => {
-    localStorage.setItem('ce:sessionWorkerConfigCache:v1', JSON.stringify({
-      v: 1,
-      bySession: {
-        edge: {
-          corsWorkerUrl: 'https://worker-kv-cache.example',
+    localStorage.setItem(
+      'ce:sessionWorkerConfigCache:v1',
+      JSON.stringify({
+        v: 1,
+        bySession: {
+          edge: {
+            corsWorkerUrl: 'https://worker-kv-cache.example',
+          },
         },
-      },
-    }));
+      }),
+    );
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        sessionName: 'Edge Session',
-        corsWorkerUrl: '',
-        __registry: {
-          updatedAt: 1700000001,
+        sessionConfig: {
+          slug: 'edge',
+          sessionName: 'Edge Session',
+          corsWorkerUrl: '',
+          __registry: {
+            updatedAt: 1700000001,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       sessionName: 'Edge Session',
       corsWorkerUrl: 'https://worker-kv-cache.example',
@@ -526,18 +554,20 @@ describe('sessionWorkerConfigCache', () => {
     });
     nowSpy.mockRestore();
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        corsWorkerUrl: '',
-        __registry: {
-          sessionIdHex: '0x00000000000000000000000000000001',
-          registryChainId: 84532,
-          updatedAt: 1699999999,
+        sessionConfig: {
+          slug: 'edge',
+          corsWorkerUrl: '',
+          __registry: {
+            sessionIdHex: '0x00000000000000000000000000000001',
+            registryChainId: 84532,
+            updatedAt: 1699999999,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       corsWorkerUrl: 'https://worker-a.example',
       __registry: {
@@ -547,18 +577,20 @@ describe('sessionWorkerConfigCache', () => {
       },
     });
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        corsWorkerUrl: '',
-        __registry: {
-          sessionIdHex: '0x00000000000000000000000000000002',
-          registryChainId: 84531,
-          updatedAt: 1699999999,
+        sessionConfig: {
+          slug: 'edge',
+          corsWorkerUrl: '',
+          __registry: {
+            sessionIdHex: '0x00000000000000000000000000000002',
+            registryChainId: 84531,
+            updatedAt: 1699999999,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       corsWorkerUrl: 'https://worker-b.example',
       __registry: {
@@ -601,11 +633,13 @@ describe('sessionWorkerConfigCache', () => {
     });
     nowSpy.mockRestore();
 
-    expect(readSessionWorkerConfigCache()).toEqual(expect.objectContaining({
-      slugIndex: expect.objectContaining({
-        edge: null,
+    expect(readSessionWorkerConfigCache()).toEqual(
+      expect.objectContaining({
+        slugIndex: expect.objectContaining({
+          edge: null,
+        }),
       }),
-    }));
+    );
     expect(getCachedSessionWorkerConfig('edge')).toBeNull();
   });
 
@@ -641,38 +675,46 @@ describe('sessionWorkerConfigCache', () => {
     });
     nowSpy.mockRestore();
 
-    localStorage.setItem('dg:sessionRegistryCache:v1', JSON.stringify({
-      sessions: {
-        edge: {
-          slug: 'edge',
-          __registry: {
-            sessionIdHex: '0x00000000000000000000000000000001',
-            registryChainId: 84532,
+    localStorage.setItem(
+      'dg:sessionRegistryCache:v1',
+      JSON.stringify({
+        sessions: {
+          edge: {
+            slug: 'edge',
+            __registry: {
+              sessionIdHex: '0x00000000000000000000000000000001',
+              registryChainId: 84532,
+            },
           },
         },
-      },
-    }));
-
-    expect(readSessionWorkerConfigCache()).toEqual(expect.objectContaining({
-      slugIndex: expect.objectContaining({
-        edge: null,
       }),
-    }));
+    );
+
+    expect(readSessionWorkerConfigCache()).toEqual(
+      expect.objectContaining({
+        slugIndex: expect.objectContaining({
+          edge: null,
+        }),
+      }),
+    );
     expect(getCachedSessionWorkerConfig('edge')).toBeNull();
   });
 
   it('prefers explicitly provided session identity over slug registry fallback during cache writes', () => {
-    localStorage.setItem('dg:sessionRegistryCache:v1', JSON.stringify({
-      sessions: {
-        edge: {
-          slug: 'edge',
-          __registry: {
-            sessionIdHex: '0x00000000000000000000000000000001',
-            registryChainId: 84532,
+    localStorage.setItem(
+      'dg:sessionRegistryCache:v1',
+      JSON.stringify({
+        sessions: {
+          edge: {
+            slug: 'edge',
+            __registry: {
+              sessionIdHex: '0x00000000000000000000000000000001',
+              registryChainId: 84532,
+            },
           },
         },
-      },
-    }));
+      }),
+    );
 
     upsertCachedSessionWorkerConfig({
       slug: 'edge',
@@ -683,18 +725,20 @@ describe('sessionWorkerConfigCache', () => {
       },
     });
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        corsWorkerUrl: '',
-        __registry: {
-          sessionIdHex: '0x00000000000000000000000000000002',
-          registryChainId: 84531,
-          updatedAt: 1699999999,
+        sessionConfig: {
+          slug: 'edge',
+          corsWorkerUrl: '',
+          __registry: {
+            sessionIdHex: '0x00000000000000000000000000000002',
+            registryChainId: 84531,
+            updatedAt: 1699999999,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       corsWorkerUrl: 'https://worker-explicit.example',
       __registry: {
@@ -704,18 +748,20 @@ describe('sessionWorkerConfigCache', () => {
       },
     });
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        corsWorkerUrl: '',
-        __registry: {
-          sessionIdHex: '0x00000000000000000000000000000001',
-          registryChainId: 84532,
-          updatedAt: 1699999999,
+        sessionConfig: {
+          slug: 'edge',
+          corsWorkerUrl: '',
+          __registry: {
+            sessionIdHex: '0x00000000000000000000000000000001',
+            registryChainId: 84532,
+            updatedAt: 1699999999,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       corsWorkerUrl: '',
       __registry: {
@@ -736,32 +782,36 @@ describe('sessionWorkerConfigCache', () => {
     });
     nowSpy.mockRestore();
 
-    expect(getSessionWorkerConfigReplicaState({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      getSessionWorkerConfigReplicaState({
         slug: 'edge',
-        corsWorkerUrl: {
-          ciphertext: 'abc',
-          iv: 'def',
-          aad: {},
-        },
-        __registry: {
-          updatedAt: 1700000001,
-        },
-      },
-    })).toEqual(expect.objectContaining({
-      cacheApplied: true,
-      cachedConfig: expect.objectContaining({
-        corsWorkerUrl: 'https://worker-cache.example',
-      }),
-      sessionConfig: expect.objectContaining({
-        slug: 'edge',
-        corsWorkerUrl: 'https://worker-cache.example',
-        __registry: {
-          updatedAt: 1700000001,
+        sessionConfig: {
+          slug: 'edge',
+          corsWorkerUrl: {
+            ciphertext: 'abc',
+            iv: 'def',
+            aad: {},
+          },
+          __registry: {
+            updatedAt: 1700000001,
+          },
         },
       }),
-    }));
+    ).toEqual(
+      expect.objectContaining({
+        cacheApplied: true,
+        cachedConfig: expect.objectContaining({
+          corsWorkerUrl: 'https://worker-cache.example',
+        }),
+        sessionConfig: expect.objectContaining({
+          slug: 'edge',
+          corsWorkerUrl: 'https://worker-cache.example',
+          __registry: {
+            updatedAt: 1700000001,
+          },
+        }),
+      }),
+    );
   });
 
   it('clears stale allowOrigins when the cached worker config explicitly removes them', () => {
@@ -775,17 +825,19 @@ describe('sessionWorkerConfigCache', () => {
     });
     nowSpy.mockRestore();
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        corsWorkerUrl: 'https://registry-mirror.example',
-        allowOrigins: ['https://stale.example'],
-        __registry: {
-          updatedAt: 1699999999,
+        sessionConfig: {
+          slug: 'edge',
+          corsWorkerUrl: 'https://registry-mirror.example',
+          allowOrigins: ['https://stale.example'],
+          __registry: {
+            updatedAt: 1699999999,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       corsWorkerUrl: 'https://worker.example',
       allowOrigins: [],
@@ -806,19 +858,21 @@ describe('sessionWorkerConfigCache', () => {
     });
     nowSpy.mockRestore();
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        corsWorkerUrl: 'https://registry-mirror.example',
-        limits: {
-          perWalletPerDay: 5,
+        sessionConfig: {
+          slug: 'edge',
+          corsWorkerUrl: 'https://registry-mirror.example',
+          limits: {
+            perWalletPerDay: 5,
+          },
+          __registry: {
+            updatedAt: 1699999999,
+          },
         },
-        __registry: {
-          updatedAt: 1699999999,
-        },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       corsWorkerUrl: 'https://worker.example',
       limits: {},
@@ -839,18 +893,20 @@ describe('sessionWorkerConfigCache', () => {
     });
     nowSpy.mockRestore();
 
-    expect(overlayCachedSessionWorkerConfig({
-      slug: 'edge',
-      sessionConfig: {
+    expect(
+      overlayCachedSessionWorkerConfig({
         slug: 'edge',
-        corsWorkerUrl: 'https://registry-mirror.example',
-        rpcEndpoint: 'https://stale-rpc.example',
-        rpcUrl: 'https://stale-rpc.example',
-        __registry: {
-          updatedAt: 1699999999,
+        sessionConfig: {
+          slug: 'edge',
+          corsWorkerUrl: 'https://registry-mirror.example',
+          rpcEndpoint: 'https://stale-rpc.example',
+          rpcUrl: 'https://stale-rpc.example',
+          __registry: {
+            updatedAt: 1699999999,
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge',
       corsWorkerUrl: 'https://worker.example',
       rpcEndpoint: '',

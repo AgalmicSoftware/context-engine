@@ -7,30 +7,38 @@ import { SBT_LIST_NO_SESSION_UNIVERSE_SLUG } from './sbtListSessionUniverseHelpe
 
 describe('sbtListSessionSelectorDisplayHelpers', () => {
   it('builds session route hrefs from registry ids, slugs, and general fallback', () => {
-    expect(buildSbtListSessionRouteHref({
-      getSessionConfig: () => ({
-        __registry: {
-          sessionIdHex: '0xabc123',
-        },
+    expect(
+      buildSbtListSessionRouteHref({
+        getSessionConfig: () => ({
+          __registry: {
+            sessionIdHex: '0xabc123',
+          },
+        }),
+        publicBasePath: '/app',
+        slug: 'alpha',
       }),
-      publicBasePath: '/app',
-      slug: 'alpha',
-    })).toBe('/app/session/0xabc123');
+    ).toBe('/app/session/0xabc123');
 
-    expect(buildSbtListSessionRouteHref({
-      publicBasePath: '/app',
-      slug: 'alpha session',
-    })).toBe('/app/session/alpha%20session');
+    expect(
+      buildSbtListSessionRouteHref({
+        publicBasePath: '/app',
+        slug: 'alpha session',
+      }),
+    ).toBe('/app/session/alpha%20session');
 
-    expect(buildSbtListSessionRouteHref({
-      publicBasePath: '',
-      slug: '',
-    })).toBe('/session');
+    expect(
+      buildSbtListSessionRouteHref({
+        publicBasePath: '',
+        slug: '',
+      }),
+    ).toBe('/session');
 
-    expect(buildSbtListSessionRouteHref({
-      publicBasePath: '/app',
-      slug: SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
-    })).toBe('');
+    expect(
+      buildSbtListSessionRouteHref({
+        publicBasePath: '/app',
+        slug: SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
+      }),
+    ).toBe('');
   });
 
   it('builds selector chip options from display state without event callbacks', () => {
@@ -49,7 +57,7 @@ describe('sbtListSessionSelectorDisplayHelpers', () => {
       },
       displayedSessionUniverseSlugs: ['alpha', 'beta', ''],
       isListModeScopeEnabled: false,
-      labelForSessionSlug: (slug) => slug ? `Session ${slug}` : 'General',
+      labelForSessionSlug: (slug) => (slug ? `Session ${slug}` : 'General'),
       sessionChipStateBySlug: {
         alpha: { isLoaded: true },
         beta: { isLoaded: false },
@@ -96,12 +104,14 @@ describe('sbtListSessionSelectorDisplayHelpers', () => {
   });
 
   it('uses selected-scope selection and summary slugs for list mode', () => {
-    expect(buildSbtListSessionSelectorOptions({
-      activeSessionSlug: 'alpha',
-      displayedSessionUniverseSlugs: ['alpha', 'beta'],
-      isListModeScopeEnabled: true,
-      selectedSessionUniverseSlugs: new Set(['beta']),
-    })).toEqual([
+    expect(
+      buildSbtListSessionSelectorOptions({
+        activeSessionSlug: 'alpha',
+        displayedSessionUniverseSlugs: ['alpha', 'beta'],
+        isListModeScopeEnabled: true,
+        selectedSessionUniverseSlugs: new Set(['beta']),
+      }),
+    ).toEqual([
       expect.objectContaining({
         active: false,
         selected: false,
@@ -114,16 +124,20 @@ describe('sbtListSessionSelectorDisplayHelpers', () => {
       }),
     ]);
 
-    expect(resolveSbtListSessionSelectorSummarySlugs({
-      isListModeScopeEnabled: true,
-      listSlug: 'alpha',
-      selectedSessionUniverseSlugs: ['beta', 'gamma'],
-    })).toEqual(['beta', 'gamma']);
+    expect(
+      resolveSbtListSessionSelectorSummarySlugs({
+        isListModeScopeEnabled: true,
+        listSlug: 'alpha',
+        selectedSessionUniverseSlugs: ['beta', 'gamma'],
+      }),
+    ).toEqual(['beta', 'gamma']);
 
-    expect(resolveSbtListSessionSelectorSummarySlugs({
-      isListModeScopeEnabled: false,
-      listSlug: 'alpha',
-      selectedSessionUniverseSlugs: ['beta', 'gamma'],
-    })).toEqual(['alpha']);
+    expect(
+      resolveSbtListSessionSelectorSummarySlugs({
+        isListModeScopeEnabled: false,
+        listSlug: 'alpha',
+        selectedSessionUniverseSlugs: ['beta', 'gamma'],
+      }),
+    ).toEqual(['alpha']);
   });
 });

@@ -27,14 +27,13 @@
   --modal-panel-pad-x: 18px;
   --modal-panel-pad-top: 24px;
   --modal-panel-pad-bottom: 76px;
-  background:
-    linear-gradient(
-      118deg,
-      rgba(145, 121, 73, 0.9) 0%,
-      rgba(128, 133, 74, 0.9) 34%,
-      rgba(107, 137, 77, 0.9) 68%,
-      rgba(79, 123, 77, 0.92) 100%
-    );
+  background: linear-gradient(
+    118deg,
+    rgba(145, 121, 73, 0.9) 0%,
+    rgba(128, 133, 74, 0.9) 34%,
+    rgba(107, 137, 77, 0.9) 68%,
+    rgba(79, 123, 77, 0.92) 100%
+  );
   background-size: 165% 165%;
   background-position: 12% 30%;
   animation: modalGradientDrift 17s ease-in-out infinite alternate;
@@ -47,13 +46,12 @@
 }
 
 .panel[data-slide-key='intro'] {
-  background:
-    linear-gradient(
-      118deg,
-      rgba(135, 117, 66, 0.92) 0%,
-      rgba(126, 130, 72, 0.92) 46%,
-      rgba(101, 128, 76, 0.92) 100%
-    );
+  background: linear-gradient(
+    118deg,
+    rgba(135, 117, 66, 0.92) 0%,
+    rgba(126, 130, 72, 0.92) 46%,
+    rgba(101, 128, 76, 0.92) 100%
+  );
 }
 
 .panel::before {

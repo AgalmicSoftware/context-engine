@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 import { Avatar } from './CharacterSVG';
-import { debateData, sourceLinks } from '../../../variables/demo/debateData.js';
+import { debateData, sourceLinks } from '../../../variables/demo/debateData';
 import { darkTheme as T, soften, useTheme } from './debateHudTheme';
 
 type DebateSideKey = 'A' | 'B';
@@ -63,22 +63,23 @@ const sourceLinkMap = sourceLinks as Record<string, string>;
 
 export const NodeIcon = ({ type }: NodeIconProps) => {
   const icons: Record<string, string> = {
-    core: "●",
-    sub: "◯"};
-  return <span style={{ fontWeight: 600, opacity: 0.6 }}>{icons[type] || "•"}</span>;
+    core: '●',
+    sub: '◯',
+  };
+  return <span style={{ fontWeight: 600, opacity: 0.6 }}>{icons[type] || '•'}</span>;
 };
 
 export const TreeNode = ({ node, debate, onNodeClick, expandedNodes, setExpandedNodes }: TreeNodeProps) => {
   useTheme();
 
-  const figure = node.side === "A" ? debate.sideA.figure : debate.sideB.figure;
-  const color = node.side === "A" ? debate.sideA.color : debate.sideB.color;
+  const figure = node.side === 'A' ? debate.sideA.figure : debate.sideB.figure;
+  const color = node.side === 'A' ? debate.sideA.color : debate.sideB.color;
   const isExpanded = expandedNodes.has(node.id);
   const hasChildren = node.children && node.children.length > 0;
   const [strength, setStrength] = useState(node.strength);
 
   return (
-    <div style={{ marginLeft: node.side === "B" ? 0 : 20, marginBottom: 12 }}>
+    <div style={{ marginLeft: node.side === 'B' ? 0 : 20, marginBottom: 12 }}>
       <div
         onClick={() => {
           if (hasChildren) {
@@ -92,12 +93,13 @@ export const TreeNode = ({ node, debate, onNodeClick, expandedNodes, setExpanded
           background: T.surface,
           border: `1px solid ${T.border}`,
           borderRadius: T.radiusSm,
-          padding: "12px 14px",
-          cursor: hasChildren ? "pointer" : "default",
-          transition: "all 0.15s ease",
+          padding: '12px 14px',
+          cursor: hasChildren ? 'pointer' : 'default',
+          transition: 'all 0.15s ease',
           borderLeft: `3px solid ${color}`,
           marginBottom: 8,
-          boxShadow: T.shadow}}
+          boxShadow: T.shadow,
+        }}
         onMouseEnter={(e) => {
           if (hasChildren) {
             e.currentTarget.style.background = T.surfaceHover;
@@ -109,59 +111,79 @@ export const TreeNode = ({ node, debate, onNodeClick, expandedNodes, setExpanded
           e.currentTarget.style.boxShadow = T.shadow;
         }}
       >
-        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-          <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 2, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2, flexShrink: 0 }}>
             <Avatar name={figure.name} color={color} size={20} />
             <NodeIcon type={node.type} />
             {hasChildren && (
               <div
                 style={{
-                  width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "transform 0.2s ease",
-                  transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)"}}
+                  width: 16,
+                  height: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'transform 0.2s ease',
+                  transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                }}
               >
                 ▸
               </div>
             )}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{
-              fontSize: 13,
-              lineHeight: 1.5,
-              color: T.text,
-              fontStyle: "italic",
-              marginBottom: 6}}>
+            <div
+              style={{
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: T.text,
+                fontStyle: 'italic',
+                marginBottom: 6,
+              }}
+            >
               {node.claim}
             </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {sourceLinkMap[node.source] ? (
-                <a href={sourceLinkMap[node.source]} target="_blank" rel="noopener noreferrer" style={{
-                  fontSize: 11,
-                  background: soften(color, 0.08),
-                  color,
-                  padding: "2px 8px",
-                  borderRadius: 4,
-                  fontWeight: 500,
-                  textDecoration: "none",
-                  cursor: "pointer",
-                  borderBottom: `1px dashed ${soften(color, 0.4)}`}}>
+                <a
+                  href={sourceLinkMap[node.source]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontSize: 11,
+                    background: soften(color, 0.08),
+                    color,
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    fontWeight: 500,
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                    borderBottom: `1px dashed ${soften(color, 0.4)}`,
+                  }}
+                >
                   {node.source} ↗
                 </a>
               ) : (
-                <span style={{
-                  fontSize: 11,
-                  background: soften(color, 0.08),
-                  color,
-                  padding: "2px 8px",
-                  borderRadius: 4,
-                  fontWeight: 500}}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    background: soften(color, 0.08),
+                    color,
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    fontWeight: 500,
+                  }}
+                >
                   {node.source}
                 </span>
               )}
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{
-                  fontSize: 11,
-                  color: T.textLight}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: T.textLight,
+                  }}
+                >
                   Strength: {strength}/10
                 </span>
                 <input
@@ -173,8 +195,9 @@ export const TreeNode = ({ node, debate, onNodeClick, expandedNodes, setExpanded
                   style={{
                     width: 60,
                     height: 4,
-                    cursor: "pointer",
-                    accentColor: color}}
+                    cursor: 'pointer',
+                    accentColor: color,
+                  }}
                 />
               </div>
             </div>
@@ -212,7 +235,7 @@ export const PointCounterpoint = ({
 
   const isExpanded = expandedNodes.has(`pc-${nodeA?.id}-${nodeB?.id}`);
   const pairId = `pc-${nodeA?.id}-${nodeB?.id}`;
-  const hasChildren = ((nodeA?.children?.length || 0) > 0) || ((nodeB?.children?.length || 0) > 0);
+  const hasChildren = (nodeA?.children?.length || 0) > 0 || (nodeB?.children?.length || 0) > 0;
   const childrenA = nodeA?.children || [];
   const childrenB = nodeB?.children || [];
   const maxChildren = Math.max(childrenA.length, childrenB.length);
@@ -229,45 +252,86 @@ export const PointCounterpoint = ({
       <div
         onClick={hasChildren ? toggle : undefined}
         style={{
-          display: "flex",
+          display: 'flex',
           gap: 0,
-          cursor: hasChildren ? "pointer" : "default",
+          cursor: hasChildren ? 'pointer' : 'default',
           borderRadius: T.radius,
-          overflow: "hidden",
+          overflow: 'hidden',
           boxShadow: T.shadow,
           border: `1px solid ${T.border}`,
-          marginBottom: 4}}
+          marginBottom: 4,
+        }}
       >
         {nodeA && (
-          <div style={{
-            flex: 1,
-            padding: "12px 14px",
-            background: soften(debate.sideA.color, 0.04),
-            borderLeft: `4px solid ${debate.sideA.color}`}}>
-            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+          <div
+            style={{
+              flex: 1,
+              padding: '12px 14px',
+              background: soften(debate.sideA.color, 0.04),
+              borderLeft: `4px solid ${debate.sideA.color}`,
+            }}
+          >
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
               <Avatar name={debate.sideA.figure.name} color={debate.sideA.color} size={18} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: debate.sideA.color, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                {depth === 0 ? "Position" : "Point"}
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: debate.sideA.color,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                }}
+              >
+                {depth === 0 ? 'Position' : 'Point'}
               </span>
               {hasChildren && (
-                <span style={{
-                  fontSize: 11, color: T.textLight,
-                  transition: "transform 0.2s ease",
-                  display: "inline-block",
-                  transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)"}}>▸</span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: T.textLight,
+                    transition: 'transform 0.2s ease',
+                    display: 'inline-block',
+                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                  }}
+                >
+                  ▸
+                </span>
               )}
             </div>
-            <div style={{ fontSize: 13, lineHeight: 1.5, color: T.text, fontStyle: "italic", marginBottom: 6 }}>
+            <div style={{ fontSize: 13, lineHeight: 1.5, color: T.text, fontStyle: 'italic', marginBottom: 6 }}>
               {nodeA.claim}
             </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               {sourceLinkMap[nodeA.source] ? (
-                <a href={sourceLinkMap[nodeA.source]} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
-                  fontSize: 10, background: soften(debate.sideA.color, 0.08), color: debate.sideA.color,
-                  padding: "2px 6px", borderRadius: 3, fontWeight: 500, textDecoration: "none",
-                  borderBottom: `1px dashed ${soften(debate.sideA.color, 0.4)}`}}>{nodeA.source} ↗</a>
+                <a
+                  href={sourceLinkMap[nodeA.source]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    fontSize: 10,
+                    background: soften(debate.sideA.color, 0.08),
+                    color: debate.sideA.color,
+                    padding: '2px 6px',
+                    borderRadius: 3,
+                    fontWeight: 500,
+                    textDecoration: 'none',
+                    borderBottom: `1px dashed ${soften(debate.sideA.color, 0.4)}`,
+                  }}
+                >
+                  {nodeA.source} ↗
+                </a>
               ) : (
-                <span style={{ fontSize: 10, background: soften(debate.sideA.color, 0.08), color: debate.sideA.color, padding: "2px 6px", borderRadius: 3, fontWeight: 500 }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    background: soften(debate.sideA.color, 0.08),
+                    color: debate.sideA.color,
+                    padding: '2px 6px',
+                    borderRadius: 3,
+                    fontWeight: 500,
+                  }}
+                >
                   {nodeA.source}
                 </span>
               )}
@@ -279,28 +343,62 @@ export const PointCounterpoint = ({
         <div style={{ width: 2, background: T.border, flexShrink: 0 }} />
 
         {nodeB && (
-          <div style={{
-            flex: 1,
-            padding: "12px 14px",
-            background: soften(debate.sideB.color, 0.04),
-            borderRight: `4px solid ${debate.sideB.color}`}}>
-            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+          <div
+            style={{
+              flex: 1,
+              padding: '12px 14px',
+              background: soften(debate.sideB.color, 0.04),
+              borderRight: `4px solid ${debate.sideB.color}`,
+            }}
+          >
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
               <Avatar name={debate.sideB.figure.name} color={debate.sideB.color} size={18} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: debate.sideB.color, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                {depth === 0 ? "Counter-Position" : "Counterpoint"}
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: debate.sideB.color,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                }}
+              >
+                {depth === 0 ? 'Counter-Position' : 'Counterpoint'}
               </span>
             </div>
-            <div style={{ fontSize: 13, lineHeight: 1.5, color: T.text, fontStyle: "italic", marginBottom: 6 }}>
+            <div style={{ fontSize: 13, lineHeight: 1.5, color: T.text, fontStyle: 'italic', marginBottom: 6 }}>
               {nodeB.claim}
             </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               {sourceLinkMap[nodeB.source] ? (
-                <a href={sourceLinkMap[nodeB.source]} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
-                  fontSize: 10, background: soften(debate.sideB.color, 0.08), color: debate.sideB.color,
-                  padding: "2px 6px", borderRadius: 3, fontWeight: 500, textDecoration: "none",
-                  borderBottom: `1px dashed ${soften(debate.sideB.color, 0.4)}`}}>{nodeB.source} ↗</a>
+                <a
+                  href={sourceLinkMap[nodeB.source]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    fontSize: 10,
+                    background: soften(debate.sideB.color, 0.08),
+                    color: debate.sideB.color,
+                    padding: '2px 6px',
+                    borderRadius: 3,
+                    fontWeight: 500,
+                    textDecoration: 'none',
+                    borderBottom: `1px dashed ${soften(debate.sideB.color, 0.4)}`,
+                  }}
+                >
+                  {nodeB.source} ↗
+                </a>
               ) : (
-                <span style={{ fontSize: 10, background: soften(debate.sideB.color, 0.08), color: debate.sideB.color, padding: "2px 6px", borderRadius: 3, fontWeight: 500 }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    background: soften(debate.sideB.color, 0.08),
+                    color: debate.sideB.color,
+                    padding: '2px 6px',
+                    borderRadius: 3,
+                    fontWeight: 500,
+                  }}
+                >
                   {nodeB.source}
                 </span>
               )}
@@ -333,21 +431,30 @@ const ArgumentTreeView = ({ selectedDebateId }: ArgumentTreeViewProps) => {
   useTheme();
 
   const [expandedNodes, setExpandedNodes] = useState<ExpandedNodeSet>(new Set());
-  const debate = (debateData as Debate[]).find((item) => item.id === selectedDebateId) || debateData[0] as Debate | undefined;
+  const debate =
+    (debateData as Debate[]).find((item) => item.id === selectedDebateId) || (debateData[0] as Debate | undefined);
 
   if (!debate) return null;
 
   return (
     <div style={{ maxWidth: 1000 }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        marginBottom: 20, padding: "0 4px"}}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 20,
+          padding: '0 4px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ width: 4, height: 16, background: debate.sideA.color, borderRadius: 2 }} />
           <span style={{ fontSize: 12, fontWeight: 700, color: debate.sideA.color }}>{debate.sideA.figure.name}</span>
         </div>
-        <span style={{ fontSize: 11, color: T.textMuted, fontStyle: "italic" }}>Click to expand point / counterpoint</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 11, color: T.textMuted, fontStyle: 'italic' }}>
+          Click to expand point / counterpoint
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: debate.sideB.color }}>{debate.sideB.figure.name}</span>
           <div style={{ width: 4, height: 16, background: debate.sideB.color, borderRadius: 2 }} />
         </div>

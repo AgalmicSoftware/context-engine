@@ -40,9 +40,7 @@ const SessionPublishBundleFallbackPanel = ({
         invalid={!!normalModeBundleUrlOverrideValidationError}
         onChange={(e) => onNormalModeBundleUrlOverrideChange(e.target.value)}
       />
-      <div className={styles.helperText}>
-        {manualBundleUrlOverrideHelp}
-      </div>
+      <div className={styles.helperText}>{manualBundleUrlOverrideHelp}</div>
       {normalModeBundleUrlOverrideValidationError ? (
         <div className={styles.errorText}>{normalModeBundleUrlOverrideValidationError}</div>
       ) : null}
@@ -70,9 +68,7 @@ const SessionPublishBundleFallbackPanel = ({
           Clear bundle file
         </Button>
       </div>
-      <div className={styles.helperText}>
-        {sponsoredManualBundleRetryMessage}
-      </div>
+      <div className={styles.helperText}>{sponsoredManualBundleRetryMessage}</div>
       {bundleFile ? (
         <div className={styles.helperText}>
           Using {bundleFile.name || localWorkerBundleFallbackFilePath} for this publish.

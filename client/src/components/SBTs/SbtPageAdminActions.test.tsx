@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import SbtPageAdminActions from './SbtPageAdminActions';
 
 const createDisplayPlan = (
-  overrides: Partial<React.ComponentProps<typeof SbtPageAdminActions>['displayPlan']> = {}
+  overrides: Partial<React.ComponentProps<typeof SbtPageAdminActions>['displayPlan']> = {},
 ) => ({
   adminBurnButtonContentState: {
     failureLabel: 'Burn Failed',
@@ -50,9 +50,7 @@ const createDisplayPlan = (
   ...overrides,
 });
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof SbtPageAdminActions>> = {}
-) => ({
+const createProps = (overrides: Partial<React.ComponentProps<typeof SbtPageAdminActions>> = {}) => ({
   burnLabel: 'Burn',
   burnSearchInput: '0xabc',
   burnSearchResultRecord: {
@@ -100,12 +98,10 @@ describe('SbtPageAdminActions', () => {
           onBurnSearchChange,
           onCopyOpenMintUrl,
         })}
-      />
+      />,
     );
 
-    expect(screen.getByTestId('ce-sbt-page-open-mint-url')).toHaveTextContent(
-      'https://session.example.test/open'
-    );
+    expect(screen.getByTestId('ce-sbt-page-open-mint-url')).toHaveTextContent('https://session.example.test/open');
     fireEvent.click(screen.getByRole('button', { name: 'Copy open mint URL' }));
     expect(onCopyOpenMintUrl).toHaveBeenCalledTimes(1);
 
@@ -134,13 +130,13 @@ describe('SbtPageAdminActions', () => {
           onIncludePreviousPasswordsChange,
           onPasswordGenerationCountChange,
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Generate Additional Password Invites')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /claim-one/ })).toHaveAttribute(
       'href',
-      'https://session.example.test/join/0xsbt/claim-one'
+      'https://session.example.test/join/0xsbt/claim-one',
     );
 
     fireEvent.change(screen.getByPlaceholderText('Number of additional passwords'), {
@@ -183,7 +179,7 @@ describe('SbtPageAdminActions', () => {
           onAdminBurn,
           onGenerateAdminInvites,
         })}
-      />
+      />,
     );
 
     const burnButton = screen.getByRole('button', { name: 'Burn SBT' });
@@ -229,7 +225,7 @@ describe('SbtPageAdminActions', () => {
             },
           }),
         })}
-      />
+      />,
     );
 
     expect(screen.getAllByRole('button')[0]).toBeDisabled();
@@ -263,7 +259,7 @@ describe('SbtPageAdminActions', () => {
             },
           }),
         })}
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: 'Burn Failed' })).toBeDisabled();
@@ -282,13 +278,13 @@ describe('SbtPageAdminActions', () => {
             },
           }),
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Previously Generated Password Invites')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /claim-one/ })).toHaveAttribute(
       'href',
-      'https://session.example.test/join/0xsbt/claim-one'
+      'https://session.example.test/join/0xsbt/claim-one',
     );
 
     rerender(
@@ -306,7 +302,7 @@ describe('SbtPageAdminActions', () => {
             },
           }),
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('No Additional Password Invites')).toBeInTheDocument();

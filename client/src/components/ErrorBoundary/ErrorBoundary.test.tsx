@@ -27,13 +27,13 @@ describe('Error boundaries', () => {
     render(
       <AppErrorBoundary>
         <Thrower />
-      </AppErrorBoundary>
+      </AppErrorBoundary>,
     );
 
     expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
     expect(screen.getByTestId('ce-error-report-github')).toHaveAttribute(
       'href',
-      'https://github.com/AgalmicSoftware/context-engine/issues/new'
+      'https://github.com/AgalmicSoftware/context-engine/issues/new',
     );
   });
 
@@ -41,25 +41,23 @@ describe('Error boundaries', () => {
     render(
       <RouteErrorBoundary>
         <Thrower />
-      </RouteErrorBoundary>
+      </RouteErrorBoundary>,
     );
 
     expect(screen.getByText(/this section encountered an error/i)).toBeInTheDocument();
     expect(screen.getByTestId('ce-error-report-github')).toHaveAttribute(
       'href',
-      'https://github.com/AgalmicSoftware/context-engine/issues/new'
+      'https://github.com/AgalmicSoftware/context-engine/issues/new',
     );
   });
 
   it('asks route-level fallback to recover stale deployed chunks', () => {
-    const recoverSpy = jest
-      .spyOn(bootRecovery, 'recoverFromStaleChunkLoadError')
-      .mockReturnValue(true);
+    const recoverSpy = jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError').mockReturnValue(true);
 
     render(
       <RouteErrorBoundary>
         <StaleChunkThrower />
-      </RouteErrorBoundary>
+      </RouteErrorBoundary>,
     );
 
     expect(recoverSpy).toHaveBeenCalledWith(expect.any(TypeError));

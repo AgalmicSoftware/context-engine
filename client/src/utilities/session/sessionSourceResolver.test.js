@@ -42,22 +42,18 @@ describe('sessionSourceResolver', () => {
 
     expect(Array.isArray(entries)).toBe(true);
     expect(entries.length).toBe(Object.keys(getDemoSessionMap()).length);
-    expect(entries[0]).toEqual([
-      expect.any(String),
-      expect.anything(),
-    ]);
+    expect(entries[0]).toEqual([expect.any(String), expect.anything()]);
   });
 
   it('finds a demo session by worker URL and returns null for misses', () => {
     const defaultConfig = getDefaultSessionConfig();
     const workerUrl = 'https://demo-general.example';
 
-    jest.spyOn(sessionWorkerAvailability, 'getUsableSessionWorkerUrl').mockImplementation(({
-      slug,
-      sessionConfig,
-    } = {}) => (
-      (sessionConfig?.slug ?? slug ?? '') === '' ? workerUrl : ''
-    ));
+    jest
+      .spyOn(sessionWorkerAvailability, 'getUsableSessionWorkerUrl')
+      .mockImplementation(({ slug, sessionConfig } = {}) =>
+        (sessionConfig?.slug ?? slug ?? '') === '' ? workerUrl : '',
+      );
 
     expect(findDemoSessionByWorkerUrl(workerUrl)).toEqual(defaultConfig);
     expect(findDemoSessionByWorkerUrl('https://missing-worker.example')).toBeNull();

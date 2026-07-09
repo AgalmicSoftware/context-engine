@@ -14,7 +14,7 @@ describe('DevE2eNav atlas routing', () => {
     render(
       <MemoryRouter initialEntries={['/su/Franklin?e2eNav=1']}>
         <DevE2eNav />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.NAV_ATLAS)).toHaveAttribute('href', '/atlas?e2eNav=1&demo=1');

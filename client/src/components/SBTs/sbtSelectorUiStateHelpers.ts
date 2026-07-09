@@ -146,13 +146,10 @@ type SbtSelectorManualInputWarningPatch = {
   manualInputWarning: string;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
-export const getSbtSelectorLoadingOptionCount = (sbtOptions: unknown): number => (
-  Math.max(0, Array.isArray(sbtOptions) ? sbtOptions.length : 0)
-);
+export const getSbtSelectorLoadingOptionCount = (sbtOptions: unknown): number =>
+  Math.max(0, Array.isArray(sbtOptions) ? sbtOptions.length : 0);
 
 export const isSbtSelectorOptionsLoading = (state: unknown = {}): boolean => {
   const record = isRecord(state) ? state : {};
@@ -165,18 +162,14 @@ export const resolveSbtSelectorNoOptionsMessage = ({
 }: {
   isLoading?: unknown;
   pluralLabel?: unknown;
-} = {}): string | null => (
-  isLoading ? null : `No ${String(pluralLabel || 'SBTs')}`
-);
+} = {}): string | null => (isLoading ? null : `No ${String(pluralLabel || 'SBTs')}`);
 
 export const resolveSbtSelectorLabelImageState = ({
   image = null,
 }: ResolveSbtSelectorLabelImageStateArgs = {}): SbtSelectorLabelImageState => {
   const shouldRenderImage = !!image;
   return {
-    imageSrc: shouldRenderImage
-      ? normalizeArweaveUrl(String(image), { contextLabel: 'sbt_selector_image' })
-      : '',
+    imageSrc: shouldRenderImage ? normalizeArweaveUrl(String(image), { contextLabel: 'sbt_selector_image' }) : '',
     shouldRenderImage,
   };
 };
@@ -194,10 +187,8 @@ export const buildSbtSelectorLoadingStatusClassName = ({
   baseClassName = '',
   compactClassName = '',
   shouldUseCompactClass = false,
-}: BuildSbtSelectorLoadingStatusClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  shouldUseCompactClass ? String(compactClassName || '') : '',
-].filter(Boolean).join(' '));
+}: BuildSbtSelectorLoadingStatusClassNameArgs = {}): string =>
+  [String(baseClassName || ''), shouldUseCompactClass ? String(compactClassName || '') : ''].filter(Boolean).join(' ');
 
 export const resolveSbtSelectorHeaderLoadingStatusState = ({
   isLoading = false,
@@ -214,9 +205,7 @@ export const getSbtSelectorLoadingStatusText = ({
 } = {}): string => {
   const safeCount = Math.max(0, Number(count || 0) || 0);
   const hasCount = safeCount > 0;
-  return compact
-    ? (hasCount ? `Loading ${safeCount}` : 'Loading')
-    : (hasCount ? `Loading ${safeCount}` : 'Loading');
+  return compact ? (hasCount ? `Loading ${safeCount}` : 'Loading') : hasCount ? `Loading ${safeCount}` : 'Loading';
 };
 
 export const resolveSbtSelectorGroupSourceSelection = ({
@@ -240,14 +229,14 @@ export const resolveSbtSelectorGroupSourceSelection = ({
 };
 
 export const buildSbtSelectorManualInputTogglePatch = (
-  prevState: SbtSelectorToggleStateLike = {}
+  prevState: SbtSelectorToggleStateLike = {},
 ): SbtSelectorManualInputTogglePatch => ({
   manualInputWarning: '',
   showManualInput: !prevState.showManualInput,
 });
 
 export const buildSbtSelectorGroupPickerTogglePatch = (
-  prevState: SbtSelectorToggleStateLike = {}
+  prevState: SbtSelectorToggleStateLike = {},
 ): SbtSelectorGroupPickerTogglePatch => ({
   showGroupPicker: !prevState.showGroupPicker,
 });
@@ -262,9 +251,7 @@ export const buildSbtSelectorGroupSourceSelectionPatch = ({
   };
 };
 
-export const buildSbtSelectorCustomAddressInputPatch = (
-  value: unknown
-): SbtSelectorCustomAddressInputPatch => ({
+export const buildSbtSelectorCustomAddressInputPatch = (value: unknown): SbtSelectorCustomAddressInputPatch => ({
   customSBTAddress: String(value ?? ''),
   manualInputWarning: '',
 });
@@ -306,7 +293,7 @@ export const resolveSbtSelectorAutoSearchButtonsState = ({
 }: ResolveSbtSelectorAutoSearchButtonsStateArgs = {}): SbtSelectorAutoSearchButtonsState => ({
   shouldRenderAutoSearchSessionButtons: Boolean(
     enableGroupSelect &&
-    (groupOverride || (Array.isArray(autoSearchSessionOptions) && autoSearchSessionOptions.length > 0))
+    (groupOverride || (Array.isArray(autoSearchSessionOptions) && autoSearchSessionOptions.length > 0)),
   ),
 });
 
@@ -342,7 +329,10 @@ export const buildSbtSelectorRootClassName = ({
     String(baseClassName || ''),
     variantDisplayState.shouldUseAdminVariant ? String(adminClassName || '') : '',
     variantDisplayState.shouldUseCreateVariant ? String(createClassName || '') : '',
-  ].filter(Boolean).join(' ').trim();
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
 };
 
 export const buildSbtSelectorSourceSessionSlugPatch = ({
@@ -363,17 +353,17 @@ export const buildSbtSelectorLoadingOptionsPatch = ({
   loadingOptions: loadingOptions === true,
 });
 
-export function buildSbtSelectorGroupOptionsPatch<TGroupOption>(
-  args: { groupOptions: TGroupOption[] }
-): SbtSelectorGroupOptionsPatch<TGroupOption>;
+export function buildSbtSelectorGroupOptionsPatch<TGroupOption>(args: {
+  groupOptions: TGroupOption[];
+}): SbtSelectorGroupOptionsPatch<TGroupOption>;
 export function buildSbtSelectorGroupOptionsPatch(
-  args?: BuildSbtSelectorGroupOptionsPatchArgs
+  args?: BuildSbtSelectorGroupOptionsPatchArgs,
 ): SbtSelectorGroupOptionsPatch;
 export function buildSbtSelectorGroupOptionsPatch({
   groupOptions = [],
 }: BuildSbtSelectorGroupOptionsPatchArgs = {}): SbtSelectorGroupOptionsPatch {
   return {
-  groupOptions: Array.isArray(groupOptions) ? groupOptions : [],
+    groupOptions: Array.isArray(groupOptions) ? groupOptions : [],
   };
 }
 

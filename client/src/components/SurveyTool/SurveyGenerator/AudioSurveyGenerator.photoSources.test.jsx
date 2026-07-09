@@ -29,7 +29,7 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
 
   it('blocks question generation when photo analysis is unsupported by the configured AI provider or model', async () => {
     mockAnalyzePhotoForQuestionGeneration.mockRejectedValueOnce(
-      new Error('Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model.')
+      new Error('Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model.'),
     );
 
     await renderSubject(
@@ -41,7 +41,7 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
         toggleLoginModal={jest.fn()}
         activeSessionSlug="edge"
         sessionConfig={makeSessionConfig()}
-      />
+      />,
     );
 
     addAdditionalPhoto();
@@ -54,7 +54,9 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     expect(mockAnalyzePhotoForQuestionGeneration).toHaveBeenCalledTimes(1);
     expect(mockCallAI).not.toHaveBeenCalled();
     expect(mockUploadDocLibraryFile).not.toHaveBeenCalled();
-    expect(container.textContent).toContain('Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model.');
+    expect(container.textContent).toContain(
+      'Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model.',
+    );
     expect(container.textContent).toContain('Photo analysis failed for memo.png');
   });
 
@@ -63,16 +65,18 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     mockAnalyzePhotoForQuestionGeneration.mockResolvedValueOnce({
       text: 'This screenshot shows a policy whiteboard with three budget scenarios, two risk warnings, and a recommendation to phase in disclosure requirements over six months.',
     });
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Photo Survey',
-      questions: [
-        {
-          prompt: 'Should the phased disclosure plan move forward?',
-          questionType: 'binary',
-          tags: ['photo'],
-        },
-      ],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Photo Survey',
+        questions: [
+          {
+            prompt: 'Should the phased disclosure plan move forward?',
+            questionType: 'binary',
+            tags: ['photo'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -83,7 +87,7 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
         toggleLoginModal={jest.fn()}
         activeSessionSlug="edge"
         sessionConfig={makeSessionConfig()}
-      />
+      />,
     );
 
     addAdditionalPhoto(photo);
@@ -93,9 +97,12 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
       form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
 
-    expect(mockAnalyzePhotoForQuestionGeneration).toHaveBeenCalledWith(photo, expect.objectContaining({
-      sessionSlug: 'edge',
-    }));
+    expect(mockAnalyzePhotoForQuestionGeneration).toHaveBeenCalledWith(
+      photo,
+      expect.objectContaining({
+        sessionSlug: 'edge',
+      }),
+    );
     expect(mockProcessAdditionalSources).not.toHaveBeenCalled();
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     expect(mockCallAI.mock.calls[0][0]).toContain('Photo Source: whiteboard.png');
@@ -109,16 +116,18 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     mockAnalyzePhotoForQuestionGeneration.mockResolvedValueOnce({
       text: 'This screenshot shows a policy whiteboard with three budget scenarios, two risk warnings, and a recommendation to phase in disclosure requirements over six months.',
     });
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Photo Survey',
-      questions: [
-        {
-          prompt: 'Should the phased disclosure plan move forward?',
-          questionType: 'binary',
-          tags: ['photo'],
-        },
-      ],
-    }));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Photo Survey',
+        questions: [
+          {
+            prompt: 'Should the phased disclosure plan move forward?',
+            questionType: 'binary',
+            tags: ['photo'],
+          },
+        ],
+      }),
+    );
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -129,7 +138,7 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
         toggleLoginModal={jest.fn()}
         activeSessionSlug="edge"
         sessionConfig={makeSessionConfig()}
-      />
+      />,
     );
 
     addAdditionalPhoto(photo);
@@ -151,7 +160,7 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     toggleCheckbox(analysisToggle);
     expect(getPhotoAnalysisToggleBySourceId(sourceId).getAttribute('aria-expanded')).toBe('true');
     expect(getPhotoAnalysisBodyBySourceId(sourceId).textContent).toContain(
-      'phase in disclosure requirements over six months'
+      'phase in disclosure requirements over six months',
     );
 
     toggleCheckbox(getPhotoAnalysisToggleBySourceId(sourceId));
@@ -169,7 +178,7 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
         toggleLoginModal={jest.fn()}
         activeSessionSlug="edge"
         sessionConfig={makeSessionConfig()}
-      />
+      />,
     );
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeNull();
@@ -183,9 +192,7 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`)).toBeNull();
 
     await act(async () => {
-      container
-        .querySelector('button[title="Add URL"]')
-        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      container.querySelector('button[title="Add URL"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeTruthy();
@@ -199,18 +206,14 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
         account="0x123"
         loginComplete
         toggleLoginModal={jest.fn()}
-      />
+      />,
     );
 
-    mockFetchImageFromURL.mockResolvedValueOnce(
-      new File(['remote-image'], 'remote_image.png', { type: 'image/png' })
-    );
+    mockFetchImageFromURL.mockResolvedValueOnce(new File(['remote-image'], 'remote_image.png', { type: 'image/png' }));
     setInputValue('input[placeholder="Add URL"]', 'https://example.com/context.png');
 
     await act(async () => {
-      container
-        .querySelector('button[title="Add URL"]')
-        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      container.querySelector('button[title="Add URL"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/context.png');
@@ -226,18 +229,16 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
         account="0x123"
         loginComplete
         toggleLoginModal={jest.fn()}
-      />
+      />,
     );
 
     mockFetchImageFromURL.mockResolvedValueOnce(
-      new File(['remote-svg'], 'remote_image.svg', { type: 'image/svg+xml' })
+      new File(['remote-svg'], 'remote_image.svg', { type: 'image/svg+xml' }),
     );
     setInputValue('input[placeholder="Add URL"]', 'https://example.com/context.png');
 
     await act(async () => {
-      container
-        .querySelector('button[title="Add URL"]')
-        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      container.querySelector('button[title="Add URL"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/context.png');
@@ -256,15 +257,13 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
         account="0x123"
         loginComplete
         toggleLoginModal={jest.fn()}
-      />
+      />,
     );
 
     setInputValue('input[placeholder="Add URL"]', 'https://example.com/assets/render?id=123');
 
     await act(async () => {
-      container
-        .querySelector('button[title="Add URL"]')
-        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      container.querySelector('button[title="Add URL"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(mockFetchImageFromURL).not.toHaveBeenCalled();
@@ -281,15 +280,13 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
         account="0x123"
         loginComplete
         toggleLoginModal={jest.fn()}
-      />
+      />,
     );
 
     setInputValue('input[placeholder="Add URL"]', 'https://example.com/articles/policy-context');
 
     await act(async () => {
-      container
-        .querySelector('button[title="Add URL"]')
-        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      container.querySelector('button[title="Add URL"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(mockFetchImageFromURL).not.toHaveBeenCalled();
@@ -306,12 +303,12 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
         account="0x123"
         loginComplete
         toggleLoginModal={jest.fn()}
-      />
+      />,
     );
 
     expect(container.querySelectorAll('input[placeholder="Add URL"]')).toHaveLength(1);
     expect(
-      Array.from(container.querySelectorAll('button')).filter((node) => node.textContent.trim() === 'URL')
+      Array.from(container.querySelectorAll('button')).filter((node) => node.textContent.trim() === 'URL'),
     ).toHaveLength(0);
   });
 
@@ -323,7 +320,7 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
         account="0x123"
         loginComplete
         toggleLoginModal={jest.fn()}
-      />
+      />,
     );
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_TITLE_INPUT}"]`)).toBeNull();
@@ -341,7 +338,7 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
         account="0x123"
         loginComplete
         toggleLoginModal={jest.fn()}
-      />
+      />,
     );
 
     const fileInput = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}"]`);
@@ -363,11 +360,13 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
           sessionId: '0xSessionToken',
           sessionIdHex: `0x${'8'.repeat(32)}`,
         })}
-      />
+      />,
     );
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_TITLE_INPUT}"]`)).toBeNull();
-    setAudioInputValue('These are durable context notes that should generate questions without exposing a direct context upload action.');
+    setAudioInputValue(
+      'These are durable context notes that should generate questions without exposing a direct context upload action.',
+    );
 
     expect(findGenerateQuestionsButton()).toBeTruthy();
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`)).toBeNull();

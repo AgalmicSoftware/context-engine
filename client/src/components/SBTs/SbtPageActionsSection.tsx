@@ -1,15 +1,10 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faChevronDown,
-  faChevronUp,
-} from '@fortawesome/free-solid-svg-icons';
+import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SBTPage.module.scss';
 import SbtPageActionFeedbackDisplay from './SbtPageActionFeedbackDisplay';
-import {
-  resolveSbtPageActionFeedbackDisplayDescriptor,
-} from './sbtPageActionFeedbackDisplayState';
+import { resolveSbtPageActionFeedbackDisplayDescriptor } from './sbtPageActionFeedbackDisplayState';
 
 type SbtPageActionFeedbackState = {
   showBurnSuccess?: boolean;
@@ -74,11 +69,7 @@ const SbtPageActionsSection = ({
   toggleState = {},
   transactionState = {},
 }: SbtPageActionsSectionProps): React.ReactElement => {
-  const {
-    isOpen = false,
-    shouldRenderClosedIcon = false,
-    shouldRenderOpenIcon = false,
-  } = toggleState;
+  const { isOpen = false, shouldRenderClosedIcon = false, shouldRenderOpenIcon = false } = toggleState;
   const feedbackDisplayDescriptor = resolveSbtPageActionFeedbackDisplayDescriptor({
     actionFeedbackState,
     errorMessage,
@@ -96,8 +87,7 @@ const SbtPageActionsSection = ({
   return (
     <div className={styles.actionsSection}>
       <h2 className={sectionHeaderClassName} onClick={onToggle}>
-        ACTIONS{' '}
-        {shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
+        ACTIONS {shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
         {shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
       </h2>
       {isOpen && (

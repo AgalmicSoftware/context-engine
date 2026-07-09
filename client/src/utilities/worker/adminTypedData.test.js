@@ -9,14 +9,16 @@ import {
 
 describe('adminTypedData', () => {
   it('builds typed data with trimmed fields and numeric expiration', () => {
-    expect(buildAdminActionTypedData({
-      action: ' set-config ',
-      slug: ' edge ',
-      bodyHash: ' 0xabc ',
-      nonce: ' nonce-1 ',
-      audience: ' https://contextengine.xyz ',
-      expiration: '123',
-    })).toEqual({
+    expect(
+      buildAdminActionTypedData({
+        action: ' set-config ',
+        slug: ' edge ',
+        bodyHash: ' 0xabc ',
+        nonce: ' nonce-1 ',
+        audience: ' https://contextengine.xyz ',
+        expiration: '123',
+      }),
+    ).toEqual({
       domain: ADMIN_ACTION_DOMAIN,
       primaryType: 'AdminAction',
       types: {
@@ -60,9 +62,7 @@ describe('adminTypedData', () => {
         allowOrigins: ['https://contextengine.xyz'],
       },
     };
-    const expectedHash = ethers.utils.keccak256(
-      ethers.utils.toUtf8Bytes(JSON.stringify(expectedUnsignedPayload))
-    );
+    const expectedHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(JSON.stringify(expectedUnsignedPayload)));
 
     expect(buildAdminActionBodyHash(unsignedBody)).toBe(expectedHash);
     expect(buildAdminActionBodyHash(wrappedBody)).toBe(expectedHash);

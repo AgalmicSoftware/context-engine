@@ -1,23 +1,17 @@
 import { ethers } from 'ethers';
 
-import {
-  base64urlToHex,
-  generateQuestionId,
-  hexToBase64url,
-} from './questionUtils.mjs';
+import { base64urlToHex, generateQuestionId, hexToBase64url } from './questionUtils.mjs';
 
 describe('questionUtils', () => {
   it('generates stable question ids for multichoice prompts', () => {
     expect(generateQuestionId('multichoice', 'Prompt', ['Yes', 'No'], true)).toBe(
-      ethers.utils.id('multichoice:prompt:yes,no:single')
+      ethers.utils.id('multichoice:prompt:yes,no:single'),
     );
   });
 
   it('normalizes surrounding whitespace before hashing question ids', () => {
-    expect(
-      generateQuestionId('multichoice', 'What is your name? ', [' Yes ', 'No  '], true)
-    ).toBe(
-      generateQuestionId('multichoice', 'What is your name?', ['Yes', 'No'], true)
+    expect(generateQuestionId('multichoice', 'What is your name? ', [' Yes ', 'No  '], true)).toBe(
+      generateQuestionId('multichoice', 'What is your name?', ['Yes', 'No'], true),
     );
   });
 

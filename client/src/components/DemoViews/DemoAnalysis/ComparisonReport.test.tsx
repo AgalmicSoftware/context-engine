@@ -17,9 +17,7 @@ const comparisonGroups = [
   { segmentKey: 'Era:Industrial', name: 'Era: Industrial' },
 ];
 
-const questions = [
-  { id: 'q1', text: 'Should advanced AI systems be openly audited?' },
-];
+const questions = [{ id: 'q1', text: 'Should advanced AI systems be openly audited?' }];
 
 const flatResponses = [
   { questionId: 'q1', responseText: 'Agree', segmentKey: 'Era:Modern', rate: 0.9 },
@@ -41,11 +39,7 @@ describe('ComparisonReport', () => {
 
   it('renders report cards with candlestick distributions instead of response labels', () => {
     render(
-      <ComparisonReport
-        flatResponses={flatResponses}
-        questions={questions}
-        comparisonGroups={comparisonGroups}
-      />
+      <ComparisonReport flatResponses={flatResponses} questions={questions} comparisonGroups={comparisonGroups} />,
     );
 
     expect(screen.queryByText(/Consensus:\s*Minimum agreement of/i)).not.toBeInTheDocument();
@@ -58,16 +52,14 @@ describe('ComparisonReport', () => {
     expect(screen.getAllByText(/Agree 90%/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Unsure 30%/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Disagree 60%/i).length).toBeGreaterThan(0);
-    expect(screen.queryByRole('button', { name: /Should advanced AI systems be openly audited/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Should advanced AI systems be openly audited/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('renders the beeswarm tooltip response as a styled pill', () => {
     const { container } = render(
-      <ComparisonReport
-        flatResponses={flatResponses}
-        questions={questions}
-        comparisonGroups={comparisonGroups}
-      />
+      <ComparisonReport flatResponses={flatResponses} questions={questions} comparisonGroups={comparisonGroups} />,
     );
 
     const firstPoint = container.querySelector('circle');
@@ -92,7 +84,7 @@ describe('ComparisonReport', () => {
         }}
         selectedTagIDs={['governance']}
         onSelectedTagIDsChange={onSelectedTagIDsChange}
-      />
+      />,
     );
 
     const governanceCheckbox = screen.getByLabelText(/Governance \(3\)/i);
@@ -105,11 +97,7 @@ describe('ComparisonReport', () => {
 
   it('collapses the full comparison report body while keeping the report summary visible', () => {
     render(
-      <ComparisonReport
-        flatResponses={flatResponses}
-        questions={questions}
-        comparisonGroups={comparisonGroups}
-      />
+      <ComparisonReport flatResponses={flatResponses} questions={questions} comparisonGroups={comparisonGroups} />,
     );
 
     const toggle = screen.getByTestId('demo-analysis-comparison-report-toggle');

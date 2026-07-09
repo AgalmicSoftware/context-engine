@@ -13,11 +13,7 @@ import {
   isReservedSessionSlugKey,
   resolveCanonicalSessionConfig,
 } from './canonicalSessionContext.js';
-import type {
-  SessionConfig,
-  SessionContractRef as BoundarySessionContractRef,
-  UnknownRecord,
-} from './sessionTypes.js';
+import type { SessionConfig, SessionContractRef as BoundarySessionContractRef, UnknownRecord } from './sessionTypes.js';
 
 type SessionContractRef = {
   address?: string;
@@ -73,18 +69,21 @@ export const normalizeSessionSlug = (rawSlug: unknown): string => {
 
 export const normalizeRegistrySessionSlugForWrite = (rawSlug: unknown): string => {
   const normalized = toStr(rawSlug).trim().toLowerCase();
-  const defaultAlias = toStr(DEFAULT_SESSION_SLUG_ALIAS || 'general').trim().toLowerCase() || 'general';
+  const defaultAlias =
+    toStr(DEFAULT_SESSION_SLUG_ALIAS || 'general')
+      .trim()
+      .toLowerCase() || 'general';
   if (!normalized || normalized === defaultAlias) return defaultAlias;
   return normalized;
 };
 
-export const validateRegistrySessionSlugForWrite = (
-  rawSlug: unknown,
-  { allowDefault = true } = {}
-) => {
+export const validateRegistrySessionSlugForWrite = (rawSlug: unknown, { allowDefault = true } = {}) => {
   const input = toStr(rawSlug).trim();
   const slug = normalizeRegistrySessionSlugForWrite(rawSlug);
-  const defaultAlias = toStr(DEFAULT_SESSION_SLUG_ALIAS || 'general').trim().toLowerCase() || 'general';
+  const defaultAlias =
+    toStr(DEFAULT_SESSION_SLUG_ALIAS || 'general')
+      .trim()
+      .toLowerCase() || 'general';
 
   if (!allowDefault && slug === defaultAlias && (!input || input.toLowerCase() === defaultAlias)) {
     return {
@@ -158,25 +157,15 @@ export const resolveSessionSlugFromPathname = (pathname: unknown = ''): string |
   }
 };
 
-export const resolveActiveSessionSlug = (input: UnknownRecord = {}): string => normalizeSessionSlug(
-  input.activeSessionSlug ??
-  input.sessionSlug ??
-  input.slug
-);
+export const resolveActiveSessionSlug = (input: UnknownRecord = {}): string =>
+  normalizeSessionSlug(input.activeSessionSlug ?? input.sessionSlug ?? input.slug);
 
-export const resolveSessionSlug = (input: UnknownRecord = {}): string => normalizeSessionSlug(
-  input.sessionSlug ??
-  input.activeSessionSlug ??
-  input.slug
-);
+export const resolveSessionSlug = (input: UnknownRecord = {}): string =>
+  normalizeSessionSlug(input.sessionSlug ?? input.activeSessionSlug ?? input.slug);
 
-export const resolveSessionSlugPinned = (input: UnknownRecord = {}): boolean => (
-  !!(input.sessionSlugPinned)
-);
+export const resolveSessionSlugPinned = (input: UnknownRecord = {}): boolean => !!input.sessionSlugPinned;
 
-export const resolveSessionName = (input: UnknownRecord = {}): string => (
-  toStr(input.sessionName ?? '').trim()
-);
+export const resolveSessionName = (input: UnknownRecord = {}): string => toStr(input.sessionName ?? '').trim();
 
 export const resolveSessionAliases = (input: UnknownRecord = {}) => {
   const activeSessionSlug = resolveActiveSessionSlug(input);
@@ -200,19 +189,9 @@ const normalizeContractRef = (value: unknown): SessionContractRef | null => {
   if (!isObj(value)) return null;
   const source = value as BoundarySessionContractRef;
   const address = toStr(
-    source.address ??
-    source.contractAddress ??
-    source.addr ??
-    source.target ??
-    source.value ??
-    ''
+    source.address ?? source.contractAddress ?? source.addr ?? source.target ?? source.value ?? '',
   ).trim();
-  const chainId = toPositiveNumber(
-    source.chainId ??
-    source.chainID ??
-    source.networkChainId ??
-    source.chain
-  );
+  const chainId = toPositiveNumber(source.chainId ?? source.chainID ?? source.networkChainId ?? source.chain);
   if (!address && !chainId) return null;
   return {
     ...(address ? { address } : {}),
@@ -220,10 +199,7 @@ const normalizeContractRef = (value: unknown): SessionContractRef | null => {
   };
 };
 
-const pickContractRefFromMap = (
-  contracts: unknown,
-  keys: ReadonlyArray<string> = []
-): SessionContractRef | null => {
+const pickContractRefFromMap = (contracts: unknown, keys: ReadonlyArray<string> = []): SessionContractRef | null => {
   if (!isObj(contracts)) return null;
   for (const key of keys) {
     if (!Object.prototype.hasOwnProperty.call(contracts, key)) continue;
@@ -242,10 +218,7 @@ const pickFirstStringFromConfig = (cfg: unknown, keys: ReadonlyArray<string> = [
   return '';
 };
 
-const pickFirstChainIdFromConfig = (
-  cfg: unknown,
-  keys: ReadonlyArray<string> = []
-): number | undefined => {
+const pickFirstChainIdFromConfig = (cfg: unknown, keys: ReadonlyArray<string> = []): number | undefined => {
   if (!isObj(cfg)) return undefined;
   for (const key of keys) {
     const value = toPositiveNumber(cfg[key]);
@@ -273,7 +246,7 @@ export const mergeSessionContractMaps = (...maps: unknown[]): SessionContractMap
 
 export const resolveSessionConfigAliases = (
   input: UnknownRecord = {},
-  opts: ResolveSessionConfigAliasesOptions = {}
+  opts: ResolveSessionConfigAliasesOptions = {},
 ): ResolvedSessionConfigAliases => {
   const source = isObj(input) ? input : {};
   const defaults = isObj(opts.defaults) ? opts.defaults : {};
@@ -298,15 +271,14 @@ export const resolveSessionConfigAliases = (
 export const resolveSessionContractRef = (input: UnknownRecord = {}) => {
   const aliases = resolveSessionConfigAliases(input, {
     defaults: isObj(input.defaults) ? input.defaults : undefined,
-    resolveBySlug: typeof input.resolveBySlug === 'function'
-      ? input.resolveBySlug as (slug: string) => unknown
-      : null,
+    resolveBySlug:
+      typeof input.resolveBySlug === 'function' ? (input.resolveBySlug as (slug: string) => unknown) : null,
     fallbackConfig: input.fallbackConfig,
   });
   const cfg = isObj(aliases.sessionConfig) ? aliases.sessionConfig : null;
   const contracts = mergeSessionContractMaps(
     isObj(cfg?.contracts) ? cfg.contracts : null,
-    isObj(input.contracts) ? input.contracts : null
+    isObj(input.contracts) ? input.contracts : null,
   );
   const contractKey = toStr(input.contractKey || '').trim();
   if (!contractKey) {
@@ -328,22 +300,14 @@ export const resolveSessionContractRef = (input: UnknownRecord = {}) => {
   }
   const refFromMap = pickContractRefFromMap(contracts, keyAliases) || {};
 
-  const addressFallbackAliases = (
-    (CONTRACT_ADDRESS_ALIASES as Record<string, readonly string[]>)[contractKey] || []
-  );
-  const chainIdFallbackAliases = (
-    (CONTRACT_CHAINID_ALIASES as Record<string, readonly string[]>)[contractKey] || []
-  );
+  const addressFallbackAliases = (CONTRACT_ADDRESS_ALIASES as Record<string, readonly string[]>)[contractKey] || [];
+  const chainIdFallbackAliases = (CONTRACT_CHAINID_ALIASES as Record<string, readonly string[]>)[contractKey] || [];
 
-  const address = (
-    toStr(refFromMap.address).trim() ||
-    pickFirstStringFromConfig(cfg, addressFallbackAliases)
-  );
-  const chainId = (
+  const address = toStr(refFromMap.address).trim() || pickFirstStringFromConfig(cfg, addressFallbackAliases);
+  const chainId =
     toPositiveNumber(refFromMap.chainId) ||
     pickFirstChainIdFromConfig(cfg, chainIdFallbackAliases) ||
-    toPositiveNumber(cfg?.networkChainId)
-  );
+    toPositiveNumber(cfg?.networkChainId);
 
   return {
     ...aliases,

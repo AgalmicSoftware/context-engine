@@ -6,17 +6,19 @@ import {
 
 describe('surveyResultsDemoSurfaceProps', () => {
   it('returns null when alternate demo results are not selected', () => {
-    expect(buildSurveyResultsDemoSurfaceProps({
-      activeSlug: 'session-a',
-      getIndividualsAggregator: jest.fn(),
-      getPolisQuestionResponses: jest.fn(),
-      isDemoAlternateResultsView: false,
-      onAtlasModalClose: jest.fn(),
-      onAtlasNodeOpen: jest.fn(),
-      parentProps: {},
-      state: {},
-      viewKey: 'report',
-    })).toBeNull();
+    expect(
+      buildSurveyResultsDemoSurfaceProps({
+        activeSlug: 'session-a',
+        getIndividualsAggregator: jest.fn(),
+        getPolisQuestionResponses: jest.fn(),
+        isDemoAlternateResultsView: false,
+        onAtlasModalClose: jest.fn(),
+        onAtlasNodeOpen: jest.fn(),
+        parentProps: {},
+        state: {},
+        viewKey: 'report',
+      }),
+    ).toBeNull();
   });
 
   it('builds report props from aggregate question responses', () => {
@@ -121,17 +123,19 @@ describe('surveyResultsDemoSurfaceProps', () => {
   });
 
   it('projects parent props used by the demo surface', () => {
-    expect(createSurveyResultsDemoSurfaceParentProps({
-      defaultTags: ['tag'],
-      filterState: { selectedTags: ['tag'] },
-      ignored: true,
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: false,
-      network: { id: 11155420 },
-      networkChainId: 11155420,
-      questionResponsesNonce: 3,
-      questionScanProgress: { done: 1 },
-    })).toEqual({
+    expect(
+      createSurveyResultsDemoSurfaceParentProps({
+        defaultTags: ['tag'],
+        filterState: { selectedTags: ['tag'] },
+        ignored: true,
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: false,
+        network: { id: 11155420 },
+        networkChainId: 11155420,
+        questionResponsesNonce: 3,
+        questionScanProgress: { done: 1 },
+      }),
+    ).toEqual({
       defaultTags: ['tag'],
       filterState: { selectedTags: ['tag'] },
       isQuestionCacheReady: true,

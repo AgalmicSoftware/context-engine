@@ -31,41 +31,49 @@ describe('ContractPage session resolution', () => {
   it('delegates slug lookup through the general alias when allowed', () => {
     const { resolveBySlug, resolveDemoBySlug, getDefaultSessionConfig } = createReaders();
 
-    expect(resolveContractPageSessionConfig('general', {
-      allowGeneral: true,
-      resolveBySlug,
-      resolveDemoBySlug,
-      getDefaultSessionConfig,
-    })).toBe(sessionConfigs['']);
+    expect(
+      resolveContractPageSessionConfig('general', {
+        allowGeneral: true,
+        resolveBySlug,
+        resolveDemoBySlug,
+        getDefaultSessionConfig,
+      }),
+    ).toBe(sessionConfigs['']);
     expect(resolveBySlug).toHaveBeenCalledWith('');
   });
 
   it('does not silently inherit the general session for unknown non-general slugs', () => {
     const { resolveBySlug, resolveDemoBySlug, getDefaultSessionConfig } = createReaders();
 
-    expect(resolveContractPageSessionConfig('missing-session-slug', {
-      resolveBySlug,
-      resolveDemoBySlug,
-      getDefaultSessionConfig,
-    })).toBeNull();
+    expect(
+      resolveContractPageSessionConfig('missing-session-slug', {
+        resolveBySlug,
+        resolveDemoBySlug,
+        getDefaultSessionConfig,
+      }),
+    ).toBeNull();
     expect(getDefaultSessionConfig).not.toHaveBeenCalled();
   });
 
   it('only resolves the general session when the caller explicitly allows it', () => {
     const { resolveBySlug, resolveDemoBySlug, getDefaultSessionConfig } = createReaders();
 
-    expect(resolveContractPageSessionConfig('general', {
-      resolveBySlug,
-      resolveDemoBySlug,
-      getDefaultSessionConfig,
-    })).toBeNull();
+    expect(
+      resolveContractPageSessionConfig('general', {
+        resolveBySlug,
+        resolveDemoBySlug,
+        getDefaultSessionConfig,
+      }),
+    ).toBeNull();
 
-    expect(resolveContractPageSessionConfig('general', {
-      allowGeneral: true,
-      resolveBySlug: jest.fn(() => null),
-      resolveDemoBySlug,
-      getDefaultSessionConfig,
-    })).toBe(sessionConfigs['']);
+    expect(
+      resolveContractPageSessionConfig('general', {
+        allowGeneral: true,
+        resolveBySlug: jest.fn(() => null),
+        resolveDemoBySlug,
+        getDefaultSessionConfig,
+      }),
+    ).toBe(sessionConfigs['']);
   });
 
   it('uses explicit demo fallback for canonical session slugs when strict lookup misses', () => {
@@ -75,11 +83,13 @@ describe('ContractPage session resolution', () => {
       demoConfigs: { rxc: demoSession },
     });
 
-    expect(resolveContractPageSessionConfig('rxc', {
-      resolveBySlug,
-      resolveDemoBySlug,
-      getDefaultSessionConfig,
-    })).toBe(demoSession);
+    expect(
+      resolveContractPageSessionConfig('rxc', {
+        resolveBySlug,
+        resolveDemoBySlug,
+        getDefaultSessionConfig,
+      }),
+    ).toBe(demoSession);
     expect(resolveBySlug).toHaveBeenCalledWith('rxc');
     expect(resolveDemoBySlug).toHaveBeenCalledWith('rxc');
     expect(getDefaultSessionConfig).not.toHaveBeenCalled();
@@ -88,42 +98,48 @@ describe('ContractPage session resolution', () => {
   it('preserves ContractPage source precedence while skipping unresolved higher-priority slugs', () => {
     const { resolveBySlug, resolveDemoBySlug, getDefaultSessionConfig } = createReaders();
 
-    expect(resolveContractPageActiveSession({
-      urlSlugLike: 'missing-session-slug',
-      querySessionRaw: 'rxc',
-      activeSessionSlug: 'route',
-      reduxActiveSessionSlug: 'redux',
-      referrerSlug: 'ref',
-      resolveBySlug,
-      resolveDemoBySlug,
-      getDefaultSessionConfig,
-    })).toBe(sessionConfigs.rxc);
+    expect(
+      resolveContractPageActiveSession({
+        urlSlugLike: 'missing-session-slug',
+        querySessionRaw: 'rxc',
+        activeSessionSlug: 'route',
+        reduxActiveSessionSlug: 'redux',
+        referrerSlug: 'ref',
+        resolveBySlug,
+        resolveDemoBySlug,
+        getDefaultSessionConfig,
+      }),
+    ).toBe(sessionConfigs.rxc);
 
-    expect(resolveContractPageActiveSession({
-      urlSlugLike: 'edge',
-      querySessionRaw: 'rxc',
-      activeSessionSlug: 'route',
-      reduxActiveSessionSlug: 'redux',
-      referrerSlug: 'ref',
-      resolveBySlug,
-      resolveDemoBySlug,
-      getDefaultSessionConfig,
-    })).toBe(sessionConfigs.edge);
+    expect(
+      resolveContractPageActiveSession({
+        urlSlugLike: 'edge',
+        querySessionRaw: 'rxc',
+        activeSessionSlug: 'route',
+        reduxActiveSessionSlug: 'redux',
+        referrerSlug: 'ref',
+        resolveBySlug,
+        resolveDemoBySlug,
+        getDefaultSessionConfig,
+      }),
+    ).toBe(sessionConfigs.edge);
   });
 
   it('preserves explicit active session slugs before generic /contracts sync uses them', () => {
     const { resolveBySlug, resolveDemoBySlug, getDefaultSessionConfig } = createReaders();
 
-    expect(resolveContractPageActiveSession({
-      urlSlugLike: undefined,
-      querySessionRaw: null,
-      activeSessionSlug: 'rxc',
-      reduxActiveSessionSlug: '',
-      referrerSlug: '',
-      resolveBySlug,
-      resolveDemoBySlug,
-      getDefaultSessionConfig,
-    })).toBe(sessionConfigs.rxc);
+    expect(
+      resolveContractPageActiveSession({
+        urlSlugLike: undefined,
+        querySessionRaw: null,
+        activeSessionSlug: 'rxc',
+        reduxActiveSessionSlug: '',
+        referrerSlug: '',
+        resolveBySlug,
+        resolveDemoBySlug,
+        getDefaultSessionConfig,
+      }),
+    ).toBe(sessionConfigs.rxc);
     expect(resolveBySlug).toHaveBeenCalledWith('rxc');
   });
 
@@ -139,16 +155,18 @@ describe('ContractPage session resolution', () => {
       demoConfigs: { edge: demoEdgeSession },
     });
 
-    expect(resolveContractPageActiveSession({
-      urlSlugLike: 'edge',
-      querySessionRaw: 'route',
-      activeSessionSlug: 'redux',
-      reduxActiveSessionSlug: 'ref',
-      referrerSlug: '',
-      resolveBySlug,
-      resolveDemoBySlug,
-      getDefaultSessionConfig,
-    })).toBe(demoEdgeSession);
+    expect(
+      resolveContractPageActiveSession({
+        urlSlugLike: 'edge',
+        querySessionRaw: 'route',
+        activeSessionSlug: 'redux',
+        reduxActiveSessionSlug: 'ref',
+        referrerSlug: '',
+        resolveBySlug,
+        resolveDemoBySlug,
+        getDefaultSessionConfig,
+      }),
+    ).toBe(demoEdgeSession);
     expect(resolveDemoBySlug).toHaveBeenCalledWith('edge');
   });
 

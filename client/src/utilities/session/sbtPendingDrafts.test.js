@@ -1,22 +1,21 @@
-import {
-  buildPendingSbtDeploySessionConfig,
-  clonePendingSbtDeployContracts,
-} from './sbtPendingDrafts.js';
+import { buildPendingSbtDeploySessionConfig, clonePendingSbtDeployContracts } from './sbtPendingDrafts.js';
 
 describe('sbtPendingDrafts helpers', () => {
   it('normalizes pending SBT contract entries from strings and alias fields', () => {
-    expect(clonePendingSbtDeployContracts({
-      featured: ' 0x00000000000000000000000000000000000000aa ',
-      invite: {
-        contractAddress: '0x00000000000000000000000000000000000000bb',
-        chainID: '84532',
-      },
-      chainOnly: {
-        chain: 11155420,
-      },
-      empty: '',
-      list: ['0x00000000000000000000000000000000000000cc'],
-    })).toEqual({
+    expect(
+      clonePendingSbtDeployContracts({
+        featured: ' 0x00000000000000000000000000000000000000aa ',
+        invite: {
+          contractAddress: '0x00000000000000000000000000000000000000bb',
+          chainID: '84532',
+        },
+        chainOnly: {
+          chain: 11155420,
+        },
+        empty: '',
+        list: ['0x00000000000000000000000000000000000000cc'],
+      }),
+    ).toEqual({
       featured: {
         address: '0x00000000000000000000000000000000000000aa',
       },
@@ -31,15 +30,17 @@ describe('sbtPendingDrafts helpers', () => {
   });
 
   it('builds a minimal deploy session config from fallback inputs', () => {
-    expect(buildPendingSbtDeploySessionConfig({
-      sessionSlug: 'edge-session',
-      networkChainId: '84532',
-      contracts: {
-        access: {
-          addr: '0x00000000000000000000000000000000000000aa',
+    expect(
+      buildPendingSbtDeploySessionConfig({
+        sessionSlug: 'edge-session',
+        networkChainId: '84532',
+        contracts: {
+          access: {
+            addr: '0x00000000000000000000000000000000000000aa',
+          },
         },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'edge-session',
       networkChainId: 84532,
       contracts: {
@@ -51,21 +52,23 @@ describe('sbtPendingDrafts helpers', () => {
   });
 
   it('prefers explicit contract input over session config contracts', () => {
-    expect(buildPendingSbtDeploySessionConfig({
-      sessionConfig: {
-        sessionSlug: 'registry-session',
-        chainId: 11155420,
+    expect(
+      buildPendingSbtDeploySessionConfig({
+        sessionConfig: {
+          sessionSlug: 'registry-session',
+          chainId: 11155420,
+          contracts: {
+            stale: '0x00000000000000000000000000000000000000ff',
+          },
+        },
         contracts: {
-          stale: '0x00000000000000000000000000000000000000ff',
+          fresh: {
+            target: '0x00000000000000000000000000000000000000dd',
+            chainId: '84532',
+          },
         },
-      },
-      contracts: {
-        fresh: {
-          target: '0x00000000000000000000000000000000000000dd',
-          chainId: '84532',
-        },
-      },
-    })).toEqual({
+      }),
+    ).toEqual({
       slug: 'registry-session',
       networkChainId: 11155420,
       contracts: {
@@ -78,9 +81,11 @@ describe('sbtPendingDrafts helpers', () => {
   });
 
   it('returns null when no deploy context is available', () => {
-    expect(buildPendingSbtDeploySessionConfig({
-      sessionConfig: [],
-      contracts: [],
-    })).toBeNull();
+    expect(
+      buildPendingSbtDeploySessionConfig({
+        sessionConfig: [],
+        contracts: [],
+      }),
+    ).toBeNull();
   });
 });

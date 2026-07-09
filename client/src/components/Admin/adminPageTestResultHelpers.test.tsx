@@ -1,9 +1,6 @@
 import { render, screen } from '@testing-library/react';
 
-import {
-  isAdminLinkedResult,
-  renderAdminTestResult,
-} from './adminPageTestResultHelpers';
+import { isAdminLinkedResult, renderAdminTestResult } from './adminPageTestResultHelpers';
 
 describe('adminPageTestResultHelpers', () => {
   it('renders empty, text, and non-linked result states without changing labels', () => {

@@ -38,13 +38,16 @@ describe('onePageSessionTelegramController', () => {
   });
 
   it('builds the resolved-session request without changing source fields', () => {
-    const request = buildCurrentSessionConfigRequest({
-      slug: 'fallback',
-      sessionConfig: { slug: 'Config' },
-      sessionName: 'Name',
-      questionsGenPrompt: 'Prompt',
-      contracts: { sessionRegistry: '0xregistry' },
-    }, () => '');
+    const request = buildCurrentSessionConfigRequest(
+      {
+        slug: 'fallback',
+        sessionConfig: { slug: 'Config' },
+        sessionName: 'Name',
+        questionsGenPrompt: 'Prompt',
+        contracts: { sessionRegistry: '0xregistry' },
+      },
+      () => '',
+    );
 
     expect(request).toEqual({
       slug: 'config',
@@ -58,23 +61,27 @@ describe('onePageSessionTelegramController', () => {
   });
 
   it('resolves agent bridge URL precedence and trims trailing slashes', () => {
-    expect(resolveTelegramAgentBridgeUrl({
-      agentBridgeUrl: 'https://primary.example///',
-      telegram: { workerUrl: 'https://telegram.example' },
-    })).toBe('https://primary.example');
+    expect(
+      resolveTelegramAgentBridgeUrl({
+        agentBridgeUrl: 'https://primary.example///',
+        telegram: { workerUrl: 'https://telegram.example' },
+      }),
+    ).toBe('https://primary.example');
 
-    expect(resolveTelegramAgentBridgeUrl({
-      telegram: { workerUrl: 'https://telegram.example/' },
-    })).toBe('https://telegram.example');
+    expect(
+      resolveTelegramAgentBridgeUrl({
+        telegram: { workerUrl: 'https://telegram.example/' },
+      }),
+    ).toBe('https://telegram.example');
 
     expect(resolveTelegramAgentBridgeUrl({})).toBe(DEFAULT_AGENT_BRIDGE_URL);
   });
 
   it('builds auth failure state with the current fallback message', () => {
-    expect(buildTelegramAuthFailureState('').telegramQuestionSubmitError)
-      .toBe('Telegram session expired. Paste a fresh agent token.');
-    expect(buildTelegramAuthFailureState('scope_denied').telegramQuestionSubmitError)
-      .toBe('scope_denied');
+    expect(buildTelegramAuthFailureState('').telegramQuestionSubmitError).toBe(
+      'Telegram session expired. Paste a fresh agent token.',
+    );
+    expect(buildTelegramAuthFailureState('scope_denied').telegramQuestionSubmitError).toBe('scope_denied');
   });
 
   it('uses normalized envelope cache keys for cache writes and clears', () => {

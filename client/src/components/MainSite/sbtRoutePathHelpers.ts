@@ -5,14 +5,14 @@ export type SbtDetailRouteStatePatch = {
   sbtDetailAddress: string | null;
 };
 
-const splitCleanPath = (path: string): string[] => (
-  String(path || '').split('?')[0].split('#')[0].split('/').filter(Boolean)
-);
+const splitCleanPath = (path: string): string[] =>
+  String(path || '')
+    .split('?')[0]
+    .split('#')[0]
+    .split('/')
+    .filter(Boolean);
 
-export const getSbtAddressFromPath = (
-  path: string,
-  opts: { isAddress: AddressValidator }
-): string | null => {
+export const getSbtAddressFromPath = (path: string, opts: { isAddress: AddressValidator }): string | null => {
   const parts = splitCleanPath(path);
   if (!['sbt', 'group'].includes(parts[0]) || !parts[1]) return null;
   const address = parts[1];
@@ -21,29 +21,32 @@ export const getSbtAddressFromPath = (
 
 export const isSbtListRoutePath = (effectivePath: string): boolean => {
   const parts = splitCleanPath(effectivePath);
-  const root = String(parts[0] || '').trim().toLowerCase();
+  const root = String(parts[0] || '')
+    .trim()
+    .toLowerCase();
   if (root !== 'sbts' && root !== 'groups') return false;
-  const slugOrMode = String(parts[1] || '').trim().toLowerCase();
+  const slugOrMode = String(parts[1] || '')
+    .trim()
+    .toLowerCase();
   if (!slugOrMode) return true;
   return slugOrMode !== 'new';
 };
 
 export const getSbtListRouteSessionSlug = (
   effectivePath: string,
-  opts: { normalizeSessionSlug: SessionSlugNormalizer }
+  opts: { normalizeSessionSlug: SessionSlugNormalizer },
 ): string => {
   const parts = splitCleanPath(effectivePath);
-  const root = String(parts[0] || '').trim().toLowerCase();
+  const root = String(parts[0] || '')
+    .trim()
+    .toLowerCase();
   if (root !== 'sbts' && root !== 'groups') return '';
   const slugOrMode = String(parts[1] || '').trim();
   if (!slugOrMode || slugOrMode.toLowerCase() === 'new') return '';
   return opts.normalizeSessionSlug(slugOrMode);
 };
 
-export const getUserAddressFromPath = (
-  path: string,
-  opts: { isAddress: AddressValidator }
-): string | null => {
+export const getUserAddressFromPath = (path: string, opts: { isAddress: AddressValidator }): string | null => {
   const parts = splitCleanPath(path);
   if (!parts.length) return null;
   if (parts[0] === 'u' && parts[1]) {

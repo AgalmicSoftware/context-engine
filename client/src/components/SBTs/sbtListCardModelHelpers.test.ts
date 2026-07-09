@@ -27,26 +27,24 @@ describe('sbtListCardModelHelpers', () => {
     const sbt = { sbtAddress: ' 0xABC ', slug: 'alpha' };
 
     expect(normalizeSbtListAddressLower(sbt.sbtAddress)).toBe('0xabc');
-    expect(Array.from(lowerSbtListAddressSet([' 0xABC ', '', null, '0xdef']))).toEqual([
-      '0xabc',
-      '0xdef',
-    ]);
+    expect(Array.from(lowerSbtListAddressSet([' 0xABC ', '', null, '0xdef']))).toEqual(['0xabc', '0xdef']);
     expect(Array.from(buildSbtListExpandedAddressSetToggle(new Set(['0xabc']), ' 0xABC '))).toEqual([]);
-    expect(Array.from(buildSbtListExpandedAddressSetToggle(new Set(['0xabc']), ' 0xDEF '))).toEqual([
-      '0xabc',
-      '0xdef',
-    ]);
+    expect(Array.from(buildSbtListExpandedAddressSetToggle(new Set(['0xabc']), ' 0xDEF '))).toEqual(['0xabc', '0xdef']);
     expect(Array.from(buildSbtListExpandedAddressSetToggle('bad', ''))).toEqual([]);
-    expect(buildSbtListRenderItemKey(sbt, {
-      allSessionsMode: false,
-      listSlug: 'alpha',
-      resolveSbtSessionSlug: () => 'beta',
-    })).toBe('alpha|0xabc');
-    expect(buildSbtListRenderItemKey(sbt, {
-      allSessionsMode: true,
-      listSlug: 'alpha',
-      resolveSbtSessionSlug: (item) => item.slug,
-    })).toBe('alpha|0xabc');
+    expect(
+      buildSbtListRenderItemKey(sbt, {
+        allSessionsMode: false,
+        listSlug: 'alpha',
+        resolveSbtSessionSlug: () => 'beta',
+      }),
+    ).toBe('alpha|0xabc');
+    expect(
+      buildSbtListRenderItemKey(sbt, {
+        allSessionsMode: true,
+        listSlug: 'alpha',
+        resolveSbtSessionSlug: (item) => item.slug,
+      }),
+    ).toBe('alpha|0xabc');
   });
 
   it('detects modified pointer navigation', () => {
@@ -60,39 +58,41 @@ describe('sbtListCardModelHelpers', () => {
   });
 
   it('builds interactive mini-card models from SBT list items', () => {
-    expect(buildSbtListInteractiveMiniCardModel({
-      keyPrefix: 'featured-mini',
-      resolveSbtSessionSlug: (sbt) => sbt.slug,
-      sbt: {
-        sbtAddress: ' 0xABC ',
-        slug: 'alpha',
-      },
-    })).toEqual({
+    expect(
+      buildSbtListInteractiveMiniCardModel({
+        keyPrefix: 'featured-mini',
+        resolveSbtSessionSlug: (sbt) => sbt.slug,
+        sbt: {
+          sbtAddress: ' 0xABC ',
+          slug: 'alpha',
+        },
+      }),
+    ).toEqual({
       key: 'featured-mini-alpha|0xabc',
       sbtAddress: '0xABC',
       sbtAddressLower: '0xabc',
       sessionSlug: 'alpha',
     });
-    expect(buildSbtListInteractiveMiniCardModel({
-      resolveSbtSessionSlug: () => 'alpha',
-      sbt: {
-        sbtAddress: '',
-      },
-    })).toBeNull();
-    expect(buildSbtListInteractiveMiniCardModel({
-      resolveSbtSessionSlug: () => 'alpha',
-      sbt: null,
-    })).toBeNull();
+    expect(
+      buildSbtListInteractiveMiniCardModel({
+        resolveSbtSessionSlug: () => 'alpha',
+        sbt: {
+          sbtAddress: '',
+        },
+      }),
+    ).toBeNull();
+    expect(
+      buildSbtListInteractiveMiniCardModel({
+        resolveSbtSessionSlug: () => 'alpha',
+        sbt: null,
+      }),
+    ).toBeNull();
   });
 
   it('builds display card models with explicit address handling', () => {
     const baseOptions: BuildSbtListDisplayCardModelOptions<SbtListHelperTestItem> = {
-      getDescriptionText: (sbtInfo) => (
-        isSbtListHelperRecord(sbtInfo) ? String(sbtInfo.description || '') : ''
-      ),
-      getDisplayName: (sbtInfo) => (
-        isSbtListHelperRecord(sbtInfo) ? sbtInfo.name : ''
-      ),
+      getDescriptionText: (sbtInfo) => (isSbtListHelperRecord(sbtInfo) ? String(sbtInfo.description || '') : ''),
+      getDisplayName: (sbtInfo) => (isSbtListHelperRecord(sbtInfo) ? sbtInfo.name : ''),
       isPasswordLocked: (sbt) => sbt.locked,
       resolveSbtSessionSlug: (sbt) => sbt.slug,
       sbt: {
@@ -118,68 +118,80 @@ describe('sbtListCardModelHelpers', () => {
       sbtAddressLower: '0xabc',
       sessionSlug: 'alpha',
     });
-    expect(buildSbtListDisplayCardModel({
-      ...baseOptions,
-      addressMode: 'raw',
-      keyPrefix: 'compact',
-    })).toEqual(expect.objectContaining({
-      key: 'compact-alpha| 0xabc ',
-      sbtAddress: ' 0xABC ',
-      sbtAddressLower: ' 0xabc ',
-    }));
-    expect(buildSbtListDisplayCardModel({
-      ...baseOptions,
-      sbt: { sbtAddress: '0xABC' },
-    })).toBeNull();
+    expect(
+      buildSbtListDisplayCardModel({
+        ...baseOptions,
+        addressMode: 'raw',
+        keyPrefix: 'compact',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        key: 'compact-alpha| 0xabc ',
+        sbtAddress: ' 0xABC ',
+        sbtAddressLower: ' 0xabc ',
+      }),
+    );
+    expect(
+      buildSbtListDisplayCardModel({
+        ...baseOptions,
+        sbt: { sbtAddress: '0xABC' },
+      }),
+    ).toBeNull();
   });
 
   it('builds meta row models for tag and details controls', () => {
-    expect(buildSbtListMetaRowModel({
-      details: {
-        documentUrls: [{ href: 'https://example.com/doc', label: 'https://example.com/doc' }],
-        hasDetails: true,
-        tags: ['Builder'],
-      },
-      expandedSbtAddresses: new Set([' 0xabc ']),
-      sbt: { sbtAddress: ' 0xABC ' },
-    })).toEqual({
+    expect(
+      buildSbtListMetaRowModel({
+        details: {
+          documentUrls: [{ href: 'https://example.com/doc', label: 'https://example.com/doc' }],
+          hasDetails: true,
+          tags: ['Builder'],
+        },
+        expandedSbtAddresses: new Set([' 0xabc ']),
+        sbt: { sbtAddress: ' 0xABC ' },
+      }),
+    ).toEqual({
       hasDetailsToggle: true,
       hasTags: true,
       isExpanded: true,
       sbtAddressLower: ' 0xabc ',
       tags: ['Builder'],
     });
-    expect(buildSbtListMetaRowModel({
-      details: {
-        documentUrls: [{ href: 'https://example.com/doc', label: 'https://example.com/doc' }],
-        hasDetails: true,
-        tags: [],
-      },
-      miniaturized: true,
-      sbt: { sbtAddress: '0xABC' },
-    })).toBeNull();
-    expect(buildSbtListMetaRowModel({
-      details: {
-        documentUrls: [],
-        hasDetails: false,
+    expect(
+      buildSbtListMetaRowModel({
+        details: {
+          documentUrls: [{ href: 'https://example.com/doc', label: 'https://example.com/doc' }],
+          hasDetails: true,
+          tags: [],
+        },
+        miniaturized: true,
+        sbt: { sbtAddress: '0xABC' },
+      }),
+    ).toBeNull();
+    expect(
+      buildSbtListMetaRowModel({
+        details: {
+          documentUrls: [],
+          hasDetails: false,
+          tags: ['Research'],
+        },
+        miniaturized: true,
+        sbt: { sbtAddress: '0xABC' },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        hasDetailsToggle: false,
+        hasTags: true,
         tags: ['Research'],
-      },
-      miniaturized: true,
-      sbt: { sbtAddress: '0xABC' },
-    })).toEqual(expect.objectContaining({
-      hasDetailsToggle: false,
-      hasTags: true,
-      tags: ['Research'],
-    }));
+      }),
+    );
   });
 
   it('builds featured card models from display state', () => {
     const featuredOptions: BuildSbtListFeaturedCardModelOptions<SbtListHelperTestItem> = {
       expandedSbtAddresses: new Set(['0xabc']),
       fallbackLabel: 'Credential',
-      getDisplayName: (sbtInfo) => (
-        isSbtListHelperRecord(sbtInfo) ? sbtInfo.name : ''
-      ),
+      getDisplayName: (sbtInfo) => (isSbtListHelperRecord(sbtInfo) ? sbtInfo.name : ''),
       resolveSbtSessionSlug: (sbt) => sbt.slug,
       sbt: {
         sbtAddress: ' 0xABC ',
@@ -196,22 +208,28 @@ describe('sbtListCardModelHelpers', () => {
       sbtAddressLower: '0xabc',
       sessionSlug: 'alpha',
     });
-    expect(buildSbtListFeaturedCardModel({
-      fallbackLabel: 'Credential',
-      getDisplayName: () => 'Named credential',
-      resolveSbtSessionSlug: () => '',
-      sbt: { sbtAddress: '0xDEF' },
-    })).toEqual(expect.objectContaining({
-      isExpanded: false,
-      linkLabel: 'Named credential',
-      sbtAddressLower: '0xdef',
-      sessionSlug: '',
-    }));
-    expect(buildSbtListFeaturedCardModel({
-      getDisplayName: () => '',
-      resolveSbtSessionSlug: () => 'alpha',
-      sbt: null,
-    })).toBeNull();
+    expect(
+      buildSbtListFeaturedCardModel({
+        fallbackLabel: 'Credential',
+        getDisplayName: () => 'Named credential',
+        resolveSbtSessionSlug: () => '',
+        sbt: { sbtAddress: '0xDEF' },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        isExpanded: false,
+        linkLabel: 'Named credential',
+        sbtAddressLower: '0xdef',
+        sessionSlug: '',
+      }),
+    );
+    expect(
+      buildSbtListFeaturedCardModel({
+        getDisplayName: () => '',
+        resolveSbtSessionSlug: () => 'alpha',
+        sbt: null,
+      }),
+    ).toBeNull();
   });
 
   it('coerces mint end timestamps to seconds', () => {

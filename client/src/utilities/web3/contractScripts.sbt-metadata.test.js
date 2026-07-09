@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
-import contractScripts from './contractScripts.js';
+import contractScripts from './chainGateway.js';
 import { getWeb3Context } from './contractScripts.impl.js';
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 
 describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
   jest.setTimeout(10000);
@@ -24,17 +24,19 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     admin: jest.fn().mockResolvedValue(adminAddress),
     owner: jest.fn().mockResolvedValue(adminAddress),
     tokenURI: jest.fn().mockResolvedValue(tokenUriValue),
-    getSBTMetadata: jest.fn().mockResolvedValue([
-      'Metadata Test SBT',
-      'MTSBT',
-      ethers.BigNumber.from(0),
-      ethers.BigNumber.from(0),
-      adminAddress,
-      ethers.BigNumber.from(0),
-      false,
-      0,
-      tokenUriValue,
-    ]),
+    getSBTMetadata: jest
+      .fn()
+      .mockResolvedValue([
+        'Metadata Test SBT',
+        'MTSBT',
+        ethers.BigNumber.from(0),
+        ethers.BigNumber.from(0),
+        adminAddress,
+        ethers.BigNumber.from(0),
+        false,
+        0,
+        tokenUriValue,
+      ]),
     maxTokens: jest.fn().mockResolvedValue(ethers.BigNumber.from(0)),
     collectionBurnAuth: jest.fn().mockResolvedValue(0),
     burnAuth: jest.fn().mockResolvedValue(0),
@@ -61,7 +63,9 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     checkTxExistsSpy = null;
     jest.useRealTimers();
     global.fetch = originalFetch;
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA;
+    } catch (_) {}
   });
 
   it('uses extensionless direct-image tokenURI as renderable image when response content-type is image/*', async () => {
@@ -81,15 +85,17 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       contracts: {},
     });
 
-    expect(meta).toEqual(expect.objectContaining({
-      tokenURI: directImageUrl,
-      image: directImageUrl,
-      admin: adminAddress,
-      deployer: adminAddress,
-      creator: adminAddress,
-      sessionSlug: 'edge',
-      sessionSlugExplicit: false,
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        tokenURI: directImageUrl,
+        image: directImageUrl,
+        admin: adminAddress,
+        deployer: adminAddress,
+        creator: adminAddress,
+        sessionSlug: 'edge',
+        sessionSlugExplicit: false,
+      }),
+    );
   });
 
   it('keeps metadata tokenURI link semantics for JSON tokenURI payloads', async () => {
@@ -119,17 +125,22 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       contracts: {},
     });
 
-    expect(meta).toEqual(expect.objectContaining({
-      tokenURI: metadataUrl,
-      image: imageUrl,
-      sessionSlug: 'beta',
-      sessionSlugExplicit: true,
-      creator: '0x3333333333333333333333333333333333333333',
-      deployer: adminAddress,
-    }));
-    expect(fetchSpy).toHaveBeenCalledWith(metadataUrl, expect.objectContaining({
-      headers: expect.objectContaining({ accept: 'application/json' }),
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        tokenURI: metadataUrl,
+        image: imageUrl,
+        sessionSlug: 'beta',
+        sessionSlugExplicit: true,
+        creator: '0x3333333333333333333333333333333333333333',
+        deployer: adminAddress,
+      }),
+    );
+    expect(fetchSpy).toHaveBeenCalledWith(
+      metadataUrl,
+      expect.objectContaining({
+        headers: expect.objectContaining({ accept: 'application/json' }),
+      }),
+    );
   });
 
   it('uses getSBTMetadata for collection tokenURI before probing token-specific URIs', async () => {
@@ -165,10 +176,12 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       contracts: {},
     });
 
-    expect(meta).toEqual(expect.objectContaining({
-      tokenURI: metadataUrl,
-      image: imageUrl,
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        tokenURI: metadataUrl,
+        image: imageUrl,
+      }),
+    );
     expect(stub.getSBTMetadata).toHaveBeenCalledTimes(1);
     expect(stub.tokenURI).not.toHaveBeenCalled();
   });
@@ -227,11 +240,13 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       contracts: {},
     });
 
-    expect(meta).toEqual(expect.objectContaining({
-      maxTokens: '2',
-      mintingEndTime: 12345,
-      hasPasswordMint: false,
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        maxTokens: '2',
+        mintingEndTime: 12345,
+        hasPasswordMint: false,
+      }),
+    );
   });
 
   it('falls back to hasPasswordMint when mintMode is unavailable on the contract', async () => {
@@ -255,10 +270,12 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       contracts: {},
     });
 
-    expect(meta).toEqual(expect.objectContaining({
-      tokenURI: metadataUrl,
-      hasPasswordMint: true,
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        tokenURI: metadataUrl,
+        hasPasswordMint: true,
+      }),
+    );
   });
 
   it.each([
@@ -266,35 +283,40 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     ['PasswordCommitReveal', 1, false, true],
     ['UnlimitedGroupSignature', 2, true, false],
     ['LimitedInviteSignature', 3, false, true],
-  ])('derives %s metadata from on-chain mintMode()', async (_label, mintMode, legacyHasPasswordMint, expectedHasPasswordMint) => {
-    const metadataUrl = `https://example.com/metadata/mint-mode-${mintMode}.json`;
-    const stub = baseContractStub(metadataUrl);
-    stub.hasPasswordMint.mockResolvedValue(legacyHasPasswordMint);
-    stub.mintMode = jest.fn().mockResolvedValue(ethers.BigNumber.from(mintMode));
-    contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
-    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      headers: { get: () => 'application/json; charset=utf-8' },
-      json: async () => ({
-        name: `Mint Mode ${mintMode} SBT`,
-        hasPasswordMint: legacyHasPasswordMint,
-      }),
-      text: async () => '',
-    });
+  ])(
+    'derives %s metadata from on-chain mintMode()',
+    async (_label, mintMode, legacyHasPasswordMint, expectedHasPasswordMint) => {
+      const metadataUrl = `https://example.com/metadata/mint-mode-${mintMode}.json`;
+      const stub = baseContractStub(metadataUrl);
+      stub.hasPasswordMint.mockResolvedValue(legacyHasPasswordMint);
+      stub.mintMode = jest.fn().mockResolvedValue(ethers.BigNumber.from(mintMode));
+      contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
+      fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'application/json; charset=utf-8' },
+        json: async () => ({
+          name: `Mint Mode ${mintMode} SBT`,
+          hasPasswordMint: legacyHasPasswordMint,
+        }),
+        text: async () => '',
+      });
 
-    const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
-      slug: 'edge',
-      networkChainId: 84532,
-      contracts: {},
-    });
+      const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
+        slug: 'edge',
+        networkChainId: 84532,
+        contracts: {},
+      });
 
-    expect(meta).toEqual(expect.objectContaining({
-      tokenURI: metadataUrl,
-      mintMode,
-      hasPasswordMint: expectedHasPasswordMint,
-    }));
-    expect(stub.mintMode).toHaveBeenCalledTimes(1);
-  });
+      expect(meta).toEqual(
+        expect.objectContaining({
+          tokenURI: metadataUrl,
+          mintMode,
+          hasPasswordMint: expectedHasPasswordMint,
+        }),
+      );
+      expect(stub.mintMode).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('parses encrypted tags, document URLs, and gate metadata from tokenURI JSON', async () => {
     const metadataUrl = 'https://example.com/metadata/private-sbt.json';
@@ -330,24 +352,26 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       contracts: {},
     });
 
-    expect(meta).toEqual(expect.objectContaining({
-      tags: [],
-      tagsEncrypted: '{"ciphertext":"tags"}',
-      tagsAccess: expect.objectContaining({
-        gateIds: ['gate-tags'],
-        chainId: 84532,
+    expect(meta).toEqual(
+      expect.objectContaining({
+        tags: [],
+        tagsEncrypted: '{"ciphertext":"tags"}',
+        tagsAccess: expect.objectContaining({
+          gateIds: ['gate-tags'],
+          chainId: 84532,
+        }),
+        documentURLs: [],
+        documentURLsEncrypted: '{"ciphertext":"docs"}',
+        documentURLsAccess: expect.objectContaining({
+          gateIds: ['gate-docs'],
+          chainId: 84532,
+        }),
+        encryptedFieldGates: {
+          tags: 'gate-tags',
+          documentURLs: 'gate-docs',
+        },
       }),
-      documentURLs: [],
-      documentURLsEncrypted: '{"ciphertext":"docs"}',
-      documentURLsAccess: expect.objectContaining({
-        gateIds: ['gate-docs'],
-        chainId: 84532,
-      }),
-      encryptedFieldGates: {
-        tags: 'gate-tags',
-        documentURLs: 'gate-docs',
-      },
-    }));
+    );
   });
 
   it('parses v2 encryptedFields metadata and keeps contractName separate from masked display name', async () => {
@@ -412,45 +436,47 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       contracts: {},
     });
 
-    expect(meta).toEqual(expect.objectContaining({
-      contractName: 'CE-SBT-12',
-      name: '[encrypted]',
-      nameLocked: true,
-      nameEncrypted: '{"ciphertext":"name"}',
-      description: '',
-      descriptionLocked: true,
-      descriptionEncrypted: '{"ciphertext":"desc"}',
-      tags: [],
-      tagsLocked: true,
-      tagsEncrypted: '{"ciphertext":"tags"}',
-      documentURLs: [],
-      documentURLsLocked: true,
-      documentURLsEncrypted: '{"ciphertext":"docs"}',
-      image: '',
-      imageLocked: true,
-      imageEncrypted: {
-        storage: 'lit-arweave',
-        txId: 'img-tx',
-        url: 'lit-ar://img-tx',
-        mime: 'image/png',
-        name: 'badge.png',
-      },
-      encryptedFields: expect.objectContaining({
-        name: '{"ciphertext":"name"}',
-        image: expect.objectContaining({ txId: 'img-tx' }),
+    expect(meta).toEqual(
+      expect.objectContaining({
+        contractName: 'CE-SBT-12',
+        name: '[encrypted]',
+        nameLocked: true,
+        nameEncrypted: '{"ciphertext":"name"}',
+        description: '',
+        descriptionLocked: true,
+        descriptionEncrypted: '{"ciphertext":"desc"}',
+        tags: [],
+        tagsLocked: true,
+        tagsEncrypted: '{"ciphertext":"tags"}',
+        documentURLs: [],
+        documentURLsLocked: true,
+        documentURLsEncrypted: '{"ciphertext":"docs"}',
+        image: '',
+        imageLocked: true,
+        imageEncrypted: {
+          storage: 'lit-arweave',
+          txId: 'img-tx',
+          url: 'lit-ar://img-tx',
+          mime: 'image/png',
+          name: 'badge.png',
+        },
+        encryptedFields: expect.objectContaining({
+          name: '{"ciphertext":"name"}',
+          image: expect.objectContaining({ txId: 'img-tx' }),
+        }),
+        encryption: expect.objectContaining({
+          status: 'lit-v1',
+          defaultGateId: 'gate-name',
+        }),
+        encryptedFieldGates: {
+          name: 'gate-name',
+          description: 'gate-description',
+          tags: 'gate-tags',
+          documentURLs: 'gate-docs',
+          image: 'gate-image',
+        },
       }),
-      encryption: expect.objectContaining({
-        status: 'lit-v1',
-        defaultGateId: 'gate-name',
-      }),
-      encryptedFieldGates: {
-        name: 'gate-name',
-        description: 'gate-description',
-        tags: 'gate-tags',
-        documentURLs: 'gate-docs',
-        image: 'gate-image',
-      },
-    }));
+    );
   });
 
   it('ignores unsupported top-level legacy image lock metadata', async () => {
@@ -478,9 +504,11 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       contracts: {},
     });
 
-    expect(meta).toEqual(expect.objectContaining({
-      name: 'Legacy Image Field SBT',
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        name: 'Legacy Image Field SBT',
+      }),
+    );
     expect(meta.imageLocked).not.toBe(true);
     expect(meta.imageEncrypted).toBeUndefined();
   });
@@ -519,14 +547,16 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
 
     const meta = await contractScripts.getSbtMetadata('none', sbtAddress, ctx);
 
-    expect(meta).toEqual(expect.objectContaining({
-      tokenURI: metadataUrl,
-      chainID: 84532,
-      sessionSlug: 'edge',
-      sessionSlugExplicit: false,
-      deployer: adminAddress,
-      creator: adminAddress,
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        tokenURI: metadataUrl,
+        chainID: 84532,
+        sessionSlug: 'edge',
+        sessionSlugExplicit: false,
+        deployer: adminAddress,
+        creator: adminAddress,
+      }),
+    );
   });
 
   it('does not mutate the returned metadata object after a tokenURI fetch times out', async () => {
@@ -537,7 +567,10 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
 
     contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
     fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(
-      () => new Promise((resolve) => { resolveFetch = resolve; })
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
     );
 
     const metaPromise = contractScripts.getSbtMetadata('none', sbtAddress, {
@@ -553,12 +586,14 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     const meta = await metaPromise;
     const metaSnapshot = { ...meta };
 
-    expect(meta).toEqual(expect.objectContaining({
-      tokenURI: metadataUrl,
-      contractName: 'Metadata Test SBT',
-      name: 'Metadata Test SBT',
-      admin: adminAddress,
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        tokenURI: metadataUrl,
+        contractName: 'Metadata Test SBT',
+        name: 'Metadata Test SBT',
+        admin: adminAddress,
+      }),
+    );
     expect(meta.image).toBeUndefined();
 
     resolveFetch({
@@ -579,9 +614,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     stub.name.mockResolvedValue('Name Only SBT');
     stub.symbol.mockResolvedValue('CE-SBT-38');
     contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
-    arweaveSpy = jest.spyOn(arweaveScripts, 'downloadDataFromArweave').mockImplementation(
-      () => new Promise(() => {})
-    );
+    arweaveSpy = jest.spyOn(arweaveClient, 'downloadDataFromArweave').mockImplementation(() => new Promise(() => {}));
 
     const metaPromise = contractScripts.getSbtMetadata('none', sbtAddress, {
       slug: 'edge',
@@ -591,16 +624,18 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
 
     const meta = await metaPromise;
 
-    expect(meta).toEqual(expect.objectContaining({
-      contractName: 'Name Only SBT',
-      name: 'Name Only SBT',
-      symbol: 'CE-SBT-38',
-      admin: adminAddress,
-      deployer: adminAddress,
-      creator: adminAddress,
-      sessionSlug: 'edge',
-      sessionSlugExplicit: false,
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        contractName: 'Name Only SBT',
+        name: 'Name Only SBT',
+        symbol: 'CE-SBT-38',
+        admin: adminAddress,
+        deployer: adminAddress,
+        creator: adminAddress,
+        sessionSlug: 'edge',
+        sessionSlugExplicit: false,
+      }),
+    );
     expect(meta?.tokenURI || '').toContain(rawTxId);
     expect(arweaveSpy).toHaveBeenCalledTimes(1);
   });
@@ -610,11 +645,11 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     const stub = baseContractStub(rawTxId);
     stub.name.mockResolvedValue('Gateway First SBT');
     contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
-    arweaveSpy = jest.spyOn(arweaveScripts, 'downloadDataFromArweave').mockResolvedValue(
+    arweaveSpy = jest.spyOn(arweaveClient, 'downloadDataFromArweave').mockResolvedValue(
       JSON.stringify({
         name: 'Gateway First SBT',
         image: 'https://example.com/assets/gateway-first.png',
-      })
+      }),
     );
 
     const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
@@ -623,24 +658,25 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       contracts: {},
     });
 
-    expect(meta).toEqual(expect.objectContaining({
-      name: 'Gateway First SBT',
-      contractName: 'Gateway First SBT',
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        name: 'Gateway First SBT',
+        contractName: 'Gateway First SBT',
+      }),
+    );
     const [, arweaveOpts] = arweaveSpy.mock.calls[0];
     expect(arweaveSpy).toHaveBeenCalledTimes(1);
     expect(arweaveSpy).toHaveBeenCalledWith(rawTxId, expect.any(Object));
-    expect(arweaveOpts).toEqual(expect.objectContaining({
-      bypassFailureCache: true,
-      directToArIo: false,
-      debugContext: expect.objectContaining({
-        category: 'sbt_metadata',
+    expect(arweaveOpts).toEqual(
+      expect.objectContaining({
+        bypassFailureCache: true,
+        directToArIo: false,
+        debugContext: expect.objectContaining({
+          category: 'sbt_metadata',
+        }),
+        gateways: expect.arrayContaining(['https://ar-io.dev', 'https://arweave.net']),
       }),
-      gateways: expect.arrayContaining([
-        'https://ar-io.dev',
-        'https://arweave.net',
-      ]),
-    }));
+    );
     expect(arweaveOpts).not.toHaveProperty('disableExistencePrecheck');
     expect(arweaveOpts).not.toHaveProperty('preflightTxExistence');
   });
@@ -653,12 +689,12 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     stub.name.mockResolvedValue('Gateway First Image SBT');
     contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
     fetchSpy = jest.spyOn(global, 'fetch');
-    checkTxExistsSpy = jest.spyOn(arweaveScripts, 'checkTxExists');
-    arweaveSpy = jest.spyOn(arweaveScripts, 'downloadDataFromArweave').mockResolvedValue(
+    checkTxExistsSpy = jest.spyOn(arweaveClient, 'checkTxExists');
+    arweaveSpy = jest.spyOn(arweaveClient, 'downloadDataFromArweave').mockResolvedValue(
       JSON.stringify({
         name: 'Gateway First Image SBT',
         image: `ar://${imageTxId}`,
-      })
+      }),
     );
 
     const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
@@ -667,11 +703,13 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       contracts: {},
     });
 
-    expect(meta).toEqual(expect.objectContaining({
-      name: 'Gateway First Image SBT',
-      contractName: 'Gateway First Image SBT',
-      image: `https://arweave.net/${imageTxId}`,
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        name: 'Gateway First Image SBT',
+        contractName: 'Gateway First Image SBT',
+        image: `https://arweave.net/${imageTxId}`,
+      }),
+    );
     expect(checkTxExistsSpy).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
   });

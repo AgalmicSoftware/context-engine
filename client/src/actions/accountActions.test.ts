@@ -1,11 +1,5 @@
-import {
-  changeAccount,
-  fetchAccount,
-} from './accountActions.js';
-import {
-  FETCH_ACCOUNT,
-  LOGIN_ACCOUNT,
-} from './types.js';
+import { changeAccount, fetchAccount } from './accountActions.js';
+import { FETCH_ACCOUNT, LOGIN_ACCOUNT } from './types.js';
 import store from '../store.js';
 
 jest.mock('../store.js', () => ({

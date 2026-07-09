@@ -14,17 +14,10 @@ import {
   faPlus,
   faSquare,
   faCheckSquare,
-  faImage
+  faImage,
 } from '@fortawesome/free-solid-svg-icons';
-import {
-  Input,
-  Button,
-  FormGroup,
-  Label
-} from 'reactstrap';
+import { Input, Button, FormGroup, Label } from 'reactstrap';
 import styles from './AudioSurveyGenerator.module.scss';
-
-
 
 import {
   callAI,
@@ -33,13 +26,10 @@ import {
   uploadMarkdownSummaryToArweave,
   processAdditionalSources,
   fetchContentFromURL,
-  analyzePhotoForQuestionGeneration
-} from '../../../utilities/ai/aiScripts.js';
+  analyzePhotoForQuestionGeneration,
+} from '../../../utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from '../../../utilities/ai/aiSettings.js';
-import {
-  getAllSessionSlugs,
-  getSessionConfigBySlug,
-} from '../../../utilities/web3/contractScripts.js';
+import { getAllSessionSlugs, getSessionConfigBySlug } from '../../../utilities/web3/chainGateway.js';
 import AudioInput from '../../Shared/AudioInput/AudioInput';
 import CompactImageChooser from '../../Shared/CompactImageChooser';
 import { readCompactImageClipboard } from '../../Shared/compactImageClipboard.js';
@@ -142,20 +132,13 @@ import type {
   SourceFileLike,
 } from './surveyGeneratorHelpers';
 
-export {
-  hasDatabaseToolInputContent,
-  isSingleHttpUrlInput,
-} from './surveyGeneratorHelpers';
+export { hasDatabaseToolInputContent, isSingleHttpUrlInput } from './surveyGeneratorHelpers';
 
 const cacheLog = createLogger('cache');
 const DEFAULT_QUESTION_COUNT = 10;
 const QUESTION_COUNT_STEP = 5;
 const CONTEXT_SAVE_LOGIN_REQUIRED_CODE = 'context_save_login_required';
-const generateSurveyGeneratorQuestionId = (
-  type: string,
-  prompt: string,
-  options: string[] = [],
-): string => {
+const generateSurveyGeneratorQuestionId = (type: string, prompt: string, options: string[] = []): string => {
   return generateSharedQuestionId(type, prompt, options);
 };
 type SurveyGeneratorQuestionTypeKey = 'binary' | 'multichoice' | 'rating' | 'freeform';
@@ -180,11 +163,7 @@ type SurveyGeneratorProps = UnknownRecord & {
   toggleLoginModal?: (open?: boolean) => void;
   minified?: boolean;
   defaultTags?: string | Array<string | null | undefined | false | ''> | null;
-  onQuestionsGenerated?: (
-    statements: GeneratedSurveyStatement[],
-    docs: string[],
-    surveyTitle: string,
-  ) => void;
+  onQuestionsGenerated?: (statements: GeneratedSurveyStatement[], docs: string[], surveyTitle: string) => void;
   hideEncryption?: boolean;
   sessionConfig?: UnknownRecord | null;
   activeSessionSlug?: string;
@@ -236,10 +215,7 @@ type SurveyGeneratorPhotoSource = Omit<
   analysisExpanded?: boolean;
 };
 type SurveyGeneratorFileSource = QueuedFileSource<SourceFileLike>;
-type SurveyGeneratorAdditionalSource =
-  | SurveyGeneratorFileSource
-  | SurveyGeneratorPhotoSource
-  | QueuedUrlSource;
+type SurveyGeneratorAdditionalSource = SurveyGeneratorFileSource | SurveyGeneratorPhotoSource | QueuedUrlSource;
 type SurveyGeneratorNonPhotoSource = Exclude<SurveyGeneratorAdditionalSource, SurveyGeneratorPhotoSource>;
 type SurveyGeneratorAdditionalSourcesResult = {
   effectiveSources: SurveyGeneratorAdditionalSource[];
@@ -317,11 +293,8 @@ type QueuedPhotoPreviewProps = {
   sourceId?: unknown;
 };
 
-const asSurveyGeneratorPlainRecord = (value: unknown): UnknownRecord | null => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as UnknownRecord
-    : null
-);
+const asSurveyGeneratorPlainRecord = (value: unknown): UnknownRecord | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : null;
 
 function QueuedPhotoPreview({ file, photoName, sourceId }: QueuedPhotoPreviewProps) {
   const [previewSrc] = useState<string>(() => buildPhotoPreviewUrl(file));
@@ -362,7 +335,6 @@ const debug = (...args: unknown[]) => {
 };
 
 const LazyCorpusViewer = React.lazy(() => import('../../DemoViews/CorpusViewer'));
-
 
 export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {} as SurveyGeneratorProps) {
   const {
@@ -447,10 +419,12 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const [saveDocAudience, setSaveDocAudience] = useState('self');
   const [showSaveDocAudienceMenu, setShowSaveDocAudienceMenu] = useState(false);
   const [analyzeBeforeLibraryUpload, setAnalyzeBeforeLibraryUpload] = useState(true);
-  const getActiveLitHooks = React.useCallback((): SurveyGeneratorLitHooks | null => (
-    (scopedLitHooks && typeof scopedLitHooks === 'object' ? scopedLitHooks as SurveyGeneratorLitHooks : null) ||
-    (getGlobalLitHooks() as SurveyGeneratorLitHooks | null)
-  ), [scopedLitHooks]);
+  const getActiveLitHooks = React.useCallback(
+    (): SurveyGeneratorLitHooks | null =>
+      (scopedLitHooks && typeof scopedLitHooks === 'object' ? (scopedLitHooks as SurveyGeneratorLitHooks) : null) ||
+      (getGlobalLitHooks() as SurveyGeneratorLitHooks | null),
+    [scopedLitHooks],
+  );
   const [imagePickerStatusText, setImagePickerStatusText] = useState('');
   const [imagePickerStatusTone, setImagePickerStatusTone] = useState<'default' | 'loading' | 'error'>('default');
 
@@ -459,26 +433,24 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const lastSummaryGateKeyRef = useRef('');
   const controlledSessionTouched = Boolean(sessionOverrideTouched);
 
-  const effectiveSessionSlugInput = useMemo(() => (
-    hasControlledSessionOverride
-      ? (
-        controlledSessionTouched
+  const effectiveSessionSlugInput = useMemo(
+    () =>
+      hasControlledSessionOverride
+        ? controlledSessionTouched
           ? normalizeSessionSlug(sessionOverrideSlug || '')
           : activeSessionSlug
-      )
-      : (
-        localSessionOverrideTouched
+        : localSessionOverrideTouched
           ? normalizeSessionSlug(localSessionOverrideSlug || '')
-          : activeSessionSlug
-      )
-  ), [
-    activeSessionSlug,
-    controlledSessionTouched,
-    hasControlledSessionOverride,
-    localSessionOverrideSlug,
-    localSessionOverrideTouched,
-    sessionOverrideSlug,
-  ]);
+          : activeSessionSlug,
+    [
+      activeSessionSlug,
+      controlledSessionTouched,
+      hasControlledSessionOverride,
+      localSessionOverrideSlug,
+      localSessionOverrideTouched,
+      sessionOverrideSlug,
+    ],
+  );
   const effectiveSessionConfigInput = useMemo(() => {
     if (hasControlledSessionOverride) {
       if (!controlledSessionTouched) return sessionConfig;
@@ -494,12 +466,19 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     sessionConfig,
     sessionOverrideSlug,
   ]);
-  const resolvedSessionAliases = useMemo(() => resolveSessionConfigAliases({
-    sessionSlug: effectiveSessionSlugInput,
-    sessionConfig: effectiveSessionConfigInput,
-  }, {
-    resolveBySlug: (slug: string) => getSessionConfigBySlug(slug),
-  }), [effectiveSessionConfigInput, effectiveSessionSlugInput]);
+  const resolvedSessionAliases = useMemo(
+    () =>
+      resolveSessionConfigAliases(
+        {
+          sessionSlug: effectiveSessionSlugInput,
+          sessionConfig: effectiveSessionConfigInput,
+        },
+        {
+          resolveBySlug: (slug: string) => getSessionConfigBySlug(slug),
+        },
+      ),
+    [effectiveSessionConfigInput, effectiveSessionSlugInput],
+  );
   const resolvedSessionSlug = resolvedSessionAliases.sessionSlug;
   const resolvedSessionConfig = useMemo<SurveyGeneratorSessionConfig>(() => {
     const cfg = asSurveyGeneratorPlainRecord(resolvedSessionAliases.sessionConfig) || {};
@@ -510,25 +489,27 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       contracts: mergeSessionContractMaps(cfg.contracts, contracts),
     };
   }, [resolvedSessionAliases.sessionConfig, resolvedSessionAliases.sessionSlug, contracts]);
-  const resolvedSessionIdHex = useMemo(() => normalizeSessionIdHex(
-    resolvedSessionConfig?.__registry?.sessionIdHex ||
-    resolvedSessionConfig?.__registry?.sessionId ||
-    resolvedSessionConfig?.sessionIdHex ||
-    resolvedSessionConfig?.sessionId ||
-    ''
-  ), [resolvedSessionConfig]);
-  const resolvedSessionIdToken = useMemo(() => (
-    toStr(resolvedSessionConfig?.__registry?.sessionId || resolvedSessionConfig?.sessionId || '').trim()
-  ), [resolvedSessionConfig]);
+  const resolvedSessionIdHex = useMemo(
+    () =>
+      normalizeSessionIdHex(
+        resolvedSessionConfig?.__registry?.sessionIdHex ||
+          resolvedSessionConfig?.__registry?.sessionId ||
+          resolvedSessionConfig?.sessionIdHex ||
+          resolvedSessionConfig?.sessionId ||
+          '',
+      ),
+    [resolvedSessionConfig],
+  );
+  const resolvedSessionIdToken = useMemo(
+    () => toStr(resolvedSessionConfig?.__registry?.sessionId || resolvedSessionConfig?.sessionId || '').trim(),
+    [resolvedSessionConfig],
+  );
   const docSaveSessionToken = useMemo(
     () => resolvedSessionIdToken || resolvedSessionSlug || '',
     [resolvedSessionIdToken, resolvedSessionSlug],
   );
   const networkChainId = network?.id || null;
-  const docSaveGate = useMemo(
-    () => resolveDocUploadsGate(resolvedSessionConfig),
-    [resolvedSessionConfig],
-  );
+  const docSaveGate = useMemo(() => resolveDocUploadsGate(resolvedSessionConfig), [resolvedSessionConfig]);
   const docSaveSessionLabel = useMemo(() => {
     const sessionName = toStr(resolvedSessionConfig?.sessionName).trim();
     if (sessionName) return sessionName;
@@ -536,15 +517,18 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     if (slug) return slug;
     return 'Session';
   }, [resolvedSessionConfig, resolvedSessionSlug]);
-  const aiRequestOptions = useMemo(() => ({
-    sessionSlug: resolvedSessionSlug || '',
-    sessionConfig: resolvedSessionConfig,
-    context: {
-      account,
-      providerLike: provider,
-      chainId: networkChainId,
-    },
-  }), [resolvedSessionSlug, resolvedSessionConfig, account, provider, networkChainId]);
+  const aiRequestOptions = useMemo(
+    () => ({
+      sessionSlug: resolvedSessionSlug || '',
+      sessionConfig: resolvedSessionConfig,
+      context: {
+        account,
+        providerLike: provider,
+        chainId: networkChainId,
+      },
+    }),
+    [resolvedSessionSlug, resolvedSessionConfig, account, provider, networkChainId],
+  );
 
   const summaryGate = useMemo(() => {
     const cfg = resolvedSessionConfig || {};
@@ -558,7 +542,10 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   }, [resolvedSessionConfig]);
   const summaryGateAddresses = useMemo(() => getGateSbtAddresses(summaryGate), [summaryGate]);
   const summaryGateModeDefault = useMemo(() => normalizeGateMode(summaryGate), [summaryGate]);
-  const summaryGateKey = summaryGateAddresses.map((addr) => addr.toLowerCase()).sort().join('|');
+  const summaryGateKey = summaryGateAddresses
+    .map((addr) => addr.toLowerCase())
+    .sort()
+    .join('|');
   const sessionHasLitChipotle = useMemo(() => {
     const litCredentials = asSurveyGeneratorPlainRecord(resolvedSessionConfig?.litCredentials);
     const hasCompleteLitCredentials = !!(
@@ -568,24 +555,26 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       toStr(litCredentials?.litPkpId).trim()
     );
     const litConfig = asSurveyGeneratorPlainRecord(resolvedSessionConfig?.lit);
-    const litNetworkHint = toStr(litConfig?.network || resolvedSessionConfig?.litNetwork).trim().toLowerCase();
+    const litNetworkHint = toStr(litConfig?.network || resolvedSessionConfig?.litNetwork)
+      .trim()
+      .toLowerCase();
     return !!(
       toStr(resolvedSessionConfig?.corsWorkerUrl).trim() &&
-      (
-        hasCompleteLitCredentials ||
+      (hasCompleteLitCredentials ||
         litNetworkHint === 'chipotle' ||
         docSaveGate.hasRecipients ||
-        summaryGateAddresses.length > 0
-      )
+        summaryGateAddresses.length > 0)
     );
   }, [docSaveGate.hasRecipients, resolvedSessionConfig, summaryGateAddresses.length]);
-  const docSaveSessionChainError = useMemo(() => (
-    docSaveGate.hasRecipients && !sessionHasLitChipotle
-      ? getUnsupportedLitContractAccessControlError({
-        chainId: docSaveGate.chainId || networkChainId || null,
-      })
-      : ''
-  ), [docSaveGate.chainId, docSaveGate.hasRecipients, networkChainId, sessionHasLitChipotle]);
+  const docSaveSessionChainError = useMemo(
+    () =>
+      docSaveGate.hasRecipients && !sessionHasLitChipotle
+        ? getUnsupportedLitContractAccessControlError({
+            chainId: docSaveGate.chainId || networkChainId || null,
+          })
+        : '',
+    [docSaveGate.chainId, docSaveGate.hasRecipients, networkChainId, sessionHasLitChipotle],
+  );
   const docSaveSessionAudienceAvailable = docSaveGate.hasRecipients && !docSaveSessionChainError;
   const activeSessionKey = useMemo(() => {
     const hasExplicit = typeof effectiveSessionSlugInput === 'string';
@@ -600,9 +589,10 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       const cfg = getSessionConfigBySlug(slug) || {};
       const sessionName = toStr(cfg?.sessionName || '').trim();
       const slugLabel = slug || 'General';
-      const label = sessionName && sessionName.toLowerCase() !== slugLabel.toLowerCase()
-        ? `${sessionName} (${slugLabel})`
-        : (sessionName || slugLabel);
+      const label =
+        sessionName && sessionName.toLowerCase() !== slugLabel.toLowerCase()
+          ? `${sessionName} (${slugLabel})`
+          : sessionName || slugLabel;
       options.set(slug, {
         key: `database-session-${slug || 'general'}`,
         slug,
@@ -623,10 +613,10 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     if (typeof resolvedSessionConfig?.slug === 'string') return normalizeSessionSlug(resolvedSessionConfig.slug);
     return null;
   }, [resolvedSessionConfig?.slug]);
-  const summaryGateSessionKey = activeSessionKey != null
-    ? activeSessionKey
-    : (configSessionKey != null ? configSessionKey : '');
-  const summaryGateMismatch = activeSessionKey != null && configSessionKey != null && activeSessionKey !== configSessionKey;
+  const summaryGateSessionKey =
+    activeSessionKey != null ? activeSessionKey : configSessionKey != null ? configSessionKey : '';
+  const summaryGateMismatch =
+    activeSessionKey != null && configSessionKey != null && activeSessionKey !== configSessionKey;
   const summaryGateSessionKeyRef = useRef(summaryGateSessionKey);
   const docSaveContextKeyRef = useRef('');
   const docSaveAutoAudienceRef = useRef(docSaveGate.hasRecipients ? 'session' : 'self');
@@ -674,7 +664,10 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
 
   const abortedRef = React.useRef(false);
   useEffect(() => {
-    abortedRef.current = false; return () => { abortedRef.current = true; };
+    abortedRef.current = false;
+    return () => {
+      abortedRef.current = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -724,18 +717,13 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     requestedCount: number = count,
   ) {
     const prompt = buildSinglePrompt(sourceDocContent, overrides);
-    const raw    = await callAI(prompt, aiRequestOptions);
-    const match  = raw.match(/\{[\s\S]*\}/);
+    const raw = await callAI(prompt, aiRequestOptions);
+    const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('No JSON object found in AI response');
     const parsed = JSON.parse(match[0]) as GeneratedAiQuestionPayload;
-    if (!Array.isArray(parsed.questions))
-      throw new Error('AI response missing "questions" array');
+    if (!Array.isArray(parsed.questions)) throw new Error('AI response missing "questions" array');
     const expectedCount = Number(requestedCount);
-    if (
-      Number.isInteger(expectedCount) &&
-      expectedCount > 0 &&
-      parsed.questions.length !== expectedCount
-    ) {
+    if (Number.isInteger(expectedCount) && expectedCount > 0 && parsed.questions.length !== expectedCount) {
       cacheLog.warn('[AudioSurveyGenerator] AI returned question count mismatch', {
         requestedCount: expectedCount,
         returnedCount: parsed.questions.length,
@@ -773,7 +761,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
         type: 'url',
         value: rawUrl,
         name: rawUrl,
-      }
+      },
     ]);
     setError('');
     setAdditionalUrlInput('');
@@ -890,16 +878,16 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   };
 
   const updateAdditionalSourceById = (sourceId: string, patch: SurveyGeneratorAdditionalSourcePatch) => {
-    setAdditionalSources((prev) => (
-      prev.map((source) => (
+    setAdditionalSources((prev) =>
+      prev.map((source) =>
         source?.id === sourceId
-          ? {
+          ? ({
               ...source,
               ...(typeof patch === 'function' ? patch(source) : patch),
-            } as SurveyGeneratorAdditionalSource
-          : source
-      ))
-    ));
+            } as SurveyGeneratorAdditionalSource)
+          : source,
+      ),
+    );
   };
 
   const analyzeQueuedPhotoSources = async (sources: SurveyGeneratorAdditionalSource[] = []) => {
@@ -1027,9 +1015,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       const baseTags = mergeTags(
         buildDocLibraryCommonTags({ kind, storage: 'lit-arweave' }),
         buildDocLibrarySessionTags({ sessionIdHex: resolvedSessionIdHex }),
-        isPhotoSource
-          ? buildDocLibraryRoleTags({ role: DOC_LIBRARY_DOC_ROLES.PHOTO })
-          : [],
+        isPhotoSource ? buildDocLibraryRoleTags({ role: DOC_LIBRARY_DOC_ROLES.PHOTO }) : [],
       );
 
       let result: DocLibraryUploadResult | null = null;
@@ -1177,19 +1163,18 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
 
       // 1. Extract content (Text or Audio Transcript)
       if (transcriptMode && audioFile) {
-          const name = (audioFile.name || '').toLowerCase();
-          const okExt = /\.(m4a|mp3|aac|wav|webm|mp4|3gp|ogg|opus)$/i.test(name) || /^audio\//.test(audioFile.type);
-          if (!okExt) throw new Error('Unsupported audio type.');
+        const name = (audioFile.name || '').toLowerCase();
+        const okExt = /\.(m4a|mp3|aac|wav|webm|mp4|3gp|ogg|opus)$/i.test(name) || /^audio\//.test(audioFile.type);
+        if (!okExt) throw new Error('Unsupported audio type.');
 
-          setIsTranscribing(true);
-          const transcript = await transcribeAudio(audioFile, aiRequestOptions);
-          if (abortedRef.current) return;
-          setIsTranscribing(false);
+        setIsTranscribing(true);
+        const transcript = await transcribeAudio(audioFile, aiRequestOptions);
+        if (abortedRef.current) return;
+        setIsTranscribing(false);
 
-          content = (transcript || '').trim();
-          if (content.length < 50) throw new Error('Transcription too short.');
-      }
-      else if (pastedText && pastedText.trim().length > 0) {
+        content = (transcript || '').trim();
+        if (content.length < 50) throw new Error('Transcription too short.');
+      } else if (pastedText && pastedText.trim().length > 0) {
         content = pastedText.trim();
         if (isSingleHttpUrlInput(content)) {
           currentDocumentURLs.push(content);
@@ -1216,7 +1201,9 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       // 2. Process Additional Sources
       if (effectiveSources.length > 0) {
         const photoSources = effectiveSources.filter((src): src is SurveyGeneratorPhotoSource => src?.type === 'photo');
-        const nonPhotoSources = effectiveSources.filter((src): src is SurveyGeneratorNonPhotoSource => src?.type !== 'photo');
+        const nonPhotoSources = effectiveSources.filter(
+          (src): src is SurveyGeneratorNonPhotoSource => src?.type !== 'photo',
+        );
         const additionalContentSections: string[] = [];
 
         if (photoSources.length > 0) {
@@ -1262,7 +1249,9 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       }
 
       if (!content || content.length < 50) {
-         throw new Error('Total extracted content is too short (min 50 chars). Please enter text, audio, or add valid URLs/Files.');
+        throw new Error(
+          'Total extracted content is too short (min 50 chars). Please enter text, audio, or add valid URLs/Files.',
+        );
       }
 
       let sourceForQuestions = content;
@@ -1284,36 +1273,40 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
         // B. Upload to Arweave (if toggled)
         if (uploadSummaryToArweave) {
           try {
-             // We do NOT block on loginComplete here; the worker handles the upload wallet.
-             const arweaveKey = await getEffectiveArweaveKey({
-               sessionSlug: resolvedSessionSlug || '',
-               sessionConfig: resolvedSessionConfig,
-               context: { account, providerLike: provider as ResourceKeyProviderLike, chainId: network?.id },
-             });
-             const { txId, url } = await uploadMarkdownSummaryToArweave(md, {
-               sessionSlug: resolvedSessionSlug || '',
-               sessionConfig: resolvedSessionConfig,
-               arweaveJwk: arweaveKey?.arweaveJwk || '',
-               context: { account, providerLike: provider, chainId: network?.id },
-             });
-             if (abortedRef.current) return;
+            // We do NOT block on loginComplete here; the worker handles the upload wallet.
+            const arweaveKey = await getEffectiveArweaveKey({
+              sessionSlug: resolvedSessionSlug || '',
+              sessionConfig: resolvedSessionConfig,
+              context: { account, providerLike: provider as ResourceKeyProviderLike, chainId: network?.id },
+            });
+            const { txId, url } = await uploadMarkdownSummaryToArweave(md, {
+              sessionSlug: resolvedSessionSlug || '',
+              sessionConfig: resolvedSessionConfig,
+              arweaveJwk: arweaveKey?.arweaveJwk || '',
+              context: { account, providerLike: provider, chainId: network?.id },
+            });
+            if (abortedRef.current) return;
 
-             if (url) {
-               finalDocUrls.unshift(url);
-             }
+            if (url) {
+              finalDocUrls.unshift(url);
+            }
           } catch (uploadErr) {
-             cacheLog.error("Summary upload failed:", uploadErr);
-             // We don't abort the whole process; just warn and proceed with questions
-             setError("Warning: Summary upload failed, but generating questions...");
+            cacheLog.error('Summary upload failed:', uploadErr);
+            // We don't abort the whole process; just warn and proceed with questions
+            setError('Warning: Summary upload failed, but generating questions...');
           }
         }
       }
 
       // 4. Generate Questions
-      const aiData = await makeSingleAiCall(sourceForQuestions, {
-        sourceTypeOverride: transcriptMode ? 'document' : (sourceTypeOverride || undefined),
-        multiSpeakerHintOverride: transcriptMode ? 'likely_multiple_speakers' : undefined
-      }, count);
+      const aiData = await makeSingleAiCall(
+        sourceForQuestions,
+        {
+          sourceTypeOverride: transcriptMode ? 'document' : sourceTypeOverride || undefined,
+          multiSpeakerHintOverride: transcriptMode ? 'likely_multiple_speakers' : undefined,
+        },
+        count,
+      );
       if (abortedRef.current) return;
 
       // 5. Spawn Survey Tool
@@ -1321,7 +1314,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       processAndSetQuestions(aiData, finalDocUrls);
       if (shouldClearAdditionalUrlInput) setAdditionalUrlInput('');
       setShowCreateSurvey(true);
-
     } catch (err: unknown) {
       if (!abortedRef.current) {
         if ((err as { code?: unknown } | null | undefined)?.code === CONTEXT_SAVE_LOGIN_REQUIRED_CODE) return;
@@ -1367,9 +1359,9 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             setPastedText('');
             setAudioFile(null);
             if (surveyHash) {
-                alert(`Upload complete! Survey ID: ${surveyHash}`);
+              alert(`Upload complete! Survey ID: ${surveyHash}`);
             } else {
-                alert(`Upload complete! Questions added.`);
+              alert(`Upload complete! Questions added.`);
             }
           }}
         />
@@ -1415,13 +1407,16 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const copyAIPromptToClipboard = () => {
     const text = aiPromptText || '';
     if (!text) return;
-    navigator.clipboard.writeText(text)
+    navigator.clipboard
+      .writeText(text)
       .then(() => {
         notify.success('Copied to clipboard');
         setAiPromptCopySuccess(true);
         setTimeout(() => setAiPromptCopySuccess(false), 1500);
       })
-      .catch((_e: unknown) => { notify.warn('Copy failed'); });
+      .catch((_e: unknown) => {
+        notify.warn('Copy failed');
+      });
   };
 
   const highlightPromptVariables = (str: unknown) => {
@@ -1436,8 +1431,10 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
       parts.push(
         <span key={match.index} className={styles.aiVar}>
-          {'<'}{match[1]}{'>'}
-        </span>
+          {'<'}
+          {match[1]}
+          {'>'}
+        </span>,
       );
       lastIndex = re.lastIndex;
     }
@@ -1479,9 +1476,8 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const hasTypedUrlSource = toStr(additionalUrlInput).trim().length > 0;
   const hasTranscriptModeInput = toStr(pastedText).trim().length > 0 || hasTypedUrlSource;
   const shouldShowSaveExtraSourcesControl = additionalSources.length > 0 || hasTypedUrlSource;
-  const saveDocAudienceLabel = saveDocAudience === 'session' && docSaveSessionAudienceAvailable
-    ? docSaveSessionLabel
-    : 'only me';
+  const saveDocAudienceLabel =
+    saveDocAudience === 'session' && docSaveSessionAudienceAvailable ? docSaveSessionLabel : 'only me';
   const isExplorerViewMode = !minified && explorerMode === 'view';
   const showDemoCorpusPanel = demoSurfaceEnabled && showDemoCorpusView;
   const showViewModeToolbar = demoSurfaceEnabled;
@@ -1551,13 +1547,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   );
 
   return (
-    <div
-      className={
-        minified
-          ? `${styles.databaseTool} ${styles.minified}`
-          : styles.databaseTool
-      }
-    >
+    <div className={minified ? `${styles.databaseTool} ${styles.minified}` : styles.databaseTool}>
       {showInternalSessionSelector && (
         <div className={styles.sessionSelectorTriggerRow} data-testid="ce-database-session-selector">
           <button
@@ -1583,529 +1573,538 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                   </Button>
                 ) : null}
               </div>
-              <SessionChipSelector
-                options={sessionSelectorOptions}
-                onToggle={handleDatabaseSessionSelect}
-              />
+              <SessionChipSelector options={sessionSelectorOptions} onToggle={handleDatabaseSessionSelect} />
             </div>
           )}
         </div>
       )}
-      {isExplorerViewMode ? renderExplorerViewMode() : (
+      {isExplorerViewMode ? (
+        renderExplorerViewMode()
+      ) : (
         <>
-      <form onSubmit={handleSubmit}>
-        <div className={styles.formSection}>
-          {hasUploadedFileSources ? (
-            <div className={styles.titleInputRow}>
-              <Input
-                type="text"
-                value={surveyTitle}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => setSurveyTitle(event.target.value)}
-                placeholder="Title"
-                className={styles.titleInput}
-                data-testid={E2E_TESTIDS.DATABASE_TITLE_INPUT}
-              />
-            </div>
-          ) : null}
+          <form onSubmit={handleSubmit}>
+            <div className={styles.formSection}>
+              {hasUploadedFileSources ? (
+                <div className={styles.titleInputRow}>
+                  <Input
+                    type="text"
+                    value={surveyTitle}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => setSurveyTitle(event.target.value)}
+                    placeholder="Title"
+                    className={styles.titleInput}
+                    data-testid={E2E_TESTIDS.DATABASE_TITLE_INPUT}
+                  />
+                </div>
+              ) : null}
 
-          <div className={styles.textInputGroup}>
-            <AudioInput
-              placeholder={transcriptMode ? "Speak to capture transcript or Paste Text..." : "Speak or type text here..."}
-              recordingDisabled={transcriptMode}
-              longFormMode={transcriptMode}
-              showRecorderControlsInTextbox={transcriptMode}
-              showRecordingTimerInTextbox={transcriptMode}
-              enableDownloads={transcriptMode}
-              updateFunction={(val: string) => setPastedText(val)}
-              toggleEncryption={(bool: boolean) => setTextEncrypted(bool)}
-              value={pastedText}
-              encrypted={textEncrypted}
-              hideEncryption={hideEncryption}
-              style={SURVEY_GENERATOR_TEXT_INPUT_STYLE}
-            />
-          </div>
-
-          <div className={styles.addSourceControls}>
-            <div className={styles.urlInputContainer}>
-              <Input
-                type="url"
-                placeholder="Add URL"
-                value={additionalUrlInput}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  setAdditionalUrlInput(e.target.value);
-                  setImagePickerStatusText('');
-                  setImagePickerStatusTone('default');
-                }}
-                onKeyDown={handleUrlKeyDown}
-                className={styles.urlInputField}
-              />
-              <button
-                type="button"
-                className={styles.internalUrlAddBtn}
-                onClick={addAdditionalUrl}
-                disabled={!additionalUrlInput.trim()}
-                title="Add URL"
-              >
-                <FontAwesomeIcon icon={faPlus} />
-              </button>
-            </div>
-
-            {hasTranscriptModeInput && (
-              <div
-                className={buildSurveyGeneratorTranscriptToggleClassName(styles, transcriptMode)}
-                onClick={handleTranscriptModeToggle}
-                title="Enable Transcript Mode (Summary + Arweave Upload)"
-                data-testid="transcript-mode-toggle"
-              >
-                <FontAwesomeIcon
-                  icon={transcriptMode ? faCheckSquare : faSquare}
-                  className={styles.checkboxIcon}
+              <div className={styles.textInputGroup}>
+                <AudioInput
+                  placeholder={
+                    transcriptMode ? 'Speak to capture transcript or Paste Text...' : 'Speak or type text here...'
+                  }
+                  recordingDisabled={transcriptMode}
+                  longFormMode={transcriptMode}
+                  showRecorderControlsInTextbox={transcriptMode}
+                  showRecordingTimerInTextbox={transcriptMode}
+                  enableDownloads={transcriptMode}
+                  updateFunction={(val: string) => setPastedText(val)}
+                  toggleEncryption={(bool: boolean) => setTextEncrypted(bool)}
+                  value={pastedText}
+                  encrypted={textEncrypted}
+                  hideEncryption={hideEncryption}
+                  style={SURVEY_GENERATOR_TEXT_INPUT_STYLE}
                 />
-                <span>Transcript</span>
               </div>
-            )}
 
-            {transcriptMode && (
-              <div
-                className={buildSurveyGeneratorTranscriptToggleClassName(styles, uploadSummaryToArweave)}
-                onClick={() => setUploadSummaryToArweave(!uploadSummaryToArweave)}
-                title="If checked, the summary is uploaded to Arweave and attached as a permanent document. If unchecked, the summary is passed directly to AI for question generation without permanent storage."
-              >
-                <FontAwesomeIcon
-                  icon={uploadSummaryToArweave ? faCheckSquare : faSquare}
-                  className={styles.checkboxIcon}
+              <div className={styles.addSourceControls}>
+                <div className={styles.urlInputContainer}>
+                  <Input
+                    type="url"
+                    placeholder="Add URL"
+                    value={additionalUrlInput}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      setAdditionalUrlInput(e.target.value);
+                      setImagePickerStatusText('');
+                      setImagePickerStatusTone('default');
+                    }}
+                    onKeyDown={handleUrlKeyDown}
+                    className={styles.urlInputField}
+                  />
+                  <button
+                    type="button"
+                    className={styles.internalUrlAddBtn}
+                    onClick={addAdditionalUrl}
+                    disabled={!additionalUrlInput.trim()}
+                    title="Add URL"
+                  >
+                    <FontAwesomeIcon icon={faPlus} />
+                  </button>
+                </div>
+
+                {hasTranscriptModeInput && (
+                  <div
+                    className={buildSurveyGeneratorTranscriptToggleClassName(styles, transcriptMode)}
+                    onClick={handleTranscriptModeToggle}
+                    title="Enable Transcript Mode (Summary + Arweave Upload)"
+                    data-testid="transcript-mode-toggle"
+                  >
+                    <FontAwesomeIcon icon={transcriptMode ? faCheckSquare : faSquare} className={styles.checkboxIcon} />
+                    <span>Transcript</span>
+                  </div>
+                )}
+
+                {transcriptMode && (
+                  <div
+                    className={buildSurveyGeneratorTranscriptToggleClassName(styles, uploadSummaryToArweave)}
+                    onClick={() => setUploadSummaryToArweave(!uploadSummaryToArweave)}
+                    title="If checked, the summary is uploaded to Arweave and attached as a permanent document. If unchecked, the summary is passed directly to AI for question generation without permanent storage."
+                  >
+                    <FontAwesomeIcon
+                      icon={uploadSummaryToArweave ? faCheckSquare : faSquare}
+                      className={styles.checkboxIcon}
+                    />
+                    <span>Upload Summary</span>
+                  </div>
+                )}
+
+                {transcriptMode && uploadSummaryToArweave && (
+                  <div
+                    className={buildSurveyGeneratorTranscriptToggleClassName(styles, encryptSummary)}
+                    onClick={() => setEncryptSummary(!encryptSummary)}
+                    title="Encrypt the summary before uploading to Arweave (Lit + SBT gate)."
+                  >
+                    <FontAwesomeIcon icon={encryptSummary ? faCheckSquare : faSquare} className={styles.checkboxIcon} />
+                    <span>Encrypt Summary</span>
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.imageSourceSection}>
+                <CompactImageChooser
+                  className={styles.imageChooser}
+                  rootTestId={E2E_TESTIDS.DATABASE_IMAGE_CHOOSER}
+                  pasteButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_PASTE}
+                  uploadButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_UPLOAD}
+                  fileInputTestId={E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}
+                  showUrlModeButton={false}
+                  isUrlMode={false}
+                  isUploadMode
+                  showUrlInput={false}
+                  onPaste={handleImagePickerPaste}
+                  onUploadClick={handleImagePickerUploadClick}
+                  onFileChange={handleAdditionalSourceUpload}
+                  fileInputRef={imagePickerInputRef}
+                  accept={SUPPORTED_SOURCE_UPLOAD_ACCEPT}
+                  multiple
+                  statusText={imagePickerStatusText}
+                  statusTone={imagePickerStatusTone}
+                  uploadAriaLabel="Upload file or image"
                 />
-                <span>Upload Summary</span>
               </div>
-            )}
 
-            {transcriptMode && uploadSummaryToArweave && (
-              <div
-                className={buildSurveyGeneratorTranscriptToggleClassName(styles, encryptSummary)}
-                onClick={() => setEncryptSummary(!encryptSummary)}
-                title="Encrypt the summary before uploading to Arweave (Lit + SBT gate)."
-              >
-                <FontAwesomeIcon
-                  icon={encryptSummary ? faCheckSquare : faSquare}
-                  className={styles.checkboxIcon}
-                />
-                <span>Encrypt Summary</span>
-              </div>
-            )}
-          </div>
+              {(additionalSources.length > 0 ||
+                shouldShowSaveExtraSourcesControl ||
+                (transcriptMode && uploadSummaryToArweave && encryptSummary)) && (
+                <div className={styles.additionalContextSection}>
+                  {queuedPhotoSources.length > 0 && (
+                    <div className={styles.photoCardGrid}>
+                      {queuedPhotoSources.map((item) => {
+                        const statusKey = toStr(item?.analysisStatus || 'queued')
+                          .trim()
+                          .toLowerCase();
+                        const statusLabel = getPhotoStatusLabel(item);
+                        const analysisBodyId = `database-photo-analysis-${item?.id || 'unknown'}`;
+                        const hasExpandedAnalysis =
+                          statusKey === 'ready' && item?.analysisExpanded && toStr(item?.analysisText).trim();
 
-          <div className={styles.imageSourceSection}>
-            <CompactImageChooser
-              className={styles.imageChooser}
-              rootTestId={E2E_TESTIDS.DATABASE_IMAGE_CHOOSER}
-              pasteButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_PASTE}
-              uploadButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_UPLOAD}
-              fileInputTestId={E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}
-              showUrlModeButton={false}
-              isUrlMode={false}
-              isUploadMode
-              showUrlInput={false}
-              onPaste={handleImagePickerPaste}
-              onUploadClick={handleImagePickerUploadClick}
-              onFileChange={handleAdditionalSourceUpload}
-              fileInputRef={imagePickerInputRef}
-              accept={SUPPORTED_SOURCE_UPLOAD_ACCEPT}
-              multiple
-              statusText={imagePickerStatusText}
-              statusTone={imagePickerStatusTone}
-              uploadAriaLabel="Upload file or image"
-            />
-          </div>
-
-          {(additionalSources.length > 0 || shouldShowSaveExtraSourcesControl || (transcriptMode && uploadSummaryToArweave && encryptSummary)) && (
-            <div className={styles.additionalContextSection}>
-              {queuedPhotoSources.length > 0 && (
-                <div className={styles.photoCardGrid}>
-                  {queuedPhotoSources.map((item) => {
-                    const statusKey = toStr(item?.analysisStatus || 'queued').trim().toLowerCase();
-                    const statusLabel = getPhotoStatusLabel(item);
-                    const analysisBodyId = `database-photo-analysis-${item?.id || 'unknown'}`;
-                    const hasExpandedAnalysis = statusKey === 'ready' && item?.analysisExpanded && toStr(item?.analysisText).trim();
-
-                    return (
-                      <div
-                        key={item?.id}
-                        className={styles.photoCard}
-                        data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_CARD}
-                        data-ce-source-id={item?.id}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => removeAdditionalSource(item?.id)}
-                          className={styles.photoRemoveBtn}
-                          aria-label={`Remove photo ${item?.name || ''}`.trim()}
-                        >
-                          ×
-                        </button>
-
-                        <div className={styles.photoCardTop}>
-                          <div className={styles.photoPreviewFrame}>
-                            <QueuedPhotoPreview
-                              file={item?.value}
-                              photoName={item?.name}
-                              sourceId={item?.id}
-                            />
-                          </div>
-
-                          <div className={styles.photoCardMeta}>
-                            <div className={styles.photoName} title={item?.name}>{item?.name}</div>
-                            <div className={styles.photoCardStatusRow}>
-                              {statusKey === 'ready' ? (
-                                <button
-                                  type="button"
-                                  className={buildSurveyGeneratorPhotoStatusToggleClassName(styles)}
-                                  onClick={() => togglePhotoAnalysisExpanded(item?.id)}
-                                  aria-expanded={Boolean(item?.analysisExpanded)}
-                                  aria-controls={analysisBodyId}
-                                  data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_TOGGLE}
-                                  data-ce-source-id={item?.id}
-                                >
-                                  <span>{PHOTO_ANALYSIS_STATUS_LABELS.ready}</span>
-                                  <FontAwesomeIcon icon={item?.analysisExpanded ? faCaretUp : faCaretDown} />
-                                </button>
-                              ) : (
-                                <span
-                                  className={buildSurveyGeneratorPhotoStatusChipClassName(styles, statusKey)}
-                                >
-                                  {statusKey === 'error' ? PHOTO_ANALYSIS_STATUS_LABELS.error : statusLabel}
-                                </span>
-                              )}
-                            </div>
-                            {statusKey === 'error' && toStr(item?.analysisError).trim() ? (
-                              <div className={styles.photoErrorText}>{item.analysisError}</div>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {hasExpandedAnalysis ? (
+                        return (
                           <div
-                            id={analysisBodyId}
-                            className={styles.photoAnalysisBody}
-                            data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_BODY}
+                            key={item?.id}
+                            className={styles.photoCard}
+                            data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_CARD}
                             data-ce-source-id={item?.id}
                           >
-                            {item.analysisText}
+                            <button
+                              type="button"
+                              onClick={() => removeAdditionalSource(item?.id)}
+                              className={styles.photoRemoveBtn}
+                              aria-label={`Remove photo ${item?.name || ''}`.trim()}
+                            >
+                              ×
+                            </button>
+
+                            <div className={styles.photoCardTop}>
+                              <div className={styles.photoPreviewFrame}>
+                                <QueuedPhotoPreview file={item?.value} photoName={item?.name} sourceId={item?.id} />
+                              </div>
+
+                              <div className={styles.photoCardMeta}>
+                                <div className={styles.photoName} title={item?.name}>
+                                  {item?.name}
+                                </div>
+                                <div className={styles.photoCardStatusRow}>
+                                  {statusKey === 'ready' ? (
+                                    <button
+                                      type="button"
+                                      className={buildSurveyGeneratorPhotoStatusToggleClassName(styles)}
+                                      onClick={() => togglePhotoAnalysisExpanded(item?.id)}
+                                      aria-expanded={Boolean(item?.analysisExpanded)}
+                                      aria-controls={analysisBodyId}
+                                      data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_TOGGLE}
+                                      data-ce-source-id={item?.id}
+                                    >
+                                      <span>{PHOTO_ANALYSIS_STATUS_LABELS.ready}</span>
+                                      <FontAwesomeIcon icon={item?.analysisExpanded ? faCaretUp : faCaretDown} />
+                                    </button>
+                                  ) : (
+                                    <span className={buildSurveyGeneratorPhotoStatusChipClassName(styles, statusKey)}>
+                                      {statusKey === 'error' ? PHOTO_ANALYSIS_STATUS_LABELS.error : statusLabel}
+                                    </span>
+                                  )}
+                                </div>
+                                {statusKey === 'error' && toStr(item?.analysisError).trim() ? (
+                                  <div className={styles.photoErrorText}>{item.analysisError}</div>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            {hasExpandedAnalysis ? (
+                              <div
+                                id={analysisBodyId}
+                                className={styles.photoAnalysisBody}
+                                data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_BODY}
+                                data-ce-source-id={item?.id}
+                              >
+                                {item.analysisText}
+                              </div>
+                            ) : null}
                           </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                        );
+                      })}
+                    </div>
+                  )}
 
-              {queuedNonPhotoSources.length > 0 && (
-                <ul className={styles.sourceList}>
-                  {queuedNonPhotoSources.map((item) => (
-                    <li key={item?.id} className={styles.sourceItem}>
-                      <span className={styles.sourceTypeLabel}>[{item.type}]</span>
-                      <div className={styles.sourceMeta}>
-                        <span className={styles.sourceName}>{item.name}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeAdditionalSource(item?.id)}
-                        className={styles.removeSourceBtn}
-                        aria-label={`Remove ${item?.type || 'source'} ${item?.name || ''}`.trim()}
-                      >
-                        ×
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {shouldShowSaveExtraSourcesControl && (
-                <div className={styles.docSaveRow}>
-                  <label className={styles.docSaveToggle} htmlFor={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}>
-                    <input
-                      id={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
-                      type="checkbox"
-                      checked={saveExtraSourcesToDocLibrary}
-                      onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                        setSaveExtraSourcesToDocLibrary(event.target.checked);
-                        if (!event.target.checked) {
-                          setShowSaveDocAudienceMenu(false);
-                        }
-                      }}
-                      data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
-                    />
-                    <span>Add to session context</span>
-                  </label>
-
-                  <div className={styles.docSaveAudienceWrap}>
-                    <button
-                      type="button"
-                      className={styles.docSaveAudienceButton}
-                      onClick={() => setShowSaveDocAudienceMenu((value: boolean) => !value)}
-                      data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}
-                      data-ce-doc-save-audience={saveDocAudience}
-                      aria-label={`Session context visibility: ${saveDocAudienceLabel}`}
-                      aria-haspopup="menu"
-                      aria-expanded={showSaveDocAudienceMenu}
-                      title={`Session context visibility: ${saveDocAudienceLabel}`}
-                    >
-                      <FontAwesomeIcon icon={faLock} />
-                    </button>
-
-                    {showSaveDocAudienceMenu && (
-                      <div
-                        className={styles.docSaveAudienceMenu}
-                        data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_MENU}
-                      >
-                        <button
-                          type="button"
-                          className={buildSurveyGeneratorDocSaveAudienceOptionClassName(styles, saveDocAudience === 'self')}
-                          onClick={() => {
-                            setSaveDocAudience('self');
-                            setShowSaveDocAudienceMenu(false);
-                          }}
-                          data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SELF}
-                        >
-                          <FontAwesomeIcon icon={faLock} />
-                          <span>only me</span>
-                        </button>
-
-                        {docSaveSessionAudienceAvailable ? (
+                  {queuedNonPhotoSources.length > 0 && (
+                    <ul className={styles.sourceList}>
+                      {queuedNonPhotoSources.map((item) => (
+                        <li key={item?.id} className={styles.sourceItem}>
+                          <span className={styles.sourceTypeLabel}>[{item.type}]</span>
+                          <div className={styles.sourceMeta}>
+                            <span className={styles.sourceName}>{item.name}</span>
+                          </div>
                           <button
                             type="button"
-                            className={buildSurveyGeneratorDocSaveAudienceOptionClassName(styles, saveDocAudience === 'session')}
-                            onClick={() => {
-                              setSaveDocAudience('session');
-                              setShowSaveDocAudienceMenu(false);
-                            }}
-                            data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SESSION}
+                            onClick={() => removeAdditionalSource(item?.id)}
+                            className={styles.removeSourceBtn}
+                            aria-label={`Remove ${item?.type || 'source'} ${item?.name || ''}`.trim()}
                           >
-                            <FontAwesomeIcon icon={faLock} />
-                            <span>{docSaveSessionLabel}</span>
+                            ×
                           </button>
-                        ) : (
-                          <div className={styles.docSaveAudienceNote}>
-                            {docSaveSessionChainError
-                              ? docSaveSessionChainError
-                              : (
-                                <>
-                                  Session <code>docUploads</code> gate unavailable. Saved docs will stay private to your wallet.
-                                </>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {shouldShowSaveExtraSourcesControl && (
+                    <div className={styles.docSaveRow}>
+                      <label className={styles.docSaveToggle} htmlFor={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}>
+                        <input
+                          id={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
+                          type="checkbox"
+                          checked={saveExtraSourcesToDocLibrary}
+                          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                            setSaveExtraSourcesToDocLibrary(event.target.checked);
+                            if (!event.target.checked) {
+                              setShowSaveDocAudienceMenu(false);
+                            }
+                          }}
+                          data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
+                        />
+                        <span>Add to session context</span>
+                      </label>
+
+                      <div className={styles.docSaveAudienceWrap}>
+                        <button
+                          type="button"
+                          className={styles.docSaveAudienceButton}
+                          onClick={() => setShowSaveDocAudienceMenu((value: boolean) => !value)}
+                          data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}
+                          data-ce-doc-save-audience={saveDocAudience}
+                          aria-label={`Session context visibility: ${saveDocAudienceLabel}`}
+                          aria-haspopup="menu"
+                          aria-expanded={showSaveDocAudienceMenu}
+                          title={`Session context visibility: ${saveDocAudienceLabel}`}
+                        >
+                          <FontAwesomeIcon icon={faLock} />
+                        </button>
+
+                        {showSaveDocAudienceMenu && (
+                          <div
+                            className={styles.docSaveAudienceMenu}
+                            data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_MENU}
+                          >
+                            <button
+                              type="button"
+                              className={buildSurveyGeneratorDocSaveAudienceOptionClassName(
+                                styles,
+                                saveDocAudience === 'self',
                               )}
+                              onClick={() => {
+                                setSaveDocAudience('self');
+                                setShowSaveDocAudienceMenu(false);
+                              }}
+                              data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SELF}
+                            >
+                              <FontAwesomeIcon icon={faLock} />
+                              <span>only me</span>
+                            </button>
+
+                            {docSaveSessionAudienceAvailable ? (
+                              <button
+                                type="button"
+                                className={buildSurveyGeneratorDocSaveAudienceOptionClassName(
+                                  styles,
+                                  saveDocAudience === 'session',
+                                )}
+                                onClick={() => {
+                                  setSaveDocAudience('session');
+                                  setShowSaveDocAudienceMenu(false);
+                                }}
+                                data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SESSION}
+                              >
+                                <FontAwesomeIcon icon={faLock} />
+                                <span>{docSaveSessionLabel}</span>
+                              </button>
+                            ) : (
+                              <div className={styles.docSaveAudienceNote}>
+                                {docSaveSessionChainError ? (
+                                  docSaveSessionChainError
+                                ) : (
+                                  <>
+                                    Session <code>docUploads</code> gate unavailable. Saved docs will stay private to
+                                    your wallet.
+                                  </>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
 
-                  {queuedPhotoSources.length > 0 ? (
-                    <label className={styles.docSaveToggle} htmlFor={E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}>
-                      <input
-                        id={E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}
-                        type="checkbox"
-                        checked={analyzeBeforeLibraryUpload}
-                        onChange={(event: React.ChangeEvent<HTMLInputElement>) => setAnalyzeBeforeLibraryUpload(event.target.checked)}
-                        data-testid={E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}
+                      {queuedPhotoSources.length > 0 ? (
+                        <label className={styles.docSaveToggle} htmlFor={E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}>
+                          <input
+                            id={E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}
+                            type="checkbox"
+                            checked={analyzeBeforeLibraryUpload}
+                            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                              setAnalyzeBeforeLibraryUpload(event.target.checked)
+                            }
+                            data-testid={E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}
+                          />
+                          <span>Analyze images before upload</span>
+                        </label>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {transcriptMode && uploadSummaryToArweave && encryptSummary && (
+                    <div className={styles.litGateRow}>
+                      <SBTSelector
+                        id="summary-encryption"
+                        label="SBTs that can decrypt the summary"
+                        selectedSBTs={summaryGateSBTs}
+                        onAddSBT={(sbt: SurveyGeneratorSbtSelection) => setSummaryGateSBTs((prev) => [...prev, sbt])}
+                        onRemoveSBT={(address: string) =>
+                          setSummaryGateSBTs((prev) =>
+                            prev.filter(
+                              (item) =>
+                                String(item.address || '').toLowerCase() !== String(address || '').toLowerCase(),
+                            ),
+                          )
+                        }
+                        network={network}
+                        sessionSlug={resolvedSessionSlug || ''}
+                        defaultFeaturedSBTs={resolvedSessionConfig?.defaultFeaturedSBTs || []}
+                        enableGroupSelect
+                        variant="create"
                       />
-                      <span>Analyze images before upload</span>
-                    </label>
-                  ) : null}
-                </div>
-              )}
+                      <FormGroup className={styles.litGateMode}>
+                        <Label>Gate mode</Label>
+                        <Input
+                          type="select"
+                          value={summaryGateMode}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            setSummaryGateMode(e.target.value as SurveyGeneratorGateMode)
+                          }
+                        >
+                          <option value="any">Any (OR)</option>
+                          <option value="all">All (AND)</option>
+                        </Input>
+                      </FormGroup>
+                    </div>
+                  )}
 
-              {transcriptMode && uploadSummaryToArweave && encryptSummary && (
-                <div className={styles.litGateRow}>
-                  <SBTSelector
-                    id="summary-encryption"
-                    label="SBTs that can decrypt the summary"
-                    selectedSBTs={summaryGateSBTs}
-                    onAddSBT={(sbt: SurveyGeneratorSbtSelection) => setSummaryGateSBTs((prev) => [...prev, sbt])}
-                    onRemoveSBT={(address: string) =>
-                      setSummaryGateSBTs((prev) =>
-                        prev.filter((item) => String(item.address || '').toLowerCase() !== String(address || '').toLowerCase())
-                      )
-                    }
-                    network={network}
-                    sessionSlug={resolvedSessionSlug || ''}
-                    defaultFeaturedSBTs={resolvedSessionConfig?.defaultFeaturedSBTs || []}
-                    enableGroupSelect
-                    variant="create"
-                  />
-                  <FormGroup className={styles.litGateMode}>
-                    <Label>Gate mode</Label>
-                    <Input
-                      type="select"
-                      value={summaryGateMode}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSummaryGateMode(e.target.value as SurveyGeneratorGateMode)}
-                    >
-                      <option value="any">Any (OR)</option>
-                      <option value="all">All (AND)</option>
-                    </Input>
-                  </FormGroup>
+                  {transcriptMode &&
+                    uploadSummaryToArweave &&
+                    encryptSummary &&
+                    summaryGateSBTs.length === 0 &&
+                    summaryGateAddresses.length === 0 && (
+                      <div className={styles.encryptionWarning}>Select at least one SBT to encrypt the summary.</div>
+                    )}
                 </div>
               )}
+            </div>
 
-              {transcriptMode && uploadSummaryToArweave && encryptSummary && summaryGateSBTs.length === 0 && summaryGateAddresses.length === 0 && (
-                <div className={styles.encryptionWarning}>
-                  Select at least one SBT to encrypt the summary.
+            <div className={styles.formSection}>
+              <h3 className={styles.sectionTitle}>Types</h3>
+
+              <div className={styles.questionTypeGrid}>
+                <div
+                  className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.binary)}
+                  onClick={() => toggleQuestionType('binary')}
+                >
+                  <div className={styles.typeTitle}>Binary</div>
+                  <div className={styles.typePreviewRow}>
+                    <span className={buildSurveyGeneratorTypePillClassName(styles, 'agree')}>Agree</span>
+                    <span className={buildSurveyGeneratorTypePillClassName(styles, 'unsure')}>Unsure</span>
+                    <span className={buildSurveyGeneratorTypePillClassName(styles, 'disagree')}>Disagree</span>
+                  </div>
                 </div>
-              )}
+
+                <div
+                  className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.multichoice)}
+                  onClick={() => toggleQuestionType('multichoice')}
+                >
+                  <div className={styles.typeTitle}>Multichoice</div>
+                  <div className={styles.typePreviewRow}>
+                    <span className={styles.pill}>Opt 1</span>
+                    <span className={styles.pill}>Opt 2</span>
+                    <span className={styles.pill}>Opt 3</span>
+                  </div>
+                </div>
+
+                <div
+                  className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.rating)}
+                  onClick={() => toggleQuestionType('rating')}
+                >
+                  <div className={styles.typeTitle}>Rating</div>
+                  <div className={styles.ratingPreviewWrap}>
+                    <div className={styles.ratingPreviewFill} />
+                    <div className={styles.ratingPreviewHandle} />
+                  </div>
+                </div>
+
+                <div
+                  className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.freeform)}
+                  onClick={() => toggleQuestionType('freeform')}
+                >
+                  <div className={styles.typeTitle}>Freeform</div>
+                  <div className={styles.freeformPreview}>...</div>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.formSection}>
+              <div className={styles.countControlRow} role="group" aria-label="Number of questions">
+                <span className={styles.countInlineLabel} aria-hidden="true">
+                  # Questions
+                </span>
+                <div
+                  className={styles.countReadout}
+                  aria-label={`Number of questions: ${count}`}
+                  data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  <span>{count}</span>
+                </div>
+                <Button
+                  type="button"
+                  color="secondary"
+                  className={styles.countAdjustButton}
+                  onClick={() => adjustQuestionCount(-QUESTION_COUNT_STEP)}
+                  disabled={count <= MIN_QUESTION_COUNT || loading}
+                  aria-label="Decrease question count"
+                  data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_DECREMENT}
+                >
+                  -
+                </Button>
+                <Button
+                  type="button"
+                  color="secondary"
+                  className={styles.countAdjustButton}
+                  onClick={() => adjustQuestionCount(QUESTION_COUNT_STEP)}
+                  disabled={count >= MAX_QUESTION_COUNT || loading}
+                  aria-label="Increase question count"
+                  data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}
+                >
+                  +
+                </Button>
+              </div>
+            </div>
+
+            {shouldShowGenerateButton && (
+              <div className={styles.actionRow}>
+                <Button type="submit" className={styles.generateButton} disabled={loading}>
+                  {loading && activeAction === 'generate' ? (
+                    <>
+                      {isTranscribing ? 'Transcribing... ' : 'Processing... '}
+                      {waitingSeconds}s <FontAwesomeIcon icon={faSpinner} spin />
+                    </>
+                  ) : (
+                    'Generate Questions'
+                  )}
+                </Button>
+              </div>
+            )}
+          </form>
+
+          {error && !loading && (
+            <div className={styles.error} style={SURVEY_GENERATOR_ERROR_STYLE}>
+              {error}
             </div>
           )}
-        </div>
 
-        <div className={styles.formSection}>
-          <h3 className={styles.sectionTitle}>Types</h3>
-
-          <div className={styles.questionTypeGrid}>
-            <div
-              className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.binary)}
-              onClick={() => toggleQuestionType('binary')}
-            >
-              <div className={styles.typeTitle}>Binary</div>
-              <div className={styles.typePreviewRow}>
-                <span className={buildSurveyGeneratorTypePillClassName(styles, 'agree')}>Agree</span>
-                <span className={buildSurveyGeneratorTypePillClassName(styles, 'unsure')}>Unsure</span>
-                <span className={buildSurveyGeneratorTypePillClassName(styles, 'disagree')}>Disagree</span>
-              </div>
-            </div>
-
-            <div
-              className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.multichoice)}
-              onClick={() => toggleQuestionType('multichoice')}
-            >
-              <div className={styles.typeTitle}>Multichoice</div>
-              <div className={styles.typePreviewRow}>
-                <span className={styles.pill}>Opt 1</span>
-                <span className={styles.pill}>Opt 2</span>
-                <span className={styles.pill}>Opt 3</span>
-              </div>
-            </div>
-
-            <div
-              className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.rating)}
-              onClick={() => toggleQuestionType('rating')}
-            >
-              <div className={styles.typeTitle}>Rating</div>
-              <div className={styles.ratingPreviewWrap}>
-                <div className={styles.ratingPreviewFill} />
-                <div className={styles.ratingPreviewHandle} />
-              </div>
-            </div>
-
-            <div
-              className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.freeform)}
-              onClick={() => toggleQuestionType('freeform')}
-            >
-              <div className={styles.typeTitle}>Freeform</div>
-              <div className={styles.freeformPreview}>...</div>
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.formSection}>
-          <div className={styles.countControlRow} role="group" aria-label="Number of questions">
-            <span className={styles.countInlineLabel} aria-hidden="true"># Questions</span>
-            <div
-              className={styles.countReadout}
-              aria-label={`Number of questions: ${count}`}
-              data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              <span>{count}</span>
-            </div>
-            <Button
-              type="button"
-              color="secondary"
-              className={styles.countAdjustButton}
-              onClick={() => adjustQuestionCount(-QUESTION_COUNT_STEP)}
-              disabled={count <= MIN_QUESTION_COUNT || loading}
-              aria-label="Decrease question count"
-              data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_DECREMENT}
-            >
-              -
-            </Button>
-            <Button
-              type="button"
-              color="secondary"
-              className={styles.countAdjustButton}
-              onClick={() => adjustQuestionCount(QUESTION_COUNT_STEP)}
-              disabled={count >= MAX_QUESTION_COUNT || loading}
-              aria-label="Increase question count"
-              data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}
-            >
-              +
-            </Button>
-          </div>
-        </div>
-
-        {shouldShowGenerateButton && (
-          <div className={styles.actionRow}>
-            <Button
-              type="submit"
-              className={styles.generateButton}
-              disabled={loading}
-            >
-              {loading && activeAction === 'generate' ? (
-                <>
-                  {isTranscribing ? 'Transcribing... ' : 'Processing... '}
-                  {waitingSeconds}s <FontAwesomeIcon icon={faSpinner} spin />
-                </>
-              ) : (
-                'Generate Questions'
-              )}
-            </Button>
-          </div>
-        )}
-      </form>
-
-      {error && !loading && (
-        <div className={styles.error} style={SURVEY_GENERATOR_ERROR_STYLE}>
-          {error}
-        </div>
-      )}
-
-      <div className={styles.aiPromptSection}>
-        <button
-          type="button"
-          className={styles.aiPromptToggleBtn}
-          onClick={toggleAIPrompt}
-        >
-          {showAIPrompt ? 'Hide AI Prompt' : 'Show AI Prompt'}
-          <FontAwesomeIcon icon={showAIPrompt ? faCaretUp : faCaretDown} style={SURVEY_GENERATOR_AI_PROMPT_ICON_STYLE} />
-        </button>
-
-        {showAIPrompt && (
-          <div className={styles.aiPromptWrapper}>
-            <button
-              type="button"
-              className={buildSurveyGeneratorAiPromptCopyClassName(styles, aiPromptCopySuccess)}
-              onClick={copyAIPromptToClipboard}
-              title="Copy prompt"
-            >
-              <FontAwesomeIcon icon={aiPromptCopySuccess ? faCheck : faClipboard} />
+          <div className={styles.aiPromptSection}>
+            <button type="button" className={styles.aiPromptToggleBtn} onClick={toggleAIPrompt}>
+              {showAIPrompt ? 'Hide AI Prompt' : 'Show AI Prompt'}
+              <FontAwesomeIcon
+                icon={showAIPrompt ? faCaretUp : faCaretDown}
+                style={SURVEY_GENERATOR_AI_PROMPT_ICON_STYLE}
+              />
             </button>
-            <div className={styles.aiPromptHeader}>
-              <strong>{`AI Prompt — ${aiPromptModelLabel}`}</strong>
-            </div>
-            <div className={styles.aiPromptMeta}>
-              Variables:&nbsp;
-              <span className={styles.aiVar}>&lt;SourceDocContent&gt;</span>,{' '}
-              <span className={styles.aiVar}>&lt;NumSeedStatements&gt;</span>,{' '}
-              <span className={styles.aiVar}>&lt;Types&gt;</span>,{' '}
-              <span className={styles.aiVar}>&lt;DefaultTags&gt;</span>
-            </div>
-            <div className={styles.jsonDisplayWrapper}>
-              <pre className={styles.jsonDisplay}>
-                {highlightPromptVariables(aiPromptText || '(Prompt not available)')}
-              </pre>
-            </div>
-          </div>
-        )}
-      </div>
 
-      {showCreateSurvey && renderCreateSurveyComponent()}
+            {showAIPrompt && (
+              <div className={styles.aiPromptWrapper}>
+                <button
+                  type="button"
+                  className={buildSurveyGeneratorAiPromptCopyClassName(styles, aiPromptCopySuccess)}
+                  onClick={copyAIPromptToClipboard}
+                  title="Copy prompt"
+                >
+                  <FontAwesomeIcon icon={aiPromptCopySuccess ? faCheck : faClipboard} />
+                </button>
+                <div className={styles.aiPromptHeader}>
+                  <strong>{`AI Prompt — ${aiPromptModelLabel}`}</strong>
+                </div>
+                <div className={styles.aiPromptMeta}>
+                  Variables:&nbsp;
+                  <span className={styles.aiVar}>&lt;SourceDocContent&gt;</span>,{' '}
+                  <span className={styles.aiVar}>&lt;NumSeedStatements&gt;</span>,{' '}
+                  <span className={styles.aiVar}>&lt;Types&gt;</span>,{' '}
+                  <span className={styles.aiVar}>&lt;DefaultTags&gt;</span>
+                </div>
+                <div className={styles.jsonDisplayWrapper}>
+                  <pre className={styles.jsonDisplay}>
+                    {highlightPromptVariables(aiPromptText || '(Prompt not available)')}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {showCreateSurvey && renderCreateSurveyComponent()}
         </>
       )}
     </div>

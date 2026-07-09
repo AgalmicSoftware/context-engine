@@ -1,7 +1,5 @@
 import { ethers } from 'ethers';
-import {
-  normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 
 type SbtAddressPropsLike = {
   SBTAddress?: unknown;
@@ -19,9 +17,7 @@ type SbtPageAddressLinkState = {
   normalized: string;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
 export const buildSessionRoutePath = (slugRaw: unknown = '', basePath: unknown = ''): string => {
   const slug = normalizeSessionSlug(slugRaw || '');
@@ -49,8 +45,7 @@ export const resolveSbtPageAddressLinkState = ({
   zeroAddress = ethers.constants.AddressZero,
 }: ResolveSbtPageAddressLinkStateArgs = {}): SbtPageAddressLinkState => {
   const normalized = String(address || '').trim();
-  const isZeroAddress =
-    normalized.toLowerCase() === String(zeroAddress || '').toLowerCase();
+  const isZeroAddress = normalized.toLowerCase() === String(zeroAddress || '').toLowerCase();
   return {
     isRenderable: !!normalized && !isZeroAddress && typeof isAddress === 'function' && isAddress(normalized),
     isZeroAddress,
@@ -58,7 +53,9 @@ export const resolveSbtPageAddressLinkState = ({
   };
 };
 
-export const getCurrentSbtAddressInfo = (propsIn: SbtAddressPropsLike = {}): {
+export const getCurrentSbtAddressInfo = (
+  propsIn: SbtAddressPropsLike = {},
+): {
   lower: string;
   original: unknown;
 } => {

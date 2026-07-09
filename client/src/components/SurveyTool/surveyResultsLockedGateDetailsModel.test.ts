@@ -1,6 +1,4 @@
-import {
-  buildSurveyResultsLockedGateDetails,
-} from './surveyResultsLockedGateDetailsModel';
+import { buildSurveyResultsLockedGateDetails } from './surveyResultsLockedGateDetailsModel';
 
 describe('surveyResultsLockedGateDetailsModel', () => {
   const normalizeGateSbtEntries = (gate: unknown) => {
@@ -20,13 +18,15 @@ describe('surveyResultsLockedGateDetailsModel', () => {
     const result = buildSurveyResultsLockedGateDetails({
       baseSlug: 'base-session',
       buildSbtDetailPath: (address, slug) => `/sbt/${slug}/${address}`,
-      getQuestionEncryptionGates: (question) => (question ? [{ gateId: 'gate-a', sbts: [{ address: '0xbbb', label: 'Direct' }] }] : []),
+      getQuestionEncryptionGates: (question) =>
+        question ? [{ gateId: 'gate-a', sbts: [{ address: '0xbbb', label: 'Direct' }] }] : [],
       getShortenedAddress: (address) => `short:${address}`,
-      lockedRows: [
-        { questionId: 'Q1' },
-      ],
+      lockedRows: [{ questionId: 'Q1' }],
       normalizeGateSbtEntries,
-      normalizeGateText: (value) => String(value || '').trim().toLowerCase(),
+      normalizeGateText: (value) =>
+        String(value || '')
+          .trim()
+          .toLowerCase(),
       questionLookup: {
         q1: { sessionSlug: 'question-session' },
       },
@@ -38,9 +38,7 @@ describe('surveyResultsLockedGateDetailsModel', () => {
         fallbackChainId: 111,
         slug,
       }),
-      resolveSbtDisplayLabel: ({ address, preferredSlug }) => (
-        address === '0xaaa' ? `Resolved ${preferredSlug}` : ''
-      ),
+      resolveSbtDisplayLabel: ({ address, preferredSlug }) => (address === '0xaaa' ? `Resolved ${preferredSlug}` : ''),
     });
 
     expect(result).toEqual({
@@ -64,18 +62,13 @@ describe('surveyResultsLockedGateDetailsModel', () => {
     const result = buildSurveyResultsLockedGateDetails({
       buildSbtDetailPath: (address, slug) => `/sbt/${slug}/${address}`,
       getQuestionEncryptionGates: () => [],
-      lockedRows: [
-        { questionId: 'q1' },
-        { questionId: 'q2' },
-      ],
+      lockedRows: [{ questionId: 'q1' }, { questionId: 'q2' }],
       normalizeGateSbtEntries,
       questionLookup: {
         q1: { sessionSlug: 'session-a' },
       },
       readSessionGateContext: (slug) => ({
-        defaultPolicy: slug === 'session-a'
-          ? { gates: [{ sbts: [{ address: '0xccc' }] }] }
-          : { gates: [{}] },
+        defaultPolicy: slug === 'session-a' ? { gates: [{ sbts: [{ address: '0xccc' }] }] } : { gates: [{}] },
         slug,
       }),
     });

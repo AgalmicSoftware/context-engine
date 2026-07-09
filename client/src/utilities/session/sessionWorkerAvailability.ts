@@ -1,7 +1,4 @@
-import {
-  CLOUDFLARE_CORS_WORKER_URL,
-  USE_ONCHAIN_SESSION_REGISTRY,
-} from '../../variables/appConfig.js';
+import { CLOUDFLARE_CORS_WORKER_URL, USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import { canonicalizeSessionSlug } from './canonicalSessionContext.js';
 import { overlayCachedSessionWorkerConfig } from './sessionWorkerConfigCache.js';
 import { parseWorkerConfig } from './sessionParsers.js';
@@ -16,9 +13,8 @@ type SessionWorkerAvailabilityOptions = {
   allowSharedFallback?: boolean;
 };
 
-const isObj = (value: unknown): value is SessionConfigLike => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isObj = (value: unknown): value is SessionConfigLike =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const getConfiguredSessionWorkerUrlFromConfig = (sessionConfig: unknown = null): string => {
   const parsed = parseWorkerConfig(sessionConfig as WorkerConfigInput);
@@ -26,9 +22,8 @@ export const getConfiguredSessionWorkerUrlFromConfig = (sessionConfig: unknown =
   return canonicalUrl;
 };
 
-export const resolveConfiguredSessionWorkerUrlFromConfig = (
-  sessionConfig: unknown = null
-): string => getConfiguredSessionWorkerUrlFromConfig(sessionConfig);
+export const resolveConfiguredSessionWorkerUrlFromConfig = (sessionConfig: unknown = null): string =>
+  getConfiguredSessionWorkerUrlFromConfig(sessionConfig);
 
 export const getSharedFallbackWorkerUrl = (): string => normalizeWorkerUrl(CLOUDFLARE_CORS_WORKER_URL);
 
@@ -54,10 +49,12 @@ const getEffectiveSessionWorkerConfig = ({
 }: SessionWorkerAvailabilityOptions = {}): SessionConfigLike | null => {
   const baseConfig = isObj(sessionConfig) ? sessionConfig : null;
   const normalizedSlug = canonicalizeSessionSlug(slug ?? baseConfig?.slug ?? '');
-  return overlayCachedSessionWorkerConfig({
-    slug: normalizedSlug,
-    sessionConfig: baseConfig,
-  }) || baseConfig;
+  return (
+    overlayCachedSessionWorkerConfig({
+      slug: normalizedSlug,
+      sessionConfig: baseConfig,
+    }) || baseConfig
+  );
 };
 
 export const getUsableSessionWorkerUrl = ({
@@ -91,9 +88,11 @@ export const hasUsableSessionWorkerConfig = ({
 }: SessionWorkerAvailabilityOptions = {}): boolean => {
   const sessionConfigSource = isObj(sessionConfig) ? sessionConfig : null;
   const normalizedSlug = canonicalizeSessionSlug(slug ?? sessionConfigSource?.slug ?? '');
-  return getUsableSessionWorkerUrl({
-    slug: normalizedSlug,
-    sessionConfig,
-    allowSharedFallback,
-  }).length > 0;
+  return (
+    getUsableSessionWorkerUrl({
+      slug: normalizedSlug,
+      sessionConfig,
+      allowSharedFallback,
+    }).length > 0
+  );
 };

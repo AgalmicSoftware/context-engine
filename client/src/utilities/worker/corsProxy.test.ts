@@ -7,8 +7,12 @@ describe('corsProxy fallback policy', () => {
   const expectedSharedFallbackWorkerUrl = CLOUDFLARE_CORS_WORKER_URL.replace(/\/+$/, '');
 
   beforeEach(() => {
-    try { localStorage.removeItem('dg:sessionRegistryCache:v1'); } catch (_) {}
-    try { localStorage.removeItem('ce:sessionWorkerConfigCache:v1'); } catch (_) {}
+    try {
+      localStorage.removeItem('dg:sessionRegistryCache:v1');
+    } catch (_) {}
+    try {
+      localStorage.removeItem('ce:sessionWorkerConfigCache:v1');
+    } catch (_) {}
   });
 
   it('uses shared fallback for general session when no worker URL is configured', async () => {

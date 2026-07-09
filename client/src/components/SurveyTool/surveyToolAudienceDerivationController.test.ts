@@ -15,28 +15,34 @@ describe('surveyToolAudienceDerivationController', () => {
     });
 
     it('returns empty array when encryption.enabled is false', () => {
-      expect(getQuestionEncryptionGates({
-        encryption: {
-          enabled: false,
-          gates: [{ id: 'g1' }],
-        },
-      })).toEqual([]);
+      expect(
+        getQuestionEncryptionGates({
+          encryption: {
+            enabled: false,
+            gates: [{ id: 'g1' }],
+          },
+        }),
+      ).toEqual([]);
     });
 
     it('returns gates array from encryption.gates', () => {
-      expect(getQuestionEncryptionGates({
-        encryption: {
-          gates: [{ id: 'g1' }, { id: 'g2' }],
-        },
-      })).toHaveLength(2);
+      expect(
+        getQuestionEncryptionGates({
+          encryption: {
+            gates: [{ id: 'g1' }, { id: 'g2' }],
+          },
+        }),
+      ).toHaveLength(2);
     });
 
     it('normalizes single gate object from encryption.gate', () => {
-      expect(getQuestionEncryptionGates({
-        encryption: {
-          gate: { id: 'g1' },
-        },
-      })).toEqual([{ id: 'g1' }]);
+      expect(
+        getQuestionEncryptionGates({
+          encryption: {
+            gate: { id: 'g1' },
+          },
+        }),
+      ).toEqual([{ id: 'g1' }]);
     });
   });
 
@@ -51,9 +57,12 @@ describe('surveyToolAudienceDerivationController', () => {
 
     it('returns explicit for additional with persisted state', () => {
       expect(
-        normalizeFieldAudienceMode('', 'additional', { value: 'note' }, (
-          v,
-        ) => !!(v && typeof v === 'object' && 'value' in v && v.value)),
+        normalizeFieldAudienceMode(
+          '',
+          'additional',
+          { value: 'note' },
+          (v) => !!(v && typeof v === 'object' && 'value' in v && v.value),
+        ),
       ).toBe('explicit');
     });
 
@@ -108,16 +117,11 @@ describe('surveyToolAudienceDerivationController', () => {
     it('uses field.encryptionAudience when present', () => {
       const normalizeAudience = jest.fn(() => 'gate');
 
-      const result = resolveFieldEncryptionAudience(
-        { encryptionAudience: 'gate' },
-        'q1',
-        'answer',
-        {
-          normalizeAudience,
-          getDefaultAudienceForQid: () => 'self',
-          getDefaultAudience: () => 'self',
-        },
-      );
+      const result = resolveFieldEncryptionAudience({ encryptionAudience: 'gate' }, 'q1', 'answer', {
+        normalizeAudience,
+        getDefaultAudienceForQid: () => 'self',
+        getDefaultAudience: () => 'self',
+      });
 
       expect(result).toBe('gate');
       expect(normalizeAudience).toHaveBeenCalledWith('gate', 'q1');
@@ -142,19 +146,23 @@ describe('surveyToolAudienceDerivationController', () => {
     });
 
     it('falls back to default audience for qid when no field audience', () => {
-      expect(resolveFieldEncryptionAudience({}, 'q1', 'answer', {
-        normalizeAudience: () => 'x',
-        getDefaultAudienceForQid: () => 'gate',
-        getDefaultAudience: () => 'self',
-      })).toBe('gate');
+      expect(
+        resolveFieldEncryptionAudience({}, 'q1', 'answer', {
+          normalizeAudience: () => 'x',
+          getDefaultAudienceForQid: () => 'gate',
+          getDefaultAudience: () => 'self',
+        }),
+      ).toBe('gate');
     });
 
     it('falls back to global default when no field audience and no qid', () => {
-      expect(resolveFieldEncryptionAudience({}, null, 'answer', {
-        normalizeAudience: () => 'x',
-        getDefaultAudienceForQid: () => 'gate',
-        getDefaultAudience: () => 'self',
-      })).toBe('self');
+      expect(
+        resolveFieldEncryptionAudience({}, null, 'answer', {
+          normalizeAudience: () => 'x',
+          getDefaultAudienceForQid: () => 'gate',
+          getDefaultAudience: () => 'self',
+        }),
+      ).toBe('self');
     });
   });
 
@@ -188,15 +196,10 @@ describe('surveyToolAudienceDerivationController', () => {
 
   describe('buildInheritedAdditionalFieldState', () => {
     it('inherits encryption from answer field', () => {
-      const result = buildInheritedAdditionalFieldState(
-        { value: 'note' },
-        { encrypted: true },
-        'q1',
-        {
-          resolveFieldEncryptionAudience: () => 'gate',
-          resolveFieldEncryptionGateId: () => 'gate-1',
-        },
-      );
+      const result = buildInheritedAdditionalFieldState({ value: 'note' }, { encrypted: true }, 'q1', {
+        resolveFieldEncryptionAudience: () => 'gate',
+        resolveFieldEncryptionGateId: () => 'gate-1',
+      });
 
       expect(result.encrypted).toBe(true);
       expect(result.encryptionAudience).toBe('gate');
@@ -205,15 +208,10 @@ describe('surveyToolAudienceDerivationController', () => {
     });
 
     it('preserves additional field properties', () => {
-      const result = buildInheritedAdditionalFieldState(
-        { value: 'note', hash: 'abc' },
-        { encrypted: false },
-        null,
-        {
-          resolveFieldEncryptionAudience: () => 'self',
-          resolveFieldEncryptionGateId: () => null,
-        },
-      );
+      const result = buildInheritedAdditionalFieldState({ value: 'note', hash: 'abc' }, { encrypted: false }, null, {
+        resolveFieldEncryptionAudience: () => 'self',
+        resolveFieldEncryptionGateId: () => null,
+      });
 
       expect(result.encrypted).toBe(false);
       expect(result.hash).toBe('abc');

@@ -4,9 +4,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import UserPageSurveySection from './UserPageSurveySection';
 
 jest.mock('reactstrap', () => ({
-  Collapse: ({ children, isOpen }: { children: React.ReactNode; isOpen?: boolean }) => (
-    isOpen ? <div data-testid="collapse">{children}</div> : null
-  ),
+  Collapse: ({ children, isOpen }: { children: React.ReactNode; isOpen?: boolean }) =>
+    isOpen ? <div data-testid="collapse">{children}</div> : null,
 }));
 
 jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
@@ -30,12 +29,13 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
     sbtCacheRevision?: unknown;
     sessionSlug?: unknown;
   }) => {
-    const responseRecord = (response && typeof response === 'object')
-      ? response as {
-        additional?: { encrypted?: unknown; value?: unknown };
-        answer?: { encrypted?: unknown; value?: unknown };
-      }
-      : {};
+    const responseRecord =
+      response && typeof response === 'object'
+        ? (response as {
+            additional?: { encrypted?: unknown; value?: unknown };
+            answer?: { encrypted?: unknown; value?: unknown };
+          })
+        : {};
 
     return (
       <div
@@ -52,21 +52,23 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
         data-session-slug={String(sessionSlug)}
       >
         {question?.prompt || question?.id}
-        <button type="button" onClick={() => onDecryptQuestion?.(question?.id)}>decrypt</button>
+        <button type="button" onClick={() => onDecryptQuestion?.(question?.id)}>
+          decrypt
+        </button>
       </div>
     );
   },
 }));
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof UserPageSurveySection>> = {}
-) => ({
+const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageSurveySection>> = {}) => ({
   detailedSurveyResponseMap: {
-    'survey-response': [{
-      canDecryptOtherResponses: true,
-      questionData: { id: 'q-response', prompt: 'Survey response prompt' },
-      responseData: { answer: { value: 'yes' }, additional: { value: '' } },
-    }],
+    'survey-response': [
+      {
+        canDecryptOtherResponses: true,
+        questionData: { id: 'q-response', prompt: 'Survey response prompt' },
+        responseData: { answer: { value: 'yes' }, additional: { value: '' } },
+      },
+    ],
   },
   expandedSurveyCreatedMap: {
     'survey-created': true,
@@ -86,24 +88,28 @@ const createProps = (
   questionResponsesNonce: 'nonce-1',
   responderAddress: '0xviewer',
   sbtCacheRevision: 'revision-1',
-  surveyCreationEntries: [{
-    documentURLs: ['https://docs.example.test/created'],
-    id: 'survey-created',
-    questionIDs: ['question-with-a-very-long-id-1234567890'],
-    questionPreviews: [{ id: 'question-with-a-very-long-id-1234567890', text: '' }],
-    questionsCount: 1,
-    slug: 'alpha',
-    tags: ['created-tag'],
-    title: 'Created survey',
-  }],
-  surveyResponseEntries: [{
-    documentURLs: ['https://docs.example.test/response'],
-    id: 'survey-response',
-    questionsCount: 1,
-    slug: 'beta',
-    tags: ['response-tag'],
-    title: 'Response survey',
-  }],
+  surveyCreationEntries: [
+    {
+      documentURLs: ['https://docs.example.test/created'],
+      id: 'survey-created',
+      questionIDs: ['question-with-a-very-long-id-1234567890'],
+      questionPreviews: [{ id: 'question-with-a-very-long-id-1234567890', text: '' }],
+      questionsCount: 1,
+      slug: 'alpha',
+      tags: ['created-tag'],
+      title: 'Created survey',
+    },
+  ],
+  surveyResponseEntries: [
+    {
+      documentURLs: ['https://docs.example.test/response'],
+      id: 'survey-response',
+      questionsCount: 1,
+      slug: 'beta',
+      tags: ['response-tag'],
+      title: 'Response survey',
+    },
+  ],
   surveyResponsesLoadingIndicator: <span data-testid="survey-responses-loading">responses loading</span>,
   surveyResponsesSectionToggleState: {
     isOpen: true,
@@ -129,7 +135,9 @@ describe('UserPageSurveySection', () => {
   it('renders survey response and created cards with parent-owned boundaries', () => {
     const getSurveyCreatedHref = jest.fn(() => '/survey/survey-created?session=alpha');
     const onDecryptQuestion = jest.fn();
-    const onOpenSurveyResponse = jest.fn((survey: unknown, event: React.MouseEvent<HTMLElement>) => event.stopPropagation());
+    const onOpenSurveyResponse = jest.fn((survey: unknown, event: React.MouseEvent<HTMLElement>) =>
+      event.stopPropagation(),
+    );
     const onShowQuestionsTab = jest.fn((event: React.MouseEvent<HTMLElement>) => event.stopPropagation());
     const onSurveyCreatedToggle = jest.fn();
     const onSurveyResponseToggle = jest.fn();
@@ -148,7 +156,7 @@ describe('UserPageSurveySection', () => {
           onSurveyResponsesSectionToggle,
           onSurveysCreatedSectionToggle,
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('Survey Responses')).toBeInTheDocument();
@@ -161,12 +169,9 @@ describe('UserPageSurveySection', () => {
     expect(screen.getByText('created-tag')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Created survey' })).toHaveAttribute(
       'href',
-      '/survey/survey-created?session=alpha'
+      '/survey/survey-created?session=alpha',
     );
-    expect(screen.getByText('question...567890')).toHaveAttribute(
-      'title',
-      'question-with-a-very-long-id-1234567890'
-    );
+    expect(screen.getByText('question...567890')).toHaveAttribute('title', 'question-with-a-very-long-id-1234567890');
     expect(screen.getByTestId('survey-question-response')).toHaveAttribute('data-session-slug', 'beta');
     expect(screen.getByTestId('survey-question-response')).toHaveAttribute('data-responder-address', '0xviewer');
     expect(screen.getByTestId('survey-question-response')).toHaveAttribute('data-can-decrypt', 'true');
@@ -179,7 +184,7 @@ describe('UserPageSurveySection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open full survey page' }));
     expect(onOpenSurveyResponse).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'survey-response' }),
-      expect.any(Object)
+      expect.any(Object),
     );
     expect(onSurveyResponseToggle).not.toHaveBeenCalled();
 
@@ -206,36 +211,40 @@ describe('UserPageSurveySection', () => {
       <UserPageSurveySection
         {...createProps({
           detailedSurveyResponseMap: {
-            'survey-response': [{
-              canDecryptOtherResponses: true,
-              questionData: { id: 'q-gated-survey', prompt: 'Gated survey prompt' },
-              responseData: {
-                additional: {
-                  encrypted: true,
-                  encryptionAudience: 'gate',
-                  value: '*',
-                },
-                answer: {
-                  encrypted: true,
-                  encryptionAudience: 'gate',
-                  value: '*',
+            'survey-response': [
+              {
+                canDecryptOtherResponses: true,
+                questionData: { id: 'q-gated-survey', prompt: 'Gated survey prompt' },
+                responseData: {
+                  additional: {
+                    encrypted: true,
+                    encryptionAudience: 'gate',
+                    value: '*',
+                  },
+                  answer: {
+                    encrypted: true,
+                    encryptionAudience: 'gate',
+                    value: '*',
+                  },
                 },
               },
-            }],
+            ],
           },
           onDecryptQuestion,
           questionResponsesNonce: 'survey-cache-nonce',
           sbtCacheRevision: 'survey-cache-revision',
-          surveyResponseEntries: [{
-            documentURLs: [],
-            id: 'survey-response',
-            questionsCount: 1,
-            slug: 'survey-cache-session',
-            tags: [],
-            title: 'Cached survey response',
-          }],
+          surveyResponseEntries: [
+            {
+              documentURLs: [],
+              id: 'survey-response',
+              questionsCount: 1,
+              slug: 'survey-cache-session',
+              tags: [],
+              title: 'Cached survey response',
+            },
+          ],
         })}
-      />
+      />,
     );
 
     const responseCard = screen.getByTestId('survey-question-response');
@@ -272,7 +281,7 @@ describe('UserPageSurveySection', () => {
             shouldRenderSurveysCreatedEmptyText: true,
           },
         })}
-      />
+      />,
     );
 
     expect(screen.getByText('No survey responses found.')).toBeInTheDocument();

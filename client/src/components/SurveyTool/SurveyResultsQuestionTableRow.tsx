@@ -59,11 +59,7 @@ const SurveyResultsQuestionTableRow = ({
       <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>{entry.type}</td>
       <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>{entry.responsesCount}</td>
       <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>
-        <Button
-          size="sm"
-          onClick={() => onViewQuestion(entry.questionId)}
-          className={styleMap.tableActionButton}
-        >
+        <Button size="sm" onClick={() => onViewQuestion(entry.questionId)} className={styleMap.tableActionButton}>
           View
         </Button>
       </td>

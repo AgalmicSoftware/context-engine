@@ -34,21 +34,26 @@ describe('admin worker ports', () => {
       fetchImpl: () => jest.fn(),
     });
 
-    await expect(ports.workerUrl.resolveCorsProxyUrl({
-      sessionSlug: 'edge',
-      sessionConfig: { slug: 'edge' },
-      context: { account: '' },
-    })).resolves.toEqual({ url: 'https://first.worker.test' });
+    await expect(
+      ports.workerUrl.resolveCorsProxyUrl({
+        sessionSlug: 'edge',
+        sessionConfig: { slug: 'edge' },
+        context: { account: '' },
+      }),
+    ).resolves.toEqual({ url: 'https://first.worker.test' });
 
     corsProxy = secondCorsProxy;
     corsOrigins = secondOrigins;
 
-    expect(ports.workerUrl.buildWorkerAllowOrigins({
-      currentOrigin: 'https://app.example',
-      extraOrigins: ['https://extra.example'],
-    })).toEqual(['https://second.example']);
-    expect(ports.workerUrl.normalizeWorkerUrl(' https://worker.example.test/ '))
-      .toBe('normalized: https://worker.example.test/ ');
+    expect(
+      ports.workerUrl.buildWorkerAllowOrigins({
+        currentOrigin: 'https://app.example',
+        extraOrigins: ['https://extra.example'],
+      }),
+    ).toEqual(['https://second.example']);
+    expect(ports.workerUrl.normalizeWorkerUrl(' https://worker.example.test/ ')).toBe(
+      'normalized: https://worker.example.test/ ',
+    );
 
     expect(firstCorsProxy.resolveCorsProxyUrl).toHaveBeenCalledWith({
       sessionSlug: 'edge',
@@ -91,21 +96,24 @@ describe('admin worker ports', () => {
       context: { account: '0xabc' },
     };
 
-    await expect(ports.adminAuth.buildSignedAdminActionAuth(authInput))
-      .resolves.toEqual({ signature: '0xfirst' });
-    await expect(ports.adminAuth.buildSignedBootstrapAdminAuth({
-      slug: 'edge',
-      workerUrl: 'https://worker.example.test',
-      context: { account: '0xabc' },
-    })).resolves.toEqual({ signature: '0xfirstBootstrap' });
+    await expect(ports.adminAuth.buildSignedAdminActionAuth(authInput)).resolves.toEqual({ signature: '0xfirst' });
+    await expect(
+      ports.adminAuth.buildSignedBootstrapAdminAuth({
+        slug: 'edge',
+        workerUrl: 'https://worker.example.test',
+        context: { account: '0xabc' },
+      }),
+    ).resolves.toEqual({ signature: '0xfirstBootstrap' });
 
     workerAuth = secondWorkerAuth;
 
-    await expect(ports.adminAuth.fetchWorkerWithAuth(
-      'https://worker.example.test/ai',
-      { method: 'POST' },
-      { sessionSlug: 'edge', workerUrl: 'https://worker.example.test' }
-    )).resolves.toEqual({ ok: true, status: 201 });
+    await expect(
+      ports.adminAuth.fetchWorkerWithAuth(
+        'https://worker.example.test/ai',
+        { method: 'POST' },
+        { sessionSlug: 'edge', workerUrl: 'https://worker.example.test' },
+      ),
+    ).resolves.toEqual({ ok: true, status: 201 });
 
     expect(firstWorkerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(authInput);
     expect(firstWorkerAuth.buildSignedBootstrapAdminAuth).toHaveBeenCalledWith({
@@ -116,7 +124,7 @@ describe('admin worker ports', () => {
     expect(secondWorkerAuth.fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker.example.test/ai',
       { method: 'POST' },
-      { sessionSlug: 'edge', workerUrl: 'https://worker.example.test' }
+      { sessionSlug: 'edge', workerUrl: 'https://worker.example.test' },
     );
   });
 
@@ -140,13 +148,15 @@ describe('admin worker ports', () => {
       fetchImpl: () => fetchImpl,
     });
 
-    await expect(ports.siweLogin.prepareSiweLogin({
-      workerUrl: 'https://worker.example.test',
-      address: '0x00000000000000000000000000000000000000aa',
-      sessionSlug: 'edge',
-      chainId: 84532,
-      statement: 'Sign in to Context Engine.',
-    })).resolves.toEqual({
+    await expect(
+      ports.siweLogin.prepareSiweLogin({
+        workerUrl: 'https://worker.example.test',
+        address: '0x00000000000000000000000000000000000000aa',
+        sessionSlug: 'edge',
+        chainId: 84532,
+        statement: 'Sign in to Context Engine.',
+      }),
+    ).resolves.toEqual({
       nonce: ' nonce-123 ',
       nonceData: { nonce: ' nonce-123 ' },
       message: 'byte-exact-siwe-message',
@@ -188,12 +198,14 @@ describe('admin worker ports', () => {
       fetchImpl: () => fetchImpl,
     });
 
-    await expect(ports.siweLogin.prepareSiweLogin({
-      workerUrl: 'https://worker.example.test',
-      address: '0x00000000000000000000000000000000000000aa',
-      sessionSlug: 'edge',
-      chainId: 84532,
-    })).rejects.toThrow('nonce unavailable');
+    await expect(
+      ports.siweLogin.prepareSiweLogin({
+        workerUrl: 'https://worker.example.test',
+        address: '0x00000000000000000000000000000000000000aa',
+        sessionSlug: 'edge',
+        chainId: 84532,
+      }),
+    ).rejects.toThrow('nonce unavailable');
     expect(buildSiweMessage).not.toHaveBeenCalled();
   });
 });

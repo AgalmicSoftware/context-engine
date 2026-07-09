@@ -51,14 +51,9 @@ const SbtPageMiniCardDisplay = ({
       >
         {isMintingActive ? `${mintingLabel} Live` : `${mintingLabel} Ended`}
       </CETooltip>
-      {showLockIcon && (
-        <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />
-      )}
+      {showLockIcon && <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />}
     </div>
-    <div
-      className={styles.miniImageContainer}
-      data-featured-card-ignore-nav="true"
-    >
+    <div className={styles.miniImageContainer} data-featured-card-ignore-nav="true">
       <img
         src={imageUrl}
         alt={sbtName}
@@ -68,9 +63,7 @@ const SbtPageMiniCardDisplay = ({
       />
     </div>
     <p className={styles.miniSbtName}>{sbtName}</p>
-    {showMiniSbtAddress ? (
-      <p className={styles.miniSbtAddress}>{getShortenedAddress(sbtAddress, false)}</p>
-    ) : null}
+    {showMiniSbtAddress ? <p className={styles.miniSbtAddress}>{getShortenedAddress(sbtAddress, false)}</p> : null}
   </>
 );
 

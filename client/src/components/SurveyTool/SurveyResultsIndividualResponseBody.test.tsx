@@ -60,21 +60,23 @@ describe('SurveyResultsIndividualResponseBody', () => {
       },
     });
 
-    expect(rows).toEqual([{
-      activeSessionSlug: 'question-session',
-      displayResponse: {
-        ...answerRow,
-        answer: { encrypted: true, value: 'Visible answer' },
+    expect(rows).toEqual([
+      {
+        activeSessionSlug: 'question-session',
+        displayResponse: {
+          ...answerRow,
+          answer: { encrypted: true, value: 'Visible answer' },
+        },
+        isOwnResponse: true,
+        question: {
+          id: 'q1',
+          prompt: 'Question one',
+          sessionSlug: 'question-session',
+        },
+        questionId: 'q1',
+        rowKey: 0,
       },
-      isOwnResponse: true,
-      question: {
-        id: 'q1',
-        prompt: 'Question one',
-        sessionSlug: 'question-session',
-      },
-      questionId: 'q1',
-      rowKey: 0,
-    }]);
+    ]);
     expect(getLockedResponseKey).toHaveBeenCalledWith({
       responder: '0xabc',
       questionId: 'q1',
@@ -104,7 +106,7 @@ describe('SurveyResultsIndividualResponseBody', () => {
           response: { responses: null },
         }}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByText('No question-level responses found for this user.')).toBeInTheDocument();
@@ -141,30 +143,34 @@ describe('SurveyResultsIndividualResponseBody', () => {
         response={{
           responder: '0xother',
           response: {
-            responses: [{
-              questionId: 'q2',
-              answer: { value: '[locked]' },
-            }],
+            responses: [
+              {
+                questionId: 'q2',
+                answer: { value: '[locked]' },
+              },
+            ],
           },
         }}
         sbtCacheRevision={3}
         styleMap={styleMap}
-      />
+      />,
     );
 
     expect(screen.getByTestId('single-question-response')).toHaveTextContent('Fallback q2:Decrypted body');
     expect(screen.getByTestId('single-question-response')).toHaveAttribute('data-own-response', 'false');
     expect(screen.getByTestId('single-question-response')).toHaveAttribute('data-session-slug', 'session-fallback');
-    expect(mockSingleQuestionResponse).toHaveBeenCalledWith(expect.objectContaining({
-      aggregatorResponseMode: false,
-      bodyClassName: 'response-body',
-      containerClassName: 'response-card',
-      mode: 'fullscreen',
-      network: { id: 84532 },
-      questionResponsesNonce: 1,
-      questionsCacheNonce: 2,
-      sbtCacheRevision: 3,
-    }));
+    expect(mockSingleQuestionResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        aggregatorResponseMode: false,
+        bodyClassName: 'response-body',
+        containerClassName: 'response-card',
+        mode: 'fullscreen',
+        network: { id: 84532 },
+        questionResponsesNonce: 1,
+        questionsCacheNonce: 2,
+        sbtCacheRevision: 3,
+      }),
+    );
     expect(getResponseCardProps).toHaveBeenCalledTimes(1);
   });
 });

@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import SessionPublishAdvancedSettingsPanel from './SessionPublishAdvancedSettingsPanel';
 
 const buildProps = (
-  overrides: Partial<React.ComponentProps<typeof SessionPublishAdvancedSettingsPanel>> = {}
+  overrides: Partial<React.ComponentProps<typeof SessionPublishAdvancedSettingsPanel>> = {},
 ): React.ComponentProps<typeof SessionPublishAdvancedSettingsPanel> => ({
   manualGasLimit: '',
   manualGasPriceGwei: '',
@@ -16,9 +16,7 @@ const buildProps = (
   onManualMaxFeePerGasGweiChange: jest.fn(),
   onManualMaxPriorityFeePerGasGweiChange: jest.fn(),
   onManualMetadataUrlChange: jest.fn(),
-  renderInfoTooltip: (options) => (
-    <span data-testid={String(options.testId)}>{String(options.ariaLabel)}</span>
-  ),
+  renderInfoTooltip: (options) => <span data-testid={String(options.testId)}>{String(options.ariaLabel)}</span>,
   resolvedWorkerBaseUrl: '',
   workerUrlSource: 'manual',
   ...overrides,
@@ -34,23 +32,26 @@ describe('SessionPublishAdvancedSettingsPanel', () => {
           resolvedWorkerBaseUrl: 'https://worker.example.test',
           workerUrlSource: 'custom worker URL',
         })}
-      />
+      />,
     );
 
     expect(
-      screen.getByText('Arweave upload worker: https://worker.example.test (custom worker URL)')
+      screen.getByText('Arweave upload worker: https://worker.example.test (custom worker URL)'),
     ).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('ar://<txId> or https://arweave.net/<txId>'))
-      .toHaveValue('ar://manual-metadata-tx');
+    expect(screen.getByPlaceholderText('ar://<txId> or https://arweave.net/<txId>')).toHaveValue(
+      'ar://manual-metadata-tx',
+    );
     expect(screen.getByPlaceholderText('1000000')).toHaveValue(900000);
-    expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-tip-gas-limit'))
-      .toHaveTextContent('Gas limit override info');
-    expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-tip-gas-price'))
-      .toHaveTextContent('Gas price override info');
-    expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-tip-max-fee'))
-      .toHaveTextContent('Max fee per gas info');
-    expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-tip-max-priority'))
-      .toHaveTextContent('Max priority fee per gas info');
+    expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-tip-gas-limit')).toHaveTextContent(
+      'Gas limit override info',
+    );
+    expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-tip-gas-price')).toHaveTextContent(
+      'Gas price override info',
+    );
+    expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-tip-max-fee')).toHaveTextContent('Max fee per gas info');
+    expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-tip-max-priority')).toHaveTextContent(
+      'Max priority fee per gas info',
+    );
   });
 
   it('routes every manual override through explicit callbacks only', () => {
@@ -69,7 +70,7 @@ describe('SessionPublishAdvancedSettingsPanel', () => {
           onManualMaxPriorityFeePerGasGweiChange,
           onManualMetadataUrlChange,
         })}
-      />
+      />,
     );
 
     fireEvent.change(screen.getByPlaceholderText('ar://<txId> or https://arweave.net/<txId>'), {

@@ -9,10 +9,7 @@ import {
   resolveSbtDisplayNameFromCaches,
   resolveSbtDisplayLabel,
 } from './sbtDisplayNames.js';
-import contractScripts, {
-  getDemoSessionConfigBySlug,
-  getSessionConfigBySlugOrDefault,
-} from '../web3/contractScripts.js';
+import contractScripts, { getDemoSessionConfigBySlug, getSessionConfigBySlugOrDefault } from '../web3/chainGateway.js';
 import {
   initCacheManager,
   listNamespaceEntriesSync,
@@ -21,7 +18,7 @@ import {
   readCache,
 } from '../cache/cacheScripts.js';
 
-jest.mock('../web3/contractScripts.js', () => ({
+jest.mock('../web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     getSbtMetadata: jest.fn(),
@@ -45,7 +42,9 @@ describe('sbtDisplayNames helpers', () => {
     jest.clearAllMocks();
     await clearSbtCache();
     __test__resetSbtDisplayNameLookups();
-    try { delete globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP; } catch (_) {
+    try {
+      delete globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP;
+    } catch (_) {
       globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP = undefined;
     }
   });
@@ -181,22 +180,25 @@ describe('sbtDisplayNames helpers', () => {
   });
 
   it('preserves display-name fallback order and address fallback handling', () => {
-    expect(getSbtDisplayName({ name: '', title: 'Title Name', symbol: 'SYM', contractName: 'Contract' }))
-      .toBe('Title Name');
-    expect(getSbtDisplayName({ name: '', title: '', symbol: 'SYM', contractName: 'Contract' }))
-      .toBe('SYM');
-    expect(getSbtDisplayName({ name: '', title: '', symbol: '', contractName: 'Contract' }))
-      .toBe('Contract');
+    expect(getSbtDisplayName({ name: '', title: 'Title Name', symbol: 'SYM', contractName: 'Contract' })).toBe(
+      'Title Name',
+    );
+    expect(getSbtDisplayName({ name: '', title: '', symbol: 'SYM', contractName: 'Contract' })).toBe('SYM');
+    expect(getSbtDisplayName({ name: '', title: '', symbol: '', contractName: 'Contract' })).toBe('Contract');
     expect(hasSbtDisplayName({ name: '', title: '', symbol: '', contractName: '' })).toBe(false);
-    expect(resolveSbtDisplayLabel({
-      address: addrA,
-      sbtInfo: {},
-      fallback: 'address',
-    })).toBe(addrA);
-    expect(resolveSbtDisplayLabel({
-      address: 'not-an-address',
-      sbtInfo: { name: 'Ignored' },
-    })).toBe('');
+    expect(
+      resolveSbtDisplayLabel({
+        address: addrA,
+        sbtInfo: {},
+        fallback: 'address',
+      }),
+    ).toBe(addrA);
+    expect(
+      resolveSbtDisplayLabel({
+        address: 'not-an-address',
+        sbtInfo: { name: 'Ignored' },
+      }),
+    ).toBe('');
   });
 
   it('invalidates memoized display labels after sbt cache writes', async () => {
@@ -211,11 +213,13 @@ describe('sbtDisplayNames helpers', () => {
       },
     });
 
-    expect(resolveSbtDisplayNameFromCaches({
-      address: addrA,
-      preferredSlug: 'edge',
-      chainId: 84532,
-    })?.name).toBe('Alpha Group');
+    expect(
+      resolveSbtDisplayNameFromCaches({
+        address: addrA,
+        preferredSlug: 'edge',
+        chainId: 84532,
+      })?.name,
+    ).toBe('Alpha Group');
 
     await writeCache('sbtCache', 'edge', {
       84532: {
@@ -228,11 +232,13 @@ describe('sbtDisplayNames helpers', () => {
       },
     });
 
-    expect(resolveSbtDisplayNameFromCaches({
-      address: addrA,
-      preferredSlug: 'edge',
-      chainId: 84532,
-    })?.name).toBe('Renamed Group');
+    expect(
+      resolveSbtDisplayNameFromCaches({
+        address: addrA,
+        preferredSlug: 'edge',
+        chainId: 84532,
+      })?.name,
+    ).toBe('Renamed Group');
   });
 
   it('hydrates missing display name from targeted metadata lookup when enabled', async () => {
@@ -349,7 +355,7 @@ describe('sbtDisplayNames helpers', () => {
         slug: 'edge',
         networkChainId: 84532,
         __registry: expect.objectContaining({ chainId: 84532 }),
-      })
+      }),
     );
     expect(getDemoSessionConfigBySlug).not.toHaveBeenCalled();
   });
@@ -380,7 +386,7 @@ describe('sbtDisplayNames helpers', () => {
       });
       expect(__test__getSbtDisplayNameLookupStats().retrySize).toBe(1);
 
-      nowSpy.mockReturnValue(1_000 + (8 * 24 * 60 * 60 * 1000));
+      nowSpy.mockReturnValue(1_000 + 8 * 24 * 60 * 60 * 1000);
       await hydrateSbtDisplayNameTargeted({
         address: addrB,
         preferredSlug: 'edge',

@@ -48,11 +48,13 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
   });
 
   it('builds pure response input descriptors for supported question types', () => {
-    expect(buildSurveyQuestionsFullQuestionResponseInputDescriptor({
-      question: { id: 'q1', type: 'multichoice', options: ['A', 'B'] },
-      answer: { value: ['A'] },
-      isSubmitting: true,
-    })).toEqual({
+    expect(
+      buildSurveyQuestionsFullQuestionResponseInputDescriptor({
+        question: { id: 'q1', type: 'multichoice', options: ['A', 'B'] },
+        answer: { value: ['A'] },
+        isSubmitting: true,
+      }),
+    ).toEqual({
       kind: 'multichoice',
       questionId: 'q1',
       options: ['A', 'B'],
@@ -61,11 +63,13 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       disabled: true,
     });
 
-    expect(buildSurveyQuestionsFullQuestionResponseInputDescriptor({
-      question: { id: 'q2', type: 'rating' },
-      answer: { value: '7' },
-      singleQuestionMode: true,
-    })).toEqual({
+    expect(
+      buildSurveyQuestionsFullQuestionResponseInputDescriptor({
+        question: { id: 'q2', type: 'rating' },
+        answer: { value: '7' },
+        singleQuestionMode: true,
+      }),
+    ).toEqual({
       kind: 'rating',
       questionId: 'q2',
       ratingValue: 7,
@@ -73,15 +77,15 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       useDeferredRating: true,
     });
 
-    expect(buildSurveyQuestionsFullQuestionResponseInputDescriptor({
-      question: { id: ' Q3 ', type: 'freeform' },
-      qIndex: 4,
-      answer: { value: { ignored: true }, encrypted: true },
-      glowAnswer: true,
-    })).toEqual({
+    expect(
+      buildSurveyQuestionsFullQuestionResponseInputDescriptor({
+        question: { id: ' Q3 ', type: 'freeform' },
+        answer: { value: { ignored: true }, encrypted: true },
+        glowAnswer: true,
+      }),
+    ).toEqual({
       kind: 'audio',
       questionId: ' Q3 ',
-      qIndex: 4,
       value: '',
       encrypted: true,
       dataTestId: E2E_TESTIDS.SURVEY_ANSWER_INPUT,
@@ -89,7 +93,6 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       disabled: false,
       forceGlow: true,
       placeholder: 'response (optional)',
-      disableEncryption: true,
     });
   });
 
@@ -170,7 +173,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         qIndex={0}
         answer={{ value: ['Alpha'] }}
         onAnswerChange={onAnswerChange}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByLabelText('Beta'));
@@ -189,7 +192,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         qIndex={0}
         answer={{ value: 'Unsure' }}
         onAnswerChange={onAnswerChange}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByLabelText('Agree'));
@@ -212,7 +215,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         onDeferredRatingCommit={onDeferredRatingCommit}
         onRatingChange={onRatingChange}
         onRatingChangeComplete={onRatingChangeComplete}
-      />
+      />,
     );
 
     const slider = screen.getByRole('slider');
@@ -243,7 +246,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         onDeferredRatingCommit={onDeferredRatingCommit}
         onRatingChange={onRatingChange}
         onRatingChangeComplete={onRatingChangeComplete}
-      />
+      />,
     );
 
     const slider = screen.getByRole('slider');
@@ -271,7 +274,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         glowAnswer
         onAnswerChange={onAnswerChange}
         onToggleAnswerEncryption={onToggleAnswerEncryption}
-      />
+      />,
     );
 
     const input = screen.getByTestId('mock-survey-audio-field-input');
@@ -299,7 +302,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         isSubmitting
         onAnswerChange={onAnswerChange}
         onToggleAnswerEncryption={onToggleAnswerEncryption}
-      />
+      />,
     );
 
     expect(screen.getByTestId('mock-survey-audio-field-input')).toHaveAttribute('data-disabled', 'true');
@@ -322,7 +325,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
           context,
           workerUrl: 'https://worker.example/audio',
         }}
-      />
+      />,
     );
 
     const input = screen.getByTestId('mock-survey-audio-field-input');
@@ -332,6 +335,42 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
     const props = mockSurveyAudioFieldInputProps[mockSurveyAudioFieldInputProps.length - 1];
     expect(props.sessionConfig).toBe(sessionConfig);
     expect(props.context).toBe(context);
+  });
+
+  it('skips non-edited answer inputs when stable parent props are reused', () => {
+    const audioInputWorkerProps = { sessionSlug: 'edge' };
+    const onAnswerChange = jest.fn();
+    const onToggleAnswerEncryption = jest.fn();
+    const firstQuestion = { id: 'q-one', type: 'freeform' };
+    const secondQuestion = { id: 'q-two', type: 'freeform' };
+    const firstAnswer = { value: 'first', encrypted: false };
+    const secondAnswer = { value: 'second', encrypted: false };
+    const secondAnswerUpdated = { value: 'second edited', encrypted: false };
+    const renderInputs = (nextSecondAnswer = secondAnswer) => (
+      <>
+        <SurveyQuestionsFullQuestionResponseInput
+          question={firstQuestion}
+          answer={firstAnswer}
+          audioInputWorkerProps={audioInputWorkerProps}
+          onAnswerChange={onAnswerChange}
+          onToggleAnswerEncryption={onToggleAnswerEncryption}
+        />
+        <SurveyQuestionsFullQuestionResponseInput
+          question={secondQuestion}
+          answer={nextSecondAnswer}
+          audioInputWorkerProps={audioInputWorkerProps}
+          onAnswerChange={onAnswerChange}
+          onToggleAnswerEncryption={onToggleAnswerEncryption}
+        />
+      </>
+    );
+    const { rerender } = render(renderInputs());
+
+    expect(mockSurveyAudioFieldInputProps.map((props) => props.dataCeQuestionId)).toEqual(['q-one', 'q-two']);
+
+    rerender(renderInputs(secondAnswerUpdated));
+
+    expect(mockSurveyAudioFieldInputProps.map((props) => props.dataCeQuestionId)).toEqual(['q-one', 'q-two', 'q-two']);
   });
 
   it('keeps submitting default answer actions inert even if a child emits', () => {
@@ -348,7 +387,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         isSubmitting
         onAnswerChange={onAnswerChange}
         onToggleAnswerEncryption={onToggleAnswerEncryption}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'update answer' }));

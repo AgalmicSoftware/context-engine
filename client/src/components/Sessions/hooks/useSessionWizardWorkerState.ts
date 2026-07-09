@@ -2,9 +2,7 @@ import { useState } from 'react';
 import type { WorkerPanelProps } from '../WorkerPanel';
 import { normalizeBaseUrl } from '../../../utilities/urlUtils.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
-import {
-  sanitizeSessionWizardWorkerSecretsForLitMode,
-} from '../sessionWizardWorkerSecretSupport';
+import { sanitizeSessionWizardWorkerSecretsForLitMode } from '../sessionWizardWorkerSecretSupport';
 import type { WorkerSecretsLike } from '../../shellTypes';
 
 type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
@@ -15,15 +13,18 @@ type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
   bundleUrl?: string;
 };
 
-type CachedWorkerState = {
-  workerSecretsEnabled?: unknown;
-  persistWorkerSecrets?: unknown;
-  deployComplete?: unknown;
-  deployWorkerUrl?: unknown;
-  deployForm?: unknown;
-  provisionedSponsoredContext?: unknown;
-  workerSecrets?: unknown;
-} | null | undefined;
+type CachedWorkerState =
+  | {
+      workerSecretsEnabled?: unknown;
+      persistWorkerSecrets?: unknown;
+      deployComplete?: unknown;
+      deployWorkerUrl?: unknown;
+      deployForm?: unknown;
+      provisionedSponsoredContext?: unknown;
+      workerSecrets?: unknown;
+    }
+  | null
+  | undefined;
 
 export interface UseSessionWizardWorkerStateOptions<TProvisionedSponsoredContext> {
   cachedWizard?: CachedWorkerState;
@@ -34,11 +35,10 @@ export interface UseSessionWizardWorkerStateOptions<TProvisionedSponsoredContext
   buildProvisionedSponsoredContextState: (value: unknown) => TProvisionedSponsoredContext;
 }
 
-const resolveCachedDeployForm = (cachedWizard: CachedWorkerState): DeployFormState => (
-  cachedWizard?.deployForm &&
-  typeof cachedWizard.deployForm === 'object' &&
-  !Array.isArray(cachedWizard.deployForm)
-) ? cachedWizard.deployForm as DeployFormState : {};
+const resolveCachedDeployForm = (cachedWizard: CachedWorkerState): DeployFormState =>
+  cachedWizard?.deployForm && typeof cachedWizard.deployForm === 'object' && !Array.isArray(cachedWizard.deployForm)
+    ? (cachedWizard.deployForm as DeployFormState)
+    : {};
 
 const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   cachedWizard,
@@ -52,13 +52,13 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   const normalizedWorkerBundleUrlDefault = toStr(workerBundleUrlDefault);
   const [workerMode, setWorkerMode] = useState('default');
   const [workerSecretsEnabled, setWorkerSecretsEnabled] = useState(() =>
-    typeof cachedWizard?.workerSecretsEnabled === 'boolean' ? cachedWizard.workerSecretsEnabled : true
+    typeof cachedWizard?.workerSecretsEnabled === 'boolean' ? cachedWizard.workerSecretsEnabled : true,
   );
-  const [persistWorkerSecrets, setPersistWorkerSecrets] = useState(() => (
+  const [persistWorkerSecrets, setPersistWorkerSecrets] = useState(() =>
     typeof cachedWizard?.persistWorkerSecrets === 'boolean'
       ? cachedWizard.persistWorkerSecrets
-      : devPersistWorkerSecrets
-  ));
+      : devPersistWorkerSecrets,
+  );
   const [deployHelperUrl, setDeployHelperUrl] = useState(() => toStr(deployHelperUrlDefault));
   const [deployForm, setDeployForm] = useState<DeployFormState>({
     apiToken: toStr(cachedDeployForm.apiToken || '').trim(),
@@ -74,14 +74,16 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   const [deployStatus, setDeployStatus] = useState('');
   const [deployInFlight, setDeployInFlight] = useState(false);
   const [deployComplete, setDeployComplete] = useState(() => !!cachedWizard?.deployComplete);
-  const [deployWorkerUrl, setDeployWorkerUrl] = useState(() => normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()));
-  const [provisionedSponsoredContext, setProvisionedSponsoredContext] = useState<TProvisionedSponsoredContext>(() => (
-    buildProvisionedSponsoredContextState(cachedWizard?.provisionedSponsoredContext)
-  ));
+  const [deployWorkerUrl, setDeployWorkerUrl] = useState(() =>
+    normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()),
+  );
+  const [provisionedSponsoredContext, setProvisionedSponsoredContext] = useState<TProvisionedSponsoredContext>(() =>
+    buildProvisionedSponsoredContextState(cachedWizard?.provisionedSponsoredContext),
+  );
   const [workerSecrets, setWorkerSecrets] = useState<WorkerSecretsLike>(() => {
     const cached = cachedWizard?.workerSecrets;
     return sanitizeSessionWizardWorkerSecretsForLitMode(
-      cached && typeof cached === 'object' ? cached as WorkerSecretsLike : {}
+      cached && typeof cached === 'object' ? (cached as WorkerSecretsLike) : {},
     );
   });
   const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);

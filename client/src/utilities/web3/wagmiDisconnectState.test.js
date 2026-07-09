@@ -31,11 +31,9 @@ describe('wagmiDisconnectState', () => {
   });
 
   it('returns safe defaults when window.localStorage getter throws', () => {
-    const localStorageGetterSpy = jest
-      .spyOn(window, 'localStorage', 'get')
-      .mockImplementation(() => {
-        throw new Error('localStorage unavailable');
-      });
+    const localStorageGetterSpy = jest.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new Error('localStorage unavailable');
+    });
 
     try {
       expect(() => wasUserExplicitlyDisconnected()).not.toThrow();

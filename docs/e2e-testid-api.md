@@ -146,11 +146,11 @@ The navbar-mounted account/login/settings surface that owns the shared modal liv
 
 | `data-testid` | Component path(s) | Meaning / When Present | TestID API |
 | --- | --- | --- | --- |
-| `ce-session-results-toggle` | `client/src/components/OnePageSession/OnePageSession.tsx` | Header/toggle that expands the "Results" section on a session page. | yes |
-| `ce-session-pile-back` | `client/src/components/OnePageSession/OnePageSession.tsx` | Back control shown while full questions view is open; returns to pile mode. | yes |
-| `ce-session-auto-mint-login-banner` | `client/src/components/OnePageSession/OnePageSession.tsx` | Sticky warning banner shown when an auto-mint URL is present but the viewer must log in first. | yes |
-| `ce-session-auto-mint-countdown` | `client/src/components/OnePageSession/OnePageSession.tsx` | Countdown banner shown immediately before the session page runs the auto-mint queue. | yes |
-| `ce-session-auto-mint-status` | `client/src/components/OnePageSession/OnePageSession.tsx` | Per-SBT status alert for session auto-mint progress/results (`data-ce-sbt-address`, `data-ce-status`). | yes |
+| `ce-session-results-toggle` | `client/src/components/OnePageSession/OnePageSessionStandardShell.tsx` | Header/toggle that expands the "Results" section on a session page. | yes |
+| `ce-session-pile-back` | `client/src/components/OnePageSession/OnePageSessionStandardShell.tsx` | Back control shown while full questions view is open; returns to pile mode. | yes |
+| `ce-session-auto-mint-login-banner` | `client/src/components/OnePageSession/OnePageSessionAutoMintAlerts.tsx` | Sticky warning banner shown when an auto-mint URL is present but the viewer must log in first. | yes |
+| `ce-session-auto-mint-countdown` | `client/src/components/OnePageSession/OnePageSessionAutoMintAlerts.tsx` | Countdown banner shown immediately before the session page runs the auto-mint queue. | yes |
+| `ce-session-auto-mint-status` | `client/src/components/OnePageSession/OnePageSessionAutoMintAlerts.tsx` | Per-SBT status alert for session auto-mint progress/results (`data-ce-sbt-address`, `data-ce-status`). | yes |
 
 ## Agent Mode (Dev/E2E)
 

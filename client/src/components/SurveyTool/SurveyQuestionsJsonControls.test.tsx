@@ -4,9 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
 
 describe('SurveyQuestionsJsonControls', () => {
-  const renderJsonTree = jest.fn((json) => (
-    <pre data-testid="json-tree">{JSON.stringify(json)}</pre>
-  ));
+  const renderJsonTree = jest.fn((json) => <pre data-testid="json-tree">{JSON.stringify(json)}</pre>);
   const buildJsonPanelDisplayState = (overrides = {}) => ({
     showFullSurveyJsonControls: false,
     showQuestionJsonControls: false,
@@ -53,7 +51,7 @@ describe('SurveyQuestionsJsonControls', () => {
         jsonPanelDisplayState={buildJsonPanelDisplayState({
           showQuestionJsonControls: true,
         })}
-      />
+      />,
     );
 
     expect(container).toBeEmptyDOMElement();
@@ -67,7 +65,7 @@ describe('SurveyQuestionsJsonControls', () => {
         jsonPanelDisplayState={buildJsonPanelDisplayState({
           showFullSurveyJsonControls: true,
         })}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'View Survey .json' }));
@@ -90,7 +88,7 @@ describe('SurveyQuestionsJsonControls', () => {
         onToggleResponseJson={baseProps.onToggleResponseJson}
         onToggleSurveyJson={baseProps.onToggleSurveyJson}
         renderJsonTree={renderJsonTree}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'View Survey .json' }));
@@ -116,7 +114,7 @@ describe('SurveyQuestionsJsonControls', () => {
           surveyJsonToggleClassName: 'survey-toggle',
         })}
         surveyJson={surveyJson}
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: 'Hide Survey .json' })).toBeInTheDocument();
@@ -147,7 +145,7 @@ describe('SurveyQuestionsJsonControls', () => {
         })}
         questionsJson={questionsJson}
         responseJson={responseJson}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'question .json' }));
@@ -172,7 +170,7 @@ describe('SurveyQuestionsJsonControls', () => {
         jsonPanelDisplayState={buildJsonPanelDisplayState({
           showResponseJsonPanel: true,
         })}
-      />
+      />,
     );
 
     expect(screen.getByTestId('json-tree')).toHaveTextContent('Loading viewed response...');
@@ -184,7 +182,7 @@ describe('SurveyQuestionsJsonControls', () => {
         jsonPanelDisplayState={buildJsonPanelDisplayState({
           showResponseJsonPanel: true,
         })}
-      />
+      />,
     );
     expect(screen.getByTestId('json-tree')).toHaveTextContent('No response found for survey from address: 0xabc');
 
@@ -195,7 +193,7 @@ describe('SurveyQuestionsJsonControls', () => {
         jsonPanelDisplayState={buildJsonPanelDisplayState({
           showResponseJsonPanel: true,
         })}
-      />
+      />,
     );
     expect(screen.getByTestId('json-tree')).toHaveTextContent('Other response');
   });

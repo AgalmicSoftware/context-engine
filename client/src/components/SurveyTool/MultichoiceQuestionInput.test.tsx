@@ -14,7 +14,7 @@ describe('MultichoiceQuestionInput', () => {
         options={['Alpha', 'Beta']}
         selectedValues={['Alpha']}
         onChange={onChange}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Beta' }));
@@ -26,7 +26,7 @@ describe('MultichoiceQuestionInput', () => {
         options={['Alpha', 'Beta']}
         selectedValues={['Alpha', 'Beta']}
         onChange={onChange}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Alpha' }));
@@ -42,7 +42,7 @@ describe('MultichoiceQuestionInput', () => {
         selectedValues={['Alpha']}
         isSingleSelect
         onChange={onChange}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Beta' }));
@@ -59,7 +59,7 @@ describe('MultichoiceQuestionInput', () => {
         selectedValues={['Alpha']}
         disabled
         onChange={onChange}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Beta' }));
@@ -75,7 +75,7 @@ describe('MultichoiceQuestionInput', () => {
         options={['Alpha', 'alpha', 'Beta']}
         selectedValues={[]}
         onChange={onChange}
-      />
+      />,
     );
 
     expect(screen.getByRole('alert')).toHaveTextContent('Multichoice options must have unique labels.');
@@ -88,15 +88,19 @@ describe('MultichoiceQuestionInput', () => {
   });
 
   it('builds multichoice option classes', () => {
-    expect(buildMultichoiceOptionClassName({
-      baseClassName: 'option',
-      isSelected: true,
-      selectedClassName: 'selected',
-    })).toBe('option selected');
-    expect(buildMultichoiceOptionClassName({
-      baseClassName: 'option',
-      isSelected: false,
-      selectedClassName: 'selected',
-    })).toBe('option');
+    expect(
+      buildMultichoiceOptionClassName({
+        baseClassName: 'option',
+        isSelected: true,
+        selectedClassName: 'selected',
+      }),
+    ).toBe('option selected');
+    expect(
+      buildMultichoiceOptionClassName({
+        baseClassName: 'option',
+        isSelected: false,
+        selectedClassName: 'selected',
+      }),
+    ).toBe('option');
   });
 });

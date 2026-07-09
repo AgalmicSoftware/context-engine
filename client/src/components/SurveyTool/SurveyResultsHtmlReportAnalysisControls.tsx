@@ -1,12 +1,7 @@
 import React from 'react';
-import {
-  Alert,
-  Button,
-} from 'reactstrap';
+import { Alert, Button } from 'reactstrap';
 
-import type {
-  SurveyResultsHtmlReportAnalysisPayload,
-} from './surveyResultsHtmlReportModalDescriptor';
+import type { SurveyResultsHtmlReportAnalysisPayload } from './surveyResultsHtmlReportModalDescriptor';
 
 export type SurveyResultsHtmlReportAnalysisControlsProps = {
   analysisPayload: SurveyResultsHtmlReportAnalysisPayload;
@@ -19,19 +14,14 @@ export type SurveyResultsHtmlReportAnalysisControlsProps = {
 
 const getAnalysisCount = (
   analysisPayload: SurveyResultsHtmlReportAnalysisPayload,
-  key: 'participants' | 'questions' | 'responses'
+  key: 'participants' | 'questions' | 'responses',
 ): number => {
   const value = analysisPayload.eligibility?.counts?.[key];
   return Number.isFinite(Number(value)) ? Number(value) : 0;
 };
 
-const getAnalysisReasons = (
-  analysisPayload: SurveyResultsHtmlReportAnalysisPayload
-): string[] => (
-  Array.isArray(analysisPayload.eligibility?.reasons)
-    ? analysisPayload.eligibility.reasons
-    : []
-);
+const getAnalysisReasons = (analysisPayload: SurveyResultsHtmlReportAnalysisPayload): string[] =>
+  Array.isArray(analysisPayload.eligibility?.reasons) ? analysisPayload.eligibility.reasons : [];
 
 const SurveyResultsHtmlReportAnalysisControls = ({
   analysisPayload,
@@ -50,10 +40,8 @@ const SurveyResultsHtmlReportAnalysisControls = ({
     <div className={styleMap.htmlReportOptionGroup}>
       <h6>Analysis views</h6>
       <p>
-        {responseCount} responses,
-        {' '}{participantCount} participants,
-        {' '}{questionCount} questions.
-        {' '}AI mode uses synthetic participant IDs.
+        {responseCount} responses, {participantCount} participants, {questionCount} questions. AI mode uses synthetic
+        participant IDs.
       </p>
       {reasons.length > 0 && (
         <Alert color="info" fade={false} className={styleMap.htmlReportInfo}>

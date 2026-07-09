@@ -56,11 +56,12 @@ jest.mock('reactstrap', () => {
   };
 });
 
-const renderDropdown = (props: any = {}) => render(
-  <MemoryRouter>
-    <QuestionTagDropdown {...props} />
-  </MemoryRouter>
-);
+const renderDropdown = (props: any = {}) =>
+  render(
+    <MemoryRouter>
+      <QuestionTagDropdown {...props} />
+    </MemoryRouter>,
+  );
 
 describe('QuestionTagDropdown', () => {
   it('renders nothing when tags is empty', () => {
@@ -101,10 +102,7 @@ describe('QuestionTagDropdown', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /show question tags/i }));
 
-    expect(screen.getByRole('link', { name: '#governance' })).toHaveAttribute(
-      'href',
-      '/tag/governance?session=edge'
-    );
+    expect(screen.getByRole('link', { name: '#governance' })).toHaveAttribute('href', '/tag/governance?session=edge');
   });
 
   it('keeps tag routes aligned with PUBLIC_URL subpath hosting when no explicit baseUrl is provided', () => {
@@ -119,7 +117,7 @@ describe('QuestionTagDropdown', () => {
 
       expect(screen.getByRole('link', { name: '#governance' })).toHaveAttribute(
         'href',
-        '/ce/tag/governance?session=edge'
+        '/ce/tag/governance?session=edge',
       );
       expect(buildTagPagePath(['governance', 'AI Policy'])).toBe('/ce/tag/governance+AI%20Policy');
       expect(buildTagPagePath([])).toBe('/ce/questions');

@@ -35,10 +35,7 @@ export const SurveyResultsLockedResponsesToggle = ({
   return (
     <button
       type="button"
-      className={[
-        styles.lockedSummaryToggle,
-        isOpen ? styles.lockedSummaryToggleOpen : '',
-      ].filter(Boolean).join(' ')}
+      className={[styles.lockedSummaryToggle, isOpen ? styles.lockedSummaryToggleOpen : ''].filter(Boolean).join(' ')}
       onClick={onToggleDetails}
       aria-expanded={isOpen}
       aria-controls="ce-results-locked-details"
@@ -70,22 +67,14 @@ export const SurveyResultsLockedResponsesBanner = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      id="ce-results-locked-details"
-      className={styles.lockedBanner}
-      data-testid="ce-results-locked-banner"
-    >
+    <div id="ce-results-locked-details" className={styles.lockedBanner} data-testid="ce-results-locked-banner">
       <div className={styles.lockedBannerTop}>
         <div className={styles.lockedBannerCopy}>
           <div className={styles.lockedBannerTitleRow}>
             <FontAwesomeIcon icon={faLock} className={styles.lockedBannerIcon} />
-            <h3 className={styles.lockedBannerHeadline}>
-              {lockedCount} Locked Responses
-            </h3>
+            <h3 className={styles.lockedBannerHeadline}>{lockedCount} Locked Responses</h3>
           </div>
-          <p className={styles.lockedBannerSubtext}>
-            Encrypted responses are present in this result set.
-          </p>
+          <p className={styles.lockedBannerSubtext}>Encrypted responses are present in this result set.</p>
         </div>
         <Button
           type="button"
@@ -94,9 +83,7 @@ export const SurveyResultsLockedResponsesBanner = ({
           data-testid="ce-results-decrypt-btn"
           disabled={decrypting}
         >
-          {decrypting && (
-            <FontAwesomeIcon icon={faSpinner} spin className={styles.lockedBannerButtonSpinner} />
-          )}
+          {decrypting && <FontAwesomeIcon icon={faSpinner} spin className={styles.lockedBannerButtonSpinner} />}
           Decrypt
         </Button>
       </div>

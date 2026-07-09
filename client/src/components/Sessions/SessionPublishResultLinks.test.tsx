@@ -39,25 +39,35 @@ describe('SessionPublishResultLinks', () => {
         ]}
         sessionUrl="https://context.example.test/session/readiness-session"
         status="Published session readiness-session."
-      />
+      />,
     );
 
     expect(screen.getByText('Metadata URI:')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_URI)).toHaveTextContent('ar://metadata-tx');
-    expect(screen.getByRole('link', { name: 'https://arweave.example.test/metadata-tx' }))
-      .toHaveAttribute('href', 'https://arweave.example.test/metadata-tx');
+    expect(screen.getByRole('link', { name: 'https://arweave.example.test/metadata-tx' })).toHaveAttribute(
+      'href',
+      'https://arweave.example.test/metadata-tx',
+    );
     expect(screen.getByText('Register txs:')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
-    expect(screen.getByRole('link', {
-      name: 'https://optimism-sepolia.blockscout.com/tx/0xregister1',
-    })).toHaveAttribute('href', 'https://optimism-sepolia.blockscout.com/tx/0xregister1');
-    expect(screen.getByRole('link', {
-      name: 'https://context.example.test/session/readiness-session',
-    })).toHaveAttribute('href', 'https://context.example.test/session/readiness-session');
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_URL))
-      .toHaveAttribute('href', 'https://context.example.test/admin/readiness-session');
-    expect(screen.getByRole('link', { name: 'Access Badge' }))
-      .toHaveAttribute('href', 'https://context.example.test/sbt/0xf1');
+    expect(
+      screen.getByRole('link', {
+        name: 'https://optimism-sepolia.blockscout.com/tx/0xregister1',
+      }),
+    ).toHaveAttribute('href', 'https://optimism-sepolia.blockscout.com/tx/0xregister1');
+    expect(
+      screen.getByRole('link', {
+        name: 'https://context.example.test/session/readiness-session',
+      }),
+    ).toHaveAttribute('href', 'https://context.example.test/session/readiness-session');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_URL)).toHaveAttribute(
+      'href',
+      'https://context.example.test/admin/readiness-session',
+    );
+    expect(screen.getByRole('link', { name: 'Access Badge' })).toHaveAttribute(
+      'href',
+      'https://context.example.test/sbt/0xf1',
+    );
     expect(screen.getByText('Admin URL copied.')).toBeInTheDocument();
     expect(screen.getByText('Published session readiness-session.')).toBeInTheDocument();
 
@@ -87,7 +97,7 @@ describe('SessionPublishResultLinks', () => {
         registerTxs={[{ action: 'createSession', hash: '0xregister1' }]}
         sessionUrl=""
         status=""
-      />
+      />,
     );
 
     expect(screen.getByText('Manual metadata URI:')).toBeInTheDocument();

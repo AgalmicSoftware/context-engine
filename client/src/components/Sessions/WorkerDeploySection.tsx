@@ -90,9 +90,7 @@ const WorkerDeploySection = ({
   handleDeployWorker,
   deployStatusDisplayState,
 }: WorkerDeploySectionProps) => {
-  const renderTooltip = typeof renderInfoTooltip === 'function'
-    ? renderInfoTooltip
-    : () => null;
+  const renderTooltip = typeof renderInfoTooltip === 'function' ? renderInfoTooltip : () => null;
   const {
     deployButtonDisabled,
     deployStatusText,
@@ -122,7 +120,10 @@ const WorkerDeploySection = ({
     <>
       {shouldUseSponsoredAutoDeployFlow && (
         <div className={styles.statusNote}>
-          Sponsored deploy bundle is ready. Normal mode will use the GitHub-hosted worker bundle automatically. If a retry needs a different source, keep that Git URL as the default and add a manual bundle URL or upload override after a fetch failure. In advanced mode you can still switch between Upload file and Use URL for manual testing.
+          Sponsored deploy bundle is ready. Normal mode will use the GitHub-hosted worker bundle automatically. If a
+          retry needs a different source, keep that Git URL as the default and add a manual bundle URL or upload
+          override after a fetch failure. In advanced mode you can still switch between Upload file and Use URL for
+          manual testing.
         </div>
       )}
       {(!shouldUseSponsoredAutoDeployFlow || !isNormalMode) && (
@@ -132,7 +133,9 @@ const WorkerDeploySection = ({
               <div className={styles.workerDeployName} data-testid={E2E_TESTIDS.WIZARD_WORKER_NAME}>
                 {deployForm.workerName}
               </div>
-            ) : <span />}
+            ) : (
+              <span />
+            )}
           </div>
           <div className={styles.workerDeployGrid}>
             {deployHelperToggle}
@@ -178,14 +181,8 @@ const WorkerDeploySection = ({
               <>
                 <FormGroup key="normal-mode-bundle-url">
                   <Label>Worker bundle URL (release asset)</Label>
-                  <Input
-                    value={normalModeBundleUrl ?? ''}
-                    readOnly
-                    data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
-                  />
-                  <div className={styles.helperText}>
-                    {normalModeBundleHelpText}
-                  </div>
+                  <Input value={normalModeBundleUrl ?? ''} readOnly data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL} />
+                  <div className={styles.helperText}>{normalModeBundleHelpText}</div>
                 </FormGroup>
                 {showNormalModeManualBundleControls && (
                   <>
@@ -199,9 +196,7 @@ const WorkerDeploySection = ({
                         invalid={!!normalModeBundleUrlOverrideValidationError}
                         onChange={(e) => setNormalModeBundleUrlOverride(e.target.value)}
                       />
-                      <div className={styles.helperText}>
-                        {manualBundleUrlOverrideHelp}
-                      </div>
+                      <div className={styles.helperText}>{manualBundleUrlOverrideHelp}</div>
                       {normalModeBundleUrlOverrideValidationError && (
                         <div className={styles.errorText}>{normalModeBundleUrlOverrideValidationError}</div>
                       )}
@@ -229,9 +224,7 @@ const WorkerDeploySection = ({
                           Clear bundle file
                         </Button>
                       </div>
-                      <div className={styles.helperText}>
-                        {normalModeManualBundleHelpText}
-                      </div>
+                      <div className={styles.helperText}>{normalModeManualBundleHelpText}</div>
                       {bundleFile && (
                         <div className={styles.helperText}>
                           Using {bundleFile.name || localWorkerBundleFallbackFilePath} for this deploy.
@@ -280,7 +273,8 @@ const WorkerDeploySection = ({
                 <span>Cloudflare API token</span>
                 {renderTooltip({
                   id: 'gw-cf-token-tip',
-                  content: 'Use the prefilled template link below. It includes Workers, R2 objects, D1 or KV metadata indexes, and Durable Objects for signer coordination only. Add Account Settings: Edit only when creating or changing the workers.dev subdomain.',
+                  content:
+                    'Use the prefilled template link below. It includes Workers, R2 objects, D1 or KV metadata indexes, and Durable Objects for signer coordination only. Add Account Settings: Edit only when creating or changing the workers.dev subdomain.',
                   placement: 'right',
                   testId: 'ce-wizard-worker-tooltip-gw-cf-token-tip',
                   ariaLabel: 'Cloudflare API token info',
@@ -294,7 +288,8 @@ const WorkerDeploySection = ({
               />
               {!isNormalMode && showSponsoredDeployAccessNotice && (
                 <div className={styles.helperText}>
-                  Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here to override it.
+                  Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here to
+                  override it.
                 </div>
               )}
               <div className={styles.helperText}>
@@ -309,9 +304,7 @@ const WorkerDeploySection = ({
               <div className={styles.helperText}>
                 You must be logged into Cloudflare before using the prefilled API token button.
               </div>
-              <div className={styles.helperText}>
-                Account is inferred from the API token during deploy.
-              </div>
+              <div className={styles.helperText}>Account is inferred from the API token during deploy.</div>
             </FormGroup>
             <FormGroup>
               <Label>Admin address</Label>
@@ -334,7 +327,10 @@ const WorkerDeploySection = ({
             </Button>
           </div>
           {deployStatusText && (
-            <div className={`${styles.copyStatus} ${deployStatusIsError ? styles.copyStatusError : ''}`} data-testid={E2E_TESTIDS.WIZARD_DEPLOY_STATUS}>
+            <div
+              className={`${styles.copyStatus} ${deployStatusIsError ? styles.copyStatusError : ''}`}
+              data-testid={E2E_TESTIDS.WIZARD_DEPLOY_STATUS}
+            >
               {deployStatusText}
             </div>
           )}

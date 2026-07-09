@@ -1,13 +1,9 @@
 import store from '../../store.js';
-import contractScripts from './contractScripts.js';
-import {
-  getReadProviderDiagnostics,
-  getReadProviderForGroup,
-  resolveGroupPathRpcPreference,
-} from './rpcProviders.js';
+import contractScripts from './chainGateway.js';
+import { getReadProviderDiagnostics, getReadProviderForGroup, resolveGroupPathRpcPreference } from './rpcProviders.js';
 import { checkSponsoredAccess } from './sponsoredAccess.js';
 
-jest.mock('./contractScripts.js', () => ({
+jest.mock('./chainGateway.js', () => ({
   __esModule: true,
   default: {
     userHasSBT: jest.fn(),
@@ -64,20 +60,21 @@ const buildWizardShapedRpcCfg = ({
   rootRpcUrl = ROOT_RPC_URL,
   pathRpcUrl = PATH_DEFAULT_BASE_SEPOLIA,
   registry = null,
-} = {}) => buildGroupCfg({
-  slug,
-  rpcUrl: rootRpcUrl,
-  rpcEndpoint: rootRpcUrl,
-  rpc: {
-    provider: 'path',
-    providers: {
-      path: {
-        rpcUrl: pathRpcUrl,
+} = {}) =>
+  buildGroupCfg({
+    slug,
+    rpcUrl: rootRpcUrl,
+    rpcEndpoint: rootRpcUrl,
+    rpc: {
+      provider: 'path',
+      providers: {
+        path: {
+          rpcUrl: pathRpcUrl,
+        },
       },
     },
-  },
-  ...(registry ? { __registry: registry } : {}),
-});
+    ...(registry ? { __registry: registry } : {}),
+  });
 
 const pinMockProviderNetwork = (provider) => {
   provider.detectNetwork = jest.fn(async () => BASE_SEPOLIA_NETWORK);
@@ -89,16 +86,28 @@ describe('rpcProviders session-sponsored reads', () => {
     jest.restoreAllMocks();
     jest.clearAllMocks();
     contractScripts.userHasSBT.mockReset();
-    try { delete globalThis.ethereum; } catch (_) {}
-    try { globalThis.CE_RPC_PROVIDER_MODE = 'fallback'; } catch (_) {}
-    try { globalThis.CE_PREFER_PATH_RPC = true; } catch (_) {}
+    try {
+      delete globalThis.ethereum;
+    } catch (_) {}
+    try {
+      globalThis.CE_RPC_PROVIDER_MODE = 'fallback';
+    } catch (_) {}
+    try {
+      globalThis.CE_PREFER_PATH_RPC = true;
+    } catch (_) {}
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
-    try { delete globalThis.ethereum; } catch (_) {}
-    try { delete globalThis.CE_RPC_PROVIDER_MODE; } catch (_) {}
-    try { delete globalThis.CE_PREFER_PATH_RPC; } catch (_) {}
+    try {
+      delete globalThis.ethereum;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_RPC_PROVIDER_MODE;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_PREFER_PATH_RPC;
+    } catch (_) {}
   });
 
   it('does not use Session Wizard root rpcUrl for ordinary participant reads', () => {
@@ -108,12 +117,14 @@ describe('rpcProviders session-sponsored reads', () => {
 
     const provider = getReadProviderForGroup(cfg);
 
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      sessionAccessStatus: 'unavailable',
-      sessionAccessMode: 'none',
-      sessionRpcSource: 'default-path',
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'path',
+        sessionAccessStatus: 'unavailable',
+        sessionAccessMode: 'none',
+        sessionRpcSource: 'default-path',
+      }),
+    );
     expect(provider?.__CE_RPC_META?.preferredUrls).not.toContain(ROOT_RPC_URL);
     expect(provider?.__CE_RPC_META?.preferredUrls).toContain(PATH_DEFAULT_BASE_SEPOLIA);
   });
@@ -140,12 +151,14 @@ describe('rpcProviders session-sponsored reads', () => {
 
     expect(diagnostics.providerLabel).toBe('session');
     expect(diagnostics.urls[0]).toBe(ROOT_RPC_URL);
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'session',
-      preferredUrls: expect.arrayContaining([ROOT_RPC_URL, PATH_DEFAULT_BASE_SEPOLIA]),
-      sessionAccessStatus: 'open',
-      sessionRpcSource: 'root',
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'session',
+        preferredUrls: expect.arrayContaining([ROOT_RPC_URL, PATH_DEFAULT_BASE_SEPOLIA]),
+        sessionAccessStatus: 'open',
+        sessionRpcSource: 'root',
+      }),
+    );
     expect(provider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
   });
 
@@ -168,17 +181,17 @@ describe('rpcProviders session-sponsored reads', () => {
 
     const provider = getReadProviderForGroup(cfg);
     const rootConfig = provider.providerConfigs.find(
-      (entry) => entry?.provider?.connection?.url === FAILING_ROOT_RPC_URL
+      (entry) => entry?.provider?.connection?.url === FAILING_ROOT_RPC_URL,
     );
     const pathConfig = provider.providerConfigs.find(
-      (entry) => entry?.provider?.connection?.url === PATH_DEFAULT_BASE_SEPOLIA
+      (entry) => entry?.provider?.connection?.url === PATH_DEFAULT_BASE_SEPOLIA,
     );
     pinMockProviderNetwork(provider);
     pinMockProviderNetwork(rootConfig.provider);
     pinMockProviderNetwork(pathConfig.provider);
 
     const sponsoredError = new Error(
-      'missing revert data in call exception; Transaction reverted without a reason string'
+      'missing revert data in call exception; Transaction reverted without a reason string',
     );
     sponsoredError.code = 'CALL_EXCEPTION';
     rootConfig.provider.send = jest.fn(async (method) => {
@@ -221,12 +234,14 @@ describe('rpcProviders session-sponsored reads', () => {
 
     expect(diagnostics.providerLabel).toBe('path');
     expect(diagnostics.urls[0]).toBe(CUSTOM_PATH_RPC_URL);
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      preferredUrls: expect.arrayContaining([CUSTOM_PATH_RPC_URL]),
-      sessionAccessStatus: 'open',
-      sessionRpcSource: 'path',
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'path',
+        preferredUrls: expect.arrayContaining([CUSTOM_PATH_RPC_URL]),
+        sessionAccessStatus: 'open',
+        sessionRpcSource: 'path',
+      }),
+    );
   });
 
   it('keeps the default PATH RPC when sponsored session root access is unavailable', () => {
@@ -241,12 +256,14 @@ describe('rpcProviders session-sponsored reads', () => {
     expect(diagnostics.providerLabel).toBe('path');
     expect(diagnostics.urls[0]).toBe(PATH_DEFAULT_BASE_SEPOLIA);
     expect(diagnostics.urls).not.toContain(ROOT_RPC_URL);
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      preferredUrls: expect.arrayContaining([PATH_DEFAULT_BASE_SEPOLIA]),
-      sessionAccessStatus: 'unavailable',
-      sessionRpcSource: 'default-path',
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'path',
+        preferredUrls: expect.arrayContaining([PATH_DEFAULT_BASE_SEPOLIA]),
+        sessionAccessStatus: 'unavailable',
+        sessionRpcSource: 'default-path',
+      }),
+    );
   });
 
   it('shares the cached provider across non-sponsored sessions with identical PATH inputs', () => {
@@ -264,12 +281,14 @@ describe('rpcProviders session-sponsored reads', () => {
     expect(providerA?.__CE_RPC_CACHE_KEY).toBe(providerB?.__CE_RPC_CACHE_KEY);
     expect(providerA?.__CE_RPC_CACHE_KEY).not.toContain(cfgA.slug);
     expect(providerA?.__CE_RPC_CACHE_KEY).not.toContain(cfgB.slug);
-    expect(providerA?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      sessionAccessStatus: 'unavailable',
-      sessionAccessMode: 'none',
-      sessionRpcSource: 'default-path',
-    }));
+    expect(providerA?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'path',
+        sessionAccessStatus: 'unavailable',
+        sessionAccessMode: 'none',
+        sessionRpcSource: 'default-path',
+      }),
+    );
   });
 
   it('does not promote top-level rpcUrlsByChainId for worker-only sponsored RPC without an on-chain gate', () => {
@@ -284,12 +303,14 @@ describe('rpcProviders session-sponsored reads', () => {
     const provider = getReadProviderForGroup(cfg);
     const diagnostics = getReadProviderDiagnostics(84532, pref);
 
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      sessionAccessStatus: 'unavailable',
-      sessionAccessMode: 'none',
-      sessionRpcSource: 'default-path',
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'path',
+        sessionAccessStatus: 'unavailable',
+        sessionAccessMode: 'none',
+        sessionRpcSource: 'default-path',
+      }),
+    );
     expect(provider?.__CE_RPC_META?.preferredUrls).not.toContain('https://session-map.example/rpc');
     expect(provider?.__CE_RPC_META?.preferredUrls).toContain(PATH_DEFAULT_BASE_SEPOLIA);
     expect(diagnostics.urls).not.toContain('https://session-map.example/rpc');
@@ -315,12 +336,14 @@ describe('rpcProviders session-sponsored reads', () => {
 
     const provider = getReadProviderForGroup(cfg);
 
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'session',
-      preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
-      sessionAccessStatus: 'open',
-      sessionRpcSource: 'root',
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'session',
+        preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
+        sessionAccessStatus: 'open',
+        sessionRpcSource: 'root',
+      }),
+    );
   });
 
   it('fails closed for restricted sponsored session RPC until access is verified', () => {
@@ -348,12 +371,14 @@ describe('rpcProviders session-sponsored reads', () => {
 
     const provider = getReadProviderForGroup(cfg);
 
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      sessionAccessStatus: 'checking',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'default-path',
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'path',
+        sessionAccessStatus: 'checking',
+        sessionAccessMode: 'sponsored-restricted',
+        sessionRpcSource: 'default-path',
+      }),
+    );
     expect(provider?.__CE_RPC_META?.preferredUrls).not.toContain(ROOT_RPC_URL);
     expect(provider?.__CE_RPC_META?.preferredUrls).toContain(PATH_DEFAULT_BASE_SEPOLIA);
   });
@@ -392,12 +417,14 @@ describe('rpcProviders session-sponsored reads', () => {
 
     const initialProvider = getReadProviderForGroup(cfg);
 
-    expect(initialProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      sessionAccessStatus: 'checking',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'default-path',
-    }));
+    expect(initialProvider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'path',
+        sessionAccessStatus: 'checking',
+        sessionAccessMode: 'sponsored-restricted',
+        sessionRpcSource: 'default-path',
+      }),
+    );
     expect(initialProvider?.__CE_RPC_META?.preferredUrls).not.toContain(ROOT_RPC_URL);
 
     const access = await checkSponsoredAccess({
@@ -409,21 +436,16 @@ describe('rpcProviders session-sponsored reads', () => {
     const provider = getReadProviderForGroup(cfg);
 
     expect(access.status).toBe('granted');
-    expect(contractScripts.userHasSBT).toHaveBeenCalledWith(
-      'none',
-      RESTRICTED_SBT,
-      account,
-      0,
-      'latest',
-      cfg
+    expect(contractScripts.userHasSBT).toHaveBeenCalledWith('none', RESTRICTED_SBT, account, 0, 'latest', cfg);
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'session',
+        sessionAccessStatus: 'granted',
+        sessionAccessMode: 'sponsored-restricted',
+        sessionRpcSource: 'root',
+        preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
+      }),
     );
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'session',
-      sessionAccessStatus: 'granted',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'root',
-      preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
-    }));
   });
 
   it('keeps sponsored-restricted session cache keys isolated by slug', () => {
@@ -455,11 +477,13 @@ describe('rpcProviders session-sponsored reads', () => {
     const provider = getReadProviderForGroup(cfg);
 
     expect(provider?.__CE_RPC_CACHE_KEY).toContain(`:${cfg.slug}:`);
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      sessionAccessStatus: 'checking',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'default-path',
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        sessionAccessStatus: 'checking',
+        sessionAccessMode: 'sponsored-restricted',
+        sessionRpcSource: 'default-path',
+      }),
+    );
   });
 
   it('prunes stuck transition-state providers after the TTL window', () => {
@@ -495,9 +519,11 @@ describe('rpcProviders session-sponsored reads', () => {
 
       const firstProvider = getReadProviderForGroup(cfg);
 
-      expect(firstProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
-        sessionAccessStatus: 'checking',
-      }));
+      expect(firstProvider?.__CE_RPC_META).toEqual(
+        expect.objectContaining({
+          sessionAccessStatus: 'checking',
+        }),
+      );
       expect(firstProvider?.__CE_RPC_CACHE_KEY).toContain(`:${cfg.slug}:`);
 
       jest.advanceTimersByTime(60_000);
@@ -565,12 +591,16 @@ describe('rpcProviders session-sponsored reads', () => {
     const providerB = getReadProviderForGroup(cfgB);
 
     expect(providerA).not.toBe(providerB);
-    expect(providerA?.__CE_RPC_META).toEqual(expect.objectContaining({
-      sessionAccessStatus: 'checking',
-    }));
-    expect(providerB?.__CE_RPC_META).toEqual(expect.objectContaining({
-      sessionAccessStatus: 'checking',
-    }));
+    expect(providerA?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        sessionAccessStatus: 'checking',
+      }),
+    );
+    expect(providerB?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        sessionAccessStatus: 'checking',
+      }),
+    );
 
     const access = await checkSponsoredAccess({
       sessionConfig: cfgA,
@@ -582,10 +612,12 @@ describe('rpcProviders session-sponsored reads', () => {
 
     expect(access.status).toBe('granted');
     expect(nextProviderB).toBe(providerB);
-    expect(nextProviderB?.__CE_RPC_META).toEqual(expect.objectContaining({
-      sessionAccessStatus: 'checking',
-      sessionRpcSource: 'default-path',
-    }));
+    expect(nextProviderB?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        sessionAccessStatus: 'checking',
+        sessionRpcSource: 'default-path',
+      }),
+    );
   });
 
   it('switches diagnostics to the session root RPC after restricted access transitions from checking to granted', async () => {
@@ -618,12 +650,14 @@ describe('rpcProviders session-sponsored reads', () => {
     const initialPref = resolveGroupPathRpcPreference(cfg, 84532);
     const initialDiagnostics = getReadProviderDiagnostics(84532, initialPref || {});
 
-    expect(initialProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      sessionAccessStatus: 'checking',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'default-path',
-    }));
+    expect(initialProvider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'path',
+        sessionAccessStatus: 'checking',
+        sessionAccessMode: 'sponsored-restricted',
+        sessionRpcSource: 'default-path',
+      }),
+    );
     expect(initialDiagnostics.sessionRpcSource).toBe('default-path');
     expect(initialDiagnostics.urls[0]).toBe(PATH_DEFAULT_BASE_SEPOLIA);
 
@@ -641,13 +675,15 @@ describe('rpcProviders session-sponsored reads', () => {
     expect(nextDiagnostics.providerLabel).toBe('session');
     expect(nextDiagnostics.sessionRpcSource).toBe('root');
     expect(nextDiagnostics.urls[0]).toBe(ROOT_RPC_URL);
-    expect(nextProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'session',
-      sessionAccessStatus: 'granted',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'root',
-      preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
-    }));
+    expect(nextProvider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'session',
+        sessionAccessStatus: 'granted',
+        sessionAccessMode: 'sponsored-restricted',
+        sessionRpcSource: 'root',
+        preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
+      }),
+    );
     expect(nextProvider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
   });
 
@@ -686,13 +722,15 @@ describe('rpcProviders session-sponsored reads', () => {
     const provider = getReadProviderForGroup(cfg);
 
     expect(access.status).toBe('granted');
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'session',
-      preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
-      sessionAccessStatus: 'granted',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'root',
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'session',
+        preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
+        sessionAccessStatus: 'granted',
+        sessionAccessMode: 'sponsored-restricted',
+        sessionRpcSource: 'root',
+      }),
+    );
     expect(provider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
   });
 
@@ -735,12 +773,14 @@ describe('rpcProviders session-sponsored reads', () => {
     const provider = getReadProviderForGroup(cfg);
 
     expect(access.status).toBe('granted');
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      sessionAccessStatus: 'checking',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'default-path',
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'path',
+        sessionAccessStatus: 'checking',
+        sessionAccessMode: 'sponsored-restricted',
+        sessionRpcSource: 'default-path',
+      }),
+    );
     expect(provider?.__CE_RPC_META?.preferredUrls).not.toContain(ROOT_RPC_URL);
   });
 
@@ -784,12 +824,14 @@ describe('rpcProviders session-sponsored reads', () => {
       nowSpy.mockReturnValue(131_500);
       const provider = getReadProviderForGroup(cfg);
 
-      expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-        providerLabel: 'path',
-        sessionAccessStatus: 'checking',
-        sessionAccessMode: 'sponsored-restricted',
-        sessionRpcSource: 'default-path',
-      }));
+      expect(provider?.__CE_RPC_META).toEqual(
+        expect.objectContaining({
+          providerLabel: 'path',
+          sessionAccessStatus: 'checking',
+          sessionAccessMode: 'sponsored-restricted',
+          sessionRpcSource: 'default-path',
+        }),
+      );
       expect(provider?.__CE_RPC_META?.preferredUrls).not.toContain(ROOT_RPC_URL);
     } finally {
       nowSpy.mockRestore();
@@ -831,12 +873,14 @@ describe('rpcProviders session-sponsored reads', () => {
     const provider = getReadProviderForGroup(cfg);
 
     expect(access.status).toBe('denied');
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      sessionAccessStatus: 'denied',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'default-path',
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'path',
+        sessionAccessStatus: 'denied',
+        sessionAccessMode: 'sponsored-restricted',
+        sessionRpcSource: 'default-path',
+      }),
+    );
     expect(provider?.__CE_RPC_META?.preferredUrls).not.toContain(ROOT_RPC_URL);
     expect(provider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
   });

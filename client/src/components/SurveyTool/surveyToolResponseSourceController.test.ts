@@ -10,14 +10,16 @@ describe('surveyToolResponseSourceController', () => {
     const cachedSlice = { answers: { q1: { value: 'cached' } } };
     const buildSliceFromUserAnswers = jest.fn();
 
-    expect(resolveSurveyUserAnswersSlice({
-      userAnswers,
-      userAnswersSliceCache: {
-        source: userAnswers,
-        value: cachedSlice,
-      },
-      buildSliceFromUserAnswers,
-    })).toEqual({
+    expect(
+      resolveSurveyUserAnswersSlice({
+        userAnswers,
+        userAnswersSliceCache: {
+          source: userAnswers,
+          value: cachedSlice,
+        },
+        buildSliceFromUserAnswers,
+      }),
+    ).toEqual({
       slice: cachedSlice,
       nextCache: {
         source: userAnswers,
@@ -45,14 +47,16 @@ describe('surveyToolResponseSourceController', () => {
       additionalComments: {},
     }));
 
-    expect(resolveSurveyBaselineSourceSlice({
-      editBaseline: null,
-      allowLocalCache: true,
-      userAnswers,
-      userAnswersSliceCache: null,
-      buildSliceFromUserAnswers,
-      buildSliceFromLocalCache,
-    })).toEqual({
+    expect(
+      resolveSurveyBaselineSourceSlice({
+        editBaseline: null,
+        allowLocalCache: true,
+        userAnswers,
+        userAnswersSliceCache: null,
+        buildSliceFromUserAnswers,
+        buildSliceFromLocalCache,
+      }),
+    ).toEqual({
       baselineSlice: builtSlice,
       nextUserAnswersSliceCache: {
         source: userAnswers,
@@ -88,17 +92,19 @@ describe('surveyToolResponseSourceController', () => {
       additionalComments: {},
     }));
 
-    expect(resolveSurveyBaselineSourceSlice({
-      editBaseline: null,
-      allowLocalCache: true,
-      userAnswers: recentUserAnswers,
-      userAnswersSliceCache: {
-        source: staleUserAnswers,
-        value: staleCachedSlice,
-      },
-      buildSliceFromUserAnswers,
-      buildSliceFromLocalCache,
-    })).toEqual({
+    expect(
+      resolveSurveyBaselineSourceSlice({
+        editBaseline: null,
+        allowLocalCache: true,
+        userAnswers: recentUserAnswers,
+        userAnswersSliceCache: {
+          source: staleUserAnswers,
+          value: staleCachedSlice,
+        },
+        buildSliceFromUserAnswers,
+        buildSliceFromLocalCache,
+      }),
+    ).toEqual({
       baselineSlice: recentSlice,
       nextUserAnswersSliceCache: {
         source: recentUserAnswers,
@@ -119,14 +125,16 @@ describe('surveyToolResponseSourceController', () => {
       additionalComments: {},
     };
 
-    expect(resolveSurveyBaselineSourceSlice({
-      editBaseline: null,
-      allowLocalCache: true,
-      userAnswers: null,
-      userAnswersSliceCache: null,
-      buildSliceFromUserAnswers: jest.fn(),
-      buildSliceFromLocalCache: jest.fn(() => localCacheSlice),
-    })).toEqual({
+    expect(
+      resolveSurveyBaselineSourceSlice({
+        editBaseline: null,
+        allowLocalCache: true,
+        userAnswers: null,
+        userAnswersSliceCache: null,
+        buildSliceFromUserAnswers: jest.fn(),
+        buildSliceFromLocalCache: jest.fn(() => localCacheSlice),
+      }),
+    ).toEqual({
       baselineSlice: localCacheSlice,
       nextUserAnswersSliceCache: {
         source: null,
@@ -157,14 +165,16 @@ describe('surveyToolResponseSourceController', () => {
     };
     const buildSliceFromLocalCache = jest.fn(() => staleDecryptedCacheSlice);
 
-    expect(resolveSurveyBaselineSourceSlice({
-      editBaseline: null,
-      allowLocalCache: false,
-      userAnswers: null,
-      userAnswersSliceCache: null,
-      buildSliceFromUserAnswers: jest.fn(),
-      buildSliceFromLocalCache,
-    })).toEqual({
+    expect(
+      resolveSurveyBaselineSourceSlice({
+        editBaseline: null,
+        allowLocalCache: false,
+        userAnswers: null,
+        userAnswersSliceCache: null,
+        buildSliceFromUserAnswers: jest.fn(),
+        buildSliceFromLocalCache,
+      }),
+    ).toEqual({
       baselineSlice: {
         answers: {},
         importance: {},
@@ -223,14 +233,16 @@ describe('surveyToolResponseSourceController', () => {
       additionalComments: {},
     }));
 
-    expect(resolveSurveyBaselineSourceSlice({
-      editBaseline,
-      allowLocalCache: true,
-      userAnswers,
-      userAnswersSliceCache,
-      buildSliceFromUserAnswers,
-      buildSliceFromLocalCache,
-    })).toEqual({
+    expect(
+      resolveSurveyBaselineSourceSlice({
+        editBaseline,
+        allowLocalCache: true,
+        userAnswers,
+        userAnswersSliceCache,
+        buildSliceFromUserAnswers,
+        buildSliceFromLocalCache,
+      }),
+    ).toEqual({
       baselineSlice: editBaseline,
       nextUserAnswersSliceCache: userAnswersSliceCache,
       source: 'edit-baseline',
@@ -242,85 +254,97 @@ describe('surveyToolResponseSourceController', () => {
 
   it('treats missing plaintext ratings as consistent when the latest response carries encrypted rating envelopes', () => {
     const latest = {
-      responses: [{
-        questionID: 'q1',
-        answer: { value: 'same' },
-        additional: { value: '' },
-        importanceEncrypted: 'imp-env',
-        convictionEncrypted: 'conv-env',
-      }],
+      responses: [
+        {
+          questionID: 'q1',
+          answer: { value: 'same' },
+          additional: { value: '' },
+          importanceEncrypted: 'imp-env',
+          convictionEncrypted: 'conv-env',
+        },
+      ],
     };
 
-    expect(areSurveyResponsesConsistent({
-      latest,
-      editBaseline: {
-        answers: { q1: { value: 'same', encrypted: false } },
-        additionalComments: { q1: { value: '', encrypted: false } },
-        importance: { q1: 4 },
-        conviction: { q1: 7 },
-      },
-      renderedIds: ['q1'],
-      buildSliceFromUserAnswers: jest.fn(() => ({
-        answers: { q1: { value: 'same' } },
-        additionalComments: { q1: { value: '' } },
-        importance: {},
-        conviction: {},
-      })),
-      valuesEqual: (left, right) => left === right,
-    })).toBe(true);
+    expect(
+      areSurveyResponsesConsistent({
+        latest,
+        editBaseline: {
+          answers: { q1: { value: 'same', encrypted: false } },
+          additionalComments: { q1: { value: '', encrypted: false } },
+          importance: { q1: 4 },
+          conviction: { q1: 7 },
+        },
+        renderedIds: ['q1'],
+        buildSliceFromUserAnswers: jest.fn(() => ({
+          answers: { q1: { value: 'same' } },
+          additionalComments: { q1: { value: '' } },
+          importance: {},
+          conviction: {},
+        })),
+        valuesEqual: (left, right) => left === right,
+      }),
+    ).toBe(true);
   });
 
   it('rejects stale decrypted cache values when the latest submitted source is still masked', () => {
-    expect(areSurveyResponsesConsistent({
-      latest: {
-        responses: [{
-          questionID: 'q1',
-          answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
-          additional: { value: '*', encrypted: true, encryptedPortion: 'note-env' },
-          importanceEncrypted: 'imp-env',
-          convictionEncrypted: 'conv-env',
-        }],
-      },
-      editBaseline: {
-        answers: { q1: { value: 'stale decrypted answer', encrypted: false } },
-        additionalComments: { q1: { value: 'stale decrypted note', encrypted: false } },
-        importance: { q1: 4 },
-        conviction: { q1: 7 },
-      },
-      renderedIds: ['q1'],
-      buildSliceFromUserAnswers: jest.fn(() => ({
-        answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'answer-env' } },
-        additionalComments: { q1: { value: '*', encrypted: true, encryptedPortion: 'note-env' } },
-        importance: {},
-        conviction: {},
-      })),
-      valuesEqual: (left, right) => left === right,
-    })).toBe(false);
+    expect(
+      areSurveyResponsesConsistent({
+        latest: {
+          responses: [
+            {
+              questionID: 'q1',
+              answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+              additional: { value: '*', encrypted: true, encryptedPortion: 'note-env' },
+              importanceEncrypted: 'imp-env',
+              convictionEncrypted: 'conv-env',
+            },
+          ],
+        },
+        editBaseline: {
+          answers: { q1: { value: 'stale decrypted answer', encrypted: false } },
+          additionalComments: { q1: { value: 'stale decrypted note', encrypted: false } },
+          importance: { q1: 4 },
+          conviction: { q1: 7 },
+        },
+        renderedIds: ['q1'],
+        buildSliceFromUserAnswers: jest.fn(() => ({
+          answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'answer-env' } },
+          additionalComments: { q1: { value: '*', encrypted: true, encryptedPortion: 'note-env' } },
+          importance: {},
+          conviction: {},
+        })),
+        valuesEqual: (left, right) => left === right,
+      }),
+    ).toBe(false);
   });
 
   it('detects mismatched answer values even when other fields match', () => {
-    expect(areSurveyResponsesConsistent({
-      latest: {
-        responses: [{
-          questionID: 'q1',
-          answer: { value: 'new' },
-          additional: { value: '' },
-        }],
-      },
-      editBaseline: {
-        answers: { q1: { value: 'old', encrypted: false } },
-        additionalComments: { q1: { value: '', encrypted: false } },
-        importance: {},
-        conviction: {},
-      },
-      renderedIds: ['q1'],
-      buildSliceFromUserAnswers: jest.fn(() => ({
-        answers: { q1: { value: 'new' } },
-        additionalComments: { q1: { value: '' } },
-        importance: {},
-        conviction: {},
-      })),
-      valuesEqual: (left, right) => left === right,
-    })).toBe(false);
+    expect(
+      areSurveyResponsesConsistent({
+        latest: {
+          responses: [
+            {
+              questionID: 'q1',
+              answer: { value: 'new' },
+              additional: { value: '' },
+            },
+          ],
+        },
+        editBaseline: {
+          answers: { q1: { value: 'old', encrypted: false } },
+          additionalComments: { q1: { value: '', encrypted: false } },
+          importance: {},
+          conviction: {},
+        },
+        renderedIds: ['q1'],
+        buildSliceFromUserAnswers: jest.fn(() => ({
+          answers: { q1: { value: 'new' } },
+          additionalComments: { q1: { value: '' } },
+          importance: {},
+          conviction: {},
+        })),
+        valuesEqual: (left, right) => left === right,
+      }),
+    ).toBe(false);
   });
 });

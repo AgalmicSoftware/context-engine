@@ -20,10 +20,9 @@ const LEGACY_LIT_NETWORK_ALIASES = Object.freeze({
   datil: 'chipotle',
 } as const);
 
-const isObj = (value: unknown): value is SessionMetadata => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
-const cloneMetadata = <T>(metadata: T): T => (isObj(metadata) ? { ...metadata } as T : metadata);
+const isObj = (value: unknown): value is SessionMetadata =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+const cloneMetadata = <T>(metadata: T): T => (isObj(metadata) ? ({ ...metadata } as T) : metadata);
 const readTrimmedString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 const resolveCanonicalLitNetwork = (value: unknown): string => {

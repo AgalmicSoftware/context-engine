@@ -1,4 +1,4 @@
-import chainGateway from '../../utilities/web3/contractScripts.js';
+import chainGateway from '../../utilities/web3/chainGateway.js';
 
 export type SurveyQuestionReadRecord = Record<string, unknown>;
 export type SurveyQuestionReadOptions = Record<string, unknown>;
@@ -8,33 +8,33 @@ export type SurveyQuestionReadsGateway = {
     provider: unknown,
     questionId: unknown,
     groupKeyOrCfg?: unknown,
-    options?: SurveyQuestionReadOptions
+    options?: SurveyQuestionReadOptions,
   ) => Promise<SurveyQuestionReadRecord | null | undefined>;
   getSurveyDataById: (
     provider: unknown,
     surveyId: unknown,
     groupKeyOrCfg?: unknown,
-    options?: SurveyQuestionReadOptions
+    options?: SurveyQuestionReadOptions,
   ) => Promise<SurveyQuestionReadRecord | null | undefined>;
   getResponse: (
     provider: unknown,
     responderAddress: unknown,
     questionId: unknown,
     groupKeyOrCfg?: unknown,
-    options?: SurveyQuestionReadOptions
+    options?: SurveyQuestionReadOptions,
   ) => Promise<SurveyQuestionReadRecord | null | undefined>;
   getResponseHash: (
     provider: unknown,
     responderAddress: unknown,
     questionId: unknown,
-    groupKeyOrCfg?: unknown
+    groupKeyOrCfg?: unknown,
   ) => Promise<unknown>;
   getSurveyResponse: (
     provider: unknown,
     responderAddress: unknown,
     surveyId: unknown,
     groupKeyOrCfg?: unknown,
-    options?: SurveyQuestionReadOptions
+    options?: SurveyQuestionReadOptions,
   ) => Promise<SurveyQuestionReadRecord | null | undefined>;
 };
 
@@ -47,29 +47,24 @@ export type BindSurveyQuestionReadsPortArgs = {
 export const bindSurveyQuestionReadsPort = ({
   chainGateway: readChainGateway,
 }: BindSurveyQuestionReadsPortArgs): SurveyQuestionReadsPort => ({
-  getQuestionData: (provider, questionId, groupKeyOrCfg, options) => (
+  getQuestionData: (provider, questionId, groupKeyOrCfg, options) =>
     options === undefined
       ? readChainGateway().getQuestionData(provider, questionId, groupKeyOrCfg)
-      : readChainGateway().getQuestionData(provider, questionId, groupKeyOrCfg, options)
-  ),
-  getSurveyDataById: (provider, surveyId, groupKeyOrCfg, options) => (
+      : readChainGateway().getQuestionData(provider, questionId, groupKeyOrCfg, options),
+  getSurveyDataById: (provider, surveyId, groupKeyOrCfg, options) =>
     options === undefined
       ? readChainGateway().getSurveyDataById(provider, surveyId, groupKeyOrCfg)
-      : readChainGateway().getSurveyDataById(provider, surveyId, groupKeyOrCfg, options)
-  ),
-  getResponse: (provider, responderAddress, questionId, groupKeyOrCfg, options) => (
+      : readChainGateway().getSurveyDataById(provider, surveyId, groupKeyOrCfg, options),
+  getResponse: (provider, responderAddress, questionId, groupKeyOrCfg, options) =>
     options === undefined
       ? readChainGateway().getResponse(provider, responderAddress, questionId, groupKeyOrCfg)
-      : readChainGateway().getResponse(provider, responderAddress, questionId, groupKeyOrCfg, options)
-  ),
-  getResponseHash: (provider, responderAddress, questionId, groupKeyOrCfg) => (
-    readChainGateway().getResponseHash(provider, responderAddress, questionId, groupKeyOrCfg)
-  ),
-  getSurveyResponse: (provider, responderAddress, surveyId, groupKeyOrCfg, options) => (
+      : readChainGateway().getResponse(provider, responderAddress, questionId, groupKeyOrCfg, options),
+  getResponseHash: (provider, responderAddress, questionId, groupKeyOrCfg) =>
+    readChainGateway().getResponseHash(provider, responderAddress, questionId, groupKeyOrCfg),
+  getSurveyResponse: (provider, responderAddress, surveyId, groupKeyOrCfg, options) =>
     options === undefined
       ? readChainGateway().getSurveyResponse(provider, responderAddress, surveyId, groupKeyOrCfg)
-      : readChainGateway().getSurveyResponse(provider, responderAddress, surveyId, groupKeyOrCfg, options)
-  ),
+      : readChainGateway().getSurveyResponse(provider, responderAddress, surveyId, groupKeyOrCfg, options),
 });
 
 export const surveyQuestionReadsPort = bindSurveyQuestionReadsPort({

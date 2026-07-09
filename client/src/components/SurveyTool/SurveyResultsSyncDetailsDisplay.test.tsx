@@ -5,7 +5,7 @@ import SurveyResultsSyncDetailsDisplay from './SurveyResultsSyncDetailsDisplay';
 import type { SurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
 
 const buildSyncStatusDisplay = (
-  overrides: Partial<SurveyResultsSyncStatusDisplayPlan> = {}
+  overrides: Partial<SurveyResultsSyncStatusDisplayPlan> = {},
 ): SurveyResultsSyncStatusDisplayPlan => ({
   isSynced: false,
   isSyncingOrLoading: true,
@@ -48,7 +48,7 @@ describe('SurveyResultsSyncDetailsDisplay', () => {
         {...baseProps}
         onManualRefresh={onManualRefresh}
         syncStatusDisplay={buildSyncStatusDisplay()}
-      />
+      />,
     );
 
     expect(screen.getByText('Questions:')).toBeInTheDocument();
@@ -77,7 +77,7 @@ describe('SurveyResultsSyncDetailsDisplay', () => {
             showSpinner: true,
           },
         })}
-      />
+      />,
     );
 
     expect(screen.queryByText('Questions:')).not.toBeInTheDocument();

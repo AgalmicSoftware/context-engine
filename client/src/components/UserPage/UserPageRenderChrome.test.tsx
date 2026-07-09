@@ -5,13 +5,7 @@ import UserPageComparePanel from './UserPageComparePanel';
 import UserPageSimulatedActions from './UserPageSimulatedActions';
 
 jest.mock('reactstrap', () => ({
-  Collapse: ({
-    children,
-    isOpen,
-  }: {
-    children: React.ReactNode;
-    isOpen?: boolean;
-  }) => (
+  Collapse: ({ children, isOpen }: { children: React.ReactNode; isOpen?: boolean }) => (
     <div data-testid="compare-collapse" data-open={String(isOpen)}>
       {children}
     </div>
@@ -23,7 +17,7 @@ describe('UserPage render chrome', () => {
     render(
       <UserPageComparePanel collapseOpen={true} minimized={false}>
         <div data-testid="compare-child">compare content</div>
-      </UserPageComparePanel>
+      </UserPageComparePanel>,
     );
 
     expect(screen.getByTestId('compare-collapse')).toHaveAttribute('data-open', 'true');
@@ -34,7 +28,7 @@ describe('UserPage render chrome', () => {
     render(
       <UserPageComparePanel collapseOpen={true} minimized={true}>
         <div data-testid="compare-child">compare content</div>
-      </UserPageComparePanel>
+      </UserPageComparePanel>,
     );
 
     expect(screen.queryByTestId('compare-collapse')).toBeNull();
@@ -43,21 +37,11 @@ describe('UserPage render chrome', () => {
 
   it('renders simulated actions only for simulated users and calls the parent handler', () => {
     const onViewResponses = jest.fn();
-    const { rerender } = render(
-      <UserPageSimulatedActions
-        isSimulated={false}
-        onViewResponses={onViewResponses}
-      />
-    );
+    const { rerender } = render(<UserPageSimulatedActions isSimulated={false} onViewResponses={onViewResponses} />);
 
     expect(screen.queryByText('View Simulated Responses')).toBeNull();
 
-    rerender(
-      <UserPageSimulatedActions
-        isSimulated={true}
-        onViewResponses={onViewResponses}
-      />
-    );
+    rerender(<UserPageSimulatedActions isSimulated={true} onViewResponses={onViewResponses} />);
 
     fireEvent.click(screen.getByText('View Simulated Responses'));
     expect(onViewResponses).toHaveBeenCalledTimes(1);

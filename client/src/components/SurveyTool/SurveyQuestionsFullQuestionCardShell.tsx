@@ -30,9 +30,7 @@ const SurveyQuestionsFullQuestionCardShell = ({
         {cardIcons}
       </FullQuestionHeader>
 
-      <div className={styles.fullQuestionMain}>
-        {mainContent}
-      </div>
+      <div className={styles.fullQuestionMain}>{mainContent}</div>
 
       <div className={styles.fullQuestionFooter}>
         {sliderSection}

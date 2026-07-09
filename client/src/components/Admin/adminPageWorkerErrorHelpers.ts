@@ -35,14 +35,16 @@ export const normalizeAdminWorkerFetchError = ({
   responseStatus = 0,
   responseError = '',
 }: NormalizeAdminWorkerFetchErrorArgs = {}): string => {
-  const message = error && typeof error === 'object' && 'message' in error
-    ? (error as { message?: unknown }).message
-    : undefined;
+  const message =
+    error && typeof error === 'object' && 'message' in error ? (error as { message?: unknown }).message : undefined;
   const raw = toStr(message || error).trim();
   const lowered = raw.toLowerCase();
   const detail = toStr(responseError).trim();
   const detailLower = detail.toLowerCase();
-  if ((Number(responseStatus || 0) === 403 && detailLower.includes('origin')) || detailLower.includes('origin not allowed')) {
+  if (
+    (Number(responseStatus || 0) === 403 && detailLower.includes('origin')) ||
+    detailLower.includes('origin not allowed')
+  ) {
     return buildAdminWorkerCorsMessage(workerBase, detail || 'Origin not allowed');
   }
   if (lowered.includes('origin not allowed')) {
@@ -68,7 +70,8 @@ export const sleep = (ms: unknown): Promise<void> => new Promise((resolve) => se
 
 export const addSessionConfigHint = (message: unknown): string => {
   const raw = toStr(message).trim();
-  if (!raw) return 'Worker session config is missing. Run the AI test again as admin to seed it, or re-deploy for this slug.';
+  if (!raw)
+    return 'Worker session config is missing. Run the AI test again as admin to seed it, or re-deploy for this slug.';
   if (!raw.toLowerCase().includes('session config not found')) return raw;
   return `${raw} Re-run this test while connected as the admin wallet to seed worker config, then verify the worker URL and selected session slug match.`;
 };
@@ -98,14 +101,10 @@ export const buildHealthAuthMismatchState = ({
 }: HealthAuthMismatchStateArgs = {}): HealthAuthMismatchState | null => {
   const status = Number(unauthStatus || 0) || 0;
   const authMsg = toStr(authError).toLowerCase();
-  const unsupportedAuthRoute = (
+  const unsupportedAuthRoute =
     status > 0 &&
     (status === 401 || status === 403) &&
-    (
-      authMsg.includes('worker login failed (404)') ||
-      authMsg.includes('worker auth login route not supported')
-    )
-  );
+    (authMsg.includes('worker login failed (404)') || authMsg.includes('worker auth login route not supported'));
   if (!unsupportedAuthRoute) return null;
   const detail = toStr(unauthError).trim();
   const suffix = detail ? `: ${detail}` : '';

@@ -1,7 +1,4 @@
-import {
-  normalizeSbtRealtimeEventCursor,
-  compareSbtRealtimeEventCursor,
-} from './sbtRealtimeCursorHelpers.js';
+import { normalizeSbtRealtimeEventCursor, compareSbtRealtimeEventCursor } from './sbtRealtimeCursorHelpers.js';
 
 describe('sbtRealtimeCursorHelpers', () => {
   describe('normalizeSbtRealtimeEventCursor', () => {
@@ -26,11 +23,13 @@ describe('sbtRealtimeCursorHelpers', () => {
     });
 
     it('defaults invalid transactionIndex and logIndex to -1', () => {
-      expect(normalizeSbtRealtimeEventCursor({
-        blockNumber: 12,
-        transactionIndex: -1,
-        logIndex: 'latest',
-      })).toEqual({
+      expect(
+        normalizeSbtRealtimeEventCursor({
+          blockNumber: 12,
+          transactionIndex: -1,
+          logIndex: 'latest',
+        }),
+      ).toEqual({
         blockNumber: 12,
         transactionIndex: -1,
         logIndex: -1,
@@ -38,11 +37,13 @@ describe('sbtRealtimeCursorHelpers', () => {
     });
 
     it('normalizes a valid full cursor to integer fields', () => {
-      expect(normalizeSbtRealtimeEventCursor({
-        blockNumber: '12',
-        transactionIndex: '3',
-        logIndex: '4',
-      })).toEqual({
+      expect(
+        normalizeSbtRealtimeEventCursor({
+          blockNumber: '12',
+          transactionIndex: '3',
+          logIndex: '4',
+        }),
+      ).toEqual({
         blockNumber: 12,
         transactionIndex: 3,
         logIndex: 4,
@@ -50,11 +51,13 @@ describe('sbtRealtimeCursorHelpers', () => {
     });
 
     it('floors a float blockNumber', () => {
-      expect(normalizeSbtRealtimeEventCursor({
-        blockNumber: 12.9,
-        transactionIndex: 3,
-        logIndex: 4,
-      })).toEqual({
+      expect(
+        normalizeSbtRealtimeEventCursor({
+          blockNumber: 12.9,
+          transactionIndex: 3,
+          logIndex: 4,
+        }),
+      ).toEqual({
         blockNumber: 12,
         transactionIndex: 3,
         logIndex: 4,
@@ -81,32 +84,42 @@ describe('sbtRealtimeCursorHelpers', () => {
     });
 
     it('orders same-block cursors by transactionIndex', () => {
-      expect(compareSbtRealtimeEventCursor(
-        { blockNumber: 1, transactionIndex: 2, logIndex: 5 },
-        { blockNumber: 1, transactionIndex: 3, logIndex: 1 }
-      )).toBeLessThan(0);
-      expect(compareSbtRealtimeEventCursor(
-        { blockNumber: 1, transactionIndex: 3, logIndex: 1 },
-        { blockNumber: 1, transactionIndex: 2, logIndex: 5 }
-      )).toBeGreaterThan(0);
+      expect(
+        compareSbtRealtimeEventCursor(
+          { blockNumber: 1, transactionIndex: 2, logIndex: 5 },
+          { blockNumber: 1, transactionIndex: 3, logIndex: 1 },
+        ),
+      ).toBeLessThan(0);
+      expect(
+        compareSbtRealtimeEventCursor(
+          { blockNumber: 1, transactionIndex: 3, logIndex: 1 },
+          { blockNumber: 1, transactionIndex: 2, logIndex: 5 },
+        ),
+      ).toBeGreaterThan(0);
     });
 
     it('orders same-block and same-transaction cursors by logIndex', () => {
-      expect(compareSbtRealtimeEventCursor(
-        { blockNumber: 1, transactionIndex: 2, logIndex: 5 },
-        { blockNumber: 1, transactionIndex: 2, logIndex: 6 }
-      )).toBeLessThan(0);
-      expect(compareSbtRealtimeEventCursor(
-        { blockNumber: 1, transactionIndex: 2, logIndex: 6 },
-        { blockNumber: 1, transactionIndex: 2, logIndex: 5 }
-      )).toBeGreaterThan(0);
+      expect(
+        compareSbtRealtimeEventCursor(
+          { blockNumber: 1, transactionIndex: 2, logIndex: 5 },
+          { blockNumber: 1, transactionIndex: 2, logIndex: 6 },
+        ),
+      ).toBeLessThan(0);
+      expect(
+        compareSbtRealtimeEventCursor(
+          { blockNumber: 1, transactionIndex: 2, logIndex: 6 },
+          { blockNumber: 1, transactionIndex: 2, logIndex: 5 },
+        ),
+      ).toBeGreaterThan(0);
     });
 
     it('returns 0 for identical cursors', () => {
-      expect(compareSbtRealtimeEventCursor(
-        { blockNumber: 1, transactionIndex: 2, logIndex: 3 },
-        { blockNumber: 1, transactionIndex: 2, logIndex: 3 }
-      )).toBe(0);
+      expect(
+        compareSbtRealtimeEventCursor(
+          { blockNumber: 1, transactionIndex: 2, logIndex: 3 },
+          { blockNumber: 1, transactionIndex: 2, logIndex: 3 },
+        ),
+      ).toBe(0);
     });
   });
 });

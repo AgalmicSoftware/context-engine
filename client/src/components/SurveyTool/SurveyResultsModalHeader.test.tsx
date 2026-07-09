@@ -42,16 +42,19 @@ describe('SurveyResultsModalHeader', () => {
         surveyTitle="Demo Survey"
         syncStatusNode={<div data-testid="sync-status">In Sync</div>}
         viewMode="survey"
-      />
+      />,
     );
 
     expect(screen.getByRole('heading', { name: 'Demo Survey' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '0x1111...1111' })).toHaveAttribute(
       'href',
-      `/survey/${encodeURIComponent(surveyId)}?session=alpha`
+      `/survey/${encodeURIComponent(surveyId)}?session=alpha`,
     );
     expect(screen.getByRole('link', { name: /https:\/\/example\.test\/documents\// })).toHaveAttribute('href', docUrl);
-    expect(screen.getByRole('link', { name: /https:\/\/example\.test\/documents\// })).toHaveAttribute('target', '_blank');
+    expect(screen.getByRole('link', { name: /https:\/\/example\.test\/documents\// })).toHaveAttribute(
+      'target',
+      '_blank',
+    );
     expect(screen.getByRole('button', { name: 'Locked' })).toBeInTheDocument();
     expect(screen.getByTestId('sync-status')).toHaveTextContent('In Sync');
 
@@ -76,7 +79,7 @@ describe('SurveyResultsModalHeader', () => {
         onToggleSurveyBookmark={jest.fn()}
         styleMap={styleMap}
         viewMode="questions"
-      />
+      />,
     );
 
     expect(screen.getByRole('heading', { name: 'Question Results' })).toBeInTheDocument();

@@ -95,7 +95,7 @@ describe('CheckboxMultiSelect', () => {
         value={null}
         onChange={jest.fn()}
         placeholder="Pick things"
-      />
+      />,
     );
 
     openMenu();

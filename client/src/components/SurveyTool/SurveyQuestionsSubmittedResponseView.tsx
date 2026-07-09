@@ -9,16 +9,8 @@ type SurveyQuestionsSubmittedResponseViewProps = {
   isVisible?: boolean;
   questionPool?: any[];
   questionPoolReady?: unknown;
-  renderQuestionAnswer: (
-    question: any,
-    answers: any,
-    index: number,
-    isOwnResponse: unknown
-  ) => React.ReactNode;
-  renderSurveyAnswers: (
-    responses: any[],
-    isOwnResponse: unknown
-  ) => React.ReactNode;
+  renderQuestionAnswer: (question: any, answers: any, index: number, isOwnResponse: unknown) => React.ReactNode;
+  renderSurveyAnswers: (responses: any[], isOwnResponse: unknown) => React.ReactNode;
   singleQuestionMode?: unknown;
   userAnswers?: any;
 };
@@ -42,17 +34,14 @@ const SurveyQuestionsSubmittedResponseView = ({
       {questionPoolReady && userAnswers ? (
         singleQuestionMode ? (
           firstQuestion ? (
-            renderQuestionAnswer(
-              firstQuestion,
-              userAnswers,
-              0,
-              isOwnResponse
-            )
-          ) : (<div>Loading question...</div>)
+            renderQuestionAnswer(firstQuestion, userAnswers, 0, isOwnResponse)
+          ) : (
+            <div>Loading question...</div>
+          )
+        ) : userAnswers.responses ? (
+          renderSurveyAnswers(userAnswers.responses, isOwnResponse)
         ) : (
-          userAnswers.responses ? (
-            renderSurveyAnswers(userAnswers.responses, isOwnResponse)
-          ) : (<div>Loading answers...</div>)
+          <div>Loading answers...</div>
         )
       ) : (
         <div className={styles.loadingContainer}>

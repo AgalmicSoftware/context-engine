@@ -14,18 +14,24 @@ jest.mock('../../actions/sessionStateActions.js', () => ({
   toggleLoginModal: jest.fn(() => ({ type: 'TOGGLE_LOGIN_MODAL' })),
 }));
 
-const buildStore = () => createStore((state = {
-  sessionState: {
-    focusedTab: 0,
-    loginModalToggled: false,
-  },
-}) => state);
+const buildStore = () =>
+  createStore(
+    (
+      state = {
+        sessionState: {
+          focusedTab: 0,
+          loginModalToggled: false,
+        },
+      },
+    ) => state,
+  );
 
-const renderFooter = () => render(
-  <Provider store={buildStore()}>
-    <Footer />
-  </Provider>
-);
+const renderFooter = () =>
+  render(
+    <Provider store={buildStore()}>
+      <Footer />
+    </Provider>,
+  );
 const footerStylesheet = fs.readFileSync(path.join(__dirname, 'Footer.module.scss'), 'utf8');
 
 describe('Footer', () => {
@@ -49,7 +55,7 @@ describe('Footer', () => {
       expect(screen.getByRole('link', { name: 'CONTRACTS' })).toHaveAttribute('href', '/ce/contracts');
       expect(screen.getByTestId('ce-footer-link-github')).toHaveAttribute(
         'href',
-        'https://github.com/AgalmicSoftware/context-engine'
+        'https://github.com/AgalmicSoftware/context-engine',
       );
     } finally {
       if (previousPublicUrl === undefined) {
@@ -68,10 +74,7 @@ describe('Footer', () => {
 
     expect(attributionLink).toHaveTextContent('Software by Agalmic');
     expect(attributionLink.tagName).toBe('SPAN');
-    expect(githubLink).toHaveAttribute(
-      'href',
-      'https://github.com/AgalmicSoftware/context-engine'
-    );
+    expect(githubLink).toHaveAttribute('href', 'https://github.com/AgalmicSoftware/context-engine');
     expect(githubLink).toHaveAttribute('target', '_blank');
     expect(githubLink).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.queryByTestId('ce-footer-brand-link')).not.toBeInTheDocument();
@@ -93,13 +96,23 @@ describe('Footer', () => {
   });
 
   it('uses larger footer text in the full-screen layout', () => {
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-size:\s*1\.18rem;/);
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1\.18rem;/);
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footerLink\s*{[\s\S]*?font-size:\s*1\.18rem;/);
+    expect(footerStylesheet).toMatch(
+      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-size:\s*1\.18rem;/,
+    );
+    expect(footerStylesheet).toMatch(
+      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1\.18rem;/,
+    );
+    expect(footerStylesheet).toMatch(
+      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footerLink\s*{[\s\S]*?font-size:\s*1\.18rem;/,
+    );
   });
 
   it('keeps desktop footer nav links as large as the attribution text', () => {
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-family:\s*inherit;/);
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1rem;/);
+    expect(footerStylesheet).toMatch(
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-family:\s*inherit;/,
+    );
+    expect(footerStylesheet).toMatch(
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1rem;/,
+    );
   });
 });

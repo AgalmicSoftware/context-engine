@@ -1,9 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faExternalLinkAlt,
-  faSpinner,
-} from '@fortawesome/free-solid-svg-icons';
+import { faExternalLinkAlt, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import SBTPage from '../SBTs/SBTPage';
@@ -78,16 +75,8 @@ const UserPageFullProfileModal = ({
   surveyResponseEntries,
   userStats,
 }: UserPageFullProfileModalProps): React.ReactElement => (
-  <Modal
-    isOpen={isOpen}
-    toggle={onToggle}
-    size="lg"
-    className={styles.modalContent}
-  >
-    <ModalHeader
-      toggle={onToggle}
-      className={styles.modalHeader}
-    >
+  <Modal isOpen={isOpen} toggle={onToggle} size="lg" className={styles.modalContent}>
+    <ModalHeader toggle={onToggle} className={styles.modalHeader}>
       Full User Profile
     </ModalHeader>
     <ModalBody className={styles.modalBody}>
@@ -95,33 +84,29 @@ const UserPageFullProfileModal = ({
         <h3>User Summary</h3>
         <p>{aiAnalysis || 'Summary not available.'}</p>
       </div>
-      <StatsSection
-        userStats={userStats}
-        collapseOpen={collapseOpen}
-        toggleCollapse={onStatsCollapseToggle}
-      />
+      <StatsSection userStats={userStats} collapseOpen={collapseOpen} toggleCollapse={onStatsCollapseToggle} />
       <div className={styles.modalSurveys}>
         <h3>Survey Responses</h3>
         {fullProfileModalDisplayState.shouldRenderSurveySpinner ? (
           <FontAwesomeIcon icon={faSpinner} spin id={styles.loadingIcon} />
-        ) : fullProfileModalDisplayState.shouldRenderSurveyEmptyText ? <p>No survey responses.</p> : (
-          fullProfileModalDisplayState.shouldRenderSurveyList ? (
-            surveyResponseEntries.map((survey, index: number) => (
-              <div key={index} className={styles.surveyPreview}>
-                <div className={styles.surveyTitle}>{survey.title}</div>
-                <div className={styles.surveyInfo}>
-                  Questions: {survey.questionsCount}
-                </div>
-              </div>
-            ))
-          ) : null
-        )}
+        ) : fullProfileModalDisplayState.shouldRenderSurveyEmptyText ? (
+          <p>No survey responses.</p>
+        ) : fullProfileModalDisplayState.shouldRenderSurveyList ? (
+          surveyResponseEntries.map((survey, index: number) => (
+            <div key={index} className={styles.surveyPreview}>
+              <div className={styles.surveyTitle}>{survey.title}</div>
+              <div className={styles.surveyInfo}>Questions: {survey.questionsCount}</div>
+            </div>
+          ))
+        ) : null}
       </div>
       <div className={styles.modalSBTs}>
         <h3>{mintedSbtsHeading}</h3>
         {sbtDisplayState.shouldRenderModalSpinner ? (
           <FontAwesomeIcon icon={faSpinner} spin id={styles.loadingIcon} />
-        ) : sbtDisplayState.shouldRenderModalEmptyText ? <p>{sbtEmptyText}</p> : (
+        ) : sbtDisplayState.shouldRenderModalEmptyText ? (
+          <p>{sbtEmptyText}</p>
+        ) : (
           sbtEntries.map((sbtItem, index: number) => (
             <SBTPage
               key={index}
@@ -145,12 +130,7 @@ const UserPageFullProfileModal = ({
               My Bookmarks <FontAwesomeIcon icon={faExternalLinkAlt} />
             </a>
           )}
-          <a
-            href={explorerUrl || undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.explorerLink}
-          >
+          <a href={explorerUrl || undefined} target="_blank" rel="noopener noreferrer" className={styles.explorerLink}>
             View on Explorer <FontAwesomeIcon icon={faExternalLinkAlt} />
           </a>
         </div>

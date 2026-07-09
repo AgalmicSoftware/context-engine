@@ -78,11 +78,7 @@ const SessionWizardHeader = ({
     <header className={styles.header}>
       <div className={styles.headerTitleBlock}>
         <h1>Session Setup</h1>
-        {!isNormalMode && (
-          <div className={styles.modeHint}>
-            Advanced mode shows the full session configuration.
-          </div>
-        )}
+        {!isNormalMode && <div className={styles.modeHint}>Advanced mode shows the full session configuration.</div>}
       </div>
       <div className={styles.headerActions}>
         {hasSponsoredBundleLink ? (
@@ -116,7 +112,9 @@ const SessionWizardHeader = ({
               {wizardModeControls}
             </div>
           </div>
-        ) : wizardModeControls}
+        ) : (
+          wizardModeControls
+        )}
         {wizardMode === 'advanced' && (
           <div className={styles.headerChainSelector}>
             <span className={styles.headerChainLabel}>Network:</span>

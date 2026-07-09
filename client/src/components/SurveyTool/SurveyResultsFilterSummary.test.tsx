@@ -4,7 +4,10 @@ import { render, screen } from '@testing-library/react';
 import SurveyResultsFilterSummary from './SurveyResultsFilterSummary';
 
 const normalizeSummaryText = (text = ''): string =>
-  text.replace(/\u200e/g, '').replace(/\s+/g, ' ').trim();
+  text
+    .replace(/\u200e/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 describe('SurveyResultsFilterSummary', () => {
   it('renders total and filtered question/response counts', () => {
@@ -15,7 +18,7 @@ describe('SurveyResultsFilterSummary', () => {
         normalizedFilteredQuestionsCount={5}
         normalizedFilteredResponsesCount={8}
         showFilteredCountSpinner={false}
-      />
+      />,
     );
     const summaryText = container.querySelector('p');
     const normalizedSummaryText = normalizeSummaryText(summaryText?.textContent || '');
@@ -37,7 +40,7 @@ describe('SurveyResultsFilterSummary', () => {
         normalizedFilteredQuestionsCount={null}
         normalizedFilteredResponsesCount={null}
         showFilteredCountSpinner={true}
-      />
+      />,
     );
 
     expect(screen.getAllByText('0')).toHaveLength(2);

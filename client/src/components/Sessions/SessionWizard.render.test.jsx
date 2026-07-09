@@ -6,10 +6,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import {
-  SESSION_MODE_PRESET_IDS,
-  cloneSessionModePreset,
-} from '../../utilities/session/sessionModeProfile';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import {
   getContractViewerCardTestId,
   getContractViewerSourceTestId,
@@ -36,12 +33,13 @@ const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
-const buildMockSponsoredBundleEnvelope = () => JSON.stringify({
-  type: 'contextengine-sponsored-bundle',
-  version: 1,
-  cipher: 'password-aes-gcm',
-  encryptedData: 'encrypted-base64',
-});
+const buildMockSponsoredBundleEnvelope = () =>
+  JSON.stringify({
+    type: 'contextengine-sponsored-bundle',
+    version: 1,
+    cipher: 'password-aes-gcm',
+    encryptedData: 'encrypted-base64',
+  });
 const buildMockSponsoredBundle = () => ({
   openaiKey: 'sponsored-openai',
   arweaveJwk: '{"kty":"RSA","n":"sponsored"}',
@@ -114,10 +112,12 @@ jest.mock('../SBTs/SBTSelector', () => (props) => {
     >
       <button
         type="button"
-        onClick={() => props.onAddSBT?.({
-          address: mockReplacementSbtAddress,
-          name: 'Replacement SBT',
-        })}
+        onClick={() =>
+          props.onAddSBT?.({
+            address: mockReplacementSbtAddress,
+            name: 'Replacement SBT',
+          })
+        }
       >
         {`Mock add ${props.id || 'selector'} SBT`}
       </button>
@@ -125,11 +125,7 @@ jest.mock('../SBTs/SBTSelector', () => (props) => {
         const address = typeof entry === 'string' ? entry : entry?.address || entry?.sbtAddress || '';
         if (!address) return null;
         return (
-          <button
-            key={address}
-            type="button"
-            onClick={() => props.onRemoveSBT?.(address)}
-          >
+          <button key={address} type="button" onClick={() => props.onRemoveSBT?.(address)}>
             {`Mock remove ${address} from ${props.id || 'selector'}`}
           </button>
         );
@@ -186,8 +182,8 @@ jest.mock('../../utilities/crypto/cryptography.js', () => ({
   },
 }));
 
-jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../../utilities/arweave/arweaveClient.js', () => ({
+  arweaveClient: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
     buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.example.test/${txId}`),
@@ -201,7 +197,11 @@ jest.mock('../../utilities/session/resourceKeys.js', () => ({
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   registerSessionOnChain: (...args) => mockRegisterSessionOnChain(...args),
   sessionRegistryUtils: {
-    normalizeSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
+    normalizeSlug: jest.fn((value = '') =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    ),
     formatSessionId: jest.fn((value = '') => String(value || '').trim()),
     normalizeSessionIdHex: jest.fn((value = '') => String(value || '').trim()),
     toRegistrySlug: jest.fn((value = '') => String(value || '').trim()),
@@ -213,14 +213,16 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   },
 }));
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     createSBT: (...args) => mockCreateSBT(...args),
     getSbtMetadata: jest.fn(async () => ({})),
   },
   getSessionConfigBySlugOrDefault: jest.fn((slug = '') => {
-    const normalized = String(slug || '').trim().toLowerCase();
+    const normalized = String(slug || '')
+      .trim()
+      .toLowerCase();
     if (normalized && normalized !== 'general') return null;
     return {
       slug: '',
@@ -239,7 +241,9 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
     };
   }),
   getDemoSessionConfigBySlug: jest.fn((slug = '') => {
-    const normalized = String(slug || '').trim().toLowerCase();
+    const normalized = String(slug || '')
+      .trim()
+      .toLowerCase();
     if (normalized && normalized !== 'general') return null;
     return {
       slug: '',
@@ -290,14 +294,11 @@ jest.mock('../../variables/appConfig.js', () => {
   return { ...actual };
 });
 
-import SessionWizard, {
-  REQUIRED_SESSION_SLUG_ERROR,
-  RESERVED_SESSION_SLUG_ERROR,
-} from './SessionWizard';
+import SessionWizard, { REQUIRED_SESSION_SLUG_ERROR, RESERVED_SESSION_SLUG_ERROR } from './SessionWizard';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
-const createTooltipStore = (tooltipsEnabled = true) => createStore(
-  (state = { sessionState: { tooltipsEnabled } }, action) => {
+const createTooltipStore = (tooltipsEnabled = true) =>
+  createStore((state = { sessionState: { tooltipsEnabled } }, action) => {
     if (action.type === 'SET_TOOLTIPS') {
       return {
         sessionState: {
@@ -306,23 +307,23 @@ const createTooltipStore = (tooltipsEnabled = true) => createStore(
       };
     }
     return state;
-  }
-);
+  });
 const renderSessionWizardWithTooltipStore = ({ tooltipsEnabled = true, props = {} } = {}) => {
   const store = createTooltipStore(tooltipsEnabled);
   const view = render(
     <Provider store={store}>
       <SessionWizard network={{ id: 84532 }} {...props} />
-    </Provider>
+    </Provider>,
   );
   return { store, ...view };
 };
-const renderLoggedInSessionWizard = (props = {}) => renderSessionWizard({
-  account: TEST_ADMIN_ADDRESS,
-  loginComplete: true,
-  toggleLoginModal: jest.fn(),
-  ...props,
-});
+const renderLoggedInSessionWizard = (props = {}) =>
+  renderSessionWizard({
+    account: TEST_ADMIN_ADDRESS,
+    loginComplete: true,
+    toggleLoginModal: jest.fn(),
+    ...props,
+  });
 const enableAdvancedMode = () => {
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
 };
@@ -338,10 +339,10 @@ const selectCloudflarePreset = () => {
     fireEvent.click(continueButton);
   }
 };
-const getMockSelectorById = (selectorId) => (
-  screen.queryAllByTestId('mock-wizard-sbt-selector')
-    .find((node) => node.getAttribute('data-selector-id') === selectorId)
-);
+const getMockSelectorById = (selectorId) =>
+  screen
+    .queryAllByTestId('mock-wizard-sbt-selector')
+    .find((node) => node.getAttribute('data-selector-id') === selectorId);
 const expectSelectorAddresses = async (selectorId, expectedAddresses) => {
   await waitFor(() => {
     const selector = getMockSelectorById(selectorId);
@@ -353,13 +354,14 @@ const openAdvancedMoreOptions = async () => {
   enableAdvancedMode();
   fireEvent.click(screen.getByRole('button', { name: /more options/i }));
 };
-const getFeaturedCreateButton = async () => await waitFor(() => {
-  const button = screen.getAllByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT).find(
-    (node) => node.getAttribute('data-ce-sbt-target') === 'defaultFeaturedSBTs'
-  );
-  expect(button).toBeTruthy();
-  return button;
-});
+const getFeaturedCreateButton = async () =>
+  await waitFor(() => {
+    const button = screen
+      .getAllByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT)
+      .find((node) => node.getAttribute('data-ce-sbt-target') === 'defaultFeaturedSBTs');
+    expect(button).toBeTruthy();
+    return button;
+  });
 const ensureGateASelectorVisible = async () => {
   if (!getMockSelectorById('encryption-gate-gate-1')) {
     fireEvent.click(screen.getByRole('button', { name: /groups allowed to decrypt locked fields/i }));
@@ -396,7 +398,7 @@ describe('SessionWizard rendered validation', () => {
     window.history.replaceState({}, '', '/');
     localStorage.clear();
     sessionStorage.clear();
-    buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) => (
+    buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) =>
       Object.keys(sessionContracts).map((contractKey) => ({
         key: contractKey,
         name:
@@ -418,15 +420,17 @@ describe('SessionWizard rendered validation', () => {
                 : 'Contract.sol',
         source: `contract ${contractKey} {}`,
         addresses: sessionContracts[contractKey]?.address
-          ? [{
-              address: sessionContracts[contractKey].address,
-              id: sessionContracts[contractKey].chainId || 84532,
-              testnet: true,
-              explorerUrl: `https://example.example.test/${contractKey}`,
-            }]
+          ? [
+              {
+                address: sessionContracts[contractKey].address,
+                id: sessionContracts[contractKey].chainId || 84532,
+                testnet: true,
+                explorerUrl: `https://example.example.test/${contractKey}`,
+              },
+            ]
           : [],
-      }))
-    ));
+      })),
+    );
   });
 
   it('shows only the selected section in default normal mode', async () => {
@@ -515,7 +519,7 @@ describe('SessionWizard rendered validation', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Session wizard display settings' })).toHaveAttribute(
         'aria-expanded',
-        'false'
+        'false',
       );
     });
 
@@ -575,11 +579,11 @@ describe('SessionWizard rendered validation', () => {
 
     expect(within(modal).getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute(
       'href',
-      '/contracts?contract=sessionRegistry&session=session-alpha'
+      '/contracts?contract=sessionRegistry&session=session-alpha',
     );
     expect(within(modal).getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute(
       'rel',
-      'noopener noreferrer'
+      'noopener noreferrer',
     );
   });
 
@@ -609,20 +613,21 @@ describe('SessionWizard rendered validation', () => {
     enableAdvancedMode();
     fireEvent.click(screen.getByRole('button', { name: /More options/i }));
 
-    expect(
-      await screen.findByDisplayValue('group, event, idea, demographic, location')
-    ).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('group, event, idea, demographic, location')).toBeInTheDocument();
   });
 
   it('keeps block limits inside optional details in normal mode when the draft contains them', async () => {
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      draft: {
-        blockLimits: {
-          start: 987654,
-          end: 988000,
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          blockLimits: {
+            start: 987654,
+            end: 988000,
+          },
         },
-      },
-    }));
+      }),
+    );
 
     renderSessionWizard();
 
@@ -641,11 +646,14 @@ describe('SessionWizard rendered validation', () => {
 
   it('keeps legacy sponsoredSbtAddress inside optional details in normal mode', async () => {
     const sponsoredSbtAddress = '0x00000000000000000000000000000000000000f1';
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      draft: {
-        sponsoredSbtAddress,
-      },
-    }));
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          sponsoredSbtAddress,
+        },
+      }),
+    );
 
     renderSessionWizard();
 
@@ -758,7 +766,7 @@ describe('SessionWizard rendered validation', () => {
     await waitFor(() => {
       expect(slugInput).toBeDisabled();
       expect(
-        screen.getByTitle('Private URL mode enabled (uses session ID). Click to restore manual URL.')
+        screen.getByTitle('Private URL mode enabled (uses session ID). Click to restore manual URL.'),
       ).toBeInTheDocument();
     });
   });
@@ -795,9 +803,11 @@ describe('SessionWizard rendered validation', () => {
     await waitFor(() => {
       expect(slugInput).toHaveValue('queued-session');
     });
-    expect(screen.getByText(
-      'Queued Group drafts pinned this slug so their uploaded metadata stays aligned with the final session URL.'
-    )).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Queued Group drafts pinned this slug so their uploaded metadata stays aligned with the final session URL.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('renders non-worker session wizard tooltips through the same explainer toggle path', async () => {
@@ -848,41 +858,59 @@ describe('SessionWizard rendered validation', () => {
     expect(await screen.findByText(REQUIRED_SESSION_SLUG_ERROR)).toBeInTheDocument();
   });
 
-  it('shows only session mode on /session/new until Continue reveals the prefilled setup', async () => {
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      draft: {
-        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-        storageProfile: { backend: 'cloudflare' },
-      },
-    }));
-    window.history.replaceState({}, '', '/session/new');
-    renderSessionWizard();
+  it.each(['/new', '/session/new'])(
+    'shows only session mode on %s until Continue reveals the prefilled setup',
+    async (pathname) => {
+      localStorage.setItem(
+        'ce:sessionWizardDraft:v1',
+        JSON.stringify({
+          draft: {
+            sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+            storageProfile: { backend: 'cloudflare' },
+          },
+        }),
+      );
+      window.history.replaceState({}, '', pathname);
+      renderSessionWizard();
 
-    expect(screen.getByTestId('ce-new-preset-continue')).toBeDisabled();
-    expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
-    expect(screen.queryByText('Custom')).not.toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeInTheDocument();
-    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+      expect(screen.getByTestId('ce-new-preset-continue')).toBeDisabled();
+      expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute(
+        'aria-checked',
+        'false',
+      );
+      expect(screen.queryByText('Custom')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeInTheDocument();
+      expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
-    expect(screen.getByTestId('ce-new-preset-continue')).not.toBeDisabled();
-    expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'true');
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
+      expect(screen.getByTestId('ce-new-preset-continue')).not.toBeDisabled();
+      expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
-    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
-    expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /advanced options/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
 
-    enableAdvancedMode();
-    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
-    expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'false');
-  });
+      enableAdvancedMode();
+      fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
+      expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'false');
+    },
+  );
 
   it('checks session slug collisions before publish upload or register side effects', async () => {
-    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     let publishClicked = false;
     mockSessionExists.mockImplementation(async () => publishClicked);
 
@@ -915,7 +943,7 @@ describe('SessionWizard rendered validation', () => {
     expect(await screen.findByText('Session slug already exists on-chain: duplicate-session')).toBeInTheDocument();
     expect(mockSessionExists).toHaveBeenCalledWith('duplicate-session');
     expect(mockCreateSBT).not.toHaveBeenCalled();
-    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 
@@ -930,4 +958,5 @@ describe('SessionWizard rendered validation', () => {
 
     fireEvent.change(slugInput, { target: { value: 'edge-custom' } });
     expect(screen.queryByText(RESERVED_SESSION_SLUG_ERROR)).not.toBeInTheDocument();
-  });});
+  });
+});

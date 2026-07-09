@@ -16,7 +16,7 @@ jest.mock('../../utilities/web3/sponsoredAccess.js', () => ({
   checkSponsoredAccess: jest.fn(),
 }));
 
-jest.mock('utilities/ai/aiScripts.js', () => ({
+jest.mock('utilities/ai/aiClient.js', () => ({
   analyzeUserOpinions: jest.fn(async () => ({
     summary: 'summary',
     details: 'details',
@@ -40,9 +40,7 @@ const makeInstance = (props = {}) => {
 
   instance._isMounted = true;
   instance.setState = jest.fn((update, cb) => {
-    const patch = typeof update === 'function'
-      ? update(instance.state, instance.props)
-      : update;
+    const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
     if (patch && typeof patch === 'object') {
       instance.state = { ...instance.state, ...patch };
     }
@@ -72,9 +70,7 @@ const getNodeTypeName = (node) => {
   return String(type.displayName || type.name || '');
 };
 
-const RESOLVABLE_USER_PAGE_COMPONENTS = new Set([
-  'UserPageHeader',
-]);
+const RESOLVABLE_USER_PAGE_COMPONENTS = new Set(['UserPageHeader']);
 
 const resolvedComponentCache = new WeakMap();
 
@@ -140,7 +136,7 @@ describe('UserPage bookmark cache controls', () => {
       const tree = instance.render();
       const bookmarkButtons = collectTreeNodes(
         tree,
-        (node) => node?.type === 'button' && node?.props?.['aria-label'] === 'Bookmark user'
+        (node) => node?.type === 'button' && node?.props?.['aria-label'] === 'Bookmark user',
       );
 
       expect(bookmarkButtons).toHaveLength(1);
@@ -159,7 +155,7 @@ describe('UserPage bookmark cache controls', () => {
       const updatedTree = instance.render();
       const removeButtons = collectTreeNodes(
         updatedTree,
-        (node) => node?.type === 'button' && node?.props?.['aria-label'] === 'Remove bookmark'
+        (node) => node?.type === 'button' && node?.props?.['aria-label'] === 'Remove bookmark',
       );
       expect(removeButtons).toHaveLength(1);
       expect(removeButtons[0].props.style).toEqual({ color: 'yellow' });
@@ -192,7 +188,7 @@ describe('UserPage bookmark cache controls', () => {
       const tree = instance.render();
       const bookmarkButtons = collectTreeNodes(
         tree,
-        (node) => node?.type === 'button' && node?.props?.['aria-label'] === 'Bookmark user'
+        (node) => node?.type === 'button' && node?.props?.['aria-label'] === 'Bookmark user',
       );
 
       expect(bookmarkButtons).toHaveLength(1);
@@ -275,7 +271,6 @@ describe('UserPage bookmark cache controls', () => {
     expect(objectInstance.state.nicknameInput).toBe('Alice');
   });
 
-
   it('skips bookmark state writes when computed bookmark values are unchanged', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const instance = makeInstance({ viewAddress });
@@ -341,12 +336,15 @@ describe('UserPage bookmark cache controls', () => {
 
     instance.toggleBookmark();
 
-    expect(instance.persistBookmarksCache).toHaveBeenCalledWith({
-      surveys: [],
-      questions: [],
-      users: [],
-      filters: [],
-    }, 'toggleBookmark');
+    expect(instance.persistBookmarksCache).toHaveBeenCalledWith(
+      {
+        surveys: [],
+        questions: [],
+        users: [],
+        filters: [],
+      },
+      'toggleBookmark',
+    );
     expect(instance.state.bookmarked).toBe(false);
     expect(instance.state.isEditingNickname).toBe(false);
     expect(instance.state.nicknameInput).toBe('');

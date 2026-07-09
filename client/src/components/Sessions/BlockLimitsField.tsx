@@ -53,9 +53,7 @@ const BlockLimitsField = ({
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => onStartChange(e.target.value)}
           />
           {latestChainBlock != null && (
-            <div className={styles.helperText}>
-              Latest block: {Number(latestChainBlock).toLocaleString()}
-            </div>
+            <div className={styles.helperText}>Latest block: {Number(latestChainBlock).toLocaleString()}</div>
           )}
           {latestBlockStatus && <div className={styles.helperText}>{latestBlockStatus}</div>}
         </FormGroup>

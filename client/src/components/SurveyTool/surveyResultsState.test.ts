@@ -84,11 +84,7 @@ describe('createInitialSurveyResultsState', () => {
   it('bootstraps bookmark lists from the bookmarks cache', () => {
     mockPeekCacheSync.mockReturnValue({ surveys: ['0xs1'], questions: ['q1', 'q2'] });
     const state = createInitialSurveyResultsState({ sessionSlug: 'demo-session' });
-    expect(mockPeekCacheSync).toHaveBeenCalledWith(
-      'bookmarksCache',
-      'demo-session',
-      { clone: false }
-    );
+    expect(mockPeekCacheSync).toHaveBeenCalledWith('bookmarksCache', 'demo-session', { clone: false });
     expect(state.bookmarkedSurveyIDs).toEqual(['0xs1']);
     expect(state.bookmarkedQuestionIDs).toEqual(['q1', 'q2']);
   });

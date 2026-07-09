@@ -57,21 +57,15 @@ export const resolveSbtRealtimeEventBlockNumber = async ({
         if (typeof log?.error === 'function') {
           log.error('Failed to get block number from transaction hash for SBT event', e);
         }
-        const { toBlock: baseTo } = await (
-          getRelevantBlockWindowForFilter as GetRelevantBlockWindowForFilter
-        )(slug);
+        const { toBlock: baseTo } = await (getRelevantBlockWindowForFilter as GetRelevantBlockWindowForFilter)(slug);
         eventBlockNumber = baseTo;
       }
     } else {
-      const { toBlock: baseTo } = await (
-        getRelevantBlockWindowForFilter as GetRelevantBlockWindowForFilter
-      )(slug);
+      const { toBlock: baseTo } = await (getRelevantBlockWindowForFilter as GetRelevantBlockWindowForFilter)(slug);
       eventBlockNumber = baseTo;
     }
   } else {
-    const { toBlock: baseTo } = await (
-      getRelevantBlockWindowForFilter as GetRelevantBlockWindowForFilter
-    )(slug);
+    const { toBlock: baseTo } = await (getRelevantBlockWindowForFilter as GetRelevantBlockWindowForFilter)(slug);
     eventBlockNumber = baseTo;
   }
 

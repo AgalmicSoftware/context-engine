@@ -45,9 +45,7 @@ export const buildSurveyResultsBooleanTogglePatch = ({
 }: BuildSurveyResultsBooleanTogglePatchArgs = {}): Record<string, boolean> => {
   const key = String(stateKey || '');
   if (!key) return {};
-  const stateRecord = (prevState && typeof prevState === 'object')
-    ? prevState as UnknownRecord
-    : {};
+  const stateRecord = prevState && typeof prevState === 'object' ? (prevState as UnknownRecord) : {};
   return { [key]: !stateRecord[key] };
 };
 
@@ -59,12 +57,9 @@ export const buildSurveyResultsKeyedTogglePatch = ({
 }: BuildSurveyResultsKeyedTogglePatchArgs = {}): Record<string, UnknownRecord> => {
   const mapName = String(mapKey || '');
   if (!mapName) return {};
-  const stateRecord = (prevState && typeof prevState === 'object')
-    ? prevState as UnknownRecord
-    : {};
-  const currentMap = (stateRecord[mapName] && typeof stateRecord[mapName] === 'object')
-    ? stateRecord[mapName] as UnknownRecord
-    : {};
+  const stateRecord = prevState && typeof prevState === 'object' ? (prevState as UnknownRecord) : {};
+  const currentMap =
+    stateRecord[mapName] && typeof stateRecord[mapName] === 'object' ? (stateRecord[mapName] as UnknownRecord) : {};
   const key = String(itemKey);
   const nextValue = typeof forceValue === 'boolean' ? forceValue : !currentMap[key];
   return {
@@ -82,12 +77,8 @@ export const buildSurveyResultsQuestionIdSortPatch = ({
   questionIdSortAsc: boolean;
   questionIdSortBy: unknown;
 } => {
-  const stateRecord = (prevState && typeof prevState === 'object')
-    ? prevState as UnknownRecord
-    : {};
-  const nextAsc = stateRecord.questionIdSortBy === column
-    ? !stateRecord.questionIdSortAsc
-    : true;
+  const stateRecord = prevState && typeof prevState === 'object' ? (prevState as UnknownRecord) : {};
+  const nextAsc = stateRecord.questionIdSortBy === column ? !stateRecord.questionIdSortAsc : true;
   return {
     questionIdSortBy: column,
     questionIdSortAsc: nextAsc,
@@ -112,19 +103,14 @@ export const buildSurveyResultsDemoViewSelectPatch = ({
 }: BuildSurveyResultsDemoViewSelectPatchArgs = {}) => {
   const allowedViews = new Set(['report', 'breakdown', 'atlas', 'riskMatrix']);
   const normalizedView = allowedViews.has(String(nextView)) ? String(nextView) : 'report';
-  const stateRecord = (prevState && typeof prevState === 'object')
-    ? prevState as UnknownRecord
-    : {};
+  const stateRecord = prevState && typeof prevState === 'object' ? (prevState as UnknownRecord) : {};
   return {
     demoResultsViewMode: stateRecord.demoResultsViewMode === normalizedView ? 'raw' : normalizedView,
     demoResultsAtlasNodeId: normalizedView === 'atlas' ? stateRecord.demoResultsAtlasNodeId : null,
   };
 };
 
-export const buildSurveyResultsViewStatePatch = (
-  viewMode: unknown,
-  surveyId: unknown
-) => ({
+export const buildSurveyResultsViewStatePatch = (viewMode: unknown, surveyId: unknown) => ({
   viewMode,
   surveyId,
 });

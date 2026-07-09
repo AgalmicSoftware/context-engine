@@ -45,9 +45,12 @@ type QuestionPayload = {
   visibility?: unknown;
 } & Record<string, unknown>;
 
-type LitHooks = {
-  getKey?: unknown;
-} | null | undefined;
+type LitHooks =
+  | {
+      getKey?: unknown;
+    }
+  | null
+  | undefined;
 
 type RetryContext = {
   account?: unknown;
@@ -64,10 +67,12 @@ type MaskedQuestionRefreshArgs = {
 };
 
 const normalizeSlug = (rawSlug: unknown): string => normalizeSessionSlug(rawSlug);
-const toLowerString = (value: unknown): string => String(value || '').trim().toLowerCase();
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const toLowerString = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const normalizePayloadAccessModeValue = (value: unknown): string => {
   const normalized = toLowerString(value).replace(/-/g, '_');
@@ -100,11 +105,7 @@ const readPayloadAccessMode = (value: unknown): string => {
   ) {
     return normalizeSessionStoragePayloadAccessControl(value).mode;
   }
-  return normalizePayloadAccessModeValue(
-    value.mode ??
-    value.payloadAccessMode ??
-    value.accessControlMode
-  );
+  return normalizePayloadAccessModeValue(value.mode ?? value.payloadAccessMode ?? value.accessControlMode);
 };
 
 const hasEnvelope = (value: unknown): boolean => {
@@ -117,11 +118,8 @@ const hasEnvelope = (value: unknown): boolean => {
 
 const hasPromptEncryptionEnvelope = (payload: QuestionPayload): boolean => {
   const encryptedFields = isRecord(payload.encryptedFields) ? payload.encryptedFields : {};
-  const encryptionTargets = (
-    isRecord(payload.encryption) && isRecord(payload.encryption.targets)
-      ? payload.encryption.targets
-      : {}
-  );
+  const encryptionTargets =
+    isRecord(payload.encryption) && isRecord(payload.encryption.targets) ? payload.encryption.targets : {};
   return (
     hasEnvelope(payload.promptEncrypted) ||
     hasEnvelope(payload.encryptedPrompt) ||
@@ -133,10 +131,9 @@ const hasPromptEncryptionEnvelope = (payload: QuestionPayload): boolean => {
 
 export const normalizeQuestionRouteSessionSlug = (rawSlug: unknown): string => normalizeSlug(rawSlug);
 
-
 export const isKnownOrGeneralSessionSlug = (
   slugIn: unknown,
-  getSessionConfigBySlug: SessionConfigResolver
+  getSessionConfigBySlug: SessionConfigResolver,
 ): boolean => {
   const slug = normalizeSlug(slugIn);
   if (!slug) return true;
@@ -145,11 +142,10 @@ export const isKnownOrGeneralSessionSlug = (
   return !!(cfg && !cfg.__unresolved);
 };
 
-
 export const resolveStrictSessionValue = <T>(
   slugIn: unknown,
   getSessionConfigBySlug: SessionConfigResolver,
-  resolverFn: StrictValueResolver<T>
+  resolverFn: StrictValueResolver<T>,
 ): T | null => {
   const slug = normalizeSlug(slugIn);
   if (!isKnownOrGeneralSessionSlug(slug, getSessionConfigBySlug)) return null;
@@ -158,45 +154,38 @@ export const resolveStrictSessionValue = <T>(
 
 export const parseQuestionSessionSlugFromSearch = (search = ''): string | null => {
   const params = new URLSearchParams(String(search || ''));
-  const raw =
-    params.get('session') ??
-    params.get('sessionSlug') ??
-    params.get('s');
+  const raw = params.get('session') ?? params.get('sessionSlug') ?? params.get('s');
   if (raw == null) return null;
   return normalizeSlug(raw);
 };
 
 export const parseQuestionSessionIdFromSearch = (search = ''): string | null => {
   const params = new URLSearchParams(String(search || ''));
-  const raw =
-    params.get('sessionId') ??
-    params.get('sessionID') ??
-    params.get('sid');
+  const raw = params.get('sessionId') ?? params.get('sessionID') ?? params.get('sid');
   if (raw == null) return null;
   const trimmed = String(raw || '').trim();
   return trimmed || null;
 };
 
-
-export const isPinnableQuestionRouteSlug = (
-  slugIn: unknown,
-  getSessionConfigBySlug: SessionConfigResolver
-): boolean => (
-  slugIn != null && isKnownOrGeneralSessionSlug(slugIn, getSessionConfigBySlug)
-);
+export const isPinnableQuestionRouteSlug = (slugIn: unknown, getSessionConfigBySlug: SessionConfigResolver): boolean =>
+  slugIn != null && isKnownOrGeneralSessionSlug(slugIn, getSessionConfigBySlug);
 
 export const isPinnableQuestionRouteSearchSlug = (
   search = '',
-  getSessionConfigBySlug: SessionConfigResolver
+  getSessionConfigBySlug: SessionConfigResolver,
 ): boolean => {
   const slug = parseQuestionSessionSlugFromSearch(search);
   return isPinnableQuestionRouteSlug(slug, getSessionConfigBySlug);
 };
 
 export const buildQuestionRoutePath = (questionId: unknown, opts: QuestionRouteOptions = {}): string => {
-  const qid = String(questionId || '').trim().toLowerCase();
+  const qid = String(questionId || '')
+    .trim()
+    .toLowerCase();
   if (!qid) return '/questions';
-  const responder = String(opts.responderAddress || '').trim().toLowerCase();
+  const responder = String(opts.responderAddress || '')
+    .trim()
+    .toLowerCase();
   const sessionId = String(opts.sessionId ?? opts.sessionID ?? '').trim();
   const sessionSlug = normalizeSlug(opts.sessionSlug ?? '');
   const base = `/question/${qid}`;
@@ -221,11 +210,8 @@ export const isMaskedQuestionPayload = (question: unknown): question is Question
   return false;
 };
 
-export const resolveQuestionPayloadAccessMode = (
-  question: unknown,
-  sessionConfig: unknown = null
-): string => {
-  const payload = isRecord(question) ? question as QuestionPayload : {};
+export const resolveQuestionPayloadAccessMode = (question: unknown, sessionConfig: unknown = null): string => {
+  const payload = isRecord(question) ? (question as QuestionPayload) : {};
   const storageRef = isRecord(payload.storageRef) ? payload.storageRef : {};
   const explicitMode =
     readPayloadAccessMode(payload.payloadAccessControl) ||
@@ -240,11 +226,8 @@ export const resolveQuestionPayloadAccessMode = (
   return cfg.payloadAccessControl.mode;
 };
 
-export const resolveQuestionPayloadDisplayState = (
-  question: unknown,
-  sessionConfig: unknown = null
-) => {
-  const payload = isRecord(question) ? question as QuestionPayload : {};
+export const resolveQuestionPayloadDisplayState = (question: unknown, sessionConfig: unknown = null) => {
+  const payload = isRecord(question) ? (question as QuestionPayload) : {};
   const masked = isMaskedQuestionPayload(payload);
   if (!masked) {
     return {
@@ -262,12 +245,11 @@ export const resolveQuestionPayloadDisplayState = (
   }
 
   const visibility = toLowerString(payload.visibility);
-  const unavailable = (
+  const unavailable =
     payload.__ceQuestionMetadataPending === true ||
     payload.payloadUnavailable === true ||
     visibility === 'payload_unavailable' ||
-    visibility === 'unavailable'
-  );
+    visibility === 'unavailable';
   const accessMode = resolveQuestionPayloadAccessMode(payload, sessionConfig);
   if (unavailable || accessMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ) {
     return {
@@ -297,10 +279,7 @@ export const resolveQuestionPayloadDisplayState = (
       requiresAuth: true,
     };
   }
-  if (
-    accessMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED ||
-    hasPromptEncryptionEnvelope(payload)
-  ) {
+  if (accessMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED || hasPromptEncryptionEnvelope(payload)) {
     return {
       masked: true,
       status: 'lit_encrypted',
@@ -334,13 +313,12 @@ export const hasQuestionDecryption = (question: unknown): question is QuestionPa
   return !!(payload.promptDecrypted || payload.optionsDecrypted || payload.tagsDecrypted);
 };
 
-const hasNonEmptyQuestionOptions = (question: QuestionPayload | null | undefined): boolean => (
-  Array.isArray(question?.options) && question.options.length > 0
-);
+const hasNonEmptyQuestionOptions = (question: QuestionPayload | null | undefined): boolean =>
+  Array.isArray(question?.options) && question.options.length > 0;
 
 export const pickBetterQuestionPayload = (
   existingQuestion: QuestionPayload | null | undefined,
-  incomingQuestion: QuestionPayload | null | undefined
+  incomingQuestion: QuestionPayload | null | undefined,
 ): QuestionPayload | null => {
   if (!incomingQuestion) return existingQuestion || null;
   if (!existingQuestion) return incomingQuestion;
@@ -382,9 +360,7 @@ export const shouldRetryMaskedQuestionRefresh = ({ masked, prev, next }: MaskedQ
   if (!loggedIn) return false;
 
   const authChanged =
-    prev?.account !== next?.account ||
-    prev?.provider !== next?.provider ||
-    prev?.loginComplete !== next?.loginComplete;
+    prev?.account !== next?.account || prev?.provider !== next?.provider || prev?.loginComplete !== next?.loginComplete;
   const litChanged = litReady(prev?.litHooks) !== litReady(next?.litHooks);
   const entitlementChanged = Number(prev?.sbtCacheRevision || 0) !== Number(next?.sbtCacheRevision || 0);
   return authChanged || litChanged || entitlementChanged;

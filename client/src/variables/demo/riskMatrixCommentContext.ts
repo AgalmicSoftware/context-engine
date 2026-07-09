@@ -73,50 +73,51 @@ const {
 } = riskMatrixCommentContextData as RiskMatrixCommentContextData;
 
 const hasText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
-const isRecord = (value: unknown): value is UnknownRecord => (
-  typeof value === 'object' && value !== null
-);
+const isRecord = (value: unknown): value is UnknownRecord => typeof value === 'object' && value !== null;
 
 const isCorpusEntryRecord = (value: unknown): value is CorpusEntryRecord => isRecord(value);
 
 const corpusSampleData = corpusSample as CorpusSampleData;
 
 const RISK_MATRIX_CORPUS_LABEL_BY_ID = Object.freeze(
-  Object.entries(corpusSampleData.meta?.corpuses || {}).reduce((acc, [corpusId, corpusEntry]) => {
-    const label = hasText(corpusEntry.label)
-      ? corpusEntry.label.trim()
-      : '';
-    if (label) acc[corpusId] = label;
-    return acc;
-  }, {} as Record<string, string>)
+  Object.entries(corpusSampleData.meta?.corpuses || {}).reduce(
+    (acc, [corpusId, corpusEntry]) => {
+      const label = hasText(corpusEntry.label) ? corpusEntry.label.trim() : '';
+      if (label) acc[corpusId] = label;
+      return acc;
+    },
+    {} as Record<string, string>,
+  ),
 );
 
-const normalizeCorpusUrl = (value: unknown = '') => String(value || '').trim().replace(/\/+$/g, '');
+const normalizeCorpusUrl = (value: unknown = '') =>
+  String(value || '')
+    .trim()
+    .replace(/\/+$/g, '');
 
 const CORPUS_ENTRY_BY_URL = Object.freeze(
-  Object.entries(corpusSampleData.corpuses || {}).reduce((acc, [corpusId, corpusEntry]) => {
-    const entries = Array.isArray(corpusEntry.entries)
-      ? corpusEntry.entries.filter(isCorpusEntryRecord)
-      : [];
+  Object.entries(corpusSampleData.corpuses || {}).reduce(
+    (acc, [corpusId, corpusEntry]) => {
+      const entries = Array.isArray(corpusEntry.entries) ? corpusEntry.entries.filter(isCorpusEntryRecord) : [];
 
-    entries.forEach((entry) => {
-      const normalizedUrl = normalizeCorpusUrl(entry?.url || '');
-      if (normalizedUrl && !acc[normalizedUrl]) {
-        acc[normalizedUrl] = {
-          corpusId,
-          entry,
-        };
-      }
-    });
+      entries.forEach((entry) => {
+        const normalizedUrl = normalizeCorpusUrl(entry?.url || '');
+        if (normalizedUrl && !acc[normalizedUrl]) {
+          acc[normalizedUrl] = {
+            corpusId,
+            entry,
+          };
+        }
+      });
 
-    return acc;
-  }, {} as Record<string, { corpusId: string; entry: CorpusEntryRecord }>)
+      return acc;
+    },
+    {} as Record<string, { corpusId: string; entry: CorpusEntryRecord }>,
+  ),
 );
 
-const isValidCorpusRef = (ref: unknown): ref is CorpusRefInput => (
-  isRecord(ref)
-  && (hasText(ref.label) || hasText(ref.corpusId))
-);
+const isValidCorpusRef = (ref: unknown): ref is CorpusRefInput =>
+  isRecord(ref) && (hasText(ref.label) || hasText(ref.corpusId));
 
 const normalizeCorpusRefs = (refs: unknown): RiskMatrixCorpusRef[] => {
   if (!Array.isArray(refs)) return [];
@@ -126,9 +127,7 @@ const normalizeCorpusRefs = (refs: unknown): RiskMatrixCorpusRef[] => {
     .map((ref) => {
       const rawCorpusId = hasText(ref.corpusId) ? ref.corpusId.trim() : '';
       const corpusId = hasText(RISK_MATRIX_CORPUS_LABEL_BY_ID[rawCorpusId]) ? rawCorpusId : '';
-      const label = corpusId
-        ? RISK_MATRIX_CORPUS_LABEL_BY_ID[corpusId]
-        : (hasText(ref.label) ? ref.label.trim() : '');
+      const label = corpusId ? RISK_MATRIX_CORPUS_LABEL_BY_ID[corpusId] : hasText(ref.label) ? ref.label.trim() : '';
 
       if (!label) return null;
 
@@ -159,7 +158,9 @@ const getContextEntry = (key = '', source: Record<string, RiskMatrixCommentConte
 };
 
 const compactSourceText = (value = '', maxLength = 120) => {
-  const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+  const normalized = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (normalized.length <= maxLength) return normalized;
   return `${normalized.slice(0, maxLength - 1).trimEnd()}\u2026`;
 };
@@ -193,7 +194,7 @@ const getSafeExternalCorpusUrl = (value: unknown = '') => {
 };
 
 export const getRiskMatrixCorpusSourceCitationItems = (
-  refs: RiskMatrixCorpusRef[] = []
+  refs: RiskMatrixCorpusRef[] = [],
 ): RiskMatrixCorpusSourceCitation[] => {
   const seen = new Set<string>();
 
@@ -214,12 +215,11 @@ export const getRiskMatrixCorpusSourceCitationItems = (
   }, []);
 };
 
-export const getRiskMatrixCorpusSourceCitations = (refs: RiskMatrixCorpusRef[] = []) => (
-  getRiskMatrixCorpusSourceCitationItems(refs).map((citation) => citation.label)
-);
+export const getRiskMatrixCorpusSourceCitations = (refs: RiskMatrixCorpusRef[] = []) =>
+  getRiskMatrixCorpusSourceCitationItems(refs).map((citation) => citation.label);
 
 export const enrichRiskMatrixCommentRecord = <T extends EnrichableRiskCommentRecord>(
-  entry: T
+  entry: T,
 ): T & {
   historicalFigure: RiskMatrixHistoricalFigure | null;
   corpusRefs: RiskMatrixCorpusRef[];
@@ -233,19 +233,21 @@ export const enrichRiskMatrixCommentRecord = <T extends EnrichableRiskCommentRec
   const primaryCategory = chooseYFirst ? categoryY : categoryX;
   const secondaryCategory = chooseYFirst ? categoryX : categoryY;
 
-  const primaryContext = getContextEntry(primarySubcategory, SUBCATEGORY_CONTEXT)
-    || getContextEntry(primaryCategory, CATEGORY_CONTEXT);
-  const secondaryContext = getContextEntry(secondarySubcategory, SUBCATEGORY_CONTEXT)
-    || getContextEntry(secondaryCategory, CATEGORY_CONTEXT);
+  const primaryContext =
+    getContextEntry(primarySubcategory, SUBCATEGORY_CONTEXT) || getContextEntry(primaryCategory, CATEGORY_CONTEXT);
+  const secondaryContext =
+    getContextEntry(secondarySubcategory, SUBCATEGORY_CONTEXT) || getContextEntry(secondaryCategory, CATEGORY_CONTEXT);
 
   const normalizedEntryRefs = normalizeCorpusRefs(entry?.corpusRefs);
-  const historicalFigure = entry?.historicalFigure || primaryContext?.historicalFigure || secondaryContext?.historicalFigure || null;
-  const corpusRefs = normalizedEntryRefs.length > 0
-    ? normalizedEntryRefs
-    : uniqueRefs([
-      ...normalizeCorpusRefs(primaryContext?.corpusRefs),
-      ...normalizeCorpusRefs(secondaryContext?.corpusRefs),
-    ]).slice(0, 3);
+  const historicalFigure =
+    entry?.historicalFigure || primaryContext?.historicalFigure || secondaryContext?.historicalFigure || null;
+  const corpusRefs =
+    normalizedEntryRefs.length > 0
+      ? normalizedEntryRefs
+      : uniqueRefs([
+          ...normalizeCorpusRefs(primaryContext?.corpusRefs),
+          ...normalizeCorpusRefs(secondaryContext?.corpusRefs),
+        ]).slice(0, 3);
 
   return {
     ...entry,

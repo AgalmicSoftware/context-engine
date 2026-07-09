@@ -1,8 +1,5 @@
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
-import {
-  resolveSessionConfigAliases,
-  resolveSessionSlugFromPathname,
-} from '../../utilities/session/sessionNaming.js';
+import { resolveSessionConfigAliases, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
 type SessionConfigLike = {
@@ -32,28 +29,30 @@ type ResolveContractPageActiveSessionOptions = {
   getDefaultSessionConfig?: GetDefaultSessionConfig;
 };
 
-const resolveBySlugReader = (resolveBySlug: ResolveBySlug): ResolveBySlug => (
+const resolveBySlugReader = (resolveBySlug: ResolveBySlug): ResolveBySlug =>
   typeof resolveBySlug === 'function'
     ? (slug: string) => {
         const sessionConfig = resolveBySlug(slug);
         return sessionConfig && !sessionConfig.__unresolved ? sessionConfig : null;
       }
-    : null
-);
+    : null;
 
-export const resolveContractPageSessionConfig = (slugLike: unknown, {
-  allowGeneral = false,
-  resolveBySlug,
-  resolveDemoBySlug,
-  getDefaultSessionConfig,
-}: ResolveContractPageSessionConfigOptions = {}): SessionConfigLike | null => {
+export const resolveContractPageSessionConfig = (
+  slugLike: unknown,
+  {
+    allowGeneral = false,
+    resolveBySlug,
+    resolveDemoBySlug,
+    getDefaultSessionConfig,
+  }: ResolveContractPageSessionConfigOptions = {},
+): SessionConfigLike | null => {
   const sessionSlug = canonicalizeSessionSlug(slugLike);
   if (!sessionSlug && !allowGeneral) return null;
 
   const readDemoBySlug = resolveBySlugReader(resolveDemoBySlug);
   const resolved = resolveSessionConfigAliases(
     { sessionSlug },
-    { resolveBySlug: resolveBySlugReader(resolveBySlug) }
+    { resolveBySlug: resolveBySlugReader(resolveBySlug) },
   ) as { sessionConfig: unknown; sessionSlug: string };
   if (resolved.sessionConfig) return resolved.sessionConfig as SessionConfigLike;
 
@@ -98,19 +97,18 @@ export const resolveContractPageActiveSession = ({
   };
   const resolveSessionConfig = (
     slugLike: unknown,
-    options: Pick<ResolveContractPageSessionConfigOptions, 'allowGeneral'> = {}
-  ): SessionConfigLike | null => resolveContractPageSessionConfig(slugLike, {
-    ...options,
-    resolveBySlug,
-    resolveDemoBySlug,
-    getDefaultSessionConfig: readDefaultSessionConfig,
-  });
+    options: Pick<ResolveContractPageSessionConfigOptions, 'allowGeneral'> = {},
+  ): SessionConfigLike | null =>
+    resolveContractPageSessionConfig(slugLike, {
+      ...options,
+      resolveBySlug,
+      resolveDemoBySlug,
+      getDefaultSessionConfig: readDefaultSessionConfig,
+    });
 
   return (
     (urlSlugLike ? resolveSessionConfig(urlSlugLike) : null) ||
-    (querySessionRaw != null
-      ? resolveSessionConfig(querySessionRaw, { allowGeneral: true })
-      : null) ||
+    (querySessionRaw != null ? resolveSessionConfig(querySessionRaw, { allowGeneral: true }) : null) ||
     (activeSessionSlug !== undefined
       ? resolveSessionConfig(activeSessionSlug, { allowGeneral: activeSessionSlug === '' })
       : null) ||

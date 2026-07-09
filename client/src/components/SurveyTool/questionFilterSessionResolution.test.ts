@@ -5,25 +5,31 @@ import {
 
 describe('questionFilterSessionResolution', () => {
   it('canonicalizes the general alias from explicit route slugs', () => {
-    expect(resolveQuestionFilterEffectiveSlug({
-      pathname: '/session/GeNeRal',
-      activeSessionSlug: 'edge',
-      sessionSlug: 'alpha',
-    })).toBe('');
+    expect(
+      resolveQuestionFilterEffectiveSlug({
+        pathname: '/session/GeNeRal',
+        activeSessionSlug: 'edge',
+        sessionSlug: 'alpha',
+      }),
+    ).toBe('');
   });
 
   it('keeps active session precedence over props while treating active general aliases as empty', () => {
-    expect(resolveQuestionFilterEffectiveSlug({
-      pathname: '',
-      activeSessionSlug: 'edge',
-      sessionSlug: 'rxc',
-    })).toBe('edge');
+    expect(
+      resolveQuestionFilterEffectiveSlug({
+        pathname: '',
+        activeSessionSlug: 'edge',
+        sessionSlug: 'rxc',
+      }),
+    ).toBe('edge');
 
-    expect(resolveQuestionFilterEffectiveSlug({
-      pathname: '',
-      activeSessionSlug: 'general',
-      sessionSlug: 'rxc',
-    })).toBe('rxc');
+    expect(
+      resolveQuestionFilterEffectiveSlug({
+        pathname: '',
+        activeSessionSlug: 'general',
+        sessionSlug: 'rxc',
+      }),
+    ).toBe('rxc');
   });
 
   it('does not silently resolve unknown non-general slugs to general config', () => {

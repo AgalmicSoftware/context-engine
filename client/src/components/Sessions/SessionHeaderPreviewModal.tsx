@@ -9,25 +9,10 @@ export type SessionHeaderPreviewModalProps = {
   previewSrc: string;
 };
 
-const SessionHeaderPreviewModal = ({
-  isOpen,
-  onClose,
-  previewSrc,
-}: SessionHeaderPreviewModalProps) => (
-  <Modal
-    isOpen={isOpen}
-    toggle={onClose}
-    centered
-    size="xl"
-    contentClassName={styles.sessionHeaderPreviewModalContent}
-  >
-    <ModalBody
-      className={styles.sessionHeaderPreviewModalBody}
-      onClick={onClose}
-    >
-      {previewSrc ? (
-        <img src={previewSrc} alt="Expanded session header preview" />
-      ) : null}
+const SessionHeaderPreviewModal = ({ isOpen, onClose, previewSrc }: SessionHeaderPreviewModalProps) => (
+  <Modal isOpen={isOpen} toggle={onClose} centered size="xl" contentClassName={styles.sessionHeaderPreviewModalContent}>
+    <ModalBody className={styles.sessionHeaderPreviewModalBody} onClick={onClose}>
+      {previewSrc ? <img src={previewSrc} alt="Expanded session header preview" /> : null}
     </ModalBody>
   </Modal>
 );

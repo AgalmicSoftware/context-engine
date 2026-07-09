@@ -1,6 +1,4 @@
-import {
-  buildSbtPageHolderListSignature,
-} from './sbtPageHolderHelpers';
+import { buildSbtPageHolderListSignature } from './sbtPageHolderHelpers';
 
 type BuildSbtPageMintedModalInitialFilterPatchArgs = {
   buildAddressListSignature?: (list: unknown) => string;
@@ -180,13 +178,12 @@ type SbtPageDocModalErrorPatch = {
   docModalError: string;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
-export const buildSbtPageInitialState = ({
-  network = null,
-}: BuildSbtPageInitialStateArgs = {}): Record<string, unknown> => ({
+export const buildSbtPageInitialState = ({ network = null }: BuildSbtPageInitialStateArgs = {}): Record<
+  string,
+  unknown
+> => ({
   sbtInfo: null,
   userHasSBT: false,
   userIsSbtAdmin: false,
@@ -269,21 +266,20 @@ export const buildSbtPageBooleanTogglePatch = ({
 export const buildSbtPageAddressChangeResetMintUiPatch = ({
   forceReset = false,
   sbtAddressChanged = false,
-}: BuildSbtPageAddressChangeResetMintUiPatchArgs = {}): Record<string, unknown> | null => (
+}: BuildSbtPageAddressChangeResetMintUiPatchArgs = {}): Record<string, unknown> | null =>
   sbtAddressChanged || forceReset
     ? {
-      showMiniPasswordInput: false,
-      mintStep: 0,
-      mintingStatus: 'idle',
-      burningStatus: 'idle',
-      manualPasswordInput: '',
-      groupPasswordInput: '',
-      mintPassword: '',
-      showPasswordAlert: false,
-      error: null,
-    }
-    : null
-);
+        showMiniPasswordInput: false,
+        mintStep: 0,
+        mintingStatus: 'idle',
+        burningStatus: 'idle',
+        manualPasswordInput: '',
+        groupPasswordInput: '',
+        mintPassword: '',
+        showPasswordAlert: false,
+        error: null,
+      }
+    : null;
 
 export const buildSbtPageNetworkUpdatePatch = ({
   network = null,
@@ -293,16 +289,18 @@ export const buildSbtPageNetworkUpdatePatch = ({
   network,
 });
 
-export const buildSbtPageMintFailurePatch = ({
-  error = null,
-}: BuildSbtPageMintFailurePatchArgs = {}): Record<string, unknown> => ({
+export const buildSbtPageMintFailurePatch = ({ error = null }: BuildSbtPageMintFailurePatchArgs = {}): Record<
+  string,
+  unknown
+> => ({
   error,
   mintingStatus: 'failure',
 });
 
-export const buildSbtPageMintPendingPatch = ({
-  clearError = false,
-}: BuildSbtPageMintPendingPatchArgs = {}): Record<string, unknown> => ({
+export const buildSbtPageMintPendingPatch = ({ clearError = false }: BuildSbtPageMintPendingPatchArgs = {}): Record<
+  string,
+  unknown
+> => ({
   mintingStatus: 'pending',
   lastTransactionType: 'mint',
   ...(clearError === true ? { error: null } : {}),
@@ -329,10 +327,10 @@ export const buildSbtPageBurnFailurePatch = ({
   burningStatus: 'failure',
   ...(resetBurnSearch === true
     ? {
-      burnSearchInput: '',
-      burnSearchResult: null,
-      burnSearchType: null,
-    }
+        burnSearchInput: '',
+        burnSearchResult: null,
+        burnSearchType: null,
+      }
     : {}),
 });
 
@@ -351,16 +349,17 @@ export const buildSbtPageBurnSuccessPatch = ({
   lastBurnTxHash: txHash,
   ...(resetBurnSearch === true
     ? {
-      burnSearchInput: '',
-      burnSearchResult: null,
-      burnSearchType: null,
-    }
+        burnSearchInput: '',
+        burnSearchResult: null,
+        burnSearchType: null,
+      }
     : {}),
 });
 
-export const buildSbtPageBurnSearchInputPatch = ({
-  input = '',
-}: BuildSbtPageBurnSearchInputPatchArgs = {}): Record<string, unknown> => ({
+export const buildSbtPageBurnSearchInputPatch = ({ input = '' }: BuildSbtPageBurnSearchInputPatchArgs = {}): Record<
+  string,
+  unknown
+> => ({
   burnSearchInput: String(input ?? ''),
   burnSearchResult: null,
   burnSearchType: null,
@@ -378,9 +377,7 @@ export const buildSbtPageBurnSearchResultPatch = ({
   burnSearchType: String(resultType ?? ''),
 });
 
-export const buildSbtPageErrorPatch = ({
-  error = null,
-}: BuildSbtPageErrorPatchArgs = {}): Record<string, unknown> => ({
+export const buildSbtPageErrorPatch = ({ error = null }: BuildSbtPageErrorPatchArgs = {}): Record<string, unknown> => ({
   error,
 });
 
@@ -424,21 +421,24 @@ export const buildSbtPageLoadInfoLoadingStartPatch = ({
   ...(hasExplicitSlug === true ? { resolvedSessionSlug: normalizedExplicitSlug } : {}),
 });
 
-export const buildSbtPageMintCountdownPatch = ({
-  countdown = null,
-}: BuildSbtPageMintCountdownPatchArgs = {}): Record<string, unknown> => ({
+export const buildSbtPageMintCountdownPatch = ({ countdown = null }: BuildSbtPageMintCountdownPatchArgs = {}): Record<
+  string,
+  unknown
+> => ({
   mintCountdown: countdown,
 });
 
-export const buildSbtPageIntervalIdPatch = ({
-  intervalId = null,
-}: BuildSbtPageIntervalIdPatchArgs = {}): Record<string, unknown> => ({
+export const buildSbtPageIntervalIdPatch = ({ intervalId = null }: BuildSbtPageIntervalIdPatchArgs = {}): Record<
+  string,
+  unknown
+> => ({
   intervalId,
 });
 
-export const buildSbtPageSbtInfoPatch = ({
-  sbtInfo = null,
-}: BuildSbtPageSbtInfoPatchArgs = {}): Record<string, unknown> => ({
+export const buildSbtPageSbtInfoPatch = ({ sbtInfo = null }: BuildSbtPageSbtInfoPatchArgs = {}): Record<
+  string,
+  unknown
+> => ({
   sbtInfo,
 });
 
@@ -448,9 +448,10 @@ export const buildSbtPageResolvedSessionSlugPatch = ({
   resolvedSessionSlug: slug,
 });
 
-export const buildSbtPageRelevantInfoPatch = ({
-  sbtLabel = 'SBT',
-}: BuildSbtPageRelevantInfoPatchArgs = {}): Record<string, unknown> => {
+export const buildSbtPageRelevantInfoPatch = ({ sbtLabel = 'SBT' }: BuildSbtPageRelevantInfoPatchArgs = {}): Record<
+  string,
+  unknown
+> => {
   const label = String(sbtLabel || 'SBT');
   return {
     relevantQuestions: [`What is the purpose of this ${label}?`, `How can I use this ${label}?`],
@@ -468,9 +469,10 @@ export const buildSbtPageLogScanProgressPatch = ({
   },
 });
 
-export const buildSbtPageBookmarkedPatch = ({
-  bookmarked = false,
-}: BuildSbtPageBookmarkedPatchArgs = {}): Record<string, boolean> => ({
+export const buildSbtPageBookmarkedPatch = ({ bookmarked = false }: BuildSbtPageBookmarkedPatchArgs = {}): Record<
+  string,
+  boolean
+> => ({
   bookmarked: bookmarked === true,
 });
 
@@ -535,9 +537,10 @@ export const buildSbtPageAdminInviteSuccessPatch = ({
   passwordGenerationCount: '',
 });
 
-export const buildSbtPageExportFormatPatch = ({
-  exportFormat = '',
-}: BuildSbtPageExportFormatPatchArgs = {}): Record<string, unknown> => ({
+export const buildSbtPageExportFormatPatch = ({ exportFormat = '' }: BuildSbtPageExportFormatPatchArgs = {}): Record<
+  string,
+  unknown
+> => ({
   exportFormat: String(exportFormat ?? ''),
 });
 
@@ -556,15 +559,17 @@ export const buildSbtPagePasswordGenerationCountPatch = ({
   };
 };
 
-export const buildSbtPageCopiedAddressPatch = ({
-  addressType = null,
-}: BuildSbtPageCopiedAddressPatchArgs = {}): Record<string, unknown> => ({
+export const buildSbtPageCopiedAddressPatch = ({ addressType = null }: BuildSbtPageCopiedAddressPatchArgs = {}): Record<
+  string,
+  unknown
+> => ({
   copiedAddress: addressType,
 });
 
-export const buildSbtPageCopiedErrorPatch = ({
-  copied = false,
-}: BuildSbtPageCopiedErrorPatchArgs = {}): Record<string, boolean> => ({
+export const buildSbtPageCopiedErrorPatch = ({ copied = false }: BuildSbtPageCopiedErrorPatchArgs = {}): Record<
+  string,
+  boolean
+> => ({
   copiedError: copied === true,
 });
 

@@ -4,10 +4,7 @@ import {
   normalizeGateMode,
   resolveSponsoredGateForResource,
 } from '../../utilities/web3/sponsoredAccess.js';
-import {
-  buildSbtAccessControlConditions,
-  resolveLitChain,
-} from '../../utilities/crypto/litProtocol.js';
+import { buildSbtAccessControlConditions, resolveLitChain } from '../../utilities/crypto/litProtocol.js';
 import { toStr } from '../../utilities/shared/primitives';
 
 type LitCredentialsLike = Record<string, unknown> & {
@@ -33,15 +30,11 @@ type MainSiteLitSessionConfigLike = Record<string, unknown> & {
 
 type ResolveSessionConfigBySlug = (slug: string) => unknown;
 
-const isSessionConfigRecord = (value: unknown): value is MainSiteLitSessionConfigLike => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isSessionConfigRecord = (value: unknown): value is MainSiteLitSessionConfigLike =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-const readRecord = (value: unknown): Record<string, unknown> => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {}
-);
+const readRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
 const resolvePrimaryLitGate = (cfg: MainSiteLitSessionConfigLike = {}) => {
   const defaultGate = getDefaultSponsoredGate(cfg);
@@ -59,17 +52,11 @@ const resolvePrimaryLitGate = (cfg: MainSiteLitSessionConfigLike = {}) => {
     .map((value) => toStr(value).trim())
     .filter(Boolean);
 
-  const candidates = [
-    ...gateIds.map((gateId) => resolveSponsoredGateForResource(cfg, gateId)),
-    defaultGate,
-  ].filter(Boolean);
-
-  return (
-    candidates.find((gate) => getGateSbtAddresses(gate).length > 0) ||
-    defaultGate ||
-    candidates[0] ||
-    null
+  const candidates = [...gateIds.map((gateId) => resolveSponsoredGateForResource(cfg, gateId)), defaultGate].filter(
+    Boolean,
   );
+
+  return candidates.find((gate) => getGateSbtAddresses(gate).length > 0) || defaultGate || candidates[0] || null;
 };
 
 export const resolveMainSiteLitSessionConfigSource = ({
@@ -82,14 +69,12 @@ export const resolveMainSiteLitSessionConfigSource = ({
   resolveStaticConfigBySlug?: ResolveSessionConfigBySlug | null;
 } = {}): MainSiteLitSessionConfigLike => {
   const normalizedSlug = toStr(slug).trim();
-  const registryConfig = typeof resolveRegistryConfigBySlug === 'function'
-    ? resolveRegistryConfigBySlug(normalizedSlug)
-    : null;
+  const registryConfig =
+    typeof resolveRegistryConfigBySlug === 'function' ? resolveRegistryConfigBySlug(normalizedSlug) : null;
   if (isSessionConfigRecord(registryConfig)) return registryConfig;
 
-  const staticConfig = typeof resolveStaticConfigBySlug === 'function'
-    ? resolveStaticConfigBySlug(normalizedSlug)
-    : null;
+  const staticConfig =
+    typeof resolveStaticConfigBySlug === 'function' ? resolveStaticConfigBySlug(normalizedSlug) : null;
   return isSessionConfigRecord(staticConfig) ? staticConfig : {};
 };
 
@@ -101,11 +86,10 @@ export const resolveMainSiteLitSessionConfig = ({
   networkChainIdFallback?: number | null;
 } = {}) => {
   const cfg: MainSiteLitSessionConfigLike = sessionConfig || {};
-  const litCredentials = (
-    cfg?.litCredentials &&
-    typeof cfg.litCredentials === 'object' &&
-    !Array.isArray(cfg.litCredentials)
-  ) ? cfg.litCredentials as LitCredentialsLike : null;
+  const litCredentials =
+    cfg?.litCredentials && typeof cfg.litCredentials === 'object' && !Array.isArray(cfg.litCredentials)
+      ? (cfg.litCredentials as LitCredentialsLike)
+      : null;
   const chipotleWorkerUrl = toStr(cfg?.corsWorkerUrl).trim();
   const hasCompleteLitCredentials = !!(
     litCredentials &&
@@ -113,10 +97,11 @@ export const resolveMainSiteLitSessionConfig = ({
     toStr(litCredentials?.litPkpId).trim() &&
     toStr(litCredentials?.litActionCid).trim()
   );
-  const litConfig = cfg?.lit && typeof cfg.lit === 'object' && !Array.isArray(cfg.lit)
-    ? cfg.lit as Record<string, unknown>
-    : null;
-  const litNetworkHint = toStr(litConfig?.network || (cfg as Record<string, unknown>)?.litNetwork).trim().toLowerCase();
+  const litConfig =
+    cfg?.lit && typeof cfg.lit === 'object' && !Array.isArray(cfg.lit) ? (cfg.lit as Record<string, unknown>) : null;
+  const litNetworkHint = toStr(litConfig?.network || (cfg as Record<string, unknown>)?.litNetwork)
+    .trim()
+    .toLowerCase();
   const gate = resolvePrimaryLitGate(cfg);
   const chainId = gate?.chainId || cfg?.networkChainId || networkChainIdFallback || null;
   const userMaxPrice = cfg?.lit?.userMaxPrice || cfg?.litUserMaxPrice || '';
@@ -127,11 +112,7 @@ export const resolveMainSiteLitSessionConfig = ({
   const gateAddresses = getGateSbtAddresses(gate);
   const hasChipotleRuntime = !!(
     chipotleWorkerUrl &&
-    (
-      hasCompleteLitCredentials ||
-      litNetworkHint === 'chipotle' ||
-      gateAddresses.length > 0
-    )
+    (hasCompleteLitCredentials || litNetworkHint === 'chipotle' || gateAddresses.length > 0)
   );
   const litNetwork = hasChipotleRuntime ? 'chipotle' : '';
   const accessControlConditions = gateAddresses.length
@@ -151,11 +132,13 @@ export const resolveMainSiteLitSessionConfig = ({
     litChain,
     gateAddresses,
     accessControlConditions,
-    chipotle: hasChipotleRuntime ? {
-      enabled: true,
-      workerUrl: chipotleWorkerUrl,
-      litCredentials: litCredentials || {},
-      sessionConfig: cfg,
-    } : null,
+    chipotle: hasChipotleRuntime
+      ? {
+          enabled: true,
+          workerUrl: chipotleWorkerUrl,
+          litCredentials: litCredentials || {},
+          sessionConfig: cfg,
+        }
+      : null,
   };
 };

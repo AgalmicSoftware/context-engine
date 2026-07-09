@@ -23,12 +23,15 @@ export const buildBullhornToggleButtonClassName = ({
   baseClassName?: unknown;
   bullhornClassName?: unknown;
   commentClassName?: unknown;
-} = {}): string => ([
-  String(baseClassName || ''),
-  String(commentClassName || ''),
-  String(bullhornClassName || ''),
-  active ? String(activeClassName || '') : '',
-].filter(Boolean).join(' '));
+} = {}): string =>
+  [
+    String(baseClassName || ''),
+    String(commentClassName || ''),
+    String(bullhornClassName || ''),
+    active ? String(activeClassName || '') : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
 export const resolveBullhornToggleIconClassName = ({
   active = false,
@@ -36,9 +39,7 @@ export const resolveBullhornToggleIconClassName = ({
 }: {
   active?: unknown;
   iconGlowClassName?: unknown;
-} = {}): string | undefined => (
-  active ? String(iconGlowClassName || '') || undefined : undefined
-);
+} = {}): string | undefined => (active ? String(iconGlowClassName || '') || undefined : undefined);
 
 const BullhornToggleButton = ({
   onClick,

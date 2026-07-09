@@ -1,6 +1,4 @@
-import type {
-  SessionResultsGeneratedAnalysisArtifact,
-} from '../../utilities/sessionResultsExport';
+import type { SessionResultsGeneratedAnalysisArtifact } from '../../utilities/sessionResultsExport';
 import {
   SESSION_RESULTS_ANALYSIS_ARTIFACT_KIND,
   SESSION_RESULTS_ANALYSIS_ARTIFACT_VERSION,
@@ -17,13 +15,13 @@ export type SurveyResultsAnalysisArtifactCacheReadOptions = {
 export type SurveyResultsAnalysisArtifactCacheReadPort = (
   namespace: SurveyResultsAnalysisArtifactCacheNamespace,
   slug: string,
-  options: SurveyResultsAnalysisArtifactCacheReadOptions
+  options: SurveyResultsAnalysisArtifactCacheReadOptions,
 ) => unknown;
 
 export type SurveyResultsAnalysisArtifactCacheWritePort = (
   namespace: SurveyResultsAnalysisArtifactCacheNamespace,
   slug: string,
-  payload: SurveyResultsRecord
+  payload: SurveyResultsRecord,
 ) => Promise<unknown> | unknown;
 
 export type SurveyResultsAnalysisArtifactCacheTarget = {
@@ -69,14 +67,13 @@ export type SurveyResultsAnalysisArtifactSelectionArgs = {
   target?: Partial<SurveyResultsAnalysisArtifactCacheTarget> | null;
 };
 
-const toRecord = (value: unknown): SurveyResultsRecord => (
-  value && typeof value === 'object' ? value as SurveyResultsRecord : {}
-);
+const toRecord = (value: unknown): SurveyResultsRecord =>
+  value && typeof value === 'object' ? (value as SurveyResultsRecord) : {};
 
 const isAnalysisArtifactCandidate = (
   value: SurveyResultsRecord,
-  inputSignature: string
-): value is SessionResultsGeneratedAnalysisArtifact => (
+  inputSignature: string,
+): value is SessionResultsGeneratedAnalysisArtifact =>
   value.kind === SESSION_RESULTS_ANALYSIS_ARTIFACT_KIND &&
   value.version === SESSION_RESULTS_ANALYSIS_ARTIFACT_VERSION &&
   value.source === 'ai-generated' &&
@@ -84,16 +81,14 @@ const isAnalysisArtifactCandidate = (
   typeof value.generatedAt === 'string' &&
   Array.isArray(value.participants) &&
   !!value.sections &&
-  typeof value.sections === 'object'
-);
+  typeof value.sections === 'object';
 
 export const buildSurveyResultsAnalysisArtifactCacheKey = ({
   chainId = '',
   inputSignature = '',
   networkLabel = '',
-}: SurveyResultsAnalysisArtifactCacheKeyArgs = {}): string => (
-  `sessionResultsAnalysis:v1:${String(networkLabel || chainId || 'unknown')}:${String(inputSignature || '')}`
-);
+}: SurveyResultsAnalysisArtifactCacheKeyArgs = {}): string =>
+  `sessionResultsAnalysis:v1:${String(networkLabel || chainId || 'unknown')}:${String(inputSignature || '')}`;
 
 export const buildSurveyResultsAnalysisArtifactCacheTarget = ({
   cacheKey = '',

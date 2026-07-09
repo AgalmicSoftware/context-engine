@@ -124,6 +124,53 @@ test('readArweaveUploadRequestPayload supports repeated reads from the same requ
   assert.equal(second.payload.providedJwk, '{"kty":"RSA"}');
 });
 
+test('readArweaveUploadRequestPayload rejects oversized content-length before parsing', async () => {
+  let parsed = false;
+  const request = {
+    headers: {
+      get: (name) => (name.toLowerCase() === 'content-type'
+        ? 'application/json'
+        : name.toLowerCase() === 'content-length'
+          ? '12'
+          : ''),
+    },
+    json: async () => {
+      parsed = true;
+      return { data: 'oversized' };
+    },
+  };
+
+  const result = await readArweaveUploadRequestPayload(request, { maxUploadBytes: 4 });
+
+  assert.equal(parsed, false);
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 413);
+  assert.match(result.error, /Upload payload too large/);
+});
+
+test('readArweaveUploadRequestPayload rejects oversized JSON and multipart payload bytes', async () => {
+  const jsonRequest = new Request('https://worker.example/arweave/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: 'too-large' }),
+  });
+  const multipartRequest = createMultipartRequest([
+    ['data', new Blob(['too-large'], { type: 'text/plain' }), 'payload.txt'],
+  ]);
+
+  const [jsonPayload, multipartPayload] = await Promise.all([
+    readArweaveUploadRequestPayload(jsonRequest, { maxUploadBytes: 4 }),
+    readArweaveUploadRequestPayload(multipartRequest, { maxUploadBytes: 4 }),
+  ]);
+
+  assert.equal(jsonPayload.ok, false);
+  assert.equal(jsonPayload.status, 413);
+  assert.match(jsonPayload.error, /Upload payload too large/);
+  assert.equal(multipartPayload.ok, false);
+  assert.equal(multipartPayload.status, 413);
+  assert.match(multipartPayload.error, /Upload payload too large/);
+});
+
 test('readArweaveUploadRequestPayload preserves parse and missing-data errors', async () => {
   const invalidJsonRequest = new Request('https://worker.example/arweave/upload', {
     method: 'POST',

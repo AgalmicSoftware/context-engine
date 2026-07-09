@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-} from 'reactstrap';
+import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 import styles from './CEConfirmDialog.module.scss';
 
 type CEConfirmDialogProps = {

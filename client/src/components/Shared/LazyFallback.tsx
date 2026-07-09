@@ -9,11 +9,7 @@ type LazyFallbackProps = {
   minHeight?: React.CSSProperties['minHeight'];
 };
 
-export default function LazyFallback({
-  label = 'Loading...',
-  subtext = '',
-  minHeight = '40vh',
-}: LazyFallbackProps) {
+export default function LazyFallback({ label = 'Loading...', subtext = '', minHeight = '40vh' }: LazyFallbackProps) {
   return (
     <div
       style={{

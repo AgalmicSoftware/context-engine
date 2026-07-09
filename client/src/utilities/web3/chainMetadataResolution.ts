@@ -87,9 +87,8 @@ const _sbtGateAccessCache = new Map<string, { ts: number; value: boolean }>();
 const _sbtGateAccessErrorCache = new Map<string, { ts: number }>();
 const _sbtGateAccessInFlight = new Map<string, Promise<boolean | null>>();
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const toLower = (value: unknown): string => toStr(value).trim().toLowerCase();
 
@@ -98,9 +97,7 @@ const errorText = (error: unknown): string => {
   return toStr(error.message ?? error.reason ?? '');
 };
 
-const getRecord = (value: unknown): UnknownRecord | null => (
-  isRecord(value) ? value : null
-);
+const getRecord = (value: unknown): UnknownRecord | null => (isRecord(value) ? value : null);
 
 const getLitGetKey = (ctx: unknown = {}): LitKeyGetter | null => {
   const record = getRecord(ctx) || {};
@@ -146,10 +143,7 @@ const resolveDefaultProviderLike = (): string => {
   return 'passkey_eoa';
 };
 
-const classifyDecryptFailure = (
-  err: unknown,
-  ctx: Partial<DecryptContext> = {}
-): DecryptFailureReason => {
+const classifyDecryptFailure = (err: unknown, ctx: Partial<DecryptContext> = {}): DecryptFailureReason => {
   const msg = toLower(errorText(err));
   if (!ctx.chainId) return 'missing-chain';
   if (!ctx.providerLike) return 'missing-provider';
@@ -164,11 +158,7 @@ const classifyDecryptFailure = (
   ) {
     return 'acc-failed';
   }
-  if (
-    msg.includes('wrong chain') ||
-    msg.includes('wrong network') ||
-    msg.includes('chain mismatch')
-  ) {
+  if (msg.includes('wrong chain') || msg.includes('wrong network') || msg.includes('chain mismatch')) {
     return 'wrong-chain';
   }
   return 'decrypt-failed';
@@ -195,10 +185,7 @@ const getDecryptFailureMessage = (reason: DecryptFailureReason): string => {
   }
 };
 
-const buildDecryptFailureResult = (
-  reason: DecryptFailureReason,
-  err: unknown = null
-): DecryptResult => {
+const buildDecryptFailureResult = (reason: DecryptFailureReason, err: unknown = null): DecryptResult => {
   let type = 'unknown';
   let retryable = false;
   switch (reason) {
@@ -237,7 +224,7 @@ const logDecryptFailure = (
   reason: DecryptFailureReason,
   err: unknown,
   meta: DecryptFailureMeta = {},
-  ctx: Partial<DecryptContext> = {}
+  ctx: Partial<DecryptContext> = {},
 ): void => {
   const key = `${reason}|${toStr(meta.field)}|${toStr(meta.slug)}|${toStr(meta.questionId)}|${buildDecryptContextTag(ctx)}`;
   if (_decryptFailureLogCache.has(key)) return;
@@ -284,9 +271,7 @@ const getDecryptContext = (groupCfg: unknown = null, context: unknown = null): D
   const litHooks = ctxIn.litHooks || ctxIn.lit || getGlobalLitHooks();
   const litOptsInput = getRecord(ctxIn.litOpts);
   const litGetKey =
-    (typeof litOptsInput?.getKey === 'function')
-      ? litOptsInput.getKey as LitKeyGetter
-      : getLitGetKey({ litHooks });
+    typeof litOptsInput?.getKey === 'function' ? (litOptsInput.getKey as LitKeyGetter) : getLitGetKey({ litHooks });
 
   const litOpts = litGetKey
     ? {
@@ -301,12 +286,10 @@ const getDecryptContext = (groupCfg: unknown = null, context: unknown = null): D
 const decryptEnvelopeCached = async (
   envelopeJson: unknown,
   ctx: DecryptContext,
-  meta: DecryptFailureMeta = {}
+  meta: DecryptFailureMeta = {},
 ): Promise<DecryptResult> => {
   if (!envelopeJson) return { value: null, error: null };
-  const key = typeof envelopeJson === 'string'
-    ? envelopeJson
-    : JSON.stringify(envelopeJson || {});
+  const key = typeof envelopeJson === 'string' ? envelopeJson : JSON.stringify(envelopeJson || {});
   const cacheKey = `${buildDecryptContextTag(ctx)}::${key}`;
   const cached = _encryptedValueCache.get(cacheKey);
   if (cached) return cached;
@@ -360,12 +343,7 @@ const decryptEnvelopeCached = async (
 const shouldPreferLitRecipientsForPayload = (payload: UnknownRecord, ctx: DecryptContext): boolean => {
   const accountLower = toLower(ctx.account || '');
   const creatorLower = normalizeAddress(payload.creator || payload.creatorAddress || '');
-  return !!(
-    accountLower &&
-    creatorLower &&
-    accountLower !== creatorLower &&
-    getLitGetKey(ctx)
-  );
+  return !!(accountLower && creatorLower && accountLower !== creatorLower && getLitGetKey(ctx));
 };
 
 const normalizeGateMode = (gate: unknown = {}): GateMode => {
@@ -455,7 +433,7 @@ const extractSbtGatesFromEnvelope = (envelopeJson: unknown): SbtGate[] => {
   if (!envelopeJson) return [];
   let env: unknown;
   try {
-    env = typeof envelopeJson === 'string' ? JSON.parse(envelopeJson) : (envelopeJson || null);
+    env = typeof envelopeJson === 'string' ? JSON.parse(envelopeJson) : envelopeJson || null;
   } catch (err: unknown) {
     contractsLog.debug('extractSbtGatesFromEnvelope error:', err);
     return [];
@@ -472,7 +450,10 @@ const extractSbtGatesFromEnvelope = (envelopeJson: unknown): SbtGate[] => {
     if (!recipient || recipient.type !== 'lit-sbt-v1' || !lit) return;
     const gate = extractSbtGateFromAccConditions(lit.accessControlConditions);
     if (!gate) return;
-    const sig = `${gate.mode}:${gate.sbtAddresses.map((a) => a.toLowerCase()).sort().join('|')}`;
+    const sig = `${gate.mode}:${gate.sbtAddresses
+      .map((a) => a.toLowerCase())
+      .sort()
+      .join('|')}`;
     if (dedupe.has(sig)) return;
     dedupe.add(sig);
     out.push({ ...gate });
@@ -485,9 +466,7 @@ const extractSbtGatesFromEncryptionMeta = (payload: UnknownRecord = {}): SbtGate
   const enc = getRecord(payload.encryption);
   if (!enc || enc.enabled === false) return [];
 
-  const gates = Array.isArray(enc.gates)
-    ? enc.gates.filter(Boolean)
-    : (isRecord(enc.gate) ? [enc.gate] : []);
+  const gates = Array.isArray(enc.gates) ? enc.gates.filter(Boolean) : isRecord(enc.gate) ? [enc.gate] : [];
   if (!gates.length) return [];
 
   const out: SbtGate[] = [];
@@ -496,7 +475,10 @@ const extractSbtGatesFromEncryptionMeta = (payload: UnknownRecord = {}): SbtGate
     const sbtAddresses = getGateSbtAddresses(gate);
     if (!sbtAddresses.length) return;
     const mode = normalizeGateMode(gate);
-    const sig = `${mode}:${sbtAddresses.map((a) => a.toLowerCase()).sort().join('|')}`;
+    const sig = `${mode}:${sbtAddresses
+      .map((a) => a.toLowerCase())
+      .sort()
+      .join('|')}`;
     if (dedupe.has(sig)) return;
     dedupe.add(sig);
     out.push({ sbtAddresses, mode });
@@ -509,7 +491,9 @@ export const buildDecryptModeTag = (opts: MetadataReadOptions = {}): string => {
   if (skipDecrypt) return 'raw';
   const ctx = getRecord(opts.decryptContext) || {};
   const account = normalizeAddress(ctx.account || '');
-  const providerLike = toStr(ctx.providerLike || '').trim().toLowerCase();
+  const providerLike = toStr(ctx.providerLike || '')
+    .trim()
+    .toLowerCase();
   const chainId = Number(ctx.chainId || 0) || 0;
   const hasLit = !!getLitGetKey({
     litOpts: ctx.litOpts,
@@ -519,23 +503,18 @@ export const buildDecryptModeTag = (opts: MetadataReadOptions = {}): string => {
   return `decrypt|${account}|${providerLike}|${chainId}|lit:${hasLit ? '1' : '0'}`;
 };
 
-export const buildFailureModeTag = (opts: MetadataReadOptions = {}): string => (
-  opts && opts.throwOnFailure ? 'strict' : 'soft'
-);
+export const buildFailureModeTag = (opts: MetadataReadOptions = {}): string =>
+  opts && opts.throwOnFailure ? 'strict' : 'soft';
 
 export const buildArweaveReadModeTag = (opts: MetadataReadOptions = {}): string => {
-  const retries = Number.isFinite(Number(opts.arweaveRetries))
-    ? Math.max(0, Number(opts.arweaveRetries))
-    : 'default';
+  const retries = Number.isFinite(Number(opts.arweaveRetries)) ? Math.max(0, Number(opts.arweaveRetries)) : 'default';
   const gatewayTimeoutMs = Number.isFinite(Number(opts.arweaveGatewayTimeoutMs))
     ? Math.max(300, Number(opts.arweaveGatewayTimeoutMs))
     : 'default';
   return `arweave|retries:${retries}|timeout:${gatewayTimeoutMs}`;
 };
 
-export const createChainMetadataResolutionHelpers = (
-  deps: MetadataResolutionDeps
-) => {
+export const createChainMetadataResolutionHelpers = (deps: MetadataResolutionDeps) => {
   const checkAccountSatisfiesSbtGate = async ({
     account,
     chainId,
@@ -555,13 +534,13 @@ export const createChainMetadataResolutionHelpers = (
     const cached = _sbtGateAccessCache.get(cacheKey);
     if (cached) {
       const ts = Number(cached.ts || 0);
-      if (ts && (Date.now() - ts) < SBT_GATE_ACCESS_TTL_MS) return !!cached.value;
+      if (ts && Date.now() - ts < SBT_GATE_ACCESS_TTL_MS) return !!cached.value;
       _sbtGateAccessCache.delete(cacheKey);
     }
     const errCached = _sbtGateAccessErrorCache.get(cacheKey);
     if (errCached) {
       const ts = Number(errCached.ts || 0);
-      if (ts && (Date.now() - ts) < SBT_GATE_ACCESS_ERROR_TTL_MS) return null;
+      if (ts && Date.now() - ts < SBT_GATE_ACCESS_ERROR_TTL_MS) return null;
       _sbtGateAccessErrorCache.delete(cacheKey);
     }
     const inflight = _sbtGateAccessInFlight.get(cacheKey);
@@ -570,9 +549,7 @@ export const createChainMetadataResolutionHelpers = (
     const run = (async () => {
       try {
         const checks = await Promise.all(
-          normalizedSbtAddresses.map((addr) =>
-            deps.userHasSBT('none', addr, acct, 0, 'latest', groupKeyOrCfg)
-          )
+          normalizedSbtAddresses.map((addr) => deps.userHasSBT('none', addr, acct, 0, 'latest', groupKeyOrCfg)),
         );
         const has = mode === 'all' ? checks.every(Boolean) : checks.some(Boolean);
         _sbtGateAccessCache.set(cacheKey, { ts: Date.now(), value: has });
@@ -641,7 +618,7 @@ export const createChainMetadataResolutionHelpers = (
   const maybeDecryptSurveyPayload = async <T>(
     surveyData: T,
     groupKeyOrCfg: unknown,
-    opts: MetadataReadOptions = {}
+    opts: MetadataReadOptions = {},
   ): Promise<T> => {
     const surveyRecord = getRecord(surveyData);
     if (!surveyRecord) return surveyData;
@@ -663,11 +640,16 @@ export const createChainMetadataResolutionHelpers = (
       groupKeyOrCfg: cfg,
     });
     if (!shouldAttempt) {
-      logDecryptFailure('acc-failed', null, {
-        field: 'survey',
-        slug: cfgRecord.slug || '',
-        surveyId: surveyRecord.id || '',
-      }, decryptCtx);
+      logDecryptFailure(
+        'acc-failed',
+        null,
+        {
+          field: 'survey',
+          slug: cfgRecord.slug || '',
+          surveyId: surveyRecord.id || '',
+        },
+        decryptCtx,
+      );
       return surveyData;
     }
 
@@ -708,7 +690,7 @@ export const createChainMetadataResolutionHelpers = (
   const maybeDecryptQuestionPayload = async <T>(
     questionData: T,
     groupKeyOrCfg: unknown,
-    opts: MetadataReadOptions = {}
+    opts: MetadataReadOptions = {},
   ): Promise<T> => {
     const questionRecord = getRecord(questionData);
     if (!questionRecord) return questionData;
@@ -731,11 +713,16 @@ export const createChainMetadataResolutionHelpers = (
       groupKeyOrCfg: cfg,
     });
     if (!shouldAttempt) {
-      logDecryptFailure('acc-failed', null, {
-        field: 'question',
-        slug: cfgRecord.slug || '',
-        questionId: questionRecord.id || '',
-      }, decryptCtx);
+      logDecryptFailure(
+        'acc-failed',
+        null,
+        {
+          field: 'question',
+          slug: cfgRecord.slug || '',
+          questionId: questionRecord.id || '',
+        },
+        decryptCtx,
+      );
       return questionData;
     }
 

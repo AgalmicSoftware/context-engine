@@ -37,27 +37,33 @@ import {
 
 describe('sbtPageActionDisplayHelpers', () => {
   it('resolves mint end and mini mint state', () => {
-    expect(resolveSbtPageMintEndDisplayState({
-      nowMs: Date.UTC(2026, 0, 1),
-      sbtInfo: { mintingEndTime: Date.UTC(2026, 0, 2) / 1000 },
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMintEndDisplayState({
+        nowMs: Date.UTC(2026, 0, 1),
+        sbtInfo: { mintingEndTime: Date.UTC(2026, 0, 2) / 1000 },
+      }),
+    ).toMatchObject({
       status: 'active',
       unixTS: Date.UTC(2026, 0, 2) / 1000,
     });
-    expect(resolveSbtPageMintEndDisplayState({
-      sbtInfo: { mintingEndTime: 0 },
-    })).toEqual({
+    expect(
+      resolveSbtPageMintEndDisplayState({
+        sbtInfo: { mintingEndTime: 0 },
+      }),
+    ).toEqual({
       fullMintEndDate: '',
       status: 'never',
       unixTS: 0,
     });
-    expect(resolveSbtPageMiniMintState({
-      burningStatus: 'idle',
-      mintingStatus: 'success',
-      nowSec: 100,
-      sbtAddress: '0xABC',
-      sbtInfo: { mintingEndTime: 0 },
-    })).toEqual({
+    expect(
+      resolveSbtPageMiniMintState({
+        burningStatus: 'idle',
+        mintingStatus: 'success',
+        nowSec: 100,
+        sbtAddress: '0xABC',
+        sbtInfo: { mintingEndTime: 0 },
+      }),
+    ).toEqual({
       hasTokenMini: true,
       isMintingActive: true,
       justJoined: true,
@@ -65,58 +71,70 @@ describe('sbtPageActionDisplayHelpers', () => {
       shouldRenderEndedIndicator: false,
       shouldRenderLiveIndicator: true,
     });
-    expect(resolveSbtPageMiniActionFailureState({
-      hasTokenMini: false,
-      mintingStatus: 'failure',
-    })).toEqual({
+    expect(
+      resolveSbtPageMiniActionFailureState({
+        hasTokenMini: false,
+        mintingStatus: 'failure',
+      }),
+    ).toEqual({
       showBurnFailedStatus: false,
       showMintFailedStatus: true,
     });
   });
 
   it('resolves mini and full mint flow visibility', () => {
-    expect(resolveSbtPageMiniMintFlowDisplayState({
-      hasPasswordMint: true,
-      isMintingActive: true,
-      miniMintable: true,
-      mintStep: 2,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintFlowDisplayState({
+        hasPasswordMint: true,
+        isMintingActive: true,
+        miniMintable: true,
+        mintStep: 2,
+      }),
+    ).toMatchObject({
       shouldRenderManualPasswordFinishInput: true,
       shouldRenderOpenMintButton: false,
     });
-    expect(resolveSbtPageMiniMintFlowDisplayState({
-      hasInviteMint: true,
-      isMintingActive: true,
-      miniMintable: true,
-      showMiniPasswordInput: false,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintFlowDisplayState({
+        hasInviteMint: true,
+        isMintingActive: true,
+        miniMintable: true,
+        showMiniPasswordInput: false,
+      }),
+    ).toMatchObject({
       shouldRenderInviteDisclosureButton: true,
       shouldRenderInviteInput: false,
     });
-    expect(resolveSbtPageMintFlowDisplayState({
-      hasGroupPasswordMint: false,
-      hasInviteMint: false,
-      mintStep: 1,
-      sbtInfo: { hasPasswordMint: true },
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMintFlowDisplayState({
+        hasGroupPasswordMint: false,
+        hasInviteMint: false,
+        mintStep: 1,
+        sbtInfo: { hasPasswordMint: true },
+      }),
+    ).toMatchObject({
       shouldRenderClaimCountdown: true,
       shouldRenderManualClaimStart: false,
       shouldRenderOpenMintButton: false,
     });
-    expect(resolveSbtPageMintFlowDisplayState({
-      hasGroupPasswordMint: true,
-      mintingStatus: 'success',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMintFlowDisplayState({
+        hasGroupPasswordMint: true,
+        mintingStatus: 'success',
+      }),
+    ).toMatchObject({
       shouldRenderGroupPasswordJoin: false,
       shouldSuppressMintControls: true,
     });
   });
 
   it('describes mini-card mint display and selected handler without invoking side effects', () => {
-    expect(resolveSbtPageMiniMintActionPlan({
-      isMintingActive: true,
-      miniMintable: false,
-    })).toEqual({
+    expect(
+      resolveSbtPageMiniMintActionPlan({
+        isMintingActive: true,
+        miniMintable: false,
+      }),
+    ).toEqual({
       blockedReason: 'mini-mint-unavailable',
       disabled: true,
       handlerKind: 'none',
@@ -126,27 +144,33 @@ describe('sbtPageActionDisplayHelpers', () => {
       shouldRenderMintArea: false,
       viewKind: 'hidden',
     });
-    expect(resolveSbtPageMiniMintActionPlan({
-      hasTokenMini: true,
-      isMintingActive: true,
-      miniMintable: true,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintActionPlan({
+        hasTokenMini: true,
+        isMintingActive: true,
+        miniMintable: true,
+      }),
+    ).toMatchObject({
       blockedReason: 'already-has-token',
       shouldRenderMintArea: false,
       viewKind: 'hidden',
     });
-    expect(resolveSbtPageMiniMintActionPlan({
-      isMintingActive: false,
-      miniMintable: true,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintActionPlan({
+        isMintingActive: false,
+        miniMintable: true,
+      }),
+    ).toMatchObject({
       blockedReason: 'mint-ended',
       shouldRenderMintArea: false,
       viewKind: 'hidden',
     });
-    expect(resolveSbtPageMiniMintActionPlan({
-      isMintingActive: true,
-      miniMintable: true,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintActionPlan({
+        isMintingActive: true,
+        miniMintable: true,
+      }),
+    ).toMatchObject({
       blockedReason: 'none',
       disabled: false,
       handlerKind: 'mini-mint',
@@ -156,79 +180,93 @@ describe('sbtPageActionDisplayHelpers', () => {
       shouldRenderMintArea: true,
       viewKind: 'open-mint-button',
     });
-    expect(resolveSbtPageMiniMintActionPlan({
-      isMintingActive: true,
-      miniMintable: true,
-      miniOpenMintButtonState: { disabled: true },
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintActionPlan({
+        isMintingActive: true,
+        miniMintable: true,
+        miniOpenMintButtonState: { disabled: true },
+      }),
+    ).toMatchObject({
       disabled: true,
       handlerKind: 'mini-mint',
       inertReason: 'disabled',
       isInteractive: false,
       viewKind: 'open-mint-button',
     });
-    expect(resolveSbtPageMiniMintActionPlan({
-      hasInviteMint: true,
-      isMintingActive: true,
-      miniMintable: true,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintActionPlan({
+        hasInviteMint: true,
+        isMintingActive: true,
+        miniMintable: true,
+      }),
+    ).toMatchObject({
       disabled: false,
       handlerKind: 'show-password-input',
       labelKind: 'join',
       viewKind: 'invite-disclosure',
     });
-    expect(resolveSbtPageMiniMintActionPlan({
-      hasInviteMint: true,
-      isMintingActive: true,
-      miniMintable: true,
-      miniPasswordJoinButtonState: { disabled: true },
-      showMiniPasswordInput: true,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintActionPlan({
+        hasInviteMint: true,
+        isMintingActive: true,
+        miniMintable: true,
+        miniPasswordJoinButtonState: { disabled: true },
+        showMiniPasswordInput: true,
+      }),
+    ).toMatchObject({
       disabled: true,
       handlerKind: 'claim-with-invite-code',
       inertReason: 'disabled',
       labelKind: 'join',
       viewKind: 'invite-input',
     });
-    expect(resolveSbtPageMiniMintActionPlan({
-      hasGroupPasswordMint: true,
-      isMintingActive: true,
-      miniMintable: true,
-      showMiniPasswordInput: true,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintActionPlan({
+        hasGroupPasswordMint: true,
+        isMintingActive: true,
+        miniMintable: true,
+        showMiniPasswordInput: true,
+      }),
+    ).toMatchObject({
       handlerKind: 'mint-unlimited-with-group-password',
       labelKind: 'join',
       viewKind: 'group-password-input',
     });
-    expect(resolveSbtPageMiniMintActionPlan({
-      hasPasswordMint: true,
-      isMintingActive: true,
-      miniManualClaimButtonState: { disabled: true },
-      miniMintable: true,
-      showMiniPasswordInput: true,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintActionPlan({
+        hasPasswordMint: true,
+        isMintingActive: true,
+        miniManualClaimButtonState: { disabled: true },
+        miniMintable: true,
+        showMiniPasswordInput: true,
+      }),
+    ).toMatchObject({
       disabled: true,
       handlerKind: 'mini-mint',
       inertReason: 'disabled',
       labelKind: 'join',
       viewKind: 'manual-password-start-input',
     });
-    expect(resolveSbtPageMiniMintActionPlan({
-      hasPasswordMint: true,
-      isMintingActive: true,
-      miniMintable: true,
-      mintStep: 2,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintActionPlan({
+        hasPasswordMint: true,
+        isMintingActive: true,
+        miniMintable: true,
+        mintStep: 2,
+      }),
+    ).toMatchObject({
       handlerKind: 'mini-mint',
       labelKind: 'finish',
       viewKind: 'manual-password-finish-input',
     });
-    expect(resolveSbtPageMiniMintActionPlan({
-      hasPasswordMint: true,
-      isMintingActive: true,
-      miniMintable: true,
-      mintStep: 1,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintActionPlan({
+        hasPasswordMint: true,
+        isMintingActive: true,
+        miniMintable: true,
+        mintStep: 1,
+      }),
+    ).toMatchObject({
       handlerKind: 'none',
       inertReason: 'status-only',
       isInteractive: false,
@@ -247,11 +285,13 @@ describe('sbtPageActionDisplayHelpers', () => {
     });
 
     expect(miniMintState.hasTokenMini).toBe(false);
-    expect(resolveSbtPageMiniMintActionPlan({
-      hasTokenMini: miniMintState.hasTokenMini,
-      isMintingActive: miniMintState.isMintingActive,
-      miniMintable: true,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniMintActionPlan({
+        hasTokenMini: miniMintState.hasTokenMini,
+        isMintingActive: miniMintState.isMintingActive,
+        miniMintable: true,
+      }),
+    ).toMatchObject({
       blockedReason: 'none',
       handlerKind: 'mini-mint',
       shouldRenderMintArea: true,
@@ -260,14 +300,16 @@ describe('sbtPageActionDisplayHelpers', () => {
   });
 
   it('describes mini-card manual claim action identity without owning execution', () => {
-    expect(resolveSbtPageMiniManualClaimActionRequest({
-      manualPasswordInput: 'mini-code',
-      miniMintActionPlan: {
-        disabled: false,
-        viewKind: 'manual-password-start-input',
-      },
-      mintingStatus: 'idle',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniManualClaimActionRequest({
+        manualPasswordInput: 'mini-code',
+        miniMintActionPlan: {
+          disabled: false,
+          viewKind: 'manual-password-start-input',
+        },
+        mintingStatus: 'idle',
+      }),
+    ).toMatchObject({
       disabled: false,
       handlerKind: 'mini-mint',
       inputDisabled: false,
@@ -288,14 +330,16 @@ describe('sbtPageActionDisplayHelpers', () => {
       },
     });
 
-    expect(resolveSbtPageMiniManualClaimActionRequest({
-      manualPasswordInput: 'mini-code',
-      miniMintActionPlan: {
-        disabled: true,
-        viewKind: 'manual-password-finish-input',
-      },
-      mintingStatus: 'pending',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniManualClaimActionRequest({
+        manualPasswordInput: 'mini-code',
+        miniMintActionPlan: {
+          disabled: true,
+          viewKind: 'manual-password-finish-input',
+        },
+        mintingStatus: 'pending',
+      }),
+    ).toMatchObject({
       disabled: true,
       handlerKind: 'mini-mint',
       inputDisabled: true,
@@ -314,10 +358,12 @@ describe('sbtPageActionDisplayHelpers', () => {
   });
 
   it('describes mini-card manual claim status-only requests', () => {
-    expect(resolveSbtPageMiniManualClaimActionRequest({
-      claimCountdown: 12,
-      miniMintActionPlan: { viewKind: 'manual-claim-countdown' },
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniManualClaimActionRequest({
+        claimCountdown: 12,
+        miniMintActionPlan: { viewKind: 'manual-claim-countdown' },
+      }),
+    ).toMatchObject({
       disabled: false,
       handlerKind: 'none',
       shouldRenderInputAction: false,
@@ -326,10 +372,12 @@ describe('sbtPageActionDisplayHelpers', () => {
       viewKind: 'manual-claim-countdown',
     });
 
-    expect(resolveSbtPageMiniManualClaimActionRequest({
-      miniMintActionPlan: { viewKind: 'manual-claim-success' },
-      successLabel: 'Collected',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageMiniManualClaimActionRequest({
+        miniMintActionPlan: { viewKind: 'manual-claim-success' },
+        successLabel: 'Collected',
+      }),
+    ).toMatchObject({
       disabled: false,
       handlerKind: 'none',
       shouldRenderInputAction: false,
@@ -464,37 +512,45 @@ describe('sbtPageActionDisplayHelpers', () => {
   });
 
   it('resolves burn and mint button state', () => {
-    expect(resolveSbtPageMiniBurnPermission({
-      account: '0xAdmin',
-      sbtInfo: { admin: '0xadmin', burnAuth: 0 },
-    })).toEqual({
+    expect(
+      resolveSbtPageMiniBurnPermission({
+        account: '0xAdmin',
+        sbtInfo: { admin: '0xadmin', burnAuth: 0 },
+      }),
+    ).toEqual({
       canAdminBurn: false,
       canBurnMini: true,
       canOwnerBurn: true,
     });
-    expect(resolveSbtPageMiniBurnPermission({
-      account: '0xOwner',
-      sbtInfo: { burnAuth: '2' },
-      userIsSbtAdmin: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageMiniBurnPermission({
+        account: '0xOwner',
+        sbtInfo: { burnAuth: '2' },
+        userIsSbtAdmin: true,
+      }),
+    ).toEqual({
       canAdminBurn: true,
       canBurnMini: true,
       canOwnerBurn: true,
     });
-    expect(resolveSbtPageMiniBurnPermission({
-      account: '0xOwner',
-      sbtInfo: { burnAuth: 'not-a-number' },
-      userIsSbtAdmin: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageMiniBurnPermission({
+        account: '0xOwner',
+        sbtInfo: { burnAuth: 'not-a-number' },
+        userIsSbtAdmin: true,
+      }),
+    ).toEqual({
       canAdminBurn: false,
       canBurnMini: false,
       canOwnerBurn: false,
     });
-    expect(resolveSbtPageBurnButtonState({
-      account: '0xOwner',
-      sbtInfo: { burnAuth: '1' },
-      userHasSBT: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageBurnButtonState({
+        account: '0xOwner',
+        sbtInfo: { burnAuth: '1' },
+        userHasSBT: true,
+      }),
+    ).toEqual({
       canOwnerBurn: true,
       shouldRenderBurnButton: true,
     });
@@ -502,17 +558,21 @@ describe('sbtPageActionDisplayHelpers', () => {
       disabled: true,
       isPending: true,
     });
-    expect(resolveSbtPageAdminBurnButtonState({
-      burningStatus: 'idle',
-      burnSearchResult: null,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageAdminBurnButtonState({
+        burningStatus: 'idle',
+        burnSearchResult: null,
+      }),
+    ).toMatchObject({
       disabled: true,
       isIdle: true,
     });
-    expect(resolveSbtPageOpenMintButtonState({
-      lastMintTxHash: '0xmint',
-      mintingStatus: 'success',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageOpenMintButtonState({
+        lastMintTxHash: '0xmint',
+        mintingStatus: 'success',
+      }),
+    ).toMatchObject({
       canOpenMintTx: true,
       disabled: false,
       isMinted: true,
@@ -520,68 +580,84 @@ describe('sbtPageActionDisplayHelpers', () => {
   });
 
   it('describes primary action availability without invoking SBT side effects', () => {
-    expect(resolveSbtPageMintActionPlan({
-      burningStatus: 'idle',
-      nowSeconds: 100,
-      sbtInfo: { mintingEndTime: 0 },
-      userHasSBT: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageMintActionPlan({
+        burningStatus: 'idle',
+        nowSeconds: 100,
+        sbtInfo: { mintingEndTime: 0 },
+        userHasSBT: true,
+      }),
+    ).toEqual({
       blockedReason: 'already-has-token',
       shouldRenderMintButton: false,
     });
-    expect(resolveSbtPageMintActionPlan({
-      burningStatus: 'success',
-      nowSeconds: 100,
-      sbtInfo: { mintingEndTime: 0 },
-      userHasSBT: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageMintActionPlan({
+        burningStatus: 'success',
+        nowSeconds: 100,
+        sbtInfo: { mintingEndTime: 0 },
+        userHasSBT: true,
+      }),
+    ).toEqual({
       blockedReason: 'none',
       shouldRenderMintButton: true,
     });
-    expect(resolveSbtPageMintActionPlan({
-      nowSeconds: 100,
-      sbtInfo: { mintingEndTime: 90 },
-    })).toEqual({
+    expect(
+      resolveSbtPageMintActionPlan({
+        nowSeconds: 100,
+        sbtInfo: { mintingEndTime: 90 },
+      }),
+    ).toEqual({
       blockedReason: 'mint-ended',
       shouldRenderMintButton: false,
     });
-    expect(resolveSbtPageMintActionPlan({
-      nowSeconds: 100,
-      sbtInfo: { mintingEndTime: 100 },
-    })).toEqual({
+    expect(
+      resolveSbtPageMintActionPlan({
+        nowSeconds: 100,
+        sbtInfo: { mintingEndTime: 100 },
+      }),
+    ).toEqual({
       blockedReason: 'mint-ended',
       shouldRenderMintButton: false,
     });
-    expect(resolveSbtPageMintActionPlan({
-      nowSeconds: 100,
-      sbtInfo: null,
-    })).toEqual({
+    expect(
+      resolveSbtPageMintActionPlan({
+        nowSeconds: 100,
+        sbtInfo: null,
+      }),
+    ).toEqual({
       blockedReason: 'missing-sbt',
       shouldRenderMintButton: false,
     });
-    expect(resolveSbtPageBurnActionPlan({
-      account: '0xOwner',
-      sbtInfo: { burnAuth: 1 },
-      userHasSBT: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageBurnActionPlan({
+        account: '0xOwner',
+        sbtInfo: { burnAuth: 1 },
+        userHasSBT: true,
+      }),
+    ).toEqual({
       blockedReason: 'none',
       canOwnerBurn: true,
       shouldRenderBurnButton: true,
     });
-    expect(resolveSbtPageBurnActionPlan({
-      account: '0xOwner',
-      sbtInfo: { burnAuth: 0 },
-      userHasSBT: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageBurnActionPlan({
+        account: '0xOwner',
+        sbtInfo: { burnAuth: 0 },
+        userHasSBT: true,
+      }),
+    ).toEqual({
       blockedReason: 'owner-burn-disabled',
       canOwnerBurn: false,
       shouldRenderBurnButton: false,
     });
-    expect(resolveSbtPageBurnActionPlan({
-      account: '0xOwner',
-      sbtInfo: { burnAuth: 1 },
-      userHasSBT: false,
-    })).toEqual({
+    expect(
+      resolveSbtPageBurnActionPlan({
+        account: '0xOwner',
+        sbtInfo: { burnAuth: 1 },
+        userHasSBT: false,
+      }),
+    ).toEqual({
       blockedReason: 'missing-token',
       canOwnerBurn: false,
       shouldRenderBurnButton: false,
@@ -675,10 +751,12 @@ describe('sbtPageActionDisplayHelpers', () => {
       shouldRenderMintSurface: false,
     });
 
-    expect(resolveSbtPageFullActionDisplayPlan({
-      nowSeconds: 100,
-      sbtInfo: null,
-    })).toMatchObject({
+    expect(
+      resolveSbtPageFullActionDisplayPlan({
+        nowSeconds: 100,
+        sbtInfo: null,
+      }),
+    ).toMatchObject({
       burnActionPlan: {
         blockedReason: 'missing-sbt',
         shouldRenderBurnButton: false,
@@ -695,44 +773,56 @@ describe('sbtPageActionDisplayHelpers', () => {
   });
 
   it('resolves status content, action feedback, and control styles', () => {
-    expect(resolveSbtPagePasswordJoinButtonState({
-      groupPasswordInput: ' code ',
-      mintingStatus: 'idle',
-    })).toEqual({ disabled: false, isPending: false });
-    expect(resolveSbtPagePendingButtonContentState({
-      isPending: true,
-      label: 'Join',
-    })).toEqual({
+    expect(
+      resolveSbtPagePasswordJoinButtonState({
+        groupPasswordInput: ' code ',
+        mintingStatus: 'idle',
+      }),
+    ).toEqual({ disabled: false, isPending: false });
+    expect(
+      resolveSbtPagePendingButtonContentState({
+        isPending: true,
+        label: 'Join',
+      }),
+    ).toEqual({
       label: 'Join',
       shouldRenderLabel: false,
       shouldRenderPendingIcon: true,
     });
-    expect(resolveSbtPageStatusButtonContentState({
-      isFailure: true,
-      failureLabel: 'Denied',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageStatusButtonContentState({
+        isFailure: true,
+        failureLabel: 'Denied',
+      }),
+    ).toMatchObject({
       failureLabel: 'Denied',
       shouldRenderFailure: true,
     });
     expect(resolveSbtPagePasswordGenerationButtonState({ passwordGenerationCount: 0 })).toEqual({
       disabled: true,
     });
-    expect(resolveSbtPagePasswordAlertState({
-      mintPassword: 'plain',
-      showPasswordAlert: true,
-    })).toEqual({ showDetectedPasswordAlert: true });
-    expect(resolveSbtPageActionFeedbackState({
-      burningStatus: 'failure',
-      error: 'Denied',
-      transactionHash: '0xerr',
-    })).toMatchObject({
+    expect(
+      resolveSbtPagePasswordAlertState({
+        mintPassword: 'plain',
+        showPasswordAlert: true,
+      }),
+    ).toEqual({ showDetectedPasswordAlert: true });
+    expect(
+      resolveSbtPageActionFeedbackState({
+        burningStatus: 'failure',
+        error: 'Denied',
+        transactionHash: '0xerr',
+      }),
+    ).toMatchObject({
       showErrorTransactionHash: true,
       showTransactionError: true,
     });
-    expect(resolveSbtPageManualClaimButtonState({
-      manualPasswordInput: '',
-      mintingStatus: 'idle',
-    })).toEqual({ disabled: true, isPending: false });
+    expect(
+      resolveSbtPageManualClaimButtonState({
+        manualPasswordInput: '',
+        mintingStatus: 'idle',
+      }),
+    ).toEqual({ disabled: true, isPending: false });
     expect(resolveSbtPageMiniOpenMintButtonState({ mintingStatus: 'failure' })).toMatchObject({
       isFailure: true,
       disabled: false,
@@ -740,12 +830,14 @@ describe('sbtPageActionDisplayHelpers', () => {
     expect(resolveSbtPageMiniActionStatusDisplayState({ isFailure: true })).toEqual({
       style: { marginTop: '10px', color: 'red' },
     });
-    expect(buildSbtPageActionButtonClassName({
-      actionClassName: 'action',
-      includeMiniClass: true,
-      miniClassName: 'mini',
-      variantClassName: 'primary',
-    })).toBe('action primary mini');
+    expect(
+      buildSbtPageActionButtonClassName({
+        actionClassName: 'action',
+        includeMiniClass: true,
+        miniClassName: 'mini',
+        variantClassName: 'primary',
+      }),
+    ).toBe('action primary mini');
     expect(resolveSbtPageMiniControlDisplayState({ inputMaxWidth: ' 140px ' })).toEqual({
       inputStyle: { maxWidth: '140px' },
       topMarginStyle: { marginTop: '10px' },
@@ -754,23 +846,29 @@ describe('sbtPageActionDisplayHelpers', () => {
       disabled: true,
       isPending: true,
     });
-    expect(resolveSbtPageMiniTokenActionDisplayState({
-      burningStatus: 'idle',
-      canBurnMini: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageMiniTokenActionDisplayState({
+        burningStatus: 'idle',
+        canBurnMini: true,
+      }),
+    ).toEqual({
       shouldRenderBurnButton: true,
       shouldRenderBurnedStatus: false,
       shouldRenderJoinedStatus: false,
     });
-    expect(shouldRenderSbtPageMintButton({
-      nowSeconds: 100,
-      sbtInfo: { mintingEndTime: 200 },
-    })).toBe(true);
-    expect(resolveSbtPageAdminActionState({
-      account: '0xAdmin',
-      hasInviteMint: true,
-      sbtInfo: { admin: '0xadmin', burnAuth: '2', hasPasswordMint: true, maxTokens: '0' },
-    })).toEqual({
+    expect(
+      shouldRenderSbtPageMintButton({
+        nowSeconds: 100,
+        sbtInfo: { mintingEndTime: 200 },
+      }),
+    ).toBe(true);
+    expect(
+      resolveSbtPageAdminActionState({
+        account: '0xAdmin',
+        hasInviteMint: true,
+        sbtInfo: { admin: '0xadmin', burnAuth: '2', hasPasswordMint: true, maxTokens: '0' },
+      }),
+    ).toEqual({
       canAdminBurn: true,
       hasPasswordMint: true,
       isInvite: true,
@@ -780,45 +878,55 @@ describe('sbtPageActionDisplayHelpers', () => {
   });
 
   it('keeps action feedback display passive across success, missing hash, and error states', () => {
-    expect(resolveSbtPageActionFeedbackState({
-      lastMintTxHash: '0xmint',
-      mintingStatus: 'success',
-    })).toEqual({
+    expect(
+      resolveSbtPageActionFeedbackState({
+        lastMintTxHash: '0xmint',
+        mintingStatus: 'success',
+      }),
+    ).toEqual({
       showBurnSuccess: false,
       showErrorTransactionHash: false,
       showMintSuccess: true,
       showTransactionError: false,
     });
-    expect(resolveSbtPageActionFeedbackState({
-      lastBurnTxHash: '0xburn',
-      lastMintTxHash: '0xmint',
-      burningStatus: 'success',
-      mintingStatus: 'success',
-    })).toEqual({
+    expect(
+      resolveSbtPageActionFeedbackState({
+        lastBurnTxHash: '0xburn',
+        lastMintTxHash: '0xmint',
+        burningStatus: 'success',
+        mintingStatus: 'success',
+      }),
+    ).toEqual({
       showBurnSuccess: true,
       showErrorTransactionHash: false,
       showMintSuccess: false,
       showTransactionError: false,
     });
-    expect(resolveSbtPageActionFeedbackState({
-      lastMintTxHash: '',
-      mintingStatus: 'success',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageActionFeedbackState({
+        lastMintTxHash: '',
+        mintingStatus: 'success',
+      }),
+    ).toMatchObject({
       showMintSuccess: false,
     });
-    expect(resolveSbtPageActionFeedbackState({
-      error: new Error('Denied'),
-      mintingStatus: 'idle',
-      transactionHash: '0xerr',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageActionFeedbackState({
+        error: new Error('Denied'),
+        mintingStatus: 'idle',
+        transactionHash: '0xerr',
+      }),
+    ).toMatchObject({
       showErrorTransactionHash: false,
       showTransactionError: false,
     });
-    expect(resolveSbtPageActionFeedbackState({
-      error: new Error('Denied'),
-      mintingStatus: 'failure',
-      transactionHash: '0xerr',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageActionFeedbackState({
+        error: new Error('Denied'),
+        mintingStatus: 'failure',
+        transactionHash: '0xerr',
+      }),
+    ).toMatchObject({
       showErrorTransactionHash: true,
       showTransactionError: true,
     });
@@ -876,14 +984,16 @@ describe('sbtPageActionDisplayHelpers', () => {
       showPasswordGen: true,
     });
 
-    expect(resolveSbtPageAdminActionDisplayPlan({
-      cachedPasswords: ['cached-code'],
-      includePreviousPasswords: false,
-      sbtInfo: {
-        hasPasswordMint: true,
-        maxTokens: '2',
-      },
-    })).toMatchObject({
+    expect(
+      resolveSbtPageAdminActionDisplayPlan({
+        cachedPasswords: ['cached-code'],
+        includePreviousPasswords: false,
+        sbtInfo: {
+          hasPasswordMint: true,
+          maxTokens: '2',
+        },
+      }),
+    ).toMatchObject({
       canAdminBurn: false,
       combinedPasswords: ['cached-code'],
       passwordExportControlsState: {
@@ -899,10 +1009,12 @@ describe('sbtPageActionDisplayHelpers', () => {
   });
 
   it('keeps open-mint transaction actions disabled or hidden when status is not viewable', () => {
-    expect(resolveSbtPageOpenMintButtonState({
-      lastMintTxHash: '0xmint',
-      mintingStatus: 'pending',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageOpenMintButtonState({
+        lastMintTxHash: '0xmint',
+        mintingStatus: 'pending',
+      }),
+    ).toMatchObject({
       canOpenMintTx: false,
       disabled: true,
       isPending: true,
@@ -915,10 +1027,12 @@ describe('sbtPageActionDisplayHelpers', () => {
       },
     });
 
-    expect(resolveSbtPageOpenMintButtonState({
-      lastMintTxHash: '',
-      mintingStatus: 'success',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageOpenMintButtonState({
+        lastMintTxHash: '',
+        mintingStatus: 'success',
+      }),
+    ).toMatchObject({
       canOpenMintTx: false,
       disabled: true,
       isMinted: true,
@@ -932,11 +1046,13 @@ describe('sbtPageActionDisplayHelpers', () => {
       title: undefined,
     });
 
-    expect(resolveSbtPageOpenMintButtonState({
-      burningStatus: 'success',
-      lastMintTxHash: '0xmint',
-      mintingStatus: 'success',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageOpenMintButtonState({
+        burningStatus: 'success',
+        lastMintTxHash: '0xmint',
+        mintingStatus: 'success',
+      }),
+    ).toMatchObject({
       canOpenMintTx: false,
       disabled: false,
       isMinted: false,
@@ -952,11 +1068,13 @@ describe('sbtPageActionDisplayHelpers', () => {
   });
 
   it('describes manual claim action identity without owning mint execution', () => {
-    expect(resolveSbtPageManualClaimActionRequest({
-      manualPasswordInput: 'claim-code',
-      mintFlowDisplayState: { shouldRenderManualClaimStart: true },
-      mintingStatus: 'idle',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageManualClaimActionRequest({
+        manualPasswordInput: 'claim-code',
+        mintFlowDisplayState: { shouldRenderManualClaimStart: true },
+        mintingStatus: 'idle',
+      }),
+    ).toMatchObject({
       disabled: false,
       handlerKind: 'handle-mint-force-refresh',
       inputType: 'text',
@@ -977,11 +1095,13 @@ describe('sbtPageActionDisplayHelpers', () => {
       },
     });
 
-    expect(resolveSbtPageManualClaimActionRequest({
-      manualPasswordInput: 'claim-code',
-      mintFlowDisplayState: { shouldRenderManualClaimFinish: true },
-      mintingStatus: 'pending',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageManualClaimActionRequest({
+        manualPasswordInput: 'claim-code',
+        mintFlowDisplayState: { shouldRenderManualClaimFinish: true },
+        mintingStatus: 'pending',
+      }),
+    ).toMatchObject({
       disabled: true,
       handlerKind: 'handle-mint-force-refresh',
       shouldRenderInputAction: true,
@@ -999,10 +1119,12 @@ describe('sbtPageActionDisplayHelpers', () => {
   });
 
   it('describes manual claim countdown and success as status-only requests', () => {
-    expect(resolveSbtPageManualClaimActionRequest({
-      claimCountdown: 12,
-      mintFlowDisplayState: { shouldRenderClaimCountdown: true },
-    })).toMatchObject({
+    expect(
+      resolveSbtPageManualClaimActionRequest({
+        claimCountdown: 12,
+        mintFlowDisplayState: { shouldRenderClaimCountdown: true },
+      }),
+    ).toMatchObject({
       disabled: false,
       handlerKind: 'none',
       shouldRenderInputAction: false,
@@ -1011,10 +1133,12 @@ describe('sbtPageActionDisplayHelpers', () => {
       viewKind: 'manual-claim-countdown',
     });
 
-    expect(resolveSbtPageManualClaimActionRequest({
-      mintFlowDisplayState: { shouldRenderClaimSuccess: true },
-      successLabel: 'SBT successfully minted!',
-    })).toMatchObject({
+    expect(
+      resolveSbtPageManualClaimActionRequest({
+        mintFlowDisplayState: { shouldRenderClaimSuccess: true },
+        successLabel: 'SBT successfully minted!',
+      }),
+    ).toMatchObject({
       disabled: false,
       handlerKind: 'none',
       shouldRenderInputAction: false,

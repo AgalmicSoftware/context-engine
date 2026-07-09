@@ -14,11 +14,9 @@ const BOOTSTRAP_REACHABILITY_PATTERNS = Object.freeze([
 ]);
 
 export const isPublishUploadBootstrapReachabilityError = (error: unknown): boolean => {
-  const message = toStr(
-    error && typeof error === 'object' && 'message' in error
-      ? error.message
-      : error
-  ).trim().toLowerCase();
+  const message = toStr(error && typeof error === 'object' && 'message' in error ? error.message : error)
+    .trim()
+    .toLowerCase();
   if (!message) return false;
   return BOOTSTRAP_REACHABILITY_PATTERNS.some((pattern) => message.includes(pattern));
 };
@@ -70,7 +68,7 @@ export const resolvePublishArweaveUploadOptions = async ({
 
   if (typeof buildAdminAuth !== 'function') {
     throw new Error(
-      toStr(missingAdminAuthMessage).trim() || 'Arweave bootstrap signing is unavailable for this upload.'
+      toStr(missingAdminAuthMessage).trim() || 'Arweave bootstrap signing is unavailable for this upload.',
     );
   }
 

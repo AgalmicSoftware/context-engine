@@ -10,27 +10,29 @@ import {
 
 describe('sessionWizardSecrets', () => {
   test('resolveWorkerSecretsSnapshot prefers the ref snapshot and falls back to state/defaults', () => {
-    expect(resolveWorkerSecretsSnapshot({
-      workerSecrets: {
-        openaiKey: 'sk-state',
-        customRpcUrl: 'https://state.example',
-        arweaveJwk: '{"state":true}',
-      },
-      workerSecretsRef: {
-        current: {
-          openaiKey: 'sk-ref',
-          arweaveJwk: '',
-          faucetPrivateKey: 'abc123',
+    expect(
+      resolveWorkerSecretsSnapshot({
+        workerSecrets: {
+          openaiKey: 'sk-state',
+          customRpcUrl: 'https://state.example',
+          arweaveJwk: '{"state":true}',
         },
-      },
-      defaults: {
-        openaiKey: '',
-        anthropicKey: '',
-        customRpcUrl: '',
-        arweaveJwk: '',
-        faucetPrivateKey: '',
-      },
-    })).toEqual({
+        workerSecretsRef: {
+          current: {
+            openaiKey: 'sk-ref',
+            arweaveJwk: '',
+            faucetPrivateKey: 'abc123',
+          },
+        },
+        defaults: {
+          openaiKey: '',
+          anthropicKey: '',
+          customRpcUrl: '',
+          arweaveJwk: '',
+          faucetPrivateKey: '',
+        },
+      }),
+    ).toEqual({
       openaiKey: 'sk-ref',
       anthropicKey: '',
       customRpcUrl: 'https://state.example',
@@ -40,16 +42,18 @@ describe('sessionWizardSecrets', () => {
   });
 
   test('buildWorkerSecretsPayload trims values and drops empty keys', () => {
-    expect(buildWorkerSecretsPayload({
-      openaiKey: ' sk-123 ',
-      anthropicKey: '',
-      arweaveJwk: '   {"kty":"RSA"}   ',
-      customRpcUrl: '   ',
-      litApiBase: 'https://api.chipotle.litprotocol.com',
-      litGroupId: 'group_123',
-      litAccountApiKey: ' account-secret ',
-      litUsageApiKey: ' lit-secret ',
-    })).toEqual({
+    expect(
+      buildWorkerSecretsPayload({
+        openaiKey: ' sk-123 ',
+        anthropicKey: '',
+        arweaveJwk: '   {"kty":"RSA"}   ',
+        customRpcUrl: '   ',
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group_123',
+        litAccountApiKey: ' account-secret ',
+        litUsageApiKey: ' lit-secret ',
+      }),
+    ).toEqual({
       openaiKey: 'sk-123',
       arweaveJwk: '{"kty":"RSA"}',
       litAccountApiKey: 'account-secret',
@@ -59,7 +63,7 @@ describe('sessionWizardSecrets', () => {
 
   test('withSecretsSyncWarning appends warning copy', () => {
     expect(withSecretsSyncWarning('Worker deployed.', 'Failed to sync secrets')).toBe(
-      'Worker deployed. Secrets sync warning: Failed to sync secrets'
+      'Worker deployed. Secrets sync warning: Failed to sync secrets',
     );
   });
 
@@ -68,14 +72,16 @@ describe('sessionWizardSecrets', () => {
   });
 
   test('withSecretsSyncStatus appends note copy when warning is empty', () => {
-    expect(withSecretsSyncStatus('Worker deployed.', {
-      note: 'Post-deploy auth sync not yet confirmed.',
-    })).toBe('Worker deployed. Secrets sync note: Post-deploy auth sync not yet confirmed.');
+    expect(
+      withSecretsSyncStatus('Worker deployed.', {
+        note: 'Post-deploy auth sync not yet confirmed.',
+      }),
+    ).toBe('Worker deployed. Secrets sync note: Post-deploy auth sync not yet confirmed.');
   });
 
   test('withWorkerConfigSyncWarning appends warning copy', () => {
     expect(withWorkerConfigSyncWarning('Worker deployed.', 'Config reseed failed')).toBe(
-      'Worker deployed. Config sync warning: Config reseed failed'
+      'Worker deployed. Config sync warning: Config reseed failed',
     );
   });
 
@@ -138,7 +144,11 @@ describe('sessionWizardSecrets', () => {
   test('syncWorkerSecretsAfterDeploy keeps a warning for allowOrigins/config failures when helper did not write secrets', async () => {
     const signAdminAction = jest
       .fn()
-      .mockRejectedValue(new Error('Failed to reach worker auth endpoint (https://worker.example/auth/nonce). Check worker URL and allowOrigins includes http://localhost:3000.'));
+      .mockRejectedValue(
+        new Error(
+          'Failed to reach worker auth endpoint (https://worker.example/auth/nonce). Check worker URL and allowOrigins includes http://localhost:3000.',
+        ),
+      );
 
     const result = await syncWorkerSecretsAfterDeploy({
       workerUrl: 'https://worker.example',
@@ -225,10 +235,12 @@ describe('sessionWizardSecrets', () => {
       ensureSessionConfig,
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      synced: false,
-      warning: 'Connect a wallet, then save worker config from /admin.',
-      note: '',
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        synced: false,
+        warning: 'Connect a wallet, then save worker config from /admin.',
+        note: '',
+      }),
+    );
   });
 });

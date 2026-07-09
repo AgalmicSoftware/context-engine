@@ -33,13 +33,13 @@ type SurveyToolLikeState = UnknownRecord & {
   userHasResponse?: unknown;
 };
 
-type SetStateUpdate = Record<string, unknown> | null | ((prevState: SurveyToolLikeState) => Record<string, unknown> | null);
+type SetStateUpdate =
+  Record<string, unknown> | null | ((prevState: SurveyToolLikeState) => Record<string, unknown> | null);
 type SetState = (update: SetStateUpdate, callback?: () => void) => unknown;
 type ResetArgs = UnknownRecord;
 
-const resolveActiveSurveyIndex = (props: SurveyToolLikeProps = {}) => (
-  props.isStandalone || props.singleQuestionMode ? 0 : (props.surveyIndex || 0)
-);
+const resolveActiveSurveyIndex = (props: SurveyToolLikeProps = {}) =>
+  props.isStandalone || props.singleQuestionMode ? 0 : props.surveyIndex || 0;
 
 export const buildSurveyStartFreshStatePatch = ({
   cloneValue = (value: unknown) => value,
@@ -195,11 +195,12 @@ export const executeSurveyPendingRevert = ({
         nextSlice,
         isLoggedIn,
       }),
-      () => applyRevertEffects({
-        clearDraft,
-        recalculateEditStats,
-        updateJsonPreview,
-      }),
+      () =>
+        applyRevertEffects({
+          clearDraft,
+          recalculateEditStats,
+          updateJsonPreview,
+        }),
     );
 
     return {
@@ -248,29 +249,29 @@ export const executeSurveyStartFresh = ({
   const nextState = state || {};
   const surveyIndex = resolveActiveSurveyIndex(nextProps);
   const renderedQuestionIds = getRenderedQuestionIds();
-  const {
-    emptySlice,
-    nextSurveysResponseState,
-  } = buildStartFreshState({
+  const { emptySlice, nextSurveysResponseState } = buildStartFreshState({
     surveyIndex,
     renderedQuestionIds,
     prevSurveysResponseState: nextState.surveysResponseState,
     buildEmptyResponseFieldState,
   });
 
-  setState(buildSurveyStartFreshStatePatch({
-    cloneValue,
-    emptySlice,
-    nextSubmittedSinceLastEdit: updateSubmittedSinceLastEdit(nextState.submittedSinceLastEdit, 'reset'),
-    nextSurveysResponseState,
-  }), () => {
-    applyStartFreshStateEffects({
-      renderedQuestionIds,
-      clearDraftFor,
-      recalculateEditStats,
-      persistDraftSafely,
-    });
-  });
+  setState(
+    buildSurveyStartFreshStatePatch({
+      cloneValue,
+      emptySlice,
+      nextSubmittedSinceLastEdit: updateSubmittedSinceLastEdit(nextState.submittedSinceLastEdit, 'reset'),
+      nextSurveysResponseState,
+    }),
+    () => {
+      applyStartFreshStateEffects({
+        renderedQuestionIds,
+        clearDraftFor,
+        recalculateEditStats,
+        persistDraftSafely,
+      });
+    },
+  );
 
   return {
     applied: true,
@@ -293,18 +294,16 @@ export const shouldSurveyAutoStartFresh = ({
   const nextProps = props || {};
   const nextState = state || {};
   const surveyIndex = resolveActiveSurveyIndex(nextProps);
-  const surveysResponseState = Array.isArray(nextState.surveysResponseState)
-    ? nextState.surveysResponseState
-    : [];
-  const currentSlice = (
-    surveysResponseState[surveyIndex]
-    && typeof surveysResponseState[surveyIndex] === 'object'
-  ) ? surveysResponseState[surveyIndex] : {
-    answers: {},
-    additionalComments: {},
-    importance: {},
-    conviction: {},
-  };
+  const surveysResponseState = Array.isArray(nextState.surveysResponseState) ? nextState.surveysResponseState : [];
+  const currentSlice =
+    surveysResponseState[surveyIndex] && typeof surveysResponseState[surveyIndex] === 'object'
+      ? surveysResponseState[surveyIndex]
+      : {
+          answers: {},
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        };
 
   return shouldStartFresh({
     viewAddress: nextProps.viewAddress,
@@ -387,11 +386,14 @@ export const executeSurveyExitEditing = ({
     };
   } catch (error) {
     onFailure(error);
-    setState(buildSurveyExitEditingFallbackPatch({
-      nextSubmittedSinceLastEdit: updateSubmittedSinceLastEdit((state || {}).submittedSinceLastEdit, 'reset'),
-    }), () => {
-      recalculateEditStats();
-    });
+    setState(
+      buildSurveyExitEditingFallbackPatch({
+        nextSubmittedSinceLastEdit: updateSubmittedSinceLastEdit((state || {}).submittedSinceLastEdit, 'reset'),
+      }),
+      () => {
+        recalculateEditStats();
+      },
+    );
     return {
       applied: false,
       reason: 'fallback',

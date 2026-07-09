@@ -57,16 +57,18 @@ export default function SessionDocumentsPage({
   sessionConfig,
   sessionIdHex,
 }: SessionDocumentsPageProps = {}) {
-  const resolvedSessionIdHex = useMemo(() => (
-    normalizeSessionIdHex(
-      sessionIdHex ||
-      sessionConfig?.__registry?.sessionIdHex ||
-      sessionConfig?.__registry?.sessionId ||
-      sessionConfig?.sessionIdHex ||
-      sessionConfig?.sessionId ||
-      ''
-    )
-  ), [sessionIdHex, sessionConfig]);
+  const resolvedSessionIdHex = useMemo(
+    () =>
+      normalizeSessionIdHex(
+        sessionIdHex ||
+          sessionConfig?.__registry?.sessionIdHex ||
+          sessionConfig?.__registry?.sessionId ||
+          sessionConfig?.sessionIdHex ||
+          sessionConfig?.sessionId ||
+          '',
+      ),
+    [sessionIdHex, sessionConfig],
+  );
 
   const backHref = buildSessionBackHref({ sessionToken, sessionSlug });
 
@@ -74,7 +76,9 @@ export default function SessionDocumentsPage({
     <div className={styles.page}>
       <div className={styles.header}>
         <div className={styles.title}>Session Doc Library</div>
-        <a className={styles.backLink} href={backHref}>Back to session</a>
+        <a className={styles.backLink} href={backHref}>
+          Back to session
+        </a>
       </div>
 
       <DocumentLibraryPanelComponent

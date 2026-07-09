@@ -5,12 +5,12 @@ import {
   readSbtCacheMetaSnapshot,
 } from './SBTsList';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 
 jest.mock('./SBTPage', () => () => null);
 jest.mock('./CreateSBTGroup', () => () => null);
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {},
   getAllSessionEntries: jest.fn(() => []),
@@ -19,7 +19,11 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
   getSessionChainId: jest.fn(() => null),
   getSessionConfigBySlug: jest.fn(() => ({})),
   getSessionLists: jest.fn(() => ({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] })),
-  normalizeSessionSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
+  normalizeSessionSlug: jest.fn((value = '') =>
+    String(value || '')
+      .trim()
+      .toLowerCase(),
+  ),
 }));
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
@@ -33,12 +37,16 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 describe('SBTsList cache watermark reads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    normalizeSessionSlug.mockImplementation((value = '') => String(value || '').trim().toLowerCase());
+    normalizeSessionSlug.mockImplementation((value = '') =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    );
   });
 
   it('reads managed sbt cache without cloning for meta lookups', () => {
     cacheScripts.peekCacheSync.mockReturnValue({
-      '84532': {
+      84532: {
         lastBlock: 123,
         sbtList: {
           '0x1': {},
@@ -49,37 +57,37 @@ describe('SBTsList cache watermark reads', () => {
 
     const meta = readSbtCacheMetaSnapshot('edge', '84532');
 
-    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith(
-      'sbtCache',
-      'edge',
-      { clone: false }
-    );
+    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('sbtCache', 'edge', { clone: false });
     expect(meta).toEqual({ lastBlock: 123, sbtCount: 2 });
   });
 
   it('treats visible metadata changes as list changes', () => {
-    const previous = [{
-      sbtAddress: '0x1',
-      blockNumber: 123,
-      mintedAddresses: ['0xa'],
-      burnedAddresses: [],
-      sbtInfo: {
-        name: 'Alpha Group',
-        description: 'Original description',
-        image: 'https://example.com/original.png',
+    const previous = [
+      {
+        sbtAddress: '0x1',
+        blockNumber: 123,
+        mintedAddresses: ['0xa'],
+        burnedAddresses: [],
+        sbtInfo: {
+          name: 'Alpha Group',
+          description: 'Original description',
+          image: 'https://example.com/original.png',
+        },
       },
-    }];
-    const next = [{
-      sbtAddress: '0x1',
-      blockNumber: 123,
-      mintedAddresses: ['0xa'],
-      burnedAddresses: [],
-      sbtInfo: {
-        name: 'Renamed Group',
-        description: 'Updated description',
-        image: 'https://example.com/updated.png',
+    ];
+    const next = [
+      {
+        sbtAddress: '0x1',
+        blockNumber: 123,
+        mintedAddresses: ['0xa'],
+        burnedAddresses: [],
+        sbtInfo: {
+          name: 'Renamed Group',
+          description: 'Updated description',
+          image: 'https://example.com/updated.png',
+        },
       },
-    }];
+    ];
 
     expect(__test__areSbtListArraysEqual(previous, next)).toBe(false);
   });
@@ -154,10 +162,7 @@ describe('SBTsList cache watermark reads', () => {
       ],
     });
 
-    expect(buckets.baseFilteredList.map((sbt) => sbt.sbtAddress)).toEqual([
-      featuredAddress,
-      expiredAddress,
-    ]);
+    expect(buckets.baseFilteredList.map((sbt) => sbt.sbtAddress)).toEqual([featuredAddress, expiredAddress]);
     expect(buckets.displayedFeatured.map((sbt) => sbt.sbtAddress)).toEqual([featuredAddress]);
     expect(buckets.mintingLiveList.map((sbt) => sbt.sbtAddress)).toEqual([featuredAddress]);
     expect(buckets.expiredList.map((sbt) => sbt.sbtAddress)).toEqual([expiredAddress]);

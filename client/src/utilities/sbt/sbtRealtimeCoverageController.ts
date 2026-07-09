@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../web3/contractScripts.js';
+import { normalizeSessionSlug } from '../web3/chainGateway.js';
 
 interface SbtRealtimeCoverageState {
   sbtRealtimeCoverageBySlug?: Record<string, unknown>;
@@ -14,9 +14,7 @@ interface SbtRealtimeCoverageControllerOptions {
   setState?: ((updater: SbtRealtimeCoverageUpdater, cb?: unknown) => unknown) | null;
 }
 
-export const createSbtRealtimeCoverageController = ({
-  setState = null,
-}: SbtRealtimeCoverageControllerOptions = {}) => {
+export const createSbtRealtimeCoverageController = ({ setState = null }: SbtRealtimeCoverageControllerOptions = {}) => {
   const applyState = (updater: SbtRealtimeCoverageUpdater, cb?: unknown): void => {
     if (typeof setState === 'function') {
       setState(updater, cb);

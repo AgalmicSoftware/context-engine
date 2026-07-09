@@ -64,9 +64,7 @@ const SessionPublishResultLinks = ({
           <span>{registerTxs.length}</span>
         </div>
         {registerTxs.map((entry) => {
-          const txUrl = registerExplorerBaseUrl
-            ? `${registerExplorerBaseUrl}/tx/${entry.hash}`
-            : '';
+          const txUrl = registerExplorerBaseUrl ? `${registerExplorerBaseUrl}/tx/${entry.hash}` : '';
           return (
             <div
               key={entry.hash}
@@ -77,7 +75,9 @@ const SessionPublishResultLinks = ({
             >
               <span className={styles.linkLabel}>{entry.action}:</span>
               {txUrl ? (
-                <a href={txUrl} target="_blank" rel="noopener noreferrer">{txUrl}</a>
+                <a href={txUrl} target="_blank" rel="noopener noreferrer">
+                  {txUrl}
+                </a>
               ) : (
                 <span>{entry.hash}</span>
               )}
@@ -89,13 +89,17 @@ const SessionPublishResultLinks = ({
     {sessionUrl ? (
       <div className={styles.linkRow}>
         <span className={styles.linkLabel}>Session URL:</span>
-        <a href={sessionUrl} target="_blank" rel="noopener noreferrer">{sessionUrl}</a>
+        <a href={sessionUrl} target="_blank" rel="noopener noreferrer">
+          {sessionUrl}
+        </a>
       </div>
     ) : null}
     {adminUrl ? (
       <div className={styles.linkRow}>
         <span className={styles.linkLabel}>Admin URL:</span>
-        <a href={adminUrl} target="_blank" rel="noopener noreferrer" data-testid={E2E_TESTIDS.WIZARD_ADMIN_URL}>{adminUrl}</a>
+        <a href={adminUrl} target="_blank" rel="noopener noreferrer" data-testid={E2E_TESTIDS.WIZARD_ADMIN_URL}>
+          {adminUrl}
+        </a>
         <Button type="button" size="sm" className={styles.actionButton} onClick={onCopyAdminUrl}>
           <FontAwesomeIcon icon={faCopy} /> Copy
         </Button>
@@ -109,7 +113,9 @@ const SessionPublishResultLinks = ({
         data-ce-sbt-address={entry.address}
       >
         <span className={styles.linkLabel}>SBT:</span>
-        <a href={entry.href} target="_blank" rel="noopener noreferrer">{entry.label}</a>
+        <a href={entry.href} target="_blank" rel="noopener noreferrer">
+          {entry.label}
+        </a>
       </div>
     ))}
     {adminUrlStatus ? <div className={styles.copyStatus}>{adminUrlStatus}</div> : null}

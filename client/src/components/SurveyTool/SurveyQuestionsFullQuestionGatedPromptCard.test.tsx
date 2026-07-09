@@ -13,7 +13,7 @@ describe('SurveyQuestionsFullQuestionGatedPromptCard', () => {
           gatedPromptNotice: <div data-testid="gate-notice">Requires access</div>,
           tagDropdownRow: <div data-testid="tag-row">Tags</div>,
         })}
-      </>
+      </>,
     );
 
     expect(screen.getByText('Encrypted prompt')).toBeInTheDocument();
