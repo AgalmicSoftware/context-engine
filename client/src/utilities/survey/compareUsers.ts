@@ -17,12 +17,14 @@
 import { createLogger } from '../logging.js';
 import { getSbtDisplayName, getSbtMaskedFieldValue } from '../sbt/sbtDisplayNames.js';
 import { RATING_MAX, RATING_MIN } from './ratingValue.js';
+import { hashSeed, mulberry32 } from './seededPrng.js';
 
 type UnknownRecord = Record<string, unknown>;
 type AddressCountMap = Record<string, number>;
 type RegionKey = 'a' | 'b' | 'c' | 'ab' | 'ac' | 'bc' | 'abc';
 type RegionCounts = Record<RegionKey, number>;
 type RegionEvidenceMap = Record<RegionKey, string[]>;
+type RegionSetMap = Record<RegionKey, Set<string>>;
 
 interface CompareSbtEntry extends UnknownRecord {
   name?: string;
@@ -217,6 +219,98 @@ function makeToken(qid: unknown, option: unknown = undefined): string {
   return option != null ? `${q}::${toLower(option)}` : q;
 }
 
+const STANCE_REGION_SEPARATOR = '::__';
+
+function emptyRegionCounts(): RegionCounts {
+  return { a: 0, b: 0, c: 0, ab: 0, ac: 0, bc: 0, abc: 0 };
+}
+
+function emptyRegionEvidenceMap(): RegionEvidenceMap {
+  return { a: [], b: [], c: [], ab: [], ac: [], bc: [], abc: [] };
+}
+
+function emptyRegionSets(): RegionSetMap {
+  return {
+    a: new Set<string>(),
+    b: new Set<string>(),
+    c: new Set<string>(),
+    ab: new Set<string>(),
+    ac: new Set<string>(),
+    bc: new Set<string>(),
+    abc: new Set<string>(),
+  };
+}
+
+function encodeOrReuseStances(user: CompareUser): EncodedStances {
+  return user && user.tokens instanceof Map ? { tokens: user.tokens } : encodeStancesForUser(user);
+}
+
+function stanceRegionKey(token: string, sign: number): string {
+  return `${token}${STANCE_REGION_SEPARATOR}${sign}`;
+}
+
+function stanceSetForEncoded(enc: EncodedStances): Set<string> {
+  const stanceSet = new Set<string>();
+  enc.tokens.forEach(({ sign }, token) => {
+    if (sign !== 0) stanceSet.add(stanceRegionKey(token, sign));
+  });
+  return stanceSet;
+}
+
+function intersectSets(left: Set<string>, right: Set<string>): Set<string> {
+  const out = new Set<string>();
+  left.forEach((value) => {
+    if (right.has(value)) out.add(value);
+  });
+  return out;
+}
+
+function diffSets(left: Set<string>, right: Set<string>): Set<string> {
+  const out = new Set<string>();
+  left.forEach((value) => {
+    if (!right.has(value)) out.add(value);
+  });
+  return out;
+}
+
+function unionSets(left: Set<string>, right: Set<string>): Set<string> {
+  const out = new Set<string>(left);
+  right.forEach((value) => out.add(value));
+  return out;
+}
+
+function buildStanceRegions(pairSets: Set<string>[]): { counts: RegionCounts; sets: RegionSetMap } {
+  const sets = emptyRegionSets();
+  if (pairSets.length === 2) {
+    const [A, B] = pairSets;
+    sets.ab = intersectSets(A, B);
+    sets.a = diffSets(A, sets.ab);
+    sets.b = diffSets(B, sets.ab);
+  } else if (pairSets.length === 3) {
+    const [A, B, C] = pairSets;
+    sets.abc = intersectSets(intersectSets(A, B), C);
+    sets.ab = diffSets(intersectSets(A, B), sets.abc);
+    sets.ac = diffSets(intersectSets(A, C), sets.abc);
+    sets.bc = diffSets(intersectSets(B, C), sets.abc);
+    sets.a = diffSets(A, unionSets(sets.ab, unionSets(sets.ac, sets.abc)));
+    sets.b = diffSets(B, unionSets(sets.ab, unionSets(sets.bc, sets.abc)));
+    sets.c = diffSets(C, unionSets(sets.ac, unionSets(sets.bc, sets.abc)));
+  }
+
+  return {
+    counts: {
+      a: sets.a.size,
+      b: sets.b.size,
+      c: sets.c.size,
+      ab: sets.ab.size,
+      ac: sets.ac.size,
+      bc: sets.bc.size,
+      abc: sets.abc.size,
+    },
+    sets,
+  };
+}
+
 /** encodeStancesForUser(user) → { tokens: Map<token,{sign,weight}> } */
 export function encodeStancesForUser(user: Partial<CompareUser> = {}): EncodedStances {
   const tokens = new Map<string, StanceToken>();
@@ -280,40 +374,9 @@ export function selectTopOpinionTokens(users: CompareUser[] = [], topN = 20): st
 /** opinionVennTriplet(users3) → counts per 7 regions (sign-aware) */
 export function opinionVennTriplet(users3: CompareUser[] = []): RegionCounts {
   const arr = Array.isArray(users3) ? users3.slice(0, 3) : [];
-  if (arr.length !== 3) return { a: 0, b: 0, c: 0, ab: 0, ac: 0, bc: 0, abc: 0 };
-  const encs: EncodedStances[] = arr.map((u) =>
-    u && u.tokens instanceof Map ? { tokens: u.tokens } : encodeStancesForUser(u),
-  );
-  const pairSets = encs.map((e) => {
-    const S = new Set<string>();
-    e.tokens.forEach(({ sign }, tok) => {
-      if (sign !== 0) S.add(`${tok}::${sign}`);
-    });
-    return S;
-  });
-  const [A, B, C] = pairSets;
-  const inter = (S1: Set<string>, S2: Set<string>): number => {
-    let c = 0;
-    S1.forEach((v) => {
-      if (S2.has(v)) c++;
-    });
-    return c;
-  };
-  const inter3 = (S1: Set<string>, S2: Set<string>, S3: Set<string>): number => {
-    let c = 0;
-    S1.forEach((v) => {
-      if (S2.has(v) && S3.has(v)) c++;
-    });
-    return c;
-  };
-  const abc = inter3(A, B, C);
-  const ab = inter(A, B) - abc,
-    ac = inter(A, C) - abc,
-    bc = inter(B, C) - abc;
-  const a = A.size - (ab + ac + abc);
-  const b = B.size - (ab + bc + abc);
-  const c = C.size - (ac + bc + abc);
-  return { a, b, c, ab, ac, bc, abc };
+  if (arr.length !== 3) return emptyRegionCounts();
+  const pairSets = arr.map((user) => stanceSetForEncoded(encodeOrReuseStances(user)));
+  return buildStanceRegions(pairSets).counts;
 }
 
 /** computeVennEvidence(users) → counts+evidenceMap+semantics; supports 2 or 3 users */
@@ -326,39 +389,13 @@ export function computeVennEvidence(users: CompareUser[] = []): {
   const semantics = 'Counts = opinion-stance overlaps: identical non-zero signs on the same question/token.';
   if (arr.length < 2 || arr.length > 3) {
     return {
-      counts: { a: 0, b: 0, c: 0, ab: 0, ac: 0, bc: 0, abc: 0 },
-      evidenceMap: { a: [], b: [], c: [], ab: [], ac: [], bc: [], abc: [] },
+      counts: emptyRegionCounts(),
+      evidenceMap: emptyRegionEvidenceMap(),
       semantics,
     };
   }
-  const encs = arr.map(encodeStancesForUser);
-  const pairSet = (enc: EncodedStances): Set<string> => {
-    const S = new Set<string>();
-    enc.tokens.forEach(({ sign }, tok) => {
-      if (sign !== 0) S.add(`${tok}::__${sign}`);
-    });
-    return S;
-  };
-  const pairSets = encs.map(pairSet);
-  const inter = (S1: Set<string>, S2: Set<string>): Set<string> => {
-    const out = new Set<string>();
-    S1.forEach((v) => {
-      if (S2.has(v)) out.add(v);
-    });
-    return out;
-  };
-  const diff = (S1: Set<string>, S2: Set<string>): Set<string> => {
-    const out = new Set<string>();
-    S1.forEach((v) => {
-      if (!S2.has(v)) out.add(v);
-    });
-    return out;
-  };
-  const union = (S1: Set<string>, S2: Set<string>): Set<string> => {
-    const out = new Set<string>(S1);
-    S2.forEach((v) => out.add(v));
-    return out;
-  };
+  const pairSets = arr.map((user) => stanceSetForEncoded(encodeOrReuseStances(user)));
+  const regions = buildStanceRegions(pairSets);
 
   // qid -> prompt lookup for compact labels
   const qMeta = new Map<string, { prompt: string }>();
@@ -369,9 +406,9 @@ export function computeVennEvidence(users: CompareUser[] = []): {
     }),
   );
   const pretty = (pairStr: string): string => {
-    const last = pairStr.lastIndexOf('::__');
+    const last = pairStr.lastIndexOf(STANCE_REGION_SEPARATOR);
     const token = last >= 0 ? pairStr.slice(0, last) : pairStr;
-    const signStr = last >= 0 ? pairStr.slice(last + 4) : '1';
+    const signStr = last >= 0 ? pairStr.slice(last + STANCE_REGION_SEPARATOR.length) : '1';
     const sign = signStr === '-1' ? '−' : '+';
     const idx = token.indexOf('::');
     const qid = idx === -1 ? token : token.slice(0, idx);
@@ -383,56 +420,23 @@ export function computeVennEvidence(users: CompareUser[] = []): {
   };
   const cap = (S: Set<string>): string[] => Array.from(S).slice(0, 30).map(pretty);
 
-  if (arr.length === 2) {
-    const [A, B] = pairSets;
-    const AB = inter(A, B);
-    const A1 = diff(A, AB);
-    const B1 = diff(B, AB);
-    const evidenceMap: RegionEvidenceMap = { a: cap(A1), b: cap(B1), c: [], ab: cap(AB), ac: [], bc: [], abc: [] };
-    const counts: RegionCounts = { a: A1.size, b: B1.size, c: 0, ab: AB.size, ac: 0, bc: 0, abc: 0 };
-    for (const k of Object.keys(counts) as RegionKey[]) {
-      if (counts[k] > 0 && (!Array.isArray(evidenceMap[k]) || evidenceMap[k].length === 0)) {
-        evidenceMap[k] = [`${k.toUpperCase()} region (${counts[k]})`];
-      }
-    }
-    return { counts, evidenceMap, semantics };
-  }
-
-  const [A, B, C] = pairSets;
-  const ABC = inter(inter(A, B), C);
-  const AB = diff(inter(A, B), ABC);
-  const AC = diff(inter(A, C), ABC);
-  const BC = diff(inter(B, C), ABC);
-  const A1 = diff(A, union(AB, union(AC, ABC)));
-  const B1 = diff(B, union(AB, union(BC, ABC)));
-  const C1 = diff(C, union(AC, union(BC, ABC)));
-
   const evidenceMap: RegionEvidenceMap = {
-    a: cap(A1),
-    b: cap(B1),
-    c: cap(C1),
-    ab: cap(AB),
-    ac: cap(AC),
-    bc: cap(BC),
-    abc: cap(ABC),
-  };
-  const counts: RegionCounts = {
-    a: A1.size,
-    b: B1.size,
-    c: C1.size,
-    ab: AB.size,
-    ac: AC.size,
-    bc: BC.size,
-    abc: ABC.size,
+    a: cap(regions.sets.a),
+    b: cap(regions.sets.b),
+    c: cap(regions.sets.c),
+    ab: cap(regions.sets.ab),
+    ac: cap(regions.sets.ac),
+    bc: cap(regions.sets.bc),
+    abc: cap(regions.sets.abc),
   };
 
   // Guarantee non-empty evidence for regions with positive counts
-  for (const k of Object.keys(counts) as RegionKey[]) {
-    if (counts[k] > 0 && (!Array.isArray(evidenceMap[k]) || evidenceMap[k].length === 0)) {
-      evidenceMap[k] = [`${k.toUpperCase()} region (${counts[k]})`];
+  for (const k of Object.keys(regions.counts) as RegionKey[]) {
+    if (regions.counts[k] > 0 && (!Array.isArray(evidenceMap[k]) || evidenceMap[k].length === 0)) {
+      evidenceMap[k] = [`${k.toUpperCase()} region (${regions.counts[k]})`];
     }
   }
-  return { counts, evidenceMap, semantics };
+  return { counts: regions.counts, evidenceMap, semantics };
 }
 
 /** pcaLiteCompass(users) → deterministic axes+points in [-1,1] */
@@ -481,21 +485,6 @@ export function pcaLiteCompass(users: CompareUser[] = []): CompassBundle {
     const points = addrList.map((a, i) => ({ address: a, x: U > 1 ? clamp(-1 + (2 * i) / (U - 1), -1, 1) : 0, y: 0 }));
     return { axes, points, evidence: { x: [], y: [] } };
   }
-  const hashSeed = (str: string): number => {
-    let h = 2166136261 >>> 0;
-    for (let i = 0; i < str.length; i++) {
-      h ^= str.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
-  };
-  const mulberry32 = (a: number): (() => number) =>
-    function () {
-      let t = (a += 0x6d2b79f5);
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
   const rand = mulberry32(hashSeed(JSON.stringify({ addresses: addrList, tokens })));
   const Av = (v: number[]): number[] => {
     const y = Array<number>(U).fill(0);
@@ -517,7 +506,11 @@ export function pcaLiteCompass(users: CompareUser[] = []): CompassBundle {
     return z;
   };
   const dot = (a: number[], b: number[]): number => a.reduce((s, v, i) => s + v * b[i], 0);
-  const norm = (v: number[]): number => Math.hypot(...v);
+  const norm = (v: number[]): number => {
+    let sum = 0;
+    for (let i = 0; i < v.length; i++) sum += v[i] * v[i];
+    return Math.sqrt(sum);
+  };
   const scale = (v: number[], k: number): number[] => v.map((x) => x * k);
   const sub = (a: number[], b: number[]): number[] => a.map((x, i) => x - b[i]);
   const powerIter = (q: number[] | null = null, iters = 10): number[] => {
@@ -543,10 +536,17 @@ export function pcaLiteCompass(users: CompareUser[] = []): CompassBundle {
     s2 = Av(v2);
   const S1 = s1.reduce((a, b) => a + b, 0) >= 0 ? s1 : s1.map((v) => -v);
   const S2 = s2.reduce((a, b) => a + b, 0) >= 0 ? s2 : s2.map((v) => -v);
-  const maxAbs = (arr: number[]): number => Math.max(1e-9, ...arr.map((v) => Math.abs(v)));
-  const Xmax = maxAbs(S1),
-    Ymax = maxAbs(S2);
-  const points = addrList.map((a, i) => ({ address: a, x: clamp(S1[i] / Xmax, -1, 1), y: clamp(S2[i] / Ymax, -1, 1) }));
+  const rawMaxAbs = (arr: number[]): number => arr.reduce((max, value) => Math.max(max, Math.abs(value)), 0);
+  const maxAbsS1 = rawMaxAbs(S1);
+  const maxAbsS2 = rawMaxAbs(S2);
+  const adjustedS2 = maxAbsS1 > 0 && maxAbsS2 < 1e-6 * maxAbsS1 ? S2.map(() => 0) : S2;
+  const Xmax = Math.max(1e-9, maxAbsS1);
+  const Ymax = Math.max(1e-9, rawMaxAbs(adjustedS2));
+  const points = addrList.map((a, i) => ({
+    address: a,
+    x: clamp(S1[i] / Xmax, -1, 1),
+    y: clamp(adjustedS2[i] / Ymax, -1, 1),
+  }));
   return { axes, points, evidence: { x: [], y: [] } };
 }
 
@@ -982,7 +982,7 @@ export function buildUsersFromCaches(
         id: qid,
         type: String(qData.type || objRecord.type || 'unknown'),
         prompt: String(qData.prompt || objRecord.prompt || 'Unknown Question'),
-        answer: Array.isArray(ans) ? ans : ans,
+        answer: ans,
         importance: extractImportance(obj),
         additionalComment: extractAdditionalComment(obj) || undefined,
       });
@@ -1019,7 +1019,7 @@ export function buildUsersFromCaches(
           id: qid,
           type: String(qData.type || r.type || 'unknown'),
           prompt: String(qData.prompt || r.prompt || 'Unknown Question'),
-          answer: Array.isArray(val) ? val : val,
+          answer: val,
           importance: extractImportance(r),
           additionalComment: extractAdditionalComment(r) || undefined,
         });

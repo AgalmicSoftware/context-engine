@@ -20,6 +20,7 @@
 import * as d3 from 'd3';
 import { UMAP } from 'umap-js';
 import { kmeans as Kmeans } from 'ml-kmeans';
+import { mulberry32 } from './seededPrng.js';
 
 type NumericCell = number | null | undefined;
 type NumericMatrix = number[][];
@@ -103,15 +104,6 @@ export function doUMAP(data: NumericMatrix, nNeighbors = 15, randomSeed: number 
   const umapOptions: { nNeighbors: number; random?: () => number } = { nNeighbors };
 
   if (randomSeed !== null) {
-    // Simple PRNG for deterministic results
-    const mulberry32 = (a: number) => {
-      return function () {
-        var t = (a += 0x6d2b79f5);
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-      };
-    };
     umapOptions.random = mulberry32(randomSeed);
   }
 

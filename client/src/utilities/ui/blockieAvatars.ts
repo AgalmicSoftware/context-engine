@@ -7,26 +7,9 @@
  * Key exports: generateBlockieDataUrl, getBlockieDataUrl, hashSeed, hslToRgb
  */
 
-// Deterministic FNV-1a 32-bit hash of a string
-export function hashSeed(str: unknown): number {
-  const s = String(str || '');
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
+import { hashSeed, mulberry32 } from '../survey/seededPrng.js';
 
-// Tiny PRNG used in existing code (mulberry32)
-export function mulberry32(a: number): () => number {
-  return function (): number {
-    let t = (a += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+export { hashSeed, mulberry32 };
 
 // HSL → RGB (same math used previously)
 export function hslToRgb(h: number, s: number, l: number): number[] {

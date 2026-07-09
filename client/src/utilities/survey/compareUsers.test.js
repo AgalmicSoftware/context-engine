@@ -445,6 +445,39 @@ describe('compare user pure helpers', () => {
     expect(computeVennEvidence([opinionUsers[0]]).counts).toEqual({ a: 0, b: 0, c: 0, ab: 0, ac: 0, bc: 0, abc: 0 });
   });
 
+  it('uses shared signed stance regions for Venn counts and evidence', () => {
+    const signedTokenUsers = [
+      {
+        tokens: new Map([
+          ['a', { sign: 1 }],
+          ['ab', { sign: 1 }],
+          ['ac', { sign: -1 }],
+          ['abc', { sign: -1 }],
+        ]),
+      },
+      {
+        tokens: new Map([
+          ['b', { sign: 1 }],
+          ['ab', { sign: 1 }],
+          ['bc', { sign: 1 }],
+          ['abc', { sign: -1 }],
+        ]),
+      },
+      {
+        tokens: new Map([
+          ['c', { sign: 1 }],
+          ['ac', { sign: -1 }],
+          ['bc', { sign: 1 }],
+          ['abc', { sign: -1 }],
+        ]),
+      },
+    ];
+    const expectedCounts = { a: 1, b: 1, c: 1, ab: 1, ac: 1, bc: 1, abc: 1 };
+
+    expect(opinionVennTriplet(signedTokenUsers)).toEqual(expectedCounts);
+    expect(computeVennEvidence(signedTokenUsers).counts).toEqual(expectedCounts);
+  });
+
   it('creates and sanitizes deterministic compass points', () => {
     const compass = pcaLiteCompass(opinionUsers);
     const sanitized = sanitizeCompass(
@@ -470,5 +503,21 @@ describe('compare user pure helpers', () => {
       evidence: { x: ['one', 'two', 'three', 'four', 'five'], y: ['north'] },
     });
     expect(sanitizeCompass(null)).toBeNull();
+  });
+
+  it('collapses a numerically empty second compass axis for opposite two-user stances', () => {
+    const compass = pcaLiteCompass([
+      {
+        address: ADDRESS_A,
+        questions: [{ id: 'q1', type: 'binary', answer: 'yes' }],
+      },
+      {
+        address: ADDRESS_B,
+        questions: [{ id: 'q1', type: 'binary', answer: 'no' }],
+      },
+    ]);
+
+    expect(compass.points).toHaveLength(2);
+    expect(compass.points.map((point) => point.y)).toEqual([0, 0]);
   });
 });
