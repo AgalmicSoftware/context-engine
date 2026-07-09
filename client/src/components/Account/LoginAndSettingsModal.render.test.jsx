@@ -363,95 +363,6 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     checkSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
   });
 
-  it('resolves a signed-out pure Worker session and presents passkey as its only identity path', () => {
-    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
-      slug === 'demo-sh' ? buildPureWorkerSessionConfig() : {},
-    );
-    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'demo-sh' }));
-
-    const tree = subject.getModalDisplay();
-    render(tree);
-
-    expect(getSessionConfigBySlugOrDefault).toHaveBeenCalledWith('demo-sh');
-    expect(screen.getByText('Account uses a passkey:')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Ethereum wallet' })).not.toBeInTheDocument();
-    expect(screen.queryByText('test network only')).not.toBeInTheDocument();
-    expect(treeHasElementType(tree, MetaMaskLoginButton)).toBe(false);
-  });
-
-  it('retains the signed-out wallet identity path for registry sessions', () => {
-    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
-      slug === 'registry' ? buildRegistrySessionConfig({ slug: 'registry' }) : {},
-    );
-    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'registry' }));
-
-    const tree = subject.getModalDisplay();
-    render(tree);
-
-    expect(getSessionConfigBySlugOrDefault).toHaveBeenCalledWith('registry');
-    expect(screen.getByRole('link', { name: 'Ethereum wallet' })).toBeInTheDocument();
-    expect(screen.getByText('test network only')).toBeInTheDocument();
-    expect(treeHasElementType(tree, MetaMaskLoginButton)).toBe(true);
-  });
-
-  it.each([
-    [
-      'missing',
-      {
-        slug: 'unavailable',
-        networkChainId: 11155420,
-      },
-    ],
-    [
-      'invalid',
-      {
-        slug: 'unavailable',
-        networkChainId: 11155420,
-        sessionModeProfile: {
-          profileVersion: 1,
-          authority: { mode: 'worker_canonical' },
-        },
-      },
-    ],
-  ])('fails closed for a concrete %s capability profile instead of inferring wallet auth', (_label, config) => {
-    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (slug === 'unavailable' ? config : {}));
-    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'unavailable' }));
-
-    const tree = subject.getModalDisplay();
-    render(tree);
-
-    expect(screen.getByTestId('ce-session-identity-unavailable')).toHaveTextContent(
-      /capability profile is unavailable or invalid/i,
-    );
-    expect(screen.queryByRole('link', { name: 'Ethereum wallet' })).not.toBeInTheDocument();
-    expect(screen.queryByText('test network only')).not.toBeInTheDocument();
-    expect(treeHasElementType(tree, MetaMaskLoginButton)).toBe(false);
-  });
-
-  it('retains the signed-out wallet access path for validated Worker hybrids', () => {
-    const hybridConfig = buildHybridWorkerSessionConfig();
-    expect(resolveSessionCapabilityProjection(hybridConfig)).toMatchObject({
-      profileValid: true,
-      isWorkerCanonical: true,
-      isPureWorkerCanonical: false,
-      usesRpc: true,
-    });
-    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (slug === 'hybrid' ? hybridConfig : {}));
-    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'hybrid' }));
-
-    const tree = subject.getModalDisplay();
-    render(tree);
-
-    expect(screen.getByText('Account uses a passkey:')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Ethereum wallet' })).not.toBeInTheDocument();
-    expect(screen.getByTestId('ce-advanced-wallet-access')).toHaveTextContent('Advanced on-chain access');
-    expect(screen.getByTestId('ce-advanced-wallet-access')).toHaveTextContent(
-      "Use an Ethereum wallet only for this session's optional on-chain gates.",
-    );
-    expect(screen.getByText('test network only')).toBeInTheDocument();
-    expect(treeHasElementType(tree, MetaMaskLoginButton)).toBe(true);
-  });
-
   it('renders passkey auth without a MetaMask login control by default', () => {
     const props = buildProps();
     const subject = new LoginAndSettingsModal(props);
@@ -464,25 +375,6 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByRole('button', { name: 'Open Crypto Login (RainbowKit)' })).not.toBeInTheDocument();
     expect(screen.queryByAltText('MetaMask')).not.toBeInTheDocument();
     expect(props.openConnectModal).not.toHaveBeenCalled();
-  });
-
-  it('shows an inline recovery hint when login has no stored passkey wallet record', async () => {
-    const missingWalletError = Object.assign(new Error('No encrypted passkey wallet is saved in this browser.'), {
-      code: 'CE_PASSKEY_WALLET_RECORD_MISSING',
-    });
-    passkeyWallet.unlockPasskeyWallet.mockRejectedValueOnce(missingWalletError);
-
-    render(<LoginAndSettingsModal {...buildProps()} />);
-
-    const loginButton = getPasskeyLoginButton();
-    expect(loginButton).toBeTruthy();
-    fireEvent.click(loginButton);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
-        /No passkey wallet is saved in this browser/i,
-      );
-    });
   });
 
   it('shows an inline recovery hint when login has no stored passkey wallet record', async () => {

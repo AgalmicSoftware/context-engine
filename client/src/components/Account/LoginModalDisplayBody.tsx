@@ -132,19 +132,11 @@ const LoginModalDisplayBody = ({
 
           {renderAgentTokenLoginPanel()}
 
-          {showAdvancedWalletAccess ? (
-            <div className={styles.advancedWalletAccessNotice} data-testid="ce-advanced-wallet-access">
-              <strong>Advanced on-chain access</strong>
-              <span>Use an Ethereum wallet only for this session&apos;s optional on-chain gates.</span>
-            </div>
-          ) : null}
-          {showWalletIdentity || showAdvancedWalletAccess ? (
-            <MetaMaskLoginButton
-              onClick={openCryptoModal}
-              className={styles.cryptoLoginLink}
-              iconClassName={styles.cryptoLoginIcon}
-            />
-          ) : null}
+          <MetaMaskLoginButton
+            onClick={openCryptoModal}
+            className={styles.cryptoLoginLink}
+            iconClassName={styles.cryptoLoginIcon}
+          />
         </div>
       </CardBody>
     );

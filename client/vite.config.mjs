@@ -7,7 +7,7 @@ import { defineConfig, loadEnv, transformWithEsbuild } from 'vite';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, 'src');
 const publicDir = path.resolve(__dirname, 'public');
-const postsDir = path.resolve(__dirname, '..', 'posts');
+const metaMaskImageFilename = 'metamask_icon_white.png';
 const headers = {
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
   'Cross-Origin-Embedder-Policy': 'unsafe-none',
@@ -312,6 +312,53 @@ const readClientEnv = (mode) => {
   };
 };
 
+export const parsePublicBoolEnv = (raw, fallback = false) => {
+  const normalized = String(raw ?? '')
+    .trim()
+    .toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return fallback;
+};
+
+export const resolveWalletRuntimeProfile = (clientEnv) => {
+  const metaMaskConnectorEnabled = parsePublicBoolEnv(clientEnv.REACT_APP_CE_ENABLE_METAMASK_CONNECTOR, false);
+  return {
+    metaMaskConnectorEnabled,
+    connectorModule: path.resolve(
+      srcDir,
+      'app',
+      'runtime',
+      metaMaskConnectorEnabled ? 'walletConnectorProfile.metamask.ts' : 'walletConnectorProfile.ts',
+    ),
+    uiModule: path.resolve(
+      srcDir,
+      'app',
+      'runtime',
+      metaMaskConnectorEnabled ? 'walletUiRuntime.metamask.tsx' : 'walletUiRuntime.tsx',
+    ),
+  };
+};
+
+const passkeyOnlyForbiddenModulePatterns = [
+  /\/node_modules\/@rainbow-me\/rainbowkit\//i,
+  /\/node_modules\/@walletconnect\//i,
+  /\/node_modules\/wagmi\/(?:dist\/)?connectors\/metamask/i,
+  /\/node_modules\/@wagmi\/.+\/metamask/i,
+  /\/walletConnectorProfile\.metamask\.tsx?$/i,
+  /\/walletUiRuntime\.metamask\.tsx?$/i,
+  /\/metamask_icon_white\.png$/i,
+];
+
+export const findPasskeyOnlyForbiddenModules = (moduleIds) =>
+  moduleIds
+    .map((moduleId) =>
+      String(moduleId || '')
+        .split(path.sep)
+        .join('/'),
+    )
+    .filter((moduleId) => passkeyOnlyForbiddenModulePatterns.some((pattern) => pattern.test(moduleId)));
+
 const resolveExistingTsSibling = (request, importer) => {
   if (!request.endsWith('.js') || !importer) return null;
   if (importer.includes(`${path.sep}node_modules${path.sep}`)) return null;
@@ -397,14 +444,52 @@ const jsxInJsCompatibilityPlugin = () => ({
   },
 });
 
-const copyStaticImageAssetsPlugin = () => ({
+const copyStaticImageAssetsPlugin = (metaMaskConnectorEnabled) => ({
   name: 'ce-copy-static-image-assets',
   apply: 'build',
   writeBundle(options) {
     const sourceDir = path.resolve(srcDir, 'assets', 'img');
     const outputDir = path.resolve(options.dir || path.resolve(__dirname, 'build'), 'images');
     if (!fs.existsSync(sourceDir)) return;
-    fs.cpSync(sourceDir, outputDir, { recursive: true });
+    fs.cpSync(sourceDir, outputDir, {
+      recursive: true,
+      filter: (source) => metaMaskConnectorEnabled || path.basename(source) !== metaMaskImageFilename,
+    });
+  },
+});
+
+const walletProfileBundleGuardPlugin = (walletRuntimeProfile) => ({
+  name: 'ce-wallet-profile-bundle-guard',
+  apply: 'build',
+  generateBundle(_outputOptions, bundle) {
+    const moduleIds = Object.values(bundle).flatMap((output) =>
+      output.type === 'chunk' ? Object.keys(output.modules) : [],
+    );
+    const forbiddenModuleMatches = walletRuntimeProfile.metaMaskConnectorEnabled
+      ? []
+      : findPasskeyOnlyForbiddenModules(moduleIds);
+
+    if (forbiddenModuleMatches.length) {
+      this.error(
+        `Passkey-only build included forbidden wallet modules:\n${forbiddenModuleMatches
+          .map((moduleId) => `- ${moduleId}`)
+          .join('\n')}`,
+      );
+    }
+
+    this.emitFile({
+      type: 'asset',
+      fileName: 'ce-wallet-profile.json',
+      source: `${JSON.stringify(
+        {
+          version: 1,
+          metaMaskConnectorEnabled: walletRuntimeProfile.metaMaskConnectorEnabled,
+          passkeyOnlyBundleGuard: walletRuntimeProfile.metaMaskConnectorEnabled ? 'not-applicable' : 'passed',
+        },
+        null,
+        2,
+      )}\n`,
+    });
   },
 });
 
@@ -451,6 +536,7 @@ const postsAssetsCompatibilityPlugin = () => ({
 
 export default defineConfig(({ mode }) => {
   const clientEnv = readClientEnv(mode);
+  const walletRuntimeProfile = resolveWalletRuntimeProfile(clientEnv);
 
   return {
     appType: 'spa',
@@ -465,8 +551,8 @@ export default defineConfig(({ mode }) => {
       react(),
       jsToTsCompatibilityPlugin(),
       litContractsSubpathShim(),
-      rawLoaderCompatibilityPlugin(),
-      copyStaticImageAssetsPlugin(),
+      copyStaticImageAssetsPlugin(walletRuntimeProfile.metaMaskConnectorEnabled),
+      walletProfileBundleGuardPlugin(walletRuntimeProfile),
       publicAssetsCompatibilityPlugin(),
       postsAssetsCompatibilityPlugin(),
       {
@@ -478,6 +564,8 @@ export default defineConfig(({ mode }) => {
     ],
     resolve: {
       alias: [
+        { find: /^.*\/walletConnectorProfile\.js$/, replacement: walletRuntimeProfile.connectorModule },
+        { find: /^.*\/walletUiRuntime\.js$/, replacement: walletRuntimeProfile.uiModule },
         { find: 'assets', replacement: path.resolve(srcDir, 'assets') },
         { find: 'components', replacement: path.resolve(srcDir, 'components') },
         { find: 'utilities', replacement: path.resolve(srcDir, 'utilities') },

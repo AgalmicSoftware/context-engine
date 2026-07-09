@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
   decentralized sessions, with the existing setup UI revealed after Continue.
 - Added public release PII scanning and stricter public push protection for
   release branches.
+- Added a default-off MetaMask build profile. Passkey-only builds remove the
+  MetaMask login control and fail if MetaMask/RainbowKit connector modules or
+  assets enter the emitted client bundle.
 
 ### Fixed
 

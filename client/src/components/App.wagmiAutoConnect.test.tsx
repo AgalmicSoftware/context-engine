@@ -278,19 +278,23 @@ describe('App wagmi auto-connect persistence', () => {
     expect(mockCreateClient).toHaveBeenCalledWith(expect.objectContaining({ autoConnect: true }));
   });
 
-  it('passes the configured websocket provider through without enabling WalletConnect by default', () => {
+  it('passes the configured websocket provider through with no browser-wallet connectors by default', () => {
     loadAppModule();
 
     expect(mockCreateClient).toHaveBeenCalledWith(
       expect.objectContaining({
+        connectors: [],
         webSocketProvider: { kind: 'configured-websocket-provider' },
       }),
     );
+    expect(mockConnectorsForWallets).not.toHaveBeenCalled();
+    expect(mockMetaMaskWallet).not.toHaveBeenCalled();
+    expect(mockMetaMaskConnector).not.toHaveBeenCalled();
     expect(mockMetaMaskWalletCreateConnector).not.toHaveBeenCalled();
   });
 
-  it('uses an injected-only MetaMask connector by default to avoid WalletConnect bridge startup', () => {
-    loadAppModule();
+  it('uses an injected-only MetaMask connector when the browser-wallet profile is enabled', () => {
+    buildEnabledMetaMaskConnectors();
 
     expect(mockCreateClient).toHaveBeenCalledWith(
       expect.objectContaining({

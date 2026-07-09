@@ -203,14 +203,13 @@ Registration cost notes:
 - `SessionRegistry.createSession(...)` currently requires a `0.0001 ETH` creation fee on top of gas
 - `setSessionFields(...)` and `setResourceGates(...)` are separate follow-up transactions in the current flow
 
-### 4. A connected browser wallet
+### 4. A signing wallet
 
-Use any wallet that can connect to OP Sepolia and sign both transactions and SIWE-style messages:
+The default client build is passkey-only and uses the Context Engine passkey EOA wallet to sign OP Sepolia transactions and SIWE-style messages.
 
-- MetaMask
 - Context Engine passkey EOA wallet
-- Coinbase Wallet
-- Other WalletConnect-compatible wallets
+
+Deployments built with `REACT_APP_CE_ENABLE_METAMASK_CONNECTOR=true` can also use MetaMask. The separate WalletConnect fallback remains opt-in; see `docs/public-client-config.md`.
 
 The same wallet is used for:
 

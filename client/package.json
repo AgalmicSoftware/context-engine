@@ -64,6 +64,7 @@
     "analyze": "source-map-explorer 'build/assets/*.js'",
     "start": "serve -s build",
     "build": "PUBLIC_URL=/ vite build",
+    "verify:passkey-only-bundle": "node scripts/verify-passkey-only-bundle.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "jest",
     "typecheck": "tsc --noEmit",
