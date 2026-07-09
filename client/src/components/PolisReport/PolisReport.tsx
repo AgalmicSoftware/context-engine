@@ -15,12 +15,12 @@ import {
   faChevronRight,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { beeswarmByExtremity, getCommentBarData } from '../../utilities/survey/polisMath';
+import { beeswarmByExtremity, getCommentBarData } from '../../utilities/survey/consensusMath';
 import {
   computePolisCommentStats,
   computePolisConversationMath,
   findRepresentativeQuestions,
-} from '../../utilities/survey/polisReportMath.js';
+} from '../../utilities/survey/consensusReportMath.js';
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import styles from './PolisReport.module.scss';

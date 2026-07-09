@@ -1,7 +1,7 @@
 import React from 'react';
 import * as d3 from 'd3';
 
-import { clusterUMAPPointsKmeans, doUMAP } from '../../utilities/survey/polisMath';
+import { clusterUMAPPointsKmeans, doUMAP } from '../../utilities/survey/consensusMath';
 import demoData from '../../variables/demo/demo_polis_data.json';
 import { CE_DEMO_SESSION_SLUGS, POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import { getChainById } from '../../variables/chains.js';

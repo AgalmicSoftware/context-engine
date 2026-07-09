@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styles from './BeeswarmPlot.module.scss';
-import { beeswarmByExtremity } from '../../utilities/survey/polisMath.js';
+import { beeswarmByExtremity } from '../../utilities/survey/consensusMath.js';
 
 const AXIS_BOTTOM_PADDING = 28;
 const POINT_RADIUS = 8;

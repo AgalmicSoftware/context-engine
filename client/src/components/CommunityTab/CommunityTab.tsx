@@ -38,7 +38,7 @@ import { peekCacheSync, readCache, subscribeCacheUpdates, writeCache } from '../
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
-import { computeQuestionDivisiveness } from '../../utilities/survey/polisMath.js';
+import { computeQuestionDivisiveness } from '../../utilities/survey/consensusMath.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import {
   GLOBAL_SESSION_SELECTION_UPDATED_EVENT,

@@ -1,12 +1,12 @@
 /**
- * @module polisMath
+ * @module consensusMath
  * @description Legacy Polis-inspired utilities retained for generic charting helpers.
- *              Live Polis-equivalent report math now lives in `polisReportMath.js`.
+ *              Live Polis-equivalent report math now lives in `consensusReportMath.ts`.
  *
  * Key exports: (standalone library, exports via default)
  */
 /**************************************************************
- * polisMath.js
+ * consensusMath.ts
  *
  * A self-contained utility library for shared chart helpers:
  *  - generic beeswarm layout

@@ -24,4 +24,4 @@ Research papers, specifications, and resources that may be useful for future fea
 ### Red Dwarf (Polis Community)
 - **URL:** https://github.com/polis-community/red-dwarf/tree/main/
 - **Summary:** Python library that reproduces Polis-like participatory democracy pipelines — loads voting data, applies dimensionality reduction (PCA, PaCMAP) and clustering (K-means, HDBSCAN) to identify opinion groups. Built on scikit-learn.
-- **Relevance:** Direct reference implementation for the Polis math that Context Engine's `polisMath.ts` implements. Useful for validating our clustering, comparing algorithms, or porting improved techniques.
+- **Relevance:** Direct reference implementation for the Polis math that Context Engine's `consensusMath.ts` implements. Useful for validating our clustering, comparing algorithms, or porting improved techniques.

@@ -4,7 +4,7 @@ import {
   computePolisConversationMath,
   computePolisStats,
   findRepresentativeQuestions,
-} from './polisReportMath';
+} from './consensusReportMath';
 
 describe('computePolisStats', () => {
   it('counts agree, disagree, and unsure votes in the summary stats', () => {

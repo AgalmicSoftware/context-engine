@@ -16,7 +16,7 @@ import {
   subtractColumnMeans,
   subtractRowMeans,
   wrappedPCA,
-} from './polisMath';
+} from './consensusMath';
 
 const ratingMatrix = [
   [1, 1, -1, -1],
@@ -25,7 +25,7 @@ const ratingMatrix = [
   [null, 1, 0, -1],
 ];
 
-describe('polisMath matrix and PCA helpers', () => {
+describe('consensusMath matrix and PCA helpers', () => {
   it('computes shapes and subtracts row/column means in place', () => {
     expect(matrixShape(ratingMatrix)).toEqual([4, 4]);
 
@@ -61,7 +61,7 @@ describe('polisMath matrix and PCA helpers', () => {
   });
 });
 
-describe('polisMath clustering helpers', () => {
+describe('consensusMath clustering helpers', () => {
   it('clusters participants from matrix rows and embedded points', () => {
     const participantClusters = clusterParticipantsKmeans(ratingMatrix, 2);
     expect(participantClusters.clusters).toHaveLength(4);
@@ -127,7 +127,7 @@ describe('polisMath clustering helpers', () => {
   });
 });
 
-describe('polisMath vote summaries and representative questions', () => {
+describe('consensusMath vote summaries and representative questions', () => {
   it('summarizes votes by participant and comment', () => {
     expect(computePolisStats(ratingMatrix)).toEqual({
       nComments: 4,

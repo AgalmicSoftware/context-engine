@@ -1,5 +1,5 @@
 /**
- * @module polisReportMath
+ * @module consensusReportMath
  * @description Polis-style report math helpers for the live report views.
  *
  * This file ports the parts of the open-source Polis math pipeline that most
@@ -1268,7 +1268,7 @@ export function computePolisConversationMath(
   };
 }
 
-const polisReportMath = {
+const consensusReportMath = {
   computeGroupAwareConsensus,
   computePolisCommentStats,
   computePolisConversationMath,
@@ -1277,4 +1277,4 @@ const polisReportMath = {
   findRepresentativeQuestions,
 };
 
-export default polisReportMath;
+export default consensusReportMath;

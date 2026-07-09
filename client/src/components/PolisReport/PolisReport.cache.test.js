@@ -21,8 +21,8 @@ import PolisReport, {
   resolvePrecomputedClusterDifference,
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
-import { getCommentBarData } from '../../utilities/survey/polisMath';
-import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/polisReportMath.js';
+import { getCommentBarData } from '../../utilities/survey/consensusMath';
+import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -31,7 +31,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   peekCacheSync: jest.fn(() => ({})),
 }));
 
-jest.mock('../../utilities/survey/polisMath', () => ({
+jest.mock('../../utilities/survey/consensusMath', () => ({
   beeswarmByExtremity: jest.fn((points = []) =>
     points.map((point, index) => ({
       ...point,
@@ -44,7 +44,7 @@ jest.mock('../../utilities/survey/polisMath', () => ({
   getCommentBarData: jest.fn((matrix = []) => matrix.map(() => ({ value: 0 }))),
 }));
 
-jest.mock('../../utilities/survey/polisReportMath.js', () => ({
+jest.mock('../../utilities/survey/consensusReportMath.js', () => ({
   computePolisConversationMath: jest.fn(() => ({
     stats: {
       nParticipants: 0,
