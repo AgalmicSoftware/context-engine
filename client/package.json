@@ -38,7 +38,6 @@
     "html2canvas": "1.4.1",
     "jspdf": "4.2.1",
     "ml-kmeans": "6.0.0",
-    "networkanalysis-ts": "1.0.0",
     "poseidon-lite": "0.3.0",
     "prop-types": "15.7.2",
     "qrcode.react": "4.2.0",
