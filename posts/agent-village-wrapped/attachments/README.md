@@ -14,5 +14,4 @@ Wanted:
 - [x] `header.png` — banner image (a cropped Wrapped poster works well at ~3:1)
 - [x] `example-wrapped-poster.jpeg` — a real Agent Village Wrapped output image
 - [x] `norms-map-compass.jpeg` — a compass-style meme mapping a predicted view against reference figures
-- [x] `diagram-loop.png`, `diagram-calibration-curve.png` — rendered from `../diagram-prompts.md`, embedded in the eval section (the calibration curve is illustrative and captioned as such).
-- [ ] Remaining rendered diagrams from `../diagram-prompts.md` are optional and can be added later if the post needs them.
+- [ ] Optional rendered diagrams from `../diagram-prompts.md` can be added later if the post needs them.

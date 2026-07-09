@@ -27,112 +27,9 @@ The same inputs can also produce more focused exhibits. Here we see a "political
 
 ![Agent Village norms map comparing a predicted view with historical and fictional reference figures](attachments/norms-map-compass.jpeg)
 
-## The Agent Mirror Test
-
-The eval hides inside the review step. Your agent commits an answer and a 0–100 confidence on every question before you see anything; you then keep or correct each prediction. The corrections are the measurement.
-
-![The Agent Village Wrapped loop: forward one message, the agent predicts every answer with a confidence, a poster comes back, you review and correct, and corrections accumulate into Mirror Score by model over time](attachments/diagram-loop.png)
-
-Three numbers come out of the review pass:
-
-- **Mirror Score** — graded agreement between prediction and final answer: exact match for binary and single-select questions, distance-based credit for ratings (a predicted 7 against your 8 scores high, not zero), overlap for multi-select. Freeform answers are scored separately and stay out of the headline number.
-- **Correction Rate** — the fraction of viewed predictions you changed. This is the blunt version of Mirror Score: no partial credit. Only predictions you actually opened count, so unreviewed links can't inflate accuracy.
-- **Calibration Error** — does 90 mean 90? Stated confidence versus the share of predictions you kept, band by band.
-
-![A calibration curve plotting stated confidence against the fraction of predictions the human kept, sagging below the diagonal at high confidence](attachments/diagram-calibration-curve.png "Illustrative curve — no correction data has been collected yet")
-
-One known trap: a confident pre-filled answer nudges people toward keeping it. The fix is blind holdouts — a slice of questions you answer before the prediction is revealed. The gap between blind and post-view agreement measures the anchoring itself, and keeps the other three numbers honest.
-
-Two design choices make the corrections usable as an eval:
-
-- **Confidence follows a rubric.** The skill gives agents explicit rules for when to say 90 versus 60 versus 30, so confidences are comparable across agents and models — and the corrections double as a calibration dataset.
-- **The model is recorded on every answer.** Correction rates can be compared across models and over time. Agents can also attach 30-day token-usage stats (visible in the example poster above).
-
-A pre-filled draft of your predicted responses (on questions relevant to you) is better UX than an empty survey. And if agents actually learn the people they represent, corrections should become more rare with months of shared context — that is exactly what repeated runs of this eval are built to detect.
-
-```ce-disclosure
-{
-  "title": "Evaluation protocol, scoring, and record schema",
-  "defaultOpen": false
-}
-```
-
-### Collection protocol
-
-1. Freeze everything before a wave: question-set version, model and version, prompt, skill version, and a hashed context snapshot. Predictions and confidences are committed before any human answer is collected.
-2. Confidence is the stated probability, 0–100, that the principal keeps the answer unchanged.
-3. Reference answers are collected under two randomized conditions: `blind` (answer first, then see the prediction) and `prediction_shown` (review, then keep or correct).
-4. Only rows with a paired human answer are scored. Unreviewed and missing rows are reported as coverage, never counted as agreement.
-5. Repeat waves reuse a stable anchor set plus fresh holdout questions, and re-collect human answers each time — separating preference drift from genuine agent improvement.
-
-### Scoring
-
-- Binary and single-select: exact match. Rating: `1 - abs(prediction - answer) / (scaleMax - scaleMin)`. Multi-select: Jaccard overlap. Freeform: preregistered rubric or blinded pairwise comparison, reported separately.
-- Calibration: keep-rate per confidence band, plus Brier score and expected calibration error with bins fixed in advance ([Guo et al.](https://arxiv.org/abs/1706.04599)).
-- Aggregation is macro: average within each principal first, then across principals, so prolific reviewers don't dominate. Uncertainty comes from a principal-level bootstrap — rows from the same person are not independent.
-- Baselines: paired lift over a population-majority predictor, a question-only predictor, and, when history exists, the principal's own past answers.
-- The analysis plan — primary endpoint, exclusion rules, bins — is frozen before results are inspected. Post-hoc cuts are labeled exploratory.
-
-### Record schema
-
-Every scored row is reconstructable from a versioned, pseudonymous record. Hashes pin the exact prompt and context snapshot without publishing anyone's private context.
-
-```typescript
-export type AgentMirrorRecord = {
-  schemaVersion: "agent-mirror-eval/v1";
-  runId: string;
-  principalId: string; // Pseudonymous and stable within the study.
-  wave: {
-    id: string;
-    index: number;
-    scheduledAt: string;
-    contextCutoffAt: string;
-    previousWaveId?: string;
-  };
-  question: {
-    id: string;
-    version: string;
-    setVersion: string;
-    longitudinalRole: "anchor" | "holdout";
-    type: "binary" | "single_select" | "multi_select" | "rating" | "freeform";
-    scale?: { min: number; max: number };
-  };
-  prediction: {
-    value: unknown;
-    confidence: number; // Integer from 0 to 100.
-    generatedAt: string;
-  };
-  reference?: {
-    value: unknown;
-    collectionMode: "blind" | "prediction_shown";
-    acceptedUnchanged?: boolean; // Defined only for prediction_shown records.
-    submittedAt: string;
-  };
-  model: {
-    provider: string;
-    name: string;
-    version?: string;
-  };
-  provenance: {
-    promptHash: string;
-    contextSnapshotHash: string;
-    skillVersion: string;
-  };
-  generation: {
-    temperature: number | null;
-    seed: number | null;
-    inputTokens?: number;
-    outputTokens?: number;
-  };
-};
-```
-
-```ce-disclosure-end
-```
-
 ## Early data (n = 4)
 
-Agent Village Wrapped launched too late for widespread use, so treat this as a preview of what results could look like. Four agents took the quiz — 58 questions each, 232 predictions — and no human corrections were made. Everything below is unreviewed agent prediction: it shows what the eval collects, and none of the Mirror Test numbers can be computed from it yet.
+Agent Village Wrapped launched too late for widespread use, so treat this as a preview of what results could look like. Four agents took the quiz — 58 questions each, 232 predictions — and no human corrections were made. Everything below is unreviewed agent prediction: it shows what the eval collects, and none of the Mirror Test numbers described in the next section can be computed from it yet.
 
 ```ce-viz
 {
@@ -575,6 +472,105 @@ Agent Village Wrapped launched too late for widespread use, so treat this as a p
     }
   ]
 }
+```
+
+## The Agent Mirror Test
+
+The eval hides inside the review step. Your agent commits an answer and a 0–100 confidence on every question before you see anything; you then keep or correct each prediction. The corrections are the measurement.
+
+Three numbers come out of the review pass:
+
+- **Mirror Score** — graded agreement between prediction and final answer: exact match for binary and single-select questions, distance-based credit for ratings (a predicted 7 against your 8 scores high, not zero), overlap for multi-select. Freeform answers are scored separately and stay out of the headline number.
+- **Correction Rate** — the fraction of viewed predictions you changed. This is the blunt version of Mirror Score: no partial credit. Only predictions you actually opened count, so unreviewed links can't inflate accuracy.
+- **Calibration Error** — does 90 mean 90? Stated confidence versus the share of predictions you kept, band by band.
+
+One known trap: a confident pre-filled answer nudges people toward keeping it. The fix is blind holdouts — a slice of questions you answer before the prediction is revealed. The gap between blind and post-view agreement measures the anchoring itself, and keeps the other three numbers honest.
+
+Two design choices make the corrections usable as an eval:
+
+- **Confidence follows a rubric.** The skill gives agents explicit rules for when to say 90 versus 60 versus 30, so confidences are comparable across agents and models — and the corrections double as a calibration dataset.
+- **The model is recorded on every answer.** Correction rates can be compared across models and over time. Agents can also attach 30-day token-usage stats (visible in the example poster above).
+
+A pre-filled draft of your predicted responses (on questions relevant to you) is better UX than an empty survey. And if agents actually learn the people they represent, corrections should become more rare with months of shared context — that is exactly what repeated runs of this eval are built to detect.
+
+```ce-disclosure
+{
+  "title": "Evaluation protocol, scoring, and record schema",
+  "defaultOpen": false
+}
+```
+
+### Collection protocol
+
+1. Freeze everything before a wave: question-set version, model and version, prompt, skill version, and a hashed context snapshot. Predictions and confidences are committed before any human answer is collected.
+2. Confidence is the stated probability, 0–100, that the principal keeps the answer unchanged.
+3. Reference answers are collected under two randomized conditions: `blind` (answer first, then see the prediction) and `prediction_shown` (review, then keep or correct).
+4. Only rows with a paired human answer are scored. Unreviewed and missing rows are reported as coverage, never counted as agreement.
+5. Repeat waves reuse a stable anchor set plus fresh holdout questions, and re-collect human answers each time — separating preference drift from genuine agent improvement.
+
+### Scoring
+
+- Binary and single-select: exact match. Rating: `1 - abs(prediction - answer) / (scaleMax - scaleMin)`. Multi-select: Jaccard overlap. Freeform: preregistered rubric or blinded pairwise comparison, reported separately.
+- Calibration: keep-rate per confidence band, plus Brier score and expected calibration error with bins fixed in advance ([Guo et al.](https://arxiv.org/abs/1706.04599)).
+- Aggregation is macro: average within each principal first, then across principals, so prolific reviewers don't dominate. Uncertainty comes from a principal-level bootstrap — rows from the same person are not independent.
+- Baselines: paired lift over a population-majority predictor, a question-only predictor, and, when history exists, the principal's own past answers.
+- The analysis plan — primary endpoint, exclusion rules, bins — is frozen before results are inspected. Post-hoc cuts are labeled exploratory.
+
+### Record schema
+
+Every scored row is reconstructable from a versioned, pseudonymous record. Hashes pin the exact prompt and context snapshot without publishing anyone's private context.
+
+```typescript
+export type AgentMirrorRecord = {
+  schemaVersion: "agent-mirror-eval/v1";
+  runId: string;
+  principalId: string; // Pseudonymous and stable within the study.
+  wave: {
+    id: string;
+    index: number;
+    scheduledAt: string;
+    contextCutoffAt: string;
+    previousWaveId?: string;
+  };
+  question: {
+    id: string;
+    version: string;
+    setVersion: string;
+    longitudinalRole: "anchor" | "holdout";
+    type: "binary" | "single_select" | "multi_select" | "rating" | "freeform";
+    scale?: { min: number; max: number };
+  };
+  prediction: {
+    value: unknown;
+    confidence: number; // Integer from 0 to 100.
+    generatedAt: string;
+  };
+  reference?: {
+    value: unknown;
+    collectionMode: "blind" | "prediction_shown";
+    acceptedUnchanged?: boolean; // Defined only for prediction_shown records.
+    submittedAt: string;
+  };
+  model: {
+    provider: string;
+    name: string;
+    version?: string;
+  };
+  provenance: {
+    promptHash: string;
+    contextSnapshotHash: string;
+    skillVersion: string;
+  };
+  generation: {
+    temperature: number | null;
+    seed: number | null;
+    inputTokens?: number;
+    outputTokens?: number;
+  };
+};
+```
+
+```ce-disclosure-end
 ```
 
 ## Extensions
