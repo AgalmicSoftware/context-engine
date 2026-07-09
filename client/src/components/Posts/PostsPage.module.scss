@@ -497,6 +497,89 @@ h3.postHeading {
   color: rgba(244, 247, 255, 0.9);
 }
 
+.postDisclosure {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(122, 167, 255, 0.24);
+  border-radius: 8px;
+  background: rgba(8, 13, 31, 0.48);
+}
+
+.postDisclosureSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: rgba(122, 167, 255, 0.09);
+  color: $text;
+  cursor: pointer;
+  font-family: var(--ce-post-font-ui);
+  font-size: 1rem;
+  font-weight: 750;
+  line-height: 1.4;
+  list-style: none;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  &:hover {
+    background: rgba(77, 255, 164, 0.08);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(77, 255, 164, 0.75);
+    outline-offset: -3px;
+  }
+}
+
+.postDisclosureIcon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  color: $accent;
+  line-height: 1;
+  place-items: center;
+}
+
+.postDisclosureIconClosed,
+.postDisclosureIconOpen {
+  grid-area: 1 / 1;
+}
+
+.postDisclosureIconOpen {
+  display: none;
+}
+
+.postDisclosure[open] .postDisclosureSummary {
+  border-bottom: 1px solid rgba(122, 167, 255, 0.16);
+}
+
+.postDisclosure[open] .postDisclosureIconClosed {
+  display: none;
+}
+
+.postDisclosure[open] .postDisclosureIconOpen {
+  display: block;
+}
+
+.postDisclosureBody {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 18px;
+
+  h3.postHeading {
+    margin-top: 2px;
+    font-size: 1.2rem;
+  }
+
+  .postParagraph,
+  .postList {
+    font-size: 1.02rem;
+  }
+}
+
 .postRule {
   width: 100%;
   border: 0;

@@ -41,8 +41,8 @@ Add a Markdown file under root `posts/`, then add it to
 
 The Markdown renderer supports headings, paragraphs, links, bold text, inline
 code, standalone images, lists, blockquotes, code fences, horizontal rules, and
-`ce-viz` fenced JSON blocks. Raw HTML is not rendered as HTML; it appears as
-text.
+`ce-disclosure` and `ce-viz` fenced blocks. Raw HTML is not rendered as HTML;
+it appears as text.
 
 Posts can be a single Markdown file directly under `posts/`, or a directory
 with its own Markdown file, attachments, data, and supporting prompts:
@@ -69,6 +69,39 @@ attachments naturally:
 `headerImage` is optional and renders above the post title on `/posts/:slug`.
 `attachments` is optional metadata for the post asset directory. Markdown image
 title text renders as the figure caption.
+
+## Disclosure Blocks
+
+Wrap Markdown content in `ce-disclosure` markers when detailed methods, schemas,
+or supporting material should remain available without dominating the article.
+The opening fence accepts a JSON title and an optional `defaultOpen` boolean.
+Content between the markers is parsed as normal post Markdown, including code
+fences:
+
+`````markdown
+```ce-disclosure
+{
+  "title": "Evaluation protocol and record schema",
+  "defaultOpen": false
+}
+```
+
+### Record schema
+
+```typescript
+type EvaluationRecord = {
+  runId: string;
+  score: number;
+};
+```
+
+```ce-disclosure-end
+```
+`````
+
+Disclosure blocks cannot be nested. An opening marker without a matching end
+marker contains the remaining post blocks so incomplete authoring still renders
+deterministically.
 
 ## Visualization Blocks
 

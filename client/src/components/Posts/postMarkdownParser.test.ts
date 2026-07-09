@@ -99,11 +99,39 @@ Paragraph text.
     expect(blocks[0]).toMatchObject({ type: 'vizGroupStart', title: 'Stacked', layout: 'stack' });
   });
 
+  it('parses disclosure markers around Markdown and code blocks', () => {
+    const blocks = parsePostMarkdown(`\`\`\`ce-disclosure
+{ "title": "Evaluation schema", "defaultOpen": true }
+\`\`\`
+
+### Record schema
+
+\`\`\`typescript
+type Record = { score: number };
+\`\`\`
+
+\`\`\`ce-disclosure-end
+\`\`\`
+`);
+
+    expect(blocks).toEqual([
+      {
+        type: 'disclosureStart',
+        raw: '{ "title": "Evaluation schema", "defaultOpen": true }',
+        title: 'Evaluation schema',
+        defaultOpen: true,
+      },
+      { type: 'heading', level: 3, text: 'Record schema' },
+      { type: 'code', language: 'typescript', code: 'type Record = { score: number };' },
+      { type: 'disclosureEnd' },
+    ]);
+  });
+
   it('keeps the Agent Village P4 ratings from a completed replacement run', () => {
     const markdown = readAgentVillageWrappedPost();
     const specs = actualAgentVillageVizSpecs();
 
-    expect(markdown).toContain('## Data Visualization (n=4)');
+    expect(markdown).toContain('## Early data (n = 4)');
     expect(markdown).not.toContain('"title": "Data Exploration (n=4)"');
     expect(markdown).not.toContain('```ce-viz-group');
     expect(markdown).not.toContain('```ce-viz-group-end');
@@ -112,8 +140,13 @@ Paragraph text.
       'Telegram was the interface users interacted with their Hermes agents through at Edge.',
     );
     expect(markdown).toContain(
-      'Sample size (n=4) is too small to be meaningful (AVW was launched too late for widespread use), but we offer the below as a preview of what results could look like. Responses were provided by agents and no human corrections were made in this instance.',
+      'Four agents took the quiz — 58 questions each, 232 predictions — and no human corrections were made.',
     );
+    expect(markdown).toContain('"title": "Evaluation protocol, scoring, and record schema"');
+    expect(markdown).toContain('schemaVersion: "agent-mirror-eval/v1"');
+    expect(markdown).toContain('The gap between blind and post-view agreement measures the anchoring itself');
+    expect(markdown).toContain('longitudinalRole: "anchor" | "holdout";');
+    expect(markdown).toContain('**Cross-model mirrors** — two models predict the same person from the same context');
     expect(markdown).not.toContain('The display below uses n=4 completed attendee answer sets');
     expect(markdown).not.toContain('A small launch sample');
     expect(markdown).not.toContain('The completed row-level data below is prediction-layer data.');

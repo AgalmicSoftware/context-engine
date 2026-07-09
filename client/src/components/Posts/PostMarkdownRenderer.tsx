@@ -16,7 +16,10 @@ type ImageBlock = Extract<PostMarkdownBlock, { type: 'image' }>;
 type VizGroupBlock = Extract<PostMarkdownBlock, { type: 'vizGroupStart' }> & {
   blocks: PostMarkdownBlock[];
 };
-type RenderablePostBlock = PostMarkdownBlock | VizGroupBlock;
+type DisclosureBlock = Extract<PostMarkdownBlock, { type: 'disclosureStart' }> & {
+  blocks: PostMarkdownBlock[];
+};
+type RenderablePostBlock = PostMarkdownBlock | VizGroupBlock | DisclosureBlock;
 
 type RenderBlockArgs = {
   block: RenderablePostBlock;
@@ -546,27 +549,64 @@ const renderBlock = ({ block, index, assetBasePath, vizDefaultOpen, nestedViz = 
     );
   }
 
-  if (block.type === 'vizGroupStart' || block.type === 'vizGroupEnd') return null;
+  if (block.type === 'disclosureStart' && 'blocks' in block) {
+    return (
+      <details key={`disclosure-${index}`} className={styles.postDisclosure} open={block.defaultOpen}>
+        <summary className={styles.postDisclosureSummary}>
+          <span>{block.title}</span>
+          <span className={styles.postDisclosureIcon} aria-hidden="true">
+            <FontAwesomeIcon className={styles.postDisclosureIconClosed} icon={faCaretDown} />
+            <FontAwesomeIcon className={styles.postDisclosureIconOpen} icon={faCaretUp} />
+          </span>
+        </summary>
+        <div className={styles.postDisclosureBody}>
+          {block.blocks.map((childBlock, childIndex) =>
+            renderBlock({ block: childBlock, index: childIndex, assetBasePath }),
+          )}
+        </div>
+      </details>
+    );
+  }
+
+  if (
+    block.type === 'vizGroupStart' ||
+    block.type === 'vizGroupEnd' ||
+    block.type === 'disclosureStart' ||
+    block.type === 'disclosureEnd'
+  ) {
+    return null;
+  }
 
   return <hr key={`rule-${index}`} className={styles.postRule} />;
 };
 
-const groupVizBlocks = (blocks: PostMarkdownBlock[]): RenderablePostBlock[] => {
+const groupContainerBlocks = (blocks: PostMarkdownBlock[]): RenderablePostBlock[] => {
   const groupedBlocks: RenderablePostBlock[] = [];
-  let activeGroup: VizGroupBlock | null = null;
+  let activeGroup: VizGroupBlock | DisclosureBlock | null = null;
+
+  const flushActiveGroup = () => {
+    if (activeGroup) groupedBlocks.push(activeGroup);
+    activeGroup = null;
+  };
 
   blocks.forEach((block) => {
     if (block.type === 'vizGroupStart') {
-      if (activeGroup) groupedBlocks.push(activeGroup);
+      flushActiveGroup();
       activeGroup = { ...block, blocks: [] };
       return;
     }
 
-    if (block.type === 'vizGroupEnd') {
-      if (activeGroup) {
-        groupedBlocks.push(activeGroup);
-        activeGroup = null;
-      }
+    if (block.type === 'disclosureStart') {
+      flushActiveGroup();
+      activeGroup = { ...block, blocks: [] };
+      return;
+    }
+
+    if (
+      (block.type === 'vizGroupEnd' && activeGroup?.type === 'vizGroupStart') ||
+      (block.type === 'disclosureEnd' && activeGroup?.type === 'disclosureStart')
+    ) {
+      flushActiveGroup();
       return;
     }
 
@@ -578,7 +618,7 @@ const groupVizBlocks = (blocks: PostMarkdownBlock[]): RenderablePostBlock[] => {
     groupedBlocks.push(block);
   });
 
-  if (activeGroup) groupedBlocks.push(activeGroup);
+  flushActiveGroup();
 
   return groupedBlocks;
 };
@@ -594,7 +634,7 @@ const suppressDuplicateTitleHeading = (blocks: PostMarkdownBlock[], title?: stri
 };
 
 const PostMarkdownRenderer = ({ markdown, assetBasePath = '', title }: PostMarkdownRendererProps) => {
-  const blocks = groupVizBlocks(suppressDuplicateTitleHeading(parsePostMarkdown(markdown), title));
+  const blocks = groupContainerBlocks(suppressDuplicateTitleHeading(parsePostMarkdown(markdown), title));
 
   return (
     <div className={styles.markdownBody}>

@@ -506,6 +506,39 @@ describe('PostsPage', () => {
     expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
   });
 
+  it('renders a collapsed Markdown disclosure containing a schema', async () => {
+    renderFirstPostMarkdown(
+      [
+        '# First Post',
+        '',
+        '```ce-disclosure',
+        '{ "title": "Evaluation schema", "defaultOpen": false }',
+        '```',
+        '',
+        '### Record schema',
+        '',
+        '```typescript',
+        'type EvaluationRecord = { score: number };',
+        '```',
+        '',
+        '```ce-disclosure-end',
+        '```',
+      ].join('\n'),
+    );
+
+    const summary = (await screen.findByText('Evaluation schema')).closest('summary') as HTMLElement;
+    const disclosure = summary.closest('details') as HTMLElement;
+
+    expect(disclosure).toBeInTheDocument();
+    expect(disclosure).not.toHaveAttribute('open');
+    expect(within(disclosure).getByRole('heading', { name: 'Record schema', level: 3 })).toBeInTheDocument();
+    expect(disclosure.querySelector('code')).toHaveTextContent('type EvaluationRecord = { score: number };');
+    expect(screen.queryByText('```ce-disclosure')).not.toBeInTheDocument();
+
+    await userEvent.click(summary);
+    expect(disclosure).toHaveAttribute('open');
+  });
+
   it('renders grouped visualizations as mounted carousel slides', async () => {
     renderFirstPostMarkdown(openGroupPostMarkdown);
 
