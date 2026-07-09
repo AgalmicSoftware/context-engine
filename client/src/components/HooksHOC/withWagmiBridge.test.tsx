@@ -21,7 +21,7 @@ jest.mock('wagmi', () => ({
   useDisconnect: (...args: any[]) => mockUseDisconnect(...args),
 }));
 
-jest.mock('@rainbow-me/rainbowkit', () => ({
+jest.mock('../../app/runtime/walletUiRuntime.js', () => ({
   useConnectModal: () => ({ openConnectModal: jest.fn() }),
   useAccountModal: () => ({ openAccountModal: jest.fn() }),
   useChainModal: () => ({ openChainModal: jest.fn() }),

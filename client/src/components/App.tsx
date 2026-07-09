@@ -16,11 +16,9 @@ import AppErrorBoundary from './ErrorBoundary/AppErrorBoundary';
 import { readColdLoadOnboardingState } from './Onboarding/onboardingConfig.js';
 import { toastTheme } from '../utilities/ui/toastTheme.js';
 
-import '@rainbow-me/rainbowkit/styles.css';
-
-import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { WagmiConfig } from 'wagmi';
 import { chains, wagmiClient } from '../app/runtime/appWagmiRuntime';
+import { WalletUiProvider } from '../app/runtime/walletUiRuntime.js';
 
 const AppShell = React.lazy(() => import('./MainSite/AppShell'));
 
@@ -254,7 +252,7 @@ class App extends React.Component<AppProps, AppState> {
 
     return (
       <WagmiConfig client={wagmiClient}>
-        <RainbowKitProvider chains={chains}>
+        <WalletUiProvider chains={chains}>
           <Provider store={store}>
             <AppErrorBoundary>
               <CEToaster position="bottom-right" toastOptions={{ style: toastTheme }} />
@@ -270,7 +268,7 @@ class App extends React.Component<AppProps, AppState> {
               </Routes>
             </AppErrorBoundary>
           </Provider>
-        </RainbowKitProvider>
+        </WalletUiProvider>
       </WagmiConfig>
     );
   }

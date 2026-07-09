@@ -227,6 +227,18 @@ describe('client package modernization contract', () => {
     expect(viteConfig).toContain("'/node_modules/minimalistic-assert/'");
   });
 
+  it('keeps the default passkey-only wallet profile and its bundle verifier wired', () => {
+    const pkg = readClientPackageJson();
+    const viteConfig = readClientFile('vite.config.mjs');
+
+    expect(pkg.scripts['verify:passkey-only-bundle']).toBe('node scripts/verify-passkey-only-bundle.mjs');
+    expect(viteConfig).toContain('REACT_APP_CE_ENABLE_METAMASK_CONNECTOR');
+    expect(viteConfig).toContain("'walletConnectorProfile.ts'");
+    expect(viteConfig).toContain("'walletConnectorProfile.metamask.ts'");
+    expect(viteConfig).toContain("fileName: 'ce-wallet-profile.json'");
+    expect(viteConfig).toContain('findPasskeyOnlyForbiddenModules(moduleIds)');
+  });
+
   it('keeps Vite browser polyfill dependencies limited to imported runtime shims', () => {
     const pkg = readClientPackageJson();
     const viteConfig = readClientFile('vite.config.mjs');

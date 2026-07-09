@@ -263,10 +263,15 @@ SPA fallback concept, but their redirect config syntax differs.
     compatibility entries after the Cloudflare-backed demo question/response
     storage replaces the Arweave/on-chain copy.
 
+- `REACT_APP_CE_ENABLE_METAMASK_CONNECTOR=false`
+  - Selects the browser-wallet profile at build time. The default `false` profile is passkey-only: the login screen has no MetaMask button, and the emitted browser bundle excludes RainbowKit, WalletConnect, the MetaMask connector, and the MetaMask login asset.
+  - Set `true` before `npm run build` only for deployments that intentionally offer MetaMask login. Because this is a build-time profile, changing it requires rebuilding the client.
+  - After a default or explicitly disabled build, run `npm run verify:passkey-only-bundle` from `client/`. The verifier fails if the build profile is enabled or forbidden connector symbols/assets are present.
+
 - `REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK=false`
-  - Controls RainbowKit's MetaMask fallback when MetaMask is not injected.
-  - Default `false` keeps the login modal on the injected MetaMask connector and avoids opening WalletConnect bridge sockets during normal startup.
-  - Set `true` only when a deployment intentionally wants the legacy WalletConnect fallback for MetaMask mobile/QR flows.
+  - Controls RainbowKit's MetaMask fallback when MetaMask is not injected, but only when `REACT_APP_CE_ENABLE_METAMASK_CONNECTOR=true`.
+  - Default `false` keeps an enabled MetaMask profile on the injected connector and avoids opening WalletConnect bridge sockets during normal startup.
+  - Setting this to `true` cannot re-enable MetaMask in a passkey-only build.
 
 ## Arweave Read Policy Toggles
 

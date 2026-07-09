@@ -300,7 +300,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     checkSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
   });
 
-  it('renders the pre-login auth options and opens RainbowKit crypto connect', () => {
+  it('renders passkey auth without a MetaMask login control by default', () => {
     const props = buildProps();
     const subject = new LoginAndSettingsModal(props);
 
@@ -309,10 +309,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.getByText('Create')).toBeInTheDocument();
     expect(getPasskeyLoginButton()).toBeTruthy();
     expect(screen.getByText('test network only')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Crypto Login (RainbowKit)' }));
-
-    expect(props.openConnectModal).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Open Crypto Login (RainbowKit)' })).not.toBeInTheDocument();
+    expect(screen.queryByAltText('MetaMask')).not.toBeInTheDocument();
+    expect(props.openConnectModal).not.toHaveBeenCalled();
   });
 
   it('shows an inline recovery hint when login has no stored passkey wallet record', async () => {

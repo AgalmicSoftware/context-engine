@@ -496,8 +496,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     expect(treeHasPropValue(tree, 'className', 'accountWarningContainer')).toBe(true);
     expect(treeHasPropValue(tree, 'className', 'passkeyButtonContainer')).toBe(true);
-    expect(treeHasPropValue(tree, 'className', 'cryptoLoginLink')).toBe(true);
-    expect(treeHasPropValue(tree, 'aria-label', 'Open Crypto Login (RainbowKit)')).toBe(true);
+    expect(treeHasPropValue(tree, 'aria-label', 'Open Crypto Login (RainbowKit)')).toBe(false);
     expect(treeHasPropValue(tree, 'id', 'inModalTorusButton')).toBe(false);
     expect(treeHasPropValue(tree, 'id', 'torusButtonContainer')).toBe(false);
   });
