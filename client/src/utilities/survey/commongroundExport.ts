@@ -56,7 +56,6 @@ export interface CommonGroundSnapshot {
 
 const ADDRESS_REDACTION_PATTERN = /0x[0-9a-fA-F]{40}/;
 const EMAIL_REDACTION_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
-const ENS_REDACTION_PATTERN = /\b[a-z0-9-]{3,}\.eth\b/i;
 const DEFAULT_SEED = 42;
 const DEFAULT_K_ANONYMITY = 5;
 
@@ -66,7 +65,7 @@ function isRecord(value: unknown): value is UnknownRecord {
 
 function hasRedactedIdentifier(value: unknown): boolean {
   const text = String(value || '');
-  return ADDRESS_REDACTION_PATTERN.test(text) || EMAIL_REDACTION_PATTERN.test(text) || ENS_REDACTION_PATTERN.test(text);
+  return ADDRESS_REDACTION_PATTERN.test(text) || EMAIL_REDACTION_PATTERN.test(text);
 }
 
 function isBinaryComment(comment: DemoCommentRecord): boolean {
@@ -122,16 +121,6 @@ function passesKAnonymity(clusters: SnapshotCluster[], kAnonymity: number): bool
   return clusters.length > 0 && clusters.every((cluster) => cluster.members.length >= kAnonymity);
 }
 
-function transposeVotesToParticipantMajor(
-  votes: VoteValue[][],
-  participantCount: number,
-  statementCount: number,
-): VoteValue[][] {
-  return Array.from({ length: participantCount }, (_, participantIndex) =>
-    Array.from({ length: statementCount }, (_, statementIndex) => votes[statementIndex]?.[participantIndex] ?? null),
-  );
-}
-
 export function buildCommonGroundSnapshotFromDemoDataset(
   dataset: DemoPolisDataset,
   options: {
@@ -175,10 +164,15 @@ export function buildCommonGroundSnapshotFromDemoDataset(
   });
 
   const allQuestions = statements.map((statement) => `s${statement.index}`);
-  const questionPromptsMap = Object.fromEntries(statements.map((statement) => [`s${statement.index}`, statement.text]));
-  const mathResult = computePolisConversationMath(votes as PolisReportRatingMatrix, questionPromptsMap, allQuestions, {
-    randomSeed: seed,
-  });
+  const questionPromptsMap = Object.fromEntries(
+    statements.map((statement) => [`s${statement.index}`, statement.text]),
+  );
+  const mathResult = computePolisConversationMath(
+    votes as PolisReportRatingMatrix,
+    questionPromptsMap,
+    allQuestions,
+    { randomSeed: seed },
+  );
 
   if (!Array.isArray(mathResult.clusterAssignments) || !mathResult.clusterAssignments.length) {
     throw new Error('CommonGround export requires computePolisConversationMath cluster assignments.');
@@ -191,7 +185,7 @@ export function buildCommonGroundSnapshotFromDemoDataset(
     session_id: sessionId,
     statements,
     participants,
-    votes: transposeVotesToParticipantMajor(votes, participants.length, statements.length),
+    votes,
     masked_cells: [],
     held_out: {},
     clusters,

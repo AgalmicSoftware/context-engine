@@ -67,6 +67,8 @@
     "verify:passkey-only-bundle": "node scripts/verify-passkey-only-bundle.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "jest",
+    "parity:fixtures": "GENERATE_PARITY_FIXTURES=1 jest --runTestsByPath src/utilities/survey/parityFixtures.test.js --watchAll=false",
+    "commonground:export": "GENERATE_COMMONGROUND_EXPORT=1 jest --runTestsByPath src/utilities/survey/commongroundExport.test.js --watchAll=false",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/ \"src/utilities/ui/**/*.{ts,tsx}\" \"src/components/Shared/**/*.{ts,tsx}\" \"src/components/About/**/*.{ts,tsx}\" \"src/components/Footer/**/*.{ts,tsx}\" \"src/components/InformationModals/**/*.{ts,tsx}\" \"src/components/Onboarding/**/*.{ts,tsx}\" \"src/components/MainContent/**/*.{ts,tsx}\" \"src/components/Agent/**/*.{ts,tsx}\" \"src/components/Bookmarks/**/*.{ts,tsx}\" \"src/components/Sponsor/**/*.{ts,tsx}\" \"src/components/ErrorBoundary/**/*.{ts,tsx}\" \"src/components/RightSidebar/**/*.{ts,tsx}\" \"src/components/E2E/**/*.{ts,tsx}\" \"src/components/Gates/**/*.{ts,tsx}\" \"src/components/CommunityTab/**/*.{ts,tsx}\" \"src/components/PolisReport/**/*.{ts,tsx}\" \"src/components/DebateMap/**/*.{ts,tsx}\" \"src/components/Navbar/**/*.{ts,tsx}\" \"src/components/ContractPage/**/*.{ts,tsx}\""
   },

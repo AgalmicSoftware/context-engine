@@ -65,7 +65,12 @@ function buildRatingToVoteFixture() {
 }
 
 function buildFixtures() {
-  return [buildPropTestFixture(), buildTwoPropTestFixture(), buildCommentStatsFixture(), buildRatingToVoteFixture()];
+  return [
+    buildPropTestFixture(),
+    buildTwoPropTestFixture(),
+    buildCommentStatsFixture(),
+    buildRatingToVoteFixture(),
+  ];
 }
 
 function callFixtureFunction(name, args) {
