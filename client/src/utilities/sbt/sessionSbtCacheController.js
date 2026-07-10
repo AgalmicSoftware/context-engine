@@ -40,6 +40,7 @@ import {
   hydrateSbtActivityCacheEntry,
 } from './sbtActivityCacheEntry.js';
 import { buildSessionSbtCacheWriteEnvelope } from './sbtCacheWriteContract.js';
+import { buildSbtHydrationQueueEntry, buildSbtLightDiscoveryInFlightKey } from './sbtProgressListenerContract.js';
 import { needsSbtListMetadataHydration } from './sbtMetadataHydrationReadiness.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 
@@ -200,7 +201,11 @@ export const createSessionSbtCacheController = (host = {}) => {
     const slug = normalizeSessionSlug(typeof slugIn === 'string' ? slugIn : getActiveSessionSlug() || '');
     const hasForcedScopeSlug = opts && Object.prototype.hasOwnProperty.call(opts, 'forceScopeSlug');
     const forcedScopeSlug = hasForcedScopeSlug ? normalizeSessionSlug(opts?.forceScopeSlug ?? '') : '';
-    const inFlightKey = `${slug}|${forcedScopeSlug}|${opts?.force === true ? '1' : '0'}`;
+    const inFlightKey = buildSbtLightDiscoveryInFlightKey({
+      sessionSlug: slug,
+      forcedScopeSlug,
+      force: opts?.force === true,
+    });
     if (_lightSbtDiscoveryInFlight[inFlightKey]) {
       return _lightSbtDiscoveryInFlight[inFlightKey];
     }
@@ -427,13 +432,13 @@ export const createSessionSbtCacheController = (host = {}) => {
         const enqueueHydrationAddresses = (addresses = []) => {
           let addedCount = 0;
           (Array.isArray(addresses) ? addresses : []).forEach((addrRaw) => {
-            const addr = String(addrRaw || '').trim();
-            if (!addr) return;
-            const lower = addr.toLowerCase();
-            if (ignoredSet.has(lower)) return;
-            if (queuedHydrationAddressSet.has(lower)) return;
-            queuedHydrationAddressSet.add(lower);
-            queuedHydrationAddresses.push(addr);
+            const queueEntry = buildSbtHydrationQueueEntry(addrRaw, {
+              ignoredAddressKeys: ignoredSet,
+              queuedAddressKeys: queuedHydrationAddressSet,
+            });
+            if (!queueEntry) return;
+            queuedHydrationAddressSet.add(queueEntry.addressKey);
+            queuedHydrationAddresses.push(queueEntry.address);
             addedCount += 1;
           });
           if (addedCount > 0) {

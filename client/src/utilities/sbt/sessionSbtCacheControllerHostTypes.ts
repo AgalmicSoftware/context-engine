@@ -1,17 +1,22 @@
 import type { SbtCountMap, SbtCountState, SbtCountsPayload, SbtCountsPayloadInput } from './sbtCountHelpers.js';
 import type { SbtHistorySummary } from './sbtHistoryHelpers.js';
-import type { SbtRealtimeEventCursor } from './sbtRealtimeCursorHelpers.js';
 import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
+import type {
+  RemoveSbtRealtimeListenersOptions,
+  SbtLiveProgressPatch,
+  SbtRealtimeCursorRecord,
+  SbtRealtimeEventLike,
+} from './sbtProgressListenerContract.js';
+
+export type {
+  RemoveSbtRealtimeListenersOptions,
+  SbtLiveProgressPatch,
+  SbtRealtimeCursorRecord,
+  SbtRealtimeEventLike,
+} from './sbtProgressListenerContract.js';
 
 type CacheRecord = Record<string, unknown>;
 type SetStateArg = CacheRecord | ((prev: CacheRecord) => CacheRecord | null) | null;
-
-export interface SbtLiveProgressPatch extends CacheRecord {
-  currentBlock?: number;
-  latestBlock?: number;
-  slug?: string;
-  updatedAtMs?: number;
-}
 
 export interface SbtDiscoveryOptions extends CacheRecord {
   force?: boolean;
@@ -27,20 +32,6 @@ export interface SbtCacheInitOptions extends CacheRecord {
 export interface SbtRefreshOptions extends CacheRecord {
   forceCounts?: boolean;
   onCheckpoint?: (checkpoint: CacheRecord) => void;
-}
-
-export interface RemoveSbtRealtimeListenersOptions {
-  removeFactory?: boolean;
-  removeInstance?: boolean;
-}
-
-export interface SbtRealtimeEventLike extends CacheRecord {
-  blockNumber?: number | string | null;
-  logIndex?: number | string | null;
-  sbtAddress?: string | null;
-  to?: string | null;
-  transactionIndex?: number | string | null;
-  type?: string | null;
 }
 
 export interface SessionSbtCacheHost {
@@ -91,7 +82,7 @@ export interface SessionSbtCacheController {
   clearSbtLiveProgress: (slugIn: string, token?: number | null) => void;
   setSbtRealtimeCoverageForGroup: (slugIn: string, hasCoverage?: boolean) => void;
   clearSbtRealtimeCoverageForGroup: (slugIn: string) => void;
-  normalizeSbtRealtimeEventCursor: (value?: unknown) => SbtRealtimeEventCursor | null;
+  normalizeSbtRealtimeEventCursor: (value?: unknown) => SbtRealtimeCursorRecord | null;
   compareSbtRealtimeEventCursor: (leftIn?: unknown, rightIn?: unknown) => number;
   removeSbtRealtimeListenersForGroup: (slugIn: string, options?: RemoveSbtRealtimeListenersOptions) => void;
   ensureSessionRouteSbtDiscovery: (slugIn?: string | null) => Promise<void> | null;
@@ -137,7 +128,7 @@ export interface SessionSbtCacheController {
     slug?: string | null,
     sbtAddressOriginalCase?: string | null,
     eventBlockNumber?: number | string | null,
-    eventCursor?: SbtRealtimeEventCursor | null,
+    eventCursor?: SbtRealtimeCursorRecord | null,
   ) => Promise<void>;
   onSbtIssuedDetected: (
     sbtAddressOriginalCase?: string | null,
@@ -162,7 +153,7 @@ export interface SessionSbtCacheController {
     accountOriginalCase?: string | null,
     burned?: boolean,
     eventBlockNumber?: number | string | null,
-    eventCursor?: SbtRealtimeEventCursor | null,
+    eventCursor?: SbtRealtimeCursorRecord | null,
   ) => Promise<void>;
   onSbtTransferDetected: (
     sbtAddressOriginalCase?: string | null,
