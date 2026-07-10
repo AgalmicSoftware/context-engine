@@ -47,8 +47,9 @@ describe('CommonGround deliberation snapshot export', () => {
     );
     expect(snapshot.statements.length).toBeGreaterThan(0);
     expect(snapshot.participants).toEqual(snapshot.participants.map((_, index) => `p${String(index).padStart(3, '0')}`));
-    expect(snapshot.votes).toHaveLength(snapshot.statements.length);
-    expect(snapshot.votes[0]).toHaveLength(snapshot.participants.length);
+    expect(snapshot.votes).toHaveLength(snapshot.participants.length);
+    expect(snapshot.votes.every((participantVotes) => participantVotes.length === snapshot.statements.length)).toBe(true);
+    expect(snapshot.votes[0][5]).toBe(demoPolisData.participantsVotes[0].votes['5']);
     expect(snapshot.stats.comment).toHaveLength(snapshot.statements.length);
     expect(snapshot.clusters.length).toBeGreaterThan(0);
     expect(snapshot.clusters.every((cluster) => cluster.members.length >= 5)).toBe(true);

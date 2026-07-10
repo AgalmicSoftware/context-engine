@@ -121,6 +121,16 @@ function passesKAnonymity(clusters: SnapshotCluster[], kAnonymity: number): bool
   return clusters.length > 0 && clusters.every((cluster) => cluster.members.length >= kAnonymity);
 }
 
+function transposeVotesToParticipantMajor(
+  votes: VoteValue[][],
+  participantCount: number,
+  statementCount: number,
+): VoteValue[][] {
+  return Array.from({ length: participantCount }, (_, participantIndex) =>
+    Array.from({ length: statementCount }, (_, statementIndex) => votes[statementIndex]?.[participantIndex] ?? null),
+  );
+}
+
 export function buildCommonGroundSnapshotFromDemoDataset(
   dataset: DemoPolisDataset,
   options: {
@@ -185,7 +195,7 @@ export function buildCommonGroundSnapshotFromDemoDataset(
     session_id: sessionId,
     statements,
     participants,
-    votes,
+    votes: transposeVotesToParticipantMajor(votes, participants.length, statements.length),
     masked_cells: [],
     held_out: {},
     clusters,
