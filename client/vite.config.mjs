@@ -129,7 +129,6 @@ const manualChunkGroups = [
       '/node_modules/java-random/',
       '/node_modules/ml-',
       '/node_modules/ml-kmeans/',
-      '/node_modules/networkanalysis-ts/',
       '/node_modules/react-simple-maps/',
       '/node_modules/robust-predicates/',
       '/node_modules/topojson-',
