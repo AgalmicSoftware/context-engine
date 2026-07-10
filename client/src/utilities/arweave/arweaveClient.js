@@ -78,6 +78,7 @@ import {
 } from './arweaveUploadFallbackPolicy.js';
 import { buildUploadSessionCandidates } from './arweaveUploadCandidates.js';
 import { parseWorkerUploadResponseJson } from './arweaveUploadWorkerResponse.js';
+import { buildArweaveUploadFallbackTelemetryEntry } from './arweaveClientHostContracts.js';
 
 const log = createLogger('general');
 const logArweaveFetchDebug = createArweaveFetchDebugLogger(log);
@@ -91,10 +92,7 @@ const logArweaveFetchDebug = createArweaveFetchDebugLogger(log);
 const ARWEAVE_UPLOAD_FALLBACK_TELEMETRY_KEY = '__CE_ARWEAVE_UPLOAD_FALLBACK__';
 
 const emitArweaveUploadFallbackTelemetry = (payload = {}) => {
-  const entry = {
-    ts: new Date().toISOString(),
-    ...(payload && typeof payload === 'object' ? payload : { value: payload }),
-  };
+  const entry = buildArweaveUploadFallbackTelemetryEntry(payload);
   log.info('[arweave] upload-fallback-attempt', entry);
   try {
     if (typeof globalThis === 'undefined') return;
