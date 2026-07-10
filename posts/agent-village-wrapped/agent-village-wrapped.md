@@ -5,9 +5,9 @@ date: 2026-07-06
 
 # Agent Village Wrapped / Agent Prediction Evaluations
 
-Many people dislike filling out surveys, but happily take (and share) a quiz about what kind of dog they are [on facebook](https://www.nbcnews.com/id/wbna33830316). Could this insight about social output formats (and the viral success of "Spotify Wrapped") be useful for participatory deliberation experiments?
+Many people dislike filling out surveys, but would happily take (and share) a quiz about what kind of dog they are [on facebook](https://www.nbcnews.com/id/wbna33830316). Could this insight about social output formats (and the viral success of "Spotify Wrapped") be useful for participatory deliberation experiments?
 
-Agent Village Wrapped and its associated evaluation were created to begin measuring how accurately a personal AI agent represents a human principal — the person it works for — and to make the process low-friction. We believe there are social AI games and future products in this direction: agents could help solve the participation and attention-scarcity challenges that have plagued civic tech, and lead to a future where your agent is always [bargaining and coalition-building on your behalf](https://blog.cosmos-institute.org/p/coasean-bargaining-at-scale).
+Agent Village Wrapped and its associated evaluation were created to begin measuring how accurately a personal AI agent represents a human principal — the person it works for — using a low-friction process. We believe there are social AI games and future products in this direction, and that agents could help solve participation challenges facing civic tech. This could lead to a future where your agent is always [bargaining and coalition-building on your behalf](https://blog.cosmos-institute.org/p/coasean-bargaining-at-scale).
 
 ## Background
 
@@ -27,9 +27,9 @@ The same inputs can also produce more focused exhibits. Here we see a "political
 
 ![Agent Village norms map comparing a predicted view with historical and fictional reference figures](attachments/norms-map-compass.jpeg)
 
-## Early data (n = 4)
+## Example data (n = 4)
 
-Agent Village Wrapped launched too late for widespread use, so treat this as a preview of what results could look like. Four agents took the quiz — 58 questions each, 232 predictions — and no human corrections were made. Everything below is unreviewed agent prediction: it shows what the eval collects, and none of the Mirror Test numbers described in the next section can be computed from it yet.
+Agent Village Wrapped was deployed too late for widespread use at Edge 2026, so the data below is not representative but previews how future results could appear. Four agents took the quiz — 58 questions each, 232 predictions — but no human corrections were made. Everything below is unreviewed agent prediction, so it demonstrates what the eval collects rather than how accurately the agents represented their principals.
 
 ```ce-viz
 {
@@ -37,6 +37,7 @@ Agent Village Wrapped launched too late for widespread use, so treat this as a p
   "title": "Statistics",
   "inline": true,
   "hideTitle": true,
+  "presentation": "editorial",
   "panels": [
     {
       "kind": "Models",
@@ -52,7 +53,7 @@ Agent Village Wrapped launched too late for widespread use, so treat this as a p
     {
       "kind": "Answer shapes",
       "title": "Prediction Response Types",
-      "display": "pie",
+      "display": "ring",
       "counts": [
         { "label": "binary", "value": 160, "color": "#7aa7ff" },
         { "label": "multi-select", "value": 52, "color": "#4dffa4" },
@@ -63,7 +64,10 @@ Agent Village Wrapped launched too late for widespread use, so treat this as a p
     {
       "kind": "Confidence",
       "title": "Agent confidence",
+      "display": "bars",
       "prompt": "Average confidence 80.8/100.",
+      "summaryValue": 80.8,
+      "summarySuffix": "/100",
       "counts": [
         { "label": "90-100", "value": 69, "color": "#4dffa4" },
         { "label": "75-89", "value": 108, "color": "#7aa7ff" },
@@ -396,6 +400,7 @@ Agent Village Wrapped launched too late for widespread use, so treat this as a p
   "title": "Rating answers",
   "inline": true,
   "hideTitle": true,
+  "presentation": "precision",
   "min": 0,
   "max": 10,
   "valueSuffix": "/10",
@@ -447,6 +452,7 @@ Agent Village Wrapped launched too late for widespread use, so treat this as a p
   "inline": true,
   "hideTitle": true,
   "combineWithPrevious": true,
+  "presentation": "precision",
   "panels": [
     {
       "kind": "Multi-select",
@@ -476,22 +482,22 @@ Agent Village Wrapped launched too late for widespread use, so treat this as a p
 
 ## The Agent Mirror Test
 
-The eval hides inside the review step. Your agent commits an answer and a 0–100 confidence on every question before you see anything; you then keep or correct each prediction. The corrections are the measurement.
+Your agent commits an answer and a 0–100 confidence on every question before you see anything; you then keep or correct predictions. The corrections are the measurement. Across repeated runs, they let us compare accuracy across models, context snapshots, and time.
 
 Three numbers come out of the review pass:
 
 - **Mirror Score** — graded agreement between prediction and final answer: exact match for binary and single-select questions, distance-based credit for ratings (a predicted 7 against your 8 scores high, not zero), overlap for multi-select. Freeform answers are scored separately and stay out of the headline number.
 - **Correction Rate** — the fraction of viewed predictions you changed. This is the blunt version of Mirror Score: no partial credit. Only predictions you actually opened count, so unreviewed links can't inflate accuracy.
-- **Calibration Error** — does 90 mean 90? Stated confidence versus the share of predictions you kept, band by band.
+- **Calibration Error** — whether confidence forecasts the keep-or-change outcome. A prediction assigned 90% confidence is calibrated if about 90% of reviewed predictions in that prespecified confidence band are accepted unchanged. For each band, compare mean stated confidence with the observed keep rate; report the weighted absolute gap as expected calibration error, alongside the row-level Brier score.
 
 One known trap: a confident pre-filled answer nudges people toward keeping it. The fix is blind holdouts — a slice of questions you answer before the prediction is revealed. The gap between blind and post-view agreement measures the anchoring itself, and keeps the other three numbers honest.
 
 Two design choices make the corrections usable as an eval:
 
 - **Confidence follows a rubric.** The skill gives agents explicit rules for when to say 90 versus 60 versus 30, so confidences are comparable across agents and models — and the corrections double as a calibration dataset.
-- **The model is recorded on every answer.** Correction rates can be compared across models and over time. Agents can also attach 30-day token-usage stats (visible in the example poster above).
+- **The model is recorded on every answer.** Correction rates can be compared across models and over time.
 
-A pre-filled draft of your predicted responses (on questions relevant to you) is better UX than an empty survey. And if agents actually learn the people they represent, corrections should become more rare with months of shared context — that is exactly what repeated runs of this eval are built to detect.
+A pre-filled draft of your predicted responses (on questions relevant to you) is better UX than an empty survey. Repeated runs test whether corrections become rarer as agents accumulate shared context, while stable anchors and fresh holdouts help separate learning from preference drift.
 
 ```ce-disclosure
 {
@@ -502,7 +508,7 @@ A pre-filled draft of your predicted responses (on questions relevant to you) is
 
 ### Collection protocol
 
-1. Freeze everything before a wave: question-set version, model and version, prompt, skill version, and a hashed context snapshot. Predictions and confidences are committed before any human answer is collected.
+1. For each wave, freeze the question-set version, model and version, prompt, skill version, and a hashed context snapshot. Predictions and confidences are committed before any human answer is collected.
 2. Confidence is the stated probability, 0–100, that the principal keeps the answer unchanged.
 3. Reference answers are collected under two randomized conditions: `blind` (answer first, then see the prediction) and `prediction_shown` (review, then keep or correct).
 4. Only rows with a paired human answer are scored. Unreviewed and missing rows are reported as coverage, never counted as agreement.
@@ -575,13 +581,13 @@ export type AgentMirrorRecord = {
 
 ## Extensions
 
-- **Cross-model mirrors** — two models predict the same person from the same context; the corrections become a head-to-head.
-- **Memory curves** — does Mirror Score rise with months of shared context?
-- **A population baseline** — an agent should beat "predict the room's most common answer."
-- **Second-order accuracy** — predict the room's distribution on the questions that split it, then compare with reality.
-- **Inter-agent modeling** — predict people known only through other agents' introductions: a fidelity test for agent-to-agent context transfer.
+- **Cross-model mirrors** — give two models the same questions and context, then compare paired Mirror Score and calibration.
+- **Memory curves** — hold the model and anchor questions fixed across context snapshots, then measure the change in Mirror Score over time.
+- **A population baseline** — compare the agent with the room's majority answer and, where available, the principal's answer history; the endpoint is paired lift over the stronger baseline.
+- **Second-order accuracy** — predict the room's answer distribution on questions that split it, then score the forecast with Brier or log score.
+- **Inter-agent modeling** — compare predictions from direct principal context with predictions based only on another agent's introduction; the endpoint is the resulting transfer loss.
 
-Run for real, each of these gets the Mirror Test treatment: frozen inputs, one primary endpoint, analysis fixed in advance.
+Each extension should freeze its inputs, preregister one primary endpoint, and fix the analysis before results are inspected.
 
 ## The next trial
 

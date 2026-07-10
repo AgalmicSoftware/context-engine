@@ -131,7 +131,7 @@ type Record = { score: number };
     const markdown = readAgentVillageWrappedPost();
     const specs = actualAgentVillageVizSpecs();
 
-    expect(markdown).toContain('## Early data (n = 4)');
+    expect(markdown).toContain('## Example data (n = 4)');
     expect(markdown).not.toContain('"title": "Data Exploration (n=4)"');
     expect(markdown).not.toContain('```ce-viz-group');
     expect(markdown).not.toContain('```ce-viz-group-end');
@@ -140,13 +140,25 @@ type Record = { score: number };
       'Telegram was the interface users interacted with their Hermes agents through at Edge.',
     );
     expect(markdown).toContain(
-      'Four agents took the quiz — 58 questions each, 232 predictions — and no human corrections were made.',
+      'Four agents took the quiz — 58 questions each, 232 predictions — but no human corrections were made.',
+    );
+    expect(markdown).toContain(
+      'Everything below is unreviewed agent prediction, so it demonstrates what the eval collects rather than how accurately the agents represented their principals.',
     );
     expect(markdown).toContain('"title": "Evaluation protocol, scoring, and record schema"');
     expect(markdown).toContain('schemaVersion: "agent-mirror-eval/v1"');
     expect(markdown).toContain('The gap between blind and post-view agreement measures the anchoring itself');
+    expect(markdown).toContain(
+      'A prediction assigned 90% confidence is calibrated if about 90% of reviewed predictions in that prespecified confidence band are accepted unchanged.',
+    );
+    expect(markdown).toContain(
+      'report the weighted absolute gap as expected calibration error, alongside the row-level Brier score.',
+    );
+    expect(markdown).not.toContain('does 90 mean 90?');
     expect(markdown).toContain('longitudinalRole: "anchor" | "holdout";');
-    expect(markdown).toContain('**Cross-model mirrors** — two models predict the same person from the same context');
+    expect(markdown).toContain(
+      '**Cross-model mirrors** — give two models the same questions and context, then compare paired Mirror Score and calibration.',
+    );
     expect(markdown).not.toContain('The display below uses n=4 completed attendee answer sets');
     expect(markdown).not.toContain('A small launch sample');
     expect(markdown).not.toContain('The completed row-level data below is prediction-layer data.');
@@ -157,6 +169,7 @@ type Record = { score: number };
     expect(displayedSummary?.inline).toBe(true);
     expect(displayedSummary?.subtitle).toBeUndefined();
     expect(displayedSummary?.hideTitle).toBe(true);
+    expect(displayedSummary?.presentation).toBe('editorial');
     expect(markdown).not.toContain('completed non-test human correction rows');
     expect(displayedSummary?.panels.map((panel: any) => panel.title)).toEqual([
       'Responding Model Type',
@@ -168,9 +181,10 @@ type Record = { score: number };
     const answerShapesPanel = displayedSummary?.panels.find(
       (panel: any) => panel.title === 'Prediction Response Types',
     );
-    expect(answerShapesPanel?.display).toBe('pie');
+    expect(answerShapesPanel?.display).toBe('ring');
     const confidencePanel = displayedSummary?.panels.find((panel: any) => panel.title === 'Agent confidence');
     expect(confidencePanel?.prompt).toContain('80.8/100');
+    expect(confidencePanel?.summaryValue).toBe(80.8);
     expect(confidencePanel?.counts).toHaveLength(4);
 
     const binaryBeeswarm = specs.find((spec) => spec.type === 'binary-beeswarm');
@@ -203,6 +217,7 @@ type Record = { score: number };
     expect(beeswarm?.note).toBeUndefined();
     expect(beeswarm?.inline).toBe(true);
     expect(beeswarm?.hideTitle).toBe(true);
+    expect(beeswarm?.presentation).toBe('precision');
     expect(p4RatingValues).toEqual([7, 2, 3]);
 
     expect(specs.find((spec) => spec.title === 'Top Difference Questions')).toBeUndefined();
@@ -210,6 +225,7 @@ type Record = { score: number };
     const otherShapes = specs.find((spec) => spec.title === 'Other response shapes in the same subset');
     expect(otherShapes?.hideTitle).toBe(true);
     expect(otherShapes?.combineWithPrevious).toBe(true);
+    expect(otherShapes?.presentation).toBe('precision');
     const fireAlarmPanel = otherShapes?.panels.find((panel: any) => panel.kind === 'Freeform');
     expect(fireAlarmPanel?.quotes.map((quote: any) => quote.color)).toEqual([
       '#9ee7ff',

@@ -1,6 +1,19 @@
 import React from 'react';
 import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  EditorialResponseTypeGridPresentation,
+  PrecisionBeeswarmPresentation,
+  ResponseTypeGridPresentation,
+} from './PostVizPresentations.js';
+import { CategoryDotsViz, QuoteWallViz, RankedThemesViz, ThemeNetworkViz } from './PostVizQualitative.js';
+import {
+  formatBinaryCountsLabel,
+  orderedResponseSplitCounts,
+  readResponsePanels,
+  resolveResponseCountColor,
+  type ResponseCountDatum,
+} from './postVizResponsePanels.js';
 import styles from './PostsPage.module.scss';
 
 type VizRecord = Record<string, unknown>;
@@ -9,17 +22,8 @@ type TooltipPositionStyle = React.CSSProperties & {
 };
 
 const PALETTE = ['#4dffa4', '#7aa7ff', '#ffb347', '#ff6bcb', '#d8f36a', '#9ee7ff'];
-const RESPONSE_SPLIT_ORDER = ['agree', 'unsure', 'disagree'];
-const RESPONSE_SPLIT_LABELS = new Set(RESPONSE_SPLIT_ORDER);
-const RESPONSE_TONE_COLORS: Record<string, string> = {
-  agree: '#4dffa4',
-  unsure: '#ffd166',
-  disagree: '#ff6bcb',
-};
 const BINARY_DOT_COLOR = '#9ee7ff';
 const BINARY_AXIS_COLOR = '#7aa7ff';
-
-const normalizeResponseSplitLabel = (label: string) => label.trim().toLowerCase();
 
 const asRecord = (value: unknown): VizRecord | null =>
   !!value && typeof value === 'object' && !Array.isArray(value) ? (value as VizRecord) : null;
@@ -56,9 +60,6 @@ const toSafeColor = (value: unknown, fallback: string): string => {
   const color = toText(value);
   return /^#[0-9a-f]{3,8}$/i.test(color) ? color : fallback;
 };
-
-const resolveResponseCountColor = (label: string, value: unknown, fallback: string): string =>
-  RESPONSE_TONE_COLORS[normalizeResponseSplitLabel(label)] || toSafeColor(value, fallback);
 
 const formatValue = (value: number, suffix = ''): string => {
   const rounded = Math.abs(value) >= 10 ? Math.round(value) : Number(value.toFixed(1));
@@ -100,340 +101,6 @@ const VizHeader = ({ title, subtitle, hidden = false }: { title: string; subtitl
 type VizBodyProps = {
   spec: VizRecord;
   hideHeader?: boolean;
-};
-
-type CategoryDatum = {
-  label: string;
-  value: number;
-  detail: string;
-  color: string;
-};
-
-const readCategories = (spec: VizRecord): CategoryDatum[] =>
-  asArray(spec.categories)
-    .map((entry, index): CategoryDatum | null => {
-      const record = asRecord(entry);
-      if (!record) return null;
-      const label = toText(record.label);
-      if (!label) return null;
-      return {
-        label,
-        value: Math.max(0, toNumber(record.value)),
-        detail: toText(record.detail),
-        color: toSafeColor(record.color, PALETTE[index % PALETTE.length]),
-      };
-    })
-    .filter((entry): entry is CategoryDatum => !!entry);
-
-const CategoryDotsViz = ({ spec, hideHeader = false }: VizBodyProps) => {
-  const title = toText(spec.title) || 'Distribution';
-  const subtitle = toText(spec.subtitle);
-  const suffix = toText(spec.valueSuffix);
-  const dotUnit = Math.max(1, toNumber(spec.dotUnit, 1));
-  const categories = readCategories(spec);
-
-  if (categories.length === 0) {
-    return <p className={styles.vizFallback}>Visualization has no categories.</p>;
-  }
-
-  return (
-    <section className={styles.vizCard} aria-label={title}>
-      <VizHeader title={title} subtitle={subtitle} hidden={hideHeader} />
-      <div className={styles.categoryViz}>
-        {categories.map((category) => {
-          const dotCount = Math.max(1, Math.min(160, Math.round(category.value / dotUnit)));
-          return (
-            <div key={category.label} className={styles.categoryRow}>
-              <div className={styles.categoryMeta}>
-                <span className={styles.categoryLabel}>{category.label}</span>
-                <span className={styles.categoryValue} style={{ color: category.color }}>
-                  {formatValue(category.value, suffix)}
-                </span>
-              </div>
-              <div className={styles.dotGrid} aria-label={`${category.label}: ${formatValue(category.value, suffix)}`}>
-                {Array.from({ length: dotCount }).map((_, index) => (
-                  <span
-                    // eslint-disable-next-line react/no-array-index-key
-                    key={`${category.label}-${index}`}
-                    className={styles.dot}
-                    style={{ backgroundColor: category.color }}
-                  />
-                ))}
-              </div>
-              {category.detail && <p className={styles.categoryDetail}>{category.detail}</p>}
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-};
-
-type QuoteDatum = {
-  text: string;
-  label: string;
-};
-
-const readQuotes = (spec: VizRecord): QuoteDatum[] =>
-  asArray(spec.quotes)
-    .map((entry): QuoteDatum | null => {
-      const record = asRecord(entry);
-      if (!record) return null;
-      const text = toText(record.text);
-      if (!text) return null;
-      return {
-        text,
-        label: toText(record.label),
-      };
-    })
-    .filter((entry): entry is QuoteDatum => !!entry);
-
-const QuoteWallViz = ({ spec, hideHeader = false }: VizBodyProps) => {
-  const title = toText(spec.title) || 'Voices';
-  const subtitle = toText(spec.subtitle);
-  const quotes = readQuotes(spec);
-
-  if (quotes.length === 0) {
-    return <p className={styles.vizFallback}>Visualization has no quotes.</p>;
-  }
-
-  return (
-    <section className={styles.vizCard} aria-label={title}>
-      <VizHeader title={title} subtitle={subtitle} hidden={hideHeader} />
-      <div className={styles.quoteWall}>
-        {quotes.map((quote, index) => (
-          <figure key={`${quote.label || 'quote'}-${index}`} className={styles.quoteItem}>
-            <blockquote className={styles.quoteText}>{quote.text}</blockquote>
-            {quote.label && <figcaption className={styles.quoteLabel}>{quote.label}</figcaption>}
-          </figure>
-        ))}
-      </div>
-    </section>
-  );
-};
-
-type RankedThemeDatum = {
-  rank: string;
-  label: string;
-  value: number;
-  summary: string;
-  quote: string;
-  source: string;
-  color: string;
-};
-
-const readRankedThemes = (spec: VizRecord): RankedThemeDatum[] =>
-  asArray(spec.items || spec.categories)
-    .map((entry, index): RankedThemeDatum | null => {
-      const record = asRecord(entry);
-      if (!record) return null;
-      const label = toText(record.label);
-      if (!label) return null;
-      return {
-        rank: toText(record.rank) || String(index + 1).padStart(2, '0'),
-        label,
-        value: Math.max(0, toNumber(record.value)),
-        summary: toText(record.summary || record.detail),
-        quote: toText(record.quote),
-        source: toText(record.source),
-        color: toSafeColor(record.color, PALETTE[index % PALETTE.length]),
-      };
-    })
-    .filter((entry): entry is RankedThemeDatum => !!entry);
-
-const RankedThemesViz = ({ spec, hideHeader = false }: VizBodyProps) => {
-  const title = toText(spec.title) || 'Ranked themes';
-  const subtitle = toText(spec.subtitle);
-  const suffix = toText(spec.valueSuffix) || '%';
-  const items = readRankedThemes(spec);
-  const maxValue = Math.max(...items.map((item) => item.value), 1);
-
-  if (items.length === 0) {
-    return <p className={styles.vizFallback}>Visualization has no ranked themes.</p>;
-  }
-
-  return (
-    <section className={`${styles.vizCard} ${styles.rankedThemesCard}`} aria-label={title}>
-      <VizHeader title={title} subtitle={subtitle} hidden={hideHeader} />
-      <div className={styles.rankedThemes}>
-        {items.map((item) => (
-          <article key={`${item.rank}-${item.label}`} className={styles.rankedTheme}>
-            <div className={styles.rankBadge}>{item.rank}</div>
-            <div className={styles.rankedThemeBody}>
-              <div className={styles.rankedThemeHeader}>
-                <h4 className={styles.rankedThemeTitle}>{item.label}</h4>
-                <span className={styles.rankedThemeValue}>{formatValue(item.value, suffix)}</span>
-              </div>
-              <div className={styles.rankedThemeTrack} aria-label={`${item.label}: ${formatValue(item.value, suffix)}`}>
-                <span
-                  className={styles.rankedThemeFill}
-                  style={{
-                    width: `${clamp((item.value / maxValue) * 100, 4, 100)}%`,
-                    backgroundColor: item.color,
-                  }}
-                />
-              </div>
-              {item.summary && <p className={styles.rankedThemeSummary}>{item.summary}</p>}
-              {item.quote && (
-                <figure className={styles.rankedThemeQuote}>
-                  <blockquote>{item.quote}</blockquote>
-                  {item.source && <figcaption>{item.source}</figcaption>}
-                </figure>
-              )}
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-};
-
-type NetworkNodeDatum = {
-  id: string;
-  label: string;
-  value: number;
-  x: number;
-  y: number;
-  detail: string;
-  color: string;
-};
-
-type NetworkLinkDatum = {
-  source: string;
-  target: string;
-  strength: number;
-  label: string;
-};
-
-const readNetworkNodes = (spec: VizRecord): NetworkNodeDatum[] =>
-  asArray(spec.nodes)
-    .map((entry, index): NetworkNodeDatum | null => {
-      const record = asRecord(entry);
-      if (!record) return null;
-      const label = toText(record.label);
-      const id = toText(record.id) || label;
-      if (!id || !label) return null;
-      return {
-        id,
-        label,
-        value: Math.max(1, toNumber(record.value, 1)),
-        x: clamp(toNumber(record.x, 50), 8, 92),
-        y: clamp(toNumber(record.y, 32), 8, 56),
-        detail: toText(record.detail),
-        color: toSafeColor(record.color, PALETTE[index % PALETTE.length]),
-      };
-    })
-    .filter((entry): entry is NetworkNodeDatum => !!entry);
-
-const readNetworkLinks = (spec: VizRecord, nodeIds: Set<string>): NetworkLinkDatum[] =>
-  asArray(spec.links)
-    .map((entry): NetworkLinkDatum | null => {
-      const record = asRecord(entry);
-      if (!record) return null;
-      const source = toText(record.source);
-      const target = toText(record.target);
-      if (!nodeIds.has(source) || !nodeIds.has(target)) return null;
-      return {
-        source,
-        target,
-        strength: clamp(toNumber(record.strength, 0.5), 0.1, 1),
-        label: toText(record.label),
-      };
-    })
-    .filter((entry): entry is NetworkLinkDatum => !!entry);
-
-const ThemeNetworkViz = ({ spec, hideHeader = false }: VizBodyProps) => {
-  const title = toText(spec.title) || 'Theme network';
-  const subtitle = toText(spec.subtitle);
-  const nodes = readNetworkNodes(spec);
-  const nodesById = new Map(nodes.map((node) => [node.id, node]));
-  const links = readNetworkLinks(spec, new Set(nodesById.keys()));
-  const maxValue = Math.max(...nodes.map((node) => node.value), 1);
-  const reactId = React.useId().replace(/:/g, '');
-  const nodeHighlightId = `theme-network-node-highlight-${reactId}`;
-  const nodeShadowId = `theme-network-node-shadow-${reactId}`;
-
-  if (nodes.length === 0) {
-    return <p className={styles.vizFallback}>Visualization has no network nodes.</p>;
-  }
-
-  return (
-    <section className={`${styles.vizCard} ${styles.themeNetworkCard}`} aria-label={title}>
-      <VizHeader title={title} subtitle={subtitle} hidden={hideHeader} />
-      <div className={styles.networkFrame}>
-        <svg className={styles.networkCanvas} viewBox="0 0 100 64" role="img" aria-label={title}>
-          <defs>
-            <radialGradient id={nodeHighlightId} cx="30%" cy="30%" r="68%">
-              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.68)" />
-              <stop offset="34%" stopColor="rgba(255, 255, 255, 0.28)" />
-              <stop offset="72%" stopColor="rgba(255, 255, 255, 0)" />
-            </radialGradient>
-            <filter id={nodeShadowId} x="-70%" y="-70%" width="240%" height="240%" colorInterpolationFilters="sRGB">
-              <feDropShadow dx="0" dy="1.4" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.34" />
-            </filter>
-          </defs>
-          {links.map((link) => {
-            const source = nodesById.get(link.source);
-            const target = nodesById.get(link.target);
-            if (!source || !target) return null;
-            return (
-              <line
-                key={`${link.source}-${link.target}`}
-                className={styles.networkLink}
-                x1={source.x}
-                y1={source.y}
-                x2={target.x}
-                y2={target.y}
-                strokeWidth={0.25 + link.strength * 1.6}
-              />
-            );
-          })}
-          {nodes.map((node) => {
-            const radius = 2.8 + (node.value / maxValue) * 5.5;
-            return (
-              <g key={node.id}>
-                <circle
-                  className={styles.networkNodeShadow}
-                  cx={node.x}
-                  cy={node.y + radius * 0.16}
-                  r={radius}
-                  filter={`url(#${nodeShadowId})`}
-                  aria-hidden="true"
-                  focusable="false"
-                  pointerEvents="none"
-                />
-                <circle className={styles.networkNode} cx={node.x} cy={node.y} r={radius} fill={node.color} />
-                <circle
-                  className={styles.networkNodeHighlight}
-                  cx={node.x}
-                  cy={node.y}
-                  r={radius}
-                  fill={`url(#${nodeHighlightId})`}
-                  aria-hidden="true"
-                  focusable="false"
-                  pointerEvents="none"
-                />
-                <text className={styles.networkLabel} x={node.x} y={node.y + radius + 4.2} textAnchor="middle">
-                  {node.label}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-        <div className={styles.networkLegend}>
-          {nodes.map((node) => (
-            <div key={node.id} className={styles.networkLegendItem}>
-              <span className={styles.networkLegendSwatch} style={{ backgroundColor: node.color }} />
-              <div>
-                <span className={styles.networkLegendTitle}>{node.label}</span>
-                {node.detail && <p>{node.detail}</p>}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
 };
 
 type BeeswarmPointDatum = {
@@ -530,7 +197,7 @@ const formatCalcPercentWithPx = (percent: number, pxOffset: number) => {
   return `calc(${percent}% ${operator} ${Math.abs(pxOffset)}px)`;
 };
 
-const BeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
+const DefaultBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const title = toText(spec.title) || 'Rating responses';
   const subtitle = toText(spec.subtitle);
   const note = toText(spec.note);
@@ -658,117 +325,33 @@ const BeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   );
 };
 
-type ResponseCountDatum = {
-  label: string;
-  value: number;
-  color: string;
-};
-
-type ResponseQuoteDatum = {
-  label: string;
-  text: string;
-  color: string;
-};
-
-type ResponsePanelDatum = {
-  kind: string;
-  title: string;
-  prompt: string;
-  note: string;
-  display: string;
-  hideTitle: boolean;
-  counts: ResponseCountDatum[];
-  quotes: ResponseQuoteDatum[];
-};
-
-const readResponsePanels = (spec: VizRecord): ResponsePanelDatum[] =>
-  asArray(spec.panels || spec.items)
-    .map((entry, panelIndex): ResponsePanelDatum | null => {
-      const record = asRecord(entry);
-      if (!record) return null;
-      const title = toText(record.title || record.label);
-      if (!title) return null;
-      const counts = asArray(record.counts || record.choices || record.options)
-        .map((count, countIndex): ResponseCountDatum | null => {
-          const countRecord = asRecord(count);
-          if (!countRecord) return null;
-          const label = toText(countRecord.label);
-          if (!label) return null;
-          return {
-            label,
-            value: Math.max(0, toNumber(countRecord.value)),
-            color: resolveResponseCountColor(
-              label,
-              countRecord.color,
-              PALETTE[(panelIndex + countIndex) % PALETTE.length],
-            ),
-          };
-        })
-        .filter((count): count is ResponseCountDatum => !!count);
-      const quotes = asArray(record.quotes || record.examples)
-        .map((quote): ResponseQuoteDatum | null => {
-          const quoteRecord = asRecord(quote);
-          if (!quoteRecord) return null;
-          const text = toText(quoteRecord.text);
-          if (!text) return null;
-          return {
-            label: toText(quoteRecord.label),
-            text,
-            color: toText(quoteRecord.color),
-          };
-        })
-        .filter((quote): quote is ResponseQuoteDatum => !!quote);
-      return {
-        kind: toText(record.kind || record.type),
-        title,
-        prompt: toText(record.prompt),
-        note: toText(record.note),
-        display: toText(record.display || record.layout).toLowerCase(),
-        hideTitle: toBoolean(record.hideTitle),
-        counts,
-        quotes,
-      };
-    })
-    .filter((entry): entry is ResponsePanelDatum => !!entry);
-
-const buildPieGradient = (counts: ResponseCountDatum[]) => {
-  const total = counts.reduce((sum, count) => sum + count.value, 0);
-  if (total <= 0) {
-    return {
-      total: 0,
-      gradient: 'conic-gradient(rgba(255, 255, 255, 0.16) 0 100%)',
-    };
+const BeeswarmViz = (props: VizBodyProps) => {
+  if (toText(props.spec.presentation).toLowerCase() !== 'precision') {
+    return <DefaultBeeswarmViz {...props} />;
   }
 
-  let cursor = 0;
-  const segments = counts.map((count) => {
-    const start = cursor;
-    const end = cursor + (count.value / total) * 100;
-    cursor = end;
-    return `${count.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
-  });
+  const title = toText(props.spec.title) || 'Rating responses';
+  const min = toNumber(props.spec.min, 0);
+  const max = Math.max(min + 1, toNumber(props.spec.max, 10));
+  const rows = readBeeswarmRows(props.spec);
 
-  return {
-    total,
-    gradient: `conic-gradient(${segments.join(', ')})`,
-  };
+  if (rows.length === 0) {
+    return <p className={styles.vizFallback}>Visualization has no beeswarm rows.</p>;
+  }
+
+  return (
+    <PrecisionBeeswarmPresentation
+      title={title}
+      subtitle={toText(props.spec.subtitle)}
+      note={toText(props.spec.note)}
+      suffix={toText(props.spec.valueSuffix)}
+      min={min}
+      max={max}
+      rows={rows}
+      hideHeader={props.hideHeader ?? false}
+    />
+  );
 };
-
-const isResponseSplitPanel = (panel: ResponsePanelDatum) => {
-  if (panel.display === 'split' || panel.display === 'results-bar') return true;
-  if (panel.display) return false;
-  if (panel.counts.length < 2) return false;
-  return panel.counts.every((count) => RESPONSE_SPLIT_LABELS.has(normalizeResponseSplitLabel(count.label)));
-};
-
-const orderedResponseSplitCounts = (counts: ResponseCountDatum[]) =>
-  [...counts].sort((a, b) => {
-    const aIndex = RESPONSE_SPLIT_ORDER.indexOf(normalizeResponseSplitLabel(a.label));
-    const bIndex = RESPONSE_SPLIT_ORDER.indexOf(normalizeResponseSplitLabel(b.label));
-    const normalizedA = aIndex === -1 ? RESPONSE_SPLIT_ORDER.length : aIndex;
-    const normalizedB = bIndex === -1 ? RESPONSE_SPLIT_ORDER.length : bIndex;
-    return normalizedA - normalizedB;
-  });
 
 type BinaryBeeswarmQuestionDatum = {
   label: string;
@@ -898,11 +481,6 @@ const buildBinaryBeeswarmPlacements = (items: BinaryBeeswarmQuestionDatum[], sca
 
   return placements;
 };
-
-const formatBinaryCountsLabel = (counts: ResponseCountDatum[]) =>
-  orderedResponseSplitCounts(counts)
-    .map((count) => `${count.label} ${formatValue(count.value)}`)
-    .join(', ');
 
 const getInitialBinaryView = (): 'swarm' | 'list' =>
   typeof window !== 'undefined' &&
@@ -1248,144 +826,35 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
 const ResponseTypeGridViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const title = toText(spec.title) || 'Response types';
   const subtitle = toText(spec.subtitle);
-  const panels = readResponsePanels(spec);
+  const panels = readResponsePanels(spec, PALETTE);
   const note = toText(spec.note);
+  const presentation = toText(spec.presentation).toLowerCase();
 
   if (panels.length === 0) {
     return <p className={styles.vizFallback}>Visualization has no response panels.</p>;
   }
 
+  if (presentation === 'editorial') {
+    return (
+      <EditorialResponseTypeGridPresentation
+        title={title}
+        subtitle={subtitle}
+        panels={panels}
+        note={note}
+        hideHeader={hideHeader}
+      />
+    );
+  }
+
   return (
-    <section className={`${styles.vizCard} ${styles.responseTypeCard}`} aria-label={title}>
-      <VizHeader title={title} subtitle={subtitle} hidden={hideHeader} />
-      <div className={styles.responseTypeGrid}>
-        {panels.map((panel) => {
-          const maxValue = Math.max(...panel.counts.map((count) => count.value), 1);
-          const shouldSortCounts = panel.kind.toLowerCase() === 'multi-select';
-          const orderedCounts = shouldSortCounts
-            ? [...panel.counts].sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
-            : panel.counts;
-          const displayAsNumbers = panel.display === 'numbers' || panel.display === 'metrics';
-          const displayAsPie = panel.display === 'pie';
-          const displayAsSplit = !displayAsNumbers && !displayAsPie && isResponseSplitPanel(panel);
-          const pie = displayAsPie ? buildPieGradient(panel.counts) : null;
-          const splitCounts = displayAsSplit ? orderedResponseSplitCounts(panel.counts) : [];
-          const splitTotal = splitCounts.reduce((sum, count) => sum + count.value, 0);
-          const visibleTitle = displayAsSplit && panel.prompt ? panel.prompt : panel.title;
-          const visiblePrompt = displayAsSplit && panel.prompt ? '' : panel.prompt;
-          return (
-            <article key={`${panel.kind}-${panel.title}`} className={styles.responseTypePanel}>
-              {!panel.hideTitle && <h4>{visibleTitle}</h4>}
-              {visiblePrompt && <p className={styles.responseTypePrompt}>{visiblePrompt}</p>}
-              {panel.counts.length > 0 && displayAsNumbers && (
-                <div className={styles.responseMetrics}>
-                  {panel.counts.map((count) => (
-                    <div key={count.label} className={styles.responseMetricRow}>
-                      <span>{count.label}</span>
-                      <strong style={{ color: count.color }}>{formatValue(count.value)}</strong>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {panel.counts.length > 0 && displayAsPie && pie && (
-                <div className={styles.responsePie}>
-                  <div
-                    className={styles.responsePieChart}
-                    role="img"
-                    aria-label={`${panel.title}: ${panel.counts.map((count) => `${count.label} ${formatValue(count.value)}`).join(', ')}`}
-                    style={{ background: pie.gradient }}
-                  >
-                    <span className={styles.responsePieTotal} aria-hidden="true">
-                      {formatValue(pie.total)} total
-                    </span>
-                  </div>
-                  <div className={styles.responsePieLegend}>
-                    {panel.counts.map((count) => (
-                      <div key={count.label} className={styles.responsePieLegendItem}>
-                        <span className={styles.responsePieSwatch} style={{ backgroundColor: count.color }} />
-                        <span>{count.label}</span>
-                        <span className={styles.responsePieLegendValue}>
-                          <strong>{formatValue(count.value)}</strong>
-                          <span>{formatValue((count.value / pie.total) * 100, '%')}</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {panel.counts.length > 0 && displayAsSplit && (
-                <div className={styles.responseSplit}>
-                  <div className={styles.responseSplitLegend}>
-                    {splitCounts.map((count) => (
-                      <span key={count.label} className={styles.responseSplitLegendItem}>
-                        <span className={styles.responseSplitSwatch} style={{ backgroundColor: count.color }} />
-                        <span>{count.label}</span>
-                        <strong>{formatValue(count.value)}</strong>
-                      </span>
-                    ))}
-                  </div>
-                  <div
-                    className={styles.responseSplitBar}
-                    role="img"
-                    aria-label={`${visibleTitle}: ${splitCounts.map((count) => `${count.label} ${formatValue(count.value)}`).join(', ')}`}
-                  >
-                    {splitCounts.map((count) => (
-                      <span
-                        key={count.label}
-                        className={styles.responseSplitSegment}
-                        style={{
-                          width: splitTotal > 0 ? `${clamp((count.value / splitTotal) * 100, 0, 100)}%` : '0%',
-                          backgroundColor: count.color,
-                        }}
-                        title={`${count.label}: ${formatValue(count.value)}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {panel.counts.length > 0 && !displayAsNumbers && !displayAsPie && !displayAsSplit && (
-                <div className={styles.responseBars}>
-                  {orderedCounts.map((count) => (
-                    <div key={count.label} className={styles.responseBarRow}>
-                      <div className={styles.responseBarMeta}>
-                        <span>{count.label}</span>
-                        <span>{formatValue(count.value)}</span>
-                      </div>
-                      <div
-                        className={styles.responseBarTrack}
-                        aria-label={`${count.label}: ${formatValue(count.value)}`}
-                      >
-                        <span
-                          className={styles.responseBarFill}
-                          style={{
-                            width: count.value > 0 ? `${clamp((count.value / maxValue) * 100, 6, 100)}%` : '0%',
-                            backgroundColor: count.color,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {panel.quotes.length > 0 && (
-                <div className={styles.responseQuotes}>
-                  {panel.quotes.map((quote, index) => (
-                    <figure key={`${quote.label || 'quote'}-${index}`}>
-                      <blockquote>{quote.text}</blockquote>
-                      {quote.label && (
-                        <figcaption style={quote.color ? { color: quote.color } : undefined}>{quote.label}</figcaption>
-                      )}
-                    </figure>
-                  ))}
-                </div>
-              )}
-              {panel.note && <p className={styles.responseTypeNote}>{renderFormattedText(panel.note)}</p>}
-            </article>
-          );
-        })}
-      </div>
-      {note && <p className={styles.vizNote}>{renderFormattedText(note)}</p>}
-    </section>
+    <ResponseTypeGridPresentation
+      title={title}
+      subtitle={subtitle}
+      panels={panels}
+      note={note}
+      hideHeader={hideHeader}
+      precision={presentation === 'precision'}
+    />
   );
 };
 

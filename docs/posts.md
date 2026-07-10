@@ -63,7 +63,7 @@ the Markdown file's directory, so a post at
 attachments naturally:
 
 ```markdown
-![Agent Village example](attachments/example-wrapped-poster.jpeg "Optional caption")
+![Agent Village example](attachments/example-wrapped-poster.jpeg 'Optional caption')
 ```
 
 `headerImage` is optional and renders above the post title on `/posts/:slug`.
@@ -78,7 +78,7 @@ The opening fence accepts a JSON title and an optional `defaultOpen` boolean.
 Content between the markers is parsed as normal post Markdown, including code
 fences:
 
-`````markdown
+````markdown
 ```ce-disclosure
 {
   "title": "Evaluation protocol and record schema",
@@ -96,8 +96,9 @@ type EvaluationRecord = {
 ```
 
 ```ce-disclosure-end
+
 ```
-`````
+````
 
 Disclosure blocks cannot be nested. An opening marker without a matching end
 marker contains the remaining post blocks so incomplete authoring still renders
@@ -140,6 +141,21 @@ Supported types:
   list (most split, confidence), and narrow screens start in the List view.
 - `response-type-grid`: renders mixed panels (`numbers`, `pie`, split bars,
   quote lists) from `panels`.
+
+Visualization blocks can opt into two report-style presentations used by the
+Agent Village results post:
+
+- A `response-type-grid` with `"presentation": "editorial"` uses a restrained
+  report layout. Panel `display` values can be `distribution`, `pie`, `ring`, or
+  `bars`; `pie` keeps the full chart-and-legend treatment, while `ring` is the
+  compact summary treatment. Bar panels may add `summaryValue` and
+  `summarySuffix` for a headline statistic such as average confidence.
+- A `beeswarm` with `"presentation": "precision"` uses a compact matrix with a
+  full question-text column, shared response scale, participant markers, and a
+  median column. Participant metadata may remain in the source JSON, but this
+  presentation intentionally has no separate participant footer. A companion
+  `response-type-grid` may use the same presentation to align ranked bars and
+  freeform responses beneath the matrix.
 
 Wrap related `ce-viz` blocks in a `ce-viz-group` fenced JSON block to render
 them as one disclosure. `"layout"` picks the body: `"carousel"` (default) is a
