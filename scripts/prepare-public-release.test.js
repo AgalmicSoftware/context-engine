@@ -90,6 +90,11 @@ test('prepare-public-release strips review artifacts and preserves the generated
     writeFile(sourceDir, path.join('scripts', 'vendor-cecc-ethers-bundle.js'), 'private companion vendoring\n');
     writeFile(
       sourceDir,
+      path.join('scripts', 'lib', 'passkey-wallet-derivation.js'),
+      "module.exports = { privateHarnessOnly: true };\n",
+    );
+    writeFile(
+      sourceDir,
       'package.json',
       `${JSON.stringify(
         {
@@ -151,6 +156,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'worker.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-agent-bridge-worker-tests.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'vendor-cecc-ethers-bundle.js')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'lib', 'passkey-wallet-derivation.js')), false);
 
     const manifestPath = path.join(outputDir, 'private-pack.manifest.json');
     assert.equal(fs.existsSync(manifestPath), true);
@@ -168,6 +174,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.doesNotMatch(manifestText, /_local_helper/);
     assert.doesNotMatch(manifestText, /\.private\.test/);
     assert.match(manifestText, /private-pack\.manifest\.json/);
+    assert.match(manifestText, /scripts\/lib\/passkey-wallet-derivation\.js/);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
