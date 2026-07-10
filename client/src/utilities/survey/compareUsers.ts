@@ -321,7 +321,7 @@ export function encodeStancesForUser(user: Partial<CompareUser> = {}): EncodedSt
     if (!qid) continue;
     const type = toLower(q?.type || '');
     const ans = q?.answer;
-    if (ans == null || ans === '' || ans === '*') continue;
+    if (ans == null || ans === '*' || (typeof ans === 'string' && ans.trim() === '')) continue;
     const impMul = importanceMultiplier(q?.importance);
     if (type === 'binary') {
       const sign = normalizeBinarySign(ans);

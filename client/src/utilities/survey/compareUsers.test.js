@@ -363,6 +363,14 @@ describe('compare user pure helpers', () => {
     expect(stance.weight).toBeCloseTo(Math.abs(expectedValue));
   });
 
+  it.each([' ', '\t', '\n', '*'])('drops blank or sentinel rating answer %j', (answer) => {
+    const { tokens } = encodeStancesForUser({
+      questions: [{ id: 'rating', type: 'rating', answer }],
+    });
+
+    expect(tokens.has('rating')).toBe(false);
+  });
+
   it.each([-1, 11, Number.NaN, Number.POSITIVE_INFINITY, 'not-a-rating'])(
     'drops non-canonical rating answer %s',
     (answer) => {
