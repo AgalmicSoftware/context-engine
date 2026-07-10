@@ -30,4 +30,15 @@ describe('deriveAesGcmKeyFromPrf', () => {
     expect(ArrayBuffer.isView(algorithm.salt)).toBe(true);
     expect(ArrayBuffer.isView(algorithm.info)).toBe(true);
   });
+
+  it('derives an AES key through the real WebCrypto HKDF boundary', async () => {
+    const prfOutput = new Uint8Array(32).fill(1).buffer;
+    const salt = bufferToBase64URL(new Uint8Array(32).fill(2));
+
+    const key = await deriveAesGcmKeyFromPrf(prfOutput, salt);
+
+    expect(key.type).toBe('secret');
+    expect(key.algorithm).toEqual(expect.objectContaining({ name: 'AES-GCM', length: 256 }));
+    expect(key.usages).toEqual(['encrypt', 'decrypt']);
+  });
 });

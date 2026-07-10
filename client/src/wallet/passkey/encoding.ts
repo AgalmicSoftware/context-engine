@@ -31,6 +31,7 @@ export function bufferSourceToWebCryptoBufferSource(buffer: ArrayBuffer | ArrayB
   const bytes = bufferSourceToUint8Array(buffer);
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
+  // Regression guard: Node 20 WebCrypto needs a Node-realm Buffer; browsers keep an isolated ArrayBuffer copy.
   const nodeBuffer = getNodeBufferConstructor();
   return nodeBuffer ? nodeBuffer.from(copy) : copy.buffer;
 }
