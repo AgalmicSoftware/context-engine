@@ -42,7 +42,7 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 - Utilities, helpers, adapters, config modules, and data loaders use camelCase filenames.
 - This applies under `client/src/utilities/` and to helper-only files that live beside a component.
 - Utility directory buckets are lowercase by domain: `ai/`, `crypto/`, `session/`, `web3/`, etc.
-- Use `.js` or `.mjs` for non-React modules unless the file actually renders JSX.
+- Use `.ts` for non-JSX TypeScript modules. Reserve `.js`/`.mjs` for compatibility barrels, scripts, or modules that must stay plain JavaScript for non-TypeScript consumers.
 - Keep JSON fixtures or static data source-adjacent when they only support one feature.
 
 ## 4. Test Naming

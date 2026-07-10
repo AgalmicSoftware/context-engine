@@ -52,6 +52,32 @@ const MIGRATED_COMPONENT_DOC_PATHS = Object.freeze([
   'client/src/components/UserPage/UserPage.tsx',
 ]);
 
+const MIGRATED_UTILITY_DOC_PATHS = Object.freeze([
+  {
+    stalePath: 'utilities/worker/corsProxy.js',
+    livePath: 'client/src/utilities/worker/corsProxy.ts',
+  },
+  {
+    stalePath: 'utilities/cache/mainSiteDgStorage.js',
+    livePath: 'client/src/utilities/cache/mainSiteDgStorage.ts',
+  },
+  {
+    stalePath: 'utilities/crypto/litProtocol.js',
+    livePath: 'client/src/utilities/crypto/litProtocol.ts',
+  },
+  {
+    stalePath: 'utilities/compareUsers.js',
+    livePath: 'client/src/utilities/survey/compareUsers.ts',
+  },
+]);
+
+const UTILITY_ANCHOR_FILES = Object.freeze([
+  'ARCHITECTURE.md',
+  'client/src/utilities/ai/aiClient.ts',
+  'docs/AdminPage.MAP.md',
+  'docs/MainSite.MAP.md',
+]);
+
 const toLegacyJsxPath = (relativePath) => relativePath.replace(/\.tsx$/, '.jsx');
 
 const OPTIONAL_WORKFLOW_SKILL_CHECKS = Object.freeze([
@@ -112,6 +138,26 @@ test('tracked anchor files do not reference stale JSX component paths after the 
       );
     });
   });
+});
+
+test('tracked utility anchors use live TypeScript source paths', () => {
+  MIGRATED_UTILITY_DOC_PATHS.forEach(({ livePath }) => {
+    assert.equal(fs.existsSync(path.join(ROOT, livePath)), true, `${livePath} should exist`);
+  });
+
+  UTILITY_ANCHOR_FILES.forEach((relativePath) => {
+    const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
+    MIGRATED_UTILITY_DOC_PATHS.forEach(({ stalePath }) => {
+      assert.equal(source.includes(stalePath), false, `${relativePath} should not reference ${stalePath}`);
+    });
+  });
+});
+
+test('repository guidance prefers TypeScript for non-JSX client modules', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'docs/repo-structure.md'), 'utf8');
+
+  assert.match(source, /Use `.ts` for non-JSX TypeScript modules/);
+  assert.doesNotMatch(source, /Use `.js` or `.mjs` for non-React modules/);
 });
 
 test('local workflow skill anchors point at live component files when the private workflow tree is present', () => {

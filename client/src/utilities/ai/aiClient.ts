@@ -6,7 +6,7 @@
  * Key exports: callAI, analyzeClusterOpinions, rankQuestionsAI, requestAiRewrite, transcribeAudio, runCompareToolkit
  */
 // Purpose: AI orchestration only — unified compare entry + toolkit calls.
-// All math/heuristics live in utilities/compareUsers.js
+// All math/heuristics live in utilities/survey/compareUsers.ts
 
 import { aiRewritePrompt } from '../../prompts/aiRewritePrompt.js';
 import buildClusterAnalysisPrompt, { CLUSTER_ANALYSIS_SYSTEM_PROMPT } from '../../prompts/clusterAnalysisPrompt.js';
