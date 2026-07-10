@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Completed the frontend modernization baseline with typed domain boundaries,
+  downward-only type-debt and size ratchets, decomposed session, survey, and
+  application shells, split CI/release verification, synchronized worker-bundle
+  checks, and public-release surface validation.
+- Added stable automation hooks for gate-lock state and gate selection without
+  changing user-facing behavior.
+
 ## [0.7.0] - 2026-07-06
 
 ### Added
