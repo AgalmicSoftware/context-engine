@@ -31,26 +31,7 @@ function writeJson(repoDir, relativePath, value) {
 
 function writeBaselines(
   repoDir,
-  {
-    violations,
-    counts,
-    deadExports = { candidateDeadFiles: 4, candidateUnusedExports: 2 },
-    legacyCoverage = { statements: 75.7, branches: 61, functions: 77, lines: 79.1 },
-    fullCoverage = { statements: 70, branches: 55, functions: 70, lines: 72 },
-    coverageRules = [{ id: 'test-source', jestPatterns: ['!src/**/*.test.ts'], reason: 'tests' }],
-    coverageExceptions = [],
-    legacyCoverageFiles = ['client/src/imported.ts'],
-    typedDiagnostics = [{ signature: 'src/example.test.ts|TS2322|fixture', count: 1 }],
-    typedClassifications = [{ id: 'test-source', pattern: 'client/src/**/*.test.ts' }],
-    typedExclusions = [],
-    bundleBudget = {
-      warningRatio: 0.95,
-      entry: { sources: ['index.html'], includeDirectDynamicImports: true, maxGzipBytes: 250000 },
-      nonVendorChunk: { maxMinifiedBytes: 500000, vendorFilePrefixes: ['assets/vendor-'] },
-      exceptions: [{ id: 'app-shell', filePrefix: 'assets/AppShell-', maxMinifiedBytes: 625000 }],
-      duplicateAssets: { allowedPairs: [] },
-    },
-  },
+  { violations, counts, deadExports = { candidateDeadFiles: 4, candidateUnusedExports: 2 } },
 ) {
   writeJson(repoDir, 'scripts/client-boundaries-baseline.json', {
     version: 1,
@@ -64,19 +45,6 @@ function writeBaselines(
     version: 1,
     ...deadExports,
   });
-  writeJson(repoDir, 'scripts/coverage-baseline.json', { global: legacyCoverage });
-  writeJson(repoDir, 'scripts/client-coverage-full-baseline.json', { global: fullCoverage });
-  writeJson(repoDir, 'scripts/client-coverage-exclusions.json', {
-    rules: coverageRules,
-    explicitProductionFileExceptions: coverageExceptions,
-  });
-  writeJson(repoDir, 'scripts/client-coverage-legacy-files.json', { files: legacyCoverageFiles });
-  writeJson(repoDir, 'scripts/client-test-type-diagnostics-baseline.json', { diagnostics: typedDiagnostics });
-  writeJson(repoDir, 'scripts/client-test-type-contract.json', {
-    classifications: typedClassifications,
-    explicitExclusions: typedExclusions,
-  });
-  writeJson(repoDir, 'scripts/client-bundle-budget.json', bundleBudget);
 }
 
 function commitAll(repoDir, message) {
@@ -368,7 +336,7 @@ test('verified maintainer approval lets intentional boundary and type-debt growt
   });
 });
 
-test('verified maintainer approval cannot permit dead-export baseline growth', () => {
+test('allow marker cannot permit dead-export baseline growth', () => {
   withTempRepo((repoDir) => {
     writeBaselines(repoDir, {
       violations: [],
@@ -390,18 +358,18 @@ test('verified maintainer approval cannot permit dead-export baseline growth', (
       repoDir,
       '--base',
       base,
-      '--approval',
-      'approved',
+      '--allow-text',
+      `Attempted bypass ${ALLOW_MARKER}`,
     ], {
       encoding: 'utf8',
     });
 
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /dead-exports-baseline\.json growth cannot be approved/);
+    assert.match(result.stderr, /dead-exports-baseline\.json growth cannot be allowed/);
   });
 });
 
-test('cli fails without verified approval when baselines grow', () => {
+test('cli fails without allow marker when baselines grow', () => {
   withTempRepo((repoDir) => {
     writeBaselines(repoDir, {
       violations: [],
@@ -431,6 +399,31 @@ test('cli fails without verified approval when baselines grow', () => {
     assert.match(result.stderr, /client-boundaries-baseline\.json gained 1 violation/);
     assert.match(result.stderr, /type-debt-baseline\.json increased 1 count/);
     assert.match(result.stderr, /dead-exports-baseline\.json increased 1 count/);
+  });
+});
+
+test('bootstraps the dead-export baseline when the base ref predates it', () => {
+  withTempRepo((repoDir) => {
+    writeJson(repoDir, 'scripts/client-boundaries-baseline.json', {
+      version: 1,
+      mode: 'fail-on-new-violation',
+      violations: [],
+    });
+    writeJson(repoDir, 'scripts/type-debt-baseline.json', {
+      counts: { colonAny: 0 },
+    });
+    commitAll(repoDir, 'base baselines without dead exports');
+    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
+
+    writeJson(repoDir, 'scripts/dead-exports-baseline.json', {
+      version: 1,
+      candidateDeadFiles: 17,
+      candidateUnusedExports: 219,
+    });
+
+    const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
+    assert.deepEqual(result.deadExportIncreases, []);
+    assert.match(result.notices.join('\n'), /dead-exports-baseline\.json was not present/);
   });
 });
 

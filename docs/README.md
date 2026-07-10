@@ -62,6 +62,10 @@ Local development:
 - `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.
 
 Release:
+- `docs/dependency-audit-hotspots.md`: dependency audit remediations, accepted residuals, and package-specific audit commands.
+- `docs/dependency-audit.md`: current client npm audit disposition ledger and blocked/deferred package-family decisions.
+- `docs/dead-code-disposition.md`: dead-file and named-export reachability dispositions plus the ratchet contract.
+- `docs/release-runbook.md`: operator release checklist, gates, public strip policy, worker bundle publishing, and rollback notes.
 - `docs/releasing.md`: Public-history replay, stripped artifact export, and release hygiene checks.
 
 Wallets:
