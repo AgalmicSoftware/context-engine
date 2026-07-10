@@ -46,6 +46,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:node:tracked': 'node scripts/run-node-tests.js --tracked-only',
           'client-boundaries:check': 'node scripts/check-client-boundaries.mjs',
           'dead-exports:advisory': 'node scripts/check-dead-exports-advisory.mjs',
+          'dead-exports:check': 'node scripts/check-dead-exports-advisory.mjs --check',
           'test:e2e': 'npm run -s test:e2e:smoke',
           'test:e2e:quick': 'npm run -s test:e2e:smoke',
           'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
@@ -54,7 +55,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'coverage-floor:check': 'node scripts/check-coverage-floor.mjs',
           'test:ci':
             'npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run test:client && npm run coverage-floor:check && npm run test:root:jest && npm run test:worker:session-cors && npm run test:node',
-          'test:wiring': 'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check',
+          'test:wiring':
+            'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check && npm run -s dead-exports:check',
           tests: 'npm run test:ci && npm run test:surveys-sbt',
           'test:client': 'npm test -- --coverage --coverageReporters=json-summary',
           'test:release:client':
@@ -176,6 +178,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/coverage-baseline.json',
       'scripts/check-dead-exports-advisory.mjs',
       'scripts/check-dead-exports-advisory.test.mjs',
+      'scripts/dead-exports-baseline.json',
       'scripts/check-baseline-monotonicity.mjs',
       'scripts/check-baseline-monotonicity.test.mjs',
       'scripts/testInventoryConfig.js',

@@ -7,6 +7,7 @@ import test from 'node:test';
 import {
   collectDeadExportAdvisory,
   formatDeadExportAdvisory,
+  runDeadExportCheck,
   runDeadExportAdvisory,
 } from './check-dead-exports-advisory.mjs';
 
@@ -45,7 +46,7 @@ test('collectDeadExportAdvisory reports candidates without failing', () => {
     writeFile(
       rootDir,
       'client/src/components/Page/Page.tsx',
-      "import { UsedWidget } from '../Used/Used';\nexport const Page = () => UsedWidget();\n",
+      "import { UsedWidget } from '../Used/Used.js';\nexport const Page = () => UsedWidget();\n",
     );
 
     const result = collectDeadExportAdvisory({ rootDir });
@@ -78,4 +79,25 @@ test('formatDeadExportAdvisory prints bounded candidate lists', () => {
   assert.match(output, /Candidate dead files: 1/);
   assert.match(output, /dead-file\? client\/src\/components\/Dead\/Dead\.tsx/);
   assert.match(output, /unused-export\? client\/src\/components\/Dead\/Dead\.tsx#deadExport/);
+});
+
+test('runDeadExportCheck passes at the banked counts and fails on regrowth', () => {
+  withTempRoot((rootDir) => {
+    writeFile(rootDir, 'client/src/components/Dead/Dead.ts', 'export const deadExport = true;\n');
+    writeFile(
+      rootDir,
+      'scripts/dead-exports-baseline.json',
+      `${JSON.stringify({ version: 1, candidateDeadFiles: 1, candidateUnusedExports: 1 }, null, 2)}\n`,
+    );
+
+    const passingOutput = [];
+    assert.equal(runDeadExportCheck({ rootDir, stdout: (line) => passingOutput.push(line) }), 0);
+    assert.match(passingOutput.join('\n'), /Dead export ratchet passed/);
+
+    writeFile(rootDir, 'client/src/components/Dead/Second.ts', 'export const secondDeadExport = true;\n');
+    const failingOutput = [];
+    assert.equal(runDeadExportCheck({ rootDir, stderr: (line) => failingOutput.push(line) }), 1);
+    assert.match(failingOutput.join('\n'), /candidate dead files increased: 1 -> 2/);
+    assert.match(failingOutput.join('\n'), /candidate unused named exports increased: 1 -> 2/);
+  });
 });

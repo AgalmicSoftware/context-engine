@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 
 export const DEFAULT_ROOT_DIR = path.resolve(__dirname, '..');
 export const SOURCE_ROOT = 'client/src';
+export const DEAD_EXPORT_BASELINE_PATH = 'scripts/dead-exports-baseline.json';
 
 const SOURCE_FILE_RE = /\.(?:js|jsx|mjs|cjs|ts|tsx)$/;
 const DECLARATION_FILE_RE = /\.d\.ts$/;
@@ -106,14 +107,18 @@ function resolveClientImport(sourceFile, specifier, fileSet) {
     return null;
   }
 
+  const explicitExtension = path.posix.extname(basePath);
+  const extensionlessBase = SOURCE_FILE_RE.test(explicitExtension)
+    ? basePath.slice(0, -explicitExtension.length)
+    : basePath;
   const candidates = [
     basePath,
-    `${basePath}.js`,
-    `${basePath}.jsx`,
-    `${basePath}.mjs`,
-    `${basePath}.cjs`,
-    `${basePath}.ts`,
-    `${basePath}.tsx`,
+    `${extensionlessBase}.js`,
+    `${extensionlessBase}.jsx`,
+    `${extensionlessBase}.mjs`,
+    `${extensionlessBase}.cjs`,
+    `${extensionlessBase}.ts`,
+    `${extensionlessBase}.tsx`,
     `${basePath}/index.js`,
     `${basePath}/index.jsx`,
     `${basePath}/index.ts`,
@@ -233,6 +238,64 @@ export function runDeadExportAdvisory({ rootDir = DEFAULT_ROOT_DIR, stdout = con
   return 0;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exit(runDeadExportAdvisory());
+function readDeadExportBaseline(rootDir) {
+  const baselinePath = path.join(rootDir, DEAD_EXPORT_BASELINE_PATH);
+  const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+  const candidateDeadFiles = Number(baseline?.candidateDeadFiles);
+  const candidateUnusedExports = Number(baseline?.candidateUnusedExports);
+  if (!Number.isFinite(candidateDeadFiles) || candidateDeadFiles < 0) {
+    throw new Error(`${DEAD_EXPORT_BASELINE_PATH} candidateDeadFiles must be a non-negative number`);
+  }
+  if (!Number.isFinite(candidateUnusedExports) || candidateUnusedExports < 0) {
+    throw new Error(`${DEAD_EXPORT_BASELINE_PATH} candidateUnusedExports must be a non-negative number`);
+  }
+  return { candidateDeadFiles, candidateUnusedExports };
+}
+
+export function collectDeadExportRatchet({ rootDir = DEFAULT_ROOT_DIR } = {}) {
+  const current = collectDeadExportAdvisory({ rootDir });
+  const baseline = readDeadExportBaseline(rootDir);
+  return {
+    current,
+    baseline,
+    deadFileIncrease: Math.max(0, current.candidateDeadFiles.length - baseline.candidateDeadFiles),
+    unusedExportIncrease: Math.max(0, current.candidateUnusedExports.length - baseline.candidateUnusedExports),
+  };
+}
+
+export function runDeadExportCheck({
+  rootDir = DEFAULT_ROOT_DIR,
+  stdout = console.log,
+  stderr = console.error,
+} = {}) {
+  let result;
+  try {
+    result = collectDeadExportRatchet({ rootDir });
+  } catch (error) {
+    stderr(`Dead export ratchet failed: ${error.message}`);
+    return 1;
+  }
+
+  const { current, baseline, deadFileIncrease, unusedExportIncrease } = result;
+  if (deadFileIncrease > 0) {
+    stderr(
+      `Dead export ratchet failed: candidate dead files increased: ${baseline.candidateDeadFiles} -> ${current.candidateDeadFiles.length}.`,
+    );
+  }
+  if (unusedExportIncrease > 0) {
+    stderr(
+      `Dead export ratchet failed: candidate unused named exports increased: ${baseline.candidateUnusedExports} -> ${current.candidateUnusedExports.length}.`,
+    );
+  }
+  if (deadFileIncrease > 0 || unusedExportIncrease > 0) return 1;
+
+  stdout(
+    `Dead export ratchet passed: dead files ${current.candidateDeadFiles.length}/${baseline.candidateDeadFiles}; unused named exports ${current.candidateUnusedExports.length}/${baseline.candidateUnusedExports}.`,
+  );
+  return 0;
+}
+
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  process.exit(process.argv.includes('--check') ? runDeadExportCheck() : runDeadExportAdvisory());
 }
