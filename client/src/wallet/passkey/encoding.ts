@@ -2,6 +2,40 @@ export function isArrayBufferLike(value: unknown): value is ArrayBuffer {
   return value instanceof ArrayBuffer || Object.prototype.toString.call(value) === '[object ArrayBuffer]';
 }
 
+export function bufferSourceToUint8Array(buffer: ArrayBuffer | ArrayBufferView): Uint8Array {
+  if (isArrayBufferLike(buffer)) {
+    return new Uint8Array(buffer);
+  }
+
+  if (ArrayBuffer.isView(buffer)) {
+    return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  }
+
+  throw new Error('Expected an ArrayBuffer or ArrayBufferView.');
+}
+
+type NodeBufferConstructor = {
+  from(input: Uint8Array): BufferSource;
+};
+
+function getNodeBufferConstructor(): NodeBufferConstructor | null {
+  const runtime = globalThis as typeof globalThis & {
+    Buffer?: NodeBufferConstructor;
+    process?: { versions?: { node?: string } };
+  };
+  if (!runtime.process?.versions?.node || typeof runtime.Buffer?.from !== 'function') return null;
+  return runtime.Buffer;
+}
+
+export function bufferSourceToWebCryptoBufferSource(buffer: ArrayBuffer | ArrayBufferView): BufferSource {
+  const bytes = bufferSourceToUint8Array(buffer);
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  // Regression guard: Node 20 WebCrypto needs a Node-realm Buffer; browsers keep an isolated ArrayBuffer copy.
+  const nodeBuffer = getNodeBufferConstructor();
+  return nodeBuffer ? nodeBuffer.from(copy) : copy.buffer;
+}
+
 export function bufferToBase64URL(buffer: ArrayBuffer | ArrayBufferView): string {
   let bytes: Uint8Array;
   if (isArrayBufferLike(buffer)) {

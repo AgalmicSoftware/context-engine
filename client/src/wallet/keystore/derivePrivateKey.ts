@@ -1,5 +1,5 @@
 import type { HexString, PasskeyDerivedWalletRecord, PasskeyWalletConfig } from '../types.js';
-import { bufferSourceToUint8Array, bufferToBase64URL } from '../passkey/encoding.js';
+import { bufferSourceToWebCryptoBufferSource, bufferToBase64URL } from '../passkey/encoding.js';
 
 const textEncoder = new TextEncoder();
 const DERIVATION_VERSION = 'passkey-prf-hkdf-secp256k1-v1' as const;
@@ -28,7 +28,7 @@ export const deriveEoaPrivateKeyFromPrf = async ({
   config: PasskeyWalletConfig;
 }): Promise<HexString> => {
   if (!crypto.subtle) throw new Error('WebCrypto subtle API is not available.');
-  const baseKey = await crypto.subtle.importKey('raw', bufferSourceToUint8Array(prfOutput), 'HKDF', false, [
+  const baseKey = await crypto.subtle.importKey('raw', bufferSourceToWebCryptoBufferSource(prfOutput), 'HKDF', false, [
     'deriveBits',
   ]);
   const salt = textEncoder.encode(`context-engine:passkey-derived-eoa-salt:v1:${config.rpId}:${namespace(config)}`);
@@ -38,9 +38,9 @@ export const deriveEoaPrivateKeyFromPrf = async ({
       {
         name: 'HKDF',
         hash: 'SHA-256',
-        salt,
-        info: textEncoder.encode(
-          `context-engine:passkey-derived-eoa:v1:${config.rpId}:${namespace(config)}:${counter}`,
+        salt: bufferSourceToWebCryptoBufferSource(salt),
+        info: bufferSourceToWebCryptoBufferSource(
+          textEncoder.encode(`context-engine:passkey-derived-eoa:v1:${config.rpId}:${namespace(config)}:${counter}`),
         ),
       },
       baseKey,
