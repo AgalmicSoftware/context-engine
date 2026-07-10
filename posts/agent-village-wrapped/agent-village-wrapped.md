@@ -5,15 +5,15 @@ date: 2026-07-06
 
 # Agent Village Wrapped: Does Your Agent Know You? (Experiment + Eval)
 
-Many people dislike filling out surveys, but would happily take (and share) a quiz about what kind of dog they are [on Facebook](https://www.nbcnews.com/id/wbna33830316). Could this insight about social output formats (and the viral success of "Spotify Wrapped") be useful for participatory deliberation experiments?
+Many people dislike filling out surveys, but would happily take (and share) a quiz about what kind of dog they are [on Facebook](https://www.nbcnews.com/id/wbna33830316). Could this insight about shareable output formats (and the viral success of "Spotify Wrapped") be useful for participatory deliberation experiments?
 
 Agent Village Wrapped and its associated evaluation were created to begin measuring how accurately a personal AI agent represents a human principal — the person it works for — using a low-friction process. We believe there are social AI games and future products in this direction, and that agents could help solve participation challenges facing civic tech. This could lead to a future where your agent is always [bargaining and coalition-building on your behalf](https://blog.cosmos-institute.org/p/coasean-bargaining-at-scale).
 
 ## Background
 
-**The Agent Village** at Edge Esmeralda 2026 gave attendees [personal AI agents for a month](https://x.com/JoinEdgeCity/status/2049205479704776723), pre-loaded with skills allowing them to find connections with other attendees (Index Network), curate a knowledge graph (GeoBrowser), navigate the schedule (EdgeOS), and participate in experiments. The most common setup was a pre-loaded Hermes agent with an OpenRouter key accessible via Telegram, although the skills could also be used via Claude Code, OpenClaw, and other agents.
+**The Agent Village** at Edge Esmeralda 2026 gave attendees [personal AI agents for a month](https://x.com/JoinEdgeCity/status/2049205479704776723). The agents came preloaded with skills for finding other attendees they should meet (Index Network), curating a knowledge graph (GeoBrowser), navigating the schedule (EdgeOS), and participating in experiments. Most attendees used a preloaded Hermes agent with an OpenRouter key through Telegram. The same skills could also be used through Claude Code, OpenClaw, and other agents.
 
-**Context Engine** is an [open-source toolkit](https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md) for deliberation, sensemaking, and negotiation in large groups (of humans and AI agents). Sessions support public or private questions, AI-assisted input and analysis of results, and decentralized or centralized versions that can be started by anyone easily. An agent running the Context Engine skill can raise appropriate questions to a user based on context, and draft + submit responses to reduce input friction.
+**Context Engine** is an [open-source toolkit](https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md) for deliberation, sensemaking, and negotiation in large groups (of humans and AI agents). Sessions support public or private questions, AI-assisted input and analysis of results, and centralized or decentralized sessions that can be deployed by anyone. An agent running the Context Engine skill can surface relevant questions for a user's context, and help draft and submit responses to reduce input friction.
 
 **Agent Village Wrapped** is a quiz your agent takes about you. You send one command, and your agent predicts your answers to a set of questions (this time on delegation, privacy, and AI futures) with a confidence score on every answer. You get back a shareable image of what it thinks it knows about you, as well as a link to review and correct all predictions via a Telegram Bot. Telegram was a primary interface for the Edge Hermes agents.
 
@@ -29,7 +29,7 @@ The same inputs can also produce more focused exhibits. Here we see a "political
 
 ## Example data (n = 4)
 
-Agent Village Wrapped was deployed too late for widespread use at Edge 2026, so the data below is not representative but previews how future results could appear. Four agents took the quiz — 58 questions each, 232 predictions — but no human corrections were made. Everything below is unreviewed agent prediction, so it demonstrates what the eval collects rather than how accurately the agents represented their principals.
+Agent Village Wrapped was deployed too late for widespread use at Edge 2026, so the data below is not representative but previews how future results could appear. Four agents took the quiz — 58 questions each, 232 predictions — but no human corrections were made. Everything below consists of unreviewed agent predictions, so it demonstrates what the eval collects rather than how accurately the agents represented their principals.
 
 ```ce-viz
 {
