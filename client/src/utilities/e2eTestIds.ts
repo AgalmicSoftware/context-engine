@@ -248,6 +248,7 @@ export const E2E_TESTIDS = Object.freeze({
   GATE_LOCK_BUTTON: 'ce-gate-lock-button',
   GATE_LOCK_POPOVER: 'ce-gate-lock-popover',
   GATE_LOCK_ROW: 'ce-gate-lock-row',
+  GATE_LOCK_CHECKBOX: 'ce-gate-lock-checkbox',
 
   // Session OnePageSession
   SESSION_PILE_BACK: 'ce-session-pile-back',
