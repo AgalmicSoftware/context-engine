@@ -21,8 +21,8 @@ import {
   seedSbtCountMapFromLegacyAddresses,
   hydrateLegacySbtCountState,
   getCurrentHolderAddressesFromCounts,
-  normalizeSbtCountsScanCheckpoint,
 } from './sbtCountHelpers.js';
+import { buildSbtCountsResumePlan, normalizeSbtCountsScanCheckpoint } from './sbtCountsCheckpointContract.js';
 import { normalizeSbtHistorySummary, buildSbtHistorySummaryFromCounts } from './sbtHistoryHelpers.js';
 import { resolveSbtCreationBlock } from './sbtCacheEntryHelpers.js';
 import { normalizeSbtRealtimeEventCursor, compareSbtRealtimeEventCursor } from './sbtRealtimeCursorHelpers.js';
@@ -1449,22 +1449,14 @@ export const createSessionSbtCacheController = (host = {}) => {
       };
       const countOptions = Object.keys(countOptionsBase).length > 0 ? countOptionsBase : null;
       const resumeCheckpoint = latestCountsCheckpoint;
-      const checkpointAlreadyCoversWindow =
-        !existing?.countsLoaded &&
-        resumeCheckpoint &&
-        resumeCheckpoint.phase === 'activity' &&
-        Number.isFinite(Number(resumeCheckpoint.blockNumber)) &&
-        Number(resumeCheckpoint.blockNumber) >= baseTo;
-      const canResumeFromCheckpoint =
-        !existing?.countsLoaded &&
-        resumeCheckpoint &&
-        Number.isFinite(Number(resumeCheckpoint.blockNumber)) &&
-        Number(resumeCheckpoint.blockNumber) >= startBlock - 1 &&
-        Number(resumeCheckpoint.blockNumber) < baseTo;
-      const initialProgressSeedBlock =
-        existing?.countsLoaded === true && Number.isFinite(existingBlock)
-          ? existingBlock
-          : Number(resumeCheckpoint?.blockNumber ?? startBlock - 1);
+      const { checkpointAlreadyCoversWindow, canResumeFromCheckpoint, initialProgressSeedBlock } =
+        buildSbtCountsResumePlan({
+          countsLoaded: existing?.countsLoaded === true,
+          existingBlock,
+          resumeCheckpoint,
+          startBlock,
+          toBlock: baseTo,
+        });
       const initialProgress = buildSbtCountsInitialProgress({
         startBlock,
         toBlock: baseTo,
