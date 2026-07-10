@@ -41,6 +41,7 @@ import {
 import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE } from './routeConfig.js';
 import { resolveMainSiteRouteMatch } from './routeTable.js';
 import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
+import { renderPostsRoute } from './postsRouteRenderer.js';
 import { buildPublicRoute, buildPublicUrl, replaceRouteResponderQueryParam } from './urlUtils.js';
 import { hasAutoFlag as hasAutoFlagFn } from './autoHashPersistence';
 import {
@@ -58,7 +59,6 @@ import {
   ContractPage as ContractPageRaw,
   DemosIndex as DemosIndexRaw,
   OnePageSession as OnePageSessionRaw,
-  PostsPage as PostsPageRaw,
   RiskMatrixDemo as RiskMatrixDemoRaw,
   SBTPage as SBTPageRaw,
   SBTsPage as SBTsPageRaw,
@@ -101,7 +101,6 @@ type RefreshQuestionResponsesOptions = Record<string, unknown>;
 type MainSiteSurveyMetadataCache = Record<string, { surveys?: Record<string, unknown> } | undefined>;
 type SessionConfigLike = MainSiteSessionConfigLike;
 type MainSiteRouteNetwork = Record<string, unknown> | null | undefined;
-
 const styles = stylesRaw as Record<string, string>;
 const asMainSiteRouteComponent = (component: unknown): MainSiteRouteComponent => component as MainSiteRouteComponent;
 const MainAreaTabs = asMainSiteRouteComponent(MainAreaTabsRaw);
@@ -120,7 +119,6 @@ const CompareAddresses = asMainSiteRouteComponent(CompareAddressesRaw);
 const ContractPage = asMainSiteRouteComponent(ContractPageRaw);
 const DemosIndex = asMainSiteRouteComponent(DemosIndexRaw);
 const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
-const PostsPage = asMainSiteRouteComponent(PostsPageRaw);
 const RiskMatrixDemo = asMainSiteRouteComponent(RiskMatrixDemoRaw);
 const SBTPage = asMainSiteRouteComponent(SBTPageRaw);
 const SBTsPage = asMainSiteRouteComponent(SBTsPageRaw);
@@ -163,14 +161,6 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     <Suspense fallback={<LazyFallback label="Loading..." />}>
       <div data-testid={E2E_TESTIDS.PAGE_ABOUT_ROOT}>
         <AboutPage />
-      </div>
-    </Suspense>
-  ),
-
-  _renderPostsRoute: () => (
-    <Suspense fallback={<LazyFallback label="Loading Posts..." />}>
-      <div data-testid={E2E_TESTIDS.PAGE_POSTS_ROOT}>
-        <PostsPage />
       </div>
     </Suspense>
   ),
@@ -1391,7 +1381,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         simUser: () => host._renderSimUserRoute(fullPath, defaultSessionNetwork),
         userProfile: () => host._renderUserProfileRoute(ctx),
         about: () => host._renderAboutRoute(),
-        posts: () => host._renderPostsRoute(),
+        posts: renderPostsRoute,
         demos: () => host._renderDemosRoute(),
         matrix: () => host._renderMatrixRoute(),
         contracts: () => host._renderContractsRoute(ctx),

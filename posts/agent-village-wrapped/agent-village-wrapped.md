@@ -1,11 +1,11 @@
 ---
-title: Agent Village Wrapped / Agent Prediction Evaluations
+title: Agent Village Wrapped: Does Your Agent Know You? (Experiment + Eval)
 date: 2026-07-06
 ---
 
-# Agent Village Wrapped / Agent Prediction Evaluations
+# Agent Village Wrapped: Does Your Agent Know You? (Experiment + Eval)
 
-Many people dislike filling out surveys, but would happily take (and share) a quiz about what kind of dog they are [on facebook](https://www.nbcnews.com/id/wbna33830316). Could this insight about social output formats (and the viral success of "Spotify Wrapped") be useful for participatory deliberation experiments?
+Many people dislike filling out surveys, but would happily take (and share) a quiz about what kind of dog they are [on Facebook](https://www.nbcnews.com/id/wbna33830316). Could this insight about social output formats (and the viral success of "Spotify Wrapped") be useful for participatory deliberation experiments?
 
 Agent Village Wrapped and its associated evaluation were created to begin measuring how accurately a personal AI agent represents a human principal — the person it works for — using a low-friction process. We believe there are social AI games and future products in this direction, and that agents could help solve participation challenges facing civic tech. This could lead to a future where your agent is always [bargaining and coalition-building on your behalf](https://blog.cosmos-institute.org/p/coasean-bargaining-at-scale).
 
@@ -48,7 +48,7 @@ Agent Village Wrapped was deployed too late for widespread use at Edge 2026, so 
         { "label": "z-ai/glm-5.2", "value": 1, "color": "#ff6bcb" },
         { "label": "unserialized model record (Hermes Agent v0.14.0)", "value": 1, "color": "#ffb347" }
       ],
-      "note": "One run preserved the model field as [object Object]."
+      "note": "One run stored its model metadata as [object Object], so it appears here as an unserialized model record."
     },
     {
       "kind": "Answer shapes",
@@ -591,6 +591,6 @@ Each extension should freeze its inputs, preregister one primary endpoint, and f
 
 ## The next trial
 
-The Context Engine / "Agent Village Wrapped" runtime has been generalized: a skill.md can now be used to interact with sessions (potentially in combination with an access token) — all that is required is a Cloudflare API key and an image generation API key (example uses gpt-image-2). Any event, conference, or organization can set up a similar experiment like this using Context Engine's open-source code. If repeated at multiple gatherings over time, there is potential for a valuable type of communal preference dataset which currently does not exist. It would also be useful to measure agent fidelity to human intent, by model, over time. Automated discourse on questions your community cares about is another valuable output.
+The Context Engine / "Agent Village Wrapped" runtime has been generalized so a `SKILL.md` can interact with sessions using an invite or agent access token. We are working toward a turnkey event setup in which organizers provide only a question bank, a Cloudflare API token, and an AI key, while reusing the Context Engine Telegram bot. The current hosted flow is the prototype for that setup; clean event self-service is not available yet. Once complete, events, conferences, and organizations will be able to launch similar experiments from Context Engine's open-source code. Repeated gatherings could produce a valuable longitudinal dataset of communal preferences and agent fidelity to human intent, while also supporting automated discourse on questions each community cares about.
 
-This skill.md is available [here](https://github.com/AgalmicSoftware/context-engine/blob/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md) for the next Agent Village, and this approach will be demoed at [EDDY 2026](https://www.eddy-network.eu/in-person-events/eddy-2026-vienna).
+This SKILL.md is available [here](https://github.com/AgalmicSoftware/context-engine/blob/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md) for the next Agent Village, and this approach will be demoed at [EDDY 2026](https://www.eddy-network.eu/in-person-events/eddy-2026-vienna).

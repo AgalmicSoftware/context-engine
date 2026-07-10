@@ -333,9 +333,9 @@ describe('PostsPage', () => {
 
     expect(screen.getByTestId('test-location')).toHaveTextContent('/posts/first-post');
     expect(screen.queryByRole('heading', { name: 'Posts', level: 1 })).not.toBeInTheDocument();
-    const detailHeading = await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    const detailHeading = await screen.findByRole('heading', { name: 'First Post', level: 1 });
     expect(detailHeading).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'First Post', level: 1 })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
     expect(screen.queryByText('Post')).not.toBeInTheDocument();
     expect(screen.queryByText('First summary')).not.toBeInTheDocument();
     const detailHeader = detailHeading.closest('header') as HTMLElement;
@@ -542,7 +542,7 @@ describe('PostsPage', () => {
   it('renders grouped visualizations as mounted carousel slides', async () => {
     renderFirstPostMarkdown(openGroupPostMarkdown);
 
-    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
     const carousel = await screen.findByTestId('ce-posts-viz-carousel');
     const slides = getCarouselSlides(carousel);
 
@@ -566,7 +566,7 @@ describe('PostsPage', () => {
   it('moves carousel state with next and previous controls', async () => {
     renderFirstPostMarkdown(openGroupPostMarkdown);
 
-    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
     const carousel = await screen.findByTestId('ce-posts-viz-carousel');
     const previousButton = within(carousel).getByTestId('ce-posts-viz-carousel-prev');
     const nextButton = within(carousel).getByTestId('ce-posts-viz-carousel-next');
@@ -602,7 +602,7 @@ describe('PostsPage', () => {
   it('jumps carousel state from dot controls', async () => {
     renderFirstPostMarkdown(openGroupPostMarkdown);
 
-    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
     const carousel = await screen.findByTestId('ce-posts-viz-carousel');
     const firstDot = within(carousel).getByTestId('ce-posts-viz-carousel-dot-0');
     const fourthDot = within(carousel).getByTestId('ce-posts-viz-carousel-dot-3');
@@ -617,7 +617,7 @@ describe('PostsPage', () => {
   it('handles carousel arrow keys without intercepting slide content keys', async () => {
     renderFirstPostMarkdown(openGroupPostMarkdown);
 
-    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
     const carousel = await screen.findByTestId('ce-posts-viz-carousel');
 
     fireEvent.keyDown(carousel, { key: 'ArrowRight' });
@@ -653,7 +653,7 @@ describe('PostsPage', () => {
     ].join('\n');
     renderFirstPostMarkdown(hideTitleMarkdown);
 
-    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
     const carousel = await screen.findByTestId('ce-posts-viz-carousel');
 
     expect(within(carousel).getByText('Visible quote body.')).toBeInTheDocument();
@@ -697,7 +697,7 @@ describe('PostsPage', () => {
     ].join('\n');
     renderFirstPostMarkdown(packedMarkdown);
 
-    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
     const carousel = await screen.findByTestId('ce-posts-viz-carousel');
 
     expect(within(carousel).getByText('1 / 2')).toBeInTheDocument();
@@ -730,7 +730,7 @@ describe('PostsPage', () => {
     ].join('\n');
     renderFirstPostMarkdown(stackMarkdown);
 
-    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
     await screen.findByText('First body.');
 
     expect(screen.getByText('First section')).toBeInTheDocument();
@@ -749,7 +749,7 @@ describe('PostsPage', () => {
 
     renderPostsPage(fetcher, true, ['/posts/first-post']);
 
-    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
     const binaryBeeswarmSvg = await screen.findByRole('img', { name: 'Consensus and Difference' });
     expect(within(binaryBeeswarmSvg as HTMLElement).getByText('Avg. confidence')).toBeInTheDocument();
     expect(within(binaryBeeswarmSvg as HTMLElement).getByText('60')).toBeInTheDocument();
@@ -783,7 +783,7 @@ describe('PostsPage', () => {
 
     renderPostsPage(fetcher, true, ['/posts/first-post']);
 
-    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
     const p1Dot = await screen.findByLabelText('P1: 3/10, 70% confidence');
     const ratingCard = p1Dot.closest('section') as HTMLElement;
 
@@ -805,7 +805,7 @@ describe('PostsPage', () => {
 
     renderPostsPage(fetcher, true, ['/posts/first-post']);
 
-    await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
     await screen.findByTestId('ce-posts-binary-view-list');
     expect(screen.queryByTestId('ce-posts-binary-list')).not.toBeInTheDocument();
 
@@ -855,7 +855,7 @@ describe('PostsPage', () => {
 
       renderPostsPage(fetcher, true, ['/posts/first-post']);
 
-      await screen.findByRole('heading', { name: 'First Post', level: 2 });
+      await screen.findByRole('heading', { name: 'First Post', level: 1 });
       expect(await screen.findByTestId('ce-posts-binary-list')).toBeInTheDocument();
       expect(screen.getByTestId('ce-posts-binary-view-list')).toHaveAttribute('aria-pressed', 'true');
       expect(screen.queryByRole('img', { name: 'Consensus and Difference' })).not.toBeInTheDocument();
@@ -877,13 +877,13 @@ describe('PostsPage', () => {
     renderPostsPage(fetcher, true, ['/posts/first-post']);
 
     expect(screen.queryByRole('heading', { name: 'Posts', level: 1 })).not.toBeInTheDocument();
-    const detailHeading = await screen.findByRole('heading', { name: 'First Post', level: 2 });
+    const detailHeading = await screen.findByRole('heading', { name: 'First Post', level: 1 });
     expect(detailHeading).toBeInTheDocument();
     const detailHeader = detailHeading.closest('header') as HTMLElement;
     expect(within(detailHeader).queryByText('Context Engine')).not.toBeInTheDocument();
     expect(within(detailHeader).getByText('Jul 3, 2026')).toBeInTheDocument();
     expect(within(detailHeader).getByText('analysis')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'First Post', level: 1 })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
     expect(screen.queryByText('Post')).not.toBeInTheDocument();
     expect(screen.queryByText('First summary')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Posts/i })).toHaveAttribute('href', '/posts');

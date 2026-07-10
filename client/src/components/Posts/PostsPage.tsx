@@ -215,7 +215,7 @@ const PostsPage = ({ enabled = CE_ABOUT_POSTS_ENABLED, fetcher = defaultFetch }:
                     )}
                   </figure>
                 )}
-                <h2 className={styles.postTitle}>{selectedPostMeta.title}</h2>
+                <h1 className={styles.postTitle}>{selectedPostMeta.title}</h1>
                 {(selectedPostMeta.date || selectedPostMeta.tags.length > 0) && (
                   <div className={styles.postMeta}>
                     {selectedPostMeta.tags.length > 0 && (
