@@ -1494,6 +1494,7 @@ describe('createSessionSbtCacheController', () => {
             lastBlock: 9,
             sbtList: expect.objectContaining({
               '0xsbt': expect.objectContaining({
+                schemaVersion: 1,
                 sbtAddress: '0xSBT',
                 sbtInfo: expect.objectContaining({
                   name: 'Cached SBT',
