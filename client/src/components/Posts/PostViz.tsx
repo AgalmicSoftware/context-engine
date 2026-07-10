@@ -1268,17 +1268,13 @@ const ResponseTypeGridViz = ({ spec, hideHeader = false }: VizBodyProps) => {
           const displayAsNumbers = panel.display === 'numbers' || panel.display === 'metrics';
           const displayAsPie = panel.display === 'pie';
           const displayAsSplit = !displayAsNumbers && !displayAsPie && isResponseSplitPanel(panel);
-          const isConfidencePanel = panel.kind.toLowerCase() === 'confidence';
           const pie = displayAsPie ? buildPieGradient(panel.counts) : null;
           const splitCounts = displayAsSplit ? orderedResponseSplitCounts(panel.counts) : [];
           const splitTotal = splitCounts.reduce((sum, count) => sum + count.value, 0);
           const visibleTitle = displayAsSplit && panel.prompt ? panel.prompt : panel.title;
           const visiblePrompt = displayAsSplit && panel.prompt ? '' : panel.prompt;
           return (
-            <article
-              key={`${panel.kind}-${panel.title}`}
-              className={`${styles.responseTypePanel} ${isConfidencePanel ? styles.responseTypePanelWide : ''}`}
-            >
+            <article key={`${panel.kind}-${panel.title}`} className={styles.responseTypePanel}>
               {!panel.hideTitle && <h4>{visibleTitle}</h4>}
               {visiblePrompt && <p className={styles.responseTypePrompt}>{visiblePrompt}</p>}
               {panel.counts.length > 0 && displayAsNumbers && (

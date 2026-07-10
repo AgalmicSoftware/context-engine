@@ -235,6 +235,7 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
 .postImageFigure {
   position: relative;
   display: grid;
+  max-width: min(100%, 720px);
   gap: 0;
 }
 
@@ -453,8 +454,6 @@ h3.postHeading {
 }
 
 .postParagraph {
-  max-width: 74ch;
-
   strong {
     color: $text;
     font-weight: 800;
@@ -479,7 +478,6 @@ h3.postHeading {
 }
 
 .postBlockquote {
-  max-width: 68ch;
   padding: 14px 18px;
   border-left: 3px solid $accent;
   border-radius: 0 8px 8px 0;
@@ -1286,6 +1284,10 @@ h3.postHeading {
   background: $viz-panel-bg;
 }
 
+.responseTypeCard {
+  container-type: inline-size;
+}
+
 .beeswarmViz {
   display: grid;
   gap: $viz-gap-lg;
@@ -1779,8 +1781,7 @@ h3.postHeading {
 
 .responseTypeGrid {
   display: grid;
-  // container-driven columns: 2-3 across on wide slides, 1 on narrow, no breakpoint cliff
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
 }
 
@@ -1789,8 +1790,10 @@ h3.postHeading {
   display: grid;
   align-content: start;
   gap: $viz-gap-sm;
-  padding: 2px $viz-gap-xl $viz-gap-xl 0;
+  margin: 0;
+  padding: $viz-gap-xl 0;
   border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 0;
   background: transparent;
 
@@ -1807,17 +1810,39 @@ h3.postHeading {
   }
 }
 
-.responseTypePanel + .responseTypePanel {
-  padding-left: $viz-gap-xl;
-  border-left: 1px solid rgba(255, 255, 255, 0.09);
+.responseTypePanel:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
-.responseTypePanelWide {
-  grid-column: 1 / -1;
-  margin-top: $viz-gap-sm;
-  padding: $viz-gap-xl 0 0;
+.responseTypePanel + .responseTypePanel {
+  padding: $viz-gap-xl 0;
+  border-left: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.09);
-  border-left: 0 !important;
+}
+
+@container (min-width: 880px) {
+  .responseTypeGrid {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(260px, 1fr);
+    grid-template-columns: none;
+    overflow-x: auto;
+  }
+
+  .responseTypePanel {
+    padding: 2px $viz-gap-xl $viz-gap-xl 0;
+    border-top: 0;
+  }
+
+  .responseTypePanel:first-child {
+    padding-top: 2px;
+  }
+
+  .responseTypePanel + .responseTypePanel {
+    padding: 2px $viz-gap-xl $viz-gap-xl;
+    border-top: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.09);
+  }
 }
 
 .responseTypePrompt {
@@ -2125,8 +2150,7 @@ h3.postHeading {
   }
 
   .responseTypePanel,
-  .responseTypePanel + .responseTypePanel,
-  .responseTypePanelWide {
+  .responseTypePanel + .responseTypePanel {
     margin: 0;
     padding: $viz-gap-xl 0;
     border-left: 0;
