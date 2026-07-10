@@ -56,6 +56,7 @@ export interface CommonGroundSnapshot {
 
 const ADDRESS_REDACTION_PATTERN = /0x[0-9a-fA-F]{40}/;
 const EMAIL_REDACTION_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const ENS_REDACTION_PATTERN = /\b[a-z0-9-]{3,}\.eth\b/i;
 const DEFAULT_SEED = 42;
 const DEFAULT_K_ANONYMITY = 5;
 
@@ -65,7 +66,11 @@ function isRecord(value: unknown): value is UnknownRecord {
 
 function hasRedactedIdentifier(value: unknown): boolean {
   const text = String(value || '');
-  return ADDRESS_REDACTION_PATTERN.test(text) || EMAIL_REDACTION_PATTERN.test(text);
+  return (
+    ADDRESS_REDACTION_PATTERN.test(text) ||
+    EMAIL_REDACTION_PATTERN.test(text) ||
+    ENS_REDACTION_PATTERN.test(text)
+  );
 }
 
 function isBinaryComment(comment: DemoCommentRecord): boolean {
