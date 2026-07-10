@@ -66,11 +66,7 @@ function isRecord(value: unknown): value is UnknownRecord {
 
 function hasRedactedIdentifier(value: unknown): boolean {
   const text = String(value || '');
-  return (
-    ADDRESS_REDACTION_PATTERN.test(text) ||
-    EMAIL_REDACTION_PATTERN.test(text) ||
-    ENS_REDACTION_PATTERN.test(text)
-  );
+  return ADDRESS_REDACTION_PATTERN.test(text) || EMAIL_REDACTION_PATTERN.test(text) || ENS_REDACTION_PATTERN.test(text);
 }
 
 function isBinaryComment(comment: DemoCommentRecord): boolean {
@@ -179,15 +175,10 @@ export function buildCommonGroundSnapshotFromDemoDataset(
   });
 
   const allQuestions = statements.map((statement) => `s${statement.index}`);
-  const questionPromptsMap = Object.fromEntries(
-    statements.map((statement) => [`s${statement.index}`, statement.text]),
-  );
-  const mathResult = computePolisConversationMath(
-    votes as PolisReportRatingMatrix,
-    questionPromptsMap,
-    allQuestions,
-    { randomSeed: seed },
-  );
+  const questionPromptsMap = Object.fromEntries(statements.map((statement) => [`s${statement.index}`, statement.text]));
+  const mathResult = computePolisConversationMath(votes as PolisReportRatingMatrix, questionPromptsMap, allQuestions, {
+    randomSeed: seed,
+  });
 
   if (!Array.isArray(mathResult.clusterAssignments) || !mathResult.clusterAssignments.length) {
     throw new Error('CommonGround export requires computePolisConversationMath cluster assignments.');
