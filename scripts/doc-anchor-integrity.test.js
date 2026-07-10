@@ -146,9 +146,7 @@ test('tracked utility anchors use live TypeScript source paths', () => {
   });
 
   UTILITY_ANCHOR_FILES.forEach((relativePath) => {
-    const absolutePath = path.join(ROOT, relativePath);
-    if (!fs.existsSync(absolutePath)) return;
-    const source = fs.readFileSync(absolutePath, 'utf8');
+    const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
     MIGRATED_UTILITY_DOC_PATHS.forEach(({ stalePath }) => {
       assert.equal(source.includes(stalePath), false, `${relativePath} should not reference ${stalePath}`);
     });
