@@ -13,6 +13,12 @@ const TOP_LEVEL_SCRIPT_RE = /^test-.+\.js$/;
 const JS_FILE_RE = /\.(?:cjs|js)$/;
 const PATH_SEP_RE = /[\\/]/g;
 
+function dependencyFixHint(specifier) {
+  return path.basename(String(specifier || '')) === 'passkey-wallet-derivation.js'
+    ? PASSKEY_FIX_HINT
+    : `restore or update the missing dependency ${specifier}`;
+}
+
 function parseArgs(argv) {
   const options = {
     repoDir: path.resolve(__dirname, '..'),
@@ -223,7 +229,7 @@ function resolveSpecifier(specifier, importerPath) {
       module: specifier,
       importer: importerPath,
       error: error && error.message ? error.message : String(error),
-      fixHint: PASSKEY_FIX_HINT,
+      fixHint: dependencyFixHint(specifier),
     };
   }
 }
@@ -267,7 +273,7 @@ function firstUnresolvableRequire(filePath, rootDir, visited = new Set()) {
       module: path.relative(rootDir, normalizedFile),
       importer: null,
       error: error && error.message ? error.message : String(error),
-      fixHint: PASSKEY_FIX_HINT,
+      fixHint: dependencyFixHint(path.relative(rootDir, normalizedFile)),
     };
   }
 
