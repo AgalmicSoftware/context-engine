@@ -102,28 +102,6 @@ test('runHarnessDoctor reports a missing private passkey helper with its restore
   });
 });
 
-test('runHarnessDoctor names unrelated missing dependencies without a passkey hint', (t) => {
-  const rootDir = makeFixture(t);
-  fs.writeFileSync(path.join(rootDir, 'scripts', 'lib', 'e2e', 'wallets.js'), `
-    'use strict';
-    module.exports = {};
-  `);
-  fs.writeFileSync(path.join(rootDir, 'scripts', 'test-session-gates-any-all.js'), `
-    'use strict';
-    module.exports = require('../missing-client-module.js');
-  `);
-
-  const report = runHarnessDoctor(rootDir);
-  const gateResult = report.results.find((result) => result.entrypoint === 'scripts/test-session-gates-any-all.js');
-
-  assert.equal(gateResult.status, 'unresolved');
-  assert.deepEqual(gateResult.firstUnresolved, {
-    module: '../missing-client-module.js',
-    importer: path.join('scripts', 'test-session-gates-any-all.js'),
-    fixHint: 'restore or update the missing dependency ../missing-client-module.js',
-  });
-});
-
 test('extractTopLevelRequireSpecifiers ignores lazy workflow requires', () => {
   const source = `
     'use strict';

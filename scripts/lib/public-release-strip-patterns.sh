@@ -67,6 +67,7 @@ scripts/test-*.js
 scripts/test-*.ui.js
 scripts/seed-*.js
 scripts/lib/e2e
+scripts/lib/passkey-wallet-derivation.js
 scripts/start-playwright-server.js
 scripts/run-e2e-*
 scripts/run-ux-*
@@ -149,6 +150,7 @@ scripts/test-*.js
 scripts/test-*.ui.js
 scripts/seed-*.js
 scripts/lib/e2e
+scripts/lib/passkey-wallet-derivation.js
 scripts/start-playwright-server.js
 scripts/run-agent-bridge-worker-tests.js
 scripts/vendor-cecc-ethers-bundle.js
