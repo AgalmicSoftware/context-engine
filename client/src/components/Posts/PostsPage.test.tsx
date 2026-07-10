@@ -210,8 +210,9 @@ describe('PostsPage', () => {
 
     expect(screen.getByTestId('test-location')).toHaveTextContent('/posts/first-post');
     expect(screen.queryByRole('heading', { name: 'Posts', level: 1 })).not.toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: 'First Post', level: 2 })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'First Post', level: 1 })).not.toBeInTheDocument();
+    const detailHeading = await screen.findByRole('heading', { name: 'First Post', level: 1 });
+    expect(detailHeading).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
     expect(screen.queryByText('Post')).not.toBeInTheDocument();
     expect(screen.queryByText('First summary')).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'First post header graphic' }))
@@ -261,6 +262,368 @@ describe('PostsPage', () => {
     expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
   });
 
+  it('renders a collapsed Markdown disclosure containing a schema', async () => {
+    renderFirstPostMarkdown(
+      [
+        '# First Post',
+        '',
+        '```ce-disclosure',
+        '{ "title": "Evaluation schema", "defaultOpen": false }',
+        '```',
+        '',
+        '### Record schema',
+        '',
+        '```typescript',
+        'type EvaluationRecord = { score: number };',
+        '```',
+        '',
+        '```ce-disclosure-end',
+        '```',
+      ].join('\n'),
+    );
+
+    const summary = (await screen.findByText('Evaluation schema')).closest('summary') as HTMLElement;
+    const disclosure = summary.closest('details') as HTMLElement;
+
+    expect(disclosure).toBeInTheDocument();
+    expect(disclosure).not.toHaveAttribute('open');
+    expect(within(disclosure).getByRole('heading', { name: 'Record schema', level: 3 })).toBeInTheDocument();
+    expect(disclosure.querySelector('code')).toHaveTextContent('type EvaluationRecord = { score: number };');
+    expect(screen.queryByText('```ce-disclosure')).not.toBeInTheDocument();
+
+    await userEvent.click(summary);
+    expect(disclosure).toHaveAttribute('open');
+  });
+
+  it('renders grouped visualizations as mounted carousel slides', async () => {
+    renderFirstPostMarkdown(openGroupPostMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
+    const carousel = await screen.findByTestId('ce-posts-viz-carousel');
+    const slides = getCarouselSlides(carousel);
+
+    expect(carousel).toHaveAttribute('aria-roledescription', 'carousel');
+    expect(carousel).toHaveAccessibleName('Data Exploration (n=4) visualizations');
+    expect(slides).toHaveLength(6);
+    expect(slides.map((slide) => slide.getAttribute('aria-label'))).toEqual([
+      '1 of 6: Theme distribution',
+      '2 of 6: Ranked interview themes',
+      '3 of 6: Interview theme network',
+      '4 of 6: Rating answers',
+      '5 of 6: Consensus and Difference',
+      '6 of 6: Other response shapes',
+    ]);
+    expect(within(carousel).getByText('1 / 6')).toBeInTheDocument();
+    expect(within(carousel).getByTestId('ce-posts-viz-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
+    expect(within(carousel).getByText('Theme distribution')).toBeInTheDocument();
+    expect(within(carousel).getByText('Other response shapes')).toBeInTheDocument();
+  });
+
+  it('moves carousel state with next and previous controls', async () => {
+    renderFirstPostMarkdown(openGroupPostMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
+    const carousel = await screen.findByTestId('ce-posts-viz-carousel');
+    const previousButton = within(carousel).getByTestId('ce-posts-viz-carousel-prev');
+    const nextButton = within(carousel).getByTestId('ce-posts-viz-carousel-next');
+    const firstDot = within(carousel).getByTestId('ce-posts-viz-carousel-dot-0');
+    const secondDot = within(carousel).getByTestId('ce-posts-viz-carousel-dot-1');
+    const lastDot = within(carousel).getByTestId('ce-posts-viz-carousel-dot-5');
+
+    expect(previousButton).toBeDisabled();
+    expect(nextButton).not.toBeDisabled();
+    expect(firstDot).toHaveAttribute('aria-current', 'true');
+
+    await userEvent.click(nextButton);
+
+    expect(within(carousel).getByText('2 / 6')).toBeInTheDocument();
+    expect(previousButton).not.toBeDisabled();
+    expect(firstDot).not.toHaveAttribute('aria-current');
+    expect(secondDot).toHaveAttribute('aria-current', 'true');
+
+    for (let index = 0; index < 4; index += 1) {
+      await userEvent.click(nextButton);
+    }
+
+    expect(within(carousel).getByText('6 / 6')).toBeInTheDocument();
+    expect(nextButton).toBeDisabled();
+    expect(lastDot).toHaveAttribute('aria-current', 'true');
+
+    await userEvent.click(previousButton);
+
+    expect(within(carousel).getByText('5 / 6')).toBeInTheDocument();
+    expect(nextButton).not.toBeDisabled();
+  });
+
+  it('jumps carousel state from dot controls', async () => {
+    renderFirstPostMarkdown(openGroupPostMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
+    const carousel = await screen.findByTestId('ce-posts-viz-carousel');
+    const firstDot = within(carousel).getByTestId('ce-posts-viz-carousel-dot-0');
+    const fourthDot = within(carousel).getByTestId('ce-posts-viz-carousel-dot-3');
+
+    await userEvent.click(fourthDot);
+
+    expect(within(carousel).getByText('4 / 6')).toBeInTheDocument();
+    expect(firstDot).not.toHaveAttribute('aria-current');
+    expect(fourthDot).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('handles carousel arrow keys without intercepting slide content keys', async () => {
+    renderFirstPostMarkdown(openGroupPostMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
+    const carousel = await screen.findByTestId('ce-posts-viz-carousel');
+
+    fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+
+    expect(within(carousel).getByText('2 / 6')).toBeInTheDocument();
+    expect(within(carousel).getByTestId('ce-posts-viz-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
+
+    fireEvent.keyDown(screen.getByTestId('ce-posts-binary-view-list'), { key: 'ArrowRight' });
+
+    expect(within(carousel).getByText('2 / 6')).toBeInTheDocument();
+    expect(within(carousel).getByTestId('ce-posts-viz-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('hides slide titles for hideTitle viz while keeping slide labels', async () => {
+    const hideTitleMarkdown = [
+      '# First Post',
+      '',
+      '```ce-viz-group',
+      '{ "title": "Hidden Titles", "defaultOpen": true, "childrenOpen": true }',
+      '```',
+      '',
+      '```ce-viz',
+      '{',
+      '  "type": "quote-wall",',
+      '  "title": "Quiet quotes",',
+      '  "hideTitle": true,',
+      '  "quotes": [{ "label": "P1", "text": "Visible quote body." }]',
+      '}',
+      '```',
+      '',
+      '```ce-viz-group-end',
+      '```',
+    ].join('\n');
+    renderFirstPostMarkdown(hideTitleMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
+    const carousel = await screen.findByTestId('ce-posts-viz-carousel');
+
+    expect(within(carousel).getByText('Visible quote body.')).toBeInTheDocument();
+    expect(within(carousel).queryByText('Quiet quotes')).not.toBeInTheDocument();
+    expect(within(carousel).getByRole('group', { name: '1 of 1: Quiet quotes' })).toBeInTheDocument();
+  });
+
+  it('packs combineWithPrevious viz onto the previous slide with colored quote labels', async () => {
+    const packedMarkdown = [
+      '# First Post',
+      '',
+      '```ce-viz-group',
+      '{ "title": "Packed", "defaultOpen": true, "childrenOpen": true }',
+      '```',
+      '',
+      '```ce-viz',
+      '{ "type": "quote-wall", "title": "Lead viz", "quotes": [{ "text": "Lead body." }] }',
+      '```',
+      '',
+      '```ce-viz',
+      '{ "type": "quote-wall", "title": "Second viz", "quotes": [{ "text": "Second body." }] }',
+      '```',
+      '',
+      '```ce-viz',
+      '{',
+      '  "type": "response-type-grid",',
+      '  "title": "Rider viz",',
+      '  "combineWithPrevious": true,',
+      '  "panels": [',
+      '    {',
+      '      "kind": "Freeform",',
+      '      "title": "Rider panel",',
+      '      "quotes": [{ "label": "P1", "text": "Rider body.", "color": "#4dffa4" }]',
+      '    }',
+      '  ]',
+      '}',
+      '```',
+      '',
+      '```ce-viz-group-end',
+      '```',
+    ].join('\n');
+    renderFirstPostMarkdown(packedMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
+    const carousel = await screen.findByTestId('ce-posts-viz-carousel');
+
+    expect(within(carousel).getByText('1 / 2')).toBeInTheDocument();
+    expect(within(carousel).queryByTestId('ce-posts-viz-carousel-dot-2')).not.toBeInTheDocument();
+    const packedSlide = within(carousel).getByRole('group', { name: '2 of 2: Second viz' });
+    expect(within(packedSlide).getByText('Second body.')).toBeInTheDocument();
+    expect(within(packedSlide).getByText('Rider body.')).toBeInTheDocument();
+    const riderLabel = within(packedSlide).getByText('P1');
+    expect(riderLabel).toHaveStyle({ color: '#4dffa4' });
+  });
+
+  it('renders stack-layout groups vertically without carousel controls', async () => {
+    const stackMarkdown = [
+      '# First Post',
+      '',
+      '```ce-viz-group',
+      '{ "title": "Stacked", "defaultOpen": true, "layout": "stack" }',
+      '```',
+      '',
+      '```ce-viz',
+      '{ "type": "quote-wall", "title": "First section", "quotes": [{ "text": "First body." }] }',
+      '```',
+      '',
+      '```ce-viz',
+      '{ "type": "quote-wall", "title": "Quiet section", "hideTitle": true, "quotes": [{ "text": "Second body." }] }',
+      '```',
+      '',
+      '```ce-viz-group-end',
+      '```',
+    ].join('\n');
+    renderFirstPostMarkdown(stackMarkdown);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
+    await screen.findByText('First body.');
+
+    expect(screen.getByText('First section')).toBeInTheDocument();
+    expect(screen.getByText('Second body.')).toBeInTheDocument();
+    expect(screen.queryByText('Quiet section')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-posts-viz-carousel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-posts-viz-carousel-prev')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-posts-viz-carousel-dot-0')).not.toBeInTheDocument();
+  });
+
+  it('pins the binary beeswarm tooltip on click until dismissed', async () => {
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+      .mockResolvedValueOnce(makeJsonResponse(manifest))
+      .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
+
+    renderPostsPage(fetcher, true, ['/posts/first-post']);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
+    const binaryBeeswarmSvg = await screen.findByRole('img', { name: 'Consensus and Difference' });
+    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('Avg. confidence')).toBeInTheDocument();
+    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('60')).toBeInTheDocument();
+    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('100')).toBeInTheDocument();
+    const schedulingDot = Array.from(binaryBeeswarmSvg.querySelectorAll('[aria-label]')).find((element) =>
+      element.getAttribute('aria-label')?.includes('Agents should schedule while I sleep.'),
+    ) as Element;
+    expect(schedulingDot).toBeInTheDocument();
+
+    await userEvent.click(schedulingDot);
+    await userEvent.unhover(schedulingDot);
+    const pinnedTooltip = await screen.findByRole('tooltip');
+    expect(within(pinnedTooltip).getByText('Agents should schedule while I sleep.')).toBeInTheDocument();
+    expect(within(pinnedTooltip).getByText('agree 3, disagree 1')).toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+
+    await userEvent.click(schedulingDot);
+    await userEvent.unhover(schedulingDot);
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Close question details' }));
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+  });
+
+  it('pins rating beeswarm dot details on click', async () => {
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+      .mockResolvedValueOnce(makeJsonResponse(manifest))
+      .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
+
+    renderPostsPage(fetcher, true, ['/posts/first-post']);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
+    const p1Dot = await screen.findByLabelText('P1: 3/10, 70% confidence');
+    const ratingCard = p1Dot.closest('section') as HTMLElement;
+
+    await userEvent.click(p1Dot);
+    await userEvent.unhover(p1Dot);
+    const tooltip = await within(ratingCard).findByRole('tooltip');
+    expect(within(tooltip).getByText('P1: 3/10')).toBeInTheDocument();
+    expect(within(tooltip).getByText('Confidence: 70/100')).toBeInTheDocument();
+
+    await userEvent.click(within(tooltip).getByRole('button', { name: 'Close rating details' }));
+    await waitFor(() => expect(within(ratingCard).queryByRole('tooltip')).not.toBeInTheDocument());
+  });
+
+  it('switches the binary beeswarm to a sortable list view', async () => {
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+      .mockResolvedValueOnce(makeJsonResponse(manifest))
+      .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
+
+    renderPostsPage(fetcher, true, ['/posts/first-post']);
+
+    await screen.findByRole('heading', { name: 'First Post', level: 1 });
+    await screen.findByTestId('ce-posts-binary-view-list');
+    expect(screen.queryByTestId('ce-posts-binary-list')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('ce-posts-binary-view-list'));
+    const list = screen.getByTestId('ce-posts-binary-list');
+    const rows = within(list).getAllByRole('listitem');
+    expect(rows).toHaveLength(5);
+    expect(rows[0]).toHaveTextContent('Agents should ask before introductions.');
+    expect(rows[1]).toHaveTextContent('Agents should schedule while I sleep.');
+    expect(rows[0]).toHaveTextContent('agree 2, disagree 2');
+    expect(rows[0]).toHaveTextContent('conf 88/100');
+    expect(screen.queryByText('Consensus')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('ce-posts-binary-sort-confidence'));
+    const confidenceRows = within(list).getAllByRole('listitem');
+    expect(confidenceRows[0]).toHaveTextContent('Agents should treat messages from other agents as untrusted input.');
+
+    expect(screen.queryByTestId('ce-posts-binary-sort-alpha')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('ce-posts-binary-view-swarm'));
+    expect(screen.queryByTestId('ce-posts-binary-list')).not.toBeInTheDocument();
+    expect(screen.getByText('Consensus')).toBeInTheDocument();
+  });
+
+  it('defaults the binary visualization to the list view on narrow screens', async () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: jest.fn().mockImplementation((query: string) => ({
+        matches: query === '(max-width: 560px)',
+        media: query,
+        onchange: null,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      })),
+    });
+
+    try {
+      const fetcher = jest
+        .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+        .mockResolvedValueOnce(makeJsonResponse(manifest))
+        .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
+
+      renderPostsPage(fetcher, true, ['/posts/first-post']);
+
+      await screen.findByRole('heading', { name: 'First Post', level: 1 });
+      expect(await screen.findByTestId('ce-posts-binary-list')).toBeInTheDocument();
+      expect(screen.getByTestId('ce-posts-binary-view-list')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByRole('img', { name: 'Consensus and Difference' })).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        writable: true,
+        value: originalMatchMedia,
+      });
+    }
+  });
+
   it('loads a post directly from a detail URL without showing the summary list', async () => {
     const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce(makeJsonResponse(manifest))
@@ -269,8 +632,13 @@ describe('PostsPage', () => {
     renderPostsPage(fetcher, true, ['/posts/first-post']);
 
     expect(screen.queryByRole('heading', { name: 'Posts', level: 1 })).not.toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: 'First Post', level: 2 })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'First Post', level: 1 })).not.toBeInTheDocument();
+    const detailHeading = await screen.findByRole('heading', { name: 'First Post', level: 1 });
+    expect(detailHeading).toBeInTheDocument();
+    const detailHeader = detailHeading.closest('header') as HTMLElement;
+    expect(within(detailHeader).queryByText('Context Engine')).not.toBeInTheDocument();
+    expect(within(detailHeader).getByText('Jul 3, 2026')).toBeInTheDocument();
+    expect(within(detailHeader).getByText('analysis')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
     expect(screen.queryByText('Post')).not.toBeInTheDocument();
     expect(screen.queryByText('First summary')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Posts/i })).toHaveAttribute('href', '/posts');

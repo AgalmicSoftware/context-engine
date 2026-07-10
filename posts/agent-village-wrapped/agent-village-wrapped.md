@@ -1,11 +1,11 @@
 ---
-title: Agent Village Wrapped / Agent Prediction Evaluations
+title: Agent Village Wrapped: Does Your Agent Know You? (Experiment + Eval)
 date: 2026-07-06
 ---
 
-# Agent Village Wrapped / Agent Prediction Evaluations
+# Agent Village Wrapped: Does Your Agent Know You? (Experiment + Eval)
 
-Many people dislike filling out surveys, but will happily take a quiz about what TV character they are most similar to and post the result on facebook – could this insight about social output formats (and the viral success of "Spotify Wrapped") be useful for participatory deliberation experiments?
+Many people dislike filling out surveys, but would happily take (and share) a quiz about what kind of dog they are [on Facebook](https://www.nbcnews.com/id/wbna33830316). Could this insight about social output formats (and the viral success of "Spotify Wrapped") be useful for participatory deliberation experiments?
 
 Agent Village Wrapped, and its associated evaluation, was created to begin measuring how accurately a personal AI agent represents the human it works for, and to make the experience fun and low-friction. We believe there are AI social games and future products in this direction.
 
@@ -27,7 +27,53 @@ A valuable thing to measure is which predicted responses are changed by the prin
 
 It is our view that agents could help solve the participation problem which has plagued many civic tech approaches: most people read, few react, and almost nobody writes. A pre-filled draft of your predicted views you can easily correct (and questions which are raised contextually by your agent) are better UX than an empty survey.
 
-## A small launch sample
+```ce-viz
+{
+  "type": "response-type-grid",
+  "title": "Statistics",
+  "inline": true,
+  "hideTitle": true,
+  "presentation": "editorial",
+  "panels": [
+    {
+      "kind": "Models",
+      "title": "Responding Model Type",
+      "display": "pie",
+      "counts": [
+        { "label": "google/gemini-3.5-flash", "value": 2, "color": "#7aa7ff" },
+        { "label": "z-ai/glm-5.2", "value": 1, "color": "#ff6bcb" },
+        { "label": "unserialized model record (Hermes Agent v0.14.0)", "value": 1, "color": "#ffb347" }
+      ],
+      "note": "One run stored its model metadata as [object Object], so it appears here as an unserialized model record."
+    },
+    {
+      "kind": "Answer shapes",
+      "title": "Prediction Response Types",
+      "display": "ring",
+      "counts": [
+        { "label": "binary", "value": 160, "color": "#7aa7ff" },
+        { "label": "multi-select", "value": 52, "color": "#4dffa4" },
+        { "label": "rating", "value": 12, "color": "#ffb347" },
+        { "label": "freeform", "value": 8, "color": "#ff6bcb" }
+      ]
+    },
+    {
+      "kind": "Confidence",
+      "title": "Agent confidence",
+      "display": "bars",
+      "prompt": "Average confidence 80.8/100.",
+      "summaryValue": 80.8,
+      "summarySuffix": "/100",
+      "counts": [
+        { "label": "90-100", "value": 69, "color": "#4dffa4" },
+        { "label": "75-89", "value": 108, "color": "#7aa7ff" },
+        { "label": "50-74", "value": 54, "color": "#ffb347" },
+        { "label": "25-49", "value": 1, "color": "#ff6bcb" }
+      ]
+    }
+  ]
+}
+```
 
 The export currently has four non-test Agent Village Wrapped principals. The results below use the three completed Wrapped answer sets and should be read as a tiny launch sample.
 
@@ -157,4 +203,6 @@ One known limitation: seeing a prediction anchors people, so acceptance overstat
 
 The runtime has been generalized: a session-wrapped skill now points at any Context Engine session with an invite token — question bank, prediction run, poster, and correction loop included. Any village, residency, or conference can stand one up, and every run feeds the same benchmark. Repeat it at each gathering and you get a curve nobody currently has: agent fidelity to human intent, by model, over time, and a starting-point for interesting discourse on questions you care about. 
 
-This skill version will be available for the next Agent Village and will be demoed at EDDY 2026. The Agent Village Wrapped skill is visible here [SKILL.md](https://github.com/AgalmicSoftware/context-engine/blob/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md).
+The Context Engine / "Agent Village Wrapped" runtime has been generalized so a `SKILL.md` can interact with sessions using an invite or agent access token. We are working toward a turnkey event setup in which organizers provide only a question bank, a Cloudflare API token, and an AI key, while reusing the Context Engine Telegram bot. The current hosted flow is the prototype for that setup; clean event self-service is not available yet. Once complete, events, conferences, and organizations will be able to launch similar experiments from Context Engine's open-source code. Repeated gatherings could produce a valuable longitudinal dataset of communal preferences and agent fidelity to human intent, while also supporting automated discourse on questions each community cares about.
+
+This SKILL.md is available [here](https://github.com/AgalmicSoftware/context-engine/blob/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md) for the next Agent Village, and this approach will be demoed at [EDDY 2026](https://www.eddy-network.eu/in-person-events/eddy-2026-vienna).

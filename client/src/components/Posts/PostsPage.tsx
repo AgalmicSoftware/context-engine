@@ -233,18 +233,23 @@ const PostsPage = ({
                     )}
                   </figure>
                 )}
-                <h2 className={styles.postTitle}>{selectedPostMeta.title}</h2>
-                <div className={styles.postMeta}>
-                  {selectedPostMeta.date && (
-                    <time dateTime={selectedPostMeta.date}>{formatPostDate(selectedPostMeta.date)}</time>
-                  )}
-                  {selectedPostMeta.author && <span>{selectedPostMeta.author}</span>}
-                </div>
-                {selectedPostMeta.tags.length > 0 && (
-                  <div className={styles.tagList} aria-label="Post tags">
-                    {selectedPostMeta.tags.map((tag) => (
-                      <span key={tag} className={styles.tag}>{tag}</span>
-                    ))}
+                <h1 className={styles.postTitle}>{selectedPostMeta.title}</h1>
+                {(selectedPostMeta.date || selectedPostMeta.tags.length > 0) && (
+                  <div className={styles.postMeta}>
+                    {selectedPostMeta.tags.length > 0 && (
+                      <div className={styles.tagList} aria-label="Post tags">
+                        {selectedPostMeta.tags.map((tag) => (
+                          <span key={tag} className={styles.tag}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {selectedPostMeta.date && (
+                      <time className={styles.postDate} dateTime={selectedPostMeta.date}>
+                        {formatPostDate(selectedPostMeta.date)}
+                      </time>
+                    )}
                   </div>
                 )}
               </header>

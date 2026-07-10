@@ -1,14 +1,21 @@
 {
   "posts": [
     {
-      "slug": "agent-village-wrapped",
-      "title": "Agent Village Wrapped / Agent Prediction Evaluations",
+      "slug": "agent-village-wrapped-2026",
+      "title": "Agent Village Wrapped: Does Your Agent Know You? (Experiment + Eval)",
       "date": "2026-07-06",
       "summary": "A quiz people want to take, an eval hiding inside it: measuring how accurately agents model their humans by recording what people correct when they see their agent's predictions.",
       "author": "Context Engine",
-      "tags": ["agent evals", "agent village", "sensemaking", "defining ai futures"],
+      "tags": [
+        "edge 2026",
+        "evals",
+        "deliberation",
+        "cryptography",
+        "sensemaking",
+        "agents"
+      ],
       "headerImage": {
-        "src": "agent-village-wrapped/attachments/header.png",
+        "src": "agent-village-wrapped/attachments/header.jpg",
         "alt": "Two illustrated robots sit at an outdoor table reading papers."
       },
       "attachments": "agent-village-wrapped/attachments",
