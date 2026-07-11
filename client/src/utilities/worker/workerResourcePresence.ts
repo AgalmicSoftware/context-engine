@@ -73,8 +73,3 @@ export const readWorkerResourcePresence = async ({
     if (presenceInflight.get(cacheKey) === run) presenceInflight.delete(cacheKey);
   }
 };
-
-export const __test__clearWorkerResourcePresenceCache = () => {
-  presenceCache.clear();
-  presenceInflight.clear();
-};

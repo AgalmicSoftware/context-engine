@@ -74,13 +74,8 @@ import {
   saveLocalResourceKeys,
   clearLocalResourceKeys,
 } from '../../utilities/session/resourceKeys.js';
-import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
-import { refreshSessionRegistryFieldsCache } from '../../utilities/web3/sessionRegistry.js';
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
-import {
-  readWorkerResourcePresence,
-  type WorkerResourcePresence,
-} from '../../utilities/worker/workerResourcePresence';
+import type { WorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
 import { resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { markUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
 import { notify } from '../../utilities/ui/notify.js';
@@ -124,6 +119,7 @@ import {
 import LoginAgentTokenPanel from './LoginAgentTokenPanel';
 import { createLoginAgentActions } from './loginAndSettingsAgentTokenActions';
 import { createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
+import { loadLoginSettingsSponsoredAccess } from './loginSettingsSponsoredAccessRuntime';
 
 const accountLog = createLogger('account');
 const normalizeAccountForComparison = (value: unknown): string =>
@@ -1181,60 +1177,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   loadSponsoredAccess = async () => {
     const slug = this.getActiveSessionSlug();
-    let cfg = getSessionConfigBySlugOrDefault(slug) || {};
-    const account = this.props.account || '';
     const reqId = (this._sponsoredReqId = (this._sponsoredReqId || 0) + 1);
     this.setStateIfMounted({ sponsoredAccessLoading: true, workerResourcePresence: null });
     try {
-      const chainId = Number(
-        (cfg as any)?.networkChainId ||
-          (cfg as any)?.chainId ||
-          (cfg as any)?.__registry?.registryChainId ||
-          this.getTargetNetwork()?.id ||
-          0,
-      );
-      if (slug && chainId) {
-        try {
-          const refreshed = await refreshSessionRegistryFieldsCache({
-            chainId,
-            slug,
-            sessionId: (cfg as any)?.sessionId || (cfg as any)?.__registry?.sessionIdHex || null,
-            providerLike: this.props.provider || null,
-          });
-          if (refreshed) cfg = refreshed;
-        } catch (_) {
-          // Preserve the existing registry snapshot when a targeted refresh is unavailable.
-        }
-      }
-      const keys = ['ai', 'arweave', 'rpc', 'txGas'];
-      const [results, workerResourcePresence] = await Promise.all([
-        Promise.all(
-          keys.map((resourceKey: any) =>
-            checkSponsoredAccess({
-              sessionConfig: cfg,
-              sessionSlug: slug,
-              account,
-              resourceKey,
-            }),
-          ),
-        ),
-        readWorkerResourcePresence({
-          sessionConfig: cfg,
-          sessionSlug: slug,
-          context: {
-            account,
-            providerLike: this.props.provider || null,
-            chainId: chainId || null,
-          },
-        }),
-      ]);
+      const { accessMap, workerResourcePresence } = await loadLoginSettingsSponsoredAccess({
+        slug,
+        sessionConfig: getSessionConfigBySlugOrDefault(slug) || {},
+        account: this.props.account || '',
+        providerLike: this.props.provider || null,
+        fallbackChainId: this.getTargetNetwork()?.id,
+      });
       if (reqId !== this._sponsoredReqId) return;
-      const accessMap = {
-        ai: results[0],
-        arweave: results[1],
-        rpc: results[2],
-        txGas: results[3],
-      };
       this.setStateIfMounted({
         sponsoredAccess: accessMap,
         sponsoredAccessLoading: false,

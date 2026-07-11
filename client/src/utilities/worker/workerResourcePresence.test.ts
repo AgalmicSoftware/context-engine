@@ -1,20 +1,20 @@
 import { resolveCorsProxyUrl } from './corsProxy.js';
-import {
-  __test__clearWorkerResourcePresenceCache,
-  readWorkerResourcePresence,
-} from './workerResourcePresence';
+import { readWorkerResourcePresence } from './workerResourcePresence';
 
 jest.mock('./corsProxy.js', () => ({
   resolveCorsProxyUrl: jest.fn(),
 }));
 
 const mockedResolveCorsProxyUrl = jest.mocked(resolveCorsProxyUrl);
+let workerSequence = 0;
+let workerUrl = '';
 
 describe('workerResourcePresence', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    __test__clearWorkerResourcePresenceCache();
-    mockedResolveCorsProxyUrl.mockResolvedValue({ url: 'https://worker.example.test' });
+    workerSequence += 1;
+    workerUrl = `https://worker-${workerSequence}.example.test`;
+    mockedResolveCorsProxyUrl.mockResolvedValue({ url: workerUrl });
   });
 
   it('reads resource booleans from the selected session worker without wallet auth', async () => {
@@ -38,7 +38,7 @@ describe('workerResourcePresence', () => {
     ).resolves.toEqual({ ai: true, arweave: true, rpc: true, txGas: true });
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      'https://worker.example.test/resource-presence',
+      `${workerUrl}/resource-presence`,
       expect.objectContaining({
         method: 'GET',
         headers: { 'X-Session-Slug': 'demo-1' },
@@ -63,7 +63,7 @@ describe('workerResourcePresence', () => {
     await readWorkerResourcePresence({ sessionSlug: '', fetchImpl });
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      'https://worker.example.test/resource-presence',
+      `${workerUrl}/resource-presence`,
       expect.objectContaining({ headers: { 'X-Session-Slug': 'general' } }),
     );
   });
