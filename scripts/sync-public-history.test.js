@@ -9,6 +9,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 const SCRIPT_SOURCE_PATH = path.join(__dirname, 'sync-public-history.sh');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
 const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-surface.js');
+const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
 const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
 const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-sync-public-history-tests');
@@ -38,6 +39,11 @@ function installSyncScriptFixture(sourceDir) {
     sourceDir,
     path.join('scripts', 'verify-public-release-surface.js'),
     fs.readFileSync(SURFACE_VERIFIER_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    sourceDir,
+    path.join('scripts', 'verify-public-docs.js'),
+    fs.readFileSync(DOCS_VERIFIER_SOURCE_PATH, 'utf8'),
   );
   writeFile(
     sourceDir,
@@ -352,7 +358,7 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.doesNotMatch(trackedPaths, /^\.secrets\.baseline$/m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e$/m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e\.local$/m);
-    assert.match(trackedPaths, /^\.env\.e2e\.example$/m);
+    assert.doesNotMatch(trackedPaths, /^\.env\.e2e\.example$/m);
     assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
 
     const publicFile = git(sourceDir, ['show', 'release-staging:public.txt']);
@@ -378,6 +384,30 @@ test('sync-public-history rejects public files that import stripped paths before
     assert.equal(result.status, 2);
     assert.match(result.stderr, /Public release surface verification failed/);
     assert.match(result.stderr, /contextEngine-cc\/lib\/litChipotleActionCatalog\.mjs/);
+
+    const remoteCheck = spawnSync('git', ['ls-remote', '--heads', 'origin', 'release-staging'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+    assert.equal(remoteCheck.status, 0);
+    assert.equal(remoteCheck.stdout.trim(), '');
+  });
+});
+
+test('sync-public-history rejects retained Markdown that exposes private planning before pushing', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const planningId = `${'PR'}${'D'} 321`;
+    writeFile(sourceDir, path.join('docs', 'public-guide.md'), `Status for ${planningId} lives here.\n`);
+    commitAll(sourceDir, 'Add public guide with private planning status', {
+      authorDate: '2025-01-05T06:07:08Z',
+      committerDate: '2025-01-05T06:07:08Z',
+    });
+
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Public documentation verification failed/);
+    assert.match(result.stderr, /internal planning identifier/);
 
     const remoteCheck = spawnSync('git', ['ls-remote', '--heads', 'origin', 'release-staging'], {
       cwd: sourceDir,
@@ -451,7 +481,7 @@ test('sync-public-history links source node_modules for public Node ESM imports 
   });
 });
 
-test('sync-public-history allows planning identifiers in commit messages while stripping planning files', () => {
+test('sync-public-history rejects planning identifiers in replay messages unless sanitization is explicit', () => {
   withSourceRepo(({ sourceDir }) => {
     const planningId = `${'PR'}${'D'} 123`;
     writeFile(sourceDir, 'public-planning-message.txt', 'public change\n');
@@ -462,9 +492,17 @@ test('sync-public-history allows planning identifiers in commit messages while s
     });
 
     const dryRun = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
-    assert.equal(dryRun.status, 0);
-    assert.match(dryRun.stdout, /Would replay: 3/);
-    assert.match(dryRun.stderr, /DRY RUN replay .*Public planning reference/);
+    assert.equal(dryRun.status, 2);
+    assert.match(dryRun.stderr, /internal planning identifier/);
+
+    const sanitized = runSyncScript(sourceDir, [
+      '--dry-run',
+      '--sanitize-private-replay-messages',
+      'release-candidate',
+    ]);
+    assert.equal(sanitized.status, 0);
+    assert.match(sanitized.stdout, /Would replay: 3/);
+    assert.match(sanitized.stderr, /Sanitized private replay message tokens/);
   });
 });
 
@@ -590,7 +628,7 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     assert.doesNotMatch(trackedPaths, /^\.secrets\.baseline$/m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e$/m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e\.local$/m);
-    assert.match(trackedPaths, /^\.env\.e2e\.example$/m);
+    assert.doesNotMatch(trackedPaths, /^\.env\.e2e\.example$/m);
     assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
   });
 });
@@ -743,7 +781,7 @@ test('sync-public-history recreates a deleted remote branch from an existing loc
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e$/m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e\.local$/m);
-    assert.match(trackedPaths, /^\.env\.e2e\.example$/m);
+    assert.doesNotMatch(trackedPaths, /^\.env\.e2e\.example$/m);
     assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
 
     const publicFile = git(sourceDir, ['show', 'origin/release-staging:public.txt']);

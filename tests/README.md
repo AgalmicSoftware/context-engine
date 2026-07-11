@@ -7,7 +7,7 @@ are not practical to colocate with client, worker, or script sources.
 
 - `foundry/script/` contains Foundry Solidity deploy scripts.
 - `foundry/test/` contains Forge Solidity suites.
-- `scripts/` contains JS/Python tooling, E2E runners, audits, and automation.
+- `scripts/` contains JS/Python tooling, audits, and supported automation.
 - `tests/root/` contains root Node/Jest tests for workers, deploy helpers, and compatibility harnesses.
 - `tests/helpers/` contains helper modules shared by `tests/root/`.
 

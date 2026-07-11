@@ -440,6 +440,15 @@ fi
 
 node "$STAGING_ROOT/scripts/verify-public-release-surface.js" "$STAGING_ROOT" >&2
 
+if [ ! -f "$STAGING_ROOT/scripts/verify-public-docs.js" ]; then
+  printf 'Public documentation verifier is missing from release copy: scripts/verify-public-docs.js\n' >&2
+  exit 1
+fi
+
+# Regression guard: source-side private docs are allowed on dev, so validate
+# Markdown only after the strip and package-script scrub have completed.
+node "$STAGING_ROOT/scripts/verify-public-docs.js" "$STAGING_ROOT" >&2
+
 mv "$STAGING_ROOT" "$OUTPUT_ABS"
 
 printf '%s files stripped, output at %s\n' "$stripped_count" "$OUTPUT_ABS"

@@ -75,21 +75,20 @@ npm run typecheck:client-tests
 npm run ci:gate -- workers
 ```
 
-`npm run test:wiring` also runs `scripts/verify-test-inventory.js`. That
-inventory check keeps root `tests/root/*.test.*` files classified as one of:
+`npm run test:wiring` also runs `scripts/verify-test-inventory.js` and the
+client architecture boundary checker. The boundary checker runs in
+fail-on-new-violation mode against `scripts/client-boundaries-baseline.json`, so
+existing legacy imports stay visible while new direct violations fail the gate.
+The inventory check keeps root tests classified as one of:
 
 - public-safe Node tests run by `npm run test:node`
 - public-safe Jest tests run by `npm run test:root:jest`
 - local-chain tests run by dedicated chain-backed commands such as
   `npm run test:surveys-sbt`
-- private/stripped Node tests named `*.private.test.*`; these run in private
-  checkouts through `npm run test:node` and are stripped from public releases
+- package-local tests run by their package's documented command
 
-Do not add non-public worker package paths, live credentials, private deployment
-names, or identifying fixtures to root `package.json` scripts. Private and
-stripped surfaces should stay behind their own package-local commands or
-release-strip rules so the public branch does not gain new references to
-private implementation details.
+Do not add live credentials, private deployment names, or identifying fixtures
+to root `package.json` scripts.
 
 ## E2E Workflows
 
@@ -101,8 +100,6 @@ nvm use 20
 npm run test:e2e
 ```
 
-For required env setup, wallet flows, and the full command catalog, use:
-
-- [docs/e2e-setup.md](e2e-setup.md)
-- [docs/e2e-commands.md](e2e-commands.md)
-- [docs/passkey-wallet.md](passkey-wallet.md)
+Wallet behavior and local contract setup are documented in
+[docs/passkey-wallet.md](passkey-wallet.md) and
+[docs/local-chain.md](local-chain.md).

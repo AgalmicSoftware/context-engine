@@ -155,4 +155,4 @@ The breakdown tab now uses [`demo_analysis_data.json`](./demo_analysis_data.json
 
 - Most JSON fixtures in this folder use `snake_case`.
 - Most fixture filenames in this folder now follow `snake_case`, including [`demo_polis_data.json`](./demo_polis_data.json).
-- JS modules in this folder now follow the same `snake_case` filename convention, including [`historical_figure_demographics.js`](./historical_figure_demographics.js).
+- TypeScript modules in this folder now follow the same `snake_case` filename convention, including [`historical_figure_demographics.ts`](./historical_figure_demographics.ts).

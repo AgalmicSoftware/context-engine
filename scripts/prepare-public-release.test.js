@@ -10,6 +10,7 @@ const SCRIPT_SOURCE_PATH = path.join(__dirname, 'prepare-public-release.sh');
 const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
 const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-surface.js');
+const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-prepare-public-release-tests');
 const REPO_ROOT = path.join(__dirname, '..');
 
@@ -53,6 +54,11 @@ test('prepare-public-release strips private surfaces without publishing an inven
       path.join('scripts', 'verify-public-release-surface.js'),
       fs.readFileSync(SURFACE_VERIFIER_SOURCE_PATH, 'utf8'),
     );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-docs.js'),
+      fs.readFileSync(DOCS_VERIFIER_SOURCE_PATH, 'utf8'),
+    );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 
     writeFile(
@@ -81,6 +87,11 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('docs', 'codebase-health-modernization-2026-05-07.md'), 'local audit notes\n');
     writeFile(sourceDir, path.join('docs', 'assets', 'codebase-health-modernization-2026-05-07.png'), 'local audit chart\n');
     writeFile(sourceDir, path.join('docs', 'telegram-response-export-scope-prd.md'), 'private product planning\n');
+    writeFile(sourceDir, path.join('docs', 'e2e-commands.md'), 'private operator commands\n');
+    writeFile(sourceDir, path.join('docs', 'release-runbook.md'), 'private release procedure\n');
+    writeFile(sourceDir, path.join('docs', 'security', 'audit-prep-2026-07-06.md'), 'private audit snapshot\n');
+    writeFile(sourceDir, 'AGENTS.md', 'private agent instructions\n');
+    writeFile(sourceDir, path.join('ai-discourse-corpus', 'corpuses', '_local_helper.js'), 'local helper script\n');
     writeFile(sourceDir, path.join('.tmp-review', 'review.js'), 'temporary review snapshot\n');
     writeFile(sourceDir, 'private-pack.manifest.json', 'tracked root manifest that should be replaced\n');
     writeFile(
@@ -148,7 +159,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, '.env.local')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.env.e2e')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.env.e2e.local')), false);
-    assert.equal(fs.readFileSync(path.join(outputDir, '.env.e2e.example'), 'utf8'), 'E2E_AI_MOCK=1\n');
+    assert.equal(fs.existsSync(path.join(outputDir, '.env.e2e.example')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.keys')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.e2e-cache')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'release-public')), false);
@@ -164,6 +175,11 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'codebase-health-modernization-2026-05-07.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'assets', 'codebase-health-modernization-2026-05-07.png')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'telegram-response-export-scope-prd.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'e2e-commands.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'release-runbook.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'security', 'audit-prep-2026-07-06.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'AGENTS.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'ai-discourse-corpus', 'corpuses', '_local_helper.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'outreach-and-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'grant-applications')), false);
@@ -192,9 +208,15 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.match(manifestText, /\.secrets\.baseline/);
     assert.doesNotMatch(manifestText, /\.env\.local/);
     assert.doesNotMatch(manifestText, /\.env\.e2e/);
+    assert.doesNotMatch(manifestText, /\.env\.example/);
     assert.doesNotMatch(manifestText, /\.keys/);
     assert.doesNotMatch(manifestText, /codebase-health-modernization/);
     assert.doesNotMatch(manifestText, /telegram-response-export-scope-prd/);
+    assert.doesNotMatch(manifestText, /e2e-commands/);
+    assert.doesNotMatch(manifestText, /release-runbook/);
+    assert.doesNotMatch(manifestText, /audit-prep/);
+    assert.doesNotMatch(manifestText, /AGENTS\.md/);
+    assert.doesNotMatch(manifestText, /_local_helper/);
     assert.doesNotMatch(manifestText, /\.private\.test/);
     assert.match(manifestText, /private-pack\.manifest\.json/);
     assert.match(manifestText, /scripts\/lib\/passkey-wallet-derivation\.js/);
@@ -220,6 +242,11 @@ test('prepare-public-release fails if private planning paths survive strip rules
       sourceDir,
       path.join('scripts', 'verify-public-release-surface.js'),
       fs.readFileSync(SURFACE_VERIFIER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-docs.js'),
+      fs.readFileSync(DOCS_VERIFIER_SOURCE_PATH, 'utf8'),
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 

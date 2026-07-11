@@ -83,6 +83,7 @@ PRIVATE_REPLAY_MESSAGE_TOKENS=(
   "contextEngine-cc"
   "docs/agent-native"
   "agent-native"
+  "workers/agentBridgeWorker"
   "client/public/skill.md"
   "scripts/e2e"
   "scripts/lib/e2e"
@@ -234,6 +235,7 @@ const replacements = [
   [/OpenClaw/gi, 'external agent'],
   [/private agent/gi, 'private integration'],
   [/TODO\//gi, 'private planning/'],
+  [/workers\/agentBridgeWorker/gi, 'private integration'],
   [/client\/public\/skill\.md/gi, 'private integration asset'],
   [/scripts\/(?:lib\/)?e2e/gi, 'private test tooling'],
   [/scripts\/(?:test|seed)-[^\s`'")]+/gi, 'private test tooling'],
@@ -508,7 +510,20 @@ verify_public_release_surface() {
   node "$verifier" "$TEMP_CLONE" >&2
 }
 
-verify_public_node_tests() {
+verify_public_docs() {
+  local verifier="$TEMP_CLONE/scripts/verify-public-docs.js"
+
+  if [ ! -f "$verifier" ]; then
+    fail "Public documentation verifier was not found in replay output: scripts/verify-public-docs.js" 1
+  fi
+
+  # Regression guard: replay strips private files commit by commit; validating
+  # the finished public tree prevents retained docs from naming what was removed.
+  log_info "Verifying public documentation content and references."
+  node "$verifier" "$TEMP_CLONE" >&2
+}
+
+ensure_public_node_modules_link() {
   local node_path="$REPO_ROOT/node_modules"
   local temp_node_path="$TEMP_CLONE/node_modules"
 
@@ -885,6 +900,18 @@ if [ -n "$offending_identities" ]; then
 fi
 
 if ! verify_public_release_surface; then
+  exit 2
+fi
+
+if ! verify_public_docs; then
+  exit 2
+fi
+
+if ! verify_public_test_wiring; then
+  exit 2
+fi
+
+if ! verify_public_type_debt; then
   exit 2
 fi
 

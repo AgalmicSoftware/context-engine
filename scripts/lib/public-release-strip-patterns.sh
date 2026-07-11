@@ -28,7 +28,6 @@ EOF
 ce_public_release_strip_patterns() {
   cat <<'EOF'
 contextEngine-cc
-docs/agent-native*.md
 client/public/skill.md
 workers/agentBridgeWorker
 TODO
@@ -44,9 +43,11 @@ video-clickthrough-local
 .DS_Store
 .secrets.baseline
 .env
+.env.example
 .env.local
 .env.*.local
 .env.e2e
+.env.e2e.example
 .keys
 .e2e-secrets
 .e2e-cache
@@ -93,9 +94,11 @@ ce_public_release_manifest_exclude_patterns() {
 TODO
 contextEngine-cc/TODO
 .env
+.env.example
 .env.local
 .env.*.local
 .env.e2e
+.env.e2e.example
 .keys
 .e2e-secrets
 .e2e-cache
@@ -105,6 +108,9 @@ docs/*PRD*.md
 docs/*prd*.md
 tests/root/*.private.test.*
 EOF
+  # Private documentation names and checksums must not leak through the
+  # reversible private-pack manifest that accompanies the public artifact.
+  ce_public_release_private_doc_patterns
 }
 
 ce_public_release_strip_assert_absent_patterns() {
@@ -122,9 +128,11 @@ CLAUDE.md
 .DS_Store
 .secrets.baseline
 .env
+.env.example
 .env.local
 .env.*.local
 .env.e2e
+.env.e2e.example
 .keys
 .e2e-secrets
 .e2e-cache

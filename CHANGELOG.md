@@ -2,12 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Completed the frontend modernization baseline with typed domain boundaries,
+  downward-only type-debt and size ratchets, decomposed session, survey, and
+  application shells, split CI/release verification, synchronized worker-bundle
+  checks, and public-release surface validation.
+- Added stable automation hooks for gate-lock state and gate selection without
+  changing user-facing behavior.
+- Hardened public documentation packaging so operator runbooks and internal
+  planning material are stripped, while retained Markdown is checked for
+  private references, unavailable commands, and broken local links.
+
 ## [0.7.0] - 2026-07-06
 
 ### Added
 
-- Published the M1 public release through a history-preserving
-  `release-staging` PR, keeping the public-safe commit narrative on `main`.
+- Published the M1 source release with a curated public tree and public-safe
+  history on `main`.
 - Added the mode-first session creation entry flow for Cloudflare-backed and
   decentralized sessions, with the existing setup UI revealed after Continue.
 - Added public release PII scanning and stricter public push protection for
@@ -38,7 +52,7 @@ All notable changes to this project will be documented in this file.
 
 ### Completed TODOs
 
-- Added a public-release surface verifier that blocks JavaScript/TypeScript imports into stripped paths before release replay branches are imported or pushed, changed the Worker Chipotle tests to read the public client action catalog instead of the stripped `contextEngine-cc` mirror, and made release replay run public `test:node` before push so stripped public-copy regressions fail locally.
+- Added a public-release surface verifier that blocks JavaScript/TypeScript imports into stripped paths before release branches are imported or pushed, changed the Worker Chipotle tests to read the public client action catalog instead of a private mirror, and made release replay run public `test:node` before push so stripped public-copy regressions fail locally.
 
 ## 2026-06-06
 

@@ -8,21 +8,9 @@ session's authority, storage, access policy, or settlement path.
 
 ## Current Implemented Profiles
 
-The `/new` chooser opens with no preset automatically selected. Its default and
-recommended path is **Hosted & Fast**, labeled `Fast & Cheap (Cloudflare)` in
-the wizard. **Trustless & Slower**, labeled
-`Trustless & Public (Decentralized)`, is an implemented opt-in path. Advanced
-per-axis changes are recorded as `Custom`.
+The current default is a public EVM deployment on OP Sepolia with synchronous writes, Arweave storage, optional Lit Protocol encryption, and direct RPC reads. This is the simplest and most trust-minimized operating mode. It supports hundreds to low thousands of concurrent participants per session.
 
-| Profile | Availability | Canonical authority and storage | Creator setup | Chain requirement |
-| --- | --- | --- | --- | --- |
-| Hosted & Fast | Implemented; default path | Creator-owned per-session Cloudflare Worker, Worker KV/Cloudflare payload storage, `worker_canonical` authority, and `worker_envelope` encryption by default | Cloudflare API token and one AI-provider key | None by default; the passkey-derived EOA signs worker config without submitting a transaction |
-| Trustless & Slower | Implemented; opt-in | Public EVM registry/contracts and Arweave | Wallet transaction, gas, RPC access, Arweave JWK, and one AI-provider key | Required; Lit credentials are required only when Lit encryption is selected |
-| Company-Operated | Planned; not generally available | Intended organizational IAM, key-release/KMS, storage, AI gateway, networking, and observability adapters | To be defined by the operator's environment | Not required by the architecture; an entirely off-chain deployment is a target, while a private EVM could only be an optional future adapter |
-
-Creators need deployment credentials only while provisioning infrastructure.
-Participants joining or using an existing session never need the creator's
-Cloudflare token, AI key, Arweave key, or other deployer credentials.
+Unless a mode is explicitly labeled available below, it describes a target architecture rather than a turnkey released deployment. In particular, company-operated private-chain, Postgres/SQLite follower, Local Key Release, and app-rollup profiles are still in development or planned.
 
 ## Write Path
 
@@ -39,17 +27,15 @@ remains supported; it is profile-specific rather than universal.
 
 Future scaling mechanisms remain optional architecture choices:
 
-| Write mode | Status | Trust and cost shape | Intended use |
-| --- | --- | --- | --- |
-| Worker-canonical Cloudflare | Implemented default | Creator/operator and Cloudflare runtime trust; no per-action gas | Hosted & Fast sessions |
-| Public EVM + synchronous settlement | Implemented opt-in | Public-chain settlement and gas | Trustless & Slower sessions |
-| Worker intake + periodic public anchor | Planned | Off-chain acceptance with later public checkpoints | Selected hosted/public use cases |
-| Private PoA EVM | Possible future adapter, not a requirement | Operator-run chain | Organizations that explicitly choose EVM compatibility |
-| Application rollup, async, or batch settlement | Planned research/scale target | Sequencer or gateway trust varies by design | Future high-volume public deployments |
+The planned escalation path is `public-evm + sync` first, then `private-poa + sync`, then async or batch settlement where product semantics allow it, then `app-rollup` for the highest-scale hosted path.
 
-`sync`, `async`, `batch`, and `periodic-anchor` describe settlement timing.
-`direct`, `worker`, and `sequencer` describe who accepts a write. They are
-building blocks, not a mandatory progression from public EVM to private EVM.
+| Mode | Throughput potential | Trust model | Cost profile | Best for |
+|---|---|---|---|---|
+| `public-evm + sync` | lowest | strongest public-chain default | highest per write | OSS/public default |
+| `private-poa + sync` | high | operator-run chain | low marginal write cost | planned enterprise/self-hosted CE |
+| `public-evm + async` | modest improvement | gateway or sequencer adds trust | gas still public | planned hosted public deployments |
+| `private-poa + batch` | very high | operator-run chain plus queue or sequencer | low | planned large enterprise/private communities |
+| `app-rollup + sync` | high | sequencer trust or permissioned trust | medium | planned high-scale hosted CE |
 
 ## Read Path
 
@@ -58,17 +44,9 @@ session worker and its Cloudflare bindings. Small payload envelopes can use the
 KV-only fallback; an existing R2 bucket is an explicit advanced option rather
 than a default requirement.
 
-Trustless & Slower currently reads registry/contracts through RPC and resolves
-Arweave-backed metadata and payloads. Repeated raw RPC scans do not scale, so an
-open-source index follower remains a useful planned optimization for this
-profile. The proposed follower would normalize on-chain state and Arweave
-references into Postgres or SQLite read models. A Cloudflare Lite mirror using
-Workers with D1 and optional R2 is also planned; neither follower package is a
-generally available release yet.
+The target scaling model is an open-source index follower that normalizes on-chain state plus Arweave-backed metadata and payload references into queryable read models. The follower would build that state once and serve browsers, workers, and read APIs from indexed tables instead of repeated raw RPC scans.
 
-Company-Operated targets organization-owned storage and query adapters. Those
-adapters may serve entirely off-chain state; they do not require an EVM follower
-or an Arweave mirror.
+The planned follower has two deployment forms. `Follower Core` is the target self-hosted canonical deployment, backed by Postgres or SQLite. `Cloudflare Lite mirror` is the lighter shared or sponsored target using Cloudflare Workers with D1 and optional R2 mirrors. Neither should be read as a generally available turnkey follower package yet. Gate snapshots are optional and come later: worker auth should remain live and on-chain authoritative until read parity is stable.
 
 ## Encryption and Private Compute
 
@@ -96,29 +74,16 @@ not shipped packages.
 
 ### Planned Private Query Capability
 
-Private-query controls remain useful future scaling semantics, but none is a
-generally available packaged service today:
+The profile names below describe architecture targets; they are not literal current configuration identifiers. The current session wizard offers `Fast & Cheap (Cloudflare)` and `Trustless & Public (Decentralized)` as its two initial presets, then records Advanced per-axis changes as `Custom`. See the [session creation guide](session-creation-guide.md#session-creation-walkthrough) for the implemented choices. Planned rows describe intended packaging and must not be presented as installable releases yet.
 
-- `off` disables private query.
-- `metadata-only` indexes ciphertext and public metadata without private-field
-  access.
-- `authorized-search` would let a trusted or attested adapter search private
-  fields for authorized callers.
-- `authorized-aggregation` would let such an adapter produce authorized private
-  summaries, filters, and analytics.
+| Profile | Availability | Audience | Read path | Write path | Encryption / private compute | Hosting style |
+|---|---|---|---|---|---|---|
+| `oss-default` | Conceptual name; current public reference path exists | OSS users, small communities | direct RPC reads | public sync | optional `lit-public`, client decrypt | simple public deploy |
+| `sponsored-cloudflare` | Partial: worker and sponsorship building blocks exist; packaged Lite mirror remains planned | maintainer-run shared sessions | current worker-backed reads; Lite mirror remains planned | public sync or supported worker intake | optional `lit-public`; Local Key Release only for future private profiles | Cloudflare-first |
+| `enterprise-private` | Planned; design work underway | self-hosted orgs / regulated installs | planned full OSS follower core | planned private PoA sync or batch | planned key-release passkey-private or KMS/Vault/OpenBao compatibility; TEE later | Docker, VPC, or on-prem |
+| `max-scale-rollup` | Planned | future hosted large-scale CE | planned full follower core plus specialized read APIs | app rollup plus batch or async settlement | `tee` or future `threshold-private` | serious hosted infra |
 
-These capabilities can sit behind Company-Operated adapters or other future
-private-compute services. They do not require a public or private EVM.
-
-## Profile-Specific Scaling
-
-- Hosted & Fast scales first through per-session worker isolation, Cloudflare KV
-  and optional R2, then future shared-worker/index services if they ship.
-- Trustless & Slower scales read fanout through followers and caches while
-  preserving public EVM and Arweave as its authority and durable-storage path.
-- Company-Operated is intended to scale through organization-selected IAM,
-  storage, AI, networking, key-release, and observability adapters. A private
-  EVM or rollup is optional, never foundational.
+The intended profile sequences are `oss-default -> sponsored-cloudflare -> max-scale-rollup` for public deployments and `oss-default -> enterprise-private` for company-operated deployments. These are roadmap sequences, not automatic or currently turnkey migrations.
 
 ## Related
 

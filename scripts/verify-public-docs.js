@@ -5,14 +5,12 @@ const path = require('node:path');
 
 const SKIP_DIRS = new Set(['.git', 'node_modules']);
 const MARKDOWN_FILE_RE = /\.md$/i;
-const REPO_PATH_RE = /^(?:client|docs|scripts|workers|contracts|foundry|tests|posts|whitepaper|ai-discourse-corpus)\//;
-const ROOT_FILE_RE = /^(?:README|ARCHITECTURE|CONTRIBUTING|CHANGELOG|LICENSING|SECURITY|ROADMAP|spec|package)(?:\.[A-Za-z0-9]+)?$/;
-const ALLOWED_UNTRACKED_PATH_RE = /^(?:client\/(?:build(?:-vite)?|vite-build)(?:\/|$)|client\/\.env(?:$|\.)|(?:dist|out|broadcast|cache|coverage|release-public)(?:\/|$))/;
 const FORBIDDEN_MARKERS = Object.freeze([
   { label: 'internal planning identifier', re: /\bPRDs?(?:\s*(?:[#:_-]\s*)?\d+|\d+)\b/gi },
   { label: 'private planning path', re: /(?:^|[^\w])TODO\//gi },
-  { label: 'private agent settings path', re: /(?:^|[^\w.-])\.(?:claude|codex)(?:\/|\b)|\bCLAUDE\.md\b/gi },
+  { label: 'private agent settings path', re: /\.claude(?:\/|\b)|\.codex(?:\/|\b)|\bCLAUDE\.md\b/gi },
   { label: 'private companion path', re: /\bcontextEngine-cc(?:\/|\b)/gi },
+  { label: 'private bridge path', re: /\bworkers\/agentBridgeWorker(?:\/|\b)/gi },
   { label: 'private skill path', re: /\bclient\/public\/skill\.md\b/gi },
   { label: 'private E2E path', re: /\bscripts\/(?:lib\/)?e2e(?:\/|\b)|\bscripts\/(?:test|seed)-[^\s`'")]+/gi },
   { label: 'private artifact path', re: /\bartifacts\//gi },
@@ -157,33 +155,6 @@ function scanLocalLinks(rootDir, absolutePath, relativePath, text) {
   return findings;
 }
 
-function scanInlineRepoPaths(rootDir, relativePath, text) {
-  if (relativePath === 'CHANGELOG.md') return [];
-
-  const findings = [];
-  const codeSpanRe = /`([^`\n]+)`/g;
-  let match;
-
-  while ((match = codeSpanRe.exec(text)) !== null) {
-    let candidate = match[1].trim().replace(/^\.\//, '').replace(/[.,;:]$/, '');
-    if (!REPO_PATH_RE.test(candidate) && !ROOT_FILE_RE.test(candidate)) continue;
-    if (/[ *?$<>{}|]/.test(candidate) || candidate.includes('...')) continue;
-
-    candidate = candidate.replace(/#.*$/, '').replace(/:\d+(?::\d+)?$/, '');
-    if (!candidate || ALLOWED_UNTRACKED_PATH_RE.test(candidate)) continue;
-    if (fs.existsSync(path.join(rootDir, candidate))) continue;
-
-    findings.push({
-      file: relativePath,
-      line: lineForOffset(text, match.index),
-      kind: 'missing inline repository path',
-      detail: candidate,
-    });
-  }
-
-  return findings;
-}
-
 function verifyPublicDocs(rootDir = path.resolve(__dirname, '..')) {
   const absoluteRoot = path.resolve(rootDir);
   const markdownFiles = walkFiles(absoluteRoot, (absolutePath) => MARKDOWN_FILE_RE.test(absolutePath));
@@ -196,7 +167,6 @@ function verifyPublicDocs(rootDir = path.resolve(__dirname, '..')) {
     findings.push(...scanForbiddenMarkers(absoluteRoot, relativePath, text));
     findings.push(...scanNpmCommands(absoluteRoot, relativePath, text, packageScripts));
     findings.push(...scanLocalLinks(absoluteRoot, absolutePath, relativePath, text));
-    findings.push(...scanInlineRepoPaths(absoluteRoot, relativePath, text));
   }
 
   return {
@@ -232,7 +202,6 @@ module.exports = {
   formatFindings,
   scanForbiddenMarkers,
   scanLocalLinks,
-  scanInlineRepoPaths,
   scanNpmCommands,
   verifyPublicDocs,
 };

@@ -6,30 +6,43 @@
 
 ![Context Engine deployment modes](client/src/assets/img/readme-architecture-deployment-modes.png)
 
-App hosting, public/private session access, and session infrastructure are
-separate choices. A publicly hosted web app can open either a private
-worker-canonical session or a public decentralized session. The `/new` chooser
-opens with no preset automatically selected; Hosted & Fast is the implemented
-default/recommended path once chosen.
-
-### Implemented Profiles
-
-```mermaid
-flowchart LR
-  Creator["Session creator"] --> Choice{"/new profile choice"}
-  Choice --> Hosted["Hosted & Fast<br/>Fast & Cheap (Cloudflare)<br/>implemented default path"]
-  Choice --> Trustless["Trustless & Slower<br/>Trustless & Public (Decentralized)<br/>implemented opt-in"]
-
-  Hosted --> DeployHelper["Deploy helper<br/>Cloudflare token is request-only"]
-  DeployHelper --> Worker["Creator-owned per-session Worker<br/>worker_canonical authority"]
-  Worker --> Cloudflare["Worker KV / Cloudflare payload storage<br/>worker_envelope by default"]
-  Worker --> AI["Selected AI provider"]
-  Passkey["Passkey-derived EOA<br/>signing/admin identity"] --> Worker
-
-  Trustless --> EVM["Public EVM registry/contracts<br/>wallet transaction + gas"]
-  Trustless --> Arweave["Arweave metadata and payloads"]
-  Trustless --> WorkerServices["Session worker services<br/>AI, auth, fetch, profile-enabled routes"]
-  Trustless -.->|Lit encryption selected| Lit["Lit Protocol"]
+```
+                              ┌──────────────────────────────┐
+                              │    EVM Chain (configurable)   │
+                              │    Optimism / Base / etc.     │
+                              │                              │
+                              │  SessionRegistry  ◄── gates  │
+                              │  Surveys          ◄── hashes │
+                              │  CustomSBT        ◄── tokens │
+                              │  SBTFactory       ◄── deploy │
+                              └──────────┬───────────────────┘
+                                         │ ethers.js
+┌────────────────────┐          ┌────────┴─────────┐
+│     Arweave        │◄─────────┤   React SPA      │
+│                    │  upload   │   (client/)      │
+│  session metadata  │          │                  │
+│  survey payloads   │  read    │  Redux + hooks   │
+│  question content  │─────────▸│  managed cache   │
+│  SBT tokenURI     │          │  (IDB + LS fb)   │
+│  doc library       │          └──┬──────┬────────┘
+└────────────────────┘             │      │
+                                   │      │ fetch + auth token
+                          Lit SDK  │      │
+                    ┌──────────────┘      │
+                    ▼                     ▼
+          ┌─────────────────┐   ┌─────────────────────────┐
+          │  Lit Protocol   │   │  CORS Worker (CF)       │
+          │                 │   │  sessionCorsWorker      │
+          │  encrypt/decrypt│   │                         │
+          │  SBT-gated ACC  │   │  /auth/nonce + /login   │
+          └─────────────────┘   │  /ai  /transcribe       │
+                                │  /arweave/upload         │
+                                │  /admin/set-config      │
+                                │  request_test_eth        │
+                                │  fetch_url / fetch_image│
+                                │                         │
+                                │  KV: config + secrets   │
+                                └─────────────────────────┘
 ```
 
 Hosted & Fast needs a creator Cloudflare API token and one AI-provider key. Its
@@ -62,15 +75,13 @@ The corporate deployment roadmap remains in private planning until the public de
 
 ## Layer Descriptions
 
-| Layer | What it does | Profile role | Primary location |
-|-------|-------------|--------------|-----------------|
-| **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | Shared across implemented profiles | `client/src/` |
-| **Session Worker** | Auth, canonical config, AI proxy, transcription, storage/fetch routes, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
-| **Cloudflare storage** | Worker KV config, secrets, encrypted payload envelopes/indexes, and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
-| **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
-| **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
-| **Lit Protocol** | Client-side encrypt/decrypt with EVM access-control conditions | Optional when Lit encryption is selected | External SDK |
-| **Organization adapters** | IAM, key release/KMS, storage, AI, networking, and observability | Planned Company-Operated profile; not shipped | Future adapter boundary |
+| Layer | What it does | Primary location |
+|-------|-------------|-----------------|
+| **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | `client/src/` |
+| **CORS Worker** | Cloudflare Worker: SIWE auth, AI proxy, Arweave uploads, transcription, faucet, resource gating via on-chain gates | `workers/sessionCorsWorker/` |
+| **Contracts** | Solidity on any EVM chain: session registry (gates + metadata pointers), surveys (hash anchoring), SBTs (membership tokens), factory | `contracts/` |
+| **Arweave** | Immutable JSON storage: session metadata, survey/question payloads, SBT tokenURI, doc library files | N/A (external) |
+| **Lit Protocol** | Client-side encrypt/decrypt with SBT-gated access control conditions (ACC) | N/A (external SDK) |
 
 ## Data Flows
 

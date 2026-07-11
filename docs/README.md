@@ -4,7 +4,7 @@ Primary product and system specification:
 - `spec.md` (repo root)
 
 Canonical reference set:
-- root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `spec.md`
+- root docs: `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `spec.md`
 - the `docs/` reference docs listed below
 - `docs/architecture-overview.md` is the first-read architecture and verification
   map for new engineers and auditors
@@ -24,12 +24,14 @@ When you add or change a feature, update documentation in the same PR:
 
 ## Core Docs
 
-Code navigation maps:
-- `docs/ai-agent-bootstrap.md`: current AI-agent entry points and supported contracts.
-- `docs/MainSite.MAP.md`: app-shell route/runtime orchestration map.
-- `docs/SurveyTool.MAP.md`: survey/question runtime and encryption flow map.
-- `docs/SessionWizard.MAP.md`: session creation, worker deploy, and publish-flow map.
-- `docs/contractScripts.MAP.md`: web3 integration/navigation map for the `contractScripts` surface.
+Architecture and repository conventions:
+- `docs/architecture-overview.md`: first-read runtime, storage, contract, and verification map.
+- `docs/adr/0001-client-domain-boundaries.md`: client domain-boundary rules.
+- `docs/adr/0002-worker-auth-revalidation.md`: worker authentication revalidation policy.
+- `docs/adr/0003-storage-port-and-read-model.md`: storage port and read-model boundary.
+- `docs/adr/0004-worker-auth-consistency-risk-acceptance.md`: accepted worker consistency limits.
+- `docs/adr/0005-route-table-migration.md`: route-table migration decision.
+- `docs/repo-structure.md`: canonical source naming and placement rules.
 
 Session, gates, and the Worker:
 - `docs/session-creation-guide.md`: End-to-end setup guide for creating a session from `/new`, including the "what a new session needs" checklist, sponsored bundle handoff, worker deploy paths, on-chain registration, and `/admin` verification.
@@ -61,22 +63,19 @@ Local development:
 - `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`) plus the current manual-fork verification note.
 - `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.
 
-Release:
-- `docs/dependency-audit-hotspots.md`: dependency audit remediations, accepted residuals, and package-specific audit commands.
-- `docs/dependency-audit.md`: current client npm audit disposition ledger and blocked/deferred package-family decisions.
-- `docs/dead-code-disposition.md`: dead-file and named-export reachability dispositions plus the ratchet contract.
-- `docs/release-runbook.md`: operator release checklist, gates, public strip policy, worker bundle publishing, and rollback notes.
-- `docs/releasing.md`: Public-history replay, stripped artifact export, and release hygiene checks.
+Design and public presentation:
+- `docs/design-system.md`: shared visual and interaction conventions.
+- `docs/visual-identity.md`: public visual identity and asset guidance.
+- `docs/reference-links.md`: background references used by the project documentation.
 
 Wallets:
 - `docs/passkey-wallet.md`: passkey-unlocked EOA wallet wiring and deterministic test wallet workflow.
 - `docs/forking-wallet.md`: RP ID and wallet setup checklist for forks.
 - `docs/security-model.md`: embedded wallet and soft-session security model.
-- `docs/passkey-wallet-migration-audit.md`: Porto migration audit and remaining risks.
 
-E2E workflows:
-- `docs/e2e-setup.md`: End-to-end workflow scripts, chain runtime modes, and the current manual-fork workflow for repeated verification against live deployments.
-- `docs/e2e-testid-api.md`: Stable `data-testid` hooks used by Playwright runners (TestID API).
+Verification:
+- `docs/testing.md`: public test commands and supported local verification paths.
+- `docs/bundle-budget.md`: client bundle-size thresholds and remediation guidance.
 
 Public discovery:
 - `docs/discoverability.md`: Static crawl assets, live GitHub branch links, and the Google Search Console checklist.
