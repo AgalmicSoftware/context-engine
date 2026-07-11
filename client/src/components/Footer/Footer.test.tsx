@@ -44,6 +44,20 @@ describe('Footer', () => {
     expect(newLink).toHaveTextContent('NEW');
   });
 
+  it('renders POSTS immediately after ABOUT', () => {
+    const { container } = renderFooter();
+    const navItems = Array.from(container.querySelectorAll('nav li'));
+
+    expect(navItems.map((item) => item.textContent?.trim())).toEqual([
+      'NEW',
+      'ABOUT',
+      'POSTS',
+      'SETTINGS',
+      'CONTRACTS',
+    ]);
+    expect(screen.getByRole('link', { name: 'POSTS' })).toHaveAttribute('href', '/posts');
+  });
+
   it('renders internal links under the configured PUBLIC_URL base path', () => {
     const previousPublicUrl = process.env.PUBLIC_URL;
     process.env.PUBLIC_URL = '/ce';
@@ -52,6 +66,7 @@ describe('Footer', () => {
 
       expect(screen.getByRole('link', { name: 'NEW' })).toHaveAttribute('href', '/ce/new');
       expect(screen.getByRole('link', { name: 'ABOUT' })).toHaveAttribute('href', '/ce/about');
+      expect(screen.getByRole('link', { name: 'POSTS' })).toHaveAttribute('href', '/ce/posts');
       expect(screen.getByRole('link', { name: 'CONTRACTS' })).toHaveAttribute('href', '/ce/contracts');
       expect(screen.getByTestId('ce-footer-link-github')).toHaveAttribute(
         'href',
@@ -84,8 +99,8 @@ describe('Footer', () => {
   it('uses full-width readable footer nav links across the mobile breakpoints', () => {
     [
       { minWidth: 0, maxWidth: 319, columns: 2, fontSize: 'clamp\\(0\\.9rem, 5\\.4vw, 1\\.08rem\\)' },
-      { minWidth: 320, maxWidth: 465, columns: 4, fontSize: 'clamp\\(0\\.86rem, 3\\.05vw, 1\\.08rem\\)' },
-      { minWidth: 466, maxWidth: 768, columns: 4, fontSize: 'clamp\\(1rem, 2\\.4vw, 1\\.22rem\\)' },
+      { minWidth: 320, maxWidth: 465, columns: 3, fontSize: 'clamp\\(0\\.86rem, 3\\.05vw, 1\\.08rem\\)' },
+      { minWidth: 466, maxWidth: 768, columns: 3, fontSize: 'clamp\\(1rem, 2\\.4vw, 1\\.22rem\\)' },
     ].forEach(({ minWidth, maxWidth, columns, fontSize }) => {
       const breakpointRule = new RegExp(
         `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?\\.footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: grid;[\\s\\S]*?grid-template-columns: repeat\\(${columns}, minmax\\(0, 1fr\\)\\);[\\s\\S]*?justify-content: stretch;[\\s\\S]*?width: 100%;[\\s\\S]*?li \\{[\\s\\S]*?width: 100%;[\\s\\S]*?li \\.footerLink \\{[\\s\\S]*?display: flex;[\\s\\S]*?font-size: ${fontSize};[\\s\\S]*?justify-content: center;[\\s\\S]*?width: 100%;`,

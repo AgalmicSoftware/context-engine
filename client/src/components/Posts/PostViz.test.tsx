@@ -134,4 +134,37 @@ describe('PostViz presentation variants', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
     expect(screen.queryByText('Participants')).not.toBeInTheDocument();
   });
+
+  it('marks multi-select response panels for the expanded reading layout', () => {
+    render(
+      <PostViz
+        spec={{
+          type: 'response-type-grid',
+          title: 'Other response shapes',
+          inline: true,
+          presentation: 'precision',
+          panels: [
+            {
+              kind: 'Multi-select',
+              title: 'Which area would I delegate first?',
+              counts: [
+                { label: 'event filtering', value: 3, color: '#ffb347' },
+                { label: 'calendar scheduling', value: 2, color: '#7aa7ff' },
+              ],
+            },
+            {
+              kind: 'Freeform',
+              title: 'What is my personal AI fire alarm?',
+              quotes: [{ label: 'P1', text: 'A privacy-line crossing.' }],
+            },
+          ],
+        }}
+      />,
+    );
+
+    const multichoice = screen.getByRole('group', { name: 'Which area would I delegate first?' });
+    expect(multichoice).toHaveClass('responseTypeMultiSelectPanel');
+    expect(within(multichoice).getByText('event filtering')).toBeInTheDocument();
+    expect(within(multichoice).getByLabelText('event filtering: 3')).toBeInTheDocument();
+  });
 });

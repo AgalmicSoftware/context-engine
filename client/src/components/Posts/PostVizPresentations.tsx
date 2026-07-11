@@ -440,9 +440,10 @@ export const ResponseTypeGridPresentation = ({
     <PresentationHeader title={title} subtitle={subtitle} hidden={hideHeader} />
     <div className={`${styles.responseTypeGrid} ${precision ? styles.responseTypePrecisionGrid : ''}`}>
       {panels.map((panel) => {
+        const isMultiSelect = panel.kind.toLowerCase() === 'multi-select';
         const maxValue = Math.max(...panel.counts.map((count) => count.value), 1);
         const orderedCounts =
-          panel.kind.toLowerCase() === 'multi-select'
+          isMultiSelect
             ? [...panel.counts].sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
             : panel.counts;
         const displayAsNumbers = panel.display === 'numbers' || panel.display === 'metrics';
@@ -456,7 +457,9 @@ export const ResponseTypeGridPresentation = ({
         return (
           <article
             key={`${panel.kind}-${panel.title}`}
-            className={`${styles.responseTypePanel} ${precision ? styles.responseTypePrecisionPanel : ''}`}
+            className={`${styles.responseTypePanel} ${
+              isMultiSelect ? styles.responseTypeMultiSelectPanel : ''
+            } ${precision ? styles.responseTypePrecisionPanel : ''}`}
             role="group"
             aria-label={panel.title}
           >
